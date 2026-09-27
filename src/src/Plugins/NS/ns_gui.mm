@@ -823,6 +823,24 @@ ns_print_menu (NSMenu* m, int depth, int max_depth) {
     }
     fprintf (stderr, "NSMENU %s%s\n",
              as_charp (string (' ', 2 * depth)), as_charp (title));
+    // with TEXMACS_NS_SNAPSHOT, the images of the items (and of the tiles)
+    string dir= get_env ("TEXMACS_NS_SNAPSHOT");
+    if (dir != "") {
+      static int n= 0;
+      NSMutableArray* imgs= [NSMutableArray array];
+      if ([mi image]) [imgs addObject: [mi image]];
+      if ([[mi view] isKindOfClass: [NSMatrix class]])
+        for (NSCell* c in [(NSMatrix*) [mi view] cells])
+          if ([c image]) [imgs addObject: [c image]];
+      for (NSImage* im in imgs) {
+        if (n >= 400) break;
+        NSData* d= [[NSBitmapImageRep imageRepWithData: [im TIFFRepresentation]]
+                     representationUsingType: NSBitmapImageFileTypePNG
+                                  properties: [NSDictionary dictionary]];
+        [d writeToFile: to_nsstring (dir * "/item-" * as_string (n++) * ".png")
+            atomically: NO];
+      }
+    }
     if ([mi hasSubmenu]) ns_print_menu ([mi submenu], depth + 1, max_depth);
   }
 }

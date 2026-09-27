@@ -688,12 +688,29 @@ shortcut_text (NSString* key, NSEventModifierFlags mask) {
   return s;
 }
 
+static bool
+us_keyboard () {
+  // Whether the keyboard layout is the one of the United States: as in the
+  // Qt interface, the shortcuts are native key equivalents only then (the
+  // key equivalents of the other layouts are not the keys of TeXmacs)
+  static int us= -1;
+  if (us < 0) {
+    CFPropertyListRef v=
+      CFPreferencesCopyAppValue (CFSTR ("AppleCurrentKeyboardLayoutInputSourceID"),
+                                 CFSTR ("com.apple.HIToolbox"));
+    NSString* id= v? [(NSString*) v autorelease]: nil;
+    us= (!id || [id isEqualToString: @"com.apple.keylayout.US"] ||
+         [id isEqualToString: @"com.apple.keylayout.ABC"])? 1: 0;
+  }
+  return us == 1;
+}
+
 static void
 set_shortcut (NSMenuItem* mi, string ks) {
   if (N(ks) == 0) return;
   array<string> strokes= tokenize (ks, " ");
   NSString* key; NSEventModifierFlags mask;
-  if (N(strokes) == 1 && parse_shortcut (ks, key, mask)) {
+  if (N(strokes) == 1 && parse_shortcut (ks, key, mask) && us_keyboard ()) {
     [mi setKeyEquivalent: key];
     [mi setKeyEquivalentModifierMask: mask];
     return;
@@ -704,7 +721,8 @@ set_shortcut (NSMenuItem* mi, string ks) {
     if (!parse_shortcut (strokes[i], key, mask)) return;
     [parts addObject: shortcut_text (key, mask)];
   }
-  [mi setTitle: [NSString stringWithFormat: @"%@\t%@", [mi title],
+  // in the title, as in the Qt interface
+  [mi setTitle: [NSString stringWithFormat: @"%@ \u250A %@", [mi title],
                   [parts componentsJoinedByString: @" "]]];
 }
 
@@ -1262,7 +1280,21 @@ ns_glue_widget_rep::render () {
     NSRectFill (NSMakeRect (0, 0, s.width, s.height));
     [NSGraphicsContext restoreGraphicsState];
   }
-  // FIXME: patterns (non atomic colors)
+  else if (gc && !is_atomic (col)) {
+    // a pattern, drawn by the renderer (see qt_glue_widget_rep::render)
+    ns_renderer_rep ren ((int) s.width, (int) s.height);
+    ren.begin (gc);
+    ren.set_shrinking_factor (1);
+    rectangle r= rectangle (0, 0, (SI) s.width, (SI) s.height);
+    ren.set_origin (0, 0);
+    ren.encode (r->x1, r->y1);
+    ren.encode (r->x2, r->y2);
+    ren.set_clipping (r->x1, r->y2, r->x2, r->y1);
+    ren.set_shrinking_factor (std_shrinkf);
+    ren.set_background (col);
+    ren.clear_pattern (5*r->x1, 5*r->y2, 5*r->x2, 5*r->y1);
+    ren.end ();
+  }
   return im;
 }
 
