@@ -12,7 +12,7 @@
 #ifndef NS_GUI_H
 #define NS_GUI_H
 
-#include "mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 
 #include "ns_simple_widget.h"
 #include "tm_timer.hpp"

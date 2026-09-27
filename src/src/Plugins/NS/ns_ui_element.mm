@@ -8,7 +8,7 @@
  * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
  ******************************************************************************/
 
-#include "mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #import <objc/runtime.h>
 #include "ns_ui_element.h"
 #include "ns_menu.h"

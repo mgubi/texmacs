@@ -12,7 +12,7 @@
 #ifndef NS_UTILITIES_H
 #define NS_UTILITIES_H
 
-#include "mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include "message.hpp"
 
 typedef quartet<SI,SI,SI,SI> coord4;

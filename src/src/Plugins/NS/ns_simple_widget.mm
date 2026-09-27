@@ -14,7 +14,7 @@
 #include "hashset.hpp"
 #include "iterator.hpp"
 
-#include "mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include "ns_simple_widget.h"
 #include "ns_utilities.h"
 #include "ns_renderer.h"

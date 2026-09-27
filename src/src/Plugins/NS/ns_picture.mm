@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include "ns_picture.h"
 #include "analyze.hpp"
 #include "image_files.hpp"

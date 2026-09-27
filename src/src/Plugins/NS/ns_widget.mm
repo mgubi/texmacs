@@ -11,7 +11,7 @@
 
 #include "window.hpp"
 
-#include "mac_cocoa.h" 
+#include "MacOS/mac_cocoa.h" 
 #include "ns_utilities.h"
 #include "ns_widget.h"
 #include "ns_ui_element.h"

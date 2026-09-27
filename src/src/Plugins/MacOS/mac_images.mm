@@ -16,7 +16,7 @@
     || !defined(AC_QT_MAJOR_VERSION) || AC_QT_MAJOR_VERSION < 6
 
 #include "converter.hpp" // hack: remove as soon as possible
-#include "Cocoa/mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include "ApplicationServices/ApplicationServices.h"
 
 static NSString *
