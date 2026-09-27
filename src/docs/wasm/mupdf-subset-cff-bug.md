@@ -10,7 +10,10 @@ c=0x0" on CFF fonts whose stem hints are declared in subroutines (Fira
 Sans), and then no font of the document is subset.
 
 **Version:** MuPDF 1.28.5 (built from the source, and the `mutool`
-1.28.5 of Homebrew, macOS arm64). Not checked against master.
+1.28.5 of Homebrew, macOS arm64), and master at d587982f971e (2026-09-24,
+`mutool` 1.29.0): `execute_charstring` and `scan_charstrings` are the same
+there, save for the renaming of the usage lists (`fz_list`), and the
+reproduction below fails the same way.
 
 **Font:** Fira Sans Bold, `FiraSans-Bold.otf`, "Version 4.203;PS
 004.203;hotconv 1.0.88;makeotf.lib2.5.64775" (SIL OFL,
@@ -107,8 +110,10 @@ renderer does, with the stack, the stem count and the state of the caller:
   execute them on their own (they are executed within their callers, and
   alone they would still fail).
 
-With the patch attached (against 1.28.5), the reproduction above subsets
-the font with no error: 45 KB for `m` and 55 KB for the printable ASCII,
-instead of 224 KB, and `mutool draw` renders the subset correctly. So do
+The patch attached, made against 1.28.5, applies to master as it is. With
+it, on 1.28.5 and on master alike, the reproduction above subsets the font
+with no error: 45 KB for `m` and 55 KB for the printable ASCII of Fira Sans
+Bold instead of 224 KB, 54 KB instead of 215 KB for Fira Sans Regular, and
+`mutool draw` renders the subsets correctly. So do
 the documents of GNU TeXmacs set in Fira: the PDF of its Welcome document
 went from 740 KB, all fonts whole, to 566 KB, all fonts subset.
