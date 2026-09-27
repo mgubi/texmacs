@@ -23,7 +23,13 @@
     <item*|<menu|Mathematical font>>The font of formulas. Its entries are
     the traditional <TeXmacs> math fonts, and, at the end of the list, the
     <name|OpenType> math fonts which are installed on your system and which
-    <TeXmacs> knows how to use.
+    <TeXmacs> knows how to use. Formulas follow the mathematical companion of
+    the text font whenever it has one, so this setting counts with the
+    default text font, Roman, or with a text font which has no mathematics
+    of its own; the font button of the focus toolbar sets text and
+    mathematics together, and the section <hlink|<em|Mathematical
+    fonts>|../../main/math/fonts/man-math-fonts.en.tm> of the user manual
+    shows each pair.
 
     <item*|<menu|Program font>>The font of program sessions and of verbatim
     text.
