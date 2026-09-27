@@ -566,7 +566,7 @@ delete_renderer (renderer ren) {
   tm_delete (ren);
 }
 
-#if !(defined(QTTEXMACS) || defined(X11TEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS))
+#if !(defined(QTTEXMACS) || defined(X11TEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS) || defined(AQUATEXMACS))
 
 picture
 native_picture (int w, int h, int ox, int oy) {

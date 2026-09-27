@@ -60,7 +60,7 @@ AC_DEFUN([TM_GUI],[
       cocoa | aqua)
          AC_MSG_RESULT([enabling experimental Cocoa port])
          COCOA_CFLAGS=""
-         COCOA_LDFLAGS="-framework Cocoa"
+         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit"
          CONFIG_GUI="COCOA"
          ;;
       sdl) 
@@ -127,7 +127,7 @@ AC_DEFUN([TM_GUI],[
          AC_DEFINE(X11TEXMACS, 1, [Use standard X11 port])
          ;;
       COCOA)
-         CONFIG_COCOA="Cocoa"
+         CONFIG_COCOA="NS"
          CONFIG_GUI_DEFINE="AQUATEXMACS"
          AC_DEFINE(AQUATEXMACS, 1, [Enable experimental Cocoa port])
          ;;

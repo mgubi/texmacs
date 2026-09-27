@@ -491,7 +491,7 @@ get_preference (string var, string def) {
 * Delayed evaluation
 ******************************************************************************/
 
-#ifndef QTTEXMACS
+#if !defined(QTTEXMACS) && !defined(AQUATEXMACS)
 static array<object> delayed_queue;
 static array<time_t> start_queue;
 
@@ -536,7 +536,7 @@ clear_pending_commands () {
   delayed_queue= array<object> (0);
   start_queue  = array<time_t> (0);
 }
-#endif // QTTEXMACS
+#endif // !defined(QTTEXMACS) && !defined(AQUATEXMACS)
 
 /******************************************************************************
 * Protected evaluation

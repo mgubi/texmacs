@@ -19,7 +19,7 @@
 
 #undef FAILED // redefined by CARBON
 #define extend CARBON_extends // avoid name collision
-#include "Cocoa/mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include <Carbon/Carbon.h>
 #include <crt_externs.h>
 #include "HIDRemote.h"

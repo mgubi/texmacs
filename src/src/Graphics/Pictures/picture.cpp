@@ -314,7 +314,7 @@ load_xpm (url file_name) {
 #endif
   if (cache->contains (name)) return cache[name];
 
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
 
   picture pict= qt_load_xpm (file_name);
 

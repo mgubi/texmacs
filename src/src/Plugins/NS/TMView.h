@@ -1,7 +1,7 @@
 
 /******************************************************************************
-* MODULE     : aqua_dialogues.hpp
-* DESCRIPTION: Aqua dialogues widgets
+* MODULE     : TMView.h
+* DESCRIPTION: Main TeXmacs view
 * COPYRIGHT  : (C) 2007  Massimiliano Gubinelli
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -9,9 +9,16 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#ifndef AQUA_DIALOGUES_H
-#define AQUA_DIALOGUES_H
+#include "MacOS/mac_cocoa.h"
+#include "ns_simple_widget.h"
 
-#include "aqua_widget.h"
-
-#endif // defined AQUA_DIALOGUES_H
+@interface TMView : NSView  <NSTextInputClient>
+{
+	simple_widget_rep *wid;
+  NSString *workingText;
+  BOOL processingCompose;
+}
+- (void) setWidget: (widget_rep*) w;
+- (widget_rep*) widget;
+- (void) deleteWorkingText;
+@end
