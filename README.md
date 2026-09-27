@@ -1,6 +1,6 @@
 # TeXmacs Vue — GNU TeXmacs in the browser
 
-[![WebAssembly](https://github.com/mgubi/texmacs/actions/workflows/wasm.yml/badge.svg?branch=wip_wasm_vue)](https://github.com/mgubi/texmacs/actions/workflows/wasm.yml)
+[![WebAssembly](https://github.com/mgubi/texmacs/actions/workflows/wasm.yml/badge.svg?branch=vue_ci)](https://github.com/mgubi/texmacs/actions/workflows/wasm.yml)
 
 **Try it: <https://mgubi.github.io/texmacs/>** — an *experimental* port of
 [GNU TeXmacs](https://texmacs.org) 2.1.5 which runs in a web page (branch
@@ -24,10 +24,10 @@ you download it.
 * **First visit**: some 11 MB before it starts (the program, and the files
   it needs to boot), the rest in the background; a second visit loads
   nothing.
-* **Published** by the CI from the branch `gh-pages`: the pushes to
-  `wip_wasm_vue` are built and tested, and a state is published with
-  `git push origin wip_wasm_vue:gh-pages`. Each run of the CI also keeps
-  the page as an artifact (`texmacs-wasm-web`).
+* **Published** by the CI, which runs on the branch `vue_ci` only: the work
+  goes on in `wip_wasm_vue` without triggering it, and a state is built,
+  tested and published with `git push origin wip_wasm_vue:vue_ci`. Each run
+  also keeps the page as an artifact (`texmacs-wasm-web`).
 * **Build it**: see [`src/README.md`](src/README.md) and, for the design,
   the notes and the plan, [`src/docs/wasm/`](src/docs/wasm/README.md).
 

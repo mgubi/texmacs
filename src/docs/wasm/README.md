@@ -79,29 +79,30 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
 
 ## Building and running
 
-The CI of GitHub builds it at every push to `wip_wasm_vue`
-(`.github/workflows/wasm.yml`, at the top of the repository): Emscripten
-6.0.10 by `emsdk`, the slim MuPDF with its patches (cached), the page and
-the node build, a smoke test (the node build turns the Welcome document
-into a PDF), and the page as an artifact of the run (`texmacs-wasm-web`:
-unzip it and serve it with `node misc/wasm/serve.mjs <dir>`). With emsdk,
+The CI of GitHub (`.github/workflows/wasm.yml`, at the top of the
+repository) runs on the branch `vue_ci` only: the work goes on in
+`wip_wasm_vue`, which triggers nothing, and a state is built, tested and
+published by moving `vue_ci` to it,
+
+    git push origin wip_wasm_vue:vue_ci
+
+(or by hand, from the Actions tab). It builds with Emscripten 6.0.10
+(`emsdk`) the slim MuPDF with its patches (cached), the page and the node
+build, runs a smoke test (the node build turns the Welcome document into a
+PDF), keeps the page as an artifact of the run (`texmacs-wasm-web`: unzip
+it and serve it with `node misc/wasm/serve.mjs <dir>`), and publishes it at
+https://mgubi.github.io/texmacs/ (GitHub Pages, source "GitHub Actions";
+the environment `github-pages` allows the branch `vue_ci`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
 
-The job `pages` publishes the page at https://mgubi.github.io/texmacs/
-(GitHub Pages, source "GitHub Actions"), from the branch `gh-pages` only:
-the pushes to `wip_wasm_vue` are built and tested, and a state is
-published by moving `gh-pages` to it,
+Pages sends files as they are, without the brotli copies of `serve.mjs`:
+the build also writes gzip copies of `texmacs.wasm` and of the packages,
+which the page decompresses itself (`DecompressionStream`, in `progress.js`
+and `packages.js`), 6.2 MB for the program instead of 22.8; the packages
+stay as they are too, for the byte ranges of a file needed before its
+package. `index.html` is the page.
 
-    git push origin wip_wasm_vue:gh-pages
-
-(the environment `github-pages` allows that branch). `gh-pages` holds the
-sources, as `wip_wasm_vue`, not the built site: the site is the artifact of
-the run. Pages sends files as they are, without
-the brotli copies of `serve.mjs`: the build also writes gzip copies of
-`texmacs.wasm` and of the packages, which the page decompresses itself
-(`DecompressionStream`, in `progress.js` and `packages.js`), 6.2 MB for the
-program instead of 22.8; the packages stay as they are too, for the byte
-ranges of a file needed before its package. `index.html` is the page.
+Locally:
 
     . misc/wasm/emenv.sh build-wasm       # Emscripten (Python >= 3.10, config)
     sh misc/wasm/build-mupdf.sh           # MuPDF 1.28.5, the slim build

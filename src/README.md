@@ -4,9 +4,9 @@
 >
 > Work in progress: TeXmacs compiled to WebAssembly and running in a web
 > page, an experimental port called TeXmacs Vue, with OpenType fonts
-> (OpenType mathematics included). The page is published by the CI from the
-> branch `gh-pages`, which is moved to this one when a state is worth
-> showing: `git push origin wip_wasm_vue:gh-pages`. Nothing is installed and
+> (OpenType mathematics included). The CI runs on the branch `vue_ci` only,
+> which is moved to this one when a state is worth building and publishing:
+> `git push origin wip_wasm_vue:vue_ci`. Nothing is installed and
 > nothing leaves the browser unless it is downloaded.
 >
 > ![TeXmacs in the browser: tabs for the documents, the TeXmacs menu of the page](docs/wasm/texmacs-in-the-browser.png)

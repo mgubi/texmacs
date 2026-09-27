@@ -2,18 +2,20 @@
 # src/docs/wasm/README.md). Builds the slim MuPDF (cached), the page and the
 # node build, checks that the node build turns a document into a PDF, and
 # keeps the page (src/build-wasm/out/web) as an artifact of the run: unzip
-# it and serve it (node src/misc/wasm/serve.mjs <dir>). The branch gh-pages
-# publishes it on GitHub Pages (the job pages): the work on wip_wasm_vue is
-# built and tested, and published only when gh-pages is moved to it,
-#   git push origin wip_wasm_vue:gh-pages
+# it and serve it (node src/misc/wasm/serve.mjs <dir>), and publishes it on
+# GitHub Pages (the job pages).
+#
+# It runs on the branch vue_ci only: the work goes on in wip_wasm_vue, which
+# triggers nothing, and a state is built, tested and published by moving
+# vue_ci to it,
+#   git push origin wip_wasm_vue:vue_ci
+# (or by hand, from the Actions tab, on the branch vue_ci)
 
 name: WebAssembly
 
 on:
   push:
-    branches: [wip_wasm_vue, gh-pages]
-  pull_request:
-    branches: [wip_wasm_vue]
+    branches: [vue_ci]
   workflow_dispatch:
 
 env:
@@ -82,12 +84,12 @@ jobs:
           if-no-files-found: error
 
   # the page on GitHub Pages (https://<owner>.github.io/<repository>/), from
-  # the branch gh-pages only (see above): the brotli copies are left out
+  # the branch vue_ci only (see above): the brotli copies are left out
   # (Pages does not send them; the page takes the gzip copies, which it
   # decompresses itself)
   pages:
     needs: wasm
-    if: github.event_name == 'push' && github.ref == 'refs/heads/gh-pages'
+    if: github.ref == 'refs/heads/vue_ci'
     runs-on: ubuntu-latest
     permissions:
       pages: write
