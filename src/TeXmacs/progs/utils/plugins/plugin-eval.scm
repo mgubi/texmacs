@@ -92,7 +92,12 @@
 (define (plugin-start lan ses)
   (when (!= lan "scheme")
     (plugin-set-author lan ses)
-    (connection-start lan ses)))
+    (with r (connection-start lan ses)
+      ;; a program which cannot be started (in a browser there are no
+      ;; processes): its error, and the evaluations waiting are cancelled
+      (when (and (string? r) (string-starts? r "Error:"))
+        (connection-notify lan ses "error" (stree->tree `(document ,r)))
+        (connection-notify-status lan ses 0)))))
 
 (tm-define (plugin-write lan ses t mode)
   (ahash-set! plugin-started (list lan ses) (texmacs-time))
