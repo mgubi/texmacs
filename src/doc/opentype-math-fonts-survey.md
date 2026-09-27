@@ -371,38 +371,48 @@ detected from the cmap, no cap.
 
 ## 6. Shipping
 
-TeXmacs now ships these math families, besides the TeX Gyre text and math
+TeXmacs ships these math families, besides the TeX Gyre text and math
 fonts and STIX v1 which were already there (the branch also adds an
-unrelated text family, OpenDyslexic):
+unrelated text family, OpenDyslexic). The choice follows the fonts LaTeX
+users know: one entry of the font menu for each of the usual pdfLaTeX
+pairings (`lmodern`, `newtx`, `newpx`, `libertine`, `kpfonts`,
+`erewhon`, `XCharter`, `eulervm`, `concmath`, `stix2`) and Fira, Kp Sans
+and Computer Modern Sans for slides.
 
 | Directory | Fonts | Size | License |
 |---|---|---|---|
-| `TeXmacs/fonts/truetype/lm` | Latin Modern Math and the four 10 pt Latin Modern Roman text faces | 1.2 MB | GUST Font License |
+| `TeXmacs/fonts/truetype/lm` | Latin Modern Math, and the 10 pt Latin Modern Roman (four faces), Sans (four) and Mono (regular, italic) | 1.7 MB | GUST Font License |
 | `TeXmacs/fonts/truetype/newcm` | New Computer Modern Math regular and bold, and four NewCM10 text faces | 4.2 MB | GUST Font License |
 | `TeXmacs/fonts/truetype/stix2` | STIX Two Math and four STIX Two Text faces | 2.0 MB | SIL OFL 1.1 |
-| `TeXmacs/fonts/truetype/kp` | KpMath regular and bold, and four KpRoman text faces | 1.1 MB | SIL OFL 1.1 |
-| `TeXmacs/fonts/truetype/fira` | Fira Math, next to the Fira Sans and Fira Mono faces already shipped | 0.2 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/kp` | KpMath regular and bold, KpMath-Sans and SansBold, and four faces each of KpRoman, KpSans and KpMono, all version 0.66 | 2.1 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/fira` | Fira Math 0.3.4, next to the Fira Sans and Fira Mono faces already shipped | 0.2 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/libertinus` | Libertinus Math, Serif (four faces), Sans (three: there is no bold italic) and Mono | 2.6 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/erewhon` | Erewhon Math regular and bold, and four Erewhon faces | 1.5 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/xcharter` | XCharter Math regular and bold, and four XCharter faces | 1.0 MB | SIL OFL 1.1 (math), Bitstream Charter license (text) |
+| `TeXmacs/fonts/truetype/concrete` | Concrete Math regular and bold, and the four Concrete faces of CM Unicode | 1.5 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/euler` | Euler Math, set with TeX Gyre Pagella text | 0.4 MB | SIL OFL 1.1 |
 
 Each directory carries the license text and a `README.md` with the upstream
-address, the version and the copyright of every file. Together
-this is about 8.6 MB, which adds about two thirds to the TrueType font
-directory and a third to the whole font tree.
-
-The five families are registered in the shipped global font database
+address, the version and the copyright of every file. The families are
+registered in the shipped global font database
 (`TeXmacs/fonts/font-database.scm`, `font-features.scm`,
 `font-characteristics.scm`), so a new installation finds them with no disk
-scan: rendering the samples with an empty home directory and no
-`TEXMACS_FONT_PATH` gives the same result as with the fonts installed
-system-wide. Users with an existing local database get them when TeXmacs
-loads the global tables for a missing family, or after a rescan.
+scan. Users with an existing local database get them when TeXmacs loads the
+global tables for a missing family, or after a rescan.
 
 Only one weight and one optical size of each text family is shipped. A
 document typeset with the whole upstream family available can therefore
 differ slightly, as the extra optical sizes of Latin Modern and the Medium
-and SemiBold weights of STIX Two Text are then used instead.
+and SemiBold weights of STIX Two Text are then used instead. Upstream has
+released only the regular weight of Fira Math, so bold Fira mathematics is
+emulated, and Erewhon-Math-Bold names its family like the Erewhon text
+face, so bold Erewhon mathematics is emulated too.
 
 Everything else in the survey is picked up from the system or from TeX
 Live through `TEXMACS_FONT_PATH` and the font database; the profiles in
 `TeXmacs/progs/fonts/fonts-opentype.scm` activate when the files are
 found, and the font menus list exactly the profiled fonts that are
-installed.
+installed. New Computer Modern Sans Math is profiled for that reason and
+not shipped (2.6 MB with its text faces); XITS, Asana, IBM Plex, Garamond,
+Old Standard, GFS Neohellenic and Lete Sans are profiled and offered in a
+submenu when installed.

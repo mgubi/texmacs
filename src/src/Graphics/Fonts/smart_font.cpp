@@ -658,25 +658,54 @@ stix_fix (string family, string series, string shape) {
 
 // Profiled OpenType math fonts: in math shapes a text family is replaced
 // by its math companion when that font is installed, in text shapes a math
-// family by its text companion. Math sans serif and math typewriter are
-// served by the companions the profile declares, since a math font has no
-// sans or typewriter face of its own.
+// family by its text companion. Sans serif and typewriter, in text as in
+// math, are served by the companions the profile declares, since a math
+// font has no sans or typewriter face of its own and a text master often
+// has none either (Latin Modern Roman, TeX Gyre Pagella).
 // A math font TeXmacs knows by name may be installed and yet be absent
 // from the font database, which only holds what the shipped database
 // records and what a scan of the disk found: the math fonts of a TeX
 // distribution are the usual case. Selecting such a family would find no
 // font at all and fall back on the nearest text face by feature distance,
 // so add the file to the database of the home directory, once.
+// The text companion may be just as absent, as New Computer Modern Sans is
+// from a TeX distribution; a profile then names one of its files, and the
+// directory of that file, which holds the other faces, is added.
 static void
 register_profiled_font (string math_family) {
-  if (N (font_database_styles (math_family)) > 0) return;
-  string file= math_font_profile_attr (math_family, "file");
-  if (file == "") return;
-  url u= tt_font_find (file);
-  if (is_none (u)) return;
-  cout << "TeXmacs] registering " << math_family << ", the math font of "
-       << as_string (u) << "\n";
-  font_database_extend_local (u);
+  static hashset<string> done;
+  if (done->contains (math_family)) return;
+  done->insert (math_family);
+  if (N (font_database_styles (math_family)) == 0) {
+    string file= math_font_profile_attr (math_family, "file");
+    url u= (file == ""? url_none (): tt_font_find (file));
+    if (!is_none (u)) {
+      cout << "TeXmacs] registering " << math_family
+           << ", the math font of " << as_string (u) << "\n";
+      font_database_extend_local (u);
+    }
+  }
+  string text = math_font_profile_attr (math_family, "text");
+  string tfile= math_font_profile_attr (math_family, "text-file");
+  if (text != "" && tfile != "" && N (font_database_styles (text)) == 0) {
+    url u= tt_font_find (tfile);
+    if (!is_none (u)) {
+      cout << "TeXmacs] registering " << text << ", the text fonts of "
+           << as_string (head (u)) << "\n";
+      font_database_extend_local (head (u));
+    }
+  }
+}
+
+// The companion a profile declares for a sans serif or typewriter variant
+static string
+profile_variant_fix (string math_family, string variant, string item) {
+  string key= (variant == "ss"? string ("sans"):
+               (variant == "tt"? string ("mono"): string ("")));
+  if (key == "") return item;
+  string comp= math_font_profile_attr (math_family, key);
+  if (comp != "" && N (font_database_styles (comp)) > 0) return comp;
+  return item;
 }
 
 string
@@ -691,18 +720,13 @@ profile_fix (string family, string variant, string series, string shape) {
       // family has no text face of its own, as Concrete Math and Euler
       // Math have none
       register_profiled_font (item);
+      string m= math_family_for_text (item);
+      bool has_math=
+        m != "" && tt_font_exists (math_font_profile_attr (m, "file"));
+      if (has_math) register_profiled_font (m);
       if (starts (shape, "math")) {
-        string m= math_family_for_text (item);
-        if (m != "" && tt_font_exists (math_font_profile_attr (m, "file"))) {
-          register_profiled_font (m);
-          item= m;
-        }
-        string key= (variant == "ss"? string ("sans"):
-                     (variant == "tt"? string ("mono"): string ("")));
-        if (key != "") {
-          string comp= math_font_profile_attr (item, key);
-          if (comp != "" && N (font_database_styles (comp)) > 0) item= comp;
-        }
+        if (has_math) item= m;
+        item= profile_variant_fix (item, variant, item);
         // the font selection is driven by masters, and a profile names a
         // family when the two differ ("KpMath" belongs to "Kepler Math")
         string mst= font_database_master (item);
@@ -710,7 +734,10 @@ profile_fix (string family, string variant, string series, string shape) {
       }
       else {
         string t= text_family_for_math (item);
-        if (t != "" && t != item) item= t;
+        if (t != "" && t != item) {
+          item= profile_variant_fix (item, variant, t);
+        }
+        else if (has_math) item= profile_variant_fix (m, variant, item);
         string mst= font_database_master (item);
         if (mst != "") item= mst;
       }

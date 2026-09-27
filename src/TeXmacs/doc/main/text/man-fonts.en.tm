@@ -91,6 +91,12 @@
   fonts may be replaced by closest matches when opening your document under a
   different operating system.
 
+  Formulas are set in the mathematical font which goes with the main font
+  of the document. The section <hlink|<em|Mathematical
+  fonts>|../math/fonts/man-math-fonts.en.tm> explains how, shows every
+  mathematical font which comes with <TeXmacs> with a sample, and lists the
+  ones you may install.
+
   The chapter <hlink|<em|Fonts, from selection to
   glyph>|../../devel/fonts/fonts.en.tm> of the reference guide explains what
   happens behind this dialog: which variables a font selection sets, how a
