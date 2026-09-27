@@ -301,7 +301,11 @@ void ns_tm_widget_rep::layout()
 {
   // From top to bottom: the icon bars, the left tools, the canvas and the
   // side tools, the bottom and extra tools, and the footer
-  NSSize fs = NSMakeSize (100, 20); // size of the right footer
+  // the footer: the messages centered vertically, with some padding
+  CGFloat pad= 10.0;
+  CGFloat text_h= [[leftField cell] cellSize].height;
+  CGFloat right_w= max ((CGFloat) 100.0, [[rightField cell] cellSize].width + 4);
+  NSSize fs = NSMakeSize (right_w, 26); // size of the right footer
   NSRect r = [view bounds];
   // NOTE: the header contains the rows of icons, which are shown or hidden
   // one by one (see updateVisibility)
@@ -339,9 +343,11 @@ void ns_tm_widget_rep::layout()
   [tool_handles[1] setHidden: !show[1]];
   [tool_views[2] setFrame: NSMakeRect (0, foot_h + extra_h, r.size.width, bot_h)];
   [tool_views[3] setFrame: NSMakeRect (0, foot_h, r.size.width, extra_h)];
-  [leftField setFrame: NSMakeRect (0, 0, r.size.width - fs.width, foot_h)];
-  [rightField setFrame: NSMakeRect (r.size.width - fs.width, 0,
-                                    fs.width, foot_h)];
+  CGFloat ty= max ((CGFloat) 0.0, floor ((foot_h - text_h) / 2));
+  [leftField setFrame: NSMakeRect (pad, ty, r.size.width - fs.width - 2*pad,
+                                   min (text_h, foot_h))];
+  [rightField setFrame: NSMakeRect (r.size.width - fs.width - pad, ty,
+                                    fs.width, min (text_h, foot_h))];
   [leftField setHidden: foot_h == 0 || prompt_view];
   [rightField setHidden: foot_h == 0 || prompt_view];
   if (prompt_view) [prompt_view setFrame: NSMakeRect (0, 0, r.size.width, foot_h)];
@@ -498,6 +504,9 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
       check_type<string> (val, s);
       string msg = open_box<string> (val);
       [rightField setStringValue:to_nsstring_utf8 (tm_var_encode (msg))];
+      // the field takes the width of its text
+      CGFloat need= max ((CGFloat) 100.0, [[rightField cell] cellSize].width + 4);
+      if (fabs (need - [rightField frame].size.width) > 0.5) layout ();
       [rightField displayIfNeeded];
     }
     break;
