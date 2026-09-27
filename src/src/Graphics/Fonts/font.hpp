@@ -309,6 +309,11 @@ void above_adjust_bbb (hashmap<string,double>& t, double force);
 int  get_spacing_id (tree spacing_desc);
 tree get_spacing_desc (int spacing_id);
 
+// Font debugging tools (debug switch "fonts")
+bool virtual_font_constructs (font fn, string s);
+bool virtual_font_draws_vectors (font fn, string s);
+tree smart_font_debug_info (font fn, string s, int pos);
+
 // Profiles of named OpenType math fonts (math_font_profiles.cpp)
 void          math_font_profile_set (string family, tree profile);
 tree          math_font_profile (string family);

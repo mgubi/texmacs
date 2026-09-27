@@ -84,6 +84,8 @@ public:
 
   void show_tree ();
   void show_box ();
+  tree font_debug_info (bool at_mouse);
+  tree font_debug_report ();
   void show_env ();
   void show_path ();
   void show_cursor ();

@@ -3600,6 +3600,28 @@ tmg_show_box () {
 }
 
 tmscm
+tmg_font_debug_info (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "font-debug-info");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->font_debug_info (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_report () {
+  // TMSCM_DEFER_INTS;
+  tree out= get_current_editor()->font_debug_report ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_show_env () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->show_env ();
@@ -3972,6 +3994,8 @@ initialize_glue_editor () {
   tmscm_install_procedure ("update-menus",  tmg_update_menus, 0, 0, 0);
   tmscm_install_procedure ("show-tree",  tmg_show_tree, 0, 0, 0);
   tmscm_install_procedure ("show-box",  tmg_show_box, 0, 0, 0);
+  tmscm_install_procedure ("font-debug-info",  tmg_font_debug_info, 1, 0, 0);
+  tmscm_install_procedure ("font-debug-report",  tmg_font_debug_report, 0, 0, 0);
   tmscm_install_procedure ("show-env",  tmg_show_env, 0, 0, 0);
   tmscm_install_procedure ("show-path",  tmg_show_path, 0, 0, 0);
   tmscm_install_procedure ("show-cursor",  tmg_show_cursor, 0, 0, 0);

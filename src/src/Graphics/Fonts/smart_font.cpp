@@ -17,6 +17,7 @@
 #include "translator.hpp"
 #include "iterator.hpp"
 #include "analyze.hpp" // contains
+#include "colors.hpp"
 
 bool virtually_defined (string c, string name);
 font smart_font_bis (string f, string v, string s, string sh, int sz,
@@ -802,6 +803,7 @@ struct smart_font_rep: font_rep {
 
   array<font> fn;
   smart_map   sm;
+  array<int>  origins; // debug switch "fonts": where each subfont comes from
 
   smart_font_rep (string name, font base_fn, font err_fn,
                   string family, string variant,
@@ -833,6 +835,9 @@ struct smart_font_rep: font_rep {
   void   get_xpositions (string s, SI* xpos, SI xk);
   void   draw_fixed (renderer ren, string s, SI x, SI y);
   void   draw_fixed (renderer ren, string s, SI x, SI y, SI xk);
+  int    debug_origin (int nr);
+  void   debug_draw (renderer ren, int nr, string r, SI x, SI y, SI xk);
+  tree   debug_info (string s, int pos);
   font   magnify (double zoomx, double zoomy);
   void   advance_glyph (string s, int& pos, bool ligf);
   glyph  get_glyph (string s);
@@ -1775,13 +1780,15 @@ smart_font_rep::get_xpositions (string s, SI* xpos, SI xk) {
 void
 smart_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
   int i=0, n= N(s);
+  bool dbg= DEBUG_FONTS;
   while (i < n) {
     int nr;
     string r= s;
     metric ey;
     advance (s, i, r, nr);
     if (nr >= 0) {
-      fn[nr]->draw_fixed (ren, r, x, y);
+      if (dbg) debug_draw (ren, nr, r, x, y, 0);
+      else fn[nr]->draw_fixed (ren, r, x, y);
       if (i < n) {
 	fn[nr]->get_extents (r, ey);
 	x += ey->x2;
@@ -1793,19 +1800,175 @@ smart_font_rep::draw_fixed (renderer ren, string s, SI x, SI y) {
 void
 smart_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, SI xk) {
   int i=0, n= N(s);
+  bool dbg= DEBUG_FONTS;
   while (i < n) {
     int nr;
     string r= s;
     metric ey;
     advance (s, i, r, nr);
     if (nr >= 0) {
-      fn[nr]->draw_fixed (ren, r, x, y, xk);
+      if (dbg) debug_draw (ren, nr, r, x, y, xk);
+      else fn[nr]->draw_fixed (ren, r, x, y, xk);
       if (i < n) {
 	fn[nr]->get_extents (r, ey, xk);
 	x += ey->x2;
       }
     }
   }
+}
+
+/******************************************************************************
+* Font debugging (debug switch "fonts")
+*
+* Nothing here is reached while the switch is off: drawing tests the switch
+* once per string, and the origin of a subfont is worked out, from the
+* specification the resolver recorded for it, only when it is first drawn
+* in debug mode. Metrics, routing and the font caches are untouched, so
+* turning the switch on or off needs a repaint, not a new typesetting.
+******************************************************************************/
+
+enum { ORIGIN_FONT, ORIGIN_RULE, ORIGIN_FALLBACK, ORIGIN_EMULATED,
+       ORIGIN_ERROR };
+
+static string
+origin_name (int o) {
+  switch (o) {
+  case ORIGIN_RULE: return "rule";
+  case ORIGIN_FALLBACK: return "fallback";
+  case ORIGIN_EMULATED: return "emulated";
+  case ORIGIN_ERROR: return "error";
+  default: return "font";
+  }
+}
+
+int
+smart_font_rep::debug_origin (int nr) {
+  if (nr < N(origins) && origins[nr] >= 0) return origins[nr];
+  while (N(origins) <= nr) origins << -1;
+  tree spec= sm->fn_spec[nr];
+  string kind= (is_tuple (spec) && N(spec) > 0 && is_atomic (spec[0]))?
+               spec[0]->label: string ("");
+  string rn= (nr < N(fn) && !is_nil (fn[nr]))? fn[nr]->res_name: string ("");
+  int o= ORIGIN_FONT;
+  if (kind == "error") o= ORIGIN_ERROR;
+  else if (kind == "virtual" || kind == "emulate" || kind == "emu-bracket" ||
+           starts (kind, "poor-") || occurs ("#virtual-", rn))
+    o= ORIGIN_EMULATED;
+  else if (kind == "other") o= ORIGIN_FALLBACK;
+  else if (kind == "subfont") o= ORIGIN_RULE;
+  else if (N(spec) == 5 && is_atomic (spec[4]))
+    o= (spec[4]->label == "1")? ORIGIN_RULE: ORIGIN_FALLBACK;
+  origins[nr]= o;
+  return o;
+}
+
+static void
+draw_in_origin_colour (renderer ren, font f, string r, SI x, SI y, SI xk,
+                       int o) {
+  if (o == ORIGIN_FONT || o == ORIGIN_ERROR) {
+    // the requested font is drawn as it is, and the error font is red
+    f->draw_fixed (ren, r, x, y, xk);
+    return;
+  }
+  color c= (o == ORIGIN_RULE)? rgb_color (0, 90, 200):
+           (o == ORIGIN_FALLBACK)? rgb_color (225, 110, 0):
+           rgb_color (0, 150, 60);
+  pencil old= ren->get_pencil ();
+  ren->set_pencil (pencil (c, old->get_width ()));
+  f->draw_fixed (ren, r, x, y, xk);
+  ren->set_pencil (old);
+}
+
+void
+smart_font_rep::debug_draw (renderer ren, int nr, string r,
+                            SI x, SI y, SI xk) {
+  font f= fn[nr];
+  int  o= debug_origin (nr);
+  if (o == ORIGIN_FONT && occurs ("#enhance-", f->res_name)) {
+    // a font extended by constructions of a virtual font: the characters
+    // it lacks are emulated, glyph by glyph
+    int i= 0;
+    while (i < N(r)) {
+      int j= i;
+      tm_char_forwards (r, j);
+      string c= r (i, j);
+      int oc= virtual_font_constructs (f, c)? ORIGIN_EMULATED: ORIGIN_FONT;
+      draw_in_origin_colour (ren, f, c, x, y, xk, oc);
+      metric ey;
+      f->get_extents (c, ey, xk);
+      x += ey->x2;
+      i= j;
+    }
+    return;
+  }
+  draw_in_origin_colour (ren, f, r, x, y, xk, o);
+}
+
+// What the smart font does with the character at pos in s, read from its
+// routing tables without resolving anything: a character not yet routed is
+// reported as such, and inspecting leaves no trace in the caches
+tree
+smart_font_rep::debug_info (string s, int pos) {
+  if (pos < 0 || pos >= N(s)) return tuple ();
+  int end= pos;
+  if (s[pos] == '<') tm_char_forwards (s, end); else end= pos + 1;
+  string c= s (pos, end);
+  int nr= -1;
+  if (N(c) == 1) {
+    int ch= (int) (unsigned char) c[0];
+    nr= sm->chv[ch];
+    if (math_kind != 0 && math_kind != 2 && is_alpha (ch) &&
+        (pos == 0 || !is_alpha (s[pos-1])) &&
+        (end == N(s) || !is_alpha (s[end])))
+      nr= italic_nr;
+  }
+  else nr= sm->cht[c];
+  tree r (TUPLE);
+  r << tuple ("char", c) << tuple ("font", res_name)
+    << tuple ("family", family) << tuple ("variant", variant)
+    << tuple ("series", series) << tuple ("shape", shape);
+  if (nr < 0) {
+    r << tuple ("origin", "unresolved");
+    return r;
+  }
+  r << tuple ("subfont", as_string (nr));
+  if (nr < N(sm->fn_spec)) r << tuple ("spec", sm->fn_spec[nr]);
+  if (nr < N(fn) && !is_nil (fn[nr])) {
+    font f= fn[nr];
+    int  o= debug_origin (nr);
+    if (o == ORIGIN_FONT && occurs ("#enhance-", f->res_name) &&
+        virtual_font_constructs (f, c))
+      o= ORIGIN_EMULATED;
+    r << tuple ("origin", origin_name (o));
+    r << tuple ("subfont-name", f->res_name);
+    string mt= (f->math_type == MATH_TYPE_OPENTYPE)? string ("OpenType"):
+               (f->math_type == MATH_TYPE_TEX_GYRE)? string ("TeX Gyre, hand tuned"):
+               (f->math_type == MATH_TYPE_STIX)? string ("STIX, hand tuned"):
+               string ("traditional");
+    r << tuple ("math-type", mt);
+    r << tuple ("opentype-math", f->ot_math? string ("yes"): string ("no"));
+    string rc= c;
+    if (sm->fn_rewr[nr] != REWRITE_NONE) {
+      rc= rewrite (c, sm->fn_rewr[nr]);
+      r << tuple ("rewritten", rc);
+    }
+    if (o == ORIGIN_EMULATED && occurs ("#", f->res_name))
+      r << tuple ("pdf", virtual_font_draws_vectors (f, rc)?
+                         string ("vector"): string ("bitmap"));
+  }
+  else r << tuple ("origin", "not loaded");
+  return r;
+}
+
+tree
+smart_font_debug_info (font fn, string s, int pos) {
+  smart_font_rep* sf= dynamic_cast<smart_font_rep*> (fn.rep);
+  if (sf == NULL) {
+    tree r (TUPLE);
+    r << tuple ("font", fn->res_name) << tuple ("origin", "not a smart font");
+    return r;
+  }
+  return sf->debug_info (s, pos);
 }
 
 font
