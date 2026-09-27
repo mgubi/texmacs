@@ -86,6 +86,7 @@ public:
   // this needs to be accesible from TMView
   NSBitmapImageRep*       backingPixmap;
   NSPoint                 cursor_pos;  //!< for the input methods
+  void follow_visible_part ();  //!< the canvas follows the scrolling
 
 protected:
   
@@ -94,7 +95,6 @@ protected:
   NSPoint                 backing_pos;
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
-  void follow_visible_part ();
   void invalidate_all ();
   bool is_invalid ();
   void repaint_invalid_regions ();

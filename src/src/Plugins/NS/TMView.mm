@@ -17,6 +17,7 @@
 #include "ns_utilities.h"
 #include "ns_renderer.h"
 #include "ns_gui.h"
+#include "scheme.hpp"
 
 //extern bool ns_update_flag;
 //extern int time_credit;
@@ -434,6 +435,33 @@ mouse_decode (unsigned int mstate) {
     string s = "move";
     the_gui -> process_mouse (wid, s, pt.x1, pt.x2, mstate, texmacs_time ());
   }
+}
+
++ (BOOL) isCompatibleWithResponsiveScrolling { return NO; }
+
+- (void) scrollWheel: (NSEvent *) event
+{
+  // As QTMWidget::wheelEvent: the wheel is sent to TeXmacs when it wants it,
+  // command zooms, and otherwise the scroll view scrolls
+  if (!wid) { [super scrollWheel: event]; return; }
+  if (as_bool (call ("wheel-capture?"))) {
+    NSPoint point = [[self superview] convertPoint: [event locationInWindow] fromView: nil];
+    coord2 pt = from_nspoint (point);
+    coord2 wh = from_nspoint (NSMakePoint ([event scrollingDeltaX],
+                                           [event scrollingDeltaY]));
+    array<double> data;
+    data << ((double) wh.x1) << ((double) wh.x2);
+    the_gui->process_mouse (wid, "wheel", pt.x1, pt.x2,
+                            mouse_state (event, false), texmacs_time (), data);
+  }
+  else if ([event modifierFlags] & NSEventModifierFlagCommand) {
+    double dy= [event scrollingDeltaY];
+    if (dy == 0) return;
+    double f= sqrt (sqrt (sqrt (sqrt ([event hasPreciseScrollingDeltas]?
+                                      fabs (dy): 2.0))));
+    call (dy > 0? "zoom-in": "zoom-out", object (f));
+  }
+  else [super scrollWheel: event];
 }
 
 - (BOOL) isFlipped

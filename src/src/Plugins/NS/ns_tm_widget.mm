@@ -32,6 +32,31 @@ NSString *TMButtonsIdentifier = @"TMButtonsIdentifier";
 
 @interface TMToolbarItem : NSToolbarItem
 @end
+NSColor* to_nscolor (color col);
+
+/******************************************************************************
+* TMClipView: the document is centered when it is smaller than the window
+******************************************************************************/
+
+@interface TMClipView : NSClipView
+@end
+
+@implementation TMClipView
+- (NSRect) constrainBoundsRect: (NSRect) r
+{
+  r= [super constrainBoundsRect: r];
+  NSView* d= [self documentView];
+  if (d) {
+    NSRect f= [d frame];
+    if (r.size.width > f.size.width)
+      r.origin.x= floor ((f.size.width - r.size.width) / 2);
+    if (r.size.height > f.size.height)
+      r.origin.y= floor ((f.size.height - r.size.height) / 2);
+  }
+  return r;
+}
+@end
+
 @implementation TMToolbarItem
 - (void)validate
 {
@@ -126,8 +151,11 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   [sv setHasVerticalScroller:YES];
   [sv setHasHorizontalScroller:YES];
   [sv setBorderType:NSNoBorder];
-  //  [sv setBackgroundColor:[NSColor redColor]];
-  [sv setBackgroundColor:[NSColor grayColor]];
+  // NOTE: the document is centered when it is smaller than the window, on
+  // the background color of TeXmacs (as QTMScrollView)
+  [sv setContentView: [[[TMClipView alloc] init] autorelease]];
+  [sv setDrawsBackground: YES];
+  [sv setBackgroundColor: to_nscolor (tm_background)];
   [sv setDocumentView:[[[NSView alloc] initWithFrame: NSMakeRect(0,0,100,100)] autorelease]];
   [view addSubview:sv];
   

@@ -26,11 +26,54 @@
  the visible part only, as the canvas of the Qt interface: its backing store
  has the size of the visible part, which scales to long documents. */
 @interface TMDocView : NSView
+{
+@public
+  ns_simple_widget_rep* wid;
+}
+- (void) scrolled: (NSNotification*) n;
 @end
 
 @implementation TMDocView
 - (BOOL) isFlipped { return YES; }
 - (BOOL) isOpaque { return YES; }
+// NOTE: TeXmacs draws synchronously, like the Qt interface
++ (BOOL) isCompatibleWithResponsiveScrolling { return NO; }
+
+- (void) viewDidMoveToSuperview
+{
+  // Follow the scrolling and the resizing of the clip view (see
+  // QTMWidget::scrollContentsBy)
+  [[NSNotificationCenter defaultCenter] removeObserver: self];
+  NSView* clip= [self superview];
+  if ([clip isKindOfClass: [NSClipView class]]) {
+    [clip setPostsBoundsChangedNotifications: YES];
+    [clip setPostsFrameChangedNotifications: YES];
+    [[NSNotificationCenter defaultCenter]
+      addObserver: self selector: @selector(scrolled:)
+             name: NSViewBoundsDidChangeNotification object: clip];
+    [[NSNotificationCenter defaultCenter]
+      addObserver: self selector: @selector(scrolled:)
+             name: NSViewFrameDidChangeNotification object: clip];
+  }
+}
+
+- (void) dealloc
+{
+  [[NSNotificationCenter defaultCenter] removeObserver: self];
+  [super dealloc];
+}
+
+- (void) scrolled: (NSNotification*) n
+{
+  // The canvas moves to the visible part, and TeXmacs updates at once so
+  // that the canvas is repainted before it is displayed
+  // NOTE: not while the window is being built (there may be no editor yet)
+  (void) n;
+  if (!wid) return;
+  wid->follow_visible_part ();
+  if (wid->backingPixmap && [NSApp isRunning] && [self window])
+    the_gui->force_update ();
+}
 @end
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
@@ -43,7 +86,10 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     [(TMView*) view setWidget: NULL];
     [view release];
   }
-  if (doc) [doc release];
+  if (doc) {
+    ((TMDocView*) doc)->wid= NULL;
+    [doc release];
+  }
 }
 
 void
@@ -65,6 +111,7 @@ ns_simple_widget_rep::as_nsview () {
   handle_get_size_hint (width, height);
   NSSize sz = to_nssize (coord2 (width, height));
   doc= [[TMDocView alloc] initWithFrame: NSMakeRect (0, 0, sz.width, sz.height)];
+  ((TMDocView*) doc)->wid= this;
   TMView* v= [[TMView alloc] initWithFrame: NSMakeRect (0, 0, sz.width, sz.height)];
   [v setWidget: this];
   [doc addSubview: v];
@@ -227,13 +274,7 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       check_type<coord4>(val, s);
       coord4 p = open_box<coord4> (val);
       NSRect rect = to_nsrect (p);
-      // NOTE: the canvas fills at least the visible part of the scroll view
-      NSScrollView* sv= [doc enclosingScrollView];
-      if (sv) {
-        NSSize ws= [sv contentSize];
-        rect.size.width = max (rect.size.width , ws.width );
-        rect.size.height= max (rect.size.height, ws.height);
-      }
+      // NOTE: the scroll view centers the document when it is smaller
       [doc setFrameSize: rect.size];
       follow_visible_part ();
     }

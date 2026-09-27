@@ -674,6 +674,70 @@ ns_print_menu (NSMenu* m, int depth, int max_depth) {
 }
 @end
 
+// NOTE: when the environment variable TEXMACS_NS_SCROLL is set, the document
+// view of the key window is scrolled by this number of points (in steps of
+// 40 points) after three seconds
+
+static NSScrollView*
+find_document_scroll_view (NSView* v) {
+  if ([v isKindOfClass: [NSScrollView class]] &&
+      [NSStringFromClass ([[(NSScrollView*) v documentView] class])
+        isEqualToString: @"TMDocView"])
+    return (NSScrollView*) v;
+  for (NSView* w in [v subviews]) {
+    NSScrollView* r= find_document_scroll_view (w);
+    if (r) return r;
+  }
+  return nil;
+}
+
+@interface TMScrollHelper : NSObject
+{
+  int remaining;
+}
+- (void) step: (NSTimer*) timer;
+@end
+
+@implementation TMScrollHelper
+- (void) step: (NSTimer*) timer
+{
+  if (remaining == 0) remaining= as_int (get_env ("TEXMACS_NS_SCROLL"));
+  NSScrollView* sv= nil;
+  for (NSWindow* win in [NSApp orderedWindows])
+    if (!sv) sv= find_document_scroll_view ([win contentView]);
+  if (!sv) {
+    fprintf (stderr, "TEXMACS_NS_SCROLL no document\n");
+    [timer invalidate];
+    return;
+  }
+  int d= remaining > 0? min (remaining, 40): max (remaining, -40);
+  NSClipView* clip= [sv contentView];
+  NSPoint p= [clip bounds].origin;
+  p.y += d;
+  [clip scrollToPoint: [clip constrainBoundsRect:
+                         NSMakeRect (p.x, p.y, [clip bounds].size.width,
+                                     [clip bounds].size.height)].origin];
+  [sv reflectScrolledClipView: clip];
+  remaining -= d;
+  static int step= 0;
+  string dir= get_env ("TEXMACS_NS_SNAPSHOT");
+  if (dir != "") {
+    // NOTE: the window after each step, to check the synchronous repainting
+    NSView* v= [[[sv window] contentView] superview];
+    NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
+    [v cacheDisplayInRect: [v bounds] toBitmapImageRep: rep];
+    NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
+                                    properties: [NSDictionary dictionary]];
+    string name= dir * "/scroll-" * as_string (step++) * ".png";
+    [data writeToFile: to_nsstring (name) atomically: NO];
+  }
+  if (remaining == 0) {
+    fprintf (stderr, "TEXMACS_NS_SCROLL done at %g\n", [clip bounds].origin.y);
+    [timer invalidate];
+  }
+}
+@end
+
 // NOTE: when the environment variable TEXMACS_NS_PRESS is set, the button
 // or the tab with this label is pressed after four seconds
 
@@ -722,6 +786,14 @@ ns_gui_rep::event_loop () {
     // must be the key window, otherwise the editor loses its focus
     [NSApp activateIgnoringOtherApps: YES];
     [[[NSApp windows] firstObject] makeKeyAndOrderFront: nil];
+  }
+  if (get_env ("TEXMACS_NS_SCROLL") != "") {
+    TMScrollHelper* h= [[TMScrollHelper alloc] init];
+    NSTimer* t= [NSTimer timerWithTimeInterval: 0.05 target: h
+                                      selector: @selector(step:)
+                                      userInfo: nil repeats: YES];
+    [t setFireDate: [NSDate dateWithTimeIntervalSinceNow: 3.0]];
+    [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
   if (get_env ("TEXMACS_NS_PRESS") != "") {
     // NOTE: also in modal dialogs
