@@ -24,6 +24,7 @@
 //                        wait <ms> | shot <name> | click <x> <y> |
 //                        move <x> <y> | type <text> | key <name> |
 //                        wheel <x> <y> <dx> <dy> | drag <x1> <y1> <x2> <y2> |
+//                        down <x> <y> | up (a button held over moves) |
 //                        upload <x> <y> <file> (the click opens the file
 //                        input of the page, which is given the file) |
 //                        uploadto <selector> <file> (to a file input) |
@@ -112,6 +113,11 @@ if (script) {
       await page.mouse.move (Number (a[0]), Number (a[1]));
       await page.mouse.wheel ({ deltaX: Number (a[2]), deltaY: Number (a[3]) });
     }
+    else if (cmd === 'down') {
+      await page.mouse.move (Number (a[0]), Number (a[1]));
+      await page.mouse.down ();
+    }
+    else if (cmd === 'up') await page.mouse.up ();
     else if (cmd === 'drag') {
       await page.mouse.move (Number (a[0]), Number (a[1]));
       await page.mouse.down ();

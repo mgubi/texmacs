@@ -126,3 +126,14 @@ bool vue_clay_transitions_active (void) {
       return true;
   return false;
 }
+
+// the smallest size the contents of an element of the last layout can take
+// (Clay's own measure: the fixed sizes, the longest words of the texts,
+// the minimum sizes, the paddings and the gaps); 0 x 0 when there is no
+// such element (see vue_plain_window_widget_rep::post_layout)
+Clay_Dimensions vue_clay_min_dimensions (Clay_ElementId id) {
+  Clay_LayoutElementHashMapItem* item= Clay__GetHashMapItem (id.id);
+  if (item == NULL || item->layoutElement == NULL)
+    return (Clay_Dimensions) { 0, 0 };
+  return item->layoutElement->minDimensions;
+}
