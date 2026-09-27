@@ -145,6 +145,9 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   [view addSubview:rightField];
   
   bc = [[TMButtonsController alloc] init];
+  // NOTE: the icon bars are shown above the canvas, as in the Qt interface
+  [[bc bar] setAutoresizingMask: NSViewWidthSizable | NSViewMinYMargin];
+  [view addSubview: [bc bar]];
   //NSView *mt = [bc bar];
   //[mt setFrame:r0];
   //[mt setAutoresizingMask:NSViewMaxXMargin|NSViewMinYMargin];
@@ -176,23 +179,22 @@ ns_tm_widget_rep::~ns_tm_widget_rep()
 
 void ns_tm_widget_rep::layout()
 {
-  NSSize s = NSMakeSize(100,20); // size of the right footer;
+  // From top to bottom: the icon bars, the canvas and the footer
+  NSSize fs = NSMakeSize (100, 20); // size of the right footer
   NSRect r = [view bounds];
-  NSRect r0 = r;
-  //	NSRect rh = [[bc bar] frame];
-  NSRect rh = NSMakeRect(0,0,0,0);
-  r.size.height -= rh.size.height;
-  r0.origin.y =+ r.size.height; r0.size.height = rh.size.height;
-  NSRect r1 = r; r1.origin.y += s.height; r1.size.height -= s.height;
-  NSRect r2 = r; r2.size.height = s.height;
-  NSRect r3 = r2; 
-  r2.size.width -= s.width; r3.origin.x =+ r2.size.width;
-  r3.size.width -= r2.size.width + 15.0;
-  [sv setFrame:r1];
-  [leftField setFrame:r2];
-  [rightField setFrame:r3];
-  //[[bc bar] setFrame:r0];
-  [NSApp setWindowsNeedUpdate:YES];
+  CGFloat bar_h = (visibility[1] || visibility[2] || visibility[3] ||
+                   visibility[4])? [[bc bar] frame].size.height: 0;
+  CGFloat foot_h= visibility[5]? fs.height: 0;
+  [[bc bar] setFrame: NSMakeRect (0, r.size.height - bar_h,
+                                  r.size.width, bar_h)];
+  [[bc bar] setHidden: bar_h == 0];
+  [sv setFrame: NSMakeRect (0, foot_h, r.size.width,
+                            r.size.height - bar_h - foot_h)];
+  [leftField setFrame: NSMakeRect (0, 0, r.size.width - fs.width, foot_h)];
+  [rightField setFrame: NSMakeRect (r.size.width - fs.width, 0,
+                                    fs.width, foot_h)];
+  [leftField setHidden: foot_h == 0];
+  [rightField setHidden: foot_h == 0];
 }
 
 
@@ -210,16 +212,8 @@ visibility_index (slot s) {
 
 void ns_tm_widget_rep::updateVisibility()
 {
-  //FIXME: this implementation is from the Qt port. to be adapted.
-#if 0
-  mainToolBar->setVisible (visibility[1] && visibility[0]);
-  contextToolBar->setVisible (visibility[2] && visibility[0]);
-  userToolBar->setVisible (visibility[4] && visibility[0]);
-  tm_mainwindow()->statusBar()->setVisible (visibility[5]);
-#ifndef Q_WS_MAC
-  tm_mainwindow()->menuBar()->setVisible (visibility[0]);
-#endif
-#endif
+  // FIXME: the rows of icons are shown or hidden together
+  layout ();
 }
 
 
@@ -517,7 +511,6 @@ ns_tm_widget_rep::plain_window_widget (string s, command q) {
   widget w = ns_widget_rep::plain_window_widget (s, q);
   // to manage correctly retain counts
   ns_window_widget_rep * wid = (ns_window_widget_rep *)(w.rep);
-  [[wid->get_windowcontroller() window] setToolbar:toolbar];
   return wid;
 }
 

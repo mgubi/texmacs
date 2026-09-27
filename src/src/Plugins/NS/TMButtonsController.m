@@ -87,11 +87,19 @@
           {
             mi = [segs objectAtIndex:j];
             [sc setEnabled:YES forSegment:j];
-            [sc setImage:[mi representedObject] forSegment:j];
             [sc setMenu:[mi submenu] forSegment:j];
             [mi setMenu:nil];
-            [sc setLabel:nil forSegment:j];
-            [sc setWidth:25.0 forSegment:j];
+            if ([mi representedObject]) {
+              [sc setImage:[mi representedObject] forSegment:j];
+              [sc setLabel:nil forSegment:j];
+              [sc setWidth:25.0 forSegment:j];
+            }
+            else {
+              // NOTE: buttons with a text instead of an icon (focus bar)
+              [sc setImage:nil forSegment:j];
+              [sc setLabel:[mi title] forSegment:j];
+              [sc setWidth:0.0 forSegment:j];
+            }
             [(NSSegmentedCell*)[sc cell] setToolTip:[mi toolTip] forSegment:j];
             
           }

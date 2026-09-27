@@ -74,9 +74,37 @@ as_native_picture (picture pict) {
 
 NSBitmapImageRep*
 xpm_image (url file_name) {
-  picture p= load_xpm (file_name);
-  ns_picture_rep* rep= (ns_picture_rep*) p->get_handle ();
-  return rep->pict;
+  // As in qt_load_xpm, the PNG equivalents of the icons are used (at double
+  // resolution on retina screens); the size of the image is in points
+  static hashmap<string,pointer> cache (NULL);
+  string key= as_string (file_name);
+  if (cache->contains (key)) return (NSBitmapImageRep*) cache[key];
+  string sss;
+  double f= 1.0;
+  if (retina_icons > 1 && suffix (file_name) == "xpm") {
+    url png_equiv= glue (unglue (file_name, 4), "_x2.png");
+    load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
+    if (sss != "") f= 2.0;
+  }
+  if (sss == "" && suffix (file_name) == "xpm") {
+    url png_equiv= glue (unglue (file_name, 3), "png");
+    load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
+  }
+  NSBitmapImageRep* im= nil;
+  if (sss != "") {
+    c_string buf (sss);
+    NSData* data= [NSData dataWithBytes: (char*) buf length: N(sss)];
+    im= [[NSBitmapImageRep alloc] initWithData: data];
+    if (im) [im setSize: NSMakeSize ([im pixelsWide] / f, [im pixelsHigh] / f)];
+  }
+  if (!im) {
+    // FIXME: the conversion of the XPM pictures loses the transparency
+    picture p= load_xpm (file_name);
+    ns_picture_rep* rep= (ns_picture_rep*) p->get_handle ();
+    im= [rep->pict retain];
+  }
+  cache (key)= (pointer) im;
+  return im;
 }
 
 picture

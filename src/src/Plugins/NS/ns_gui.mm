@@ -648,6 +648,12 @@ void
 ns_gui_rep::event_loop () {
   [NSApp finishLaunching];
   need_update ();
+  if (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_SNAPSHOT") != "") {
+    // NOTE: when testing, TeXmacs is started in the background; the window
+    // must be the key window, otherwise the editor loses its focus
+    [NSApp activateIgnoringOtherApps: YES];
+    [[[NSApp windows] firstObject] makeKeyAndOrderFront: nil];
+  }
   if (get_env ("TEXMACS_NS_MENUS") != "") {
     TMMenuPrinter* h= [[TMMenuPrinter alloc] init];
     [NSTimer scheduledTimerWithTimeInterval: 3.0 target: h

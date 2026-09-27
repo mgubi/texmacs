@@ -442,6 +442,7 @@ ns_simple_widget_rep::impress () {
 
 void
 ns_simple_widget_rep::invalidate_rect (int x1, int y1, int x2, int y2) {
+  if (x1 >= x2 || y1 >= y2) return;
   rectangle r = rectangle (x1, y1, x2, y2);
   // cout << "invalidating " << r << LF;
   invalid_regions = invalid_regions | rectangles (r);
@@ -560,11 +561,12 @@ ns_simple_widget_rep::repaint_invalid_regions () {
   // << backingPixmap.height() << LF;
   // update backing store size
   {
-    NSSize _oldSize = [backingPixmap size];
+    // NOTE: sizes in pixels, rounded as the pixels of the backing store
+    NSSize _oldSize = NSMakeSize ([backingPixmap pixelsWide],
+                                  [backingPixmap pixelsHigh]);
     NSSize _new_logical_Size = [view frame].size;
-    NSSize _newSize = _new_logical_Size;
-    _newSize.width *= retina_factor;
-    _newSize.height *= retina_factor;
+    NSSize _newSize = NSMakeSize (ceil (_new_logical_Size.width * retina_factor),
+                                  ceil (_new_logical_Size.height * retina_factor));
 
     //cout << "      surface size of " << _newSize.width() << " x "
     // << _newSize.height() << LF;
@@ -587,12 +589,12 @@ ns_simple_widget_rep::repaint_invalid_regions () {
       [NSGraphicsContext saveGraphicsState];
       [NSGraphicsContext setCurrentContext: gc];
       [backingPixmap drawAtPoint: NSMakePoint (0, 0)];
-      if (_newSize.width >= _oldSize.width) {
+      if (_newSize.width > _oldSize.width) {
         invalidate_rect (_oldSize.width, 0, _newSize.width, _newSize.height);
         [[NSColor colorWithWhite:0.5 alpha:1.0] drawSwatchInRect:
           NSMakeRect (_oldSize.width, 0, _newSize.width-_oldSize.width, _newSize.height)];
       }
-      if (_newSize.height >= _oldSize.height) {
+      if (_newSize.height > _oldSize.height) {
         invalidate_rect (0,_oldSize.height, _newSize.width, _newSize.height);
         [[NSColor colorWithWhite:0.5 alpha:1.0] drawSwatchInRect: NSMakeRect (0,_oldSize.height, _newSize.width, _newSize.height-_oldSize.height)];
       }

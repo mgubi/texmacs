@@ -25,11 +25,15 @@ at the right scale on Retina screens), and **documents can be edited**:
 typing (including return and backspace) and clicking to move the cursor
 work. The TeXmacs menus are in the menu bar (after an application menu
 created in the code, since there is no MainMenu.nib outside a bundle), and
-all of them, with their submenus, can be built. The toolbars are not visible
-yet.
+all of them, with their submenus, can be built. The icon bars are shown
+above the canvas (with the PNG icons, at double resolution on Retina
+screens), and the footer shows the messages of TeXmacs.
 
 Testing aids (other programs are not allowed to capture or control the
 windows):
+* with `TEXMACS_NS_SNAPSHOT` or `TEXMACS_NS_TYPE`, TeXmacs activates itself
+  and its window becomes the key window (otherwise, started in the
+  background, the editor does not keep the focus);
 * `TEXMACS_NS_SNAPSHOT=<dir>`: the windows are saved as
   `<dir>/window-<i>.png` every 3 seconds;
 * `TEXMACS_NS_TYPE=<text>`: after 2 seconds, the text is sent as key events
@@ -70,8 +74,8 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 
 ### Known gaps (FIXME in the code)
 
-* toolbars not visible; the view is redrawn at each update even without
-  changes;
+* the rows of icons are shown or hidden together; the side tools (left,
+  right, bottom, extra) are not shown;
 * the backing store has the size of the whole document (the Qt interface
   uses a canvas of the size of the visible part, which scales to long
   documents);
