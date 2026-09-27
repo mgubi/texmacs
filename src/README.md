@@ -43,8 +43,13 @@
 >   kept when a copy is pasted back. On a Mac the shortcuts are Cmd+..., as
 >   the browser's.
 >
+> * **The TeXmacs server**: the Remote menu logs in to a TeXmacs server over
+>   WebSocket (the servers of this branch serve WebSocket clients on their
+>   usual port), for remote files and shared documents.
+>
 > Not there yet: plugins and external converters (no processes in a page),
-> resizing the dialogs.
+> `wss` for servers elsewhere than on the same machine, resizing the
+> dialogs.
 >
 > Build and try it (Emscripten, tested with 6.0; Python ≥ 3.10; Node):
 >

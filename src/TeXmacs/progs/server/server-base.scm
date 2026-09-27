@@ -816,7 +816,7 @@
     (server-log-write `notice
       (format #f
           "user ~A: ~A failed logins, ~A last failure, suspended: ~A\n"
-          uid n (strftime "%c" (localtime t)) (server-user-suspended? uid)))
+          uid n (pretty-date t "iso8601") (server-user-suspended? uid)))
     (and (not (server-user-deleted? uid))
          (not (server-user-suspended? uid))
 	 (or (< n (server-get-failed-login-limit))

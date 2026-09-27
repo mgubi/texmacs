@@ -284,7 +284,7 @@ deps_incl = $(call incl_flags,System System/Boot System/Classes System/Files \
   Kernel/Containers Kernel/Types Data/Convert \
   Data/Document Data/Drd Data/History Data/Parser \
   Data/Observers Data/Document Data/String Data/Tmfs Data/Tree Graphics \
-  Plugins Plugins/Pdf/LibAesgm Plugins/$(QT_PLUGIN_DIR) \
+  Plugins Plugins/Pdf/LibAesgm Plugins/$(QT_PLUGIN_DIR) Plugins/Gnutls \
   Style/Environment Style/Evaluate Style/Memorizer \
   Typeset Edit Texmacs Texmacs/Data Scheme Graphics/Bitmap_fonts \
   Graphics/Colors Graphics/Fonts \

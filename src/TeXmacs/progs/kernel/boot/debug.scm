@@ -48,7 +48,23 @@
   (let* ((header (format #f "[~S]:" key))
          (msg (call-with-output-string
                 (lambda (p)
-                  (if (>= (length args) 3)
+                  (cond
+                   ((and (>= (length args) 3) (not (defined? 'display-error)))
+                    ;; S7 has no display-error: the message of the error
+                    ;; (subr message args [rest]), formatted with its args
+                    (let ((subr (car args)) (message (cadr args))
+                          (margs (caddr args)))
+                      (when (string? subr) (display subr p) (display ": " p))
+                      (display
+                       (catch #t
+                         (lambda ()
+                           (if (and (string? message) (list? margs))
+                               (apply format #f message margs)
+                               message))
+                         (lambda err message))
+                       p)
+                      (newline p)))
+                   ((>= (length args) 3)
                     (display-error #f
                                    p
                                    (car args)
@@ -56,8 +72,8 @@
                                    (caddr args)
                                    (if (= (length args) 4)
                                      (cadddr args)
-                                     '()))
-                    (begin
+                                     '())))
+                   (else
                       (display "uncaught throw " p)
                       (display ": " p)
                       (display args p)

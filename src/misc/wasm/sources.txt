@@ -14,12 +14,11 @@ Data/Convert/Scheme/to_scheme.cpp
 Data/Convert/Tex/conservative_fromtex.cpp
 Data/Convert/Tex/conservative_totex.cpp
 Data/Convert/Tex/fromcls.cpp
-Data/Convert/Tex/fromtex_post.cpp
 Data/Convert/Tex/fromtex.cpp
+Data/Convert/Tex/fromtex_post.cpp
 Data/Convert/Tex/inittex.cpp
 Data/Convert/Tex/latex_recover.cpp
 Data/Convert/Tex/latex_tools.cpp
-Data/Convert/Tex/metadata_post.cpp
 Data/Convert/Tex/metadata-acm.cpp
 Data/Convert/Tex/metadata-ams.cpp
 Data/Convert/Tex/metadata-elsevier.cpp
@@ -27,6 +26,7 @@ Data/Convert/Tex/metadata-ieee.cpp
 Data/Convert/Tex/metadata-revtex.cpp
 Data/Convert/Tex/metadata-springer.cpp
 Data/Convert/Tex/metadata.cpp
+Data/Convert/Tex/metadata_post.cpp
 Data/Convert/Tex/parsetex.cpp
 Data/Convert/Tex/tracked_fromtex.cpp
 Data/Convert/Tex/tracked_totex.cpp
@@ -107,6 +107,7 @@ Edit/Replace/edit_search.cpp
 Edit/Replace/edit_select.cpp
 Edit/Replace/edit_spell.cpp
 Graphics/Bitmap_fonts/bitmap_font.cpp
+Graphics/Bitmap_fonts/glyph.cpp
 Graphics/Bitmap_fonts/glyph_analyze.cpp
 Graphics/Bitmap_fonts/glyph_distorted.cpp
 Graphics/Bitmap_fonts/glyph_effected.cpp
@@ -114,13 +115,13 @@ Graphics/Bitmap_fonts/glyph_ops.cpp
 Graphics/Bitmap_fonts/glyph_shrink.cpp
 Graphics/Bitmap_fonts/glyph_transforms.cpp
 Graphics/Bitmap_fonts/glyph_unserif.cpp
-Graphics/Bitmap_fonts/glyph.cpp
 Graphics/Colors/colors.cpp
 Graphics/Colors/true_color.cpp
 Graphics/Fonts/charmap.cpp
 Graphics/Fonts/compound_font.cpp
 Graphics/Fonts/feature_font.cpp
 Graphics/Fonts/find_font.cpp
+Graphics/Fonts/font.cpp
 Graphics/Fonts/font_database.cpp
 Graphics/Fonts/font_guess.cpp
 Graphics/Fonts/font_protrusion.cpp
@@ -129,9 +130,8 @@ Graphics/Fonts/font_select.cpp
 Graphics/Fonts/font_spacing.cpp
 Graphics/Fonts/font_translate.cpp
 Graphics/Fonts/font_wide.cpp
-Graphics/Fonts/font.cpp
-Graphics/Fonts/math_font_profiles.cpp
 Graphics/Fonts/math_font.cpp
+Graphics/Fonts/math_font_profiles.cpp
 Graphics/Fonts/poor_bbb.cpp
 Graphics/Fonts/poor_bold.cpp
 Graphics/Fonts/poor_distorted.cpp
@@ -169,8 +169,8 @@ Graphics/Renderer/renderer.cpp
 Graphics/Spacial/enlightened.cpp
 Graphics/Spacial/transformed.cpp
 Graphics/Spacial/triangulated.cpp
-Graphics/Types/curve_extras.cpp
 Graphics/Types/curve.cpp
+Graphics/Types/curve_extras.cpp
 Graphics/Types/equations.cpp
 Graphics/Types/frame.cpp
 Graphics/Types/grid.cpp
@@ -181,8 +181,8 @@ Kernel/Abstractions/observer.cpp
 Kernel/Abstractions/player.cpp
 Kernel/Containers/array.cpp
 Kernel/Containers/hashfunc.cpp
-Kernel/Containers/hashmap_extra.cpp
 Kernel/Containers/hashmap.cpp
+Kernel/Containers/hashmap_extra.cpp
 Kernel/Containers/hashset.cpp
 Kernel/Containers/hashtree.cpp
 Kernel/Containers/iterator.cpp
@@ -195,10 +195,10 @@ Kernel/Types/rectangles.cpp
 Kernel/Types/space.cpp
 Kernel/Types/string.cpp
 Kernel/Types/tab.cpp
-Kernel/Types/tree_label.cpp
 Kernel/Types/tree.cpp
-Plugins/Bibtex/bibtex_functions.cpp
+Kernel/Types/tree_label.cpp
 Plugins/Bibtex/bibtex.cpp
+Plugins/Bibtex/bibtex_functions.cpp
 Plugins/Cairo/cairo_renderer.cpp
 Plugins/Cairo/tm_cairo.cpp
 Plugins/Database/database.cpp
@@ -229,8 +229,8 @@ Plugins/Ghostscript/ghostscript.cpp
 Plugins/Ghostscript/gs_utilities.cpp
 Plugins/Gnutls/gnutls.cpp
 Plugins/Imlib2/imlib2.cpp
-Plugins/Ispell/ispell_exe.cpp
 Plugins/Ispell/ispell.cpp
+Plugins/Ispell/ispell_exe.cpp
 Plugins/LaTeX_Preview/latex_preview.cpp
 Plugins/Metafont/adjust_cmr.cpp
 Plugins/Metafont/load_pk.cpp
@@ -259,8 +259,8 @@ Plugins/Updater/tm_winsparkle.cpp
 Plugins/Vue/clay.c
 Plugins/Vue/vue_gui.cpp
 Plugins/Vue/vue_widget.cpp
-Scheme/S7/s7_tm.cpp
 Scheme/S7/s7.c
+Scheme/S7/s7_tm.cpp
 Scheme/Scheme/glue.cpp
 Scheme/Scheme/object.cpp
 System/Boot/init_texmacs.cpp
@@ -302,6 +302,7 @@ System/Link/texmacs_client.cpp
 System/Link/texmacs_server.cpp
 System/Link/tm_link.cpp
 System/Link/tm_sockets.cpp
+System/Link/websocket_contact.cpp
 System/Misc/data_cache.cpp
 System/Misc/fakedlopen.c
 System/Misc/fast_alloc.cpp
@@ -340,6 +341,7 @@ Typeset/Boxes/Modifier/art_boxes.cpp
 Typeset/Boxes/Modifier/change_boxes.cpp
 Typeset/Boxes/Modifier/highlight_boxes.cpp
 Typeset/Boxes/Modifier/modifier_boxes.cpp
+Typeset/Bridge/bridge.cpp
 Typeset/Bridge/bridge_argument.cpp
 Typeset/Bridge/bridge_auto.cpp
 Typeset/Bridge/bridge_compound.cpp
@@ -356,7 +358,6 @@ Typeset/Bridge/bridge_mark.cpp
 Typeset/Bridge/bridge_rewrite.cpp
 Typeset/Bridge/bridge_surround.cpp
 Typeset/Bridge/bridge_with.cpp
-Typeset/Bridge/bridge.cpp
 Typeset/Bridge/typesetter.cpp
 Typeset/Concat/concat_active.cpp
 Typeset/Concat/concat_animate.cpp
@@ -368,13 +369,13 @@ Typeset/Concat/concat_math.cpp
 Typeset/Concat/concat_post.cpp
 Typeset/Concat/concat_text.cpp
 Typeset/Concat/concater.cpp
+Typeset/Env/env.cpp
 Typeset/Env/env_animate.cpp
 Typeset/Env/env_default.cpp
 Typeset/Env/env_exec.cpp
 Typeset/Env/env_inactive.cpp
 Typeset/Env/env_length.cpp
 Typeset/Env/env_semantics.cpp
-Typeset/Env/env.cpp
 Typeset/Format/format.cpp
 Typeset/Format/formatter.cpp
 Typeset/Format/line_item.cpp

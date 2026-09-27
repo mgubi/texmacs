@@ -3214,6 +3214,15 @@ vue_web_drop_files (float x, float y, const char* paths) {
 static vue_virtual_window_rep* find_tab_of (widget w);
 static void activate_tab (vue_virtual_window_rep* v);
 
+// a Scheme command from the page (its tests, and its console:
+// _vue_web_scheme (stringToUTF8OnStack ("(...)")) under withStackSave),
+// run by the loop as the delayed commands are
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_scheme (const char* cmd) {
+  exec_delayed (scheme_cmd (utf8_to_cork (string (cmd))));
+  gui_needs_update= true;
+}
+
 // a document of the page is shown in its tab if it has one, else opened in
 // a new one (a new window of TeXmacs)
 extern "C" EMSCRIPTEN_KEEPALIVE void

@@ -24,6 +24,7 @@
 #include "boot.hpp"
 #include "server_log.hpp"
 #include "gnutls.hpp"
+#include "websocket_contact.hpp"
 #include "tm_timer.hpp"
 #include <cctype>
 
@@ -257,6 +258,14 @@ int try_connect (const char* host, const char* port, int timeout,
       CLOSE (s);
       continue;
     }
+#endif
+#ifdef __EMSCRIPTEN__
+    // in the browser a socket is a WebSocket, which opens once the page
+    // has the hand again: no waiting here (it would never open). What is
+    // written before is queued, and the link waits for the socket to be
+    // writable, which it is once open
+    FREEADDRINFO (result);
+    return s;
 #endif
     socks[n]= s;
     pfds[n].fd= s;
@@ -575,6 +584,11 @@ socket_link_rep::data_set_ready (int s) {
   }
   DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
     << socket_id << ", s= " << s);
+  // a contact may hold data of its own (decoded from WebSocket frames, or
+  // TLS records) beyond what one call gives: read until it has no more,
+  // since the socket will not say it is readable for those
+  bool got= false;
+  for (int round= 0; round < 256; round++) {
   char data[16384];
   int n= receive (contact, (void*) data, 16384);
   DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
@@ -617,9 +631,13 @@ socket_link_rep::data_set_ready (int s) {
           << N(s));
       }
     }
-    if (!is_nil (feed_cmd))
-      feed_cmd->apply ();
+    got= true;
+    continue;
   }
+  break; // nothing more (or the end, or an error)
+  }
+  if (got && !is_nil (feed_cmd))
+    feed_cmd->apply ();
 }
 
 void
@@ -883,9 +901,18 @@ socket_server_rep::connection (int s) {
     authentications << _anonymous;
 
   bool is_tls_server = get_preference ("tls-server") == string ("on");
-  tm_contact contact= is_tls_server ?
+  tm_contact inner= is_tls_server ?
     make_tls_server_contact (authentications) :
     make_socket_server_contact (authentications);
+  // the clients in a browser come as WebSockets (websocket_contact.cpp),
+  // the others through the inner contact
+  string ws_mode= get_preference ("server websocket", "local");
+  if (ws_mode == "default") ws_mode= "local";
+  bool local= starts (address, "127.") || address == "[::1]" ||
+              starts (address, "[::ffff:127.");
+  tm_contact contact= inner;
+  if (ws_mode != "off")
+    contact= make_websocket_server_contact (inner, ws_mode, local);
 
   if (!contact.rep) {
     SLOGE ("contact creation failed from " * string_from_socket_address (&cltadd)

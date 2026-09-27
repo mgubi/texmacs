@@ -28,7 +28,8 @@ with a precise collector.
 | several windows (dialogs, tools, menus, tooltips) | one canvas |
 | the loop owns the thread (`gui_start_loop`) | control goes back to the browser every frame |
 | files anywhere, `$HOME/.TeXmacs` | a virtual file system; persistence in IndexedDB; the user's files through upload/download |
-| plugins as processes (pipes), sockets, `system ()` | none: no fork, no pipes, no sockets |
+| plugins as processes (pipes), `system ()` | none: no fork, no pipes |
+| TCP sockets (the TeXmacs server and its clients) | WebSockets only: a client, not a server |
 | system file dialogs (SDL) | the browser's file input |
 | the system clipboard, synchronously | the async Clipboard API (text), only on a user gesture |
 | threads (SDL file dialog callbacks) | none unless SharedArrayBuffer and COOP/COEP headers |
@@ -51,6 +52,7 @@ MuPDF writer) in about 4 s, boot included.
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
 | clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac) | paste from the menus sees the last paste or copy only |
+| remote (TeXmacs server) | client over WebSocket: login, remote files, directories; the servers serve WebSocket clients | `wss` (TLS for the WebSocket); a connection which fails is reported as aborted |
 
 ## Windows and the frame of the page
 
@@ -167,6 +169,58 @@ it to about 90 KB; the rest is its pictures, kept lossless (Flate), where
 the desktop build writes them as JPEG. The desktop build links the MuPDF of
 Homebrew, which has the same bug: a document in Fira gets its fonts whole
 there.
+
+## The TeXmacs server, from the browser
+
+The collaborative tools (the Remote menu: remote files and directories,
+shared documents, chat) talk to a TeXmacs server over TCP, on port 6561,
+with TLS (GnuTLS) within the connection. A page has no TCP: Emscripten
+makes the sockets of the program WebSockets (`connect` to host:port opens
+`ws://host:port/`, subprotocol `binary`), so the page is a client of any
+server which speaks WebSocket on its port -- a TeXmacs server of this
+branch does.
+
+- **Server** (`src/System/Link/websocket_contact.cpp`): the contact of a
+  new client looks at its first bytes; `GET ` opens the handshake of a
+  WebSocket (the key through SHA-1 and base64, the subprotocol `binary`
+  echoed), and the data goes in binary frames (masked by the client,
+  control frames answered). Any other client gets the contact of before
+  (TLS or plain, preference `tls-server`), unchanged. A WebSocket client
+  has no TLS of its own within the WebSocket: the connection is encrypted
+  by `wss`, or local. The preference `server websocket` says which are
+  served: `local` (the default: the clients of the same machine), `on`
+  (any: behind a proxy which does the TLS of `wss`), `off`. The same in
+  the Qt port (`Plugins/Qt/QTMSockets.cpp`). The link now reads its
+  contact until it has no more data (`data_set_ready`): a WebSocket frame
+  (or a TLS record) may hold more than one read, and the socket does not
+  say it is readable again for those.
+- **Client** (the page): `try_connect` does not wait for the connection
+  (the WebSocket opens only when the page has the hand again; what is
+  written before is queued), and a login "Password via TLS" goes through a
+  plain contact (`tls_client_start`): accounts need nothing new.
+- **S7** (on which the desktop builds of this branch run, as the page):
+  the server logged a failed login with Guile's `strftime`, and formatted
+  its errors with Guile's `display-error` (`format-err`): both fixed.
+
+Tests (`misc/wasm/remote/`): `server.scm` makes a test server (admin /
+secret123, TLS with a self-signed certificate) of a desktop build,
+
+    TEXMACS_HOME_PATH=<a copy of ~/.TeXmacs> TeXmacs/bin/texmacs.bin \
+      -headless -server -x '(load "misc/wasm/remote/server.scm")'
+
+`client.mjs` logs in over WebSocket from node; `tls-client.scm` from a
+desktop client over TCP and TLS (with `-tls-no-verify`: `TM_ARGS` of the
+test runner of Vue); `browser-home.txt` and `browser-create.txt`, scripts
+of `browser-run.mjs`, from the page: the login, the home directory, a
+remote file created and opened (`_vue_web_scheme` runs a Scheme command
+of the page). Checked on 2026-09-27: all of them, a WebSocket client from
+another address refused with `local` and served with `on`, none with
+`off`; the desktop Vue and the Qt (compiled) ports.
+
+Next: `wss`. A page served over https can open `wss://` only, with a
+certificate the browser trusts: the TeXmacs server doing TLS itself for
+its WebSocket clients (GnuTLS, a real certificate), or behind a proxy
+(Caddy, nginx) with `server websocket` on.
 
 ## The files of TeXmacs in the page
 
