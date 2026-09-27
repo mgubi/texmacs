@@ -216,4 +216,9 @@ public:
 
 extern widget the_keyboard_focus;
 
+#ifdef MAC_COCOA_H
+CGFloat main_screen_height ();
+widget ns_window_widget_of (NSWindow* win);
+#endif
+
 #endif // defined NS_WIDGET_H

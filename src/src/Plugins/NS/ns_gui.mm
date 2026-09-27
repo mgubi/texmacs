@@ -574,13 +574,15 @@ ns_snapshot (string dir) {
     [v performSelector: @selector(focusIn)];
   if (click != "" && [v isKindOfClass: [NSView class]]) {
     // a click at the point x,y of the view which has the focus
-    int k= search_forwards (",", click);
-    NSPoint p= NSMakePoint (as_double (click (0, k)),
-                            as_double (click (k+1, N(click))));
+    // x,y or x,y,right
+    array<string> xy= tokenize (click, ",");
+    bool right= N(xy) > 2 && xy[2] == "right";
+    NSPoint p= NSMakePoint (as_double (xy[0]), as_double (xy[1]));
     p= [v convertPoint: p toView: nil];
     for (int up=0; up<2; up++) {
-      NSEvent* e= [NSEvent mouseEventWithType: up? NSEventTypeLeftMouseUp
-                                                 : NSEventTypeLeftMouseDown
+      NSEvent* e= [NSEvent mouseEventWithType:
+                             right? (up? NSEventTypeRightMouseUp: NSEventTypeRightMouseDown)
+                                  : (up? NSEventTypeLeftMouseUp: NSEventTypeLeftMouseDown)
                                      location: p
                                 modifierFlags: 0
                                     timestamp: [[NSProcessInfo processInfo] systemUptime]
@@ -712,10 +714,12 @@ ns_gui_rep::event_loop () {
                                    userInfo: nil repeats: NO];
   }
   if (get_env ("TEXMACS_NS_SNAPSHOT") != "") {
+    // NOTE: also while menus are tracked or dialogs are modal
     TMSnapshotHelper* h= [[TMSnapshotHelper alloc] init];
-    [NSTimer scheduledTimerWithTimeInterval: 3.0 target: h
-                                   selector: @selector(snapshot:)
-                                   userInfo: nil repeats: YES];
+    NSTimer* t= [NSTimer timerWithTimeInterval: 3.0 target: h
+                                      selector: @selector(snapshot:)
+                                      userInfo: nil repeats: YES];
+    [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
   [NSApp run];
 }

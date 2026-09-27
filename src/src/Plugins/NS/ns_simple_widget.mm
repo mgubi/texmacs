@@ -274,8 +274,7 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<coord2>(val, s);
       coord2 p = open_box<coord2> (val);
-      NOT_IMPLEMENTED ("ns_simple_widget::SLOT_CURSOR");
-//      canvas()->setCursorPos(to_qpoint(p));
+      cursor_pos= to_nspoint (p);
     }
       break;
       
@@ -312,16 +311,13 @@ ns_simple_widget_rep::query (slot s, int type_id) {
     case SLOT_POSITION:
     {
       check_type_id<coord2> (type_id, s);
-      NOT_IMPLEMENTED ("ns_simple_widget::query (SLOT_POSITION)");
-#if 0
-      // HACK: mapTo() does not work as we expect on the Mac, so we manually
-      // calculate the global screen cordinates and substract
-      QPoint sg = scrollarea()->surface()->mapToGlobal (QPoint (0,0));
-      QRect  wg = scrollarea()->window()->frameGeometry();
-      sg.ry() -= wg.y();
-      sg.rx() -= wg.x();
-      return close_box<coord2> (from_qpoint (sg));
-#endif
+      // The position of the canvas in its window, from the top left corner
+      // of the window (see qt_simple_widget_rep)
+      if (!view || ![view window]) return close_box<coord2> (coord2 (0, 0));
+      NSRect r= [view convertRect: [view visibleRect] toView: nil];
+      NSRect f= [[view window] frame];
+      NSPoint pt= NSMakePoint (r.origin.x, f.size.height - NSMaxY (r));
+      return close_box<coord2> (from_nspoint (pt));
     }
       
     case SLOT_SIZE:
@@ -375,11 +371,9 @@ ns_simple_widget_rep::read (slot s, blackbox index) {
   switch (s) {
     case SLOT_WINDOW:
       check_type_void (index, s);
+      if (view && [view window]) return ns_window_widget_of ([view window]);
       if (parent) return parent->read(s, index);
-      else {
-        cout << "problem in ns_simple_widget_rep::read (SLOT_WINDOW)\n";
-        return NULL;
-      }
+      return widget ();
     default:
       return ns_widget_rep::read (s, index);
   }

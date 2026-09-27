@@ -178,6 +178,20 @@ ns_widget_rep::popup_window_widget (string s) {
 
 extern int nr_windows;
 
+CGFloat
+main_screen_height () {
+  return [[[NSScreen screens] firstObject] frame].size.height;
+}
+
+widget
+ns_window_widget_of (NSWindow* win) {
+  // The window widget of a window, or nil
+  id wc= [win windowController];
+  if (wc && [wc isKindOfClass: [TMWindowController class]])
+    return (widget_rep*) [(TMWindowController*) wc widget];
+  return widget ();
+}
+
 ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
                                             command _quit, bool _fake)
 : ns_widget_rep (window_widget), orig_name (_name), quit (_quit), fake (_fake)
@@ -240,7 +254,12 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       coord2 p = open_box<coord2> (val);
       NSWindow *win = [wc window];
       if (win) {
-        [win setFrameOrigin: to_nspoint (p)];
+        // NOTE: the screen coordinates of TeXmacs have their origin at the
+        // top left of the main screen (as in Qt), those of Cocoa at the
+        // bottom left
+        NSPoint pt= to_nspoint (p);
+        pt.y= main_screen_height () - pt.y;
+        [win setFrameTopLeftPoint: pt];
       }
     }
       break;
@@ -317,7 +336,9 @@ ns_window_widget_rep::query (slot s, int type_id) {
     {
       check_type_id<coord2> (type_id, s);
       NSRect frame = [[wc window] frame];
-      return close_box<coord2> (from_nspoint (frame.origin));
+      NSPoint pt= NSMakePoint (frame.origin.x,
+                               main_screen_height () - NSMaxY (frame));
+      return close_box<coord2> (from_nspoint (pt));
     }
     case SLOT_SIZE:
     {

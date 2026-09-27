@@ -56,6 +56,7 @@ class ns_simple_widget_rep;
  */
 class ns_menu_rep: public ns_widget_rep {
   NSMenuItem* item;
+  coord2 position;  //!< in screen coordinates, as in the Qt interface
 public:
   ns_menu_rep (NSMenuItem* _item);
   ~ns_menu_rep ();

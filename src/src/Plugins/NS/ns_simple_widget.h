@@ -84,6 +84,7 @@ public:
   
   // this needs to be accesible from TMView
   NSBitmapImageRep*       backingPixmap;
+  NSPoint                 cursor_pos;  //!< for the input methods
 
 protected:
   

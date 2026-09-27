@@ -348,13 +348,30 @@ initkeymap () {
 
 static unsigned int
 mouse_state (NSEvent* event, bool flag) {
+  // As in the Qt interface on the Mac: control and option emulate the right
+  // and middle buttons, but the modifiers are passed anyway
+  (void) flag;
   unsigned int i= 0;
-  i += 1 << min([event buttonNumber],4);
-  unsigned int mods = [event modifierFlags];
-  if (mods & NSAlternateKeyMask) i = 2;  
-  if (mods & NSCommandKeyMask) i = 4;  
-  if (mods & NSShiftKeyMask) i += 256;  
-  if (mods & NSControlKeyMask) i += 2048;  
+  NSInteger b= [event buttonNumber];
+  switch ([event type]) {
+    case NSEventTypeLeftMouseDown: case NSEventTypeLeftMouseUp:
+    case NSEventTypeLeftMouseDragged:
+      b= 0; break;
+    case NSEventTypeRightMouseDown: case NSEventTypeRightMouseUp:
+    case NSEventTypeRightMouseDragged:
+      b= 1; break;
+    default: break;
+  }
+  if (b == 0) i += 1;
+  else if (b == 1) i += 4;
+  else if (b == 2) i += 2;
+  else if (b == 3) i += 8;
+  else if (b == 4) i += 16;
+  NSEventModifierFlags mods = [event modifierFlags];
+  if (mods & NSEventModifierFlagControl) i = 1024 + 4;
+  if (mods & NSEventModifierFlagOption)  i = 2048 + 2;
+  if (mods & NSEventModifierFlagShift)   i += 256;
+  if (mods & NSEventModifierFlagCommand) i += 4096;
   return i;
 }
 
@@ -400,6 +417,13 @@ mouse_decode (unsigned int mstate) {
     the_gui -> process_mouse (wid, s, pt.x1, pt.x2, mstate, texmacs_time ());
   }
 }
+
+- (void) rightMouseDown: (NSEvent *)event { [self mouseDown: event]; }
+- (void) rightMouseUp: (NSEvent *)event { [self mouseUp: event]; }
+- (void) rightMouseDragged: (NSEvent *)event { [self mouseDragged: event]; }
+- (void) otherMouseDown: (NSEvent *)event { [self mouseDown: event]; }
+- (void) otherMouseUp: (NSEvent *)event { [self mouseUp: event]; }
+- (void) otherMouseDragged: (NSEvent *)event { [self mouseDragged: event]; }
 
 - (void) mouseMoved: (NSEvent *)event
 {
@@ -454,107 +478,112 @@ mouse_decode (unsigned int mstate) {
   processingCompose = NO;
 }
 
-#pragma mark NSTextInput protocol implementation
+#pragma mark NSTextInputClient protocol implementation
 
+// NOTE: as in QTMWidget::inputMethodEvent, the text being composed by an
+// input method is sent to TeXmacs as a key "pre-edit:<pos>:<text>", and the
+// composed text as ordinary keys
 
-- (void) insertText: (id)aString
-// instead of keyDown: aString can be NSString or NSAttributedString
+static NSString*
+plain_string (id s) {
+  return [s isKindOfClass: [NSAttributedString class]]? [s string]: s;
+}
+
+- (void) sendPreEdit: (NSString*) str position: (NSUInteger) pos
 {
+  if (!wid) return;
+  string r= "pre-edit:";
+  if ([str length] > 0)
+    r= r * as_string ((int) pos) * ":" * from_nsstring (str);
+  the_gui->process_keypress (wid, r, texmacs_time ());
+}
+
+- (void) insertText: (id) aString replacementRange: (NSRange) replacementRange
+{
+  (void) replacementRange;
+  NSString *str= plain_string (aString);
+  if (workingText) {
+    [self deleteWorkingText];
+    [self sendPreEdit: @"" position: 0];
+  }
   processingCompose = NO;
-  
-  NSString *str = [aString respondsToSelector: @selector(string)] ?
-  [aString string] : aString;
-  
-  static char buf[256];
-  for (unsigned int i=0; i<[str length]; i++) {
-    [[str substringWithRange: NSMakeRange(i, 1)]
-     getCString: buf maxLength: 256 encoding: NSUTF8StringEncoding];
-    string rr (buf, strlen(buf));
-    string s= utf8_to_cork (rr);
+  if (!wid) return;
+  for (NSUInteger i=0; i<[str length]; i++) {
+    NSString* c= [str substringWithRange: [str rangeOfComposedCharacterSequenceAtIndex: i]];
+    i += [c length] - 1;
+    string s= from_nsstring (c);
     if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << s << LF;
     the_gui->process_keypress (wid, s, texmacs_time ());
   }
 }
 
-- (void) doCommandBySelector: (SEL)aSelector
+- (void) doCommandBySelector: (SEL) aSelector
 {
+  // NOTE: the keys with a command are handled in keyDown:
+  (void) aSelector;
 }
 
-// setMarkedText: cannot take a nil first argument. aString can be NSString or NSAttributedString
-- (void) setMarkedText:(id)aString selectedRange:(NSRange)selRange
+- (void) setMarkedText: (id) aString selectedRange: (NSRange) selRange
+      replacementRange: (NSRange) replacementRange
 {
-  NSString *str = [aString respondsToSelector: @selector(string)] ?
-  [aString string] : aString;
-  
-  if (workingText != nil)
-    [self deleteWorkingText];
-  if ([str length] == 0)
-    return;
-  workingText = [str copy];
-  processingCompose = YES;
+  (void) replacementRange;
+  NSString *str= plain_string (aString);
+  [self deleteWorkingText];
+  if ([str length] > 0) {
+    workingText = [str copy];
+    processingCompose = YES;
+  }
+  [self sendPreEdit: str position: selRange.location];
 }
 
 - (void) unmarkText
 {
-  [self deleteWorkingText];  
+  [self deleteWorkingText];
+  [self sendPreEdit: @"" position: 0];
 }
+
 - (BOOL) hasMarkedText
 {
   return workingText != nil;
-  
-}
-- (NSInteger) conversationIdentifier
-{
-  return (NSInteger)self;
 }
 
-/* Returns attributed string at the range.  This allows input mangers to query any range in backing-store.  May return nil.
- */
-- (NSAttributedString *) attributedSubstringFromRange: (NSRange)theRange
-{
-  static NSAttributedString *str = nil;
-  if (str == nil) str = [NSAttributedString new];
-  return str;
-}
-
-/* This method returns the range for marked region.  If hasMarkedText == false, it'll return NSNotFound location & 0 length range.
- */
 - (NSRange) markedRange
 {
-  NSRange rng = workingText != nil
-  ? NSMakeRange (0, [workingText length]) : NSMakeRange (NSNotFound, 0);
-  return rng;
-  
+  return workingText != nil
+    ? NSMakeRange (0, [workingText length]) : NSMakeRange (NSNotFound, 0);
 }
 
-/* This method returns the range for selected region.  Just like markedRange method, its location field contains char index from the text beginning.
- */
 - (NSRange) selectedRange
 {
-  return NSMakeRange(NSNotFound, 0);
-}
-/* This method returns the first frame of rects for theRange in screen coordindate system.
- */
-- (NSRect) firstRectForCharacterRange: (NSRange)theRange
-{
-  return NSMakeRect (0,0,50,50);
+  return NSMakeRange (NSNotFound, 0);
 }
 
-/* This method returns the index for character that is nearest to thePoint.  thePoint is in screen coordinate system.
- */
-- (NSUInteger) characterIndexForPoint: (NSPoint)thePoint
+- (NSAttributedString *) attributedSubstringForProposedRange: (NSRange) range
+                                                 actualRange: (NSRangePointer) actualRange
 {
-  return 0;
+  (void) range; (void) actualRange;
+  return nil;
 }
 
-/* This method is the key to attribute extension.  We could add new attributes through this method. NSInputServer examines the return value of this method & constructs appropriate attributed string.
- */
 - (NSArray*) validAttributesForMarkedText
 {
-  static NSArray *arr = nil;
-  if (arr == nil) arr = [NSArray new];
-  return arr;
+  return [NSArray array];
 }
 
+- (NSRect) firstRectForCharacterRange: (NSRange) range
+                          actualRange: (NSRangePointer) actualRange
+{
+  // The cursor on the screen, for the windows of the input methods
+  (void) range; (void) actualRange;
+  NSPoint p= wid? wid->cursor_pos: NSZeroPoint;
+  NSRect r= [self convertRect: NSMakeRect (p.x, p.y, 1, 16) toView: nil];
+  return [self window]? [[self window] convertRectToScreen: r]: r;
+}
+
+- (NSUInteger) characterIndexForPoint: (NSPoint) point
+{
+  (void) point;
+  return NSNotFound;
+}
 
 @end

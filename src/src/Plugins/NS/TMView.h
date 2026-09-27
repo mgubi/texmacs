@@ -12,7 +12,7 @@
 #include "mac_cocoa.h"
 #include "ns_simple_widget.h"
 
-@interface TMView : NSView  <NSTextInput>
+@interface TMView : NSView  <NSTextInputClient>
 {
 	simple_widget_rep *wid;
   NSString *workingText;

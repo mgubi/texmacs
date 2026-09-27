@@ -154,7 +154,8 @@
 ******************************************************************************/
 
 ns_menu_rep::ns_menu_rep (NSMenuItem* _item):
-  ns_widget_rep (vertical_menu), item (_item) { [item retain]; }
+  ns_widget_rep (vertical_menu), item (_item), position (coord2 (0, 0))
+{ [item retain]; }
 
 ns_menu_rep::~ns_menu_rep () { [item release]; }
 
@@ -179,17 +180,21 @@ ns_menu_rep::send (slot s, blackbox val) {
   switch (s) {
     case SLOT_POSITION:
       check_type<coord2> (val, s);
+      position= open_box<coord2> (val);
       break;
     case SLOT_VISIBILITY:
       check_type<bool> (val, s);
       break;
     case SLOT_MOUSE_GRAB:
       {
+        // show the menu at the position (the origin of the screen
+        // coordinates of TeXmacs is at the top left of the main screen)
         check_type<bool> (val, s);
-        if (open_box<bool> (val) && !is_nil (the_keyboard_focus)) {
-          NSView* v= concrete (the_keyboard_focus)->as_nsview ();
-          [NSMenu popUpContextMenu: [item submenu]
-                         withEvent: [NSApp currentEvent] forView: v];
+        if (open_box<bool> (val) && [item submenu]) {
+          NSPoint p= to_nspoint (position);
+          p.y= main_screen_height () - p.y;
+          [[item submenu] popUpMenuPositioningItem: nil atLocation: p
+                                            inView: nil];
         }
       }
       break;

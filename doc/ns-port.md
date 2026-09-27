@@ -40,8 +40,8 @@ windows):
   `<dir>/window-<i>.png` every 3 seconds;
 * `TEXMACS_NS_TYPE=<text>`: after 2 seconds, the text is sent as key events
   to the canvas (`\r` is return, `\b` backspace);
-* `TEXMACS_NS_CLICK=<x>,<y>`: a click at this point of the canvas (in
-  points), before typing;
+* `TEXMACS_NS_CLICK=<x>,<y>[,right]`: a click at this point of the canvas
+  (in points), before typing;
 * `TEXMACS_NS_PRESS=<label>`: after 4 seconds, the button or the tab with
   this label is pressed (in the frontmost window which has it);
 * `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
@@ -93,9 +93,10 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 ## After compiling
 
 In order:
-1. **Keyboard:** input methods with `NSTextInputClient` (the view still uses
-   the deprecated `NSTextInput`), modifiers; **mouse:** right button,
-   wheel, drag selection; menus and toolbars.
+1. Check with real input: the input methods (`NSTextInputClient`, with the
+   text being composed shown by TeXmacs as in Qt), the contextual menu (it
+   is requested at the right place, but synthetic clicks close it at once),
+   drag selection.
    At this point documents can be edited: this is the main milestone.
 2. The `FIXME`/`NOT_IMPLEMENTED` of 2018 (about 60): arcs, alpha, images,
    mouse grab, pointer and cursor, the wait indicator, the empty and ink
