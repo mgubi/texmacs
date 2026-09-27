@@ -142,6 +142,220 @@ placeholder (string what) {
   return t;
 }
 
+
+/******************************************************************************
+ * Refresh widgets (see QTMRefreshWidget and QTMRefreshableWidget)
+ ******************************************************************************/
+
+widget make_menu_widget (object wid);
+widget as_widget (object obj);
+extern bool menu_caching;
+
+/*! The state of a refresh widget: its content is recomputed from a menu
+ (refresh_widget) or from a promise (refreshable_widget) when a refresh of
+ its kind is requested with SLOT_REFRESH. */
+struct ns_refresh_state {
+  ns_widget_rep* parent;
+  bool     refreshable;
+  string   strwid;
+  object   prom;
+  string   kind;
+  object   curobj;
+  widget   cur;
+  hashmap<object,widget> cache;
+  ns_refresh_state (): curobj (false), cache (widget ()) {}
+  bool recompute (string what);
+};
+
+bool
+ns_refresh_state::recompute (string what) {
+  if (what != "init" && kind != "any" && kind != what) return false;
+  eval ("(lazy-initialize-force)");
+  widget previous= cur;
+  if (refreshable) {
+    object xwid= call (prom);
+    if (curobj == xwid) return false;
+    if (!is_widget (xwid)) return false;
+    curobj= xwid;
+    cur= as_widget (xwid);
+  }
+  else {
+    string s= "'(vertical (link " * strwid * "))";
+    object xwid= call ("menu-expand", eval (s));
+    if (cache->contains (xwid)) {
+      if (curobj == xwid) return false;
+      curobj= xwid;
+      cur= cache [xwid];
+    }
+    else {
+      curobj= xwid;
+      cur= make_menu_widget (eval (s));
+      if (menu_caching) cache (xwid)= cur;
+    }
+  }
+  if (!is_nil (previous) && previous != cur) parent->remove_child (previous);
+  parent->add_child (cur);
+  return true;
+}
+
+@interface TMRefreshView : NSView
+{
+  ns_refresh_state* state;
+  NSView* content;
+}
+- (id) initWithState: (ns_refresh_state*) st;
+- (void) refresh: (NSNotification*) n;
+@end
+
+@implementation TMRefreshView
+- (id) initWithState: (ns_refresh_state*) st
+{
+  self= [super initWithFrame: NSMakeRect (0, 0, 10, 10)];
+  if (self) {
+    state= st;
+    content= nil;
+    [self setTranslatesAutoresizingMaskIntoConstraints: NO];
+    [[NSNotificationCenter defaultCenter]
+      addObserver: self selector: @selector(refresh:)
+             name: @"TMRefresh" object: nil];
+    [self show: "init"];
+  }
+  return self;
+}
+- (void) dealloc
+{
+  [[NSNotificationCenter defaultCenter] removeObserver: self];
+  tm_delete (state);
+  [super dealloc];
+}
+- (void) show: (string) kind
+{
+  if (!state->recompute (kind) && content) return;
+  if (content) [content removeFromSuperview];
+  content= is_nil (state->cur)? nil: concrete (state->cur)->as_nsview ();
+  if (!content) return;
+  [content setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [self addSubview: content];
+  [NSLayoutConstraint activateConstraints: @[
+    [content.leadingAnchor constraintEqualToAnchor: self.leadingAnchor],
+    [content.trailingAnchor constraintEqualToAnchor: self.trailingAnchor],
+    [content.topAnchor constraintEqualToAnchor: self.topAnchor],
+    [content.bottomAnchor constraintEqualToAnchor: self.bottomAnchor]]];
+}
+- (void) refresh: (NSNotification*) n
+{
+  string kind= from_nsstring ([[n userInfo] objectForKey: @"kind"]);
+  NSView* old= content;
+  [self show: kind];
+  if (content != old) {
+    // the window takes the size of its new contents (as in the Qt interface)
+    NSWindow* win= [self window];
+    NSView* root= [win contentView];
+    if (win && root && ![root isKindOfClass: [NSClassFromString(@"TMView") class]]) {
+      NSSize fs= [root fittingSize];
+      if (fs.width > 0 && fs.height > 0) [win setContentSize: fs];
+    }
+  }
+}
+@end
+
+/******************************************************************************
+ * Choice lists (see QTMListView)
+ ******************************************************************************/
+
+@interface TMChoiceList : NSObject <NSTableViewDataSource, NSTableViewDelegate>
+{
+  command_rep* cmd;
+  NSArray* items;
+  BOOL multiple;
+  NSTableView* table;
+}
+- (id) initWithItems: (NSArray*) its command: (command_rep*) c
+            multiple: (BOOL) m table: (NSTableView*) t;
+@end
+
+@implementation TMChoiceList
+- (id) initWithItems: (NSArray*) its command: (command_rep*) c
+            multiple: (BOOL) m table: (NSTableView*) t
+{
+  self= [super init];
+  if (self) {
+    items= [its retain]; cmd= c; INC_COUNT_NULL (cmd);
+    multiple= m; table= t;
+  }
+  return self;
+}
+- (void) dealloc
+{
+  [items release]; DEC_COUNT_NULL (cmd);
+  [super dealloc];
+}
+- (NSInteger) numberOfRowsInTableView: (NSTableView*) tv
+{
+  (void) tv; return [items count];
+}
+- (id) tableView: (NSTableView*) tv objectValueForTableColumn: (NSTableColumn*) col
+             row: (NSInteger) row
+{
+  (void) tv; (void) col; return [items objectAtIndex: row];
+}
+- (void) tableViewSelectionDidChange: (NSNotification*) n
+{
+  (void) n;
+  if (!cmd) return;
+  NSIndexSet* sel= [table selectedRowIndexes];
+  object l= null_object ();
+  if (multiple) {
+    for (NSUInteger i= [sel lastIndex]; i != NSNotFound;
+         i= [sel indexLessThanIndex: i])
+      l= cons (from_nsstring ([items objectAtIndex: i]), l);
+  }
+  else if ([sel count] > 0)
+    l= object (from_nsstring ([items objectAtIndex: [sel firstIndex]]));
+  else l= object ("");
+  command c (cmd);
+  c (list_object (l));
+}
+@end
+
+static NSView*
+choice_list (command cmd, array<string> vals, array<string> chosen, bool multiple) {
+  NSMutableArray* its= [NSMutableArray array];
+  for (int i=0; i<N(vals); i++) [its addObject: to_label (vals[i])];
+  NSTableView* t= [[[NSTableView alloc] init] autorelease];
+  NSTableColumn* col= [[[NSTableColumn alloc] initWithIdentifier: @"c"] autorelease];
+  [col setWidth: 200];
+  [t addTableColumn: col];
+  [t setHeaderView: nil];
+  [t setAllowsMultipleSelection: multiple];
+  TMChoiceList* ds= [[TMChoiceList alloc] initWithItems: its command: cmd.rep
+                                               multiple: multiple table: t];
+  // NOTE: the data source lives as long as the table (released with it)
+  [t setDataSource: ds];
+  [t setDelegate: ds];
+  NSMutableIndexSet* sel= [NSMutableIndexSet indexSet];
+  for (int i=0; i<N(vals); i++)
+    if (contains (vals[i], chosen)) [sel addIndex: i];
+  [t reloadData];
+  [t selectRowIndexes: sel byExtendingSelection: NO];
+  NSScrollView* sv= [[[NSScrollView alloc] init] autorelease];
+  [sv setDocumentView: t];
+  [sv setHasVerticalScroller: YES];
+  [sv setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [[sv.heightAnchor constraintGreaterThanOrEqualToConstant: 120] setActive: YES];
+  [[sv.widthAnchor constraintGreaterThanOrEqualToConstant: 200] setActive: YES];
+  return sv;
+}
+
+static double
+length_in_points (string l) {
+  // Approximate sizes of the resize widgets (FIXME: as qt_decode_length)
+  if (ends (l, "px")) return as_double (l (0, N(l) - 2));
+  if (ends (l, "em")) return 12.0 * as_double (l (0, N(l) - 2));
+  if (ends (l, "ex")) return 6.0 * as_double (l (0, N(l) - 2));
+  return 0.0;
+}
+
 /******************************************************************************
  * ns_ui_element_rep
  ******************************************************************************/
@@ -447,8 +661,14 @@ ns_ui_element_rep::as_nsview () {
       typedef triple<string, string, string> T1;
       typedef quartet<widget, int, T1, T1> T;
       T x= open_box<T> (load);
-      // FIXME: the sizes are not applied
-      return concrete (x.x1)->as_nsview ();
+      NSView* v= concrete (x.x1)->as_nsview ();
+      if (!v) return v;
+      // FIXME: only the minimal sizes (in px, em and ex) are applied
+      double w= length_in_points (x.x3.x1), h= length_in_points (x.x4.x1);
+      if (w > 0 || h > 0) [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+      if (w > 0) [[v.widthAnchor constraintGreaterThanOrEqualToConstant: w] setActive: YES];
+      if (h > 0) [[v.heightAnchor constraintGreaterThanOrEqualToConstant: h] setActive: YES];
+      return v;
     }
 
     case glue_widget:
@@ -475,8 +695,78 @@ ns_ui_element_rep::as_nsview () {
       return sv;
     }
 
+    case refresh_widget: case refreshable_widget:
+    {
+      ns_refresh_state* st= tm_new<ns_refresh_state> ();
+      st->parent= this;
+      st->refreshable= (type == refreshable_widget);
+      if (st->refreshable) {
+        typedef pair<object, string> T;
+        T x= open_box<T> (load);
+        st->prom= x.x1; st->kind= x.x2;
+      }
+      else {
+        typedef pair<string, string> T;
+        T x= open_box<T> (load);
+        st->strwid= x.x1; st->kind= x.x2;
+      }
+      return [[[TMRefreshView alloc] initWithState: st] autorelease];
+    }
+
+    case tabs_widget: case icon_tabs_widget:
+    {
+      // FIXME: the icons of icon_tabs_widget
+      array<widget> tabs, bodies;
+      if (type == tabs_widget) {
+        typedef pair<array<widget>, array<widget> > T;
+        T x= open_box<T> (load);
+        tabs= x.x1; bodies= x.x2;
+      }
+      else {
+        typedef triple<array<url>, array<widget>, array<widget> > T;
+        T x= open_box<T> (load);
+        tabs= x.x2; bodies= x.x3;
+      }
+      NSTabView* tv= [[[NSTabView alloc] init] autorelease];
+      for (int i=0; i < min (N(tabs), N(bodies)); i++) {
+        NSTabViewItem* it= [[[NSTabViewItem alloc] init] autorelease];
+        [it setLabel: to_label (text_of (tabs[i]))];
+        NSView* body= is_nil (bodies[i])? nil: concrete (bodies[i])->as_nsview ();
+        if (body) {
+          NSView* holder= [[[NSView alloc] init] autorelease];
+          [body setTranslatesAutoresizingMaskIntoConstraints: NO];
+          [holder addSubview: body];
+          [NSLayoutConstraint activateConstraints: @[
+            [body.leadingAnchor constraintEqualToAnchor: holder.leadingAnchor constant: 8],
+            [body.trailingAnchor constraintEqualToAnchor: holder.trailingAnchor constant: -8],
+            [body.topAnchor constraintEqualToAnchor: holder.topAnchor constant: 8],
+            [body.bottomAnchor constraintEqualToAnchor: holder.bottomAnchor constant: -8]]];
+          [it setView: holder];
+        }
+        [tv addTabViewItem: it];
+      }
+      return tv;
+    }
+
+    case choice_widget:
+    {
+      typedef quintuple<command, array<string>, array<string>, bool, int> T;
+      T x= open_box<T> (load);
+      return choice_list (x.x1, x.x2, x.x3, x.x4);
+    }
+
+    case filtered_choice_widget:
+    {
+      // FIXME: the filter field
+      typedef quartet<command, array<string>, string, string> T;
+      T x= open_box<T> (load);
+      array<string> chosen;
+      chosen << x.x3;
+      return choice_list (x.x1, x.x2, chosen, false);
+    }
+
     default:
-      // FIXME: tabs, choices, refreshable widgets, tree views, ...
+      // FIXME: tree views
       return placeholder (type_as_string ());
   }
 }

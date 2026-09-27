@@ -53,6 +53,16 @@ ns_widget_rep::add_children (array<widget> a) {
 }
 
 void
+ns_widget_rep::remove_child (widget w) {
+  if (is_nil (w) || N(children) == 0) return;
+  array<widget> kept;
+  for (int i = 0; i < N(children); ++i)
+    if (is_nil (children[i]) || children[i] != w)
+      kept << children[i];
+  children = kept;
+}
+
+void
 ns_widget_rep::send (slot s, blackbox val) {
   switch (s) {
     case SLOT_KEYBOARD_FOCUS:
@@ -187,6 +197,10 @@ ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
                                                    defer: NO] autorelease];
   
   [win setContentView: v];
+  // dialogs take the size of their contents (the main windows are sized
+  // by TeXmacs)
+  NSSize fs= v? [v fittingSize]: NSZeroSize;
+  if (fs.width > 0 && fs.height > 0) [win setContentSize: fs];
   [win setTitle: to_nsstring (orig_name)];
   [win setAcceptsMouseMovedEvents: YES];
   
@@ -277,8 +291,10 @@ ns_window_widget_rep::send (slot s, blackbox val) {
     {
       check_type<string> (val, s);
       string kind = open_box<string> (val);
-      // FIXME: implement
-//      the_gui->gui_helper->emitTmSlotRefresh (kind);
+      // NOTE: the refresh widgets (TMRefreshView) observe this notification
+      [[NSNotificationCenter defaultCenter]
+        postNotificationName: @"TMRefresh" object: nil
+                    userInfo: @{ @"kind": to_nsstring (kind) }];
     }
       break;
     default:

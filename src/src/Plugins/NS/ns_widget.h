@@ -84,6 +84,7 @@ public:
   
   void add_child (widget a);
   void add_children (array<widget> a);
+  void remove_child (widget w);
   
   ////////////////////// NS semantics of abstract texmacs widgets
   

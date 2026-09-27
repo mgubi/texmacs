@@ -644,6 +644,45 @@ ns_print_menu (NSMenu* m, int depth, int max_depth) {
 }
 @end
 
+// NOTE: when the environment variable TEXMACS_NS_PRESS is set, the button
+// or the tab with this label is pressed after four seconds
+
+static bool
+ns_press (NSView* v, NSString* label) {
+  if ([v isKindOfClass: [NSTabView class]]) {
+    for (NSTabViewItem* it in [(NSTabView*) v tabViewItems])
+      if ([[it label] isEqualToString: label]) {
+        [(NSTabView*) v selectTabViewItem: it];
+        return true;
+      }
+  }
+  if ([v isKindOfClass: [NSButton class]] &&
+      [[(NSButton*) v title] isEqualToString: label]) {
+    [(NSButton*) v performClick: nil];
+    return true;
+  }
+  for (NSView* sub in [v subviews])
+    if (ns_press (sub, label)) return true;
+  return false;
+}
+
+@interface TMPressHelper : NSObject
+- (void) press: (NSTimer*) timer;
+@end
+
+@implementation TMPressHelper
+- (void) press: (NSTimer*) timer
+{
+  (void) timer;
+  NSString* label= to_nsstring (get_env ("TEXMACS_NS_PRESS"));
+  bool done= false;
+  for (NSWindow* win in [[[NSApp orderedWindows] copy] autorelease])
+    if (!done && [win isVisible])
+      done= ns_press ([win contentView], label);
+  fprintf (stderr, "TEXMACS_NS_PRESS %s\n", done? "done": "not found");
+}
+@end
+
 void
 ns_gui_rep::event_loop () {
   [NSApp finishLaunching];
@@ -653,6 +692,12 @@ ns_gui_rep::event_loop () {
     // must be the key window, otherwise the editor loses its focus
     [NSApp activateIgnoringOtherApps: YES];
     [[[NSApp windows] firstObject] makeKeyAndOrderFront: nil];
+  }
+  if (get_env ("TEXMACS_NS_PRESS") != "") {
+    TMPressHelper* h= [[TMPressHelper alloc] init];
+    [NSTimer scheduledTimerWithTimeInterval: 4.0 target: h
+                                   selector: @selector(press:)
+                                   userInfo: nil repeats: NO];
   }
   if (get_env ("TEXMACS_NS_MENUS") != "") {
     TMMenuPrinter* h= [[TMMenuPrinter alloc] init];

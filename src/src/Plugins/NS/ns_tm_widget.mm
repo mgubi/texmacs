@@ -230,6 +230,13 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
   case SLOT_MOUSE_GRAB:
     if (!is_nil (main_widget)) main_widget->send (s, val);
     return;
+  case SLOT_MODIFIED:
+    {
+      // the "edited" dot in the close button of the window
+      check_type<bool> (val, s);
+      [[view window] setDocumentEdited: open_box<bool> (val)];
+    }
+    break;
   case SLOT_HEADER_VISIBILITY:
     {
       check_type<bool> (val, s);

@@ -434,6 +434,7 @@ ns_tm_embedded_widget_rep::read (slot s, blackbox index) {
       check_type_void (index, s);
       return this;
     case SLOT_SCROLLABLE:
+    case SLOT_CANVAS:
       check_type_void (index, s);
       return main_widget;
     default:

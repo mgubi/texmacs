@@ -27,7 +27,9 @@ work. The TeXmacs menus are in the menu bar (after an application menu
 created in the code, since there is no MainMenu.nib outside a bundle), and
 all of them, with their submenus, can be built. The icon bars are shown
 above the canvas (with the PNG icons, at double resolution on Retina
-screens), and the footer shows the messages of TeXmacs.
+screens), and the footer shows the messages of TeXmacs. Dialogs made with
+`tm-widget` work, such as the preferences and the page format (tabs, pop-up
+menus, buttons, refreshable parts, and embedded TeXmacs editors).
 
 Testing aids (other programs are not allowed to capture or control the
 windows):
@@ -40,6 +42,8 @@ windows):
   to the canvas (`\r` is return, `\b` backspace);
 * `TEXMACS_NS_CLICK=<x>,<y>`: a click at this point of the canvas (in
   points), before typing;
+* `TEXMACS_NS_PRESS=<label>`: after 4 seconds, the button or the tab with
+  this label is pressed (in the frontmost window which has it);
 * `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
   its submenus up to this depth (which builds the lazy menus).
 
@@ -80,7 +84,8 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
   uses a canvas of the size of the visible part, which scales to long
   documents);
 * menus: keyboard shortcuts, the prefixes `*` and `o`, widgets inside menus;
-* views: tabs, choice lists, refreshable widgets, tree views, resize sizes;
+* views: icons of the icon tabs, filter of the filtered choices, tree
+  views, maximal and default sizes of the resize widgets;
 * color picker and printing; picture effects and patterns;
 * the interactive prompt is a dialog instead of the footer;
 * the side tools (left, right, bottom, extra) are ignored.
