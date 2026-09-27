@@ -435,10 +435,6 @@ static void
 layout_window_passes (vue_window_rep* w) {
   bool relayout= false;
   int passes= 0;
-  {
-    with_window frame (w);
-    clay_wheel_flush (w);
-  }
   do {
     with_window frame (w);
     layout_again= false;
@@ -466,6 +462,10 @@ layout_window_passes (vue_window_rep* w) {
     // post layout tweaking
     relayout= w->content->post_layout () || layout_again;
   } while (relayout && ++passes < 5);
+  {
+    with_window frame (w);
+    clay_wheel_flush (w);
+  }
 }
 
 void
@@ -2340,14 +2340,22 @@ push_wheel (vue_window win, double dx, double dy) {
 }
 
 // the wheel of the frame to the Clay scroll containers of the window, as
-// Clay wants it, once before its layout (win is the current window)
+// Clay wants it, once between two layouts (win is the current window).
+// After the layout which gave the wheel to the widgets, and only if none
+// of them used it: an editor in a dialog scrolls, not the dialog around
+// it (Clay itself gives the wheel to the innermost of its containers)
 static void
 clay_wheel_flush (vue_window_rep* win) {
   vue_input_state& in= win->input;
+  bool taken= in.wheel_taken;
+  in.wheel_taken= false;
   if (in.clay_wheel_x == 0 && in.clay_wheel_y == 0) return;
-  Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
-  Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) in.clay_wheel_x,
-                                                      (float) in.clay_wheel_y }, 0.01f);
+  if (!taken) {
+    Clay_SetPointerState ((Clay_Vector2) { (float) in.mouse_x, (float) in.mouse_y }, false);
+    Clay_UpdateScrollContainers (true, (Clay_Vector2) { (float) in.clay_wheel_x,
+                                                        (float) in.clay_wheel_y }, 0.01f);
+    gui_needs_relayout= true; // shown at once, by another layout
+  }
   in.clay_wheel_x= in.clay_wheel_y= 0;
 }
 

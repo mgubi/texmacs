@@ -448,9 +448,12 @@ notify_window_focus (vue_window win, bool has_focus) {
   if (cur != NULL) cur->handle_keyboard_focus (has_focus, texmacs_time ());
 }
 
+static bool wheel_pending= false; // the pass was given the wheel
+
 void
 gui_init_context() {
   load_input_state (current_window);
+  wheel_pending= (mouse_action == "wheel");
   hot_id= 0;
   // a release which never reached us (outside the window) ends the capture;
   // the release event itself comes with the buttons already up and must
@@ -477,6 +480,10 @@ gui_finalize_context() {
     active_button= 0;
     active_id= 0;
   }
+  // the wheel was used by a widget (see clay_wheel_flush in vue_gui.cpp)
+  if (wheel_pending && mouse_action != "wheel")
+    current_window->input.wheel_taken= true;
+  wheel_pending= false;
   // events live for exactly one layout pass of their window
   mouse_action= "";
   key_event= "";
