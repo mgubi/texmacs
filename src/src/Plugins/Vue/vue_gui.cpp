@@ -726,9 +726,20 @@ native_picture_from_SDL_Surface (SDL_Surface *surf) {
   // SDL only promises the format which suits the window best: check that
   // it is four bytes per pixel and use its own pitch (the rows may be
   // padded, which sheared the image when 4*w was assumed)
+  // and the order of its bytes: B, G, R, A for the formats of macOS
+  // (ARGB8888), R, G, B, A for that of the browser (RGBA32, i.e. ABGR8888
+  // on a little endian machine); taking one for the other exchanged the
+  // red and the blue of everything
+  fz_colorspace* cs= mupdf_screen_colorspace ();
+  if (surf != NULL) {
+    if (surf->format == SDL_PIXELFORMAT_ABGR8888 ||
+        surf->format == SDL_PIXELFORMAT_XBGR8888) cs= fz_device_rgb (ctx);
+    else if (surf->format == SDL_PIXELFORMAT_ARGB8888 ||
+             surf->format == SDL_PIXELFORMAT_XRGB8888) cs= fz_device_bgr (ctx);
+  }
   bool ok= (surf != NULL) && SDL_BYTESPERPIXEL (surf->format) == 4 &&
            mupdf_protected ("window surface", [&] () {
-    pix= fz_new_pixmap_with_data (ctx, mupdf_screen_colorspace (),
+    pix= fz_new_pixmap_with_data (ctx, cs,
                                   surf->w, surf->h, NULL, 1, surf->pitch,
                                   (unsigned char*) surf->pixels);
   });
