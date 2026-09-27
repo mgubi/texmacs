@@ -90,7 +90,9 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 * menus: keyboard shortcuts, the prefixes `*` and `o`, widgets inside menus;
 * views: icons of the icon tabs, filter of the filtered choices, tree
   views, maximal and default sizes of the resize widgets;
-* color picker and printing; picture effects and patterns;
+* printing only handles PDF files (with PDFKit and the print panel of the
+  system); the native color picker has no proposals nor patterns; picture
+  effects and patterns;
 * the interactive prompt is a dialog instead of the footer;
 * the side tools (left, right, bottom, extra) are ignored.
 

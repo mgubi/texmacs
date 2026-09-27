@@ -9,6 +9,7 @@
 ******************************************************************************/
 
 #include "mac_cocoa.h"
+#import <PDFKit/PDFKit.h>
 #include "ns_other_widgets.h"
 #include "ns_utilities.h"
 #include "ns_simple_widget.h"
@@ -485,7 +486,7 @@ ns_tm_embedded_widget_rep::as_nsview () {
 }
 
 /******************************************************************************
-* Color picker and printer (not implemented yet)
+* Color picker (see qt_color_picker_widget_rep)
 ******************************************************************************/
 
 ns_color_picker_widget_rep::ns_color_picker_widget_rep (command cmd, bool bg,
@@ -516,17 +517,41 @@ ns_color_picker_widget_rep::send (slot s, blackbox val) {
 
 void
 ns_color_picker_widget_rep::showDialog () {
-  // FIXME: use NSColorPanel
-  NOT_IMPLEMENTED ("ns_color_picker_widget_rep::showDialog");
+  // A modal dialog with a color well, as the color dialog of Qt
+  // FIXME: the proposals and the patterns
+  NSAlert* alert= [[[NSAlert alloc] init] autorelease];
+  [alert setMessageText: to_label (_windowTitle != ""? _windowTitle:
+                                   string ("Choose a color"))];
+  NSColorWell* well= [[[NSColorWell alloc]
+                        initWithFrame: NSMakeRect (0, 0, 120, 40)] autorelease];
+  [well setColor: [NSColor whiteColor]];
+  [alert setAccessoryView: well];
+  [alert addButtonWithTitle: to_label (translate ("Ok"))];
+  [alert addButtonWithTitle: to_label (translate ("Cancel"))];
+  bool ok= [alert runModal] == NSAlertFirstButtonReturn;
+  [[NSColorPanel sharedColorPanel] orderOut: nil];
+  if (!ok || is_nil (_commandAfterExecution)) return;
+  NSColor* c= [[well color] colorUsingColorSpace: [NSColorSpace sRGBColorSpace]];
+  if (!c) return;
+  char buf[16];
+  snprintf (buf, 16, "#%02x%02x%02x",
+            (int) round (255 * [c redComponent]),
+            (int) round (255 * [c greenComponent]),
+            (int) round (255 * [c blueComponent]));
+  _commandAfterExecution (list_object (object (tree (string (buf)))));
 }
 
+/******************************************************************************
+* Printing (see qt_printer_widget_rep)
+******************************************************************************/
+
 ns_printer_widget_rep::ns_printer_widget_rep (command cmd, url ps_pdf_file):
-  ns_widget_rep (none), commandAfterExecution (cmd)
-{ (void) ps_pdf_file; }
+  ns_widget_rep (none), commandAfterExecution (cmd), file (ps_pdf_file) {}
 
 widget
 ns_printer_widget_rep::plain_window_widget (string s, command q) {
-  (void) s; (void) q;
+  (void) s;
+  commandAfterExecution= q;
   return this;
 }
 
@@ -537,6 +562,8 @@ ns_printer_widget_rep::send (slot s, blackbox val) {
       check_type<bool> (val, s);
       if (open_box<bool> (val)) showDialog ();
       break;
+    case SLOT_REFRESH:
+      break;
     default:
       ns_widget_rep::send (s, val);
   }
@@ -544,6 +571,21 @@ ns_printer_widget_rep::send (slot s, blackbox val) {
 
 void
 ns_printer_widget_rep::showDialog () {
-  // FIXME: use NSPrintOperation on the PDF file
-  NOT_IMPLEMENTED ("ns_printer_widget_rep::showDialog");
+  // The PDF file is printed with the print panel of the system
+  if (suffix (file) != "pdf") {
+    // FIXME: PostScript files
+    call ("set-message", object ("Only PDF files can be printed by the NS interface"),
+          object ("Print"));
+    return;
+  }
+  NSURL* u= [NSURL fileURLWithPath: to_nsstring_utf8 (concretize (file))];
+  PDFDocument* d= [[[PDFDocument alloc] initWithURL: u] autorelease];
+  if (!d) return;
+  NSPrintOperation* op=
+    [d printOperationForPrintInfo: [NSPrintInfo sharedPrintInfo]
+                      scalingMode: kPDFPrintPageScaleToFit autoRotate: YES];
+  [op setShowsPrintPanel: YES];
+  [op setShowsProgressPanel: YES];
+  if (![op runOperation]) return;
+  if (!is_nil (commandAfterExecution)) commandAfterExecution ();
 }

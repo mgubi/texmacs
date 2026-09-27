@@ -565,6 +565,32 @@ ns_ui_element_rep::as_nsview () {
       return g;
     }
 
+    case tile_menu:
+    {
+      typedef pair<array<widget>, int> T;
+      T x= open_box<T> (load);
+      int cols= max (x.x2, 1);
+      NSGridView* g= [[[NSGridView alloc] init] autorelease];
+      [g setRowSpacing: 2];
+      [g setColumnSpacing: 2];
+      NSMutableArray* row= [NSMutableArray array];
+      for (int i=0; i<N(x.x1); i++) {
+        if (is_nil (x.x1[i])) break;
+        NSView* v= concrete (x.x1[i])->as_nsview ();
+        [row addObject: v? v: [[[NSView alloc] init] autorelease]];
+        if ((int) [row count] == cols) {
+          [g addRowWithViews: row];
+          row= [NSMutableArray array];
+        }
+      }
+      if ([row count] > 0) {
+        while ((int) [row count] < cols)
+          [row addObject: [NSGridCell emptyContentView]];
+        [g addRowWithViews: row];
+      }
+      return g;
+    }
+
     case menu_separator:
     {
       NSBox* b= [[[NSBox alloc] init] autorelease];
@@ -605,11 +631,14 @@ ns_ui_element_rep::as_nsview () {
         typedef quartet<string, int, color, bool> T2;
         [b setTitle: to_label (open_box<T2> (get_payload (w)).x1)];
       }
-      else if (w->type == xpm_widget) {
+      else {
+        // icons and colored glue (color palettes) are shown as images
         [b setTitle: @""];
-        [b setImage: to_nsimage (open_box<url> (get_payload (w)))];
+        NSView* cv= w->as_nsview ();
+        if ([cv isKindOfClass: [NSImageView class]])
+          [b setImage: [(NSImageView*) cv image]];
+        [b setBezelStyle: NSBezelStyleSmallSquare];
       }
-      else [b setTitle: @""];
       [b setCommand: x.x2.rep kind: 0];
       [b setEnabled: (x.x5 & WIDGET_STYLE_INERT) == 0];
       return b;

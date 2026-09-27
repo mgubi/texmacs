@@ -724,10 +724,12 @@ ns_gui_rep::event_loop () {
     [[[NSApp windows] firstObject] makeKeyAndOrderFront: nil];
   }
   if (get_env ("TEXMACS_NS_PRESS") != "") {
+    // NOTE: also in modal dialogs
     TMPressHelper* h= [[TMPressHelper alloc] init];
-    [NSTimer scheduledTimerWithTimeInterval: 4.0 target: h
-                                   selector: @selector(press:)
-                                   userInfo: nil repeats: NO];
+    NSTimer* t= [NSTimer timerWithTimeInterval: 4.0 target: h
+                                      selector: @selector(press:)
+                                      userInfo: nil repeats: NO];
+    [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
   if (get_env ("TEXMACS_NS_MENUS") != "") {
     TMMenuPrinter* h= [[TMMenuPrinter alloc] init];

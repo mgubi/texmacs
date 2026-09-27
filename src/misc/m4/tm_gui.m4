@@ -86,7 +86,7 @@ AC_DEFUN([TM_GUI],[
       yes)
          AC_MSG_RESULT([enabling experimental Cocoa port])
          COCOA_CFLAGS=""
-         COCOA_LDFLAGS="-framework Cocoa"
+         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit"
          CONFIG_GUI="COCOA"
          ;;
       no)

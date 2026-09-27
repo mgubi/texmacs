@@ -303,8 +303,8 @@ public:
   void showDialog ();
   
 private:
-  //static QTMPrinterSettings* _settings;
   command commandAfterExecution;    //! scheme closure to execute after printing
+  url file;                         //! the PDF file to be printed
 };
 
 

@@ -36396,7 +36396,7 @@ fi
          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: enabling experimental Cocoa port" >&5
 printf "%s\n" "enabling experimental Cocoa port" >&6; }
          COCOA_CFLAGS=""
-         COCOA_LDFLAGS="-framework Cocoa"
+         COCOA_LDFLAGS="-framework Cocoa -framework PDFKit"
          CONFIG_GUI="COCOA"
          ;;
       no)
