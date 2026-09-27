@@ -21,11 +21,13 @@ const float invpix =  1.0/SCREEN_PIXEL;
 
 coord4 from_nsrect (NSRect rect)
 {
+  // A rectangle of a flipped view (the y coordinate goes down), as
+  // from_qrect in the Qt interface
   SI c1, c2, c3, c4;
   c1 = rect.origin.x*SCREEN_PIXEL;
-  c2 = rect.origin.y*SCREEN_PIXEL;
-  c3 = (rect.origin.x+rect.size.width+SCREEN_PIXEL-1)*SCREEN_PIXEL;
-  c4 = (rect.origin.y+rect.size.height+SCREEN_PIXEL-1)*SCREEN_PIXEL;
+  c2 = -(rect.origin.y+rect.size.height)*SCREEN_PIXEL;
+  c3 = (rect.origin.x+rect.size.width)*SCREEN_PIXEL;
+  c4 = -rect.origin.y*SCREEN_PIXEL;
   return coord4 (c1, c2, c3, c4);
 }
 

@@ -71,6 +71,11 @@ NSColor* to_nscolor (color col);
     if (r.size.height > f.size.height)
       r.origin.y= floor ((f.size.height - r.size.height) / 2);
   }
+  // NOTE: the scroll positions are whole pixels, so that the backing store
+  // of the canvas moves by whole pixels (no seams between its parts)
+  CGFloat k= [self window]? [[self window] backingScaleFactor]: 2.0;
+  r.origin.x= round (r.origin.x * k) / k;
+  r.origin.y= round (r.origin.y * k) / k;
   return r;
 }
 @end
