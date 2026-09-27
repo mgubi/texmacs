@@ -15,6 +15,7 @@
 //                      IndexedDB of the page: the home directory of TeXmacs)
 //   --slow <KB/s>      the server sends that many KB per second (the
 //                      progress of the loading)
+//   --url <address>    the page served there (GitHub Pages), not --dir
 //   --headed           a window on the screen: the clipboard of the system
 //                      (a headless browser has one of its own)
 //   --script <file>    actions after the load, one per line (# comments):
@@ -66,7 +67,9 @@ const served = [];
 const server = await serve (dir, Number (opt ('--port', '0')), '127.0.0.1',
                             (p, n, how) => served.push ({ p, n, how, t: Date.now () }),
                             1000 * Number (opt ('--slow', '0')));
-const url = `http://127.0.0.1:${server.address ().port}/texmacs.html${query}`;
+// --url <address>: a page served elsewhere (GitHub Pages) instead of --dir
+const url = opt ('--url', null) ? opt ('--url', null) + query
+                                : `http://127.0.0.1:${server.address ().port}/texmacs.html${query}`;
 
 const profile = opt ('--profile', null);
 if (profile) fs.mkdirSync (profile, { recursive: true });
