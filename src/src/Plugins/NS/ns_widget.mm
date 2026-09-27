@@ -206,9 +206,10 @@ ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
   NSView* v = wid->as_nsview ();
   NSRect screen_frame = [[NSScreen mainScreen] visibleFrame];
   NSWindow *win = [[[NSWindow alloc] initWithContentRect: NSMakeRect(0,0,100,100)
-                                               styleMask: NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask
+                                               styleMask: NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
                                                  backing: NSBackingStoreBuffered
                                                    defer: NO] autorelease];
+  [win setCollectionBehavior: NSWindowCollectionBehaviorFullScreenPrimary];
   
   [win setContentView: v];
   // dialogs take the size of their contents (the main windows are sized

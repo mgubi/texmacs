@@ -84,6 +84,8 @@ public:
   widget main_widget;  //!< the canvas (the editor)
   widget tool_widgets[4]; //!< right, left, bottom and extra tools
   NSView* tool_views[4];  //!< their containers
+  NSView* tool_handles[2];  //!< to resize the right and left tools
+  double tool_widths[2];    //!< their widths chosen by the user (or 0)
 
   ns_tm_widget_rep (int mask, command _quit);
   ~ns_tm_widget_rep ();

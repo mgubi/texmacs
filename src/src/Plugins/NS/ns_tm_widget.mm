@@ -21,6 +21,7 @@
 #include "message.hpp"
 #include "promise.hpp"
 #include "analyze.hpp"
+#include "file.hpp"
 
 #import "TMView.h"
 #import "TMButtonsController.h"
@@ -33,6 +34,16 @@ NSString *TMButtonsIdentifier = @"TMButtonsIdentifier";
 @interface TMToolbarItem : NSToolbarItem
 @end
 NSColor* to_nscolor (color col);
+
+/*! The handle between the canvas and the side tools, which resizes them as
+ the splitters of the docks of the Qt interface. */
+@interface TMSplitHandle : NSView
+{
+@public
+  ns_tm_widget_rep* wid;
+  int which;  // 0 for the right tools, 1 for the left ones
+}
+@end
 
 /******************************************************************************
 * TMClipView: the document is centered when it is smaller than the window
@@ -199,7 +210,17 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
     tool_views[i]= [[NSView alloc] initWithFrame: NSZeroRect];
     [tool_views[i] setHidden: YES];
     [view addSubview: tool_views[i]];
+    if (i < 2) {
+      TMSplitHandle* h= [[TMSplitHandle alloc] initWithFrame: NSZeroRect];
+      h->wid= this;
+      h->which= i;
+      [h setHidden: YES];
+      tool_handles[i]= h;
+      tool_widths[i]= 0;
+    }
   }
+  // the handles are above the tools
+  for (int i=0; i<2; i++) [view addSubview: tool_handles[i]];
 	
   toolbar = [[NSToolbar alloc] initWithIdentifier:TMToolbarIdentifier ];
   [toolbar setDelegate:wh];
@@ -212,6 +233,10 @@ ns_tm_widget_rep::~ns_tm_widget_rep()
 { 
   [[NSNotificationCenter defaultCenter] removeObserver: wh];
   for (int i=0; i<4; i++) [tool_views[i] release];
+  for (int i=0; i<2; i++) {
+    ((TMSplitHandle*) tool_handles[i])->wid= NULL;
+    [tool_handles[i] release];
+  }
   [wh release];	
   [bc release]; 
 }
@@ -225,6 +250,30 @@ tool_size (NSView* v) {
   NSSize fs= [[[v subviews] firstObject] fittingSize];
   return NSMakeSize (fs.width + 8, fs.height + 8);
 }
+
+
+@implementation TMSplitHandle
+- (void) resetCursorRects
+{
+  [self addCursorRect: [self bounds] cursor: [NSCursor resizeLeftRightCursor]];
+}
+- (void) drawRect: (NSRect) r
+{
+  (void) r;
+  [[NSColor separatorColor] setFill];
+  NSRect b= [self bounds];
+  NSRectFill (NSMakeRect (which == 0? 0: b.size.width - 1, 0, 1, b.size.height));
+}
+- (void) mouseDragged: (NSEvent*) e
+{
+  if (!wid) return;
+  NSView* sup= [self superview];
+  NSPoint p= [sup convertPoint: [e locationInWindow] fromView: nil];
+  double w= (which == 0)? [sup bounds].size.width - p.x: p.x;
+  wid->tool_widths[which]= max (w, 60.0);
+  wid->layout ();
+}
+@end
 
 void ns_tm_widget_rep::layout()
 {
@@ -247,8 +296,11 @@ void ns_tm_widget_rep::layout()
     show[i]= visibility[6+i] && sz[i].width > 0 && sz[i].height > 0;
     [tool_views[i] setHidden: !show[i]];
   }
-  CGFloat side_w = show[0]? min (sz[0].width, r.size.width / 2): 0;
-  CGFloat left_w = show[1]? min (sz[1].width, r.size.width / 2): 0;
+  // the widths chosen with the handles, or the natural ones
+  CGFloat side_w = show[0]? min (tool_widths[0] > 0? tool_widths[0]: sz[0].width,
+                                 r.size.width / 2): 0;
+  CGFloat left_w = show[1]? min (tool_widths[1] > 0? tool_widths[1]: sz[1].width,
+                                 r.size.width / 2): 0;
   CGFloat extra_h= show[3]? sz[3].height: 0;
   CGFloat bot_h  = show[2]? sz[2].height: 0;
   CGFloat y0= foot_h + extra_h + bot_h;
@@ -259,6 +311,10 @@ void ns_tm_widget_rep::layout()
   [tool_views[1] setFrame: NSMakeRect (0, y0, left_w, mid_h)];
   [tool_views[0] setFrame: NSMakeRect (r.size.width - side_w, y0, side_w, mid_h)];
   [sv setFrame: NSMakeRect (left_w, y0, r.size.width - left_w - side_w, mid_h)];
+  [tool_handles[0] setFrame: NSMakeRect (r.size.width - side_w - 3, y0, 6, mid_h)];
+  [tool_handles[1] setFrame: NSMakeRect (left_w - 3, y0, 6, mid_h)];
+  [tool_handles[0] setHidden: !show[0]];
+  [tool_handles[1] setHidden: !show[1]];
   [tool_views[2] setFrame: NSMakeRect (0, foot_h + extra_h, r.size.width, bot_h)];
   [tool_views[3] setFrame: NSMakeRect (0, foot_h, r.size.width, extra_h)];
   [leftField setFrame: NSMakeRect (0, 0, r.size.width - fs.width, foot_h)];
@@ -440,10 +496,29 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     
   case SLOT_FILE:
     {
+      // the file of the window (for the proxy icon of the title)
       check_type<string> (val, s);
       string file = open_box<string> (val);
       if (DEBUG_EVENTS) cout << "File: " << file << LF;
-//      view->window()->setWindowFilePath(to_qstring(file));
+      url u= url_system (file);
+      if (file != "" && is_rooted (u) && exists (u))
+        [[view window] setRepresentedFilename: to_nsstring_utf8 (as_string (u))];
+      else [[view window] setRepresentedFilename: @""];
+    }
+      break;
+
+  case SLOT_FULL_SCREEN:
+    {
+      // As in the Qt interface: a black background, without scroll bars
+      check_type<bool> (val, s);
+      bool flag= open_box<bool> (val);
+      NSWindow* win= [view window];
+      bool is_full= win && ([win styleMask] & NSWindowStyleMaskFullScreen);
+      [sv setBackgroundColor: flag? [NSColor blackColor]
+                                  : to_nscolor (tm_background)];
+      [sv setHasVerticalScroller: !flag];
+      [sv setHasHorizontalScroller: !flag];
+      if (win && flag != is_full) [win toggleFullScreen: nil];
     }
       break;
       
