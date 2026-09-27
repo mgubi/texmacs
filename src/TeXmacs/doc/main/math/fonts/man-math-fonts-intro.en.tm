@@ -107,15 +107,17 @@
 
   <paragraph*|Letters, alphabets and alternates>
 
-  The letters of a formula are taken from the mathematical italic alphabet
-  of the font, so that the italic corrections and the kerning of the
-  font apply to them. An <name|OpenType> math font also has alphabets for
+  With an <name|OpenType> math font, the letters of a formula are taken
+  from the mathematical italic alphabet of the font, so that the italic
+  corrections and the kerning of the font apply to them; the hand-tuned
+  <name|TeX Gyre> fonts take them from the italic of their text font. An <name|OpenType> math font also has alphabets for
   blackboard bold (<math|\<bbb-R\>>), calligraphic (<math|\<cal-F\>>) and
   fraktur (<math|\<frak-g\>>) letters, which are used when present;
   <TeXmacs> emulates those which are missing. In scripts, the smaller
   alternates the font designs for that purpose are used, as are its dotless
-  <math|i> and <math|j> under an accent. <menu|Format|Font features> and
-  <menu|Document|Font|Features> give access to the other variants a font
+  <math|i> and <math|j> under an accent. The font browser, and, when
+  complex actions go through the menus, <menu|Format|Font features> and
+  <menu|Document|Font|Features>, give access to the other variants a font
   offers, such as old style figures or its stylistic sets.
 
   <paragraph*|Fonts that are not installed>
