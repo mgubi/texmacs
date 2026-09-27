@@ -328,7 +328,7 @@ ns_renderer_rep::lines (array<SI> x, array<SI> y) {
   [path stroke];
   // XDrawLines (dpy, win, gc, pnt, n, CoordModeOrigin);
   STACK_DELETE_ARRAY (pnt);
-  [path release];
+  // NOTE: the path is autoreleased
 }
 
 void
@@ -435,7 +435,7 @@ ns_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   [path fill];
   
   STACK_DELETE_ARRAY (pnt);
-  [path release];
+  // NOTE: the path is autoreleased
 }
 
 void
