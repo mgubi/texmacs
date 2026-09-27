@@ -16,6 +16,17 @@ roughly 1300 lines, nearly all in `src/Plugins/Freetype/` and
 on 23 September 2026 were replayed onto the SVN mirror so that they form a
 linear series on top of it.
 
+The MATH table reader goes back further. Massimiliano Gubinelli wrote a first
+one in May 2021 on the `wip-unicode-math` branch of the GitHub repository,
+together with stretchable delimiters built from the glyph assemblies and
+italic corrections taken from the table. The OSPP 2024 reader keeps its
+names (`ot_mathtable_rep`, `parse_mathtable`, `dump_mathtable`,
+`minConnectorOverlap`, `ver_glyph_variants_adv`, `hor_glyph_assembly`) and
+fixes what it lacked: signed values, NULL sub-table offsets, `MathKernInfo`,
+`ExtendedShapeCoverage`, and structured assembly records. That branch was
+deleted in September 2026; its last commit of its own was `283a33dcfa`, and
+its tip, a merge of trunk, `d102fbc244`.
+
 Reference: the MATH table specification at
 <https://learn.microsoft.com/en-gb/typography/opentype/spec/math>.
 
