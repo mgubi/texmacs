@@ -23,7 +23,7 @@
 # the styles, the metrics of the fonts, the icons of the default theme).
 # The other packages, in the order of their loading, follow PACKAGES below.
 
-import hashlib, json, os, subprocess, sys, fnmatch
+import hashlib, json, os, re, subprocess, sys, fnmatch
 
 EXCLUDE = ['bin', 'plugins/*/bin', 'plugins/*/doc', 'misc/images/windows',
            '*.DS_Store', 'CMakeLists.txt']
@@ -49,6 +49,20 @@ CHUNK = 4 * 1024 * 1024
 def excluded (rel):
   return any (fnmatch.fnmatch (rel, e) or rel.startswith (e + '/') for e in EXCLUDE)
 
+# SVNREV holds the version TeXmacs checks its files against: that of the
+# browser build (ALTERNATIVE_VERSION of misc/wasm/config.h), whatever the
+# source tree has (configure writes it, a checkout has none: the CI)
+def build_version ():
+  config = os.path.join (os.path.dirname (os.path.abspath (__file__)), 'config.h')
+  for line in open (config):
+    m = re.match (r'#define ALTERNATIVE_VERSION "(.*)"', line)
+    if m: return m.group (1)
+  sys.exit ('package.py: no ALTERNATIVE_VERSION in ' + config)
+
+def file_bytes (root, rel):
+  if rel == 'SVNREV': return (build_version () + '\n').encode ()
+  return open (os.path.join (root, rel), 'rb').read ()
+
 def main ():
   if len (sys.argv) != 4:
     sys.exit ('usage: package.py <TeXmacs dir> <output dir> <boot list>')
@@ -59,7 +73,8 @@ def main ():
     rd = '' if rd == '.' else rd + '/'
     ds[:] = sorted (x for x in ds if not excluded (rd + x))
     for f in sorted (fs):
-      if not excluded (rd + f): files.append (rd + f)
+      if not excluded (rd + f) and rd + f != 'SVNREV': files.append (rd + f)
+  files.append ('SVNREV')
   boot = set ()
   for line in open (boot_list):
     p = line.strip ()
@@ -79,7 +94,7 @@ def main ():
   for name, rels in groups:
     part, size, n = [], 0, 1
     for rel in rels:
-      s = os.path.getsize (os.path.join (root, rel))
+      s = len (file_bytes (root, rel)) if rel == 'SVNREV' else os.path.getsize (os.path.join (root, rel))
       if part and size + s > CHUNK and name != 'boot':
         chunks.append ((name + '-' + str (n), part)); n += 1
         part, size = [], 0
@@ -91,7 +106,7 @@ def main ():
   for name, rels in chunks:
     data, entries = bytearray (), []
     for rel in rels:
-      b = open (os.path.join (root, rel), 'rb').read ()
+      b = file_bytes (root, rel)
       entries.append ([rel, len (data), len (b)])
       data += b
     digest = hashlib.sha1 (data).hexdigest ()[:10]

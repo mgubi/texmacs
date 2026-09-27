@@ -88,7 +88,14 @@ FORCE:
 # a variant for node, which sees the host file system as it is (NODERAWFS)
 # and takes its environment: to test the build headless, see
 # docs/wasm/README.md
-node: $(OUT)/node/texmacs.js
+node: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV
+
+# the version TeXmacs checks its files against (test_texmacs_path): made by
+# configure, which a checkout of the sources (the CI) has not run; the node
+# build reads the files of the source tree. That of a build with configure
+# is left as it is
+$(TM)/TeXmacs/SVNREV:
+	sed -n 's/^#define ALTERNATIVE_VERSION "\(.*\)"/\1/p' $(W)/config.h > $@
 
 $(OUT)/node/texmacs.js: $(OBJECTS) $(LIBDEPS) $(W)/node-pre.js
 	@mkdir -p $(OUT)/node
