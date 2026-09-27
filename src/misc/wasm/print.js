@@ -15,7 +15,8 @@ var tmPrint = (function () {
   var urls = [], notice = null;
 
   var style = `
-    #tm-print { position:fixed; right:16px; top:44px; width:320px; max-width:calc(100% - 32px);
+    #tm-print { position:fixed; left:50%; top:40%; transform:translate(-50%,-50%);
+      width:320px; max-width:calc(100% - 32px);
       box-sizing:border-box; padding:12px 14px; background:#f6f6f6; border:1px solid #999;
       border-radius:6px; box-shadow:0 6px 24px rgba(0,0,0,.3); z-index:35;
       font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222 }
