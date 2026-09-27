@@ -74,7 +74,7 @@ public:
   ns_widget int_prompt;
   ns_widget int_input;
 
-  bool visibility[5]; 
+  bool visibility[10];  //!< the bars and tools, as in qt_tm_widget_rep
 
 public:
   command quit;

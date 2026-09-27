@@ -23,7 +23,10 @@ opens with its title, canvas and footer, the Cocoa event loop runs the
 TeXmacs update cycle, documents are drawn correctly (text, mathematics,
 at the right scale on Retina screens), and **documents can be edited**:
 typing (including return and backspace) and clicking to move the cursor
-work. The toolbars are not visible yet.
+work. The TeXmacs menus are in the menu bar (after an application menu
+created in the code, since there is no MainMenu.nib outside a bundle), and
+all of them, with their submenus, can be built. The toolbars are not visible
+yet.
 
 Testing aids (other programs are not allowed to capture or control the
 windows):
@@ -32,7 +35,9 @@ windows):
 * `TEXMACS_NS_TYPE=<text>`: after 2 seconds, the text is sent as key events
   to the canvas (`\r` is return, `\b` backspace);
 * `TEXMACS_NS_CLICK=<x>,<y>`: a click at this point of the canvas (in
-  points), before typing.
+  points), before typing;
+* `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
+  its submenus up to this depth (which builds the lazy menus).
 
 For example, to check the result:
 

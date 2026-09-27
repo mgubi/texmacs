@@ -99,11 +99,16 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   quit (_quit)
 {
   // decode mask
-  visibility[0] = (mask & 1)  == 1;  // header
-  visibility[1] = (mask & 2)  == 2;  // main
-  visibility[2] = (mask & 4)  == 4;  // context
-  visibility[3] = (mask & 8)  == 8;  // user
-  visibility[4] = (mask & 16) == 16; // footer
+  visibility[0] = (mask & 1)   == 1;   // header
+  visibility[1] = (mask & 2)   == 2;   // main
+  visibility[2] = (mask & 4)   == 4;   // mode
+  visibility[3] = (mask & 8)   == 8;   // focus
+  visibility[4] = (mask & 16)  == 16;  // user
+  visibility[5] = (mask & 32)  == 32;  // footer
+  visibility[6] = (mask & 64)  == 64;  // right side tools
+  visibility[7] = (mask & 128) == 128; // left side tools
+  visibility[8] = (mask & 256) == 256; // bottom tools
+  visibility[9] = (mask & 512) == 512; // extra bottom tools
   
   
   NSSize s = NSMakeSize(100,20); // size of the right footer;
@@ -191,14 +196,26 @@ void ns_tm_widget_rep::layout()
 }
 
 
+static int
+visibility_index (slot s) {
+  // The index in ns_tm_widget_rep::visibility (see the constructor)
+  switch (s) {
+    case SLOT_FOCUS_ICONS_VISIBILITY: return 3;
+    case SLOT_SIDE_TOOLS_VISIBILITY: return 6;
+    case SLOT_LEFT_TOOLS_VISIBILITY: return 7;
+    case SLOT_BOTTOM_TOOLS_VISIBILITY: return 8;
+    default: return 9;
+  }
+}
+
 void ns_tm_widget_rep::updateVisibility()
 {
   //FIXME: this implementation is from the Qt port. to be adapted.
 #if 0
   mainToolBar->setVisible (visibility[1] && visibility[0]);
   contextToolBar->setVisible (visibility[2] && visibility[0]);
-  userToolBar->setVisible (visibility[3] && visibility[0]);
-  tm_mainwindow()->statusBar()->setVisible (visibility[4]);
+  userToolBar->setVisible (visibility[4] && visibility[0]);
+  tm_mainwindow()->statusBar()->setVisible (visibility[5]);
 #ifndef Q_WS_MAC
   tm_mainwindow()->menuBar()->setVisible (visibility[0]);
 #endif
@@ -247,7 +264,7 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     {
       check_type<bool> (val, s);
       bool f= open_box<bool> (val);
-      visibility[3] = f;
+      visibility[4] = f;
       updateVisibility();
     }
     break;
@@ -255,7 +272,19 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
     {
       check_type<bool> (val, s);
       bool f= open_box<bool> (val);
-      visibility[4] = f;
+      visibility[5] = f;
+      updateVisibility();
+    }
+    break;
+  // FIXME: the focus icons and the tools are not shown yet
+  case SLOT_FOCUS_ICONS_VISIBILITY:
+  case SLOT_SIDE_TOOLS_VISIBILITY:
+  case SLOT_LEFT_TOOLS_VISIBILITY:
+  case SLOT_BOTTOM_TOOLS_VISIBILITY:
+  case SLOT_EXTRA_TOOLS_VISIBILITY:
+    {
+      check_type<bool> (val, s);
+      visibility[visibility_index (s)] = open_box<bool> (val);
       updateVisibility();
     }
     break;
@@ -321,7 +350,14 @@ ns_tm_widget_rep::query (slot s, int type_id) {
         
   case SLOT_USER_ICONS_VISIBILITY:
     check_type_id<bool> (type_id, s);
-    return close_box<bool> (visibility[3]);
+    return close_box<bool> (visibility[4]);
+  case SLOT_FOCUS_ICONS_VISIBILITY:
+  case SLOT_SIDE_TOOLS_VISIBILITY:
+  case SLOT_LEFT_TOOLS_VISIBILITY:
+  case SLOT_BOTTOM_TOOLS_VISIBILITY:
+  case SLOT_EXTRA_TOOLS_VISIBILITY:
+    check_type_id<bool> (type_id, s);
+    return close_box<bool> (visibility[visibility_index (s)]);
         
   case SLOT_MODE_ICONS_VISIBILITY:
     check_type_id<bool> (type_id, s);
@@ -337,7 +373,7 @@ ns_tm_widget_rep::query (slot s, int type_id) {
     
   case SLOT_FOOTER_VISIBILITY:
     check_type_id<bool> (type_id, s);
-    return close_box<bool> (visibility[4]);
+    return close_box<bool> (visibility[5]);
     
   case SLOT_INTERACTIVE_INPUT:
     {
@@ -383,24 +419,25 @@ ns_tm_widget_rep::read (slot s, blackbox index) {
 TMMenuHelper *the_menu_helper = nil;
 
 @implementation TMMenuHelper
-- init { 
-  [super init]; mi = nil; menu = nil; 
-  
-  mi = [[NSMenuItem allocWithZone:[NSMenu menuZone]] initWithTitle:@"Menu" action:NULL keyEquivalent:@""];
-  NSMenu *sm = [[[NSMenu allocWithZone:[NSMenu menuZone]] initWithTitle:@"Menu"] autorelease];
-  [mi  setSubmenu:sm];
-  //[[NSApp mainMenu] removeItem: [[NSApp mainMenu] itemWithTitle:@"Help"]]; //FIXME: Help menu causes problems (crash)
-  
-  [[NSApp mainMenu] insertItem: mi atIndex:1];	
-  //	[sm setDelegate: self];
-  
-  return self; 
+- init {
+  [super init]; mi = nil; menu = nil;
+  return self;
 }
-- (void)setMenu:(NSMenu *)_m  
-{ 
+- (void)setMenu:(NSMenu *)_m
+{
+  // The menus of TeXmacs (File, Edit, ...) become the menus of the menu
+  // bar, after the application menu
+  if (!_m) return;
+  NSMenu* main= [NSApp mainMenu];
+  while ([main numberOfItems] > 1) [main removeItemAtIndex: 1];
   if (menu) [menu release];  menu = _m; [menu retain];
-  [mi  setSubmenu:menu];
-  [menu setTitle:@"Menu"];	
+  NSArray* items= [[[menu itemArray] copy] autorelease];
+  for (NSMenuItem* item in items) {
+    [menu removeItem: item];
+    // NOTE: the menu bar shows the titles of the submenus
+    if ([item hasSubmenu]) [[item submenu] setTitle: [item title]];
+    [main addItem: item];
+  }
 };
 - (void)dealloc { [mi release]; [menu release]; [super dealloc]; }
 + (TMMenuHelper *)sharedHelper 

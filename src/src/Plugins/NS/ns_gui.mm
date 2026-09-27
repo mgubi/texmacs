@@ -612,10 +612,48 @@ ns_snapshot (string dir) {
 }
 @end
 
+// NOTE: when the environment variable TEXMACS_NS_MENUS is set, the menu bar
+// is printed after three seconds, with the submenus up to that depth
+
+static void
+ns_print_menu (NSMenu* m, int depth, int max_depth) {
+  if (!m || depth > max_depth) return;
+  if ([m delegate] && [[m delegate] respondsToSelector: @selector(menuNeedsUpdate:)])
+    [[m delegate] menuNeedsUpdate: m];
+  for (NSMenuItem* mi in [m itemArray]) {
+    string title= [mi isSeparatorItem]? string ("---")
+                                      : from_nsstring ([mi title]);
+    if ([mi image] && N(title) == 0) title= "[icon]";
+    if (![mi isEnabled]) title= title * " (disabled)";
+    fprintf (stderr, "NSMENU %s%s\n",
+             as_charp (string (' ', 2 * depth)), as_charp (title));
+    if ([mi hasSubmenu]) ns_print_menu ([mi submenu], depth + 1, max_depth);
+  }
+}
+
+@interface TMMenuPrinter : NSObject
+- (void) print: (NSTimer*) timer;
+@end
+
+@implementation TMMenuPrinter
+- (void) print: (NSTimer*) timer
+{
+  (void) timer;
+  ns_print_menu ([NSApp mainMenu], 0,
+                 as_int (get_env ("TEXMACS_NS_MENUS")));
+}
+@end
+
 void
 ns_gui_rep::event_loop () {
   [NSApp finishLaunching];
   need_update ();
+  if (get_env ("TEXMACS_NS_MENUS") != "") {
+    TMMenuPrinter* h= [[TMMenuPrinter alloc] init];
+    [NSTimer scheduledTimerWithTimeInterval: 3.0 target: h
+                                   selector: @selector(print:)
+                                   userInfo: nil repeats: NO];
+  }
   if (get_env ("TEXMACS_NS_TYPE") != "") {
     TMTypeHelper* h= [[TMTypeHelper alloc] init];
     [NSTimer scheduledTimerWithTimeInterval: 2.0 target: h
@@ -644,6 +682,56 @@ static NSAutoreleasePool *pool = nil;
 * Main routines
 ******************************************************************************/
 
+/*! Quitting from the application menu goes through TeXmacs, which asks
+ about unsaved documents. */
+@interface TMQuitHelper : NSObject
+- (void) quit: (id) sender;
+@end
+
+@implementation TMQuitHelper
+- (void) quit: (id) sender
+{
+  (void) sender;
+  exec_delayed (scheme_cmd ("(safely-quit-TeXmacs)"));
+  the_gui->need_update ();
+}
+@end
+
+static void
+make_main_menu () {
+  // The main menu, when it does not come from MainMenu.nib (as when TeXmacs
+  // is not started from an application bundle); the menus of TeXmacs are
+  // added after the application menu (see TMMenuHelper)
+  static TMQuitHelper* quit_helper= [[TMQuitHelper alloc] init];
+  NSMenu* main= [[[NSMenu alloc] initWithTitle: @"MainMenu"] autorelease];
+  NSMenuItem* app_item= [[[NSMenuItem alloc] initWithTitle: @"TeXmacs"
+                                                    action: NULL
+                                             keyEquivalent: @""] autorelease];
+  NSMenu* app= [[[NSMenu alloc] initWithTitle: @"TeXmacs"] autorelease];
+  [app addItemWithTitle: @"About TeXmacs"
+                 action: @selector(orderFrontStandardAboutPanel:)
+          keyEquivalent: @""];
+  [app addItem: [NSMenuItem separatorItem]];
+  [app addItemWithTitle: @"Hide TeXmacs" action: @selector(hide:)
+          keyEquivalent: @"h"];
+  NSMenuItem* others= [app addItemWithTitle: @"Hide Others"
+                                     action: @selector(hideOtherApplications:)
+                              keyEquivalent: @"h"];
+  [others setKeyEquivalentModifierMask:
+            NSEventModifierFlagCommand | NSEventModifierFlagOption];
+  [app addItemWithTitle: @"Show All"
+                 action: @selector(unhideAllApplications:)
+          keyEquivalent: @""];
+  [app addItem: [NSMenuItem separatorItem]];
+  NSMenuItem* quit= [app addItemWithTitle: @"Quit TeXmacs"
+                                   action: @selector(quit:)
+                            keyEquivalent: @"q"];
+  [quit setTarget: quit_helper];
+  [app_item setSubmenu: app];
+  [main addItem: app_item];
+  [NSApp setMainMenu: main];
+}
+
 void gui_open (int& argc, char** argv)
   // start the gui
 {
@@ -651,6 +739,14 @@ void gui_open (int& argc, char** argv)
     // initialize app
     [NSApplication sharedApplication];
     [NSBundle loadNibNamed:@"MainMenu" owner:NSApp];
+    // NOTE: needed for a menu bar when TeXmacs is not in a bundle
+    [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
+    // NOTE: otherwise these items are added to the Edit menu each time the
+    // menu bar is rebuilt
+    NSUserDefaults* d= [NSUserDefaults standardUserDefaults];
+    [d setBool: YES forKey: @"NSDisabledDictationMenuItem"];
+    [d setBool: YES forKey: @"NSDisabledCharacterPaletteMenuItem"];
+    if (![NSApp mainMenu]) make_main_menu ();
   }
   if (!pool) {
     // create autorelease pool 
