@@ -24,6 +24,10 @@
 #include "message.hpp"
 #include "scheme.hpp"
 #include "url.hpp"
+#include "file.hpp"
+#include "MacOS/mac_images.h"
+#include "editor.hpp"
+#include "convert.hpp"
 
 
 /******************************************************************************
@@ -35,9 +39,29 @@ ns_chooser_widget_rep::ns_chooser_widget_rep (command _cmd, string _type,
   ns_widget_rep (file_chooser), cmd (_cmd), type (_type), prompt (_prompt),
   position (coord2 (0, 0)), size (coord2 (100, 100)), file ("") {}
 
+/*! The filter of the file type (see qt_chooser_widget_rep::set_type). */
 bool
 ns_chooser_widget_rep::set_type (const string& _type) {
-  // FIXME: filters for the file types, as in qt_chooser_widget_rep
+  filter_name= "";
+  suffixes= array<string> ();
+  if (_type == "directory" || _type == "generic") {
+    type= _type;
+    return true;
+  }
+  if (format_exists (_type)) {
+    filter_name= translate (as_string (call ("format-get-name", _type))
+                            * " file");
+    array<object> a= as_array_object (call ("format-get-suffixes*", _type));
+    for (int i=1; i<N(a); i++) suffixes << as_string (a[i]);
+  }
+  else if (_type == "image") {
+    filter_name= translate ("Image file");
+    suffixes << string ("png") << string ("jpg") << string ("jpeg")
+             << string ("bmp") << string ("gif") << string ("pdf")
+             << string ("eps") << string ("ps") << string ("svg")
+             << string ("tif") << string ("tiff");
+  }
+  else return false;
   type= _type;
   return true;
 }
@@ -122,6 +146,31 @@ ns_chooser_widget_rep::plain_window_widget (string s, command q) {
   return this;
 }
 
+/*! The pop-up menu of the filters of a file panel. */
+@interface TMChooserFilter : NSObject
+{
+@public
+  NSSavePanel* panel;
+  NSArray* types;
+}
+- (void) choose: (NSPopUpButton*) sender;
+@end
+
+@implementation TMChooserFilter
+- (void) choose: (NSPopUpButton*) sender
+{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  [panel setAllowedFileTypes: [sender indexOfSelectedItem] == 0? types: nil];
+#pragma clang diagnostic pop
+}
+- (void) dealloc
+{
+  [types release];
+  [super dealloc];
+}
+@end
+
 void
 ns_chooser_widget_rep::perform_dialog () {
   // The result is queried by TeXmacs with SLOT_STRING_INPUT
@@ -147,10 +196,58 @@ ns_chooser_widget_rep::perform_dialog () {
   if (file != "" && save)
     [panel setNameFieldStringValue: to_nsstring (as_string (tail (url_system (file))))];
 
+  // the filters: the file type or all files (as in the Qt interface)
+  TMChooserFilter* filter= nil;
+  if (N(suffixes) > 0 && type != "directory") {
+    NSMutableArray* types= [NSMutableArray array];
+    string desc;
+    for (int i=0; i<N(suffixes); i++) {
+      [types addObject: to_nsstring (suffixes[i])];
+      desc << (i == 0? "": " ") << "*." << suffixes[i];
+    }
+    filter= [[[TMChooserFilter alloc] init] autorelease];
+    filter->panel= panel;
+    filter->types= [types retain];
+    NSPopUpButton* pop= [[[NSPopUpButton alloc] init] autorelease];
+    [pop addItemWithTitle: to_label (filter_name * " (" * desc * ")")];
+    [pop addItemWithTitle: to_label (translate ("All files (*)"))];
+    [pop setTarget: filter];
+    [pop setAction: @selector(choose:)];
+    [pop sizeToFit];
+    NSStackView* acc= [NSStackView stackViewWithViews:
+                        [NSArray arrayWithObjects:
+                          [NSTextField labelWithString:
+                            to_label (translate ("Format") * ":")], pop, nil]];
+    [acc setEdgeInsets: NSEdgeInsetsMake (8, 8, 8, 8)];
+    [acc setFrameSize: [acc fittingSize]];
+    [panel setAccessoryView: acc];
+    if ([panel isKindOfClass: [NSOpenPanel class]])
+      [(NSOpenPanel*) panel setAccessoryViewDisclosed: YES];
+    [filter choose: pop];
+    [panel setAllowsOtherFileTypes: YES];
+  }
+
   file= "#f";
   if ([panel runModal] == NSModalResponseOK) {
     string name= from_nsstring ([[panel URL] path]);
+    // the default suffix, when there is none (see qt_chooser_widget_rep)
+    if (save && N(suffixes) > 0 && suffix (url_system (name)) == "")
+      name= name * "." * suffixes[0];
     file= "(system->url " * scm_quote (name) * ")";
+    if (type == "image") {
+      // the size of the image (see qt_pretty_image_size)
+      string w= "", h= "";
+      int ww, hh;
+      string ext= locase_all (suffix (url_system (name)));
+      if (ext != "pdf" && ext != "ps" && ext != "eps" &&
+          mac_image_size (url_system (name), ww, hh)) {
+        SI pt = get_current_editor()->as_length ("1pt");
+        SI par= get_current_editor()->as_length ("1par");
+        if (ww <= 0 || hh <= 0 || ww * pt > par) w= "1par";
+        else { w= as_string (ww) * "pt"; h= as_string (hh) * "pt"; }
+      }
+      file= "(list " * file * " \"" * w * "\" \"" * h * "\" \"\" \"\")";
+    }
   }
   cmd ();
   if (!is_nil (quit)) quit ();

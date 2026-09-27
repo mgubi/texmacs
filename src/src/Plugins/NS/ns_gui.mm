@@ -934,6 +934,17 @@ ns_press (NSView* v, NSString* label) {
   (void) timer;
   NSString* label= to_nsstring (get_env ("TEXMACS_NS_PRESS"));
   bool done= false;
+  if ([label isEqualToString: @"abort-modal"]) {
+    // the modal window (for instance a file panel) is closed
+    NSWindow* w= [NSApp modalWindow];
+    fprintf (stderr, "TEXMACS_NS_PRESS modal %s\n",
+             w? [NSStringFromClass ([w class]) UTF8String]: "none");
+    if (w) {
+      [NSApp abortModal];
+      [w orderOut: nil];
+    }
+    return;
+  }
   for (NSWindow* win in [[[NSApp orderedWindows] copy] autorelease])
     if (!done && [win isVisible]) {
       if ([label hasPrefix: @"field:"]) done= ns_fill_field (win, label);
