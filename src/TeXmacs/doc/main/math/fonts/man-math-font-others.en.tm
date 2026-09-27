@@ -44,7 +44,7 @@
 
   <paragraph*|Lete Sans>
 
-  A sans serif mathematical font designed for Lato. Text: Lato; mathematics: Lete Sans Math, with 95% of the symbols. Where to find it: <verbatim|lete-sans-math> and <verbatim|lato> in <TeX> Live. Once installed, it appears in the section <menu|Sans serif text and mathematics> of the font menu.
+  A sans serif mathematical font designed to go with Lato; <TeXmacs> sets the text in the letters of the mathematical font itself. Text: Lete Sans Math itself; mathematics: Lete Sans Math, with 95% of the symbols. Where to find it: <verbatim|lete-sans-math> in <TeX> Live. Once installed, it appears in the section <menu|Sans serif text and mathematics> of the font menu.
 
   <\with|font|Lete Sans Math>
     Text in <em|italic> and <strong|bold>: the quick brown fox, 0123456789.

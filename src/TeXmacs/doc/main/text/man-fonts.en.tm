@@ -7,8 +7,9 @@
 
   In <TeXmacs>, the global document font can be specified using
   <menu|Document|Font>. It is also possible to locally use another font using
-  <menu|Format|Font>. Both <menu|Document|Font> and <menu|Format|Font> open
-  the <TeXmacs> font browser. Fonts have three main characteristics:
+  <menu|Format|Font>. In the compact menus, both <menu|Document|Font> and
+  <menu|Format|Font> open the <TeXmacs> font browser; in the full menus they
+  are submenus which list the fonts. Fonts have three main characteristics:
 
   <\description>
     <item*|Family>Fonts are grouped together into <em|families> with a
@@ -84,8 +85,12 @@
   (for instance).
 
   It should be noticed that <TeXmacs> comes with a limited number of
-  preinstalled fonts, such as the <with|font|Stix|Stix> fonts and several
-  fonts prefixed by \PTeXmacs\Q. Documents which only use these fonts will be
+  preinstalled fonts: the fonts prefixed by \PTeXmacs\Q, the
+  <with|font|Stix|Stix> fonts, and the text and mathematical fonts shown in
+  the section <hlink|<em|The fonts which come with
+  <TeXmacs>>|../math/fonts/man-math-font-catalogue.en.tm>, among them Latin
+  Modern, <name|TeX Gyre>, Libertinus and Fira. Documents which only use
+  these fonts will be
   rendered the same on different systems (assuming the same version of
   <TeXmacs>). When your documents contain other fonts as well, then these
   fonts may be replaced by closest matches when opening your document under a

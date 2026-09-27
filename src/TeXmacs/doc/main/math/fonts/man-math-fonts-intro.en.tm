@@ -40,8 +40,10 @@
     <name|TeX Gyre> fonts, <TeXmacs> has its own corrections, adjusted by
     hand before it could read the <verbatim|MATH> table. They are still used,
     and the table only supplies what they do not cover. The preference
-    <menu|Edit|Preferences|Other|Hand tuned math fonts> switches them off,
-    to see what the table alone gives.
+    <menu|Hand tuned math fonts>, among the experimental features of the tab
+    <menu|Other> of the preferences (<menu|Edit|Preferences>, or
+    <menu|TeXmacs|Preferences> on <name|macOS>), switches them off, to see
+    what the table alone gives.
   </description>
 
   <paragraph*|Choosing the fonts of a document>
@@ -49,7 +51,7 @@
   The simplest way is the font button of the focus toolbar, which shows the
   name of the main font of the document (for instance <menu|Roman>) when the
   cursor is not inside any particular tag. Its menu has a section <menu|Text
-  and mathematics> with the <TeX> fonts, then a section <menu|Serif text and
+  and mathematics> with Roman and the first STIX fonts, then a section <menu|Serif text and
   mathematics> and a section <menu|Sans serif text and mathematics> with the
   <name|OpenType> pairs, under the names <LaTeX> users know: <menu|Times>
   for <name|TeX Gyre> Termes as with the <verbatim|newtx> package,
@@ -58,22 +60,25 @@
   knows but which are less common are in a submenu <menu|Other OpenType math
   fonts>. Every entry sets the text font, the mathematical font and, when
   the pair calls for it, the font family, and a menu lists only the fonts
-  which are installed.
+  which are installed. A last section, <menu|Text only>, changes the text
+  font alone.
 
   <menu|Document|Font|Mathematical font> changes the mathematical font alone,
   and keeps the text font. Its entries are the traditional <TeXmacs> math
   fonts and, at the end, the installed <name|OpenType> math fonts. Formulas
-  follow the font of the text whenever that font has a mathematical
-  companion, so this menu has an effect with the default text font, Roman,
-  or with a text font which has no mathematics of its own.
+  follow the text font, so this menu only has an effect while the text font
+  is the default one, Roman; to combine another text font with a
+  mathematical font, use the font button, or the rule described below.
 
   <paragraph*|The same thing in markup>
 
   An entry of the menu stores its choice in the document as environment
   variables. The main font is <src-var|font>, which names a font by its
-  family, <verbatim|Libertinus> or <verbatim|TeX Gyre Pagella> for instance,
-  and formulas are then set in the mathematical font which belongs to that
-  family. When a text font is combined with another mathematical font than
+  family, <verbatim|Libertinus> or <verbatim|Kepler> for instance, and
+  formulas are then set in the mathematical font which belongs to that
+  family. (The <name|TeX Gyre> entries, Times, Palatino, Bookman and
+  Schoolbook, add a style package instead, such as
+  <verbatim|pagella-font>, which also sets the hand-tuned mathematics.) When a text font is combined with another mathematical font than
   its own, the value of <src-var|font> is a <em|rule> which names both: Euler
   is set with Pagella text by
 
