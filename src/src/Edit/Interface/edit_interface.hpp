@@ -63,6 +63,7 @@ protected:
   array<rectangles> alt_selection_rects;
   array<rectangles> spell_error_rects;
   rectangle     last_visible;
+  rectangle     last_extents;
   rectangles    env_rects;
   rectangles    foc_rects;
   rectangles    sem_rects;

@@ -853,6 +853,15 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling extents\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS)) {
+    // the parts between the old and the new box of the document pass from
+    // its background to its surroundings or back (a slide which overflows
+    // its page, for instance): the changes of the text do not cover them
+    rectangle nb (eb->x1, eb->y1, eb->x2, eb->y2);
+    if (nb != last_extents) {
+      rectangles o (last_extents), n (nb);
+      invalidate ((n - o) | (o - n));
+      last_extents= nb;
+    }
     string medium= get_init_string (PAGE_MEDIUM);
     SI ex1= (SI) (((double) eb->x1) * magf);
     SI ey1= (SI) (((double) eb->y1) * magf);
