@@ -72,16 +72,21 @@ of them was set with no kerning at all.
 `TeXmacs/progs/fonts/fonts-opentype.scm`). What the MATH table cannot say:
 the text, sans serif and typewriter companions of a math font, whether math
 letters come from the math font or from the text italic, the menu label.
-Twenty fonts are profiled, each declared with `define-math-font-profile`,
+Twenty-four fonts are profiled, each declared with `define-math-font-profile`,
 and a companion is named by its master, the way
 the `font` environment variable names a font, not by its family. A text family typesets its formulas in its math
 companion and the other way round, math sans serif and math typewriter use
-the declared companions, and the "Mathematical font" menu lists the profiled
-fonts that are installed.
+the declared companions, in text as in formulas. The font menu offers the
+installed ones under the names LaTeX users know, in a Serif and a Sans serif
+section (Times, Palatino, Utopia, Charter, Euler, Concrete, Fira, Kp Sans,
+Computer Modern Sans...), and the "Mathematical font" menu lists them all.
 
 **Shipped fonts.** Latin Modern Math, New Computer Modern Math, STIX Two
-Math, KpMath and Fira Math are shipped with text companions and registered in
-the global database, so they work in a fresh installation without a scan.
+Math, KpMath and KpMath Sans, Fira Math, Libertinus Math, Erewhon Math,
+XCharter Math, Concrete Math and Euler Math are shipped with their text
+companions (sans serif and typewriter too where the family has them) and
+registered in the global database, so they work in a fresh installation
+without a scan.
 Rescanning a complete database went from minutes to about two seconds by
 skipping files already recorded.
 
@@ -180,9 +185,10 @@ hand-tuned tables. Both are here to compare against.
 
 ### Shipped with TeXmacs
 
-These five are in `TeXmacs/fonts/truetype` and need no font scan. They take
+These are in `TeXmacs/fonts/truetype` and need no font scan. They take
 the MATH path with no hand tuning, so they exercise everything described
-above.
+above. Libertinus, Erewhon, XCharter, Concrete and Euler, shipped as well,
+are shown below among the other profiled fonts.
 
 ![Latin Modern Math](opentype-math/latin-modern-math.png)
 
@@ -191,6 +197,8 @@ above.
 ![STIX Two Math](opentype-math/stix-two-math.png)
 
 ![KpMath](opentype-math/kpmath.png)
+
+![KpMath Sans](opentype-math/kpmathsans.png)
 
 ![Fira Math](opentype-math/fira-math.png)
 
@@ -236,6 +244,8 @@ two-em cap.
 ![Euler Math](opentype-math/euler-math.png)
 
 ![IBM Plex Math](opentype-math/ibm-plex-math.png)
+
+![New Computer Modern Sans Math](opentype-math/newcomputermodernsansmath.png)
 
 ![Lete Sans Math](opentype-math/lete-sans-math.png)
 
