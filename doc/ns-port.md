@@ -13,8 +13,10 @@ cd src
 make -k -j8
 ```
 
-`--enable-cocoa` defines `AQUATEXMACS` and compiles `Plugins/NS` (it used to
-compile the old `Plugins/Cocoa`), together with `Plugins/MacOS`.
+`--enable-cocoa` defines `AQUATEXMACS` and compiles `Plugins/NS`, together
+with `Plugins/MacOS`. The old interface (`Plugins/Cocoa`, with its nibs) and
+the branch `ns` were removed (the branch is kept in the local tags
+`archive/ns-2018` and `archive/ns-worktree-2026-09-27`).
 
 ## State (2026-09-27, night)
 

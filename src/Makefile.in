@@ -486,7 +486,6 @@ MACOS_BUNDLE: TEXMACS
 
 	$(CP) $(MACOS_PACKAGE_SRC)/TeXmacs-document.icns \
 				$(MACOS_PACKAGE_RESOURCES)
-	$(CP) src/Plugins/Cocoa/English.lproj $(MACOS_PACKAGE_RESOURCES)
 	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(MACOS_PACKAGE_RESOURCES)
 	$(CP) TeXmacs $(MACOS_PACKAGE_RESOURCES)/share
 	$(RM) $(MACOS_PACKAGE_TEXMACS)/bin/texmacs.bin

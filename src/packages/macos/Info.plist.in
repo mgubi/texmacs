@@ -64,8 +64,6 @@
     <false/>
     <key>CFBundleSignature</key>
     <string>TXMC</string>
-    <key>NSMainNibFile</key>
-    <string>MainMenu</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
