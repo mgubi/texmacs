@@ -153,10 +153,20 @@ took longer (a long document) the tab is refused, and a notice in the page
 offers to open it (a click of its own) or to download it. The last four
 PDFs are kept for their tabs (`URL.revokeObjectURL` for the older ones).
 
-Known: the Fira fonts of some documents (the Welcome document) are
-embedded whole, not subset (`MuPDF error: format error: Reserved
-charstring byte`): the PDF is right but larger (740 KB for the Welcome
-document, 130 KB on the desktop, which uses other fonts for it).
+The fonts are subset by MuPDF (`pdf_subset_fonts`). Its subsetter of CFF
+fonts scanned each subroutine apart from the glyphs which call it, with no
+stem hints: the hintmasks of a subroutine then had the wrong length, and
+the scan read their bytes as operators (`MuPDF error: format error:
+Reserved charstring byte c=0x0`), which stopped the subsetting of every
+font of the document -- all of them were embedded whole. The Fira fonts,
+whose charstrings are subroutinized, have hundreds of such subroutines.
+`misc/wasm/mupdf-subset-cff.patch` (applied by `build-mupdf.sh`) executes
+the subroutines within the charstrings which call them, as a renderer does.
+The PDF of the Welcome document went from 740 KB to 566 KB, the fonts in
+it to about 90 KB; the rest is its pictures, kept lossless (Flate), where
+the desktop build writes them as JPEG. The desktop build links the MuPDF of
+Homebrew, which has the same bug: a document in Fira gets its fonts whole
+there.
 
 ## The files of TeXmacs in the page
 

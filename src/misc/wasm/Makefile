@@ -56,6 +56,8 @@ LDFLAGS  := $(OPT) $(EH) -sUSE_SDL=3 -sALLOW_MEMORY_GROWTH=1 \
   -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=16777216 \
   -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm
+# a new MuPDF (build-mupdf.sh, its patches) links the program again
+LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a
 
 all: $(OUT)/texmacs.js
 
@@ -65,7 +67,7 @@ all: $(OUT)/texmacs.js
 # which serve them (misc/wasm/serve.mjs does)
 web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json
 
-$(OUT)/web/texmacs.html: $(OBJECTS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/shell.html
+$(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
 	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/progress.js --pre-js $(W)/packages.js --pre-js $(W)/web-pre.js \
 	  --pre-js $(W)/files.js --pre-js $(W)/frame.js --pre-js $(W)/clipboard.js --pre-js $(W)/print.js --shell-file $(W)/shell.html \
@@ -88,7 +90,7 @@ FORCE:
 # docs/wasm/README.md
 node: $(OUT)/node/texmacs.js
 
-$(OUT)/node/texmacs.js: $(OBJECTS) $(W)/node-pre.js
+$(OUT)/node/texmacs.js: $(OBJECTS) $(LIBDEPS) $(W)/node-pre.js
 	@mkdir -p $(OUT)/node
 	em++ $(LDFLAGS) -sNODERAWFS=1 -sENVIRONMENT=node --pre-js $(W)/node-pre.js \
 	  $(OBJECTS) $(LIBS) -o $@
