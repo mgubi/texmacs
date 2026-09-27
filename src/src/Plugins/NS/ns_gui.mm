@@ -22,6 +22,8 @@
 #include "sys_utils.hpp"
 
 #include "tm_window.hpp"
+#include "editor.hpp"
+#include "convert.hpp"
 #include "new_window.hpp"
 #include "ns_gui.h"
 #include "ns_utilities.h"
@@ -156,26 +158,67 @@ ns_gui_rep::get_selection (string key, tree& t, string& s, string format) {
 
   string input_format;
   NSData* data= nil;
+  int pic_w= 0, pic_h= 0;
+  NSArray* img_types= [NSArray arrayWithObjects: NSPasteboardTypePNG,
+                                                 NSPasteboardTypeTIFF, nil];
   if (format == "default") {
     if ((data= [pb dataForType: texmacs_clipboard_type]))
       input_format= "texmacs-snippet";
+    else if ([pb availableTypeFromArray: img_types]) {
+      // pictures, as in the Qt interface: a file, or the image itself
+      NSArray* urls= [pb readObjectsForClasses:
+                        [NSArray arrayWithObject: [NSURL class]] options: nil];
+      if ([urls count] == 1 && [[urls firstObject] isFileURL]) {
+        data= [[[urls firstObject] path] dataUsingEncoding: NSUTF8StringEncoding];
+        input_format= "linked-picture";
+      }
+      else {
+        NSBitmapImageRep* rep= [NSBitmapImageRep imageRepWithData:
+          [pb dataForType: [pb availableTypeFromArray: img_types]]];
+        data= [rep representationUsingType: NSBitmapImageFileTypePNG
+                                properties: [NSDictionary dictionary]];
+        pic_w= (int) [rep size].width;
+        pic_h= (int) [rep size].height;
+        input_format= "picture";
+      }
+    }
     else if ((data= [[pb stringForType: NSPasteboardTypeHTML]
                       dataUsingEncoding: NSUTF8StringEncoding]))
       input_format= "html-snippet";
     else if ((data= [[pb stringForType: NSPasteboardTypeString]
                       dataUsingEncoding: NSUTF8StringEncoding]))
       input_format= "verbatim-snippet";
-    // FIXME: pictures, as in the Qt interface
   }
   else data= [[pb stringForType: NSPasteboardTypeString]
                dataUsingEncoding: NSUTF8StringEncoding];
   if (data && [data length] > 0)
     s << string ((char*) [data bytes], (int) [data length]);
-  if (input_format != "" && !direct_selection)
+  bool picture= (input_format == "picture" || input_format == "linked-picture");
+  if (input_format == "linked-picture") s= utf8_to_cork (s);
+  if (input_format == "html-snippet" && seems_buggy_html_paste (s))
+    s= correct_buggy_html_paste (s);
+  if (!picture && seems_buggy_paste (s))
+    s= correct_buggy_paste (s);
+  if (input_format != "" && !picture && !direct_selection)
     s= as_string (call ("convert", s, input_format, "texmacs-snippet"));
   if (input_format == "html-snippet") {
     tree h= as_tree (call ("convert", s, "texmacs-snippet", "texmacs-tree"));
+    h= default_with_simplify (h);
     s= as_string (call ("convert", h, "texmacs-tree", "texmacs-snippet"));
+  }
+  if (input_format == "picture") {
+    // the size as qt_pretty_image_size
+    string w= "", h= "";
+    SI pt = get_current_editor()->as_length ("1pt");
+    SI par= get_current_editor()->as_length ("1par");
+    if (pic_w <= 0 || pic_h <= 0 || pic_w * pt > par) w= "1par";
+    else { w= as_string (pic_w) * "pt"; h= as_string (pic_h) * "pt"; }
+    tree im (IMAGE, tuple (tree (RAW_DATA, s), "png"), w, h, "", "");
+    s= as_string (call ("convert", im, "texmacs-tree", "texmacs-snippet"));
+  }
+  if (input_format == "linked-picture") {
+    tree im (IMAGE, s, "", "", "", "");
+    s= as_string (call ("convert", im, "texmacs-tree", "texmacs-snippet"));
   }
   t= tuple ("extern", s);
   return true;

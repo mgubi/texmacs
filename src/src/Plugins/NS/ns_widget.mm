@@ -281,11 +281,8 @@ ns_window_widget_rep::send (slot s, blackbox val) {
     {
       check_type<bool> (val, s);
       bool flag = open_box<bool> (val);  // true= get grab, false= release grab
-      NSWindow *win = [wc window];
-      if (win) {
-        // FIXME: not sure how to handle this
-        cout << "TeXmacs] Warning: mouse grabbing is currenlty ignored in the NS backend\n";
-      }
+      // NOTE: as in the Qt interface, nothing to do for the windows
+      (void) flag;
     }
       break;
     case SLOT_NAME: // sets window *title* not the name
