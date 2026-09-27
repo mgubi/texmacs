@@ -78,7 +78,13 @@
   [self setDelegate:self];
 }
 
-- (void)dealloc { [self setPromise:NULL]; [super dealloc]; }
+- (void)dealloc
+{
+  // NOTE: not setPromise:, which would make a weak reference to self
+  [self setDelegate: nil];
+  if (pm) { DEC_COUNT_NULL(pm); pm= NULL; }
+  [super dealloc];
+}
 
 - (void)menuNeedsUpdate:(NSMenu *)menu
 {

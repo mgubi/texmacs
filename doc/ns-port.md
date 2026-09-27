@@ -31,7 +31,8 @@ screens), and the footer shows the messages of TeXmacs. Dialogs made with
 `tm-widget` work, such as the preferences and the page format (tabs, pop-up
 menus, buttons, refreshable parts, and embedded TeXmacs editors), and so do
 the side and bottom tools (for instance the document metadata and the search
-bar).
+bar). The clipboard works with the other applications (text and HTML) and
+between TeXmacs processes (in the format of TeXmacs).
 
 Testing aids (other programs are not allowed to capture or control the
 windows):

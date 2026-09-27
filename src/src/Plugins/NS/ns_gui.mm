@@ -122,33 +122,59 @@ ns_gui_rep::~ns_gui_rep()  {
  * interclient communication
  ******************************************************************************/
 
+/* NOTE: as in the Qt interface, the clipboard contains the selection in the
+ format of TeXmacs (with the process which put it there), and as text or
+ HTML for the other applications */
+
+static NSString* texmacs_clipboard_type= @"org.texmacs.clipboard";
+static NSString* texmacs_pid_type= @"org.texmacs.pid";
+
+static bool
+owns_pasteboard (NSPasteboard* pb) {
+  NSString* pid= [pb stringForType: texmacs_pid_type];
+  return pid && [pid intValue] == [[NSProcessInfo processInfo] processIdentifier];
+}
+
 bool
 ns_gui_rep::get_selection (string key, tree& t, string& s, string format) {
-  // FIXME: sync with Qt version
-  
+  bool direct_selection= (key == "extern");
+  if (direct_selection) key= "primary";
   s= "";
   t= "none";
-  if (selection_t->contains (key)) {
+  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  bool owns= (format != "temp" && format != "wrapbuf" && key != "primary") ||
+             (key == "primary" && owns_pasteboard (pb));
+  if (owns) {
+    if (!selection_t->contains (key)) return false;
     t= copy (selection_t [key]);
     s= copy (selection_s [key]);
     return true;
   }
   if (key != "primary") return false;
-  
-	NSPasteboard *pb = [NSPasteboard generalPasteboard];
-	NSArray *types = [NSArray arrayWithObject: NSStringPboardType];
-	NSString *bestType = [pb availableTypeFromArray: types];
 
-	if (bestType != nil) {
-		NSString* data = [pb stringForType:bestType];
-		if (data) {
-		char *buf = (char*)[data UTF8String];
-			unsigned size = strlen(buf);
-		s << string(buf, size);
-		}
-	}
-
-
+  string input_format;
+  NSData* data= nil;
+  if (format == "default") {
+    if ((data= [pb dataForType: texmacs_clipboard_type]))
+      input_format= "texmacs-snippet";
+    else if ((data= [[pb stringForType: NSPasteboardTypeHTML]
+                      dataUsingEncoding: NSUTF8StringEncoding]))
+      input_format= "html-snippet";
+    else if ((data= [[pb stringForType: NSPasteboardTypeString]
+                      dataUsingEncoding: NSUTF8StringEncoding]))
+      input_format= "verbatim-snippet";
+    // FIXME: pictures, as in the Qt interface
+  }
+  else data= [[pb stringForType: NSPasteboardTypeString]
+               dataUsingEncoding: NSUTF8StringEncoding];
+  if (data && [data length] > 0)
+    s << string ((char*) [data bytes], (int) [data length]);
+  if (input_format != "" && !direct_selection)
+    s= as_string (call ("convert", s, input_format, "texmacs-snippet"));
+  if (input_format == "html-snippet") {
+    tree h= as_tree (call ("convert", s, "texmacs-snippet", "texmacs-tree"));
+    s= as_string (call ("convert", h, "texmacs-tree", "texmacs-snippet"));
+  }
   t= tuple ("extern", s);
   return true;
 }
@@ -156,38 +182,40 @@ ns_gui_rep::get_selection (string key, tree& t, string& s, string format) {
 bool
 ns_gui_rep::set_selection (string key, tree t,
                            string s, string sv, string sh, string format) {
-  // FIXME: sync with Qt version
-
+  (void) sh;
   selection_t (key)= copy (t);
   selection_s (key)= copy (s);
-  if (key == "primary") {
-    //if (is_nil (windows_l)) return false;
-    //Window win= windows_l->item;
-    if (selection!=NULL) tm_delete_array (selection);
-    //XSetSelectionOwner (dpy, XA_PRIMARY, win, CurrentTime);
-    //if (XGetSelectionOwner(dpy, XA_PRIMARY)==None) return false;
-    selection= as_charp (s);
-	
-	NSPasteboard *pb = [NSPasteboard generalPasteboard];
-	NSArray *types = [NSArray arrayWithObjects:
-		NSStringPboardType, nil];
-	[pb declareTypes:types owner:nil];
-	[pb setString: [NSString stringWithCString: selection]
-        forType: NSStringPboardType];
+  if (key != "primary") return true;
+  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  [pb clearContents];
+  string text= s;
+  if (format == "default") {
+    c_string cs (s);
+    [pb setData: [NSData dataWithBytes: (char*) cs length: N(s)]
+        forType: texmacs_clipboard_type];
+    [pb setString: [NSString stringWithFormat: @"%d",
+                      [[NSProcessInfo processInfo] processIdentifier]]
+          forType: texmacs_pid_type];
+    text= sv;
   }
+  c_string ct (text);
+  NSString* str= [[[NSString alloc] initWithBytes: (char*) ct length: N(text)
+                                         encoding: NSUTF8StringEncoding] autorelease];
+  if (!str)
+    str= [[[NSString alloc] initWithBytes: (char*) ct length: N(text)
+                                 encoding: NSISOLatin1StringEncoding] autorelease];
+  if (format == "html") [pb setString: str forType: NSPasteboardTypeHTML];
+  else [pb setString: str forType: NSPasteboardTypeString];
   return true;
 }
 
 void
 ns_gui_rep::clear_selection (string key) {
-  // FIXME: sync with Qt version
   selection_t->reset (key);
   selection_s->reset (key);
-  if ((key == "primary") && (selection != NULL)) {
-    tm_delete_array (selection);
-	// FIXME: should we do something with the pasteboard?
-    selection= NULL;
-  }
+  if (key != "primary") return;
+  NSPasteboard *pb = [NSPasteboard generalPasteboard];
+  if (owns_pasteboard (pb)) [pb clearContents];
 }
 
 

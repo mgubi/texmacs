@@ -87,8 +87,8 @@
           {
             mi = [segs objectAtIndex:j];
             [sc setEnabled:YES forSegment:j];
+            // NOTE: not [mi setMenu:nil], which is reserved to NSMenu
             [sc setMenu:[mi submenu] forSegment:j];
-            [mi setMenu:nil];
             if ([mi representedObject]) {
               [sc setImage:[mi representedObject] forSegment:j];
               [sc setLabel:nil forSegment:j];
