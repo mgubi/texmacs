@@ -34,16 +34,36 @@ Module['preRun'].push(function () {
   FS.syncfs (true, function (err) {
     if (err) console.error ('TeXmacs: cannot read the saved home directory', err);
     try { FS.mkdirTree ('/home/web/.TeXmacs'); } catch (e) {}
+    // the temporary files of the previous sessions: TeXmacs empties its
+    // temporary directory when it quits, which a page never does (and its
+    // process has always the same number: they piled up in the storage)
+    tmRemoveTree ('/home/web/.TeXmacs/system/tmp', false);
     removeRunDependency ('home');
   });
 });
 
-// the home directory to IndexedDB now (files.js calls it after a change)
-var tmSaveHome;
+// remove a directory of the file system of the page: its contents, and the
+// directory itself when self is true
+function tmRemoveTree (path, self) {
+  var st;
+  try { st = FS.stat (path); } catch (e) { return; }
+  if (FS.isDir (st.mode)) {
+    FS.readdir (path).forEach (function (x) {
+      if (x !== '.' && x !== '..') tmRemoveTree (path + '/' + x, true);
+    });
+    if (self) try { FS.rmdir (path); } catch (e) {}
+  }
+  else try { FS.unlink (path); } catch (e) {}
+}
+
+// the home directory to IndexedDB now (files.js calls it after a change);
+// never again once the page removed its storage (tmFrame, "Remove from this
+// browser"), or it would write it back
+var tmSaveHome, tmStorageRemoved = false;
 (function () {
   var busy = false;
   function save () {
-    if (busy || !runtimeInitialized) return;
+    if (busy || !runtimeInitialized || tmStorageRemoved) return;
     busy = true;
     FS.syncfs (false, function (err) {
       busy = false;

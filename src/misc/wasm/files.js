@@ -6,6 +6,10 @@
 // - a panel (tmFiles.browse) to see it and to bring files in and out:
 //   upload files, whole folders (a project with its images) or a zip, make
 //   folders, rename, delete, download a file, or a folder as a zip;
+// - in the same panel, the files of TeXmacs (/texmacs: its styles,
+//   packages, Scheme code, documentation), which are not changed: they are
+//   opened, downloaded, or copied into the TeXmacs folder of the user
+//   ("customize": ~/.TeXmacs at the same place), where TeXmacs looks first;
 // - the same panel as the Open and Save dialogs of TeXmacs (tmFiles.open,
 //   tmFiles.save, called from vue_gui.cpp);
 // - the files and folders dropped on the page: copied into ~/Documents,
@@ -18,6 +22,11 @@
 var tmFiles = (function () {
   var HOME = '/home/web';
   var DOCS = HOME + '/Documents';
+  // the files of TeXmacs (its styles, packages, Scheme code...): shown, not
+  // changed; "customize" copies one into the TeXmacs folder of the user,
+  // where TeXmacs looks first
+  var SYS = '/texmacs', USER_TM = HOME + '/.TeXmacs';
+  function inSys (p) { return p === SYS || p.indexOf (SYS + '/') === 0; }
   var DOC_SUFFIXES = ['tm', 'tmml', 'ts', 'tex', 'html', 'htm', 'md', 'bib', 'scm', 'txt'];
   var IMAGE_SUFFIXES = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'pdf', 'eps', 'ps', 'tif', 'tiff', 'bmp'];
 
@@ -303,11 +312,13 @@ var tmFiles = (function () {
     root.appendChild (box);
     var head = el ('div', 'padding:10px 14px;font-weight:bold;border-bottom:1px solid #ccc',
                    mode === 'open' ? 'Open a file' : mode === 'save' ? 'Save as' : 'Files of the page');
+    var places = el ('div', 'padding:8px 14px 0;display:flex;gap:14px');
     var crumbs = el ('div', 'padding:6px 14px;color:#444');
     var tools = el ('div', 'padding:4px 14px 8px');
     var listing = el ('div', 'flex:1;overflow:auto;background:#fff;margin:0 14px;border:1px solid #ccc');
     var foot = el ('div', 'padding:10px 14px;display:flex;gap:8px;align-items:center');
-    box.appendChild (head); box.appendChild (crumbs); box.appendChild (tools);
+    box.appendChild (head); box.appendChild (places); box.appendChild (crumbs);
+    box.appendChild (tools);
     box.appendChild (listing); box.appendChild (foot);
 
     var nameInput = null, dlBox = null;
@@ -322,8 +333,11 @@ var tmFiles = (function () {
       foot.appendChild (nameInput);
       foot.appendChild (dl);
     }
-    else foot.appendChild (el ('span', 'flex:1;color:#666',
-      'Drop files or folders here to add them to this folder.'));
+    var hint = null;
+    if (mode !== 'save') {
+      hint = el ('span', 'flex:1;color:#666');
+      foot.appendChild (hint);
+    }
 
     function close (result) {
       if (!current) return;
@@ -342,6 +356,10 @@ var tmFiles = (function () {
         if (selected && !isDir (selected)) close (selected);
       }
       else if (mode === 'save') {
+        if (inSys (dir)) {
+          window.alert ('The files of TeXmacs cannot be changed: save in one of your folders.');
+          return;
+        }
         var n = safe (nameInput.value.trim ());
         if (!n) return;
         var p = join (dir, n);
@@ -358,11 +376,41 @@ var tmFiles = (function () {
       foot.appendChild (ok);
     }
 
+    // a file or folder of TeXmacs into the TeXmacs folder of the user, at the
+    // same place (styles/x.ts: .TeXmacs/styles/x.ts), where TeXmacs looks
+    // before its own files
+    function customize (e) {
+      var rel = e.path.slice (SYS.length + 1), dest = join (USER_TM, rel);
+      if (exists (dest) &&
+          !window.confirm ('.TeXmacs/' + rel + ' exists already: replace it by the one of TeXmacs?'))
+        return;
+      if (exists (dest)) remove (dest);
+      if (e.dir) walk (e.path, '', []).forEach (function (f) {
+        write (join (dest, f.rel), FS.readFile (f.path));
+      });
+      else write (dest, FS.readFile (e.path));
+      save ();
+      toast ('Copied to .TeXmacs/' + rel + ': TeXmacs uses your copy, which you can edit ' +
+             '(a style or a package in the next document, Scheme code at the next start)');
+    }
+
     function render () {
+      var sys = inSys (dir), top = sys ? SYS : HOME;
+      places.textContent = '';
+      [['Your files', DOCS, false], ['Files of TeXmacs', SYS, true]].forEach (function (pl) {
+        var a = el ('a', 'cursor:pointer;color:#036' + (pl[2] === sys ? ';font-weight:bold' : ''), pl[0]);
+        a.onclick = function () { dir = pl[1]; selected = null; mkdirs (DOCS); render (); };
+        places.appendChild (a);
+      });
+      tools.style.display = sys ? 'none' : '';
+      if (hint) hint.textContent = sys
+        ? 'The files of TeXmacs cannot be changed here: "customize" copies one into your ' +
+          'TeXmacs folder (.TeXmacs), where you can edit it.'
+        : 'Drop files or folders here to add them to this folder.';
       crumbs.textContent = '';
-      var parts = dir.slice (HOME.length).split ('/').filter (Boolean), acc = HOME;
-      var home = el ('a', 'cursor:pointer;color:#036', 'Home');
-      home.onclick = function () { dir = HOME; render (); };
+      var parts = dir.slice (top.length).split ('/').filter (Boolean), acc = top;
+      var home = el ('a', 'cursor:pointer;color:#036', sys ? 'TeXmacs' : 'Home');
+      home.onclick = function () { dir = top; render (); };
       crumbs.appendChild (home);
       parts.forEach (function (p) {
         acc = acc + '/' + p;
@@ -391,6 +439,20 @@ var tmFiles = (function () {
         }
         if (mode === 'browse' && !e.dir) act ('open', function () { close (null); openDocument (e.path); });
         act ('download', function () { downloadPath (e.path); });
+        if (sys) {
+          act ('customize', function () { customize (e); });
+          listing.appendChild (row);
+          row.onclick = function () {
+            if (e.dir) { dir = e.path; selected = null; render (); return; }
+            selected = e.path; render ();
+          };
+          row.ondblclick = function () {
+            if (e.dir) return;
+            if (mode === 'open') close (e.path);
+            else if (mode === 'browse') { close (null); openDocument (e.path); }
+          };
+          return;
+        }
         act ('rename', function () {
           var n = window.prompt ('Rename', e.name);
           if (!n || n === e.name) return;
@@ -440,6 +502,7 @@ var tmFiles = (function () {
     root.addEventListener ('dragover', function (e) { e.preventDefault (); e.stopPropagation (); });
     root.addEventListener ('drop', function (e) {
       e.preventDefault (); e.stopPropagation ();
+      if (inSys (dir)) { toast ('The files of TeXmacs cannot be changed: drop in one of your folders'); return; }
       dropped (e.dataTransfer).then (function (items) {
         return importFiles (dir, items);
       }).then (render);

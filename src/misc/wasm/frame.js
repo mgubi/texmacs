@@ -158,6 +158,88 @@ var tmFrame = (function () {
     if (b) b.classList.remove ('open');
   }
 
+  // what the page keeps: the home directory (in IndexedDB) and the packages
+  // of TeXmacs (in the Cache Storage), counted here, and what the browser
+  // counts for the site (navigator.storage.estimate: its database files
+  // do not shrink when data is replaced, so it is often more)
+  function storageUse () {
+    var home = 0;
+    (function walk (p) {
+      var st;
+      try { st = FS.stat (p); } catch (e) { return; }
+      if (FS.isDir (st.mode))
+        FS.readdir (p).forEach (function (x) { if (x !== '.' && x !== '..') walk (p + '/' + x); });
+      else home += st.size;
+    }) ('/home/web');
+    var cache = (typeof caches === 'undefined') ? Promise.resolve (0) :
+      caches.open ('texmacs-packages').then (function (c) {
+        return c.keys ().then (function (ks) {
+          return Promise.all (ks.map (function (k) {
+            return c.match (k).then (function (r) {
+              var n = r && Number (r.headers.get ('content-length'));
+              return n || (r ? r.blob ().then (function (b) { return b.size; }) : 0);
+            });
+          }));
+        });
+      }).then (function (l) { return l.reduce (function (a, b) { return a + b; }, 0); },
+               function () { return 0; });
+    var browser = (navigator.storage && navigator.storage.estimate) ?
+      navigator.storage.estimate ().then (function (e) { return e.usage || 0; },
+                                          function () { return 0; }) : Promise.resolve (0);
+    return Promise.all ([cache, browser]).then (function (r) {
+      return { home: home, cache: r[0], browser: r[1] };
+    });
+  }
+
+  // everything the page keeps in the browser goes, and TeXmacs stops: its
+  // saves of the home directory, its loop, its connection to the database
+  // (a database which is open is not deleted); the page says so
+  function removeAll () {
+    tmStorageRemoved = true;
+    try { if (Module.pauseMainLoop) Module.pauseMainLoop (); } catch (e) {}
+    try {
+      if (typeof IDBFS !== 'undefined' && IDBFS.dbs)
+        for (var k in IDBFS.dbs) { try { IDBFS.dbs[k].close (); } catch (e) {} delete IDBFS.dbs[k]; }
+    } catch (e) {}
+    var jobs = [];
+    if (window.indexedDB && indexedDB.databases)
+      jobs.push (indexedDB.databases ().then (function (dbs) {
+        return Promise.all (dbs.map (function (d) {
+          return new Promise (function (ok) {
+            var r = indexedDB.deleteDatabase (d.name); r.onsuccess = r.onerror = r.onblocked = ok;
+          });
+        }));
+      }));
+    else if (window.indexedDB)
+      jobs.push (new Promise (function (ok) {
+        var r = indexedDB.deleteDatabase ('/home/web'); r.onsuccess = r.onerror = r.onblocked = ok;
+      }));
+    if (window.caches)
+      jobs.push (caches.keys ().then (function (ks) {
+        return Promise.all (ks.map (function (k) { return caches.delete (k); }));
+      }));
+    try { localStorage.clear (); sessionStorage.clear (); } catch (e) {}
+    Promise.all (jobs).then (done, done);
+    function done () {
+      document.title = 'TeXmacs Vue removed';
+      document.body.innerHTML = '';
+      var box = el ('div');
+      box.style.cssText = 'max-width:460px;margin:15vh auto;padding:24px;background:#f6f6f6;' +
+        'border:1px solid #999;border-radius:8px;font:14px -apple-system,"Fira Sans",Helvetica,sans-serif;' +
+        'color:#222;line-height:1.45';
+      box.appendChild (el ('div', null, 'TeXmacs Vue has been removed from this browser.'));
+      var p = el ('div', null, 'Your files and preferences and the files of TeXmacs are no longer ' +
+                               'kept here. Reload the page to start TeXmacs Vue again.');
+      p.style.marginTop = '8px'; p.style.color = '#555';
+      box.appendChild (p);
+      var b = el ('button', null, 'Reload');
+      b.style.marginTop = '14px';
+      b.onclick = function () { location.reload (); };
+      box.appendChild (b);
+      document.body.appendChild (box);
+    }
+  }
+
   function human (n) {
     return n < 1e6 ? Math.round (n / 1e3) + ' KB' : (n / 1e6).toFixed (1) + ' MB';
   }
@@ -212,12 +294,13 @@ var tmFrame = (function () {
       files.textContent = 'Files of TeXmacs: ' + s.loaded + ' of ' + m.packages.length +
         ' packages loaded' + (s.onDemand ? ', ' + s.onDemand + ' files fetched on demand' : '') + '.';
     }
-    var storage = text ('Your files: kept in the storage of this browser for this site.');
-    if (navigator.storage && navigator.storage.estimate)
-      navigator.storage.estimate ().then (function (e) {
-        storage.textContent = 'Your files and preferences are kept in the storage of this ' +
-          'browser for this site: ' + human (e.usage || 0) + ' used.';
-      });
+    var storage = text ('Your files and preferences are kept in the storage of this browser.');
+    storageUse ().then (function (u) {
+      storage.textContent = 'Kept in this browser: your files and preferences, ' +
+        human (u.home) + ', and the files of TeXmacs, ' + human (u.cache) + '.' +
+        (u.browser ? ' (The browser counts ' + human (u.browser) + ' for this site, with ' +
+                     'the space it has not given back yet.)' : '');
+    });
     sep ();
     item ('Files of the page…', function () { tmFiles.browse (); });
     item ('Keyboard…', function () {
@@ -248,6 +331,14 @@ var tmFrame = (function () {
         }));
       if (window.caches) jobs.push (caches.delete ('texmacs-packages'));
       Promise.all (jobs).then (function () { location.reload (); });
+    });
+    item ('Remove from this browser…', function () {
+      if (!window.confirm ('Remove TeXmacs Vue from this browser?\n\n' +
+                           'This deletes everything this page keeps in the browser: ' +
+                           'your files and preferences (download the ones you want to ' +
+                           'keep first, from Files of the page) and the files of TeXmacs. ' +
+                           'TeXmacs stops; it is downloaded again if you come back.')) return;
+      removeAll ();
     });
     document.body.appendChild (menu);
   }

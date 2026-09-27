@@ -195,6 +195,31 @@ the desktop build writes them as JPEG. The desktop build links the MuPDF of
 Homebrew, which has the same bug: a document in Fira gets its fonts whole
 there.
 
+## Storage, and the files of TeXmacs
+
+The page keeps two things in the browser: the home directory (IndexedDB,
+`web-pre.js`) and the packages of TeXmacs (the Cache Storage,
+`packages.js`), some 2 and 44 MB. The TeXmacs Vue menu counts them
+itself (`storageUse` in `frame.js`), next to what the browser counts for
+the site (`navigator.storage.estimate`), which is often more: its
+database files do not shrink when data is replaced. The temporary
+directory of TeXmacs (`.TeXmacs/system/tmp`) is emptied at each start: a
+page never quits, where TeXmacs empties it, and its process always has
+the same number, so that the pictures of every session piled up there.
+
+- **Reset…** deletes the storage of the page and reloads it.
+- **Remove from this browser…** (with a confirmation) deletes it and stops
+  TeXmacs: no more saves of the home directory (`tmStorageRemoved`), its
+  loop paused, its connection to the database closed (an open database is
+  not deleted); the page says so, and a reload starts afresh.
+
+The Files panel shows the files of TeXmacs too (**Files of TeXmacs**:
+`/texmacs`, its styles, packages, Scheme code, documentation), which are
+not changed there: opened, downloaded, or copied into the TeXmacs folder
+of the user with **customize** (`styles/article.ts` becomes
+`.TeXmacs/styles/article.ts`), where TeXmacs looks first and where the
+copy can be edited.
+
 ## The TeXmacs server, from the browser
 
 The collaborative tools (the Remote menu: remote files and directories,
