@@ -155,8 +155,8 @@ in whatever font serves the formula, and the smart font finds a
 fallback when the math font lacks the glyph.
 
 That fallback goes through the font database, so a stale one shows the
-symbol as its own name in red. Latin Modern Math, the font of the
-default `roman` family, has no U+25FB, U+25FC, U+26AA or U+26AB, and
+symbol as its own name in red. Latin Modern Math, the math font of
+the Latin Modern entry, has no U+25FB, U+25FC, U+26AA or U+26AB, and
 the fallback reaches them in KpMath, New Computer Modern Math or the
 STIX fonts only if the database of `$TEXMACS_HOME_PATH/fonts` knows
 those fonts. TeXmacs merges the shipped database whenever it has

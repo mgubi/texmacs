@@ -23,8 +23,8 @@ make -j8
 
 Then, run your unit tests:
 ```
-ctest // run all
-ctest -R analyze // run unit tests with name containing `analyze`
+ctest                # run all
+ctest -R analyze     # run unit tests with name containing `analyze`
 ```
 
 ### Advanced Topic
@@ -33,7 +33,7 @@ You may also run the unit tests via the binaries under `${cmake_build_dir}/tests
 tests/converter_test
 ```
 
-However, this specify unit test will fail. For `utf8_to_cork`, we need to set
+However, this specific unit test will fail. For `utf8_to_cork`, we need to set
 the `TEXMACS_PATH` to find the dictionaries. You may specify it manually:
 ``` bash
 TEXMACS_PATH=/path/to/somewhere tests/converter_test
@@ -306,7 +306,8 @@ the code point, which is what moves them from the second file to the
 first. `src/Data/String/converter.cpp` names the first one in every
 `hashtree_from_dictionary` chain that reads `tmuniversaltounicode`, so its
 two hundred symbols are converted like any other; the candidates wait for
-the same treatment. (`--include-extra` was meant to count them as covered,
+the same treatment: the candidates file is committed in
+`TeXmacs/langs/encoding` but not loaded. (`--include-extra` was meant to count them as covered,
 to see what would remain; since every entry of the candidates file is a
 comment, it changes only the notes column of the report.) Since the first table is in service, the script counts
 its symbols as named and would write only the few left over: give
@@ -333,7 +334,8 @@ fail to serve appears there as a box instead of a glyph.
 
 `tests/opentype/font-gallery.sh` renders one specimen per math font into a
 PNG, for the gallery of `src/OPENTYPEMATH.md`: without arguments it asks
-TeXmacs for the installed profiled fonts (`opentype-math-font-list`), and
+TeXmacs for the installed profiled fonts (`opentype-math-font-list`) and
+puts the TeX fonts and the first STIX in front as references, and
 families can be given instead, separated by `|`. Options: `-o outdir`
 (default `src/opentype-math`), `-r dpi` (300) and `-w width` (1100).
 

@@ -48,7 +48,9 @@ what the `MATH` table cannot: which text, sans serif and typewriter fonts go
 with them, where their letters come from, and where they belong in the
 menus. XITS, Asana, IBM Plex, Garamond, Old Standard, DejaVu, Lete Sans,
 New Computer Modern Sans and GFS Neohellenic are used as soon as they are
-installed, from the system or from TeX Live. Any other font with a `MATH`
+installed, in the font directories of the system or of TeXmacs, or from TeX
+Live (any year on macOS, 2020 to 2022 on Linux, or through
+`TEXMACS_FONT_PATH`). Any other font with a `MATH`
 table works too, without a profile and outside the menus, named in the
 document as `math=Cambria Math,Cambria`.
 
@@ -58,9 +60,9 @@ Charter, Euler, Concrete, Libertinus, Kp Fonts and the others in a serif
 section, Fira, Kp Sans, Computer Modern Sans and Lete Sans in a sans serif
 section, the less common fonts in a submenu, and the text fonts alone in a
 last section. The OpenType features of a font, such as old style figures,
-small capitals and stylistic sets, are offered in `Document > Font >
-Features`, in `Format > Font features` and in a column of the font
-browser.
+small capitals and stylistic sets, are offered by the font browser, and,
+when complex actions go through the menus, in `Document > Font > Features`
+and `Format > Font features`.
 
 **Symbols.** Two hundred mathematical symbols which TeXmacs could draw but
 not name have names, LaTeX equivalents and classes now. In a formula, a

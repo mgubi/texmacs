@@ -35,7 +35,7 @@ are honored, which fonts without `MathKernInfo` need.
 table sets `font_rep::ot_math` and about forty parameters converted from
 design units through `units_per_EM`: the axis, the fraction and radical
 geometry, the limit and stretch-stack geometry, the script shifts and drops,
-the bar constants and the script percentages. This happens *before* the
+the accent base heights, the bar constants and the script percentages. This happens *before* the
 per-family branches, so a hand-tuned font overwrites what it tunes and keeps
 the rest.
 
@@ -113,7 +113,7 @@ faces of CM Unicode; Euler Math, set with TeX Gyre Pagella. The TeX Gyre
 Pagella, Termes, Bonum and Schola Math fonts and the first STIX fonts were
 shipped before. All their text and math faces are registered in the global
 database, so they work in a fresh installation without a scan (the size
-fonts of the first STIX are loaded by file name, as before). Rescanning a
+and integral fonts of the first STIX are loaded by file name, as before). Rescanning a
 complete database went from minutes to about two seconds by skipping files
 already recorded.
 
@@ -205,7 +205,8 @@ tests/opentype/font-gallery.sh                  # the specimens below
 ```
 
 Without `TM_TEST_FONT_DIR`, 19 of the tests skip; pointing it at
-`TeXmacs/fonts/truetype` runs them all. `tests/README.md` describes each
+`TeXmacs/fonts/truetype` runs them all but the one that needs Asana Math,
+which is not shipped. `tests/README.md` describes each
 script, including the pixel diff against the reference renders in
 `tests/build/ref`, when that directory exists.
 
@@ -270,8 +271,12 @@ Pagella, Termes, Bonum and Schola are shipped too, and keep their
 hand-tuned tables for corrections, wide accents and integrals, while the
 MATH table gives them the delimiter variants, the assemblies and the
 constants they never had; the menu calls them Palatino, Times, Bookman and
-Schoolbook. TeX Gyre DejaVu Math is not shipped: it has no tuned tables at
-all and takes the MATH path like the fonts above.
+Schoolbook. TeX Gyre DejaVu Math is not shipped. It has no tuned tables of
+its own, but its file name starts like the others', so while the hand
+tuning is on it is taken for a hand-tuned TeX Gyre font: it keeps the MATH
+variants, assemblies and constants, but not the italic corrections and
+corner kerning of the table (a known defect, see
+`doc/opentype-math-design.md` section 6).
 
 ![TeX Gyre Pagella Math](opentype-math/tex-gyre-pagella-math.png)
 
@@ -314,9 +319,11 @@ The short version, with the details in section 7 of
   fonts) are silently mixed with the emulated ones; no profile key declares
   what a font really has.
 - `delimitedSubFormulaMinHeight`, the device tables and the plain stack
-  constants for `above` and `below` are deliberately not applied; the first
-  two would diverge from TeX, the third would move every such construct.
-- The rest of GPOS (mark attachment) is unused, which affects fonts that
+  constants for `above` and `below` are deliberately not applied: the first
+  would diverge from TeX, the device tables only matter for small sizes on
+  the screen, and the stack constants would move every such construct.
+- The rest of GPOS (mark attachment, cursive and contextual positioning) is
+  unused, which affects fonts that
   place accents with `mark`/`mkmk` rather than with the top accent
   attachment.
 - The profile test checks each math font, its family name and its MATH table,

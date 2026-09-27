@@ -14,7 +14,7 @@ rebased) and adjusted in two follow-up commits. The port itself adds
 roughly 1300 lines, nearly all in `src/Plugins/Freetype/` and
 `src/Typeset/Boxes/Composite/`. The 61 commits the branch had on 23
 September 2026 were then replayed onto the SVN mirror so that they form a
-linear series on top of it; it has 94 on 27 September.
+linear series on top of it; it has about a hundred on 27 September.
 
 The MATH table reader goes back further. Massimiliano Gubinelli wrote a first
 one in May 2021 on the `wip-unicode-math` branch of the GitHub repository,
@@ -78,7 +78,8 @@ works well without C++ changes.
                                              v
                                    variants  -> "<@XXXX>" native glyph ids
                                    assembly  -> runtime translator + virtual_font
-                                                (glue-above / glue*, ver-take / hor-take)
+                                                (join of placed parts, ver-take / hor-take;
+                                                 made to measure <head-root-hN>, <-wN>)
 
   Font choice:  smart_font.cpp (profile_fix, math italic letters, ssty)
                 <---- math_font_profiles.cpp <---- fonts-opentype.scm
@@ -170,7 +171,8 @@ the rest to the table. It:
   `overbar_extra_ascender` and their `underbar` twins);
 - sets the classical TeXmacs parameters the table can give: `yfrac` from
   `axisHeight`, `wline` from `fractionRuleThickness`, and the script shifts
-  `ysub_lo_base`, `ysub_hi_lim`, `ysup_lo_lim`, `ysup_lo_base` and `yshift`.
+  `ysub_lo_base`, `ysub_hi_lim`, `ysup_lo_lim`, `ysup_lo_base`,
+  `ysup_hi_lim` (as `max (ysup_lo_base, yx)`, see section 6) and `yshift`.
 
 All the fields are zero-initialized in `font.hpp`, so a font without a MATH
 table reads zeros rather than garbage, and `copy_math_pars` propagates them to
@@ -266,29 +268,36 @@ available. That function:
    (the delimiter, accent or operator name, which may itself contain dashes)
    and the variant number `N`, the last dash-separated token; `<big-...>`
    numbers are shifted down by one because there is no `<big-x-0>`;
-2. converts the root to a code point and then to a glyph id with
-   `ft_get_char_index`;
+2. converts the root to a code point, through the `wide_code_point` map for
+   the wide accents, and then to a glyph id (`variant_glyph`);
 3. if the glyph has vertical or horizontal variants and `N` is within range,
    rewrites the string to `<@XXXX>` for the Nth variant and returns subfont 0.
    The typesetter no longer probes sizes: `get_rubber_variant (s, h)` and
    `get_wide_variant (s, w)` return the smallest variant whose advance
-   reaches a target height or width, or the assembly with the number of
-   repetitions that does, from the advances the parser stores;
+   reaches a target height or width, from the advances the parser stores,
+   and beyond the largest one a *made to measure* name, `<head-root-hN>` or
+   `<head-root-wN>`, where N is the size in thousandths of an em; such a
+   name is answered first (`make_measured`), and carries its size so that a
+   magnified copy of the font, which is what the screen draws with, can
+   build it again;
 4. otherwise, if it has an assembly, synthesizes on first use one virtual
    glyph definition per size: every part becomes an `@XXXX` leaf, an extender
    part is repeated as many times as that size needs, and the leaves are
-   folded with `glue-above` (vertical) or `glue*` (horizontal) with a
-   negative separation, the overlap. The first size is the smallest number of
+   placed one by one in a `join`, each at the distance the table prescribes
+   from the ink of the previous one (the ink of every part is measured in
+   the rendered font, since many fonts draw their parts at differing
+   offsets), with the overlaps at least `minConnectorOverlap` and, for a
+   made to measure size, enlarged uniformly up to the connector lengths so
+   that the assembly reaches the target. The first size is the smallest number of
    repetitions whose assembled length exceeds the largest pre-drawn variant,
    so sizes keep growing with the variant number, and the definitions are
    stored in `virt` under their concrete names. Because the virtual font caches compiled definitions,
    adding a glyph evicts the existing instance from `font::instances` and
    also from `font_metric::instances` and `font_glyphs::instances`, which
    share its name and were sized for the earlier definitions; subfont 6 is
-   then re-created. All sizes up to 64 repetitions are defined at once, so
-   this happens once per glyph rather than once per size. `MAX_ASSEMBLY_REPS`
-   is 64, so 64 sizes are defined, from the first useful repetition count
-   upwards;
+   then re-created. The numbered sizes are defined at once, so this happens
+   once per glyph rather than once per size: `MAX_ASSEMBLY_REPS` is 64, so 64
+   sizes are defined, from the first useful repetition count upwards;
 5. otherwise falls back to the legacy `search_font_sub`, and if that yields
    subfont 0 (meaning "not handled") uses subfont 5.
 
@@ -323,8 +332,9 @@ non-zero, so a font with a degenerate table falls back to the old code.
   whether the base is in the extended shape coverage.
 - **Delimiters.** `get_delimiter` (`text_boxes.cpp`) asks the font for the
   variant that reaches the target height, through `get_rubber_variant`,
-  instead of probing sizes; only a font without an answer falls back to the
-  old search.
+  instead of probing sizes, and an assembly made to measure beyond the
+  largest variant; only a font without an answer falls back to the old
+  search.
 - **Big operators.** `concat_math.cpp` builds the `<big-...>` name and the
   rubber font picks the variant: the smallest one that reaches
   `displayOperatorMinHeight`, or the largest one, capped at two em by
@@ -1024,6 +1034,20 @@ be comparable.
    to the advances of the table. The result matches the table within pixel
    rounding, but a font whose parts have unusual side bearings could still
    show a seam.
+3. TeX Gyre DejaVu Math is taken for a hand-tuned TeX Gyre font while the
+   hand tuning is on: the branch of the constructor ladder in
+   `unicode_font.cpp` tests only the prefix `texgyre`, so the font keeps
+   `MATH_TYPE_TEX_GYRE` with no tables of its own and loses the italic
+   corrections and corner kerning of its MATH table, and it is given the
+   `tex_gyre_operators` table, whose glyph numbers are those of Pagella.
+   Linux Libertine, whose regular face carries a stub MATH table, is in the
+   same position.
+4. The bold math face of Erewhon names its family Erewhon, like the text
+   face, and is listed in the database among the text faces, so bold
+   Erewhon mathematics is emulated although the face is shipped.
+5. `supported` in `virtual_font.cpp`, which decides whether a virtual glyph
+   can be drawn as vectors, knows `ver-take` but not `hor-take`, so a
+   horizontal assembly that uses it would fall back to a bitmap.
 
 Two entries of this list were mistakes and are now closed.
 `parse_variant` takes the last dash-separated token as the size and
@@ -1078,14 +1102,16 @@ menus in `fonts-opentype.scm`, and `register_profiled_font`), `menu` and
 reaches a real bold math face through the font database now that the math
 series is honored. What is left:
 
-- `bold-math` is not read. In every profile it names the master whose Bold
+- `bold-math` is not read. In the four profiles that have it, it names the
+  master whose Bold
   style the database finds anyway, so it only records that a real bold face
   exists. It would be needed for a font whose bold companion is a family of
   its own that no master attaches, and none of the twenty-four is: the bold
   faces of XCharter Math and Concrete Math, which call their families
   otherwise, are attached to their masters in `font-features.scm`.
 - A key for the alphabets a font really provides is still missing, so an
-  incomplete alphabet (Latin Modern Math has 18 of 52 script letters) is
+  incomplete alphabet (Latin Modern Math has the 26 script capitals, 18 of them in plane 1 and
+  the others in the Letterlike block, and no lowercase) is
   silently mixed with emulated glyphs instead of being declared.
 
 The symbols themselves are a separate gap, on the TeXmacs side rather than
@@ -1245,20 +1271,23 @@ around it should TeXmacs gain a skewed fraction primitive.
 brackets for `<left-.>` style TeX cases) all reduce to `<left-x-N>` names,
 which the rubber font now serves from variants and assemblies. The size
 search of `get_delimiter` was the last hand-made part; it now asks the font
-through `get_rubber_variant` for the smallest variant or the assembly that
-reaches the height (section 3.6). The assemblies are glued on the measured
-ink rather than by stretching the connector overlaps (section 6), and
+through `get_rubber_variant` for the smallest variant that reaches the
+height, or beyond it an assembly made to measure (sections 3.5 and 3.6):
+its parts are placed on their measured ink, and its overlaps are enlarged
+uniformly, up to the connector lengths, to reach the target.
 `delimitedSubFormulaMinHeight` is deliberately not applied (section 7.2).
 The extended shape coverage tells which delimiters and operators should not
 have their superscripts raised.
 
 ### 8.6 Stacks: above, below, limits, binomials
 
-`typeset_above`, `typeset_below` and `lim_box` place material above and
-below a base with `fn->sep` and `yshift`; limits already use the four
-limit constants. The stack constants (`stackTopShiftUp`,
-`stackBottomShiftDown`, their display variants and gaps) are the
-counterpart for `above`, `below`, `stack` and binomials without a bar.
+`typeset_above` and `typeset_below` build a `limit_box`, like the limits of
+a big operator, so with a MATH table they use the four limit constants. The
+stack constants (`stackTopShiftUp`, `stackBottomShiftDown`, their display
+variants and gaps) are the counterpart the specification gives for `above`,
+`below`, `stack` and binomials without a bar; they are deliberately not
+adopted, since they would move every such construct (section 7.2 and
+Phase 1 item 4).
 
 ### 8.7 Negations
 
@@ -1313,8 +1342,9 @@ L (a week or more). Phases 1 and 2 are independent of 3; phase 4 needs 3.
    assembly with the exact number of repetitions, stretching connector
    overlaps to fit. `get_delimiter` uses it for `MATH_TYPE_OPENTYPE` fonts
    instead of probing; `delimitedSubFormulaMinHeight` gives the minimum.
-   *Done as `get_rubber_variant`; the overlaps are not stretched, the parts
-   are glued on their measured ink, and `delimitedSubFormulaMinHeight` is
+   *Done as `get_rubber_variant`, with made to measure assemblies whose
+   parts are placed on their measured ink and whose overlaps are enlarged
+   up to the connector lengths; `delimitedSubFormulaMinHeight` is
    deliberately not applied (section 7.2).*
 2. Radical junction: rule position from the radical glyph's top,
    `radicalKernBeforeDegree`; fixes the Latin Modern gap.
