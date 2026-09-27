@@ -13,6 +13,7 @@
 #define NS_RENDERER_H
 
 #include "basic_renderer.hpp"
+#include "hashmap.hpp"
 
 class ns_renderer_rep:  public basic_renderer_rep {
 public:
@@ -31,6 +32,10 @@ public:
   void reset_transformation ();
    
   void set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore = false);
+  static hashmap<pointer,bool> clip_pushed_table;
+  array<bool> clip_stack_pushed;
+  bool& clip_pushed (CGContextRef ctx);
+  void reapply_state ();
 
   void  draw_bis (int char_code, font_glyphs fn, SI x, SI y);
   void  draw (int char_code, font_glyphs fn, SI x, SI y);
@@ -62,6 +67,7 @@ public:
 ns_renderer_rep *the_ns_renderer();
 
 NSImage* get_image (url u, int w, int h);
+NSImage* get_image (url u, int w, int h, tree eff, SI pixel);
 
 
 #endif // defined NS_RENDERER_H

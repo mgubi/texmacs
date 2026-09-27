@@ -100,6 +100,12 @@ ns_renderer_rep::begin (void * c) {
 
 void 
 ns_renderer_rep::end () { 
+  if (!context) return;
+  {
+    CGContextRef ctx = [context CGContext];
+    if (clip_pushed (ctx)) CGContextRestoreGState (ctx);
+    clip_pushed_table->reset ((pointer) ctx);
+  }
 //  CGContextEndPage(context);
   [NSGraphicsContext restoreGraphicsState];
   [context release];
@@ -134,6 +140,9 @@ ns_renderer_rep::set_transformation (frame fr) {
   {
     CGContextRef ctx = [context CGContext];
     CGAffineTransform tr = CGAffineTransformMake (ux[0], ux[1], uy[0], uy[1], o[0], o[1]);
+    // NOTE: the clipping inside the transformation starts from this state
+    clip_stack_pushed << clip_pushed (ctx);
+    clip_pushed (ctx)= false;
     CGContextSaveGState (ctx);
     CGContextConcatCTM (ctx, tr);
   }
@@ -146,7 +155,15 @@ ns_renderer_rep::reset_transformation () {
   unclip ();
   {
     CGContextRef ctx = [context CGContext];
+    if (clip_pushed (ctx)) CGContextRestoreGState (ctx);
     CGContextRestoreGState (ctx);
+    int n= N(clip_stack_pushed);
+    if (n > 0) {
+      clip_pushed (ctx)= clip_stack_pushed[n-1];
+      clip_stack_pushed->resize (n-1);
+    }
+    else clip_pushed (ctx)= false;
+    reapply_state ();
   }
 }
 
@@ -157,17 +174,42 @@ ns_renderer_rep::reset_transformation () {
 void
 ns_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore)
 {
+  // NOTE: as QPainter::setClipRect, the new clipping replaces the previous
+  // one; since CoreGraphics can only reduce the clipping region, the state
+  // before the clipping is saved, and restored at the next clipping
   (void) restore;
   basic_renderer_rep::set_clipping (x1, y1, x2, y2);
+  if (!context) return;
   outer_round (x1, y1, x2, y2);
   decode (x1, y1);
   decode (x2, y2);
-  if ((x1<x2) && (y2<y1)) {
-    CGRect r = CGRectMake (x1,y2,x2-x1,y1-y2);
-    CGContextRef ctx = [context CGContext];
-    CGContextClipToRect (ctx, r);
-  } else {
-    // painter->setClipRect(QRect());
+  CGContextRef ctx = [context CGContext];
+  if (clip_pushed (ctx)) CGContextRestoreGState (ctx);
+  CGContextSaveGState (ctx);
+  clip_pushed (ctx)= true;
+  if ((x1<x2) && (y2<y1))
+    CGContextClipToRect (ctx, CGRectMake (x1,y2,x2-x1,y1-y2));
+  else CGContextClipToRect (ctx, CGRectZero);
+  reapply_state ();
+}
+
+hashmap<pointer,bool> ns_renderer_rep::clip_pushed_table (false);
+
+bool&
+ns_renderer_rep::clip_pushed (CGContextRef ctx) {
+  // Whether the state before the clipping was saved (the shadows share the
+  // context of their master, and thus this information)
+  return clip_pushed_table ((pointer) ctx);
+}
+
+void
+ns_renderer_rep::reapply_state () {
+  // The pen and the brush after restoring the graphics state
+  if (!is_nil (pen)) {
+    pencil p= pen;
+    brush b= fg_brush;
+    if (!is_nil (b) && b->get_type () == brush_pattern) set_brush (b);
+    set_pencil (p);
   }
 }
 
@@ -179,12 +221,11 @@ double as_percentage (tree t);
 
 static NSImage*
 get_pattern_image (brush br, SI pixel) {
-  // FIXME: the effect eff of the pattern is not applied
   url u;
   SI w, h;
   tree eff;
   get_pattern_data (u, w, h, eff, br, pixel);
-  NSImage* pm= get_image (u, w, h);
+  NSImage* pm= get_image (u, w, h, eff, pixel);
   return pm;
 }
 
@@ -215,8 +256,9 @@ drawColoredPatternCallback (void *info, CGContextRef myContext) {
   if (im) {
     NSSize is = [im size];
     NSRect r = NSMakeRect (0,0,is.width,is.height);
-    //[im setFlipped:YES];
-    [im drawInRect:r fromRect:r operation:NSCompositingOperationSourceAtop fraction:1.0];
+    // NOTE: the tile is drawn in the context of the pattern
+    CGImageRef cg= [im CGImageForProposedRect: &r context: nil hints: nil];
+    if (cg) CGContextDrawImage (myContext, NSRectToCGRect (r), cg);
   }
 }
 
@@ -231,7 +273,8 @@ set_pattern (CGContextRef ctx, NSImage *pm, CGFloat pattern_alpha, double pox, d
   NSSize pms = [pm size];
   //painter->setOpacity (qreal (pattern_alpha) / qreal (255));
   CGColorSpaceRef patternSpace = CGColorSpaceCreatePattern (NULL);
-  CGContextSetFillColorSpace (ctx, patternSpace);
+  if (fill) CGContextSetFillColorSpace (ctx, patternSpace);
+  else CGContextSetStrokeColorSpace (ctx, patternSpace);
   CGColorSpaceRelease (patternSpace);
   struct CGPatternCallbacks callbacks = {
     0,
@@ -241,7 +284,8 @@ set_pattern (CGContextRef ctx, NSImage *pm, CGFloat pattern_alpha, double pox, d
   [pm retain];
   CGPatternRef pattern = CGPatternCreate (pm,
                                           CGRectMake (0, 0, pms.width, pms.height),
-                                          CGAffineTransformMake (1, 0, 0, 1, pox, poy),
+                                          // NOTE: y goes down (see draw_picture)
+                                          CGAffineTransformMake (1, 0, 0, -1, pox, poy),
                                           pms.width, pms.height,
                                           kCGPatternTilingConstantSpacing,
                                           true, &callbacks);
@@ -254,10 +298,13 @@ set_pattern (CGContextRef ctx, NSImage *pm, CGFloat pattern_alpha, double pox, d
   
 void
 ns_renderer_rep::set_pencil (pencil np) {
-  //painter->setOpacity (qreal (1.0));
+  // NOTE: as in the Qt interface, a pattern brush remains for the filling
+  if (!context) { basic_renderer_rep::set_pencil (np); return; }
+  CGContextSetAlpha ([context CGContext], 1.0);
   basic_renderer_rep::set_pencil (np);
   NSColor *c= to_nscolor (pen->get_color ());
-  [c set];
+  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern) [c set];
+  else [c setStroke];
   CGFloat pw= (CGFloat) (((double) pen->get_width ()) / ((double) pixel));
   [NSBezierPath setDefaultLineWidth:pw];
   if (np->get_type () == pencil_brush) {
@@ -265,12 +312,12 @@ ns_renderer_rep::set_pencil (pencil np) {
     brush br= np->get_brush ();
     NSImage* pm= get_pattern_image (br, pixel);
     CGFloat pattern_alpha= br->get_alpha ()/255.0;
-    //painter->setOpacity (qreal (pattern_alpha) / qreal (255));
     if (pm != NULL) {
       CGContextRef ctx = [context CGContext];
+      CGContextSetAlpha (ctx, pattern_alpha);
       double pox, poy;
       decode (0, 0, pox, poy);
-      set_pattern (ctx, pm, pattern_alpha, pox, poy, false);
+      set_pattern (ctx, pm, 1.0, pox, poy, false);
     }
   }
   [NSBezierPath setDefaultLineCapStyle: (pen->get_cap () == cap_round? NSRoundLineCapStyle : NSButtLineCapStyle)];
@@ -279,6 +326,7 @@ ns_renderer_rep::set_pencil (pencil np) {
 
 void
 ns_renderer_rep::set_brush (brush br) {
+  if (!context) { basic_renderer_rep::set_brush (br); return; }
   CGContextRef ctx = [context CGContext];
   basic_renderer_rep::set_brush (br);
   if (br->get_type () == brush_none) {
@@ -294,12 +342,11 @@ ns_renderer_rep::set_brush (brush br) {
   if (br->get_type () == brush_pattern) {
     NSImage* pm= get_pattern_image (br, pixel);
     int pattern_alpha= br->get_alpha ();
-    //painter->setOpacity (qreal (pattern_alpha) / qreal (255));
+    CGContextSetAlpha (ctx, pattern_alpha / 255.0);
     if (pm != NULL) {
-      CGContextRef ctx = [context CGContext];
       double pox, poy;
       decode (0, 0, pox, poy);
-      set_pattern (ctx, pm, pattern_alpha, pox, poy, true);
+      set_pattern (ctx, pm, 1.0, pox, poy, true);
     }
   }
 }
@@ -348,8 +395,17 @@ ns_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
 
 void
 ns_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
-  // The background of the device, outside the pages
-  // FIXME: the Qt interface uses the pattern neutral-pattern.png
+  // The neutral background, below transparent parts (as in Qt)
+  static NSColor* neutral= nil;
+  if (!neutral) {
+    url u= resolve_pattern ("neutral-pattern.png");
+    NSImage* im= nil;
+    if (!is_none (u))
+      im= [[[NSImage alloc] initWithContentsOfFile:
+                              to_nsstring (concretize (u))] autorelease];
+    if (im) neutral= [[NSColor colorWithPatternImage: im] retain];
+    else neutral= [[NSColor lightGrayColor] retain];
+  }
   x1= max (x1, cx1-ox); y1= max (y1, cy1-oy);
   x2= min (x2, cx2-ox); y2= min (y2, cy2-oy);
   decode (x1, y1);
@@ -357,7 +413,9 @@ ns_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
   if ((x1>=x2) || (y1<=y2)) return;
   NSRect rect = NSMakeRect (x1,y2,x2-x1,y1-y2);
   [context saveGraphicsState];
-  [[NSColor lightGrayColor] setFill];
+  [[NSColor whiteColor] setFill];
+  [NSBezierPath fillRect:rect];
+  [neutral setFill];
   [NSBezierPath fillRect:rect];
   [context restoreGraphicsState];
 }
@@ -390,34 +448,49 @@ ns_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   [context restoreGraphicsState];
 }
 
+static NSBezierPath*
+arc_path (double x1, double y1, double x2, double y2, int alpha, int delta) {
+  // The arc of the ellipse inscribed in the rectangle, from alpha to
+  // alpha+delta (in 64th of degrees, counterclockwise on the screen)
+  NSBezierPath* p= [NSBezierPath bezierPath];
+  [p appendBezierPathWithArcWithCenter: NSZeroPoint radius: 1.0
+                            startAngle: alpha / 64.0
+                              endAngle: (alpha + delta) / 64.0
+                             clockwise: delta < 0];
+  // NOTE: y goes down in the device coordinates
+  NSAffineTransform* t= [NSAffineTransform transform];
+  [t translateXBy: (x1 + x2) / 2 yBy: (y1 + y2) / 2];
+  [t scaleXBy: (x2 - x1) / 2 yBy: - (y1 - y2) / 2];
+  [p transformUsingAffineTransform: t];
+  return p;
+}
+
 void
 ns_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   if ((x1>=x2) || (y1>=y2)) return;
   double rx1, ry1, rx2, ry2;
   decode (x1, y1, rx1, ry1);
   decode (x2, y2, rx2, ry2);
-  // FIXME: implement arc
-  //painter->setRenderHints (QPainter::Antialiasing);
-  //painter->drawArc (QRectF (rx1, ry2, rx2-rx1, ry1-ry2), alpha / 4, delta / 4);
+  NSBezierPath* p= arc_path (rx1, ry1, rx2, ry2, alpha, delta);
+  [p setLineWidth: [NSBezierPath defaultLineWidth]];
+  [p stroke];
 }
 
 void
 ns_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
+  // NOTE: as in the Qt interface, the arc is closed by its chord
   if ((x1>=x2) || (y1>=y2)) return;
   double rx1, ry1, rx2, ry2;
   decode (x1, y1, rx1, ry1);
   decode (x2, y2, rx2, ry2);
-  // FIXME: implement fill_arc
-//  QBrush br= painter->brush ();
-//  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
-//    br= QBrush (to_qcolor (pen->get_color ()));
-//  QPainterPath pp;
-//  pp.arcMoveTo (QRectF (rx1, ry2, rx2-rx1, ry1-ry2), alpha / 64);
-//  pp.arcTo (QRectF (rx1, ry2, rx2-rx1, ry1-ry2), alpha / 64, delta / 64);
-//  pp.closeSubpath ();
-//  pp.setFillRule (Qt::WindingFill);
-//  painter->setRenderHints (QPainter::Antialiasing);
-//  painter->fillPath (pp, br);
+  NSBezierPath* p= arc_path (rx1, ry1, rx2, ry2, alpha, delta);
+  [p closePath];
+  [p setWindingRule: NSNonZeroWindingRule];
+  [context saveGraphicsState];
+  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
+    [to_nscolor (pen->get_color ()) setFill];
+  [p fill];
+  [context restoreGraphicsState];
 }
 
 void
@@ -431,8 +504,13 @@ ns_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   
   NSBezierPath *path = [NSBezierPath bezierPath];
   [path appendBezierPathWithPoints: pnt count: n];
+  [path closePath];
   [path setWindingRule: (convex? NSEvenOddWindingRule : NSNonZeroWindingRule)];
+  [context saveGraphicsState];
+  if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
+    [to_nscolor (pen->get_color ()) setFill];
   [path fill];
+  [context restoreGraphicsState];
   
   STACK_DELETE_ARRAY (pnt);
   // NOTE: the path is autoreleased

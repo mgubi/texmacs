@@ -40,17 +40,28 @@ int ns_picture_rep::get_origin_x () { return ox; }
 int ns_picture_rep::get_origin_y () { return oy; }
 void ns_picture_rep::set_origin (int ox2, int oy2) { ox= ox2; oy= oy2; }
 
+// NOTE: the rows of the bitmaps go from the top to the bottom, with
+// premultiplied RGBA pixels (see native_picture); the y coordinate of TeXmacs
+// goes up
+
 color
 ns_picture_rep::internal_get_pixel (int x, int y) {
-  NSUInteger col;
-  [pict getPixel:&col atX:x y:h - 1 - y];
-  return (color) col;
+  unsigned char* p= [pict bitmapData] + (h - 1 - y) * [pict bytesPerRow] + 4 * x;
+  int a= p[3];
+  if (a == 0) return rgb_color (0, 0, 0, 0);
+  return rgb_color ((255 * p[0] + a/2) / a, (255 * p[1] + a/2) / a,
+                    (255 * p[2] + a/2) / a, a);
 }
 
 void
 ns_picture_rep::internal_set_pixel (int x, int y, color c) {
-  NSUInteger col = c;
-  [pict setPixel:&col atX:x y:h - 1 - y];
+  unsigned char* p= [pict bitmapData] + (h - 1 - y) * [pict bytesPerRow] + 4 * x;
+  int r, g, b, a;
+  get_rgb_color (c, r, g, b, a);
+  p[0]= (r * a + 127) / 255;
+  p[1]= (g * a + 127) / 255;
+  p[2]= (b * a + 127) / 255;
+  p[3]= a;
 }
 
 picture
@@ -109,10 +120,9 @@ xpm_image (url file_name) {
 
 picture
 native_picture (int w, int h, int ox, int oy) {
-  NSInteger pixelsWide = w;
-  NSInteger pixelsHigh = h;
-  // FIXME: maybe the following is not correct, I'm not sure about handling of alpha
-  // (premultipiled in this configuration)
+  // A transparent bitmap with premultiplied RGBA pixels
+  NSInteger pixelsWide = max (w, 1);
+  NSInteger pixelsHigh = max (h, 1);
   NSBitmapImageRep* im =
     [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: NULL
                                             pixelsWide: pixelsWide
@@ -124,6 +134,7 @@ native_picture (int w, int h, int ox, int oy) {
                                         colorSpaceName: NSDeviceRGBColorSpace
                                            bytesPerRow: 4 * pixelsWide
                                           bitsPerPixel: 32];
+  memset ([im bitmapData], 0, 4 * pixelsWide * pixelsHigh);
   picture ret =  ns_picture (im, ox, oy);
   [im release];
   return ret;
@@ -135,11 +146,18 @@ ns_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   ns_picture_rep* pict= (ns_picture_rep*) p->get_handle ();
   int x0= pict->ox, y0= pict->h - 1 - pict->oy;
   decode (x, y);
-  [pict->pict drawInRect: NSMakeRect(x - x0,  y - y0, pict->w, pict->h)
+  // NOTE: y goes down in the device coordinates, and the pictures are stored
+  // from the top to the bottom, so that they are drawn upside down
+  CGContextRef ctx= [context CGContext];
+  CGContextSaveGState (ctx);
+  CGContextTranslateCTM (ctx, x - x0, y - y0 + pict->h);
+  CGContextScaleCTM (ctx, 1.0, -1.0);
+  [pict->pict drawInRect: NSMakeRect (0, 0, pict->w, pict->h)
                 fromRect: NSZeroRect
-               operation: NSCompositingOperationSourceAtop
+               operation: NSCompositingOperationSourceOver
                 fraction: (alpha/255.0)
-          respectFlipped: YES hints: NULL];
+          respectFlipped: NO hints: NULL];
+  CGContextRestoreGState (ctx);
 }
 
 /******************************************************************************
@@ -162,18 +180,32 @@ ns_image_renderer_rep::ns_image_renderer_rep (picture p, double zoom) :
   ox = pox * pixel;
   oy = poy * pixel;
   cx1= 0;
-  cy1= 0;
+  cy1= -ph * pixel;
   cx2= pw * pixel;
-  cy2= ph * pixel;
+  cy2= 0;
 
+  // NOTE: as in the Qt interface, the picture is cleared first
   ns_picture_rep* handle = (ns_picture_rep*) pict->get_handle ();
   NSBitmapImageRep* im = handle->pict;
+  memset ([im bitmapData], 0, [im bytesPerRow] * [im pixelsHigh]);
   begin ([NSGraphicsContext graphicsContextWithBitmapImageRep: im]);
-  [[NSColor colorWithWhite:0.0 alpha:1.0] drawSwatchInRect: NSMakeRect(0, 0, pw, ph)];
 }
 
 ns_image_renderer_rep::~ns_image_renderer_rep () {
-//  [NSGraphicsContext restoreGraphicsState];
+  // The renderer draws with y going down in a context where it goes up, so
+  // that the rows are reversed at the end (see draw_picture)
+  end ();
+  ns_picture_rep* handle = (ns_picture_rep*) pict->get_handle ();
+  NSBitmapImageRep* im = handle->pict;
+  NSInteger bpr= [im bytesPerRow], n= [im pixelsHigh];
+  unsigned char* data= [im bitmapData];
+  STACK_NEW_ARRAY (row, unsigned char, bpr);
+  for (NSInteger i=0; i < n/2; i++) {
+    memcpy (row, data + i*bpr, bpr);
+    memcpy (data + i*bpr, data + (n-1-i)*bpr, bpr);
+    memcpy (data + (n-1-i)*bpr, row, bpr);
+  }
+  STACK_DELETE_ARRAY (row);
 }
 
 void
@@ -216,8 +248,8 @@ get_image (url u, int w, int h) {
 
 picture
 load_picture (url u, int w, int h, tree eff, int pixel) {
-  // FIXME: the effect eff is not applied
-  (void) eff; (void) pixel;
+  // As get_image_for_real in the Qt interface: the image at the given size,
+  // with the effect
   NSImage* im = get_image (u, w, h);
   if (im == nil) return error_picture (w, h);
   picture p = native_picture (w, h, 0, 0);
@@ -228,7 +260,24 @@ load_picture (url u, int w, int h, tree eff, int pixel) {
    setCurrentContext: [NSGraphicsContext graphicsContextWithBitmapImageRep: rep]];
   [im drawInRect:NSMakeRect (0, 0, w, h)];
   [NSGraphicsContext restoreGraphicsState];
+  if (eff != "") {
+    effect e= build_effect (eff);
+    array<picture> a;
+    a << p;
+    p= as_ns_picture (e->apply (a, pixel));
+  }
   return p;
+}
+
+NSImage*
+get_image (url u, int w, int h, tree eff, SI pixel) {
+  // The image of a pattern, with its effect
+  if (eff == "") return get_image (u, w, h);
+  picture p= load_picture (u, w, h, eff, pixel);
+  ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
+  NSImage* im= [[[NSImage alloc] initWithSize: [handle->pict size]] autorelease];
+  [im addRepresentation: handle->pict];
+  return im;
 }
 
 picture
