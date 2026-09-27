@@ -73,7 +73,9 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	  --pre-js $(W)/files.js --pre-js $(W)/frame.js --pre-js $(W)/clipboard.js --pre-js $(W)/print.js --shell-file $(W)/shell.html \
 	  $(OBJECTS) $(LIBS) -o $@
 	perl -pi -e "s/\@TM_WASM_SIZE\@/$$(wc -c < $(OUT)/web/texmacs.wasm | tr -d ' ')/" $@
+	cp $@ $(OUT)/web/index.html
 	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
+	gzip -9 -n -k -f $(OUT)/web/texmacs.wasm
 
 # made at every build (package.py only writes the packages which changed)
 $(OUT)/web/texmacs-files.json: FORCE | $(TM)/TeXmacs/plugins

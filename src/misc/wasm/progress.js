@@ -28,7 +28,11 @@ var tmProgress = (function () {
       background:#f4f4f4; border:1px solid #999; border-radius:8px;
       box-shadow:0 6px 24px rgba(0,0,0,.25); z-index:40;
       font:14px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222 }
-    #tm-loading .tm-title { font-weight:bold; font-size:17px; margin-bottom:12px }
+    #tm-loading .tm-title { font-weight:bold; font-size:17px; margin-bottom:4px }
+    #tm-loading .tm-about { font-size:12px; color:#555; margin-bottom:12px }
+    #tm-loading .tm-badge { display:inline-block; margin-left:8px; padding:1px 6px;
+      font-size:11px; font-weight:normal; color:#8a4b00; background:#ffe9c7; border:1px solid #e8b56b;
+      border-radius:8px; vertical-align:middle }
     #tm-loading .tm-phase { margin-bottom:8px }
     #tm-loading .tm-bar { height:8px; background:#d4d4d4; border-radius:4px; overflow:hidden;
       position:relative }
@@ -48,7 +52,9 @@ var tmProgress = (function () {
     document.head.appendChild (st);
     panel = document.createElement ('div');
     panel.id = 'tm-loading';
-    panel.innerHTML = '<div class="tm-title">GNU TeXmacs</div><div class="tm-phase"></div>' +
+    panel.innerHTML = '<div class="tm-title">TeXmacs Vue<span class="tm-badge">experimental</span></div>' +
+      '<div class="tm-about">An experimental port of GNU TeXmacs to the browser, ' +
+      'with OpenType fonts</div><div class="tm-phase"></div>' +
       '<div class="tm-bar"><div class="tm-fill"></div></div><div class="tm-detail"></div>';
     phase = panel.querySelector ('.tm-phase');
     bar = panel.querySelector ('.tm-bar');
@@ -112,9 +118,21 @@ var tmProgress = (function () {
   program.total = Number (Module['tmWasmSize']) || 0;
   if (typeof WebAssembly !== 'undefined' && WebAssembly.instantiateStreaming &&
       typeof TransformStream !== 'undefined' && typeof document !== 'undefined') {
+    // texmacs.wasm.gz, decompressed here, when the browser can: the servers
+    // of static files (GitHub Pages) may not compress the program (22 MB,
+    // 7 MB in gzip); texmacs.wasm otherwise, or if there is no gzip copy
+    var gunzip = typeof DecompressionStream !== 'undefined';
+    var fetchProgram = function () {
+      var base = new URL ('texmacs.wasm', document.baseURI).href;
+      var plain = function () { return fetch (base, { credentials: 'same-origin' }); };
+      if (!gunzip) return plain ();
+      return fetch (base + '.gz', { credentials: 'same-origin' }).then (function (resp) {
+        if (!resp.ok) return plain ();
+        return new Response (resp.body.pipeThrough (new DecompressionStream ('gzip')));
+      }, plain);
+    };
     Module['instantiateWasm'] = function (imports, receive) {
-      var url = new URL ('texmacs.wasm', document.baseURI).href;
-      fetch (url, { credentials: 'same-origin' }).then (function (resp) {
+      fetchProgram ().then (function (resp) {
         if (!resp.ok) throw new Error ('cannot load texmacs.wasm: ' + resp.status);
         if (!program.total && !resp.headers.get ('content-encoding'))
           program.total = Number (resp.headers.get ('content-length')) || 0;

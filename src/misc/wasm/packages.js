@@ -27,16 +27,22 @@ var tmPackages = (function () {
   }
 
   // the bytes of a package, from the cache of the browser or from the network
-  // (onBytes (n): the bytes which came, for the progress of the page)
+  // (onBytes (n): the bytes which came, for the progress of the page). Its
+  // gzip copy when the browser can decompress it (DecompressionStream): the
+  // servers of static files (GitHub Pages) do not compress the packages
+  var gunzip = typeof DecompressionStream !== 'undefined';
   async function fetchPackage (pkg, onBytes) {
     var cache = null;
     try { if (typeof caches !== 'undefined') cache = await caches.open (CACHE); } catch (e) {}
-    var u = url (pkg.url), resp = cache ? await cache.match (u) : null;
+    var name = (gunzip && pkg.gz) ? pkg.gz : pkg.url;
+    var u = url (name), resp = cache ? await cache.match (u) : null;
     if (!resp) {
       resp = await fetch (u);
-      if (!resp.ok) throw new Error ('cannot load ' + pkg.url + ': ' + resp.status);
+      if (!resp.ok) throw new Error ('cannot load ' + name + ': ' + resp.status);
       if (cache) try { await cache.put (u, resp.clone ()); } catch (e) {}
     }
+    if (name !== pkg.url && resp.body)
+      resp = new Response (resp.body.pipeThrough (new DecompressionStream ('gzip')));
     if (!onBytes || !resp.body) return new Uint8Array (await resp.arrayBuffer ());
     var bytes = new Uint8Array (pkg.size), at = 0, reader = resp.body.getReader ();
     for (;;) {
@@ -53,7 +59,10 @@ var tmPackages = (function () {
     try {
       if (typeof caches === 'undefined') return;
       var cache = await caches.open (CACHE), keep = {};
-      manifest.packages.forEach (function (p) { keep[url (p.url)] = true; });
+      manifest.packages.forEach (function (p) {
+        keep[url (p.url)] = true;
+        if (p.gz) keep[url (p.gz)] = true;
+      });
       (await cache.keys ()).forEach (function (req) {
         if (!keep[req.url]) cache.delete (req);
       });

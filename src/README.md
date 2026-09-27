@@ -1,8 +1,10 @@
-> ## Branch `wip_wasm_vue` — TeXmacs in the browser
+> ## Branch `wip_wasm_vue` — TeXmacs in the browser (TeXmacs Vue)
 >
 > Work in progress: TeXmacs compiled to WebAssembly and running in a web
-> page. Nothing is installed and nothing leaves the browser unless it is
-> downloaded.
+> page, an experimental port called TeXmacs Vue. Try it at
+> **https://mgubi.github.io/texmacs/** (built and published by the CI at
+> every push to this branch). Nothing is installed and nothing leaves the
+> browser unless it is downloaded.
 >
 > ![TeXmacs in the browser: tabs for the documents, the TeXmacs menu of the page](docs/wasm/texmacs-in-the-browser.png)
 >

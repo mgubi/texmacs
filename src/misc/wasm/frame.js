@@ -41,6 +41,9 @@ var tmFrame = (function () {
       border:1px solid #999; border-radius:6px; box-shadow:0 6px 24px rgba(0,0,0,.3);
       font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222; z-index:30; padding:6px 0 }
     #tm-menu .tm-head { padding:8px 14px 4px; font-weight:bold; font-size:14px }
+    #tm-menu .tm-badge, #tm-loading .tm-badge { display:inline-block; margin-left:8px; padding:1px 6px;
+      font-size:11px; font-weight:normal; color:#8a4b00; background:#ffe9c7; border:1px solid #e8b56b;
+      border-radius:8px; vertical-align:middle }
     #tm-menu .tm-text { padding:2px 14px; color:#444 }
     #tm-menu .tm-sep { height:1px; background:#ccc; margin:6px 0 }
     #tm-menu .tm-item { padding:5px 14px; cursor:pointer }
@@ -53,8 +56,8 @@ var tmFrame = (function () {
     var st = el ('style'); st.textContent = style; document.head.appendChild (st);
     bar = document.getElementById ('tm-frame');
     if (!bar) return;
-    var appButton = el ('div', 'tm-app', 'TeXmacs');
-    appButton.title = 'About this TeXmacs';
+    var appButton = el ('div', 'tm-app', 'TeXmacs Vue');
+    appButton.title = 'About TeXmacs Vue, an experimental port of GNU TeXmacs';
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
     ribbon (strip);
@@ -134,8 +137,8 @@ var tmFrame = (function () {
       if (l < strip.scrollLeft) strip.scrollLeft = l;
       else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth;
     }
-    document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs'
-                            : 'GNU TeXmacs';
+    document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs Vue'
+                            : 'TeXmacs Vue';
   }
 
   /****************************************************************************
@@ -167,11 +170,16 @@ var tmFrame = (function () {
       d.onclick = function () { closeMenu (); f (); };
       menu.appendChild (d);
     }
-    head ('GNU TeXmacs ' + (app.version || ''));
-    text ('A structured editor for scientists, running in this page: nothing is installed, ' +
-          'and nothing leaves the browser unless you download it.');
-    text ('WebAssembly build (' + (app.scheme || 'S7') + ' Scheme, MuPDF ' + (app.mupdf || '') +
-          '), built ' + (app.built || '') + '.');
+    var h = el ('div', 'tm-head', 'TeXmacs Vue');
+    h.appendChild (el ('span', 'tm-badge', 'experimental'));
+    menu.appendChild (h);
+    text ('An experimental port of GNU TeXmacs ' + (app.version || '') + ', the structured ' +
+          'editor for scientists, running in this page: nothing is installed, and nothing ' +
+          'leaves the browser unless you download it.');
+    text ('Vue is a new interface for TeXmacs (Clay, SDL3 and MuPDF), here on WebAssembly, ' +
+          'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
+          'mathematics included. Expect rough edges.');
+    text ('MuPDF ' + (app.mupdf || '') + ', built ' + (app.built || '') + '.');
     sep ();
     var files = text ('Files of TeXmacs: …');
     if (typeof tmPackages !== 'undefined' && tmPackages.manifest ()) {
@@ -197,6 +205,9 @@ var tmFrame = (function () {
     });
     sep ();
     item ('texmacs.org', function () { window.open ('https://www.texmacs.org', '_blank'); });
+    item ('This port (sources, notes)', function () {
+      window.open ('https://github.com/mgubi/texmacs/tree/wip_wasm_vue', '_blank');
+    });
     item ('Reload', function () { location.reload (); });
     item ('Reset…', function () {
       if (!window.confirm ('Delete your files and preferences kept in this browser, ' +

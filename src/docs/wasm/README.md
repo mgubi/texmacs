@@ -87,6 +87,15 @@ into a PDF), and the page as an artifact of the run (`texmacs-wasm-web`:
 unzip it and serve it with `node misc/wasm/serve.mjs <dir>`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
 
+The job `pages` publishes the page at https://mgubi.github.io/texmacs/
+(GitHub Pages, source "GitHub Actions"; the environment `github-pages`
+allows the branch `wip_wasm_vue`). Pages sends files as they are, without
+the brotli copies of `serve.mjs`: the build also writes gzip copies of
+`texmacs.wasm` and of the packages, which the page decompresses itself
+(`DecompressionStream`, in `progress.js` and `packages.js`), 6.2 MB for the
+program instead of 22.8; the packages stay as they are too, for the byte
+ranges of a file needed before its package. `index.html` is the page.
+
     . misc/wasm/emenv.sh build-wasm       # Emscripten (Python >= 3.10, config)
     sh misc/wasm/build-mupdf.sh           # MuPDF 1.28.5, the slim build
     make -C build-wasm -f ../misc/wasm/Makefile -j8 web    # the page

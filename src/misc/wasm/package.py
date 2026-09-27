@@ -23,7 +23,7 @@
 # the styles, the metrics of the fonts, the icons of the default theme).
 # The other packages, in the order of their loading, follow PACKAGES below.
 
-import hashlib, json, os, re, subprocess, sys, fnmatch
+import gzip, hashlib, json, os, re, subprocess, sys, fnmatch
 
 EXCLUDE = ['bin', 'plugins/*/bin', 'plugins/*/doc', 'misc/images/windows',
            '*.DS_Store', 'CMakeLists.txt']
@@ -115,7 +115,16 @@ def main ():
     # the name has the digest: a package which is there already is the same
     if not os.path.exists (os.path.join (out, fname)):
       open (os.path.join (out, fname), 'wb').write (data)
+    # a gzip copy, which the page decompresses itself (packages.js): the
+    # servers of static files (GitHub Pages) do not send the brotli copies
+    # of serve.mjs; the package itself stays, for the byte ranges of a file
+    # needed before its package
+    gzname = fname + '.gz'
+    if not os.path.exists (os.path.join (out, gzname)):
+      open (os.path.join (out, gzname), 'wb').write (gzip.compress (bytes (data), 9, mtime = 0))
+    written.add (gzname)
     manifest['packages'].append ({ 'name': name, 'url': fname, 'size': len (data),
+                                   'gz': gzname,
                                    'boot': name == 'boot', 'files': entries })
     print ('%-10s %5d files %7.2f MB  %s' % (name, len (rels), len (data) / 1e6, fname))
   # the packages of a previous build go, with their compressed copies

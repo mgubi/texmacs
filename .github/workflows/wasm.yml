@@ -1,8 +1,9 @@
-# TeXmacs in the browser: the WebAssembly build (src/misc/wasm,
+# TeXmacs in the browser (TeXmacs Vue): the WebAssembly build (src/misc/wasm,
 # src/docs/wasm/README.md). Builds the slim MuPDF (cached), the page and the
 # node build, checks that the node build turns a document into a PDF, and
 # keeps the page (src/build-wasm/out/web) as an artifact of the run: unzip
-# it and serve it (node src/misc/wasm/serve.mjs <dir>).
+# it and serve it (node src/misc/wasm/serve.mjs <dir>). A push to
+# wip_wasm_vue also publishes it on GitHub Pages (the job pages).
 
 name: WebAssembly
 
@@ -77,3 +78,37 @@ jobs:
           name: texmacs-wasm-web
           path: src/build-wasm/out/web
           if-no-files-found: error
+
+  # the page on GitHub Pages (https://<owner>.github.io/<repository>/): the
+  # brotli copies are left out (Pages does not send them; the page takes
+  # the gzip copies, which it decompresses itself)
+  pages:
+    needs: wasm
+    if: github.event_name == 'push' && github.ref == 'refs/heads/wip_wasm_vue'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: texmacs-wasm-web
+          path: web
+
+      - name: The site
+        run: |
+          find web -name '*.br' -delete
+          du -sh web
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
