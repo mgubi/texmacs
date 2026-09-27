@@ -54,6 +54,19 @@ var tmFrame = (function () {
     #tm-menu .tm-soft a { text-decoration:none }
     #tm-menu .tm-soft a:hover { text-decoration:underline }
     #tm-menu .tm-soft .tm-ver { color:#666; font-variant-numeric:tabular-nums }
+    #tm-about { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.25);
+      display:flex; align-items:center; justify-content:center; padding:16px }
+    #tm-about .tm-box { position:relative; max-width:560px; max-height:calc(100vh - 32px); overflow:auto;
+      background:#f6f6f6; border:1px solid #999; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.3);
+      padding:18px 22px; font:14px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222;
+      line-height:1.45 }
+    #tm-about h2 { font-size:16px; margin:0 0 8px }
+    #tm-about h3 { font-size:14px; margin:14px 0 4px }
+    #tm-about ul { margin:0; padding-left:20px }
+    #tm-about li { margin:3px 0; color:#333 }
+    #tm-about .tm-x { position:absolute; top:8px; right:10px; width:24px; height:24px; line-height:24px;
+      text-align:center; border-radius:4px; cursor:pointer; color:#555; font-size:18px }
+    #tm-about .tm-x:hover { background:#ddd; color:#000 }
   `;
 
   function build () {
@@ -239,6 +252,65 @@ var tmFrame = (function () {
     return n < 1e6 ? Math.round (n / 1e3) + ' KB' : (n / 1e6).toFixed (1) + ' MB';
   }
 
+  // more about the port and its limitations, from the text of the menu
+  var about = [
+    ['In the browser', [
+      'The windows of TeXmacs are the tabs above the page; the dialogs float over it.',
+      'TeXmacs uses its usual shortcuts, but the browser keeps some of them for itself ' +
+      '(new window, new tab, close tab, reload...): use the menus of TeXmacs, or the + ' +
+      'of the tabs, for those.',
+      'Copy, cut and paste go through the clipboard of the system; on a Mac the ' +
+      'shortcuts are Cmd+..., as the browser\'s.',
+      'Opening and saving go through the Files panel (Files of the page...): files come ' +
+      'in by upload or by dropping them on the page, and go out as downloads. The files ' +
+      'of TeXmacs can be browsed there, and copied to your own to customize them.',
+      'Printing opens the document as a PDF in a new tab, to print from there.']],
+    ['Limitations', [
+      'Your files are kept in the storage of this browser, for this site only: clearing ' +
+      'the data of the site deletes them, and Safari deletes the data of a site which was ' +
+      'not visited for seven days. Download the files you want to keep.',
+      'No plugins and no sessions (Maxima, Python, R...): a page cannot run other ' +
+      'programs. For the same reason, the converters and tools which need an external ' +
+      'program (LaTeX, Ghostscript, ImageMagick, the spell checker, Git) are missing.',
+      'Only the fonts which come with TeXmacs: the page cannot see the fonts of the system.',
+      'The remote tools (the Remote menu) connect over WebSocket to a TeXmacs server of ' +
+      'this branch, on this machine only for now (no encrypted wss yet).',
+      'The dialogs cannot be resized.',
+      'Two tabs of the browser with this page share the same storage, and their saves ' +
+      'may overwrite each other: keep TeXmacs Vue open in one tab.',
+      'It is slower than the desktop program, and its first visit downloads some 40 to 50 MB.']]
+  ];
+
+  function showAbout () {
+    var old = document.getElementById ('tm-about');
+    if (old) old.remove ();
+    var back = el ('div'); back.id = 'tm-about';
+    var box = el ('div', 'tm-box');
+    var x = el ('div', 'tm-x', '\u00d7'); x.title = 'Close';
+    box.appendChild (x);
+    box.appendChild (el ('h2', null, 'TeXmacs Vue: more info and limitations'));
+    about.forEach (function (sec) {
+      box.appendChild (el ('h3', null, sec[0]));
+      var ul = el ('ul');
+      sec[1].forEach (function (t) { ul.appendChild (el ('li', null, t)); });
+      box.appendChild (ul);
+    });
+    back.appendChild (box);
+    // the keys are for the popup, not for TeXmacs below it
+    function close () {
+      back.remove ();
+      ['keydown', 'keypress', 'keyup'].forEach (function (t) { window.removeEventListener (t, key, true); });
+    }
+    function key (e) {
+      e.stopPropagation ();
+      if (e.key === 'Escape') { e.preventDefault (); if (e.type === 'keydown') close (); }
+    }
+    x.onclick = close;
+    back.addEventListener ('mousedown', function (e) { e.stopPropagation (); if (e.target === back) close (); });
+    ['keydown', 'keypress', 'keyup'].forEach (function (t) { window.addEventListener (t, key, true); });
+    document.body.appendChild (back);
+  }
+
   function toggleMenu (button) {
     if (menu) { closeMenu (); return; }
     button.classList.add ('open');
@@ -255,13 +327,17 @@ var tmFrame = (function () {
     var h = el ('div', 'tm-head', 'TeXmacs Vue');
     h.appendChild (el ('span', 'tm-badge', 'experimental'));
     menu.appendChild (h);
-    // a paragraph of texts and links ([text, url])
+    // a paragraph of texts and links ([text, url], or [text, function])
     function para (parts) {
       var d = el ('div', 'tm-text');
       parts.forEach (function (x) {
         if (typeof x === 'string') { d.appendChild (document.createTextNode (x)); return; }
         var a = el ('a', null, x[0]);
-        a.href = x[1]; a.target = '_blank'; a.rel = 'noopener';
+        if (typeof x[1] === 'function') {
+          a.href = '#';
+          a.onclick = function (e) { e.preventDefault (); closeMenu (); x[1] (); };
+        }
+        else { a.href = x[1]; a.target = '_blank'; a.rel = 'noopener'; }
         d.appendChild (a);
       });
       menu.appendChild (d);
@@ -272,7 +348,8 @@ var tmFrame = (function () {
            'page: nothing is installed, and nothing leaves the browser unless you download it.']);
     para (['Vue is a new interface for TeXmacs (Clay, SDL3 and MuPDF), here on WebAssembly, ' +
            'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
-           'mathematics included. Expect rough edges. ',
+           'mathematics included. Expect rough edges: ',
+           ['more info and limitations', showAbout], '. ',
            ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/wip_wasm_vue'],
            '.']);
     // the software this page is made of, with their versions as the program
@@ -310,14 +387,6 @@ var tmFrame = (function () {
     });
     sep ();
     item ('Files of the page…', function () { tmFiles.browse (); });
-    item ('Keyboard…', function () {
-      window.alert ('Keyboard shortcuts in the browser\n\n' +
-        'TeXmacs uses its usual shortcuts, but the browser keeps some of them ' +
-        'for itself (new window, new tab, close tab, reload...). ' +
-        'Use the menus of TeXmacs, or the + of the tabs, for those.\n\n' +
-        'Opening and saving go through the Files panel: files come in by ' +
-        'upload or by dropping them on the page, and go out as downloads.');
-    });
     sep ();
     item ('Reload', function () { location.reload (); });
     item ('Reset…', function () {
