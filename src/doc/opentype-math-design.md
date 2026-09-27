@@ -1034,13 +1034,7 @@ be comparable.
    to the advances of the table. The result matches the table within pixel
    rounding, but a font whose parts have unusual side bearings could still
    show a seam.
-3. In a display formula, the integrals of the TeX Gyre math fonts on the
-   table path (TeX Gyre DejaVu Math, and the four others with the hand
-   tuning off) come out at their text size, although `displayOperatorMinHeight`
-   (1333 in DejaVu Math) asks for the 1495 unit variant; summation and
-   product do reach their display size, and the integrals of New Computer
-   Modern and STIX Two do too.
-4. Linux Libertine, whose regular face carries a stub MATH table, is taken
+3. Linux Libertine, whose regular face carries a stub MATH table, is taken
    by its hand-tuned branch while the tuning is on, and by the table path
    otherwise.
 
@@ -1051,6 +1045,15 @@ contour integral in place of its radical, now name the four tuned fonts);
 the bold math face of Erewhon, whose name table calls it Erewhon, is listed
 in the shipped database as the Bold style of Erewhon Math; and `supported`
 in `virtual_font.cpp` knows `hor-take`.
+
+A fourth, recorded the same day, was not a defect: the display integrals of
+the TeX Gyre math fonts on the table path looked small next to their sums.
+The rubber font picks the variant `displayOperatorMinHeight` asks for (the
+third of seven in DejaVu Math, 1495 units against 1333), and LuaLaTeX with
+`unicode-math` draws the same integral (`compare-lualatex.sh -f
+texgyredejavu-math.otf -m "TeX Gyre DejaVu Math" big-operators`): those
+fonts design their display integral at about one and a half em, where New
+Computer Modern and STIX Two draw a tall one.
 
 Two entries of this list were mistakes and are now closed.
 `parse_variant` takes the last dash-separated token as the size and
