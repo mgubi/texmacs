@@ -690,29 +690,15 @@ shortcut_text (NSString* key, NSEventModifierFlags mask) {
   return s;
 }
 
-static bool
-us_keyboard () {
-  // Whether the keyboard layout is the one of the United States: as in the
-  // Qt interface, the shortcuts are native key equivalents only then (the
-  // key equivalents of the other layouts are not the keys of TeXmacs)
-  static int us= -1;
-  if (us < 0) {
-    CFPropertyListRef v=
-      CFPreferencesCopyAppValue (CFSTR ("AppleCurrentKeyboardLayoutInputSourceID"),
-                                 CFSTR ("com.apple.HIToolbox"));
-    NSString* id= v? [(NSString*) v autorelease]: nil;
-    us= (!id || [id isEqualToString: @"com.apple.keylayout.US"] ||
-         [id isEqualToString: @"com.apple.keylayout.ABC"])? 1: 0;
-  }
-  return us == 1;
-}
 
 static void
 set_shortcut (NSMenuItem* mi, string ks) {
   if (N(ks) == 0) return;
   array<string> strokes= tokenize (ks, " ");
   NSString* key; NSEventModifierFlags mask;
-  if (N(strokes) == 1 && parse_shortcut (ks, key, mask) && us_keyboard ()) {
+  // NOTE: native key equivalents, as usual on macOS (the Qt interface puts
+  // them in the title with the keyboard layouts other than the US one)
+  if (N(strokes) == 1 && parse_shortcut (ks, key, mask)) {
     [mi setKeyEquivalent: key];
     [mi setKeyEquivalentModifierMask: mask];
     return;
