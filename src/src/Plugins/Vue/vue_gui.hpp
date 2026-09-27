@@ -200,6 +200,7 @@ public:
   virtual void   set_position (SI x, SI y) = 0;
   virtual void   get_position (SI& x, SI& y) = 0;
   
+  virtual void layout_size (int& w, int& h) = 0; // of the layout, in device pixels
   virtual void process_layout () = 0;
   virtual void process_redraw () = 0;
   virtual void draw_picture (void *data, picture pic) = 0;

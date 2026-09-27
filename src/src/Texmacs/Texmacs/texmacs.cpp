@@ -575,7 +575,14 @@ TeXmacs_main (int argc, char** argv) {
   
   { // opening scope for server sv
     if (DEBUG_STD) debug_boot << "Starting server...\n";
+#ifdef __EMSCRIPTEN__
+    // in the browser the main loop is left by unwinding the stack (see
+    // gui_start_loop in the Vue plugin): the server must not be on it
+    server& sv= *tm_new<server> ();
+    (void) sv;
+#else
     server sv;
+#endif
   
     // append commands to open standard welcome messages if needed
     if (install_status == 1) {

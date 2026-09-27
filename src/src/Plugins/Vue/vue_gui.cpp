@@ -40,7 +40,18 @@
 #include "socket_notifier.hpp" // notifiers_active (pause of the loop)
 
 #include <SDL3/SDL.h>
+#include <unistd.h> // usleep (the headless loop)
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h> // emscripten_set_main_loop
+#endif
+// SDL3_ttf serves only the rendering through SDL's own renderer (see
+// vue_sdl_window_rep), which the browser build leaves out
+#ifndef __EMSCRIPTEN__
+#define VUE_SDL_RENDERER 1
+#endif
+#ifdef VUE_SDL_RENDERER
 #include <SDL3_ttf/SDL_ttf.h>
+#endif
 
 // The Vue GUI draws with MuPDF: its windows and pictures are MuPDF pixmaps,
 // drawn by mupdf_renderer (the experimental fitz_renderer, the other one,
@@ -118,10 +129,12 @@ public:
   void   get_position (SI& x, SI& y);
   
   void process_layout ();
+  void layout_size (int& w, int& h);
 };
 
 int vue_window_rep::serial= 1; // serial identifier for windows
 
+#ifdef VUE_SDL_RENDERER
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
 {
   TTF_Font **fonts= (TTF_Font **)userData;
@@ -135,6 +148,7 @@ static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextEl
 
   return (Clay_Dimensions) { (float) width, (float) height };
 }
+#endif
 
 // Clay reports its problems through this handler and goes on, skipping the
 // offending element. Each kind is printed a few times and then suppressed,
@@ -175,7 +189,36 @@ void HandleClayErrors (Clay_ErrorData errorData) {
     cout << "TeXmacs]   (further errors of this kind are not reported)" << LF;
 }
 
+#ifdef VUE_SDL_RENDERER
 static TTF_Font **ttf_fonts= NULL; // fonts cache
+#endif
+
+// The layout context of a window (SDL or virtual): its own Clay context and
+// arena. The previous context is restored, since a window may be created in
+// the middle of the layout of another one.
+static void
+init_window_clay (vue_window_rep* w, int win_w, int win_h) {
+  Clay_Context *save_ctx= Clay_GetCurrentContext ();
+  // the element hash map must hold the ids of the previous frame and of
+  // the current one together (the stale ones go at the next layout), so
+  // a window whose widgets are rebuilt (a tool with a long list) needs
+  // twice its largest frame; the default 8192 was exceeded by the macros
+  // editor
+  Clay_SetMaxElementCount (32768);
+  uint64_t totalMemorySize= Clay_MinMemorySize ();
+  static bool reported= false;
+  if (!reported) { cout << "Vue: Clay arena " << (totalMemorySize >> 20) << " MB per window" << LF; reported= true; }
+  w->clay_arena= (Clay_Arena) {
+      .memory=  (char*) SDL_malloc (totalMemorySize),
+      .capacity= (size_t) totalMemorySize
+  };
+  if (w->clay_arena.memory == NULL) FAILED ("Vue: cannot allocate the layout arena");
+  w->clay_ctx= Clay_Initialize (w->clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
+  Clay_SetCurrentContext (save_ctx);
+  w->clay_debug= false;
+  w->last_layout_time= 0;
+  w->transitions_active= false;
+}
 
 vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup)
 : vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
@@ -184,6 +227,11 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   // windows start hidden and are shown once laid out, see set_visibility
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE |
                          SDL_WINDOW_HIDDEN;
+#ifdef __EMSCRIPTEN__
+  // the one window of the browser (the others are virtual) takes the page,
+  // and follows its size
+  flags |= SDL_WINDOW_FILL_DOCUMENT;
+#endif
   if (popup)
     // popups and tooltips are undecorated, start hidden and stay on top;
     // they are shown via SLOT_VISIBILITY once positioned
@@ -218,32 +266,7 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   notify_position (abstract (content), 0, 0);
   notify_size (abstract (content), win_w,  win_h);
   
-  {
-    // initialize clay context
-    // note: we need to preserve previous context in case it was present
-    // we may be in the middle of some layout operation for another window
-    Clay_Context *save_ctx= Clay_GetCurrentContext ();
-    // the element hash map must hold the ids of the previous frame and of
-    // the current one together (the stale ones go at the next layout), so
-    // a window whose widgets are rebuilt (a tool with a long list) needs
-    // twice its largest frame; the default 8192 was exceeded by the macros
-    // editor
-    Clay_SetMaxElementCount (32768);
-    uint64_t totalMemorySize= Clay_MinMemorySize ();
-    static bool reported= false;
-    if (!reported) { cout << "Vue: Clay arena " << (totalMemorySize >> 20) << " MB per window" << LF; reported= true; }
-    clay_arena= (Clay_Arena) {
-        .memory=  (char*) SDL_malloc (totalMemorySize),
-        .capacity= totalMemorySize
-    };
-    if (clay_arena.memory == NULL) FAILED ("Vue: cannot allocate the layout arena");
-    clay_ctx= Clay_Initialize (clay_arena, (Clay_Dimensions) { (float) win_w, (float) win_h }, (Clay_ErrorHandler) { HandleClayErrors });
-    Clay_SetCurrentContext (save_ctx);
-  }
-  
-  clay_debug= false;
-  last_layout_time= 0;
-  transitions_active= false;
+  init_window_clay (this, win_w, win_h);
   update_density ();
 }
 
@@ -404,40 +427,49 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
   // otherwise the window is shown by process_layout once it fits its contents
 }
  
-void
-vue_sdl_base_window_rep::process_layout () {
+// The layout of a window (SDL or virtual) at the size it has in device
+// pixels, with the passes its contents ask for
+static void
+layout_window_passes (vue_window_rep* w) {
   bool relayout= false;
   int passes= 0;
   do {
-    with_window frame (this);
+    with_window frame (w);
     layout_again= false;
     // init the current GUI context
-    int win_x, win_y, win_w, win_h;
-    SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
-    SDL_GetWindowPosition (sdl_win, &win_x, &win_y);
-
-//    Clay_SetCurrentContext (clay_ctx);
+    int win_w, win_h;
+    w->layout_size (win_w, win_h);
     Clay_SetLayoutDimensions ((Clay_Dimensions) { (float) win_w, (float) win_h });
-    layout_w= win_w; layout_h= win_h;
+    w->layout_w= win_w; w->layout_h= win_h;
     gui_init_context ();
 
     // layout the top widget
-    Clay_SetDebugModeEnabled (clay_debug);
+    Clay_SetDebugModeEnabled (w->clay_debug);
     Clay__debugViewWidth= 600; // redefine to have more space
     Clay_BeginLayout ();
-    content->do_layout ();
+    w->content->do_layout ();
     // the frame time drives the transitions declared by the elements
     // (.transition, see the notes on animation in vue-graphics-stack.md)
     time_t now= texmacs_time ();
-    float dt= (last_layout_time == 0) ? 0.0f : (float) (now - last_layout_time) / 1000.0f;
-    last_layout_time= now;
-    render_commands= Clay_EndLayout (min (dt, 0.1f));
-    transitions_active= vue_clay_transitions_active (); // clay.c
+    float dt= (w->last_layout_time == 0) ? 0.0f : (float) (now - w->last_layout_time) / 1000.0f;
+    w->last_layout_time= now;
+    w->render_commands= Clay_EndLayout (min (dt, 0.1f));
+    w->transitions_active= vue_clay_transitions_active (); // clay.c
     gui_finalize_context ();
 
     // post layout tweaking
-    relayout= content->post_layout () || layout_again;
+    relayout= w->content->post_layout () || layout_again;
   } while (relayout && ++passes < 5);
+}
+
+void
+vue_sdl_base_window_rep::layout_size (int& w, int& h) {
+  SDL_GetWindowSizeInPixels (sdl_win, &w, &h);
+}
+
+void
+vue_sdl_base_window_rep::process_layout () {
+  layout_window_passes (this);
 
   // show the window once it fits its contents (or after a few passes, in
   // case the contents never settle)
@@ -448,6 +480,32 @@ vue_sdl_base_window_rep::process_layout () {
   }
 }
 
+void snapshot_pixmap (fz_context* ctx, fz_pixmap *pix);
+
+static void
+save_pixmap_as_png (fz_context *ctx, fz_pixmap *pix, string path) {
+  c_string cpath (path);
+  fz_output *out= NULL;
+  fz_pixmap *rgb_pix= NULL;
+  fz_var (out);
+  fz_var (rgb_pix);
+  fz_try (ctx) {
+    rgb_pix= fz_convert_pixmap (ctx, pix, fz_device_rgb (ctx),
+                                NULL, NULL, fz_default_color_params, 1);
+    out= fz_new_output_with_path (ctx, cpath, 0);
+    fz_write_pixmap_as_png (ctx, out, rgb_pix);
+  }
+  fz_always (ctx) {
+    fz_drop_pixmap (ctx, rgb_pix);
+    fz_close_output (ctx, out);
+    fz_drop_output (ctx, out);
+  }
+  fz_catch (ctx) {
+    cout << "Fitz error in save_pixmap_as_png: " << fz_caught_message (ctx) << LF;
+  }
+}
+
+#ifdef VUE_SDL_RENDERER
 //******************************************************************************
 // Rendering through SDL's own renderer and the example Clay renderer
 // (clay_renderer_SDL3.c), as an alternative to the MuPDF path below.
@@ -489,30 +547,6 @@ vue_render (SDL_Renderer *sdl_ren, void *data, SDL_FRect *rect) {
 }
 }
 
-void snapshot_pixmap (fz_context* ctx, fz_pixmap *pix);
-
-static void
-save_pixmap_as_png (fz_context *ctx, fz_pixmap *pix, string path) {
-  c_string cpath (path);
-  fz_output *out= NULL;
-  fz_pixmap *rgb_pix= NULL;
-  fz_var (out);
-  fz_var (rgb_pix);
-  fz_try (ctx) {
-    rgb_pix= fz_convert_pixmap (ctx, pix, fz_device_rgb (ctx),
-                                NULL, NULL, fz_default_color_params, 1);
-    out= fz_new_output_with_path (ctx, cpath, 0);
-    fz_write_pixmap_as_png (ctx, out, rgb_pix);
-  }
-  fz_always (ctx) {
-    fz_drop_pixmap (ctx, rgb_pix);
-    fz_close_output (ctx, out);
-    fz_drop_output (ctx, out);
-  }
-  fz_catch (ctx) {
-    cout << "Fitz error in save_pixmap_as_png: " << fz_caught_message (ctx) << LF;
-  }
-}
 
 void
 sdl_draw_picture (SDL_Renderer *sdl_ren, picture pic, SDL_FRect *dest) {
@@ -603,11 +637,17 @@ vue_sdl_window_rep::process_redraw () {
 
   SDL_RenderPresent (sdl_ren);
 }
+#endif // VUE_SDL_RENDERER
 
 //******************************************************************************
 // rendering via MuPDF renderer
 
 array<styled_string> styled_strings;
+
+// single-window mode (see "Single-window mode" below)
+static void composite_virtual_windows (vue_window host, renderer ren);
+static bool is_host (vue_window w);
+static void forget_host (vue_window w);
 
 class vue_sdl_mupdf_window_rep : public vue_sdl_base_window_rep {
 public:
@@ -615,7 +655,7 @@ public:
   picture backing_store;
 
   vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup= false);
-  ~vue_sdl_mupdf_window_rep () { delete_renderer (ren); }
+  ~vue_sdl_mupdf_window_rep () { forget_host (this); delete_renderer (ren); }
   
   void process_redraw ();
   void process_layout ();
@@ -758,6 +798,7 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     vue_commands += render_commands.length;
   }
   render_clay_commands (ren, &render_commands);
+  if (is_host (this)) composite_virtual_windows (this, ren);
 
     static_cast<mupdf_renderer_rep*>(ren)->end ();
 
@@ -771,7 +812,10 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
   if (N(snapshot_dir) > 0) {
     save_pixmap_as_png (ctx, pix, snapshot_dir * "/window-" * as_string (id) * ".png");
-    if (snapshot_win == this && N(snapshot_name) > 0) {
+    // a virtual window is saved with the host which draws it
+    bool target= (snapshot_win == this) ||
+                 (snapshot_win != NULL && snapshot_win->platform_window () == NULL && is_host (this));
+    if (target && N(snapshot_name) > 0) {
       // named snapshot requested by a script
       save_pixmap_as_png (ctx, pix, snapshot_dir * "/" * snapshot_name * ".png");
       snapshot_name= "";
@@ -1091,11 +1135,459 @@ void layout_text (string s, int style, color c) {
 }
 
 //******************************************************************************
+// Single-window mode: virtual windows
+//
+// In a browser there is one canvas and no other window. The first window
+// becomes the host, and the windows created after it (dialogs, tools,
+// balloons, popups) are virtual: each has its layout context and its input
+// state as an SDL window has, but no SDL window. The host draws them over
+// its own contents (composite_virtual_windows), dialogs with a title bar to
+// move and close them, and hands them the pointer events which fall on them
+// and the keys when one of them has the focus (route_pointer, route_keys).
+// Their positions are screen points like those of SDL windows, so that the
+// code which places a window relative to another does not change.
+//
+// Always on in the browser; on the desktop with TEXMACS_VUE_SINGLE_WINDOW.
+//******************************************************************************
+
+static bool
+single_window_mode () {
+#ifdef __EMSCRIPTEN__
+  return true;
+#else
+  static int on= -1;
+  if (on < 0) {
+    string v= get_env ("TEXMACS_VUE_SINGLE_WINDOW");
+    on= (N(v) > 0 && v != "0") ? 1 : 0;
+  }
+  return on == 1;
+#endif
+}
+
+class vue_virtual_window_rep;
+static vue_sdl_mupdf_window_rep* the_host= NULL;       // holds the others
+static array<vue_virtual_window_rep*> virtual_windows; // back to front
+static vue_virtual_window_rep* focused_virtual= NULL;  // gets the keys
+static const float title_bar_h= 24.0f;                 // points
+
+// the content area of the host, in screen points
+static void
+host_geometry (float& x, float& y, float& w, float& h) {
+  x= y= 0; w= h= 1;
+  if (the_host == NULL) return;
+  int ix, iy, iw, ih;
+  SDL_GetWindowPosition (the_host->sdl_win, &ix, &iy);
+  SDL_GetWindowSize (the_host->sdl_win, &iw, &ih);
+  x= ix; y= iy; w= iw; h= ih;
+}
+
+class vue_virtual_window_rep : public vue_window_rep {
+public:
+  float x, y;  // top left corner of the contents, screen points
+  float w, h;  // size of the contents, points
+  bool  placed; // positioned by TeXmacs (else centered on the host)
+  SI Min_w, Min_h, Max_w, Max_h;
+
+  vue_virtual_window_rep (vue_widget w, string name, bool popup);
+  ~vue_virtual_window_rep ();
+
+  void*  platform_window () { return NULL; }
+  bool   decorated () { return !popup; }
+  float  top () { return decorated () ? y - title_bar_h : y; }
+  void   destroy_event ();
+  void   set_name (string n) { the_name= n; mod_name= n; }
+  string get_name () { return the_name; }
+  void   set_modified (bool flag) { modified= flag; }
+  void   set_visibility (bool flag);
+  void   set_full_screen (bool flag) { (void) flag; }
+  void   set_size (SI w, SI h);
+  void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
+  void   get_size (SI& w, SI& h);
+  void   get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h);
+  void   set_position (SI x, SI y);
+  void   get_position (SI& x, SI& y);
+  void   update_density ();
+  void   layout_size (int& w, int& h);
+  void   process_layout ();
+  void   process_redraw () {} // drawn by the host, see composite_virtual_windows
+  void   draw_picture (void *data, picture pic);
+  void   get_viewport_size (void *data, int& w, int& h);
+
+  void   show ();
+  void   raise ();
+  void   clamp ();
+  bool   contains (float sx, float sy) {
+    return sx >= x && sx < x + w && sy >= y && sy < y + h; }
+  bool   in_title_bar (float sx, float sy) {
+    return decorated () && sx >= x && sx < x + w && sy >= y - title_bar_h && sy < y; }
+};
+
+static void focus_virtual (vue_virtual_window_rep* v);
+static vue_window pointer_hover= NULL;             // the window under the pointer
+static vue_virtual_window_rep* pointer_capture= NULL; // a button is held in it
+static vue_virtual_window_rep* drag_win= NULL;     // moved by its title bar
+static float drag_dx= 0, drag_dy= 0;
+
+vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _name, bool _popup)
+  : vue_window_rep (_content, _name, _popup), x (0), y (0), w (200), h (200),
+    placed (false), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
+{
+  if (DEBUG_VUE) debug_widgets << "create vue_virtual_window_rep " << id << (popup ? " (popup)" : "") << LF;
+  the_name= name;
+  mod_name= name;
+  nr_windows++;
+  last_created_window= this;
+  id= serial++; // as the SDL windows do, so that the ids are the same
+  id_to_window (id)= this;
+  set_identifier (abstract (content), id);
+  notify_position (abstract (content), 0, 0);
+  notify_size (abstract (content), (SI) w, (SI) h);
+  init_window_clay (this, (int) w, (int) h);
+  update_density ();
+  {
+    with_window frame (this);
+    Clay_SetMeasureTextFunction (ren_measure_text, this);
+  }
+  virtual_windows << this;
+}
+
+vue_virtual_window_rep::~vue_virtual_window_rep () {
+  if (DEBUG_VUE) debug_widgets << "destroy vue_virtual_window_rep " << id << LF;
+  vue_simple_widget_rep::forget_window (this);
+  if (last_created_window == this) last_created_window= NULL;
+  if (script_win == this) script_win= NULL;
+  if (snapshot_win == this) snapshot_win= NULL;
+  if (pointer_hover == this) pointer_hover= NULL;
+  if (pointer_capture == this) pointer_capture= NULL;
+  if (drag_win == this) drag_win= NULL;
+  if (focused_virtual == this) focus_virtual (NULL);
+  array<vue_virtual_window_rep*> rest;
+  for (int i= 0; i < N(virtual_windows); i++)
+    if (virtual_windows[i] != this) rest << virtual_windows[i];
+  virtual_windows= rest;
+  id_to_window->reset (id);
+  id= 0;
+  set_identifier (abstract (content), 0);
+  nr_windows--;
+  SDL_free (clay_arena.memory);
+}
+
+void
+vue_virtual_window_rep::destroy_event () {
+  notify_window_destroy (orig_name);
+  send_destroy (abstract (content));
+}
+
+void
+vue_virtual_window_rep::update_density () {
+  if (the_host == NULL) return;
+  density= the_host->density;
+  retina= the_host->retina;
+}
+
+void
+vue_virtual_window_rep::layout_size (int& lw, int& lh) {
+  lw= max (1, (int) (w * density + 0.5f));
+  lh= max (1, (int) (h * density + 0.5f));
+}
+
+void
+vue_virtual_window_rep::process_layout () {
+  update_density ();
+  layout_window_passes (this);
+  layout_passes++;
+  if (visible_requested && !shown && (ready_to_show || layout_passes > 10))
+    show ();
+}
+
+// keep the window, title bar included, on the host
+void
+vue_virtual_window_rep::clamp () {
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  float tb= decorated () ? title_bar_h : 0;
+  if (x + w > hx + hw) x= hx + hw - w;
+  if (x < hx) x= hx;
+  if (y + h > hy + hh) y= hy + hh - h;
+  if (y - tb < hy) y= hy + tb;
+}
+
+void
+vue_virtual_window_rep::show () {
+  shown= true;
+  if (!placed) {
+    // centered on the host (a dialog nobody positioned)
+    float hx, hy, hw, hh;
+    host_geometry (hx, hy, hw, hh);
+    x= hx + (hw - w) / 2;
+    y= hy + (hh - h) / 2;
+  }
+  clamp ();
+  raise ();
+  if (decorated ()) focus_virtual (this);
+}
+
+void
+vue_virtual_window_rep::raise () {
+  array<vue_virtual_window_rep*> rest;
+  for (int i= 0; i < N(virtual_windows); i++)
+    if (virtual_windows[i] != this) rest << virtual_windows[i];
+  rest << this;
+  virtual_windows= rest;
+}
+
+void
+vue_virtual_window_rep::set_visibility (bool flag) {
+  visible_requested= flag;
+  if (!flag) {
+    shown= false;
+    if (focused_virtual == this) focus_virtual (NULL);
+    if (pointer_capture == this) pointer_capture= NULL;
+    if (drag_win == this) drag_win= NULL;
+  }
+  else if (ready_to_show && !shown) show ();
+  // otherwise it is shown by process_layout once it fits its contents
+}
+
+void
+vue_virtual_window_rep::set_size (SI sw, SI sh) {
+  w= max (1.0f, (float) sw / PIXEL);
+  h= max (1.0f, (float) sh / PIXEL);
+  if (Min_w > 0) w= max (w, (float) Min_w / PIXEL);
+  if (Min_h > 0) h= max (h, (float) Min_h / PIXEL);
+  if (Max_w > 0) w= min (w, (float) Max_w / PIXEL);
+  if (Max_h > 0) h= min (h, (float) Max_h / PIXEL);
+  if (shown) clamp ();
+}
+
+void
+vue_virtual_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) {
+  Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
+}
+
+void
+vue_virtual_window_rep::get_size (SI& sw, SI& sh) {
+  sw= (SI) (w * PIXEL);
+  sh= (SI) (h * PIXEL);
+}
+
+void
+vue_virtual_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& max_h) {
+  min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
+}
+
+void
+vue_virtual_window_rep::set_position (SI sx, SI sy) {
+  x= (float) sx / PIXEL;
+  y= (float) -sy / PIXEL;
+  placed= true;
+  clamp ();
+}
+
+void
+vue_virtual_window_rep::get_position (SI& sx, SI& sy) {
+  sx= (SI) (x * PIXEL);
+  sy= (SI) (-y * PIXEL);
+}
+
+void
+vue_virtual_window_rep::draw_picture (void *data, picture pic) {
+  vue_render_ren_data* d= (vue_render_ren_data*)data;
+  d->ren->draw_picture (pic, d->r->x1, d->r->y1);
+}
+
+void
+vue_virtual_window_rep::get_viewport_size (void *data, int& vw, int& vh) {
+  vue_render_ren_data* d= (vue_render_ren_data*)data;
+  vw= (d->r->x2 - d->r->x1) / d->ren->pixel;
+  vh= (d->r->y2 - d->r->y1) / d->ren->pixel;
+}
+
+static bool
+is_host (vue_window w) {
+  return w != NULL && w == (vue_window) the_host;
+}
+
+// the host goes away (the virtual windows it holds are no longer drawn)
+static void
+forget_host (vue_window w) {
+  if (!is_host (w)) return;
+  the_host= NULL;
+  if (pointer_hover == w) pointer_hover= NULL;
+}
+
+// the keys go to the focused virtual window, or to the host; the widget
+// which has the focus in each is told whether its window has it
+static void
+focus_virtual (vue_virtual_window_rep* v) {
+  if (focused_virtual == v) return;
+  vue_window old= (focused_virtual != NULL) ? (vue_window) focused_virtual
+                                            : (vue_window) the_host;
+  focused_virtual= v;
+  vue_window cur= (v != NULL) ? (vue_window) v : (vue_window) the_host;
+  if (old != NULL) notify_window_focus (old, false);
+  if (cur != NULL) notify_window_focus (cur, true);
+}
+
+// a text drawn with the fonts of the widgets, vertically centered in the
+// band [y1, y2] (renderer coordinates, see vue_render_text_fn)
+static void
+draw_band_text (renderer ren, string s, int style, color c, SI x, SI y1, SI y2) {
+  font fn= get_default_styled_font (style);
+  SI th= (fn->y2 - fn->y1) / 3;
+  SI yb= y1 + ((y2 - y1) - th) / 2;
+  ren->set_pencil (c);
+  ren->set_shrinking_factor (3);
+  fn->var_draw (ren, s, x*3, yb*3 - fn->y1);
+  ren->set_shrinking_factor (1);
+}
+
+// draw the visible virtual windows over the host, back to front
+static void
+composite_virtual_windows (vue_window host, renderer ren) {
+  if (N(virtual_windows) == 0) return;
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  float d= host->density;
+  SI px= ren->pixel;
+  for (int i= 0; i < N(virtual_windows); i++) {
+    vue_virtual_window_rep* v= virtual_windows[i];
+    if (!v->shown) continue;
+    int X= (int) ((v->x - hx) * d), Y= (int) ((v->y - hy) * d);
+    int W, H;
+    v->layout_size (W, H);
+    ren->set_origin (0, 0);
+    if (v->decorated ()) {
+      int T= (int) (title_bar_h * d), B= max (1, (int) d);
+      // a frame around the title bar and the contents
+      ren->set_pencil (theme_color (the_theme.border));
+      ren->fill ((X-B)*px, -(Y+H+B)*px, (X+W+B)*px, -(Y-T-B)*px);
+      ren->set_pencil (theme_color (the_theme.shade[2]));
+      ren->fill (X*px, -Y*px, (X+W)*px, -(Y-T)*px);
+      color tc= theme_color (the_theme.text);
+      draw_band_text (ren, v->the_name, WIDGET_STYLE_BOLD, tc,
+                      (X + (int) (8*d))*px, -Y*px, -(Y-T)*px);
+      // the close box: a cross, whatever the fonts have
+      int c= (int) (7*d), cx= X + W - T/2, cy= Y - T/2;
+      ren->set_pencil (pencil (tc, max (1, (int) d) * px));
+      ren->line ((cx-c/2)*px, -(cy-c/2)*px, (cx+c/2)*px, -(cy+c/2)*px);
+      ren->line ((cx-c/2)*px, -(cy+c/2)*px, (cx+c/2)*px, -(cy-c/2)*px);
+    }
+    ren->set_origin (X*px, -Y*px);
+    ren->clip (0, -H*px, W*px, 0);
+    ren->set_pencil (theme_color (the_theme.background));
+    ren->fill (0, -H*px, W*px, 0);
+    {
+      with_window frame (v);
+      render_clay_commands (ren, &v->render_commands);
+    }
+    ren->unclip ();
+    ren->set_origin (0, 0);
+  }
+}
+
+// the pointer has left a window: no element of it is under the pointer any
+// more (as for SDL_EVENT_WINDOW_MOUSE_LEAVE); a popup goes away
+static void
+pointer_left (vue_window w) {
+  if (w == NULL) return;
+  vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (w);
+  if (v != NULL && v->popup) { v->set_visibility (false); return; }
+  with_window frame (w);
+  Clay_SetPointerState ((Clay_Vector2) { -1, -1 }, false);
+  w->input.mouse_action= "move";
+  w->input.mouse_time= texmacs_time ();
+}
+
+// A pointer event of the host (x, y: points in the host). Returns the
+// window it is for, with x and y made relative to it, or NULL when the
+// event was used here (a title bar). kind: 0 motion, 1 press, 2 release,
+// 3 an event which only needs the window under the pointer (wheel, drop).
+static vue_window
+route_pointer (vue_window win, float& x, float& y, int kind) {
+  if (!single_window_mode () || win == NULL || win != (vue_window) the_host)
+    return win;
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  float sx= hx + x, sy= hy + y;
+  if (drag_win != NULL && kind != 3) {
+    if (kind == 0) {
+      drag_win->x= sx - drag_dx;
+      drag_win->y= sy - drag_dy;
+      drag_win->placed= true;
+      drag_win->clamp ();
+    }
+    else if (kind == 2) drag_win= NULL;
+    return NULL;
+  }
+  vue_virtual_window_rep* target= NULL;
+  bool title= false;
+  if (pointer_capture != NULL && kind != 3) target= pointer_capture;
+  else
+    for (int i= N(virtual_windows) - 1; i >= 0; i--) {
+      vue_virtual_window_rep* v= virtual_windows[i];
+      if (!v->shown) continue;
+      if (v->contains (sx, sy)) { target= v; break; }
+      if (v->in_title_bar (sx, sy)) { target= v; title= true; break; }
+    }
+  if (kind == 1) {
+    // a press outside the popups dismisses them, and reaches its target
+    for (int i= N(virtual_windows) - 1; i >= 0; i--) {
+      vue_virtual_window_rep* v= virtual_windows[i];
+      if (v->shown && v->popup && v != target) v->set_visibility (false);
+    }
+    if (target != NULL) {
+      target->raise ();
+      if (target->decorated ()) focus_virtual (target);
+    }
+    else focus_virtual (NULL);
+    if (title) {
+      if (sx >= target->x + target->w - title_bar_h) target->destroy_event ();
+      else {
+        drag_win= target;
+        drag_dx= sx - target->x;
+        drag_dy= sy - target->y;
+      }
+      return NULL;
+    }
+    pointer_capture= target;
+  }
+  else if (kind == 2) pointer_capture= NULL;
+  if (kind != 3) {
+    vue_window now= (target != NULL && !title) ? (vue_window) target : win;
+    if (now != pointer_hover) {
+      vue_window old= pointer_hover;
+      pointer_hover= now;
+      if (old != NULL) pointer_left (old);
+    }
+  }
+  if (title) return NULL;
+  if (target == NULL) return win;
+  x= sx - target->x;
+  y= sy - target->y;
+  return target;
+}
+
+// the window which gets the keys of the host
+static vue_window
+route_keys (vue_window win) {
+  if (single_window_mode () && win != NULL && win == (vue_window) the_host &&
+      focused_virtual != NULL && focused_virtual->shown)
+    return focused_virtual;
+  return win;
+}
+
+//******************************************************************************
 // entrypoints for top-level windows
 
 vue_window
 plain_window (vue_widget wwid, string name, bool popup) {
- return tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  // headless: the windows are virtual as well, with no host to be drawn in
+  if (is_headless () || (single_window_mode () && the_host != NULL))
+    return tm_new<vue_virtual_window_rep> (wwid, name, popup);
+  vue_sdl_mupdf_window_rep* w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  if (single_window_mode () && the_host == NULL && !popup) the_host= w;
+  return w;
 }
 
 //******************************************************************************
@@ -1113,6 +1605,13 @@ extern Uint32 vue_dialog_event; // the results of the file dialogs (below)
 void gui_open (int& argc, char** argv) {
   // start the gui
   
+  // headless (-headless): no display is opened at all, which is what makes
+  // the browser build testable under node (see docs/wasm/README.md)
+  if (is_headless ()) {
+    initialize_colors ();
+    initialize_keyboard ();
+    return;
+  }
   // trackpads: macOS itself generates the momentum events of a gesture
   // (SDL drops them by default), see the kinetic scrolling notes below
   SDL_SetHint (SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
@@ -1121,9 +1620,11 @@ void gui_open (int& argc, char** argv) {
     exit (-1);
   }
 
+#ifdef VUE_SDL_RENDERER
   if (!TTF_Init()) {
     exit (-1);
   }
+#endif
 
   SDL_SetHint (SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
   vue_dialog_event= SDL_RegisterEvents (1); // results of the file dialogs
@@ -1157,11 +1658,19 @@ void gui_open (int& argc, char** argv) {
 
 void gui_close () {
   // cleanly close the gui
-  SDL_Quit();
+  if (!is_headless ()) SDL_Quit();
 }
 
 void gui_root_extents (SI& width, SI& height)
 {
+  // in single-window mode the windows live on the host
+  if (single_window_mode () && the_host != NULL) {
+    int w, h;
+    SDL_GetWindowSize (the_host->sdl_win, &w, &h);
+    width= w * PIXEL;
+    height= h * PIXEL;
+    return;
+  }
   // get the screen size
   SDL_Rect r;
   if (SDL_GetDisplayBounds (SDL_GetPrimaryDisplay (), &r)) {
@@ -1618,9 +2127,9 @@ static bool watch_may_run= false;
 // which has closed in between is no longer in the table.
 static void
 apply_default_focus () {
-  iterator<SDL_Window*> it= iterate (Window_to_window);
+  iterator<int> it= iterate (id_to_window);
   while (it->busy ()) {
-    vue_window win= (vue_window) Window_to_window [it->next ()];
+    vue_window win= (vue_window) id_to_window [it->next ()];
     if (win == NULL || is_nil (win->default_focus)) continue;
     vue_widget w= win->default_focus;
     win->default_focus= vue_widget ();
@@ -1638,181 +2147,218 @@ loop_poll (SDL_Event* event) {
 
 static void
 loop_wait (int ms) {
+#ifdef __EMSCRIPTEN__
+  (void) ms; // the browser paces the frames (see gui_start_loop)
+#else
   watch_may_run= true;
   SDL_WaitEventTimeout (NULL, ms);
   watch_may_run= false;
+#endif
+}
+
+// headless: no window, no event; the interpose handler runs the commands of
+// the command line and the delayed ones, until one of them quits (quitting
+// ends the process, see quit_texmacs_internal)
+static void
+headless_loop () {
+  while (true) {
+    if (!is_nil (cmd_list)) {
+      list<command> l= reverse (cmd_list);
+      cmd_list= list<command> ();
+      for (; !is_nil (l); l= l->next) l->item->apply ();
+    }
+    if (the_interpose_handler != NULL) the_interpose_handler ();
+    usleep (10000);
+  }
+}
+
+// One iteration of the main loop: the events, the layout, the commands, the
+// interpose handler, the repaint of the editors and the redraw of the
+// windows. The desktop calls it in a loop, the browser once per frame (it
+// may not keep control: see gui_start_loop).
+static int loop_delay= 10; // the pause of the loop, which grows when idle
+
+static void
+loop_iteration () {
+  int& delay= loop_delay;
+  time_t t1= 0, t2= 0;
+  uint64_t t_frame= vue_now (); // the whole iteration, wait included
+  
+  // 1. process events
+  script_step (); // may push synthetic events
+  SDL_Event event;
+  if (loop_poll (&event)) {
+    bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
+                     event.type == SDL_EVENT_MOUSE_MOTION);
+    process_event (&event);
+    gui_needs_update= true;
+    // A frame costs more than the interval between the events of a
+    // trackpad or of a fast pointer: handle the wheel and motion events
+    // which are already queued in this frame too (their deltas add up,
+    // the last position wins), so that the view keeps up with the
+    // fingers. Only when the first event was itself a motion or a wheel:
+    // the motion handler overwrites mouse_action, so batching after a
+    // press or a release would drop it before any widget sees it (a
+    // click on a trackpad almost always comes with a small motion).
+    while (batchable &&
+           SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
+                           SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
+           (event.type == SDL_EVENT_MOUSE_WHEEL ||
+            event.type == SDL_EVENT_MOUSE_MOTION) &&
+           loop_poll (&event)) {
+      process_event (&event);
+    }
+  }
+  if (transitions_running ()) {
+    // a transition animates: keep the frames coming (paced, woken by events)
+    gui_needs_update= true;
+    if (!loop_poll (NULL)) loop_wait (8);
+  }
+  if (wheel_step ()) {
+    // keep the frames coming while the view moves by itself (or while a
+    // stream of wheel events is being watched for a launch), paced at
+    // 5 ms but woken up by any event: a plain sleep here added its
+    // length to the latency of every wheel event
+    gui_needs_update= true;
+    if (!loop_poll (NULL)) loop_wait (5);
+  }
+
+  if (gui_needs_update) {
+    delay= 10;
+    gui_wait= false;
+    gui_needs_update= false;
+  }
+      
+  // 2. wait for events on all channels
+  if (gui_wait) {
+    // sleep until an event arrives, or at most 'delay' (the interpose
+    // handler and the delayed Scheme commands need periodic calls; the
+    // pause grows while nothing happens). A plain SDL_Delay here made the
+    // first event after a pause wait for the end of the pause: up to 1 s
+    // before a scroll started to move
+    // sockets and pipes (plugins, the TeXmacs client/server) are polled
+    // by the interpose handler (perform_select): keep the pause short
+    // while any is open, they have no event of their own to wake us
+    int pause= notifiers_active () ? min (delay, 40) : delay;
+    uint64_t t_wait= vue_now ();
+    loop_wait (pause);
+    vue_profile_add (VP_WAIT, vue_now () - t_wait);
+    delay += (delay/5);
+    if (delay > 1000) delay= 1000;
+  }
+
+  // 3. process layout and handle events
+  {
+    t2= texmacs_time ();
+    uint64_t t_ns= vue_now ();
+    process_layout ();
+    vue_profile_add (VP_LAYOUT, vue_now () - t_ns);
+    t1= t2; t2= texmacs_time ();
+    if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "layout took " << t2 - t1 << "ms" << LF;
+  }
+  
+  // 4. exec commands if present
+  uint64_t t_cmd= vue_now ();
+  if (!is_nil (cmd_list)) {
+    list<command> l= reverse(cmd_list);
+    cmd_list= list<command>();
+    while (!is_nil(l)) {
+      if (DEBUG_VUE_WIDGETS) debug_widgets << "run command " << l->item << LF;
+      l->item->apply();
+      l= l->next;
+    }
+  }
+  vue_profile_add (VP_COMMANDS, vue_now () - t_cmd);
+  
+  // 5. interpose
+  uint64_t t_int= vue_now ();
+  t2= texmacs_time ();
+  apply_default_focus ();
+  vue_simple_widget_rep::notify_resizes ();
+  if (the_interpose_handler != NULL) the_interpose_handler ();
+  if (nr_windows == 0) return;
+  vue_profile_add (VP_INTERPOSE, vue_now () - t_int);
+  t1= t2; t2= texmacs_time ();
+  if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "interpose took " << t2-t1 << "ms" << LF;
+
+  if (nr_windows == 0) return;
+
+  // the commands and the interpose handler may have replaced widgets
+  // (menus, tools, dialogs): the render commands of the last layout would
+  // draw freed widgets, so lay the windows out again first
+  if (gui_needs_relayout) process_layout ();
+
+  // 6. repaint all the editors
+  uint64_t t_rep= vue_now ();
+  t2= texmacs_time ();
+  // The editors are repainted when no event is waiting, so that a burst
+  // of input is handled before the pixels are computed. A trackpad
+  // delivers its events faster than a frame is drawn, though, and its
+  // stream never runs dry: the repaint then never got its turn for as
+  // long as a swipe lasted and the page stood still. It is therefore
+  // done anyway once it is older than vue_repaint_dt.
+  static time_t last_repaint= 0;
+  time_t now_rep= texmacs_time ();
+  int n_events= SDL_PollEvent (NULL);
+  if (n_events == 0 || request_partial_redraw ||
+      now_rep - last_repaint >= vue_repaint_dt) {
+    last_repaint= now_rep;
+    request_partial_redraw= false;
+
+    interrupted= false;
+    interrupt_time= texmacs_time () + (100 / (n_events + 1));
+
+    vue_simple_widget_rep::repaint_all ();
+    // note that repaint can be interrupted if events are present
+    //FIXME: we should redraw the focused editor first, then the others
+
+    request_partial_redraw= interrupted;
+  }
+  vue_profile_add (VP_REPAINT, vue_now () - t_rep);
+  t1= t2; t2= texmacs_time ();
+  if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "repaint took " << t2 - t1 << "ms" << LF;
+
+  // 7. redraw the UI
+  // the repaint runs the typesetter, which may execute Scheme and replace
+  // widgets (a tool rebuilt from a document change, say): lay the windows
+  // out again, or the interface would be drawn as it was before. A layout
+  // which frees a widget asks for another one, hence the loop, bounded in
+  // case one never settles; drawing commands which are one layout old is
+  // safe, they hold their widgets (see render_ref).
+  for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
+  uint64_t t_draw= vue_now ();
+  vue_clay_ns= 0; vue_upload_ns= 0; vue_fill_ns= 0; vue_commands= 0;
+  process_redraw ();
+  vue_profile_add (VP_REDRAW, vue_now () - t_draw);
+  vue_profile_add (VP_CLAY, vue_clay_ns);
+  vue_profile_add (VP_FILL, vue_fill_ns);
+  vue_profile_add (VP_UPLOAD, vue_upload_ns);
+  vue_total_commands += vue_commands;
+  t1= t2; t2= texmacs_time ();
+  if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
+  vue_profile_add (VP_FRAME, vue_now () - t_frame);
+  vue_profile_frame ();
+  gui_wait= true;
 }
 
 void gui_start_loop () {
   // start the main loop
-  int  delay= 10;
+  if (is_headless ()) { headless_loop (); return; }
   request_partial_redraw= true;
-  time_t t1, t2;
 
   // FIXME: Don't typeset when resizing window
   
   SDL_AddEventWatch (&event_filter, NULL);
   script_init ();
 
-  while (nr_windows > 0 || number_of_servers () > 0) {
-    uint64_t t_frame= vue_now (); // the whole iteration, wait included
-    
-    // 1. process events
-    script_step (); // may push synthetic events
-    SDL_Event event;
-    if (loop_poll (&event)) {
-      bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
-                       event.type == SDL_EVENT_MOUSE_MOTION);
-      process_event (&event);
-      gui_needs_update= true;
-      // A frame costs more than the interval between the events of a
-      // trackpad or of a fast pointer: handle the wheel and motion events
-      // which are already queued in this frame too (their deltas add up,
-      // the last position wins), so that the view keeps up with the
-      // fingers. Only when the first event was itself a motion or a wheel:
-      // the motion handler overwrites mouse_action, so batching after a
-      // press or a release would drop it before any widget sees it (a
-      // click on a trackpad almost always comes with a small motion).
-      while (batchable &&
-             SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
-                             SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
-             (event.type == SDL_EVENT_MOUSE_WHEEL ||
-              event.type == SDL_EVENT_MOUSE_MOTION) &&
-             loop_poll (&event)) {
-        process_event (&event);
-      }
-    }
-    if (transitions_running ()) {
-      // a transition animates: keep the frames coming (paced, woken by events)
-      gui_needs_update= true;
-      if (!loop_poll (NULL)) loop_wait (8);
-    }
-    if (wheel_step ()) {
-      // keep the frames coming while the view moves by itself (or while a
-      // stream of wheel events is being watched for a launch), paced at
-      // 5 ms but woken up by any event: a plain sleep here added its
-      // length to the latency of every wheel event
-      gui_needs_update= true;
-      if (!loop_poll (NULL)) loop_wait (5);
-    }
-
-    if (gui_needs_update) {
-      delay= 10;
-      gui_wait= false;
-      gui_needs_update= false;
-    }
-        
-    // 2. wait for events on all channels
-    if (gui_wait) {
-      // sleep until an event arrives, or at most 'delay' (the interpose
-      // handler and the delayed Scheme commands need periodic calls; the
-      // pause grows while nothing happens). A plain SDL_Delay here made the
-      // first event after a pause wait for the end of the pause: up to 1 s
-      // before a scroll started to move
-      // sockets and pipes (plugins, the TeXmacs client/server) are polled
-      // by the interpose handler (perform_select): keep the pause short
-      // while any is open, they have no event of their own to wake us
-      int pause= notifiers_active () ? min (delay, 40) : delay;
-      uint64_t t_wait= vue_now ();
-      loop_wait (pause);
-      vue_profile_add (VP_WAIT, vue_now () - t_wait);
-      delay += (delay/5);
-      if (delay > 1000) delay= 1000;
-    }
-
-    // 3. process layout and handle events
-    {
-      t2= texmacs_time ();
-      uint64_t t_ns= vue_now ();
-      process_layout ();
-      vue_profile_add (VP_LAYOUT, vue_now () - t_ns);
-      t1= t2; t2= texmacs_time ();
-      if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "layout took " << t2 - t1 << "ms" << LF;
-    }
-    
-    // 4. exec commands if present
-    uint64_t t_cmd= vue_now ();
-    if (!is_nil (cmd_list)) {
-      list<command> l= reverse(cmd_list);
-      cmd_list= list<command>();
-      while (!is_nil(l)) {
-        if (DEBUG_VUE_WIDGETS) debug_widgets << "run command " << l->item << LF;
-        l->item->apply();
-        l= l->next;
-      }
-    }
-    vue_profile_add (VP_COMMANDS, vue_now () - t_cmd);
-    
-    // 5. interpose
-    uint64_t t_int= vue_now ();
-    t2= texmacs_time ();
-    apply_default_focus ();
-    vue_simple_widget_rep::notify_resizes ();
-    if (the_interpose_handler != NULL) the_interpose_handler ();
-    if (nr_windows == 0) continue;
-    vue_profile_add (VP_INTERPOSE, vue_now () - t_int);
-    t1= t2; t2= texmacs_time ();
-    if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "interpose took " << t2-t1 << "ms" << LF;
-
-    if (nr_windows == 0) continue;
-
-    // the commands and the interpose handler may have replaced widgets
-    // (menus, tools, dialogs): the render commands of the last layout would
-    // draw freed widgets, so lay the windows out again first
-    if (gui_needs_relayout) process_layout ();
-
-    // 6. repaint all the editors
-    uint64_t t_rep= vue_now ();
-    t2= texmacs_time ();
-    // The editors are repainted when no event is waiting, so that a burst
-    // of input is handled before the pixels are computed. A trackpad
-    // delivers its events faster than a frame is drawn, though, and its
-    // stream never runs dry: the repaint then never got its turn for as
-    // long as a swipe lasted and the page stood still. It is therefore
-    // done anyway once it is older than vue_repaint_dt.
-    static time_t last_repaint= 0;
-    time_t now_rep= texmacs_time ();
-    int n_events= SDL_PollEvent (NULL);
-    if (n_events == 0 || request_partial_redraw ||
-        now_rep - last_repaint >= vue_repaint_dt) {
-      last_repaint= now_rep;
-      request_partial_redraw= false;
-
-      interrupted= false;
-      interrupt_time= texmacs_time () + (100 / (n_events + 1));
-
-      vue_simple_widget_rep::repaint_all ();
-      // note that repaint can be interrupted if events are present
-      //FIXME: we should redraw the focused editor first, then the others
-
-      request_partial_redraw= interrupted;
-    }
-    vue_profile_add (VP_REPAINT, vue_now () - t_rep);
-    t1= t2; t2= texmacs_time ();
-    if (DEBUG_VUE && t2 - t1 >= 30) debug_widgets << "repaint took " << t2 - t1 << "ms" << LF;
-
-    // 7. redraw the UI
-    // the repaint runs the typesetter, which may execute Scheme and replace
-    // widgets (a tool rebuilt from a document change, say): lay the windows
-    // out again, or the interface would be drawn as it was before. A layout
-    // which frees a widget asks for another one, hence the loop, bounded in
-    // case one never settles; drawing commands which are one layout old is
-    // safe, they hold their widgets (see render_ref).
-    for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
-    uint64_t t_draw= vue_now ();
-    vue_clay_ns= 0; vue_upload_ns= 0; vue_fill_ns= 0; vue_commands= 0;
-    process_redraw ();
-    vue_profile_add (VP_REDRAW, vue_now () - t_draw);
-    vue_profile_add (VP_CLAY, vue_clay_ns);
-    vue_profile_add (VP_FILL, vue_fill_ns);
-    vue_profile_add (VP_UPLOAD, vue_upload_ns);
-    vue_total_commands += vue_commands;
-    t1= t2; t2= texmacs_time ();
-    if (DEBUG_VUE && t2 - t1 >= 50) debug_widgets << "redraw took " << t2 - t1 << "ms" << LF;
-    vue_profile_add (VP_FRAME, vue_now () - t_frame);
-    vue_profile_frame ();
-    gui_wait= true;
-  }
+#ifdef __EMSCRIPTEN__
+  // The browser calls an iteration per animation frame and the loop may not
+  // wait (loop_wait does nothing). Control does not come back: the stack is
+  // unwound, which is why the server of TeXmacs_main is not on it there.
+  emscripten_set_main_loop (loop_iteration, 0, true);
+#else
+  while (nr_windows > 0 || number_of_servers () > 0) loop_iteration ();
+#endif
 }
 
 void process_layout () {
@@ -1828,6 +2374,11 @@ void process_layout () {
     vue_window_rep *win= (vue_window_rep*) Window_to_window [it->next()];
     win->process_layout ();
   }
+  // the virtual windows (single-window mode); the array may change while
+  // they are laid out
+  array<vue_virtual_window_rep*> vl= virtual_windows;
+  for (int i= 0; i < N(vl); i++)
+    if (id_to_window->contains (vl[i]->id)) vl[i]->process_layout ();
 }
 
 void process_redraw () {
@@ -1897,9 +2448,31 @@ static bool script_no_target= false; // the last "window" command matched nothin
 static vue_window
 script_target () {
   if (script_no_target) return NULL; // the commands are skipped until a "window" matches
-  if (script_win != NULL && Window_to_window->contains ((SDL_Window*) script_win->platform_window ()))
+  if (script_win != NULL && id_to_window->contains (script_win->id))
     return script_win;
   return last_created_window;
+}
+
+// the SDL window which receives the events meant for win, and the position
+// (x, y) in it: a virtual window gets them through its host, with the
+// coordinates shifted, so that the routing of single-window mode is tested
+static Uint32
+script_window_id (vue_window win, float& x, float& y) {
+  if (win->platform_window () != NULL)
+    return SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+  vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
+  if (v == NULL || the_host == NULL) return 0;
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  x += v->x - hx;
+  y += v->y - hy;
+  return SDL_GetWindowID (the_host->sdl_win);
+}
+
+static Uint32
+script_window_id (vue_window win) {
+  float x= 0, y= 0;
+  return script_window_id (win, x, y);
 }
 
 static Uint8
@@ -1915,7 +2488,7 @@ script_push_button (vue_window win, float x, float y, Uint8 button, bool down) {
   SDL_zero (ev);
   ev.type= down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
   ev.button.timestamp= SDL_GetTicksNS ();
-  ev.button.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+  ev.button.windowID= script_window_id (win, x, y);
   ev.button.button= button;
   ev.button.down= down;
   ev.button.clicks= 1;
@@ -1932,7 +2505,7 @@ script_push_motion (vue_window win, float x, float y) {
   SDL_zero (ev);
   ev.type= SDL_EVENT_MOUSE_MOTION;
   ev.motion.timestamp= SDL_GetTicksNS ();
-  ev.motion.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+  ev.motion.windowID= script_window_id (win, x, y);
   ev.motion.state= script_buttons;
   ev.motion.x= x;
   ev.motion.y= y;
@@ -1961,19 +2534,21 @@ script_step () {
       // no match: the following commands are skipped rather than sent to
       // the previous target (e.g. closing the main window by mistake)
       script_win= NULL;
-      iterator<SDL_Window*> it= iterate (Window_to_window);
+      iterator<int> it= iterate (id_to_window);
       while (it->busy ()) {
-        vue_window w= (vue_window) Window_to_window [it->next ()];
+        vue_window w= (vue_window) id_to_window [it->next ()];
         if (title == "#" * as_string (w->id) ||
             occurs (title, w->name) || occurs (title, w->get_name ())) script_win= w;
       }
       script_no_target= (script_win == NULL);
       if (script_win == NULL) cout << "vue script: no window matches " << title << LF;
       else {
-        int wx, wy, ww, wh;
-        SDL_GetWindowPosition ((SDL_Window*) script_win->platform_window (), &wx, &wy);
-        SDL_GetWindowSize ((SDL_Window*) script_win->platform_window (), &ww, &wh);
-        cout << "vue script: window at " << wx << "," << wy << " size " << ww << "x" << wh << LF;
+        SI wx, wy, ww, wh;
+        script_win->get_position (wx, wy);
+        script_win->get_size (ww, wh);
+        cout << "vue script: window at " << wx/PIXEL << "," << -wy/PIXEL
+             << " size " << ww/PIXEL << "x" << wh/PIXEL
+             << (script_win->platform_window () == NULL ? " (virtual)" : "") << LF;
       }
       continue;
     }
@@ -1994,9 +2569,10 @@ script_step () {
       SDL_zero (ev);
       ev.type= SDL_EVENT_MOUSE_WHEEL;
       ev.wheel.timestamp= SDL_GetTicksNS ();
-      ev.wheel.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
-      ev.wheel.mouse_x= as_double (a[1]);
-      ev.wheel.mouse_y= as_double (a[2]);
+      float wx= as_double (a[1]), wy= as_double (a[2]);
+      ev.wheel.windowID= script_window_id (win, wx, wy);
+      ev.wheel.mouse_x= wx;
+      ev.wheel.mouse_y= wy;
       ev.wheel.x= as_double (a[3]);
       ev.wheel.y= as_double (a[4]);
       SDL_PushEvent (&ev);
@@ -2019,7 +2595,7 @@ script_step () {
       c_string name (kn);
       ev.type= SDL_EVENT_KEY_DOWN;
       ev.key.timestamp= SDL_GetTicksNS ();
-      ev.key.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      ev.key.windowID= script_window_id (win);
       ev.key.scancode= SDL_GetScancodeFromName (name);
       ev.key.key= SDL_GetKeyFromScancode (ev.key.scancode, SDL_KMOD_NONE, false);
       ev.key.mod= mod;
@@ -2046,7 +2622,7 @@ script_step () {
         SDL_zero (ev);
         ev.type= SDL_EVENT_TEXT_INPUT;
         ev.text.timestamp= SDL_GetTicksNS ();
-        ev.text.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+        ev.text.windowID= script_window_id (win);
         ev.text.text= buf;
         SDL_PushEvent (&ev);
       }
@@ -2062,11 +2638,14 @@ script_step () {
     else if (cmd == "focus") {
       // pretend the window got the keyboard focus (a test instance launched
       // while another application is in use never gets it)
+      // (a virtual window: the host gets it, and that window the keys)
+      vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
+      if (v != NULL) { v->raise (); focus_virtual (v); }
       SDL_Event ev;
       SDL_zero (ev);
       ev.type= SDL_EVENT_WINDOW_FOCUS_GAINED;
       ev.window.timestamp= SDL_GetTicksNS ();
-      ev.window.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      ev.window.windowID= script_window_id (win);
       SDL_PushEvent (&ev);
     }
     else if (cmd == "compose") {
@@ -2079,7 +2658,7 @@ script_step () {
       SDL_zero (ev);
       ev.type= SDL_EVENT_TEXT_EDITING;
       ev.edit.timestamp= SDL_GetTicksNS ();
-      ev.edit.windowID= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      ev.edit.windowID= script_window_id (win);
       ev.edit.text= ctext;
       ev.edit.start= N(composed);
       ev.edit.length= 0;
@@ -2096,7 +2675,8 @@ script_step () {
       int n= min ((int) strlen (citem), 1023);
       for (int i= 0; i < n; i++) buf[i]= ((char*) citem)[i];
       buf[n]= 0;
-      Uint32 wid= SDL_GetWindowID ((SDL_Window*) win->platform_window ());
+      float dx= as_double (a[1]), dy= as_double (a[2]);
+      Uint32 wid= script_window_id (win, dx, dy);
       SDL_Event ev;
       SDL_zero (ev);
       ev.type= SDL_EVENT_DROP_BEGIN;
@@ -2107,18 +2687,20 @@ script_step () {
       ev.type= is_text ? SDL_EVENT_DROP_TEXT : SDL_EVENT_DROP_FILE;
       ev.drop.timestamp= SDL_GetTicksNS ();
       ev.drop.windowID= wid;
-      ev.drop.x= as_double (a[1]);
-      ev.drop.y= as_double (a[2]);
+      ev.drop.x= dx;
+      ev.drop.y= dy;
       ev.drop.data= buf;
       SDL_PushEvent (&ev);
       SDL_zero (ev);
       ev.type= SDL_EVENT_DROP_COMPLETE;
       ev.drop.timestamp= SDL_GetTicksNS ();
       ev.drop.windowID= wid;
-      ev.drop.x= as_double (a[1]);
-      ev.drop.y= as_double (a[2]);
+      ev.drop.x= dx;
+      ev.drop.y= dy;
       SDL_PushEvent (&ev);
     }
+    else if (cmd == "close" && win->platform_window () == NULL)
+      win->destroy_event (); // a virtual window: as its close box does
     else if (cmd == "close") {
       SDL_Event ev;
       SDL_zero (ev);
@@ -2281,6 +2863,9 @@ process_event (SDL_Event *event) {
         Clay_SetPointerState ((Clay_Vector2) { -1, -1 }, false);
         win->input.mouse_action= "move";
         win->input.mouse_time= texmacs_time ();
+        // nor of the virtual window it was over (single-window mode)
+        if (is_host (win) && pointer_hover != win) pointer_left (pointer_hover);
+        if (is_host (win)) pointer_hover= NULL;
       }
       break;
     case SDL_EVENT_SYSTEM_THEME_CHANGED:
@@ -2316,7 +2901,7 @@ process_event (SDL_Event *event) {
       // tell the focused widget of the window (e.g. the editor, which hides
       // its cursor) whether the window has the keyboard focus
       win= get_window_from_ID (event->window.windowID);
-      if (win) notify_window_focus (win, event->type == SDL_EVENT_WINDOW_FOCUS_GAINED);
+      if (win) notify_window_focus (route_keys (win), event->type == SDL_EVENT_WINDOW_FOCUS_GAINED);
       break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -2325,6 +2910,7 @@ process_event (SDL_Event *event) {
       win= get_window_from_ID (event->button.windowID);
       float bx= event->button.x, by= event->button.y;
       bool down= (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+      win= route_pointer (win, bx, by, down ? 1 : 2);
       if (win && popup_grab (win, bx, by, down)) {
         string action;
         if (down) {
@@ -2352,11 +2938,13 @@ process_event (SDL_Event *event) {
                  event->wheel.windowID, event->wheel.x, event->wheel.y,
                  (int) ((SDL_GetTicksNS () - event->wheel.timestamp) / 1000000));
       win= get_window_from_ID (event->wheel.windowID);
+      float wx= event->wheel.mouse_x, wy= event->wheel.mouse_y;
+      win= route_pointer (win, wx, wy, 3);
       if (win) {
         vue_input_state& in= win->input;
         in.mouse_time= texmacs_time();
-        in.mouse_x= (int) (event->wheel.mouse_x * win->density);
-        in.mouse_y= (int) (event->wheel.mouse_y * win->density);
+        in.mouse_x= (int) (wx * win->density);
+        in.mouse_y= (int) (wy * win->density);
         wheel_event (win, event->wheel.x, event->wheel.y, in.mouse_time,
                      event->wheel.timestamp); // see "Scrolling with the wheel"
       }
@@ -2368,6 +2956,7 @@ process_event (SDL_Event *event) {
       update_mouse_state ();
       win= get_window_from_ID (event->motion.windowID);
       float mx= event->motion.x, my= event->motion.y;
+      win= route_pointer (win, mx, my, 0);
       if (win && popup_grab (win, mx, my, false)) {
         with_window frame (win);
         Clay_SetPointerState ((Clay_Vector2) { mx * win->density, my * win->density },
@@ -2387,7 +2976,7 @@ process_event (SDL_Event *event) {
         c_string buf (print_key_info (&(event->key)));
         SDL_Log ("Keydown: %s ", (char*) buf);
       }
-      win= get_window_from_ID (event->key.windowID);
+      win= route_keys (get_window_from_ID (event->key.windowID));
       if (win) {
         if (event->key.scancode == SDL_SCANCODE_F1) {
           // toggle the debug mode for the current window
@@ -2439,7 +3028,7 @@ process_event (SDL_Event *event) {
       if (r == " ") r= "space";
       else if (r == "<") r= "<less>";
       else if (r == ">") r= "<gtr>";
-      win= get_window_from_ID (event->text.windowID);
+      win= route_keys (get_window_from_ID (event->text.windowID));
       if (win) {
         // a text event right after a key delivered as a key (a command
         // modifier, an unconsumed alt) belongs to that keystroke
@@ -2490,12 +3079,14 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_DROP_COMPLETE:
     {
       win= get_window_from_ID (event->drop.windowID);
+      float dx= event->drop.x, dy= event->drop.y;
+      win= route_pointer (win, dx, dy, 3);
       if (win == NULL || N(drop_doc) == 0) { drop_doc= tree (CONCAT); break; }
       vue_input_state& in= win->input;
       in.mouse_action= "drop";
       in.mouse_time= texmacs_time ();
-      in.mouse_x= (int) (event->drop.x * win->density);
-      in.mouse_y= (int) (event->drop.y * win->density);
+      in.mouse_x= (int) (dx * win->density);
+      in.mouse_y= (int) (dy * win->density);
       in.mouse_ticket= ++drop_serial;
       payloads (in.mouse_ticket)= drop_doc;
       if (DEBUG_VUE_EVENTS)
@@ -2510,7 +3101,7 @@ process_event (SDL_Event *event) {
       // shows it as a pre-edit ("pre-edit:<cursor>:<text>", an empty text
       // ends it), as the Qt port does; the committed text comes as a text
       // input event
-      win= get_window_from_ID (event->edit.windowID);
+      win= route_keys (get_window_from_ID (event->edit.windowID));
       if (win) {
         string t= (event->edit.text != NULL) ? utf8_to_cork (string (event->edit.text)) : string ("");
         string k= "pre-edit:";
@@ -2590,6 +3181,13 @@ font get_default_font (bool tt, bool mini, bool bold) {
   if (j<n) j++;
   int dpi= (j<n? as_int (s (j, n)): 300);
   if (mini) { sz= (int) (0.6 * sz); dpi= (int) (1.3333333 * dpi); }
+#ifdef __EMSCRIPTEN__
+  // the browser: Fira, which comes with TeXmacs (the TeX fonts of the
+  // fallback below have no glyph for the arrows and marks of the widgets)
+  if (tt) return unicode_font (bold ? "FiraMono-Bold" : "FiraMono-Regular", sz, dpi);
+  return unicode_font (bold ? "FiraSans-Bold" : "FiraSans-Regular",
+                       sz, (int) (0.95 * dpi));
+#endif
   if (tt) {
     // WIDGET_STYLE_MONOSPACED: a typewriter font, whatever the platform
     tree tt_fn= tuple ("modern", "tt", series, "right");
@@ -3165,8 +3763,127 @@ vue_dialog_finish (vue_dialog_result* res) {
   tm_delete (res);
 }
 
+#ifdef __EMSCRIPTEN__
+/******************************************************************************
+* The file dialogs of the browser
+*
+* SDL has none there. Open: the file input of the page; the file chosen is
+* copied to /home/web/Uploads and its path handed over as SDL's callback
+* would. Save: the name is asked for (a page cannot choose a place on the
+* disk of the user); the file goes to /home/web/Documents, which is kept
+* (see misc/wasm/web-pre.js), and is offered as a download once written:
+* the command of the dialog writes it in a later frame, so the page waits
+* until its size is stable. The input needs a recent gesture of the user,
+* which the click on the menu item is.
+******************************************************************************/
+
+EM_JS_DEPS (vue_web_dialogs, "$withStackSave,$stringToUTF8OnStack,$UTF8ToString");
+
+EM_JS (void, vue_web_open_dialog, (void* res, const char* accept), {
+  function safe_name (n) {
+    return n.split ('/').join ('_').split (String.fromCharCode (92)).join ('_');
+  }
+  var input = document.createElement ('input');
+  input.type = 'file';
+  var acc = UTF8ToString (accept);
+  if (acc) input.accept = acc;
+  var done = false;
+  function finish (path) {
+    if (done) return;
+    done = true;
+    withStackSave (function () {
+      _vue_web_dialog_done (res, path ? stringToUTF8OnStack (path) : 0);
+    });
+  }
+  input.addEventListener ('cancel', function () { finish (null); });
+  input.onchange = function () {
+    var f = input.files && input.files[0];
+    if (!f) { finish (null); return; }
+    f.arrayBuffer ().then (function (buf) {
+      try { FS.mkdirTree ('/home/web/Uploads'); } catch (e) {}
+      var path = '/home/web/Uploads/' + safe_name (f.name);
+      FS.writeFile (path, new Uint8Array (buf));
+      finish (path);
+    });
+  };
+  input.click ();
+});
+
+EM_JS (void, vue_web_save_dialog, (void* res, const char* name), {
+  function safe_name (n) {
+    return n.split ('/').join ('_').split (String.fromCharCode (92)).join ('_');
+  }
+  var n = window.prompt ('Save as', UTF8ToString (name) || 'untitled.tm');
+  if (!n) {
+    withStackSave (function () { _vue_web_dialog_done (res, 0); });
+    return;
+  }
+  n = safe_name (n);
+  try { FS.mkdirTree ('/home/web/Documents'); } catch (e) {}
+  var path = '/home/web/Documents/' + n;
+  withStackSave (function () {
+    _vue_web_dialog_done (res, stringToUTF8OnStack (path));
+  });
+  var last = -1, stable = 0, tries = 0;
+  var timer = setInterval (function () {
+    var size = -1;
+    try { size = FS.stat (path).size; } catch (e) {}
+    stable = (size >= 0 && size === last) ? stable + 1 : 0;
+    last = size;
+    if (stable < 2 && ++tries < 120) return;
+    clearInterval (timer);
+    if (size < 0) return;
+    var a = document.createElement ('a');
+    a.href = URL.createObjectURL (new Blob ([FS.readFile (path)]));
+    a.download = n;
+    document.body.appendChild (a);
+    a.click ();
+    a.remove ();
+    setTimeout (function () { URL.revokeObjectURL (a.href); }, 10000);
+  }, 500);
+});
+
+// the answer of a dialog of the page (path NULL: cancelled)
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_dialog_done (void* res, const char* path) {
+  const char* list[2]= { path, NULL };
+  file_dialog_callback (res, list, 0);
+}
+
+// the suffixes of the files which may be chosen, for the file input
+static string
+web_accept (string file_type) {
+  if (file_type == "image") return "image/*,.pdf,.eps,.ps,.svg";
+  if (file_type == "directory" || file_type == "generic") return "";
+  tree sufs= as_tree (call ("format-get-suffixes*", file_type));
+  string acc;
+  if (is_tuple (sufs))
+    for (int i= 0; i < N(sufs); i++) {
+      if (N(acc) > 0) acc << ",";
+      acc << "." << as_string (sufs[i]);
+    }
+  return acc;
+}
+#endif
+
 void
 vue_chooser_widget_rep::perform_dialog (vue_window win) {
+#ifdef __EMSCRIPTEN__
+  (void) win;
+  vue_dialog_result* wres= tm_new<vue_dialog_result> ();
+  wres->wid= abstract (this);
+  wres->chosen= false;
+  if (file_type == "directory") vue_web_dialog_done ((void*) wres, NULL);
+  else if (prompt != "") {
+    c_string cname (file);
+    vue_web_save_dialog ((void*) wres, cname);
+  }
+  else {
+    c_string cacc (web_accept (file_type));
+    vue_web_open_dialog ((void*) wres, cacc);
+  }
+  return;
+#endif
  
   c_string caption (win_title);
   c_string tmp1 (directory);
