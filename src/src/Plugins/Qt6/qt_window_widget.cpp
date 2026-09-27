@@ -241,6 +241,21 @@ qt_window_widget_rep::send (slot s, blackbox val) {
       }
     }
       break;
+    case SLOT_ON_TOP:
+    {
+      // a tool window floats above the other windows of the application
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);
+      if (qwid) {
+        Qt::WindowFlags f= qwid->windowFlags () & ~Qt::WindowType_Mask;
+        if (flag) f= (f | Qt::Tool | Qt::WindowStaysOnTopHint);
+        else f= ((f & ~Qt::WindowStaysOnTopHint) | Qt::Window);
+        bool vis= qwid->isVisible ();
+        qwid->setWindowFlags (f);
+        if (vis) qwid->show ();
+      }
+    }
+      break;
     case SLOT_MOUSE_GRAB:
     {   
       check_type<bool> (val, s);

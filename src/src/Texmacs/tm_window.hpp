@@ -107,6 +107,7 @@ void window_create_tooltip  (int win, widget wid, string name);
 void window_delete (int win);
 void window_show (int win);
 void window_hide (int win);
+void window_set_on_top (int win, bool flag);
 scheme_tree window_get_size (int win);
 void window_set_size (int win, int w, int h);
 scheme_tree window_get_position (int win);
