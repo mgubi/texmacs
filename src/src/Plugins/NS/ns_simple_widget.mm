@@ -322,10 +322,9 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
     {
       check_type<bool> (val, s);
       bool grab = open_box<bool>(val);
-      // FIXME: to implement
-      NOT_IMPLEMENTED("ns_simple_widget::SLOT_MOUSE_GRAB");
-//      if (grab && canvas() && !canvas()->hasFocus())
-//        canvas()->setFocus (Qt::MouseFocusReason);
+      // as in the Qt interface, the canvas gets the focus
+      if (grab && view && [view window] && [[view window] firstResponder] != view)
+        [[view window] makeFirstResponder: view];
     }
       break;
       

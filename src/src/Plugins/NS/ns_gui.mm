@@ -620,7 +620,8 @@ ns_gui_rep::need_update () {
 
 void
 ns_gui_rep::refresh_language () {
-  // FIXME: update the texts of the menus
+  // NOTE: TeXmacs translates the texts of its menus and widgets itself;
+  // the Qt interface only installs the translations of Qt here
 }
 
 /******************************************************************************

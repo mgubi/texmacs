@@ -24,6 +24,9 @@
 #include "message.hpp"
 #include "scheme.hpp"
 #include "url.hpp"
+#ifdef USE_GS
+#include "Ghostscript/gs_utilities.hpp"
+#endif
 #include "file.hpp"
 #include "MacOS/mac_images.h"
 #include "editor.hpp"
@@ -811,14 +814,28 @@ ns_printer_widget_rep::send (slot s, blackbox val) {
 
 void
 ns_printer_widget_rep::showDialog () {
-  // The PDF file is printed with the print panel of the system
+  // The PDF file is printed with the print panel of the system; the
+  // PostScript files are converted with Ghostscript first
+  url pdf= file;
   if (suffix (file) != "pdf") {
-    // FIXME: PostScript files
-    call ("set-message", object ("Only PDF files can be printed by the NS interface"),
-          object ("Print"));
-    return;
+#ifdef USE_GS
+    if (has_gs ()) {
+      // the pages keep their size (ps2pdf)
+      pdf= url_temp (".pdf");
+      string cmd= gs_prefix ();
+      cmd << "-dQUIET -dNOPAUSE -dBATCH -dSAFER -sDEVICE=pdfwrite ";
+      cmd << "-sOutputFile=" << sys_concretize (pdf) << " ";
+      cmd << sys_concretize (file);
+      system (cmd);
+    }
+#endif
+    if (!exists (pdf)) {
+      call ("set-message", object ("Could not convert the file for printing"),
+            object ("Print"));
+      return;
+    }
   }
-  NSURL* u= [NSURL fileURLWithPath: to_nsstring_utf8 (concretize (file))];
+  NSURL* u= [NSURL fileURLWithPath: to_nsstring_utf8 (concretize (pdf))];
   PDFDocument* d= [[[PDFDocument alloc] initWithURL: u] autorelease];
   if (!d) return;
   NSPrintOperation* op=
