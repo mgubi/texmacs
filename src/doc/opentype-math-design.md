@@ -357,9 +357,29 @@ its *master*, the way the `font` environment variable names a font.
 is replaced by its math companion when that font is installed, and the
 variant picks the companion: sans serif and typewriter mathematics come from
 the `sans` and `mono` masters, since a math font has no such face. In a text
-shape a math family is replaced by its text companion. Whatever it produces
-goes through `font_database_master`, so a profile that names a family instead
-of a master still resolves.
+shape a math family is replaced by its text companion, and sans serif and
+typewriter text come from the same companions, since a text master often has
+no such face either (Latin Modern Roman, TeX Gyre Pagella). Whatever it
+produces goes through `font_database_master`, so a profile that names a
+family instead of a master still resolves.
+
+In math mode the font is found from the *text* font (`font`), not from
+`math-font`, which only counts when the text font is `roman`: the math
+companion of the text font is taken. A math font which is not the companion
+of its text font, Euler Math and Asana Math with Pagella or KpMath Sans with
+Kepler, is therefore given by a rule, `math=Euler Math,TeX Gyre Pagella`,
+which `math_fix` turns into the main family in math shapes.
+
+The font menus are built from the profiles. The `group` key puts a font in
+the Serif or Sans serif section, or in a submenu of other fonts, and the
+`menu` key gives it the name LaTeX users know, Times for TeX Gyre Termes,
+Palatino for Pagella, Utopia for Erewhon. `init-opentype-font` writes the
+text font, the rule when one is needed, and the font family of the profile
+(`family ss` for Kp Sans, a sans serif design with a serif master). A
+profile may also name a file of its text companion (`text-file`); when the
+database does not know that companion, as it does not know New Computer
+Modern Sans from TeX Live, the directory of the file is added once, as the
+math font itself is.
 
 `REWRITE_MATH_ITALIC` in the same file takes the letters of a formula from
 the mathematical italic alphabet of the math font itself, rather than from
@@ -718,6 +738,39 @@ prints, the `get_unicode_range` experiment) were dropped.
   table of that face calls its family `XCharter-Math-Bold` rather than
   `XCharter Math` with subfamily `Bold`, which is why the database entry
   has that spelling: it is what a user's own scan produces.
+
+- **Font menus like the LaTeX world, and the fonts to fill them (27
+  September 2026).** TeXmacs now ships Libertinus (Math, Serif, Sans, Mono),
+  Euler Math, Concrete Math with the Concrete faces of CM Unicode, Erewhon
+  and XCharter with their math fonts, and completes the shipped families:
+  LM Sans and Mono, KpSans, KpMono and KpMath-Sans (the Kp fonts move to
+  0.66 as a whole), Fira Math 0.3.4. The font menu offers the fourteen
+  serif and four sans serif pairings of section 3.7. What had to change for
+  them to come out whole:
+
+  the Euler and Asana entries were set in Pagella Math, because the
+  formulas follow the companion of the text font; they now use a `math=`
+  rule. The TeX Gyre shortcut of `init-font` ignored the math font it was
+  given and applied the package of Pagella, which forces its own
+  mathematics; it now applies only when no other math font is asked for.
+  The Fira entry loaded `fira-font`, which takes the large operators from
+  Pagella; a font package is now skipped when the math font is a profiled
+  OpenType one. KpMath-Sans calls its family KpMath, and KpMathSans in the
+  shipped database belonged to the master Kepler Math, which answered with
+  the serif KpMath; it is a master of its own now, as Fira Math and Lete
+  Sans Math are, and so is New Computer Modern Sans Math. KpMono is tagged
+  sans serif, which the feature distance penalizes more than leaving the
+  master, so Kepler typewriter came out in Libertinus Mono; KpMono has the
+  master Kepler Mono now, which the Kp profiles name as their `mono`, and
+  keeps its tag, so it does not become the typewriter every other family
+  falls back on. Upstream Erewhon-Math-Bold calls its family Erewhon, like
+  the text face, so bold Erewhon mathematics is still emulated.
+
+  Visible in existing documents: the sans serif and typewriter text of
+  Latin Modern and of the four TeX Gyre fonts now come from their
+  companions (LM Sans and Mono, TeX Gyre Heros or Adventor and Cursor)
+  rather than from European Computer Modern, and Kp and Fira documents move
+  with the new versions of those fonts.
 
 - **The extra symbols are in service (22 September 2026).**
   `tmuniversaltounicode-extra.scm` is loaded beside `tmuniversaltounicode`
