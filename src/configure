@@ -34342,6 +34342,8 @@ printf "%s\n" "enabling Qt port" >&6; }
          ;;
       no)
          CONFIG_QTPIPES="no"
+         # NOTE: the Cocoa port does not use X11
+         if test x"$enable_cocoa" != xyes; then
          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: enabling X11 port" >&5
 printf "%s\n" "enabling X11 port" >&6; }
 
@@ -36340,6 +36342,7 @@ fi
 
 fi
 
+         fi
          ;;
       *)
          CONFIG_QTPIPES="no"

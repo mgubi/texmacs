@@ -111,6 +111,29 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
   lose their transparency; shadows with their own context are not copied
   back (they always share the context of their master here).
 
+## Packaging
+
+```sh
+cd src
+packages/macos/build-ns-app.sh --guile-config <guile-config of Guile 1.8> [--dmg] [--sign IDENTITY]
+```
+
+configures (`--disable-qt --enable-cocoa`, which no longer links X11),
+builds, and makes `../distr/TeXmacs.app` with `make MACOS_BUNDLE`; with
+`--dmg`, `make MACOS_PACKAGE` then makes `../distr/macos/TeXmacs-<version>.dmg`
+(and removes the application, as for the Qt version). The libraries which
+do not come with macOS (Guile, FreeType, GMP, libltdl, libintl, libpng) are
+copied in `Contents/Resources/lib` and relinked by `bundle-libs.sh` (now
+also from `/opt/homebrew`); they are signed one by one, and the application
+is signed with the identity given, or ad hoc (an application which is
+signed ad hoc and not notarized opens on the machine where it was built,
+but Gatekeeper rejects it elsewhere). The script checks the signature, the
+`Info.plist` and that no library outside the application is used.
+
+Checked: the application, copied elsewhere and started with an empty
+environment or with `open`, finds its files in the bundle and edits
+documents.
+
 ## Next steps
 
 1. Use it with real input and hardware: input methods, the contextual
@@ -120,5 +143,4 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
    is not used any more: the views use `NSStackView` and `NSGridView`.
 3. Replace the deprecated AppKit constants (`NSResizableWindowMask`, ...),
    which only give warnings.
-4. An application bundle (`Info.plist`, icon, `MainMenu`), with the
-   packaging of the Qt version.
+4. Notarization of the application, for distribution.

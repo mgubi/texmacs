@@ -43,10 +43,13 @@ AC_DEFUN([TM_GUI],[
          ;;
       no)
          CONFIG_QTPIPES="no"
-         AC_MSG_RESULT([enabling X11 port])
-         LC_X_HEADERS
-         AC_PATH_X
-         AC_PATH_XTRA
+         # NOTE: the Cocoa port does not use X11
+         if test x"$enable_cocoa" != xyes; then
+           AC_MSG_RESULT([enabling X11 port])
+           LC_X_HEADERS
+           AC_PATH_X
+           AC_PATH_XTRA
+         fi
          ;;
       *)
          CONFIG_QTPIPES="no"

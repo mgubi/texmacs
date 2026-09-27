@@ -1258,7 +1258,8 @@ void gui_open (int& argc, char** argv)
   if (!NSApp) {
     // initialize app
     [NSApplication sharedApplication];
-    [[NSBundle mainBundle] loadNibNamed: @"MainMenu" owner: NSApp topLevelObjects: nil];
+    // NOTE: the menu bar is made by make_main_menu (the MainMenu.nib of the
+    // bundle is the one of the old Cocoa interface)
     // NOTE: needed for a menu bar when TeXmacs is not in a bundle
     [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
     // NOTE: otherwise these items are added to the Edit menu each time the
