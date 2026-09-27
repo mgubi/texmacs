@@ -543,6 +543,7 @@ test_profile_file () {
   known->insert ("file"); known->insert ("text"); known->insert ("sans");
   known->insert ("mono"); known->insert ("letters");
   known->insert ("bold-math"); known->insert ("menu"); known->insert ("group");
+  known->insert ("family"); known->insert ("text-file");
   hashset<string> names, texts;
   int nr_profiles= 0, nr_installed= 0;
   for (int i=0; i<N(forms); i++) {
@@ -583,6 +584,13 @@ test_profile_file () {
     if (val->contains ("letters"))
       CHECK_MSG (val["letters"] == "math" || val["letters"] == "text",
                 as_charp ("letters is neither math nor text in " * name));
+    if (val->contains ("family"))
+      CHECK_MSG (val["family"] == "rm" || val["family"] == "ss",
+                as_charp ("family is neither rm nor ss in " * name));
+    if (val->contains ("group"))
+      CHECK_MSG (val["group"] == "Serif" || val["group"] == "Sans serif" ||
+                 val["group"] == "Other",
+                as_charp ("unknown group " * val["group"] * " in " * name));
     // several math fonts may name the same text companion; the first one
     // in the file is the one that companion pulls in
     bool first_claim= false;
@@ -609,7 +617,21 @@ test_profile_file () {
     CHECK_MSG (!is_atomic (fn) && N(fn) >= 1, as_charp ("no name table in " *
                                                        val["file"]));
     CHECK_MSG (!is_atomic (fn[0]) && N(fn[0]) >= 1, "malformed name table");
-    CHECK_EQ (scm_unquote (fn[0][0]->label), name);
+    // a file may call its family otherwise, as KpMath-Sans calls itself
+    // KpMath; the shipped database must then list it under the profile name
+    if (scm_unquote (fn[0][0]->label) != name) {
+      bool listed= false;
+      array<string> st= font_database_global_styles (name);
+      for (int k=0; k<N(st); k++) {
+        array<string> fs= font_database_search (name, st[k]);
+        for (int l=0; l<N(fs); l++)
+          if (starts (fs[l], val["file"] * ".")) listed= true;
+      }
+      CHECK_MSG (listed, as_charp (val["file"] * " calls its family " *
+                                   scm_unquote (fn[0][0]->label) *
+                                   ", and the database does not list it as " *
+                                   name));
+    }
     font mf= unicode_font (val["file"], LM_SIZE, LM_DPI);
     CHECK (!is_nil (mf));
     CHECK_MSG (mf->ot_math,
