@@ -79,6 +79,14 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
 
 ## Building and running
 
+The CI of GitHub builds it at every push to `wip_wasm_vue`
+(`.github/workflows/wasm.yml`, at the top of the repository): Emscripten
+6.0.10 by `emsdk`, the slim MuPDF with its patches (cached), the page and
+the node build, a smoke test (the node build turns the Welcome document
+into a PDF), and the page as an artifact of the run (`texmacs-wasm-web`:
+unzip it and serve it with `node misc/wasm/serve.mjs <dir>`). With emsdk,
+`emenv.sh` keeps the configuration of emsdk.
+
     . misc/wasm/emenv.sh build-wasm       # Emscripten (Python >= 3.10, config)
     sh misc/wasm/build-mupdf.sh           # MuPDF 1.28.5, the slim build
     make -C build-wasm -f ../misc/wasm/Makefile -j8 web    # the page

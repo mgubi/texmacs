@@ -10,6 +10,13 @@
 WASM_BUILD="${1:-build-wasm}"
 mkdir -p "$WASM_BUILD"
 
+# with emsdk (emsdk_env.sh sourced, as in the CI: .github/workflows/wasm.yml)
+# its configuration is the one to use
+if [ -n "$EMSDK" ]; then
+  echo "emscripten: $(emcc --version 2>&1 | head -1) (emsdk $EMSDK)"
+  return 0 2>/dev/null || exit 0
+fi
+
 if [ -z "$EMSDK_PYTHON" ]; then
   for p in /opt/homebrew/opt/python@3.13/bin/python3.13 \
            /opt/homebrew/opt/python@3.14/bin/python3.14 \
