@@ -529,11 +529,8 @@ ns_ui_element_rep::as_menuitem () {
     }
 
     default:
-      // FIXME: widgets inside menus (toggles, enums, ...)
-      if (DEBUG_QT_WIDGETS)
-        debug_widgets << "ns_ui_element: no menu item for "
-                      << type_as_string () << LF;
-      return nil;
+      // The other widgets (toggles, enums, ...) are shown by their view
+      return ns_widget_rep::as_menuitem ();
   }
 }
 

@@ -15,146 +15,168 @@
 - (void) doit;
 @end
 
+@interface TMFlippedView : NSView
+@end
+
+@implementation TMFlippedView
+- (BOOL) isFlipped { return YES; }
+@end
+
 @implementation TMButtonsController
 
 - (id) init
 {
-	self = [super init];
-	if (self != nil) {
-		menuArray = [[NSMutableArray alloc] initWithCapacity:10];
-		barArray = [[NSMutableArray alloc] initWithCapacity:10];
-		view = [[NSView alloc] init];
-	}
-	return self;
+  self = [super init];
+  if (self != nil) {
+    rowArray = [[NSMutableArray alloc] initWithCapacity:4];
+    menuArray = [[NSMutableArray alloc] initWithCapacity:4];
+    shownArray = [[NSMutableArray alloc] initWithCapacity:4];
+    view = [[TMFlippedView alloc] init];
+  }
+  return self;
 }
+
 - (void) dealloc
 {
-	[menuArray release];
-	[barArray release];
-	[view release];
-	[super dealloc];
+  [rowArray release];
+  [menuArray release];
+  [shownArray release];
+  [view release];
+  [super dealloc];
 }
 
 - (void) buttonsAction:(id) sc
 {
-  unsigned idx = [sc selectedSegment];
+  NSInteger idx = [sc selectedSegment];
   NSArray *arr = [[sc cell] representedObject];
+  if (idx < 0 || idx >= (NSInteger) [arr count]) return;
   NSMenuItem *mi = [arr objectAtIndex:idx];
   NSMenu *sm = [mi submenu];
-  if (sm)
-    [NSMenu popUpContextMenu:sm withEvent:[NSApp currentEvent] forView:sc];
+  if (sm) {
+    // the menu below the segment, as the menus of the Qt tool bars
+    NSRect r = [sc bounds];
+    CGFloat x = 0;
+    for (NSInteger j = 0; j < idx; j++) x += [sc widthForSegment:j];
+    [sm popUpMenuPositioningItem:nil
+                      atLocation:NSMakePoint (x, [sc isFlipped]?
+                                              NSMaxY (r) + 2: -2)
+                          inView:sc];
+  }
   else if ([mi respondsToSelector:@selector(doit)]) [(id)mi doit];
 }
 
-- (NSSegmentedControl*) newSegment
+- (NSSegmentedControl*) segmentFor:(NSArray*) items
 {
-  NSSegmentedControl *ret =  [[[NSSegmentedControl alloc] init] autorelease];
-  [ret setSegmentStyle: NSSegmentStyleTexturedSquare];
-  return ret; 
+  NSSegmentedControl *sc = [[[NSSegmentedControl alloc] init] autorelease];
+  [sc setSegmentStyle: NSSegmentStyleTexturedSquare];
+  [sc setSegmentCount:[items count]];
+  for (NSUInteger j = 0; j < [items count]; j++) {
+    NSMenuItem *mi = [items objectAtIndex:j];
+    [sc setEnabled:[mi isEnabled] forSegment:j];
+    if ([mi representedObject]) {
+      [sc setImage:[mi representedObject] forSegment:j];
+      [sc setLabel:@"" forSegment:j];
+      [sc setWidth:25.0 forSegment:j];
+    }
+    else {
+      // buttons with a text instead of an icon (focus bar)
+      [sc setImage:nil forSegment:j];
+      [sc setLabel:[mi title] forSegment:j];
+      [sc setWidth:0.0 forSegment:j];
+    }
+    [(NSSegmentedCell*)[sc cell] setToolTip:[mi toolTip] forSegment:j];
+  }
+  [(NSCell*)[sc cell] setRepresentedObject:items];
+  [[sc cell] setTrackingMode: NSSegmentSwitchTrackingMomentary];
+  [sc setTarget: self];
+  [sc setAction:@selector(buttonsAction:)];
+  [sc sizeToFit];
+  return sc;
+}
+
+- (NSView*) rowFor:(NSMenu*) menu
+{
+  NSStackView *row = [[[NSStackView alloc] init] autorelease];
+  [row setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
+  [row setAlignment: NSLayoutAttributeCenterY];
+  [row setSpacing: 5.0];
+  [row setEdgeInsets: NSEdgeInsetsMake (1, 4, 1, 4)];
+  NSMutableArray *segs = [NSMutableArray array];
+  NSInteger c = [menu numberOfItems];
+  for (NSInteger i = 0; i <= c; i++) {
+    NSMenuItem *mi = (i < c)? [menu itemAtIndex:i]: nil;
+    BOOL button = mi && ![mi isSeparatorItem] && ![mi view] &&
+      ([mi representedObject] || [mi submenu] || [mi action]);
+    if (button) { [segs addObject:mi]; continue; }
+    if ([segs count] > 0) {
+      [row addArrangedSubview: [self segmentFor: segs]];
+      segs = [NSMutableArray array];
+    }
+    if (!mi || [mi isSeparatorItem]) continue;
+    if ([mi view]) {
+      NSView *v = [[[mi view] retain] autorelease];
+      [mi setView:nil];
+      [row addArrangedSubview: v];
+    }
+    else if ([[mi title] length] > 0) {
+      NSTextField *t = [NSTextField labelWithString:[mi title]];
+      [row addArrangedSubview: t];
+    }
+  }
+  return row;
+}
+
+- (void) ensureRow:(unsigned) idx
+{
+  while ([rowArray count] <= idx) {
+    [rowArray addObject:[[[NSView alloc] init] autorelease]];
+    [menuArray addObject:[[[NSMenu alloc] init] autorelease]];
+    [shownArray addObject:[NSNumber numberWithBool:YES]];
+  }
 }
 
 - (void)setMenu:(NSMenu *)menu forRow:(unsigned) idx
 {
-	unsigned count = [menuArray count];
-	while (count <= idx) { 
-		[menuArray addObject:[[[NSMenu alloc] init] autorelease]];  
-      NSMutableArray *arr =  [[NSMutableArray alloc] initWithCapacity:10];
-      [barArray addObject:arr];  
-		count++; 
-	}
-	[menuArray replaceObjectAtIndex: idx withObject: menu];
-	{
-      NSMutableArray *arr = [barArray objectAtIndex:idx];
-//      [arr removeAllObjects];
-      unsigned nn = [arr count], mm = 0;
-      unsigned  i,j;
-      [menu addItem:[NSMenuItem separatorItem]];
-      unsigned c = [menu numberOfItems];
-      NSMutableArray *segs =  [[[NSMutableArray alloc] initWithCapacity:10] autorelease];
-      for(i = 0; i < c; i++)
-      {
-        NSMenuItem *mi = [menu itemAtIndex:i];
-        if (![mi isSeparatorItem]) [segs addObject:mi];
-        else  if ([segs count]>0) {
-          while (mm >= nn) {
-            [arr addObject:[self newSegment]];
-            nn++;
-          }
-          NSSegmentedControl *sc = [arr objectAtIndex:mm];
-          mm++;
-          [sc setSegmentCount:[segs count]];
-          for(j=0; j<[segs count]; j++)
-          {
-            mi = [segs objectAtIndex:j];
-            [sc setEnabled:YES forSegment:j];
-            // NOTE: not [mi setMenu:nil], which is reserved to NSMenu
-            [sc setMenu:[mi submenu] forSegment:j];
-            if ([mi representedObject]) {
-              [sc setImage:[mi representedObject] forSegment:j];
-              [sc setLabel:nil forSegment:j];
-              [sc setWidth:25.0 forSegment:j];
-            }
-            else {
-              // NOTE: buttons with a text instead of an icon (focus bar)
-              [sc setImage:nil forSegment:j];
-              [sc setLabel:[mi title] forSegment:j];
-              [sc setWidth:0.0 forSegment:j];
-            }
-            [(NSSegmentedCell*)[sc cell] setToolTip:[mi toolTip] forSegment:j];
-            
-          }
-          [(NSCell*)[sc cell] setRepresentedObject:segs];
-          [[sc cell] setTrackingMode: NSSegmentSwitchTrackingMomentary];
-          [sc sizeToFit];
-          [sc setTarget: self];
-          [sc setAction:@selector(buttonsAction:)];
-          segs =  [[[NSMutableArray alloc] initWithCapacity:10] autorelease];
-        }
-        
-      }
-      while (mm < nn) {
-        [(NSSegmentedControl*)[arr objectAtIndex:mm] removeFromSuperview];
-        mm++;
-      }
-	}
+  [self ensureRow: idx];
+  [[rowArray objectAtIndex:idx] removeFromSuperview];
+  NSView *row = menu? [self rowFor: menu]: [[[NSView alloc] init] autorelease];
+  [rowArray replaceObjectAtIndex:idx withObject:row];
+  if (menu) [menuArray replaceObjectAtIndex:idx withObject:menu];
+  [self layout];
+}
+
+- (void) setVisible:(BOOL) flag forRow:(unsigned) idx
+{
+  [self ensureRow: idx];
+  [shownArray replaceObjectAtIndex:idx
+                        withObject:[NSNumber numberWithBool:flag]];
   [self layout];
 }
 
 - (void) layout
 {
-  NSRect r = [view bounds];
-  float totalHeight = 0.0;
-  float totalWidth = 0.0;
-  float baseX = r.origin.x;
-  int i,j;
-  //	r.origin.y += r.size.height;
-  for (i=[barArray count]-1; i>= 0; i--) {
-    r.origin.x = baseX;
-    NSArray *arr = [barArray objectAtIndex:i];
-    float currHeight = 0.0;
-    for(j=0; j<((int) [arr count]); j++) {
-      NSSegmentedControl *sc = [arr objectAtIndex:j];
-      if (![sc superview]) [view addSubview:sc];
-      r.size = [sc frame].size;
-	  [sc setFrame:r];
-      r = NSOffsetRect(r, r.size.width + 5.0, 0);            
-      if (NSMaxX(r) > totalWidth) totalWidth = NSMaxX(r);
-      if (r.size.height > currHeight) currHeight = r.size.height; 
-    }
-    r = NSOffsetRect(r, 0, currHeight);
-    totalHeight += currHeight;    
+  // The rows from the top to the bottom, with their natural height
+  CGFloat y = 0.0, w = [view frame].size.width;
+  for (NSUInteger i = 0; i < [rowArray count]; i++) {
+    NSView *row = [rowArray objectAtIndex:i];
+    BOOL shown = [[shownArray objectAtIndex:i] boolValue] &&
+                 [[row subviews] count] > 0;
+    if (!shown) { [row removeFromSuperview]; continue; }
+    if ([row superview] != view) [view addSubview:row];
+    NSSize sz = [row fittingSize];
+    // NOTE: the input fields shrink when the row is too long
+    [row setFrame: NSMakeRect (0, y, w > 0? w: sz.width, sz.height)];
+    y += sz.height;
   }
-  r = [view frame];
-  r.size.height = totalHeight;
-  r.size.width = totalWidth;
-  
+  NSRect r = [view frame];
+  r.size.height = y;
   [view setFrame:r];
   [view setNeedsDisplay:YES];
 }
 
 - (NSView*) bar
 {
-	return view;
+  return view;
 }
 
 @end

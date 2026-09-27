@@ -741,6 +741,35 @@ find_document_scroll_view (NSView* v) {
 // NOTE: when the environment variable TEXMACS_NS_PRESS is set, the button
 // or the tab with this label is pressed after four seconds
 
+static void
+ns_editable_fields (NSView* v, NSMutableArray* a) {
+  if ([v isKindOfClass: [NSTextField class]] && [(NSTextField*) v isEditable]
+      && ![v isHiddenOrHasHiddenAncestor])
+    [a addObject: v];
+  for (NSView* sub in [v subviews]) ns_editable_fields (sub, a);
+}
+
+static bool
+ns_fill_field (NSWindow* win, NSString* spec) {
+  // "field:<n>=<text>": the text is typed in the n-th editable field of the
+  // window, followed by return
+  NSRange eq= [spec rangeOfString: @"="];
+  if (eq.location == NSNotFound) return false;
+  int n= [[spec substringWithRange: NSMakeRange (6, eq.location - 6)] intValue];
+  NSString* text= [spec substringFromIndex: eq.location + 1];
+  NSMutableArray* a= [NSMutableArray array];
+  ns_editable_fields ([win contentView], a);
+  if (n < 0 || n >= (int) [a count]) return false;
+  NSTextField* f= [a objectAtIndex: n];
+  [win makeFirstResponder: f];
+  NSText* ed= (NSText*) [win firstResponder];
+  if (![ed isKindOfClass: [NSText class]]) ed= [win fieldEditor: YES forObject: f];
+  [ed selectAll: nil];
+  [ed insertText: text];
+  [ed doCommandBySelector: @selector(insertNewline:)];
+  return true;
+}
+
 static bool
 ns_press (NSView* v, NSString* label) {
   if ([v isKindOfClass: [NSTabView class]]) {
@@ -771,8 +800,10 @@ ns_press (NSView* v, NSString* label) {
   NSString* label= to_nsstring (get_env ("TEXMACS_NS_PRESS"));
   bool done= false;
   for (NSWindow* win in [[[NSApp orderedWindows] copy] autorelease])
-    if (!done && [win isVisible])
-      done= ns_press ([win contentView], label);
+    if (!done && [win isVisible]) {
+      if ([label hasPrefix: @"field:"]) done= ns_fill_field (win, label);
+      else done= ns_press ([win contentView], label);
+    }
   fprintf (stderr, "TEXMACS_NS_PRESS %s\n", done? "done": "not found");
 }
 @end

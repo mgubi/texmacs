@@ -10,6 +10,7 @@
 
 #include "mac_cocoa.h"
 #import <PDFKit/PDFKit.h>
+#import <objc/runtime.h>
 #include "ns_other_widgets.h"
 #include "ns_utilities.h"
 #include "ns_simple_widget.h"
@@ -340,25 +341,122 @@ ns_inputs_list_widget_rep::perform_dialog () {
 * ns_input_text_widget_rep
 ******************************************************************************/
 
+/*! The behavior of the input fields of the Qt interface (QTMLineEdit):
+ the input is committed with return, and when the field loses the focus if
+ the preference gui:line-input:autocommit is on; escape cancels; tab and the
+ arrows complete with the proposals; the continuous fields (searching,
+ replacing, spelling, forms) send each change with the last key. */
 @interface TMInputTextHelper : NSObject <NSTextFieldDelegate>
 {
+@public
   ns_input_text_widget_rep* wid;
+  NSArray* proposals;
+  NSInteger current;
+  BOOL handled;
 }
-- (id) initWithWidget: (ns_input_text_widget_rep*) w;
-- (void) commit: (id) sender;
+- (id) initWithWidget: (ns_input_text_widget_rep*) w
+            proposals: (NSArray*) p;
 @end
 
 @implementation TMInputTextHelper
 - (id) initWithWidget: (ns_input_text_widget_rep*) w
+            proposals: (NSArray*) p
 {
+  // NOTE: the helper keeps the widget alive, as QTMInputTextWidgetHelper
   self= [super init];
-  if (self) wid= w;
+  if (self) {
+    wid= w; INC_COUNT (wid);
+    proposals= [p retain]; current= -1; handled= NO;
+  }
   return self;
 }
-- (void) commit: (id) sender
+
+- (void) dealloc
 {
-  (void) sender;
-  if (wid) wid->commit (true);
+  [proposals release];
+  if (wid) { if (wid->view) wid->view= nil; DEC_COUNT (wid); }
+  [super dealloc];
+}
+
+- (void) complete: (NSTextView*) tv forward: (BOOL) fw
+{
+  // The next proposal which extends the text before the cursor
+  NSString* text= [tv string];
+  NSRange sel= [tv selectedRange];
+  NSString* prefix= [text substringToIndex: MIN (sel.location,
+                                                 [text length])];
+  NSMutableArray* ok= [NSMutableArray array];
+  for (NSString* p in proposals)
+    if ([p hasPrefix: prefix]) [ok addObject: p];
+  if ([ok count] == 0) return;
+  NSUInteger k= [ok indexOfObject: text];
+  if (k == NSNotFound) k= fw? 0: [ok count] - 1;
+  else k= fw? (k + 1) % [ok count]: (k + [ok count] - 1) % [ok count];
+  NSString* c= [ok objectAtIndex: k];
+  [tv setString: c];
+  [tv setSelectedRange: NSMakeRange ([prefix length],
+                                     [c length] - [prefix length])];
+}
+
+- (BOOL) control: (NSControl*) control textView: (NSTextView*) tv
+    doCommandBySelector: (SEL) sel
+{
+  (void) control;
+  if (!wid) return NO;
+  if (wid->continuous ()) {
+    string key= "";
+    if (sel == @selector(insertNewline:)) key= "return";
+    else if (sel == @selector(cancelOperation:)) key= "escape";
+    else if (sel == @selector(moveUp:)) key= "up";
+    else if (sel == @selector(moveDown:)) key= "down";
+    else if (sel == @selector(insertTab:)) key= "tab";
+    else if (sel == @selector(insertBacktab:)) key= "S-tab";
+    else if (sel == @selector(scrollPageUp:)) key= "pageup";
+    else if (sel == @selector(scrollPageDown:)) key= "pagedown";
+    if (key == "") return NO;
+    wid->send_key (from_nsstring ([tv string]), key);
+    return YES;
+  }
+  if (sel == @selector(cancelOperation:)) {
+    handled= YES;
+    wid->commit (false);
+    return YES;
+  }
+  if (sel == @selector(insertNewline:)) {
+    handled= YES;
+    wid->commit (true);
+    return YES;
+  }
+  if ([proposals count] > 0 &&
+      (sel == @selector(insertTab:) || sel == @selector(moveDown:))) {
+    [self complete: tv forward: YES];
+    return YES;
+  }
+  if ([proposals count] > 0 &&
+      (sel == @selector(insertBacktab:) || sel == @selector(moveUp:))) {
+    [self complete: tv forward: NO];
+    return YES;
+  }
+  return NO;
+}
+
+- (void) controlTextDidChange: (NSNotification*) n
+{
+  (void) n;
+  handled= NO;
+  if (wid && wid->continuous ()) {
+    NSTextField* f= [n object];
+    wid->send_key (from_nsstring ([f stringValue]), "none");
+  }
+}
+
+- (void) controlTextDidEndEditing: (NSNotification*) n
+{
+  // The field loses the focus
+  (void) n;
+  if (!wid || handled || wid->continuous ()) return;
+  wid->commit (wid->can_autocommit () &&
+               get_preference ("gui:line-input:autocommit") == "on");
 }
 @end
 
@@ -373,17 +471,74 @@ ns_input_text_widget_rep::ns_input_text_widget_rep (command _cmd, string _type,
   if (N(proposals) > 0) input= proposals[0];
 }
 
+string
+ns_input_text_widget_rep::field_type () {
+  // "name#serial:type" (see QTMLineEdit::set_type)
+  int i= search_forwards (":", 0, type);
+  return i >= 0? type (i+1, N(type)): type;
+}
+
+bool
+ns_input_text_widget_rep::continuous () {
+  string t= field_type ();
+  string name= type;
+  int i= search_forwards (":", 0, type);
+  string serial= "";
+  if (i >= 0) {
+    name= type (0, i);
+    int j= search_forwards ("#", 0, name);
+    if (j >= 0) serial= name (j+1, N(name));
+  }
+  return starts (t, "search") || starts (t, "replace-") ||
+         starts (t, "spell") || starts (serial, "form-");
+}
+
+bool
+ns_input_text_widget_rep::can_autocommit () {
+  return !(ends (type, "search") || ends (type, "replace") ||
+           starts (type, "interactive"));
+}
+
+void
+ns_input_text_widget_rep::send_key (string s, string key) {
+  // As QTMLineEdit::keyPressEvent for the continuous fields
+  input= s;
+  the_gui->process_command (cmd, list_object (list_object (object (s),
+                                                           object (key))));
+}
+
 NSView*
 ns_input_text_widget_rep::as_nsview () {
-  // FIXME: completion with the proposals and file names
   NSTextField* f= (type == "password")
     ? [[[NSSecureTextField alloc] init] autorelease]
     : [[[NSTextField alloc] init] autorelease];
   [f setStringValue: to_label (input)];
-  // NOTE: the helper lives as long as the text field
-  TMInputTextHelper* h= [[TMInputTextHelper alloc] initWithWidget: this];
-  [f setTarget: h];
-  [f setAction: @selector(commit:)];
+  [f setIdentifier: to_nsstring (type)];
+  if (style & WIDGET_STYLE_MINI) [f setControlSize: NSControlSizeSmall];
+  [f setFont: [NSFont systemFontOfSize:
+                 [NSFont systemFontSizeForControlSize: [f controlSize]]]];
+  NSMutableArray* props= [NSMutableArray array];
+  if (N(proposals) > 1 || (N(proposals) == 1 && N(proposals[0]) > 0))
+    for (int i=0; i<N(proposals); i++)
+      [props addObject: to_label (proposals[i])];
+  // NOTE: the text field keeps its delegate (the delegate is a weak reference)
+  TMInputTextHelper* h= [[[TMInputTextHelper alloc] initWithWidget: this
+                                                          proposals: props]
+                          autorelease];
+  objc_setAssociatedObject (f, "TMInputTextHelper", h,
+                            OBJC_ASSOCIATION_RETAIN);
+  [f setDelegate: h];
+  // The width (see QTMLineEdit::sizeHint)
+  NSSize sz= ns_decode_length (width, "", NSMakeSize (150, 22));
+  // NOTE: as in the Qt interface, the fields shrink when there is no room
+  [f setTranslatesAutoresizingMaskIntoConstraints: NO];
+  NSLayoutConstraint* c= [f.widthAnchor constraintEqualToConstant: sz.width];
+  [c setPriority: NSLayoutPriorityDefaultLow];
+  [c setActive: YES];
+  [[f.widthAnchor constraintGreaterThanOrEqualToConstant: min (sz.width, 30.0)]
+    setActive: YES];
+  [f setContentCompressionResistancePriority: NSLayoutPriorityDefaultLow - 1
+                              forOrientation: NSLayoutConstraintOrientationHorizontal];
   view= f;
   return f;
 }

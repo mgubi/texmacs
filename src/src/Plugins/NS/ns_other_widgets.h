@@ -151,6 +151,10 @@ public:
 
   virtual NSView* as_nsview ();
   void commit (bool ok);
+  void send_key (string s, string key);
+  string field_type ();
+  bool continuous ();
+  bool can_autocommit ();
   string get_input () { return input; }
   };
 

@@ -118,3 +118,28 @@ operator << (tm_ostream& out, coord2 c) {
   out << "[" << c.x1 << "," << c.x2 << "]";
   return out;
 }
+
+/******************************************************************************
+ * Lengths of the widgets (see qt_decode_length)
+ ******************************************************************************/
+
+NSSize
+ns_decode_length (string width, string height, NSSize ref) {
+  // The size given by the lengths (in points), from the default size ref:
+  // w and h are multiples of the default width and height, em and px are
+  // absolute (an em of 14 points)
+  NSSize size= ref;
+  string w_unit, h_unit;
+  double w_len, h_len;
+  parse_length (width, w_len, w_unit);
+  parse_length (height, h_len, h_unit);
+  if      (w_unit == "w" ) size.width= w_len * ref.width;
+  else if (w_unit == "h" ) size.width= w_len * ref.height;
+  else if (w_unit == "em") size.width= 14.0 * w_len;
+  else if (w_unit == "px") size.width= w_len;
+  if      (h_unit == "w" ) size.height= h_len * size.width;
+  else if (h_unit == "h" ) size.height= h_len * ref.height;
+  else if (h_unit == "em") size.height= 14.0 * h_len;
+  else if (h_unit == "px") size.height= h_len;
+  return size;
+}

@@ -231,8 +231,11 @@ void ns_tm_widget_rep::layout()
   // side tools, the bottom and extra tools, and the footer
   NSSize fs = NSMakeSize (100, 20); // size of the right footer
   NSRect r = [view bounds];
-  CGFloat bar_h = (visibility[1] || visibility[2] || visibility[3] ||
-                   visibility[4])? [[bc bar] frame].size.height: 0;
+  // NOTE: the header contains the rows of icons, which are shown or hidden
+  // one by one (see updateVisibility)
+  [[bc bar] setFrameSize: NSMakeSize (r.size.width, [[bc bar] frame].size.height)];
+  [bc layout];
+  CGFloat bar_h = visibility[0]? [[bc bar] frame].size.height: 0;
   CGFloat foot_h= visibility[5]? fs.height: 0;
   bool show[4];
   NSSize sz[4];
@@ -284,9 +287,26 @@ visibility_index (slot s) {
   }
 }
 
+static NSView*
+view_with_identifier (NSView* v, NSString* name) {
+  // The first view with this identifier (or with a name ending with ":name",
+  // for the input fields of the form "name#serial:type")
+  if (!v) return nil;
+  NSString* id= [v identifier];
+  if (id && ([id isEqualToString: name] ||
+             [id hasSuffix: [@":" stringByAppendingString: name]]))
+    return v;
+  for (NSView* w in [v subviews]) {
+    NSView* r= view_with_identifier (w, name);
+    if (r) return r;
+  }
+  return nil;
+}
+
 void ns_tm_widget_rep::updateVisibility()
 {
-  // FIXME: the rows of icons are shown or hidden together
+  // The main, mode, focus and user icons are the rows of the icon bar
+  for (int i=0; i<4; i++) [bc setVisible: visibility[1+i] forRow: i];
   layout ();
 }
 
@@ -310,11 +330,17 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
       // editor gets the focus, which is noticed as a change, so that the
       // menus and tools are updated
       check_type<string> (val, s);
-      if (open_box<string> (val) == "canvas" && !is_nil (main_widget)) {
+      string name= open_box<string> (val);
+      if (name == "canvas" && !is_nil (main_widget)) {
         NSView* v= canvas_of (concrete (main_widget)->as_nsview ());
         if (v && [v window]) [[v window] makeFirstResponder: v];
         the_gui->process_keyboard_focus
           ((ns_simple_widget_rep*) main_widget.rep, true, texmacs_time ());
+      }
+      else {
+        // an input field, by its type (see qt_tm_widget_rep)
+        NSView* v= view_with_identifier (view, to_nsstring (name));
+        if (v && [v window]) [[v window] makeFirstResponder: v];
       }
     }
     break;
@@ -365,7 +391,6 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
       updateVisibility();
     }
     break;
-  // FIXME: the focus icons and the tools are not shown yet
   case SLOT_FOCUS_ICONS_VISIBILITY:
   case SLOT_SIDE_TOOLS_VISIBILITY:
   case SLOT_LEFT_TOOLS_VISIBILITY:

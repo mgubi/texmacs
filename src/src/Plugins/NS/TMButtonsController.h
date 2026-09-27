@@ -11,16 +11,18 @@
 
 #import <Cocoa/Cocoa.h>
 
+/*! The rows of icons above the canvas (main, mode, focus and user icons).
+ Each row is made from the items of a menu: the buttons between separators
+ are grouped in segmented controls, the texts are labels, and the items with
+ a view (input fields, pop-up menus, ...) show this view. */
 @interface TMButtonsController : NSObject {
-	NSMutableArray *menuArray;
-	NSMutableArray *barArray;
-	NSView *view;
-	IBOutlet  NSSegmentedControl *prototype;
+  NSMutableArray *rowArray;     // the view of each row
+  NSMutableArray *menuArray;    // the menu of each row (keeps the items)
+  NSMutableArray *shownArray;   // whether each row is visible
+  NSView *view;
 }
 - (void) setMenu:(NSMenu *)menu forRow:(unsigned) idx;
+- (void) setVisible:(BOOL) flag forRow:(unsigned) idx;
 - (void) layout;
 - (NSView*) bar;
-//- (void) buttonsAction:(NSMatrix*) mat;
-- (NSSegmentedControl*) newSegment;
-
 @end

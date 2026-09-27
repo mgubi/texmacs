@@ -848,8 +848,14 @@ ns_widget_rep::as_nsview () {
 
 TMMenuItem*
 ns_widget_rep::as_menuitem () {
-  // NOTE: the widgets which can be shown in menus redefine this method
-  return nil;
+  // NOTE: the widgets which can be shown in menus redefine this method; the
+  // others are shown by their view (as the QWidgetAction of the Qt interface)
+  NSView* v= as_nsview ();
+  if (!v) return nil;
+  TMMenuItem* mi= [[[TMMenuItem alloc] initWithTitle: @"" action: NULL
+                                       keyEquivalent: @""] autorelease];
+  [mi setView: v];
+  return mi;
 }
 
 /******************************************************************************

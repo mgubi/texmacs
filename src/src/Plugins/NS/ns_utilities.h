@@ -80,6 +80,8 @@ tm_ostream& operator << (tm_ostream& out, coord2 c);
 // deprecated, use check_type<T>(bb, slot) instead
 //#define TYPE_CHECK(b) ASSERT (b, "type mismatch")
 
+NSSize ns_decode_length (string width, string height, NSSize ref);
+
 #define NOT_IMPLEMENTED(x) \
 { if (DEBUG_QT) debug_qt << x << " not implemented yet.\n"; }
 
