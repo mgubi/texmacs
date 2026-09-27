@@ -271,7 +271,8 @@ gui_is_x () {
 
 bool
 gui_is_qt () {
-#ifdef QTTEXMACS
+  // NOTE: the native interface of macOS implements the widgets of Qt
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
   return true;
 #else
   return false;

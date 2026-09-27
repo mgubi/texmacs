@@ -309,6 +309,35 @@ void (*the_interpose_handler) (void) = NULL;
 
 void gui_interpose (void (*r) (void)) { the_interpose_handler= r; }
 
+/*! Put the image of a file on the clipboard (see the Qt interface): the
+ bitmaps as images, the other formats by their type. */
+bool
+ns_gui_rep::put_graphics_on_clipboard (url file) {
+  string ext= locase_all (suffix (file));
+  NSPasteboard* pb= [NSPasteboard generalPasteboard];
+  NSString* path= to_nsstring_utf8 (concretize (file));
+  if (ext == "bmp" || ext == "png" || ext == "jpg" || ext == "jpeg" ||
+      ext == "tif" || ext == "tiff") {
+    NSImage* im= [[[NSImage alloc] initWithContentsOfFile: path] autorelease];
+    if (!im) return false;
+    [pb clearContents];
+    return [pb writeObjects: [NSArray arrayWithObject: im]];
+  }
+  NSData* data= [NSData dataWithContentsOfFile: path];
+  if (!data) return false;
+  NSString* type= @"public.data";
+  if (ext == "pdf") type= NSPasteboardTypePDF;
+  else if (ext == "eps" || ext == "ps") type= @"com.adobe.encapsulated-postscript";
+  else if (ext == "svg") type= @"public.svg-image";
+  [pb clearContents];
+  return [pb setData: data forType: type];
+}
+
+bool
+ns_put_graphics_on_clipboard (url file) {
+  return the_gui->put_graphics_on_clipboard (file);
+}
+
 /******************************************************************************
 * Queued processing (see qt_gui.cpp)
 ******************************************************************************/
@@ -721,6 +750,15 @@ ns_print_menu (NSMenu* m, int depth, int max_depth) {
                                       : from_nsstring ([mi title]);
     if ([mi image] && N(title) == 0) title= "[icon]";
     if (![mi isEnabled]) title= title * " (disabled)";
+    if ([mi state] == NSControlStateValueOn) title= "[x] " * title;
+    if ([[mi keyEquivalent] length] > 0) {
+      NSEventModifierFlags m= [mi keyEquivalentModifierMask];
+      title= title * "  <" * ((m & NSEventModifierFlagControl)? "C-": "")
+           * ((m & NSEventModifierFlagOption)? "A-": "")
+           * ((m & NSEventModifierFlagShift)? "S-": "")
+           * ((m & NSEventModifierFlagCommand)? "M-": "")
+           * from_nsstring ([mi keyEquivalent]) * ">";
+    }
     fprintf (stderr, "NSMENU %s%s\n",
              as_charp (string (' ', 2 * depth)), as_charp (title));
     if ([mi hasSubmenu]) ns_print_menu ([mi submenu], depth + 1, max_depth);
@@ -909,6 +947,28 @@ void
 ns_gui_rep::event_loop () {
   [NSApp finishLaunching];
   need_update ();
+  // NOTE: the menus of TeXmacs show the keyboard shortcuts but leave the keys
+  // to the editor; the text fields get the usual editing shortcuts here
+  [NSEvent addLocalMonitorForEventsMatchingMask: NSEventMaskKeyDown
+            handler: ^NSEvent* (NSEvent* e) {
+      NSEventModifierFlags m= [e modifierFlags] &
+        NSEventModifierFlagDeviceIndependentFlagsMask;
+      id r= [[NSApp keyWindow] firstResponder];
+      if (![r isKindOfClass: [NSText class]] ||
+          (m & ~NSEventModifierFlagShift) != NSEventModifierFlagCommand)
+        return e;
+      NSString* c= [e charactersIgnoringModifiers];
+      SEL sel= NULL;
+      if ([c isEqualToString: @"c"]) sel= @selector(copy:);
+      else if ([c isEqualToString: @"x"]) sel= @selector(cut:);
+      else if ([c isEqualToString: @"v"]) sel= @selector(paste:);
+      else if ([c isEqualToString: @"a"]) sel= @selector(selectAll:);
+      else if ([c isEqualToString: @"z"])
+        sel= (m & NSEventModifierFlagShift)? @selector(redo:): @selector(undo:);
+      else if ([c isEqualToString: @"Z"]) sel= @selector(redo:);
+      if (sel && [NSApp sendAction: sel to: nil from: nil]) return nil;
+      return e;
+    }];
   if (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_SNAPSHOT") != "") {
     // NOTE: when testing, TeXmacs is started in the background; the window
     // must be the key window, otherwise the editor loses its focus

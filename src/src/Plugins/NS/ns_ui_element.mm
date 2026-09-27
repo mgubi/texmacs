@@ -404,6 +404,82 @@ ns_ui_element_rep::make_popup_widget () {
  * Menu items (menus and toolbars)
  ******************************************************************************/
 
+/*! The keyboard shortcut of a menu item (see conv_sub in the Qt interface):
+ M- is command, C- control, A- option and S- shift, an upper case letter
+ implies shift; the shortcuts of several keys are shown in the title. */
+static NSString*
+shortcut_key (string k) {
+  static hashmap<string,int> keys (0);
+  if (N(keys) == 0) {
+    keys ("return")= NSCarriageReturnCharacter; keys ("enter")= NSEnterCharacter;
+    keys ("tab")= NSTabCharacter; keys ("space")= ' ';
+    keys ("backspace")= NSBackspaceCharacter; keys ("delete")= NSDeleteCharacter;
+    keys ("escape")= 0x1b;
+    keys ("left")= NSLeftArrowFunctionKey; keys ("right")= NSRightArrowFunctionKey;
+    keys ("up")= NSUpArrowFunctionKey; keys ("down")= NSDownArrowFunctionKey;
+    keys ("home")= NSHomeFunctionKey; keys ("end")= NSEndFunctionKey;
+    keys ("pageup")= NSPageUpFunctionKey; keys ("pagedown")= NSPageDownFunctionKey;
+    for (int i=1; i<=12; i++) keys ("F" * as_string (i))= NSF1FunctionKey + i - 1;
+  }
+  if (keys->contains (k)) {
+    unichar c= (unichar) keys[k];
+    return [NSString stringWithCharacters: &c length: 1];
+  }
+  if (N(k) == 1) return to_nsstring (k);
+  return nil;
+}
+
+static bool
+parse_shortcut (string ks, NSString*& key, NSEventModifierFlags& mask) {
+  mask= 0;
+  while (N(ks) > 2 && ks[1] == '-') {
+    if (ks[0] == 'M') mask |= NSEventModifierFlagCommand;
+    else if (ks[0] == 'C') mask |= NSEventModifierFlagControl;
+    else if (ks[0] == 'A') mask |= NSEventModifierFlagOption;
+    else if (ks[0] == 'S') mask |= NSEventModifierFlagShift;
+    else return false;
+    ks= ks (2, N(ks));
+  }
+  key= shortcut_key (ks);
+  if (!key) return false;
+  if (N(ks) == 1 && is_upcase (ks[0])) {
+    mask |= NSEventModifierFlagShift;
+    key= [key lowercaseString];
+  }
+  return true;
+}
+
+static NSString*
+shortcut_text (NSString* key, NSEventModifierFlags mask) {
+  NSMutableString* s= [NSMutableString string];
+  if (mask & NSEventModifierFlagControl) [s appendString: @"\u2303"];
+  if (mask & NSEventModifierFlagOption)  [s appendString: @"\u2325"];
+  if (mask & NSEventModifierFlagShift)   [s appendString: @"\u21E7"];
+  if (mask & NSEventModifierFlagCommand) [s appendString: @"\u2318"];
+  [s appendString: [key uppercaseString]];
+  return s;
+}
+
+static void
+set_shortcut (NSMenuItem* mi, string ks) {
+  if (N(ks) == 0) return;
+  array<string> strokes= tokenize (ks, " ");
+  NSString* key; NSEventModifierFlags mask;
+  if (N(strokes) == 1 && parse_shortcut (ks, key, mask)) {
+    [mi setKeyEquivalent: key];
+    [mi setKeyEquivalentModifierMask: mask];
+    return;
+  }
+  // several keys: in the title
+  NSMutableArray* parts= [NSMutableArray array];
+  for (int i=0; i<N(strokes); i++) {
+    if (!parse_shortcut (strokes[i], key, mask)) return;
+    [parts addObject: shortcut_text (key, mask)];
+  }
+  [mi setTitle: [NSString stringWithFormat: @"%@\t%@", [mi title],
+                  [parts componentsJoinedByString: @" "]]];
+}
+
 static TMMenuItem*
 new_item (NSString* title) {
   return [[[TMMenuItem alloc] initWithTitle: title action: NULL
@@ -490,8 +566,13 @@ ns_ui_element_rep::as_menuitem () {
       if (!mi) mi= new_item (@"");
       [mi setCommand: x.x2.rep];
       [mi setEnabled: (ok? YES: NO)];
-      // FIXME: keyboard shortcuts (x.x4) and the prefixes "*" and "o"
-      [mi setState: (x.x3 != ""? NSControlStateValueOn: NSControlStateValueOff)];
+      // the keyboard shortcut is shown, but the keys go to the editor (the
+      // lazy menus have no key equivalents, see TMLazyMenu)
+      set_shortcut (mi, x.x4);
+      // NOTE: as in the Qt interface, the prefixes (v, * and o) and the
+      // pressed buttons are shown by a check mark
+      bool check= (x.x3 != "") || (x.x5 & WIDGET_STYLE_PRESSED);
+      [mi setState: (check? NSControlStateValueOn: NSControlStateValueOff)];
       return mi;
     }
 

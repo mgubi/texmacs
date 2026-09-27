@@ -661,7 +661,7 @@ ns_color_picker_widget_rep::send (slot s, blackbox val) {
 void
 ns_color_picker_widget_rep::showDialog () {
   // A modal dialog with a color well, as the color dialog of Qt
-  // FIXME: the proposals and the patterns
+  // NOTE: as in the Qt interface, the proposals and the patterns are ignored
   NSAlert* alert= [[[NSAlert alloc] init] autorelease];
   [alert setMessageText: to_label (_windowTitle != ""? _windowTitle:
                                    string ("Choose a color"))];

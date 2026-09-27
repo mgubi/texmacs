@@ -395,7 +395,7 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   string s= suffix (name);
   bool bitmap=
     (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) && !defined (AQUATEXMACS)
   bitmap= false;
 #endif
   bool ps= (s == "ps" || s == "eps");
@@ -443,6 +443,9 @@ edit_main_rep::graphics_file_to_clipboard (url name) {
 #ifdef QTTEXMACS
   the_gui->put_graphics_on_clipboard (name);
   return true;
+#elif defined (AQUATEXMACS)
+  bool ns_put_graphics_on_clipboard (url file);
+  return ns_put_graphics_on_clipboard (name);
 #else 
   return false;
 #endif
