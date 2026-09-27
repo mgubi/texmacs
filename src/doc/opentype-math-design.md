@@ -9,12 +9,12 @@ it can be considered complete.
 
 The work originates from Ke Shi's OSPP 2024 project for Mogan, the TeXmacs
 fork. It was ported to this tree in the commit "Port the OSPP24 work of Ke
-Shi on OpenType support from Mogan" (`569a9062f` since the branch was
-rebased) and adjusted in three follow-up commits. The port itself adds
+Shi on OpenType support from Mogan" (`f798c1bc82` since the branch was
+rebased) and adjusted in two follow-up commits. The port itself adds
 roughly 1300 lines, nearly all in `src/Plugins/Freetype/` and
-`src/Typeset/Boxes/Composite/`; the branch as a whole is 61 commits, which
-on 23 September 2026 were replayed onto the SVN mirror so that they form a
-linear series on top of it.
+`src/Typeset/Boxes/Composite/`. The 61 commits the branch had on 23
+September 2026 were then replayed onto the SVN mirror so that they form a
+linear series on top of it; it has 94 on 27 September.
 
 The MATH table reader goes back further. Massimiliano Gubinelli wrote a first
 one in May 2021 on the `wip-unicode-math` branch of the GitHub repository,
@@ -65,7 +65,7 @@ works well without C++ changes.
     math_type = MATH_TYPE_OPENTYPE         stretch_stack_*, *bar_*, script_*
       (unless a tuned branch keeps           (about forty constants)
        its own math_type)
-    math_face, math_table
+    ot_face, math_table
     get_ot_italic_correction ------------> get_right_correction, get_rsup_correction
     get_ot_kerning ----------------------> get_[lr]su[bp]_correction_at (height aware)
     get_top_accent, is_extended_shape ---> top_accent, extended_shape on boxes
@@ -146,7 +146,7 @@ Papyrus, Libertine, Biolinum and Fira. `init_ot_math (face)` runs **before**
 that ladder, so a hand-tuned branch overrides the fields it tunes and leaves
 the rest to the table. It:
 
-- stores `math_face` and `math_table` on the font and sets the `ot_math`
+- stores the face (`ot_face`) and `math_table` on the font and sets the `ot_math`
   flag, which is what the typesetter tests;
 - leaves `math_type` alone: the ladder sets it to `MATH_TYPE_OPENTYPE` in
   its final `else`, that is only when no tuned branch claimed the font, so
@@ -239,7 +239,7 @@ and derived fonts forward both forms.
 it, so a font can choose its rubber implementation:
 
 - `unicode_font_rep::make_rubber_font` returns
-  `rubber_unicode_font (this, math_face)` when a MATH table exists.
+  `rubber_unicode_font (this, ot_face)` when a MATH table exists.
 - `smart_font_rep::make_rubber_font` returns itself for `mathlarge=` and
   `mathrubber=` families, forwards to the main subfont when that subfont is
   OpenType, and otherwise uses the default.
@@ -350,8 +350,11 @@ Three pieces sit between the document and the font.
 font, filled at boot from `TeXmacs/progs/fonts/fonts-opentype.scm`, which
 records what the MATH table cannot: the text, sans serif and typewriter
 companions, whether math letters come from the math font or from the text
-italic, a bold math face, a menu label and a group. A companion is named by
-its *master*, the way the `font` environment variable names a font.
+italic, a bold math face (recorded, not consulted), the family its text is
+set in (`family`), a file of a text companion the database may not know
+(`text-file`), a menu label and a group. A companion is named by its
+*master*, the way the `font` environment variable names a font; a family is
+accepted too, and mapped to its master.
 
 `profile_fix` in `smart_font.cpp` applies it. In a math shape a text family
 is replaced by its math companion when that font is installed, and the
@@ -395,7 +398,7 @@ levels. The other two features are applied at the call site: `dtls` for
 dotless letters under an accent, and `flac` for the flattened accent over a
 tall base.
 
-## 4. Status (updated 23 September 2026)
+## 4. Status (updated 27 September 2026)
 
 This is a log, in the order the work was done. Later entries correct earlier
 ones: a sentence saying that something is missing or implicit is history if a
@@ -739,39 +742,6 @@ prints, the `get_unicode_range` experiment) were dropped.
   `XCharter Math` with subfamily `Bold`, which is why the database entry
   has that spelling: it is what a user's own scan produces.
 
-- **Font menus like the LaTeX world, and the fonts to fill them (27
-  September 2026).** TeXmacs now ships Libertinus (Math, Serif, Sans, Mono),
-  Euler Math, Concrete Math with the Concrete faces of CM Unicode, Erewhon
-  and XCharter with their math fonts, and completes the shipped families:
-  LM Sans and Mono, KpSans, KpMono and KpMath-Sans (the Kp fonts move to
-  0.66 as a whole), Fira Math 0.3.4. The font menu offers the fourteen
-  serif and four sans serif pairings of section 3.7. What had to change for
-  them to come out whole:
-
-  the Euler and Asana entries were set in Pagella Math, because the
-  formulas follow the companion of the text font; they now use a `math=`
-  rule. The TeX Gyre shortcut of `init-font` ignored the math font it was
-  given and applied the package of Pagella, which forces its own
-  mathematics; it now applies only when no other math font is asked for.
-  The Fira entry loaded `fira-font`, which takes the large operators from
-  Pagella; a font package is now skipped when the math font is a profiled
-  OpenType one. KpMath-Sans calls its family KpMath, and KpMathSans in the
-  shipped database belonged to the master Kepler Math, which answered with
-  the serif KpMath; it is a master of its own now, as Fira Math and Lete
-  Sans Math are, and so is New Computer Modern Sans Math. KpMono is tagged
-  sans serif, which the feature distance penalizes more than leaving the
-  master, so Kepler typewriter came out in Libertinus Mono; KpMono has the
-  master Kepler Mono now, which the Kp profiles name as their `mono`, and
-  keeps its tag, so it does not become the typewriter every other family
-  falls back on. Upstream Erewhon-Math-Bold calls its family Erewhon, like
-  the text face, so bold Erewhon mathematics is still emulated.
-
-  Visible in existing documents: the sans serif and typewriter text of
-  Latin Modern and of the four TeX Gyre fonts now come from their
-  companions (LM Sans and Mono, TeX Gyre Heros or Adventor and Cursor)
-  rather than from European Computer Modern, and Kp and Fira documents move
-  with the new versions of those fonts.
-
 - **The extra symbols are in service (22 September 2026).**
   `tmuniversaltounicode-extra.scm` is loaded beside `tmuniversaltounicode`
   in the seven conversion cases of `converter.cpp` that use it, in both
@@ -874,25 +844,101 @@ prints, the `get_unicode_range` experiment) were dropped.
   glyph is drawn, so the text of the document is untouched and an exported
   PDF still yields the digits that were typed.
 
+- **Delimiters, masters and installed fonts (24 to 26 September 2026).**
+  The delimiters of every font are assembled, not only those drawn at the
+  origin, and a delimiter made to measure keeps its size on the screen.
+  `init-font` recognized the old STIX by the prefix of its name, so the
+  menu entry of STIX Two, which asks for Stix Two Text, got the STIX of
+  2010; it recognizes the family by its whole name now. A family of the
+  master a profile names asks for the same mathematics as the master
+  (KpRoman as Kepler), and a profiled math font which is installed but in
+  no database, as the math fonts of TeX Live are, is added to the local
+  database the first time it is asked for (`register_profiled_font`),
+  instead of falling back on the nearest text face.
+
+- **Font menus like the LaTeX world, and the fonts to fill them (27
+  September 2026).** TeXmacs now ships Libertinus (Math, Serif, Sans, Mono),
+  Euler Math, Concrete Math with the Concrete faces of CM Unicode, Erewhon
+  and XCharter with their math fonts, and completes the shipped families:
+  LM Sans and Mono, KpSans, KpMono and KpMath-Sans (the Kp fonts move to
+  0.66 as a whole), Fira Math 0.3.4. The font menu offers fourteen serif
+  and four sans serif pairings, and six other fonts in a submenu, each when
+  it is installed (the profiles of `fonts-opentype.scm`; the manual shows
+  them). What had to change for
+  them to come out whole:
+
+  the Euler and Asana entries were set in Pagella Math, because the
+  formulas follow the companion of the text font; they now use a `math=`
+  rule. The TeX Gyre shortcut of `init-font` ignored the math font it was
+  given and applied the package of Pagella, which forces its own
+  mathematics; it now applies only when no other math font is asked for.
+  The Fira entry loaded `fira-font`, which takes the large operators from
+  Pagella; a font package is now skipped when the math font is a profiled
+  OpenType one. KpMath-Sans calls its family KpMath, and KpMathSans in the
+  shipped database belonged to the master Kepler Math, which answered with
+  the serif KpMath; it is a master of its own now, as Fira Math and Lete
+  Sans Math are, and so is New Computer Modern Sans Math. KpMono is tagged
+  sans serif, which the feature distance penalizes more than leaving the
+  master, so Kepler typewriter came out in Libertinus Mono; KpMono has the
+  master Kepler Mono now, the Kp profiles name the family KpMono as their
+  `mono` (a companion must be a family the database lists, and is then
+  mapped to its master), and KpMono keeps its tag, so it does not become the typewriter every other family
+  falls back on. Upstream Erewhon-Math-Bold calls its family Erewhon, like
+  the text face, so bold Erewhon mathematics is still emulated.
+
+  Visible in existing documents: the sans serif and typewriter text of
+  Latin Modern and of the four TeX Gyre fonts now come from their
+  companions (LM Sans and Mono, TeX Gyre Heros or Adventor and Cursor)
+  rather than from European Computer Modern, and Kp and Fira documents move
+  with the new versions of those fonts.
+
+- **The font menus open, and say what is chosen (27 September 2026).**
+  The font button of the focus bar raised "widget expected" and showed
+  nothing, and so did the OpenType fonts at the end of Document > Font >
+  Mathematical font. The check mark a command declares with `:check-mark`
+  is applied by `make-menu-entry-check` (`kernel/gui/menu-widget.scm`) to
+  the arguments of the command as they are written in the menu, taken from
+  `promise-source`: an entry built in a loop, `(init-opentype-font (cadr
+  p))`, handed its predicate the list `(cadr p)`, and the predicate failed
+  on it, taking the whole menu down. Entries built in loops now say which
+  one is checked with `(check label "*" predicate)`, evaluated where the
+  loop variable is bound. And a submenu `->` is expanded when it is opened,
+  after the menu which holds it; a menu with arguments inside it,
+  `(dynamic (menu arg))`, had lost them by then. There is one menu without
+  arguments per section now, in `fonts-opentype.scm` (Serif, Sans serif,
+  Other) and in `fonts/font-short-menu.scm` (the four kinds of text only
+  fonts). A profile whose `text-file` is absent is left out of the menus.
+
+- **Documentation in TeXmacs (27 September 2026).** A section of the user
+  manual, *Mathematical fonts* (`TeXmacs/doc/main/math/fonts/`), explains
+  how the math fonts work, shows every shipped font with a sample and a
+  table of its characteristics, and lists the fonts to install;
+  `Help > Manual > Fonts` gathers it with the page on the font browser and
+  the reference chapter *Fonts, from selection to glyph*. Rendering its
+  samples found IBM Plex text set in the thin weight: the families IBM Plex
+  Serif Thin and Sans Thin carried no Thin feature and tied with the
+  regular faces under the master IBM Plex; they are tagged now.
+
 ## 5. Tests
 
 ### Unit tests
 
-`make -C tests` builds and runs eighteen binaries, 138 tests in all with
-`TM_TEST_FONT_DIR` set, counting the setup and teardown that QtTest reports
+`make -C tests` builds and runs eighteen binaries, 143 tests in all, 19
+of which skip without `TM_TEST_FONT_DIR`, counting the setup and teardown that QtTest reports
 as tests in the binaries which still use it. Two
 sources of the tree are left out: `xml_test`, which includes a file that is
 already part of the main build, and `mac_images_test`, whose functions
 `mac_images.h` does not declare in a Qt 6 build. Two of the binaries are
 this work:
 
-- `tests/Plugins/Freetype/tt_tools_test.cpp`, nine tests of the readers
+- `tests/Plugins/Freetype/tt_tools_test.cpp`, ten tests of the readers
   against values extracted with fontTools: a font without a MATH table and a
   truncated one, the constants of the shipped `texgyrepagella-math.otf`
   including a negative one, its glyph info, its vertical and horizontal
   variants and assemblies, the absence of MathKernInfo there, the MathKern
-  lookup with its height intervals on STIX Two Math, and GPOS pair kerning.
-- `tests/Graphics/Fonts/opentype_font_test.cpp`, twenty tests of the font
+  lookup with its height intervals on STIX Two Math, GPOS pair kerning, and
+  the GSUB feature tags.
+- `tests/Graphics/Fonts/opentype_font_test.cpp`, twenty-four tests of the font
   level: activation and `math_type` of the shipped fonts, the conversion of
   the constants and its linearity in the size, italic correction, rubber
   variants by number and by target height, assemblies and their monotonicity,
@@ -900,16 +946,20 @@ this work:
   and the smart font, the hand-tuning switch, wide variants, the GSUB feature
   variants and the feature font, the script, bar and radical parameters, the
   stretch stack constants, the bold math face, GPOS kerning through a text
-  font, and a validation of every profile of `fonts-opentype.scm` against the
-  installed fonts.
+  font, the OpenType features of text fonts, and a validation of every
+  profile of `fonts-opentype.scm`: its keys and groups, the first claim on a
+  shared text companion, and for each installed font its MATH table and its
+  listing in the database under the profile's name.
 
-Both need OpenType math fonts that TeXmacs does not ship. `TM_TEST_FONT_DIR`
-points at a directory that is searched recursively; the tests that need a
-missing font skip themselves.
+Both look for their fonts through `TM_TEST_FONT_DIR`, a directory that is
+searched recursively, and the tests that need a missing font skip
+themselves; pointing it at `TeXmacs/fonts/truetype` runs them all, and a
+few tests use fonts TeXmacs does not ship (Asana Math) when they are
+there.
 
 ### Renders
 
-`tests/opentype/render-samples.sh` typesets the three documents of
+`tests/opentype/render-samples.sh` typesets the four documents of
 `tests/opentype/samples/` to PDF and to one PNG per page, named after the git
 revision, and compares them with a reference directory when one is given:
 
@@ -920,7 +970,9 @@ revision, and compares them with a reference directory when one is given:
   scripts and kerning, fractions, radicals, delimiters, wide accents, big
   operators and arrows with labels;
 - `math-variants.tm`, math roman, math sans serif, math typewriter and bold
-  mathematics for six profiled fonts, each with its text companion.
+  mathematics for six profiled fonts, each with its text companion;
+- `math-symbols-extra.tm`, generated by `missing-symbols.py --sample`, the
+  200 symbols of `tmuniversaltounicode-extra.scm` in tables.
 
 `tests/opentype/check.sh` is what to run before a commit: it runs the unit
 tests, then the samples twice, once as they are and once with the hand-tuned
@@ -943,9 +995,10 @@ name for. The same script drafts the entries for a family with `--emit`,
 the encoding lines and the `std-symbols.scm` group that gives them their
 spacing, and checks the tables with `--check`, which `check.sh` runs when
 `TM_UNICODE_MATH_TABLE` points at the `unicode-math` list. With `--tables`
-it writes the two proposal tables of `TeXmacs/langs/encoding`,
-`tmuniversaltounicode-extra.scm` and its candidates file, which wait for a
-line in `converter.cpp` to come into service;
+it writes the two proposal tables in the shape of those of
+`TeXmacs/langs/encoding`, `tmuniversaltounicode-extra.scm` and its
+candidates file; the first is in service, loaded by `converter.cpp`, so the
+script must be given a scratch directory, not the encoding directory;
 `tests/opentype/confirmed-symbols.txt` records the names whose shape was
 compared by eye with the glyph of the code point.
 
@@ -1014,24 +1067,29 @@ samples are compared against them.
 
 ### 7.3 Profile keys declared but not consumed
 
-`sans` and `mono` serve math sans serif and math typewriter since
-22 September 2026, and bold mathematics reaches a real bold math face
-through the font database now that the math series is honored. What is
-left:
+Every key but one is consumed: `file` (the menus and the registration of
+an installed font), `text` (the text-to-math maps of
+`math_font_profiles.cpp`, the registration of an installed font, and the
+menus), `sans` and `mono` (`profile_fix`, in text and in
+math since 27 September 2026), `letters` (the letter routing of
+`smart_font.cpp`), `family` and `text-file` (`init-opentype-font` and the
+menus in `fonts-opentype.scm`, and `register_profiled_font`), `menu` and
+`group` (the labels and sections of the font menus). Bold mathematics
+reaches a real bold math face through the font database now that the math
+series is honored. What is left:
 
 - `bold-math` is not read. In every profile it names the master whose Bold
   style the database finds anyway, so it only records that a real bold face
   exists. It would be needed for a font whose bold companion is a family of
-  its own, and none of the twenty is.
-- `group` is not read either. The menus are built from `menu`; `group`
-  records the grouping they could have, and the profile test only requires
-  it to be there.
+  its own that no master attaches, and none of the twenty-four is: the bold
+  faces of XCharter Math and Concrete Math, which call their families
+  otherwise, are attached to their masters in `font-features.scm`.
 - A key for the alphabets a font really provides is still missing, so an
   incomplete alphabet (Latin Modern Math has 18 of 52 script letters) is
   silently mixed with emulated glyphs instead of being declared.
 
 The symbols themselves are a separate gap, on the TeXmacs side rather than
-the font side: of the 2435 code points of the `unicode-math` list, 892 have
+the font side: of the 2437 code points of the `unicode-math` list, 694 have
 no TeXmacs name at all, so they can only be typed as `<#XXXX>` and reach
 neither the palettes nor the LaTeX conversion.
 `doc/math-symbol-coverage.md` lists them, block by block, with the note the
@@ -1045,6 +1103,16 @@ but only for fonts without a MATH table: a font that has one is taken to
 have its own big operators, as the MATH-aware rubber font already assumed.
 The remaining `stix` and `agella` name tests in the typesetter are
 deliberate: they guard hand-tuned corrections, which keep precedence.
+
+Outside the typesetter, the choice of fonts still knows some families by
+name. `is_math_family` in `smart_font.cpp` is a fixed list of the
+traditional math families (roman, concrete, Euler, ENR), and
+`tex_gyre_fix` names the four hand-tuned TeX Gyre fonts. In Scheme,
+`init-font` (`generic/document-edit.scm`) sends the TeX Gyre text fonts to
+the style packages of their hand-tuned mathematics (`tex-gyre-font?`,
+`font-package-name`), and `fonts-opentype.scm` finds those packages from
+the profile (`tex-gyre-package`). They concern the traditional and the
+hand-tuned fonts, which have no profile to consult.
 
 ### 7.5 Testing and export
 
@@ -1175,13 +1243,13 @@ around it should TeXmacs gain a skewed fraction primitive.
 
 `delimiter_box`, `typeset_wide_middle` and `bracket_box` (line-drawn
 brackets for `<left-.>` style TeX cases) all reduce to `<left-x-N>` names,
-which the rubber font now serves from variants and assemblies. The
-remaining hand-made part is the size search in `get_delimiter`: with a
-`get_delimiter_variant (s, height)` hook the typesetter could ask for the
-smallest variant or the exact assembly directly, and stretch the connector
-overlaps to fit, as the specification intends. `delimitedSubFormulaMinHeight`
-gives the minimum size for delimiters around sub-formulas, and the
-extended shape coverage tells which delimiters and operators should not
+which the rubber font now serves from variants and assemblies. The size
+search of `get_delimiter` was the last hand-made part; it now asks the font
+through `get_rubber_variant` for the smallest variant or the assembly that
+reaches the height (section 3.6). The assemblies are glued on the measured
+ink rather than by stretching the connector overlaps (section 6), and
+`delimitedSubFormulaMinHeight` is deliberately not applied (section 7.2).
+The extended shape coverage tells which delimiters and operators should not
 have their superscripts raised.
 
 ### 8.6 Stacks: above, below, limits, binomials
@@ -1197,9 +1265,10 @@ counterpart for `above`, `below`, `stack` and binomials without a bar.
 `neg_box` strikes a diagonal `line_box` through the box. Unicode has
 precomposed negated symbols (U+2260, U+2209, U+2288 and about sixty more,
 listed in the `unicode-math` table) which every math font draws better than
-a stroke. TeXmacs already has `tradi-negate.vfn` for the reverse direction;
-the improvement is to map `<neg|x>` to the precomposed code point when the
-font supports it, and keep the stroke as the fallback.
+a stroke. TeXmacs already has `tradi-negate.vfn` for the reverse direction. For an
+untuned OpenType math font, `<neg|x>` is now mapped to the precomposed code
+point when the font has it, and the stroke is kept as the fallback
+(section 3.6).
 
 ### 8.8 What has no counterpart
 
@@ -1211,7 +1280,7 @@ them (see the survey document), and the rest stays as it is.
 ## 9. Plan to complete the OpenType support
 
 This is the plan as it was written on 21 September 2026 and executed over
-the two days that followed. It is kept as the record of what was decided;
+the week that followed. It is kept as the record of what was decided;
 each phase now carries the state of its items, so the list is not mistaken
 for open work. What remains open is section 7.
 
@@ -1224,6 +1293,8 @@ L (a week or more). Phases 1 and 2 are independent of 3; phase 4 needs 3.
 
 - Turn dependency tracking on in the autotools build, or add a rule that
   invalidates objects on header changes (`check-stale` is a stopgap).
+  *Done: `deps` is defined, and `src/Deps` holds a dependency file per
+  object.*
 - Replace the hard-coded TeX Live years in `tt_font_path` by a glob or
   `kpsewhich`, so system math fonts are found. *Done for macOS only:*
   `texlive_font_dirs` scans `/usr/local/texlive`, `/usr/share/texlive`,
@@ -1236,11 +1307,15 @@ L (a week or more). Phases 1 and 2 are independent of 3; phase 4 needs 3.
 
 ### Phase 1: finish the table-driven layout (M) — done except item 4
 
-1. `get_delimiter_variant (s, height)` hook on `font_rep`: the rubber font
+1. `get_delimiter_variant (s, height)` hook on `font_rep` (it became
+   `get_rubber_variant`): the rubber font
    returns the smallest pre-drawn variant reaching the height, or the
    assembly with the exact number of repetitions, stretching connector
    overlaps to fit. `get_delimiter` uses it for `MATH_TYPE_OPENTYPE` fonts
    instead of probing; `delimitedSubFormulaMinHeight` gives the minimum.
+   *Done as `get_rubber_variant`; the overlaps are not stretched, the parts
+   are glued on their measured ink, and `delimitedSubFormulaMinHeight` is
+   deliberately not applied (section 7.2).*
 2. Radical junction: rule position from the radical glyph's top,
    `radicalKernBeforeDegree`; fixes the Latin Modern gap.
 3. Remaining script constants: `subSuperscriptGapMin`,
@@ -1285,19 +1360,26 @@ a sample row of accents over letters and over wide bases in every font.
 1. The math font profile table of the survey document, in Scheme, read at
    boot: family, file, aliases, text companions, bold math variant, letter
    routing, real alphabets, rubber policy, display cap, menu placement,
-   quirks.
+   quirks. *Done in part: the keys of section 7.3; aliases, the rubber
+   policy and quirks were not needed as keys, and the display cap is one
+   constant for all fonts.*
 2. `is_math_family`, `tex_gyre_fix`, `math_fix`, `supports_big_operators`
    and the `font_translate` aliases consult the profiles; letters in math
    mode are rewritten to the plane 1 code points of the math font when the
    profile says so, which makes italic corrections and MathKernInfo
    effective for letters (today they only reach digits and symbols).
+   *Done for the letters, the text companions and `supports_big_operators`
+   (which asks the MATH table); `is_math_family` and `tex_gyre_fix` still
+   name the traditional and hand-tuned families, see section 7.4.*
 3. Real alphabets from the font when present; virtual emulation only for
    the missing ones (script and double-struck are the usual gaps).
 4. `ssty` alternates for script sizes and `dtls` under accents through the
    GSUB reader; GPOS pair kerning through a small GPOS reader, since math
    fonts have no legacy `kern` table.
 5. Font menus generated from installed profiles; `math-*` legacy values
-   kept as aliases.
+   kept as aliases. *Done (27 September 2026): the font button of the focus
+   bar and the end of Document > Font > Mathematical font; the legacy values
+   still work.*
 6. Profiles for Tier 1: Latin Modern, New Computer Modern, TeX Gyre (five),
    STIX Two, XITS, Libertinus, KpMath.
 
@@ -1317,7 +1399,9 @@ which the current test could not do.
    must be pixel-identical to before.
 3. Ship STIX Two Math and its text faces, and Latin Modern Math with four
    text faces; route the `stix` family to STIX Two through a profile while
-   keeping STIX v1 for old documents.
+   keeping STIX v1 for old documents. *Shipped; the routing was dropped:
+   `stix` stays STIX v1, and STIX Two has an entry of its own, so old
+   documents do not change.*
 
 ### Phase 5: polish (M) — done except the two items marked below
 
@@ -1355,7 +1439,7 @@ render exactly as before with the switch on; every installed Tier 1 font
 has a profile and passes the profile test; all unit tests and both sample
 renders pass.
 
-### Where this stands, 22 September 2026
+### Where this stands, 27 September 2026
 
 Met, with three things worth naming exactly:
 
@@ -1368,12 +1452,12 @@ Met, with three things worth naming exactly:
   bars, scripts, fractions, binomials, integrals and big operators
   (`tests/opentype/compare-lualatex.sh`), not accents, delimiters at every
   size or kerning.
-- The profile test checks the math font of every profile, its family name
-  and its MATH table, but not that the text, sans and typewriter
-  companions it names exist as masters or are installed.
+- The profile test checks the math font of every profile, its MATH table
+  and its listing in the database, but not that the text, sans and
+  typewriter companions it names exist or are installed.
 
 Everything under "What is still missing" is either deliberate
 (`delimitedSubFormulaMinHeight`, the device tables, the stack constants
-for `above`) or a small, named gap. The twenty-two tests of
-`opentype_font_test`, the eleven of `tt_tools_test`, the other sixteen
-test binaries and the three samples, tuned and untuned, pass.
+for `above`) or a small, named gap. The twenty-four tests of
+`opentype_font_test`, the ten of `tt_tools_test`, the other sixteen test
+binaries and the four samples, tuned and untuned, pass.

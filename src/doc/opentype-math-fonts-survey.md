@@ -38,7 +38,8 @@ importance:
    italic, script, fraktur, double-struck, sans, mono. Missing alphabets can
    be emulated by TeXmacs's virtual fonts, but real ones look better.
 5. **Weights**: a bold math font for bold headings and theorem titles
-   (TeXmacs currently emulates bold mathematics by stroking).
+   (TeXmacs emulated bold mathematics by stroking; it now uses a real bold
+math face where the font has one, see 5.2 step 5).
 6. **License** allowing redistribution with TeXmacs (OFL, GUST, LPPL).
 
 ## 2. Summary table
@@ -105,6 +106,10 @@ hard-coded its behaviour.
 
 ## 3. The fonts, one by one
 
+The tiers below were written as a plan, before anything was shipped; each
+entry ends with what the branch does with the font now. Section 6 lists
+what is shipped.
+
 ### Tier 1: complete families to support first
 
 These have a full set of text companions in the same design, a good MATH
@@ -120,14 +125,18 @@ against which to compare TeXmacs's own TeX-based layout. Quirk seen in the
 samples: the radical sign is drawn so that its top edge is the rule, and its
 `radicalExtraAscender` of 40 design units is the smallest of the fonts
 measured, so a gap between the sign and the rule shows immediately. This is
-what the radical junction of 22 September 2026 fixed.
+what the radical junction of 22 September 2026 fixed. *Now: shipped
+(`lm`), with LM Roman, Sans and Mono; menu entry "Latin Modern".*
 
 **New Computer Modern Math** (GUST FL). Regular, Book (slightly heavier,
 for screens) and Bold math fonts, with matching `NewCM10-{Regular, Italic,
 Bold, BoldItalic, Book, BookItalic}` text faces, sans and mono, plus a Sans
 Math. Complete symbol coverage, kerning info, many stylistic sets, and a real
 **bold math font**, which XITS, KpMath, Concrete, Erewhon, XCharter and Lete
-Sans also have. Strong candidate to ship instead of or next to Latin Modern.
+Sans also have. *Now: shipped next to Latin Modern (`newcm`), regular and
+bold math with four NewCM10 faces; Book, Sans and Mono are not shipped, and
+New Computer Modern Sans Math has a profile of its own ("Computer Modern
+Sans") for when it is installed.*
 
 **TeX Gyre Pagella, Termes, Bonum, Schola Math** (GUST FL). Already shipped
 with TeXmacs together with their text faces, and already special-cased
@@ -136,35 +145,41 @@ The hand-tuned tables stay and take precedence: they were crafted against
 TeXmacs's own layout and are better than what the font declares. The MATH
 table only supplies what they do not cover (variants and assemblies for
 delimiters, constants for fractions, radicals and limits); the visual
-sample shows where the two disagree.
+sample shows where the two disagree. *Now: the menu calls them Palatino,
+Times, Bookman and Schoolbook.*
 
 **TeX Gyre DejaVu Math** (Bitstream Vera / DejaVu license, free). Sans
 serif math for DejaVu Sans and DejaVu Serif; TeXmacs already knows the
 DejaVu text fonts (`math-dejavu`). Identical structure to the other TeX
-Gyre math fonts. Companions in the `dejavu` collection.
+Gyre math fonts. Companions in the `dejavu` collection. *Now: profiled, not
+shipped; menu entry "DejaVu" when installed.*
 
 **STIX Two Math** (OFL). The most complete symbol set, MathKernInfo,
 stylistic sets for alternate glyph shapes (upright integrals, calligraphic
 versus script, and so on). Companions `STIXTwoText-{Regular, Italic, Bold,
-BoldItalic, Medium, SemiBold}`. Replaces STIX v1, which TeXmacs ships and
-special-cases (`rubber_stix_font.cpp`, `adjust_stix.cpp`). The font calls
+BoldItalic, Medium, SemiBold}`. Ships next to STIX v1, which TeXmacs still
+ships and special-cases (`rubber_stix_font.cpp`, `adjust_stix.cpp`). The font calls
 itself "STIX Two Math", but `tt_font_name` normalizes every family starting
 with "STIX" to "Stix", so inside TeXmacs the family is "Stix Two Math" and
 documents must use that spelling (the sample document had to be fixed).
 Its `displayOperatorMinHeight` is 1800, so display operators come out
-large; `minConnectorOverlap` 100.
+large; `minConnectorOverlap` 100. *Now: shipped (`stix2`) with four STIX
+Two Text faces; STIX Two has no sans serif or typewriter companion.*
 
 **XITS Math** (OFL, a fork of STIX v1 by Khaled Hosny). Regular and Bold
 math, `XITS-{Regular, Italic, Bold, BoldItalic}` text. Coverage like STIX
 v1 but with italic corrections, `ssty` and kerning. The Bold math font is
 partial (40 vertical variants, one assembly). Good fallback for users who
-prefer Times; less compelling now that STIX Two exists.
+prefer Times; less compelling now that STIX Two exists. *Now: profiled,
+not shipped; in the "Other" submenu when installed.*
 
 **Libertinus Math** (OFL). Companion of Libertinus Serif and Sans, the
 maintained successor of Linux Libertine, which TeXmacs already knows
 (`adjust_libertine.cpp`). Fewer variants and assemblies (59 and 15) and
 only 85% of the operators block, but the design is popular. TeXmacs should
-map Linux Libertine users to Libertinus when both are present.
+map Linux Libertine users to Libertinus when both are present; that is not
+done, the two are offered separately. *Now: shipped (`libertinus`), with
+Libertinus Serif, Sans and Mono; menu entry "Libertinus".*
 
 **KpMath** (OFL). Kp-Fonts in OpenType: Light, Regular, Semibold, Bold math,
 plus Sans and Sans Bold math, with `KpRoman`, `KpSans` and `KpMono` text
@@ -172,20 +187,27 @@ faces in matching weights. Very rich MathKernInfo (700 glyphs) and many
 stylistic sets. Alphabets partial (script 18, double-struck 20 of 52). Six math fonts: four
 weights of the serif design, Light, Regular, Semibold and Bold, plus Sans and
 SansBold, which are a design of their own. Valuable for presentations.
+*Now: Regular, Bold, Sans and SansBold are shipped (`kp`, version 0.66)
+with four faces each of KpRoman, KpSans and KpMono, as two menu entries,
+"Kp Fonts" and "Kp Sans" (profile `KpMathSans`, set with the sans serif
+family); Light and Semibold are not shipped.*
 
 ### Tier 2: good fonts with a narrower audience
 
 **Asana Math** (OFL). Derived from Palatino-like pxfonts; wide coverage
 (94%), MathKernInfo, but no companion text fonts of its own. Pair it with
 TeX Gyre Pagella or with the pxfonts text faces. TeXmacs already lists it
-(`math-asana`).
+(`math-asana`). *Now: profiled with Pagella text, not shipped; in the
+"Other" submenu when installed.*
 
 **Fira Math** (OFL). Sans serif math for Fira Sans, which TeXmacs supports
 (`adjust_fira.cpp`, `fira-font` package). Coverage is limited (43% of the
 symbol list, no script or fraktur alphabets, 61% of operators): TeXmacs's
 virtual glyphs must fill the gaps, which is exactly what the smart font
 does for missing symbols. Worth supporting because of Fira's popularity for
-slides. Version 0.3.4, still evolving.
+slides. Version 0.3.4, still evolving; upstream has released only the
+regular weight. *Now: shipped in the `fira` directory, next to Fira Sans
+and Mono; menu entry "Fira", the first of the shipped sans serif entries.*
 
 **Erewhon Math**, **XCharter Math**, **Concrete Math**, **Euler Math**
 (OFL, all by Daniel Flipo). Recent, well-made, consistent design of the
@@ -193,25 +215,36 @@ MATH tables (same 52 horizontal variants, 45 assemblies), MathKernInfo in
 Erewhon. Text companions: Erewhon (Utopia), XCharter (Charter), Concrete
 Roman for Concrete Math, and for Euler Math any upright text font, as with
 TeX's Euler. TeXmacs already has "Concrete" and "Euler new roman" math
-options through Metafont; these are their OpenType replacements.
+options through Metafont; these are their OpenType replacements. *Now: all
+four are shipped and in the serif section of the menu as Utopia, Charter,
+Concrete and Euler: Concrete Math with the Concrete faces of CM Unicode
+(CMU Concrete), Euler Math with TeX Gyre Pagella text, as with `eulervm`.
+XCharter and Concrete use their bold math faces; the bold Erewhon math file
+names its family like the text face, and bold Erewhon mathematics is
+emulated.*
 
 **Garamond Math** (OFL). For EB Garamond; huge MathKernInfo (2094 glyphs)
 but almost no italic corrections (44), so kerning must come from the kern
 table. Text companions are EB Garamond from Google Fonts or TeX Live.
+*Now: profiled, not shipped.*
 
 **Lete Sans Math** (OFL). Sans math for Lato; 95% coverage, kerning.
-Companions: Lato.
+Companions: Lato. *Now: profiled, not shipped, with the math font itself as
+its text companion rather than Lato; in the sans serif section of the menu
+when installed.*
 
 **IBM Plex Math** (OFL). Complete coverage, kerning, `mark` positioning,
 and the large Plex Sans, Serif and Mono families. `displayOperatorMinHeight`
 is 2339, the largest of all, so display integrals will be very tall unless
-capped.
+capped. *Now: profiled with IBM Plex text, not shipped; the display
+operators are capped at two em.*
 
 **Old Standard Math** (OFL). Complete coverage, no kerning info; for Old
-Standard text (historical and slavistic typography).
+Standard text (historical and slavistic typography). *Now: profiled, not
+shipped.*
 
 **GFS Neohellenic Math** (OFL). Greek sans; 41% of the alphanumerics
-block, 98% of the operators. Niche.
+block, 98% of the operators. Niche. *Now: profiled, not shipped.*
 
 ### Tier 3: do not integrate
 
@@ -220,10 +253,14 @@ block, 98% of the operators. Niche.
 have it, so activation by name should work, but no special support beyond
 the generic path is warranted. **Noto Sans Math** has no MATH table.
 
-## 4. What TeXmacs has today for named fonts
+## 4. What TeXmacs has for named fonts
 
-The current per-font knowledge is spread over several places, which is
-what an integration should consolidate:
+When the survey was written, the per-font knowledge was spread over the
+places below, which is what an integration should consolidate. They are all
+still there, for the traditional fonts and the hand-tuned ones; the
+profiles of section 5.1 (`math_font_profiles.cpp`, `fonts-opentype.scm`)
+now carry what the OpenType math fonts need, and the menus of
+`fonts-opentype.scm` list them:
 
 - `unicode_font.cpp`: the constructor ladder that installs hand-tuned
   script corrections for STIX, TeX Gyre, Papyrus, Libertine, Biolinum and
@@ -233,10 +270,10 @@ what an integration should consolidate:
   `make_rubber_font`, which selects `rubber_stix_font` by name.
 - `rubber_stix_font.cpp`: knows the STIX size fonts (`STIXSizeOneSym`,
   `STIXIntegralsD`, ...) by file name.
-- `smart_font.cpp`: `is_math_family` (fixed list), `tex_gyre_fix`,
-  `kepler_fix`, `math_fix` (`stix_fix` exists but every call is commented
-  out), which append " Math" to the family for
-  math shapes), `supports_big_operators` in `poor_rubber.cpp`.
+- `smart_font.cpp`: `is_math_family` (fixed list), and `tex_gyre_fix`,
+  `kepler_fix` and `math_fix`, which append " Math" to the family for math
+  shapes (`stix_fix` exists but every call is commented out);
+  `supports_big_operators` in `poor_rubber.cpp`.
 - `font_translate.cpp`: the map from legacy names (`math-stix`,
   `math-pagella`, `math-asana`, ...) to database family names.
 - `TeXmacs/progs/generic/document-menu.scm` and `document-edit.scm`: the
@@ -254,10 +291,14 @@ what an integration should consolidate:
 
 *Implemented (first version) in `src/Graphics/Fonts/math_font_profiles.cpp`
 and `TeXmacs/progs/fonts/fonts-opentype.scm`, where a profile is declared
-with `define-math-font-profile` in the shape below: keys `file`, `text`,
-`sans`, `mono`, `letters`, `bold-math`, `menu`, `group`; the text-to-math mapping
-in `smart_font_bis`, the letter routing and the menu. Alphabets, rubber
-policy, display cap and quirks are still to come.*
+with `define-math-font-profile`, in a reduced form of the proposal below: keys `file`, `text`,
+`text-file`, `sans`, `mono`, `family`, `letters`, `bold-math`, `menu` and
+`group`, with a menu label in the LaTeX style (`(menu "Palatino") (group
+"Serif")`); the text-to-math mapping in `smart_font_bis`, the letter
+routing and the menus. `bold-math` is recorded but not consulted: a bold
+math face is found through the master of the math font in the database.
+Alphabets, rubber policy and quirks are still to come; the display cap is a
+constant for all fonts.*
 
 Introduce one data structure, filled by hand, consulted by all the places
 above. In C++ it can be a static table in a new
@@ -331,11 +372,13 @@ detected from the cmap, no cap.
    that affect all fonts: radical placement, direct variant selection in
    `get_delimiter`, top accent attachment, horizontal variants for wide
    accents. Use Latin Modern Math and STIX Two Math as the two references,
-   compared against TeX's layout of the same formulas.
+   compared against TeX's layout of the same formulas. *Done.*
 2. **Profiles and the letter routing.** Implement the profile table and make
    `smart_font.cpp` use it for `is_math_family`, the family fix-ups and the
    text companions. This is the change that lets an OpenType math font
-   supply its own italic letters. Add the profiles for Tier 1.
+   supply its own italic letters. Add the profiles for Tier 1. *Done for
+   the text companions and the letters; `is_math_family` is still a fixed
+   list, and `tex_gyre_fix` still names the four TeX Gyre fonts.*
 3. **Layer the MATH data under the hand-tuned tables.** The `adjust_*.cpp`
    corrections and the other per-font tuning keep precedence: when a
    correction table has an entry for a glyph, it wins over the italic
@@ -347,14 +390,20 @@ detected from the cmap, no cap.
    table. New profiles may add hand-tuned tables of their own where the
    font data is poor (the survey shows which fonts lack MathKernInfo or
    italic corrections). Ship STIX Two Math and its text faces next to STIX
-   v1.
+   v1. *Done.*
 4. **Menus and legacy names.** Generate the font menus from installed
    profiles; keep the `math-*` aliases so that old documents keep working.
+   *Done: the font button of the focus bar and the end of Document > Font >
+   Mathematical font list the installed profiles; the hand-written list of
+   traditional math fonts stays before them.*
 5. **Weights.** Use the bold math fonts (NewCM Math Bold, KpMath Bold, XITS
    Math Bold) for `math-font-series bold` instead of stroking, through the
-   `bold-math` field.
+   `bold-math` field. *Done, but through the database rather than the
+   field: a bold face attached to the master of the math font is used, which
+   covers New Computer Modern, Kp, XCharter and Concrete; `bold-math` is not
+   read.*
 6. **Tier 2 profiles**, then the remaining quirks per font as they show up
-   in the samples.
+   in the samples. *Profiles done, for every font of the survey.*
 
 ### 5.3 Tests to add
 
@@ -369,15 +418,21 @@ detected from the cmap, no cap.
   first assembled parenthesis, computed from the MATH table as in
   `opentype_font_test.cpp`.
 
+*Status: `math-variants.tm` is the second sample; `math-overview.tm` has
+ten font rows, not one per profile. `test_profile_file` checks every
+installed profile's file, name table and database listing, not its
+companions or alphabets. The per-font sizes are not tested.*
+
 ## 6. Shipping
 
 TeXmacs ships these math families, besides the TeX Gyre text and math
-fonts and STIX v1 which were already there (the branch also adds an
-unrelated text family, OpenDyslexic). The choice follows the fonts LaTeX
+fonts and STIX v1 which were already there. The choice follows the fonts LaTeX
 users know: one entry of the font menu for each of the usual pdfLaTeX
 pairings (`lmodern`, `newtx`, `newpx`, `libertine`, `kpfonts`,
-`erewhon`, `XCharter`, `eulervm`, `concmath`, `stix2`) and Fira, Kp Sans
-and Computer Modern Sans for slides.
+`erewhon`, `XCharter`, `eulervm`, `concmath`, `stix2`) and Fira and Kp
+Sans for slides; Computer Modern Sans, listed first of the sans serif
+entries (the menus are sorted by label), appears when New Computer Modern
+Sans is installed.
 
 | Directory | Fonts | Size | License |
 |---|---|---|---|
@@ -385,11 +440,11 @@ and Computer Modern Sans for slides.
 | `TeXmacs/fonts/truetype/newcm` | New Computer Modern Math regular and bold, and four NewCM10 text faces | 4.2 MB | GUST Font License |
 | `TeXmacs/fonts/truetype/stix2` | STIX Two Math and four STIX Two Text faces | 2.0 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/kp` | KpMath regular and bold, KpMath-Sans and SansBold, and four faces each of KpRoman, KpSans and KpMono, all version 0.66 | 2.1 MB | SIL OFL 1.1 |
-| `TeXmacs/fonts/truetype/fira` | Fira Math 0.3.4, next to the Fira Sans and Fira Mono faces already shipped | 0.2 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/fira` | Fira Math 0.3.4, next to the Fira Sans and Fira Mono faces already shipped | 0.2 MB added | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/libertinus` | Libertinus Math, Serif (four faces), Sans (three: there is no bold italic) and Mono | 2.6 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/erewhon` | Erewhon Math regular and bold, and four Erewhon faces | 1.5 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/xcharter` | XCharter Math regular and bold, and four XCharter faces | 1.0 MB | SIL OFL 1.1 (math), Bitstream Charter license (text) |
-| `TeXmacs/fonts/truetype/concrete` | Concrete Math regular and bold, and the four Concrete faces of CM Unicode | 1.5 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/concrete` | Concrete Math regular (0.65) and bold (0.60), and the four Concrete faces of CM Unicode | 1.5 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/euler` | Euler Math, set with TeX Gyre Pagella text | 0.4 MB | SIL OFL 1.1 |
 
 Each directory carries the license text and a `README.md` with the upstream
@@ -397,8 +452,10 @@ address, the version and the copyright of every file. The families are
 registered in the shipped global font database
 (`TeXmacs/fonts/font-database.scm`, `font-features.scm`,
 `font-characteristics.scm`), so a new installation finds them with no disk
-scan. Users with an existing local database get them when TeXmacs loads the
-global tables for a missing family, or after a rescan.
+scan. Users with an existing local database get them at the next start:
+the local database is merged with the shipped one whenever the shipped one
+has changed or the local one has lost entries (see section 4.1 of
+`doc/font-system-review.md`).
 
 Only one weight and one optical size of each text family is shipped. A
 document typeset with the whole upstream family available can therefore
@@ -413,6 +470,7 @@ Live through `TEXMACS_FONT_PATH` and the font database; the profiles in
 `TeXmacs/progs/fonts/fonts-opentype.scm` activate when the files are
 found, and the font menus list exactly the profiled fonts that are
 installed. New Computer Modern Sans Math is profiled for that reason and
-not shipped (2.6 MB with its text faces); XITS, Asana, IBM Plex, Garamond,
-Old Standard, GFS Neohellenic and Lete Sans are profiled and offered in a
-submenu when installed.
+not shipped (2.6 MB with its text faces). TeX Gyre DejaVu Math (serif
+section) and Lete Sans Math (sans serif section) are profiled and offered
+when installed, and XITS, Asana, IBM Plex, Garamond, Old Standard and GFS
+Neohellenic in the submenu of other fonts.
