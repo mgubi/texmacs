@@ -528,6 +528,26 @@ icon_box_size (url dir, int& w, int& h) {
 // Draw the vector one when there is one, and otherwise pick the raster which
 // matches the resolution we draw at (retina_factor device pixels per point),
 // falling back on the smaller ones, then on the file which was asked for.
+// An icon of a lower resolution than the one we draw at (a 1x png, or an
+// xpm, where no _x2 variant exists) is enlarged by f: the widgets take the
+// size of an icon in device pixels, so that at 2x such an icon was drawn at
+// half its size (the tabs of the preferences)
+static picture
+mupdf_icon_at_resolution (picture p, int f) {
+  if (f <= 1) return p;
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= ((mupdf_picture_rep*) p->get_handle ())->pix;
+  int w= fz_pixmap_width (ctx, pix), h= fz_pixmap_height (ctx, pix);
+  fz_pixmap* scaled= NULL;
+  mupdf_protected ("icon scaling", [&] () {
+    scaled= fz_scale_pixmap (ctx, pix, 0, 0, f * w, f * h, NULL);
+  });
+  if (scaled == NULL) return p;
+  picture q= mupdf_picture (scaled, 0, 0);
+  fz_drop_pixmap (ctx, scaled);
+  return q;
+}
+
 picture 
 mupdf_load_xpm (url file_name) {
   if (suffix (file_name) != "xpm") return mupdf_load_picture (file_name);
@@ -542,15 +562,19 @@ mupdf_load_xpm (url file_name) {
     if (!is_nil (pic)) return pic;
   }
   array<string> tried;
-  if (retina_factor >= 4) tried << string ("_x4.png");
-  if (retina_factor >= 2) tried << string ("_x2.png");
-  tried << string (".png");
+  array<int> factor; // the resolution of each variant
+  if (retina_factor >= 4) { tried << string ("_x4.png"); factor << 4; }
+  if (retina_factor >= 2) { tried << string ("_x2.png"); factor << 2; }
+  tried << string (".png"); factor << 1;
   for (int i= 0; i < N(tried); i++) {
     url variant= glue (base, tried[i]);
     if (exists (resolve ("$TEXMACS_PIXMAP_PATH" * variant)))
-      return mupdf_load_picture (variant);
+      return mupdf_icon_at_resolution (mupdf_load_picture (variant),
+                                       retina_factor / factor[i]);
   }
-  return mupdf_load_picture (file_name); // the xpm itself
+  // the xpm itself, at 1x
+  return mupdf_icon_at_resolution (mupdf_load_picture (file_name),
+                                   retina_factor);
 }  
 
 #ifdef MUPDF_RENDERER

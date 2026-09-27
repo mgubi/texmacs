@@ -9,7 +9,7 @@
 > `git push origin wip_wasm_vue:vue_ci`. Nothing is installed and
 > nothing leaves the browser unless it is downloaded.
 >
-> ![TeXmacs in the browser: tabs for the documents, the TeXmacs menu of the page](docs/wasm/texmacs-in-the-browser.png)
+> ![TeXmacs Vue in the browser: tabs for the documents, the tool bars, a formula](docs/wasm/texmacs-in-the-browser.png)
 >
 > It is stock TeXmacs on
 >

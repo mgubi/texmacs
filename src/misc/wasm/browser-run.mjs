@@ -7,6 +7,8 @@
 //   --shot <ms>:<name> a screenshot <name>.png that many ms after the page
 //                      has loaded (several may be given)
 //   --size <w>x<h>     the size of the page (default 1280x800)
+//   --scale <r>        the device pixel ratio (default 1; 2 as a Retina
+//                      screen: the page draws at 2x, the screenshots too)
 //   --browser <path>   the browser (default: the Firefox of /Applications)
 //   --query <string>   appended to the url of the page
 //   --port <n>         the port of the server (the IndexedDB of a page
@@ -79,7 +81,8 @@ const browser = await puppeteer.launch ({
   args: [`--width=${W}`, `--height=${H}`]
 });
 const page = await browser.newPage ();
-await page.setViewport ({ width: W, height: H });
+await page.setViewport ({ width: W, height: H,
+                          deviceScaleFactor: Number (opt ('--scale', '1')) });
 page.on ('console', msg => console.log ('page:', msg.text ()));
 page.on ('pageerror', err => console.log ('page error:', err.message));
 let answer = null; // the answer to the next prompt of the page (see "answer")

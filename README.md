@@ -7,7 +7,7 @@
 `wip_wasm_vue`). Nothing is installed, and nothing leaves the browser unless
 you download it.
 
-![TeXmacs Vue in the browser: tabs for the documents, the TeXmacs Vue menu](src/docs/wasm/texmacs-in-the-browser.png)
+![TeXmacs Vue in the browser: tabs for the documents, the tool bars, a formula](src/docs/wasm/texmacs-in-the-browser.png)
 
 * **What it is**: stock TeXmacs compiled to WebAssembly, on **Vue**, a new
   interface for TeXmacs (Clay, SDL3 and MuPDF, below), with the
