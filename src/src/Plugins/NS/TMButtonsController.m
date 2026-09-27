@@ -107,6 +107,27 @@
 }
 @end
 
+/*! The divider between the main and mode icons and the focus and user
+ icons, which have another meaning: a line with a soft shadow below it. */
+@interface TMBarDivider : NSView
+@end
+
+@implementation TMBarDivider
+- (BOOL) isFlipped { return YES; }
+- (void) drawRect: (NSRect) r
+{
+  (void) r;
+  NSRect b= [self bounds];
+  [[NSColor separatorColor] setFill];
+  NSRectFill (NSMakeRect (0, 0, b.size.width, 1));
+  NSGradient *g= [[[NSGradient alloc]
+                    initWithStartingColor: [NSColor colorWithWhite: 0.0 alpha: 0.10]
+                              endingColor: [NSColor colorWithWhite: 0.0 alpha: 0.0]]
+                   autorelease];
+  [g drawInRect: NSMakeRect (0, 1, b.size.width, b.size.height - 1) angle: 90];
+}
+@end
+
 @implementation TMButtonsController
 
 - (id) init
@@ -117,6 +138,7 @@
     menuArray = [[NSMutableArray alloc] initWithCapacity:4];
     shownArray = [[NSMutableArray alloc] initWithCapacity:4];
     view = [[TMFlippedView alloc] init];
+    divider = [[TMBarDivider alloc] init];
     // a hairline below the icon bars, as below the toolbars of macOS
     line = [[NSBox alloc] init];
     [line setBoxType: NSBoxSeparator];
@@ -131,6 +153,7 @@
   [menuArray release];
   [shownArray release];
   [line release];
+  [divider release];
   [view release];
   [super dealloc];
 }
@@ -270,12 +293,20 @@
   // The rows from the top to the bottom, with their natural height, a
   // little space below the title bar, and a hairline below the rows
   CGFloat y = 4.0, w = [view frame].size.width;
-  BOOL any = NO;
+  BOOL any = NO, upper = NO, divided = NO;
   for (NSUInteger i = 0; i < [rowArray count]; i++) {
     NSView *row = [rowArray objectAtIndex:i];
     BOOL shown = [[shownArray objectAtIndex:i] boolValue] &&
                  [[row subviews] count] > 0;
     if (!shown) { [row removeFromSuperview]; continue; }
+    if (i < 2) upper = YES;
+    else if (upper && !divided) {
+      // the focus and user icons are below a divider
+      if ([divider superview] != view) [view addSubview: divider];
+      [divider setFrame: NSMakeRect (0, y + 1, w, 5)];
+      y += 6.0;
+      divided = YES;
+    }
     if ([row superview] != view) [view addSubview:row];
     NSSize sz = [row fittingSize];
     // NOTE: the input fields shrink when the row is too long
@@ -288,6 +319,7 @@
   [view setFrame:r];
   [line setFrame: NSMakeRect (0, r.size.height - 1, w, 1)];
   [line setHidden: !any];
+  if (!divided) [divider removeFromSuperview];
   [view setNeedsDisplay:YES];
 }
 

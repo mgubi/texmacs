@@ -21,6 +21,7 @@
   NSMutableArray *shownArray;   // whether each row is visible
   NSView *view;
   NSBox *line;           // the hairline below the rows
+  NSView *divider;       // between the main/mode and focus/user rows
 }
 - (void) setMenu:(NSMenu *)menu forRow:(unsigned) idx;
 - (void) setVisible:(BOOL) flag forRow:(unsigned) idx;
