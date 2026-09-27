@@ -989,8 +989,9 @@ find_canvas (NSView* v) {
 }
 @end
 
-// NOTE: when the environment variable TEXMACS_NS_PRESS is set, the button
-// or the tab with this label is pressed after four seconds
+// NOTE: when the environment variable TEXMACS_NS_PRESS is set, its steps
+// (separated by ";") are done after four seconds, one per second: a label
+// presses the button, the tab or the segment with this label
 
 static void
 ns_editable_fields (NSView* v, NSMutableArray* a) {
@@ -1085,7 +1086,7 @@ ns_dump_view (NSView* v, int depth) {
   if (step >= (int) [steps count]) [timer invalidate];
   bool done= false;
   if ([label isEqualToString: @"dump-views"]) {
-    // the views of the windows, with their frames and constraints on size
+    // the views of the windows, with their frames
     for (NSWindow* win in [NSApp orderedWindows]) {
       fprintf (stderr, "WINDOW %s\n", [[win title] UTF8String]);
       ns_dump_view ([win contentView], 1);
@@ -1221,9 +1222,8 @@ static NSAutoreleasePool *pool = nil;
 
 static void
 make_main_menu () {
-  // The main menu, when it does not come from MainMenu.nib (as when TeXmacs
-  // is not started from an application bundle); the menus of TeXmacs are
-  // added after the application menu (see TMMenuHelper)
+  // The main menu (there is no nib); the menus of TeXmacs are added after
+  // the application menu (see TMMenuHelper)
   static TMQuitHelper* quit_helper= [[TMQuitHelper alloc] init];
   NSMenu* main= [[[NSMenu alloc] initWithTitle: @"MainMenu"] autorelease];
   NSMenuItem* app_item= [[[NSMenuItem alloc] initWithTitle: @"TeXmacs"
@@ -1260,8 +1260,7 @@ void gui_open (int& argc, char** argv)
   if (!NSApp) {
     // initialize app
     [NSApplication sharedApplication];
-    // NOTE: the menu bar is made by make_main_menu (the MainMenu.nib of the
-    // bundle is the one of the old Cocoa interface)
+    // NOTE: the menu bar is made by make_main_menu
     // NOTE: needed for a menu bar when TeXmacs is not in a bundle
     [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
     // NOTE: otherwise these items are added to the Edit menu each time the

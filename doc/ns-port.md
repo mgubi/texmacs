@@ -73,7 +73,7 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   segment with this label; `field:<n>=<text>` types the text in the n-th
   editable field of the window, followed by return; `abort-modal` closes
   the modal window (such as a file panel); `dump-views` prints the views of
-  the key window, with their frames;
+  all the windows, with their frames;
 * `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
   its submenus up to this depth (with the shortcuts and check marks); with
   `TEXMACS_NS_SNAPSHOT`, the images of the items are saved as
@@ -85,8 +85,9 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   canvas;
 * `TEXMACS_NS_SCROLL_STEP=<points>`: the steps of `TEXMACS_NS_SCROLL`
   (trackpads give fractional ones); with `TEXMACS_NS_SNAPSHOT`, the backing
-  store of the canvas is saved as `backing.png` at the end (upside down),
-  and `TEXMACS_NS_DEBUG_RED=1` fills the parts to repaint in red first;
+  store of the canvas is saved as `backing.png` at the end (upside down);
+* `TEXMACS_NS_DEBUG_RED=1`: when the backing store moves (scrolling), the
+  parts which it does not keep are red until they are repainted;
 * `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
   printed (the snapshots redraw everything, and do not show what is on
   screen; other programs cannot capture the windows of TeXmacs).
@@ -168,4 +169,5 @@ documents.
 
 (Done: the bundled GNUstep AutoLayout was removed, the views use
 `NSStackView` and `NSGridView`; the deprecated AppKit constants were
-replaced.)
+replaced. The only deprecation warnings left are the sizes of the toolbar
+items, `NSToolbarItem` `minSize`/`maxSize`, in `ns_tm_widget.mm`.)
