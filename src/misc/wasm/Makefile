@@ -76,7 +76,7 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
 
 # made at every build (package.py only writes the packages which changed)
-$(OUT)/web/texmacs-files.json: FORCE
+$(OUT)/web/texmacs-files.json: FORCE | $(TM)/TeXmacs/plugins
 	@mkdir -p $(OUT)/web
 	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
 	-command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack; do \
@@ -88,7 +88,7 @@ FORCE:
 # a variant for node, which sees the host file system as it is (NODERAWFS)
 # and takes its environment: to test the build headless, see
 # docs/wasm/README.md
-node: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV
+node: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV $(TM)/TeXmacs/plugins
 
 # the version TeXmacs checks its files against (test_texmacs_path): made by
 # configure, which a checkout of the sources (the CI) has not run; the node
@@ -96,6 +96,12 @@ node: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV
 # is left as it is
 $(TM)/TeXmacs/SVNREV:
 	sed -n 's/^#define ALTERNATIVE_VERSION "\(.*\)"/\1/p' $(W)/config.h > $@
+
+# the plugins, which the build with configure copies from plugins/ (make at
+# the top): a checkout of the sources has none in TeXmacs/ (and a lazy
+# format of a plugin, looked for at the first conversion, then stopped it)
+$(TM)/TeXmacs/plugins:
+	cp -R $(TM)/plugins $@
 
 $(OUT)/node/texmacs.js: $(OBJECTS) $(LIBDEPS) $(W)/node-pre.js
 	@mkdir -p $(OUT)/node
