@@ -104,6 +104,9 @@ struct vue_input_state {
   double wheel_pend_x, wheel_pend_y;
   double wheel_over_x, wheel_over_y;
   time_t wheel_smooth_time;
+  // the wheel for the Clay scroll containers, in units of Clay, applied
+  // once before the next layout (see push_wheel)
+  double clay_wheel_x, clay_wheel_y;
   // popups and balloons
   bool current_popup;      // is there an active popup?
   bool cancel_popup;       // should we cancel popups?
@@ -125,6 +128,7 @@ struct vue_input_state {
       wheel_precise (false),
       wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
       wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
+      clay_wheel_x (0), clay_wheel_y (0),
       current_popup (false), cancel_popup (false), away_time (0),
       current_balloon (0), balloon_time (0),
       hot_id (0), active_id (0), active_button (0), last_id {},
