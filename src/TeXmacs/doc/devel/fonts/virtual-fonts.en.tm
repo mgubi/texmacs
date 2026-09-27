@@ -55,28 +55,33 @@
     <item*|assembling><verbatim|join> superposes glyphs,
     <verbatim|glue> and <verbatim|row> put them side by side,
     <verbatim|stack> puts one above the other, and <verbatim|add>,
-    <verbatim|min>, <verbatim|max>, <verbatim|intersect> and
-    <verbatim|exclude> combine them as images.
+    <verbatim|intersect> and <verbatim|exclude> combine them as images.
 
     <item*|cutting><verbatim|part> takes a rectangular piece of a glyph in
-    relative coordinates, <verbatim|crop> removes the white margins,
-    <verbatim|hor-take> and <verbatim|ver-take> keep a band.
+    relative coordinates, <verbatim|crop> removes the white margins, and
+    <verbatim|hor-take> and <verbatim|ver-take> repeat one column or one row
+    of a glyph over a given length, which is how a stretchable piece is
+    extended.
 
     <item*|transforming><verbatim|hor-flip>, <verbatim|ver-flip>,
     <verbatim|rot-left>, <verbatim|rot-right> and <verbatim|rotate> turn a
     glyph around, <verbatim|magnify>, <verbatim|scale>,
     <verbatim|hor-scale> and <verbatim|fscale> resize it,
-    <verbatim|italic> slants it and <verbatim|unserif> removes its serifs.
+    <verbatim|widen> and <verbatim|deepen> stretch it while keeping the width
+    of its strokes, <verbatim|unserif> removes its serifs, and
+    <verbatim|italic> leaves the glyph as it is but declares its slant and
+    italic correction.
 
-    <item*|spacing><verbatim|enlarge>, <verbatim|widen>,
-    <verbatim|deepen>, <verbatim|unindent> and the <verbatim|pretend>
-    operations change the box around a glyph without changing the ink,
+    <item*|spacing><verbatim|enlarge>, <verbatim|unindent> and the
+    <verbatim|pretend> operations change the box around a glyph without
+    changing the ink,
     which is how a construction is made to align with the rest of a line.
 
     <item*|decorating><verbatim|bar-left>, <verbatim|bar-right>,
     <verbatim|bar-top>, <verbatim|bar-bottom> add a stroke,
     <verbatim|negate> draws a slash through a glyph, <verbatim|circle>
-    draws a circle around it, and <verbatim|flood-fill> fills an outline.
+    draws a circle of a given radius and pen width, and
+    <verbatim|flood-fill> fills an outline.
 
     <item*|measuring><verbatim|width>, <verbatim|height>, <verbatim|xpos>
     and <verbatim|ypos> give a length, the arithmetic operations
@@ -108,10 +113,11 @@
   enough to give a new symbol a shape everywhere.
 
   The second is by a font rule. A compound font may list a virtual font
-  among its members, as the traditional mathematics font does:
+  among its members, as the traditional mathematics font does in
+  <verbatim|fonts-math.scm>:
 
   <\scm-code>
-    (tradi-misc (virtual tradi-misc $s $d))
+    (virtual tradi-misc $s $d)
   </scm-code>
 
   and the stretchable characters are built the same way, out of the

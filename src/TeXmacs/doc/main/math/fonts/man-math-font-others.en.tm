@@ -6,10 +6,11 @@
   <tmdoc-title|Other mathematical fonts>
 
   <TeXmacs> knows more mathematical fonts than it installs. The fonts of
-  this page are used as soon as they are installed on your system: they
-  then appear in the font menu like the fonts which come with <TeXmacs>,
-  with their text companions. Most of them are part of <TeX> Live, the
-  <TeX> distribution, which <TeXmacs> searches for fonts; they are all free.
+  the first section below are used as soon as they are installed on your
+  system: they then appear in the font menu like the fonts which come with
+  <TeXmacs>, with their text companions. They are all free, and part of
+  <TeX> Live, the <TeX> distribution. The second section is about the other
+  <name|OpenType> math fonts, which <TeXmacs> can use without knowing them.
 
   Each font is shown with a sample which is set in the font itself when it is
   installed. When it is not, <TeXmacs> sets the sample in the closest font it
@@ -159,10 +160,13 @@
   <section|Installing fonts>
 
   <TeXmacs> looks for fonts in the directory <verbatim|fonts/truetype> of its
-  installation and of your <TeXmacs> home directory (<verbatim|~/.TeXmacs>),
+  installation and of your <TeXmacs> home directory (<verbatim|~/.TeXmacs>,
+  or the folder <verbatim|TeXmacs> of the application data on <name|Windows>),
   in the font directories of your system, in the <TeX> Live installations it
-  finds, and in the directories listed in the environment variable
-  <verbatim|TEXMACS_FONT_PATH>. To add a font:
+  finds (of any year on <name|macOS>, of 2020 to 2022 on <name|Linux>), and
+  in the directories listed in the environment variable
+  <verbatim|TEXMACS_FONT_PATH>, which is the way to point it at another
+  <TeX> Live. To add a font:
 
   <\enumerate>
     <item>Install it in the usual way for your system, with the package

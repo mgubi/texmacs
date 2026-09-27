@@ -8,14 +8,14 @@
   <paragraph*|From the dialogs>
 
   The font of a whole document is chosen in <menu|Document|Font>, and the
-  font of a piece of text in <menu|Format|Font>. In the compact menus both
-  open the font browser, which lets you pick a family, a shape and a size, and which can also
+  font of a piece of text in <menu|Format|Font>. When the preference
+  <menu|Complex actions> is set to popup windows, both open the font browser, which lets you pick a family, a shape and a size, and which can also
   search for a font by its properties; the <hlink|font selection
   system|../../main/text/man-fonts.en.tm> describes the browser and its
   filters.
 
-  In the full menus, <menu|Document|Font> has instead three submenus which
-  set the font of one mode at a time, one for the
+  When it is set to menus, <menu|Document|Font> has instead three submenus
+  which set the font of one mode at a time, one for the
   <name|OpenType> features, and two which set the sizes:
 
   <\description>
@@ -35,7 +35,7 @@
     <item*|<menu|Features>>The <name|OpenType> features of the document
     font, such as old style figures or small capitals.
 
-    <item*|<menu|Program font>>The font of program sessions and of verbatim
+    <item*|<menu|Program font>>The font of program sessions and of program
     text; like the mathematical font, it counts while the text font is
     Roman.
 
@@ -195,8 +195,9 @@
   </tm-fragment>
 
   A feature which offers several alternates for the same character takes the
-  number of the one you want after an equals sign, as in
-  <verbatim|ss01=1>; the first alternate is taken by default. Features
+  number of the one you want after an equals sign, counting from 0, as in
+  <verbatim|salt=1> for the second; the first, 0, is taken by default, and
+  a number the font does not have leaves the glyph alone. Features
   apply from left to right, so <verbatim|onum,tnum> asks for old style
   figures and then for the tabular form of those.
 
@@ -206,10 +207,12 @@
   have the feature you asked for simply ignores it, which means that the
   variable is safe to set on a whole document.
 
-  The menus propose the features of the font at the cursor, and nothing
-  else: <menu|Format|Font features> applies one to the selection,
-  <menu|Document|Font|Features> to the whole document, and a tick shows
-  which are in force. The font browser has them too, in its
+  The menus propose the features of the font at the cursor which they
+  know, the figure, capital and stylistic features and the stylistic sets
+  <verbatim|ss01> to <verbatim|ss05>: when complex actions go through the
+  menus, <menu|Format|Font features> (with detailed menus) applies one to
+  the selection, <menu|Document|Font|Features> to the whole document, and a
+  tick shows which are in force. The font browser has them too, in its
   <menu|Font customization> area and under its <menu|Features> tab, where
   the list follows the font the dialog has selected and the sample text
   shows the effect.
@@ -218,7 +221,8 @@
   present. That covers <verbatim|onum>, <verbatim|lnum>, <verbatim|tnum>,
   <verbatim|pnum>, <verbatim|zero>, <verbatim|smcp>, <verbatim|c2sc>,
   <verbatim|salt>, <verbatim|swsh>, <verbatim|hist> and the stylistic sets
-  <verbatim|ss01> to <verbatim|ss20> in the fonts shipped with <TeXmacs>.
+  <verbatim|ss01> to <verbatim|ss20> in the fonts shipped with <TeXmacs>;
+  those the menus do not list can be named in the variable.
   The ligature features, <verbatim|liga>, <verbatim|dlig> and
   <verbatim|frac>, replace several glyphs by one and are not applied yet.
 

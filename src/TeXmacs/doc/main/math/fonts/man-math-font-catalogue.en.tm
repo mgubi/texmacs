@@ -12,7 +12,7 @@
   text, then a formula with an integral, a sum, a fraction, a radical and
   large delimiters, then Greek letters, blackboard bold, calligraphic and
   fraktur letters, bold, sans serif and typewriter letters, a wide accent
-  and a matrix. The table at the end sums up the characteristics of each
+  and a matrix. The tables at the end sum up the characteristics of each
   font.
 
   <section|Serif text and mathematics>
@@ -265,7 +265,9 @@
   <section|The traditional fonts>
 
   These are the fonts of the section <menu|Text and mathematics> of the font
-  menu, which do not use an <name|OpenType> mathematical font.
+  menu, which do not use the <name|OpenType> mathematical fonts above: Roman
+  uses the fonts of <TeX>, and Stix the first STIX Math font, with its
+  hand-tuned corrections.
 
   <paragraph*|Roman>
 
@@ -307,7 +309,7 @@
   perfectly. Every font below has all the symbols of everyday mathematics.
 
   <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|symbols>>|<cell|<em|missing alphabets>>|<cell|<em|bold>>>|<row|<cell|Latin Modern>|<cell|65%>|<cell|lowercase script>|<cell|no>>|<row|<cell|New Computer Modern>|<cell|100%>|<cell|none>|<cell|yes>>|<row|<cell|Times>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Palatino>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Bookman>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Schoolbook>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|STIX Two>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Libertinus>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Kp Fonts>|<cell|65%>|<cell|lowercase script, blackboard>|<cell|yes>>|<row|<cell|Utopia>|<cell|68%>|<cell|lowercase script>|<cell|no>>|<row|<cell|Charter>|<cell|67%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Euler>|<cell|66%>|<cell|lowercase script>|<cell|no>>|<row|<cell|Concrete>|<cell|67%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Fira>|<cell|43%>|<cell|script, fraktur, sans serif>|<cell|no>>|<row|<cell|Kp Sans>|<cell|63%>|<cell|lowercase script, blackboard>|<cell|yes>>>>>>
-    How complete the mathematical fonts which come with <TeXmacs> are. <em|Symbols> is the part of the list of symbols of the <LaTeX> package <verbatim|unicode-math> which the font has; <em|missing alphabets> names the mathematical alphabets of <name|Unicode> (bold, italic, script, fraktur, blackboard bold, sans serif, typewriter) which are incomplete, and which <TeXmacs> emulates; <em|bold> says whether there is a bold mathematical font.
+    How complete the mathematical fonts which come with <TeXmacs> are. <em|Symbols> is the part of the list of symbols of the <LaTeX> package <verbatim|unicode-math> which the font has; <em|missing alphabets> names the mathematical alphabets of <name|Unicode> (bold, italic, script, fraktur, blackboard bold, sans serif, typewriter) which are incomplete, and which <TeXmacs> emulates; <em|bold> says whether bold formulas use a real bold mathematical font (the bold math file of Erewhon is shipped but not found yet, a known defect).
   </big-table>
 
   <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|sans serif, typewriter>>|<cell|<em|license>>>|<row|<cell|Latin Modern>|<cell|LM Sans, LM Mono>|<cell|GUST>>|<row|<cell|New Computer Modern>|<cell|none>|<cell|GUST>>|<row|<cell|Times>|<cell|Heros, Cursor>|<cell|GUST>>|<row|<cell|Palatino>|<cell|Heros, Cursor>|<cell|GUST>>|<row|<cell|Bookman>|<cell|Adventor, Cursor>|<cell|GUST>>|<row|<cell|Schoolbook>|<cell|Heros, Cursor>|<cell|GUST>>|<row|<cell|STIX Two>|<cell|none>|<cell|OFL>>|<row|<cell|Libertinus>|<cell|Libertinus Sans, Mono>|<cell|OFL>>|<row|<cell|Kp Fonts>|<cell|KpSans, KpMono>|<cell|OFL>>|<row|<cell|Utopia>|<cell|none>|<cell|OFL>>|<row|<cell|Charter>|<cell|none>|<cell|OFL, Bitstream>>|<row|<cell|Euler>|<cell|Heros, Cursor>|<cell|OFL>>|<row|<cell|Concrete>|<cell|none>|<cell|OFL>>|<row|<cell|Fira>|<cell|Fira Mono>|<cell|OFL>>|<row|<cell|Kp Sans>|<cell|KpMono>|<cell|OFL>>>>>>

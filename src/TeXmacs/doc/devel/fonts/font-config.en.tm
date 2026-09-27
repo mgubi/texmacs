@@ -9,8 +9,10 @@
   in two copies: the ones shipped with the program, under
   <verbatim|$TEXMACS_PATH/fonts>, and the ones of your own installation,
   under <verbatim|$TEXMACS_HOME_PATH/fonts>, which is
-  <verbatim|~/.TeXmacs/fonts> on <name|Unix>. The local copy is the one in
-  use; the shipped one is its starting point and its safety net.
+  <verbatim|~/.TeXmacs/fonts> on <name|Unix>. For the database files the
+  local copy is the one in use, and the shipped one is its starting point
+  and its safety net; <verbatim|font-substitutions.scm> is only read from
+  the installation.
 
   <paragraph*|The database>
 
@@ -45,10 +47,13 @@
     <verbatim|FandolHei> and not a slanted <verbatim|FandolSong>.
 
     <item*|<verbatim|shipped-stamp.scm>>The date and the size of the
-    shipped files from which the local database was built. When they
-    differ, <TeXmacs> merges the shipped entries into the local ones at the
-    next start, so that a version which ships new fonts does not go
-    unnoticed by an old home directory.
+    shipped files from which the local database was built, the installation
+    they came from, and the number of entries of the local database. When
+    the shipped files or the installation differ, or the local database has
+    lost entries, <TeXmacs> merges the shipped entries into the local ones at
+    the next start, so that a version which ships new fonts does not go
+    unnoticed by an old home directory, and several installations can share
+    one.
   </description>
 
   Rescanning is <menu|Tools|Fonts|Scan disk for fonts>, and emptying the
@@ -103,7 +108,8 @@
 
   Rules are ordinary <scheme>, so your personal initialization file may
   add its own; they are tried in the order in which they were declared,
-  so a rule added later takes precedence.
+  and the first which matches is used, so a rule added later only applies
+  to requests which no earlier rule matches.
 
   <paragraph*|The fonts themselves>
 
