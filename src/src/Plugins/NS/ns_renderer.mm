@@ -320,8 +320,8 @@ ns_renderer_rep::set_pencil (pencil np) {
       set_pattern (ctx, pm, 1.0, pox, poy, false);
     }
   }
-  [NSBezierPath setDefaultLineCapStyle: (pen->get_cap () == cap_round? NSRoundLineCapStyle : NSButtLineCapStyle)];
-  [NSBezierPath setDefaultLineJoinStyle: NSRoundLineJoinStyle];
+  [NSBezierPath setDefaultLineCapStyle: (pen->get_cap () == cap_round? NSLineCapStyleRound : NSLineCapStyleButt)];
+  [NSBezierPath setDefaultLineJoinStyle: NSLineJoinStyleRound];
 }
 
 void
@@ -369,9 +369,9 @@ ns_renderer_rep::lines (array<SI> x, array<SI> y) {
   }
   NSBezierPath *path = [NSBezierPath bezierPath];
   [path appendBezierPathWithPoints:pnt count:n];
-  [path setLineCapStyle:(pen->get_cap () == cap_round? NSRoundLineCapStyle : NSButtLineCapStyle)];
-  if (x[N(x)-1] == x[0] && y[N(y)-1] == y[0]) [path setLineCapStyle:NSRoundLineCapStyle];
-  [path setLineJoinStyle: NSRoundLineJoinStyle];
+  [path setLineCapStyle:(pen->get_cap () == cap_round? NSLineCapStyleRound : NSLineCapStyleButt)];
+  if (x[N(x)-1] == x[0] && y[N(y)-1] == y[0]) [path setLineCapStyle:NSLineCapStyleRound];
+  [path setLineJoinStyle: NSLineJoinStyleRound];
   [path stroke];
   // XDrawLines (dpy, win, gc, pnt, n, CoordModeOrigin);
   STACK_DELETE_ARRAY (pnt);
@@ -485,7 +485,7 @@ ns_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
   decode (x2, y2, rx2, ry2);
   NSBezierPath* p= arc_path (rx1, ry1, rx2, ry2, alpha, delta);
   [p closePath];
-  [p setWindingRule: NSNonZeroWindingRule];
+  [p setWindingRule: NSWindingRuleNonZero];
   [context saveGraphicsState];
   if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
     [to_nscolor (pen->get_color ()) setFill];
@@ -505,7 +505,7 @@ ns_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
   NSBezierPath *path = [NSBezierPath bezierPath];
   [path appendBezierPathWithPoints: pnt count: n];
   [path closePath];
-  [path setWindingRule: (convex? NSEvenOddWindingRule : NSNonZeroWindingRule)];
+  [path setWindingRule: (convex? NSWindingRuleEvenOdd : NSWindingRuleNonZero)];
   [context saveGraphicsState];
   if (is_nil (fg_brush) || fg_brush->get_type () != brush_pattern)
     [to_nscolor (pen->get_color ()) setFill];

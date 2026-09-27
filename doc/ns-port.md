@@ -16,42 +16,50 @@ make -k -j8
 `--enable-cocoa` defines `AQUATEXMACS` and compiles `Plugins/NS` (it used to
 compile the old `Plugins/Cocoa`), together with `Plugins/MacOS`.
 
-## State (2026-09-27, evening)
+## State (2026-09-27, night)
 
-**TeXmacs compiles, links and starts with the NS interface:** the main window
-opens with its title, canvas and footer, the Cocoa event loop runs the
-TeXmacs update cycle, documents are drawn correctly (text, mathematics,
-at the right scale on Retina screens), and **documents can be edited**:
-typing (including return and backspace) and clicking to move the cursor
-work. The TeXmacs menus are in the menu bar (after an application menu
-created in the code, since there is no MainMenu.nib outside a bundle), and
-all of them, with their submenus, can be built. The icon bars are shown
-above the canvas (with the PNG icons, at double resolution on Retina
-screens), and the footer shows the messages of TeXmacs. Dialogs made with
-`tm-widget` work, such as the preferences and the page format (tabs, pop-up
-menus, buttons, refreshable parts, and embedded TeXmacs editors), and so do
-the side and bottom tools (for instance the document metadata and the search
-bar). The clipboard works with the other applications (text and HTML) and
-between TeXmacs processes (in the format of TeXmacs). As in the Qt
-interface, the canvas and its backing store have the size of the visible
-part of the document, so that long documents can be edited.
+**TeXmacs compiles, links and runs with the NS interface, with the features
+of the Qt interface.** Documents are drawn and edited (text, mathematics,
+pictures, graphics, patterns and picture effects), at the right scale on
+Retina screens; scrolling is synchronous, as in Qt, and the document is
+centered when it is narrower than the window. The menus are in the menu bar
+with their keyboard shortcuts and check marks; the icon bars have their
+buttons, labels and input fields (the focus bar), row by row; the footer
+shows the messages and the interactive prompt. Dialogs made with
+`tm-widget` work (tabs, icon tabs, pop-up menus, lists, filtered lists,
+tree views, resizable parts, refreshable parts, embedded editors), and so
+do the side and bottom tools (resizable with a handle), tooltips and help
+balloons, the wait indicator, the file panels (with the filters of the
+file types), the color picker, printing (PDF, and PostScript through
+Ghostscript), the clipboard (text, HTML, TeXmacs, images, both ways),
+drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
+(command-wheel zooms).
+
+`qt-gui?` holds for this interface, since it implements the widgets of the
+Qt one: the Scheme code uses the same native dialogs and shortcuts.
 
 Testing aids (other programs are not allowed to capture or control the
 windows). NOTE: with them, TeXmacs becomes the active application, so that
-keys typed meanwhile go to TeXmacs.
+keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
 * with `TEXMACS_NS_SNAPSHOT` or `TEXMACS_NS_TYPE`, TeXmacs activates itself
-  and its window becomes the key window (otherwise, started in the
-  background, the editor does not keep the focus);
+  and its window becomes the key window;
 * `TEXMACS_NS_SNAPSHOT=<dir>`: the windows are saved as
   `<dir>/window-<i>.png` every 3 seconds;
 * `TEXMACS_NS_TYPE=<text>`: after 2 seconds, the text is sent as key events
   to the canvas (`\r` is return, `\b` backspace);
-* `TEXMACS_NS_CLICK=<x>,<y>[,right]`: a click at this point of the canvas
-  (in points), before typing;
+* `TEXMACS_NS_CLICK=<x>,<y>[,right|,move]`: a click (or a mouse move) at
+  this point of the canvas (in points), before typing;
 * `TEXMACS_NS_PRESS=<label>`: after 4 seconds, the button or the tab with
-  this label is pressed (in the frontmost window which has it);
+  this label is pressed; `field:<n>=<text>` types the text in the n-th
+  editable field of the window, followed by return; `abort-modal` closes
+  the modal window (such as a file panel);
 * `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
-  its submenus up to this depth (which builds the lazy menus).
+  its submenus up to this depth (with the shortcuts and check marks);
+* `TEXMACS_NS_SCROLL=<points>`: after 3 seconds, the document is scrolled
+  in steps of 40 points, and with `TEXMACS_NS_SNAPSHOT` the window is saved
+  after each step (`scroll-<i>.png`);
+* `TEXMACS_NS_DROP=<file>`: after 3 seconds, the file is dropped on the
+  canvas.
 
 For example, to check the result:
 
@@ -64,59 +72,46 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 
 * **Widget layer** (the 2018 refactoring, completed on the model of Qt):
   `ns_widget.mm` holds the factories and the base, window, popup and view
-  widgets; the main window moved to `ns_tm_widget.mm`; `ns_ui_element.mm`
-  builds menu items (menus and toolbars) and views (dialogs: labels, icons,
-  buttons, check boxes, popups, stacks, grids, glue, scroll and split views);
+  widgets; the main window is in `ns_tm_widget.mm`; `ns_ui_element.mm`
+  builds menu items (menus and icon bars) and views (dialogs);
   `ns_menu.mm` has the Objective-C menu classes and `ns_menu_rep` (popup
-  menus); `ns_dialogues.mm` implements the file chooser (NSOpenPanel,
-  NSSavePanel), questions and input dialogs (NSAlert), the text input and the
-  embedded editor.
+  menus); `ns_dialogues.mm` implements the file chooser, questions and
+  input dialogs, line inputs (as `QTMLineEdit`), the embedded editor, the
+  color picker and the printer.
 * **Event loop** (`ns_gui.mm`): queued keyboard, mouse, resize and command
   events and the update cycle of `qt_gui.cpp`, with an NSTimer and
   `[NSApp run]`.
-* **Renderer**: `clear_device`, shadows drawing in the context of their
-  master (as the Qt proxy renderers), the current `get_pattern_data`,
-  `decode`, `shrink`, pixel ratio; `load_picture`, `save_picture`.
-* **Simple widget**: its `TMView` is created on demand (`as_nsview`).
+* **Canvas** (`ns_simple_widget.mm`, `TMView.mm`): a document view in the
+  scroll view, and the canvas which follows its visible part, with a
+  backing store of that size (as in Qt); scrolling repaints at once; mouse
+  state as in Qt; input methods (`NSTextInputClient`); gestures; drops.
+* **Renderer**: clipping as `QPainter::setClipRect` (the graphics state is
+  restored before each new clipping), pictures and the picture renderer,
+  patterns, effects, arcs, shadows drawing in the context of their master.
 * **Builds without Qt** (also useful for X11): stubs for the client/server
   functions, `execute_shell` defined only once, and `AQUATEXMACS` treated as
-  Qt for delayed commands and native pictures.
+  Qt where the generic code has Qt specific parts (delayed commands,
+  native pictures, drops, bitmap exports, texmacs output widgets).
 
-### Known gaps (FIXME in the code)
+### Known gaps
 
-* the rows of icons are shown or hidden together; the side tools have the
-  width wanted by their contents (no splitter to resize them);
+* as in the Qt interface: no ink widget, no empty widget, no mouse pointer
+  shapes, no proposals in the color picker;
+* not tested with real hardware: full screen (it takes the screen),
+  printing on a printer, help balloons triggered by hovering (the tooltip
+  windows themselves work), trackpad gestures;
+* tree views ignore their roles; the XPM icons without a PNG equivalent
+  lose their transparency; shadows with their own context are not copied
+  back (they always share the context of their master here).
 
-* menus: keyboard shortcuts, the prefixes `*` and `o`, widgets inside menus;
-* views: icons of the icon tabs, filter of the filtered choices, tree
-  views, maximal and default sizes of the resize widgets;
-* printing only handles PDF files (with PDFKit and the print panel of the
-  system); the native color picker has no proposals nor patterns; picture
-  effects and patterns;
-* the interactive prompt is a dialog instead of the footer;
-* the side tools (left, right, bottom, extra) are ignored.
+## Next steps
 
-## After compiling
-
-In order:
-1. Check with real input: the input methods (`NSTextInputClient`, with the
-   text being composed shown by TeXmacs as in Qt), the contextual menu (it
-   is requested at the right place, but synthetic clicks close it at once),
-   drag selection.
-   At this point documents can be edited: this is the main milestone.
-2. The `FIXME`/`NOT_IMPLEMENTED` of 2018 (about 60): arcs, alpha, images,
-   mouse grab, pointer and cursor, the wait indicator, the empty and ink
-   widgets, refreshable and promise widgets.
-3. Menus and toolbars, with the lazy menus of TeXmacs.
-4. Dialogs and the widget set used by `tm-widget` (forms, tabs, lists,
-   embedded editors), one Qt widget at a time.
-5. Printing, clipboard, file dialogs.
-
-Suggestions:
-* Replace the bundled GNUstep AutoLayout (about 5000 lines of 2013) by
-  AppKit's `NSStackView` and `NSGridView`.
-* Port the test harness of the Qt interface (`Plugins/Qt/qt_test.cpp` on
-  `wip-git-versioning`) to check each step with snapshots and scripted
-  menus.
-* The deprecated AppKit constants (`NSResizableWindowMask`, ...) only give
-  warnings, but should be replaced by their current names.
+1. Use it with real input and hardware: input methods, the contextual
+   menu, drag selection, gestures, full screen, printing, several windows
+   and screens.
+2. Remove the bundled GNUstep AutoLayout (about 5000 lines of 2013), which
+   is not used any more: the views use `NSStackView` and `NSGridView`.
+3. Replace the deprecated AppKit constants (`NSResizableWindowMask`, ...),
+   which only give warnings.
+4. An application bundle (`Info.plist`, icon, `MainMenu`), with the
+   packaging of the Qt version.

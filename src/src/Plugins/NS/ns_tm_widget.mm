@@ -177,11 +177,11 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   [rightField setAutoresizingMask:NSViewMinXMargin|NSViewMaxYMargin];
   [leftField setEditable: NO];
   [rightField setEditable: NO];
-  [leftField setBackgroundColor:[NSColor windowFrameColor]];
-  [rightField setBackgroundColor:[NSColor windowFrameColor]];
+  [leftField setBackgroundColor:[NSColor windowBackgroundColor]];
+  [rightField setBackgroundColor:[NSColor windowBackgroundColor]];
   [leftField setBezeled:NO];
   [rightField setBezeled:NO];
-  [rightField setAlignment:NSRightTextAlignment];
+  [rightField setAlignment:NSTextAlignmentRight];
   [view addSubview:leftField];
   [view addSubview:rightField];
   

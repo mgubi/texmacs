@@ -341,7 +341,7 @@ initkeymap () {
       int key = [nss characterAtIndex:0];
       if (nskeymap->contains(key)) {
         r = nskeymap[key];
-        r = ((mods & NSShiftKeyMask)? "S-" * r: r);
+        r = ((mods & NSEventModifierFlagShift)? "S-" * r: r);
       }
       else
       {
@@ -354,14 +354,14 @@ initkeymap () {
       string s (r);
       if (! contains_unicode_char (s))     
       {
-        //      string s= ((mods & NSShiftKeyMask)? "S-" * r: r);
+        //      string s= ((mods & NSEventModifierFlagShift)? "S-" * r: r);
         /* other keyboard modifiers */
         if (N(s)!=0) {
-          if (mods & NSControlKeyMask ) s= "C-" * s;
-          if (mods & NSAlternateKeyMask) s= "A-" * s;
-          if (mods & NSCommandKeyMask) s= "M-" * s;
+          if (mods & NSEventModifierFlagControl ) s= "C-" * s;
+          if (mods & NSEventModifierFlagOption) s= "A-" * s;
+          if (mods & NSEventModifierFlagCommand) s= "M-" * s;
           // if (mods & NSNumericPadKeyMask) s= "K-" * s;
-	  // if (mods & NSHelpKeyMask) s= "H-" * s;
+	  // if (mods & NSEventModifierFlagHelp) s= "H-" * s;
           // if (mods & NSFunctionKeyMask) s= "F-" * s;
         }
         cout << "key press: " << s << LF;
@@ -403,11 +403,11 @@ initkeymap () {
     
     string modstr;
     
-    if (mods & NSControlKeyMask ) modstr= "C-" * modstr;
-    if (mods & NSAlternateKeyMask) modstr= "A-" * modstr;
-    if (mods & NSCommandKeyMask) modstr= "M-" * modstr;
+    if (mods & NSEventModifierFlagControl ) modstr= "C-" * modstr;
+    if (mods & NSEventModifierFlagOption) modstr= "A-" * modstr;
+    if (mods & NSEventModifierFlagCommand) modstr= "M-" * modstr;
     // if (mods & NSNumericPadKeyMask) modstr= "K-" * modstr;
-    // if (mods & NSHelpKeyMask) modstr= "H-" * modstr;
+    // if (mods & NSEventModifierFlagHelp) modstr= "H-" * modstr;
     // if (mods & NSFunctionKeyMask) modstr= "F-" * modstr;
     
     //    if (!processingCompose)
@@ -416,12 +416,12 @@ initkeymap () {
         int key = [nss characterAtIndex:0];
         if (nskeymap->contains(key)) {
           r = nskeymap[key];
-          r = ((mods & NSShiftKeyMask)? "S-" * modstr: modstr) * r;          
+          r = ((mods & NSEventModifierFlagShift)? "S-" * modstr: modstr) * r;          
           if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << r << LF;
           [self deleteWorkingText];
           the_gui->process_keypress (wid, r, texmacs_time());
           return;
-        } else if (mods & (NSControlKeyMask  | NSCommandKeyMask | NSHelpKeyMask))
+        } else if (mods & (NSEventModifierFlagControl  | NSEventModifierFlagCommand | NSEventModifierFlagHelp))
         {
           static char str[256];
           [nss getCString:str maxLength:256 encoding:NSUTF8StringEncoding];
