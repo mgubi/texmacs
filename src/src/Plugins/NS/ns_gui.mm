@@ -867,7 +867,9 @@ find_document_scroll_view (NSView* v) {
 @implementation TMScrollHelper
 - (void) step: (NSTimer*) timer
 {
-  if (remaining == 0) remaining= as_int (get_env ("TEXMACS_NS_SCROLL"));
+  if (remaining == 0) {
+    remaining= as_int (get_env ("TEXMACS_NS_SCROLL"));
+  }
   NSScrollView* sv= nil;
   for (NSWindow* win in [NSApp orderedWindows])
     if (!sv) sv= find_document_scroll_view ([win contentView]);
@@ -875,6 +877,14 @@ find_document_scroll_view (NSView* v) {
     fprintf (stderr, "TEXMACS_NS_SCROLL no document\n");
     [timer invalidate];
     return;
+  }
+  static bool shown= false;
+  if (!shown) {
+    shown= true;
+    NSRect f= [[sv window] frame];
+    CGFloat H= [[[NSScreen screens] firstObject] frame].size.height;
+    fprintf (stderr, "TEXMACS_NS_SCROLL window %.0f,%.0f,%.0f,%.0f\n",
+             f.origin.x, H - NSMaxY (f), f.size.width, f.size.height);
   }
   int d= remaining > 0? min (remaining, 40): max (remaining, -40);
   NSClipView* clip= [sv contentView];

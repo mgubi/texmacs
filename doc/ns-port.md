@@ -60,6 +60,9 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   after each step (`scroll-<i>.png`);
 * `TEXMACS_NS_DROP=<file>`: after 3 seconds, the file is dropped on the
   canvas.
+* `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
+  printed (the snapshots redraw everything, and do not show what is on
+  screen; other programs cannot capture the windows of TeXmacs).
 
 For example, to check the result:
 

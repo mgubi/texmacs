@@ -313,6 +313,11 @@ initkeymap () {
   // retina_factor pixels per point; the view is flipped, and so is the
   // backing store, so that the coordinates correspond directly
   if (!wid || !wid->backingPixmap) return;
+  static int dbg= -1;
+  if (dbg < 0) dbg= (get_env ("TEXMACS_NS_DEBUG_DRAW") != "");
+  if (dbg) fprintf (stderr, "DRAWRECT %.0f,%.0f %.0fx%.0f of %.0fx%.0f\n",
+                    rect.origin.x, rect.origin.y, rect.size.width, rect.size.height,
+                    [self bounds].size.width, [self bounds].size.height);
   NSRect src= NSMakeRect (rect.origin.x * retina_factor,
                           rect.origin.y * retina_factor,
                           rect.size.width * retina_factor,

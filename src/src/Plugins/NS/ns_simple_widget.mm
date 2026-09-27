@@ -578,7 +578,11 @@ ns_simple_widget_rep::repaint_invalid_regions () {
   if (!backingPixmap || [backingPixmap pixelsWide] < 1 ||
       [backingPixmap pixelsHigh] < 1)
     backing_pos= origin;
+  // NOTE: when the backing store moves or changes its size, all the view
+  // is shown again (the view keeps its old image on screen otherwise)
+  bool moved= false;
   if ((backing_pos.x != origin.x)||(backing_pos.y != origin.y)) {
+    moved= true;
     int dx =  retina_factor * (origin.x - backing_pos.x);
     int dy =  retina_factor * (origin.y - backing_pos.y);
     backing_pos.x = origin.x;
@@ -656,6 +660,7 @@ ns_simple_widget_rep::repaint_invalid_regions () {
     // NOTE: nothing to draw in an empty canvas (not laid out yet)
     if (_newSize.width < 1 || _newSize.height < 1) return;
     if ((_newSize.width != _oldSize.width)||(_newSize.height != _oldSize.height)) {
+      moved= true;
       // cout << "RESIZING BITMAP"<< LF;
       NSBitmapImageRep *newBackingPixmap = [[NSBitmapImageRep alloc]
                                          initWithBitmapDataPlanes:NULL
@@ -730,12 +735,14 @@ ns_simple_widget_rep::repaint_invalid_regions () {
       ren->end();
       
       // propagate immediately the changes to the screen
-      [view displayRect: NSMakeRect (lub->x1 / retina_factor,
-                                     lub->y1 / retina_factor,
-                                     (lub->x2 - lub->x1) / retina_factor,
-                                     (lub->y2 - lub->y1) / retina_factor)];
+      if (!moved)
+        [view displayRect: NSMakeRect (lub->x1 / retina_factor,
+                                       lub->y1 / retina_factor,
+                                       (lub->x2 - lub->x1) / retina_factor,
+                                       (lub->y2 - lub->y1) / retina_factor)];
     } // !is_nil (invalid_regions)
   }
+  if (moved) [view display];
 }
 
 hashset<pointer> ns_simple_widget_rep::all_widgets;

@@ -75,6 +75,7 @@
     [sc setEnabled:[mi isEnabled] forSegment:j];
     if ([mi representedObject]) {
       [sc setImage:[mi representedObject] forSegment:j];
+      [sc setImageScaling: NSImageScaleProportionallyDown forSegment:j];
       [sc setLabel:@"" forSegment:j];
       [sc setWidth:25.0 forSegment:j];
     }
@@ -100,7 +101,7 @@
   [row setOrientation: NSUserInterfaceLayoutOrientationHorizontal];
   [row setAlignment: NSLayoutAttributeCenterY];
   [row setSpacing: 5.0];
-  [row setEdgeInsets: NSEdgeInsetsMake (1, 4, 1, 4)];
+  [row setEdgeInsets: NSEdgeInsetsMake (2, 6, 2, 6)];
   NSMutableArray *segs = [NSMutableArray array];
   NSInteger c = [menu numberOfItems];
   for (NSInteger i = 0; i <= c; i++) {
@@ -158,7 +159,8 @@
 - (void) layout
 {
   // The rows from the top to the bottom, with their natural height
-  CGFloat y = 0.0, w = [view frame].size.width;
+  // NOTE: a little space below the title bar and above the canvas
+  CGFloat y = 6.0, w = [view frame].size.width;
   for (NSUInteger i = 0; i < [rowArray count]; i++) {
     NSView *row = [rowArray objectAtIndex:i];
     BOOL shown = [[shownArray objectAtIndex:i] boolValue] &&
@@ -171,7 +173,7 @@
     y += sz.height;
   }
   NSRect r = [view frame];
-  r.size.height = y;
+  r.size.height = y > 6.0? y + 4.0: 0.0;
   [view setFrame:r];
   [view setNeedsDisplay:YES];
 }
