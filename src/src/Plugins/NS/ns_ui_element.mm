@@ -171,6 +171,35 @@ stack_of (array<widget> a, bool vertical) {
 - (BOOL) isFlipped { return YES; }
 @end
 
+/*! When a tab is chosen, the dialog takes the size of the new page (in the
+ main windows, the tools are laid out again). */
+@interface TMTabHelper : NSObject <NSTabViewDelegate>
+@end
+
+@implementation TMTabHelper
+- (void) tabView: (NSTabView*) tv didSelectTabViewItem: (NSTabViewItem*) it
+{
+  (void) it;
+  NSWindow* win= [tv window];
+  NSView* root= [win contentView];
+  if (!win || !root) return;
+  if ([[root identifier] isEqualToString: @"TMMainView"]) {
+    [[NSNotificationCenter defaultCenter]
+      postNotificationName: @"TMToolsChanged" object: root];
+    return;
+  }
+  [root layoutSubtreeIfNeeded];
+  NSSize fs= [root fittingSize];
+  if (fs.width <= 0 || fs.height <= 0) return;
+  // the top left corner stays in place
+  NSRect f= [win frame];
+  NSRect nf= [win frameRectForContentRect: NSMakeRect (0, 0, fs.width, fs.height)];
+  nf.origin.x= f.origin.x;
+  nf.origin.y= NSMaxY (f) - nf.size.height;
+  [win setFrame: nf display: YES animate: [win isVisible]];
+}
+@end
+
 static NSView*
 placeholder (string what) {
   // FIXME: widgets which are not implemented yet
@@ -1149,26 +1178,12 @@ ns_ui_element_rep::as_nsview () {
         }
         [tv addTabViewItem: it];
       }
-      // As QTabWidget: the size of the largest page (the hidden pages are
-      // not taken into account by the layout of AppKit)
+      // As in the Qt interface, the dialog takes the size of the page shown
+      // (see TMTabHelper)
       {
-        CGFloat mw= 0, mh= 0;
-        for (NSTabViewItem* it in [tv tabViewItems]) {
-          NSSize fs= [[it view] fittingSize];
-          mw= max (mw, fs.width); mh= max (mh, fs.height);
-        }
-        if (mw > 0 && mh > 0) {
-          NSSize extra= NSMakeSize (0, 0);
-          if (type == tabs_widget) {
-            NSRect cr= [tv contentRect], fr= [tv frame];
-            extra= NSMakeSize (fr.size.width - cr.size.width,
-                               fr.size.height - cr.size.height);
-            if (extra.width <= 0 || extra.height <= 0) extra= NSMakeSize (20, 40);
-          }
-          [tv setTranslatesAutoresizingMaskIntoConstraints: NO];
-          [[tv.widthAnchor constraintGreaterThanOrEqualToConstant: mw + extra.width] setActive: YES];
-          [[tv.heightAnchor constraintGreaterThanOrEqualToConstant: mh + extra.height] setActive: YES];
-        }
+        TMTabHelper* th= [[[TMTabHelper alloc] init] autorelease];
+        objc_setAssociatedObject (tv, "TMTabHelper", th, OBJC_ASSOCIATION_RETAIN);
+        [tv setDelegate: th];
       }
       if (type == tabs_widget) return tv;
       // the icon tabs: a segmented control with the icons above the tabs
