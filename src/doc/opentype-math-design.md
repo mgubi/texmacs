@@ -1034,20 +1034,23 @@ be comparable.
    to the advances of the table. The result matches the table within pixel
    rounding, but a font whose parts have unusual side bearings could still
    show a seam.
-3. TeX Gyre DejaVu Math is taken for a hand-tuned TeX Gyre font while the
-   hand tuning is on: the branch of the constructor ladder in
-   `unicode_font.cpp` tests only the prefix `texgyre`, so the font keeps
-   `MATH_TYPE_TEX_GYRE` with no tables of its own and loses the italic
-   corrections and corner kerning of its MATH table, and it is given the
-   `tex_gyre_operators` table, whose glyph numbers are those of Pagella.
-   Linux Libertine, whose regular face carries a stub MATH table, is in the
-   same position.
-4. The bold math face of Erewhon names its family Erewhon, like the text
-   face, and is listed in the database among the text faces, so bold
-   Erewhon mathematics is emulated although the face is shipped.
-5. `supported` in `virtual_font.cpp`, which decides whether a virtual glyph
-   can be drawn as vectors, knows `ver-take` but not `hor-take`, so a
-   horizontal assembly that uses it would fall back to a bitmap.
+3. In a display formula, the integrals of the TeX Gyre math fonts on the
+   table path (TeX Gyre DejaVu Math, and the four others with the hand
+   tuning off) come out at their text size, although `displayOperatorMinHeight`
+   (1333 in DejaVu Math) asks for the 1495 unit variant; summation and
+   product do reach their display size, and the integrals of New Computer
+   Modern and STIX Two do too.
+4. Linux Libertine, whose regular face carries a stub MATH table, is taken
+   by its hand-tuned branch while the tuning is on, and by the table path
+   otherwise.
+
+Three entries of 27 September 2026 are closed the same day: TeX Gyre DejaVu
+Math is no longer taken for a hand-tuned TeX Gyre font (the ladder and the
+`tex_gyre_operators` table, whose glyph numbers are Pagella's and drew a
+contour integral in place of its radical, now name the four tuned fonts);
+the bold math face of Erewhon, whose name table calls it Erewhon, is listed
+in the shipped database as the Bold style of Erewhon Math; and `supported`
+in `virtual_font.cpp` knows `hor-take`.
 
 Two entries of this list were mistakes and are now closed.
 `parse_variant` takes the last dash-separated token as the size and

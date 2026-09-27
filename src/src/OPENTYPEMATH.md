@@ -271,12 +271,10 @@ Pagella, Termes, Bonum and Schola are shipped too, and keep their
 hand-tuned tables for corrections, wide accents and integrals, while the
 MATH table gives them the delimiter variants, the assemblies and the
 constants they never had; the menu calls them Palatino, Times, Bookman and
-Schoolbook. TeX Gyre DejaVu Math is not shipped. It has no tuned tables of
-its own, but its file name starts like the others', so while the hand
-tuning is on it is taken for a hand-tuned TeX Gyre font: it keeps the MATH
-variants, assemblies and constants, but not the italic corrections and
-corner kerning of the table (a known defect, see
-`doc/opentype-math-design.md` section 6).
+Schoolbook. TeX Gyre DejaVu Math is not shipped; it has no tuned tables and
+takes the MATH path like the fonts above. On that path the display
+integrals of the TeX Gyre fonts stay at their text size, a known defect
+(`doc/opentype-math-design.md` section 6).
 
 ![TeX Gyre Pagella Math](opentype-math/tex-gyre-pagella-math.png)
 

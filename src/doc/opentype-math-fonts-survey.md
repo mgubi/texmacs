@@ -225,9 +225,9 @@ options through Metafont; these are their OpenType replacements. *Now: all
 four are shipped and in the serif section of the menu as Utopia, Charter,
 Concrete and Euler: Concrete Math with the Concrete faces of CM Unicode
 (CMU Concrete), Euler Math with TeX Gyre Pagella text, as with `eulervm`.
-XCharter and Concrete use their bold math faces; the bold Erewhon math file
-names its family like the text face, and bold Erewhon mathematics is
-emulated.*
+XCharter, Concrete and Erewhon use their bold math faces; the bold Erewhon
+math file names its family like the text face, and the shipped database
+lists it as the Bold style of Erewhon Math.*
 
 **Garamond Math** (OFL). For EB Garamond; huge MathKernInfo (2094 glyphs)
 but almost no italic corrections (44), so kerning must come from the kern
@@ -370,7 +370,7 @@ What each field replaces:
 Activation stays generic: any font with a MATH table gets
 `MATH_TYPE_OPENTYPE` and the table-driven layout, unless a hand-tuned branch
 of the constructor ladder claims it while the hand tuning is on (STIX, the
-TeX Gyre fonts, TeX Gyre DejaVu Math among them, Libertine, Fira). The profile only adds
+four TeX Gyre fonts, Libertine, Fira). The profile only adds
 knowledge that is not in the font. A font without a profile (Cambria Math,
 a new release) still works with defaults: `letters text`, alphabets
 detected from the cmap, no cap.
@@ -471,8 +471,9 @@ document typeset with the whole upstream family available can therefore
 differ slightly, as the extra optical sizes of Latin Modern and the Medium
 and SemiBold weights of STIX Two Text are then used instead. Upstream has
 released only the regular weight of Fira Math, so bold Fira mathematics is
-emulated, and Erewhon-Math-Bold names its family like the Erewhon text
-face, so bold Erewhon mathematics is emulated too.
+emulated. Erewhon-Math-Bold names its family like the Erewhon text face;
+the shipped database lists it as the Bold style of Erewhon Math, which a
+scan of the disk alone would not.
 
 Everything else in the survey is picked up from the system or from TeX
 Live through `TEXMACS_FONT_PATH` and the font database; the profiles in
