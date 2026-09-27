@@ -1065,11 +1065,6 @@ ns_dump_view (NSView* v, int depth) {
            [NSStringFromClass ([v class]) UTF8String],
            f.origin.x, f.origin.y, f.size.width, f.size.height,
            [v isHidden]? "hidden ": "", [extra UTF8String]);
-  if (getenv ("TEXMACS_NS_DUMP_CONSTRAINTS") &&
-      [v isKindOfClass: [NSStackView class]] && fabs (f.size.width - 528) < 1)
-    for (NSLayoutConstraint* c in [v constraintsAffectingLayoutForOrientation:
-                                     NSLayoutConstraintOrientationHorizontal])
-      fprintf (stderr, "CONSTRAINT %s\n", [[c description] UTF8String]);
   if (depth > 40) return;
   for (NSView* w in [v subviews]) ns_dump_view (w, depth + 1);
 }

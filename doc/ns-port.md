@@ -1,8 +1,9 @@
 # Native Cocoa (NS) interface: status of the port
 
-Branch `ns-port`, worktree `~/t/lab/ns-port`, based on `svn_sync`
-(8629ced4f7). The code comes from the `ns` branch (715c2ffbdc, 2018) and the
-uncommitted work of its worktree `~/t/lab/ns`.
+Branch `wip_other_guis` (worktree `~/t/lab/ns-port`). The port was made on
+the branch `ns-port`, based on `svn_sync` (8629ced4f7), from the `ns` branch
+(715c2ffbdc, 2018) and the uncommitted work of its worktree `~/t/lab/ns`;
+`ns-port` was merged in `wip_other_guis` (8a3aa0f503) and deleted.
 
 ## Building
 
@@ -10,15 +11,20 @@ uncommitted work of its worktree `~/t/lab/ns`.
 cd src
 ./configure --with-guile=/Users/mgubi/t/guile-1.8.7/usr/bin/guile-config \
             --with-gui=cocoa
-make -k -j8
+make -j8
 ```
+
+`--with-guile` must name the `guile-config` of Guile 1.8: the Guile 3 of
+Homebrew is rejected. After a change of the classes of the NS headers,
+remove `src/Objects/*.o`: `editor.hpp` includes `NS/ns_simple_widget.h`, and
+the dependencies miss it (stale objects of `Edit` crash at startup).
 
 `--with-gui=cocoa` defines `AQUATEXMACS` and compiles `Plugins/NS`, together
 with `Plugins/MacOS`. The old interface (`Plugins/Cocoa`, with its nibs) and
 the branch `ns` were removed (the branch is kept in the local tags
 `archive/ns-2018` and `archive/ns-worktree-2026-09-27`).
 
-## State (2026-09-27, night)
+## State (2026-09-27)
 
 **TeXmacs compiles, links and runs with the NS interface, with the features
 of the Qt interface.** Documents are drawn and edited (text, mathematics,
@@ -37,6 +43,16 @@ Ghostscript), the clipboard (text, HTML, TeXmacs, images, both ways),
 drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
 (command-wheel zooms).
 
+The look follows macOS where Qt has its own: the selection is translucent
+as in Qt; the icon bars are flat, with a small triangle in the corner of
+the icons with a pull-down menu (a chevron after text buttons), and a line
+with a shadow separates the focus and user bars from the main and mode
+bars; the menus show the shortcuts as native key equivalents (they are
+drawn by the menus, but the keys go to the editor, which handles them as
+in Qt). Dialogs are laid out as in Qt (fields and lists take the extra
+space, grids keep their size, glues share it), and a dialog with tabs is
+resized to the tab shown. The color palettes show the patterns.
+
 `qt-gui?` holds for this interface, since it implements the widgets of the
 Qt one: the Scheme code uses the same native dialogs and shortcuts.
 
@@ -49,19 +65,24 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   `<dir>/window-<i>.png` every 3 seconds;
 * `TEXMACS_NS_TYPE=<text>`: after 2 seconds, the text is sent as key events
   to the canvas (`\r` is return, `\b` backspace);
-* `TEXMACS_NS_CLICK=<x>,<y>[,right|,move]`: a click (or a mouse move) at
-  this point of the canvas (in points), before typing;
-* `TEXMACS_NS_PRESS=<label>`: after 4 seconds, the button or the tab with
-  this label is pressed; `field:<n>=<text>` types the text in the n-th
+* `TEXMACS_NS_CLICK=<x>,<y>[,right|,move|,drag,<x2>,<y2>]`: a click (or a
+  mouse move, or a drag to the second point) at this point of the canvas
+  (in points), before typing;
+* `TEXMACS_NS_PRESS=<steps>`: after 4 seconds, the steps separated by `;`
+  are done, one per second; a label presses the button, the tab or the
+  segment with this label; `field:<n>=<text>` types the text in the n-th
   editable field of the window, followed by return; `abort-modal` closes
-  the modal window (such as a file panel);
+  the modal window (such as a file panel); `dump-views` prints the views of
+  the key window, with their frames;
 * `TEXMACS_NS_MENUS=<depth>`: after 3 seconds, the menu bar is printed with
-  its submenus up to this depth (with the shortcuts and check marks);
+  its submenus up to this depth (with the shortcuts and check marks); with
+  `TEXMACS_NS_SNAPSHOT`, the images of the items are saved as
+  `item-<i>.png`;
 * `TEXMACS_NS_SCROLL=<points>`: after 3 seconds, the document is scrolled
   in steps of 40 points, and with `TEXMACS_NS_SNAPSHOT` the window is saved
   after each step (`scroll-<i>.png`);
 * `TEXMACS_NS_DROP=<file>`: after 3 seconds, the file is dropped on the
-  canvas.
+  canvas;
 * `TEXMACS_NS_SCROLL_STEP=<points>`: the steps of `TEXMACS_NS_SCROLL`
   (trackpads give fractional ones); with `TEXMACS_NS_SNAPSHOT`, the backing
   store of the canvas is saved as `backing.png` at the end (upside down),
@@ -97,10 +118,11 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 * **Renderer**: clipping as `QPainter::setClipRect` (the graphics state is
   restored before each new clipping), pictures and the picture renderer,
   patterns, effects, arcs, shadows drawing in the context of their master.
-* **Builds without Qt** (also useful for X11): stubs for the client/server
-  functions, `execute_shell` defined only once, and `AQUATEXMACS` treated as
-  Qt where the generic code has Qt specific parts (delayed commands,
-  native pictures, drops, bitmap exports, texmacs output widgets).
+* **Generic code**: `AQUATEXMACS` is treated as Qt where the generic code
+  has Qt specific parts (delayed commands, native pictures, drops, bitmap
+  exports, texmacs output widgets, the repainting and the mouse of the
+  editor); `exec_pending_commands` (needed by the sockets) is in
+  `ns_gui.mm`.
 
 ### Known gaps
 
@@ -120,12 +142,13 @@ cd src
 packages/macos/build-ns-app.sh --guile-config <guile-config of Guile 1.8> [--dmg] [--sign IDENTITY]
 ```
 
-configures (`--with-gui=cocoa`, which does not link X11),
+configures (`--with-gui=cocoa`, which does not link X11; the default
+`guile-config` is usually not Guile 1.8, so give it),
 builds, and makes `../distr/TeXmacs.app` with `make MACOS_BUNDLE`; with
 `--dmg`, `make MACOS_PACKAGE` then makes `../distr/macos/TeXmacs-<version>.dmg`
 (and removes the application, as for the Qt version). The libraries which
-do not come with macOS (Guile, FreeType, GMP, libltdl, libintl, libpng) are
-copied in `Contents/Resources/lib` and relinked by `bundle-libs.sh` (now
+do not come with macOS (with the configuration here: Guile, FreeType, GMP,
+libltdl, libintl, libpng) are copied in `Contents/Resources/lib` and relinked by `bundle-libs.sh` (now
 also from `/opt/homebrew`); they are signed one by one, and the application
 is signed with the identity given, or ad hoc (an application which is
 signed ad hoc and not notarized opens on the machine where it was built,
@@ -141,8 +164,8 @@ documents.
 1. Use it with real input and hardware: input methods, the contextual
    menu, drag selection, gestures, full screen, printing, several windows
    and screens.
-2. Remove the bundled GNUstep AutoLayout (about 5000 lines of 2013), which
-   is not used any more: the views use `NSStackView` and `NSGridView`.
-3. Replace the deprecated AppKit constants (`NSResizableWindowMask`, ...),
-   which only give warnings.
-4. Notarization of the application, for distribution.
+2. Notarization of the application, for distribution.
+
+(Done: the bundled GNUstep AutoLayout was removed, the views use
+`NSStackView` and `NSGridView`; the deprecated AppKit constants were
+replaced.)

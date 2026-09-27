@@ -4,7 +4,8 @@
 # optionally its disk image.
 #
 # Usage: packages/macos/build-ns-app.sh [options]   (from the src directory)
-#   --guile-config PATH   guile-config of Guile 1.8 (default: guile-config)
+#   --guile-config PATH   guile-config of Guile 1.8 (default: guile-config;
+#                         Guile 3, as installed by Homebrew, is rejected)
 #   --sign IDENTITY       code signing identity (default: ad hoc signature)
 #   --dmg                 also make the disk image in ../distr/macos
 #   --no-configure        keep the current configuration

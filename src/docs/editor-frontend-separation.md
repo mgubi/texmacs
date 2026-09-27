@@ -16,7 +16,8 @@ C++ file references are relative to `src/`. Line numbers are those of
   is built for. Qt, Qtwk, Vue, X11 and Cocoa each need their own build.
 - **New GUIs touch the editor.** Every port so far has added its macro to
   the `#if`s of `edit_interface.cpp` (the last were `SDLTEXMACS` and
-  `VUETEXMACS`). The native Cocoa port (`ns-port`) would be next.
+  `VUETEXMACS`), and then the native Cocoa port, merged on 2026-09-27,
+  added `AQUATEXMACS` to them.
 - **No editor without a window.** Tests fake a display
   (`QT_QPA_PLATFORM=offscreen`, the Vue snapshot harness); batch
   conversions go through a window too.
