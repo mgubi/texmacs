@@ -357,6 +357,8 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
       is_tuple (t, "hor-extend", 4) ||
       is_tuple (t, "ver-extend", 3) ||
       is_tuple (t, "ver-extend", 4) ||
+      is_tuple (t, "hor-take", 3) ||
+      is_tuple (t, "hor-take", 4) ||
       is_tuple (t, "ver-take", 3) ||
       is_tuple (t, "ver-take", 4) ||
       (is_tuple (t, "unserif") && !svg) ||
