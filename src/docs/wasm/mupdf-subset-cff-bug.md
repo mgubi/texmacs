@@ -1,7 +1,12 @@
 # Bug report for MuPDF: subsetting a CFF font fails on hintmasks after stems declared in subroutines
 
-*For https://bugs.ghostscript.com (product MuPDF, component fitz). The patch
-is `misc/wasm/mupdf-subset-cff.patch`.*
+*For https://bugs.ghostscript.com (product MuPDF, component fitz): the
+GitHub repository of MuPDF is a mirror, whose pull requests are not read.
+The patch to attach is
+`0001-Subset-CFF-fonts-whose-subroutines-declare-stem-hint.patch` (next to
+this file; `git format-patch` against master d587982f971e, `git am`
+applies it); `misc/wasm/mupdf-subset-cff.patch` is the same change, which
+the browser build applies to 1.28.5.*
 
 ---
 
