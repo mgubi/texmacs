@@ -13,11 +13,10 @@ C++ file references are relative to `src/`. Line numbers are those of
 
 - **One binary per GUI.** The editor is compiled for one GUI at a time: its
   class derives from the GUI's widget class, and `Edit/` tests which GUI it
-  is built for. Qt, Qtwk, Vue, X11 and Cocoa each need their own build.
+  is built for. Qt, Qtwk, Vue, SDL, X11 and Cocoa each need their own build.
 - **New GUIs touch the editor.** Every port so far has added its macro to
-  the `#if`s of `edit_interface.cpp` (the last were `SDLTEXMACS` and
-  `VUETEXMACS`), and then the native Cocoa port, merged on 2026-09-27,
-  added `AQUATEXMACS` to them.
+  the `#if`s of `edit_interface.cpp`: `SDLTEXMACS`, `VUETEXMACS`, and last
+  `AQUATEXMACS` with the native Cocoa port (merged on 2026-09-27).
 - **No editor without a window.** Tests fake a display
   (`QT_QPA_PLATFORM=offscreen`, the Vue snapshot harness); batch
   conversions go through a window too.
@@ -32,10 +31,11 @@ windows).
 
 ## How the editor depends on the GUI today
 
-**1. Inheritance chosen at compile time.** `Edit/editor.hpp:18-28` includes
+**1. Inheritance chosen at compile time.** `Edit/editor.hpp:16-28` includes
 the GUI's widget header and `editor_rep` derives from `simple_widget_rep`
 (`editor.hpp:60`), a typedef to `qt_simple_widget_rep`,
-`vue_simple_widget_rep` or Widkit's `simple_widget_rep`. The other core
+`vue_simple_widget_rep`, `ns_simple_widget_rep` or Widkit's
+`simple_widget_rep`. The other core
 class which does this is `box_widget_rep` (`Texmacs/Window/tm_button.cpp:113`),
 for typeset boxes in dialogs. The GUIs call them through the same virtual
 methods (`handle_keypress`, `handle_mouse`, `handle_repaint`, ...; see
@@ -57,11 +57,14 @@ and to the canvas of its window:
 |---|---|---|
 | `edit_interface.cpp:221` | scroll bar width from Qt's style | `canvas_host::scrollbar_width` |
 | `edit_interface.cpp:246, 257` | Qt 4 divides the canvas size by the retina zoom | done by the Qt GUI in `canvas_host::get_canvas_size` (or dropped with Qt 4, which `qt.m4` and `CMakeLists.txt` still accept) |
-| `edit_interface.cpp:866, 876, 887` | 1-pixel frame and centering of narrow documents, except in Qt | `canvas_host::frames_and_centers_document` |
-| `edit_interface.cpp:997, 1019, 1049` | thinning of selection and spelling rectangles, except in Qt, SDL, Vue | `canvas_host::fills_selections` |
+| `edit_interface.cpp:866, 876, 887` | 1-pixel frame and centering of narrow documents, except in Qt and NS | `canvas_host::frames_and_centers_document` |
+| `edit_interface.cpp:997, 1019, 1049` | thinning of selection and spelling rectangles, except in Qt, SDL, Vue, NS (SDL thins the spelling ones) | `canvas_host::fills_selections` |
+| `edit_repaint.cpp:156, 165, 175` | selections drawn with `draw_selection` (translucent) in Qt, SDL, Vue, NS (spelling errors: Qt, NS) | `canvas_host::fills_selections` |
+| `edit_mouse.cpp:199` | position of the contextual menu from the scroll position in Qt, Vue, NS | the GUI places the popup (`canvas_host`) |
+| `edit_mouse.cpp:635`, `edit_select.cpp:624` | drops carry their payload, and copies a verbatim variant, in Qt, Vue, NS | functions of `gui.hpp` which every GUI provides |
 | `edit_main.cpp:34-39` | includes `qt_gui.hpp`, `qt_utilities.hpp`, `qtwk_gui.hpp` | nothing, once the two lines below move |
-| `edit_main.cpp:425` | printing to PNG, JPEG, TIFF only in Qt and Vue | `canvas_host::can_print_bitmaps` |
-| `edit_main.cpp:470` | `graphics_file_to_clipboard` only in Qt | a function of `gui.hpp` which every GUI provides (false where unsupported) |
+| `edit_main.cpp:427` | printing to PNG, JPEG, TIFF only in Qt, Vue and NS | `canvas_host::can_print_bitmaps` |
+| `edit_main.cpp:472, 475` | `graphics_file_to_clipboard` only in Qt and NS | a function of `gui.hpp` which every GUI provides (false where unsupported) |
 | `edit_keyboard.cpp:18, 297-303` | macOS compose map of Qt's `QTMApplication` | resolved in the Qt GUI before `handle_keypress` |
 
 `edit_spell.cpp:17` includes `MacOS/mac_spellservice.h`. That is a service
@@ -93,7 +96,7 @@ the application's buffer, which also lists its views, its links and a
 notification flag. `Edit/` uses only `buf->buf` (file information, 26
 uses), `buf->data` (42) and `buf->prj` (33).
 
-In the other direction the GUIs include `editor.hpp` (Qt 3 files, Vue 1),
+In the other direction the GUIs include `editor.hpp` (Qt 3 files, NS 3, Vue 1),
 `tm_window.hpp` and `new_view.hpp`/`new_window.hpp` in a handful of files.
 
 ## Stage 1: the editor is not a widget any more

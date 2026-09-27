@@ -131,7 +131,8 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
   shapes, no proposals in the color picker;
 * not tested with real hardware: full screen (it takes the screen),
   printing on a printer, help balloons triggered by hovering (the tooltip
-  windows themselves work), trackpad gestures;
+  windows themselves work), trackpad gestures other than scrolling (which
+  was used on a trackpad);
 * tree views ignore their roles; the XPM icons without a PNG equivalent
   lose their transparency; shadows with their own context are not copied
   back (they always share the context of their master here).
