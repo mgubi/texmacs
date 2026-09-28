@@ -1,15 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="svg3039" width="20" height="20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
- <metadata id="metadata3044">
-  <rdf:RDF>
-   <cc:Work rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title/>
-   </cc:Work>
-  </rdf:RDF>
- </metadata>
- <g id="layer1" transform="translate(0,4)">
-  <path id="path1883" d="m1 14 4-16 5 5 5-5 4 16s-1.6029-0.97364-2.5-1c-0.52682-0.01548-1.5 0.5-1.5 0.5l-2-10.5-3 5-3.5-5-1.5 10.5s-0.97318-0.51548-1.5-0.5c-0.89714 0.026364-2.5 1-2.5 1z" fill="#404040"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><path fill="#3A3A3C" stroke="#3A3A3C" stroke-width="1.1" d="M22.11 18.86V17.92H19.95V6.08H22.11V5.14H17.69C17.25 5.14 17.03 5.14 16.81 5.64L12.01 16.22L7.21 5.64C6.99 5.14 6.77 5.14 6.33 5.14H1.89V6.08H4.05V17.34C4.05 17.78 4.03 17.8 3.47 17.86C2.99 17.92 2.95 17.92 2.39 17.92H1.89V18.86C2.65 18.8 3.79 18.8 4.57 18.8C5.41 18.8 6.45 18.8 7.27 18.86V17.92H6.77C6.41 17.92 6.07 17.9 5.71 17.86C5.13 17.8 5.11 17.78 5.11 17.34V6.34H5.13L10.57 18.36C10.75 18.76 10.99 18.86 11.21 18.86C11.61 18.86 11.77 18.56 11.85 18.38L17.43 6.08H17.45V17.92H15.29V18.86C16.01 18.8 17.87 18.8 18.69 18.8C19.51 18.8 21.39 18.8 22.11 18.86Z"/></g>
 </svg>

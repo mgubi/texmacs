@@ -1,27 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-<svg id="svg3039" width="20" height="20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
- <metadata id="metadata3044">
-  <rdf:RDF>
-   <cc:Work rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title/>
-   </cc:Work>
-  </rdf:RDF>
- </metadata>
- <g id="layer1" transform="translate(0,4)" stroke-linecap="round">
-  <path id="path3802" d="m1 12.5h18" fill="#bfbfbf" stroke="#bfbfbf" stroke-width="1.5"/>
-  <path id="path3806" d="m1 14.5h18" fill="#bfbfbf" stroke="#bfbfbf" stroke-width="1.5"/>
-  <path id="path3810" d="m1-0.5h18" fill="#bfbfbf" stroke="#bfbfbf" stroke-dashoffset=".5" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path3812" d="m1-2.5h18" fill="#bfbfbf" stroke="#bfbfbf" stroke-dashoffset=".5" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path3841" d="m8.5 4.5h10.5" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path3843" d="m8.5 6.5h10.5" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path3845" d="m1 8.5h18" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path3847" d="m1.5 6.5v-4" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path3853" d="m0.5 2.5h2" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path3855" d="m4.5 2.5v4" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path3859" d="m6.5 2.5v4" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path3861" d="m4.5 4.5h2" fill="#9f9fff" stroke="#7777d2" stroke-dashoffset=".5" stroke-linejoin="round"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><path fill="#D8D8D8" stroke="#D8D8D8" stroke-width="1.1" d="M8.67 5.77 8.4 2.64H-0.35L-0.62 5.77H-0.01C0.1 4.3 0.23 3.25 2.11 3.25H3.11V10.8H1.12V11.41C1.82 11.37 3.26 11.37 4.03 11.37C4.8 11.37 6.24 11.37 6.94 11.41V10.8H4.95V3.25H5.94C7.8 3.25 7.93 4.29 8.06 5.77ZM17.22 11.41V10.8H16.33V7.43C16.33 6.07 15.63 5.56 14.33 5.56C13.08 5.56 12.41 6.32 12.13 6.81H12.12V2.39L9.81 2.49V3.1C10.62 3.1 10.71 3.1 10.71 3.61V10.8H9.81V11.41L11.45 11.37L13.09 11.41V10.8H12.19V8.08C12.19 6.67 13.31 6.03 14.13 6.03C14.57 6.03 14.85 6.3 14.85 7.29V10.8H13.95V11.41L15.59 11.37Z"/><path fill="none" stroke="#D8D8D8" stroke-width="1.6" d="M16.5 11H21M3 14.5H21M3 17.75H21M3 21H15"/></g>
 </svg>

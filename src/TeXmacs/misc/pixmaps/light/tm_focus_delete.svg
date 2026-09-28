@@ -1,16 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-<svg id="svg3039" width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
- <metadata id="metadata3044">
-  <rdf:RDF>
-   <cc:Work rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title/>
-   </cc:Work>
-  </rdf:RDF>
- </metadata>
- <g id="layer1">
-  <path id="path6243" d="m2.5 13 2 1.5 3.5-5 3.5 5 2-1.5-3.5-5 3.5-5-2-1.5-3.5 5-3.5-5-2 1.5 3.5 5z" fill="#c06060" stroke="#804040" stroke-width=".5"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.15) translate(-12 -12)"><path fill="#FF3B30" stroke="#3A3A3C" stroke-width="1.6" d="M4.5 7.25 7.25 4.5 12 9.25l4.75-4.75 2.75 2.75L14.75 12l4.75 4.75-2.75 2.75L12 14.75 7.25 19.5 4.5 16.75 9.25 12z"/></g></g>
 </svg>
