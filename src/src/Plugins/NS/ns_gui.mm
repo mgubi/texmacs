@@ -261,7 +261,8 @@ ns_gui_rep::clear_selection (string key) {
   selection_s->reset (key);
   if (key != "primary") return;
   NSPasteboard *pb = [NSPasteboard generalPasteboard];
-  if (owns_pasteboard (pb)) [pb clearContents];
+  // as in Qt: when a TeXmacs (this one or another) put it there
+  if ([pb stringForType: texmacs_pid_type]) [pb clearContents];
 }
 
 
@@ -290,14 +291,16 @@ static bool check_mask(int mask)
 
 
 
+static NSPanel* wait_window= nil;
+static NSTextField* wait_label= nil;
+static NSMutableArray* wait_messages= nil;
+
 /*! A window with the icon of TeXmacs and the message, at the center of the
  window of w (see qt_gui_rep::show_wait_indicator); the messages are stacked,
- and an empty message removes the last one. */
+ and an empty message removes the last one. As in Qt, the next update closes
+ it (several callers never remove their message). */
 void
 ns_gui_rep::show_wait_indicator (widget w, string message, string arg) {
-  static NSPanel* wait_window= nil;
-  static NSTextField* wait_label= nil;
-  static NSMutableArray* wait_messages= nil;
   if (!wait_window) {
     wait_window= [[NSPanel alloc] initWithContentRect: NSMakeRect (0, 0, 300, 60)
                    styleMask: NSWindowStyleMaskBorderless |
@@ -351,9 +354,11 @@ ns_gui_rep::show_wait_indicator (widget w, string message, string arg) {
 
 void
 exec_pending_commands () {
-  // The delayed commands, while the sockets wait (see tm_sockets.cpp): as
-  // in the Qt interface, they belong to the event loop of the interface
-  if (the_gui) the_gui->process_delayed_commands ();
+  // The delayed commands, while the sockets wait (see tm_sockets.cpp): a
+  // server in this process answers with them, so they run here (queuing
+  // them would only run them when the wait is over)
+  if (the_gui && the_gui->delayed_commands.must_wait (texmacs_time ()))
+    the_gui->delayed_commands.exec_pending ();
 }
 
 void (*the_interpose_handler) (void) = NULL;
@@ -366,7 +371,7 @@ bool
 ns_gui_rep::put_graphics_on_clipboard (url file) {
   string ext= locase_all (suffix (file));
   NSPasteboard* pb= [NSPasteboard generalPasteboard];
-  NSString* path= to_nsstring_utf8 (concretize (file));
+  NSString* path= to_nsstring (concretize (file)); // UTF-8 already
   if (ext == "bmp" || ext == "png" || ext == "jpg" || ext == "jpeg" ||
       ext == "tif" || ext == "tiff") {
     NSImage* im= [[[NSImage alloc] initWithContentsOfFile: path] autorelease];
@@ -594,6 +599,12 @@ ns_gui_rep::update () {
   }
   if (updatetimer) { [updatetimer invalidate]; updatetimer= nil; }
   updating = true;
+
+  // the wait indicator ends with the work it was shown for (as in Qt)
+  if (wait_messages && [wait_messages count] > 0) {
+    [wait_messages removeAllObjects];
+    [wait_window orderOut: nil];
+  }
 
   static int count_events    = 0;
   static int max_proc_events = 40;
@@ -1220,6 +1231,49 @@ static NSAutoreleasePool *pool = nil;
 }
 @end
 
+/*! The delegate of the application: the files and URLs given by macOS
+ (Finder, the Dock, open, the links tmfs://), and the requests to quit from
+ outside of TeXmacs (the Dock, logout), which TeXmacs handles itself, with
+ its questions about the unsaved documents (see QTMGuiHelper::eventFilter) */
+@interface TMNSAppDelegate : NSObject <NSApplicationDelegate>
+@end
+
+@implementation TMNSAppDelegate
+- (void) application: (NSApplication*) app openURLs: (NSArray<NSURL*>*) urls
+{
+  (void) app;
+  // as in Qt: the first one replaces the buffer of the start, the others
+  // open new windows
+  static bool new_window_flag= false;
+  for (NSURL* u in urls) {
+    string name= [u isFileURL]? from_nsstring_utf8 ([u path]):
+                                from_nsstring_utf8 ([u absoluteString]);
+    const char* win= new_window_flag? ":new-window": ":current-window";
+    exec_delayed (scheme_cmd (list_object (symbol_object ("load-buffer"),
+                                           object (url_system (name)),
+                                           eval (win))));
+    new_window_flag= true;
+  }
+  if (the_gui) the_gui->need_update ();
+}
+
+- (NSApplicationTerminateReply) applicationShouldTerminate: (NSApplication*) app
+{
+  // NOTE: TeXmacs itself ends by stopping the loop (see update), so this
+  // only comes from outside
+  (void) app;
+  exec_delayed (scheme_cmd ("(safely-quit-TeXmacs)"));
+  if (the_gui) the_gui->need_update ();
+  return NSTerminateCancel;
+}
+
+- (BOOL) applicationSupportsSecureRestorableState: (NSApplication*) app
+{
+  (void) app;
+  return YES;
+}
+@end
+
 static void
 make_main_menu () {
   // The main menu (there is no nib); the menus of TeXmacs are added after
@@ -1268,7 +1322,14 @@ void gui_open (int& argc, char** argv)
     NSUserDefaults* d= [NSUserDefaults standardUserDefaults];
     [d setBool: YES forKey: @"NSDisabledDictationMenuItem"];
     [d setBool: YES forKey: @"NSDisabledCharacterPaletteMenuItem"];
+    // NOTE: the files on the command line are opened by TeXmacs, not a
+    // second time by AppKit (as in Qt); the windows are not restored
+    [d setBool: NO forKey: @"NSTreatUnknownArgumentsAsOpen"];
+    [d setBool: NO forKey: @"NSQuitAlwaysKeepsWindows"];
+    [d setBool: YES forKey: @"ApplePersistenceIgnoreState"];
     if (![NSApp mainMenu]) make_main_menu ();
+    static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
+    [NSApp setDelegate: delegate];
   }
   if (!pool) {
     // create autorelease pool 

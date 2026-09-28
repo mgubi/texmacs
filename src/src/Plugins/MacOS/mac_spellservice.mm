@@ -39,7 +39,14 @@ to_nsstring_utf8 (string s) {
 
 static hashmap<string,string> available_dicts ("");
 static string current_lang = "";
-static NSInteger current_tag = 0;
+// NOTE: a document tag for each language (with its ignored words), from
+// mac_spell_start until mac_spell_done for this language
+static hashmap<string,int> spell_tags (0);
+
+static NSInteger
+spell_tag (string lan) {
+  return (NSInteger) spell_tags [lan];
+}
 
 static bool mac_spelling_language(string lang)
 {
@@ -100,8 +107,9 @@ mac_spell_start (string lan) {
   mac_init_dictionary ();
   if (mac_spelling_language (lan)) {
     // warning: we must be sure that the tag is relased by the appropriate
-    // message to sharedSpellChecker
-    current_tag = [NSSpellChecker uniqueSpellDocumentTag];
+    // message to sharedSpellChecker (see mac_spell_done)
+    if (!spell_tags->contains (lan))
+      spell_tags (lan)= (int) [NSSpellChecker uniqueSpellDocumentTag];
     r = "ok";
   }
   else r = "Error: no dictionary available for '" * lan * "'";
@@ -124,7 +132,7 @@ mac_spell_check (string lan, string s) {
 	          startingAt: 0
                   language: nil
                   wrap: NO
-                  inSpellDocumentWithTag: current_tag
+                  inSpellDocumentWithTag: spell_tag (lan)
                   wordCount: NULL];
     if (r.length == 0) 
       t = "ok";
@@ -137,7 +145,7 @@ mac_spell_check (string lan, string s) {
 		      guessesForWordRange: NSMakeRange(0, [nss length])
 		      inString: nss
 		      language: nil
-		      inSpellDocumentWithTag: current_tag];
+		      inSpellDocumentWithTag: spell_tag (lan)];
 #endif
       if ([arr count] == 0)
         t = tree (TUPLE, "0");
@@ -168,7 +176,7 @@ mac_spell_accept (string lan, string s) {
   } else {
     [[NSSpellChecker sharedSpellChecker]
      ignoreWord:to_nsstring_utf8 (s)
-     inSpellDocumentWithTag:current_tag];
+     inSpellDocumentWithTag: spell_tag (lan)];
   }  
   //  ispell_send (lan, "@" * s);
   [pool release];
@@ -190,11 +198,11 @@ mac_spell_insert (string lan, string s) {
 
 void
 mac_spell_done (string lan) {
-  (void) lan;
+  if (!spell_tags->contains (lan)) return;
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   [[NSSpellChecker sharedSpellChecker]
-   closeSpellDocumentWithTag:current_tag];
-  current_tag = 0;
+   closeSpellDocumentWithTag: spell_tag (lan)];
+  spell_tags->reset (lan);
   [pool release];
 }
 

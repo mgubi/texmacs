@@ -232,7 +232,7 @@ ns_chooser_widget_rep::perform_dialog () {
 
   file= "#f";
   if ([panel runModal] == NSModalResponseOK) {
-    string name= from_nsstring ([[panel URL] path]);
+    string name= from_nsstring_utf8 ([[panel URL] path]); // not cork
     // the default suffix, when there is none (see qt_chooser_widget_rep)
     if (save && N(suffixes) > 0 && suffix (url_system (name)) == "")
       name= name * "." * suffixes[0];
@@ -402,11 +402,19 @@ ns_inputs_list_widget_rep::perform_dialog () {
     for (int i=0; i<N(children); i++) {
       ns_field_widget_rep* f= field(i);
       NSTextField* label= [NSTextField labelWithString: to_label (f->prompt)];
-      NSComboBox* box= [[[NSComboBox alloc]
-                          initWithFrame: NSMakeRect (0, 0, 300, 24)] autorelease];
-      for (int j=0; j<N(f->proposals); j++)
-        [box addItemWithObjectValue: to_label (f->proposals[j])];
-      if (N(f->proposals) > 0) [box setStringValue: to_label (f->proposals[0])];
+      NSTextField* box;
+      if (f->type == "password")
+        // hidden, and without the proposals (as in Qt)
+        box= [[[NSSecureTextField alloc]
+                initWithFrame: NSMakeRect (0, 0, 300, 24)] autorelease];
+      else {
+        NSComboBox* cb= [[[NSComboBox alloc]
+                           initWithFrame: NSMakeRect (0, 0, 300, 24)] autorelease];
+        for (int j=0; j<N(f->proposals); j++)
+          [cb addItemWithObjectValue: to_label (f->proposals[j])];
+        if (N(f->proposals) > 0) [cb setStringValue: to_label (f->proposals[0])];
+        box= cb;
+      }
       [grid addRowWithViews: [NSArray arrayWithObjects: label, box, nil]];
       [boxes addObject: box];
     }
@@ -830,20 +838,26 @@ ns_printer_widget_rep::showDialog () {
       system (cmd);
     }
 #endif
-    if (!exists (pdf)) {
+    // NOTE: without Ghostscript, pdf is still the PostScript file
+    if (pdf == file || !exists (pdf)) {
       call ("set-message", object ("Could not convert the file for printing"),
             object ("Print"));
       return;
     }
   }
-  NSURL* u= [NSURL fileURLWithPath: to_nsstring_utf8 (concretize (pdf))];
+  NSURL* u= [NSURL fileURLWithPath: to_nsstring (concretize (pdf))];
   PDFDocument* d= [[[PDFDocument alloc] initWithURL: u] autorelease];
-  if (!d) return;
-  NSPrintOperation* op=
-    [d printOperationForPrintInfo: [NSPrintInfo sharedPrintInfo]
-                      scalingMode: kPDFPrintPageScaleToFit autoRotate: YES];
-  [op setShowsPrintPanel: YES];
-  [op setShowsProgressPanel: YES];
-  if (![op runOperation]) return;
-  if (!is_nil (commandAfterExecution)) commandAfterExecution ();
+  bool done= false;
+  if (d) {
+    NSPrintOperation* op=
+      [d printOperationForPrintInfo: [NSPrintInfo sharedPrintInfo]
+                        scalingMode: kPDFPrintPageScaleToFit autoRotate: YES];
+    [op setShowsPrintPanel: YES];
+    [op setShowsProgressPanel: YES];
+    done= [op runOperation];
+  }
+  else call ("set-message", object ("Could not read the file for printing"),
+             object ("Print"));
+  if (pdf != file) remove (pdf);
+  if (done && !is_nil (commandAfterExecution)) commandAfterExecution ();
 }

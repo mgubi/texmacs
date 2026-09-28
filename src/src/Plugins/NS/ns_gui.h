@@ -191,6 +191,7 @@ public:
   friend void exec_delayed_pause (object cmd);
   friend void clear_pending_commands ();
   friend void needs_update ();
+  friend void exec_pending_commands ();
 };
 
 /*! Force an immediate update of the internal texmacs state. */
