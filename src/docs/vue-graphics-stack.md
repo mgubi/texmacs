@@ -360,8 +360,17 @@ system sends the resulting text, composed with the dead keys and the input
 method, as `SDL_EVENT_TEXT_INPUT`, and that is what is delivered (" ", "<"
 and ">" become `space`, `<less>`, `<gtr>`); a dead key alone types nothing.
 Every other key (return, arrows, function keys, C-, M- and A- combinations)
-is delivered as a key, and a text event following it within 30 ms
-(`key_stamp`) belongs to the same keystroke and is dropped. The scripted
+is delivered as a key. A text event following a key with a modifier within
+30 ms (`key_stamp`) belongs to the same keystroke and is dropped; for a key
+without one only the text that key would type itself is dropped (the echo:
+a digit of the keypad, the space of `S-space`), since the next letter of a
+fast typist may well come within 30 ms of a Return. An input method which
+commits several characters at once gives one key per character, one per
+frame. On macOS option is folded into the character only without command
+or control: with them the keys are `M-A-x`, `A-C-x` as in Qt. With a command
+modifier a key of a non-Latin layout is named by its Latin (US) key, so
+control-C is `C-c` whatever the layout. F1 opens the Clay debug view only
+with `-debug-qt` or `TEXMACS_VUE_CLAY_DEBUG`. The scripted
 `key` command therefore drives the control keys and `text` the characters.
 
 **Input methods.** A composition (`SDL_EVENT_TEXT_EDITING`: dead keys, CJK)
