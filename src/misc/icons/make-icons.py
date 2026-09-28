@@ -257,7 +257,7 @@ def attributes (cls, p):
   for c, k in (("folderl","folderl"),("sb","blue"),("sr","red")):
     if c in cl: stroke= p[k]
   if "wh" in cl: stroke= p["on"]; width= 1.7
-  if "thin" in cl: width= 1.2
+  if "thin" in cl: width= 1.45
   if "wide" in cl: width= 2.4
   if "gl" in cl: fill= p["ink"]
   if "emb" in cl: stroke= p["ink"]; width= EMBOLDEN
