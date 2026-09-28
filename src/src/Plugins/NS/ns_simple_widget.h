@@ -95,6 +95,7 @@ protected:
   static hashset<pointer> all_widgets;
   rectangles              invalid_regions;
   NSPoint                 backing_pos;
+  NSSize                  last_viewport; // as notified to TeXmacs (resizes)
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void invalidate_all ();

@@ -91,7 +91,8 @@
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
-  backingPixmap (nil), extents (coord4 (0, 0, 0, 0)) { }
+  backingPixmap (nil), extents (coord4 (0, 0, 0, 0)),
+  last_viewport (NSZeroSize) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
   all_widgets->remove ((pointer) this);
@@ -132,6 +133,15 @@ ns_simple_widget_rep::follow_visible_part () {
   NSRect r= NSIntersectionRect ([doc visibleRect], [doc bounds]);
   if (NSIsEmptyRect (r)) return;
   if (!NSEqualRects (r, [view frame])) [view setFrame: r];
+  // NOTE: as QTMWidget::resizeEventBis, TeXmacs is told when the viewport
+  // changes its size (the documents whose size follows the one of the
+  // window, as the papyrus mode, are laid out again)
+  NSSize vs= viewport ().size;
+  if (!NSEqualSizes (vs, last_viewport)) {
+    last_viewport= vs;
+    coord2 p= from_nssize (vs);
+    the_gui->process_resize (this, p.x1, p.x2);
+  }
 }
 
 /*! The view of the canvas, created when it is needed for the first time
