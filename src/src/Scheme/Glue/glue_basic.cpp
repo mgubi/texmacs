@@ -11057,6 +11057,43 @@ tmg_alt_window_set_on_top (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_font_debug_info (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "font-debug-info");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_info (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_info_of (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-debug-info-of");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "font-debug-info-of");
+
+  url in1= tmscm_to_url (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_info_of (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_report () {
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_report ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_alt_window_get_size (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-get-size");
 
@@ -12233,6 +12270,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("alt-window-show",  tmg_alt_window_show, 1, 0, 0);
   tmscm_install_procedure ("alt-window-hide",  tmg_alt_window_hide, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-on-top",  tmg_alt_window_set_on_top, 2, 0, 0);
+  tmscm_install_procedure ("font-debug-info",  tmg_font_debug_info, 1, 0, 0);
+  tmscm_install_procedure ("font-debug-info-of",  tmg_font_debug_info_of, 2, 0, 0);
+  tmscm_install_procedure ("font-debug-report",  tmg_font_debug_report, 0, 0, 0);
   tmscm_install_procedure ("alt-window-get-size",  tmg_alt_window_get_size, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-size",  tmg_alt_window_set_size, 3, 0, 0);
   tmscm_install_procedure ("alt-window-get-position",  tmg_alt_window_get_position, 1, 0, 0);
