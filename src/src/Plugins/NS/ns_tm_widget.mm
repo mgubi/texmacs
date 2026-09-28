@@ -758,20 +758,42 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
       int i= (s == SLOT_SIDE_TOOLS? 0: s == SLOT_LEFT_TOOLS? 1:
               s == SLOT_BOTTOM_TOOLS? 2: 3);
       tool_widgets[i]= w;
-      for (NSView* old in [[[tool_views[i] subviews] copy] autorelease])
-        [old removeFromSuperview];
       NSView* v= is_nil (w)? nil: concrete (w)->as_nsview ();
+      // NOTE: the scroll view of the side tools is kept, with its position,
+      // when their contents change (as the QScrollArea of Qt, whose widget
+      // is replaced): the tools are made again after most clicks in them
+      NSScrollView* sc= nil;
+      if (v && i < 2)
+        for (NSView* old in [tool_views[i] subviews])
+          if ([old isKindOfClass: [NSScrollView class]]) sc= (NSScrollView*) old;
+      for (NSView* old in [[[tool_views[i] subviews] copy] autorelease])
+        if (old != sc) [old removeFromSuperview];
       if (v && i < 2) {
         // the side tools can be scrolled (as the QScrollArea of Qt)
-        NSScrollView* sc= [[[NSScrollView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
-        [sc setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
-        [sc setHasVerticalScroller: YES];
-        [sc setAutohidesScrollers: YES];
-        [sc setDrawsBackground: NO];
-        NSView* doc= [[[TMFlippedToolView alloc] init] autorelease];
-        [doc setTranslatesAutoresizingMaskIntoConstraints: NO];
-        [sc setDocumentView: doc];
-        NSClipView* clip= [sc contentView];
+        NSView* doc;
+        if (sc) {
+          doc= [sc documentView];
+          for (NSView* old in [[[doc subviews] copy] autorelease])
+            [old removeFromSuperview];
+        }
+        else {
+          sc= [[[NSScrollView alloc] initWithFrame: [tool_views[i] bounds]] autorelease];
+          [sc setAutoresizingMask: NSViewWidthSizable | NSViewHeightSizable];
+          [sc setHasVerticalScroller: YES];
+          [sc setAutohidesScrollers: YES];
+          [sc setDrawsBackground: NO];
+          doc= [[[TMFlippedToolView alloc] init] autorelease];
+          [doc setTranslatesAutoresizingMaskIntoConstraints: NO];
+          [sc setDocumentView: doc];
+          NSClipView* clip= [sc contentView];
+          [NSLayoutConstraint activateConstraints: @[
+            [doc.leadingAnchor constraintEqualToAnchor: clip.leadingAnchor],
+            [doc.widthAnchor constraintEqualToAnchor: clip.widthAnchor],
+            [doc.topAnchor constraintEqualToAnchor: clip.topAnchor],
+            [doc.heightAnchor constraintGreaterThanOrEqualToAnchor: clip.heightAnchor]]];
+          [tool_views[i] addSubview: sc];
+        }
+        NSPoint pos= [[sc contentView] bounds].origin;
         [v setTranslatesAutoresizingMaskIntoConstraints: NO];
         [doc addSubview: v];
         NSLayoutConstraint* tr= [v.trailingAnchor constraintEqualToAnchor:
@@ -781,12 +803,14 @@ ns_tm_widget_rep::write (slot s, blackbox index, widget w) {
           [v.leadingAnchor constraintEqualToAnchor: doc.leadingAnchor constant: 4],
           tr,
           [v.topAnchor constraintEqualToAnchor: doc.topAnchor constant: 4],
-          [v.bottomAnchor constraintLessThanOrEqualToAnchor: doc.bottomAnchor constant: -4],
-          [doc.leadingAnchor constraintEqualToAnchor: clip.leadingAnchor],
-          [doc.widthAnchor constraintEqualToAnchor: clip.widthAnchor],
-          [doc.topAnchor constraintEqualToAnchor: clip.topAnchor],
-          [doc.heightAnchor constraintGreaterThanOrEqualToAnchor: clip.heightAnchor]]];
-        [tool_views[i] addSubview: sc];
+          [v.bottomAnchor constraintLessThanOrEqualToAnchor: doc.bottomAnchor constant: -4]]];
+        // the same position in the new contents (as far as they go)
+        [sc layoutSubtreeIfNeeded];
+        [[sc contentView] scrollToPoint:
+          [[sc contentView] constrainBoundsRect:
+            NSMakeRect (pos.x, pos.y, [[sc contentView] bounds].size.width,
+                        [[sc contentView] bounds].size.height)].origin];
+        [sc reflectScrolledClipView: [sc contentView]];
       }
       else if (v) {
         [v setTranslatesAutoresizingMaskIntoConstraints: NO];
@@ -947,6 +971,9 @@ ns_tm_widget_rep::end_interactive_prompt () {
  *   select:<text>     selects the row with this text in a list
  *   combo:<n>=<text>  types the text in the n-th combo box, then return
  *   eval:<scheme>     evaluates a Scheme expression (delayed)
+ *   side-scroll:<y>   scrolls the side tools which are shown to y
+ *   side-pos          prints the scroll position of the side tools
+ *   side-width:<w>    the width of the right side tools (as with the handle)
  ******************************************************************************/
 
 static NSMenu* ns_test_menu= nil;  // the last menu which was shown
@@ -1134,6 +1161,41 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
   }
   else if ([st isEqualToString: @"eval"])
     exec_delayed (scheme_cmd (from_nsstring (arg)));
+  else if ([st isEqualToString: @"side-width"]) {
+    // as the handle of the right side tools
+    NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: [TMSplitHandle class]] && ![v isHidden] &&
+          ((TMSplitHandle*) v)->which == 0 && ((TMSplitHandle*) v)->wid) {
+        ((TMSplitHandle*) v)->wid->tool_widths[0]= [arg doubleValue];
+        ((TMSplitHandle*) v)->wid->layout ();
+      }
+      else [todo addObjectsFromArray: [v subviews]];
+    }
+  }
+  else if ([st isEqualToString: @"side-scroll"] ||
+           [st isEqualToString: @"side-pos"]) {
+    // the scroll views of the side tools which are shown
+    NSMutableArray* todo= [NSMutableArray arrayWithObject: [win contentView]];
+    while ([todo count] > 0) {
+      NSView* v= [todo lastObject];
+      [todo removeLastObject];
+      if ([v isKindOfClass: [NSScrollView class]] &&
+          [[(NSScrollView*) v documentView] isKindOfClass: [TMFlippedToolView class]] &&
+          ![v isHiddenOrHasHiddenAncestor]) {
+        NSClipView* c= [(NSScrollView*) v contentView];
+        if ([st isEqualToString: @"side-scroll"]) {
+          [c scrollToPoint: NSMakePoint (0, [arg doubleValue])];
+          [(NSScrollView*) v reflectScrolledClipView: c];
+        }
+        fprintf (stderr, "NSTEST side tools at %g (height %g)\n",
+                 [c bounds].origin.y, [[(NSScrollView*) v documentView] frame].size.height);
+      }
+      else [todo addObjectsFromArray: [v subviews]];
+    }
+  }
 }
 @end
 
