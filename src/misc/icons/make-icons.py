@@ -721,13 +721,13 @@ OTHER_ICONS = [
  ('cloud_mail', 'Mail',
   '<rect class="paper o" x="2.5" y="5" width="19" height="14" rx="2"/><path class="o" d="M3 6l9 7 9-7"/>'),
  ('cloud_mail_new', 'New mail',
-  '<rect class="paper o" x="2.5" y="5" width="19" height="14" rx="2"/><path class="o" d="M3 6l9 7 9-7"/><circle class="paperf" cx="19" cy="6" r="4.25"/><circle class="fr" cx="19" cy="6" r="3.25"/>'),
+  '<rect class="paper o" x="2.5" y="5" width="19" height="14" rx="2"/><path class="o" d="M3 6l9 7 9-7"/><circle class="paperf" cx="18.5" cy="6.5" r="5.5"/><circle class="fr" cx="18.5" cy="6.5" r="4.25"/>'),
  ('cloud_live', 'Live document',
   '<path class="paper o" d="M6.5 2.75h7.25l4.5 4.5v12.5c0 .83-.67 1.5-1.5 1.5H6.5c-.83 0-1.5-.67-1.5-1.5V4.25c0-.83.67-1.5 1.5-1.5z"/><path class="o" d="M13.75 2.75v3c0 .83.67 1.5 1.5 1.5h3"/><path class="o thin" d="M8 14.5a3.5 3.5 0 0 1 3.5 3.5M8 11a7 7 0 0 1 7 7"/><circle class="gl" cx="8.25" cy="17.75" r="1.1"/>'),
  ('cloud_server', 'Server',
   '<path class="paper o" d="M6 13.5h11.25a3.6 3.6 0 0 0 .5-7.15A5.5 5.5 0 0 0 7.05 5.3 4.1 4.1 0 0 0 6 13.5z"/><path class="sec o" d="M6 15.25v4.25c0 1.1 2.7 2 6 2s6-.9 6-2v-4.25"/><ellipse class="paper o" cx="12" cy="15.25" rx="6" ry="2"/>'),
  ('cloud_admin', 'Administration',
-  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><path class="sec o" d="M12 7.25l1.55 3.15 3.45.5-2.5 2.45.6 3.45-3.1-1.65-3.1 1.65.6-3.45-2.5-2.45 3.45-.5z"/>'),
+  '<circle class="paper o" cx="10" cy="7.5" r="3.75"/><path class="paper o" d="M2.5 21c0-4.4 3.4-7.5 7.5-7.5 1.4 0 2.7.35 3.8 1"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M17.5 15.2v4.6M15.5 16.35l4 2.3M19.5 16.35l-4 2.3"/>'),
 ]
 ICONS= ICONS + OTHER_ICONS
 
