@@ -28,6 +28,7 @@ coord2 from_nssize (NSSize s);
 NSString *to_nsstring (string s);
 NSString *to_nsstring_utf8 (string s);
 string from_nsstring (NSString *s);
+string from_nsstring_utf8 (NSString *s);
 string ns_translate (string s);
 
 /******************************************************************************

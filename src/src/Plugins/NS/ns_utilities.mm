@@ -81,6 +81,15 @@ string from_nsstring(NSString *s)
 	return utf8_to_cork(string((char*)cstr));
 }
 
+/*! The UTF-8 bytes, without conversion to the cork encoding: for the names
+ of files (as in the Qt interface, see also mac_app.mm) */
+string
+from_nsstring_utf8 (NSString *s) {
+  if (!s) return "";
+  const char *cstr= [s UTF8String];
+  return cstr? string ((char*) cstr): string ("");
+}
+
 
 NSString *to_nsstring_utf8(string s)
 {
@@ -162,5 +171,6 @@ to_label (string s) {
 string
 from_label (NSString* s) {
   // Inputs are returned in the cork encoding, like in the Qt interface
-  return utf8_to_cork (from_nsstring (s));
+  // (from_nsstring converts already)
+  return from_nsstring (s);
 }

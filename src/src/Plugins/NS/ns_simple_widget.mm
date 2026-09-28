@@ -763,6 +763,10 @@ ns_simple_widget_rep::repaint_all () {
   iterator<pointer> i = iterate(ns_simple_widget_rep::all_widgets);
   while (i->busy()) {
     ns_simple_widget_rep *w = static_cast<ns_simple_widget_rep*>(i->next());
-    if (w->view && ![w->view isHiddenOrHasHiddenAncestor]) w->repaint_invalid_regions();
+    // NOTE: as with isVisible in Qt, not the views outside a visible window
+    // (the canvas of a buffer which left its window, for instance)
+    if (w->view && [[w->view window] isVisible] &&
+        ![w->view isHiddenOrHasHiddenAncestor])
+      w->repaint_invalid_regions();
   }
 }
