@@ -3471,7 +3471,8 @@ popup_grab (vue_window& win, float& x, float& y, bool press) {
 // sixteenth root of the displacement (in degrees for a notch of a wheel, in
 // points for a trackpad) for each event. It is the editor with the keyboard
 // focus in the window under the pointer, which is the current one when the
-// window is. Returns true if the event was used.
+// window is. Returns true if the event was used; not when the editor
+// captures the wheel.
 static bool
 wheel_zooms (vue_window win, double y) {
 #ifdef OS_MACOS
@@ -3483,6 +3484,8 @@ wheel_zooms (vue_window win, double y) {
   SDL_Keymod mods= SDL_GetModState () & all;
   if (mods == 0 || (mods & ~zoom_mod) != 0) return false;
   if (dynamic_cast<vue_simple_widget_rep*> (win->kbd_focus.rep) == NULL) return false;
+  // as in Qt, the editor gets the wheel when it captures it (graphics)
+  if (as_bool (call ("wheel-capture?"))) return false;
   if (y == 0) return true; // a sideways wheel does not scroll either
   double m= (y == floor (y)) ? 15.0 * fabs (y) : wheel_precise_step * fabs (y);
   double f= pow (max (m, 1.0), 1.0 / 16.0);

@@ -4291,28 +4291,6 @@ vue_plain_window_widget_rep::post_layout () {
   return false; // the new size is picked up by the next layout pass
 }
 
-// The geometry of a window is remembered in the preferences under its name
-// ("abscissa TeXmacs", "width TeXmacs:2"...), for the next window of that
-// name: the platform window calls this when it is moved or resized, as the
-// Qt windows do from their move and resize events (QTMWindow.cpp). Popups
-// and windows not shown yet (still being placed) are left out.
-void
-vue_notify_window_geometry (vue_window win, bool moved) {
-  if (win == NULL || win->popup || !win->shown) return;
-  vue_plain_window_widget_rep* ww=
-    dynamic_cast<vue_plain_window_widget_rep*> (win->content.rep);
-  if (ww == NULL || ww->popup || N(ww->name) == 0) return;
-  SI a, b;
-  if (moved) {
-    win->get_position (a, b);
-    notify_window_move (ww->name, a, b);
-  }
-  else {
-    win->get_size (a, b);
-    notify_window_resize (ww->name, a, b);
-  }
-}
-
 //******************************************************************************
 // vue_texmacs_widget
 

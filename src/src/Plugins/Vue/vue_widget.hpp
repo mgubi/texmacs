@@ -188,9 +188,6 @@ extern string layout_who;
 // keyboard focus of a window: editors are told when they gain or lose it
 void set_kbd_focus (vue_window win, vue_widget w);
 void notify_window_focus (vue_window win, bool has_focus);
-// the platform window was moved (or resized): its geometry is saved in the
-// preferences under the name of the window, as the Qt windows do
-void vue_notify_window_geometry (vue_window win, bool moved);
 
 /*!
   A file/directory chooser dialog, using native dialogs where available.
