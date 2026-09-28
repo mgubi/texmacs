@@ -31,7 +31,7 @@ jobs:
       run:
         working-directory: src
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Tools and libraries
         run: brew install gmp libtool readline freetype libpng jpeg-turbo pkgconf
@@ -41,7 +41,7 @@ jobs:
       # the recipe below changes)
       - name: Cache of Guile
         id: guile-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.tool_cache }}/guile-${{ env.GUILE_VERSION }}
           key: guile-${{ env.GUILE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-1
@@ -66,10 +66,12 @@ jobs:
         run: |
           packages/macos/build-ns-app.sh --dmg \
             --guile-config "$RUNNER_TOOL_CACHE/guile-$GUILE_VERSION/bin/guile-config"
+          # the architecture in the name (the artifact is the file itself);
           # upload-artifact wants a path without ".."
           dmg=$(cd ../distr/macos && ls "$PWD"/*.dmg)
+          mv "$dmg" "${dmg%.dmg}-$(uname -m).dmg"
+          dmg="${dmg%.dmg}-$(uname -m).dmg"
           echo "DMG=$dmg" >> "$GITHUB_ENV"
-          echo "DMG_NAME=$(basename "$dmg" .dmg)-$(uname -m)" >> "$GITHUB_ENV"
           ls -l "$dmg"
 
       # the application of the disk image, with its own libraries only; a
@@ -95,13 +97,13 @@ jobs:
           cp "$shots"/*.png ../distr/snapshots/ 2> /dev/null || true
           test -s "$shots/window-1.png"
 
-      - uses: actions/upload-artifact@v4
+      # not zipped: the artifact downloads as the .dmg
+      - uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.DMG_NAME }}
           path: ${{ env.DMG }}
-          compression-level: 0
+          archive: false
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: snapshots
