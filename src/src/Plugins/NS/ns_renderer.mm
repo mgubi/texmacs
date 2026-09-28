@@ -86,7 +86,9 @@ ns_renderer_rep::ns_renderer_rep (int w2, int h2) :
 }
 
 ns_renderer_rep::~ns_renderer_rep () {
-  if (context) end();
+  // NOTE: a shadow uses the context of its master, without begin (and the
+  // editor deletes its shadows with tm_delete, not delete_shadow)
+  if (context && master == NULL) end();
 } ;
 
 void 
