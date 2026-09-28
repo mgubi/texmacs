@@ -1,18 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-<svg id="svg5375" width="24" height="24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
- <metadata id="metadata5380">
-  <rdf:RDF>
-   <cc:Work rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title/>
-   </cc:Work>
-  </rdf:RDF>
- </metadata>
- <g id="layer1">
-  <path id="path8349" d="m0.5 0.5v23h18v-23z" fill-opacity=".88889" stroke="#9b9b9b" stroke-width="1px"/>
-  <path id="path3084" d="m21.5 23 2-2-4.5-4.5-2 2z" fill="#eac39b" stroke="#fde0c3" stroke-width="1px"/>
-  <path id="path4048" transform="translate(.5)" d="m19 13.25a5.5 5.25 0 1 1-11 0 5.5 5.25 0 1 1 11 0z" fill="#000050" fill-opacity=".75362" stroke="#fde0c3" stroke-dashoffset=".5" stroke-linejoin="bevel"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><path fill="#45474D" stroke="#D8D8D8" stroke-width="1.6" d="M6.5 2.75h7.25l4.5 4.5v12.5c0 .83-.67 1.5-1.5 1.5H6.5c-.83 0-1.5-.67-1.5-1.5V4.25c0-.83.67-1.5 1.5-1.5z"/><path fill="none" stroke="#D8D8D8" stroke-width="1.6" d="M13.75 2.75v3c0 .83.67 1.5 1.5 1.5h3"/><path fill="none" stroke="#D8D8D8" stroke-width="1.2" d="M8 10h5M8 13h3"/><circle fill="#45474D" stroke="#D8D8D8" stroke-width="1.6" cx="15" cy="15" r="3.9"/><path fill="none" stroke="#D8D8D8" stroke-width="2.4" d="M17.9 17.9 20.8 20.8"/></g>
 </svg>
