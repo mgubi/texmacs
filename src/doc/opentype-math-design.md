@@ -945,9 +945,14 @@ prints, the `get_unicode_range` experiment) were dropped.
   `smart_font_rep::draw_fixed`, and metrics, routing and caches are
   untouched, so it needs a repaint, not a typesetting; an export of
   `math-showcase.tm` takes the same time with it on and off. The font
-  inspector (`font-debug-info`, `edit_main_rep::font_debug_info`) finds the
-  text box under the cursor or the mouse and reads the smart font's tables
-  for one character without resolving anything; its window refreshes from
+  inspector (`font-debug-info`) finds the text box under the cursor or the
+  mouse and reads the smart font's tables for one character without
+  resolving anything. The editor only lends read-only access to its boxes
+  (`get_box_root`, and `get_box_path_at` for the box path at the cursor or
+  the mouse); the box walking is in `Typeset/Boxes/Basic/font_debug_boxes.cpp`
+  and the glue functions in `Texmacs/Data/new_view.cpp`, which, while a
+  font report has the focus, query the view of its master document
+  (`font-debug-info-of`) and never create a view. The window refreshes from
   `notify-cursor-moved` and `mouse-event` overrides that exist only once
   the lazy module `fonts/font-debug.scm` is loaded and apply only while the
   window is open. The font report (`font-debug-report`) walks the typeset

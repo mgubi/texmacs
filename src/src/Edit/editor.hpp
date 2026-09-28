@@ -617,8 +617,8 @@ public:
   virtual path the_buffer_path () = 0;
   virtual void show_tree () = 0;
   virtual void show_box () = 0;
-  virtual tree font_debug_info (bool at_mouse) = 0;
-  virtual tree font_debug_report () = 0;
+  virtual box  get_box_root () = 0;
+  virtual path get_box_path_at (bool at_mouse) = 0;
   virtual void show_env () = 0;
   virtual void show_path () = 0;
   virtual void show_cursor () = 0;

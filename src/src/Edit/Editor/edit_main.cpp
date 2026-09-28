@@ -19,8 +19,6 @@
 #include "typesetter.hpp"
 #include "drd_std.hpp"
 #include "message.hpp"
-#include "analyze.hpp"
-#include "font.hpp"
 #include <setjmp.h>
 #include "image_files.hpp"
 #include "iterator.hpp"
@@ -536,89 +534,22 @@ edit_main_rep::show_box () {
   stretched_print (eb);
 }
 
-// The glyph at the cursor, or at the last position of the mouse, and what
-// the font system did with it, for the font debugging tools. Nothing is
-// computed unless a tool asks, and nothing is resolved or cached anew.
-tree
-edit_main_rep::font_debug_info (bool at_mouse) {
-  tree r (TUPLE);
-  if (is_nil (eb)) return r;  // not typeset yet
+// Read-only access to the typeset boxes, for tools that inspect how the
+// document was typeset (the font inspector and the font report)
+box
+edit_main_rep::get_box_root () {
+  return eb;
+}
+
+path
+edit_main_rep::get_box_path_at (bool at_mouse) {
+  // the box path of the cursor, or of the last position of the mouse, in
+  // the root box; the empty path when there is none
+  if (is_nil (eb)) return path ();
   bool found= false;
   path bp= at_mouse? eb->find_box_path (last_x, last_y, 0, false, found):
                      eb->find_box_path (tp, found);
-  if (!found || is_nil (bp)) return r;
-  box leaf= eb[path_up (bp)];
-  int type= leaf->get_type ();
-  if (type != TEXT_BOX && type != SHORTER_BOX) {
-    r << tuple ("box", "not a text box") << tuple ("box-type", as_string (type));
-    return r;
-  }
-  string s= leaf->get_leaf_string ();
-  font   fn= leaf->get_leaf_font ();
-  int    off= last_item (bp);
-  if (N(s) == 0) return r;
-  // at the cursor, the glyph before it, as for typing; under the mouse, the
-  // glyph after the nearest boundary
-  int pos= min (max (off, 0), N(s));
-  if ((!at_mouse || pos == N(s)) && pos > 0) tm_char_backwards (s, pos);
-  r= smart_font_debug_info (fn, s, pos);
-  r << tuple ("string", s) << tuple ("position", as_string (pos));
-  return r;
-}
-
-// Every character of the typeset document with the route its font took,
-// counted by font and origin, for the font report. It reads what the
-// typesetter already did and resolves nothing anew.
-static string
-info_field (tree info, string key) {
-  for (int i=0; i<N(info); i++)
-    if (is_tuple (info[i]) && N(info[i]) == 2 && info[i][0] == key &&
-        is_atomic (info[i][1]))
-      return info[i][1]->label;
-  return "";
-}
-
-static void
-font_debug_collect (box b, hashmap<tree,int>& h) {
-  int type= b->get_type ();
-  if (type == TEXT_BOX || type == SHORTER_BOX) {
-    string s= b->get_leaf_string ();
-    font  fn= b->get_leaf_font ();
-    int  pos= 0;
-    while (pos < N(s)) {
-      int end= pos;
-      if (s[pos] == '<') tm_char_forwards (s, end); else end= pos + 1;
-      if (end <= pos) end= pos + 1;
-      tree info= smart_font_debug_info (fn, s, pos);
-      tree key= tuple (info_field (info, "origin"), info_field (info, "char"),
-                       info_field (info, "family"),
-                       info_field (info, "subfont-name"),
-                       info_field (info, "pdf"));
-      key << info_field (info, "variant") << info_field (info, "series")
-          << info_field (info, "shape");
-      h (key)= h[key] + 1;
-      pos= end;
-    }
-    return;
-  }
-  int n= b->subnr ();
-  for (int i=0; i<n; i++) font_debug_collect (b->subbox (i), h);
-}
-
-tree
-edit_main_rep::font_debug_report () {
-  tree r (TUPLE);
-  if (is_nil (eb)) return r;
-  hashmap<tree,int> h (0);
-  font_debug_collect (eb, h);
-  iterator<tree> it= iterate (h);
-  while (it->busy ()) {
-    tree key= it->next ();
-    tree e= copy (key);
-    e << as_string (h[key]);
-    r << e;
-  }
-  return r;
+  return found? bp: path ();
 }
 
 void

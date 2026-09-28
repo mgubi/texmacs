@@ -360,8 +360,6 @@
 
   (show-tree show_tree (void))
   (show-box show_box (void))
-  (font-debug-info font_debug_info (tree bool))
-  (font-debug-report font_debug_report (tree))
   (show-env show_env (void))
   (show-path show_path (void))
   (show-cursor show_cursor (void))
