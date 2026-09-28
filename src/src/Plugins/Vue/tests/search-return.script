@@ -1,0 +1,17 @@
+# needs search-return.scm: type in the search bar, close it with Escape,
+# type again: the second text goes to the document. Expected:
+#   got: (document "xyz")
+wait 9000
+window #2
+focus
+wait 1500
+text abc
+wait 800
+snapshot bar
+key Escape
+wait 1000
+text xyz
+wait 800
+key F12
+wait 500
+snapshot after

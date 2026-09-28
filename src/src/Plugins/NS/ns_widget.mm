@@ -321,6 +321,19 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       }
     }
       break;
+    case SLOT_ON_TOP:
+    {
+      // a tool window, which floats above the other windows of TeXmacs and
+      // hides with the application (as the Qt::Tool of the Qt interface)
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);
+      NSWindow *win = [wc window];
+      if (win) {
+        [win setLevel: flag? NSFloatingWindowLevel: NSNormalWindowLevel];
+        [win setHidesOnDeactivate: flag];
+      }
+    }
+      break;
     case SLOT_VISIBILITY:
     {
       check_type<bool> (val, s);
@@ -972,9 +985,228 @@ widget responsive_icon_tabs_widget (array<url> us, array<widget> ts,
   return icon_tabs_widget (us, ts, bs);
 }
 
+/******************************************************************************
+* The titles of the tools (division "title")
+******************************************************************************/
+
+/*! The title of a tool (the side tools, for instance): a light band with a
+ line below it, the text in semibold, and the button "x" (which closes the
+ tool) as the close icon of macOS; it takes the width of its container, so
+ that the button follows the width of the tools. */
+@interface TMToolTitleView : NSView
+{
+  NSLayoutConstraint *lead, *trail, *visible;
+}
+@end
+
+@implementation TMToolTitleView
+- (void) drawRect: (NSRect) r
+{
+  (void) r;
+  NSRect b= [self bounds];
+  [[[NSColor labelColor] colorWithAlphaComponent: 0.05] setFill];
+  NSRectFillUsingOperation (b, NSCompositingOperationSourceOver);
+  [[NSColor separatorColor] setFill];
+  NSRectFillUsingOperation (NSMakeRect (0, 0, b.size.width, 1),
+                            NSCompositingOperationSourceOver);
+}
+// NOTE: the constraints are retained (they are replaced when the view moves)
+- (void) dealloc
+{
+  [lead release]; [trail release]; [visible release];
+  [super dealloc];
+}
+- (void) viewDidMoveToSuperview
+{
+  [super viewDidMoveToSuperview];
+  if (lead) { [lead setActive: NO]; [lead release]; lead= nil; }
+  if (trail) { [trail setActive: NO]; [trail release]; trail= nil; }
+  NSView* sup= [self superview];
+  if (!sup) return;
+  lead = [[self.leadingAnchor constraintEqualToAnchor: sup.leadingAnchor] retain];
+  trail= [[self.trailingAnchor constraintEqualToAnchor: sup.trailingAnchor] retain];
+  [lead setPriority: NSLayoutPriorityRequired - 1];
+  [trail setPriority: NSLayoutPriorityRequired - 1];
+  [lead setActive: YES];
+  [trail setActive: YES];
+}
+- (void) viewDidMoveToWindow
+{
+  [super viewDidMoveToWindow];
+  // NOTE: never wider than the visible part of the tools (their contents
+  // may be wider), so that the button "x" remains visible
+  if (visible) { [visible setActive: NO]; [visible release]; visible= nil; }
+  NSScrollView* sc= [self enclosingScrollView];
+  if (!sc || ![self window]) return;
+  visible= [[self.trailingAnchor constraintLessThanOrEqualToAnchor:
+               [sc contentView].trailingAnchor constant: -4] retain];
+  [visible setActive: YES];
+}
+@end
+
+static void
+style_tool_title (NSView* v) {
+  // the text in semibold, the button "x" as a close icon
+  if ([v isKindOfClass: [NSTextField class]] && ![(NSTextField*) v isEditable]) {
+    NSTextField* t= (NSTextField*) v;
+    [t setFont: [NSFont systemFontOfSize: [NSFont systemFontSize]
+                                  weight: NSFontWeightSemibold]];
+    [t setTextColor: [NSColor labelColor]];
+    // a long title is shortened, rather than pushing the button out
+    [t setLineBreakMode: NSLineBreakByTruncatingTail];
+    [[t cell] setTruncatesLastVisibleLine: YES];
+    [t setContentCompressionResistancePriority: NSLayoutPriorityDefaultLow
+                                 forOrientation: NSLayoutConstraintOrientationHorizontal];
+  }
+  else if ([v isKindOfClass: [NSButton class]] &&
+           [[(NSButton*) v title] isEqualToString: @"x"]) {
+    NSButton* b= (NSButton*) v;
+    NSImage* im= [NSImage imageWithSystemSymbolName: @"xmark.circle.fill"
+                            accessibilityDescription: @"Close"];
+    im= [im imageWithSymbolConfiguration:
+           [NSImageSymbolConfiguration configurationWithPointSize: 13
+                                                           weight: NSFontWeightRegular]];
+    [b setTitle: @""];
+    [b setImage: im];
+    [b setImagePosition: NSImageOnly];
+    [b setBordered: NO];
+    [b setContentTintColor: [NSColor tertiaryLabelColor]];
+    [b setToolTip: @"Close"];
+  }
+  for (NSView* sub in [v subviews]) style_tool_title (sub);
+}
+
+class ns_title_widget_rep: public ns_view_widget_rep {
+  widget body; // the contents, kept alive with their view
+public:
+  ns_title_widget_rep (widget w, NSView* v):
+    ns_view_widget_rep (v), body (w) {}
+};
+
+/******************************************************************************
+* The tabs of the sections of the tools (division "section-tabs")
+******************************************************************************/
+
+/*! The tabs of section-tabs (menu-define.scm), a row of buttons, one of
+ which is in the class "section-active-tab": shown as a segmented control,
+ the tabs of macOS; its segments press the buttons, which are kept, hidden. */
+@interface TMSectionTabsView : NSView
+{
+  NSArray* buttons;   // the buttons of TeXmacs, in the order of the tabs
+  NSView* original;   // their view (hidden)
+}
+- (id) initWithView: (NSView*) v;
+@end
+
+static void
+collect_tab_buttons (NSView* v, NSMutableArray* bs, int& active, bool in_active) {
+  if ([[v identifier] isEqualToString: @"TMSectionActiveTab"]) in_active= true;
+  if ([v isKindOfClass: [NSButton class]]) {
+    if (in_active) active= (int) [bs count];
+    [bs addObject: v];
+    return;
+  }
+  for (NSView* sub in [v subviews]) collect_tab_buttons (sub, bs, active, in_active);
+}
+
+@implementation TMSectionTabsView
+- (id) initWithView: (NSView*) v
+{
+  self= [super initWithFrame: NSZeroRect];
+  if (!self) return nil;
+  NSMutableArray* bs= [NSMutableArray array];
+  int active= -1;
+  collect_tab_buttons (v, bs, active, false);
+  buttons= [bs retain];
+  original= [v retain];
+  NSSegmentedControl* sc= [[[NSSegmentedControl alloc] init] autorelease];
+  [sc setSegmentCount: [bs count]];
+  for (NSUInteger i=0; i < [bs count]; i++)
+    [sc setLabel: [(NSButton*) [bs objectAtIndex: i] title] forSegment: i];
+  [sc setTrackingMode: NSSegmentSwitchTrackingSelectOne];
+  [sc setSegmentDistribution: NSSegmentDistributionFillEqually];
+  if (active >= 0) [sc setSelectedSegment: active];
+  [sc setTarget: self];
+  [sc setAction: @selector(select:)];
+  [sc setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [self addSubview: sc];
+  // the tabs take the width of the tools (with margins), and may shrink
+  NSLayoutConstraint* w= [sc.trailingAnchor constraintEqualToAnchor:
+                            self.trailingAnchor constant: -2];
+  [w setPriority: NSLayoutPriorityRequired - 1];
+  [sc setContentCompressionResistancePriority: NSLayoutPriorityDefaultLow
+                               forOrientation: NSLayoutConstraintOrientationHorizontal];
+  [NSLayoutConstraint activateConstraints: @[
+    [sc.leadingAnchor constraintEqualToAnchor: self.leadingAnchor constant: 2],
+    w,
+    [sc.topAnchor constraintEqualToAnchor: self.topAnchor constant: 6],
+    [sc.bottomAnchor constraintEqualToAnchor: self.bottomAnchor constant: -6]]];
+  return self;
+}
+- (void) dealloc
+{
+  [buttons release];
+  [original release];
+  [super dealloc];
+}
+- (void) select: (NSSegmentedControl*) sc
+{
+  NSInteger i= [sc selectedSegment];
+  if (i >= 0 && i < (NSInteger) [buttons count])
+    [(NSButton*) [buttons objectAtIndex: i] performClick: nil];
+}
+- (void) viewDidMoveToSuperview
+{
+  [super viewDidMoveToSuperview];
+  // as wide as the tools, like the title
+  NSView* sup= [self superview];
+  if (!sup) return;
+  NSLayoutConstraint* l= [self.leadingAnchor constraintEqualToAnchor: sup.leadingAnchor];
+  NSLayoutConstraint* t= [self.trailingAnchor constraintEqualToAnchor: sup.trailingAnchor];
+  [l setPriority: NSLayoutPriorityRequired - 1];
+  [t setPriority: NSLayoutPriorityRequired - 1];
+  [l setActive: YES];
+  [t setActive: YES];
+}
+@end
+
 widget division_widget (string name, widget w) {
-  // NOTE: divisions only matter for the style of the Qt widgets
-  (void) name; return w;
+  // NOTE: the other divisions only matter for the style of the Qt widgets
+  if (is_nil (w)) return w;
+  if (name == "section-active-tab") {
+    // the button of the active tab (see TMSectionTabsView), marked in a
+    // view which is kept (the widgets make a new view each time)
+    NSView* c= concrete (w)->as_nsview ();
+    if (!c) return w;
+    [c setIdentifier: @"TMSectionActiveTab"];
+    return tm_new<ns_title_widget_rep> (w, c);
+  }
+  if (name == "section-tabs") {
+    NSView* c= concrete (w)->as_nsview ();
+    if (!c) return w;
+    NSMutableArray* bs= [NSMutableArray array];
+    int active= -1;
+    collect_tab_buttons (c, bs, active, false);
+    if ([bs count] < 2) return w;
+    TMSectionTabsView* v=
+      [[[TMSectionTabsView alloc] initWithView: c] autorelease];
+    [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+    return tm_new<ns_title_widget_rep> (w, v);
+  }
+  if (name != "title") return w;
+  NSView* c= concrete (w)->as_nsview ();
+  if (!c) return w;
+  style_tool_title (c);
+  TMToolTitleView* v= [[[TMToolTitleView alloc] init] autorelease];
+  [v setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [c setTranslatesAutoresizingMaskIntoConstraints: NO];
+  [v addSubview: c];
+  [NSLayoutConstraint activateConstraints: @[
+    [c.leadingAnchor constraintEqualToAnchor: v.leadingAnchor constant: 6],
+    [c.trailingAnchor constraintEqualToAnchor: v.trailingAnchor constant: -4],
+    [c.topAnchor constraintEqualToAnchor: v.topAnchor constant: 4],
+    [c.bottomAnchor constraintEqualToAnchor: v.bottomAnchor constant: -5]]];
+  return tm_new<ns_title_widget_rep> (w, v);
 }
 
 widget setting_toggle_widget (command cmd, string text, bool on, int style) {

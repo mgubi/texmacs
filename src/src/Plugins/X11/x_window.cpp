@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "X11/x_window.hpp"
+#include <X11/Xatom.h>
 #include "message.hpp"
 #include "boot.hpp"
 #include "x_picture.hpp"
@@ -336,6 +337,29 @@ void
 x_window_rep::set_visibility (bool flag) {
   if (flag) XMapRaised (dpy, win);
   else XUnmapWindow (dpy, win);
+}
+
+void
+x_window_rep::set_on_top (bool flag) {
+  // _NET_WM_STATE_ABOVE (EWMH): the property for a window which is not
+  // mapped yet, a message to the window manager for one which is
+  Atom state= XInternAtom (dpy, "_NET_WM_STATE", False);
+  Atom above= XInternAtom (dpy, "_NET_WM_STATE_ABOVE", False);
+  if (flag)
+    XChangeProperty (dpy, win, state, XA_ATOM, 32, PropModeReplace,
+                     (unsigned char*) &above, 1);
+  else XDeleteProperty (dpy, win, state);
+  XEvent ev;
+  memset (&ev, 0, sizeof (ev));
+  ev.xclient.type        = ClientMessage;
+  ev.xclient.window      = win;
+  ev.xclient.message_type= state;
+  ev.xclient.format      = 32;
+  ev.xclient.data.l[0]   = flag? 1: 0; // _NET_WM_STATE_ADD or _REMOVE
+  ev.xclient.data.l[1]   = above;
+  ev.xclient.data.l[3]   = 1;          // from an application
+  XSendEvent (dpy, DefaultRootWindow (dpy), False,
+              SubstructureRedirectMask | SubstructureNotifyMask, &ev);
 }
 
 void

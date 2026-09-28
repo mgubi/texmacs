@@ -90,11 +90,16 @@ clay_tm_string (string s) {
 #define CLAY_TM_STRING(s) clay_tm_string (s)
 
 // the id of the k-th probe element of the widget 'id' (an element laid out
-// only to be measured): a static label, the numbers go in the offset
+// only to be measured): a static label, the numbers go in the offset. The
+// widget and the index are hashed one after the other, as Clay does for
+// the children of an element (CLAY_IDI_LOCAL): packed into one number, as
+// id * 4096 + k, they wrapped around past a million widgets, and a 4097th
+// probe landed on the first probe of the next widget
 static inline Clay_ElementId
 probe_id (const char* label, unsigned int id, unsigned int k) {
   Clay_String cs= CLAY__INIT(Clay_String) { .isStaticallyAllocated= true, .length= (int32_t) strlen (label), .chars= label };
-  return Clay__HashString (cs, id * 4096u + k);
+  Clay_ElementId base= Clay__HashStringWithOffset (cs, id, 0);
+  return Clay__HashStringWithOffset (cs, k, base.id);
 }
 
 
@@ -276,6 +281,14 @@ highlight_on (Clay_Color bg) {
 static Clay_Color
 faded (Clay_Color c) { return (Clay_Color) { c.r, c.g, c.b, 0 }; }
 
+// a colour a fraction t of the way from a to b (a line between two colours
+// of the theme, a frame which is to be fainter than the border)
+static Clay_Color
+mix_colors (Clay_Color a, Clay_Color b, float t) {
+  return (Clay_Color) { a.r + t * (b.r - a.r), a.g + t * (b.g - a.g),
+                        a.b + t * (b.b - a.b), a.a + t * (b.a - a.a) };
+}
+
 // Counts the changes of the icon theme: a picture widget which holds an
 // icon of an older generation loads it again (see icon_picture).
 static int icon_generation= 0;
@@ -332,6 +345,31 @@ uint32_t current_menu= 0; // the open menu being laid out (its float)
 bool menu_press= false;   // the pass has a press, maybe taken by the menus
 bool menu_hovered= false; // an item of an open menu is under the pointer
 array<uint32_t> menu_zones_now; // the open menus and their buttons
+// A title of a bar opens its menu as it is pressed, and the button may be
+// held and dragged down to an item, which is chosen by the release (see
+// layout_pull_button): while such a drag lasts, the title gives up the
+// capture of the pointer, so that the items are hovered, and a release on
+// an item of an open menu is a click even though the press was elsewhere
+static bool menu_drag= false;
+static bool menu_drag_ends= false; // the pass has the release ending it
+static void* menu_drag_window= NULL; // the window of the drag
+
+// The refresh messages (SLOT_REFRESH, refresh-now) reach a window, which
+// lays out its widgets once afterwards; a refresh or refreshable widget
+// which is not laid out in that pass (a hidden tool panel, a menu which is
+// closed) must still see the message the next time it is. Every message
+// gets a number, and each kind remembers the number of the last message
+// of that kind; a widget remembers the number at its last refresh, and it
+// is stale when a message of its kind (or "any") came later. Qt sends the
+// message to every widget alive (tmSlotRefresh); this is the same, lazily.
+static int refresh_serial= 0;
+static hashmap<string,int> refresh_stamps (0);
+
+static bool
+refresh_stale (string kind, int stamp) {
+  if (kind == "any") return refresh_serial > stamp; // any message at all
+  return refresh_stamps["any"] > stamp || refresh_stamps[kind] > stamp;
+}
 
 // some more context during layout
 Clay_ElementId last_id;
@@ -480,6 +518,18 @@ gui_init_context() {
     else if (mouse_action == "move") mouse_action= "";
   }
   menu_press= starts (mouse_action, "press-");
+  // a drag from a title of a bar ends with the release of the button, or
+  // when the buttons are found up (the release went to another window)
+  // (only in the passes of the window of the drag: the buttons are up in
+  // the passes of the other windows which come between the release and
+  // the pass of that window which takes it)
+  if (menu_drag && menu_drag_window == (void*) current_window) {
+    menu_drag_ends= starts (mouse_action, "release-");
+    if (!menu_drag_ends && (mouse_state & 7) == 0 &&
+        !starts (mouse_action, "press-"))
+      menu_drag= false;
+  }
+  else menu_drag_ends= false;
   if (N(in.menu_zones) > 0) {
     if (menu_press) {
       bool inside= false;
@@ -500,9 +550,13 @@ gui_init_context() {
   menu_hovered= false;
   current_bar= current_menu= 0;
   
-  // make refresh messages available to widgets during layout
+  // the refresh messages which came since the last pass: they are numbered
+  // (refresh_stale), so that a widget which is not laid out now sees them
+  // when it next is
   current_window->refresh_kinds= current_window->next_refresh_kinds;
   current_window->next_refresh_kinds= hashset<string>();
+  iterator<string> it= iterate (current_window->refresh_kinds);
+  while (it->busy ()) refresh_stamps (it->next ())= ++refresh_serial;
 }
 
 void
@@ -512,6 +566,7 @@ gui_finalize_context() {
     active_button= 0;
     active_id= 0;
   }
+  if (menu_drag_ends) menu_drag= menu_drag_ends= false;
   // the wheel was used by a widget (see clay_wheel_flush in vue_gui.cpp)
   if (wheel_pending && mouse_action != "wheel")
     current_window->input.wheel_taken= true;
@@ -550,7 +605,11 @@ button_logic (Clay_ElementId id) {
         res.held= true;
         break;
       }
-      if ((mouse_action == r[i]) && (active_id == id.id) && (active_button == i)) {
+      // the release which ends a drag from a title of a bar chooses the
+      // item of the open menu it is over (see menu_drag)
+      bool dragged= menu_drag && i == 1 && active_id == 0 && current_menu != 0;
+      if ((mouse_action == r[i]) &&
+          (dragged || ((active_id == id.id) && (active_button == i)))) {
         res.clicked= i;
         mouse_action= "";
         active_id= 0;
@@ -1014,15 +1073,23 @@ VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx,
 
 VUE_WIDGET_DATA(tabs_widget_star, array<widget>, tabs, array<widget>, icons, array<widget>, bodies, int, current);
 
-VUE_WIDGET_DATA(refreshable_widget_star, object, prom, string, kind, widget, current, object, curobj);
+VUE_WIDGET_DATA(refreshable_widget_star, object, prom, string, kind, widget, current, object, curobj, int, stamp);
 
-VUE_WIDGET_DATA(refresh_widget_star, string, tmwid, string, kind, widget, current, object, curobj);
+VUE_WIDGET_DATA(refresh_widget_star, string, tmwid, string, kind, widget, current, object, curobj, int, stamp,
+                array<object>, cache_keys, array<widget>, cache_widgets);
+// stamp: the number of the last refresh message the widget has seen (see
+// refresh_stale); cache_keys, cache_widgets: the menus the widget has
+// built, by their expansion (its own cache, as Qt's QTMRefreshWidget has:
+// one cache for all of them gave a widget to several parents at once)
 
 VUE_WIDGET_DATA(split_widget_star, widget, a, widget, b, float, pos, bool, dragging);
 // hsplit/vsplit widgets with the position of the divider (in pixels, <0 if unset)
 
-VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val, int, st, string, w, bool, open);
-// an enum widget with the state of its dropdown list
+VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val, int, st, string, w, bool, open,
+                bool, editable, widget, input);
+// an enum widget with the state of its dropdown list; an editable one (as
+// Qt, when the value or the last of the values is empty) has a text input
+// in place of the value
 
 VUE_WIDGET_DATA(filtered_choice_widget_star, command, cb, array<string>, vals, string, val, widget, input);
 // a filtered choice widget with the input field used for the filter
@@ -1409,6 +1476,54 @@ make_color_picker_dialog (command cmd, bool bg, array<tree> proposals) {
   return vertical_list (rows);
 }
 
+// the width of a label in the font of a style, in points times PIXEL (as
+// layout_text_box measures it)
+static SI
+label_width (string s, int style) {
+  font fn= get_default_styled_font (style);
+  metric ex;
+  fn->var_get_extents (s, ex);
+  return (ex->x2 - ex->x1 + 2) / 3;
+}
+
+// the widest of the values of an enum (Qt sizes its combo boxes so, in
+// QTMComboBox::addItemsAndResize), in device pixels
+static float
+enum_values_width (array<string> vals, string val, int style) {
+  SI w= label_width (val, style);
+  for (int i= 0; i < N(vals); i++) w= max (w, label_width (vals[i], style));
+  return (float) retina_factor * w / PIXEL;
+}
+
+// The call back of the text input of an editable enum: the value is
+// committed by return, as the line edit of an editable QComboBox; escape
+// (the input calls back with #f) leaves it as it was
+class enum_commit_command_rep: public command_rep {
+  command cb;
+public:
+  enum_commit_command_rep (command _cb): cb (_cb) {}
+  void apply () {}
+  void apply (object args) {
+    if (is_list (args) && !is_null (args) && is_string (car (args))) cb (args);
+  }
+  tm_ostream& print (tm_ostream& out) { return out << "<enum_commit_command>"; }
+};
+
+// the text input of an editable enum, holding val; as wide as the widest of
+// the values unless the enum was given a width
+static widget
+make_enum_input (command cb, array<string> vals, string val, int st, string w) {
+  if (N(w) == 0) {
+    SI wd= label_width (val, st);
+    for (int i= 0; i < N(vals); i++) wd= max (wd, label_width (vals[i], st));
+    w= as_string (max (wd / PIXEL, 40) + 4) * "px";
+  }
+  array<string> def (1);
+  def[0]= val;
+  return input_text_widget (tm_new<enum_commit_command_rep> (cb), "string",
+                            def, st, w);
+}
+
 
 vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   : vue_widget_rep (_type), data (_data)
@@ -1478,7 +1593,16 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   }
   if (type == "enum_widget") {
     vue_enum_widget d= open_box<vue_enum_widget> (data);
-    vue_enum_widget_star dd { .cb= d.cb, .vals= d.vals, .val= d.val, .st= d.st, .w= d.w, .open= false };
+    // the convention of Qt (qt_ui_element.cpp): the enum can be edited when
+    // the value is empty or the last value is, and that empty value is not
+    // one of the choices
+    array<string> vals= d.vals;
+    bool editable= (N(vals) == 0 || d.val == "" || vals[N(vals)-1] == "");
+    if (N(vals) > 0 && vals[N(vals)-1] == "") vals= range (vals, 0, N(vals)-1);
+    widget input;
+    if (editable) input= make_enum_input (d.cb, vals, d.val, d.st, d.w);
+    vue_enum_widget_star dd { .cb= d.cb, .vals= vals, .val= d.val, .st= d.st, .w= d.w, .open= false,
+                              .editable= editable, .input= input };
     data= close_box (dd);
     return;
   }
@@ -1665,12 +1789,25 @@ layout_pull_button (vue_ui_rep *w) {
       if (down && open_pull_id == button_id.id) open_pull_id= 0;
     };
     bool is_open= !is_nil (d.cw);
-    if (sig.clicked == 1 && !is_open) open_menu ();
-    else if (sig.clicked == 1 && down) {
-      // a click on the title of the open menu closes it
-      close_menu ();
-      current_popup= false;
+    if (down && sig.pressed == 1) {
+      // a title of a bar acts as it is pressed, as on the Mac: it opens
+      // its menu, or closes it when it is open. The button may then be
+      // dragged to an item and released there to choose it: the title
+      // gives up the pointer (which it took with the press), so that the
+      // items are hovered, and the release is theirs (menu_drag)
+      if (!is_open) {
+        open_menu ();
+        menu_drag= true;
+        menu_drag_window= (void*) current_window;
+      }
+      else {
+        close_menu ();
+        current_popup= false;
+      }
+      active_id= 0;
+      active_button= 0;
     }
+    else if (!down && sig.clicked == 1 && !is_open) open_menu ();
     else if (!is_open && down && open_pull_id != 0 &&
              open_pull_id != button_id.id && open_pull_bar == current_bar &&
              active_id == 0 && Clay_PointerOver (button_id)) {
@@ -1763,7 +1900,7 @@ layout_pull_button (vue_ui_rep *w) {
                  .childOffset= Clay_GetScrollOffset () },
         .border= {
           .width= { 1, 1, 1, 1 },
-          .color= { 150, 150, 150, 255 }}})
+          .color= color_border }})
       {
         current_popup= false;
         uint32_t save_menu= current_menu, save_bar= current_bar;
@@ -1843,8 +1980,12 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
       string t= concrete (a[i])->type;
       if (vert && (t == "menu_group" || t == "text_widget")) {
         // a label of the menu (the greyed title of a group): where the
-        // labels of the items are, with their padding and mark column
-        CLAY_AUTO_ID({
+        // labels of the items are, with their padding and mark column.
+        // The pointer resting on it rests on the menu as on an item, and
+        // closes the submenu of another item (see layout_pull_button)
+        Clay_ElementId label_id= CLAY_IDI ("menu_label", concrete (a[i])->id);
+        note_menu_hover (label_id);
+        CLAY(label_id, {
           .layout= {
             .padding= menu_item_padding (),
             .sizing= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
@@ -2039,12 +2180,12 @@ render_menu_mark_fn (renderer ren, void* data, rectangle r) {
     xs[0]= r->x1 + (SI) (0.22*w); ys[0]= r->y1 + (SI) (0.50*h);
     xs[1]= r->x1 + (SI) (0.42*w); ys[1]= r->y1 + (SI) (0.28*h);
     xs[2]= r->x1 + (SI) (0.78*w); ys[2]= r->y1 + (SI) (0.74*h);
-    ren->set_pencil (pencil (black, 2*px, cap_round));
+    ren->set_pencil (pencil (theme_color (the_theme.text), 2*px, cap_round));
     ren->lines (xs, ys);
   }
   else {
     SI rad= min (w, h) / 5;
-    ren->set_pencil (pencil (black, px));
+    ren->set_pencil (pencil (theme_color (the_theme.text), px));
     if (kind == 2) ren->fill_arc (cx-rad, cy-rad, cx+rad, cy+rad, 0, 360*64);
     else ren->arc (cx-rad, cy-rad, cx+rad, cy+rad, 0, 360*64);
   }
@@ -2086,9 +2227,12 @@ vue_ui_rep::do_layout () {
       // the header of a tool: a bold title on a framed bar, rounded on top
       context_style |= WIDGET_STYLE_BOLD;
       in_title_bar= true;
+      // the grey of the mode bar (212 in the light theme), a step lighter
+      // than the window; the buttons in it are highlighted over it
+      with_behind wb (the_theme.bar_mode);
       CLAY(div_id, {
-        .backgroundColor= { 208, 208, 208, 255 },
-        .cornerRadius= { 6, 6, 0, 0 },
+        .backgroundColor= the_theme.bar_mode,
+        .cornerRadius= { ui_pxf (6), ui_pxf (6), 0, 0 },
         .layout= {
           .padding= { ui_px (12), ui_px (8), ui_px (8), ui_px (8) },
           .childGap= ui_px (8),
@@ -2139,8 +2283,11 @@ vue_ui_rep::do_layout () {
         }
       }
       else {
+        // a segmented bar in the grey of the mode bar (the segments are
+        // highlighted over it: see menu_button)
+        with_behind wb (the_theme.bar_mode);
         CLAY(div_id, {
-          .backgroundColor= { 204, 204, 204, 255 },
+          .backgroundColor= the_theme.bar_mode,
           .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (7)),
           .layout= {
             .padding= CLAY_PADDING_ALL(ui_px (2)),
@@ -2277,9 +2424,9 @@ vue_ui_rep::do_layout () {
           Clay_ElementData td= Clay_GetElementData (tab_id);
           CLAY(tab_id, {
             .backgroundColor= bg,
-            .cornerRadius= { 10, 10, 0, 0 },
+            .cornerRadius= { ui_pxf (10), ui_pxf (10), 0, 0 },
             .layout= {
-              .padding= { 20, 20, (uint16_t) (cur ? 10 : 8), (uint16_t) (cur ? 10 : 7) },
+              .padding= { ui_px (20), ui_px (20), ui_px (cur ? 10 : 8), ui_px (cur ? 10 : 7) },
               .childGap= ui_px (10),
               .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
             .border= { .width= { 1, 1, 1, (uint16_t) (cur ? 0 : 1) }, .color= color_border }})
@@ -2314,7 +2461,7 @@ vue_ui_rep::do_layout () {
       // the page of the current tab
       CLAY(CLAY_ID_LOCAL("tab_area"), {
         .backgroundColor= color_background,
-        .cornerRadius= { 0, 8, 8, 8 },
+        .cornerRadius= { 0, ui_pxf (8), ui_pxf (8), ui_pxf (8) },
         .layout= {
           .padding= CLAY_PADDING_ALL((uint16_t) pad),
           .sizing= { .width=  CLAY_SIZING_GROW(.min= page_w + 2*pad),
@@ -2401,14 +2548,16 @@ vue_ui_rep::do_layout () {
       }
     }
     Clay_Sizing sz= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) }; // items of vertical menus
-    if (!button_grow) sz= { CLAY_SIZING_FIT (.min= push ? 70.0f : 20.0f) };
+    if (!button_grow) sz= { CLAY_SIZING_FIT (.min= ui_pxf (push ? 70 : 20)) };
     Clay_Color hl= highlight_on (color_behind); // shows on the bar behind
     Clay_Color bg= faded (hl); // flat buttons show their container
     Clay_Padding padding= swatch ? CLAY_PADDING_ALL(ui_px (2)) : CLAY_PADDING_ALL(ui_px (5));
     // an item of a vertical menu: the column of the marks, then its label
     bool item= !swatch && !push && section_bar == 0 && button_grow;
     if (item) padding= menu_item_padding ();
-    if (!inert) note_menu_hover (button_id);
+    // a disabled item is an item all the same: the pointer resting on it
+    // closes the submenu of another item (see layout_pull_button)
+    note_menu_hover (button_id);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(ui_pxf (4));
     Clay_BorderElementConfig border= {};
     bool tab_strip= false;
@@ -2429,7 +2578,7 @@ vue_ui_rep::do_layout () {
         tab_strip= true;
       }
       else if (down) bg= color_pressed;
-      else if (hot) bg= { 236, 236, 236, 255 };
+      else if (hot) bg= highlight_on (color_behind);
     }
     else if (section_bar == 1) {
       // a segment of a "sections" bar
@@ -2440,7 +2589,7 @@ vue_ui_rep::do_layout () {
         border= { .width= { 1, 1, 1, 1 }, .color= color_border };
       }
       else if (down) bg= color_pressed;
-      else if (hot) bg= { 220, 220, 220, 255 };
+      else if (hot) bg= highlight_on (color_behind);
     }
     else if (down || pressed) bg= color_pressed;
     else if (hot) bg= hl;
@@ -2522,16 +2671,20 @@ vue_ui_rep::do_layout () {
           .sizing= { .height= CLAY_SIZING_GROW(0) },
           .padding= { ui_px (5), ui_px (5), ui_px (5), ui_px (5) } },
         .border= {
-          .width= { .left= 2 },
-          .color=  { 150, 150, 150, 255 } } });
+          .width= { .left= ui_px (2) },
+          .color= color_border } });
     } else {
-      CLAY(CLAY_IDI("menu_separator (h)", id), {
+      // the pointer resting on the rule of a menu rests on the menu as on
+      // an item: it closes the submenu of another item
+      Clay_ElementId sep_id= CLAY_IDI("menu_separator (h)", id);
+      note_menu_hover (sep_id);
+      CLAY(sep_id, {
         .layout= {
           .sizing= { .width= CLAY_SIZING_GROW(0) },
           .padding= { ui_px (5), ui_px (5), ui_px (5), ui_px (5) } },
         .border= {
-          .width= { .top= 2 } ,
-          .color=  { 210, 210, 210, 255 } } });
+          .width= { .top= ui_px (2) } ,
+          .color= the_theme.shade[2] } });
     }
     return;
   }
@@ -2683,7 +2836,7 @@ vue_ui_rep::do_layout () {
       cmd_list= list (c, cmd_list);
     }
     // a check box, drawn by vue_ui_rep::render (smaller in the mini style)
-    float box= (d.style & WIDGET_STYLE_MINI) ? 24 : 30;
+    float box= ui_pxf ((d.style & WIDGET_STYLE_MINI) ? 24 : 30);
     CLAY(toggle_id, {
       .layout= { .sizing= { CLAY_SIZING_FIXED(box), CLAY_SIZING_FIXED(box) }},
       .custom= { .customData= vue_render_widget },
@@ -2692,66 +2845,104 @@ vue_ui_rep::do_layout () {
   }
   if (type == "enum_widget") {
     //VUE_WIDGET(enum_widget, command, cb, array<string>, vals, string, val, int, st, string, w);
-    // a button showing the current value, with a dropdown list of the choices
+    // a button showing the current value, with a dropdown list of the
+    // choices; an editable enum has a text input in place of the value and
+    // the button is only the arrow
     vue_enum_widget_star d= open_box<vue_enum_widget_star> (data);
     bool inert= (d.st & WIDGET_STYLE_INERT) != 0;
     Clay_ElementId enum_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    Clay_ElementId arrow_id= CLAY_IDI ("enum_widget_arrow", id);
     Clay_ElementId list_id= CLAY_IDI ("enum_widget_list", id);
-    ui_signal sig { .clicked= 0 };
-    if (!inert) sig= button_logic (enum_id);
+    Clay_ElementId button_id= d.editable ? arrow_id : enum_id;
     bool changed= false;
+    if (d.editable) {
+      // what is typed is the value (enum_widget_value), committed by return
+      string typed= input_text_widget_string (d.input);
+      if (typed != d.val) { d.val= typed; changed= true; }
+    }
+    ui_signal sig { .clicked= 0 };
+    if (!inert) sig= button_logic (button_id);
     if (sig.clicked == 1) { d.open= !d.open; changed= true; }
+    // as wide as the widest of the values, as the combo boxes of Qt, so
+    // that it does not change size with the value, unless a width is given
     Clay_Sizing sz= { CLAY_SIZING_FIT (.min= ui_pxf (40)), CLAY_SIZING_FIT (0) };
+    Clay_Sizing val_sz= { CLAY_SIZING_FIXED (enum_values_width (d.vals, d.val, d.st | context_style)),
+                          CLAY_SIZING_FIT (0) };
     if (N(d.w) > 0) {
       SI w= decode_length (d.w, current_window, d.st);
-      sz.width= CLAY_SIZING_FIXED ((float) retina_factor*w/PIXEL);
+      if (!d.editable) sz.width= CLAY_SIZING_FIXED ((float) retina_factor*w/PIXEL);
+      val_sz.width= CLAY_SIZING_GROW (0);
     }
+    Clay_Color face= (!inert && hot_id == button_id.id)
+                     ? highlight_on (the_theme.shade[2]) : the_theme.shade[2];
     Clay_ElementData ed= Clay_GetElementData (enum_id);
+    // The list opens below the enum, or above it when it does not fit
+    // below and there is more room above, and it is at most as tall as the
+    // room on its side; it scrolls (wheel, markers) when it is taller, as
+    // the menus do (layout_pull_button). The height it needs is that of its
+    // contents in the last pass; the first time it is laid out once more
+    // before it is drawn
+    bool flip= false;
+    float max_h= current_window->layout_h;
+    if (d.open) {
+      Clay_ScrollContainerData ld= Clay_GetScrollContainerData (list_id);
+      if (!ld.found || !ed.found) layout_again= true;
+      else {
+        float margin= ui_pxf (4);
+        float need= ld.contentDimensions.height + 2;
+        float above= ed.boundingBox.y - margin;
+        float below= current_window->layout_h
+                     - (ed.boundingBox.y + ed.boundingBox.height) - margin;
+        flip= (need > below && above > below);
+        max_h= max (ui_pxf (40), flip ? above : below);
+      }
+    }
     CLAY(enum_id, {
-      .layout= { .sizing= sz, .padding= { ui_px (8), ui_px (8), ui_px (4), ui_px (4) }, .childGap= ui_px (4) },
-      .backgroundColor= (!inert && hot_id == enum_id.id)
-                          ? highlight_on (the_theme.shade[2]) : the_theme.shade[2],
-      .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
+      .layout= { .sizing= sz,
+                 .padding= d.editable ? (Clay_Padding) { 0, 0, 0, 0 }
+                                      : (Clay_Padding) { ui_px (8), ui_px (8), ui_px (4), ui_px (4) },
+                 .childGap= ui_px (4),
+                 .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+      .backgroundColor= d.editable ? (Clay_Color) { 0, 0, 0, 0 } : face,
+      .border= { .width= { 1, 1, 1, 1 },
+                 .color= d.editable ? (Clay_Color) { 0, 0, 0, 0 } : palette[0] }})
     {
-      layout_text (d.val, d.st, inert ? dark_grey : black);
-      CLAY_AUTO_ID({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }}}) {}
-      layout_arrow ("<#25BE>", 3, inert ? dark_grey : black); // down arrow
-      if (d.open) {
-        // the list opens below the field, or above it when it does not fit
-        // below and there is more room above (the field near the bottom of
-        // a dialog); it is at most as tall as that room, and scrolls. Its
-        // height is known from the previous pass: the first one lays out
-        // again before the list is seen
-        float wh= current_window->layout_h;
-        bool up= false;
-        float room= wh;
-        Clay_ScrollContainerData ls= Clay_GetScrollContainerData (list_id);
-        if (!ls.found) layout_again= true;
-        if (ed.found) {
-          float above= ed.boundingBox.y;
-          float below= wh - (ed.boundingBox.y + ed.boundingBox.height);
-          float need= ls.found ? ls.contentDimensions.height : 0;
-          up= need > below && above > below;
-          room= max (up ? above : below, ui_pxf (40));
+      if (d.editable) {
+        concrete (d.input)->do_layout ();
+        CLAY(arrow_id, {
+          .layout= { .sizing= { CLAY_SIZING_FIT (0), CLAY_SIZING_GROW (0) },
+                     .padding= { ui_px (6), ui_px (6), ui_px (4), ui_px (4) },
+                     .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+          .backgroundColor= face,
+          .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
+        {
+          layout_arrow ("<#25BE>", 3, inert ? dark_grey : black); // down arrow
         }
-        Clay_FloatingAttachPoints attach= up
-          ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_BOTTOM,
-                                          .parent= CLAY_ATTACH_POINT_LEFT_TOP }
-          : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP,
-                                          .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM };
+      }
+      else {
+        CLAY_AUTO_ID({ .layout= { .sizing= val_sz }}) {
+          layout_text (d.val, d.st, inert ? dark_grey : black);
+        }
+        layout_arrow ("<#25BE>", 3, inert ? dark_grey : black); // down arrow
+      }
+      if (d.open) {
         CLAY(list_id, {
           .floating= {
             .zIndex= 10,
             .attachTo= CLAY_ATTACH_TO_PARENT,
-            .attachPoints= attach },
+            .attachPoints= flip
+              ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_BOTTOM,
+                                              .parent= CLAY_ATTACH_POINT_LEFT_TOP }
+              : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                                              .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM }},
           .layout= {
             .layoutDirection= CLAY_TOP_TO_BOTTOM,
             .padding= CLAY_PADDING_ALL(ui_px (4)),
             .sizing= { .width= CLAY_SIZING_FIT (.min= ed.found ? ed.boundingBox.width : 0),
-                       .height= CLAY_SIZING_FIT (.max= room) }},
-          .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
+                       .height= CLAY_SIZING_FIT (.max= max_h) }},
           .backgroundColor= color_background,
-          .border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 }}})
+          .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
+          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
         {
           for (int i=0; i<N(d.vals); i++) {
             Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
@@ -2768,17 +2959,25 @@ vue_ui_rep::do_layout () {
               d.val= d.vals[i];
               d.open= false;
               changed= true;
+              // the input shows the value chosen (it has no setter: it is
+              // made again, with the value as its default)
+              if (d.editable)
+                d.input= make_enum_input (d.cb, d.vals, d.val, d.st, d.w);
               cmd_list= list (applied_command (d.cb, list_object (object (d.val))), cmd_list);
             }
           }
         }
         // dismiss the list when clicking somewhere else
         if (starts (mouse_action, "press-") &&
-            !Clay_PointerOver (list_id) && !Clay_PointerOver (enum_id)) {
+            !Clay_PointerOver (list_id) && !Clay_PointerOver (button_id)) {
           d.open= false;
           changed= true;
         }
       }
+    }
+    if (d.open) {
+      Clay_ScrollContainerData ld= Clay_GetScrollContainerData (list_id);
+      if (ld.found) scroll_markers (list_id, ld, color_background, false, 11);
     }
     if (changed) data= close_box (d);
     return;
@@ -2823,10 +3022,10 @@ vue_ui_rep::do_layout () {
   if (type == "refreshable_widget") {
     //VUE_WIDGET(refreshable_widget, object, prom, string, kind);
     vue_refreshable_widget_star d= open_box<vue_refreshable_widget_star> (data);
-    if (is_nil (d.current) ||
-        current_window->refresh_kinds->contains ("any") ||
-        current_window->refresh_kinds->contains (d.kind) ) {
-      // (re)initialize the widget
+    if (is_nil (d.current) || refresh_stale (d.kind, d.stamp)) {
+      // (re)initialize the widget: it is new, or a message of its kind came
+      // since it last was, maybe while it was not laid out (refresh_stale)
+      d.stamp= refresh_serial;
       eval ("(lazy-initialize-force)");
       object xwid= call (d.prom);
       if (d.curobj != xwid)  {
@@ -2852,27 +3051,33 @@ vue_ui_rep::do_layout () {
   if (type == "refresh_widget") {
     //VUE_WIDGET(refreshable_widget, object, prom, string, kind);
     vue_refresh_widget_star d= open_box<vue_refresh_widget_star> (data);
-    if (is_nil (d.current) ||
-        current_window->refresh_kinds->contains ("any") ||
-        current_window->refresh_kinds->contains (d.kind) ) {
-      // (re)initialize the widget
+    if (is_nil (d.current) || refresh_stale (d.kind, d.stamp)) {
+      // (re)initialize the widget (see refreshable_widget)
+      d.stamp= refresh_serial;
       string s= "'(vertical (link " * d.tmwid * "))";
       eval ("(lazy-initialize-force)");
       object xwid_expanded= eval (s); // evaluated once, was evaluated twice
       object xwid= call ("menu-expand", xwid_expanded);
-      static hashmap<object, widget> cache;
+      // the widgets this one has built, by expansion: its own cache, as in
+      // Qt (QTMRefreshWidget::cache); a cache shared by all of them handed
+      // the same widget to two refresh widgets showing the same menu
+      int k= -1;
+      for (int i= 0; i < N(d.cache_keys); i++)
+        if (d.cache_keys[i] == xwid) { k= i; break; }
       if (d.curobj == xwid); // unchanged: keep the widget we already have
-      else if (cache->contains (xwid)) {
+      else if (k >= 0) {
         d.curobj= xwid;
-        d.current= cache [xwid];
-        data= close_box (d);
+        d.current= d.cache_widgets[k];
       }
       else {
         d.curobj= xwid;
         d.current= make_menu_widget (xwid_expanded);
-        if (menu_caching) cache (xwid)= d.current;
-        data= close_box (d);
+        if (menu_caching) {
+          d.cache_keys << xwid;
+          d.cache_widgets << d.current;
+        }
       }
+      data= close_box (d);
     }
     CLAY(CLAY_SIDI (CLAY_TM_STRING (type), id), {
       .layout= { .sizing= layoutFit }})
@@ -2920,7 +3125,7 @@ vue_ui_rep::do_layout () {
     // both panes share the space equally
     vue_split_widget_star d= open_box<vue_split_widget_star> (data);
     bool horiz= (type == "hsplit_widget");
-    const float bar= 8;
+    const float bar= ui_pxf (8);
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
     Clay_ElementId bar_id= CLAY_IDI ("splitter", id);
     Clay_ElementData ed= Clay_GetElementData (my_id);
@@ -2975,12 +3180,23 @@ vue_ui_rep::do_layout () {
     bool inert= (d.style & (WIDGET_STYLE_INERT | WIDGET_STYLE_GREY)) != 0;
     int  lab_style= d.style & (WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED |
                                WIDGET_STYLE_BOLD | WIDGET_STYLE_CENTERED);
-    CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
+    // The list is as tall as its items, unless it is in a resize (the
+    // choice lists of the dialogs are: fill_parent), which may give it less
+    // room: then it fills it, clipped, and scrolls, with a scroll bar, as
+    // the list view of Qt (QTMListView, made with scroll= true). Anywhere
+    // else a clipped list would be shrunk to nothing when the window is
+    // sized to its contents: a clip container asks for no room
+    bool bounded= fill_parent;
+    Clay_ElementId my_id= CLAY_SIDI(CLAY_TM_STRING(type), id);
+    CLAY(my_id, {
       .backgroundColor= inert ? color_background : color_field,
       .layout= {
         .layoutDirection=  CLAY_TOP_TO_BOTTOM,
-        .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_FIT(0) },
-        .childGap= ui_px (2) }
+        .sizing= { .width= CLAY_SIZING_GROW(0),
+                   .height= bounded ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIT(0) },
+        .childGap= ui_px (2) },
+      .clip= { .horizontal= bounded, .vertical= bounded,
+               .childOffset= bounded ? Clay_GetScrollOffset () : (Clay_Vector2) { 0, 0 } }
     }) {
       for (int i=0; i<N(d.vals); i++) {
         int j, n= N(d.chosen);
@@ -3017,6 +3233,10 @@ vue_ui_rep::do_layout () {
           layout_text (d.vals [i], lab_style, col);
         }
       }
+    }
+    if (bounded) {
+      Clay_ScrollContainerData scrollData= Clay_GetScrollContainerData (my_id);
+      if (scrollData.found) scroll_bar (my_id, scrollData);
     }
     if (changed) {
       data= close_box (d);
@@ -3158,8 +3378,8 @@ vue_ui_rep::do_layout () {
         .layoutDirection= CLAY_TOP_TO_BOTTOM,
         .childGap= ui_px (8),
         .childAlignment= { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER }},
-      .backgroundColor= { 255, 255, 160, 255 },
-      .border= { .width= { 1, 1, 1, 1 }, .color= { 0, 0, 0, 255 }}})
+      .backgroundColor= the_theme.balloon,
+      .border= { .width= { 1, 1, 1, 1 }, .color= the_theme.balloon_border }})
     {
       layout_text (upcase_all (translate ("please wait")), WIDGET_STYLE_BOLD, black);
       if (N(d.message) > 0) layout_text (d.message, 0, black);
@@ -3241,11 +3461,17 @@ vue_ui_rep::render (void *render_data) {
     rectangle r= rd->r;
     bool inert= (d.style & WIDGET_STYLE_INERT) != 0;
     bool hot= (hot_id == CLAY_IDI ("toggle_widget", id).id);
-    SI px= ren->pixel, m= 4*px, rad= 4*px; // 22px box in a 30px cell
+    // a 22px box in a 30px cell at 2x (ui_px)
+    SI px= ren->pixel, m= ui_px (4) * px, rad= ui_px (4) * px;
     SI x1= r->x1 + m, y1= r->y1 + m, x2= r->x2 - m, y2= r->y2 - m;
-    color fill= d.on ? (inert ? rgb_color (160, 170, 200) : rgb_color (70, 110, 220))
-                     : (hot ? rgb_color (255, 255, 255) : rgb_color (248, 248, 248));
-    color edge= d.on ? fill : rgb_color (inert ? 190 : 150, inert ? 190 : 150, inert ? 190 : 150);
+    // the colours of the theme: the accent of the selections when on (the
+    // soft one when inert), a field when off, lighter or darker when hot
+    // as the fields are; an inert box has a fainter frame
+    Clay_Color f= d.on ? (inert ? the_theme.selection_soft : the_theme.selection)
+                       : (hot ? highlight_on (the_theme.field) : the_theme.field);
+    Clay_Color e= d.on ? f : (inert ? mix_colors (the_theme.border, the_theme.background, 0.5f)
+                                    : the_theme.border);
+    color fill= theme_color (f), edge= theme_color (e);
     ren->set_pencil (pencil (fill, px));
     ren->rounded_rectangle (x1, y1, x2, y2, rad, rad, rad, rad, true);
     ren->set_pencil (pencil (edge, px));
@@ -3256,7 +3482,8 @@ vue_ui_rep::render (void *render_data) {
       xs[0]= x1 + (SI) (0.22*w); ys[0]= y1 + (SI) (0.50*h);
       xs[1]= x1 + (SI) (0.42*w); ys[1]= y1 + (SI) (0.27*h);
       xs[2]= x1 + (SI) (0.78*w); ys[2]= y1 + (SI) (0.74*h);
-      ren->set_pencil (pencil (white, 3*px, cap_round));
+      ren->set_pencil (pencil (theme_color (the_theme.selection_text),
+                               max (1, (int) ui_px (3)) * px, cap_round));
       ren->lines (xs, ys);
     }
     return;
@@ -3407,6 +3634,7 @@ public:
   int     tab_pos;     // cursor position where tab was pressed
 
   command tab_cb; // called with #t/#f on tab/shift-tab (moves the focus in dialogs)
+  vue_window win; // the window it was last laid out in (weak, only compared)
   
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
@@ -3447,7 +3675,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
     def (_def), call_back (_call_back), style (_style),
     greyed ((_style & WIDGET_STYLE_INERT) != 0), width (_width),
     ok (true), done (false), def_cur (0), pos (0), sel (-1), scroll (0),
-    pre_edit (""), pre_edit_pos (0), tab_nr (0), tab_pos (0)
+    pre_edit (""), pre_edit_pos (0), tab_nr (0), tab_pos (0), win (NULL)
 {
   set_type (_type);
   if (N(def) > 0) {
@@ -3885,6 +4113,7 @@ vue_input_text_widget_rep::render (void *data) {
 
 void
 vue_input_text_widget_rep::do_layout () {
+  win= current_window; // see focus_on_named_input
   bool is_focused= current_window->kbd_focus == this;
   SI w= decode_length (width, current_window, style);
   font fn= get_font ();
@@ -3935,11 +4164,16 @@ focus_on_named_input (vue_window win, string field) {
   // "name#serial:type", which we split, or a bare word which lands in the
   // type ("search", "replace-what"...). Qt matches the same string, which
   // it keeps whole as the object name, so both halves are tried here.
-  for (int pass= 0; pass < 2; pass++) {
+  // Only the fields of this window count (the search bar of another
+  // window has the same name): those laid out in it, else those not laid
+  // out yet, as a bar which has just been built and asks for the keyboard
+  // at once (toolbar-search-start); Qt searches the children of the window.
+  for (int pass= 0; pass < 4; pass++) {
     iterator<pointer> it= iterate (live_inputs);
     while (it->busy ()) {
       vue_input_text_widget_rep* in= (vue_input_text_widget_rep*) it->next ();
-      if (pass == 0 ? (in->name == field) : (in->type == field)) {
+      if (in->win != ((pass < 2) ? win : (vue_window) NULL)) continue;
+      if ((pass & 1) == 0 ? (in->name == field) : (in->type == field)) {
         set_kbd_focus (win, in);
         return true;
       }
@@ -3988,6 +4222,10 @@ public:
   bool quit_sent; // the quit command has been queued
   SI last_cw, last_ch; // contents size measured in the previous layout pass
   float min_cw, min_ch; // smallest size of the contents of a dialog (pixels)
+  // the point on which the window is centred once it is sized to its
+  // contents (a dialog placed before its size was known, see centre_on)
+  bool centre_pending;
+  SI centre_x, centre_y;
   string title;
   string refresh_kind;
   
@@ -4004,7 +4242,12 @@ public:
   
   void do_layout ();
   bool post_layout ();
+  void centre_on (SI x, SI y) { centre_pending= true; centre_x= x; centre_y= y; }
 }; // class vue_plain_window_widget_rep
+
+// the texmacs widget learns its window from the window around it (defined
+// with vue_texmacs_widget_rep below)
+static void texmacs_widget_set_window (vue_widget w, vue_window win);
 
 vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name,
                                                           command _quit, bool _popup)
@@ -4017,6 +4260,8 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
   last_cw= last_ch= -1;
   min_cw= min_ch= 0;
   quit_sent= false;
+  centre_pending= false;
+  centre_x= centre_y= 0;
 }
 
 void
@@ -4029,6 +4274,10 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       {
         int id= check_open<int> (val, s);
         win= (vue_window) id_to_window [id];
+        // the editor of the window is in it from now on (SLOT_IDENTIFIER of
+        // the texmacs widget), not only once it is laid out: TeXmacs
+        // attaches its view at once (attach_view checks is_attached)
+        if (!is_nil (wid)) texmacs_widget_set_window (concrete (wid), win);
       }
       break;
     case SLOT_SIZE:
@@ -4054,6 +4303,12 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
         if (win) {
           win->set_visibility (flag);
         }
+      }
+      break;
+    case SLOT_ON_TOP:
+      {
+        bool flag= check_open<bool> (val, s);
+        if (win) win->set_on_top (flag);
       }
       break;
     case SLOT_MOUSE_GRAB:
@@ -4302,7 +4557,9 @@ vue_plain_window_widget_rep::post_layout () {
     win->ready_to_show= true;
     return false;
   }
-  if (abs (w - cw) <= PIXEL && abs (h - ch) <= PIXEL) win->ready_to_show= true;
+  // (not before a window to be centred has been moved to its place)
+  if (abs (w - cw) <= PIXEL && abs (h - ch) <= PIXEL && !centre_pending)
+    win->ready_to_show= true;
   // popups always follow their contents, other windows only initially
   if (!popup) {
     // some widgets (tabs, aligned, extend) use measurements of the previous
@@ -4340,6 +4597,12 @@ vue_plain_window_widget_rep::post_layout () {
       win->get_position (x, y);
       win->set_position (x, y);
     }
+  }
+  if (!popup && centre_pending) {
+    // the size is final: the window goes where it was meant to be centred
+    // (y upwards, the position is the top left corner)
+    centre_pending= false;
+    win->set_position (centre_x - cw / 2, centre_y + ch / 2);
   }
   return false; // the new size is picked up by the next layout pass
 }
@@ -4393,6 +4656,7 @@ public:
   void notify (slot s, blackbox new_val);
   
   void do_layout ();
+  friend void texmacs_widget_set_window (vue_widget w, vue_window win);
 }; // class vue_plain_window_widget_rep
 
 widget texmacs_widget (int mask, command quit) {
@@ -4528,6 +4792,14 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_KEYBOARD_FOCUS_ON:
       if (win) focus_on_named_input (win, check_open<string> (val, s));
       break;
+
+    case SLOT_KEYBOARD_FOCUS:
+      // (keyboard-focus-on "canvas"), e.g. when the search bar closes: the
+      // keyboard goes back to the editor (qt_tm_widget_rep gives it to the
+      // canvas); it was dropped, and the typing went on into the bar
+      if (check_open<bool> (val, s) && win && !is_nil (main_widget))
+        set_kbd_focus (win, main_widget);
+      break;
       
     default:
       vue_widget_rep::send(s, val);
@@ -4561,9 +4833,20 @@ vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
   (void) index; (void) w;
   switch (s) {
     case SLOT_SCROLLABLE:
-      check_type_void (index, s);
-      main_widget= concrete (w);
-      if (win) set_kbd_focus (win, main_widget);
+      {
+        check_type_void (index, s);
+        // the editor which is switched out is no longer in a window (its
+        // SLOT_IDENTIFIER answers 0, as in Qt) and the new one is in ours
+        // at once, before it is laid out
+        vue_simple_widget_rep* old=
+          dynamic_cast<vue_simple_widget_rep*> (main_widget.rep);
+        if (old != NULL) old->win= NULL;
+        main_widget= concrete (w);
+        vue_simple_widget_rep* cur=
+          dynamic_cast<vue_simple_widget_rep*> (main_widget.rep);
+        if (cur != NULL && win != NULL) cur->win= win;
+        if (win) set_kbd_focus (win, main_widget);
+      }
       break;
       
     case SLOT_MAIN_MENU:
@@ -4636,6 +4919,13 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
                   << "\t\tto widget\t" << type << LF;
   
   switch (s) {
+    case SLOT_IDENTIFIER:
+      // the window it is in, as the Qt widgets answer through their
+      // window (0: in none, see is_attached). This was a counter which
+      // counted up at every query and never said 0
+      check_type_id<int> (type_id, s);
+      return close_box<int> (win ? win->id : 0);
+
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
@@ -4773,6 +5063,16 @@ layout_bar_content (int key, vue_widget content, Clay_Color bg) {
   }
   Clay_ScrollContainerData sd= Clay_GetScrollContainerData (clip_id);
   if (sd.found) scroll_markers (clip_id, sd, bg, true, 2);
+}
+
+static void
+texmacs_widget_set_window (vue_widget w, vue_window win) {
+  vue_texmacs_widget_rep* tw= dynamic_cast<vue_texmacs_widget_rep*> (w.rep);
+  if (tw == NULL) return;
+  tw->win= win;
+  vue_simple_widget_rep* canvas=
+    dynamic_cast<vue_simple_widget_rep*> (tw->main_widget.rep);
+  if (canvas != NULL) canvas->win= win;
 }
 
 void vue_texmacs_widget_rep::do_layout () {
@@ -4983,10 +5283,12 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   absolute_scroll (false),
   scroll_pending (false),
   scrollbars_hidden (false),
+  pointer_captured (false),
   ren (NULL),
   backing_pos (coord2 (0, 0)), origin (coord2 (0, 0)),
   backing_valid (false),
   resize_pending (false),
+  cursor_moved (false), ime_x (-1), ime_y (-1),
   scroll_rest_x (0), scroll_rest_y (0)
 {
   // note that size is set to an arbitrary value to init the backing_store
@@ -4995,6 +5297,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   // (see native_opaque_picture)
   backing_store= native_opaque_picture (size.x1, size.x2, 0, 0);
   ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  ren_retina= retina_factor;
   paint_list= list<vue_simple_widget_rep*>(this, paint_list);
 };
 
@@ -5091,8 +5394,17 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_CURSOR:
       {
+        // the input area of the window follows it once the scroll which
+        // may come with it is applied (update_text_input_area)
         cursor_pos= check_open <coord2> (val, s);
+        cursor_moved= true;
       }
+      break;
+    case SLOT_KEYBOARD_FOCUS:
+      // the editor asks for the keyboard (send_keyboard_focus: a new view,
+      // a click, the end of an interactive command), as qt_widget_rep
+      // gives it to its widget
+      if (check_open<bool> (val, s) && win) set_kbd_focus (win, this);
       break;
     default:
       if (DEBUG_VUE_WIDGETS) debug_widgets << "simple_widget does not handle " << slot_name (s) << LF;
@@ -5128,9 +5440,11 @@ vue_simple_widget_rep::query (slot s, int type_id) {
       // the position of the canvas in its window, in TeXmacs coordinates
       // (PIXEL per point, y up): the editor adds it to the position of the
       // window and to a click to place its context menu (edit_mouse.cpp)
+      // (origin is in device pixels of the window, at its own density)
       check_type_id<coord2> (type_id, s);
-      return close_box<coord2> (coord2 (origin.x1 * PIXEL / retina_factor,
-                                        -origin.x2 * PIXEL / retina_factor));
+      int rf= win ? win->retina : retina_factor;
+      return close_box<coord2> (coord2 (origin.x1 * PIXEL / rf,
+                                        -origin.x2 * PIXEL / rf));
     }
     case SLOT_SIZE:
     {
@@ -5321,7 +5635,21 @@ vue_simple_widget_rep::do_layout () {
     }
   }
   // note: our CLAY block is closed here, Clay_Hovered () would test the parent
-  if (Clay_PointerOver (clay_id) && (mouse_action != "")) {
+  bool over= Clay_PointerOver (clay_id);
+  // A press on the canvas captures the pointer until the buttons are
+  // released: the moves and the release reach the editor wherever they
+  // happen, beyond the viewport and outside the window (SDL keeps sending
+  // them while a button is held), so that a drag selection extends past
+  // the visible part and the editor scrolls to follow it, as with Qt. A
+  // release which never reached us (the buttons are up) ends it too
+  if (pointer_captured && (mouse_state & 7) == 0 &&
+      !starts (mouse_action, "release-"))
+    pointer_captured= false;
+  bool captured= pointer_captured && d.found &&
+                 (mouse_action == "move" || starts (mouse_action, "release-"));
+  if (over && starts (mouse_action, "press-")) pointer_captured= true;
+  if (starts (mouse_action, "release-")) pointer_captured= false;
+  if ((over || captured) && (mouse_action != "")) {
     SI x= mouse_x - d.boundingBox.x;
     SI y= mouse_y - d.boundingBox.y;
     ren->set_origin (-backing_pos.x1, -backing_pos.x2);
@@ -5339,7 +5667,21 @@ vue_simple_widget_rep::do_layout () {
         debug_events << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
       debug_events << LF;
     }
-    if (mouse_action == "wheel") {
+    if (mouse_action == "wheel" && is_editor_widget () &&
+        as_bool (call ("wheel-capture?"))) {
+      // the editor wants the wheel (in graphics mode, see QTMWidget::
+      // wheelEvent): it gets it as a "wheel" event, deltas in points
+      // (the displacement of a trackpad, as Qt's pixelDelta), instead of
+      // the view being scrolled
+      // (mouse_data is in SI here, ren->pixel per device pixel)
+      array<double> data;
+      if (N(mouse_data) == 2) {
+        double f= (double) ren->pixel * (win ? win->density : 1.0f);
+        data << mouse_data[0] / f << mouse_data[1] / f;
+      }
+      handle_mouse ("wheel", x, y, (int) mouse_state, mouse_time, data);
+    }
+    else if (mouse_action == "wheel") {
       // the deltas come in small steps (see "Scrolling with the wheel" in
       // vue_gui.cpp): the fractions of SI are carried over to the next step
       // and the deltas add up on top of a position which is still pending.
@@ -5455,11 +5797,17 @@ vue_simple_widget_rep::repaint_invalid_regions () {
           : NULL;
 
   if (!w) return; // we are not in a layout yet
-  
+
+  // Everything below happens at the density of our window: with_window
+  // makes its factor the one of the renderers (retina_factor), so that the
+  // backing store is made and painted at the resolution of the display the
+  // window is on, not at that of whichever window happened to be current
+  // (the loop repaints all the editors outside any window)
+  with_window frame (w->win);
+
   // retrieve current geometry
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   {
-    with_window frame (w->win);
     Clay_ElementData d= Clay_GetElementData (clay_id);
     if (d.found) {
       // cache the current viewport size
@@ -5483,6 +5831,23 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   // current backing_store size
   int bs_w= backing_store->get_width ();
   int bs_h= backing_store->get_height ();
+  // A renderer made at another density (the window moved to a display of
+  // another density, or the widget to another window) is replaced by one at
+  // the density of our window, and everything is painted again: nothing of
+  // the old pixels can be reused, and the scroll below must already count
+  // with the new size of a pixel
+  if (ren_retina != retina_factor) {
+    SI old_w= bs_w * ren->pixel, old_h= bs_h * ren->pixel;
+    bs_w= size.x1; bs_h= size.x2;
+    backing_store= native_opaque_picture (bs_w, bs_h, 0, 0);
+    delete_renderer (ren);
+    ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+    ren_retina= retina_factor;
+    backing_valid= false;
+    invalidate_all ();
+    if (old_w != bs_w * ren->pixel || old_h != bs_h * ren->pixel)
+      resize_pending= true; // see below
+  }
 
   // Update the scroll position
 
@@ -5494,15 +5859,16 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   {
     // preprocess scroll_pos
     if (absolute_scroll) {
+      // SLOT_SCROLL_POSITION names the point which is to be at the centre
+      // of the view, as in Qt (qt_simple_widget_rep: origin = p - size/2),
+      // whether it is visible already or not: the editor relies on it to
+      // move the view by a little (selection_visible during a drag, which
+      // asks for a centre slightly off the current one) and to centre a
+      // page ("snap to pages"). It used to move only when the point was
+      // outside the view, so a drag selection never scrolled
       coord2 pt= scroll_pos;
-      scroll_pos= backing_pos;
-      // cout << "extents " << extents << LF;
-      // cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
-      if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-      else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-      if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-      else if (pt.x2 < scroll_pos.x2 - sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-      // cout << "scroll_pos (corrected) " << scroll_pos << LF;
+      scroll_pos.x1= pt.x1 - sz.x1/2;
+      scroll_pos.x2= pt.x2 + sz.x2/2; // y upwards: the top of the view
       absolute_scroll=false;
     }
     
@@ -5587,6 +5953,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     backing_store= new_backing_store;
     delete_renderer (ren);
     ren= ren2;
+    ren_retina= retina_factor;
     // the editor must be told (see notify_resizes), but not while we are
     // repainting: it would re-typeset in the middle of a repaint
     resize_pending= true;
@@ -5616,6 +5983,30 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     invalid_regions= new_regions;
   } // if (!is_nil (invalid_regions))
   backing_valid= true;
+  update_text_input_area ();
+}
+
+// The input methods show their candidates next to the cursor of the editor
+// which has the keyboard: SDL is told where it is (SDL_SetTextInputArea, in
+// points of the window), as Qt answers ImCursorRectangle from the position
+// of SLOT_CURSOR. Done after the scroll, which moves the cursor in the
+// window, and only when it changed.
+void
+vue_simple_widget_rep::update_text_input_area () {
+  if (win == NULL || win->kbd_focus != this) return;
+  SDL_Window* sw= (SDL_Window*) win->platform_window ();
+  if (sw == NULL) return; // a virtual window (single-window mode)
+  SI x= cursor_pos.x1, y= cursor_pos.x2;
+  ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+  ren->decode (x, y); // pixels of the backing store, from its top left
+  float d= (win->density > 0.0f) ? win->density : 1.0f;
+  int px= (int) ((origin.x1 + x) / d), py= (int) ((origin.x2 + y) / d);
+  if (!cursor_moved && px == ime_x && py == ime_y) return;
+  cursor_moved= false;
+  ime_x= px; ime_y= py;
+  // a thin box on the baseline, the candidates go below it
+  SDL_Rect r= { px, py - 12, 2, 16 };
+  SDL_SetTextInputArea (sw, &r, 0);
 }
 
 void
@@ -5672,6 +6063,8 @@ vue_simple_widget_rep::render (void *data) {
 //-----------------------------------------------------------------------------
 //vue_chooser_widget
 
+#include "editor.hpp"   // get_current_editor ()->as_length (image sizes)
+#include "new_view.hpp"
 
 /*!
   \param _cmd  Scheme closure to execute after the dialog is closed.
@@ -5799,6 +6192,24 @@ vue_chooser_widget_rep::read (slot s, blackbox index) {
   }
 }
 
+// the width and height of an image as pretty TeXmacs lengths, the policy
+// of qt_pretty_image_size (and of vue_pretty_image_size for the drops): the
+// size in points, or the width of the line for a wider image; nothing for
+// the formats the box sizes itself
+static void
+chooser_pretty_image_size (url image, string& w, string& h) {
+  w= ""; h= "";
+  string ext= locase_all (suffix (image));
+  if (ext == "pdf" || ext == "ps" || ext == "eps") return;
+  picture pic= load_picture (image, -1, -1, tree (""), PIXEL);
+  if (is_nil (pic)) return;
+  int ww= pic->get_width (), hh= pic->get_height ();
+  SI pt= get_current_editor () -> as_length ("1pt");
+  SI par= get_current_editor () -> as_length ("1par");
+  if (ww <= 0 || hh <= 0 || ww * pt > par) { w= "1par"; h= ""; }
+  else { w= as_string (ww) * "pt"; h= as_string (hh) * "pt"; }
+}
+
 void
 vue_chooser_widget_rep::callback (char* res) {
   if (!res) {
@@ -5813,7 +6224,7 @@ vue_chooser_widget_rep::callback (char* res) {
     if (file_type == "image") {
       url u= url_system (name);
       string w, h;
-      //qt_pretty_image_size (u, w, h);
+      chooser_pretty_image_size (u, w, h);
       string params;
       params << "\"" << w << "\" "
       << "\"" << h << "\" "
@@ -5948,7 +6359,7 @@ vue_field_widget_rep::query (slot s, int type_id) {
 vue_inputs_list_widget_rep::vue_inputs_list_widget_rep (command _cmd,
                                                       array<string> _prompts)
 : vue_widget_rep ("inputs_list_widget"),
-  cmd (_cmd), size (coord2 (100, 100)),
+  cmd (_cmd), size (coord2 (0, 0)),
   position (coord2 (0, 0)),
   win_title (""), style (0), done (false)
 {
@@ -6121,6 +6532,13 @@ vue_inputs_list_widget_rep::perform_dialog () {
   // closing the window from its title bar cancels the dialog
   win_widget= plain_window_widget (content, win_title, cancel_cmd);
   set_position (win_widget, position.x1, position.x2);
+  // dialogue_start centres the dialog on its window with the size we
+  // report, which is not known before the dialog is laid out: the window
+  // is centred on that point once it has been sized to its contents
+  vue_plain_window_widget_rep* ww=
+    dynamic_cast<vue_plain_window_widget_rep*> (win_widget.rep);
+  if (ww != NULL)
+    ww->centre_on (position.x1 + size.x1 / 2, position.x2 - size.x2 / 2);
   set_visibility (win_widget, true);
   focus_first_input ();
 }
@@ -6500,6 +6918,9 @@ void destroy_window_widget (widget w) {
     // the dialog is shown in a window of its own
     if (!is_nil (il->win_widget)) destroy_window_widget (il->win_widget);
     il->win_widget= widget ();
+  } else if (dynamic_cast<vue_chooser_widget_rep*> (vw.rep) != NULL) {
+    // the file chooser is the system dialog, which closes itself: there
+    // is no window of ours to destroy (see plain_window_widget)
   } else {
     cout << "not a window widget!" << LF;
   }

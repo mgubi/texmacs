@@ -413,6 +413,10 @@ ns_refresh_state::recompute (string what) {
 {
   string kind= from_nsstring ([[n userInfo] objectForKey: @"kind"]);
   NSView* old= content;
+  // NOTE: the position of a scroll view around (the side tools), which
+  // went back to the top while the contents were replaced
+  NSScrollView* sc= [self enclosingScrollView];
+  NSPoint pos= sc? [[sc contentView] bounds].origin: NSZeroPoint;
   [self show: kind];
   if (content != old) {
     // the window takes the size of its new contents (as in the Qt interface)
@@ -425,6 +429,14 @@ ns_refresh_state::recompute (string what) {
     else if (win && root) {
       NSSize fs= [root fittingSize];
       if (fs.width > 0 && fs.height > 0) [win setContentSize: fs];
+    }
+    if (sc) {
+      NSClipView* c= [sc contentView];
+      [sc layoutSubtreeIfNeeded];
+      NSRect b= [c bounds];
+      b.origin= pos;
+      [c scrollToPoint: [c constrainBoundsRect: b].origin];
+      [sc reflectScrolledClipView: c];
     }
   }
 }

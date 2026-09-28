@@ -94,6 +94,7 @@ public:
   void   set_modified (bool flag);
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
+  void   set_on_top (bool flag);
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   get_size (SI& w, SI& h);

@@ -42,7 +42,12 @@ MuPDF one. Each window owns
 Windows are registered in `Window_to_window` (SDL window → vue window) and
 `id_to_window` (TeXmacs window id → vue window). The id is given to the
 content widget through `SLOT_IDENTIFIER`; plain windows keep the pointer in
-their `win` member.
+their `win` member and pass it on to the texmacs widget inside, which
+answers the `SLOT_IDENTIFIER` query with the id of its window (0 when it
+is in none, as in Qt: `is_attached`, which `attach_view` asserts before the
+window is ever laid out). An editor is in the window of the texmacs widget
+from the moment it is made its scrollable (`SLOT_SCROLLABLE`), and in none
+once it is switched out, until it is laid out somewhere again.
 
 **Popups** (`popup=true`, used for `popup_window_widget` and
 `tooltip_window_widget`) are borderless, always on top, not focusable, sized
@@ -204,7 +209,11 @@ frame, and the next ones into windows of their own. Two faults showed:
   "invalid situation") and calls `handle_notify_resize`, so the editor
   re-typesets and recomputes its extents: `edit_interface.cpp` centers the
   paper in a wider canvas for `VUETEXMACS` as for X11, and the scroll
-  position is clamped to the extents at every repaint. The `SLOT_SIZE` query
+  position is clamped to the extents at every repaint. `SLOT_SCROLL_POSITION`
+  names the point to put at the centre of the view, as in Qt, whether it is
+  already visible or not: the editor moves the view by a little that way
+  while a drag selection goes past its edge (`selection_visible`), and
+  centres a page for "snap to pages". The `SLOT_SIZE` query
   of an editor returns its viewport in SI (`size * ren->pixel`), the one of
   the main widget the window size (as the Qt main window).
 * **Size policy** (`widget_grows` in `vue_widget.cpp`): a container grows
@@ -287,7 +296,12 @@ invalidate the editors so their backing stores are rebuilt at the new
 size). TeXmacs reads one global `retina_factor`, so `with_window` makes
 the factor of the current window current too and restores it afterwards:
 windows on displays of different densities each draw at their own
-resolution. The startup value, before any window exists, comes from the
+resolution. This covers the editors too: `repaint_invalid_regions` runs
+inside `with_window` of the editor's window (the loop repaints all the
+editors outside any window), so the backing store is made, and painted, at
+the factor of that window; a renderer made for another factor (the window
+went to another display, the editor to another window) is replaced and
+everything repainted, even when the number of pixels did not change. The startup value, before any window exists, comes from the
 desktop display mode (the *content scale* is the wrong query, macOS
 reports 1 there while drawing at 2 pixels per point). Sizes coming from
 TeXmacs are in SI, `PIXEL` per point, so a length becomes
@@ -322,10 +336,20 @@ position is set off-window, so that nothing stays hovered. Every
 `ui_signal` must be initialized (`{ .clicked= 0 }`): an uninitialized one
 fired commands every frame. Elements which must not be captured by the
 element behind them consume the press (`mouse_action= ""`, the thumbs).
+The editor canvas does not use `button_logic` but captures the pointer the
+same way (`pointer_captured`): after a press on it, the moves and the
+release reach it wherever they happen, beyond the viewport and outside the
+window (SDL keeps reporting them while a button is held), so that a drag
+selection extends past the visible part and the view follows it.
 
 **Keyboard focus** is per window (`win->kbd_focus`); change it with
 `set_kbd_focus`, which notifies editors (`handle_keyboard_focus`), and
-`notify_window_focus` forwards SDL focus changes. Text inputs and editors
+`notify_window_focus` forwards SDL focus changes. `SLOT_KEYBOARD_FOCUS`
+(`keyboard-focus-on "canvas"`, e.g. when the search bar closes) gives it
+back to the editor, `SLOT_KEYBOARD_FOCUS_ON` to a named input of that
+window. The focused editor tells SDL where its cursor is
+(`SDL_SetTextInputArea`, from `SLOT_CURSOR`), so that the candidates of an
+input method appear next to it. Text inputs and editors
 consume `key_event` when focused. Key names follow TeXmacs conventions
 (`lookup_key`, `initialize_keyboard`).
 
@@ -336,8 +360,17 @@ system sends the resulting text, composed with the dead keys and the input
 method, as `SDL_EVENT_TEXT_INPUT`, and that is what is delivered (" ", "<"
 and ">" become `space`, `<less>`, `<gtr>`); a dead key alone types nothing.
 Every other key (return, arrows, function keys, C-, M- and A- combinations)
-is delivered as a key, and a text event following it within 30 ms
-(`key_stamp`) belongs to the same keystroke and is dropped. The scripted
+is delivered as a key. A text event following a key with a modifier within
+30 ms (`key_stamp`) belongs to the same keystroke and is dropped; for a key
+without one only the text that key would type itself is dropped (the echo:
+a digit of the keypad, the space of `S-space`), since the next letter of a
+fast typist may well come within 30 ms of a Return. An input method which
+commits several characters at once gives one key per character, one per
+frame. On macOS option is folded into the character only without command
+or control: with them the keys are `M-A-x`, `A-C-x` as in Qt. With a command
+modifier a key of a non-Latin layout is named by its Latin (US) key, so
+control-C is `C-c` whatever the layout. F1 opens the Clay debug view only
+with `-debug-qt` or `TEXMACS_VUE_CLAY_DEBUG`. The scripted
 `key` command therefore drives the control keys and `text` the characters.
 
 **Input methods.** A composition (`SDL_EVENT_TEXT_EDITING`: dead keys, CJK)

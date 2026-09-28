@@ -272,7 +272,7 @@ set_full_screen (widget w, bool flag) {
 
 inline void
 set_on_top (widget w, bool flag) {
-  // a window which stays above the other windows of TeXmacs (Qt only)
+  // a window which stays above the other windows of TeXmacs
   send<bool> (w, SLOT_ON_TOP, flag);
 }
 

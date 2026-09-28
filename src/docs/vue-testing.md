@@ -34,11 +34,14 @@ release x y [left|right|middle]
 click x y [left|right|middle]
 wheel x y dx dy
 key [S-][C-][A-][M-]<name>   an SDL key name (Return, Escape, Tab, Backspace, Down,
-                            Home...) with shift/control/option/command prefixes
+                            Home...) with shift/control/option/command prefixes;
+                            keypad keys as Keypad_1, Keypad_Plus...
+key <name> <text>           the key and the text the system sends with it
 text <string>               one text-input event per character
 resize w h                  resize the target window (points)
 repaint                     invalidate every editor (repaint from scratch)
 compose <text>              composition of an input method (no text: ends it)
+commit <text>               an input method commits a text (one key per character)
 drop x y <path>|text:<text> a drag and drop of one item at that position
 focus                       pretend the target window got the keyboard focus
 snapshot <name>             save the next redraw of the target window
@@ -131,7 +134,7 @@ callback output.
 | `tabs` | switching tabs, and the layout of each page |
 | `prefs-tool` | the section tabs of the preferences tool react to clicks |
 | `prefs-dialog` | the preferences window with icon tabs: tabs of equal height |
-| `menus` | a pull-down menu opens and closes; in a window narrowed to 640x200 the Help menu is shifted back inside |
+| `menus` | a pull-down menu opens (on press) and closes; in a window narrowed to 640x200 the Help menu is shifted back inside |
 | `submenu` | a submenu opens without closing its parent; another menu of the bar closes both |
 | `checks` | the check marks of the View menu |
 | `popup` | the context menu of the editor opens with its corner at the pointer, an item runs and closes it, near the screen border it is moved back. Needs `-debug-events`: the check compares the logged `set_position` with the window position and the click |
@@ -145,7 +148,7 @@ callback output.
 | `two-tools` | three tools at once: top right, bottom right and left |
 | `tools-close` | replacing a tool, adding a bottom one, closing the top one; the paper follows the canvas |
 | `tool-replace` | replacing the font tool, whose sample text is an editor, must not crash the redraw |
-| `debug-view` | the Clay debug view of F1 over a window with a tool; hover and click while it is shown |
+| `debug-view` | the Clay debug view of F1 over a window with a tool; hover and click while it is shown. Needs `TEXMACS_VUE_CLAY_DEBUG=1`: without it F1 goes to TeXmacs |
 | `drop` | a dropped file name and a dropped piece of text reach `mouse-drop-event` and are inserted |
 | `entrypoints` | the wait indicator appears over the window and is popped by the empty message; the help balloon appears and a pointer motion dismisses it |
 | `figures` | PDF figures drawn by MuPDF as drawing (a form XObject), upright and turned by `/Rotate 90`, one at half opacity (where its squares overlap: pale blue, never purple), at a size where pixels would show, and an EPS figure made a PDF once (`-debug-convert` shows one `image_to_pdf` and no `image_to_png`); the figures are those of `Plugins/MuPDF/tests` |
@@ -162,6 +165,11 @@ callback output.
 | `tmoutput` | the extent of the typeset boxes: on its own a `texmacs-output` is as wide as what it typesets, and inside a `resize` it fills the pane it was given |
 | `interactive` | the query line of the footer: the prompt and the field appear in place of the footer, the answer comes back (`answer: Bob`). It sets the "interactive questions" preference and puts it back in the same turn, since a test must not leave the settings changed |
 | `search-focus` | the search toolbar asks for the keyboard with `keyboard-focus-on`, so what is typed next lands in its field rather than in the document |
+| `search-return` | after the search toolbar is closed with Escape, typing goes back to the document (`got: (document xyz)`) |
+| `drag-scroll` | a drag selection past the bottom of the window scrolls the document and extends the selection; a move after the release changes nothing |
+| `wheel-graphics` | in a graphics with `wheel-capture?`, the wheel goes to the editor and does not scroll |
+| `enums` | an editable enum (typed and picked values), an enum as wide as its widest value, a long list near the bottom opening above and scrolling, a choice list which scrolls |
+| `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu. Give it 40 s under load |
 | `sockets` | the TeXmacs server and an anonymous legacy client in the same instance (see below) |
 
 One more is not run this way. `sockets-tls` repeats the `sockets` exchange
