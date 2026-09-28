@@ -34,6 +34,8 @@
 #include "tm_window.hpp"
 #ifdef OS_MACOS
 #include "MacOS/mac_utilities.h" // mac_beep
+#include <objc/runtime.h> // the NSWindow of a tool window, see set_on_top
+#include <objc/message.h>
 #endif
 #include "sys_utils.hpp"     // get_env
 #include "file.hpp"          // load_string (scripted events)
@@ -107,10 +109,18 @@ class vue_sdl_base_window_rep : public vue_window_rep {
 public:
   SDL_Window *sdl_win;
   SI Min_w, Min_h, Max_w, Max_h; // size limits, 0 if unset
-  
-  vue_sdl_base_window_rep (vue_widget w, string name, bool popup= false);
+  bool on_top;       // a tool window, above the other windows of TeXmacs
+  bool level_raised; // ... and currently at the level of SDL's "on top"
+  // the geometry last seen (see track_geometry), in points; unknown while
+  // saved_w < 0
+  int  saved_x, saved_y, saved_w, saved_h;
+
+  // adopt: an SDL window taken over from a window being destroyed (the
+  // host of single-window mode, see forget_host), instead of a new one
+  vue_sdl_base_window_rep (vue_widget w, string name, bool popup= false,
+                           SDL_Window* adopt= NULL);
   ~vue_sdl_base_window_rep ();
-  
+
   void *platform_window () { return (void*)sdl_win; }
 
   void   destroy_event ();
@@ -120,7 +130,9 @@ public:
   void   set_modified (bool flag);
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
-  void   set_on_top (bool flag) { SDL_SetWindowAlwaysOnTop (sdl_win, flag); }
+  void   set_on_top (bool flag);
+  void   follow_app_focus (); // an on-top window leaves its level with the app
+  void   track_geometry ();   // the user moved or resized the window
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   update_density (); // the pixel density of its display (override)
@@ -134,6 +146,10 @@ public:
 };
 
 int vue_window_rep::serial= 1; // serial identifier for windows
+
+// single-window mode (see "Single-window mode" below)
+static bool close_hosted_windows (vue_window w);
+static void host_changed ();
 
 #ifdef VUE_SDL_RENDERER
 static inline Clay_Dimensions SDL_MeasureText(Clay_StringSlice text, Clay_TextElementConfig *config, void *userData)
@@ -221,10 +237,32 @@ init_window_clay (vue_window_rep* w, int win_w, int win_h) {
   w->transitions_active= false;
 }
 
-vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup)
-: vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
+vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup,
+                                                  SDL_Window* adopt)
+: vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0),
+  on_top (false), level_raised (false), saved_x (0), saved_y (0), saved_w (-1), saved_h (-1)
 {
   if (DEBUG_VUE) debug_widgets << "create vue_sdl_base_window_rep " << id << (popup ? " (popup)" : "") << LF;
+  if (adopt != NULL) {
+    // the window is already on the screen, with its title and its input
+    the_name= name;
+    mod_name= name;
+    sdl_win= adopt;
+    nr_windows++;
+    Window_to_window (sdl_win)= (void*) this;
+    id= serial++;
+    id_to_window (id)= this;
+    int win_w, win_h;
+    SDL_GetWindowSize (sdl_win, &win_w, &win_h);
+    set_identifier (abstract (content), id);
+    notify_position (abstract (content), 0, 0);
+    notify_size (abstract (content), win_w, win_h);
+    init_window_clay (this, win_w, win_h);
+    update_density ();
+    visible_requested= ready_to_show= true;
+    shown= !(SDL_GetWindowFlags (sdl_win) & SDL_WINDOW_HIDDEN);
+    return;
+  }
   // windows start hidden and are shown once laid out, see set_visibility
   SDL_WindowFlags flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE |
                          SDL_WINDOW_HIDDEN;
@@ -300,17 +338,19 @@ vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
   id_to_window->reset (id);
   id= 0;
   set_identifier (abstract (content), 0); // FIXME: is this ok?
-  Window_to_window->reset (sdl_win);
   nr_windows--;
-
-  SDL_StopTextInput (sdl_win);
-
   SDL_free (clay_arena.memory);
+  // NULL: the SDL window went to another one (see forget_host)
+  if (sdl_win == NULL) return;
+  Window_to_window->reset (sdl_win);
+  SDL_StopTextInput (sdl_win);
   SDL_DestroyWindow (sdl_win);
 }
 
 void
 vue_sdl_base_window_rep::destroy_event () {
+  // the host which outlived its own window closes the windows it holds
+  if (close_hosted_windows (this)) return;
   notify_window_destroy (orig_name);
   send_destroy (abstract (content));
 }
@@ -337,23 +377,30 @@ vue_sdl_base_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& m
   min_w= Min_w; min_h= Min_h; max_w= Max_w; max_h= Max_h;
 }
 
+// The window is kept on the display it is put on, the one which holds most
+// of it (or the nearest), in the part of that display which is not taken
+// by the menu bar and the dock. The displays are in one plane of points,
+// where the ones on the left of or above the primary display have negative
+// coordinates: those are allowed.
 void
 vue_sdl_base_window_rep::set_position (SI x, SI y) {
-  SI screen_w, screen_h;
-  gui_root_extents (screen_w, screen_h);
-  screen_w /= PIXEL; screen_h /= PIXEL;
-  
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
 
-  x= x/PIXEL;
-  y= -y/PIXEL;
-  if ((x+ win_w) > screen_w) x= screen_w- win_w;
-  if (x<0) x=0;
-  if ((y+ win_h) > screen_h) y= screen_h- win_h;
-  if (y<0) y=0;
-  SI win_x= x, win_y= y;
-  if (DEBUG_VUE_EVENTS) SDL_Log ("Window %d set_position %d %d", id, (int) win_x, (int) win_y);
+  int win_x= x/PIXEL;
+  int win_y= -y/PIXEL;
+  SDL_Rect wr= { win_x, win_y, max (win_w, 1), max (win_h, 1) };
+  SDL_DisplayID d= SDL_GetDisplayForRect (&wr);
+  if (d == 0) d= SDL_GetPrimaryDisplay ();
+  SDL_Rect r;
+  if (d != 0 && (SDL_GetDisplayUsableBounds (d, &r) ||
+                 SDL_GetDisplayBounds (d, &r))) {
+    if (win_x + win_w > r.x + r.w) win_x= r.x + r.w - win_w;
+    if (win_x < r.x) win_x= r.x;
+    if (win_y + win_h > r.y + r.h) win_y= r.y + r.h - win_h;
+    if (win_y < r.y) win_y= r.y;
+  }
+  if (DEBUG_VUE_EVENTS) SDL_Log ("Window %d set_position %d %d", id, win_x, win_y);
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
 }
 
@@ -415,6 +462,64 @@ vue_sdl_base_window_rep::set_full_screen (bool flag) {
   // the change is asynchronous (an animation on macOS); presentation mode
   // fits the slide to the window just after it, so wait for the new size
   else SDL_SyncWindow (sdl_win);
+}
+
+// A window on top (a tool, SLOT_ON_TOP) stays above the windows of TeXmacs,
+// not above those of the other applications, as the Qt::Tool of the Qt port
+// and the NS port. SDL's "always on top" alone floats above everything, so:
+// on macOS the window hides with the application, as a panel of Cocoa does
+// (setHidesOnDeactivate, on the NSWindow of SDL; SDL gives it the floating
+// level); elsewhere it leaves that level while no window of TeXmacs has the
+// keyboard, see follow_app_focus. A parent window (SDL_SetWindowParent)
+// would do on some systems, but moves the tool with its parent on macOS and
+// destroys it with it, which the windows of TeXmacs do not expect.
+void
+vue_sdl_base_window_rep::set_on_top (bool flag) {
+  on_top= flag;
+  level_raised= flag;
+  SDL_SetWindowAlwaysOnTop (sdl_win, flag);
+#ifdef OS_MACOS
+  void* ns= SDL_GetPointerProperty (SDL_GetWindowProperties (sdl_win),
+                                    SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, NULL);
+  if (ns != NULL)
+    ((void (*) (objc_object*, SEL, BOOL)) objc_msgSend)
+      ((objc_object*) ns, sel_registerName ("setHidesOnDeactivate:"), flag ? YES : NO);
+#endif
+}
+
+void
+vue_sdl_base_window_rep::follow_app_focus () {
+  if (!on_top) return;
+  bool active= (SDL_GetKeyboardFocus () != NULL);
+  if (active == level_raised) return;
+  level_raised= active;
+  SDL_SetWindowAlwaysOnTop (sdl_win, active);
+}
+
+// The geometry of a window which the user changed is kept in the
+// preferences, as the Qt port does (moveEvent and resizeEvent of
+// QTMWindow), where texmacs_window_widget finds it for the next window of
+// that name ("abscissa TeXmacs" and friends). The windows are compared to
+// what they were at the previous frame: SDL reports the moves while the
+// loop may be held (a move is modal on macOS), and one write per frame
+// instead of one per event. The host of single-window mode takes the
+// virtual windows along.
+void
+vue_sdl_base_window_rep::track_geometry () {
+  int x, y, w, h;
+  SDL_GetWindowPosition (sdl_win, &x, &y);
+  SDL_GetWindowSize (sdl_win, &w, &h);
+  bool moved= (x != saved_x || y != saved_y);
+  bool resized= (w != saved_w || h != saved_h);
+  bool first= (saved_w < 0);
+  if (!moved && !resized) return;
+  saved_x= x; saved_y= y; saved_w= w; saved_h= h;
+  host_changed ();
+  // the first geometry is the one TeXmacs gave; popups are not remembered
+  // (nor by the other ports), nor is the host which outlived its window
+  if (first || popup || N(orig_name) == 0) return;
+  if (moved) notify_window_move (orig_name, x * PIXEL, -y * PIXEL);
+  if (resized) notify_window_resize (orig_name, w * PIXEL, h * PIXEL);
 }
 
 void
@@ -656,6 +761,7 @@ array<styled_string> styled_strings;
 
 // single-window mode (see "Single-window mode" below)
 static void composite_virtual_windows (vue_window host, renderer ren);
+static int32_t host_overlay_start (Clay_RenderCommandArray& a);
 static bool is_host (vue_window w);
 static void forget_host (vue_window w);
 
@@ -664,8 +770,11 @@ public:
   renderer ren;
   picture backing_store;
 
-  vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup= false);
-  ~vue_sdl_mupdf_window_rep () { forget_host (this); delete_renderer (ren); }
+  vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup= false,
+                            SDL_Window* adopt= NULL);
+  // (no renderer: a window which was never shown was never drawn)
+  ~vue_sdl_mupdf_window_rep () {
+    forget_host (this); if (ren != NULL) delete_renderer (ren); }
   
   void process_redraw ();
   void process_layout ();
@@ -694,8 +803,9 @@ ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *u
                              .height= (float) retina_factor*h / PIXEL };
 }
 
-vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup)
-  : vue_sdl_base_window_rep (w, name, popup), ren (NULL)
+vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup,
+                                                    SDL_Window* adopt)
+  : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL)
 {
   with_window frame (this);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
@@ -785,13 +895,24 @@ int      vue_text_n= 0,  vue_editor_n= 0,  vue_other_n= 0;
 
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
+  // a hidden or minimized window is neither drawn nor uploaded (the loop
+  // redraws every window at every frame); it is drawn again when shown
+  if (!shown || (SDL_GetWindowFlags (sdl_win) &
+                 (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) return;
+  track_geometry ();
+#ifndef OS_MACOS
+  follow_app_focus ();
+#endif
   with_window frame (this);
   int win_w, win_h;
 
   SDL_Surface *surf= SDL_GetWindowSurface(sdl_win);
   if (surf == NULL) {
-    // e.g. a window being destroyed or minimized: nothing to draw on
-    SDL_Log ("SDL_GetWindowSurface failed: %s", SDL_GetError ());
+    // e.g. a window being destroyed: nothing to draw on (reported a few
+    // times only, it may go on for every frame)
+    static int reported= 0;
+    if (reported++ < 3)
+      SDL_Log ("SDL_GetWindowSurface failed: %s", SDL_GetError ());
     return;
   }
   backing_store= native_picture_from_SDL_Surface (surf);
@@ -824,8 +945,18 @@ vue_sdl_mupdf_window_rep::process_redraw () {
     vue_fill_ns += SDL_GetTicksNS () - t_ns;
     vue_commands += render_commands.length;
   }
-  render_clay_commands (ren, &render_commands);
-  if (is_host (this)) composite_virtual_windows (this, ren);
+  if (is_host (this)) {
+    // the virtual windows go between the contents of the host and its
+    // floating elements (menus, lists, balloons), see host_overlay_start
+    int32_t k= host_overlay_start (render_commands);
+    Clay_RenderCommandArray below= render_commands, above= render_commands;
+    below.length= k;
+    above.internalArray += k; above.length -= k; above.capacity -= k;
+    render_clay_commands (ren, &below);
+    composite_virtual_windows (this, ren);
+    render_clay_commands (ren, &above);
+  }
+  else render_clay_commands (ren, &render_commands);
 
     static_cast<mupdf_renderer_rep*>(ren)->end ();
 
@@ -1106,32 +1237,60 @@ vue_render_text_fn (renderer ren, void *w, rectangle r) {
 
 void *vue_render_text= (void*)&vue_render_text_fn;
 
+// The extents of the texts of the widgets, measured once per (font,
+// string): a layout pass runs several times per frame and a menu bar holds
+// many unchanging labels. A few fonts are in use at once (the plain, bold
+// and small ones of the widgets, alternating in one layout), so each has a
+// table of its own; with more fonts, the one used least recently makes
+// room, and a full table starts again. Bounded: the texts of a UI are few.
+struct text_extents {
+  string font_name;
+  hashmap<string,int> index;
+  array<SI> w, h;
+  int last_use;
+  text_extents (): index (-1), last_use (-1) {}
+};
+
+static text_extents&
+text_extents_of (font fn) {
+  const int nr_fonts= 8;
+  static text_extents tables[nr_fonts];
+  static int use_clock= 0;
+  int found= -1, oldest= 0;
+  for (int i= 0; i < nr_fonts; i++) {
+    if (tables[i].last_use >= 0 && tables[i].font_name == fn->res_name) {
+      found= i; break; }
+    if (tables[i].last_use < tables[oldest].last_use) oldest= i;
+  }
+  if (found < 0) {
+    found= oldest;
+    tables[found].font_name= fn->res_name;
+    tables[found].index= hashmap<string,int> (-1);
+    tables[found].w= array<SI> (); tables[found].h= array<SI> ();
+  }
+  tables[found].last_use= use_clock++;
+  return tables[found];
+}
+
 static void
 layout_text_box (string s, int style, color c) {
   font fn= get_default_styled_font (style);
-  // the extents are measured once per (font, string): a layout pass runs
-  // several times per frame and a menu bar holds many unchanging labels
-  static hashmap<string,int> extent_cache (-1);
-  static array<SI> extent_w, extent_h;
-  static string cache_font;
-  if (cache_font != fn->res_name) {
-    cache_font= fn->res_name;
-    extent_cache= hashmap<string,int> (-1);
-    extent_w= array<SI> (); extent_h= array<SI> ();
-  }
+  text_extents& cache= text_extents_of (fn);
   SI w, h;
-  int idx= extent_cache[s];
-  if (idx >= 0) { w= extent_w[idx]; h= extent_h[idx]; }
+  int idx= cache.index[s];
+  if (idx >= 0) { w= cache.w[idx]; h= cache.h[idx]; }
   else {
     metric ex;
     fn->var_get_extents (s, ex);
     w= ((ex->x2- ex->x1+ 2)/3);
     h= ((fn->y2- fn->y1+ 2)/3);
     abs_round (w, h);
-    if (N(extent_w) < 4096) { // bounded: the texts of a UI are few
-      extent_cache (s)= N(extent_w);
-      extent_w << w; extent_h << h;
+    if (N(cache.w) >= 4096) {
+      cache.index= hashmap<string,int> (-1);
+      cache.w= array<SI> (); cache.h= array<SI> ();
     }
+    cache.index (s)= N(cache.w);
+    cache.w << w; cache.h << h;
   }
   styled_string ss= tm_new<styled_string_rep> (s, fn, c);
   styled_strings << ss;
@@ -1201,15 +1360,18 @@ single_window_mode () {
 
 class vue_virtual_window_rep;
 static vue_sdl_mupdf_window_rep* the_host= NULL;       // holds the others
+static bool host_is_bare= false; // the host outlived its own window, see forget_host
 static array<vue_virtual_window_rep*> virtual_windows; // back to front
 static vue_virtual_window_rep* focused_virtual= NULL;  // gets the keys
 static const float title_bar_h= 24.0f;                 // points
 
-// the content area of the host, in screen points
+// the content area of the host, in screen points (the virtual windows are
+// first brought up to date with a move or a resize of the host)
 static void
 host_geometry (float& x, float& y, float& w, float& h) {
   x= y= 0; w= h= 1;
   if (the_host == NULL) return;
+  host_changed ();
   int ix, iy, iw, ih;
   SDL_GetWindowPosition (the_host->sdl_win, &ix, &iy);
   SDL_GetWindowSize (the_host->sdl_win, &iw, &ih);
@@ -1221,22 +1383,32 @@ public:
   float x, y;  // top left corner of the contents, screen points
   float w, h;  // size of the contents, points
   bool  placed; // positioned by TeXmacs (else centered on the host)
-  bool  on_top; // above the other virtual windows (see raise)
+  bool  on_top; // above the other virtual windows (see restack)
+  // a window may fill the host instead of floating on it, as its contents:
+  // in full screen mode (presentations), and the editor which takes the
+  // place of the window of a closed host (see promote_editor); the
+  // geometry it had is restored when it floats again
+  bool  full, promoted;
+  float saved_x, saved_y, saved_w, saved_h;
   SI Min_w, Min_h, Max_w, Max_h;
 
   vue_virtual_window_rep (vue_widget w, string name, bool popup);
   ~vue_virtual_window_rep ();
 
   void*  platform_window () { return NULL; }
-  bool   decorated () { return !popup; }
+  bool   fills () { return full || promoted; }
+  bool   decorated () { return !popup && !fills (); }
   float  top () { return decorated () ? y - title_bar_h : y; }
+  int    layer () { return fills () ? 0 : popup ? 3 : on_top ? 2 : 1; }
   void   destroy_event ();
-  void   set_name (string n) { the_name= n; mod_name= n; }
+  void   update_title ();
+  void   set_name (string n) { if (the_name != n) { the_name= n; update_title (); } }
   string get_name () { return the_name; }
-  void   set_modified (bool flag) { modified= flag; }
+  void   set_modified (bool flag) {
+    if (modified != flag) { modified= flag; update_title (); } }
   void   set_visibility (bool flag);
-  void   set_full_screen (bool flag) { (void) flag; }
-  void   set_on_top (bool flag) { on_top= flag; raise (); }
+  void   set_full_screen (bool flag);
+  void   set_on_top (bool flag);
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   get_size (SI& w, SI& h);
@@ -1253,6 +1425,8 @@ public:
   void   show ();
   void   raise ();
   void   clamp ();
+  void   fill ();
+  void   set_fills (bool full, bool promoted);
   bool   contains (float sx, float sy) {
     return sx >= x && sx < x + w && sy >= y && sy < y + h; }
   bool   in_title_bar (float sx, float sy) {
@@ -1260,6 +1434,7 @@ public:
 };
 
 static void focus_virtual (vue_virtual_window_rep* v);
+static void promote_editor ();
 static vue_window pointer_hover= NULL;             // the window under the pointer
 static vue_virtual_window_rep* pointer_capture= NULL; // a button is held in it
 static vue_virtual_window_rep* drag_win= NULL;     // moved by its title bar
@@ -1267,7 +1442,9 @@ static float drag_dx= 0, drag_dy= 0;
 
 vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _name, bool _popup)
   : vue_window_rep (_content, _name, _popup), x (0), y (0), w (200), h (200),
-    placed (false), on_top (false), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
+    placed (false), on_top (false), full (false), promoted (false),
+    saved_x (0), saved_y (0), saved_w (200), saved_h (200),
+    Min_w (0), Min_h (0), Max_w (0), Max_h (0)
 {
   if (DEBUG_VUE) debug_widgets << "create vue_virtual_window_rep " << id << (popup ? " (popup)" : "") << LF;
   the_name= name;
@@ -1286,6 +1463,17 @@ vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _nam
     Clay_SetMeasureTextFunction (ren_measure_text, this);
   }
   virtual_windows << this;
+  raise (); // below the popups and the windows on top
+}
+
+// the windows which a host holds, but the popups (the menus and balloons,
+// which go with the window they were opened from)
+static int
+nr_hosted_windows () {
+  int n= 0;
+  for (int i= 0; i < N(virtual_windows); i++)
+    if (!virtual_windows[i]->popup) n++;
+  return n;
 }
 
 vue_virtual_window_rep::~vue_virtual_window_rep () {
@@ -1307,12 +1495,30 @@ vue_virtual_window_rep::~vue_virtual_window_rep () {
   set_identifier (abstract (content), 0);
   nr_windows--;
   SDL_free (clay_arena.memory);
+  // the host which outlived its window: another editor takes the place of
+  // this one, and the host goes with the last window it holds
+  if (host_is_bare && the_host != NULL) {
+    if (nr_hosted_windows () == 0) tm_delete (the_host);
+    else if (promoted) promote_editor ();
+  }
 }
 
 void
 vue_virtual_window_rep::destroy_event () {
   notify_window_destroy (orig_name);
   send_destroy (abstract (content));
+}
+
+// the name and the marker of unsaved changes, as vue_sdl_base_window_rep
+// shows them in its title; the title bar is drawn with mod_name, and the
+// host shows the title of the editor which fills it in place of its own
+void
+vue_virtual_window_rep::update_title () {
+  mod_name= modified ? the_name * " *" : the_name;
+  if (promoted && the_host != NULL) {
+    c_string s (cork_to_utf8 (mod_name));
+    SDL_SetWindowTitle (the_host->sdl_win, s);
+  }
 }
 
 void
@@ -1337,9 +1543,18 @@ vue_virtual_window_rep::process_layout () {
     show ();
 }
 
+// the whole content area of the host
+void
+vue_virtual_window_rep::fill () {
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  x= hx; y= hy; w= hw; h= hh;
+}
+
 // keep the window, title bar included, on the host
 void
 vue_virtual_window_rep::clamp () {
+  if (fills ()) { fill (); return; }
   float hx, hy, hw, hh;
   host_geometry (hx, hy, hw, hh);
   float tb= decorated () ? title_bar_h : 0;
@@ -1352,7 +1567,7 @@ vue_virtual_window_rep::clamp () {
 void
 vue_virtual_window_rep::show () {
   shown= true;
-  if (!placed) {
+  if (!placed && !fills ()) {
     // centered on the host (a dialog nobody positioned)
     float hx, hy, hw, hh;
     host_geometry (hx, hy, hw, hh);
@@ -1361,21 +1576,65 @@ vue_virtual_window_rep::show () {
   }
   clamp ();
   raise ();
-  if (decorated ()) focus_virtual (this);
+  if (!popup) focus_virtual (this);
 }
 
+// The order of the windows, back to front, by layer: those which fill the
+// host (they are its contents), the others, the ones on top (tools), and
+// the popups and balloons, which are above everything, as the menus and
+// the tooltips of the desktop. The order within a layer is kept.
+static void
+restack () {
+  array<vue_virtual_window_rep*> sorted;
+  for (int l= 0; l <= 3; l++)
+    for (int i= 0; i < N(virtual_windows); i++)
+      if (virtual_windows[i]->layer () == l) sorted << virtual_windows[i];
+  virtual_windows= sorted;
+}
+
+// to the front of its layer
 void
 vue_virtual_window_rep::raise () {
-  // NOTE: the windows on top stay above the others (in their own order)
-  array<vue_virtual_window_rep*> rest, top;
+  array<vue_virtual_window_rep*> rest;
   for (int i= 0; i < N(virtual_windows); i++)
-    if (virtual_windows[i] != this) {
-      if (virtual_windows[i]->on_top) top << virtual_windows[i];
-      else rest << virtual_windows[i];
-    }
-  if (on_top) top << this;
-  else rest << this;
-  virtual_windows= rest << top;
+    if (virtual_windows[i] != this) rest << virtual_windows[i];
+  virtual_windows= rest << this;
+  restack ();
+}
+
+// Above the other windows, or back among them. Only the layer changes: the
+// window is not raised (turning it off let it jump in front of the others),
+// it ends up at the bottom of the windows on top, or at the top of the rest.
+void
+vue_virtual_window_rep::set_on_top (bool flag) {
+  if (on_top == flag) return;
+  on_top= flag;
+  restack ();
+}
+
+// full: set_full_screen; promoted: see promote_editor
+void
+vue_virtual_window_rep::set_fills (bool _full, bool _promoted) {
+  bool before= fills ();
+  full= _full; promoted= _promoted;
+  if (fills () == before) return;
+  if (fills ()) {
+    saved_x= x; saved_y= y; saved_w= w; saved_h= h;
+    fill ();
+  }
+  else {
+    x= saved_x; y= saved_y; w= saved_w; h= saved_h;
+    clamp ();
+  }
+  restack ();
+}
+
+// presentation and full screen modes: the window takes the whole host (the
+// host itself goes full screen only when it is asked to, as a window)
+void
+vue_virtual_window_rep::set_full_screen (bool flag) {
+  set_fills (flag, promoted);
+  if (flag && shown) focus_virtual (this);
 }
 
 void
@@ -1393,12 +1652,15 @@ vue_virtual_window_rep::set_visibility (bool flag) {
 
 void
 vue_virtual_window_rep::set_size (SI sw, SI sh) {
-  w= max (1.0f, (float) sw / PIXEL);
-  h= max (1.0f, (float) sh / PIXEL);
-  if (Min_w > 0) w= max (w, (float) Min_w / PIXEL);
-  if (Min_h > 0) h= max (h, (float) Min_h / PIXEL);
-  if (Max_w > 0) w= min (w, (float) Max_w / PIXEL);
-  if (Max_h > 0) h= min (h, (float) Max_h / PIXEL);
+  float nw= max (1.0f, (float) sw / PIXEL);
+  float nh= max (1.0f, (float) sh / PIXEL);
+  if (Min_w > 0) nw= max (nw, (float) Min_w / PIXEL);
+  if (Min_h > 0) nh= max (nh, (float) Min_h / PIXEL);
+  if (Max_w > 0) nw= min (nw, (float) Max_w / PIXEL);
+  if (Max_h > 0) nh= min (nh, (float) Max_h / PIXEL);
+  // a window which fills the host gets that size when it floats again
+  if (fills ()) { saved_w= nw; saved_h= nh; return; }
+  w= nw; h= nh;
   if (shown) clamp ();
 }
 
@@ -1420,14 +1682,21 @@ vue_virtual_window_rep::get_size_limits (SI& min_w, SI& min_h, SI& max_w, SI& ma
 
 void
 vue_virtual_window_rep::set_position (SI sx, SI sy) {
+  host_changed (); // or a pending move of the host would move it too
+  placed= true;
+  if (fills ()) {
+    saved_x= (float) sx / PIXEL;
+    saved_y= (float) -sy / PIXEL;
+    return;
+  }
   x= (float) sx / PIXEL;
   y= (float) -sy / PIXEL;
-  placed= true;
   clamp ();
 }
 
 void
 vue_virtual_window_rep::get_position (SI& sx, SI& sy) {
+  host_changed ();
   sx= (SI) (x * PIXEL);
   sy= (SI) (-y * PIXEL);
 }
@@ -1450,12 +1719,90 @@ is_host (vue_window w) {
   return w != NULL && w == (vue_window) the_host;
 }
 
-// the host goes away (the virtual windows it holds are no longer drawn)
+// The geometry of the host last seen, in screen points (unknown while
+// host_w < 0). The windows on it are screen positioned, as SDL windows are:
+// when the host moves they move with it, and when it shrinks they are
+// brought back on it. Checked whenever the geometry of the host is asked
+// for (host_geometry) and at each redraw of the host (track_geometry),
+// which is how a move of the host is noticed.
+static int host_x= 0, host_y= 0, host_w= -1, host_h= -1;
+
+static void
+host_changed () {
+  if (the_host == NULL) return;
+  int x, y, w, h;
+  SDL_GetWindowPosition (the_host->sdl_win, &x, &y);
+  SDL_GetWindowSize (the_host->sdl_win, &w, &h);
+  if (x == host_x && y == host_y && w == host_w && h == host_h) return;
+  bool known= (host_w >= 0);
+  float dx= (float) (x - host_x), dy= (float) (y - host_y);
+  host_x= x; host_y= y; host_w= w; host_h= h; // before clamp, which asks
+  if (!known) return;
+  for (int i= 0; i < N(virtual_windows); i++) {
+    vue_virtual_window_rep* v= virtual_windows[i];
+    v->x += dx; v->y += dy;
+    v->saved_x += dx; v->saved_y += dy;
+    v->clamp ();
+  }
+}
+
+// The editor which fills the host in place of its window: when the window
+// of the host is closed, the windows it holds would be lost with it, so
+// the host keeps the SDL window (forget_host) and the editor on top takes
+// its place, as its contents. The editors are the windows TeXmacs names
+// "TeXmacs", "TeXmacs:2"... (unique_window_name in tm_window.cpp); with
+// none, the other windows stay where they are on an empty host.
+static void
+promote_editor () {
+  if (the_host == NULL) return;
+  vue_virtual_window_rep* best= NULL;
+  for (int i= N(virtual_windows) - 1; i >= 0 && best == NULL; i--) {
+    vue_virtual_window_rep* v= virtual_windows[i];
+    if (!v->popup && v->visible_requested && starts (v->orig_name, "TeXmacs"))
+      best= v;
+  }
+  if (best == NULL) return;
+  best->set_fills (best->full, true);
+  best->update_title ();
+  if (best->shown) focus_virtual (best);
+}
+
+// The host goes away. The virtual windows it holds would go with it: the
+// SDL window is handed over to a host with no contents of its own, which
+// goes on holding them, and an editor among them is promoted in place of
+// the one which was closed. That host goes with the last window it holds
+// (see ~vue_virtual_window_rep).
 static void
 forget_host (vue_window w) {
   if (!is_host (w)) return;
+  vue_sdl_mupdf_window_rep* old= the_host;
   the_host= NULL;
+  host_is_bare= false;
+  host_w= host_h= -1;
   if (pointer_hover == w) pointer_hover= NULL;
+  if (!single_window_mode () || is_headless () || nr_hosted_windows () == 0)
+    return;
+  SDL_Window* sw= old->sdl_win;
+  Window_to_window->reset (sw);
+  old->sdl_win= NULL; // not destroyed with the old window
+  vue_widget empty (tm_new<vue_widget_rep> ("vue_host"));
+  the_host= tm_new<vue_sdl_mupdf_window_rep> (empty, "", false, sw);
+  host_is_bare= true;
+  SDL_SetWindowTitle (sw, "TeXmacs");
+  promote_editor ();
+}
+
+// Closing the host which outlived its window closes the windows it holds
+// (they may refuse, e.g. a document with unsaved changes). Returns whether
+// w was such a host.
+static bool
+close_hosted_windows (vue_window w) {
+  if (!host_is_bare || !is_host (w)) return false;
+  array<vue_virtual_window_rep*> vl= virtual_windows;
+  for (int i= N(vl) - 1; i >= 0; i--)
+    if (id_to_window->contains (vl[i]->id) && !vl[i]->popup)
+      vl[i]->destroy_event ();
+  return true;
 }
 
 // The editors are told of a change of focus when the loop may change them,
@@ -1511,6 +1858,35 @@ draw_band_text (renderer ren, string s, int style, color c, SI x, SI y1, SI y2) 
   ren->set_shrinking_factor (1);
 }
 
+// The floating elements of the layout of the host with at least this
+// depth, its pulldown menus (5), the lists of its choice widgets and its
+// balloons (10), are above the virtual windows, as the menus and the
+// tooltips of the desktop are above its windows; the scroll bars (1) are
+// not. Clay sorts the commands by depth: those are at the end.
+static const int16_t host_overlay_z= 5;
+
+static int32_t
+host_overlay_start (Clay_RenderCommandArray& a) {
+  for (int32_t i= 0; i < a.length; i++)
+    if (Clay_RenderCommandArray_Get (&a, i)->zIndex >= host_overlay_z) return i;
+  return a.length;
+}
+
+// is there such an element of the host at (x, y) (points in the host)?
+// Then the pointer is for the host, whatever is below
+static bool
+host_overlay_at (float x, float y) {
+  if (the_host == NULL) return false;
+  Clay_RenderCommandArray& a= the_host->render_commands;
+  float d= the_host->density, px= x * d, py= y * d;
+  for (int32_t i= host_overlay_start (a); i < a.length; i++) {
+    Clay_BoundingBox b= Clay_RenderCommandArray_Get (&a, i)->boundingBox;
+    if (px >= b.x && px < b.x + b.width && py >= b.y && py < b.y + b.height)
+      return true;
+  }
+  return false;
+}
+
 // draw the visible virtual windows over the host, back to front
 static void
 composite_virtual_windows (vue_window host, renderer ren) {
@@ -1534,7 +1910,7 @@ composite_virtual_windows (vue_window host, renderer ren) {
       ren->set_pencil (theme_color (the_theme.shade[2]));
       ren->fill (X*px, -Y*px, (X+W)*px, -(Y-T)*px);
       color tc= theme_color (the_theme.text);
-      draw_band_text (ren, v->the_name, WIDGET_STYLE_BOLD, tc,
+      draw_band_text (ren, v->mod_name, WIDGET_STYLE_BOLD, tc,
                       (X + (int) (8*d))*px, -Y*px, -(Y-T)*px);
       // the close box: a cross, whatever the fonts have
       int c= (int) (7*d), cx= X + W - T/2, cy= Y - T/2;
@@ -1592,7 +1968,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
   vue_virtual_window_rep* target= NULL;
   bool title= false;
   if (pointer_capture != NULL && kind != 3) target= pointer_capture;
-  else
+  else if (!host_overlay_at (x, y))
     for (int i= N(virtual_windows) - 1; i >= 0; i--) {
       vue_virtual_window_rep* v= virtual_windows[i];
       if (!v->shown) continue;
@@ -1702,8 +2078,10 @@ void gui_open (int& argc, char** argv) {
   // the pointer comes in points: the factor between them is the pixel
   // density of the display. It was hardcoded to 2, so on a display without
   // HiDPI every pointer position was doubled and nothing could be hit.
-  // TeXmacs keeps one global factor, so a mixed-density setup follows the
-  // primary display.
+  // The density is a property of each window (update_density, from the
+  // display it is on), made current while that window is laid out or
+  // drawn (with_window, in vue_gui.hpp); the factor set here, from the
+  // primary display, is only the one in force outside of any window.
   {
     // the pixel density of the desktop mode, not its content scale, which
     // macOS reports as 1 while drawing at 2 pixels per point
@@ -1715,7 +2093,7 @@ void gui_open (int& argc, char** argv) {
     int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
     if (density <= 0.0f) factor= 2; // unknown: the previous default
     set_retina_factor (factor);
-      if (DEBUG_VUE || factor != 2)
+    if (DEBUG_VUE || factor != 2)
       SDL_Log ("display pixel density %.2f: drawing at %dx", density, factor);
   }
   initialize_colors ();
