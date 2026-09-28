@@ -1,0 +1,108 @@
+# TeXmacs with the native interface of macOS (NS/Cocoa, doc/ns-port.md):
+# builds Guile 1.8 (cached; Homebrew only has Guile 3), then TeXmacs.app and
+# its disk image with src/packages/macos/build-ns-app.sh, checks that the
+# application of the disk image starts and shows its window, and keeps the
+# disk image (and the snapshot of the window) as artifacts of the run.
+#
+# The application is signed ad hoc and not notarized: Gatekeeper rejects it
+# on another machine until the quarantine is removed,
+#   xattr -dr com.apple.quarantine /Applications/TeXmacs.app
+#
+# It runs on the branch ns_ci only: the work goes on in wip_other_guis,
+# which triggers nothing, and a state is built by moving ns_ci to it,
+#   git push -f origin wip_other_guis:ns_ci
+# (or by hand, from the Actions tab, on any branch)
+
+name: macOS (Cocoa)
+
+on:
+  push:
+    branches: [ns_ci]
+  workflow_dispatch:
+
+env:
+  GUILE_VERSION: 1.8.8
+
+jobs:
+  dmg:
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tools and libraries
+        run: brew install gmp libtool readline freetype libpng jpeg-turbo pkgconf
+
+      # Guile 1.8, in $RUNNER_TOOL_CACHE/guile-<version>: again only when its
+      # version or the runner change (or the last number of the key, when
+      # the recipe below changes)
+      - name: Cache of Guile
+        id: guile-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/guile-${{ env.GUILE_VERSION }}
+          key: guile-${{ env.GUILE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-1
+
+      - name: Guile
+        if: steps.guile-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -sSfLO "https://ftp.gnu.org/gnu/guile/guile-$GUILE_VERSION.tar.gz"
+          tar xzf "guile-$GUILE_VERSION.tar.gz"
+          cd "guile-$GUILE_VERSION"
+          # readline is keg-only (the one of macOS is libedit)
+          brew=$(brew --prefix) readline=$(brew --prefix readline)
+          ./configure --prefix="$RUNNER_TOOL_CACHE/guile-$GUILE_VERSION" \
+            --disable-error-on-warning --disable-dependency-tracking \
+            CPPFLAGS="-I$readline/include -I$brew/include" \
+            LDFLAGS="-L$readline/lib -L$brew/lib"
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: TeXmacs.app and its disk image
+        run: |
+          packages/macos/build-ns-app.sh --dmg \
+            --guile-config "$RUNNER_TOOL_CACHE/guile-$GUILE_VERSION/bin/guile-config"
+          dmg=$(ls ../distr/macos/*.dmg)
+          echo "DMG=$PWD/$dmg" >> "$GITHUB_ENV"
+          echo "DMG_NAME=$(basename "$dmg" .dmg)-$(uname -m)" >> "$GITHUB_ENV"
+          ls -l "$dmg"
+
+      # the application of the disk image, with its own libraries only; a
+      # test home, and the window saved as a PNG after some seconds
+      - name: Smoke test (the application of the disk image starts)
+        run: |
+          home=$(mktemp -d) shots=$(mktemp -d)
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG"
+          HOME="$home" TEXMACS_HOME_PATH="$home/.TeXmacs" TEXMACS_NS_SNAPSHOT="$shots" \
+            "$mnt/TeXmacs.app/Contents/MacOS/TeXmacs" > "$home/log.txt" 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do
+            test -s "$shots/window-1.png" && break
+            kill -0 $pid 2> /dev/null || break
+            sleep 2
+          done
+          kill $pid 2> /dev/null || true
+          wait $pid 2> /dev/null || true
+          hdiutil detach "$mnt"
+          tail -30 "$home/log.txt"
+          mkdir -p ../distr/snapshots
+          cp "$shots"/*.png ../distr/snapshots/ 2> /dev/null || true
+          test -s "$shots/window-1.png"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DMG_NAME }}
+          path: ${{ env.DMG }}
+          compression-level: 0
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snapshots
+          path: distr/snapshots
+          if-no-files-found: ignore

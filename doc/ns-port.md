@@ -161,6 +161,24 @@ Checked: the application, copied elsewhere and started with an empty
 environment or with `open`, finds its files in the bundle and edits
 documents.
 
+### Continuous integration
+
+`.github/workflows/macos-ns.yml` (GitHub Actions, macOS 15 on arm64)
+builds Guile 1.8.8 from its GNU tarball (Homebrew has only Guile 3; the
+build is cached), then runs `build-ns-app.sh --dmg` and starts the
+application of the disk image with a test home and `TEXMACS_NS_SNAPSHOT`:
+the run fails unless it shows its window. The disk image and the snapshots
+are artifacts of the run. The disk image is signed ad hoc: after
+installing it elsewhere, `xattr -dr com.apple.quarantine
+/Applications/TeXmacs.app`. It runs on the branch `ns_ci` only (the work in
+`wip_other_guis` triggers nothing):
+
+```sh
+git push -f origin wip_other_guis:ns_ci
+```
+
+or by hand from the Actions tab.
+
 ## Next steps
 
 1. Use it with real input and hardware: input methods, the contextual
