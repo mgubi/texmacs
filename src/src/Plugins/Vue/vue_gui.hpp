@@ -112,7 +112,14 @@ struct vue_input_state {
   // popups and balloons
   bool current_popup;      // is there an active popup?
   bool cancel_popup;       // should we cancel popups?
-  time_t away_time;        // tolerance for mouse motion
+  // menus (see layout_pull_button): the item of an open menu under the
+  // pointer, the menu it is in and since when; the open menus and their
+  // buttons in the last pass; a press outside them closes them and goes no
+  // further, nor do the moves and the release which follow it
+  uint32_t hover_item, hover_menu;
+  time_t hover_since;
+  array<uint32_t> menu_zones;
+  bool swallow_mouse;
   uint32_t current_balloon;
   time_t balloon_time;
   // hot and active elements
@@ -131,7 +138,8 @@ struct vue_input_state {
       wheel_ambiguous (false), wheel_pend_x (0), wheel_pend_y (0),
       wheel_over_x (0), wheel_over_y (0), wheel_smooth_time (0),
       clay_wheel_x (0), clay_wheel_y (0), wheel_taken (false),
-      current_popup (false), cancel_popup (false), away_time (0),
+      current_popup (false), cancel_popup (false),
+      hover_item (0), hover_menu (0), hover_since (0), swallow_mouse (false),
       current_balloon (0), balloon_time (0),
       hot_id (0), active_id (0), active_button (0), last_id {},
       scrollbar { 0, 0, true } {}

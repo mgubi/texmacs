@@ -326,7 +326,12 @@ array<double> mouse_data;
 bool current_popup; // is there an active popup?
 bool cancel_popup;  // should we cancel popups?
 uint32_t open_pull_id= 0; // the pull button whose menu is open (0: none)
-time_t away_time;   // tolerance for mouse motion
+uint32_t open_pull_bar= 0; // the bar of that button
+uint32_t current_bar= 0;  // the horizontal menu being laid out
+uint32_t current_menu= 0; // the open menu being laid out (its float)
+bool menu_press= false;   // the pass has a press, maybe taken by the menus
+bool menu_hovered= false; // an item of an open menu is under the pointer
+array<uint32_t> menu_zones_now; // the open menus and their buttons
 
 // some more context during layout
 Clay_ElementId last_id;
@@ -396,7 +401,6 @@ load_input_state (vue_window win) {
   mouse_data= in.mouse_data;
   current_popup= in.current_popup;
   cancel_popup= in.cancel_popup;
-  away_time= in.away_time;
   current_balloon= in.current_balloon;
   balloon_time= in.balloon_time;
   hot_id= in.hot_id;
@@ -420,7 +424,6 @@ store_input_state (vue_window win) {
   in.mouse_data= mouse_data;
   in.current_popup= current_popup;
   in.cancel_popup= cancel_popup;
-  in.away_time= away_time;
   in.current_balloon= current_balloon;
   in.balloon_time= balloon_time;
   in.hot_id= hot_id;
@@ -467,6 +470,38 @@ gui_init_context() {
   // popup state initialization
   current_popup= false;
   cancel_popup= false;
+
+  // the menus (see layout_pull_button): a press outside the open ones
+  // closes them, and neither it nor the moves and the release which follow
+  // it go to what is under the pointer, as on the Mac; Escape closes them
+  vue_input_state& in= current_window->input;
+  if (in.swallow_mouse) {
+    if (starts (mouse_action, "release-")) {
+      mouse_action= "";
+      in.swallow_mouse= false;
+    }
+    else if (mouse_action == "move") mouse_action= "";
+  }
+  menu_press= starts (mouse_action, "press-");
+  if (N(in.menu_zones) > 0) {
+    if (menu_press) {
+      bool inside= false;
+      for (int i=0; i<N(in.menu_zones); i++)
+        if (Clay_PointerOver ((Clay_ElementId) { .id= in.menu_zones[i] }))
+          inside= true;
+      if (!inside) {
+        mouse_action= "";
+        in.swallow_mouse= true;
+      }
+    }
+    if (key_event == "escape") {
+      cancel_popup= true;
+      key_event= "";
+    }
+  }
+  menu_zones_now= array<uint32_t> ();
+  menu_hovered= false;
+  current_bar= current_menu= 0;
   
   // make refresh messages available to widgets during layout
   current_window->refresh_kinds= current_window->next_refresh_kinds;
@@ -484,6 +519,9 @@ gui_finalize_context() {
   if (wheel_pending && mouse_action != "wheel")
     current_window->input.wheel_taken= true;
   wheel_pending= false;
+  // the menus open in this pass; the pointer left their items
+  current_window->input.menu_zones= menu_zones_now;
+  if (!menu_hovered) current_window->input.hover_item= 0;
   // events live for exactly one layout pass of their window
   mouse_action= "";
   key_event= "";
@@ -1520,6 +1558,45 @@ vue_ui_rep::send (slot s, blackbox val) {
 void scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t z= 1); // below
 extern "C" Clay_Dimensions vue_clay_min_dimensions (Clay_ElementId id); // clay.c
 
+// The menus behave as those of the Mac: a click on a title of a bar opens
+// its menu, and while it is open the pointer opens the menu of any other
+// title of that bar it goes over; a submenu opens when the pointer rests
+// on its item (MENU_DELAY) and closes when it rests on another item of the
+// same menu; everything stays open when the pointer leaves the menus, until
+// an item is chosen, the pointer is pressed outside them (the press is not
+// passed on: gui_init_context), or Escape.
+#define MENU_DELAY 150
+
+// the padding of the items of vertical menus
+static Clay_Padding
+menu_item_padding () {
+  return { ui_px (16), ui_px (16), ui_px (6), ui_px (6) };
+}
+
+// the item of an open menu under the pointer, and since when
+static void
+note_menu_hover (Clay_ElementId id) {
+  if (current_menu == 0 || !Clay_PointerOver (id)) return;
+  vue_input_state& in= current_window->input;
+  menu_hovered= true;
+  if (in.hover_item != id.id || in.hover_menu != current_menu) {
+    in.hover_item= id.id;
+    in.hover_menu= current_menu;
+    in.hover_since= texmacs_time ();
+  }
+}
+
+// the pointer has rested MENU_DELAY on an item of the menu (0: on none)
+static bool
+menu_rested (uint32_t menu, uint32_t item) {
+  vue_input_state& in= current_window->input;
+  if (in.hover_menu != menu || in.hover_item == 0) return false;
+  if (item != 0 && in.hover_item != item) return false;
+  if (texmacs_time () - in.hover_since >= MENU_DELAY) return true;
+  needs_update (); // a pass when the delay is over, the pointer resting
+  return false;
+}
+
 void
 layout_pull_button (vue_ui_rep *w) {
   vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
@@ -1529,56 +1606,83 @@ layout_pull_button (vue_ui_rep *w) {
   Clay_Sizing s= layoutExpand;
   if (down) s= { CLAY_SIZING_FIT(.min=ui_pxf (20)) };
   ui_signal sig= button_logic (button_id);
+  uint32_t parent_menu= current_menu;
+  if (!down) note_menu_hover (button_id);
+  // the items of vertical menus have the padding of menu_button
+  Clay_Padding padding= CLAY_PADDING_ALL(ui_px (5));
+  if (!down && button_grow) padding= menu_item_padding ();
   CLAY(button_id, {
     .layout= {
-      .padding= CLAY_PADDING_ALL(ui_px (5)),
+      .padding= padding,
       .childGap= ui_px (4),
       .sizing= s,
       .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
     // flat: the bar or menu behind shows through unless hovered (the bars
     // of the main window have different greys, hence highlight_on)
-    .backgroundColor= hot_id == button_id.id ? highlight_on (color_behind)
-                                             : (Clay_Color) { 0, 0, 0, 0 } })
+    .backgroundColor= (hot_id == button_id.id || !is_nil (d.cw))
+                      ? highlight_on (color_behind)
+                      : (Clay_Color) { 0, 0, 0, 0 } })
   {
     // items of vertical menus with check marks reserve their column
     if (!down && menu_has_marks)
       CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED(ui_pxf (22)), CLAY_SIZING_FIXED(ui_pxf (22)) }}}) {}
     concrete(d.w)->do_layout ();
     if (!down) {
-      CLAY_AUTO_ID({ .layout= { .sizing= layoutExpand }}){};
+      CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_GROW(ui_pxf (32)), CLAY_SIZING_GROW(0) }}}){};
       layout_arrow ("<#25B8>", 1, black); // right arrow
     }
-    if (sig.clicked == 1) {
-      if (is_nil (d.cw)) {
-        // we clicked an inactive button, we evaluate the promise
-        d.cw= d.pw->eval ();
-        d.placed= false;
-        d.flip= false;
-        d.shift_x= d.shift_y= 0;
-        d.win_w= d.win_h= 0;
-        current_popup= true;
-        away_time= 0;
-        // only the buttons of a bar are mutually exclusive: a submenu
-        // (pullright) belongs to the chain of the menu it is in, and
-        // claiming the slot here would close its own parent
-        if (down) open_pull_id= button_id.id;
-      } else {
-        // we clicked an active button, we go back to an inactive state
-        d.cw= NULL;
-        current_popup= false;
-        if (down && open_pull_id == button_id.id) open_pull_id= 0;
+    auto open_menu= [&] () {
+      // evaluate the promise
+      d.cw= d.pw->eval ();
+      d.placed= false;
+      d.flip= false;
+      d.shift_x= d.shift_y= 0;
+      d.win_w= d.win_h= 0;
+      current_popup= true;
+      // only the buttons of a bar are mutually exclusive: a submenu
+      // (pullright) belongs to the chain of the menu it is in, and
+      // claiming the slot here would close its own parent
+      if (down) {
+        open_pull_id= button_id.id;
+        open_pull_bar= current_bar;
       }
-    } else if (current_popup) {
-      // some other popup is active, we should be inactive
+    };
+    auto close_menu= [&] () {
       d.cw= NULL;
+      if (down && open_pull_id == button_id.id) open_pull_id= 0;
+    };
+    bool is_open= !is_nil (d.cw);
+    if (sig.clicked == 1 && !is_open) open_menu ();
+    else if (sig.clicked == 1 && down) {
+      // a click on the title of the open menu closes it
+      close_menu ();
+      current_popup= false;
     }
-    else if (down && !is_nil (d.cw) &&
+    else if (!is_open && down && open_pull_id != 0 &&
+             open_pull_id != button_id.id && open_pull_bar == current_bar &&
+             active_id == 0 && Clay_PointerOver (button_id)) {
+      // another menu of the bar is open: the pointer takes it here
+      open_menu ();
+      layout_again= true;
+    }
+    else if (!is_open && !down && !current_popup &&
+             menu_rested (parent_menu, button_id.id))
+      open_menu (); // the pointer rests on the item of a submenu
+    else if (current_popup && is_open && sig.clicked != 1) {
+      // some other popup is active, we should be inactive
+      close_menu ();
+    }
+    else if (down && is_open &&
              open_pull_id != 0 && open_pull_id != button_id.id) {
       // another button of the bar opened its menu (it may have been laid
       // out after us, where neither cancel_popup nor current_popup reaches
       // us); our own submenus close with us
-      d.cw= NULL;
+      close_menu ();
     }
+    else if (!down && is_open && !Clay_PointerOver (button_id) &&
+             menu_rested (parent_menu, 0) &&
+             current_window->input.hover_item != button_id.id)
+      close_menu (); // the pointer rests on another item of our menu
     // if we are active then we draw the float window
     if (!is_nil (d.cw)) {
       // when the menu (as laid out in the previous pass) sticks out of the
@@ -1638,7 +1742,7 @@ layout_pull_button (vue_ui_rep *w) {
           .attachTo= CLAY_ATTACH_TO_PARENT,
           .attachPoints= attach },
         .layout= {
-          .padding= { ui_px (8), ui_px (8), ui_px (8), ui_px (8) },
+          .padding= { ui_px (10), ui_px (10), ui_px (12), ui_px (12) },
           .sizing= { .width= CLAY_SIZING_FIT(.min= ui_pxf (120), .max= dims.width),
                      .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
@@ -1649,21 +1753,25 @@ layout_pull_button (vue_ui_rep *w) {
           .color= { 150, 150, 150, 255 }}})
       {
         current_popup= false;
+        uint32_t save_menu= current_menu, save_bar= current_bar;
+        current_menu= float_id.id;
+        current_bar= 0;
         concrete (d.cw)->do_layout ();
-        bool away= false;
-        if (!(Clay_PointerOver (float_id) || Clay_PointerOver (button_id))) {
-          if (away_time == 0) away_time= texmacs_time ();
-          else if (texmacs_time () - away_time > 500) away= true;
-        }
-        if (cancel_popup || (!current_popup && away)) {
-          // we are requested to cancel or
-          // we are the last popup of the chain and we are not hovered:
-          // then we need to deactivate
-          d.cw= NULL;
-          current_popup= false; // well, noop, but keep for clarity
+        current_menu= save_menu;
+        current_bar= save_bar;
+        // a press outside the chain: its last menu closes first, then the
+        // ones it hangs from, down to the one the press is in
+        bool outside= menu_press && !Clay_PointerOver (float_id) &&
+                      !Clay_PointerOver (button_id);
+        if (cancel_popup || (!current_popup && outside)) {
+          // an item was chosen, or we are the last popup of the chain and
+          // the pointer was pressed outside: then we need to deactivate
+          close_menu ();
+          current_popup= false;
         } else {
           // ok, we are the current popup now in this layout cycle
           current_popup= true;
+          menu_zones_now << float_id.id << button_id.id;
         }
       }
     }
@@ -1714,13 +1822,21 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
       .childAlignment= { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
   {
     bool save_grow= button_grow, save_marks= menu_has_marks;
+    uint32_t save_bar= current_bar, save_menu= current_menu;
     button_grow= vert;
     menu_has_marks= vert && marks;
+    // the titles of a bar (see layout_pull_button); a vertical menu which
+    // is not in an open menu is one too (a popup menu in a window of its
+    // own, a menu of a dialog): its submenus open under the pointer
+    if (!vert) current_bar= id;
+    else if (current_menu == 0) current_menu= CLAY_IDI("vertical_menu", id).id;
     for (int i=0, n=N(a); i< n; i++) {
       concrete (a[i])->do_layout ();
     }
     button_grow= save_grow;
     menu_has_marks= save_marks;
+    current_bar= save_bar;
+    current_menu= save_menu;
   }
 }
 
@@ -2268,6 +2384,8 @@ vue_ui_rep::do_layout () {
     Clay_Color hl= highlight_on (color_behind); // shows on the bar behind
     Clay_Color bg= faded (hl); // flat buttons show their container
     Clay_Padding padding= swatch ? CLAY_PADDING_ALL(ui_px (2)) : CLAY_PADDING_ALL(ui_px (5));
+    if (!swatch && button_grow) padding= menu_item_padding ();
+    if (!inert) note_menu_hover (button_id);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(ui_pxf (4));
     Clay_BorderElementConfig border= {};
     bool tab_strip= false;
@@ -2336,8 +2454,8 @@ vue_ui_rep::do_layout () {
       }
       concrete(d.w)->do_layout ();
       if (N(d.ks) > 0) {
-        // add shortcut
-        CLAY_AUTO_ID({ .layout= { .sizing= layoutExpand }}) {}
+        // add shortcut, well apart from the label
+        CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_GROW(ui_pxf (32)), CLAY_SIZING_GROW(0) }}}) {}
         layout_text (d.ks, d.style, black);
       }
       if (tab_strip && bd.found) {
