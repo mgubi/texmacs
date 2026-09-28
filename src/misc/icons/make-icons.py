@@ -49,8 +49,8 @@ PAGE='M6.5 2.75h7.25l4.5 4.5v12.5c0 .83-.67 1.5-1.5 1.5H6.5c-.83 0-1.5-.67-1.5-1
 FOLD='M13.75 2.75v3c0 .83.67 1.5 1.5 1.5h3'
 FOLDER='M3 6.25c0-.97.78-1.75 1.75-1.75h3.9c.52 0 1.01.23 1.34.63L11.5 6.75h7.75c.97 0 1.75.78 1.75 1.75v9.75c0 .97-.78 1.75-1.75 1.75H4.75C3.78 20 3 19.22 3 18.25z'
 def badge(cls, glyph):
-  return (f'<circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="{cls}" cx="17.5" cy="17.5" r="5"/>'
-          f'<path class="wh" d="{glyph}"/>')
+  return (f'<circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="{cls}" cx="17" cy="17" r="5.75"/>'
+          f'<g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="{glyph}"/></g>')
 HAND=('<path class="paper o" d="M13 7.25H4.25a1.75 1.75 0 0 0 0 3.5H10"/>'
       '<path class="paper o" d="M10 7.5c1-1.3 2.2-2.2 3.8-2.2H17c1.1 0 2 .9 2 2v9.2c0 1.1-.9 2-2 2h-4.5c-1 0-1.8-.8-1.8-1.8'
       'c0-.9.7-1.6 1.6-1.6h-.8c-.9 0-1.6-.7-1.6-1.6s.7-1.6 1.6-1.6h-.2c-.9 0-1.6-.7-1.6-1.6"/>'
@@ -495,9 +495,9 @@ GRAPHICS_ICONS = [
  ('cline_mode', 'Polygons',
   '<path class="sec o" d="M4 17.5 7.5 5l12 3.5-2 11z"/>'),
  ('spline_mode', 'Splines',
-  '<path class="o" d="M3.5 17c2.5-9 6.5-11 8.5-7s5 4.5 8.5-3"/>'),
+  '<path class="o" d="M21 5.5c-2.5-2-6-2-9.5-.5C7 7 3.5 10.5 3.5 14.5s3 6.5 7 6.5 6.5-2.5 6.5-5.5-2.5-5-5.5-5-4 2-4 4 1.5 3.5 3.5 3.5 2.5-1.25 2.5-2.5"/>'),
  ('cspline_mode', 'Closed splines',
-  '<path class="sec o" d="M6 6.5c3.5-3.5 11-3 12.5 1.5s-1 6-3 7.5-2.5 5-7 4-7.5-9.5-2.5-13z"/>'),
+  '<path class="sec o" d="M11 4c2.5-1.5 5.5 0 6.75 2.75s4 5 3.5 8.75-4 5.75-8.25 5.25S5.5 19 5.75 16.5s4-2.75 4-4.75S5.5 9.5 5.5 7.75 8.5 5.5 11 4z"/>'),
  ('arc_mode', 'Arcs',
   '<path class="o" d="M4.5 17.5a8 8 0 0 1 15-4"/><circle class="gl" cx="4.5" cy="17.5" r="1.75"/><circle class="gl" cx="19.5" cy="13.5" r="1.75"/>'),
  ('carc_mode', 'Circles',
@@ -681,17 +681,17 @@ OTHER_ICONS = [
  ('entry', 'Entry',
   '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H18.5M5.5 14.5H18.5M5.5 18H13"/>'),
  ('entry_add', 'Add an entry',
-  '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H12.5M5.5 14.5H11"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M17.5 15.1v4.8M15.1 17.5h4.8"/>'),
+  '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H12.5M5.5 14.5H11"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="gl" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="M17.5 15.1v4.8M15.1 17.5h4.8"/></g>'),
  ('entry_confirm', 'Confirm the entry',
-  '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H12.5M5.5 14.5H11"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M15.3 17.6l1.5 1.6 3-3.2"/>'),
+  '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H12.5M5.5 14.5H11"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="gl" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="M15.3 17.6l1.5 1.6 3-3.2"/></g>'),
  ('entry_remove', 'Remove the entry',
-  '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H12.5M5.5 14.5H11"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="fr" cx="17.5" cy="17.5" r="5"/><path class="white" d="M15.6 15.6l3.8 3.8M19.4 15.6l-3.8 3.8"/>'),
+  '<rect class="paper o" x="2.5" y="3.5" width="19" height="17" rx="2"/><path class="sec" d="M3.3 4.3h17.4v3.2H3.3z"/><path class="o thin" d="M2.5 7.5h19"/><path class="o thin" d="M5.5 11H12.5M5.5 14.5H11"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="fr" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="white" d="M15.6 15.6l3.8 3.8M19.4 15.6l-3.8 3.8"/></g>'),
  ('open_bis', 'Open',
-  '<path class="folder" d="M3 6.25c0-.97.78-1.75 1.75-1.75h3.9c.52 0 1.01.23 1.34.63L11.5 6.75h7.75c.97 0 1.75.78 1.75 1.75v9.75c0 .97-.78 1.75-1.75 1.75H4.75C3.78 20 3 19.22 3 18.25z"/><path class="folder" d="M3 20 5.55 11.3c.14-.47.57-.8 1.06-.8h14.4c.55 0 .94.53.78 1.05L19.4 19.1c-.18.54-.68.9-1.25.9z"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M17.5 20v-4.9M15.3 17.2l2.2-2.2 2.2 2.2"/>'),
+  '<path class="folder" d="M3 6.25c0-.97.78-1.75 1.75-1.75h3.9c.52 0 1.01.23 1.34.63L11.5 6.75h7.75c.97 0 1.75.78 1.75 1.75v9.75c0 .97-.78 1.75-1.75 1.75H4.75C3.78 20 3 19.22 3 18.25z"/><path class="folder" d="M3 20 5.55 11.3c.14-.47.57-.8 1.06-.8h14.4c.55 0 .94.53.78 1.05L19.4 19.1c-.18.54-.68.9-1.25.9z"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="gl" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="M17.5 20v-4.9M15.3 17.2l2.2-2.2 2.2 2.2"/></g>'),
  ('tmdoc_title', 'Documentation title',
   '<path class="gl emb" d="M7.26 9.55C7.26 8.69 7.12 7.62 6.51 6.84C5.68 5.82 4.36 5.68 3.65 5.68H0.74C0.35 5.68 0.21 5.8 0.21 6.21V12.79C0.21 13.19 0.33 13.32 0.74 13.32H3.65C6.33 13.32 7.26 11.71 7.26 9.55ZM5.68 9.55C5.68 10.8 5.56 12.37 3.22 12.37H1.8V6.63H3.21C5.58 6.63 5.68 8.32 5.68 9.55ZM16 9.55C16 7.34 15.2 5.44 12.31 5.44C9.27 5.44 8.62 7.54 8.62 9.55C8.62 11.61 9.33 13.56 12.3 13.56C15.14 13.56 16 11.81 16 9.55ZM14.38 9.38C14.38 10.36 14.38 12.68 12.31 12.68C10.23 12.68 10.23 10.38 10.23 9.38C10.23 8.41 10.23 6.3 12.3 6.3C14.38 6.3 14.38 8.39 14.38 9.38ZM23.79 12.68 23.7 11.73C23.7 11.67 23.63 11.61 23.57 11.61C23.53 11.61 23.51 11.62 23.48 11.63C23.18 11.87 22.86 12.09 22.5 12.21C22.14 12.33 21.75 12.34 21.38 12.34C20.7 12.34 20.01 12.15 19.57 11.64C19.08 11.06 18.97 10.27 18.97 9.5C18.97 8.73 19.08 7.94 19.57 7.36C20.01 6.84 20.7 6.65 21.38 6.65C21.71 6.65 22.05 6.7 22.37 6.82C22.69 6.94 22.96 7.12 23.21 7.36C23.24 7.38 23.27 7.39 23.3 7.39C23.38 7.39 23.43 7.33 23.45 7.28L23.65 6.1C23.65 6.01 23.61 5.97 23.57 5.95C23.21 5.82 22.85 5.71 22.49 5.64C22.11 5.57 21.74 5.55 21.38 5.55C20.28 5.55 19.14 5.78 18.36 6.54C17.59 7.3 17.35 8.41 17.35 9.5C17.35 10.58 17.59 11.69 18.36 12.45C19.14 13.22 20.28 13.44 21.38 13.44C21.78 13.44 22.2 13.43 22.6 13.32C22.99 13.21 23.36 13.02 23.72 12.81C23.75 12.79 23.79 12.75 23.79 12.68Z"/><circle class="o thin" cx="12" cy="18" r="3"/><path class="o thin" d="M13.1 17.1a1.3 1.3 0 1 0 0 1.8"/>'),
  ('tmdoc_annotate', 'Annotate',
-  '<path class="paper o" d="M9 2.5h10.5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-5.5l-3.5 3v-3H9a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z"/><path class="o" d="M5 15.5 3 17.5l2 2M9 15.5 11 17.5l-2 2"/>'),
+  '<path class="paper o" d="M11.5 2.5h8a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-3.5l-3 2.5v-2.5h-1.5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path class="o" d="M7 11 2.5 16l4.5 5M11.5 11l4.5 5-4.5 5"/>'),
  ('prefs_general', 'General',
   '<rect class="sec o" x="2.5" y="3" width="13" height="11" rx="1.5"/><rect class="paper o" x="8.5" y="9" width="13" height="11" rx="1.5"/><path class="o thin" d="M8.5 12h13"/>'),
  ('prefs_keyboard', 'Keyboard',
@@ -705,13 +705,13 @@ OTHER_ICONS = [
  ('cloud', 'Cloud',
   '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/>'),
  ('cloud_upload', 'Upload',
-  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><path class="o" d="M12 17v-6.5M9.5 13 12 10.5l2.5 2.5"/>'),
+  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><path class="o" d="M12 15.75v-6.5M9.5 11.75 12 9.25l2.5 2.5"/>'),
  ('cloud_download', 'Download',
-  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><path class="o" d="M12 10v6.5M9.5 14 12 16.5l2.5-2.5"/>'),
+  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><path class="o" d="M12 9.25v6.5M9.5 13.25 12 15.75l2.5-2.5"/>'),
  ('cloud_file', 'Remote file',
-  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M15.75 15h2.5l1.25 1.25v3.25h-3.75z"/>'),
+  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="gl" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="M15.75 15h2.5l1.25 1.25v3.25h-3.75z"/></g>'),
  ('cloud_dir', 'Remote directory',
-  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M15 15.5h2l.75.75h2.25v3.25H15z"/>'),
+  '<path class="paper o" d="M7 19h10.75a4.25 4.25 0 0 0 .6-8.46A6.5 6.5 0 0 0 5.9 9.3 4.9 4.9 0 0 0 7 19z"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="gl" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="M15 15.5h2l.75.75h2.25v3.25H15z"/></g>'),
  ('cloud_home', 'Home',
   '<path class="paper o" d="M3.5 11 12 3.5l8.5 7.5"/><path class="paper o" d="M5.5 9.5V20h13V9.5"/><rect class="sec o" x="10" y="14" width="4" height="6"/>'),
  ('cloud_share', 'Share',
@@ -727,7 +727,7 @@ OTHER_ICONS = [
  ('cloud_server', 'Server',
   '<path class="paper o" d="M6 13.5h11.25a3.6 3.6 0 0 0 .5-7.15A5.5 5.5 0 0 0 7.05 5.3 4.1 4.1 0 0 0 6 13.5z"/><path class="sec o" d="M6 15.25v4.25c0 1.1 2.7 2 6 2s6-.9 6-2v-4.25"/><ellipse class="paper o" cx="12" cy="15.25" rx="6" ry="2"/>'),
  ('cloud_admin', 'Administration',
-  '<circle class="paper o" cx="10" cy="7.5" r="3.75"/><path class="paper o" d="M2.5 21c0-4.4 3.4-7.5 7.5-7.5 1.4 0 2.7.35 3.8 1"/><circle class="paperf" cx="17.5" cy="17.5" r="6.25"/><circle class="gl" cx="17.5" cy="17.5" r="5"/><path class="wh" d="M17.5 15.2v4.6M15.5 16.35l4 2.3M19.5 16.35l-4 2.3"/>'),
+  '<circle class="paper o" cx="10" cy="7.5" r="3.75"/><path class="paper o" d="M2.5 21c0-4.4 3.4-7.5 7.5-7.5 1.4 0 2.7.35 3.8 1"/><circle class="paperf" cx="17" cy="17" r="6.9"/><circle class="gl" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path class="wh" d="M17.5 15.2v4.6M15.5 16.35l4 2.3M19.5 16.35l-4 2.3"/></g>'),
 ]
 ICONS= ICONS + OTHER_ICONS
 
