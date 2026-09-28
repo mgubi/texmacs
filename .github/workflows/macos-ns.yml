@@ -66,8 +66,9 @@ jobs:
         run: |
           packages/macos/build-ns-app.sh --dmg \
             --guile-config "$RUNNER_TOOL_CACHE/guile-$GUILE_VERSION/bin/guile-config"
-          dmg=$(ls ../distr/macos/*.dmg)
-          echo "DMG=$PWD/$dmg" >> "$GITHUB_ENV"
+          # upload-artifact wants a path without ".."
+          dmg=$(cd ../distr/macos && ls "$PWD"/*.dmg)
+          echo "DMG=$dmg" >> "$GITHUB_ENV"
           echo "DMG_NAME=$(basename "$dmg" .dmg)-$(uname -m)" >> "$GITHUB_ENV"
           ls -l "$dmg"
 
