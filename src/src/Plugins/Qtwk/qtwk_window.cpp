@@ -213,6 +213,19 @@ qtwk_window_rep::set_visibility (bool flag) {
 }
 
 void
+qtwk_window_rep::set_on_top (bool flag) {
+  // a tool window floats above the other windows of the application (as
+  // qt_window_widget_rep)
+  if (!win) return;
+  Qt::WindowFlags f= win->windowFlags () & ~Qt::WindowType_Mask;
+  if (flag) f= (f | Qt::Tool | Qt::WindowStaysOnTopHint);
+  else f= ((f & ~Qt::WindowStaysOnTopHint) | Qt::Window);
+  bool vis= win->isVisible ();
+  win->setWindowFlags (f);
+  if (vis) win->show ();
+}
+
+void
 qtwk_window_rep::set_full_screen (bool flag) {
 #if 0
   if (full_screen_flag == flag) return;

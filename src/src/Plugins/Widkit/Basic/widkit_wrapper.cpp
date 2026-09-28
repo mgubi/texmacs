@@ -694,6 +694,10 @@ wk_widget_rep::send (slot s, blackbox val) {
     check_type<bool> (val, "SLOT_FULL_SCREEN");
     win->set_full_screen (open_box<bool> (val));
     break;
+  case SLOT_ON_TOP:
+    check_type<bool> (val, "SLOT_ON_TOP");
+    win->set_on_top (open_box<bool> (val));
+    break;
   case SLOT_NAME:
     send_string (THIS, "window name", val);
     break;

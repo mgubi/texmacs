@@ -207,6 +207,8 @@ public:
   virtual void   set_modified (bool flag) = 0;
   virtual void   set_visibility (bool flag) = 0;
   virtual void   set_full_screen (bool flag) = 0;
+  // above the other windows of TeXmacs (a tool window)
+  virtual void   set_on_top (bool flag) { (void) flag; }
   virtual void   set_size (SI w, SI h) = 0;
   virtual void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h) = 0;
   virtual void   get_size (SI& w, SI& h) = 0;

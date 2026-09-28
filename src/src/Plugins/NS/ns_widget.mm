@@ -321,6 +321,19 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       }
     }
       break;
+    case SLOT_ON_TOP:
+    {
+      // a tool window, which floats above the other windows of TeXmacs and
+      // hides with the application (as the Qt::Tool of the Qt interface)
+      check_type<bool> (val, s);
+      bool flag = open_box<bool> (val);
+      NSWindow *win = [wc window];
+      if (win) {
+        [win setLevel: flag? NSFloatingWindowLevel: NSNormalWindowLevel];
+        [win setHidesOnDeactivate: flag];
+      }
+    }
+      break;
     case SLOT_VISIBILITY:
     {
       check_type<bool> (val, s);

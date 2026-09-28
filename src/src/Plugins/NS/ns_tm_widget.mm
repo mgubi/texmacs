@@ -1103,11 +1103,12 @@ ns_test_combos (NSView* v, NSMutableArray* a) {
       if (is_nil (ns_window_widget_of (w))) continue;
       NSRect f= [w frame];
       NSRect c= [w contentRectForFrameRect: f];
-      fprintf (stderr, "NSTEST window '%s' %s%s%s%sat %.0f,%.0f content %.0fx%.0f\n",
+      fprintf (stderr, "NSTEST window '%s' %s%s%s%s%sat %.0f,%.0f content %.0fx%.0f\n",
                [[w title] UTF8String], [w isVisible]? "shown ": "hidden ",
                ns_test_menu_state (w),
                [w isMainWindow]? "main ": "",
                ([w styleMask] & NSWindowStyleMaskFullScreen)? "full-screen ": "",
+               [w level] > NSNormalWindowLevel? "on-top ": "",
                f.origin.x, main_screen_height () - NSMaxY (f),
                c.size.width, c.size.height);
     }

@@ -4029,6 +4029,12 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
         }
       }
       break;
+    case SLOT_ON_TOP:
+      {
+        bool flag= check_open<bool> (val, s);
+        if (win) win->set_on_top (flag);
+      }
+      break;
     case SLOT_MOUSE_GRAB:
       {
         check_type<bool> (val, s); // true= get grab, false= release grab

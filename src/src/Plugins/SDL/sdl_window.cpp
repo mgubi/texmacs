@@ -264,6 +264,12 @@ sdl_window_rep::set_full_screen (bool flag) {
 }
 
 void
+sdl_window_rep::set_on_top (bool flag) {
+  // a tool window, above the other windows
+  SDL_SetWindowAlwaysOnTop (sdl_win, flag);
+}
+
+void
 sdl_window_rep::move_event (int x, int y) {
   bool flag= (win_x!=x) || (win_y!=y);
   win_x= x; win_y= y;

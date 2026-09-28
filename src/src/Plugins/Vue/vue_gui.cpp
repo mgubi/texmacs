@@ -120,6 +120,7 @@ public:
   void   set_modified (bool flag);
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag);
+  void   set_on_top (bool flag) { SDL_SetWindowAlwaysOnTop (sdl_win, flag); }
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   update_density (); // the pixel density of its display (override)
@@ -1214,6 +1215,7 @@ public:
   float x, y;  // top left corner of the contents, screen points
   float w, h;  // size of the contents, points
   bool  placed; // positioned by TeXmacs (else centered on the host)
+  bool  on_top; // above the other virtual windows (see raise)
   SI Min_w, Min_h, Max_w, Max_h;
 
   vue_virtual_window_rep (vue_widget w, string name, bool popup);
@@ -1228,6 +1230,7 @@ public:
   void   set_modified (bool flag) { modified= flag; }
   void   set_visibility (bool flag);
   void   set_full_screen (bool flag) { (void) flag; }
+  void   set_on_top (bool flag) { on_top= flag; raise (); }
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   get_size (SI& w, SI& h);
@@ -1258,7 +1261,7 @@ static float drag_dx= 0, drag_dy= 0;
 
 vue_virtual_window_rep::vue_virtual_window_rep (vue_widget _content, string _name, bool _popup)
   : vue_window_rep (_content, _name, _popup), x (0), y (0), w (200), h (200),
-    placed (false), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
+    placed (false), on_top (false), Min_w (0), Min_h (0), Max_w (0), Max_h (0)
 {
   if (DEBUG_VUE) debug_widgets << "create vue_virtual_window_rep " << id << (popup ? " (popup)" : "") << LF;
   the_name= name;
@@ -1357,11 +1360,16 @@ vue_virtual_window_rep::show () {
 
 void
 vue_virtual_window_rep::raise () {
-  array<vue_virtual_window_rep*> rest;
+  // NOTE: the windows on top stay above the others (in their own order)
+  array<vue_virtual_window_rep*> rest, top;
   for (int i= 0; i < N(virtual_windows); i++)
-    if (virtual_windows[i] != this) rest << virtual_windows[i];
-  rest << this;
-  virtual_windows= rest;
+    if (virtual_windows[i] != this) {
+      if (virtual_windows[i]->on_top) top << virtual_windows[i];
+      else rest << virtual_windows[i];
+    }
+  if (on_top) top << this;
+  else rest << this;
+  virtual_windows= rest << top;
 }
 
 void
