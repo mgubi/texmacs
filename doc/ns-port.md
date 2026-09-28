@@ -15,16 +15,15 @@ make -j8
 ```
 
 `--with-guile` must name the `guile-config` of Guile 1.8: the Guile 3 of
-Homebrew is rejected. After a change of the classes of the NS headers,
-remove `src/Objects/*.o`: `editor.hpp` includes `NS/ns_simple_widget.h`, and
-the dependencies miss it (stale objects of `Edit` crash at startup).
+Homebrew is rejected. The dependencies of the headers are followed
+(`src/Deps`), also of the NS headers which `editor.hpp` includes.
 
 `--with-gui=cocoa` defines `AQUATEXMACS` and compiles `Plugins/NS`, together
-with `Plugins/MacOS`. The old interface (`Plugins/Cocoa`, with its nibs) and
+with `Plugins/MacOS` (so `--disable-macosx-extensions` is refused). The old interface (`Plugins/Cocoa`, with its nibs) and
 the branch `ns` were removed (the branch is kept in the local tags
 `archive/ns-2018` and `archive/ns-worktree-2026-09-27`).
 
-## State (2026-09-27)
+## State (2026-09-28)
 
 **TeXmacs compiles, links and runs with the NS interface, with the features
 of the Qt interface.** Documents are drawn and edited (text, mathematics,
@@ -35,13 +34,28 @@ with their keyboard shortcuts and check marks; the icon bars have their
 buttons, labels and input fields (the focus bar), row by row; the footer
 shows the messages and the interactive prompt. Dialogs made with
 `tm-widget` work (tabs, icon tabs, pop-up menus, lists, filtered lists,
-tree views, resizable parts, refreshable parts, embedded editors), and so
-do the side and bottom tools (resizable with a handle), tooltips and help
+tree views, resizable parts, refreshable parts, embedded editors, pull-down
+buttons, editable enums, hidden password fields), and so do the side tools
+(resizable with a handle) and the bottom tools, tooltips and help
 balloons, the wait indicator, the file panels (with the filters of the
 file types), the color picker, printing (PDF, and PostScript through
 Ghostscript), the clipboard (text, HTML, TeXmacs, images, both ways),
 drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
-(command-wheel zooms).
+(command-wheel zooms). The keys are named as in Qt (`space`, `S-tab`,
+`enter`, `<` and `>`, the cork names of the other characters; Option with a
+letter gives `A-<letter>` when it is bound, the composed character
+otherwise); an input method gets all the keys while it composes. Only the
+canvas which is the first responder of the key window has the focus.
+
+macOS itself: the files and URLs given by the Finder, the Dock or `open`
+are loaded (the first one in the current window, as in Qt); a quit from the
+Dock or at logout goes through `safely-quit-TeXmacs`; the close button of a
+window runs its quit command (`safely-kill-window` for the main windows);
+each main window has its own menu bar, installed when it becomes main (not
+while a menu is open); the menus are computed each time they are shown, as
+in Qt; the moves and sizes of the windows are kept; the full screen of
+macOS and the one of TeXmacs are the same. The windows are not restored at
+the start (`ApplePersistenceIgnoreState`).
 
 The look follows macOS where Qt has its own: the selection is translucent
 as in Qt; the icon bars are flat, with a small triangle in the corner of
@@ -90,7 +104,13 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   parts which it does not keep are red until they are repainted;
 * `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
   printed (the snapshots redraw everything, and do not show what is on
-  screen; other programs cannot capture the windows of TeXmacs).
+  screen; other programs cannot capture the windows of TeXmacs);
+* `TEXMACS_NS_WINDOW_TEST=<steps>`: after 4 seconds, the steps separated
+  by `;`, one per second, on the windows: the close and full screen buttons,
+  moves and sizes, a window becoming main, the menu bar and the last pop-up
+  menu printed, the tracking of the menu bar, the buttons with a menu of
+  the dialogs, the rows of the lists, the combo boxes, Scheme expressions
+  (the list is at the end of `ns_tm_widget.mm`).
 
 For example, to check the result:
 
@@ -114,25 +134,42 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
   `[NSApp run]`.
 * **Canvas** (`ns_simple_widget.mm`, `TMView.mm`): a document view in the
   scroll view, and the canvas which follows its visible part, with a
-  backing store of that size (as in Qt); scrolling repaints at once; mouse
-  state as in Qt; input methods (`NSTextInputClient`); gestures; drops.
+  backing store of that size (as in Qt); scrolling repaints at once, and
+  the backing store only moves by what it copies (also when the scale of
+  the screen differs from `retina_factor`); only the canvases of a visible
+  window are repainted (as `isVisible` in Qt); mouse state as in Qt; input
+  methods (`NSTextInputClient`); gestures; drops.
 * **Renderer**: clipping as `QPainter::setClipRect` (the graphics state is
-  restored before each new clipping), pictures and the picture renderer,
-  patterns, effects, arcs, shadows drawing in the context of their master.
+  restored before each new clipping), the glyphs in the color of the pen
+  (and text with a pattern, as `draw_bis`), pictures and the picture
+  renderer, patterns (cached as in Qt, at the size asked for), effects,
+  arcs, shadows drawing in the context of their master (which they do not
+  end when they are deleted).
 * **Generic code**: `AQUATEXMACS` is treated as Qt where the generic code
   has Qt specific parts (delayed commands, native pictures, drops, bitmap
   exports, texmacs output widgets, the repainting and the mouse of the
-  editor); `exec_pending_commands` (needed by the sockets) is in
-  `ns_gui.mm`.
+  editor); `exec_pending_commands` (needed by the sockets, for a server in
+  the same process) runs the delayed commands, in `ns_gui.mm`.
+* **Strings**: the labels and the inputs are in the cork encoding (converted
+  once); the names of files may be in cork (drops, as in Qt) or UTF-8 (the
+  file chooser, the files given by macOS): `to_nsstring_utf8` keeps a
+  string which looks like UTF-8, as `to_qstring` does.
 
 ### Known gaps
 
 * as in the Qt interface: no ink widget, no empty widget, no mouse pointer
   shapes, no proposals in the color picker;
-* not tested with real hardware: full screen (it takes the screen),
-  printing on a printer, help balloons triggered by hovering (the tooltip
+* not tested with real hardware: printing on a printer, a real input method
+  (Japanese, Chinese: the keys were tested with marked text made by the
+  tests), a real click in the menu bar while the menus change, help balloons triggered by hovering (the tooltip
   windows themselves work), trackpad gestures other than scrolling (which
   was used on a trackpad);
+* the bottom and extra tools have no handle (their contents have a fixed
+  height, without a scroll view);
+* Option with a letter is decided when the key is pressed (`A-<letter>` if
+  it is bound), where Qt lets the kernel decide (its fallback to the
+  composed character, in `edit_keyboard.cpp` and `tm_config.cpp`, is only
+  compiled for Qt);
 * tree views ignore their roles; the XPM icons without a PNG equivalent
   lose their transparency; shadows with their own context are not copied
   back (they always share the context of their master here).
@@ -186,8 +223,11 @@ made for each architecture (from the same sources, in two copies of them),
 makes one of both with `lipo`, signs it again, and makes its disk image.
 `packages/macos/check-app.sh` (run by both) checks the signature, and that
 every program and library of the application, for each architecture, only
-uses the libraries of macOS and its own, and does not need a version of
-macOS after `LSMinimumSystemVersion`.
+uses the libraries of macOS and its own (the references `@rpath`,
+`@loader_path` and `@executable_path` must lead to files of the
+application, and no library path leads outside), and does not need a
+version of macOS after `LSMinimumSystemVersion`. The sources of the
+libraries are checked with their SHA-256 (in `build-deps.sh`).
 
 The version is 12.0. The sources compile down to 10.13 (the oldest target
 of the current Xcode) for x86_64, except for a few calls, all in the
@@ -200,8 +240,10 @@ images (11.0), which would need `@available`.
 the above: a job per architecture builds the libraries (cached, until
 `build-deps.sh` changes) and the application, and a last job merges them
 into `TeXmacs-<version>-universal.dmg`, then starts the application of the
-disk image with each architecture (x86_64 under Rosetta), a test home and
-`TEXMACS_NS_SNAPSHOT`: the run fails unless it shows its window. The disk
+disk image with each architecture (x86_64 under Rosetta), a test home,
+`TEXMACS_NS_SNAPSHOT` and the document `packages/macos/ci-colors.tm` (big
+red text) on the command line: the run fails unless a window shows the red
+text (`packages/macos/png-has-red.py`). The disk
 image and the snapshots are artifacts of the run. The disk image is signed
 ad hoc: after installing it elsewhere, `xattr -dr com.apple.quarantine
 /Applications/TeXmacs.app`. It runs on the branch `ns_ci` only (the work in
@@ -222,5 +264,4 @@ or by hand from the Actions tab.
 
 (Done: the bundled GNUstep AutoLayout was removed, the views use
 `NSStackView` and `NSGridView`; the deprecated AppKit constants were
-replaced. The only deprecation warnings left are the sizes of the toolbar
-items, `NSToolbarItem` `minSize`/`maxSize`, in `ns_tm_widget.mm`.)
+replaced; the unused `NSToolbar` of the main window was removed.)
