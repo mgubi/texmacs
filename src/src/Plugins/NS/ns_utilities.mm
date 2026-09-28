@@ -91,9 +91,12 @@ from_nsstring_utf8 (NSString *s) {
 }
 
 
+/*! From the cork encoding, or UTF-8 already (the names of files may be in
+ both: see to_qstring in the Qt interface) */
 NSString *to_nsstring_utf8(string s)
 {
-  s = cork_to_utf8 (s);
+  if (!looks_utf8 (s) || looks_ascii (s) || looks_universal (s))
+    s = cork_to_utf8 (s);
   c_string p = c_string (s);
   NSString *nss = [NSString stringWithCString:p encoding:NSUTF8StringEncoding];
   return nss;

@@ -371,7 +371,7 @@ bool
 ns_gui_rep::put_graphics_on_clipboard (url file) {
   string ext= locase_all (suffix (file));
   NSPasteboard* pb= [NSPasteboard generalPasteboard];
-  NSString* path= to_nsstring (concretize (file)); // UTF-8 already
+  NSString* path= to_nsstring_utf8 (concretize (file));
   if (ext == "bmp" || ext == "png" || ext == "jpg" || ext == "jpeg" ||
       ext == "tif" || ext == "tiff") {
     NSImage* im= [[[NSImage alloc] initWithContentsOfFile: path] autorelease];

@@ -845,7 +845,7 @@ ns_printer_widget_rep::showDialog () {
       return;
     }
   }
-  NSURL* u= [NSURL fileURLWithPath: to_nsstring (concretize (pdf))];
+  NSURL* u= [NSURL fileURLWithPath: to_nsstring_utf8 (concretize (pdf))];
   PDFDocument* d= [[[PDFDocument alloc] initWithURL: u] autorelease];
   bool done= false;
   if (d) {
