@@ -803,6 +803,12 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   } else {
     static_cast<mupdf_renderer_rep*>(ren)->begin (pix);
   }
+  // NOTE: no clipping of its own at the start of a frame (the renderer
+  // keeps the one of the size of its first frame, and the elements which
+  // clip are intersected with it, see SCISSOR_START); the device clips to
+  // the surface
+  ren->cx1= ren->ox - (1 << 28); ren->cx2= ren->ox + (1 << 28);
+  ren->cy1= ren->oy - (1 << 28); ren->cy2= ren->oy + (1 << 28);
   
   win_w = surf->w;
   win_h = surf->h;
