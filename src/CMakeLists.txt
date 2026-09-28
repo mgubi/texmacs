@@ -630,7 +630,7 @@ if (WIN32)
   endif ()
 elseif (APPLE)
   # the Unix sources, and the Objective-C of the macOS plugin (as
-  # configure: its cg_renderer.cpp is not used)
+  # configure)
   file (GLOB TeXmacs_OS_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"

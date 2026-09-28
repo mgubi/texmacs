@@ -80,8 +80,8 @@ an installed TeXmacs, under `CMAKE_INSTALL_PREFIX`).
 
 What was added to upstream's file, and why:
 
-- **macOS**: the Unix sources and the Objective-C of `Plugins/MacOS` (not
-  its `cg_renderer.cpp`, as with configure), the Cocoa and IOKit
+- **macOS**: the Unix sources and the Objective-C of `Plugins/MacOS` (as
+  with configure), the Cocoa and IOKit
   frameworks, and the entry point `unix_entrypoint.cpp`. Qt makes
   `build/TeXmacs.app`; the other GUIs make `build/TeXmacs/bin/texmacs.bin`,
   as on Linux.

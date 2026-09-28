@@ -3222,8 +3222,6 @@
 		9C0B487E10A8CC100097A335 /* imlib2.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = imlib2.hpp; sourceTree = "<group>"; };
 		9C0B488010A8CC100097A335 /* ispell.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ispell.cpp; sourceTree = "<group>"; };
 		9C0B488110A8CC100097A335 /* ispell.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = ispell.hpp; sourceTree = "<group>"; };
-		9C0B488310A8CC100097A335 /* cg_renderer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cg_renderer.cpp; sourceTree = "<group>"; };
-		9C0B488410A8CC100097A335 /* cg_renderer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = cg_renderer.hpp; sourceTree = "<group>"; };
 		9C0B488510A8CC100097A335 /* mac_app.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mac_app.h; sourceTree = "<group>"; };
 		9C0B488610A8CC100097A335 /* mac_app.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = mac_app.mm; sourceTree = "<group>"; };
 		9C0B488710A8CC100097A335 /* mac_images.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = mac_images.h; sourceTree = "<group>"; };
@@ -5028,8 +5026,6 @@
 			children = (
 				9CCC738D12A7D6DA006EDBDA /* HIDRemote.h */,
 				9CCC738E12A7D6DA006EDBDA /* HIDRemote.m */,
-				9C0B488310A8CC100097A335 /* cg_renderer.cpp */,
-				9C0B488410A8CC100097A335 /* cg_renderer.hpp */,
 				9C0B488510A8CC100097A335 /* mac_app.h */,
 				9C0B488610A8CC100097A335 /* mac_app.mm */,
 				9C0B488710A8CC100097A335 /* mac_images.h */,
