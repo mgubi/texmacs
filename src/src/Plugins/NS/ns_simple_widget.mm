@@ -301,6 +301,19 @@ ns_simple_widget_rep::send (slot s, blackbox val) {
       rect.size.width = min (rect.size.width , 5000000.0);
       rect.size.height= min (rect.size.height, 5000000.0);
       [doc setFrameSize: rect.size];
+      {
+        // NOTE: the clip view centers the document when it scrolls; a
+        // document which became smaller (a zoom out) is centered at once
+        NSScrollView* sv= [doc enclosingScrollView];
+        NSClipView* cv= [sv contentView];
+        if (cv) {
+          NSPoint o= [cv constrainBoundsRect: [cv bounds]].origin;
+          if (!NSEqualPoints (o, [cv bounds].origin)) {
+            [cv scrollToPoint: o];
+            [sv reflectScrolledClipView: cv];
+          }
+        }
+      }
       follow_visible_part ();
     }
       break;
@@ -389,6 +402,13 @@ ns_simple_widget_rep::query (slot s, int type_id) {
   switch (s) {
     case SLOT_IDENTIFIER:
     {
+      // as in Qt: the identifier of the window which shows the canvas (the
+      // editor is attached to it; without it, the editor did not follow the
+      // zoom, nor the size of the window)
+      if (view && [view window]) {
+        widget w= ns_window_widget_of ([view window]);
+        if (!is_nil (w)) return w->query (s, type_id);
+      }
       if (parent)
         return parent->query (s, type_id);
       else

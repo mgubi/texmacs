@@ -978,16 +978,13 @@ the_ns_renderer () {
 
 void
 ns_renderer_rep::new_shadow (renderer& ren) {
-  SI mw, mh, sw, sh;
-  get_extents (mw, mh);
-  if (ren != NULL) {
-    ren->get_extents (sw, sh);
-    if (sw != mw || sh != mh) {
-      delete_shadow (ren);
-      ren= NULL;
-    }
-  }
-  if (ren == NULL) ren= (renderer) tm_new<ns_renderer_rep> (w, h);
+  // NOTE: a new shadow each time (it has no bitmap of its own): a shadow
+  // which is used again keeps the state of the previous drawing (zoom,
+  // origin, clipping), and the repaints after a zoom or a scroll were drawn
+  // at the old scale or in bands at other places (the proxy renderers of
+  // Qt draw with the state of their master)
+  if (ren != NULL) delete_shadow (ren);
+  ren= (renderer) tm_new<ns_renderer_rep> (w, h);
 }
 
 void
