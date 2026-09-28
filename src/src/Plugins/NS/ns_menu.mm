@@ -74,7 +74,6 @@
 - (void)setPromise:(promise_rep<widget> *)p
 {
   if (pm) { DEC_COUNT_NULL(pm); }  pm = p;  INC_COUNT_NULL(pm);
-  forced = NO;
   [self setDelegate:self];
 }
 
@@ -88,17 +87,18 @@
 
 - (void)menuNeedsUpdate:(NSMenu *)menu
 {
-  if (!forced) {
-    widget w = pm->eval();
-    NSMenu *menu2 = to_nsmenu (w);
-    NSInteger count = [menu2 numberOfItems];
-    for (NSInteger j=0; j<count; j++) {
-      NSMenuItem *itm = [[[menu2 itemAtIndex:0] retain] autorelease];
-      [menu2 removeItem:itm];
-      [menu insertItem:itm atIndex:j];
-    }
-    DEC_COUNT_NULL(pm); pm = NULL;
-    forced = YES;
+  // As QTMLazyMenu::force, each time the menu is shown: the items are
+  // computed again, so that the check marks, the enabled items and the
+  // lists (of documents, ...) are up to date
+  if (!pm) return;
+  widget w = pm->eval();
+  NSMenu *menu2 = to_nsmenu (w);
+  [menu removeAllItems];
+  NSInteger count = [menu2 numberOfItems];
+  for (NSInteger j=0; j<count; j++) {
+    NSMenuItem *itm = [[[menu2 itemAtIndex:0] retain] autorelease];
+    [menu2 removeItem:itm];
+    [menu addItem:itm];
   }
 }
 

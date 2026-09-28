@@ -179,8 +179,13 @@
 
 - (void) buttonAction:(TMBarButton*) b
 {
-  NSMenuItem *mi = b->item;
-  NSMenu *sm = [mi submenu];
+  // NOTE: the row of the button may be replaced while its menu is shown
+  // (setMenu:forRow: during the menu loop); the button and its item stay
+  // until the end of the event (and so does the controller)
+  [[b retain] autorelease];
+  [[self retain] autorelease];
+  NSMenuItem *mi = [[b->item retain] autorelease];
+  NSMenu *sm = [[[mi submenu] retain] autorelease];
   if (sm) {
     // the menu below the button
     [sm popUpMenuPositioningItem:nil

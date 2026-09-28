@@ -46,6 +46,8 @@ public:
   //  virtual void deconnect (slot s, widget w2, slot s2);
   
   TMWindowController *get_windowcontroller() { return wc; };
+  virtual inline string get_nickname () { return orig_name; }
+  command get_quit () { return quit; }
 };
 
 class ns_popup_widget_rep: public ns_widget_rep {
@@ -70,8 +72,8 @@ public:
 	NSTextField *leftField, *rightField;
 	TMButtonsController *bc;
 	TMWidgetHelper *wh;
-	NSToolbar *toolbar;
-	
+  NSArray *menu_items;  //!< the menus of the menu bar for this window
+  bool full_screen;     //!< the full screen mode of TeXmacs (SLOT_FULL_SCREEN)
   
   ns_widget int_prompt;
   ns_widget int_input;
@@ -104,6 +106,9 @@ public:
   void updateVisibility();
   void do_interactive_prompt();
   void end_interactive_prompt();
+  void install_main_menu ();
+  void window_became_main ();
+  void window_full_screen (bool flag);
 };
 
 

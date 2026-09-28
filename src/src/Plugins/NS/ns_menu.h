@@ -31,11 +31,10 @@ class ns_simple_widget_rep;
 - (void)doit;
 @end
 
-/*! A menu whose items are computed when it is shown for the first time. */
+/*! A menu whose items are computed each time it is shown. */
 @interface TMLazyMenu : NSMenu <NSMenuDelegate>
 {
   promise_rep<widget> *pm;
-  BOOL forced;
 }
 - (void)setPromise:(promise_rep<widget> *)p;
 @end

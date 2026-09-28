@@ -17,6 +17,7 @@
 #include "ns_ui_element.h"
 #include "ns_other_widgets.h"
 #include "ns_menu.h"
+#include "ns_gui.h"
 #include "gui.hpp"
 
 
@@ -155,14 +156,16 @@ ns_widget_rep::popup_window_widget (string s) {
 #pragma mark ns_window_widget_rep
 
 
-@interface TMWindowController : NSWindowController
+/*! The controller and delegate of the windows: as QTMWindow, closing the
+ window runs the quit command of the widget (which lets TeXmacs close the
+ window, or not), and the moves and sizes are remembered by TeXmacs. */
+@interface TMWindowController : NSWindowController <NSWindowDelegate>
 {
   ns_window_widget_rep *wid;
 }
 - (void) setWidget:(widget_rep*) w;
 - (widget_rep*) widget;
 @end
-
 
 @implementation TMWindowController
 - (void) setWidget: (widget_rep*) w
@@ -173,6 +176,51 @@ ns_widget_rep::popup_window_widget (string s) {
 - (widget_rep*)widget
 {
   return (ns_widget_rep*)wid;
+}
+
+- (BOOL) windowShouldClose: (NSWindow*) sender
+{
+  // As QTMWindow::closeEvent: the window stays, the quit command (for the
+  // main windows safely-kill-window, for the dialogs their deleter) closes
+  // it if need be. Without a command, the window is only hidden.
+  (void) sender;
+  if (!wid) return YES;
+  command q= wid->get_quit ();
+  if (is_nil (q)) return YES;
+  the_gui->process_command (q);
+  return NO;
+}
+
+- (BOOL) remembersGeometry
+{
+  // not in full screen, and not before the window is shown
+  NSWindow* win= [self window];
+  return wid && win && [win isVisible] &&
+         !([win styleMask] & NSWindowStyleMaskFullScreen);
+}
+
+- (void) windowDidMove: (NSNotification*) n
+{
+  // As QTMWindow::moveEvent (the top left corner, from the top left of the
+  // main screen)
+  (void) n;
+  if (![self remembersGeometry]) return;
+  NSRect f= [[self window] frame];
+  coord2 p= from_nspoint (NSMakePoint (f.origin.x,
+                                       main_screen_height () - NSMaxY (f)));
+  notify_window_move (wid->get_nickname (), p.x1, p.x2);
+}
+
+- (void) windowDidResize: (NSNotification*) n
+{
+  // As QTMWindow::resizeEvent; NOTE: the size of the contents, which is the
+  // one set by SLOT_SIZE (Qt takes the frame and tolerates the difference)
+  (void) n;
+  if (![self remembersGeometry]) return;
+  NSWindow* win= [self window];
+  NSSize sz= [win contentRectForFrameRect: [win frame]].size;
+  coord2 p= from_nssize (sz);
+  notify_window_resize (wid->get_nickname (), p.x1, p.x2);
 }
 @end
 
@@ -210,6 +258,9 @@ ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
                                                  backing: NSBackingStoreBuffered
                                                    defer: NO] autorelease];
   [win setCollectionBehavior: NSWindowCollectionBehaviorFullScreenPrimary];
+  // NOTE: the window controller keeps the window, which is only hidden when
+  // closed without a quit command
+  [win setReleasedWhenClosed: NO];
   
   [win setContentView: v];
   // dialogs take the size of their contents (the main windows are sized
@@ -221,6 +272,7 @@ ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
   
   wc = [[TMWindowController alloc] initWithWindow: win];
   [wc setWidget: this];
+  [win setDelegate: wc];
 }
 
 ns_window_widget_rep::~ns_window_widget_rep()
@@ -228,6 +280,11 @@ ns_window_widget_rep::~ns_window_widget_rep()
   if (DEBUG_QT)
     debug_qt << "Deleting qt_window_widget " << id << "\n";
   if (!fake) nr_windows--;
+  // as the destruction of the QWidget in Qt: the window disappears
+  NSWindow* win= [wc window];
+  [win setDelegate: nil];
+  [win orderOut: nil];
+  if (!fake) notify_window_destroy (orig_name);
   [wc setWidget: nil];
   [wc autorelease];
 }
@@ -303,6 +360,12 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       bool flag = open_box<bool> (val);
       [wc setDocumentEdited: flag];
     }
+      break;
+    case SLOT_FULL_SCREEN:
+      // NOTE: TeXmacs sends it to the window; the main widget handles it (in
+      // the Qt interface, the main widget is the window)
+      for (int i = 0; i < N(children); ++i)
+        if (!is_nil (children[i])) children[i]->send (s, val);
       break;
     case SLOT_REFRESH:
     {
