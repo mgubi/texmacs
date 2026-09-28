@@ -132,6 +132,9 @@
     and whether the <name|OpenType> math path applies. It reads the routing
     tables and resolves nothing, so inspecting a glyph changes nothing.
     <menu|Freeze> keeps the report of one glyph while the cursor moves on.
+    While a font report or another auxiliary document has the focus, the
+    inspector keeps showing the glyph at the cursor of the document it was
+    looking at.
 
     <item*|<menu|Colour glyphs by origin>>Draws every glyph in the colour of
     its route: as usual for the requested font, blue for a family which a

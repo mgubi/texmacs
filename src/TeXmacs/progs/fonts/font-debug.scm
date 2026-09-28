@@ -82,8 +82,17 @@
                         ")"))
         (else (object->string v))))
 
+(define (inspector-query)
+  ;; the glyph at the cursor of the edited document: in a font report or
+  ;; another auxiliary buffer, the one of the document it was opened from
+  (cond ((editor-document? (current-buffer))
+         (font-debug-info inspector-follows-mouse?))
+        ((and inspector-master (buffer-exists? inspector-master))
+         (font-debug-info-of inspector-master inspector-follows-mouse?))
+        (else (tree 'tuple))))
+
 (define (inspector-read)
-  (with t (tree->stree (font-debug-info inspector-follows-mouse?))
+  (with t (tree->stree (inspector-query))
     (if (and (pair? t) (== (car t) 'tuple))
         (map (lambda (x) (if (and (pair? x) (== (car x) 'tuple)) (cdr x) x))
              (cdr t))
@@ -153,13 +162,14 @@
 (tm-define (notify-cursor-moved status)
   (:require (and inspector-open? (not inspector-follows-mouse?)))
   (former status)
-  (inspector-note-document)
-  (inspector-schedule))
+  (when (editor-document? (current-buffer))
+    (inspector-note-document)
+    (inspector-schedule)))
 
 (tm-define (mouse-event key x y mods time data)
   (:require (and inspector-open? inspector-follows-mouse?))
   (former key x y mods time data)
-  (when (== key "move")
+  (when (and (== key "move") (editor-document? (current-buffer)))
     (inspector-note-document)
     (inspector-schedule)))
 
