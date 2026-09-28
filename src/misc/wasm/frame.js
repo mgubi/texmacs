@@ -419,9 +419,51 @@ var tmFrame = (function () {
     else build ();
   }
 
+  // Presentation mode (the plugin, vue_virtual_window_rep::set_full_screen):
+  // the frame goes, and the page asks the browser for the full screen. The
+  // browser grants it only shortly after an action of the user (the key or
+  // the menu which asked for it); when it does not, the slides still take
+  // the whole page. Leaving the full screen from the browser (Escape) also
+  // leaves presentation mode.
+  var presenting = false;
+  function fullScreenElement () {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+  function fullScreen (on) {
+    presenting = on;
+    if (bar) bar.style.display = on ? 'none' : '';
+    var d = document, e = d.documentElement;
+    try {
+      if (on && !fullScreenElement ()) {
+        var p = e.requestFullscreen ? e.requestFullscreen ()
+              : (e.webkitRequestFullscreen ? e.webkitRequestFullscreen () : null);
+        if (p && p.catch) p.catch (function () {});
+      }
+      else if (!on && fullScreenElement ()) {
+        var q = d.exitFullscreen ? d.exitFullscreen ()
+              : (d.webkitExitFullscreen ? d.webkitExitFullscreen () : null);
+        if (q && q.catch) q.catch (function () {});
+      }
+    } catch (err) {}
+    // the canvas takes the place of the frame: SDL follows the size of the
+    // canvas when the window is resized
+    window.dispatchEvent (new Event ('resize'));
+  }
+  function fullScreenChanged () {
+    if (!fullScreenElement () && presenting && typeof _vue_web_scheme !== 'undefined')
+      withStackSave (function () {
+        _vue_web_scheme (stringToUTF8OnStack ('(when (full-screen?) (toggle-full-screen-mode))'));
+      });
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener ('fullscreenchange', fullScreenChanged);
+    document.addEventListener ('webkitfullscreenchange', fullScreenChanged);
+  }
+
   return {
     update: function (state) { tabs = state.tabs || []; render (); },
     info: function (d) { app = d || {}; },
-    tabs: function () { return tabs; }
+    tabs: function () { return tabs; },
+    fullScreen: fullScreen
   };
 })();

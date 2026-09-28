@@ -1238,7 +1238,7 @@ public:
   string get_name () { return the_name; }
   void   set_modified (bool flag);
   void   set_visibility (bool flag);
-  void   set_full_screen (bool flag) { (void) flag; }
+  void   set_full_screen (bool flag);
   void   set_size (SI w, SI h);
   void   set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h);
   void   get_size (SI& w, SI& h);
@@ -1544,6 +1544,25 @@ vue_virtual_window_rep::set_size (SI sw, SI sh) {
   if (Max_w > 0) w= min (w, (float) Max_w / PIXEL);
   if (Max_h > 0) h= min (h, (float) Max_h / PIXEL);
   if (shown) clamp ();
+}
+
+#ifdef __EMSCRIPTEN__
+EM_JS (void, vue_web_full_screen, (int on), {
+  if (typeof tmFrame !== 'undefined' && tmFrame.fullScreen) tmFrame.fullScreen (!!on);
+});
+#endif
+
+// presentation mode (SLOT_FULL_SCREEN, see vue_texmacs_widget_rep::send): a
+// tab is the whole of the host, which goes full screen; in the browser the
+// page does it, and hides its frame (tmFrame.fullScreen in misc/wasm/frame.js)
+void
+vue_virtual_window_rep::set_full_screen (bool flag) {
+  if (!tab) return;
+#ifdef __EMSCRIPTEN__
+  vue_web_full_screen (flag ? 1 : 0);
+#else
+  if (the_host != NULL) the_host->set_full_screen (flag);
+#endif
 }
 
 void

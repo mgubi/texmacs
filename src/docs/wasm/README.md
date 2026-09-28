@@ -80,7 +80,11 @@ missing), the Files panel, reload, a reset (the files kept by the browser
 deleted) and a removal from the browser. The plugin tells the
 frame of the tabs once per frame when they changed (`frame_sync`); the
 frame asks it to show, close or open one. Quitting TeXmacs reloads the
-page (after the home directory is written to the storage of the browser).
+page (after the home directory is written to the storage of the browser). Presentation mode hides the frame and asks the browser for the full
+screen (`tmFrame.fullScreen`, from `vue_virtual_window_rep::set_full_screen`):
+the browser grants it only shortly after an action of the user (the key or
+the menu), otherwise the slides take the whole page; leaving the full screen
+from the browser (Escape) leaves presentation mode.
 
 On the desktop, `TEXMACS_VUE_SINGLE_WINDOW=1` gives the same, without the
 frame: a tab asks the host to change its size and position, so that it

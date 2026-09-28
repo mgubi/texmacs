@@ -85,7 +85,7 @@ const page = await browser.newPage ();
 await page.setViewport ({ width: W, height: H,
                           deviceScaleFactor: Number (opt ('--scale', '1')) });
 page.on ('console', msg => console.log ('page:', msg.text ()));
-page.on ('pageerror', err => console.log ('page error:', err.message));
+page.on ('pageerror', err => console.log ('page error:', err.message, err.stack ? '\n' + err.stack : ''));
 let answer = null; // the answer to the next prompt of the page (see "answer")
 page.on ('dialog', async d => {
   console.log (`dialog: ${d.type ()} "${d.message ()}" -> ${answer}`);
