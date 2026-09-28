@@ -121,17 +121,18 @@ function bundle_lib {
     return 11
     ;;
     @rpath/*) #some extra libs
-    for p in "${rpath[@]}"
-    do fullname=${lib/@rpath\//$p}
+    for p in "${trpath[@]}" $absLibPath
+    do fullname=${lib/@rpath/$p}
       if test -f "$fullname"
       then 
         local blib=$(basename $lib)
         if test ! -f "$libdest/$blib"
         then 
-          cp "$fullname" "$libdest" 
+          cp "$fullname" "$libdest" && chmod u+w "$libdest/$blib" || return 11
           bundle_lib "$libdest/$blib" || return $?
-          setrpath=$(($setrpath|2))
         fi
+        # NOTE: also when the library was already copied (for another one)
+        setrpath=$(($setrpath|2))
         continue 2
       fi
     done

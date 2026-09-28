@@ -36305,6 +36305,10 @@ fi
       cocoa | aqua)
          { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling experimental Cocoa port" >&5
 printf '%s\n' "enabling experimental Cocoa port" >&6; }
+         # the Cocoa port uses Plugins/MacOS (images, spell checking, ...)
+         if test -z "$CONFIG_MACOS"; then
+            as_fn_error $? "the Cocoa port needs the Mac OS X extensions (do not use --disable-macosx-extensions)" "$LINENO" 5
+         fi
          COCOA_CFLAGS=""
          COCOA_LDFLAGS="-framework Cocoa -framework PDFKit"
          CONFIG_GUI="COCOA"

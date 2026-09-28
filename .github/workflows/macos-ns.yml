@@ -8,8 +8,9 @@
 #     TeXmacs.app with packages/macos/build-ns-app.sh;
 #   * dmg: both applications merged (packages/macos/merge-universal.sh),
 #     its disk image, and a check that the application of the disk image
-#     starts and shows its window with each architecture. The disk image and
-#     the snapshots of the window are artifacts of the run.
+#     opens a document given on the command line with each architecture and
+#     shows its colors (packages/macos/ci-colors.tm, png-has-red.py). The
+#     disk image and the snapshots of the windows are artifacts of the run.
 #
 # The application is signed ad hoc and not notarized: Gatekeeper rejects it
 # on another machine until the quarantine is removed,
@@ -111,8 +112,9 @@ jobs:
           ls -l "$dmg"
 
       # the application of the disk image, with each architecture: a test
-      # home, and the window saved as a PNG after some seconds
-      - name: Smoke test (the application of the disk image starts)
+      # home, a document with big red text on the command line, and the
+      # windows saved as PNGs every 3 seconds until one shows the red text
+      - name: Smoke test (the application of the disk image shows a document)
         run: |
           mnt=$(mktemp -d)
           hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG"
@@ -122,18 +124,21 @@ jobs:
             mkdir -p ../distr/snapshots/$a
             shots=$(cd ../distr/snapshots/$a && pwd)
             HOME="$home" TEXMACS_HOME_PATH="$home/.TeXmacs" TEXMACS_NS_SNAPSHOT="$shots" \
-              arch -$a "$mnt/TeXmacs.app/Contents/MacOS/TeXmacs" > "$home/log.txt" 2>&1 &
+              arch -$a "$mnt/TeXmacs.app/Contents/MacOS/TeXmacs" \
+              "$PWD/packages/macos/ci-colors.tm" > "$home/log.txt" 2>&1 &
             pid=$!
-            for i in $(seq 1 90); do
-              test -s "$shots/window-1.png" && break
+            ok=no
+            for i in $(seq 1 60); do
+              sleep 3
               kill -0 $pid 2> /dev/null || break
-              sleep 2
+              ls "$shots"/window-*.png > /dev/null 2>&1 &&
+                packages/macos/png-has-red.py "$shots"/window-*.png && { ok=yes; break; }
             done
             kill $pid 2> /dev/null || true
             wait $pid 2> /dev/null || true
             echo "== $a"
             tail -20 "$home/log.txt"
-            test -s "$shots/window-1.png" || { echo "error: no window with $a"; status=1; }
+            [ $ok = yes ] || { echo "error: the document is not shown with $a"; status=1; }
           done
           hdiutil detach "$mnt"
           exit $status

@@ -17,11 +17,18 @@
 
 set -e
 
+# the versions and the SHA-256 of their sources (the same as Homebrew's,
+# except for Guile 1.8, which Homebrew no longer has)
 GMP_VERSION=6.3.0
-LIBTOOL_VERSION=2.5.4
-LIBPNG_VERSION=1.6.50
-FREETYPE_VERSION=2.13.3
+GMP_SHA256=a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
+LIBTOOL_VERSION=2.6.2
+LIBTOOL_SHA256=2ef1067c16c97db930fd740cc9bc3d3ba9a583804ae5ac42cc3e8719e49e191e
+LIBPNG_VERSION=1.6.58
+LIBPNG_SHA256=28eb403f51f0f7405249132cecfe82ea5c0ef97f1b32c5a65828814ae0d34775
+FREETYPE_VERSION=2.14.3
+FREETYPE_SHA256=36bc4f1cc413335368ee656c42afca65c5a3987e8768cc28cf11ba775e785a5f
 GUILE_VERSION=1.8.8
+GUILE_SHA256=c3471fed2e72e5b04ad133bbaaf16369e8360283679bcf19800bc1b381024050
 
 prefix="$1"
 arch="${2:-$(uname -m)}"
@@ -53,16 +60,21 @@ export PKG_CONFIG_PATH="$prefix/lib/pkgconfig" PKG_CONFIG_LIBDIR="$prefix/lib/pk
 jobs=$(sysctl -n hw.ncpu)
 common="--prefix=$prefix --disable-shared --enable-static --with-pic --disable-dependency-tracking"
 
-fetch () { # url
+fetch () { # url sha256
   local f="$work/$(basename "$1")"
   [ -s "$f" ] || curl -sSfL --retry 3 -o "$f" "$1"
+  if [ "$(shasum -a 256 "$f" | cut -d' ' -f1)" != "$2" ]; then
+    echo "error: wrong SHA-256 for $(basename "$1")" >&2
+    rm -f "$f"
+    exit 1
+  fi
   rm -rf "$work/src" && mkdir "$work/src"
   tar xf "$f" -C "$work/src" --strip-components 1
   cd "$work/src"
 }
 
 echo "== GMP $GMP_VERSION ($arch, macOS $min)"
-fetch "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz"
+fetch "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz" $GMP_SHA256
 # not tuned for the processor of the build machine: fat binaries on x86_64
 # (the code for each processor chosen at run time), generic code on arm64
 if [ "$arch" = x86_64 ]; then fat=--enable-fat; else fat=; fi
@@ -70,17 +82,17 @@ if [ "$arch" = x86_64 ]; then fat=--enable-fat; else fat=; fi
 make -j"$jobs" && make install
 
 echo "== libltdl (libtool $LIBTOOL_VERSION)"
-fetch "https://ftp.gnu.org/gnu/libtool/libtool-$LIBTOOL_VERSION.tar.xz"
+fetch "https://ftp.gnu.org/gnu/libtool/libtool-$LIBTOOL_VERSION.tar.xz" $LIBTOOL_SHA256
 ./configure $common --enable-ltdl-install
 make -j"$jobs" && make install
 
 echo "== libpng $LIBPNG_VERSION"
-fetch "https://download.sourceforge.net/libpng/libpng-$LIBPNG_VERSION.tar.xz"
+fetch "https://download.sourceforge.net/libpng/libpng-$LIBPNG_VERSION.tar.xz" $LIBPNG_SHA256
 ./configure $common
 make -j"$jobs" && make install
 
 echo "== FreeType $FREETYPE_VERSION"
-fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.xz"
+fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.xz" $FREETYPE_SHA256
 # zlib of macOS; libpng for the color emoji fonts (given here: there is no
 # pkg-config)
 ./configure $common --enable-freetype-config --with-zlib=yes --with-png=yes \
@@ -89,7 +101,7 @@ fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VE
 make -j"$jobs" && make install
 
 echo "== Guile $GUILE_VERSION"
-fetch "https://ftp.gnu.org/gnu/guile/guile-$GUILE_VERSION.tar.gz"
+fetch "https://ftp.gnu.org/gnu/guile/guile-$GUILE_VERSION.tar.gz" $GUILE_SHA256
 ./configure $common --disable-error-on-warning
 # not guile-readline, which TeXmacs does not use (and which finds the
 # readline.h of libedit)

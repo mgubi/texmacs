@@ -78,8 +78,6 @@ if [ $configure = yes ]; then
   ./configure $args
 fi
 
-# NOTE: editor.hpp includes the headers of the NS interface; after changing
-# their classes, remove src/Objects/*.o (the dependencies miss them)
 echo "== building TeXmacs"
 make -j "$jobs"
 
@@ -91,7 +89,13 @@ packages/macos/check-app.sh "$app"
 echo "== $app is ready"
 
 if [ $dmg = yes ]; then
+  # NOTE: of the application checked above (make MACOS_PACKAGE would make
+  # it again)
   echo "== making the disk image"
-  make MACOS_PACKAGE
-  ls ../distr/macos/*.dmg
+  version=$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")
+  mkdir -p ../distr/macos
+  dmg=../distr/macos/TeXmacs-$version.dmg
+  rm -f "$dmg"
+  hdiutil create -volname TeXmacs -srcfolder "$app" -format UDZO "$dmg"
+  ls "$dmg"
 fi

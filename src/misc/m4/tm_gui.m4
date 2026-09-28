@@ -59,6 +59,10 @@ AC_DEFUN([TM_GUI],[
          ;;
       cocoa | aqua)
          AC_MSG_RESULT([enabling experimental Cocoa port])
+         # the Cocoa port uses Plugins/MacOS (images, spell checking, ...)
+         if test -z "$CONFIG_MACOS"; then
+            AC_MSG_ERROR([the Cocoa port needs the Mac OS X extensions (do not use --disable-macosx-extensions)])
+         fi
          COCOA_CFLAGS=""
          COCOA_LDFLAGS="-framework Cocoa -framework PDFKit"
          CONFIG_GUI="COCOA"

@@ -508,13 +508,14 @@ MACOS_BUNDLE: TEXMACS
 		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
 			codesign --force --timestamp -s @SIGNID@ {} + &&\
 		codesign --force --timestamp --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
-		echo "Bundle successfully signed" || echo "Signing failed"; \
+		echo "Bundle successfully signed" ||\
+		{ echo "Signing failed"; exit 1; }; \
 	else \
 		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
 			codesign --force -s - {} + &&\
 		codesign --force --deep -s - $(MACOS_PACKAGE_APP) &&\
 		echo "Bundle signed ad hoc (no identity given to configure)" ||\
-		echo "Signing failed"; fi
+		{ echo "Signing failed"; exit 1; }; fi
 
 
 MACOS_PACKAGE: MACOS_BUNDLE
