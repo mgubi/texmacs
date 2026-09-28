@@ -278,11 +278,12 @@ void ns_tm_widget_rep::layout()
 {
   // From top to bottom: the icon bars, the left tools, the canvas and the
   // side tools, the bottom and extra tools, and the footer
-  // the footer: the messages centered vertically, with some padding
-  CGFloat pad= 10.0;
+  // the footer: the messages centered vertically, with some padding (also
+  // above and below)
+  CGFloat pad= 10.0, vpad= 4.0;
   CGFloat text_h= [[leftField cell] cellSize].height;
   CGFloat right_w= max ((CGFloat) 100.0, [[rightField cell] cellSize].width + 4);
-  NSSize fs = NSMakeSize (right_w, 26); // size of the right footer
+  NSSize fs = NSMakeSize (right_w, 26 + 2*vpad); // size of the right footer
   NSRect r = [view bounds];
   // NOTE: the header contains the rows of icons, which are shown or hidden
   // one by one (see updateVisibility)
@@ -291,7 +292,7 @@ void ns_tm_widget_rep::layout()
   CGFloat bar_h = visibility[0]? [[bc bar] frame].size.height: 0;
   CGFloat foot_h= visibility[5]? fs.height: 0;
   if (prompt_view)
-    foot_h= max (fs.height, [prompt_view fittingSize].height);
+    foot_h= max (fs.height, [prompt_view fittingSize].height + 2*vpad);
   bool show[4];
   NSSize sz[4];
   for (int i=0; i<4; i++) {
@@ -327,7 +328,8 @@ void ns_tm_widget_rep::layout()
                                     fs.width, min (text_h, foot_h))];
   [leftField setHidden: foot_h == 0 || prompt_view];
   [rightField setHidden: foot_h == 0 || prompt_view];
-  if (prompt_view) [prompt_view setFrame: NSMakeRect (0, 0, r.size.width, foot_h)];
+  if (prompt_view)
+    [prompt_view setFrame: NSMakeRect (0, vpad, r.size.width, foot_h - 2*vpad)];
 }
 
 
