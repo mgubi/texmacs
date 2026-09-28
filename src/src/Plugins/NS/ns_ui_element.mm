@@ -111,6 +111,103 @@ text_of (widget w) {
 }
 @end
 
+/*! An editable enum (see the enum widgets of the Qt interface): the command
+ gets the text when an item is chosen or when the edition ends (return, or
+ the focus goes elsewhere), if it changed. */
+@interface TMCommandCombo : NSComboBox
+{
+  command_rep *cmd;
+  NSString *last;  // the last value given to the command
+}
+- (void)setCommand:(command_rep *)_c;
+- (void)doit:(id)sender;
+@end
+
+@implementation TMCommandCombo
+- (void)setCommand:(command_rep *)_c
+{
+  if (cmd) { DEC_COUNT_NULL(cmd); } cmd = _c;
+  if (cmd) {
+    INC_COUNT_NULL(cmd);
+    [self setTarget:self];
+    [self setAction:@selector(doit:)];
+  }
+  [last release]; last= [[self stringValue] copy];
+}
+- (void)dealloc { [self setCommand:NULL]; [last release]; [super dealloc]; }
+- (void)doit:(id)sender
+{
+  (void) sender;
+  NSString* v= [self stringValue];
+  if (!cmd || [v isEqualToString: last]) return;
+  [last release]; last= [v copy];
+  command c (cmd);
+  c (list_object (object (from_nsstring (v))));
+}
+@end
+
+/*! A button showing a menu (the pull-down and pull-right buttons in the
+ dialogs and the tools, as QTMMenuButton): below the button, or at its right.
+ The menu is computed each time it is shown (see TMLazyMenu). */
+@interface TMPullButton : NSButton
+{
+  NSMenu *pmenu;
+  BOOL right;
+}
+- (void)setPullMenu:(NSMenu *)m right:(BOOL)r;
+@end
+
+@implementation TMPullButton
+- (void)setPullMenu:(NSMenu *)m right:(BOOL)r
+{
+  [m retain]; [pmenu release]; pmenu= m; right= r;
+  [self setTarget: self];
+  [self setAction: @selector(pull:)];
+}
+- (void)dealloc { [pmenu release]; [super dealloc]; }
+- (void)pull:(id)sender
+{
+  (void) sender;
+  if (!pmenu) return;
+  // NOTE: the button may be removed while its menu is shown (a refresh of
+  // the dialog): both stay until the end of the event
+  [[self retain] autorelease];
+  NSMenu* m= [[pmenu retain] autorelease];
+  NSRect b= [self bounds];
+  NSPoint p= right? NSMakePoint (NSMaxX (b), [self isFlipped]? NSMinY (b): NSMaxY (b))
+                  : NSMakePoint (0, [self isFlipped]? NSMaxY (b) + 3: NSMinY (b) - 3);
+  [m popUpMenuPositioningItem: nil atLocation: p inView: self];
+}
+@end
+
+static void
+set_button_face (NSButton* b, ns_widget w) {
+  // The text or the image of a button, from the widget of its label
+  if (w->type == ns_widget_rep::balloon_widget) {
+    // the help balloon is the tooltip of the button
+    typedef pair<widget, widget> T;
+    T x= open_box<T> (((ns_ui_element_rep*) w.rep)->operator blackbox ());
+    set_button_face (b, concrete (x.x1));
+    [b setToolTip: to_label (text_of (x.x2))];
+  }
+  else if (w->type == ns_widget_rep::text_widget) {
+    typedef quartet<string, int, color, bool> T2;
+    [b setTitle: to_label (open_box<T2> (((ns_ui_element_rep*) w.rep)->
+                                          operator blackbox ()).x1)];
+  }
+  else {
+    // icons and colored glue (color palettes) are shown as images
+    [b setTitle: @""];
+    NSView* cv= w->as_nsview ();
+    if ([cv isKindOfClass: [NSImageView class]])
+      [b setImage: [(NSImageView*) cv image]];
+    // flat, with a border under the mouse (as the tool buttons of Qt)
+    [b setBezelStyle: NSBezelStyleAccessoryBarAction];
+    [b setShowsBorderOnlyWhileMouseInside: YES];
+    [b setImagePosition: NSImageOnly];
+  }
+}
+
 static NSView*
 stack_of (array<widget> a, bool vertical) {
   NSStackView* sv= [[[NSStackView alloc] init] autorelease];
@@ -343,12 +440,14 @@ ns_refresh_state::recompute (string what) {
   command_rep* cmd;
   NSArray* all;      // all the items
   NSArray* items;    // the items which pass the filter
+  NSString* filter;  // the filter (nil for the lists without a filter)
   BOOL multiple;
   BOOL filtering;
   NSTableView* table;
 }
 - (id) initWithItems: (NSArray*) its command: (command_rep*) c
             multiple: (BOOL) m table: (NSTableView*) t;
+- (void) setFiltering: (BOOL) f;
 - (void) setFilter: (NSString*) f;
 @end
 
@@ -365,11 +464,17 @@ ns_refresh_state::recompute (string what) {
 }
 - (void) dealloc
 {
-  [all release]; [items release]; DEC_COUNT_NULL (cmd);
+  [all release]; [items release]; [filter release]; DEC_COUNT_NULL (cmd);
   [super dealloc];
+}
+- (void) setFiltering: (BOOL) f
+{
+  // the selection is changed by the program: no command
+  filtering= f;
 }
 - (void) setFilter: (NSString*) f
 {
+  [filter release]; filter= [f copy];
   // As QTMListView::setFilterRegularExpression (case insensitive)
   NSMutableArray* a= [NSMutableArray array];
   NSRegularExpression* re= nil;
@@ -395,13 +500,14 @@ ns_refresh_state::recompute (string what) {
     if (i < [items count]) [chosen addObject: [items objectAtIndex: i]];
   [items release];
   items= [a retain];
+  BOOL was= filtering;
   filtering= YES;
   [table reloadData];
   NSMutableIndexSet* nsel= [NSMutableIndexSet indexSet];
   for (NSUInteger i=0; i<[items count]; i++)
     if ([chosen containsObject: [items objectAtIndex: i]]) [nsel addIndex: i];
   [table selectRowIndexes: nsel byExtendingSelection: NO];
-  filtering= NO;
+  filtering= was;
 }
 - (void) controlTextDidChange: (NSNotification*) n
 {
@@ -431,7 +537,10 @@ ns_refresh_state::recompute (string what) {
     l= object (from_nsstring ([items objectAtIndex: [sel firstIndex]]));
   else l= object ("");
   command c (cmd);
-  c (list_object (l));
+  // NOTE: the commands of the filtered lists also get the filter (see
+  // qt_choice_command_rep): (lambda (answer filter) ...)
+  if (filter) c (list_object (l, object (from_nsstring (filter))));
+  else c (list_object (l));
 }
 @end
 
@@ -448,9 +557,14 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
   [t setAllowsMultipleSelection: multiple];
   TMChoiceList* ds= [[TMChoiceList alloc] initWithItems: its command: cmd.rep
                                                multiple: multiple table: t];
-  // NOTE: the data source lives as long as the table (released with it)
+  // NOTE: the data source lives as long as the table (which does not retain
+  // it), and as the filter field below
+  objc_setAssociatedObject (t, "TMChoiceList", ds, OBJC_ASSOCIATION_RETAIN);
+  [ds release];
   [t setDataSource: ds];
   [t setDelegate: ds];
+  // the initial selection does not call the command
+  [ds setFiltering: YES];
   NSMutableIndexSet* sel= [NSMutableIndexSet indexSet];
   for (int i=0; i<N(vals); i++)
     if (contains (vals[i], chosen)) [sel addIndex: i];
@@ -462,12 +576,14 @@ choice_list (command cmd, array<string> vals, array<string> chosen, bool multipl
   [sv setTranslatesAutoresizingMaskIntoConstraints: NO];
   [[sv.heightAnchor constraintGreaterThanOrEqualToConstant: 120] setActive: YES];
   [[sv.widthAnchor constraintGreaterThanOrEqualToConstant: 200] setActive: YES];
-  if (!filtered) return sv;
+  if (!filtered) { [ds setFiltering: NO]; return sv; }
   // a filter above the list (see the Qt interface)
   NSSearchField* f= [[[NSSearchField alloc] init] autorelease];
   [f setStringValue: to_label (filter)];
+  objc_setAssociatedObject (f, "TMChoiceList", ds, OBJC_ASSOCIATION_RETAIN);
   [f setDelegate: ds];
   [ds setFilter: [f stringValue]];
+  [ds setFiltering: NO];
   NSStackView* st= [NSStackView stackViewWithViews:
                      [NSArray arrayWithObjects: f, sv, nil]];
   [st setOrientation: NSUserInterfaceLayoutOrientationVertical];
@@ -955,24 +1071,29 @@ ns_ui_element_rep::as_nsview () {
       T x= open_box<T> (load);
       TMCommandButton* b= [[[TMCommandButton alloc] init] autorelease];
       [b setBezelStyle: NSBezelStyleRounded];
-      ns_widget w= concrete (x.x1);
-      if (w->type == text_widget) {
-        typedef quartet<string, int, color, bool> T2;
-        [b setTitle: to_label (open_box<T2> (get_payload (w)).x1)];
-      }
-      else {
-        // icons and colored glue (color palettes) are shown as images
-        [b setTitle: @""];
-        NSView* cv= w->as_nsview ();
-        if ([cv isKindOfClass: [NSImageView class]])
-          [b setImage: [(NSImageView*) cv image]];
-        // flat, with a border under the mouse (as the tool buttons of Qt)
-        [b setBezelStyle: NSBezelStyleAccessoryBarAction];
-        [b setShowsBorderOnlyWhileMouseInside: YES];
-        [b setImagePosition: NSImageOnly];
-      }
+      set_button_face (b, concrete (x.x1));
       [b setCommand: x.x2.rep kind: 0];
       [b setEnabled: (x.x5 & WIDGET_STYLE_INERT) == 0];
+      return b;
+    }
+
+    case pulldown_button: case pullright_button:
+    {
+      typedef pair<widget, promise<widget> > T;
+      T x= open_box<T> (load);
+      TMPullButton* b= [[[TMPullButton alloc] init] autorelease];
+      [b setBezelStyle: NSBezelStyleRounded];
+      set_button_face (b, concrete (x.x1));
+      if ([[b title] length] > 0) {
+        // a chevron after the text (as in the icon bars)
+        [b setImage: [NSImage imageWithSystemSymbolName: @"chevron.down"
+                                accessibilityDescription: nil]];
+        [b setImagePosition: NSImageTrailing];
+      }
+      TMLazyMenu *lm= [[[TMLazyMenu alloc] init] autorelease];
+      [lm setAutoenablesItems: NO];
+      [lm setPromise: x.x2.rep];
+      [b setPullMenu: lm right: type == pullright_button];
       return b;
     }
 
@@ -993,11 +1114,35 @@ ns_ui_element_rep::as_nsview () {
     {
       typedef quintuple<command, array<string>, string, int, string> T;
       T x= open_box<T> (load);
-      TMCommandPopUp* p= [[[TMCommandPopUp alloc] init] autorelease];
-      for (int i=0; i<N(x.x2); i++)
-        if (x.x2[i] != "") [p addItemWithTitle: to_label (x.x2[i])];
-      [p selectItemWithTitle: to_label (x.x3)];
-      [p setCommand: x.x1.rep];
+      // NOTE: as in the Qt interface, the enum is editable when the value is
+      // empty or the last value is empty (which is not an item)
+      bool last_empty= N(x.x2) == 0 || x.x2[N(x.x2)-1] == "";
+      bool editable= (x.x3 == "" || last_empty);
+      array<string> vals;  // (a copy: the arrays are shared)
+      for (int i=0; i < N(x.x2) - (last_empty? 1: 0); i++) vals << x.x2[i];
+      NSControl* p;
+      if (editable) {
+        TMCommandCombo* cb= [[[TMCommandCombo alloc] init] autorelease];
+        for (int i=0; i<N(vals); i++)
+          [cb addItemWithObjectValue: to_label (vals[i])];
+        [cb setNumberOfVisibleItems: min (max (N(vals), 1), 15)];
+        [cb setCompletes: YES];
+        [cb setStringValue: to_label (x.x3)];
+        [[cb cell] setSendsActionOnEndEditing: YES];
+        [cb setCommand: x.x1.rep];
+        p= cb;
+      }
+      else {
+        TMCommandPopUp* pb= [[[TMCommandPopUp alloc] init] autorelease];
+        for (int i=0; i<N(vals); i++)
+          if (vals[i] != "") [pb addItemWithTitle: to_label (vals[i])];
+        // a value which is not in the list is shown anyway
+        NSString* cur= to_label (x.x3);
+        if (![pb itemWithTitle: cur]) [pb addItemWithTitle: cur];
+        [pb selectItemWithTitle: cur];
+        [pb setCommand: x.x1.rep];
+        p= pb;
+      }
       [p setEnabled: (x.x4 & WIDGET_STYLE_INERT) == 0];
       if (x.x4 & WIDGET_STYLE_MINI) {
         [p setControlSize: NSControlSizeSmall];
@@ -1006,11 +1151,24 @@ ns_ui_element_rep::as_nsview () {
       }
       // the width given by TeXmacs (see QTMComboBox::addItemsAndResize)
       [p sizeToFit];
-      if (x.x5 != "") {
-        NSSize sz= ns_decode_length (x.x5, "", [p fittingSize]);
+      NSSize fit= [p fittingSize];
+      if (editable) {
+        // the combo boxes have no natural width: the one of the longest item
+        CGFloat w= 60;
+        NSDictionary* attrs= @{ NSFontAttributeName: [p font] };
+        for (int i=0; i<N(vals); i++)
+          w= max (w, [to_label (vals[i]) sizeWithAttributes: attrs].width);
+        w= max (w, [to_label (x.x3) sizeWithAttributes: attrs].width);
+        fit.width= w + 34;
+      }
+      if (x.x5 != "" || editable) {
+        CGFloat w= fit.width;
+        if (x.x5 != "") {
+          NSSize sz= ns_decode_length (x.x5, "", fit);
+          w= editable? max (sz.width, (CGFloat) 40.0): max (sz.width, fit.width);
+        }
         [p setTranslatesAutoresizingMaskIntoConstraints: NO];
-        NSLayoutConstraint* c= [p.widthAnchor constraintEqualToConstant:
-                                  max (sz.width, [p fittingSize].width)];
+        NSLayoutConstraint* c= [p.widthAnchor constraintEqualToConstant: w];
         [c setPriority: NSLayoutPriorityDefaultHigh - 5];
         [c setActive: YES];
       }
