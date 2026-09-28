@@ -3382,6 +3382,7 @@ public:
   int     tab_pos;     // cursor position where tab was pressed
 
   command tab_cb; // called with #t/#f on tab/shift-tab (moves the focus in dialogs)
+  vue_window win; // the window it was last laid out in (weak, only compared)
   
   vue_input_text_widget_rep (command _call_back, string _type, array<string> _def,
                              int _style, string _width);
@@ -3422,7 +3423,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
     def (_def), call_back (_call_back), style (_style),
     greyed ((_style & WIDGET_STYLE_INERT) != 0), width (_width),
     ok (true), done (false), def_cur (0), pos (0), sel (-1), scroll (0),
-    pre_edit (""), pre_edit_pos (0), tab_nr (0), tab_pos (0)
+    pre_edit (""), pre_edit_pos (0), tab_nr (0), tab_pos (0), win (NULL)
 {
   set_type (_type);
   if (N(def) > 0) {
@@ -3860,6 +3861,7 @@ vue_input_text_widget_rep::render (void *data) {
 
 void
 vue_input_text_widget_rep::do_layout () {
+  win= current_window; // see focus_on_named_input
   bool is_focused= current_window->kbd_focus == this;
   SI w= decode_length (width, current_window, style);
   font fn= get_font ();
@@ -3910,11 +3912,16 @@ focus_on_named_input (vue_window win, string field) {
   // "name#serial:type", which we split, or a bare word which lands in the
   // type ("search", "replace-what"...). Qt matches the same string, which
   // it keeps whole as the object name, so both halves are tried here.
-  for (int pass= 0; pass < 2; pass++) {
+  // Only the fields of this window count (the search bar of another
+  // window has the same name): those laid out in it, else those not laid
+  // out yet, as a bar which has just been built and asks for the keyboard
+  // at once (toolbar-search-start); Qt searches the children of the window.
+  for (int pass= 0; pass < 4; pass++) {
     iterator<pointer> it= iterate (live_inputs);
     while (it->busy ()) {
       vue_input_text_widget_rep* in= (vue_input_text_widget_rep*) it->next ();
-      if (pass == 0 ? (in->name == field) : (in->type == field)) {
+      if (in->win != ((pass < 2) ? win : (vue_window) NULL)) continue;
+      if ((pass & 1) == 0 ? (in->name == field) : (in->type == field)) {
         set_kbd_focus (win, in);
         return true;
       }
@@ -3962,6 +3969,10 @@ public:
   bool autosize; // size the window to its contents at the next layout pass
   bool quit_sent; // the quit command has been queued
   SI last_cw, last_ch; // contents size measured in the previous layout pass
+  // the point on which the window is centred once it is sized to its
+  // contents (a dialog placed before its size was known, see centre_on)
+  bool centre_pending;
+  SI centre_x, centre_y;
   string title;
   string refresh_kind;
   
@@ -3978,7 +3989,12 @@ public:
   
   void do_layout ();
   bool post_layout ();
+  void centre_on (SI x, SI y) { centre_pending= true; centre_x= x; centre_y= y; }
 }; // class vue_plain_window_widget_rep
+
+// the texmacs widget learns its window from the window around it (defined
+// with vue_texmacs_widget_rep below)
+static void texmacs_widget_set_window (vue_widget w, vue_window win);
 
 vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _name,
                                                           command _quit, bool _popup)
@@ -3990,6 +4006,8 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
   autosize= !popup && concrete (wid)->type != "vue_texmacs_widget_rep";
   last_cw= last_ch= -1;
   quit_sent= false;
+  centre_pending= false;
+  centre_x= centre_y= 0;
 }
 
 void
@@ -4002,6 +4020,10 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       {
         int id= check_open<int> (val, s);
         win= (vue_window) id_to_window [id];
+        // the editor of the window is in it from now on (SLOT_IDENTIFIER of
+        // the texmacs widget), not only once it is laid out: TeXmacs
+        // attaches its view at once (attach_view checks is_attached)
+        if (!is_nil (wid)) texmacs_widget_set_window (concrete (wid), win);
       }
       break;
     case SLOT_SIZE:
@@ -4219,7 +4241,9 @@ vue_plain_window_widget_rep::post_layout () {
     win->ready_to_show= true;
     return false;
   }
-  if (abs (w - cw) <= PIXEL && abs (h - ch) <= PIXEL) win->ready_to_show= true;
+  // (not before a window to be centred has been moved to its place)
+  if (abs (w - cw) <= PIXEL && abs (h - ch) <= PIXEL && !centre_pending)
+    win->ready_to_show= true;
   // popups always follow their contents, other windows only initially
   if (!popup) {
     // some widgets (tabs, aligned, extend) use measurements of the previous
@@ -4258,7 +4282,35 @@ vue_plain_window_widget_rep::post_layout () {
       win->set_position (x, y);
     }
   }
+  if (!popup && centre_pending) {
+    // the size is final: the window goes where it was meant to be centred
+    // (y upwards, the position is the top left corner)
+    centre_pending= false;
+    win->set_position (centre_x - cw / 2, centre_y + ch / 2);
+  }
   return false; // the new size is picked up by the next layout pass
+}
+
+// The geometry of a window is remembered in the preferences under its name
+// ("abscissa TeXmacs", "width TeXmacs:2"...), for the next window of that
+// name: the platform window calls this when it is moved or resized, as the
+// Qt windows do from their move and resize events (QTMWindow.cpp). Popups
+// and windows not shown yet (still being placed) are left out.
+void
+vue_notify_window_geometry (vue_window win, bool moved) {
+  if (win == NULL || win->popup || !win->shown) return;
+  vue_plain_window_widget_rep* ww=
+    dynamic_cast<vue_plain_window_widget_rep*> (win->content.rep);
+  if (ww == NULL || ww->popup || N(ww->name) == 0) return;
+  SI a, b;
+  if (moved) {
+    win->get_position (a, b);
+    notify_window_move (ww->name, a, b);
+  }
+  else {
+    win->get_size (a, b);
+    notify_window_resize (ww->name, a, b);
+  }
 }
 
 //******************************************************************************
@@ -4310,6 +4362,7 @@ public:
   void notify (slot s, blackbox new_val);
   
   void do_layout ();
+  friend void texmacs_widget_set_window (vue_widget w, vue_window win);
 }; // class vue_plain_window_widget_rep
 
 widget texmacs_widget (int mask, command quit) {
@@ -4445,6 +4498,14 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
     case SLOT_KEYBOARD_FOCUS_ON:
       if (win) focus_on_named_input (win, check_open<string> (val, s));
       break;
+
+    case SLOT_KEYBOARD_FOCUS:
+      // (keyboard-focus-on "canvas"), e.g. when the search bar closes: the
+      // keyboard goes back to the editor (qt_tm_widget_rep gives it to the
+      // canvas); it was dropped, and the typing went on into the bar
+      if (check_open<bool> (val, s) && win && !is_nil (main_widget))
+        set_kbd_focus (win, main_widget);
+      break;
       
     default:
       vue_widget_rep::send(s, val);
@@ -4478,9 +4539,20 @@ vue_texmacs_widget_rep::write (slot s, blackbox index, widget w)  {
   (void) index; (void) w;
   switch (s) {
     case SLOT_SCROLLABLE:
-      check_type_void (index, s);
-      main_widget= concrete (w);
-      if (win) set_kbd_focus (win, main_widget);
+      {
+        check_type_void (index, s);
+        // the editor which is switched out is no longer in a window (its
+        // SLOT_IDENTIFIER answers 0, as in Qt) and the new one is in ours
+        // at once, before it is laid out
+        vue_simple_widget_rep* old=
+          dynamic_cast<vue_simple_widget_rep*> (main_widget.rep);
+        if (old != NULL) old->win= NULL;
+        main_widget= concrete (w);
+        vue_simple_widget_rep* cur=
+          dynamic_cast<vue_simple_widget_rep*> (main_widget.rep);
+        if (cur != NULL && win != NULL) cur->win= win;
+        if (win) set_kbd_focus (win, main_widget);
+      }
       break;
       
     case SLOT_MAIN_MENU:
@@ -4553,6 +4625,13 @@ vue_texmacs_widget_rep::query (slot s, int type_id) {
                   << "\t\tto widget\t" << type << LF;
   
   switch (s) {
+    case SLOT_IDENTIFIER:
+      // the window it is in, as the Qt widgets answer through their
+      // window (0: in none, see is_attached). This was a counter which
+      // counted up at every query and never said 0
+      check_type_id<int> (type_id, s);
+      return close_box<int> (win ? win->id : 0);
+
     case SLOT_SCROLL_POSITION:
     case SLOT_EXTENTS:
     case SLOT_VISIBLE_PART:
@@ -4690,6 +4769,16 @@ layout_bar_content (int key, vue_widget content, Clay_Color bg) {
   }
   Clay_ScrollContainerData sd= Clay_GetScrollContainerData (clip_id);
   if (sd.found) scroll_markers (clip_id, sd, bg, true, 2);
+}
+
+static void
+texmacs_widget_set_window (vue_widget w, vue_window win) {
+  vue_texmacs_widget_rep* tw= dynamic_cast<vue_texmacs_widget_rep*> (w.rep);
+  if (tw == NULL) return;
+  tw->win= win;
+  vue_simple_widget_rep* canvas=
+    dynamic_cast<vue_simple_widget_rep*> (tw->main_widget.rep);
+  if (canvas != NULL) canvas->win= win;
 }
 
 void vue_texmacs_widget_rep::do_layout () {
@@ -4900,10 +4989,12 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   absolute_scroll (false),
   scroll_pending (false),
   scrollbars_hidden (false),
+  pointer_captured (false),
   ren (NULL),
   backing_pos (coord2 (0, 0)), origin (coord2 (0, 0)),
   backing_valid (false),
   resize_pending (false),
+  cursor_moved (false), ime_x (-1), ime_y (-1),
   scroll_rest_x (0), scroll_rest_y (0)
 {
   // note that size is set to an arbitrary value to init the backing_store
@@ -4912,6 +5003,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   // (see native_opaque_picture)
   backing_store= native_opaque_picture (size.x1, size.x2, 0, 0);
   ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  ren_retina= retina_factor;
   paint_list= list<vue_simple_widget_rep*>(this, paint_list);
 };
 
@@ -5008,8 +5100,17 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       break;
     case SLOT_CURSOR:
       {
+        // the input area of the window follows it once the scroll which
+        // may come with it is applied (update_text_input_area)
         cursor_pos= check_open <coord2> (val, s);
+        cursor_moved= true;
       }
+      break;
+    case SLOT_KEYBOARD_FOCUS:
+      // the editor asks for the keyboard (send_keyboard_focus: a new view,
+      // a click, the end of an interactive command), as qt_widget_rep
+      // gives it to its widget
+      if (check_open<bool> (val, s) && win) set_kbd_focus (win, this);
       break;
     default:
       if (DEBUG_VUE_WIDGETS) debug_widgets << "simple_widget does not handle " << slot_name (s) << LF;
@@ -5045,9 +5146,11 @@ vue_simple_widget_rep::query (slot s, int type_id) {
       // the position of the canvas in its window, in TeXmacs coordinates
       // (PIXEL per point, y up): the editor adds it to the position of the
       // window and to a click to place its context menu (edit_mouse.cpp)
+      // (origin is in device pixels of the window, at its own density)
       check_type_id<coord2> (type_id, s);
-      return close_box<coord2> (coord2 (origin.x1 * PIXEL / retina_factor,
-                                        -origin.x2 * PIXEL / retina_factor));
+      int rf= win ? win->retina : retina_factor;
+      return close_box<coord2> (coord2 (origin.x1 * PIXEL / rf,
+                                        -origin.x2 * PIXEL / rf));
     }
     case SLOT_SIZE:
     {
@@ -5238,7 +5341,21 @@ vue_simple_widget_rep::do_layout () {
     }
   }
   // note: our CLAY block is closed here, Clay_Hovered () would test the parent
-  if (Clay_PointerOver (clay_id) && (mouse_action != "")) {
+  bool over= Clay_PointerOver (clay_id);
+  // A press on the canvas captures the pointer until the buttons are
+  // released: the moves and the release reach the editor wherever they
+  // happen, beyond the viewport and outside the window (SDL keeps sending
+  // them while a button is held), so that a drag selection extends past
+  // the visible part and the editor scrolls to follow it, as with Qt. A
+  // release which never reached us (the buttons are up) ends it too
+  if (pointer_captured && (mouse_state & 7) == 0 &&
+      !starts (mouse_action, "release-"))
+    pointer_captured= false;
+  bool captured= pointer_captured && d.found &&
+                 (mouse_action == "move" || starts (mouse_action, "release-"));
+  if (over && starts (mouse_action, "press-")) pointer_captured= true;
+  if (starts (mouse_action, "release-")) pointer_captured= false;
+  if ((over || captured) && (mouse_action != "")) {
     SI x= mouse_x - d.boundingBox.x;
     SI y= mouse_y - d.boundingBox.y;
     ren->set_origin (-backing_pos.x1, -backing_pos.x2);
@@ -5256,7 +5373,21 @@ vue_simple_widget_rep::do_layout () {
         debug_events << " [" << mouse_data[0] << "," << mouse_data[1] << "]";
       debug_events << LF;
     }
-    if (mouse_action == "wheel") {
+    if (mouse_action == "wheel" && is_editor_widget () &&
+        as_bool (call ("wheel-capture?"))) {
+      // the editor wants the wheel (in graphics mode, see QTMWidget::
+      // wheelEvent): it gets it as a "wheel" event, deltas in points
+      // (the displacement of a trackpad, as Qt's pixelDelta), instead of
+      // the view being scrolled
+      // (mouse_data is in SI here, ren->pixel per device pixel)
+      array<double> data;
+      if (N(mouse_data) == 2) {
+        double f= (double) ren->pixel * (win ? win->density : 1.0f);
+        data << mouse_data[0] / f << mouse_data[1] / f;
+      }
+      handle_mouse ("wheel", x, y, (int) mouse_state, mouse_time, data);
+    }
+    else if (mouse_action == "wheel") {
       // the deltas come in small steps (see "Scrolling with the wheel" in
       // vue_gui.cpp): the fractions of SI are carried over to the next step
       // and the deltas add up on top of a position which is still pending.
@@ -5372,11 +5503,17 @@ vue_simple_widget_rep::repaint_invalid_regions () {
           : NULL;
 
   if (!w) return; // we are not in a layout yet
-  
+
+  // Everything below happens at the density of our window: with_window
+  // makes its factor the one of the renderers (retina_factor), so that the
+  // backing store is made and painted at the resolution of the display the
+  // window is on, not at that of whichever window happened to be current
+  // (the loop repaints all the editors outside any window)
+  with_window frame (w->win);
+
   // retrieve current geometry
   Clay_ElementId clay_id= CLAY_IDI("simple_widget", id);
   {
-    with_window frame (w->win);
     Clay_ElementData d= Clay_GetElementData (clay_id);
     if (d.found) {
       // cache the current viewport size
@@ -5400,6 +5537,23 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   // current backing_store size
   int bs_w= backing_store->get_width ();
   int bs_h= backing_store->get_height ();
+  // A renderer made at another density (the window moved to a display of
+  // another density, or the widget to another window) is replaced by one at
+  // the density of our window, and everything is painted again: nothing of
+  // the old pixels can be reused, and the scroll below must already count
+  // with the new size of a pixel
+  if (ren_retina != retina_factor) {
+    SI old_w= bs_w * ren->pixel, old_h= bs_h * ren->pixel;
+    bs_w= size.x1; bs_h= size.x2;
+    backing_store= native_opaque_picture (bs_w, bs_h, 0, 0);
+    delete_renderer (ren);
+    ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+    ren_retina= retina_factor;
+    backing_valid= false;
+    invalidate_all ();
+    if (old_w != bs_w * ren->pixel || old_h != bs_h * ren->pixel)
+      resize_pending= true; // see below
+  }
 
   // Update the scroll position
 
@@ -5411,15 +5565,16 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   {
     // preprocess scroll_pos
     if (absolute_scroll) {
+      // SLOT_SCROLL_POSITION names the point which is to be at the centre
+      // of the view, as in Qt (qt_simple_widget_rep: origin = p - size/2),
+      // whether it is visible already or not: the editor relies on it to
+      // move the view by a little (selection_visible during a drag, which
+      // asks for a centre slightly off the current one) and to centre a
+      // page ("snap to pages"). It used to move only when the point was
+      // outside the view, so a drag selection never scrolled
       coord2 pt= scroll_pos;
-      scroll_pos= backing_pos;
-      // cout << "extents " << extents << LF;
-      // cout << "scroll_to (initial) " << pt << " current " << scroll_pos << " size " << sz << LF;
-      if (pt.x1 < scroll_pos.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-      else if (pt.x1 > scroll_pos.x1 + sz.x1) scroll_pos.x1= pt.x1-sz.x1/2;
-      if (pt.x2 > scroll_pos.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-      else if (pt.x2 < scroll_pos.x2 - sz.x2) scroll_pos.x2= pt.x2+sz.x2/2;
-      // cout << "scroll_pos (corrected) " << scroll_pos << LF;
+      scroll_pos.x1= pt.x1 - sz.x1/2;
+      scroll_pos.x2= pt.x2 + sz.x2/2; // y upwards: the top of the view
       absolute_scroll=false;
     }
     
@@ -5504,6 +5659,7 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     backing_store= new_backing_store;
     delete_renderer (ren);
     ren= ren2;
+    ren_retina= retina_factor;
     // the editor must be told (see notify_resizes), but not while we are
     // repainting: it would re-typeset in the middle of a repaint
     resize_pending= true;
@@ -5533,6 +5689,30 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     invalid_regions= new_regions;
   } // if (!is_nil (invalid_regions))
   backing_valid= true;
+  update_text_input_area ();
+}
+
+// The input methods show their candidates next to the cursor of the editor
+// which has the keyboard: SDL is told where it is (SDL_SetTextInputArea, in
+// points of the window), as Qt answers ImCursorRectangle from the position
+// of SLOT_CURSOR. Done after the scroll, which moves the cursor in the
+// window, and only when it changed.
+void
+vue_simple_widget_rep::update_text_input_area () {
+  if (win == NULL || win->kbd_focus != this) return;
+  SDL_Window* sw= (SDL_Window*) win->platform_window ();
+  if (sw == NULL) return; // a virtual window (single-window mode)
+  SI x= cursor_pos.x1, y= cursor_pos.x2;
+  ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+  ren->decode (x, y); // pixels of the backing store, from its top left
+  float d= (win->density > 0.0f) ? win->density : 1.0f;
+  int px= (int) ((origin.x1 + x) / d), py= (int) ((origin.x2 + y) / d);
+  if (!cursor_moved && px == ime_x && py == ime_y) return;
+  cursor_moved= false;
+  ime_x= px; ime_y= py;
+  // a thin box on the baseline, the candidates go below it
+  SDL_Rect r= { px, py - 12, 2, 16 };
+  SDL_SetTextInputArea (sw, &r, 0);
 }
 
 void
@@ -5589,6 +5769,8 @@ vue_simple_widget_rep::render (void *data) {
 //-----------------------------------------------------------------------------
 //vue_chooser_widget
 
+#include "editor.hpp"   // get_current_editor ()->as_length (image sizes)
+#include "new_view.hpp"
 
 /*!
   \param _cmd  Scheme closure to execute after the dialog is closed.
@@ -5716,6 +5898,24 @@ vue_chooser_widget_rep::read (slot s, blackbox index) {
   }
 }
 
+// the width and height of an image as pretty TeXmacs lengths, the policy
+// of qt_pretty_image_size (and of vue_pretty_image_size for the drops): the
+// size in points, or the width of the line for a wider image; nothing for
+// the formats the box sizes itself
+static void
+chooser_pretty_image_size (url image, string& w, string& h) {
+  w= ""; h= "";
+  string ext= locase_all (suffix (image));
+  if (ext == "pdf" || ext == "ps" || ext == "eps") return;
+  picture pic= load_picture (image, -1, -1, tree (""), PIXEL);
+  if (is_nil (pic)) return;
+  int ww= pic->get_width (), hh= pic->get_height ();
+  SI pt= get_current_editor () -> as_length ("1pt");
+  SI par= get_current_editor () -> as_length ("1par");
+  if (ww <= 0 || hh <= 0 || ww * pt > par) { w= "1par"; h= ""; }
+  else { w= as_string (ww) * "pt"; h= as_string (hh) * "pt"; }
+}
+
 void
 vue_chooser_widget_rep::callback (char* res) {
   if (!res) {
@@ -5730,7 +5930,7 @@ vue_chooser_widget_rep::callback (char* res) {
     if (file_type == "image") {
       url u= url_system (name);
       string w, h;
-      //qt_pretty_image_size (u, w, h);
+      chooser_pretty_image_size (u, w, h);
       string params;
       params << "\"" << w << "\" "
       << "\"" << h << "\" "
@@ -5865,7 +6065,7 @@ vue_field_widget_rep::query (slot s, int type_id) {
 vue_inputs_list_widget_rep::vue_inputs_list_widget_rep (command _cmd,
                                                       array<string> _prompts)
 : vue_widget_rep ("inputs_list_widget"),
-  cmd (_cmd), size (coord2 (100, 100)),
+  cmd (_cmd), size (coord2 (0, 0)),
   position (coord2 (0, 0)),
   win_title (""), style (0), done (false)
 {
@@ -6038,6 +6238,13 @@ vue_inputs_list_widget_rep::perform_dialog () {
   // closing the window from its title bar cancels the dialog
   win_widget= plain_window_widget (content, win_title, cancel_cmd);
   set_position (win_widget, position.x1, position.x2);
+  // dialogue_start centres the dialog on its window with the size we
+  // report, which is not known before the dialog is laid out: the window
+  // is centred on that point once it has been sized to its contents
+  vue_plain_window_widget_rep* ww=
+    dynamic_cast<vue_plain_window_widget_rep*> (win_widget.rep);
+  if (ww != NULL)
+    ww->centre_on (position.x1 + size.x1 / 2, position.x2 - size.x2 / 2);
   set_visibility (win_widget, true);
   focus_first_input ();
 }
@@ -6417,6 +6624,9 @@ void destroy_window_widget (widget w) {
     // the dialog is shown in a window of its own
     if (!is_nil (il->win_widget)) destroy_window_widget (il->win_widget);
     il->win_widget= widget ();
+  } else if (dynamic_cast<vue_chooser_widget_rep*> (vw.rep) != NULL) {
+    // the file chooser is the system dialog, which closes itself: there
+    // is no window of ours to destroy (see plain_window_widget)
   } else {
     cout << "not a window widget!" << LF;
   }

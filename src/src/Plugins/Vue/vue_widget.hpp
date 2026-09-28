@@ -106,6 +106,10 @@ public:
   bool scroll_pending;
   // no scroll bars (presentation mode, as the Qt port)
   bool scrollbars_hidden;
+  // a button went down on the canvas and is still held: the pointer
+  // events go to it wherever the pointer is, even outside the window
+  // (the editor extends a selection and scrolls, as with Qt)
+  bool pointer_captured;
   
   string debug_text; // debug view
 
@@ -152,6 +156,9 @@ protected:
   coord2       origin;       // position of the canvas in its window (device pixels, y down)
   bool         backing_valid;
   bool         resize_pending; // the viewport changed since the last notification
+  int          ren_retina;     // the density ren and the backing store were made for
+  bool         cursor_moved;   // SLOT_CURSOR since the input area was last set
+  int          ime_x, ime_y;   // where the input area was set (window points)
   double       scroll_rest_x, scroll_rest_y; // fractions of wheel deltas not yet applied
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
@@ -159,6 +166,7 @@ protected:
   void invalidate_all ();
   bool is_invalid ();
   void repaint_invalid_regions ();
+  void update_text_input_area (); // the IME candidates follow the cursor
   void translate_backing_store (int dpx, int dpy); // shift the pixels
 };
 
@@ -180,6 +188,9 @@ extern string layout_who;
 // keyboard focus of a window: editors are told when they gain or lose it
 void set_kbd_focus (vue_window win, vue_widget w);
 void notify_window_focus (vue_window win, bool has_focus);
+// the platform window was moved (or resized): its geometry is saved in the
+// preferences under the name of the window, as the Qt windows do
+void vue_notify_window_geometry (vue_window win, bool moved);
 
 /*!
   A file/directory chooser dialog, using native dialogs where available.
