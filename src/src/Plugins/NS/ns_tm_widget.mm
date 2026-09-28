@@ -389,6 +389,17 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
   case SLOT_MOUSE_GRAB:
     if (!is_nil (main_widget)) main_widget->send (s, val);
     return;
+  case SLOT_KEYBOARD_FOCUS:
+    {
+      // as in the Qt interface: the canvas gets the focus
+      check_type<bool> (val, s);
+      if (open_box<bool> (val) && !is_nil (main_widget)) {
+        NSView* v= canvas_of (concrete (main_widget)->as_nsview ());
+        if (v && [v window] && [[v window] firstResponder] != v)
+          [[v window] makeFirstResponder: v];
+      }
+    }
+    break;
   case SLOT_KEYBOARD_FOCUS_ON:
     {
       // As in the Qt interface (focus to the widget of this name): the

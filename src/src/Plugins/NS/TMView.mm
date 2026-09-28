@@ -294,6 +294,18 @@ initkeymap () {
   }
 }
 
+- (void) viewDidMoveToWindow
+{
+  [super viewDidMoveToWindow];
+  // NOTE: the canvas which comes in a window where nothing has the focus
+  // takes it (the canvas of a new window is put in it before the window
+  // exists, when it cannot become the first responder): as a Qt canvas,
+  // which has the focus by default
+  NSWindow* w= [self window];
+  if (w && ([w firstResponder] == w || [w firstResponder] == nil))
+    [w makeFirstResponder: self];
+}
+
 - (void) windowDidBecomeKey: (NSNotification*) n
 {
   (void) n;
