@@ -161,20 +161,54 @@ Checked: the application, copied elsewhere and started with an empty
 environment or with `open`, finds its files in the bundle and edits
 documents.
 
+### Older versions of macOS, both architectures
+
+The libraries of Homebrew are built for the version of macOS where they are
+installed (and so is an application which uses them). For a version of macOS
+which runs on other machines:
+
+```sh
+cd src
+packages/macos/build-deps.sh ~/tm-deps-arm64 arm64 12.0
+packages/macos/build-deps.sh ~/tm-deps-x86_64 x86_64 12.0     # under Rosetta
+packages/macos/build-ns-app.sh --deps ~/tm-deps-arm64 --arch arm64 --min-macos 12.0
+```
+
+`build-deps.sh` builds GMP, libltdl, libpng, FreeType and Guile 1.8.8 from
+their sources, as static libraries for this architecture and version of
+macOS; `build-ns-app.sh --deps` then builds with them only (not with
+Homebrew: its `PATH` and `pkg-config` exclude it), with
+`MACOSX_DEPLOYMENT_TARGET` and `--with-osx` (hence `LSMinimumSystemVersion`)
+set to the version. x86_64 on Apple silicon is built under Rosetta (both
+scripts run themselves again with `arch -x86_64`). With the application
+made for each architecture (from the same sources, in two copies of them),
+`packages/macos/merge-universal.sh ARM64.app X86_64.app OUT.app [OUT.dmg]`
+makes one of both with `lipo`, signs it again, and makes its disk image.
+`packages/macos/check-app.sh` (run by both) checks the signature, and that
+every program and library of the application, for each architecture, only
+uses the libraries of macOS and its own, and does not need a version of
+macOS after `LSMinimumSystemVersion`.
+
+The version is 12.0. The sources compile down to 10.13 (the oldest target
+of the current Xcode) for x86_64, except for a few calls, all in the
+tool bars: `separatorColor` and `controlAccentColor` (10.14) and the symbol
+images (11.0), which would need `@available`.
+
 ### Continuous integration
 
-`.github/workflows/macos-ns.yml` (GitHub Actions, macOS 15 on arm64)
-builds Guile 1.8.8 from its GNU tarball (Homebrew has only Guile 3; the
-build is cached), then runs `build-ns-app.sh --dmg` and starts the
-application of the disk image with a test home and `TEXMACS_NS_SNAPSHOT`:
-the run fails unless it shows its window. The disk image and the snapshots
-are artifacts of the run. The disk image is signed ad hoc: after
-installing it elsewhere, `xattr -dr com.apple.quarantine
+`.github/workflows/macos-ns.yml` (GitHub Actions, macOS 15 runners) does
+the above: a job per architecture builds the libraries (cached, until
+`build-deps.sh` changes) and the application, and a last job merges them
+into `TeXmacs-<version>-universal.dmg`, then starts the application of the
+disk image with each architecture (x86_64 under Rosetta), a test home and
+`TEXMACS_NS_SNAPSHOT`: the run fails unless it shows its window. The disk
+image and the snapshots are artifacts of the run. The disk image is signed
+ad hoc: after installing it elsewhere, `xattr -dr com.apple.quarantine
 /Applications/TeXmacs.app`. It runs on the branch `ns_ci` only (the work in
 `wip_other_guis` triggers nothing):
 
 ```sh
-git push -f origin wip_other_guis:ns_ci
+git push origin wip_other_guis:ns_ci
 ```
 
 or by hand from the Actions tab.

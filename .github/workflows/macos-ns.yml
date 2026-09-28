@@ -1,8 +1,15 @@
-# TeXmacs with the native interface of macOS (NS/Cocoa, doc/ns-port.md):
-# builds Guile 1.8 (cached; Homebrew only has Guile 3), then TeXmacs.app and
-# its disk image with src/packages/macos/build-ns-app.sh, checks that the
-# application of the disk image starts and shows its window, and keeps the
-# disk image (and the snapshot of the window) as artifacts of the run.
+# TeXmacs with the native interface of macOS (NS/Cocoa, doc/ns-port.md), as
+# one disk image for Apple silicon and Intel which runs on macOS 12 and
+# later:
+#   * app (for arm64 and x86_64, the latter under Rosetta): the libraries
+#     which do not come with macOS (GMP, libltdl, libpng, FreeType, Guile
+#     1.8) built for macOS 12 with packages/macos/build-deps.sh (cached; the
+#     ones of Homebrew only run on the version of macOS of the runner), then
+#     TeXmacs.app with packages/macos/build-ns-app.sh;
+#   * dmg: both applications merged (packages/macos/merge-universal.sh),
+#     its disk image, and a check that the application of the disk image
+#     starts and shows its window with each architecture. The disk image and
+#     the snapshots of the window are artifacts of the run.
 #
 # The application is signed ad hoc and not notarized: Gatekeeper rejects it
 # on another machine until the quarantine is removed,
@@ -10,7 +17,7 @@
 #
 # It runs on the branch ns_ci only: the work goes on in wip_other_guis,
 # which triggers nothing, and a state is built by moving ns_ci to it,
-#   git push -f origin wip_other_guis:ns_ci
+#   git push origin wip_other_guis:ns_ci
 # (or by hand, from the Actions tab, on any branch)
 
 name: macOS (Cocoa)
@@ -21,10 +28,13 @@ on:
   workflow_dispatch:
 
 env:
-  GUILE_VERSION: 1.8.8
+  MIN_MACOS: "12.0"
 
 jobs:
-  dmg:
+  app:
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
     runs-on: macos-15
     timeout-minutes: 90
     defaults:
@@ -33,69 +43,100 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Tools and libraries
-        run: brew install gmp libtool readline freetype libpng jpeg-turbo pkgconf
+      - name: Rosetta
+        if: matrix.arch == 'x86_64'
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license || arch -x86_64 /usr/bin/true
 
-      # Guile 1.8, in $RUNNER_TOOL_CACHE/guile-<version>: again only when its
-      # version or the runner change (or the last number of the key, when
-      # the recipe below changes)
-      - name: Cache of Guile
-        id: guile-cache
+      - name: Place of the libraries
+        run: echo "DEPS=$RUNNER_TOOL_CACHE/texmacs-deps-${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+      # the libraries: again only when build-deps.sh (which has their
+      # versions) or the version of macOS change
+      - name: Cache of the libraries
+        id: deps-cache
         uses: actions/cache@v6
         with:
-          path: ${{ runner.tool_cache }}/guile-${{ env.GUILE_VERSION }}
-          key: guile-${{ env.GUILE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-1
+          path: ${{ env.DEPS }}
+          key: texmacs-deps-${{ matrix.arch }}-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh') }}
 
-      - name: Guile
-        if: steps.guile-cache.outputs.cache-hit != 'true'
-        working-directory: ${{ runner.temp }}
-        run: |
-          curl -sSfLO "https://ftp.gnu.org/gnu/guile/guile-$GUILE_VERSION.tar.gz"
-          tar xzf "guile-$GUILE_VERSION.tar.gz"
-          cd "guile-$GUILE_VERSION"
-          # readline is keg-only (the one of macOS is libedit)
-          brew=$(brew --prefix) readline=$(brew --prefix readline)
-          ./configure --prefix="$RUNNER_TOOL_CACHE/guile-$GUILE_VERSION" \
-            --disable-error-on-warning --disable-dependency-tracking \
-            CPPFLAGS="-I$readline/include -I$brew/include" \
-            LDFLAGS="-L$readline/lib -L$brew/lib"
-          make -j"$(sysctl -n hw.ncpu)"
-          make install
+      - name: Libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: packages/macos/build-deps.sh "$DEPS" ${{ matrix.arch }} "$MIN_MACOS"
 
-      - name: TeXmacs.app and its disk image
+      - name: TeXmacs.app
         run: |
-          packages/macos/build-ns-app.sh --dmg \
-            --guile-config "$RUNNER_TOOL_CACHE/guile-$GUILE_VERSION/bin/guile-config"
-          # the architecture in the name (the artifact is the file itself);
+          packages/macos/build-ns-app.sh --deps "$DEPS" \
+            --arch ${{ matrix.arch }} --min-macos "$MIN_MACOS"
+          tar -C ../distr -czf ../distr/TeXmacs-${{ matrix.arch }}.tar.gz TeXmacs.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-${{ matrix.arch }}
+          path: distr/TeXmacs-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+
+  dmg:
+    needs: app
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rosetta
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license || arch -x86_64 /usr/bin/true
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: app-*
+          path: distr
+          merge-multiple: true
+
+      - name: Universal application and its disk image
+        run: |
+          for a in arm64 x86_64; do
+            mkdir -p ../distr/$a
+            tar -C ../distr/$a -xzf ../distr/TeXmacs-$a.tar.gz
+          done
+          version=$(plutil -extract CFBundleShortVersionString raw \
+                      ../distr/arm64/TeXmacs.app/Contents/Info.plist)
+          mkdir -p ../distr/macos
           # upload-artifact wants a path without ".."
-          dmg=$(cd ../distr/macos && ls "$PWD"/*.dmg)
-          mv "$dmg" "${dmg%.dmg}-$(uname -m).dmg"
-          dmg="${dmg%.dmg}-$(uname -m).dmg"
+          dmg="$(cd ../distr/macos && pwd)/TeXmacs-$version-universal.dmg"
+          packages/macos/merge-universal.sh ../distr/arm64/TeXmacs.app \
+            ../distr/x86_64/TeXmacs.app ../distr/TeXmacs.app "$dmg"
           echo "DMG=$dmg" >> "$GITHUB_ENV"
           ls -l "$dmg"
 
-      # the application of the disk image, with its own libraries only; a
-      # test home, and the window saved as a PNG after some seconds
+      # the application of the disk image, with each architecture: a test
+      # home, and the window saved as a PNG after some seconds
       - name: Smoke test (the application of the disk image starts)
         run: |
-          home=$(mktemp -d) shots=$(mktemp -d)
           mnt=$(mktemp -d)
           hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG"
-          HOME="$home" TEXMACS_HOME_PATH="$home/.TeXmacs" TEXMACS_NS_SNAPSHOT="$shots" \
-            "$mnt/TeXmacs.app/Contents/MacOS/TeXmacs" > "$home/log.txt" 2>&1 &
-          pid=$!
-          for i in $(seq 1 60); do
-            test -s "$shots/window-1.png" && break
-            kill -0 $pid 2> /dev/null || break
-            sleep 2
+          status=0
+          for a in arm64 x86_64; do
+            home=$(mktemp -d)
+            mkdir -p ../distr/snapshots/$a
+            shots=$(cd ../distr/snapshots/$a && pwd)
+            HOME="$home" TEXMACS_HOME_PATH="$home/.TeXmacs" TEXMACS_NS_SNAPSHOT="$shots" \
+              arch -$a "$mnt/TeXmacs.app/Contents/MacOS/TeXmacs" > "$home/log.txt" 2>&1 &
+            pid=$!
+            for i in $(seq 1 90); do
+              test -s "$shots/window-1.png" && break
+              kill -0 $pid 2> /dev/null || break
+              sleep 2
+            done
+            kill $pid 2> /dev/null || true
+            wait $pid 2> /dev/null || true
+            echo "== $a"
+            tail -20 "$home/log.txt"
+            test -s "$shots/window-1.png" || { echo "error: no window with $a"; status=1; }
           done
-          kill $pid 2> /dev/null || true
-          wait $pid 2> /dev/null || true
           hdiutil detach "$mnt"
-          tail -30 "$home/log.txt"
-          mkdir -p ../distr/snapshots
-          cp "$shots"/*.png ../distr/snapshots/ 2> /dev/null || true
-          test -s "$shots/window-1.png"
+          exit $status
 
       # not zipped: the artifact downloads as the .dmg
       - uses: actions/upload-artifact@v7

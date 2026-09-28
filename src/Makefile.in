@@ -502,14 +502,16 @@ MACOS_BUNDLE: TEXMACS
 	@echo TeXmacs has been bundled in $(MACOS_PACKAGE_APP)
 	@# NOTE: the libraries modified by bundle-libs.sh are signed first
 	@# (--deep does not sign the libraries in Resources/lib, and macOS
-	@# kills the processes which load a library with a broken signature)
+	@# kills the processes which load a library with a broken signature;
+	@# there are none when they are linked statically)
 	@if test -n "@SIGNID@";then \
-		codesign --force --timestamp -s @SIGNID@ \
-			$(MACOS_PACKAGE_RESOURCES)/lib/*.dylib &&\
+		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
+			codesign --force --timestamp -s @SIGNID@ {} + &&\
 		codesign --force --timestamp --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
 		echo "Bundle successfully signed" || echo "Signing failed"; \
 	else \
-		codesign --force -s - $(MACOS_PACKAGE_RESOURCES)/lib/*.dylib &&\
+		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
+			codesign --force -s - {} + &&\
 		codesign --force --deep -s - $(MACOS_PACKAGE_APP) &&\
 		echo "Bundle signed ad hoc (no identity given to configure)" ||\
 		echo "Signing failed"; fi
