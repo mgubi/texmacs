@@ -1323,10 +1323,12 @@ void gui_open (int& argc, char** argv)
     [d setBool: YES forKey: @"NSDisabledDictationMenuItem"];
     [d setBool: YES forKey: @"NSDisabledCharacterPaletteMenuItem"];
     // NOTE: the files on the command line are opened by TeXmacs, not a
-    // second time by AppKit (as in Qt); the windows are not restored
-    [d setBool: NO forKey: @"NSTreatUnknownArgumentsAsOpen"];
-    [d setBool: NO forKey: @"NSQuitAlwaysKeepsWindows"];
-    [d setBool: YES forKey: @"ApplePersistenceIgnoreState"];
+    // second time by AppKit (as in Qt); the windows are not restored (as
+    // registered defaults, not written in the preferences of the domain,
+    // which other versions of TeXmacs share)
+    [d registerDefaults: @{ @"NSTreatUnknownArgumentsAsOpen": @NO,
+                            @"NSQuitAlwaysKeepsWindows": @NO,
+                            @"ApplePersistenceIgnoreState": @YES }];
     if (![NSApp mainMenu]) make_main_menu ();
     static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
     [NSApp setDelegate: delegate];
