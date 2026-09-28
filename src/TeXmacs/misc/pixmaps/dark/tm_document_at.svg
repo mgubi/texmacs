@@ -1,21 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
-<svg id="svg3039" width="20" height="20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
- <metadata id="metadata3044">
-  <rdf:RDF>
-   <cc:Work rdf:about="">
-    <dc:format>image/svg+xml</dc:format>
-    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:title/>
-   </cc:Work>
-  </rdf:RDF>
- </metadata>
- <g id="layer1" transform="translate(0,4)">
-  <path id="path4565" d="m1.5 0.5c0-1.5 0.5-2 2-2h13c1.5 0 2 1 2 2.5v9.5c0 1.5-0.5 2-2 2h-13c-1.5 0-2-0.5-2-2z" fill-opacity=".12549" stroke="#7f7f7f"/>
-  <path id="path4571" d="m4 1.5h12" fill-opacity="0" stroke="#bfbfbf" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path11248" d="m4 3.5h12" fill-opacity="0" stroke="#bfbfbf" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path11250" d="m4.0319 5.4431h12" fill-opacity="0" stroke="#bfbfbf" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path11252" d="m4 7.5h12" fill-opacity="0" stroke="#bfbfbf" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path11254" d="m4 9.5h8" fill-opacity="0" stroke="#bfbfbf" stroke-linecap="round" stroke-width="1.5"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><path fill="#D8D8D8" stroke="#D8D8D8" stroke-width="1.1" d="M18.65 12.18C18.65 7.5 15.23 4.84 12.01 4.84C8.35 4.84 5.35 8.02 5.35 12C5.35 15.76 8.11 19.16 12.11 19.16C13.15 19.16 14.43 19.02 15.71 18.72C16.23 18.6 18.63 17.9 18.63 17.58C18.63 17.38 18.49 17.38 18.17 17.38H17.99C17.67 17.38 17.63 17.38 17.53 17.44C15.83 18.24 13.97 18.72 12.09 18.72C8.45 18.72 5.85 15.58 5.85 12C5.85 8.18 8.71 5.28 11.99 5.28C14.73 5.28 18.15 7.48 18.15 12.3C18.15 14.14 18.01 15.94 16.69 15.94C15.99 15.94 15.99 14.92 15.99 14.62V9.8C15.99 9.34 15.97 9.32 15.51 9.32H15.17C14.85 9.32 14.83 9.3 14.71 9.16C13.79 7.9 12.75 7.62 11.97 7.62C9.91 7.62 8.01 9.48 8.01 12C8.01 14.52 9.91 16.38 11.97 16.38C13.05 16.38 14.01 15.8 14.61 14.96C14.81 16 15.85 16.38 16.61 16.38C18.37 16.38 18.65 14.32 18.65 12.18ZM14.61 13.7C14.61 14.06 14.61 14.14 14.33 14.56C13.45 15.82 12.43 15.94 12.03 15.94C10.59 15.94 9.39 14.22 9.39 12C9.39 9.78 10.57 8.06 12.03 8.06C12.67 8.06 13.63 8.38 14.35 9.5C14.61 9.88 14.61 9.94 14.61 10.3Z"/></g>
 </svg>
