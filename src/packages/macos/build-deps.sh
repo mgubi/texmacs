@@ -18,11 +18,13 @@
 set -e
 
 # the versions and the SHA-256 of their sources (the same as Homebrew's,
-# except for Guile 1.8, which Homebrew no longer has)
+# except for Guile 1.8, which Homebrew no longer has, and libtool: the
+# static libltdl of 2.6 needs an archive of its build, and Guile does not
+# link with it)
 GMP_VERSION=6.3.0
 GMP_SHA256=a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
-LIBTOOL_VERSION=2.6.2
-LIBTOOL_SHA256=2ef1067c16c97db930fd740cc9bc3d3ba9a583804ae5ac42cc3e8719e49e191e
+LIBTOOL_VERSION=2.5.4
+LIBTOOL_SHA256=f81f5860666b0bc7d84baddefa60d1cb9fa6fceb2398cc3baca6afaa60266675
 LIBPNG_VERSION=1.6.58
 LIBPNG_SHA256=28eb403f51f0f7405249132cecfe82ea5c0ef97f1b32c5a65828814ae0d34775
 FREETYPE_VERSION=2.14.3
@@ -58,6 +60,8 @@ export CPPFLAGS="-I$prefix/include" LDFLAGS="-L$prefix/lib"
 export PATH="$prefix/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig" PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig"
 jobs=$(sysctl -n hw.ncpu)
+# NOTE: make and make install on their own lines: set -e does not stop
+# "make && make install" when make fails
 common="--prefix=$prefix --disable-shared --enable-static --with-pic --disable-dependency-tracking"
 
 fetch () { # url sha256
@@ -79,17 +83,20 @@ fetch "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz" $GMP_SHA256
 # (the code for each processor chosen at run time), generic code on arm64
 if [ "$arch" = x86_64 ]; then fat=--enable-fat; else fat=; fi
 ./configure $common $fat
-make -j"$jobs" && make install
+make -j"$jobs"
+make install
 
 echo "== libltdl (libtool $LIBTOOL_VERSION)"
 fetch "https://ftp.gnu.org/gnu/libtool/libtool-$LIBTOOL_VERSION.tar.xz" $LIBTOOL_SHA256
 ./configure $common --enable-ltdl-install
-make -j"$jobs" && make install
+make -j"$jobs"
+make install
 
 echo "== libpng $LIBPNG_VERSION"
 fetch "https://download.sourceforge.net/libpng/libpng-$LIBPNG_VERSION.tar.xz" $LIBPNG_SHA256
 ./configure $common
-make -j"$jobs" && make install
+make -j"$jobs"
+make install
 
 echo "== FreeType $FREETYPE_VERSION"
 fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.xz" $FREETYPE_SHA256
@@ -98,7 +105,8 @@ fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VE
 ./configure $common --enable-freetype-config --with-zlib=yes --with-png=yes \
   --with-bzip2=no --with-harfbuzz=no --with-brotli=no \
   LIBPNG_CFLAGS="-I$prefix/include/libpng16" LIBPNG_LIBS="-L$prefix/lib -lpng16 -lz"
-make -j"$jobs" && make install
+make -j"$jobs"
+make install
 
 echo "== Guile $GUILE_VERSION"
 fetch "https://ftp.gnu.org/gnu/guile/guile-$GUILE_VERSION.tar.gz" $GUILE_SHA256
@@ -106,7 +114,8 @@ fetch "https://ftp.gnu.org/gnu/guile/guile-$GUILE_VERSION.tar.gz" $GUILE_SHA256
 # not guile-readline, which TeXmacs does not use (and which finds the
 # readline.h of libedit)
 sed -i '' 's/ guile-readline / /' Makefile
-make -j"$jobs" && make install
+make -j"$jobs"
+make install
 
 rm -rf "$work"
 echo "== the libraries are in $prefix"
