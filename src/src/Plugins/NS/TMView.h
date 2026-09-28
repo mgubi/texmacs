@@ -17,6 +17,7 @@
 	simple_widget_rep *wid;
   NSString *workingText;
   BOOL processingCompose;
+  BOOL hasFocus;  // TeXmacs was told that the canvas has the focus
 }
 - (void) setWidget: (widget_rep*) w;
 - (widget_rep*) widget;

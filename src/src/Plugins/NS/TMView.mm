@@ -72,6 +72,10 @@ ns_dropped_document (NSPasteboard* pb) {
   if ([urls count] > 0) {
     for (NSURL* u in urls) {
       if ([u isFileURL]) {
+        // NOTE: the name in the Cork encoding, as in QTMWidget::dropEvent
+        // (from_qstring): it is a string of the document, and the images
+        // are read with cork_to_utf8 of their names (see mac_images.mm);
+        // the UTF-8 bytes would give an empty image for a name like "é.png"
         string name= from_nsstring ([u path]);
         string ext= locase_all (suffix (url_system (name)));
         if (ext == "eps" || ext == "ps" || ext == "svg" || ext == "pdf" ||
@@ -138,7 +142,9 @@ initkeymap () {
   map(0xf728,"backspace");
   map(0xf003,"enter");
   map(0x1b,"escape");
-  map(0x0003,"K-enter");
+  map(0x20,"space");            // as Qt::Key_Space
+  map(NSBackTabCharacter,"tab");  // shift-tab, as Qt::Key_Backtab
+  map(NSEnterCharacter,"enter");  // the enter of the keypad, or fn-return
   map(0x7f,"backspace");
   
   map( NSUpArrowFunctionKey       ,"up" );
@@ -242,13 +248,7 @@ initkeymap () {
 -(void) dealloc
 {
   [self deleteWorkingText];
-  [[NSNotificationCenter defaultCenter] removeObserver: self
-                                                  name: @"NSWindowDidBecomeKeyNotification"
-                                                object: nil];
-  [[NSNotificationCenter defaultCenter] removeObserver: self
-                                                  name: @"NSWindowDidBecomeKeyNotification"
-                                                object: nil];
-  
+  [[NSNotificationCenter defaultCenter] removeObserver: self];
   [super dealloc];
 }
 
@@ -262,45 +262,83 @@ initkeymap () {
 	return  (widget_rep*)wid;
 }
 
+/******************************************************************************
+* Keyboard focus (see QTMWidget::focusInEvent and focusOutEvent)
+******************************************************************************/
+
+// NOTE: as a Qt widget, the canvas has the focus when it is the first
+// responder of the key window; a canvas outside a window (the one of a
+// hidden buffer) never has it
+
 - (void) viewWillMoveToWindow: (NSWindow *)newWindow
 {
   // query widget preferred size
-  SI w = 0, h = 0;
-  wid->handle_get_size_hint (w, h);
-  [self setFrameSize: to_nssize (w, h)];
-  
-  // register to receive focus in/out notifications  
-  [[NSNotificationCenter defaultCenter] removeObserver: self
-                                                  name: @"NSWindowDidBecomeKeyNotification"
-                                                object: nil];
-  [[NSNotificationCenter defaultCenter] removeObserver: self
-                                                  name: @"NSWindowDidBecomeKeyNotification"
-                                                object: nil];
-  
-  [[NSNotificationCenter defaultCenter] addObserver: self
-                                           selector: @selector(focusIn)
-                                               name: @"NSWindowDidBecomeKeyNotification"
-                                             object: newWindow];
-  
-  [[NSNotificationCenter defaultCenter] addObserver: self
-                                           selector: @selector(focusOut)
-                                               name: @"NSWindowDidResignKeyNotification"
-                                             object: newWindow];
-  
+  if (wid) {
+    SI w = 0, h = 0;
+    wid->handle_get_size_hint (w, h);
+    [self setFrameSize: to_nssize (w, h)];
+  }
+
+  // the canvas which leaves its window loses the focus
+  if (newWindow != [self window]) [self focusOut];
+
+  // register to receive the focus in/out notifications of the new window
+  // (the only notifications which the canvas observes)
+  NSNotificationCenter* nc= [NSNotificationCenter defaultCenter];
+  [nc removeObserver: self];
+  if (newWindow) {
+    [nc addObserver: self selector: @selector(windowDidBecomeKey:)
+               name: NSWindowDidBecomeKeyNotification object: newWindow];
+    [nc addObserver: self selector: @selector(windowDidResignKey:)
+               name: NSWindowDidResignKeyNotification object: newWindow];
+  }
+}
+
+- (void) windowDidBecomeKey: (NSNotification*) n
+{
+  (void) n;
+  if ([[self window] firstResponder] == self) [self focusIn];
+}
+
+- (void) windowDidResignKey: (NSNotification*) n
+{
+  (void) n;
+  [self focusOut];
+}
+
+- (BOOL) becomeFirstResponder
+{
+  BOOL ok= [super becomeFirstResponder];
+  if (ok && [[self window] isKeyWindow]) [self focusIn];
+  return ok;
+}
+
+- (BOOL) resignFirstResponder
+{
+  BOOL ok= [super resignFirstResponder];
+  if (ok) [self focusOut];
+  return ok;
 }
 
 - (void) focusIn
 {
+  if (hasFocus || !wid || ![self window]) return;
+  hasFocus= YES;
   if (DEBUG_EVENTS) cout << "FOCUSIN" << LF;
-  if (wid) {
-      if (DEBUG_QT) debug_qt << "FOCUSIN: " << wid->type_as_string () << LF;
-      the_gui->process_keyboard_focus (wid, true, texmacs_time ());
-  }
+  if (DEBUG_QT) debug_qt << "FOCUSIN: " << wid->type_as_string () << LF;
+  the_gui->process_keyboard_focus (wid, true, texmacs_time ());
 }
 
 - (void) focusOut
 {
+  if (!hasFocus) return;
+  hasFocus= NO;
   if (DEBUG_EVENTS)   cout << "FOCUSOUT" << LF;
+  if (workingText) {
+    // the text being composed by an input method is abandoned
+    [[self inputContext] discardMarkedText];
+    [self unmarkText];
+  }
   if (wid) {
     if (DEBUG_QT) debug_qt << "FOCUSOUT: " << wid->type_as_string () << LF;
     the_gui -> process_keyboard_focus (wid, false, texmacs_time ());
@@ -327,67 +365,82 @@ initkeymap () {
                         fraction: 1.0 respectFlipped: NO hints: nil];
 }
 
-#if 0
-- (void)keyDown:(NSEvent *)theEvent
-{
-  if (!wid) return;
-  
-  {
-    char str[256];
-    string r;
-    NSString *nss = [theEvent charactersIgnoringModifiers];
-    unsigned int mods = [theEvent modifierFlags];
-    
-    
-    
-    if (([nss length]==1)&& (!processingCompose))
-      
-    {
-      int key = [nss characterAtIndex:0];
-      if (nskeymap->contains(key)) {
-        r = nskeymap[key];
-        r = ((mods & NSEventModifierFlagShift)? "S-" * r: r);
-      }
-      else
-      {
-        [nss getCString:str maxLength:256 encoding:NSUTF8StringEncoding];
-        string rr (str, strlen(str));
-        r= utf8_to_cork (rr);          
-      } 
-      
-      
-      string s (r);
-      if (! contains_unicode_char (s))     
-      {
-        //      string s= ((mods & NSEventModifierFlagShift)? "S-" * r: r);
-        /* other keyboard modifiers */
-        if (N(s)!=0) {
-          if (mods & NSEventModifierFlagControl ) s= "C-" * s;
-          if (mods & NSEventModifierFlagOption) s= "A-" * s;
-          if (mods & NSEventModifierFlagCommand) s= "M-" * s;
-          // if (mods & NSNumericPadKeyMask) s= "K-" * s;
-	  // if (mods & NSEventModifierFlagHelp) s= "H-" * s;
-          // if (mods & NSFunctionKeyMask) s= "F-" * s;
-        }
-        cout << "key press: " << s << LF;
-        wid -> handle_keypress (s, texmacs_time());    
-      }
-    }
-    else {
-      processingCompose = YES;
-      static NSMutableArray *nsEvArray = nil;
-      if (nsEvArray == nil)
-        nsEvArray = [[NSMutableArray alloc] initWithCapacity: 1];
-      
-      [nsEvArray addObject: theEvent];
-      [self interpretKeyEvents: nsEvArray];
-      [nsEvArray removeObject: theEvent];
-    }
-  }	
-  
-  
+/******************************************************************************
+* Keyboard (see QTMWidget::keyPressEvent and QTMKeyboardEvent)
+******************************************************************************/
+
+static string
+ns_key_name (NSString* c) {
+  // As QTMKeyboardEvent::computeUnicodeToCork: the character in the Cork
+  // encoding, but without the brackets of the TeXmacs symbols, since the
+  // keys are named in this way ("alpha" for <alpha>), except < and >
+  if ([c length] == 0) return "";
+  switch ([c characterAtIndex: 0]) {
+    case 96:    return "`";
+    case 168:   return "umlaut";
+    case 180:   return "acute";
+    case 0x300: return "grave";
+    case 0x301: return "acute";
+    case 0x302: return "hat";
+    case 0x308: return "umlaut";
+    case 0x33e: return "tilde";
+    default: break;
+  }
+  string s= from_nsstring (c);
+  int n= N(s);
+  if (n >= 2 && s[0] == '<' && s[1] != '#' && s[n-1] == '>') s= s (1, n-1);
+  if (s == "less") return "<";
+  if (s == "gtr") return ">";
+  return s;
 }
-#else
+
+static string ns_pending_key;  // the key of the event given to the input method
+
+- (string) texmacsKey: (NSEvent*) theEvent
+{
+  // The name of the key for TeXmacs, or "" when the key is a character which
+  // is left to the input method (as the text of the QKeyEvent in Qt)
+  NSString *nss = [theEvent charactersIgnoringModifiers];
+  NSEventModifierFlags mods = [theEvent modifierFlags];
+  if ([nss length] == 0) return "";
+  int key = [nss characterAtIndex:0];
+  bool shift= (mods & NSEventModifierFlagShift) != 0;
+  bool ctrl = (mods & NSEventModifierFlagControl) != 0;
+  bool alt  = (mods & NSEventModifierFlagOption) != 0;
+  bool cmd  = (mods & NSEventModifierFlagCommand) != 0;
+  if (key == NSBackTabCharacter) shift= true;
+
+  // NOTE: the modifiers in the order of the keyboard shortcuts of TeXmacs
+  // ("M-A-C-S-x", see the wildcards of prefix-kbd.scm); command is "M-",
+  // option "A-" and control "C-", as in the Qt interface on the Mac
+  string modstr;
+  if (ctrl) modstr= "C-" * modstr;
+  if (alt)  modstr= "A-" * modstr;
+  if (cmd)  modstr= "M-" * modstr;
+
+  if (nskeymap->contains (key))
+    // the special keys, with shift as a modifier
+    return modstr * (shift? string ("S-"): string ("")) * nskeymap[key];
+  if (ctrl || cmd)
+    // the chords, with the character without the modifiers (but with the
+    // shift, which is therefore not a modifier)
+    return modstr * ns_key_name (nss);
+  if (alt && key >= 32 && key < 128) {
+    // As QTMKeyboardEvent::patchForMac: option with a key which does not
+    // give an ASCII character is "A-x", but here only when "A-x" is
+    // a shortcut, since the kernel only inserts the composed character
+    // for the Qt interface (see edit_interface_rep::key_press); otherwise
+    // the character (or the dead key) is left to the input method
+    NSString* chs= [theEvent characters];
+    int c= [chs length] == 1? [chs characterAtIndex: 0]: 0;
+    if (c < 32 || c >= 128) {
+      string r= "A-" * string ((char) key);
+      if (call ("kbd-find-key-binding", r) != object (false)) return r;
+    }
+  }
+  return "";
+}
+
 - (void)keyDown:(NSEvent *)theEvent
 {
   if (!wid) return;
@@ -399,63 +452,23 @@ initkeymap () {
     initkeymap();
     fInit= true;
   }
-  
-  {
-    // char str[256];
-    string r;
-    NSString *nss = [theEvent charactersIgnoringModifiers];
-    unsigned int mods = [theEvent modifierFlags];
-    
-    string modstr;
-    
-    if (mods & NSEventModifierFlagControl ) modstr= "C-" * modstr;
-    if (mods & NSEventModifierFlagOption) modstr= "A-" * modstr;
-    if (mods & NSEventModifierFlagCommand) modstr= "M-" * modstr;
-    // if (mods & NSNumericPadKeyMask) modstr= "K-" * modstr;
-    // if (mods & NSEventModifierFlagHelp) modstr= "H-" * modstr;
-    // if (mods & NSFunctionKeyMask) modstr= "F-" * modstr;
-    
-    //    if (!processingCompose)
-    {
-      if ([nss length]>0) {
-        int key = [nss characterAtIndex:0];
-        if (nskeymap->contains(key)) {
-          r = nskeymap[key];
-          r = ((mods & NSEventModifierFlagShift)? "S-" * modstr: modstr) * r;          
-          if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << r << LF;
-          [self deleteWorkingText];
-          the_gui->process_keypress (wid, r, texmacs_time());
-          return;
-        } else if (mods & (NSEventModifierFlagControl  | NSEventModifierFlagCommand | NSEventModifierFlagHelp))
-        {
-          static char str[256];
-          [nss getCString:str maxLength:256 encoding:NSUTF8StringEncoding];
-          string rr (str, strlen(str));
-          r= utf8_to_cork (rr);          
-          
-          string s ( modstr * r);
-          [self deleteWorkingText];
-          
-          if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << s << LF;
-          the_gui->process_keypress (wid, s, texmacs_time());
 
-          return;
-        }
-      }
-    }
-    
-    processingCompose = YES;
-    static NSMutableArray *nsEvArray = nil;
-    if (nsEvArray == nil)
-      nsEvArray = [[NSMutableArray alloc] initWithCapacity: 1];
-    
-    [nsEvArray addObject: theEvent];
-    [self interpretKeyEvents: nsEvArray];
-    [nsEvArray removeObject: theEvent];
+  string r= [self texmacsKey: theEvent];
+  if (r != "" && ![self hasMarkedText]) {
+    if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << r << LF;
+    the_gui->process_keypress (wid, r, texmacs_time());
+    return;
   }
+
+  // The characters, and all the keys while an input method composes some
+  // text (return commits it, escape cancels it, the arrows choose among
+  // the candidates...), go to the input method; the keys which it does
+  // not want come back in doCommandBySelector:
+  ns_pending_key= r;
+  [self interpretKeyEvents: [NSArray arrayWithObject: theEvent]];
+  ns_pending_key= "";
 }
 
-#endif
 
 static unsigned int
 mouse_state (NSEvent* event, bool flag) {
@@ -723,6 +736,7 @@ plain_string (id s) {
   string r= "pre-edit:";
   if ([str length] > 0)
     r= r * as_string ((int) pos) * ":" * from_nsstring (str);
+  if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << r << LF;
   the_gui->process_keypress (wid, r, texmacs_time ());
 }
 
@@ -739,7 +753,7 @@ plain_string (id s) {
   for (NSUInteger i=0; i<[str length]; i++) {
     NSString* c= [str substringWithRange: [str rangeOfComposedCharacterSequenceAtIndex: i]];
     i += [c length] - 1;
-    string s= from_nsstring (c);
+    string s= ns_key_name (c);
     if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << s << LF;
     the_gui->process_keypress (wid, s, texmacs_time ());
   }
@@ -747,8 +761,15 @@ plain_string (id s) {
 
 - (void) doCommandBySelector: (SEL) aSelector
 {
-  // NOTE: the keys with a command are handled in keyDown:
+  // NOTE: the keys with a command are handled in keyDown:, but those which
+  // an input method which is composing some text does not want are sent
+  // to TeXmacs here
   (void) aSelector;
+  if (wid && ns_pending_key != "") {
+    if (DEBUG_QT && DEBUG_KEYBOARD) debug_qt << "key press: " << ns_pending_key << LF;
+    the_gui->process_keypress (wid, ns_pending_key, texmacs_time ());
+    ns_pending_key= "";
+  }
 }
 
 - (void) setMarkedText: (id) aString selectedRange: (NSRange) selRange
