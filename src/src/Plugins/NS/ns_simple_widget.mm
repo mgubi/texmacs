@@ -39,6 +39,19 @@
 // NOTE: TeXmacs draws synchronously, like the Qt interface
 + (BOOL) isCompatibleWithResponsiveScrolling { return NO; }
 
+// NOTE: in a list of widgets (Auto Layout), the size of the widget (the
+// virtual keyboard, a texmacs-output, for instance), as the size hint of the
+// QWidget in Qt; without it, the glues around it took all the width. The
+// document view of the scroll view of an editor is sized by its frame.
+- (NSSize) intrinsicContentSize
+{
+  if (!wid || [[self superview] isKindOfClass: [NSClipView class]])
+    return NSMakeSize (NSViewNoIntrinsicMetric, NSViewNoIntrinsicMetric);
+  SI w= 0, h= 0;
+  wid->handle_get_size_hint (w, h);
+  return to_nssize (w, h);
+}
+
 - (void) viewDidMoveToSuperview
 {
   // Follow the scrolling and the resizing of the clip view (see
