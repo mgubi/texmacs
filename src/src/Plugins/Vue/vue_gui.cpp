@@ -1954,9 +1954,12 @@ vue_web_close_tab (int id) {
 
 // the + of the tabs: a new window, whatever the buffer management (with
 // "separate", new-document* makes a new buffer in the current window)
+extern bool gui_needs_update; // below: the loop has work to do
+
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_new_tab () {
   exec_delayed (scheme_cmd ("(open-window)"));
+  gui_needs_update= true;
 }
 #else
 static void frame_sync () {}
@@ -2652,6 +2655,11 @@ loop_poll (SDL_Event* event) {
   return r;
 }
 
+#ifdef __EMSCRIPTEN__
+static bool   web_busy= true;      // the last iteration had work in progress
+static time_t web_idle_since= 0;   // the end of the last iteration
+#endif
+
 static void
 loop_wait (int ms) {
 #ifdef __EMSCRIPTEN__
@@ -2689,6 +2697,25 @@ static void
 loop_iteration () {
   int& delay= loop_delay;
   time_t t1= 0, t2= 0;
+#ifdef __EMSCRIPTEN__
+  // The browser calls this once per frame (60 or 120 times a second), where
+  // the desktop sleeps until an event comes or the pause ends (loop_wait,
+  // the pause growing to a second while nothing happens). An iteration with
+  // nothing to do laid out the windows and drew them again all the same:
+  // some 7 ms a frame, and a canvas to composite, with the page idle. As
+  // on the desktop, a frame does nothing until an event, a request of the
+  // page or of TeXmacs (gui_needs_update, gui_needs_relayout, commands) or
+  // the end of the pause, unless the last iteration was busy (a wheel
+  // which glides, a transition, a repaint which was interrupted).
+  {
+    int pause= notifiers_active () ? min (delay, 40) : delay;
+    if (gui_wait && !web_busy && !gui_needs_update && !gui_needs_relayout &&
+        !request_partial_redraw && is_nil (cmd_list) &&
+        SDL_PollEvent (NULL) == 0 && texmacs_time () - web_idle_since < pause)
+      return;
+  }
+  web_busy= false;
+#endif
   uint64_t t_frame= vue_now (); // the whole iteration, wait included
   
   // 1. process events
@@ -2719,6 +2746,9 @@ loop_iteration () {
   if (transitions_running ()) {
     // a transition animates: keep the frames coming (paced, woken by events)
     gui_needs_update= true;
+#ifdef __EMSCRIPTEN__
+    web_busy= true;
+#endif
     if (!loop_poll (NULL)) loop_wait (8);
   }
   if (wheel_step ()) {
@@ -2727,6 +2757,9 @@ loop_iteration () {
     // 5 ms but woken up by any event: a plain sleep here added its
     // length to the latency of every wheel event
     gui_needs_update= true;
+#ifdef __EMSCRIPTEN__
+    web_busy= true;
+#endif
     if (!loop_poll (NULL)) loop_wait (5);
   }
 
@@ -2848,6 +2881,9 @@ loop_iteration () {
   vue_profile_frame ();
   frame_sync (); // the tabs, to the page
   gui_wait= true;
+#ifdef __EMSCRIPTEN__
+  web_idle_since= texmacs_time ();
+#endif
 }
 
 void gui_start_loop () {
@@ -4444,6 +4480,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_dialog_done (void* res, const char* path) {
   const char* list[2]= { path, NULL };
   file_dialog_callback (res, list, 0);
+  gui_needs_update= true;
 }
 
 // the suffixes of the files which may be chosen, for the file input

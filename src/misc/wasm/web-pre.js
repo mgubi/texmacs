@@ -28,6 +28,10 @@ Module['preRun'].push(function () {
     (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
   ENV['TEXMACS_WEB_PLATFORM'] = /mac|iphone|ipad/i.test (platform) ? 'macos' :
                                 /win/i.test (platform) ? 'windows' : 'other';
+  // texmacs.html?profile=<n>: the profile of the loop, every n frames, in
+  // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
+  var prof = (typeof location !== 'undefined') && /[?&]profile=(\d+)/.exec (location.search);
+  if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[1];
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');
