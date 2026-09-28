@@ -193,7 +193,7 @@ var tmPackages = (function () {
         // the rest once TeXmacs runs (and has had its first frames);
         // ?no-background leaves it to the demand, to test that path
         var noBackground = typeof location !== 'undefined' &&
-                           location.search.indexOf ('no-background') >= 0;
+                           new URLSearchParams (location.search).has ('no-background');
         if (!noBackground) setTimeout (background, 500);
       })
       .catch (function (e) {

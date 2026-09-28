@@ -148,6 +148,47 @@ Locally:
   compressed response does not give it. `serve.mjs [dir] [port] [KB/s]` and
   `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
 
+## A viewer: `texmacs.html?open=<url>`
+
+The page opens the document at `<url>` once TeXmacs runs, in a tab of its
+own, which is the active one: a link to the page with a document in it
+makes a viewer of TeXmacs documents on the web
+(`texmacs.html?open=https://example.org/paper.tm`; the url is encoded as a
+parameter, `%20` for a space). `files.js` fetches it while TeXmacs loads
+and opens it when `tmProgress.running` says TeXmacs runs.
+
+- The url is relative to the page or absolute; another site has to let
+  the page read it (CORS, `Access-Control-Allow-Origin`), or the page says
+  it cannot open it, and why.
+- Any format TeXmacs opens (`.tm`, `.tex`, `.html`, `.md`...); a name
+  without one of their suffixes is opened as `.tm`.
+- The document is kept in `/tmp/web`, in memory, not in the home directory
+  of the page: a document viewed is not one of the user's (Save as puts it
+  among them).
+- What the document refers to (images, included files, a style of its
+  own) is not fetched with it.
+
+Other options of the address, joined with `&` (`URLSearchParams`: a
+value is written as a parameter, `%26` for `&`):
+
+- `x=<command>`: a Scheme command, as `texmacs -x`, run once TeXmacs runs,
+  after the document of `open` (as `-x` after the files of the command
+  line); several run in their order. A link is anyone's and a command can
+  change or delete the files kept in the browser, so the page shows the
+  commands and asks first (`tmFrame.ask`); they go to TeXmacs through
+  `_vue_web_scheme` (`files.js`).
+- `debug=<flags>` (`-debug-<flag>`, joined with commas; `std` is `-d`) and
+  `verbose` (`-V`): options of the command line, which `web-pre.js` puts in
+  `Module.arguments`.
+- `profile=<n>`, `trace-files`, `trace-clipboard`, `no-background`: for the
+  development of the page (see below).
+
+The menu of the TeXmacs Vue button has "Address of the page: open a
+document, options…": the options of the address, each with a line to copy,
+and a field which makes the link opening a document (`frame.js`,
+`addressOptions`). While that dialog is open, or text of the page is
+selected, `clipboard.js` leaves the keys to the browser (Cmd+C copies).
+
 ## The clipboard
 
 TeXmacs reads the clipboard synchronously when it pastes; the browser gives

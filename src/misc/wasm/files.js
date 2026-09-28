@@ -14,7 +14,9 @@
 //   tmFiles.save, called from vue_gui.cpp);
 // - the files and folders dropped on the page: copied into ~/Documents,
 //   keeping their structure; the documents are opened, the images dropped
-//   on a document inserted where they fall, a folder shown in the panel.
+//   on a document inserted where they fall, a folder shown in the panel;
+// - a document given in the address of the page (texmacs.html?open=<url>),
+//   opened once TeXmacs runs: the page as a viewer of documents on the web.
 //
 // Everything that opens a chooser of the system is a control the user
 // clicks: the browsers open one only for a click being handled.
@@ -585,6 +587,74 @@ var tmFiles = (function () {
     }, true);
   }
   if (typeof window !== 'undefined') installDrop ();
+
+  /****************************************************************************
+  * A document from the web: texmacs.html?open=<url>
+  ****************************************************************************/
+
+  // The document is fetched while TeXmacs loads, and opened once it runs.
+  // The url is relative to the page, or absolute: another site must allow
+  // the page to read it (CORS: Access-Control-Allow-Origin). It is kept in
+  // /tmp, not in the home directory: a document viewed is not a document
+  // of the user (Save as puts it among them). What it refers to (images,
+  // included files) is not fetched with it.
+  // the promise: the document has been given to TeXmacs, or could not be
+  function openFromWeb (src) {
+    var u;
+    try { u = new URL (src, location.href); }
+    catch (e) {
+      return new Promise (function (ok) {
+        tmProgress.running (function () { toast ('Not an address: ' + src); ok (); });
+      });
+    }
+    var name = safe (decodeURIComponent (base (u.pathname))) || 'document.tm';
+    if (!isDocument (name)) name += '.tm';
+    var fetched = fetch (u.href).then (function (r) {
+      if (!r.ok) throw new Error (r.status + ' ' + r.statusText);
+      return r.arrayBuffer ();
+    });
+    fetched.catch (function () {}); // handled once TeXmacs runs, below
+    return new Promise (function (ok) {
+      tmProgress.running (function () {
+        fetched.then (function (buf) {
+          var p = '/tmp/web/' + name;
+          write (p, new Uint8Array (buf));
+          openDocument (p);
+        }).catch (function (err) {
+          console.error ('TeXmacs: cannot open ' + u.href, err);
+          toast ('Cannot open ' + u.href + ': ' + (err.message || err) +
+                 (u.origin !== location.origin ? ' (does the site allow it? CORS)' : ''));
+        }).then (ok);
+      });
+    });
+  }
+
+  // ?x=<command>: Scheme commands, as TeXmacs -x <command>, run once
+  // TeXmacs runs, after the document of ?open (as -x after the files of the
+  // command line), in their order. A link is anyone's, and a command could
+  // change or delete the files kept in the browser: the page asks first,
+  // showing them.
+  function runCommands (cmds) {
+    tmFrame.ask ('Run Scheme commands?',
+                 'The address of this page asks TeXmacs to run ' +
+                 (cmds.length === 1 ? 'this Scheme command' : 'these Scheme commands') +
+                 '. Run only what you trust: a command can change or delete your files ' +
+                 'kept in this browser.', cmds, 'Run')
+      .then (function (yes) {
+        if (!yes) return;
+        cmds.forEach (function (c) {
+          withStackSave (function () { _vue_web_scheme (stringToUTF8OnStack (c)); });
+        });
+      });
+  }
+
+  if (typeof location !== 'undefined') {
+    var address = new URLSearchParams (location.search);
+    var opened = address.get ('open') ? openFromWeb (address.get ('open')) : Promise.resolve ();
+    var cmds = address.getAll ('x').filter (function (c) { return c.trim () !== ''; });
+    if (cmds.length > 0)
+      tmProgress.running (function () { opened.then (function () { runCommands (cmds); }); });
+  }
 
   return {
     browse: function (dir) { panel ('browse', { dir: dir }, null); },

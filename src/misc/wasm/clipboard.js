@@ -37,12 +37,20 @@ var tmClipboard = (function () {
   var pending = null; // the key of a paste, until its paste event
   var sink = null, back = null; // the hidden text area, the focus before it
   var held = false; // Ctrl or Cmd is down, the focus is in the text area
-  var trace = typeof location !== 'undefined' && location.search.indexOf ('trace-clipboard') >= 0;
+  var trace = typeof location !== 'undefined' &&
+              new URLSearchParams (location.search).has ('trace-clipboard');
   function log (s) { if (trace) console.log ('clipboard: ' + s); }
 
   function editable (t) {
     return t && t.nodeType === 1 && t !== sink &&
            (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test (t.tagName));
+  }
+  // a dialog of the page is open (frame.js), or text of the page is
+  // selected: the keys (Cmd+C...) are the browser's, not TeXmacs's
+  function pageOwnsKeys () {
+    if (document.getElementById ('tm-about')) return true;
+    var sel = window.getSelection && window.getSelection ();
+    return !!(sel && !sel.isCollapsed && String (sel) !== '');
   }
   function isPaste (e) {
     var v = (e.key === 'v' || e.key === 'V' || e.code === 'KeyV');
@@ -122,7 +130,7 @@ var tmClipboard = (function () {
   if (typeof window !== 'undefined') {
     // before SDL (its listeners are on window, in the bubbling phase)
     window.addEventListener ('keydown', function (e) {
-      if (!e.isTrusted || editable (e.target)) return;
+      if (!e.isTrusted || editable (e.target) || pageOwnsKeys ()) return;
       if (e.key === 'Meta' || e.key === 'Control') {
         held = true;
         borrow ();

@@ -56,7 +56,7 @@ var tmFrame = (function () {
     #tm-menu .tm-soft .tm-ver { color:#666; font-variant-numeric:tabular-nums }
     #tm-about { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.25);
       display:flex; align-items:center; justify-content:center; padding:16px }
-    #tm-about .tm-box { position:relative; max-width:560px; max-height:calc(100vh - 32px); overflow:auto;
+    #tm-about .tm-box { position:relative; max-width:560px; max-height:min(80vh, calc(100vh - 32px)); overflow:auto;
       background:#f6f6f6; border:1px solid #999; border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.3);
       padding:18px 22px; font:14px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222;
       line-height:1.45 }
@@ -67,6 +67,31 @@ var tmFrame = (function () {
     #tm-about .tm-x { position:absolute; top:8px; right:10px; width:24px; height:24px; line-height:24px;
       text-align:center; border-radius:4px; cursor:pointer; color:#555; font-size:18px }
     #tm-about .tm-x:hover { background:#ddd; color:#000 }
+    #tm-about .tm-box { user-select:text; -webkit-user-select:text }
+    #tm-about p { margin:4px 0; color:#333 }
+    #tm-about code { font:12.5px ui-monospace,Menlo,monospace; background:#e8e8e8;
+      padding:1px 4px; border-radius:3px }
+    #tm-about .tm-opt { margin:12px 0 }
+    #tm-about .tm-name { font-size:13.5px; background:none; padding:0 }
+    #tm-about b { font-weight:600; color:#111 }
+    #tm-about .tm-line { display:flex; align-items:center; gap:6px; margin:4px 0 }
+    #tm-about .tm-line code { flex:1; min-width:0; overflow-wrap:anywhere; padding:4px 6px }
+    #tm-about .tm-button { flex:none; font:12px -apple-system,Helvetica,sans-serif; padding:3px 9px;
+      border:1px solid #999; border-radius:4px; background:#fff; cursor:pointer; user-select:none }
+    #tm-about .tm-button:hover { background:#eef3f9 }
+    #tm-about .tm-icon { flex:none; display:flex; align-items:center; justify-content:center;
+      width:26px; height:26px; padding:0; border:none; border-radius:4px; background:none;
+      color:#888; cursor:pointer }
+    #tm-about .tm-icon:hover { background:#dde3ea; color:#333 }
+    #tm-about .tm-icon.done { color:#3a7d44 }
+    #tm-about .tm-icon svg { width:15px; height:15px; fill:none; stroke:currentColor;
+      stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round }
+    #tm-about .tm-buttons { display:flex; justify-content:flex-end; gap:8px; margin-top:14px }
+    #tm-about .tm-buttons button { font-size:13px; padding:4px 14px }
+    #tm-about .tm-default { background:#5b7fa8; color:#fff; border-color:#4a6b91 }
+    #tm-about .tm-default:hover { background:#6a8db5 }
+    #tm-about input { width:100%; box-sizing:border-box; font:13px ui-monospace,Menlo,monospace;
+      padding:4px 6px; border:1px solid #999; border-radius:4px }
   `;
 
   function build () {
@@ -281,33 +306,216 @@ var tmFrame = (function () {
   ];
 
   function showAbout () {
+    dialog ('TeXmacs Vue: more info and limitations', function (box) {
+      about.forEach (function (sec) {
+        box.appendChild (el ('h3', null, sec[0]));
+        var ul = el ('ul');
+        sec[1].forEach (function (t) { ul.appendChild (el ('li', null, t)); });
+        box.appendChild (ul);
+      });
+    });
+  }
+
+  // The options of the address of the page (texmacs.html?...), as the
+  // scripts read them: files.js (open), web-pre.js (profile, trace-files),
+  // clipboard.js (trace-clipboard), packages.js (no-background)
+  // [name, its value ('' for a flag), an example, what it does]; the
+  // texts are in the markup of rich (): **...** in bold
+  var addressOptions = [
+    ['open', '<url>', 'open=https://example.org/paper.tm',
+     'Opens the document at **<url>** in a tab of its own once TeXmacs runs: a link to ' +
+     'the page with **open** is a viewer of the document. **<url>** is absolute, or ' +
+     'relative to the page, written as a parameter (%20 for a space...). Another site ' +
+     'has to allow the page to read it (CORS: Access-Control-Allow-Origin). Any format ' +
+     'TeXmacs opens (.tm, .tex, .html, .md...); the images and files the document ' +
+     'refers to are not fetched with it. It is not kept in the storage of the ' +
+     'browser: Save as keeps it.'],
+    ['x', '<command>', 'open=https://example.org/paper.tm&x=' +
+       encodeURIComponent ('(change-zoom-factor 1.5)'),
+     'Runs the Scheme **<command>**, as texmacs -x <command>: once TeXmacs runs, after ' +
+     'the document of **open**. Several **x** run in their order. The page shows ' +
+     'the commands and asks before running them.'],
+    ['debug', '<flags>', 'debug=events,keyboard',
+     'Debugging messages of TeXmacs in the console of the browser, as the ' +
+     '-debug-<flag> options of the command line. **<flags>**: among **std**, ' +
+     '**events**, **io**, **keyboard**, **convert**, **parser**, **correct**, ' +
+     '**packrat**, **flatten**, **history**, **bench**, **remote**, **live**, ' +
+     '**sockets**, **gnutls**, **all**, joined with commas.'],
+    ['verbose', '', 'verbose', 'More messages of TeXmacs in the console, as -V.'],
+    ['profile', '<n>', 'profile=60',
+     'Prints the profile of the main loop of TeXmacs in the console of the browser, ' +
+     'every **<n>** frames.'],
+    ['trace-files', '', 'trace-files',
+     'Records the files of TeXmacs opened, in their order, in window.tmTrace (to make ' +
+     'the list of the files needed at boot).'],
+    ['trace-clipboard', '', 'trace-clipboard',
+     'Logs each paste, and what the clipboard brought, in the console.'],
+    ['no-background', '', 'no-background',
+     'Does not download the files of TeXmacs in the background once it runs: they ' +
+     'come on demand only (to test that path).']
+  ];
+
+  // an element of text with parts in bold: **...**
+  function rich (tag, text) {
+    var e = el (tag);
+    text.split ('**').forEach (function (part, k) {
+      if (part === '') return;
+      if (k % 2 === 1) e.appendChild (el ('b', null, part));
+      else e.appendChild (document.createTextNode (part));
+    });
+    return e;
+  }
+
+  // the address of this page with the options q (without the old ones)
+  function pageAddress (q) {
+    return location.origin + location.pathname + (q ? '?' + q : '');
+  }
+
+  // a small line drawing: the paths of a 16x16 box
+  function icon (paths) {
+    var ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS (ns, 'svg');
+    svg.setAttribute ('viewBox', '0 0 16 16');
+    svg.setAttribute ('aria-hidden', 'true');
+    paths.forEach (function (d) {
+      var p = document.createElementNS (ns, 'path');
+      p.setAttribute ('d', d);
+      svg.appendChild (p);
+    });
+    return svg;
+  }
+  var COPY_ICON = ['M5.5 5.5h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z',
+                   'M2.5 10.5v-7a1 1 0 0 1 1-1h7'];
+  var DONE_ICON = ['M3 8.5l3.2 3.2L13 4.8'];
+
+  // a button which copies get () to the clipboard; a check mark says it did
+  function copyButton (get) {
+    var b = el ('button', 'tm-icon');
+    b.title = 'Copy';
+    b.setAttribute ('aria-label', 'Copy');
+    b.appendChild (icon (COPY_ICON));
+    b.onclick = function () {
+      var t = get (), done = function () {
+        b.replaceChildren (icon (DONE_ICON));
+        b.classList.add ('done');
+        b.title = 'Copied';
+        setTimeout (function () {
+          b.replaceChildren (icon (COPY_ICON));
+          b.classList.remove ('done');
+          b.title = 'Copy';
+        }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText)
+        navigator.clipboard.writeText (t).then (done, function () { fallback (t); done (); });
+      else { fallback (t); done (); }
+    };
+    function fallback (t) {
+      var a = document.createElement ('textarea');
+      a.value = t; a.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0';
+      document.body.appendChild (a); a.select ();
+      try { document.execCommand ('copy'); } catch (e) {}
+      a.remove ();
+    }
+    return b;
+  }
+  // a line of code with its Copy button
+  function codeLine (box, get) {
+    var line = el ('div', 'tm-line');
+    var c = el ('code', null, get ());
+    line.appendChild (c);
+    line.appendChild (copyButton (get));
+    box.appendChild (line);
+    return c;
+  }
+
+  function showAddressOptions () {
+    dialog ('The address of the page', function (box) {
+      box.appendChild (rich ('p', 'Options go after the address of the page: ' +
+        'texmacs.html?**option**, or texmacs.html?**option**=**value**. They are read ' +
+        'when the page loads.'));
+      box.appendChild (rich ('p', 'Several options are joined with **&**, in any order: ' +
+        'texmacs.html?**open**=paper.tm**&x**=(...)**&verbose**. A value is written as ' +
+        'a parameter of an address: **%20** for a space, **%26** for &, **%3D** for = ' +
+        '(the lines to copy below are).'));
+      box.appendChild (el ('h3', null, 'A link to open a document'));
+      box.appendChild (rich ('p', 'The address of a document (.tm, .tex, .html, .md...), ' +
+        'and the link with **open** which opens it in TeXmacs Vue:'));
+      var input = el ('input');
+      input.type = 'url';
+      input.placeholder = 'https://example.org/paper.tm';
+      box.appendChild (input);
+      var link = function () {
+        var u = input.value.trim () || input.placeholder;
+        return pageAddress ('open=' + encodeURIComponent (u));
+      };
+      var out = codeLine (box, link);
+      input.oninput = function () { out.textContent = link (); };
+      box.appendChild (el ('h3', null, 'The options'));
+      addressOptions.forEach (function (o) {
+        var d = el ('div', 'tm-opt');
+        var name = el ('code', 'tm-name');
+        name.appendChild (el ('b', null, o[0]));
+        if (o[1]) name.appendChild (document.createTextNode ('=' + o[1]));
+        d.appendChild (name);
+        d.appendChild (rich ('p', o[3]));
+        codeLine (d, function () { return pageAddress (o[2]); });
+        box.appendChild (d);
+      });
+    });
+  }
+
+  // a dialog above the page, closed by its x, a click beside it, or Escape;
+  // fill (box, close) makes its contents, closed (true when a button of
+  // them closed it) is called once it is closed
+  function dialog (title, fill, closed) {
     var old = document.getElementById ('tm-about');
     if (old) old.remove ();
     var back = el ('div'); back.id = 'tm-about';
     var box = el ('div', 'tm-box');
     var x = el ('div', 'tm-x', '\u00d7'); x.title = 'Close';
     box.appendChild (x);
-    box.appendChild (el ('h2', null, 'TeXmacs Vue: more info and limitations'));
-    about.forEach (function (sec) {
-      box.appendChild (el ('h3', null, sec[0]));
-      var ul = el ('ul');
-      sec[1].forEach (function (t) { ul.appendChild (el ('li', null, t)); });
-      box.appendChild (ul);
-    });
+    box.appendChild (el ('h2', null, title));
+    fill (box, function () { close (true); });
     back.appendChild (box);
     // the keys are for the popup, not for TeXmacs below it
-    function close () {
+    var done = false;
+    function close (byButton) {
+      if (done) return;
+      done = true;
       back.remove ();
       ['keydown', 'keypress', 'keyup'].forEach (function (t) { window.removeEventListener (t, key, true); });
+      if (closed) closed (byButton === true);
     }
     function key (e) {
       e.stopPropagation ();
-      if (e.key === 'Escape') { e.preventDefault (); if (e.type === 'keydown') close (); }
+      if (e.key === 'Escape') { e.preventDefault (); if (e.type === 'keydown') close (false); }
     }
-    x.onclick = close;
-    back.addEventListener ('mousedown', function (e) { e.stopPropagation (); if (e.target === back) close (); });
+    x.onclick = function () { close (false); };
+    back.addEventListener ('mousedown', function (e) { e.stopPropagation (); if (e.target === back) close (false); });
     ['keydown', 'keypress', 'keyup'].forEach (function (t) { window.addEventListener (t, key, true); });
     document.body.appendChild (back);
+  }
+
+  // ask before doing something: the lines of code it would run, and a
+  // button for it; true when it was pressed (files.js: ?x=)
+  function ask (title, text, lines, okLabel) {
+    return new Promise (function (answer) {
+      var ok = false;
+      dialog (title, function (box, close) {
+        box.appendChild (el ('p', null, text));
+        lines.forEach (function (t) {
+          var line = el ('div', 'tm-line');
+          line.appendChild (el ('code', null, t));
+          box.appendChild (line);
+        });
+        var bar = el ('div', 'tm-buttons');
+        var no = el ('button', 'tm-button', 'Cancel'), yes = el ('button', 'tm-button tm-default', okLabel);
+        no.onclick = function () { close (); };
+        yes.onclick = function () { ok = true; close (); };
+        bar.appendChild (no); bar.appendChild (yes);
+        box.appendChild (bar);
+        setTimeout (function () { no.focus (); }, 0);
+      }, function () { answer (ok); });
+    });
   }
 
   function toggleMenu (button) {
@@ -350,6 +558,9 @@ var tmFrame = (function () {
            'mathematics included. Expect rough edges: ',
            ['more info and limitations', showAbout], '. ',
            ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/wip_wasm_vue'],
+           '.']);
+    para (['A link to this page can open a document from the web, and pass options and ' +
+           'Scheme commands to TeXmacs: see ', ['the options of the address', showAddressOptions],
            '.']);
     // the software this page is made of, with their versions as the program
     // reports them (gui_open in vue_gui.cpp), and their pages
@@ -464,6 +675,7 @@ var tmFrame = (function () {
     update: function (state) { tabs = state.tabs || []; render (); },
     info: function (d) { app = d || {}; },
     tabs: function () { return tabs; },
-    fullScreen: fullScreen
+    fullScreen: fullScreen,
+    ask: ask
   };
 })();

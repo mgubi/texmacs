@@ -94,10 +94,12 @@ var tmProgress = (function () {
     console.log ('TeXmacs: ' + s + ' (' + Math.round (performance.now ()) + ' ms)');
     render ();
   }
+  var onRunning = []; // what waits for TeXmacs to run (tmProgress.running)
   function hide () {
     console.log ('TeXmacs: running (' + Math.round (performance.now ()) + ' ms)');
     state = 'done';
     if (panel && !failed) { panel.remove (); panel = null; }
+    onRunning.splice (0).forEach (function (f) { f (); });
   }
   function error (text) {
     build ();
@@ -194,6 +196,8 @@ var tmProgress = (function () {
           loaded >= total && !compiled) set ('compiling');
       else render ();
     },
-    error: error
+    error: error,
+    // f is called once TeXmacs runs (now if it does)
+    running: function (f) { if (state === 'done') f (); else onRunning.push (f); }
   };
 })();

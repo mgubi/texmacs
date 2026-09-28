@@ -5,11 +5,35 @@
 // IndexedDB of the page (IDBFS): it is read before TeXmacs starts, and
 // written back every few seconds and when the page goes away, so that the
 // preferences and the documents of the user survive a reload.
+
+// The options of the address of the page (texmacs.html?a&b=...; the list is
+// in the dialog "Address of the page", frame.js) which are options of the
+// command line of TeXmacs: ?debug=<flags> (-debug-<flag>, several joined
+// with commas: events,io,keyboard...; std is -d) and ?verbose (-V).
+// ?open and ?x are for once TeXmacs runs (files.js).
+var tmAddress = new URLSearchParams (typeof location !== 'undefined' ? location.search : '');
+(function () {
+  var flags = ['std', 'all', 'events', 'io', 'sockets', 'gnutls', 'bench', 'history',
+               'keyboard', 'packrat', 'flatten', 'parser', 'correct', 'convert',
+               'remote', 'live'];
+  var args = [];
+  tmAddress.getAll ('debug').forEach (function (v) {
+    v.split (',').forEach (function (f) {
+      f = f.trim ();
+      if (f === '') return;
+      if (flags.indexOf (f) < 0) console.warn ('TeXmacs: no debugging flag ' + f);
+      else args.push (f === 'std' ? '-d' : '-debug-' + f);
+    });
+  });
+  if (tmAddress.has ('verbose')) args.push ('-V');
+  if (args.length > 0) Module['arguments'] = (Module['arguments'] || []).concat (args);
+})();
+
 Module['preRun'] = Module['preRun'] || [];
 Module['preRun'].push(function () {
   // ?trace-files: the files of /texmacs which TeXmacs opens, in the order
   // it opens them (window.tmTrace), to choose the files needed at boot
-  if (typeof location !== 'undefined' && location.search.indexOf ('trace-files') >= 0) {
+  if (tmAddress.has ('trace-files')) {
     var seen = {}, open = FS.open;
     window.tmTrace = [];
     FS.open = function (path, flags, mode) {
@@ -30,8 +54,8 @@ Module['preRun'].push(function () {
                                 /win/i.test (platform) ? 'windows' : 'other';
   // texmacs.html?profile=<n>: the profile of the loop, every n frames, in
   // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
-  var prof = (typeof location !== 'undefined') && /[?&]profile=(\d+)/.exec (location.search);
-  if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[1];
+  var prof = /^\d+$/.exec (tmAddress.get ('profile') || '');
+  if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[0];
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');
