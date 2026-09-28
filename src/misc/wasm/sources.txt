@@ -323,6 +323,7 @@ Texmacs/Window/tm_window.cpp
 Typeset/Boxes/Animate/animate_boxes.cpp
 Typeset/Boxes/Basic/basic_boxes.cpp
 Typeset/Boxes/Basic/boxes.cpp
+Typeset/Boxes/Basic/font_debug_boxes.cpp
 Typeset/Boxes/Basic/rubber_boxes.cpp
 Typeset/Boxes/Basic/stretch_boxes.cpp
 Typeset/Boxes/Basic/text_boxes.cpp
