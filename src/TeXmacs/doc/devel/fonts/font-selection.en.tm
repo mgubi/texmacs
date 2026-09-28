@@ -8,14 +8,15 @@
   <paragraph*|From the dialogs>
 
   The font of a whole document is chosen in <menu|Document|Font>, and the
-  font of a piece of text in <menu|Format|Font>. Both open the font browser,
-  which lets you pick a family, a shape and a size, and which can also
+  font of a piece of text in <menu|Format|Font>. When the preference
+  <menu|Complex actions> is set to popup windows, both open the font browser, which lets you pick a family, a shape and a size, and which can also
   search for a font by its properties; the <hlink|font selection
   system|../../main/text/man-fonts.en.tm> describes the browser and its
   filters.
 
-  <menu|Document|Font> has, besides the browser, three submenus which set
-  the font of one mode at a time, and two which set the sizes:
+  When it is set to menus, <menu|Document|Font> has instead three submenus
+  which set the font of one mode at a time, one for the
+  <name|OpenType> features, and two which set the sizes:
 
   <\description>
     <item*|<menu|Text font>>The font of ordinary text.
@@ -23,16 +24,20 @@
     <item*|<menu|Mathematical font>>The font of formulas. Its entries are
     the traditional <TeXmacs> math fonts, and, at the end of the list, the
     <name|OpenType> math fonts which are installed on your system and which
-    <TeXmacs> knows how to use. Formulas follow the mathematical companion of
-    the text font whenever it has one, so this setting counts with the
-    default text font, Roman, or with a text font which has no mathematics
-    of its own; the font button of the focus toolbar sets text and
-    mathematics together, and the section <hlink|<em|Mathematical
+    <TeXmacs> knows how to use. This setting counts only while the text font
+    is the default one, Roman: with any other text font, formulas are set in
+    the mathematical companion of that font, or in the font itself. The
+    font button of the focus toolbar sets text and mathematics together, and
+    the section <hlink|<em|Mathematical
     fonts>|../../main/math/fonts/man-math-fonts.en.tm> of the user manual
     shows each pair.
 
-    <item*|<menu|Program font>>The font of program sessions and of verbatim
-    text.
+    <item*|<menu|Features>>The <name|OpenType> features of the document
+    font, such as old style figures or small capitals.
+
+    <item*|<menu|Program font>>The font of program sessions and of program
+    text; like the mathematical font, it counts while the text font is
+    Roman.
 
     <item*|<menu|Size>, <menu|Dpi>>The base size of the document in points
     and the resolution at which the glyphs are rendered.
@@ -69,9 +74,15 @@
     The environment variables which select a font.
   </big-table>
 
-  The three modes are independent: a formula inside a sans serif paragraph
-  is still set in the mathematical font, and the program font is used inside
-  sessions and verbatim text. The family, the series and the shape are
+  The three modes are not independent. A formula is set from the text font
+  and its family: in a document whose font is Libertinus, formulas are set in
+  Libertinus Math, the mathematical companion of that font, and in a sans
+  serif paragraph their letters turn sans serif. The variables
+  <src-var|math-font> and <src-var|prog-font> are used only while
+  <src-var|font> is <verbatim|roman>. To combine a text font with another
+  mathematical font than its own, write both in <src-var|font> as a rule,
+  <verbatim|math=Euler Math,TeX Gyre Pagella>, where the part before the
+  comma applies to mathematics only. The family, the series and the shape are
   <em|requests>: if the font you asked for has no bold italic, <TeXmacs>
   takes the closest match it can find, or emulates it.
 
@@ -184,8 +195,9 @@
   </tm-fragment>
 
   A feature which offers several alternates for the same character takes the
-  number of the one you want after an equals sign, as in
-  <verbatim|ss01=1>; the first alternate is taken by default. Features
+  number of the one you want after an equals sign, counting from 0, as in
+  <verbatim|salt=1> for the second; the first, 0, is taken by default, and
+  a number the font does not have leaves the glyph alone. Features
   apply from left to right, so <verbatim|onum,tnum> asks for old style
   figures and then for the tabular form of those.
 
@@ -195,10 +207,12 @@
   have the feature you asked for simply ignores it, which means that the
   variable is safe to set on a whole document.
 
-  The menus propose the features of the font at the cursor, and nothing
-  else: <menu|Format|Font features> applies one to the selection,
-  <menu|Document|Font|Features> to the whole document, and a tick shows
-  which are in force. The font browser has them too, in its
+  The menus propose the features of the font at the cursor which they
+  know, the figure, capital and stylistic features and the stylistic sets
+  <verbatim|ss01> to <verbatim|ss05>: when complex actions go through the
+  menus, <menu|Format|Font features> (with detailed menus) applies one to
+  the selection, <menu|Document|Font|Features> to the whole document, and a
+  tick shows which are in force. The font browser has them too, in its
   <menu|Font customization> area and under its <menu|Features> tab, where
   the list follows the font the dialog has selected and the sample text
   shows the effect.
@@ -207,7 +221,8 @@
   present. That covers <verbatim|onum>, <verbatim|lnum>, <verbatim|tnum>,
   <verbatim|pnum>, <verbatim|zero>, <verbatim|smcp>, <verbatim|c2sc>,
   <verbatim|salt>, <verbatim|swsh>, <verbatim|hist> and the stylistic sets
-  <verbatim|ss01> to <verbatim|ss20> in the fonts shipped with <TeXmacs>.
+  <verbatim|ss01> to <verbatim|ss20> in the fonts shipped with <TeXmacs>;
+  those the menus do not list can be named in the variable.
   The ligature features, <verbatim|liga>, <verbatim|dlig> and
   <verbatim|frac>, replace several glyphs by one and are not applied yet.
 
@@ -275,20 +290,29 @@
     The value of <var|var> at the current cursor position, as a string.
   </explain>
 
-  The font of a formula is set in the same way, through <verbatim|math-font>
-  and its companions, and a pair of fonts which belong together can be set
-  at once:
+  The font of a formula follows the text font, as explained above, so a
+  pair of fonts which belong together is set at once: <scm|init-opentype-font>
+  takes the name of a profiled <name|OpenType> math font and sets its text
+  font, the rule for its mathematics when needed and the font family, which
+  is what the entries of the font menu do, and <scm|init-font> takes a text
+  font and a traditional math font. For the four <name|TeX Gyre> fonts both
+  add a style package, such as <verbatim|pagella-font>, instead of setting
+  <src-var|font>, and the package sets the hand-tuned mathematics:
 
   <\scm-code>
-    (init-env "math-font" "STIXTwoMath")
+    (init-opentype-font "Libertinus Math")
+
+    (init-opentype-font "Euler Math")
 
     (init-font "pagella" "math-pagella")
   </scm-code>
 
   <paragraph*|Which fonts are there?>
 
-  <TeXmacs> ships a few fonts of its own and finds the others on your
-  system. If a font you have installed does not appear in the browser, ask
+  <TeXmacs> ships a number of fonts of its own, among them the mathematical
+  fonts shown in the section <hlink|<em|Mathematical
+  fonts>|../../main/math/fonts/man-math-fonts.en.tm> of the user manual, and
+  finds the others on your system. If a font you have installed does not appear in the browser, ask
   for a scan with <menu|Tools|Fonts|Scan disk for fonts>; if a font behaves
   as if <TeXmacs> still remembered an older state of your system, empty the
   caches with <menu|Tools|Fonts|Clear font cache> and restart. What those

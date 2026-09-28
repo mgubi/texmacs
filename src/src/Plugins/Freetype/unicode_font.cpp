@@ -303,8 +303,13 @@ unicode_font_rep::unicode_font_rep (string name,
     ligs= LIGATURE_FF + LIGATURE_FI + LIGATURE_FL + LIGATURE_FFI;
   //cout << "ligs= " << ligs << ", " << family << ", " << size << "\n";
 
-  // direct translations for certain characters without Unicode names
-  if (starts (family, "texgyre") && ends (family, "-math"))
+  // direct translations for certain characters without Unicode names; the
+  // glyph numbers are those of the four hand-tuned TeX Gyre math fonts,
+  // not those of TeX Gyre DejaVu Math, which has no tuning of its own
+  bool tuned_gyre=
+    starts (family, "texgyretermes-") || starts (family, "texgyrepagella-") ||
+    starts (family, "texgyreschola-") || starts (family, "texgyrebonum-");
+  if (tuned_gyre && ends (family, "-math"))
     tex_gyre_operators ();
 
   // Fonts with an OpenType MATH table are typeset from the table; the
@@ -337,7 +342,7 @@ unicode_font_rep::unicode_font_rep (string name,
     }
   }
 
-  else if (tuned && starts (family, "texgyre")) {
+  else if (tuned && tuned_gyre) {
     if (!ends (family, "italic")) {
       if (starts (family, "texgyretermes-")) {
         global_rsup_correct= (SI) (0.04 * wfn);

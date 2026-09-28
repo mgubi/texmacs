@@ -359,4 +359,8 @@ struct gr_selection_rep: concrete_struct {
 };
 CONCRETE_CODE(gr_selection);
 
+// the font inspector and the font report (font_debug_boxes.cpp)
+tree box_font_debug_info (box root, path bp, bool after);
+tree box_font_debug_report (box root);
+
 #endif // defined BOXES_H

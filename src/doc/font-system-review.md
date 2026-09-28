@@ -21,7 +21,7 @@ Paths are relative to the repository root. Line numbers refer to the
 | Renderers | `src/Graphics/Renderer/` | `renderer::draw (int char_code, font_glyphs, x, y)` and friends |
 | Typesetter | `src/Typeset/` | Consumes fonts: `env_semantics.cpp` picks the current font, `Boxes/` and `Concat/` build boxes from glyphs |
 | Data | `TeXmacs/fonts/` | `font-database.scm`, `font-features.scm`, `font-characteristics.scm`, `font-substitutions.scm`, `enc/` translators, `virtual/` virtual fonts, `truetype/`, `type1/`, `tfm/` |
-| Scheme side | `TeXmacs/progs/fonts/` | Font rules for the legacy TeX font scheme, menus and widgets |
+| Scheme side | `TeXmacs/progs/fonts/` | Font rules for the legacy TeX font scheme, menus and widgets, the math font profiles (`fonts-opentype.scm`) |
 
 ## 2. Core abstractions
 
@@ -65,11 +65,11 @@ by each backend from a handful of glyphs:
 |---|---|---|
 | `y1`, `y2` | descent and ascent | extents of `f`, `p` and `d` together |
 | `yx` | x-height | extents of `x` |
-| `yfrac` | fraction bar height (math axis) | middle of `<#2212>` or of `-`, then `axisHeight` for a MATH font |
+| `yfrac` | fraction bar height (math axis) | middle of `<#2212>`, else of `+`, `-` or `x` (raised by `wline/4` without `<#2212>`), then `axisHeight` for a MATH font |
 | `ysub_*`, `ysup_*`, `yshift` | script placement limits | fractions of `yx` |
 | `wpt`, `hpt` | size of one point in `SI` units | from dpi |
 | `wfn` | design size in `SI` | `wpt * size` |
-| `wline` | rule thickness | `wfn/20`, then the height of `<#2212>` or `-` clamped to `[wfn/48, wfn/8]`, then `fractionRuleThickness` for a MATH font |
+| `wline` | rule thickness | `wfn/20`, then the height of `<#2212>`, `+` or `-` (capped by the en dash without `<#2212>`) clamped to `[wfn/48, wfn/8]`, then `fractionRuleThickness` for a MATH font |
 | `wquad` | quad | width of `M` |
 | `spc`, `extra`, `mspc`, `sep` | spacing | width of space, `wfn/10` |
 | `slope` | italic slope | ink overhang of `f` |
@@ -170,15 +170,16 @@ char index, load glyph, render glyph, get kerning.
   `(truetype ...)` tuples.
 - `unicode_font.cpp`: the workhorse for modern fonts. It parses `<#XXXX>`
   and named entities via `strict_cork_to_utf8`, supports a `native` table for
-  glyphs without Unicode code points (`tex_gyre_operators`, `<@XXXX>`),
-  implements f- and s-ligatures itself, and hosts the per-family
+  glyphs without Unicode code points (`tex_gyre_operators`) and decodes
+  `<@XXXX>` glyph numbers in `get_glyphID`, implements the f-ligatures
+  itself, and hosts the per-family
   microtypography: the constructor contains an `if / else if` ladder on the
   family name that installs hand-tuned correction tables for STIX, TeX Gyre
   (Termes, Pagella, Schola, Bonum), Papyrus, Libertine, Biolinum and Fira,
   with data in `adjust_*.cpp`. The OpenType MATH support is read by
   `init_ot_math`, which runs *before* that ladder; each branch of the ladder
-  then overrides the fields it tunes, and the branches are skipped when the
-  user switches the hand tuning off.
+  then overrides the fields it tunes, and the branches are skipped for a font
+  with a MATH table when the user switches the hand tuning off.
 - `unicode_math_font.cpp`: the older `(unimath up it bup bit rubber)`
   compound, superseded by smart fonts.
 - `rubber_unicode_font.cpp`, `rubber_assemble_font.cpp`,
@@ -216,29 +217,43 @@ The local database is built by scanning the font path
 database to `delta-*.scm`, which is how new fonts are contributed. Loading is
 lazy, and the global database is loaded as a fallback when a family is
 missing; on this branch `font_database_master` answers the same question for
-one family without printing a warning.
+one family (loading the global database still prints its one warning,
+"missing font, loading global substitution list").
 
 The local database also has to follow the shipped one, which grows with the
 fonts a new version registers. Its own date says nothing, since it is saved
 again on every scan, so `font_database_load` keeps a stamp in
 `$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm` — the date and the size of the
-three shipped files — and merges the shipped entries, filtered against the
-files really present, whenever the stamp differs. An old home directory
+three shipped files and the installation (`$TEXMACS_PATH`), with the number
+of entries of the local database on a second line — and merges the shipped
+entries, filtered against the files really present, whenever the stamp
+differs or the local database has fewer entries than it had: several
+installations may share one home directory, and each must find its own
+fonts. An old home directory
 otherwise hides a new font for good, and the fallback search of the smart
 font then finds no font at all for a character only that font draws, which
 the error font shows as the name of the character in red.
 
-### 4.2 Logical fonts and features (`font_select.cpp`, `font_guess.cpp`)
+### 4.2 Logical fonts and features (`font_select.cpp`, `font_translate.cpp`, `font_guess.cpp`)
 
 TeXmacs describes a requested font as a *logical font*: an array of strings
 whose first element is the family and the rest are normalized features
 (`bold`, `italic`, `smallcaps`, `condensed`, `wide`, `sansserif`, `mono`,
-...). `logical_font (family, variant, series, shape)` translates the four
-document environment variables into such an array. `search_font` then
+...). `logical_font (family, variant, series, shape)` (`font_translate.cpp`)
+translates the four document environment variables into such an array. `search_font` then
 computes a distance between the requested features and every style of every
-candidate family (with heuristics in `distance`), first strictly, then after
-dropping unknown features, then using guessed distances between families
-(`font_guess.cpp`). The `attempt` argument selects successively worse
+candidate family (with heuristics in `distance`): strictly when an exact
+match is required or no feature is given, otherwise after dropping unknown
+features, and finally strictly again among the families of the winning
+master; `guessed_distance` between families (`font_guess.cpp`) only breaks
+ties. The search stays inside the master of
+the request unless the best distance there reaches `D_MASTER` (10000), and
+then looks at every family; a mismatch of serif and sans serif costs
+`D_SERIF` (100000), more than leaving the master. So a sans serif
+typewriter face inside a serif master (KpMono under Kepler) loses to a
+serif typewriter of another master, which is why the shipped database gives
+KpMono a master of its own, Kepler Mono, and does the same for the sans
+serif math fonts KpMathSans and NewComputerModernSansMath. The `attempt` argument selects successively worse
 matches, which the smart font uses to find fallback fonts for characters the
 main font lacks.
 
@@ -247,28 +262,50 @@ main font lacks.
 
 ## 5. Smart fonts: the entry point for the typesetter
 
-`edit_env_rep::update_font` (`src/Typeset/Env/env_semantics.cpp`) creates the
-current font from environment variables:
+`edit_env_rep::make_current_font` (`src/Typeset/Env/env_semantics.cpp`)
+creates the current font from environment variables, and `update_font`
+calls it and then applies the MATH script sizes, `ssty`, the features and
+the effects:
 
 - text mode: `smart_font (font, font-family, font-series, font-shape, size, dpi)`
 - math mode: `smart_font (math-font, math-font-family, math-font-series, math-font-shape, font, font-family, font-series, "mathitalic", size, dpi)`
-- program mode: same with the `prog-*` variables.
+- program mode: the `prog-*` variables, with `font` and `font-family` plus
+  `-tt` as the text arguments.
+
+The math and program overload builds the font from the *text* arguments:
+`math-font` (or `prog-font`) is used only when `font` is `roman`, `ms` and
+`mt` turn into the `ss` and `tt` variants, a math series other than medium
+overrides the text series, and the shape `right` becomes `mathupright`.
+With any other text font, `profile_fix` turns the text family into its math
+companion. A text font set with another math font than its own must
+therefore be written as a rule, `math=Euler Math,TeX Gyre Pagella`, which
+is what `init-opentype-font` in `fonts-opentype.scm` does.
 
 The size passed is already the script size for the current index level:
 `get_script_size` divides by 1.5 per level, at most twice, unless the
 document sets `math-font-sizes`. A font with a MATH table overrides that with
-`scriptPercentScaleDown` and `scriptScriptPercentScaleDown`, and at script
-levels the font is wrapped in `feature_font (fn, "ssty", ...)` so that the
-script-size alternates of the font are used.
+`scriptPercentScaleDown` and `scriptScriptPercentScaleDown` when
+`math-font-sizes` has its default value, and at script levels a font of
+type `MATH_TYPE_OPENTYPE` (not a hand-tuned one) is wrapped in `feature_font
+(fn, "ssty", ...)` so that the script-size alternates of the font are used.
 
 `smart_font_bis` builds the name, applies family fix-ups (`tex_gyre_fix`,
 `kepler_fix`, `math_fix`, `profile_fix` and the `sys-*` CJK defaults), picks
 the closest physical font as `fn[SUBFONT_MAIN]` and a sans-serif error font,
 and creates a `smart_font_rep` (`smart_font.cpp`). `profile_fix` is the
 OpenType math part: it swaps a text family for its math companion in math
-shapes and back in text shapes, and sends math sans serif and math typewriter
-to the companions declared in `math_font_profiles.cpp`, which
-`TeXmacs/progs/fonts/fonts-opentype.scm` fills at boot.
+shapes and back in text shapes, and in text as in math it sends the `ss`
+and `tt` variants to the `sans` and `mono` companions declared in
+`math_font_profiles.cpp`, which `TeXmacs/progs/fonts/fonts-opentype.scm`
+fills at boot with `define-math-font-profile` (keys `file`, `text`,
+`text-file`, `sans`, `mono`, `family`, `letters`, `bold-math`, `menu`,
+`group`; the first profile naming a text family is the one that family
+pulls in). A text family is swapped for its math companion only when that
+font is installed, and every plain family name it produces is replaced by
+its master; items with conditions, such as `math=...`, are left alone. A profiled
+math font missing from the database, and the directory of its `text-file`
+whenever the text companion is missing, is added to the local database once
+per session (`register_profiled_font`).
 
 ### 5.1 Family syntax
 
@@ -283,13 +320,21 @@ or `math`. Examples: `cjk=Songti SC,roman`,
 
 The `math` condition is special: it is not one of the conditions the
 per-character resolver knows. `math_fix`, which runs before resolution,
-strips it from an item in a math shape, so the item applies, and drops the
-item entirely in a text shape. The resolver's own conditions are the logical
+strips it from an item in a math shape, so the item applies; in a text
+shape it leaves the item alone, and the resolver never satisfies `math`. The resolver's own conditions are the logical
 font's features, the Unicode ranges (`ascii`, `latin`, `greek`, `cyrillic`,
 `cjk`, `hiragana`, `hangul`, `mathsymbols`, `mathextra`, `mathletters`), the
 pseudo ranges `mathlarge`, `mathbigop` and `mathrubber`, the character
 collections (`digit`, `latin`, `greek`, `basic-letters` and their case and
-bold variants), a literal character and a code point range `A:Z`.
+bold variants), the alphabet names that `substitute_math_letter` gives a
+letter (`bold-math`, `cal`, `frak`, `bbb`, ...), a literal character and a
+code point range `A:Z`. A negated collection, `!latin`, accepts the characters
+outside the collection (until 27 September 2026 the resolver looked up a
+collection named with the `!` itself, found none, and accepted every
+character). The negation knows only the collections of `init_collections`:
+`!cjk` or `!cyrillic` name no collection and are always satisfied, and a
+letter such as `e` with acute accent satisfies both `latin`, by its Unicode
+range, and `!latin`, since it is in no collection of that name.
 
 ### 5.2 Per-character resolution
 
@@ -318,8 +363,9 @@ and rewrite Unicode math alphanumerics (`substitute_math_letter`) into
 `<b-x>`, `<cal-A>` style names or into the corresponding Unicode plane 1
 code points depending on what the font offers.
 
-Rubber characters (`<left-...>`, `<big-...>`, `<mid-...>`, `<right-...>`,
-`<large-...>`) are routed by `resolve_rubber`: the base delimiter is resolved
+Rubber characters (`<left-...>`, `<mid-...>`, `<right-...>`, `<large-...>`;
+`is_rubber` does not count `<big-...>`) are routed by `resolve_rubber`, which
+an OpenType math font also tries first for `<wide-...>` and `<rubber-...>`: the base delimiter is resolved
 first, and then a `rubber` subfont wrapping the font that provided it is
 created with `rubber_font (fn)`.
 
@@ -341,6 +387,19 @@ carry, and a symbol that lives in a Unicode font alone came out blank. On
 this branch that call goes to the smart font for the mathematical classes,
 which is the same font the typesetter would use for the symbol.
 
+The font menus are Scheme (`generic/document-menu.scm`,
+`fonts/fonts-opentype.scm`, `fonts/font-short-menu.scm`), and two
+properties of the menu language shape them. A command's `:check-mark` is
+applied by `make-menu-entry-check` (`kernel/gui/menu-widget.scm`) to the
+arguments as written in the menu, recovered with `promise-source`, not to
+their values: an entry built in a loop, `(init-opentype-font (cadr p))`,
+hands its predicate the list `(cadr p)`, so such entries state their check
+with `(check label "*" predicate)`, evaluated where the loop variable is
+bound. And the contents of a submenu are built when it is opened, after
+the menu that holds it, so a menu with arguments inside a submenu has lost
+them by then ("widget expected"): each submenu is a menu without
+arguments.
+
 ## 6. Virtual fonts (`virtual_font.cpp`, `TeXmacs/fonts/virtual/*.vfn`)
 
 A virtual font builds glyphs from Scheme expressions over other glyphs. A
@@ -352,7 +411,7 @@ definition looks like
   (slash (or (font minus Baskerville Cuprum) /)))
 ```
 
-The evaluator (`compile_bis`) supports about ninety primitives: glyph
+The evaluator (`compile_bis`) supports about seventy-five primitives: glyph
 references, `glue`, `glue*`, `glue-above`, `glue-below`, `join`, `intersect`,
 `exclude`, `align`, `magnify`, `scale`, `hor-extend`, `ver-extend`,
 `hor-take`, `ver-take`, `hor-flip`, `rotate`, `crop` variants, `bar-*`,
@@ -376,11 +435,13 @@ from `.vfn` files.
 
 ### 7.1 Naming
 
-The typesetter never asks for "a parenthesis of height h". It asks a font for
-a named glyph with a size suffix, and searches for the smallest that fits:
+The typesetter asks a font for a named glyph with a size suffix, and, where
+the font cannot answer for a height, searches for the smallest that fits:
 
 - `get_delimiter (s, fn, height)` in `src/Typeset/Boxes/Basic/text_boxes.cpp`
-  tries `<left-(-0>`, `<left-(-1>`, ... until the extents are tall enough or a
+  first asks the font, through `get_rubber_variant`, for the name that reaches
+  the height; a font with a MATH table answers. Otherwise it tries
+  `<left-(-0>`, `<left-(-1>`, ... until the extents are tall enough or a
   credit of about twenty attempts is exhausted.
 - `big_operator_box` uses `<big-sum-1>` in text style and `<big-sum-2>` in
   display style.
@@ -395,7 +456,8 @@ dispatches on the font name:
 
 | Condition | Implementation | How it stretches |
 |---|---|---|
-| name mentions `stix` | `rubber_stix_font` | STIX's own size variants and assembly pieces, hard-coded glyph names |
+| a Unicode font with a MATH table | `rubber_unicode_font` (`unicode_font.cpp`) | the variants and assemblies of the table |
+| name mentions `stix`, while the hand tuning is on | `rubber_stix_font` | STIX's own size variants and assembly pieces, hard-coded glyph names |
 | `mathlarge=` or `mathrubber=` in the name | the font itself | the smart font routes rubber names to a dedicated family |
 | Unicode font and `has_poor_rubber` (default true) | `poor_rubber_font` | five magnification levels built with `poor_stretched_font`, each in a normal and a narrow variant, then the `emu-large` virtual assembly for larger sizes; big operators are served by `rubber_unicode_font` |
 | other Unicode fonts | `rubber_unicode_font` | magnified base glyphs (`sqrt 0.5`, `sqrt 2`, `2`) and `rubber_assemble_font`, which glues the Unicode bracket pieces U+239B..U+23B7 via `emu-alt-large.vfn` |
@@ -445,10 +507,11 @@ Weaknesses and technical debt:
 - Glyphs are monochrome bitmaps rasterized per size and dpi. Anti-aliasing
   and vector output are handled downstream, and all glyph manipulation is
   raster manipulation.
-- OpenType layout is read only where the math work needed it: the single and
-  alternate substitutions of one GSUB feature (`dtls`, `flac`, `ssty`) and
-  the pair kerning of GPOS. There is no contextual or chained substitution,
-  no mark attachment, no ligature support beyond the built-in f and s
+- OpenType layout is read for single and alternate substitutions (the
+  `dtls`, `flac` and `ssty` of the math work, and any feature a document names
+  in `font-features`, `onum` or `ss01` for instance) and for the pair kerning
+  of GPOS. There is no contextual or chained substitution,
+  no mark attachment, no ligature support beyond the built-in f
   ligatures, and no complex-script shaping.
 - Character addressing by string names means every layer re-parses names, and
   glyphs without Unicode code points need ad hoc escapes (`native`, `<@XXXX>`).
@@ -465,8 +528,8 @@ Weaknesses and technical debt:
   reaches a target size, but for every other font nothing tells the
   typesetter the set of available sizes.
 - Caching by concatenated names is fragile: two constructors producing the
-  same name share an object, as happens with `rubber_unicode_font` on the
-  OpenType branch.
+  same name share an object; the rubber Unicode fonts are kept apart only by
+  their prefixes, `rubberunicode[...]` and `rubberunicode-ot[...]`.
 - Font knowledge is spread over C++ tables, the Scheme font database and now
   the math font profiles; nothing checks that they agree, beyond the profile
   test.

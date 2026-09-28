@@ -357,6 +357,8 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
       is_tuple (t, "hor-extend", 4) ||
       is_tuple (t, "ver-extend", 3) ||
       is_tuple (t, "ver-extend", 4) ||
+      is_tuple (t, "hor-take", 3) ||
+      is_tuple (t, "hor-take", 4) ||
       is_tuple (t, "ver-take", 3) ||
       is_tuple (t, "ver-take", 4) ||
       (is_tuple (t, "unserif") && !svg) ||
@@ -2105,6 +2107,33 @@ virtually_defined (string c, string name) {
   if (vdefined [name * "-" * c]) return true;
   string nr;
   return vdefined [name * "-" * decode_sharp (c, nr)];
+}
+
+/******************************************************************************
+* For the font debugging tools
+******************************************************************************/
+
+// Whether the character s of a virtual font is drawn by one of its
+// constructions rather than taken from the font it extends; an extended
+// font may extend another virtual font, whose constructions count too
+bool
+virtual_font_constructs (font fn, string s) {
+  virtual_font_rep* v= dynamic_cast<virtual_font_rep*> (fn.rep);
+  if (v == NULL) return false;
+  if (v->extend && v->base_fn->supports (s))
+    return virtual_font_constructs (v->base_fn, s);
+  return v->virt->dict->contains (s);
+}
+
+// Whether the PDF writer can draw the character s of a virtual font as
+// vectors; otherwise it embeds a bitmap of it, in a Type 3 font
+bool
+virtual_font_draws_vectors (font fn, string s) {
+  virtual_font_rep* v= dynamic_cast<virtual_font_rep*> (fn.rep);
+  if (v == NULL) return true;
+  if (v->extend && v->base_fn->supports (s))
+    return virtual_font_draws_vectors (v->base_fn, s);
+  return v->supported (s, true);
 }
 
 font

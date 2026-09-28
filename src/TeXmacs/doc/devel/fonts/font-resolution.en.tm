@@ -12,15 +12,15 @@
   <paragraph*|What the typesetter sees>
 
   The text of a document is a sequence of <em|characters> in the internal
-  encoding of <TeXmacs>: ordinary ASCII characters stand for themselves, and
-  everything else is written between angle brackets. The letter
+  encoding of <TeXmacs>: ASCII characters and the accented Latin letters of
+  the Cork encoding stand for themselves, and everything else is written
+  between angle brackets. The letter
   <math|<with|font-shape|italic|\<alpha\>>> is the character
-  <verbatim|\<less\>alpha\<gtr\>>, an accented letter is
-  <verbatim|\<less\>#E9\<gtr\>>, and a character which exists only as a
-  Unicode code point is <verbatim|\<less\>#1D6FC\<gtr\>>. Stretchable
-  characters have names of their own, such as
-  <verbatim|\<less\>left-(-2\<gtr\>> for the second size of an opening
-  parenthesis.
+  <verbatim|\<less\>alpha\<gtr\>>, and a character which has neither a
+  byte nor a name is written by its Unicode code point, such as
+  <verbatim|\<less\>#1D6FC\<gtr\>>. Stretchable characters have names of
+  their own, such as <verbatim|\<less\>left-(-2\<gtr\>> for the third
+  size of an opening parenthesis (sizes count from 0).
 
   A name is not a glyph, and it is not a code point either: it is what the
   editor stores and what the font system is asked to draw.
@@ -48,25 +48,25 @@
   desperate:
 
   <\enumerate>
-    <item>the main font of the request;
+    <item>a few rewritings which come first: in a formula an italic Greek
+    letter, a dotless letter or a prime taken from the italic font, a few
+    special characters, and the brackets which <TeXmacs> knows how to build
+    out of pieces;
 
-    <item>the mathematical rewritings: an italic Greek letter, a bold
-    letter, a script or double-struck letter, which are either taken from
-    the font's own alphabets or from the Unicode mathematical alphanumerics;
+    <item>the families of the font request, the main one first, in
+    successive attempts, each one less demanding than the last: the font
+    itself, its derived, or \Ppoor\Q, variants (bold by thickening, for
+    instance), its stretchable characters, and at the later attempts
+    another family which has the character, found in the font database and
+    rendered at a size adjusted so that its x-height matches the one of the
+    main font;
 
-    <item>a few special characters, and the brackets which <TeXmacs> knows
-    how to build out of pieces;
+    <item>the mathematical letters: a bold, script, fraktur or
+    double-struck letter taken from the Unicode mathematical alphanumerics
+    or from an emulated alphabet;
 
     <item>a <hlink|virtual font|virtual-fonts.en.tm> which defines the
     character as a construction over other glyphs;
-
-    <item>the derived, or \Ppoor\Q, fonts: bold by thickening, italic by
-    slanting, small capitals by scaling, blackboard bold by doubling a
-    stroke;
-
-    <item>another family which has the character, searched in the font
-    database and rendered at a resolution adjusted so that its x-height
-    matches the one of the main font;
 
     <item>failing everything, the error font, which draws the name of the
     character in red.
@@ -108,25 +108,73 @@
 
   <name|FreeType> opens the file and gives back an outline, which is
   rasterized at the size and the resolution in use; the resulting bitmaps
-  are cached, per size and per resolution, under
-  <verbatim|$TEXMACS_HOME_PATH/fonts>. When a document is exported to
+  are kept in memory, per size and per resolution, for the session (the
+  directory <verbatim|$TEXMACS_HOME_PATH/fonts> holds the font database and
+  the bitmaps and metrics of the <TeX> fonts, not those of <name|FreeType>).
+  When a document is exported to
   <name|PDF> or <name|PostScript> the same glyphs are written as vectors and
   the fonts are embedded as subsets, except for the glyphs which <TeXmacs>
   draws itself, which become small bitmap fonts.
+
+  <paragraph*|Seeing the choices>
+
+  The ladder is a strength: a document can use any font, and whatever the
+  font lacks is found elsewhere or emulated. <menu|Tools|Fonts|Font
+  inspector> opens a window which shows what it decided, and gives access
+  to the other tools; none of them slows the typesetter down when it is not
+  in use. The window stays above the editor windows.
+
+  <\description>
+    <item*|The inspector>Reports, as the cursor (or, with <menu|Follow the
+    mouse>, the mouse) moves, what the font system did with the glyph before
+    the cursor: its route, the font file which draws it, the rewriting into
+    another character (a letter into its mathematical italic, for instance),
+    and whether the <name|OpenType> math path applies. It reads the routing
+    tables and resolves nothing, so inspecting a glyph changes nothing.
+    <menu|Freeze> keeps the report of one glyph while the cursor moves on.
+    While a font report or another auxiliary document has the focus, the
+    inspector keeps showing the glyph at the cursor of the document it was
+    looking at.
+
+    <item*|<menu|Colour glyphs by origin>>Draws every glyph in the colour of
+    its route: as usual for the requested font, blue for a family which a
+    font rule names, orange for another family found by feature distance,
+    green for an emulation (a virtual or a derived font); the error font is
+    red anyway. Only the drawing changes, so the switch takes effect at the
+    next repaint, and it is turned off with the inspector. The same switch
+    is <verbatim|fonts> in the <menu|Debug> menu.
+
+    <item*|<menu|Font report>>A document attached to the document being
+    edited, like
+    the bibliography viewer, which lists every character of the typeset
+    document by route: a summary per family, then the emulated characters,
+    those taken from other families or from families of a font rule, and
+    those no font has, each shown and counted. For an emulated character it
+    also says whether a <name|PDF> export will draw it as vectors or as a
+    bitmap. Opening it again regenerates it.
+  </description>
+
+  Glyphs which <TeX> fonts assemble themselves, inside the compound fonts of
+  the traditional mathematics, are not marked: the tools see the routes of
+  the smart font, not the insides of those fonts.
 
   <paragraph*|When something looks wrong>
 
   <\description>
     <item*|A character appears as a red name>No font was found for it. Try
-    <menu|Tools|Fonts|Scan disk for fonts>, and read
-    <hlink|below|font-config.en.tm> about the merge of the shipped database.
+    <menu|Tools|Fonts|Scan disk for fonts>, and read about the merge of the
+    shipped database in <hlink|the font configuration
+    files|font-config.en.tm>.
 
     <item*|A font you installed is not proposed>The database was written
     before you installed it; the same scan adds it.
 
-    <item*|A font looks like an older version of itself>The rendered glyphs
-    are cached; <menu|Tools|Fonts|Clear font cache> empties the caches and
-    the database, which are rebuilt at the next start.
+    <item*|A font looks like an older version of itself>The file found for a
+    font name is cached; <menu|Tools|Fonts|Clear font cache> removes that
+    cache (<verbatim|system/cache/font_cache.scm>) and the local database
+    files (<verbatim|font-database.scm>, <verbatim|font-features.scm>,
+    <verbatim|font-characteristics.scm> and <verbatim|shipped-stamp.scm>
+    under <verbatim|fonts>), which are rebuilt at the next start.
 
     <item*|The document looks different on another machine>The fonts it
     asks for are not installed there, and the closest matches were used

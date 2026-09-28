@@ -17,31 +17,31 @@ gamma of U+213D decomposes to an ordinary gamma.
 
 | | Symbols |
 |---|---|
-| In the reference list | 2435 |
+| In the reference list | 2437 |
 | Named in `langs/encoding` | 1083 |
 | Named as a math alphanumeric | 597 |
 | Text characters, typed as themselves | 23 |
 | Combining marks of the accent constructs | 40 |
-| **Symbols without a name** | **692** |
+| **Symbols without a name** | **694** |
 
-Glyph availability is counted over 12 font(s): FiraMath-Regular, KpMath-Bold, KpMath-Regular, latinmodern-math, NewCMMath-Bold, NewCMMath-Regular, STIXMath-Regular, STIXTwoMath-Regular, texgyrebonum-math, texgyrepagella-math, texgyreschola-math, texgyretermes-math.
+Glyph availability is counted over 22 font(s): Concrete-Math-Bold, Concrete-Math, Erewhon-Math-Bold, Erewhon-Math, Euler-Math, FiraMath-Regular, KpMath-Bold, KpMath-Regular, KpMath-Sans, KpMath-SansBold, LibertinusMath-Regular, latinmodern-math, NewCMMath-Bold, NewCMMath-Regular, STIXMath-Regular, STIXTwoMath-Regular, texgyrebonum-math, texgyrepagella-math, texgyreschola-math, texgyretermes-math, XCharter-Math-Bold, XCharter-Math.
 
 ## Where they are
 
-| Unicode block | Missing | Drawn by at least 6 fonts |
+| Unicode block | Missing | Drawn by at least 11 fonts |
 |---|---|---|
 | Punctuation | 6 | 0 |
 | Letterlike | 5 | 0 |
-| Arrows | 19 | 2 |
+| Arrows | 19 | 4 |
 | Mathematical operators | 18 | 0 |
-| Miscellaneous technical | 33 | 6 |
-| Miscellaneous symbols | 84 | 6 |
-| Miscellaneous mathematical A | 22 | 2 |
+| Miscellaneous technical | 33 | 7 |
+| Miscellaneous symbols | 84 | 7 |
+| Miscellaneous mathematical A | 24 | 4 |
 | Supplemental arrows A | 4 | 0 |
 | Supplemental arrows B | 124 | 0 |
-| Miscellaneous mathematical B | 113 | 1 |
+| Miscellaneous mathematical B | 113 | 2 |
 | Supplemental operators | 199 | 1 |
-| Miscellaneous symbols and arrows | 57 | 0 |
+| Miscellaneous symbols and arrows | 57 | 8 |
 | Mathematical alphanumerics | 4 | 2 |
 | Arabic mathematical | 2 | 0 |
 | Other | 2 | 0 |
@@ -57,56 +57,76 @@ since a symbol almost no font has is not worth a name; pass
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+21DC | ⇜ | `\leftsquigarrow` | rel | leftwards squiggle arrow | leftwards squiggle arrow | 11 |
-| U+21DD | ⇝ | `\rightsquigarrow` | rel | rightwards squiggle arrow | rigthwards squiggle arrow | 11 |
+| U+21DC | ⇜ | `\leftsquigarrow` | rel | leftwards squiggle arrow | leftwards squiggle arrow | 19 |
+| U+21DD | ⇝ | `\rightsquigarrow` | rel | rightwards squiggle arrow | rigthwards squiggle arrow | 19 |
+| U+21E1 | ⇡ | `\updasharrow` | ord | upwards dashed arrow |  | 12 |
+| U+21E3 | ⇣ | `\downdasharrow` | ord | downwards dashed arrow |  | 12 |
 
 ### Miscellaneous technical
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+23B4 | ⎴ | `\overbracket` | over | top square bracket |  | 11 |
-| U+23B5 | ⎵ | `\underbracket` | under | bottom square bracket |  | 11 |
-| U+23DC | ⏜ | `\overparen` | over | top parenthesis (mathematical use) |  | 12 |
-| U+23DD | ⏝ | `\underparen` | under | bottom parenthesis (mathematical use) |  | 12 |
-| U+23DE | ⏞ | `\overbrace` | over | top curly bracket (mathematical use) |  | 12 |
-| U+23DF | ⏟ | `\underbrace` | under | bottom curly bracket (mathematical use) |  | 12 |
+| U+23AF | ⎯ | `\harrowextender` | ord | horizontal line extension (used to extend arrows) |  | 13 |
+| U+23B4 | ⎴ | `\overbracket` | over | top square bracket |  | 17 |
+| U+23B5 | ⎵ | `\underbracket` | under | bottom square bracket |  | 17 |
+| U+23DC | ⏜ | `\overparen` | over | top parenthesis (mathematical use) |  | 19 |
+| U+23DD | ⏝ | `\underparen` | under | bottom parenthesis (mathematical use) |  | 19 |
+| U+23DE | ⏞ | `\overbrace` | over | top curly bracket (mathematical use) |  | 19 |
+| U+23DF | ⏟ | `\underbrace` | under | bottom curly bracket (mathematical use) |  | 19 |
 
 ### Miscellaneous symbols
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+25B6 | ▶ | `\blacktriangleright` | ord | (large) right triangle, filled | black right-pointing triangle | 12 |
-| U+25B7 | ▷ | `\triangleright` | bin | (large) right triangle, open; z notation range restriction | white right-pointing triangle | 11 |
-| U+25C0 | ◀ | `\blacktriangleleft` | ord | (large) left triangle, filled | black left-pointing triangle | 12 |
-| U+25C1 | ◁ | `\triangleleft` | bin | (large) left triangle, open; z notation domain restriction | white left-pointing triangle | 11 |
-| U+2661 | ♡ | `\heartsuit` | ord | heart suit symbol | white heart suit | 11 |
-| U+2662 | ♢ | `\diamondsuit` | ord | diamond suit symbol | white diamond suit | 11 |
+| U+25B6 | ▶ | `\blacktriangleright` | ord | (large) right triangle, filled | black right-pointing triangle | 22 |
+| U+25B7 | ▷ | `\triangleright` | bin | (large) right triangle, open; z notation range restriction | white right-pointing triangle | 21 |
+| U+25C0 | ◀ | `\blacktriangleleft` | ord | (large) left triangle, filled | black left-pointing triangle | 22 |
+| U+25C1 | ◁ | `\triangleleft` | bin | (large) left triangle, open; z notation domain restriction | white left-pointing triangle | 21 |
+| U+25FE | ◾ | `\mdsmblksquare` | ord | black medium small square | black medium small square | 13 |
+| U+2661 | ♡ | `\heartsuit` | ord | heart suit symbol | white heart suit | 18 |
+| U+2662 | ♢ | `\diamondsuit` | ord | diamond suit symbol | white diamond suit | 18 |
 
 ### Miscellaneous mathematical A
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+27C2 | ⟂ | `\perp` | rel | perpendicular |  | 12 |
-| U+27DE | ⟞ | `\longdashv` | rel | long right tack |  | 10 |
+| U+27C2 | ⟂ | `\perp` | rel | perpendicular |  | 19 |
+| U+27CB | ⟋ | `\diagup` | ord | mathematical rising diagonal |  | 12 |
+| U+27CD | ⟍ | `\diagdown` | ord | mathematical falling diagonal |  | 12 |
+| U+27DE | ⟞ | `\longdashv` | rel | long right tack |  | 15 |
 
 ### Miscellaneous mathematical B
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+29F5 | ⧵ | `\setminus` | bin | reverse solidus operator |  | 6 |
+| U+2980 | ⦀ | `\Vvert` | fence | triple vertical bar delimiter | triple vertical bar delimiter | 14 |
+| U+29F5 | ⧵ | `\reversesolidus` | bin | reverse solidus |  | 16 |
 
 ### Supplemental operators
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+2A5E | ⩞ | `\doublebarwedge` | bin | logical and with double overbar |  | 6 |
+| U+2A5E | ⩞ | `\doublebarwedge` | bin | logical and with double overbar |  | 12 |
+
+### Miscellaneous symbols and arrows
+
+| Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
+|---|---|---|---|---|---|---|
+| U+2B1B | ⬛ | `\lgblksquare` | ord | black large square |  | 13 |
+| U+2B1C | ⬜ | `\lgwhtsquare` | ord | white large square |  | 13 |
+| U+2B1D | ⬝ | `\vysmblksquare` | ord | black very small square |  | 13 |
+| U+2B1E | ⬞ | `\vysmwhtsquare` | ord | white very small square |  | 13 |
+| U+2B27 | ⬧ | `\mdblklozenge` | ord | black medium lozenge |  | 13 |
+| U+2B29 | ⬩ | `\smblkdiamond` | ord | black small diamond |  | 13 |
+| U+2B2A | ⬪ | `\smblklozenge` | ord | black small lozenge |  | 13 |
+| U+2B2B | ⬫ | `\smwhtlozenge` | ord | white small lozenge |  | 13 |
 
 ### Mathematical alphanumerics
 
 | Code | Char | unicode-math | Class | Description | Noted in the table as | Fonts |
 |---|---|---|---|---|---|---|
-| U+1D6A4 | 𝚤 | `\imath` | alpha | mathematical italic small dotless i | decomposes to `<i*>`, U+0131 | 12 |
-| U+1D6A5 | 𝚥 | `\jmath` | alpha | mathematical italic small dotless j |  | 12 |
+| U+1D6A4 | 𝚤 | `\imath` | alpha | mathematical italic small dotless i | decomposes to `<i*>`, U+0131 | 22 |
+| U+1D6A5 | 𝚥 | `\jmath` | alpha | mathematical italic small dotless j |  | 22 |
 
 ## Filling a gap
 
@@ -135,8 +155,8 @@ in whatever font serves the formula, and the smart font finds a
 fallback when the math font lacks the glyph.
 
 That fallback goes through the font database, so a stale one shows the
-symbol as its own name in red. Latin Modern Math, the font of the
-default `roman` family, has no U+25FB, U+25FC, U+26AA or U+26AB, and
+symbol as its own name in red. Latin Modern Math, the math font of
+the Latin Modern entry, has no U+25FB, U+25FC, U+26AA or U+26AB, and
 the fallback reaches them in KpMath, New Computer Modern Math or the
 STIX fonts only if the database of `$TEXMACS_HOME_PATH/fonts` knows
 those fonts. TeXmacs merges the shipped database whenever it has

@@ -462,6 +462,7 @@
 		9C0B4B0210A8CC110097A335 /* rubber_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497E10A8CC110097A335 /* rubber_boxes.cpp */; };
 		9C0B4B0310A8CC110097A335 /* stretch_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497F10A8CC110097A335 /* stretch_boxes.cpp */; };
 		9C0B4B0410A8CC110097A335 /* text_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498010A8CC110097A335 /* text_boxes.cpp */; };
+		4964705416F72CB500D9FA03 /* font_debug_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4964705016F72CB500D9FA03 /* font_debug_boxes.cpp */; };
 		9C0B4B0510A8CC110097A335 /* composite_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498210A8CC110097A335 /* composite_boxes.cpp */; };
 		9C0B4B0610A8CC110097A335 /* concat_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498310A8CC110097A335 /* concat_boxes.cpp */; };
 		9C0B4B0710A8CC110097A335 /* decoration_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498410A8CC110097A335 /* decoration_boxes.cpp */; };
@@ -1242,6 +1243,7 @@
 		9CCC74BE10D303D900E88D90 /* rubber_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497E10A8CC110097A335 /* rubber_boxes.cpp */; };
 		9CCC74BF10D303D900E88D90 /* stretch_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497F10A8CC110097A335 /* stretch_boxes.cpp */; };
 		9CCC74C010D303D900E88D90 /* text_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498010A8CC110097A335 /* text_boxes.cpp */; };
+		4964705516F72CB500D9FA03 /* font_debug_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4964705016F72CB500D9FA03 /* font_debug_boxes.cpp */; };
 		9CCC74C110D303D900E88D90 /* composite_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498210A8CC110097A335 /* composite_boxes.cpp */; };
 		9CCC74C210D303D900E88D90 /* concat_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498310A8CC110097A335 /* concat_boxes.cpp */; };
 		9CCC74C310D303D900E88D90 /* decoration_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498410A8CC110097A335 /* decoration_boxes.cpp */; };
@@ -1475,6 +1477,7 @@
 		9CD4E6B310B14AB300E0DD5C /* rubber_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497E10A8CC110097A335 /* rubber_boxes.cpp */; };
 		9CD4E6B410B14AB300E0DD5C /* stretch_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B497F10A8CC110097A335 /* stretch_boxes.cpp */; };
 		9CD4E6B510B14AB300E0DD5C /* text_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498010A8CC110097A335 /* text_boxes.cpp */; };
+		4964705616F72CB500D9FA03 /* font_debug_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4964705016F72CB500D9FA03 /* font_debug_boxes.cpp */; };
 		9CD4E6B610B14AB300E0DD5C /* composite_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498210A8CC110097A335 /* composite_boxes.cpp */; };
 		9CD4E6B710B14AB300E0DD5C /* concat_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498310A8CC110097A335 /* concat_boxes.cpp */; };
 		9CD4E6B810B14AB300E0DD5C /* decoration_boxes.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C0B498410A8CC110097A335 /* decoration_boxes.cpp */; };
@@ -3429,6 +3432,7 @@
 		9C0B497E10A8CC110097A335 /* rubber_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = rubber_boxes.cpp; sourceTree = "<group>"; };
 		9C0B497F10A8CC110097A335 /* stretch_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = stretch_boxes.cpp; sourceTree = "<group>"; };
 		9C0B498010A8CC110097A335 /* text_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = text_boxes.cpp; sourceTree = "<group>"; };
+		4964705016F72CB500D9FA03 /* font_debug_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_debug_boxes.cpp; sourceTree = "<group>"; };
 		9C0B498210A8CC110097A335 /* composite_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = composite_boxes.cpp; sourceTree = "<group>"; };
 		9C0B498310A8CC110097A335 /* concat_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = concat_boxes.cpp; sourceTree = "<group>"; };
 		9C0B498410A8CC110097A335 /* decoration_boxes.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = decoration_boxes.cpp; sourceTree = "<group>"; };
@@ -5632,6 +5636,7 @@
 				9C0B497E10A8CC110097A335 /* rubber_boxes.cpp */,
 				9C0B497F10A8CC110097A335 /* stretch_boxes.cpp */,
 				9C0B498010A8CC110097A335 /* text_boxes.cpp */,
+				4964705016F72CB500D9FA03 /* font_debug_boxes.cpp */,
 			);
 			path = Basic;
 			sourceTree = "<group>";
@@ -6998,6 +7003,7 @@
 				9C0B4B0210A8CC110097A335 /* rubber_boxes.cpp in Sources */,
 				9C0B4B0310A8CC110097A335 /* stretch_boxes.cpp in Sources */,
 				9C0B4B0410A8CC110097A335 /* text_boxes.cpp in Sources */,
+				4964705416F72CB500D9FA03 /* font_debug_boxes.cpp in Sources */,
 				9C0B4B0510A8CC110097A335 /* composite_boxes.cpp in Sources */,
 				9C0B4B0610A8CC110097A335 /* concat_boxes.cpp in Sources */,
 				9C0B4B0710A8CC110097A335 /* decoration_boxes.cpp in Sources */,
@@ -7438,6 +7444,7 @@
 				9CCC74BF10D303D900E88D90 /* stretch_boxes.cpp in Sources */,
 				49C096131B0F945300E038BA /* database.cpp in Sources */,
 				9CCC74C010D303D900E88D90 /* text_boxes.cpp in Sources */,
+				4964705516F72CB500D9FA03 /* font_debug_boxes.cpp in Sources */,
 				9CACE325242BD54F00D0B7CA /* keyword_parser.cpp in Sources */,
 				9CCC74C110D303D900E88D90 /* composite_boxes.cpp in Sources */,
 				9CCC74C210D303D900E88D90 /* concat_boxes.cpp in Sources */,
@@ -7832,6 +7839,7 @@
 				9CD4E6B310B14AB300E0DD5C /* rubber_boxes.cpp in Sources */,
 				9CD4E6B410B14AB300E0DD5C /* stretch_boxes.cpp in Sources */,
 				9CD4E6B510B14AB300E0DD5C /* text_boxes.cpp in Sources */,
+				4964705616F72CB500D9FA03 /* font_debug_boxes.cpp in Sources */,
 				9CD4E6B610B14AB300E0DD5C /* composite_boxes.cpp in Sources */,
 				49C096081B0F93C600E038BA /* rubber_unicode_font.cpp in Sources */,
 				9CD4E6B710B14AB300E0DD5C /* concat_boxes.cpp in Sources */,
