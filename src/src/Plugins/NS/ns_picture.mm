@@ -227,11 +227,12 @@ picture_renderer (picture p, double zoomf) {
 * Loading pictures
 ******************************************************************************/
 
-NSImage*
-get_image (url u, int w, int h) {
+static NSImage*
+load_image (url u, int w, int h) {
+  // The image of the file (+1 reference), converted when NSImage cannot
+  // read it
   NSString *fname = to_nsstring (concretize (u));
   NSImage *pm = [[NSImage alloc] initWithContentsOfFile: fname];
-    
   if (!pm) {
     url temp= url_temp (".png");
     image_to_png (u, temp, w, h);
@@ -239,19 +240,22 @@ get_image (url u, int w, int h) {
     pm = [[NSImage alloc] initWithContentsOfFile: fname];
     remove (temp);
   }
-  if (pm == nil) {
-      cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
-      return nil;
-  }
+  if (pm == nil)
+    cout << "TeXmacs] warning: cannot render " << concretize (u) << "\n";
   return pm;
 }
 
-picture
-load_picture (url u, int w, int h, tree eff, int pixel) {
+static picture
+load_picture_bis (url u, int w, int h, tree eff, int pixel) {
   // As get_image_for_real in the Qt interface: the image at the given size,
-  // with the effect
-  NSImage* im = get_image (u, w, h);
-  if (im == nil) return error_picture (w, h);
+  // with the effect (a null picture when the file cannot be read)
+  NSImage* im = load_image (u, w, h);
+  if (im == nil) return picture ();
+  if (w <= 0 || h <= 0) {
+    NSSize sz= [im size];
+    if (w <= 0) w= (int) ceil (sz.width);
+    if (h <= 0) h= (int) ceil (sz.height);
+  }
   picture p = native_picture (w, h, 0, 0);
   ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
   NSBitmapImageRep* rep = handle->pict;
@@ -260,6 +264,7 @@ load_picture (url u, int w, int h, tree eff, int pixel) {
    setCurrentContext: [NSGraphicsContext graphicsContextWithBitmapImageRep: rep]];
   [im drawInRect:NSMakeRect (0, 0, w, h)];
   [NSGraphicsContext restoreGraphicsState];
+  [im release];
   if (eff != "") {
     effect e= build_effect (eff);
     array<picture> a;
@@ -269,14 +274,35 @@ load_picture (url u, int w, int h, tree eff, int pixel) {
   return p;
 }
 
+picture
+load_picture (url u, int w, int h, tree eff, int pixel) {
+  picture p= load_picture_bis (u, w, h, eff, pixel);
+  if (is_nil (p)) return error_picture (w, h);
+  return p;
+}
+
+static hashmap<tree,pointer> ns_pic_cache (NULL);
+
 NSImage*
 get_image (url u, int w, int h, tree eff, SI pixel) {
-  // The image of a pattern, with its effect
-  if (eff == "") return get_image (u, w, h);
-  picture p= load_picture (u, w, h, eff, pixel);
-  ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
-  NSImage* im= [[[NSImage alloc] initWithSize: [handle->pict size]] autorelease];
-  [im addRepresentation: handle->pict];
+  // The tile of a pattern: the image at the size w x h (in pixels of the
+  // device), with its effect; as in the Qt interface, the images are cached
+  // (the cache owns them, the callers do not release them)
+  tree key= tuple (as_tree (u), as_tree (w), as_tree (h));
+  if (eff != "") key << eff << as_tree (pixel);
+  if (ns_pic_cache->contains (key)) return (NSImage*) ns_pic_cache [key];
+  NSImage* im= nil;
+  picture p= load_picture_bis (u, w, h, eff, pixel);
+  if (!is_nil (p)) {
+    // NOTE: a single bitmap whose size (in points) is its number of pixels,
+    // since the default space of the contexts of the renderer is in pixels
+    ns_picture_rep* handle= (ns_picture_rep*) p->get_handle ();
+    NSBitmapImageRep* rep= handle->pict;
+    [rep setSize: NSMakeSize ([rep pixelsWide], [rep pixelsHigh])];
+    im= [[NSImage alloc] initWithSize: [rep size]];
+    [im addRepresentation: rep];
+  }
+  ns_pic_cache (key)= (pointer) im;
   return im;
 }
 
@@ -308,6 +334,7 @@ qt_load_xpm (url file_name) {
      setCurrentContext:[NSGraphicsContext graphicsContextWithBitmapImageRep:rep]];
     [im drawInRect:NSMakeRect (0, 0, sz.width, sz.height)];
     [NSGraphicsContext restoreGraphicsState];
+    [im release];
     return p;
   }
   else

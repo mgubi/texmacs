@@ -627,75 +627,132 @@ ns_renderer_rep::draw_clipped (CGImageRef im, int w, int h, SI x, SI y) {
 }
 
 
-static CGContextRef 
+static CGContextRef
 MyCreateBitmapContext (int pixelsWide, int pixelsHigh) {
-    int bitmapBytesPerRow   = (pixelsWide * 4);
-    int bitmapByteCount     = (bitmapBytesPerRow * pixelsHigh);	
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName (kCGColorSpaceGenericRGB);
-    void *bitmapData = malloc (bitmapByteCount);
-    if (bitmapData == NULL) {
-        //fprintf (stderr, "Memory not allocated!");
-        return NULL;
+  // A transparent bitmap with premultiplied RGBA pixels, in the color space
+  // of the backing store (the memory belongs to the context)
+  if (pixelsWide < 1 || pixelsHigh < 1) return NULL;
+  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB ();
+  CGContextRef context = CGBitmapContextCreate (NULL, pixelsWide, pixelsHigh, 8,
+                                                0, colorSpace,
+                                                kCGImageAlphaPremultipliedLast);
+  CGColorSpaceRelease (colorSpace);
+  if (context == NULL) return NULL;
+  memset (CGBitmapContextGetData (context), 0,
+          CGBitmapContextGetBytesPerRow (context) * pixelsHigh);
+  return context;
+}
+
+// NOTE: the rows of the glyphs go down, and so does y in the device
+// coordinates, so that the row j of a glyph is the row j from the bottom of
+// its bitmap (the last row of its memory; see draw_clipped)
+
+static inline unsigned char*
+glyph_pixel (CGContextRef ic, int i, int j) {
+  size_t h= CGBitmapContextGetHeight (ic);
+  return ((unsigned char*) CGBitmapContextGetData (ic))
+    + (h - 1 - j) * CGBitmapContextGetBytesPerRow (ic) + 4 * i;
+}
+
+void
+ns_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
+  // draw with a pattern (as in the Qt interface)
+  SI xo, yo;
+  glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
+  glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
+  int w= gl->width, h= gl->height;
+  CGContextRef ic = MyCreateBitmapContext (w, h);
+  if (ic == NULL) return;
+  SI tx= x- xo*std_shrinkf, ty= y+ yo*std_shrinkf;
+  {
+    // the pattern, at its place in the device coordinates
+    brush br= pen->get_brush ();
+    NSImage* pm= get_pattern_image (br, brushpx==-1? pixel: brushpx);
+    if (pm != NULL) {
+      double pox, poy;
+      decode (0, 0, pox, poy);
+      SI dx= tx, dy= ty;
+      decode (dx, dy); dy--;
+      set_pattern (ic, pm, br->get_alpha () / 255.0, pox - dx, poy - dy, true);
+      CGContextFillRect (ic, CGRectMake (0, 0, w, h));
     }
-    CGContextRef context = CGBitmapContextCreate (bitmapData, pixelsWide,	pixelsHigh,	8,
-                                                  bitmapBytesPerRow, colorSpace,
-                                                  kCGImageAlphaPremultipliedLast);
-    if (context == NULL) {
-        free (bitmapData);
-		// fprintf (stderr, "Context not created!");
-        return NULL;
-    }
-    CGColorSpaceRelease (colorSpace);
-    return context;
+  }
+  {
+    // the glyph as the alpha channel of the pattern
+    int nr_cols= std_shrinkf*std_shrinkf;
+    if (nr_cols >= 64) nr_cols= 64;
+    bool rev= get_reverse_colors ();
+    for (int j=0; j<h; j++)
+      for (int i=0; i<w; i++) {
+        unsigned char* p= glyph_pixel (ic, i, j);
+        int col= gl->get_x (i, j);
+        if (rev && p[3] != 0) {
+          int a= p[3];
+          int r= (255 * p[0] + a/2) / a;
+          int g= (255 * p[1] + a/2) / a;
+          int b= (255 * p[2] + a/2) / a;
+          reverse (r, g, b);
+          p[0]= (r * a + 127) / 255;
+          p[1]= (g * a + 127) / 255;
+          p[2]= (b * a + 127) / 255;
+        }
+        for (int k=0; k<4; k++) p[k]= (p[k] * col) / nr_cols;
+      }
+  }
+  CGImageRef im = CGBitmapContextCreateImage (ic);
+  CGContextRelease (ic);
+  if (im == NULL) return;
+  draw_clipped (im, w, h, tx, ty);
+  CGImageRelease (im);
 }
 
 void
 ns_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   if (pen->get_type () == pencil_brush) {
-    // FIXME: implement
-    // draw_bis (c, fng, x, y);
+    draw_bis (c, fng, x, y);
     return;
   }
   
-	// get the pixmap
+  // get the pixmap
   color fgc= pen->get_color ();
-	basic_character xc (c, fng, std_shrinkf, fgc, 0);
-	cg_image mi = character_image [xc];
-	if (is_nil(mi)) {
+  basic_character xc (c, fng, std_shrinkf, fgc, 0);
+  cg_image mi = character_image [xc];
+  if (is_nil(mi)) {
     int r, g, b, a;
     get_rgb (fgc, r, g, b, a);
     if (get_reverse_colors ()) reverse (r, g, b);
-		SI xo, yo;
-		glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
-		glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
-		int i, j, w= gl->width, h= gl->height;
-		CGImageRef im = NULL;
-		{
-			CGContextRef ic = MyCreateBitmapContext (w,h);
-			int nr_cols= std_shrinkf*std_shrinkf;
-			if (nr_cols >= 64) nr_cols= 64;
-			//CGContextSetShouldAntialias(ic,true);
-			CGContextSetBlendMode(ic,kCGBlendModeCopy);
-			//CGContextSetRGBFillColor(ic,1.0,1.0,1.0,0.0);
-			//CGContextFillRect(ic,CGRectMake(0,0,w,h));
-			
-			for (j=0; j<h; j++)
-				for (i=0; i<w; i++) {
-					int col = gl->get_x (i, j);
-					CGContextSetRGBFillColor (ic, 0.0,0.0,0.0,  ((255*col)/(nr_cols+1))/255.0);
-					CGContextFillRect (ic,CGRectMake(i,j,1,1));
-				}
-			im = CGBitmapContextCreateImage (ic);
-			CGContextRelease (ic);
-		}
-		cg_image mi2 (im, xo, yo, w, h);
-		mi = mi2;
-		CGImageRelease(im); // cg_image retains im
-		character_image (xc)= mi;
-	}
-	
-	// draw the character
-  draw_clipped (mi->img, mi->w, mi->h, x- mi->xo*std_shrinkf, y+ mi->yo*std_shrinkf);
+    SI xo, yo;
+    glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
+    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
+    int i, j, w= gl->width, h= gl->height;
+    CGImageRef im = NULL;
+    CGContextRef ic = MyCreateBitmapContext (w, h);
+    if (ic != NULL) {
+      // the color of the pen, with the glyph as alpha (premultiplied)
+      int nr_cols= std_shrinkf*std_shrinkf;
+      if (nr_cols >= 64) nr_cols= 64;
+      for (j=0; j<h; j++)
+        for (i=0; i<w; i++) {
+          int col = gl->get_x (i, j);
+          int ca= (a*col)/nr_cols;
+          unsigned char* p= glyph_pixel (ic, i, j);
+          p[0]= (r * ca + 127) / 255;
+          p[1]= (g * ca + 127) / 255;
+          p[2]= (b * ca + 127) / 255;
+          p[3]= ca;
+        }
+      im = CGBitmapContextCreateImage (ic);
+      CGContextRelease (ic);
+    }
+    cg_image mi2 (im, xo, yo, w, h);
+    mi = mi2;
+    if (im) CGImageRelease (im); // cg_image retains im
+    character_image (xc)= mi;
+  }
+  
+  // draw the character
+  if (mi->img)
+    draw_clipped (mi->img, mi->w, mi->h, x- mi->xo*std_shrinkf, y+ mi->yo*std_shrinkf);
 #if 0 // old code
   {
     CGContextRef cgc = (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];

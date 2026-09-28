@@ -66,7 +66,7 @@ public:
 
 ns_renderer_rep *the_ns_renderer();
 
-NSImage* get_image (url u, int w, int h);
+// the tile of a pattern (owned by a cache)
 NSImage* get_image (url u, int w, int h, tree eff, SI pixel);
 
 

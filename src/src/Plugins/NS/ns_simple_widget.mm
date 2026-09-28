@@ -90,6 +90,7 @@ ns_simple_widget_rep::~ns_simple_widget_rep () {
     ((TMDocView*) doc)->wid= NULL;
     [doc release];
   }
+  [backingPixmap release];
 }
 
 NSRect
@@ -466,36 +467,36 @@ ns_simple_widget_rep::read (slot s, blackbox index) {
  * Translation into QAction for insertion in menus (i.e. for buttons)
  ******************************************************************************/
 
-// Prints the current contents of the canvas onto a QPixmap
+// Prints the current contents of the canvas onto a bitmap (autoreleased),
+// with retina_factor pixels per point, and whose size is in points
 NSBitmapImageRep*
 ns_simple_widget_rep::impress () {
   SI width, height;
   handle_get_size_hint (width, height);
-  NSSize s = to_nssize (width, height);
-  NSSize phys_s = s;
-  phys_s.width *= retina_factor;
-  phys_s.height *= retina_factor;
+  NSSize s = to_nssize (coord2 (width, height));
+  NSInteger pw= max ((NSInteger) ceil (s.width * retina_factor), (NSInteger) 1);
+  NSInteger ph= max ((NSInteger) ceil (s.height * retina_factor), (NSInteger) 1);
   NSBitmapImageRep* im =
   [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: NULL
-                                          pixelsWide: phys_s.width
-                                          pixelsHigh: phys_s.height
+                                          pixelsWide: pw
+                                          pixelsHigh: ph
                                        bitsPerSample: 8
                                      samplesPerPixel: 4
                                             hasAlpha: YES
                                             isPlanar: NO
                                       colorSpaceName: NSDeviceRGBColorSpace
-                                         bytesPerRow: 4 * phys_s.width
+                                         bytesPerRow: 4 * pw
                                         bitsPerPixel: 32];
+  [im autorelease];
+  // transparent fill
+  memset ([im bitmapData], 0, [im bytesPerRow] * ph);
   if (DEBUG_QT)
     debug_qt << "impress (" << s.width << "," << s.height << ")\n";
   NSGraphicsContext* cg = [NSGraphicsContext graphicsContextWithBitmapImageRep: im];
   {
     ns_renderer_rep *ren = the_ns_renderer();
     ren->begin (cg);
-    // transparent fill
-    [[NSColor colorWithDeviceWhite:1.0 alpha:0.0] drawSwatchInRect: NSMakeRect(0, 0, phys_s.width, phys_s.height)];
-    
-    rectangle r = rectangle (0, 0,  phys_s.width, phys_s.height);
+    rectangle r = rectangle (0, 0, pw, ph);
     ren->set_origin (0, 0);
     ren->encode (r->x1, r->y1);
     ren->encode (r->x2, r->y2);
@@ -508,6 +509,21 @@ ns_simple_widget_rep::impress () {
     }
     ren->end();
   }
+  // The renderer draws with y going down in a context where it goes up, so
+  // that the rows are reversed (see ns_image_renderer_rep)
+  {
+    NSInteger bpr= [im bytesPerRow];
+    unsigned char* data= [im bitmapData];
+    STACK_NEW_ARRAY (row, unsigned char, bpr);
+    for (NSInteger i=0; i < ph/2; i++) {
+      memcpy (row, data + i*bpr, bpr);
+      memcpy (data + i*bpr, data + (ph-1-i)*bpr, bpr);
+      memcpy (data + (ph-1-i)*bpr, row, bpr);
+    }
+    STACK_DELETE_ARRAY (row);
+  }
+  [im setSize: NSMakeSize (pw / (double) retina_factor,
+                           ph / (double) retina_factor)];
   return im;
 }
 
@@ -580,15 +596,19 @@ ns_simple_widget_rep::repaint_invalid_regions () {
     backing_pos= origin;
   // NOTE: when the backing store moves or changes its size, all the view
   // is shown again (the view keeps its old image on screen otherwise)
+  // NOTE: the backing store moves by whole pixels (retina_factor per point),
+  // and backing_pos by what was moved: the scroll positions are whole pixels
+  // of the screen, which may be half pixels of the backing store (with a
+  // retina_factor of 1 on a Retina screen); the rest is moved later
   bool moved= false;
-  if ((backing_pos.x != origin.x)||(backing_pos.y != origin.y)) {
+  int dx = (int) round (retina_factor * (origin.x - backing_pos.x));
+  int dy = (int) round (retina_factor * (origin.y - backing_pos.y));
+  if (dx != 0 || dy != 0) {
     moved= true;
-    int dx =  retina_factor * (origin.x - backing_pos.x);
-    int dy =  retina_factor * (origin.y - backing_pos.y);
     if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
       fprintf (stderr, "SHIFT %g -> %g dy %d size %g\n", backing_pos.y, origin.y, dy, [backingPixmap size].height);
-    backing_pos.x = origin.x;
-    backing_pos.y = origin.y;
+    backing_pos.x += dx / (double) retina_factor;
+    backing_pos.y += dy / (double) retina_factor;
     NSBitmapImageRep *newBackingPixmap = [[NSBitmapImageRep alloc]
                                           initWithBitmapDataPlanes:NULL
                                           pixelsWide:sz.width
@@ -724,9 +744,6 @@ ns_simple_widget_rep::repaint_invalid_regions () {
         rectangle r = rectangle (max (r0->x1 - 1, (SI) 0), max (r0->y1 - 1, (SI) 0),
                                  min (r0->x2 + 1, (SI) bs.width),
                                  min (r0->y2 + 1, (SI) bs.height));
-        NSRect qr = NSMakeRect (r0->x1 / retina_factor, r0->y1 / retina_factor,
-                          (r0->x2 - r0->x1) / retina_factor,
-                          (r0->y2 - r0->y1) / retina_factor);
         //cout << "repainting " << r0 << "\n";
         ren->set_origin (ox, oy);
         ren->encode (r->x1, r->y1);
@@ -746,11 +763,12 @@ ns_simple_widget_rep::repaint_invalid_regions () {
       ren->end();
       
       // propagate immediately the changes to the screen
-      if (!moved)
-        [view displayRect: NSMakeRect (lub->x1 / retina_factor,
-                                       lub->y1 / retina_factor,
-                                       (lub->x2 - lub->x1) / retina_factor,
-                                       (lub->y2 - lub->y1) / retina_factor)];
+      if (!moved) {
+        double k= retina_factor;
+        [view displayRect: NSMakeRect (lub->x1 / k, lub->y1 / k,
+                                       (lub->x2 - lub->x1) / k,
+                                       (lub->y2 - lub->y1) / k)];
+      }
     } // !is_nil (invalid_regions)
   }
   if (moved) [view display];
