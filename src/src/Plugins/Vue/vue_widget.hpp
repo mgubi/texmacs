@@ -104,6 +104,8 @@ public:
   // the wheel then adds its delta to it instead of to backing_pos, which
   // only moves with a repaint (see handle_events)
   bool scroll_pending;
+  // no scroll bars (presentation mode, as the Qt port)
+  bool scrollbars_hidden;
   
   string debug_text; // debug view
 
