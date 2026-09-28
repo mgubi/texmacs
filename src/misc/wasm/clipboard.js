@@ -68,8 +68,29 @@ var tmClipboard = (function () {
     p.ups.forEach (function (u) { window.dispatchEvent (new KeyboardEvent ('keyup', u)); });
   }
 
+  // On a Mac, the key of Shift+Cmd+... is that of the key without the Shift
+  // ("=" for Shift+Cmd+=, whose "+" is Cmd++, the zoom): SDL would note it
+  // in its keymap, as the key of Shift and that key, and TeXmacs, which
+  // asks the keymap, would then get M-S-= instead of M-+. SDL gets no key
+  // for those: it then finds it in its keymap, which knows the layout from
+  // the keys typed (or it has the US one).
+  var mac = typeof navigator !== 'undefined' &&
+    /mac|iphone|ipad/i.test ((navigator.userAgentData && navigator.userAgentData.platform) ||
+                             navigator.platform || '');
+  function unshifted (e) {
+    return mac && e.metaKey && e.shiftKey && !e.ctrlKey && !e.altKey &&
+           typeof e.key === 'string' && e.key.length === 1;
+  }
+  // the key again, for SDL, without its key
+  function redispatch (e) {
+    e.preventDefault ();
+    e.stopImmediatePropagation ();
+    window.dispatchEvent (new KeyboardEvent (e.type, init (e)));
+  }
+
   function init (e) {
-    return { key: e.key, code: e.code, location: e.location, repeat: e.repeat,
+    return { key: unshifted (e) ? 'Unidentified' : e.key,
+             code: e.code, location: e.location, repeat: e.repeat,
              ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey,
              metaKey: e.metaKey, bubbles: true, cancelable: true };
   }
@@ -108,7 +129,8 @@ var tmClipboard = (function () {
         return;
       }
       if (!isPaste (e)) {
-        if (e.metaKey) e.preventDefault ();
+        if (unshifted (e)) redispatch (e);
+        else if (e.metaKey) e.preventDefault ();
         return;
       }
       e.stopImmediatePropagation ();
@@ -128,7 +150,10 @@ var tmClipboard = (function () {
         held = false;
         if (!pending) giveBack ();
       }
-      if (!pending) return;
+      if (!pending) {
+        if (unshifted (e) && !editable (e.target)) redispatch (e);
+        return;
+      }
       e.stopImmediatePropagation ();
       pending.ups.push (init (e));
     }, true);
