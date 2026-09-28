@@ -140,7 +140,7 @@ process_all_cmdlines () {
 /******************************************************************************
 * Routines for cmdline_links
 ******************************************************************************/
-#if defined (QTTEXMACS)
+// NOTE: the copy in pipe_link.cpp is local to it
 #ifndef OS_MINGW
 void
 execute_shell (string s) {
@@ -152,10 +152,6 @@ execute_shell (string s) {
   argv[3] = NULL;
   execve ("/bin/sh", argv, environ);
 }
-#endif
-#else
-void
-execute_shell (string s);
 #endif 
 
 string

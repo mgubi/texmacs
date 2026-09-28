@@ -268,7 +268,7 @@ pager_rep::make_pages () {
           SI l= 10*pixel, r= 10*pixel;
           SI b= 10*pixel, t= 10*pixel;
           if (env->get_string (PAGE_BORDER) == "attached") {
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
             if (i > 0) l= pixel/2;
 #else
             if (i > 0) l= pixel;

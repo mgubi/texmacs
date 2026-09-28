@@ -207,9 +207,9 @@ tm_server_rep::cpu_idle_time () {
 
 void
 tm_server_rep::interpose_handler () {
-#ifdef QTTEXMACS
-  // TeXmacs/Qt handles delayed messages and socket notification
-  // in its own runloop
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
+  // TeXmacs/Qt (and the NS port) handle delayed messages and socket
+  // notification in their own runloop
   //server_listen_connections (0);
   //client_listen_connections (0);
 #ifndef QTPIPES

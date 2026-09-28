@@ -16,7 +16,7 @@
 #include "tm_buffer.hpp"
 #include "message.hpp"
 #ifdef AQUATEXMACS
-#  include "Cocoa/aqua_simple_widget.h"
+#  include "NS/ns_simple_widget.h"
 #else
 #  if defined(QTTEXMACS) && !defined(QTWKTEXMACS)
 #    include "Qt/qt_simple_widget.hpp"
@@ -325,14 +325,14 @@ texmacs_output_widget (tree doc, tree style) {
   color col= env->get_color (BG_COLOR);
   if (env->get_string (BG_COLOR) == "white" &&
       is_transparent (extract (doc, "body")))
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
     col= rgb_color (236, 236, 236);
 #elif defined(VUETEXMACS)
     col= rgb_color (250, 250, 250); // the "field" background of the Vue widgets
 #else
     col= light_grey;
 #endif
-#if QT_VERSION >= 0x060000
+#if QT_VERSION >= 0x060000 || defined (AQUATEXMACS)
   double zoom= 1.0;
 #else
   double zoom= (retina_zoom == 2? 1.0: 1.2);

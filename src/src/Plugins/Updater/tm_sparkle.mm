@@ -15,7 +15,7 @@
 
 #include "tm_sparkle.hpp"
 #include "string.hpp"
-#include "Cocoa/mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include <Sparkle/Sparkle.h>
 
 /*! A class to hide the Cocoa types from the c++ header. */

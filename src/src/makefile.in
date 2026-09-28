@@ -206,7 +206,8 @@ data_incl     := $(system_incl)
 graphics_incl := $(system_incl)
 plugins_incl  := $(system_incl)
 x11_incl      := $(system_incl)
-cocoa_incl    := $(system_incl)
+cocoa_incl    := $(system_incl) \
+	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset)
 os_incl       := $(system_incl)
 qt_incl       := $(system_incl) \
 	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset Plugins/Gnutls)

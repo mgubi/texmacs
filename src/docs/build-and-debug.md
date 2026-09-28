@@ -42,7 +42,7 @@ ports do not all draw their pictures the same way:
 | `qt` (default) | `QTTEXMACS` | optional | `Qt` (or `Qt6`), `MacOS` |
 | `qtwk` | `QTWKTEXMACS`, `QTTEXMACS` | optional | `Qtwk`, `Widkit`, a few files of `Qt` |
 | `x11` | `X11TEXMACS` | not usable | `X11`, `Widkit` |
-| `cocoa` or `aqua` | `AQUATEXMACS` | not usable | `Cocoa`, `MacOS` |
+| `cocoa` or `aqua` | `AQUATEXMACS` | not usable | `NS`, `MacOS` |
 | `sdl` | `SDLTEXMACS` | required | `SDL`, `Widkit` |
 | `vue` | `VUETEXMACS` | required | `Vue` |
 
@@ -55,9 +55,10 @@ MuPDF. The X11 port needs the X11 headers: with Homebrew's `libx11`, pass
 (configure stops if it finds none).
 
 Checked on 2026-09-26 (macOS, clean builds): qt with and without MuPDF,
-qtwk, x11, cocoa, sdl and vue all build; x11 and cocoa with `--with-mupdf`,
+qtwk, x11, cocoa, sdl and vue all build (the NS port of `cocoa`, merged
+on 2026-09-27, was built and run then); x11 and cocoa with `--with-mupdf`,
 sdl and vue without it, x11 without X11 headers and an unknown GUI all stop
-in configure with a message. Only the Vue and SDL ports were run.
+in configure with a message. Only the Vue, SDL and NS ports were run.
 
 ## CMake
 
@@ -79,8 +80,8 @@ an installed TeXmacs, under `CMAKE_INSTALL_PREFIX`).
 
 What was added to upstream's file, and why:
 
-- **macOS**: the Unix sources and the Objective-C of `Plugins/MacOS` (not
-  its `cg_renderer.cpp`, as with configure), the Cocoa and IOKit
+- **macOS**: the Unix sources and the Objective-C of `Plugins/MacOS` (as
+  with configure), the Cocoa and IOKit
   frameworks, and the entry point `unix_entrypoint.cpp`. Qt makes
   `build/TeXmacs.app`; the other GUIs make `build/TeXmacs/bin/texmacs.bin`,
   as on Linux.

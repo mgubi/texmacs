@@ -1003,7 +1003,7 @@ edit_interface_rep::apply_changes () {
       table_selection= selection_active_table ();
       selection sel; selection_get (sel);
       rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS))
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS)||defined(AQUATEXMACS))
       rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
       selection_rects= rs;
@@ -1025,7 +1025,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (alt_sel[i], alt_sel[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS))
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS)||defined(AQUATEXMACS))
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) alt_selection_rects << rs;
@@ -1055,7 +1055,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (errs[i], errs[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#if !defined (QTTEXMACS) && !defined (VUETEXMACS)
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS) && !defined (AQUATEXMACS)
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) spell_error_rects << rs;

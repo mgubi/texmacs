@@ -19,7 +19,7 @@
 
 #undef FAILED // redefined by CARBON
 #define extend CARBON_extends // avoid name collision
-#include "Cocoa/mac_cocoa.h"
+#include "MacOS/mac_cocoa.h"
 #include <Carbon/Carbon.h>
 #include <crt_externs.h>
 #include "HIDRemote.h"
@@ -544,7 +544,7 @@ mac_begin_server () {
 #if MAC_OS_X_VERSION_MAX_ALLOWED > MAC_OS_X_VERSION_10_8
 #if defined (MAC_OS_X_VERSION_10_9)
   if (background_activity == nil) {
-    id background_activity = [[NSProcessInfo processInfo]
+    background_activity = [[NSProcessInfo processInfo]
                                beginActivityWithOptions: NSActivityBackground
                               reason: @"TeXmacs server running"];
     [background_activity retain];
@@ -560,6 +560,7 @@ mac_end_server () {
   if (background_activity) {
     [[NSProcessInfo processInfo] endActivity: background_activity];
     [background_activity release];
+    background_activity= nil;
   }
 #endif
 #endif

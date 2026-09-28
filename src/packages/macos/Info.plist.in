@@ -27,6 +27,7 @@
         <true/>
       </dict>
     </array>
+    <key>CFBundleURLTypes</key>
     <array>
       <dict>
         <key>CFBundleTypeRole</key>
@@ -63,8 +64,6 @@
     <false/>
     <key>CFBundleSignature</key>
     <string>TXMC</string>
-    <key>NSMainNibFile</key>
-    <string>MainMenu</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
