@@ -3929,6 +3929,13 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       }
     }
       break;
+    case SLOT_FULL_SCREEN:
+      // TeXmacs sends it to the window (tm_frame_rep::full_screen_mode);
+      // the texmacs widget inside hides its bars and makes the window full
+      // screen. It was dropped here, so presentation mode stayed in the
+      // window
+      if (!is_nil (wid)) wid->send (s, val);
+      break;
     default:
       vue_widget_rep::send(s, val);
   }
@@ -4274,7 +4281,14 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       break;
 
     case SLOT_FULL_SCREEN:
-      if (win) win->set_full_screen (check_open<bool> (val, s));
+      {
+        bool flag= check_open<bool> (val, s);
+        // no scroll bars on the slides, as in Qt
+        vue_simple_widget_rep* canvas=
+          dynamic_cast<vue_simple_widget_rep*> (main_widget.rep);
+        if (canvas) canvas->scrollbars_hidden= flag;
+        if (win) win->set_full_screen (flag);
+      }
       break;
 
     case SLOT_KEYBOARD_FOCUS_ON:
@@ -4547,7 +4561,9 @@ void vue_texmacs_widget_rep::do_layout () {
   // edit_interface_rep::handle_repaint). The loop gives it just before
   // the interpose handler (apply_default_focus in vue_gui.cpp)
   if (win->kbd_focus == NULL) win->default_focus= main_widget;
-  // the bars follow the mask given at creation and the visibility slots;
+  // the bars follow the mask given at creation and the visibility slots
+  // (the icon bars go with the header, as in Qt: presentation mode hides
+  // the header only);
   // an embedded editor (texmacs-input in a dialog or a tool, mask 0) is
   // only its canvas, as the Qt embedded widget
   // no background either, for the same reason: with bars this widget fills
@@ -4573,7 +4589,7 @@ void vue_texmacs_widget_rep::do_layout () {
       if (!is_nil (main_menu))
         layout_bar_content (8*id + 0, main_menu, color_background);
     }
-    if (visibility[1]) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
+    if (visibility[0] && visibility[1]) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
       .layout= {
          .padding= { bar_hpad, bar_hpad, 0, 0 },
          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
@@ -4586,7 +4602,7 @@ void vue_texmacs_widget_rep::do_layout () {
       if (!is_nil (main_icons))
         layout_bar_content (8*id + 1, main_icons, color_background);
     }
-    if (visibility[2]) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
+    if (visibility[0] && visibility[2]) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
       .layout= {
          .padding= { bar_hpad, bar_hpad, 0, 0 },
          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
@@ -4599,7 +4615,7 @@ void vue_texmacs_widget_rep::do_layout () {
       if (!is_nil (mode_icons))
         layout_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
     }
-    if (visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
+    if (visibility[0] && visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
       .layout= {
          .padding= { bar_hpad, bar_hpad, 0, 0 },
          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
@@ -4614,7 +4630,7 @@ void vue_texmacs_widget_rep::do_layout () {
     }
     // the user icon bar, which a document may fill through its style
     // (the bar was received and stored, and never drawn)
-    if (visibility[4] && !is_nil (user_icons))
+    if (visibility[0] && visibility[4] && !is_nil (user_icons))
       CLAY(CLAY_ID_LOCAL("UserToolbar"), {
         .layout= {
            .padding= { bar_hpad, bar_hpad, 0, 0 },
@@ -4732,6 +4748,7 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   mouse_grab (false),
   absolute_scroll (false),
   scroll_pending (false),
+  scrollbars_hidden (false),
   ren (NULL),
   backing_pos (coord2 (0, 0)), origin (coord2 (0, 0)),
   backing_valid (false),
@@ -5057,7 +5074,7 @@ vue_simple_widget_rep::do_layout () {
       .found= true
     };
     Clay_Vector2 before= scrollPosition;
-    scroll_bar (clay_id, scrollData);
+    if (!scrollbars_hidden) scroll_bar (clay_id, scrollData);
     // only a dragged thumb changes the position here; assigning it back
     // unconditionally dropped the scroll requests of the editor (scroll to
     // the cursor) whenever a second layout pass followed in the same

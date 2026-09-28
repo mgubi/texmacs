@@ -129,7 +129,9 @@ edit_interface_rep::draw_surround (renderer ren, rectangle r) {
   ren->set_background (tm_background);
   string medium= get_init_string (PAGE_MEDIUM);
   if (medium == "automatic") return;
-  if (medium == "beamer" && full_screen) return;
+  // around the slides of a presentation, black (the background of the
+  // window in Qt, where the canvas is only the size of the page)
+  if (medium == "beamer" && full_screen) ren->set_background (black);
   ren->clear (r->x1, r->y1, max (r->x1, eb->x1), r->y2);
   ren->clear (min (r->x2, eb->x2), r->y1, r->x2, r->y2);
   if (medium == "papyrus") return;

@@ -411,6 +411,9 @@ vue_sdl_base_window_rep::set_full_screen (bool flag) {
   // presentation and full screen modes (SLOT_FULL_SCREEN)
   if (!SDL_SetWindowFullscreen (sdl_win, flag))
     SDL_Log ("SDL_SetWindowFullscreen failed: %s", SDL_GetError ());
+  // the change is asynchronous (an animation on macOS); presentation mode
+  // fits the slide to the window just after it, so wait for the new size
+  else SDL_SyncWindow (sdl_win);
 }
 
 void
