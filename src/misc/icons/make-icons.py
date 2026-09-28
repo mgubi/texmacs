@@ -31,12 +31,13 @@
 #   o       outline in ink               paper   fill of white paper
 #   sec     secondary grey fill          lens    fill of a magnifier lens
 #   folder  blue folder, with its line   folderl line of a folder
-#   fb fm   fills accent, metal          sb sr   strokes accent, red
+#   fb fm fr  fills accent, metal, red   sb sr   strokes accent, red
 #   fa      fill of a body: the accent, a light tone in monochrome
 #   wh      stroke on a badge            paperf  paper fill (ring of a badge)
+#   white   white stroke on a red sign
 #   thin wide        stroke width modifiers
 #   gl      solid ink: letters, bars     dots    dotted line (leaders)
-#   emb     outline thickening a letter
+#   emb     outline thickening a letter  dash    dashed outline
 # In the monochrome variant everything is in the tint and its light tones;
 # in the colour variant the accent marks the part that acts. In both, red
 # marks an error (the cross of the spell checker) and nothing else.
@@ -262,10 +263,6 @@ MATH_ICONS = [
   '<path class="paper o" d="M11 3.25h8.5a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-4.25l-3 2.5v-2.5H11a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z"/><path class="o thin" d="M12.25 6.5h6M12.25 9.25h4"/><path class="gl emb" d="M13.6 19.01H13.25C12.9 20.06 11.96 20.92 10.77 21.32C10.55 21.39 9.58 21.73 7.52 21.73H1.57L6.43 15.72C6.53 15.6 6.56 15.56 6.56 15.5C6.56 15.44 6.54 15.43 6.46 15.3L1.91 9.06H7.45C9.05 9.06 12.27 9.16 13.25 11.78H13.6L12.4 8.5H0.79C0.41 8.5 0.4 8.51 0.4 8.95L5.51 15.98L0.54 22.12C0.43 22.26 0.41 22.29 0.41 22.35C0.41 22.5 0.54 22.5 0.79 22.5H12.4Z"/>'),
  ('math_style', 'Change the style of mathematical formulas',
   '<path class="gl emb" d="M9.24 7.76H9.02C8.79 8.43 8.19 8.98 7.43 9.24C7.28 9.29 6.66 9.5 5.34 9.5H1.51L4.64 5.64C4.7 5.56 4.72 5.54 4.72 5.5C4.72 5.46 4.71 5.46 4.65 5.37L1.73 1.36H5.29C6.32 1.36 8.39 1.42 9.02 3.11H9.24L8.47 1H1.01C0.77 1 0.76 1.01 0.76 1.29L4.04 5.81L0.85 9.76C0.77 9.85 0.77 9.87 0.77 9.9C0.77 10 0.85 10 1.01 10H8.47Z"/><path class="gl emb" d="M22.84 19.39H22.47C22.11 20.48 21.14 21.36 19.91 21.78C19.68 21.85 18.68 22.2 16.54 22.2H10.38L15.41 15.98C15.51 15.85 15.54 15.81 15.54 15.75C15.54 15.69 15.53 15.68 15.44 15.55L10.73 9.08H16.47C18.12 9.08 21.46 9.18 22.47 11.89H22.84L21.59 8.5H9.57C9.18 8.5 9.16 8.51 9.16 8.96L14.46 16.24L9.31 22.61C9.19 22.75 9.18 22.78 9.18 22.84C9.18 23 9.31 23 9.57 23H21.59Z"/>'),
- ('insert_up', 'Insert superscript',
-  '<rect class="sec o thin" x="3" y="9.5" width="11" height="11.5" rx=".7"/><rect class="paper o" x="15.5" y="2.5" width="6" height="6" rx=".7"/>'),
- ('insert_down', 'Insert subscript',
-  '<rect class="sec o thin" x="3" y="3" width="11" height="11.5" rx=".7"/><rect class="paper o" x="15.5" y="15.5" width="6" height="6" rx=".7"/>'),
  ('root_index', 'Multiple root',
   '<path class="o" d="M2.75 14.5 5 13.25l3.5 7L12.5 3.5h9"/><rect class="sec o thin" x="2.75" y="5" width="5" height="5" rx=".7"/><rect class="sec o thin" x="12.5" y="7.5" width="7.5" height="9.5" rx=".7"/>'),
  ('wide_under', 'Accent below',
@@ -280,6 +277,119 @@ MATH_ICONS = [
   '<path class="o" d="M7.5 3.5c-3.2 4.6-3.2 12.4 0 17M16.5 3.5c3.2 4.6 3.2 12.4 0 17"/><path class="o" d="M8 10h8M8 14h8"/>'),
 ]
 ICONS= ICONS + MATH_ICONS
+
+# The focus toolbar: structure editing, search, and the tools it opens.
+# The insert and delete icons (also used for scripts in math mode) are tags
+# pointing in their direction.
+FOCUS_ICONS = [
+ ('focus_search', 'Search',
+  '<circle class="lens o" cx="10.5" cy="10.5" r="6.5"/><path class="o wide" d="M15.3 15.3 20.5 20.5"/>'),
+ ('focus_help', 'Help',
+  '<circle class="paper o" cx="12" cy="12" r="9"/><path class="gl emb" d="M15.11 8.69C15.11 6.75 12.44 6.75 11.88 6.75C9.79 6.75 8.89 7.7 8.89 8.66C8.89 9.38 9.45 9.62 9.83 9.62C10.3 9.62 10.77 9.29 10.77 8.67C10.77 7.96 10.12 7.77 10.1 7.76C10.48 7.47 11.1 7.29 11.79 7.29C13.17 7.29 13.19 7.88 13.19 8.58C13.19 9.24 13.07 9.48 12.77 9.78C11.84 10.75 11.42 11.91 11.42 12.88V13.46C11.42 13.79 11.42 13.86 11.76 13.86C12.12 13.86 12.12 13.77 12.12 13.41V13C12.12 11.46 13.52 10.54 14.09 10.21C14.39 10.04 15.11 9.63 15.11 8.69ZM12.93 16.08C12.93 15.44 12.41 14.91 11.76 14.91C11.12 14.91 10.59 15.44 10.59 16.08C10.59 16.73 11.12 17.25 11.76 17.25C12.41 17.25 12.93 16.73 12.93 16.08Z"/>'),
+ ('focus_prefs', 'Preferences',
+  '<path class="fm o" d="M10.08 4.85L10.35 2.64L13.65 2.64L13.92 4.85L15.70 5.59L17.45 4.22L19.78 6.55L18.41 8.30L19.15 10.08L21.36 10.35L21.36 13.65L19.15 13.92L18.41 15.70L19.78 17.45L17.45 19.78L15.70 18.41L13.92 19.15L13.65 21.36L10.35 21.36L10.08 19.15L8.30 18.41L6.55 19.78L4.22 17.45L5.59 15.70L4.85 13.92L2.64 13.65L2.64 10.35L4.85 10.08L5.59 8.30L4.22 6.55L6.55 4.22L8.30 5.59Z"/><circle class="paper o" cx="12" cy="12" r="3.2"/>'),
+ ('focus_delete', 'Delete',
+  '<path class="paper o" d="M6 7l1 12.6a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4L18 7"/><path class="o" d="M3.5 7h17M9.5 7V4.75c0-.4.35-.75.75-.75h3.5c.4 0 .75.35.75.75V7"/><path class="o thin" d="M10 10.5v7M14 10.5v7"/>'),
+ ('focus_font', 'Font',
+  '<path class="gl emb" d="M21.07 4.5 20.76 4.3 20.06 5.09C19.81 5.36 19.4 5.58 19.04 5.58C18.89 5.58 18.58 5.53 18.36 5.49C17.28 5.31 16.27 5.09 15.26 4.83L15.41 4.21L15.28 4.15L14.07 4.7C13.74 4.65 13.08 4.61 12.73 4.61C10.99 4.61 9.41 4.94 7.85 6.19C6.86 6.98 5.98 8.02 5.69 9.14C5.6 9.51 5.56 9.89 5.76 10.15C5.91 10.33 6.06 10.46 6.35 10.46C6.59 10.46 6.83 10.31 7.05 10.15C7.27 9.95 7.38 9.76 7.45 9.49C7.52 9.25 7.47 8.94 7.47 8.7C7.49 8.39 7.52 8.15 7.6 7.84C7.69 7.49 8.31 6.72 8.81 6.3C9.85 5.49 10.88 5.25 11.98 5.25C12.51 5.25 13.19 5.31 13.68 5.44L12.11 11.27H8.86L8.4 11.89H11.96L11.43 13.83C11.21 14.6 10.97 15.39 10.55 16.14C10.22 16.73 9.83 17.26 9.28 17.74C8.53 18.42 7.52 18.97 6.59 18.97C6 18.97 5.47 18.84 5.14 18.4C4.99 18.2 4.85 17.94 4.81 17.65C4.63 16.86 4.55 16.82 4.22 16.82C3.93 16.82 3.64 16.91 3.42 17.08C3.18 17.28 3.05 17.46 2.98 17.72C2.87 18.16 2.94 18.62 3.2 18.95C3.64 19.55 4.35 19.85 5.18 19.85C6.97 19.85 8.92 19.13 10.42 17.83C11.21 17.15 11.65 16.55 12.07 15.81C12.6 14.9 12.95 13.94 13.19 12.97L13.46 11.89H16.16L16.78 11.27H13.61L15.02 5.82C15.28 5.93 16.73 6.41 17.64 6.68C17.92 6.79 18.25 6.87 18.54 6.87C19 6.87 19.53 6.48 19.84 6.1Z"/>'),
+ ('focus_style', 'Style',
+  '<path class="sec o" d="M13.5 12.5 19.25 4a1.6 1.6 0 0 1 2.6 1.85L14.75 13.5"/><path class="gl emb" d="M13.4 12.4c1.3.9 1.7 2.5.9 3.8-1.3 2.2-4.5 3.4-8.8 2.9 1.9-1.2 1.6-3 2.8-4.6 1.2-1.5 3.6-3 5.1-2.1z"/>'),
+ ('focus_load', 'Load',
+  '<path class="folder" d="M3 6.25c0-.97.78-1.75 1.75-1.75h3.9c.52 0 1.01.23 1.34.63L11.5 6.75h7.75c.97 0 1.75.78 1.75 1.75v9.75c0 .97-.78 1.75-1.75 1.75H4.75C3.78 20 3 19.22 3 18.25z"/><path class="folder" d="M3 20 5.55 11.3c.14-.47.57-.8 1.06-.8h14.4c.55 0 .94.53.78 1.05L19.4 19.1c-.18.54-.68.9-1.25.9z"/>'),
+ ('focus_save', 'Save',
+  '<path class="fa o" d="M5.5 3.25h10.9l4.35 4.35v10.9a2.25 2.25 0 0 1-2.25 2.25H5.5a2.25 2.25 0 0 1-2.25-2.25V5.5A2.25 2.25 0 0 1 5.5 3.25z"/><path class="fm o" d="M7.75 3.25h8v5h-8z"/><path class="paper" d="M12.75 4.5h1.75v2.5h-1.75z"/><rect class="paper o" x="6.5" y="12.25" width="11" height="8.5" rx=".75"/><path class="o thin" d="M8.75 15h6.5M8.75 17.5h6.5"/>'),
+ ('like', 'Cite TeXmacs',
+  '<rect class="sec o" x="3" y="10.5" width="4" height="10" rx="1"/><path class="paper o" d="M7 11.5 10.6 4.9c.4-.75 1.3-1.1 2.1-.75.8.35 1.2 1.25.95 2.1L12.8 9.5h5.45a2 2 0 0 1 1.95 2.4l-1.25 6.5a2 2 0 0 1-1.95 1.6H7z"/>'),
+ ('add', 'Add',
+  '<path class="o wide" d="M12 5v14M5 12h14"/>'),
+ ('add_2', 'Add',
+  '<circle class="paper o" cx="12" cy="12" r="9"/><path class="o" d="M12 7.5v9M7.5 12h9"/>'),
+ ('remove', 'Remove',
+  '<path class="o wide" d="M5 12h14"/>'),
+ ('insert_left', 'Insert to the left',
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+ ('insert_right', 'Insert to the right',
+  '<g><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+ ('insert_up', 'Insert above',
+  '<g transform="rotate(-90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+ ('insert_down', 'Insert below',
+  '<g transform="rotate(90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+ ('delete_left', 'Delete to the left',
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+ ('delete_right', 'Delete to the right',
+  '<g><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+ ('delete_up', 'Delete above',
+  '<g transform="rotate(-90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+ ('delete_down', 'Delete below',
+  '<g transform="rotate(90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+ ('exit_left', 'Exit to the left',
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="o" d="M10.5 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h4.5"/><path class="o" d="M9 12h11.5M17 8.5l3.5 3.5-3.5 3.5"/></g>'),
+ ('exit_right', 'Exit to the right',
+  '<path class="o" d="M10.5 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h4.5"/><path class="o" d="M9 12h11.5M17 8.5l3.5 3.5-3.5 3.5"/>'),
+ ('similar_first', 'First similar',
+  '<g><path class="gl emb" d="M12 8.5 17.5 16h-11z"/><path class="o wide" d="M6 5h12"/></g>'),
+ ('similar_previous', 'Previous similar',
+  '<g><path class="gl emb" d="M12 8.5 17.5 16h-11z"/></g>'),
+ ('similar_next', 'Next similar',
+  '<g transform="rotate(180 12 12)"><path class="gl emb" d="M12 8.5 17.5 16h-11z"/></g>'),
+ ('similar_last', 'Last similar',
+  '<g transform="rotate(180 12 12)"><path class="gl emb" d="M12 8.5 17.5 16h-11z"/><path class="o wide" d="M6 5h12"/></g>'),
+ ('search_first', 'First match',
+  '<g transform="rotate(-90 12 12)"><path class="gl emb" d="M12 8.5 17.5 16h-11z"/><path class="o wide" d="M6 5h12"/></g>'),
+ ('search_previous', 'Previous match',
+  '<g transform="rotate(-90 12 12)"><path class="gl emb" d="M12 8.5 17.5 16h-11z"/></g>'),
+ ('search_next', 'Next match',
+  '<g transform="rotate(90 12 12)"><path class="gl emb" d="M12 8.5 17.5 16h-11z"/></g>'),
+ ('search_last', 'Last match',
+  '<g transform="rotate(90 12 12)"><path class="gl emb" d="M12 8.5 17.5 16h-11z"/><path class="o wide" d="M6 5h12"/></g>'),
+ ('show_hidden', 'Show hidden',
+  '<path class="paper o" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle class="sec o" cx="12" cy="12" r="3.25"/>'),
+ ('numbered', 'Toggle numbering',
+  '<path class="gl emb" d="M12.86 18.22V17.33H10.2V6.39C10.2 5.97 10.2 5.78 9.71 5.78C9.5 5.78 9.46 5.78 9.29 5.91C7.83 6.99 5.87 6.99 5.47 6.99H5.09V7.89H5.47C5.78 7.89 6.82 7.87 7.94 7.51V17.33H5.3V18.22C6.14 18.17 8.15 18.17 9.08 18.17C10.01 18.17 12.03 18.17 12.86 18.22ZM18.91 16.74C18.91 15.92 18.24 15.26 17.42 15.26C16.61 15.26 15.94 15.92 15.94 16.74C15.94 17.56 16.61 18.22 17.42 18.22C18.24 18.22 18.91 17.56 18.91 16.74Z"/>'),
+ ('lock_open', 'Unlocked',
+  '<path class="o" d="M8 11V7.5a4 4 0 0 1 7.75-1.4"/><rect class="sec o" x="5" y="11" width="14" height="10" rx="2"/><circle class="gl" cx="12" cy="16" r="1.4"/>'),
+ ('lock_closed', 'Locked',
+  '<path class="o" d="M8 11V7.5a4 4 0 0 1 8 0V11"/><rect class="sec o" x="5" y="11" width="14" height="10" rx="2"/><circle class="gl" cx="12" cy="16" r="1.4"/>'),
+ ('stateless', 'Stateless',
+  '<rect class="dash" x="3.5" y="3.5" width="17" height="17" rx="3"/><path class="gl emb" d="M14.69 9.13C14.69 7.45 12.38 7.45 11.9 7.45C10.09 7.45 9.31 8.27 9.31 9.1C9.31 9.73 9.79 9.93 10.12 9.93C10.53 9.93 10.93 9.65 10.93 9.11C10.93 8.5 10.38 8.33 10.35 8.32C10.69 8.07 11.22 7.92 11.82 7.92C13.01 7.92 13.03 8.43 13.03 9.04C13.03 9.61 12.92 9.82 12.66 10.08C11.86 10.92 11.49 11.92 11.49 12.77V13.26C11.49 13.55 11.49 13.61 11.79 13.61C12.1 13.61 12.1 13.53 12.1 13.22V12.87C12.1 11.53 13.31 10.74 13.81 10.45C14.07 10.3 14.69 9.95 14.69 9.13ZM12.81 15.54C12.81 14.98 12.35 14.52 11.79 14.52C11.23 14.52 10.78 14.98 10.78 15.54C10.78 16.1 11.23 16.55 11.79 16.55C12.35 16.55 12.81 16.1 12.81 15.54Z"/>'),
+ ('customized', 'Customized',
+  '<circle class="paper o" cx="12" cy="7.5" r="3.75"/><path class="paper o" d="M4.5 21c0-4.4 3.4-7.5 7.5-7.5s7.5 3.1 7.5 7.5z"/>'),
+ ('theme', 'Theme',
+  '<circle class="paper o" cx="12" cy="12" r="8.5"/><path class="gl" d="M12 3.5a8.5 8.5 0 0 1 0 17z"/>'),
+ ('camera', 'Take a snapshot',
+  '<path class="paper o" d="M4.5 7.5h3l1.6-2.5h5.8l1.6 2.5h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle class="lens o" cx="12" cy="13.75" r="3.75"/>'),
+ ('portrait', 'Portrait',
+  '<rect class="paper o" x="5.5" y="3.0" width="13" height="18" rx="1.5"/>'),
+ ('portrait_1col', 'Portrait, one column',
+  '<rect class="paper o" x="5.5" y="3.0" width="13" height="18" rx="1.5"/><rect class="sec" x="8" y="5.5" width="8" height="13" rx=".5"/>'),
+ ('portrait_2col', 'Portrait, two columns',
+  '<rect class="paper o" x="5.5" y="3.0" width="13" height="18" rx="1.5"/><rect class="sec" x="7.75" y="5.5" width="3.75" height="13" rx=".5"/><rect class="sec" x="12.5" y="5.5" width="3.75" height="13" rx=".5"/>'),
+ ('landscape', 'Landscape',
+  '<rect class="paper o" x="2.0" y="5.5" width="20" height="13" rx="1.5"/>'),
+ ('landscape_1col', 'Landscape, one column',
+  '<rect class="paper o" x="2.0" y="5.5" width="20" height="13" rx="1.5"/><rect class="sec" x="4.75" y="8" width="14.5" height="8" rx=".5"/>'),
+ ('landscape_2col', 'Landscape, two columns',
+  '<rect class="paper o" x="2.0" y="5.5" width="20" height="13" rx="1.5"/><rect class="sec" x="4.75" y="8" width="6.75" height="8" rx=".5"/><rect class="sec" x="12.5" y="8" width="6.75" height="8" rx=".5"/>'),
+ ('left', 'Left',
+  '<path class="o" d="M20 12H4M10 6l-6 6 6 6"/>'),
+ ('right', 'Right',
+  '<path class="o" d="M4 12h16M14 6l6 6-6 6"/>'),
+ ('up', 'Up',
+  '<path class="o" d="M12 20V4M6 10l6-6 6 6"/>'),
+ ('down', 'Down',
+  '<path class="o" d="M12 4v16M6 14l6 6 6-6"/>'),
+ ('go', 'Go',
+  '<circle class="paper o" cx="12" cy="12" r="9"/><path class="gl emb" d="M10 8.25v7.5L16 12z"/>'),
+ ('stop', 'Stop',
+  '<path class="fr" d="M8.3 2.75h7.4l5.55 5.55v7.4l-5.55 5.55H8.3l-5.55-5.55V8.3z"/><path class="white" d="M8 12h8"/>'),
+ ('close_tool', 'Close',
+  '<circle class="paper o" cx="12" cy="12" r="9"/><path class="o" d="M8.75 8.75l6.5 6.5M15.25 8.75l-6.5 6.5"/>'),
+ ('expand_tool', 'Expand',
+  '<path class="o" d="M14 4h6v6M20 4l-6.5 6.5M10 20H4v-6M4 20l6.5-6.5"/>'),
+ ('compress_tool', 'Compress',
+  '<path class="o" d="M19.5 10.5h-6v-6M13.5 10.5 20 4M4.5 13.5h6v6M10.5 13.5 4 20"/>'),
+]
+ICONS= ICONS + FOCUS_ICONS
 
 GROUPS = [["new","open","save","build","print","preferences","cancel"],
           ["cut","copy","paste","find","replace","spell","undo","redo"],
@@ -335,20 +445,23 @@ def attributes (cls, p):
   fill= "none"; stroke= "none"; width= STROKE
   if "o" in cl: stroke= p["ink"]
   for c, k in (("paper","paper"),("paperf","paper"),("sec","sec"),("lens","lens"),
-               ("fb","blue"),("fa","body"),("fm","metal")):
+               ("fb","blue"),("fa","body"),("fm","metal"),("fr","red")):
     if c in cl: fill= p[k]
   if "folder" in cl: fill= p["folder"]; stroke= p["folderl"]
   for c, k in (("folderl","folderl"),("sb","blue"),("sr","red")):
     if c in cl: stroke= p[k]
   if "wh" in cl: stroke= p["on"]; width= 1.7
+  if "white" in cl: stroke= WHITE; width= 2
   if "thin" in cl: width= 1.45
   if "wide" in cl: width= 2.4
   if "gl" in cl: fill= p["ink"]
   if "emb" in cl: stroke= p["ink"]; width= EMBOLDEN
   if "dots" in cl: stroke= p["ink"]; width= 1.4
+  if "dash" in cl: stroke= p["ink"]
   a= 'fill="%s"' % fill
   if stroke != "none": a += ' stroke="%s" stroke-width="%g"' % (stroke, width)
   if "dots" in cl: a += ' stroke-dasharray="0 2.2"'
+  if "dash" in cl: a += ' stroke-dasharray="3 2.4"'
   return a
 
 def svg (body, p):
