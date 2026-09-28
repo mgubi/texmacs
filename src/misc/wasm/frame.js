@@ -23,8 +23,8 @@ var tmFrame = (function () {
       border-bottom:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
       color:#222; user-select:none; flex:none }
     #tm-frame .tm-app { display:flex; align-items:center; padding:0 12px; font-weight:bold;
-      cursor:pointer; border-right:1px solid #b8b8b8 }
-    #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#c8c8c8 }
+      cursor:pointer; color:#fff; background:#5b7fa8; border-right:1px solid #4a6b91 }
+    #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#6a8db5 }
     #tm-frame .tm-tabs { display:flex; flex:1; overflow:hidden; scrollbar-width:none }
     #tm-frame .tm-tabs::-webkit-scrollbar { display:none }
     #tm-frame .tm-tabs.dragging { cursor:grabbing }

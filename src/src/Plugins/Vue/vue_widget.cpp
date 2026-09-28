@@ -346,9 +346,6 @@ string layout_who;
 // set while laying out what a resize widget contains: a widget which would
 // otherwise take the size of its contents fills the box instead
 bool fill_parent= false;
-// the vertical menu being laid out has items with check marks: all its items
-// reserve the column of the marks so that the labels align
-bool menu_has_marks= false;
 
 uint32_t current_balloon;
 time_t balloon_time;
@@ -1567,10 +1564,23 @@ extern "C" Clay_Dimensions vue_clay_min_dimensions (Clay_ElementId id); // clay.
 // passed on: gui_init_context), or Escape.
 #define MENU_DELAY 150
 
-// the padding of the items of vertical menus
+// the padding of the items of vertical menus: on the left, the column of
+// the check marks, which every item has, marked or not, so that the labels
+// of a menu align and a menu is as wide with marks as without them
 static Clay_Padding
 menu_item_padding () {
-  return { ui_px (16), ui_px (16), ui_px (6), ui_px (6) };
+  return { 0, ui_px (16), ui_px (6), ui_px (6) };
+}
+
+static void render_menu_mark_fn (renderer ren, void* data, rectangle r); // below
+
+static void
+layout_mark_column (int kind= 0) {
+  // kind: 0 none, 1 "v" (check), 2 "*", 3 "o" (see render_menu_mark_fn)
+  CLAY_AUTO_ID({
+    .layout= { .sizing= { CLAY_SIZING_FIXED(ui_pxf (22)), CLAY_SIZING_FIXED(ui_pxf (22)) }},
+    .custom= { .customData= (kind != 0) ? (void*) &render_menu_mark_fn : NULL },
+    .userData= (void*) (intptr_t) kind }) {}
 }
 
 // the item of an open menu under the pointer, and since when
@@ -1608,9 +1618,13 @@ layout_pull_button (vue_ui_rep *w) {
   ui_signal sig= button_logic (button_id);
   uint32_t parent_menu= current_menu;
   if (!down) note_menu_hover (button_id);
-  // the items of vertical menus have the padding of menu_button
+  // the items of vertical menus have the padding of menu_button, but the
+  // arrow of a submenu lies in the padding on the right, near the border
   Clay_Padding padding= CLAY_PADDING_ALL(ui_px (5));
-  if (!down && button_grow) padding= menu_item_padding ();
+  if (!down && button_grow) {
+    padding= menu_item_padding ();
+    padding.right= 0;
+  }
   CLAY(button_id, {
     .layout= {
       .padding= padding,
@@ -1623,9 +1637,8 @@ layout_pull_button (vue_ui_rep *w) {
                       ? highlight_on (color_behind)
                       : (Clay_Color) { 0, 0, 0, 0 } })
   {
-    // items of vertical menus with check marks reserve their column
-    if (!down && menu_has_marks)
-      CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED(ui_pxf (22)), CLAY_SIZING_FIXED(ui_pxf (22)) }}}) {}
+    // items of vertical menus have the column of the check marks
+    if (!down && button_grow) layout_mark_column ();
     concrete(d.w)->do_layout ();
     if (!down) {
       CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_GROW(ui_pxf (32)), CLAY_SIZING_GROW(0) }}}){};
@@ -1796,13 +1809,10 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
   // a menu fits its items and grows along an axis only when one of its items
   // does (a horizontal menu bar fills the height of its row); the items of a
   // vertical menu fill the width of the menu
-  bool grows_main= false, grows_cross= false, marks= false;
+  bool grows_main= false, grows_cross= false;
   for (int i=0; i<N(a); i++) {
     grows_main=  grows_main  || widget_grows (a[i], !vert);
     grows_cross= grows_cross || widget_grows (a[i], vert);
-    vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (concrete (a[i]).rep);
-    if (u != NULL && u->type == "menu_button" &&
-        N(open_box<vue_menu_button> (u->data).pre) > 0) marks= true;
   }
   Clay_Sizing s= layoutFit;
   if (vert) {
@@ -1821,20 +1831,31 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
       // several sizes, texts, separators) are centered in it
       .childAlignment= { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
   {
-    bool save_grow= button_grow, save_marks= menu_has_marks;
+    bool save_grow= button_grow;
     uint32_t save_bar= current_bar, save_menu= current_menu;
     button_grow= vert;
-    menu_has_marks= vert && marks;
     // the titles of a bar (see layout_pull_button); a vertical menu which
     // is not in an open menu is one too (a popup menu in a window of its
     // own, a menu of a dialog): its submenus open under the pointer
     if (!vert) current_bar= id;
     else if (current_menu == 0) current_menu= CLAY_IDI("vertical_menu", id).id;
     for (int i=0, n=N(a); i< n; i++) {
-      concrete (a[i])->do_layout ();
+      string t= concrete (a[i])->type;
+      if (vert && (t == "menu_group" || t == "text_widget")) {
+        // a label of the menu (the greyed title of a group): where the
+        // labels of the items are, with their padding and mark column
+        CLAY_AUTO_ID({
+          .layout= {
+            .padding= menu_item_padding (),
+            .sizing= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+            .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}}) {
+          layout_mark_column ();
+          concrete (a[i])->do_layout ();
+        }
+      }
+      else concrete (a[i])->do_layout ();
     }
     button_grow= save_grow;
-    menu_has_marks= save_marks;
     current_bar= save_bar;
     current_menu= save_menu;
   }
@@ -2384,7 +2405,9 @@ vue_ui_rep::do_layout () {
     Clay_Color hl= highlight_on (color_behind); // shows on the bar behind
     Clay_Color bg= faded (hl); // flat buttons show their container
     Clay_Padding padding= swatch ? CLAY_PADDING_ALL(ui_px (2)) : CLAY_PADDING_ALL(ui_px (5));
-    if (!swatch && button_grow) padding= menu_item_padding ();
+    // an item of a vertical menu: the column of the marks, then its label
+    bool item= !swatch && !push && section_bar == 0 && button_grow;
+    if (item) padding= menu_item_padding ();
     if (!inert) note_menu_hover (button_id);
     Clay_CornerRadius radius= CLAY_CORNER_RADIUS(ui_pxf (4));
     Clay_BorderElementConfig border= {};
@@ -2441,16 +2464,13 @@ vue_ui_rep::do_layout () {
                      .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR }
     }) {
       last_id= button_id;
-      if ((menu_has_marks && !swatch) || N(d.pre) > 0) {
+      if (item || N(d.pre) > 0) {
         // the column for the mark of the item: "v" (check), "*" or "o";
-        // all items of a menu with marks reserve it so that labels align,
-        // but the cells of a colour tile are not labels: reserving it in
-        // each of them spread the palette by the width of a mark per column
+        // every item of a vertical menu has it, but the cells of a colour
+        // tile are not labels: reserving it in each of them spread the
+        // palette by the width of a mark per column
         int kind= (d.pre == "v") ? 1 : (d.pre == "*") ? 2 : (d.pre == "o") ? 3 : 0;
-        CLAY_AUTO_ID({
-          .layout= { .sizing= { CLAY_SIZING_FIXED(ui_pxf (22)), CLAY_SIZING_FIXED(ui_pxf (22)) }},
-          .custom= { .customData= (kind != 0) ? (void*) &render_menu_mark_fn : NULL },
-          .userData= (void*) (intptr_t) kind }) {}
+        layout_mark_column (kind);
       }
       concrete(d.w)->do_layout ();
       if (N(d.ks) > 0) {

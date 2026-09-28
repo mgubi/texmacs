@@ -37,7 +37,7 @@ entry points of a GUI*.
 
 | Widget | Layout | Callback / notes |
 |---|---|---|
-| `horizontal_menu`, `vertical_menu`, `minibar_menu` | `layout_menu`: vertical menus fit their items, items fill the width (`button_grow`), check-mark column reserved when an item of the menu has a mark (a colour cell of a tile does not reserve it); `minibar_menu` uses a gap of 2 instead of 10 | |
+| `horizontal_menu`, `vertical_menu`, `minibar_menu` | `layout_menu`: vertical menus fit their items, items fill the width (`button_grow`), every item has the column of the check marks, marked or not, in place of its left padding, so that a menu is as wide with marks as without (a colour cell of a tile has none); `minibar_menu` uses a gap of 2 instead of 10 | |
 | `horizontal_list`, `vertical_list` | `layout_list` with the grow policy | |
 | `tile_menu` | rows of `cols` items, gap 2, cells at their natural size (`button_grow` cleared, or a palette in a wider menu would be spread out) | |
 | `menu_button (w, cmd, pre, ks, style)` | flat (menus, tool bars; transparent until hovered) or framed push button (`WIDGET_STYLE_BUTTON`); a button whose whole content is a colour or pattern cell (`swatch`, the palettes) is flat whatever its style, with 2 px of padding, centered, and reserves no mark column; `pre` = `"v"`/`"*"`/`"o"` drawn as check/bullet/circle; `ks` shortcut right-aligned; in a tool title bar the `"x"` label becomes a round close button; inside a `sections`/`section-tabs` division it draws as a segment/tab (`section_bar`, `section_active`) | queues `cmd`; sets `cancel_popup` |
