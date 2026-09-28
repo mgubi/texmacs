@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
- <g stroke-linecap="round" stroke-linejoin="round"><path fill="#FFFFFF" stroke="#3A3A3C" stroke-width="1.6" d="M4.5 7.5h3l1.6-2.5h5.8l1.6 2.5h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle fill="#FFFFFF" stroke="#3A3A3C" stroke-width="1.6" cx="12" cy="13.75" r="3.75"/></g>
+ <g stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.15) translate(-12 -12)"><path fill="#FFFFFF" stroke="#3A3A3C" stroke-width="1.6" d="M4.5 7.5h3l1.6-2.5h5.8l1.6 2.5h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-15a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle fill="#FFFFFF" stroke="#3A3A3C" stroke-width="1.6" cx="12" cy="13.75" r="3.75"/></g></g>
 </svg>

@@ -286,19 +286,19 @@ FOCUS_ICONS = [
  ('focus_search', 'Search',
   '<circle class="lens o" cx="10.5" cy="10.5" r="6.5"/><path class="o wide" d="M15.3 15.3 20.5 20.5"/>'),
  ('focus_help', 'Help',
-  '<circle class="paper o" cx="12" cy="12" r="9"/><path class="gl emb" d="M15.11 8.69C15.11 6.75 12.44 6.75 11.88 6.75C9.79 6.75 8.89 7.7 8.89 8.66C8.89 9.38 9.45 9.62 9.83 9.62C10.3 9.62 10.77 9.29 10.77 8.67C10.77 7.96 10.12 7.77 10.1 7.76C10.48 7.47 11.1 7.29 11.79 7.29C13.17 7.29 13.19 7.88 13.19 8.58C13.19 9.24 13.07 9.48 12.77 9.78C11.84 10.75 11.42 11.91 11.42 12.88V13.46C11.42 13.79 11.42 13.86 11.76 13.86C12.12 13.86 12.12 13.77 12.12 13.41V13C12.12 11.46 13.52 10.54 14.09 10.21C14.39 10.04 15.11 9.63 15.11 8.69ZM12.93 16.08C12.93 15.44 12.41 14.91 11.76 14.91C11.12 14.91 10.59 15.44 10.59 16.08C10.59 16.73 11.12 17.25 11.76 17.25C12.41 17.25 12.93 16.73 12.93 16.08Z"/>'),
+  '<path class="gl emb" d="M16.97 6.7C16.97 3.6 12.7 3.6 11.81 3.6C8.47 3.6 7.03 5.11 7.03 6.65C7.03 7.8 7.92 8.18 8.52 8.18C9.29 8.18 10.03 7.66 10.03 6.67C10.03 5.54 9 5.23 8.95 5.21C9.58 4.75 10.56 4.46 11.66 4.46C13.87 4.46 13.9 5.4 13.9 6.53C13.9 7.58 13.7 7.97 13.22 8.45C11.74 10.01 11.06 11.86 11.06 13.42V14.33C11.06 14.86 11.06 14.98 11.62 14.98C12.19 14.98 12.19 14.83 12.19 14.26V13.61C12.19 11.14 14.42 9.67 15.34 9.14C15.82 8.86 16.97 8.21 16.97 6.7ZM13.49 18.53C13.49 17.5 12.65 16.66 11.62 16.66C10.58 16.66 9.74 17.5 9.74 18.53C9.74 19.56 10.58 20.4 11.62 20.4C12.65 20.4 13.49 19.56 13.49 18.53Z"/>'),
  ('focus_prefs', 'Preferences',
-  '<path class="fm o" d="M10.08 4.85L10.35 2.64L13.65 2.64L13.92 4.85L15.70 5.59L17.45 4.22L19.78 6.55L18.41 8.30L19.15 10.08L21.36 10.35L21.36 13.65L19.15 13.92L18.41 15.70L19.78 17.45L17.45 19.78L15.70 18.41L13.92 19.15L13.65 21.36L10.35 21.36L10.08 19.15L8.30 18.41L6.55 19.78L4.22 17.45L5.59 15.70L4.85 13.92L2.64 13.65L2.64 10.35L4.85 10.08L5.59 8.30L4.22 6.55L6.55 4.22L8.30 5.59Z"/><circle class="paper o" cx="12" cy="12" r="3.2"/>'),
+  '<g transform="rotate(45 12 12)"><g transform="translate(12 12)"><path class="fm o" d="M-1.5-9.9A4.4 4.4 0 1 0 1.5-9.9L1.5-7-1.5-7Z"/><rect class="fm o" x="-1.6" y="-3" width="3.2" height="13" rx="1.6"/></g></g>'),
  ('focus_delete', 'Delete',
   '<path class="fr o" d="M4.5 7.25 7.25 4.5 12 9.25l4.75-4.75 2.75 2.75L14.75 12l4.75 4.75-2.75 2.75L12 14.75 7.25 19.5 4.5 16.75 9.25 12z"/>'),
  ('focus_font', 'Font',
   '<path class="gl emb" d="M21.07 4.5 20.76 4.3 20.06 5.09C19.81 5.36 19.4 5.58 19.04 5.58C18.89 5.58 18.58 5.53 18.36 5.49C17.28 5.31 16.27 5.09 15.26 4.83L15.41 4.21L15.28 4.15L14.07 4.7C13.74 4.65 13.08 4.61 12.73 4.61C10.99 4.61 9.41 4.94 7.85 6.19C6.86 6.98 5.98 8.02 5.69 9.14C5.6 9.51 5.56 9.89 5.76 10.15C5.91 10.33 6.06 10.46 6.35 10.46C6.59 10.46 6.83 10.31 7.05 10.15C7.27 9.95 7.38 9.76 7.45 9.49C7.52 9.25 7.47 8.94 7.47 8.7C7.49 8.39 7.52 8.15 7.6 7.84C7.69 7.49 8.31 6.72 8.81 6.3C9.85 5.49 10.88 5.25 11.98 5.25C12.51 5.25 13.19 5.31 13.68 5.44L12.11 11.27H8.86L8.4 11.89H11.96L11.43 13.83C11.21 14.6 10.97 15.39 10.55 16.14C10.22 16.73 9.83 17.26 9.28 17.74C8.53 18.42 7.52 18.97 6.59 18.97C6 18.97 5.47 18.84 5.14 18.4C4.99 18.2 4.85 17.94 4.81 17.65C4.63 16.86 4.55 16.82 4.22 16.82C3.93 16.82 3.64 16.91 3.42 17.08C3.18 17.28 3.05 17.46 2.98 17.72C2.87 18.16 2.94 18.62 3.2 18.95C3.64 19.55 4.35 19.85 5.18 19.85C6.97 19.85 8.92 19.13 10.42 17.83C11.21 17.15 11.65 16.55 12.07 15.81C12.6 14.9 12.95 13.94 13.19 12.97L13.46 11.89H16.16L16.78 11.27H13.61L15.02 5.82C15.28 5.93 16.73 6.41 17.64 6.68C17.92 6.79 18.25 6.87 18.54 6.87C19 6.87 19.53 6.48 19.84 6.1Z"/>'),
  ('focus_style', 'Style',
-  '<path class="sec o" d="M13.5 12.5 19.25 4a1.6 1.6 0 0 1 2.6 1.85L14.75 13.5"/><path class="gl emb" d="M13.4 12.4c1.3.9 1.7 2.5.9 3.8-1.3 2.2-4.5 3.4-8.8 2.9 1.9-1.2 1.6-3 2.8-4.6 1.2-1.5 3.6-3 5.1-2.1z"/>'),
+  '<path class="paper o" d="M1.75 12S5.5 5 12 5s10.25 7 10.25 7S18.5 19 12 19 1.75 12 1.75 12z"/><circle class="sec o" cx="12" cy="12" r="4"/><circle class="gl" cx="12" cy="12" r="1.8"/>'),
  ('focus_load', 'Load',
-  '<path class="folder" d="M3 6.25c0-.97.78-1.75 1.75-1.75h3.9c.52 0 1.01.23 1.34.63L11.5 6.75h7.75c.97 0 1.75.78 1.75 1.75v9.75c0 .97-.78 1.75-1.75 1.75H4.75C3.78 20 3 19.22 3 18.25z"/><path class="folder" d="M3 20 5.55 11.3c.14-.47.57-.8 1.06-.8h14.4c.55 0 .94.53.78 1.05L19.4 19.1c-.18.54-.68.9-1.25.9z"/>'),
+  '<path class="#3E9B4F o" d="M12 2.5 21 11.5h-5v9.5H8v-9.5H3z"/>'),
  ('focus_save', 'Save',
-  '<path class="fa o" d="M5.5 3.25h10.9l4.35 4.35v10.9a2.25 2.25 0 0 1-2.25 2.25H5.5a2.25 2.25 0 0 1-2.25-2.25V5.5A2.25 2.25 0 0 1 5.5 3.25z"/><path class="fm o" d="M7.75 3.25h8v5h-8z"/><path class="paper" d="M12.75 4.5h1.75v2.5h-1.75z"/><rect class="paper o" x="6.5" y="12.25" width="11" height="8.5" rx=".75"/><path class="o thin" d="M8.75 15h6.5M8.75 17.5h6.5"/>'),
+  '<path class="#B0392F o" d="M12 21.5 3 12.5h5V3h8v9.5h5z"/>'),
  ('like', 'Cite TeXmacs',
   '<rect class="sec o" x="3" y="10.5" width="4" height="10" rx="1"/><path class="paper o" d="M7 11.5 10.6 4.9c.4-.75 1.3-1.1 2.1-.75.8.35 1.2 1.25.95 2.1L12.8 9.5h5.45a2 2 0 0 1 1.95 2.4l-1.25 6.5a2 2 0 0 1-1.95 1.6H7z"/>'),
  ('add', 'Add',
@@ -308,21 +308,21 @@ FOCUS_ICONS = [
  ('remove', 'Remove',
   '<path class="o wide" d="M5 12h14"/>'),
  ('insert_left', 'Insert to the left',
-  '<g transform="matrix(-1 0 0 1 24 0)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="wh wide" d="M9.75 8.5v7M6.25 12h7"/></g>'),
  ('insert_right', 'Insert to the right',
-  '<g><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+  '<g><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="wh wide" d="M9.75 8.5v7M6.25 12h7"/></g>'),
  ('insert_up', 'Insert above',
-  '<g transform="rotate(-90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+  '<g transform="rotate(-90 12 12)"><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="wh wide" d="M9.75 8.5v7M6.25 12h7"/></g>'),
  ('insert_down', 'Insert below',
-  '<g transform="rotate(90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="o" d="M9.75 9v6M6.75 12h6"/></g>'),
+  '<g transform="rotate(90 12 12)"><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="wh wide" d="M9.75 8.5v7M6.25 12h7"/></g>'),
  ('delete_left', 'Delete to the left',
-  '<g transform="matrix(-1 0 0 1 24 0)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="sr wide" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="paperf" d="M9.75 8.25a3.75 3.75 0 1 1 0 7.5 3.75 3.75 0 0 1 0-7.5z"/><path class="sr wide" d="M8 10.25l3.5 3.5M11.5 10.25 8 13.75"/></g>'),
  ('delete_right', 'Delete to the right',
-  '<g><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="sr wide" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+  '<g><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="paperf" d="M9.75 8.25a3.75 3.75 0 1 1 0 7.5 3.75 3.75 0 0 1 0-7.5z"/><path class="sr wide" d="M8 10.25l3.5 3.5M11.5 10.25 8 13.75"/></g>'),
  ('delete_up', 'Delete above',
-  '<g transform="rotate(-90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="sr wide" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+  '<g transform="rotate(-90 12 12)"><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="paperf" d="M9.75 8.25a3.75 3.75 0 1 1 0 7.5 3.75 3.75 0 0 1 0-7.5z"/><path class="sr wide" d="M8 10.25l3.5 3.5M11.5 10.25 8 13.75"/></g>'),
  ('delete_down', 'Delete below',
-  '<g transform="rotate(90 12 12)"><path class="sec o" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="sr wide" d="M7.75 10l4 4M11.75 10l-4 4"/></g>'),
+  '<g transform="rotate(90 12 12)"><path class="gl emb" d="M4.5 6h9.25l6 6-6 6H4.5A1.5 1.5 0 0 1 3 16.5v-9A1.5 1.5 0 0 1 4.5 6z"/><path class="paperf" d="M9.75 8.25a3.75 3.75 0 1 1 0 7.5 3.75 3.75 0 0 1 0-7.5z"/><path class="sr wide" d="M8 10.25l3.5 3.5M11.5 10.25 8 13.75"/></g>'),
  ('exit_left', 'Exit to the left',
   '<g transform="matrix(-1 0 0 1 24 0)"><path class="o" d="M10.5 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h4.5"/><path class="o" d="M9 12h11.5M17 8.5l3.5 3.5-3.5 3.5"/></g>'),
  ('exit_right', 'Exit to the right',
@@ -344,7 +344,7 @@ FOCUS_ICONS = [
  ('search_last', 'Last match',
   '<g transform="rotate(90 12 12)"><path class="gl emb" d="M12 7 20.5 17.5H3.5z"/><path class="o wide" d="M3.5 3.75h17"/></g>'),
  ('show_hidden', 'Show hidden',
-  '<path class="paper o" d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle class="sec o" cx="12" cy="12" r="3.25"/>'),
+  '<path class="paper o" d="M3.5 3.5h17v17h-17z"/><path class="gl" d="M3.5 3.5h17L3.5 20.5z"/>'),
  ('numbered', 'Toggle numbering',
   '<path class="gl emb" d="M12.86 18.22V17.33H10.2V6.39C10.2 5.97 10.2 5.78 9.71 5.78C9.5 5.78 9.46 5.78 9.29 5.91C7.83 6.99 5.87 6.99 5.47 6.99H5.09V7.89H5.47C5.78 7.89 6.82 7.87 7.94 7.51V17.33H5.3V18.22C6.14 18.17 8.15 18.17 9.08 18.17C10.01 18.17 12.03 18.17 12.86 18.22ZM18.91 16.74C18.91 15.92 18.24 15.26 17.42 15.26C16.61 15.26 15.94 15.92 15.94 16.74C15.94 17.56 16.61 18.22 17.42 18.22C18.24 18.22 18.91 17.56 18.91 16.74Z"/>'),
  ('lock_open', 'Unlocked',
@@ -923,8 +923,13 @@ def attributes (cls, p):
   if "half" in cl: a += ' fill-opacity=".4"'
   return a
 
-def svg (body, p):
+FOCUS_SCALE= 1.15     # the focus toolbar shows its icons at 16px: less margin
+
+def svg (body, p, focus= False):
   body= re.sub (r'class="([^"]*)"', lambda m: attributes (m.group (1), p), body)
+  if focus:
+    body= ('<g transform="translate(12 12) scale(%g) translate(-12 -12)">%s</g>'
+           % (FOCUS_SCALE, body))
   return ('<?xml version="1.0" encoding="UTF-8"?>\n'
           '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" '
           'viewBox="0 0 24 24">\n'
@@ -954,6 +959,7 @@ def main ():
   pix= os.path.join ("TeXmacs", "misc", "pixmaps")
   out= option (args, "out", pix)
   names= [a for a in args if not a.startswith ("--")]
+  focus= set (n for n, t, b in FOCUS_ICONS)
   for name, tip, body in ICONS:
     if names and name not in names: continue
     for theme in ("light", "dark"):
@@ -961,7 +967,7 @@ def main ():
       d= os.path.join (out, theme)
       os.makedirs (d, exist_ok= True)
       with open (os.path.join (d, "tm_%s.svg" % name), "w") as f:
-        f.write (svg (body, p))
+        f.write (svg (body, p, name in focus))
     if png and out == pix:
       # PNG fallbacks, at the size of the directory where they already are
       src= os.path.join (pix, "light", "tm_%s.svg" % name)
