@@ -310,6 +310,8 @@ FOCUS_ICONS = [
   '<path class="dk" d="M6 11V7.5a6 6 0 0 1 11.6-2.2l-2.8 1.1A3 3 0 0 0 9 7.5V11z"/><rect class="g" x="2.5" y="10" width="19" height="12" rx="1.5"/><circle class="ink" cx="12" cy="16" r="1.75"/>'),
  ('shell', 'Start an interactive session',
   '<path class="kh" d="M9.5 17.5h5l.75 3h-6.5z"/><rect class="kh" x="6" y="20" width="12" height="2" rx=".75"/><rect class="kh" x="1.75" y="2.5" width="20.5" height="15.5" rx="2"/><rect class="screen" x="3.75" y="4.5" width="16.5" height="11.5" rx=".75"/><path class="lng" d="M6.25 7.5 9 10.25 6.25 13M10.5 13.25h4.5"/>'),
+ ('link', 'Insert a link',
+  '<path class="met" fill-rule="evenodd" transform="rotate(45 8.4 8.4)" d="M6.40 3.90h4.00a4.50 4.50 0 0 1 0 9.00h-4.00a4.50 4.50 0 0 1 0 -9.00zM6.40 6.60h4.00a1.80 1.80 0 0 1 0 3.60h-4.00a1.80 1.80 0 0 1 0 -3.60z"/><path class="met" fill-rule="evenodd" transform="rotate(45 15.6 15.6)" d="M13.60 11.10h4.00a4.50 4.50 0 0 1 0 9.00h-4.00a4.50 4.50 0 0 1 0 -9.00zM13.60 13.80h4.00a1.80 1.80 0 0 1 0 3.60h-4.00a1.80 1.80 0 0 1 0 -3.60z"/><path class="met" transform="rotate(45 8.4 8.4)" d="M10.40 3.90a4.50 4.50 0 0 1 0 9.00L10.40 10.20a1.80 1.80 0 0 0 0 -3.60z"/>'),
 ]
 ICONS= ICONS + FOCUS_ICONS
 
