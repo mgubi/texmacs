@@ -1,6 +1,4 @@
-> <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="96" align="right">
->
-> ## Branch `wip_wasm_vue` — TeXmacs in the browser (TeXmacs Vue)
+> ## <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="36" align="top"> Branch `wip_wasm_vue` — TeXmacs in the browser (TeXmacs Vue)
 >
 > **Try it: <https://mgubi.github.io/texmacs/>** (experimental)
 >
