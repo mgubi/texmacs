@@ -65,7 +65,15 @@ all: $(OUT)/texmacs.js
 # loaded by the page (packages.js): the boot package before TeXmacs starts,
 # the others in the background; brotli copies are written for the servers
 # which serve them (misc/wasm/serve.mjs does)
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json
+# the icon of the page (the tab of the browser, its bookmarks, the home
+# screen of a phone): the icon of TeXmacs, declared in shell.html
+WEB_ICONS := $(foreach n,16 32 192,$(OUT)/web/texmacs-$(n).png)
+
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS)
+
+$(OUT)/web/texmacs-%.png: $(TM)/TeXmacs/misc/images/texmacs-%.png
+	@mkdir -p $(OUT)/web
+	cp $< $@
 
 $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
