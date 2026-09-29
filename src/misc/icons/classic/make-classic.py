@@ -40,7 +40,7 @@
 #   wf wl  white fill, white line (on a coloured sign)
 #   #RRGGBB  a literal colour (paint cards), with the outline
 #   bold   a heavier near-black outline (icons shown small)
-#   tagf tagm tagx  solid dark tag, its green plus and red cross (as the
+#   tagf tagm tagx  solid dark tag, its white plus and light red cross (as the
 #          originals); redx redf  red cross (line, fill)
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
@@ -130,8 +130,8 @@ def attributes (cls, p):
   if "bold" in cl: stroke= INK_DARK if dark else INK; width= 1.6
   if "sig" in cl: fill= INK_DARK if dark else INK; stroke= fill; width= 1.1
   if "tagf" in cl: fill= "#8A8A90" if dark else "#58585D"; stroke= "#C6C6CC" if dark else INK
-  if "tagm" in cl: stroke= "#8CCB95"; width= 3
-  if "tagx" in cl: stroke= "#EC8A80"; width= 3
+  if "tagm" in cl: stroke= WHITE; width= 3
+  if "tagx" in cl: stroke= "#F6B3AC"; width= 3
   if "redx" in cl: stroke= "#FF3B30" if dark else "#E8261B"; width= 2.6
   if "redf" in cl: fill= "#EE5145" if dark else "#D64A3E"; stroke= outline (p, "line")
   for c in cl:
