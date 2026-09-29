@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B3B3B4"/><stop offset="1" stop-color="#8C8D8E"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BB9492"/><stop offset="1" stop-color="#976561"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BB9492"/><stop offset="1" stop-color="#976561"/></linearGradient></defs>
  <g id="layer1">
-  <rect id="rect3905" y="4" width="16" height="1" fill="url(#cg0)" stroke-width="0"/>
-  <rect id="rect3907" y="11" width="16" height="1" fill="url(#cg0)" stroke-width="0"/>
-  <rect id="rect3913" transform="rotate(90)" y="-5" width="16" height="1" fill="url(#cg0)" stroke-width="0"/>
-  <rect id="rect3915" transform="rotate(90)" y="-12" width="16" height="1" fill="url(#cg0)" stroke-width="0"/>
+  <rect id="rect3905" y="4" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
+  <rect id="rect3907" y="11" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
+  <rect id="rect3913" transform="rotate(90)" y="-5" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
+  <rect id="rect3915" transform="rotate(90)" y="-12" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
   <path id="path3942" d="m-0.5 14.5 3-4.5c1-1.5 4.4189-5 6-5 1.5 0 2.5 1 3.5 2.5s4.4622 7.3459 5.5 5" fill="none" stroke="#ADADAE" stroke-width="1px"/>
-  <path id="path3921" d="m4 4h1v3h3v1h-3v3h-1v-3h-3v-1h3z" fill="url(#cg1)" stroke="#CEB5B3" stroke-linejoin="round" stroke-width=".5"/>
+  <path id="path3921" d="m4 4h1v3h3v1h-3v3h-1v-3h-3v-1h3z" fill="url(#cg0)" stroke="#CEB5B3" stroke-linejoin="round" stroke-width=".5"/>
  </g>
 </svg>

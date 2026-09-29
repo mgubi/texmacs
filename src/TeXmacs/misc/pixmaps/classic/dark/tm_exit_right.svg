@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9A9C9D"/><stop offset="1" stop-color="#6C6F70"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
  <g id="layer1">
   <path id="path8903" d="m9 5v-2h-8v10h8v-2" fill="none" stroke="#ADADAE" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path8905" d="m4 9h8v2l4-3-4-3v2h-8z" fill="url(#cg0)"/>
+  <path id="path8905" d="m4 9h8v2l4-3-4-3v2h-8z" fill="#B8B8BC"/>
  </g>
 </svg>

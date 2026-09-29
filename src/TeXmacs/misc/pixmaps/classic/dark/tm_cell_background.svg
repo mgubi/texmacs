@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B3BFB4"/><stop offset="1" stop-color="#8C9C8E"/></linearGradient><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient><linearGradient id="cg3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C0BDB1"/><stop offset="1" stop-color="#9D9989"/></linearGradient><linearGradient id="cg4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BEB3B4"/><stop offset="1" stop-color="#9B8D8E"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B3BFB4"/><stop offset="1" stop-color="#8C9C8E"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C0BDB1"/><stop offset="1" stop-color="#9D9989"/></linearGradient><linearGradient id="cg3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BEB3B4"/><stop offset="1" stop-color="#9B8D8E"/></linearGradient></defs>
  <g id="layer1">
-  <path id="path4086" d="m0 1v15h1v-15z" fill="url(#cg0)"/>
-  <path id="path4088" d="m14 1v15h1v-15z" fill="url(#cg0)"/>
-  <path id="path4090" d="m15 1-15.001 1e-7 5.7783e-4 1h15z" fill="url(#cg0)"/>
-  <path id="path4134" d="m15 15h-15l5.7783e-4 1h14.999z" fill="url(#cg0)"/>
-  <path id="path4136" d="m15 8-15.001 1e-7 5.7783e-4 1h15z" fill="url(#cg0)"/>
-  <path id="path4138" d="m7 1v15h1v-15z" fill="url(#cg0)"/>
-  <path id="path4140" d="m1 2v6h6v-6z" fill="url(#cg1)"/>
-  <path id="path4148" d="m8 2v6h6v-6z" fill="url(#cg2)"/>
-  <path id="path4150" d="m8 9v6h6v-6z" fill="url(#cg3)"/>
-  <path id="path4152" d="m1 9v6h6v-6z" fill="url(#cg4)"/>
+  <path id="path4086" d="m0 1v15h1v-15z" fill="#B8B8BC"/>
+  <path id="path4088" d="m14 1v15h1v-15z" fill="#B8B8BC"/>
+  <path id="path4090" d="m15 1-15.001 1e-7 5.7783e-4 1h15z" fill="#B8B8BC"/>
+  <path id="path4134" d="m15 15h-15l5.7783e-4 1h14.999z" fill="#B8B8BC"/>
+  <path id="path4136" d="m15 8-15.001 1e-7 5.7783e-4 1h15z" fill="#B8B8BC"/>
+  <path id="path4138" d="m7 1v15h1v-15z" fill="#B8B8BC"/>
+  <path id="path4140" d="m1 2v6h6v-6z" fill="url(#cg0)"/>
+  <path id="path4148" d="m8 2v6h6v-6z" fill="url(#cg1)"/>
+  <path id="path4150" d="m8 9v6h6v-6z" fill="url(#cg2)"/>
+  <path id="path4152" d="m1 9v6h6v-6z" fill="url(#cg3)"/>
  </g>
 </svg>

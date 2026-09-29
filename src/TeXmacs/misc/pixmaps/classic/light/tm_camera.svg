@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8B8B8"/><stop offset="1" stop-color="#939393"/></linearGradient></defs>
- <g id="layer1" fill="url(#cg0)" stroke-linecap="round" stroke-linejoin="round">
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
+ <g id="layer1" fill="#5E5E62" stroke-linecap="round" stroke-linejoin="round">
   <rect id="rect4959" x="1.5" y="5" width="13" height="7" stroke="#48484B" stroke-width="2"/>
   <rect id="rect4961" x="6" y="3.5" width="4" height="1" stroke="#48484B" stroke-width="2"/>
-  <path id="path4975" d="m10.75 8.5a2.75 2.75 0 0 1-2.6878 2.7493 2.75 2.75 0 0 1-2.8094-2.625 2.75 2.75 0 0 1 2.5608-2.868 2.75 2.75 0 0 1 2.9251 2.4953" stroke="#E3E3E3"/>
+  <path id="path4975" d="m10.75 8.5a2.75 2.75 0 0 1-2.6878 2.7493 2.75 2.75 0 0 1-2.8094-2.625 2.75 2.75 0 0 1 2.5608-2.868 2.75 2.75 0 0 1 2.9251 2.4953" stroke="#8C8C90"/>
  </g>
 </svg>

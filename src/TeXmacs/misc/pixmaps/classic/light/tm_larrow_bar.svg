@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8B8B8"/><stop offset="1" stop-color="#939393"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEEEEE"/><stop offset="1" stop-color="#D9D9D9"/></linearGradient><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EDEEEE"/><stop offset="1" stop-color="#D8D9D9"/></linearGradient></defs>
- <g id="layer1" stroke="#C6C6C6" stroke-width=".5">
-  <path id="path10074" transform="matrix(-1,0,0,1,24,0)" d="m1 12v-5c0-2.5 2-4 4-4h14c2 0 4 2 4 4v10c0 2.5-2 4-4 4h-7-7c-2 0-4-2-4-4v-5z" fill="url(#cg0)"/>
-  <path id="path10076" transform="matrix(-1,0,0,1,24,0)" d="m5 12v5l10-5-10-5z" fill="url(#cg1)" stroke-linejoin="round"/>
-  <path id="path11446" transform="matrix(-1,0,0,1,24,0)" d="m17 7v10h2v-10z" fill="url(#cg2)" stroke-linejoin="round"/>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEEEEE"/><stop offset="1" stop-color="#D9D9D9"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EDEEEE"/><stop offset="1" stop-color="#D8D9D9"/></linearGradient></defs>
+ <g id="layer1" stroke="#6E6E72" stroke-width=".5">
+  <path id="path10074" transform="matrix(-1,0,0,1,24,0)" d="m1 12v-5c0-2.5 2-4 4-4h14c2 0 4 2 4 4v10c0 2.5-2 4-4 4h-7-7c-2 0-4-2-4-4v-5z" fill="#5E5E62"/>
+  <path id="path10076" transform="matrix(-1,0,0,1,24,0)" d="m5 12v5l10-5-10-5z" fill="url(#cg0)" stroke-linejoin="round"/>
+  <path id="path11446" transform="matrix(-1,0,0,1,24,0)" d="m17 7v10h2v-10z" fill="url(#cg1)" stroke-linejoin="round"/>
  </g>
 </svg>

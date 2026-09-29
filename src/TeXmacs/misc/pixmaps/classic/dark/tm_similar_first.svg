@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient></defs>
- <g id="layer1" fill="url(#cg0)">
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
+ <g id="layer1" fill="#B8B8BC">
   <path id="path6257" d="m3 11h10l-5-6z" stroke="#ADADAE" stroke-linejoin="round" stroke-width="2"/>
   <path id="path6464" d="m3 0c-0.5236 0.024544-1.0245 0.9764-1 1.5 0.024544 0.5236 0.4764 1.5245 1 1.5h10c0.52831 0.0075 1-0.97164 1-1.5s-0.47169-1.5075-1-1.5h-10c-0.031227-0.0015 0.031227-0.0015 0 0z" color="#000000" style="block-progression:tb;text-indent:0;text-transform:none"/>
  </g>

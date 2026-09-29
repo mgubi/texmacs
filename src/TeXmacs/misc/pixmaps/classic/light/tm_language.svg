@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C0BA9E"/><stop offset="1" stop-color="#9E9571"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8B8B8"/><stop offset="1" stop-color="#939393"/></linearGradient><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0EBD6"/><stop offset="1" stop-color="#DCD5BA"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C0BA9E"/><stop offset="1" stop-color="#9E9571"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0EBD6"/><stop offset="1" stop-color="#DCD5BA"/></linearGradient></defs>
  <g id="layer1">
   <path id="path8316" d="m1 23v1h4v-1h-1v-22h1v-1h-4v1h1v22z" fill="url(#cg0)" stroke="#A89F78" stroke-width=".5"/>
-  <path id="path8318" d="m4 2h18v13h-18v-1h17v-11h-17z" fill="url(#cg1)" stroke-width="0"/>
-  <path id="path8320" d="m4 7h17v-1h-17z" fill="url(#cg1)" stroke-width="0"/>
-  <path id="path8322" d="m4 11h17v-1h-17z" fill="url(#cg1)" stroke-width="0"/>
-  <path id="path8324" d="m4 3v3h17v-3z" fill="url(#cg2)" stroke-width="0"/>
+  <path id="path8318" d="m4 2h18v13h-18v-1h17v-11h-17z" fill="#5E5E62" stroke-width="0"/>
+  <path id="path8320" d="m4 7h17v-1h-17z" fill="#5E5E62" stroke-width="0"/>
+  <path id="path8322" d="m4 11h17v-1h-17z" fill="#5E5E62" stroke-width="0"/>
+  <path id="path8324" d="m4 3v3h17v-3z" fill="url(#cg1)" stroke-width="0"/>
   <path id="path8326" d="m4 10h17v-3h-17z" fill="#FFFFFF" stroke-width="0"/>
-  <path id="path8328" d="m4 14h17v-3h-17z" fill="url(#cg2)" stroke-width="0"/>
+  <path id="path8328" d="m4 14h17v-3h-17z" fill="url(#cg1)" stroke-width="0"/>
  </g>
 </svg>

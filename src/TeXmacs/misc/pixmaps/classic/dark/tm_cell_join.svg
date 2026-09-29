@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BB9492"/><stop offset="1" stop-color="#976561"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BB9492"/><stop offset="1" stop-color="#976561"/></linearGradient></defs>
  <g id="layer1">
   <path id="path5336" d="m3 13h10v-10h-10z" fill="url(#cg0)" fill-opacity=".12444"/>
-  <path id="path4086" d="m2 0v16h1v-16z" fill="url(#cg1)"/>
-  <path id="path4088" d="m13 0v16h1v-16z" fill="url(#cg1)"/>
-  <path id="path4090" d="m15.999 2h-16l5.7783e-4 1 15.999 1e-7z" fill="url(#cg1)"/>
-  <path id="path4092" d="m16 13h-16l5.7783e-4 1h15.999z" fill="url(#cg1)"/>
-  <path id="path5151" d="m6 14v2h1v-2z" fill="url(#cg1)"/>
-  <path id="path5153" d="m9 14v2h1v-2z" fill="url(#cg1)"/>
-  <path id="path5155" d="m6 0v2h1v-2z" fill="url(#cg1)"/>
-  <path id="path5157" d="m9 0v2h1v-2z" fill="url(#cg1)"/>
-  <path id="path5159" d="m16 9h-2v1h2z" fill="url(#cg1)"/>
-  <path id="path5161" d="m16 6h-2v1h2z" fill="url(#cg1)"/>
-  <path id="path5163" d="m2 6h-2v1h2z" fill="url(#cg1)"/>
-  <path id="path5165" d="m2 9h-2v1h2z" fill="url(#cg1)"/>
+  <path id="path4086" d="m2 0v16h1v-16z" fill="#B8B8BC"/>
+  <path id="path4088" d="m13 0v16h1v-16z" fill="#B8B8BC"/>
+  <path id="path4090" d="m15.999 2h-16l5.7783e-4 1 15.999 1e-7z" fill="#B8B8BC"/>
+  <path id="path4092" d="m16 13h-16l5.7783e-4 1h15.999z" fill="#B8B8BC"/>
+  <path id="path5151" d="m6 14v2h1v-2z" fill="#B8B8BC"/>
+  <path id="path5153" d="m9 14v2h1v-2z" fill="#B8B8BC"/>
+  <path id="path5155" d="m6 0v2h1v-2z" fill="#B8B8BC"/>
+  <path id="path5157" d="m9 0v2h1v-2z" fill="#B8B8BC"/>
+  <path id="path5159" d="m16 9h-2v1h2z" fill="#B8B8BC"/>
+  <path id="path5161" d="m16 6h-2v1h2z" fill="#B8B8BC"/>
+  <path id="path5163" d="m2 6h-2v1h2z" fill="#B8B8BC"/>
+  <path id="path5165" d="m2 9h-2v1h2z" fill="#B8B8BC"/>
   <path id="path5346" d="m5.5 5.5h5" fill="none" stroke="#ADADAE" stroke-linecap="round"/>
   <path id="path5348" d="m5.5 7.5h5" fill="none" stroke="#ADADAE" stroke-linecap="round"/>
   <path id="path5352" d="m5.5 9.5h5" fill="none" stroke="#ADADAE" stroke-linecap="round"/>

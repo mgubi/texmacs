@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg5078" width="32px" height="32px" version="1.1">
  <g id="layer1" fill="none" stroke-width="2">
-  <path id="path6187" d="m27 3.9907v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4773" d="m5 4v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4775" d="m12 4v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4777" d="m20 4v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4781" d="m27 31.991v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4783" d="m5 32v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4785" d="m12 32v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4787" d="m20 32v-3.9907" stroke="#E7E7E7"/>
-  <g id="g4797" transform="matrix(-1 0 0 -1 47.991 32)" stroke="#E7E7E7">
+  <path id="path6187" d="m27 3.9907v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4773" d="m5 4v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4775" d="m12 4v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4777" d="m20 4v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4781" d="m27 31.991v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4783" d="m5 32v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4785" d="m12 32v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4787" d="m20 32v-3.9907" stroke="#BEBEC0"/>
+  <g id="g4797" transform="matrix(-1 0 0 -1 47.991 32)" stroke="#BEBEC0">
    <path id="path4789" d="m19.981 5h-3.9907"/>
    <path id="path4791" d="m19.991 27h-3.9907"/>
    <path id="path4793" d="m19.991 20h-3.9907"/>
    <path id="path4795" d="m19.991 12h-3.9907"/>
   </g>
-  <g id="g4803" transform="matrix(-1 0 0 -1 19.991 32)" stroke="#E7E7E7">
+  <g id="g4803" transform="matrix(-1 0 0 -1 19.991 32)" stroke="#BEBEC0">
    <path id="path4805" d="m19.981 5h-3.9907"/>
    <path id="path4807" d="m19.991 27h-3.9907"/>
    <path id="path4809" d="m19.991 20h-3.9907"/>
    <path id="path4811" d="m19.991 12h-3.9907"/>
   </g>
-  <path id="path4813" d="m27 3.9907v-3.9907" stroke="#E7E7E7"/>
-  <path id="path4815" d="m27 3.9907v-3.9907" stroke="#E7E7E7"/>
+  <path id="path4813" d="m27 3.9907v-3.9907" stroke="#BEBEC0"/>
+  <path id="path4815" d="m27 3.9907v-3.9907" stroke="#BEBEC0"/>
   <path id="path4821" d="m5 27.998v-23.995" stroke="#ADADAE"/>
   <path id="path4254" d="m12 4v24" stroke="#ADADAE"/>
   <path id="path4256" d="m20 4v24" stroke="#ADADAE"/>

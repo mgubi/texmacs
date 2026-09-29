@@ -70,6 +70,7 @@ MODERN = {
 
 WHITE, BLACK, TOOLBAR_DARK= "#FFFFFF", "#000000", "#2B2D31"
 INK, INK_DARK= "#2A2A2C", "#E6E6EA"
+GREY_DARK, GREY_MID= "#5E5E62", "#8C8C90"
 LINES= ("line", "khl", "gl", "rl", "brl", "metl", "dkl", "skinl", "bl")
 
 def mix (a, b, t):
@@ -382,10 +383,18 @@ def map_colour (c, kind, theme):
     col= light[KNOWN[c]]
     if kind == "stroke" and KNOWN[c] in ("kh", "khd", "g", "r", "lav", "br", "skin"):
       col= mix (col, BLACK, .35)
+  elif kind == "stroke" and neutral (c):
+    # lighter grey lines of the originals (grids, borders, small marks) must
+    # still read on the toolbar
+    col= "#6E6E72" if lightness (c) < .8 else "#8C8C90"
   elif kind == "stroke":
-    col= mix ("#" + c, WHITE, .1)
+    col= mix ("#" + c, BLACK, .12)
   elif neutral (c) and lightness (c) < .35:
     col= INK                    # letters and symbols: solid ink
+  elif neutral (c) and lightness (c) < .6:
+    col= GREY_DARK              # grey bars and borders
+  elif neutral (c) and lightness (c) < .8:
+    col= GREY_MID               # grids and light marks
   elif lightness (c) > .9:
     col= "#" + c
   else:
@@ -394,6 +403,8 @@ def map_colour (c, kind, theme):
     if kind == "stroke": col= mix (col, WHITE, .55)
     elif lightness (col[1:]) > .9: col= "#4B4D53"
     elif col == INK: col= INK_DARK
+    elif col == GREY_DARK: col= "#B8B8BC"
+    elif col == GREY_MID: col= "#8E8E94"
     elif neutral (c) and lightness (c) < .5: col= mix (col, WHITE, .75)
     else: col= mix (col, TOOLBAR_DARK, .35)
   return col.upper ()
@@ -408,7 +419,8 @@ def convert (src, theme):
     grads= {}
     def grad (m):
       c= m.group (3)
-      if lightness (c[1:].lower ()) > .92 or c in (INK, INK_DARK): return m.group (0)
+      if lightness (c[1:].lower ()) > .92 or c in (INK, INK_DARK, GREY_DARK, GREY_MID, "#B8B8BC", "#8E8E94"):
+        return m.group (0)
       if c not in grads: grads[c]= "cg%d" % len (grads)
       return "%s%surl(#%s)" % (m.group (1), m.group (2), grads[c])
     s= re.sub (r'(fill)(=\"|:\s*)(#[0-9A-F]{6})', grad, s)

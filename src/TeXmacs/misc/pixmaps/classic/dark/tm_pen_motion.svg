@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9E9E9"/><stop offset="1" stop-color="#D3D3D3"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
  <g id="layer1">
-  <rect id="rect15929" transform="matrix(.87338 -.48704 .48704 .87338 0 0)" x="-4.9093" y="9.8834" width="16" height="2" fill="url(#cg0)" fill-rule="evenodd"/>
+  <rect id="rect15929" transform="matrix(.87338 -.48704 .48704 .87338 0 0)" x="-4.9093" y="9.8834" width="16" height="2" fill="#B8B8BC" fill-rule="evenodd"/>
  </g>
 </svg>

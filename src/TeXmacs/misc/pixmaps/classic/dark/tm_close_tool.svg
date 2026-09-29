@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
  <g id="layer1">
-  <path id="path5937" d="m14 8a6 6 0 1 1-12 0 6 6 0 1 1 12 0z" fill="url(#cg0)"/>
-  <path id="path5939" d="m9.7707 4.8198 1.4129 1.4155-4.9544 4.9451-1.4129-1.4155z" fill="url(#cg1)"/>
-  <path id="path5941" d="m11.18 9.7714-1.4157 1.4127-4.9445-4.955 1.4157-1.4127z" fill="url(#cg1)"/>
+  <path id="path5937" d="m14 8a6 6 0 1 1-12 0 6 6 0 1 1 12 0z" fill="#B8B8BC"/>
+  <path id="path5939" d="m9.7707 4.8198 1.4129 1.4155-4.9544 4.9451-1.4129-1.4155z" fill="url(#cg0)"/>
+  <path id="path5941" d="m11.18 9.7714-1.4157 1.4127-4.9445-4.955 1.4157-1.4127z" fill="url(#cg0)"/>
  </g>
 </svg>
