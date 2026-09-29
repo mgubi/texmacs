@@ -64,6 +64,14 @@ get_user_preference (string var, string val) {
 * Loading and saving user preferences
 ******************************************************************************/
 
+// ("variable" "value")
+static bool
+is_preference_pair (tree t) {
+  return is_func (t, TUPLE, 2) &&
+         is_atomic (t[0]) && is_atomic (t[1]) &&
+         is_quoted (t[0]->label) && is_quoted (t[1]->label);
+}
+
 void
 load_user_preferences () {
   url prefs_file= "$TEXMACS_HOME_PATH/system/preferences.scm";
@@ -71,11 +79,12 @@ load_user_preferences () {
   tree p (TUPLE);
   if (!load_string (prefs_file, s, false))
     p= block_to_scheme_tree (s);
-  while (is_func (p, TUPLE, 1)) p= p[0];
+  // a list of the pairs in a list of its own (an older format); a file with
+  // a single preference is a list of that pair, which is not unwrapped
+  while (is_func (p, TUPLE, 1) && !is_preference_pair (p[0])) p= p[0];
+  if (is_preference_pair (p)) p= tree (TUPLE, p);
   for (int i=0; i<N(p); i++)
-    if (is_func (p[i], TUPLE, 2) &&
-        is_atomic (p[i][0]) && is_atomic (p[i][1]) &&
-        is_quoted (p[i][0]->label) && is_quoted (p[i][1]->label)) {
+    if (is_preference_pair (p[i])) {
       string var= scm_unquote (p[i][0]->label);
       string val= scm_unquote (p[i][1]->label);
       user_prefs (var)= val;
