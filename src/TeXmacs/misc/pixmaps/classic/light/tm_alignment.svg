@@ -1,13 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A6A6DC"/><stop offset="1" stop-color="#7B7BC2"/></linearGradient></defs>
- <g id="layer1" transform="translate(0,4)">
-  <path id="path5198" transform="translate(0,-4)" d="m1.5 1.5h12.5" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5200" transform="translate(0,-4)" d="m1.5 1.5h12.5" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5202" d="m1.5-0.5h14.5" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5204" d="m1.5 1.5h6.5" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5206" d="m6.5 14.5h12.5" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5208" d="m12 12.5h7" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5210" d="m10 10.5h9" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path5212" transform="translate(0,-4)" d="m0 10 3-3v2h14v-2l3 3-3 3v-2h-14v2z" fill="url(#cg0)"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><path fill="none" stroke="#48484B" stroke-width="1.6" d="M3 4.5H21M6 8H18M3 19.5H21"/><path fill="none" stroke="#48484B" stroke-width="1.6" d="M5 14h14M7.5 11.5 5 14l2.5 2.5M16.5 11.5 19 14l-2.5 2.5"/></g>
 </svg>

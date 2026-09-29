@@ -1,11 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
- <g id="layer1">
-  <path id="path3808" d="m1 14.5h14" fill="#E6E6EA" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path3812" d="m1 1.5h14" fill="#E6E6EA" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6624" d="m3 5.5h10" fill="#E6E6EA" stroke="#9999B3" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6626" d="m3 7.5h10" fill="#E6E6EA" stroke="#9999B3" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6628" d="m3 9.5h10" fill="#E6E6EA" stroke="#9999B3" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6630" d="m8 0-4 4h3v8h-3l4 4 4-4h-3v-8h3z" fill="#EE5145" stroke="#B8B8B8" stroke-width=".5"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><rect fill="#4B4D53" stroke="#D8D8DC" stroke-width="1.6" x="4" y="2.5" width="16" height="19" rx="2"/><rect fill="#A7A392" stroke="#D8D8DC" stroke-width="1.45" x="7" y="6" width="6.5" height="5" rx=".6"/><path fill="none" stroke="#D8D8DC" stroke-width="1.6" d="M16.5 6v12M14.5 8 16.5 6l2 2M14.5 16l2 2 2-2"/><path fill="none" stroke="#D8D8DC" stroke-width="1.45" d="M7 14.5h6.5M7 17.5h6.5"/></g>
 </svg>

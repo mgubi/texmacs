@@ -1,31 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg5078" width="32px" height="32px" version="1.1">
- <g id="layer1" fill="none" stroke-width="2">
-  <path id="path6187" d="m28.009 27h3.9907" stroke="#BEBEC0"/>
-  <path id="path4773" d="m28 5h3.9907" stroke="#BEBEC0"/>
-  <path id="path4775" d="m28 12h3.9907" stroke="#BEBEC0"/>
-  <path id="path4777" d="m28 20h3.9907" stroke="#BEBEC0"/>
-  <path id="path4781" d="M 0.009323,27 4,27" stroke="#BEBEC0"/>
-  <path id="path4783" d="m0 5h3.9907" stroke="#BEBEC0"/>
-  <path id="path4785" d="m0 12h3.9907" stroke="#BEBEC0"/>
-  <path id="path4787" d="m0 20h3.9907" stroke="#BEBEC0"/>
-  <g id="g4797" transform="matrix(0 -1 1 0 0 47.991)" stroke="#BEBEC0">
-   <path id="path4789" d="m19.981 5h-3.9907"/>
-   <path id="path4791" d="m19.991 27h-3.9907"/>
-   <path id="path4793" d="m19.991 20h-3.9907"/>
-   <path id="path4795" d="m19.991 12h-3.9907"/>
-  </g>
-  <g id="g4803" transform="matrix(0 -1 1 0 0 19.991)" stroke="#BEBEC0">
-   <path id="path4805" d="m19.981 5h-3.9907"/>
-   <path id="path4807" d="m19.991 27h-3.9907"/>
-   <path id="path4809" d="m19.991 20h-3.9907"/>
-   <path id="path4811" d="m19.991 12h-3.9907"/>
-  </g>
-  <path id="path4813" d="m28.009 27h3.9907" stroke="#BEBEC0"/>
-  <path id="path4815" d="m28.009 27h3.9907" stroke="#BEBEC0"/>
-  <path id="path4821" d="m4.0023 5h23.995" stroke="#ADADAE"/>
-  <path id="path4254" d="m28 12h-24" stroke="#ADADAE"/>
-  <path id="path4256" d="m28 20h-24" stroke="#ADADAE"/>
-  <path id="path4277" d="m4.0023 27h23.995" stroke="#ADADAE"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="round" stroke-linejoin="round"><rect fill="none" stroke="#D8D8DC" stroke-width="1.4" stroke-dasharray="0 2.2" x="3.5" y="3.5" width="17" height="17"/><path fill="none" stroke="#D8D8DC" stroke-width="1.6" d="M3.5 9.25h17M3.5 14.75h17"/></g>
 </svg>

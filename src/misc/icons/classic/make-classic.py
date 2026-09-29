@@ -561,6 +561,17 @@ def main ():
       os.makedirs (d, exist_ok= True)
       with open (os.path.join (d, "tm_%s.svg" % name), "w") as f:
         f.write (svg (body, PAL[theme], name in FLAT))
+  # the table icons: the modern drawings of the monochrome set, in the
+  # colours of this one (the originals are too dated for this group)
+  tables= {n: b for n, t, b in M["TABLE_ICONS"] + M["TABLE_MORE_ICONS"]}
+  for name, body in tables.items ():
+    if name in drawn or (names and name not in names): continue
+    for theme in ("light", "dark"):
+      d= os.path.join (out, theme)
+      os.makedirs (d, exist_ok= True)
+      with open (os.path.join (d, "tm_%s.svg" % name), "w", encoding= "utf-8") as f:
+        f.write (from_monochrome (M, body, theme))
+  drawn |= set (tables)
   for name in original_names ():
     if name in drawn or (names and name not in names): continue
     src= os.path.join (ORIGINALS, "tm_%s.svg" % name)
