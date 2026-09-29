@@ -46,7 +46,7 @@ def logo(small):
     hw = 3.4 if small else 2.6
     halo = (''.join(f'<rect x="{x}" y="{y}" {pin} fill="{HALO}" stroke="{HALO}" stroke-width="{hw}"/>' for x, y in at)
             + f'<rect {BODY} fill="{HALO}" stroke="{HALO}" stroke-width="{hw + 1.5}"/>')
-    d = sigma(32, 32, 34 if small else 31)
+    d = sigma(32, 32, 31 if small else 28)
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <!-- The logo of TeXmacs Vue, made by misc/icons/vue-logo/make-vue-logo.py:
      the Sigma is the one of TeX Gyre Pagella Bold, mirrored -->
