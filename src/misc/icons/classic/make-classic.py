@@ -72,6 +72,7 @@ MODERN = {
 WHITE, BLACK, TOOLBAR_DARK= "#FFFFFF", "#000000", "#2B2D31"
 INK, INK_DARK= "#2A2A2C", "#E6E6EA"
 GREY_DARK, GREY_MID= "#5E5E62", "#8C8C90"
+RED_STRONG, RED_STRONG_DARK= "#C3342A", "#EE5145"
 LINES= ("line", "khl", "gl", "rl", "brl", "metl", "dkl", "skinl", "bl")
 
 def mix (a, b, t):
@@ -386,7 +387,7 @@ KNOWN= {
   "008000": "g", "009000": "g", "409040": "g", "60a060": "g", "50a050": "g",
   "006000": "gl", "306030": "gl", "408040": "gl",
   "800000": "r", "c04040": "r", "c00000": "r", "de1818": "r", "e61717": "r",
-  "ff0000": "r", "cc0000": "r", "a06060": "r",
+  "ff0000": "r", "cc0000": "r", "a06060": "r", "9f5f5f": "r", "810000": "r",
   "600000": "rl", "8f3636": "rl", "8e3737": "rl", "603030": "rl", "804040": "rl",
   "e0e0ff": "lav", "e8e8ff": "lav", "c0c0e0": "lav",
   "806040": "br", "81553a": "br", "c0a082": "br", "663d19": "brl", "604830": "brl",
@@ -413,6 +414,8 @@ def map_colour (c, kind, theme):
   light= PAL["light"]
   if kind == "stroke" and c in NEUTRAL_LINES:
     col= outline (light, "line")
+  elif c in KNOWN and KNOWN[c] == "r" and kind == "fill":
+    col= RED_STRONG             # small red marks: strong and flat
   elif c in KNOWN:
     col= light[KNOWN[c]]
     if kind == "stroke":
@@ -438,6 +441,7 @@ def map_colour (c, kind, theme):
     if kind == "stroke": col= mix (col, WHITE, .55)
     elif lightness (col[1:]) > .9: col= "#4B4D53"
     elif col == INK: col= INK_DARK
+    elif col == RED_STRONG: col= RED_STRONG_DARK
     elif col == GREY_DARK: col= "#B8B8BC"
     elif col == GREY_MID: col= "#8E8E94"
     elif neutral (c) and lightness (c) < .5: col= mix (col, WHITE, .75)
@@ -457,7 +461,8 @@ def convert (src, theme, flat= False):
     grads= {}
     def grad (m):
       c= m.group (3)
-      if lightness (c[1:].lower ()) > .92 or c in (INK, INK_DARK, GREY_DARK, GREY_MID, "#B8B8BC", "#8E8E94"):
+      if lightness (c[1:].lower ()) > .92 or c in (INK, INK_DARK, GREY_DARK, GREY_MID, "#B8B8BC", "#8E8E94",
+                                                   RED_STRONG, RED_STRONG_DARK):
         return m.group (0)
       if c not in grads: grads[c]= "cg%d" % len (grads)
       return "%s%surl(#%s)" % (m.group (1), m.group (2), grads[c])

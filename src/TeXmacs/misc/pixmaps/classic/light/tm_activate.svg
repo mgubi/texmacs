@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9ACA6"/><stop offset="1" stop-color="#D3847C"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1">
  <g id="layer1" transform="translate(0,4)">
   <path id="path5198" d="m5.3185-1.5 9.331-0.031855" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
   <path id="path5202" d="m4 0.5h12" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
@@ -9,6 +9,6 @@
   <path id="path5210" d="m1 10.5h18" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
   <path id="path5419" transform="translate(0,-4)" d="m4 1.5-2 3 2 3" fill="none" stroke="#0E0E56" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
   <path id="path5929" d="m16-2.5 2 3-2 3" fill="none" stroke="#0E0E56" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path5931" transform="translate(0,-4)" d="m8.5 6v6l-3.4351-0.02741 4.9694 4.9375 4.8738-4.9056-3.4081-0.004445v-6z" fill="url(#cg0)" stroke="#616161" stroke-width=".5"/>
+  <path id="path5931" transform="translate(0,-4)" d="m8.5 6v6l-3.4351-0.02741 4.9694 4.9375 4.8738-4.9056-3.4081-0.004445v-6z" fill="#C3342A" stroke="#616161" stroke-width=".5"/>
  </g>
 </svg>

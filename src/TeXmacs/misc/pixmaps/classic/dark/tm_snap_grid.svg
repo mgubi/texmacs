@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BB9492"/><stop offset="1" stop-color="#976561"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
  <g id="layer1">
   <rect id="rect3905" y="4" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
   <rect id="rect3907" y="11" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
   <rect id="rect3913" transform="rotate(90)" y="-5" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
   <rect id="rect3915" transform="rotate(90)" y="-12" width="16" height="1" fill="#8E8E94" stroke-width="0"/>
-  <path id="path3921" d="m4 1h1v3h3v1h-3v3h-1v-3h-3v-1h3z" fill="url(#cg0)" stroke="#B2A4A3" stroke-linejoin="round" stroke-width=".5"/>
+  <path id="path3921" d="m4 1h1v3h3v1h-3v3h-1v-3h-3v-1h3z" fill="#EE5145" stroke="#B2A4A3" stroke-linejoin="round" stroke-width=".5"/>
  </g>
 </svg>
