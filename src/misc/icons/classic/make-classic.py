@@ -40,7 +40,7 @@
 #   wf wl  white fill, white line (on a coloured sign)
 #   #RRGGBB  a literal colour (paint cards), with the outline
 #   bold   a heavier near-black outline (icons shown small)
-#   tagf tagm tagx  solid dark tag, its light plus and light cross (as the
+#   tagf tagm tagx  solid dark tag, its green plus and red cross (as the
 #          originals); redx redf  red cross (line, fill)
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
@@ -130,8 +130,8 @@ def attributes (cls, p):
   if "bold" in cl: stroke= INK_DARK if dark else INK; width= 1.6
   if "sig" in cl: fill= INK_DARK if dark else INK; stroke= fill; width= 1.1
   if "tagf" in cl: fill= "#8A8A90" if dark else "#58585D"; stroke= "#C6C6CC" if dark else INK
-  if "tagm" in cl: stroke= "#E2F6E4"; width= 2.4
-  if "tagx" in cl: stroke= "#FFD2CD"; width= 2.6
+  if "tagm" in cl: stroke= "#5BD66E"; width= 3
+  if "tagx" in cl: stroke= "#FF5A4E"; width= 3
   if "redx" in cl: stroke= "#FF3B30" if dark else "#E8261B"; width= 2.6
   if "redf" in cl: fill= "#EE5145" if dark else "#D64A3E"; stroke= outline (p, "line")
   for c in cl:
@@ -346,21 +346,21 @@ FOCUS_ICONS = [
  ('camera', 'Take a snapshot',
   '<path class="#5E5E62" d="M8.75 7 9.9 4.9c.25-.45.7-.65 1.2-.65h1.8c.5 0 .95.2 1.2.65L15.25 7z"/><rect class="#5E5E62" x="2" y="6.75" width="20" height="13.5" rx="2.75"/><circle class="#C8C8CC" cx="12" cy="13.5" r="4.6"/><circle class="lav" cx="12" cy="13.5" r="2.6"/><circle class="wf" cx="18.5" cy="9.5" r=".9"/>'),
  ('insert_right', 'Insert',
-  '<g><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+  '<g><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 7v10M5.5 12h10"/></g>'),
  ('delete_right', 'Delete',
-  '<g><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+  '<g><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M6.75 8l7.5 8M14.25 8l-7.5 8"/></g>'),
  ('insert_left', 'Insert',
-  '<g transform="matrix(-1 0 0 1 24 0)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 7v10M5.5 12h10"/></g>'),
  ('delete_left', 'Delete',
-  '<g transform="matrix(-1 0 0 1 24 0)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M6.75 8l7.5 8M14.25 8l-7.5 8"/></g>'),
  ('insert_up', 'Insert',
-  '<g transform="rotate(-90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+  '<g transform="rotate(-90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 7v10M5.5 12h10"/></g>'),
  ('delete_up', 'Delete',
-  '<g transform="rotate(-90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+  '<g transform="rotate(-90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M6.75 8l7.5 8M14.25 8l-7.5 8"/></g>'),
  ('insert_down', 'Insert',
-  '<g transform="rotate(90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+  '<g transform="rotate(90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 7v10M5.5 12h10"/></g>'),
  ('delete_down', 'Delete',
-  '<g transform="rotate(90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+  '<g transform="rotate(90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagx" d="M6.75 8l7.5 8M14.25 8l-7.5 8"/></g>'),
  ('focus_delete', 'Delete',
   '<path class="redf" d="M5 7.25 7.25 5 12 9.75 16.75 5 19 7.25 14.25 12 19 16.75 16.75 19 12 14.25 7.25 19 5 16.75 9.75 12z"/>'),
  ('entry_remove', 'Remove the entry',
