@@ -318,7 +318,7 @@ FOCUS_ICONS = [
  ('theme', 'Theme',
   '<circle class="paper" cx="12" cy="12" r="9"/><path class="ink" d="M12 3a9 9 0 0 1 0 18z"/>'),
  ('show_hidden', 'Show hidden',
-  '<rect class="paper" x="3" y="3" width="18" height="18" rx="1"/><path class="ink" d="M3 3h18L3 21z"/>'),
+  '<rect class="#46464A" x="4.75" y="1.75" width="16.5" height="20.75" rx="1.5"/><path class="wf" d="M8.6 21.75h11.9a.75.75 0 0 0 .75-.75V7.1z"/><path class="#C9C9CE" d="M7.6 22.4 19.6 7.4 1.6 11.9z"/>'),
  ('focus_style', 'Style',
   '<path class="paper" d="M1.75 12S5.5 5 12 5s10.25 7 10.25 7S18.5 19 12 19 1.75 12 1.75 12z"/><circle class="lav" cx="12" cy="12" r="4.25"/><circle class="ink" cx="12" cy="12" r="1.9"/>'),
  ('view', 'View',
