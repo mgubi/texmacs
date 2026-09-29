@@ -38,6 +38,7 @@
 #   ink    letters (emb: thickened)     b     blue (accents), bf: solid blue
 #   ln lnb lng lnr   lines of text: dark, blue, green, red
 #   wf wl  white fill, white line (on a coloured sign)
+#   #RRGGBB  a literal colour (paint cards), with the outline
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
 
@@ -120,6 +121,11 @@ def attributes (cls, p):
       stroke= p[k] if k else (INK_DARK if p["ink"] == "#E6E6EA" else INK); width= LINE
   if "bf" in cl: fill= p["bl"]; stroke= "none"
   if "wf" in cl: fill= WHITE; stroke= "none"
+  for c in cl:
+    if re.match (r"^#[0-9A-Fa-f]{6}$", c):
+      # a literal colour (paint cards): deeper on the dark toolbar
+      fill= c if p["ink"] != "#E6E6EA" else mix (c, TOOLBAR_DARK, .3)
+      stroke= outline (p, "line")
   if "screen" in cl: fill= "#2F3A33" if p["ink"] != "#E6E6EA" else "#1E2420"; stroke= outline (p, "line")
   if "wl" in cl: stroke= WHITE; width= 2.4
   if "ow" in cl: width= 2 * STROKE
@@ -312,6 +318,10 @@ FOCUS_ICONS = [
   '<path class="kh" d="M9.5 17.5h5l.75 3h-6.5z"/><rect class="kh" x="6" y="20" width="12" height="2" rx=".75"/><rect class="kh" x="1.75" y="2.5" width="20.5" height="15.5" rx="2"/><rect class="screen" x="3.75" y="4.5" width="16.5" height="11.5" rx=".75"/><path class="lng" d="M6.25 7.5 9 10.25 6.25 13M10.5 13.25h4.5"/>'),
  ('link', 'Insert a link',
   '<path class="met" fill-rule="evenodd" transform="rotate(45 8.4 8.4)" d="M6.40 3.90h4.00a4.50 4.50 0 0 1 0 9.00h-4.00a4.50 4.50 0 0 1 0 -9.00zM6.40 6.60h4.00a1.80 1.80 0 0 1 0 3.60h-4.00a1.80 1.80 0 0 1 0 -3.60z"/><path class="met" fill-rule="evenodd" transform="rotate(45 15.6 15.6)" d="M13.60 11.10h4.00a4.50 4.50 0 0 1 0 9.00h-4.00a4.50 4.50 0 0 1 0 -9.00zM13.60 13.80h4.00a1.80 1.80 0 0 1 0 3.60h-4.00a1.80 1.80 0 0 1 0 -3.60z"/><path class="met" transform="rotate(45 8.4 8.4)" d="M10.40 3.90a4.50 4.50 0 0 1 0 9.00L10.40 10.20a1.80 1.80 0 0 0 0 -3.60z"/>'),
+ ('animate', 'Animation',
+  '<rect class="#4E4E52" x="3.25" y="1.25" width="17.5" height="21.5" rx="1.5"/><rect class="wf" x="4.3" y="2.6" width="1.7" height="2" rx=".35"/><rect class="wf" x="18" y="2.6" width="1.7" height="2" rx=".35"/><rect class="wf" x="4.3" y="6.2" width="1.7" height="2" rx=".35"/><rect class="wf" x="18" y="6.2" width="1.7" height="2" rx=".35"/><rect class="wf" x="4.3" y="9.8" width="1.7" height="2" rx=".35"/><rect class="wf" x="18" y="9.8" width="1.7" height="2" rx=".35"/><rect class="wf" x="4.3" y="13.4" width="1.7" height="2" rx=".35"/><rect class="wf" x="18" y="13.4" width="1.7" height="2" rx=".35"/><rect class="wf" x="4.3" y="17" width="1.7" height="2" rx=".35"/><rect class="wf" x="18" y="17" width="1.7" height="2" rx=".35"/><rect class="wf" x="4.3" y="20.4" width="1.7" height="2" rx=".35"/><rect class="wf" x="18" y="20.4" width="1.7" height="2" rx=".35"/><rect class="kh" x="7.25" y="2.25" width="9.5" height="6.25" rx=".6"/><rect class="kh" x="7.25" y="8.9" width="9.5" height="6.25" rx=".6"/><rect class="kh" x="7.25" y="15.5" width="9.5" height="6.25" rx=".6"/><path class="#F2C94C" d="M10.25 2.40L11.01 4.35L13.10 4.47L11.49 5.80L12.01 7.83L10.25 6.70L8.49 7.83L9.01 5.80L7.40 4.47L9.49 4.35Z"/><path class="#F2C94C" d="M12.00 9.05L12.76 11.00L14.85 11.12L13.24 12.45L13.76 14.48L12.00 13.35L10.24 14.48L10.76 12.45L9.15 11.12L11.24 11.00Z"/><path class="#F2C94C" d="M13.75 15.65L14.51 17.60L16.60 17.72L14.99 19.05L15.51 21.08L13.75 19.95L11.99 21.08L12.51 19.05L10.90 17.72L12.99 17.60Z"/>'),
+ ('color', 'Select a foreground color',
+  '<rect class="#8FB3F0" x="10.25" y="2.5" width="7.5" height="18" rx="1.5" transform="rotate(0 14 18.5)"/><rect class="#8CCB8E" x="10.25" y="2.5" width="7.5" height="18" rx="1.5" transform="rotate(-15 14 18.5)"/><rect class="#F2CE5B" x="10.25" y="2.5" width="7.5" height="18" rx="1.5" transform="rotate(-30 14 18.5)"/><rect class="#EC8A80" x="10.25" y="2.5" width="7.5" height="18" rx="1.5" transform="rotate(-45 14 18.5)"/><circle class="paper" cx="14" cy="18.5" r="1.6"/>'),
 ]
 ICONS= ICONS + FOCUS_ICONS
 
