@@ -1,3 +1,5 @@
+<img src="src/TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="96" align="right">
+
 # TeXmacs Vue — GNU TeXmacs in the browser
 
 [![WebAssembly](https://github.com/mgubi/texmacs/actions/workflows/wasm.yml/badge.svg?branch=vue_ci)](https://github.com/mgubi/texmacs/actions/workflows/wasm.yml)
