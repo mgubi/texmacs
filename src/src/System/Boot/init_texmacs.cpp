@@ -379,9 +379,10 @@ init_env_vars () {
                        url ("$TEXMACS_PATH/misc/pixmaps/traditional/--x17") |
                        plugin_path ("misc/pixmaps"));
   // The icon set: the original icons ("classical") are those of the path
-  // above; another set, chosen in the preferences, is looked up first
+  // above; another set, chosen in the preferences (by default the
+  // neo-classical one), is looked up first
   if (!pixmap_path_given) {
-    string icon_set= get_user_preference ("icon set", "classical");
+    string icon_set= get_user_preference ("icon set", "neo-classical");
     string icon_dir= "";
     if (icon_set == "monochrome") icon_dir= "monochrome";
     if (icon_set == "neo-classical") icon_dir= "neoclassical";
