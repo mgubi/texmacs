@@ -369,11 +369,21 @@ text in the user defined charset: TeXmacs reads its files synchronously),
 so that TeXmacs never finds a file of its tree missing, nor records it as
 such. The packages are kept in the Cache Storage of the browser.
 
+Some servers compress a package as they send it and cut the range out of
+what they compress: GitHub Pages answers a range with a range of the gzip
+of the package (`content-encoding: gzip`), or 416 beyond its size, when the
+browser accepts gzip (Chrome, Safari; Firefox asks ranges without it). The
+first such answer (or a range which fails) makes `packages.js` fetch whole
+packages instead: the package of the file is fetched at once, which the
+server compresses whole and the browser decodes, and all its files are
+installed.
+
 The boot package is the files TeXmacs opens when it starts
 (`misc/wasm/boot-files.txt`, the list of `?trace-files`: boot, the welcome
 document, a new document with text and a formula) and some whole groups
 read at unforeseeable times (the Scheme code, styles, packages, the metrics
-of the fonts, the icons of the light theme): 15.9 MB, 4.0 MB with brotli.
+of the fonts, the icons of the default set, neoclassical, in the light
+theme): 15.9 MB, 4.0 MB with brotli.
 To make the list again: load the page with `?trace-files`, use it, and
 save `window.tmTrace` (see `build-wasm/trace.txt` of the notes below).
 

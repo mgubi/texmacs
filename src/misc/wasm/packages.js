@@ -69,24 +69,69 @@ var tmPackages = (function () {
     } catch (e) {}
   }
 
-  // the bytes of one file, now: a range of its package (synchronous; the
-  // bytes come as text in the "user defined" charset, the only way for a
-  // synchronous request on the main thread)
-  function fetchNow (node) {
+  // a request now (synchronous; the bytes come as text in the "user
+  // defined" charset, the only way for a synchronous request on the main
+  // thread)
+  function getNow (address, range) {
     var xhr = new XMLHttpRequest ();
-    xhr.open ('GET', url (node.tmPackage.url), false);
-    xhr.setRequestHeader ('Range', 'bytes=' + node.tmOffset + '-' + (node.tmOffset + node.tmSize - 1));
+    xhr.open ('GET', address, false);
+    if (range) xhr.setRequestHeader ('Range', range);
     xhr.overrideMimeType ('text/plain; charset=x-user-defined');
     xhr.send (null);
-    var s = xhr.responseText, from = 0;
-    if (xhr.status === 200) from = node.tmOffset; // the whole package: no ranges
-    else if (xhr.status !== 206) throw new Error ('cannot load ' + node.tmPath + ': ' + xhr.status);
-    var bytes = new Uint8Array (node.tmSize);
-    for (var i = 0; i < node.tmSize; i++) bytes[i] = s.charCodeAt (from + i) & 0xff;
-    stats.onDemand++;
-    stats.onDemandBytes += node.tmSize;
-    console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand (' + node.tmSize + ' bytes)');
+    return xhr;
+  }
+  function textBytes (s, from, n) {
+    var bytes = new Uint8Array (n);
+    for (var i = 0; i < n; i++) bytes[i] = s.charCodeAt (from + i) & 0xff;
     return bytes;
+  }
+
+  // Some servers compress a package as they send it and cut the range out of
+  // what they compress: GitHub Pages answers a range of a package with a
+  // range of its gzip (content-encoding: gzip), or 416 beyond the size of
+  // that. Their ranges are then of no use, and the whole package is fetched
+  // at once (which they compress whole, and the browser decodes).
+  var rangesUseless = false;
+
+  // the bytes of one file, now: a range of its package, or else the whole
+  // package, all of whose files are then installed
+  function fetchNow (node) {
+    var pkg = node.tmPackage;
+    if (!rangesUseless) {
+      try {
+        var xhr = getNow (url (pkg.url), 'bytes=' + node.tmOffset + '-' +
+                                         (node.tmOffset + node.tmSize - 1));
+        var enc = xhr.getResponseHeader ('Content-Encoding');
+        var plain = !enc || enc === 'identity';
+        var s = xhr.responseText;
+        if (xhr.status === 206 && plain && s.length === node.tmSize) {
+          stats.onDemand++;
+          stats.onDemandBytes += node.tmSize;
+          console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand (' + node.tmSize + ' bytes)');
+          return textBytes (s, 0, node.tmSize);
+        }
+        if (xhr.status === 200 && s.length === pkg.size) {
+          // the whole package: no ranges
+          installNow (pkg, textBytes (s, 0, pkg.size));
+          console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand, with its package ' +
+                       pkg.name + ' (the server sends no ranges)');
+          return textBytes (s, node.tmOffset, node.tmSize);
+        }
+        console.warn ('TeXmacs: the ranges of ' + pkg.url + ' are of no use (' + xhr.status +
+                      (plain ? '' : ', ' + enc) + '): the whole packages are fetched');
+      } catch (e) {
+        console.warn ('TeXmacs: a range of ' + pkg.url + ' failed (' + e + '): the whole packages are fetched');
+      }
+      rangesUseless = true;
+    }
+    var all = getNow (url (pkg.url), null);
+    if (all.status !== 200 || all.responseText.length !== pkg.size)
+      throw new Error ('cannot load ' + node.tmPath + ': ' + all.status);
+    var bytes = textBytes (all.responseText, 0, pkg.size);
+    installNow (pkg, bytes);
+    console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand, with its package ' +
+                 pkg.name + ' (' + pkg.size + ' bytes)');
+    return bytes.subarray (node.tmOffset, node.tmOffset + node.tmSize);
   }
 
   function fill (node, bytes) {
@@ -141,9 +186,22 @@ var tmPackages = (function () {
     });
   }
 
+  // a whole package fetched for one of its files (fetchNow): its
+  // placeholders filled at once, and not fetched again in the background
+  function installNow (pkg, bytes) {
+    if (pkg.tmInstalled) return;
+    var nodes = pending[pkg.name];
+    for (var i = 0; i < nodes.length; i++)
+      if (nodes[i].tmPackage) fill (nodes[i], bytes.subarray (nodes[i].tmOffset, nodes[i].tmOffset + nodes[i].tmSize));
+    pending[pkg.name] = [];
+    pkg.tmInstalled = true;
+    stats.loaded++;
+  }
+
   // the bytes of a package into its placeholders (by slices when in the
   // background, so that the page keeps responding)
   async function install (pkg, bytes, slices) {
+    if (pkg.tmInstalled) return;
     var nodes = pending[pkg.name], t = performance.now ();
     for (var i = 0; i < nodes.length; i++) {
       var n = nodes[i];
@@ -154,12 +212,14 @@ var tmPackages = (function () {
       }
     }
     pending[pkg.name] = [];
+    pkg.tmInstalled = true;
     stats.loaded++;
   }
 
   async function background () {
     var rest = manifest.packages.filter (function (p) { return !p.boot; });
     for (var i = 0; i < rest.length; i++) {
+      if (rest[i].tmInstalled) continue; // fetched on demand, whole
       try { await install (rest[i], await fetchPackage (rest[i]), true); }
       catch (e) { console.error ('TeXmacs: package ' + rest[i].name + ': ' + e.message); }
     }
