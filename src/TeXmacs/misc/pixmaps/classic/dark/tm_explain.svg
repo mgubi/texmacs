@@ -8,6 +8,6 @@
   <path id="path3812" transform="translate(0,-4)" d="m4.5 10.5h14.5" fill="#E6E6EA" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linejoin="round"/>
   <path id="path3814" transform="translate(0,-4)" d="m4.5 8.5h14.5" fill="#E6E6EA" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linejoin="round"/>
   <path id="path3816" transform="translate(0,-4)" d="m4.5 6.5h14.5" fill="#E6E6EA" stroke="#ADADAE" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path3820" d="m1-1.5h14v1h-14z" fill="url(#cg0)" stroke="#A5A5D8" stroke-dashoffset=".5" stroke-linejoin="round"/>
+  <path id="path3820" d="m1-1.5h14v1h-14z" fill="url(#cg0)" stroke="#9999B3" stroke-dashoffset=".5" stroke-linejoin="round"/>
  </g>
 </svg>

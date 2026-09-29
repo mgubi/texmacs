@@ -415,14 +415,15 @@ def map_colour (c, kind, theme):
     col= outline (light, "line")
   elif c in KNOWN:
     col= light[KNOWN[c]]
-    if kind == "stroke" and KNOWN[c] in ("kh", "khd", "g", "r", "lav", "br", "skin"):
-      col= mix (col, BLACK, .35)
+    if kind == "stroke":
+      # coloured outlines: a deep tone of their colour
+      col= mix (col, BLACK, .62)
   elif kind == "stroke" and neutral (c):
     # lighter grey lines of the originals (grids, borders, small marks) must
     # still read on the toolbar
     col= "#6E6E72" if lightness (c) < .8 else "#8C8C90"
   elif kind == "stroke":
-    col= mix ("#" + c, BLACK, .12)
+    col= mix ("#" + c, BLACK, .55 if lightness (c) > .4 else .12)
   elif neutral (c) and lightness (c) < .35:
     col= INK                    # letters and symbols: solid ink
   elif neutral (c) and lightness (c) < .6:

@@ -5,9 +5,9 @@
   <path id="path3808" d="m1 12.5h18" fill="#2A2A2C" stroke="#48484B" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
   <path id="path3812" d="m1-0.5h18" fill="#2A2A2C" stroke="#48484B" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
   <path id="path3814" d="m1-2.5h18" fill="#2A2A2C" stroke="#48484B" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6624" d="m5 3.5h10" fill="#2A2A2C" stroke="#3838A9" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6626" d="m5 5.5h10" fill="#2A2A2C" stroke="#3838A9" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6628" d="m5 7.5h10" fill="#2A2A2C" stroke="#3838A9" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-  <path id="path6630" transform="translate(0,-4)" d="m10 2-4 4h3v8h-3l4 4 4-4h-3v-8h3z" fill="url(#cg0)" stroke="#FFFFFF" stroke-width=".5"/>
+  <path id="path6624" d="m5 3.5h10" fill="#2A2A2C" stroke="#1D1D56" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6626" d="m5 5.5h10" fill="#2A2A2C" stroke="#1D1D56" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6628" d="m5 7.5h10" fill="#2A2A2C" stroke="#1D1D56" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6630" transform="translate(0,-4)" d="m10 2-4 4h3v8h-3l4 4 4-4h-3v-8h3z" fill="url(#cg0)" stroke="#616161" stroke-width=".5"/>
  </g>
 </svg>

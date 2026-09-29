@@ -9,7 +9,7 @@
   <path id="path4182" d="m7.5 13.5a0.5 0.5 0 1 1-1 0 0.5 0.5 0 1 1 1 0z" fill="none" stroke="#BEBEC0" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="path4184" d="m2 8a0.5 0.5 0 1 1-1 0 0.5 0.5 0 1 1 1 0z" fill="none" stroke="#BEBEC0" stroke-linecap="round" stroke-linejoin="round"/>
   <path id="path4186" transform="translate(11)" d="m2 8a0.5 0.5 0 1 1-1 0 0.5 0.5 0 1 1 1 0z" fill="none" stroke="#BEBEC0" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="path3921" d="m12 4.5h1v3h3v1h-3v3h-1v-3h-3v-1h3z" fill="url(#cg0)" stroke="#CEB5B3" stroke-linejoin="round" stroke-width=".5"/>
+  <path id="path3921" d="m12 4.5h1v3h3v1h-3v3h-1v-3h-3v-1h3z" fill="url(#cg0)" stroke="#B2A4A3" stroke-linejoin="round" stroke-width=".5"/>
   <path id="path4188" transform="translate(11,5.5)" d="m2 8a0.5 0.5 0 1 1-1 0 0.5 0.5 0 1 1 1 0z" fill="none" stroke="#BEBEC0" stroke-linecap="round" stroke-linejoin="round"/>
  </g>
 </svg>

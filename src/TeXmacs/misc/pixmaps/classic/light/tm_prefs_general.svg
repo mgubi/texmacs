@@ -7,9 +7,9 @@
   <path id="path3854" d="m3.5 17.5v1h19v-1z" fill="none" stroke="#8C8C90"/>
   <path id="path3873" d="m13.5 12.5v10h17v-10z" fill="url(#cg0)" stroke="#8C8C90"/>
   <path id="path3875" d="m13.5 12.5v1h17v-1z" fill="#8C8C90" stroke="#6E6E72"/>
-  <path id="path3887" d="m15 16.5h14" fill="none" stroke="#FFFFFF"/>
-  <path id="path3889" d="m15 18.5h14" fill="none" stroke="#FFFFFF"/>
-  <path id="path3891" d="m15 20.5h14" fill="none" stroke="#FFFFFF"/>
+  <path id="path3887" d="m15 16.5h14" fill="none" stroke="#616161"/>
+  <path id="path3889" d="m15 18.5h14" fill="none" stroke="#616161"/>
+  <path id="path3891" d="m15 20.5h14" fill="none" stroke="#616161"/>
   <path id="path4289" transform="translate(0,-8)" d="m12.5 19.5v12h19v-12z" fill="none" stroke="#48484B"/>
  </g>
 </svg>
