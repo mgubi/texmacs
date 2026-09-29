@@ -1,15 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="32" height="32" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
- <g id="layer1" transform="translate(0,8)" stroke-width="1px">
-  <path id="path3844" transform="translate(0,-8)" d="m2.5 0.5v27h21v-27z" fill="url(#cg0)" stroke="#ADADAE"/>
-  <path id="path3846" transform="translate(0,-8)" d="m3.5 1.5v2h19v-2z" fill="#8E8E94" stroke="#BEBEC0"/>
-  <path id="path3848" d="m3.5-3.5v2h19v-2z" fill="url(#cg0)" stroke="#CBCBCD"/>
-  <path id="path3854" d="m3.5 17.5v1h19v-1z" fill="none" stroke="#CBCBCD"/>
-  <path id="path3873" d="m13.5 12.5v10h17v-10z" fill="url(#cg0)" stroke="#CBCBCD"/>
-  <path id="path3875" d="m13.5 12.5v1h17v-1z" fill="#8E8E94" stroke="#BEBEC0"/>
-  <path id="path3887" d="m15 16.5h14" fill="none" stroke="#B8B8B8"/>
-  <path id="path3889" d="m15 18.5h14" fill="none" stroke="#B8B8B8"/>
-  <path id="path3891" d="m15 20.5h14" fill="none" stroke="#B8B8B8"/>
-  <path id="path4289" transform="translate(0,-8)" d="m12.5 19.5v12h19v-12z" fill="none" stroke="#ADADAE"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><rect fill="#4B4D53" stroke="#E6E6EA" stroke-width="1.6" x="1.5" y="2.5" width="14" height="11" rx="1.2"/><path fill="#737EA8" stroke="#E6E6EA" stroke-width="1.6" d="M2.7 2.5h11.6a1.2 1.2 0 0 1 1.2 1.2V6h-14V3.7a1.2 1.2 0 0 1 1.2-1.2z"/><rect fill="#4B4D53" stroke="#E6E6EA" stroke-width="1.6" x="8.5" y="10" width="14" height="11" rx="1.2"/><path fill="#737EA8" stroke="#E6E6EA" stroke-width="1.6" d="M9.7 10h11.6a1.2 1.2 0 0 1 1.2 1.2V13.5h-14v-2.3a1.2 1.2 0 0 1 1.2-1.2z"/></g></g>
 </svg>

@@ -1,10 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="32" height="32" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3DCC3"/><stop offset="1" stop-color="#CBC3A2"/></linearGradient></defs>
- <g id="layer1" transform="translate(0,8)">
-  <path id="path4094" d="m18.5-6c-3.3137 0-6 2.6863-6 6 0 3.3137 2.6863 6 6 6s6-2.6863 6-6c0-3.3137-2.6863-6-6-6zm0 3c1.6569 0 3 1.3431 3 3s-1.3431 3-3 3-3-1.3431-3-3 1.3431-3 3-3z" fill="url(#cg0)" stroke="#524F41" stroke-linecap="square" stroke-linejoin="round" stroke-width=".75"/>
-  <path id="path4123" transform="translate(0,-8)" d="m14.5 13-7 14 7 3.5 2.5-5-5-2.5 4.5-9z" fill="url(#cg0)" stroke="#524F41" stroke-width=".75"/>
-  <path id="path4125" d="m15.375 20.75-5-2.5v0 0" fill="none" stroke="#524F41" stroke-linecap="square" stroke-width=".75"/>
-  <path id="path4127" d="m16.125 19.25-5-2.5" fill="none" stroke="#524F41" stroke-linecap="square" stroke-width=".75"/>
-  <path id="path4131" transform="translate(0,-8)" d="m15.6 14.95-1.2-0.9 0.85-1.75 1.55 0.25z" fill="url(#cg0)" stroke-width="0"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><circle fill="#EAE3C6" stroke="#2A2A2C" stroke-width="1.6" cx="7" cy="12" r="5.25"/><circle fill="#FFFFFF" stroke="#2A2A2C" stroke-width="1.6" cx="6" cy="12" r="1.6"/><path fill="#EAE3C6" stroke="#2A2A2C" stroke-width="1.6" d="M12 10.5h10v3h-2v3h-3v-3h-2v2h-3z"/></g></g>
 </svg>

@@ -1,9 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg5078" width="32px" height="32px" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B7B3A4"/><stop offset="1" stop-color="#928D79"/></linearGradient></defs>
- <g id="layer1">
-  <path id="path6425" d="m1.5 0.5v23h17v-23z" fill="url(#cg0)" stroke="#ADADAE" stroke-width="1px"/>
-  <path id="path6935" d="m13.5 8.5v23h17v-23z" fill="url(#cg0)" stroke="#ADADAE" stroke-width="1px"/>
-  <path id="path6937" d="m10 6s4.0775-0.55136 6 0c1.5114 0.43346 2.7378 1.1248 3.5 2.5 0.56556 1.0204 0.5 3.5 0.5 3.5h2l-3 4-3-4h2s-0.12732-1.7546-0.5-2.5-0.70943-1.2365-1.5-1.5c-1.8974-0.63246-6 0-6 0z" fill="url(#cg1)" stroke="#B1B0AA" stroke-linejoin="round" stroke-width=".5"/>
-  <path id="path6939" d="m17 26s-4.0775 0.55136-6 0c-1.5114-0.43346-2.7378-1.1248-3.5-2.5-0.56556-1.0204-0.5-3.5-0.5-3.5h-2l3-4 3 4h-2s0.12732 1.7546 0.5 2.5 0.70943 1.2365 1.5 1.5c1.8974 0.63246 6 0 6 0z" fill="url(#cg1)" stroke="#B1B0AA" stroke-linejoin="round" stroke-width=".5"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><rect fill="#4B4D53" stroke="#E6E6EA" stroke-width="1.6" x="1.5" y="2.5" width="10" height="13" rx="1"/><rect fill="#A7A392" stroke="#E6E6EA" stroke-width="1.6" x="12.5" y="8.5" width="10" height="13" rx="1"/><path fill="none" stroke="#60906B" stroke-width="2" d="M5.5 18.5c0 2 1.5 3 3.5 3h1.5M15.5 5.5c0-1.5-1-2.5-3-2.5H11"/><path fill="#60906B" stroke="#E6E6EA" stroke-width="1.6" d="M9.5 19.4 12.4 21.5 9.5 23.6z"/></g></g>
 </svg>

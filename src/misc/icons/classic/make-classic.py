@@ -39,6 +39,7 @@
 #   ln lnb lng lnr   lines of text: dark, blue, green, red
 #   wf wl  white fill, white line (on a coloured sign)
 #   #RRGGBB  a literal colour (paint cards), with the outline
+#   bold   a heavier near-black outline (icons shown small)
 #   tagf tagm  light grey tag and its dark mark; redx redf  red cross (line, fill)
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
@@ -125,6 +126,7 @@ def attributes (cls, p):
   if "bf" in cl: fill= p["bl"]; stroke= "none"
   if "wf" in cl: fill= WHITE; stroke= "none"
   dark= p["ink"] == "#E6E6EA"
+  if "bold" in cl: stroke= INK_DARK if dark else INK; width= 1.6
   if "tagf" in cl: fill= "#C6C6CC" if dark else "#D2D2D7"; stroke= outline (p, "line")
   if "tagm" in cl: stroke= "#2F2F32"; width= 2.4
   if "redx" in cl: stroke= "#FF3B30" if dark else "#E8261B"; width= 2.6
@@ -360,6 +362,16 @@ FOCUS_ICONS = [
   '<path class="redf" d="M5 7.25 7.25 5 12 9.75 16.75 5 19 7.25 14.25 12 19 16.75 16.75 19 12 14.25 7.25 19 5 16.75 9.75 12z"/>'),
  ('entry_remove', 'Remove the entry',
   '<rect class="paper" x="2" y="3" width="17" height="14" rx="1.5"/><path class="b" d="M3.5 3h14A1.5 1.5 0 0 1 19 4.5V7H2V4.5A1.5 1.5 0 0 1 3.5 3z"/><path class="ln thin" d="M4.5 10.5h9M4.5 13.5h6"/><path class="redx" d="M13.5 13.5l8 8M21.5 13.5l-8 8"/>'),
+ ('prefs_general', 'Preferences',
+  '<rect class="paper bold" x="1.5" y="2.5" width="14" height="11" rx="1.2"/><path class="b bold" d="M2.7 2.5h11.6a1.2 1.2 0 0 1 1.2 1.2V6h-14V3.7a1.2 1.2 0 0 1 1.2-1.2z"/><rect class="paper bold" x="8.5" y="10" width="14" height="11" rx="1.2"/><path class="b bold" d="M9.7 10h11.6a1.2 1.2 0 0 1 1.2 1.2V13.5h-14v-2.3a1.2 1.2 0 0 1 1.2-1.2z"/>'),
+ ('prefs_keyboard', 'Preferences',
+  '<rect class="kh bold" x="1.5" y="6.5" width="21" height="13" rx="2"/><rect class="ink nostroke" x="4.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="8.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="12.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="16.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="4.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="8.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="12.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="16.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="6.5" y="16.3" width="11" height="1.9" rx=".5"/>'),
+ ('prefs_convert', 'Preferences',
+  '<rect class="paper bold" x="1.5" y="2.5" width="10" height="13" rx="1"/><rect class="kh bold" x="12.5" y="8.5" width="10" height="13" rx="1"/><path class="lng" d="M5.5 18.5c0 2 1.5 3 3.5 3h1.5M15.5 5.5c0-1.5-1-2.5-3-2.5H11"/><path class="g bold" d="M9.5 19.4 12.4 21.5 9.5 23.6z"/>'),
+ ('prefs_other', 'Preferences',
+  '<path class="met bold" d="M10.16 4.63L10.44 2.12L13.56 2.12L13.84 4.63L15.91 5.49L17.88 3.91L20.09 6.12L18.51 8.09L19.37 10.16L21.88 10.44L21.88 13.56L19.37 13.84L18.51 15.91L20.09 17.88L17.88 20.09L15.91 18.51L13.84 19.37L13.56 21.88L10.44 21.88L10.16 19.37L8.09 18.51L6.12 20.09L3.91 17.88L5.49 15.91L4.63 13.84L2.12 13.56L2.12 10.44L4.63 10.16L5.49 8.09L3.91 6.12L6.12 3.91L8.09 5.49Z"/><circle class="paper bold" cx="12" cy="12" r="3.3"/>'),
+ ('prefs_security', 'Preferences',
+  '<circle class="kh bold" cx="7" cy="12" r="5.25"/><circle class="paper bold" cx="6" cy="12" r="1.6"/><path class="kh bold" d="M12 10.5h10v3h-2v3h-3v-3h-2v2h-3z"/>'),
 ]
 ICONS= ICONS + FOCUS_ICONS
 
@@ -532,6 +544,8 @@ def main ():
                if f.startswith ("tm_") and f.endswith (".png") and "_x" not in f)
   FLAT.update (n for n, t, b in M["FOCUS_ICONS"])
   FLAT.update (n for n, t, b in M["TABLE_MORE_ICONS"])
+  FLAT.update (("prefs_general", "prefs_keyboard", "prefs_convert", "prefs_other",
+                "prefs_security"))
   out= os.path.join ("TeXmacs", "misc", "pixmaps", "classic")
   drawn= set ()
   for name, tip, body in ICONS:
