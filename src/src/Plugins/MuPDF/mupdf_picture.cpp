@@ -14,6 +14,8 @@
 #include "file.hpp"
 #include "image_files.hpp"
 #include "effect.hpp"
+#include "analyze.hpp"
+#include "hashmap.hpp"
 
 /******************************************************************************
 * Protected MuPDF calls (see mupdf_picture.hpp)
@@ -309,6 +311,108 @@ picture raw_load_xpm (url file_name);
 * black, so the files of misc/pixmaps carry their styles inline.
 ******************************************************************************/
 
+// The value of the attribute a of the element starting at the tag t (the
+// text from its '<' to its '>'), "" when it has none
+static string
+svg_attribute (string t, string a) {
+  int i= 0;
+  while (true) {
+    i= search_forwards (a * "=", i, t);
+    if (i < 0) return "";
+    if (i > 0 && (t[i-1] == ' ' || t[i-1] == '\n' || t[i-1] == '\t' ||
+                  t[i-1] == '\r')) break;
+    i++;
+  }
+  i += N(a) + 1;
+  if (i >= N(t) || (t[i] != '"' && t[i] != '\'')) return "";
+  char q= t[i];
+  int j= search_forwards (string (q), i + 1, t);
+  return j < 0 ? string ("") : t (i + 1, j);
+}
+
+// a colour #rgb or #rrggbb as its components (false when it is not one)
+static bool
+svg_hex_color (string c, int& r, int& g, int& b) {
+  c= trim_spaces (c);
+  if (N(c) == 4 && c[0] == '#') c= string ("#") * c(1,2) * c(1,2) *
+                                   c(2,3) * c(2,3) * c(3,4) * c(3,4);
+  if (N(c) != 7 || c[0] != '#') return false;
+  for (int i= 1; i < 7; i++) if (!is_hex_digit (c[i])) return false;
+  r= from_hexadecimal (c (1, 3)); g= from_hexadecimal (c (3, 5)); b= from_hexadecimal (c (5, 7));
+  return true;
+}
+
+// MuPDF does not draw the gradients of SVG: a fill or a stroke with one
+// ("url(#id)") comes out black. The icons of some sets (neoclassical) are
+// shaded with them: each reference to a gradient is replaced by the average
+// of the colours of its stops (those of the gradient it refers to by href,
+// when it has none of its own), which is the colour the shading is made
+// around. Returns s itself when it has no gradient.
+static string
+svg_flatten_gradients (string s) {
+  if (search_forwards ("Gradient", 0, s) < 0) return s;
+  hashmap<string,string> stops_of (""), href_of ("");
+  array<string> ids;
+  int i= 0;
+  while ((i= search_forwards ("Gradient", i, s)) >= 0) {
+    int b= i;
+    while (b > 0 && s[b] != '<') b--;
+    int e= search_forwards (">", i, s);
+    if (e < 0) break;
+    string tag= s (b, e + 1);
+    i= e;
+    if (s[b+1] == '/') continue; // a closing tag
+    string id= svg_attribute (tag, "id");
+    if (id == "") continue;
+    ids << id;
+    string href= svg_attribute (tag, "xlink:href");
+    if (href == "") href= svg_attribute (tag, "href");
+    if (N(href) > 1 && href[0] == '#') href_of (id)= href (1, N(href));
+    if (tag[N(tag)-2] == '/') continue; // no stops of its own
+    int end= search_forwards ("Gradient>", e, s);
+    if (end < 0) end= N(s);
+    string body= s (e, end), cols;
+    int k= 0;
+    while ((k= search_forwards ("<stop", k, body)) >= 0) {
+      int ke= search_forwards (">", k, body);
+      if (ke < 0) break;
+      string st= body (k, ke + 1);
+      string c= svg_attribute (st, "stop-color");
+      if (c == "") {
+        string style= svg_attribute (st, "style");
+        int p= search_forwards ("stop-color:", 0, style);
+        if (p >= 0) {
+          int q= search_forwards (";", p, style);
+          c= style (p + 11, q < 0 ? N(style) : q);
+        }
+      }
+      cols << trim_spaces (c) << " ";
+      k= ke;
+    }
+    stops_of (id)= cols;
+  }
+  for (int n= 0; n < N(ids); n++) {
+    string id= ids[n], cols= stops_of[id];
+    for (int d= 0; d < 8 && cols == "" && href_of->contains (id); d++) {
+      id= href_of[id];
+      cols= stops_of[id];
+    }
+    array<string> l= tokenize (cols, " ");
+    int r= 0, g= 0, b= 0, m= 0;
+    for (int k= 0; k < N(l); k++) {
+      int cr, cg, cb;
+      if (svg_hex_color (l[k], cr, cg, cb)) { r += cr; g += cg; b += cb; m++; }
+    }
+    if (m == 0) continue;
+    string col= "#" * as_hexadecimal (r / m, 2) * as_hexadecimal (g / m, 2) *
+                as_hexadecimal (b / m, 2);
+    s= replace (s, "url(#" * ids[n] * ")", col);
+    s= replace (s, "url('#" * ids[n] * "')", col);
+    s= replace (s, "url(\"#" * ids[n] * "\")", col);
+  }
+  return s;
+}
+
 // Draw u in a box of w x h points, at scale device pixels per point. A side
 // given as zero is taken from the size the file declares; the drawing keeps
 // its proportions and is centered in the box. NULL when the file cannot be
@@ -329,6 +433,19 @@ mupdf_render_svg (url u, int w, int h, int scale) {
   fz_var (pix);
   fz_try (ctx) {
     buf= fz_read_file (ctx, path);
+    {
+      // the gradients as plain colours (see svg_flatten_gradients)
+      unsigned char* data= NULL;
+      size_t len= fz_buffer_storage (ctx, buf, &data);
+      string text ((char*) data, (int) len);
+      string flat= svg_flatten_gradients (text);
+      if (N(flat) != N(text) || flat != text) {
+        fz_drop_buffer (ctx, buf);
+        buf= NULL;
+        c_string cs (flat);
+        buf= fz_new_buffer_from_copied_data (ctx, (const unsigned char*) (char*) cs, N(flat));
+      }
+    }
     list= fz_new_display_list_from_svg (ctx, buf, NULL, NULL, &dw, &dh);
     if (dw <= 0.0f || dh <= 0.0f) fz_throw (ctx, FZ_ERROR_GENERIC, "empty svg");
     // the box: what was asked for, completed with what the file declares
