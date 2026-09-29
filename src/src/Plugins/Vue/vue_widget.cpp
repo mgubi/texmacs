@@ -4500,6 +4500,47 @@ vue_plain_window_widget_rep::do_layout () {
   // before replaying the commands, and painting it again here cost a fill
   // of the whole window per frame (see "Rendering details" in
   // docs/vue-graphics-stack.md)
+  // A dialog, once it has its size, keeps its contents inside: they are
+  // laid out at their own size at least (the children of a container which
+  // clips are not compressed, see clay.h) and scroll when the window is
+  // smaller, as after a resize or on a small page
+  bool scrolled= !popup && !autosize &&
+                 concrete (wid)->type != "vue_texmacs_widget_rep";
+  refit_window= false; // set by a tabs widget which changed tab
+  if (scrolled) {
+    Clay_ElementId my_id= CLAY_ID("plain_window_widget");
+    CLAY(my_id, {
+      .layout= { .sizing= layoutFull },
+      .border= border,
+      .clip= { .horizontal= true, .vertical= true,
+               .childOffset= Clay_GetScrollOffset () }})
+    {
+      CLAY(CLAY_ID("plain_window_contents"), {
+        .layout= {
+          .layoutDirection= CLAY_TOP_TO_BOTTOM,
+          .sizing= layoutExpand }})
+      {
+        concrete (wid)->do_layout ();
+      }
+    }
+    // the size of the window, made from the size of the contents, may be a
+    // pixel short of it (roundings): no scrolling for so little
+    Clay_ScrollContainerData sd= Clay_GetScrollContainerData (my_id);
+    if (sd.found) {
+      const float slack= 2.0f;
+      bool sx= sd.contentDimensions.width  > sd.scrollContainerDimensions.width  + slack;
+      bool sy= sd.contentDimensions.height > sd.scrollContainerDimensions.height + slack;
+      if (!sx) sd.scrollPosition->x= 0;
+      if (!sy) sd.scrollPosition->y= 0;
+      if (sx || sy) {
+        Clay_ScrollContainerData bars= sd;
+        if (!sx) bars.contentDimensions.width = bars.scrollContainerDimensions.width;
+        if (!sy) bars.contentDimensions.height= bars.scrollContainerDimensions.height;
+        scroll_bar (my_id, bars);
+      }
+    }
+  }
+  else
   CLAY(CLAY_ID("plain_window_widget"), {
     .layout= {
       .layoutDirection= CLAY_TOP_TO_BOTTOM,
@@ -4508,16 +4549,15 @@ vue_plain_window_widget_rep::do_layout () {
     .border= border })
   {
      window_autosizing= autosize;
-     refit_window= false;
      concrete (wid)->do_layout ();
      window_autosizing= false;
-     if (refit_window && fits_contents && !autosize) {
-       autosize= true; // from the next pass, see post_layout
-       last_cw= last_ch= -1;
-       layout_again= true;
-     }
-     refit_window= false;
   }
+  if (refit_window && fits_contents && !autosize) {
+    autosize= true; // from the next pass, see post_layout
+    last_cw= last_ch= -1;
+    layout_again= true;
+  }
+  refit_window= false;
   // popup menus are dismissed once one of their buttons has been activated
   if (popup && cancel_popup && win) win->set_visibility (false);
 }
