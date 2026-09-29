@@ -737,7 +737,7 @@
   (pick-background ,gui-make-pick-background))
 
 (tm-define (allow-pattern-colors?)
-  (qt-gui?))
+  (or (qt-gui?) (vue-gui?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra RGB color picker
