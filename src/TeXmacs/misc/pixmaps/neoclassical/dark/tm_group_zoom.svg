@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#AD9B8C"/><stop offset="1" stop-color="#856D59"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A7B39E"/><stop offset="1" stop-color="#7D8D71"/></linearGradient></defs>
+ <g id="layer1" transform="translate(0,4)" stroke="#ADADAE" stroke-linejoin="round">
+  <g id="g7747" transform="matrix(.7 0 0 .7 .8 -1)" opacity=".5" stroke-width="1.5">
+   <path id="path7737" d="m1 12h10v-7h-10z" fill="url(#cg0)"/>
+   <path id="path7741" d="m1 5h10l-5-8z" fill="url(#cg1)"/>
+  </g>
+  <path id="path7743" d="m7.2889 13.998h10.711v-7.4978h-10.711z" fill="url(#cg0)" stroke-width="1.6067"/>
+  <path id="path7745" d="m7.2889 6.5h10.711l-5.3556-8.5689z" fill="url(#cg1)" stroke-width="1.6067"/>
+ </g>
+</svg>

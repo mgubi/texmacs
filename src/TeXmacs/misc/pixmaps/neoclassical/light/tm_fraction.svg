@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8B8FF"/><stop offset="1" stop-color="#9393F0"/></linearGradient></defs>
+ <g id="layer1" transform="translate(0,4)">
+  <path id="path6903" transform="translate(0,-4)" d="m8.5 1.5v5h3v-5z" fill="url(#cg0)" stroke="#1D1D56" stroke-linejoin="round" stroke-width=".5"/>
+  <path id="path6905" d="m8.5 9.5v5h3v-5z" fill="url(#cg0)" stroke="#1D1D56" stroke-linejoin="round" stroke-width=".5"/>
+  <path id="path4745" d="m5.3438 5.25a0.75406 0.75406 0 1 0 0.15625 1.5h9a0.75008 0.75008 0 1 0 0-1.5h-9a0.75008 0.75008 0 0 0-0.15625 0z" color="#000000" fill="#2A2A2C" style="block-progression:tb;text-indent:0;text-transform:none"/>
+ </g>
+</svg>
