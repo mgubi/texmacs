@@ -62,7 +62,14 @@ decode_url (string s) {
   if (s (0, i) == "here") return url (s (i+1, N(s)));
   if (s (0, i) == "default") return url (s (i, N(s)));
 #endif
-  return url_root (s (0, i)) * url_general (s (i+1, N(s)), URL_CLEAN_UNIX);
+  // a URL of the web is made again as its buffer was named: from
+  // "http://host:8080/a.tm" url_general takes the host as it is, while
+  // from "host:8080/a.tm" it took the ":" of the port for the separator of
+  // a list of paths, and the view of the buffer was not found
+  string root= s (0, i);
+  if (root == "http" || root == "https" || root == "ftp")
+    return url_general (root * "://" * s (i+1, N(s)), URL_CLEAN_UNIX);
+  return url_root (root) * url_general (s (i+1, N(s)), URL_CLEAN_UNIX);
 }
 
 url
