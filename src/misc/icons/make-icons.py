@@ -926,8 +926,14 @@ def attributes (cls, p):
 
 FOCUS_SCALE= 1.15     # the focus toolbar shows its icons at 16px: less margin
 
-def svg (body, p, focus= False):
+MAIN_WEIGHT= 0.85      # the main toolbar is drawn with slightly thinner lines
+
+def svg (body, p, focus= False, weight= 1.0):
   body= re.sub (r'class="([^"]*)"', lambda m: attributes (m.group (1), p), body)
+  if weight != 1.0:
+    body= re.sub (r'stroke-width="([0-9.]+)"',
+                  lambda m: 'stroke-width="%g"' % round (float (m.group (1)) * weight, 3),
+                  body)
   if focus:
     body= ('<g transform="translate(12 12) scale(%g) translate(-12 -12)">%s</g>'
            % (FOCUS_SCALE, body))
@@ -961,6 +967,7 @@ def main ():
   out= option (args, "out", os.path.join (pix, "monochrome"))
   names= [a for a in args if not a.startswith ("--")]
   focus= set (n for n, t, b in FOCUS_ICONS)
+  main= set (n for g in GROUPS for n in g)
   for name, tip, body in ICONS:
     if names and name not in names: continue
     for theme in ("light", "dark"):
@@ -968,7 +975,8 @@ def main ():
       d= os.path.join (out, theme)
       os.makedirs (d, exist_ok= True)
       with open (os.path.join (d, "tm_%s.svg" % name), "w") as f:
-        f.write (svg (body, p, name in focus))
+        f.write (svg (body, p, name in focus,
+                      MAIN_WEIGHT if name in main else 1.0))
     if png:
       # PNG fallbacks (for Qt builds without an SVG renderer), next to the
       # SVGs of the set: the bitmaps of pixmaps/modern are the original ones
