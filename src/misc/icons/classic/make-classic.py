@@ -39,6 +39,7 @@
 #   ln lnb lng lnr   lines of text: dark, blue, green, red
 #   wf wl  white fill, white line (on a coloured sign)
 #   #RRGGBB  a literal colour (paint cards), with the outline
+#   tagf tagm  grey tag and its white mark; redx redf  red cross (line, fill)
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
 
@@ -122,6 +123,11 @@ def attributes (cls, p):
       stroke= p[k] if k else (INK_DARK if p["ink"] == "#E6E6EA" else INK); width= LINE
   if "bf" in cl: fill= p["bl"]; stroke= "none"
   if "wf" in cl: fill= WHITE; stroke= "none"
+  dark= p["ink"] == "#E6E6EA"
+  if "tagf" in cl: fill= "#B4B4BA" if dark else "#7E7E84"; stroke= outline (p, "line")
+  if "tagm" in cl: stroke= TOOLBAR_DARK if dark else WHITE; width= 2.4
+  if "redx" in cl: stroke= "#EE5145" if dark else "#D64A3E"; width= 2.6
+  if "redf" in cl: fill= "#EE5145" if dark else "#D64A3E"; stroke= outline (p, "line")
   for c in cl:
     if re.match (r"^#[0-9A-Fa-f]{6}$", c):
       # a literal colour (paint cards): deeper on the dark toolbar
@@ -138,10 +144,12 @@ def attributes (cls, p):
   if stroke != "none": a += ' stroke="%s" stroke-width="%g"' % (stroke, width)
   return a + extra
 
-def svg (body, p):
+FLAT= set ()                # icons drawn without gradients (the focus toolbar)
+
+def svg (body, p, flat= False):
   body= re.sub (r'class="([^"]*)"', lambda m: attributes (m.group (1), p), body)
   defs= ""
-  if SHADING == "soft":
+  if SHADING == "soft" and not flat:
     grads= {}
     def grad (m):
       nonlocal defs
@@ -331,6 +339,26 @@ FOCUS_ICONS = [
   '<g transform="translate(.4 -.9) scale(.74 1.06)"><rect class="#E2F0F4 nostroke" x="2.5" y="4" width="19" height="16" rx="2.2"/><path class="#C9DFB2 nostroke" d="M3.2 14.3c4.2 1.2 10.3 1.3 17.6-.9v4.4a1.5 1.5 0 0 1-1.5 1.5H4.7a1.5 1.5 0 0 1-1.5-1.5z"/><g transform="translate(2.75 4.25) scale(.95 1.05)"><path class="#8E6443 nostroke" d="m4.2143 12.882h1.7857l1.1905-8.8825h-1.1905z"/><path class="#5E8F2F nostroke" d="m6 3.9991s0.5-2.4871 2-3.1089c1.5-0.62178 4.7452-0.96626 4.7452-0.96626s-3.1481 1.519-4.1593 2.2098c-1.0112 0.69077-1.6496 3.0813-1.6496 3.0813z"/><path class="#5E8F2F nostroke" d="m6 3.9991h1.1905s-0.75527-2.2021-1.7857-2.9608c-1.0304-0.75873-4.1667-0.74021-4.1667-0.74021s2.6048 1.5049 3.5389 2.1406c0.93409 0.63574 1.223 1.5605 1.223 1.5605z"/><path class="#5E8F2F nostroke" d="m6 3.9991 0.94564 0.89866s1.5891-0.50081 2.5302-0.34408c0.94112 0.15673 3.2729 1.2427 3.2729 1.2427s-1.6632-2.5305-2.7314-2.8544c-1.0682-0.32391-4.0174 1.0571-4.0174 1.0571z"/><path class="#5E8F2F nostroke" d="m6.723 4.8069 0.46749-0.80781s-2.1923-0.91609-3.3903-0.62137-3.0618 3.1193-3.0618 3.1193 2.5691-1.4465 3.5801-1.6505 2.4044-0.039615 2.4044-0.039615z"/></g><rect class="o" x="2.5" y="4" width="19" height="16" rx="2.2"/></g><path class="#D64A3E" d="M9.5 12 15 6.75v3h8v4.5h-8v3z"/>'),
  ('camera', 'Take a snapshot',
   '<path class="#5E5E62" d="M8.75 7 9.9 4.9c.25-.45.7-.65 1.2-.65h1.8c.5 0 .95.2 1.2.65L15.25 7z"/><rect class="#5E5E62" x="2" y="6.75" width="20" height="13.5" rx="2.75"/><circle class="#C8C8CC" cx="12" cy="13.5" r="4.6"/><circle class="lav" cx="12" cy="13.5" r="2.6"/><circle class="wf" cx="18.5" cy="9.5" r=".9"/>'),
+ ('insert_right', 'Insert',
+  '<g><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+ ('delete_right', 'Delete',
+  '<g><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="redx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+ ('insert_left', 'Insert',
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+ ('delete_left', 'Delete',
+  '<g transform="matrix(-1 0 0 1 24 0)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="redx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+ ('insert_up', 'Insert',
+  '<g transform="rotate(-90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+ ('delete_up', 'Delete',
+  '<g transform="rotate(-90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="redx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+ ('insert_down', 'Insert',
+  '<g transform="rotate(90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="tagm" d="M10.5 8v8M6.5 12h8"/></g>'),
+ ('delete_down', 'Delete',
+  '<g transform="rotate(90 12 12)"><path class="tagf" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path class="redx" d="M7.5 8.5l6 7M13.5 8.5l-6 7"/></g>'),
+ ('focus_delete', 'Delete',
+  '<path class="redf" d="M5 7.25 7.25 5 12 9.75 16.75 5 19 7.25 14.25 12 19 16.75 16.75 19 12 14.25 7.25 19 5 16.75 9.75 12z"/>'),
+ ('entry_remove', 'Remove the entry',
+  '<rect class="paper" x="2" y="3" width="17" height="14" rx="1.5"/><path class="b" d="M3.5 3h14A1.5 1.5 0 0 1 19 4.5V7H2V4.5A1.5 1.5 0 0 1 3.5 3z"/><path class="ln thin" d="M4.5 10.5h9M4.5 13.5h6"/><path class="redx" d="M13.5 13.5l8 8M21.5 13.5l-8 8"/>'),
 ]
 ICONS= ICONS + FOCUS_ICONS
 
@@ -415,7 +443,7 @@ def map_colour (c, kind, theme):
     else: col= mix (col, TOOLBAR_DARK, .35)
   return col.upper ()
 
-def convert (src, theme):
+def convert (src, theme, flat= False):
   s= open (src, encoding= "utf-8").read ()
   def rep (m):
     return "%s%s%s" % (m.group (1), m.group (2),
@@ -424,7 +452,7 @@ def convert (src, theme):
   # outlines are solid (some originals halve them with an opacity)
   s= re.sub (r'\sstroke-opacity="[^"]*"', "", s)
   s= re.sub (r'stroke-opacity:\s*[0-9.]+;?', "", s)
-  if SHADING == "soft":
+  if SHADING == "soft" and not flat:
     grads= {}
     def grad (m):
       c= m.group (3)
@@ -474,6 +502,8 @@ def from_monochrome (M, body, theme):
 
 def main ():
   names= [a for a in sys.argv[1:] if not a.startswith ("--")]
+  M= monochrome_drawings ()
+  FLAT.update (n for n, t, b in M["FOCUS_ICONS"])
   out= os.path.join ("TeXmacs", "misc", "pixmaps", "classic")
   drawn= set ()
   for name, tip, body in ICONS:
@@ -483,17 +513,17 @@ def main ():
       d= os.path.join (out, theme)
       os.makedirs (d, exist_ok= True)
       with open (os.path.join (d, "tm_%s.svg" % name), "w") as f:
-        f.write (svg (body, PAL[theme]))
+        f.write (svg (body, PAL[theme], name in FLAT))
   for name in original_names ():
     if name in drawn or (names and name not in names): continue
     src= os.path.join (ORIGINALS, "tm_%s.svg" % name)
     for theme in ("light", "dark"):
       d= os.path.join (out, theme)
       os.makedirs (d, exist_ok= True)
-      text= open (src, encoding= "utf-8").read () if name in KEEP else convert (src, theme)
+      text= (open (src, encoding= "utf-8").read () if name in KEEP
+             else convert (src, theme, name in FLAT))
       with open (os.path.join (d, "tm_%s.svg" % name), "w", encoding= "utf-8") as f:
         f.write (text)
-  M= monochrome_drawings ()
   done= drawn | set (original_names ())
   for name, tip, body in M["ICONS"]:
     if name in done or (names and name not in names): continue

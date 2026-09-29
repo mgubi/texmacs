@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B39091"/><stop offset="1" stop-color="#8C5F60"/></linearGradient></defs>
- <g id="layer1">
-  <path id="path6243" d="m2.5 13 2 1.5 3.5-5 3.5 5 2-1.5-3.5-5 3.5-5-2-1.5-3.5 5-3.5-5-2 1.5 3.5 5z" fill="url(#cg0)" stroke="#DBB3B0" stroke-width=".5"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><path fill="#EE5145" stroke="#D8D8DC" stroke-width="1" d="M5 7.25 7.25 5 12 9.75 16.75 5 19 7.25 14.25 12 19 16.75 16.75 19 12 14.25 7.25 19 5 16.75 9.75 12z"/></g></g>
 </svg>
