@@ -2422,6 +2422,24 @@ web_open_pdf_s7 (s7_scheme* sc, s7_pointer args) {
   vue_web_open_pdf (path, name);
   return s7_unspecified (sc);
 }
+
+EM_JS (void, vue_web_open_external, (const char* target, int file, const char* name), {
+  if (typeof tmPrint !== 'undefined')
+    tmPrint.external (UTF8ToString (target), !!file, UTF8ToString (name));
+});
+
+// (web-open-external target file? name): a link which TeXmacs leaves to the
+// system (load-external in tm-files.scm), in the browser: a page of the web
+// or a mail address (file? false), or a file of the page, in the viewer of
+// the browser or downloaded under name (misc/wasm/print.js)
+static s7_pointer
+web_open_external_s7 (s7_scheme* sc, s7_pointer args) {
+  const char* target= s7_string (s7_car (args));
+  bool file= s7_boolean (sc, s7_cadr (args));
+  const char* name= s7_string (s7_caddr (args));
+  vue_web_open_external (target, file ? 1 : 0, name);
+  return s7_unspecified (sc);
+}
 #endif
 
 void gui_open (int& argc, char** argv) {
@@ -2433,6 +2451,9 @@ void gui_open (int& argc, char** argv) {
   if (tm_s7 != NULL)
     s7_define_function (tm_s7, "web-open-pdf", web_open_pdf_s7, 2, 0, false,
                         "(web-open-pdf path name): a PDF in a tab of the browser");
+  if (tm_s7 != NULL)
+    s7_define_function (tm_s7, "web-open-external", web_open_external_s7, 3, 0, false,
+                        "(web-open-external target file? name): a link left to the browser");
 #endif
 #ifdef __EMSCRIPTEN__
   {
@@ -3987,9 +4008,26 @@ static void activate_tab (vue_virtual_window_rep* v);
 // a Scheme command from the page (its tests, and its console:
 // _vue_web_scheme (stringToUTF8OnStack ("(...)")) under withStackSave),
 // run by the loop as the delayed commands are
+// The text of a Scheme command in the encoding of TeXmacs: the characters
+// which are not ASCII in Cork, the others as they are (utf8_to_cork makes
+// "<" and ">" symbols of their own: (url->string u) became url-<gtr>string)
+static string
+web_scheme_text (string s) {
+  string r;
+  int i= 0, n= N(s);
+  while (i < n) {
+    if (((unsigned char) s[i]) < 128) { r << s[i]; i++; continue; }
+    int j= i + 1;
+    while (j < n && (((unsigned char) s[j]) & 0xC0) == 0x80) j++;
+    r << utf8_to_cork (s (i, j));
+    i= j;
+  }
+  return r;
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_scheme (const char* cmd) {
-  exec_delayed (scheme_cmd (utf8_to_cork (string (cmd))));
+  exec_delayed (scheme_cmd (web_scheme_text (string (cmd))));
   gui_needs_update= true;
 }
 
