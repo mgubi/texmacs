@@ -115,7 +115,7 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
-  ("icon set" "classical" notify-restart)
+  ("icon set" "neo-classical" notify-restart)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-restart)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
