@@ -127,6 +127,7 @@ def attributes (cls, p):
   if "wf" in cl: fill= WHITE; stroke= "none"
   dark= p["ink"] == "#E6E6EA"
   if "bold" in cl: stroke= INK_DARK if dark else INK; width= 1.6
+  if "sig" in cl: fill= INK_DARK if dark else INK; stroke= fill; width= 1.1
   if "tagf" in cl: fill= "#C6C6CC" if dark else "#D2D2D7"; stroke= outline (p, "line")
   if "tagm" in cl: stroke= "#2F2F32"; width= 2.4
   if "redx" in cl: stroke= "#FF3B30" if dark else "#E8261B"; width= 2.6
@@ -367,11 +368,13 @@ FOCUS_ICONS = [
  ('prefs_keyboard', 'Preferences',
   '<rect class="kh bold" x="1.5" y="6.5" width="21" height="13" rx="2"/><rect class="ink nostroke" x="4.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="8.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="12.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="16.5" y="9.5" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="4.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="8.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="12.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="16.5" y="13" width="2.6" height="2.4" rx=".5"/><rect class="ink nostroke" x="6.5" y="16.3" width="11" height="1.9" rx=".5"/>'),
  ('prefs_convert', 'Preferences',
-  '<rect class="paper bold" x="1.5" y="2.5" width="10" height="13" rx="1"/><rect class="kh bold" x="12.5" y="8.5" width="10" height="13" rx="1"/><path class="lng" d="M5.5 18.5c0 2 1.5 3 3.5 3h1.5M15.5 5.5c0-1.5-1-2.5-3-2.5H11"/><path class="g bold" d="M9.5 19.4 12.4 21.5 9.5 23.6z"/>'),
+  '<rect class="paper bold" x="1.5" y="2.5" width="10" height="13" rx="1"/><rect class="kh bold" x="12.5" y="8.5" width="10" height="13" rx="1"/><path class="g bold" d="M5.5 10.5h7V7l6 5.25-6 5.25V14h-7z"/>'),
  ('prefs_other', 'Preferences',
   '<path class="met bold" d="M10.16 4.63L10.44 2.12L13.56 2.12L13.84 4.63L15.91 5.49L17.88 3.91L20.09 6.12L18.51 8.09L19.37 10.16L21.88 10.44L21.88 13.56L19.37 13.84L18.51 15.91L20.09 17.88L17.88 20.09L15.91 18.51L13.84 19.37L13.56 21.88L10.44 21.88L10.16 19.37L8.09 18.51L6.12 20.09L3.91 17.88L5.49 15.91L4.63 13.84L2.12 13.56L2.12 10.44L4.63 10.16L5.49 8.09L3.91 6.12L6.12 3.91L8.09 5.49Z"/><circle class="paper bold" cx="12" cy="12" r="3.3"/>'),
  ('prefs_security', 'Preferences',
   '<circle class="kh bold" cx="7" cy="12" r="5.25"/><circle class="paper bold" cx="6" cy="12" r="1.6"/><path class="kh bold" d="M12 10.5h10v3h-2v3h-3v-3h-2v2h-3z"/>'),
+ ('math_preferences', 'Preferences for editing mathematical formulas',
+  '<g transform="rotate(45 8 7.5)"><g transform="translate(8 7.5)"><path class="met bold" d="M-1.5-7.4A3.7 3.7 0 1 0 1.5-7.4L1.5-5-1.5-5Z"/><rect class="met bold" x="-1.5" y="-1.8" width="3" height="7.5" rx="1.5"/></g></g><path class="ink sig" d="M23.38 20.26H23.05C22.73 21.24 21.86 22.03 20.75 22.41C20.55 22.47 19.65 22.79 17.74 22.79H12.21L16.72 17.21C16.81 17.09 16.84 17.05 16.84 17C16.84 16.95 16.83 16.93 16.75 16.82L12.52 11.02H17.67C19.15 11.02 22.14 11.11 23.05 13.54H23.38L22.26 10.5H11.48C11.13 10.5 11.12 10.51 11.12 10.92L15.87 17.44L11.25 23.15C11.15 23.28 11.13 23.3 11.13 23.36C11.13 23.5 11.25 23.5 11.48 23.5H22.26Z"/>'),
 ]
 ICONS= ICONS + FOCUS_ICONS
 
@@ -545,7 +548,7 @@ def main ():
   FLAT.update (n for n, t, b in M["FOCUS_ICONS"])
   FLAT.update (n for n, t, b in M["TABLE_MORE_ICONS"])
   FLAT.update (("prefs_general", "prefs_keyboard", "prefs_convert", "prefs_other",
-                "prefs_security"))
+                "prefs_security", "math_preferences"))
   out= os.path.join ("TeXmacs", "misc", "pixmaps", "classic")
   drawn= set ()
   for name, tip, body in ICONS:
