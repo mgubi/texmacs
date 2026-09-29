@@ -15,9 +15,9 @@
   <path id="path4088" d="m14 1v15h1v-15z" fill="#B8B8BC"/>
   <path id="path4090" d="m15 1-15.001 1e-7 5.7783e-4 1h15z" fill="#B8B8BC"/>
   <path id="path4134" d="m15 15h-15l5.7783e-4 1h14.999z" fill="#B8B8BC"/>
-  <path id="path4192" d="m3 4.5h9" fill="url(#radialGradient4200)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path4202" d="m3 6.5h9" fill="url(#radialGradient4204)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path4206" d="m3 10.5h9" fill="url(#radialGradient4208)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
-  <path id="path4210" d="m3 12.5h9" fill="url(#radialGradient4220)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4192" d="m3 4.5h9" fill="#95A697" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4202" d="m3 6.5h9" fill="#95A697" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4206" d="m3 10.5h9" fill="#95A697" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4210" d="m3 12.5h9" fill="#95A697" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
  </g>
 </svg>

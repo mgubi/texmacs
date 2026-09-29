@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A1D6AB"/><stop offset="1" stop-color="#75BA82"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
  <g id="layer1" fill-rule="evenodd">
   <path id="path4181" d="m0 7h5v2h-5z" fill="#8C8C90"/>
-  <path id="path4185" d="m7 9h5v3l4-4-4-4v3h-5z" fill="url(#cg0)"/>
+  <path id="path4185" d="m7 9h5v3l4-4-4-4v3h-5z" fill="#7CC68A"/>
   <path id="path4187" d="m7 5v6h-2v-6z" fill="#8C8C90"/>
  </g>
 </svg>

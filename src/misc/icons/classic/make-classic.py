@@ -473,6 +473,22 @@ def convert (src, theme, flat= False):
                      '</linearGradient>' % (i, mix (c, WHITE, .28), mix (c, BLACK, .06))
                      for c, i in grads.items ())
       s= re.sub (r"(<svg[^>]*>)", lambda m: m.group (1) + "<defs>" + defs + "</defs>", s, count= 1)
+  if flat:
+    # gradients of the originals become the colour of their first stop
+    stops= {}
+    for m in re.finditer (r'<(?:linear|radial)Gradient\b([^>]*)>(.*?)</(?:linear|radial)Gradient>|'
+                          r'<(?:linear|radial)Gradient\b([^>]*)/>', s, re.S):
+      attrs= m.group (1) or m.group (3) or ""
+      gid= re.search (r'\bid="([^"]+)"', attrs)
+      if not gid: continue
+      first= re.search (r'stop-color[=:]"?\s*(#[0-9A-Fa-f]{6})', m.group (2) or "")
+      href= re.search (r'href="#([^"]+)"', attrs)
+      stops[gid.group (1)]= first.group (1) if first else ("@" + href.group (1) if href else None)
+    def solid (gid, depth= 0):
+      v= stops.get (gid)
+      if v and v.startswith ("@") and depth < 4: return solid (v[1:], depth + 1)
+      return v
+    s= re.sub (r'url\(#([^)]+)\)', lambda m: solid (m.group (1)) or m.group (0), s)
   # shapes without a fill are black by default: give the default explicitly
   s= re.sub (r"<svg\b", '<svg fill="%s"' % map_colour ("000000", "fill", theme), s, count= 1)
   return s
@@ -509,7 +525,13 @@ def from_monochrome (M, body, theme):
 def main ():
   names= [a for a in sys.argv[1:] if not a.startswith ("--")]
   M= monochrome_drawings ()
+  # icons of the focus bar: those drawn at 16 pixels in the original set,
+  # the focus toolbar itself, and the table icons which only had bitmaps
+  focus_dir= os.path.join ("TeXmacs", "misc", "pixmaps", "modern", "16x16", "focus")
+  FLAT.update (f[3:-4] for f in os.listdir (focus_dir)
+               if f.startswith ("tm_") and f.endswith (".png") and "_x" not in f)
   FLAT.update (n for n, t, b in M["FOCUS_ICONS"])
+  FLAT.update (n for n, t, b in M["TABLE_MORE_ICONS"])
   out= os.path.join ("TeXmacs", "misc", "pixmaps", "classic")
   drawn= set ()
   for name, tip, body in ICONS:

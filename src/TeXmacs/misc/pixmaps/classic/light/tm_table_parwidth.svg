@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A5A6DC"/><stop offset="1" stop-color="#7A7BC2"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
  <g id="layer1">
   <path id="path3977" d="m0 0.5h16" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
   <path id="path3979" d="m0 2.5h16" fill="none" stroke="#48484B" stroke-linecap="round" stroke-width="1.5"/>
@@ -9,6 +9,6 @@
   <path id="path3989" d="m5.5 5.5v10.5" fill="none" stroke="#6E6E72" stroke-width="1px"/>
   <path id="path3991" d="m10.5 5.5v10.5" fill="none" stroke="#6E6E72" stroke-width="1px"/>
   <path id="path3993" d="m0.5 12.5h15" fill="none" stroke="#6E6E72" stroke-width="1px"/>
-  <path id="path3995" d="m0 15h2v-2h9v3l5-4-5-4v3h-9v-2h-2z" fill="url(#cg0)"/>
+  <path id="path3995" d="m0 15h2v-2h9v3l5-4-5-4v3h-9v-2h-2z" fill="#8283CE"/>
  </g>
 </svg>
