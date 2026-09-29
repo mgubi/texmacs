@@ -367,6 +367,7 @@ init_env_vars () {
                        url ("$TEXMACS_PATH/misc/patterns") |
                        url ("$TEXMACS_PATH/misc/pictures") |
                        plugin_path ("misc/patterns"));
+  bool pixmap_path_given= (get_env ("TEXMACS_PIXMAP_PATH") != "");
   (void) get_env_path ("TEXMACS_PIXMAP_PATH",
 		       url ("$TEXMACS_PATH/misc/pixmaps") |
                        url ("$TEXMACS_HOME_PATH/misc/pixmaps") |
@@ -377,6 +378,18 @@ init_env_vars () {
                        url ("$TEXMACS_PATH/misc/pixmaps/modern/16x16/focus") |
                        url ("$TEXMACS_PATH/misc/pixmaps/traditional/--x17") |
                        plugin_path ("misc/pixmaps"));
+  // The icon set: the original icons ("classical") are those of the path
+  // above; another set, chosen in the preferences, is looked up first
+  if (!pixmap_path_given) {
+    string icon_set= get_user_preference ("icon set", "classical");
+    string icon_dir= "";
+    if (icon_set == "monochrome") icon_dir= "monochrome";
+    if (icon_set == "neo-classical") icon_dir= "neoclassical";
+    if (icon_dir != "")
+      set_env_path ("TEXMACS_PIXMAP_PATH",
+                    url ("$TEXMACS_PATH/misc/pixmaps") * url (icon_dir) |
+                    url_system (get_env ("TEXMACS_PIXMAP_PATH")));
+  }
   (void) get_env_path ("TEXMACS_DIC_PATH",
                        "$TEXMACS_HOME_PATH/langs/natural/dic" |
                        url ("$TEXMACS_PATH/langs/natural/dic") |

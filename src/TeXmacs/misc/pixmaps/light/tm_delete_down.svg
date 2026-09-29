@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
- <g stroke-linecap="round" stroke-linejoin="round"><g transform="translate(12 12) scale(1.15) translate(-12 -12)"><g transform="rotate(90 12 12)"><path fill="#D8D8D8" stroke="#3A3A3C" stroke-width="1.6" d="M4.5 4h8.75l7.5 8-7.5 8H4.5A1.5 1.5 0 0 1 3 18.5v-13A1.5 1.5 0 0 1 4.5 4z"/><path fill="none" stroke="#FF3B30" stroke-width="2.4" d="M7.5 8.75l6 6.5M13.5 8.75l-6 6.5"/></g></g></g>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg id="svg3039" width="16" height="16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+ <metadata id="metadata3044">
+  <rdf:RDF>
+   <cc:Work rdf:about="">
+    <dc:format>image/svg+xml</dc:format>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title/>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <g id="layer1" stroke-width="2">
+  <path id="path3016" transform="matrix(0,1,-1,0,16,0)" d="m3 3v10h6.5l3.5-5-3.5-5z" fill="#808080" stroke="#808080" stroke-linejoin="round"/>
+  <path id="path3786" d="m5.5288 4.5215c0.69722 0.69927 3.0024 3.0113 4.9425 4.957" fill="none" stroke="#f0e0e0"/>
+  <path id="path3788" d="m10.479 4.5288-4.957 4.9425" fill="none" stroke="#f0e0e0"/>
+ </g>
 </svg>

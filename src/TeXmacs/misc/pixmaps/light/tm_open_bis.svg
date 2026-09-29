@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
- <g stroke-linecap="round" stroke-linejoin="round"><path fill="#D8D8D8" stroke="#3A3A3C" stroke-width="1.6" d="M3 6.25c0-.97.78-1.75 1.75-1.75h3.9c.52 0 1.01.23 1.34.63L11.5 6.75h7.75c.97 0 1.75.78 1.75 1.75v9.75c0 .97-.78 1.75-1.75 1.75H4.75C3.78 20 3 19.22 3 18.25z"/><path fill="#D8D8D8" stroke="#3A3A3C" stroke-width="1.6" d="M3 20 5.55 11.3c.14-.47.57-.8 1.06-.8h14.4c.55 0 .94.53.78 1.05L19.4 19.1c-.18.54-.68.9-1.25.9z"/><circle fill="#FFFFFF" cx="17" cy="17" r="6.9"/><circle fill="#3A3A3C" cx="17" cy="17" r="5.75"/><g transform="translate(17 17) scale(1.2) translate(-17.5 -17.5)"><path fill="none" stroke="#FFFFFF" stroke-width="1.7" d="M17.5 20v-4.9M15.3 17.2l2.2-2.2 2.2 2.2"/></g></g>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+<svg id="svg5375" width="24" height="24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+ <metadata id="metadata5380">
+  <rdf:RDF>
+   <cc:Work rdf:about="">
+    <dc:format>image/svg+xml</dc:format>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:title/>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <g id="layer1">
+  <path id="path5937" d="m3 17.5-0.5-9h21v15l-4-8z" fill="#7f8060" stroke="#404030" stroke-linejoin="round" stroke-width="1px"/>
+  <path id="path5939" d="m21.5 22v-20.5h-16v20.5z" fill="#f8f8f8" stroke="#808080" stroke-width="1px"/>
+  <path id="path5935" d="m0.5 12.5 4 11h19l-3.5-11z" fill="#c0c0a0" stroke="#404030" stroke-linejoin="round" stroke-width="1px"/>
+  <path id="path5941" d="m4.5 10.5v-2c0-1 0-2 3-2h1.5v3l6.5-5-6.5-5v3h-1.5c-3 0-7 0.5-7 6v2z" fill="#008000" stroke="#fff"/>
+ </g>
 </svg>

@@ -12,12 +12,13 @@
 # Each icon is drawn once, on a 24x24 grid, in the manner of the macOS
 # symbols; this script writes it, by default in the monochrome variant, with
 # the light and the dark palettes into
-# TeXmacs/misc/pixmaps/{light,dark}/tm_<name>.svg, and the PNG fallbacks
-# (1x, 2x, 4x, from the light version) used by Qt builds without an SVG
-# renderer, next to the existing ones in TeXmacs/misc/pixmaps/modern.
+# TeXmacs/misc/pixmaps/monochrome/{light,dark}/tm_<name>.svg (the icon set
+# "monochrome"; the original icons in pixmaps/{light,dark} and pixmaps/modern
+# are left alone). With --png it also writes PNG renderings to
+# pixmaps/monochrome/png.
 #
 # Usage (from src/): misc/icons/make-icons.py [options] [names...]
-#   --png            also write the PNG fallbacks
+#   --png            also write PNG renderings (1x, 2x, 4x)
 #   --tint=#RRGGBB   tint of the monochrome icons (default: graphite)
 #   --colour         the colour variant instead, with
 #   --accent=#RRGGBB its accent colour (default: the macOS system blue)
@@ -957,7 +958,7 @@ def main ():
   accent= option (args, "accent", ACCENT)
   tint= option (args, "tint", TINT)
   pix= os.path.join ("TeXmacs", "misc", "pixmaps")
-  out= option (args, "out", pix)
+  out= option (args, "out", os.path.join (pix, "monochrome"))
   names= [a for a in args if not a.startswith ("--")]
   focus= set (n for n, t, b in FOCUS_ICONS)
   for name, tip, body in ICONS:
@@ -968,16 +969,16 @@ def main ():
       os.makedirs (d, exist_ok= True)
       with open (os.path.join (d, "tm_%s.svg" % name), "w") as f:
         f.write (svg (body, p, name in focus))
-    if png and out == pix:
-      # PNG fallbacks, at the size of the directory where they already are
-      src= os.path.join (pix, "light", "tm_%s.svg" % name)
-      for d in png_directories (pix, name):
-        base= int (os.path.basename (os.path.dirname (d)).split ("x")[0])
-        for tag, k in (("", 1), ("_x2", 2), ("_x4", 4)):
-          dest= os.path.join (d, "tm_%s%s.png" % (name, tag))
-          size= str (base * k)
-          subprocess.run (["rsvg-convert", "-w", size, "-h", size,
-                           src, "-o", dest], check= True)
+    if png:
+      # PNG fallbacks (for Qt builds without an SVG renderer), next to the
+      # SVGs of the set: the bitmaps of pixmaps/modern are the original ones
+      src= os.path.join (out, "light", "tm_%s.svg" % name)
+      d= os.path.join (out, "png")
+      os.makedirs (d, exist_ok= True)
+      for tag, size in (("", 24), ("_x2", 48), ("_x4", 96)):
+        dest= os.path.join (d, "tm_%s%s.png" % (name, tag))
+        subprocess.run (["rsvg-convert", "-w", str (size), "-h", str (size),
+                         src, "-o", dest], check= True)
 
 if __name__ == "__main__":
   main ()
