@@ -18,7 +18,14 @@ AC_DEFUN([TM_GUI],[
   CONFIG_GUI="X11"
   CONFIG_QTPIPES="no"
 
-  AC_ARG_WITH(gui,[  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, cocoa (or aqua), sdl, vue],
+  AC_ARG_WITH(gui,[  --with-gui=GUI          GUI type selector:
+                            qt     Qt 5/6 with native Qt widgets (default)
+                            qtwk   Qt as platform layer, TeXmacs Widkit widgets
+                            x11    plain X11 with the Widkit widgets
+                            cocoa  native macOS port (also: aqua)
+                            sdl    SDL with the Widkit widgets
+                            vue    SDL3 windows, widgets drawn by Clay,
+                                   MuPDF rendering],
             gui_selector="$withval", gui_selector="qt")
 
   case "$gui_selector" in

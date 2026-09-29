@@ -1665,7 +1665,14 @@ Optional Packages:
   --with-resvg[=DIR]      with resvg support [ARG=auto]
   --with-sdk[=none]       Apple SDK level (i.e 10.6)
   --with-osx[=none]       targeted configuration (i.e 10.6)
-  --with-gui=GUI   GUI type selector: qt (default), qtwk, x11, cocoa (or aqua), sdl, vue
+  --with-gui=GUI          GUI type selector:
+                            qt     Qt 5/6 with native Qt widgets (default)
+                            qtwk   Qt as platform layer, TeXmacs Widkit widgets
+                            x11    plain X11 with the Widkit widgets
+                            cocoa  native macOS port (also: aqua)
+                            sdl    SDL with the Widkit widgets
+                            vue    SDL3 windows, widgets drawn by Clay,
+                                   MuPDF rendering
   --with-qt-find-method=METHOD
                           Method to find Qt (autotroll, autotrollstatic,
                           pkgconfig)
