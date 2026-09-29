@@ -369,8 +369,15 @@ async_eval_system (string c, int& status, string& outbuf,
   return false;
 }
 
+#ifdef __EMSCRIPTEN__
+void web_async_pending (); // the requests of the browser (web_files.cpp)
+#endif
+
 void
 async_eval_pending () {
+#ifdef __EMSCRIPTEN__
+  web_async_pending ();
+#endif
   for (int i=0; i<N(async_busy); )
     if (async_busy[i]->done) {
       async_handle* handle= async_busy[i];

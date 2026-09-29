@@ -189,6 +189,35 @@ and a field which makes the link opening a document (`frame.js`,
 `addressOptions`). While that dialog is open, or text of the page is
 selected, `clipboard.js` leaves the keys to the browser (Cmd+C copies).
 
+## The network
+
+A page runs no program, and what wget and curl do elsewhere is done by the
+browser (`web_files.cpp`): `get_from_web` (documents, pictures, styles and
+files included by a URL, DOI links) with a synchronous `XMLHttpRequest`
+into the temporary file TeXmacs reads; `http_post` and its variants with a
+synchronous request, and `async_http_post` and its variants (LanguageTool,
+the AI tools) with `fetch`, whose answer the main loop takes
+(`async_eval_pending`) and hands to the callback as it does the output of a
+program. The bodies are those curl sends (`--data-binary`,
+`--data-urlencode` with its `name@file`). A failed download is not asked
+for again for ten seconds (loading a document asks for it several times).
+
+- The site has to let the page read its answer (CORS,
+  `Access-Control-Allow-Origin`): raw.githubusercontent.com does,
+  www.texmacs.org does not; the console says so when it is missing.
+- A synchronous request holds the page until the answer comes.
+- The browser does not let the page set some headers (User-Agent).
+- A document whose URL has a port (`http://host:8080/a.tm`) is not opened:
+  the view of its buffer is not found again from its name (the `:` of the
+  port, in `tmfs://view/...`), whatever the interface.
+
+The links which TeXmacs leaves to the system (`load-external`: a page of
+the web, a mail address, a PDF or a picture) go to the browser through
+`web-open-external` (`misc/wasm/print.js`): a page in a new tab, a mail
+address to the mail program, a file of the page in the viewer of the browser
+(PDF, pictures, text) or downloaded. When the browser refuses the tab (too
+long after the click), a notice offers to open it.
+
 ## The clipboard
 
 TeXmacs reads the clipboard synchronously when it pastes; the browser gives
