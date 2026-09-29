@@ -42,8 +42,25 @@ scale them to the density of the window (the check box, the paddings and
 radii of the tabs and of the title bars were not, and were twice too large
 at 1x; `TEXMACS_VUE_DENSITY=1` shows it).
 
+The corners of the fields are rounded by the theme's `radius` (8, i.e. 4
+points; `TEXMACS_VUE_RADIUS` overrides it, 0 makes them square), through
+`ui_corners (k)`: the enums, their arrow and their lists, the choice lists
+and the filtered ones, and the text inputs (drawn by `render`, with a thin
+frame instead of the lowered border of the square ones). The pull-down menus are rounder (`menu_round`, 1.5
+times), and so is the opaque cell of their scroll markers, which lies on
+their corners. The highlights of the titles of the menu bar and of
+the buttons of the tool bars have the radius of the menus and a roomier
+padding; the tabs have rounder tops (16, and 12 for the section tabs). A
+border open at the bottom with rounded top corners (the current tab) is
+drawn as one line along its three sides, not as three strips. The elements
+inside them (the items of the lists) take half of it, and a choice list
+has a small padding so that its items keep off its corners. A rounded
+rectangle is a path filled by MuPDF: about 55 µs against 12 for a square
+one, measured with everything rounded (+0.5 ms a frame of the main
+window, +0.5 ms of the preferences dialog, `TEXMACS_VUE_PROFILE`).
+
 The elements laid out only to be measured (the cells of `aligned_widget`,
-the hidden pages of the tabs, the probes of `extend_widget`) have ids made
+the probes of `extend_widget`) have ids made
 by `probe_id (label, widget, k)`, which hashes the widget and then the index
 into the label as Clay does for the children of an element; they used to be
 packed as `widget * 4096 + k`, which wrapped around and let a probe of one
@@ -81,7 +98,7 @@ entry points of a GUI*.
 | `extend_widget (w, a)` | `w` with the size of the largest of `a` (measured off-screen) | |
 | `division_widget (name, w)` | CSS class names (see the Qt themes in `misc/themes`): `title`/`title-bar` (framed bold bar, rounded top, in the grey of the mode bar, `bar_mode`), `subtitle`, `discrete` (grey), `sections` (segmented bar of buttons, in `bar_mode`), `section-tabs` (row of tabs on a line, inactive tabs grey), `active-section`/`section-active-tab` (transparent wrappers marking the selected entry, which the button draws framed); `plain`/others transparent; bold/grey inherited via `context_style` | |
 | `aligned_widget (lhs, rhs, ...)` | two columns, rows sized from the measured heights of both cells | |
-| `tabs_widget`, `icon_tabs_widget` | tab bar + page area sized to the largest page (hidden pages measured off-screen), framed/rounded look; the icons (20 or 32 px in the preferences) sit in boxes of the largest icon so that all tabs have the same height | |
+| `tabs_widget`, `icon_tabs_widget` | tab bar + page area of the size of the current page, as in Qt: a dialog sized to its contents (`fits_contents`) is sized again when another tab is chosen (`refit_window`, as `QTMTabWidget::resizeOthers`), framed/rounded look; the icons (20 or 32 px in the preferences) sit in boxes of the largest icon so that all tabs have the same height | |
 | `wrapped_widget (w, quit)` | forwards messages; queues `quit` on `SLOT_DESTROY` | |
 | `user_canvas_widget` (scrollable) | clip container with scroll bars, field background; the `style` argument is ignored | |
 | `texmacs_output_widget` → `box_widget_rep` | a typeset box which takes the size of what it typesets (`handle_get_size_hint`), unless it sits in a `resize`, whose pane it fills (`fill_parent`); it paints its own background over the whole of its rectangle. A typeset box (`texmacs-output`): natural size from its size hint, drawn by the core (`tm_button.cpp`) on the field color | |
@@ -89,7 +106,7 @@ entry points of a GUI*.
 | `hsplit_widget`, `vsplit_widget` | draggable divider (8 px at 2x), equal split until moved | |
 | `wait_widget` | "please wait" box in the colours of the balloons | |
 | `ink_widget (cb)` | 600×400 canvas, left drag draws, right click erases | `cb (list of strokes)`, points in pixels y-up (X11 protocol) |
-| `refresh_widget`, `refreshable_widget` | rebuilt on `SLOT_REFRESH` with a matching kind (or `"any"`; a widget of kind `"any"` on every message, as in Qt): `refreshable_widget` calls its `promise<widget>`, `refresh_widget` re-expands the menu named by its widget name, and keeps what it has built by expansion in a cache of its own when `menu_caching` is on (`cache_keys`, `cache_widgets`, as `QTMRefreshWidget::cache`; a single cache for all of them gave one widget to several parents). The messages are numbered when a window takes them (`gui_init_context`: `refresh_serial`, and `refresh_stamps` keeps the number of the last message of each kind) and each widget keeps the number of its last refresh (`stamp`): a widget is stale when a message of its kind came later (`refresh_stale`), so that one which is not laid out in the pass after the message (a hidden panel) is refreshed when it next is, as Qt refreshes every widget alive (`tmSlotRefresh`) | |
+| `refresh_widget`, `refreshable_widget` | rebuilt on `SLOT_REFRESH` with a matching kind (or `"any"`; a widget of kind `"any"` on every message, as in Qt): `refreshable_widget` calls its `promise<widget>`, `refresh_widget` re-expands the menu named by its widget name, and keeps what it has built by expansion in a cache of its own when `menu_caching` is on (`cache_keys`, `cache_widgets`, as `QTMRefreshWidget::cache`; a single cache for all of them gave one widget to several parents). The messages are numbered when a window takes them (`gui_init_context`: `refresh_serial`, and `refresh_stamps` keeps the number of the last message of each kind) and each widget keeps the number of its last refresh (`stamp`): a widget is stale when a message of its kind came later (`refresh_stale`), so that one which is not laid out in the pass after the message (a hidden panel) is refreshed when it next is, as Qt refreshes every widget alive (`tmSlotRefresh`). Both grow along an axis when their contents do (a column ending with a vertical glue fills the height of its row) | |
 | `printer_widget (cmd, file)` | printer (the spooler's list from `lpstat -a`, or the default), copies, pages, and the paper size, two-sided and color options of the chosen printer (`lpoptions -l`, rebuilt when the printer changes), assembled into `lpr -P -# -o page-ranges -o Key=value`; Print / Cancel | `cmd ()` after printing or cancelling |
 | `color_picker_widget (cmd, bg, proposals)` | swatch grids of 12x12 px cells, eight per row (the proposals, then 28 named colours); the `bg` flag is ignored and neither patterns nor background images are offered, unlike the Qt picker | `cmd (tree color)`, Cancel `cmd (#f)` |
 | `popup_widget (w)` | transparent container; ignores `SLOT_MOUSE_GRAB` | |

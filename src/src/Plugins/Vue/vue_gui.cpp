@@ -1105,6 +1105,33 @@ render_clay_commands (renderer ren, Clay_RenderCommandArray *rcommands)
         color c= rgb_color (config->color.r, config->color.g, config->color.b, config->color.a);
         Clay_BorderWidth bw= config->width;
         bool uniform= (bw.left == bw.right && bw.top == bw.bottom && bw.left == bw.top);
+        if (!uniform && bw.bottom == 0 && bw.left > 0 &&
+            bw.left == bw.top && bw.top == bw.right &&
+            (config->cornerRadius.topLeft > 0 || config->cornerRadius.topRight > 0)) {
+          // open at the bottom with rounded top corners (the current tab,
+          // which merges with the page below): one line along the left
+          // side, the top corners and the right side, on the pixels inside
+          SI px= ren->pixel, w= bw.top * px, h= w / 2;
+          SI x1= r->x1 + h, x2= r->x2 - h, y1= r->y1, y2= r->y2 - h;
+          SI rmax= min (x2 - x1, y2 - y1) / 2;
+          SI rl= min ((SI) (config->cornerRadius.topLeft  * px), rmax);
+          SI rr= min ((SI) (config->cornerRadius.topRight * px), rmax);
+          array<SI> xs, ys;
+          xs << x1; ys << y1;
+          const int steps= 8; // each corner as a polyline of 8 segments
+          for (int i= 0; i <= steps; i++) {
+            double t= (M_PI / 2) * i / steps; // from the left side to the top
+            xs << (SI) (x1 + rl - rl * cos (t)); ys << (SI) (y2 - rl + rl * sin (t));
+          }
+          for (int i= 0; i <= steps; i++) {
+            double t= (M_PI / 2) * i / steps; // from the top to the right side
+            xs << (SI) (x2 - rr + rr * sin (t)); ys << (SI) (y2 - rr + rr * cos (t));
+          }
+          xs << x2; ys << y1;
+          ren->set_pencil (pencil (c, w, cap_flat, join_round));
+          ren->lines (xs, ys);
+          break;
+        }
         if (!uniform) {
           // some sides only (the line under a bar, a separator): each side
           // is a filled strip of its own width, no outline, no corners
@@ -1508,6 +1535,7 @@ vue_virtual_window_rep::~vue_virtual_window_rep () {
   if (pointer_hover == this) pointer_hover= NULL;
   if (pointer_capture == this) pointer_capture= NULL;
   if (drag_win == this) drag_win= NULL;
+  if (focused_virtual == this) focus_virtual (NULL);
   if (resize_win == this) resize_win= NULL;
   array<vue_virtual_window_rep*> rest;
   for (int i= 0; i < N(virtual_windows); i++)

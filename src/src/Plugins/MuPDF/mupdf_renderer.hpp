@@ -72,6 +72,7 @@ protected:
   void end_text ();
 
   void select_line_width (SI w);
+  void restored_state ();
   void select_stroke_color (color c);
   void select_fill_color (color c);
   void select_alpha (int a);
