@@ -544,8 +544,39 @@
                 (load-buffer-check-permissions name opts)))))
       (load-buffer-check-permissions name opts)))
 
+;; A document at an address with a port (http://host:8080/a.tm) cannot be
+;; opened: the view of its buffer is not found again from its name (the ":"
+;; of the port, in tmfs://view/...), and TeXmacs stopped with "no active
+;; view". The user is told so instead.
+(define (url-with-port? name)
+  (let* ((u (if (string? name) (string->url name) name))
+         (s (url->string u))
+         (i (string-search-forwards "://" 0 s)))
+    (and (url-rooted-web? u) (>= i 0)
+         (let* ((rest (substring s (+ i 3) (string-length s)))
+                (j (string-search-forwards "/" 0 rest))
+                (host (if (>= j 0) (substring rest 0 j) rest)))
+           (>= (string-search-forwards ":" 0 host) 0)))))
+
+(tm-widget ((url-with-port-dialogue name) cmd)
+  (padded
+    (text "TeXmacs cannot open a document at an address with a port:")
+    (centered (text (url->string (if (string? name) (string->url name) name))))
+    ===
+    (text "Download the document, and open the copy instead.")
+    ===
+    (bottom-buttons
+      >>
+      ("Ok" (cmd "Ok"))
+      >>)))
+
 (tm-define (load-buffer-main name . opts)
   ;;(display* "load-buffer-main " name ", " opts "\n")
+  (if (url-with-port? name)
+      (dialogue-window (url-with-port-dialogue name) noop "Cannot open document")
+      (apply load-buffer-main-sub (cons name opts))))
+
+(define (load-buffer-main-sub name . opts)
   (if (and (not (url-exists? name))
            (url-exists? (url-append "$TEXMACS_FILE_PATH" name)))
       (set! name (url-resolve (url-append "$TEXMACS_FILE_PATH" name) "f")))

@@ -209,7 +209,9 @@ for again for ten seconds (loading a document asks for it several times).
 - The browser does not let the page set some headers (User-Agent).
 - A document whose URL has a port (`http://host:8080/a.tm`) is not opened:
   the view of its buffer is not found again from its name (the `:` of the
-  port, in `tmfs://view/...`), whatever the interface.
+  port, in `tmfs://view/...`), whatever the interface, and TeXmacs stopped
+  ("no active view"). `load-buffer-main` (`tm-files.scm`) now says so in a
+  dialog and loads nothing.
 
 The links which TeXmacs leaves to the system (`load-external`: a page of
 the web, a mail address, a PDF or a picture) go to the browser through
