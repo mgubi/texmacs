@@ -115,11 +115,12 @@ def attributes (cls, p):
   if "rs" in cl: stroke= p["r"]
   if "emb" in cl: stroke= p["ink"]; width= 0.6
   if "nostroke" in cl: stroke= "none"
-  for c, k in (("ln", None), ("lnb", "bl"), ("lng", "gl"), ("lnr", "rl")):
+  for c, k in (("ln", None), ("lnb", "bl"), ("lng", "g"), ("lnr", "rl")):
     if c in cl:
       stroke= p[k] if k else (INK_DARK if p["ink"] == "#E6E6EA" else INK); width= LINE
   if "bf" in cl: fill= p["bl"]; stroke= "none"
   if "wf" in cl: fill= WHITE; stroke= "none"
+  if "screen" in cl: fill= "#2F3A33" if p["ink"] != "#E6E6EA" else "#1E2420"; stroke= outline (p, "line")
   if "wl" in cl: stroke= WHITE; width= 2.4
   if "ow" in cl: width= 2 * STROKE
   if "dash" in cl: stroke= p["ink"]; extra= ' stroke-dasharray="2 1.6"'
@@ -307,6 +308,8 @@ FOCUS_ICONS = [
   '<path class="dk" d="M6 11V7.5a6 6 0 0 1 12 0V11h-3V7.5a3 3 0 0 0-6 0V11z"/><rect class="r" x="2.5" y="10" width="19" height="12" rx="1.5"/><circle class="ink" cx="12" cy="16" r="1.75"/>'),
  ('lock_open', 'Unlocked',
   '<path class="dk" d="M6 11V7.5a6 6 0 0 1 11.6-2.2l-2.8 1.1A3 3 0 0 0 9 7.5V11z"/><rect class="g" x="2.5" y="10" width="19" height="12" rx="1.5"/><circle class="ink" cx="12" cy="16" r="1.75"/>'),
+ ('shell', 'Start an interactive session',
+  '<path class="kh" d="M9.5 17.5h5l.75 3h-6.5z"/><rect class="kh" x="6" y="20" width="12" height="2" rx=".75"/><rect class="kh" x="1.75" y="2.5" width="20.5" height="15.5" rx="2"/><rect class="screen" x="3.75" y="4.5" width="16.5" height="11.5" rx=".75"/><path class="lng" d="M6.25 7.5 9 10.25 6.25 13M10.5 13.25h4.5"/>'),
 ]
 ICONS= ICONS + FOCUS_ICONS
 
