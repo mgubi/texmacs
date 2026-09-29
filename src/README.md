@@ -1,6 +1,9 @@
 > ## <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="36" align="top"> Branch `wip_wasm_vue` — TeXmacs in the browser (TeXmacs Vue)
 >
-> **Try it: <https://mgubi.github.io/texmacs/>** (experimental)
+> **Try it: <https://mgubi.github.io/texmacs/>** (experimental). Issues
+> of this port which cannot be reproduced in the official TeXmacs
+> distribution go to the [issue page](https://github.com/mgubi/texmacs/issues)
+> of this repository, not to the TeXmacs project.
 >
 > Work in progress: TeXmacs compiled to WebAssembly and running in a web
 > page, an experimental port called TeXmacs Vue, with OpenType fonts

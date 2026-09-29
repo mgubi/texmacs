@@ -21,6 +21,11 @@ you download it.
 * **Not yet**: plugins which run programs (a page has no processes), `wss`
   for TeXmacs servers on other machines, resizing the dialogs. Tested in
   Firefox and Safari.
+* **Issues**: a problem of this port which does not happen in the official
+  TeXmacs distribution is to be reported on the
+  [issue page of this repository](https://github.com/mgubi/texmacs/issues),
+  not to the TeXmacs project; the others go to
+  [TeXmacs](https://www.texmacs.org/tmweb/contact/bugs.en.html) as usual.
 * **First visit**: some 11 MB before it starts (the program, and the files
   it needs to boot), the rest in the background; a second visit loads
   nothing.
