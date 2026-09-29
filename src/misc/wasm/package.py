@@ -20,7 +20,8 @@
 # The boot package holds the files TeXmacs opens when it starts (the boot
 # list: see misc/wasm/boot-files.txt and docs/wasm/README.md) and some whole
 # groups which are small and read at unforeseeable times (the Scheme code,
-# the styles, the metrics of the fonts, the icons of the default theme).
+# the styles, the metrics of the fonts, the icons of the default set in the
+# light theme: neoclassical, see init_texmacs.cpp).
 # The other packages, in the order of their loading, follow PACKAGES below.
 
 import gzip, hashlib, json, os, re, subprocess, sys, fnmatch
@@ -30,10 +31,12 @@ EXCLUDE = ['bin', 'plugins/*/bin', 'plugins/*/doc', 'misc/images/windows',
 
 BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/',
                'langs/encoding/', 'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/',
-               'misc/pixmaps/light/']
+               'misc/pixmaps/neoclassical/light/']
 BOOT_FILES = ['fonts/font-database.scm', 'fonts/font-characteristics.scm',
               'fonts/font-features.scm', 'fonts/font-substitutions.scm',
-              'fonts/pdf-font-issues.scm']
+              'fonts/pdf-font-issues.scm',
+              'misc/pixmaps/light/TeXmacs.svg'] # the one icon of light/ which
+                                                # neoclassical/light has not
 
 # the other packages, in the order they are loaded: (name, prefixes); a
 # package larger than CHUNK is split
