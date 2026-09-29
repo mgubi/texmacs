@@ -1708,6 +1708,7 @@ vue_ui_rep::send (slot s, blackbox val) {
 }
 
 void scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t z= 1); // below
+extern "C" Clay_Dimensions vue_clay_min_dimensions (Clay_ElementId id); // clay.c
 
 // The menus behave as those of the Mac: a click on a title of a bar opens
 // its menu, and while it is open the pointer opens the menu of any other
@@ -4292,6 +4293,7 @@ public:
   // contents (a dialog placed before its size was known, see centre_on)
   bool centre_pending;
   SI centre_x, centre_y;
+  float min_cw, min_ch; // smallest size of the contents of a dialog (pixels)
   string title;
   string refresh_kind;
   
@@ -4325,6 +4327,7 @@ vue_plain_window_widget_rep::vue_plain_window_widget_rep (widget _wid, string _n
   autosize= !popup && concrete (wid)->type != "vue_texmacs_widget_rep";
   fits_contents= autosize;
   last_cw= last_ch= -1;
+  min_cw= min_ch= 0;
   quit_sent= false;
   centre_pending= false;
   centre_x= centre_y= 0;
@@ -4500,15 +4503,19 @@ vue_plain_window_widget_rep::do_layout () {
   // before replaying the commands, and painting it again here cost a fill
   // of the whole window per frame (see "Rendering details" in
   // docs/vue-graphics-stack.md)
-  // A dialog, once it has its size, keeps its contents inside: they are
-  // laid out at their own size at least (the children of a container which
-  // clips are not compressed, see clay.h) and scroll when the window is
-  // smaller, as after a resize or on a small page
+  // A dialog, once it has its size, keeps its contents inside. They take
+  // the size of the window, and shrink with it as far as they can: down to
+  // the smallest size Clay finds for them (min_cw, min_ch, measured on
+  // plain_window_probe, which is not bound, see post_layout). In a window
+  // smaller than that they keep that size and scroll (the children of a
+  // container which clips are not compressed, see clay.h), as after a
+  // resize or on a small page.
   bool scrolled= !popup && !autosize &&
                  concrete (wid)->type != "vue_texmacs_widget_rep";
   refit_window= false; // set by a tabs widget which changed tab
   if (scrolled) {
     Clay_ElementId my_id= CLAY_ID("plain_window_widget");
+    float ww= (win != NULL) ? win->layout_w : 0, wh= (win != NULL) ? win->layout_h : 0;
     CLAY(my_id, {
       .layout= { .sizing= layoutFull },
       .border= border,
@@ -4517,10 +4524,17 @@ vue_plain_window_widget_rep::do_layout () {
     {
       CLAY(CLAY_ID("plain_window_contents"), {
         .layout= {
-          .layoutDirection= CLAY_TOP_TO_BOTTOM,
-          .sizing= layoutExpand }})
+          .sizing= {
+            .width=  CLAY_SIZING_GROW(.min= min_cw, .max= (float) max (min_cw, ww)),
+            .height= CLAY_SIZING_GROW(.min= min_ch, .max= (float) max (min_ch, wh)) }}})
       {
-        concrete (wid)->do_layout ();
+        CLAY(CLAY_ID("plain_window_probe"), {
+          .layout= {
+            .layoutDirection= CLAY_TOP_TO_BOTTOM,
+            .sizing= layoutExpand }})
+        {
+          concrete (wid)->do_layout ();
+        }
       }
     }
     // the size of the window, made from the size of the contents, may be a
@@ -4604,6 +4618,17 @@ vue_plain_window_widget_rep::post_layout () {
   SI cw= (SI) (el.boundingBox.width  * PIXEL / retina_factor),
      ch= (SI) (el.boundingBox.height * PIXEL / retina_factor);
   if (cw <= 0 || ch <= 0) return false;
+  // the smallest size of the contents of a dialog (see do_layout): laid out
+  // again when it changed
+  if (!(popup || autosize)) {
+    Clay_Dimensions m= vue_clay_min_dimensions (CLAY_ID("plain_window_probe"));
+    if (m.width > 0 && m.height > 0 &&
+        (fabs (m.width - min_cw) > 0.5f || fabs (m.height - min_ch) > 0.5f)) {
+      min_cw= m.width; min_ch= m.height;
+      win->ready_to_show= true;
+      return true;
+    }
+  }
   // the window may be shown once its contents fit in it (see vue_window_rep)
   if (!(popup || autosize)) {
     win->ready_to_show= true;
