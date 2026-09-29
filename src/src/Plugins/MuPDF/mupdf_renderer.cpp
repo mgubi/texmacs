@@ -495,6 +495,7 @@ mupdf_renderer_rep::reset_transformation () {
   fz_context* ctx= mupdf_context ();
   mupdf_protected ("reset_transformation", [&] () { proc->op_Q (ctx, proc); });
   if (transform_level > 0) transform_level--;
+  restored_state ();
 }
 
 /******************************************************************************
@@ -516,6 +517,7 @@ mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
     if (clip_level > 0) {
       mupdf_protected ("set_clipping, restore", [&] () { proc->op_Q (ctx, proc); });
       clip_level--;
+      restored_state ();
     }
     cfn= "";
   }
@@ -770,6 +772,17 @@ mupdf_renderer_rep::select_fill_pattern (brush br) {
   });
   pdf_drop_pattern (ctx, pat); // the processor keeps its own
   select_alpha ((1000*br->get_alpha ())/255);
+}
+
+// A Q brings back the line width of its q, which select_line_width does not
+// know: it would skip setting a width it believes current. Seen with the
+// borders of the Vue widgets, stroked after the clip of their contents was
+// closed: they came out with the width of a line drawn before the clip
+// (several pixels for 1). The pencil in use is made current again.
+void
+mupdf_renderer_rep::restored_state () {
+  current_width= -1.0;
+  select_line_width (lw);
 }
 
 void
