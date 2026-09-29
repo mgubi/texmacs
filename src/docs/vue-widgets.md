@@ -42,6 +42,23 @@ scale them to the density of the window (the check box, the paddings and
 radii of the tabs and of the title bars were not, and were twice too large
 at 1x; `TEXMACS_VUE_DENSITY=1` shows it).
 
+The corners of the fields are rounded by the theme's `radius` (8, i.e. 4
+points; `TEXMACS_VUE_RADIUS` overrides it, 0 makes them square), through
+`ui_corners (k)`: the enums, their arrow and their lists, the choice lists
+and the filtered ones, and the text inputs (drawn by `render`, with a thin
+frame instead of the lowered border of the square ones). The pull-down menus are rounder (`menu_round`, 1.5
+times), and so is the opaque cell of their scroll markers, which lies on
+their corners. The highlights of the titles of the menu bar and of
+the buttons of the tool bars have the radius of the menus and a roomier
+padding; the tabs have rounder tops (16, and 12 for the section tabs). A
+border open at the bottom with rounded top corners (the current tab) is
+drawn as one line along its three sides, not as three strips. The elements
+inside them (the items of the lists) take half of it, and a choice list
+has a small padding so that its items keep off its corners. A rounded
+rectangle is a path filled by MuPDF: about 55 µs against 12 for a square
+one, measured with everything rounded (+0.5 ms a frame of the main
+window, +0.5 ms of the preferences dialog, `TEXMACS_VUE_PROFILE`).
+
 The elements laid out only to be measured (the cells of `aligned_widget`,
 the hidden pages of the tabs, the probes of `extend_widget`) have ids made
 by `probe_id (label, widget, k)`, which hashes the widget and then the index

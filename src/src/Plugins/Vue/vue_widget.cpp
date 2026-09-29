@@ -122,6 +122,16 @@ ui_px (float v) {
   return (uint16_t) (r < 1.0f ? 1.0f : floorf (r + 0.5f));
 }
 
+// the rounded corners of the fields, lists and menus (the theme's radius,
+// by a factor k for the elements inside them, which follow their curve)
+static inline Clay_CornerRadius
+ui_corners (float k= 1.0f) {
+  return CLAY_CORNER_RADIUS (ui_pxf (the_theme.radius * k));
+}
+
+// the pull-down menus are rounder than the fields
+static const float menu_round= 1.5f;
+
 /******************************************************************************
 * Themes
 *
@@ -164,7 +174,8 @@ static const vue_theme vue_theme_light= {
   .balloon_border= {186, 180, 148, 255},
   .pre_edit= {252, 250, 232, 255},
   .pre_edit_line= {120, 120, 180, 255},
-  .cursor= {224, 0, 0, 255}
+  .cursor= {224, 0, 0, 255},
+  .radius= 8
 };
 
 static const vue_theme vue_theme_dark= {
@@ -195,7 +206,8 @@ static const vue_theme vue_theme_dark= {
   .balloon_border= {120, 116, 86, 255},
   .pre_edit= {62, 60, 44, 255},
   .pre_edit_line= {150, 150, 210, 255},
-  .cursor= {255, 96, 96, 255}
+  .cursor= {255, 96, 96, 255},
+  .radius= 8
 };
 
 vue_theme the_theme= vue_theme_light;
@@ -306,6 +318,10 @@ set_vue_theme (string name) {
   else if (name == "light") dark= false;
   else dark= (SDL_GetSystemTheme () == SDL_SYSTEM_THEME_DARK);
   the_theme= dark ? vue_theme_dark : vue_theme_light;
+  // TEXMACS_VUE_RADIUS overrides the rounding of the corners (0: square)
+  string radius= get_env ("TEXMACS_VUE_RADIUS");
+  if (N(radius) > 0 && is_double (radius))
+    the_theme.radius= max (0.0, as_double (radius));
   vue_apply_theme ();
   // the vector icons come in a light and a dark set: the widgets which were
   // built with the other one load theirs again (see icon_picture)
@@ -1187,7 +1203,10 @@ layout_arrow (string glyph, int dir, color c) {
 
 static void
 scroll_markers (Clay_ElementId id, Clay_ScrollContainerData& sd,
-                Clay_Color bg, bool horizontal, int16_t z= 1) {
+                Clay_Color bg, bool horizontal, int16_t z= 1,
+                float radius= 0) {
+  // radius: the corners of a rounded container, which the opaque cell of a
+  // marker, at its edge, follows
   // Clay clamps the position of a scroll container only while it handles a
   // wheel event: a bar or a menu which fits again, because the window was
   // made larger, would stay where it had been scrolled to, with its first
@@ -1249,7 +1268,13 @@ scroll_markers (Clay_ElementId id, Clay_ScrollContainerData& sd,
               ? (Clay_Sizing) { CLAY_SIZING_FIXED(ui_pxf (marker_cell[k])), CLAY_SIZING_GROW(0) }
               : (Clay_Sizing) { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(ui_pxf (marker_cell[k])) },
             .childAlignment= { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER }},
-          .backgroundColor= { bg.r, bg.g, bg.b, marker_fade[k] }})
+          .backgroundColor= { bg.r, bg.g, bg.b, marker_fade[k] },
+          .cornerRadius= (k != 0 || radius <= 0) ? (Clay_CornerRadius) { 0, 0, 0, 0 }
+            : horizontal
+              ? (end == 0 ? (Clay_CornerRadius) { radius, 0, radius, 0 }
+                          : (Clay_CornerRadius) { 0, radius, 0, radius })
+              : (end == 0 ? (Clay_CornerRadius) { radius, radius, 0, 0 }
+                          : (Clay_CornerRadius) { 0, 0, radius, radius }) })
         {
           if (k == 0) {
             int dir= horizontal ? (end == 0 ? 0 : 1) : (end == 0 ? 2 : 3);
@@ -1743,10 +1768,13 @@ layout_pull_button (vue_ui_rep *w) {
   if (!down) note_menu_hover (button_id);
   // the items of vertical menus have the padding of menu_button, but the
   // arrow of a submenu lies in the padding on the right, near the border
-  Clay_Padding padding= CLAY_PADDING_ALL(ui_px (5));
+  // the titles of a menu bar: roomy, with a round highlight
+  Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (6), ui_px (6) };
+  float rad= ui_corners (menu_round).topLeft; // as the menus
   if (!down && button_grow) {
     padding= menu_item_padding ();
     padding.right= 0;
+    rad= ui_pxf (4); // as menu_button
   }
   CLAY(button_id, {
     .layout= {
@@ -1758,7 +1786,8 @@ layout_pull_button (vue_ui_rep *w) {
     // of the main window have different greys, hence highlight_on)
     .backgroundColor= (hot_id == button_id.id || !is_nil (d.cw))
                       ? highlight_on (color_behind)
-                      : (Clay_Color) { 0, 0, 0, 0 } })
+                      : (Clay_Color) { 0, 0, 0, 0 },
+    .cornerRadius= CLAY_CORNER_RADIUS(rad) })
   {
     // items of vertical menus have the column of the check marks
     if (!down && button_grow) layout_mark_column ();
@@ -1895,6 +1924,7 @@ layout_pull_button (vue_ui_rep *w) {
           .sizing= { .width= CLAY_SIZING_FIT(.min= ui_pxf (120), .max= dims.width),
                      .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
+        .cornerRadius= ui_corners (menu_round),
         .clip= { .horizontal= true, .vertical= true,
                  .childOffset= Clay_GetScrollOffset () },
         .border= {
@@ -1930,8 +1960,8 @@ layout_pull_button (vue_ui_rep *w) {
     // the items and over the arrows of the submenus
     Clay_ScrollContainerData sd= Clay_GetScrollContainerData (float_id);
     if (sd.found) {
-      scroll_markers (float_id, sd, color_background, false, 6);
-      scroll_markers (float_id, sd, color_background, true, 6);
+      scroll_markers (float_id, sd, color_background, false, 6, ui_corners (menu_round).topLeft);
+      scroll_markers (float_id, sd, color_background, true, 6, ui_corners (menu_round).topLeft);
     }
   }
   // store back changes
@@ -2423,9 +2453,9 @@ vue_ui_rep::do_layout () {
           Clay_ElementData td= Clay_GetElementData (tab_id);
           CLAY(tab_id, {
             .backgroundColor= bg,
-            .cornerRadius= { ui_pxf (10), ui_pxf (10), 0, 0 },
+            .cornerRadius= { ui_pxf (16), ui_pxf (16), 0, 0 },
             .layout= {
-              .padding= { ui_px (20), ui_px (20), ui_px (cur ? 10 : 8), ui_px (cur ? 10 : 7) },
+              .padding= { ui_px (26), ui_px (26), ui_px (cur ? 13 : 11), ui_px (cur ? 13 : 10) },
               .childGap= ui_px (10),
               .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
             .border= { .width= { 1, 1, 1, (uint16_t) (cur ? 0 : 1) }, .color= color_border }})
@@ -2569,8 +2599,8 @@ vue_ui_rep::do_layout () {
     else if (section_bar == 2) {
       // a tab of a "section-tabs" bar: the active one is framed and merges
       // with the area below (the line of the bar is covered by a strip)
-      padding= { ui_px (12), ui_px (12), ui_px (6), ui_px (6) };
-      radius= { ui_pxf (6), ui_pxf (6), 0, 0 };
+      padding= { ui_px (16), ui_px (16), ui_px (8), ui_px (8) };
+      radius= { ui_pxf (12), ui_pxf (12), 0, 0 };
       if (section_active) {
         bg= palette[3];
         border= { .width= { 1, 1, 1, 0 }, .color= color_border };
@@ -2590,8 +2620,15 @@ vue_ui_rep::do_layout () {
       else if (down) bg= color_pressed;
       else if (hot) bg= highlight_on (color_behind);
     }
-    else if (down || pressed) bg= color_pressed;
-    else if (hot) bg= hl;
+    else {
+      if (!item && !swatch) {
+        // a button of a tool bar: roomier, with a rounder highlight
+        padding= CLAY_PADDING_ALL(ui_px (7));
+        radius= ui_corners (menu_round); // as the menus
+      }
+      if (down || pressed) bg= color_pressed;
+      else if (hot) bg= hl;
+    }
     Clay_ElementData bd= Clay_GetElementData (button_id);
     CLAY(button_id, {
       .layout= {
@@ -2903,6 +2940,7 @@ vue_ui_rep::do_layout () {
                  .childGap= ui_px (4),
                  .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
       .backgroundColor= d.editable ? (Clay_Color) { 0, 0, 0, 0 } : face,
+      .cornerRadius= ui_corners (),
       .border= { .width= { 1, 1, 1, 1 },
                  .color= d.editable ? (Clay_Color) { 0, 0, 0, 0 } : palette[0] }})
     {
@@ -2913,6 +2951,7 @@ vue_ui_rep::do_layout () {
                      .padding= { ui_px (6), ui_px (6), ui_px (4), ui_px (4) },
                      .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
           .backgroundColor= face,
+          .cornerRadius= ui_corners (),
           .border= { .width= { 1, 1, 1, 1 }, .color= palette[0] }})
         {
           layout_arrow ("<#25BE>", 3, inert ? dark_grey : black); // down arrow
@@ -2940,6 +2979,7 @@ vue_ui_rep::do_layout () {
             .sizing= { .width= CLAY_SIZING_FIT (.min= ed.found ? ed.boundingBox.width : 0),
                        .height= CLAY_SIZING_FIT (.max= max_h) }},
           .backgroundColor= color_background,
+          .cornerRadius= ui_corners (),
           .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
           .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
         {
@@ -2950,7 +2990,8 @@ vue_ui_rep::do_layout () {
             CLAY(item_id, {
               .layout= { .padding= { ui_px (8), ui_px (8), ui_px (4), ui_px (4) }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
               .backgroundColor= (hot_id == item_id.id) ? highlight_on (color_background)
-                                : (active ? palette[2] : color_background) })
+                                : (active ? palette[2] : color_background),
+              .cornerRadius= ui_corners (0.5f) })
             {
               layout_text (d.vals[i], d.st, black);
             }
@@ -2976,7 +3017,7 @@ vue_ui_rep::do_layout () {
     }
     if (d.open) {
       Clay_ScrollContainerData ld= Clay_GetScrollContainerData (list_id);
-      if (ld.found) scroll_markers (list_id, ld, color_background, false, 11);
+      if (ld.found) scroll_markers (list_id, ld, color_background, false, 11, ui_corners ().topLeft);
     }
     if (changed) data= close_box (d);
     return;
@@ -3193,7 +3234,10 @@ vue_ui_rep::do_layout () {
         .layoutDirection=  CLAY_TOP_TO_BOTTOM,
         .sizing= { .width= CLAY_SIZING_GROW(0),
                    .height= bounded ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIT(0) },
+        // the items keep off the rounded corners
+        .padding= CLAY_PADDING_ALL (the_theme.radius > 0 ? ui_px (3) : (uint16_t) 0),
         .childGap= ui_px (2) },
+      .cornerRadius= ui_corners (),
       .clip= { .horizontal= bounded, .vertical= bounded,
                .childOffset= bounded ? Clay_GetScrollOffset () : (Clay_Vector2) { 0, 0 } }
     }) {
@@ -3224,7 +3268,8 @@ vue_ui_rep::do_layout () {
         CLAY(item_id, {
           .layout= { .padding= { pad_x, pad_x, pad_y, pad_y },
                      .sizing= { .width= CLAY_SIZING_GROW(0) }},
-          .backgroundColor= bg })
+          .backgroundColor= bg,
+          .cornerRadius= ui_corners (0.5f) })
         {
           color col= active ? theme_color (the_theme.selection_text)
                             : theme_color (the_theme.text);
@@ -3277,6 +3322,7 @@ vue_ui_rep::do_layout () {
           .layoutDirection= CLAY_TOP_TO_BOTTOM,
           .sizing= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(.min= ui_pxf (100)) }},
         .backgroundColor= color_field,
+        .cornerRadius= ui_corners (),
         .border= { .width= { 1, 1, 1, 1 }, .color= color_border },
         .clip= { .horizontal= true, .vertical= true, .childOffset= Clay_GetScrollOffset () }})
       {
@@ -3294,7 +3340,8 @@ vue_ui_rep::do_layout () {
           else if (hot_id == item_id.id) bg= highlight_on (color_field);
           CLAY(item_id, {
             .layout= { .padding= { ui_px (8), ui_px (8), ui_px (2), ui_px (2) }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
-            .backgroundColor= bg })
+            .backgroundColor= bg,
+            .cornerRadius= ui_corners (0.5f) })
           {
             layout_text (d.vals[i], 0, active ? theme_color (the_theme.selection_text)
                                               : theme_color (the_theme.text));
@@ -4049,15 +4096,27 @@ vue_input_text_widget_rep::render (void *data) {
   color bg= greyed ? theme_color (the_theme.shade[1])
           : focused ? theme_color (the_theme.field_focused)
                     : theme_color (the_theme.shade[2]);
-  ren->set_pencil (pencil (bg));
-  ren->fill (r->x1, r->y1, r->x2, r->y2);
-  // the lowered border: darker above and to the left, lighter below
-  ren->set_pencil (pencil (theme_color (the_theme.border)));
-  ren->fill (r->x1, r->y2 - px, r->x2, r->y2);
-  ren->fill (r->x1, r->y1, r->x1 + px, r->y2);
-  ren->set_pencil (pencil (theme_color (the_theme.shade[3])));
-  ren->fill (r->x1, r->y1, r->x2, r->y1 + px);
-  ren->fill (r->x2 - px, r->y1, r->x2, r->y2);
+  SI rad= (SI) (ui_pxf (the_theme.radius) * px);
+  if (rad > 0) {
+    // rounded: the box and a thin frame of the colour of the borders
+    ren->set_pencil (pencil (bg));
+    ren->rounded_rectangle (r->x1, r->y1, r->x2, r->y2, rad, rad, rad, rad, true);
+    ren->set_pencil (pencil (theme_color (the_theme.border), px));
+    SI h= px / 2; // the line on the pixels inside the box
+    ren->rounded_rectangle (r->x1 + h, r->y1 + h, r->x2 - h, r->y2 - h,
+                            rad, rad, rad, rad, false);
+  }
+  else {
+    ren->set_pencil (pencil (bg));
+    ren->fill (r->x1, r->y1, r->x2, r->y2);
+    // the lowered border: darker above and to the left, lighter below
+    ren->set_pencil (pencil (theme_color (the_theme.border)));
+    ren->fill (r->x1, r->y2 - px, r->x2, r->y2);
+    ren->fill (r->x1, r->y1, r->x1 + px, r->y2);
+    ren->set_pencil (pencil (theme_color (the_theme.shade[3])));
+    ren->fill (r->x1, r->y1, r->x2, r->y1 + px);
+    ren->fill (r->x2 - px, r->y1, r->x2, r->y2);
+  }
   // the text, scrolled so that the cursor stays visible (with a margin);
   // what an input method is composing is shown at the cursor, so it is
   // spliced into the string which is drawn and measured

@@ -53,6 +53,8 @@ struct vue_theme {
                                       // is the ordinary text colour)
   Clay_Color pre_edit, pre_edit_line; // the composition of an input method
   Clay_Color cursor;        // the caret of the text inputs
+  float radius;             // the corners of the fields, lists and menus
+                            // (2x device pixels, see ui_px); 0: square
 };
 
 extern vue_theme the_theme;       // the one in use
