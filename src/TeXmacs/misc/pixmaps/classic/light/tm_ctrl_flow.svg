@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient></defs>
+ <g id="layer1" transform="translate(0,4)">
+  <path id="path5277" transform="translate(0,-4)" d="m0 0v20h20v-3h-17v-4h13v2.5l4-4-4-3.5v2.5h-13v-3.5h17v-3h-17v-4z" fill="url(#cg0)"/>
+  <path id="path5279" transform="translate(0,-4)" d="m0-0.5v20.5h20.5v-3h-17.5v-4h13v2.5l4-4-4-3.5v2.5h-13v-3.5h17.5v-3h-17.5v-4.5z" fill="none" stroke="#48484B" stroke-linejoin="round" stroke-width=".5"/>
+ </g>
+</svg>

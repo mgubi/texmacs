@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8F90B4"/><stop offset="1" stop-color="#5E5F8E"/></linearGradient></defs>
+ <g id="layer1">
+  <path id="path4086" d="m2 0v16h1v-16z" fill="url(#cg0)"/>
+  <path id="path4088" d="m13 0v16h1v-16z" fill="url(#cg0)"/>
+  <path id="path4090" d="m15.999 2h-16l5.7783e-4 1 15.999 1e-7z" fill="url(#cg0)"/>
+  <path id="path4100" d="m5 12.5h6" fill="none" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4092" d="m16 12h-16v2h16z" fill="url(#cg1)"/>
+  <path id="path4094" d="m5 6.5h6" fill="none" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4096" d="m5 8.5h6" fill="none" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4098" d="m5 10.5h6" fill="none" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4113" d="m7 0v16h2v-16z" fill="url(#cg1)"/>
+ </g>
+</svg>

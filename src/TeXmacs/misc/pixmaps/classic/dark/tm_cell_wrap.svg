@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient></defs>
+ <defs id="defs3041">
+  <linearGradient id="linearGradient4194">
+   <stop id="stop4196" stop-color="#95A697" offset="0"/>
+   <stop id="stop4198" stop-color="#95A697" stop-opacity="0" offset="1"/>
+  </linearGradient>
+  <radialGradient id="radialGradient4200" cx="8" cy="2.5" r="5.5" gradientTransform="matrix(1 0 0 .090909 0 4.2727)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient4194"/>
+  <radialGradient id="radialGradient4204" cx="8" cy="2.5" r="5.5" gradientTransform="matrix(1 0 0 .090909 0 6.2727)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient4194"/>
+  <radialGradient id="radialGradient4208" cx="8" cy="2.5" r="5.5" gradientTransform="matrix(1 0 0 .090909 0 10.273)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient4194"/>
+  <radialGradient id="radialGradient4220" cx="8" cy="2.5" r="5.5" gradientTransform="matrix(1 0 0 .090909 0 12.273)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient4194"/>
+ </defs>
+ <g id="layer1">
+  <path id="path4086" d="m0 1v15h1v-15z" fill="url(#cg0)"/>
+  <path id="path4088" d="m14 1v15h1v-15z" fill="url(#cg0)"/>
+  <path id="path4090" d="m15 1-15.001 1e-7 5.7783e-4 1h15z" fill="url(#cg0)"/>
+  <path id="path4134" d="m15 15h-15l5.7783e-4 1h14.999z" fill="url(#cg0)"/>
+  <path id="path4192" d="m3 4.5h9" fill="url(#radialGradient4200)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4202" d="m3 6.5h9" fill="url(#radialGradient4204)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4206" d="m3 10.5h9" fill="url(#radialGradient4208)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path4210" d="m3 12.5h9" fill="url(#radialGradient4220)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5"/>
+ </g>
+</svg>

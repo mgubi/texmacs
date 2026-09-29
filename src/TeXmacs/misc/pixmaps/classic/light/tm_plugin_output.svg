@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#383838" xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" width="16" height="16" id="svg3039" version="1.1">
+ <defs id="defs3041">
+  <linearGradient id="linearGradient6140">
+   <stop style="stop-color:#9C9C9C;stop-opacity:1;" offset="0" id="stop6142"/>
+   <stop style="stop-color:#838383;stop-opacity:1;" offset="1" id="stop6144"/>
+  </linearGradient>
+ </defs>
+ <g id="layer1">
+  <path style="fill:none;fill-rule:evenodd;stroke:#48484B;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1" d="m 1,1.5 10,0" id="path5523"/>
+  <path id="path6095" d="m 3,4.5 12,0" style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#7070FF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"/>
+  <path style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#7070FF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 3,6.5 10,0" id="path6097"/>
+  <path id="path6099" d="m 1,9.5 10,0" style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#48484B;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"/>
+  <path style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#7070FF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" d="m 3,12.5 12,0" id="path6101"/>
+  <path id="path6105" d="m 3,14.5 12,0" style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#7070FF;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"/>
+ </g>
+</svg>

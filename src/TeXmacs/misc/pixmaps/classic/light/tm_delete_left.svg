@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8B8B8"/><stop offset="1" stop-color="#939393"/></linearGradient></defs>
+ <g id="layer1" stroke-width="2">
+  <path id="path3016" transform="matrix(-1,0,0,1,16,0)" d="m3 3v10h6.5l3.5-5-3.5-5z" fill="url(#cg0)" stroke="#48484B" stroke-linejoin="round"/>
+  <path id="path3786" d="m11.479 10.471c-0.69927-0.69722-3.0113-3.0024-4.957-4.9425" fill="none" stroke="#F2E3E3"/>
+  <path id="path3788" d="m11.471 5.5215-4.9425 4.957" fill="none" stroke="#F2E3E3"/>
+ </g>
+</svg>

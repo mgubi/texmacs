@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C0BA9E"/><stop offset="1" stop-color="#9E9571"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0EBD6"/><stop offset="1" stop-color="#DCD5BA"/></linearGradient><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A1D6AB"/><stop offset="1" stop-color="#75BA82"/></linearGradient></defs>
+ <g id="layer1">
+  <path id="path5937" d="m3 17.5-0.5-9h21v15l-4-8z" fill="url(#cg0)" stroke="#A89F78" stroke-linejoin="round" stroke-width="1px"/>
+  <path id="path5939" d="m21.5 22v-20.5h-16v20.5z" fill="#FFFFFF" stroke="#48484B" stroke-width="1px"/>
+  <path id="path5935" d="m0.5 12.5 4 11h19l-3.5-11z" fill="url(#cg1)" stroke="#A89F78" stroke-linejoin="round" stroke-width="1px"/>
+  <path id="path5941" d="m4.5 10.5v-2c0-1 0-2 3-2h1.5v3l6.5-5-6.5-5v3h-1.5c-3 0-7 0.5-7 6v2z" fill="url(#cg2)" stroke="#FFFFFF"/>
+ </g>
+</svg>

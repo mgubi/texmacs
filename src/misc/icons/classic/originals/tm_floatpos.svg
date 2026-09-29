@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1">
+ <g id="layer1" transform="translate(0,4)">
+  <path id="path3802" d="m1 14.5h18" fill="none" stroke="#404040" stroke-linecap="round" stroke-width="1.5"/>
+  <path id="path3808" d="m1 12.5h18" fill="#404040" stroke="#404040" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path3812" d="m1-0.5h18" fill="#404040" stroke="#404040" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path3814" d="m1-2.5h18" fill="#404040" stroke="#404040" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6624" d="m5 3.5h10" fill="#404040" stroke="#4040c0" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6626" d="m5 5.5h10" fill="#404040" stroke="#4040c0" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6628" d="m5 7.5h10" fill="#404040" stroke="#4040c0" stroke-dashoffset=".5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+  <path id="path6630" transform="translate(0,-4)" d="m10 2-4 4h3v8h-3l4 4 4-4h-3v-8h3z" fill="#c04040" stroke="#fff" stroke-width=".5"/>
+ </g>
+</svg>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1">
+ <g id="layer1">
+  <path id="path8349" d="m0.5 0.5v23h18v-23z" fill="#fff" fill-opacity=".88889" stroke="#808080" stroke-width="1px"/>
+  <path id="path3084" d="m21.5 23 2-2-4.5-4.5-2 2z" fill="#806040" stroke="#604830" stroke-width="1px"/>
+  <path id="path4048" transform="translate(.5)" d="m19 13.25a5.5 5.25 0 1 1-11 0 5.5 5.25 0 1 1 11 0z" fill="#e0e0ff" fill-opacity=".75362" stroke="#604830" stroke-dashoffset=".5" stroke-linejoin="bevel"/>
+ </g>
+</svg>

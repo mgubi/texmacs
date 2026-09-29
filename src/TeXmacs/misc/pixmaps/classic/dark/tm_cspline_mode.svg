@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
+ <g id="layer1" transform="translate(0,4)">
+  <path id="path6382" transform="translate(0,-4)" d="m7.5 5.5c2.0572-0.73436 3.0776-4.9076 5.5-4.5 2.4224 0.40761 3.4358 3.6809 4 6.5 0.5642 2.8191 1.1226 6.872-1.5 9.5s-13 3-13 0 7.4464-2.7489 7-5.5c-0.44644-2.7511-8.8788-3.8784-8-6 0.87878-2.1216 3.9428 0.73436 6 0z" fill="url(#cg0)" stroke="#ADADAE" stroke-linejoin="round" stroke-width="2"/>
+ </g>
+</svg>
