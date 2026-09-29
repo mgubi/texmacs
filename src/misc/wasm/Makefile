@@ -66,12 +66,13 @@ all: $(OUT)/texmacs.js
 # the others in the background; brotli copies are written for the servers
 # which serve them (misc/wasm/serve.mjs does)
 # the icon of the page (the tab of the browser, its bookmarks, the home
-# screen of a phone): the icon of TeXmacs, declared in shell.html
-WEB_ICONS := $(foreach n,16 32 192,$(OUT)/web/texmacs-$(n).png)
+# screen of a phone): the logo of TeXmacs Vue (misc/icons/vue-logo),
+# declared in shell.html
+WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png)
 
 web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS)
 
-$(OUT)/web/texmacs-%.png: $(TM)/TeXmacs/misc/images/texmacs-%.png
+$(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
 	@mkdir -p $(OUT)/web
 	cp $< $@
 

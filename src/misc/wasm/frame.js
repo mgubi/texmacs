@@ -18,6 +18,17 @@ var tmFrame = (function () {
     return e;
   }
 
+  // the logo of TeXmacs Vue (misc/icons/vue-logo), next to the page (see
+  // WEB_ICONS in misc/wasm/Makefile)
+  function logo (cls, srcset) {
+    var img = el ('img', cls);
+    img.srcset = srcset;
+    img.src = srcset.split (' ')[0];
+    img.alt = '';
+    img.draggable = false;
+    return img;
+  }
+
   var style = `
     #tm-frame { display:flex; align-items:stretch; height:32px; background:#d8d8d8;
       border-bottom:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
@@ -25,6 +36,7 @@ var tmFrame = (function () {
     #tm-frame .tm-app { display:flex; align-items:center; padding:0 12px; font-weight:bold;
       cursor:pointer; color:#fff; background:#5b7fa8; border-right:1px solid #4a6b91 }
     #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#6a8db5 }
+    #tm-frame .tm-app .tm-logo { width:20px; height:20px; margin-right:7px; flex:none }
     #tm-frame .tm-tabs { display:flex; flex:1; overflow:hidden; scrollbar-width:none }
     #tm-frame .tm-tabs::-webkit-scrollbar { display:none }
     #tm-frame .tm-tabs.dragging { cursor:grabbing }
@@ -40,7 +52,9 @@ var tmFrame = (function () {
     #tm-menu { position:fixed; left:4px; top:34px; width:340px; background:#f6f6f6;
       border:1px solid #999; border-radius:6px; box-shadow:0 6px 24px rgba(0,0,0,.3);
       font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222; z-index:30; padding:6px 0 }
-    #tm-menu .tm-head { padding:8px 14px 4px; font-weight:bold; font-size:14px }
+    #tm-menu .tm-head { padding:8px 14px 4px; font-weight:bold; font-size:14px;
+      display:flex; align-items:center }
+    #tm-menu .tm-head .tm-logo { width:40px; height:40px; margin-right:10px; flex:none }
     #tm-menu .tm-badge, #tm-loading .tm-badge { display:inline-block; margin-left:8px; padding:1px 6px;
       font-size:11px; font-weight:normal; color:#1f4e8c; background:#e3eefc; border:1px solid #9cbce8;
       border-radius:8px; vertical-align:middle }
@@ -99,7 +113,9 @@ var tmFrame = (function () {
     var st = el ('style'); st.textContent = style; document.head.appendChild (st);
     bar = document.getElementById ('tm-frame');
     if (!bar) return;
-    var appButton = el ('div', 'tm-app', 'TeXmacs Vue');
+    var appButton = el ('div', 'tm-app');
+    appButton.appendChild (logo ('tm-logo', 'texmacs-vue-32.png 1x, texmacs-vue-48.png 2x'));
+    appButton.appendChild (document.createTextNode ('TeXmacs Vue'));
     appButton.title = 'About TeXmacs Vue, an experimental port of GNU TeXmacs';
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
@@ -531,7 +547,9 @@ var tmFrame = (function () {
       d.onclick = function () { closeMenu (); f (); };
       menu.appendChild (d);
     }
-    var h = el ('div', 'tm-head', 'TeXmacs Vue');
+    var h = el ('div', 'tm-head');
+    h.appendChild (logo ('tm-logo', 'texmacs-vue-64.png 1x, texmacs-vue-128.png 2x'));
+    h.appendChild (document.createTextNode ('TeXmacs Vue'));
     h.appendChild (el ('span', 'tm-badge', 'experimental'));
     menu.appendChild (h);
     // a paragraph of texts and links ([text, url], or [text, function])
