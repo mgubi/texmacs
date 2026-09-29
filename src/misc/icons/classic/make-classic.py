@@ -39,7 +39,7 @@
 #   ln lnb lng lnr   lines of text: dark, blue, green, red
 #   wf wl  white fill, white line (on a coloured sign)
 #   #RRGGBB  a literal colour (paint cards), with the outline
-#   tagf tagm  grey tag and its white mark; redx redf  red cross (line, fill)
+#   tagf tagm  light grey tag and its dark mark; redx redf  red cross (line, fill)
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
 
@@ -125,9 +125,9 @@ def attributes (cls, p):
   if "bf" in cl: fill= p["bl"]; stroke= "none"
   if "wf" in cl: fill= WHITE; stroke= "none"
   dark= p["ink"] == "#E6E6EA"
-  if "tagf" in cl: fill= "#B4B4BA" if dark else "#7E7E84"; stroke= outline (p, "line")
-  if "tagm" in cl: stroke= TOOLBAR_DARK if dark else WHITE; width= 2.4
-  if "redx" in cl: stroke= "#EE5145" if dark else "#D64A3E"; width= 2.6
+  if "tagf" in cl: fill= "#C6C6CC" if dark else "#D2D2D7"; stroke= outline (p, "line")
+  if "tagm" in cl: stroke= "#2F2F32"; width= 2.4
+  if "redx" in cl: stroke= "#FF3B30" if dark else "#E8261B"; width= 2.6
   if "redf" in cl: fill= "#EE5145" if dark else "#D64A3E"; stroke= outline (p, "line")
   for c in cl:
     if re.match (r"^#[0-9A-Fa-f]{6}$", c):
