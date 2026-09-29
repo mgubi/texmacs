@@ -68,11 +68,15 @@ all: $(OUT)/texmacs.js
 # the icon of the page (the tab of the browser, its bookmarks, the home
 # screen of a phone): the logo of TeXmacs Vue (misc/icons/vue-logo),
 # declared in shell.html
-WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png)
+WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
 web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS)
 
 $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
+	@mkdir -p $(OUT)/web
+	cp $< $@
+
+$(OUT)/web/favicon.ico: $(TM)/TeXmacs/misc/images/texmacs-vue.ico
 	@mkdir -p $(OUT)/web
 	cp $< $@
 

@@ -1781,7 +1781,6 @@ layout_pull_button (vue_ui_rep *w) {
   if (!down && button_grow) {
     padding= menu_item_padding ();
     padding.right= 0;
-    rad= ui_pxf (4); // as menu_button
   }
   CLAY(button_id, {
     .layout= {
@@ -2576,7 +2575,10 @@ vue_ui_rep::do_layout () {
     // a disabled item is an item all the same: the pointer resting on it
     // closes the submenu of another item (see layout_pull_button)
     note_menu_hover (button_id);
-    Clay_CornerRadius radius= CLAY_CORNER_RADIUS(ui_pxf (4));
+    // the highlight of an item is rounded as the menu (and the titles of
+    // the menu bar, see layout_pull_button)
+    Clay_CornerRadius radius= item ? ui_corners (menu_round)
+                                   : CLAY_CORNER_RADIUS(ui_pxf (4));
     Clay_BorderElementConfig border= {};
     bool tab_strip= false;
     if (push) {
