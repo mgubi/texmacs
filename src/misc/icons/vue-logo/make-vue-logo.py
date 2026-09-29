@@ -47,6 +47,7 @@ def logo(small):
     halo = (''.join(f'<rect x="{x}" y="{y}" {pin} fill="{HALO}" stroke="{HALO}" stroke-width="{hw}"/>' for x, y in at)
             + f'<rect {BODY} fill="{HALO}" stroke="{HALO}" stroke-width="{hw + 1.5}"/>')
     d = sigma(32, 32, 31 if small else 28)
+    bold = 1.2 if small else 1.0     # the Sigma made thicker by that much
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <!-- The logo of TeXmacs Vue, made by misc/icons/vue-logo/make-vue-logo.py:
      the Sigma is the one of TeX Gyre Pagella Bold, mirrored -->
@@ -60,8 +61,9 @@ def logo(small):
  {pins}
  <rect {BODY} fill="url(#body)" stroke="#161618" stroke-width="1.5"/>
  <rect x="11.5" y="10.5" width="41" height="43" rx="4.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="1"/>
- <path d="{d}" transform="translate(0.8 1.1)" fill="#000000" fill-opacity="0.55"/>
- <path d="{d}" fill="url(#glyph)" stroke="#0E0E10" stroke-width="0.6" stroke-linejoin="round"/>
+ <g transform="translate(0.8 1.1)" opacity="0.55"><path d="{d}" fill="#000000" stroke="#000000" stroke-width="{bold}" stroke-linejoin="round"/></g>
+ <path d="{d}" fill="#0E0E10" stroke="#0E0E10" stroke-width="{bold + 1.2}" stroke-linejoin="round"/>
+ <path d="{d}" fill="url(#glyph)" stroke="url(#glyph)" stroke-width="{bold}" stroke-linejoin="round"/>
 </svg>
 '''
 
