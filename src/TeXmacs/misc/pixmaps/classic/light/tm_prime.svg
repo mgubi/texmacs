@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#949494"/><stop offset="1" stop-color="#646464"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1">
  <g id="layer1" transform="translate(0,4)">
-  <path id="text3315" transform="matrix(.83301 0 0 .66505 1.6663 -.46335)" d="m12.2-6.0445c0-0.49951-0.40436-0.90387-0.90387-0.90387-0.35679 0-0.6898 0.23786-0.78494 0.49951l-2.8543 7.0645h0.64222l3.7582-6.2082c0.09514-0.11893 0.14272-0.28543 0.14272-0.45194z" fill="url(#cg0)" stroke="#48484B" stroke-width=".5" aria-label="′"/>
+  <path id="text3315" transform="matrix(.83301 0 0 .66505 1.6663 -.46335)" d="m12.2-6.0445c0-0.49951-0.40436-0.90387-0.90387-0.90387-0.35679 0-0.6898 0.23786-0.78494 0.49951l-2.8543 7.0645h0.64222l3.7582-6.2082c0.09514-0.11893 0.14272-0.28543 0.14272-0.45194z" fill="#2A2A2C" stroke="#48484B" stroke-width=".5" aria-label="′"/>
  </g>
 </svg>

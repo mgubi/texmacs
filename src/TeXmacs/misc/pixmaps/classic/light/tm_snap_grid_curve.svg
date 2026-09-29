@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9ACA6"/><stop offset="1" stop-color="#D3847C"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9ACA6"/><stop offset="1" stop-color="#D3847C"/></linearGradient></defs>
  <g id="layer1">
   <rect id="rect3905" y="4" width="16" height="1" fill="url(#cg0)" stroke-width="0"/>
   <rect id="rect3907" y="11" width="16" height="1" fill="url(#cg0)" stroke-width="0"/>

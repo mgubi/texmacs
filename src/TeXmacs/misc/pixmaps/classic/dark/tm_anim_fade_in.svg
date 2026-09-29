@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient></defs>
  <g id="layer1">
   <path id="path12171" d="m1.5 14c-1 0-1 1 0 1 2 0 4.5-0.5 6-1.5 1.4936-0.99572 4.208-3.5764 5.5-7 0.76108-2.0167 1.75-4 2-5 0.11433-0.45733-0.88567-0.45733-1 0-0.25 1-1.2251 2.7465-2 4.5-1.292 2.9236-3.5064 5.5043-5 6.5-1.5 1-3.5 1.5-5.5 1.5z" fill="url(#cg0)" fill-rule="evenodd" stroke="#ADADAE" stroke-linecap="round" stroke-linejoin="round"/>
  </g>

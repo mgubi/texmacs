@@ -1,23 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E4E4"/><stop offset="1" stop-color="#CDCDCD"/></linearGradient></defs>
- <g id="layer1" transform="translate(0,4)" stroke="#ADADAE" stroke-linecap="round" stroke-width="1.5">
-  <path id="path3802" d="m3-0.5h9" fill="url(#cg0)"/>
-  <path id="path3810" d="m1-2.5h9" fill="url(#cg0)" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4534" d="m5 1.5h9" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4536" d="m5 3.5h7" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4538" d="m3 5.5h9" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4573" d="m1 7.5h11" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4605" d="m17-2.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4607" d="m17-0.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4609" d="m17 1.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4611" d="m17 3.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4613" d="m17 5.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4615" d="m17 7.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4617" d="m17 9.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4619" d="m17 11.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4621" d="m17 13.5h2" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4623" d="m3 9.5h11" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4625" d="m3 11.5h11" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4627" d="m1 13.5h11" fill="none" stroke-dashoffset=".5" stroke-linejoin="round"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><path fill="none" stroke="#E6E6EA" stroke-width="2" d="M3 4H9M5 9.5H10M5 15H11M3 20.5H8.5"/><path fill="none" stroke="#E6E6EA" stroke-width="1" stroke-dasharray="2 1.6" d="M10.5 4H17M11.5 9.5H17M12.5 15H17M10 20.5H17"/><path fill="none" stroke="#B0B9DD" stroke-width="2" d="M18.5 4H21M18.5 9.5H21M18.5 15H21M18.5 20.5H21"/></g></g>
 </svg>

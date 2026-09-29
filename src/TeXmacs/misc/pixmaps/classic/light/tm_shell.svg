@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#949494"/><stop offset="1" stop-color="#646464"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3DCC3"/><stop offset="1" stop-color="#CBC3A2"/></linearGradient><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0EBD6"/><stop offset="1" stop-color="#DCD5BA"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E3DCC3"/><stop offset="1" stop-color="#CBC3A2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F0EBD6"/><stop offset="1" stop-color="#DCD5BA"/></linearGradient></defs>
  <g id="layer1" transform="translate(0,4)">
   <path id="path6162" d="m1-3v12h18v-12z" fill="none" stroke="#48484B" stroke-linejoin="round" stroke-width="2"/>
-  <path id="path6138" transform="translate(0,-4)" d="m1 1v12h18v-12z" fill="url(#cg0)" fill-opacity=".75294" stroke="#989481" stroke-linejoin="round" stroke-width="1.75"/>
-  <path id="path6156" transform="translate(0,-4)" d="m2 18 2-2h12l2 2z" fill="url(#cg1)" stroke="#48484B" stroke-width=".125"/>
-  <path id="path6158" transform="translate(0,-4)" d="m2 18v2h16v-2z" fill="url(#cg2)" stroke="#48484B" stroke-width=".125"/>
-  <path id="path6160" transform="translate(0,-4)" d="m7 17h6s-0.83779-1.3129-1-2 0-1 0-1h-4s0.16221 0.31288 0 1-1 2-1 2z" fill="url(#cg2)" stroke="#48484B" stroke-width=".125"/>
+  <path id="path6138" transform="translate(0,-4)" d="m1 1v12h18v-12z" fill="#2A2A2C" fill-opacity=".75294" stroke="#989481" stroke-linejoin="round" stroke-width="1.75"/>
+  <path id="path6156" transform="translate(0,-4)" d="m2 18 2-2h12l2 2z" fill="url(#cg0)" stroke="#48484B" stroke-width=".125"/>
+  <path id="path6158" transform="translate(0,-4)" d="m2 18v2h16v-2z" fill="url(#cg1)" stroke="#48484B" stroke-width=".125"/>
+  <path id="path6160" transform="translate(0,-4)" d="m7 17h6s-0.83779-1.3129-1-2 0-1 0-1h-4s0.16221 0.31288 0 1-1 2-1 2z" fill="url(#cg1)" stroke="#48484B" stroke-width=".125"/>
  </g>
 </svg>

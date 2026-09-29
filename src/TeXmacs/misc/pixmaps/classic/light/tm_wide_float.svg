@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#949494"/><stop offset="1" stop-color="#646464"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1">
  <g id="layer1" stroke="#48484B" stroke-linecap="round" stroke-linejoin="round">
-  <path id="path3812" d="m1.5 1.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
-  <path id="path4666" d="m1.5 3.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
-  <path id="path4668" d="m9 1.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
-  <path id="path4672" d="m9 3.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
-  <path id="path4674" d="m9 5.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
-  <path id="path4676" d="m1.5 5.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
+  <path id="path3812" d="m1.5 1.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
+  <path id="path4666" d="m1.5 3.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
+  <path id="path4668" d="m9 1.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
+  <path id="path4672" d="m9 3.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
+  <path id="path4674" d="m9 5.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
+  <path id="path4676" d="m1.5 5.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
   <rect id="rect4678" x="1.5" y="9.5" width="13" height="5" fill="#ECEDFF" fill-rule="evenodd"/>
-  <path id="path4682" d="m9 7.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
-  <path id="path4684" d="m1.5 7.5h5.5" fill="url(#cg0)" stroke-dashoffset=".5"/>
+  <path id="path4682" d="m9 7.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
+  <path id="path4684" d="m1.5 7.5h5.5" fill="#2A2A2C" stroke-dashoffset=".5"/>
  </g>
 </svg>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9ACA6"/><stop offset="1" stop-color="#D3847C"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9ACA6"/><stop offset="1" stop-color="#D3847C"/></linearGradient></defs>
  <g id="layer1" fill-rule="evenodd">
   <path id="path4181" d="m0.0024 7h5v2h-5z" fill="url(#cg0)"/>
   <path id="path4185" d="m7.0024 9h4.5l-1.5 3h2l1-2.5 1 2.5h2l-2-4 2-4h-2l-1 2.5-1-2.5h-2l1.5 3h-4.5z" fill="url(#cg1)"/>

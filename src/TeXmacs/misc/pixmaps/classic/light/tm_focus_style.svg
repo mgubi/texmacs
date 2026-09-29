@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B8B8B8"/><stop offset="1" stop-color="#939393"/></linearGradient></defs>
- <g id="layer1" fill-rule="evenodd">
-  <path id="path4353" d="m1 8s4.2412-3.5 7-3.5c2.7588 0 7 3.5 7 3.5s-4.2412 3.5-7 3.5c-2.7588 0-7-3.5-7-3.5z" fill="#FFFFFF" stroke="#48484B" stroke-width="1px"/>
-  <circle id="path4359" cx="8" cy="8" r="3" opacity=".333" stroke-width="0"/>
-  <circle id="path4363" cx="8" cy="8" r="1" fill="url(#cg0)" stroke-width="0"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <defs><linearGradient id="g0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F0F0F0"/></linearGradient><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1F2FF"/><stop offset="1" stop-color="#DEDFF0"/></linearGradient><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7D7B"/><stop offset="1" stop-color="#464644"/></linearGradient></defs>
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><path fill="url(#g0)" stroke="#48484B" stroke-width="1" d="M1.75 12S5.5 5 12 5s10.25 7 10.25 7S18.5 19 12 19 1.75 12 1.75 12z"/><circle fill="url(#g1)" stroke="#48484B" stroke-width="1" cx="12" cy="12" r="4.25"/><circle fill="url(#g2)" cx="12" cy="12" r="1.9"/></g></g>
 </svg>

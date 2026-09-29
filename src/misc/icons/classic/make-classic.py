@@ -35,13 +35,16 @@
 #   met    light metal              dk    dark metal
 #   skin   glove                    grey  grey block (a selection's content)
 #   dash   dashed outline (a selection)  rs    red stroke
-#   ink    letters (emb: thickened)
+#   ink    letters (emb: thickened)     b     blue (accents), bf: solid blue
+#   ln lnb lng lnr   lines of text: dark, blue, green, red
+#   wf wl  white fill, white line (on a coloured sign)
 #   thin wide ow  stroke width modifiers (ow: a double outline, half of it
 #                 covered by a fill drawn on top)
 
 import os, re, sys
 
 STROKE= 1.0
+LINE= 2.0              # lines of text
 SCALE= 1.05            # drawings are scaled around the centre, strokes too
 OUTLINE= "dark"        # grey | tone (darker tone of the fill) | dark (near black)
 PALETTE= "soft"        # modern | soft
@@ -53,17 +56,20 @@ MODERN = {
                 khd="#B5AC7E", g="#2FA046", gl="#1D6E2D", r="#B8322A", rl="#7E1D17",
                 lav="#DEE0FB", br="#8E6443", brl="#5C3D26", met="#D6D6D8",
                 metl="#7C7C80", dk="#5A5A5E", dkl="#2E2E30", skin="#FFF3EA",
-                skinl="#3C3C3C", grey="#BDBDBD", ink="#303032", white="#FFFFFF"),
+                skinl="#3C3C3C", grey="#BDBDBD", ink="#303032", white="#FFFFFF",
+                b="#9AAAE8", bl="#5064B4"),
  "dark":  dict (line="#B4B4B8", paper="#4B4D53", kh="#9A9168", khl="#D6CDA0",
                 khd="#7C7452", g="#3DB655", gl="#9BE3A8", r="#E0463C", rl="#F5A39C",
                 lav="#4A4F7A", br="#9A7050", brl="#D8B89A", met="#6A6A70",
                 metl="#C8C8CC", dk="#8A8A90", dkl="#D8D8DC", skin="#5A5048",
-                skinl="#E4DCD4", grey="#7A7A80", ink="#E6E6EA", white="#FFFFFF"),
+                skinl="#E4DCD4", grey="#7A7A80", ink="#E6E6EA", white="#FFFFFF",
+                b="#5A6AA8", bl="#AFC0FF"),
 }
 
 
 WHITE, BLACK, TOOLBAR_DARK= "#FFFFFF", "#000000", "#2B2D31"
-LINES= ("line", "khl", "gl", "rl", "brl", "metl", "dkl", "skinl")
+INK, INK_DARK= "#2A2A2C", "#E6E6EA"
+LINES= ("line", "khl", "gl", "rl", "brl", "metl", "dkl", "skinl", "bl")
 
 def mix (a, b, t):
   ca= [int (a[i:i+2], 16) for i in (1, 3, 5)]
@@ -84,7 +90,8 @@ SOFT_LIGHT= dict (line="#8A8A86", paper="#FFFFFF", kh="#EAE3C6", khl="#A89F78",
                   khd="#D8CFAC", g="#7CC68A", gl="#4E9A5C", r="#E08C84", rl="#B0574F",
                   lav="#ECEDFF", br="#C29A78", brl="#8E6A4E", met="#E6E6E8",
                   metl="#9A9AA0", dk="#9A9AA0", dkl="#6A6A70", skin="#FFF6EF",
-                  skinl="#6A6660", grey="#D4D4D4", ink="#4A4A48", white="#FFFFFF")
+                  skinl="#6A6660", grey="#D4D4D4", ink="#4A4A48", white="#FFFFFF",
+                  b="#9AAAE8", bl="#5064B4")
 SOFT= {"light": SOFT_LIGHT, "dark": dark_of (SOFT_LIGHT)}
 PAL= SOFT if PALETTE == "soft" else MODERN
 
@@ -99,7 +106,7 @@ def attributes (cls, p):
   pairs= { "paper": ("paper", "line"), "kh": ("kh", "khl"), "khd": ("khd", "khl"),
            "g": ("g", "gl"), "r": ("r", "rl"), "lav": ("lav", "line"),
            "br": ("br", "brl"), "met": ("met", "metl"), "dk": ("dk", "dkl"),
-           "skin": ("skin", "skinl") }
+           "skin": ("skin", "skinl"), "b": ("b", "bl") }
   for c, (f, s) in pairs.items ():
     if c in cl: fill= p[f]; stroke= outline (p, s)
   if "grey" in cl: fill= p["grey"]
@@ -108,6 +115,12 @@ def attributes (cls, p):
   if "rs" in cl: stroke= p["r"]
   if "emb" in cl: stroke= p["ink"]; width= 0.6
   if "nostroke" in cl: stroke= "none"
+  for c, k in (("ln", None), ("lnb", "bl"), ("lng", "gl"), ("lnr", "rl")):
+    if c in cl:
+      stroke= p[k] if k else (INK_DARK if p["ink"] == "#E6E6EA" else INK); width= LINE
+  if "bf" in cl: fill= p["bl"]; stroke= "none"
+  if "wf" in cl: fill= WHITE; stroke= "none"
+  if "wl" in cl: stroke= WHITE; width= 2.4
   if "ow" in cl: width= 2 * STROKE
   if "dash" in cl: stroke= p["ink"]; extra= ' stroke-dasharray="2 1.6"'
   if "thin" in cl: width= STROKE * .8
@@ -221,6 +234,83 @@ ICONS = [
  ("forward", "Browse forward", '<g transform="matrix(-1 0 0 1 24 0)">%s</g>' % HAND),
 ]
 
+# The text mode toolbar, redrawn after the originals: lines of text with blue
+# accents, without a page.
+TEXT_ICONS = [
+ ('title', 'Enter title information',
+  '<rect class="b" x="6.5" y="3" width="11" height="3.5" rx=".6"/><path class="ln" d="M3 10.5H21M3 14H21M3 17.5H21M3 21H14"/>'),
+ ('chapter', 'Start a new chapter',
+  '<rect class="b" x="3" y="3" width="10" height="4" rx=".6"/><path class="ln" d="M3 10.5H21M3 14H21M3 17.5H21M3 21H14"/>'),
+ ('section', 'Start a new section',
+  '<path class="ln" d="M3 3.5H21M3 7H17"/><rect class="b" x="3" y="10" width="8" height="3" rx=".6"/><path class="ln" d="M3 16.5H21M3 20H15"/>'),
+ ('block', 'Insert a section block',
+  '<rect class="paper" x="3" y="3" width="18" height="18" rx="1.5"/><path class="b" d="M4.5 3h15A1.5 1.5 0 0 1 21 4.5V7.5H3V4.5A1.5 1.5 0 0 1 4.5 3z"/><path class="ln thin" d="M6 11H18M6 14.5H18M6 18H14"/>'),
+ ('theorem', 'Insert an enunciation',
+  '<path class="bf" d="M6.82 2.79V2.72C6.82 2.41 6.75 2.26 6.36 2.26H1.08C0.74 2.26 0.62 2.37 0.62 2.72V2.79C0.62 3.25 0.85 3.25 1.12 3.25L3.03 3.22V8.34C3.03 8.68 3.13 8.8 3.48 8.8H3.97C4.33 8.8 4.42 8.67 4.42 8.34V3.22L6.32 3.25C6.59 3.25 6.82 3.25 6.82 2.79ZM13.88 8.34V2.66C13.88 2.36 13.81 2.2 13.42 2.2H12.94C12.57 2.2 12.48 2.33 12.48 2.66V4.92H9.47V2.66C9.47 2.36 9.4 2.2 9.01 2.2H8.53C8.19 2.2 8.07 2.31 8.07 2.66V8.34C8.07 8.68 8.18 8.8 8.53 8.8H9.01C9.37 8.8 9.47 8.67 9.47 8.34V5.81H12.48V8.34C12.48 8.64 12.55 8.8 12.94 8.8H13.42C13.78 8.8 13.88 8.67 13.88 8.34Z"/><path class="ln" d="M13.5 5.5H21M3 10H21M3 14H21M3 18H21M3 21.5H13"/>'),
+ ('prominent', 'Insert a prominent piece of text',
+  '<rect class="grey o" x="2.5" y="4" width="19" height="16" rx="2"/><path class="lnb" d="M6 8.5H18M6 12H18M6 15.5H14"/>'),
+ ('var_prominent', 'Insert a prominent piece of text',
+  '<path class="lnb" d="M8 4.5H21M8 12H21M8 19.5H15"/><path class="ln" d="M3 8.25H21M3 15.75H21"/>'),
+ ('program', 'Insert a computer program',
+  '<path class="lnb" d="M3 4.5H8.5M6.5 13.5H10.5"/><path class="ln" d="M10.5 4.5H16M6.5 9H19.5M12.5 13.5H20M6.5 18H14M3 21H8"/>'),
+ ('list', 'Insert a list',
+  '<circle class="paper" cx="5" cy="6" r="2"/><circle class="paper" cx="5" cy="12" r="2"/><circle class="paper" cx="5" cy="18" r="2"/><path class="ln" d="M9.5 6H21M9.5 12H21M9.5 18H17"/>'),
+ ('footnote', 'Insert a footnote',
+  '<path class="ln" d="M3 3.5H21M3 7H21M3 10.5H16"/><path class="ln thin" d="M3 14H9"/><path class="lnb" d="M3 17H21M3 20.5H17"/>'),
+ ('margin', 'Insert a marginal note',
+  '<path class="ln" d="M3 3.5H15M3 7H15M3 10.5H15M3 14H15M3 17.5H15M3 21H11"/><path class="lnb" d="M17.5 3.5H21M17.5 7H21"/>'),
+ ('floating', 'Insert a floating object',
+  '<path class="ln" d="M3 3.5H21M3 20.5H21"/><rect class="paper" x="5.5" y="6.5" width="13" height="11" rx="1"/><path class="g" d="M6.5 16.5l3.5-4.5 2.5 3 2-2.5 3 4z"/><circle class="r" cx="15.25" cy="9.75" r="1.25"/>'),
+ ('multicol', 'Start multicolumn context',
+  '<path class="ln" d="M3 3.5H10.5M3 7H10.5M3 10.5H10.5M3 14H10.5M3 17.5H10.5M3 21H8.5M13.5 3.5H21M13.5 7H21M13.5 10.5H21M13.5 14H21M13.5 17.5H19"/>'),
+ ('pageins', 'Insert a note or a floating object',
+  '<path class="ln" d="M3 3.5H21M3 20.5H21"/><rect class="b" x="3" y="7.5" width="12" height="9" rx="2"/><path class="ln" d="M17.5 9.5H21M17.5 14.5H21"/>'),
+ ('index', 'Insert automatically generated content',
+  '<path class="ln" d="M3 4H9M5 9.5H10M5 15H11M3 20.5H8.5"/><path class="dash" d="M10.5 4H17M11.5 9.5H17M12.5 15H17M10 20.5H17"/><path class="lnb" d="M18.5 4H21M18.5 9.5H21M18.5 15H21M18.5 20.5H21"/>'),
+ ('parstyle', 'Set paragraph mode',
+  '<path class="ln" d="M3 3.5H21M3 7.5H21M3 11.5H15"/><path class="lnb" d="M4.5 17.5h15M7 15l-2.5 2.5L7 20M17 15l2.5 2.5L17 20"/>'),
+ ('align_left', 'Align text to the left',
+  '<path class="ln" d="M3 4.5H21M3 9.5H15M3 14.5H19M3 19.5H12"/>'),
+ ('align_center', 'Center text',
+  '<path class="ln" d="M3 4.5H21M6.5 9.5H17.5M4.5 14.5H19.5M7.5 19.5H16.5"/>'),
+ ('align_right', 'Align text to the right',
+  '<path class="ln" d="M3 4.5H21M9 9.5H21M5 14.5H21M12 19.5H21"/>'),
+ ('align_justify', 'Justify text',
+  '<path class="ln" d="M3 4.5H21M3 9.5H21M3 14.5H21M3 19.5H14"/>'),
+ ('parindent', 'Set paragraph margins',
+  '<path class="ln" d="M10 4.5H21M3 9.5H21M3 14.5H21M3 19.5H15"/><path class="lnb" d="M3 4.5h4.5M5.5 2.5l2 2-2 2"/>'),
+]
+ICONS= ICONS + TEXT_ICONS
+
+
+# The focus toolbar: the icons whose originals look dated, redrawn.
+FOCUS_ICONS = [
+ ('go', 'Go',
+  '<circle class="g" cx="12" cy="12" r="9.5"/><path class="wf" d="M9.75 7.5v9l7.25-4.5z"/>'),
+ ('stop', 'Stop',
+  '<path class="r" d="M8.2 2.5h7.6l5.7 5.7v7.6l-5.7 5.7H8.2l-5.7-5.7V8.2z"/><path class="wl" d="M7.5 12h9"/>'),
+ ('customized', 'Customized',
+  '<circle class="skin" cx="12" cy="7" r="4"/><path class="b" d="M4 21.5c0-4.6 3.6-8 8-8s8 3.4 8 8z"/>'),
+ ('stateless', 'Stateless',
+  '<rect class="dash" x="2.5" y="2.5" width="19" height="19" rx="3"/><path class="ink" d="M15.93 7.8C15.93 5.35 12.55 5.35 11.85 5.35C9.21 5.35 8.07 6.55 8.07 7.76C8.07 8.67 8.77 8.98 9.25 8.98C9.85 8.98 10.44 8.56 10.44 7.78C10.44 6.89 9.62 6.64 9.59 6.62C10.08 6.26 10.86 6.03 11.73 6.03C13.48 6.03 13.5 6.77 13.5 7.67C13.5 8.5 13.35 8.81 12.97 9.19C11.79 10.42 11.26 11.89 11.26 13.12V13.84C11.26 14.26 11.26 14.36 11.7 14.36C12.15 14.36 12.15 14.24 12.15 13.79V13.27C12.15 11.32 13.92 10.16 14.64 9.74C15.02 9.51 15.93 9 15.93 7.8ZM13.18 17.17C13.18 16.35 12.51 15.69 11.7 15.69C10.88 15.69 10.21 16.35 10.21 17.17C10.21 17.98 10.88 18.65 11.7 18.65C12.51 18.65 13.18 17.98 13.18 17.17Z"/>'),
+ ('theme', 'Theme',
+  '<circle class="paper" cx="12" cy="12" r="9"/><path class="ink" d="M12 3a9 9 0 0 1 0 18z"/>'),
+ ('show_hidden', 'Show hidden',
+  '<rect class="paper" x="3" y="3" width="18" height="18" rx="1"/><path class="ink" d="M3 3h18L3 21z"/>'),
+ ('focus_style', 'Style',
+  '<path class="paper" d="M1.75 12S5.5 5 12 5s10.25 7 10.25 7S18.5 19 12 19 1.75 12 1.75 12z"/><circle class="lav" cx="12" cy="12" r="4.25"/><circle class="ink" cx="12" cy="12" r="1.9"/>'),
+ ('view', 'View',
+  '<path class="paper" d="M1.75 12S5.5 5 12 5s10.25 7 10.25 7S18.5 19 12 19 1.75 12 1.75 12z"/><circle class="lav" cx="12" cy="12" r="4.25"/><circle class="ink" cx="12" cy="12" r="1.9"/>'),
+ ('like', 'Cite TeXmacs',
+  '<rect class="b" x="2.5" y="10.5" width="4.5" height="10.5" rx="1"/><path class="skin" d="M7 11.5 10.6 4.4c.4-.8 1.4-1.2 2.2-.8.9.4 1.3 1.3 1 2.2L12.9 9.5h5.5a2 2 0 0 1 2 2.4l-1.3 7a2 2 0 0 1-2 1.6H7z"/>'),
+ ('lock_closed', 'Locked',
+  '<path class="dk" d="M6 11V7.5a6 6 0 0 1 12 0V11h-3V7.5a3 3 0 0 0-6 0V11z"/><rect class="r" x="2.5" y="10" width="19" height="12" rx="1.5"/><circle class="ink" cx="12" cy="16" r="1.75"/>'),
+ ('lock_open', 'Unlocked',
+  '<path class="dk" d="M6 11V7.5a6 6 0 0 1 11.6-2.2l-2.8 1.1A3 3 0 0 0 9 7.5V11z"/><rect class="g" x="2.5" y="10" width="19" height="12" rx="1.5"/><circle class="ink" cx="12" cy="16" r="1.75"/>'),
+]
+ICONS= ICONS + FOCUS_ICONS
+
+
 
 ###############################################################################
 # The other icons: converted from the original ones
@@ -277,6 +367,8 @@ def map_colour (c, kind, theme):
       col= mix (col, BLACK, .35)
   elif kind == "stroke":
     col= mix ("#" + c, WHITE, .1)
+  elif neutral (c) and lightness (c) < .35:
+    col= INK                    # letters and symbols: solid ink
   elif lightness (c) > .9:
     col= "#" + c
   else:
@@ -284,6 +376,7 @@ def map_colour (c, kind, theme):
   if theme == "dark":
     if kind == "stroke": col= mix (col, WHITE, .55)
     elif lightness (col[1:]) > .9: col= "#4B4D53"
+    elif col == INK: col= INK_DARK
     elif neutral (c) and lightness (c) < .5: col= mix (col, WHITE, .75)
     else: col= mix (col, TOOLBAR_DARK, .35)
   return col.upper ()
@@ -298,7 +391,7 @@ def convert (src, theme):
     grads= {}
     def grad (m):
       c= m.group (3)
-      if lightness (c[1:].lower ()) > .92: return m.group (0)
+      if lightness (c[1:].lower ()) > .92 or c in (INK, INK_DARK): return m.group (0)
       if c not in grads: grads[c]= "cg%d" % len (grads)
       return "%s%surl(#%s)" % (m.group (1), m.group (2), grads[c])
     s= re.sub (r'(fill)(=\"|:\s*)(#[0-9A-F]{6})', grad, s)

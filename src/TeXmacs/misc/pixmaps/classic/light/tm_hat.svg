@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="Calque_1" data-name="Calque 1" viewBox="0 0 256 256"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7070FF"/><stop offset="1" stop-color="#3535F0"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#707070"/><stop offset="1" stop-color="#353535"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="Calque_1" data-name="Calque 1" viewBox="0 0 256 256"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7070FF"/><stop offset="1" stop-color="#3535F0"/></linearGradient></defs>
  <defs>
   <style>
       .cls-1 {
         fill: url(#cg0);
       }
       .cls-2 {
-        fill: url(#cg1);
+        fill: #2A2A2C;
       }
     </style>
  </defs>

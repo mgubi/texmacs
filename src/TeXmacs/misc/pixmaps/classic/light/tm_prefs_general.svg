@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="32" height="32" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEEEEE"/><stop offset="1" stop-color="#D9D9D9"/></linearGradient></defs>
+<svg fill="#2A2A2C" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="32" height="32" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DCDCDC"/><stop offset="1" stop-color="#C2C2C2"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEEEEE"/><stop offset="1" stop-color="#D9D9D9"/></linearGradient></defs>
  <g id="layer1" transform="translate(0,8)" stroke-width="1px">
   <path id="path3844" transform="translate(0,-8)" d="m2.5 0.5v27h21v-27z" fill="#FFFFFF" stroke="#48484B"/>
   <path id="path3846" transform="translate(0,-8)" d="m3.5 1.5v2h19v-2z" fill="url(#cg0)" stroke="#C6C6C6"/>

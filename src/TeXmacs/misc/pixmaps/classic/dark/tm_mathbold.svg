@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" id="svg3039" viewBox="0 0 20 20.000001" version="1.1" width="20" height="20"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E4E4"/><stop offset="1" stop-color="#CDCDCD"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" id="svg3039" viewBox="0 0 20 20.000001" version="1.1" width="20" height="20">
  <defs id="defs1">
   <style id="style1">
       .cls-1 {
-        fill: url(#cg0);
+        fill: #E6E6EA;
         stroke: #ADADAE;
         stroke-width: .5px;
       }

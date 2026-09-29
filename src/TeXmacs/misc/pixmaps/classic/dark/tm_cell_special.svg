@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BEBFA9"/><stop offset="1" stop-color="#9B9C7F"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="16" height="16" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9B9C9D"/><stop offset="1" stop-color="#6D6E70"/></linearGradient><linearGradient id="cg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BEBFA9"/><stop offset="1" stop-color="#9B9C7F"/></linearGradient></defs>
  <g id="layer1">
   <path id="path4966" d="m16 1.9857-16 0.014295 8.934e-4 1 16-0.0143-8.94e-4 -1z" fill="url(#cg0)"/>
   <path id="path4452" d="m2 0v16h1v-16h-1z" fill="url(#cg0)"/>

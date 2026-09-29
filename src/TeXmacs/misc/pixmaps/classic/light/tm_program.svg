@@ -1,14 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#383838" xmlns="http://www.w3.org/2000/svg" id="svg3039" width="20" height="20" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#949494"/><stop offset="1" stop-color="#646464"/></linearGradient></defs>
- <g id="layer1" transform="translate(0,4)" stroke-linecap="round" stroke-width="1.5">
-  <path id="path3802" d="m4 1.5h12" fill="url(#cg0)" stroke="#48484B"/>
-  <path id="path3806" d="m6 3.5h8" fill="url(#cg0)" stroke="#48484B"/>
-  <path id="path3810" d="m4-0.5h12" fill="url(#cg0)" stroke="#48484B" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path3812" d="m2-2.5h10" fill="url(#cg0)" stroke="#5353C6" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4530" d="m2 6.5h14" fill="none" stroke="#5353C6" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4532" d="m4 8.5h14" fill="none" stroke="#48484B" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4534" d="m6 10.5h10" fill="none" stroke="#48484B" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4536" d="m6 12.5h12" fill="none" stroke="#48484B" stroke-dashoffset=".5" stroke-linejoin="round"/>
-  <path id="path4538" d="m4 14.5h12" fill="none" stroke="#48484B" stroke-dashoffset=".5" stroke-linejoin="round"/>
- </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+ <g stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><g transform="translate(12 12) scale(1.05) translate(-12 -12)"><path fill="none" stroke="#5064B4" stroke-width="2" d="M3 4.5H8.5M6.5 13.5H10.5"/><path fill="none" stroke="#2A2A2C" stroke-width="2" d="M10.5 4.5H16M6.5 9H19.5M12.5 13.5H20M6.5 18H14M3 21H8"/></g></g>
 </svg>

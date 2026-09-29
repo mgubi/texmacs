@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg fill="#CDCDCD" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
+<svg fill="#E6E6EA" xmlns="http://www.w3.org/2000/svg" id="svg5375" width="24" height="24" version="1.1"><defs><linearGradient id="cg0" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D7F83"/><stop offset="1" stop-color="#46484E"/></linearGradient></defs>
  <g id="layer1" fill="url(#cg0)" fill-opacity=".87843">
   <path id="path5385" d="m6.5 3.5h11v13h-11v-8.5z" stroke="#ADADAE" stroke-opacity=".50222"/>
   <path id="path5103" d="m6.5 14.5v2h11v-2.5s2.9659-0.10518 3.7233 0.63342c1.0535 1.0275 0.92266 1.8624 0.86605 2.446-0.089304 0.92055-0.45535 1.2954-1.3386 1.661-1.033 0.42757-2.7507 0.25957-2.7507 0.25957s-0.75908 2.0893-4.4814 2.3214c-3.2713 0.20397-5.0186-1.8214-5.0186-1.8214s-0.71443 1-2.0667 1.0039c-1.0713 0.003088-2.4333-1.0039-2.4333-2.5039-1.5 0-2.5 0-2.1874-2.027 0.18812-1.22 1.3853-2.3301 2.3759-2.3916 1.3116-0.081425 2.3116 0.91858 2.3116 0.91858z" stroke="#ADADAE" stroke-width="1px"/>
