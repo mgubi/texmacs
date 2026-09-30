@@ -392,6 +392,9 @@ uint32_t current_menu= 0; // the open menu being laid out (its float)
 bool menu_press= false;   // the pass has a press, maybe taken by the menus
 bool menu_hovered= false; // an item of an open menu is under the pointer
 array<uint32_t> menu_zones_now; // the open menus and their buttons
+// the pointer is over the open list of an enum (it floats above the menu
+// which has the enum, where Clay does not see the pointer over the menu)
+static bool pointer_on_enum_list= false;
 // A title of a bar opens its menu as it is pressed, and the button may be
 // held and dragged down to an item, which is chosen by the release (see
 // layout_pull_button): while such a drag lasts, the title gives up the
@@ -600,6 +603,7 @@ gui_init_context() {
     }
   }
   menu_zones_now= array<uint32_t> ();
+  pointer_on_enum_list= false;
   menu_hovered= false;
   current_bar= current_menu= 0;
   
@@ -1983,7 +1987,7 @@ layout_pull_button (vue_ui_rep *w) {
         // a press outside the chain: its last menu closes first, then the
         // ones it hangs from, down to the one the press is in
         bool outside= menu_press && !Clay_PointerOver (float_id) &&
-                      !Clay_PointerOver (button_id);
+                      !Clay_PointerOver (button_id) && !pointer_on_enum_list;
         if (cancel_popup || (!current_popup && outside)) {
           // an item was chosen, or we are the last popup of the chain and
           // the pointer was pressed outside: then we need to deactivate
@@ -3058,6 +3062,15 @@ vue_ui_rep::do_layout () {
             }
           }
         }
+        // a press on the list is its own: the elements under it, laid out
+        // after it, must not take it (a swatch of the colour menu under the
+        // list of the sets of the typographic palette: its release chose
+        // the colour and closed the menu)
+        if (starts (mouse_action, "press-") && Clay_PointerOver (list_id))
+          mouse_action= "";
+        // in a menu, the list is part of it (a press on it is not outside)
+        if (Clay_PointerOver (list_id)) pointer_on_enum_list= true;
+        if (current_menu != 0) menu_zones_now << list_id.id;
         // dismiss the list when clicking somewhere else
         if (starts (mouse_action, "press-") &&
             !Clay_PointerOver (list_id) && !Clay_PointerOver (button_id)) {
@@ -4467,6 +4480,15 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       {
         string kind= check_open<string> (val, s);
         if (win) win->next_refresh_kinds << kind;
+        // numbered at once, and every window laid out again: the widgets
+        // to refresh may be in another window, which the message does not
+        // reach (a menu or a popup whose refreshable part depends on a
+        // choice made in it, the typographic palette of the colour menus)
+        // (not the periodic "auto" one, which each window takes in turn)
+        if (kind != "auto") {
+          refresh_stamps (kind)= ++refresh_serial;
+          gui_needs_relayout= true;
+        }
       }
       break;
     case SLOT_DESTROY:
