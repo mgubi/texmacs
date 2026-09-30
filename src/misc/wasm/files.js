@@ -323,17 +323,13 @@ var tmFiles = (function () {
     box.appendChild (tools);
     box.appendChild (listing); box.appendChild (foot);
 
-    var nameInput = null, dlBox = null;
+    var nameInput = null;
     if (mode === 'save') {
       nameInput = el ('input', 'flex:1');
       nameInput.id = 'tm-files-name';
       nameInput.value = opts.name || 'untitled.tm';
-      var dl = el ('label', 'white-space:nowrap');
-      dlBox = el ('input'); dlBox.type = 'checkbox'; dlBox.checked = false;
-      dl.appendChild (dlBox); dl.appendChild (document.createTextNode (' download a copy'));
       foot.appendChild (el ('span', '', 'Name:'));
       foot.appendChild (nameInput);
-      foot.appendChild (dl);
     }
     var hint = null;
     if (mode !== 'save') {
@@ -364,10 +360,7 @@ var tmFiles = (function () {
         }
         var n = safe (nameInput.value.trim ());
         if (!n) return;
-        var p = join (dir, n);
-        var copy = dlBox.checked;
-        close (p);
-        if (copy) downloadWhenWritten (p);
+        close (join (dir, n));
       }
     }
     if (mode === 'browse') foot.appendChild (button ('Close', function () { close (null); }));
@@ -515,20 +508,6 @@ var tmFiles = (function () {
     current = { close: close };
     render ();
     if (nameInput) { nameInput.focus (); nameInput.select (); }
-  }
-
-  // the copy of a saved file, once TeXmacs has written it (in a later frame)
-  function downloadWhenWritten (p) {
-    var last = -1, stable = 0, tries = 0;
-    var timer = setInterval (function () {
-      var size = -1;
-      try { size = FS.stat (p).size; } catch (e) {}
-      stable = (size >= 0 && size === last) ? stable + 1 : 0;
-      last = size;
-      if (stable < 2 && ++tries < 120) return;
-      clearInterval (timer);
-      if (size >= 0) download (base (p), new Blob ([FS.readFile (p)]));
-    }, 500);
   }
 
   /****************************************************************************
