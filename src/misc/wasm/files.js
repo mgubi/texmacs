@@ -280,15 +280,17 @@ var tmFiles = (function () {
     if (text !== undefined) e.textContent = text;
     return e;
   }
+  // the buttons of the panel, those which open a chooser too: one style
+  var BUTTON = 'display:inline-block;margin-right:6px;padding:2px 8px;border:1px solid #999;' +
+               'border-radius:4px;background:#fff;cursor:pointer;font:inherit;color:inherit';
   function button (text, onclick) {
-    var b = el ('button', 'margin-right:6px', text);
+    var b = el ('button', BUTTON, text);
     b.onclick = onclick;
     return b;
   }
   // a button which opens a chooser: a label around a hidden input
   function chooser (id, text, attrs, onfiles) {
-    var l = el ('label', 'display:inline-block;margin-right:6px;padding:2px 8px;border:1px solid #999;' +
-                         'border-radius:4px;background:#fff;cursor:pointer', text);
+    var l = el ('label', BUTTON, text);
     var i = el ('input', 'display:none');
     i.type = 'file';
     i.id = id;
