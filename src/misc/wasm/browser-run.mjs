@@ -21,7 +21,7 @@
 //   --headed           a window on the screen: the clipboard of the system
 //                      (a headless browser has one of its own)
 //   --script <file>    actions after the load, one per line (# comments):
-//                        wait <ms> | shot <name> | click <x> <y> |
+//                        wait <ms> | shot <name> | click <x> <y> | rclick <x> <y> |
 //                        move <x> <y> | type <text> | key <name> |
 //                        wheel <x> <y> <dx> <dy> | drag <x1> <y1> <x2> <y2> |
 //                        down <x> <y> | up (a button held over moves) |
@@ -108,6 +108,7 @@ if (script) {
       await page.screenshot ({ path: path.join (out, a[0] + '.png') });
     }
     else if (cmd === 'click') await page.mouse.click (Number (a[0]), Number (a[1]));
+    else if (cmd === 'rclick') await page.mouse.click (Number (a[0]), Number (a[1]), { button: 'right' });
     else if (cmd === 'move') await page.mouse.move (Number (a[0]), Number (a[1]));
     else if (cmd === 'wheel') {
       await page.mouse.move (Number (a[0]), Number (a[1]));

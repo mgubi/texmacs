@@ -136,6 +136,32 @@ static const float menu_round= 1.5f;
 // layout_pull_button)
 static bool in_footer= false;
 
+// The context menu of the editor (texmacs-popup-menu, the Focus menu) at a
+// point of the screen (SI, y upwards as for set_position): a right click
+// on a tag of the interactive footer, once the tag is selected (the
+// command of the tag runs first). One at a time: a new one replaces the
+// last, as the popup of the editor (edit_interface_rep::mouse_adjust)
+static widget footer_popup_wid;
+
+class footer_popup_command_rep : public command_rep {
+  SI x, y;
+public:
+  footer_popup_command_rep (SI x2, SI y2) : x (x2), y (y2) {}
+  void apply () {
+    if (!is_nil (footer_popup_wid)) {
+      set_visibility (footer_popup_wid, false);
+      destroy_window_widget (footer_popup_wid);
+      footer_popup_wid= widget ();
+    }
+    widget menu= make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))"));
+    footer_popup_wid= popup_window_widget (popup_widget (menu), "Popup menu");
+    set_position (footer_popup_wid, x, y);
+    set_visibility (footer_popup_wid, true);
+  }
+  void apply (object arg) { (void) arg; apply (); }
+  tm_ostream& print (tm_ostream& out) { return out << "<footer_popup_command>"; }
+};
+
 /******************************************************************************
 * Themes
 *
@@ -2687,6 +2713,18 @@ vue_ui_rep::do_layout () {
       if (DEBUG_VUE_WIDGETS) debug_widgets << "Click!! " << id << LF;
       cmd_list= list(d.cmd, cmd_list);
     }
+    else if (sig.clicked == 3 && in_footer && current_window != NULL) {
+      // a tag of the interactive footer: selected, then its context menu
+      // at the pointer (the position of the window and the pointer in
+      // points; mouse_x, mouse_y are layout pixels)
+      cancel_popup= true;
+      SI wx, wy;
+      current_window->get_position (wx, wy);
+      SI x= wx + (SI) (mouse_x * PIXEL / retina_factor);
+      SI y= wy - (SI) (mouse_y * PIXEL / retina_factor);
+      cmd_list= list (d.cmd, cmd_list);
+      cmd_list= list (command (tm_new<footer_popup_command_rep> (x, y)), cmd_list);
+    }
     return;
   }
   if (type == "pulldown_button" || type == "pullright_button") {
@@ -4736,6 +4774,7 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   bool footer_menus;
   object footer_env_menu, footer_path_menu;
   vue_widget footer_env, footer_path;
+  float footer_room; // the width of the tags in the last layout, points
   void update_footer_menus ();
 
   // the title of the window and the marker of a document with unsaved
@@ -4786,7 +4825,7 @@ visibility_index (slot s) {
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit),
-    win (NULL), interactive_mode (false), footer_menus (false),
+    win (NULL), interactive_mode (false), footer_menus (false), footer_room (0),
     win_title_set (false), win_modified (false), win_modified_set (false)
 {
   // decode mask
@@ -5161,6 +5200,11 @@ footer_menu (object& current, vue_widget& w, string menu) {
 
 void
 vue_texmacs_widget_rep::update_footer_menus () {
+  // the room of the tags, in characters (their width in the last pass,
+  // at some 7 points a character): the outer tags which do not fit are
+  // folded into a menu, see (texmacs menus footer-menu)
+  if (footer_room > 0)
+    call ("footer-set-budget", object (max ((int) (footer_room / 7.0f), 12)));
   footer_menu (footer_env_menu, footer_env,
                "(horizontal (link texmacs-footer-environment))");
   footer_menu (footer_path_menu, footer_path,
@@ -5347,11 +5391,20 @@ void vue_texmacs_widget_rep::do_layout () {
         // (clipped on their left: the innermost tags stay in view)
         in_footer= true;
         footer_env->do_layout ();
-        CLAY_AUTO_ID({
+        // when the tags are wider than their room, they are shifted left by
+        // the difference (as measured in the last pass): the end of the
+        // path, the innermost tags and the character, stays in view
+        Clay_ElementId path_id= CLAY_IDI ("footer_path", id);
+        Clay_ScrollContainerData pd= Clay_GetScrollContainerData (path_id);
+        float shift= 0;
+        if (pd.found && pd.contentDimensions.width > pd.scrollContainerDimensions.width)
+          shift= pd.scrollContainerDimensions.width - pd.contentDimensions.width;
+        if (pd.found) footer_room= pd.scrollContainerDimensions.width / retina_factor;
+        CLAY(path_id, {
           .layout= {
             .sizing= { .width= CLAY_SIZING_GROW(0) },
             .childAlignment= { .x= CLAY_ALIGN_X_RIGHT, .y= CLAY_ALIGN_Y_CENTER }},
-          .clip= { .horizontal= true }})
+          .clip= { .horizontal= true, .childOffset= { shift, 0 } }})
         {
           footer_path->do_layout ();
         }
