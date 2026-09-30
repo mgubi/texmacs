@@ -14,9 +14,9 @@ window) shows as menus and buttons what it otherwise shows as text.
 * **On the right, the tags around the cursor**, from the outermost to the
   innermost (in bold), separated by `›`. A click on one selects it, as a
   click in the context tool (Tools › Context tool) does; a **right click**
-  selects it and opens the context menu of the editor on it, its Focus
-  menu (rename, remove, variants, preferences of the tag...), at the
-  pointer. `document` and `concat`, which say nothing, are left out.
+  (or, on a Mac, Control+click or Option+click) selects it and opens the
+  context menu of the editor on it, its Focus menu (rename, remove,
+  variants, preferences of the tag...), at the pointer. `document` and `concat`, which say nothing, are left out.
 * **Folding.** The outer tags which do not fit in the room of the path
   fold into a `…` menu (a click on one of them selects it); the innermost
   tags stay in view. If the path is still too wide (a narrow window) it is
@@ -42,7 +42,8 @@ while the status bar is), the preference `interactive footer` (`on` or
 | `TeXmacs/progs/kernel/texmacs/tm-dialogue.scm` | `(footer-environment?)`, that state. A function and not an exported variable: an exported variable is a copy of the binding of the module, which a `set!` in the module does not change |
 | `src/Plugins/Vue/vue_widget.cpp`, `vue_texmacs_widget_rep` | At `SLOT_LEFT_FOOTER` (sent first) it reads the preference and `(footer-environment?)`; at `SLOT_RIGHT_FOOTER` it expands the two menus and rebuilds the widget of each only when its expansion changed (`update_footer_menus`, as `tm_window_rep::get_menu_widget` does for the tool bars). The footer then lays out the environment menu on the left and the path on the right, right-aligned; when the path is wider than its room it is shifted left by the difference measured in the last pass, so that its end stays in view. The width of the path in the last layout (`footer_room`, points, at some 7 points a character) is the budget given to Scheme before the menus are expanded |
 | `vue_widget.cpp`, `in_footer` | Set while the footer is laid out: the buttons are flatter (the footer is lower than the tool bars), the pull-down buttons get a chevron (`layout_arrow`), and a right click on a button (a tag) runs its command, then `footer_popup_command_rep`, which opens `texmacs-popup-menu` (the Focus menu of the selection) in a popup window at the pointer, as `edit_interface_rep::mouse_adjust` does for a right click in the document |
-| `misc/wasm/browser-run.mjs` | `rclick x y`, a right click, for the tests |
+| `misc/wasm/clipboard.js`, `vue_gui.cpp` (the mouse buttons) | Control+click on a Mac in a browser: the browser sends a `mousedown` of the right button but no `pointerdown`, then a `pointerup` of the left button, so that SDL (which listens to the pointer events) saw no click at all. The page gives SDL a `pointerdown` and a `pointerup` of the right button; and Vue takes a left release which ends a right press made with Control as a right release (a browser which sends that `pointerdown` but the left `pointerup`). This is for every click of the page, not only the footer |
+| `misc/wasm/browser-run.mjs` | `rclick x y`, a right click, and `hold key` / `release key`, a modifier held over clicks, for the tests |
 
 The only change outside Vue and the Scheme menus is the notification in
 `set_footer`, which the other interfaces ignore.

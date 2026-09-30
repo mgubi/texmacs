@@ -22,6 +22,7 @@
 //                      (a headless browser has one of its own)
 //   --script <file>    actions after the load, one per line (# comments):
 //                        wait <ms> | shot <name> | click <x> <y> | rclick <x> <y> |
+//                        hold <key> | release <key> (a modifier held over clicks) |
 //                        move <x> <y> | type <text> | key <name> |
 //                        wheel <x> <y> <dx> <dy> | drag <x1> <y1> <x2> <y2> |
 //                        down <x> <y> | up (a button held over moves) |
@@ -151,6 +152,8 @@ if (script) {
       for (const k of keys) await page.keyboard.down (k);
       for (const k of keys.reverse ()) await page.keyboard.up (k);
     }
+    else if (cmd === 'hold') await page.keyboard.down (a[0]);
+    else if (cmd === 'release') await page.keyboard.up (a[0]);
     else console.log (`script: unknown command ${cmd}`);
   }
 }

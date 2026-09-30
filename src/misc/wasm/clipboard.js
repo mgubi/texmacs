@@ -206,3 +206,40 @@ var tmClipboard = (function () {
     }
   };
 })();
+
+// Control and a click on a Mac (the right click of a trackpad or of a mouse
+// with one button): the browser sends a mousedown of the right button (and
+// a contextmenu) but no pointerdown, then a pointerup of the left button.
+// SDL, which listens to the pointer events, sees a release and no press,
+// and TeXmacs no click at all. The press is given to SDL as a pointerdown
+// of the right button, and the release as a pointerup of the right button.
+(function () {
+  if (typeof window === 'undefined') return;
+  var pressed = false;   // a pointerdown came for this press
+  var ours = false;      // the press was ours: its release is too
+  function pointer (type, e, buttons) {
+    return new PointerEvent (type, {
+      bubbles: true, cancelable: true, composed: true,
+      clientX: e.clientX, clientY: e.clientY, screenX: e.screenX, screenY: e.screenY,
+      button: 2, buttons: buttons, pointerId: 1, pointerType: 'mouse', isPrimary: true,
+      ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey });
+  }
+  window.addEventListener ('pointerdown', function (e) {
+    if (e.isTrusted) pressed = true;
+  }, true);
+  window.addEventListener ('mousedown', function (e) {
+    if (e.button === 2 && e.ctrlKey && !pressed && e.target && e.target.tagName === 'CANVAS') {
+      ours = true;
+      e.target.dispatchEvent (pointer ('pointerdown', e, 2));
+    }
+    pressed = false;
+  }, true);
+  window.addEventListener ('pointerup', function (e) {
+    if (ours && e.isTrusted) {
+      ours = false;
+      e.stopImmediatePropagation ();
+      e.preventDefault ();
+      (e.target || window).dispatchEvent (pointer ('pointerup', e, 0));
+    }
+  }, true);
+})();

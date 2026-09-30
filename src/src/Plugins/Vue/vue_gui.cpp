@@ -4264,6 +4264,19 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP:
     {
+      // Control and a click on a Mac, in a browser: the browser makes it a
+      // right click, but only the press (button 2, with a "contextmenu");
+      // the release is of the left button. That release ends the right
+      // click, or it would never end (and a widget would see a right press
+      // then a left release: no click at all)
+      static bool right_from_left= false;
+      if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+        right_from_left= (event->button.button == SDL_BUTTON_RIGHT &&
+                          (SDL_GetModState () & SDL_KMOD_CTRL) != 0);
+      else if (right_from_left && event->button.button == SDL_BUTTON_LEFT) {
+        event->button.button= SDL_BUTTON_RIGHT;
+        right_from_left= false;
+      }
       update_mouse_state ();
       win= get_window_from_ID (event->button.windowID);
       float bx= event->button.x, by= event->button.y;

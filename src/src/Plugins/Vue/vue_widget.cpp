@@ -2707,13 +2707,19 @@ vue_ui_rep::do_layout () {
             .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }}) {}
       }
     }
-    if (sig.clicked == 1) {
+    // a right click on a tag of the interactive footer, or a click with
+    // Control or Option held: the right click of a Mac trackpad or mouse
+    // with one button, which the browser (and SDL) report as a left click
+    bool context_click= in_footer && current_window != NULL &&
+      (sig.clicked == 3 ||
+       (sig.clicked == 1 && (SDL_GetModState () & (SDL_KMOD_CTRL | SDL_KMOD_ALT)) != 0));
+    if (sig.clicked == 1 && !context_click) {
       // close any active popup chain (see pull_widget)
       cancel_popup= true;
       if (DEBUG_VUE_WIDGETS) debug_widgets << "Click!! " << id << LF;
       cmd_list= list(d.cmd, cmd_list);
     }
-    else if (sig.clicked == 3 && in_footer && current_window != NULL) {
+    else if (context_click) {
       // a tag of the interactive footer: selected, then its context menu
       // at the pointer (the position of the window and the pointer in
       // points; mouse_x, mouse_y are layout pixels)
