@@ -178,6 +178,7 @@
 "font-database-search"
 "font-available-features"
 "font-variation-axes"
+"font-clean-instances"
 "font-logical-search"
 "font-database-characteristics"
 "font-database-substitutions"

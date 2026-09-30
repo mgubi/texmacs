@@ -251,7 +251,9 @@
   brought back into it, and axes the font does not have, as well as fonts
   which are not variable, ignore the variable, which is therefore safe to
   set on a whole document. Each point used is written once as an ordinary
-  font under <verbatim|fonts/unpacked> in your <TeXmacs> home directory.
+  font under <verbatim|fonts/unpacked> in your <TeXmacs> home directory;
+  the least recently used ones are removed beyond 200 MB, and
+  <menu|Tools|Fonts|Clear font cache> removes them all.
   Only fonts with <name|TrueType> outlines can be varied.
 
   The series may also be given as a weight, from 1 to 1000, as in

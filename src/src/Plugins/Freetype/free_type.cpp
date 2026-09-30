@@ -56,6 +56,9 @@ FT_Error (*ft_done_face)      (FT_Face        face);
 FT_Error (*ft_set_var_design_coordinates) (FT_Face   face,
                                            FT_UInt   num_coords,
                                            FT_Fixed* coords)= NULL;
+FT_Error (*ft_get_var_blend_coordinates) (FT_Face   face,
+                                          FT_UInt   num_coords,
+                                          FT_Fixed* coords)= NULL;
 
 typedef FT_Error (*glyph_renderer) (FT_GlyphSlot, FT_Render_Mode);
 
@@ -75,6 +78,7 @@ ft_initialize () {
   ft_get_kerning   = FT_Get_Kerning;
   ft_done_face     = FT_Done_Face;
   ft_set_var_design_coordinates= FT_Set_Var_Design_Coordinates;
+  ft_get_var_blend_coordinates = FT_Get_Var_Blend_Coordinates;
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "With linked TrueType support\n";
 #else
@@ -112,6 +116,9 @@ ft_initialize () {
   (void) symbol_install ("/usr/lib/libfreetype.so",
                          "FT_Set_Var_Design_Coordinates",
                          (pointer&) ft_set_var_design_coordinates);
+  (void) symbol_install ("/usr/lib/libfreetype.so",
+                         "FT_Get_Var_Blend_Coordinates",
+                         (pointer&) ft_get_var_blend_coordinates);
   debug_on (status);
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "Installed TrueType support\n";

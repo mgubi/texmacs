@@ -1773,6 +1773,19 @@ tmg_font_database_search (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_font_clean_instances (tmscm arg1) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "font-clean-instances");
+
+  int in1= tmscm_to_int (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tt_clean_instances (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_font_variation_axes (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-variation-axes");
 
@@ -11627,6 +11640,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("font-database-search",  tmg_font_database_search, 2, 0, 0);
   tmscm_install_procedure ("font-available-features",  tmg_font_available_features, 1, 0, 0);
   tmscm_install_procedure ("font-variation-axes",  tmg_font_variation_axes, 1, 0, 0);
+  tmscm_install_procedure ("font-clean-instances",  tmg_font_clean_instances, 1, 0, 0);
   tmscm_install_procedure ("font-logical-search",  tmg_font_logical_search, 4, 0, 0);
   tmscm_install_procedure ("font-database-characteristics",  tmg_font_database_characteristics, 2, 0, 0);
   tmscm_install_procedure ("font-database-substitutions",  tmg_font_database_substitutions, 1, 0, 0);

@@ -173,6 +173,7 @@
   (font-database-search font_database_search (array_string string string))
   (font-available-features ot_font_features (array_string string))
   (font-variation-axes tt_font_axes (scheme_tree string))
+  (font-clean-instances tt_clean_instances (void int))
   (font-logical-search font_database_search (array_string string string string string))
   (font-database-characteristics
    font_database_characteristics (array_string string string))

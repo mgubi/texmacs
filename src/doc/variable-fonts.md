@@ -158,23 +158,50 @@ extrema), `maxp` (points and contours; no composites, no instructions) and
 `OS/2.usWeightClass` (the `wght` coordinate). The tables of variations
 (`fvar gvar avar cvar HVAR VVAR MVAR STAT`) and of hinting
 (`cvt fpgm prep hdmx LTSH VDMX`) are dropped, as is `DSIG`; the others are
-copied as they are. Checksums and `checkSumAdjustment` are computed anew.
+copied as they are, except `GPOS` (below). Checksums and
+`checkSumAdjustment` are computed anew.
+
+**Positioning.** The values of `GPOS` are those of the default instance; a
+value which varies has a Device table in the format `VariationIndex`,
+pointing to deltas in the `ItemVariationStore` of `GDEF`, one for each
+region of the design space. `tt_vary_gpos` corrects every such value in
+place, at the normalized coordinates FreeType gives for the instance
+(`FT_Get_Var_Blend_Coordinates`, after `avar`): the value records of
+single and pair adjustments (kerning; in a PairSet the Device tables are
+relative to the PairSet, elsewhere to the subtable) and the anchors of
+cursive attachment and of marks on bases, ligatures and marks. The tables
+keep their layout, and a field shared by several records is corrected
+once.
 
 Checked against `fontTools.varLib.instancer` on SF NS Bold and Extra
 Compressed Thin: outlines agree within the rounding to integer units, and
 advances agree except for a few composite glyphs flagged
 `USE_MY_METRICS`, where the instance takes the advance of the component
-(as the default instance does) and fontTools the one of `HVAR`.
+(as the default instance does) and fontTools the one of `HVAR`. The
+kerning of every pair of letters, digits and punctuation (4146 pairs, of
+which 897 at Black and 1277 at `wdth=60,wght=850` differ from the
+default) agrees with fontTools exactly, and so do the 12002 mark anchors of
+Junicode VF at weight 700 (11530 of them varying).
+
+## Disk space
+
+Each instance is a file of the size of the variable font (1.5 MB for SF
+NS, 2.9 MB for Junicode VF). The access time of a file records when it was
+last used (`tt_unpack` sets it; the modification time is left alone, since
+it says which version of the variable font the file comes from), and when
+the font database is loaded, `tt_clean_instances` removes the least
+recently used instances beyond 200 MB. `Tools > Fonts > Clear font cache`
+removes them all (`font-clean-instances 0`). Instances are not cached in
+`font_cache.scm`: `tt_font_find` passes their names to `tt_unpack` every
+time, which checks them against the variable font.
 
 ## Limits
 
 - **CFF2** variable fonts (cubic outlines) are not instanced; they keep their
   default instance only.
-- **GPOS, GDEF, MATH, kern** are those of the default instance. Kerning
-  pairs and mark positions of a Black are therefore those of the Regular;
-  applying `GDEF` item variations would fix that.
+- **MATH, kern, GDEF** are those of the default instance, and so are the
+  lookups which `GSUB` and `GPOS` switch at some points of the design space
+  (`FeatureVariations`, as in a dollar sign with a simpler bar at heavy
+  weights). No variable math font is known to TeXmacs yet.
 - No slider in the panel (see above).
-- Every point used is a static font of the size of the variable font (1.5
-  MB for SF NS) in `fonts/unpacked`, and nothing removes the ones which are
-  no longer used.
 - Collections of variable fonts (`.ttc`) are not instanced.

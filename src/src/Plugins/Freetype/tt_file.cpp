@@ -187,6 +187,9 @@ tt_font_find (string name) {
   // came first still named the .pfb file of a family whose .otf TeXmacs
   // now wants; the font then had no OpenType feature and no MATH table.
   // Change the prefix whenever tt_font_find_sub changes its order.
+  // an instance of a variable font is checked against the variable font
+  // (which may have been updated) each time, and not cached
+  if (tt_is_instance_name (name)) return tt_unpack (name);
   string s= "sfnt:" * name;
   if (is_cached ("font_cache.scm", s)) {
     string r= cache_get ("font_cache.scm", s) -> label;

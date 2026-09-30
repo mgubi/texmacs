@@ -25,12 +25,15 @@ int tt_instance_record (string fvar, int k);
 double tt_instance_coordinate (string fvar, int k, string axis, double def);
 string tt_make_instance (string tt, int k);
 string tt_make_variation (string tt, array<double> coords);
+string tt_vary_gpos (string gpos, string gdef, array<double> nc);
 array<string> tt_axis_tags (string fvar);
 array<double> tt_axis_values (string fvar, int which);
 array<double> tt_variation_coordinates (string fvar, string suffix);
 string tt_variation_name (string name, string spec, int sz);
 scheme_tree tt_font_axes (string name);
 url tt_unpack (string name);
+bool tt_is_instance_name (string name);
+void tt_clean_instances (int max_mb);
 
 string find_attribute_value (array<string> a, string s);
 array<string> tt_analyze (string family);

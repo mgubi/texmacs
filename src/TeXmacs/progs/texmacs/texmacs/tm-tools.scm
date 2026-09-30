@@ -74,7 +74,9 @@
       "$TEXMACS_HOME_PATH/fonts/font-database.scm"
       "$TEXMACS_HOME_PATH/fonts/font-features.scm"
       "$TEXMACS_HOME_PATH/fonts/font-characteristics.scm"
-      "$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm")))
+      "$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm"))
+  ;; the static fonts written for the instances of variable fonts
+  (font-clean-instances 0))
 
 (tm-define (scan-disk-for-fonts)
   (:interactive #t)

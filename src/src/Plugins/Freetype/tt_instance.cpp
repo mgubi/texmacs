@@ -20,6 +20,8 @@
 
 #include "tt_tools.hpp"
 #include "analyze.hpp"
+#include "hashmap.hpp"
+#include <math.h>
 
 #ifdef USE_FREETYPE
 #include "free_type.hpp"
@@ -31,7 +33,7 @@ string tt_table (string tt, int i, int k);
 
 static int
 U16_at (string s, int i) {
-  if (i + 2 > N(s)) return 0;
+  if (i < 0 || i + 2 > N(s)) return 0;
   return (((int) (unsigned char) s[i]) << 8) + ((int) (unsigned char) s[i+1]);
 }
 
@@ -48,7 +50,7 @@ put32 (string& s, unsigned int v) {
 
 static void
 set16 (string& s, int i, int v) {
-  if (i + 2 > N(s)) return;
+  if (i < 0 || i + 2 > N(s)) return;
   s[i]  = (char) ((v >> 8) & 255);
   s[i+1]= (char) (v & 255);
 }
@@ -84,6 +86,250 @@ dropped_table (string tag) {
     tag == "LTSH" || tag == "VDMX" || tag == "DSIG";
 }
 
+/******************************************************************************
+* The positioning values of an instance
+******************************************************************************/
+
+// The values of GPOS (kerning pairs, the anchors of marks) are those of the
+// default instance; a value which varies has a Device table in the format
+// VariationIndex, which points to deltas in the ItemVariationStore of GDEF,
+// one for each region of the design space. The values are corrected in
+// place: the tables keep their layout, and every field is corrected once,
+// however many records share it.
+
+static int
+S16_at (string s, int i) {
+  int v= U16_at (s, i);
+  return v >= 32768? v - 65536: v;
+}
+
+static int
+U32_at (string s, int i) {
+  return (U16_at (s, i) << 16) + U16_at (s, i+2);
+}
+
+static double
+F2DOT14_at (string s, int i) {
+  return ((double) S16_at (s, i)) / 16384.0;
+}
+
+static double
+region_scalar (string gd, int regions, int r, array<double> nc) {
+  int axis_count  = U16_at (gd, regions);
+  int region_count= U16_at (gd, regions + 2);
+  if (r >= region_count) return 0.0;
+  int pos= regions + 4 + r * axis_count * 6;
+  double scalar= 1.0;
+  for (int a=0; a<axis_count; a++, pos += 6) {
+    double start= F2DOT14_at (gd, pos);
+    double peak = F2DOT14_at (gd, pos + 2);
+    double end  = F2DOT14_at (gd, pos + 4);
+    double c    = (a < N(nc))? nc[a]: 0.0;
+    if (start > peak || peak > end) continue;
+    if (start < 0.0 && end > 0.0 && peak != 0.0) continue;
+    if (peak == 0.0) continue;
+    if (c < start || c > end) return 0.0;
+    if (c == peak) continue;
+    if (c < peak) scalar *= (c - start) / (peak - start);
+    else scalar *= (end - c) / (end - peak);
+  }
+  return scalar;
+}
+
+static double
+item_delta (string gd, int store, int outer, int inner, array<double> nc) {
+  if (store <= 0 || store + 8 > N(gd) || U16_at (gd, store) != 1) return 0.0;
+  int regions= store + U32_at (gd, store + 2);
+  int count  = U16_at (gd, store + 6);
+  if (outer >= count) return 0.0;
+  int data= store + U32_at (gd, store + 8 + 4 * outer);
+  int item_count= U16_at (gd, data);
+  int word_count= U16_at (gd, data + 2);
+  int ric       = U16_at (gd, data + 4);
+  bool long_words= (word_count & 0x8000) != 0;
+  word_count &= 0x7fff;
+  if (inner >= item_count || word_count > ric) return 0.0;
+  int row_size= long_words? 4 * word_count + 2 * (ric - word_count)
+                          : 2 * word_count + (ric - word_count);
+  int pos= data + 6 + 2 * ric + inner * row_size;
+  if (pos + row_size > N(gd)) return 0.0;
+  double sum= 0.0;
+  for (int j=0; j<ric; j++) {
+    int region= U16_at (gd, data + 6 + 2 * j);
+    int delta;
+    if (j < word_count) {
+      if (long_words) { delta= U32_at (gd, pos); pos += 4; }
+      else { delta= S16_at (gd, pos); pos += 2; }
+    }
+    else {
+      if (long_words) { delta= S16_at (gd, pos); pos += 2; }
+      else {
+        delta= (pos < N(gd))? (int) (unsigned char) gd[pos]: 0; pos += 1;
+        if (delta >= 128) delta -= 256;
+      }
+    }
+    if (delta != 0) sum += delta * region_scalar (gd, regions, region, nc);
+  }
+  return sum;
+}
+
+struct gpos_variator {
+  string g, gd;
+  int store;
+  array<double> nc;
+  hashmap<int,bool> done;
+  gpos_variator (string g2, string gd2, int store2, array<double> nc2):
+    g (copy (g2)), gd (gd2), store (store2), nc (nc2), done (false) {}
+  void device (int field, int dev);
+  int  value_size (int format);
+  void value_record (int rec, int format, int base);
+  void anchor (int a);
+  void subtable (int st, int type, int depth);
+  void run ();
+};
+
+void
+gpos_variator::device (int field, int dev) {
+  // correct the value at field by the delta of the Device table at dev
+  if (dev + 6 > N(g) || field + 2 > N(g) || done[field]) return;
+  if (U16_at (g, dev + 4) != 0x8000) return;  // hinting deltas, for pixels
+  int outer= U16_at (g, dev), inner= U16_at (g, dev + 2);
+  double d= item_delta (gd, store, outer, inner, nc);
+  int v= S16_at (g, field) + (int) floor (d + 0.5);
+  set16 (g, field, v);
+  done (field)= true;
+}
+
+int
+gpos_variator::value_size (int format) {
+  int n= 0;
+  for (int b=0; b<8; b++) if ((format >> b) & 1) n++;
+  return 2 * n;
+}
+
+void
+gpos_variator::value_record (int rec, int format, int base) {
+  // the value fields come first, then the offsets of their Device tables
+  int field[4]= { -1, -1, -1, -1 };
+  int pos= rec;
+  for (int b=0; b<4; b++)
+    if ((format >> b) & 1) { field[b]= pos; pos += 2; }
+  for (int b=4; b<8; b++)
+    if ((format >> b) & 1) {
+      int off= U16_at (g, pos); pos += 2;
+      if (off != 0 && field[b-4] >= 0) device (field[b-4], base + off);
+    }
+}
+
+void
+gpos_variator::anchor (int a) {
+  if (a <= 0 || a + 10 > N(g) || U16_at (g, a) != 3) return;
+  int xdev= U16_at (g, a + 6), ydev= U16_at (g, a + 8);
+  if (xdev != 0) device (a + 2, a + xdev);
+  if (ydev != 0) device (a + 4, a + ydev);
+}
+
+void
+gpos_variator::subtable (int st, int type, int depth) {
+  if (st <= 0 || st + 4 > N(g) || depth > 2) return;
+  int fmt= U16_at (g, st);
+  if (type == 9) {                             // extension
+    if (fmt == 1) subtable (st + U32_at (g, st + 4), U16_at (g, st + 2),
+                            depth + 1);
+  }
+  else if (type == 1) {                        // single adjustment
+    int vf= U16_at (g, st + 4);
+    if (fmt == 1) value_record (st + 6, vf, st);
+    else if (fmt == 2) {
+      int n= U16_at (g, st + 6), sz= value_size (vf);
+      for (int i=0; i<n; i++) value_record (st + 8 + i * sz, vf, st);
+    }
+  }
+  else if (type == 2) {                        // pair adjustment
+    int vf1= U16_at (g, st + 4), vf2= U16_at (g, st + 6);
+    int s1= value_size (vf1), s2= value_size (vf2);
+    if (fmt == 1) {
+      int n= U16_at (g, st + 8);
+      for (int i=0; i<n; i++) {
+        int ps= st + U16_at (g, st + 10 + 2 * i);
+        int cnt= U16_at (g, ps);
+        for (int j=0; j<cnt; j++) {
+          // here the Device tables are relative to the PairSet
+          int rec= ps + 2 + j * (2 + s1 + s2);
+          value_record (rec + 2, vf1, ps);
+          value_record (rec + 2 + s1, vf2, ps);
+        }
+      }
+    }
+    else if (fmt == 2) {
+      int c1= U16_at (g, st + 12), c2= U16_at (g, st + 14);
+      int rec= st + 16;
+      for (int i=0; i < c1 * c2; i++, rec += s1 + s2) {
+        value_record (rec, vf1, st);
+        value_record (rec + s1, vf2, st);
+      }
+    }
+  }
+  else if (type == 3) {                        // cursive attachment
+    int n= U16_at (g, st + 4);
+    for (int i=0; i<n; i++) {
+      int en= U16_at (g, st + 6 + 4 * i), ex= U16_at (g, st + 8 + 4 * i);
+      if (en != 0) anchor (st + en);
+      if (ex != 0) anchor (st + ex);
+    }
+  }
+  else if (type == 4 || type == 5 || type == 6) {  // attachment of marks
+    int classes= U16_at (g, st + 6);
+    int marks= st + U16_at (g, st + 8);
+    int n= U16_at (g, marks);
+    for (int i=0; i<n; i++) {
+      int off= U16_at (g, marks + 2 + 4 * i + 2);
+      if (off != 0) anchor (marks + off);
+    }
+    int bases= st + U16_at (g, st + 10);
+    int m= U16_at (g, bases);
+    if (type == 5)
+      for (int i=0; i<m; i++) {
+        int lig= bases + U16_at (g, bases + 2 + 2 * i);
+        int comps= U16_at (g, lig);
+        for (int k=0; k < comps * classes; k++) {
+          int off= U16_at (g, lig + 2 + 2 * k);
+          if (off != 0) anchor (lig + off);
+        }
+      }
+    else
+      for (int k=0; k < m * classes; k++) {
+        int off= U16_at (g, bases + 2 + 2 * k);
+        if (off != 0) anchor (bases + off);
+      }
+  }
+}
+
+void
+gpos_variator::run () {
+  if (N(g) < 10) return;
+  int ll= U16_at (g, 8);
+  int n= U16_at (g, ll);
+  for (int i=0; i<n; i++) {
+    int lk= ll + U16_at (g, ll + 2 + 2 * i);
+    int type= U16_at (g, lk), subs= U16_at (g, lk + 4);
+    for (int j=0; j<subs; j++)
+      subtable (lk + U16_at (g, lk + 6 + 2 * j), type, 0);
+  }
+}
+
+string
+tt_vary_gpos (string gpos, string gdef, array<double> nc) {
+  // gpos with its values at the normalized coordinates nc
+  if (N(gdef) < 18 || U16_at (gdef, 0) != 1 || U16_at (gdef, 2) < 3)
+    return gpos;
+  int store= U32_at (gdef, 14);
+  if (store == 0) return gpos;
+  gpos_variator v (gpos, gdef, store, nc);
+  v.run ();
+  return v.g;
+}
+
 // The static font of the named instance k (from 1) or, for k = 0, of the
 // point with the given design coordinates (one for each axis, in the order
 // of fvar)
@@ -104,6 +350,14 @@ tt_make_static (string tt, int k, array<double> coords) {
     FT_Error err= ft_set_var_design_coordinates (face, na, c);
     tm_delete_array (c);
     if (err) { ft_done_face (face); return ""; }
+  }
+  array<double> nc;                           // normalized coordinates
+  if (ft_get_var_blend_coordinates != NULL) {
+    int na= N (tt_axis_tags (fv));
+    FT_Fixed* c= tm_new_array<FT_Fixed> (max (na, 1));
+    if (ft_get_var_blend_coordinates (face, na, c) == 0)
+      for (int a=0; a<na; a++) nc << ((double) c[a]) / 65536.0;
+    tm_delete_array (c);
   }
   int n= (int) face->num_glyphs;
 
@@ -179,6 +433,8 @@ tt_make_static (string tt, int k, array<double> coords) {
     tabs (tag)= tt_table (tt, 0, t);
     tags << tag;
   }
+  if (N(nc) > 0 && tabs->contains ("GPOS") && tabs->contains ("GDEF"))
+    tabs ("GPOS")= tt_vary_gpos (tabs ["GPOS"], tabs ["GDEF"], nc);
   tabs ("glyf")= glyf;
   tabs ("loca")= loca_tab;
   tabs ("hmtx")= hmtx;

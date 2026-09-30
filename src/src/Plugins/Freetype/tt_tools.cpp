@@ -16,6 +16,11 @@
 #include "iterator.hpp"
 #include "sys_utils.hpp"
 #include <math.h>
+#include <sys/stat.h>
+#include <time.h>
+#ifndef OS_MINGW
+#include <utime.h>
+#endif
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -716,6 +721,74 @@ tt_font_instances (url u) {
   return r;
 }
 
+/******************************************************************************
+* The static fonts written for variable fonts
+******************************************************************************/
+
+// Each instance used is a file of the size of the variable font. The access
+// time of a file records when it was last used (its modification time says
+// which version of the variable font it comes from), and the least recently
+// used ones are removed when there are too many.
+
+bool
+tt_is_instance_name (string s) {
+  string suf= suffix (url (s));
+  return (N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)))) ||
+         starts (suf, "var_");
+}
+
+static void
+tt_mark_used (url u) {
+#ifndef OS_MINGW
+  string name= concretize (u);
+  c_string p (name);
+  struct stat st;
+  if (stat (p, &st) != 0) return;
+  struct utimbuf t;
+  t.actime = time (NULL);
+  t.modtime= st.st_mtime;
+  (void) utime (p, &t);
+#else
+  (void) u;
+#endif
+}
+
+void
+tt_clean_instances (int max_mb) {
+  // keep at most max_mb megabytes of instances; 0 removes them all
+  url dir= url ("$TEXMACS_HOME_PATH/fonts/unpacked");
+  if (!is_directory (dir)) return;
+  bool err;
+  array<string> a= read_directory (dir, err);
+  if (err) return;
+  array<string> names;
+  array<long> used, sizes;
+  long total= 0;
+  for (int i=0; i<N(a); i++) {
+    if (!ends (a[i], ".ttf")) continue;
+    if (!tt_is_instance_name (a[i] (0, N(a[i]) - 4))) continue;
+    string name= concretize (dir * url (a[i]));
+    c_string p (name);
+    struct stat st;
+    if (stat (p, &st) != 0) continue;
+    names << a[i];
+    used  << (long) st.st_atime;
+    sizes << (long) st.st_size;
+    total += (long) st.st_size;
+  }
+  long max_bytes= ((long) max_mb) << 20;
+  while (total > max_bytes && N(names) > 0) {
+    int old= 0;
+    for (int i=1; i<N(names); i++)
+      if (used[i] < used[old]) old= i;
+    remove (dir * url (names[old]));
+    total -= sizes[old];
+    names= append (range (names, 0, old), range (names, old+1, N(names)));
+    used = append (range (used , 0, old), range (used , old+1, N(used )));
+    sizes= append (range (sizes, 0, old), range (sizes, old+1, N(sizes)));
+  }
+}
+
 url
 tt_unpack (string s) {
   string suf= suffix (url (s));
@@ -728,8 +801,10 @@ tt_unpack (string s) {
     url u= tt_font_find (strip_suffix (s));
     if (is_none (u)) return url_none ();
     // written again when the variable font was updated since
-    if (exists (name) && last_modified (u, false) <= last_modified (name, false))
+    if (exists (name) && last_modified (u, false) <= last_modified (name, false)) {
+      tt_mark_used (name);
       return name;
+    }
     string tt;
     if (load_string (u, tt, false)) return url_none ();
     string inst;
@@ -740,6 +815,7 @@ tt_unpack (string s) {
     }
     if (inst == "") return url_none ();
     if (save_string (name, inst, false)) return url_none ();
+    tt_mark_used (name);
     return name;
   }
   if (!is_int (suf)) return url_none ();

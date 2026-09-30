@@ -55,6 +55,10 @@ extern FT_Error (*ft_done_face)      (FT_Face        face);
 extern FT_Error (*ft_set_var_design_coordinates) (FT_Face   face,
                                                   FT_UInt   num_coords,
                                                   FT_Fixed* coords);
+// the normalized coordinates (-1 to 1, after avar) of the instance in use
+extern FT_Error (*ft_get_var_blend_coordinates) (FT_Face   face,
+                                                 FT_UInt   num_coords,
+                                                 FT_Fixed* coords);
 
 #endif
 

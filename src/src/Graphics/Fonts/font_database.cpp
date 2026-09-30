@@ -282,6 +282,7 @@ shipped_fonts_shrunk (int nr) {
 void
 font_database_load () {
   if (fonts_loaded) return;
+  tt_clean_instances (200);  // megabytes of static instances of variable fonts
   bool renew= shipped_fonts_changed ();
   font_database_load_database (LOCAL_DATABASE);
   if (renew && N (font_table) != 0)
