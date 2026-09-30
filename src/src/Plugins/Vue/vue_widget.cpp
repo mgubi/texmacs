@@ -132,6 +132,10 @@ ui_corners (float k= 1.0f) {
 // the pull-down menus are rounder than the fields
 static const float menu_round= 1.5f;
 
+// the footer is being laid out: its buttons are flatter (menu_button,
+// layout_pull_button)
+static bool in_footer= false;
+
 /******************************************************************************
 * Themes
 *
@@ -1779,6 +1783,7 @@ layout_pull_button (vue_ui_rep *w) {
   // above than below, as the text keeps room for the descenders below its
   // baseline, so that the letters look centered in the highlight
   Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (8), ui_px (4) };
+  if (in_footer) padding= { ui_px (10), ui_px (10), ui_px (4), ui_px (2) };
   float rad= ui_corners (menu_round).topLeft; // as the menus
   if (!down && button_grow) {
     padding= menu_item_padding ();
@@ -1800,6 +1805,8 @@ layout_pull_button (vue_ui_rep *w) {
     // items of vertical menus have the column of the check marks
     if (!down && button_grow) layout_mark_column ();
     concrete(d.w)->do_layout ();
+    // the menus of the interactive footer say that they are menus
+    if (down && in_footer) layout_arrow ("<#25BE>", 3, dark_grey);
     if (!down) {
       CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_GROW(ui_pxf (32)), CLAY_SIZING_GROW(0) }}}){};
       layout_arrow ("<#25B8>", 1, black); // right arrow
@@ -2615,8 +2622,10 @@ vue_ui_rep::do_layout () {
     }
     else {
       if (!item && !swatch) {
-        // a button of a tool bar: roomier, with a rounder highlight
-        padding= CLAY_PADDING_ALL(ui_px (7));
+        // a button of a tool bar: roomier, with a rounder highlight (flatter
+        // in the footer, which is lower than the tool bars)
+        padding= in_footer ? (Clay_Padding) { ui_px (10), ui_px (10), ui_px (3), ui_px (3) }
+                           : CLAY_PADDING_ALL(ui_px (7));
         radius= ui_corners (menu_round); // as the menus
       }
       if (down || pressed) bg= color_pressed;
@@ -4718,6 +4727,17 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   vue_widget interactive_input;
   bool interactive_mode;
 
+  // the interactive footer (the preference "interactive footer"): the
+  // properties of the text at the cursor and the tags around it as menus,
+  // see (texmacs menus footer-menu), in place of the texts of the footer
+  // while the editor shows those (footer_menus) and not a message; the
+  // menus are rebuilt when their expansions change, as the tool bars
+  // (tm_window_rep::get_menu_widget)
+  bool footer_menus;
+  object footer_env_menu, footer_path_menu;
+  vue_widget footer_env, footer_path;
+  void update_footer_menus ();
+
   // the title of the window and the marker of a document with unsaved
   // changes. TeXmacs sends them to this widget, which only learns which
   // window it is in when it is first laid out: what arrives before that
@@ -4766,7 +4786,7 @@ visibility_index (slot s) {
   
 vue_texmacs_widget_rep::vue_texmacs_widget_rep (int _mask, command _quit)
   : vue_widget_rep ("vue_texmacs_widget_rep"), mask (_mask), quit (_quit),
-    win (NULL), interactive_mode (false),
+    win (NULL), interactive_mode (false), footer_menus (false),
     win_title_set (false), win_modified (false), win_modified_set (false)
 {
   // decode mask
@@ -4803,10 +4823,15 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       
     case SLOT_LEFT_FOOTER:
       left_footer= check_open<string> (val, s);
+      // the editor sends the left footer first (edit_interface_rep::
+      // set_footer), having said what it shows
+      footer_menus= get_preference ("interactive footer") == "on" &&
+                    as_bool (call ("footer-environment?"));
       break;
       
     case SLOT_RIGHT_FOOTER:
       right_footer= check_open<string> (val, s);
+      if (footer_menus) update_footer_menus ();
       break;
       
     case SLOT_SCROLLBARS_VISIBILITY:
@@ -5125,6 +5150,23 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
 #define bar_focus_h  ui_pxf (64)
 #define bar_footer_h ui_pxf (56)
 
+static void
+footer_menu (object& current, vue_widget& w, string menu) {
+  object m= eval ("'" * menu);
+  object x= call ("menu-expand", m);
+  if (!is_nil (w) && x == current) return;
+  current= x;
+  w= concrete (make_menu_widget (m));
+}
+
+void
+vue_texmacs_widget_rep::update_footer_menus () {
+  footer_menu (footer_env_menu, footer_env,
+               "(horizontal (link texmacs-footer-environment))");
+  footer_menu (footer_path_menu, footer_path,
+               "(horizontal (link texmacs-footer-path))");
+}
+
 // The contents of a bar of the main window, clipped to its width: when
 // they do not fit, the markers at the ends say so and a click on one
 // brings the rest into view. A scroll bar is not an option here: a bar
@@ -5298,6 +5340,22 @@ void vue_texmacs_widget_rep::do_layout () {
         {
           interactive_input->do_layout ();
         }
+      }
+      else if (footer_menus && !is_nil (footer_env) && !is_nil (footer_path)) {
+        // the interactive footer: the properties on the left, the tags on
+        // the right, which give way to the properties when space is short
+        // (clipped on their left: the innermost tags stay in view)
+        in_footer= true;
+        footer_env->do_layout ();
+        CLAY_AUTO_ID({
+          .layout= {
+            .sizing= { .width= CLAY_SIZING_GROW(0) },
+            .childAlignment= { .x= CLAY_ALIGN_X_RIGHT, .y= CLAY_ALIGN_Y_CENTER }},
+          .clip= { .horizontal= true }})
+        {
+          footer_path->do_layout ();
+        }
+        in_footer= false;
       }
       else {
         // the left text takes the remaining space and is clipped

@@ -138,6 +138,18 @@
 (define-public (set-message-notify)
   (set! message-serial (+ message-serial 1)))
 
+;; is the status bar showing the properties of the text at the cursor and
+;; the tags around it (and not a message)? The editor says so each time it
+;; updates the status bar; an interactive status bar replaces only those
+;; (texmacs menus footer-menu)
+(define footer-environment #f)
+
+(define-public (footer-environment?)
+  footer-environment)
+
+(define-public (footer-environment-notify flag)
+  (set! footer-environment flag))
+
 (define-public (recall-message-after len)
   (with current message-serial
     (delayed
