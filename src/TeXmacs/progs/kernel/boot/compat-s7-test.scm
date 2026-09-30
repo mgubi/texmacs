@@ -48,6 +48,16 @@
          (assoc-set! (list (cons 'a 1)) 'a 2) '((a . 2)))
    (test "assoc-set!, new key"
          (assoc-set! (list (cons 'a 1)) 'b 2) '((b . 2) (a . 1)))
+   (test "assoc-remove!, first"
+         (assoc-remove! (list (cons "a" 1) (cons "b" 2)) "a") '(("b" . 2)))
+   (test "assoc-remove!, inside"
+         (assoc-remove! (list (cons "a" 1) (cons "b" 2) (cons "c" 3)) "b")
+         '(("a" . 1) ("c" . 3)))
+   (test "assoc-remove!, only the first"
+         (assoc-remove! (list (cons 'a 1) (cons 'a 2)) 'a) '((a . 2)))
+   (test "assoc-remove!, missing"
+         (assoc-remove! (list (cons 'a 1)) 'z) '((a . 1)))
+   (test "assoc-remove!, empty" (assoc-remove! '() 'a) '())
    (test "stable-sort is stable"
          (stable-sort '((1 . a) (0 . b) (1 . c) (0 . d)) (lambda (x y) (< (car x) (car y))))
          '((0 . b) (0 . d) (1 . a) (1 . c)))
