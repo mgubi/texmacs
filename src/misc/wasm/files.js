@@ -313,8 +313,11 @@ var tmFiles = (function () {
     box.id = 'tm-files';
     root.appendChild (box);
     var head = el ('div', 'padding:10px 14px;font-weight:bold;border-bottom:1px solid #ccc',
-                   mode === 'open' ? 'Open a file' : mode === 'save' ? 'Save as' : 'Files of the page');
+                   mode === 'open' ? 'Open a file' : mode === 'save' ? 'Save as' : 'Files in this browser');
     var places = el ('div', 'padding:8px 14px 0;display:flex;gap:14px');
+    // the files are the user's, on this computer: nothing goes to a server
+    var stored = el ('span', 'margin-left:auto;color:#777;font-size:90%',
+                     'Stored in this browser only; nothing is sent anywhere.');
     var crumbs = el ('div', 'padding:6px 14px;color:#444');
     var tools = el ('div', 'padding:4px 14px 8px');
     var listing = el ('div', 'flex:1;overflow:auto;background:#fff;margin:0 14px;border:1px solid #ccc');
@@ -397,6 +400,7 @@ var tmFiles = (function () {
         a.onclick = function () { dir = pl[1]; selected = null; mkdirs (DOCS); render (); };
         places.appendChild (a);
       });
+      places.appendChild (stored);
       tools.style.display = sys ? 'none' : '';
       if (hint) hint.textContent = sys
         ? 'The files of TeXmacs cannot be changed here: "customize" copies one into your ' +
@@ -427,13 +431,15 @@ var tmFiles = (function () {
         row.appendChild (name);
         if (!e.dir) row.appendChild (el ('span', 'color:#888;margin-right:10px',
           e.size < 1024 ? e.size + ' B' : Math.round (e.size / 1024) + ' KB'));
-        function act (text, f) {
+        function act (text, f, tip) {
           var a = el ('a', 'cursor:pointer;color:#036;margin-left:8px', text);
+          if (tip) a.title = tip;
           a.onclick = function (ev) { ev.stopPropagation (); f (); };
           row.appendChild (a);
         }
         if (mode === 'browse' && !e.dir) act ('open', function () { close (null); openDocument (e.path); });
-        act ('download', function () { downloadPath (e.path); });
+        act ('save copy', function () { downloadPath (e.path); },
+             e.dir ? 'Save a copy on your computer, as a zip' : 'Save a copy on your computer');
         if (sys) {
           act ('customize', function () { customize (e); });
           listing.appendChild (row);
@@ -475,16 +481,16 @@ var tmFiles = (function () {
       });
     }
 
-    tools.appendChild (chooser ('tm-files-upload', 'Upload files', { multiple: '' }, function (fs) {
+    tools.appendChild (chooser ('tm-files-upload', 'Add files…', { multiple: '' }, function (fs) {
       importFiles (dir, fs.map (function (f) { return { rel: f.name, file: f }; }))
         .then (render);
     }));
-    tools.appendChild (chooser ('tm-files-folder', 'Upload a folder', { webkitdirectory: '', multiple: '' }, function (fs) {
+    tools.appendChild (chooser ('tm-files-folder', 'Add a folder…', { webkitdirectory: '', multiple: '' }, function (fs) {
       importFiles (dir, fs.map (function (f) {
         return { rel: f.webkitRelativePath || f.name, file: f };
       })).then (render);
     }));
-    tools.appendChild (chooser ('tm-files-zip', 'Upload a zip', { accept: '.zip' }, function (fs) {
+    tools.appendChild (chooser ('tm-files-zip', 'Add a zip…', { accept: '.zip' }, function (fs) {
       importFiles (dir, fs.map (function (f) { return { rel: f.name, file: f, unpack: true }; }))
         .then (render).catch (function (e) { window.alert ('Cannot read the zip: ' + e.message); });
     }));
@@ -493,6 +499,7 @@ var tmFiles = (function () {
       if (!n) return;
       mkdirs (join (dir, safe (n))); save (); render ();
     }));
+
 
     root.addEventListener ('dragover', function (e) { e.preventDefault (); e.stopPropagation (); });
     root.addEventListener ('drop', function (e) {

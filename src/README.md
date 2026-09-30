@@ -35,10 +35,11 @@
 >   with `TEXMACS_VUE_SINGLE_WINDOW=1`, which is how it is tested.
 > * **The TeXmacs menu** of the page: the version, the state of the files,
 >   the storage used, the Files panel, reload and reset.
-> * **Files.** *Files of the page…* (also in the File menu) shows the files
->   kept in the browser; files and whole projects (folders, zip archives,
->   with their images) come in by upload or by dropping them on the page,
->   and go out as downloads (a folder as a zip). The open and save dialogs of
+> * **Files.** *Files in this browser…* (also in the File menu) shows the
+>   files kept in the browser, on the user's computer (nothing is sent
+>   anywhere); files and whole projects (folders, zip archives, with their
+>   images) are added from the computer or dropped on the page, and a copy
+>   of one is saved back on the computer (a folder as a zip). The open and save dialogs of
 >   TeXmacs are this panel. The home directory, with the preferences and the
 >   documents, is kept in IndexedDB.
 > * **Loading in pieces.** The program is 5.2 MB (brotli) and the files of

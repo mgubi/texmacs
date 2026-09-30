@@ -302,14 +302,15 @@ var tmFrame = (function () {
       'of the tabs, for those.',
       'Copy, cut and paste go through the clipboard of the system; on a Mac the ' +
       'shortcuts are Cmd+..., as the browser\'s.',
-      'Opening and saving go through the Files panel (Files of the page...): files come ' +
-      'in by upload or by dropping them on the page, and go out as downloads. The files ' +
-      'of TeXmacs can be browsed there, and copied to your own to customize them.',
+      'Opening and saving go through the Files panel (Files in this browser...): files are ' +
+      'added from your computer or dropped on the page, and a copy of one is saved back ' +
+      'on your computer with its "save copy". The files of TeXmacs can be browsed there, ' +
+      'and copied to your own to customize them.',
       'Printing opens the document as a PDF in a new tab, to print from there.']],
     ['Limitations', [
       'Your files are kept in the storage of this browser, for this site only: clearing ' +
       'the data of the site deletes them, and Safari deletes the data of a site which was ' +
-      'not visited for seven days. Download the files you want to keep.',
+      'not visited for seven days. Save a copy of the files you want to keep.',
       'No plugins and no sessions (Maxima, Python, R...): a page cannot run other ' +
       'programs. For the same reason, the converters and tools which need an external ' +
       'program (LaTeX, Ghostscript, ImageMagick, the spell checker, Git) are missing.',
@@ -614,7 +615,7 @@ var tmFrame = (function () {
         human (u.home) + ', and the files of TeXmacs, ' + human (u.cache) + '.';
     });
     sep ();
-    item ('Files of the page…', function () { tmFiles.browse (); });
+    item ('Files in this browser…', function () { tmFiles.browse (); });
     sep ();
     item ('Reload', function () { location.reload (); });
     item ('Reset…', function () {
@@ -635,8 +636,8 @@ var tmFrame = (function () {
     item ('Remove from this browser…', function () {
       if (!window.confirm ('Remove TeXmacs Vue from this browser?\n\n' +
                            'This deletes everything this page keeps in the browser: ' +
-                           'your files and preferences (download the ones you want to ' +
-                           'keep first, from Files of the page) and the files of TeXmacs. ' +
+                           'your files and preferences (save a copy of the ones you want ' +
+                           'to keep first, from Files in this browser) and the files of TeXmacs. ' +
                            'TeXmacs stops; it is downloaded again if you come back.')) return;
       removeAll ();
     });

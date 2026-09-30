@@ -172,7 +172,7 @@
   ;; the browser build: the files kept in the page (web-files is defined
   ;; by the Vue plugin there)
   (if (defined? 'web-files)
-      ("Files of the page..." (web-files)))
+      ("Files in this browser..." (web-files)))
   (if (not (window-per-buffer?))
       ("Load in new window" (open-document*)))
   ---
