@@ -261,6 +261,26 @@ var tmFiles = (function () {
   function openDocument (p) {
     withStackSave (function () { _vue_web_open_document (stringToUTF8OnStack (p)); });
   }
+
+  // The files which TeXmacs does not open as documents but the browser shows
+  // (a PDF, an image): they open in a new tab of the browser (tmPrint.external,
+  // print.js), unless TeXmacs asked for such a file (an image to insert: the
+  // accept of the Open dialog, suffixes and MIME types as for a file input)
+  var BROWSER_VIEWS = /\.(pdf|png|jpe?g|gif|webp|svg|bmp)$/i;
+  function browserViews (p) { return BROWSER_VIEWS.test (p); }
+  function accepted (accept, p) {
+    if (!accept) return false;
+    var name = p.toLowerCase ();
+    return accept.split (',').some (function (a) {
+      a = a.trim ().toLowerCase ();
+      if (a.charAt (0) === '.') return name.endsWith (a);
+      if (a === 'image/*') return /\.(png|jpe?g|gif|webp|svg|bmp|tiff?)$/.test (name);
+      return false;
+    });
+  }
+  function viewInBrowser (p) {
+    if (typeof tmPrint !== 'undefined') tmPrint.external (p, true, base (p));
+  }
   // images dropped at (x, y) of the canvas: inserted by the editor
   function dropImages (x, y, paths) {
     withStackSave (function () {
@@ -354,9 +374,19 @@ var tmFiles = (function () {
       else if (e.key === 'Enter' && mode !== 'browse') { e.stopPropagation (); e.preventDefault (); accept (); }
       else e.stopPropagation (); // the keys typed in the panel are not for TeXmacs
     }
+    // a file opened (the Open dialog, or open in the panel): for TeXmacs, or
+    // for the browser (a PDF or an image, unless TeXmacs asked for one)
+    function openChosen (p) {
+      if (browserViews (p) && !(mode === 'open' && accepted (opts.accept, p))) {
+        if (mode === 'open') close (null);
+        viewInBrowser (p);
+      }
+      else if (mode === 'open') close (p);
+      else { close (null); openDocument (p); }
+    }
     function accept () {
       if (mode === 'open') {
-        if (selected && !isDir (selected)) close (selected);
+        if (selected && !isDir (selected)) openChosen (selected);
       }
       else if (mode === 'save') {
         if (inSys (dir)) {
@@ -442,7 +472,12 @@ var tmFiles = (function () {
           a.onclick = function (ev) { ev.stopPropagation (); f (); };
           row.appendChild (a);
         }
-        if (mode === 'browse' && !e.dir) act ('open', function () { close (null); openDocument (e.path); });
+        if (mode === 'browse' && !e.dir) {
+          if (browserViews (e.path))
+            act ('open', function () { openChosen (e.path); },
+                 'Open in a new tab of the browser (TeXmacs does not open this kind of file)');
+          else act ('open', function () { openChosen (e.path); });
+        }
         act ('save copy', function () { downloadPath (e.path); },
              e.dir ? 'Save a copy on your computer, as a zip' : 'Save a copy on your computer');
         if (sys) {
@@ -454,8 +489,7 @@ var tmFiles = (function () {
           };
           row.ondblclick = function () {
             if (e.dir) return;
-            if (mode === 'open') close (e.path);
-            else if (mode === 'browse') { close (null); openDocument (e.path); }
+            if (mode === 'open' || mode === 'browse') openChosen (e.path);
           };
           return;
         }
@@ -478,9 +512,8 @@ var tmFiles = (function () {
         };
         row.ondblclick = function () {
           if (e.dir) return;
-          if (mode === 'open') close (e.path);
-          else if (mode === 'save') accept ();
-          else { close (null); openDocument (e.path); }
+          if (mode === 'save') accept ();
+          else openChosen (e.path);
         };
         listing.appendChild (row);
       });
