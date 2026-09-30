@@ -505,9 +505,10 @@ tt_variation_coordinates (string fv, string suf) {
   return r;
 }
 
-// Only the fvar table of a font file, without reading the whole file
+// One table of a font file with TrueType outlines, without reading the
+// whole file; "" for another file
 static string
-tt_file_fvar (url u) {
+tt_file_table (url u, string which) {
   FILE* f= texmacs_fopen (concretize (u), "rb", false);
   if (f == NULL) return "";
   unsigned char h[12];
@@ -521,7 +522,7 @@ tt_file_fvar (url u) {
       if (fread (e, 1, 16, f) != 16) break;
       string tag ((char*) e, 4);
       if (tag == "glyf") glyf= true;
-      if (tag == "fvar") {
+      if (tag == which) {
         start= (((long) e[8]) << 24) + (((long) e[9]) << 16) +
                (((long) e[10]) << 8) + ((long) e[11]);
         len  = (((long) e[12]) << 24) + (((long) e[13]) << 16) +
@@ -548,9 +549,59 @@ tt_font_fvar (string base) {
   url u= tt_font_find (base);
   if (!is_none (u)) {
     string suf= suffix (u);
-    if (suf == "ttf" || suf == "otf") r= tt_file_fvar (u);
+    if (suf == "ttf" || suf == "otf") r= tt_file_table (u, "fvar");
   }
   fvar_cache (base)= r;
+  return r;
+}
+
+static string
+tt_axis_name (string tag, string nt, int id) {
+  if (tag == "wght") return "Weight";
+  if (tag == "wdth") return "Width";
+  if (tag == "slnt") return "Slant";
+  if (tag == "ital") return "Italic";
+  if (tag == "opsz") return "Optical size";
+  string r= name_record_english_string (nt, id);
+  return r == ""? tag: r;
+}
+
+scheme_tree
+tt_font_axes (string name) {
+  // the axes of a variable font, for a file name as the database gives it:
+  // tuples (tag, name, minimum, default, maximum, value of this font)
+  tree r (TUPLE);
+  if (ends (name, ".ttf") || ends (name, ".otf")) name= name (0, N(name) - 4);
+  string base= name, suf= suffix (url (name));
+  bool named= N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)));
+  bool point= starts (suf, "var_");
+  if (named || point) base= strip_suffix (name);
+  string fv= tt_font_fvar (base);
+  if (fv == "") return r;
+  url u= tt_font_find (base);
+  string nt= is_none (u)? string (""): tt_file_table (u, "name");
+  array<string> tags= tt_axis_tags (fv);
+  array<double> lo  = tt_axis_values (fv, 0);
+  array<double> def = tt_axis_values (fv, 1);
+  array<double> hi  = tt_axis_values (fv, 2);
+  array<double> cur = copy (def);
+  if (named) {
+    int k= as_int (suf (1, N(suf)));
+    for (int a=0; a<N(tags); a++)
+      cur[a]= tt_instance_coordinate (fv, k, tags[a], def[a]);
+  }
+  if (point) cur= tt_variation_coordinates (fv, suf);
+  int axes_offset= get_U16 (fv, 4);
+  int axis_size  = get_U16 (fv, 10);
+  for (int a=0; a<N(tags); a++) {
+    int flags= get_U16 (fv, axes_offset + a * axis_size + 16);
+    if ((flags & 1) != 0) continue;  // an axis hidden from users
+    int id= get_U16 (fv, axes_offset + a * axis_size + 18);
+    tree t= tuple (tags[a], tt_axis_name (tags[a], nt, id),
+                   as_string (lo[a]), as_string (def[a]), as_string (hi[a]));
+    t << tree (as_string (cur[a]));
+    r << t;
+  }
   return r;
 }
 
@@ -588,6 +639,19 @@ tt_variation_name (string name, string spec, int sz) {
         else if (is_double (val)) cur[a]= as_double (val);
         cur[a]= max (lo[a], min (hi[a], cur[a]));
       }
+  }
+  // a named instance at these coordinates is already a font of its own
+  for (int k=1; k <= tt_nr_instances (fv); k++) {
+    int rec= tt_instance_record (fv, k);
+    if (rec + 4 + 4 * N(tags) > N(fv)) break;
+    bool same= true;
+    for (int a=0; a<N(tags) && same; a++)
+      same= coordinate_string (cur[a]) == coordinate_string
+              (tt_instance_coordinate (fv, k, tags[a], def[a]));
+    bool dflt_k= true;
+    for (int a=0; a<N(tags) && dflt_k; a++)
+      dflt_k= coordinate_string (cur[a]) == coordinate_string (def[a]);
+    if (same && !dflt_k) return base * ".v" * as_string (k);
   }
   string r= base * ".var";
   bool dflt= true;

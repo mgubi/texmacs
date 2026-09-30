@@ -29,6 +29,7 @@ array<string> tt_axis_tags (string fvar);
 array<double> tt_axis_values (string fvar, int which);
 array<double> tt_variation_coordinates (string fvar, string suffix);
 string tt_variation_name (string name, string spec, int sz);
+scheme_tree tt_font_axes (string name);
 url tt_unpack (string name);
 
 string find_attribute_value (array<string> a, string s);

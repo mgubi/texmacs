@@ -233,7 +233,8 @@
   axes such as the weight (<verbatim|wght>), the width (<verbatim|wdth>),
   the slant (<verbatim|slnt>) and the optical size (<verbatim|opsz>). The
   styles the font names, such as <verbatim|Bold> or <verbatim|Condensed
-  Light>, appear in the font browser like the styles of any other family.
+  Light>, appear in the font browser like the styles of any other family,
+  once <menu|Tools|Fonts|Scan disk for fonts> has seen the font.
   The variable <verbatim|font-variations> reaches the points in between,
   as a comma separated list of axes and values:
 
@@ -252,6 +253,20 @@
   set on a whole document. Each point used is written once as an ordinary
   font under <verbatim|fonts/unpacked> in your <TeXmacs> home directory.
   Only fonts with <name|TrueType> outlines can be varied.
+
+  The series may also be given as a weight, from 1 to 1000, as in
+  <verbatim|font-series> <verbatim|550>. A variable font takes that weight
+  exactly; a family of static fonts takes the style whose weight is the
+  nearest (400 is the regular style, 700 the bold one). A weight given in
+  <verbatim|font-variations> takes precedence over the series.
+
+  <menu|Format|Font variations...> opens a panel with the axes of the font
+  at the cursor, their ranges and the values in force; a value is typed or
+  chosen in the list, or stepped with the <verbatim|->
+  and <verbatim|+> buttons, and applies at once to the selection or, when
+  the panel is switched to the whole document, to the initial environment
+  of the document, which is what <menu|Document|Font|Variations...> opens
+  it for. <menu|Reset> removes the variations.
 
   <paragraph*|In markup>
 

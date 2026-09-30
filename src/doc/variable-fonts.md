@@ -6,6 +6,35 @@ Condensed Black...), each a point on the axes. Before this branch TeXmacs
 saw only the default instance of such a file (SF NS Regular, New York
 Regular, Junicode VF Regular) and emulated bold and the other weights.
 
+![Weights, widths and optical sizes of the macOS system font, and numeric
+series on a static family](variable-fonts/specimen.png)
+
+The specimen above is [`variable-fonts/specimen.tm`](variable-fonts/specimen.tm),
+typeset by TeXmacs and exported to PDF, with SF NS, the variable system font
+of macOS (weight 1 to 1000, width 30 to 150, optical size 17 to 96).
+
+## Using it
+
+- **Named styles.** After a scan of the fonts (`Tools > Fonts > Scan disk
+  for fonts`), the named instances are styles like any other: SF NS shows
+  up as the family `System Font` with Thin to Black in nine widths, and
+  `font-series` `bold` picks the real Bold instead of an emulated one.
+- **Any weight.** `font-series` accepts a number from 1 to 1000:
+  `<with|font-series|550|...>`.
+- **Any point.** `font-variations` sets the axes:
+  `<with|font-variations|wght=550,wdth=87.5|...>`, and `opsz=auto` gives
+  the optical size of the current font size.
+- **The panel.** `Format > Font variations...` (for the selection) and
+  `Document > Font > Variations...` (for the whole document) list the axes
+  of the font at the cursor with their ranges and the values in force.
+
+A home directory whose font database was made before this branch (or comes
+from the database shipped with TeXmacs, built on another machine) does not
+know the named instances, and may not know a variable family under its
+current name at all: SF NS is `Sf ns` in the shipped database, and a
+document asking for `System Font` then falls back to another font. A scan of
+the fonts fixes both.
+
 ## What TeXmacs does now
 
 Each named instance of a TrueType variable font becomes a font of its own,
@@ -79,6 +108,37 @@ select.
   its fallbacks included, so that a character taken from another variable
   font gets the same weight. Static fonts are left alone.
 
+## Weights as series
+
+`font-series` may be a number from 1 to 1000. `make_current_font`
+(`Typeset/Env/env_semantics.cpp`) turns it into the series with the nearest
+name (thin, extralight, light, medium, semibold, bold, extrabold, black),
+which selects the style and, for a static family, is the nearest weight
+there is, and puts `wght=<number>` in front of `font-variations`, so that
+a variable font takes the weight exactly and an explicit `wght` in
+`font-variations` still wins. Coordinates which are those of a named
+instance resolve to that instance (`SFNS.v236` rather than
+`SFNS.var_wght700`), so no second copy is written.
+
+## The panel
+
+`Format > Font variations...` and `Document > Font > Variations...`
+(`progs/fonts/font-variations.scm`) open a window, kept above the editor
+windows, with the axes of the font at the cursor: for each, its name, a
+field with the value in force and a few values along the axis, `-` and `+`
+buttons which step by a twentieth of the range, and the range. The axes
+come from `font-variation-axes` (`tt_font_axes`), which reads `fvar` and
+`name` from the table directory and leaves out the axes the font hides. A
+change applies at once, to the selection (the innermost `with` which sets
+`font-variations` is updated rather than nested again) or to the initial
+environment of the document. A value equal to the one of the style in
+force is dropped from the list, and Reset removes the variable. The panel
+follows the cursor.
+
+The values are chosen with a field and buttons rather than sliders: the
+widget language of TeXmacs has no slider, and adding one means a new
+widget in each GUI.
+
 ## How an instance is made
 
 `tt_make_instance (tt, k)` opens the font with FreeType at face index
@@ -113,8 +173,7 @@ advances agree except for a few composite glyphs flagged
 - **GPOS, GDEF, MATH, kern** are those of the default instance. Kerning
   pairs and mark positions of a Black are therefore those of the Regular;
   applying `GDEF` item variations would fix that.
-- No user interface for `font-variations` yet: the value is typed in
-  markup or in the initial environment.
+- No slider in the panel (see above).
 - Every point used is a static font of the size of the variable font (1.5
   MB for SF NS) in `fonts/unpacked`, and nothing removes the ones which are
   no longer used.

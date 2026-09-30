@@ -185,6 +185,7 @@
   (-> "Specific" (link specific-menu))
   (-> "Font effects" (link text-font-effects-menu))
   (-> "Font features" (link text-font-features-menu))
+  ("Font variations..." (open-text-font-variations))
   (assuming (== (get-preference "bitmap effects") "on")
     (-> "Graphical effects" (link text-effects-menu))))
 
@@ -197,6 +198,7 @@
   (-> "Specific" (link specific-menu))
   (-> "Font effects" (link text-font-effects-menu))
   (-> "Font features" (link text-font-features-menu))
+  ("Font variations..." (open-text-font-variations))
   (assuming (== (get-preference "bitmap effects") "on")
     (-> "Graphical effects" (link text-effects-menu))))
 

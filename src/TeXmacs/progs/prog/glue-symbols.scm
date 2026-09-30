@@ -177,6 +177,7 @@
 "font-database-styles"
 "font-database-search"
 "font-available-features"
+"font-variation-axes"
 "font-logical-search"
 "font-database-characteristics"
 "font-database-substitutions"

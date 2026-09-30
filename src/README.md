@@ -69,6 +69,17 @@ not name have names, LaTeX equivalents and classes now. In a formula, a
 window and a side tool show all the symbols, group by group, with their
 markup in a balloon, to insert them with a click.
 
+**Variable fonts.** The named styles of a variable font (the weights and
+widths of SF on macOS, of Junicode VF, of the Google variable fonts) are
+styles of their own, the series may be a weight from 1 to 1000, and the
+variable `font-variations` (`wght=550,wdth=87.5,opsz=auto`) reaches any
+point in between, with a panel in `Format > Font variations...`. Each point
+is written once as a static TrueType font, so rendering and PDF export are
+those of any other font. See
+[`doc/variable-fonts.md`](doc/variable-fonts.md).
+
+![Variable fonts](doc/variable-fonts/specimen.png)
+
 **Where to read more.**
 
 - `Help > Manual > Fonts` in TeXmacs: choosing fonts, the mathematical

@@ -549,27 +549,63 @@ edit_env_rep::get_script_size (int sz, int level) {
 * Updating the environment from the variables
 ******************************************************************************/
 
+// A series may be a weight, as in 550: the series with the nearest name
+// selects the style, which is the nearest weight for a static family, and
+// the weight becomes the wght axis of a variable font. An explicit wght in
+// font-variations comes later and wins.
+
+static string
+series_weight (string ser) {
+  if (N(ser) == 0 || !is_int (ser)) return "";
+  int w= as_int (ser);
+  if (w < 1 || w > 1000) return "";
+  return ser;
+}
+
+static string
+series_name (string ser) {
+  if (series_weight (ser) == "") return ser;
+  int w= as_int (ser);
+  if (w < 150) return "thin";
+  if (w < 250) return "extralight";
+  if (w < 350) return "light";
+  if (w < 550) return "medium";
+  if (w < 650) return "semibold";
+  if (w < 750) return "bold";
+  if (w < 850) return "extrabold";
+  return "black";
+}
+
 font
 edit_env_rep::make_current_font (int sz) {
-  font_variations_scope scope (get_string (FONT_VARIATIONS));
+  string ser = get_string (FONT_SERIES);
+  string mser= get_string (MATH_FONT_SERIES);
+  string pser= get_string (PROG_FONT_SERIES);
+  string w= series_weight (ser);
+  if (mode == 2 && series_weight (mser) != "") w= series_weight (mser);
+  if (mode == 3 && series_weight (pser) != "") w= series_weight (pser);
+  string var= get_string (FONT_VARIATIONS);
+  if (w != "") var= "wght=" * w * (var == ""? string (""): "," * var);
+  font_variations_scope scope (var);
+  ser = series_name (ser);
+  mser= series_name (mser);
+  pser= series_name (pser);
   switch (mode) {
   case 2:
     return smart_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),
-                       get_string (MATH_FONT_SERIES),
-                       get_string (MATH_FONT_SHAPE),
+                       mser, get_string (MATH_FONT_SHAPE),
                        get_string (FONT), get_string (FONT_FAMILY),
-                       get_string (FONT_SERIES), "mathitalic",
+                       ser, "mathitalic",
                        sz, (int) (magn*dpi));
   case 3:
     return smart_font (get_string (PROG_FONT), get_string (PROG_FONT_FAMILY),
-                       get_string (PROG_FONT_SERIES),
-                       get_string (PROG_FONT_SHAPE),
+                       pser, get_string (PROG_FONT_SHAPE),
                        get_string (FONT), get_string (FONT_FAMILY) * "-tt",
-                       get_string (FONT_SERIES), get_string (FONT_SHAPE),
+                       ser, get_string (FONT_SHAPE),
                        sz, (int) (magn*dpi));
   default:
     return smart_font (get_string (FONT), get_string (FONT_FAMILY),
-                       get_string (FONT_SERIES), get_string (FONT_SHAPE),
+                       ser, get_string (FONT_SHAPE),
                        sz, (int) (magn*dpi));
   }
 }
