@@ -107,7 +107,15 @@
     (if (== v "") '()
         (list `(row (cell ,label) (cell (verbatim ,(info-value v))))))))
 
+;; The inspector is a debugging aid which stays open next to the document:
+;; it is set small, so as to take as little room as it can
+(define (inspector-small doc)
+  `(with "font-base-size" "8" "par-sep" "0.1fn" ,doc))
+
 (define (inspector-document)
+  (inspector-small (inspector-document*)))
+
+(define (inspector-document*)
   (if (null? inspector-info)
       `(document
          ,(if inspector-follows-mouse?
@@ -134,16 +142,25 @@
              (strong ,(string-append "Origin: " origin)))
            (tabular
              (tformat (twith "table-width" "1par")
-                      (cwith "1" "-1" "1" "1" "cell-width" "8em")
+                      (cwith "1" "-1" "1" "-1" "cell-lsep" "0.2em")
+                      (cwith "1" "-1" "1" "-1" "cell-rsep" "0.2em")
+                      (cwith "1" "-1" "1" "-1" "cell-tsep" "0.05em")
+                      (cwith "1" "-1" "1" "-1" "cell-bsep" "0.05em")
+                      (cwith "1" "-1" "1" "1" "cell-width" "6.5em")
                       (cwith "1" "-1" "1" "1" "cell-hmode" "exact")
                       (table ,@rows)))))))
 
 (define (inspector-legend)
-  `(document
-     ,@(map (lambda (l)
-              `(concat (with "color" ,(cadr l) (strong ,(car l))) ": "
-                       ,(caddr l)))
-            origin-colours)))
+  ;; one paragraph rather than a line for each origin
+  (inspector-small
+    `(document
+       (concat
+         ,@(list-intersperse
+             (map (lambda (l)
+                    `(concat (with "color" ,(cadr l) (strong ,(car l))) ": "
+                             ,(caddr l)))
+                  origin-colours)
+             ";  ")))))
 
 (define (inspector-update)
   (set! inspector-pending? #f)
@@ -179,23 +196,23 @@
       (toggle (begin (set! inspector-follows-mouse? answer)
                      (inspector-update))
               inspector-follows-mouse?)
-      // (text "Follow the mouse") >>>
+      // (text "Follow mouse") >>>
       (toggle (begin (set! inspector-frozen? answer)
                      (inspector-update))
               inspector-frozen?)
       // (text "Freeze") >>>
       (toggle (toggle-font-colours-by-origin)
               (font-colours-by-origin?))
-      // (text "Colour glyphs by origin"))
+      // (text "Colour by origin"))
     ===
     (explicit-buttons
       ("Font report" (open-font-report-of inspector-master)) >>)
     ===
     (refreshable "font-inspector"
-      (resize "480px" "320px"
+      (resize "360px" "200px"
         (texmacs-output (inspector-document) '(style "generic"))))
     ===
-    (resize "480px" "120px"
+    (resize "360px" "72px"
       (texmacs-output (inspector-legend) '(style "generic")))))
 
 (tm-define (open-font-inspector)
