@@ -84,14 +84,27 @@ dropped_table (string tag) {
     tag == "LTSH" || tag == "VDMX" || tag == "DSIG";
 }
 
-string
-tt_make_instance (string tt, int k) {
+// The static font of the named instance k (from 1) or, for k = 0, of the
+// point with the given design coordinates (one for each axis, in the order
+// of fvar)
+static string
+tt_make_static (string tt, int k, array<double> coords) {
   if (!tt_is_variable (tt, 0)) return "";
   if (ft_initialize ()) return "";
+  string fv= tt_table (tt, 0, "fvar");
+  if (k == 0 && ft_set_var_design_coordinates == NULL) return "";
   FT_Face face;
   if (ft_new_memory_face (ft_library, (const FT_Byte*) &(tt[0]), N(tt),
                           ((FT_Long) k) << 16, &face))
     return "";
+  if (k == 0) {
+    int na= N(coords);
+    FT_Fixed* c= tm_new_array<FT_Fixed> (max (na, 1));
+    for (int a=0; a<na; a++) c[a]= (FT_Fixed) (coords[a] * 65536.0 + 0.5);
+    FT_Error err= ft_set_var_design_coordinates (face, na, c);
+    tm_delete_array (c);
+    if (err) { ft_done_face (face); return ""; }
+  }
   int n= (int) face->num_glyphs;
 
   string glyf, hmtx;
@@ -199,9 +212,14 @@ tt_make_instance (string tt, int k) {
 
   string os2= tabs ["OS/2"];
   if (N(os2) >= 6) {
-    string fv= tt_table (tt, 0, "fvar");
-    int w= (int) (tt_instance_coordinate (fv, k, "wght", U16_at (os2, 4))
-                  + 0.5);
+    double w0= U16_at (os2, 4);
+    if (k > 0) w0= tt_instance_coordinate (fv, k, "wght", w0);
+    else {
+      array<string> tags= tt_axis_tags (fv);
+      for (int a=0; a<N(tags) && a<N(coords); a++)
+        if (tags[a] == "wght") w0= coords[a];
+    }
+    int w= (int) (w0 + 0.5);
     set16 (os2, 4, max (1, min (1000, w)));
   }
   tabs ("OS/2")= os2;
@@ -235,11 +253,27 @@ tt_make_instance (string tt, int k) {
   return r;
 }
 
+string
+tt_make_instance (string tt, int k) {
+  return tt_make_static (tt, k, array<double> ());
+}
+
+string
+tt_make_variation (string tt, array<double> coords) {
+  return tt_make_static (tt, 0, coords);
+}
+
 #else
 
 string
 tt_make_instance (string tt, int k) {
   (void) tt; (void) k;
+  return "";
+}
+
+string
+tt_make_variation (string tt, array<double> coords) {
+  (void) tt; (void) coords;
   return "";
 }
 

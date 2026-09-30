@@ -77,6 +77,7 @@ initialize_default_env () {
   env (FONT_BASE_SIZE)   = "10";        // the font base size
   env (FONT_EFFECTS)     = "";          // additional effects applied to font
   env (FONT_FEATURES)    = "";          // OpenType features, e.g. onum,smcp
+  env (FONT_VARIATIONS)  = "";          // axes of variable fonts, e.g. wght=550
   env (MAGNIFICATION)    = "1";         // magnification (slides for instance)
   env (COLOR)            = "black";     // the color
   env (OPACITY)          = "100%";      // the opacity

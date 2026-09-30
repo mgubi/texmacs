@@ -318,7 +318,8 @@ closest_font (string family, string variant, string series, string shape,
   string s=
     family * "-" * variant * "-" *
     series * "-" * shape * "-" *
-    as_string (sz) * "-" * as_string (dpi) * "-" * as_string (attempt);
+    as_string (sz) * "-" * as_string (dpi) * "-" * as_string (attempt) *
+    font_variations_key ();
   if (font::instances->contains (s)) return font (s);
   find_closest (family, variant, series, shape, attempt);
   font fn= find_font (family, variant, series, shape, sz, dpi);

@@ -51,6 +51,10 @@ extern FT_Error (*ft_get_kerning)    (FT_Face        face,
                                       FT_UInt        kern_mode,
                                       FT_Vector      *akerning);
 extern FT_Error (*ft_done_face)      (FT_Face        face);
+// NULL when the FreeType library does not support variable fonts
+extern FT_Error (*ft_set_var_design_coordinates) (FT_Face   face,
+                                                  FT_UInt   num_coords,
+                                                  FT_Fixed* coords);
 
 #endif
 

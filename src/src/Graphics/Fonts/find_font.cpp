@@ -15,6 +15,7 @@
 #include "hashmap.hpp"
 #include "tm_timer.hpp"
 #include "Freetype/tt_file.hpp"
+#include "Freetype/tt_tools.hpp"
 
 hashmap<string,tree> font_conversion ("rule");
 
@@ -187,10 +188,17 @@ find_font_bis (tree t) {
       string shape  = as_string (t[3]);
       array<string> a= font_database_search (family, variant, series, shape);
       //cout << t << " -> " << a << "\n";
-      for (int i=0; i<N(a); i++)
-        if (tt_font_exists (strip_suffix (a[i])))
-          return unicode_font (strip_suffix (a[i]),
-                               as_int (t[4]), as_int (t[5]));
+      string var= get_font_variations ();
+      for (int i=0; i<N(a); i++) {
+        string name= strip_suffix (a[i]);
+        if (var != "") {
+          string vname= tt_variation_name (name, var, as_int (t[4]));
+          if (vname != name && tt_font_exists (vname))
+            return unicode_font (vname, as_int (t[4]), as_int (t[5]));
+        }
+        if (tt_font_exists (name))
+          return unicode_font (name, as_int (t[4]), as_int (t[5]));
+      }
     }
     return font ();
   }
@@ -205,6 +213,29 @@ find_font_bis (tree t) {
 
   return font ();
 }
+
+/******************************************************************************
+* Variations of variable fonts
+******************************************************************************/
+
+static string font_variations= "";
+
+string
+get_font_variations () {
+  return font_variations;
+}
+
+string
+font_variations_key () {
+  if (font_variations == "") return "";
+  return "-var[" * font_variations * "]";
+}
+
+font_variations_scope::font_variations_scope (string v):
+  old (font_variations) { font_variations= v; }
+
+font_variations_scope::~font_variations_scope () {
+  font_variations= old; }
 
 font
 find_font (tree t) {
@@ -232,7 +263,7 @@ find_font (string family, string variant,
   string s=
     family * "-" * variant * "-" *
     series * "-" * shape * "-" *
-    as_string (sz) * "-" * as_string (dpi);
+    as_string (sz) * "-" * as_string (dpi) * font_variations_key ();
   if (font::instances->contains (s)) return font (s);
 
   if (ends (shape, "-poorit")) {

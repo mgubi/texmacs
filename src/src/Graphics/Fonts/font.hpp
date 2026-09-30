@@ -257,6 +257,19 @@ font poor_effected_font (font base, tree kind);
 font recolored_font (font base, tree kind);
 font feature_font (font base, string feature, int alt);
 font apply_features (font fn, string features);
+
+// The variations (font-variations, as in "wght=550,opsz=auto") which apply
+// to the fonts being looked up: a variable font found in the database is
+// replaced by the point of its design space they give. They are part of the
+// cache keys of the fonts, and a smart font keeps the ones it was made with
+// for the subfonts it looks up later.
+string get_font_variations ();
+string font_variations_key ();
+struct font_variations_scope {
+  string old;
+  font_variations_scope (string v);
+  ~font_variations_scope ();
+};
 array<string> ot_font_features (string name);
 font superposed_font (array<font> fns, int ref);
 font x_font (string family, int size, int dpi);

@@ -56,6 +56,7 @@ extern string FONT_SIZE;
 extern string FONT_BASE_SIZE;
 extern string FONT_EFFECTS;
 extern string FONT_FEATURES;
+extern string FONT_VARIATIONS;
 extern string MAGNIFICATION;
 extern string COLOR;
 extern string OPACITY;

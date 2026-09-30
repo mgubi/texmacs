@@ -24,6 +24,11 @@ int tt_nr_instances (string fvar);
 int tt_instance_record (string fvar, int k);
 double tt_instance_coordinate (string fvar, int k, string axis, double def);
 string tt_make_instance (string tt, int k);
+string tt_make_variation (string tt, array<double> coords);
+array<string> tt_axis_tags (string fvar);
+array<double> tt_axis_values (string fvar, int which);
+array<double> tt_variation_coordinates (string fvar, string suffix);
+string tt_variation_name (string name, string spec, int sz);
 url tt_unpack (string name);
 
 string find_attribute_value (array<string> a, string s);

@@ -63,7 +63,8 @@
   base size in points>>|<row|<cell|<verbatim|font-size>>|<cell|<verbatim|1>>|<cell|a
   multiplier of the base size>>|<row|<cell|<verbatim|font-effects>>|<cell|>|<cell|extra
   effects, such as <verbatim|bold=0.5>>>|<row|<cell|<verbatim|font-features>>|<cell|>|<cell|OpenType
-  features, such as <verbatim|onum>>>|<row|<cell|<verbatim|math-font>>|<cell|<verbatim|roman>>|<cell|the
+  features, such as <verbatim|onum>>>|<row|<cell|<verbatim|font-variations>>|<cell|>|<cell|axes
+  of variable fonts, such as <verbatim|wght=550>>>|<row|<cell|<verbatim|math-font>>|<cell|<verbatim|roman>>|<cell|the
   font name in math mode>>|<row|<cell|<verbatim|math-font-family>>|<cell|<verbatim|mr>>|<cell|<verbatim|mr>,
   <verbatim|ms> or <verbatim|mt>>>|<row|<cell|<verbatim|math-font-series>>|<cell|<verbatim|medium>>|<cell|as
   in text mode>>|<row|<cell|<verbatim|math-font-shape>>|<cell|<verbatim|normal>>|<cell|<verbatim|normal>
@@ -225,6 +226,32 @@
   those the menus do not list can be named in the variable.
   The ligature features, <verbatim|liga>, <verbatim|dlig> and
   <verbatim|frac>, replace several glyphs by one and are not applied yet.
+
+  <paragraph*|Variable fonts>
+
+  A <em|variable font> holds a continuum of designs in a single file, along
+  axes such as the weight (<verbatim|wght>), the width (<verbatim|wdth>),
+  the slant (<verbatim|slnt>) and the optical size (<verbatim|opsz>). The
+  styles the font names, such as <verbatim|Bold> or <verbatim|Condensed
+  Light>, appear in the font browser like the styles of any other family.
+  The variable <verbatim|font-variations> reaches the points in between,
+  as a comma separated list of axes and values:
+
+  <	m-fragment>
+    <inactive*|<with|font-variations|wght=550,wdth=90|a weight of 550 at
+    90% of the normal width>>
+  </tm-fragment>
+
+  The values apply to the style which the other variables select, so
+  <verbatim|font-series> <verbatim|bold> with <verbatim|wdth=75> gives a
+  narrow bold. For the optical size, <verbatim|opsz=auto> takes the size
+  of the text in points: small text then gets the sturdier design meant for
+  it and large text the finer one. Values outside the range of an axis are
+  brought back into it, and axes the font does not have, as well as fonts
+  which are not variable, ignore the variable, which is therefore safe to
+  set on a whole document. Each point used is written once as an ordinary
+  font under <verbatim|fonts/unpacked> in your <TeXmacs> home directory.
+  Only fonts with <name|TrueType> outlines can be varied.
 
   <paragraph*|In markup>
 

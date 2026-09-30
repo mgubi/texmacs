@@ -797,6 +797,7 @@ struct smart_font_rep: font_rep {
   int    dpi;
   int    math_kind;
   int    italic_nr;
+  string variations; // font-variations when the font was made, for subfonts
   bool   ot_math;    // the main font is an OpenType math font without
                      // hand-tuned customizations: letters and Greek come
                      // from its own math alphabets
@@ -864,7 +865,7 @@ smart_font_rep::smart_font_rep (
     family (family2), variant (variant2),
     series (series2), shape (shape2), rshape (shape2),
     sz (sz2), hdpi (hdpi2), dpi (vdpi2),
-    math_kind (0), italic_nr (-1),
+    math_kind (0), italic_nr (-1), variations (get_font_variations ()),
     ot_math (!is_nil (base_fn) && base_fn->math_type == MATH_TYPE_OPENTYPE &&
              math_font_profile_attr (main_family (family2), "letters") != "text"),
     fn (2), sm (get_smart_map (tuple (family2, variant2, series2, shape2)))
@@ -938,6 +939,7 @@ smart_font_rep::adjust_subfont (font fn) {
 
 font
 smart_font_rep::get_math_font (string fam, string var, string ser, string sh) {
+  font_variations_scope scope (variations);
   find_closest (fam, var, ser, sh);
   string mvar= "mr";
   if (var == "ss") mvar= "ms";
@@ -947,12 +949,14 @@ smart_font_rep::get_math_font (string fam, string var, string ser, string sh) {
 
 font
 smart_font_rep::get_cyrillic_font (string fam, string var, string ser, string sh) {
+  font_variations_scope scope (variations);
   find_closest (fam, var, ser, sh);
   return find_font ("cyrillic", var, ser, sh, sz, dpi);
 }
 
 font
 smart_font_rep::get_greek_font (string fam, string var, string ser, string sh) {
+  font_variations_scope scope (variations);
   find_closest (fam, var, ser, sh);
   return find_font ("greek", var, ser, sh, sz, dpi);
 }
@@ -1079,6 +1083,7 @@ is_italic_font (string master) {
 
 int
 smart_font_rep::resolve (string c, string fam, int attempt) {
+  font_variations_scope scope (variations);
   //cout << "Resolve " << c << " in " << fam << ", attempt " << attempt << "\n";
   array<string> a= trimmed_tokenize (fam, "=");
   if (N(a) >= 2) {
@@ -1541,6 +1546,7 @@ smart_font_rep::resolve (string c) {
 
 void
 smart_font_rep::initialize_font (int nr) {
+  font_variations_scope scope (variations);
   if (N(fn) <= nr) fn->resize (nr+1);
   if (!is_nil (fn[nr])) return;
   array<string> a= tuple_as_array (sm->fn_spec[nr]);
@@ -1973,6 +1979,7 @@ smart_font_debug_info (font fn, string s, int pos) {
 
 font
 smart_font_rep::magnify (double zoomx, double zoomy) {
+  font_variations_scope scope (variations);
   //if (zoomx != zoomy) return poor_magnify (zoomx, zoomy);
   return smart_font_bis (family, variant, series, shape, sz,
                          (int) tm_round (hdpi * zoomx),
@@ -2168,6 +2175,7 @@ smart_font_bis (string family, string variant, string series, string shape,
       family * "-" * variant * "-" *
       series * "-" * shape * "-" * as_string (sz) * "-" *
       as_string (hdpi) * "-" * as_string (vdpi) * "-smart";
+  name << font_variations_key ();
   if (font::instances->contains (name)) return font (name);
   if (starts (family, "tc")) {
     // FIXME: temporary hack for symbols from std-symbol.ts

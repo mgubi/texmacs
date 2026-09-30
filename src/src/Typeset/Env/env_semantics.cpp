@@ -41,6 +41,7 @@ initialize_default_var_type () {
   var_type (FONT_BASE_SIZE)     = Env_Font_Size;
   var_type (FONT_EFFECTS)       = Env_Font;
   var_type (FONT_FEATURES)      = Env_Font;
+  var_type (FONT_VARIATIONS)    = Env_Font;
   var_type (MAGNIFICATION)      = Env_Magnification;
   var_type (MAGNIFY)            = Env_Magnify;
   var_type (COLOR)              = Env_Color;
@@ -550,6 +551,7 @@ edit_env_rep::get_script_size (int sz, int level) {
 
 font
 edit_env_rep::make_current_font (int sz) {
+  font_variations_scope scope (get_string (FONT_VARIATIONS));
   switch (mode) {
   case 2:
     return smart_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),

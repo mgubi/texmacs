@@ -15,6 +15,7 @@
 #include "file.hpp"
 #include "iterator.hpp"
 #include "sys_utils.hpp"
+#include <math.h>
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -443,6 +444,162 @@ tt_instance_is_style (string fv, int k) {
   return true;
 }
 
+/******************************************************************************
+* Arbitrary points of variable fonts
+******************************************************************************/
+
+// A point in the design space of a variable font is a font of its own too,
+// named after the file and the coordinates which differ from the default,
+// as in SFNS.var_wght550_opsz12 (a minus sign is written m, a decimal
+// point p). tt_unpack writes it like a named instance.
+
+array<string>
+tt_axis_tags (string fv) {
+  array<string> r;
+  if (N(fv) < 16) return r;
+  int axes_offset= get_U16 (fv, 4);
+  int axis_count = get_U16 (fv, 8);
+  int axis_size  = get_U16 (fv, 10);
+  for (int a=0; a<axis_count; a++)
+    r << trim_spaces (get_tag (fv, axes_offset + a * axis_size));
+  return r;
+}
+
+array<double>
+tt_axis_values (string fv, int which) {
+  // the minimal (0), default (1) or maximal (2) value of each axis
+  array<double> r;
+  if (N(fv) < 16) return r;
+  int axes_offset= get_U16 (fv, 4);
+  int axis_count = get_U16 (fv, 8);
+  int axis_size  = get_U16 (fv, 10);
+  for (int a=0; a<axis_count; a++) {
+    int v= (int) get_U32 (fv, axes_offset + a * axis_size + 4 + 4 * which);
+    r << ((double) v) / 65536.0;
+  }
+  return r;
+}
+
+static string
+coordinate_string (double v) {
+  int t= (int) floor (fabs (v) * 10.0 + 0.5);
+  string r= (v < 0 && t != 0)? string ("m"): string ("");
+  r << as_string (t / 10);
+  if (t % 10 != 0) r << "p" << as_string (t % 10);
+  return r;
+}
+
+array<double>
+tt_variation_coordinates (string fv, string suf) {
+  // the coordinates which a suffix var_... stands for
+  array<string> tags= tt_axis_tags (fv);
+  array<double> r= tt_axis_values (fv, 1);
+  array<string> parts= tokenize (suf, "_");
+  for (int i=1; i<N(parts); i++)
+    for (int a=0; a<N(tags); a++)
+      if (N(tags[a]) > 0 && starts (parts[i], tags[a])) {
+        string v= parts[i] (N(tags[a]), N(parts[i]));
+        v= replace (replace (v, "m", "-"), "p", ".");
+        if (is_double (v)) r[a]= as_double (v);
+      }
+  return r;
+}
+
+// Only the fvar table of a font file, without reading the whole file
+static string
+tt_file_fvar (url u) {
+  FILE* f= texmacs_fopen (concretize (u), "rb", false);
+  if (f == NULL) return "";
+  unsigned char h[12];
+  string r;
+  bool glyf= false;
+  long start= -1, len= 0;
+  if (fread (h, 1, 12, f) == 12 && h[0] != 't') {  // not a collection
+    int n= (((int) h[4]) << 8) + ((int) h[5]);
+    for (int k=0; k<n; k++) {
+      unsigned char e[16];
+      if (fread (e, 1, 16, f) != 16) break;
+      string tag ((char*) e, 4);
+      if (tag == "glyf") glyf= true;
+      if (tag == "fvar") {
+        start= (((long) e[8]) << 24) + (((long) e[9]) << 16) +
+               (((long) e[10]) << 8) + ((long) e[11]);
+        len  = (((long) e[12]) << 24) + (((long) e[13]) << 16) +
+               (((long) e[14]) << 8) + ((long) e[15]);
+      }
+    }
+  }
+  if (glyf && start >= 0 && len > 0 && len < 1000000 &&
+      fseek (f, start, SEEK_SET) == 0) {
+    char* buf= tm_new_array<char> (len);
+    if (fread (buf, 1, len, f) == (size_t) len) r= string (buf, (int) len);
+    tm_delete_array (buf);
+  }
+  texmacs_fclose (f);
+  return r;
+}
+
+static hashmap<string,string> fvar_cache ("?");
+
+static string
+tt_font_fvar (string base) {
+  if (fvar_cache->contains (base)) return fvar_cache[base];
+  string r;
+  url u= tt_font_find (base);
+  if (!is_none (u)) {
+    string suf= suffix (u);
+    if (suf == "ttf" || suf == "otf") r= tt_file_fvar (u);
+  }
+  fvar_cache (base)= r;
+  return r;
+}
+
+string
+tt_variation_name (string name, string spec, int sz) {
+  // the font for the variations spec (such as "wght=550,opsz=auto") applied
+  // to the font name, which may be a variable font, one of its named
+  // instances or another point; name itself when there is nothing to vary
+  string base= name, suf= suffix (url (name));
+  bool named= N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)));
+  bool point= starts (suf, "var_");
+  if (named || point) base= strip_suffix (name);
+  string fv= tt_font_fvar (base);
+  if (fv == "") return name;
+  array<string> tags= tt_axis_tags (fv);
+  array<double> lo  = tt_axis_values (fv, 0);
+  array<double> def = tt_axis_values (fv, 1);
+  array<double> hi  = tt_axis_values (fv, 2);
+  array<double> cur = copy (def);
+  if (named) {
+    int k= as_int (suf (1, N(suf)));
+    if (k < 1 || k > tt_nr_instances (fv)) return name;
+    for (int a=0; a<N(tags); a++)
+      cur[a]= tt_instance_coordinate (fv, k, tags[a], def[a]);
+  }
+  if (point) cur= tt_variation_coordinates (fv, suf);
+  array<string> items= tokenize (spec, ",");
+  for (int i=0; i<N(items); i++) {
+    array<string> kv= tokenize (items[i], "=");
+    if (N(kv) != 2) continue;
+    string tag= trim_spaces (kv[0]), val= trim_spaces (kv[1]);
+    for (int a=0; a<N(tags); a++)
+      if (tags[a] == tag) {
+        if (tag == "opsz" && val == "auto") cur[a]= (double) sz;
+        else if (is_double (val)) cur[a]= as_double (val);
+        cur[a]= max (lo[a], min (hi[a], cur[a]));
+      }
+  }
+  string r= base * ".var";
+  bool dflt= true;
+  for (int a=0; a<N(tags); a++)
+    if (coordinate_string (cur[a]) != coordinate_string (def[a])) {
+      r << "_" << tags[a] << coordinate_string (cur[a]);
+      dflt= false;
+    }
+  if (dflt) return base;
+  return r;
+}
+
 bool
 tt_file_is_variable (url u) {
   // from the table directory alone, without reading the whole file
@@ -498,12 +655,12 @@ tt_font_instances (url u) {
 url
 tt_unpack (string s) {
   string suf= suffix (url (s));
-  if (N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)))) {
-    // a named instance of a variable font: a static font written once
+  bool named= N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)));
+  if (named || starts (suf, "var_")) {
+    // an instance of a variable font: a static font written once
     url dir= url ("$TEXMACS_HOME_PATH/fonts/unpacked");
     if (!exists (dir)) mkdir (dir);
     url name= dir * url (s * ".ttf");
-    int k= as_int (suf (1, N(suf)));
     url u= tt_font_find (strip_suffix (s));
     if (is_none (u)) return url_none ();
     // written again when the variable font was updated since
@@ -511,7 +668,12 @@ tt_unpack (string s) {
       return name;
     string tt;
     if (load_string (u, tt, false)) return url_none ();
-    string inst= tt_make_instance (tt, k);
+    string inst;
+    if (named) inst= tt_make_instance (tt, as_int (suf (1, N(suf))));
+    else {
+      string fv= tt_table (tt, 0, "fvar");
+      inst= tt_make_variation (tt, tt_variation_coordinates (fv, suf));
+    }
     if (inst == "") return url_none ();
     if (save_string (name, inst, false)) return url_none ();
     return name;

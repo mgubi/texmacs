@@ -48,6 +48,37 @@ the way each subfont of a `.ttc` collection already was.
   (`tt_file_is_variable`, which reads a few hundred bytes) and scanned
   again.
 
+## Arbitrary points: `font-variations`
+
+The environment variable `font-variations` holds a comma separated list of
+axes and values, as in `wght=550,wdth=87.5,opsz=auto`. It applies on top of
+the font which `font`, `font-family`, `font-series` and `font-shape`
+select.
+
+- **Naming.** A point of the design space is a font named after the file
+  and the coordinates which differ from the default:
+  `SFNS.var_wdth60_wght700` (values rounded to a tenth, a minus sign
+  written `m`, a decimal point `p`). `tt_unpack` writes it like a named
+  instance, with `tt_make_variation`, which sets the coordinates through
+  `FT_Set_Var_Design_Coordinates` instead of opening a named instance.
+- **Resolution.** `tt_variation_name (name, spec, sz)` starts from the
+  coordinates of the font the database found (the default, a named
+  instance `v<k>`, or another point), replaces those the spec names,
+  clamps them to the ranges of the axes, and gives the canonical name.
+  `opsz=auto` takes the size in points. Only the `fvar` table is read,
+  once per file, from the table directory. A font which is not variable,
+  or a spec which changes nothing, gives the name back.
+- **Where it is applied.** In `find_font`, where a file of the font
+  database becomes a `unicode_font`. The value is a context,
+  `get_font_variations`, set with `font_variations_scope` by
+  `make_current_font`. It is part of the cache keys of `find_font`,
+  `closest_font` and `smart_font_bis`, and a smart font keeps the value it
+  was made with and sets it again whenever it looks up a subfont later
+  (fallbacks, math alphabets, magnification).
+- **Scope.** The variations reach every variable font the smart font uses,
+  its fallbacks included, so that a character taken from another variable
+  font gets the same weight. Static fonts are left alone.
+
 ## How an instance is made
 
 `tt_make_instance (tt, k)` opens the font with FreeType at face index
@@ -82,6 +113,9 @@ advances agree except for a few composite glyphs flagged
 - **GPOS, GDEF, MATH, kern** are those of the default instance. Kerning
   pairs and mark positions of a Black are therefore those of the Regular;
   applying `GDEF` item variations would fix that.
-- Only named instances: there is no way yet to ask for an arbitrary point on
-  an axis (weight 550, optical size of the current font size).
+- No user interface for `font-variations` yet: the value is typed in
+  markup or in the initial environment.
+- Every point used is a static font of the size of the variable font (1.5
+  MB for SF NS) in `fonts/unpacked`, and nothing removes the ones which are
+  no longer used.
 - Collections of variable fonts (`.ttc`) are not instanced.

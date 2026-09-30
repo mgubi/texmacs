@@ -12,6 +12,9 @@
 #include "config.h"
 #include "free_type.hpp"
 #include "dyn_link.hpp"
+#ifdef USE_FREETYPE
+#include FT_MULTIPLE_MASTERS_H
+#endif
 
 #ifdef USE_FREETYPE
 
@@ -50,6 +53,9 @@ FT_Error (*ft_get_kerning)    (FT_Face        face,
                                FT_UInt        kern_mode,
                                FT_Vector      *akerning);
 FT_Error (*ft_done_face)      (FT_Face        face);
+FT_Error (*ft_set_var_design_coordinates) (FT_Face   face,
+                                           FT_UInt   num_coords,
+                                           FT_Fixed* coords)= NULL;
 
 typedef FT_Error (*glyph_renderer) (FT_GlyphSlot, FT_Render_Mode);
 
@@ -68,6 +74,7 @@ ft_initialize () {
   ft_render_glyph  = (glyph_renderer) ((void*) FT_Render_Glyph);
   ft_get_kerning   = FT_Get_Kerning;
   ft_done_face     = FT_Done_Face;
+  ft_set_var_design_coordinates= FT_Set_Var_Design_Coordinates;
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "With linked TrueType support\n";
 #else
@@ -102,6 +109,9 @@ ft_initialize () {
   (void) symbol_install ("/usr/lib/libfreetype.so", "FT_Done_Face"     ,
        (pointer&) ft_done_face);
   if (ft_done_face == NULL) return true;
+  (void) symbol_install ("/usr/lib/libfreetype.so",
+                         "FT_Set_Var_Design_Coordinates",
+                         (pointer&) ft_set_var_design_coordinates);
   debug_on (status);
   if (ft_init_freetype (&ft_library)) return true;
   if (DEBUG_AUTO) debug_automatic << "Installed TrueType support\n";

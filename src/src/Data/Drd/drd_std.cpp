@@ -1039,6 +1039,7 @@ init_std_drd () {
   init_var (FONT_BASE_SIZE, TYPE_NUMERIC);
   init_var (FONT_EFFECTS, TYPE_STRING);
   init_var (FONT_FEATURES, TYPE_STRING);
+  init_var (FONT_VARIATIONS, TYPE_STRING);
   init_var (MAGNIFICATION, TYPE_NUMERIC);
   init_var (COLOR, TYPE_COLOR);
   init_var (OPACITY, TYPE_NUMERIC);
