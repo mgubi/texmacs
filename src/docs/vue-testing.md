@@ -124,6 +124,7 @@ callback output.
 | `dialog` | an `interactive` prompt: tab order, keyboard routing |
 | `dialogs` | colour picker, printer dialog, popup window |
 | `palette` | the colour palette of the document "Color" menu, in a popup sized to its contents: flat cells, framed only by the highlight of the one hovered, sitting next to each other |
+| `typographic-palette` | the typographic palette of the "Color" menu (preference `typographic palette`): eight families of hues in columns, their tones in rows under Text, Accents and Backgrounds; the list of its sets opened, and "Earth" chosen: the grid is made again while the menu stays open (a promise in a refreshable, which Vue refreshes at once) |
 | `pattern-palette` | the pattern cells of the document "Color" menu, drawn from the images of `misc/patterns/vintage`; one chosen colours the text inserted next (`got: (document (with color (pattern ...) ...))`) |
 | `choice-style` | the four styles of a choice list side by side; a click on the inert one neither selects nor calls back |
 | `input-edit` | editing in a text input: select all and replace, word selection, cut and paste (`got: Bob Smith / 42`) |
