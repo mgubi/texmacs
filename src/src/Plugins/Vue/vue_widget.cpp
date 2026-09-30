@@ -2690,7 +2690,7 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut, well apart from the label
         CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_GROW(ui_pxf (32)), CLAY_SIZING_GROW(0) }}}) {}
-        layout_text (d.ks, d.style, black);
+        layout_keys (d.ks, d.style, black);
       }
       if (tab_strip && bd.found) {
         // cover the bottom line of the bar under the active tab (the border

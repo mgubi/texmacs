@@ -265,6 +265,7 @@ extern void* vue_render_widget;
 extern void* vue_render_text;
 
 void layout_text (string s, int style, color c);
+void layout_keys (string s, int style, color c); // a keyboard shortcut
 
 extern vue_window current_window;
 class with_window {

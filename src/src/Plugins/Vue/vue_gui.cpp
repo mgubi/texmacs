@@ -1350,8 +1350,7 @@ text_extents_of (font fn) {
 }
 
 static void
-layout_text_box (string s, int style, color c) {
-  font fn= get_default_styled_font (style);
+layout_text_box (string s, int style, color c, font fn) {
   text_extents& cache= text_extents_of (fn);
   SI w, h;
   int idx= cache.index[s];
@@ -1399,10 +1398,54 @@ void layout_text (string s, int style, color c) {
         .sizing= { .width= CLAY_SIZING_GROW(0) },
         .childAlignment= { .x= CLAY_ALIGN_X_CENTER }}})
     {
-      layout_text_box (s, style, c);
+      layout_text_box (s, style, c, get_default_styled_font (style));
     }
   }
-  else layout_text_box (s, style, c);
+  else layout_text_box (s, style, c, get_default_styled_font (style));
+}
+
+// The font of the symbols which the font of the widgets does not have, at
+// its size: the keys of the shortcuts on a Mac in the browser (Fira has no
+// command sign, no option sign...), from STIX Two Math, which has them all
+static font
+widget_symbol_font (int style) {
+  bool mini= (style & WIDGET_STYLE_MINI) != 0;
+  int sz= 11, dpi= 300;
+  if (mini) { sz= (int) (0.6 * sz); dpi= (int) (1.3333333 * dpi); }
+  return unicode_font ("STIXTwoMath-Regular", sz, (int) (0.95 * dpi));
+}
+
+// A keyboard shortcut (as the menus show it): the characters of the font of
+// the widgets in it, the others from widget_symbol_font, run by run
+void
+layout_keys (string s, int style, color c) {
+  style |= context_style;
+  if (style & (WIDGET_STYLE_GREY | WIDGET_STYLE_INERT)) c= dark_grey;
+  if (c == black) c= theme_color (the_theme.text);
+  else if (c == dark_grey) c= theme_color (the_theme.text_grey);
+  font fn= get_default_styled_font (style);
+  font sym;
+  string run;
+  bool run_sym= false;
+  int i= 0;
+  auto flush= [&] () {
+    if (N(run) == 0) return;
+    layout_text_box (run, style, c, run_sym ? sym : fn);
+    run= "";
+  };
+  CLAY_AUTO_ID({ .layout= { .childAlignment= { .y= CLAY_ALIGN_Y_CENTER } } }) {
+    while (i < N(s)) {
+      int start= i;
+      tm_char_forwards (s, i);
+      string ch= s (start, i);
+      bool need= !fn->supports (ch);
+      if (need && is_nil (sym)) sym= widget_symbol_font (style);
+      if (need && !sym->supports (ch)) need= false; // as it is, then
+      if (need != run_sym) { flush (); run_sym= need; }
+      run << ch;
+    }
+    flush ();
+  }
 }
 
 //******************************************************************************

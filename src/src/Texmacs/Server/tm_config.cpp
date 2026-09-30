@@ -230,7 +230,7 @@ mathop (string s) {
 static void
 system_kbd_initialize (hashmap<string,tree>& h) {
   if (N(h) != 0);
-  else if (use_macos_fonts ()) {
+  else if (use_macos_keys ()) {
     h ("S-")= "<#21E7>";
     h ("C-")= "<#2303>";
     h ("A-")= "<#2325>";
@@ -355,7 +355,7 @@ tm_config_rep::kbd_system_rewrite (string s) {
       if (i < N(s) && s[i] == '-') i++;
       string ss= s (start, i);
       if (system_kbd_decode->contains (ss)) r << system_kbd_decode[ss];
-      else if (N(ss) == 1 && (use_macos_fonts () || gui_is_qt ()) && !cs) {
+      else if (N(ss) == 1 && (use_macos_keys () || gui_is_qt ()) && !cs) {
         if (is_locase (ss[0])) r << upcase_all (ss);
         else if (is_upcase (ss[0])) r << system_kbd_decode ("S-") << ss;
         else r << ss;
