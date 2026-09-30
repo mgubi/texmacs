@@ -34,6 +34,15 @@
 	((tree? s) (tmdoc-key (tree->stree s)))
 	(else '(render-key (with "color" "red" "?")))))
 
+(tm-define (tmdoc-menu-font body)
+  ;; the names of the menus in the documentation, in the font of the menus
+  ;; of the interface when TeXmacs knows it: Fira Sans in the browser (the
+  ;; Vue port, where web-files is defined)
+  (:secure #t)
+  (if (defined? 'web-files)
+      `(with "font" "Fira Sans" ,body)
+      body))
+
 (tm-define (tmdoc-key* s)
   (:secure #t)
   (lazy-keyboard-force #t)
