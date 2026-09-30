@@ -1037,8 +1037,11 @@
 		9C6632E91676B272000D7974 /* preferences.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632E71676B272000D7974 /* preferences.cpp */; };
 		9C6632EA1676B272000D7974 /* preferences.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632E71676B272000D7974 /* preferences.cpp */; };
 		9C6632EF1676B28E000D7974 /* tt_tools.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632ED1676B28E000D7974 /* tt_tools.cpp */; };
+		A1F0C0DE2026093000000002 /* tt_instance.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE2026093000000001 /* tt_instance.cpp */; };
 		9C6632F01676B28E000D7974 /* tt_tools.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632ED1676B28E000D7974 /* tt_tools.cpp */; };
+		A1F0C0DE2026093000000003 /* tt_instance.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE2026093000000001 /* tt_instance.cpp */; };
 		9C6632F11676B28E000D7974 /* tt_tools.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C6632ED1676B28E000D7974 /* tt_tools.cpp */; };
+		A1F0C0DE2026093000000004 /* tt_instance.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A1F0C0DE2026093000000001 /* tt_instance.cpp */; };
 		9C6723D714FFD4EC005F1FE9 /* object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46A9214740A3F00A7E2FC /* object.cpp */; };
 		9C6723D814FFD4EE005F1FE9 /* guile_tm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9CD46B11147429F900A7E2FC /* guile_tm.cpp */; };
 		9C6723D914FFD4F1005F1FE9 /* glue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 9C4DE77A1475AA9A00F41E44 /* glue.cpp */; };
@@ -2799,6 +2802,7 @@
 		9C6632E11676B229000D7974 /* font_database.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = font_database.cpp; sourceTree = "<group>"; };
 		9C6632E71676B272000D7974 /* preferences.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = preferences.cpp; sourceTree = "<group>"; };
 		9C6632ED1676B28E000D7974 /* tt_tools.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tt_tools.cpp; sourceTree = "<group>"; };
+		A1F0C0DE2026093000000001 /* tt_instance.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = tt_instance.cpp; sourceTree = "<group>"; };
 		9C722BEB10D2F7C700C41915 /* qt_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = qt_sys_utils.cpp; sourceTree = "<group>"; };
 		9C722BEC10D2F7C700C41915 /* qt_sys_utils.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = qt_sys_utils.hpp; sourceTree = "<group>"; };
 		9C722C0D10D2F88800C41915 /* unix_sys_utils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = unix_sys_utils.cpp; sourceTree = "<group>"; };
@@ -4095,6 +4099,7 @@
 				9C0B487610A8CC100097A335 /* tt_file.hpp */,
 				9C0B487710A8CC100097A335 /* tt_font.cpp */,
 				9C6632ED1676B28E000D7974 /* tt_tools.cpp */,
+				A1F0C0DE2026093000000001 /* tt_instance.cpp */,
 				9C0B487810A8CC100097A335 /* unicode_font.cpp */,
 				9CEDAA351264FF88009630CC /* unicode_math_font.cpp */,
 				491132F216767D3E009F1A5C /* tt_tools.cpp */,
@@ -6089,6 +6094,7 @@
 				9C6632E21676B229000D7974 /* font_database.cpp in Sources */,
 				9C6632E81676B272000D7974 /* preferences.cpp in Sources */,
 				9C6632EF1676B28E000D7974 /* tt_tools.cpp in Sources */,
+				A1F0C0DE2026093000000002 /* tt_instance.cpp in Sources */,
 				4942BEF71679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FA916DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712F916E90E5900934EA3 /* metadata-acm.cpp in Sources */,
@@ -6508,6 +6514,7 @@
 				9C6632E41676B229000D7974 /* font_database.cpp in Sources */,
 				9C6632EA1676B272000D7974 /* preferences.cpp in Sources */,
 				9C6632F11676B28E000D7974 /* tt_tools.cpp in Sources */,
+				A1F0C0DE2026093000000004 /* tt_instance.cpp in Sources */,
 				4942BEF91679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FAB16DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712FB16E90E5900934EA3 /* metadata-acm.cpp in Sources */,
@@ -6955,6 +6962,7 @@
 				9C6632E31676B229000D7974 /* font_database.cpp in Sources */,
 				9C6632E91676B272000D7974 /* preferences.cpp in Sources */,
 				9C6632F01676B28E000D7974 /* tt_tools.cpp in Sources */,
+				A1F0C0DE2026093000000003 /* tt_instance.cpp in Sources */,
 				4942BEF81679293B00A6C354 /* font_select.cpp in Sources */,
 				49DD8FAA16DB75C100647CA2 /* sqlite3.cpp in Sources */,
 				495712FA16E90E5900934EA3 /* metadata-acm.cpp in Sources */,

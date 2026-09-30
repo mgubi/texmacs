@@ -348,6 +348,18 @@ on_blacklist (string name) {
     starts (name, "FonetikaDania");
 }
 
+// The file which holds the font of a database entry: a subfont of a
+// collection and a named instance of a variable font ("v<k>") are written
+// apart by tt_unpack, under the name of the file followed by the number.
+static string
+font_file_name (string name, string nr) {
+  if (N(nr) > 1 && nr[0] == 'v' && N(name) > 4)
+    return name (0, N(name)-4) * "." * nr * ".ttf";
+  if (ends (name, ".ttc"))
+    return name (0, N(name)-4) * "." * nr * ".ttf";
+  return name;
+}
+
 // Scanning a font file means reading it whole and parsing its name table,
 // which is slow when there are thousands of them (a TeX Live installation
 // on the font path). Files whose name and size are already recorded in the
@@ -364,9 +376,13 @@ font_database_init_scanned () {
   while (it->busy ()) {
     tree im= font_table[it->next ()];
     for (int i=0; i<N(im); i++)
-      if (is_func (im[i], TUPLE, 3))
+      if (is_func (im[i], TUPLE, 3)) {
         scanned_files->insert (as_string (im[i][0]) * " " *
                                as_string (im[i][2]));
+        if (starts (as_string (im[i][1]), "v"))
+          scanned_files->insert (as_string (im[i][0]) * " " *
+                                 as_string (im[i][2]) * " instances");
+      }
   }
   scanned_files_ready= true;
   scan_new= scan_skipped= 0;
@@ -394,7 +410,11 @@ font_database_build (url u) {
     string name= as_string (tail (u));
     if (on_blacklist (name)) return;
     int sz= file_size (u);
-    if (scanned_files->contains (name * " " * as_string (sz))) {
+    // a variable font scanned before TeXmacs knew named instances has
+    // only its default instance in the database: scan it again
+    if (scanned_files->contains (name * " " * as_string (sz)) &&
+        (scanned_files->contains (name * " " * as_string (sz) * " instances")
+         || !tt_file_is_variable (u))) {
       scan_skipped++;
       return;
     }
@@ -414,7 +434,19 @@ font_database_build (url u) {
           tuple_insert (all, im);
           font_table (key)= all;
         }
+    t= tt_font_instances (u);
+    for (int i=0; i<N(t); i++)
+      if (is_func (t[i], TUPLE, 3)) {
+        tree key= t[i] (0, 2);
+        tree im = tuple (name, t[i][2], as_string (sz));
+        tree all= tree (TUPLE);
+        if (font_table->contains (key))
+          all= font_table [key];
+        tuple_insert (all, im);
+        font_table (key)= all;
+      }
     scanned_files->insert (name * " " * as_string (sz));
+    scanned_files->insert (name * " " * as_string (sz) * " instances");
   }
 }
 
@@ -533,6 +565,7 @@ font_database_save_local_delta () {
 
 static hashmap<tree,tree> new_font_table (UNINIT);
 static hashmap<tree,tree> back_font_table (UNINIT);
+static hashmap<string,int> nr_instances (0);
 
 void
 build_back_entry (tree key, tree loc) {
@@ -555,6 +588,13 @@ build_back_table () {
         build_back_entry (key, loc);
         if (is_func (loc, TUPLE, 3))
           build_back_entry (key, loc (0, 2));
+        if (is_func (loc, TUPLE, 3) && is_atomic (loc[1])) {
+          string nr= loc[1]->label;
+          if (N(nr) > 1 && nr[0] == 'v' && is_int (nr (1, N(nr)))) {
+            string name= as_string (loc[0]);
+            nr_instances (name)= max (nr_instances[name], as_int (nr (1, N(nr))));
+          }
+        }
       }
     }
   }
@@ -627,6 +667,24 @@ font_database_collect (url u) {
             }
             else break;
           }
+    for (int i=0; i<N(a); i++)
+      for (int k=1; k <= nr_instances[a[i]]; k++) {
+        int  sz= file_size (u * a[i]);
+        tree ff= tuple (a[i], "v" * as_string (k), as_string (sz));
+        if (!back_font_table->contains (ff) &&
+             back_font_table->contains (ff (0, 2)))
+          ff= find_best_approximation (ff);
+        if (!back_font_table->contains (ff)) continue;
+        tree keys= back_font_table [ff];
+        for (int j=0; j<N(keys); j++) {
+          tree key= keys[j];
+          tree im (TUPLE);
+          if (new_font_table->contains (key))
+            im= new_font_table [key];
+          tuple_insert (im, ff);
+          new_font_table (key)= im;
+        }
+      }
   }
 }
 
@@ -634,6 +692,7 @@ void
 font_database_filter () {
   new_font_table = hashmap<tree,tree> (UNINIT);
   back_font_table= hashmap<tree,tree> (UNINIT);
+  nr_instances= hashmap<string,int> (0);
   build_back_table ();
   font_database_collect (tt_font_path ());
   font_database_collect (tfm_font_path ());
@@ -697,12 +756,16 @@ font_database_build_characteristics (bool force) {
           string nr  = as_string (im[i][1]);
           if (DEBUG_VERBOSE)
             debug_fonts << "| Processing " << name << ", " << nr << "\n";
-          if (ends (name, ".ttc"))
-            name= (name (0, N(name)-4) * "." * nr * ".ttf");
+          name= font_file_name (name, nr);
           if (ends (name, ".ttf") ||
               ends (name, ".otf") ||
               ends (name, ".tfm")) {
             name= name (0, N(name)-4);
+            // the static font of a named instance is written for the
+            // analysis only, and again when the font is used
+            url inst= url ("$TEXMACS_HOME_PATH/fonts/unpacked") *
+                      url (name * ".ttf");
+            bool temp= starts (nr, "v") && !exists (inst);
             if (!tt_font_exists (name) && ends (name, "10"))
               name= name (0, N(name)-2);
             if (tt_font_exists (name)) {
@@ -712,6 +775,7 @@ font_database_build_characteristics (bool force) {
               for (int j=0; j<N(a); j++) t[j]= a[j];
               font_characteristics (key)= t;
             }
+            if (temp && exists (inst)) remove (inst);
           }
         }
   }
@@ -781,7 +845,7 @@ font_database_global_styles (string family) {
 array<string>
 font_database_search (string family, string style) {
   font_database_load ();
-  array<string> r;
+  array<string> r, inst;
   tree key= tuple (family, style);
   if (font_table->contains (key)) {
     tree im= font_table [key];
@@ -789,11 +853,12 @@ font_database_search (string family, string style) {
       if (is_func (im[i], TUPLE, 3)) {
         string name= im[i][0]->label;
         string nr  = im[i][1]->label;
-        if (!ends (name, ".ttc")) r << name;
-        else r << (name (0, N(name)-4) * "." * nr * ".ttf");
+        // a static font comes before the same style of a variable font
+        if (starts (nr, "v")) inst << font_file_name (name, nr);
+        else r << font_file_name (name, nr);
       }
   }
-  return r;
+  return append (r, inst);
 }
 
 array<string>

@@ -17,6 +17,13 @@
 
 void tt_dump (url u);
 scheme_tree tt_font_name (url u);
+scheme_tree tt_font_instances (url u);
+bool tt_is_variable (string tt, int i);
+bool tt_file_is_variable (url u);
+int tt_nr_instances (string fvar);
+int tt_instance_record (string fvar, int k);
+double tt_instance_coordinate (string fvar, int k, string axis, double def);
+string tt_make_instance (string tt, int k);
 url tt_unpack (string name);
 
 string find_attribute_value (array<string> a, string s);

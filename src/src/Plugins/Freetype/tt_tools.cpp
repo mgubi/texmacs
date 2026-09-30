@@ -14,6 +14,7 @@
 #include "analyze.hpp"
 #include "file.hpp"
 #include "iterator.hpp"
+#include "sys_utils.hpp"
 
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
@@ -324,6 +325,42 @@ move_to_shape (string& fam, string& shape, string what, string by) {
   else shape= by * " " * shape;
 }
 
+static void
+normalize_font_name (string& fam, string& sh) {
+  move_to_shape (fam, sh, "Narrow", "Narrow");
+  move_to_shape (fam, sh, "Condensed", "Condensed");
+  move_to_shape (fam, sh, "Extended", "Extended");
+  move_to_shape (fam, sh, "Wide", "Wide");
+  move_to_shape (fam, sh, "Caption", "Caption");
+  move_to_shape (fam, sh, "Semilight", "SemiLight");
+  move_to_shape (fam, sh, "SemiLight", "SemiLight");
+  move_to_shape (fam, sh, "Semi Light", "SemiLight");
+  move_to_shape (fam, sh, "Ultralight", "Thin");
+  move_to_shape (fam, sh, "UltraLight", "Thin");
+  move_to_shape (fam, sh, "Ultra Light", "Thin");
+  move_to_shape (fam, sh, "Light", "Light");
+  move_to_shape (fam, sh, "Medium", "");
+  move_to_shape (fam, sh, "Semibold", "SemiBold");
+  move_to_shape (fam, sh, "SemiBold", "SemiBold");
+  move_to_shape (fam, sh, "Semi Bold", "SemiBold");
+  move_to_shape (fam, sh, "Demibold", "DemiBold");
+  move_to_shape (fam, sh, "DemiBold", "DemiBold");
+  move_to_shape (fam, sh, "Demi Bold", "DemiBold");
+  move_to_shape (fam, sh, "Bold", "Bold");
+  move_to_shape (fam, sh, "Extrabold", "ExtraBold");
+  move_to_shape (fam, sh, "ExtraBold", "ExtraBold");
+  move_to_shape (fam, sh, "Extra Bold", "ExtraBold");
+  move_to_shape (fam, sh, "Heavy", "Heavy");
+  move_to_shape (fam, sh, "Black", "Black");
+  move_to_shape (fam, sh, "Italic", "Italic");
+  move_to_shape (fam, sh, "Oblique", "Oblique");
+
+  while (fam != "" && !is_alpha (fam[0])) fam= fam (1, N(fam));
+  if (upcase_all (fam) == fam) fam= locase_all (fam);
+  fam= upcase_first (fam);
+  if (starts (fam, "STIX")) fam= "Stix" * fam (4, N(fam));
+}
+
 scheme_tree
 tt_font_name (url u) {
   string tt;
@@ -334,50 +371,152 @@ tt_font_name (url u) {
     string nt = tt_table (tt, i, "name");
     string fam= name_record_family (nt);
     string sh = name_record_shape (nt);
-
-    // Some basic normalization of family name
-    move_to_shape (fam, sh, "Narrow", "Narrow");
-    move_to_shape (fam, sh, "Condensed", "Condensed");
-    move_to_shape (fam, sh, "Extended", "Extended");
-    move_to_shape (fam, sh, "Wide", "Wide");
-    move_to_shape (fam, sh, "Caption", "Caption");
-    move_to_shape (fam, sh, "Semilight", "SemiLight");
-    move_to_shape (fam, sh, "SemiLight", "SemiLight");
-    move_to_shape (fam, sh, "Semi Light", "SemiLight");
-    move_to_shape (fam, sh, "Ultralight", "Thin");
-    move_to_shape (fam, sh, "UltraLight", "Thin");
-    move_to_shape (fam, sh, "Ultra Light", "Thin");
-    move_to_shape (fam, sh, "Light", "Light");
-    move_to_shape (fam, sh, "Medium", "");
-    move_to_shape (fam, sh, "Semibold", "SemiBold");
-    move_to_shape (fam, sh, "SemiBold", "SemiBold");
-    move_to_shape (fam, sh, "Semi Bold", "SemiBold");
-    move_to_shape (fam, sh, "Demibold", "DemiBold");
-    move_to_shape (fam, sh, "DemiBold", "DemiBold");
-    move_to_shape (fam, sh, "Demi Bold", "DemiBold");
-    move_to_shape (fam, sh, "Bold", "Bold");
-    move_to_shape (fam, sh, "Extrabold", "ExtraBold");
-    move_to_shape (fam, sh, "ExtraBold", "ExtraBold");
-    move_to_shape (fam, sh, "Extra Bold", "ExtraBold");
-    move_to_shape (fam, sh, "Heavy", "Heavy");
-    move_to_shape (fam, sh, "Black", "Black");
-    move_to_shape (fam, sh, "Italic", "Italic");
-    move_to_shape (fam, sh, "Oblique", "Oblique");
-
-    while (fam != "" && !is_alpha (fam[0])) fam= fam (1, N(fam));
-    if (upcase_all (fam) == fam) fam= locase_all (fam);
-    fam= upcase_first (fam);
-    if (starts (fam, "STIX")) fam= "Stix" * fam (4, N(fam));
-    // End normalization of family name
-    
+    normalize_font_name (fam, sh);
     r << tuple (fam, sh);
+  }
+  return r;
+}
+
+/******************************************************************************
+* Named instances of variable fonts
+******************************************************************************/
+
+// A variable font holds a continuum of designs (weights, widths...) in one
+// file; its fvar table lists named instances, such as Bold or Condensed
+// Light. TeXmacs handles each named instance as a font of its own: the
+// database registers it as the subfont "v<k>" of the file (k counts from 1,
+// as FreeType numbers named instances), and tt_unpack writes a static font
+// for it, as it does for the subfonts of a collection. Only TrueType
+// outlines (glyf) are supported; a CFF2 font keeps its default instance.
+
+bool
+tt_is_variable (string tt, int i) {
+  return tt_table (tt, i, "fvar") != "" && tt_table (tt, i, "glyf") != "";
+}
+
+int
+tt_nr_instances (string fv) {
+  if (N(fv) < 16) return 0;
+  return get_U16 (fv, 12);
+}
+
+int
+tt_instance_record (string fv, int k) {
+  // offset in fvar of the record of the named instance k (from 1)
+  int axes_offset  = get_U16 (fv, 4);
+  int axis_count   = get_U16 (fv, 8);
+  int axis_size    = get_U16 (fv, 10);
+  int instance_size= get_U16 (fv, 14);
+  return axes_offset + axis_count * axis_size + (k - 1) * instance_size;
+}
+
+double
+tt_instance_coordinate (string fv, int k, string axis, double def) {
+  // the coordinate of the named instance k on the axis with this tag
+  int axes_offset= get_U16 (fv, 4);
+  int axis_count = get_U16 (fv, 8);
+  int axis_size  = get_U16 (fv, 10);
+  int rec= tt_instance_record (fv, k);
+  for (int a=0; a<axis_count; a++)
+    if (get_tag (fv, axes_offset + a * axis_size) == axis) {
+      int v= (int) get_U32 (fv, rec + 4 + 4 * a);
+      return ((double) v) / 65536.0;
+    }
+  return def;
+}
+
+static bool
+tt_instance_is_style (string fv, int k) {
+  // an instance which differs from the default only in weight, width or
+  // slant; those set apart by an optical size or a grade are left out
+  int axes_offset= get_U16 (fv, 4);
+  int axis_count = get_U16 (fv, 8);
+  int axis_size  = get_U16 (fv, 10);
+  int rec= tt_instance_record (fv, k);
+  for (int a=0; a<axis_count; a++) {
+    int ax= axes_offset + a * axis_size;
+    string tag= get_tag (fv, ax);
+    if (tag == "wght" || tag == "wdth" || tag == "ital" || tag == "slnt")
+      continue;
+    if (get_U32 (fv, ax + 8) != get_U32 (fv, rec + 4 + 4 * a)) return false;
+  }
+  return true;
+}
+
+bool
+tt_file_is_variable (url u) {
+  // from the table directory alone, without reading the whole file
+  FILE* f= texmacs_fopen (concretize (u), "rb", false);
+  if (f == NULL) return false;
+  unsigned char h[12];
+  bool fvar= false, glyf= false;
+  if (fread (h, 1, 12, f) == 12 && h[0] != 't') {  // not a collection
+    int n= (((int) h[4]) << 8) + ((int) h[5]);
+    for (int k=0; k<n; k++) {
+      unsigned char e[16];
+      if (fread (e, 1, 16, f) != 16) break;
+      string tag ((char*) e, 4);
+      if (tag == "fvar") fvar= true;
+      if (tag == "glyf") glyf= true;
+    }
+  }
+  texmacs_fclose (f);
+  return fvar && glyf;
+}
+
+scheme_tree
+tt_font_instances (url u) {
+  string tt;
+  tree r (TUPLE);
+  if (load_string (u, tt, false)) return r;
+  if (tt_is_collection (tt) || !tt_correct_version (tt, 0)) return r;
+  if (!tt_is_variable (tt, 0)) return r;
+  string nt= tt_table (tt, 0, "name");
+  string fv= tt_table (tt, 0, "fvar");
+  // the family of the default instance, as tt_font_name gives it
+  scheme_tree def= tt_font_name (u);
+  if (N(def) != 1 || !is_func (def[0], TUPLE, 2)) return r;
+  string base= as_string (def[0][0]);
+  hashmap<tree,bool> seen (false);
+  seen (def[0])= true;
+  for (int k=1; k <= tt_nr_instances (fv); k++) {
+    int rec= tt_instance_record (fv, k);
+    if (rec + 4 + 4 * get_U16 (fv, 8) > N(fv)) break;
+    if (!tt_instance_is_style (fv, k)) continue;
+    string sh= name_record_english_string (nt, get_U16 (fv, rec));
+    if (sh == "") continue;
+    string fam= base;
+    normalize_font_name (fam, sh);
+    tree key= tuple (fam, sh);
+    if (seen[key]) continue;
+    seen (key)= true;
+    r << tuple (fam, sh, "v" * as_string (k));
   }
   return r;
 }
 
 url
 tt_unpack (string s) {
-  if (!is_int (suffix (url (s)))) return url_none ();
+  string suf= suffix (url (s));
+  if (N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)))) {
+    // a named instance of a variable font: a static font written once
+    url dir= url ("$TEXMACS_HOME_PATH/fonts/unpacked");
+    if (!exists (dir)) mkdir (dir);
+    url name= dir * url (s * ".ttf");
+    int k= as_int (suf (1, N(suf)));
+    url u= tt_font_find (strip_suffix (s));
+    if (is_none (u)) return url_none ();
+    // written again when the variable font was updated since
+    if (exists (name) && last_modified (u, false) <= last_modified (name, false))
+      return name;
+    string tt;
+    if (load_string (u, tt, false)) return url_none ();
+    string inst= tt_make_instance (tt, k);
+    if (inst == "") return url_none ();
+    if (save_string (name, inst, false)) return url_none ();
+    return name;
+  }
+  if (!is_int (suf)) return url_none ();
   url dir= url ("$TEXMACS_HOME_PATH/fonts/unpacked");
   if (!exists (dir)) mkdir (dir);
   url name= dir * url (s * ".ttf");
