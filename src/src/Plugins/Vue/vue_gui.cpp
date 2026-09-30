@@ -1997,6 +1997,26 @@ host_overlay_at (float x, float y) {
   return false;
 }
 
+// fill the rectangle x1..x2, y1..y2 (device pixels, y downwards) with its
+// corners rounded by r
+static void
+fill_rounded (renderer ren, int x1, int y1, int x2, int y2, float r) {
+  SI px= ren->pixel;
+  r= min (r, (float) min (x2 - x1, y2 - y1) / 2.0f);
+  if (r < 1.0f) { ren->fill (x1*px, -y2*px, x2*px, -y1*px); return; }
+  int n= max (2, (int) (r / 1.5f));  // the segments of a quarter of circle
+  float cx[4]= { x2 - r, x1 + r, x1 + r, x2 - r };
+  float cy[4]= { y1 + r, y1 + r, y2 - r, y2 - r };
+  array<SI> xs, ys;
+  for (int c= 0; c < 4; c++)
+    for (int k= 0; k <= n; k++) {
+      double a= (c + (double) k / n) * M_PI / 2.0;
+      xs << (SI) ((cx[c] + r * cos (a)) * px);
+      ys << (SI) (-(cy[c] - r * sin (a)) * px);
+    }
+  ren->polygon (xs, ys);
+}
+
 // draw the visible virtual windows over the host, back to front
 static void
 composite_virtual_windows (vue_window host, renderer ren) {
@@ -2015,17 +2035,21 @@ composite_virtual_windows (vue_window host, renderer ren) {
     if (v->decorated ()) {
       int T= (int) (title_bar_h * d), B= max (1, (int) d);
       int F= (int) (frame_w * d + 0.5f);
+      // the corners are rounded as those of the menus (vue_widget.cpp: the
+      // theme's radius by 1.5, in 2x pixels); the contents stay square,
+      // the frame is wide enough to hold the curve
+      float R= the_theme.radius * 1.5f / 2.0f * d;
       // a shadow, then a frame around the title bar and the contents, with
       // a line on both of its sides
       for (int k= 3; k >= 1; k--) {
         int s= k * B;
         ren->set_pencil (rgb_color (0, 0, 0, 22));
-        ren->fill ((X-F-B-s)*px, -(Y+H+F+B+s+B)*px, (X+W+F+B+s)*px, -(Y-T-F-B-s+B)*px);
+        fill_rounded (ren, X-F-B-s, Y-T-F-B-s+B, X+W+F+B+s, Y+H+F+B+s+B, R + s);
       }
       ren->set_pencil (theme_color (the_theme.border));
-      ren->fill ((X-F-B)*px, -(Y+H+F+B)*px, (X+W+F+B)*px, -(Y-T-F-B)*px);
+      fill_rounded (ren, X-F-B, Y-T-F-B, X+W+F+B, Y+H+F+B, R);
       ren->set_pencil (theme_color (the_theme.shade[2]));
-      ren->fill ((X-F)*px, -(Y+H+F)*px, (X+W+F)*px, -(Y-T-F)*px);
+      fill_rounded (ren, X-F, Y-T-F, X+W+F, Y+H+F, max (0.0f, R - B));
       ren->set_pencil (theme_color (the_theme.border));
       ren->fill ((X-B)*px, -(Y+H+B)*px, (X+W+B)*px, -Y*px);
       color tc= theme_color (the_theme.text);
