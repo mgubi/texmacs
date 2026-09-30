@@ -111,6 +111,7 @@ public:
   SI Min_w, Min_h, Max_w, Max_h; // size limits, 0 if unset
   bool on_top;       // a tool window, above the other windows of TeXmacs
   bool level_raised; // ... and currently at the level of SDL's "on top"
+  bool document= false; // the window of an editor (see plain_window)
   // the geometry last seen (see track_geometry), in points; unknown while
   // saved_w < 0
   int  saved_x, saved_y, saved_w, saved_h;
@@ -533,6 +534,10 @@ vue_sdl_base_window_rep::set_visibility (bool flag) {
     SDL_ShowWindow (sdl_win);
     shown= true;
   }
+  // the window of an editor already shown comes to the front with the
+  // focus (switch_to_window maps the window of a buffer to switch to it:
+  // the Go menu, switch-to-buffer*)
+  else if (shown && document) SDL_RaiseWindow (sdl_win);
   // otherwise the window is shown by process_layout once it fits its contents
 }
  
@@ -2188,11 +2193,12 @@ route_keys (vue_window win) {
 // entrypoints for top-level windows
 
 vue_window
-plain_window (vue_widget wwid, string name, bool popup) {
+plain_window (vue_widget wwid, string name, bool popup, bool document) {
   // headless: the windows are virtual as well, with no host to be drawn in
   if (is_headless () || (single_window_mode () && the_host != NULL))
     return tm_new<vue_virtual_window_rep> (wwid, name, popup);
   vue_sdl_mupdf_window_rep* w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
+  w->document= document && !popup;
   if (single_window_mode () && the_host == NULL && !popup) the_host= w;
   return w;
 }

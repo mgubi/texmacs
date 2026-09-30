@@ -230,7 +230,10 @@ typedef vue_window_rep* vue_window;
 extern hashmap<int, pointer> id_to_window;
 void draw_picture (void *data, picture pic);
 void get_viewport_size (void *data, int& w, int& h);
-vue_window plain_window (vue_widget wwid, string name, bool popup= false);
+// document: the window of an editor, brought to the front when it is shown
+// again (switch_to_window, to switch to its buffer)
+vue_window plain_window (vue_widget wwid, string name, bool popup= false,
+                         bool document= false);
 
 typedef void (*render_fn) (renderer ren, void *data, rectangle rect);
 

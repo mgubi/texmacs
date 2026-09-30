@@ -1775,8 +1775,10 @@ layout_pull_button (vue_ui_rep *w) {
   if (!down) note_menu_hover (button_id);
   // the items of vertical menus have the padding of menu_button, but the
   // arrow of a submenu lies in the padding on the right, near the border
-  // the titles of a menu bar: roomy, with a round highlight
-  Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (6), ui_px (6) };
+  // the titles of a menu bar: roomy, with a round highlight; more padding
+  // above than below, as the text keeps room for the descenders below its
+  // baseline, so that the letters look centered in the highlight
+  Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (8), ui_px (4) };
   float rad= ui_corners (menu_round).topLeft; // as the menus
   if (!down && button_grow) {
     padding= menu_item_padding ();
@@ -6964,7 +6966,8 @@ widget plain_window_widget (widget wid, string s, command quit) {
     // contents, the main window and the popups have their own rules
     // (see vue_plain_window_widget_rep::post_layout)
     vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
-    plain_window (wwid, s);
+    plain_window (wwid, s, false,
+                  concrete (wid)->type == "vue_texmacs_widget_rep");
     return abstract (wwid);
   }
 }
