@@ -5,9 +5,9 @@
 <\body>
   <tmdoc-title|<TeXmacs> in the browser>
 
-  <TeXmacs> Vue is an experimental port of <TeXmacs> which runs in a page of
+  <TeXmacs> <name|Vue> is an experimental port of <TeXmacs> which runs in a page of
   a web browser. It is the same <TeXmacs>, compiled to WebAssembly, with a
-  new interface, Vue, which draws the menus, the tool bars and the dialogs
+  new interface, <name|Vue>, which draws the menus, the tool bars and the dialogs
   itself. Nothing is installed on your computer, and nothing you write is
   sent anywhere: the documents stay in the browser, on your computer, until
   you save a copy of them.
@@ -23,7 +23,7 @@
   document. The dialogs of <TeXmacs> float over the page, and can be moved
   by their title bar and resized by their edges.
 
-  The <with|font-series|bold|TeXmacs Vue> button at the top left of the
+  The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
   of its files and the storage they use, <menu|Files in this browser...>,
   <menu|Reload>, <menu|Reset...> (which deletes your files and preferences),
@@ -62,7 +62,7 @@
   <\warning*>
     Clearing the data of the site deletes your files, and Safari deletes the
     data of a site which was not visited for seven days. Save a copy of the
-    documents you want to keep. Keep <TeXmacs> Vue open in a single tab of
+    documents you want to keep. Keep <TeXmacs> <name|Vue> open in a single tab of
     the browser: two tabs share the same storage, and their saves may
     overwrite each other.
   </warning*>
@@ -105,7 +105,7 @@
   allow other pages to read it, and the images the document refers to are
   not fetched with it. Other options of the address run Scheme commands (the
   page asks before running them) or show debugging messages: see the
-  options of the address in the <with|font-series|bold|TeXmacs Vue> menu.
+  options of the address in the <with|font-series|bold|TeXmacs <name|Vue>> menu.
 
   <section|What does not work>
 
@@ -118,12 +118,12 @@
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
     WebSocket, on the same computer only for now.
 
-    <item><TeXmacs> Vue is slower than the desktop program.
+    <item><TeXmacs> <name|Vue> is slower than the desktop program.
   </itemize>
 
   <section|Reporting problems>
 
-  <TeXmacs> Vue is experimental. A problem which does not happen with the
+  <TeXmacs> <name|Vue> is experimental. A problem which does not happen with the
   <TeXmacs> you install on your computer is a problem of this port: please
   report it on the <hlink|issue page of the
   port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
