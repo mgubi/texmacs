@@ -169,6 +169,8 @@
            print-menu print-menu-inline close-menu)
 (lazy-menu (texmacs menus edit-menu) edit-menu)
 (lazy-menu (texmacs menus view-menu) view-menu texmacs-bottom-toolbars)
+(lazy-menu (texmacs menus footer-menu)
+           texmacs-footer-environment texmacs-footer-path)
 (lazy-menu (texmacs menus tools-menu) tools-menu)
 (lazy-menu (texmacs menus preferences-menu) preferences-menu page-setup-menu)
 (lazy-menu (texmacs menus preferences-widgets)
