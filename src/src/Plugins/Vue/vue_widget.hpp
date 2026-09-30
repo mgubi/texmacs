@@ -160,6 +160,16 @@ protected:
   bool         cursor_moved;   // SLOT_CURSOR since the input area was last set
   int          ime_x, ime_y;   // where the input area was set (window points)
   double       scroll_rest_x, scroll_rest_y; // fractions of wheel deltas not yet applied
+
+  // the smooth zoom (render_zoom): the backing store as it was before the
+  // zoom changed, the ratio of the new zoom to the old, the scroll position
+  // then, the start of the transition; zoom_now is the current zoom
+  picture      zoom_snap;
+  double       zoom_ratio, zoom_now;
+  coord2       zoom_pos;
+  time_t       zoom_start;
+  void start_zoom_transition (double new_zoom);
+  bool render_zoom (void *data);
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void invalidate_viewport_rect (int x1, int y1, int x2, int y2);

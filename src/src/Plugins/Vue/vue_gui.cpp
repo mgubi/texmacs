@@ -3045,9 +3045,14 @@ wheel_step () {
   }
   return busy;
 }
+// an animation of ours runs until then (the smooth zoom of the editors,
+// vue_widget.cpp): frames until then, as for the transitions of Clay
+time_t vue_animation_until= 0;
+
 // does a window have a Clay transition in progress? (see process_layout)
 static bool
 transitions_running () {
+  if (texmacs_time () < vue_animation_until) return true;
   iterator<int> it= iterate (id_to_window);
   while (it->busy ()) {
     vue_window win= (vue_window) id_to_window[it->next ()];

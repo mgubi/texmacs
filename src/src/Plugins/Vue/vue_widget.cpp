@@ -31,6 +31,7 @@
 #include "poly_line.hpp" // for ink widget
 
 #include "../MuPDF/mupdf_picture.hpp"
+#include "../MuPDF/mupdf_renderer.hpp" // draw_picture_scaled (the smooth zoom)
 
 widget make_menu_widget (object wid);
 extern bool menu_caching;
@@ -5487,7 +5488,8 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
   backing_valid (false),
   resize_pending (false),
   cursor_moved (false), ime_x (-1), ime_y (-1),
-  scroll_rest_x (0), scroll_rest_y (0)
+  scroll_rest_x (0), scroll_rest_y (0),
+  zoom_ratio (1.0), zoom_now (0.0), zoom_pos (coord2 (0, 0)), zoom_start (0)
 {
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
@@ -5574,6 +5576,7 @@ vue_simple_widget_rep::send (slot s, blackbox val) {
       {
         double new_zoom= check_open<double> (val, s);
         if (DEBUG_EVENTS) debug_events << "New zoom factor :" << new_zoom << LF;
+        start_zoom_transition (new_zoom);
         handle_set_zoom_factor (new_zoom);
         invalidate_all ();
       }
@@ -5757,6 +5760,10 @@ void
 vue_simple_widget_rep::do_layout () {
   layout_who= is_editor_widget () ? string ("editor") : string ("typeset box");
   win= current_window; // save the info
+  // the zoom the editor starts with (the first one is not sent to the
+  // widget): the smooth zoom needs the old zoom to scale from
+  if (zoom_now == 0 && is_editor_widget ())
+    zoom_now= as_double (call ("get-window-zoom-factor"));
   SI w= 0, h= 0;
   Clay_Sizing s= layoutExpand;
   if (is_embedded_widget () && !is_editor_widget ()) {
@@ -6255,7 +6262,92 @@ vue_simple_widget_rep::forget_window (vue_window win) {
 
 void
 vue_simple_widget_rep::render (void *data) {
+  if (!is_nil (zoom_snap) && render_zoom (data)) return;
   current_window->draw_picture (data, backing_store);
+}
+
+/******************************************************************************
+* The smooth zoom
+*
+* When the zoom of an editor changes, the page does not jump from the old
+* size to the new: for a moment (zoom_duration) the old picture grows or
+* shrinks to the new size and fades out, over the new one, which grows or
+* shrinks from the old size to its own. Both are scaled about the point of
+* the view which the zoom leaves in place, as the editor scrolled after it.
+* The old picture is a copy of the backing store taken when the new zoom
+* arrives (it has not been repainted yet); the new one is the backing store,
+* repainted meanwhile. The preference "smooth zoom" (default on) turns it
+* off; zooms by less than 3% (a pinch, a step of the wheel) are immediate.
+******************************************************************************/
+
+extern time_t vue_animation_until; // vue_gui.cpp: frames until then
+static const double zoom_duration= 180.0; // ms
+
+void
+vue_simple_widget_rep::start_zoom_transition (double new_zoom) {
+  double old_zoom= zoom_now;
+  zoom_now= new_zoom;
+  if (!is_editor_widget () || old_zoom <= 0 || new_zoom <= 0) return;
+  double r= new_zoom / old_zoom;
+  if (fabs (log (r)) < 0.03 || !backing_valid || is_nil (backing_store)) return;
+  if (get_preference ("smooth zoom", "on") == "off") return;
+  mupdf_picture_rep* pict=
+    (mupdf_picture_rep*) as_mupdf_picture (backing_store)->get_handle ();
+  if (pict == NULL || pict->pix == NULL) return;
+  fz_pixmap* copy= NULL;
+  fz_try (mupdf_context ()) { copy= fz_clone_pixmap (mupdf_context (), pict->pix); }
+  fz_catch (mupdf_context ()) { copy= NULL; }
+  if (copy == NULL) return;
+  zoom_snap= picture (tm_new<mupdf_picture_rep> (copy, pict->ox, pict->oy));
+  fz_drop_pixmap (mupdf_context (), copy);
+  zoom_ratio= r;
+  zoom_pos= backing_pos;
+  // the transition starts with its first frame (render_zoom): the repaint
+  // of the editor at the new zoom, which comes first, may take longer than
+  // the whole transition
+  zoom_start= 0;
+  vue_animation_until= max (vue_animation_until, texmacs_time () + 1000);
+}
+
+bool
+vue_simple_widget_rep::render_zoom (void *data) {
+  vue_render_ren_data* d= (vue_render_ren_data*) data;
+  mupdf_renderer_rep* mr= dynamic_cast<mupdf_renderer_rep*> (d->ren);
+  time_t now= texmacs_time ();
+  if (zoom_start == 0) {
+    zoom_start= now;
+    vue_animation_until= now + (time_t) zoom_duration + 20;
+  }
+  double t= (now - zoom_start) / zoom_duration;
+  if (mr == NULL || t >= 1.0 || t < 0.0) { zoom_snap= picture (); return false; }
+  double u= 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t); // ease out
+  // a point of the view (pixels from its top left) moves by the zoom from
+  // x to r x + T, as the editor scrolled (backing_pos: the top left of the
+  // view in the zoomed document, y upwards); the point which stays is
+  // c = T / (1 - r), and at the time u the old picture is scaled by r^u
+  // about c, the new one by r^u / r
+  double r= zoom_ratio;
+  double pe= (double) ren->pixel;
+  double tx= (r * zoom_pos.x1 - backing_pos.x1) / pe;
+  double ty= (backing_pos.x2 - r * zoom_pos.x2) / pe;
+  double cx= tx / (1.0 - r), cy= ty / (1.0 - r);
+  double s= pow (r, u);
+  rectangle rr= d->r;
+  SI P= mr->pixel;
+  mr->clip (rr->x1, rr->y1, rr->x2, rr->y2);
+  // the room which the pictures leave, in the colour of the canvas
+  mr->set_pencil (backing_store->get_pixel (0, 0));
+  mr->fill (rr->x1, rr->y1, rr->x2, rr->y2);
+  auto place= [&] (picture p, double sc, int alpha) {
+    double left= cx * (1.0 - sc), top= cy * (1.0 - sc);
+    SI x= rr->x1 + (SI) (left * P);
+    SI y= rr->y2 - (SI) ((top + p->get_height () * sc) * P);
+    mr->draw_picture_scaled (p, x, y, sc, alpha);
+  };
+  place (backing_store, s / r, 255);
+  place (zoom_snap, s, (int) (255.0 * (1.0 - u)));
+  mr->unclip ();
+  return true;
 }
 
 //-----------------------------------------------------------------------------

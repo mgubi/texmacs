@@ -1610,6 +1610,23 @@ mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
          to_x (x - ox*pixel), to_y (y - oy*pixel));
 }
 
+// the picture scaled by s, its lower left corner at (x, y), with the pixels
+// it has now: a picture which changes (the backing store of an editor) is
+// not cached as an image, as draw_picture does (the smooth zoom of Vue)
+void
+mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
+                                         int alpha) {
+  p= as_mupdf_picture (p);
+  mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
+  fz_image* im= mupdf_image_from_pixmap (pict->pix);
+  if (im == NULL) return;
+  float w= p->get_width () * s, h= p->get_height () * s;
+  end_text ();
+  image (mupdf_context (), proc, mupdf_image (im), alpha,
+         w, 0, 0, h, to_x (x), to_y (y));
+  fz_drop_image (mupdf_context (), im);
+}
+
 void
 mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
   // debug_convert << "pdf renderer, draw_scalable "

@@ -137,6 +137,7 @@ public:
   void fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y);
 
   void draw_picture (picture pict, SI x, SI y, int alpha);
+  void draw_picture_scaled (picture pict, SI x, SI y, double s, int alpha);
   
   friend class mupdf_proxy_renderer_rep;
 };
