@@ -42,9 +42,10 @@
 >   TeXmacs are this panel. The home directory, with the preferences and the
 >   documents, is kept in IndexedDB.
 > * **Loading in pieces.** The program is 5.2 MB (brotli) and the files of
->   TeXmacs are packages: 4 MB are needed to start, the other 24 MB come in
+>   TeXmacs are packages: 4 MB are needed to start, 8.5 MB more come in
 >   the background once TeXmacs runs; a file needed before its package is
->   fetched alone (a byte range). Everything is kept in the cache of the
+>   fetched alone (a byte range). The fonts (28 MB) come one by one, the
+>   first time a document uses them. Everything is kept in the cache of the
 >   browser: a second visit loads nothing.
 >
 > * **The clipboard of the system**: copy, cut and paste with the other

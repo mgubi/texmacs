@@ -23,6 +23,12 @@
 # the styles, the metrics of the fonts, the icons of the default set in the
 # light theme: neoclassical, see init_texmacs.cpp).
 # The other packages, in the order of their loading, follow PACKAGES below.
+#
+# The fonts themselves (LAZY: the OpenType and Type 1 files, 42 MB, two
+# thirds of the whole) are not in a package: each is a file of its own
+# (tm-font-<digest>.<ext>), which the page fetches when TeXmacs first reads
+# it and keeps in the cache of the browser for the next visits; the manifest
+# lists them under "lazy". Those of the boot list stay in the boot package.
 
 import gzip, hashlib, json, os, re, subprocess, sys, fnmatch
 
@@ -48,6 +54,14 @@ PACKAGES = [
   ('misc',  ['']),
 ]
 CHUNK = 4 * 1024 * 1024
+
+# the fonts which are fetched only when TeXmacs reads them
+LAZY_DIRS = ['fonts/truetype/', 'fonts/type1/']
+LAZY_EXTS = ['.otf', '.ttf', '.ttc', '.pfb']
+
+def lazy (rel):
+  return (any (rel.startswith (d) for d in LAZY_DIRS) and
+          os.path.splitext (rel)[1].lower () in LAZY_EXTS)
 
 def excluded (rel):
   return any (fnmatch.fnmatch (rel, e) or rel.startswith (e + '/') for e in EXCLUDE)
@@ -84,9 +98,13 @@ def main ():
     if p.startswith ('/texmacs/'): p = p[len ('/texmacs/'):]
     if p and not p.startswith ('#'): boot.add (p)
   groups = [('boot', [])] + [(name, []) for name, _ in PACKAGES]
+  lazies = []
   for rel in files:
     if rel in boot or rel in BOOT_FILES or any (rel.startswith (g) for g in BOOT_GROUPS):
       groups[0][1].append (rel)
+      continue
+    if lazy (rel):
+      lazies.append (rel)
       continue
     for i, (name, prefixes) in enumerate (PACKAGES):
       if any (rel.startswith (p) for p in prefixes):
@@ -130,9 +148,24 @@ def main ():
                                    'gz': gzname,
                                    'boot': name == 'boot', 'files': entries })
     print ('%-10s %5d files %7.2f MB  %s' % (name, len (rels), len (data) / 1e6, fname))
-  # the packages of a previous build go, with their compressed copies
+  # the fonts fetched on demand: a file each, named by its digest (a file
+  # which is there already is the same, and two copies of a font are one)
+  manifest['lazy'] = []
+  lazy_size = 0
+  for rel in lazies:
+    b = file_bytes (root, rel)
+    fname = 'tm-font-%s%s' % (hashlib.sha1 (b).hexdigest ()[:12],
+                              os.path.splitext (rel)[1].lower ())
+    written.add (fname)
+    if not os.path.exists (os.path.join (out, fname)):
+      open (os.path.join (out, fname), 'wb').write (b)
+    manifest['lazy'].append ([rel, fname, len (b)])
+    lazy_size += len (b)
+  print ('%-10s %5d files %7.2f MB  tm-font-*' % ('lazy', len (lazies), lazy_size / 1e6))
+  # the packages and fonts of a previous build go, with their compressed copies
   for f in os.listdir (out):
-    if f.startswith ('tm-') and f.split ('.pack')[0] + '.pack' not in written:
+    if f.startswith ('tm-') and f not in written and \
+       f.split ('.pack')[0] + '.pack' not in written:
       os.remove (os.path.join (out, f))
   json.dump (manifest, open (os.path.join (out, 'texmacs-files.json'), 'w'),
              separators = (',', ':'))

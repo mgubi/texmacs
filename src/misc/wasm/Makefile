@@ -94,7 +94,8 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 $(OUT)/web/texmacs-files.json: FORCE | $(TM)/TeXmacs/plugins
 	@mkdir -p $(OUT)/web
 	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
-	-command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack; do \
+	-command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack $(OUT)/web/tm-font-*; do \
+	  case $$f in *.br) continue;; esac; \
 	  [ -f $$f.br ] || brotli -q 9 -k $$f; done; \
 	  brotli -f -q 9 -k $(OUT)/web/texmacs-files.json
 

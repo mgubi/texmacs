@@ -26,9 +26,9 @@ you download it.
   [issue page of this repository](https://github.com/mgubi/texmacs/issues),
   not to the TeXmacs project; the others go to
   [TeXmacs](https://www.texmacs.org/tmweb/contact/bugs.en.html) as usual.
-* **First visit**: some 11 MB before it starts (the program, and the files
-  it needs to boot), the rest in the background; a second visit loads
-  nothing.
+* **First visit**: some 9 MB before it starts (the program, and the files
+  it needs to boot), 8.5 MB more in the background, and each font the first
+  time a document uses it; a second visit loads nothing.
 * **Published** by the CI, which runs on the branch `vue_ci` only: the work
   goes on in `wip_wasm_vue` without triggering it, and a state is built,
   tested and published with `git push origin wip_wasm_vue:vue_ci`. Each run

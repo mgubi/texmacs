@@ -12,6 +12,12 @@
 // more than that file. The packages are kept in the Cache Storage of the
 // browser, so that the next visit takes them from there.
 //
+// The fonts (the manifest's "lazy" files: package.py) are in no package:
+// each is a file of its own, fetched whole when TeXmacs first reads it (the
+// read waits for it, as for a file of a package not there yet), and kept in
+// the Cache Storage too; the fonts found there are put in place before
+// TeXmacs starts. A font which is never used is never fetched.
+//
 // ?trace-files keeps the list of the files opened (window.tmTrace), which is
 // how misc/wasm/boot-files.txt, the files of the boot package, is made.
 
@@ -19,8 +25,11 @@ var tmPackages = (function () {
   var ROOT = '/texmacs';
   var CACHE = 'texmacs-packages';
   var manifest = null;
-  var stats = { onDemand: 0, onDemandBytes: 0, loaded: 0, start: 0 };
+  var stats = { onDemand: 0, onDemandBytes: 0, loaded: 0, start: 0,
+                fonts: 0, fontBytes: 0, fontsCached: 0 };
   var pending = {}; // package name -> [node] still to fill
+  var lazyNodes = {}; // the url of a font -> its placeholders (the same font
+                      // may be at several places of the tree)
 
   function url (name) {
     return (typeof document !== 'undefined') ? new URL (name, document.baseURI).href : name;
@@ -63,6 +72,7 @@ var tmPackages = (function () {
         keep[url (p.url)] = true;
         if (p.gz) keep[url (p.gz)] = true;
       });
+      if (manifest.lazy) manifest.lazy.forEach (function (f) { keep[url (f[1])] = true; });
       (await cache.keys ()).forEach (function (req) {
         if (!keep[req.url]) cache.delete (req);
       });
@@ -97,6 +107,7 @@ var tmPackages = (function () {
   // package, all of whose files are then installed
   function fetchNow (node) {
     var pkg = node.tmPackage;
+    if (pkg.lazy) return fetchFont (node);
     if (!rangesUseless) {
       try {
         var xhr = getNow (url (pkg.url), 'bytes=' + node.tmOffset + '-' +
@@ -132,6 +143,48 @@ var tmPackages = (function () {
     console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand, with its package ' +
                  pkg.name + ' (' + pkg.size + ' bytes)');
     return bytes.subarray (node.tmOffset, node.tmOffset + node.tmSize);
+  }
+
+  // a font, now: the whole file, into every placeholder of it, and into the
+  // cache for the next visits
+  function fetchFont (node) {
+    var pkg = node.tmPackage, u = url (pkg.url);
+    var xhr = getNow (u, null);
+    var s = xhr.responseText;
+    if (xhr.status !== 200 || s.length !== pkg.size)
+      throw new Error ('cannot load ' + node.tmPath + ': ' + xhr.status);
+    var bytes = textBytes (s, 0, pkg.size);
+    stats.fonts++;
+    stats.fontBytes += pkg.size;
+    console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand (' + pkg.size + ' bytes)');
+    (lazyNodes[u] || []).forEach (function (n) { if (n !== node && n.tmPackage) fill (n, bytes); });
+    if (typeof caches !== 'undefined')
+      caches.open (CACHE).then (function (cache) {
+        return cache.put (u, new Response (bytes, {
+          headers: { 'Content-Type': 'application/octet-stream',
+                     'Content-Length': String (bytes.length) } }));
+      }).catch (function () {});
+    return bytes;
+  }
+
+  // the fonts which an earlier visit fetched, from the cache, before TeXmacs
+  // starts (a read of one of them would fetch it again)
+  async function restoreFonts () {
+    if (typeof caches === 'undefined' || !manifest.lazy) return;
+    try {
+      var cache = await caches.open (CACHE), have = {};
+      (await cache.keys ()).forEach (function (req) { have[req.url] = true; });
+      for (var u in lazyNodes) {
+        if (!have[u]) continue;
+        var resp = await cache.match (u);
+        if (!resp) continue;
+        var bytes = new Uint8Array (await resp.arrayBuffer ());
+        var nodes = lazyNodes[u];
+        if (bytes.length !== nodes[0].tmSize) continue;
+        nodes.forEach (function (n) { if (n.tmPackage) fill (n, bytes); });
+        stats.fontsCached++;
+      }
+    } catch (e) {}
   }
 
   function fill (node, bytes) {
@@ -183,6 +236,14 @@ var tmPackages = (function () {
         mkdir (dir);
         pending[pkg.name].push (placeholder (dir, p.slice (i + 1), pkg, f[1], f[2]));
       });
+    });
+    // the fonts: a placeholder each, whose "package" is the font's own file
+    (manifest.lazy || []).forEach (function (f) {
+      var p = ROOT + '/' + f[0], i = p.lastIndexOf ('/'), dir = p.slice (0, i);
+      mkdir (dir);
+      var pkg = { name: f[0], url: f[1], size: f[2], lazy: true };
+      var u = url (f[1]);
+      (lazyNodes[u] = lazyNodes[u] || []).push (placeholder (dir, p.slice (i + 1), pkg, 0, f[2]));
     });
   }
 
@@ -248,7 +309,9 @@ var tmPackages = (function () {
           progress (done, total);
           await install (boot[i], bytes, false);
         }
-        console.log ('TeXmacs: boot files in ' + Math.round (performance.now () - stats.start) + ' ms');
+        await restoreFonts ();
+        console.log ('TeXmacs: boot files in ' + Math.round (performance.now () - stats.start) + ' ms' +
+                     (stats.fontsCached ? ', ' + stats.fontsCached + ' fonts from the cache' : ''));
         removeRunDependency ('texmacs-files');
         // the rest once TeXmacs runs (and has had its first frames);
         // ?no-background leaves it to the demand, to test that path

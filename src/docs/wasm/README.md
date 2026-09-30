@@ -362,8 +362,8 @@ the programs and documentation of the plugins: 62.6 MB) as packages with a
 manifest, `texmacs-files.json` (each file: its package, offset, size).
 `misc/wasm/packages.js` makes the whole tree at `/texmacs` before TeXmacs
 starts, every file a placeholder of its size, and loads the boot package;
-the others (fonts, icons, languages, documentation, the rest, in pieces of
-4 MB) come one after the other once TeXmacs runs. A file read before its
+the others (icons, languages, documentation, the rest, in pieces of 4 MB)
+come one after the other once TeXmacs runs. A file read before its
 package fetches its bytes alone, a range of the package (synchronously, as
 text in the user defined charset: TeXmacs reads its files synchronously),
 so that TeXmacs never finds a file of its tree missing, nor records it as
@@ -377,6 +377,19 @@ first such answer (or a range which fails) makes `packages.js` fetch whole
 packages instead: the package of the file is fetched at once, which the
 server compresses whole and the browser decodes, and all its files are
 installed.
+
+The fonts are in no package (they were two thirds of the whole: 42 MB, 28
+with brotli, the Type 1 fonts compressing poorly). Each OpenType and Type 1
+file of `fonts/truetype/` and `fonts/type1/` is a file of its own,
+`tm-font-<digest>.<ext>`, listed in the manifest under `lazy` (its path, its
+file, its size); only those of the boot list are in the boot package. Its
+placeholder fetches it whole when TeXmacs first reads it (a plain request,
+no range: it works on GitHub Pages as anywhere), fills the other
+placeholders of the same font (two paths, one digest), and puts it in the
+Cache Storage; before TeXmacs starts, the fonts found there are put in place
+(`restoreFonts`). A font no document uses is never fetched, and a font is
+fetched once: a document in Libertinus fetches `LibertinusSerif-Regular.otf`
+(337 KB) the first time, and nothing the next visits.
 
 The boot package is the files TeXmacs opens when it starts
 (`misc/wasm/boot-files.txt`, the list of `?trace-files`: boot, the welcome
@@ -393,7 +406,8 @@ Measured in a headless Firefox with `misc/wasm/serve.mjs` (brotli, ranges,
 | | transferred |
 |---|---|
 | before TeXmacs starts (program + boot package) | 9.3 MB |
-| everything, the first time (16 packages, 2.6 s locally) | 33.3 MB |
+| the other packages, in the background (11 packages, 2.4 s locally) | 8.5 MB (33.3 MB when they had the fonts) |
+| a font, the first time a document uses it | its file: 0.1 to 1 MB |
 | the next visit | 0 (the Cache Storage, and 304 for the program) |
 | a document of the help opened before its packages (`?no-background`) | 5 files on demand, 353 KB |
 
