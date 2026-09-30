@@ -22,9 +22,18 @@
   NSView *view;
   NSBox *line;           // the hairline below the rows
   NSView *divider;       // between the main/mode and focus/user rows
+@public
+  BOOL upward;           // the menus open above the buttons (the footer)
+  id contextTarget;      // not retained: told of a right click (or of a
+  SEL contextAction;     // Control or Option click) on a button, with its
+                         // menu item and the event
 }
 - (void) setMenu:(NSMenu *)menu forRow:(unsigned) idx;
 - (void) setVisible:(BOOL) flag forRow:(unsigned) idx;
 - (void) layout;
 - (NSView*) bar;
+/*! A row of buttons made from a menu, for a bar of another view (the
+ interactive footer): not placed in the bar of the controller, which keeps
+ the menu while the row is in use */
+- (NSView*) rowForMenu:(NSMenu*) menu;
 @end

@@ -14,6 +14,7 @@
 
 
 #include "ns_widget.h"
+#include "scheme.hpp"
 
 
 @class TMWidgetHelper;
@@ -78,6 +79,19 @@ public:
   ns_widget int_prompt;
   ns_widget int_input;
   NSView* prompt_view;  //!< the interactive prompt, in the footer
+
+  // the interactive footer (the preference "interactive footer"): the
+  // properties of the text at the cursor and the tags around it as menus,
+  // see (texmacs menus footer-menu), in place of the texts of the footer
+  // while the editor shows those (footer_menus) and not a message; the
+  // rows are made again only when the expansions of the menus change, as
+  // in the Vue interface
+  bool footer_menus;
+  object footer_env_menu, footer_path_menu; //!< their last expansions
+  TMButtonsController *fc;   //!< makes the rows of buttons
+  NSView *footer_env, *footer_path; //!< the rows (or nil)
+  NSView *footer_clip;       //!< clips the tags on their left
+  void update_footer_menus ();
 
   bool visibility[10];  //!< the bars and tools, as in qt_tm_widget_rep
 

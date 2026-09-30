@@ -32,7 +32,9 @@ Retina screens; scrolling is synchronous, as in Qt, and the document is
 centered when it is narrower than the window. The menus are in the menu bar
 with their keyboard shortcuts and check marks; the icon bars have their
 buttons, labels and input fields (the focus bar), row by row; the footer
-shows the messages and the interactive prompt. Dialogs made with
+shows the messages and the interactive prompt, and can be interactive
+(View › Interactive status bar: the properties at the cursor as menus, the
+tags around it as buttons, see src/docs/vue-interactive-footer.md). Dialogs made with
 `tm-widget` work (tabs, icon tabs, pop-up menus, lists, filtered lists,
 tree views, resizable parts, refreshable parts, embedded editors, pull-down
 buttons, editable enums, hidden password fields), and so do the side tools
