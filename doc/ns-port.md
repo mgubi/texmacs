@@ -40,7 +40,8 @@ tree views, resizable parts, refreshable parts, embedded editors, pull-down
 buttons, editable enums, hidden password fields), and so do the side tools
 (resizable with a handle) and the bottom tools, tooltips and help
 balloons, the wait indicator, the file panels (with the filters of the
-file types), the color picker, printing (PDF, and PostScript through
+file types), the color picker, printing (the PDF written by TeXmacs with
+PDFHummus, handed to the print panel of the system; PostScript only through
 Ghostscript), the clipboard (text, HTML, TeXmacs, images, both ways),
 drag and drop, trackpad gestures (pinch, rotate, swipe) and the wheel
 (command-wheel zooms). The keys are named as in Qt (`space`, `S-tab`,
@@ -175,6 +176,20 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
 * tree views ignore their roles; the XPM icons without a PNG equivalent
   lose their transparency; shadows with their own context are not copied
   back (they always share the context of their master here).
+
+## PDF
+
+The PDF is written by TeXmacs itself, with PDFHummus (`src/Plugins/Pdf`,
+`PDF_RENDERER`), as in the Qt interface: the exports, and the printing,
+which gives that PDF to the print panel of the system (PDFKit), with no
+Ghostscript, which is not in the application. Configure enables it for
+Qt and Cocoa (`misc/m4/hummus.m4`) when it finds `png.h` and libpng: with
+Homebrew, pass `CPPFLAGS=-I/opt/homebrew/include LDFLAGS=-L/opt/homebrew/lib`
+to configure (build-ns-app.sh passes the prefix of the dependencies). The
+parts of the renderer which used Qt (the tiles of the patterns and their
+pixels, the pictures drawn) go through the pictures of the interface
+(`load_picture`, `save_picture`) when Qt is not there. Without MuPDF, the
+Cocoa interface has no other writer of PDF (see docs/build-and-debug.md).
 
 ## Packaging
 

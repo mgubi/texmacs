@@ -50,7 +50,10 @@ With MuPDF, `MUPDF_RENDERER` makes MuPDF the screen renderer and picture
 type; X11 and Cocoa have pictures of their own, which clash with MuPDF's at
 link time, so for them an explicit `--with-mupdf` is an error and a MuPDF
 found by itself is left out. SDL and Vue stop at configure time without
-MuPDF. The X11 port needs the X11 headers: with Homebrew's `libx11`, pass
+MuPDF. The PDF of the Qt and Cocoa interfaces is written by PDFHummus
+(`PDF_RENDERER`, `misc/m4/hummus.m4`, which needs `png.h` and libpng);
+the others make it with Ghostscript from PostScript (or with MuPDF, if
+asked: docs/pdf-output-with-mupdf.md). The X11 port needs the X11 headers: with Homebrew's `libx11`, pass
 `--x-includes=/opt/homebrew/include --x-libraries=/opt/homebrew/lib`
 (configure stops if it finds none).
 

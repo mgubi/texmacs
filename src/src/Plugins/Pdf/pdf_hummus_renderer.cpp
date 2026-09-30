@@ -687,6 +687,8 @@ pdf_hummus_renderer_rep::register_pattern_image (brush br, SI pixel) {
     image_pdf= pattern_image_pool[key];
   else {
     // debug_convert << "Insert pattern image\n";
+    url temp= url_temp (".png");
+#ifdef QTTEXMACS
     QImage* pim = get_image (u, w, h, eff, pixel);
     if (pim == NULL) {
       convert_error << "Cannot read image file '" << u << "'"
@@ -698,8 +700,17 @@ pdf_hummus_renderer_rep::register_pattern_image (brush br, SI pixel) {
 		    << " after get_image" << LF;
       return;
     }
-    url temp= url_temp (".png");
     pim->save (utf8_to_qstring (concretize (temp)), "PNG");
+#else
+    // the tile through the pictures of the interface (Cocoa)
+    picture pic= load_picture (u, w, h, eff, pixel);
+    if (is_nil (pic) || pic->get_width () != w || pic->get_height () != h) {
+      convert_error << "Cannot read image file '" << u << "'"
+		    << " with load_picture" << LF;
+      return;
+    }
+    save_picture (temp, pic);
+#endif
     temp_images << temp;
     ObjectIDType image_id= pdfWriter.GetObjectsContext()
       .GetInDirectObjectsRegistry().AllocateNewObjectID();
@@ -1902,6 +1913,37 @@ pdf_image_info (url image, int& w, int& h, PDFRectangle& cropBox, double (&tMat)
     << "dx,dy={"<<tMat[4]<< ", "<<tMat[5] <<"}"<< LF;
 }
 
+#ifndef QTTEXMACS
+// the pixels of an image (RGB, and the alpha as a mask), from the top row,
+// through the pictures of the interface (Cocoa), as qt_image_data below
+static void
+picture_image_data (url image, int& w, int&h, string& data, string& mask) {
+  picture pic= load_picture (image, 0, 0, tree (""), PIXEL);
+  if (is_nil (pic) || pic->get_width () <= 0 || pic->get_height () <= 0) {
+    convert_error << "Cannot read image file '" << image << "'"
+    << " in picture_image_data" << LF;
+    return;
+  }
+  w= pic->get_width ();
+  h= pic->get_height ();
+  data= string ((w*h)*3);
+  mask= string (w*h);
+  int k= 0, l= 0;
+  for (int j= 0; j < h; j++)
+    for (int i= 0; i < w; i++) {
+      // the rows of a picture go up from its bottom
+      int r, g, b, a;
+      get_rgb_color (pic->get_pixel (i - pic->get_origin_x (),
+                                     h - 1 - j - pic->get_origin_y ()),
+                     r, g, b, a);
+      data[l++]= (char) r;
+      data[l++]= (char) g;
+      data[l++]= (char) b;
+      mask[k++]= (char) a;
+    }
+}
+#endif
+
 #ifdef QTTEXMACS
 void
 qt_image_data (url image, int& w, int&h, string& data, string& mask) {
@@ -1936,8 +1978,7 @@ pdf_image_rep::flush_for_pattern (PDFWriter& pdfw) {
 #ifdef QTTEXMACS
   qt_image_data (u, iw, ih, data, smask);
 #else
-  convert_error << "pdf_image_rep::flush_for_pattern: cannot export pattern "
-		<< u << "  to PDF" << LF;
+  picture_image_data (u, iw, ih, data, smask);
 #endif
   if ((iw==0)||(ih==0)) return false;
   
@@ -2148,8 +2189,10 @@ pdf_hummus_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
     pict->pict.save (utf8_to_qstring (concretize (temp)), "PNG");
     temp_images << temp;	
 #else
-    convert_error << "pdf renderer, draw_picture: "
-      << "cannot export picture " << p->get_name() << LF;
+    // through the pictures of the interface (Cocoa)
+    temp= url_temp (".png");
+    save_picture (temp, p);
+    temp_images << temp;
 #endif
     picture_cache (key)= temp;
   }

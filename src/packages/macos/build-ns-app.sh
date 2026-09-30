@@ -73,6 +73,9 @@ fi
 if [ $configure = yes ]; then
   args="--with-guile=$guile_config --with-gui=cocoa"
   [ -n "$deps" ] && args="$args --with-freetype=$deps/bin --with-osx=$min"
+  # the headers and the libraries of the dependencies for the other tests
+  # (png.h and libpng for the PDF renderer, PDFHummus)
+  [ -n "$deps" ] && args="$args CPPFLAGS=-I$deps/include LDFLAGS=-L$deps/lib"
   [ -n "$sign" ] && args="$args --enable-sign=$sign"
   echo "== ./configure $args"
   ./configure $args
