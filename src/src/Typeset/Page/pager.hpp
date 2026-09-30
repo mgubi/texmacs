@@ -86,6 +86,9 @@ public:
   array<box>   pages;
   page_memo*   memo;     // the pages of the last pass, or NULL
 
+  SI           snap;  // outside paper mode: screen pixel for the body lines
+  box          body;  // outside paper mode: the stack of the body lines
+
   array<box>   lines_bx;
   array<space> lines_ht;
 
