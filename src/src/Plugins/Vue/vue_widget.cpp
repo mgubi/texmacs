@@ -6281,7 +6281,7 @@ vue_simple_widget_rep::render (void *data) {
 ******************************************************************************/
 
 extern time_t vue_animation_until; // vue_gui.cpp: frames until then
-static const double zoom_duration= 180.0; // ms
+static const double zoom_duration= 150.0; // ms
 
 void
 vue_simple_widget_rep::start_zoom_transition (double new_zoom) {
@@ -6298,7 +6298,9 @@ vue_simple_widget_rep::start_zoom_transition (double new_zoom) {
   fz_try (mupdf_context ()) { copy= fz_clone_pixmap (mupdf_context (), pict->pix); }
   fz_catch (mupdf_context ()) { copy= NULL; }
   if (copy == NULL) return;
-  zoom_snap= picture (tm_new<mupdf_picture_rep> (copy, pict->ox, pict->oy));
+  mupdf_picture_rep* snap= tm_new<mupdf_picture_rep> (copy, pict->ox, pict->oy);
+  snap->opaque= pict->opaque; // the fast path of draw_picture_scaled
+  zoom_snap= picture (snap);
   fz_drop_pixmap (mupdf_context (), copy);
   zoom_ratio= r;
   zoom_pos= backing_pos;
@@ -6344,9 +6346,11 @@ vue_simple_widget_rep::render_zoom (void *data) {
     SI y= rr->y2 - (SI) ((top + p->get_height () * sc) * P);
     mr->draw_picture_scaled (p, x, y, sc, alpha);
   };
+  uint64_t TMPT0= SDL_GetTicksNS ();
   place (backing_store, s / r, 255);
   place (zoom_snap, s, (int) (255.0 * (1.0 - u)));
   mr->unclip ();
+  cout << "TMPF t=" << (int) (t*1000) << " draw " << (int) ((SDL_GetTicksNS () - TMPT0)/1000000) << "ms" << LF;
   return true;
 }
 
