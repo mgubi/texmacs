@@ -432,7 +432,10 @@ var tmFiles = (function () {
         if (!e.dir) row.appendChild (el ('span', 'color:#888;margin-right:10px',
           e.size < 1024 ? e.size + ' B' : Math.round (e.size / 1024) + ' KB'));
         function act (text, f, tip) {
-          var a = el ('a', 'cursor:pointer;color:#036;margin-left:8px', text);
+          // a small button: a light rounded border around the link
+          var a = el ('a', 'cursor:pointer;color:#036;margin-left:6px;padding:1px 7px;' +
+                           'border:1px solid #c8d0da;border-radius:10px;background:#fff;' +
+                           'font-size:92%;white-space:nowrap', text);
           if (tip) a.title = tip;
           a.onclick = function (ev) { ev.stopPropagation (); f (); };
           row.appendChild (a);
