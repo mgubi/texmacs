@@ -656,6 +656,39 @@ after a click must wait for it to settle (they do, 300 ms and more). The
 elements' ids must be stable for this to work (see the notes on
 `clay_tm_string`).
 
+## The smooth zoom
+
+A change of the zoom of an editor is a transition of 180 ms instead of a
+jump (`start_zoom_transition` and `render_zoom`, `vue_widget.cpp`). When
+`SLOT_ZOOM_FACTOR` brings a new zoom, the editor widget copies its backing
+store (the page as it is on the screen, not repainted yet) and notes the
+ratio of the zooms and the scroll position. Until the transition ends, its
+`render` draws, instead of the backing store as it is:
+
+* the colour of the canvas (the pictures do not always cover the view);
+* the backing store (repainted at the new zoom meanwhile) scaled from the
+  old size to its own, opaque;
+* the copy scaled from its size to the new one, fading out (ease out).
+
+Both are scaled about the point of the view which the zoom leaves in place:
+the editor scrolls with the zoom, so that a point of the view at `x` (pixels)
+ends at `r x + T`, `r` the ratio of the zooms and `T` given by the old and
+new scroll positions (`backing_pos`, the top left of the view in the zoomed
+document); that point is `T / (1 - r)`, and at time `u` the copy is scaled
+by `r^u` about it, the backing store by `r^u / r` (they meet at `u = 1`).
+The scaling is `mupdf_renderer_rep::draw_picture_scaled`: the pixmap drawn
+as an image with a matrix (not cached as an image, as `draw_picture` does,
+since the backing store changes).
+
+The transition starts with its first frame, not with the zoom: the repaint
+at the new zoom comes first and may take as long as the transition (a
+quarter of a second in the browser). `vue_animation_until` (`vue_gui.cpp`)
+keeps the loop drawing meanwhile, as `transitions_running` does for Clay.
+The zoom an editor starts with is not sent to its widget: it is read when
+the editor is first laid out (`get-window-zoom-factor`). Zooms by less than
+3% (a pinch, a step of the wheel) are immediate; the preference `smooth
+zoom` (`off`) turns the transition off.
+
 ## Design decisions recorded
 
 * **Relayout flag**: every window is laid out on every iteration of the
