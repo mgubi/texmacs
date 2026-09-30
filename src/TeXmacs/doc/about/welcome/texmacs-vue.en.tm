@@ -72,7 +72,8 @@
   <TeXmacs> keeps its usual keyboard shortcuts, but the browser keeps some
   for itself (a new window, a new tab, closing a tab, reloading the page):
   use the menus of <TeXmacs>, or the <verbatim|+> of the tabs, for those. On
-  a Mac, the shortcuts use <key|Cmd>, as those of the browser.
+  a Mac, they use the command key, as those of the browser: <key|M-c>,
+  <key|M-x> and <key|M-v> copy, cut and paste.
 
   Copy, cut and paste go through the clipboard of the system, so that text
   can be exchanged with the other programs; a copy made in <TeXmacs> keeps

@@ -301,7 +301,7 @@ var tmFrame = (function () {
       '(new window, new tab, close tab, reload...): use the menus of TeXmacs, or the + ' +
       'of the tabs, for those.',
       'Copy, cut and paste go through the clipboard of the system; on a Mac the ' +
-      'shortcuts are Cmd+..., as the browser\'s.',
+      'shortcuts use \u2318 (Cmd), as the browser\'s.',
       'Opening and saving go through the Files panel (Files in this browser...): files are ' +
       'added from your computer or dropped on the page, and a copy of one is saved back ' +
       'on your computer with its "save copy". The files of TeXmacs can be browsed there, ' +
