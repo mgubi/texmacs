@@ -86,6 +86,19 @@
   (let ((b (assoc what l)))
     (if b (cdr b) #f)))
 
+;; as Guile's: the first entry of key what (equal?) goes, the list is
+;; changed in place and returned (use the result: the first entry may go)
+(define-public (assoc-remove! l what)
+  (cond ((null? l) l)
+        ((and (pair? (car l)) (equal? (caar l) what)) (cdr l))
+        (else
+         (let loop ((prev l))
+           (cond ((null? (cdr prev)) l)
+                 ((and (pair? (cadr prev)) (equal? (caadr prev) what))
+                  (set-cdr! prev (cddr prev))
+                  l)
+                 (else (loop (cdr prev))))))))
+
 (define-public (sort l op) (sort! (copy l) op))
 
 ;; SRFI-13 string functions which Guile provides and s7 does not
