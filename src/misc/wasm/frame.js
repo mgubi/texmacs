@@ -319,7 +319,8 @@ var tmFrame = (function () {
       'this branch, on this machine only for now (no encrypted wss yet).',
       'Two tabs of the browser with this page share the same storage, and their saves ' +
       'may overwrite each other: keep TeXmacs Vue open in one tab.',
-      'It is slower than the desktop program, and its first visit downloads some 40 to 50 MB.']]
+      'It is slower than the desktop program. Its first visit loads some 9 MB before it ' +
+      'starts and 8 MB more in the background; the fonts come when a document first uses them.']]
   ];
 
   function showAbout () {
