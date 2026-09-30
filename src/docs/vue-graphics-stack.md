@@ -658,7 +658,7 @@ elements' ids must be stable for this to work (see the notes on
 
 ## The smooth zoom
 
-A change of the zoom of an editor is a transition of 180 ms instead of a
+A change of the zoom of an editor is a transition of 150 ms instead of a
 jump (`start_zoom_transition` and `render_zoom`, `vue_widget.cpp`). When
 `SLOT_ZOOM_FACTOR` brings a new zoom, the editor widget copies its backing
 store (the page as it is on the screen, not repainted yet) and notes the
@@ -676,9 +676,14 @@ ends at `r x + T`, `r` the ratio of the zooms and `T` given by the old and
 new scroll positions (`backing_pos`, the top left of the view in the zoomed
 document); that point is `T / (1 - r)`, and at time `u` the copy is scaled
 by `r^u` about it, the backing store by `r^u / r` (they meet at `u = 1`).
-The scaling is `mupdf_renderer_rep::draw_picture_scaled`: the pixmap drawn
-as an image with a matrix (not cached as an image, as `draw_picture` does,
-since the backing store changes).
+The scaling is `mupdf_renderer_rep::draw_picture_scaled`, which for an
+opaque picture (a backing store, and its copy) is a direct blit into the
+pixmap of the window, each pixel taking the nearest pixel of the source
+(`draw_pixmap_scaled_direct`): some 5 ms a frame for a window of a Retina
+display in the browser, where MuPDF's own drawing of the pixmap as an image
+(filtered, through the draw device, which remains for the other pictures)
+took 40 to 50 ms for the two, and the transition showed four frames. The
+page is a little coarser while it moves, which does not show at that speed.
 
 The transition starts with its first frame, not with the zoom: the repaint
 at the new zoom comes first and may take as long as the transition (a

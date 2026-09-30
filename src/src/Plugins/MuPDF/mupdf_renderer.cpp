@@ -1095,6 +1095,65 @@ mupdf_renderer_rep::draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
   return true;
 }
 
+// the pixmap scaled by s, its bottom left corner at (x, y) (SI), each device
+// pixel taking the nearest pixel of the source, composed with the given
+// alpha; false if MuPDF must do it. For the smooth zoom of Vue, which draws
+// two views of the page scaled at every frame: MuPDF's own drawing of an
+// image (filtered, through the draw device) took some 20 ms for a window of
+// a Retina display in the browser, and a transition of a few frames stuttered
+bool
+mupdf_renderer_rep::draw_pixmap_scaled_direct (fz_pixmap* src, SI x, SI y,
+                                              double s, int alpha) {
+  if (src == NULL || src->samples == NULL || pixmap == NULL || s <= 0) return false;
+  if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
+  if (src->s != 0 || src->n != 4 || !src->alpha) return false;
+  fz_context* ctx= mupdf_context ();
+  bool dst_bgr= (pixmap->colorspace == fz_device_bgr (ctx));
+  bool src_bgr= (src->colorspace == fz_device_bgr (ctx));
+  if (!dst_bgr && pixmap->colorspace != fz_device_rgb (ctx)) return false;
+  if (!src_bgr && src->colorspace != fz_device_rgb (ctx)) return false;
+  if (alpha <= 0) return true;
+  end_text ();
+  // the box of the scaled image in device pixels, then the visible part
+  double w= src->w * s, h= src->h * s;
+  double fx1= to_x (x), fy2= -to_y (y), fy1= fy2 - h;
+  int px1, py1, px2, py2;
+  if (!device_box (x, y, x + (SI) (w * pixel), y + (SI) (h * pixel),
+                   px1, py1, px2, py2)) return true;
+  px1= max (px1, (int) floor (fx1)); px2= min (px2, (int) ceil (fx1 + w));
+  py1= max (py1, (int) floor (fy1)); py2= min (py2, (int) ceil (fy2));
+  if (px1 >= px2 || py1 >= py2) return true;
+  int n= px2 - px1;
+  int* cols= tm_new_array<int> (n);
+  for (int i= 0; i < n; i++) {
+    int sx= (int) ((px1 + i + 0.5 - fx1) / s);
+    cols[i]= 4 * max (0, min (src->w - 1, sx));
+  }
+  bool swap_rb= (dst_bgr != src_bgr);
+  int r= swap_rb ? 2 : 0, b= swap_rb ? 0 : 2;
+  int ia= 255 - alpha;
+  for (int py= py1; py < py2; py++) {
+    int sy= max (0, min (src->h - 1, (int) ((py + 0.5 - fy1) / s)));
+    const unsigned char* srow= src->samples + (ptrdiff_t) sy * src->stride;
+    unsigned char* d= pixmap->samples + (ptrdiff_t) py * pixmap->stride + 4 * px1;
+    if (alpha >= 255)
+      for (int i= 0; i < n; i++, d += 4) {
+        const unsigned char* sp= srow + cols[i];
+        d[0]= sp[r]; d[1]= sp[1]; d[2]= sp[b]; d[3]= 255;
+      }
+    else
+      for (int i= 0; i < n; i++, d += 4) {
+        const unsigned char* sp= srow + cols[i];
+        d[0]= (unsigned char) ((sp[r] * alpha + d[0] * ia) / 255);
+        d[1]= (unsigned char) ((sp[1] * alpha + d[1] * ia) / 255);
+        d[2]= (unsigned char) ((sp[b] * alpha + d[2] * ia) / 255);
+        d[3]= 255;
+      }
+  }
+  tm_delete_array (cols);
+  return true;
+}
+
 void
 mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
   if ((x1<x2) && (y1<y2))
@@ -1618,6 +1677,8 @@ mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
                                          int alpha) {
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
+  if (pict->opaque && draw_pixmap_scaled_direct (pict->pix, x, y, s, alpha))
+    return;
   fz_image* im= mupdf_image_from_pixmap (pict->pix);
   if (im == NULL) return;
   float w= p->get_width () * s, h= p->get_height () * s;

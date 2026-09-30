@@ -86,6 +86,7 @@ protected:
   bool fill_direct (SI x1, SI y1, SI x2, SI y2, color c);
   bool draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
                            bool opaque= false);
+  bool draw_pixmap_scaled_direct (fz_pixmap* src, SI x, SI y, double s, int alpha);
 
 public:
   mupdf_renderer_rep (int w = 0, int h = 0);
