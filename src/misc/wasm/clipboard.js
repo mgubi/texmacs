@@ -182,7 +182,104 @@ var tmClipboard = (function () {
     });
   }
 
+  // Edit > Paste from browser (web-paste-dialog in vue_gui.cpp). A menu has
+  // no paste event, so the plain Paste of the menus pastes what the page
+  // knows (the last copy or paste); this one asks the browser, in a dialog
+  // of the page: the paste key in its text area (or the Paste of a long
+  // press, on a touch screen) is a paste event, which needs no permission;
+  // its button reads navigator.clipboard, which the browser may ask the
+  // user to confirm. What comes becomes the page's clipboard, and the
+  // Scheme command cmd pastes it.
+  function fromBrowser (cmd) {
+    if (typeof tmFrame === 'undefined') return;
+    var got = false, before = document.activeElement;
+    tmFrame.dialog ('Paste from the browser', function (box, close) {
+      function p (cls, t) {
+        var e = document.createElement ('p');
+        if (cls) e.className = cls;
+        e.textContent = t;
+        box.appendChild (e);
+        return e;
+      }
+      var key = mac ? '⌘V' : 'Ctrl+V';
+      p (null, 'Press ' + key + ' to paste what was copied in another page or program.');
+      var area = document.createElement ('textarea');
+      area.className = 'tm-paste';
+      area.placeholder = key;
+      area.setAttribute ('aria-label', 'Paste here');
+      box.appendChild (area);
+      var note = p ('tm-note', '');
+      function take (plain, html) {
+        plain = (plain || '').replace (/\r\n?/g, '\n');
+        if (!plain && !html) { note.textContent = 'The clipboard has no text.'; return; }
+        known = { plain: plain, html: html || '' };
+        log ('from the browser: ' + JSON.stringify (plain.slice (0, 40)));
+        got = true;
+        close ();
+      }
+      area.addEventListener ('paste', function (e) {
+        var d = e.clipboardData;
+        var plain = d ? d.getData ('text/plain') || '' : '', html = d ? d.getData ('text/html') || '' : '';
+        if (!plain && !html) { // into the text area (Safari, at times)
+          setTimeout (function () { take (area.value, ''); }, 0);
+          return;
+        }
+        e.preventDefault ();
+        take (plain, html);
+      });
+      var bar = document.createElement ('div');
+      bar.className = 'tm-buttons';
+      var no = document.createElement ('button');
+      no.className = 'tm-button';
+      no.textContent = 'Cancel';
+      no.onclick = function () { close (); };
+      bar.appendChild (no);
+      var c = typeof navigator !== 'undefined' && navigator.clipboard;
+      if (c && (c.read || c.readText)) {
+        var read = document.createElement ('button');
+        read.className = 'tm-button';
+        read.textContent = 'Read the clipboard';
+        read.title = 'The browser may ask to allow it';
+        read.onclick = function () {
+          readClipboard (c).then (function (r) { take (r.plain, r.html); }, function (e) {
+            note.textContent = 'The browser did not give the clipboard: press ' + key + ' instead.';
+            log ('read: ' + e);
+            area.focus ({ preventScroll: true });
+          });
+        };
+        bar.appendChild (read);
+      }
+      box.appendChild (bar);
+      setTimeout (function () { area.focus ({ preventScroll: true }); }, 0);
+    }, function () {
+      if (before && before.focus) before.focus ({ preventScroll: true });
+      if (got && typeof _vue_web_scheme !== 'undefined')
+        withStackSave (function () { _vue_web_scheme (stringToUTF8OnStack (cmd)); });
+    });
+  }
+
+  // the text and the HTML of the clipboard, with navigator.clipboard (the
+  // HTML when the browser has read (), else the text only)
+  function readClipboard (c) {
+    if (!c.read || typeof ClipboardItem === 'undefined')
+      return c.readText ().then (function (t) { return { plain: t, html: '' }; });
+    return c.read ().then (function (items) {
+      var r = { plain: '', html: '' }, jobs = [];
+      items.forEach (function (it) {
+        ['text/plain', 'text/html'].forEach (function (m) {
+          if (it.types.indexOf (m) < 0) return;
+          jobs.push (it.getType (m).then (function (b) { return b.text (); }).then (function (t) {
+            if (m === 'text/html') { if (!r.html) r.html = t; }
+            else if (!r.plain) r.plain = t;
+          }));
+        });
+      });
+      return Promise.all (jobs).then (function () { return r; });
+    });
+  }
+
   return {
+    fromBrowser: fromBrowser,
     // what TeXmacs copies: kept here, and given to the system
     write: function (plain, html) {
       known = { plain: plain, html: html };

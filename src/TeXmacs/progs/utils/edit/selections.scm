@@ -71,6 +71,14 @@
     (clipboard-paste which)
     (clipboard-set-import temp)))
 
+(tm-define (clipboard-paste-browser format which)
+  (:synopsis "Paste the clipboard of the browser (TeXmacs in a web page)")
+  (web-paste-dialog
+   (if (== format "default")
+       (string-append "(clipboard-paste " (string-quote which) ")")
+       (string-append "(clipboard-paste-import " (string-quote format)
+                      " " (string-quote which) ")"))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Structured selections
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

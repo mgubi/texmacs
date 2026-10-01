@@ -77,7 +77,12 @@
 
   Copy, cut and paste go through the clipboard of the system, so that text
   can be exchanged with the other programs; a copy made in <TeXmacs> keeps
-  its structure when it is pasted back into <TeXmacs>.
+  its structure when it is pasted back into <TeXmacs>. The browser lets a
+  page read its clipboard only when a key pastes, so that
+  <menu|Edit|Paste> pastes the last copy or paste of <TeXmacs>; use
+  <menu|Edit|Paste from browser...> for what was copied in another page or
+  program since: it opens a small dialog, in which <key|M-v> (or its button)
+  pastes.
 
   <menu|File|Print> makes a PDF of the document and opens it in a new tab
   of the browser, from which it can be printed or saved.

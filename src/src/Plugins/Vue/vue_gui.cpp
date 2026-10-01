@@ -2590,6 +2590,19 @@ web_open_external_s7 (s7_scheme* sc, s7_pointer args) {
   vue_web_open_external (target, file ? 1 : 0, name);
   return s7_unspecified (sc);
 }
+
+EM_JS (void, vue_web_paste_dialog, (const char* cmd), {
+  if (typeof tmClipboard !== 'undefined') tmClipboard.fromBrowser (UTF8ToString (cmd));
+});
+
+// (web-paste-dialog cmd): Edit > Paste from browser, the dialog of the page
+// which gets the clipboard of the browser (a menu has no paste event), and
+// then runs the Scheme command cmd, which pastes it (misc/wasm/clipboard.js)
+static s7_pointer
+web_paste_dialog_s7 (s7_scheme* sc, s7_pointer args) {
+  vue_web_paste_dialog (s7_string (s7_car (args)));
+  return s7_unspecified (sc);
+}
 #endif
 
 void gui_open (int& argc, char** argv) {
@@ -2604,6 +2617,9 @@ void gui_open (int& argc, char** argv) {
   if (tm_s7 != NULL)
     s7_define_function (tm_s7, "web-open-external", web_open_external_s7, 3, 0, false,
                         "(web-open-external target file? name): a link left to the browser");
+  if (tm_s7 != NULL)
+    s7_define_function (tm_s7, "web-paste-dialog", web_paste_dialog_s7, 1, 0, false,
+                        "(web-paste-dialog cmd): the clipboard of the browser, then cmd");
 #endif
 #ifdef __EMSCRIPTEN__
   {
