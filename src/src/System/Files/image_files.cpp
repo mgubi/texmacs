@@ -525,7 +525,8 @@ image_to_psdoc (url image) {
 
 //mostly the same code as image_to_eps 
 void 
-image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi) {
+image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi,
+              bool placeholder) {
   if (DEBUG_CONVERT)
     debug_convert << "image_to_pdf, converting " << image
 		  << " into " << pdf << LF;
@@ -556,7 +557,7 @@ image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi) {
   if (DEBUG_CONVERT)
     debug_convert << "image_to_pdf, using call_imagemagick_convert"<< LF;
   call_imagemagick_convert(image, pdf, w_pt, h_pt, dpi);
-  if (!exists (pdf)) {
+  if (!exists (pdf) && placeholder) {
     convert_error << image << "image_to_pdf, failed converting " << image
 		  << " into " << pdf << LF;
     copy ("$TEXMACS_PATH/misc/pixmaps/unknown.pdf", pdf);
