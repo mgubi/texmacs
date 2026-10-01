@@ -13,6 +13,7 @@
 
 (texmacs-module (convert bibtex bibtexout)
   (:use (convert tools output))
+  (:use (convert latex init-latex))
   (:use (convert latex texout)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -187,7 +188,12 @@
   (if (and (list? x) (= 2 (length x)))
       (begin
 	(output-verbatim "  " (bibtex-padded (car x)) " = ")
-	(bibtex-arg (cadr x)))))
+	(if (string? (cadr x))
+	    (begin
+	      (output-verbatim "{")
+	      (bibtex-latex (cadr x))
+	      (output-verbatim "}"))
+	    (bibtex-arg (cadr x))))))
 
 (define (bibtex-fields x)
   (if (and (list? x) (not (null? x)))
