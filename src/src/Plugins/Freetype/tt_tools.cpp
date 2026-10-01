@@ -494,6 +494,15 @@ coordinate_string (double v) {
   return r;
 }
 
+// The suffix of a font name, as in SFNS.v236 or Fraunces.var_opsz36_WONK0,
+// with its case: suffix () gives it in lower case, and the tags of the axes
+// a font defines (WONK, GRAD) are in upper case
+static string
+instance_suffix (string name) {
+  int i= search_backwards (".", name);
+  return i < 0? string (""): name (i + 1, N(name));
+}
+
 array<double>
 tt_variation_coordinates (string fv, string suf) {
   // the coordinates which a suffix var_... stands for
@@ -577,7 +586,7 @@ tt_font_axes (string name) {
   // tuples (tag, name, minimum, default, maximum, value of this font)
   tree r (TUPLE);
   if (ends (name, ".ttf") || ends (name, ".otf")) name= name (0, N(name) - 4);
-  string base= name, suf= suffix (url (name));
+  string base= name, suf= instance_suffix (name);
   bool named= N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)));
   bool point= starts (suf, "var_");
   if (named || point) base= strip_suffix (name);
@@ -610,12 +619,30 @@ tt_font_axes (string name) {
   return r;
 }
 
+static hashmap<string,int> default_cache (-1);
+
+static bool
+tt_font_varies_at_default (string base) {
+  // whether the features of a variable font at its default are other than
+  // those of its FeatureList, so that the font itself is not its default
+  if (default_cache->contains (base)) return default_cache[base] == 1;
+  bool r= false;
+  url u= tt_font_find (base);
+  if (!is_none (u))
+    r= tt_varies_at_default (tt_file_table (u, "GSUB")) ||
+       tt_varies_at_default (tt_file_table (u, "GPOS"));
+  default_cache (base)= r? 1: 0;
+  return r;
+}
+
 string
 tt_variation_name (string name, string spec, int sz) {
   // the font for the variations spec (such as "wght=550,opsz=auto") applied
   // to the font name, which may be a variable font, one of its named
-  // instances or another point; name itself when there is nothing to vary
-  string base= name, suf= suffix (url (name));
+  // instances or another point; name itself when there is nothing to vary,
+  // unless the features of the font at its default are other than those
+  // of its FeatureList, which the instance var_default then has
+  string base= name, suf= instance_suffix (name);
   bool named= N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)));
   bool point= starts (suf, "var_");
   if (named || point) base= strip_suffix (name);
@@ -665,7 +692,7 @@ tt_variation_name (string name, string spec, int sz) {
       r << "_" << tags[a] << coordinate_string (cur[a]);
       dflt= false;
     }
-  if (dflt) return base;
+  if (dflt) return tt_font_varies_at_default (base)? base * ".var_default": base;
   return r;
 }
 
@@ -732,7 +759,7 @@ tt_font_instances (url u) {
 
 bool
 tt_is_instance_name (string s) {
-  string suf= suffix (url (s));
+  string suf= instance_suffix (s);
   return (N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)))) ||
          starts (suf, "var_");
 }
@@ -791,7 +818,7 @@ tt_clean_instances (int max_mb) {
 
 url
 tt_unpack (string s) {
-  string suf= suffix (url (s));
+  string suf= instance_suffix (s);
   bool named= N(suf) > 1 && suf[0] == 'v' && is_int (suf (1, N(suf)));
   if (named || starts (suf, "var_")) {
     // an instance of a variable font: a static font written once
@@ -1294,31 +1321,51 @@ parse_gsub_tags (const string& buf) {
   return r;
 }
 
-ot_gsub_map
-parse_gsub_feature (const string& buf, string feature) {
-  ot_gsub_map m;
-  if ((N (buf) == 0) || (!tt_correct_version (buf, 0))) return m;
-  string gsub= tt_table (buf, 0, "GSUB");
-  if (N (gsub) < 10) return m;
+// The lookups of a feature, in the order of the feature table; a tag which
+// is in the feature list more than once (one for each script) gives the
+// lookups of every occurrence
+array<int>
+parse_gsub_feature_lookups (const string& gsub, string feature) {
+  array<int> r;
+  if (N (gsub) < 10) return r;
   int feature_list= get_U16 (gsub, 6);
-  int lookup_list = get_U16 (gsub, 8);
   int feature_count= get_U16 (gsub, feature_list);
-  int lookup_count = get_U16 (gsub, lookup_list);
   for (int f= 0; f < feature_count; f++) {
     int rec= feature_list + 2 + 6*f;
     if (get_tag (gsub, rec) != feature) continue;
     int feat= feature_list + get_U16 (gsub, rec + 4);
     int nl= get_U16 (gsub, feat + 2);
-    for (int l= 0; l < nl; l++) {
-      int li= get_U16 (gsub, feat + 4 + 2*l);
-      if (li >= lookup_count) continue;
-      int lookup= lookup_list + get_U16 (gsub, lookup_list + 2 + 2*li);
-      int type= get_U16 (gsub, lookup);
-      int nsub= get_U16 (gsub, lookup + 4);
-      for (int s= 0; s < nsub; s++)
-        parse_gsub_subtable (gsub, type, lookup + get_U16 (gsub, lookup + 6 + 2*s), m);
-    }
+    for (int l= 0; l < nl; l++) r << (int) get_U16 (gsub, feat + 4 + 2*l);
   }
+  return r;
+}
+
+static void
+parse_gsub_lookup (const string& gsub, int li, ot_gsub_map& m) {
+  int lookup_list = get_U16 (gsub, 8);
+  int lookup_count= get_U16 (gsub, lookup_list);
+  if (li >= lookup_count) return;
+  int lookup= lookup_list + get_U16 (gsub, lookup_list + 2 + 2*li);
+  int type= get_U16 (gsub, lookup);
+  int nsub= get_U16 (gsub, lookup + 4);
+  for (int s= 0; s < nsub; s++)
+    parse_gsub_subtable (gsub, type, lookup + get_U16 (gsub, lookup + 6 + 2*s), m);
+}
+
+ot_gsub_map
+parse_gsub_lookup (const string& gsub, int li) {
+  ot_gsub_map m;
+  if (N (gsub) >= 10) parse_gsub_lookup (gsub, li, m);
+  return m;
+}
+
+ot_gsub_map
+parse_gsub_feature (const string& buf, string feature) {
+  ot_gsub_map m;
+  if ((N (buf) == 0) || (!tt_correct_version (buf, 0))) return m;
+  string gsub= tt_table (buf, 0, "GSUB");
+  array<int> lookups= parse_gsub_feature_lookups (gsub, feature);
+  for (int i= 0; i < N(lookups); i++) parse_gsub_lookup (gsub, lookups[i], m);
   return m;
 }
 

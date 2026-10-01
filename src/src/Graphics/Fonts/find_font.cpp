@@ -191,11 +191,11 @@ find_font_bis (tree t) {
       string var= get_font_variations ();
       for (int i=0; i<N(a); i++) {
         string name= strip_suffix (a[i]);
-        if (var != "") {
-          string vname= tt_variation_name (name, var, as_int (t[4]));
-          if (vname != name && tt_font_exists (vname))
-            return unicode_font (vname, as_int (t[4]), as_int (t[5]));
-        }
+        // even without variations, the default of a variable font may be
+        // a font of its own (tt_variation_name)
+        string vname= tt_variation_name (name, var, as_int (t[4]));
+        if (vname != name && tt_font_exists (vname))
+          return unicode_font (vname, as_int (t[4]), as_int (t[5]));
         if (tt_font_exists (name))
           return unicode_font (name, as_int (t[4]), as_int (t[5]));
       }

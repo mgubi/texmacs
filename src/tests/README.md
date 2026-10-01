@@ -68,10 +68,14 @@ kinds, and runs `moc` only on the sources which declare a `Q_OBJECT`.
 `TM_TEST_FONT_DIR` points to a directory, searched recursively, with the
 fonts the OpenType tests need. Latin Modern Math and STIX Two Math are
 shipped in the tree now, but the tests still look for them through this
-variable and skip themselves when it is not set: without it, 19 of the 143
-tests of the 18 binaries skip, 18 of them in `opentype_font_test`. Pointing
-it at `TeXmacs/fonts/truetype` runs them all; other fonts, Asana Math for
-instance, are genuinely external. `opentype_font_test` covers the MATH
+variable and skip themselves when it is not set: without it, 24 of the 148
+tests of the 19 binaries skip, 18 of them in `opentype_font_test`. Pointing
+it at `TeXmacs/fonts/truetype` runs them all but those of
+`tt_instance_test`; other fonts are genuinely external, such as Asana Math,
+or the variable fonts Fraunces, Roboto Flex and M+ 1 which
+`tt_instance_test` needs, from the test suite of HarfBuzz
+(`test/subset/data/fonts`). The variable can list several directories,
+separated by colons. `opentype_font_test` covers the MATH
 constants, variants and assemblies of the fonts it finds, the corrections
 and kerning hooks, and the profiles: `test_profile_file` reads
 `fonts-opentype.scm` and checks every key and group, which profile first

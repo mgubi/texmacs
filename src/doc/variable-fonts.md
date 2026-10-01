@@ -158,7 +158,7 @@ extrema), `maxp` (points and contours; no composites, no instructions) and
 `OS/2.usWeightClass` (the `wght` coordinate). The tables of variations
 (`fvar gvar avar cvar HVAR VVAR MVAR STAT`) and of hinting
 (`cvt fpgm prep hdmx LTSH VDMX`) are dropped, as is `DSIG`; the others are
-copied as they are, except `GPOS` (below). Checksums and
+copied as they are, except `GPOS`, `GSUB` and `cmap` (below). Checksums and
 `checkSumAdjustment` are computed anew.
 
 **Positioning.** The values of `GPOS` are those of the default instance; a
@@ -183,6 +183,48 @@ which 897 at Black and 1277 at `wdth=60,wght=850` differ from the
 default) agrees with fontTools exactly, and so do the 12002 mark anchors of
 Junicode VF at weight 700 (11530 of them varying).
 
+**Features which vary.** `GSUB` and `GPOS` 1.1 may end with a
+`FeatureVariations` table: records, each a set of conditions (a range of
+normalized coordinates on some axes) and the feature tables which replace
+those of the `FeatureList` when the conditions hold; the first record whose
+conditions hold applies. Fonts use it for glyphs which change at some points
+of the design space, nearly always through the feature `rvrn` (required
+variation alternates), which is empty in the `FeatureList`: the dollar and
+cent of Roboto Flex lose a bar at weights from 600 and at narrow widths, and
+the h, m, n and ampersand of Fraunces are "wonky" at small optical sizes or
+wherever its axis `WONK` is off. `tt_vary_layout` evaluates the conditions
+at the coordinates of the instance, rounded to F2DOT14 as HarfBuzz does,
+writes a new `FeatureList` with the feature tables of the record in front of
+the rest of the table (which moves as a whole and keeps its layout, a
+feature keeping its parameters) and leaves a table of version 1.0.
+
+TeXmacs does not shape text: a character has the glyph of the `cmap`, and
+features apply only when a document names them (`font-features`). A shaper
+applies `rvrn` first and without being asked, so `tt_fold_rvrn` applies its
+single substitutions to the subtables of format 4 and 12 of the `cmap` of the
+instance, in the order of the lookups; every place where TeXmacs maps a
+character to a glyph (metrics, rendering, rubber fonts, the PDF writer) then
+finds the glyph of the instance. A feature a document asks for sees the
+glyphs `rvrn` chose, as it would after a shaper.
+
+A record may hold at the default itself, as for Fraunces (whose default is
+wonky): the variable font is then not its own default, and
+`tt_variation_name` gives the instance `var_default` even without
+variations, which `find_font` takes as for any other point.
+
+Checked against `fontTools.varLib.instancer` (the `cmap` of its instance
+followed by its `rvrn`) at 19 points of Fraunces, Roboto Flex and M+ 1 (44
+records, 6335 characters): every character has the same glyph, and the
+features have the same lookups, up to the numbering of lookups which
+fontTools prunes. `tests/Plugins/Freetype/tt_instance_test.cpp` checks a few
+of these points on the fonts of the test suite of HarfBuzz
+(`test/subset/data/fonts`), found through `TM_TEST_FONT_DIR`.
+
+**Names.** The suffix of an instance keeps its case (`instance_suffix`, as
+`suffix` gives it in lower case): the axes a font defines have upper case
+tags, and `Fraunces.var_opsz36_WONK0` used to be read back as a point
+without `WONK`.
+
 ## Disk space
 
 Each instance is a file of the size of the variable font (1.5 MB for SF
@@ -199,9 +241,11 @@ time, which checks them against the variable font.
 
 - **CFF2** variable fonts (cubic outlines) are not instanced; they keep their
   default instance only.
-- **MATH, kern, GDEF** are those of the default instance, and so are the
-  lookups which `GSUB` and `GPOS` switch at some points of the design space
-  (`FeatureVariations`, as in a dollar sign with a simpler bar at heavy
-  weights). No variable math font is known to TeXmacs yet.
+- **MATH, kern, GDEF** are those of the default instance. No variable math
+  font is known to TeXmacs yet.
+- **Features which vary** other than `rvrn` are those of the point, but
+  apply, as any feature, only when a document asks for them; `rvrn` itself
+  is applied through the `cmap`, which works for its single substitutions,
+  the only ones known in such fonts.
 - No slider in the panel (see above).
 - Collections of variable fonts (`.ttc`) are not instanced.

@@ -26,6 +26,8 @@ double tt_instance_coordinate (string fvar, int k, string axis, double def);
 string tt_make_instance (string tt, int k);
 string tt_make_variation (string tt, array<double> coords);
 string tt_vary_gpos (string gpos, string gdef, array<double> nc);
+string tt_vary_layout (string table, array<double> nc);
+bool tt_varies_at_default (string gsub_or_gpos);
 array<string> tt_axis_tags (string fvar);
 array<double> tt_axis_values (string fvar, int which);
 array<double> tt_variation_coordinates (string fvar, string suffix);
@@ -244,6 +246,9 @@ ot_mathtable parse_mathtable (const string& buf);
 // order for alternate substitutions), for all lookups of the feature tag
 typedef hashmap<unsigned int, array<unsigned int> > ot_gsub_map;
 ot_gsub_map parse_gsub_feature (const string& buf, string feature);
+// the same, from the GSUB table, one lookup at a time
+array<int> parse_gsub_feature_lookups (const string& gsub, string feature);
+ot_gsub_map parse_gsub_lookup (const string& gsub, int lookup_index);
 array<string> parse_gsub_tags (const string& buf);
 
 /******************************************************************************

@@ -15,16 +15,14 @@
 // in font units. The glyf, loca and hmtx tables are written anew from
 // them, head, hhea, maxp and OS/2 are adjusted, the tables of variations
 // and of hinting are dropped (the outlines are no longer those the hints
-// were written for), and the other tables are copied as they are. The
-// values of GPOS and MATH remain those of the default instance.
+// were written for), and the other tables are copied as they are, except
+// for the variations of GPOS and of the features of GSUB and GPOS, which
+// are applied (below). MATH remains that of the default instance.
 
 #include "tt_tools.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
 #include <math.h>
-
-#ifdef USE_FREETYPE
-#include "free_type.hpp"
 
 string tt_table (string tt, int i, string tag);
 int tt_nr_tables (string tt, int i);
@@ -330,6 +328,297 @@ tt_vary_gpos (string gpos, string gdef, array<double> nc) {
   return v.g;
 }
 
+/******************************************************************************
+* The features of an instance
+******************************************************************************/
+
+// GSUB and GPOS 1.1 may end with a FeatureVariations table: a list of
+// records, each a set of conditions on the axes (a range of normalized
+// coordinates for each axis named) and the feature tables which replace
+// those of the FeatureList when the conditions hold. The first record
+// whose conditions hold applies. A font uses it for the glyphs which
+// change at some points of its design space, as a dollar sign whose bar
+// is simplified at heavy weights, and usually through the feature rvrn
+// (required variation alternates), empty in the FeatureList.
+
+static int
+F2DOT14_round (double x) {
+  return (int) floor (x * 16384.0 + 0.5);
+}
+
+// the FeatureTableSubstitution which applies at the normalized coordinates
+// nc (missing coordinates are those of the default), or -1
+static int
+feature_substitution (string t, array<double> nc) {
+  if (N(t) < 14 || U16_at (t, 0) != 1 || U16_at (t, 2) < 1) return -1;
+  int fv= U32_at (t, 10);
+  if (fv <= 0 || fv + 8 > N(t)) return -1;
+  int n= U32_at (t, fv + 4);
+  for (int i=0; i<n; i++) {
+    int rec= fv + 8 + 8 * i;
+    if (rec + 8 > N(t)) break;
+    int cs= U32_at (t, rec), sub= U32_at (t, rec + 4);
+    bool holds= true;
+    if (cs != 0) {
+      cs += fv;
+      int nr= U16_at (t, cs);
+      for (int j=0; j<nr && holds; j++) {
+        int c= cs + U32_at (t, cs + 2 + 4 * j);
+        if (U16_at (t, c) != 1) { holds= false; break; }  // unknown format
+        int axis= U16_at (t, c + 2);
+        int v= axis < N(nc)? F2DOT14_round (nc[axis]): 0;
+        holds= S16_at (t, c + 4) <= v && v <= S16_at (t, c + 6);
+      }
+    }
+    if (holds) return sub == 0? -1: fv + sub;
+  }
+  return -1;
+}
+
+bool
+tt_varies_at_default (string t) {
+  // whether the features of GSUB or GPOS t are other ones at the default
+  int sub= feature_substitution (t, array<double> ());
+  return sub >= 0 && U16_at (t, sub + 4) > 0;
+}
+
+string
+tt_vary_layout (string t, array<double> nc) {
+  // GSUB or GPOS t with the features at the normalized coordinates nc, as
+  // a table of version 1.0. The FeatureList is written anew in front of
+  // the other tables, which move as a whole and keep their layout; a
+  // feature keeps the parameters it has in the FeatureList.
+  if (N(t) < 14 || U16_at (t, 0) != 1 || U16_at (t, 2) < 1) return t;
+  int sub= feature_substitution (t, nc);
+  string r= t;
+  set16 (r, 2, 0);                             // version 1.0,
+  set32 (r, 10, 0);                            // without variations
+  if (sub < 0) return r;
+  int fl= U16_at (t, 6), nf= U16_at (t, fl);
+  array<int> table (nf);
+  for (int f=0; f<nf; f++) table[f]= fl + U16_at (t, fl + 2 + 6 * f + 4);
+  array<int> params= copy (table);
+  int ns= U16_at (t, sub + 4);
+  for (int i=0; i<ns; i++) {
+    int f= U16_at (t, sub + 6 + 6 * i);
+    if (f < nf) table[f]= sub + U32_at (t, sub + 8 + 6 * i);
+  }
+  int size= 2 + 6 * nf;                        // of the new FeatureList
+  for (int f=0; f<nf; f++) size += 4 + 2 * U16_at (t, table[f] + 2);
+  int delta= 10 + size - 14;                   // how far the rest moves
+  if (U16_at (t, 4) + delta > 65535 || U16_at (t, 8) + delta > 65535)
+    return r;
+  string l;
+  put16 (l, nf);
+  int pos= 2 + 6 * nf;
+  for (int f=0; f<nf; f++) {
+    for (int k=0; k<4; k++) l << t[fl + 2 + 6 * f + k];
+    put16 (l, pos);
+    pos += 4 + 2 * U16_at (t, table[f] + 2);
+  }
+  for (int f=0; f<nf; f++) {
+    int p= U16_at (t, params[f]);              // relative to the table
+    if (p != 0) p= params[f] + p + delta - (10 + N(l));
+    if (p < 0 || p > 65535) p= 0;
+    put16 (l, p);
+    int nl= U16_at (t, table[f] + 2);
+    put16 (l, nl);
+    for (int k=0; k<nl; k++) put16 (l, U16_at (t, table[f] + 4 + 2 * k));
+  }
+  string h;
+  put32 (h, 0x00010000);
+  put16 (h, U16_at (t, 4) + delta);            // ScriptList
+  put16 (h, 10);                               // FeatureList
+  put16 (h, U16_at (t, 8) + delta);            // LookupList
+  return h * l * t (14, N(t));
+}
+
+/******************************************************************************
+* The required variation alternates
+******************************************************************************/
+
+// TeXmacs does not shape text: the glyph of a character is the one of the
+// cmap, and features apply only when a document asks for them. The
+// substitutions of rvrn, which a shaper applies before any other feature
+// and without being asked, are therefore applied to the cmap of the
+// instance, so that every character has the glyph of this point of the
+// design space wherever TeXmacs looks it up.
+
+static void
+cmap_entries (string c, int st, array<int>& codes, array<int>& glyphs) {
+  // the characters and glyphs of the subtable at st, of format 4 or 12
+  int format= U16_at (c, st);
+  if (format == 4) {
+    int seg= U16_at (c, st + 6) / 2;
+    int ends= st + 14, starts= ends + 2 * seg + 2;
+    int deltas= starts + 2 * seg, ranges= deltas + 2 * seg;
+    for (int i=0; i<seg; i++) {
+      int e= U16_at (c, ends + 2 * i), s= U16_at (c, starts + 2 * i);
+      int d= U16_at (c, deltas + 2 * i), ro= U16_at (c, ranges + 2 * i);
+      for (int ch=s; ch<=e && ch < 0xFFFF; ch++) {
+        int g;
+        if (ro == 0) g= (ch + d) & 0xFFFF;
+        else {
+          g= U16_at (c, ranges + 2 * i + ro + 2 * (ch - s));
+          if (g != 0) g= (g + d) & 0xFFFF;
+        }
+        if (g != 0) { codes << ch; glyphs << g; }
+      }
+    }
+  }
+  else if (format == 12) {
+    int n= U32_at (c, st + 12);
+    for (int i=0; i<n; i++) {
+      int gr= st + 16 + 12 * i;
+      if (gr + 12 > N(c)) break;
+      int s= U32_at (c, gr), e= U32_at (c, gr + 4), g= U32_at (c, gr + 8);
+      for (int ch=s; ch<=e && ch <= 0x10FFFF; ch++) {
+        codes << ch; glyphs << (g + ch - s); }
+    }
+  }
+}
+
+static string
+cmap_format4 (string c, int st, array<int> codes, array<int> glyphs) {
+  // a subtable of format 4: a segment for each run of consecutive
+  // characters, by a delta when the glyphs are consecutive too and else by
+  // the array of glyphs; "" when it does not fit
+  array<int> s, e;
+  for (int i=0; i<N(codes); i++) {
+    if (codes[i] > 0xFFFE) break;
+    if (N(e) > 0 && codes[i] == e[N(e)-1] + 1) e[N(e)-1]= codes[i];
+    else { s << codes[i]; e << codes[i]; }
+  }
+  hashmap<int,int> glyph (0);
+  for (int i=0; i<N(codes); i++) glyph (codes[i])= glyphs[i];
+  int seg= N(s) + 1;
+  array<int> delta (seg), offset (seg);
+  string arr;
+  for (int i=0; i<seg-1; i++) {
+    bool consecutive= true;
+    for (int ch=s[i]+1; ch<=e[i] && consecutive; ch++)
+      consecutive= glyph[ch] == glyph[ch-1] + 1;
+    if (consecutive) {
+      delta[i]= (glyph[s[i]] - s[i]) & 0xFFFF;
+      offset[i]= -1;
+    }
+    else {
+      delta[i]= 0;
+      offset[i]= N(arr);
+      for (int ch=s[i]; ch<=e[i]; ch++) put16 (arr, glyph[ch]);
+    }
+  }
+  s << 0xFFFF; e << 0xFFFF; delta[seg-1]= 1; offset[seg-1]= -1;
+  int len= 16 + 8 * seg + N(arr);
+  if (len > 65535) return "";
+  int pow= 1, lg= 0;
+  while (2 * pow <= seg) { pow *= 2; lg++; }
+  string r;
+  put16 (r, 4); put16 (r, len); put16 (r, U16_at (c, st + 4));
+  put16 (r, 2 * seg); put16 (r, 2 * pow); put16 (r, lg);
+  put16 (r, 2 * seg - 2 * pow);
+  for (int i=0; i<seg; i++) put16 (r, e[i]);
+  put16 (r, 0);
+  for (int i=0; i<seg; i++) put16 (r, s[i]);
+  for (int i=0; i<seg; i++) put16 (r, delta[i]);
+  int ranges= N(r);
+  for (int i=0; i<seg; i++)
+    put16 (r, offset[i] < 0? 0:
+                (ranges + 2 * seg + offset[i]) - (ranges + 2 * i));
+  return r * arr;
+}
+
+static string
+cmap_format12 (string c, int st, array<int> codes, array<int> glyphs) {
+  // a subtable of format 12: a group for each run of consecutive
+  // characters with consecutive glyphs
+  array<int> s, e, g;
+  for (int i=0; i<N(codes); i++) {
+    int k= N(s) - 1;
+    if (k >= 0 && codes[i] == e[k] + 1 && glyphs[i] == g[k] + codes[i] - s[k])
+      e[k]= codes[i];
+    else { s << codes[i]; e << codes[i]; g << glyphs[i]; }
+  }
+  string r;
+  put16 (r, 12); put16 (r, 0);
+  put32 (r, 16 + 12 * N(s));
+  put32 (r, (unsigned int) U32_at (c, st + 8));
+  put32 (r, N(s));
+  for (int i=0; i<N(s); i++) {
+    put32 (r, s[i]); put32 (r, e[i]); put32 (r, g[i]); }
+  return r;
+}
+
+static string
+tt_fold_rvrn (string c, string gsub) {
+  // the cmap c with the substitutions of rvrn in gsub applied
+  array<int> lookups= parse_gsub_feature_lookups (gsub, "rvrn");
+  if (N(lookups) == 0 || N(c) < 4) return c;
+  array<ot_gsub_map> maps;
+  for (int i=0; i<N(lookups); i++)
+    maps << parse_gsub_lookup (gsub, lookups[i]);
+  int nt= U16_at (c, 2);
+  if (N(c) < 4 + 8 * nt) return c;
+  hashmap<int,string> done ("");              // subtables by their offset
+  array<int> order;
+  bool changed= false;
+  for (int i=0; i<nt; i++) {
+    int st= U32_at (c, 4 + 8 * i + 4);
+    if (done->contains (st)) continue;
+    int format= U16_at (c, st);
+    int len= format == 12? U32_at (c, st + 4): U16_at (c, st + 2);
+    if (format >= 8) len= U32_at (c, st + 4);
+    if (format == 14) len= U32_at (c, st + 2);
+    if (len <= 0 || st + len > N(c)) return c;
+    string data= c (st, st + len);
+    if (format == 4 || format == 12) {
+      array<int> codes, glyphs;
+      cmap_entries (c, st, codes, glyphs);
+      bool differ= false;
+      for (int k=0; k<N(glyphs); k++)
+        for (int m=0; m<N(maps); m++) {
+          unsigned int g= (unsigned int) glyphs[k];
+          if (maps[m]->contains (g) && N(maps[m][g]) > 0) {
+            glyphs[k]= (int) maps[m][g][0];
+            differ= true;
+          }
+        }
+      if (differ) {
+        string nd= format == 4? cmap_format4 (c, st, codes, glyphs):
+                                cmap_format12 (c, st, codes, glyphs);
+        if (nd != "") { data= nd; changed= true; }
+      }
+    }
+    done (st)= data;
+    order << st;
+  }
+  if (!changed) return c;
+  string r;
+  put16 (r, U16_at (c, 0)); put16 (r, nt);
+  hashmap<int,int> where (0);
+  int pos= 4 + 8 * nt;
+  for (int i=0; i<N(order); i++) {
+    where (order[i])= pos;
+    pos += ((N(done[order[i]]) + 3) >> 2) << 2;
+  }
+  for (int i=0; i<nt; i++) {
+    for (int k=0; k<4; k++) r << c[4 + 8 * i + k];
+    put32 (r, where [U32_at (c, 4 + 8 * i + 4)]);
+  }
+  for (int i=0; i<N(order); i++) {
+    r << done[order[i]];
+    while ((N(r) & 3) != 0) r << '\0';
+  }
+  return r;
+}
+
+/******************************************************************************
+* The static font
+******************************************************************************/
+
+#ifdef USE_FREETYPE
+#include "free_type.hpp"
+
 // The static font of the named instance k (from 1) or, for k = 0, of the
 // point with the given design coordinates (one for each axis, in the order
 // of fvar)
@@ -435,6 +724,13 @@ tt_make_static (string tt, int k, array<double> coords) {
   }
   if (N(nc) > 0 && tabs->contains ("GPOS") && tabs->contains ("GDEF"))
     tabs ("GPOS")= tt_vary_gpos (tabs ["GPOS"], tabs ["GDEF"], nc);
+  if (N(nc) > 0 && tabs->contains ("GPOS"))
+    tabs ("GPOS")= tt_vary_layout (tabs ["GPOS"], nc);
+  if (N(nc) > 0 && tabs->contains ("GSUB")) {
+    tabs ("GSUB")= tt_vary_layout (tabs ["GSUB"], nc);
+    if (tabs->contains ("cmap"))
+      tabs ("cmap")= tt_fold_rvrn (tabs ["cmap"], tabs ["GSUB"]);
+  }
   tabs ("glyf")= glyf;
   tabs ("loca")= loca_tab;
   tabs ("hmtx")= hmtx;

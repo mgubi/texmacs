@@ -50,11 +50,16 @@ Fonts > Clear font cache` removes them all. The instances were checked
 against `fontTools.varLib.instancer`: outlines agree to the font unit, and
 the kerning of SF and the mark anchors of Junicode VF exactly.
 
+**Glyphs which change.** Some fonts change glyphs at some points of their
+design space: Roboto Flex drops a bar of the dollar at heavy weights, and
+Fraunces has "wonky" letters at small sizes. An instance has the glyphs and
+the features of its point (the `FeatureVariations` of `GSUB` and `GPOS`),
+checked against `fontTools` at every character of three such fonts.
+
 **Limits.** Variable fonts with cubic outlines (CFF2) keep their default
-design only; the lookups a font switches at some points of its design space
-(`FeatureVariations`) and the `MATH` table are those of the default
-instance; and the panel has fields and buttons rather than sliders, which
-the widget language of TeXmacs does not have.
+design only; the `MATH` table is that of the default instance; and the panel
+has fields and buttons rather than sliders, which the widget language of
+TeXmacs does not have.
 
 **Where to read more.**
 
