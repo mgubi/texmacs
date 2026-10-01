@@ -622,7 +622,7 @@ edit_env_rep::exec_provide (tree t) {
   if (N(t)!=2) return tree (_ERROR, "bad provide");
   tree r= exec (t[0]);
   if (is_compound (r)) return tree (_ERROR, "bad provide");
-  if (provides (t->label)) return "";
+  if (provides (r->label)) return "";
   assign (r->label, copy (t[1]));
   tree v= read (r->label);
   if (is_atomic (v) || is_func (v, MACRO));
