@@ -23,6 +23,8 @@
     <branch|The font database and font selection|font-database.en.tm>
 
     <branch|Smart, virtual and emulated fonts|smart-fonts.en.tm>
+
+    <branch|TeX fonts: Metafont, PK, TFM and Type 1|texfonts.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

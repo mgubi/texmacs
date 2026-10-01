@@ -21,7 +21,11 @@
 
     <branch|Macro expansion and evaluation|macro-expansion.en.tm>
 
+    <branch|The experimental style rewriter|rewriter.en.tm>
+
     <branch|Links, loci and references|links.en.tm>
+
+    <branch|Multi-file documents: projects, inclusions and document parts|multifile.en.tm>
 
     <branch|The typesetting algorithm|typesetter.en.tm>
 
@@ -30,6 +34,8 @@
     <branch|Mathematical typesetting|maths.en.tm>
 
     <branch|The renderer interface|renderer.en.tm>
+
+    <branch|Colors and geometric helpers|geometry.en.tm>
 
     <branch|Images, pictures and PDF output|images.en.tm>
 

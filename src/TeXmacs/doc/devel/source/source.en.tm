@@ -15,7 +15,11 @@
   <\traverse>
     <branch|General architecture of <TeXmacs>|architecture.en.tm>
 
+    <branch|Building <TeXmacs> and running the tests|build.en.tm>
+
     <branch|Basic data types|types.en.tm>
+
+    <branch|Strings, characters and encodings|strings.en.tm>
 
     <branch|The <scheme> interpreter and the <c++>/<scheme> glue|scheme-bridge.en.tm>
 
@@ -30,6 +34,8 @@
     <branch|Data formats, converters and databases|source-data.en.tm>
 
     <branch|Plug-ins, collaboration and remote services|source-external.en.tm>
+
+    <branch|The documentation system|docsys.en.tm>
   </traverse>
 
   The document format itself, as seen by authors of documents and style
