@@ -77,7 +77,7 @@
       (when (selection-active-any?)
         (-> "Copy to"
             (link clipboard-copy-export-menu)
-            (if (qt-gui?) ("Image" (clipboard-copy-image "")))
+            (if (or (qt-gui?) (vue-gui?)) ("Image" (clipboard-copy-image "")))
             ---
             ("Primary" (clipboard-copy "primary"))
             ("Secondary" (clipboard-copy "secondary"))

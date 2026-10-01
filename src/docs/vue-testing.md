@@ -31,7 +31,7 @@ window <substring of title> | window #<id>    (default: the last created window;
 move x y
 press x y [left|right|middle]
 release x y [left|right|middle]
-click x y [left|right|middle]
+click x y [left|right|middle] [n]   n: the count of a double (2) or triple (3) click
 wheel x y dx dy
 key [S-][C-][A-][M-]<name>   an SDL key name (Return, Escape, Tab, Backspace, Down,
                             Home...) with shift/control/option/command prefixes;
@@ -56,6 +56,10 @@ keyboard focus, and the editor's idle time (hence the pre-edits and the
 are checked on what the callbacks print to standard output with `display*`
 (`choice: ...`, `got: ...`), and a few on lines the code logs, which then
 need `-debug-events` on the command line.
+
+`TEXMACS_VUE_TAB_MODE=top|side|mobile|grid` stands for the preference
+"gui:responsive tab mode" (test `responsive-tabs`), so that no test has to
+set it.
 
 `TEXMACS_VUE_THEME=light|dark` forces the theme of the interface. The
 `theme` and `icons` tests each render one window under whichever theme is
@@ -127,6 +131,7 @@ callback output.
 | `typographic-palette` | the typographic palette of the "Color" menu (preference `typographic palette`): eight families of hues in columns, their tones in rows under Text, Accents and Backgrounds; the list of its sets opened, and "Earth" chosen: the grid is made again while the menu stays open (a promise in a refreshable, which Vue refreshes at once) |
 | `pattern-palette` | the pattern cells of the document "Color" menu, drawn from the images of `misc/patterns/vintage`; one chosen colours the text inserted next (`got: (document (with color (pattern ...) ...))`) |
 | `choice-style` | the four styles of a choice list side by side; a click on the inert one neither selects nor calls back |
+| `input-mouse` | `input-edit.scm` under `input-mouse.script`: the mouse in a text input. A double click selects a word (cut), a triple click the whole field, the context menu of a right click pastes over it (`got: Smith / 42`) |
 | `input-edit` | editing in a text input: select all and replace, word selection, cut and paste (`got: Bob Smith / 42`) |
 | `math-backspace` | typed symbols are keys named without their brackets, as in the Qt port: `x<y` and `$a<=` then two Backspaces; F12 prints the tree, `(math "a<leqslant>")`, `(math "a")`, `(math "")`. `<` was the key `<less>`, inserted as `<<less>>`, and a Backspace then crashed (`bad path`) |
 | `pre-edit` | the composition of an input method in the editor: a dead key then a letter, shown in a pre-edit box and replaced by the committed text |
@@ -169,6 +174,10 @@ callback output.
 | `search-focus` | the search toolbar asks for the keyboard with `keyboard-focus-on`, so what is typed next lands in its field rather than in the document |
 | `search-return` | after the search toolbar is closed with Escape, typing goes back to the document (`got: (document xyz)`) |
 | `drag-scroll` | a drag selection past the bottom of the window scrolls the document and extends the selection; a move after the release changes nothing |
+| `resize-pos` | the initial scrolling position of a resize: a box starting at the bottom of its lines (Line 20 at its foot), a wide row starting in its middle (Line 11) |
+| `copy-image` | "Copy to > Image": a selection exported as a PNG goes to the system clipboard under `image/png`, and pasted back is an `image` (`got: pasted (image ...`). It replaces the contents of the clipboard |
+| `tree-observe` | a tree view follows its tree: nodes inserted and removed by Scheme show at once (zero, one, two and no three in the snapshot) |
+| `responsive-tabs` | run with `TEXMACS_VUE_TAB_MODE=side`, `mobile`, `grid`: the column of tabs, the list with its pages and Back, the grid of pages |
 | `wheel-graphics` | in a graphics with `wheel-capture?`, the wheel goes to the editor and does not scroll |
 | `enums` | an editable enum (typed and picked values), an enum as wide as its widest value, a long list near the bottom opening above and scrolling, a choice list which scrolls |
 | `menu-drag` | a menu title opens on press and a drag-release chooses an item, also after dragging to another title; resting on a disabled item, a separator or a group title closes a submenu. Give it 40 s under load |

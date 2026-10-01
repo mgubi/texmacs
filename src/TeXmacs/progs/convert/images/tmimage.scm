@@ -219,8 +219,8 @@
   (:argument void "not used")
   (:returns "nothing")
   ;;the format of the graphics is set in the preferences
-  (if (not (qt-gui?))
-    (set-message "Qt GUI only, sorry. Use \"Export selection...\"" "")
+  (if (not (or (qt-gui?) (vue-gui?)))
+    (set-message "Qt and Vue GUIs only, sorry. Use \"Export selection...\"" "")
     (if (not (selection-active-any?))
       (set-message "no selection!" "")
       (let* ((format (get-preference "texmacs->image:format"))

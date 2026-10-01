@@ -9,29 +9,28 @@ TODO
   and the background images of the Qt picker are not implemented. The
   colour menus do not reach it at all: they route on (qt-gui?) and fall
   back to the Scheme rgb picker, which is richer, so this is not urgent
-* resize_widget ignores the initial scrolling position (hpos, vpos), and
-  user_canvas_widget ignores its style
 * no image previsualizer in the file chooser (the native dialog has none)
-* copying a selection as an image to the clipboard is Qt-only
-  (graphics_file_to_clipboard); the menu entry is hidden
-* the tree view does not observe its tree, so a database browser will not
-  refresh by itself (Qt has QTMTreeModel)
-* responsive tabs are plain tabs: the "gui:responsive tab mode" preference
-  does nothing
 * Windows: perform_select and the pipe layer are stubs, so no plugins and
   no client/server there; printing shells out to CUPS
 * Linux: no X11 PRIMARY selection (SDL has only the system clipboard), and
   the interface is drawn in the TeX fonts rather than a desktop UI font
 
-WIP
+DONE
 
 * text input: the pre-edit of the input methods is shown in the editor
   (test pre-edit) and in the fields of the dialogs (test pre-edit-input);
   the input widget has a selection, the clipboard and word moves (test
-  input-edit); double-click selection and a context menu are missing
-
-DONE
-
+  input-edit), a double click selects a word and a triple one the field,
+  a right click opens a menu of the clipboard (test input-mouse)
+* responsive tabs follow the "gui:responsive tab mode" preference: top,
+  side (the default, as in Qt), mobile and grid (test responsive-tabs)
+* the tree view shows the changes of its tree at once: it reads the rows
+  at every layout (test tree-observe), no observer is needed
+* "Copy to > Image" of the Edit menu puts the image on the system
+  clipboard under its MIME type (test copy-image)
+* resize_widget honours the initial scrolling position (right, bottom,
+  center: a scroll container starting there, test resize-pos); the style
+  of resize_widget and user_canvas_widget reaches the texts inside
 * the printer dialog has an orientation: a landscape asks the spooler to
   turn the pages (-o orientation-requested=4, as the Qt port), no rotation
   of the PDF of ours

@@ -3159,7 +3159,8 @@ get_window_from_ID (Uint32 ID) {
 *   move x y                        pointer motion
 *   press x y [left|right|middle]   button down
 *   release x y [left|right|middle] button up
-*   click x y [left|right|middle]   press followed by release
+*   click x y [left|right|middle] [n]  press followed by release; n: the
+*                                   count of a double (2) or triple (3) click
 *   wheel x y dx dy                 wheel event at (x, y)
 *   key [S-][C-][A-][M-]<name>      key press, e.g. Return, Escape, Tab, Down,
 *                                   with shift/control/option/command prefixes
@@ -3234,7 +3235,8 @@ script_button (array<string> a, int i) {
 }
 
 static void
-script_push_button (vue_window win, float x, float y, Uint8 button, bool down) {
+script_push_button (vue_window win, float x, float y, Uint8 button, bool down,
+                    int clicks= 1) {
   SDL_Event ev;
   SDL_zero (ev);
   ev.type= down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
@@ -3242,7 +3244,7 @@ script_push_button (vue_window win, float x, float y, Uint8 button, bool down) {
   ev.button.windowID= script_window_id (win, x, y);
   ev.button.button= button;
   ev.button.down= down;
-  ev.button.clicks= 1;
+  ev.button.clicks= (Uint8) clicks;
   ev.button.x= x;
   ev.button.y= y;
   if (down) script_buttons |= SDL_BUTTON_MASK (button);
@@ -3311,9 +3313,12 @@ script_step () {
     else if (cmd == "release" && N(a) > 2)
       script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
     else if (cmd == "click" && N(a) > 2) {
+      // the count of a double or triple click, as SDL gives it (the
+      // presses before it are the script's own clicks)
+      int clicks= (N(a) > 4 && is_int (a[4])) ? max (1, as_int (a[4])) : 1;
       script_push_motion (win, as_double (a[1]), as_double (a[2]));
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true);
-      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false);
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), true, clicks);
+      script_push_button (win, as_double (a[1]), as_double (a[2]), script_button (a, 3), false, clicks);
     }
     else if (cmd == "wheel" && N(a) > 4) {
       SDL_Event ev;
@@ -3763,6 +3768,7 @@ process_event (SDL_Event *event) {
         string action= (down ? "press-" : "release-") * mouse_decode (bits);
         vue_input_state& in= win->input;
         in.mouse_action= action;
+        if (down) in.mouse_clicks= max (1, (int) event->button.clicks);
         in.mouse_time= texmacs_time();
         in.mouse_x= (int) (bx * win->density);
         in.mouse_y= (int) (by * win->density);
@@ -4317,6 +4323,59 @@ bool set_selection (string key, tree t,
     return false;
   }
 
+  return true;
+}
+
+// an image on the clipboard, for the "Copy to > Image" of the edit menu
+// (graphics_file_to_clipboard, edit_main.cpp): the contents of the file
+// under the MIME type of its format, as qt_gui_rep::put_graphics_on_
+// clipboard does; SDL gives the type to the system (public.png, ...)
+struct image_clipboard {
+  string mime, bytes;
+};
+
+static const void* SDLCALL
+image_clipboard_callback (void *userdata, const char *mime_type, size_t *size) {
+  image_clipboard* img= static_cast<image_clipboard*> (userdata);
+  if (img == NULL || mime_type == NULL || img->mime != string (mime_type)) {
+    *size= 0;
+    return NULL;
+  }
+  *size= N(img->bytes);
+  return (const void*) &(img->bytes[0]);
+}
+
+static void SDLCALL
+image_clipboard_cleanup (void *userdata) {
+  tm_delete (static_cast<image_clipboard*> (userdata));
+}
+
+bool
+vue_put_graphics_on_clipboard (url file) {
+  string ext= locase_all (suffix (file));
+  string mime;
+  if (ext == "png") mime= "image/png";
+  else if (ext == "jpg" || ext == "jpeg") mime= "image/jpeg";
+  else if (ext == "bmp") mime= "image/bmp";
+  else if (ext == "tif" || ext == "tiff") mime= "image/tiff";
+  else if (ext == "svg") mime= "image/svg+xml";
+  else if (ext == "pdf") mime= "application/pdf";
+  else if (ext == "eps" || ext == "ps") mime= "application/postscript";
+  else return false;
+  image_clipboard* img= tm_new<image_clipboard> ();
+  img->mime= mime;
+  if (load_string (file, img->bytes, false) || N(img->bytes) == 0) {
+    tm_delete (img);
+    return false;
+  }
+  c_string cmime (mime);
+  const char* mime_types[1]= { (const char*) cmime };
+  if (!SDL_SetClipboardData (image_clipboard_callback, image_clipboard_cleanup,
+                             img, mime_types, 1)) {
+    SDL_Log ("Failed to set clipboard data: %s", SDL_GetError ());
+    tm_delete (img);
+    return false;
+  }
   return true;
 }
 

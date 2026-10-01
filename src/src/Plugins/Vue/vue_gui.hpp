@@ -88,6 +88,7 @@ struct vue_input_state {
   int    mouse_x, mouse_y;
   array<double> mouse_data;
   int    mouse_ticket; // for the "drop" action: the key of its payload
+  int    mouse_clicks; // a press: 1, 2 for a double click, 3 for a triple one
   // kinetic scrolling (see wheel_step in vue_gui.cpp): the speed of the
   // wheel estimated from its events, the velocity of the glide after they
   // stop (device pixels per ms), the times of the last step and event
@@ -133,7 +134,7 @@ struct vue_input_state {
 
   vue_input_state ()
     : key_time (0), key_stamp (0), mouse_time (0), mouse_x (0), mouse_y (0),
-      mouse_ticket (0),
+      mouse_ticket (0), mouse_clicks (1),
       wheel_est_x (0), wheel_est_y (0), wheel_vx (0), wheel_vy (0),
       wheel_time (0), wheel_event_time (0), wheel_stamp (0),
       wheel_precise (false),
