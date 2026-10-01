@@ -105,9 +105,15 @@
   <\explain>
     <var-val|font-series|medium><explain-synopsis|font weight>
   <|explain>
-    The font series determines the weight of the font. Most fonts only
-    provide <verbatim|regular> and <verbatim|bold> font weights. Some fonts
-    also provide <verbatim|light> as a possible value.
+    The font series determines the weight of the font. Its value is one of
+    <verbatim|thin>, <verbatim|extralight>, <verbatim|light>,
+    <verbatim|medium> (the regular weight), <verbatim|semibold>,
+    <verbatim|bold>, <verbatim|extrabold> and <verbatim|black>, or a number
+    from 1 to 1000, where 400 is the regular weight and 700 the bold one. Many
+    fonts only provide the regular and the bold weight; for a weight which
+    the font does not have, the closest one is taken, or the weight is
+    emulated. A <hlink|variable font|#font-variations> takes a numeric
+    weight exactly.
 
     <\tm-fragment>
       medium, <with|font-series|bold|bold>
@@ -130,6 +136,32 @@
       condensed>>, <with|font-shape|flat|<with|font-family|ss|flat sans
       serif>>, <with|font-shape|long|long>
     </tm-fragment>
+  </explain>
+
+  <\explain>
+    <label|font-variations><var-val|font-variations|><explain-synopsis|axes
+    of variable fonts>
+  <|explain>
+    A <em|variable font> holds a continuum of designs, along axes such as
+    the weight <verbatim|wght>, the width <verbatim|wdth>, the slant
+    <verbatim|slnt> and the optical size <verbatim|opsz>. A font may define
+    axes of its own, whose tags are in capitals, such as <verbatim|GRAD> for
+    the grade; the tags are case sensitive. The value of
+    <src-var|font-variations> is a comma separated list of axes and values,
+    which apply on top of the style that the other font variables select:
+
+    <\tm-fragment>
+      <inactive*|<with|font-variations|wght=550,wdth=87.5|...>>
+    </tm-fragment>
+
+    The value <verbatim|auto> for <verbatim|opsz> stands for the size of the
+    text in points. A value outside the range of its axis is brought back
+    into it, and the axes which the font does not have, as well as the fonts
+    which are not variable, ignore the variable. A weight given here takes
+    precedence over a numeric <src-var|font-series>. The panel
+    <menu|Format|Font variations...> shows the axes of the font at the
+    cursor and sets this variable; <hlink|Selecting
+    fonts|../../fonts/font-selection.en.tm> tells more.
   </explain>
 
   <\explain>

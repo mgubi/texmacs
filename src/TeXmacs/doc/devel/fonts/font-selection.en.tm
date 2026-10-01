@@ -238,7 +238,7 @@
   The variable <verbatim|font-variations> reaches the points in between,
   as a comma separated list of axes and values:
 
-  <	m-fragment>
+  <\tm-fragment>
     <inactive*|<with|font-variations|wght=550,wdth=90|a weight of 550 at
     90% of the normal width>>
   </tm-fragment>
@@ -256,6 +256,22 @@
   <menu|Tools|Fonts|Clear font cache> removes them all.
   Only fonts with <name|TrueType> outlines can be varied.
 
+  The tags of the axes are case sensitive: those of the axes registered by
+  the <name|OpenType> standard are in lower case, those of the axes a font
+  defines for itself in capitals, such as <verbatim|GRAD> for the grade of
+  <name|Roboto Flex> or <verbatim|WONK> in <name|Fraunces>. The panel below
+  shows them as the font writes them.
+
+  Some fonts change the shape of a few characters at some points of their
+  design space, through the <verbatim|FeatureVariations> of their layout
+  tables: <name|Roboto Flex> drops a bar of its dollar sign in heavy
+  weights and narrow widths, and the <verbatim|h>, <verbatim|m> and
+  <verbatim|n> of <name|Fraunces> lean at small optical sizes. Each point
+  takes the shapes it calls for, without anything to set, and so does the
+  default design of a font, which for <name|Fraunces> is one of those
+  points; the features named in <src-var|font-features> are those of the
+  point too.
+
   The series may also be given as a weight, from 1 to 1000, as in
   <verbatim|font-series> <verbatim|550>. A variable font takes that weight
   exactly; a family of static fonts takes the style whose weight is the
@@ -266,9 +282,10 @@
   at the cursor, their ranges and the values in force; a value is typed or
   chosen in the list, or stepped with the <verbatim|->
   and <verbatim|+> buttons, and applies at once to the selection or, when
-  the panel is switched to the whole document, to the initial environment
-  of the document, which is what <menu|Document|Font|Variations...> opens
-  it for. <menu|Reset> removes the variations.
+  <menu|Apply to> is set to <menu|Whole document>, to the initial
+  environment of the document, which is what
+  <menu|Document|Font|Variations...> opens it for. <menu|Reset> removes the
+  variations.
 
   <paragraph*|In markup>
 

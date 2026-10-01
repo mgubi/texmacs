@@ -99,6 +99,48 @@
   fonts may be replaced by closest matches when opening your document under a
   different operating system.
 
+  <paragraph*|Variable fonts>
+
+  Many recent fonts are <em|variable fonts>: a single file holds a whole
+  range of designs, along <em|axes> such as the weight, the width or the
+  optical size. The system fonts of <name|macOS>, most of the <name|Google>
+  fonts and fonts such as <name|Inter>, <name|Roboto Flex> or
+  <name|Junicode> are of this kind. <TeXmacs> uses them as follows.
+
+  <\description>
+    <item*|Styles>The styles which a variable font names, from Thin to Black
+    and, for some fonts, from Condensed to Expanded, appear in the font
+    browser like the styles of any other family, and
+    <with|font-series|bold|bold> text takes the real bold of the font
+    instead of a thickened regular. A variable font which <TeXmacs> saw
+    before it knew about these styles shows only its regular style until you
+    scan the fonts again with <menu|Tools|Fonts|Scan disk for fonts>.
+
+    <item*|Any weight>Besides the usual names, the weight may be a number
+    from 1 to 1000, where 400 is the regular weight and 700 the bold one,
+    given as the value of the environment variable <src-var|font-series>. A
+    variable font takes that weight exactly, and a family of ordinary fonts
+    its closest style.
+
+    <item*|Any design>The entry <menu|Format|Font variations...> opens a
+    panel with the axes of the font at the cursor, their ranges and their
+    values. A value which you type, pick or step with the <verbatim|->
+    and <verbatim|+> buttons applies at once, to the selection, or to the whole
+    document when <menu|Apply to> is set to <menu|Whole document>;
+    <menu|Reset> removes the variations. When complex actions go through
+    the menus, <menu|Document|Font|Variations...> opens the panel for the
+    whole document. Setting the optical size to <verbatim|auto> gives text
+    of every size the design which the font has for that size.
+  </description>
+
+  Some fonts change the shape of a few characters at some points of their
+  design space, such as a dollar sign with a single bar in heavy weights:
+  <TeXmacs> takes the shapes of the design in use, without anything to set.
+  Only fonts with <name|TrueType> outlines can be varied; the others keep
+  their default design. A font which is not variable ignores the
+  variations, so that a document which uses them can still be read on a
+  system where the font is an ordinary one.
+
   Formulas are set in the mathematical font which goes with the main font
   of the document. The section <hlink|<em|Mathematical
   fonts>|../math/fonts/man-math-fonts.en.tm> explains how, shows every
