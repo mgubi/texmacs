@@ -1054,6 +1054,7 @@ edit_env_rep::exec_apply_theme_sub (string var) {
   while (is_compound (val, 1) && !is_func (val, WITH)) {
     string lab= as_string (L(val));
     r << exec_apply_theme_sub (lab);
+    val= val[N(val)-1];
   }
   if (is_func (val, WITH))
     for (int i=0; i+2<N(val); i+=2)
