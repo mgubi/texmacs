@@ -1095,7 +1095,7 @@ edit_env_rep::exec_select_theme_sub (string theme, string from) {
 tree
 edit_env_rep::exec_select_theme (tree t) {
   if (N(t)<1 || !is_atomic (t[0]))
-    return tree (_ERROR, "bad copy-theme");
+    return tree (_ERROR, "bad select-theme");
   string theme= t[0]->label;
   tree r (CONCAT);
   for (int k=1; k<N(t); k++) {
