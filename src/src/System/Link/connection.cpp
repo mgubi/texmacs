@@ -119,10 +119,10 @@ connection_rep::start (bool again) {
 
 void
 connection_rep::write (string s) {
-  ln->write (s, LINK_IN);
   tm_out->bof ();
   tm_err->bof ();
   status= WAITING_FOR_OUTPUT;
+  ln->write (s, LINK_IN);
 }
 
 void
@@ -384,7 +384,9 @@ connection_eval (string name, string session, tree t) {
   // cout << "Evaluating " << name << ", " << session << ", " << t << LF;
   connection con= connection_get (name, session);
   if (is_nil (con)) return "";
+  con->forced_eval= true;
   connection_write (name, session, t);
+  con->forced_eval= false;
   return connection_retrieve (name, session);
 }
 
@@ -393,7 +395,9 @@ connection_eval (string name, string session, string s) {
   // cout << "Evaluating " << name << ", " << session << ", " << s << LF;
   connection con= connection_get (name, session);
   if (is_nil (con)) return "";
+  con->forced_eval= true;
   connection_write (name, session, s);
+  con->forced_eval= false;
   return connection_retrieve (name, session);
 }
 
