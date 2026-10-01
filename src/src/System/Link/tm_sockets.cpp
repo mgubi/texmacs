@@ -26,6 +26,7 @@
 #include "gnutls.hpp"
 #include "websocket_contact.hpp"
 #include "tm_timer.hpp"
+#include "hashset.hpp"
 #include <cctype>
 
 #if defined(OS_MACOS)
@@ -205,6 +206,43 @@ socket_present () {
 
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+// In the browser a socket is a WebSocket (Emscripten), to ws://host:port/
+// or wss://host:port/. A page served over https may open wss only (a ws
+// from it is blocked as mixed content), save to this machine, which the
+// browser trusts: wss to the other hosts then, ws otherwise (a page over
+// http, a server on this machine). ?websocket=wss (or ws) in the address of
+// the page says which, whatever the page (the tests serve it over http)
+EM_JS (int, web_socket_scheme, (const char* host), {
+  var h = UTF8ToString (host);
+  var page = typeof location !== 'undefined' ? location : null;
+  var q = page ? new URLSearchParams (page.search).get ('websocket') : null;
+  var local = /^(localhost|127\.[0-9.]+|::1|\[::1\])$/i.test (h);
+  var scheme = (q === 'wss' || q === 'ws') ? q :
+               (page && page.protocol === 'https:' && !local ? 'wss' : 'ws');
+  if (typeof SOCKFS !== 'undefined') SOCKFS.websocketArgs['url'] = scheme + '://';
+  return scheme === 'wss' ? 1 : 0;
+});
+
+// The browser does not tell a page why a WebSocket failed (security): a
+// connection which fails before any data says where it went, and what may
+// be wrong
+static hashmap<int,string> web_socket_url ("");
+static hashset<int> web_socket_got;
+
+static string
+web_socket_failure (int s) {
+  if (web_socket_got->contains (s) || web_socket_url[s] == "") return "";
+  return " (" * web_socket_url[s] * " could not be opened: no TeXmacs "
+    "server there, one which does not serve WebSocket clients (its "
+    "preference \"server websocket\"), or, for wss, a certificate which "
+    "the browser does not trust)";
+}
+#else
+static string web_socket_failure (int s) { (void) s; return ""; }
+#endif
+
 int try_connect (const char* host, const char* port, int timeout,
                  char* errbuf, size_t errlen) {
 #define MAX_SOCKS 16
@@ -219,6 +257,9 @@ int try_connect (const char* host, const char* port, int timeout,
   hints.ai_next= NULL;
 
   if (errbuf && errlen > 0) errbuf[0]= '\0';
+#ifdef __EMSCRIPTEN__
+  bool wss= web_socket_scheme (host) != 0;
+#endif
 
   int x= GETADDRINFO (host, port, &hints, &result);
   if (x != 0) {
@@ -239,6 +280,11 @@ int try_connect (const char* host, const char* port, int timeout,
       continue;
     }
 
+#ifdef __EMSCRIPTEN__
+    web_socket_url (s)= string (wss ? "wss://" : "ws://") * string (host) *
+                        ":" * string (port) * "/";
+    web_socket_got->remove (s);
+#endif
     int ret= CONNECT (s, rp->ai_addr, rp->ai_addrlen);
     if (ret == 0) {
       // immediate success
@@ -570,6 +616,10 @@ socket_link_rep::resume_start (int s) {
   if (is_active (contact)) {
     connect_data_notifiers();
     enable_write (N(output_buffer) > 0);
+    // what the contact read while it started (the first request of a
+    // client over TLS, read to know what it is) does not make the socket
+    // readable again
+    data_set_ready (s);
   }
 }
 
@@ -597,7 +647,8 @@ socket_link_rep::data_set_ready (int s) {
     DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
       << socket_id << " hung up");
     if (!used_by_server ())
-      io_error << "connection to server '" << host << "' hung up" << LF;
+      io_error << "connection to server '" << host << "' hung up"
+               << web_socket_failure (socket_id) << LF;
     stop ();
   }
   else if (n < 0) {
@@ -608,12 +659,16 @@ socket_link_rep::data_set_ready (int s) {
       if (used_by_server ())
 	io_error << "connection to client " << s << " aborted" << LF;
       else
-        io_error << "connection to server '" << host << "' aborted" << LF;
+        io_error << "connection to server '" << host << "' aborted"
+                 << web_socket_failure (socket_id) << LF;
       stop ();
     }
   }
   else {
     input_buffer << string (data, n);
+#ifdef __EMSCRIPTEN__
+    web_socket_got->insert (socket_id);
+#endif
     if (DEBUG_IO) {
       string s (data, n);
       bool ok= true;
@@ -685,7 +740,8 @@ socket_link_rep::ready_to_send (int s) {
             << as_string (s) << " aborted: " << last_error (contact);
         else
           io_error << "connection to server '"
-            << host << "' aborted: " << last_error (contact);
+            << host << "' aborted: " << last_error (contact)
+            << web_socket_failure (socket_id);
         stop ();
       }
     }
@@ -912,7 +968,8 @@ socket_server_rep::connection (int s) {
               starts (address, "[::ffff:127.");
   tm_contact contact= inner;
   if (ws_mode != "off")
-    contact= make_websocket_server_contact (inner, ws_mode, local);
+    contact= make_websocket_server_contact (inner, is_tls_server,
+                                            authentications, ws_mode, local);
 
   if (!contact.rep) {
     SLOGE ("contact creation failed from " * string_from_socket_address (&cltadd)

@@ -52,7 +52,7 @@ MuPDF writer) in about 4 s, boot included.
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
 | clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac); Edit > Paste from browser... (a dialog of the page: one Paste button) | |
-| remote (TeXmacs server) | client over WebSocket: login, remote files, directories; the servers serve WebSocket clients | `wss` (TLS for the WebSocket); a connection which fails is reported as aborted |
+| remote (TeXmacs server) | client over WebSocket: login, remote files, directories; `wss` from a page over https; the servers serve WebSocket clients, over TLS too; a failed connection says where it went and why it may have failed | |
 
 ## Windows and the frame of the page
 
@@ -359,19 +359,39 @@ branch does.
   WebSocket (the key through SHA-1 and base64, the subprotocol `binary`
   echoed), and the data goes in binary frames (masked by the client,
   control frames answered). Any other client gets the contact of before
-  (TLS or plain, preference `tls-server`), unchanged. A WebSocket client
-  has no TLS of its own within the WebSocket: the connection is encrypted
-  by `wss`, or local. The preference `server websocket` says which are
-  served: `local` (the default: the clients of the same machine), `on`
-  (any: behind a proxy which does the TLS of `wss`), `off`. The same in
-  the Qt port (`Plugins/Qt/QTMSockets.cpp`). The link now reads its
-  contact until it has no more data (`data_set_ready`): a WebSocket frame
-  (or a TLS record) may hold more than one read, and the socket does not
-  say it is readable again for those.
+  (TLS or plain, preference `tls-server`), unchanged. A client which
+  opens with a TLS record (`0x16`) gets a TLS session first (that of the
+  `tls-server` contact, or one of its own when `tls-server` is off), with
+  the certificate of the server (`$TEXMACS_SERVER_CERT_DIR/cert.pem`,
+  `key.pem`), and its first bytes within TLS say it again: `GET ` is a
+  WebSocket over TLS (`wss`), anything else a TeXmacs client over TLS,
+  handed to the `tls-server` contact with what was read of it (refused when
+  `tls-server` is off). A TeXmacs client speaks first (its login), so this
+  never waits for nothing. The preference `server websocket` says which
+  WebSocket clients are served: `local` (the default: the clients of the
+  same machine), `on` (any: over `wss`, or behind a proxy which does the
+  TLS), `off`. The same in the Qt port (`Plugins/Qt/QTMSockets.cpp`). The
+  link reads its contact until it has no more data (`data_set_ready`): a
+  WebSocket frame (or a TLS record) may hold more than one read, and the
+  socket does not say it is readable again for those; for the same reason
+  it reads once as soon as the contact is active (`resume_start`): the
+  first request of a client over TLS was read to know what it is.
+- **Certificate for `wss`**: one the browser trusts, for the name of the
+  host (Let's Encrypt...), ECDSA or RSA: the self-signed certificate
+  TeXmacs generates (`generate-self-signed-certificate`) is Ed25519, which
+  the browsers do not accept for TLS (node does).
 - **Client** (the page): `try_connect` does not wait for the connection
   (the WebSocket opens only when the page has the hand again; what is
   written before is queued), and a login "Password via TLS" goes through a
-  plain contact (`tls_client_start`): accounts need nothing new.
+  plain contact (`tls_client_start`): accounts need nothing new. A page
+  served over https may open `wss` only (a `ws` from it is blocked as mixed
+  content), save to this machine: `try_connect` sets the WebSocket of each
+  connection (`SOCKFS.websocketArgs`), `wss://host:port/` to the other
+  hosts from a page over https, `ws://` otherwise; `?websocket=wss` (or
+  `ws`) in the address of the page says which, whatever the page. The
+  browser does not tell a page why a WebSocket failed: a connection which
+  fails before any data says where it went, and what may be wrong (no
+  server there, `server websocket`, the certificate).
 - **S7** (on which the desktop builds of this branch run, as the page):
   the server logged a failed login with Guile's `strftime`, and formatted
   its errors with Guile's `display-error` (`format-err`): both fixed.
@@ -391,10 +411,22 @@ of the page). Checked on 2026-09-27: all of them, a WebSocket client from
 another address refused with `local` and served with `on`, none with
 `off`; the desktop Vue and the Qt (compiled) ports.
 
-Next: `wss`. A page served over https can open `wss://` only, with a
-certificate the browser trusts: the TeXmacs server doing TLS itself for
-its WebSocket clients (GnuTLS, a real certificate), or behind a proxy
-(Caddy, nginx) with `server websocket` on.
+`wss` (2026-10-01): `wss-cert.sh <home of the server>` puts an ECDSA
+certificate for localhost in place of the Ed25519 one, and
+`browser-run.mjs --insecure --query '?websocket=wss'` runs the scripts
+over `wss` (the page served over http). Checked: from the page, the login
+and the home directory over `wss`, with `tls-server` on and off; from node
+(`client.mjs wss://localhost:6561/` with `NODE_TLS_REJECT_UNAUTHORIZED=0`,
+and a TeXmacs client over TLS: `tls.connect`, the login packet), on the
+same port: `wss`, `ws`, a TeXmacs client over TLS (handed on with
+`tls-server` on, closed with it off), `wss` from another address refused
+with `local`. The headless desktop client (`tls-client.scm` with
+`-headless`) does not finish its TLS handshake: run it with a window.
+
+A server for the page served over https (GitHub Pages): `server
+websocket` on, and a real certificate in `$TEXMACS_SERVER_CERT_DIR`
+(`cert.pem`: the full chain, `key.pem`), or a proxy (Caddy, nginx) on the
+port of the server which does the TLS.
 
 ## The files of TeXmacs in the page
 

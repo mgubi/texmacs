@@ -534,9 +534,14 @@ socket_link_rep::resume_start (int s) {
       return;
     }
   }
-  if (is_active (contact))
-    connect_data_notifiers();
   notifier->setEnabled (true);
+  if (is_active (contact)) {
+    connect_data_notifiers();
+    // what the contact read while it started (the first request of a
+    // client over TLS, read to know what it is) does not make the socket
+    // readable again
+    data_set_ready (s);
+  }
 }
 
 void
@@ -871,7 +876,8 @@ socket_server_rep::connection (int s) {
               starts (address, "[::ffff:127.");
   tm_contact contact= inner;
   if (ws_mode != "off")
-    contact= make_websocket_server_contact (inner, ws_mode, local);
+    contact= make_websocket_server_contact (inner, is_tls_server,
+                                            authentications, ws_mode, local);
 
   if (!contact.rep) {
     SLOGE ("contact creation failed from " * string_from_socket_address (&cltadd)

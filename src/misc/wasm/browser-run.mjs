@@ -20,6 +20,9 @@
 //   --url <address>    the page served there (GitHub Pages), not --dir
 //   --headed           a window on the screen: the clipboard of the system
 //                      (a headless browser has one of its own)
+//   --insecure         certificates which are not trusted are accepted (the
+//                      self-signed one of the test server, for wss: see
+//                      misc/wasm/remote/)
 //   --pref <name>=<v>  a preference of Firefox (several may be given), e.g.
 //                      dom.events.testing.asyncClipboard=true: the reads of
 //                      navigator.clipboard without the Paste prompt
@@ -90,6 +93,7 @@ args.forEach ((a, i) => {
 const browser = await puppeteer.launch ({
   browser: 'firefox', executablePath: browserPath, headless: !process.argv.includes ('--headed'),
   extraPrefsFirefox: prefs,
+  acceptInsecureCerts: process.argv.includes ('--insecure'),
   ...(profile ? { userDataDir: path.resolve (profile) } : {}),
   args: [`--width=${W}`, `--height=${H}`]
 });
