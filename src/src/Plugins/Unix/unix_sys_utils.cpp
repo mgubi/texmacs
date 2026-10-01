@@ -31,7 +31,8 @@ int
 unix_system (string cmd, string& result) {
   url temp= url_temp ();
   string temp_s= escape_sh (concretize (temp));
-  c_string _cmd (cmd * " > " * temp_s * " 2>&1");
+  // group the command, so that its own redirections take precedence
+  c_string _cmd ("{ " * cmd * "\n} > " * temp_s * " 2>&1");
   int ret= system (_cmd);
   bool flag= load_string (temp, result, false);
   remove (temp);
@@ -45,7 +46,7 @@ unix_system (string cmd, string& result, string& error) {
   url tempe= url_temp ();
   string temp_s= escape_sh (concretize (temps));
   string temp_e= escape_sh (concretize (tempe));
-  c_string _cmd (cmd * " > " * temp_s * " 2> " * temp_e);
+  c_string _cmd ("{ " * cmd * "\n} > " * temp_s * " 2> " * temp_e);
   int ret= system (_cmd);
   bool flag= load_string (temps, result, false);
   remove (temps);

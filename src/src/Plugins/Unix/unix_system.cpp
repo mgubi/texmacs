@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "unix_system.hpp"
+#include <fcntl.h>
 #include "config.h"
 
 #include <chrono>
@@ -76,6 +77,25 @@ void texmacs_unlock_file(FILE *&file) {
 
 
 FILE* texmacs_fopen(string filename, string mode, bool lock) {
+  if (lock && mode == "w") {
+    // do not truncate the file before we hold the lock
+    int fd = open(texmacs_utf8_string_to_system_string(filename).c_str(),
+                  O_WRONLY | O_CREAT, 0666);
+    if (fd == -1) return nullptr;
+    FILE *file = fdopen(fd, "w");
+    if (file == nullptr) {
+      close(fd);
+      return nullptr;
+    }
+    texmacs_lock_file(file);
+    struct stat st;
+    if (file != nullptr && fstat(fd, &st) == 0 && S_ISREG(st.st_mode) &&
+        ftruncate(fd, 0) == -1) {
+      texmacs_fclose(file);
+      file = nullptr;
+    }
+    return file;
+  }
   c_string c_mode = mode;
   FILE *file = fopen(texmacs_utf8_string_to_system_string(filename).c_str(),
 		     c_mode);
@@ -154,6 +174,10 @@ int texmacs_stat (string filename, struct_stat* buf) {
   return stat (texmacs_utf8_string_to_system_string (filename).c_str(), buf);
 }
 
+int texmacs_lstat (string filename, struct_stat* buf) {
+  return lstat (texmacs_utf8_string_to_system_string (filename).c_str(), buf);
+}
+
 bool texmacs_mkdir (string dirname, int mode) {
   return mkdir (texmacs_utf8_string_to_system_string (dirname).c_str(), mode) == 0;
 }
@@ -210,8 +234,9 @@ string get_default_theme () {
 url texmacs_get_application_directory () {
   // sometimes, the bin path is set in TEXMACS_BIN_PATH
   string bin_path;
+  // (it is the directory which contains bin/, as in misc/scripts/texmacs.in)
   if (texmacs_getenv ("TEXMACS_BIN_PATH", bin_path))
-    return url (bin_path) * "..";
+    return url_system (bin_path) * "bin";
 #ifdef OS_GNU_LINUX
   // use proc self exe to get the path of the executable
   char path[PATH_MAX+1];
@@ -227,6 +252,7 @@ url texmacs_get_application_directory () {
   string exe_path = path;
   return url_system (exe_path) * "..";
 #endif
+  return url ();
 }
 
 void texmacs_init_guile_hooks() {

@@ -342,7 +342,12 @@ is_of_type (url name, string filter) {
       break;
 #ifndef OS_MINGW
     case 'l':
-      if (err || !S_ISLNK (buf.st_mode)) return false;
+      {
+        // buf follows symbolic links (and may come from the stat cache)
+        struct_stat lbuf;
+        if (texmacs_lstat (concretize (name), &lbuf) != 0 ||
+            !S_ISLNK (lbuf.st_mode)) return false;
+      }
       break;
 #endif
     case 'r':
@@ -393,10 +398,6 @@ bool
 is_newer (url which, url than) {
   struct_stat which_stat;
   struct_stat than_stat;
-  // FIXME: why was this? 
-  if (is_cached ("stat_cache.scm", concretize (which))) return false;
-  if (is_cached ("stat_cache.scm", concretize (than))) return false;
-  // end FIXME
   if (get_attributes (which, &which_stat, true)) return false;
   if (get_attributes (than , &than_stat , true)) return false;
   return which_stat.st_mtime > than_stat.st_mtime;
