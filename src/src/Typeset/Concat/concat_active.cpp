@@ -153,7 +153,11 @@ build_locus (edit_env env, tree t, list<string>& ids, string& col, string &ref, 
         string cb= cork_to_utf8 (as_string (arg[1]));
         if (accessible) {
           if (env->secure ||
-              as_bool (eval ("(secure? '(" * cb * " #f #f #f))")))
+              as_bool (call ("secure?",
+                             cons (symbol_object (cb),
+                                   list_object (object (false),
+                                                object (false),
+                                                object (false))))))
             env->link_env->insert_locus (id, body, cb);
         }
         ids= list<string> (id, ids);
