@@ -76,8 +76,9 @@ remove_buffer (tm_buffer buf) {
     if (bufs[nr] == buf) {
       // (the programs which follow the buffer: language servers)
       call ("notify-buffer-closed", object (as_string (buf->buf->name)));
-      for (int i=0; i<N(buf->vws); i++)
-        delete_view (abstract_view (buf->vws[i]));
+      array<tm_view> vws= copy (buf->vws);
+      for (int i=0; i<N(vws); i++)
+        delete_view (abstract_view (vws[i]));
       if (n == 1 && number_of_servers () == 0)
         get_server () -> quit ();
       for (int i=nr; i<n-1; i++)
