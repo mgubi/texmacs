@@ -32,7 +32,7 @@
              (else #f))))
 
 (plugin-configure xypic
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:require (xypic-exists?))
   (:launch ,(xypic-launcher))
   (:serializer ,xypic-serialize)

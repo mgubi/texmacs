@@ -26,7 +26,7 @@
                      "/plugins/tmpy/session/tm_sympy.py\"")))
 
 (plugin-configure sympy
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:launch ,(sympy-launcher))
   (:serializer ,sympy-serialize)
   (:tab-completion #t)
