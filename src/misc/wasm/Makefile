@@ -52,6 +52,12 @@ OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
 
+# the headers each object includes (obj/....d): a change of a header, of
+# config.h (-include) or of those of MuPDF compiles again the objects which
+# include it, else an object built against the old layout of a class gives
+# "indirect call signature mismatch" at startup
+DEPFLAGS := -MMD -MP
+
 LDFLAGS  := $(OPT) $(EH) -sUSE_SDL=3 -sALLOW_MEMORY_GROWTH=1 \
   -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=16777216 \
   -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1
@@ -130,15 +136,17 @@ $(OUT)/texmacs.js: $(OBJECTS)
 
 $(OBJ)/Plugins/Vue/%.o: $(S)/Plugins/Vue/%.cpp
 	@mkdir -p $(dir $@)
-	em++ $(CPPFLAGS) $(CXXFLAGS) -std=c++20 -c $< -o $@
+	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -std=c++20 -c $< -o $@
 
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
-	em++ $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ)/%.o: $(S)/%.c
 	@mkdir -p $(dir $@)
-	emcc $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+	emcc $(CPPFLAGS) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
+
+-include $(OBJECTS:.o=.d)
 
 clean:
 	rm -rf $(OBJ) $(OUT)

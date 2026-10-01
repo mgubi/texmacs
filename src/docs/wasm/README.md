@@ -127,6 +127,12 @@ Locally:
   pointers and `long` are 4 bytes), in place of what configure writes.
 - `misc/wasm/sources.txt`: the sources, those of a desktop Vue+S7 build
   without the Objective-C (`list-sources.sh` writes it again).
+- Each object has the list of the headers it includes (`obj/....d`, from
+  `-MMD -MP`): a change of a header, of `config.h` or of the headers of
+  MuPDF compiles again the objects which include it. (Before, an object
+  built against the old layout of a class stayed, and the program stopped
+  at startup with "indirect call signature mismatch".) Objects built before
+  have no list: `rm -rf build-wasm/obj` once.
 - MuPDF's model of exceptions and of `setjmp`/`longjmp` is WebAssembly's
   (`-fwasm-exceptions -sSUPPORT_LONGJMP=wasm`): TeXmacs is compiled with the
   same, which rules out ASYNCIFY; the main loop gives control back to the
