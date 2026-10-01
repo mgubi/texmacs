@@ -25,6 +25,11 @@
   <em|inferred> from their macro definitions, and can be refined or frozen
   by <markup|drd-props> declarations in style files.
 
+  This page concentrates on the interplay between macros and the
+  <abbr|DRD>; the complete reference for the <abbr|DRD> subsystem, on the
+  <c++> and on the <scheme> side, is the chapter <hlink|the data relation
+  descriptor (DRD)|drd.en.tm>.
+
   <section|Data structures>
 
   <\explain>
