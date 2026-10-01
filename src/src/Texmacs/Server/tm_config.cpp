@@ -316,6 +316,17 @@ kbd_render (tree t) {
   if (use_macos_fonts ())
     t= tree (WITH, "font", "apple-lucida", "font-family", "rm",
              tree (WITH, "font-size", "0.7", t));
+#ifdef __EMSCRIPTEN__
+  else
+    // the browser: the keys in the font of its menus, Fira Sans, with the
+    // arrows and the technical signs (the keys of a Mac: the command sign,
+    // which Fira and the fonts of the documents lack) from STIX Two Math,
+    // which has them all (their search through the other fonts loaded
+    // half of them in the browser); the family first: after the font, it
+    // made the keys Fira Mono (the keys are in the tt family, render-key)
+    t= tree (WITH, "font-family", "rm",
+             "font", "<#2190>:<#2423>=Stix Two Math,Fira Sans", t);
+#endif
   return compound ("render-key", t);
 }
 
