@@ -43,9 +43,12 @@
 (define-public connection-session (make-ahash-table))
 (define-public connection-scripts (make-ahash-table))
 
-(ahash-set! connection-defined "scheme" "Scheme")
-(ahash-set! connection-session "scheme" "Scheme")
-(ahash-set! connection-scripts "scheme" "Scheme")
+(define (register-scheme-connection)
+  (ahash-set! connection-defined "scheme" "Scheme")
+  (ahash-set! connection-session "scheme" "Scheme")
+  (ahash-set! connection-scripts "scheme" "Scheme"))
+
+(register-scheme-connection)
 
 (define (connection-setup name val . opt)
   (ahash-set! connection-defined name #t)
@@ -358,7 +361,8 @@
   (set! connection-varlist (make-ahash-table))
   (set! connection-handler (make-ahash-table))
   (set! connection-session (make-ahash-table))
-  (set! connection-scripts (make-ahash-table)))
+  (set! connection-scripts (make-ahash-table))
+  (register-scheme-connection))
 
 (define-public (reinit-plugin-cache)
   (reinit-connection)
