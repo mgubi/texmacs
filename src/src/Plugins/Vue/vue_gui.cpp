@@ -3299,8 +3299,8 @@ headless_loop () {
 
 // The characters of a text committed at once (by an input method) are
 // delivered as one key each, as the Qt port does (QTMWidget.cpp): the
-// window takes one key per frame, so the rest waits here and goes before
-// any later event
+// window takes one key per layout, so the rest waits here and goes before
+// any later event (in the browser, several in a frame: web_more_events)
 static array<string> pending_keys;
 static int pending_keys_win= -1;
 
@@ -3355,6 +3355,110 @@ frame_wanted () {
 // shows up in time
 static const time_t vue_idle_frame_dt= 250;
 
+// One event into the input of its window (or the next key of a text
+// committed at once); the wheel and motion events queued behind a wheel or
+// a motion come with it. False when there was none
+static bool
+take_event () {
+  if (deliver_pending_key ()) return true;
+  SDL_Event event;
+  if (!loop_poll (&event)) return false;
+  bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
+                   event.type == SDL_EVENT_MOUSE_MOTION);
+  process_event (&event);
+  gui_needs_update= true;
+  // A frame costs more than the interval between the events of a
+  // trackpad or of a fast pointer: handle the wheel and motion events
+  // which are already queued in this frame too (their deltas add up,
+  // the last position wins), so that the view keeps up with the
+  // fingers. Only when the first event was itself a motion or a wheel:
+  // the motion handler overwrites mouse_action, so batching after a
+  // press or a release would drop it before any widget sees it (a
+  // click on a trackpad almost always comes with a small motion).
+  while (batchable &&
+         SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
+                         SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
+         (event.type == SDL_EVENT_MOUSE_WHEEL ||
+          event.type == SDL_EVENT_MOUSE_MOTION) &&
+         loop_poll (&event)) {
+    process_event (&event);
+  }
+  return true;
+}
+
+// the commands of the editors and of the widgets (exec_delayed)
+static void
+run_commands () {
+  if (is_nil (cmd_list)) return;
+  list<command> l= reverse (cmd_list);
+  cmd_list= list<command> ();
+  while (!is_nil (l)) {
+    if (DEBUG_VUE_WIDGETS) debug_widgets << "run command " << l->item << LF;
+    l->item->apply ();
+    l= l->next;
+  }
+}
+
+#ifdef __EMSCRIPTEN__
+// The browser calls the loop once per frame, and an iteration takes one
+// event: a keystroke is three (its key down, its text, its key up), so a
+// burst of keys (a key held down, fast typing, a text committed at once)
+// came in at a character every three frames, 40 a second at 120 Hz and 20
+// at 60, and the text lagged behind the keys. The keyboard events queued
+// in a frame are therefore taken in that frame: each is handed to the
+// widgets by a layout (a window holds one key at a time, which its widgets
+// read while it is laid out) and followed by the commands it asked for and
+// the interpose handler, as an iteration of the desktop; the editors are
+// repainted and the windows drawn once, after them, as the Qt port does with its queue
+// (process_queued_events). Not past a window which is still to be shown (a
+// key which opened a dialog: the next keys are for it), and within a
+// budget, so that a long burst still shows its progress.
+static const uint64_t web_events_ns= 8000000;
+
+static bool
+keyboard_event (Uint32 type) {
+  return type == SDL_EVENT_KEY_DOWN || type == SDL_EVENT_KEY_UP ||
+         type == SDL_EVENT_TEXT_INPUT || type == SDL_EVENT_TEXT_EDITING;
+}
+
+static bool
+window_to_show () {
+  iterator<int> it= iterate (id_to_window);
+  while (it->busy ()) {
+    vue_window win= (vue_window) id_to_window [it->next ()];
+    if (win != NULL && win->visible_requested && !win->shown) return true;
+  }
+  return false;
+}
+
+static void
+web_more_events () {
+  uint64_t end= vue_now () + web_events_ns;
+  while (vue_now () < end) {
+    SDL_Event next;
+    bool key= N(pending_keys) > 0 ||
+      (SDL_PeepEvents (&next, 1, SDL_PEEKEVENT,
+                       SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
+       keyboard_event (next.type));
+    if (!key) return;
+    uint64_t t_ns= vue_now ();
+    process_layout (); // the event taken last, to its widgets
+    vue_profile_add (VP_LAYOUT, vue_now () - t_ns);
+    run_commands ();
+    // as the step 5 of an iteration: the interpose handler typesets the
+    // editors which changed (apply_changes), which the next key may need
+    // (a cursor motion is ignored in a document not typeset since its last
+    // change: go_left...)
+    deliver_focus ();
+    apply_default_focus ();
+    vue_simple_widget_rep::notify_resizes ();
+    if (the_interpose_handler != NULL) the_interpose_handler ();
+    if (nr_windows == 0 || window_to_show ()) return;
+    if (!take_event ()) return;
+  }
+}
+#endif
+
 // One iteration of the main loop: the events, the layout, the commands, the
 // interpose handler, the repaint of the editors and the redraw of the
 // windows. The desktop calls it in a loop, the browser once per frame (it
@@ -3390,30 +3494,11 @@ loop_iteration () {
 
   // 1. process events
   script_step (); // may push synthetic events
-  SDL_Event event;
-  if (deliver_pending_key ()) active= true;
-  else if (loop_poll (&event)) {
+  if (take_event ()) {
     active= true;
-    bool batchable= (event.type == SDL_EVENT_MOUSE_WHEEL ||
-                     event.type == SDL_EVENT_MOUSE_MOTION);
-    process_event (&event);
-    gui_needs_update= true;
-    // A frame costs more than the interval between the events of a
-    // trackpad or of a fast pointer: handle the wheel and motion events
-    // which are already queued in this frame too (their deltas add up,
-    // the last position wins), so that the view keeps up with the
-    // fingers. Only when the first event was itself a motion or a wheel:
-    // the motion handler overwrites mouse_action, so batching after a
-    // press or a release would drop it before any widget sees it (a
-    // click on a trackpad almost always comes with a small motion).
-    while (batchable &&
-           SDL_PeepEvents (&event, 1, SDL_PEEKEVENT,
-                           SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
-           (event.type == SDL_EVENT_MOUSE_WHEEL ||
-            event.type == SDL_EVENT_MOUSE_MOTION) &&
-           loop_poll (&event)) {
-      process_event (&event);
-    }
+#ifdef __EMSCRIPTEN__
+    web_more_events ();
+#endif
   }
   if (transitions_running ()) {
     // a transition animates: keep the frames coming (paced, woken by events)
@@ -3480,15 +3565,7 @@ loop_iteration () {
   
   // 4. exec commands if present
   uint64_t t_cmd= vue_now ();
-  if (!is_nil (cmd_list)) {
-    list<command> l= reverse(cmd_list);
-    cmd_list= list<command>();
-    while (!is_nil(l)) {
-      if (DEBUG_VUE_WIDGETS) debug_widgets << "run command " << l->item << LF;
-      l->item->apply();
-      l= l->next;
-    }
-  }
+  run_commands ();
   vue_profile_add (VP_COMMANDS, vue_now () - t_cmd);
   
   // 5. interpose

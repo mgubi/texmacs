@@ -46,7 +46,7 @@ MuPDF writer) in about 4 s, boot included.
 |---|---|---|
 | windows | single-window mode: tabs for the windows of the editors, floating dialogs, resized by their frame, their contents scrolled when they do not fit; the frame of the page | |
 | build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4 | `-Oz` and LTO (not measured) |
-| loop | one iteration per frame (`emscripten_set_main_loop`) | all the events of a frame in one iteration |
+| loop | one iteration per frame (`emscripten_set_main_loop`); the keyboard events queued in a frame all handled in it (`web_more_events`: a layout, the commands and the interpose handler for each, one repaint and one redraw), 80 keys in one frame where they took 2 s at 120 Hz | |
 | files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
 | processes | `posix_spawnp` fails cleanly; the plugins which run a program are not offered (their `:require` sees no command), and one started anyway fails at once, its session dead with an error (it froze the page: `fork` fails, and the pipes were read again and again); Scheme sessions work | no external converters offered |
 | file dialogs | the Files panel of the page | |
