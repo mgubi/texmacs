@@ -1151,7 +1151,7 @@ VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val,
 VUE_WIDGET_DATA(filtered_choice_widget_star, command, cb, array<string>, vals, string, val, widget, input);
 // a filtered choice widget with the input field used for the filter
 
-VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content, widget, printer, widget, copies, widget, pages, string, options_for);
+VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content, widget, printer, widget, copies, widget, pages, widget, orientation, string, options_for);
 // a printer widget with the prebuilt dialog contents
 
 VUE_WIDGET_DATA(color_picker_widget_star, command, cmd, bool, bg, array<tree>, proposals, widget, content);
@@ -1411,13 +1411,13 @@ printer_options (string printer) {
 class print_command_rep: public command_rep {
   url file;
   command after;
-  widget printer, copies, pages;
+  widget printer, copies, pages, orientation;
   array<printer_option> options;
 public:
   print_command_rep (url _file, command _after, widget _printer, widget _copies, widget _pages,
-                     array<printer_option> _options):
+                     widget _orientation, array<printer_option> _options):
     file (_file), after (_after), printer (_printer), copies (_copies), pages (_pages),
-    options (_options) {}
+    orientation (_orientation), options (_options) {}
   void apply () {
     string cmd= "lpr";
     string pr= enum_widget_value (printer);
@@ -1429,6 +1429,10 @@ public:
     for (int i= 0; i < N(rg); i++) // digits, commas and dashes only
       if ((rg[i] >= '0' && rg[i] <= '9') || rg[i] == ',' || rg[i] == '-') clean << rg[i];
     if (N(clean) > 0) cmd << " -o page-ranges=" << clean;
+    // the spooler turns the pages (IPP orientation-requested, 4 is
+    // landscape), as the Qt port asks it (QTMPrinterSettings)
+    if (enum_widget_value (orientation) == translate ("Landscape"))
+      cmd << " -o orientation-requested=4";
     for (int i= 0; i < N(options); i++) {
       string v= enum_widget_value (options[i].choice);
       if (N(v) > 0 && v != options[i].def) cmd << " -o " << options[i].key << "=" << escape_sh (v);
@@ -1462,30 +1466,36 @@ system_printers () {
 // the persistent inputs of the printer dialog (kept across the rebuilds of
 // its contents when another printer is chosen)
 static void
-make_printer_inputs (widget& printer, widget& copies, widget& pages) {
+make_printer_inputs (widget& printer, widget& copies, widget& pages, widget& orientation) {
   array<string> printers= system_printers ();
   printer= enum_widget (noop_command (), printers, printers[0], 0, "14em");
   array<string> one; one << string ("1");
   array<string> none; none << string ("");
   copies= input_text_widget (noop_command (), "copies", one, 0, "3em");
   pages= input_text_widget (noop_command (), "pages", none, 0, "8em");
+  array<string> turns;
+  turns << translate ("Portrait") << translate ("Landscape");
+  orientation= enum_widget (noop_command (), turns, turns[0], 0, "14em");
 }
 
 // contents of the dialog shown by printer_widget: the printer, the number
-// of copies, the pages (as lpr's page-ranges: "1-3,7"), the options of the
-// chosen printer (lpoptions), Cancel/Print
+// of copies, the pages (as lpr's page-ranges: "1-3,7"), the orientation,
+// the options of the chosen printer (lpoptions), Cancel/Print
 static widget
-make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies, widget pages) {
+make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies, widget pages,
+                     widget orientation) {
   string pr= enum_widget_value (printer);
   if (pr == translate ("Default printer")) pr= "";
   array<printer_option> options= printer_options (pr);
   array<widget> lhs, rhs;
   lhs << text_widget (translate ("Printer") * ":", 0, black)
       << text_widget (translate ("Copies") * ":", 0, black)
-      << text_widget (translate ("Pages") * ":", 0, black);
+      << text_widget (translate ("Pages") * ":", 0, black)
+      << text_widget (translate ("Orientation") * ":", 0, black);
   rhs << printer << copies
       << horizontal_list (array<widget> (pages, glue_widget (false, false, 8*PIXEL, 0),
-                                         text_widget (translate ("all, or e.g. 1-3,7"), WIDGET_STYLE_GREY, black)));
+                                         text_widget (translate ("all, or e.g. 1-3,7"), WIDGET_STYLE_GREY, black)))
+      << orientation;
   for (int i= 0; i < N(options); i++) {
     options[i].choice= enum_widget (noop_command (), options[i].values, options[i].def, 0, "14em");
     lhs << text_widget (translate (options[i].label) * ":", 0, black);
@@ -1495,7 +1505,8 @@ make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies
   buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", WIDGET_STYLE_BUTTON)
           << glue_widget (false, false, 8*PIXEL, 0)
           << menu_button (text_widget (translate ("Print"), 0, black),
-                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages, options),
+                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages,
+                                                             orientation, options),
                           "", "", WIDGET_STYLE_BUTTON);
   array<widget> rows;
   rows << text_widget (translate ("Print document") * ": " * as_string (tail (ps_pdf_file)), 0, black)
@@ -1694,11 +1705,13 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   }
   if (type == "printer_widget") {
     vue_printer_widget d= open_box<vue_printer_widget> (data);
-    widget printer, copies, pages;
-    make_printer_inputs (printer, copies, pages);
+    widget printer, copies, pages, orientation;
+    make_printer_inputs (printer, copies, pages, orientation);
     vue_printer_widget_star dd { .cmd= d.cmd, .ps_pdf_file= d.ps_pdf_file,
-                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file, printer, copies, pages),
+                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file, printer, copies,
+                                                                pages, orientation),
                                  .printer= printer, .copies= copies, .pages= pages,
+                                 .orientation= orientation,
                                  .options_for= enum_widget_value (printer) };
     data= close_box (dd);
     return;
@@ -3515,9 +3528,10 @@ vue_ui_rep::do_layout () {
     vue_printer_widget_star d= open_box<vue_printer_widget_star> (data);
     if (enum_widget_value (d.printer) != d.options_for) {
       // another printer: its options replace the previous ones (the inputs
-      // for the printer, the copies and the pages are kept)
+      // for the printer, the copies, the pages and the orientation are kept)
       d.options_for= enum_widget_value (d.printer);
-      d.content= make_printer_dialog (d.cmd, d.ps_pdf_file, d.printer, d.copies, d.pages);
+      d.content= make_printer_dialog (d.cmd, d.ps_pdf_file, d.printer, d.copies, d.pages,
+                                      d.orientation);
       data= close_box (d);
       layout_again= true; // the window is sized to the new contents
     }
