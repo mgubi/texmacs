@@ -29,6 +29,8 @@
 
     <branch|The abstract widget system|widgets.en.tm>
 
+    <branch|The graphical user interface ports|guiports.en.tm>
+
     <branch|The graphical user interface (historical Widkit toolkit)|gui.en.tm>
 
     <branch|The graphics editor|graphics-editor.en.tm>

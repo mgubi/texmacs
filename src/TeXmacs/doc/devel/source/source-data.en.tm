@@ -22,6 +22,8 @@
     <branch|The <LaTeX> and <name|HTML> converters|convert.en.tm>
 
     <branch|The database and bibliographies|database.en.tm>
+
+    <branch|The BibTeX engine and bibliography styles|bibtex.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
