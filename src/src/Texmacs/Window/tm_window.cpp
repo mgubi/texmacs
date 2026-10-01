@@ -394,11 +394,11 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   the_drd= old_drd;
   //if (which == 10) cout << "xmenu= " << xmenu << "\n";
   //cout << "xmenu= " << xmenu << "\n";
+  if (menu_current[which] == xmenu) return false;
   if (menu_cache->contains (xmenu)) {
     //if (menu_current[which] == xmenu) cout << "Same " << menu << "\n";
     //if (which == 10) cout << which << " -> cached? " << (menu_current[which] == xmenu? "yes": "no") << LF;
     //cout << which << " -> cached? " << (menu_current[which] == xmenu) << LF;
-    if (menu_current[which] == xmenu) return false;
     if (which < 10) {
       menu_current (which)= xmenu;
       //cout << "Cached " << menu << "\n";

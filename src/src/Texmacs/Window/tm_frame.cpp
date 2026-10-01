@@ -18,7 +18,8 @@
 ******************************************************************************/
 
 tm_frame_rep::tm_frame_rep ():
-  full_screen (false), full_screen_edit (false), dialogue_win () {}
+  full_screen (false), full_screen_edit (false),
+  saved_header (true), saved_footer (true), dialogue_win () {}
 tm_frame_rep::~tm_frame_rep () {}
 
 /******************************************************************************
@@ -230,31 +231,37 @@ tm_frame_rep::get_window_zoom_factor () {
 
 void
 tm_frame_rep::get_visible (SI& x1, SI& y1, SI& x2, SI& y2) {
+  if (!has_current_window ()) { x1= y1= x2= y2= 0; return; }
   concrete_window () -> get_visible (x1, y1, x2, y2);
 }
 
 void
 tm_frame_rep::set_scrollbars (int sb) {
+  if (!has_current_window ()) return;
   concrete_window () -> set_scrollbars (sb);
 }
 
 void
 tm_frame_rep::scroll_where (SI& x, SI& y) {
+  if (!has_current_window ()) { x= y= 0; return; }
   concrete_window () -> get_scroll_pos (x, y);
 }
 
 void
 tm_frame_rep::scroll_to (SI x, SI y) {
+  if (!has_current_window ()) return;
   concrete_window () -> set_scroll_pos (x, y);
 }
 
 void
 tm_frame_rep::get_extents (SI& x1, SI& y1, SI& x2, SI& y2) {
+  if (!has_current_window ()) { x1= y1= x2= y2= 0; return; }
   concrete_window () -> get_extents (x1, y1, x2, y2);
 }
 
 void
 tm_frame_rep::set_extents (SI x1, SI y1, SI x2, SI y2) {
+  if (!has_current_window ()) return;
   concrete_window () -> set_extents (x1, y1, x2, y2);
 }
 
@@ -285,13 +292,18 @@ tm_frame_rep::recall_message () {
 void
 tm_frame_rep::full_screen_mode (bool on, bool edit) {
   if (!has_current_window ()) return;
+  bool hidden= full_screen && !full_screen_edit;
   if (on && !edit) {
+    if (!hidden) {
+      saved_header= visible_header ();
+      saved_footer= visible_footer ();
+    }
     show_header (false);
     show_footer (false);
   }
-  else {
-    show_header (true);
-    show_footer (true);
+  else if (hidden) {
+    show_header (saved_header);
+    show_footer (saved_footer);
   }
   set_full_screen (concrete_window () -> win, on);
   get_current_editor () -> full_screen_mode (on && !edit);
