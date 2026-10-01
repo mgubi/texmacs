@@ -275,6 +275,8 @@ connection_start (string name, string session, bool again) {
         make_dynamic_link (t[1]->label, t[2]->label, t[3]->label, session);
       con= tm_new<connection_rep> (name, session, ln);
     }
+    else if (!is_tuple (t, "cmdline") && !is_tuple (t, "request"))
+      return "Error: unsupported link type for connection " * name;
     con->info= t;
   }
 
