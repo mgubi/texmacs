@@ -318,12 +318,27 @@ kbd_render (tree t) {
              tree (WITH, "font-size", "0.7", t));
 #ifdef __EMSCRIPTEN__
   else
-    // the browser: the keys in the font of its menus, Fira Sans, with the
-    // arrows and the technical signs (the keys of a Mac: the command sign,
-    // which Fira and the fonts of the documents lack) from STIX Two Math,
-    // which has them all (their search through the other fonts loaded
-    // half of them in the browser); the family first: after the font, it
-    // made the keys Fira Mono (the keys are in the tt family, render-key)
+    // The browser has no Lucida Grande: the keys are drawn in the font of
+    // its menus, Fira Sans (see get_default_font in vue_gui.cpp).
+    //
+    // Why a font for the symbols: with the look and feel of a Mac the keys
+    // are written with the symbols of the Mac (the command sign, the option
+    // sign, the arrows: U+2190 to U+2423, see system_kbd_initialize), which
+    // neither Fira nor the fonts of the documents have. A glyph missing in
+    // a font is searched through the other fonts of TeXmacs, and in the
+    // browser each font tried is downloaded first: a single command sign
+    // on the welcome page fetched eight fonts (4 MB) before one had it.
+    // STIX Two Math has all these symbols.
+    //
+    // Why the range: a plain list "Fira Sans,Stix Two Math" does not do it,
+    // since the fallbacks of Fira Sans itself (Fira Math, Biolinum) are
+    // tried before the next font of the list; "<#2190>:<#2423>=..." sends
+    // that range to STIX Two Math first (see smart_font_rep::resolve),
+    // scaled to the size of Fira.
+    //
+    // Why the family before the font: render-key puts the keys in the tt
+    // family, and with "font-family" "rm" after "font" the keys were still
+    // drawn in Fira Mono.
     t= tree (WITH, "font-family", "rm",
              "font", "<#2190>:<#2423>=Stix Two Math,Fira Sans", t);
 #endif
