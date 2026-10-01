@@ -104,10 +104,23 @@ mupdf_screen_colorspace () {
 #endif
 }
 
+picture raw_load_xpm (url file_name); // Graphics/Pictures
+
 bool
 mupdf_image_size (url u, int& w, int& h) {
   fz_context* ctx= mupdf_context ();
   string suf= locase_all (suffix (u));
+  if (suf == "xpm") {
+    // MuPDF has no XPM: the size of the icon's svg or 1x png beside it
+    // (misc/pixmaps, the icons of the manuals), else that of our reader
+    url base= unglue (u, 4);
+    url svg= glue (base, ".svg"), png= glue (base, ".png");
+    if (exists (svg) && mupdf_image_size (svg, w, h)) return true;
+    if (exists (png) && mupdf_image_size (png, w, h)) return true;
+    picture p= raw_load_xpm (u);
+    w= p->get_width (); h= p->get_height ();
+    return w > 0 && h > 0;
+  }
   c_string path (concretize (u));
   if (suf == "pdf" || suf == "svg") {
     float fw= 0, fh= 0;
@@ -528,8 +541,21 @@ mupdf_load_image (url u) {
   return im;
 }
 
+static fz_pixmap* mupdf_apply_effect (fz_pixmap* pix, tree eff, SI pixel);
+
 fz_pixmap*
 mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
+  // a vector picture asked at a size is drawn at that size, rather than at
+  // its own and then scaled, which blurs it: an svg, or the svg an icon has
+  // beside its xpm (misc/pixmaps: the icons the manuals show)
+  url vec= u;
+  if (suffix (u) == "xpm" && exists (glue (unglue (u, 4), ".svg")))
+    vec= glue (unglue (u, 4), ".svg");
+  fz_pixmap* drawn= NULL;
+  if (suffix (vec) == "svg" && w > 0 && h > 0)
+    drawn= mupdf_render_svg (vec, w, h, 1);
+  if (drawn != NULL) return mupdf_apply_effect (drawn, eff, pixel);
+
   fz_image *im = mupdf_load_image (u);
 
   if (im == NULL) {
@@ -569,8 +595,12 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
     }
     else cout << "TeXmacs] warning: cannot scale " << concretize (u) << "\n";
   }
+  return mupdf_apply_effect (pix, eff, pixel);
+}
 
-  // Build effect
+// the effect eff applied to pix (which it takes), for mupdf_load_pixmap
+static fz_pixmap*
+mupdf_apply_effect (fz_pixmap* pix, tree eff, SI pixel) {
   if (eff != "") {
     effect e= build_effect (eff);
     picture src= mupdf_picture (pix, 0, 0);

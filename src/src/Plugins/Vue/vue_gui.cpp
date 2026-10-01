@@ -2832,6 +2832,7 @@ static string print_key_info ( SDL_KeyboardEvent *key );
 
 void process_event (SDL_Event *event);
 void close_help_balloon ();
+void dismiss_wait_indicator ();
 
 // The payloads of the drops, read back by call_drop_event (edit_mouse.cpp)
 // through the ticket carried by the "drop" mouse action.
@@ -4429,6 +4430,7 @@ process_event (SDL_Event *event) {
       win= get_window_from_ID (event->button.windowID);
       float bx= event->button.x, by= event->button.y;
       bool down= (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+      if (down) dismiss_wait_indicator ();
       win= route_pointer (win, bx, by, down ? 1 : 2);
       if (win && popup_grab (win, bx, by, down)) {
         // the button of the event, whatever the state says by now (a
@@ -4492,6 +4494,7 @@ process_event (SDL_Event *event) {
     case SDL_EVENT_KEY_DOWN:
     {
       close_help_balloon ();
+      dismiss_wait_indicator ();
       if (DEBUG_VUE_EVENTS) {
         c_string buf (print_key_info (&(event->key)));
         SDL_Log ("Keydown: %s ", (char*) buf);
@@ -5336,10 +5339,32 @@ void show_help_balloon (widget balloon, SI x, SI y) {
   set_visibility (help_balloon_wid, true);
 }
 
+static void
+close_wait_window () {
+  if (is_nil (wait_indicator_wid)) return;
+  set_visibility (wait_indicator_wid, false);
+  destroy_window_widget (wait_indicator_wid);
+  wait_indicator_wid= widget ();
+}
+
+// A key or a click: the loop takes events again, so the operation which
+// asked for the wait indicator is over, and the messages it did not take
+// back go (the manuals push one per pass and never pop them; the last one,
+// "Finishing manual", stayed on the screen)
+void
+dismiss_wait_indicator () {
+  if (is_nil (wait_messages)) return;
+  wait_messages= list<string> ();
+  close_wait_window ();
+}
+
 void show_wait_indicator (widget base, string message, string argument) {
   // Display a wait indicator with a message and an optional argument, at
   // the centre of the window which triggered the lengthy operation; an
-  // empty message pops the last one (the calls are nested)
+  // empty message pops the last one (the calls are nested). It is a panel
+  // with the icon of TeXmacs, the outermost operation in bold and, when
+  // operations are nested, the innermost one under it (as the Qt port
+  // shows the first and the last message)
   (void) base;
   if (is_headless ()) return;
   if (N(message) > 0) {
@@ -5349,15 +5374,26 @@ void show_wait_indicator (widget base, string message, string argument) {
   }
   else if (!is_nil (wait_messages)) wait_messages= wait_messages->next;
 
-  if (!is_nil (wait_indicator_wid)) {
-    set_visibility (wait_indicator_wid, false);
-    destroy_window_widget (wait_indicator_wid);
-    wait_indicator_wid= widget ();
-  }
+  close_wait_window ();
   if (is_nil (wait_messages) || !has_current_window ()) return;
 
-  widget lab= text_widget (wait_messages->item, 0, black);
-  wait_indicator_wid= popup_window_widget (lab, "Wait");
+  string outer= wait_messages->item, inner;
+  for (list<string> l= wait_messages; !is_nil (l); l= l->next) outer= l->item;
+  if (!is_nil (wait_messages->next)) inner= wait_messages->item;
+  array<widget> lines;
+  lines << text_widget (outer, WIDGET_STYLE_BOLD, black);
+  if (N(inner) > 0)
+    lines << glue_widget (false, false, 0, 3*PIXEL)
+          << text_widget (inner, WIDGET_STYLE_GREY, black);
+  else
+    lines << glue_widget (false, false, 0, 3*PIXEL)
+          << text_widget (translate ("Please wait"), WIDGET_STYLE_GREY, black);
+  array<widget> row;
+  row << xpm_widget (url_system ("$TEXMACS_PATH/misc/images/texmacs-vue-64.png"))
+      << glue_widget (false, false, 14*PIXEL, 0)
+      << vertical_list (lines);
+  widget panel= division_widget ("wait-panel", horizontal_list (row));
+  wait_indicator_wid= popup_window_widget (panel, "Wait");
   SI wx= 0, wy= 0, ww= 0, wh= 0;
   widget win= get_window (concrete_window () -> win);
   get_position (win, wx, wy);
@@ -5365,8 +5401,14 @@ void show_wait_indicator (widget base, string message, string argument) {
   set_position (wait_indicator_wid, wx + ww/2, wy - wh/2);
   set_visibility (wait_indicator_wid, true);
   // the window must appear now: the operation which asked for it is about
-  // to block the loop
+  // to block the loop. It is centred once laid out, when its size is known
   process_layout ();
+  SI pw= 0, ph= 0;
+  get_size (wait_indicator_wid, pw, ph);
+  if (pw > 0 && ph > 0) {
+    set_position (wait_indicator_wid, wx + (ww - pw)/2, wy - (wh - ph)/2);
+    process_layout ();
+  }
   process_redraw ();
 }
 
