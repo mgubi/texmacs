@@ -259,9 +259,12 @@ clipboard: the last copy of TeXmacs, or what the last paste event brought.
   once for the permission): the menu of TeXmacs runs its command a frame
   after the click, where Safari refuses. The paste key in the dialog (or
   the Paste of a long press on a touch screen) is a paste event in a text
-  area out of sight, which needs no permission. What comes becomes the
-  page's clipboard, and the dialog then runs the Scheme command of the
-  paste (`clipboard-paste-browser`, `selections.scm`). The entries are
+  area out of sight, which needs no permission. The dialog has the formats
+  of Paste from (Default, Html, LaTeX, Verbatim...), starting on the one of
+  the menu; an Html paste takes the HTML of the clipboard, not its text.
+  What comes becomes the page's clipboard, and the dialog then runs the
+  Scheme command of the paste in the chosen format
+  (`clipboard-paste-browser`, `selections.scm`). The entries are
   there only when `web-paste-dialog` is defined (the browser build).
 
 ## Printing

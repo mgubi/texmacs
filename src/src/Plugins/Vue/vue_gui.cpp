@@ -2591,16 +2591,22 @@ web_open_external_s7 (s7_scheme* sc, s7_pointer args) {
   return s7_unspecified (sc);
 }
 
-EM_JS (void, vue_web_paste_dialog, (const char* cmd), {
-  if (typeof tmClipboard !== 'undefined') tmClipboard.fromBrowser (UTF8ToString (cmd));
+EM_JS (void, vue_web_paste_dialog, (const char* choices, int chosen), {
+  if (typeof tmClipboard !== 'undefined')
+    tmClipboard.fromBrowser (UTF8ToString (choices), chosen);
 });
 
-// (web-paste-dialog cmd): Edit > Paste from browser, the dialog of the page
-// which gets the clipboard of the browser (a menu has no paste event), and
-// then runs the Scheme command cmd, which pastes it (misc/wasm/clipboard.js)
+// (web-paste-dialog choices chosen): Edit > Paste from browser, the dialog
+// of the page which gets the clipboard of the browser (a menu has no paste
+// event), and then runs the Scheme command which pastes it in the format
+// chosen there (misc/wasm/clipboard.js). choices: one format a line, its
+// name and its command separated by a tab, in UTF-8; chosen: the one
+// selected at first
 static s7_pointer
 web_paste_dialog_s7 (s7_scheme* sc, s7_pointer args) {
-  vue_web_paste_dialog (s7_string (s7_car (args)));
+  s7_pointer n= s7_cadr (args);
+  vue_web_paste_dialog (s7_string (s7_car (args)),
+                        s7_is_integer (n) ? (int) s7_integer (n) : 0);
   return s7_unspecified (sc);
 }
 #endif
@@ -2618,8 +2624,9 @@ void gui_open (int& argc, char** argv) {
     s7_define_function (tm_s7, "web-open-external", web_open_external_s7, 3, 0, false,
                         "(web-open-external target file? name): a link left to the browser");
   if (tm_s7 != NULL)
-    s7_define_function (tm_s7, "web-paste-dialog", web_paste_dialog_s7, 1, 0, false,
-                        "(web-paste-dialog cmd): the clipboard of the browser, then cmd");
+    s7_define_function (tm_s7, "web-paste-dialog", web_paste_dialog_s7, 2, 0, false,
+                        "(web-paste-dialog choices chosen): the clipboard of the browser, "
+                        "pasted in a format chosen among choices");
 #endif
 #ifdef __EMSCRIPTEN__
   {
@@ -5064,6 +5071,16 @@ bool get_selection (string key, tree& t, string& s, string format) {
         SDL_free (data_ptr);
       }
     }
+  }
+  else if (format == "html" && SDL_HasClipboardData ("text/html")) {
+    // the HTML of the clipboard, when it has some (a page of a browser):
+    // its text would lose the markup the import is asked for
+    data_ptr = SDL_GetClipboardData ("text/html", &data_size);
+    if (data_ptr) {
+      s = string ((char*)data_ptr, data_size);
+      SDL_free (data_ptr);
+    }
+    if (seems_buggy_html_paste (s)) s = correct_buggy_html_paste (s);
   }
   else {
     // For other formats, get plain text

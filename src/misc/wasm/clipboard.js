@@ -192,10 +192,18 @@ var tmClipboard = (function () {
   // a frame later, outside of it. Enter does the same, and the paste key
   // (or the Paste of a long press, on a touch screen) is a paste event,
   // which needs no permission, in a hidden text area which has the focus.
-  // What comes becomes the page's clipboard, and the Scheme command cmd
-  // pastes it.
-  function fromBrowser (cmd) {
+  // What comes becomes the page's clipboard, and the Scheme command of the
+  // format chosen in the dialog pastes it. choices: one format a line, its
+  // name and its command separated by a tab (clipboard-paste-browser,
+  // selections.scm); chosen: the line selected at first.
+  function fromBrowser (choices, chosen) {
     if (typeof tmFrame === 'undefined') return;
+    var formats = String (choices).split ('\n').map (function (l) {
+      var i = l.indexOf ('\t');
+      return i < 0 ? { name: '', cmd: l } : { name: l.slice (0, i), cmd: l.slice (i + 1) };
+    }).filter (function (f) { return f.cmd; });
+    if (formats.length === 0) return;
+    var cmd = formats[Math.max (0, Math.min (chosen | 0, formats.length - 1))].cmd;
     var got = false, before = document.activeElement, enter = null;
     tmFrame.dialog ('Paste from the browser', function (box, close) {
       var key = mac ? '\u2318V' : 'Ctrl+V';
@@ -210,6 +218,24 @@ var tmClipboard = (function () {
       }
       p (null, api ? 'Paste what was copied in another page or program (or press ' + key + ').'
                    : 'Press ' + key + ' to paste what was copied in another page or program.');
+      // the format of the paste, among those of Edit > Paste from
+      if (formats.length > 1) {
+        var row = document.createElement ('label');
+        row.className = 'tm-format';
+        row.appendChild (document.createTextNode ('Format: '));
+        var pick = document.createElement ('select');
+        formats.forEach (function (f) {
+          var o = document.createElement ('option');
+          o.textContent = f.name;
+          o.value = f.cmd;
+          if (f.cmd === cmd) o.selected = true;
+          pick.appendChild (o);
+        });
+        // the focus goes back to the text area, for the paste key
+        pick.onchange = function () { cmd = pick.value; area.focus ({ preventScroll: true }); };
+        row.appendChild (pick);
+        box.appendChild (row);
+      }
       var note = p ('tm-note', '');
       // the paste key: a paste event in a text area out of sight
       var area = document.createElement ('textarea');
@@ -246,7 +272,8 @@ var tmClipboard = (function () {
       // Enter: on the window before the dialog, which keeps the keys from
       // the page (frame.js)
       enter = function (e) {
-        if (e.key === 'Enter' && api && e.type === 'keydown' && e.target !== no) {
+        if (e.key === 'Enter' && api && e.type === 'keydown' && e.target !== no &&
+            e.target.tagName !== 'SELECT') {
           e.preventDefault ();
           read ();
         }

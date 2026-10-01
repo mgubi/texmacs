@@ -107,6 +107,8 @@ var tmFrame = (function () {
     #tm-about input { width:100%; box-sizing:border-box; font:13px ui-monospace,Menlo,monospace;
       padding:4px 6px; border:1px solid #999; border-radius:4px }
     #tm-about .tm-note { font-size:12.5px; color:#666 }
+    #tm-about .tm-format { display:block; margin:10px 0 0; font-size:13px }
+    #tm-about .tm-format select { margin-left:4px; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif }
   `;
 
   function build () {
