@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "tm_config.hpp"
+#include "iterator.hpp"
 #include "analyze.hpp"
 
 #ifdef Q_OS_MAC
@@ -258,6 +259,21 @@ system_kbd_initialize (hashmap<string,tree>& h) {
     h ("section")= "\237";
     h ("<less>")= "<#3C>";
     h ("<gtr>")= "<#3E>";
+    if (!use_macos_fonts ()) {
+      // the browser of a Mac (use_macos_keys): no Lucida Grande, and the
+      // fonts of the documents have no command sign, whose search through
+      // the other fonts loaded half of them in the browser; the symbols
+      // come from STIX Two Math, which has them all (translate drops the
+      // font: the menus get the symbols alone)
+      iterator<string> it= iterate (h);
+      array<string> keys;
+      while (it->busy ()) keys << it->next ();
+      for (int i= 0; i < N(keys); i++) {
+        tree v= h[keys[i]];
+        if (is_atomic (v) && starts (v->label, "<#2"))
+          h (keys[i])= tree (WITH, "font", "Stix Two Math", v);
+      }
+    }
   }
   else if (gui_is_qt ()) {
     h ("S-")= localize ("Shift::keyboard", true);
