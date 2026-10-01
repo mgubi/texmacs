@@ -85,19 +85,21 @@ decode_base64 (string s) {
   array<int> tmp;
   int i, n= N(s), cnt=0;
   for (i=0; i<n && !end; i++) {
-    if (b64_to_int[(int)s[i]] != '?') {
-      tmp << (int)s[i];
+    unsigned char c= s[i];
+    if (c < 128 && b64_to_int[(int) c] != '?') {
+      tmp << (int) c;
       cnt++;
     }
-    else if (s[i] == '=') {
+    else if (c == '=') {
       end= true;
     }
 
     if (cnt == 4 || end) {
-      r << decode_base64 (tmp);
+      if (N(tmp) >= 2) r << decode_base64 (tmp);
       cnt= 0;
       tmp= array<int> ();
     }
   }
+  if (N(tmp) >= 2) r << decode_base64 (tmp);
   return r;
 }

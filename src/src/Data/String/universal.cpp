@@ -195,9 +195,9 @@ string
 uni_locase_char (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
-    if ((is_iso_upcase (c)) ||
-        (c >= ((unsigned char) 0x80) && (c <= ((unsigned char) 0x9F))) ||
-        (c >= ((unsigned char) 0xC0) && (c <= ((unsigned char) 0xDF))))
+    if (c == ((unsigned char) 0x9D)) return "i"; // I with dot above
+    if (c == ((unsigned char) 0x9E)) return s;   // d with stroke
+    if (is_iso_upcase (c))
       return string ((char) (c + 0x20));
     return s;
   }
@@ -246,9 +246,8 @@ string
 uni_upcase_char (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
-    if ((is_iso_locase (c)) ||
-        (c >= ((unsigned char) 0xA0) && (c <= ((unsigned char) 0xBF))) ||
-        (c >= ((unsigned char) 0xE0)))
+    if (c == ((unsigned char) 0x9E)) return string ((char) 0xD0); // D stroke
+    if (is_iso_locase (c))
       return string ((char) (c - 0x20));
     return s;
   }
@@ -457,7 +456,11 @@ uni_is_letter (string s) {
     unsigned char c= s[0];
     return
       is_alpha (c) ||
-      (((unsigned int) c) >= 128 && (((unsigned int) c) & 97) != 31);
+      (((unsigned int) c) >= 128 &&
+       c != ((unsigned char) 0x9F) && // section sign
+       c != ((unsigned char) 0xBD) && // inverted exclamation mark
+       c != ((unsigned char) 0xBE) && // inverted question mark
+       c != ((unsigned char) 0xBF));  // pound sign
   }
   else if (starts (s, "<#") && ends (s, ">")) {
     int code= from_hexadecimal (s (2, N(s) - 1));

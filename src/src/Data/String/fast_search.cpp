@@ -86,6 +86,7 @@ string_searcher_rep::search_sub (string what) {
   }
   int k=1, l=0;
   while ((k<<1) <= N(what)) { k <<= 1; l++; }
+  if (l >= N(a)) return array<int> ();
   int code= fast_hash (what (0, k));
   if (!a[l]->contains (code)) return array<int> ();
   else return a[l][code];
