@@ -106,10 +106,6 @@ var tmFrame = (function () {
     #tm-about .tm-default:hover { background:#6a8db5 }
     #tm-about input { width:100%; box-sizing:border-box; font:13px ui-monospace,Menlo,monospace;
       padding:4px 6px; border:1px solid #999; border-radius:4px }
-    #tm-about textarea.tm-paste { display:block; width:100%; box-sizing:border-box; height:64px;
-      margin:10px 0 2px; padding:8px; resize:none; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
-      border:1px dashed #8aa3c0; border-radius:6px; background:#fff; color:#222; text-align:center }
-    #tm-about textarea.tm-paste:focus { outline:none; border-style:solid; border-color:#5b7fa8 }
     #tm-about .tm-note { font-size:12.5px; color:#666 }
   `;
 

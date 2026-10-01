@@ -51,7 +51,7 @@ MuPDF writer) in about 4 s, boot included.
 | processes | `posix_spawnp` fails cleanly; the plugins which run a program are not offered (their `:require` sees no command), and one started anyway fails at once, its session dead with an error (it froze the page: `fork` fails, and the pipes were read again and again); Scheme sessions work | no external converters offered |
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
-| clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac); Edit > Paste from browser... (a dialog of the page) | |
+| clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac); Edit > Paste from browser... (a dialog of the page: one Paste button) | |
 | remote (TeXmacs server) | client over WebSocket: login, remote files, directories; the servers serve WebSocket clients | `wss` (TLS for the WebSocket); a connection which fails is reported as aborted |
 
 ## Windows and the frame of the page
@@ -252,14 +252,17 @@ clipboard: the last copy of TeXmacs, or what the last paste event brought.
   knows, the last copy or paste, at once. **Edit > Paste from browser...**
   (and Edit > Paste from browser as, with the formats of Paste from, in the
   detailed menus) asks the browser instead, in a dialog of the page
-  (`web-paste-dialog`, `vue_gui.cpp`; `tmClipboard.fromBrowser`): the paste
-  key in its text area (or the Paste of a long press on a touch screen) is a
-  paste event, which needs no permission; its button "Read the clipboard"
-  calls `navigator.clipboard.read` (or `readText`), which the browser may ask
-  the user to confirm. What comes becomes the page's clipboard, and the
-  dialog then runs the Scheme command of the paste
-  (`clipboard-paste-browser`, `selections.scm`). The entries are there only
-  when `web-paste-dialog` is defined (the browser build).
+  (`web-paste-dialog`, `vue_gui.cpp`; `tmClipboard.fromBrowser`) with one
+  button, Paste. Its click (or Enter) calls `navigator.clipboard.read` (or
+  `readText`) in the handler of the gesture, which is the only place the
+  browsers allow it (Safari then shows its own Paste button, Chrome asks
+  once for the permission): the menu of TeXmacs runs its command a frame
+  after the click, where Safari refuses. The paste key in the dialog (or
+  the Paste of a long press on a touch screen) is a paste event in a text
+  area out of sight, which needs no permission. What comes becomes the
+  page's clipboard, and the dialog then runs the Scheme command of the
+  paste (`clipboard-paste-browser`, `selections.scm`). The entries are
+  there only when `web-paste-dialog` is defined (the browser build).
 
 ## Printing
 

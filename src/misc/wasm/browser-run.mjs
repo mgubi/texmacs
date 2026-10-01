@@ -20,6 +20,9 @@
 //   --url <address>    the page served there (GitHub Pages), not --dir
 //   --headed           a window on the screen: the clipboard of the system
 //                      (a headless browser has one of its own)
+//   --pref <name>=<v>  a preference of Firefox (several may be given), e.g.
+//                      dom.events.testing.asyncClipboard=true: the reads of
+//                      navigator.clipboard without the Paste prompt
 //   --script <file>    actions after the load, one per line (# comments):
 //                        wait <ms> | shot <name> | click <x> <y> | rclick <x> <y> |
 //                        hold <key> | release <key> (a modifier held over clicks) |
@@ -77,8 +80,16 @@ const url = opt ('--url', null) ? opt ('--url', null) + query
 
 const profile = opt ('--profile', null);
 if (profile) fs.mkdirSync (profile, { recursive: true });
+const prefs = {};
+args.forEach ((a, i) => {
+  if (a !== '--pref') return;
+  const [k, ...v] = args[i + 1].split ('=');
+  const s = v.join ('=');
+  prefs[k] = s === 'true' ? true : s === 'false' ? false : /^-?\d+$/.test (s) ? Number (s) : s;
+});
 const browser = await puppeteer.launch ({
   browser: 'firefox', executablePath: browserPath, headless: !process.argv.includes ('--headed'),
+  extraPrefsFirefox: prefs,
   ...(profile ? { userDataDir: path.resolve (profile) } : {}),
   args: [`--width=${W}`, `--height=${H}`]
 });

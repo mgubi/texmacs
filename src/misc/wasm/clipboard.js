@@ -185,15 +185,22 @@ var tmClipboard = (function () {
   // Edit > Paste from browser (web-paste-dialog in vue_gui.cpp). A menu has
   // no paste event, so the plain Paste of the menus pastes what the page
   // knows (the last copy or paste); this one asks the browser, in a dialog
-  // of the page: the paste key in its text area (or the Paste of a long
-  // press, on a touch screen) is a paste event, which needs no permission;
-  // its button reads navigator.clipboard, which the browser may ask the
-  // user to confirm. What comes becomes the page's clipboard, and the
-  // Scheme command cmd pastes it.
+  // of the page with one button, Paste, which reads navigator.clipboard in
+  // its click: the browsers give the clipboard only to the handler of a
+  // gesture of the user (Safari then shows its own Paste button, Chrome
+  // asks once for the permission), and a menu of TeXmacs runs its command
+  // a frame later, outside of it. Enter does the same, and the paste key
+  // (or the Paste of a long press, on a touch screen) is a paste event,
+  // which needs no permission, in a hidden text area which has the focus.
+  // What comes becomes the page's clipboard, and the Scheme command cmd
+  // pastes it.
   function fromBrowser (cmd) {
     if (typeof tmFrame === 'undefined') return;
-    var got = false, before = document.activeElement;
+    var got = false, before = document.activeElement, enter = null;
     tmFrame.dialog ('Paste from the browser', function (box, close) {
+      var key = mac ? '\u2318V' : 'Ctrl+V';
+      var c = typeof navigator !== 'undefined' && navigator.clipboard;
+      var api = !!(c && (c.read || c.readText));
       function p (cls, t) {
         var e = document.createElement ('p');
         if (cls) e.className = cls;
@@ -201,14 +208,15 @@ var tmClipboard = (function () {
         box.appendChild (e);
         return e;
       }
-      var key = mac ? '⌘V' : 'Ctrl+V';
-      p (null, 'Press ' + key + ' to paste what was copied in another page or program.');
-      var area = document.createElement ('textarea');
-      area.className = 'tm-paste';
-      area.placeholder = key;
-      area.setAttribute ('aria-label', 'Paste here');
-      box.appendChild (area);
+      p (null, api ? 'Paste what was copied in another page or program (or press ' + key + ').'
+                   : 'Press ' + key + ' to paste what was copied in another page or program.');
       var note = p ('tm-note', '');
+      // the paste key: a paste event in a text area out of sight
+      var area = document.createElement ('textarea');
+      area.setAttribute ('aria-hidden', 'true');
+      area.tabIndex = -1;
+      area.style.cssText = 'position:fixed;left:-1000px;top:0;width:10px;height:10px;opacity:0';
+      box.appendChild (area);
       function take (plain, html) {
         plain = (plain || '').replace (/\r\n?/g, '\n');
         if (!plain && !html) { note.textContent = 'The clipboard has no text.'; return; }
@@ -221,12 +229,29 @@ var tmClipboard = (function () {
         var d = e.clipboardData;
         var plain = d ? d.getData ('text/plain') || '' : '', html = d ? d.getData ('text/html') || '' : '';
         if (!plain && !html) { // into the text area (Safari, at times)
-          setTimeout (function () { take (area.value, ''); }, 0);
+          setTimeout (function () { take (area.value, ''); area.value = ''; }, 0);
           return;
         }
         e.preventDefault ();
         take (plain, html);
       });
+      // in the handler of the click (or of Enter), not after it
+      function read () {
+        readClipboard (c).then (function (r) { take (r.plain, r.html); }, function (e) {
+          note.textContent = 'The browser did not give the clipboard: press ' + key + '.';
+          log ('read: ' + e);
+          area.focus ({ preventScroll: true });
+        });
+      }
+      // Enter: on the window before the dialog, which keeps the keys from
+      // the page (frame.js)
+      enter = function (e) {
+        if (e.key === 'Enter' && api && e.type === 'keydown' && e.target !== no) {
+          e.preventDefault ();
+          read ();
+        }
+      };
+      window.addEventListener ('keydown', enter, true);
       var bar = document.createElement ('div');
       bar.className = 'tm-buttons';
       var no = document.createElement ('button');
@@ -234,24 +259,17 @@ var tmClipboard = (function () {
       no.textContent = 'Cancel';
       no.onclick = function () { close (); };
       bar.appendChild (no);
-      var c = typeof navigator !== 'undefined' && navigator.clipboard;
-      if (c && (c.read || c.readText)) {
-        var read = document.createElement ('button');
-        read.className = 'tm-button';
-        read.textContent = 'Read the clipboard';
-        read.title = 'The browser may ask to allow it';
-        read.onclick = function () {
-          readClipboard (c).then (function (r) { take (r.plain, r.html); }, function (e) {
-            note.textContent = 'The browser did not give the clipboard: press ' + key + ' instead.';
-            log ('read: ' + e);
-            area.focus ({ preventScroll: true });
-          });
-        };
-        bar.appendChild (read);
+      if (api) {
+        var yes = document.createElement ('button');
+        yes.className = 'tm-button tm-default';
+        yes.textContent = 'Paste';
+        yes.onclick = read;
+        bar.appendChild (yes);
       }
       box.appendChild (bar);
       setTimeout (function () { area.focus ({ preventScroll: true }); }, 0);
     }, function () {
+      if (enter) window.removeEventListener ('keydown', enter, true);
       if (before && before.focus) before.focus ({ preventScroll: true });
       if (got && typeof _vue_web_scheme !== 'undefined')
         withStackSave (function () { _vue_web_scheme (stringToUTF8OnStack (cmd)); });
