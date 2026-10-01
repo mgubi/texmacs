@@ -181,7 +181,7 @@
     current font, each of the form <verbatim|<em|effect>=<em|value>>.
     Supported effects include <verbatim|bold>, <verbatim|bbb> (blackboard
     bold), <verbatim|slant>, <verbatim|hmagnify>, <verbatim|vmagnify>,
-    <verbatim|hextended>, <verbatim|vextended>, <verbatim|mono>,
+    <verbatim|hextended>, <verbatim|mono>,
     <verbatim|degraded>, <verbatim|distorted>, <verbatim|gnawed>,
     <verbatim|blurred> and <verbatim|enhanced> (see <cpp|apply_effects> in
     <verbatim|Graphics/Fonts/smart_font.cpp>). For instance,

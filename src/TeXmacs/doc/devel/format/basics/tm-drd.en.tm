@@ -129,6 +129,10 @@
   <hlink|manually override|../stylesheet/prim-macro.en.tm> the default
   properties.
 
+  The implementation of <abbr|D.R.D.>s is described in detail in the
+  developer chapter on <hlink|the data relation
+  descriptor|../../source/drd.en.tm>.
+
   <tmdoc-copyright|2004|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

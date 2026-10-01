@@ -12,10 +12,16 @@
 
     <branch|Converters to other data formats|conversions.en.tm>
 
+    <branch|The <LaTeX> and <name|Html> converters|convert.en.tm>
+
     <branch|The graphical user interface (historical Widkit
     toolkit)|gui.en.tm>
 
     <branch|<TeXmacs> fonts|fonts.en.tm>
+
+    <branch|The font database and font selection|font-database.en.tm>
+
+    <branch|Smart, virtual and emulated fonts|smart-fonts.en.tm>
 
     <branch|Mathematical typesetting|maths.en.tm>
 
@@ -24,6 +30,8 @@
     <branch|The typesetting algorithm|typesetter.en.tm>
 
     <branch|Macro expansion and evaluation|macro-expansion.en.tm>
+
+    <branch|Data relation descriptors (DRD)|drd.en.tm>
 
     <branch|The server, buffers, views and windows|server.en.tm>
 
@@ -35,6 +43,12 @@
     versioning|collaboration.en.tm>
 
     <branch|The database and bibliographies|database.en.tm>
+
+    <branch|The graphics editor|graphics-editor.en.tm>
+
+    <branch|Syntax highlighting and programming languages|syntax-highlighting.en.tm>
+
+    <branch|The plug-in machinery|plugins.en.tm>
   </traverse>
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
