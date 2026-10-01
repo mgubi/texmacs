@@ -45,7 +45,7 @@ MuPDF writer) in about 4 s, boot included.
 | | done | not yet |
 |---|---|---|
 | windows | single-window mode: tabs for the windows of the editors, floating dialogs, resized by their frame, their contents scrolled when they do not fit; the frame of the page | |
-| build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4 | `-Oz` and LTO (not measured) |
+| build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4; the published build with `-Os -flto` (see Optimization) | |
 | loop | one iteration per frame (`emscripten_set_main_loop`); the keyboard events queued in a frame all handled in it (`web_more_events`: a layout, the commands and the interpose handler for each, one repaint and one redraw), 80 keys in one frame where they took 2 s at 120 Hz | |
 | files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
 | processes | `posix_spawnp` fails cleanly; the plugins which run a program are not offered (their `:require` sees no command), and one started anyway fails at once, its session dead with an error (it froze the page: `fork` fails, and the pipes were read again and again); Scheme sessions work | no external converters offered |
@@ -172,6 +172,35 @@ Locally:
   waits for `preRun`. They used to be fetched in `preRun`, after the
   program had been compiled: the two downloads followed each other. `serve.mjs [dir] [port] [KB/s]` and
   `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
+
+## Optimization
+
+`OPT` of the Makefile (`-O2` by default) is that of the compilation and of
+the link of TeXmacs; MuPDF is built apart (`build-mupdf.sh`, release), so
+LTO covers the code of TeXmacs only. Measured on 2026-10-02 (the program
+alone; the speed in headless Firefox, the CPU time by the node build
+turning the Welcome document into a PDF, warm runs):
+
+| `OPT` | wasm | gzip | brotli | PDF | rebuild after one change |
+|---|---|---|---|---|---|
+| `-O2` | 22.97 MB | 6.23 MB | 5.32 MB | 4.8 s | 15 s |
+| `-Os` | 21.84 MB | 6.24 MB | 5.26 MB | | |
+| `-Oz` | 15.11 MB | 5.48 MB | 4.84 MB | | |
+| `-O2 -flto` | 30.39 MB | 6.54 MB | 5.29 MB | | |
+| `-Os -flto` | 19.11 MB | 5.76 MB | 4.89 MB | 4.7 s | 70 s |
+| `-Oz -flto` | 12.92 MB | 5.02 MB | 4.48 MB | 5.4 s | 70 s |
+
+In the browser all of them are as fast, within the noise of the runs
+(the frames of a scroll and of typing at 2x, the typesetting and the
+repaints of a page of formulas); the startup is that of the download and
+of the compilation, a little shorter for a smaller program. The node build
+shows what the browser does not: `-Oz` costs some 12 % of CPU time. LTO
+compiles the whole program again at each link, hence the rebuild.
+
+The published build (`.github/workflows/wasm.yml`) uses `-Os -flto`: 8 %
+less to download (gzip, what GitHub Pages sends) at the same speed; the
+development builds keep `-O2`. `-Oz -flto` would save 19 % for 12 % more
+CPU time. The page and the PDF are the same with all of them.
 
 ## A viewer: `texmacs.html?open=<url>`
 

@@ -59,7 +59,10 @@ jobs:
           sh misc/wasm/build-mupdf.sh ${{ env.MUPDF_VERSION }}
 
       - name: TeXmacs (the page and the node build)
-        run: make -C build-wasm -f ../misc/wasm/Makefile -j"$(nproc)" web node
+        # -Os -flto: 8% less to download than -O2, at the same speed (see
+        # "Optimization" in docs/wasm/README.md); LTO is for this build only,
+        # it makes a rebuild after one change take 70 s instead of 15
+        run: make -C build-wasm -f ../misc/wasm/Makefile -j"$(nproc)" OPT="-Os -flto" web node
 
       - name: Smoke test (node, the Welcome document to PDF)
         run: |
