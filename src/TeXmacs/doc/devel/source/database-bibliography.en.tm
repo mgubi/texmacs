@@ -86,8 +86,12 @@
   "bibliography")> (<verbatim|generic/document-edit.scm>), which runs
   <scm|generate-all-aux> and retypesets the buffer (as many times as
   specified by the preference <verbatim|"document update times">). Notice
-  that this regenerates all automatic content, not only bibliographies;
-  <scm|(generate-aux "bibliography")> would restrict it.
+  that this regenerates all automatic content, not only bibliographies.
+  <scm|(generate-aux "bibliography")> regenerates only the bibliographies,
+  but it still empties every other automatic section (tables of contents,
+  indexes, ...) without filling it again, because
+  <cpp|generate_aux_recursively> clears each automatic body before testing
+  which kind was requested; see <hlink|automatic content|editing-auxiliary.en.tm>.
 
   <cpp|edit_process_rep::generate_aux> (<verbatim|Edit/Process/edit_process.cpp>)
   walks through the document. For each automatic tag (<cpp|is_aux>) it

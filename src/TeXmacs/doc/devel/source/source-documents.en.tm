@@ -21,6 +21,8 @@
 
     <branch|Macro expansion and evaluation|macro-expansion.en.tm>
 
+    <branch|Links, loci and references|links.en.tm>
+
     <branch|The typesetting algorithm|typesetter.en.tm>
 
     <branch|The boxes produced by the typesetter|boxes.en.tm>
@@ -28,6 +30,10 @@
     <branch|Mathematical typesetting|maths.en.tm>
 
     <branch|The renderer interface|renderer.en.tm>
+
+    <branch|Images, pictures and PDF output|images.en.tm>
+
+    <branch|Languages, hyphenation and spell checking|language.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
