@@ -25,7 +25,8 @@
         (server server-backup-test)
         (server server-notifications-test)
         (server server-tmfs-test)
-        (utils cite cite-sort-test)))
+        (utils cite cite-sort-test)
+        (kernel texmacs tm-secure-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -94,6 +95,7 @@
   (regtest-tmmltm)
   (regtest-prog-format)
   (regtest-cite-sort)
+  (regtest-secure)
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
