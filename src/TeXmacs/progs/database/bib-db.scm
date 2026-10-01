@@ -256,7 +256,7 @@
 (define (db-bib-sub-sub type var val)
   (cond ((and (== var "title")
               (in? type '("article" "booklet" "incollection" "inproceedings"
-                          "masterthesis" "misc" "phd-thesis" "techreport"
+                          "mastersthesis" "misc" "phdthesis" "techreport"
                           "unpublished")))
          (db-bib-protect val #t))
         ((or (== var "type") (== var "mtype"))
@@ -363,7 +363,7 @@
 (define (bib-db-sub-sub type var val)
   (cond ((and (== var "title")
               (in? type '("article" "booklet" "incollection" "inproceedings"
-                          "masterthesis" "misc" "phd-thesis" "techreport"
+                          "mastersthesis" "misc" "phdthesis" "techreport"
                           "unpublished")))
          (bib-db-locase val #t))
         ((or (== var "type") (== var "mtype"))
