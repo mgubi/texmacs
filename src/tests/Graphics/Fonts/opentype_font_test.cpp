@@ -388,10 +388,14 @@ test_wide_variants () {
   metric ex;
   rf->get_extents (r, ex);
   CHECK_MSG (ex->x4 - ex->x3 >= du_x (1000) - du_x (10), as_charp (r));
-  // the hat has no assembly: beyond its widest variant (1897) we get that one
-  SI w= du_x (4000);
+  // the hat has no assembly: a little beyond its widest variant (1897) we
+  // get that one, and further (where it covers less than three quarters of
+  // the width) none, so that TeXmacs draws the hat itself
+  SI w= du_x (2400);
   CHECK (rf->get_wide_variant ("<wide-hat>", w, r));
   CHECK_EQ (r, string ("<wide-hat-7>"));
+  w= du_x (4000);
+  CHECK (!rf->get_wide_variant ("<wide-hat>", w, r));
   // the overbrace has one (its widest variant is 4007): an assembly made
   // to measure
   w= du_x (6000);
