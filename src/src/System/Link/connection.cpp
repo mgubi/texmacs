@@ -98,7 +98,7 @@ connection_rep::start (bool again) {
   tm_out->bof ();
   tm_err->bof ();
   ln->set_command (command (connection_callback, this));
-  if (name == "dynlink") {
+  if (is_tuple (info, "dynlink")) {
     this->listen ();
     status = WAITING_FOR_OUTPUT;
   }
