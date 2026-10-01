@@ -473,7 +473,7 @@ drd_info_rep::get_type_child (tree t, int i) {
   if (is_func (t, EXTERN) && N(t)>0 && is_atomic (t[0])) {
     tree_label lab= make_tree_label ("extern:" * t[0]->label);
     if (info->contains(lab)) { ti= info[lab]; }
-    else { ti = info(EXTERN); info(lab)= ti; }
+    else ti= info[EXTERN];
   }
   int index= ti->get_index (i, N(t));
   if ((index<0) || (index>=N(ti->ci))) return TYPE_INVALID;
@@ -537,7 +537,7 @@ drd_info_rep::is_accessible_child (tree t, int i) {
   if (is_func (t, EXTERN) && N(t)>0 && is_atomic (t[0])) {
     tree_label lab= make_tree_label ("extern:" * t[0]->label);
     if (info->contains(lab)) { ti= info[lab]; }
-    else { ti = info(EXTERN); info(lab)= ti; }
+    else ti= info[EXTERN];
   }
   int index= ti->get_index (i, N(t));
   if ((index<0) || (index>=N(ti->ci))) {
@@ -601,7 +601,7 @@ drd_info_rep::get_writability_child (tree t, int i) {
   if (is_func (t, EXTERN) && N(t)>0 && is_atomic (t[0])) {
     tree_label lab= make_tree_label ("extern:" * t[0]->label);
     if (info->contains(lab)) { ti= info[lab]; }
-    else { ti = info(EXTERN); info(lab)= ti; }
+    else ti= info[EXTERN];
   }
   int index= ti->get_index (i, N(t));
   if ((index<0) || (index>=N(ti->ci))) return WRITABILITY_DISABLE;
@@ -634,30 +634,32 @@ drd_info_rep::get_child_long_name (tree_label l, int nr) {
 
 string
 drd_info_rep::get_child_name (tree t, int i) {
-  tag_info ti= info[L(t)];
+  tree_label l= L(t);
+  tag_info ti= info[l];
   if (is_func (t, EXTERN) && N(t)>0 && is_atomic (t[0])) {
     tree_label lab= make_tree_label ("extern:" * t[0]->label);
-    if (info->contains(lab)) { ti= info[lab]; }
-    else { ti = info(EXTERN); info(lab)= ti; }
+    if (info->contains(lab)) { l= lab; ti= info[lab]; }
+    else ti= info[EXTERN];
   }
   int index= ti->get_index (i, N(t));
   if ((index<0) || (index>=N(ti->ci))) return "";
-  return get_child_name (L(t), index);
+  return get_child_name (l, index);
 }
 
 string
 drd_info_rep::get_child_long_name (tree t, int i) {
-  tag_info ti= info[L(t)];
+  tree_label l= L(t);
+  tag_info ti= info[l];
   if (is_func (t, EXTERN) && N(t)>0 && is_atomic (t[0])) {
     tree_label lab= make_tree_label ("extern:" * t[0]->label);
-    if (info->contains(lab)) { ti= info[lab]; }
-    else { ti = info(EXTERN); info(lab)= ti; }
+    if (info->contains(lab)) { l= lab; ti= info[lab]; }
+    else ti= info[EXTERN];
   }
   int index= ti->get_index (i, N(t));
   if ((index<0) || (index>=N(ti->ci))) return "";
-  string r= get_child_long_name (L(t), index);
+  string r= get_child_long_name (l, index);
   if (r != "") return r;
-  return get_child_name (L(t), index);
+  return get_child_name (l, index);
 }
 
 /******************************************************************************
