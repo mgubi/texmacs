@@ -97,6 +97,22 @@
 	     (load-help-article "main/styles/styles"))
 	    ("Compatibility with other formats"
 	     (load-help-article "main/convert/man-convert"))))
+  (when (url-exists-in-help? "devel/devel.en.tm")
+	(-> "Developer documentation"
+	    ("Browse" (load-help-buffer "devel/devel"))
+	    ---
+	    ("The TeXmacs document format"
+	     (load-help-article "devel/format/format"))
+	    ("Writing TeXmacs style files"
+	     (load-help-article "devel/style/style"))
+	    ("The TeXmacs Scheme developer guide"
+	     (load-help-article "devel/scheme/scheme"))
+	    ("The TeXmacs plug-in system"
+	     (load-help-article "devel/plugin/plugins"))
+	    ("Interfacing TeXmacs with other programs"
+	     (load-help-article "devel/interface/interface"))
+	    ("About the source code of TeXmacs"
+	     (load-help-article "devel/source/source"))))
   (-> "Plug-ins"
       (link help-plugins-menu))
   (when (url-exists-in-help? "about/about.en.tm")
