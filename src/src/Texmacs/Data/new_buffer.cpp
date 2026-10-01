@@ -73,8 +73,9 @@ remove_buffer (tm_buffer buf) {
   int nr, n= N(bufs);
   for (nr=0; nr<n; nr++)
     if (bufs[nr] == buf) {
-      for (int i=0; i<N(buf->vws); i++)
-        delete_view (abstract_view (buf->vws[i]));
+      array<tm_view> vws= copy (buf->vws);
+      for (int i=0; i<N(vws); i++)
+        delete_view (abstract_view (vws[i]));
       if (n == 1 && number_of_servers () == 0)
         get_server () -> quit ();
       for (int i=nr; i<n-1; i++)
