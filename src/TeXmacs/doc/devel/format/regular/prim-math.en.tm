@@ -66,6 +66,36 @@
   \;
 
   <\explain>
+    <explain-macro|around|left|body|right>
+
+    <explain-macro|around*|left|body|right><explain-synopsis|matching
+    brackets>
+  <|explain>
+    These primitives are used for matching brackets around a
+    <src-arg|body>, which is the preferred representation of bracketed
+    expressions in <TeXmacs> formulas. In the case of <markup|around>, the
+    brackets <src-arg|left> and <src-arg|right> keep their normal size; in
+    the case of <markup|around*>, they are rendered as large delimiters
+    (as with <markup|left> and <markup|right>) which are automatically
+    sized so as to fit the <src-arg|body>. For instance, the formula
+    <math|f<around*|(|<frac|1|x>|)>> is represented by
+    <inactive*|f<around*|(|<frac|1|x>|)>>. When the
+    <src-var|math-nesting-mode> environment variable is not <verbatim|off>
+    (the default is <verbatim|off>), nested brackets are colored according
+    to their nesting level.
+  </explain>
+
+  <\explain>
+    <explain-macro|big-around|big-symbol|body><explain-synopsis|big
+    operators with explicit scope>
+  <|explain>
+    This primitive is the structured counterpart of <markup|big>: it
+    renders the big operator <src-arg|big-symbol> (such as
+    <verbatim|\<less\>sum\<gtr\>>) and makes its scope <src-arg|body>
+    explicit, instead of closing it with an invisible <inactive*|<big|.>>.
+  </explain>
+
+  <\explain>
     <explain-macro|big|big-symbol><explain-synopsis|big symbols>
   <|explain>
     This primitive is used in order to produce big operators as in
@@ -216,6 +246,20 @@
   </explain>
 
   <\explain>
+    <explain-macro|long-arrow|arrow|sup>
+
+    <explain-macro|long-arrow|arrow|sup|sub><explain-synopsis|long arrows
+    with scripts>
+  <|explain>
+    Renders an extensible arrow (such as
+    <verbatim|\<less\>rightarrow\<gtr\>>) whose width is adapted to the
+    superscript <src-arg|sup> and the optional subscript <src-arg|sub>,
+    which are placed above and below the arrow. For instance,
+    <inactive*|<long-arrow|\<rightarrow\>|f>> is rendered as
+    <math|<long-arrow|\<rightarrow\>|f>>.
+  </explain>
+
+  <\explain>
     <explain-macro|neg|content><explain-synopsis|negations>
   <|explain>
     This primitive is mainly used for producing negated symbols or
@@ -241,6 +285,28 @@
 
     In the future, we plan to provide further style parameters in order to
     control the rendering.
+  </explain>
+
+  <\explain>
+    <explain-macro|syntax|content|syntax><explain-synopsis|override the
+    mathematical syntax>
+  <|explain>
+    Typeset <src-arg|content> as an atomic box, but let it behave, for the
+    purpose of mathematical spacing, line breaking penalties and semantic
+    analysis, as the (evaluated) <src-arg|syntax>. For instance,
+    <inactive*|<syntax|<with|color|red|+>|+>> behaves like an infix plus.
+    When <src-arg|syntax> is a single character, its spacing
+    and penalty properties are used for the rendering.
+  </explain>
+
+  <\explain>
+    <explain-macro|with-limits><explain-synopsis|display scripts as
+    limits>
+  <|explain>
+    This zero-ary directive indicates that right scripts attached to the
+    preceding item should be rendered as limits (below and above it)
+    instead of beside it, like for operators such as <math|lim>. As for
+    such operators, this only happens in display style.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

@@ -26,7 +26,13 @@
   the plug-ins. For instance, the module <verbatim|(math math-edit)>
   corresponds to the file
 
-  <verbatim| \ \ \ $TEXMACS_PATH/progs/edit/math-edit.scm>
+  <verbatim| \ \ \ $TEXMACS_PATH/progs/math/math-edit.scm>
+
+  The option <scm|(:inherit <em|module-1> ... <em|module-n>)> can be used
+  instead of <scm|:use> in order to import the given modules and re-export
+  all their public symbols. Outside a module declaration, the same effects
+  are obtained with <scm|(use-modules <em|module-1> ... <em|module-n>)>
+  <abbr|resp.> <scm|(inherit-modules <em|module-1> ... <em|module-n>)>.
 
   The user should explicitly specify all submodules on which the module
   depends, except those modules which are loaded by default, <abbr|i.e.> all

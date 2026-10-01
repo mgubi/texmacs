@@ -60,24 +60,31 @@
   <paragraph*|Current <abbr|D.R.D.> properties and applications>
 
   Currently, the <abbr|D.R.D.> of a document contains the following
-  information:
+  information (see <verbatim|Data/Drd/drd_info.hpp> and
+  <verbatim|Data/Drd/tag_info.hpp> in the <c++> sources, and
+  <verbatim|Data/Drd/drd_std.cpp> for the properties of the built-in
+  primitives):
 
   <\itemize>
     <item>The possible arities of a tag.
 
-    <item>The accessibility of a tag and its children.
+    <item>The accessibility of the children of a tag (always accessible,
+    hidden, or never accessible) and their writability.
+
+    <item>The types of a tag and of its children (regular content, lengths,
+    colors, <abbr|URL>s, numbers, graphical objects, <abbr|etc.>).
+
+    <item>Whether a tag and its children are inline or block content.
+
+    <item>Border properties (whether the cursor may be positioned just
+    before or after the tag) and whether a tag behaves like <markup|with>.
+
+    <item>Local environment settings for the children of a tag (for
+    instance, the <src-var|mode>).
+
+    <item>Human readable names of tags and their children, which are used in
+    menus and in the footer.
   </itemize>
-
-  In the near future, the following properties will be added:
-
-  <\itemize>
-    <item>Inline-ness of a tag and its children.
-
-    <item>Tabular-ness of a tag and its children.
-
-    <item>Purpose of a tag and its children.
-  </itemize>
-
   The above information is used (among others) for the following
   applications:
 
@@ -92,13 +99,13 @@
     <item>Automatic insertion of <markup|document> or <markup|table> tags
     when creating block or tabular environments.
 
-    <item>Syntactic highlighting in source mode as a function of the purpose
+    <item>Syntactic highlighting in source mode as a function of the types
     of tags and arguments.
   </itemize>
 
   <paragraph*|Determination of the <abbr|D.R.D.> of a document>
 
-  <TeXmacs> associate a unique <abbr|D.R.D.> to each document. This
+  <TeXmacs> associates a unique <abbr|D.R.D.> to each document. This
   <abbr|D.R.D.> is determined in two stages. First of all, <TeXmacs> tries to
   heuristically determine <abbr|D.R.D.> properties of user-defined tags, or
   tags which are defined in style files. For instance, when the user defines

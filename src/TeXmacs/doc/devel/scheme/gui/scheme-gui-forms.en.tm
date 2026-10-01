@@ -79,8 +79,25 @@
     </input>
   </session>
 
-  A complete list of the widgets you can embed in a form is in the table
-  <scm|gui-make-table> inside <hlink|<verbatim|menu-define.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-define.scm>.
+  The available form fields are <scm|(form-input <scm-arg|field>
+  <scm-arg|type> <scm-arg|proposals> <scm-arg|width>)>, <scm|(form-enum
+  <scm-arg|field> <scm-arg|vals> <scm-arg|val> <scm-arg|width>)>,
+  <scm|(form-choice <scm-arg|field> <scm-arg|vals> <scm-arg|val>)>,
+  <scm|(form-choices <scm-arg|field> <scm-arg|vals> <scm-arg|selected>)>
+  and <scm|(form-toggle <scm-arg|field> <scm-arg|on?>)>. They take the same
+  arguments as <scm|input>, <scm|enum>, <scm|choice>, <scm|choices> and
+  <scm|toggle>, except that the command is replaced by the name of the
+  field. Other widgets can be freely mixed with the fields inside a form.
+
+  Inside the form, <scm|(form-fields)> returns the list of field names,
+  <scm|(form-values)> the list of their current values, <scm|(form-ref
+  <scm-arg|field>)> the value of one field and <scm|(form-set
+  <scm-arg|field> <scm-arg|value>)> changes it. The values are stored in a
+  global table under the name of the form and of the field; when the form
+  is built, each field is initialized with its default value (the first
+  proposal, <abbr|resp.> the selected value), except for toggles, whose
+  value is only set when they are clicked. These macros are defined
+  in <hlink|<verbatim|gui-markup.scm>|$TEXMACS_PATH/progs/kernel/gui/gui-markup.scm>.
 
   <tmdoc-copyright|2012|the <TeXmacs> team.>
 

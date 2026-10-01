@@ -42,7 +42,7 @@
   </explain>
 
   <\explain>
-    <var-val|par-flexibility|1000.0><explain-synopsis|paragraph flexibility>
+    <var-val|par-flexibility|1000><explain-synopsis|paragraph flexibility>
   <|explain>
     When using the justified alignment mode, it sometimes occurs that certain
     lines need to be stretched a lot, thereby leaving abnormally large spaces
@@ -77,12 +77,15 @@
   </explain>
 
   <\explain>
-    <var-val|par-hyphen|normal><explain-synopsis|quality of hyphenation>
+    <var-val|par-hyphen|professional><explain-synopsis|quality of
+    hyphenation>
   <|explain>
     This parameter controls the quality of the hyphenation algorithm.
-    Possible values are <verbatim|normal> and <verbatim|professional>. The
-    professional hyphenation algorithm uses a global algorithm on the entire
-    paragraph, whereas the normal one uses a faster first-fit algorithm.
+    Possible values are <verbatim|normal> and <verbatim|professional> (the
+    default). The professional hyphenation algorithm uses a global algorithm
+    on the entire paragraph, whereas the normal one uses a faster first-fit
+    algorithm. Any value other than <verbatim|normal> selects the
+    professional algorithm.
 
     <\big-table>
       <\with|font-base-size|10>
@@ -114,11 +117,72 @@
   </explain>
 
   <\explain>
+    <var-val|par-min-penalty|0><explain-synopsis|minimal page break penalty>
+  <|explain>
+    A minimal penalty which is applied to the page breaks between the
+    successive lines of a paragraph. Increasing this value discourages page
+    breaks inside paragraphs.
+  </explain>
+
+  <\explain>
+    <var-val|par-kerning-reduce|auto>
+
+    <var-val|par-kerning-stretch|auto><explain-synopsis|reduced and extra
+    kerning>
+  <|explain>
+    When justifying lines, <TeXmacs> may slightly reduce or stretch the
+    spacing between characters, in addition to the spacing between words.
+    These variables determine the maximal relative amounts of such reductions
+    and extensions. Possible values are <verbatim|auto> (a default which
+    depends on the average number of characters per line), a number (the
+    relative amount itself), or <verbatim|none> (any other non-numeric value
+    disables the feature). The <src-var|par-kerning-stretch> variable also
+    accepts the value <verbatim|tolerant>, which allows for more stretching
+    than <verbatim|auto>.
+  </explain>
+
+  <\explain>
+    <var-val|par-contraction|auto>
+
+    <var-val|par-expansion|auto><explain-synopsis|glyph contraction and
+    expansion>
+  <|explain>
+    When justifying lines, <TeXmacs> may also slightly contract or expand the
+    glyphs themselves. These variables specify the maximal relative
+    contraction and expansion. The allowed values are the same as for
+    <src-var|par-kerning-reduce> and <src-var|par-kerning-stretch>
+    (<verbatim|auto>, a number, or a non-numeric value such as
+    <verbatim|none> for no contraction <abbr|resp.> expansion); the
+    <src-var|par-expansion> variable also accepts <verbatim|tolerant>.
+  </explain>
+
+  <\explain>
+    <var-val|par-kerning-margin|false><explain-synopsis|marginal kerning>
+  <|explain>
+    When set to <verbatim|true>, certain characters, like punctuation, are
+    allowed to protrude slightly into the margins, which gives the margins a
+    visually straighter appearance (this technique is also known as
+    <em|protrusion>).
+  </explain>
+
+  <\explain>
+    <var-val|par-spacing|plain><explain-synopsis|spacing of CJK punctuation>
+  <|explain>
+    This variable controls the spacing around punctuation in Chinese,
+    Japanese and Korean text. The possible values are <verbatim|plain>,
+    <verbatim|quanjiao>, <verbatim|banjiao>, <verbatim|hangmobanjiao> and
+    <verbatim|kaiming>. Some language-specific packages set this variable to
+    <verbatim|kaiming>.
+  </explain>
+
+  <\explain>
     <var-val|par-width|auto><explain-synopsis|paragraph width>
   <|explain>
     This environment variable controls the width of paragraphs. By default,
     it is automatically determined as a function of the page (or screen) size
-    and margins.
+    and margins. When <src-var|par-width> is set explicitly and
+    <src-var|par-columns> is larger than one, the width of each column is
+    derived from it (taking into account <src-var|par-columns-sep>).
   </explain>
 
   <\explain>
@@ -207,8 +271,8 @@
     The sum of the font size and <inactive|<value|par-sep>> determines the
     ideal distance between two successive base lines in a paragraph (also
     called the ``base line skip''). Of course, when the lines contain large
-    boxes, then this distance may need to be increased. When <verbatim|1fn>
-    for <inactive|<value|par-sep>>, one may for instance produce documents
+    boxes, then this distance may need to be increased. When using
+    <verbatim|1fn> for <inactive|<value|par-sep>>, one may for instance produce documents
     with a double interline space:
 
     <\tm-fragment>
@@ -237,22 +301,24 @@
   </explain>
 
   <\explain>
-    <var-val|par-line-sep|0.025fn*><explain-synopsis|extra space between
+    <var-val|par-line-sep|0.025fns><explain-synopsis|extra space between
     lines>
   <|explain>
     This parameter corresponds an additional stretchable amount of whitespace
     between successive lines in a paragraph. Setting
     <inactive|<value|par-line-sep>> to a small stretchable value which
     defaults to <math|0> allows the page breaker to correctly stretch pages
-    which contain a very long textual paragraph. Indeed,
+    which contain a very long textual paragraph. Indeed, if
     <inactive|<value|par-line-sep>> vanishes, then the height of a textual
     paragraph is of the form <math|a+b*n>, where <math|a> and <math|b> are
     constants and <math|n> is the number of lines. There is no reason why the
-    usable height of a page should be of this form.
+    usable height of a page should be of this form. The default value
+    <verbatim|0.025fns> is zero, but may be stretched up to
+    <verbatim|0.025fn>.
   </explain>
 
   <\explain>
-    <var-val|par-par-sep|0.5fn*><explain-synopsis|extra space between
+    <var-val|par-par-sep|0.5fns><explain-synopsis|extra space between
     paragraphs>
   <|explain>
     The <src-var|par-par-sep> parameter specifies the amount of vertical
@@ -260,7 +326,7 @@
     determined in <hlink|stretchable length units|../basics/lengths.en.tm>.
     By default, <TeXmacs> does not use any whitespace between successive
     paragraphs, except when no nice page breaks could be found (this explains
-    the use of the <verbatim|fn*> length unit). Starts of new paragraphs are
+    the use of the <verbatim|fns> length unit). Starts of new paragraphs are
     rather indicated through the use of first indentations (see table
     <reference|par-first-tab>).
 
@@ -281,7 +347,7 @@
 
     <\with|font-base-size|10>
       <\tm-fragment>
-        Consider a fraction which decends more than usual like
+        Consider a fraction which descends more than usual like
         <math|<frac|1|x+1>> at the end of a line and an expression like
         <math|\<mathe\><rsup|\<mathe\><rsup|x>>> which is higher than usual.
 
@@ -291,14 +357,14 @@
         In the case of a fraction <math|<frac|1|x+1>> and an exceptionally
         high expression at the wrong place, like the expression
         <math|\<mathe\><rsup|\<mathe\><rsup|x>>> here, the boxes are
-        separated by <src-var|env-ver-sep>.
+        separated by <src-var|par-ver-sep>.
       </tm-fragment>
     </with>
 
     As soon as the horizontal distance between two large boxes is less than
     <src-var|par-hor-sep>, then they are considered to be in collision. In
     that case, the vertical distance between them must be at least
-    <src-var|par-ver-sep>. Also, the amount of showing never exceeds
+    <src-var|par-ver-sep>. Also, the amount of shoving never exceeds
     <verbatim|1ex>.
 
     When using an interline space of <verbatim|1.5> or <verbatim|2>, the
@@ -307,7 +373,7 @@
     small <src-var|par-sep> and a large <inactive|<value|par-ver-sep>>, the
     distance between two successive lines remains small, except when their
     contents are horizontally close. This may for instance be used to reduce
-    the space between a short like followed by a centered equation.
+    the space between a short line followed by a centered equation.
   </explain>
 
   <\explain>
@@ -331,6 +397,18 @@
   <|explain>
     This environment variable specifies the amount of horizontal whitespace
     which separates different columns in multi-column mode.
+  </explain>
+
+  <\explain>
+    <var-val|par-swell|0ex><explain-synopsis|extra padding around large
+    lines>
+  <|explain>
+    When positive, lines containing exceptionally high or deep content (like
+    large formulas) receive additional vertical padding of at most
+    <src-var|par-swell>. The amount of padding increases progressively when
+    the content exceeds the thresholds given by <src-var|math-top-swell-start>
+    <abbr|resp.> <src-var|math-bot-swell-start>, and reaches its maximum at
+    <src-var|math-top-swell-end> <abbr|resp.> <src-var|math-bot-swell-end>.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

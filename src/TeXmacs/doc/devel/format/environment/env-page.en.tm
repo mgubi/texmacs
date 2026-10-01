@@ -5,7 +5,7 @@
 <\body>
   <tmdoc-title|Page layout>
 
-  In this section, we describe how <TeXmacs> fills pages with typesetted
+  In this section, we describe how <TeXmacs> fills pages with typeset
   content. Besides specifying the settings on how to print a document, the
   user may also determine the way pages should be rendered on screen. It
   should be noticed that the number of environment variables is redundant in
@@ -24,6 +24,14 @@
     <menu|Edit|Preferences|Printer>). When the <src-var|page-type> is set to
     <verbatim|user>, then the page size is given by <src-var|page-width> and
     <src-var|page-height>.
+
+    The known page types, together with their default dimensions and
+    margins, are listed in <verbatim|Graphics/Renderer/page_type.cpp>. Besides
+    the usual paper formats (<verbatim|a0>, ..., <verbatim|a10>,
+    <verbatim|b0>, ..., <verbatim|letter>, <verbatim|legal>,
+    <abbr|etc.>), this includes screen formats such as <verbatim|4:3> and
+    <verbatim|16:9>, which are used for presentations. Unknown page types
+    fall back to the dimensions of <verbatim|a4>.
   </explain>
 
   <\explain>
@@ -34,12 +42,32 @@
   </explain>
 
   <\explain>
+    <var-val|page-crop-marks|><explain-synopsis|paper type for crop marks>
+  <|explain>
+    When non-empty (and when <src-var|page-medium> is <verbatim|paper>), this
+    variable specifies a larger paper type (like <verbatim|a3>,
+    <verbatim|a4> or <verbatim|letter>) on which the pages of type
+    <src-var|page-type> are printed, together with crop marks. It may be set
+    in <menu|Document|Page|Crop marks>.
+  </explain>
+
+  <\explain>
+    <var-val|page-printed|false><explain-synopsis|are we printing?>
+  <|explain>
+    This flag is set to <verbatim|true> by the editor while typesetting a
+    document for printing (or exporting to <name|Pdf> or <name|PostScript>).
+    It allows the rendering of certain elements (like hyperlinks and
+    scrollable canvases) to differ between the screen and paper. It should
+    not be set by the user.
+  </explain>
+
+  <\explain>
     <var-val|page-nr|0><explain-synopsis|current page number>
   <|explain>
     The current page number. This environment variable should be manipulated
     with care, since it is not yet available at typesetting time. For a
     reliable determination of page numbers, one may combine the
-    <markup|label> and <markup|page-ref> primitives. Nevertheless, the
+    <markup|label> and <markup|pageref> primitives. Nevertheless, the
     <src-var|page-nr> variable can be used in the macros which render page
     headers and footers.
   </explain>
@@ -55,21 +83,36 @@
     <\tm-fragment>
       <inactive*|<assign|page-the-page|<macro|<plus|<value|page-nr>|122>>>>
     </tm-fragment>
+
+    In practice, it is simpler to set <src-var|page-first> for this purpose.
   </explain>
 
   <\explain>
-    <var-val|page-breaking|optimal><explain-synopsis|page breaking algorithm>
+    <var-val|page-first|1><explain-synopsis|number of the first page>
+  <|explain>
+    The number of the first page of the document. This value is read once
+    when the style is initialized (it cannot be changed locally using
+    <markup|with>). It may be set in the global page format dialog (field
+    \PFirst page\Q) and is typically used for documents which are part of a
+    larger project.
+  </explain>
+
+  <\explain>
+    <var-val|page-breaking|professional><explain-synopsis|page breaking
+    algorithm>
   <|explain>
     This parameter specifies the page breaking algorithm. The default
-    <verbatim|optimal> algorithm takes into account the global document and
+    <verbatim|professional> algorithm (the older name <verbatim|optimal> is
+    treated in the same way) takes into account the global document and
     tries hard to avoid bad page breaks. The alternative <verbatim|sloppy>
     algorithm uses a fast first-fit algorithm, but produces bad page break
     with a higher probability. The <verbatim|medium> quality algorithm is the
-    same as the <verbatim|optimal> algorithm, except for two column content.
+    same as the <verbatim|professional> algorithm, except for two column
+    content.
   </explain>
 
   <\explain>
-    <var-val|page-flexibility|1.0><explain-synopsis|flexibility for
+    <var-val|page-flexibility|1><explain-synopsis|flexibility for
     stretching>
   <|explain>
     This parameter specifies how much stretchable spaces may be extended or
@@ -109,16 +152,16 @@
 
     <\description>
       <item*|<verbatim|paper>>Page breaks are visually indicated on the
-      screen. This mode is useful for ajusting the final version of a
+      screen. This mode is useful for adjusting the final version of a
       document before printing or sending it to a publisher. However, the use
       of this mode slows down the editor since every modification in the
       document triggers the page-breaking algorithm.
 
       Notice also that the mere selection of this mode does not imply the
       screen margins and page decorations to be as on paper. In order to
-      previsualize a document in a fully realistic way, you should also set
-      <menu|Document|Page|Screen margins|Show header and footer> and
-      <menu|Document|Page|Screen margins|Margins as on paper>.
+      previsualize a document in a fully realistic way, you should also
+      select <menu|Document|Page|Screen margins|Margins as on paper> (and
+      make sure that <src-var|page-show-hf> is <verbatim|true>).
 
       <item*|<verbatim|papyrus>>The paragraph width is the same as on paper,
       but page breaking is disabled. This mode is most useful during the
@@ -130,15 +173,57 @@
       This setting, which makes optimal use of the available space on your
       screen, is useful for documents which are not intended to be printed
       out. It may for instance be selected when using <TeXmacs> as a browser
-      or as an interface to computer algebra systems.
+      or as an interface to computer algebra systems. In the menu, this
+      value is called \PScreen\Q.
+
+      <item*|<verbatim|beamer>>Similar to <verbatim|paper>, but each page is
+      given at least the full height of a page, and scroll bars are hidden
+      in full screen mode. This medium is used for presentations.
     </description>
+
+    The additional page \Ptypes\Q <verbatim|book>, <verbatim|panorama> and
+    <verbatim|slideshow> in <menu|Document|Page|Type> are not values of
+    <src-var|page-medium>: they select the <verbatim|paper> medium in
+    combination with suitable values of <src-var|page-border>,
+    <src-var|page-packet> and <src-var|page-offset> (see below).
+  </explain>
+
+  <\explain>
+    <var-val|page-border|default><explain-synopsis|page border decorations>
+  <|explain>
+    Determines how page borders are drawn on the screen in <verbatim|paper>
+    mode. With <verbatim|none>, no borders are drawn (this value is used when
+    printing). With <verbatim|attached>, successive pages in a packet are
+    drawn next to each other without separation, like the facing pages of a
+    book. Any other value (such as the default <verbatim|default>) draws a
+    small border around each page.
+  </explain>
+
+  <\explain>
+    <var-val|page-packet|1>
+
+    <var-val|page-offset|0><explain-synopsis|display pages side by side>
+  <|explain>
+    In <verbatim|paper> mode, pages are displayed on the screen by packets
+    of <src-var|page-packet> pages which are placed next to each other. The
+    <src-var|page-offset> specifies the position of the first page inside
+    the first packet; for instance, a book-like layout is obtained with
+    <src-var|page-packet> set to <verbatim|2>, <src-var|page-offset> set to
+    <verbatim|1> and <src-var|page-border> set to <verbatim|attached>.
+  </explain>
+
+  <\explain>
+    <var-val|page-single|false><explain-synopsis|display page by page>
+  <|explain>
+    This flag is read together with the other page parameters, but it is
+    currently not used by the typesetter.
   </explain>
 
   <\explain>
     <var-val|page-screen-width|10cm><explain-synopsis|width of the rendering
     window>
   <|explain>
-    In <verbatim|automatic> mode, this environement variable contains the
+    In <verbatim|automatic> mode, this environment variable contains the
     width of the screen.
   </explain>
 
@@ -146,7 +231,7 @@
     <var-val|page-screen-height|10cm><explain-synopsis|height of the
     rendering window>
   <|explain>
-    In <verbatim|automatic> mode, this environement variable contains the
+    In <verbatim|automatic> mode, this environment variable contains the
     height of the screen.
   </explain>
 
@@ -155,7 +240,9 @@
     screen editing?>
   <|explain>
     This flag specifies whether the screen margins are manually specified by
-    the user, or whether they are the same as on paper.
+    the user, or whether they are the same as on paper. It is toggled by
+    <menu|Document|Page|Screen margins|Margins as on paper> and it is
+    automatically set to <verbatim|false> when printing.
   </explain>
 
   <\explain>
@@ -165,7 +252,7 @@
 
     <var-val|page-screen-top|15mm>
 
-    <var-val|page-screen-bot|15mm><explain-synopsis|left margin on screen>
+    <var-val|page-screen-bot|15mm><explain-synopsis|margins on screen>
   <|explain>
     When <src-var|page-screen-margin> is <verbatim|true>, then these
     environment variables determine the margins which are to be used for
@@ -173,11 +260,13 @@
   </explain>
 
   <\explain>
-    <var-val|page-show-hf|false><explain-synopsis|show headers and footers on
+    <var-val|page-show-hf|true><explain-synopsis|show headers and footers on
     screen?>
   <|explain>
     This flag determines whether the page headers and footers should be
-    visible on the screen. When set to <verbatim|true>, it should be noticed
+    visible on the screen. It only has an effect in <verbatim|paper> mode
+    and it is forced to <verbatim|true> when printing. When set to
+    <verbatim|true>, it should be noticed
     that the headers and footers are not always correctly updated when
     editing. In the case when you suspect them to be wrong, refreshing the
     display by scrolling down and up should display the correct values.
@@ -202,18 +291,23 @@
     page size and the left and right margins. When set to <verbatim|true>,
     the left and right margins are determined as a function of the page size,
     the paragraph width, <src-var|page-odd-shift> and
-    <src-var|page-even-shift>. For compatability with <TeX>/<LaTeX>, it is
+    <src-var|page-even-shift>. For compatibility with <TeX>/<LaTeX>, it is
     also possible to set <src-var|page-width-margin> to <verbatim|tex>, in
     which case the horizontal margins are determined from <src-var|page-odd>,
     <src-var|page-even> and <src-var|par-width>. The
     <src-var|page-height-margin> variable plays a similar role for the
-    vertical margins.
+    vertical margins: when <verbatim|false>, the height of the main text is
+    determined from the page height, <src-var|page-top> and
+    <src-var|page-bot>; when <verbatim|true>, the height of the main text is
+    given by <src-var|page-user-height> and the text is vertically centered
+    on the page; when <verbatim|tex>, it is given by
+    <src-var|page-user-height> and the top margin by <src-var|page-top>.
   </explain>
 
   <\explain>
     <var-val|page-width|auto>
 
-    <var-val|page-height|auto><explain-synopsis|page width>
+    <var-val|page-height|auto><explain-synopsis|page size>
   <|explain>
     By default, the width and height of a page are automatically determined
     from the page type. When <src-var|page-type> is set to <verbatim|user>,
@@ -244,7 +338,7 @@
     margin for even pages is given by the formula
 
     <\equation*>
-      <text|<src-var|page-right>>+<text|<src-var|page-even>>-<text|<src-var|page-odd>>
+      <text|<src-var|page-right>>+<text|<src-var|page-odd>>-<text|<src-var|page-even>>
     </equation*>
 
     If <src-var|page-width-margin> is <verbatim|true> or when
@@ -262,11 +356,32 @@
     paragraph width and the margin shifts using the formulas
 
     <\eqnarray*>
-      <tformat|<table|<row|<cell|<text|<src-var|page-even>>>|<cell|=>|<cell|<frac|<text|<src-var|page-width>>-<text|<src-var|par-width>>|2>+<text|<src-var|page-odd-shift>>>>|<row|<cell|<text|<src-var|page-odd>>>|<cell|=>|<cell|<frac|<text|<src-var|page-width>>-<text|<src-var|par-width>>|2>+<text|<src-var|page-even-shift>>>>>>
+      <tformat|<table|<row|<cell|<text|<src-var|page-odd>>>|<cell|=>|<cell|<frac|<text|<src-var|page-width>>-<text|<src-var|par-width>>|2>+<text|<src-var|page-odd-shift>>>>|<row|<cell|<text|<src-var|page-even>>>|<cell|=>|<cell|<frac|<text|<src-var|page-width>>-<text|<src-var|par-width>>|2>+<text|<src-var|page-even-shift>>>>>>
     </eqnarray*>
 
     The right margin is always taken to be such that the paragraph width and
     the left and right margins sum up to the page width.
+  </explain>
+
+  <\explain>
+    <var-val|page-top|auto>
+
+    <var-val|page-bot|auto><explain-synopsis|top and bottom margins>
+  <|explain>
+    The top and bottom margins, used when <src-var|page-height-margin> is
+    <verbatim|false> (for <verbatim|tex>, only <src-var|page-top> is used).
+    When set to <verbatim|auto>, a default margin is determined as a function
+    of the page type.
+  </explain>
+
+  <\explain>
+    <var-val|page-user-height|522pt><explain-synopsis|height of the main
+    text>
+  <|explain>
+    The height of the main text on each page, used when
+    <src-var|page-height-margin> is <verbatim|true> or <verbatim|tex>.
+    Otherwise, it is computed from the page height and the top and bottom
+    margins.
   </explain>
 
   <\quote-env>
@@ -291,17 +406,36 @@
 
     <var-val|page-even-header|>
 
-    <var-val|page-even-footer|><explain-synopsis|header for odd pages>
+    <var-val|page-even-footer|><explain-synopsis|headers and footers>
   <|explain>
     These environment variables contain the header and footer texts for odd
     and even pages.
   </explain>
 
   <\explain>
+    <var-val|page-this-header|>
+
+    <var-val|page-this-footer|>
+
+    <var-val|page-this-top|>
+
+    <var-val|page-this-bot|>
+
+    <var-val|page-this-bg-color|><explain-synopsis|settings for the current
+    page only>
+  <|explain>
+    When assigned inside the document, these variables override the header,
+    the footer, the top and bottom margins and the background color for the
+    page on which the assignment occurs only. They are reset after each page.
+    For instance, the <verbatim|beamer> style uses
+    <inactive*|<assign|page-this-top|0mm>> for slides with a title bar.
+  </explain>
+
+  <\explain>
     <var-val|page-head-sep|8mm>
 
     <var-val|page-foot-sep|8mm><explain-synopsis|separation between
-    headers/fotters and text>
+    headers/footers and text>
   <|explain>
     These parameters determine the space between the main text and page
     headers and footers. They correspond to the <math|h> and <math|f>
@@ -320,7 +454,7 @@
     <var-val|page-fnote-barlen|7.5fn><explain-synopsis|length of footnote
     bars>
   <|explain>
-    The length of the foornote bar.
+    The length of the footnote bar.
   </explain>
 
   <\explain>
@@ -331,17 +465,29 @@
   </explain>
 
   <\explain>
+    <var-val|page-float-enable|paper><explain-synopsis|enable floating
+    objects>
+  <|explain>
+    Floating objects are really allowed to float if this variable is
+    <verbatim|true> or if it coincides with the current
+    <src-var|page-medium>. Otherwise, floats are placed \Phere\Q. By
+    default, floats therefore only float in <verbatim|paper> mode.
+  </explain>
+
+  <\explain>
     <var-val|page-mnote-sep|5mm><explain-synopsis|separation between marginal
     notes and text>
   <|explain>
-    The separation between marginal notes and the main text (not implemented
-    yet).
+    The separation between marginal notes and the main text (not used by
+    the typesetter; marginal notes in the standard styles use the macro
+    variable <src-var|marginal-note-sep> instead).
   </explain>
 
   <\explain>
     <var-val|page-mnote-width|15mm><explain-synopsis|width of marginal notes>
   <|explain>
-    The width of marginal notes (not implemented yet).
+    The width of marginal notes (not used by the typesetter; marginal notes
+    in the standard styles use <src-var|marginal-note-width> instead).
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

@@ -7,12 +7,12 @@
 
   Besides sequences of instructions, which can be achieved using the
   <markup|concat> primitive, and the mechanism of macro expansion, the
-  <TeXmacs> style-sheet language provides a few other primitive for affecting
+  <TeXmacs> style-sheet language provides a few other primitives for affecting
   the control flow: <markup|if>, <markup|case>, <markup|while> and
   <markup|for-each>. These primitives are available from the
   <menu|Source|Control flow> menu. However, we have to warn the user that the
   conditional constructs are quite fragile: they only apply to inline content
-  and the accessibility of macro arguments should not to much depend on the
+  and the accessibility of macro arguments should not too much depend on the
   conditions.
 
   The most important primitive <markup|if>, which can be entered using
@@ -26,7 +26,11 @@
 
   In this example, <markup|appendix> is a block environment consisting of a
   title and a body, and which is rendered as a chapter for long documents and
-  as a section for short ones. Notice that the following implementation would
+  as a section for short ones. (This is a simplified example: the predicate
+  <markup|long-document> and the macros <markup|chapter-appendix> and
+  <markup|section-appendix> are not part of the standard styles, whose
+  actual implementation of appendices in <tmpackage|section-base> relies on
+  a similar test on <markup|sectional-short-style>.) Notice that the following implementation would
   have been incorrect, since the <markup|if> primitive currently only works
   for inline content:
 

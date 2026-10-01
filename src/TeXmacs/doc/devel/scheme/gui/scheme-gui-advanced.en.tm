@@ -60,8 +60,8 @@
   </explain>
 
   <\explain>
-    <scm|(resize (<scm-arg|w1> <scm-arg|w2> <scm-arg|w3>) (<scm-arg|h1>
-    <scm-arg|h2> <scm-arg|h3>) <scm-arg|wid>)>
+    <scm|(resize '(<scm-arg|w1> <scm-arg|w2> <scm-arg|w3>) '(<scm-arg|h1>
+    <scm-arg|h2> <scm-arg|h3>) <scm-arg|widget>)>
 
     <scm|(resize <scm-arg|w> <scm-arg|h> <scm-arg|widget>)><explain-synopsis|resizes
     <scm-arg|widget>>
@@ -71,7 +71,9 @@
     <scm-arg|w2><math|\<times\>><scm-arg|h2> and a maximum size of
     <scm-arg|w3><math|\<times\>><scm-arg|h3>. <scm-arg|widget> will be set to
     the default size and will be allowed to resize but not beyond the bounds
-    specified. The second alternative sets a fixed width and height.
+    specified. The second alternative sets a fixed width and height. Both
+    size arguments are evaluated, so that lists must be quoted; both
+    variants may also be mixed.
 
     Sizes are specified as strings with a unit suffix, like in <scm|"150px">.
 
@@ -111,45 +113,75 @@
   another.
 
   <\explain>
-    <scm|(aligned <scm-arg|items-list>)><explain-synopsis|arranges items in a
-    two column table>
+    <scm|(aligned (item <scm-arg|left> <scm-arg|right>) ...)><explain-synopsis|arranges
+    items in a two column table>
   <|explain>
-    \;
+    Each <scm|item> gives the contents of the two cells of a row, usually a
+    label and an input widget. <scm|(meti <scm-arg|right> <scm-arg|left>)>
+    is the same as <scm|(item <scm-arg|left> <scm-arg|right>)>. An example
+    can be found in \P<hlink|Dialogs and composite
+    widgets|scheme-gui-dialogs.en.tm>\Q.
   </explain>
 
   <\explain>
     <scm|(hlist <scm-arg|widgets>)> <explain-synopsis|arranges items
     horizontally>
   <|explain>
-    \;
+    Arranges its arguments from left to right. Use glue widgets (see below)
+    to separate them.
   </explain>
 
   <\explain>
     <scm|(vlist <scm-arg|widgets>)><explain-synopsis|arranges items
     vertically>
   <|explain>
-    \;
+    Arranges its arguments from top to bottom. The variants
+    <scm|horizontal> and <scm|vertical> are mainly used for menus and
+    toolbars.
   </explain>
 
   <\explain>
-    <scm|(hsplit (item (<scm-arg|widget>)) (item (<scm-arg|widget>))
-    ...)><explain-synopsis|arranges two items in a split panel>
+    <scm|(hsplit <scm-arg|left> <scm-arg|right>)>
+
+    <scm|(vsplit <scm-arg|top> <scm-arg|bottom>)><explain-synopsis|arranges
+    two items in a split panel>
   <|explain>
-    \;
+    Puts exactly two widgets side by side <abbr|resp.> one above the other,
+    separated by a border which can be moved by the user.
   </explain>
 
   <\explain>
-    <scm|(tabs (tab (<scm-arg|widget>)) (tab (<scm-arg|widget>))
-    ...)><explain-synopsis|a tabbed widget>
+    <scm|(tabs (tab <scm-arg|label> <scm-arg|widgets>) (tab <scm-arg|label>
+    <scm-arg|widgets>) ...)><explain-synopsis|a tabbed widget>
   <|explain>
-    \;
+    A tabbed widget with one page per <scm|tab>; the first argument of each
+    <scm|tab> is the label of the tab (for instance <scm|(text "General")>),
+    the remaining ones form the contents of the page:
+
+    <\scm-code>
+      (tm-widget (tabs-example)
+
+      \ \ (tabs
+
+      \ \ \ \ (tab (text "First") (text "Contents of the first tab"))
+
+      \ \ \ \ (tab (text "Second") (text "Contents of the second tab"))))
+    </scm-code>
+
+    With <scm|icon-tabs> and <scm|(icon-tab <scm-arg|icon-file>
+    <scm-arg|label> <scm-arg|widgets>)>, the tabs also display an icon, as
+    in the preferences dialog.
   </explain>
 
   <\explain>
-    <scm|(dynamic (<scm-arg|widget>))><explain-synopsis|embeds a tm-widget
+    <scm|(dynamic <scm-arg|expr>)><explain-synopsis|embeds a tm-widget
     into another one>
   <|explain>
-    \;
+    Evaluates <scm-arg|expr>, typically a call <scm|(<scm-arg|some-widget>
+    <scm-arg|args>)> of a function defined with <scm|tm-widget> or
+    <scm|tm-menu>, and inserts the resulting widgets at this place. For
+    menus without arguments, one may also use <scm|(link
+    <scm-arg|some-menu>)>.
   </explain>
 
   <subsection|Glue widgets>
@@ -256,22 +288,91 @@
   For the specific use in menus the following two macros are defined:
 
   <\explain>
-    <scm|\|><explain-synopsis|horizontal separator>
+    <scm|\|> or <scm|/><explain-synopsis|separator in horizontal menus>
   <|explain>
-    (A vertical bar)
+    A vertical separator line between the items of a horizontal menu or
+    toolbar.
   </explain>
 
   <\explain>
-    <scm|---><explain-synopsis|vertical separator>
+    <scm|---><explain-synopsis|separator in vertical menus>
   <|explain>
-    (Three dashes)
+    A horizontal separator line between the items of a vertical menu or
+    list.
   </explain>
 
   <subsection|Refresh widgets>
 
-  Refresh widgets redraw their contents every time a command is executed.
-  They achieve this re-evaluating the code for the whole widget, so you can
-  have new values in your variables...
+  Widgets are normally built once, when they are displayed. <em|Refresh
+  widgets> are rebuilt on demand, by re-evaluating the code which defines
+  their contents, so that they can reflect new values of your variables.
+
+  <\explain>
+    <scm|(refreshable <scm-arg|kind> <scm-arg|widgets>)><explain-synopsis|a
+    widget which can be rebuilt>
+  <|explain>
+    The <scm-arg|widgets> are rebuilt whenever <scm|(refresh-now
+    <scm-arg|kind>)> is executed, where <scm-arg|kind> is a string. For
+    instance, the following widget from <verbatim|menu-test.scm> changes
+    its text when the toggle is clicked:
+
+    <\session|scheme|default>
+      <\input|Scheme] >
+        (tm-widget (widget9)
+
+        \ \ (padded
+
+        \ \ \ \ (with flag? #f
+
+        \ \ \ \ \ \ (refreshable "test"
+
+        \ \ \ \ \ \ \ \ (if (not flag?) (text "Flag is off"))
+
+        \ \ \ \ \ \ \ \ (if flag? (text "Flag is on")))
+
+        \ \ \ \ \ \ ===
+
+        \ \ \ \ \ \ (hlist
+
+        \ \ \ \ \ \ \ \ (toggle (begin (set! flag? answer) (refresh-now
+        "test")) flag?)
+
+        \ \ \ \ \ \ \ \ ///
+
+        \ \ \ \ \ \ \ \ (text "Toggle here")))))
+      </input>
+
+      <\input|Scheme] >
+        (show widget9)
+      </input>
+    </session>
+
+    Refreshable widgets of kind <verbatim|"auto"> are automatically rebuilt
+    after each user command.
+  </explain>
+
+  <\explain>
+    <scm|(refresh <scm-arg|widget> <scm-arg|kind>)><explain-synopsis|a named
+    widget which can be rebuilt>
+  <|explain>
+    Includes the widget or menu <scm-arg|widget> (a name defined by
+    <scm|tm-widget> or <scm|menu-bind> without arguments, not evaluated),
+    which is rebuilt in the same way. Here <scm-arg|kind> is written as a
+    symbol, as in <scm|(refresh widget8-sub auto)>.
+  </explain>
+
+  <\explain>
+    <scm|(cached <scm-arg|kind> <scm-arg|valid?>
+    <scm-arg|widgets>)><explain-synopsis|a refreshable widget with a cache>
+  <|explain>
+    Like <scm|refreshable>, but the previously built widget is reused as
+    long as <scm-arg|valid?> holds; <scm|(invalidate-now <scm-arg|kind>)>
+    forces the widget to be rebuilt.
+  </explain>
+
+  The implementation of these widgets is described in \P<hlink|The
+  <scheme> widget language and its
+  interpreter|../../source/widgets-scheme.en.tm>\Q.
 
   <tmdoc-copyright|2012|the <TeXmacs> team.>
 

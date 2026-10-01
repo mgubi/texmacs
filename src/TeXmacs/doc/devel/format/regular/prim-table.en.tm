@@ -113,7 +113,7 @@
     <explain-macro|subtable|table><explain-synopsis|subtable cell data>
   <|explain>
     In addition to regular markup, cells can accept
-    <markup|><markup|subtable> as an operand. The operand of
+    <markup|subtable> as an operand. The operand of
     <markup|subtable> is a <markup|tformat> tree containing regular table
     data.
 
@@ -123,13 +123,11 @@
   </explain>
 
   <\explain>
-    <explain-macro|tmarker|table><explain-synopsis|decoration origin marker>
+    <explain-macro|tmarker><explain-synopsis|decoration origin marker>
   <|explain>
-    This tag is used in the definition of cell decorations, see the
-    documentation of the <src-var|cell-decoration> environment variable.
-
-    It is also used outside tables, in the <markup|switch> tag to mark the
-    currently displayed position.
+    This zero-ary tag is used in the definition of cell decorations, see the
+    documentation of the <src-var|cell-decoration> environment variable: it
+    marks the position of the decorated cell inside the decoration.
   </explain>
 
   <\explain>
@@ -137,7 +135,9 @@
   <|explain>
     This macro implements standard left aligned tables without borders.
     Although the <markup|tabular> macro is built-in into <TeXmacs>, it should
-    not really be considered as a primitive. However, it is not part of any
+    not really be considered as a primitive: it is defined in the default
+    environment (<verbatim|Typeset/Env/env_default.cpp>) as
+    <inactive*|<macro|x|<tformat|<arg|x>>>>, but it is not part of any
     style file either.
   </explain>
 

@@ -1,4 +1,4 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english|old-spacing>>
 
@@ -32,9 +32,12 @@
     public. Each option is of the form <scm|(:<scm-arg|kind>
     <scm-args|arguments>)> and the <scm-arg|body> starts at the first element
     of the list following <scm-arg|head> which is not of this form. Available
-    options are <scm|:type>, <scm|:synopsis>, <scm|:returns>, <scm|:note>,
-    <scm|:argument>, <scm|:default>, <scm|:proposals>, <scm|:secure>,
-    <scm|:check-mark>, <scm|:interactive> and <scm|:balloon>.
+    options are <scm|:mode>, <scm|:require> and <scm|:applicable> (for
+    contextual overloading), <scm|:type>, <scm|:synopsis>, <scm|:synopsis*>,
+    <scm|:returns>, <scm|:note>, <scm|:argument>, <scm|:default>,
+    <scm|:proposals>, <scm|:secure>, <scm|:check-mark>, <scm|:interactive>
+    and <scm|:balloon>. The implementation can be found in
+    <verbatim|kernel/texmacs/tm-define.scm>.
   </explain>
 
   <\explain>
@@ -43,10 +46,8 @@
   <|explain>
     <scm|tm-property> allows the declaration of <TeXmacs> properties for
     functions which have already been defined, specifically for functions
-    exported through the glue. Available options are <scm|:type>,
-    <scm|:synopsis>, <scm|:returns>, <scm|:note>, <scm|:argument>,
-    <scm|:default>, <scm|:proposals>, <scm|:secure>, <scm|:check-mark>,
-    <scm|:interactive> and <scm|:balloon>.
+    exported through the glue. Available options are the same as for
+    <scm|tm-define>, except for the ones used for contextual overloading.
   </explain>
 
   <paragraph*|Contextual overloading>
@@ -74,7 +75,7 @@
 
       \;
 
-      (tm-define (special)
+      (tm-define (special t)
 
       \ \ (:require (tree-is? t 'frac))
 
@@ -82,7 +83,7 @@
 
       \;
 
-      (tm-define (special)
+      (tm-define (special t)
 
       \ \ (:require (tree-is? t 'rsub))
 
@@ -108,9 +109,14 @@
   <\explain>
     <scm|(:mode <scm-arg|mode>)><explain-synopsis|mode-based overloading>
   <|explain>
-    This option is equivalent to <scm|(:require (<scm-arg|mode>))> and
+    This option is similar to <scm|(:require (<scm-arg|mode>))> and
     specifies that the definition is only valid when we are in a given
-    <scm-arg|mode>. New modes are defined using <scm|texmacs-modes> and modes
+    <scm-arg|mode>. Here <scm-arg|mode> is a mode predicate such as
+    <scm|in-math?> or <scm|in-prog-scheme?>. Contrary to conditions
+    specified using <scm|:require>, mode conditions do not depend on the
+    arguments of the function, and definitions for more specific modes
+    automatically take precedence over definitions for more general
+    modes. New modes are defined using <scm|texmacs-modes> and modes
     can inherit from other modes.
   </explain>
 
@@ -122,8 +128,11 @@
     overloading, for instance in <scm|kbd-map>. Modes may be made dependent
     on other modes. This macro takes a variable number of definitions as
     arguments, each of the form <scm|(mode-name conditions . dependencies)>.
-    End your <scm|mode-name> and any dependencies with one <scm|%>, like
-    this:
+    End your <scm|mode-name> and any dependencies with one <scm|%>; the
+    macro then defines a predicate whose name is obtained by replacing
+    <scm|%> by <scm|?> (<abbr|e.g.> <scm|in-verbatim?> below). The
+    <scm-arg|conditions> may be <scm|#t> for modes which only depend on
+    other modes. For instance:
 
     <\scm-code>
       (texmacs-modes
@@ -184,10 +193,55 @@
     <scm-arg|var> to the function or macro. Such a description is used for
     instance for the prompts, when calling the function interactively. For
     these uses, the second format allows for the specification of a
-    <scm-arg|type> which changes how the widgets/prompts work. Some allowed
-    values are <scm|"string">, the default, and <scm|"file"> and
-    <scm|"directory">. If any of the last two is specified, tab completion in
-    the interactive prompt will traverse the file system.
+    <scm-arg|type> (a string or a symbol) which changes how the
+    widgets/prompts work. The default type is <scm|"string">. Types ending
+    with <scm|file> (such as <scm|smart-file>) and the type
+    <scm|"directory"> allow the user to choose a file or directory, and tab
+    completion in the interactive prompt will traverse the file system. For
+    instance, <scm|load-buffer> in <verbatim|texmacs/texmacs/tm-files.scm> is
+    declared using <scm|(:argument name smart-file "File name")>.
+  </explain>
+
+  <\explain>
+    <scm|(:default <scm-arg|var> <scm-args|body>)>
+
+    <scm|(:proposals <scm-arg|var> <scm-args|body>)><explain-synopsis|default
+    values and proposals for arguments>
+  <|explain>
+    When calling the function interactively, the argument <scm-arg|var> is
+    proposed with the default value obtained by evaluating <scm-arg|body>,
+    <abbr|resp.> with the list of proposals obtained by evaluating
+    <scm-arg|body>.
+  </explain>
+
+  <\explain>
+    <scm|(:interactive #t)><explain-synopsis|interactive functions>
+  <|explain>
+    Indicates that the function is interactive, <abbr|i.e.> that it may
+    prompt the user for further input. In menus, the names of the
+    corresponding entries are followed by dots.
+  </explain>
+
+  <\explain>
+    <scm|(:check-mark <scm-arg|text> <scm-arg|pred?>)>
+
+    <scm|(:balloon <scm-arg|fun>)><explain-synopsis|menu decorations>
+  <|explain>
+    The <scm|:check-mark> option specifies a check mark <scm-arg|text> (such
+    as <scm|"*"> or <scm|"v">) and a predicate <scm-arg|pred?> which
+    determines whether menu entries calling the function should be marked;
+    the predicate is applied to the same arguments as the function. The
+    <scm|:balloon> option specifies a function which is applied to the same
+    arguments and which should return the text of the help balloon for menu
+    entries calling the function. By default, the synopsis is used as the
+    help balloon.
+  </explain>
+
+  <\explain>
+    <scm|(:secure #t)><explain-synopsis|secure functions>
+  <|explain>
+    Declares the function to be secure, so that it can be called from
+    untrusted documents (for instance through <markup|action> tags).
   </explain>
 
   <\explain>

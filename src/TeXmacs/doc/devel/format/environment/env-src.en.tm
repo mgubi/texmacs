@@ -6,7 +6,7 @@
   <tmdoc-title|Editing source trees>
 
   The different rendering styles for source trees are described in more
-  detail in the <hyper-link|section|../../style/presentation/src-present-global.en.tm>
+  detail in the <hlink|section|../../style/presentation/src-present-global.en.tm>
   about the global presentation of source trees. The corresponding
   environment variables are briefly described here.
 
@@ -29,12 +29,12 @@
   </explain>
 
   <\explain>
-    <var-val|src-compact|normal><explain-synopsis|compactication level>
+    <var-val|src-compact|normal><explain-synopsis|compactification level>
   <|explain>
     How compact should tags be rendered, as specified in
     <menu|Document|Source|Compactification>. Possible values are
     <verbatim|none>, <verbatim|inline>, <verbatim|normal>, <verbatim|inline
-    tags> and <verbatim|all>.
+    args> and <verbatim|all>.
   </explain>
 
   <\explain>
@@ -44,6 +44,13 @@
     <menu|Document|Source|Closing style>. Possible values are
     <verbatim|repeat>, <verbatim|long>, <verbatim|compact> and
     <verbatim|minimal>.
+  </explain>
+
+  <\explain>
+    <var-val|src-tag-color|blue><explain-synopsis|color of source tags>
+  <|explain>
+    The default color which is used for rendering the names of tags in
+    source trees.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

@@ -93,8 +93,8 @@
 
   <paragraph*|Positions inside document fragments>
 
-  The main way to address positions inside a tree is via a list of positive
-  integers, called a <em|path>, and corresponding to the <scheme> type
+  The main way to address positions inside a tree is via a list of
+  integers (starting at <math|0>), called a <em|path>, and corresponding to the <scheme> type
   <verbatim|path>. For instance, assume that <scm|x> corresponds to the
   expression<nbsp>(<reference|example-edit-formula>). Then the subscript
   <math|1> is identified uniquely by the path<nbsp><rigid|<scm|(1 0)>>.
@@ -104,7 +104,7 @@
   corresponds to the cursor position just behind the <scm|i>-th character in
   the string (we notice that <scm|rcons> is used to append a new element at
   the end of a list). If <scm|p> is a path to a non-string subtree, then
-  <scm|(rcons p 0)> and <scm|(rcons p 1>) correspond to the cursor positions
+  <scm|(rcons p 0)> and <scm|(rcons p 1)> correspond to the cursor positions
   before and behind this subtree.
 
   It should be noticed that paths do not necessarily correspond to <em|valid>
@@ -202,7 +202,7 @@
   modifying a tree, this yields a first simple implementation:
 
   <\scm-code>
-    (define (swap-numerator-denominator)
+    (tm-define (swap-numerator-denominator)
 
     \ \ (with-innermost t 'frac
 
@@ -218,7 +218,7 @@
   position\Q modulo the exchange numerator/denominator:
 
   <\scm-code>
-    (define (swap-numerator-denominator)
+    (tm-define (swap-numerator-denominator)
 
     \ \ (with-innermost t 'frac
 
@@ -236,19 +236,21 @@
   mechanism of structured variants:
 
   <\scm-code>
-    (define (variant-circulate t forward?)
+    (tm-define (variant-circulate t forward?)
 
     \ \ (:require (tree-is? t 'frac))
 
     \ \ (swap-numerator-denominator))
   </scm-code>
 
-  Notice that this implementation can be incorrect when operating on nested
+  (Since <scm|variant-circulate> is overloaded with <scm|:require>, it must
+  be redefined using <scm|tm-define> rather than <scm|define>.) Notice that
+  this implementation can be incorrect when operating on nested
   fractions. The implementation can be further improved by letting
   <scm|swap-numerator-denominator> operate on a specific<nbsp>tree:
 
   <\scm-code>
-    (define (swap-numerator-denominator t)
+    (tm-define (swap-numerator-denominator t)
 
     \ \ (:require (tree-is? t 'frac))
 
@@ -262,7 +264,7 @@
   The corresponding generic routine could be defined as
 
   <\scm-code>
-    (define (swap-numerator-denominator t)
+    (tm-define (swap-numerator-denominator t)
 
     \ \ (and-with p (tree-outer t)
 
@@ -270,7 +272,9 @@
   </scm-code>
 
   This piece of code will perform an outward recursion until a specific
-  handler is found. We may now replace the call
+  handler is found. Since the most recent definition is tried first, this
+  generic definition should come <em|before> the specific one in the
+  source code. We may now replace the call
   <scm|(swap-numerator-denominator)> by <scm|(swap-numerator-denominator
   (cursor-tree))>.
 
@@ -282,7 +286,7 @@
   the focus as follows:
 
   <\scm-code>
-    (define (swap-numerator-denominator t)
+    (tm-define (swap-numerator-denominator t)
 
     \ \ (:require (tree-is? t 'frac))
 

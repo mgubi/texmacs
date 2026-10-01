@@ -41,7 +41,7 @@
     order to show the inactive representation of <TeXmacs> content.
     Nevertheless, it is sometimes desirable to reactivate certain subtrees
     inside deactivated content. For instance, the following piece of
-    deactivated code (using <markup|disactive*>) contains the reactivated
+    deactivated code (using <markup|inactive*>) contains the reactivated
     subexpression <math|<with|color|red|\<heartsuit\>\<heartsuit\>\<heartsuit\>>>
     (using <markup|active*>):
 
@@ -59,7 +59,7 @@
     a given <src-arg|name> and arguments <src-arg|arg-1> until
     <src-arg|arg-n>. For instance, <inactive*|<inline-tag|foo|x|y>> produces
     <inline-tag|foo|x|y>. The style of the rendering may be customized in the
-    <menu|Document|Source|Source tags> menu, or by modifying the
+    <menu|Document|Source|Preferences> menu, or by modifying the
     <src-var|src-style>, <src-var|src-special>, <src-var|src-compact> and
     <src-var|src-close> environment variables.
   </explain>
@@ -137,6 +137,17 @@
   </explain>
 
   <\explain>
+    <explain-macro|filter-style|expr><explain-synopsis|remove style
+    markup>
+  <|explain>
+    Evaluates <src-arg|expr>, removes all <markup|style-with>,
+    <markup|style-with*>, <markup|style-only>, <markup|style-only*>,
+    <markup|active>, <markup|active*>, <markup|inactive> and
+    <markup|inactive*> tags from the result, as is done when importing a
+    style file, and evaluates the filtered tree.
+  </explain>
+
+  <\explain>
     <explain-macro|symbol|symbol>
 
     <explain-macro|latex|cmd>
@@ -172,15 +183,20 @@
   style file either.
 
   <\explain>
-    <explain-macro|indent|body><explain-synopsis|indent some content>
+    <explain-macro|indent|body>
+
+    <explain-macro|indent*|body><explain-synopsis|indent some content>
   <|explain>
-    Typeset the <src-arg|body> using some indentation.
+    Typeset the <src-arg|body> using some indentation: <markup|indent*>
+    increases the left margin <src-var|par-left> by <verbatim|1.5fn>, and
+    <markup|indent> moreover adds a <markup|right-flush> at the end.
   </explain>
 
   <\explain>
-    <explain-macro|rightflush><explain-synopsis|indent some content>
+    <explain-macro|right-flush><explain-synopsis|flush to the right>
   <|explain>
-    Flush to the right. This macro is useful to make the end of a block
+    Flush to the right (this macro expands to
+    <inactive*|<htab|0fn|first>>). This macro is useful to make the end of a block
     environment run until the right margin. This allows for more natural
     cursor positioning and a better layout of the informative boxes.
   </explain>
@@ -194,17 +210,24 @@
 
     <explain-macro|src-tt|verbatim-content>
 
-    <explain-macro|src-integer|interger>
+    <explain-macro|src-numeric|number>
 
     <explain-macro|src-length|length>
+
+    <explain-macro|src-textual|text>
+
+    <explain-macro|src-regular|content>
+
+    <explain-macro|src-unknown|content>
 
     <explain-macro|src-error|message><explain-synopsis|syntactic highlighting
     on purpose>
   <|explain>
     These macros are used for the syntactic highlighting of source trees.
     They determine how to render subtrees which correspond to macro names,
-    variable names, argument names, verbatim content, integers, lengths and
-    error messages.
+    variable names, argument names, verbatim content, numbers, lengths,
+    textual content, regular content, content of unknown type and error
+    messages.
   </explain>
 
   <\explain>

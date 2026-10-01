@@ -1,6 +1,6 @@
-<TeXmacs|1.99.11>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Example of a plug-in with Python code>
@@ -150,13 +150,63 @@
   </python-code>
 
   <python|flush_verbatim> is provided by <python|tmpy.protocol> which is a
-  subpackage for interaction with <TeXmacs> server in Python.
+  subpackage for interaction with <TeXmacs> server in Python. It writes a
+  <verbatim|DATA_BEGIN>-<verbatim|DATA_END> block in the <verbatim|utf8>
+  format on the standard output and flushes it. The same module also
+  provides <python|flush_prompt>, <python|flush_command>,
+  <python|flush_scheme>, <python|flush_latex>, <python|flush_file>,
+  <python|flush_ps> and <python|flush_err> (the latter writes to the
+  standard error, whose contents are displayed as error output), as well as
+  the constants <python|DATA_BEGIN>, <python|DATA_END>,
+  <python|DATA_ESCAPE> and <python|DATA_COMMAND>.
 
   <python|tm_input> is provided by <python|tmpy.compat> which is a subpackage
-  for compatibility within Python 2 and 3. For built-in plugins written in
-  Python, it would be better to support more Python version. For example, in
-  some desktop environments, the <shell|python> command may redirect to
-  <shell|python2.6>.
+  for compatibility within Python 2 and 3.
+
+  <paragraph|Choosing the <name|Python> interpreter>
+
+  The example uses the command <shell|python> both in its <scm|:require>
+  test and in its launcher. On systems where only <shell|python3> is
+  installed, the plug-in will therefore not be detected. The plug-ins which
+  are shipped with <TeXmacs> rather use the function
+  <scm|(python-command)> (defined in <verbatim|kernel/library/base.scm>),
+  which returns the first of <shell|python3>, <shell|python> and
+  <shell|python2> which can be found in the path (or the empty string if
+  there is none). For instance, the configuration of the
+  <verbatim|python> plug-in (in <verbatim|plugins/python/progs/init-python.scm>)
+  reads
+
+  <\scm-code>
+    (plugin-configure python
+
+    \ \ (:winpath "python*" ".")
+
+    \ \ (:winpath "Python*" ".")
+
+    \ \ (:winpath "Python/Python*" ".")
+
+    \ \ (:require (python-command))
+
+    \ \ (:launch ,(python-launcher))
+
+    \ \ (:preferences (supports-jupyter?))
+
+    \ \ (:tab-completion #t)
+
+    \ \ (:serializer ,python-serialize)
+
+    \ \ (:session "Python")
+
+    \ \ (:scripts "Python"))
+  </scm-code>
+
+  where <scm|python-launcher> starts the script
+  <verbatim|plugins/tmpy/session/tm_python.py> with the interpreter
+  returned by <scm|(python-command)> and the option <verbatim|-X utf8>.
+  Notice that the empty string returned by <scm|(python-command)> when no
+  interpreter is found is a true value in <scheme>, so this particular
+  <scm|:require> test always succeeds; a more robust test would be
+  <scm|(!= (python-command) "")>.
 
   <paragraph|Comparison with <c++>>
 
@@ -177,6 +227,8 @@
   </itemize>
 
   <tmdoc-copyright|2019|Darcy Shen>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

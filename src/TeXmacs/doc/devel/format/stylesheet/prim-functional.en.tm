@@ -9,9 +9,12 @@
   typesetting phase, such as increasing counters, localizing strings like
   ``theorem'' and so on. A fundamental set of basic functional operators are
   built-in primitives. New functional operators can easily be added using the
-  <markup|extern> primitive. Functional operators operate on five main types
-  of arguments: strings, numbers, lengths, booleans and tuples. Some
+  <markup|extern> primitive. Functional operators operate on six main types
+  of arguments: strings, numbers, lengths, booleans, tuples and colors. Some
   operators are overloaded, so that they can be used for several types.
+  Their implementation can be found in <verbatim|Typeset/Env/env_exec.cpp>
+  (the methods <cpp|edit_env_rep::exec_plus_minus>,
+  <cpp|edit_env_rep::exec_merge>, <abbr|etc.>).
 
   <\traverse>
     <branch|Operations on text|prim-strings.en.tm>

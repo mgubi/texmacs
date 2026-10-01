@@ -1,56 +1,44 @@
-<TeXmacs|1.0.0.5>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
-  <expand|tmdoc-title|Look at an example>
+  <tmdoc-title|Look at an example>
 
   Before writing your own style file, it may be useful to take a look at some
-  standard style files. For instance, you may load <verbatim|book.ts> using
-  <submenu|File|load> (no path is necessary here, since the style directory
-  is included in the default file path).
+  standard style files. For instance, you may open <verbatim|book.ts> using
+  <menu|File|Open>; it can be found in the directory
+  <verbatim|$TEXMACS_PATH/styles>. Alternatively, when editing a document
+  whose style is <tmstyle|book>, you may use <menu|Document|Style|Edit style>.
+  Style files are shown in source mode, so that all macro and environment
+  declarations are visible.
 
-  After loading <verbatim|book.ts>, you will see many function and
-  environment declarations (these declarations are visible, since style files
-  are written in ``preamble mode'' (see <submenu|Options|mode>)). Some more
-  declarations are contained in the files <verbatim|basic.ts>,
-  <verbatim|list.ts>, <verbatim|theorem.ts> and <verbatim|program.ts> on
-  which <verbatim|book.ts> is based. These files respectively contain basic,
-  itemize-like, theorem-like and programming environments.
+  The file <verbatim|book.ts> itself is very short: it essentially loads the
+  packages <tmpackage|std>, <tmpackage|env>, <tmpackage|title-book>,
+  <tmpackage|header-book> and <tmpackage|section-book> and sets a few style
+  parameters. Most declarations are contained in these packages and in the
+  packages on which they are based in their turn. For instance,
+  <tmpackage|std> loads <tmpackage|std-markup>, <tmpackage|std-list>,
+  <tmpackage|std-math>, <tmpackage|std-automatic> and several other packages
+  (in <verbatim|$TEXMACS_PATH/packages/standard>), which respectively contain
+  basic markup, itemize-like environments, mathematical markup, automatically
+  generated content (tables of contents, bibliographies, <abbr|etc.>), and so
+  on. Similarly, <tmpackage|env> loads <tmpackage|env-base>,
+  <tmpackage|env-math>, <tmpackage|env-theorem>, <tmpackage|env-float> and
+  <tmpackage|env-program> (in <verbatim|$TEXMACS_PATH/packages/environment>),
+  which contain theorem-like, mathematical, floating and programming
+  environments. Sectional commands are defined in <tmpackage|section-base>
+  and customized in <tmpackage|section-book>.
 
-  <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
-  <expand|tmdoc-license|Permission is granted to copy, distribute and/or
-  modify this document under the terms of the GNU Free Documentation License,
-  Version 1.1 or any later version published by the Free Software Foundation;
-  with no Invariant Sections, with no Front-Cover Texts, and with no
-  Back-Cover Texts. A copy of the license is included in the section entitled
-  "GNU Free Documentation License".>
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|paragraph width|150mm>
-    <associate|odd page margin|30mm>
-    <associate|shrinking factor|4>
-    <associate|page right margin|30mm>
-    <associate|page top margin|30mm>
-    <associate|reduction page right margin|25mm>
-    <associate|page type|a4>
-    <associate|reduction page bottom margin|15mm>
-    <associate|even page margin|30mm>
-    <associate|reduction page left margin|25mm>
-    <associate|page bottom margin|30mm>
-    <associate|reduction page top margin|15mm>
-    <associate|language|english>
-  </collection>
-</initial>
-
-<\references>
-  <\collection>
-    <associate|idx-1|<tuple|<uninit>|?>>
-    <associate|toc-1|<tuple|<uninit>|?>>
-    <associate|toc-2|<tuple|<uninit>|?>>
-    <associate|idx-2|<tuple|<uninit>|?>>
-  </collection>
-</references>
+<initial|<\collection>
+</collection>>

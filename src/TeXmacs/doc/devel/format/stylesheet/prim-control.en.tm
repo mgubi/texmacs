@@ -68,6 +68,23 @@
   </explain>
 
   <\explain>
+    <explain-macro|dynamic-case|event-1|body-1|<math|\<cdots\>>|event-n|body-n|else-body><explain-synopsis|interactive
+    case distinction>
+  <|explain>
+    Contrary to <markup|case>, all bodies are typeset beforehand and the
+    selection of the displayed body happens at rendering time, without
+    retypesetting the document (<verbatim|case_box> in
+    <verbatim|Typeset/Boxes/Composite/case_boxes.cpp>). The
+    <src-arg|else-body> is displayed by default. The <src-arg|event-i>
+    are evaluated and each of them may be the name of an event received by
+    the box, <verbatim|mouse-over> (when the mouse pointer is above the
+    box), <verbatim|focus> (when the cursor is inside the corresponding
+    part of the document), <verbatim|any>, or a comma separated list of
+    such conditions. This primitive is useful for interactive effects in
+    presentations and graphical user interfaces.
+  </explain>
+
+  <\explain>
     <explain-macro|while|condition|body><explain-synopsis|repeated
     evaluation>
   <|explain>
@@ -87,6 +104,24 @@
       <assign|i|<plus|<value|i>|1>>><arg|to>>>|<count|1|50>>
     </tm-fragment>
   </explain>
+
+  <\explain>
+    <explain-macro|for-each|foo|tuple><explain-synopsis|iterate over a
+    tuple>
+  <|explain>
+    Apply the macro <src-arg|foo> (the result of an evaluation, as in the
+    case of <markup|compound>) to each of the elements of the evaluated
+    <src-arg|tuple>. The results of the applications are discarded, so this
+    primitive is only useful for its side effects, such as assignments.
+    For instance, a style file may declare several similar environments
+    with <inactive*|<for-each|<value|new-theorem-like>|<tuple|theorem|lemma>>>
+    when <markup|new-theorem-like> is a macro which defines an environment
+    whose name is given by its argument.
+  </explain>
+
+  See also the <markup|if*> primitive in the section on <hlink|box
+  operations|../regular/prim-box.en.tm>, which reserves the space for its
+  content even when the condition is not satisfied.
 
   <tmdoc-copyright|2004|Joris van der Hoeven>
 

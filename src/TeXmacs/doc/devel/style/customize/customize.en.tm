@@ -12,8 +12,9 @@
   understanding of the global architecture of the standard style files and a
   more precise understanding of the parts you wish to customize. In this
   section, we will explain the general principles. For more details, we refer
-  to the chapter on the <hlink|principal <TeXmacs>
-  tags|../design/style-language.en.tm>.
+  to the chapter on the <hlink|standard <TeXmacs>
+  styles|../../../main/styles/styles.en.tm> and to the section on the
+  <hlink|style-sheet language|../design/style-language.en.tm>.
 
   <\traverse>
     <branch|Organization of the style files and

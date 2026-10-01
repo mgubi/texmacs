@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Background evaluations>
@@ -16,7 +16,15 @@
   for evaluating an expression using the application. Here
   <verbatim|<em|plugin>> is the name of the plug-in, <verbatim|<em|session>>
   the name of the session and <verbatim|<em|expression>> a <scheme>
-  expression which represents a <TeXmacs> tree.
+  expression which represents a <TeXmacs> tree. The command is defined in
+  the module <verbatim|(utils plugins plugin-eval)>; it starts the
+  application if necessary and returns the output as a <scheme>
+  expression. Notice that <scm|plugin-eval> is <em|synchronous>: <TeXmacs>
+  is blocked until the application has finished its output. For
+  asynchronous evaluations, the routines <scm|silent-feed> and
+  <scm|silent-feed*> can be used instead; see the section on the
+  <hlink|internals of the plug-in
+  system|../plugin/plugin-internals.en.tm>.
 
   <paragraph*|The <verbatim|substitute> plug-in>
 
@@ -54,30 +62,29 @@
   </cpp-code>
 
   Moreover, the configuration file <verbatim|init-substitute.scm> contains
-  the following code for replacing a selected region by its evaluation
+  the following code for replacing a selected region by its evaluation, as
+  well as the keyboard shortcut <key|C-F12> for this operation:
 
   <\scm-code>
-    (define (substitute-substitute)
+    (when (supports-substitute?)
 
-    \ \ (import-from (texmacs plugin plugin-cmd))
+    \ \ (define (substitute-substitute)
 
-    \ \ (if (selection-active-any?)
+    \ \ \ \ (import-from (utils plugins plugin-eval))
 
-    \ \ \ \ \ \ (let* ((t (tree-\<gtr\>stree (the-selection)))
+    \ \ \ \ (if (selection-active-any?)
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ (u (plugin-eval "substitute" "default" t)))
+    \ \ \ \ \ \ \ \ (let* ((t (tree-\<gtr\>stree (selection-tree)))
 
-    \ \ \ \ \ \ \ \ (clipboard-cut "primary")
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ (u (plugin-eval "substitute" "default" t)))
 
-    \ \ \ \ \ \ \ \ (insert (stree-\<gtr\>tree u)))))
-  </scm-code>
+    \ \ \ \ \ \ \ \ \ \ (clipboard-cut "primary")
 
-  as well as the keyboard shortcut for <shortcut|(substitute-substitute)>:
+    \ \ \ \ \ \ \ \ \ \ (insert (stree-\<gtr\>tree u)))))
 
-  <\scm-code>
-    (kbd-map
+    \ \ (kbd-map
 
-    \ \ ("C-F12" (substitute-substitute)))
+    \ \ \ \ ("C-F12" (substitute-substitute))))
   </scm-code>
 
   Notice that these routines should really be defined in a separate module
@@ -102,13 +109,15 @@
 
   Just as <verbatim|substitute.cpp> above, the main program
   <verbatim|secure.cpp> just converts mathematical <LaTeX> expressions to
-  <TeXmacs>. The <verbatim|secure-secure.scm> module contains the <em|secure>
+  <TeXmacs>. The <verbatim|secure-secure.scm> module (which is loaded by
+  <verbatim|init-secure.scm> using <scm|(import-from (secure-secure))>)
+  contains the <em|secure>
   <scheme> routine <verbatim|latexer>:
 
   <\scm-code>
     (tm-define (latexer s)
 
-    \ \ (:type (tree -\<gtr\> object))
+    \ \ (:type (-\<gtr\> tree object))
 
     \ \ (:synopsis "convert LaTeX string to TeXmacs tree using plugin")
 
@@ -125,7 +134,7 @@
     <\inactive*>
       See a LaTeX math command as a TeXmacs expression via plug-in
 
-      <assign|latexer|<macro|x|<extern|latexer|<arg|x>>>>
+      <assign|latexer|<macro|x|<extern|latexer|<quote-arg|x>>>>
     </inactive*>
   </tm-fragment>
 
@@ -136,6 +145,8 @@
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
   or any later version published by the Free Software Foundation; with no
@@ -144,8 +155,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

@@ -1,6 +1,6 @@
-<TeXmacs|1.99.11>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|The <TeXmacs> plug-in system>
@@ -25,9 +25,18 @@
 
     <branch|Summary of the configuration options for
     plug-ins|plugin-config.en.tm>
+
+    <branch|How the plug-in system works internally|plugin-internals.en.tm>
   </traverse>
 
+  The protocol which is used for the communication between <TeXmacs> and
+  extern applications is described in more detail in the chapter about
+  <hlink|interfacing <TeXmacs> with other
+  programs|../interface/interface.en.tm>.
+
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

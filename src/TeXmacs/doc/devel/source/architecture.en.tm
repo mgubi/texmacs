@@ -1,222 +1,409 @@
-<TeXmacs|1.0.1.11>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
-  <expand|tmdoc-title|General architecture of <TeXmacs>>
+  <tmdoc-title|General architecture of <TeXmacs>>
 
   <section|Introduction>
 
-  The <apply|TeXmacs> program has been written in C++. You need
-  <verbatim|g++> and the <verbatim|makefile> utility in order to compile
-  <apply|TeXmacs>. Currently, the source (in the <verbatim|src> directory) of
-  the <apply|TeXmacs> implementation has been divided into the following
-  parts:
+  The core of <TeXmacs> is written in <c++>; most of the user interface,
+  the menus, the keyboard bindings, the converters and many editing routines
+  are written in the extension language <scheme> (currently <name|Guile>).
+  <TeXmacs> can be built with the traditional <verbatim|configure> and
+  <verbatim|make> utilities, or with <name|CMake>. At the top level of the
+  source distribution, one finds:
 
   <\itemize>
-    <item>A set of basic and generic data structures in the <verbatim|Basic>
-    directory.
+    <item>The <c++> sources in the directory <verbatim|src/src>.
 
-    <item>Standard resources for <apply|TeXmacs>, such as <apply|TeX> fonts,
-    languages, encodings and dictionaries, in the <verbatim|Resource>
-    directory.
+    <item>The <TeXmacs> runtime data (<scheme> programs, style files, fonts,
+    documentation, icons, <abbr|etc.>) in the directory
+    <verbatim|src/TeXmacs>. After installation, this directory becomes
+    <verbatim|$TEXMACS_PATH>.
 
-    <item>A documented graphical toolkit in the <verbatim|Window> directory
-    (although the documentation is a bit outdated).
+    <item>The plug-ins for external systems in <verbatim|src/plugins>. They
+    are copied into <verbatim|$TEXMACS_PATH/plugins> when <TeXmacs> is
+    built.
 
-    <item>The extension language for <apply|TeXmacs> in the <verbatim|Prg>
-    directory.
-
-    <item>The typesetting part of the editor in the directory
-    <verbatim|src/Typeset>.
-
-    <item>The editor in the directory <verbatim|src/Edit>.
-
-    <item>The <apply|TeXmacs> server in the directory <verbatim|src/Server>.
+    <item>Build support (<verbatim|configure.in>, <verbatim|CMakeLists.txt>,
+    <verbatim|misc/m4>, <verbatim|cmake>, <abbr|etc.>) and packaging data in
+    <verbatim|src/misc> and <verbatim|src/packages>.
   </itemize>
 
-  All parts use the data structures from <verbatim|Basic>. The graphical
-  toolkit depends on <verbatim|Resource> for the <apply|TeX> fonts. The
-  extension language is independent from <verbatim|Resource> and
-  <verbatim|Window>. The typesetting part depends on all other parts except
-  from <verbatim|Prg>. The main editor and the <apply|TeXmacs> server use all
-  previous parts.
+  This chapter gives a bird's eye view on how these parts fit together.
+  Several aspects are described in more detail in other chapters: see the
+  documentation about the <hlink|basic data types|types.en.tm>, the
+  <hlink|typesetter|typesetter.en.tm>, <hlink|macro expansion|macro-expansion.en.tm>,
+  the <hlink|typeset boxes|boxes.en.tm>, the <hlink|server, buffers, views
+  and windows|server.en.tm>, the <hlink|renderers|renderer.en.tm> and the
+  <hlink|abstract widget system|widgets.en.tm>.
 
-  The <apply|TeXmacs> data are contained in the directory <verbatim|edit>
-  which corresponds to the <apply|TeXmacs> distribution without the source
-  code. Roughly speaking, we have the following kind of data:
+  <section|The <c++> source tree>
 
-  <\itemize>
-    <item>Font data in <verbatim|fonts> (encodings, <verbatim|.pk> files,
-    etc.).
+  The <c++> sources in <verbatim|src/src> are organized in the following
+  directories:
 
-    <item>Language data in <verbatim|languages> (hyphenation patterns,
-    dictionaries, etc.).
+  <\description>
+    <item*|<verbatim|Kernel>>Basic and generic data structures, which are
+    used everywhere else. The subdirectory <verbatim|Kernel/Abstractions>
+    contains the reference counting machinery (<verbatim|basic.hpp>),
+    commands, observers and black boxes; <verbatim|Kernel/Containers>
+    contains arrays, lists, hash tables, hash sets and iterators;
+    <verbatim|Kernel/Types> contains strings, trees, tree labels, paths,
+    modifications, rectangles and stretchable spaces.
 
-    <item>Document styles in <verbatim|style>.
+    <item*|<verbatim|Data>>Everything which is related to <TeXmacs>
+    documents as data: the global edit tree (<verbatim|Data/Document>), the
+    data relation descriptors (<verbatim|Data/Drd>), the observers which are
+    attached to trees (<verbatim|Data/Observers>), the undo/redo history and
+    patches (<verbatim|Data/History>), routines for analyzing and correcting
+    trees (<verbatim|Data/Tree>), string utilities and encodings
+    (<verbatim|Data/String>), small parsers for syntax highlighting
+    (<verbatim|Data/Parser>) and the <c++> part of the
+    <hlink|converters|conversions.en.tm> (<verbatim|Data/Convert>).
 
-    <item>Initialization and other <apply|scheme> programs in
-    <verbatim|progs>.
-  </itemize>
+    <item*|<verbatim|System>>The interaction with the operating system:
+    booting and preferences (<verbatim|System/Boot>), <abbr|URL>s and timers
+    (<verbatim|System/Classes>), files (<verbatim|System/Files>), natural and
+    programming languages, hyphenation and dictionaries
+    (<verbatim|System/Language>), the connections with plug-ins through
+    pipes, sockets and dynamic libraries (<verbatim|System/Link>) and
+    miscellaneous routines, such as the fast memory allocator
+    (<verbatim|System/Misc>).
 
-  The directory <verbatim|misc> contains some miscellaneous data like the
-  edit icon (<verbatim|misc/pixmaps/traditional/--x17/edit.xpm>).
+    <item*|<verbatim|Graphics>>Graphical data structures and the abstract
+    interfaces to the graphical output and the user interface: fonts
+    (<verbatim|Graphics/Fonts>) and bitmap glyphs
+    (<verbatim|Graphics/Bitmap_fonts>), colors, pictures, points, curves and
+    frames (<verbatim|Graphics/Types>), renderers
+    (<verbatim|Graphics/Renderer>), the abstract widget and window interface
+    (<verbatim|Graphics/Gui>), handwriting recognition and some generic
+    mathematical templates (<verbatim|Graphics/Mathematics>).
 
-  <section|Intern representation of texts>
+    <item*|<verbatim|Typeset>>The <hlink|typesetter|typesetter.en.tm>. It
+    contains the typesetting environment and the evaluation of macros
+    (<verbatim|Typeset/Env>), the boxes (<verbatim|Typeset/Boxes>), the
+    incremental bridges between trees and boxes (<verbatim|Typeset/Bridge>),
+    the concatenation of lines (<verbatim|Typeset/Concat>), line breaking
+    (<verbatim|Typeset/Line>), page breaking (<verbatim|Typeset/Page>),
+    stacks and tables.
 
-  <apply|TeXmacs> represents all texts by trees (for a fixed text, the
-  corresponding tree is called the <em|edit tree>). The nodes of such a tree
-  are labeled by standard <em|operators> which are listed in
-  <verbatim|Basic/Data/tree.hpp> and <verbatim|Basic/Data/tree.cpp>. The labels
-  of the leaves of the tree are strings, which are either invisible (such as
-  lengths or macro definitions), or visible (the real text).
+    <item*|<verbatim|Style>>An alternative, experimental implementation of
+    the evaluator for style files and macros, which is independent from the
+    typesetter.
+
+    <item*|<verbatim|Edit>>The editor proper. The abstract class
+    <cpp|editor_rep> is declared in <verbatim|Edit/editor.hpp>; its
+    implementation <cpp|edit_main_rep> (<verbatim|Edit/Editor>) inherits from
+    a series of classes which take care of the interface with the user
+    (<verbatim|Edit/Interface>), the modification of the document
+    (<verbatim|Edit/Modify>), selections, searching and replacing
+    (<verbatim|Edit/Replace>) and the processing of the document
+    (<verbatim|Edit/Process>).
+
+    <item*|<verbatim|Texmacs>>The <TeXmacs> <hlink|server|server.en.tm>,
+    which manages buffers, views, windows and projects
+    (<verbatim|Texmacs/Data>, <verbatim|Texmacs/Server>,
+    <verbatim|Texmacs/Window>), and the main program
+    <verbatim|Texmacs/Texmacs/texmacs.cpp>.
+
+    <item*|<verbatim|Scheme>>The interface with the <scheme> interpreter. The
+    generic <cpp|object> type and the calling conventions are defined in
+    <verbatim|Scheme/scheme.hpp> and <verbatim|Scheme/Scheme>; the binding
+    with <name|Guile> lives in <verbatim|Scheme/Guile>. The \Pglue\Q which
+    exports <c++> routines to <scheme> is generated from the specifications
+    <verbatim|Scheme/Glue/build-glue-*.scm> into the files
+    <verbatim|Scheme/Glue/glue_*.cpp>.
+
+    <item*|<verbatim|Plugins>>Implementations of the abstract interfaces for
+    specific libraries or platforms. For instance, <verbatim|Plugins/Qt>
+    contains the default graphical user interface based on <name|Qt>,
+    <verbatim|Plugins/Freetype> the support for <name|TrueType> and
+    <name|OpenType> fonts, <verbatim|Plugins/Metafont> the support for
+    <TeX> fonts, <verbatim|Plugins/Pdf> the <name|PDF> renderer,
+    <verbatim|Plugins/Unix>, <verbatim|Plugins/MacOS> and
+    <verbatim|Plugins/Windows> system specific code,
+    <verbatim|Plugins/Database> the database engine, and
+    <verbatim|Plugins/Widkit> with <verbatim|Plugins/X11> the historical
+    <hlink|<name|X11> interface|gui.en.tm>.
+  </description>
+
+  Roughly speaking, <verbatim|Kernel> does not depend on anything else;
+  <verbatim|Data> and <verbatim|System> only depend on <verbatim|Kernel>
+  (and on each other); <verbatim|Graphics> builds on top of these;
+  <verbatim|Typeset> uses all previous parts; <verbatim|Edit> relies on the
+  typesetter and <verbatim|Texmacs> uses everything. The directories in
+  <verbatim|Plugins> provide concrete implementations of abstract classes
+  declared elsewhere (such as <cpp|renderer_rep>, <cpp|widget_rep>,
+  <cpp|window_rep> or <cpp|font_rep>); which of them are compiled depends
+  on the configuration.
+
+  <section|The <TeXmacs> runtime data>
+
+  The directory <verbatim|src/TeXmacs> contains the part of <TeXmacs> which
+  is not compiled. It is located at run time through the environment
+  variable <verbatim|TEXMACS_PATH>. The most important subdirectories are:
+
+  <\description>
+    <item*|<verbatim|progs>>The <scheme> programs. The boot sequence starts
+    with <verbatim|progs/init-texmacs.scm>; the kernel of the <scheme> part
+    (<scm|tm-define>, menus, keyboard definitions, modes, plug-in
+    declarations, <abbr|etc.>) is in <verbatim|progs/kernel>. The other
+    subdirectories correspond to the various editing modes
+    (<verbatim|text>, <verbatim|math>, <verbatim|prog>,
+    <verbatim|graphics>, <verbatim|table>, <abbr|etc.>), to converters
+    (<verbatim|convert>), fonts (<verbatim|fonts>) and so on.
+
+    <item*|<verbatim|styles> and <verbatim|packages>>The style files
+    (<verbatim|.ts>) and style packages.
+
+    <item*|<verbatim|fonts>>Font data: <TeX> font metrics and <name|Type
+    1> fonts, <name|TrueType> and <name|OpenType> fonts shipped with
+    <TeXmacs>, encodings and virtual fonts, as well as the font database
+    (<verbatim|font-database.scm> and companions).
+
+    <item*|<verbatim|langs>>Language data: hyphenation patterns and
+    dictionaries (<verbatim|langs/natural>) and character encodings
+    (<verbatim|langs/encoding>).
+
+    <item*|<verbatim|doc>>The documentation, including the present
+    document.
+
+    <item*|<verbatim|misc>>Miscellaneous data, such as the icons in
+    <verbatim|misc/pixmaps>, images, patterns, sounds, themes and helper
+    scripts.
+  </description>
+
+  User specific data (preferences, personal styles, packages, plug-ins,
+  font databases, <abbr|etc.>) are stored in the directory
+  <verbatim|$TEXMACS_HOME_PATH>, which defaults to
+  <verbatim|~/.TeXmacs> on <name|Unix> systems.
+
+  <section|Internal representation of texts>
+
+  <TeXmacs> represents all texts by trees. All open documents are subtrees of
+  a single global tree <cpp|the_et> (the <em|edit tree>, declared in
+  <verbatim|Data/Document/new_document.hpp>); each buffer corresponds to a
+  child of <cpp|the_et> and each editor knows the path <cpp|rp> to the root
+  of its document. The inner nodes of a tree are labeled by <em|tree
+  labels>: the built-in labels of the <TeXmacs> format are enumerated in
+  <verbatim|Kernel/Types/tree_label.hpp>, and new labels are created on the
+  fly for user defined macros (<cpp|make_tree_label>). The leaves of the tree
+  are strings, which are either invisible (such as lengths or the names of
+  environment variables) or visible (the real text). Properties of the tags,
+  such as their arity, the accessibility of their children and the types of
+  their arguments, are maintained by the <em|data relation descriptor> or
+  DRD (see <verbatim|Data/Drd> and the chapter on
+  <hlink|macro expansion|macro-expansion.en.tm>).
 
   The meaning of the text and the way it is typeset essentially depend on the
-  current environment. The environment mainly consists of a relative hash
-  table of type <verbatim|rel_hashmap\<less\>string,tree\<gtr\>>, i.e. a
-  mapping from the environment variables to their tree values. The current
-  language and the current font are examples of system environment variables;
-  new variables can be defined by the user.
+  current <em|environment>. The environment (see the class
+  <cpp|edit_env_rep> in <verbatim|Typeset/env.hpp>) mainly consists of a
+  hash table of type <cpp|hashmap\<less\>string,tree\<gtr\>>, which maps
+  environment variables to their tree values. The current language and the
+  current font are examples of system environment variables; new variables
+  can be defined by the user, and macros are nothing but environment
+  variables whose values are <markup|macro> trees. When the typesetter enters
+  a <markup|with> tag or a macro body, the modified variables are saved in a
+  second hash table, so that they can be restored afterwards.
 
   <subsection|Text>
 
-  All text strings in <apply|TeXmacs> consist of sequences of either specific
-  or universal symbols. A specific symbol is a character, different from
-  <verbatim|'\\0'>, <verbatim|'\<less\>'> and <verbatim|'\<gtr\>'>. Its
-  meaning may depend on the particular font which is being used. A universal
-  symbol is a string starting with <verbatim|'\<less\>'>, followed by an
-  arbitrary sequence of characters different from <verbatim|'\\0'>,
+  All text strings in <TeXmacs> consist of sequences of either specific or
+  universal symbols. A specific symbol is a character, different from
+  <verbatim|'\\0'>, <verbatim|'\<less\>'> and <verbatim|'\<gtr\>'>. A
+  universal symbol is a string starting with <verbatim|'\<less\>'>, followed
+  by an arbitrary sequence of characters different from <verbatim|'\\0'>,
   <verbatim|'\<less\>'> and <verbatim|'\<gtr\>'>, and ending with
-  <verbatim|'\<gtr\>'>. The meaning of universal characters does not depend
-  on the particular font which is used, but different fonts may render them
-  in a different way.
+  <verbatim|'\<gtr\>'>. For instance, <verbatim|\<less\>alpha\<gtr\>> stands
+  for the Greek letter alpha and <verbatim|\<less\>#2212\<gtr\>> for the
+  <name|Unicode> character with code point <verbatim|U+2212>. Specific
+  characters are interpreted in the <em|Cork> encoding (the <TeX> T1
+  encoding); the conversions between this internal encoding and <name|UTF-8>
+  are done by routines such as <cpp|utf8_to_cork> and <cpp|cork_to_utf8> in
+  <verbatim|Data/String/converter.cpp>. The meaning of symbols does not
+  depend on the font which is used, but different fonts may render them in
+  a different way (see the chapter on <hlink|fonts|fonts.en.tm>).
 
   <subsection|The language>
 
-  The language of the text is capable performing a further semantic analysis
-  of a text phrase. At least, it is capable of splitting a phrase up into
-  <em|words> (which are smaller phrases) and inform the typesetter about the
-  desired spaces between words and hyphenation information. In the future,
-  additional semantics may be added into languages. For instance, spell
-  checkers might be implemented for natural languages and parsers for
-  mathematical formulas or programming languages.
+  The language of the text (see the abstract class <cpp|language_rep> in
+  <verbatim|System/Language/language.hpp>) is capable of performing a further
+  semantic analysis of a text phrase. At least, it is capable of splitting a
+  phrase into <em|words> (which are smaller phrases) and to inform the
+  typesetter about the desired spaces between words and hyphenation
+  information (the methods <cpp|advance>, <cpp|get_hyphens> and
+  <cpp|hyphenate>). There are three main kinds of languages:
+
+  <\itemize>
+    <item>Natural languages (<cpp|text_language>), which use the hyphenation
+    patterns from <verbatim|$TEXMACS_PATH/langs/natural/hyphen>.
+
+    <item>The mathematical language (<cpp|math_language>), which classifies
+    mathematical symbols into groups (operators, relations, brackets,
+    <abbr|etc.>) and determines the spacing between them. Semantic editing
+    of formulas relies in addition on the packrat grammars implemented in
+    <verbatim|System/Language/packrat_*.cpp>.
+
+    <item>Programming languages (<cpp|prog_language> and variants), which
+    are mainly used for syntax highlighting of computer programs.
+  </itemize>
+
+  Spell checking is not done by the languages themselves, but by external
+  tools (see <verbatim|Plugins/Ispell>).
 
   <section|Typesetting texts>
 
-  Roughly speaking, the typesetter of <apply|TeXmacs> takes a tree on input
-  and produces a box, while accessing and modifying the typesetting
-  environment. The <verbatim|box> class is multifunctional. Its principal
-  method is used for displaying the box on a post-script device (either the
-  screen or a printer). But it also contains a lot of typesetting
-  information, such as logical and ink bounding boxes, the positions of
-  scripts, etc.
+  Roughly speaking, the typesetter of <TeXmacs> takes a tree on input and
+  produces a box, while accessing and modifying the typesetting environment.
+  The typesetting is incremental: the <hlink|typesetter|typesetter.en.tm>
+  maintains a tree of <em|bridges> which mirrors the document tree and
+  remembers the boxes which were produced during the previous run, so that
+  only the modified parts of the document need to be typeset again.
 
-  Another functionality of boxes is to convert between physical cursors
-  (positions on the screen) and logical cursors (paths in the edit tree).
-  Actually, boxes are also organized into a tree, which often simplifies the
-  conversion. However, because of macro expansions and line and page
-  breaking, the conversion routines may become quite intricate. Notice also
-  that, besides a horizontal and vertical position, the physical cursor also
-  contains an infinitesimal horizontal position. Roughly speaking, this
-  infinitesimal coordinate is used to give certain boxes (such as color
-  changes) an extra infinitesimal width.
+  The <cpp|box> class is multifunctional. Its principal method is used for
+  displaying the box on a <hlink|renderer|renderer.en.tm> (the screen, a
+  printer, a <name|PDF> file or an image). But it also contains a lot of
+  typesetting information, such as logical and ink bounding boxes, the
+  positions of scripts, italic corrections, <abbr|etc.>
+
+  Another functionality of <hlink|boxes|boxes.en.tm> is to convert between
+  physical cursors (positions on the screen) and logical cursors (paths in
+  the edit tree). Actually, boxes are also organized into a tree, which
+  often simplifies the conversion. However, because of macro expansions and
+  line and page breaking, the conversion routines may become quite intricate.
+  Notice also that, besides a horizontal and vertical position, the physical
+  cursor also contains an infinitesimal horizontal position. Roughly
+  speaking, this infinitesimal coordinate is used to give certain boxes (such
+  as color changes) an extra infinitesimal width.
 
   <section|Making modifications in texts>
 
-  In <verbatim|Edit/Modify> you find different routines for modifying the
-  edit tree. Modifications go in several steps:
+  <subsection|Elementary modifications>
+
+  All modifications of documents eventually break down into nine types of
+  <em|elementary modifications>, which are declared in
+  <verbatim|Kernel/Types/modification.hpp>:
+
+  <\description>
+    <item*|<cpp|MOD_ASSIGN>>Replace a subtree by another tree.
+
+    <item*|<cpp|MOD_INSERT>>Insert a string into a string leaf, or insert a
+    sequence of children into a compound tree.
+
+    <item*|<cpp|MOD_REMOVE>>Remove a range of characters from a string leaf,
+    or a range of children from a compound tree.
+
+    <item*|<cpp|MOD_SPLIT>>Split a leaf or a node into two consecutive ones
+    (for instance, split a paragraph into two paragraphs).
+
+    <item*|<cpp|MOD_JOIN>>The inverse operation: join two consecutive
+    leaves or nodes.
+
+    <item*|<cpp|MOD_ASSIGN_NODE>>Change the label of a node.
+
+    <item*|<cpp|MOD_INSERT_NODE>>Insert a new node above a given subtree,
+    which becomes one of its children.
+
+    <item*|<cpp|MOD_REMOVE_NODE>>The inverse operation: replace a node by one
+    of its children.
+
+    <item*|<cpp|MOD_SET_CURSOR>>A pseudo-modification which does not change
+    the tree, but which records a cursor position (useful for undoing and for
+    collaborative editing).
+  </description>
+
+  A <cpp|modification> consists of its type, a path and possibly a tree; it
+  is constructed with the functions <cpp|mod_assign>, <cpp|mod_insert>,
+  <abbr|etc.> The corresponding functions <cpp|assign>, <cpp|insert>,
+  <cpp|remove>, <cpp|split>, <cpp|join>, <cpp|assign_node>,
+  <cpp|insert_node>, <cpp|remove_node> and <cpp|set_cursor> (defined in
+  <verbatim|Kernel/Abstractions/observer.cpp>) take either a reference to a
+  tree or a path in <cpp|the_et>, and call <cpp|apply>. From <scheme>, the
+  same operations are available as <scm|tree-assign>, <scm|tree-insert>,
+  <scm|tree-remove>, <scm|tree-split>, <scm|tree-join>,
+  <scm|tree-assign-node>, <scm|tree-insert-node> and
+  <scm|tree-remove-node> (and their variants with an exclamation mark).
+
+  <subsection|Observers>
+
+  Every tree may carry an <em|observer> (the field <cpp|obs> of
+  <cpp|tree_rep>; see <verbatim|Kernel/Abstractions/observer.hpp> and
+  <verbatim|Data/Observers>). When an elementary modification is applied to
+  a tree, its observers are first <em|announced> the modification, then
+  <em|notified> of the precise change (<cpp|notify_assign>,
+  <cpp|notify_insert>, <abbr|etc.>), the modification is performed, and the
+  observers are finally informed that it is <em|done>. Several observers can
+  be combined into lists. The most important ones are:
+
+  <\itemize>
+    <item>The <em|inverse path> observer (<verbatim|ip_observer.cpp>), which
+    allows each subtree of <cpp|the_et> to know its own location. Inverse
+    paths are also stored in the boxes; they are the basis for the
+    correspondence between the document and its typeset form.
+
+    <item>The <em|editor> observer (<verbatim|edit_observer.cpp>), which
+    forwards the modifications to the editor. The editor updates the cursor
+    position and notifies the typesetter, which invalidates the corresponding
+    bridges, so that the modified parts will be typeset again during the next
+    repaint.
+
+    <item>The <em|undo> observer (<verbatim|undo_observer.cpp>), which
+    records the modifications into the <em|archiver> of the buffer (see
+    <verbatim|Data/History/archiver.hpp>). The archiver stores the history as
+    <em|patches> (<verbatim|Data/History/patch.hpp>), which can be inverted
+    in order to undo or redo changes.
+
+    <item>Tree pointers, tree positions and links, which keep track of
+    locations in the document while it is being edited.
+  </itemize>
+
+  <subsection|The flow of a modification>
+
+  A typical modification goes through the following steps:
 
   <\enumerate>
-    <item>A certain input event triggers an action, such as
-    <verbatim|make_fraction>, which intends to modify the edit tree.
+    <item>An input event, such as a key press, is transmitted by the
+    graphical user interface to the editor, which calls the <scheme>
+    function <scm|keyboard-press>. The keyboard bindings (defined with
+    <scm|kbd-map> in the <scheme> code) or a menu entry then trigger an
+    action, such as <scm|make-fraction>, which is ultimately implemented by a
+    <c++> routine like <cpp|edit_math_rep::make_fraction>.
 
-    <item>All modifications which <verbatim|make_fraction> or its subroutines
-    will make to the edit tree eventually break down to seven elementary
-    modification routines, namely <verbatim|assign>, <verbatim|insert>,
-    <verbatim|remove>, <verbatim|split>, <verbatim|join>,
-    <verbatim|ins_unary> and <verbatim|rem_unary>.
+    <item>All modifications which this action makes to the edit tree break
+    down into elementary modifications, which are applied using
+    <cpp|apply>.
 
-    <item>Before performing the required modification, the elementary
-    modification routine first notifies all views of the same text of the
+    <item>Before and after performing each elementary modification, the
+    observers of the affected subtree are notified as explained above. In
+    particular, all editors which view the same buffer are informed, the
+    typesetter invalidates the modified parts, and the archiver records the
     modification.
 
-    <item>On notification, each view updates several things, such as the
-    cursor position. It also notifies the modification to the typesetter of
-    the text, since the typesetter maintains a list of already typeset
-    paragraphs.
+    <item>Each user action like a keystroke or a mouse click is enclosed
+    between calls of <cpp|start_editing> and <cpp|end_editing>. At the end,
+    the pending modifications are confirmed as one step in the history; this
+    determines the granularity of undo. Undo points can also be inserted
+    explicitly using <cpp|mark_start>, <cpp|mark_end> and
+    <cpp|archive_state>.
 
-    <item>When all views have been notified of the modification, we really
-    perform it.
-
-    <item>Each user action like a keystroke or a mouse click is responsible
-    for inserting <em|undo points> between sequences of elementary
-    modifications. When undoing a modification, the editor will move to the
-    previous undo point.
+    <item>Finally, the event loop of the graphical user interface requests
+    the typesetting of the invalid parts of the document and the repainting
+    of the invalid regions of the screen.
   </enumerate>
 
-  <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
-  <expand|tmdoc-license|Permission is granted to copy, distribute and/or
-  modify this document under the terms of the GNU Free Documentation License,
-  Version 1.1 or any later version published by the Free Software Foundation;
-  with no Invariant Sections, with no Front-Cover Texts, and with no
-  Back-Cover Texts. A copy of the license is included in the section entitled
-  "GNU Free Documentation License".>
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|paragraph width|150mm>
-    <associate|odd page margin|30mm>
-    <associate|shrinking factor|4>
-    <associate|page right margin|30mm>
-    <associate|page top margin|30mm>
-    <associate|reduction page right margin|25mm>
-    <associate|page type|a4>
-    <associate|reduction page bottom margin|15mm>
-    <associate|even page margin|30mm>
-    <associate|reduction page left margin|25mm>
-    <associate|page bottom margin|30mm>
-    <associate|reduction page top margin|15mm>
-    <associate|language|english>
-  </collection>
-</initial>
-
-<\references>
-  <\collection>
-    <associate|idx-1|<tuple|<uninit>|?>>
-    <associate|toc-1|<tuple|1|?>>
-    <associate|idx-2|<tuple|<uninit>|?>>
-    <associate|toc-2|<tuple|2|?>>
-    <associate|toc-3|<tuple|2.1|?>>
-    <associate|toc-4|<tuple|2.2|?>>
-    <associate|toc-5|<tuple|3|?>>
-    <associate|toc-6|<tuple|4|?>>
-    <associate|toc-7|<tuple|<uninit>|?>>
-  </collection>
-</references>
-
-<\auxiliary>
-  <\collection>
-    <\associate|toc>
-      <vspace*|1fn><with|font series|<quote|bold>|math font
-      series|<quote|bold>|1<space|2spc>Introduction><value|toc-dots><pageref|toc-1><vspace|0.5fn>
-
-      <vspace*|1fn><with|font series|<quote|bold>|math font
-      series|<quote|bold>|2<space|2spc>Intern representation of
-      texts><value|toc-dots><pageref|toc-2><vspace|0.5fn>
-
-      2.1<space|2spc>Text<value|toc-dots><pageref|toc-3>
-
-      2.2<space|2spc>The language<value|toc-dots><pageref|toc-4>
-
-      <vspace*|1fn><with|font series|<quote|bold>|math font
-      series|<quote|bold>|3<space|2spc>Typesetting
-      texts><value|toc-dots><pageref|toc-5><vspace|0.5fn>
-
-      <vspace*|1fn><with|font series|<quote|bold>|math font
-      series|<quote|bold>|4<space|2spc>Making modifications in
-      texts><value|toc-dots><pageref|toc-6><vspace|0.5fn>
-    </associate>
-  </collection>
-</auxiliary>
+<initial|<\collection>
+</collection>>

@@ -1,6 +1,6 @@
-<TeXmacs|1.0.6.10>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Miscellaneous features>
@@ -11,11 +11,17 @@
 
   <paragraph*|Interrupts>
 
-  The ``stop'' icon can be used in order to interrupt the evaluation of some
+  The \Pstop\Q icon (or the <menu|Interrupt execution> entry of the
+  session menus) can be used in order to interrupt the evaluation of some
   input. When pressing this button, <TeXmacs> will just send a
-  <verbatim|SIGINT> signal to your application. It expects your application
-  to finish the output as usual. In particular, you should close all open
+  <verbatim|SIGINT> signal to the process group of your application (this
+  is not implemented under <name|Windows>). It expects your application to
+  finish the output as usual. In particular, you should close all open
   <render-key|DATA_BEGIN>-blocks.
+
+  The <menu|Close session> entry terminates the application by sending
+  <verbatim|SIGTERM> to its process group, followed by <verbatim|SIGKILL>
+  two seconds later.
 
   <paragraph*|Testing whether the input is complete>
 
@@ -25,9 +31,9 @@
   for testing whether the input is complete. First of all, this requires you
   to specify the configuration option
 
-  <\scheme-fragment>
+  <\scm-code>
     (:test-input-done #t)
-  </scheme-fragment>
+  </scm-code>
 
   As soon as you will press <shortcut|(kbd-return)> in your input, <TeXmacs> will
   then send the command
@@ -49,10 +55,17 @@
   </quotation>
 
   where <verbatim|<em|done>> is either <scm|#t> or <scm|#f>. The
+  <verbatim|<em|input-string>> is a quoted <scheme> string, obtained by
+  serializing the input with the serializer of the plug-in (without the
+  final newline), and the command is sent using the same mechanism as
+  tab-completion requests (so that it can be customized using the
+  <scm|:commander> option). The
   <verbatim|multiline> plug-in provides an example of this mechanism (see in
   particular the file <example-plugin-link|multiline/src/multiline.cpp>).
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
@@ -62,8 +75,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

@@ -10,10 +10,10 @@
   (prefixed by <src-var|cell->) which apply to individual cells. Whereas
   usual environment variables are set with <markup|assign> and <markup|with>,
   the tabular environment variables are rather set with the
-  <hyper-link|<markup|tformat> primitive|../regular/prim-table.en.tm>. This
+  <hlink|<markup|tformat> primitive|../regular/prim-table.en.tm>. This
   makes it possible to apply certain settings to any rectangular subtable of
   the entire table and in particular to rows or columns. For more details,
-  see the <hyper-link|documentation|../regular/prim-table.en.tm#table-twith>
+  see the <hlink|documentation|../regular/prim-table.en.tm#table-twith>
   of the <markup|twith> and <markup|cwith> primitives.
 
   <paragraph*|Layout of the table as a whole>
@@ -29,15 +29,23 @@
   </explain>
 
   <\explain>
-    <var-val|table-hmode|>
+    <var-val|table-hmode|auto>
 
-    <var-val|table-vmode|><explain-synopsis|determination of table
+    <var-val|table-vmode|auto><explain-synopsis|determination of table
     dimensions>
   <|explain>
-    These parameters specify how to determine the dimensions of the table. At
-    the moment, the values of <src-var|table-hmode> and <src-var|table-vmode>
-    are actually ignored and <src-var|table-width> and <src-var|table-height>
-    are interpreted as the minimal width and height of the table.
+    These parameters specify how to determine the dimensions of the table.
+    When no <src-var|table-width> is specified, the width is determined
+    automatically from the contents (mode <verbatim|auto>). When
+    <src-var|table-width> is specified, the possible values of
+    <src-var|table-hmode> are <verbatim|exact> (the default in that case: the
+    table gets exactly the specified width), <verbatim|min> (the table is at
+    most as wide as <src-var|table-width>, but no wider than needed for its
+    contents) and <verbatim|max> (the table is at least as wide as
+    <src-var|table-width>). In the non-automatic modes, unused space is
+    distributed over the columns according to <src-var|cell-hpart> (see
+    below). The height is determined similarly using
+    <src-var|table-height>, <src-var|table-vmode> and <src-var|cell-vpart>.
   </explain>
 
   <\explain>
@@ -57,21 +65,23 @@
     <src-var|table-halign> are <verbatim|L> (align <abbr|w.r.t.> the left
     column), <verbatim|C> (align <abbr|w.r.t.> the middle column),
     <verbatim|R> (align <abbr|w.r.t.> the right column) and <verbatim|O>
-    (align <abbr|w.r.t.> the priviledged origin column
-    <src-var|table-col-origin>). Similarly, <src-var|table-halign> may take
+    (align <abbr|w.r.t.> the privileged origin column
+    <src-var|table-col-origin>). Similarly, <src-var|table-valign> may take
     the additional values <verbatim|T> (align <abbr|w.r.t.> the top row),
     <verbatim|C> (align <abbr|w.r.t.> the middle row), <verbatim|B> (align
     <abbr|w.r.t.> the bottom row) and <verbatim|O> (align <abbr|w.r.t.> the
-    priviledged origin row <src-var|table-row-origin>).
+    privileged origin row <src-var|table-row-origin>).
   </explain>
 
   <\explain>
     <var-val|table-row-origin|0>
 
-    <var-val|table-col-origin|0><explain-synopsis|priviledged cell>
+    <var-val|table-col-origin|0><explain-synopsis|privileged cell>
   <|explain>
-    Table coordinates of an priviledged ``origin cell'' which may be used for
-    aligning the table in the surrounding text (see above).
+    Table coordinates of a privileged ``origin cell'' which may be used for
+    aligning the table in the surrounding text (see above). Rows and columns
+    are numbered from <verbatim|1>; negative values count from the bottom
+    <abbr|resp.> right of the table.
   </explain>
 
   <\explain>
@@ -111,7 +121,7 @@
       <item> The table is not surrounded by other markup in the same
       paragraph.
 
-      <item>The rows whether the page break occurs has no borders.
+      <item>The rows where the page break occurs have no borders.
     </enumerate>
 
     An example of a tabular environment which allows for page breaks is
@@ -132,8 +142,8 @@
     columns for the table. Such settings constraint the behaviour of the
     editor for operations which may modify the size of the table (like the
     insertion and deletion of rows and columns). This is particularly useful
-    for tabular macros. For instance, <src-var|table-min-columns> and
-    <src-var|table-max-columns> are both set to <with|mode|math|3> for the
+    for tabular macros. For instance, <src-var|table-min-cols> and
+    <src-var|table-max-cols> are both set to <with|mode|math|3> for the
     <markup|eqnarray*> environment.
   </explain>
 
@@ -142,7 +152,9 @@
   <\explain>
     <var-val|cell-background|><explain-synopsis|background color>
   <|explain>
-    A background color for the cell.
+    A background color for the cell. Besides colors, patterns and gradients
+    are also allowed; the special value <verbatim|foreground> stands for the
+    current foreground color.
   </explain>
 
   <\explain>
@@ -177,17 +189,19 @@
   </explain>
 
   <\explain>
-    <var-val|cell-hmode|exact>
+    <var-val|cell-hmode|auto>
 
-    <var-val|cell-vmode|exact><explain-synopsis|determination of cell
+    <var-val|cell-vmode|auto><explain-synopsis|determination of cell
     dimensions>
   <|explain>
     These parameters specify how to determine the width and the height of the
-    cell. If <src-var|cell-hmode> is <verbatim|exact>, then the width is
-    given by <src-var|cell-width>. If <src-var|cell-hmode> is <verbatim|min>
-    or <verbatim|max>, then the width is the minimul <abbr|resp.> maximum of
-    <src-var|cell-width> and the width of the content. The height is
-    determined similarly.
+    cell. If no <src-var|cell-width> is specified, the width is determined by
+    the content (mode <verbatim|auto>). Otherwise, if <src-var|cell-hmode>
+    is <verbatim|exact> (the default when a width is given), then the width
+    is given by <src-var|cell-width>. If <src-var|cell-hmode> is
+    <verbatim|min> or <verbatim|max>, then the width is the minimum
+    <abbr|resp.> maximum of <src-var|cell-width> and the width of the
+    content. The height is determined similarly.
   </explain>
 
   <\explain>
@@ -197,20 +211,26 @@
   <|explain>
     These parameters determine the horizontal and vertical alignment of the
     cell. Possible values of <src-var|cell-halign> are <verbatim|l> (left),
-    <verbatim|c> (center), <verbatim|r> (right), <verbatim|.> (decimal dot),
-    <verbatim|,> (decimal comma) and <verbatim|R> (vertical baseline).
-    Possible values of <src-var|cell-valign> are <verbatim|t> (top),
-    <verbatim|c> (center), <verbatim|b> (bottom) and <verbatim|B> (baseline).
+    <verbatim|c> (center) and <verbatim|r> (right). The upper case variants
+    <verbatim|L>, <verbatim|C> and <verbatim|R> align the cells of a column
+    <abbr|w.r.t.> a common vertical axis; such a value may be followed by a
+    string at whose position the alignment takes place. For instance,
+    <verbatim|L.> aligns on the decimal dot and <verbatim|L,> on the decimal
+    comma. Possible values of <src-var|cell-valign> are <verbatim|t> (top),
+    <verbatim|c> (center), <verbatim|b> (bottom) and <verbatim|B> (baseline);
+    the less common values <verbatim|T> and <verbatim|C> align the cells of a
+    row <abbr|w.r.t.> common horizontal axes near the top <abbr|resp.> the
+    center.
   </explain>
 
   <\explain>
-    <var-val|cell-lsep|0fn>
+    <var-val|cell-lsep|1spc>
 
-    <var-val|cell-rsep|0fn>
+    <var-val|cell-rsep|1spc>
 
-    <var-val|cell-bsep|0fn>
+    <var-val|cell-bsep|1sep>
 
-    <var-val|cell-tsep|0fn><explain-synopsis|cell padding>
+    <var-val|cell-tsep|1sep><explain-synopsis|cell padding>
   <|explain>
     The amount of padding around the cell (at the left, right, bottom and
     top).
@@ -257,13 +277,39 @@
     <var-val|cell-hyphen|n><explain-synopsis|allow for hyphenation inside
     cells>
   <|explain>
-    By default, the cells contain inline content which is not hyphenated. By
-    selecting <menu|Table|Special cell properties|Hyphenation|Multi-paragraph>,
-    the cell contents becomes multi-paragraph. In that case,
-    <src-var|cell-hyphen> determines how this content is hyphenated. Possible
-    values are <verbatim|n> (disable line breaking) and <verbatim|b>,
-    <verbatim|c> and <verbatim|t> (enable line breaking and align at the
-    bottom, center <abbr|resp.> top line).
+    By default, the cells contain inline content which is not hyphenated.
+    The <src-var|cell-hyphen> variable, which can be set through
+    <menu|Cell|Line wrapping>, determines whether and how the content is
+    broken into several lines. Possible values are <verbatim|n> (disable line
+    breaking) and <verbatim|b>, <verbatim|c> and <verbatim|t> (enable line
+    breaking and align at the bottom, center <abbr|resp.> top line). When
+    line breaking is enabled, the cell content is typeset as a paragraph
+    whose width is the width of the cell.
+  </explain>
+
+  <\explain>
+    <var-val|cell-block|auto><explain-synopsis|block content inside cells>
+  <|explain>
+    This variable determines whether the cell contains block content,
+    <abbr|i.e.> whether its content is wrapped into a <markup|document> tag.
+    Possible values are <verbatim|no>, <verbatim|yes> and <verbatim|auto>
+    (block content if and only if line wrapping is enabled through
+    <src-var|cell-hyphen>). The editor uses this setting in order to insert
+    or remove the <markup|document> tags around cell contents.
+  </explain>
+
+  <\explain>
+    <var-val|cell-swell|0ex><explain-synopsis|extra padding around large
+    cells>
+  <|explain>
+    When positive, cells without line wrapping whose content is
+    exceptionally high or deep receive additional vertical padding of at
+    most <src-var|cell-swell> at the top <abbr|resp.> bottom (except at the
+    top and bottom borders of the table). As for <src-var|par-swell>, the
+    amount of padding depends on the thresholds
+    <src-var|math-top-swell-start>, <src-var|math-top-swell-end>,
+    <src-var|math-bot-swell-start> and <src-var|math-bot-swell-end>. This
+    variable is used for instance by matrices.
   </explain>
 
   <\explain>
@@ -299,8 +345,10 @@
 
     <var-val|cell-col-nr|1><explain-synopsis|current cell position>
   <|explain>
-    In the future, these environment variables should contain the current
-    cell position during the typesetting process.
+    During the typesetting of a table, these environment variables contain
+    the position of the cell which is currently being typeset. Notice that
+    the typesetter numbers rows and columns starting from <verbatim|0> here,
+    contrary to the <markup|cwith> primitive.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Output channels, prompts and default input>
@@ -17,13 +17,24 @@
     <framed-fragment|<verbatim|<render-key|DATA_BEGIN><em|channel>#<em|message><render-key|DATA_END>>>
   </quotation>
 
-  Here <verbatim|<em|channel>> specifies an ``output channel'' to which the
+  Here <verbatim|<em|channel>> specifies an \Poutput channel\Q to which the
   body <verbatim|<em|message>> has to be sent. The default output channel is
   <verbatim|output>, but we also provide channels <verbatim|prompt> and
   <verbatim|input> for specifying the prompt and a default input for the next
-  input in a session. Default inputs may be useful for instance be useful for
-  demo modes of computer algebra systems. In the future, we also plan to
-  support <verbatim|error> and <verbatim|status> channels.
+  input in a session. Default inputs may for instance be useful for demo
+  modes of computer algebra systems. All output which the application
+  writes on its <em|standard error> is sent to a fourth channel
+  <verbatim|error> and displayed as error output in the session; this
+  output may again be structured using
+  <render-key|DATA_BEGIN>-<render-key|DATA_END> blocks. Blocks sent to
+  other channels are ignored, unless a handler has been declared for the
+  channel using the <scm|:handler> configuration option (see the
+  <verbatim|handler> example plug-in).
+
+  Older plug-ins (such as <verbatim|mycas>) use the equivalent syntax
+  <verbatim|<render-key|DATA_BEGIN>channel:prompt<render-key|DATA_END>>,
+  which redirects the remainder of the enclosing block to the
+  <verbatim|prompt> channel.
 
   <paragraph*|The <verbatim|prompt> plug-in>
 
@@ -96,6 +107,8 @@
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
   or any later version published by the Free Software Foundation; with no
@@ -104,8 +117,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

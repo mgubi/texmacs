@@ -1,134 +1,203 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Basic data types>
 
   In this chapter, we give a rough description of <TeXmacs>'s basic data
-  types in <verbatim|Basic>. The description of the exported functions is non
-  exhaustive and we refer to the corresponding header files for more
-  precision.
+  types, most of which can be found in the directory <verbatim|Kernel> of
+  the <c++> sources (<verbatim|src/src/Kernel>). The description of the
+  exported functions is non exhaustive and we refer to the corresponding
+  header files for more precision.
 
-  <section|Memory allocation and data structures in TeXmacs>
+  <section|Memory allocation and data structures in <TeXmacs>>
 
-  The file <verbatim|fast_alloc.hpp> declares the <TeXmacs> memory allocation
-  routines. These routines are very fast for small sizes, since for each such
-  size, <TeXmacs> maintains a linked list of freed objects of that size. No
-  garbage collection has been implemented yet.
+  The file <verbatim|System/Misc/fast_alloc.hpp> declares the <TeXmacs>
+  memory allocation routines. Objects should be created with
+  <cpp|tm_new\<less\>T\<gtr\> (args)> and destroyed with <cpp|tm_delete>;
+  arrays are handled by <cpp|tm_new_array> and <cpp|tm_delete_array>. These
+  routines are very fast for small sizes (below <cpp|MAX_FAST> bytes), since
+  for each such size, <TeXmacs> maintains a linked list of freed objects of
+  that size. Larger blocks are allocated with the standard <cpp|malloc>.
+  There is no garbage collection: memory is managed through reference
+  counting.
 
-  Modulo a few exceptions, all <TeXmacs> composite data structures are based
-  on the modules <verbatim|concrete>, <verbatim|abstract>,
-  <verbatim|concrete_null> and <verbatim|abstract_null>. Consequently, these
-  data structures are pointers to representation classes, which may be
-  abstract in the case of <verbatim|abstract> and <verbatim|abstract_null>,
-  and which always contain a reference counter. Because of the reference
-  counter, the C++ copy operator is very fast. Most of the implemented data
-  structures also export a function <verbatim|copy>, which should be used if
-  one really wants to physically duplicate an object,
+  Modulo a few exceptions, all <TeXmacs> composite data structures are
+  constructed using the macros <cpp|CONCRETE>, <cpp|ABSTRACT>,
+  <cpp|CONCRETE_NULL> and <cpp|ABSTRACT_NULL> (as well as their
+  <cpp|_TEMPLATE> variants), which are defined in
+  <verbatim|Kernel/Abstractions/basic.hpp>. Consequently, these data
+  structures are pointers to representation classes, which derive from
+  <cpp|concrete_struct> or <cpp|abstract_struct>, which may be abstract in
+  the case of <cpp|ABSTRACT> and <cpp|ABSTRACT_NULL>, and which always
+  contain a reference counter. Because of the reference counter, the <c++>
+  copy operator is very fast. Most of the implemented data structures also
+  export a function <cpp|copy>, which should be used if one really wants to
+  physically duplicate an object. Conversely, one should keep in mind that
+  an assignment like <cpp|a= b> makes <cpp|a> and <cpp|b> share the same
+  representation, so that a subsequent in-place modification of <cpp|b>
+  also affects <cpp|a>.
 
-  For classes constructed using <verbatim|concrete_null> or
-  <verbatim|abstract_null>, the pointer to the representation class is
-  allowed to be <verbatim|NULL> and we have a default constructor which
-  initializes this pointer with <verbatim|NULL>. Instances of these classes
-  are tested to be <verbatim|NULL> using the function <verbatim|nil>.
-  Examples of such classes are lists, files and widgets.
+  For classes constructed using <cpp|CONCRETE_NULL> or <cpp|ABSTRACT_NULL>,
+  the pointer to the representation class is allowed to be <cpp|NULL> and we
+  have a default constructor which initializes this pointer with
+  <cpp|NULL>. Instances of these classes are tested to be <cpp|NULL> using
+  the function <cpp|is_nil>. Examples of such classes are lists, commands
+  and widgets.
 
   <section|Array-like structures>
 
   <TeXmacs> implements three \Parray-like\Q structures:
 
   <\itemize>
-    <item><verbatim|string> is the string type, which may contain '0'
-    characters.
+    <item><cpp|string> (<verbatim|Kernel/Types/string.hpp>) is the string
+    type, which may contain <verbatim|'\\0'> characters. Strings are
+    sequences of bytes; the interpretation of these bytes is described in
+    the chapter on the <hlink|general architecture|architecture.en.tm>.
 
-    <item><verbatim|tree> is the tree type with string labels.
+    <item><cpp|tree> (<verbatim|Kernel/Types/tree.hpp>) is the tree type.
+    A tree is either <em|atomic> (a leaf labeled by a string) or
+    <em|compound> (a node labeled by a <cpp|tree_label> with an array of
+    children).
 
-    <item><verbatim|array\<less\>T\<gtr\>> is the generic array type with
-    elements of type <verbatim|T>.
+    <item><cpp|array\<less\>T\<gtr\>> (<verbatim|Kernel/Containers/array.hpp>)
+    is the generic array type with elements of type <cpp|T>.
   </itemize>
 
   Array-like structures export the following operations:
 
   <\itemize>
-    <item><verbatim|N> computes the length of an array.
+    <item><cpp|N> computes the length of an array.
 
-    <item><verbatim|[]> accesses an element.
+    <item><cpp|[]> accesses an element.
 
-    <item><verbatim|\<less\>\<less\>> is used for appending elements or
-    arrays.
+    <item><cpp|\<less\>\<less\>> is used for appending elements or arrays.
+
+    <item>For strings, <cpp|*> concatenates two strings and
+    <cpp|s (start, end)> extracts a substring. For arrays, the analogous
+    operations are <cpp|append> and <cpp|range>; for trees, <cpp|t (start,
+    end)> yields a tree with the same label and a subrange of the children.
   </itemize>
 
-  For trees <verbatim|t>, we notice that <verbatim|t-\<gtr\>label> yields the
-  label of the tree and <verbatim|t-\<gtr\>a> the array of its children. The
-  second argument of <verbatim|\<less\>\<less\>> for trees is either a tree
-  or an array of trees.
+  For an atomic tree <cpp|t>, <cpp|t-\<gtr\>label> yields the string label
+  of the tree. For a compound tree, <cpp|L(t)> yields its label,
+  <cpp|A(t)> the array of its children and <cpp|t[i]> its <cpp|i>-th child.
+  The predicates <cpp|is_atomic> and <cpp|is_compound> distinguish between
+  both kinds of trees and <cpp|is_func (t, lab, n)> tests whether <cpp|t> is
+  a compound tree with label <cpp|lab> and arity <cpp|n>. The second
+  argument of <cpp|\<less\>\<less\>> for trees is either a tree or an array
+  of trees. Besides its label or its children, every tree also carries an
+  <em|observer> (the field <cpp|obs>), which is used for keeping track of
+  modifications (see <verbatim|Kernel/Abstractions/observer.hpp> and the
+  chapter on the <hlink|general architecture|architecture.en.tm>).
 
-  The implementation has been made such that the <verbatim|\<less\>\<less\>>
+  The implementation has been made such that the <cpp|\<less\>\<less\>>
   operation is fast, which is useful when considering arrays as buffers.
   Actually, the allocated space for arrays with more than five elements
-  (words for strings) is always a power of two, so that new elements can be
-  appended quickly. Notice that GNU malloc also always allocates blocks,
-  whose sizes are powers of two. Therefore, we do not waste memory for small
-  and large arrays.
+  (<abbr|resp.> strings with more than 23 characters) is always a power of two, so
+  that new elements can be appended quickly (see <cpp|round_length> in
+  <verbatim|array.cpp> and <verbatim|string.cpp>).
 
-  <section|Lists>
+  <section|Lists and paths>
 
-  Generic lists are implemented by the class <verbatim|list\<less\>T\<gtr\>>.
-  The \Pnil\Q list is created using <verbatim|list\<less\>T\<gtr\>()>, an
-  atom using <verbatim|list\<less\>T\<gtr\>(T x)> and a general list using
-  <verbatim|list\<less\>T\<gtr\>(T x, list\<less\>T\<gtr\> next)>. If
-  <verbatim|l> is a list, <verbatim|l-\<gtr\>item> and
-  <verbatim|l-\<gtr\>next> correspond to its label and its successor
-  respectively (<verbatim|car> and <verbatim|cdr> in lisp). The functions
-  <verbatim|nil> and <verbatim|atom> tests whether a list is nil or an atom.
-  The function <verbatim|N> computes the length of a list.
+  Generic lists are implemented by the class <cpp|list\<less\>T\<gtr\>> in
+  <verbatim|Kernel/Containers/list.hpp>. The \Pnil\Q list is created using
+  <cpp|list\<less\>T\<gtr\>()>, an atom using
+  <cpp|list\<less\>T\<gtr\>(T x)> and a general list using
+  <cpp|list\<less\>T\<gtr\>(T x, list\<less\>T\<gtr\> next)>. If <cpp|l> is
+  a list, <cpp|l-\<gtr\>item> and <cpp|l-\<gtr\>next> correspond to its
+  label and its successor respectively (<scm|car> and <scm|cdr> in
+  <scheme>). The functions <cpp|is_nil> and <cpp|is_atom> test whether a
+  list is nil or an atom. The function <cpp|N> computes the length of a
+  list, <cpp|l * x> appends an element at the end, and <cpp|reverse>,
+  <cpp|last_item>, <cpp|head> and <cpp|tail> have the usual meanings.
 
-  The type <verbatim|list\<less\>T\<gtr\>> is also denoted by
-  <verbatim|path>, because some additional functions are defined for it.
-  Indeed, paths are used for accessing descendants in tree like structures.
-  For instance, we implemented the function <verbatim|tree subtree (tree t,
-  path p)>.
+  The type <cpp|list\<less\>int\<gtr\>> is also denoted by <cpp|path>
+  (<verbatim|Kernel/Types/path.hpp>), because some additional functions are
+  defined for it. Indeed, paths are used for accessing descendants in tree
+  like structures. For instance, we implemented the functions
+  <cpp|tree& subtree (tree& t, path p)>, <cpp|path_up>, <cpp|path_less>
+  and <cpp|p / q>, which removes the prefix <cpp|q> from <cpp|p>. The
+  <em|inverse paths> which are stored in typeset boxes are also of type
+  <cpp|path>; see the chapter on <hlink|boxes|boxes.en.tm>.
 
   <section|Hash tables>
 
-  The <verbatim|hashmap\<less\>T,U\<gtr\>> class implements hash tables with
-  entries in <verbatim|T> and values in <verbatim|U>. A function
-  <verbatim|hash> should be implemented for <verbatim|T>. Given a hash table
-  <verbatim|H>. We set elements through\ 
+  The <cpp|hashmap\<less\>T,U\<gtr\>> class
+  (<verbatim|Kernel/Containers/hashmap.hpp>) implements hash tables with
+  entries in <cpp|T> and values in <cpp|U>. A function <cpp|hash> should be
+  implemented for <cpp|T> (see <verbatim|Kernel/Containers/hashfunc.hpp>).
+  The constructor <cpp|hashmap\<less\>T,U\<gtr\> (U init)> specifies the
+  default value <cpp|init> which is returned for keys without an entry.
+  Given a hash table <cpp|H>, we set elements through
 
-  <\verbatim>
-    \ \ \ \ H(x)=y;
-  </verbatim>
+  <\cpp-code>
+    H(x)= y;
+  </cpp-code>
 
-  and access to elements through\ 
+  and access elements through
 
-  <\verbatim>
-    \ \ \ \ H[x]
-  </verbatim>
+  <\cpp-code>
+    H[x]
+  </cpp-code>
 
-  We also implemented a variant <verbatim|rel_hashmap\<less\>T,U\<gtr\>> of
-  hash tables, which also have a list-like structure, which makes them useful
-  for implementing recursive environments.
+  The methods <cpp|H-\<gtr\>contains (x)> and <cpp|H-\<gtr\>reset (x)> test
+  whether <cpp|x> has an entry, <abbr|resp.> remove the entry for
+  <cpp|x>. Similarly, <cpp|hashset\<less\>T\<gtr\>> implements sets of
+  elements of type <cpp|T>.
+
+  We also implemented a variant <cpp|rel_hashmap\<less\>T,U\<gtr\>> of hash
+  tables (<verbatim|Kernel/Containers/rel_hashmap.hpp>), which also have a
+  list-like structure. The methods <cpp|extend> and <cpp|shorten> push and
+  pop a new level of definitions, which makes them useful for implementing
+  recursive environments. They are used for instance by the <LaTeX> importer
+  in order to handle local macro definitions.
 
   <section|Other data structures>
 
   <\itemize>
-    <item><verbatim|command> implements abstract commands.
+    <item><cpp|iterator\<less\>T\<gtr\>>
+    (<verbatim|Kernel/Containers/iterator.hpp>) implements generic
+    iterators. An iterator <cpp|it> over the keys of a hash table <cpp|H> is
+    obtained using <cpp|iterate (H)>; one then loops using
+    <cpp|while (it-\<gtr\>busy ()) { T x= it-\<gtr\>next (); ... }>.
 
-    <item><verbatim|file> implements files.
+    <item><cpp|pair\<less\>T1,T2\<gtr\>> and similar tuples
+    (<verbatim|Kernel/Containers/ntuple.hpp>), hash trees
+    (<verbatim|hashtree.hpp>) and promises (<verbatim|promise.hpp>).
 
-    <item><verbatim|iterator\<less\>T\<gtr\>> implements generic iterators.
+    <item><cpp|command> (<verbatim|Kernel/Abstractions/command.hpp>)
+    implements abstract commands, with a virtual method <cpp|apply>.
 
-    <item><verbatim|rectangles> implements rectangles and lists of
-    rectangles.
+    <item><cpp|blackbox> (<verbatim|Kernel/Abstractions/blackbox.hpp>)
+    allows to store values of an arbitrary type in a type-safe way.
 
-    <item><verbatim|space> implements stretchable spaces.
+    <item><cpp|observer> and <cpp|modification>
+    (<verbatim|Kernel/Abstractions/observer.hpp>,
+    <verbatim|Kernel/Types/modification.hpp>) implement the observers
+    attached to trees and the elementary modifications of trees.
 
-    <item><verbatim|timer> implements timers.
+    <item><cpp|rectangle> and <cpp|rectangles>
+    (<verbatim|Kernel/Types/rectangles.hpp>) implement rectangles and lists
+    of rectangles.
+
+    <item><cpp|space> (<verbatim|Kernel/Types/space.hpp>) implements
+    stretchable spaces with a minimal, a default and a maximal size.
+
+    <item><cpp|url> (<verbatim|System/Classes/url.hpp>) implements file
+    names, which may be local or remote, and search paths.
+
+    <item>Files are read and written using functions like
+    <cpp|load_string> and <cpp|save_string> in
+    <verbatim|System/Files/file.hpp>, and timers using functions like
+    <cpp|texmacs_time> and <cpp|bench_start> in
+    <verbatim|System/Classes/tm_timer.hpp>.
   </itemize>
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

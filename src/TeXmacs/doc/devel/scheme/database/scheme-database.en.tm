@@ -1,9 +1,14 @@
-<TeXmacs|1.99.2>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|<TeXmacs> databases>
+
+  This chapter describes the <scheme> interface to <TeXmacs> databases, as
+  implemented in the directory <verbatim|progs/database/>. The internals of
+  the database engine are described in <hlink|the <TeXmacs>
+  database|../../source/database.en.tm>.
 
   <\traverse>
     <branch|The <TeXmacs> database model|database-base.en.tm>
@@ -26,3 +31,6 @@
   Texts. A copy of the license is included in the section entitled "GNU Free
   Documentation License".>
 </body>
+
+<initial|<\collection>
+</collection>>
