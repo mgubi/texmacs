@@ -29,11 +29,32 @@
 using namespace PDFHummus;
 using namespace IOBasicTypes;
 
+// Reduce the name of an embedded file to a plain file name, so that it
+// can only be written inside the extraction directory.
+// Return "" if no safe name can be derived.
+static string
+safe_attachment_name (string name) {
+  int i= N (name);
+  while (i > 0 && name[i - 1] != '/' && name[i - 1] != '\\') i--;
+  name= name (i, N (name));
+  if (name == "" || name == "." || name == "..") return "";
+  for (int j= 0; j < N (name); j++) {
+    char c= name[j];
+    if (((unsigned char) c) < 32 || c == ':' || c == '$' || c == '~' ||
+        c == '*' || c == '?' || c == '<' || c == '>' || c == '|' || c == '"')
+      return "";
+  }
+  return name;
+}
+
 bool
 extract_attachments_from_pdf (url pdf_path, list<url>& names) {
   EStatusCode status= PDFHummus::eSuccess;
   InputFile   pdfFile;
   PDFParser   parser;
+  // extract into a fresh directory, never next to the pdf
+  url out_dir= url_temp ("");
+  mkdir (out_dir);
   do {
     status= pdfFile.OpenFile (as_charp (as_string (pdf_path)));
     if (status != PDFHummus::eSuccess) {
@@ -129,8 +150,15 @@ extract_attachments_from_pdf (url pdf_path, list<url>& names) {
         break;
       }
 
-      url attachment_path=
-          relative (pdf_path, url (string (name->GetValue ().c_str ())));
+      string stored_name= string (name->GetValue ().c_str ());
+      string file_name  = safe_attachment_name (stored_name);
+      if (file_name == "") {
+        convert_warning << "skipping PDF attachment with unsafe name "
+                        << stored_name << LF;
+        delete streamReader;
+        continue;
+      }
+      url        attachment_path= out_dir * url_system (file_name);
       OutputFile attachment_file;
       status= attachment_file.OpenFile (
           std::string (as_charp (as_string (attachment_path))));
@@ -163,10 +191,16 @@ extract_attachments_from_pdf (url pdf_path, list<url>& names) {
   else return true;
 }
 
+// Files extracted by the last call of scm_extract_attachments
+static url       last_extracted_pdf= url_none ();
+static list<url> last_extracted;
+
 bool
 scm_extract_attachments (url pdf_path) {
   list<url> attachments_paths;
   bool      ret= extract_attachments_from_pdf (pdf_path, attachments_paths);
+  last_extracted_pdf= ret ? pdf_path : url_none ();
+  last_extracted    = attachments_paths;
   return ret;
 }
 static hashset<string> internal_styles;
@@ -274,7 +308,12 @@ get_linked_file_paths (tree t, url path) {
   string     label= get_label (t);
   if (label == "image" || label == "include") {
     url incl_url= get_url_image_or_include_tree (t, path);
-    if (incl_url != url ()) tm_and_linked_file << incl_url;
+    if (is_none (incl_url))
+      ;
+    else if (is_regular (incl_url)) tm_and_linked_file << incl_url;
+    else
+      convert_warning << "linked file " << incl_url
+                      << " not found, not attached to the PDF" << LF;
     return tm_and_linked_file;
   }
   if (label == "style") return get_url_style_tree (t, path);
@@ -384,7 +423,11 @@ replace_with_relative_path (tree t, url path) {
 url
 get_main_tm (url pdf_path) {
   list<url> attachments_paths;
-  bool      ret= extract_attachments_from_pdf (pdf_path, attachments_paths);
-  (void) ret;
+  if (pdf_path == last_extracted_pdf && !is_nil (last_extracted) &&
+      exists (last_extracted[0]))
+    attachments_paths= last_extracted;
+  else if (!extract_attachments_from_pdf (pdf_path, attachments_paths))
+    return url_none ();
+  if (is_nil (attachments_paths)) return url_none ();
   return attachments_paths[0];
 }
