@@ -2410,6 +2410,20 @@ vue_ui_rep::do_layout () {
         concrete (d.w)->do_layout ();
       }
     }
+    else if (d.name == "wait-panel") {
+      // the wait indicator (show_wait_indicator in vue_gui.cpp): a framed
+      // panel, its content centred vertically
+      CLAY(div_id, {
+        .backgroundColor= color_field,
+        .cornerRadius= ui_corners (menu_round),
+        .layout= {
+          .padding= { ui_px (18), ui_px (24), ui_px (14), ui_px (14) },
+          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+        .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+      {
+        concrete (d.w)->do_layout ();
+      }
+    }
     else if (d.name == "discrete") {
       context_style |= WIDGET_STYLE_GREY;
       CLAY(div_id, { .layout= { .padding= { ui_px (4), ui_px (4), ui_px (2), ui_px (2) } }})
