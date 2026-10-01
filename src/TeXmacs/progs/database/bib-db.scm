@@ -379,7 +379,7 @@
 
 (define (db-get-origin)
   (if db-bib-origin
-      (list `(fb-field "origin" ,db-bib-origin))
+      (list `(db-field "origin" ,db-bib-origin))
       (list)))
 
 (tm-define (bib->db t)
