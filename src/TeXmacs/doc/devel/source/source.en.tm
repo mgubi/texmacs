@@ -5,55 +5,37 @@
 <\body>
   <tmdoc-title|About the source code of <TeXmacs>>
 
+  This part of the documentation describes the internals of <TeXmacs>: the
+  <c++> kernel and the <scheme> code which is closely tied to it. It is
+  meant for developers who want to understand, debug or extend the program
+  itself. The first two chapters give the general architecture and the
+  basic data types used everywhere; the other chapters are grouped by
+  subsystem.
+
   <\traverse>
     <branch|General architecture of <TeXmacs>|architecture.en.tm>
 
     <branch|Basic data types|types.en.tm>
 
-    <branch|Converters to other data formats|conversions.en.tm>
+    <branch|Documents, typesetting and rendering|source-documents.en.tm>
 
-    <branch|The <LaTeX> and <name|Html> converters|convert.en.tm>
+    <branch|Fonts|source-fonts.en.tm>
 
-    <branch|The graphical user interface (historical Widkit
-    toolkit)|gui.en.tm>
+    <branch|The editor and the user interface|source-editing.en.tm>
 
-    <branch|<TeXmacs> fonts|fonts.en.tm>
+    <branch|Data formats, converters and databases|source-data.en.tm>
 
-    <branch|The font database and font selection|font-database.en.tm>
-
-    <branch|Smart, virtual and emulated fonts|smart-fonts.en.tm>
-
-    <branch|Mathematical typesetting|maths.en.tm>
-
-    <branch|The boxes produced by the typesetter|boxes.en.tm>
-
-    <branch|The typesetting algorithm|typesetter.en.tm>
-
-    <branch|Macro expansion and evaluation|macro-expansion.en.tm>
-
-    <branch|Data relation descriptors (DRD)|drd.en.tm>
-
-    <branch|The server, buffers, views and windows|server.en.tm>
-
-    <branch|The server layer: classes and files of <verbatim|Texmacs/>|server-layer.en.tm>
-
-    <branch|The renderer interface|renderer.en.tm>
-
-    <branch|The abstract widget system|widgets.en.tm>
-
-    <branch|Collaboration, remote servers and
-    versioning|collaboration.en.tm>
-
-    <branch|The database and bibliographies|database.en.tm>
-
-    <branch|The graphics editor|graphics-editor.en.tm>
-
-    <branch|Syntax highlighting and programming languages|syntax-highlighting.en.tm>
-
-    <branch|The plug-in machinery|plugins.en.tm>
+    <branch|Plug-ins, collaboration and remote services|source-external.en.tm>
   </traverse>
 
+  The document format itself, as seen by authors of documents and style
+  files, is described in <hlink|the <TeXmacs> document
+  format|../format/format.en.tm>, and the <scheme> programming interface in
+  <hlink|the <TeXmacs> <scheme> developer guide|../scheme/scheme.en.tm>.
+
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
