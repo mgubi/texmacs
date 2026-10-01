@@ -36,6 +36,8 @@
     // the size of texmacs.wasm, written by the build (misc/wasm/Makefile)
     // for the progress of its download (misc/wasm/progress.js)
     tmWasmSize: Number('@TM_WASM_SIZE@') || 0,
+    // the version of TeXmacs, for the panel of the loading
+    tmVersion: '@TM_VERSION@',
     print: function (text) { console.log(text); },
     printErr: function (text) { console.error(text); },
     setStatus: function (text) {

@@ -108,12 +108,23 @@ https://mgubi.github.io/texmacs/ (GitHub Pages, source "GitHub Actions";
 the environment `github-pages` allows the branch `vue_ci`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
 
-Pages sends files as they are, without the brotli copies of `serve.mjs`:
-the build also writes gzip copies of `texmacs.wasm` and of the packages,
-which the page decompresses itself (`DecompressionStream`, in `progress.js`
-and `packages.js`), 6.2 MB for the program instead of 22.8; the packages
-stay as they are too, for the byte ranges of a file needed before its
-package. `index.html` is the page.
+Pages has no brotli: the build also writes gzip copies of `texmacs.wasm`
+and of the packages, which the page decompresses itself
+(`DecompressionStream`, in `progress.js` and `packages.js`), 6.2 MB for the
+program instead of 22.9; the packages stay as they are too, for the byte
+ranges of a file needed before its package. `index.html` is the page.
+Pages gzips the files it sends anyway (`content-encoding: gzip`, even the
+packages, 6.4 MB for the program), so that the copies save it 2 %: they
+are for the servers which send files as they are.
+
+What the compression is worth (2026-10-01, a first visit in a headless
+Firefox, `browser-run.mjs`, the time until TeXmacs runs): at 2 MB/s a file
+(`--slow 2000`), 8.3 s with the gzip copies, 7.6 s with brotli from the
+server (`serve.mjs`, the copies removed), 22.7 s with nothing compressed;
+at full speed, on the same machine, 2.6 to 2.7 s in all three cases, so
+that the decompression costs nothing measurable. The compression is what
+makes a first visit bearable; brotli over gzip is a tenth less, where the
+server has it.
 
 Locally:
 
@@ -144,14 +155,22 @@ Locally:
 - SDL3_ttf serves only the unused rendering through SDL's renderer
   (`VUE_SDL_RENDERER`): not linked.
 - The progress of the loading (`misc/wasm/progress.js`, the first pre-js):
-  a panel with the phase and a bar, for the program (fetched by
-  `Module.instantiateWasm` to count its bytes, compiled by the browser as
-  they come), the boot package (`packages.js` reports its bytes), what is
-  left to compile, and the boot of TeXmacs, before which the page is
-  painted (a run dependency of its own, removed after two frames). The
-  sizes are those of the files uncompressed: the build writes that of
-  `texmacs.wasm` into the page (`@TM_WASM_SIZE@` in `shell.html`), since a
-  compressed response does not give it. `serve.mjs [dir] [port] [KB/s]` and
+  a panel with the icon of TeXmacs Vue, the version (`@TM_VERSION@` in
+  `shell.html`, from `tm_configure.hpp`) and three lines about the
+  program; a bar with the share downloaded and the time left; and the list
+  of the operations, each waiting, running (its share), or done (its
+  time): the program (fetched by `Module.instantiateWasm` to count its
+  bytes, compiled by the browser as they come), the files (the boot
+  packages, `packages.js` reports their bytes), and the boot of TeXmacs,
+  before which the page is painted (a run dependency of its own, removed
+  after two frames; the boot holds the page, so nothing moves during it).
+  The shares are those of the bytes uncompressed: the build writes the
+  size of `texmacs.wasm` into the page (`@TM_WASM_SIZE@`), since a
+  compressed response does not give it.
+- The manifest and the boot packages are fetched as soon as `packages.js`
+  runs, while the program comes and compiles; only their installation
+  waits for `preRun`. They used to be fetched in `preRun`, after the
+  program had been compiled: the two downloads followed each other. `serve.mjs [dir] [port] [KB/s]` and
   `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
 
 ## A viewer: `texmacs.html?open=<url>`

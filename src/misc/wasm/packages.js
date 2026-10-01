@@ -290,24 +290,47 @@ var tmPackages = (function () {
     prune ();
   }
 
+  // The manifest and the bytes of the boot packages are fetched as soon as
+  // the page runs this, while the program comes and compiles: they used to
+  // wait for preRun, which comes once the program is compiled, so that the
+  // two downloads followed each other (and the bar of the page knew the
+  // size of the files only then). Only their installation, which needs the
+  // file system, waits for preRun.
+  var early = null;
+  function fetchBoot () {
+    if (early) return early;
+    stats.start = performance.now ();
+    early = fetch (url ('texmacs-files.json')).then (function (r) {
+      if (!r.ok) throw new Error ('cannot load texmacs-files.json: ' + r.status);
+      return r.json ();
+    }).then (async function (m) {
+      var boot = m.packages.filter (function (p) { return p.boot; });
+      var total = 0, done = 0, bytes = [];
+      boot.forEach (function (p) { total += p.size; });
+      var progress = typeof tmProgress !== 'undefined' ? tmProgress.files : function () {};
+      progress (0, total);
+      for (var i = 0; i < boot.length; i++) {
+        bytes.push (await fetchPackage (boot[i], function (n) { progress (done + n, total); }));
+        done += boot[i].size;
+        progress (done, total);
+      }
+      return { manifest: m, boot: boot, bytes: bytes };
+    });
+    return early;
+  }
+  if (typeof document !== 'undefined' && typeof fetch !== 'undefined')
+    fetchBoot ().catch (function () {}); // reported by preRun
+
   Module['preRun'] = Module['preRun'] || [];
   Module['preRun'].push (function () {
     addRunDependency ('texmacs-files');
-    stats.start = performance.now ();
-    fetch (url ('texmacs-files.json')).then (function (r) { return r.json (); })
-      .then (async function (m) {
-        manifest = m;
+    fetchBoot ()
+      .then (async function (r) {
+        manifest = r.manifest;
         createTree ();
-        var boot = manifest.packages.filter (function (p) { return p.boot; });
-        var total = 0, done = 0;
-        boot.forEach (function (p) { total += p.size; });
-        var progress = typeof tmProgress !== 'undefined' ? tmProgress.files : function () {};
-        progress (0, total);
-        for (var i = 0; i < boot.length; i++) {
-          var bytes = await fetchPackage (boot[i], function (n) { progress (done + n, total); });
-          done += boot[i].size;
-          progress (done, total);
-          await install (boot[i], bytes, false);
+        for (var i = 0; i < r.boot.length; i++) {
+          await install (r.boot[i], r.bytes[i], false);
+          r.bytes[i] = null;
         }
         await restoreFonts ();
         console.log ('TeXmacs: boot files in ' + Math.round (performance.now () - stats.start) + ' ms' +
