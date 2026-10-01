@@ -52,6 +52,11 @@ struct poor_rubber_font_rep: font_rep {
 
 #define MAGNIFIED_NUMBER 4
 #define HUGE_ADJUST      1
+// slashes cannot be extended by repeating a straight middle part, as the
+// other delimiters are: beyond MAGNIFIED_NUMBER they keep being stretched,
+// mostly vertically, in the fonts from SLASH_BASE on
+#define SLASH_BASE       (2*MAGNIFIED_NUMBER + 6)
+#define SLASH_NUMBER     16
 
 bool
 supports_big_operators (string res_name) {
@@ -74,7 +79,7 @@ poor_rubber_font_rep::poor_rubber_font_rep (string name, font base2):
   this->copy_math_pars (base);
   initialized << true;
   larger << base;
-  for (int i=1; i<=2*MAGNIFIED_NUMBER+5; i++) {
+  for (int i=1; i<SLASH_BASE+SLASH_NUMBER; i++) {
     initialized << false;
     larger << base;
   }
@@ -86,7 +91,13 @@ poor_rubber_font_rep::get_font (int nr) {
   ASSERT (nr < N(larger), "wrong font number");
   if (initialized[nr]) return larger[nr];
   initialized[nr]= true;
-  if (nr <= 2*MAGNIFIED_NUMBER + 1) {
+  if (nr >= SLASH_BASE) {
+    int k= MAGNIFIED_NUMBER + 1 + (nr - SLASH_BASE);
+    double zoomy= pow (2.0, ((double) k) / 4.0);
+    double zoomx= sqrt (sqrt (zoomy));
+    larger[nr]= poor_stretched_font (base, zoomx, zoomy);
+  }
+  else if (nr <= 2*MAGNIFIED_NUMBER + 1) {
     int hnr= nr / 2;
     double zoomy= pow (2.0, ((double) hnr) / 4.0);
     double zoomx= sqrt (zoomy);
@@ -164,6 +175,23 @@ poor_rubber_font_rep::search_font (string s, string& r) {
     int nr= max (num - 5, 0);
     int thin= (is_thin (r)? 1: 0);
     int code;
+    if ((r == "/" || r == "\\") && num > MAGNIFIED_NUMBER) {
+      int k= min (num - MAGNIFIED_NUMBER - 1, SLASH_NUMBER - 1);
+      if (r == "\\" && base->supports ("/")) {
+        metric ex1, ex2;
+        base -> get_extents ("/", ex1);
+        base -> get_extents ("\\", ex2);
+        double h1= ex1->y2 - ex1->y1;
+        double h2= ex2->y2 - ex2->y1;
+        if (fabs ((h2/h1) - 1.0) > 0.05) {
+          // as below: a backslash made from the slash, at the largest
+          // magnified size
+          r= "<emu-backslash>";
+          return 2*MAGNIFIED_NUMBER;
+        }
+      }
+      return SLASH_BASE + k;
+    }
     if (num <= MAGNIFIED_NUMBER ||
         r == "/" || r == "\\" ||
         r == "langle" || r == "rangle" ||
