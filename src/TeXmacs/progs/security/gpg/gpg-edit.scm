@@ -503,25 +503,33 @@
      (cmd "Disable"))))
 
 ;; Encrypt before saving
+;; Returns the encrypted document, or #f on failure (never the plain text)
 (tm-define (tree-export-encrypted name t)
   (let* ((err (lambda ()
-		(set-message `(concat "Could not save " ,(url->system name))
-			     "Save file")
-		(dialogue-window
-		 (gpg-widget-error-export-tree-texmacs-hook name)
-		 noop "Encryption error")))
+		(if (rescue-mode?)
+		    (display* "TeXmacs] Encryption failed, not saving "
+			      (url->system name) "\n")
+		    (begin
+		      (set-message `(concat "Could not save "
+					    ,(url->system name)
+					    " (encryption failed)")
+				   "Save file")
+		      (dialogue-window
+		       (gpg-widget-error-export-tree-texmacs-hook name)
+		       noop "Encryption error")))
+		#f))
 	 (dec (serialize-texmacs t))
 	 (passphrase (gpg-get-buffer-passphrase name)))
-    (if (and passphrase dec)
+    (if (and (string? passphrase) (string? dec))
       (with enc (gpg-passphrase-encrypt dec passphrase)
-	(if enc
+	(if (and (string? enc) (!= enc ""))
 	    (stree->tree
 	     `(document (TeXmacs ,(texmacs-version))
 			(style (tuple "generic"))
 			(body (document
 				(gpg-passphrase-encrypted-buffer ,enc)))))
-	    (begin (err) t)))
-      (begin (err) t))))
+	    (err)))
+      (err))))
 
 (tm-define (encrypted-buffer? t)
   (and-with b (tmfile-get t 'body)
