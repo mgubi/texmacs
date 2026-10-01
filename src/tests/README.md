@@ -329,6 +329,16 @@ bold mathematics for the profiled fonts. `math-symbols-extra.tm`, generated
 by `missing-symbols.py --sample`, shows the 200 symbols of
 `tmuniversaltounicode-extra.scm` in tables: a name the conversion tables
 fail to serve appears there as a box instead of a glyph.
+`math-extensible.tm` gives a page to each of the default TeXmacs fonts and
+six OpenType math fonts (Latin Modern, STIX Two, Libertinus, Fira, New
+Computer Modern, TeX Gyre Pagella) with everything which stretches: over-
+and underbraces (curly, round and square), wide accents over one letter,
+three letters and a long formula, arrows over and under formulas, long
+arrows with short and long labels, square roots up to nine rows, growing
+delimiters up to twelve rows, and big operators. It shows what happens
+when a font runs out of sizes: a wide check or breve beyond the largest
+variant is drawn by TeXmacs, a long arrow always covers its labels, and a
+slash without variants (Fira Math) keeps being stretched.
 
 ## Other tools
 

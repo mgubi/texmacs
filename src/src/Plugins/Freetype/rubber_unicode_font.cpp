@@ -429,7 +429,15 @@ rubber_unicode_font_rep::search_font_sub_opentype (string s, string& rew) {
   int nr= search_font_sub (s, rew);
   // if nr == 0, failed to find the sub font from subfn[1:4]
   // use default rubber font subfn[5]
-  return nr == 0 ? 5 : nr;
+  if (nr != 0) return nr;
+  // a delimiter of which the font has no larger size (Fira Math has none
+  // for / and \): the default rubber font stretches it, beyond the base
+  // glyph of the font itself
+  if (var > 0 && rew != "" &&
+      (starts (s, "<left-") || starts (s, "<right-") ||
+       starts (s, "<mid-") || starts (s, "<large-")))
+    rew= s;
+  return 5;
 }
 
 // Glyph of the base character of a rubber or wide character name
@@ -478,8 +486,13 @@ rubber_unicode_font_rep::get_wide_variant (string s, SI width, string& r) {
       return true;
     }
   if (!mt->hor_glyph_assembly->contains (glyphID)) {
+    // without an assembly the largest variant is all the font has; when
+    // it covers much less than the width (a wide check or breve over a
+    // long formula), the typesetter draws a stretched accent of its own
+    if (N(gv) == 0 || N(adv) == 0) return false;
+    if (4 * (int) adv[N(adv) - 1] < 3 * target) return false;
     r= prefix * as_string (N(gv) - 1) * ">";
-    return N(gv) > 0;
+    return true;
   }
   double em= (double) base->size * (double) base->wpt;
   r= prefix * "w" * as_string (per_em (width, em)) * ">";

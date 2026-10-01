@@ -607,6 +607,36 @@ wide_box (path ip, string s, font fn, pencil pen, SI width) {
   return macro_box (ip, b, fn);
 }
 
+// A long arrow has to cover its labels: get_wide gives the widest size
+// which is not wider than the width (what an accent wants), so the next
+// sizes are tried as long as they fall short. A font without horizontal
+// variants (Fira Math has none for its arrows) otherwise leaves the arrow
+// at the size of its base glyph under a wider label.
+box
+wide_box_covering (path ip, string s, font fn, pencil pen, SI width) {
+  string r= get_wide (s, fn, width);
+  metric ex;
+  fn->get_extents (r, ex);
+  int pos= search_backwards ("-", N(r), r);
+  if (ex->x2 - ex->x1 < width && pos > 0 && ends (r, ">") &&
+      is_int (r (pos + 1, N(r) - 1))) {
+    string radical= r (0, pos + 1);
+    int n= as_int (r (pos + 1, N(r) - 1));
+    SI  w= ex->x2 - ex->x1;
+    for (int k= n + 1; k <= n + 30; k++) {
+      string test= radical * as_string (k) * ">";
+      metric ey;
+      fn->get_extents (test, ey);
+      SI wk= ey->x2 - ey->x1;
+      if (wk <= w) break;                      // no longer growing
+      r= test; w= wk;
+      if (w >= width) break;
+    }
+  }
+  box b= text_box (ip, 0, r, fn, pen);
+  return macro_box (ip, b, fn);
+}
+
 box
 wide_stix_box (path ip, string s, font fn, pencil pen, SI width) {
   string r= get_wide_stix (s, fn, width);
@@ -620,3 +650,4 @@ box
 text_box (path ip, int pos, string s, font fn, pencil pen) {
   return tm_new<text_box_rep> (ip, pos, s, fn, pen, xkerning ());
 }
+

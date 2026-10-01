@@ -244,7 +244,8 @@ concater_rep::typeset_long_arrow (tree t, path ip) {
   SI w= sup_b->w();
   if (N(t) == 3) w= max (w, sub_b->w());
   w += env->fn->wquad;
-  box arrow= wide_box (decorate (descend (ip, 0)), s, env->fn, env->pen, w);
+  box arrow= wide_box_covering (decorate (descend (ip, 0)), s,
+                                env->fn, env->pen, w);
 
   space spc= env->fn->spc;
   if (env->math_condensed) spc= space (spc->min>>3, spc->def>>3, spc->max>>2);
