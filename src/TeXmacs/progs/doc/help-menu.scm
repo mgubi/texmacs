@@ -267,6 +267,8 @@
             ("User manual" (load-help-book "main/man-user-manual")))
           ;; (when (url-exists-in-help? "tutorial/tut-tutorial.en.tm")
           ;;   ("Tutorial" (load-help-book "tutorial/tut-tutorial")))
+          (when (url-exists-in-help? "devel/devel.en.tm")
+            ("Developer documentation" (load-help-book "devel/devel")))
           (when (url-exists-in-help? "devel/source/source.en.tm")
             ("Developers guide" (load-help-book "devel/source/source")))
           (when (url-exists-in-help? "devel/scheme/scheme.en.tm")
