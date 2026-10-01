@@ -227,7 +227,7 @@ edit_env_rep::update_page_pars () {
     }
     else if (height_flag == "true") {
       page_user_height  = get_length (PAGE_USER_HEIGHT);
-      page_top_margin   = (page_height - page_user_width) >> 1;
+      page_top_margin   = (page_height - page_user_height) >> 1;
       page_bottom_margin= page_top_margin;
     }
     else {
