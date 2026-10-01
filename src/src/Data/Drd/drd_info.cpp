@@ -311,7 +311,7 @@ drd_info_rep::is_with_like (tree t) {
 
 void
 drd_info_rep::set_var_type (tree_label l, int vt) {
-  if (info[l]->pi.freeze_with) return;
+  if (info[l]->pi.freeze_var_type) return;
   if (!info->contains (l)) info(l)= copy (info[l]);
   tag_info& ti= info(l);
   ti->pi.var_type= vt;
@@ -326,7 +326,7 @@ void
 drd_info_rep::freeze_var_type (tree_label l) {
   if (!info->contains (l)) info(l)= copy (info[l]);
   tag_info& ti= info(l);
-  ti->pi.freeze_with= true;
+  ti->pi.freeze_var_type= true;
 }
 
 /******************************************************************************
