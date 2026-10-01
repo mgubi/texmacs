@@ -48,9 +48,6 @@ EH       := -fwasm-exceptions -sSUPPORT_LONGJMP=wasm
 CPPFLAGS := -I$(W) -include $(W)/config.h $(patsubst %,-I$(S)/%,$(INCLUDE_DIRS)) \
   -I$(TM)/TeXmacs/include -I$(MUPDF)/include \
   -I$(MUPDF)/thirdparty/freetype/include -sUSE_SDL=3
-# -O2 for development; the published build (.github/workflows/wasm.yml)
-# uses OPT="-Os -flto", smaller at the same speed but slow to relink (see
-# "Optimization" in docs/wasm/README.md)
 OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17

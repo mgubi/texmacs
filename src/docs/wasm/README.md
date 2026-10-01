@@ -45,7 +45,7 @@ MuPDF writer) in about 4 s, boot included.
 | | done | not yet |
 |---|---|---|
 | windows | single-window mode: tabs for the windows of the editors, floating dialogs, resized by their frame, their contents scrolled when they do not fit; the frame of the page | |
-| build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4; the published build with `-Os -flto` (see Optimization) | |
+| build | `misc/wasm/Makefile`, the slim MuPDF 1.28.5, S7, SDL3 3.4; `-O2` (`-Os`, `-Oz` and LTO measured: see Optimization) | |
 | loop | one iteration per frame (`emscripten_set_main_loop`); the keyboard events queued in a frame all handled in it (`web_more_events`: a layout, the commands and the interpose handler for each, one repaint and one redraw), 80 keys in one frame where they took 2 s at 120 Hz | |
 | files | packages: 9.3 MB before the start, the rest in the background; the home kept in IndexedDB; the Files panel, uploads, downloads, drops | |
 | processes | `posix_spawnp` fails cleanly; the plugins which run a program are not offered (their `:require` sees no command), and one started anyway fails at once, its session dead with an error (it froze the page: `fork` fails, and the pipes were read again and again); Scheme sessions work | no external converters offered |
@@ -197,10 +197,10 @@ of the compilation, a little shorter for a smaller program. The node build
 shows what the browser does not: `-Oz` costs some 12 % of CPU time. LTO
 compiles the whole program again at each link, hence the rebuild.
 
-The published build (`.github/workflows/wasm.yml`) uses `-Os -flto`: 8 %
-less to download (gzip, what GitHub Pages sends) at the same speed; the
-development builds keep `-O2`. `-Oz -flto` would save 19 % for 12 % more
-CPU time. The page and the PDF are the same with all of them.
+All the builds keep `-O2`: `-Os -flto` would save 8 % of the download
+(gzip, what GitHub Pages sends) at the same speed, `-Oz -flto` 19 % for
+12 % more CPU time, not worth a slower or separate build. The page and the
+PDF are the same with all of them.
 
 ## A viewer: `texmacs.html?open=<url>`
 
