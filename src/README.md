@@ -7,7 +7,63 @@ The software includes a text editor with support for mathematical formulas, a sm
 
 TeXmacs runs on all major Unix platforms and Windows. Documents can be saved in TeXmacs, Xml or Scheme format and printed as Postscript or Pdf files. Converters exist for TeX/LaTeX and Html/Mathml. 
 
-## This branch: OpenType mathematical fonts (`wip_opentype`)
+## This branch: variable fonts (`wip_variable_fonts`)
+
+This branch, made from `wip_opentype` (below) and kept up to date with it,
+teaches TeXmacs to use variable fonts: the fonts which hold a continuum of
+designs in a single file, along axes such as the weight, the width and the
+optical size. The system fonts of macOS (SF, New York), most of the Google
+Fonts and many recent free fonts (Junicode, Roboto Flex, Inter) come in
+this form. TeXmacs used to see only the default design of such a file, and
+drew bold and the other weights by emulation.
+
+![Variable fonts](doc/variable-fonts/specimen.png)
+
+**Named styles.** The styles a variable font names (Thin to Black, in
+widths from Compressed to Expanded for SF) are styles of their own in the
+font database, the font browser and the menus, and `font-series` `bold`
+picks the real Bold. A scan of the fonts (`Tools > Fonts > Scan disk for
+fonts`) finds them; it is needed once in a home directory made by an older
+version, which otherwise does not know these styles, and may not know the
+family itself under its current name.
+
+**Any weight, any point.** The series may be a weight from 1 to 1000
+(`<with|font-series|550|...>`): a variable font takes that weight exactly,
+a family of static fonts its nearest weight. The new environment variable
+`font-variations` sets the axes directly, as in `wght=550,wdth=87.5`, and
+`opsz=auto` gives text of every size the optical size meant for it. The
+variable is ignored by fonts which are not variable, so it is safe to set on
+a whole document.
+
+**A panel.** `Format > Font variations...` (for the selection) and
+`Document > Font > Variations...` (for the whole document) list the axes of
+the font at the cursor, with their ranges and the values in force, and
+change them at once.
+
+**How it works.** Each instance which is used is written once as an
+ordinary static TrueType font, with FreeType applying the variations to the
+outlines and the advances, and the kerning and the anchors of marks
+corrected for the instance from the variation data of the font. Rendering,
+metrics and PDF export are therefore those of any other font. The files are
+kept under 200 MB, the least recently used removed first, and `Tools >
+Fonts > Clear font cache` removes them all. The instances were checked
+against `fontTools.varLib.instancer`: outlines agree to the font unit, and
+the kerning of SF and the mark anchors of Junicode VF exactly.
+
+**Limits.** Variable fonts with cubic outlines (CFF2) keep their default
+design only; the lookups a font switches at some points of its design space
+(`FeatureVariations`) and the `MATH` table are those of the default
+instance; and the panel has fields and buttons rather than sliders, which
+the widget language of TeXmacs does not have.
+
+**Where to read more.**
+
+- [`doc/variable-fonts.md`](doc/variable-fonts.md): the design, how an
+  instance is made and checked, and the limits.
+- `Help > Manual > Fonts` in TeXmacs: the variables `font-series` and
+  `font-variations`, and the panel.
+
+## The base branch: OpenType mathematical fonts (`wip_opentype`)
 
 This branch teaches TeXmacs to typeset mathematics with the fonts that
 LaTeX users know from `unicode-math`, and to offer them the way LaTeX
@@ -68,17 +124,6 @@ and `Format > Font features`.
 not name have names, LaTeX equivalents and classes now. In a formula, a
 window and a side tool show all the symbols, group by group, with their
 markup in a balloon, to insert them with a click.
-
-**Variable fonts.** The named styles of a variable font (the weights and
-widths of SF on macOS, of Junicode VF, of the Google variable fonts) are
-styles of their own, the series may be a weight from 1 to 1000, and the
-variable `font-variations` (`wght=550,wdth=87.5,opsz=auto`) reaches any
-point in between, with a panel in `Format > Font variations...`. Each point
-is written once as a static TrueType font, so rendering and PDF export are
-those of any other font. See
-[`doc/variable-fonts.md`](doc/variable-fonts.md).
-
-![Variable fonts](doc/variable-fonts/specimen.png)
 
 **Where to read more.**
 
