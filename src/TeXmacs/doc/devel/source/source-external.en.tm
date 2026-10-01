@@ -21,6 +21,10 @@
     <branch|The plug-in machinery|plugins.en.tm>
 
     <branch|Collaboration, remote servers and versioning|collaboration.en.tm>
+
+    <branch|AI integration|ai.en.tm>
+
+    <branch|Security, encryption and trusted documents|security.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

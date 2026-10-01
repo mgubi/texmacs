@@ -17,6 +17,10 @@
 
     <branch|Basic data types|types.en.tm>
 
+    <branch|The <scheme> interpreter and the <c++>/<scheme> glue|scheme-bridge.en.tm>
+
+    <branch|The system layer: files, URLs, caches and platform support|system.en.tm>
+
     <branch|Documents, typesetting and rendering|source-documents.en.tm>
 
     <branch|Fonts|source-fonts.en.tm>

@@ -23,6 +23,10 @@
 
     <branch|The server layer: classes and files of <verbatim|Texmacs/>|server-layer.en.tm>
 
+    <branch|Structured editing, search and automatic content|editing.en.tm>
+
+    <branch|Editing modes on the <scheme> side|modes.en.tm>
+
     <branch|The abstract widget system|widgets.en.tm>
 
     <branch|The graphical user interface (historical Widkit toolkit)|gui.en.tm>
