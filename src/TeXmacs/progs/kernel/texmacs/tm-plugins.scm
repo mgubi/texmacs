@@ -656,8 +656,10 @@
 
 (define-public (lazy-plugin-initialize name)
   "Initialize the plug-in @name in a lazy way"
+  (plugin-load-setup)
   (ahash-set! plugin-initialize-todo name #t)
-  (if (eval (ahash-ref plugin-data-table (list name :prioritary)))
+  (if (eval (ahash-ref plugin-data-table
+                       (list (symbol->string name) :prioritary)))
       (plugin-initialize name)
       (delayed
         (:idle 1000)
