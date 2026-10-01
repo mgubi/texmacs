@@ -750,7 +750,7 @@ edit_env_rep::exec_drd_props (tree t) {
 	if (val == "yes") drd->set_border (l, BORDER_YES);
 	if (val == "inner") drd->set_border (l, BORDER_INNER);
 	if (val == "outer") drd->set_border (l, BORDER_OUTER);
-	if (val == "no") drd->set_border (l, BORDER_INNER);
+	if (val == "no") drd->set_border (l, BORDER_NO);
 	drd->freeze_border (l);
       }
       else if (prop == "with-like") {
