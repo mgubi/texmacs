@@ -95,8 +95,10 @@ struct scaling_rep: public frame_rep {
     (void) p; error= false; return magnify * v; }
   point jacobian_of_inverse (point p, point v, bool &error) {
     (void) p; error= false; return v / magnify; }
-  double direct_bound (point p, double eps) { (void) p; return eps / magnify; }
-  double inverse_bound (point p, double eps) { (void) p; return eps * magnify; }
+  double direct_bound (point p, double eps) {
+    (void) p; return eps / fabs (magnify); }
+  double inverse_bound (point p, double eps) {
+    (void) p; return eps * fabs (magnify); }
 };
 
 frame
@@ -169,7 +171,7 @@ struct slanting_rep: public frame_rep {
   point jacobian (point p, point v, bool &error) {
     (void) p; error= false; return slanted (v, slant); }
   point jacobian_of_inverse (point p, point v, bool &error) {
-    (void) p; error= false; return slanted (v, slant); }
+    (void) p; error= false; return slanted (v, -slant); }
   double direct_bound (point p, double eps) {
     (void) p; return eps / sqrt (1.0 + slant*slant); }
   double inverse_bound (point p, double eps) {
@@ -185,6 +187,24 @@ slanting (point center, double slant) {
 * Linear transformations
 ******************************************************************************/
 
+static double
+linear_norm_2D (matrix<double> m) {
+  // Frobenius norm of the upper left 2x2 block (an upper bound for the
+  // operator norm of the linear part of the transformation)
+  double r= 0.0;
+  for (int i=0; i<2; i++)
+    for (int j=0; j<2; j++)
+      r += m (i, j) * m (i, j);
+  return sqrt (r);
+}
+
+static double
+linear_bound_2D (matrix<double> m, double eps) {
+  double r= linear_norm_2D (m);
+  // degenerate transformations: keep the old behaviour
+  return (r > 0.0 && r < 1.0e100? eps / r: eps);
+}
+
 struct linear_2D_rep: public frame_rep {
   matrix<double> m, u;
   linear_2D_rep (matrix<double> m2): m (m2), u (invert (m)) {
@@ -197,8 +217,10 @@ struct linear_2D_rep: public frame_rep {
     (void) p; error= false; return m * v; }
   point jacobian_of_inverse (point p, point v, bool &error) {
     (void) p; error= false; return u * v; }
-  double direct_bound (point p, double eps) { (void) p; return eps; }
-  double inverse_bound (point p, double eps) { (void) p; return eps; }
+  double direct_bound (point p, double eps) {
+    (void) p; return linear_bound_2D (m, eps); }
+  double inverse_bound (point p, double eps) {
+    (void) p; return linear_bound_2D (u, eps); }
 };
 
 frame
@@ -213,7 +235,10 @@ linear_2D (matrix<double> m) {
 struct affine_2D_rep: public frame_rep {
   matrix<double> m, j;
   affine_2D_rep (matrix<double> m2): m (m2) {
-    j= copy (m);
+    j= matrix<double> (0.0, 2, 2);
+    for (int r=0; r<2; r++)
+      for (int c=0; c<2; c++)
+        j (r, c)= m (r, c);
     linear= true; }
  // FIXME: Do we use "linear" in such a
  //   weakest sense for affine transforms ?
@@ -233,8 +258,10 @@ struct affine_2D_rep: public frame_rep {
     (void) p; (void) v; (void) error;
     FAILED ("not yet implemented");
     return p;}
-  double direct_bound (point p, double eps) { (void) p; return eps; }
-  double inverse_bound (point p, double eps) { (void) p; return eps; }
+  double direct_bound (point p, double eps) {
+    (void) p; return linear_bound_2D (j, eps); }
+  double inverse_bound (point p, double eps) {
+    (void) p; return linear_bound_2D (invert (j), eps); }
 };
 
 frame
