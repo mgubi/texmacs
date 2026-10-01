@@ -14,10 +14,10 @@
 
   The style-sheet primitives can be obtained from the <menu|Source> menu when
   you are in source mode. In all other modes, the <menu|Source> menu becomes
-  visible after enabling the <menu|Source macros tool> in the <menu|Tools>
-  menu. Alternatively, you may use the <prefix|A-> and <prefix|executable>
-  keyboard prefixes in source mode and the<nbsp><prefix|inactive>
-  and<nbsp><prefix|executable> prefixes otherwise. Furthermore, we recall
+  visible after enabling <menu|Tools|Source macros tool>. Alternatively, you
+  may use the <prefix|special> and <prefix|executable> keyboard prefixes in
+  source mode and the<nbsp><prefix|inactive> and<nbsp><prefix|executable>
+  prefixes otherwise (see <verbatim|progs/source/source-kbd.scm>). Furthermore, we recall
   that the hybrid <key|\\>-key may be used for creating macro-applications or
   arguments, depending on the context. Finally, the
   <shortcut|(structured-insert-right)> and <shortcut|(structured-insert-left)>

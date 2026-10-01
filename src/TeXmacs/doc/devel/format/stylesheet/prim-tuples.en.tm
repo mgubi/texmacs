@@ -31,7 +31,9 @@
     <explain-macro|look-up|tuple|which><explain-synopsis|access an entry in a
     tuple>
   <|explain>
-    Returns the element with index <src-arg|which> in <src-arg|tuple>. For
+    Returns the element with index <src-arg|which> (counting from zero) in
+    <src-arg|tuple>; more generally, <src-arg|tuple> may be any compound
+    tree. For
     instance, <inactive*|<look-up|<tuple|a|b|c>|1>> yields
     <look-up|<tuple|a|b|c>|1>.
   </explain>
@@ -53,6 +55,15 @@
     until <src-arg|expr-n>. For instance,
     <inactive*|<merge|<tuple|1|2>|<tuple|3|4|5>>> produces
     <merge|<tuple|1|2>|<tuple|3|4|5>>.
+  </explain>
+
+  <\explain>
+    <explain-macro|occurs-inside|expr|var><explain-synopsis|occurrence
+    test>
+  <|explain>
+    Returns <verbatim|true> if the evaluated <src-arg|expr> occurs as a
+    subtree of the (unevaluated) value of the macro argument with name
+    <src-arg|var>, and <verbatim|false> otherwise.
   </explain>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

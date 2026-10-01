@@ -1,6 +1,6 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Mathematical typesetting>
@@ -60,8 +60,9 @@
   Consequently, <TeXmacs> should offer a reasonable compromise for the most
   frequent cases, while offering methods for the user to make finer
   adjustments in the remaining ones. We provide the constructs
-  <menu|Format|Adjust|Move> and <menu|Format|Adjust|Resize> to move and
-  resize boxes in order to perform such adjustments. For instance, if the
+  <menu|Format|Transform|Move> and <menu|Format|Transform|Resize> (tags
+  <markup|move> and <markup|resize>) to move and resize boxes in order to
+  perform such adjustments. For instance, if the
   brackets around the two sums
 
   <\equation*>
@@ -72,7 +73,7 @@
   <math|j> of the second sum to <verbatim|0fn>. Alternatively, one may resize
   the bottoms of both the <math|i> and <math|j> subscripts to (say)
   <verbatim|-0.3fn>. For easier adjustments you may use
-  <menu|Format|Adjust|Smash> and <menu|Format|Adjust|Inflate> to automatically
+  <menu|Format|Transform|Smash> and <menu|Format|Transform|Inflate> to automatically
   adjust the size of the contents to the height of the character \Px\Q and
   the largest one in the font respectively.
 
@@ -98,25 +99,28 @@
   <section|The font parameters>
 
   Several font parameters are crucial for the correct positioning of the
-  different components. The following are often needed:
+  different components. They are stored as fields of the class
+  <cpp|font_rep> (see <verbatim|Graphics/Fonts/font.hpp> and the chapter on
+  <hlink|fonts|fonts.en.tm>). The following are often needed:
 
   <\description>
-    <item*|<verbatim|quad>>The main font reference space <verbatim|1fn>,
+    <item*|<verbatim|wfn>>The main font reference space <verbatim|1fn>,
     which can be taken as the distance between successive lines of text.
 
     <item*|<verbatim|y1> and <verbatim|y2>>The bottom and top level for the
-    font (we have <verbatim|y2-y1=quad>).
+    font (for <TeX> fonts, we have <verbatim|y2-y1=wfn>).
 
     <item*|<verbatim|sep>>The reference minimal space between distinct
     components, like the minimal distance between a subscript and a
-    superscript. In fact, <verbatim|sep=quad/10>.
+    superscript. In fact, <verbatim|sep=wfn/10>.
 
     <item*|<verbatim|wline>>The width of several types of lines, like the
     fraction and square root bars, wide accents, etc.
 
     <item*|<verbatim|yfrac>>The height of the fraction bar, which is needed
-    for the positioning of fractions and big delimiters. Usually,
-    <verbatim|yfrac> is almost equal to <verbatim|yx/2> below.
+    for the positioning of fractions and big delimiters. For <TeX> fonts,
+    <verbatim|yfrac> is equal to <verbatim|yx/2> below; for <name|Unicode>
+    fonts, it is the vertical middle of the minus sign.
   </description>
 
   The following parameters are mainly needed in order to deal with scripts:
@@ -126,17 +130,17 @@
     needed for the positioning of scripts. All the remaining parameters are
     actually computed as a function of <verbatim|yx>.
 
-    <item*|<verbatim|ysub lo base>>Logical base line for subscripts.
+    <item*|<verbatim|ysub_lo_base>>Logical base line for subscripts.
 
-    <item*|<verbatim|ysub hi lim>>Subscripts may never physically exceed this
-    top height.
+    <item*|<verbatim|ysub_hi_lim>>Subscripts may never physically exceed
+    this top height.
 
-    <item*|<verbatim|ysup lo base>>Logical base line for superscripts.
+    <item*|<verbatim|ysup_lo_base>>Logical base line for superscripts.
 
-    <item*|<verbatim|ysup lo lim>>Superscripts may never physically exceed
+    <item*|<verbatim|ysup_lo_lim>>Superscripts may never physically exceed
     this bottom height.
 
-    <item*|<verbatim|ysup hi lim>>Suggestion for a physical top line for
+    <item*|<verbatim|ysup_hi_lim>>Suggestion for a physical top line for
     superscripts.
 
     <item*|<verbatim|yshift>>Possible shift of the base lines when we are
@@ -147,7 +151,15 @@
   properties. First of all, they always admit left and right slopes.
   Furthermore, they admit left and right italic corrections, which are needed
   for the positioning of scripts or when passing from text in upright to text
-  in italics (or vice versa).
+  in italics (or vice versa). These are computed by the virtual methods
+  <cpp|get_left_slope>, <cpp|get_right_slope>, <cpp|get_left_correction>,
+  <cpp|get_right_correction> of the font and, at the level of boxes, by the
+  methods <cpp|left_slope>, <cpp|right_slope>, <cpp|left_correction>,
+  <cpp|right_correction>, <cpp|lsub_correction>, <cpp|rsup_correction>,
+  <abbr|etc.> of <cpp|box_rep>. More recent versions of <TeXmacs> also
+  implement font-specific microtypographic corrections for the positioning
+  of scripts and wide accents (see the files
+  <verbatim|Plugins/Freetype/adjust_*.cpp>).
 
   <section|Some major mathematical constructs>
 
@@ -189,8 +201,9 @@
     at least <verbatim|sep>.
 
     <item>The root itself is typeset like a large delimiter. The positioning
-    of a potential script works only is very dependent on the usage of <TeX>
-    fonts.
+    of a potential script (the index of the root) depends on the font, with
+    special cases for some math fonts (see <cpp|sqrt_box_rep> in
+    <verbatim|math_boxes.cpp>).
 
     <item>The upper bar has a overhang of <verbatim|sep/2> at the right and
     the logical right limit of the root is situated another <verbatim|sep/2>
@@ -218,15 +231,17 @@
   The following heuristics are used:
 
   <\itemize>
-    <item>We use <TeX> fonts for small accents and an
-    <with|font-shape|italic|ad hoc> algorithm for the wider ones.
+    <item>We use the accents of the font for small accents and
+    extensible glyphs or an <with|font-shape|italic|ad hoc> algorithm for
+    the wider ones.
 
     <item>The distance between the main argument and the accent is at least
-    <verbatim|sep> (or a distance which depends on the <TeX> font for small
+    <verbatim|sep> (or a distance which depends on the font for small
     accents).
 
     <item>The accent is positioned horizontally according to the right slope
-    of the main argument.
+    of the main argument, with an additional font-specific correction
+    (<cpp|wide_correction>).
 
     <item>The slopes for the accented box are inherited from those of the
     main argument and the italic corrections are adjusted accordingly.
@@ -297,13 +312,15 @@
   again complicated because of potential conflicts between locally and
   globally optimal esthetics.
 
-  First of all, <TeX> fonts come only with a discrete set of possible sizes
-  for large delimiters. This is an advantage from the point of view that it
-  favorites delimiters around slightly different expressions to have the same
-  baselines. However, it has the disadvantage that delimiters are easily made
-  \Pone size to large\Q. For this reason, we actually diminish the height and
-  the depth of the delimited expression by the small amount <verbatim|sep>,
-  before computing the sizes of the delimiters.
+  First of all, fonts come only with a discrete set of possible sizes for
+  large delimiters (see the section on string encodings in the chapter on
+  <hlink|fonts|fonts.en.tm>), before the delimiters are assembled from
+  pieces. This is an advantage from the point of view that it favorites
+  delimiters around slightly different expressions to have the same
+  baselines. However, it has the disadvantage that delimiters are easily
+  made \Pone size too large\Q. For this reason, we actually diminish the
+  height and the depth of the delimited expression by the small amount
+  <verbatim|sep/2>, before computing the sizes of the delimiters.
 
   Secondly, it is best when the vertical middles of big delimiters occur at
   the height of fraction bars. However, in a formula like
@@ -322,8 +339,12 @@
 
   In <TeXmacs>, we use the following compromise: we start with the middle of
   the delimited expression as a first approximation to the middle of the
-  delimiters. The real middle is obtained by shifting this middle towards the
-  height of fraction bars by an amount which cannot exceed <verbatim|sep>.
+  delimiters. We then try to make the delimiters symmetric with respect to
+  the middle of a delimiter of normal size (which is close to the height of
+  fraction bars), by extending them at the top or at the bottom, but the
+  corresponding shift of the middle may not exceed <verbatim|2 sep>. This
+  algorithm is implemented in <cpp|concater_rep::handle_matching> in
+  <verbatim|Typeset/Concat/concat_post.cpp>.
 
   From a horizontal point of view, we finally have to notice that we adapted
   the metrics of the big delimiters in a way that potential scripts are
@@ -339,7 +360,28 @@
   annoying in the case of automatically generated formulas, where this
   situation occurs quite often.
 
+  <section|Implementation>
+
+  The mathematical constructs are typeset by the routines in
+  <verbatim|Typeset/Concat/concat_math.cpp> (fractions, roots, scripts,
+  big operators, delimiters, wide accents, <abbr|etc.>), which produce the
+  boxes implemented in <verbatim|Typeset/Boxes/Composite/math_boxes.cpp>
+  (fractions, roots, negations, wide accents) and
+  <verbatim|Typeset/Boxes/Composite/script_boxes.cpp> (scripts and limits).
+  Brackets are resized in a post-processing step, in
+  <verbatim|Typeset/Concat/concat_post.cpp>, once the entire line is known.
+  The spacing between symbols depends on their types (operators,
+  relations, <abbr|etc.>), as provided by the mathematical language (see
+  <verbatim|System/Language/math_language.cpp> and the grammar
+  <verbatim|progs/language/std-math.scm>), and on spacing tables provided
+  by the font. Notice that the directory
+  <verbatim|Graphics/Mathematics> is unrelated to mathematical typesetting:
+  it contains generic templates for polynomials, vectors, matrices and
+  formal expressions.
+
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

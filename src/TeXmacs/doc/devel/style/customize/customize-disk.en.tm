@@ -10,7 +10,7 @@
   organization may be represented by a labeled tree. For instance, the tree
   which corresponds to the <tmstyle|article> style is represented below:
 
-  <\big-figure|<tree|<tmstyle|article>|<tree|<tmpackage|std>|<stack|<tformat|<table|<row|<cell|<tmpackage|std-markup>>>|<row|<cell|<tmpackage|std-symbol>>>|<row|<cell|<tmpackage|std-math>>>|<row|<cell|<tmpackage|std-list>>>|<row|<cell|<tmpackage|std-utils>>>|<row|<cell|<tmpackage|std-counter>>>|<row|<cell|<tmpackage|std-automatic>>>|<row|<cell|<tmpackage|list>>>|<row|<cell|<tmpackage|session>>>>>>>|<tree|<tmpackage|env>|<stack|<tformat|<table|<row|<cell|<tmpackage|env-base>>>|<row|<cell|<tmpackage|env-math>>>|<row|<cell|<tmpackage|env-theorem>>>|<row|<cell|<tmpackage|env-float>>>>>>>|<tree|<tmpackage|title-base>|<tmpackage|title-generic>>|<tmpackage|header-article>|<tree|<tmpackage|section-article>|<tmpackage|section-base>>>>
+  <\big-figure|<tree|<tmstyle|article>|<tree|<tmpackage|std>|<stack|<tformat|<table|<row|<cell|<tmpackage|std-counter>>>|<row|<cell|<tmpackage|std-markup>>>|<row|<cell|<tmpackage|std-utils>>>|<row|<cell|<tmpackage|std-symbol>>>|<row|<cell|<tmpackage|std-math>>>|<row|<cell|<tmpackage|std-list>>>|<row|<cell|<tmpackage|std-automatic>>>|<row|<cell|<tmpackage|std-pattern>>>|<row|<cell|<tmpackage|std-fold>>>|<row|<cell|<tmpackage|std-graphics>>>|<row|<cell|<tmpackage|std-security>>>|<row|<cell|<tmpackage|std-animate>>>|<row|<cell|<tmpackage|session>>>|<row|<cell|<tmpackage|scripts>>>|<row|<cell|<tmpackage|calc>>>|<row|<cell|<tmpackage|program>>>>>>>|<tree|<tmpackage|env>|<stack|<tformat|<table|<row|<cell|<tmpackage|env-base>>>|<row|<cell|<tmpackage|env-math>>>|<row|<cell|<tmpackage|env-theorem>>>|<row|<cell|<tmpackage|env-float>>>|<row|<cell|<tmpackage|env-program>>>>>>>|<tree|<tmpackage|title-generic>|<tmpackage|title-base>>|<tmpackage|header-article>|<tree|<tmpackage|section-article>|<tmpackage|section-base>>>>
     The tree with the packages from which the <tmstyle|article> style has
     been built up. In order to save space, we have regrouped the numerous
     children of <tmpackage|std> and <tmpackage|env> in vertical lists.
@@ -33,12 +33,19 @@
     <inactive*|<use-package|std|env|title-generic|header-article|section-article>>
   </tm-fragment>
 
-  More precisely, the <markup|use-package> package sequentially includes the
-  style packages corresponding to its arguments. The packages should be in
-  <verbatim|$TEXMACS_PACKAGE_PATH>, which contains <verbatim|.>,
-  <verbatim|~/.TeXmacs/packages> and <verbatim|$TEXMACS_PATH/packages> by
-  default. Furthermore rendering information for the source code like
-  <markup|style-with> tags are discarded before evaluation of the files.
+  More precisely, the <markup|use-package> primitive sequentially includes
+  the style packages corresponding to its arguments. The packages are
+  searched in the directory of the current file and in
+  <verbatim|$TEXMACS_STYLE_PATH>, which by default contains all
+  subdirectories of <verbatim|~/.TeXmacs/styles>,
+  <verbatim|~/.TeXmacs/packages>, <verbatim|$TEXMACS_PATH/styles>,
+  <verbatim|$TEXMACS_PATH/packages> and of the <verbatim|styles> and
+  <verbatim|packages> directories of the installed plug-ins. Furthermore
+  rendering information for the source code like <markup|style-with> tags
+  are discarded before evaluation of the files. Similarly, the
+  <markup|use-module> primitive may be used to load a <scheme> module on
+  which the package depends, as in <inactive*|<use-module|(database
+  title-markup)>>.
 
   <\remark>
     We strongly recommend the user to take a look at some of the standard

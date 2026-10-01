@@ -27,7 +27,7 @@
   more complex tags like <markup|section>. Indeed, the <markup|section> tag
   involves many things like resetting subcounters, entering the title into
   the table of contents and so on. Therefore, special additional macros are
-  provided the customization of such tags, like <markup|section-title>,
+  provided for the customization of such tags, like <markup|section-title>,
   <markup|section-clean> and <markup|section-toc>.
 
   <tmdoc-copyright|1998--2004|Joris van der Hoeven>

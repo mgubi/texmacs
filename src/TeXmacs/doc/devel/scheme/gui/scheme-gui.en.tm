@@ -19,6 +19,9 @@
   However, automatically generated content is not always the best approach,
   so you might want to explicitly design your interface placing it inside a
   complicated dialog. The following sections should help you with this.
+  The implementation of the widget language is described in \P<hlink|The
+  <scheme> widget language and its
+  interpreter|../../source/widgets-scheme.en.tm>\Q.
 
   <\traverse>
     <branch|An introduction to widgets.|scheme-gui-intro.en.tm>

@@ -42,7 +42,14 @@
     <src-var|prog-font-series>, <src-var|prog-font-shape>. In more recent
     versions of <TeXmacs>, the environment variables <src-var|font>,
     <src-var|font-family>, <src-var|font-series> and <src-var|font-shape>
-    directly control the font for all modes.
+    directly control the font for all modes. The mode specific variables
+    still exist, but only play a secondary role: in mathematical mode, the
+    <src-var|math-font> is only used when <src-var|font> is set to
+    <verbatim|roman> (the default), the values <verbatim|ms> and
+    <verbatim|mt> of <src-var|math-font-family> select sans serif and
+    typewriter variants of the text font, and the value <verbatim|right> of
+    <src-var|math-font-shape> selects upright mathematics (see
+    <cpp|smart_font> in <verbatim|Graphics/Fonts/smart_font.cpp>).
   </remark>
 
   <\explain>
@@ -106,7 +113,7 @@
     <var-val|font-series|medium><explain-synopsis|font weight>
   <|explain>
     The font series determines the weight of the font. Most fonts only
-    provide <verbatim|regular> and <verbatim|bold> font weights. Some fonts
+    provide <verbatim|medium> and <verbatim|bold> font weights. Some fonts
     also provide <verbatim|light> as a possible value.
 
     <\tm-fragment>
@@ -165,6 +172,21 @@
     progression with factor <no-break><math|<sqrt|2|4>>. Notice that the font
     size is also affected by the <hlink|index
     level|env-math.en.tm#math-level>.
+  </explain>
+
+  <\explain>
+    <var-val|font-effects|><explain-synopsis|additional font effects>
+  <|explain>
+    A comma separated list of artificial effects which are applied to the
+    current font, each of the form <verbatim|<em|effect>=<em|value>>.
+    Supported effects include <verbatim|bold>, <verbatim|bbb> (blackboard
+    bold), <verbatim|slant>, <verbatim|hmagnify>, <verbatim|vmagnify>,
+    <verbatim|hextended>, <verbatim|vextended>, <verbatim|mono>,
+    <verbatim|degraded>, <verbatim|distorted>, <verbatim|gnawed>,
+    <verbatim|blurred> and <verbatim|enhanced> (see <cpp|apply_effects> in
+    <verbatim|Graphics/Fonts/smart_font.cpp>). For instance,
+    <verbatim|bold=2,slant=0.25> produces a poor man's bold slanted variant
+    of the current font.
   </explain>
 
   <\explain>

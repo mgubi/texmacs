@@ -26,8 +26,9 @@
 
   Usually, the file <verbatim|my-init-texmacs.scm> contains personal keyboard
   bindings and menus. For instance, when putting the following piece of code
-  in this file, the keyboard shortcuts <key|T h .> and <key|P r o p .> for
-  starting a new theorem <abbr|resp.> proposition:
+  in this file, you define the keyboard shortcuts <key|T h .> and <key|P r o
+  p .> for starting a new theorem <abbr|resp.> proposition (and similar
+  shortcuts for definitions and lemmas):
 
   <\scm-code>
     (kbd-map
@@ -85,7 +86,7 @@
     \ \ \ \ \ \ (buffer-pretend-saved (current-buffer))))
   </scm-code>
 
-  Notice that the ``no name'' check is important: when omitted, the styles of
+  Notice that the \Pno name\Q check is important: when omitted, the styles of
   existing documents would also be changed to <tmstyle|article>. The function
   <scm|buffer-pretend-saved> is used in order to avoid <TeXmacs> to complain
   about unsaved documents when leaving <TeXmacs> without changing the
@@ -155,7 +156,7 @@
   load the appropriate modules only when needed.
 
   For more information about how to write plug-ins, we refer to the
-  <hlink|corresponding chapter|../../interface/interface.en.tm>.
+  <hlink|corresponding chapter|../../plugin/plugins.en.tm>.
 
   <paragraph*|Interactive invocation of <scheme> commands>
 
@@ -178,21 +179,21 @@
   session and execute them):
 
   <\session|scheme|default>
-    <\folded-io|scheme] >
+    <\input|Scheme] >
       (define (square x) (* x x))
-    </folded-io|>
+    </input>
 
-    <\folded-io|scheme] >
+    <\input|Scheme] >
       (square 1111111)
-    </folded-io|>
+    </input>
 
-    <\folded-io|scheme] >
+    <\input|Scheme] >
       (kbd-map ("h i ." (insert "Hi there!")))
-    </folded-io|>
+    </input>
 
-    <\folded-io|scheme] >
-      ;; try typing ``hi.''
-    </folded-io|>
+    <\input|Scheme] >
+      ;; now try typing "hi."
+    </input>
   </session>
 
   <paragraph*|Command-line options for executing <scheme> commands>
@@ -210,7 +211,7 @@
       texmacs -x "(display \\"Hi there\\\\n\\")"
     </shell-code>
 
-    causes <TeXmacs> to print ``Hi there!'' when starting up. Notice that the
+    causes <TeXmacs> to print \PHi there\Q when starting up. Notice that the
     <verbatim|-x> option may be used several times.
 
     <item*|<with|font-series|medium|<verbatim|-q>>>This option causes
@@ -230,7 +231,7 @@
     <verbatim|<em|out>> determine their file formats.
   </description-long>
 
-  <paragraph*|Invoking <scheme> scrips from <TeXmacs> markup>
+  <paragraph*|Invoking <scheme> scripts from <TeXmacs> markup>
 
   <label|markup-scripts><TeXmacs> provides two major tags for invoking
   <scheme> scripts from within the markup:
@@ -254,8 +255,8 @@
       <inactive*|<extern|(lambda (x) `(concat "Hallo " ,x))|Piet>>
     </tm-fragment>
 
-    produces the output ``<extern|(lambda (x) `(concat "Hallo " ,x))|Piet>''.
-    Notice that the argument ``Piet'' remains editable.
+    produces the output \P<extern|(lambda (x) `(concat "Hallo " ,x))|Piet>\Q.
+    Notice that the argument \PPiet\Q remains editable.
   </description-long>
 
   It should be noticed that the direct invocation of <scheme> scripts from
@@ -265,8 +266,9 @@
   considered secure or not. For instance, when clicking <action|here|(lambda
   () (system "xterm"))> (so as to launch an <verbatim|xterm>), the editor
   will prompt you by default in order to confirm whether you wish to execute
-  this script. The desired level of security can be specified in
-  <menu|Edit|Preferences|Security>. When writing your own <scheme> extensions
+  this script. The desired level of security can be specified with the
+  <menu|Security> field in the <menu|Other> tab of the preferences dialog
+  (<menu|Edit|Preferences>). When writing your own <scheme> extensions
   to <TeXmacs>, it is also possible to define routines as being secure.
 
   <tmdoc-copyright|2005|Joris van der Hoeven>

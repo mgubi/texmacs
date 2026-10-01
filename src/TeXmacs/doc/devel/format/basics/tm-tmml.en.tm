@@ -9,28 +9,35 @@
   the serialization of <TeXmacs> documents in the XML format. However, the
   XML format is generally more verbose and less readable than the default
   <TeXmacs> format. In order to save or load a file in the XML format (using
-  the <verbatim|.tmml> extension), you may use <menu|File|Export|XML>
-  <abbr|resp.> <menu|File|Import|XML>.\ 
+  the <verbatim|.tmml> extension), you may use <menu|File|Export|Xml>
+  <abbr|resp.> <menu|File|Import|Xml>. The conversion is implemented in
+  <scheme> in the directory <verbatim|convert/tmml/> of
+  <verbatim|$TEXMACS_PATH/progs>.
 
   It should be noticed that <TeXmacs> documents do not match a predefined
   DTD, since the appropriate DTD for a document depends on its style. The XML
   format therefore merely provides an XML representation for <TeXmacs> trees.
   The syntax has both been designed to be close to the tree structure and use
   conventional <acronym|XML> notations which are well supported by standard
-  tools.
+  tools. A complete document is represented by a root element
+  <verbatim|TeXmacs>, whose <verbatim|version> attribute contains the
+  version of <TeXmacs>, and whose children represent the children of the
+  top-level <markup|document> tag (<markup|style>, <markup|body>,
+  <markup|initial>, <abbr|etc.>).
 
   <paragraph*|The encoding for strings>
 
   The leafs of <TeXmacs> trees are translated from the universal <TeXmacs>
-  encoding into Unicode. Characters without Unicode equivalents are
-  represented as entities (in the future, we rather plan to create a
-  <verbatim|tmsym> tag for representing such characters).
+  encoding into Unicode (UTF-8). Characters without Unicode equivalents
+  are represented using a special <verbatim|tm-sym> tag; for instance, the
+  <TeXmacs> symbol <verbatim|\<less\>foo\<gtr\>> would be represented as
+  <verbatim|\<less\>tm-sym\<gtr\>foo\<less\>/tm-sym\<gtr\>>.
 
   <paragraph*|XML representation of regular tags>
 
   Trees with a single child are simply represented by the corresponding XML
   tag. In the case when a tree has several children, then each child is
-  enclosed into a <verbatim|tm-arg> tag. For instance, <math|<sqrt|x+y>> is
+  enclosed into a <verbatim|tm-arg> tag. For instance, <math|<sqrt|y+z>> is
   simply represented as
 
   <\quote-env>
@@ -63,7 +70,7 @@
 
   Some tags are represented in a special way in XML. The <markup|concat> tag
   is simply represented by a textual concatenation. For instance,
-  <math|<frac|1|2>+<sqrt|x+y>> is represented as
+  <math|<frac|1|2>+<sqrt|y+z>> is represented as
 
   <\quote-env>
     <framed-fragment|<\verbatim>
@@ -128,6 +135,9 @@
   would be imported as \P<inactive*|some <my-tag|<attr|beast|heary>|special>
   text>\Q. This will make it possible, in principle, to use <TeXmacs> as an
   editor of general XML files.
+
+  Finally, the binary content of a <markup|raw-data> tag is encoded in
+  base64 inside a <verbatim|tm-arg> child of a <verbatim|raw-data> element.
 
   <tmdoc-copyright|2004|Joris van der Hoeven>
 

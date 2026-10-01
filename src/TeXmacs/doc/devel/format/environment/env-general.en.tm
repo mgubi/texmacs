@@ -36,7 +36,7 @@
   <\explain>
     <var-val|language|english>
 
-    <var-val|math-language|texmath>
+    <var-val|math-language|std-math>
 
     <var-val|prog-language|scheme><explain-synopsis|language>
   <|explain>
@@ -49,7 +49,7 @@
     <\itemize>
       <item>The language may specify rules for typesetting content. For
       instance, the text language specifies punctuation and hyphenation
-      rules. Similarly the mathematical language containns spacing
+      rules. Similarly the mathematical language contains spacing
       information for mathematical operators.
 
       <item>Several editing operations depend on the current language: when
@@ -82,19 +82,19 @@
 
     The language may be specified globally for the whole document in
     <menu|Document|Language> and locally for a piece of text in
-    <menu|Format|Language>.
+    <menu|Insert|Language>.
   </explain>
 
   <\explain>
     <var-val|prog-session|default><explain-synopsis|name of programming
     session>
   <|explain>
-    This environment variables is used in addition to the
+    This environment variable is used in addition to the
     <src-var|prog-language> variable in order to determine a concrete
     implementation as well as a particular instance of the current
     programming language. For instance, in case of the
     <hlink|<name|Maxima>|../../../../plugins/maxima/doc/maxima-abstract.en.tm>
-    language, different implementation may be used fooor the underlying
+    language, different implementations may be used for the underlying
     <name|Lisp>. Similarly, one may wish to run two different instances of
     <name|Maxima> in parallel.
   </explain>
@@ -125,18 +125,59 @@
     <var-val|bg-color|white><explain-synopsis|background color>
   <|explain>
     The background color for your document, as specified in
-    <menu|Document|Color|Background>.
+    <menu|Document|Colors|Background>. Besides colors, the background may
+    also be a pattern, a gradient or a picture.
   </explain>
 
   <\explain>
     <var-val|color|black><explain-synopsis|foreground color>
   <|explain>
     The current foreground color of text and graphics, as specified in
-    <menu|Document|Color|Foreground> or <menu|Format|Color>. Named colors,
+    <menu|Document|Colors|Foreground> or <menu|Format|Color>. Named colors,
     like ``<verbatim|Salmon>'', are supported for different color charts:
     <hlink|<verbatim|dvips>|https://en.wikibooks.org/wiki/LaTeX/Colors#The_68_standard_colors_known_to_dvips>,
     <hlink|<verbatim|x11>|https://en.wikipedia.org/wiki/X11_color_names#Color_name_charts>
     and <hlink|<verbatim|html>|https://www.w3schools.com/colors/colors_names.asp>.
+    Colors may also be specified in hexadecimal notation, like
+    <verbatim|#f80> or <verbatim|#ff8000>, possibly with an additional alpha
+    channel, like <verbatim|#ff800080>.
+  </explain>
+
+  <\explain>
+    <var-val|opacity|100%><explain-synopsis|opacity>
+  <|explain>
+    The opacity of the foreground color, specified either as a percentage or
+    as a number between <verbatim|0> and <verbatim|1>.
+  </explain>
+
+  <\explain>
+    <var-val|locus-color|global>
+
+    <var-val|visited-color|global><explain-synopsis|colors of hyperlinks>
+  <|explain>
+    The colors used for rendering loci (like hyperlinks and references),
+    <abbr|resp.> loci whose destination has already been visited. The value
+    <verbatim|global> means that the color is determined by the global user
+    preferences, whereas the value <verbatim|preserve> means that the
+    current <src-var|color> is used.
+  </explain>
+
+  <\explain>
+    <var-val|spacing-policy|default><explain-synopsis|spacing policy>
+  <|explain>
+    This variable controls the horizontal spacing around mathematical
+    operators and punctuation. Standard values are <verbatim|default>,
+    <verbatim|old> and <verbatim|wide>, as selected by the
+    <markup|normal-spacing>, <markup|old-spacing> and <markup|wide-spacing>
+    macros. Style packages may also use more complex tuples as values.
+  </explain>
+
+  <\explain>
+    <var-val|prog-scripts|none><explain-synopsis|scripting language>
+  <|explain>
+    The plug-in which is used for evaluating scripts inside the document
+    (like executable fold or input fields), as specified in
+    <menu|Document|Scripts>. The value <verbatim|none> disables scripts.
   </explain>
 
   <\explain>
@@ -148,12 +189,14 @@
   </explain>
 
   <\explain>
-    <var-val|info-flag|short><explain-synopsis|informative flags style>
+    <var-val|info-flag|minimal><explain-synopsis|informative flags style>
   <|explain>
     This variable controls the rendering of informative flags, which are for
     instance used to indicate the locations of otherwise invisible labels or
     typesetting directives. The <src-var|info-flag> may take the values
-    <verbatim|none>, <verbatim|short> and <verbatim|detailed>:
+    <verbatim|none>, <verbatim|minimal>, <verbatim|short> and
+    <verbatim|detailed>. The values <verbatim|paper> and
+    <verbatim|short-paper> also render the flags when printing:
 
     <\tm-fragment>
       <with|info-flag|none|Label 1<label|flag-label-1>>,

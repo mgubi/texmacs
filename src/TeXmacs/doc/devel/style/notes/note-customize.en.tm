@@ -9,7 +9,7 @@
   <markup|lemma>. As a general rule, <TeXmacs> provides a set of well-chosen
   macros which can be customized by the user so as to obtain the desired
   effect. For instance, as we have seen <hyper-link|above|../customize/customize-theorems.en.tm>,
-  you should use modify one of the macros <markup|render-theorem>,
+  you should modify one of the macros <markup|render-theorem>,
   <markup|theorem-name> or <markup|theorem-sep> in order to customize the
   rendering of <markup|lemma> and all other theorem-like environments.
 

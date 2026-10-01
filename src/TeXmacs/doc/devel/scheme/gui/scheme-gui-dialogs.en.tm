@@ -91,11 +91,11 @@
   <scm|resize> is another of the several available container or
   <hlink|content management widgets|scheme-gui-advanced.en.tm>. It accepts
   two sorts of arguments. Either one sets a fixed size for the widget with
-  two strings, as in the example above, or one passes two lists, the first
-  for widths, the second for heights, with the minimum, default and maximum
-  values in that order, like this:\ 
+  two strings, as in the example above, or one passes two (quoted) lists,
+  the first for widths, the second for heights, with the minimum, default
+  and maximum values in that order, like this:\ 
 
-  <scm|(resize ("100px" "200px" "400px") ("100px" "200px" "400px")
+  <scm|(resize '("100px" "200px" "400px") '("100px" "200px" "400px")
   (some-widget-here))>
 
   This sets <scm|some-widget-here> to have a default square size of 200x200
@@ -128,8 +128,9 @@
   </session>
 
   Since the widget now needs an argument, we must use another function to
-  display it, namely <scm|dialogue-window>, which will also close the window
-  after the button has been clicked.
+  display it, namely <scm|(dialogue-window <scm-arg|widget> <scm-arg|cmd>
+  <scm-arg|title>)>. It passes to the widget a function which first calls
+  <scm-arg|cmd> with the same arguments and then closes the window.
 
   <\session|scheme|default>
     <\input|Scheme] >

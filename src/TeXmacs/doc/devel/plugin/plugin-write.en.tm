@@ -1,4 +1,4 @@
-<TeXmacs|2.1.2>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -17,22 +17,32 @@
   following subdirectories (when needed):
 
   <\description-dash>
-    <item*|<verbatim|bin>>For binary files.
+    <item*|<verbatim|bin>>For binary files. This directory is appended to
+    the <verbatim|PATH>.
 
-    <item*|<verbatim|doc>>For documentation.
+    <item*|<verbatim|doc>>For documentation. This directory is added to
+    <verbatim|TEXMACS_DOC_PATH>.
 
-    <item*|<verbatim|langs>>For language related files, such as dictionaries
-    (not yet supported).
+    <item*|<verbatim|langs/natural/dic>>For dictionaries. This directory is
+    added to <verbatim|TEXMACS_DIC_PATH>.
 
-    <item*|<verbatim|lib>>For libraries.
+    <item*|<verbatim|lib>>For shared libraries. This directory is added to
+    <verbatim|LD_LIBRARY_PATH>.
+
+    <item*|<verbatim|misc/patterns>, <verbatim|misc/pixmaps>,
+    <verbatim|misc/themes>>For background patterns, icons and themes.
 
     <item*|<verbatim|packages>>For style packages.
 
-    <item*|<verbatim|progs>>For <scheme> programs.
+    <item*|<verbatim|progs>>For <scheme> programs. This directory is added
+    to the load path of <scheme> modules.
 
-    <item*|<verbatim|src>>For source files.
+    <item*|<verbatim|src>>For source files (this directory is not used by
+    <TeXmacs> itself).
 
     <item*|<verbatim|styles>>For style files.
+
+    <item*|<verbatim|texts>>For text files.
   </description-dash>
 
   As a general rule, files which are present in these subdirectories will be
@@ -45,10 +55,13 @@
 
   will be automatically added to the <verbatim|PATH> environment variable at
   startup. Notice that the subdirectory structure of a plug-in is very
-  similar to the subdirectory structure of <verbatim|$TEXMACS_PATH>.
+  similar to the subdirectory structure of <verbatim|$TEXMACS_PATH>. Since
+  these search paths are computed only once at startup, <TeXmacs> has to be
+  restarted after the creation of a new plug-in or of a new subdirectory
+  of a plug-in.
 
   Similarly, plugin documentation is intended to be automatically added to
-  the <menu|Help|Plug-ins> submenu. For this to automation to work, the
+  the <menu|Help|Plug-ins> submenu. For this automation to work, the
   <verbatim|myplugin/doc/> directory should contain at least two files
 
   <\verbatim>
@@ -89,6 +102,11 @@
     \ \ \ \ $TEXMACS_HOME_PATH/plugins/<em|myplugin>/progs/init-<em|myplugin>.scm
   </verbatim>
 
+  The name of this file has to be exactly <verbatim|init-<em|myplugin>.scm>,
+  where <verbatim|<em|myplugin>> is the name of the plug-in directory. The
+  file is not loaded immediately at startup, but about one second later,
+  when <TeXmacs> becomes idle (or earlier, when information about all
+  plug-ins is needed); see the section on <hlink|internals|plugin-internals.en.tm>.
   This configuration file should contain an instruction of the following form
 
   <\scm-code>
@@ -109,10 +127,14 @@
     \ \ \ \ $TEXMACS_PATH/plugins
   </verbatim>
 
-  Some of these are <hlink|described|../interface/interface.en.tm> in more
-  detail in the chapter about writing new interfaces.
+  In the source code of <TeXmacs>, the second directory corresponds to
+  <verbatim|src/plugins>. Some of these plug-ins are
+  <hlink|described|../interface/interface.en.tm> in more detail in the
+  chapter about writing new interfaces.
 
   <tmdoc-copyright|1998\U2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

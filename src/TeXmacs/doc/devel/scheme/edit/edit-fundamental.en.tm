@@ -6,8 +6,9 @@
   <tmdoc-title|Fundamental tree modification routines>
 
   From an internal point of view, all modifications to the <TeXmacs> edit
-  tree are decomposed into atomic modifications of eight different types. In
-  this section, we describe the <scheme> interface to these fundamental
+  tree are decomposed into atomic modifications of eight different types
+  (see <verbatim|src/Kernel/Types/modification.hpp>; a ninth type,
+  <cpp|MOD_SET_CURSOR>, only records cursor positions). In this section, we describe the <scheme> interface to these fundamental
   modification routines. Even though it is usually more convenient to use
   higher level modification routines, as described in the <hlink|next
   section|edit-modify.en.tm>, the fundamental tree modification routines may
@@ -164,13 +165,25 @@
   </big-figure>
 
   <\remark>
-    Each of the macros <scm|tree-assign!>, <scm|tree-insert!>, <abbr|etc.>
-    has a functional counterpart <verbatim|<scm|tree-assign>>,
+    Each of the routines <scm|tree-assign!>, <scm|tree-insert!>,
+    <abbr|etc.> has a functional counterpart <verbatim|<scm|tree-assign>>,
     <verbatim|<scm|tree-insert>>, etc. The first parameter of these
-    counterparts can be an arbitrary \Pl-<no-break>value\Q and does not have
-    to be a scheme variable. However, in the case when a <scheme> variable is
-    passed as the first parameter, these variants do not necessarily update
-    its contents with the return value.
+    counterparts can be an arbitrary expression and does not have to be a
+    scheme variable. However, in the case when a <scheme> variable is passed
+    as the first parameter, these variants do not necessarily update its
+    contents with the return value.
+
+    Since <scm|tree-insert>, <scm|tree-remove>, <scm|tree-split>,
+    <scm|tree-join> and <scm|tree-assign-node> modify the tree in place,
+    the corresponding names with an exclamation mark are simply aliases of
+    these functions. Only <scm|tree-assign!>, <scm|tree-insert-node!> and
+    <scm|tree-remove-node!> are macros which update the variable. The
+    functional versions are glued from <c++> (see
+    <verbatim|src/Scheme/Glue/build-glue-basic.scm>, where
+    <scm|tree-insert> is called <scm|tree-var-insert>), and the other
+    routines are defined in <verbatim|progs/utils/library/tree.scm>, which
+    must be imported with <scm|(use-modules (utils library tree))> in
+    modules which use them.
   </remark>
 
   <tmdoc-copyright|2005|Joris van der Hoeven>

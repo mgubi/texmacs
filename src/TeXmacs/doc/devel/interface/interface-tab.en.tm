@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Tab-completion>
@@ -29,7 +29,8 @@
 
   Here <verbatim|DATA_COMMAND> stands for the special character
   <verbatim|'\\20'> (ASCII 16). The <verbatim|<em|input-string>> is the
-  complete string in which the <key|tab> occurred and the
+  complete string in which the <key|tab> occurred, written as a quoted
+  <scheme> string, and the
   <verbatim|<em|cursor-position>> is an integer which specifies the position
   of the cursor when you pressed <key|tab>. <TeXmacs> expects your
   application to return a tuple with all possible tab-completions of the form
@@ -51,7 +52,14 @@
   <\remark>
     In principle, the tab-completion mechanism should still work in
     mathematical input mode. In that case, the <verbatim|<em|input-string>>
-    will correspond to the serialization of the <TeXmacs> input.
+    will correspond to the serialization of the <TeXmacs> input. Notice
+    that the command is computed by
+    <cpp|edit_interface_rep::session_complete_command> (in
+    <verbatim|src/Edit/Interface/edit_complete.cpp>) using the default
+    serializer <scm|verbatim-serialize>, and not the custom serializer of
+    the plug-in. The answer of the application is passed to the <scheme>
+    function <scm|custom-complete>, which ignores answers which are not a
+    tuple with at least one completion.
   </remark>
 
   <\remark>
@@ -152,6 +160,8 @@
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
   or any later version published by the Free Software Foundation; with no
@@ -160,8 +170,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

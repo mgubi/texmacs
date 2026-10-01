@@ -57,14 +57,34 @@
   </explain>
 
   <\explain>
+    <explain-macro|line-note|body|x|y>
+
+    <explain-macro|page-note|body|x|y><explain-synopsis|notes attached to
+    lines or pages>
+  <|explain>
+    The <markup|line-note> primitive typesets <src-arg|body> as a box of
+    zero size which is attached to the current physical line, at the
+    horizontal and vertical offsets <src-arg|x> and <src-arg|y> (evaluated
+    lengths) with respect to the origin of that line. It is used for
+    instance for marginal notes (see the <markup|marginal-left-note> and
+    related macros in <verbatim|std-markup.ts>). The <markup|page-note>
+    primitive has the same syntax and is intended to attach notes to pages;
+    it is not yet handled by the page breaker.
+  </explain>
+
+  <\explain>
     <explain-macro|specific|medium|body><explain-synopsis|medium-specific
     content>
   <|explain>
     This primitive marks <src-arg|body> for output only on the specified
-    <src-arg|medium>. The following values of <src-arg|medium> are supported:
+    <src-arg|medium> (which is evaluated). The following values of
+    <src-arg|medium> are supported:
 
     <\description>
       <item*|texmacs>The <src-arg|body> is typeset as usual line content.
+
+      <item*|image>Same as <verbatim|texmacs> for the typesetter; converters
+      use this medium for content which should be exported as an image.
 
       <item*|latex>The <src-arg|body>, which must be a string, is not visible
       from within <TeXmacs>, but it will be included in a verbatim way when
@@ -82,7 +102,18 @@
       <item*|printer>This medium is complementary to <verbatim|screen>, when
       the <src-arg|body> should only be visible when printing out, but not
       when the document is displayed on the screen.
+
+      <item*|even, odd>The <src-arg|body> is only visible on even,
+      respectively odd, pages. This is used for instance for marginal notes
+      in documents with different layouts for even and odd pages.
     </description>
+
+    For the <verbatim|screen>, <verbatim|printer>, <verbatim|even> and
+    <verbatim|odd> media, a trailing <verbatim|*> (as in
+    <verbatim|screen*>) indicates that the space occupied by the
+    <src-arg|body> should be kept even when it is not visible. Any other
+    <src-arg|medium> (such as <verbatim|latex> or <verbatim|html>) makes the
+    <src-arg|body> invisible inside <TeXmacs>.
   </explain>
 
   <\explain|<explain-macro|raw-data|data><explain-synopsis|binary content>>

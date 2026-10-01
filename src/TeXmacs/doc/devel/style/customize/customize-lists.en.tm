@@ -22,7 +22,12 @@
 
   This redefinition affects the rendering of all list environments (itemize,
   enumerate, <abbr|etc.>) by reducing the right margin with a length of
-  <verbatim|3fn>:
+  <verbatim|3fn>. Notice that the standard definition of <markup|render-list>
+  in <tmpackage|std-list> uses the macros <markup|item-hsep> and
+  <markup|item-vsep> (whose default values are <verbatim|3fn> and
+  <verbatim|0.5fn>) for the horizontal indentation and the vertical space
+  around lists; redefining these two macros is often sufficient in order to
+  change the spacing of all lists:
 
   <\with|render-list|<macro|body|<surround|<no-page-break*><vspace*|0.5fn>|<right-flush><vspace|0.5fn><no-indent*>|<with|par-left|<plus|<value|par-left>|3fn>|par-right|<plus|<value|par-right>|3fn>|<arg|body>>>>>
     <\itemize>
@@ -94,8 +99,11 @@
   where <src-arg|name> is the name of the new list environment,
   <src-arg|item-render> an (inline) macro for rendering the item and
   <src-arg|item-transform> an additional transformation which is applied on
-  the item text. For instance, the <markup|enumerate-roman> environment is
-  defined by
+  the item text. Besides the environment <src-arg|name>, <markup|new-list>
+  also defines the variants <src-arg|name><verbatim|*> and
+  <src-arg|name><verbatim|-continued> (the latter continues the numbering of
+  the previous list). For instance, the <markup|enumerate-roman> environment
+  is defined by
 
   <\tm-fragment>
     <\inactive*>

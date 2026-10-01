@@ -88,19 +88,42 @@
   </explain>
 
   <\explain>
+    <explain-macro|repeat*|content|pattern><explain-synopsis|fill line,
+    pattern underneath>
+  <|explain>
+    Variant of <markup|repeat>, where the repeated <src-arg|pattern> is
+    placed underneath the <src-arg|content> instead of on top of it.
+  </explain>
+
+  <\explain>
+    <explain-macro|hidden|content><explain-synopsis|typeset without
+    display>
+  <|explain>
+    The <src-arg|content> is typeset (so that side effects such as
+    assignments, labels or auxiliary data are taken into account), but
+    nothing is displayed.
+  </explain>
+
+  <\explain>
     <explain-macro|datoms|foo|content>
 
     <explain-macro|dlines|foo|content>
 
     <explain-macro|dpages|foo|content><explain-synopsis|decorations>
   <|explain>
-    These primitives are used to decorate <em|a posteriori> the lines of a
-    paragraph, the lines of a page, or the pages of a document. Currently,
-    only decorations of atoms on lines of a paragraph have been implemented.
+    These primitives are used to decorate <em|a posteriori> the atoms on
+    the lines of a paragraph, the lines of a page, or the pages of a
+    document. Currently, only decorations of atoms on lines of a paragraph
+    (<markup|datoms>) have been implemented.
 
     The first argument <src-arg|foo> is a macro which will be applied to all
     boxes in the line and the second argument <src-arg|content> is the part
-    of the paragraph to which the decoration will be applied. For instance,
+    of the paragraph to which the decoration will be applied. More
+    generally, the tags accept several decorating macros before the
+    <src-arg|content>; the last macro (just before the <src-arg|content>) is
+    applied first and the first macro is applied last.
+    Inside the decorating macro, the box being decorated is inserted by the
+    internal <markup|dbox> primitive. For instance,
     the construction
 
     <\tm-fragment>

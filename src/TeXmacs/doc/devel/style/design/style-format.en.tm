@@ -69,6 +69,10 @@
   paragraph (unused space being equally distributed over the first and last
   columns). Furthermore, we have specified that the table contains exactly
   three columns.
+  In the current version of <tmpackage|env-math>, the block part of this
+  definition (the <markup|with> and <markup|surround> constructs) has been
+  factored out into an auxiliary macro <markup|equations-base>, which is
+  shared with other equation array environments.
 
   Finally, it is important to bear in mind that style-sheets do not merely
   specify the final presentation of a document, but that they may also

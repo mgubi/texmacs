@@ -36,9 +36,13 @@
   unpacked the source code of <TeXmacs> in <verbatim|<em|source-dir>>, then
   you can find a full list of the routines exported by the glue in the files
 
-  <verbatim| \ \ \ <em|source-dir>/src/Guile/Glue/build-glue-base.scm<new-line>
-  \ \ \ <em|source-dir>/src/Guile/Glue/build-glue-editor.scm<new-line>
-  \ \ \ <em|source-dir>/src/Guile/Glue/build-glue-server.scm>
+  <verbatim| \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-basic.scm<new-line>
+  \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-editor.scm<new-line>
+  \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-server.scm>
+
+  (from which the <c++> files <verbatim|glue_basic.cpp>,
+  <verbatim|glue_editor.cpp> and <verbatim|glue_server.cpp> in the same
+  directory are generated).
 
   <paragraph*|Extensions to <value|scheme> and further utilities>
 
@@ -87,8 +91,8 @@
   \ \ \ $TEXMACS_PATH/progs/math<new-line> \ \ \ $TEXMACS_PATH/progs/table>
 
   respectively contain routines for editing source code, mathematics and
-  tables. Exceptions are the internal modules <verbatim|content> and
-  <verbatim|fonts>, which rather correspond to a particular type of
+  tables. Exceptions are internal modules like <verbatim|fonts>,
+  <verbatim|convert> or <verbatim|security>, which rather correspond to a particular type of
   functionality. Each internal module corresponds to a group of files, each
   of which corresponds to an individual <em|<TeXmacs> module>. The internal
   modules are designed to be as independent as possible.

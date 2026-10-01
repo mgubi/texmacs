@@ -5,6 +5,15 @@
 <\body>
   <tmdoc-title|Graphics interface between C++ and <scheme>>
 
+  <\warning>
+    Most of this page describes the interface as it was designed in 2005.
+    The routines <scm|editor-\<gtr\>graphics>, <scm|graphics-\<gtr\>editor>,
+    <scm|grid-project>, <scm|grid-point-pertinence\<less\>?>,
+    <scm|graphics-find-disk> and <scm|graphics-find-rectangle> do not exist
+    in the current implementation. The actual interface is summarized in the
+    last section of this page.
+  </warning>
+
   <paragraph*|Rationale>
 
   <TeXmacs> both implements a low-level part of the graphics in C++ and the
@@ -109,10 +118,18 @@
   <paragraph*|Computations with shapes>
 
   <\explain>
-    <scm|(box-info t)><explain-synopsis|get bounding box for a shape>
+    <scm|(box-info <scm-arg|t> <scm-arg|what>)><explain-synopsis|get
+    bounding box for a shape>
   <|explain>
-    \ Get a bounding box (and other information) about a shape <scm-arg|t>.
-    <scm-arg|t> can be a tree or a scheme tree.
+    Get a bounding box (and other information) about a shape <scm-arg|t>.
+    <scm-arg|t> can be a tree or a scheme tree, and <scm-arg|what> is a
+    string of letters which specify the requested coordinates, like
+    <scm|"lbrt"> (left, bottom, right and top of the logical box) or
+    <scm|"LBRT"> (the same for the ink box). The routine is implemented in
+    <verbatim|graphics-utils.scm> by typesetting the markup <markup|box-info>
+    with <scm|texmacs-exec*>; the analogous routines <scm|frame-direct> and
+    <scm|frame-inverse> transform points between the coordinates of the
+    graphics and the coordinates of the typeset document.
   </explain>
 
   <\remark>
@@ -123,6 +140,53 @@
     graphical expansion of the macro (the constituent elementary shapes, i.e.
     polylines, splines, etc.).
   </remark>
+
+  <paragraph*|The current interface>
+
+  In the current implementation, the <c++> editor
+  (<verbatim|src/Edit/Interface/edit_graphics.cpp>) handles mouse events
+  inside graphics as follows: it transforms the mouse position into
+  graphics coordinates, projects it on the current grid (taking into account
+  the control points of nearby objects), and then calls one of the
+  <scheme> routines <scm|graphics-move>, <scm|graphics-release-left>,
+  <scm|graphics-start-drag-left>, <scm|graphics-dragging-left>,
+  <scm|graphics-end-drag-left>, <scm|graphics-release-right>, <abbr|etc.>
+  with the resulting coordinates as strings. These routines are defined in
+  <verbatim|progs/graphics/graphics-edit.scm> and dispatch on the current
+  graphical mode. The main glued routines which may be used by these
+  handlers are:
+
+  <\explain>
+    <scm|(get-graphical-x)>
+
+    <scm|(get-graphical-y)>
+
+    <scm|(get-graphical-pixel)><explain-synopsis|current position>
+  <|explain>
+    The coordinates of the last (adjusted) mouse position in graphics
+    coordinates, and the size of a pixel in the same unit.
+  </explain>
+
+  <\explain>
+    <scm|(graphical-select <scm-arg|x> <scm-arg|y>)>
+
+    <scm|(graphical-select-area <scm-arg|x1> <scm-arg|y1> <scm-arg|x2>
+    <scm-arg|y2>)><explain-synopsis|find objects>
+  <|explain>
+    Return the list of the objects close to a point <abbr|resp.> inside a
+    rectangle, given in graphics coordinates, as a tree of lists of paths,
+    ordered by pertinence.
+  </explain>
+
+  <\explain>
+    <scm|(set-graphical-object <scm-arg|t>)>
+
+    <scm|(get-graphical-object)><explain-synopsis|the temporary object>
+  <|explain>
+    Set <abbr|resp.> get the markup (typically the object under
+    construction together with its control points) which is displayed on
+    top of the graphics without being part of the document.
+  </explain>
 
   <tmdoc-copyright|2005|Joris van der Hoeven>
 

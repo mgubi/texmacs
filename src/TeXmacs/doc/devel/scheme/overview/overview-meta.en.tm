@@ -47,30 +47,33 @@
   instance, the statement
 
   <\scm-code>
-    (tm-property (choose-file fun text type)
+    (tm-property (open-document-page-format)
 
     \ \ (:interactive #t))
   </scm-code>
 
-  in the source code of <TeXmacs> states that <scm|choose-file> is an
-  interactive command. As a consequence, the <menu|File|Load> entry, which is
-  defined by
+  in the source code of <TeXmacs> (see <verbatim|init-texmacs.scm>) states
+  that <scm|open-document-page-format> is an interactive command. As a
+  consequence, the <menu|Document|Page> entry, which is defined by
 
   <\scm-code>
-    ("Load" (choose-file load-buffer "Load file" ""))
+    ("Page" (open-document-page-format))
   </scm-code>
 
-  will be followed by dots <scm|...> in the <menu|File> menu. The interesting
-  point here is that, although the command <scm|choose-file> may be reused
+  will be followed by dots <scm|...> in the <menu|Document> menu. The
+  interesting point here is that, although the command
+  <scm|open-document-page-format> may be reused
   several times in different menu entries, we only have to specify once that
   it is an interactive command. Similarly, consider the definition
 
   <\scm-code>
     (tm-define (toggle-session-math-input)
 
+    \ \ (:synopsis "Toggle mathematical input in sessions")
+
     \ \ (:check-mark "v" session-math-input?)
 
-    \ \ (session-use-math-input (not (session-math-input?))))
+    \ \ ...)
   </scm-code>
 
   Given a menu item with <scm|(toggle-session-math-input)> as its associated
@@ -81,26 +84,45 @@
   Another frequently used option is <scm|:secure>, which specifies that a
   given routine can be used inside <TeXmacs> documents, in particular inside
   <markup|extern> and <markup|action> macros. For instance, the default
-  implementation of the <markup|fold> tag allows the user to click on the
+  implementation of the <markup|folded> tag allows the user to click on the
   \P<math|<op|\<circ\>>>\Q before the folded text so as to unfold the tag.
   When doing this, the scheme script <scm|mouse-unfold> is launched. However,
-  for this to work, the <scm|mouse-unfold> function needs to be secure:
+  for this to work, the <scm|mouse-unfold> function needs to be secure (see
+  <verbatim|utils/edit/variants.scm>):
 
   <\scm-code>
-    (tm-define mouse-unfold
+    (tm-define (mouse-unfold t)
+
+    \ \ (:type (-\<gtr\> void))
+
+    \ \ (:synopsis "Unfold using the mouse")
 
     \ \ (:secure #t)
 
-    \ \ (with-action t
+    \ \ (when (tree-\<gtr\>path t)
 
     \ \ \ \ (tree-go-to t :start)
 
-    \ \ \ \ (fold)))
+    \ \ \ \ (when (tree-up t)
+
+    \ \ \ \ \ \ (alternate-unfold (tree-up t)))))
   </scm-code>
 
   You can read more about the tags which depend on <scheme> scripts in
   \P<hlink|Invoking <scheme> scripts from <TeXmacs>
   markup|overview-start.en.tm#markup-scripts>\Q.\ 
+
+  The complete list of options currently understood by <scm|tm-define> and
+  <scm|tm-property> (see <verbatim|kernel/texmacs/tm-define.scm>) is:
+  <scm|:mode> and <scm|:require> (for <hlink|contextual
+  overloading|overview-overloading.en.tm>), <scm|:applicable> (a condition
+  under which a menu entry for the command is active, rather than greyed
+  out), <scm|:synopsis>, <scm|:synopsis*>, <scm|:returns>, <scm|:note>,
+  <scm|:type>, <scm|:argument>, <scm|:default> and <scm|:proposals> (a
+  default value <abbr|resp.> a list of proposals for an argument when the
+  command is executed interactively), <scm|:secure>, <scm|:check-mark>,
+  <scm|:interactive> and <scm|:balloon> (a tooltip for menu entries).
+  Unknown options raise an error.
 
   In the future, the number of options for entering meta-information is
   likely to increase. <TeXmacs> also supports an additional mechanism for the

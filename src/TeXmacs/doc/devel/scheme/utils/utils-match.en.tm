@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.21>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -8,7 +8,8 @@
   Regular expressions naturally generalize from strings to trees and allow to
   test whether a given tree matches a given pattern. <TeXmacs> implements the
   primitives <scm|match?> and <scm|match> for this purpose, which also
-  provide support for wildcards, user-defined grammars and more.
+  provide support for wildcards, user-defined grammars and more. They are
+  implemented in <verbatim|kernel/regexp/regexp-match.scm>.
 
   <\explain>
     <scm|(match? <scm-arg|expr> <scm-arg|pattern>)><explain-synopsis|check
@@ -21,8 +22,8 @@
     failure, we return<nbsp><scm|#f>. The expression <scm|expr> may contain
     trees, in which case we understand that such tree subexpressions should
     match their scheme counterparts. For instance, <scm|(match? (tree "x")
-    "x<name|">)> will return<nbsp><scm|(())>, whereas <scm|(match? (tree "x")
-    "y<name|">)> returns <scm|#f>.
+    "x")> will return<nbsp><scm|(())>, whereas <scm|(match? (tree "x") "y")>
+    returns <scm|#f>.
   </explain>
 
   <\explain>
@@ -34,7 +35,11 @@
     free variables and an association list of <scm-arg|bindings>, this
     routine determines all substitutions of free variables by values
     (extending the given <scm-arg|bindings>), for which <scm-arg|l> matches
-    the <scm-arg|pattern>.
+    the <scm-arg|pattern>. Each substitution is returned as an association
+    list, and the empty list is returned if there are no solutions. In
+    particular, <scm|(match? <scm-arg|expr> <scm-arg|pattern>)> is
+    equivalent to <scm|(match (list <scm-arg|expr>) (list <scm-arg|pattern>)
+    '())>, except that <scm|#f> is returned instead of the empty list.
   </explain>
 
   <\explain>
@@ -71,7 +76,10 @@
   <|explain>
     The wildcard <scm|:%n>, where <scm|n> is a number matches any list of
     length <scm|n>. The wildcard <scm|:*> matches any list, including the
-    empty list.
+    empty list. Notice that the current implementation of <scm|:*> simply
+    accepts all remaining elements and ignores the remainder of the pattern:
+    <scm|:*> should therefore only be used as the last element of a list
+    pattern.
   </explain>
 
   <\explain>
@@ -140,10 +148,12 @@
       (define t '(foo (bar "x") (bar "y") (option "z")))
     </scm-code>
 
-    matches the pattern <scm|(foo (:repeat (bar :%1)) :*)>, but not <scm|(foo
-    (:repeat (bar 'x)) :*)>. The call <scm|(match t '(foo 'x 'y :*))> will
-    return <scm|(((x . (bar "x")) (y . (bar "y"))))>. Notice that <scm|(x .
-    (bar "x"))> will be displayed as <scm|(x bar "x")>:
+    matches the pattern <scm|(foo (:repeat (bar :%1)) (option :%1))>, but
+    not <scm|(foo (:repeat (bar 'x)) (option :%1))>, since <scm|'x> would
+    have to be bound both to <scm|"x"> and <scm|"y">. The call <scm|(match? t
+    '(foo 'x 'y :*))> will return <scm|(((y . (bar "y")) (x . (bar
+    "x"))))>. Notice that <scm|(x . (bar "x"))> will be displayed as <scm|(x
+    bar "x")>:
 
     <\session|scheme|default>
       <\input|Scheme] >

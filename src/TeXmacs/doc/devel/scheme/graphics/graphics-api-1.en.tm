@@ -5,6 +5,16 @@
 <\body>
   <tmdoc-title|Low level graphics manipulation>
 
+  <\warning>
+    This page describes the design of the low-level graphics library as it
+    was planned in 2005. Only part of it has been implemented, sometimes
+    under different names; the entries below indicate the current status.
+    The actual implementation of the graphical editor can be found in
+    <verbatim|progs/graphics/>, mainly in <verbatim|graphics-utils.scm>
+    (enhanced trees), <verbatim|graphics-object.scm> (the sketch and the
+    current object) and <verbatim|graphics-edit.scm> (mouse handlers).
+  </warning>
+
   <paragraph*|Rationale>
 
   <TeXmacs> provides a small low-level library for the manipulation of
@@ -87,7 +97,11 @@
     <scm|(enhanced-tree-\<gtr\>radical <scm-arg|t>)><explain-synopsis|get
     radical>
   <|explain>
-    \ Given an enhanced tree <scm-arg|t>, return its radical.
+    \ Given an enhanced tree <scm-arg|t>, return its radical. In the current
+    implementation, the enhancements are <markup|with> and
+    <markup|anim-edit> tags (see <scm|enhanced-tree?> in
+    <verbatim|graphics-utils.scm>); <scm|stree-radical> does the same for
+    <scheme> trees.
   </explain>
 
   <\explain>
@@ -95,8 +109,9 @@
     enhanced tree>
   <|explain>
     Given a radical <scm-arg|t>, find its parent which corresponds to its
-    largest enhancement. If <scm-arg|t> does not belong to a TeXmacs
-    document, this routine returns <scm|#f>.
+    largest enhancement. If <scm-arg|t> is not enhanced, then it is
+    returned unchanged. The tree <scm-arg|t> must belong to a <TeXmacs>
+    document.
   </explain>
 
   <\explain>
@@ -107,8 +122,9 @@
     <scm|(enhanced-tree-arity <scm-arg|t>
     <scm-args|p>)><explain-synopsis|analogue of basic tree API>
   <|explain>
-    These routines are similar to tree-set, <scm|tree-set!>, etc. except that
-    they operate on the radical of the enhanced tree.
+    These routines are similar to <scm|tree-set!>, <scm|tree-ref>, etc.
+    except that they operate on the radical of the enhanced tree. <em|Not
+    implemented.>
   </explain>
 
   <\explain>
@@ -116,7 +132,7 @@
     <scm-arg|l>)><explain-synopsis|set properties>
   <|explain>
     Given an enhanced tree <scm-arg|t>, override its properties with the
-    elements in the association list <scm-arg|l>.
+    elements in the association list <scm-arg|l>. <em|Not implemented.>
   </explain>
 
   <\explain>
@@ -124,7 +140,7 @@
     properties>
   <|explain>
     Obtain an association list with all properties of the enhanced tree
-    <scm-arg|t>.
+    <scm-arg|t>. <em|Not implemented.>
   </explain>
 
   <\explain>
@@ -132,22 +148,26 @@
     <scm-arg|val>)><explain-synopsis|set enhanced property>
   <|explain>
     Set the property <scm-arg|var> of an enhanced tree <scm-arg|t> to
-    <scm-arg|val>.
+    <scm-arg|val>. <em|Not implemented.>
   </explain>
 
   <\explain>
-    <scm|(enhanced-tree-property-ref t var)><explain-synopsis|get enhanced
-    property>
+    <scm|(enhanced-tree-property-ref <scm-arg|t>
+    <scm-arg|var>)><explain-synopsis|get enhanced property>
   <|explain>
     Obtain the property <scm-arg|var> of an enhanced tree <scm-arg|t>.
+    <em|Not implemented.>
   </explain>
 
   <paragraph*|Sketch manipulation>
 
   <\explain>
-    <scm|(sketch-tree)><explain-synopsis|get current sketch>
+    <scm|(sketch-get)><explain-synopsis|get current sketch>
   <|explain>
-    Return the current sketch tree.
+    Return the current sketch. In the current implementation, the sketch is
+    a list of (enhanced) trees, rather than a single tree; the originally
+    planned name was <scm|sketch-tree>. <scm|(sketch-in? <scm-arg|t>)> tests
+    whether <scm-arg|t> belongs to the sketch.
   </explain>
 
   <\explain>
@@ -155,21 +175,23 @@
   <|explain>
     Put a new tree in the sketch, which is not part of the document. This
     routine is typically called when starting the construction of a new
-    enhanced shape.
+    enhanced shape. <em|Not implemented>; use <scm|sketch-set!>.
   </explain>
 
   <\explain>
-    <scm|(sketch-set <scm-arg|t>)><explain-synopsis|set sketch tree>
+    <scm|(sketch-set! <scm-arg|l>)><explain-synopsis|set sketch>
   <|explain>
-    Assign the sketch which a tree <scm-arg|t> which is part of the document
-    (and maintain the correspondence between <scm-arg|t> and the sketch).
-    This routine is typically called when editing an enhanced shape.
+    Assign the sketch with the list <scm-arg|l> of trees; trees which are
+    part of the document are replaced by their largest enhancement (and the
+    correspondence with the document is maintained). This routine is
+    typically called when editing an enhanced shape. (The original design
+    called it <scm|sketch-set> and took a single tree.)
   </explain>
 
   <\explain>
     <scm|(sketch-reset)><explain-synopsis|reset sketch tree>
   <|explain>
-    Assign the sketch with an empty group of objects. This routine is
+    Assign the sketch with an empty list of objects. This routine is
     typically called before starting the selection of a group of objects.
   </explain>
 
@@ -177,10 +199,9 @@
     <scm|(sketch-toggle <scm-arg|t>)><explain-synopsis|toggle a tree in the
     sketch>
   <|explain>
-    When the sketch is an enhanced group, this routine toggles whether a tree
-    t in the document belongs to the group (and we maintain the
-    correspondence between t and the corresponding subtree in the sketch).
-    This routine is typically called when selecting a group of objects.
+    This routine toggles whether a tree <scm-arg|t> in the document (or
+    rather its largest enhancement) belongs to the sketch. This routine is
+    typically called when selecting a group of objects.
   </explain>
 
   <\explain>
@@ -201,7 +222,8 @@
     <scm|(sketch-cancel)><explain-synopsis|cancel the sketch>
   <|explain>
     Cancel any changes made to the sketch in MODIFYING mode and return to the
-    state of the document before the call of sketch-checkout.
+    state of the document before the call of <scm|sketch-checkout>. <em|In
+    the current implementation, this routine does nothing.>
   </explain>
 
   <paragraph*|Miscellaneous>
@@ -212,7 +234,10 @@
     Assign a list of markup objects with control ornaments to the current
     sketch. The ornaments are rendered on top of the sketch as a visual aid
     for the user. Typically, when editing a polyline, <scm-arg|l> consists of
-    a list of control points.
+    a list of control points. <em|Not implemented as such:> the current
+    object and its control points are computed by
+    <scm|graphics-decorations-update> and passed to the <c++> editor with
+    <scm|(set-graphical-object <scm-arg|t>)>.
   </explain>
 
   <tmdoc-copyright|2005|Joris van der Hoeven>

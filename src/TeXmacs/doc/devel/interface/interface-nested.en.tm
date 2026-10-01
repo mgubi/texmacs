@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.21>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -13,11 +13,17 @@
   </quotation>
 
   Currently implemented formats include <verbatim|verbatim>,
-  <verbatim|latex>, <verbatim|html>, <verbatim|ps>, and <verbatim|scheme>.
-  Certain formats, such as <verbatim|verbatim>, allow the
-  <verbatim|<em|message>> to recursively contain blocks of the same form. The
-  <verbatim|scheme> format is used for sending <TeXmacs> trees in the form of
-  <scheme> expressions.
+  <verbatim|utf8>, <verbatim|latex>, <verbatim|html>, <verbatim|ps>,
+  <verbatim|file> (the name of an image file), <verbatim|math> (a formula
+  in prefix <scheme> notation), <verbatim|scheme> and <verbatim|command>,
+  as well as any other data format for which <TeXmacs> has a converter
+  from <verbatim|<em|format>-snippet> to <TeXmacs> (blocks in unknown
+  formats are treated as <verbatim|verbatim>). Certain formats, such as
+  <verbatim|verbatim>, allow the <verbatim|<em|message>> to recursively
+  contain blocks of the same form. The <verbatim|scheme> format is used
+  for sending <TeXmacs> trees in the form of <scheme> expressions. A
+  detailed description of all formats can be found in the section on the
+  <hlink|internals of the plug-in system|../plugin/plugin-internals.en.tm>.
 
   <paragraph*|The <verbatim|formula> plug-in>
 
@@ -59,11 +65,11 @@
   <example-plugin-link|nested/src/nested.cpp>.
 
   <\remark>
-    At the moment, we only implemented <LaTeX> as a standard transmission
-    format for mathematical formulas, because this is the format which is
-    most widely used. In the future, we intend to implement more semantically
-    secure formats, and we recommend you to keep in mind the possibility of
-    sending your output in tree format.
+    <LaTeX> is the most common transmission format for mathematical
+    formulas, because this is the format which is most widely used. More
+    semantically secure alternatives are the <verbatim|scheme> and
+    <verbatim|math> formats, and we recommend you to keep in mind the
+    possibility of sending your output in tree format.
 
     Nevertheless, we enriched standard <LaTeX> with the <verbatim|\\*> and
     <verbatim|\\bignone> commands for multiplication and closing big
@@ -151,6 +157,8 @@
   <menu|Insert|Session|Markup>.
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1

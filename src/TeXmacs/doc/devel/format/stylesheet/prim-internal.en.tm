@@ -69,13 +69,16 @@
   </explain>
 
   <\explain>
-    <explain-macro|tag|content|annotation>
-
-    <explain-macro|meaning|content|annotation><explain-synopsis|associate a
-    meaning to some content>
+    <explain-macro|tag|id|body><explain-synopsis|attach a label to some
+    content>
   <|explain>
-    Associate a special meaning to some <src-arg|content>. Currently, no real
-    use has been made of these tags.
+    This built-in macro (defined in <verbatim|Typeset/Env/env_default.cpp>)
+    adds the label <src-arg|id> to the <src-var|the-tags> environment
+    variable while typesetting <src-arg|body>. The next
+    <explain-macro|set-binding|value> inside <src-arg|body> (typically
+    issued by a numbered environment) then binds <src-arg|id> to
+    <src-arg|value>, so that <src-arg|id> can be referred to using
+    <markup|reference>.
   </explain>
 
   <\explain>
@@ -97,6 +100,14 @@
   <|explain>
     This internal primitive is used for rewriting an inactive tree into a new
     tree whose rendering corresponds to the rendering of the inactive tree.
+    The first argument must be a macro argument <explain-macro|arg|x> (with
+    optional indices). The second argument is a literal string which
+    specifies the rewriting mode: <verbatim|once> (only the root is shown
+    inactive, as for <markup|inactive>), <verbatim|recurse> (the whole tree
+    is shown inactive, as for <markup|inactive*>; this is also the default)
+    or <verbatim|error> (as for <markup|error>). The variants
+    <verbatim|once*>, <verbatim|recurse*> and <verbatim|error*> are used
+    for block content.
     It may be successfully invoked from within a macro.
 
     e.g. <inactive*|<assign|show-inactive|<macro|x|<rewrite-inactive|<arg|x>|>>>>
@@ -109,11 +120,34 @@
   </explain>
 
   <\explain>
-    <explain-macro|new-dpage>
+    <explain-macro|freeze|content>
 
-    <explain-macro|new-dpage*><explain-synopsis|new double page>
+    <explain-macro|unfreeze|content><explain-synopsis|frozen content>
   <|explain>
-    Yet to be implemented primitives for starting a new double page.
+    The <src-arg|content> of a <markup|freeze> tag is typeset as usual, but
+    as a decoration, so that it cannot be edited; <markup|unfreeze> can be
+    used inside frozen content in order to make parts of it editable again.
+  </explain>
+
+  <\explain>
+    <explain-macro|hidden-binding|keys|value><explain-synopsis|result of
+    <markup|set-binding>>
+  <|explain>
+    This tag is returned by the evaluation of <markup|set-binding>; it is
+    not rendered.
+  </explain>
+
+  <\explain>
+    <explain-macro|cache-ref|hash|kind>
+
+    <explain-macro|cache-ref|hash|kind|width|height><explain-synopsis|placeholder
+    for cached content>
+  <|explain>
+    Placeholder for content (of a given <src-arg|kind>, such as
+    <verbatim|image> or <verbatim|graphics>) which is stored elsewhere
+    under the key <src-arg|hash> and which has not been loaded yet. It is
+    rendered as a provisional box, whose size may be given by the optional
+    <src-arg|width> and <src-arg|height>.
   </explain>
 
   <\explain>
@@ -127,11 +161,12 @@
   a few obsolete primitives, which are no longer being used by <TeXmacs>, but
   whose names should be avoided when creating your own macros. The full list
   of obsolete primitives is: <markup|format>, <markup|line-sep>,
-  <markup|with-limits>, <markup|split>, <markup|old-matrix>,
-  <markup|old-table>, <markup|old-mosaic>, <markup|old-mosaic-item>,
-  <markup|set>, <markup|reset>, <markup|expand>, <markup|expand*>,
-  <markup|hide-expand>, <markup|apply>, <markup|begin>, <markup|end>,
-  <markup|func>, <markup|env>, <markup|authorize>.
+  <markup|split>, <markup|delay>, <markup|hold>, <markup|release>,
+  <markup|old-matrix>, <markup|old-table>, <markup|old-mosaic>,
+  <markup|old-mosaic-item>, <markup|set>, <markup|reset>, <markup|expand>,
+  <markup|expand*>, <markup|hide-expand>, <markup|apply>, <markup|begin>,
+  <markup|end>, <markup|func>, <markup|env>, <markup|authorize>,
+  <markup|postscript>.
 
   <tmdoc-copyright|2004|Joris van der Hoeven>
 

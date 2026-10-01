@@ -1,6 +1,6 @@
-<TeXmacs|1.0.3.7>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Example of a plug-in with <name|C++> code>
@@ -31,7 +31,7 @@
   </verbatim>
 
   to <verbatim|$TEXMACS_PATH/plugins> or <verbatim|$TEXMACS_HOME_PATH/plugins>.
-  Next, running the <verbatim|Makefile> using
+  Next, running the <verbatim|Makefile> in the copied directory using
 
   <\verbatim>
     \ \ \ \ make
@@ -43,18 +43,25 @@
     \ \ \ \ minimal/bin/minimal.bin
   </verbatim>
 
-  When relaunching <TeXmacs>, the plug-in should now be automatically
-  recognized.
+  The <verbatim|Makefile> simply runs <verbatim|g++> on each file in
+  <verbatim|src> and expects the directory <verbatim|bin> to exist (create
+  it using <verbatim|mkdir bin> if necessary). When relaunching <TeXmacs>,
+  the plug-in should now be automatically recognized. Notice that
+  <TeXmacs> has to be restarted after the compilation: the
+  <verbatim|bin> directories of plug-ins are only added to the
+  <verbatim|PATH> at startup, and the result of the <scm|:require> test is
+  cached (use <menu|Tools|Update|Plugins> if the plug-in is still not
+  recognized).
 
   <paragraph*|How it works>
 
   The <verbatim|minimal> plug-in demonstrates a minimal interface between
   <TeXmacs> and an extern program; the program <verbatim|minimal.cpp> is
-  <hyper-link|explained|../interface/interface-pipes.en.tm> in more detail in
+  <hlink|explained|../interface/interface-pipes.en.tm> in more detail in
   the chapter about writing interfaces. The initialization file
   <verbatim|init-minimal.scm> essentially contains the following code:
 
-  <\scheme-fragment>
+  <\scm-code>
     (plugin-configure minimal
 
     \ \ (:require (url-exists-in-path? "minimal.bin"))
@@ -62,16 +69,18 @@
     \ \ (:launch "minimal.bin")
 
     \ \ (:session "Minimal"))
-  </scheme-fragment>
+  </scm-code>
 
-  The <scheme-code|:require> option checks whether <verbatim|minimal.bin>
+  The <scm|:require> option checks whether <verbatim|minimal.bin>
   indeed exists in the path (so this will fail if you forgot to run the
-  <verbatim|Makefile>). The <scheme-code|:launch> option specifies how to
-  launch the extern program. The <verbatim|:session> option indicates that it
+  <verbatim|Makefile>). The <scm|:launch> option specifies how to
+  launch the extern program. The <scm|:session> option indicates that it
   will be possible to create sessions for the <verbatim|minimal> plug-in
   using <menu|Insert|Session|Minimal>.
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
@@ -81,20 +90,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-    <associate|page-bot|30mm>
-    <associate|page-even|30mm>
-    <associate|page-odd|30mm>
-    <associate|page-reduce-bot|15mm>
-    <associate|page-reduce-left|25mm>
-    <associate|page-reduce-right|25mm>
-    <associate|page-reduce-top|15mm>
-    <associate|page-right|30mm>
-    <associate|page-top|30mm>
-    <associate|page-type|a4>
-    <associate|par-width|150mm>
-    <associate|sfactor|4>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

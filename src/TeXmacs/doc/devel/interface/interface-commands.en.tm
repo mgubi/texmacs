@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.14>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Sending commands to <TeXmacs>>
@@ -20,7 +20,7 @@
 
   <paragraph*|The <verbatim|menus> plug-in>
 
-  The <verbatim|nested> plug-in shows how an application can modify the
+  The <verbatim|menus> plug-in shows how an application can modify the
   <TeXmacs> menus in an interactive way. The plug-in consists of the files
 
   <\verbatim>
@@ -54,45 +54,8 @@
     cout.flush ();
   </cpp-code>
 
-  The <scheme> macro <scm|menus-add> is defined in <verbatim|init-menus.scm>:
-
-  <\scm-code>
-    (define menu-items '("Hi"))
-
-    \;
-
-    (tm-menu (menus-menu)
-
-    \ \ (for (entry menu-items)
-
-    \ \ \ \ ((eval entry) (insert entry))))
-
-    \;
-
-    (tm-define (menus-add entry)
-
-    \ \ (set! menu-items (cons entry menu-items)))
-
-    \;
-
-    (plugin-configure menus
-
-    \ \ (:require (url-exists-in-path? "menus.bin"))
-
-    \ \ (:launch "menus.bin")
-
-    \ \ (:session "Menus"))
-
-    \;
-
-    (menu-bind plugin-menu
-
-    \ \ (:require (in-menus?))
-
-    \ \ (=\<gtr\> "Menus" (link menus-menu)))
-  </scm-code>
-
-  The configuration of <verbatim|menus> proceeds as usual:
+  The <scheme> function <scm|menus-add> is defined in
+  <verbatim|init-menus.scm>, which contains
 
   <\scm-code>
     (plugin-configure menus
@@ -102,9 +65,47 @@
     \ \ (:launch "menus.bin")
 
     \ \ (:session "Menus"))
+
+    \;
+
+    (when (supports-menus?)
+
+    \ \ (define menu-items '("Hi"))
+
+    \;
+
+    \ \ (tm-menu (menus-menu)
+
+    \ \ \ \ (for (entry menu-items)
+
+    \ \ \ \ \ \ ((eval entry) (insert entry))))
+
+    \;
+
+    \ \ (tm-define (menus-add entry)
+
+    \ \ \ \ (set! menu-items (cons entry menu-items)))
+
+    \;
+
+    \ \ (menu-bind plugin-menu
+
+    \ \ \ \ (:require (in-menus?))
+
+    \ \ \ \ (=\<gtr\> "Menus" (link menus-menu))))
   </scm-code>
+
+  The configuration of <verbatim|menus> proceeds as usual. The additional
+  code is only executed if the plug-in is operational. It defines a
+  dynamic menu <scm|menus-menu>, whose entries are computed from the list
+  <scm|menu-items> each time the menu is displayed, and attaches it to the
+  main menu bar through the <scm|plugin-menu> hook, which is reserved for
+  plug-ins. The predicate <scm|in-menus?> ensures that the menu is only
+  visible inside <verbatim|menus> sessions.
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
@@ -114,8 +115,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>
