@@ -364,7 +364,7 @@ connection_retrieve (string name, string session) {
   tree doc (DOCUMENT);
   while (true) {
     con->forced_eval= true;
-#ifndef QTTEXMACS
+#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
     perform_select ();
 #endif
     con->forced_eval= false;
