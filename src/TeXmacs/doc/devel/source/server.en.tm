@@ -22,7 +22,9 @@
   typesetter|boxes.en.tm>), and the widgets which make up menus, toolbars,
   side panes and the footer are described in <hlink|the abstract widget
   system|widgets.en.tm>. The <scheme> interface to buffers, views and windows
-  is documented in <hlink|the Scheme buffer API|../scheme/buffer/scheme-buffer.en.tm>.
+  is documented in <hlink|the Scheme buffer API|../scheme/buffer/scheme-buffer.en.tm>. A
+  class by class and file by file reference of the directory
+  <verbatim|Texmacs/> is given in <hlink|the server layer|server-layer.en.tm>.
 
   The relevant sources are mainly located in the following directories
   (relative to <verbatim|src/src/>):

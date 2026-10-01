@@ -35,6 +35,8 @@
 
     <branch|The server, buffers, views and windows|server.en.tm>
 
+    <branch|The server layer: classes and files of <verbatim|Texmacs/>|server-layer.en.tm>
+
     <branch|The renderer interface|renderer.en.tm>
 
     <branch|The abstract widget system|widgets.en.tm>
