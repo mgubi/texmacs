@@ -764,9 +764,25 @@ search_doc_title (tree t) {
   }
 }
 
+static tree
+expand_includes (tree t) {
+  // replace include by include* so that the included files are
+  // expanded in the environment of the main document
+  if (is_atomic (t)) return t;
+  else if (is_func (t, INCLUDE, 1)) return tree (VAR_INCLUDE, t[0]);
+  else {
+    int i, n= N(t);
+    tree r (t, n);
+    for (i=0; i<n; i++)
+      r[i]= expand_includes (t[i]);
+    return r;
+  }
+}
+
 tree
 edit_typeset_rep::exec_html (tree t, path p) {
   t= convert_OTS1_symbols_to_universal_encoding (t);
+  t= expand_includes (t);
   if (p == (rp * 0)) typeset_preamble ();
   typeset_exec_until (p);
   hashmap<string,tree> H= copy (cur[p]);
