@@ -151,6 +151,18 @@ Such a file runs with `check.sh path/to/lists-test.scm` while it is being
 written, and joins the others once it is in the `:use` list and the table
 of suites of `check-master.scm`.
 
+Four suites test the Scheme library on which the rest is built:
+`lists-test.scm` (`kernel/library/list.scm`, the abbreviations and macros
+of `kernel/boot/abbrevs.scm`, `kernel/library/iterator.scm`), `base-test.scm`
+(the strings, numbers and characters of `kernel/library/base.scm`, and the
+hash tables of `kernel/boot/ahash-table.scm`), `trees-test.scm` (trees,
+content and the `tm-` functions, modifications and patches, on detached
+trees) and `define-test.scm` (`tm-define` and its overloading by condition
+and mode, `former`, properties, modes and sub-modes, `lazy-define` and the
+module macros). What needs a buffer, the cursor or the GUI is left out;
+checks which fail because of a bug in the sources are left out with a
+`FIXME` at their place.
+
 `TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
 (`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
 the source tree (1181 functions) and checks that each one is bound to a

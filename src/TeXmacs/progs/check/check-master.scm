@@ -27,7 +27,11 @@
         (server server-tmfs-test)
         (utils cite cite-sort-test)
         (kernel texmacs tm-convert-test)
-        (check glue-test)))
+        (check glue-test)
+        (check lists-test)
+        (check base-test)
+        (check trees-test)
+        (check define-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -101,7 +105,12 @@
     ("prog-format" regtest-prog-format error)
     ("cite-sort" regtest-cite-sort error)
     ("tm-convert" regtest-tm-convert error)
-    ("glue" glue-test-failures count)))
+    ("glue" glue-test-failures count)
+    ("lists" lists-test-failures count)
+    ("base" base-test-failures count)
+    ("trees" trees-test-failures count)
+    ;; last, since it defines modes and functions in the running TeXmacs
+    ("tm-define" define-test-failures count)))
 
 (define integration-suites
   '(("deletion-plan" regtest-deletion-plan integration)
