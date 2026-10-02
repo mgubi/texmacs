@@ -23,14 +23,32 @@
 (define symbols-charset "!@#$%^&*()_+-=[]{}|;:,.?")
 (define all-charset (string-append lower-charset upper-charset digits-charset symbols-charset))
 
-(define (rnd n) (if (supports-gnutls?) (gnutls-random-number n) (random n)))
+(define (urandom-number n)
+  ;; Uniform random integer in [0..n-1] from /dev/urandom, or #f
+  (and (url-exists? "/dev/urandom")
+       (catch #t
+         (lambda ()
+           (call-with-input-file "/dev/urandom"
+             (lambda (p)
+               (let* ((m 4294967296)
+                      (limit (- m (modulo m n))))
+                 (let loop ()
+                   (let* ((b (lambda () (char->integer (read-char p))))
+                          (x (+ (b) (* 256 (+ (b) (* 256 (+ (b) (* 256 (b)))))))))
+                     (if (< x limit) (modulo x n) (loop))))))))
+         (lambda args #f))))
+
+(define (rnd n)
+  (if (supports-gnutls?)
+      (gnutls-random-number n)
+      (or (urandom-number n) (random n))))
 
 (define (string-shuffle! s)
   (let ((n (string-length s)))
     (let loop ((i (- n 1)))
       (if (<= i 0)
           s
-          (let* ((j (random (+ i 1)))     ; j in [0..i]
+          (let* ((j (rnd (+ i 1)))        ; j in [0..i]
                  (ci (string-ref s i))
                  (cj (string-ref s j)))
             (string-set! s i cj)

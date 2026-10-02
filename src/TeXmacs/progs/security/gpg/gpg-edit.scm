@@ -359,7 +359,7 @@
   (:interactive #t)
   (:synopsis "Interactive passphrase decryption")
   (with cb (lambda (x) (tm-gpg-passphrase-decrypt t x))
-    (gpg-ask-ask-standalone-passphrase
+    (gpg-ask-standalone-passphrase
      (lambda (x) (gpg-decryptable? (tree->string (tree-ref t 0)) x))
      (lambda (action) (tm-gpg-command-passphrase-decrypt cb action)))))
 
@@ -398,10 +398,10 @@
     ("Cancel" (cmd "Cancel"))
     >>
     ("Ok"
-      (for (x fingerprints))
+      (for (x fingerprints)
         (gpg-import-public-keys
           (tree->string (tm-gpg-get-key-data (string->tree x)))))
-      (cmd "Ok"))))
+      (cmd "Ok")))))
 
 (tm-widget (gpg-widget-no-new-public-key-from-buffer cmd)
   (resize '("400px" "400px" "400px") '("100px" "100px" "100px") 

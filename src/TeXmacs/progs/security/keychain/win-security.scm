@@ -58,4 +58,5 @@
   (with ret (evaluate-system (list (wallet-cmd) "RM" account service)
 			     '(0) (list "") '(1 2))
     (or (== (car ret) "0")
-	(system-security-error (list cmd) (cadr ret) (caddr ret)))))
+	(system-security-error (list (wallet-cmd) "RM" account service)
+			       (cadr ret) (caddr ret)))))
