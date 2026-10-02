@@ -169,7 +169,7 @@ struct slanting_rep: public frame_rep {
   point jacobian (point p, point v, bool &error) {
     (void) p; error= false; return slanted (v, slant); }
   point jacobian_of_inverse (point p, point v, bool &error) {
-    (void) p; error= false; return slanted (v, slant); }
+    (void) p; error= false; return slanted (v, -slant); }
   double direct_bound (point p, double eps) {
     (void) p; return eps / sqrt (1.0 + slant*slant); }
   double inverse_bound (point p, double eps) {
