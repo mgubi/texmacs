@@ -51,3 +51,28 @@
 
 ;; (logic-query (child% 'x Opa))
 ;; (logic-query (child% 'x Opa) family%)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Regression tests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (regtest-logic-query)
+  (regression-test-group
+   "logic-query" "logic"
+   :none :none
+   (test "children"
+     (logic-query (child% 'x Opa))
+     '(((x . Piet)) ((x . Geeske)) ((x . Jekke))))
+   (test "descendants"
+     (logic-query (descends% 'x 'y))
+     '(((y . Piet) (x . Joris)) ((y . Opa) (x . Piet))
+       ((y . Opa) (x . Geeske)) ((y . Opa) (x . Jekke))
+       ((y . Opa) (x . Joris))))
+   (test "no solution"
+     (logic-query (child% 'x Joris))
+     '())))
+
+(tm-define (regtest-logic)
+  (let ((n (regtest-logic-query)))
+    (display* "Total: " (object->string n) " tests.\n")
+    (display "Test suite of logic: ok\n")))

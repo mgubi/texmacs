@@ -528,7 +528,14 @@ if (WIN32)
     list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Windows/windows32_entrypoint.cpp")
   endif ()
 elseif (APPLE)
-  # Apple/Cocoa
+  # Unix system layer plus the Objective-C(++) helpers of Plugins/MacOS
+  enable_language (OBJC OBJCXX)
+  set (CMAKE_OBJCXX_STANDARD 17)
+  file (GLOB TeXmacs_OS_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.mm")
+  list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
 else ()
   file (GLOB TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp")
   list (REMOVE_ITEM TeXmacs_OS_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/unix_entrypoint.cpp")
@@ -557,6 +564,7 @@ set (TeXmacs_All_SRCS
 ### --------------------------------------------------------------------
 
 set (TeXmacs_Include_Dirs
+  ${CMAKE_CURRENT_BINARY_DIR}/src/System
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Data/Convert
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Data/Document
@@ -614,7 +622,6 @@ set (TeXmacs_Include_Dirs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Typeset/Concat
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Typeset/Page
   ${CMAKE_CURRENT_SOURCE_DIR}/TeXmacs/include
-  ${CMAKE_CURRENT_BINARY_DIR}/src/System
   ${Guile_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${PNG_INCLUDE_DIRS}
@@ -676,6 +683,9 @@ if (USE_SQLITE3)
     list (APPEND TeXmacs_Libraries ${SQLite3_LIBRARIES})
   endif ()
 endif ()
+if (APPLE)
+  list (APPEND TeXmacs_Libraries "-framework Cocoa" "-framework IOKit")
+endif ()
 if (WIN32)
   list (APPEND TeXmacs_Libraries
     dbghelp Secur32 shell32 ole32 advapi32 secur32 dwmapi ws2_32 userenv bcrypt ntdll pthread
@@ -686,10 +696,21 @@ endif ()
 ### Subdirectories
 ### --------------------------------------------------------------------
 
+# Install location of texmacs.bin, relative to CMAKE_INSTALL_PREFIX
+# (the texmacs script configured in misc/ expects it in libexec/TeXmacs/bin)
+set (tmbin "libexec/TeXmacs")
+
 add_subdirectory (src)
 add_subdirectory (plugins)
 add_subdirectory (misc)
 add_subdirectory (TeXmacs)
+
+# C++ unit tests (Qt Test based, see tests/README.md); run them with ctest
+option (TEXMACS_BUILD_TESTS "Build the C++ unit tests in tests/" OFF)
+if (TEXMACS_BUILD_TESTS)
+  enable_testing ()
+  add_subdirectory (tests)
+endif ()
 
 ### --------------------------------------------------------------------
 ### Installation

@@ -515,7 +515,7 @@ MACOS_PACKAGE: MACOS_BUNDLE
 
 MACOS_RELEASE: MACOS_BUNDLE
 	$(RM) $(MACOS_PACKAGE_ZIP)
-	(cd ../distr; zip -r9Tq $(tm_devel).zip $MACOS_PACKAGE_APP)
+	(cd ../distr; zip -r9Tq $(tm_devel).zip $(notdir $(MACOS_PACKAGE_APP)))
 	$(SIGN) $(MACOS_PACKAGE_ZIP) @SVNREV@ $(tm_devel_version)
 
 .PHONY: MACOS_BUNDLE MACOS_PACKAGE MACOS_RELEASE

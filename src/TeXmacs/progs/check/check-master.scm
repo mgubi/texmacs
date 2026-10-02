@@ -20,6 +20,9 @@
         (convert tools environment-test)
         (convert mathml mathtm-test)
         (convert tmml tmmltm-test)
+        (kernel texmacs tm-convert-test)
+        (kernel regexp regexp-test)
+        (kernel logic logic-test)
         (prog prog-format-test)
         (server server-cache-test)
         (server server-backup-test)
@@ -94,6 +97,9 @@
   (regtest-tmmltm)
   (regtest-prog-format)
   (regtest-cite-sort)
+  (regtest-tm-convert)
+  (regtest-regexp)
+  (regtest-logic)
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

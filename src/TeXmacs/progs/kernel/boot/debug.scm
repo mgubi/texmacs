@@ -300,6 +300,8 @@
               (failed (- total passed)))
          (display* "  " (number->string passed) "/" (number->string total)
                    " passed\n")
+         (when (> failed 0)
+           (error "Integration test failure:" ,group-id failed))
          total))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
