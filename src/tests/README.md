@@ -69,3 +69,42 @@ whose functions `mac_images.h` does not declare in a Qt 6 build.
 Because dependency tracking may be disabled in the main build, run
 `make -C tests check-stale` after changing a header and remove the listed
 objects before rebuilding.
+
+## Document regression tests
+
+`tests/documents/check.sh` typesets the documents in
+`tests/documents/samples` without a window and compares them with
+references:
+
+```
+tests/documents/check.sh               # all samples
+tests/documents/check.sh math tables   # some of them
+tests/documents/check.sh -u            # accept the current output
+tests/documents/check.sh -u -p         # ... and keep pixel references
+tests/documents/check.sh -p            # compare pixels too
+```
+
+Each sample is loaded, its references and table of contents are generated
+and it is typeset again twice (`tests/documents/export.scm`, the steps of
+Document > Update > All, which without a window have to be forced), then
+printed to PDF. `mutool` extracts the number of pages and the text of each
+page, which is compared with `tests/documents/ref/<sample>.txt`. These
+references are committed: a change in line breaks, page breaks, numbering,
+references or glyphs shows up as a diff in `tests/build/documents`. A PDF
+which `mutool` reads with a syntax error fails too. Pixel references depend
+on the machine and the build, so `-p` keeps them in `tests/build/documents`
+and never commits them.
+
+The samples cover an article (title, abstract, sections, lists, footnote,
+references, theorems), mathematics, tables, a drawing, program code,
+languages with accented letters, and a book (table of contents, chapters,
+page breaks, appendix). They use only the fonts which come with TeXmacs.
+Like every `.tm` file they are Cork-encoded: accented letters are Cork
+bytes, not UTF-8. The references record the current output, not the ideal
+one: the text layer of the PDF currently maps the Cork glyphs of oe, sharp
+s and the Spanish inverted marks to the wrong characters, and the
+reference of `languages` holds those characters until the writer is fixed.
+
+When a change is intended, run `check.sh -u` and commit the new references
+together with the change, so that the diff of the references documents what
+moved.

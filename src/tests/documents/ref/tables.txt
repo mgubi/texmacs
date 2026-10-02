@@ -1,0 +1,53 @@
+pages: 1
+--- page 1
+1 Tables
+
+A plain table with borders, and cells aligned left, centered and right:
+
+Left
+Center
+Right
+apple
+1
+0.50
+banana
+12
+12.25
+cherry
+123
+1230.00
+
+Table 1. A table with a header row.
+
+A table whose cells span several rows and columns:
+
+Two rows Two columns
+
+a
+b
+c
+d
+e
+
+Table 2. Merged cells.
+
+A table whose cells hold paragraphs, which must wrap within their width:
+A long paragraph in a cell of
+fixed width, which the type-
+setter breaks into several lines.
+
+Another paragraph, shorter.
+
+A matrix-like table inside a formula:
+
+
+
+1 0
+0 1
+
+    = 1.
+
+Tables
+1
+
+

@@ -1,0 +1,19 @@
+pages: 1
+--- page 1
+1 A drawing
+
+A drawing made with the graphics editor: lines, a polygon, a circle, an arc, a spline, arrows and
+labels.
+
+A
+
+x2
+
+The caption of the drawing follows it.
+
+Figure 1. A rectangle and its diagonal.
+
+A drawing
+1
+
+
