@@ -475,6 +475,9 @@ edit_main_rep::graphics_file_to_clipboard (url name) {
 #elif defined (AQUATEXMACS)
   bool ns_put_graphics_on_clipboard (url file);
   return ns_put_graphics_on_clipboard (name);
+#elif defined (VUETEXMACS)
+  bool vue_put_graphics_on_clipboard (url file);
+  return vue_put_graphics_on_clipboard (name);
 #else 
   return false;
 #endif

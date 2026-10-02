@@ -1,6 +1,6 @@
 # The interactive status bar
 
-An option of the Vue interface: the status bar (the footer of an editor
+An option of the Vue and Cocoa interfaces: the status bar (the footer of an editor
 window) shows as menus and buttons what it otherwise shows as text.
 
 ![The interactive status bar: the properties at the cursor as menus, the tags around it as a path, the outer tags folded into a menu, the character before the cursor](wasm/interactive-footer.png)
@@ -29,8 +29,8 @@ window) shows as menus and buttons what it otherwise shows as text.
   start-up) or asks a question in the footer, the status bar is the text
   it always was.
 
-It is off by default: **View › Interactive status bar** (Vue only, shown
-while the status bar is), the preference `interactive footer` (`on` or
+It is off by default: **View › Interactive status bar** (Vue and Cocoa,
+`(or (vue-gui?) (ns-gui?))`, shown while the status bar is), the preference `interactive footer` (`on` or
 `off`).
 
 ## How it works
@@ -66,10 +66,28 @@ The only change outside Vue and the Scheme menus is the notification in
   desktop window it hangs below the footer; it could open upwards as the
   menus of the footer do. The folding budget is an estimate (7 points a
   character); measuring the names would be exact.
-* **Other interfaces.** Nothing in the menus is Vue specific: Qt could
-  show them as well, through a slot for the footer (the editor would send
-  the widget, as it sends the tool bars) instead of the reading of
-  `(footer-environment?)` in the GUI.
+* **Other interfaces.** Nothing in the menus is specific to an interface:
+  Cocoa shows them too (below), and Qt could, through a slot for the footer
+  (the editor would send the widget, as it sends the tool bars) instead of
+  the reading of `(footer-environment?)` in the GUI.
+
+## In the Cocoa interface
+
+`ns_tm_widget_rep` (`src/Plugins/NS/ns_tm_widget.mm`) does what Vue does:
+at `SLOT_LEFT_FOOTER` it reads the preference and `(footer-environment?)`,
+at `SLOT_RIGHT_FOOTER` it expands the two menus and makes a row again only
+when its expansion changed (`update_footer_menus`). The rows are made by a
+`TMButtonsController` of their own (`fc`), as those of the icon bars, from
+the NSMenus of the menus (`to_nsmenu`): the pull-down buttons have a
+chevron, and their menus open upwards (`upward`). The properties are on
+the left of the footer; the tags are on the right, in a view which clips
+them on their left (`footer_clip`), whose width, at 7 points a character,
+is the budget of the folding. A right click on a tag, or a click with
+Control or Option (`contextTarget` of the controller, `footerContext:` of
+`TMWidgetHelper`), runs its command, then opens `texmacs-popup-menu` at the
+pointer once the event is over. The swatch of the colour is the image of
+its menu item, and the bold of the innermost tag the attributed title of
+its item (`text_widget` in `ns_ui_element.mm`).
 * **Performance.** The two menus are expanded at every update of the
   footer (every key); the tool bars are too, but the expansions could be
   skipped while the cursor stays in the same tag and environment.

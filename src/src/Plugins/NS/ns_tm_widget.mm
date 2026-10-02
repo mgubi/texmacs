@@ -28,6 +28,8 @@
 #import "TMView.h"
 #import "TMButtonsController.h"
 
+widget make_menu_widget (object wid); // Texmacs/Window/tm_window.cpp
+
 #pragma mark ns_tm_widget_rep
 
 static void forget_main_menu (ns_tm_widget_rep* w);
@@ -89,6 +91,8 @@ NSColor* to_nscolor (color col);
   ns_tm_widget_rep *wid;
 }
 - (void)notify:(NSNotification*)obj;
+- (void)footerContext:(NSMenuItem*)item event:(NSEvent*)e;
+- (void)footerPopup;
 @end
 
 @implementation TMWidgetHelper
@@ -108,6 +112,30 @@ NSColor* to_nscolor (color col);
   else if ([name isEqualToString: NSWindowDidExitFullScreenNotification])
     wid->window_full_screen (false);
 }
+- (void)footerContext:(NSMenuItem*)item event:(NSEvent*)e
+{
+  // a right click on a button of the interactive footer: a tag is
+  // selected, then the menu of the selection opens at the pointer; the
+  // menus of the properties open as with a left click
+  (void) e;
+  if (!wid || [item submenu] != nil) return;
+  if ([item respondsToSelector: @selector(doit)])
+    [item performSelector: @selector(doit)];
+  // once the event is over and the selection made
+  [self performSelector: @selector(footerPopup) withObject: nil afterDelay: 0];
+}
+// the context menu of the editor (texmacs-popup-menu, the Focus menu) at
+// the pointer, as a right click in the document (edit_interface_rep::
+// mouse_adjust)
+- (void)footerPopup
+{
+  if (!wid) return;
+  widget w= make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))"));
+  NSMenu* m= to_nsmenu (w);
+  if (m != nil && [m numberOfItems] > 0)
+    [m popUpMenuPositioningItem: nil atLocation: [NSEvent mouseLocation]
+                         inView: nil];
+}
 @end
 
 
@@ -116,6 +144,8 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
                       texmacs_widget),
   sv(nil), leftField(nil), rightField(nil), bc(nil), menu_items(nil),
   full_screen(false), prompt_view(nil),
+  footer_menus(false), fc(nil), footer_env(nil), footer_path(nil),
+  footer_clip(nil),
   quit (_quit)
 {
   // decode mask
@@ -178,6 +208,17 @@ ns_tm_widget_rep::ns_tm_widget_rep (int mask, command _quit):
   //	[mt setPostsFrameChangedNotifications:YES];
   wh = [[TMWidgetHelper alloc] init];
   wh->wid = this;
+  // the interactive footer: its menus open upwards, and a right click on a
+  // tag opens the menu of the tag (see TMWidgetHelper)
+  fc = [[TMButtonsController alloc] init];
+  fc->upward= YES;
+  fc->contextTarget= wh;
+  fc->contextAction= @selector(footerContext:event:);
+  footer_clip = [[NSView alloc] initWithFrame: NSZeroRect];
+  [footer_clip setWantsLayer: YES];
+  [[footer_clip layer] setMasksToBounds: YES];
+  [footer_clip setHidden: YES];
+  [view addSubview: footer_clip];
   // the side tools and the canvas are laid out again when the window is
   // resized and when the contents of the tools change (see TMRefreshView)
   [view setIdentifier: @"TMMainView"];
@@ -228,6 +269,10 @@ ns_tm_widget_rep::~ns_tm_widget_rep()
   }
   [wh release];	
   [bc release]; 
+  [fc release];
+  [footer_env release];
+  [footer_path release];
+  [footer_clip release];
 }
 
 
@@ -273,6 +318,33 @@ tool_size (NSView* v) {
   wid->layout ();
 }
 @end
+
+// the row of a menu of the footer, made again when its expansion changed
+static void
+footer_row (TMButtonsController* fc, object& current, NSView*& row, string menu) {
+  object m= eval ("'" * menu);
+  object x= call ("menu-expand", m);
+  if (row != nil && x == current) return;
+  current= x;
+  NSView* r= [fc rowForMenu: to_nsmenu (make_menu_widget (m))];
+  [row removeFromSuperview];
+  [row release];
+  row= [r retain];
+}
+
+void
+ns_tm_widget_rep::update_footer_menus () {
+  // the room of the tags, in characters (their width in the last layout,
+  // at some 7 points a character): the outer tags which do not fit are
+  // folded into a menu, see (texmacs menus footer-menu)
+  CGFloat room= [footer_clip frame].size.width;
+  if (room > 0)
+    call ("footer-set-budget", object (max ((int) (room / 7.0), 12)));
+  footer_row (fc, footer_env_menu, footer_env,
+              "(horizontal (link texmacs-footer-environment))");
+  footer_row (fc, footer_path_menu, footer_path,
+              "(horizontal (link texmacs-footer-path))");
+}
 
 void ns_tm_widget_rep::layout()
 {
@@ -328,6 +400,26 @@ void ns_tm_widget_rep::layout()
                                     fs.width, min (text_h, foot_h))];
   [leftField setHidden: foot_h == 0 || prompt_view];
   [rightField setHidden: foot_h == 0 || prompt_view];
+  // the interactive footer: the properties on the left, the tags on the
+  // right, which give way to the properties when space is short (clipped
+  // on their left: the innermost tags stay in view)
+  bool menus= footer_menus && footer_env && footer_path && foot_h > 0 && !prompt_view;
+  if (menus) {
+    [leftField setHidden: YES];
+    [rightField setHidden: YES];
+    if ([footer_env superview] != view) [view addSubview: footer_env];
+    if ([footer_path superview] != footer_clip) [footer_clip addSubview: footer_path];
+    NSSize es= [footer_env fittingSize], ps= [footer_path fittingSize];
+    CGFloat ex= pad - 8; // the rows have their own margins of 8 points
+    [footer_env setFrame: NSMakeRect (ex, floor ((foot_h - es.height) / 2),
+                                      es.width, es.height)];
+    CGFloat cx= ex + es.width, cw= max ((CGFloat) 0.0, r.size.width - cx - (pad - 8));
+    [footer_clip setFrame: NSMakeRect (cx, 0, cw, foot_h)];
+    [footer_path setFrame: NSMakeRect (cw - ps.width, floor ((foot_h - ps.height) / 2),
+                                       ps.width, ps.height)];
+  }
+  [footer_env setHidden: !menus];
+  [footer_clip setHidden: !menus];
   if (prompt_view)
     [prompt_view setFrame: NSMakeRect (0, vpad, r.size.width, foot_h - 2*vpad)];
 }
@@ -487,6 +579,12 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
       string msg = open_box<string> (val);
       [leftField setStringValue:to_nsstring_utf8 (tm_var_encode (msg))];
       [leftField displayIfNeeded];
+      // the editor sends the left footer first (edit_interface_rep::
+      // set_footer), having said what it shows
+      bool was= footer_menus;
+      footer_menus= get_preference ("interactive footer") == "on" &&
+                    as_bool (call ("footer-environment?"));
+      if (was && !footer_menus) layout ();
     }
     break;
   case SLOT_RIGHT_FOOTER:
@@ -496,7 +594,11 @@ ns_tm_widget_rep::send (slot s, blackbox val) {
       [rightField setStringValue:to_nsstring_utf8 (tm_var_encode (msg))];
       // the field takes the width of its text
       CGFloat need= max ((CGFloat) 100.0, [[rightField cell] cellSize].width + 4);
-      if (fabs (need - [rightField frame].size.width) > 0.5) layout ();
+      if (footer_menus) {
+        update_footer_menus ();
+        layout ();
+      }
+      else if (fabs (need - [rightField frame].size.width) > 0.5) layout ();
       [rightField displayIfNeeded];
     }
     break;

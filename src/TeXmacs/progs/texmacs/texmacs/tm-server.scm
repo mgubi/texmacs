@@ -120,6 +120,8 @@
   ("gui scaling" "default" notify-restart)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
   ("interactive footer" "off" noop)
+  ("typographic palette" "off" noop)
+  ("typographic palette set" "Muted" noop)
   ("page medium" "paper" (lambda args (noop)))
   ("fast environments" "on" notify-fast-environments)
   ("continuous spell checking" "off" notify-continuous-spell-checking)

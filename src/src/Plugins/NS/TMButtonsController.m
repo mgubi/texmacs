@@ -15,6 +15,11 @@
 - (void) doit;
 @end
 
+// the controller is told of the right clicks on its buttons
+@protocol TMContextClick
+- (BOOL) contextClick:(id) button event:(NSEvent*) e;
+@end
+
 @interface TMFlippedView : NSView
 @end
 
@@ -57,6 +62,26 @@
 - (void) mouseExited: (NSEvent*) e { (void) e; hover= NO; [self setNeedsDisplay: YES]; }
 
 - (BOOL) hasMenu { return [item submenu] != nil; }
+
+// a right click, or a click with Control or Option (the right click of a
+// mouse or trackpad with one button), goes to the context target of the
+// controller if there is one
+- (BOOL) contextClick: (NSEvent*) e
+{
+  id c= [self target];
+  if (![c respondsToSelector: @selector(contextClick:event:)]) return NO;
+  return [(id<TMContextClick>) c contextClick: self event: e];
+}
+- (void) rightMouseDown: (NSEvent*) e
+{
+  if (![self contextClick: e]) [super rightMouseDown: e];
+}
+- (void) mouseDown: (NSEvent*) e
+{
+  if (([e modifierFlags] & (NSEventModifierFlagControl | NSEventModifierFlagOption))
+      && [self contextClick: e]) return;
+  [super mouseDown: e];
+}
 
 - (NSSize) intrinsicContentSize
 {
@@ -187,10 +212,14 @@
   NSMenuItem *mi = [[b->item retain] autorelease];
   NSMenu *sm = [[[mi submenu] retain] autorelease];
   if (sm) {
-    // the menu below the button
-    [sm popUpMenuPositioningItem:nil
-                      atLocation:NSMakePoint (0, NSMaxY ([b bounds]) + 3)
-                          inView:b];
+    // the menu below the button, or above it (the footer, which is at the
+    // bottom of the window: the button is flipped, y goes down)
+    NSPoint at= NSMakePoint (0, NSMaxY ([b bounds]) + 3);
+    if (upward) {
+      [sm update];
+      at= NSMakePoint (0, - [sm size].height - 3);
+    }
+    [sm popUpMenuPositioningItem:nil atLocation: at inView:b];
     [b setNeedsDisplay: YES];
   }
   else if ([mi respondsToSelector:@selector(doit)]) [(id)mi doit];
@@ -214,9 +243,17 @@
     [b setTitle: @""];
   }
   else {
+    // bold if the title of the item is (the innermost tag of the footer)
+    BOOL bold = NO;
+    NSAttributedString *at = [mi attributedTitle];
+    if ([at length] > 0) {
+      NSFont *f = [at attribute: NSFontAttributeName atIndex: 0 effectiveRange: NULL];
+      bold = f && ([[f fontDescriptor] symbolicTraits] & NSFontDescriptorTraitBold);
+    }
+    CGFloat fs = [NSFont smallSystemFontSize] + 1;
     NSDictionary *attrs =
       [NSDictionary dictionaryWithObjectsAndKeys:
-        [NSFont systemFontOfSize: [NSFont smallSystemFontSize] + 1],
+        bold? [NSFont boldSystemFontOfSize: fs]: [NSFont systemFontOfSize: fs],
         NSFontAttributeName,
         [mi isEnabled]? [NSColor labelColor]: [NSColor tertiaryLabelColor],
         NSForegroundColorAttributeName, nil];
@@ -261,6 +298,12 @@
     }
     else if ([mi representedObject] || [mi submenu] || [mi action])
       v = [self buttonFor: mi];
+    else if ([mi image]) {
+      // an image of its own (a swatch of colour): the image
+      NSImageView *iv = [NSImageView imageViewWithImage: [mi image]];
+      [iv setToolTip: [mi title]];
+      v = iv;
+    }
     else if ([[mi title] length] > 0) {
       NSTextField *t = [NSTextField labelWithString:[mi title]];
       [t setTextColor: [NSColor secondaryLabelColor]];
@@ -350,6 +393,24 @@
 - (NSView*) bar
 {
   return view;
+}
+
+- (NSView*) rowForMenu:(NSMenu*) menu
+{
+  // NOTE: the items are retained by the buttons, the menu by the controller
+  if (menu) [menuArray addObject: menu];
+  if ([menuArray count] > 8) [menuArray removeObjectAtIndex: 0];
+  return [self rowFor: menu];
+}
+
+- (BOOL) contextClick:(id) button event:(NSEvent*) e
+{
+  TMBarButton* b= (TMBarButton*) button;
+  if (!contextTarget || ![contextTarget respondsToSelector: contextAction])
+    return NO;
+  [[b retain] autorelease];
+  [contextTarget performSelector: contextAction withObject: b->item withObject: e];
+  return YES;
 }
 
 @end

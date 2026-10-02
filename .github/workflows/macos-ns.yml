@@ -10,7 +10,11 @@
 #     its disk image, and a check that the application of the disk image
 #     opens a document given on the command line with each architecture and
 #     shows its colors (packages/macos/ci-colors.tm, png-has-red.py). The
-#     disk image and the snapshots of the windows are artifacts of the run.
+#     disk image and the snapshots of the windows are artifacts of the run;
+#   * release (on ns_ci only): the disk image published as the pre-release
+#     cocoa-latest of the repository, replaced at each build (its tag moved
+#     to the commit built), so that its page and its download stay the same:
+#     https://github.com/<owner>/<repo>/releases/tag/cocoa-latest
 #
 # The application is signed ad hoc and not notarized: Gatekeeper rejects it
 # on another machine until the quarantine is removed,
@@ -155,3 +159,45 @@ jobs:
           name: snapshots
           path: distr/snapshots
           if-no-files-found: ignore
+
+  release:
+    needs: dmg
+    if: github.ref == 'refs/heads/ns_ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: TeXmacs-*-universal.dmg
+          path: dist
+          merge-multiple: true
+
+      - name: The pre-release cocoa-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          dmg=$(ls dist/*.dmg | head -1)
+          [ -f "$dmg" ] || { echo "error: no disk image"; exit 1; }
+          tag=cocoa-latest
+          cat > notes.md << EOF
+          The latest build of GNU TeXmacs with the native interface of macOS
+          (Cocoa), from the branch \`wip_other_guis\` (commit
+          ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)); it is replaced at each
+          build. Work in progress: see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md).
+
+          * One application for Apple silicon and Intel, macOS 12 or later.
+          * Signed ad hoc and not notarized: macOS refuses to open it the
+            first time. Open it from the context menu (Open), or allow it
+            in System Settings > Privacy & Security, or remove the
+            quarantine: \`xattr -dr com.apple.quarantine /Applications/TeXmacs.app\`
+          * The PDF is written by TeXmacs itself; Ghostscript is only needed
+            for PostScript.
+
+          Built by [this run](https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}).
+          EOF
+          gh release delete "$tag" --cleanup-tag --yes || true
+          gh release create "$tag" "$dmg" --target "$GITHUB_SHA" --prerelease \
+            --title "TeXmacs for macOS (Cocoa), latest build" --notes-file notes.md

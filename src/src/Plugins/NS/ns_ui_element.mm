@@ -951,7 +951,17 @@ ns_ui_element_rep::as_menuitem () {
     {
       typedef quartet<string, int, color, bool> T;
       T x= open_box<T> (load);
-      return new_item (to_label (x.x1));
+      TMMenuItem* mi= new_item (to_label (x.x1));
+      if (x.x2 & WIDGET_STYLE_BOLD) {
+        // bold (the innermost tag of the interactive footer)
+        NSDictionary* attrs= [NSDictionary dictionaryWithObjectsAndKeys:
+          [NSFont boldSystemFontOfSize: [NSFont systemFontSize]],
+          NSFontAttributeName, nil];
+        [mi setAttributedTitle: [[[NSAttributedString alloc]
+                                   initWithString: [mi title]
+                                       attributes: attrs] autorelease]];
+      }
+      return mi;
     }
 
     case xpm_widget:

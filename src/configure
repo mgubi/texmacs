@@ -36745,11 +36745,11 @@ printf %s "checking hummus support for native pdf exports... " >&6; }
   exec 3>&6 6>/dev/null
 
   if [[ "$enableval" != no ]]
-  then if [[ $CONFIG_GUI != QT ]]
+  then if [[ $CONFIG_GUI != QT && $CONFIG_GUI != COCOA ]]
     then
   exec 6>&3
-  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabled: needs Qt" >&5
-printf '%s\n' "disabled: needs Qt" >&6; }
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabled: needs Qt or Cocoa" >&5
+printf '%s\n' "disabled: needs Qt or Cocoa" >&6; }
 
     else
       ac_fn_cxx_check_header_compile "$LINENO" "zlib.h" "ac_cv_header_zlib_h" "$ac_includes_default"

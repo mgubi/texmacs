@@ -150,20 +150,26 @@ static bool in_tool_bar= false;
 // last, as the popup of the editor (edit_interface_rep::mouse_adjust)
 static widget footer_popup_wid;
 
+// a context menu at a point of the screen (the editor's, that of an input
+// field): it replaces the one shown before, if any
+static void
+show_context_menu (widget menu, SI x, SI y) {
+  if (!is_nil (footer_popup_wid)) {
+    set_visibility (footer_popup_wid, false);
+    destroy_window_widget (footer_popup_wid);
+    footer_popup_wid= widget ();
+  }
+  footer_popup_wid= popup_window_widget (popup_widget (menu), "Popup menu");
+  set_position (footer_popup_wid, x, y);
+  set_visibility (footer_popup_wid, true);
+}
+
 class footer_popup_command_rep : public command_rep {
   SI x, y;
 public:
   footer_popup_command_rep (SI x2, SI y2) : x (x2), y (y2) {}
   void apply () {
-    if (!is_nil (footer_popup_wid)) {
-      set_visibility (footer_popup_wid, false);
-      destroy_window_widget (footer_popup_wid);
-      footer_popup_wid= widget ();
-    }
-    widget menu= make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))"));
-    footer_popup_wid= popup_window_widget (popup_widget (menu), "Popup menu");
-    set_position (footer_popup_wid, x, y);
-    set_visibility (footer_popup_wid, true);
+    show_context_menu (make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))")), x, y);
   }
   void apply (object arg) { (void) arg; apply (); }
   tm_ostream& print (tm_ostream& out) { return out << "<footer_popup_command>"; }
@@ -386,6 +392,7 @@ time_t mouse_time;
 int mouse_x; // signed: see vue_input_state in vue_gui.hpp
 int mouse_y;
 int mouse_ticket= 0; // the payload of a "drop" action
+int mouse_clicks= 1; // the count of the clicks of a press (2: double click)
 unsigned int mouse_state= 0;
 array<double> mouse_data;
 
@@ -398,6 +405,9 @@ uint32_t current_menu= 0; // the open menu being laid out (its float)
 bool menu_press= false;   // the pass has a press, maybe taken by the menus
 bool menu_hovered= false; // an item of an open menu is under the pointer
 array<uint32_t> menu_zones_now; // the open menus and their buttons
+// the pointer is over the open list of an enum (it floats above the menu
+// which has the enum, where Clay does not see the pointer over the menu)
+static bool pointer_on_enum_list= false;
 // A title of a bar opens its menu as it is pressed, and the button may be
 // held and dragged down to an item, which is chosen by the release (see
 // layout_pull_button): while such a drag lasts, the title gives up the
@@ -453,6 +463,12 @@ bool window_autosizing= false; // the window is being sized to its contents
 // sized to its contents is sized to them again, as QTMTabWidget::resizeOthers
 static bool refit_window= false;
 int context_style= 0; // style flags (bold, grey) added by the enclosing divisions
+// the flags of a container which its texts inherit (user_canvas_widget,
+// resize_widget), as the style sheet of a container does in Qt
+static const int inherited_styles= WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED |
+  WIDGET_STYLE_GREY | WIDGET_STYLE_INERT | WIDGET_STYLE_BOLD;
+// the resize widgets whose initial scrolling position has been set (by id)
+static hashset<int> resize_positioned;
 bool in_title_bar= false; // laying out the title bar of a tool (its "x" is a close button)
 // laying out the buttons of a "sections" or "section-tabs" bar of a tool:
 // 0 not in a bar, 1 in a bar of buttons, 2 in a bar of tabs; the selected
@@ -492,6 +508,7 @@ load_input_state (vue_window win) {
   mouse_x= in.mouse_x;
   mouse_y= in.mouse_y;
   mouse_ticket= in.mouse_ticket;
+  mouse_clicks= in.mouse_clicks;
   mouse_data= in.mouse_data;
   current_popup= in.current_popup;
   cancel_popup= in.cancel_popup;
@@ -515,6 +532,7 @@ store_input_state (vue_window win) {
   in.mouse_x= mouse_x;
   in.mouse_y= mouse_y;
   in.mouse_ticket= mouse_ticket;
+  in.mouse_clicks= mouse_clicks;
   in.mouse_data= mouse_data;
   in.current_popup= current_popup;
   in.cancel_popup= cancel_popup;
@@ -606,6 +624,7 @@ gui_init_context() {
     }
   }
   menu_zones_now= array<uint32_t> ();
+  pointer_on_enum_list= false;
   menu_hovered= false;
   current_bar= current_menu= 0;
   
@@ -1034,13 +1053,37 @@ widget setting_group_widget (string text, array<widget> vals, int style) {
   return vertical_list (a);
 }
   // a titled group of settings
+// Tabs whose presentation is the preference "gui:responsive tab mode", read
+// when they are made (as the look and feel, a change shows in the next
+// ones): "top" plain tabs, "side" a column of tabs on the left of the page
+// (the default, as in the Qt port), "mobile" the list of the tabs, a page
+// replacing it with a button back to the list, "grid" all the pages at
+// once, in two columns (three in a wide window). Qt has the four modes in
+// QTMResponsiveTabWidget but always shows the side one (the mobile one on
+// Android). TEXMACS_VUE_TAB_MODE overrides the preference (the tests)
+static string
+responsive_tab_mode () {
+  string mode= get_env ("TEXMACS_VUE_TAB_MODE");
+  if (mode == "") mode= get_preference ("gui:responsive tab mode", "side");
+  if (mode != "top" && mode != "mobile" && mode != "grid") mode= "side";
+  return mode;
+}
+VUE_WIDGET(responsive_tabs_widget, array<url>, us, array<widget>, tabs, array<widget>, bodies,
+                                   string, mode);
+VUE_WIDGET_DATA(responsive_tabs_widget_star, array<widget>, tabs, array<widget>, icons,
+                array<widget>, bodies, int, current, string, mode, bool, viewing);
 widget responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
-  return tabs_widget (tabs, bodies);
+  string mode= responsive_tab_mode ();
+  if (mode == "top") return tabs_widget (tabs, bodies);
+  vue_responsive_tabs_widget d { .tabs= tabs, .bodies= bodies, .mode= mode };
+  return vue_create<vue_responsive_tabs_widget> ("responsive_tabs_widget", d);
 }
 widget responsive_icon_tabs_widget (array<url> us, array<widget> ss, array<widget> bs) {
-  return icon_tabs_widget (us, ss, bs);
+  string mode= responsive_tab_mode ();
+  if (mode == "top") return icon_tabs_widget (us, ss, bs);
+  vue_responsive_tabs_widget d { .us= us, .tabs= ss, .bodies= bs, .mode= mode };
+  return vue_create<vue_responsive_tabs_widget> ("responsive_tabs_widget", d);
 }
-  // tabs which adapt to the available space: plain tabs here
   // an input toggle
 VUE_WIDGET(wait_widget, SI, width, SI, height, string, message);
   // a widget of a specified width and height, displaying a wait message
@@ -1153,7 +1196,7 @@ VUE_WIDGET_DATA(enum_widget_star, command, cb, array<string>, vals, string, val,
 VUE_WIDGET_DATA(filtered_choice_widget_star, command, cb, array<string>, vals, string, val, widget, input);
 // a filtered choice widget with the input field used for the filter
 
-VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content, widget, printer, widget, copies, widget, pages, string, options_for);
+VUE_WIDGET_DATA(printer_widget_star, command, cmd, url, ps_pdf_file, widget, content, widget, printer, widget, copies, widget, pages, widget, orientation, string, options_for);
 // a printer widget with the prebuilt dialog contents
 
 VUE_WIDGET_DATA(color_picker_widget_star, command, cmd, bool, bg, array<tree>, proposals, widget, content);
@@ -1413,13 +1456,13 @@ printer_options (string printer) {
 class print_command_rep: public command_rep {
   url file;
   command after;
-  widget printer, copies, pages;
+  widget printer, copies, pages, orientation;
   array<printer_option> options;
 public:
   print_command_rep (url _file, command _after, widget _printer, widget _copies, widget _pages,
-                     array<printer_option> _options):
+                     widget _orientation, array<printer_option> _options):
     file (_file), after (_after), printer (_printer), copies (_copies), pages (_pages),
-    options (_options) {}
+    orientation (_orientation), options (_options) {}
   void apply () {
     string cmd= "lpr";
     string pr= enum_widget_value (printer);
@@ -1431,6 +1474,10 @@ public:
     for (int i= 0; i < N(rg); i++) // digits, commas and dashes only
       if ((rg[i] >= '0' && rg[i] <= '9') || rg[i] == ',' || rg[i] == '-') clean << rg[i];
     if (N(clean) > 0) cmd << " -o page-ranges=" << clean;
+    // the spooler turns the pages (IPP orientation-requested, 4 is
+    // landscape), as the Qt port asks it (QTMPrinterSettings)
+    if (enum_widget_value (orientation) == translate ("Landscape"))
+      cmd << " -o orientation-requested=4";
     for (int i= 0; i < N(options); i++) {
       string v= enum_widget_value (options[i].choice);
       if (N(v) > 0 && v != options[i].def) cmd << " -o " << options[i].key << "=" << escape_sh (v);
@@ -1464,30 +1511,36 @@ system_printers () {
 // the persistent inputs of the printer dialog (kept across the rebuilds of
 // its contents when another printer is chosen)
 static void
-make_printer_inputs (widget& printer, widget& copies, widget& pages) {
+make_printer_inputs (widget& printer, widget& copies, widget& pages, widget& orientation) {
   array<string> printers= system_printers ();
   printer= enum_widget (noop_command (), printers, printers[0], 0, "14em");
   array<string> one; one << string ("1");
   array<string> none; none << string ("");
   copies= input_text_widget (noop_command (), "copies", one, 0, "3em");
   pages= input_text_widget (noop_command (), "pages", none, 0, "8em");
+  array<string> turns;
+  turns << translate ("Portrait") << translate ("Landscape");
+  orientation= enum_widget (noop_command (), turns, turns[0], 0, "14em");
 }
 
 // contents of the dialog shown by printer_widget: the printer, the number
-// of copies, the pages (as lpr's page-ranges: "1-3,7"), the options of the
-// chosen printer (lpoptions), Cancel/Print
+// of copies, the pages (as lpr's page-ranges: "1-3,7"), the orientation,
+// the options of the chosen printer (lpoptions), Cancel/Print
 static widget
-make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies, widget pages) {
+make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies, widget pages,
+                     widget orientation) {
   string pr= enum_widget_value (printer);
   if (pr == translate ("Default printer")) pr= "";
   array<printer_option> options= printer_options (pr);
   array<widget> lhs, rhs;
   lhs << text_widget (translate ("Printer") * ":", 0, black)
       << text_widget (translate ("Copies") * ":", 0, black)
-      << text_widget (translate ("Pages") * ":", 0, black);
+      << text_widget (translate ("Pages") * ":", 0, black)
+      << text_widget (translate ("Orientation") * ":", 0, black);
   rhs << printer << copies
       << horizontal_list (array<widget> (pages, glue_widget (false, false, 8*PIXEL, 0),
-                                         text_widget (translate ("all, or e.g. 1-3,7"), WIDGET_STYLE_GREY, black)));
+                                         text_widget (translate ("all, or e.g. 1-3,7"), WIDGET_STYLE_GREY, black)))
+      << orientation;
   for (int i= 0; i < N(options); i++) {
     options[i].choice= enum_widget (noop_command (), options[i].values, options[i].def, 0, "14em");
     lhs << text_widget (translate (options[i].label) * ":", 0, black);
@@ -1497,7 +1550,8 @@ make_printer_dialog (command cmd, url ps_pdf_file, widget printer, widget copies
   buttons << menu_button (text_widget (translate ("Cancel"), 0, black), cmd, "", "", WIDGET_STYLE_BUTTON)
           << glue_widget (false, false, 8*PIXEL, 0)
           << menu_button (text_widget (translate ("Print"), 0, black),
-                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages, options),
+                          tm_new<print_command_rep> (ps_pdf_file, cmd, printer, copies, pages,
+                                                             orientation, options),
                           "", "", WIDGET_STYLE_BUTTON);
   array<widget> rows;
   rows << text_widget (translate ("Print document") * ": " * as_string (tail (ps_pdf_file)), 0, black)
@@ -1627,6 +1681,19 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
     data= close_box (dd);
     return;
   }
+  if (type == "responsive_tabs_widget") {
+    vue_responsive_tabs_widget d= open_box<vue_responsive_tabs_widget> (data);
+    array<widget> icons;
+    for (int i=0; i< N(d.us); i++) {
+      vue_picture_widget pd { .p= load_xpm (d.us[i]), .file_name= d.us[i],
+                              .stamp= icon_stamp () };
+      icons << vue_create<vue_picture_widget> ("picture_widget", pd);
+    }
+    vue_responsive_tabs_widget_star dd { .tabs= d.tabs, .icons= icons, .bodies= d.bodies,
+                                         .current= 0, .mode= d.mode, .viewing= false };
+    data= close_box (dd);
+    return;
+  }
   if (type == "pulldown_button") {
     // add more space in the struct for caching the widget
     vue_pulldown_button d= open_box<vue_pulldown_button> (data);
@@ -1696,11 +1763,13 @@ vue_ui_rep::vue_ui_rep (string _type, blackbox _data)
   }
   if (type == "printer_widget") {
     vue_printer_widget d= open_box<vue_printer_widget> (data);
-    widget printer, copies, pages;
-    make_printer_inputs (printer, copies, pages);
+    widget printer, copies, pages, orientation;
+    make_printer_inputs (printer, copies, pages, orientation);
     vue_printer_widget_star dd { .cmd= d.cmd, .ps_pdf_file= d.ps_pdf_file,
-                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file, printer, copies, pages),
+                                 .content= make_printer_dialog (d.cmd, d.ps_pdf_file, printer, copies,
+                                                                pages, orientation),
                                  .printer= printer, .copies= copies, .pages= pages,
+                                 .orientation= orientation,
                                  .options_for= enum_widget_value (printer) };
     data= close_box (dd);
     return;
@@ -1989,7 +2058,7 @@ layout_pull_button (vue_ui_rep *w) {
         // a press outside the chain: its last menu closes first, then the
         // ones it hangs from, down to the one the press is in
         bool outside= menu_press && !Clay_PointerOver (float_id) &&
-                      !Clay_PointerOver (button_id);
+                      !Clay_PointerOver (button_id) && !pointer_on_enum_list;
         if (cancel_popup || (!current_popup && outside)) {
           // an item was chosen, or we are the last popup of the chain and
           // the pointer was pressed outside: then we need to deactivate
@@ -2092,6 +2161,7 @@ widget_grows (widget w, bool horizontal) {
   if (t == "simple_widget" || t == "user_canvas_widget" ||
       t == "hsplit_widget" || t == "vsplit_widget" ||
       t == "tabs_widget" || t == "icon_tabs_widget" ||
+      t == "responsive_tabs_widget" ||
       t == "vue_texmacs_widget_rep") return true; // an embedded editor
   vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (r);
   if (u == NULL) return false;
@@ -2567,6 +2637,186 @@ vue_ui_rep::do_layout () {
     }
     if (next != d.current) refit_window= true;
     d.current= next;
+    data= close_box (d);
+    return;
+  }
+  if (type == "responsive_tabs_widget") {
+    // the modes other than "top" (see responsive_tab_mode)
+    vue_responsive_tabs_widget_star d= open_box<vue_responsive_tabs_widget_star> (data);
+    int n= min (N(d.tabs), N(d.bodies));
+    if (n == 0) return;
+    if (d.current < 0 || d.current >= n) d.current= 0;
+    int  next= d.current;
+    bool viewing= d.viewing;
+    Clay_ElementId clay_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    const float pad= ui_pxf (14); // around a page
+    Clay_Sizing grow= { .width= CLAY_SIZING_GROW(0), .height= CLAY_SIZING_GROW(0) };
+    // the label of a tab: its icon, if any, and its text
+    auto label= [&] (int i) {
+      if (i < N(d.icons)) concrete (d.icons[i])->do_layout ();
+      concrete (d.tabs[i])->do_layout ();
+    };
+    // a page, framed (rounded corners: which ones as a mask, 1 for the top
+    // left, 2 top right, 4 bottom right, 8 bottom left)
+    auto page= [&] (Clay_ElementId pid, int i, int corners) {
+      float r= ui_pxf (8);
+      CLAY(pid, {
+        .backgroundColor= color_background,
+        .cornerRadius= { (corners & 1) ? r : 0, (corners & 2) ? r : 0,
+                         (corners & 8) ? r : 0, (corners & 4) ? r : 0 },
+        .layout= { .padding= CLAY_PADDING_ALL((uint16_t) pad), .sizing= grow },
+        .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+      {
+        CLAY_AUTO_ID({ .layout= { .sizing= grow }}) {
+          concrete (d.bodies[i])->do_layout ();
+        }
+      }
+    };
+    if (d.mode == "side") {
+      // the tabs in a column, the current one merging with the page
+      CLAY(clay_id, {
+        .layout= { .layoutDirection= CLAY_LEFT_TO_RIGHT, .sizing= grow }})
+      {
+        CLAY(CLAY_ID_LOCAL("tab_column"), {
+          .layout= {
+            .layoutDirection= CLAY_TOP_TO_BOTTOM,
+            .padding= { 0, 0, ui_px (10), ui_px (10) },
+            .childGap= ui_px (4),
+            .sizing= { .width= CLAY_SIZING_FIT(0), .height= CLAY_SIZING_FIT(0) }}})
+        {
+          for (int i= 0; i < n; i++) {
+            Clay_ElementId tab_id= CLAY_IDI_LOCAL("tab", i);
+            if (button_logic (tab_id).clicked == 1) next= i;
+            bool cur= (d.current == i);
+            Clay_Color bg= cur ? color_background
+                         : ((hot_id == tab_id.id) ? highlight_on (the_theme.tab_inactive)
+                                                  : the_theme.tab_inactive);
+            Clay_ElementData td= Clay_GetElementData (tab_id);
+            CLAY(tab_id, {
+              .backgroundColor= bg,
+              .cornerRadius= { ui_pxf (12), 0, ui_pxf (12), 0 },
+              .layout= {
+                .padding= { ui_px (18), ui_px (cur ? 20 : 18), ui_px (8), ui_px (8) },
+                .childGap= ui_px (10),
+                .sizing= { .width= CLAY_SIZING_GROW(0) },
+                .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+              .border= { .width= { 1, (uint16_t) (cur ? 0 : 1), 1, 1 }, .color= color_border }})
+            {
+              label (i);
+              if (cur && td.found) {
+                // cover the left border of the page beside the current tab
+                CLAY_AUTO_ID({
+                  .backgroundColor= color_background,
+                  .layout= { .sizing= { CLAY_SIZING_FIXED (ui_pxf (2)),
+                                        CLAY_SIZING_FIXED (td.boundingBox.height - 2) }},
+                  .floating= {
+                    .offset= { -1, 1 },
+                    .zIndex= 1,
+                    .attachTo= CLAY_ATTACH_TO_PARENT,
+                    .attachPoints= { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                                     .parent= CLAY_ATTACH_POINT_RIGHT_TOP },
+                    .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }}) {}
+              }
+            }
+          }
+        }
+        page (CLAY_ID_LOCAL("tab_area"), d.current, 2 | 4 | 8);
+      }
+    }
+    else if (d.mode == "mobile") {
+      // the list of the tabs; a page replaces it, under a bar with a button
+      // back to the list and the name of the page
+      CLAY(clay_id, {
+        .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM, .childGap= ui_px (6), .sizing= grow }})
+      {
+        if (!d.viewing) {
+          for (int i= 0; i < n; i++) {
+            Clay_ElementId row_id= CLAY_IDI_LOCAL("tab_row", i);
+            if (button_logic (row_id).clicked == 1) { next= i; viewing= true; }
+            CLAY(row_id, {
+              .backgroundColor= (hot_id == row_id.id) ? highlight_on (color_field) : color_field,
+              .cornerRadius= CLAY_CORNER_RADIUS (ui_pxf (6)),
+              .layout= {
+                .padding= { ui_px (14), ui_px (10), ui_px (10), ui_px (10) },
+                .childGap= ui_px (10),
+                .sizing= { .width= CLAY_SIZING_GROW(0) },
+                .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+              .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+            {
+              label (i);
+              CLAY_AUTO_ID({ .layout= { .sizing= { .width= CLAY_SIZING_GROW(0) }}}) {}
+              layout_arrow ("<#25B8>", 1, dark_grey);
+            }
+          }
+        }
+        else {
+          CLAY(CLAY_ID_LOCAL("tab_bar"), {
+            .layout= {
+              .childGap= ui_px (12),
+              .sizing= { .width= CLAY_SIZING_GROW(0) },
+              .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+          {
+            Clay_ElementId back_id= CLAY_ID_LOCAL("tab_back");
+            if (button_logic (back_id).clicked == 1) viewing= false;
+            CLAY(back_id, {
+              .backgroundColor= (hot_id == back_id.id) ? highlight_on (the_theme.tab_inactive)
+                                                       : the_theme.tab_inactive,
+              .cornerRadius= CLAY_CORNER_RADIUS (ui_pxf (6)),
+              .layout= {
+                .padding= { ui_px (8), ui_px (12), ui_px (4), ui_px (4) },
+                .childGap= ui_px (6),
+                .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+              .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+            {
+              layout_arrow ("<#25C2>", 0, dark_grey);
+              layout_text (translate ("Back"), 0, black);
+            }
+            label (d.current);
+          }
+          page (CLAY_ID_LOCAL("tab_area"), d.current, 1 | 2 | 4 | 8);
+        }
+      }
+    }
+    else {
+      // "grid": every page under its name, in two columns, three in a wide
+      // window (above 1700 pixels, as in Qt), from the width of the last
+      // layout
+      Clay_ElementData gd= Clay_GetElementData (clay_id);
+      int cols= (gd.found && gd.boundingBox.width > ui_pxf (1700)) ? 3 : 2;
+      cols= min (cols, n);
+      CLAY(clay_id, {
+        .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM, .childGap= ui_px (10), .sizing= grow }})
+      {
+        for (int r= 0; r*cols < n; r++)
+          CLAY(CLAY_IDI_LOCAL("tab_grid_row", r), {
+            .layout= { .childGap= ui_px (10), .sizing= grow }})
+          {
+            for (int c= 0; c < cols; c++) {
+              int i= r*cols + c;
+              CLAY(CLAY_IDI_LOCAL("tab_cell", i), {
+                .layout= { .layoutDirection= CLAY_TOP_TO_BOTTOM, .childGap= ui_px (4),
+                           .sizing= grow }})
+              {
+                if (i < n) {
+                  CLAY(CLAY_IDI_LOCAL("tab_title", i), {
+                    .layout= { .padding= { ui_px (4), 0, 0, 0 }, .childGap= ui_px (8),
+                               .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+                  {
+                    int save= context_style;
+                    context_style |= WIDGET_STYLE_BOLD;
+                    label (i);
+                    context_style= save;
+                  }
+                  page (CLAY_IDI_LOCAL("tab_page", i), i, 1 | 2 | 4 | 8);
+                }
+              }
+            }
+          }
+      }
+    }
+    if (next != d.current || viewing != d.viewing) refit_window= true;
+    d.current= next;
+    d.viewing= viewing;
     data= close_box (d);
     return;
   }
@@ -3080,6 +3330,15 @@ vue_ui_rep::do_layout () {
             }
           }
         }
+        // a press on the list is its own: the elements under it, laid out
+        // after it, must not take it (a swatch of the colour menu under the
+        // list of the sets of the typographic palette: its release chose
+        // the colour and closed the menu)
+        if (starts (mouse_action, "press-") && Clay_PointerOver (list_id))
+          mouse_action= "";
+        // in a menu, the list is part of it (a press on it is not outside)
+        if (Clay_PointerOver (list_id)) pointer_on_enum_list= true;
+        if (current_menu != 0) menu_zones_now << list_id.id;
         // dismiss the list when clicking somewhere else
         if (starts (mouse_action, "press-") &&
             !Clay_PointerOver (list_id) && !Clay_PointerOver (button_id)) {
@@ -3099,7 +3358,6 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(resize_widget, widget, w, int, style, string, w1, string, h1,
     //string, w2, string, h2, string, w3, string, h3,
     //string, hpos, string, vpos);
-    //FIXME: implement
     vue_resize_widget d= open_box<vue_resize_widget> (data);
     SI minw, minh, defw, defh, maxw, maxh;
     minw= decode_length (d.w1, current_window, d.style);
@@ -3119,16 +3377,54 @@ vue_ui_rep::do_layout () {
       sizing.width=  CLAY_SIZING_GROW (.min= (float) retina_factor*minw/PIXEL, .max= (float) retina_factor*maxw/PIXEL);
       sizing.height= CLAY_SIZING_GROW (.min= (float) retina_factor*minh/PIXEL, .max= (float) retina_factor*maxh/PIXEL);
     }
-    CLAY(CLAY_SIDI(CLAY_TM_STRING(type), id), {
-      .layout= { .sizing= sizing }})
+    // an initial scrolling position other than the top left (hpos "right"
+    // or "center", vpos "bottom" or "center") makes the box a scroll
+    // container of its contents, which start at that position, as in
+    // Widkit (resize_widget in canvas_widget.cpp): a log which shows its
+    // last lines. Otherwise the contents fill the box
+    bool hscroll= (d.hpos == "right" || d.hpos == "center");
+    bool vscroll= (d.vpos == "bottom" || d.vpos == "center");
+    Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
+    int save_style= context_style;
+    context_style |= d.style & inherited_styles;
+    if (!hscroll && !vscroll) {
+      CLAY(my_id, {
+        .layout= { .sizing= sizing }})
+      {
+        // what a resize contains is meant to fill it: a typeset box would
+        // otherwise keep the size of its contents inside a pane which asked
+        // for a larger one (the documentation pane of the macro editors)
+        bool save_fill= fill_parent;
+        fill_parent= true;
+        concrete(d.w)->do_layout ();
+        fill_parent= save_fill;
+      }
+      context_style= save_style;
+      return;
+    }
+    CLAY(my_id, {
+      .layout= { .sizing= sizing },
+      .clip= {
+        .horizontal= hscroll, .vertical= vscroll,
+        .childOffset= Clay_GetScrollOffset () }})
     {
-      // what a resize contains is meant to fill it: a typeset box would
-      // otherwise keep the size of its contents inside a pane which asked
-      // for a larger one (the documentation pane of the macro editors)
-      bool save_fill= fill_parent;
-      fill_parent= true;
       concrete(d.w)->do_layout ();
-      fill_parent= save_fill;
+    }
+    context_style= save_style;
+    Clay_ScrollContainerData sd= Clay_GetScrollContainerData (my_id);
+    if (sd.found) {
+      // the position is set once, when the contents have been measured
+      // (Clay knows them from the previous layout); then it is the user's
+      if (!resize_positioned->contains ((int) id) &&
+          sd.contentDimensions.width > 0 && sd.contentDimensions.height > 0) {
+        resize_positioned << (int) id;
+        float over_x= max (sd.contentDimensions.width - sd.scrollContainerDimensions.width, 0.0f);
+        float over_y= max (sd.contentDimensions.height - sd.scrollContainerDimensions.height, 0.0f);
+        if (hscroll) sd.scrollPosition->x= -(d.hpos == "center" ? floor (over_x / 2) : over_x);
+        if (vscroll) sd.scrollPosition->y= -(d.vpos == "center" ? floor (over_y / 2) : over_y);
+        gui_needs_relayout= true; // shown at once, by another layout
+      }
+      scroll_bar (my_id, sd);
     }
     return;
   }
@@ -3226,6 +3522,10 @@ vue_ui_rep::do_layout () {
     //VUE_WIDGET(user_canvas_widget, widget, wid, int, style);
     vue_user_canvas_widget d= open_box<vue_user_canvas_widget> (data);
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING(type), id);
+    // its style reaches the contents, as a style sheet does in Qt
+    // (qt_apply_tm_style): mini, monospaced, bold or greyed texts
+    int save_style= context_style;
+    context_style |= d.style & inherited_styles;
     CLAY(my_id, {
       .layout= { .sizing= layoutExpand },
       .backgroundColor= color_field,
@@ -3238,6 +3538,7 @@ vue_ui_rep::do_layout () {
     {
       concrete (d.wid)->do_layout ();
     }
+    context_style= save_style;
     Clay_ScrollContainerData scrollData= Clay_GetScrollContainerData (my_id);
     //Clay_ElementData canvas_layout= Clay_GetElementData (my_id);
     if (scrollData.found) {
@@ -3524,9 +3825,10 @@ vue_ui_rep::do_layout () {
     vue_printer_widget_star d= open_box<vue_printer_widget_star> (data);
     if (enum_widget_value (d.printer) != d.options_for) {
       // another printer: its options replace the previous ones (the inputs
-      // for the printer, the copies and the pages are kept)
+      // for the printer, the copies, the pages and the orientation are kept)
       d.options_for= enum_widget_value (d.printer);
-      d.content= make_printer_dialog (d.cmd, d.ps_pdf_file, d.printer, d.copies, d.pages);
+      d.content= make_printer_dialog (d.cmd, d.ps_pdf_file, d.printer, d.copies, d.pages,
+                                      d.orientation);
       data= close_box (d);
       layout_again= true; // the window is sized to the new contents
     }
@@ -3759,6 +4061,8 @@ public:
   int     def_cur;     // current choice between default possible values
   int     pos;         // cursor position (index in s)
   int     sel;         // anchor of the selection (index in s), -1 for none
+  bool    word_drag;   // the selection was made by a double or triple
+                       // click: the drag which follows does not undo it
   SI      scroll;      // how much the text is scrolled to the left (SI)
   string  pre_edit;     // the text an input method is composing, shown at
   int     pre_edit_pos; // the cursor inside it (a byte offset)
@@ -3785,6 +4089,8 @@ public:
   void  paste ();
   void  word_left ();
   void  word_right ();
+  void  select_word (int p);
+  widget input_context_menu ();
   void do_layout ();
   void render (void *data);
   bool process_key (string);
@@ -3807,7 +4113,7 @@ vue_input_text_widget_rep::vue_input_text_widget_rep (command _call_back,
     type ("default"), name ("default"), serial ("default"),
     def (_def), call_back (_call_back), style (_style),
     greyed ((_style & WIDGET_STYLE_INERT) != 0), width (_width),
-    ok (true), done (false), def_cur (0), pos (0), sel (-1), scroll (0),
+    ok (true), done (false), def_cur (0), pos (0), sel (-1), word_drag (false), scroll (0),
     pre_edit (""), pre_edit_pos (0), tab_nr (0), tab_pos (0), win (NULL)
 {
   set_type (_type);
@@ -3952,6 +4258,65 @@ void
 vue_input_text_widget_rep::word_right () {
   while (pos < N(s) && !is_word_char (s, pos)) tm_char_forwards (s, pos);
   while (pos < N(s) && is_word_char (s, pos)) tm_char_forwards (s, pos);
+}
+
+// the word at p (index in s), selected: a run of word characters, or else
+// of the other ones (a double click between two words selects the spaces)
+void
+vue_input_text_widget_rep::select_word (int p) {
+  p= max (0, min (p, N(s)));
+  // the character after p, unless p is at the end of a word
+  int c= p;
+  if (c == N(s) || (c > 0 && is_word_char (s, c-1) && !is_word_char (s, c)))
+    if (c > 0) tm_char_backwards (s, c);
+  bool w= is_word_char (s, c);
+  int b= c, e= c;
+  while (b > 0) {
+    int q= b; tm_char_backwards (s, q);
+    if (is_word_char (s, q) != w) break;
+    b= q;
+  }
+  while (e < N(s) && is_word_char (s, e) == w) tm_char_forwards (s, e);
+  sel= b; pos= e;
+  tabs= array<string> (0);
+}
+
+// an item of the context menu of an input field: the key it stands for,
+// processed as if typed (so that the field reports its changes the same
+// way). It holds the field, which may be gone by the time it is chosen
+class input_menu_command_rep : public command_rep {
+  widget field;
+  string key;
+public:
+  input_menu_command_rep (widget f, string k) : field (f), key (k) {}
+  void apply () {
+    vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (field.rep);
+    if (in != NULL) in->process_key (key);
+    gui_needs_relayout= true;
+  }
+  tm_ostream& print (tm_ostream& out) { return out << "<input_menu " << key << ">"; }
+};
+
+widget
+vue_input_text_widget_rep::input_context_menu () {
+  int b, e;
+  bool some= selection (b, e) && b < e;
+  bool editable= !greyed;
+  widget me (this);
+  auto item= [&] (string label, string key, bool active) {
+    int st= active ? 0 : WIDGET_STYLE_INERT;
+    // the shortcut as the menus of Scheme show it (kbd-system, menu-widget.scm)
+    string ks= translate (as_tree (call ("kbd-system-rewrite", key)));
+    return menu_button (text_widget (translate (label), st, black),
+                        tm_new<input_menu_command_rep> (me, key), "", ks, st);
+  };
+  array<widget> items;
+  items << item ("Cut", "M-x", some && editable)
+        << item ("Copy", "M-c", some)
+        << item ("Paste", "M-v", editable)
+        << menu_separator (false)
+        << item ("Select all", "M-a", N(s) > 0);
+  return vertical_menu (items);
 }
 
 #ifdef OS_WIN32
@@ -4275,19 +4640,36 @@ vue_input_text_widget_rep::do_layout () {
     .layout= { .sizing= { sw, CLAY_SIZING_FIXED (h_px) } },
     .custom= { .customData= vue_render_widget },
     .userData= render_ref () }) {}
-  if (ed.found && (sig.pressed == 1 || (sig.held && (mouse_state & 1)))) {
-    // the mouse places the cursor and, dragged, selects
+  bool by_words= false; // a double click selected a word
+  if (ed.found && (sig.pressed == 1 || (sig.held && (mouse_state & 1) && !word_drag))) {
+    // the mouse places the cursor and, dragged, selects; a double click
+    // selects the word under the pointer, a triple one the whole field
     SI x= (SI) ((mouse_x - ed.boundingBox.x - input_pad_x)
                 * (PIXEL / retina_factor)) + scroll;
     int p= position_at (x);
     if (sig.pressed == 1) {
       mouse_action= "";
       set_kbd_focus (current_window, this);
-      pos= p; sel= p;
+      word_drag= false;
+      if (mouse_clicks >= 3) { sel= 0; pos= N(s); word_drag= true; }
+      else if (mouse_clicks == 2) { select_word (p); word_drag= by_words= true; }
+      else { pos= p; sel= p; }
     }
     else pos= p;
   }
-  if (sig.clicked == 1 && sel == pos) sel= -1;
+  if (sig.clicked == 1 && sel == pos && !word_drag) sel= -1;
+  if (sig.clicked == 1 && !by_words) word_drag= false;
+  if (ed.found && sig.pressed == 3) {
+    // the context menu of the field, at the pointer (as the line edits of
+    // Qt): the clipboard and the selection
+    mouse_action= "";
+    set_kbd_focus (current_window, this);
+    SI wx, wy;
+    current_window->get_position (wx, wy);
+    SI x= wx + (SI) (mouse_x * PIXEL / retina_factor);
+    SI y= wy - (SI) (mouse_y * PIXEL / retina_factor);
+    show_context_menu (input_context_menu (), x, y);
+  }
   if ((N(key_event) > 0) && (is_focused)) {
     process_key (key_event);
     key_event= "";
@@ -4489,6 +4871,15 @@ vue_plain_window_widget_rep::send (slot s, blackbox val) {
       {
         string kind= check_open<string> (val, s);
         if (win) win->next_refresh_kinds << kind;
+        // numbered at once, and every window laid out again: the widgets
+        // to refresh may be in another window, which the message does not
+        // reach (a menu or a popup whose refreshable part depends on a
+        // choice made in it, the typographic palette of the colour menus)
+        // (not the periodic "auto" one, which each window takes in turn)
+        if (kind != "auto") {
+          refresh_stamps (kind)= ++refresh_serial;
+          gui_needs_relayout= true;
+        }
       }
       break;
     case SLOT_DESTROY:
@@ -7212,7 +7603,8 @@ widget plain_window_widget (widget wid, string s, command quit) {
     // contents, the main window and the popups have their own rules
     // (see vue_plain_window_widget_rep::post_layout)
     vue_plain_window_widget_rep *wwid= tm_new<vue_plain_window_widget_rep> (wid, s, quit);
-    plain_window (wwid, s, false, concrete (wid)->type == "vue_texmacs_widget_rep");
+    plain_window (wwid, s, false,
+                  concrete (wid)->type == "vue_texmacs_widget_rep");
     return abstract (wwid);
   }
 }

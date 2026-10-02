@@ -18,8 +18,8 @@ AC_ARG_ENABLE(pdf-renderer,
 
   LC_MSG_CHECKING([hummus support for native pdf exports])
   if @<:@@<:@ "$enableval" != no @:>@@:>@
-  then if @<:@@<:@ $CONFIG_GUI != QT @:>@@:>@ 
-    then LC_MSG_RESULT([disabled: needs Qt])
+  then if @<:@@<:@ $CONFIG_GUI != QT && $CONFIG_GUI != COCOA @:>@@:>@
+    then LC_MSG_RESULT([disabled: needs Qt or Cocoa])
     else
       AC_CHECK_HEADER(zlib.h, [
         AC_CHECK_LIB([z],[deflate],[
