@@ -54,6 +54,7 @@
 (define-public (tm-arity x)
   (cond ((list? x) (- (length x) 1))
 	((string? x) 0)
+	((tree-atomic? x) 0)
 	(else (tree-arity x))))
 
 (define-public (tm->string x)
