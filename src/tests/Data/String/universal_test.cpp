@@ -130,8 +130,9 @@ test_utf8_invalid () {
     "\xf8\x88\x80\x80\x80", // five byte sequences are not decoded
     "\xfe",
     "\xff",
-    // FIXME: a sequence truncated at the end of the string, such as
-    // "\xe2\x82", is decoded by reading its last byte twice (U+2082)
+    "\xe2\x82",       // sequences truncated at the end of the string
+    "\xf0\x9f\x98",
+    "\xf0\x9f",
     0 };
   for (int k=0; bad[k] != 0; k++) {
     string s= bad[k];
