@@ -163,6 +163,19 @@ module macros). What needs a buffer, the cursor or the GUI is left out;
 checks which fail because of a bug in the sources are left out with a
 `FIXME` at their place.
 
+Three more test the document level. `latex-test.scm` converts to and from
+LaTeX (special characters, accents, structure, formulas, tables, theorems,
+macros, whole documents) and checks round trips, including the ones which
+lose information on purpose. `formats-test.scm` does the same for the .tm,
+Scheme, TMML, HTML and plain text formats, round-trips a common table of
+samples through the TeXmacs formats, and checks the format registry.
+`editing-test.scm` opens buffers and edits them through the commands a user
+or a plugin uses (inserting, the cursor, selections and the clipboard,
+structured editing, the environment, undo and redo, saving and exporting),
+each action wrapped like a key press of the event loop so that it reaches
+the undo history. Moving the cursor by characters and lines needs a window
+and is left out.
+
 `TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
 (`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
 the source tree (1181 functions) and checks that each one is bound to a

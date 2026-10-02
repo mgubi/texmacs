@@ -31,7 +31,10 @@
         (check lists-test)
         (check base-test)
         (check trees-test)
-        (check define-test)))
+        (check define-test)
+        (check latex-test)
+        (check formats-test)
+        (check editing-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -109,6 +112,10 @@
     ("lists" lists-test-failures count)
     ("base" base-test-failures count)
     ("trees" trees-test-failures count)
+    ("latex" latex-test-failures count)
+    ("formats" formats-test-failures count)
+    ;; opens buffers and edits them
+    ("editing" editing-test-failures count)
     ;; last, since it defines modes and functions in the running TeXmacs
     ("tm-define" define-test-failures count)))
 
