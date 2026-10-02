@@ -1,8 +1,8 @@
-;; the typographic palette of the "Color" menu (the preference "typographic
-;; palette", set in the home of the test only): the families of hues in
+;; a typographic palette of the "Color" menu (the preference "typographic
+;; palette set", set in the home of the test only): the families of hues in
 ;; columns, their tones in rows, grouped as Text, Accents and Backgrounds
 (use-modules (kernel gui menu-test))
-(set-preference "typographic palette" "on")
+(set-preference "typographic palette set" "Muted")
 ;; a set of the user, computed from a colour per column, as it would be
 ;; defined in ~/.TeXmacs/progs/my-init-texmacs.scm
 (define-typographic-palette-from-colors "Sea"

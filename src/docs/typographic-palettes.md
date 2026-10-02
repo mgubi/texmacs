@@ -1,11 +1,11 @@
 # Typographic palettes
 
-An alternative to the standard grid of colours of the colour menus
+Alternatives to the standard grid of colours of the colour menus
 (Format › Color, the backgrounds, the cells of the tables...), in the Vue
-interface: **Typographic palette**, a check box under the grid (the
-preference `typographic palette`, `on` or `off`). The choice, and the
-choice of a set in the **Set** list above the palette, change the grid
-without closing the menu, and are kept (the preference `typographic
+interface: the **Palette** list above the grid offers **Classical**, the
+standard grid (the default), then the typographic palettes. The choice
+changes the grid without closing the menu (the menu moves to stay in the
+window if it changed size), and is kept (the preference `typographic
 palette set`).
 
 A set has families of hues, the columns (eight in the sets of TeXmacs, a
@@ -51,9 +51,12 @@ A set of the same name replaces the one there was (a set of TeXmacs too).
 The colours are those of TeXmacs (`"#rrggbb"`, `"dark red"`...), except for
 `define-typographic-palette-from-colors`, which computes with `"#rrggbb"`.
 `(typographic-color-tones color lightnesses saturations)` gives the tones
-of a colour, and `(typographic-palette-names)` the names of the sets. The
+of a colour, and `(typographic-palette-names)` the names in the list
+(`"Classical"` first, then the sets); a set may not be called
+`"Classical"`, which is the standard grid. The
 grid has eight colours a line: the rows of a set of eight columns are its
 lines (other widths wrap).
 
 Code: `TeXmacs/progs/kernel/gui/menu-define.scm` (the sets, the menu);
-test: `src/Plugins/Vue/tests/typographic-palette.*`.
+tests: `src/Plugins/Vue/tests/typographic-palette.*` (a popup) and
+`typographic-palette-bar.*` (Format › Colour from the menu bar).
