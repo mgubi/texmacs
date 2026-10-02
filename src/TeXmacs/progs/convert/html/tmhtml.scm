@@ -283,7 +283,8 @@
     `(h:html
       (h:head
        (h:title ,@(tmhtml title))
-       (h:meta (@ (charset "utf-8") (name "generator") 
+       (h:meta (@ (charset "utf-8")))
+       (h:meta (@ (name "generator")
 		  (content ,(string-append "TeXmacs " (texmacs-version)))))
        ,css
        ,@xhead)
