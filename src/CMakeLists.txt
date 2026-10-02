@@ -516,6 +516,9 @@ endif ()
 
 # GUI Sources
 file (GLOB TeXmacs_Qt_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.cpp")
+# moc output left in the source tree by the autotools build; AUTOMOC
+# generates its own, so compiling these too gives stale/duplicate symbols
+list (FILTER TeXmacs_Qt_SRCS EXCLUDE REGEX "/moc_[^/]*\\.cpp$")
 file (GLOB TeXmacs_Qt_HDRS "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Qt/*.hpp")
 
 # System OS Sources
