@@ -468,8 +468,11 @@ code_point_to_cyrillic_subset_in_t2a (string input) {
       while (i < n && input[i] != '>') i++;
     }
     i++;
-    string s= apply (conv, input (start, i));
-    if (N(s) == 5 && s[0] == '<' && s[1] == '#' && s[4] == '>')
+    string c= input (start, i);
+    string s= apply (conv, c);
+    // a code point which the converter left alone is not in T2A, and
+    // must not be taken for the T2A byte of the same number
+    if (s != c && N(s) == 5 && s[0] == '<' && s[1] == '#' && s[4] == '>')
       r << string ((char) from_hexadecimal (s (2, 4)));
     else r << s;
   }
