@@ -330,7 +330,22 @@ test_case_escapes () {
   CHECK_EQ (uni_upcase_char ("<#44F>"), string ("<#42F>"));
   CHECK_EQ (uni_locase_char ("<#460>"), string ("<#461>"));
   CHECK_EQ (uni_upcase_char ("<#461>"), string ("<#460>"));
-  // FIXME: from 0x4C1 to 0x4CE the capitals are odd, which is not handled
+  // from 0x4C1 to 0x4CE the capitals are odd, the palochka pairs 0x4C0
+  // with 0x4CF, and the signs from 0x482 to 0x489 have no case
+  CHECK_EQ (uni_locase_char ("<#4C1>"), string ("<#4C2>"));
+  CHECK_EQ (uni_upcase_char ("<#4C2>"), string ("<#4C1>"));
+  CHECK_EQ (uni_locase_char ("<#4C2>"), string ("<#4C2>"));
+  CHECK_EQ (uni_upcase_char ("<#4C1>"), string ("<#4C1>"));
+  CHECK_EQ (uni_locase_char ("<#4CD>"), string ("<#4CE>"));
+  CHECK_EQ (uni_upcase_char ("<#4CE>"), string ("<#4CD>"));
+  CHECK_EQ (uni_locase_char ("<#4C0>"), string ("<#4CF>"));
+  CHECK_EQ (uni_upcase_char ("<#4CF>"), string ("<#4C0>"));
+  CHECK_EQ (uni_locase_char ("<#482>"), string ("<#482>"));
+  CHECK_EQ (uni_upcase_char ("<#483>"), string ("<#483>"));
+  CHECK_EQ (uni_locase_char ("<#4D0>"), string ("<#4D1>"));
+  CHECK_EQ (uni_upcase_char ("<#4FF>"), string ("<#4FE>"));
+  // final sigma has the capital of sigma
+  CHECK_EQ (uni_upcase_char ("<#3C2>"), string ("<#3A3>"));
   // lower case hexadecimal digits are understood, and the result is
   // written in upper case
   CHECK_EQ (uni_locase_char ("<#3a3>"), string ("<#3C3>"));
@@ -344,8 +359,7 @@ static void
 test_case_pairs () {
   int bad= 0;
   for (int c=0x391; c<=0x3A9; c++) {
-    // FIXME: 0x3A2 is unassigned, yet it is the upper case of 0x3C2
-    if (c == 0x3A2) continue;
+    if (c == 0x3A2) continue;  // unassigned
     string up= "<#" * as_hexadecimal (c) * ">";
     string lo= "<#" * as_hexadecimal (c + 0x20) * ">";
     if ((uni_locase_char (up) != lo || uni_upcase_char (lo) != up) && bad++ < 5)
