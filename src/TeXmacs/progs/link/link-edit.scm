@@ -55,9 +55,16 @@
   (if (tree? ln) (set! ln (link-flatten ln)))
   (and (func? ln 'link) (caddr ln)))
 
+(define (link-attributes? x)
+  ;; flattened (attr ...) is an association list, vertices are (id ...) etc.
+  (or (null? x) (and (pair? x) (pair? (car x)))))
+
 (tm-define (link-vertices ln)
   (if (tree? ln) (set! ln (link-flatten ln)))
-  (and (func? ln 'link) (cdddr ln)))
+  (and (func? ln 'link)
+       (if (and (pair? (cddr ln)) (link-attributes? (caddr ln)))
+           (cdddr ln)
+           (cddr ln))))
 
 (tm-define (link-source ln)
   (car (link-vertices ln)))
@@ -143,13 +150,13 @@
 	     (cons t (link-get-trees (+ nr 1)))))
 	  (else (link-get-trees (+ nr 1))))))
 
-(define (link-vertices nr)
+(define (link-participant-vertices nr)
   (with p (ahash-ref link-participants nr)
     (cond ((not p) '())
 	  ((observer? p)
 	   (with t (tree-pointer->tree p)
-	     (cons `(id ,(locus-id t)) (link-vertices (+ nr 1)))))
-	  (else (cons p (link-vertices (+ nr 1)))))))
+	     (cons `(id ,(locus-id t)) (link-participant-vertices (+ nr 1)))))
+	  (else (cons p (link-participant-vertices (+ nr 1)))))))
 
 (define (link-remove-participant nr)
   (with p (ahash-ref link-participants nr)
@@ -165,7 +172,7 @@
 
 (define (link-build type)
   (let* ((ts (link-get-trees 0))
-         (vs (link-vertices 0))
+         (vs (link-participant-vertices 0))
          (ln (tm->tree `(link ,type ,@vs))))
     (when (and (nnull? vs) (list-and (map locus-id ts)))
       (cond ((== current-link-mode "simple")
@@ -196,7 +203,7 @@
        (or (not check-mode?)
 	   (cond ((== current-link-mode "simple")
 		  (and-let* ((id1 (locus-id (tree-up ln)))
-			     (id2 (link-source ln)))
+			     (id2 (vertex->id (link-source ln))))
 		    (== id1 id2)))
 		 ((== current-link-mode "bidirectional") #t)
 		 ((== current-link-mode "external") #t)
