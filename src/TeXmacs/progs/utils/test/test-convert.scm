@@ -158,6 +158,15 @@
 ;; Building manuals
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (manual-out-of-date? root pdf)
+  ;; is some .tm file in the directory tree of root newer than pdf?
+  (or (not (url-exists? pdf))
+      (let* ((d (url-append (url-head root) (url-any)))
+             (v (url-expand (url-complete d "dr")))
+             (w (url-append v (url-wildcard "*.tm")))
+             (l (url->list (url-expand (url-complete w "fr")))))
+        (list-or (map (cut url-newer? <> pdf) l)))))
+
 (define (build-manual* dir name lan next)
   ;;(display* "-- build-manual " dir ", " name ", " lan "\n")
   (let* ((root (cond ((== name "texmacs-user-manual")
@@ -166,9 +175,13 @@
                       (string-append "main/man-reference." lan ".tm"))
                      ((== name "texmacs-scheme-manual")
                       (string-append "devel/scheme/scheme." lan ".tm"))
-                     (else "unknown.en.tm")))
+                     (else #f)))
          (doc-dir "$TEXMACS_DOC_PATH"))
-    (if (url-exists? (url-unix doc-dir root))
+    (cond ((not root)
+           (display* "TeXmacs] Error: unknown manual " name "\n"))
+          ((not (url-exists? (url-unix doc-dir root)))
+           (display* "TeXmacs] Error: " root " not found\n")))
+    (if (and root (url-exists? (url-unix doc-dir root)))
         (let* ((old-lan (get-output-language))
                (new-lan (locale-to-language lan))
                (u (url-resolve (url-unix doc-dir root) "r"))
@@ -177,7 +190,7 @@
                        (export-buffer-main (current-buffer) pdf "pdf" (list))
                        (set-output-language old-lan)
                        (user-delayed next))))
-          (cond ((url-exists? pdf) (user-delayed next))
+          (cond ((not (manual-out-of-date? u pdf)) (user-delayed next))
 		((== new-lan old-lan) (tmdoc-expand-help-manual* u cont))
                 (else
 		  (set-output-language new-lan)

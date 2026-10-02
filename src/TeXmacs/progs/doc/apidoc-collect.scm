@@ -66,7 +66,8 @@
   (let* ((s (select t '(initial collection associate)))
          (flt (lambda (x) (== (tm-ref x 0) "language")))
          (s2 (list-filter (map tree->stree s) flt)))
-    (or (and (nnull? s2) (tm-ref (car s2) 1)) "english")))
+    (or (and (nnull? s2) (tm-ref (car s2) 1))
+        (tmfile-language t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Parsing and processing of explain tags in texmacs trees.
@@ -214,13 +215,17 @@
   (doc-check-cache)
   (doc-retrieve* cache key lan))
 
+(define (doc-delete-cache-file u)
+  (cond ((url-directory? u) (system-rmdir-recursive u))
+        ((url-exists? u) (system-remove u))))
+
 (define (doc-delete-cache*)
   (with s (url->system (doc-scm-cache))
-    (display* "I WOULD HAVE deleted the cache at " s ".\n")
+    (doc-delete-cache-file (system->url s))
     (reset-preference "doc:doc-scm-cache")
     (set-message `(replace "The cache at %1 was deleted" (verbatim ,s)) ""))
   (with s (url->system (doc-macro-cache))
-    (display* "I WOULD HAVE deleted the cache at " s ".\n")
+    (doc-delete-cache-file (system->url s))
     (reset-preference "doc:doc-macro-cache")
     (set-message `(replace "The cache at %1 was deleted" (verbatim ,s)) ""))
   (reset-preference "doc:collect-timestamp")
