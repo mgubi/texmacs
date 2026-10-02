@@ -20,6 +20,11 @@
 #include "qt_utilities.hpp"
 #endif
 
+#ifndef OS_MINGW
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
 #define MAX_CACHED 25
 static int web_nr=0;
 static array<tree> web_cache (MAX_CACHED);
@@ -189,23 +194,90 @@ get_from_ramdisc (url u) {
 }
 
 /******************************************************************************
-* HTTP requests
+* Keeping secrets in HTTP headers off command lines and out of logs
 ******************************************************************************/
-
-#if !defined(QTTEXMACS) || AC_QT_MAJOR_VERSION < 6
 
 static inline string
 shell_quote (string s) {
   return "'" * replace (s, "'", "'\\''") * "'";
 }
 
+bool
+http_secret_header (string name) {
+  name= locase_all (name);
+  return name == "authorization" || name == "proxy-authorization" ||
+         occurs ("api-key", name) || occurs ("api_key", name) ||
+         occurs ("token", name) || occurs ("secret", name);
+}
+
+array<string>
+http_mask_headers (array<string> headers_attr) {
+  array<string> r= copy (headers_attr);
+  for (int i= 0; i+1 < N(r); i += 2)
+    if (http_secret_header (r[i]) && r[i+1] != "") r[i+1]= "***";
+  return r;
+}
+
+tree
+http_mask_request (tree t) {
+  // hide the secret header values of an (http_post url headers data) tree
+  if (!is_compound (t, "http_post") || N(t) < 2 || !is_tuple (t[1])) return t;
+  tree h= copy (t[1]);
+  for (int i= 0; i+1 < N(h); i += 2)
+    if (is_atomic (h[i]) && http_secret_header (h[i]->label) &&
+        h[i+1] != "")
+      h[i+1]= "***";
+  tree r= copy (t);
+  r[1]= h;
+  return r;
+}
+
+static bool
+save_private_string (url u, string s) {
+  // like save_string, but the file is only readable by the user
+#ifdef OS_MINGW
+  return save_string (u, s);
+#else
+  c_string name (concretize (u));
+  int fd= open (name, O_WRONLY | O_CREAT | O_EXCL, 0600);
+  if (fd < 0) return true;
+  bool err= ::write (fd, &s[0], N(s)) != N(s);
+  return close (fd) != 0 || err;
+#endif
+}
+
+string
+curl_command (string args, array<string> headers_attr) {
+  // Shell command for 'curl args', the HTTP headers being passed to curl
+  // on its standard input from a temporary file of mode 600,
+  // which is removed as soon as the shell has opened it.
+  string h;
+  for (int i= 0; i+1 < N(headers_attr); i += 2) {
+    string line= headers_attr[i] * ": " * headers_attr[i+1];
+    h << replace (replace (line, "\r", ""), "\n", "") << "\n";
+  }
+  if (h == "") return "curl " * args;
+  url tmp= url_temp (".txt");
+  if (save_private_string (tmp, h)) {
+    io_error << "curl_command, cannot write headers to "
+             << as_string (tmp) << LF;
+    return "";
+  }
+  string f= shell_quote (as_string (tmp));
+  return "{ rm -f " * f * "; curl -H @- " * args * "; } < " * f;
+}
+
+/******************************************************************************
+* HTTP requests
+******************************************************************************/
+
+#if !defined(QTTEXMACS) || AC_QT_MAJOR_VERSION < 6
+
 static string
 to_shell_command (string url, array<string> headers_attr, string data) {
-  string cmd= "curl --silent -X POST " * shell_quote (url) * "\\\n";
-  for (int i= 0; i+1 < N(headers_attr); i += 2)
-    cmd << "  -H "
-	<< shell_quote (headers_attr[i] * ":" * headers_attr[i+1]) << "\\\n";
-  cmd << "  --data-binary " << shell_quote (data) << "\\\n";
+  string args= "--silent -X POST " * shell_quote (url) * " \\\n";
+  args << "  --data-binary " << shell_quote (data);
+  string cmd= curl_command (args, headers_attr);
   if (DEBUG_IO)
     debug_io << "http_post, launching" << LF
 	     << cmd << LF;
@@ -219,15 +291,13 @@ to_shell_command (string url, array<string> headers_attr, tree data) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, array<string> attr) {
-  string cmd= "curl --silent -X POST " * shell_quote (url) * " \\\n";
-  for (int i= 0; i+1 < N(headers_attr); i += 2)
-    cmd << "  -H "
-	<< shell_quote (headers_attr[i] * ":" * headers_attr[i+1]) << "\\\n";
+  string args= "--silent -X POST " * shell_quote (url);
   for (int i= 0; i+1 < N(attr); i += 2) {
-    cmd << "  --data-urlencode " << shell_quote (attr[i]);
-    if (!ends (attr[i], "@")) cmd << "=";
-    cmd << shell_quote (attr[i+1]) << "\\\n";
+    args << " \\\n  --data-urlencode " << shell_quote (attr[i]);
+    if (!ends (attr[i], "@")) args << "=";
+    args << shell_quote (attr[i+1]);
   }
+  string cmd= curl_command (args, headers_attr);
   if (DEBUG_IO)
     debug_io << "http_post, launching" << LF
 	     << cmd << LF;

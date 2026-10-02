@@ -335,14 +335,12 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string cmd= "curl --silent -X POST " * shell_quote (url) * " \\\n";
-    for (int i= 0; i+1 < N(headers); i += 2)
-      cmd << "  -H " << shell_quote (headers[i])
-	  << ":"  << shell_quote (headers[i+1]) << " \\\n";
-    cmd << "  --data-binary " << shell_quote (tree_to_json (data));
-    return cmd;
+    string args= "--silent -X POST " * shell_quote (url) * " \\\n";
+    args << "  --data-binary " << shell_quote (tree_to_json (data));
+    return curl_command (args, headers);
   }
-  io_error << "as_shell_command, unknown command type: " << t << LF;
+  io_error << "as_shell_command, unknown command type: "
+           << http_mask_request (t) << LF;
   return "";
 }
 
@@ -357,7 +355,8 @@ ai_eval_command (tree t) {
     get_post_data (url, headers, data, t);
     return http_post_json (url, headers, data);
   }
-  io_error << "ai_eval_command, wrong command: " << t << LF;
+  io_error << "ai_eval_command, wrong command: "
+           << http_mask_request (t) << LF;
   return "";
 }
 
@@ -371,7 +370,8 @@ ai_async_eval_command (tree t, object callback) {
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
   }
-  io_error << "ai_async_eval_command, wrong command: " << t << LF;
+  io_error << "ai_async_eval_command, wrong command: "
+           << http_mask_request (t) << LF;
   return true;
 }
 
@@ -398,10 +398,8 @@ gemini_command (string s, string model, string chat) {
     model_= get_preference ("gemini model", "gemini-2.0-flash");
   string gem= "https://generativelanguage.googleapis.com/v1beta/models/"
     * model_ * ":generateContent";
-  string cmd= "curl " * shell_quote (gem) * " \\\n";
-  cmd << "  -H 'Content-Type: application/json' \\\n"
-      << "  -H 'X-goog-api-key: " << key << "' \\\n"
-      << "  -X POST \\\n"
+  string cmd= shell_quote (gem) * " \\\n";
+  cmd << "  -X POST \\\n"
       << "  -d '{\n"
       << "    \"contents\": [ {\n"
       << "      \"parts\": [ {\n"
@@ -409,7 +407,10 @@ gemini_command (string s, string model, string chat) {
       << "      } ]\n"
       << "    } ]\n"
       << "  }'";
-  return compound ("eval_system", cmd);
+  array<string> headers;
+  headers << string ("Content-Type") << string ("application/json")
+          << string ("X-goog-api-key") << key;
+  return compound ("eval_system", curl_command (cmd, headers));
 }
 
 tree
@@ -432,10 +433,8 @@ tree
 mistral_command (string s, string model, string chat) {
   (void) chat;
   string key= get_env ("MISTRAL_API_KEY");
-  string cmd= "curl -X POST \\\n";
-  cmd << "  -H \"Authorization: Bearer " << key << "\" \\\n"
-      << "  -H \"Content-Type: application/json\" \\\n"
-      << "  -d '{\n"
+  string cmd= "-X POST \\\n";
+  cmd << "  -d '{\n"
       << "    \"model\": \"" << model << "\",\n"
       << "    \"messages\": [ {\n"
       << "      \"role\": \"user\",\n"
@@ -443,7 +442,10 @@ mistral_command (string s, string model, string chat) {
       << "    } ]\n"
       << "  }' \\\n"
       << "  https://api.mistral.ai/v1/chat/completions";
-  return compound ("eval_system", cmd);
+  array<string> headers;
+  headers << string ("Authorization") << ("Bearer " * key)
+          << string ("Content-Type") << string ("application/json");
+  return compound ("eval_system", curl_command (cmd, headers));
 }
 
 tree

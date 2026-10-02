@@ -119,7 +119,8 @@ eval_request (tree t, int& status,
     return async_http_post_json (url, headers, data,
 				 status, outbuf, errbuf, kill);
   }
-  io_error << "request_link, unexpected request: " << t << LF;
+  io_error << "request_link, unexpected request: "
+           << http_mask_request (t) << LF;
   return true;
 }
 
@@ -135,7 +136,7 @@ request_link_rep::write (string s, int channel) {
     return;
   }
   tree t= scheme_to_tree (cmd);
-  if (DEBUG_IO) debug_io << "Requesting '" << t << "'\n";
+  if (DEBUG_IO) debug_io << "Requesting '" << http_mask_request (t) << "'\n";
   status= 1; outbuf= ""; errbuf= ""; kill= false;
   alive= !eval_request (t, status, outbuf, errbuf, kill);
 }
