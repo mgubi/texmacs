@@ -231,9 +231,7 @@
 
 ;; integers up to the limits of a C int, and an error beyond them
 (define (test-glue-integers)
-  ;; FIXME: as_hexadecimal (int) recurses forever on -2^31, whose negation
-  ;; overflows, and crashes TeXmacs, so -2^31+1 is the lowest checked
-  (for (n (list 0 1 -1 255 65536 2147483647 -2147483647))
+  (for (n (list 0 1 -1 255 65536 2147483647 -2147483647 -2147483648))
     (glue-check-equal "integers" (number->string n)
                       (lambda () (hexadecimal->integer
                                   (integer->hexadecimal n)))
