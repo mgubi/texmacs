@@ -59,7 +59,12 @@
     instance), its stretchable characters, and at the later attempts
     another family which has the character, found in the font database and
     rendered at a size adjusted so that its x-height matches the one of the
-    main font;
+    main font. A symbol the main font lacks may also be emulated there, as
+    a construction over its other glyphs; when the main font is an
+    <name|OpenType> math font and the construction could only be exported
+    as a bitmap, the symbol is taken from <name|STIX Two Math> instead,
+    which comes with <TeXmacs>, so that the document looks the same on
+    every system;
 
     <item>the mathematical letters: a bold, script, fraktur or
     double-struck letter taken from the Unicode mathematical alphanumerics
@@ -113,8 +118,10 @@
   the bitmaps and metrics of the <TeX> fonts, not those of <name|FreeType>).
   When a document is exported to
   <name|PDF> or <name|PostScript> the same glyphs are written as vectors and
-  the fonts are embedded as subsets, except for the glyphs which <TeXmacs>
-  draws itself, which become small bitmap fonts.
+  the fonts are embedded as subsets. The glyphs which <TeXmacs> builds out
+  of other glyphs are written as vectors too, except those whose
+  construction works on pixels, a few emulated symbols and alphabets, which
+  become small bitmap fonts.
 
   <paragraph*|Seeing the choices>
 

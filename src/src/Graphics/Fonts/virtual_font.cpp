@@ -267,9 +267,11 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
     if (r == "#28") r= "(";
     if (r == "#29") r= ")";
     if (N(r)>1) r= "<" * r * ">";
-    if (!extend || base_fn->supports (r) || !virt->dict->contains (r))
-      return base_fn->supports (r);
-    if (!virt->dict->contains (r)) return false;
+    if (!extend || base_fn->supports (r) || !virt->dict->contains (r)) {
+      // a base which is a virtual font may itself draw r as a bitmap
+      if (!base_fn->supports (r)) return false;
+      return !svg || virtual_font_draws_vectors (base_fn, r);
+    }
     return supported (virt->virt_def [virt->dict [r]], svg);
   }
 

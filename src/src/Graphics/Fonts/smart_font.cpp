@@ -817,6 +817,7 @@ struct smart_font_rep: font_rep {
   int    resolve (string c, string fam, int attempt);
   bool   is_italic_prime (string c);
   int    resolve_rubber (string c, string fam, int attempt);
+  int    resolve_shipped_math (string c);
   int    resolve (string c);
   void   initialize_font (int nr);
   int    adjusted_dpi (string fam, string var, string ser, string sh, int att);
@@ -1077,6 +1078,17 @@ is_italic_font (string master) {
   return contains (string ("italic"), master_features (master));
 }
 
+// The math font which comes with TeXmacs and has the most symbols. Taking
+// a symbol from it rather than from the fonts found on the system keeps a
+// document the same everywhere, as an emulation does.
+#define SHIPPED_MATH_FONT "STIXTwoMath-Regular"
+
+static bool
+has_math_table (font f) {
+  return f->math_type == MATH_TYPE_OPENTYPE ||
+         f->math_type == MATH_TYPE_TEX_GYRE;
+}
+
 int
 smart_font_rep::resolve (string c, string fam, int attempt) {
   //cout << "Resolve " << c << " in " << fam << ", attempt " << attempt << "\n";
@@ -1215,8 +1227,16 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
           tree key= tuple ("emulate", emu_names[i]);
           int nr= sm->add_font (key, REWRITE_NONE);
           initialize_font (nr);
-          if (fn[nr]->supports (c))
+          if (fn[nr]->supports (c)) {
+            // an emulation which a PDF can only hold as a bitmap gives way
+            // to the glyph of the math font shipped with TeXmacs
+            if (has_math_table (fn[SUBFONT_MAIN]) &&
+                !virtual_font_draws_vectors (fn[nr], c)) {
+              int alt= resolve_shipped_math (c);
+              if (alt >= 0) return alt;
+            }
             return sm->add_char (key, c);
+          }
         }
     }
   }
@@ -1239,6 +1259,17 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
   }
 
   return -1;
+}
+
+int
+smart_font_rep::resolve_shipped_math (string c) {
+  if (!tt_font_exists (SHIPPED_MATH_FONT)) return -1;
+  tree key= tuple ("shipped-math");
+  int nr= sm->add_font (key, REWRITE_NONE);
+  initialize_font (nr);
+  if (fn[nr]->res_name == fn[SUBFONT_MAIN]->res_name ||
+      !fn[nr]->supports (c)) return -1;
+  return sm->add_char (key, c);
 }
 
 bool
@@ -1630,6 +1661,8 @@ smart_font_rep::initialize_font (int nr) {
   }
   else if (a[0] == "ignore")
     fn[nr]= fn[SUBFONT_MAIN];
+  else if (a[0] == "shipped-math")
+    fn[nr]= adjust_subfont (unicode_font (SHIPPED_MATH_FONT, sz, dpi));
   else {
     int  ndpi= adjusted_dpi (a[0], a[1], a[2], a[3], as_int (a[4]));
     font cfn = closest_font (a[0], a[1], a[2], a[3], sz, ndpi, as_int (a[4]));
@@ -1854,7 +1887,7 @@ smart_font_rep::debug_origin (int nr) {
   else if (kind == "virtual" || kind == "emulate" || kind == "emu-bracket" ||
            starts (kind, "poor-") || occurs ("#virtual-", rn))
     o= ORIGIN_EMULATED;
-  else if (kind == "other") o= ORIGIN_FALLBACK;
+  else if (kind == "other" || kind == "shipped-math") o= ORIGIN_FALLBACK;
   else if (kind == "subfont") o= ORIGIN_RULE;
   else if (N(spec) == 5 && is_atomic (spec[4]))
     o= (spec[4]->label == "1")? ORIGIN_RULE: ORIGIN_FALLBACK;
