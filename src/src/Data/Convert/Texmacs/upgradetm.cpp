@@ -483,7 +483,8 @@ upgrade_apply_expand_value (tree t, hashset<string> H) {
     tree r (t, n);
     if (is_func (t, APPLY))
       if ((n >= 1) && is_atomic (t[0]) && H->contains (t[0]->label)) {
-        if (n == 1) r= tree (VALUE, n);
+        // in LaTeX imports, user macros such as \tm are not variables
+        if (n == 1) { if (!upgrade_tex_flag) r= tree (VALUE, n); }
         else r= tree (EXPAND, n);
       }
     for (i=0; i<n; i++)
