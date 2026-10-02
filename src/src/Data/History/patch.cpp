@@ -386,10 +386,10 @@ possible_inverse (modification m1, modification m2) {
   case MOD_ASSIGN:
     return m2->k == MOD_ASSIGN;
   case MOD_INSERT:
-    return m2->k == MOD_REMOVE && 
+    return m2->k == MOD_REMOVE && index (m2) == index (m1) &&
            argument (m2) == insert_length (m1->t);
   case MOD_REMOVE:
-    return m2->k == MOD_INSERT && 
+    return m2->k == MOD_INSERT && index (m2) == index (m1) &&
            insert_length (m2->t) == argument (m1);
   case MOD_SPLIT:
     return m2->k == MOD_JOIN && 

@@ -355,9 +355,12 @@ test_commute_patches () {
       }
       tree u1= clean_apply (s1, t);
       CHECK_MSG (clean_apply (s2, u1) == t2, "different result: " * what);
-      // undo in the new order: the inverse of s2, then that of s1; only
-      // the whole sequence is checked, since for an insertion at the place
-      // of a removal the swapped inverses are paired with the wrong steps
+      // each swapped patch is undone by its own inverse
+      CHECK_MSG (clean_apply (u1, get_inverse (s1)) == t,
+                 "inverse of the first swapped patch: " * what);
+      CHECK_MSG (clean_apply (clean_apply (s2, u1), get_inverse (s2)) == u1,
+                 "inverse of the second swapped patch: " * what);
+      // undo in the new order: the inverse of s2, then that of s1
       modification i2= get_inverse (s2), i1= get_inverse (s1);
       if (!applicable (t2, i2) || !applicable (clean_apply (t2, i2), i1)) {
         CHECK_MSG (false, "swapped inverses not applicable: " * what);
@@ -367,6 +370,25 @@ test_commute_patches () {
                  "undo after swap: " * what);
     }
   CHECK (nr_swapped > 500);
+}
+
+// an insertion at the place of a removal: the forward steps and their
+// inverses may be reordered in two ways, and they must not be paired across
+// the two (the swap is refused rather than undoing to a wrong tree)
+static void
+test_swap_keeps_inverses () {
+  tree t= tree (TUPLE, "a", "b", "c");
+  modification m1= mod_remove (path (), 0, 2);
+  modification m2= mod_insert (path (), 0, tree (TUPLE, "x", "y"));
+  tree t1= clean_apply (t, m1);
+  patch s1 (m1, invert (m1, t));
+  patch s2 (m2, invert (m2, t1));
+  if (swap (s1, s2)) {
+    tree u1= clean_apply (s1, t);
+    CHECK_EQ (show (clean_apply (u1, get_inverse (s1))), show (t));
+    CHECK_EQ (show (clean_apply (clean_apply (s2, u1), get_inverse (s2))),
+              show (u1));
+  }
 }
 
 // a few cases worked out by hand
@@ -620,6 +642,7 @@ main () {
   RUN (test_compactify);
   RUN (test_commute_modifications);
   RUN (test_commute_patches);
+  RUN (test_swap_keeps_inverses);
   RUN (test_commute_examples);
   RUN (test_join);
   RUN (test_cursor_birth_author);
