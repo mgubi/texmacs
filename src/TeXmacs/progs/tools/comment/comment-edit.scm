@@ -186,10 +186,23 @@
     (former which)
     (when (nnull? l) (notify-comments-editor))))
 
+(define (renew-pasted-comment-ids old)
+  ;; Pasted copies of comments which are already in the buffer get new
+  ;; identifiers, so that they become independent comments, not mirrors
+  (with ids (map comment-id old)
+    (for (t (tree-search (buffer-tree) any-comment-context?))
+      (when (and (in? (comment-id t) ids)
+                 (null? (list-filter old (cut tree-eq? t <>))))
+        (tree-set (tree-ref t 0) (create-unique-id))
+        (tree-set (tree-ref t 1) (create-unique-id))))))
+
 (tm-define (clipboard-paste which)
   (with l (tree-search (clipboard-get which) any-comment-context?)
-    (former which)
-    (when (nnull? l) (notify-comments-editor))))
+    (if (null? l) (former which)
+        (with old (tree-search (buffer-tree) any-comment-context?)
+          (former which)
+          (renew-pasted-comment-ids old)
+          (notify-comments-editor)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting a new comment
