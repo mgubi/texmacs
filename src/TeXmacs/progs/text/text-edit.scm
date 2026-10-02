@@ -720,6 +720,8 @@
 (tm-define (titled-toggle-name t)
   (cond ((tree-in? t (numbered-unnumbered-append (theorem-tag-list)))
          (tree-set! t `(render-theorem "" ,(tree-ref t 0))))
+        ((tree-in? t (numbered-unnumbered-append (definition-tag-list)))
+         (tree-set! t `(render-theorem "" ,(tree-ref t 0))))
         ((tree-in? t (numbered-unnumbered-append (remark-tag-list)))
          (tree-set! t `(render-remark "" ,(tree-ref t 0))))
         ((tree-in? t '(question answer))
