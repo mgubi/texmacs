@@ -621,9 +621,9 @@
   '("black" "darker grey" "dark grey" "#a0a0a0"
     "light grey" "pastel grey" "#f0f0f0" "white"))
 
-;; Palettes for typographic design (the preference "typographic palette",
-;; Vue), in several sets, the one in use being the preference "typographic
-;; palette set". A set has families of hues, the columns (eight in the sets
+;; Palettes for typographic design (Vue), in several sets, the one in use
+;; being the preference "typographic palette set"; the first one of the list,
+;; "Classical", is the standard grid of colours. A set has families of hues, the columns (eight in the sets
 ;; below, a neutral one first), each in five tones, the rows, grouped by
 ;; their use in a document: the inks and the deep tones are dark enough for
 ;; text on white paper, the medium ones are accents (headings, emphasis,
@@ -649,6 +649,8 @@
   (let ((rows (list ink deep medium soft tint)))
     (cond ((not (string? name))
            (typographic-palette-error name "the name must be a string"))
+          ((== name "Classical")
+           (typographic-palette-error name "the name of the standard grid"))
           ((not (and (list-and (map list? rows))
                      (list-and (map (lambda (r) (list-and (map string? r))) rows))))
            (typographic-palette-error name "the rows must be lists of colours"))
@@ -772,13 +774,11 @@
   '("#fdf6e3" "#f5e6e6" "#f6eae5" "#f8f3e2" "#f5f8e2" "#e7f3f2" "#e6eef5" "#e9e9f2"))
 
 (define-public (typographic-palette-names)
-  (map car typographic-palettes))
+  (cons "Classical" (map car typographic-palettes)))
 
 (tm-define (typographic-palette-set)
   (with name (get-preference "typographic palette set")
-    (cond ((assoc name typographic-palettes) name)
-          ((null? typographic-palettes) "")
-          (else (car (typographic-palette-names))))))
+    (if (assoc name typographic-palettes) name "Classical")))
 
 (tm-define (set-typographic-palette-set name)
   (set-preference "typographic palette set" name)
@@ -790,7 +790,7 @@
 
 
 (tm-define (typographic-palette?)
-  (and (vue-gui?) (== (get-preference "typographic palette") "on")))
+  (and (vue-gui?) (!= (typographic-palette-set) "Classical")))
 
 (tm-menu (typographic-color-tiles cmd l)
   ;; eight colours a line (tile wants a number, not an expression): the
@@ -801,16 +801,7 @@
         ((color col #f #f 32 24)
          (cmd col))))))
 
-(tm-define (set-typographic-palette on?)
-  (set-preference "typographic palette" (if on? "on" "off"))
-  (refresh-now "typographic-palette"))
-
 (tm-menu (typographic-color-menu cmd)
-  (hlist
-    // // (text "Set:") //
-    (enum (set-typographic-palette-set answer)
-          (typographic-palette-names) (typographic-palette-set) "10em")
-    >>)
   (group "Text")
   (dynamic (typographic-color-tiles cmd (typographic-palette-rows 0 2)))
   (group "Accents")
@@ -826,21 +817,21 @@
          (cmd col))))))
 
 (tm-menu (standard-color-grid cmd)
+  (hlist
+    // // (text "Palette:") //
+    (enum (set-typographic-palette-set answer)
+          (typographic-palette-names) (typographic-palette-set) "10em")
+    >>)
   (if (typographic-palette?)
       (dynamic (typographic-color-menu cmd)))
   (if (not (typographic-palette?))
-      (dynamic (standard-color-tiles cmd)))
-  ---
-  (hlist
-    // //
-    (toggle (set-typographic-palette answer) (typographic-palette?))
-    // (text "Typographic palette") >>))
+      (dynamic (standard-color-tiles cmd))))
 
 (tm-menu (standard-color-menu cmd)
-  ;; in Vue, the typographic palette can replace the standard one, and the
-  ;; choices of the palette and of its set (a toggle, an enum, which do not
-  ;; close the menu) change the grid in place: a promise in a refreshable,
-  ;; whose items are made again when it is refreshed
+  ;; in Vue, a typographic palette can replace the standard one (Classical),
+  ;; and the choice of it (an enum, which does not close the menu) changes
+  ;; the grid in place: a promise in a refreshable, whose items are made
+  ;; again when it is refreshed
   (if (vue-gui?)
       (refreshable "typographic-palette"
         (promise (cons 'vertical (standard-color-grid cmd)))))
