@@ -37,7 +37,7 @@
     ("purple" (128 0 128)) ("fuchsia" (255 0 255)) ("green" (0 128 0))
     ("lime" (0 255 0)) ("olive" (128 128 0)) ("yellow" (255 255 0))
     ("navy" (0 0 128)) ("blue" (0 0 255)) ("teal" (0 128 128))
-    ("aqua" (0 0 255))))
+    ("aqua" (0 255 255))))
 
 (define (html-named-color->rgb255 s)
   (cond ((assoc-string-ci s html-named-colors) => second)
@@ -524,7 +524,7 @@
   ;;; Links
   (a (handler :mixed :inline htmltm-anchor))
   ;; Elements allowed only in HEAD
-  ((:or (link base)) htmltm-drop)
+  ((:or link base) htmltm-drop)
 
   ;;; Objects images and applets
   (object (handler :mixed :inline htmltm-drop))
