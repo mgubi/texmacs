@@ -714,6 +714,13 @@ table_rep::compute_heights (SI* mh, SI* bh, SI* th, SI xh) {
       if ((!is_nil (C)) && (C->row_span!=1)) {
         SI cmh, cbh, cth;
         C->compute_height (cmh, cbh, cth, xh);
+        if (cbh != 0 || cth != 0) {
+          // baseline aligned with the first row: the part above the
+          // baseline must fit into the first row, the rest below it
+          if (cth > mh[i] - bh[i]) mh[i]= bh[i] + cth;
+          SI below= sum (mh+i, C->row_span) - (mh[i] - bh[i]);
+          if (cmh - cth > below) mh[i+C->row_span-1] += cmh - cth - below;
+        }
         SI tot= sum (mh+i, C->row_span);
         if (cmh > tot) mh[i] += cmh - tot;
       }
