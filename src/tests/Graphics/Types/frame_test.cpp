@@ -299,8 +299,18 @@ test_bezier () {
   CHECK_POINT (c (0.0), point (0.0, 0.0));
   CHECK_POINT (c (1.0), point (1.0, 0.0));
   CHECK_POINT (c (0.5), point (0.5, 0.75));
+  // the derivative 3 P3 t^2 + 2 P2 t + P1 of the power form, checked
+  // against the control points at the ends and a finite difference inside
   bool error;
+  CHECK_POINT (c->grad (0.0, error), point (0.0, 3.0));
   CHECK_POINT (c->grad (1.0, error), point (0.0, -3.0));
+  CHECK_POINT (c->grad (0.5, error), point (1.5, 0.0));
+  for (int i=1; i<10; i++) {
+    double t= i / 10.0, h= 1.0e-6;
+    point d= (c (t + h) - c (t - h)) / (2.0 * h);
+    CHECK_MSG (near_eq (c->grad (t, error), d, 1.0e-6),
+               "derivative at " * as_string (t));
+  }
   // a rectification stays within eps of the curve
   array<point> r= c->rectify (0.01);
   CHECK (N(r) > 2);
@@ -337,6 +347,26 @@ test_rectify_starting_point () {
   point a (0.0, 0.0), b (4.0, 0.0);
   CHECK_EQ (N(segment (a, b)->rectify (0.1)), 2);
   CHECK_EQ (N(part (segment (a, b), 0.0, 1.0)->rectify (0.1)), 2);
+  // inverted and transformed curves used to repeat their starting point
+  array<point> r= invert (segment (a, b))->rectify (0.1);
+  CHECK_EQ (N(r), 2);
+  if (N(r) == 2) {
+    CHECK_POINT (r[0], b);
+    CHECK_POINT (r[1], a);
+  }
+  r= shift_2D (point (1.0, 1.0)) (segment (a, b))->rectify (0.1);
+  CHECK_EQ (N(r), 2);
+  if (N(r) == 2) {
+    CHECK_POINT (r[0], point (1.0, 1.0));
+    CHECK_POINT (r[1], point (5.0, 1.0));
+  }
+  // and no two consecutive points of a longer rectification coincide
+  array<point> q;
+  q << point (0.0, 0.0) << point (0.0, 1.0) << point (1.0, 1.0)
+    << point (1.0, 0.0);
+  r= invert (bezier (q))->rectify (0.01);
+  for (int i=1; i<N(r); i++)
+    CHECK_MSG (!near_eq (r[i-1], r[i]), "repeated point " * as_string (i));
 }
 
 int
