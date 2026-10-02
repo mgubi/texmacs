@@ -271,6 +271,8 @@ ispell_check (string lan, string s) {
   if (is_nil (sc) || (!sc->ln->alive)) {
     string message= ispell_start (lan);
     if (starts (message, "Error: ")) return message;
+    sc= ispeller (lan);
+    if (is_nil (sc)) return "Error: unavailable";
   }
   if (sc->unavailable) return "Error: unavailable";
   string ret_s= ispell_eval (lan, "^" * s);

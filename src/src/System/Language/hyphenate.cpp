@@ -100,6 +100,13 @@ load_hyphen_tables (string file_name,
       pattern_flag=false;
       hyphenation_flag=false;
     }
+    bool close_flag= false;
+    if ((pattern_flag || hyphenation_flag) &&
+        N(buffer) > 1 && buffer[N(buffer)-1] == '}') {
+      // last entry glued to the closing brace, e.g. "some-thing}"
+      buffer= buffer (0, N(buffer)-1);
+      close_flag= true;
+    }
     if (pattern_flag && i != 0 && N(buffer) != 0) {
       string norm= hyphen_normalize (buffer);
       patterns (unpattern (norm, !toCork))= norm;
@@ -109,7 +116,10 @@ load_hyphen_tables (string file_name,
       string word= replace (buffer, "-", "");
       hyphenations (word)= buffer;
       //cout << word << " --> " << buffer << "\n";
-      // bug: shows the hyphenation "something} --> some-thing}" for english
+    }
+    if (close_flag) {
+      pattern_flag=false;
+      hyphenation_flag=false;
     }
     if (buffer == "\\patterns{") pattern_flag=true;
     if (buffer == "\\hyphenation{") hyphenation_flag=true;

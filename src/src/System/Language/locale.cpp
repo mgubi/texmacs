@@ -115,6 +115,7 @@ locale_to_language (string s) {
   if (s == "fi") return "finnish";
   if (s == "fr") return "french";
   if (s == "de") return "german";
+  if (s == "el") return "greek";
   if (s == "gr") return "greek";
   if (s == "hu") return "hungarian";
   if (s == "it") return "italian";
@@ -143,11 +144,11 @@ language_to_locale (string s) {
   if (s == "danish")     return "da_DK";
   if (s == "dutch")      return "nl_NL";
   if (s == "english")    return "en_US";
-  if (s == "esperanto")  return "eo_EO";
+  if (s == "esperanto")  return "eo";
   if (s == "finnish")    return "fi_FI";
   if (s == "french")     return "fr_FR";
   if (s == "german")     return "de_DE";
-  if (s == "greek")      return "gr_GR";
+  if (s == "greek")      return "el_GR";
   if (s == "hungarian")  return "hu_HU";
   if (s == "italian")    return "it_IT";
   if (s == "japanese")   return "ja_JP";
@@ -159,7 +160,7 @@ language_to_locale (string s) {
   if (s == "slovak")     return "sk_SK";
   if (s == "slovene")    return "sl_SI";
   if (s == "spanish")    return "es_ES";
-  if (s == "swedish")    return "sv_SV";
+  if (s == "swedish")    return "sv_SE";
   if (s == "taiwanese")  return "zh_TW";
   if (s == "ukrainian")  return "uk_UA";
   return "en_US";
@@ -242,7 +243,7 @@ get_std_locale (string language) {
 
   {
     string loc= language_to_locale(language);
-    loc[2] = '-';
+    if (N(loc) > 2) loc[2] = '-';
     c_string _loc (loc);
     try {
       return std::locale (_loc);
@@ -325,10 +326,9 @@ get_date (string lan, string fm) {
   if (get_env (lvar) == "") lvar= "LC_ALL";
   if (get_env (lvar) == "") lvar= "LANG";
   string old= get_env (lvar);
-  set_env (lvar, lan);
+  set_env (lvar, lan * ".UTF-8");
   string date= simplify_date (var_eval_system ("date +\"" * fm * "\""));
-  if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
-    date= il2_to_cork (date);
+  date= utf8_to_cork (date);
   // if (lan == "ru_RU") date= iso_to_koi8 (date);
   set_env (lvar, old);
   return date;
