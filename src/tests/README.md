@@ -108,3 +108,30 @@ reference of `languages` holds those characters until the writer is fixed.
 When a change is intended, run `check.sh -u` and commit the new references
 together with the change, so that the diff of the references documents what
 moved.
+
+## Scheme tests
+
+`tests/scheme/check.sh` runs Scheme test suites without a window and
+exits with their status:
+
+```
+tests/scheme/check.sh          # the tests of the glue
+tests/scheme/check.sh all      # run-all-tests, the glue included
+```
+
+`TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
+(`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
+the source tree (1181 functions) and checks that each one is bound to a
+procedure with the declared number of arguments, and that a first
+argument of the wrong type is refused with `wrong-type-arg` before any C++
+code runs. It then checks that values cross the glue unchanged: trees and
+Scheme trees, content given as a string, a tree or a Scheme tree, strings
+with every byte, integers up to the limits of a C int (and `out-of-range`
+beyond), paths, urls, lists of strings, booleans and doubles. Every check
+runs and the failures are counted; the functions which Scheme code
+redefines are listed and left out. In a session, `(regtest-glue)` runs the
+same tests, and `run-all-tests` includes them.
+
+An error in an expression given with `-x` keeps TeXmacs from quitting, so
+the runner catches every error and exits itself, and stops a run after
+`TM_TEST_TIMEOUT` seconds (600 by default).
