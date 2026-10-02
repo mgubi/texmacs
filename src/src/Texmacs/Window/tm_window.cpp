@@ -767,5 +767,17 @@ windows_refresh (string kind) {
     if (kind == "auto") refresh_size (window_table[id], false);
 #endif
   }
+  // a refresh asked for by name (refresh-now) reaches the windows of the
+  // editors too, which window_table does not hold: else it was lost while
+  // no other window was open (the widgets of that kind in the menus of an
+  // editor window, e.g. the typographic palette of the colour menus, which
+  // changes as it is chosen in the open menu)
+  if (kind != "auto") {
+    array<url> l= windows_list ();
+    for (int i=0; i<N(l); i++) {
+      tm_window w= concrete_window (l[i]);
+      if (w != NULL) send_refresh (w->win, kind);
+    }
+  }
   if (kind == "auto") windows_delayed_refresh (1000000000);
 }

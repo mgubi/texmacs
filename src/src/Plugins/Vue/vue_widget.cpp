@@ -1164,12 +1164,14 @@ icon_picture (blackbox& data) {
 
 VUE_WIDGET_DATA(cached_pull_button, widget, w, promise<widget>, pw, widget, cw,
                 bool, placed, bool, flip, float, shift_x, float, shift_y,
-                float, win_w, float, win_h);
+                float, win_w, float, win_h, float, menu_w, float, menu_h);
 // placed: the position of the open menu has been decided (see layout_pull_button)
 // flip: the menu is opened on the other side of the button to stay in the window
 // shift_x, shift_y: shift of the menu to keep it inside the window
-// win_w, win_h: the window the decision was taken for (it is taken again
-// when the window is resized while the menu is open)
+// win_w, win_h, menu_w, menu_h: the window and the menu the decision was
+// taken for (it is taken again when the window is resized, or when the
+// menu changes size, while the menu is open: a part of it refreshed by a
+// choice made in it, the typographic palette of the colour menus)
 // data for a button w with a lazy pulldown menu pw and a cached value
 VUE_WIDGET_DATA(cached_glue_widget, picture, pic, tree, col, bool, hx, bool, vx, SI, w, SI, h);
 
@@ -1920,6 +1922,7 @@ layout_pull_button (vue_ui_rep *w) {
       d.flip= false;
       d.shift_x= d.shift_y= 0;
       d.win_w= d.win_h= 0;
+      d.menu_w= d.menu_h= 0;
       current_popup= true;
       // only the buttons of a bar are mutually exclusive: a submenu
       // (pullright) belongs to the chain of the menu it is in, and
@@ -1989,6 +1992,9 @@ layout_pull_button (vue_ui_rep *w) {
       Clay_ElementData bd= Clay_GetElementData (button_id);
       if (d.placed && (d.win_w != dims.width || d.win_h != dims.height))
         d.placed= false; // the window was resized under the open menu
+      if (d.placed && fd.found && (d.menu_w != fd.boundingBox.width ||
+                                   d.menu_h != fd.boundingBox.height))
+        d.placed= false; // the menu changed size (refreshed in place)
       if (!fd.found)
         // the menu has never been laid out: there is nothing to place it
         // by yet, and drawing this pass would show it over the edge of the
@@ -1998,6 +2004,7 @@ layout_pull_button (vue_ui_rep *w) {
       if (fd.found && bd.found && !d.placed) {
         d.placed= true;
         d.win_w= dims.width; d.win_h= dims.height;
+        d.menu_w= fd.boundingBox.width; d.menu_h= fd.boundingBox.height;
         Clay_BoundingBox f= fd.boundingBox, b= bd.boundingBox;
         // the box was measured with the shift of the last decision in it:
         // take it off, or a decision taken twice would not be the same one
