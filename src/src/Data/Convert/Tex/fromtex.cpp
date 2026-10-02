@@ -1523,13 +1523,13 @@ is_large_delimiter (tree t, int& type) {
 tree
 latex_cite_to_tree (string cite_type, string s) {
   tree r (APPLY, cite_type);
-  int i, last, n=N(s);
-  for (last=0, i=0; i<n; i++) {
+  int i= 0, n= N(s);
+  while (i<n) {
+    int start= i;
     while ((i<n) && (s[i]!=',')) i++;
-    r << s (last, i);
+    r << s (start, i);
     if (i<n) i++;
     while ((i<n) && (s[i]==' ')) i++;
-    last= i;
   }
   if (N(r) == 1) return "";
   return r;
