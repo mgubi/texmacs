@@ -1,0 +1,25 @@
+# needs typographic-palette-bar.scm: Format > Colour from the menu bar (col),
+# its check box "Typographic palette" checked (on: the Set list and the
+# palette in the open menu, which moves up if it no longer fits), then
+# unchecked (off: the grid of before). The refresh asked for in the menu
+# reaches the editor window (windows_refresh), which no other window opens.
+# Positions for the default window of the test home.
+wait 6000
+window No name
+click 231 15
+wait 900
+move 242 275
+wait 1200
+snapshot col
+move 400 280
+wait 300
+move 387 454
+wait 300
+click 387 454
+wait 1500
+snapshot on
+move 387 559
+wait 300
+click 387 559
+wait 1500
+snapshot off
