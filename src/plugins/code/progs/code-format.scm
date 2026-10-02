@@ -134,6 +134,66 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; JavaScript source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format javascript
+  (:name "JavaScript source code")
+  (:suffix "js"))
+
+(define (texmacs->javascript x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (javascript->texmacs x . opts)
+  (code->texmacs x))
+
+(define (javascript-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree javascript-document
+  (:function texmacs->javascript))
+
+(converter javascript-document texmacs-tree
+  (:function javascript->texmacs))
+  
+(converter texmacs-tree javascript-snippet
+  (:function texmacs->javascript))
+
+(converter javascript-snippet texmacs-tree
+  (:function javascript-snippet->texmacs))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Graphviz dot source files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-format dot
+  (:name "Graphviz dot source code")
+  (:suffix "dot" "gv"))
+
+(define (texmacs->dot x . opts)
+  (texmacs->verbatim x (acons "texmacs->verbatim:encoding" "SourceCode" '())))
+
+(define (dot->texmacs x . opts)
+  (code->texmacs x))
+
+(define (dot-snippet->texmacs x . opts)
+  (code-snippet->texmacs x))
+
+(converter texmacs-tree dot-document
+  (:function texmacs->dot))
+
+(converter dot-document texmacs-tree
+  (:function dot->texmacs))
+  
+(converter texmacs-tree dot-snippet
+  (:function texmacs->dot))
+
+(converter dot-snippet texmacs-tree
+  (:function dot-snippet->texmacs))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; JSON source files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
