@@ -83,14 +83,14 @@ poor_extended_font_rep::get_extents (string s, metric& ex) {
 void
 poor_extended_font_rep::get_xpositions (string s, SI* xpos) {
   base->get_xpositions (s, xpos);
-  for (int i=0; i<N(s); i++)
+  for (int i=0; i<=N(s); i++)
     xpos[i]= (SI) floor (xpos[i] * xf + 0.5);
 }
 
 void
 poor_extended_font_rep::get_xpositions (string s, SI* xpos, bool lig) {
   base->get_xpositions (s, xpos, lig);
-  for (int i=0; i<N(s); i++)
+  for (int i=0; i<=N(s); i++)
     xpos[i]= (SI) floor (xpos[i] * xf + 0.5);
 }
 
@@ -98,7 +98,7 @@ void
 poor_extended_font_rep::get_xpositions (string s, SI* xpos, SI xk) {
   SI xk2= (SI) floor (xk / xf + 0.5);
   base->get_xpositions (s, xpos, xk2);
-  for (int i=0; i<N(s); i++)
+  for (int i=0; i<=N(s); i++)
     xpos[i]= (SI) floor (xpos[i] * xf + 0.5);
 }
 
