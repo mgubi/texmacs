@@ -153,6 +153,7 @@ include (CheckFunctionExists)
 include (CheckLibraryExists)
 include (CheckIncludeFile)
 include (CheckTypeSize)
+include (CheckSymbolExists)
 include (FindPkgConfig)
 
 ### --------------------------------------------------------------------
@@ -213,6 +214,15 @@ check_include_file (pty.h HAVE_PTY_H)
 check_include_file (util.h HAVE_UTIL_H)
 check_function_exists (gettimeofday HAVE_GETTIMEOFDAY)
 check_function_exists (snprintf HAVE_SNPRINTF)
+
+if (NOT WIN32)
+  set (CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+  check_symbol_exists (dlopen dlfcn.h HAVE_DLOPEN)
+  unset (CMAKE_REQUIRED_LIBRARIES)
+  if (HAVE_DLOPEN)
+    set (TM_DYNAMIC_LINKING dlopen)
+  endif ()
+endif ()
 
 set (STDC_HEADERS 1)
 set (DEBUG_ASSERT 1)
@@ -645,6 +655,10 @@ set (TeXmacs_Libraries
   ${GNUTLS_LIBRARIES}
   ${GNUTLS_EXTRA_LIBS}
 )
+
+if (TM_DYNAMIC_LINKING)
+  list (APPEND TeXmacs_Libraries ${CMAKE_DL_LIBS})
+endif ()
 
 if (USE_RESVG)
   list (APPEND TeXmacs_Libraries ${RESVG_LIBRARIES})
