@@ -550,6 +550,36 @@ is_set_cursor (patch p) {
     get_modification (p)->k == MOD_SET_CURSOR;
 }
 
+static patch
+strip_set_cursor (patch p) {
+  // same as remove_set_cursor, but without copying the modifications:
+  // join only builds new patches on success, so no copies are needed,
+  // and copying is very expensive for large modifications (bug #62862)
+  switch (get_type (p)) {
+  case PATCH_MODIFICATION:
+    if (get_modification (p)->k != MOD_SET_CURSOR) return p;
+    return patch (array<patch> ());
+  case PATCH_COMPOUND:
+    {
+      array<patch> r;
+      for (int i=0; i<N(p); i++) {
+        patch q= strip_set_cursor (p[i]);
+        r << children (q);
+      }
+      if (N(r) == 1) return r[0];
+      return patch (r);
+    }
+  case PATCH_AUTHOR:
+    {
+      patch q= strip_set_cursor (p[0]);
+      if (nr_children (q) == 0) return q;
+      else return patch (get_author (p), q);
+    }
+  default:
+    return p;
+  }
+}
+
 bool
 join (patch& p1, patch p2, tree t) {
   //cout << "Join " << p1 << LF << "with " << p2 << LF;
@@ -572,16 +602,17 @@ join (patch& p1, patch p2, tree t) {
       modification i2= get_inverse (p2);
       modification i1= get_inverse (p1);
       bool r= join (m1, m2, t);
+      if (!r) return false;
       bool v= join (i2, i1, clean_apply (p2, clean_apply (p1, t)));
       if (r && v) p1= patch (m1, i2);
       return r && v;
     }
   if (get_type (p1) == PATCH_COMPOUND &&
       nr_children (p1) > 0 &&
-      nr_children (remove_set_cursor (p1)) == 1)
+      nr_children (strip_set_cursor (p1)) == 1)
     {
       int nr= nr_children (p1);
-      patch p1b= remove_set_cursor (p1);
+      patch p1b= strip_set_cursor (p1);
       if (nr_children (p1b) == 1) {
         bool rf= join (p1b, p2, t);
         if (rf) {
@@ -597,10 +628,10 @@ join (patch& p1, patch p2, tree t) {
     }
   if (get_type (p2) == PATCH_COMPOUND &&
       nr_children (p2) > 0 &&
-      nr_children (remove_set_cursor (p2)) == 1)
+      nr_children (strip_set_cursor (p2)) == 1)
     {
       int nr= nr_children (p2);
-      patch p2b= remove_set_cursor (p2);
+      patch p2b= strip_set_cursor (p2);
       if (nr_children (p2b) == 1) {
         bool rf= join (p1, p2b, t);
         if (rf && nr >= 2 && is_set_cursor (child (p2, nr-1))) {
