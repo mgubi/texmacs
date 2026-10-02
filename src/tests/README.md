@@ -111,13 +111,45 @@ moved.
 
 ## Scheme tests
 
-`tests/scheme/check.sh` runs Scheme test suites without a window and
+`tests/scheme/check.sh` runs the Scheme test suites without a window and
 exits with their status:
 
 ```
-tests/scheme/check.sh          # the tests of the glue
-tests/scheme/check.sh all      # run-all-tests, the glue included
+tests/scheme/check.sh                     # the regression suites
+tests/scheme/check.sh integration         # the integration suites
+tests/scheme/check.sh glue tmhtml         # some suites, by name
+tests/scheme/check.sh path/to/foo-test.scm  # a suite not listed yet
 ```
+
+The suites are listed in `TeXmacs/progs/check/check-master.scm`: the
+regression suites, which `run-all-tests` runs, and the integration suites
+(server backup, cache, notifications and tmfs), which have side effects and
+which `run-integration-tests` runs. Both run every suite, also after one
+has failed, and return the number of failed suites; `run-regression-suite`
+runs one suite by name. `integration-test-group` adds the tests which
+fail to `integration-failure-total`, which is how their failures are
+counted.
+
+New suites use `TeXmacs/progs/check/check-lib.scm`: `check=`, `check-true`,
+`check-false` and `check-error` run every check and report a failure with
+the expression which failed, and the suite of `foo-test.scm` is a function
+`foo-test-failures` which returns their number:
+
+```scheme
+(texmacs-module (check lists-test)
+  (:use (check check-lib)))
+
+(tm-define (lists-test-failures)
+  (check-suite "lists")
+  (check-group "sublists")
+  (check= (sublist '(a b c d) 1 3) '(b c))
+  (check-error (car '()) #t)
+  (check-end))
+```
+
+Such a file runs with `check.sh path/to/lists-test.scm` while it is being
+written, and joins the others once it is in the `:use` list and the table
+of suites of `check-master.scm`.
 
 `TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
 (`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
@@ -127,11 +159,10 @@ argument of the wrong type is refused with `wrong-type-arg` before any C++
 code runs. It then checks that values cross the glue unchanged: trees and
 Scheme trees, content given as a string, a tree or a Scheme tree, strings
 with every byte, integers up to the limits of a C int (and `out-of-range`
-beyond), paths, urls, lists of strings, booleans and doubles. Every check
-runs and the failures are counted; the functions which Scheme code
-redefines are listed and left out. In a session, `(regtest-glue)` runs the
-same tests, and `run-all-tests` includes them.
+beyond), paths, urls, lists of strings, booleans and doubles. The
+functions which Scheme code redefines are listed and left out.
 
 An error in an expression given with `-x` keeps TeXmacs from quitting, so
 the runner catches every error and exits itself, and stops a run after
-`TM_TEST_TIMEOUT` seconds (600 by default).
+`TM_TEST_TIMEOUT` seconds (600 by default); `TM_TEST_HOME` chooses the
+scratch home directory.

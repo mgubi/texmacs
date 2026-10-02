@@ -24,46 +24,27 @@
 ;;     strings with any byte, integers up to the limits of a C int, paths,
 ;;     urls, lists of strings, booleans and doubles.
 ;;
-;; Unlike regression-test-group, every check runs and the failures are
-;; counted, so that one failure does not hide the others; glue-test-failures
-;; returns their number (see tests/scheme/check.sh).
+;; The checks are those of check-lib: every check runs, and
+;; glue-test-failures returns the number of failures.
 
-(texmacs-module (check glue-test))
+(texmacs-module (check glue-test)
+  (:use (check check-lib)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Counting checks
+;; Checks (check-lib), named by group as the tables of this file need
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define glue-checks 0)
-(define glue-failures 0)
-
-;; the output is flushed, so that a crash shows which group it was in
-(define (glue-group name)
-  (display* "  group " name "\n")
-  (force-output))
-
-(define (glue-fail group what detail)
-  (set! glue-failures (+ glue-failures 1))
-  (display* "  FAILED [" group "] " what ": " detail "\n"))
+(define (glue-group name) (check-group name))
+(define (glue-try thunk) (check-run thunk))
 
 (define (glue-check group what ok? detail)
-  (set! glue-checks (+ glue-checks 1))
-  (when (not ok?) (glue-fail group what detail)))
-
-;; the value of (thunk), or (error key) when it raises an error
-(define (glue-try thunk)
-  (catch #t
-    (lambda () (thunk))
-    (lambda (key . args) (list 'error key))))
+  (check-report ok? what detail))
 
 (define (glue-check-equal group what thunk expected)
-  (let ((result (glue-try thunk)))
-    (glue-check group what (equal? result expected)
-                (string-append "expected " (object->string expected)
-                               ", got " (object->string result)))))
+  (check-equal what thunk expected))
 
 (define (glue-check-error group what thunk key)
-  (glue-check-equal group what thunk (list 'error key)))
+  (check-raises what thunk key))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The declarations of the glue
@@ -281,10 +262,8 @@
 
 (tm-define (glue-test-failures)
   (:synopsis "Run the tests of the glue and return the number of failures")
-  (set! glue-checks 0)
-  (set! glue-failures 0)
   (set! glue-redefined '())
-  (display "Test suite of the glue\n")
+  (check-suite "the glue")
   (with decls (glue-declarations)
     (if (not decls)
         (display "  the glue declarations are not at hand, skipped\n")
@@ -307,9 +286,7 @@
   (when (nnull? glue-redefined)
     (display* "  redefined in Scheme, not checked: "
               (object->string (reverse glue-redefined)) "\n"))
-  (display* "Total: " (number->string glue-checks) " checks, "
-            (number->string glue-failures) " failed\n")
-  glue-failures)
+  (check-end))
 
 (tm-define (regtest-glue)
   (with n (glue-test-failures)

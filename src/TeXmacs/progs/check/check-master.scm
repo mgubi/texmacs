@@ -26,6 +26,7 @@
         (server server-notifications-test)
         (server server-tmfs-test)
         (utils cite cite-sort-test)
+        (kernel texmacs tm-convert-test)
         (check glue-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -85,26 +86,76 @@
 (tm-define (run-checks)
   (check-latex-export "$TEXMACS_CHECKS/latex-export"))
 
+;; The suites: a name, the function which runs it, and how it reports its
+;; failures: count (it returns their number), error (it raises an error at
+;; the first one) or integration (integration-test-group adds them to
+;; integration-failure-total).
+(define regression-suites
+  '(("htmltm" regtest-htmltm error)
+    ("xmltm" regtest-xmltm error)
+    ("tmlength" regtest-tmlength error)
+    ("environment" regtest-environment error)
+    ("mathtm" regtest-mathtm error)
+    ("tmhtml" regtest-tmhtml error)
+    ("tmmltm" regtest-tmmltm error)
+    ("prog-format" regtest-prog-format error)
+    ("cite-sort" regtest-cite-sort error)
+    ("tm-convert" regtest-tm-convert error)
+    ("glue" glue-test-failures count)))
+
+(define integration-suites
+  '(("deletion-plan" regtest-deletion-plan integration)
+    ("server-notifications" regtest-server-notifications integration)
+    ("server-backup" regtest-server-backup integration)
+    ("server-cache" regtest-server-cache integration)))
+
+;; the number of failures of a suite; an error which escapes the suite
+;; counts as one, and does not stop the suites after it
+(define (suite-failures suite)
+  (let ((f (eval (cadr suite)))
+        (kind (caddr suite)))
+    (set! integration-failure-total 0)
+    (catch #t
+      (lambda ()
+        (with r (f)
+          (cond ((== kind 'count) r)
+                ((== kind 'integration) integration-failure-total)
+                (else 0))))
+      (lambda (key . args)
+        (display* "  error in suite " (car suite) ": "
+                  (object->string (cons key args)) "\n")
+        (+ integration-failure-total 1)))))
+
+(define (run-suites suites)
+  (let ((failed '()))
+    (for (suite suites)
+      (with n (suite-failures suite)
+        (when (> n 0) (set! failed (cons (car suite) failed)))))
+    (display* "Suites: " (number->string (length suites)) ", failed: "
+              (if (null? failed) "none"
+                  (string-recompose (reverse failed) ", "))
+              "\n")
+    (length failed)))
+
+(tm-define (test-suite-names)
+  (:synopsis "The names of the test suites")
+  (map car (append regression-suites integration-suites)))
+
+(tm-define (run-regression-suite name)
+  (:synopsis "Run the test suite @name and return its number of failures")
+  (with suite (or (assoc name regression-suites)
+                  (assoc name integration-suites))
+    (if suite (suite-failures suite)
+        (begin (display* "no test suite " name "\n") 1))))
+
 (tm-define (run-all-tests)
-  (regtest-htmltm)
-  (regtest-xmltm)
-  (regtest-tmlength)
-  (regtest-environment)
-  (regtest-mathtm)
-  (regtest-tmhtml)
-  (regtest-tmmltm)
-  (regtest-prog-format)
-  (regtest-cite-sort)
-  (regtest-glue)
-)
+  (:synopsis "Run the regression tests; the number of failed suites")
+  (run-suites regression-suites))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integration tests (side-effecting, with setup/teardown)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (run-integration-tests)
-  (regtest-deletion-plan)
-  (regtest-server-notifications)
-  (regtest-server-backup)
-  (regtest-server-cache)
-)
+  (:synopsis "Run the integration tests; the number of failed suites")
+  (run-suites integration-suites))
