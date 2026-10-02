@@ -581,9 +581,10 @@ prints, the `get_unicode_range` experiment) were dropped.
   the real fonts: `LatinModernMath-Regular`, `NewCMMath-Regular`,
   `STIXTwoMath-Regular`, `KpSans-Italic` and so on, 78 subsets in the
   showcase. Delimiter variants and assemblies come out of those subsets and
-  render correctly. Only thirteen small Type 3 bitmap fonts are left, for
+  render correctly. Only thirteen small Type 3 bitmap fonts were left, for
   the glyphs TeXmacs draws itself: emulated blackboard bold and bold, and
-  some glued shapes. Note that a reconfigure also rewrites `TeXmacs/SVNREV`
+  some emulated symbols (see *Bitmaps in the PDF* below for what remains).
+  Note that a reconfigure also rewrites `TeXmacs/SVNREV`
   from `svnversion`, which prints "Unversioned directory" in a git
   checkout; `make SAFE_TEXMACS_REV` puts the expected version back,
   otherwise the binary refuses its own `TEXMACS_PATH`.
@@ -961,6 +962,45 @@ prints, the `get_unicode_range` experiment) were dropped.
   emulated characters `virtual_font_draws_vectors` says whether the PDF
   writer draws them as vectors or embeds a bitmap.
 
+- **Bitmaps in the PDF.** A glyph which a virtual font constructs is drawn
+  as vectors when every operation of its definition has a vector form
+  (placing, scaling, gluing, flipping and cropping other glyphs), and as a
+  Type 3 bitmap otherwise (`bar-*`, `unserif`, `curly`, `junc-*`,
+  `intersect`, `exclude`, `flood-fill`, `circle`, `fscale*`, `bitmap`).
+  Glue is vector: `math-extensible.tm`, every stretchable construct in seven
+  fonts, had no bitmap at all, and `math-showcase.tm` one, the triangle of
+  Fira Math. A document holding every character of the `emu-*` virtual
+  fonts, in each of the seventeen shipped math fonts, gave the full
+  picture: 78 bitmaps common to all fonts, internal pieces of other
+  definitions (`times1`, `ssA`, `Phi*`) without a code point, and per font
+  up to 31 more, nearly all the triangle family (`vartriangle`,
+  `triangleleft`, `blacktriangle`...), `ltimes`, `rtimes`, `Subset`,
+  `Supset`, `varocircle`. Three changes:
+
+  - An emulation which would be a bitmap gives way, when the main font has
+    a MATH table, to the glyph of STIX Two Math, shipped with TeXmacs
+    (`smart_font_rep::resolve_shipped_math`): the shipped font keeps a
+    document the same on every system, as the emulation did, where the
+    fonts found by a later attempt would not. The choice does not depend
+    on the renderer, so the screen and the PDF agree. The font inspector
+    reports such a character as a fallback.
+  - `virtual_font_rep::supported` called a character vector when the base
+    font had it, also when the base is a virtual font which draws it as a
+    bitmap: `Subset` (`join` with the emulated `smallsubset`) passed for
+    vector and came out with a bitmap inside. It now asks the base
+    (`virtual_font_draws_vectors`), and the fallback above applies to such
+    characters too.
+  - A bitmap glyph without ink was written as an inline image of width 0,
+    which is not valid PDF (mutool: "image width is zero"); it is now a
+    glyph procedure with its advance only.
+
+  What remains are the internal pieces and six characters which TeXmacs
+  alone defines, without a code point, so that no font can provide them:
+  `triangleup`, `blacktriangleup` and the four `nblacktriangle...`. The
+  samples have no bitmap left, which `tests/opentype/check.sh` now
+  checks, together with the absence of syntax errors, for every PDF made
+  by the native writer.
+
 ## 5. Tests
 
 ### Unit tests
@@ -1186,11 +1226,14 @@ hand-tuned fonts, which have no profile to consult.
   noticed when a document asks for it.
 - The samples are compared against stored reference renders by hand; the
   check script does not fail on a pixel difference, it only reports it.
-- The glyphs TeXmacs glues together itself still export as Type 3 bitmap
-  fonts (`/ProcSet [ /PDF /ImageB ]`), where the PDF writer could place
-  the parts as vectors; `pdf_hummus_renderer.cpp` has a disused path for
-  that. It concerns emulated alphabets more than the MATH assemblies,
-  which come from the embedded subsets.
+- Six characters which TeXmacs alone defines (`triangleup`,
+  `blacktriangleup`, `nblacktriangleleft` and the like) still export as
+  Type 3 bitmaps when the main font does not have them, as do the emulated
+  alphabets (`unserif`); glue and the MATH assemblies are vectors, and the
+  other emulations which would be bitmaps take the glyph of STIX Two Math
+  (section 4, *Bitmaps in the PDF*). Their definitions use operations on
+  pixels, such as `bar-bottom` or `flood-fill`, which have no vector form
+  in `draw_tree`.
 
 ## 8. Hand-made constructions in the typesetter and their MATH counterparts
 

@@ -340,6 +340,9 @@ The short version, with the details in section 7 of
   attachment.
 - The profile test checks each math font, its family name and its MATH table,
   but not that the companion masters a profile names exist or are installed.
-- Glyphs TeXmacs glues itself still export as Type 3 bitmap fonts, where the
-  PDF writer could place the parts as vectors. The MATH variants and
-  assemblies are not affected: they come out of the embedded font subsets.
+- Six symbols which only TeXmacs defines (`triangleup`, `blacktriangleup`
+  and the four `nblacktriangle...`) are drawn by pixel operations and still
+  export as small bitmaps when the font lacks them. Every other symbol an
+  OpenType math font lacks is either built as vectors or, when its
+  emulation would be a bitmap, taken from the shipped STIX Two Math; glue
+  and the MATH assemblies are vectors.
