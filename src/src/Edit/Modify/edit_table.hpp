@@ -22,6 +22,7 @@ protected:
   path search_format ();
   path search_format (path p);
   path search_format (int& row, int& col);
+  path search_format (int& row, int& col, bool create);
   path search_table ();
   path search_table (path fp);
   path search_table (int& row, int& col);

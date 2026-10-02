@@ -106,11 +106,16 @@ edit_table_rep::search_format (path p) {
 
 path
 edit_table_rep::search_format (int& row, int& col) {
+  return search_format (row, col, true);
+}
+
+path
+edit_table_rep::search_format (int& row, int& col, bool create) {
   path p= search_table (row, col);
   if (is_nil (p)) return p;
   if (is_func (subtree (et, p), TFORMAT)) return p;
   if (is_func (subtree (et, path_up (p)), TFORMAT)) return path_up (p);
-  insert_node (p * 0, TFORMAT);
+  if (create) insert_node (p * 0, TFORMAT);
   return p;
 }
 
@@ -444,7 +449,7 @@ edit_table_rep::table_get_limits (
   i2= as_int (table_get_format (fp, TABLE_MAX_ROWS));
   j2= as_int (table_get_format (fp, TABLE_MAX_COLS));
   if (i2<i1) i2= 0x7fffffff;
-  if (j2<i1) j2= 0x7fffffff;
+  if (j2<j1) j2= 0x7fffffff;
 }
 
 void
@@ -520,8 +525,8 @@ edit_table_rep::table_insert (path fp, int row, int col, int insr, int insc) {
 
   T= subtree (et, p);
   if (insc>0)
-    for (row=0; row<N(T); row++) {
-      path q= search_row (p, row);
+    for (int r=0; r<N(T); r++) {
+      path q= search_row (p, r);
       tree R= subtree (et, q);
       if (col <= N(R))
         insert (q * col, empty_row (insc));
@@ -844,7 +849,7 @@ edit_table_rep::table_write_subtable (
     for (j=0; j<sub_cols; j++) {
       path cp  = search_cell (rp, j+col);
       tree subc= subr[j];
-      while (is_func (subc, TFORMAT)) subc= subc [N(subr)-1];
+      while (is_func (subc, TFORMAT)) subc= subc [N(subc)-1];
       if (is_func (subc, CELL, 1)) subc= subc[0];
       assign (cp, copy (subc));
     }
@@ -1263,7 +1268,7 @@ edit_table_rep::table_set_extents (int rows, int cols) {
 int
 edit_table_rep::table_which_row () {
   int row, col;
-  path fp= search_format (row, col);
+  path fp= search_format (row, col, false);
   if (is_nil (fp)) return 0;
   return row+1;
 }
@@ -1271,7 +1276,7 @@ edit_table_rep::table_which_row () {
 int
 edit_table_rep::table_which_column () {
   int row, col;
-  path fp= search_format (row, col);
+  path fp= search_format (row, col, false);
   if (is_nil (fp)) return 0;
   return col+1;
 }
@@ -1287,7 +1292,7 @@ edit_table_rep::table_which_cells () {
   }
   else {
     int row, col;
-    path fp= search_format (row, col);
+    path fp= search_format (row, col, false);
     if (is_nil (fp)) return array<int> ();
     row++; col++;
     r << row << row << col << col;
@@ -1460,7 +1465,7 @@ edit_table_rep::cell_set_format (string var, tree val) {
 string
 edit_table_rep::cell_get_format (string var) {
   int row, col;
-  path fp= search_format (row, col); row++; col++;
+  path fp= search_format (row, col, false); row++; col++;
   if (is_nil (fp)) return "";
   if (cell_mode=="row")
     return as_string (table_get_format (fp, row, 1, row, -1, var));

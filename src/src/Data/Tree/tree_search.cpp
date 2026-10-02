@@ -257,6 +257,7 @@ search_string (range_set& sel, string s, tree what, path p) {
 
   if (is_atomic (what)) {
     string w= what->label;
+    if (case_insensitive_match_flag) w= locase_all (w);
     int pos= 0;
     while (pos < N(s)) {
       int next= tm_search_forwards (w, pos, source);
@@ -266,9 +267,15 @@ search_string (range_set& sel, string s, tree what, path p) {
     }
   }
   else if (is_concat (what)) {
+    tree w= what;
+    if (case_insensitive_match_flag) {
+      w= tree (L(what), N(what));
+      for (int i=0; i<N(what); i++)
+        w[i]= is_atomic (what[i])? tree (locase_all (what[i]->label)): what[i];
+    }
     for (int pos=0; pos<N(s); ) {
       int start, end;
-      if (match_atomic (s, what, pos, 0, start, end)) {
+      if (match_atomic (source, w, pos, 0, start, end)) {
         merge (sel, simple_range (p * start, p * end));
         pos= end;
       }
