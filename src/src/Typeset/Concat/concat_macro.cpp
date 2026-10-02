@@ -164,11 +164,17 @@ concater_rep::typeset_include (tree t, path ip) {
   if (N(t) != 1) { typeset_error (t, ip); return; }
   url file_name= url_unix (env->exec_string (t[0]));
   url incl_file= relative (env->base_file_name, file_name);
+  if (inclusion_busy (incl_file)) {
+    typeset_dynamic (tree (_ERROR, "inclusion cycle"), ip);
+    return;
+  }
   tree incl= load_inclusion (incl_file);
   url save_name= env->cur_file_name;
   env->cur_file_name= incl_file;
   env->secure= is_secure (env->cur_file_name);
+  inclusion_enter (incl_file);
   typeset_dynamic (incl, ip);
+  inclusion_leave (incl_file);
   env->cur_file_name= save_name;
   env->secure= is_secure (env->cur_file_name);
 }

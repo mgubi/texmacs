@@ -109,6 +109,8 @@ edit_env_rep::rewrite (tree t) {
       url file_rel = relative (base_file_name, file_name);
       if (file_rel == base_file_name)
         return tree (_ERROR, "invalid self include");
+      if (inclusion_busy (file_rel))
+        return tree (_ERROR, "inclusion cycle");
       //cout << "file_name= " << as_tree (file_name) << LF;
       return load_inclusion (file_rel);
     }
@@ -160,6 +162,18 @@ edit_env_rep::exec_rewrite (tree t) {
   return r;
   */
   return exec (rewrite (t));
+}
+
+tree
+edit_env_rep::exec_include (tree t) {
+  if (N(t) == 0) return exec_rewrite (t);
+  url file_name= url_unix (exec_string (t[0]));
+  url file_rel = relative (base_file_name, file_name);
+  tree r= rewrite (t);
+  inclusion_enter (file_rel);
+  r= exec (r);
+  inclusion_leave (file_rel);
+  return r;
 }
 
 bool
@@ -302,7 +316,7 @@ edit_env_rep::exec (tree t) {
   case EXTERN:
     return exec_rewrite (t);
   case VAR_INCLUDE:
-    return exec_rewrite (t);
+    return exec_include (t);
   case WITH_PACKAGE:
     return exec_rewrite (t);
   case USE_PACKAGE:
