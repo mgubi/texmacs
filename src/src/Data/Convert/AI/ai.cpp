@@ -51,6 +51,12 @@ ai_quote (string s) {
     case '\n':
       r << "\\n";
       break;
+    case '\r':
+      r << "\\r";
+      break;
+    case '\t':
+      r << "\\t";
+      break;
     case '\'':
       r << "'\\''";
       break;
@@ -58,7 +64,9 @@ ai_quote (string s) {
       r << '\\' << s[i];
       break;
     default:
-      r << s[i];
+      if (((unsigned char) s[i]) < 0x20)
+        r << "\\u00" << as_hexadecimal ((unsigned char) s[i], 2);
+      else r << s[i];
     }
   return r;
 }
@@ -358,13 +366,13 @@ ai_async_eval_command (tree t, object callback) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))
     return async_eval_system (t[0]->label, callback);
   if (is_compound (t, "http_post", 3) && is_atomic (t[0])
-      && is_tuple (t[1]) && is_atomic (t[2])) {
+      && is_tuple (t[1])) {
     string url; tree data; array<string> headers; 
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
   }
-  io_error << "ai_eval_command, wrong command: " << t << LF;
-  return "";
+  io_error << "ai_async_eval_command, wrong command: " << t << LF;
+  return true;
 }
 
 /******************************************************************************
@@ -383,14 +391,17 @@ chatgpt_command (string s, string model, string chat) {
 
 tree
 gemini_command (string s, string model, string chat) {
-  (void) model;
   (void) chat;
   string key= get_env ("GEMINI_API_KEY");
-  string gem= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-  string cmd= "curl \"" * gem * "\" \\\n";
+  string model_= model;
+  if (model_ == "gemini")
+    model_= get_preference ("gemini model", "gemini-2.0-flash");
+  string gem= "https://generativelanguage.googleapis.com/v1beta/models/"
+    * model_ * ":generateContent";
+  string cmd= "curl " * shell_quote (gem) * " \\\n";
   cmd << "  -H 'Content-Type: application/json' \\\n"
       << "  -H 'X-goog-api-key: " << key << "' \\\n"
-      << "  -X POST \\"
+      << "  -X POST \\\n"
       << "  -d '{\n"
       << "    \"contents\": [ {\n"
       << "      \"parts\": [ {\n"
@@ -408,8 +419,9 @@ ollama_command (string s, string model, string chat) {
   string port  = get_preference ("ollama port", "11434");
   string model_= get_preference ("ollama model", "default");
   if (model_ == "default") model_= as_string (call ("ollama-default-model"));
-  string cmd= "curl http://" * server * ":" * port * "/api/generate -d '{\n";
-  cmd << "\"model\": \"" << model_ << "\",\n"
+  string api= "http://" * server * ":" * port * "/api/generate";
+  string cmd= "curl " * shell_quote (api) * " -d '{\n";
+  cmd << "\"model\": \"" << ai_quote (model_) << "\",\n"
       << "\"prompt\": \"" << ai_quote (s) << "\",\n"
       << "\"stream\": false\n"
       << "}'";
@@ -812,7 +824,7 @@ ai_correct (tree t, string lan, string model, string chat) {
   tree u= decompress_html (r);
   //cout << "u = " << u << "\n";
   tree ret= tree (TUPLE);
-  ret << ai_post (r, u);
+  ret << ai_post (t, u);
   for (int i= 0; i < N(comments); i++)
     ret << decompress_html (comments[i]);
   return ret;
@@ -848,5 +860,5 @@ ai_translate (tree t, string from, string into, string model, string chat) {
   //cout << "r= " << r << "\n";
   tree u= decompress_html (r);
   //cout << "u = " << u << "\n";
-  return ai_post (r, u);
+  return ai_post (t, u);
 }
