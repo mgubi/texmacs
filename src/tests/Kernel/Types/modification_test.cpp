@@ -173,6 +173,8 @@ test_is_applicable () {
     { mod_join (path (), 0), false },                 // string and concat
     { mod_join (path (), 3), false },                 // no right neighbour
     { mod_join (path (), -1), false },
+    { mod_join (path (0), 0), false },                // below a string
+    { mod_join (path (0), 2), false },
     { mod_assign_node (path (1, 2), TUPLE), true },
     { mod_assign_node (path (0), TUPLE), false },     // a string has no node
     { mod_assign_node (path (8), TUPLE), false },
