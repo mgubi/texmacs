@@ -187,10 +187,18 @@
     (when (nnull? l) (notify-comments-editor))))
 
 (define (comment-id-elsewhere? id)
-  ;; Is the mirror identifier id also used in another open buffer?
+  ;; Is the mirror identifier id also used by a comment in another open
+  ;; buffer?  The comment editors (mirror-comment and carbon-comment views)
+  ;; share the identifier on purpose, so they are not counted.
   (with cur (current-buffer)
     (list-find (id->trees id)
-               (lambda (u) (and-with b (tree->buffer u) (!= b cur))))))
+               (lambda (u)
+                 (and-with b (tree->buffer u)
+                   (and (!= b cur)
+                        (and-with p (tree-up u)
+                          (and (any-comment-context? p)
+                               (not (tree-in? p '(mirror-comment
+                                                  carbon-comment)))))))))))
 
 (define (renew-pasted-comment-ids old)
   ;; Pasted copies of comments which are already in this buffer or in
