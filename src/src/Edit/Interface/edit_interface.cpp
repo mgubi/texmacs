@@ -1204,6 +1204,10 @@ edit_interface_rep::is_editor_widget () {
 bool
 edit_interface_rep::is_embedded_widget () {
   if (!has_subtree (et, rp) || subtree (et, rp) == tree (UNINIT)) return false;
+  // the view was closed (delete_view), but its widget may still receive
+  // events, such as the focus event posted when it was created: like an
+  // embedded widget, it should not take the focus
+  if (buf == NULL) return true;
   string name= as_string (buf->buf->name);
   return starts (name, "tmfs://aux/");
   // FIXME: could be made more robust: test should not be based on file name
