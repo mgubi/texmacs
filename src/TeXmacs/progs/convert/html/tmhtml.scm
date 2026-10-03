@@ -282,8 +282,8 @@
         (set! body (tmhtml-css-post body)))
     `(h:html
       (h:head
-       (h:title ,@(tmhtml title))
        (h:meta (@ (charset "utf-8")))
+       (h:title ,@(tmhtml title))
        (h:meta (@ (name "generator")
 		  (content ,(string-append "TeXmacs " (texmacs-version)))))
        ,css
