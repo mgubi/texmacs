@@ -69,7 +69,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|configure.in>, <verbatim|misc/m4/*.m4>>The autoconf
     input: one macro file per dependency or feature (<verbatim|guile.m4>,
     <verbatim|qt.m4>, <verbatim|freetype.m4>, <verbatim|tm_gui.m4>,
@@ -109,7 +109,7 @@
     <verbatim|TeXmacs/progs/kernel/boot/debug.scm>,
     <verbatim|TeXmacs/progs/utils/test/>>The <scheme> regression tests and
     their macros, and the document test suites.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

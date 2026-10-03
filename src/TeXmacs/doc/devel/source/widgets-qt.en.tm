@@ -19,7 +19,7 @@
 
   The files relevant for widgets are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|qt_widget.hpp/cpp>>the base class
     <cpp|qt_widget_rep> and the implementation of all the constructors of
     <verbatim|widget.hpp>;
@@ -54,7 +54,7 @@
     <item*|<verbatim|qt_gui.hpp/cpp>, <verbatim|QTMGuiHelper.*>>the
     <cpp|qt_gui_rep> singleton <cpp|the_gui>, the event queue and the
     functions of <verbatim|gui.hpp>.
-  </description>
+  </description-paragraphs>
 
   <section|The base class <cpp|qt_widget_rep>>
 

@@ -70,7 +70,7 @@
   Paths below are relative to <verbatim|src/TeXmacs/progs/> for <scheme>
   files and to <verbatim|src/src/> for <c++> files.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|kernel/texmacs/tm-secure.scm>>The checker
     <scm|secure?>, <scm|secure-eval> and the list of primitive functions
     which are declared secure.
@@ -120,7 +120,7 @@
     encrypted and decrypted regions; the packages
     <verbatim|packages/customize/encryption/gpg-info-level-*.ts> choose
     how much information about the recipients is displayed.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

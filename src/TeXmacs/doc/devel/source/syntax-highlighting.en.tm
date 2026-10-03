@@ -107,7 +107,7 @@
 
   <section|Main source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|System/Language/language.hpp>,
     <verbatim|language.cpp>>The abstract class <cpp|language_rep>, text
     properties, the registry functions and the encoding and decoding of
@@ -153,7 +153,7 @@
 
     <item*|<verbatim|themes/base/base-colors.ts>,
     <verbatim|themes/dark/dark-scene.ts>>The theme for highlighting colors.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

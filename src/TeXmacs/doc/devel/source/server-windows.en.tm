@@ -571,7 +571,7 @@
   <verbatim|Texmacs/Window/tm_button.cpp> contains the widgets which only
   <em|display> typeset material:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|box_widget_rep>>A <cpp|simple_widget_rep> which shows a
     box, centered and scaled, optionally on a background color. It
     forwards mouse moves, clicks and releases to the box as
@@ -603,7 +603,7 @@
 
     <item*|<cpp|get_texmacs_widget_size (wid)>>The size hint of such a
     widget.
-  </description>
+  </description-paragraphs>
 
   <section|Alternative windows><label|alt-windows>
 
@@ -618,7 +618,7 @@
   <cpp|tm_window_rep>s, and the dialogs of <cpp|tm_frame_rep> (file
   choosers, popup questions) use the separate dialog slot.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|window_handle ()>>Allocates a new handle (and records it in
     <cpp|last_window_handle>, see above).
 
@@ -636,7 +636,7 @@
     <cpp|window_set_size>, <cpp|window_get_position>,
     <cpp|window_set_position>>The obvious operations, with sizes in
     pixels.
-  </description>
+  </description-paragraphs>
 
   These windows have no <cpp|tm_window_rep>, no view and no menus of their
   own. They are not returned by <cpp|windows_list>.

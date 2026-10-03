@@ -405,7 +405,7 @@
     factor <cpp|def_zoomf> and three fields of the idle monitor. The
     methods are:
 
-    <\description>
+    <\description-paragraphs>
       <item*|<cpp|interpose_handler ()>>Called by the GUI each time it is
       about to wait for events. It processes input from plug-in pipes and
       sockets (under <name|Qt>: <cpp|perform_select>, unless
@@ -468,7 +468,7 @@
       code.
 
       <item*|<cpp|shell (s)>>Runs a shell command.
-    </description>
+    </description-paragraphs>
   </explain>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

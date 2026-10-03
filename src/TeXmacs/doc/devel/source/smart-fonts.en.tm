@@ -152,7 +152,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Graphics/Fonts/smart_font.cpp>>The smart font, the
     <cpp|smart_map> cache, the rewriting rules, the user entry points
     <cpp|smart_font>, <cpp|smart_font_bis> and <cpp|apply_effects>.
@@ -187,7 +187,7 @@
 
     <item*|<verbatim|$TEXMACS_PATH/fonts/virtual/>>The virtual font
     definitions <verbatim|tradi-*.vfn> and <verbatim|emu-*.vfn>.
-  </description>
+  </description-paragraphs>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

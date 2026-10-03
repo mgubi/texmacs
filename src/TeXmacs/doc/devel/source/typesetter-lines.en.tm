@@ -57,7 +57,7 @@
   <em|forbidden>) are defined in <verbatim|System/Language/language.hpp>.
   The main item types are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|STRING_ITEM>>A piece of text in a single font (a
     <cpp|text_box>), which may be hyphenated using the language <cpp|lan>.
 
@@ -93,7 +93,7 @@
 
     <item*|<cpp|OBSOLETE_ITEM>>An item which has been absorbed by another
     one and will be removed.
-  </description>
+  </description-paragraphs>
 
   <subsection|Page items and stack borders>
 
@@ -546,7 +546,7 @@
   the border properties <cpp|sb>. Its methods are called by the paragraph
   formatter:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|print (box b, array\<less\>lazy\<gtr\> fl, int
     nr_cols)>>Appends a line. The vertical space between the previous
     line and the new one is computed by the static function <cpp|shove>
@@ -571,7 +571,7 @@
     second and next-to-last lines by 10. This implements widow and orphan
     control: breaking a page one or two lines away from a paragraph border
     is expensive.
-  </description>
+  </description-paragraphs>
 
   <cpp|shove> determines the distance between two successive lines. If the
   lines are far enough apart for the default baseline distance

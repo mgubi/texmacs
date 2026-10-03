@@ -97,7 +97,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Data/Convert/AI/ai.cpp>>Engine dispatch, command
     trees, transport helpers, extraction of answers, conversation history,
     <LaTeX> answers (including <name|TikZ> and <name|SVG> pictures), chat,
@@ -153,7 +153,7 @@
     <item*|<verbatim|texmacs/menus/tools-menu.scm>>The <menu|Tools|AI
     engine>, <menu|Correct>, <menu|Translate> and <menu|External AI>
     entries.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

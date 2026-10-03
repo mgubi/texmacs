@@ -88,7 +88,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Plugins/Bibtex/bibtex.cpp>, <verbatim|bibtex.hpp>>The
     interface to the external program: <cpp|set_bibtex_command>,
     <cpp|bibtex_present>, <cpp|bibtex_run>, <cpp|bibtex_load_bbl>.
@@ -136,7 +136,7 @@
     <item*|<verbatim|src/TeXmacs/misc/bib/texmacs.bib>>Entries with keys
     <verbatim|TeXmacs:...>, appended to every bibliography so that
     documents may cite the <TeXmacs> papers without a <verbatim|.bib> file.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

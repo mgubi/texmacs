@@ -72,7 +72,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Graphics/Gui/gui.hpp>, <verbatim|widget.hpp>,
     <verbatim|message.hpp>>The interfaces every port implements.
 
@@ -103,7 +103,7 @@
     <item*|<verbatim|Plugins/Cocoa/aqua_gui.mm>, <verbatim|TMView.mm>,
     <verbatim|aqua_dialogues.mm>>Main loop, keyboard and dialogs of the
     <name|Cocoa> port.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

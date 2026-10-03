@@ -85,7 +85,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Scheme/scheme.hpp>>The interface seen by the rest of
     <TeXmacs>: the class <cpp|object>, its predicates and conversions,
     <cpp|eval>, <cpp|call>, <cpp|exec_delayed>, <cpp|protected_call>,
@@ -132,7 +132,7 @@
 
     <item*|<verbatim|TeXmacs/progs/kernel/texmacs/tm-define.scm>>The macros
     <scm|tm-define>, <scm|tm-property> and <scm|lazy-define>.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

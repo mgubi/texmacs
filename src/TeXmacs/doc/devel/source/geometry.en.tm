@@ -69,7 +69,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Graphics/Colors/colors.hpp>, <verbatim|colors.cpp>>The
     <cpp|color> word: <cpp|rgb_color>, <cpp|get_rgb_color>,
     <cpp|cmyk_color>, <cpp|xpm_color>, <cpp|named_color>,
@@ -117,7 +117,7 @@
 
     <item*|<verbatim|Graphics/Spacial/>>Triangulated three dimensional
     objects, their transformations and lighting.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

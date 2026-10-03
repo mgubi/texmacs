@@ -278,7 +278,7 @@
 
   <subsection|The standard groups>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|variant-tag>>Groups of interchangeable tags.
     <scm|(variants-of <scm-arg|label>)> returns the subgroup of
     <scm|variant-tag> containing the label (taking numbered and
@@ -326,11 +326,11 @@
     title routines, <scm|spell-tag> (used with <scm|group-resolve> by
     <verbatim|tools/spell/spell-edit.scm>), and the graphical groups of
     <verbatim|graphics/graphics-drd.scm>.
-  </description>
+  </description-paragraphs>
 
   <subsection|Where groups are declared>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|utils/edit/variants.scm>>The macro, the standard
     groups for source-like tags (<scm|argument-tag>, <scm|value-tag>,
     <scm|binary-operation-tag>, <scm|reference-tag>, <scm|citation-tag>,
@@ -357,7 +357,7 @@
     modes and packages. Some editing modules also declare groups directly
     (<verbatim|database/db-edit.scm>, <verbatim|table/table-edit.scm>,
     <verbatim|math/math-edit.scm>, ...).
-  </description>
+  </description-paragraphs>
 
   These modules are not loaded at start-up: they are pulled in through the
   <scm|:use> clauses of the corresponding editing modules

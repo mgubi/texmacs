@@ -522,7 +522,7 @@
   The first element of a subfont specification determines how
   <cpp|initialize_font> creates it. The following kinds exist:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|main>, <verbatim|error>>The base font and the error
     font of the constructor.
 
@@ -596,7 +596,7 @@
     <item*|<verbatim|(rubber <em|nr>)>><cpp|rubber_font (fn[nr])>: the
     extensible version of another subfont (see <hlink|emulated
     fonts|smart-fonts-emulated.en.tm>).
-  </description>
+  </description-paragraphs>
 
   After creation, <cpp|initialize_font> checks that the new subfont is not
   the smart font itself (same <cpp|res_name>), and aborts with

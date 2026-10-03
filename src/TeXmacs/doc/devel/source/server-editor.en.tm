@@ -69,7 +69,7 @@
   <cpp|edit_main_rep> combines the implementation classes by multiple
   inheritance; all of them derive virtually from <cpp|editor_rep>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|edit_interface_rep>>(<verbatim|Edit/Interface/edit_interface.cpp>,
     <verbatim|edit_keyboard.cpp>, <verbatim|edit_mouse.cpp>,
     <verbatim|edit_repaint.cpp>, <verbatim|edit_footer.cpp>,
@@ -103,7 +103,7 @@
     <item*|<cpp|edit_replace_rep>>(<verbatim|Edit/Replace/edit_search.cpp>,
     <verbatim|edit_spell.cpp>) Searching upwards in the tree, interactive
     search and replace, spell checking.
-  </description>
+  </description-paragraphs>
 
   <cpp|edit_main_rep> itself adds a table of editor properties
   (<cpp|set_property>, <cpp|get_property>), printing, some queries (such as

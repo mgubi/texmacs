@@ -24,7 +24,7 @@
     none), and a table <cpp|color_decoding> of highlighting colors. The
     pure virtual methods are:
 
-    <\description>
+    <\description-paragraphs>
       <item*|<cpp|text_property advance (tree t, int& pos)>>Given an atomic
       tree <cpp|t> and a position <cpp|pos> in its string, move <cpp|pos>
       to the end of the next lexical unit (a word, a run of spaces, a run
@@ -38,7 +38,7 @@
       <item*|<cpp|void hyphenate (string s, int after, string& l, string&
       r)>>Split <cpp|s> after position <cpp|after>, adding a hyphen to the
       left part.
-    </description>
+    </description-paragraphs>
 
     The virtual methods <cpp|get_group>, <cpp|get_members>,
     <cpp|highlight> and <cpp|get_color> have default implementations; they

@@ -195,7 +195,7 @@
   All file names are relative to <verbatim|src/src/> unless stated
   otherwise. The directory <verbatim|Texmacs/> contains the server proper:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Texmacs/server.hpp>>The abstract class
     <cpp|server_rep>, the handle <cpp|server>, <cpp|get_server> and a few
     global declarations. It also includes the headers of
@@ -261,7 +261,7 @@
     <item*|<verbatim|Texmacs/Texmacs/texmacs.cpp>>The main program:
     <cpp|texmacs_entrypoint>, <cpp|TeXmacs_main>, the command line options
     and the startup preferences.
-  </description>
+  </description-paragraphs>
 
   Two closely related files live elsewhere:
   <verbatim|Data/Document/new_data.hpp> (the class <cpp|new_data_rep>,

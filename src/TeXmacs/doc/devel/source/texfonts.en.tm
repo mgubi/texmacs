@@ -96,7 +96,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Plugins/Metafont/tex_files.hpp>,
     <verbatim|tex_files.cpp>>Search paths for <verbatim|.tfm>,
     <verbatim|.pk> and <verbatim|.pfb> files (<cpp|reset_tfm_path>,
@@ -157,7 +157,7 @@
     <verbatim|fonts-composite.scm>, <verbatim|fonts-adobe.scm>,
     <verbatim|fonts-math.scm>>(relative to <verbatim|src/>) Font rules which
     map logical font requests to <TeX> font trees.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

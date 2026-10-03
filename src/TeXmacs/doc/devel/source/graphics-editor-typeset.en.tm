@@ -344,7 +344,7 @@
 
   <subsection|Objects>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|typeset_point>>Evaluates the coordinates, maps them through
     <cpp|env-\<gtr\>fr> and produces a <cpp|point_box> with the current
     <src-var|point-style>, <src-var|point-size>, pen and fill brush.
@@ -398,7 +398,7 @@
     keyboard shortcuts <key|C-left>, <key|C-right>, <key|C-up> and
     <key|C-down> rotate the view by modifying <src-var|gr-transformation>
     (<scm|graphics-rotate-xz>, <scm|graphics-rotate-yz>).
-  </description>
+  </description-paragraphs>
 
   The tags <markup|spline*> (<cpp|typeset_var_spline>) and <markup|fill>
   (<cpp|typeset_fill>) are placeholders which only print a

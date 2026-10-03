@@ -12,7 +12,7 @@
   <cpp|box_rep> (<verbatim|Typeset/boxes.hpp>,
   <verbatim|Typeset/Boxes/Basic/boxes.cpp>):
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|virtual void display (renderer ren) = 0>>Paint the box
     itself, not its children, in its local coordinates.
 
@@ -34,7 +34,7 @@
     <item*|<cpp|void clear (renderer ren, SI x1, SI y1, SI x2, SI
     y2)>>Repaint only the backgrounds of a region, used by the editor to
     clear parts of the page with the correct background.
-  </description>
+  </description-paragraphs>
 
   The default <cpp|box_rep::redraw> reads, in abridged form:
 

@@ -103,7 +103,7 @@
   On top of the converters, <verbatim|converter.cpp> defines the functions
   used by the rest of the program:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|utf8_to_cork (s)>>Decodes <cpp|s> one code point at a time
     and converts each separately. A code point of at least 256 without a
     table entry becomes <verbatim|\<less\>#<em|hex>\<gtr\>>; one below 256
@@ -145,7 +145,7 @@
     <name|iconv> (<cpp|convert_using_iconv>, <cpp|check_using_iconv>). In
     builds without <verbatim|USE_ICONV>, unknown conversions return their
     input unchanged and <cpp|check_encoding> returns true.
-  </description>
+  </description-paragraphs>
 
   The <name|iconv> wrapper converts in one pass with a growing output
   buffer. On an invalid or incomplete input sequence it prints an error
@@ -154,7 +154,7 @@
 
   <section|Low level <name|UTF-8> routines>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|encode_as_utf8 (code)>>The <name|UTF-8> bytes of a code
     point (up to <verbatim|0x1FFFFF>; larger values give the empty
     string).
@@ -177,7 +177,7 @@
     <item*|<cpp|convert_escapes>, <cpp|convert_char_entities>,
     <cpp|convert_char_entity>, <cpp|hex_digit_to_int>>Helpers for reading
     the tables.
-  </description>
+  </description-paragraphs>
 
   <section|Guessing the encoding of western text>
 

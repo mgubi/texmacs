@@ -118,7 +118,7 @@
   <scm|texout> in <verbatim|convert/latex/texout.scm> recognizes the
   following labels:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(!file <scm-arg|body> <scm-arg|styles> <scm-arg|needs>
     <scm-arg|init> <scm-arg|preamble>)>>A complete document; serialized by
     <scm|texout-file>, which writes the <verbatim|\\documentclass>, the
@@ -167,7 +167,7 @@
     <item*|<scm|!invariant>, <scm|!marker>>Verbatim <LaTeX> source reused
     by the conservative converter, and the source tracking markers
     <verbatim|{\\btm{...}}> and <verbatim|{\\etm{...}}>.
-  </description>
+  </description-paragraphs>
 
   Any other list is serialized as a command application by
   <scm|texout-apply>. The serializer writes into the output buffer of

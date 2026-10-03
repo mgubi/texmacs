@@ -121,7 +121,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Graphics/Pictures/picture.hpp>,
     <verbatim|picture.cpp>>The abstract class <cpp|picture_rep>, the
     composition modes, the list of picture operations, the cache of loaded
@@ -202,7 +202,7 @@
     <item*|<verbatim|$TEXMACS_PATH/progs/convert/images/tmimage.scm>>Export
     of the selection as an image and copy of the selection to the clipboard
     as an image.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

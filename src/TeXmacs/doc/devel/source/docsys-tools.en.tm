@@ -10,7 +10,7 @@
   The <TeXmacs> web site is built from a directory tree of <TeXmacs>
   documents by <verbatim|progs/doc/tmweb.scm>. The entry points are
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|tmweb-convert-dir>, <scm|tmweb-update-dir>>Convert, or
     update, the tree <scm-arg|tm-dir> into <scm-arg|html-dir>. They are
     called by the command line options <verbatim|-W <em|in> <em|out>> and
@@ -27,7 +27,7 @@
     in the preferences <verbatim|website:src-dir> and
     <verbatim|website:dest-dir>. They are declared lazily in
     <verbatim|init-texmacs.scm> but no menu calls them.
-  </description>
+  </description-paragraphs>
 
   <scm|tmweb-convert-directory> enumerates all files below the source
   directory. Every <verbatim|.tm> file is exported to <name|HTML> (or

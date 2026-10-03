@@ -82,7 +82,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|System/Language/language.hpp>,
     <verbatim|language.cpp>>The classes <cpp|text_property_rep> and
     <cpp|language_rep>, the predefined text properties, the table of
@@ -168,7 +168,7 @@
     <item*|<verbatim|src/TeXmacs/packages/customize/language/>>One style
     package per language, which sets the <verbatim|language> variable and
     language specific typography.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

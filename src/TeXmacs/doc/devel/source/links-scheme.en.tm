@@ -15,7 +15,7 @@
 
   <section|Loci and identifiers (<verbatim|locus-edit.scm>)>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(create-unique-id)>>Returns a new identifier
     <verbatim|+<em|xxx><em|yyy>>, made of a random prefix chosen at startup
     and a counter, both in base 62. The identifiers are unique with high
@@ -38,7 +38,7 @@
     <item*|<scm|locus-insert-link>, <scm|locus-remove-link>,
     <scm|locus-remove-all-links>>Insert a link as an argument of a locus
     (just before the body) or remove it.
-  </description>
+  </description-paragraphs>
 
   <section|Making links interactively (<verbatim|link-edit.scm>)>
 

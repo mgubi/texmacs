@@ -94,7 +94,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Edit/Modify/edit_text.hpp>, <verbatim|edit_text.cpp>,
     <verbatim|edit_delete.cpp>>The class <cpp|edit_text_rep>: insertion of
     trees and paragraphs, normalization of <markup|concat> nodes, spaces,
@@ -156,7 +156,7 @@
     <item*|<verbatim|packages/standard/std-automatic.ts>>(relative to
     <verbatim|src/TeXmacs/>) The macros which record entries for the
     automatic content with the <markup|write> primitive.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

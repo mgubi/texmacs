@@ -138,7 +138,7 @@
   <verbatim|src/TeXmacs/packages/standard/std-security.ts>, which is part
   of <verbatim|std>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<markup|gpg-decrypted>, <markup|gpg-decrypted-block>>A region in
     clear, followed by the fingerprints of its recipients.
 
@@ -152,7 +152,7 @@
     <item*|<markup|gpg-passphrase-encrypted>,
     <markup|gpg-passphrase-encrypted-block>>The armored result of passphrase
     encryption.
-  </description>
+  </description-paragraphs>
 
   The packages <verbatim|gpg-info-level-none>, <verbatim|-short> and
   <verbatim|-detailed> (<verbatim|packages/customize/encryption/>) set

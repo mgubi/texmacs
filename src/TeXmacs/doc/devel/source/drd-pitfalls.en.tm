@@ -91,7 +91,7 @@
 
   <subsection|In the <c++> code>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|drd-props> border <verbatim|no>
     (<verbatim|Typeset/Env/env_exec.cpp:753>)>The value <verbatim|no> sets
     <verbatim|BORDER_INNER> instead of <verbatim|BORDER_NO>, so the 64 or
@@ -200,7 +200,7 @@
 
     <item*|Glue name>The <scheme> function <scm|tree-insert_point> has an
     underscore in its name, unlike all other glue functions.
-  </description>
+  </description-paragraphs>
 
   <subsection|In style packages>
 

@@ -12,7 +12,7 @@
   of the previous chapters: there is no shared tokenizer between highlighting
   and editing. The main files are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|prog/prog-edit.scm>>Generic routines: access to the
     lines of a program, preferences for brackets, bracket insertion,
     highlighting and selection, tab stops, the indentation framework, and
@@ -38,7 +38,7 @@
 
     <item*|<verbatim|prog/prog-menu.scm>>The <menu|Format> menu and the icon
     bar in programming mode (loaded lazily as well).
-  </description>
+  </description-paragraphs>
 
   <section|Mode predicates>
 

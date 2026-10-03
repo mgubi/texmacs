@@ -115,7 +115,7 @@
   (<cpp|destroy_table>, which also removes an enclosing tabular macro or
   <markup|subtable>). On top of them:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|table_insert_row (forward)>,
     <cpp|table_insert_column>>(<scm|table-insert-row>,
     <scm|table-insert-column>) Insert after or before the current one,
@@ -139,7 +139,7 @@
     <cpp|table_which_cells>, <cpp|table_search_cell>,
     <cpp|table_go_to>>Queries and cursor movement, with 1-based indices
     (negative ones count from the end).
-  </description>
+  </description-paragraphs>
 
   After a change of the shape, <cpp|table_resize_notify> calls the
   <scheme> hook <scm|table-resize-notify>, which does nothing by default and

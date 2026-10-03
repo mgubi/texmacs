@@ -321,7 +321,7 @@
   The skeleton is turned into boxes by the methods in
   <verbatim|Typeset/Page/make_pages.cpp>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|pages_format (array\<less\>page_item\<gtr\> l, SI ht, SI
     tcor, SI bcor)>>Stacks a range of page items into a box of the given
     height with <cpp|format_stack>, which stretches or shrinks the vertical
@@ -346,7 +346,7 @@
     <abbr|etc.>, or the one-shot <verbatim|page-this-header>), determines
     the background and margin adjustments, and builds a <cpp|page_box>.
     Crop marks are added with <cpp|crop_marks_box> if requested.
-  </description>
+  </description-paragraphs>
 
   The page boxes are the children of the document box returned by
   <cpp|make_pages>. Since headers and footers are regenerated at each pass,

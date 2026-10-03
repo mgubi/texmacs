@@ -115,7 +115,7 @@
   The following files are involved (macros at the top of
   <verbatim|font_database.cpp>):
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|$TEXMACS_PATH/fonts/font-database.scm>,
     <verbatim|font-features.scm>, <verbatim|font-characteristics.scm>>The
     <em|global> database, shipped with <TeXmacs> (in the source tree:
@@ -141,7 +141,7 @@
     entries of the local database which are not in the global one, written
     by <cpp|font_database_save_local_delta>. They are used by maintainers in
     order to inspect new fonts before adding them to the global database.
-  </description>
+  </description-paragraphs>
 
   The file <verbatim|$TEXMACS_PATH/fonts/pdf-font-issues.scm> is unrelated
   to the database proper: it lists font files that need a special treatment

@@ -81,7 +81,7 @@
 
   All server data are stored below <verbatim|$TEXMACS_HOME_PATH/server>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|global.tmdb>>The server database, returned by
     <scm|(global-database)> (<verbatim|database/db-base.scm>) and
     installed by <scm|tm-service> as the current database of each service
@@ -109,7 +109,7 @@
     <item*|Numbered directories>The contents of remote files, live
     documents and messages. See <hlink|the remote file
     system|collab-remote-fs.en.tm>.
-  </description>
+  </description-paragraphs>
 
   The database layer is described in the <scheme> modules of
   <verbatim|progs/database/>. The points which matter for the server are:

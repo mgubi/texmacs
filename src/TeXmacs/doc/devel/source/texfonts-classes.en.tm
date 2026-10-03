@@ -50,7 +50,7 @@
   character codes of the font. Each has a constructor and a font tree tag
   recognized by <cpp|find_font>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|tex_font>, tree <verbatim|(tex <em|family> <em|size>
     <em|dpi> [<em|dsize>])>>Status <cpp|TEX_ANY>: raw character codes; only
     one-character strings and <verbatim|\<less\>less\<gtr\>>,
@@ -82,7 +82,7 @@
     character. The position of the accent depends on the height of the
     letter and on the slant of the font; a few accents which go below or
     beside the letter, such as the cedilla, are placed by special rules.
-  </description>
+  </description-paragraphs>
 
   For all variants, a string is drawn by running the ligature and kerning
   program of the metric (<cpp|tfm-\<gtr\>execute>) and drawing the resulting

@@ -89,7 +89,7 @@
   here we only recall the helpers from <verbatim|Typeset/boxes.hpp> which
   are used throughout the typesetter:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|descend (ip, i)>>The inverse path of the <cpp|i>-th child.
     If <cpp|ip> is a decoration, <cpp|ip> is returned unchanged: the
     children of an inaccessible subtree are inaccessible too.
@@ -108,7 +108,7 @@
     evaluation) through <cpp|attach_dip>. Later, <cpp|obtain_ip (t)>
     recovers the inverse path of such a tree, or of any subtree of the edit
     tree, from the <cpp|ip_observer> attached to it.
-  </description>
+  </description-paragraphs>
 
   Since subtrees of the edit tree carry their inverse path in their
   observers, the concater and the bridges start by checking

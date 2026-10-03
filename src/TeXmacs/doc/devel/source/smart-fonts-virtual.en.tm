@@ -64,7 +64,7 @@
 
   The standard files are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|tradi-long.vfn>, <verbatim|tradi-negate.vfn>,
     <verbatim|tradi-misc.vfn>>Traditional constructions: long arrows,
     negated relations, dots, flipped letters, ... Used by the old
@@ -90,7 +90,7 @@
     operators (<verbatim|big-iint-1>, <verbatim|big-oint-2>, ...) and
     parameterized extensible delimiters (<verbatim|rubber-lparenthesis-#>,
     ...) for <cpp|poor_rubber_font> and <cpp|rubber_assemble_font>.
-  </description>
+  </description-paragraphs>
 
   <subsection|Translators>
 
@@ -330,7 +330,7 @@
 
   <subsection|Geometric transformations>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|(magnify <em|g> <em|mx> <em|my>)>>Scale by the given
     factors.
 
@@ -379,11 +379,11 @@
     rendered as a bitmap.
 
     <item*|<verbatim|(copy <em|g>)>>A copy of the glyph.
-  </description>
+  </description-paragraphs>
 
   <subsection|Positioning and bounding boxes>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|(align <em|g> <em|r> <em|xa> <em|ya> [<em|xa<rsub|2>>
     <em|ya<rsub|2>>])>>Move <math|g> so that the point at the fractions
     <math|(xa,ya)> of its logical box coincides with the point
@@ -420,7 +420,7 @@
     <verbatim|max-width>, <verbatim|min-height>,
     <verbatim|max-height>>Choose the narrower, wider, lower or higher
     glyph.
-  </description>
+  </description-paragraphs>
 
   <subsection|Numeric expressions>
 

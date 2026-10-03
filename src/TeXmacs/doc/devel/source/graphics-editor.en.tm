@@ -63,7 +63,7 @@
 
   <section|Source map>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Graphics/Types/>>Geometric types:
     <cpp|point> (an <cpp|array\<less\>double\<gtr\>>, in
     <verbatim|point.hpp>), coordinate transformations <cpp|frame>
@@ -145,7 +145,7 @@
     <item*|<verbatim|graphics/graphics-kbd.scm>,
     <verbatim|graphics/graphics-menu.scm>>Keyboard shortcuts, menus and
     toolbars.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

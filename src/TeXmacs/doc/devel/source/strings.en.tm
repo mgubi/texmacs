@@ -55,7 +55,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Kernel/Types/string.hpp>,
     <verbatim|string.cpp>>The byte string class; see <hlink|basic data
     types|types.en.tm>.
@@ -105,7 +105,7 @@
     <item*|<verbatim|Scheme/Glue/build-glue-basic.scm>>The <scheme> glue
     for the routines above (<scm|utf8-\<gtr\>cork>,
     <scm|tmstring-length>, <scm|tmstring-upcase-all>, ...).
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

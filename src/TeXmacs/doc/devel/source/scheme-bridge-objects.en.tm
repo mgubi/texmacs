@@ -15,7 +15,7 @@
     holds the <name|Guile> value. Objects are built from the usual
     <TeXmacs> types:
 
-    <\description>
+    <\description-paragraphs>
       <item*|<cpp|object ()>>The empty list <verbatim|()>, also returned by
       <cpp|null_object ()>.
 
@@ -31,7 +31,7 @@
       <item*|<cpp|object (path)>, <cpp|object (list\<less\>string\<gtr\>)>,
       <cpp|object (list\<less\>tree\<gtr\>)>, <cpp|object
       (array\<less\>double\<gtr\>)>>Lists of the converted elements.
-    </description>
+    </description-paragraphs>
 
     The constructor <cpp|object (void*)> is declared but deliberately left
     undefined: without it, any pointer would silently be converted to

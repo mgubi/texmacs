@@ -18,7 +18,7 @@
 
   The most important data members are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|drd_info& drd>>A <em|reference> to the data relation
     descriptor of the buffer (the member <cpp|drd> of <cpp|editor_rep>). The
     environment uses it for <markup|drd-props> and for accessibility tests,
@@ -63,7 +63,7 @@
     <item*|<cpp|complete>, <cpp|read_only>, <cpp|missing>,
     <cpp|redefined>, <cpp|touched>, <cpp|link_env>>Information collected
     while typesetting, such as missing references or loci.
-  </description>
+  </description-paragraphs>
 
   The remaining members (<cpp|fn>, <cpp|pen>, <cpp|lan>, <cpp|mode>,
   <cpp|index_level>, <cpp|page_width>, <cpp|point_style>, ...) are C++

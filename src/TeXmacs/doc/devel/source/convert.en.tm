@@ -121,7 +121,7 @@
 
   <section|Source map>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|convert/latex/init-latex.scm>>Format declarations,
     converters and their options for <LaTeX>.
 
@@ -193,7 +193,7 @@
 
     <item*|<verbatim|doc/tmweb.scm>>Conversion of whole directories into a
     web site.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

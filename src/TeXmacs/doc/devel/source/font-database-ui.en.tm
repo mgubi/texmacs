@@ -10,7 +10,7 @@
   The following user preferences influence the font database and the font
   selection:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|"new style fonts">>Default <verbatim|"on">. When it
     changes, <scm|notify-new-fonts> in
     <verbatim|progs/texmacs/texmacs/tm-server.scm> calls
@@ -34,7 +34,7 @@
     japanese font name">, <verbatim|"default korean font name">>Override the
     default fonts used for <verbatim|sys-chinese>, <verbatim|sys-japanese>
     and <verbatim|sys-korean>.
-  </description>
+  </description-paragraphs>
 
   The environment variable <verbatim|TEXMACS_FONT_PATH> also extends the
   font path.
@@ -43,7 +43,7 @@
 
   The directory <verbatim|progs/fonts> contains:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|fonts-ec.scm>, <verbatim|fonts-adobe.scm>,
     <verbatim|fonts-x.scm>, <verbatim|fonts-math.scm>,
     <verbatim|fonts-foreign.scm>, <verbatim|fonts-misc.scm>,
@@ -65,7 +65,7 @@
     <item*|<verbatim|font-sample.scm>>Utilities which build tables of
     characters and font samples, used by the font selector and by
     maintainers for comparing fonts.
-  </description>
+  </description-paragraphs>
 
   The commands <scm|scan-disk-for-fonts> and <scm|clear-font-cache>, bound
   to <menu|Tools|Fonts|Scan disk for fonts> and <menu|Tools|Fonts|Clear font

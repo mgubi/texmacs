@@ -95,7 +95,7 @@
 
   <section|Where to find the code>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|src/src/Graphics/Gui/>>The abstract interface:
     <verbatim|widget.hpp>, <verbatim|message.hpp>, <verbatim|gui.hpp>,
     <verbatim|window.hpp> and <verbatim|widget.cpp>.
@@ -126,7 +126,7 @@
     <verbatim|Plugins/Cocoa/>>The older <name|X11> port, built on the
     <TeXmacs> own widget kit <name|Widkit>, and an experimental <name|Cocoa>
     port.
-  </description>
+  </description-paragraphs>
 
   <section|Contents>
 

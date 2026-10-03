@@ -103,7 +103,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Style/Environment/environment.hpp>>The abstract
     <cpp|environment_rep> (integer keys obtained with
     <cpp|make_tree_label>), the handle <cpp|environment>, the identity
@@ -146,7 +146,7 @@
 
     <item*|<verbatim|evaluate_misc.cpp>>Formatting tags, tables,
     <markup|hard-id>, scripts, bindings, patterns and points.
-  </description>
+  </description-paragraphs>
 
   The hooks in the editor are in <verbatim|Edit/editor.hpp>,
   <verbatim|Edit/Editor/edit_main.cpp>,

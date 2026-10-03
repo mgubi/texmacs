@@ -82,7 +82,7 @@
   <verbatim|$TEXMACS_PATH> and <verbatim|/usr/share/TeXmacs> for
   <verbatim|plugins/*/<em|sub>>.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|GUILE_LOAD_PATH>><verbatim|$TEXMACS_PATH/progs>, the
     previous value, <verbatim|$TEXMACS_HOME_PATH/progs> and the
     <verbatim|progs> directories of plug-ins.
@@ -121,7 +121,7 @@
 
     <item*|<verbatim|TEXMACS_SOURCE_PATH>>The source directory given at
     build time (empty on <name|Windows>).
-  </description>
+  </description-paragraphs>
 
   Because <abbr|URL>s expand environment variables when they are
   constructed (<hlink|URLs|system-urls.en.tm>), code which builds search

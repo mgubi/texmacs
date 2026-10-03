@@ -104,7 +104,7 @@
   Paths are relative to <verbatim|src/src/> for <c++> files and to
   <verbatim|src/TeXmacs/> for the others.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Texmacs/Data/new_project.cpp>>Attaching a project to
     the current buffer, implicit projects, <cpp|project_get>.
 
@@ -153,7 +153,7 @@
 
     <item*|<verbatim|progs/part/part-menu.scm>>The menus which open the
     included files as part views.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

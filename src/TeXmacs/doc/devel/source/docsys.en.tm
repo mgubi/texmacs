@@ -64,7 +64,7 @@
 
   Paths are relative to <verbatim|src/TeXmacs/>.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|styles/documentation/texmacs/tmdoc.ts>>The
     <tmstyle|tmdoc> style: page layout, fonts and the code markup
     (<markup|verbatim>, <markup|scm>, <markup|cpp>, ...).
@@ -105,7 +105,7 @@
     <verbatim|make-apidoc-doc.scm>, <verbatim|make-apidoc-module.scm>>The
     generator of <verbatim|doc/devel/scheme/api/glue-auto-doc.en.tm> and
     <verbatim|progs/prog/glue-symbols.scm>.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

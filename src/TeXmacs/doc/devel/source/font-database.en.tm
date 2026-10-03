@@ -174,7 +174,7 @@
 
   <subsection|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Graphics/Fonts/font.hpp>>Declarations of all public
     database and selection routines (sections \PFont database\Q and \PFont
     selection\Q at the end of the file) and of <cpp|FONT_ATTEMPTS>.
@@ -212,7 +212,7 @@
     (<verbatim|font-old-menu.scm>), the font selector
     (<verbatim|font-new-widgets.scm>) and tools for sampling and comparing
     fonts (<verbatim|font-sample.scm>).
-  </description>
+  </description-paragraphs>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

@@ -193,7 +193,7 @@
   <scm|(drd-props tag prop1 val1 ...)>. Each recognized property is set
   and frozen in <cpp|drd>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|arity>>A number, or a tuple <verbatim|repeat>,
     <verbatim|repeat*> or <verbatim|options> with two numbers.
 
@@ -220,7 +220,7 @@
     <item*|a type name>(as accepted by <cpp|drd_encode_type>, such as
     <verbatim|regular>, <verbatim|length>, <verbatim|boolean>) with a child
     number or <verbatim|all>: the type of children.
-  </description>
+  </description-paragraphs>
 
   Note that <markup|drd-props> acts on the DRD passed to the environment
   at the moment it is <em|executed>: in a style file, this is the DRD

@@ -69,7 +69,7 @@
   The keys of <verbatim|generic/generic-kbd.scm> call parameterless
   commands, which call the following hooks on the focus tree:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(kbd-enter <scm-arg|t> <scm-arg|shift?>)>><key|return> and
     <key|S-return> (with <scm|kbd-control-enter> and
     <scm|kbd-alternate-enter> for the modified variants). The default
@@ -89,7 +89,7 @@
     <scm|kbd-incremental>>Cursor movements with the arrow keys,
     <key|home>/<key|end> and <key|pageup>/<key|pagedown>; sessions redefine
     them to move between input fields.
-  </description>
+  </description-paragraphs>
 
   In addition, the unconditional entry points <scm|kbd-insert> (insertion of
   a character or shorthand), <scm|kbd-backspace> and <scm|kbd-delete> may be
@@ -101,7 +101,7 @@
   <key|structured:move ...> and <key|structured:cmd ...> shortcuts and the
   corresponding icons of the focus bar:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(structured-insert-horizontal <scm-arg|t>
     <scm-arg|forwards?>)>, <scm|structured-insert-vertical>,
     <scm|structured-remove-horizontal>, <scm|structured-remove-vertical>>Insert
@@ -137,7 +137,7 @@
 
     <item*|<scm|structured-maximize>, <scm|structured-minimize>,
     <scm|swipe-horizontal>, <scm|swipe-vertical>>Gestures.
-  </description>
+  </description-paragraphs>
 
   The predicates <scm|structured-horizontal?> and
   <scm|structured-vertical?> tell the generic code whether the horizontal

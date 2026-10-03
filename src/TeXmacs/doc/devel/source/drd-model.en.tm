@@ -507,7 +507,7 @@
   convert between the constants and the names used by <markup|drd-props>
   and by the glue (<scm|tree-child-type>, <scm|tree-label-type>).
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|TYPE_REGULAR> (<verbatim|regular>)>Ordinary content.
 
     <item*|<verbatim|TYPE_ADHOC> (<verbatim|adhoc>)>Content without a
@@ -550,7 +550,7 @@
     initial value used by the heuristics. <verbatim|TYPE_INVALID>
     (<math|-1>) is returned by <cpp|get_type_child> for a child outside the
     layout and is never stored.
-  </description>
+  </description-paragraphs>
 
   The child types are used for syntax coloring in source mode
   (<cpp|highlight> in <verbatim|Typeset/Env/env_inactive.cpp> maps them to

@@ -188,7 +188,7 @@
   following files are created on demand below
   <verbatim|$TEXMACS_HOME_PATH> (usually <verbatim|~/.TeXmacs>):
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|users/users-master.tmdb>>User identities, the default
     user and, for each user and each database kind, the preferred database
     file (<verbatim|db-users.scm>).
@@ -215,7 +215,7 @@
     of the external <verbatim|bibtex> program: <verbatim|temp.aux>,
     <verbatim|temp.bbl>, <verbatim|temp.log>, <verbatim|auto.bib> and
     copies of <verbatim|.bst> files.
-  </description>
+  </description-paragraphs>
 
   In addition, a document may carry bibliographic entries as
   <em|attachments> named <verbatim|<em|prefix>-bibliography> (entries

@@ -97,7 +97,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Data/Observers/link.hpp>,
     <verbatim|link.cpp>>The classes <cpp|soft_link> and
     <cpp|link_repository>, the global tables, the navigation queries
@@ -158,7 +158,7 @@
     <verbatim|ref-markup.scm>, <verbatim|ref-menu.scm>>Tools for labels
     and references: broken references, duplicate labels, inferred
     references, previews, smart references.
-  </description>
+  </description-paragraphs>
 
   Paths of <c++> files are relative to <verbatim|src/src/>, paths of
   <scheme> files to <verbatim|src/TeXmacs/>.

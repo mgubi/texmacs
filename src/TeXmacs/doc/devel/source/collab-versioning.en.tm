@@ -55,7 +55,7 @@
 
   The functions to be provided by a back-end are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(version-status <scm-arg|name>)>>One of
     <verbatim|"unknown">, <verbatim|"modified"> or
     <verbatim|"unmodified">.
@@ -79,7 +79,7 @@
     <item*|<scm|version-supports-svn-style?>,
     <scm|version-supports-git-style?>>Which of the two interfaces the menu
     should offer.
-  </description>
+  </description-paragraphs>
 
   The buffer level commands <scm|update-buffer>, <scm|register-buffer>,
   <scm|commit-buffer> and <scm|commit-buffer-message> call these

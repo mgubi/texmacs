@@ -104,7 +104,7 @@
 
   <section|Inclusions on the <scheme> side>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|tm-get-includes>, <scm|buffer-get-includes>,
     <scm|buffer-contains-includes?>>(<verbatim|generic/document-part.scm>)
     List the names of the files included by a document, looking through
@@ -122,7 +122,7 @@
     <markup|include> which is a paragraph of a <markup|document> (at any
     depth) is replaced by the paragraphs
     of the included body (taken from the cache).
-  </description>
+  </description-paragraphs>
 
   <section|Pitfalls>
 

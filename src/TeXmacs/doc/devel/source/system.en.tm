@@ -89,7 +89,7 @@
 
   <section|Source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|System/Classes/url.hpp>, <verbatim|url.cpp>>The class
     <cpp|url>: constructors and parsing, printing, operations, resolution
     (<cpp|complete>, <cpp|resolve>) and concretization.
@@ -154,7 +154,7 @@
     32-bit and 64-bit <name|Windows> layers.
 
     <item*|<verbatim|Plugins/Android/>>The <name|Android> layer.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

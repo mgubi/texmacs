@@ -179,7 +179,7 @@
 
   <section|Preferences>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|ai>>The engine used by <menu|Tools|Correct>,
     <menu|Translate> and <scm|ai-translate*>.
 
@@ -203,7 +203,7 @@
 
     <item*|<verbatim|http request timeout>>The timeout of <abbr|HTTP>
     requests in <name|Qt> 6 builds.
-  </description>
+  </description-paragraphs>
 
   <section|Pitfalls>
 

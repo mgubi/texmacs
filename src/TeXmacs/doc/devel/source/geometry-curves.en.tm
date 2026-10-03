@@ -128,7 +128,7 @@
   <math|[0,1]> to points: <cpp|c (t)> evaluates it. The virtual methods of
   <cpp|curve_rep> are
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|nr_components ()>>The number of pieces, used to choose
     step sizes and to parameterize concatenations.
 
@@ -157,11 +157,11 @@
     <cpp|find_closest_point>>Local minima of the distance to <cpp|p>,
     found by walking along the curve with steps given by <cpp|bound>, and
     sorted by distance.
-  </description>
+  </description-paragraphs>
 
   <subsection|Concrete curves>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|segment (p1, p2)>, <cpp|poly_segment (a, cip)>>A segment
     and a polyline; the polyline has <math|N(a)-1> components with equal
     parameter intervals.
@@ -201,7 +201,7 @@
     <item*|<cpp|recontrol (c, a, cip)>>The same curve with other control
     points; used for calligraphic strokes, whose shape is computed but
     whose control points are those of the source markup.
-  </description>
+  </description-paragraphs>
 
   <subsection|Closest points and intersections>
 

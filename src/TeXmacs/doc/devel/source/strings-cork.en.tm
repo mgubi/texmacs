@@ -98,7 +98,7 @@
   The routines of <verbatim|Data/String/analyze.cpp> whose name starts with
   <cpp|tm_> treat a symbol as one character:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|tm_char_forwards (s, pos)>,
     <cpp|tm_char_backwards (s, pos)>>Move <cpp|pos> over one character:
     one byte, or a whole symbol from <verbatim|\<less\>> to
@@ -127,7 +127,7 @@
 
     <item*|<cpp|contains_unicode_char>>Whether the string contains a
     <verbatim|\<less\>#...\<gtr\>> escape.
-  </description>
+  </description-paragraphs>
 
   Conversions between universal strings and plain text which only touch
   the brackets:
@@ -177,7 +177,7 @@
   The remaining routines of <verbatim|universal.cpp> are mainly used for
   sorting, indexing and bibliographies:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|uni_translit (s)>>Transliteration to <abbr|ASCII>: Cork
     accented letters lose their accents (using the table
     <cpp|Cork_unaccented> of <verbatim|Data/Convert/Tex/parsetex.cpp>), and
@@ -197,7 +197,7 @@
     <item*|<cpp|uni_before (s1, s2)>>Comparison for sorting
     (<scm|tmstring-before?>): both strings are unaccented and put in lower
     case, then compared bytewise. This is not a locale aware collation.
-  </description>
+  </description-paragraphs>
 
   Some of these tables have errors; see <hlink|string utilities and
   pitfalls|strings-utils.en.tm>.

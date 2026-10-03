@@ -246,7 +246,7 @@
   <c++> (<verbatim|Plugins/Bibtex/bibtex_functions.cpp>) and exported to
   <scheme>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|bib-field>, <scm|bib-empty?>>access to a field of a
     <markup|bib-entry>.
 
@@ -263,7 +263,7 @@
     <item*|<scm|bib-add-period>>the analogue of <verbatim|add.period$>.
 
     <item*|<scm|bib-abbreviate>>abbreviation of first names.
-  </description>
+  </description-paragraphs>
 
   The <scheme> side (<verbatim|bib-utils.scm>) adds helpers for building
   the output (<scm|bib-new-block>, <scm|bib-new-sentence>,

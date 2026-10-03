@@ -117,7 +117,7 @@
 
   <section|Source map>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|Typeset/env.hpp>>Declaration of the class
     <cpp|edit_env_rep>, the <verbatim|Env_*> categories of environment
     variables and various constants.
@@ -179,7 +179,7 @@
 
     <item*|<verbatim|kernel/texmacs/tm-secure.scm>>The <scheme> side of the
     security check for <markup|extern>.
-  </description>
+  </description-paragraphs>
 
   <section|Contents of this chapter>
 

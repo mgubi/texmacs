@@ -77,7 +77,7 @@
   <scm|latex-type> returns one of the following strings, according to the
   logical group in which the command occurs:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|"command">>Ordinary commands
     (<scm|latex-command%>, with arities from <scm|latex-command-0%>,
     <scm|latex-command-1%>, ...; the groups <scm|latex-command-1*%>
@@ -117,7 +117,7 @@
     <verbatim|\\tmstrong>); this allows a round trip of exported documents.
 
     <item*|<verbatim|"undefined">>Unknown commands.
-  </description>
+  </description-paragraphs>
 
   The parser adds its own types for commands defined in the document:
   <verbatim|"user"> (macros defined by <verbatim|\\def> or
@@ -381,7 +381,7 @@
 
   <section|Options>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|"latex-\<gtr\>texmacs:fallback-on-pictures">
     (default <verbatim|"on">)>Import the constructs of type
     <verbatim|"as-picture"> as pictures (requires a working <LaTeX>
@@ -392,7 +392,7 @@
     <verbatim|"latex-\<gtr\>texmacs:transparent-source-tracking">
     (default <verbatim|"off">)>See <hlink|source tracking and conservative
     conversion|convert-latex-tracking.en.tm>.
-  </description>
+  </description-paragraphs>
 
   All these options are read with <scm|get-preference> or
   <cpp|get_preference>; the option list passed to the converter is
