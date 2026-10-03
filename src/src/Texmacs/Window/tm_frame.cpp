@@ -295,6 +295,9 @@ tm_frame_rep::full_screen_mode (bool on, bool edit) {
   bool hidden= full_screen && !full_screen_edit;
   if (on && !edit) {
     if (!hidden) {
+      // NOTE: like full_screen, the saved visibilities are stored per
+      // server, not per window; leaving presentation mode in another
+      // window than the one where it was entered restores this state there
       saved_header= visible_header ();
       saved_footer= visible_footer ();
     }
