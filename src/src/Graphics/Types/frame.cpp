@@ -233,12 +233,15 @@ linear_2D (matrix<double> m) {
 ******************************************************************************/
 
 struct affine_2D_rep: public frame_rep {
-  matrix<double> m, j;
+  matrix<double> m, j, u;
+  bool invertible;
   affine_2D_rep (matrix<double> m2): m (m2) {
     j= matrix<double> (0.0, 2, 2);
     for (int r=0; r<2; r++)
       for (int c=0; c<2; c++)
         j (r, c)= m (r, c);
+    invertible= (j (0, 0) * j (1, 1) - j (0, 1) * j (1, 0) != 0.0);
+    if (invertible) u= invert (j);
     linear= true; }
  // FIXME: Do we use "linear" in such a
  //   weakest sense for affine transforms ?
@@ -261,7 +264,7 @@ struct affine_2D_rep: public frame_rep {
   double direct_bound (point p, double eps) {
     (void) p; return linear_bound_2D (j, eps); }
   double inverse_bound (point p, double eps) {
-    (void) p; return linear_bound_2D (invert (j), eps); }
+    (void) p; return invertible? linear_bound_2D (u, eps): eps; }
 };
 
 frame
