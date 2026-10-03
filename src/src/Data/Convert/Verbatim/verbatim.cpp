@@ -298,7 +298,8 @@ static string
 encode (string s, string enc) {
   if (enc == "auto") return western_to_cork (s);
   else if (enc == "utf-8") return utf8_to_cork (s);
-  else if (enc == "iso-8859-1") return latin1_to_cork (s);
+  else if (enc == "iso-8859-1" || enc == "ISO-8859-1")
+    return latin1_to_cork (s);
   else if (enc == "SourceCode") return sourcecode_to_cork(s);
   else return tm_encode (s);
 }

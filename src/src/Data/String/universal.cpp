@@ -456,11 +456,7 @@ uni_is_letter (string s) {
     unsigned char c= s[0];
     return
       is_alpha (c) ||
-      (((unsigned int) c) >= 128 &&
-       c != ((unsigned char) 0x9F) && // section sign
-       c != ((unsigned char) 0xBD) && // inverted exclamation mark
-       c != ((unsigned char) 0xBE) && // inverted question mark
-       c != ((unsigned char) 0xBF));  // pound sign
+      (((unsigned int) c) >= 128 && (((unsigned int) c) & 97) != 31);
   }
   else if (starts (s, "<#") && ends (s, ">")) {
     int code= from_hexadecimal (s (2, N(s) - 1));

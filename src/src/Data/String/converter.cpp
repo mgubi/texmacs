@@ -882,11 +882,7 @@ decode_from_utf8 (string s, int& i) {
   int start= i-1;
   for (; trail > 0; trail--) {
     i++;
-    if (i >= N(s)) {
-      i= start+1;
-      c= s[i++];
-      return c;
-    }
+    if (i >= N(s)) i= N(s)-1;
     c = s[i];
     if ((0xC0 & c) == 0x80)
       code = (code << 6) | (c & 0x3F);
@@ -927,8 +923,9 @@ hex_entities_to_utf8 (string s) {
   int i, n= N(s);
   for (i=0; i<n; )
     if (test (s, i, "&#x")) {
-      int j= search_forwards (";", i, s);
-      if (j > i) {
+      int j= i+3;
+      while (j < n && j < i+9 && is_hex_digit (s[j])) j++;
+      if (j > i+3 && j < n && s[j] == ';') {
         unsigned int code= from_hexadecimal (s (i+3, j));
         if (code >= 0x80 && code <= 0x10FFFF &&
             (code < 0xD800 || code > 0xDFFF)) {
