@@ -354,6 +354,26 @@ connection_get (string name, string session) {
   return con;
 }
 
+static void
+connection_append (tree& doc, tree next) {
+  // the answer may come in several reads: the first line of a read
+  // continues the last line of the previous one, as within a read
+  if (!is_document (next)) next= tree (DOCUMENT, next);
+  if (N(doc) == 0 || doc[N(doc)-1] == "") {
+    if (N(doc) != 0) doc= doc (0, N(doc)-1);
+    doc << A (next);
+    return;
+  }
+  if (next[0] != "") {
+    tree last= doc[N(doc)-1], first= next[0];
+    if (!is_concat (last)) last= tree (CONCAT, last);
+    if (!is_concat (first)) first= tree (CONCAT, first);
+    last << A (first);
+    doc[N(doc)-1]= last;
+  }
+  doc << A (next (1, N(next)));
+}
+
 static tree
 connection_retrieve (string name, string session) {
   // cout << "Retrieve " << name << ", " << session << "\n";
@@ -367,10 +387,10 @@ connection_retrieve (string name, string session) {
 #endif
     con->forced_eval= false;
     tree next= connection_read (name, session);
-    if (next == "");
-    else if (is_document (next)) doc << A (next);
-    else doc << next;
+    if (next != "") connection_append (doc, next);
     if (con->status == WAITING_FOR_INPUT) break;
+    // a dead connection never completes its answer
+    if (con->status == CONNECTION_DEAD) break;
   }
   if (N(doc) == 0) return "";
   // cout << "Retrieved " << doc << "\n";
