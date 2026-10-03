@@ -439,14 +439,15 @@
     ===
     (hlist
       (text "CSS stylesheet:") //
-      (enum (set-preference "texmacs->html:css-stylesheet" answer)
-            '("---"
-              "https://www.texmacs.org/css/web-article.css"
-              "https://www.texmacs.org/css/web-article-dark.css"
-              "https://www.texmacs.org/css/web-article-colored.css"
-              "https://www.texmacs.org/css/web-article-dark-colored.css"
-              "")
-            (get-preference "texmacs->html:css-stylesheet") "18em")))
+      (verb
+        (enum (set-preference "texmacs->html:css-stylesheet" answer)
+              '("---"
+                "https://www.texmacs.org/css/web-article.css"
+                "https://www.texmacs.org/css/web-article-dark.css"
+                "https://www.texmacs.org/css/web-article-colored.css"
+                "https://www.texmacs.org/css/web-article-dark-colored.css"
+                "")
+              (get-preference "texmacs->html:css-stylesheet") "18em"))))
   ====== ======
   (bold (text "Html -> TeXmacs"))
   ===
