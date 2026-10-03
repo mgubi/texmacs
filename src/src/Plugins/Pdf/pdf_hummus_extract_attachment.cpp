@@ -176,9 +176,9 @@ extract_attachments_from_pdf (url pdf_path, list<url>& names) {
         delete streamReader;
         continue;
       }
-      if (!is_directory (out_dir)) {
+      if (is_link (out_dir) || !is_directory (out_dir)) {
         if (!exists (out_dir)) mkdir (out_dir);
-        if (!is_directory (out_dir)) {
+        if (is_link (out_dir) || !is_directory (out_dir)) {
           convert_error << "cannot create the folder " << out_dir
                         << " for the PDF attachments" << LF;
           delete streamReader;
@@ -343,12 +343,12 @@ get_linked_file_paths (tree t, url path) {
   string     label= get_label (t);
   if (label == "image" || label == "include") {
     url incl_url= get_url_image_or_include_tree (t, path);
-    if (is_none (incl_url))
-      ;
-    else if (is_regular (incl_url)) tm_and_linked_file << incl_url;
-    else
-      convert_warning << "linked file " << incl_url
-                      << " not found, not attached to the PDF" << LF;
+    if (!is_none (incl_url)) {
+      if (is_regular (incl_url)) tm_and_linked_file << incl_url;
+      else
+        convert_warning << "linked file " << incl_url
+                        << " not found, not attached to the PDF" << LF;
+    }
     return tm_and_linked_file;
   }
   if (label == "style") return get_url_style_tree (t, path);
