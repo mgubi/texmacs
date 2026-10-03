@@ -534,6 +534,7 @@ elseif (APPLE)
   # Unix system layer plus the Objective-C(++) helpers of Plugins/MacOS
   enable_language (OBJC OBJCXX)
   set (CMAKE_OBJCXX_STANDARD 17)
+  set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
   file (GLOB TeXmacs_OS_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"

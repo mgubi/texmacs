@@ -107,8 +107,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (run-integration-tests)
-  (regtest-deletion-plan)
-  (regtest-server-notifications)
-  (regtest-server-backup)
-  (regtest-server-cache)
-)
+  ;; run all groups and return the number of failing groups;
+  ;; no error is raised, so that a -x session can still quit afterwards
+  (with failed (integration-test-run-all
+                (list regtest-deletion-plan
+                      regtest-server-notifications
+                      regtest-server-backup
+                      regtest-server-cache))
+    (if (null? failed)
+        (display* "All integration test groups passed\n")
+        (display* "Integration test failure: " (length failed)
+                  " groups failed: " failed "\n"))
+    (length failed)))
