@@ -455,9 +455,11 @@
     (gpg-delete-buffer-passphrase w)
     (check-false (gpg-get-buffer-passphrase u))
     (check-false (gpg-get-buffer-passphrase w))
-    ;; the passphrase of the autosave file is deleted too (#176)
+    ;; the passphrases of the autosave files are deleted too (#176)
     (check-false (gpg-get-buffer-passphrase (url-autosave u "~")))
-    (check-false (gpg-get-buffer-passphrase (url-autosave w "~")))))
+    (check-false (gpg-get-buffer-passphrase (url-autosave u "#")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave w "~")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave w "#")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Untrusted documents
