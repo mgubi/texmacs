@@ -631,10 +631,12 @@
   (check= (iterator->list (iterator-filter (range 1 2) odd?)) '(1))
   (check= (iterator-value (iterator-filter (range 1 9) even?)) 2)
   (check= (iterator-value (extract x (range 1 9) (> x 4))) 5)
-  ;; FIXME: iterator-filter only skips the values before the first match
-  ;; and returns the rest of the iterator unfiltered, so that
-  ;; (iterator->list (iterator-filter (range 0 6) even?)) is (0 1 2 3 4 5)
-  ;; instead of (0 2 4), and likewise for extract; not checked
+  ;; the values after the first match are filtered too
+  (check= (iterator->list (iterator-filter (range 0 6) even?)) '(0 2 4))
+  (check= (iterator->list (iterator-filter (range 0 6) odd?)) '(1 3 5))
+  (check= (iterator->list (extract x (range 0 6) (odd? x))) '(1 3 5))
+  (check= (iterator->list (iterator-filter (list->iterator '(a 1 b 2 c)) symbol?))
+          '(a b c))
   (check= (iterator-value (iterator-filter (list->iterator '(a 1 b)) number?))
           1))
 
