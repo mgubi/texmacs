@@ -20,6 +20,9 @@
         (convert tools environment-test)
         (convert mathml mathtm-test)
         (convert tmml tmmltm-test)
+        (kernel texmacs tm-convert-test)
+        (kernel regexp regexp-test)
+        (kernel logic logic-test)
         (prog prog-format-test)
         (server server-cache-test)
         (server server-backup-test)
@@ -94,6 +97,9 @@
   (regtest-tmmltm)
   (regtest-prog-format)
   (regtest-cite-sort)
+  (regtest-tm-convert)
+  (regtest-regexp)
+  (regtest-logic)
 )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -101,8 +107,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (run-integration-tests)
-  (regtest-deletion-plan)
-  (regtest-server-notifications)
-  (regtest-server-backup)
-  (regtest-server-cache)
-)
+  ;; run all groups and return the number of failing groups;
+  ;; no error is raised, so that a -x session can still quit afterwards
+  (with failed (integration-test-run-all
+                (list regtest-deletion-plan
+                      regtest-server-notifications
+                      regtest-server-backup
+                      regtest-server-cache))
+    (if (null? failed)
+        (display* "All integration test groups passed\n")
+        (display* "Integration test failure: " (length failed)
+                  " groups failed: " failed "\n"))
+    (length failed)))
