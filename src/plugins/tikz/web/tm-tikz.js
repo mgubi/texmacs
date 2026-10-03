@@ -77,6 +77,65 @@ function stopTex () {
 * The input, as tm_tikz.py takes it
 ******************************************************************************/
 
+// TeX marks the text of each node in the SVG, a group <g data-tm-node="n">
+// numbered in the order it makes the nodes (dvisvgm specials, which the
+// drivers of TikZJax and dvi2html speak)
+var NODE_MARKERS =
+  '\\newcount\\tmnode\n' +
+  '\\tikzset{every node/.append style={' +
+  'execute at begin node={\\global\\advance\\tmnode by 1 ' +
+  '\\special{dvisvgm:raw <g data-tm-node="\\the\\tmnode">}},' +
+  'execute at end node={\\special{dvisvgm:raw </g>}}}}\n';
+
+// the nodes of a TikZ source, in the order of TeX: for each, where its text
+// {...} is in the source, and its options; null for a coordinate (a node
+// without text). A heuristic, checked against the nodes TeX made: a picture
+// whose nodes do not match (a \foreach, label=...) keeps the runs of TeX
+function scanNodes (code) {
+  var nodes = [], i = 0, n = code.length;
+  function blank () { while (i < n && /\s/.test (code[i])) i++; }
+  function group (open, close) { // from code[i] == open, past its close
+    var depth = 0;
+    for (; i < n; i++) {
+      var c = code[i];
+      if (c === '\\') { i++; continue; }
+      if (c === '%') { while (i < n && code[i] !== '\n') i++; continue; }
+      if (c === open) depth++;
+      else if (c === close && --depth === 0) { i++; return true; }
+    }
+    return false;
+  }
+  while (i < n) {
+    var c = code[i];
+    if (c === '%') { while (i < n && code[i] !== '\n') i++; continue; }
+    var m = /^(\\?)(node|coordinate)(?![a-zA-Z@\/])/.exec (code.slice (i, i + 12));
+    if (m && (m[1] || i === 0 || !/[a-zA-Z@\\]/.test (code[i - 1]))) {
+      i += m[0].length;
+      var opts = '';
+      while (true) { // (name), [options], at (...), in any order
+        blank ();
+        if (code[i] === '(') { if (!group ('(', ')')) break; continue; }
+        if (code[i] === '[') { var o = i; if (!group ('[', ']')) break; opts += code.slice (o, i); continue; }
+        if (code.slice (i, i + 2) === 'at' && !/[a-zA-Z]/.test (code[i + 2] || '')) {
+          i += 2; blank (); if (code[i] === '(') group ('(', ')'); continue;
+        }
+        break;
+      }
+      if (m[2] === 'coordinate') { nodes.push (null); continue; }
+      if (code[i] === '{') {
+        var b = i;
+        if (group ('{', '}')) nodes.push ({ start: b + 1, end: i - 1, opts: opts });
+        else nodes.push (null);
+      }
+      else nodes.push (null);
+      continue;
+    }
+    if (c === '\\') { i += 2; continue; }
+    i++;
+  }
+  return nodes;
+}
+
 // the TikZ code of an input, and what goes in the preamble: a full LaTeX
 // document is cut into its preamble and its body; code without
 // tikzpicture gets one; "% packages: a, b" and "% libraries: c, d" as first
@@ -121,6 +180,7 @@ function prepare (code) {
       body = '\\begin{tikzpicture}\n' + body + '\n\\end{tikzpicture}';
   }
   options.tikzLibraries = libs.filter (Boolean).join (',');
+  options.addToPreamble += NODE_MARKERS;
   return { body: body, options: options };
 }
 
@@ -242,14 +302,17 @@ function runTree (font, size, text, fill) {
   return '(with ' + env.join (' ') + ' (math ' + schemeString (str) + '))';
 }
 
-// the SVG without the runs which TeXmacs sets, and those runs as trees
-function split (svg) {
+// the SVG without the text which TeXmacs sets, and that text as trees: the
+// nodes whose source is known as labels (their LaTeX, typeset by TeXmacs),
+// the other runs as runs; the source cut into its texts and the texts of
+// its nodes, when they match the nodes of TeX
+function split (svg, source) {
   var root = /<svg\b[^>]*>/.exec (svg)[0];
   var vb = (attr (root, 'viewBox') || '0 0 0 0').split (/[\s,]+/).map (Number);
   var w = parseFloat (attr (root, 'width')), h = parseFloat (attr (root, 'height'));
   var k = vb[2] > 0 && w > 0 ? w / vb[2] : 1; // points per unit of the SVG
-  var stack = [{ m: [1, 0, 0, 1, 0, 0], fill: null }];
-  var out = [], runs = [];
+  var stack = [{ m: [1, 0, 0, 1, 0, 0], fill: null, node: 0 }];
+  var out = [], texts = [], nodeCount = 0;
   var re = /<(\/?)([\w:-]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g, t;
   var text = null; // the <text> being read: its tag, its characters
   while ((t = re.exec (svg))) {
@@ -261,23 +324,116 @@ function split (svg) {
     var top = stack[stack.length - 1];
     if (name === 'text' && !closing) {
       text = { tag: tag, chars: '', m: mul (top.m, transform (attr (tag, 'transform'))),
-               fill: attr (tag, 'fill') || top.fill };
+               fill: attr (tag, 'fill') || top.fill, node: top.node };
       continue;
     }
     if (name === 'text' && closing && text) {
-      var tr = run (text, vb, k);
-      if (tr) runs.push (tr);
-      else out.push (keep (text) + tag); // left to the image
+      text.end = tag;
+      texts.push (place (text, vb, k));
+      out.push (texts.length - 1); // decided below
       text = null;
       continue;
     }
     out.push (tag);
     if (closing) { if (stack.length > 1) stack.pop (); }
-    else if (!self)
+    else if (!self) {
+      var nd = attr (tag, 'data-tm-node');
+      if (nd) nodeCount = Math.max (nodeCount, Number (nd));
       stack.push ({ m: mul (top.m, transform (attr (tag, 'transform'))),
-                    fill: attr (tag, 'fill') || top.fill });
+                    fill: attr (tag, 'fill') || top.fill,
+                    node: nd ? Number (nd) : top.node });
+    }
   }
-  return { svg: out.join (''), runs: runs, w: attr (root, 'width'), h: attr (root, 'height') };
+  // the nodes of the source, if they are those of TeX
+  var nodes = scanNodes (source);
+  if (nodes.length !== nodeCount) nodes = null;
+  var labels = {}, segments = null;
+  if (nodes) {
+    segments = [];
+    var at = 0, content = 0;
+    nodes.forEach (function (nd, j) {
+      if (!nd) return;
+      segments.push (source.slice (at, nd.start), source.slice (nd.start, nd.end));
+      at = nd.end;
+      content++; // the label of the n-th text of the source (coordinates have none)
+      var l = label (content, j + 1, nd, source.slice (nd.start, nd.end), texts);
+      if (l) labels[j + 1] = l;
+    });
+    segments.push (source.slice (at));
+  }
+  // the runs, and the SVG without what TeXmacs sets
+  var runs = [];
+  Object.keys (labels).forEach (function (j) { runs.push (labels[j]); });
+  var svgOut = out.map (function (x) {
+    if (typeof x !== 'number') return x;
+    var tx = texts[x];
+    if (tx.node && labels[tx.node]) return '';
+    if (tx.run) { runs.push (tx.run); return ''; }
+    return keep (tx) + tx.end; // left to the image
+  }).join ('');
+  return { svg: svgOut, runs: runs, segments: segments,
+           w: attr (root, 'width'), h: attr (root, 'height') };
+}
+
+// where a <text> goes: its point and frame in the picture, in points (y
+// up), and its tree as a run of TeXmacs, if it can be one
+function place (text, vb, k) {
+  var x = Number (attr (text.tag, 'x') || 0), y = Number (attr (text.tag, 'y') || 0);
+  var m = text.m;
+  var px = m[0]*x + m[2]*y + m[4], py = m[1]*x + m[3]*y + m[5];
+  text.dx = (px - vb[0]) * k;
+  text.dy = (vb[1] + vb[3] - py) * k;
+  text.font = attr (text.tag, 'font-family') || '';
+  // the frame of the text: its x axis (a, b), a rotation and a scale, no
+  // mirror nor skew (y down in the SVG, y up in TeXmacs)
+  var s = Math.hypot (m[0], m[1]), det = m[0]*m[3] - m[1]*m[2];
+  text.straight = s !== 0 && Math.abs (det - s*s) <= 1e-3 * s*s &&
+                  Math.abs (Math.atan2 (-m[1], m[0])) < 1e-4;
+  text.size = Number (attr (text.tag, 'font-size') || 10) * s * k;
+  // a rotated run stays in the image: TeXmacs' rotate (gr-transform) is
+  // drawn mirrored and clipped by the renderer of the browser for now
+  var t = text.straight ? runTree (text.font, text.size, decode (text.chars), text.fill) : null;
+  text.run = t ? '(move (smash ' + t + ') "' + num (text.dx) + 'pt" "' + num (text.dy) + 'pt")' : null;
+  return text;
+}
+
+// the label of a node (the n-th text of the source, the node-th node of
+// TeX): its LaTeX, typeset by TeXmacs at the place of its
+// text in TeX (its leftmost run, the baseline of its main runs), in the
+// font of its first run of text; null for a node of several lines, a
+// rotated one, or one without text
+function label (n, node, nd, latex, texts) {
+  var mine = texts.filter (function (t) { return t.node === node; });
+  if (!mine.length || !latex.trim ()) return null;
+  if (/text width|align\s*=/.test (nd.opts) || /\\\\/.test (latex)) return null;
+  if (mine.some (function (t) { return !t.straight; })) return null;
+  var size = Math.max.apply (null, mine.filter (function (t) { return !/^cmex/.test (t.font); })
+                                     .map (function (t) { return t.size; }).concat ([0]));
+  if (!size) size = mine[0].size;
+  // a text which sets its own size (\tiny...) is set by TeXmacs from the
+  // size of the document of TeX (10 pt), as TeX did: from the size it ended
+  // with, it would be made smaller twice
+  var base = /\\(tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b/.test (latex)
+             ? 10 : size;
+  var main = mine.filter (function (t) { return Math.abs (t.size - size) < 0.01 && !/^cmex/.test (t.font); });
+  if (!main.length) main = mine;
+  var count = {}, dy = main[0].dy;
+  main.forEach (function (t) {
+    var key = num (t.dy); count[key] = (count[key] || 0) + 1;
+    if (count[key] > (count[num (dy)] || 0)) dy = t.dy;
+  });
+  var dx = Math.min.apply (null, mine.map (function (t) { return t.dx; }));
+  var f = /^([a-z]+?)(\d+)$/.exec ((mine.find (function (t) { return TEXT_FONTS[(/^([a-z]+?)\d+$/.exec (t.font) || [])[1]]; }) || {}).font || '');
+  var tf = (f && TEXT_FONTS[f[1]]) || ['rm', 'medium', 'right'];
+  var env = ['"mode" "text"', '"font" "roman"', '"font-family" "' + tf[0] + '"',
+             '"font-series" "' + tf[1] + '"', '"font-shape" "' + tf[2] + '"',
+             '"font-base-size" "' + num (base) + '"', '"font-size" "1"'];
+  var c = color (mine[0].fill);
+  if (c) env.push ('"color" ' + schemeString (c));
+  var src = '(tikz-latex ' + schemeString (latex) + ')';
+  // (not smashed: its box is what a click finds, before the image under it)
+  return '(move (with ' + env.join (' ') + ' (tikz-label "' + n + '" ' + src + ' ' + src +
+         ')) "' + num (dx) + 'pt" "' + num (dy) + 'pt")';
 }
 
 // a run left in the image, which TeXmacs draws as outlines (mupdf_picture.cpp,
@@ -295,32 +451,13 @@ function keep (text) {
   return text.tag.replace (/^<text/, '<text data-tm-tex="1"') + chars;
 }
 
-// a run as TeXmacs text placed over the image, or null
-function run (text, vb, k) {
-  var x = Number (attr (text.tag, 'x') || 0), y = Number (attr (text.tag, 'y') || 0);
-  var m = text.m;
-  var px = m[0]*x + m[2]*y + m[4], py = m[1]*x + m[3]*y + m[5];
-  // the frame of the text: its x axis (a, b), a rotation and a scale, no
-  // mirror nor skew (y down in the SVG, y up in TeXmacs)
-  var s = Math.hypot (m[0], m[1]), det = m[0]*m[3] - m[1]*m[2];
-  if (s === 0 || Math.abs (det - s*s) > 1e-3 * s*s) return null;
-  var angle = Math.atan2 (-m[1], m[0]) * 180 / Math.PI;
-  var size = Number (attr (text.tag, 'font-size') || 10) * s * k;
-  var t = runTree (attr (text.tag, 'font-family') || '', size, decode (text.chars), text.fill);
-  if (!t) return null;
-  // a rotated run stays in the image: TeXmacs' rotate (gr-transform) is
-  // drawn mirrored and clipped by the renderer of the browser for now
-  if (Math.abs (angle) > 0.01) return null;
-  var dx = (px - vb[0]) * k, dy = (vb[1] + vb[3] - py) * k;
-  return '(move (smash ' + t + ') "' + num (dx) + 'pt" "' + num (dy) + 'pt")';
-}
-
 function picture (source, svg) {
-  var p = split (svg);
-  var image = '(image (tuple (raw-data ' + schemeString (p.svg) + ') "tikz.svg") ' +
-              schemeString (p.w || '') + ' ' + schemeString (p.h || '') + ' "" "")';
-  return '(tikz-picture ' + schemeString (source) +
-         ' (superpose ' + [image].concat (p.runs).join (' ') + '))';
+  var p = split (svg, source);
+  var image = '(tikz-drawing (image (tuple (raw-data ' + schemeString (p.svg) + ') "tikz.svg") ' +
+              schemeString (p.w || '') + ' ' + schemeString (p.h || '') + ' "" ""))';
+  var src = p.segments ? '(tuple ' + p.segments.map (schemeString).join (' ') + ')'
+                       : schemeString (source);
+  return '(tikz-picture ' + src + ' (superpose ' + [image].concat (p.runs).join (' ') + '))';
 }
 
 // the error of TeX in its log: from its first line "! ...", the lines up to

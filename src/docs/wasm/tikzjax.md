@@ -315,6 +315,34 @@ Why not otherwise:
   yet: a circle, a line and two labels were in TikZJax's test page within
   15 s of its loading, download included).
 
+## Editing the text of a picture
+
+Each node of TikZ whose text can be found in the source is one label, its
+LaTeX typeset by TeXmacs, and editable:
+
+- TeX marks the text of each node: the preamble of every picture has
+  `every node/.append style={execute at begin node=...}` with a dvisvgm
+  special `<g data-tm-node="n">` around it, numbered in the order TeX
+  makes the nodes (coordinates included).
+- `scanNodes` (`tm-tikz.js`) finds the text `{...}` of each node in the
+  source, in the same order (`\node`, `node` on a path, `\coordinate`;
+  options, names and `at (...)` skipped, comments too). When its count is
+  that of TeX, the source is cut into its texts and the texts of its nodes,
+  `(tikz-picture (tuple text1 node1 text2 ...) ...)`, and each node of one
+  line, not rotated, is a label: `(tikz-label n orig body)`, at the place of
+  its leftmost run and on the baseline of its main runs, from its LaTeX
+  (`(tikz-latex "...")`, converted when the output comes, `tikz-edit.scm`
+  overloading `connection-notify`). Otherwise the runs of TeX, as before.
+- A label can be edited (the image under it is `tikz-drawing`, not
+  accessible, and a superpose now gives a click to the child drawn last,
+  `superpose_box_rep::find_child`: the image used to take every click).
+- In an executable fold (Insert > Fold > Executable > TikZ, whose source is
+  code, `tikz-script-input`), Return on the picture shows its source with
+  the edited labels in it (`alternate-toggle`, overloaded): an edited label
+  (its body no longer its orig) as LaTeX in place of the text of its node.
+  Return on the source makes the picture again with TeX, which places the
+  new text. In a session, the edit stays in the picture.
+
 ## Later
 
 - A tag `tikz` in documents (not only sessions), made again when its

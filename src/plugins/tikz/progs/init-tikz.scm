@@ -42,5 +42,11 @@
                      (url-exists-in-path? "latex"))))
   ,@(tikz-engine)
   (:serializer ,tikz-serialize)
-  (:session "TikZ"))
+  (:session "TikZ")
+  (:scripts "TikZ"))
+
+;; the text of the pictures made in a browser: editable, and put back into
+;; the source of an executable fold (tikz-edit.scm)
+(when (and (tikz-in-browser?) (supports-tikz?))
+  (import-from (tikz-edit)))
 

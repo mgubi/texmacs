@@ -30,7 +30,41 @@
 
   <assign|tikz-picture|<macro|src|body|<arg|body>>>
 
-  <drd-props|tikz-picture|arity|2|accessible|none|border|no>
+  <drd-props|tikz-picture|arity|2|accessible|1|border|no>
+
+  <\active*>
+    <\src-comment>
+      The text of a node of the picture, typeset by TeXmacs from its source
+      and editable: n is the number of the node, orig the text as it came
+      (an edited one is put back into the source of an executable fold,
+      plugins/tikz/progs/tikz-edit.scm).
+    </src-comment>
+  </active*>
+
+  <assign|tikz-label|<macro|n|orig|body|<arg|body>>>
+
+  <\active*>
+    <\src-comment>
+      The drawing of the picture, under its labels: not accessible, so that
+      a click on a label goes to the label (a superpose gives a click to the
+      first accessible child under it)
+    </src-comment>
+  </active*>
+
+  <assign|tikz-drawing|<macro|body|<arg|body>>>
+
+  <drd-props|tikz-drawing|arity|1|accessible|none|border|no>
+
+  <\active*>
+    <\src-comment>
+      The source of an executable fold of TikZ: code, a backslash being a
+      backslash (as the input of a converter, scripts.ts)
+    </src-comment>
+  </active*>
+
+  <assign|tikz-script-input|<macro|language|session|in|out|<style-with|src-compact|none|<compound|<if|<equal|<get-label|<arg|in>>|document>|render-big-script|render-small-script>|<arg|language>|<with|mode|prog|prog-language|verbatim|<arg|in>>>>>>
+
+  <drd-props|tikz-label|arity|3|accessible|2|border|no>
 
   \;
 </body>
