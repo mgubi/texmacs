@@ -1,0 +1,89 @@
+pages: 11
+--- page 1
+A short book
+
+
+--- page 2
+
+--- page 3
+
+--- page 4
+
+--- page 5
+Table of contents
+
+1 First chapter
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+7
+
+1.1 A section of the first chapter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+7
+
+2 Second chapter . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+9
+
+2.1 Another section
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+9
+
+Appendix A An appendix
+. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+11
+
+5
+
+
+--- page 6
+
+--- page 7
+Chapter 1
+
+First chapter
+
+A book is divided into chapters, which start on a new page and carry the running headers. This
+paragraph is the first one of the first chapter.
+
+1.1 A section of the first chapter
+
+Sections are numbered within their chapter.
+
+figure content
+
+Figure 1.1. A figure, numbered within the chapter.
+
+7
+
+
+--- page 8
+This paragraph starts on a page of its own, after an explicit page break.
+
+8
+First chapter
+
+
+--- page 9
+Chapter 2
+
+Second chapter
+
+2.1 Another section
+
+The second chapter is numbered two, and its first section 2.1.
+
+Theorem 2.1. A theorem in a book is numbered within its chapter.
+
+9
+
+
+--- page 10
+
+--- page 11
+Appendix A
+
+An appendix
+
+Appendices are numbered with letters.
+
+11
+
+

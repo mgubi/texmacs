@@ -180,7 +180,7 @@ TMSCM_ASSERT (tmscm_is_bool (flag), flag, arg, rout)
 #define TMSCM_ASSERT_INT(i,arg,rout) \
 TMSCM_ASSERT (tmscm_is_int (i), i, arg, rout);
 #define TMSCM_ASSERT_UINT(i,arg,rout) \
-TMSCM_ASSERT (tmscm_is_int (i) && scm_positive_p (i), i, arg, rout);
+TMSCM_ASSERT (tmscm_is_int (i) && tmscm_to_int (i) >= 0, i, arg, rout);
 #define TMSCM_ASSERT_DOUBLE(i,arg,rout) \
   TMSCM_ASSERT (tmscm_is_double (i), i, arg, rout);
 //TMSCM_ASSERT (SCM_REALP (i), i, arg, rout);
@@ -419,6 +419,7 @@ scheme_tree_to_tmscm (scheme_tree t) {
     if (s == "#t") return tmscm_true ();
     if (s == "#f") return tmscm_false ();
     if (is_int (s)) return int_to_tmscm (as_int (s));
+    if (is_double (s)) return double_to_tmscm (as_double (s));
     if (is_quoted (s))
       return string_to_tmscm (scm_unquote (s));
     //if ((N(s)>=2) && (s[0]=='\42') && (s[N(s)-1]=='\42'))
@@ -449,6 +450,7 @@ tmscm_to_scheme_tree (tmscm p) {
   if (tmscm_is_string (p)) return scm_quote (tmscm_to_string (p));
   //if (tmscm_is_string (p)) return "\"" * tmscm_to_string (p) * "\"";
   if (tmscm_is_int (p)) return as_string ((int) tmscm_to_int (p));
+  if (tmscm_is_double (p)) return as_string (tmscm_to_double (p));
   if (tmscm_is_bool (p)) return (tmscm_to_bool (p)? string ("#t"): string ("#f"));
   if (tmscm_is_tree (p)) return tree_to_scheme_tree (tmscm_to_tree (p));
   return "?";
