@@ -533,11 +533,15 @@ bool
 export_tree (tree doc, url u, string fm) {
   tree aux= doc;
   // NOTE: hook for encryption
+  // On failure, never fall back to saving the document in clear
   tree init= extract (aux, "initial");
   if (fm == "texmacs")
     for (int i=0; i<N(init); i++)
-      if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == "encryption") {
-        aux= as_tree (call ("tree-export-encrypted", u, aux));
+      if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == "encryption" &&
+          init[i][1] == "gpg-passphrase") {
+        object r= call ("tree-export-encrypted", u, aux);
+        if (!is_tree (r)) return true;
+        aux= as_tree (r);
         break;
       }
   // END hook
