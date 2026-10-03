@@ -379,6 +379,9 @@ QTMLazyMenu::attachTo (QAction* a) {
   QObject::connect (a,  &QAction::destroyed,
                     this, &QTMLazyMenu::destroy);
 #endif
+  // A submenu never plays an application menu role: otherwise, on macOS,
+  // Qt's text heuristic would move e.g. Help -> About to the application menu
+  a->setMenuRole (QAction::NoRole);
   a->setMenu (this);
 }
 
