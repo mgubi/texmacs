@@ -457,11 +457,15 @@
       (wallet-set `(gpg-buffer-passphrase ,rsc) passphrase))))
 
 (tm-define (gpg-delete-buffer-passphrase url)
-  (with var (url-concretize url)
-    (when (ahash-ref gpg-buffer-passphrase-table var)
-      (ahash-remove! gpg-buffer-passphrase-table var)
-      (with-wallet
-	(wallet-delete `(gpg-buffer-passphrase ,var))))))
+  ;; the passphrases of the document and of its autosave files
+  (let* ((var (url-concretize url))
+	 (bck (url-concretize (url-autosave var "~")))
+	 (rsc (url-concretize (url-autosave var "#"))))
+    (for (x (list var bck rsc))
+      (when (ahash-ref gpg-buffer-passphrase-table x)
+	(ahash-remove! gpg-buffer-passphrase-table x)
+	(with-wallet
+	  (wallet-delete `(gpg-buffer-passphrase ,x)))))))
 
 (tm-define (gpg-get-buffer-passphrase url)
   (ahash-ref gpg-buffer-passphrase-table (url-concretize url)))
@@ -534,11 +538,14 @@
     (if (and (string? passphrase) (string? dec))
       (with enc (gpg-passphrase-encrypt dec passphrase)
 	(if (and (string? enc) (!= enc ""))
-	    (stree->tree
-	     `(document (TeXmacs ,(texmacs-version))
-			(style (tuple "generic"))
-			(body (document
-				(gpg-passphrase-encrypted-buffer ,enc)))))
+	    (begin
+	      ;; report again if a later save fails
+	      (ahash-remove! gpg-export-failure-reported (url->system name))
+	      (stree->tree
+	       `(document (TeXmacs ,(texmacs-version))
+			  (style (tuple "generic"))
+			  (body (document
+				  (gpg-passphrase-encrypted-buffer ,enc))))))
 	    (err)))
       (err))))
 
