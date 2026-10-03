@@ -1290,6 +1290,11 @@
 	((and (func? x 'label 1) (string? (cadr x))) `((id ,(cadr x))))
 	(else (append-map tmhtml-collect-labels (cdr x)))))
 
+(define (tmhtml-math-labels x)
+  ;; labels inside formulas are lost by the MathML and MathJax conversions
+  (map (lambda (id) `(h:a (@ (id ,(cork->html (cadr id))))))
+       (tmhtml-collect-labels x)))
+
 (define (tmhtml-image-names ext)
   (set! tmhtml-image-serial (+ tmhtml-image-serial 1))
   (let* ((postfix (string-append
@@ -1868,9 +1873,11 @@
   ;; Takes a TeXmacs tree in Scheme notation and produce a SXML node-set.
   ;; All handler functions have a similar prototype.
   (cond ((and tmhtml-mathjax? (ahash-ref tmhtml-env :math))
-         (tmhtml-mathjax-formula x))
+         (append (tmhtml-math-labels x)
+                 (tmhtml-mathjax-formula x)))
         ((and tmhtml-mathml? (ahash-ref tmhtml-env :math))
-	 `((m:math (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
+	 `(,@(tmhtml-math-labels x)
+           (m:math (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
 		   ,(texmacs->mathml x tmhtml-env))))
 	((and tmhtml-images? (ahash-ref tmhtml-env :math)
               (!= tmhtml-image-root-string "image"))
