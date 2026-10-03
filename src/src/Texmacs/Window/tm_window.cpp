@@ -373,6 +373,7 @@ tm_window_rep::unmap () {
 
 void
 tm_window_rep::refresh () {
+  menu_current= hashmap<int,object> (object ());
   menu_cache= hashmap<object,widget> (widget ());
 }
 
