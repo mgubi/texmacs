@@ -176,7 +176,11 @@ function prepare (code) {
       else keep.push (l);
     });
     body = keep.join ('\n');
-    if (!/\\begin\{tikzpicture\}/.test (body))
+    // the commands of a picture are put in one; not an environment which is
+    // a picture itself (tikzcd, circuitikz...): nested, its coordinates are
+    // wrong in the SVG of dvi2html
+    if (!/\\begin\{tikzpicture\}/.test (body) &&
+        !/^(\s*(%[^\n]*)?\n)*\s*\\begin\{/.test (body))
       body = '\\begin{tikzpicture}\n' + body + '\n\\end{tikzpicture}';
   }
   options.tikzLibraries = libs.filter (Boolean).join (',');
@@ -334,7 +338,11 @@ function split (svg, source) {
       text = null;
       continue;
     }
-    out.push (tag);
+    // what TeX draws in the text of a node (the rule of a fraction, of a
+    // root...) goes with its text, set by TeXmacs when the node is a label
+    if (top.node && /^(rect|path|line|polyline|polygon)$/.test (name))
+      out.push ({ el: tag, node: top.node });
+    else out.push (tag);
     if (closing) { if (stack.length > 1) stack.pop (); }
     else if (!self) {
       var nd = attr (tag, 'data-tm-node');
@@ -365,7 +373,8 @@ function split (svg, source) {
   var runs = [];
   Object.keys (labels).forEach (function (j) { runs.push (labels[j]); });
   var svgOut = out.map (function (x) {
-    if (typeof x !== 'number') return x;
+    if (typeof x === 'string') return x;
+    if (typeof x === 'object') return labels[x.node] ? '' : x.el;
     var tx = texts[x];
     if (tx.node && labels[tx.node]) return '';
     if (tx.run) { runs.push (tx.run); return ''; }

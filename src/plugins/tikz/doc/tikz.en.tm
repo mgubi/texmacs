@@ -1,12 +1,14 @@
 <TeXmacs|1.99.12>
 
-<style|<tuple|tmdoc|old-spacing|old-dots>>
+<style|<tuple|tmdoc|tikz|old-spacing|old-dots>>
 
 <\body>
   <tmdoc-title|The <name|TikZ> plug-in>
 
   <\traverse>
     <branch|Short description|tikz-abstract.en.tm>
+
+    <branch|<name|TikZ> in a web browser|tikz-browser.en.tm>
 
     <\branch>
       Example sessions
