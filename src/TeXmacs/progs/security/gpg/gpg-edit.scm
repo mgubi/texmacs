@@ -443,13 +443,18 @@
 (define gpg-buffer-passphrase-table (make-ahash-table))
 
 (tm-define (gpg-set-buffer-passphrase url passphrase)
+  ;; Also register the autosave files ("~", and "#" in rescue mode),
+  ;; so that they get encrypted too
   (let* ((var (url-concretize url))
-	 (bck (url-concretize (url-autosave var "~"))))
+	 (bck (url-concretize (url-autosave var "~")))
+	 (rsc (url-concretize (url-autosave var "#"))))
     (ahash-set! gpg-buffer-passphrase-table var passphrase)
     (ahash-set! gpg-buffer-passphrase-table bck passphrase)
+    (ahash-set! gpg-buffer-passphrase-table rsc passphrase)
     (with-wallet
       (wallet-set `(gpg-buffer-passphrase ,var) passphrase)
-      (wallet-set `(gpg-buffer-passphrase ,bck) passphrase))))
+      (wallet-set `(gpg-buffer-passphrase ,bck) passphrase)
+      (wallet-set `(gpg-buffer-passphrase ,rsc) passphrase))))
 
 (tm-define (gpg-delete-buffer-passphrase url)
   (with var (url-concretize url)
@@ -504,11 +509,17 @@
 
 ;; Encrypt before saving
 ;; Returns the encrypted document, or #f on failure (never the plain text)
+(define gpg-export-failure-reported (make-ahash-table))
+
 (tm-define (tree-export-encrypted name t)
   (let* ((err (lambda ()
 		(if (rescue-mode?)
-		    (display* "TeXmacs] Encryption failed, not saving "
-			      (url->system name) "\n")
+		    (with sname (url->system name)
+		      ;; autosave runs periodically: report only once
+		      (when (not (ahash-ref gpg-export-failure-reported sname))
+			(ahash-set! gpg-export-failure-reported sname #t)
+			(display* "TeXmacs] Encryption failed, not saving "
+				  sname "\n")))
 		    (begin
 		      (set-message `(concat "Could not save "
 					    ,(url->system name)
