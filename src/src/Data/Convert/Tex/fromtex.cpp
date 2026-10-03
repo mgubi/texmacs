@@ -1335,7 +1335,7 @@ latex_concat_to_tree (tree t, bool& new_flag) {
       else if (s == "\\end-verbatim") command_type ("!verbatim") = "false";
     }
     if (is_atomic (t[i]) && (command_type["!verbatim"] == "true")) {
-      r << tm_encode (t[i]->label);
+      r << t[i];
       continue;
     }
 
@@ -2434,7 +2434,7 @@ latex_command_to_tree (tree t) {
   if (is_tuple (t, "\\raisebox", 2))
     return tree (MOVE, l2e (t[2]), "0pt", t2e (t[1]));
   if (is_tuple (t, "\\verbatim", 1))
-    return compound ("verbatim", tm_encode (t[1]));
+    return compound ("verbatim", t[1]);
   if (is_tuple (t, "\\tmcodeinline", 1) || is_tuple (t, "\\tmverbatim", 1))
     return compound ("verbatim", v2e (t[1]));
   if (is_tuple (t, "\\tmcodeinline*", 2))
