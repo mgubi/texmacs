@@ -380,7 +380,7 @@
       x))
 
 (define (xhtml-block? x)
-  (tm-in? x '(h:p h:div h:pre h:h1 h:h2 h:h3 h:h4 h:h5 h:h6
+  (tm-in? x '(h:p h:div h:center h:pre h:h1 h:h2 h:h3 h:h4 h:h5 h:h6
               h:ol h:ul h:dl h:table)))
 
 (define (mixed-block l)
@@ -404,7 +404,7 @@
         (else x)))
 
 (define (force-block? x)
-  (or (and (tm-in? x '(h:p h:div h:pre h:h1 h:h2 h:h3 h:h4
+  (or (and (tm-in? x '(h:p h:div h:center h:pre h:h1 h:h2 h:h3 h:h4
                        h:ol h:ul h:dl h:table))
            (not (and-with style (sxml-attr x 'style)
                   (string-contains? style "display: inline")))
