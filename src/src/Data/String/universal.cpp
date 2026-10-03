@@ -231,7 +231,13 @@ uni_locase_char (string s) {
     else if (code >= 0x400 && code <= 0x40F) code += 0x50;
     else if (code >= 0x410 && code <= 0x42F) code += 0x20;
     else if (code >= 0x460 && code <= 0x4FF) {
-      if ((code & 1) == 0) code += 1;
+      // capitals are even, except for the signs 0x482-0x489, which have no
+      // case, the palochka 0x4C0 and 0x4CF, and 0x4C1-0x4CE (odd capitals)
+      if (code >= 0x482 && code <= 0x489);
+      else if (code == 0x4C0) code= 0x4CF;
+      else if (code >= 0x4C1 && code <= 0x4CF) {
+        if ((code & 1) == 1 && code != 0x4CF) code += 1; }
+      else if ((code & 1) == 0) code += 1;
     }
     return "<#" * as_hexadecimal (code) * ">";
   }
@@ -273,7 +279,8 @@ uni_upcase_char (string s) {
       else if ((code & 1) == 1) code -= 1;
     }
     else if (code >= 0x3AC && code <= 0x3CE) {
-      if      (code >= 0x3B1 && code <= 0x3CB) code -= 0x20;
+      if      (code == 0x3C2) code= 0x3A3;  // final sigma
+      else if (code >= 0x3B1 && code <= 0x3CB) code -= 0x20;
       else if (code >= 0x3AC && code <= 0x3AC) code -= 0x26;
       else if (code >= 0x3AD && code <= 0x3AF) code -= 0x25;
       else if (code >= 0x3CC && code <= 0x3CC) code -= 0x40;
@@ -282,7 +289,12 @@ uni_upcase_char (string s) {
     else if (code >= 0x450 && code <= 0x45F) code -= 0x50;
     else if (code >= 0x430 && code <= 0x44F) code -= 0x20;
     else if (code >= 0x460 && code <= 0x4FF) {
-      if ((code & 1) == 1) code -= 1;
+      // as in uni_locase_char
+      if (code >= 0x482 && code <= 0x489);
+      else if (code == 0x4CF) code= 0x4C0;
+      else if (code >= 0x4C0 && code <= 0x4CE) {
+        if ((code & 1) == 0 && code != 0x4C0) code -= 1; }
+      else if ((code & 1) == 1) code -= 1;
     }
     return "<#" * as_hexadecimal (code) * ">";
   }
