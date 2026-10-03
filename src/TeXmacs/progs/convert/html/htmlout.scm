@@ -48,8 +48,12 @@
 
 (define (htmlout-p-simplify? x)
   ;; FIXME: font should not really be in the list here
-  (and (func? x 'p 1) (pair? (cadr x))
-       (in? (caadr x) '(div p li dt dd center blockquote ul ol dl))))
+  (or (and (func? x 'p 1) (pair? (cadr x))
+           (in? (caadr x) '(div p li dt dd center blockquote ul ol dl)))
+      ;; the term and the definition of an item of a description list
+      (and (func? x 'p) (nnull? (cdr x))
+           (list-and (map (lambda (y) (and (pair? y) (in? (car y) '(dt dd))))
+                          (cdr x))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Outputting main flow
@@ -123,7 +127,7 @@
 	((or (func? x '!concat) (func? x '*TOP*))
 	 (for-each htmlout (cdr x)))
 	((htmlout-p-simplify? x)
-	 (htmlout (cadr x)))
+	 (for-each htmlout (cdr x)))
   	((func? x '*PI*)
 	 (output-lf-verbatim "<?" (symbol->string (cadr x)) " " (caddr x) "?>")
 	 (output-lf))

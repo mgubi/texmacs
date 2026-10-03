@@ -296,11 +296,11 @@
   ;; a document inside a tag comes back
   (check= (round-trip '(equation* (document "a" "b")) "tmml-snippet")
           '(equation* (document "a" "b")))
-  ;; FIXME: a snippet of several paragraphs does not come back: the
-  ;; tm-par elements at the top are not made into a document again
-  ;; (xmlin in tmmltm.scm takes the regular branch for *TOP*), so that
-  ;; (document "p1" "p2") gives (concat (tm-par "p1") " " (tm-par "p2")).
-  )
+  ;; a snippet of several paragraphs comes back as a document
+  (check= (round-trip '(document "p1" "p2") "tmml-snippet")
+          '(document "p1" "p2"))
+  (check= (round-trip '(document "p1" (section "S") "p2") "tmml-snippet")
+          '(document "p1" (section "S") "p2")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HTML export
@@ -493,13 +493,17 @@
   ;; a document comes back with the style browser
   (check= (round-trip (tmfile '(document "a" (em "b"))) "html-document")
           '(document (body (document "a" (em "b"))) (style "browser")))
-  ;; FIXME: a description list is written with a p element around each
-  ;; dt/dd pair, <dl><p><dt>k</dt><dd><p>v</p></dd></p></dl>, which is
-  ;; not valid HTML (transform-item-post in tmhtml.scm makes a document of
-  ;; each item, and htmlout-p-simplify? only removes a p of one child),
-  ;; and comes back with an empty paragraph:
-  ;; (description (document "" (concat (item* "k") "v"))).
-  )
+  ;; a description list is a dl of dt and dd, without a p around each
+  ;; pair, and comes back without an empty paragraph
+  (with dl '(description (document (concat (item* "k") "v")
+                                   (concat (item* "l") "w")))
+    (check= (html dl) "<dl><dt>k</dt><dd><p>v</p></dd><dt>l</dt><dd><p>w</p></dd></dl>")
+    (check= (round-trip dl "html-snippet")
+            '(description (document (concat (item* "k") "v")
+                                    (concat (item* "l") "w")))))
+  (check= (round-trip '(description (document (concat (item* "k") "v")))
+                      "html-snippet")
+          '(description (concat (item* "k") "v"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Markdown
