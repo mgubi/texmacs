@@ -311,7 +311,9 @@
   ;; signal an error, unless failures are being collected
   ;; by integration-test-run-all
   (if (list? integration-failures)
-      (set! integration-failures (cons group-id integration-failures))
+      (begin
+        (display* "  FAILED group " group-id ": " failed " tests failed\n")
+        (set! integration-failures (cons group-id integration-failures)))
       (error "Integration test failure:" group-id failed)))
 
 (define-public (integration-test-run-all groups)
