@@ -116,6 +116,8 @@ json_parse_string (string s, int& pos, int mode) {
           code= 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
           pos += 6;
         }
+        else if (code >= 0xd800 && code < 0xe000)
+          code= 0xfffd; // unpaired surrogate
         r << encode_as_utf8 (code);
       }
     }

@@ -49,6 +49,7 @@
   ("ollama-text-input" "on" noop)
   ("chatgpt-text-input" "on" noop)
   ("gemini-text-input" "on" noop)
+  ("gemini model" "gemini-2.0-flash" noop)
   ("open-mistral-7b-text-input" "on" noop)
   ("albert api key" "" noop)
   ("albert-text-input" "on" noop)
