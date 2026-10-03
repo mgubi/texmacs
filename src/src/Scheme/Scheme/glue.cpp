@@ -419,6 +419,7 @@ scheme_tree_to_tmscm (scheme_tree t) {
     if (s == "#t") return tmscm_true ();
     if (s == "#f") return tmscm_false ();
     if (is_int (s)) return int_to_tmscm (as_int (s));
+    if (is_double (s)) return double_to_tmscm (as_double (s));
     if (is_quoted (s))
       return string_to_tmscm (scm_unquote (s));
     //if ((N(s)>=2) && (s[0]=='\42') && (s[N(s)-1]=='\42'))

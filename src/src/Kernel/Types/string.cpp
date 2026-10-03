@@ -395,24 +395,25 @@ is_int (string s) {
 
 bool
 is_double (string s) {
-  int i=0, n=N(s);
+  int i=0, n=N(s), d=0;
   if (n==0) return false;
   if (s[i]=='+') i++;
-  if (s[i]=='-') i++;
+  if (i<n && s[i]=='-') i++;
   if (i==n) return false;
-  for (; i< n; i++)
+  for (; i< n; i++, d++)
     if ((s[i]<'0') || (s[i]>'9')) break;
   if (i==n) return true;
   if (s[i]=='.') {
     i++;
     if (i==n) return false;
-    for (; i< n; i++)
+    for (; i< n; i++, d++)
       if ((s[i]<'0') || (s[i]>'9')) break;
   }
+  if (d==0) return false;
   if (i==n) return true;
   if (s[i++]!='e') return false;
-  if (s[i]=='+') i++;
-  if (s[i]=='-') i++;
+  if (i<n && s[i]=='+') i++;
+  if (i<n && s[i]=='-') i++;
   if (i==n) return false;
   for (; i< n; i++)
     if ((s[i]<'0') || (s[i]>'9')) return false;
