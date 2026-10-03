@@ -413,6 +413,11 @@ void gui_refresh ()
   // FIXME: add suitable code
 }
 
+string
+gui_version () {
+  return "cocoa";
+}
+
 
 
 /******************************************************************************
@@ -457,7 +462,9 @@ load_system_font (string family, int size, int dpi,
 bool
 set_selection (string key, tree t,
                string s, string sv, string sh, string format) {
-  (void) format;
+  (void) sh;
+  // foreign clients get the plain text version, not TeXmacs markup
+  if (format == "default") s= sv;
   return the_gui->set_selection (key, t, s);
 }
 

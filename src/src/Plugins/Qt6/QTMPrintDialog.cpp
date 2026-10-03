@@ -148,12 +148,14 @@ QTMPrintDialog::accept() {
   _settings->orientation    = (QTMPrinterSettings::PageOrientation)
             orientationCombo->itemData(orderPagesCombo->currentIndex()).toInt();
   _settings->duplex         = duplexCheck->isChecked();
-  _settings->blackWhite     = blackWhiteCheck->isChecked();
+  _settings->blackWhite     = blackWhiteCheck->isEnabled() &&
+                              blackWhiteCheck->isChecked();
   _settings->pagesPerSide   = pagesPerSideCombo->currentText().toInt();
   _settings->pagesOrder     = (QTMPrinterSettings::PagePrintingOrder) 
              orderPagesCombo->itemData(orderPagesCombo->currentIndex()).toInt();
   _settings->fitToPage      = fitToPageCheck->isChecked();
-  _settings->blackWhite     = blackWhiteCheck->isChecked();
+  _settings->blackWhite     = blackWhiteCheck->isEnabled() &&
+                              blackWhiteCheck->isChecked();
   
   QDialog::accept();
 }
