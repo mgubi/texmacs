@@ -137,13 +137,14 @@ bridge_locus_rep::my_typeset_will_be_complete () {
 void
 bridge_locus_rep::my_typeset (int desired_status) {
   extern bool build_locus (edit_env env, tree t, list<string>& ids, string& c);
-  tree xbody= env->expand (st[last], true);
-  if (!is_accessible (obtain_ip (xbody)) && !is_multi_paragraph (xbody) &&
-      (desired_status & WANTED_MASK) == WANTED_PARAGRAPH) {
-    // inaccessible loci (e.g. inside included files) are handled
-    // by the concater, which wraps the body into locus boxes
-    ttt->insert_paragraph (st, ip);
-    return;
+  if ((desired_status & WANTED_MASK) == WANTED_PARAGRAPH) {
+    tree xbody= env->expand (st[last], true);
+    if (!is_accessible (obtain_ip (xbody)) && !is_multi_paragraph (xbody)) {
+      // inaccessible loci (e.g. inside included files) are handled
+      // by the concater, which wraps the body into locus boxes
+      ttt->insert_paragraph (st, ip);
+      return;
+    }
   }
   list<string> ids;
   string col;
