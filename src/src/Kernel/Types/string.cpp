@@ -386,7 +386,7 @@ is_int (string s) {
   int i=0, n=N(s);
   if (n==0) return false;
   if (s[i]=='+') i++;
-  if (s[i]=='-') i++;
+  if (i<n && s[i]=='-') i++;
   if (i==n) return false;
   for (; i<n; i++)
     if ((s[i]<'0') || (s[i]>'9')) return false;
