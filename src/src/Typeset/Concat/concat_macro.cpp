@@ -172,9 +172,10 @@ concater_rep::typeset_include (tree t, path ip) {
   url save_name= env->cur_file_name;
   env->cur_file_name= incl_file;
   env->secure= is_secure (env->cur_file_name);
-  inclusion_enter (incl_file);
-  typeset_dynamic (incl, ip);
-  inclusion_leave (incl_file);
+  {
+    inclusion_guard guard (incl_file);
+    typeset_dynamic (incl, ip);
+  }
   env->cur_file_name= save_name;
   env->secure= is_secure (env->cur_file_name);
 }

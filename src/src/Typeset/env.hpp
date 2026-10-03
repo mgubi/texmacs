@@ -595,6 +595,12 @@ bool inclusion_busy (url u);
 void inclusion_enter (url u);
 void inclusion_leave (url u);
 void reset_inclusion (url u);
+struct inclusion_guard {
+  // Marks u as being included during the guard's lifetime (exception-safe)
+  url u;
+  inclusion_guard (url u2): u (u2) { inclusion_enter (u); }
+  ~inclusion_guard () { inclusion_leave (u); }
+};
 tree tree_extents (tree t);
 bool is_percentage (tree t, string s);
 bool is_percentage (tree t);

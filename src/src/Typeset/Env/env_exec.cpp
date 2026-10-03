@@ -175,10 +175,8 @@ edit_env_rep::exec_include (tree t) {
   url file_name= url_unix (exec_string (t[0]));
   url file_rel = relative (base_file_name, file_name);
   tree r= rewrite_include (base_file_name, file_rel);
-  inclusion_enter (file_rel);
-  r= exec (r);
-  inclusion_leave (file_rel);
-  return r;
+  inclusion_guard guard (file_rel);
+  return exec (r);
 }
 
 bool
