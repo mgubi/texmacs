@@ -129,8 +129,10 @@
          (t (list->ahash-set l))
          (e (docgrep-files path "*.en.tm"))
          (translated? (lambda (f)
-                        (ahash-ref t (string-append (string-drop-right f 6)
-                                                    "." lan ".tm"))))
+                        (with base (string-append (string-drop-right f 6)
+                                                  "." lan)
+                          (or (ahash-ref t (string-append base ".tm"))
+                              (ahash-ref t (string-append base ".tmml"))))))
          (r (list-filter e (lambda (f) (not (translated? f))))))
     (build-doc-link-page what (append l r))))
 

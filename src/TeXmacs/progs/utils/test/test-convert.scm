@@ -160,6 +160,8 @@
 
 (define (manual-out-of-date? root pdf)
   ;; is some .tm file in the directory tree of root newer than pdf?
+  ;; NOTE: pages included from other directories (e.g. the reference
+  ;; manual pulling pages from devel/) are not checked
   (or (not (url-exists? pdf))
       (let* ((d (url-append (url-head root) (url-any)))
              (v (url-expand (url-complete d "dr")))
@@ -177,10 +179,6 @@
                       (string-append "devel/scheme/scheme." lan ".tm"))
                      (else #f)))
          (doc-dir "$TEXMACS_DOC_PATH"))
-    (cond ((not root)
-           (display* "TeXmacs] Error: unknown manual " name "\n"))
-          ((not (url-exists? (url-unix doc-dir root)))
-           (display* "TeXmacs] Error: " root " not found\n")))
     (if (and root (url-exists? (url-unix doc-dir root)))
         (let* ((old-lan (get-output-language))
                (new-lan (locale-to-language lan))
@@ -197,7 +195,11 @@
 		  (delayed
 		    (:idle 3000)
 		    (tmdoc-expand-help-manual* u cont)))))
-        (user-delayed next))))
+        (begin
+          (if (not root)
+              (display* "TeXmacs] Error: unknown manual " name "\n")
+              (display* "TeXmacs] Error: " root " not found\n"))
+          (user-delayed next)))))
 
 (define (build-manuals-sub* dir l next)
   ;;(display* "-- build-manuals-sub " dir ", " l "\n")

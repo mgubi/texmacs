@@ -81,11 +81,12 @@
 
 (define (tmdoc-page-label rel)
   ;; label for the page at rel (relative to the root of the book),
-  ;; with the .tm and language suffixes removed
+  ;; with the .tm and language suffixes removed and "/" replaced by "-"
   (let* ((s (if (string-ends? rel ".tm") (string-drop-right rel 3) rel))
          (i (string-search-backwards "." (string-length s) s))
          (j (string-search-backwards "/" (string-length s) s)))
-    (string-append "sec-" (if (> i j) (substring s 0 i) s))))
+    (string-append "sec-" (string-replace (if (> i j) (substring s 0 i) s)
+                                          "/" "-"))))
 
 (define (tmdoc-rewrite-one x root cur the-level done)
   (let* ((omit? (list? the-level))
