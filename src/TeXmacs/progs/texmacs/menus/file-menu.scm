@@ -256,8 +256,8 @@
                        (pdf-get-attached-main-tm tem-pdf))))
     (if (and main-tm (not (url-none? main-tm)))
         (begin
-          ;; the attachments were extracted into a fresh temporary directory;
-          ;; make the links of the main document point there
+          ;; the attachments were extracted into <pdf-name>-attachments
+          ;; next to the pdf; make the links of the main document point there
           (string-save
             (serialize-texmacs
               (pdf-replace-linked-path

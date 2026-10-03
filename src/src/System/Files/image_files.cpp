@@ -67,7 +67,7 @@
 
 static bool informed_about_dependencies= false;
 
-static void
+void
 inform_about_dependencies () {
   if (informed_about_dependencies) return;
 #ifdef USE_GS

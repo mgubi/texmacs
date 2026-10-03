@@ -26,8 +26,25 @@
 #include "PDFWriter/PDFWriter.h"
 #include "PDFWriter/SafeBufferMacrosDefs.h"
 #include "PDFWriter/Trace.h"
+#ifndef OS_MINGW
+#include <sys/stat.h>
+#endif
 using namespace PDFHummus;
 using namespace IOBasicTypes;
+
+// Is u a symbolic link (possibly dangling)?
+// (is_symbolic_link follows links, so it cannot be used here)
+static bool
+is_link (url u) {
+#ifdef OS_MINGW
+  (void) u;
+  return false;
+#else
+  struct stat buf;
+  c_string    s (concretize (u));
+  return lstat (s, &buf) == 0 && S_ISLNK (buf.st_mode);
+#endif
+}
 
 // Reduce the name of an embedded file to a plain file name, so that it
 // can only be written inside the extraction directory.
@@ -52,9 +69,10 @@ extract_attachments_from_pdf (url pdf_path, list<url>& names) {
   EStatusCode status= PDFHummus::eSuccess;
   InputFile   pdfFile;
   PDFParser   parser;
-  // extract into a fresh directory, never next to the pdf
-  url out_dir= url_temp ("");
-  mkdir (out_dir);
+  // extract into the folder <pdf-basename>-attachments next to the pdf,
+  // so that the links of the imported document remain valid
+  url out_dir= head (pdf_path) * url_system (basename (pdf_path) *
+                                              "-attachments");
   do {
     status= pdfFile.OpenFile (as_charp (as_string (pdf_path)));
     if (status != PDFHummus::eSuccess) {
@@ -158,7 +176,24 @@ extract_attachments_from_pdf (url pdf_path, list<url>& names) {
         delete streamReader;
         continue;
       }
-      url        attachment_path= out_dir * url_system (file_name);
+      if (!is_directory (out_dir)) {
+        if (!exists (out_dir)) mkdir (out_dir);
+        if (!is_directory (out_dir)) {
+          convert_error << "cannot create the folder " << out_dir
+                        << " for the PDF attachments" << LF;
+          delete streamReader;
+          status= PDFHummus::eFailure;
+          break;
+        }
+      }
+      url attachment_path= out_dir * url_system (file_name);
+      if (is_link (attachment_path)) {
+        convert_warning << "skipping PDF attachment " << file_name
+                        << ": " << attachment_path << " is a symbolic link"
+                        << LF;
+        delete streamReader;
+        continue;
+      }
       OutputFile attachment_file;
       status= attachment_file.OpenFile (
           std::string (as_charp (as_string (attachment_path))));
@@ -428,6 +463,7 @@ get_main_tm (url pdf_path) {
     attachments_paths= last_extracted;
   else if (!extract_attachments_from_pdf (pdf_path, attachments_paths))
     return url_none ();
-  if (is_nil (attachments_paths)) return url_none ();
-  return attachments_paths[0];
+  for (list<url> l= attachments_paths; !is_nil (l); l= l->next)
+    if (suffix (l->item) == "tm") return l->item;
+  return url_none ();
 }

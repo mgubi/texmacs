@@ -1781,6 +1781,7 @@ pdf_image_rep::flush (PDFWriter& pdfw)
         // the png route failed too: include the placeholder
         convert_error << "pdf_hummus, failed converting " << name << LF;
         copy ("$TEXMACS_PATH/misc/pixmaps/unknown.pdf", temp);
+        inform_about_dependencies ();
     }
 
   }
