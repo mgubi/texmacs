@@ -76,7 +76,22 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS)
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax
+
+# the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
+# TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
+# pages, and the worker of the plugin, in out/web/tikzjax/
+TIKZJAX := tikzjax-1.6.0
+tikzjax: $(OUT)/web/tikzjax/tm-tikz.js
+
+$(TIKZJAX)/dist/run-tex.js:
+	sh $(W)/get-tikzjax.sh $(CURDIR)
+
+$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js
+	@mkdir -p $(OUT)/web/tikzjax
+	cp $(TIKZJAX)/dist/run-tex.js $(TIKZJAX)/dist/tex.wasm.gz $(TIKZJAX)/dist/core.dump.gz $(TIKZJAX)/LICENSE $(OUT)/web/tikzjax/
+	rm -rf $(OUT)/web/tikzjax/tex_files; cp -R $(TIKZJAX)/dist/tex_files $(OUT)/web/tikzjax/
+	cp $(TM)/plugins/tikz/web/tm-tikz.js $@
 
 $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
 	@mkdir -p $(OUT)/web
@@ -152,4 +167,4 @@ $(OBJ)/%.o: $(S)/%.c
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean
+.PHONY: all web node clean tikzjax

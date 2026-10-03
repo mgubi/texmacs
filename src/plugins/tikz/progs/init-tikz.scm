@@ -25,10 +25,22 @@
                      (getenv "TEXMACS_PATH")
                      "/plugins/tmpy/session/tm_tikz.py\"")))
 
+;; In a browser, the plugin is a Web Worker which runs TikZJax, TeX in
+;; WebAssembly (web/tm-tikz.js, copied to tikzjax/ next to the page; see
+;; src/docs/wasm/tikzjax.md); elsewhere a Python program which runs latex
+(define (tikz-in-browser?)
+  (defined? 'web-files))
+
+(define (tikz-engine)
+  (if (tikz-in-browser?)
+      `((:worker "tikzjax/tm-tikz.js"))
+      `((:launch ,(tikz-launcher)))))
+
 (plugin-configure tikz
-  (:require (python-command))
-  (:require (url-exists-in-path? "latex"))
-  (:launch ,(tikz-launcher))
+  (:require (or (tikz-in-browser?)
+                (and (python-command) (!= (python-command) "")
+                     (url-exists-in-path? "latex"))))
+  ,@(tikz-engine)
   (:serializer ,tikz-serialize)
   (:session "TikZ"))
 
