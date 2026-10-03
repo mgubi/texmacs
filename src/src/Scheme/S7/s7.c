@@ -61610,8 +61610,9 @@ static bool fx_tree_in_c_sc(s7_scheme *sc, const s7_pointer tree, const s7_point
 	{
 	  if (opt3_direct(cdr(expr)) == (s7_pointer)vector_ref_p_pi)
 	    return(with_fx(tree, fx_vector_ref_tc));
-	  if ((opt3_direct(cdr(expr)) == (s7_pointer)string_ref_p_pi) && (integer(caddr(expr)) == 0))
-	    set_opt3_direct(cdr(expr), string_ref_p_p0);
+	  /* TeXmacs: not string_ref_p_p0 here, a p_pp function which fx_c_ti_direct
+	   *   would call as p_pi: WebAssembly traps on the mismatched signature
+	   *   (indirect call signature mismatch) where native code does not */
 	  return(with_fx(tree, (opt3_direct(cdr(expr)) == (s7_pointer)remainder_p_pi) ? fx_c_ti_remainder : fx_c_ti_direct));
 	}
       if (pfunc == fx_is_eq_sc)    return(with_fx(tree, fx_is_eq_tc));
