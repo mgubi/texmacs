@@ -173,7 +173,9 @@ collect_abstract_data (tree u) {
 static array<tree>
 get_latex_author_datas (tree t) {
   array<tree> r;
-  if (is_atomic (t)) return r;
+  if (t == "") return r;
+  // a name of one atom, such as A, is not a concat
+  if (is_atomic (t)) t= tree (CONCAT, t);
   int i, n=N(t);
   tree u;
   tree author_data (APPLY, "\\author-data");
@@ -182,7 +184,9 @@ get_latex_author_datas (tree t) {
     if (i<n) u= t[i];
     else u= concat();
     if (i==n || is_tuple (u, "\\and")) {
-      if (N(author_name) > 1) {
+      // a name of one letter is a concat of one atom
+      if (N(author_name) > 1 ||
+          (N(author_name) == 1 && author_name[0] != " ")) {
         tree a (APPLY, "\\author-data");
         a << tree (APPLY, "\\author-name", author_name);
         for (int j=1; j<N(author_data); j++)

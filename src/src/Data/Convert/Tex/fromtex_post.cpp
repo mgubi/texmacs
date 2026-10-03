@@ -588,14 +588,19 @@ finalize_layout (tree t) {
         continue;
       }
 
+      // the line breaks after \begin{tmcode} and before \end{tmcode} only
+      // separate the code from the environment, as for alltt
       if (is_func (v, BEGIN) && (v[0] == "tmcode" || v[0] == "tmcode*")) {
         if (is_func (v, BEGIN, 2)) lang= string_arg (v[1]) * "-code";
         else lang= "code";
         r << tree (BEGIN, lang);
+        if (i+1 < n && u[i+1] == tree (FORMAT, "new line")) i++;
         continue;
       }
 
       if (is_func (v, END) && v[0] == "tmcode") {
+        if (N(r) > 0 && r[N(r)-1] == tree (FORMAT, "new line"))
+          r= r (0, N(r)-1);
         r << tree (END, lang);
         continue;
       }
@@ -2394,7 +2399,10 @@ latex_to_tree (tree t0) {
   // cout << "\n\nt3= " << t3 << "\n\n";
   tree t4= finalize_document (t3);
   // cout << "\n\nt4= " << t4 << "\n\n";
-  tree t5= is_document? finalize_preamble (t4, style): t4;
+  // the first paragraph of a document starts with \begin{document} and
+  // the preamble until finalize_preamble removes them, so a section which
+  // starts the body is only split from what follows it after that
+  tree t5= is_document? finalize_sections (finalize_preamble (t4, style)): t4;
   // cout << "\n\nt5= " << t5 << "\n\n";
   tree t6= handle_matches (t5);
   // cout << "\n\nt6= " << t6 << "\n\n";
