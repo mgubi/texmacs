@@ -26,7 +26,7 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
+    <associate|language|polish>
     <associate|page-bot|30mm>
     <associate|page-even|30mm>
     <associate|page-odd|30mm>

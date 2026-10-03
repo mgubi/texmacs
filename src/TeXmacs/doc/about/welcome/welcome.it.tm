@@ -37,7 +37,7 @@
     contiene ulteriori informazioni su <TeXmacs> come informazioni
     riguardanti gli <hlink|autori|../../about/authors/authors.it.tm>, su come
     <hlink|contattarci|../../about/authors/contact.it.tm> e sui
-    <hlink|cambiamenti|../../about/changes/changes.it.tm> intervenuti durante
+    <hlink|cambiamenti|../../about/changes/changes.en.tm> intervenuti durante
     lo sviluppo del programma.
 
     <item>È possibile avere aggiornamenti della documentazione via web
@@ -61,7 +61,7 @@
 
   Se desideri contribuire a <TeXmacs> o se vuoi adattare il programma per
   scopi particolari, troverai informazioni utili nel menu <menu|Help>. Il
-  sottomenu <hlink|<menu|Help|Document format>|../../devel/format/format.en.tm>
+  sottomenu <hlink|<menu|Help|Document format>|../../devel/format/basics/basics.en.tm>
   contiene informazioni sul formato dei documenti di <TeXmacs> e in
   <hlink|<menu|Help|Interfacing>|../../devel/plugin/plugin.en.tm> vengono
   fornite spiegazioni su come interfacciare <TeXmacs> con altri sistemi. Una
