@@ -408,15 +408,17 @@ edit_select_rep::selection_get_subtable (
 {
   path fp= find_subtable_selection (et, start (cur_sel), end (cur_sel),
                                     row1, col1, row2, col2);
-  table_bound (fp, row1, col1, row2, col2);
+  if (!is_nil (fp)) table_bound (fp, row1, col1, row2, col2);
   return fp;
 }
 
 selection
 edit_select_rep::compute_selection (path p1, path p2) {
-  if (is_table_selection (et, p1, p2, true)) {
-    int row1, col1, row2, col2;
-    path fp= find_subtable_selection (et, p1, p2, row1, col1, row2, col2);
+  int row1, col1, row2, col2;
+  path fp;
+  if (is_table_selection (et, p1, p2, true))
+    fp= find_subtable_selection (et, p1, p2, row1, col1, row2, col2);
+  if (!is_nil (fp)) {
     tree st= subtree (et, fp);
     table_bound (fp, row1, col1, row2, col2);
 
