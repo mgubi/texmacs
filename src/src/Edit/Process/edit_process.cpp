@@ -618,23 +618,21 @@ edit_process_rep::generate_aux_recursively (string which, tree st, path p) {
         cout << "tp= " << tp << "\n";
         cout << "------------------------------------------------------\n";
       */
+      // t is filtered on 'which' by aux_matches; dispatch on its tag
       if (arity (t) >= 1) {
-        if ((arity(t) >= 3) &&
-            (is_compound (t, "bibliography") ||
-             is_compound (t, "bibliography*")))
-          generate_bibliography (as_string (t[0]), as_string (t[1]),
-                                 as_string (t[2]));
-        if ((is_compound (t, "table-of-contents") ||
-             is_compound (t, "table-of-contents*")))
+        if (is_compound (t, "bibliography") ||
+            is_compound (t, "bibliography*")) {
+          if (arity (t) >= 3)
+            generate_bibliography (as_string (t[0]), as_string (t[1]),
+                                   as_string (t[2]));
+        }
+        else if (is_compound (t, "table-of-contents") ||
+                 is_compound (t, "table-of-contents*"))
           generate_table_of_contents (as_string (t[0]));
-        if (is_compound (t, "the-index") || is_compound (t, "the-index*"))
+        else if (is_compound (t, "the-index") ||
+                 is_compound (t, "the-index*"))
           generate_index (as_string (t[0]));
-        if ((is_compound (t, "the-glossary") ||
-             is_compound (t, "the-glossary*")))
-          generate_glossary (as_string (t[0]));
-        if (is_compound (t, "list-of-figures"))
-          generate_glossary (as_string (t[0]));
-        if (is_compound (t, "list-of-tables"))
+        else // the-glossary(*), list-of-figures, list-of-tables
           generate_glossary (as_string (t[0]));
       }
       /*

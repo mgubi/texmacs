@@ -105,11 +105,6 @@ edit_table_rep::search_format (path p) {
 }
 
 path
-edit_table_rep::search_format (int& row, int& col) {
-  return search_format (row, col, true);
-}
-
-path
 edit_table_rep::search_format (int& row, int& col, bool create) {
   path p= search_table (row, col);
   if (is_nil (p)) return p;
