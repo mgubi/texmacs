@@ -537,7 +537,10 @@ export_tree (tree doc, url u, string fm) {
   if (fm == "texmacs")
     for (int i=0; i<N(init); i++)
       if (is_func (init[i], ASSOCIATE, 2) && init[i][0] == "encryption") {
-        aux= as_tree (call ("tree-export-encrypted", u, aux));
+        // a document which could not be encrypted is not saved in clear
+        object enc= call ("tree-export-encrypted", u, aux);
+        if (!is_tree (enc)) return true;
+        aux= as_tree (enc);
         break;
       }
   // END hook

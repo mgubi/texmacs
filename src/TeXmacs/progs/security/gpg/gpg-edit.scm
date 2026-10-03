@@ -452,11 +452,14 @@
       (wallet-set `(gpg-buffer-passphrase ,bck) passphrase))))
 
 (tm-define (gpg-delete-buffer-passphrase url)
-  (with var (url-concretize url)
-    (when (ahash-ref gpg-buffer-passphrase-table var)
-      (ahash-remove! gpg-buffer-passphrase-table var)
-      (with-wallet
-	(wallet-delete `(gpg-buffer-passphrase ,var))))))
+  ;; the passphrase of the document and the one of its autosave file
+  (let* ((var (url-concretize url))
+	 (bck (url-concretize (url-autosave var "~"))))
+    (for (x (list var bck))
+      (when (ahash-ref gpg-buffer-passphrase-table x)
+	(ahash-remove! gpg-buffer-passphrase-table x)
+	(with-wallet
+	  (wallet-delete `(gpg-buffer-passphrase ,x)))))))
 
 (tm-define (gpg-get-buffer-passphrase url)
   (ahash-ref gpg-buffer-passphrase-table (url-concretize url)))
@@ -502,7 +505,8 @@
      (tm-gpg-passphrase-buffer-unset-encryption)
      (cmd "Disable"))))
 
-;; Encrypt before saving
+;; Encrypt before saving; #f when the document cannot be encrypted, so that
+;; it is not saved in clear
 (tm-define (tree-export-encrypted name t)
   (let* ((err (lambda ()
 		(set-message `(concat "Could not save " ,(url->system name))
@@ -520,8 +524,8 @@
 			(style (tuple "generic"))
 			(body (document
 				(gpg-passphrase-encrypted-buffer ,enc)))))
-	    (begin (err) t)))
-      (begin (err) t))))
+	    (begin (err) #f)))
+      (begin (err) #f))))
 
 (tm-define (encrypted-buffer? t)
   (and-with b (tmfile-get t 'body)
