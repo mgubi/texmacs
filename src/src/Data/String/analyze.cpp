@@ -489,19 +489,26 @@ fnsymbol_nr (int nr) {
 
 static const char* hex_string= "0123456789ABCDEF";
 
+static string
+as_hexadecimal_unsigned (unsigned long long u) {
+  if (u<16) return hex_string [u & 15];
+  return as_hexadecimal_unsigned (u >> 4) * hex_string [u & 15];
+}
+
+// the magnitude of a negative number as an unsigned one: -i overflows for
+// the smallest value of the type, whose magnitude has no positive form
 string
 as_hexadecimal (int i) {
-  if (i<0) return "-" * as_hexadecimal (-i);
-  if (i<16) return hex_string [i & 15];
-  return as_hexadecimal (i >> 4) * hex_string [i & 15];
+  if (i<0) return "-" * as_hexadecimal_unsigned (0ULL - (long long) i);
+  return as_hexadecimal_unsigned ((unsigned long long) i);
 }
 
 string
 as_hexadecimal (pointer ptr) {
   intptr_t i= (intptr_t) ptr;
-  if (i<0) return "-" * as_hexadecimal (-i);
-  if (i<16) return hex_string [i & 15];
-  return as_hexadecimal (i >> 4) * hex_string [i & 15];
+  if (i<0) return "-" * as_hexadecimal_unsigned
+                          (0ULL - (unsigned long long) i);
+  return as_hexadecimal_unsigned ((unsigned long long) i);
 }
 
 string
