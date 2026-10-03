@@ -518,8 +518,9 @@ spell_check (string lan, string s) {
       return r;
     }
     else {
-      spell_active= false;
-      spell_done (lan);
+      // do not end a spell session which may be active for another language
+      spell_busy->reset (lan);
+      ispell_done (lan);
       return "ok";  
     }
   }

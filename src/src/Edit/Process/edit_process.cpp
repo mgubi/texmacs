@@ -481,7 +481,8 @@ edit_process_rep::generate_index (string idx) {
     locale_less_eq_operator::le= get_std_locale (get_init_string ("language"));
 #else
     locale_less_eq_operator::locale_name = language_to_locale (get_init_string ("language"));
-    locale_less_eq_operator::locale_name[2] = '-';
+    if (N (locale_less_eq_operator::locale_name) > 2)
+      locale_less_eq_operator::locale_name[2] = '-';
 #endif
     merge_sort_leq<string,locale_less_eq_operator> (entry);
 #else
