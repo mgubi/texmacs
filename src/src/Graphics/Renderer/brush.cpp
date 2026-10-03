@@ -143,6 +143,10 @@ make_brush (tree p, int a) {
     else
       return make_brush (named_color (s, a));
   }
+  else if (!is_func (p, _PATTERN) || N(p) < 3)
+    // NOTE: unevaluated color, such as <arg|fg> in the macro editor;
+    // treat it like an unknown color name instead of as a pattern
+    return make_brush (named_color ("black", a));
   else {
     color c= white;
     if (N(p) == 4) c= named_color (as_string (p[3]), a);
