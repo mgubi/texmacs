@@ -323,14 +323,20 @@ function picture (source, svg) {
          ' (superpose ' + [image].concat (p.runs).join (' ') + '))';
 }
 
-// the end of the log of TeX, from its first error
+// the error of TeX in its log: from its first line "! ...", the lines up to
+// its prompt "?" (the help of an interactive TeX and what follows, the
+// emergency stop of a TeX without terminal, are left out)
 function texError (e) {
   var msg = (e && (e.message || e.toString && e.toString ())) || String (e);
   var i = msg.indexOf ('\n!');
-  if (i >= 0) msg = msg.slice (i + 1);
-  var lines = msg.split ('\n');
-  if (lines.length > 20) lines = lines.slice (0, 20).concat (['...']);
-  return lines.join ('\n');
+  if (i < 0) return msg.split ('\n').slice (0, 20).join ('\n');
+  var lines = msg.slice (i + 1).split ('\n'), r = [];
+  for (var k = 0; k < lines.length && k < 20; k++) {
+    if (/^\?/.test (lines[k])) break;
+    r.push (lines[k]);
+  }
+  while (r.length && /^\s*$/.test (r[r.length - 1])) r.pop ();
+  return r.join ('\n');
 }
 
 /******************************************************************************
