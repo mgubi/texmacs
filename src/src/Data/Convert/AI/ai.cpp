@@ -322,11 +322,6 @@ get_post_data (string& url, array<string>& headers, tree& data,
     if (is_atomic (t[1][i])) headers << t[1][i]->label;
 }
 
-static inline string
-shell_quote (string s) {
-  return "'" * replace (s, "'", "'\\''") * "'";
-}
-
 static string
 to_shell_command (tree t) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))

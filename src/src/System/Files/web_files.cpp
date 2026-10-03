@@ -197,8 +197,9 @@ get_from_ramdisc (url u) {
 * Keeping secrets in HTTP headers off command lines and out of logs
 ******************************************************************************/
 
-static inline string
+string
 shell_quote (string s) {
+  // quote s as a single word for a POSIX shell
   return "'" * replace (s, "'", "'\\''") * "'";
 }
 
@@ -251,6 +252,9 @@ curl_command (string args, array<string> headers_attr) {
   // Shell command for 'curl args', the HTTP headers being passed to curl
   // on its standard input from a temporary file of mode 600,
   // which is removed as soon as the shell has opened it.
+  // The file is written when the command is built: if the command is
+  // never run, the file stays in the temporary directory until it is
+  // removed at exit, and the command can only be run once.
   string h;
   for (int i= 0; i+1 < N(headers_attr); i += 2) {
     string line= headers_attr[i] * ": " * headers_attr[i+1];
