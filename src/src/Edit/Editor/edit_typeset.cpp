@@ -776,11 +776,19 @@ expand_includes (tree t) {
            is_atomic (url_unix (t[0]->label)))
     return tree (VAR_INCLUDE, t[0]);
   else {
+    // only copy the tree if some include was actually rewritten
     int i, n= N(t);
-    tree r (t, n);
-    for (i=0; i<n; i++)
-      r[i]= expand_includes (t[i]);
-    return r;
+    for (i=0; i<n; i++) {
+      tree c= expand_includes (t[i]);
+      if (!strong_equal (c, t[i])) {
+        tree r (t, n);
+        for (int j=0; j<i; j++) r[j]= t[j];
+        r[i]= c;
+        for (i++; i<n; i++) r[i]= expand_includes (t[i]);
+        return r;
+      }
+    }
+    return t;
   }
 }
 
