@@ -21,6 +21,7 @@
 #endif
 
 #include <iostream>
+#include <locale.h>
 
 #define outline Core_outline
 #define extend Core_extends
@@ -300,6 +301,18 @@ simplify_date (string s) {
   return r;
 }
 
+static bool
+locale_available (string loc) {
+  // check whether the C library knows the locale, restoring the current one
+  const char* cur= setlocale (LC_TIME, NULL);
+  string saved= (cur == NULL? string ("C"): string (cur));
+  c_string _loc (loc);
+  bool ok= (setlocale (LC_TIME, _loc) != NULL);
+  c_string _saved (saved);
+  setlocale (LC_TIME, _saved);
+  return ok;
+}
+
 string
 get_date (string lan, string fm) {
 //#ifdef OS_MINGW
@@ -326,9 +339,12 @@ get_date (string lan, string fm) {
   if (get_env (lvar) == "") lvar= "LC_ALL";
   if (get_env (lvar) == "") lvar= "LANG";
   string old= get_env (lvar);
-  set_env (lvar, lan * ".UTF-8");
+  bool utf8= locale_available (lan * ".UTF-8");
+  set_env (lvar, utf8? lan * ".UTF-8": lan);
   string date= simplify_date (var_eval_system ("date +\"" * fm * "\""));
-  date= utf8_to_cork (date);
+  if (utf8) date= utf8_to_cork (date);
+  else if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
+    date= il2_to_cork (date);
   // if (lan == "ru_RU") date= iso_to_koi8 (date);
   set_env (lvar, old);
   return date;
