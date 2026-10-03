@@ -327,6 +327,13 @@ var tmPackages = (function () {
     fetchBoot ()
       .then (async function (r) {
         manifest = r.manifest;
+        // the build, for TeXmacs: the hashes of the contents of its
+        // packages; the cache of the plugins (tm-plugins.scm) is made again
+        // when it changes (a new build may have other plugins)
+        ENV['TEXMACS_WEB_BUILD'] = manifest.packages.map (function (p) {
+          var h = /-([0-9a-f]+)\.pack$/.exec (p.url || '');
+          return h ? h[1] : '';
+        }).join ('');
         createTree ();
         for (var i = 0; i < r.boot.length; i++) {
           await install (r.boot[i], r.bytes[i], false);

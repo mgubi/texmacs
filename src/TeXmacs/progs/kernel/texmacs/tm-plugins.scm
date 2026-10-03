@@ -395,6 +395,14 @@
 (define check-dir-table (make-ahash-table))
 (define-public plugin-data-table (make-ahash-table))
 
+;; what the cache of the plugins was made for: the path, and in a browser
+;; the build of the page (its packages, misc/wasm/packages.js), since the
+;; path of a page never changes while its plugins do
+(define (plugin-cache-key)
+  (with b (or (getenv "TEXMACS_WEB_BUILD") "")
+    (if (== b "") (get-original-path)
+        (string-append (get-original-path) "|" b))))
+
 (define-public (plugin-load-setup)
   (when (not plugin-loaded-setup?)
     (set! plugin-loaded-setup? #t)
@@ -416,7 +424,7 @@
 (define (plugin-save-setup)
   (when reconfigure-flag?
     (save-object plugin-cache
-                 (list (get-original-path)
+                 (list (plugin-cache-key)
                        (ahash-table->list plugin-data-table)
                        (ahash-table->list check-dir-table)))))
 
@@ -482,7 +490,7 @@
     (add-macos-program-path (url-append rad rel) after?)))
 
 (define (path-up-to-date?)
-  (with ok? (== plugin-check-path (get-original-path))
+  (with ok? (== plugin-check-path (plugin-cache-key))
     (for (p (ahash-table->list check-dir-table))
       (with modified? (!= (url-last-modified (system->url (car p))) (cdr p))
         (if modified? (set! ok? #f))))
@@ -663,8 +671,13 @@
             ;;(with start (texmacs-time)
             ;;  (load fname)
             ;;  (display* name " -> " (- (texmacs-time) start) " ms\n"))
-            (load fname)
-            ))
+            ;; a plugin which fails (an error in its files) is reported,
+            ;; and does not stop the initialization of the others
+            (catch #t
+              (lambda () (load fname))
+              (lambda err
+                (display* "TeXmacs] the plugin " name
+                          " could not be initialized: " err "\n")))))
       (if (plugin-all-initialized?) (plugin-save-setup)))))
 
 (define-public (lazy-plugin-initialize name)
