@@ -878,8 +878,9 @@ bib_set_fields (tree& t, array<tree> latex, int& ind) {
         if (bib_is_field (f)) {
           if ((f[0]->label == "author" || f[0]->label == "editor") &&
               is_atomic (f[1])) {
+            // the names may end the values: read no further than their end
             tree res= compound ("bib-names"); ind++;
-            while (latex[ind] == compound ("bibname")) {
+            while (ind + 4 < N(latex) && latex[ind] == compound ("bibname")) {
               tree name= compound ("bib-name"); ind++;
               name << latex[ind]; ind++;
               name << latex[ind]; ind++;
@@ -891,7 +892,7 @@ bib_set_fields (tree& t, array<tree> latex, int& ind) {
           }
           else if (f[0]->label == "pages" && is_atomic (f[1]))
             f[1]= bib_field_pages (f[1]->label);
-          else {
+          else if (ind < N(latex)) {
             f[1]= latex[ind];
             ind++;
           }
