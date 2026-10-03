@@ -43,17 +43,8 @@
 (define sync-db #f)
 
 (define (test-db name)
-  ;; FIXME: a database whose file does not exist yet is created by
-  ;; database_rep::initialize without setting its time stamp, so that the
-  ;; first synchronization reloads it from the file and replays the
-  ;; unsaved lines with replay (clone, start, true), which sets the
-  ;; expiration of a removed line to its creation time
-  ;; (src/Plugins/Database/db_disk.cpp:165, l->created instead of
-  ;; l->expires): all the removals done before the first synchronization
-  ;; lose their date.  The files are therefore created before being opened.
-  (with u (url-append test-dir name)
-    (string-save "" u)
-    u))
+  ;; a database whose file is created when it is opened
+  (url-append test-dir name))
 
 (define (db-sync)
   (tmdb-keep-history sync-db #f)
@@ -103,10 +94,11 @@
   (check= db-extra-fields '())
   (check-error (db-get-db) #t)
   (check-error (db-get-field "x" "y") #t)
-  ;; FIXME: with-global (kernel/boot/abbrevs.scm:118) does not restore the
-  ;; variable when its body raises an error, so that the failed
-  ;; db-get-field above leaves db-encoding at #f (it runs its former
-  ;; definition inside with-encoding #f); db-reset puts it back
+  ;; the failed db-get-field above ran inside with-encoding #f, and the
+  ;; variables of with-global are restored after an error (#175)
+  (check= db-encoding :default)
+  (check-error (with-time 'bad (db-get-time)) #t)
+  (check= db-time :now)
   (db-reset)
   (check= db-encoding :default)
   (check-true (url-none? current-database))
@@ -303,14 +295,18 @@
     (check= (tmdb-query db '(("type" "t1")) 150.0 0 5) '())
     (check= (tmdb-query db '(("type" "t1") ("color" "red")) 150.0 1 0)
             '("b"))
-    ;; FIXME: the offset skips the candidates of the first constraint and
-    ;; not the results (db_query.cpp:98, filter starts at qargs.offset in
-    ;; the ansatz ids): with offset 1, (("type" "t1") ("color" "red"))
-    ;; gives ("b" "c") instead of ("c"), since "a" is skipped.
-    ;; FIXME: an order clause raises the limit to at least 1000 and the
-    ;; result is not cut back (db_query.cpp:209): with limit 1,
-    ;; (("color" "red") (order "name" #t)) gives ("b" "c" "d") instead of
-    ;; ("b"), so that the limit of db-tmfs.scm (get-db-fields) is ignored.
+    ;; the offset skips results, not candidates (#175)
+    (check= (tmdb-query db '(("type" "t1") ("color" "red")) 150.0 0 1)
+            '("c"))
+    (check= (tmdb-query db '(("type" "t1") ("color" "red")) 150.0 1 1)
+            '("c"))
+    ;; with an order, the limit and the offset apply to the sorted results
+    (check= (tmdb-query db '(("color" "red") (order "name" #t)) 150.0 1 0)
+            '("b"))
+    (check= (tmdb-query db '(("color" "red") (order "name" #t)) 150.0 1 1)
+            '("c"))
+    (check= (tmdb-query db '(("color" "red") (order "name" #f)) 150.0 2 2)
+            '("b"))
     ;; modification dates
     (tmdb-remove-entry db "a" 200.0)
     (check= (tmdb-query db '((modified "150" "300")) 0.0 0 0) '("a"))
@@ -321,13 +317,14 @@
             '())
     (check= (tmdb-query db '(("type" "t1")) 250.0 0 0) '("b" "c"))
     (check= (tmdb-query db '(("type" "t1")) 0.0 0 0) '("a" "b" "c"))
-    ;; FIXME: a query without field constraints (the empty query, a query
-    ;; with only (order ...) or (contains "")) returns every id ever used,
-    ;; also the removed entries: after removing "a" at 200,
-    ;; (tmdb-query db '() 250.0 0 0) gives ("a" "b" "c" "d") instead of
-    ;; ("b" "c" "d") (db_query.cpp:145 and 150 return ids_list, which
-    ;; filter keeps as there is no constraint), and db-load loads them.
-    ))
+    ;; a query without field constraints gives the entries which exist
+    ;; at the time, without the removed ones (#175)
+    (check= (sorted (tmdb-query db '() 250.0 0 0)) '("b" "c" "d"))
+    (check= (sorted (tmdb-query db '() 150.0 0 0)) '("a" "b" "c" "d"))
+    (check= (sorted (tmdb-query db '() 0.0 0 0)) '("a" "b" "c" "d"))
+    (check= (tmdb-query db '((order "name" #t)) 250.0 0 0) '("b" "c" "d"))
+    (check= (sorted (tmdb-query db '((contains "")) 250.0 0 0))
+            '("b" "c" "d"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keywords and completions
@@ -420,10 +417,17 @@
       (check= (tmdb-get-field db3 "p" "name" 450.0) '("Renamed"))
       (check= (tmdb-get-field db3 "p" "name" 150.0) '("Persistent"))
       (check= (tmdb-get-field db3 "c" "color" 200.0) '("red"))))
-  ;; FIXME: for a database whose file did not exist before (see test-db),
-  ;; (tmdb-set-field db "c" "color" '("red") 100.0),
-  ;; (tmdb-remove-field db "c" "color" 300.0) and a synchronization make
-  ;; (tmdb-get-field db "c" "color" 200.0) give () instead of ("red").
+  ;; the removals in a new file keep their dates after its first
+  ;; synchronization (#175)
+  (with db (test-db "new-file.tmdb")
+    (check-false (url-exists? db))
+    (tmdb-set-field db "c" "color" '("red") 100.0)
+    (tmdb-remove-field db "c" "color" 300.0)
+    (db-sync)
+    (check= (tmdb-get-field db "c" "color" 200.0) '("red"))
+    (check= (tmdb-get-field db "c" "color" 350.0) '())
+    (with db2 (copy-db db "new-file-copy.tmdb")
+      (check= (tmdb-get-field db2 "c" "color" 200.0) '("red"))))
   ;; compression without history
   (with db (test-db "compress.tmdb")
     (for (i (iota 10))
@@ -451,14 +455,19 @@
     (db-sync)
     (check= (tmdb-get-field db "k" "v" 150.0) '("theirs"))
     (check= (tmdb-get-field db "k2" "v" 150.0) '("new")))
-  ;; FIXME: when the file changed on disk, the reload (check_for_updates,
-  ;; db_disk.cpp:303-310) only replays the unsaved lines created since the
-  ;; last write: the unsaved removal of a value which was already written
-  ;; is lost.  Repro: set ("one") at 100, synchronize, set ("two") at 200,
-  ;; touch the file into the future, synchronize; then
-  ;; (tmdb-get-field db "k" "v" 250.0) gives ("one" "two") instead of
-  ;; ("two").
-  )
+  ;; the unsaved removal of a saved value survives a reload (#175)
+  (with db (test-db "external-removal.tmdb")
+    (tmdb-set-field db "k" "v" '("one") 100.0)
+    (db-sync)
+    (tmdb-set-field db "k" "v" '("two") 200.0)
+    (eval-system (string-append "touch -t 203001010000 '"
+                                (url->system db) "'"))
+    (db-sync)
+    (check= (tmdb-get-field db "k" "v" 250.0) '("two"))
+    (check= (tmdb-get-field db "k" "v" 150.0) '("one"))
+    (with db2 (copy-db db "external-removal-copy.tmdb")
+      (check= (tmdb-get-field db2 "k" "v" 250.0) '("two"))
+      (check= (tmdb-get-field db2 "k" "v" 150.0) '("one")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The basic Scheme interface (db-base.scm)
@@ -624,13 +633,22 @@
         (check= (sorted (db-get-field id "owner")) '("u1" "u2")))
       (check-false (with-user '() (db-create-entry '(("name" "x")))))
       (check= db-current-user #t)
-      ;; FIXME: db-get-field, db-get-entry, db-set-field, db-set-entry and
-      ;; db-remove-entry recurse without end when the current user is not
-      ;; #t: they call db-allow?, whose (db-get-field id attr)
-      ;; (db-users.scm:288) runs again with the same user.  Repro:
-      ;; (with-user "u2" (db-get-field "r1" "name")) raises stack-overflow
-      ;; instead of giving ("doc").
-      )))
+      ;; the wrappers check the rights of the user (#175)
+      (check= (with-user "u2" (db-get-field "r1" "name")) '("doc"))
+      (check= (with-user "zz" (db-get-field "r1" "name")) '())
+      (check= (with-user "zz" (db-get-field "r2" "name")) '("pub"))
+      (check= (with-user "u2" (assoc-ref (db-get-entry "r1") "name"))
+              '("doc"))
+      (check= (with-user "zz" (db-get-entry "r1")) '())
+      (with-user "u2" (db-set-field "r1" "name" '("changed")))
+      (check= (db-get-field "r1" "name") '("doc"))
+      (with-user "u1" (db-set-field "r1" "name" '("changed")))
+      (check= (db-get-field "r1" "name") '("changed"))
+      (with-user "u2" (db-remove-entry "r1"))
+      (check= (db-get-field "r1" "name") '("changed"))
+      (with-user "u1" (db-remove-entry "r1"))
+      (check= (db-get-field "r1" "name") '())
+      (check= db-current-user #t))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Versions and import (db-version.scm)
