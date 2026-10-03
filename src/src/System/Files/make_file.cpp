@@ -101,14 +101,14 @@ make_file (int cmd, tree data, array<url> args) {
     {
       system_wait ("Fetching web file", as_string (args[0]));
       url local= get_from_web (args[0]);
-      if (!is_none (local)) move (local, make_target);
+      if (!is_none (local)) copy (local, make_target);
       system_wait ("");
       break;
     }
   case CMD_GET_FROM_SERVER:
     {
       url local= get_from_server (args[0]);
-      if (!is_none (local)) move (local, make_target);
+      if (!is_none (local)) copy (local, make_target);
       break;
     }
   case CMD_APPLY_EFFECT:

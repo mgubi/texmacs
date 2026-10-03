@@ -167,6 +167,13 @@ texmacs_dirent texmacs_readdir(TEXMACS_DIR dirp) {
   return {true, texmacs_qstring_to_string(dir->iterator->fileName())};
 }
 
+int texmacs_lstat(string filename, struct stat *buf) {
+    int ret = texmacs_stat(filename, buf);
+    if (ret == 0 && QFileInfo(texmacs_string_to_qstring(filename)).isSymLink())
+        buf->st_mode = (buf->st_mode & ~S_IFMT) | S_IFLNK;
+    return ret;
+}
+
 int texmacs_stat(string filename, struct stat *buf) {
     QFileInfo info(texmacs_string_to_qstring(filename));
     
