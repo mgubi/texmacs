@@ -597,8 +597,6 @@ latex_expand (tree doc) {
   return remove_doc_attr (doc, "view");
 }
 
-void reset_inclusion (url name);
-
 bool
 buffer_save (url name) {
   string fm= file_format (name);

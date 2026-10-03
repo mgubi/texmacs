@@ -51,13 +51,16 @@
   (if (tree? ln) (set! ln (link-flatten ln)))
   (and (func? ln 'link) (cadr ln)))
 
-(tm-define (link-attributes ln)
-  (if (tree? ln) (set! ln (link-flatten ln)))
-  (and (func? ln 'link) (caddr ln)))
-
-(define (link-attributes? x)
+(tm-define (link-attributes? x)
   ;; flattened (attr ...) is an association list, vertices are (id ...) etc.
   (or (null? x) (and (pair? x) (pair? (car x)))))
+
+(tm-define (link-attributes ln)
+  (if (tree? ln) (set! ln (link-flatten ln)))
+  (and (func? ln 'link)
+       (if (and (pair? (cddr ln)) (link-attributes? (caddr ln)))
+           (caddr ln)
+           '())))
 
 (tm-define (link-vertices ln)
   (if (tree? ln) (set! ln (link-flatten ln)))

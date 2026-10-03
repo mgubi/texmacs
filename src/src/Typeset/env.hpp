@@ -594,6 +594,7 @@ tree load_inclusion (url u); // implemented in tm_file.cpp
 bool inclusion_busy (url u);
 void inclusion_enter (url u);
 void inclusion_leave (url u);
+void reset_inclusion (url u);
 tree tree_extents (tree t);
 bool is_percentage (tree t, string s);
 bool is_percentage (tree t);
