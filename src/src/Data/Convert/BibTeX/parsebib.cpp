@@ -90,6 +90,10 @@ bib_within (string s, int& pos, char cbegin, char cend, string& content) {
       if (s[pos] == cbegin) depth++;
       else if (s[pos] == cend) depth--;
     }
+    else {
+      if (s[pos] == '{') depth++;
+      else if (s[pos] == '}' && depth > 0) depth--;
+    }
     if (s[pos] == '\\' && bib_ok (s, pos+1)) {
       content << '\\';
       pos++;
@@ -408,6 +412,7 @@ bib_list (string s, int& pos, tree& t) {
 //  t << A(tentry);
   hashmap<string,string> dict=
     bib_strings_dict (tree (DOCUMENT, compound ("bib-string", tstring)));
+  if (N(tpreamble) != 0) t << compound ("bib-preamble", tpreamble);
   t << A(bib_subst_vars (tentry, dict));
   bib_parse_fields (t);
 }

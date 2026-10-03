@@ -118,7 +118,7 @@ bibtex_load_bbl (string bib, url bbl_file) {
 	  item= compound ("bibitem*", as_string (count++), item[0]);
 	t[i][0]= item;
 	tree v (CONCAT, compound ("bibitem*", item[0]));
-	if (is_atomic (item[1]))
+	if (N(item) > 1 && is_atomic (item[1]))
 	  v << tree (LABEL, bib * "-" * item[1]->label);
 	if (N(t[i])>1) {
 	  v << remove_start_space (t[i][1]);
@@ -184,22 +184,28 @@ bibtex_run (string bib, string style, url bib_file, tree bib_t) {
     bib_name= bib_name (0, N(bib_name)- 4);
   bib_s << "\\bibdata{" << bib_name << "}\n";
   save_string ("$TEXMACS_HOME_PATH/system/bib/temp.aux", bib_s);
+  remove (url ("$TEXMACS_HOME_PATH/system/bib/temp.bbl"));
 
 #ifdef OS_WIN32_LATER
   c_string directory (dir);
   RunBibtex (directory, "$TEXMACS_HOME_PATH/system/bib", "temp");
 #else
-  string cmdln= "cd $TEXMACS_HOME_PATH/system/bib; ";
+  string cmdln= "cd \"$TEXMACS_HOME_PATH/system/bib\"; ";
   cmdln << "BIBINPUTS=\"" << dir << "\":$BIBINPUTS "
 	<< "BSTINPUTS=\"" << dir << "\":$BSTINPUTS "
 	<< bibtex_command
-        << " temp > $TEXMACS_HOME_PATH/system/bib/temp.log";
+        << " temp > \"$TEXMACS_HOME_PATH/system/bib/temp.log\"";
   if (DEBUG_AUTO) {
     if (!(DEBUG_STD))
       debug_shell << cmdln << "\n";
   }
   string log;
-  if (system (cmdln, log))
+  int ret= system (cmdln, log);
+  // some bibtex versions exit with status 1 when there were only warnings
+  bool only_warnings= occurs ("Warning--", log) &&
+                      !occurs ("error message", log) &&
+                      !occurs ("fatal error", log);
+  if (ret != 0 && !only_warnings)
     bibtex_error << log << "\n";
   else {
     int pos=0;
