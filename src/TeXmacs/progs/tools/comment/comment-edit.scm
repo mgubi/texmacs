@@ -186,10 +186,39 @@
     (former which)
     (when (nnull? l) (notify-comments-editor))))
 
+(define (comment-id-elsewhere? id)
+  ;; Is the mirror identifier id also used by a comment in another open
+  ;; buffer?  The comment editors (mirror-comment and carbon-comment views)
+  ;; share the identifier on purpose, so they are not counted.
+  (with cur (current-buffer)
+    (list-find (id->trees id)
+               (lambda (u)
+                 (and-with b (tree->buffer u)
+                   (and (!= b cur)
+                        (and-with p (tree-up u)
+                          (and (any-comment-context? p)
+                               (not (tree-in? p '(mirror-comment
+                                                  carbon-comment)))))))))))
+
+(define (renew-pasted-comment-ids old)
+  ;; Pasted copies of comments which are already in this buffer or in
+  ;; another open buffer get new identifiers, so that they become
+  ;; independent comments, not mirrors
+  (with ids (map comment-id old)
+    (for (t (tree-search (buffer-tree) any-comment-context?))
+      (when (and (not (list-find old (cut tree-eq? t <>)))
+                 (or (in? (comment-id t) ids)
+                     (comment-id-elsewhere? (comment-id t))))
+        (tree-set (tree-ref t 0) (create-unique-id))
+        (tree-set (tree-ref t 1) (create-unique-id))))))
+
 (tm-define (clipboard-paste which)
   (with l (tree-search (clipboard-get which) any-comment-context?)
-    (former which)
-    (when (nnull? l) (notify-comments-editor))))
+    (if (null? l) (former which)
+        (with old (tree-search (buffer-tree) any-comment-context?)
+          (former which)
+          (renew-pasted-comment-ids old)
+          (notify-comments-editor)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting a new comment
