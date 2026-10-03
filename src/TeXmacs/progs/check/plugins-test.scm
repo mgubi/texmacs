@@ -862,15 +862,16 @@
   ;; tm_python sends its banner and then its prompt, as two blocks: the
   ;; first evaluation reads the banner and may stop after the prompt, its
   ;; answer is then still pending, and an empty line (which tm_python
-  ;; ignores) reads it
+  ;; ignores) reads it. #t, or the answers which were read instead.
   (with r (py ses "6*7")
-    (or (== r '(document "42"))
-        (and (== r "")
-             (with old (ahash-ref plugin-serializer-table "python")
-               (plugin-serializer-set! "python" (lambda (lan t) "\n"))
-               (with r2 (py ses "")
-                 (plugin-serializer-set! "python" old)
-                 (== r2 '(document "42"))))))))
+    (cond ((== r '(document "42")) #t)
+          ((== r "")
+           (with old (ahash-ref plugin-serializer-table "python")
+             (plugin-serializer-set! "python" (lambda (lan t) "\n"))
+             (with r2 (py ses "")
+               (plugin-serializer-set! "python" old)
+               (or (== r2 '(document "42")) (list r r2)))))
+          (else (list r)))))
 
 (define plugin-serializer-table
   ;; the serializers of plugin-cmd.scm
@@ -882,7 +883,7 @@
 ;; the completion with a scheme block, and ends when it is stopped.
 (define (test-python)
   (check-group "python: evaluation")
-  (check-true (py-start "plugins-test-py1"))
+  (check= (py-start "plugins-test-py1") #t)
   (check= (connection-status "python" "plugins-test-py1") 2)
   (check= (py "plugins-test-py1" "6*8") '(document "48"))
   (check= (py "plugins-test-py1" "'a' + 'b'") '(document "ab"))
@@ -922,7 +923,7 @@
           '(tuple "y" "" "ield"))
 
   (check-group "python: two sessions and stop")
-  (check-true (py-start "plugins-test-py2"))
+  (check= (py-start "plugins-test-py2") #t)
   (check= (py "plugins-test-py2" "y = 7") "")
   (check= (py "plugins-test-py1" "y") '(document "5"))
   (check= (py "plugins-test-py2" "y") '(document "7"))
