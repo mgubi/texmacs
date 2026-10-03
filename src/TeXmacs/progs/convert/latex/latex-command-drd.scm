@@ -418,4 +418,4 @@
   ((latex-arity% 'x 0)      (latex-ignore-0*% 'x))
   ((latex-arity% 'x 1)      (latex-ignore-1% 'x))
   ((latex-arity% 'x 2)      (latex-ignore-2% 'x))
-  ((latex-optional-arg% 'x) (latex-ignore-1*% 'x)))
+  ((latex-optional-arg% 'x) (latex-ignore-0*% 'x)))
