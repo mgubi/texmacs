@@ -47,6 +47,10 @@
         (check misc-modules-test)
         (check remote-test)
         (check kbd-menu-test)
+        (check structures-test)
+        (check convert-more-test)
+        (check parse-test)
+        (check macro-drd-test)
         (check crypto-test)
         (check plugins-test)))
 
@@ -136,6 +140,8 @@
     ;; generates the auxiliary data of documents in the temporary directory;
     ;; FIXME: before editing too, for the same reason as bibtex
     ("links" links-test-failures count)
+    ("structures" structures-test-failures count)
+    ("convert-more" convert-more-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ("typeset" typeset-test-failures count)
@@ -146,6 +152,8 @@
     ;; makes a throwaway git repository in the temporary directory
     ("version" version-test-failures count)
     ("misc-modules" misc-modules-test-failures count)
+    ;; loads the keyword tables of the program languages
+    ("parse" parse-test-failures count)
     ("database" database-test-failures count)
     ("crypto" crypto-test-failures count)
     ;; server and clients in this process, with databases in the temporary
@@ -155,6 +163,8 @@
     ("plugins" plugins-test-failures count)
     ;; loads every lazy menu, and maps and unmaps test keys
     ("kbd-menu" kbd-menu-test-failures count)
+    ;; loads every style package, and with them the Scheme modules they use
+    ("macro-drd" macro-drd-test-failures count)
     ;; last, since it defines modes and functions in the running TeXmacs
     ("tm-define" define-test-failures count)))
 
