@@ -10,10 +10,10 @@
 ******************************************************************************/
 
 #include "unix_system.hpp"
-#include <fcntl.h>
 #include "config.h"
 
 #include <chrono>
+#include <fcntl.h>
 
 #include "Guile/guile_tm.hpp"
 #ifdef SCM_HAVE_HOOKS
@@ -88,6 +88,7 @@ FILE* texmacs_fopen(string filename, string mode, bool lock) {
       return nullptr;
     }
     texmacs_lock_file(file);
+    // texmacs_lock_file closes the file and sets it to nullptr on failure
     struct stat st;
     if (file != nullptr && fstat(fd, &st) == 0 && S_ISREG(st.st_mode) &&
         ftruncate(fd, 0) == -1) {

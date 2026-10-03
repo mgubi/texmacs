@@ -29,6 +29,8 @@ unix_system (string s) {
 
 int
 unix_system (string cmd, string& result) {
+  result= "";
+  if (cmd == "") return 0;
   url temp= url_temp ();
   string temp_s= escape_sh (concretize (temp));
   // group the command, so that its own redirections take precedence
@@ -42,6 +44,8 @@ unix_system (string cmd, string& result) {
 
 int
 unix_system (string cmd, string& result, string& error) {
+  result= ""; error= "";
+  if (cmd == "") return 0;
   url temps= url_temp ();
   url tempe= url_temp ();
   string temp_s= escape_sh (concretize (temps));
