@@ -98,7 +98,7 @@ connection_rep::start (bool again) {
   tm_out->bof ();
   tm_err->bof ();
   ln->set_command (command (connection_callback, this));
-  if (name == "dynlink") {
+  if (is_tuple (info, "dynlink")) {
     this->listen ();
     status = WAITING_FOR_OUTPUT;
   }
@@ -119,10 +119,10 @@ connection_rep::start (bool again) {
 
 void
 connection_rep::write (string s) {
-  ln->write (s, LINK_IN);
   tm_out->bof ();
   tm_err->bof ();
   status= WAITING_FOR_OUTPUT;
+  ln->write (s, LINK_IN);
 }
 
 void
@@ -275,6 +275,8 @@ connection_start (string name, string session, bool again) {
         make_dynamic_link (t[1]->label, t[2]->label, t[3]->label, session);
       con= tm_new<connection_rep> (name, session, ln);
     }
+    else if (!is_tuple (t, "cmdline") && !is_tuple (t, "request"))
+      return "Error: unsupported link type for connection " * name;
     con->info= t;
   }
 
@@ -354,6 +356,26 @@ connection_get (string name, string session) {
   return con;
 }
 
+static void
+connection_append (tree& doc, tree next) {
+  // the answer may come in several reads: the first line of a read
+  // continues the last line of the previous one, as within a read
+  if (!is_document (next)) next= tree (DOCUMENT, next);
+  if (N(doc) == 0 || doc[N(doc)-1] == "") {
+    if (N(doc) != 0) doc= doc (0, N(doc)-1);
+    doc << A (next);
+    return;
+  }
+  if (next[0] != "") {
+    tree last= doc[N(doc)-1], first= next[0];
+    if (!is_concat (last)) last= tree (CONCAT, last);
+    if (!is_concat (first)) first= tree (CONCAT, first);
+    last << A (first);
+    doc[N(doc)-1]= last;
+  }
+  doc << A (next (1, N(next)));
+}
+
 static tree
 connection_retrieve (string name, string session) {
   // cout << "Retrieve " << name << ", " << session << "\n";
@@ -362,15 +384,15 @@ connection_retrieve (string name, string session) {
   tree doc (DOCUMENT);
   while (true) {
     con->forced_eval= true;
-#ifndef QTTEXMACS
+#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
     perform_select ();
 #endif
     con->forced_eval= false;
     tree next= connection_read (name, session);
-    if (next == "");
-    else if (is_document (next)) doc << A (next);
-    else doc << next;
+    if (next != "") connection_append (doc, next);
     if (con->status == WAITING_FOR_INPUT) break;
+    // a dead connection never completes its answer
+    if (con->status == CONNECTION_DEAD) break;
   }
   if (N(doc) == 0) return "";
   // cout << "Retrieved " << doc << "\n";
@@ -382,7 +404,9 @@ connection_eval (string name, string session, tree t) {
   // cout << "Evaluating " << name << ", " << session << ", " << t << LF;
   connection con= connection_get (name, session);
   if (is_nil (con)) return "";
+  con->forced_eval= true;
   connection_write (name, session, t);
+  con->forced_eval= false;
   return connection_retrieve (name, session);
 }
 
@@ -391,7 +415,9 @@ connection_eval (string name, string session, string s) {
   // cout << "Evaluating " << name << ", " << session << ", " << s << LF;
   connection con= connection_get (name, session);
   if (is_nil (con)) return "";
+  con->forced_eval= true;
   connection_write (name, session, s);
+  con->forced_eval= false;
   return connection_retrieve (name, session);
 }
 

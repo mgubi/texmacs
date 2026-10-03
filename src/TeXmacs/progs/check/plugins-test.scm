@@ -34,7 +34,7 @@
 ;;     (scheme-eval) are plain functions.
 ;;
 ;; connection-eval has no timeout: it waits until the answer is complete
-;; (see the FIXME in test-connection-status). The suite only sends commands
+;; or the plugin is dead. The suite only sends commands
 ;; whose answers are complete and quick, and the parser is tested with a
 ;; plugin which echoes its input (cat), so that the answer is exactly the
 ;; stream the test writes. Every other wait is a poll with a time limit, and
@@ -104,6 +104,21 @@
 ;; echoes its input on its standard output and its standard error
 (plugin-configure tmtesterr
   (:launch "sh -c \"trap '' INT; printf '\\002verbatim:ready\\005'; exec tee /dev/stderr\"")
+  (:serializer ,raw-serialize))
+
+;; answers in two pieces, a second apart: two reads of the pipe; it sends
+;; a banner, which the first connection-eval reads when it starts it
+(plugin-configure tmtestsplit
+  (:launch "sh -c \"printf '\\002verbatim:ready\\005'; while read x; do printf '\\002verbatim:a\\002verbatim:'; sleep 1; printf 'b\\005\\005'; done\"")
+  (:serializer ,raw-serialize))
+
+;; answer once and exit, completing their answer or not; they send no
+;; banner, and are started with connection-start, which does not read it
+(plugin-configure tmtestonce
+  (:launch "sh -c \"read x; printf '\\002verbatim:bye\\005'\"")
+  (:serializer ,raw-serialize))
+(plugin-configure tmtestcut
+  (:launch "sh -c \"read x; printf '\\002verbatim:cut'\"")
   (:serializer ,raw-serialize))
 
 ;; two variants, the session name chooses the variant
@@ -548,6 +563,10 @@
   (connection-write-string "tmtestecho" "plugins-test-parse"
                            (string-append BEGIN "verbatim:x" ESCAPE))
   (check= (echo (string-append END "y" END)) (list 'document (string-append "x" END "y")))
+  ;; an answer which comes in two reads is joined as in one read (#177)
+  (check= (eval* "tmtestsplit" "plugins-test-split" "go\n")
+          '(document (concat "a" "b")))
+  (connection-stop "tmtestsplit" "plugins-test-split")
   ;; long answers, more than one read of the pipe
   (with s (make-string 20000 #\a)
     (check= (echo (blk "verbatim:" s)) (list 'document s)))
@@ -678,11 +697,11 @@
   (check= (tree->stree (connection-eval "tm-plugins-test-nothing" "default" "x"))
           "")
   (check= (connection-status "tm-plugins-test-nothing" "default") 0)
-  ;; FIXME: after this failed start, connection-eval in the same session
-  ;; never returns (see the FIXME below); it is not checked
   (check= (start* "tmtestnone" "plugins-test-none")
           "Error: cannot start application")
   (check= (connection-status "tmtestnone" "plugins-test-none") 0)
+  ;; after a failed start, there is no answer (#177)
+  (check= (eval* "tmtestnone" "plugins-test-none" "x") "")
 
   (check= (start* "tmtestecho" "plugins-test-a") "ok")
   (check= (echo* "plugins-test-a" "a1") '(document "a1"))
@@ -699,19 +718,23 @@
   (check= (connection-status "tmtestecho" "plugins-test-a") 0)
   (check= (connection-status "tmtestecho" "plugins-test-b") 2)
   (check= (echo* "plugins-test-b" "b2") '(document "b2"))
-  ;; FIXME: connection-eval on a stopped connection, or on a plugin which
-  ;; exits before its answer is complete, never returns: connection_retrieve
-  ;; (src/System/Link/connection.cpp) loops until the status is
-  ;; WAITING_FOR_INPUT, which a dead link never reaches, and connection_get
-  ;; starts only a connection which was never made. It is not checked; the
-  ;; stopped session is started again before it is evaluated in.
+  ;; a stopped connection gives no answer, and is not started again (#177)
+  (check= (echo* "plugins-test-a" "a5") "")
+  (check= (connection-status "tmtestecho" "plugins-test-a") 0)
   (check= (connection-start "tmtestecho" "plugins-test-a") "ok")
   (check= (echo* "plugins-test-a" "a4") '(document "a4"))
   (check= (connection-status "tmtestecho" "plugins-test-a") 2)
-  ;; FIXME: with the Qt pipes, the status of a plugin whose process has
-  ;; exited by itself stays 2 (or 3) instead of 0: qt_pipe_link.cpp sets
-  ;; alive to false only in stop. It is 0 only after connection-stop, and
-  ;; the check that it is 0 before is left out.
+  ;; a plugin which exits by itself is dead (#177)
+  (check= (start* "tmtestonce" "plugins-test-once") "ok")
+  (check= (eval* "tmtestonce" "plugins-test-once" "x\n") '(document "bye"))
+  (check-true (poll "tmtestonce" "plugins-test-once"
+                    (lambda ()
+                      (== (connection-status "tmtestonce" "plugins-test-once")
+                          0))))
+  ;; and one which exits before the end of its answer gives what it wrote
+  (check= (start* "tmtestcut" "plugins-test-cut") "ok")
+  (check= (eval* "tmtestcut" "plugins-test-cut" "x\n") '(document "cut"))
+  (check= (connection-status "tmtestcut" "plugins-test-cut") 0)
   (connection-stop "tmtestecho" "plugins-test-a")
   (connection-stop "tmtestecho" "plugins-test-b")
   (check= (connection-status "tmtestecho" "plugins-test-a") 0)
@@ -839,15 +862,16 @@
   ;; tm_python sends its banner and then its prompt, as two blocks: the
   ;; first evaluation reads the banner and may stop after the prompt, its
   ;; answer is then still pending, and an empty line (which tm_python
-  ;; ignores) reads it
+  ;; ignores) reads it. #t, or the answers which were read instead.
   (with r (py ses "6*7")
-    (or (== r '(document "42"))
-        (and (== r "")
-             (with old (ahash-ref plugin-serializer-table "python")
-               (plugin-serializer-set! "python" (lambda (lan t) "\n"))
-               (with r2 (py ses "")
-                 (plugin-serializer-set! "python" old)
-                 (== r2 '(document "42"))))))))
+    (cond ((== r '(document "42")) #t)
+          ((== r "")
+           (with old (ahash-ref plugin-serializer-table "python")
+             (plugin-serializer-set! "python" (lambda (lan t) "\n"))
+             (with r2 (py ses "")
+               (plugin-serializer-set! "python" old)
+               (or (== r2 '(document "42")) (list r r2)))))
+          (else (list r)))))
 
 (define plugin-serializer-table
   ;; the serializers of plugin-cmd.scm
@@ -859,7 +883,7 @@
 ;; the completion with a scheme block, and ends when it is stopped.
 (define (test-python)
   (check-group "python: evaluation")
-  (check-true (py-start "plugins-test-py1"))
+  (check= (py-start "plugins-test-py1") #t)
   (check= (connection-status "python" "plugins-test-py1") 2)
   (check= (py "plugins-test-py1" "6*8") '(document "48"))
   (check= (py "plugins-test-py1" "'a' + 'b'") '(document "ab"))
@@ -899,7 +923,7 @@
           '(tuple "y" "" "ield"))
 
   (check-group "python: two sessions and stop")
-  (check-true (py-start "plugins-test-py2"))
+  (check= (py-start "plugins-test-py2") #t)
   (check= (py "plugins-test-py2" "y = 7") "")
   (check= (py "plugins-test-py1" "y") '(document "5"))
   (check= (py "plugins-test-py2" "y") '(document "7"))

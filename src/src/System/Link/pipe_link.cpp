@@ -77,6 +77,7 @@ public:
   void    stop ();
 
   void    feed (int channel);
+  void    close_fds ();
 };
 
 pipe_link_rep::pipe_link_rep (string cmd2): cmd (cmd2) {
@@ -99,6 +100,35 @@ make_pipe_link (string cmd) {
   return tm_new<pipe_link_rep> (cmd);
 }
 
+#ifndef OS_MINGW
+static void
+terminate_child (int pid) {
+  // Ask the process group of the child to terminate, give it a short
+  // time to do so, kill it otherwise, and reap the child
+  if (-1 != killpg (pid, SIGTERM)) {
+    for (int i=0; i<50; i++) {
+      if (waitpid (pid, NULL, WNOHANG) != 0) {
+        killpg (pid, SIGKILL);
+        return;
+      }
+      usleep (10000);
+    }
+    killpg (pid, SIGKILL);
+  }
+  else kill (pid, SIGKILL);
+  waitpid (pid, NULL, 0);
+}
+#endif
+
+void
+pipe_link_rep::close_fds () {
+#ifndef OS_MINGW
+  if (in  != -1) { close (in ); in = -1; }
+  if (out != -1) { close (out); out= -1; }
+  if (err != -1) { close (err); err= -1; }
+#endif
+}
+
 void
 close_all_pipes () {
 #ifndef OS_MINGW
@@ -106,11 +136,11 @@ close_all_pipes () {
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
     if (con->alive) {
-      if (-1 != killpg(con->pid,SIGTERM)) {
-sleep(2);
-        killpg(con->pid,SIGKILL);
-      }
+      terminate_child (con->pid);
       con->alive= false;
+      remove_notifier (con->snout);
+      remove_notifier (con->snerr);
+      con->close_fds ();
     }
   }
 #endif
@@ -193,11 +223,10 @@ pipe_link_rep::start () {
       r= ::read (out, outbuf, 1024);
       if (r == 1 && outbuf[0] == TERMCHAR) return "ok";
       alive= false;
-      if (-1 != killpg(pid,SIGTERM)) {
-        sleep(2);
-        killpg(pid,SIGKILL);
-      }
-      wait (NULL);
+      terminate_child (pid);
+      remove_notifier (snout);
+      remove_notifier (snerr);
+      close_fds ();
       if (r == -1) return "Error: the application does not reply";
       else
         return "Error: the application did not send its usual startup banner";
@@ -247,17 +276,14 @@ pipe_link_rep::feed (int channel) {
   else r = ::read (err, tempout, 1024);
   if (r == -1) {
     io_error << "Read failed for '" << cmd << "'\n";
-    wait (NULL);
+    waitpid (pid, NULL, WNOHANG);
   }
   else if (r == 0) {
-    if (-1 != killpg(pid,SIGTERM)) {
-      sleep(2);
-      killpg(pid,SIGKILL);
-    }
-
+    terminate_child (pid);
     alive= false;
     remove_notifier (snout);      
     remove_notifier (snerr);      
+    close_fds ();
   }
   else {
     if (DEBUG_IO) debug_io << debug_io_string (string (tempout, r));
@@ -297,7 +323,7 @@ pipe_link_rep::listen (int msecs) {
 #endif
   if (!alive) return;
   time_t wait_until= texmacs_time () + msecs;
-  while ((outbuf == "") && (errbuf == "")) {
+  while (alive && (outbuf == "") && (errbuf == "")) {
     fd_set rfds;
     FD_ZERO (&rfds);
     FD_SET (out, &rfds);
@@ -307,7 +333,7 @@ pipe_link_rep::listen (int msecs) {
     tv.tv_usec = 1000 * (msecs % 1000);
     int nr= select (max (out, err) + 1, &rfds, NULL, NULL, &tv);
     if (nr != 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
-    if (nr != 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
+    if (alive && nr != 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
     if (texmacs_time () - wait_until > 0) break;
   }
 }
@@ -324,17 +350,12 @@ void
 pipe_link_rep::stop () {
 #ifndef OS_MINGW
   if (!alive) return;
-  if (-1 != killpg(pid,SIGTERM)) {
-    sleep(2);
-    killpg(pid,SIGKILL);
-  }
-  alive= false;    
-  close (in);
+  terminate_child (pid);
   alive= false;
-  wait (NULL);
 
   remove_notifier (snout);
   remove_notifier (snerr);
+  close_fds ();
 #endif
 }
 
@@ -348,7 +369,7 @@ void pipe_callback (void *obj, void *info) {
   pipe_link_rep* con= (pipe_link_rep*) obj;  
   bool busy= true;
   bool news= false;
-  while (busy) {
+  while (busy && con->alive) {
     fd_set rfds;
     FD_ZERO (&rfds);
     int max_fd= max (con->err, con->out) + 1;
