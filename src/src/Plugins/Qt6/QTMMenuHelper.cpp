@@ -1175,6 +1175,17 @@ void QTMScrollArea::onTrackedListViewDestroyed(QObject *obj) {
   listViews.removeAll(listView);
 }
 
+/*! Disconnects the tracked list views before destruction.
+
+ The list views are descendants of the scroll area and are only deleted by
+ the QWidget destructor, after ~QTMScrollArea has run. Their signals
+ (destroyed, selectionHasChanged) must not reach this half-destroyed object.
+ */
+QTMScrollArea::~QTMScrollArea () {
+  for (QTMListView* listView : listViews)
+    QObject::disconnect (listView, nullptr, this, nullptr);
+}
+
 /*! Scrolls the area to a given index in a QTMListView. */
 void
 QTMScrollArea::scrollToSelection (const QItemSelection& sel) {
