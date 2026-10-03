@@ -325,7 +325,7 @@ utf8_to_cork (string input) {
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);
-    if (r == s && code >= 256)
+    if (r == s && (code >= 256 || (code >= 128 && N(s) > 1)))
       r= "<#" * as_hexadecimal (code) * ">";
     output << r;
   }
@@ -342,7 +342,8 @@ var_utf8_to_cork (string input) {
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);
-    if ((r == s && code >= 256) || (code >= 0x2018 && code <= 0x201D))
+    if ((r == s && (code >= 256 || (code >= 128 && N(s) > 1))) ||
+        (code >= 0x2018 && code <= 0x201D))
       r= "<#" * as_hexadecimal (code) * ">";
     output << r;
   }
@@ -359,7 +360,7 @@ sourcecode_to_cork (string input) {
     unsigned int code= decode_from_utf8 (input, i);
     string s= input (start, i);
     string r= apply (conv, s);
-    if (r == s && code >= 256)
+    if (r == s && (code >= 256 || (code >= 128 && N(s) > 1)))
       r= "<#" * as_hexadecimal (code) * ">";
     output << r;
   }
@@ -376,6 +377,7 @@ cork_to_utf8 (string input) {
       r << apply (conv, input (start, i));
       start= i= i+2;
       while (i<n && input[i] != '>') i++;
+      if (i >= n || i == start) { start -= 2; i= start + 1; continue; }
       r << encode_as_utf8 (from_hexadecimal (input (start, i)));
       start= i+1;
     }
@@ -393,6 +395,7 @@ strict_cork_to_utf8 (string input) {
       r << apply (conv, input (start, i));
       start= i= i+2;
       while (i<n && input[i] != '>') i++;
+      if (i >= n || i == start) { start -= 2; i= start + 1; continue; }
       r << encode_as_utf8 (from_hexadecimal (input (start, i)));
       start= i+1;
     }
@@ -410,6 +413,7 @@ cork_to_sourcecode (string input) {
       r << apply (conv, input (start, i));
       start= i= i+2;
       while (i<n && input[i] != '>') i++;
+      if (i >= n || i == start) { start -= 2; i= start + 1; continue; }
       r << encode_as_utf8 (from_hexadecimal (input (start, i)));
       start= i+1;
     }
@@ -486,6 +490,7 @@ t2a_to_utf8 (string input) {
       r << apply (conv, input (start, i));
       start= i= i+2;
       while (i<n && input[i] != '>') i++;
+      if (i >= n || i == start) { start -= 2; i= start + 1; continue; }
       r << encode_as_utf8 (from_hexadecimal (input (start, i)));
       start= i+1;
     }
@@ -918,10 +923,12 @@ hex_entities_to_utf8 (string s) {
   int i, n= N(s);
   for (i=0; i<n; )
     if (test (s, i, "&#x")) {
-      int j= search_forwards (";", i, s);
-      if (j > i) {
+      int j= i+3;
+      while (j < n && j < i+9 && is_hex_digit (s[j])) j++;
+      if (j > i+3 && j < n && s[j] == ';') {
         unsigned int code= from_hexadecimal (s (i+3, j));
-        if (code >= 0x80 && code <= 0xff) {
+        if (code >= 0x80 && code <= 0x10FFFF &&
+            (code < 0xD800 || code > 0xDFFF)) {
           result << encode_as_utf8 (code);
           i= j + 1;
         }
