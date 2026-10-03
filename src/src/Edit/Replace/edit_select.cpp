@@ -477,10 +477,13 @@ edit_select_rep::selection_get (path& p1, path& p2) {
   if (selection_active_table ()) {
     int row1, col1, row2, col2;
     path fp= selection_get_subtable (row1, col1, row2, col2);
-    p1= fp * 0;
-    p2= fp * 1;
+    if (!is_nil (fp)) {
+      p1= fp * 0;
+      p2= fp * 1;
+      return;
+    }
   }
-  else selection_correct (start (cur_sel), end (cur_sel), p1, p2);
+  selection_correct (start (cur_sel), end (cur_sel), p1, p2);
   /*
   selection sel; selection_get (sel);
   p1= sel->start;
@@ -518,17 +521,15 @@ edit_select_rep::selection_get () {
   if (selection_active_table ()) {
     int row1, col1, row2, col2;
     path fp= selection_get_subtable (row1, col1, row2, col2);
-    return table_get_subtable (fp, row1, col1, row2, col2);
+    if (!is_nil (fp)) return table_get_subtable (fp, row1, col1, row2, col2);
   }
-  else {
-    path p1, p2;
-    // cout << "Selecting...\n";
-    selection_get (p1, p2);
-    // cout << "Between paths: " << p1 << " and " << p2 << "\n";
-    tree t= selection_compute (et, p1, p2);
-    // cout << "Selection : " << t << "\n";
-    return simplify_correct (t);
-  }
+  path p1, p2;
+  // cout << "Selecting...\n";
+  selection_get (p1, p2);
+  // cout << "Between paths: " << p1 << " and " << p2 << "\n";
+  tree t= selection_compute (et, p1, p2);
+  // cout << "Selection : " << t << "\n";
+  return simplify_correct (t);
 }
 
 path

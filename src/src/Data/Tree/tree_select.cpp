@@ -342,7 +342,8 @@ is_table_selection (tree et, path p1, path p2, bool strict) {
   if (is_func (t, TFORMAT) || is_func (t, TABLE) ||
       is_func (t, ROW) || is_func (t, CELL))
     // NOTE: a tformat need not contain a table, e.g. in a macro definition
-    // edited in source mode, as in <tformat|...|<arg|body>>
+    // edited in source mode, as in <tformat|...|<arg|body>>; we only require
+    // that table_search_format finds a table (possibly an enclosing one)
     return !is_nil (table_search_format (et, p));
   return !strict && is_compound (t) && N(t) == 1 && is_func (t[0], TFORMAT);
 }
