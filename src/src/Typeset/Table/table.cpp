@@ -717,7 +717,8 @@ table_rep::compute_heights (SI* mh, SI* bh, SI* th, SI xh) {
         if (cbh != 0 || cth != 0) {
           // baseline aligned with the first row: the part above the
           // baseline must fit into the first row, the rest below it
-          if (cth > mh[i] - bh[i]) mh[i]= bh[i] + cth;
+          th[i]= max (th[i], cth);
+          mh[i]= max (mh[i], bh[i] + th[i]);
           SI below= sum (mh+i, C->row_span) - (mh[i] - bh[i]);
           if (cmh - cth > below) mh[i+C->row_span-1] += cmh - cth - below;
         }
