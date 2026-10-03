@@ -109,6 +109,7 @@
                (else (and (secure-quasiquote? (car args) env)
                           (secure-quasiquote? (cdr args) env)))))
         ((symbol? args) #t)
+        ((keyword? args) #t)
         ((number? args) #t)
         ((string? args) #t)
         ((char? args) #t)

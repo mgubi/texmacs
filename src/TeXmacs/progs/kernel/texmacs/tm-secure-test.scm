@@ -30,7 +30,8 @@
    (test "secure function as value" '(list car cdr) #t)
    (test "if" '(if (null? (list)) "a" "b") #t)
    (test "cond" '(cond ((== 1 2) "a") (else "b" "c")) #t)
-   (test "character in quasiquoted data" '(quasiquote (a #\b)) #t)))
+   (test "character in quasiquoted data" '(quasiquote (a #\b)) #t)
+   (test "keyword in quasiquoted data" '(quasiquote (a :foo)) #t)))
 
 (define (regtest-secure-reject)
   (regression-test-group
