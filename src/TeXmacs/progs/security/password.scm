@@ -30,11 +30,17 @@
          (lambda ()
            (call-with-input-file "/dev/urandom"
              (lambda (p)
+               ;; Read raw bytes: Guile 1.8 and S7 ports are byte ports,
+               ;; Guile 2+ ports decode text unless set to latin-1
+               (when (defined? 'set-port-encoding!)
+                 (set-port-encoding! p "ISO-8859-1"))
                (let* ((m 4294967296)
-                      (limit (- m (modulo m n))))
+                      (limit (- m (modulo m n)))
+                      (b (lambda ()
+                           (with c (char->integer (read-char p))
+                             (if (< c 256) c (error "not a byte"))))))
                  (let loop ()
-                   (let* ((b (lambda () (char->integer (read-char p))))
-                          (x (+ (b) (* 256 (+ (b) (* 256 (+ (b) (* 256 (b)))))))))
+                   (let ((x (+ (b) (* 256 (+ (b) (* 256 (+ (b) (* 256 (b)))))))))
                      (if (< x limit) (modulo x n) (loop))))))))
          (lambda args #f))))
 
