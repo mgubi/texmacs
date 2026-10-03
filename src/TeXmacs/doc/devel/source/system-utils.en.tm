@@ -10,7 +10,7 @@
   output streams of <verbatim|System/Files/tm_ostream.hpp>, the timer of
   <verbatim|System/Classes/tm_timer.hpp> and the server log of
   <verbatim|System/Misc/server_log.hpp>. Pipes and sockets to plug-ins are
-  described in <hlink|the plug-in machinery|plugins.en.tm>.
+  described in <hlink|the plug-in machinery|plugin-machinery.en.tm>.
 
   <section|Running external programs>
 

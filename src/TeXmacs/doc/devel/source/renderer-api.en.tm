@@ -73,7 +73,7 @@
     characters, <cpp|(shrinkf \<gtr\>\<gtr\> 1) * PIXEL>.
 
     <item*|<cpp|brushpx>>A hack: <cpp|-1>, or the size of a pixel to be
-    used when rendering patterns (see <reference|sec-fonts>).
+    used when rendering patterns (see <reference|sec-renderer-fonts>).
 
     <item*|<cpp|is_screen>>Whether the renderer draws on the screen. Some
     boxes behave differently on screen and on paper (for instance they
@@ -520,7 +520,7 @@
     by calling <cpp|obj-\<gtr\>draw (this)>.
   </explain>
 
-  <section|Text and fonts><label|sec-fonts>
+  <section|Text and fonts><label|sec-renderer-fonts>
 
   Fonts are described in <hlink|the fonts document|fonts.en.tm>; here we only
   describe the interface with the renderer. There is exactly one text

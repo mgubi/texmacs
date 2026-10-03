@@ -37,7 +37,7 @@
 
   The integration reuses three general mechanisms which are documented
   elsewhere: the plug-in links behind the <scm|:cmdline> and
-  <scm|:request> options (<hlink|the plug-in machinery|plugins.en.tm>), the
+  <scm|:request> options (<hlink|the plug-in machinery|plugin-machinery.en.tm>), the
   user database in which the AI <em|agents> are stored (<hlink|the database
   and bibliographies|database.en.tm>) and the <LaTeX> import used to read
   answers (<hlink|the <LaTeX> and <name|HTML> converters|convert.en.tm>).

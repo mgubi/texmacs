@@ -220,7 +220,7 @@
 
   <\itemize>
     <item>All communication happens in the main thread, by polling; see
-    <hlink|threading and the event loop|plugins.en.tm>. There is no timeout
+    <hlink|threading and the event loop|plugin-machinery.en.tm>. There is no timeout
     for synchronous evaluations.
 
     <item>Only one request per connection is in progress at any time; the

@@ -43,7 +43,7 @@
     <item><hlink|the event loop|server-events.en.tm>, for
     the way the <c++> editor receives keys and rebuilds menus;
 
-    <item><hlink|sessions, connections and links|plugins.en.tm>, for the
+    <item><hlink|sessions, connections and links|plugin-machinery.en.tm>, for the
     communication with the plug-ins behind sessions, scripts and
     spreadsheets.
   </itemize>

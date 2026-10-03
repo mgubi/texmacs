@@ -46,7 +46,7 @@
     <item*|Escaping for other programs><cpp|escape_sh> (shell; on
     <name|Windows> it only adds double quotes), <cpp|escape_generic> (the
     escapes of the plug-in protocol, see <hlink|the plug-in
-    machinery|plugins.en.tm>), <cpp|escape_verbatim> (removes control
+    machinery|plugin-machinery.en.tm>), <cpp|escape_verbatim> (removes control
     characters and turns tabs and newlines into spaces),
     <cpp|escape_spaces>, <cpp|dos_to_better> (removes carriage returns),
     <cpp|convert_tabs_to_spaces>.

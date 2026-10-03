@@ -46,7 +46,7 @@
   preferences|server-events.en.tm>; memory allocation and the basic containers are in
   <hlink|basic data types|types.en.tm>; pipes, sockets and dynamic
   libraries used by plug-ins are in <hlink|the plug-in
-  machinery|plugins.en.tm>.
+  machinery|plugin-machinery.en.tm>.
 
   All file names below are relative to <verbatim|src/src/> unless stated
   otherwise.

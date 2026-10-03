@@ -51,7 +51,7 @@
   <section|How a session request is processed>
 
   The generic machinery for <scm|:cmdline> and <scm|:request> plug-ins is
-  described in <hlink|the plug-in machinery|plugins.en.tm>. For the AI
+  described in <hlink|the plug-in machinery|plugin-machinery.en.tm>. For the AI
   sessions, the steps are:
 
   <\enumerate>
@@ -89,7 +89,7 @@
   fields of the session text rather than mathematics
   (<scm|session-text-input?> in <verbatim|dynamic/session-edit.scm>).
 
-  <section|The <menu|Tools> menu>
+  <section|The Tools menu>
 
   The AI entries of <verbatim|texmacs/menus/tools-menu.scm> are:
 

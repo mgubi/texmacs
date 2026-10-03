@@ -18,7 +18,7 @@
   server|../../main/remote/man-server.en.tm>.
 
   <\traverse>
-    <branch|The plug-in machinery|plugins.en.tm>
+    <branch|The plug-in machinery|plugin-machinery.en.tm>
 
     <branch|Collaboration, remote servers and versioning|collaboration.en.tm>
 
