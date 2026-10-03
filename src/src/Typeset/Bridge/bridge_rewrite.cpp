@@ -79,9 +79,13 @@ bridge_rewrite_rep::my_typeset (int desired_status) {
   if (is_func (st, VAR_INCLUDE)) {
     url save_name= env->cur_file_name;
     url file_name= url_unix (env->exec_string (st[0]));
-    env->cur_file_name= relative (env->base_file_name, file_name);
+    url incl_file= relative (env->base_file_name, file_name);
+    env->cur_file_name= incl_file;
     env->secure= is_secure (env->cur_file_name);
-    body->typeset (desired_status);
+    {
+      inclusion_guard guard (incl_file);
+      body->typeset (desired_status);
+    }
     env->cur_file_name= save_name;
     env->secure= is_secure (env->cur_file_name);
   }

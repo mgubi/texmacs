@@ -113,8 +113,14 @@
 
 (tm-define (link-item-id item) (car item))
 (tm-define (link-item-type item) (cadr item))
-(tm-define (link-item-attributes item) (caddr item))
-(tm-define (link-item-vertices item) (cdddr item))
+(define (link-item-has-attributes? item)
+  (and (pair? (cddr item)) (link-attributes? (caddr item))))
+
+(tm-define (link-item-attributes item)
+  (if (link-item-has-attributes? item) (caddr item) '()))
+
+(tm-define (link-item-vertices item)
+  (if (link-item-has-attributes? item) (cdddr item) (cddr item)))
 
 (define (id->link-list id)
   (let* ((lns (vertex->links `(id ,id)))
