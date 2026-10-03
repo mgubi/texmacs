@@ -82,7 +82,12 @@ web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
 # pages, and the worker of the plugin, in out/web/tikzjax/
 TIKZJAX := tikzjax-1.6.0
-tikzjax: $(OUT)/web/tikzjax/tm-tikz.js
+tikzjax: $(OUT)/web/tikzjax/tm-tikz.js $(OUT)/web/tikzjax/tables.js
+
+# the tables of the worker: the codes of dvi2html, the encodings of TeXmacs
+$(OUT)/web/tikzjax/tables.js: $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(wildcard $(TM)/TeXmacs/fonts/enc/*.enc)
+	@mkdir -p $(OUT)/web/tikzjax
+	node $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(TM)/TeXmacs/fonts/enc $@
 
 $(TIKZJAX)/dist/run-tex.js:
 	sh $(W)/get-tikzjax.sh $(CURDIR)

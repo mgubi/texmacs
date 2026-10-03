@@ -85,10 +85,11 @@ function prepare (code) {
   var options = { texPackages: {}, tikzLibraries: '', addToPreamble: '' };
   var libs = [];
   var lines = code.split ('\n');
-  while (lines.length && /^\s*%\s*(packages|libraries)\s*:/.test (lines[0])) {
-    var m = /^\s*%\s*(packages|libraries)\s*:(.*)$/.exec (lines.shift ());
+  while (lines.length && /^\s*%\s*(packages|libraries|debug)\s*:/.test (lines[0])) {
+    var m = /^\s*%\s*(packages|libraries|debug)\s*:(.*)$/.exec (lines.shift ());
     var names = m[2].split (',').map (function (x) { return x.trim (); }).filter (Boolean);
     if (m[1] === 'packages') names.forEach (function (p) { options.texPackages[p] = ''; });
+    else if (m[1] === 'debug') options.debug = names;   // "svg": the SVG of TikZJax as text
     else libs = libs.concat (names);
   }
   code = lines.join ('\n');
@@ -127,18 +128,199 @@ function prepare (code) {
 * The picture
 ******************************************************************************/
 
-// the size of the SVG ("111.2pt"), from its width and height
-function svgSize (svg) {
-  var w = /<svg[^>]*\swidth="([^"]*)"/.exec (svg), h = /<svg[^>]*\sheight="([^"]*)"/.exec (svg);
-  return { w: w ? w[1] : '', h: h ? h[1] : '' };
+// The picture: the SVG of TikZJax is split into its drawing, an image, and
+// its text, typeset by TeXmacs over it (src/docs/wasm/tikzjax.md, 5 and 6).
+// dvi2html writes each run of characters of the DVI as a <text> in a TeX
+// font, under nested transforms; each run becomes TeXmacs text, placed by
+// its baseline at the point where TeX put it, in the Computer Modern of
+// TeXmacs at the size of TeX. What TeXmacs cannot set (cmex, a position
+// without a symbol, a font it has not) stays in the SVG.
+
+importScripts ('tables.js'); // TIKZ_GLYPHS, TIKZ_ENC (tikzjax-tables.mjs)
+
+// the TeX fonts set as text by TeXmacs: family, series, shape
+var TEXT_FONTS = {
+  cmr: ['rm', 'medium', 'right'], cmb: ['rm', 'bold', 'right'],
+  cmbx: ['rm', 'bold', 'right'], cmsl: ['rm', 'medium', 'slanted'],
+  cmbxsl: ['rm', 'bold', 'slanted'], cmti: ['rm', 'medium', 'italic'],
+  cmbxti: ['rm', 'bold', 'italic'], cmcsc: ['rm', 'medium', 'small-caps'],
+  cmss: ['ss', 'medium', 'right'], cmssbx: ['ss', 'bold', 'right'],
+  cmssi: ['ss', 'medium', 'italic'], cmssdc: ['ss', 'bold', 'right'],
+  cmtt: ['tt', 'medium', 'right'], cmitt: ['tt', 'medium', 'italic'],
+  cmsltt: ['tt', 'medium', 'slanted'], cmtcsc: ['tt', 'medium', 'small-caps']
+};
+// the TeX fonts set as mathematics: their encoding, bold or not
+var MATH_FONTS = {
+  cmmi: ['cmmi', false], cmmib: ['cmmi', true], cmsy: ['cmsy', false],
+  cmbsy: ['cmsy', true], msam: ['msam', false], msbm: ['msbm', false]
+};
+// the positions of OT1 which TeXmacs writes otherwise: the ligatures (it
+// makes them itself), the quotes
+var TEXT_EXTRA = { 11: 'ff', 12: 'fi', 13: 'fl', 14: 'ffi', 15: 'ffl',
+                   34: "''", 92: '``' };
+var TT_EXTRA = { 13: "'", 32: ' ', 34: '"', 60: '<less>', 62: '<gtr>',
+                 92: '\\', 95: '_', 123: '{', 124: '|', 125: '}', 126: '~' };
+
+// transforms: [a, b, c, d, e, f] as in SVG (x' = a x + c y + e, ...)
+function mul (m, n) {
+  return [m[0]*n[0] + m[2]*n[1], m[1]*n[0] + m[3]*n[1],
+          m[0]*n[2] + m[2]*n[3], m[1]*n[2] + m[3]*n[3],
+          m[0]*n[4] + m[2]*n[5] + m[4], m[1]*n[4] + m[3]*n[5] + m[5]];
+}
+function transform (s) {
+  var m = [1, 0, 0, 1, 0, 0];
+  if (!s) return m;
+  var re = /(\w+)\s*\(([^)]*)\)/g, t;
+  while ((t = re.exec (s))) {
+    var v = t[2].split (/[\s,]+/).filter (function (x) { return x !== ''; }).map (Number);
+    var n = [1, 0, 0, 1, 0, 0];
+    if (t[1] === 'translate') n = [1, 0, 0, 1, v[0], v[1] || 0];
+    else if (t[1] === 'scale') n = [v[0], 0, 0, v.length > 1 ? v[1] : v[0], 0, 0];
+    else if (t[1] === 'matrix') n = v;
+    else if (t[1] === 'rotate') {
+      var r = v[0] * Math.PI / 180, c = Math.cos (r), si = Math.sin (r);
+      n = [c, si, -si, c, 0, 0];
+      if (v.length > 2) n = mul (mul ([1, 0, 0, 1, v[1], v[2]], n), [1, 0, 0, 1, -v[1], -v[2]]);
+    }
+    m = mul (m, n);
+  }
+  return m;
+}
+function attr (tag, name) {
+  var m = new RegExp ('\\s' + name + '="([^"]*)"').exec (tag);
+  return m ? m[1] : null;
+}
+function decode (s) {
+  return s.replace (/&#x([0-9a-f]+);/gi, function (_, h) { return String.fromCodePoint (parseInt (h, 16)); })
+          .replace (/&#(\d+);/g, function (_, d) { return String.fromCodePoint (Number (d)); })
+          .replace (/&lt;/g, '<').replace (/&gt;/g, '>').replace (/&quot;/g, '"')
+          .replace (/&apos;/g, "'").replace (/&amp;/g, '&');
+}
+function num (x) { return (Math.round (x * 1000) / 1000).toString (); }
+
+// a colour of the SVG as TeXmacs takes it; null for black, which is the
+// colour of the text of the document
+function color (c) {
+  if (!c || /^(black|#000|#000000|currentcolor|none)$/i.test (c)) return null;
+  var m = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec (c);
+  if (m) return '#' + [m[1], m[2], m[3]].map (function (x) {
+    return ('0' + Number (x).toString (16)).slice (-2); }).join ('');
+  return c;
 }
 
-function picture (svg) {
-  var size = svgSize (svg);
-  // MuPDF draws "currentColor" as nothing: the colour of the text
-  svg = svg.replace (/currentColor/gi, '#000000');
-  return '(image (tuple (raw-data ' + schemeString (svg) + ') "tikz.svg") ' +
-         schemeString (size.w) + ' ' + schemeString (size.h) + ' "" "")';
+// the TeXmacs tree of a run, or null if TeXmacs cannot set it
+function runTree (font, size, text, fill) {
+  var f = /^([a-z]+?)(\d+)$/.exec (font);
+  if (!f) return null;
+  var base = f[1], codes = TIKZ_GLYPHS[font];
+  if (!codes) return null;
+  var tf = TEXT_FONTS[base], mf = MATH_FONTS[base];
+  if (!tf && !mf) return null;
+  var enc = TIKZ_ENC[tf ? 'cmr' : mf[0]];
+  if (!enc) return null;
+  var str = '';
+  for (var ch of text) {
+    var pos = codes[ch.codePointAt (0)];
+    if (pos === undefined) return null;
+    var sym = tf && tf[0] === 'tt' && TT_EXTRA[pos] !== undefined ? TT_EXTRA[pos]
+            : tf && TEXT_EXTRA[pos] !== undefined ? TEXT_EXTRA[pos] : enc[pos];
+    if (sym === undefined) return null;
+    str += sym;
+  }
+  var env = ['"font" "roman"', '"font-base-size" "' + num (size) + '"', '"font-size" "1"'];
+  var c = color (fill);
+  if (c) env.push ('"color" ' + schemeString (c));
+  // (the mode: the output of a session is in the mode of programs, whose
+  // fonts are those of programs)
+  if (tf)
+    return '(with ' + env.concat (['"mode" "text"', '"font-family" "' + tf[0] + '"',
+                                   '"font-series" "' + tf[1] + '"',
+                                   '"font-shape" "' + tf[2] + '"']).join (' ') +
+           ' ' + schemeString (str) + ')';
+  env.push ('"mode" "text"', '"math-font" "roman"', '"math-level" "0"');
+  if (mf[1]) env.push ('"math-font-series" "bold"');
+  return '(with ' + env.join (' ') + ' (math ' + schemeString (str) + '))';
+}
+
+// the SVG without the runs which TeXmacs sets, and those runs as trees
+function split (svg) {
+  var root = /<svg\b[^>]*>/.exec (svg)[0];
+  var vb = (attr (root, 'viewBox') || '0 0 0 0').split (/[\s,]+/).map (Number);
+  var w = parseFloat (attr (root, 'width')), h = parseFloat (attr (root, 'height'));
+  var k = vb[2] > 0 && w > 0 ? w / vb[2] : 1; // points per unit of the SVG
+  var stack = [{ m: [1, 0, 0, 1, 0, 0], fill: null }];
+  var out = [], runs = [];
+  var re = /<(\/?)([\w:-]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g, t;
+  var text = null; // the <text> being read: its tag, its characters
+  while ((t = re.exec (svg))) {
+    if (t[5] !== undefined) {
+      if (text) text.chars += t[5]; else out.push (t[5]);
+      continue;
+    }
+    var closing = t[1] === '/', name = t[2], tag = t[0], self = t[4] === '/';
+    var top = stack[stack.length - 1];
+    if (name === 'text' && !closing) {
+      text = { tag: tag, chars: '', m: mul (top.m, transform (attr (tag, 'transform'))),
+               fill: attr (tag, 'fill') || top.fill };
+      continue;
+    }
+    if (name === 'text' && closing && text) {
+      var tr = run (text, vb, k);
+      if (tr) runs.push (tr);
+      else out.push (keep (text) + tag); // left to the image
+      text = null;
+      continue;
+    }
+    out.push (tag);
+    if (closing) { if (stack.length > 1) stack.pop (); }
+    else if (!self)
+      stack.push ({ m: mul (top.m, transform (attr (tag, 'transform'))),
+                    fill: attr (tag, 'fill') || top.fill });
+  }
+  return { svg: out.join (''), runs: runs, w: attr (root, 'width'), h: attr (root, 'height') };
+}
+
+// a run left in the image, which TeXmacs draws as outlines (mupdf_picture.cpp,
+// svg_outline_tex_text): its characters as positions in its TeX font
+// (U+F000 plus the position), marked data-tm-tex
+function keep (text) {
+  var codes = TIKZ_GLYPHS[attr (text.tag, 'font-family') || ''];
+  if (!codes) return text.tag + text.chars;
+  var chars = '';
+  for (var ch of decode (text.chars)) {
+    var pos = codes[ch.codePointAt (0)];
+    if (pos === undefined) return text.tag + text.chars;
+    chars += '&#x' + (0xF000 + pos).toString (16) + ';';
+  }
+  return text.tag.replace (/^<text/, '<text data-tm-tex="1"') + chars;
+}
+
+// a run as TeXmacs text placed over the image, or null
+function run (text, vb, k) {
+  var x = Number (attr (text.tag, 'x') || 0), y = Number (attr (text.tag, 'y') || 0);
+  var m = text.m;
+  var px = m[0]*x + m[2]*y + m[4], py = m[1]*x + m[3]*y + m[5];
+  // the frame of the text: its x axis (a, b), a rotation and a scale, no
+  // mirror nor skew (y down in the SVG, y up in TeXmacs)
+  var s = Math.hypot (m[0], m[1]), det = m[0]*m[3] - m[1]*m[2];
+  if (s === 0 || Math.abs (det - s*s) > 1e-3 * s*s) return null;
+  var angle = Math.atan2 (-m[1], m[0]) * 180 / Math.PI;
+  var size = Number (attr (text.tag, 'font-size') || 10) * s * k;
+  var t = runTree (attr (text.tag, 'font-family') || '', size, decode (text.chars), text.fill);
+  if (!t) return null;
+  // a rotated run stays in the image: TeXmacs' rotate (gr-transform) is
+  // drawn mirrored and clipped by the renderer of the browser for now
+  if (Math.abs (angle) > 0.01) return null;
+  var dx = (px - vb[0]) * k, dy = (vb[1] + vb[3] - py) * k;
+  return '(move (smash ' + t + ') "' + num (dx) + 'pt" "' + num (dy) + 'pt")';
+}
+
+function picture (source, svg) {
+  var p = split (svg);
+  var image = '(image (tuple (raw-data ' + schemeString (p.svg) + ') "tikz.svg") ' +
+              schemeString (p.w || '') + ' ' + schemeString (p.h || '') + ' "" "")';
+  return '(tikz-picture ' + schemeString (source) +
+         ' (superpose ' + [image].concat (p.runs).join (' ') + '))';
 }
 
 // the end of the log of TeX, from its first error
@@ -164,7 +346,10 @@ function evaluate (code) {
   return t.ready
     .then (function () { return call (t, 'texify', [p.body, p.options]); })
     .then (function (svg) {
-      out (B + 'verbatim:' + B + 'scheme:' + picture (svg) + E + PROMPT + E);
+      if (p.options.debug && p.options.debug.indexOf ('svg') >= 0)
+        out (B + 'verbatim:' + B + 'utf8:' + svg + E + PROMPT + E);
+      else
+        out (B + 'verbatim:' + B + 'scheme:' + picture (code, svg) + E + PROMPT + E);
     }, function (e) {
       err (B + 'utf8:' + texError (e) + E);
       out (B + 'verbatim:' + PROMPT + E);

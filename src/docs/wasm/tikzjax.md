@@ -1,7 +1,7 @@
 # TikZ in the browser: the TikZ plugin on TikZJax (design)
 
-Branch `wip_tikzjax` (from `wip_wasm_vue`). Status: design, nothing
-implemented yet. The text of a picture is typeset by TeXmacs, over an image
+Branch `wip_tikzjax` (from `wip_wasm_vue`). Status: steps 1 to 4 below
+done and tested in headless Firefox; step 5 to do. The text of a picture is typeset by TeXmacs, over an image
 of its drawing. Measurements and checks quoted below were made on
 2026-10-03 with `@rod2ik/tikzjax` 1.6.0.
 
@@ -331,12 +331,21 @@ Why not otherwise:
 1. Plugins which are Web Workers: `worker_link.cpp`, `workers.js`,
    `(:worker url)`. Done, tested with an echo worker.
 2. `get-tikzjax.sh`, the files in `out/web/tikzjax/`, `tm-tikz.js`: a
-   session returns the picture as an image, its text missing.
-3. The split of the SVG in the page, the glyph table, and the runs as
-   TeXmacs text (`tikz-picture`, `superpose`, the `.enc` tables, the
-   fonts): text, math, colours, sizes.
-4. What stays in the image: `svg-outline-tex-text` for `cmex` and the
-   others; rotated runs.
+   session returns the picture as an image, its text missing. Done.
+3. The split of the SVG in the worker, the tables
+   (`misc/wasm/tikzjax-tables.mjs`, `out/web/tikzjax/tables.js`), and the
+   runs as TeXmacs text (`tikz-picture` in `packages/session/tikz.ts`,
+   `superpose`, `move`, `smash`): text, math, colours, sizes. Done. The
+   runs need `mode` `text` (the output of a session is in the mode of
+   programs, whose fonts are typewriter).
+4. What stays in the image: `svg_outline_tex_text` in
+   `mupdf_picture.cpp` (called by `mupdf_render_svg` after
+   `svg_flatten_gradients`) for `cmex` and the others: the worker writes
+   their characters as U+F000 plus their position and marks them
+   `data-tm-tex`. Done. Rotated runs go there too for now: TeXmacs'
+   `rotate` (`gr-transform`) is drawn mirrored and clipped by the MuPDF
+   renderer of the browser (a bug of its own, to fix; then they can be
+   TeXmacs text again).
 5. Errors, the timeout, interruption; the plugin's documentation; tests.
 
 ## Tests
