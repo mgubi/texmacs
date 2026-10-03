@@ -1,7 +1,8 @@
 # TikZ in the browser: the TikZ plugin on TikZJax (design)
 
 Branch `wip_tikzjax` (from `wip_wasm_vue`). Status: design, nothing
-implemented yet. Measurements and checks quoted below were made on
+implemented yet. The text of a picture is typeset by TeXmacs, over an image
+of its drawing. Measurements and checks quoted below were made on
 2026-10-03 with `@rod2ik/tikzjax` 1.6.0.
 
 ## Goal
@@ -13,8 +14,8 @@ A page has neither processes nor TeX. [TikZJax](https://github.com/rod2ik/tikzja
 (GPL-3.0, as TeXmacs) runs TeX itself in the browser: an e-TeX compiled to
 WebAssembly, with LaTeX and TikZ preloaded, turns TikZ code into SVG. The
 plugin is to work in the page on TikZJax, with the same session, the same
-input, and pictures which look as they do from `latex` -- in particular
-their text, in the fonts of TeX.
+input, and pictures which look as they do from `latex`, their text being
+typeset by TeXmacs, in its own fonts, where TeX put it.
 
 Out of scope for a first version: a TikZ picture as markup of the document
 re-rendered when edited (see "Later"), the desktop (it keeps `latex`).
@@ -72,6 +73,14 @@ image, and MuPDF has no `@font-face`.
 
 ## Design
 
+The drawing and the text of a picture go separate ways: the SVG keeps the
+drawing (paths, fills, colours) and becomes an image; the text TeX set in
+it is taken out of the SVG and typeset by TeXmacs, with its own fonts and
+renderer, over the image, each run of characters at the point where TeX put
+it. The text is then TeXmacs text: drawn as the rest of the document at any
+zoom, real text in the exported PDF (searchable, selectable), in the
+document's colour.
+
 ```text
  TeXmacs (Scheme)                    page (JavaScript)          worker
  ----------------                    -----------------          ------
@@ -81,14 +90,18 @@ image, and MuPDF has no `@font-face`.
  (web-tikz id source options) ---->  tmTikz.render ------------> texify
                                        queue, timeout             TeX, DVI,
                                                                   dvi2html
- (tikz-done id svg log)       <----  _vue_web_scheme  <---------- SVG
+                                     split the SVG     <--------- SVG
+                                       drawing: SVG without <text>
+                                       text: runs (font, size, point,
+                                             TeX positions, colour)
+ (tikz-done id result)        <----  _vue_web_scheme
    |
    v
- svg-outline-tex-text (C++): <text> of TeX fonts -> <path>,
-   glyphs from TeXmacs' own Type 1 fonts
+ runs -> TeXmacs text (fonts/enc tables: TeX position -> TeXmacs symbol)
    |
    v
- image (tuple (raw-data svg) "svg") in the output of the session
+ (tikz-picture source
+   (superpose (image drawing) (move run1 x1 y1) (move run2 x2 y2) ...))
 ```
 
 ### 1. The plugin: same name, another engine
@@ -132,8 +145,9 @@ A `--pre-js` of the browser build, as `clipboard.js`:
 - `tmTikz.render (id, source, options)`: starts the worker the first time
   (`new Worker (assetRoot + "/run-tex.js")`, then `load (assetRoot)`), puts
   the job in a queue (one worker: a second one costs 2.8 MB of memory dump
-  and is not worth it for a session), and when it is done calls
-  `(tikz-done id svg log)` through `_vue_web_scheme`, as `files.js` does.
+  and is not worth it for a session), splits the SVG it returns into the
+  drawing and the text (section 5), and calls `(tikz-done id result)`
+  through `_vue_web_scheme`, as `files.js` does.
   A timeout (60 s, TeX has no other limit), and the TeX log on an error
   (`input.log`, which the worker returns in the message of its error).
 - `vue_gui.cpp`: `(web-tikz id source options-json)` calls it (`EM_JS`, as
@@ -159,60 +173,114 @@ the files as the packages of TeXmacs (`packages.js`, the Cache API), so a
 second visit loads nothing. The worker stays alive after a job, so the
 memory dump is loaded once a session.
 
-### 5. The fonts: text to outlines, from TeXmacs' fonts
+### 5. Taking the text out of the SVG (in the page)
 
-The SVG is rewritten before TeXmacs sees it: every `<text>` whose family is
-a font of TeX becomes one `<path>` per character, with the outline of the
-glyph. Done in C++, next to `svg_flatten_gradients`, as a function given to
-Scheme, `(svg-outline-tex-text svg)`:
+`tmTikz` parses the SVG of the worker (`DOMParser`) and, for each `<text>`:
 
-- **The glyphs come from TeXmacs' own Type 1 fonts**, the Blue Sky
-  Computer Modern (`TeXmacs/fonts/type1/bluesky/cm/cmr10.pfb`..., also the
-  AMS ones), which the page already loads one by one when a document uses
-  them. They have the same outlines as the BaKoMa fonts of the web fonts
-  (both are the AMS/Blue Sky Computer Modern), and widths which are those
-  of the TFM files of TeX. No 1.8 MB of web fonts to download.
-- **Position of a character**: the inverse of dvi2html's table (code point
-  -> position in the TeX font, per font), kept as data in the plugin
-  (`plugins/tikz/progs/tikzjax-glyphs.scm`, generated from the bundle of
-  the pinned version by a script, so that a new version of TikZJax is
-  checked). The built-in encoding of the Blue Sky fonts gives the glyph of
-  a position (checked: position 11 of `cmmi10` is `alpha`, and 174, its
-  BaKoMa duplicate, is `alpha` too).
-- **Outline**: MuPDF loads the `.pfb` (`fz_new_font_from_buffer`, kept in a
-  cache by font name), FreeType gives the glyph of the position through the
-  built-in encoding of the font (`FT_ENCODING_ADOBE_CUSTOM` on
-  `fz_font_ft_face`), `fz_outline_glyph` its outline for the size of the
-  text, and `fz_walk_path` writes it as SVG path data. The characters of a
-  run are placed one after the other by their advances
-  (`fz_advance_glyph`), as the browser does for a `<text>` (dvi2html starts
-  a new `<text>` where TeX moves otherwise: kerns, glue).
-- **Colour**: the `fill` of the text, `currentColor` resolved to the colour
-  of the text where the picture is inserted (black by default), as the paths
-  of the picture (`stroke="currentColor"`).
-- A family which is not a font of TeX, a character which is not in the
-  table: the `<text>` is left as it is (MuPDF draws it as it can) and the
-  plugin says so once in the output of the session.
+- its point: the `x`, `y` of the element through the transforms of the
+  `<g>` around it (dvi2html nests several: `translate`, `scale(-1,1)`,
+  `scale(1,-1)`; composed as matrices, not measured by the browser), in the
+  coordinates of the picture, i.e. relative to its `viewBox`, in points,
+  with the origin at the bottom left and y upwards as in TeXmacs;
+- the rest of the matrix: a run which is rotated or scaled (`node[rotate=
+  30]`) is flagged with its angle and factor;
+- its font (`font-family`, e.g. `cmmi7`), size (`font-size`), colour
+  (`fill`, `currentColor` kept as such) and characters, given back as
+  positions in the TeX font through the inverse of dvi2html's table (see
+  below);
+
+then removes it. The result is the SVG of the drawing alone, its size, and
+the list of runs, sent to Scheme as one Scheme expression.
+
+dvi2html writes a character as U+F000 plus its code in the BaKoMa fonts
+(positions 0-32 moved up to 0xA1-0xC4), the ligatures as U+FB00-U+FB04, by
+a table of 112 fonts (the Computer Modern families in their sizes; 10
+distinct tables). Its inverse is generated from the bundle of the pinned
+version by a script (`misc/wasm/tikzjax-glyphs.mjs`), so that a new version
+of TikZJax is checked rather than trusted.
+
+### 6. The text in TeXmacs
+
+**Characters.** TeXmacs already knows the encodings of the TeX fonts:
+`TeXmacs/fonts/enc/cmr.enc`, `cmmi.enc`, `cmsy.enc`, `cmex.enc` (read by
+`translator.cpp`) give the TeXmacs symbol of a position (in `cmmi`, 11 is
+`alpha`, 65 is `A`; in `cmr`, 11 is the ligature `ff`). A run becomes a
+string of TeXmacs symbols (`<alpha>`, `A`...).
+
+**Fonts.** The name of the TeX font gives the TeXmacs font and the mode:
+
+| TeX fonts | TeXmacs |
+|---|---|
+| `cmr`, `cmbx`, `cmti`, `cmsl`, `cmss`, `cmtt`, `cmcsc`... | text in the Computer Modern of TeXmacs (`font` `roman`), with the series, shape and family of the name (bold, italic, slanted, sans serif, typewriter, small capitals) |
+| `cmmi`, `cmmib` | math: `<math|...>`, letters in math italic |
+| `cmsy`, `cmbsy` | math symbols: `<math|<infty>>`... |
+| `cmex` and the rest | not typeset by TeXmacs: left in the image (see below) |
+
+**Size.** The size TeX used (`font-size` of the run: 7 for `cmr7`),
+absolute: `font-base-size` set to it (and `font-size` 1), so that the text
+has the size it had in TeX whatever the size of the document -- the drawing
+was laid out for it. TeXmacs takes the design size of Computer Modern for
+it, as TeX did (`cmr7` at 7 pt). TeX is given the size of the document
+(`\fontsize` in the preamble), so that the text of a picture is that of the
+document as long as the picture does not change it.
+
+**Widths.** TeXmacs' Computer Modern has the metrics of the TFM files of
+TeX, so that a run is as wide as in TeX. Within a run TeX did not kern
+(dvi2html starts a new `<text>` where TeX moves otherwise: kerns, glue), and
+TeXmacs, with the same tables, does not either; the ligatures TeX made are
+in the run as their symbols.
+
+**Placement.** The picture is a `superpose` of the image of the drawing and
+of one `move` per run, its box `smash`ed and placed by its baseline at the
+point of the run:
+
+```scheme
+(tikz-picture "<source>"
+  (superpose
+    (image (tuple (raw-data "<svg of the drawing>") "tikz.svg") "111.2pt" "95.7pt" "" "")
+    (move (smash (with "font-base-size" "10" "Hello")) "29.4pt" "40.1pt")
+    (move (smash (with "font-base-size" "10" (math "x"))) "55.3pt" "40.1pt")
+    ...))
+```
+
+`tikz-picture` is a macro of the plugin's style package (`tikz.ts`): it
+shows its second argument and keeps the source, for later (a picture made
+again from its source, see "Later"). A rotated or scaled run goes into
+TeXmacs' `rotate` (`std-graphics.ts`) and a size, or into the image (below) if the matrix is not
+a rotation with a scale.
+
+**Colour.** A run in `currentColor` takes the colour of the document's text;
+a run with its own colour (`\node[red]`) gets it (`with color`). The
+drawing in `currentColor` is drawn in the colour of the text of the
+document where the picture is (the SVG is given it when inserted).
+
+**What stays in the image.** Glyphs which are not text of TeXmacs: those of
+`cmex` (big delimiters and operators, of the sizes TeX chose, which TeXmacs
+makes itself otherwise), positions without a symbol in the `.enc` tables,
+families TeXmacs does not have (the fonts of some TikZ packages). Their
+`<text>` stays in the SVG, which is useless as such in MuPDF (it draws any
+family with Times, Helvetica or Courier, and the page has only those 14
+fonts): such text is turned into outlines -- `(svg-outline-tex-text svg)`
+in C++, next to `svg_flatten_gradients`, with the glyphs of TeXmacs' own
+Type 1 fonts (the Blue Sky Computer Modern, `TeXmacs/fonts/type1/bluesky/
+cm/*.pfb`, which have the same outlines as the BaKoMa fonts and the TFM
+widths; checked: position 11 of `cmmi10` is `alpha`, as is 174, its BaKoMa
+duplicate), through MuPDF (`fz_new_font_from_buffer`, the built-in encoding
+of the font through FreeType, `fz_outline_glyph`, `fz_walk_path`). A
+picture with a big integral sign has its text from TeXmacs and its integral
+sign from the image, both from the same Computer Modern.
 
 Why not otherwise:
 
-- Web fonts in the SVG (`@font-face` with data URIs): MuPDF does not read
-  them.
-- The font files of TikZJax (WOFF2, converted from BaKoMa): 1.8 MB more to
-  fetch, a WOFF2 decoder, for the outlines TeXmacs already has.
-- Text to paths in JavaScript (opentype.js): the same outlines, more code
-  in the page, and a format (OpenType) the page does not have.
-- Text as TeXmacs text: an image has no text of TeXmacs in it, and the
-  picture would no longer be the one TeX made.
-
-### 6. What goes into the document
-
-An image whose data is in the document,
-`(image (tuple (raw-data <svg>) "tikz.svg") <w> <h> "" "")`, the size
-being that of the SVG (`width="111.2pt"`). Saved with the document,
-exported to PDF as the other SVG images, drawn on the desktop too (MuPDF
-there as well), without any file. The source stays in the input field of
-the session, as with the desktop plugin.
+- The whole text as outlines in the image (the first version of this
+  design): the text would not be TeXmacs text (no PDF text, drawn as an
+  image at every zoom).
+- The text re-typeset by TeXmacs from the source (`Hello $x^2+\alpha$`
+  found in the TikZ code): its place in the picture is TeX's, which depends
+  on its size in TeX; the runs of the DVI are the result of that, and
+  TeXmacs sets the same characters in the same fonts at the same points.
+- The picture as TeXmacs graphics (`text-at`, `cline`...): every TikZ path
+  would have to become a TeXmacs object, for no gain in the drawing.
 
 ### 7. Errors and limits
 
@@ -229,33 +297,39 @@ the session, as with the desktop plugin.
 
 ## Later
 
-- A tag `tikz` in documents (not only sessions), rendered when its source
-  changes, with a cache of the SVG by the hash of the source (the home in
-  IndexedDB), so that opening a document does not run TeX again.
-- The same outlining for the desktop, where TikZ pictures could also be SVG
-  (dvisvgm) rather than EPS.
-- Fonts other than Computer Modern if TikZJax adds them (the table and the
-  font resolution of TeXmacs cover the families TeXmacs has).
+- A tag `tikz` in documents (not only sessions), made again when its
+  source changes, with a cache of the result by the hash of the source (the
+  home in IndexedDB), so that opening a document does not run TeX again;
+  `tikz-picture` already keeps the source for it.
+- The same split for the desktop (`latex` and `dvisvgm`, or TikZJax under
+  node), so that a picture is the same in both.
+- Fonts other than Computer Modern if TikZJax adds them (a row of the
+  table of fonts, an `.enc` table).
 
 ## Steps
 
 1. In-process plugins with an answer later (`plugin-eval.scm`), Scheme
    moved to the table; the Scheme sessions tested as before.
 2. `get-tikzjax.sh`, the files in `out/web/tikzjax/`, `tikz.js` and
-   `web-tikz`: a session returns the raw SVG (text in Times).
-3. `svg-outline-tex-text` and the glyph table: the text in its fonts.
-   Checked against TikZJax's own page (the same picture with its web fonts),
-   by comparing screenshots.
-4. Errors, the timeout, interruption; the plugin's documentation; tests
-   with `browser-run.mjs` (a session, a picture with text, an error).
+   `web-tikz`: a session returns the picture as an image, its text missing.
+3. The split of the SVG in the page, the glyph table, and the runs as
+   TeXmacs text (`tikz-picture`, `superpose`, the `.enc` tables, the
+   fonts): text, math, colours, sizes.
+4. What stays in the image: `svg-outline-tex-text` for `cmex` and the
+   others; rotated runs.
+5. Errors, the timeout, interruption; the plugin's documentation; tests.
 
 ## Tests
 
-- A TikZ session in the page (`browser-run.mjs`): a circle and a node with
-  text and a formula; the image is inserted, its text is paths (no
-  `<text>` left), the glyphs those of TeX.
-- Fonts: the same picture in TikZJax's own page with its web fonts and in
-  TeXmacs, as images at the same scale, compared.
+- A TikZ session in the page (`browser-run.mjs`): a circle, a node with
+  text and a formula, a red label, a label in `\tiny`; the image has no
+  `<text>` left, the runs are in the document as TeXmacs text, of the
+  sizes and colours of TeX.
+- Placement: the same picture in TikZJax's own page (text from its web
+  fonts) and in TeXmacs (text from TeXmacs), as images at the same scale,
+  compared: the text where TeX put it, to a pixel.
+- A big integral sign (`$\displaystyle\int$`): from the image, in Computer
+  Modern; a rotated node.
 - An error of TeX (an undefined control sequence) and a missing package:
   the log in the output, the session ready for the next input.
 - Scheme sessions, as before (the in-process table).
