@@ -29,7 +29,8 @@
    (test "with secure function" '(with g car (g (list 1 2))) #t)
    (test "secure function as value" '(list car cdr) #t)
    (test "if" '(if (null? (list)) "a" "b") #t)
-   (test "cond" '(cond ((== 1 2) "a") (else "b" "c")) #t)))
+   (test "cond" '(cond ((== 1 2) "a") (else "b" "c")) #t)
+   (test "character in quasiquoted data" '(quasiquote (a #\b)) #t)))
 
 (define (regtest-secure-reject)
   (regression-test-group
@@ -49,8 +50,24 @@
    (test "unquote in vector" '(quasiquote #((unquote (system "ls")))) #f)
    (test "improper argument list" '(string-append . system) #f)))
 
+(define (nested-with n)
+  (if (== n 0) 1
+      `(with f (lambda () ,(nested-with (- n 1))) 1)))
+
+(define (secure-quickly? expr)
+  (let* ((start (texmacs-time))
+         (ok (secure? expr)))
+    (and ok (< (- (texmacs-time) start) 500))))
+
+(define (regtest-secure-speed)
+  (regression-test-group
+   "secure check speed" "secure-speed"
+   :none :none
+   (test "nested with, depth 30" (secure-quickly? (nested-with 30)) #t)))
+
 (tm-define (regtest-secure)
   (let ((n (+ (regtest-secure-accept)
-              (regtest-secure-reject))))
+              (regtest-secure-reject)
+              (regtest-secure-speed))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of secure: ok\n")))

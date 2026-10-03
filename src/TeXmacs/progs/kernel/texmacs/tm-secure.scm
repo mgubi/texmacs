@@ -93,7 +93,13 @@
   (and (pair? args) (pair? (cdr args)) (pair? (cddr args))
        (secure-bindable? (car args))
        (secure-expr? (cadr args) env)
-       (with kind (if (secure-procedure? (cadr args) env) 'proc #t)
+       ;; (cadr args) has just been checked; classify it without checking
+       ;; it again (re-checking takes exponential time on nested with's).
+       ;; This is safe because lambda can not be rebound.
+       (let* ((v (cadr args))
+              (kind (if (or (and (pair? v) (== (car v) 'lambda))
+                            (and (symbol? v) (secure-procedure? v env)))
+                        'proc #t)))
          (secure-args? (cddr args) (local-env env (list (car args)) kind)))))
 
 (define (secure-quasiquote? args env)
@@ -105,6 +111,7 @@
         ((symbol? args) #t)
         ((number? args) #t)
         ((string? args) #t)
+        ((char? args) #t)
         ((tree? args) #t)
         ((null? args) #t)
         ((boolean? args) #t)
