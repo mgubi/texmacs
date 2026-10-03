@@ -538,10 +538,10 @@
 (tm-define (old-execute-script s secure-origin? opt-location)
   ;; NOTE: this code is deprecated; we should remove the old support
   ;; when we will be sure that nobody uses it anymore.
-  (let* ((secure-s (string-append "(secure? '" s ")"))
-         (ok? (or secure-origin? (eval (string->object secure-s))))
-         (cmd-s (string-append "(lambda () " s ")"))
-         (cmd (eval (string->object cmd-s))))
+  (let* ((cmd-s (string-append "(lambda () " s ")"))
+         (cmd-o (string->object cmd-s))
+         (ok? (or secure-origin? (secure? cmd-o)))
+         (cmd (eval cmd-o)))
     (cond ((or ok? (== (get-preference "security") "accept all scripts"))
            (execute-at cmd opt-location))
           ((== (get-preference "security") "prompt on scripts")

@@ -41,51 +41,103 @@
 ;; Secure evaluation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The environment @env is an association list which maps the locally
+;; bound variables to #t if they may hold arbitrary values and to 'proc
+;; if they are known to hold secure procedures (checked lambda expressions
+;; or secure symbols).  Only variables of the second kind may be called.
+;; The names of the special forms understood by the checker can not be
+;; rebound, since that would change the meaning of these forms.
+
 (define (secure-args? args env)
-  (if (null? args) #t
-      (and (secure-expr? (car args) env)
-           (secure-args? (cdr args) env))))
+  (cond ((null? args) #t)
+        ((npair? args) #f)
+        (else (and (secure-expr? (car args) env)
+                   (secure-args? (cdr args) env)))))
 
 (define (secure-cond? args env)
-  (if (null? args) #t
-      (and (or (== (caar args) 'else) (secure-expr? (caar args) env))
-           (secure-expr? (cadar args) env)
-           (secure-cond? (cdr args) env))))
+  (cond ((null? args) #t)
+        ((or (npair? args) (npair? (car args))) #f)
+        (else (and (or (== (caar args) 'else) (secure-expr? (caar args) env))
+                   (secure-args? (cdar args) env)
+                   (secure-cond? (cdr args) env)))))
 
-(define (local-env env l)
+(define (secure-bindable? x)
+  (and (symbol? x)
+       (not (logic-ref secure-macros% x))
+       (not (in? x '(quote quasiquote unquote unquote-splicing else =>)))))
+
+(define (secure-formals? l)
+  (cond ((null? l) #t)
+        ((pair? l) (and (secure-bindable? (car l)) (secure-formals? (cdr l))))
+        (else (secure-bindable? l))))
+
+(define (local-env env l kind)
   (cond ((null? l) env)
-        ((pair? l) (local-env (assoc-set! env (car l) #t) (cdr l)))
-        (else (assoc-set! env l #t))))
+        ((pair? l) (local-env (cons (cons (car l) kind) env) (cdr l) kind))
+        (else (cons (cons l kind) env))))
 
 (define (secure-lambda? args env)
-  (secure-args? (cdr args) (local-env env (car args))))
+  (and (pair? args)
+       (secure-formals? (car args))
+       (secure-args? (cdr args) (local-env env (car args) #t))))
+
+(define (secure-procedure? expr env)
+  (cond ((symbol? expr)
+         (with kind (assoc-ref env expr)
+           (if kind (== kind 'proc) (property expr :secure))))
+        ((pair? expr)
+         (and (== (car expr) 'lambda) (secure-lambda? (cdr expr) env)))
+        (else #f)))
 
 (define (secure-with args env)
-  (and (>= (length args) 3)
-       (symbol? (car args))
+  (and (pair? args) (pair? (cdr args)) (pair? (cddr args))
+       (secure-bindable? (car args))
        (secure-expr? (cadr args) env)
-       (secure-args? (cddr args) (local-env env (list (car args))))))
+       ;; (cadr args) has just been checked; classify it without checking
+       ;; it again (re-checking takes exponential time on nested with's).
+       ;; This is safe because lambda can not be rebound.
+       (let* ((v (cadr args))
+              (kind (if (or (and (pair? v) (== (car v) 'lambda))
+                            (and (symbol? v) (secure-procedure? v env)))
+                        'proc #t)))
+         (secure-args? (cddr args) (local-env env (list (car args)) kind)))))
 
 (define (secure-quasiquote? args env)
-  (cond ((npair? args) #t)
-        ((func? args 'unquote 1) (secure-expr? (cadr args) env))
-        ((func? args 'unquote-splicing 1) (secure-expr? (cadr args) env))
-        (else (and (secure-quasiquote? (car args) env)
-                   (secure-quasiquote? (cdr args) env)))))
+  (cond ((pair? args)
+         (cond ((func? args 'unquote 1) (secure-expr? (cadr args) env))
+               ((func? args 'unquote-splicing 1) (secure-expr? (cadr args) env))
+               (else (and (secure-quasiquote? (car args) env)
+                          (secure-quasiquote? (cdr args) env)))))
+        ((symbol? args) #t)
+        ((keyword? args) #t)
+        ((number? args) #t)
+        ((string? args) #t)
+        ((char? args) #t)
+        ((tree? args) #t)
+        ((null? args) #t)
+        ((boolean? args) #t)
+        (else #f)))
 
 (define (secure-expr? expr env)
   (cond ((pair? expr)
          (let* ((f (car expr))
-                (m (logic-ref secure-macros% f)))
-           (cond (m (m (cdr expr) env))
-                 ((assoc-ref env f) (secure-args? (cdr expr) env))
+                (m (and (symbol? f) (logic-ref secure-macros% f))))
+           (cond ((and (symbol? f) (assoc-ref env f))
+                  (and (== (assoc-ref env f) 'proc)
+                       (secure-args? (cdr expr) env)))
+                 (m (m (cdr expr) env))
                  ((== f 'quote) #t)
                  ((== f 'quasiquote) (secure-quasiquote? (cdr expr) env))
                  ((symbol? f)
                   (and (property f :secure)
                        (secure-args? (cdr expr) env)))
-                 (else (secure-args? expr env)))))
-        ((symbol? expr) #t)
+                 ((pair? f)
+                  (and (== (car f) 'lambda)
+                       (secure-lambda? (cdr f) env)
+                       (secure-args? (cdr expr) env)))
+                 (else #f))))
+        ((symbol? expr)
+         (or (assoc-ref env expr) (property expr :secure)))
         ((number? expr) #t)
         ((string? expr) #t)
         ((tree? expr) #t)
@@ -100,7 +152,6 @@
   (if ,secure-args?)
   (lambda ,secure-lambda?)
   (or ,secure-args?)
-  (set! ,secure-args?)
   (with ,secure-with))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -109,8 +160,9 @@
 
 (define-public (secure? expr)
   "Test whether it is secure to evaluate the expression @expr"
-  (or (secure-expr? expr '())
-      (and (lazy-plugin-force) (secure-expr? expr '()))))
+  (and (or (secure-expr? expr '())
+           (and (lazy-plugin-force) (secure-expr? expr '())))
+       #t))
 
 (define-public (secure-eval expr)
   "Evaluate @expr only when it is secure to do so"
