@@ -38,6 +38,15 @@
         (check typeset-test)
         (check bibtex-test)
         (check database-test)
+        (check math-edit-test)
+        (check table-test)
+        (check text-structure-test)
+        (check graphics-edit-test)
+        (check version-test)
+        (check links-test)
+        (check misc-modules-test)
+        (check remote-test)
+        (check kbd-menu-test)
         (check crypto-test)
         (check plugins-test)))
 
@@ -124,13 +133,28 @@
     ;; widget of a view which editing closed reaches is_embedded_widget,
     ;; which reads the buffer of the editor, NULL since delete_view
     ("bibtex" bibtex-test-failures count)
+    ;; generates the auxiliary data of documents in the temporary directory;
+    ;; FIXME: before editing too, for the same reason as bibtex
+    ("links" links-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ("typeset" typeset-test-failures count)
+    ("math-edit" math-edit-test-failures count)
+    ("table" table-test-failures count)
+    ("text-structure" text-structure-test-failures count)
+    ("graphics-edit" graphics-edit-test-failures count)
+    ;; makes a throwaway git repository in the temporary directory
+    ("version" version-test-failures count)
+    ("misc-modules" misc-modules-test-failures count)
     ("database" database-test-failures count)
     ("crypto" crypto-test-failures count)
+    ;; server and clients in this process, with databases in the temporary
+    ;; directory and the server files of the (scratch) home, which it cleans
+    ("remote" remote-test-failures count)
     ;; starts plugin processes (shell, python when present) and stops them
     ("plugins" plugins-test-failures count)
+    ;; loads every lazy menu, and maps and unmaps test keys
+    ("kbd-menu" kbd-menu-test-failures count)
     ;; last, since it defines modes and functions in the running TeXmacs
     ("tm-define" define-test-failures count)))
 
