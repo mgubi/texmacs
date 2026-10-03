@@ -1901,7 +1901,7 @@ edit_env_rep::exec_rgb_color (tree t) {
   tree t1= exec (t[0]);
   tree t2= exec (t[1]);
   tree t3= exec (t[2]);
-  tree t4= (N(t)==4? tree ("255"): exec (t[3]));
+  tree t4= (N(t)==4? exec (t[3]): tree ("255"));
   if (!(is_int (t1) && is_int (t2) && is_int (t3) && is_int (t4)))
     return tree (_ERROR, "bad rgb-color");
   color c= rgb_color (as_int (t1), as_int (t2), as_int (t3), as_int (t4));
