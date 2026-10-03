@@ -44,7 +44,7 @@ slot_name (const slot s) {
     "SLOT_DELAYED_MESSAGE",
     "SLOT_DESTROY",
     
-    "SLOT_SHRINKING_FACTOR",
+    "SLOT_ZOOM_FACTOR",
     "SLOT_EXTENTS",
     "SLOT_VISIBLE_PART",
     "SLOT_SCROLLBARS_VISIBILITY",
