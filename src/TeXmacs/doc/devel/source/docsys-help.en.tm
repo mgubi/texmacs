@@ -73,8 +73,8 @@
     <item*|<markup|tmdoc-title>>becomes a sectional heading of the current
     <em|level>, followed by a label <verbatim|sec-<em|name>>, where
     <verbatim|<em|name>> is the base name of the file without language and
-    suffix (for instance <verbatim|sec-server-layer> for
-    <verbatim|server-layer.en.tm>). At the top of a book the level is
+    suffix (for instance <verbatim|sec-server-buffers> for
+    <verbatim|server-buffers.en.tm>). At the top of a book the level is
     <verbatim|title> and the title becomes the title of the book.
 
     <item*|<markup|traverse>>is replaced by the expansion of its branches.
@@ -159,7 +159,7 @@
   and exported to <abbr|PDF>. Other names are silently ignored, and an
   existing <abbr|PDF> file is not rebuilt. Note also that in headless mode
   the automatic <scm|quit-TeXmacs> runs before this command unless
-  <verbatim|-X> is given (see <hlink|startup commands|server-layer-startup.en.tm>).
+  <verbatim|-X> is given (see <hlink|startup commands|server-startup.en.tm>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

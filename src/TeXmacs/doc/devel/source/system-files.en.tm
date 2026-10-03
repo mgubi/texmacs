@@ -240,7 +240,7 @@
   <verbatim|-delete-cache>, <verbatim|-delete-style-cache>,
   <verbatim|-delete-file-cache>, <verbatim|-delete-doc-cache>,
   <verbatim|-delete-font-cache> and <verbatim|-delete-plugin-cache> remove
-  parts of it (<hlink|the main program|server-layer-startup.en.tm>).
+  parts of it (<hlink|the main program|server-startup.en.tm>).
 
   <section|The persistent store>
 

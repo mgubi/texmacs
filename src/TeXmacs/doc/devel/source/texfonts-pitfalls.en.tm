@@ -29,7 +29,7 @@
 
     <item>When <cpp|load_tex> finds neither the requested font nor
     <verbatim|ecrm> at the same size, it ends with <cpp|FAILED>, which aborts
-    the current action (see <hlink|fatal errors|server-layer-startup.en.tm>).
+    the current action (see <hlink|fatal errors|server-startup.en.tm>).
 
     <item><TeX> fonts have at most 256 characters; anything else is
     rendered by the smart and virtual font layers on top of them.

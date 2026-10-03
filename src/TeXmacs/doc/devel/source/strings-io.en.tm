@@ -60,7 +60,7 @@
   <section|Keyboard and input methods>
 
   Keys reach the editor as strings in a small language of their own (see
-  <hlink|the event loop|server.en.tm>): <verbatim|a>, <verbatim|S-a>,
+  <hlink|the event loop|server-events.en.tm>): <verbatim|a>, <verbatim|S-a>,
   <verbatim|C-x>, <verbatim|return>, <verbatim|alpha>, ... A character
   typed on the keyboard is therefore converted to the universal encoding
   <em|without> its angular brackets.

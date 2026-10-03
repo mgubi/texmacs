@@ -188,7 +188,7 @@
   <cpp|after_menu_action> of the current editor, and, if a <c++>
   exception is raised, calls <cpp|cancel_menu_action> and reports it with
   <cpp|handle_exceptions> (see <hlink|fatal errors and crash
-  handling|server-layer-startup.en.tm>).
+  handling|server-startup.en.tm>).
 
   <section|Preferences>
 

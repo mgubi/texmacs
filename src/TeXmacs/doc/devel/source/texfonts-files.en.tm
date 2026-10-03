@@ -51,7 +51,7 @@
   These values are not detected again at later runs. Installing a <TeX>
   distribution after the first run of <TeXmacs> therefore has no effect on
   font generation until the settings are reset (for instance with
-  <verbatim|texmacs -setup>, see <hlink|the main program|server-layer-startup.en.tm>).
+  <verbatim|texmacs -setup>, see <hlink|the main program|server-startup.en.tm>).
 
   <section|Search paths>
 

@@ -13,7 +13,7 @@
   See also the user manual section on <hlink|creating your own keyboard
   shortcuts|../../../main/scheme/man-custom-keyboard.en.tm>. The way
   keyboard events reach the editor is described in <hlink|the
-  server|../../source/server.en.tm>.
+  event loop|../../source/server-events.en.tm>.
 
   <\explain>
     <scm|(kbd-map <scm-arg|option> ... <scm-arg|binding>

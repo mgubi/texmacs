@@ -159,7 +159,7 @@
 
   Before a binding is stored, the key sequence is rewritten with the
   <em|pre-wildcards> of the server (<cpp|kbd_pre_rewrite>, see <hlink|the
-  partial server tm_config_rep|server-layer-classes.en.tm>). This is how
+  partial server tm_config_rep|server-classes.en.tm>). This is how
   symbolic prefixes such as <verbatim|math:small>, <verbatim|structured:cmd>
   or <verbatim|table> are turned into concrete modifier combinations; the
   prefixes are declared with <scm|kbd-wildcards> in
@@ -191,7 +191,7 @@
   (<verbatim|math/math-edit.scm>) it removes a space typed before an infix
   operator, and in semantic math mode it checks the syntactic correctness
   of the result. The details of the <c++> side are in <hlink|keyboard
-  events|server.en.tm>.
+  events|server-events.en.tm>.
 
   <subsection|Menus and icon bars>
 
@@ -237,7 +237,7 @@
 
   The editor rebuilds these menus whenever the context may have changed;
   how the result is cached is described in <hlink|windows, menus, dialogs
-  and embedded widgets|server-layer-windows.en.tm>.
+  and embedded widgets|server-windows.en.tm>.
 
   <section|Lazy loading>
 

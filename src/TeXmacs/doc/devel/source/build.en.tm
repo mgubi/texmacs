@@ -18,7 +18,7 @@
   <hlink|general architecture of <TeXmacs>|architecture.en.tm>; what the
   resulting program does when it starts, and its command line options, are
   described in <hlink|the main program and crash
-  handling|server-layer-startup.en.tm>. The generation of the <scheme>
+  handling|server-startup.en.tm>. The generation of the <scheme>
   glue is explained in detail in <hlink|the <scheme> glue|scheme-bridge-glue.en.tm>.
 
   All file names in this chapter are relative to the directory

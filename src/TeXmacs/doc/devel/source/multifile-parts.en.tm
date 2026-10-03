@@ -148,8 +148,7 @@
     <item>When the body of a <markup|shared> tag is modified,
     <scm|mirror-notify> calls <scm|buffer-initialize-shared>. If a buffer
     with the included file's name is open, it attaches a notifier to that
-    buffer (<scm|buffer-attach-notifier>, see <hlink|metadata: buffers,
-    views, windows and projects|server-layer-metadata.en.tm>) and marks it
+    buffer (<scm|buffer-attach-notifier>, see <hlink|buffers|server-buffers.en.tm>) and marks it
     for an initial copy.
 
     <item>The modification is queued for that buffer

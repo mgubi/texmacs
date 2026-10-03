@@ -36,7 +36,7 @@
   and the current window are the buffer of the current view and the window
   in which it is displayed. Most editing routines act on the current view.
   The <c++> implementation of these objects is described in <hlink|the
-  server, buffers, views and windows|../../source/server.en.tm>.
+  server: buffers, views and windows|../../source/server.en.tm>.
 
   <\remark>
     In the future, views and windows should really be considered as documents

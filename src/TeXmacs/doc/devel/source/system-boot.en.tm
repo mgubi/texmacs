@@ -6,7 +6,7 @@
   <tmdoc-title|Paths, directories and settings at boot time>
 
   The order of the boot steps is described in <hlink|the main program and
-  crash handling|server-layer-startup.en.tm>. This page describes what the
+  crash handling|server-startup.en.tm>. This page describes what the
   steps which concern the system layer do: finding the installation,
   setting the environment variables which all search paths are built
   from, creating the user directories, managing temporary directories,
@@ -144,8 +144,7 @@
   <verbatim|server>, <verbatim|system> and <verbatim|users> are made
   accessible to the user only (mode <verbatim|0700>). The other files in
   <verbatim|system> include <verbatim|settings.scm> (below),
-  <verbatim|preferences.scm> (see <hlink|the server, buffers, views and
-  windows|server.en.tm>) and the boot lock.
+  <verbatim|preferences.scm> (see <hlink|preferences|server-events.en.tm>) and the boot lock.
 
   <section|Temporary directories>
 

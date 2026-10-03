@@ -43,7 +43,7 @@
     <item*|<verbatim|build-glue-server.scm>>Prefix
     <verbatim|get_server()-\<gtr\>>: methods of the server (about 40
     routines), declared in <cpp|server_rep> (see <hlink|the server
-    classes|server-layer-classes.en.tm>).
+    classes|server-classes.en.tm>).
   </description>
 
   <section|The generator>

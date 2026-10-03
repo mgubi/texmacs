@@ -117,7 +117,7 @@
 
   Starting the interpreter takes two steps, which are described from the
   point of view of the main program in <hlink|the main program and crash
-  handling|server-layer-startup.en.tm>:
+  handling|server-startup.en.tm>:
 
   <\description>
     <item*|<cpp|start_scheme (argc, argv, call_back)>>Called by

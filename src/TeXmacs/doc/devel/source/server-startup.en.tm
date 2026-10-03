@@ -84,7 +84,7 @@
     the display and the default font is set.
 
     <item>The server is constructed (<cpp|server sv>), which boots the
-    <scheme> side; see <hlink|the server classes|server-layer-classes.en.tm>.
+    <scheme> side; see <hlink|the server classes|server-classes.en.tm>.
 
     <item>On the first run after an installation or an upgrade
     (<cpp|install_status>), a command which loads the welcome message or

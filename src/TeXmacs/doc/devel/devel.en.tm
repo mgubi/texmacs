@@ -28,9 +28,9 @@
     programs.
 
     <item*|The source code>The internals of the <c++> kernel and of the
-    <scheme> code which is closely tied to it: data types, typesetting,
-    fonts, the editor and the user interface, converters, plug-ins and
-    collaboration.
+    <scheme> code which is closely tied to it: data types and the system
+    layer, typesetting, fonts, the server and the editor, the graphical
+    user interface, converters, plug-ins and collaboration.
   </description>
 
   The first chapters only require some familiarity with <TeXmacs> itself;

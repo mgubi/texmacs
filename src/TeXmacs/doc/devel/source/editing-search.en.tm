@@ -11,8 +11,7 @@
   <cpp|edit_select_rep> (<verbatim|Edit/Replace/edit_select.cpp>): a flat
   array of paths <math|(s<rsub|1>,e<rsub|1>,s<rsub|2>,e<rsub|2>,\<ldots\>)>,
   of which normally only the first range is used. The overall organization
-  of the editor state is described in <hlink|the server, buffers, views and
-  windows|server.en.tm>; here are the details which matter for editing
+  of the editor state is described in <hlink|the editor|server-editor.en.tm>; here are the details which matter for editing
   operations.
 
   <paragraph|Setting the selection.><cpp|select (p1, p2)> orders the two

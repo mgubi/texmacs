@@ -141,7 +141,7 @@
 
   The documentation manuals (<scm|build-manual>) can be part of the run as
   well. The entry points, also available as command line options (see
-  <hlink|the main program|server-layer-startup.en.tm>), are:
+  <hlink|the main program|server-startup.en.tm>), are:
 
   <\description>
     <item*|<scm|(build-ref-suite <scm-arg|dir>)>, option
@@ -221,7 +221,7 @@
     <item>In headless mode, the <verbatim|-test-suite> and
     <verbatim|-reference-suite> options have no effect unless
     <verbatim|-X> is given, because the automatic <scm|quit-TeXmacs> runs
-    first; see <hlink|the main program|server-layer-startup.en.tm>.
+    first; see <hlink|the main program|server-startup.en.tm>.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

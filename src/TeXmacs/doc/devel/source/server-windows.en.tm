@@ -3,19 +3,275 @@
 <style|<tuple|tmdoc|english>>
 
 <\body>
-  <tmdoc-title|Windows, menus, dialogs and embedded widgets>
+  <tmdoc-title|Windows>
 
-  This page describes the code of <verbatim|Texmacs/Window/>: the methods
-  of <cpp|tm_window_rep>, the dialogs of <cpp|tm_frame_rep>, the embedded
-  <TeXmacs> widgets and the integer handle based \Palternative\Q windows.
-  All of it is written against the abstract widget interface of
+  A <em|window> is a top level <TeXmacs> window with a menu bar, icon
+  bars, side and bottom tool areas, a canvas and a footer. The canvas shows
+  one view, whose editor draws the document and decides what the menus,
+  toolbars and footer contain. This page describes the class
+  <cpp|tm_window_rep>, how windows are created and closed, how their
+  menus and toolbars are built and cached, and the other kinds of windows
+  which the server manages: dialogs, embedded <TeXmacs> editors and the
+  \Palternative\Q windows which <scheme> builds from widgets. All of it is
+  written against the abstract widget interface of
   <verbatim|Graphics/Gui/widget.hpp> and <verbatim|message.hpp>, so it is
   independent of the toolkit; how the <name|Qt> port implements the
   corresponding widgets is described in <hlink|the <name|Qt>
   implementation|widgets-qt.en.tm>, and the <scheme> side of menus and
   dialogs in <hlink|widgets from <scheme>|widgets-scheme.en.tm>.
 
-  <section|Geometry of top level windows>
+  The <TeXmacs> widget built by <cpp|texmacs_widget (mask, quit)> has the
+  following parts; the numbers are the <cpp|which> arguments used to
+  address the bars (see <hlink|menus and toolbars|#menus> below):
+
+  <\verbatim-code>
+    +-------------------------------------------------------------+
+
+    \| header: main menu bar (-1) \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \|
+
+    \| icon bars: main (0), mode (1), focus (2), user (3) \ \ \ \ \ \ \ \ \ \|
+
+    +----------+--------------------------------+-----------------+
+
+    \| left \ \ \ \ \| canvas: the editor of the view \ \| side tools (10) \|
+
+    \| tools \ \ \ \| (scrollable) \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \| \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \|
+
+    \| (11) \ \ \ \ \| \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \| \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \|
+
+    +----------+--------------------------------+-----------------+
+
+    \| bottom tools (20), extra tools (21) \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \|
+
+    \| footer: messages, context, interactive prompts \ \ \ \ \ \ \ \ \ \ \ \ \ \|
+
+    +-------------------------------------------------------------+
+  </verbatim-code>
+
+  Three other kinds of top level windows exist besides these document
+  windows, and it is easy to confuse them:
+
+  <\description>
+    <item*|Dialogs of the server>File choosers and popup questions opened
+    by <cpp|tm_frame_rep::dialogue_start>; there is a single slot for them
+    (<hlink|dialogs|#dialogs>).
+
+    <item*|Alternative windows>Windows built by <scheme> from widgets
+    (<scm|top-window>, <scm|dialogue-window>, tooltips), identified by
+    small integers (<hlink|alternative windows|#alt-windows>).
+
+    <item*|Embedded editors>Not top level windows themselves, but complete
+    editors inside a widget, each with its own buffer, view and an
+    anonymous <cpp|tm_window_rep> (<hlink|embedded
+    widgets|#embedded>).
+  </description>
+
+  Only document windows have an identifier, appear in
+  <cpp|windows_list> (<scm|window-list>) and can be current.
+
+  <section|The class <cpp|tm_window_rep>>
+
+  <\explain>
+    <cpp|class tm_window_rep><explain-synopsis|a <TeXmacs> window>
+  <|explain>
+    Declared in <verbatim|Texmacs/tm_window.hpp>, implemented in
+    <verbatim|Texmacs/Window/tm_window.cpp>. Its public fields are:
+
+    <\description>
+      <item*|<cpp|widget win>>The top level window widget.
+
+      <item*|<cpp|widget wid>>The <TeXmacs> widget inside it, with menus,
+      icon bars, side and bottom tools, the canvas and the footer. All the
+      methods of the class operate on <cpp|wid> through the generic widget
+      messages (<cpp|set_main_menu>, <cpp|set_zoom_factor>,
+      <cpp|set_left_footer>, ...).
+
+      <item*|<cpp|url id>>The identifier <verbatim|tmfs://window/<em|n>>,
+      or <cpp|url_none ()> for the window of an embedded widget.
+
+      <item*|<cpp|hashmap\<less\>tree,tree\<gtr\> props>>Arbitrary
+      properties, set and read from <scheme> with
+      <scm|window-set-property> and <scm|window-get-property>.
+
+      <item*|<cpp|int serial>>A serial number, unique for the session,
+      returned by <scm|window-get-serial>.
+
+      <item*|<cpp|double zoomf>>The zoom factor, multiplied by
+      <cpp|retina_zoom>.
+    </description>
+
+    Its protected fields are the menu caches <cpp|menu_current> and
+    <cpp|menu_cache>, the state of an interactive prompt in the footer
+    (<cpp|text_ptr> and <cpp|call_back>), and the current title
+    <cpp|cur_title>.
+
+    There are two constructors:
+
+    <\description>
+      <item*|<cpp|tm_window_rep (widget wid, tree geom)>>For ordinary
+      windows: wraps <cpp|wid> in a top level window of the given geometry
+      (<cpp|texmacs_window_widget>), allocates an identifier and takes the
+      default zoom factor of the server.
+
+      <item*|<cpp|tm_window_rep (tree doc, command quit)>>For embedded
+      widgets: builds a <TeXmacs> widget without any bars, uses it as both
+      <cpp|win> and <cpp|wid>, does not allocate an identifier, and takes
+      the zoom factor from the document if it has one.
+    </description>
+
+    The destructor releases the identifier. The methods are described
+    below.
+  </explain>
+
+  <section|Window identifiers and the window table>
+
+  Windows are owned by the static table <cpp|tm_window_table> of
+  <verbatim|Texmacs/Data/new_window.cpp>, which maps window identifiers to
+  <cpp|tm_window_rep> pointers. The identifiers are <abbr|URL>s
+  <verbatim|tmfs://window/<em|n>>, allocated by <cpp|create_window_id>
+  (from the constructor of <cpp|tm_window_rep>) and released by
+  <cpp|destroy_window_id> (from its destructor); the counter is never
+  decremented, so identifiers are not reused during a session.
+
+  <\description>
+    <item*|Conversions><cpp|concrete_window (url)> is a lookup in
+    <cpp|tm_window_table>; <cpp|abstract_window> returns the field
+    <cpp|id> of the window.
+
+    <item*|Enumeration><cpp|windows_list> returns the identifiers of all
+    document windows, in order of creation. <cpp|get_nr_windows>
+    (<scm|windows-number>) is something else: the number of top level
+    windows as counted by the GUI back-end (<cpp|nr_windows>). Under
+    <name|Qt> it is maintained by <cpp|qt_window_widget_rep> for all its
+    non \Pfake\Q windows, which includes dialogs and alternative windows;
+    under X11 by <verbatim|x_window.cpp>; in the <name|Cocoa> port it stays
+    0. In no case is it the length of <cpp|windows_list>.
+
+    <item*|Current window><cpp|has_current_window>,
+    <cpp|get_current_window> (returns the empty <abbr|URL> if there is
+    none) and <cpp|concrete_window ()>. There is no stored current window:
+    it is always the window of the current view (see <hlink|the current
+    view|server-views.en.tm>).
+
+    <item*|Queries><cpp|buffer_to_windows>, <cpp|window_to_buffer> and
+    <cpp|window_to_view>, which searches the view history for the view
+    attached to the window.
+  </description>
+
+  <section|Creating windows>
+
+  A new window is created by <cpp|new_window (bool map_flag, tree geom)>
+  (not declared in any header). It
+
+  <\enumerate>
+    <item>builds the <TeXmacs> widget with <cpp|texmacs_widget (mask,
+    quit)>, where the bits of <cpp|mask> are computed from the preferences
+    <verbatim|header> (1), <verbatim|main icon bar> (2), <verbatim|mode
+    dependent icons> (4), <verbatim|focus dependent icons> (8),
+    <verbatim|user provided icons> (16), <verbatim|status bar> (32),
+    <verbatim|bottom tools> (256) and <verbatim|extra tools> (512), so
+    that only the bars enabled in the preferences are initially visible;
+
+    <item>creates the <cpp|tm_window_rep>, which wraps the widget in a top
+    level window with <cpp|texmacs_window_widget> (see <hlink|geometry of
+    top level windows|#geometry>) and allocates an identifier;
+
+    <item>registers the window in <cpp|tm_window_table> and maps it.
+  </enumerate>
+
+  The <cpp|quit> command passed to the widget is a
+  <cpp|kill_window_command_rep>, which is called when the user clicks on
+  the close box of the window. It does not close anything itself: it
+  schedules the <scheme> command <scm|(safely-kill-window <scm-arg|id>)>
+  with <cpp|exec_delayed>, so that the user can be asked for confirmation.
+  (It holds a pointer to an <abbr|URL> which is filled in only once the
+  identifier is known.)
+
+  A new window is empty; it shows nothing until a view is attached to
+  it. The exported routines therefore always combine the two steps:
+
+  <\description>
+    <item*|<cpp|open_window (geom)>>Creates a new scratch buffer and shows
+    it in a new window (<scm|open-window>).
+
+    <item*|<cpp|new_buffer_in_new_window (name, doc, geom)>>Creates the
+    buffer from <cpp|doc> if it does not exist, opens a new window and
+    shows a passive view on the buffer in it, with the focus
+    (<scm|open-buffer-in-window>; this is how <scm|load-buffer> implements
+    <scm|:new-window>).
+
+    <item*|<cpp|clone_window ()>>Opens a new window with a passive view on
+    the current buffer (<scm|clone-window>); a new view is created if all
+    existing views are displayed in windows, so that the two windows show
+    two views on the same document.
+
+    <item*|<cpp|create_buffer ()>>Creates a new scratch buffer in the
+    <em|current> window (<scm|new-buffer>).
+  </description>
+
+  The user commands <scm|new-document> and <scm|new-document*> choose
+  between <scm|open-window> and <scm|new-buffer> according to the
+  <verbatim|buffer management> preference: with the value
+  <verbatim|separate> (the default on <name|macOS> and <name|Windows>,
+  tested by the mode predicate <scm|window-per-buffer?> of
+  <verbatim|kernel/texmacs/tm-modes.scm>) each document gets its own
+  window; with <verbatim|shared> (the default elsewhere) documents replace
+  each other in the same window.
+
+  <section|Closing windows>
+
+  At the <c++> level, windows are destroyed by the file local
+  <cpp|delete_window>, which detaches the view of the window (the view is
+  kept, so that the \Pmodified\Q status of its buffer remains available),
+  unmaps the window, removes it from the table, destroys the window widget
+  and deletes the <cpp|tm_window_rep>. It is called by
+
+  <\description>
+    <item*|<cpp|kill_window (win)>>(<scm|kill-window>) Makes the most
+    recent view which is shown in <em|another> window current and deletes
+    the window. If there is no other window, the program quits, unless it
+    acts as a server for remote clients (<cpp|number_of_servers ()>), in
+    which case the window is deleted anyway. The buffer of the window is
+    not closed.
+
+    <item*|<cpp|kill_current_window_and_buffer ()>>Quits if there is only
+    one buffer; otherwise closes the current window, and also removes its
+    buffer if no other window shows it.
+  </description>
+
+  The user command is <scm|safely-kill-window> in
+  <verbatim|texmacs/texmacs/tm-server.scm>, called from the close box (with
+  the window as argument) and, through <scm|close-document>, from the
+  <menu|File> menu (without argument):
+
+  <\enumerate>
+    <item>If the current buffer is an embedded buffer and no window was
+    given, it deletes the alternative windows which contain it (see
+    <hlink|embedded widgets|#embedded>).
+
+    <item>If <scm|windows-number> is at most 1, it calls
+    <scm|safely-quit-TeXmacs>, which asks for confirmation if some
+    non-auxiliary buffer is modified and then quits.
+
+    <item>Otherwise it asks for confirmation if the buffer of the window
+    is modified, then calls <scm|kill-window> and, after an idle delay of
+    100 milliseconds, <scm|buffer-close> on that buffer.
+  </enumerate>
+
+  So closing a window <em|also closes its buffer>, even when the buffer is
+  still shown in another window: <cpp|kill_buffer> then gives that other
+  window a view on another buffer. Since <scm|windows-number> counts all
+  toolkit windows, an open dialog or tool window can make the second test
+  fail for the last document window; <cpp|kill_window> then quits anyway
+  (without the confirmation of <scm|safely-quit-TeXmacs>, but only after
+  the confirmation about the buffer of the window).
+
+  The entries of the <menu|File> menu call <scm|close-document> and
+  <scm|close-document*>, which choose between <scm|safely-kill-window> and
+  <scm|safely-kill-buffer> according to the <verbatim|buffer management>
+  preference, in the same way as <scm|new-document> above.
+
+  <section|Geometry of top level windows><label|geometry>
 
   <cpp|texmacs_window_widget (wid, geom)> (<verbatim|tm_window.cpp>) wraps
   the <TeXmacs> widget in a top level window and decides its size and
@@ -56,15 +312,9 @@
   alternative windows) under its title (<verbatim|Plugins/Qt/qt_widget.cpp>,
   <verbatim|Plugins/Qt/QTMWindow.cpp>).
 
-  <section|Methods of <cpp|tm_window_rep>>
+  <section|Menus and toolbars><label|menus>
 
-  <paragraph|Title and status.><cpp|set_window_name> (only sends the title
-  to the widget if it changed), <cpp|set_window_url> (the file
-  associated with the window),
-  <cpp|set_modified> (the \Pmodified\Q mark of the title bar),
-  <cpp|map> and <cpp|unmap>.
-
-  <paragraph|Menus.>Menus and toolbars are given as a string which holds a
+  Menus and toolbars are given as a string which holds a
   <scheme> menu expression, such as <verbatim|"(horizontal (link
   texmacs-menu))">; it is quoted and evaluated to obtain the menu.
   <cpp|get_menu_widget (which, menu, w)> turns it into a widget:
@@ -108,14 +358,42 @@
   <cpp|refresh> empties the cache. The <cpp|set_..._flag> and
   <cpp|get_..._flag> methods show, hide and query the corresponding bars.
 
-  These methods are normally not called directly. The editor installs
-  the menus of its window when it is resumed
-  (<cpp|edit_interface_rep::resume>) and rebuilds them whenever the menus
-  may have changed (<cpp|update_menus>, called from <cpp|apply_changes>),
-  through the server routines <cpp|menu_main>, <cpp|menu_icons>,
-  <cpp|side_tools> and <cpp|bottom_tools>. For cacheable menus, the
-  comparison with <cpp|menu_current> makes this cheap when nothing has
-  changed.
+  These methods are normally not called directly: the menus of a window
+  are installed by its editor. When the editor is resumed
+  (<cpp|edit_interface_rep::resume>, called by <cpp|attach_view>,
+  <cpp|switch_to_window> and <cpp|var_focus_on_buffer>), it calls
+
+  <\cpp-code>
+    SERVER (menu_main ("(horizontal (link texmacs-menu))"));
+
+    SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
+
+    SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
+
+    SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
+
+    SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
+  </cpp-code>
+
+  and similarly <cpp|side_tools (1, ...)>, <cpp|side_tools (0, ...)>,
+  <cpp|bottom_tools (0, ...)> and <cpp|bottom_tools (1, ...)> with the
+  dynamic menus <scm|texmacs-left-tools>, <scm|texmacs-side-tools>,
+  <scm|texmacs-bottom-tools> and <scm|texmacs-extra-tools>, which receive
+  the window as an argument. <cpp|update_menus>, called from
+  <cpp|apply_changes> when the document changed and the user is idle,
+  does the same. The <cpp|SERVER> macro makes the editor current during
+  each call, because the server routines act on the current window (see
+  <hlink|working in the context of another view|server-views.en.tm>).
+  For cacheable menus, the comparison with <cpp|menu_current> makes these
+  repeated calls cheap when nothing has changed.
+
+  <section|Other methods of <cpp|tm_window_rep>>
+
+  <paragraph|Title and status.><cpp|set_window_name> (only sends the title
+  to the widget if it changed), <cpp|set_window_url> (the file
+  associated with the window),
+  <cpp|set_modified> (the \Pmodified\Q mark of the title bar),
+  <cpp|map> and <cpp|unmap>.
 
   <paragraph|Canvas.><cpp|set_window_zoom_factor> and
   <cpp|get_window_zoom_factor> (the stored factor includes
@@ -126,6 +404,17 @@
 
   <paragraph|Footer.><cpp|get_footer_flag>, <cpp|set_footer_flag>,
   <cpp|set_left_footer>, <cpp|set_right_footer>.
+
+  The contents of the footer are decided by the editor
+  (<verbatim|Edit/Interface/edit_footer.cpp>). <cpp|set_message (left,
+  right, temp)> stores a message and calls <cpp|notify_change
+  (THE_DECORATIONS)>; <cpp|set_footer>, called from <cpp|update_menus>,
+  displays the message if there is one, and otherwise computes a
+  description of the context of the cursor (mode, language, font, and the
+  path of enclosing tags) with <cpp|set_left_footer> and
+  <cpp|set_right_footer>. The server routine
+  <cpp|tm_frame_rep::set_message> (<scheme>: <scm|set-message>) forwards
+  to the current editor.
 
   <paragraph|Interactive input in the footer.>A single line prompt can
   replace the footer:
@@ -143,7 +432,7 @@
     answer, leaves interactive mode and calls the callback.
   </description>
 
-  <section|Dialogs and interactive commands>
+  <section|Dialogs and interactive commands><label|dialogs>
 
   <paragraph|Dialog windows.><cpp|tm_frame_rep::dialogue_start (name,
   wid)> (<verbatim|tm_dialogue.cpp>) opens <cpp|wid> in a plain window
@@ -205,7 +494,7 @@
   on), that function shows an <scm|interactive-tool> in the bottom tool
   area instead, and <cpp|tm_frame_rep::interactive> is not used.
 
-  <section|Embedded <TeXmacs> widgets>
+  <section|Embedded <TeXmacs> widgets><label|embedded>
 
   An embedded <TeXmacs> widget is a complete editor inside a dialog or a
   side panel, used for instance for input fields with mathematics, for
@@ -316,7 +605,7 @@
     widget.
   </description>
 
-  <section|Alternative windows>
+  <section|Alternative windows><label|alt-windows>
 
   The end of <verbatim|tm_window.cpp> implements a second, simpler family
   of top level windows, identified by small integers rather than by
@@ -364,6 +653,31 @@
   calls <scm|refresh-now> with a specific kind to refresh only the
   widgets of that kind. The mechanism is described in more detail in
   <hlink|refreshing dynamic widgets|widgets-window.en.tm>.
+
+  <section|Pitfalls>
+
+  <\itemize>
+    <item>Do not keep <cpp|tm_window> pointers across operations which may
+    close windows; keep the identifier.
+
+    <item><scm|windows-number> is not the number of document windows; use
+    <scm|(length (window-list))> for that.
+
+    <item>Closing a window with <scm|safely-kill-window> also closes its
+    buffer; use <scm|kill-window> to close only the window.
+
+    <item>The frame routines of the server act on the window of the
+    current view. Right after <scm|switch-to-window>, this is still the old
+    window (see <hlink|when the current view
+    changes|server-views.en.tm>).
+
+    <item>There is a single dialog slot: a second dialog requested while
+    one is open is silently ignored.
+
+    <item>The bookkeeping which closes the alternative windows of an
+    embedded buffer can close the wrong window (see the warning in
+    <hlink|embedded widgets|#embedded>).
+  </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

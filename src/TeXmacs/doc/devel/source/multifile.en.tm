@@ -31,8 +31,7 @@
 
   This chapter describes how these mechanisms are implemented. It assumes
   familiarity with the buffer data (<cpp|new_data_rep>) and the
-  <cpp|prj> field of buffers, described in <hlink|metadata: buffers, views,
-  windows and projects|server-layer-metadata.en.tm>, with the reference and
+  <cpp|prj> field of buffers, described in <hlink|buffers|server-buffers.en.tm>, with the reference and
   auxiliary tables of <hlink|links, loci and references|links.en.tm>, and
   with the generation of automatic content in <hlink|structured editing,
   search and automatic content|editing-auxiliary.en.tm>.

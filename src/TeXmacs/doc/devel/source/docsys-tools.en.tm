@@ -15,7 +15,7 @@
     update, the tree <scm-arg|tm-dir> into <scm-arg|html-dir>. They are
     called by the command line options <verbatim|-W <em|in> <em|out>> and
     <verbatim|-U <em|in> <em|out>> (see <hlink|command line
-    options|server-layer-startup.en.tm>).
+    options|server-startup.en.tm>).
 
     <item*|<scm|tmweb-convert-dir-keep-texmacs>,
     <scm|tmweb-update-dir-keep-texmacs>>The same, but the <verbatim|.tm>

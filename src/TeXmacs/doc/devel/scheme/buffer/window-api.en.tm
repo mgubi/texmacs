@@ -110,8 +110,7 @@
     is running as a server).
   </explain>
 
-  See <hlink|the server, buffers, views and
-  windows|../../source/server.en.tm> for the corresponding <c++> data
+  See <hlink|windows|../../source/server-windows.en.tm> for the corresponding <c++> data
   structures.
 
   <tmdoc-copyright|2012|Joris van der Hoeven>

@@ -112,7 +112,7 @@
 
   Headless mode is not a separate port but a run-time mode of the
   <name|Qt> port, selected by <verbatim|-headless> (and implied by the
-  conversion and web site options, see <hlink|the main program|server-layer-startup.en.tm>).
+  conversion and web site options, see <hlink|the main program|server-startup.en.tm>).
   A <cpp|QTMCoreApplication> replaces the <cpp|QTMApplication>, no window
   is shown, and the interpose handler skips the screen updates; see also
   the section on headless mode in <hlink|the <name|Qt>

@@ -31,8 +31,7 @@
   <section|Auxiliary data>
 
   The auxiliary data are kept in the hash tables <cpp|aux> and <cpp|ref>
-  of the <cpp|new_data_rep> of the buffer (see <hlink|metadata: buffers,
-  views, windows and projects|server-layer-metadata.en.tm>), which are
+  of the <cpp|new_data_rep> of the buffer (see <hlink|buffers|server-buffers.en.tm>), which are
   shared by all views on the buffer and are saved in the
   <markup|auxiliary> and <markup|references> parts of the file (unless
   the <verbatim|save-aux> variable of the document is false,

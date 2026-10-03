@@ -40,7 +40,7 @@
     (<scm|define-group>) and for the <abbr|DRD> queries used by the
     context predicates;
 
-    <item><hlink|the server, buffers, views and windows|server.en.tm>, for
+    <item><hlink|the event loop|server-events.en.tm>, for
     the way the <c++> editor receives keys and rebuilds menus;
 
     <item><hlink|sessions, connections and links|plugins.en.tm>, for the

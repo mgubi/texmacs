@@ -5,6 +5,17 @@
 <\body>
   <tmdoc-title|The server classes and their connections>
 
+  The server is the single object through which the rest of the program
+  reaches the configuration, the windows and the <scheme> side of
+  <TeXmacs>. This page describes its classes: the abstract interface
+  <cpp|server_rep>, the two partial implementations <cpp|tm_config_rep>
+  (fonts and keyboard) and <cpp|tm_frame_rep> (the current window), and
+  the concrete <cpp|tm_server_rep>, together with the way the server is
+  constructed and connected to <scheme> and to the editors. The buffers,
+  views and windows which the server manages are described in the
+  following pages; they are not members of the server but global tables
+  of <verbatim|Texmacs/Data/>.
+
   <section|The class hierarchy>
 
   The server is split into an abstract interface, two partial
@@ -170,47 +181,9 @@
   <verbatim|build-glue-basic.scm> exports free functions without a prefix;
   among those are all buffer, view, window and project routines of
   <verbatim|Texmacs/Data/> (the block starting with the comment
-  <verbatim|;; buffers> in that file). The correspondence is mostly one to one; a few
-  noteworthy names are:
-
-  <\description>
-    <item*|Buffers><scm|buffer-list> (<cpp|get_all_buffers>),
-    <scm|current-buffer-url> (<cpp|get_current_buffer_safe>),
-    <scm|buffer-new> (<cpp|make_new_buffer>), <scm|buffer-set> /
-    <scm|buffer-get> (<cpp|set_buffer_tree> / <cpp|get_buffer_tree>),
-    <scm|buffer-aux?>, <scm|buffer-embedded?>,
-    <scm|buffer-focus> (<cpp|focus_on_buffer>), <scm|buffer-focus*>
-    (<cpp|var_focus_on_buffer>), <scm|cpp-buffer-close>
-    (<cpp|kill_buffer>).
-
-    <item*|Views><scm|view-list> (<cpp|get_all_views>),
-    <scm|current-view-url>, <scm|view-new>, <scm|view-passive>,
-    <scm|view-recent>, <scm|view-delete>, <scm|window-set-view>,
-    <scm|switch-to-buffer>, <scm|set-drd> (<cpp|set_current_drd>).
-
-    <item*|Windows><scm|window-list>, <scm|windows-number>,
-    <scm|current-window>, <scm|window-focus>, <scm|switch-to-window>,
-    <scm|new-buffer> (<cpp|create_buffer ()>), <scm|open-window>,
-    <scm|open-buffer-in-window> (<cpp|new_buffer_in_new_window>),
-    <scm|clone-window>, <scm|kill-window>.
-
-    <item*|Projects><scm|project-attach>, <scm|project-detach> (which is
-    <cpp|project_attach> with the default empty name),
-    <scm|project-attached?>, <scm|project-get>.
-
-    <item*|Alternative windows>The family <scm|alt-window-...>, which
-    wraps the window functions at the end of <verbatim|tm_window.hpp>;
-    these use integer handles, except <scm|alt-window-search>, which maps
-    a buffer name to the list of handles of its windows; see <hlink|windows, menus, dialogs and
-    embedded widgets|server-layer-windows.en.tm>.
-  </description>
-
-  User level commands are rarely these glue routines themselves: the file
-  and window commands of the menus are <scheme> functions in
-  <verbatim|progs/texmacs/texmacs/tm-files.scm> and
-  <verbatim|tm-server.scm> (<scm|load-buffer>, <scm|save-buffer>,
-  <scm|safely-kill-buffer>, <scm|safely-kill-window>, ...) which add
-  confirmations, autosave handling and the like on top of the glue.
+  <verbatim|;; buffers> in that file). The correspondence between the <scheme>
+  names and the <c++> routines is listed in <hlink|the <scheme>
+  interface|server-scheme.en.tm>.
 
   <paragraph|From the server to <scheme>.>The server calls into <scheme>
   with the functions of <verbatim|Scheme/scheme.hpp>:
@@ -278,7 +251,8 @@
   (footer, zoom, scrolling, menus). Since the latter act on the
   <em|current> window, an editor which needs them for its own window uses
   the <cpp|SERVER> macro, which makes the editor current for the duration
-  of the call; see <hlink|the server singleton|server.en.tm>.
+  of the call; see <hlink|working in the context of another
+  view|server-views.en.tm>.
 
   Conversely, the server reaches the editors only through the views:
 
@@ -343,7 +317,7 @@
     wildcards, looks the binding up and returns a status (0: no binding, 1:
     a command, 2: a shorthand string to insert, plus 3 when the key was
     reduced to a bare variant key). The details are in
-    <hlink|configuration and keyboard maps|server.en.tm>.
+    <hlink|keyboard configuration|server-events.en.tm>.
 
     <cpp|set_font_rules (rules)> passes a list of pairs to
     <cpp|font_rule>, which installs font substitution rules (see
@@ -382,15 +356,14 @@
       <item*|<cpp|dialogue_win>, <cpp|dialogue_wid>>The single dialog
       window used by <cpp|dialogue_start>, <cpp|choose_file> and
       <cpp|interactive> commands which use a popup (see <hlink|dialogs and
-      interactive commands|server-layer-windows.en.tm>). As there is only
+      interactive commands|server-windows.en.tm>). As there is only
       one such slot, a second dialog is silently ignored while the first is
       open (<cpp|choose_file> then still moves the keyboard focus to the
       old dialog).
     </description>
 
     The methods are grouped as follows (the window side is described in
-    <hlink|windows, menus, dialogs and embedded
-    widgets|server-layer-windows.en.tm>):
+    <hlink|windows|server-windows.en.tm>):
 
     <\description>
       <item*|Properties><cpp|get_window_serial>, and
@@ -446,7 +419,7 @@
       <cpp|windows_refresh ()>. It finally synchronizes the databases
       (<cpp|sync_databases>) and ticks the idle monitor. This is the heart
       of the repaint scheduling described in <hlink|the event loop and
-      repaint scheduling|server.en.tm>.
+      repaint scheduling|server-events.en.tm>.
 
       <item*|<cpp|idle_monitor_tick ()>, <cpp|cpu_idle_time ()>>At most
       once per second, compare the process CPU time with the elapsed

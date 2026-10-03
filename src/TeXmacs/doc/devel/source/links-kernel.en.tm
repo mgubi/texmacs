@@ -97,7 +97,7 @@
 
     <item>Every buffer owns one (<cpp|tm_buffer_rep::lns>), created by
     <cpp|attach_notifier> for the buffer notifier (see <hlink|the
-    metadata classes|server-layer-metadata.en.tm>).
+    buffer classes|server-buffers.en.tm>).
   </itemize>
 
   <section|Queries>

@@ -3,35 +3,27 @@
 <style|<tuple|tmdoc|english>>
 
 <\body>
-  <tmdoc-title|The editor and the user interface>
+  <tmdoc-title|The server and the editor>
 
   These chapters describe the interactive side of <TeXmacs>: how open
   documents are organized into buffers, views and windows, how events reach
-  the editor and how the screen is updated; the classes of the server layer
-  which hold all this together; the abstract widget system on which menus,
-  toolbars and dialogs are built, together with its <name|Qt>
-  implementation; and two specialized editing subsystems, the graphics
-  editor and the support for programming languages.
+  the editor and how the screen is updated; the structured editing
+  operations and the editing modes built on top of them; and two
+  specialized editing subsystems, the graphics editor and the support for
+  programming languages.
 
   The <scheme> side of the same subjects is documented in the <hlink|Scheme
-  developer guide|../scheme/scheme.en.tm>, in particular the chapters on
-  <hlink|buffer management|../scheme/buffer/scheme-buffer.en.tm> and on
-  <hlink|the graphical user interface|../scheme/gui/scheme-gui.en.tm>.
+  developer guide|../scheme/scheme.en.tm>, in particular the chapter on
+  <hlink|buffer management|../scheme/buffer/scheme-buffer.en.tm>. The
+  widgets from which menus, toolbars and dialogs are built are described in
+  <hlink|the graphical user interface|source-gui.en.tm>.
 
   <\traverse>
-    <branch|The server, buffers, views and windows|server.en.tm>
-
-    <branch|The server layer: classes and files of <verbatim|Texmacs/>|server-layer.en.tm>
+    <branch|The server: buffers, views and windows|server.en.tm>
 
     <branch|Structured editing, search and automatic content|editing.en.tm>
 
     <branch|Editing modes on the <scheme> side|modes.en.tm>
-
-    <branch|The abstract widget system|widgets.en.tm>
-
-    <branch|The graphical user interface ports|guiports.en.tm>
-
-    <branch|The graphical user interface (historical Widkit toolkit)|gui.en.tm>
 
     <branch|The graphics editor|graphics-editor.en.tm>
 

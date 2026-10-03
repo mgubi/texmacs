@@ -10,8 +10,7 @@
   (see <verbatim|Scheme/Glue/build-glue-basic.scm>); a few convenience
   wrappers are defined in <verbatim|kernel/library/base.scm> and
   <verbatim|texmacs/texmacs/tm-files.scm>. The underlying <c++> data
-  structures are described in <hlink|the server, buffers, views and
-  windows|../../source/server.en.tm>.
+  structures are described in <hlink|buffers|../../source/server-buffers.en.tm>.
 
   <paragraph|Basic buffer management>
 

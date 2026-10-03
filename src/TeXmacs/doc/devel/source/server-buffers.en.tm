@@ -3,81 +3,41 @@
 <style|<tuple|tmdoc|english>>
 
 <\body>
-  <tmdoc-title|Metadata: buffers, views, windows and projects>
+  <tmdoc-title|Buffers>
 
-  This page describes the classes which record what is open and where it is
-  displayed, together with the global tables in which they are kept and the
-  routines of <verbatim|Texmacs/Data/> which manipulate them. For the life
-  cycle of these objects (in which order they are created, displayed and
-  destroyed by the user level commands) see <hlink|the server, buffers,
-  views and windows|server.en.tm>.
-
-  <section|Ownership and identifiers>
-
-  The metadata objects are plain <c++> objects allocated with
-  <cpp|tm_new> and deleted with <cpp|tm_delete>; they are <em|not>
-  reference counted. Ownership is as follows:
-
-  <\description>
-    <item*|Buffers>are owned by the global array <cpp|bufs>
-    (<verbatim|new_buffer.cpp>). They are created by <cpp|insert_buffer>
-    and destroyed by <cpp|remove_buffer>.
-
-    <item*|Views>are owned by their buffer (the array
-    <cpp|tm_buffer_rep::vws>). They are created by <cpp|get_new_view> and
-    destroyed by <cpp|delete_view>, or implicitly when their buffer is
-    removed.
-
-    <item*|Windows>are owned by the static table <cpp|tm_window_table>
-    (<verbatim|new_window.cpp>), which maps window identifiers to
-    <cpp|tm_window_rep*>. They are created by <cpp|new_window> and
-    destroyed by <cpp|delete_window>. The windows of embedded <TeXmacs>
-    widgets are the exception: they are not in this table and are owned by
-    the widget (see <hlink|embedded widgets|server-layer-windows.en.tm>).
-  </description>
-
-  Everything outside <verbatim|Texmacs/Data/> refers to these objects by
-  <abbr|URL>, and converts with the <em|concrete> and <em|abstract>
-  functions:
-
-  <\description>
-    <item*|Buffer>The <abbr|URL> is the buffer name itself.
-    <cpp|concrete_buffer (url)> searches <cpp|bufs> linearly and returns
-    <cpp|NULL> if there is no such buffer; <cpp|concrete_buffer_insist>
-    loads the file first if needed.
-
-    <item*|View><verbatim|tmfs://view/<em|nr>/<em|encoded-name>>.
-    <cpp|abstract_view> builds it from the view number and the buffer
-    name; <cpp|concrete_view> parses it, looks up the buffer, and then
-    the view with the given number among the views of that buffer. The
-    buffer name is encoded by <cpp|encode_url>: a relative name becomes
-    <verbatim|here/...>, a local absolute name <verbatim|default/...>,
-    and another root (<verbatim|tmfs>, <verbatim|http>, ...) is followed
-    by a slash and the rest of the name; <cpp|decode_url> reverses this
-    (with special handling of drive letters on <name|Windows>).
-
-    <item*|Window><verbatim|tmfs://window/<em|n>>, allocated by
-    <cpp|create_window_id>; the counter is never decremented, so window
-    identifiers are not reused during a session. <cpp|concrete_window
-    (url)> is a lookup in <cpp|tm_window_table>; <cpp|abstract_window>
-    returns the field <cpp|id> of the window.
-  </description>
-
-  Since a view <abbr|URL> contains the buffer name, it changes when the
-  buffer is renamed; <cpp|rename_buffer> therefore removes the old view
-  <abbr|URL>s from the view history before the rename and puts the new ones
-  back afterwards (<cpp|notify_rename_before>, <cpp|notify_rename_after>).
-  Any view <abbr|URL> kept elsewhere (for instance in <scheme>) becomes
-  invalid.
-
-  <section|Buffers>
+  A <em|buffer> is an open document. It exists independently of any
+  window: a buffer may be shown in several windows, in one, or in none at
+  all (help pages loaded in the background, the project file of a book,
+  the auxiliary documents built by <scheme>). This page describes how a
+  buffer is represented, how it is named, which routines of
+  <verbatim|Texmacs/Data/new_buffer.cpp> manipulate it, and how buffers are
+  created, loaded, saved, renamed and closed, both at the <c++> level and
+  by the user level commands written in <scheme>.
 
   A buffer is described by three objects: the <cpp|tm_buffer_rep> which
   ties everything together, the file related information
   <cpp|new_buffer_rep>, and the document data <cpp|new_data_rep>. The body
-  of the document is stored in neither of them, but in the global edit tree.
+  of the document is stored in none of them, but in the global edit tree.
+  The \Pmodified\Q status is not stored at all: it is derived from the
+  undo histories of the editors of the buffer.
 
-  <subsection|The global edit tree>
+  <\verbatim-code>
+    tm_buffer_rep
+
+    \ \ \|- buf \ : new_buffer \ \ name, master, title, last_save, ...
+
+    \ \ \|- data : new_data \ \ \ \ style, init, fin, ref, aux, att, project
+
+    \ \ \|- rp \ \ : path \ \ \ \ \ \ \ \ \ ---\<gtr\> the_et[rp] = body of the document
+
+    \ \ \|- vws \ : views \ \ \ \ \ \ \ \ ---\<gtr\> each with an editor (cursor, undo, ...)
+
+    \ \ \|- prj \ : tm_buffer \ \ \ \ ---\<gtr\> the project (master document), if any
+
+    \ \ \|- lns, notify \ \ \ \ \ \ \ \ \ \ \ <scheme> notifier (shared buffers)
+  </verbatim-code>
+
+  <section|The global edit tree>
 
   All document bodies are children of the global tree <cpp|the_et>
   (<verbatim|Data/Document/new_document.cpp>), a <markup|tuple> created at
@@ -100,6 +60,68 @@
   The path of the slot is the <em|root path> <cpp|rp> of the buffer and of
   all its editors. Since slots are reused, a root path identifies a buffer
   only for as long as the buffer exists.
+
+  Keeping all documents in one tree has two important consequences. First,
+  any subtree of any open document can be designated by an absolute path,
+  and the root <cpp|ip_observer> which is attached to <cpp|the_et> at
+  startup allows to recover this path from the tree itself
+  (<cpp|obtain_ip>); <cpp|path_to_buffer (p)> then finds the buffer whose
+  root path is a prefix of <cpp|p>. Second, all modifications go through
+  the same functions (such as <cpp|assign (path, tree)>), which forward
+  them to the observers attached to the modified subtrees; this is how a
+  change made in one view reaches the typesetters of all other views and
+  the undo histories (see <hlink|the modification
+  pipeline|server-editor.en.tm>).
+
+  <section|Buffer names>
+
+  A buffer is <em|identified by its name>, which is a <abbr|URL>: there is
+  no separate naming scheme for buffers, and <cpp|concrete_buffer (url)>
+  simply searches the global array <cpp|bufs> for a buffer with the given
+  name. The name is typically
+
+  <\itemize>
+    <item>the file name of the document on disk or on the web;
+
+    <item>a scratch <abbr|URL> produced by <cpp|make_new_buffer> for new
+    documents (<cpp|url_scratch ("no_name_", ".tm", i)>, with the first
+    free <math|i>); such buffers are recognized by <cpp|buffer_has_name>,
+    which returns false for them;
+
+    <item>a <verbatim|tmfs://> <abbr|URL> for documents that are generated
+    by <scheme> handlers of the <TeXmacs> file system: help pages,
+    auxiliary documents <verbatim|tmfs://aux/...>, embedded input fields
+    <verbatim|tmfs://aux/TeXmacs-input-<em|n>>, document parts
+    <verbatim|tmfs://part/...>, and so on. See <hlink|the <TeXmacs> file
+    system|../scheme/api/tmfs/tmfs.en.tm>.
+  </itemize>
+
+  Besides its name, a buffer has a <em|master> <abbr|URL>, with respect to
+  which relative links and file names are resolved, and which is used for
+  navigation. For ordinary documents the master is the name itself. A
+  buffer whose master differs from its name is called <em|auxiliary>
+  (<cpp|is_aux_buffer>, <scm|buffer-aux?>): generated bibliographies, help
+  pages opened from a document, the documents behind embedded widgets.
+  Auxiliary buffers cannot be saved under their own name, but behave as if
+  they were located at their master. The <scheme> routine
+  <scm|open-auxiliary> in <verbatim|texmacs/texmacs/tm-files.scm> creates
+  such a buffer from a tree and a master (via <scm|aux-set-document> and
+  <scm|aux-set-master> of <verbatim|kernel/texmacs/tm-file-system.scm>),
+  and <scm|load-buffer-open> sets the master of a <verbatim|tmfs://> buffer
+  to the one proposed by its handler (<scm|tmfs-master>).
+
+  The <em|title> of a buffer, shown in window titles and in the <menu|Go>
+  menu, is computed by <cpp|propose_title>: the last component of the file
+  name, \PNo name [<em|i>]\Q for scratch buffers, the title returned by the
+  <scheme> function <scm|tmfs-title> for <verbatim|tmfs://> buffers, and a
+  suffix \P(2)\Q, \P(3)\Q, ... if another buffer already has the same
+  title.
+
+  Since the name is the identifier, renaming a buffer (<cpp|rename_buffer>,
+  used by <menu|Save as>) changes the identity of the buffer and of all its
+  views: see <hlink|view identifiers|server-views.en.tm>.
+
+  <section|The buffer classes>
 
   <subsection|The class <cpp|new_buffer_rep>>
 
@@ -142,7 +164,7 @@
     </description>
   </explain>
 
-  <subsection|The class <cpp|new_data_rep>>
+  <subsection|The class <cpp|new_data_rep>><label|new-data>
 
   <\explain>
     <cpp|class new_data_rep><explain-synopsis|everything but the body>
@@ -239,12 +261,12 @@
       (<cpp|ed-\<gtr\>need_save ()> and <cpp|need_save (false)>). The
       \Pmodified\Q state is thus not stored in the buffer but derived from
       the undo history of the editors (see <hlink|undo and
-      redo|server.en.tm>); this is why a buffer must always keep at least
+      redo|server-editor.en.tm>); this is why a buffer must always keep at least
       one view.
     </description>
   </explain>
 
-  <subsection|Buffer routines>
+  <section|Reference of the buffer routines>
 
   Most routines of <verbatim|new_buffer.cpp> take a buffer name and do
   nothing (or return a neutral value) if there is no such buffer. The
@@ -275,8 +297,7 @@
   <verbatim|tmfs://> buffers, and a suffix \P(2)\Q, \P(3)\Q, ... if
   another buffer has the same title. <cpp|set_title_buffer> also updates
   the title and file of all windows which show the buffer.
-  <cpp|rename_buffer> was described above; it kills any existing buffer
-  with the new name.
+  <cpp|rename_buffer> is described below.
 
   <paragraph|Contents.><cpp|set_buffer_tree (name, doc)> creates the
   buffer if needed, splits the document with <cpp|detach_data>, stores the
@@ -341,186 +362,157 @@
   (<verbatim|Style/Evaluate/evaluate_rewrite.cpp>,
   <verbatim|Typeset/Env/env_exec.cpp>).
 
-  <section|Views>
+  <section|Life cycle of a buffer>
 
-  <\explain>
-    <cpp|class tm_view_rep><explain-synopsis|an editor on a buffer>
-  <|explain>
-    Declared in <verbatim|Texmacs/tm_window.hpp>; <cpp|tm_view> is a plain
-    pointer to it. Its fields are:
+  The <c++> routines above are deliberately simple; the policy (which
+  questions are asked, what happens to autosave files, where the buffer is
+  shown) lives in <scheme>, in <verbatim|texmacs/texmacs/tm-files.scm>
+  (loading and saving) and <verbatim|texmacs/texmacs/tm-server.scm>
+  (closing). The following subsections follow a buffer through its life.
 
-    <\description>
-      <item*|<cpp|tm_buffer buf>>The buffer.
+  <subsection|Creation>
 
-      <item*|<cpp|editor ed>>The editor (a reference counted handle).
-
-      <item*|<cpp|tm_window win>>The window which displays the view, or
-      <cpp|NULL> for a <em|passive> view.
-
-      <item*|<cpp|int nr>>A number which distinguishes the views on the
-      same buffer. It is allocated by <cpp|new_view_number> from the
-      static table <cpp|view_number_table>, indexed by buffer name, and is
-      never reused, not even after the buffer has been closed and opened
-      again.
-    </description>
-  </explain>
-
-  <paragraph|The current view.>The static pointer <cpp|the_view> in
-  <verbatim|new_view.cpp> is the current view. <cpp|set_current_view>
-  also sets the global <abbr|DRD> <cpp|the_drd> to that of the editor and
-  updates <cpp|last_visit>. <cpp|has_current_view>,
-  <cpp|get_current_view> (asserts), <cpp|get_current_view_safe> and
-  <cpp|get_current_editor> read it. <cpp|set_current_drd (name)> only
-  switches the <abbr|DRD> to that of a buffer, without changing the
-  current view; since it uses <cpp|get_passive_view>, it may load the
-  buffer and create a view as a side effect.
-
-  <paragraph|The view history.>The array <cpp|view_history> lists the
-  <abbr|URL>s of all views which have once been attached to a window,
-  most recently attached first; <cpp|notify_set_view> (called by
-  <cpp|attach_view>) moves a view to the front and
-  <cpp|notify_delete_view> (called by <cpp|delete_view>) removes it.
-  Detaching a view does not remove it from the history. Renaming a buffer
-  is an exception to the rule: <cpp|notify_rename_after> puts <em|all>
-  views of the renamed buffer at the front, including views which have
-  never been attached. It is the list returned
-  by <cpp|get_all_views> and used for all \Pmost recent\Q queries. Note
-  that a view which has never been attached to a window (for instance the
-  passive view created to load a buffer in the background) is normally <em|not>
-  in the history, so <cpp|get_all_views> does not return all views; use
-  <cpp|buffer_to_views> to enumerate the views of a buffer.
-
-  <paragraph|Queries.><cpp|buffer_to_views>, <cpp|view_to_buffer>,
-  <cpp|view_to_window>, <cpp|view_to_editor>, and the general
-  <cpp|get_recent_view (name, same, other, active, passive)>, which
-  returns the first view of the history passing the given filters (on
-  the same buffer, on another buffer, attached, not attached). The one
-  argument <cpp|get_recent_view (name)> creates a new view if the buffer
-  has none; otherwise it prefers the current view, then the most recent
-  attached view on the buffer, then the most recent view on the buffer in
-  the history, and finally the first view of the buffer.
-
-  <paragraph|Creation and destruction.><cpp|get_new_view (name)> creates
-  the buffer if needed, creates an editor with <cpp|new_editor>, registers
-  the view in the buffer, passes the document data to the editor and runs
-  the buffer initialization files <verbatim|init-buffer.scm> and
-  <verbatim|my-init-buffer.scm> with the new view temporarily current.
-  <cpp|get_passive_view (name)> returns a view which is not attached to a
-  window, loading the buffer and creating a view if needed.
-  <cpp|delete_view> removes the view from its buffer and from the history,
-  clears the editor's buffer pointer and deletes the view.
-
-  <paragraph|Attaching views to windows.><cpp|attach_view (win, view)> and
-  <cpp|detach_view (view)> connect a view to a window and disconnect it again. <cpp|attach_view>
-  sets <cpp|vw-\<gtr\>win>, installs the editor as the scrollable canvas of
-  the window, sets <cpp|ed-\<gtr\>cvw>, resumes the editor, updates the
-  window title and records the view in the history; <cpp|detach_view>
-  clears <cpp|vw-\<gtr\>win>, suspends the editor, installs an empty glue
-  widget and resets the title. <cpp|window_set_view (win, view, focus)>
-  replaces the view of a window; it does nothing if the view is already
-  shown there, asserts that the new view is not attached to another
-  window, and makes the new view current only if <cpp|focus> is set or
-  the old view was current. <cpp|switch_to_buffer>,
-  <cpp|focus_on_editor>, <cpp|focus_on_buffer> and
-  <cpp|var_focus_on_buffer> are described in <hlink|the current view and
-  the focus|server.en.tm>.
-
-  <section|Windows>
-
-  <\explain>
-    <cpp|class tm_window_rep><explain-synopsis|a <TeXmacs> window>
-  <|explain>
-    Declared in <verbatim|Texmacs/tm_window.hpp>, implemented in
-    <verbatim|Texmacs/Window/tm_window.cpp>. Its public fields are:
-
-    <\description>
-      <item*|<cpp|widget win>>The top level window widget.
-
-      <item*|<cpp|widget wid>>The <TeXmacs> widget inside it, with menus,
-      icon bars, side and bottom tools, the canvas and the footer. All the
-      methods of the class operate on <cpp|wid> through the generic widget
-      messages (<cpp|set_main_menu>, <cpp|set_zoom_factor>,
-      <cpp|set_left_footer>, ...).
-
-      <item*|<cpp|url id>>The identifier <verbatim|tmfs://window/<em|n>>,
-      or <cpp|url_none ()> for the window of an embedded widget.
-
-      <item*|<cpp|hashmap\<less\>tree,tree\<gtr\> props>>Arbitrary
-      properties, set and read from <scheme> with
-      <scm|window-set-property> and <scm|window-get-property>.
-
-      <item*|<cpp|int serial>>A serial number, unique for the session,
-      returned by <scm|window-get-serial>.
-
-      <item*|<cpp|double zoomf>>The zoom factor, multiplied by
-      <cpp|retina_zoom>.
-    </description>
-
-    Its protected fields are the menu caches <cpp|menu_current> and
-    <cpp|menu_cache>, the state of an interactive prompt in the footer
-    (<cpp|text_ptr> and <cpp|call_back>), and the current title
-    <cpp|cur_title>.
-
-    There are two constructors:
-
-    <\description>
-      <item*|<cpp|tm_window_rep (widget wid, tree geom)>>For ordinary
-      windows: wraps <cpp|wid> in a top level window of the given geometry
-      (<cpp|texmacs_window_widget>), allocates an identifier and takes the
-      default zoom factor of the server.
-
-      <item*|<cpp|tm_window_rep (tree doc, command quit)>>For embedded
-      widgets: builds a <TeXmacs> widget without any bars, uses it as both
-      <cpp|win> and <cpp|wid>, does not allocate an identifier, and takes
-      the zoom factor from the document if it has one.
-    </description>
-
-    The destructor releases the identifier. The methods are described in
-    <hlink|windows, menus, dialogs and embedded
-    widgets|server-layer-windows.en.tm>.
-  </explain>
-
-  The routines of <verbatim|new_window.cpp> manage the windows:
+  All buffers are created by <cpp|set_buffer_tree (name, doc)>: if no
+  buffer with the given name exists, the file local <cpp|insert_buffer>
+  allocates a new <cpp|tm_buffer_rep> (whose constructor obtains a slot in
+  <cpp|the_et> through <cpp|new_document>) and appends it to <cpp|bufs>; the
+  document is split with <cpp|detach_data>, its body is stored with
+  <cpp|set_document> and a title is proposed. The variants are
 
   <\description>
-    <item*|Identifiers><cpp|create_window_id> and
-    <cpp|destroy_window_id> maintain the list <cpp|all_windows> returned
-    by <cpp|windows_list>. <cpp|get_nr_windows> returns the number of
-    top level windows as counted by the GUI back-end (<cpp|nr_windows>).
-    Under <name|Qt> it is maintained by <cpp|qt_window_widget_rep> for all
-    its non \Pfake\Q windows, which includes dialog windows; under X11 by
-    <verbatim|x_window.cpp>; in the <name|Cocoa> port it stays 0. In no
-    case is it the length of <cpp|windows_list>.
+    <item*|<cpp|create_buffer (name, doc)>>Only creates the buffer if it
+    does not exist yet.
 
-    <item*|Creation><cpp|new_window (map_flag, geom)> (not declared in any
-    header) builds
-    the <TeXmacs> widget with the bars enabled in the preferences, creates
-    the <cpp|tm_window_rep>, registers it in <cpp|tm_window_table> and maps
-    it. The <cpp|quit> command passed to the widget is a
-    <cpp|kill_window_command_rep>, which holds a pointer to an
-    <abbr|URL> that is filled in only once the identifier is known, and
-    schedules <scm|(safely-kill-window <scm-arg|id>)>.
+    <item*|<cpp|make_new_buffer ()>>Creates an empty scratch buffer
+    (<scm|buffer-new>).
 
-    <item*|Destruction><cpp|delete_window> (not declared in any
-    header) detaches the view
-    of the window (the view is kept, see above), unmaps the window,
-    removes it from the table and destroys the widget.
+    <item*|<cpp|set_buffer_body (name, body)>>Creates the buffer with
+    default data if needed (<scm|buffer-set-body>).
 
-    <item*|Current window><cpp|has_current_window>,
-    <cpp|get_current_window> (returns the empty <abbr|URL> if there is
-    none), <cpp|concrete_window ()>. There is no stored current window: it
-    is always the window of the current view.
-
-    <item*|Queries><cpp|buffer_to_windows>, <cpp|window_to_buffer>,
-    <cpp|window_to_view> (a search through the view history).
-
-    <item*|Commands><cpp|window_set_buffer>, <cpp|window_focus>,
-    <cpp|switch_to_window>, <cpp|create_buffer ()>, <cpp|open_window>,
-    <cpp|clone_window>, <cpp|new_buffer_in_new_window>,
-    <cpp|new_buffer_in_this_window>, <cpp|kill_buffer>,
-    <cpp|kill_window>, <cpp|kill_current_window_and_buffer>; see
-    <hlink|life cycle of buffers, views and windows|server.en.tm>.
+    <item*|<cpp|get_new_view (name)>, <cpp|get_recent_view (name)>>Create
+    an empty buffer as a side effect if there is none; see <hlink|views and
+    the current view|server-views.en.tm>.
   </description>
+
+  A freshly created buffer has <em|no view>, and hence no editor: it is
+  not typeset, its \Pmodified\Q status is always false, and the
+  routines which act on the current editor cannot be applied to it. The
+  first view is created when the buffer is displayed, or explicitly with
+  <scm|view-new> or <scm|view-passive> (the <scheme> macro
+  <scm|with-buffer> silently does nothing on a buffer without views).
+
+  <subsection|Loading>
+
+  The <c++> part of loading is <cpp|buffer_load (name)>, which determines
+  the format with <cpp|file_format> and calls <cpp|buffer_import (name,
+  name, fm)>; the latter reads and converts the file with
+  <cpp|import_tree> and passes the result to <cpp|set_buffer_tree>. Note
+  the convention of these low level routines: they return <cpp|true> on
+  <em|failure>.
+
+  The user command <scm|load-buffer> (<menu|File|Load>, files on the
+  command line, hyperlinks) goes through a chain of <scheme> functions,
+  each of which either stops with a message or calls the next one:
+
+  <\enumerate>
+    <item><scm|load-buffer-main> resolves the name: relative to
+    <verbatim|$TEXMACS_FILE_PATH> if the file only exists there, then
+    relative to the current buffer (or to the working directory if there
+    is none).
+
+    <item><scm|load-buffer-check-autosave> proposes to load a more recent
+    autosave file, or to rescue the file after a crash (unless the option
+    <scm|:strict> is given). If the user accepts, the autosave file is
+    loaded with <scm|buffer-set> and the buffer is marked as modified.
+
+    <item><scm|load-buffer-check-permissions> checks that the file can be
+    read, or created.
+
+    <item><scm|load-buffer-load> does nothing if the buffer is already
+    open, calls <scm|buffer-load> if the file exists, and otherwise
+    creates an empty document with the default style.
+
+    <item><scm|load-buffer-open> displays the buffer: not at all with the
+    option <scm|:background>, in a new window with <scm|:new-window>
+    (<scm|open-buffer-in-window>, that is,
+    <cpp|new_buffer_in_new_window>), and otherwise in the current window
+    with <scm|switch-to-buffer>. It then records the file in the list of
+    recent files, asks for the passphrase of an encrypted document, and
+    sets the master of <verbatim|tmfs://> buffers.
+  </enumerate>
+
+  <scm|load-buffer-in-new-window> adds <scm|:new-window>, but does nothing
+  if the buffer is already shown in some window. <scm|revert-buffer>
+  re-imports the file and replaces the contents with <scm|buffer-set>; as
+  for any existing buffer, <cpp|set_buffer_tree> then uses <cpp|assign>, so
+  that all views are updated through the modification pipeline, and passes
+  the new document data to all editors (<cpp|set_data> and
+  <cpp|init_update>).
+
+  <subsection|Saving and exporting>
+
+  <cpp|buffer_save (name)> exports the buffer to its own name in the format
+  given by its suffix, marks it as saved with <cpp|pretend_buffer_saved>
+  (which calls <cpp|notify_save> on the editors and records the time stamp
+  of the file) and clears the \Pmodified\Q mark of all windows showing it.
+  <cpp|buffer_export (name, dest, fm)> does the real work. It needs an
+  editor, so it takes the most recent view on the buffer (creating one if
+  necessary), retrieves the body from <cpp|the_et>, applies the editor
+  based conversions for the formats which need the typesetter
+  (<cpp|exec_verbatim>, <cpp|exec_html>, or <cpp|print_to_file> for
+  PostScript and PDF), copies the document data back from the editor
+  (<cpp|get_data>, see <hlink|the class <cpp|new_data_rep>|#new-data>),
+  attaches them, adds the link locations and writes the result with
+  <cpp|export_tree>. Like the loading routines, these functions return
+  <cpp|true> on failure.
+
+  The user command <scm|save-buffer> calls <scm|save-buffer-main>, then
+
+  <\enumerate>
+    <item><scm|save-buffer-check-permissions>, which asks for a file name
+    for scratch buffers, refuses to save non existing, unmodified or
+    unwritable buffers and warns when the file changed on disk since
+    <scm|buffer-last-save>;
+
+    <item><scm|save-buffer-check-faithful>, which asks for confirmation
+    when the target format is not a faithful <TeXmacs> format;
+
+    <item><scm|save-buffer-save>, which finally calls <scm|buffer-save>.
+  </enumerate>
+
+  <scm|save-buffer-as> renames the buffer with <scm|buffer-rename> before
+  saving it. Autosaving is implemented in the same file
+  (<scm|autosave-buffer>, <scm|autosave-all>, <scm|autosave-propose>).
+
+  <subsection|Renaming>
+
+  <cpp|rename_buffer (name, new_name)> first kills any buffer which already
+  has the new name, then changes <cpp|name> and <cpp|master>, notifies the
+  editors with <cpp|THE_ENVIRONMENT> (relative links must be resolved
+  again), updates the view history (view identifiers contain the buffer
+  name; see <cpp|notify_rename_before> and <cpp|notify_rename_after>) and
+  proposes a new title.
+
+  <subsection|Closing>
+
+  <cpp|kill_buffer (name)> (<scm|cpp-buffer-close>) first gives every
+  window which displays the buffer something else to show: the most recent
+  passive view on another buffer or, failing that, a new view on the
+  buffer of the most recent view on another buffer. If there is no other
+  buffer at all, the window keeps its view. It then calls
+  <cpp|remove_buffer>, which deletes the views of the buffer, removes it
+  from <cpp|bufs> and deletes the <cpp|tm_buffer_rep>; its destructor frees
+  the slot in <cpp|the_et> with <cpp|delete_document>. If the last buffer
+  is removed and <TeXmacs> does not act as a server for remote clients
+  (<cpp|number_of_servers ()>), the program quits.
+
+  At the user level, <scm|safely-kill-buffer> asks for confirmation if the buffer is modified and then calls
+  <scm|buffer-close>; for an embedded buffer it deletes the alternative
+  windows which contain it instead (see <hlink|embedded
+  widgets|server-windows.en.tm>). Closing a <em|window> also closes its
+  buffer (<hlink|closing windows|server-windows.en.tm>), and
+  <scm|close-document> chooses between the two according to the
+  <verbatim|buffer management> preference.
 
   <section|Projects>
 
@@ -559,10 +551,13 @@
   <section|Pitfalls>
 
   <\itemize>
-    <item>The pointers <cpp|tm_buffer>, <cpp|tm_view> and <cpp|tm_window>
-    are not reference counted. Do not keep them across calls which may
-    close buffers or windows; keep the <abbr|URL> instead and convert it
-    again when needed.
+    <item>Do not keep <cpp|tm_buffer> pointers across calls which may close
+    buffers; keep the name and call <cpp|concrete_buffer> again.
+
+    <item>A buffer without views has no editor: it is not typeset, it is
+    never reported as modified, its modifications are not recorded in any
+    undo history, and <scm|with-buffer> does not execute its body on it.
+    Create a view (<scm|view-passive>) first if any of this matters.
 
     <item><cpp|get_buffer_tree> (<scm|buffer-get>) returns the style and
     initial environment stored in the buffer, which are only synchronized
@@ -571,22 +566,18 @@
     therefore be out of date; the body, on the other hand, is always
     current. It also leaves out the references and the auxiliary data.
 
-    <item><cpp|get_all_views> only returns views which have been attached
-    to a window at least once (or belong to a renamed buffer).
+    <item><cpp|buffer_export> and <cpp|buffer_save> on a name which is not
+    a buffer create an empty buffer with that name.
 
     <item>Because of the bug in <cpp|remove_buffer> described above, do not
     assume that all views of a closed buffer are gone.
 
-    <item>Several routines (<cpp|get_current_buffer>,
-    <cpp|get_current_view>, the one argument <cpp|get_recent_view>,
-    <cpp|import_tree> for a name which cannot be resolved
-    directly) assert that there is a current
-    view; use the <cpp|_safe> variants in code which may run without one.
+    <item><cpp|get_current_buffer> and <cpp|import_tree> for a name which
+    cannot be resolved directly assert that there is a current view; use
+    <cpp|get_current_buffer_safe> in code which may run without one.
 
-    <item><cpp|view_to_editor> on an invalid view <abbr|URL> removes the
-    <abbr|URL> from the history and returns a nil editor (or fails in
-    <verbatim|ADVANCED_DEVELOPER_MODE>); callers in this layer
-    assume that the result is valid.
+    <item>The low level loading and saving routines return <cpp|true> on
+    <em|failure>.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

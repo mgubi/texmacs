@@ -41,9 +41,9 @@
   <verbatim|tmfs> <abbr|URL>s, in <hlink|internals of the <TeXmacs> file
   system|../scheme/api/tmfs/tmfs-internals.en.tm>. The order of the boot
   steps, the command line options and the crash handler are in <hlink|the
-  main program and crash handling|server-layer-startup.en.tm>; user
-  preferences are in <hlink|the server, buffers, views and
-  windows|server.en.tm>; memory allocation and the basic containers are in
+  main program and crash handling|server-startup.en.tm>; user
+  preferences are in <hlink|the event loop and
+  preferences|server-events.en.tm>; memory allocation and the basic containers are in
   <hlink|basic data types|types.en.tm>; pipes, sockets and dynamic
   libraries used by plug-ins are in <hlink|the plug-in
   machinery|plugins.en.tm>.

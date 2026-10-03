@@ -90,7 +90,7 @@
   ignored. Otherwise <cpp|qt_gui_rep::process_keypress> queues a
   <verbatim|QP_KEYPRESS> event, which the event loop later delivers to the
   editor; from there on the key is handled by the keyboard configuration
-  of the server, see <hlink|configuration and keyboard maps|server.en.tm>.
+  of the server, see <hlink|keyboard configuration|server-events.en.tm>.
 
   Input methods (accents, Chinese and Japanese input, the macOS
   character palette, dictation) go through

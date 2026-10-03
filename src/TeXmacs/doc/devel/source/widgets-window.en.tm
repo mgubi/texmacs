@@ -40,30 +40,20 @@
 
   <section|The <TeXmacs> windows>
 
-  <subsection|The class <cpp|tm_window_rep>>
-
   A <TeXmacs> editing window is an instance of <cpp|tm_window_rep>
-  (<verbatim|Texmacs/tm_window.hpp>). Its most important fields are
+  (<verbatim|Texmacs/tm_window.hpp>), which holds two widgets: the window
+  widget <cpp|win> (the result of <cpp|plain_window_widget>) and, inside
+  it, the <em|main <TeXmacs> widget> <cpp|wid>, created by
 
-  <\description>
-    <item*|<cpp|widget win>>the window widget (the result of
-    <cpp|plain_window_widget>);
+  <\cpp-code>
+    widget texmacs_widget (int mask, command quit);
+  </cpp-code>
 
-    <item*|<cpp|widget wid>>the <em|main <TeXmacs> widget> inside it,
-    created by <cpp|texmacs_widget>;
-
-    <item*|<cpp|url id>>the abstract name of the window, as seen from
-    <scheme> (see \P<hlink|Manipulating <TeXmacs>
-    windows|../scheme/buffer/window-api.en.tm>\Q);
-
-    <item*|<cpp|menu_current>, <cpp|menu_cache>>the caches used to avoid
-    rebuilding menus and icon bars (see below).
-  </description>
-
-  Windows are created by <cpp|new_window> in
-  <verbatim|Texmacs/Data/new_window.cpp>. It reads the user preferences
-  to build the <em|mask> argument of <cpp|texmacs_widget>, which says which
-  parts of the main widget are initially visible:
+  The main widget is implemented by each port (in <name|Qt> by
+  <cpp|qt_tm_widget_rep>) and contains the menu bar, the four icon bars,
+  the left and right side tools, the canvas, the bottom and extra tools
+  and the footer. The bits of <cpp|mask> say which parts are initially
+  visible:
 
   <descriptive-table|<tformat|<table|<row|<cell|Bit>|<cell|Preference>|<cell|Part>>|<row|<cell|1>|<cell|<verbatim|header>>|<cell|menu
   and icon bars as a whole>>|<row|<cell|2>|<cell|<verbatim|main icon
@@ -77,154 +67,46 @@
   tools>>|<row|<cell|512>|<cell|<verbatim|extra tools>>|<cell|extra
   tools>>>>>
 
-  and passes a <cpp|kill_window_command_rep> as the <cpp|quit> command
-  (which calls the <scheme> function <scm|safely-kill-window> through
-  <cpp|exec_delayed>). The constructor <cpp|tm_window_rep (widget wid2, tree
-  geom)> then calls <cpp|texmacs_window_widget>, which wraps the main widget
-  with <cpp|plain_window_widget> under a unique name derived from
-  <verbatim|"TeXmacs"> and sets its initial size and position.
+  A mask of zero, used for embedded editors, asks the port for a
+  stripped-down main widget without any bars (in <name|Qt> a
+  <cpp|qt_tm_embedded_widget_rep>).
 
-  <subsection|Attaching views>
+  The main widget understands a large set of slots, sent by the methods of
+  <cpp|tm_window_rep>: <cpp|SLOT_SCROLLABLE> (the canvas, whose contents
+  is the editor of the view shown in the window), <cpp|SLOT_MAIN_MENU>,
+  <cpp|SLOT_MAIN_ICONS>, ..., <cpp|SLOT_SIDE_TOOLS>,
+  <cpp|SLOT_BOTTOM_TOOLS>, the visibility slots of the bars,
+  <cpp|SLOT_LEFT_FOOTER> and <cpp|SLOT_RIGHT_FOOTER>, the slots of the
+  interactive prompt, the zoom factor, the extents and the scroll
+  position of the canvas, and <cpp|SLOT_FULL_SCREEN>. The editor itself
+  is a <cpp|simple_widget_rep>; once it is installed as the canvas, it
+  keeps a pointer <cpp|cvw> to the main widget in order to send messages
+  back to it (<cpp|get_canvas>, <cpp|set_extents>,
+  <cpp|send_keyboard_focus_on>, ...).
 
-  The main <TeXmacs> widget is a canvas; the document is displayed by an
-  <em|editor>, which is a <cpp|simple_widget_rep> (<cpp|editor_rep> derives
-  from it). When a view is attached to a window (<cpp|attach_view> in
-  <verbatim|Texmacs/Data/new_view.cpp>), the editor is installed in the
-  main widget with
-
-  <\cpp-code>
-    set_scrollable (wid, vw-\<gtr\>ed);
-
-    vw-\<gtr\>ed-\<gtr\>cvw= wid.rep;
-  </cpp-code>
-
-  and <cpp|detach_view> replaces it by an empty <cpp|glue_widget ()>. The
-  editor uses <cpp|cvw> to send messages back to its window (for instance
-  <cpp|get_canvas>, <cpp|set_extents> or <cpp|send_keyboard_focus_on>).
-
-  <subsection|Menus, icon bars and tools>
-
-  The contents of the bars of a window are not stored in the window. They
-  are recomputed from <scheme> each time the editor thinks they may have
-  changed, in <cpp|edit_interface_rep::update_menus>
-  (<verbatim|Edit/Interface/edit_interface.cpp>):
-
-  <\cpp-code>
-    SERVER (menu_main ("(horizontal (link texmacs-menu))"));
-
-    SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
-
-    SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
-
-    SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
-
-    SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
-
-    ...
-
-    SERVER (side_tools (0, "(vertical " * rdyn * ")"));
-  </cpp-code>
-
-  where <verbatim|rdyn> is a string such as <verbatim|(dynamic
-  (texmacs-side-tools <em|win>))>. The same calls are made by
-  <cpp|edit_interface_rep::resume> when a view gets the focus. The
-  arguments are the textual form of <scheme> <em|menu items> (see
-  \P<hlink|The <scheme> widget language and its
-  interpreter|widgets-scheme.en.tm>\Q); the symbols <scm|texmacs-menu>,
-  <scm|texmacs-main-icons>, ... are defined with <scm|menu-bind> in
-  <verbatim|texmacs/menus/main-menu.scm> and other files.
-  <cpp|update_menus> is called by <cpp|edit_interface_rep::apply_changes>
-  when the flag <cpp|THE_MENUS> is set, or when the editor has been idle
-  for a short while after a change; it can also be forced from <scheme>
-  with <scm|update-menus>.
-
-  The server methods of <cpp|tm_frame_rep> forward to the current
-  <cpp|tm_window_rep>, whose methods <cpp|menu_main>, <cpp|menu_icons>,
-  <cpp|side_tools> and <cpp|bottom_tools> all go through
-
-  <\explain>
-    <cpp|bool tm_window_rep::get_menu_widget (int which, string menu,
-    widget& w)><explain-synopsis|build or reuse a menu widget>
-  <|explain>
-    <cpp|which> identifies the bar: -1 for the menu bar, 0 to 3 for the
-    icon bars, 10 and 11 for the right and left side tools, 20 and 21 for
-    the bottom and extra tools. The function first calls the <scheme>
-    function <scm|menu-expand> on the menu item, which evaluates all its
-    dynamic parts and yields a closure-free description. If this expansion
-    is equal to the one currently displayed in the same bar
-    (<cpp|menu_current[which]>), nothing has changed and the function
-    returns <cpp|false>. For the menu bar and the icon bars (<cpp|which> \<less\> 10), a
-    widget found in <cpp|menu_cache> under the same expansion is reused.
-    Otherwise the widget is built by <cpp|make_menu_widget>, which calls
-    the <scheme> function <scm|make-menu-widget> (or, for the side tools,
-    <scm|make-menu-widget*> with a size of 400 by 1000 pixels, only used by
-    the markup interface), and stored in the cache if the global flag
-    <cpp|menu_caching> is set and either <cpp|which> \<geq\> 10 or the
-    <scheme> predicate <scm|cache-menu?> accepts the expansion.
-  </explain>
-
-  If <cpp|get_menu_widget> returns <cpp|true>, the new widget is
-  installed with <cpp|set_main_menu>, <cpp|set_main_icons>, ...,
-  <cpp|set_side_tools>, <cpp|set_left_tools>, <cpp|set_bottom_tools> or
-  <cpp|set_extra_tools>. Before this, <cpp|(lazy-initialize-force)> is
-  evaluated so that all lazily defined menus are available. The cache is
-  flushed by <cpp|tm_window_rep::refresh>, called for all windows by
-  <cpp|tm_server_rep::refresh> when the interface language changes.
-
-  The visibility of the bars is controlled by
-  <cpp|tm_frame_rep::show_header>, <cpp|show_icon_bar>,
-  <cpp|show_side_tools>, <cpp|show_bottom_tools> and <cpp|show_footer>,
-  exported to <scheme> as <scm|show-header>, <scm|show-icon-bar>, ...,
-  which send the corresponding visibility slots to the main widget.
-
-  <subsection|The footer and interactive input>
-
-  The left and right parts of the footer are set by the editor
-  (<verbatim|Edit/Interface/edit_footer.cpp>) through
-  <cpp|tm_frame_rep::set_left_footer> and <cpp|set_right_footer>, which
-  send <cpp|SLOT_LEFT_FOOTER> and <cpp|SLOT_RIGHT_FOOTER>.
-
-  The footer can also be used to ask the user for a string. In
-  <cpp|tm_window_rep::interactive>, the kernel builds a prompt with
-  <cpp|text_widget> and an input field with <cpp|input_text_widget>, whose
-  call-back is an <cpp|ia_command_rep>, installs them with
-  <cpp|set_interactive_prompt> and <cpp|set_interactive_input> and switches
-  on <cpp|set_interactive_mode>. When the user validates, the call-back
-  runs <cpp|interactive_return>, which reads the answer with
-  <cpp|get_interactive_input>, leaves interactive mode and calls the
-  continuation.
+  How windows are created and closed, how views are attached to them, how
+  the menus and icon bars are built from <scheme> and cached
+  (<cpp|tm_window_rep::get_menu_widget>), and how the footer is used for
+  interactive input is described in <hlink|windows|server-windows.en.tm>,
+  in the chapter on the server. The present chapter is only concerned with
+  the widgets involved.
 
   <section|Dialogs>
 
   <subsection|Dialogs built by the kernel>
 
-  <verbatim|Texmacs/Window/tm_dialogue.cpp> implements two kinds of
-  dialogs directly in <c++>.
-
-  <\itemize>
-    <item><cpp|tm_frame_rep::choose_file> (glue <scm|cpp-choose-file>)
-    builds a <cpp|file_chooser_widget>, initializes it with
-    <cpp|set_directory> and <cpp|set_file> and opens it with
-    <cpp|dialogue_start>.
-
-    <item><cpp|tm_frame_rep::interactive> (glue <scm|tm-interactive>) asks
-    for the arguments of a <scheme> function. Depending on the preference
-    <verbatim|interactive questions>, the number of arguments and the
-    current buffer, it either uses the footer (through an
-    <cpp|interactive_command_rep>, which asks the arguments one by one with
-    <cpp|tm_window_rep::interactive>), or builds an
-    <cpp|inputs_list_widget> with one field per argument. The fields are
-    accessed with <cpp|get_form_field>, and configured with
-    <cpp|set_input_type>, <cpp|set_string_input> and
-    <cpp|add_input_proposal>.
-  </itemize>
-
+  <verbatim|Texmacs/Window/tm_dialogue.cpp> builds two kinds of dialogs
+  directly in <c++>: file choosers (<cpp|tm_frame_rep::choose_file>, glue
+  <scm|cpp-choose-file>), from a <cpp|file_chooser_widget> initialized with
+  <cpp|set_directory> and <cpp|set_file>, and the forms which ask for the
+  arguments of an interactive command (<cpp|tm_frame_rep::interactive>,
+  glue <scm|tm-interactive>), from an <cpp|inputs_list_widget> whose fields
+  are configured with <cpp|set_input_type>, <cpp|set_string_input> and
+  <cpp|add_input_proposal> and read with <cpp|get_form_field>.
   <cpp|dialogue_start> wraps the dialog into a <cpp|plain_window_widget>,
-  centers it on the current window and shows it; the call-back
-  (a <cpp|dialogue_command_rep>) collects the answers with
-  <cpp|dialogue_inquire>, which uses <cpp|get_string_input> or
-  <cpp|get_form_field>, and closes the dialog through the <scheme>
-  function <scm|dialogue-end>.
+  centers it on the current window and shows it. The details, including
+  when the footer is used instead of a dialog, are in <hlink|dialogs and
+  interactive commands|server-windows.en.tm>.
 
   <subsection|Windows created from <scheme>>
 
@@ -291,21 +173,18 @@
 
   <subsection|Embedded <TeXmacs> widgets>
 
-  <cpp|texmacs_input_widget> embeds a full editor in a dialog. It creates
-  or updates an auxiliary buffer, a view on it and a
-  <cpp|tm_window_rep> built with the second constructor <cpp|tm_window_rep
-  (tree doc, command quit)>, which calls <cpp|texmacs_widget (0, quit)>: a
-  mask of zero asks the port for a stripped-down main widget without bars
-  (in <name|Qt> a <cpp|qt_tm_embedded_widget_rep>). The editor is attached
-  with <cpp|set_scrollable> as for an ordinary window, and the whole thing
-  is returned wrapped by <cpp|wrapped_widget>, whose command
-  (<cpp|close_embedded_command>) is executed on <cpp|SLOT_DESTROY> and
-  closes the auxiliary buffer.
-
+  <cpp|texmacs_input_widget> embeds a full editor in a dialog or a side
+  panel: it creates an auxiliary buffer, a passive view on it and an
+  anonymous <cpp|tm_window_rep> whose main widget is built with a mask of
+  zero, installs the editor as the canvas with <cpp|set_scrollable> as for
+  an ordinary window, and returns the main widget wrapped by
+  <cpp|wrapped_widget>, whose command (<cpp|close_embedded_command>) is
+  executed on <cpp|SLOT_DESTROY> and closes the auxiliary buffer.
   <cpp|texmacs_output_widget> (<verbatim|tm_button.cpp>) is much lighter:
   it typesets the document once into a box and returns a
-  <cpp|box_widget_rep>, a read-only <cpp|simple_widget_rep> which paints the
-  box.
+  <cpp|box_widget_rep>, a read-only <cpp|simple_widget_rep> which paints
+  the box. Both are described in more detail in <hlink|embedded <TeXmacs>
+  widgets|server-windows.en.tm>.
 
   <section|Refreshing dynamic widgets>
 

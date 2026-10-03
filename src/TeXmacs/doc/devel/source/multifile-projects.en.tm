@@ -10,8 +10,7 @@
   next page|multifile-inclusions.en.tm>); each chapter which should be
   editable on its own is <em|attached> to the master. The buffer level
   routines (<cpp|project_attach>, <cpp|project_attached>,
-  <cpp|project_get>, implicit projects) are described in <hlink|metadata:
-  buffers, views, windows and projects|server-layer-metadata.en.tm>; this
+  <cpp|project_get>, implicit projects) are described in <hlink|buffers|server-buffers.en.tm>; this
   page explains what attaching a project actually changes.
 
   <section|Declaring masters and chapters>

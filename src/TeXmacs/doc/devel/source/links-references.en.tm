@@ -73,7 +73,7 @@
     <item*|<cpp|local_ref>, <cpp|local_aux>, <cpp|local_att>>the fields
     <cpp|ref>, <cpp|aux> and <cpp|att> of <cpp|buf-\<gtr\>data>, which are
     shared by all views and saved with the document (see <hlink|the
-    metadata classes|server-layer-metadata.en.tm>);
+    buffer classes|server-buffers.en.tm>);
 
     <item*|<cpp|global_ref>, <cpp|global_aux>, <cpp|global_att>>the same
     tables of the project buffer if the buffer belongs to a project, so

@@ -41,7 +41,7 @@
   All of this is skipped if there is no current link repository
   (<cpp|env-\<gtr\>link_env> is null), which happens when trees are typeset
   outside an editor, for instance in <hlink|output
-  widgets|server-layer-windows.en.tm>. <cpp|build_locus> also returns the
+  widgets|server-windows.en.tm>. <cpp|build_locus> also returns the
   identifiers in <cpp|ids>, the destination of a <verbatim|url> vertex in
   <cpp|ref> and the name of an <verbatim|id> vertex in <cpp|anchor>, and
   computes the colour <cpp|col> of the locus: <verbatim|visited-color> if

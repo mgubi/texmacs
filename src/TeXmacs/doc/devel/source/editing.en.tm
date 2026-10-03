@@ -24,7 +24,7 @@
     <item>the structure of the editor classes, the editor state (cursor,
     selection, focus) and the way elementary modifications are propagated
     to the typesetter and to the undo history are described in <hlink|the
-    server, buffers, views and windows|server.en.tm>;
+    editor|server-editor.en.tm>;
 
     <item>the <scheme> routines for modifying trees directly
     (<scm|tree-assign!>, <scm|tree-insert!>, <scm|tree-set!>, ...) and for
@@ -79,7 +79,7 @@
     edit tree. These are the only functions which change the document.
     They notify the observers, so that the typesetter, the undo history,
     position observers and the other views are updated automatically (see
-    <hlink|the modification pipeline|server.en.tm>).
+    <hlink|the modification pipeline|server-editor.en.tm>).
   </enumerate>
 
   Two consequences of this design are worth keeping in mind. First, the
@@ -119,7 +119,7 @@
     <item*|<verbatim|Edit/Modify/edit_modify.hpp>,
     <verbatim|edit_modify.cpp>>The class <cpp|edit_modify_rep>, which
     receives the modifications and implements undo and redo; see
-    <hlink|the server, buffers, views and windows|server.en.tm>.
+    <hlink|undo and redo|server-editor.en.tm>.
 
     <item*|<verbatim|Edit/Replace/edit_select.hpp>,
     <verbatim|edit_select.cpp>>The class <cpp|edit_select_rep>: the

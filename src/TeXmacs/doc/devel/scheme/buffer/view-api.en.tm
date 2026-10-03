@@ -72,8 +72,8 @@
   </explain>
 
   The <c++> counterparts of these routines can be found in
-  <verbatim|Texmacs/Data/new_view.cpp>; see <hlink|the server, buffers, views
-  and windows|../../source/server.en.tm> for more details.
+  <verbatim|Texmacs/Data/new_view.cpp>; see <hlink|views and the current
+  view|../../source/server-views.en.tm> for more details.
 
   <tmdoc-copyright|2012|Joris van der Hoeven>
 
