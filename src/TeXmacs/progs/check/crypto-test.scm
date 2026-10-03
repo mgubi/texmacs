@@ -184,13 +184,13 @@
                        '(concat "" "ab") '(document "x") '(document "x" "")
                        '(frac "a" "b") '(frac "b" "a")))
     (check= (length (list-remove-duplicates l)) (length l)))
-  ;; FIXME: tree-hash does not separate a label from the hashes of the
-  ;; children (src/Data/Tree/tree_cache.cpp:317-324): the hash of a tree is
-  ;; the hash of a string, so that (tree-hash (stree->tree '(frac))) equals
-  ;; (tree-hash (stree->tree "frac")), and the hash of (em "x") equals that
-  ;; of the string "em" followed by the hash of "x"; a document can thus
-  ;; contain a string with the cache name of another tree.
-  )
+  ;; the hash of a tree is not the one of a string, and its label is
+  ;; separated from its children (#176)
+  (check-false (== (h '(frac)) (h "frac")))
+  (check-false (== (h '(em "x")) (h (string-append "em" (h "x")))))
+  (check-false (== (h '(em "x")) (h (string-append "1:em" (h "x")))))
+  (check-false (== (h (list (string->symbol (string-append "em" (h "x")))))
+                   (h '(em "x")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Random numbers and salts
@@ -349,10 +349,17 @@
           (check-false (== (server-password-encode "pw-X1!" s "pbkdf2")
                            (server-password-encode "pw-X1!" test-salt
                                                    "pbkdf2"))))))
-  ;; FIXME: password-correct-sha512? prints the password and its hash on
-  ;; the standard output (server/server-authentication.scm:375, :384),
-  ;; which is the log of a headless server.
-  )
+  ;; checking a password prints nothing, since the output of a server
+  ;; without a window is its log (#176)
+  (for (type '("clear" "sha256" "sha512" "pbkdf2"))
+    (check= (begin
+              (cout-buffer)
+              (check-run
+               (lambda ()
+                 (server-password-correct? "Logged-pw-7!"
+                                           `(password ,type ,test-salt "x"))))
+              (cout-unbuffer))
+            "")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format of encrypted blocks and documents
@@ -448,12 +455,11 @@
     (gpg-delete-buffer-passphrase w)
     (check-false (gpg-get-buffer-passphrase u))
     (check-false (gpg-get-buffer-passphrase w))
-    ;; FIXME: gpg-delete-buffer-passphrase (security/gpg/gpg-edit.scm:449)
-    ;; forgets the passphrase of the document but not the one which
-    ;; gpg-set-buffer-passphrase (:440) stored for its autosave file, which
-    ;; stays in memory and in the wallet: after the deletion,
-    ;; (gpg-get-buffer-passphrase (url-autosave u "~")) is still "pass-two".
-    ))
+    ;; the passphrases of the autosave files are deleted too (#176)
+    (check-false (gpg-get-buffer-passphrase (url-autosave u "~")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave u "#")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave w "~")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave w "#")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Untrusted documents
@@ -505,14 +511,22 @@
     (check-false (tree-export (stree->tree doc) u "texmacs"))
     (check-true (contains? (string-load u) "PLAINTEXT"))
     (check-false (contains? (string-load u) "gpg-passphrase-encrypted")))
-  ;; FIXME (#66, item 3): a document whose initial environment has
-  ;; encryption gpg-passphrase is saved in clear when it has no passphrase
-  ;; or when gpg fails: tree-export-encrypted returns the plain tree
-  ;; (security/gpg/gpg-edit.scm:506-524), which export_tree writes
-  ;; (src/Texmacs/Data/new_buffer.cpp:535-545); (tree-export doc u
-  ;; "texmacs") then returns #f (success) and the file contains the
-  ;; secret text, with or without (gpg-set-buffer-passphrase u "pw").
-  )
+  ;; a document to be encrypted which cannot be is not saved: without a
+  ;; passphrase, or when gpg fails (#66, item 3)
+  (let ((u (tmp "secret.tm"))
+        (doc '(document (TeXmacs "2.1") (style (tuple "generic"))
+                        (initial (collection
+                                  (associate "encryption" "gpg-passphrase")))
+                        (body (document "SECRETTEXT")))))
+    (when (url-exists? u) (system-remove u))
+    (check-true (tree-export (stree->tree doc) u "texmacs"))
+    (check-false (and (url-exists? u) (contains? (string-load u) "SECRETTEXT")))
+    ;; with a passphrase, gpg is missing here
+    (gpg-set-buffer-passphrase u "pw")
+    (check-true (tree-export (stree->tree doc) u "texmacs"))
+    (check-false (and (url-exists? u)
+                      (contains? (string-load u) "SECRETTEXT")))
+    (gpg-delete-buffer-passphrase u)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GnuPG setup
