@@ -176,6 +176,20 @@ each action wrapped like a key press of the event loop so that it reaches
 the undo history. Moving the cursor by characters and lines needs a window
 and is left out.
 
+Five more reach further into the system. `typeset-test.scm` checks the
+typesetter as Scheme sees it: evaluation of the style language, lengths,
+the environment and the numbering at paths, the extents of boxes (text,
+mathematics, tables), line breaking, hyphenation, paragraphs and pages.
+`bibtex-test.scm` checks the .bib parser, the BibTeX engine and its styles,
+the export to .bib and the bibliography of a document. `database-test.scm`
+checks the TeXmacs database (fields, history, queries, persistence and the
+Scheme layer) on databases of its own in the temporary directory.
+`crypto-test.scm` checks base64, tree hashes, passwords, the encrypted
+blocks and documents, and GnuPG and GnuTLS, which it skips when they are
+missing (it never touches `~/.gnupg`). `plugins-test.scm` checks plugin
+configuration, the protocol of plugin answers, and live shell and Python
+sessions when they are installed, stopping every process it starts.
+
 `TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
 (`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
 the source tree (1181 functions) and checks that each one is bound to a

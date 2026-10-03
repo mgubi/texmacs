@@ -34,7 +34,12 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
-        (check editing-test)))
+        (check editing-test)
+        (check typeset-test)
+        (check bibtex-test)
+        (check database-test)
+        (check crypto-test)
+        (check plugins-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -114,8 +119,18 @@
     ("trees" trees-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ;; FIXME: bibtex before editing: generating a bibliography processes
+    ;; the pending GUI events (system_wait), and a focus event for the
+    ;; widget of a view which editing closed reaches is_embedded_widget,
+    ;; which reads the buffer of the editor, NULL since delete_view
+    ("bibtex" bibtex-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
+    ("typeset" typeset-test-failures count)
+    ("database" database-test-failures count)
+    ("crypto" crypto-test-failures count)
+    ;; starts plugin processes (shell, python when present) and stops them
+    ("plugins" plugins-test-failures count)
     ;; last, since it defines modes and functions in the running TeXmacs
     ("tm-define" define-test-failures count)))
 
