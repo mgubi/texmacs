@@ -1168,9 +1168,11 @@ void QTMScrollArea::setWidgetAndConnect (QWidget* w) {
  The list views are descendants of the scroll area and are only deleted by
  the QWidget destructor, after ~QTMScrollArea has run. Their signals
  (destroyed, selectionHasChanged) must not reach this half-destroyed object.
+ The views are looked up again rather than taken from listViews, which may
+ still hold views that were deleted earlier.
  */
 QTMScrollArea::~QTMScrollArea () {
-  for (QTMListView* listView : listViews)
+  for (QTMListView* listView : findChildren<QTMListView*> ())
     QObject::disconnect (listView, nullptr, this, nullptr);
 }
 
