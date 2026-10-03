@@ -562,6 +562,10 @@
          (connection-setup name `(tuple "pipe" ,(second cmd))))
         ((func? cmd :launch 2)
          (connection-setup name `(tuple "pipe" ,(third cmd)) (cadr cmd)))
+        ((func? cmd :worker 1)
+         ;; a Web Worker, in a browser (worker_link.cpp): its script, from
+         ;; the directory of the page
+         (connection-setup name `(tuple "worker" ,(second cmd))))
         ((func? cmd :socket 2)
          (connection-setup name `(tuple "socket" ,(second cmd) ,(third cmd))))
         ((func? cmd :socket 3)

@@ -303,6 +303,7 @@ System/Link/texmacs_server.cpp
 System/Link/tm_link.cpp
 System/Link/tm_sockets.cpp
 System/Link/websocket_contact.cpp
+System/Link/worker_link.cpp
 System/Misc/data_cache.cpp
 System/Misc/fakedlopen.c
 System/Misc/fast_alloc.cpp

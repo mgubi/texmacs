@@ -82,76 +82,95 @@ zoom, real text in the exported PDF (searchable, selectable), in the
 document's colour.
 
 ```text
- TeXmacs (Scheme)                    page (JavaScript)          worker
- ----------------                    -----------------          ------
+ TeXmacs                       plugin worker (tm-tikz.js)      TikZJax worker
+ -------                       --------------------------      --------------
  session "TikZ" input
-   | plugin-feed (in-process plugin)
+   | worker link (pipe-like)
    v
- (web-tikz id source options) ---->  tmTikz.render ------------> texify
-                                       queue, timeout             TeX, DVI,
+ input ... <EOF>  ------------> source, preamble -------------> texify:
+                                                                  TeX, DVI,
                                                                   dvi2html
-                                     split the SVG     <--------- SVG
-                                       drawing: SVG without <text>
-                                       text: runs (font, size, point,
-                                             TeX positions, colour)
- (tikz-done id result)        <----  _vue_web_scheme
+                                split the SVG      <------------- SVG
+                                  drawing: SVG without <text>
+                                  text: runs (font, size, point,
+                                        characters, colour)
+                                runs -> TeXmacs text (the .enc
+                                  tables: TeX position -> symbol)
+ \2scheme:(tikz-picture  <------
+   source (superpose (image drawing) (move run1 x1 y1) ...))\5
    |
    v
- runs -> TeXmacs text (fonts/enc tables: TeX position -> TeXmacs symbol)
-   |
-   v
- (tikz-picture source
-   (superpose (image drawing) (move run1 x1 y1) (move run2 x2 y2) ...))
+ the picture in the output of the session
 ```
 
 ### 1. The plugin: same name, another engine
 
 `plugins/tikz/progs/init-tikz.scm` keeps one plugin, `tikz`, with the same
-session and serializer. When the page offers TikZ (`(defined? 'web-tikz)`,
-a function of `vue_gui.cpp` as `web-paste`), it is configured as an
-in-process plugin evaluated by `tikz-browser-eval` instead of `:launch`ing
-the Python program; otherwise it is configured as before. A document made
-on the desktop is evaluated in the page, and the other way round. The input
+session and serializer: in a page (workers there, `vue_web_wake` defined),
+`(:worker "tikzjax/tm-tikz.js")`; elsewhere `(:launch ...)` of the Python
+program, with its `:require`s, as before. A document made on the desktop is
+evaluated in the page, and the other way round. The input
 is treated as `tm_tikz.py` treats it: a `tikzpicture` is added around code
 which has none, `\usetikzlibrary` lines go to the preamble, a full document
 (`\documentclass`) is cut to its body and its preamble. The "magic" first
 line of tmpy (`%` options) gives `texPackages`, e.g. `% packages: circuitikz`.
 
-### 2. In-process plugins with an asynchronous answer
+### 2. The plugin is a Web Worker (a fifth kind of link)
 
-`utils/plugins/plugin-eval.scm` has one plugin without a process, Scheme,
-special-cased in four places (`plugin-status`, `plugin-start`,
-`plugin-write`, `plugin-feed`), which answers at once. The design makes
-it a table:
+A page has no processes, but it has workers: scripts which run apart from
+it and exchange messages with it, as a program exchanges bytes through its
+pipes. TeXmacs makes the link of a plugin from its connection info, of four
+kinds (`connection.cpp`: `pipe` to a program, `dynlink`, `cmdline`,
+`request`); a fifth one, `worker`, is a Web Worker:
 
 ```scheme
-(plugin-in-process! "tikz" tikz-browser-eval)
-;; (tikz-browser-eval lan ses input done): runs, then calls
-;; (done "output" tree) or (done "error" tree), once, possibly later
+(plugin-configure tikz
+  (:worker "tikzjax/tm-tikz.js")   ; the browser: its script, from the page
+  (:serializer ,tikz-serialize)
+  (:session "TikZ"))
 ```
 
-Its status is "running" (2) at once, `plugin-write` calls the evaluator,
-and `done` does what the Scheme case does after its evaluation:
-`connection-notify` with the channel and the tree, then
-`connection-notify-status` 2, which goes to the next input. Scheme becomes
-the first entry of the table (its evaluator calls `done` at once), so that
-the special cases go. An interruption (`plugin-interrupt`) cancels the job
-in the page (the worker is terminated and made again).
+- `src/System/Link/worker_link.cpp`: `make_worker_link (url)`, a
+  `tm_link_rep` as the pipe link (`start`, `write`, `read`, `interrupt`,
+  `stop`); its output is taken by `process_all_workers` in the interpose
+  handler of the server, as that of the pipes.
+- `misc/wasm/workers.js` (a `--pre-js`): `tmWorkers` makes the worker,
+  posts the input to it, keeps what it sends until TeXmacs takes it, and
+  wakes the loop of the page (`vue_web_wake`). The messages are those of a
+  program: `{input}` (its stdin) and `{interrupt}` to the worker, `{out}`,
+  `{err}` (stdout, stderr, in the protocol of the plugins) and `{exit}` from
+  it.
+- `(:worker url)` in `plugin-configure` (`tm-plugins.scm`) declares it.
 
-### 3. The bridge in the page: `misc/wasm/tikz.js`
+Nothing else of TeXmacs changes: the sessions, `plugin-eval.scm`, the
+protocol are those of every plugin, and an interruption terminates nothing
+but the worker. Any other plugin of the browser is a worker the same way (a
+Python session on Pyodide...). Done and tested with a worker which echoes
+its input (`misc/wasm/test/echo-worker.js`).
 
-A `--pre-js` of the browser build, as `clipboard.js`:
+The worker answers an input with one block of the protocol, which ends the
+evaluation (`connection_rep::read`: the end of the outermost block), with
+the other blocks in it: `\2verbatim:` ... `\2scheme:(tree)\5` ...
+`\2prompt#TikZ] \5\5`.
 
-- `tmTikz.render (id, source, options)`: starts the worker the first time
-  (`new Worker (assetRoot + "/run-tex.js")`, then `load (assetRoot)`), puts
-  the job in a queue (one worker: a second one costs 2.8 MB of memory dump
-  and is not worth it for a session), splits the SVG it returns into the
-  drawing and the text (section 5), and calls `(tikz-done id result)`
-  through `_vue_web_scheme`, as `files.js` does.
-  A timeout (60 s, TeX has no other limit), and the TeX log on an error
-  (`input.log`, which the worker returns in the message of its error).
-- `vue_gui.cpp`: `(web-tikz id source options-json)` calls it (`EM_JS`, as
-  `web-paste`).
+### 3. The worker of the TikZ plugin: `tm-tikz.js`
+
+The worker of the plugin speaks the protocol of the plugins on one side and
+drives TikZJax on the other:
+
+- it reads the input of the session up to the line `<EOF>` (the serializer
+  of the plugin), and treats it as `tm_tikz.py` does (section 1);
+- it starts TikZJax's own worker (`run-tex.js`, a worker in the worker),
+  calls `load (assetRoot)` once and `texify (source, options)` for each
+  picture, with the protocol of threads.js (40 lines);
+- it splits the SVG into the drawing and the text (section 5; workers have
+  no `DOMParser`: a small parser of dvi2html's regular output) and answers
+  with the tree of the picture, `\2scheme:(tikz-picture ...)\5`, the
+  characters already TeXmacs symbols (the `.enc` tables, converted to JSON
+  at build time, section 6);
+- on an error of TeX, the end of its log in `\2utf8:...\5` on `err`;
+- an interruption terminates TikZJax's worker, which is made again for the
+  next picture.
 
 ### 4. Where TikZJax comes from
 
@@ -173,9 +192,10 @@ the files as the packages of TeXmacs (`packages.js`, the Cache API), so a
 second visit loads nothing. The worker stays alive after a job, so the
 memory dump is loaded once a session.
 
-### 5. Taking the text out of the SVG (in the page)
+### 5. Taking the text out of the SVG (in the worker)
 
-`tmTikz` parses the SVG of the worker (`DOMParser`) and, for each `<text>`:
+`tm-tikz.js` parses the SVG of TikZJax (a small parser: workers have no
+`DOMParser`, and dvi2html's output is regular) and, for each `<text>`:
 
 - its point: the `x`, `y` of the element through the transforms of the
   `<g>` around it (dvi2html nests several: `translate`, `scale(-1,1)`,
@@ -308,10 +328,10 @@ Why not otherwise:
 
 ## Steps
 
-1. In-process plugins with an answer later (`plugin-eval.scm`), Scheme
-   moved to the table; the Scheme sessions tested as before.
-2. `get-tikzjax.sh`, the files in `out/web/tikzjax/`, `tikz.js` and
-   `web-tikz`: a session returns the picture as an image, its text missing.
+1. Plugins which are Web Workers: `worker_link.cpp`, `workers.js`,
+   `(:worker url)`. Done, tested with an echo worker.
+2. `get-tikzjax.sh`, the files in `out/web/tikzjax/`, `tm-tikz.js`: a
+   session returns the picture as an image, its text missing.
 3. The split of the SVG in the page, the glyph table, and the runs as
    TeXmacs text (`tikz-picture`, `superpose`, the `.enc` tables, the
    fonts): text, math, colours, sizes.
@@ -332,4 +352,4 @@ Why not otherwise:
   Modern; a rotated node.
 - An error of TeX (an undefined control sequence) and a missing package:
   the log in the output, the session ready for the next input.
-- Scheme sessions, as before (the in-process table).
+- Scheme sessions, as before; the echo worker (`misc/wasm/test/`).

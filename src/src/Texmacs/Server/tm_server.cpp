@@ -220,6 +220,7 @@ tm_server_rep::interpose_handler () {
   perform_select ();
   exec_pending_commands ();
 #endif
+  process_all_workers (); // the plugins which are Web Workers (browser)
   async_eval_pending ();
 
   if (!headless_mode) {
