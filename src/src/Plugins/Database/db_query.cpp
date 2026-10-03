@@ -93,7 +93,7 @@ database_rep::filter (db_atoms ids, tree qt, db_time t, query_args qargs) {
   //cout << "Query " << qt << ", limit= " << qargs.limit << ", offset= "<< qargs.offset << LF;
   db_constraints cs= encode_constraints (qt);
   //cout << "Encoded as " << cs << "\n";
-  if (N(cs) == 1 && N(cs) == 0) return db_atoms ();
+  if (N(cs) == 1 && N(cs[0]) == 0) return db_atoms ();
   db_atoms r;
   int skipped= 0;
   for (int i=0; i<N(ids); i++)

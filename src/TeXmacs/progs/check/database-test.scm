@@ -286,8 +286,11 @@
             '("d" "c" "b"))
     (check= (tmdb-query db '((order "color" #t) ("type" "t1")) 150.0 0 0)
             '("a" "b" "c"))
+    ;; each key has its own direction (#59)
     (check= (tmdb-query db '((order "color" #f) (order "name" #t)) 150.0 0 0)
-            '("d" "c" "b" "a"))
+            '("b" "c" "d" "a"))
+    (check= (tmdb-query db '((order "color" #t) (order "name" #f)) 150.0 0 0)
+            '("a" "d" "c" "b"))
     ;; limits and offsets on a single constraint
     (check= (tmdb-query db '(("type" "t1")) 150.0 2 0) '("a" "b"))
     (check= (tmdb-query db '(("type" "t1")) 150.0 0 1) '("b" "c"))
