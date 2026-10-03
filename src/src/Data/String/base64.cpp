@@ -61,10 +61,19 @@ b64_to_int[]= "???????????????????????????????????????????~???\177tuvwxyz{|}??\
 ?????@ABCDEFGHIJKLMNOPQRSTUVWXY??????Z[\\]^_`abcdefghijklmnopqrs?????";
 
 
+// the value of a character of the alphabet, -1 for any other character
+static int
+b64_value (char c) {
+  int i= (int) (unsigned char) c;
+  if (i >= (int) sizeof (b64_to_int) - 1 || b64_to_int[i] == '?') return -1;
+  return b64_to_int[i] - 64;
+}
+
 string
 decode_base64 (array<int> ac) {
   string r(3);
   int n= N(ac), n1, n2, n3, n4;
+  if (n < 2) return "";  // one character holds no byte
 
   n1= b64_to_int[(int)ac[0]] - 64;
   n2= b64_to_int[(int)ac[1]] - 64;
@@ -85,7 +94,7 @@ decode_base64 (string s) {
   array<int> tmp;
   int i, n= N(s), cnt=0;
   for (i=0; i<n && !end; i++) {
-    if (b64_to_int[(int)s[i]] != '?') {
+    if (b64_value (s[i]) >= 0) {
       tmp << (int)s[i];
       cnt++;
     }
@@ -99,5 +108,7 @@ decode_base64 (string s) {
       tmp= array<int> ();
     }
   }
+  // a final group without its padding
+  if (cnt > 0) r << decode_base64 (tmp);
   return r;
 }
