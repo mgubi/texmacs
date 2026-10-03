@@ -324,23 +324,16 @@ pk_loader::load_pk () {
 	i = pkbyte (); 	/* pixel width */
 	break;
       case 4:
-	length = pkbyte () * 256;
+      case 5:
+      case 6:
+	length = (flagbyte & 3) * 65536;
+	length = length + pkbyte () * 256;
 	length = length + pkbyte ();
 	charcode = pkbyte ();
 	startpos = input_pos;
 	i = pktrio ();                  /* TFM width */
 	i = pkbyte ();
 	i = i * 256 + pkbyte ();        /* pixelwidth */
-	break;
-      case 5:
-	failed_error << "pk file= " << file_name << "\n";
-	failed_error << "last charcode= " << charcode << "\n";
-	FAILED ("lost sync in pk file (character too big / status = 5)");
-	break;
-      case 6:
-	failed_error << "pk file= " << file_name << "\n";
-	failed_error << "last charcode= " << charcode << "\n";
-	FAILED ("lost sync in pk file (character too big / status = 6)");
 	break;
       case 7:
 	length = pkquad ();
