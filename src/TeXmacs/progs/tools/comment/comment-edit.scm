@@ -186,13 +186,21 @@
     (former which)
     (when (nnull? l) (notify-comments-editor))))
 
+(define (comment-id-elsewhere? id)
+  ;; Is the mirror identifier id also used in another open buffer?
+  (with cur (current-buffer)
+    (list-find (id->trees id)
+               (lambda (u) (and-with b (tree->buffer u) (!= b cur))))))
+
 (define (renew-pasted-comment-ids old)
-  ;; Pasted copies of comments which are already in the buffer get new
-  ;; identifiers, so that they become independent comments, not mirrors
+  ;; Pasted copies of comments which are already in this buffer or in
+  ;; another open buffer get new identifiers, so that they become
+  ;; independent comments, not mirrors
   (with ids (map comment-id old)
     (for (t (tree-search (buffer-tree) any-comment-context?))
-      (when (and (in? (comment-id t) ids)
-                 (null? (list-filter old (cut tree-eq? t <>))))
+      (when (and (not (list-find old (cut tree-eq? t <>)))
+                 (or (in? (comment-id t) ids)
+                     (comment-id-elsewhere? (comment-id t))))
         (tree-set (tree-ref t 0) (create-unique-id))
         (tree-set (tree-ref t 1) (create-unique-id))))))
 
