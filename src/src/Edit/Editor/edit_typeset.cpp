@@ -767,9 +767,14 @@ search_doc_title (tree t) {
 static tree
 expand_includes (tree t) {
   // replace include by include* so that the included files are
-  // expanded in the environment of the main document
+  // expanded in the environment of the main document.
+  // Only do this for files in the directory of the main document:
+  // the relative urls inside other included files would be resolved
+  // against the wrong directory; tmhtml-include handles those.
   if (is_atomic (t)) return t;
-  else if (is_func (t, INCLUDE, 1)) return tree (VAR_INCLUDE, t[0]);
+  else if (is_func (t, INCLUDE, 1) && is_atomic (t[0]) &&
+           is_atomic (url_unix (t[0]->label)))
+    return tree (VAR_INCLUDE, t[0]);
   else {
     int i, n= N(t);
     tree r (t, n);
