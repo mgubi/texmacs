@@ -93,8 +93,10 @@
 	(let ((type (if (bib-null? t)
 			(bib-translate "chapter")
 			(bib-locase t)))
-	      (pages `(concat ", " ,(bib-format-pages x))))
-	  `(concat ,type " " ,c ,pages)))))
+	      (pages (bib-format-pages x)))
+	  (if (bib-null? pages)
+	      `(concat ,type " " ,c)
+	      `(concat ,type " " ,c ", " ,pages))))))
 
 (tm-define (bib-format-tr-number x)
   (:mode bib-acm?)
