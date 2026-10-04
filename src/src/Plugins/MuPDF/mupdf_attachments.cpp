@@ -36,6 +36,10 @@
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h>
 
+// With PDFHummus (PDF_RENDERER), pdf_hummus_extract_attachment.cpp defines
+// the same functions; this file only replaces it in builds without Hummus.
+#ifndef PDF_RENDERER
+
 /******************************************************************************
 * The files a document links to (as pdf_hummus_extract_attachment.cpp)
 ******************************************************************************/
@@ -405,3 +409,5 @@ get_main_tm (url pdf_path) {
     return url_none ();
   return paths[0];
 }
+
+#endif // !defined PDF_RENDERER
