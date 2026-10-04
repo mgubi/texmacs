@@ -154,7 +154,8 @@
   <paragraph|4 October 2026>
 
   <\itemize>
-    <item>A click puts the help balloon of a button away.
+    <item>A click puts the help balloon of a button away, and no balloon
+    comes while a menu is open, where it would hide the menu.
 
     <item>The arrows of the submenus, and of the other menus and lists, are
     solid triangles.

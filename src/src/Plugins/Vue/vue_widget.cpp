@@ -3105,6 +3105,12 @@ vue_ui_rep::do_layout () {
         balloon_presses= mouse_presses;
         balloon_time= texmacs_time () - 5000;
       }
+      // nor does it come while a menu is open (a menu of a bar, a submenu):
+      // it would hide the menu; its delay starts when the menus close
+      else if ((current_window != NULL &&
+                N(current_window->input.menu_zones) > 0) ||
+               N(menu_zones_now) > 0)
+        balloon_time= texmacs_time ();
       time_t elapsed= texmacs_time () - balloon_time;
       if ((elapsed > 1000) && (elapsed < 5000)) {
         // The balloon sits near the pointer and floats over the whole
