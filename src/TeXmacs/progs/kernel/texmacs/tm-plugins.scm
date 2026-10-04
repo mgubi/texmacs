@@ -388,6 +388,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public reconfigure-flag? #t)
+
+;; Other modules should use these accessors: in S7 a public variable which its
+;; module changes with set! keeps its first value in the other modules.
+(define-public (plugin-reconfigure?) reconfigure-flag?)
+(define-public (plugin-reconfigure-set! flag) (set! reconfigure-flag? flag))
+
 (define plugin-loaded-setup? #f)
 (define plugin-cache "$TEXMACS_HOME_PATH/system/cache/plugin_cache.scm")
 
@@ -617,6 +623,15 @@
   (or (in? (car cmd) '(:macpath :winpath))
       (ahash-ref plugin-data-table name)))
 
+;; plugin-configure expands into calls of these functions rather than into
+;; references to plugin-data-table, which plugin-load-setup replaces: in S7
+;; the other modules would keep seeing the first table.
+(define-public (plugin-data name)
+  (ahash-ref plugin-data-table name))
+
+(define-public (plugin-configure-start name)
+  (if reconfigure-flag? (ahash-set! plugin-data-table name #t)))
+
 (define-public (plugin-configure-cmds name cmds)
   "Helper function for plugin-configure"
   (when (and (nnull? cmds) (plugin-configure-cmd name (car cmds)))
@@ -640,9 +655,9 @@
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
        (tm-define (,supports-name?)
-         (or (ahash-ref plugin-data-table ,name)
+         (or (plugin-data ,name)
              (remote-connection-defined? ,name)))
-       (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
+       (plugin-configure-start ,name)
        (plugin-configure-cmds ,name
          ,(list 'quasiquote (map plugin-configure-sub options))))))
 

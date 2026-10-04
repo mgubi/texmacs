@@ -93,6 +93,10 @@ did not work on s7.
 | New upstream server code used SRFI-14 char-sets and `*random-state*` | `compat-s7.scm` |
 | The HTML export used `hash-map->list` and `string-prefix?`, and printed keywords | `compat-s7.scm`, `tmhtml.scm` |
 | `latex-needs?` ran a logic query for every document node | `latex-tools.scm`, `logic-rules.scm` |
+| `plugin-configure` expanded into references to `reconfigure-flag?` and `plugin-data-table`, which `tm-plugins.scm` changes with `set!`: on s7 the plugins configured outside that module saw stale values (§6.2). It now expands into calls of `plugin-data` and `plugin-configure-start`; other modules read and set the flag with `plugin-reconfigure?` and `plugin-reconfigure-set!` | `tm-plugins.scm`, `init-maxima.scm`, `plugins-test.scm` |
+| A conditional master routine (a first `tm-define` with `:require`) tested `cur-conds` when the definition ran instead of when it was expanded; on s7 the code saw the empty list, so its `former` was unbound | `tm-define.scm` |
+| `procedure-name` returned the procedure itself on s7; it now returns its name, as with Guile | `tm-define.scm` |
+| The doxygen package used Guile's `(ice-9 rdelim)` to read a file | `utils/misc/doxygen.scm` |
 
 ## 4.4 Tests
 
@@ -101,8 +105,8 @@ The regression suites are listed in `check/check-master.scm`, and
 
 | Suite | Module | Tests | What it checks |
 |---|---|---|---|
-| `regtest-compat-s7` | `kernel/boot/compat-s7-test` | 96 | The compatibility layer: lists and alists (`assoc-ref`, `assoc-set!`, `assoc-remove!`), `while`, the `symbol?`/`list?` rebindings, string functions, char-sets (including the s7 closure bug), records, `delay`/`force`, `hash`, `*random-state*`, curried `define`, `stable-sort`, `hash-map->list` |
-| `regtest-boot-s7` | `kernel/boot/boot-s7-test` | 56 | The reader (`'x` as `(quote x)`, quasiquote, multiple values, NUL in strings), the `catch` adapter, run-time macros, the module system (exports, private definitions, `use-modules`, `inherit-modules`, publication in the rootlet, `tm-define-macro`), and lookups in large environments (iteration and reused argument lets) |
+| `regtest-compat-s7` | `kernel/boot/compat-s7-test` | 91 | The compatibility layer: lists and alists (`assoc-ref`, `assoc-set!`, `assoc-remove!`), `while`, the `symbol?`/`list?` rebindings, string functions, char-sets (including the s7 closure bug), records, `delay`/`force`, `hash`, `*random-state*`, `stable-sort`, `hash-map->list` |
+| `regtest-boot-s7` | `kernel/boot/boot-s7-test` | 72 | The reader (`'x` as `(quote x)`, quasiquote, multiple values, NUL in strings), the `catch` adapter, run-time macros, the module system (exports, private definitions, `use-modules`, `inherit-modules`, publication in the rootlet, `tm-define-macro`), lookups in large environments (iteration and reused argument lets), and the local patches of s7 (long strings, closures at call sites, curried `define`, also with `define-public`) |
 | `regtest-abbrevs` | `kernel/boot/abbrevs-test` | 60 | Adaptive hash tables, programming constructs (`with`, `with-global`, `for`, …), SRFI macros (`receive`, `case-lambda`, `cut`, `and-let*`), `save-object`/`load-object` |
 | `regtest-logic` | `kernel/logic/logic-engine-test` | 21 | Unification, logic tables with run-time names, dispatchers, groups, rules and queries with free variables, `logic-rules-version` |
 | `regtest-tm-glue` | `kernel/texmacs/tm-glue-test` | 41 | C++/Scheme conversions: booleans, integers, doubles, strings with NUL, UTF-8 and escapes, string arrays, trees, urls, commands from closures, blackboxes across `gc` |
@@ -140,8 +144,11 @@ TEXMACS_HOME_PATH=<scratch dir> QT_QPA_PLATFORM=offscreen \
 - **Each expression is evaluated twice.** `regression-test-group` evaluates
   every test expression once for the "Result in" display and once for the
   comparison. Tests with side effects must be idempotent.
-- **Test modules run in module environments.** `define` there is
-  `curried-define`, and `tm-define` definitions are global, so give them
-  distinctive names.
+- **Expected values can't contain the empty symbol.** s7 refuses
+  `(string->symbol "")`, and the error would stop the whole run. Compare
+  `symbol->string` of the result instead, as the `null PI` test of
+  `xmltm-test.scm` does.
+- **Test modules run in module environments.** `tm-define` definitions are
+  global, so give them distinctive names.
 
 The C++ tests in `tests/` do not exercise Scheme.

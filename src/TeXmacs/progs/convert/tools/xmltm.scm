@@ -107,12 +107,17 @@
 				(sxml-content t))))))))
 
 (define (ns-import-attrs env attrs)
-  ((cut map <> attrs)
-   (lambda (attr)
-     ;; handles correctly the pseudo-sxml produced by enumerated html
-     ;; attributes without left hand side. (e.g. <frame noresize>)
-     (cons (string->symbol (ns-import-name env #f (first attr)))
-	   (cdr attr)))))
+  ;; an attribute without a name (as broken markup such as "a<b) x" gives)
+  ;; is left out: s7 has no empty symbol
+  (list-filter
+   ((cut map <> attrs)
+    (lambda (attr)
+      ;; handles correctly the pseudo-sxml produced by enumerated html
+      ;; attributes without left hand side. (e.g. <frame noresize>)
+      (with name (ns-import-name env #f (first attr))
+        (and (!= name "")
+             (cons (string->symbol name) (cdr attr))))))
+   identity))
 
 (define (ns-import-name env use-default? name)
   (receive (ns-id ncname) (sxml-split-name name)

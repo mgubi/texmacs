@@ -62,10 +62,20 @@ according to the build option `USE_S7` / `USE_GUILE` (see
 
 - `eval_scheme_file` → `s7_load_with_environment(tm_s7, file, user_env)`.
 - `eval_scheme` → `s7_eval_c_string_with_environment(tm_s7, s, user_env)`.
-- `call_scheme(fun, a1…)` builds an argument list and calls `s7_call`.
-- None of them sets up an error handler at the C level. An uncaught Scheme
-  error goes to s7's default handler, which prints it and returns to the top
-  level.
+- `call_scheme(fun, a1…)` builds an argument list and calls `s7_call` on
+  `catch_call`, a lambda made in `start_scheme` which applies the function
+  inside a `catch`. As in the Guile version, an error is printed (`Error:
+  …` on the standard error) and returned as `(type . info)` to the C++ code
+  which called Scheme. Without the catch, s7 jumped over the C++ frames to
+  the nearest Scheme `catch`: the error escaped from a document's `extern`,
+  and the C++ state of the frames it skipped was not restored.
+  - The function runs in the environment of `catch_call`, made in
+    `user_env`, so `(defined? 'sym)` as called by C++ (the highlighting of
+    Scheme code does it) also sees its two arguments, which have unlikely
+    names (`catch-call-fun`, `catch-call-args`).
+- `eval_scheme` and `eval_scheme_file` set up no error handler at the C
+  level. An uncaught Scheme error goes to s7's default handler, which prints
+  it and returns to the top level.
 - None of them renumbers `user_env`, which matters for lookups (see
   [02](02-boot-and-modules.md#lookup-caching)).
 

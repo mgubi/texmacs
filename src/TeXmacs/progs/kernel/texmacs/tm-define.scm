@@ -89,9 +89,15 @@
   (if (list-1? conds) (car conds) `(begin ,@conds)))
 
 (if (s7-scheme?)
-    ;; s7 procedures do not know their names; see procedure-symbol-name
+    ;; as with Guile, the name s7 knows (a named procedure prints as its
+    ;; name, others as #<...>), else the name given by tm-define
     (define-public (procedure-name fun)
-      (if (procedure? fun) fun #f))
+      (and (procedure? fun)
+           (let ((s (object->string fun)))
+             (if (and (> (string-length s) 0)
+                      (not (char=? (string-ref s 0) #\#)))
+                 (string->symbol s)
+                 (ahash-ref tm-defined-name fun)))))
     (let ((old-procedure-name procedure-name))
       (set! procedure-name
             (lambda (fun)
@@ -183,14 +189,14 @@
 (define (property-rewrite l)
   `(property-set! ,@l (list ,@cur-conds)))
 
-(define (define-property . l) (lambda (opt decl)
+(define ((define-property . l) opt decl)
   (for (which l)
     (set! cur-props (cons `(',(ca*adr decl) ,which ',opt) cur-props)))
-  decl))
+  decl)
 
-(define (define-property* which) (lambda (opt decl)
+(define ((define-property* which) opt decl)
   (set! cur-props (cons `(',(ca*adr decl) ,which (list ,@opt)) cur-props))
-  decl))
+  decl)
 
 (define (compute-arguments decl)
   (cond ((pair? (cadr decl)) (cdadr decl))
@@ -290,19 +296,22 @@
 			     (ahash-ref tm-defined-module ',var)))
            ,@(map property-rewrite cur-props))
         `(begin
-           (when (nnull? cur-conds)
-             (display* "warning: conditional master routine " ',var "\n")
-             (display* "   " ',nval "\n"))
+           ;; the conditions are tested when the definition is expanded: in
+           ;; S7, cur-conds as seen by the expanded code is not this one
+           ,@(if (nnull? cur-conds)
+                 `((display* "warning: conditional master routine " ',var "\n")
+                   (display* "   " ',nval "\n"))
+                 '())
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
            ,@(if (s7-scheme?)
                  `((varlet (rootlet) ',var
-                     (if (null? cur-conds) ,nval
-                         ,(list 'let '((former (lambda args (noop)))) nval))))
+                     ,(if (null? cur-conds) nval
+                          (list 'let '((former (lambda args (noop)))) nval))))
                  `((set! temp-module ,(current-module))
                    (set! temp-value
-                         (if (null? cur-conds) ,nval
-                             ,(list 'let '((former (lambda args (noop)))) nval)))
+                         ,(if (null? cur-conds) nval
+                              (list 'let '((former (lambda args (noop)))) nval)))
                    (set-current-module texmacs-user)
                    (define-public ,var temp-value)
                    (set-current-module temp-module)))

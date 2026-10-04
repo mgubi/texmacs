@@ -109,9 +109,9 @@
    :none :none
    (test "string-split" (string-split "a,b,c" #\,) '("a" "b" "c"))
    (test "string-split, empty fields"
-         (string-split ",a,,b," #\,) '("" "a" "b" ""))
+         (string-split ",a,,b," #\,) '("" "a" "" "b" ""))
    (test "string-split, no separator" (string-split "abc" #\,) '("abc"))
-   (test "string-split, empty string" (string-split "" #\,) '())
+   (test "string-split, empty string" (string-split "" #\,) '(""))
    (test "string-index, char" (string-index "hello" #\l) 2)
    (test "string-index, missing char" (string-index "hello" #\z) #f)
    (test "string-rindex, char" (string-rindex "hello" #\l) 3)
@@ -253,26 +253,6 @@
          #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Curried define (only available in modules)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define ((adder a) b) (+ a b))
-(define (((adder3 a) b) c) (+ a b c))
-(define ((adder* a) . l) (apply + a l))
-
-(define (regtest-compat-curried)
-  (regression-test-group
-   "compat-s7, curried define" "curried"
-   :none :none
-   (test "one level" ((adder 1) 2) 3)
-   (test "two levels" (((adder3 1) 2) 3) 6)
-   (test "rest arguments" ((adder* 1) 2 3 4) 10)
-   (test "plain define still works" (let () (define x 5) x) 5)
-   (test "internal curried define"
-         (let () (define ((mul a) b) (* a b)) ((mul 6) 7))
-         42)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -281,7 +261,6 @@
               (regtest-compat-misc)
               (regtest-compat-strings)
               (regtest-compat-char-sets)
-              (regtest-compat-data)
-              (regtest-compat-curried))))
+              (regtest-compat-data))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of compat-s7: ok\n")))

@@ -13,15 +13,17 @@ first module inherited at boot (see §2.1). In addition:
 | SRFI-1 / Guile list functions | `filter` (only if missing), `delq` (non-destructive), `acons`, `last-pair`, `list-copy` (via generic `copy`), `copy-tree`, `map-in-order` (= `map`), `append!` (= non-destructive `append`) | |
 | Association lists | `assoc-ref`, `assoc-set!` | `assoc-set!` is defined twice (identical copies) and returns the new list. Guile's version mutates in place, so callers must use the return value. |
 | Arithmetic and misc | `1+`, `1-` (as macros), `noop`, `symbol-append`, `seed->random-state`, `*random-state*`, `force-output`, `iota` (single-argument form only) | `*random-state*` lives in the rootlet. Its setter reseeds `(*s7* 'default-random-state)`. |
-| Strings | `string-null?`, `string-split` (char separator), `string-index` / `string-rindex` (char, char-set or predicate, no start/end) | |
+| Strings | `string-null?`, `string-split` (char separator), `string-index` / `string-rindex` (char, char-set or predicate, optional start and end) | |
 | Char-sets (SRFI-14 subset) | `char-set`, `string->char-set`, `char-set-adjoin`, `char-set-complement`, `char-set-intersection`, `char-set-union`, `char-set-contains?`, `char-set-size`, `char-set:whitespace`, `char-set:lower-case`, `char-set:upper-case`, `char-set:digit` | Char-sets are hash tables mapping characters to `#t`. They are applicable, so `(cs ch)` tests membership. Predicates are accepted wherever a char-set is expected. Closures are avoided because of an s7 optimizer bug (see [06](06-open-issues.md)). |
 | Sorting | `(sort l op)` = `(sort! (copy l) op)` | s7's `sort!` is destructive. |
 | Errors | `lazy-catch` = `catch` | Guile's `lazy-catch` runs the handler before unwinding; here it unwinds first. |
+| Debugging | `debug-options` (the empty list), `debug-enable`, `debug-disable` (do nothing) | Used by the "Backtrace errors" item of the debug menu, which stays unchecked. |
+| Procedures | `module-ref`, `closure?`, `procedure-property` (`arity` only), `procedure-documentation` (`#f` without documentation) | |
 | Records | `make-record-type`, `record-constructor`, `record-accessor` (a macro), `record-predicate` | Records are `inlet`s with a `'type` slot. The constructor is built with `eval`. |
 | Promises | `make-promise`, `delay`, `delay-force`, `force` | Taken from s7's `r7rs.scm`. |
 | Hashing | `(hash obj [bound])` | `(modulo (hash-code obj) bound)` |
 | Loops | `while` | Uses `call-with-exit`. `break` and `continue` are bound inside the body. |
-| `define` | `curried-define` | Installed as `define` **only** in `*texmacs-user-module*`, so module files (whose parent is that environment) can use `(define ((f a) b) …)`. Code evaluated in the rootlet cannot. Rebinding `define` in the rootlet itself aborts s7's `load`. |
+| `define` | none | Guile's curried definitions, `(define ((f a) b) …)`, are handled by s7's own `define`: the vendored s7 is patched for them (patch 0003, see [05](05-build-and-vendored-s7.md#s7-version-and-local-patch)). An earlier version rebound `define` in the user module to a run-time macro, which made s7 crash (patch 0002) and re-expanded every internal definition at each call. |
 
 The file ends with a "TODO/FIXME" about redefining `error` to match Guile's
 calling convention. That has not been done.
@@ -50,14 +52,13 @@ vendored s7 11.9.
   defines helper functions can lose them between recursive calls of those
   helpers. Seen with `case-lambda` used inside a function body with two or
   more clauses: `unbound variable alength`.
-  - In standalone s7 it reproduces only when the internal `define` is
-    TeXmacs's `curried-define` macro.
+  - In standalone s7 it reproduces only when the internal `define` is a
+    run-time macro, as TeXmacs's `define` once was.
   - Inside TeXmacs it also happened with the builtin `#_define`.
   - The helpers of `case-lambda` are now module-level functions.
   - The other macros with internal definitions (`and-let*`,
     `regression-test-group`, `trace-variables`, `kbd-symbols`,
-    `texmacs-module`) use the builtin `#_define`, so they do not go through
-    `curried-define`.
+    `texmacs-module`) use the builtin `#_define`.
 - **Multiple values splice** ✓. `(+ 1 (values 2 3))` is `6`. An empty
   `(values)` used as an argument is `#<unspecified>`, but `map` drops such
   results: `(map (lambda (x) (if (odd? x) x (values))) '(1 2 3))` is

@@ -154,6 +154,12 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>Fixes in the Scheme interpreter: a crash which could happen the
+    second time some functions ran (for instance when editing graphics), an
+    error in a document no longer escapes from the typesetting, long runs of
+    one character in a document are saved and cached correctly, and plug-ins
+    keep all their settings when <TeXmacs> starts from its plug-in cache.
+
     <item>In a JavaScript session, <verbatim|TeXmacs.show> shows <TeXmacs>
     content at once, while asynchronous code runs; executable folds show
     their output as it comes, as sessions do, with every plug-in.

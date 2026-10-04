@@ -18,13 +18,8 @@
     (define-public (filter pred? l)
       (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l))))
 
-;; curried define
-(define base-define define)
-(define-public-macro (curried-define head . body)
-    (if (pair? head)
-      `(,curried-define ,(car head) (lambda ,(cdr head) ,@body))
-      `(,base-define ,head ,@body)))
-(varlet *texmacs-user-module* 'define curried-define)
+;; Guile's curried define, (define ((f a) b) ...), is s7's own define: the
+;; vendored s7 is patched for it (src/Scheme/S7/patches/0003-curried-define).
 
 
 ;(define primitive-string->symbol string->symbol)
@@ -100,6 +95,29 @@
                  (else (loop (cdr prev))))))))
 
 (define-public (sort l op) (sort! (copy l) op))
+;; Guile's module-ref: a TeXmacs module is an s7 environment, in which the
+;; module's own bindings are looked up (used by tests which call functions a
+;; module does not export)
+(define-public (module-ref module sym) (let-ref module sym))
+;; Guile's closure?: a procedure written in Scheme, which s7 recognizes by
+;; its source (the source of a C function is the empty list)
+(define-public (closure? f) (and (procedure? f) (pair? (procedure-source f))))
+;; Guile's procedure-documentation: #f for a procedure without documentation
+(define-public (procedure-documentation f)
+  (let ((d (documentation f)))
+    (and (string? d) (not (string-null? d)) d)))
+;; Guile's debug options: s7 has no backtrace option to toggle (the debug
+;; menu shows the option as off)
+(define-public (debug-options . args) '())
+(define-public (debug-enable . opts) (noop))
+(define-public (debug-disable . opts) (noop))
+;; Guile's procedure-property, for the arity only: a list of the required
+;; and the optional arguments and whether there is a rest argument (s7's
+;; arity is a pair of the minimum and the maximum, very large with a rest)
+(define-public (procedure-property f key)
+  (and (== key 'arity) (procedure? f)
+       (let* ((a (arity f)) (rest? (>= (cdr a) 536870912)))
+         (list (car a) (if rest? 0 (- (cdr a) (car a))) rest?))))
 
 ;; SRFI-13 string functions which Guile provides and s7 does not
 ;; (character arguments may be a char, a predicate or a char-set)
@@ -168,23 +186,14 @@
 (define-public (append! . ls) (apply append ls))
 
 (define-public (string-split str ch)
+  ;; as Guile's: the pieces between the occurrences of ch, so that there is
+  ;; always one more piece than occurrences ("" gives (""), "a," ("a" ""))
   (let ((len (string-length str)))
-    (letrec
-      ((split
-        (lambda (a b)
-          (cond
-            ((>= b len) (if (= a b) '() (cons (substring str a b) '())))
-            ((char=? ch (string-ref str b))
-             (cond
-               ((!= a b)
-                (cons (substring str a b) (split b b)))
-               ((and (= a b) (or (= b 0) (= b (- len 1))))
-                (cons "" (split (+ 1 b) (+ 1 b))))
-               (else
-                (split (+ 1 b) (+ 1 b)))))
-            (else
-             (split a (+ 1 b)))))))
-      (split 0 0))))
+    (let loop ((i (- len 1)) (end len) (acc '()))
+      (cond ((< i 0) (cons (substring str 0 end) acc))
+            ((char=? (string-ref str i) ch)
+             (loop (- i 1) i (cons (substring str (+ i 1) end) acc)))
+            (else (loop (- i 1) end acc))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;guile-style records
@@ -329,20 +338,26 @@
 (define-public char-set:upper-case (char-set-from-predicate char-upper-case?))
 (define-public char-set:digit (char-set-from-predicate char-numeric?))
 
-; string-index and string-rindex accepts char-sets
+; string-index and string-rindex accept a character, a char-set or a
+; predicate, and, as in Guile (SRFI-13), an optional start and end
 
-(define-public (string-index str cs)
- (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs)))
-  (define len (string-length str))
-  (do ((pos 0 (+ 1 pos)))
-      ((or (>= pos len) (chr (string-ref str pos)))
-       (and (< pos len) pos)))))
+(define-public (string-index str cs . range)
+ (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs))
+       (start (if (pair? range) (car range) 0))
+       (end (if (and (pair? range) (pair? (cdr range))) (cadr range)
+                (string-length str))))
+  (do ((pos start (+ 1 pos)))
+      ((or (>= pos end) (chr (string-ref str pos)))
+       (and (< pos end) pos)))))
 
-(define-public (string-rindex str cs)
- (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs)))
-  (do ((pos (+ -1 (string-length str)) (+ -1 pos)))
-      ((or (negative? pos) (chr (string-ref str pos)))
-       (and (not (negative? pos)) pos)))))
+(define-public (string-rindex str cs . range)
+ (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs))
+       (start (if (pair? range) (car range) 0))
+       (end (if (and (pair? range) (pair? (cdr range))) (cadr range)
+                (string-length str))))
+  (do ((pos (+ -1 end) (+ -1 pos)))
+      ((or (< pos start) (chr (string-ref str pos)))
+       (and (>= pos start) pos)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

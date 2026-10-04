@@ -82,8 +82,13 @@
         (output-text " " (symbol->string (car x)) "=")
         (output-verbatim "\"" (cadr x) "\""))))
 
+(define (htmlout-attr<=? a1 a2)
+  (string<=? (symbol->string (car a1)) (symbol->string (car a2))))
+
 (define (htmlout-open-tags s l)
-  (with ll (ahash-table->list (list->ahash-table l))
+  ;; the attributes, the last value of a repeated one, sorted by name: the
+  ;; order of a hash table would depend on the interpreter
+  (with ll (sort (ahash-table->list (list->ahash-table l)) htmlout-attr<=?)
     (htmlout-text "<" (symbol->string s))
     (for-each htmlout-tag ll)
     (htmlout-text ">")
