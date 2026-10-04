@@ -70,6 +70,7 @@ var tmClipboard = (function () {
   }
 
   var WAIT = 60; // ms for the paste of a key into the text area
+  var DIALOG_OFF = 'tm-copy-dialog-off'; // the copy dialog turned off (localStorage)
 
   // the write of a copy key, waiting for the text of TeXmacs's copy
   var copying = null;
@@ -394,24 +395,118 @@ var tmClipboard = (function () {
                           .replace (/>/g, '&gt;') + '</pre>';
   }
 
+  // a message in the status bar of TeXmacs
+  function message (msg) {
+    if (typeof _vue_web_scheme === 'undefined') return;
+    var cmd = '(set-message ' + JSON.stringify (msg) + ' "Copy")';
+    withStackSave (function () { _vue_web_scheme (stringToUTF8OnStack (cmd)); });
+  }
+
+  // the dialog of a copy which did not reach the system, unless the user
+  // turned it off (the choice kept by the browser, DIALOG_OFF)
+  function dialogOff () {
+    try { return localStorage.getItem (DIALOG_OFF) === '1'; } catch (e) { return false; }
+  }
+
   // a copy which did not reach the system (Safari, after a menu: the browser
   // gives its clipboard only to the handler of a key or a click, and the
   // menus of TeXmacs run their commands later): TeXmacs has it, the other
-  // programs have not; the status bar says so, and how to copy for them
-  function notReached (e) {
+  // programs have not. A dialog of the page offers to give it to them: its
+  // button is a click of the user, in whose handler the browser lets the
+  // page write, in any format of Copy to (with its HTML). Without it, the
+  // status bar says how to copy for them.
+  function notReached (plain, html, e) {
     console.warn ('TeXmacs: cannot copy to the clipboard: ' + e);
+    if (typeof tmFrame !== 'undefined' && !dialogOff ()) { toSystem (plain, html); return; }
     if (typeof _vue_web_scheme === 'undefined') return;
     var key = mac ? 'Cmd+C' : 'Ctrl+C';
-    var msg = 'Copied in TeXmacs only: ' + key + ' copies for other programs too';
-    var cmd = '(set-message ' + JSON.stringify (msg) + ' "Copy")';
-    withStackSave (function () { _vue_web_scheme (stringToUTF8OnStack (cmd)); });
+    message ('Copied in TeXmacs only: ' + key + ' copies for other programs too');
+  }
+
+  // the text of a copy for the other programs, in a dialog of the page
+  function toSystem (plain, html) {
+    var c = navigator.clipboard;
+    var enter = null, before = document.activeElement;
+    tmFrame.dialog ('Copy for other programs', function (box, close) {
+      function p (cls, t) {
+        var e = document.createElement ('p');
+        if (cls) e.className = cls;
+        e.textContent = t;
+        box.appendChild (e);
+        return e;
+      }
+      p (null, 'TeXmacs has the copy; this browser gives its clipboard to other programs ' +
+               'only from a key (' + (mac ? '\u2318C' : 'Ctrl+C') + ') or a button, not from a menu.');
+      var view = document.createElement ('pre');
+      view.style.cssText = 'max-height:12em;overflow:auto;white-space:pre-wrap;word-break:break-word;' +
+                           'margin:8px 0;padding:6px 8px;border:1px solid #ccc;border-radius:4px;' +
+                           'background:#fafafa;font:12px Menlo,Monaco,monospace';
+      var shown = plain.length > 4000 ? plain.slice (0, 4000) + '\n...' : plain;
+      view.textContent = shown;
+      box.appendChild (view);
+      var note = p ('tm-note', html ? 'With its HTML, for the programs which take it.' : '');
+      var row = document.createElement ('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px';
+      var off = document.createElement ('input');
+      off.type = 'checkbox';
+      off.style.cssText = 'width:auto;flex:none;margin:0'; // not the text inputs of the dialogs
+      row.appendChild (off);
+      row.appendChild (document.createTextNode ('Do not show this again (copy in TeXmacs only)'));
+      box.appendChild (row);
+      function remember () {
+        if (!off.checked) return;
+        try { localStorage.setItem (DIALOG_OFF, '1'); } catch (e) {}
+      }
+      // in the handler of the click (or of Enter), not after it
+      function copy () {
+        var job;
+        try {
+          if (html && c.write && typeof ClipboardItem !== 'undefined')
+            job = c.write ([new ClipboardItem ({
+              'text/plain': new Blob ([plain], { type: 'text/plain' }),
+              'text/html': new Blob ([html], { type: 'text/html' }) })]);
+          else job = c.writeText (plain);
+        } catch (e) { job = Promise.reject (e); }
+        job.then (function () {
+          remember ();
+          close ();
+          message ('Copied for other programs too');
+        }, function (e) {
+          note.textContent = 'The browser did not take it: ' + (e && e.message ? e.message : e);
+        });
+      }
+      enter = function (e) {
+        if (e.key === 'Enter' && e.type === 'keydown' && e.target !== no && e.target !== off) {
+          e.preventDefault ();
+          copy ();
+        }
+      };
+      window.addEventListener ('keydown', enter, true);
+      var bar = document.createElement ('div');
+      bar.className = 'tm-buttons';
+      var no = document.createElement ('button');
+      no.className = 'tm-button';
+      no.textContent = 'Not now';
+      no.onclick = function () { remember (); close (); };
+      var yes = document.createElement ('button');
+      yes.className = 'tm-button tm-default';
+      yes.textContent = 'Copy';
+      yes.onclick = copy;
+      bar.appendChild (no);
+      bar.appendChild (yes);
+      box.appendChild (bar);
+      setTimeout (function () { yes.focus ({ preventScroll: true }); }, 0);
+    }, function () {
+      if (enter) window.removeEventListener ('keydown', enter, true);
+      if (before && before.focus) before.focus ({ preventScroll: true });
+    });
   }
 
   // the write of a copy after the key or the menu (Firefox, Chrome accept
   // it), its HTML too when it has one
   function writeLate (plain, html) {
     var done = function () {};
-    var failed = notReached;
+    var failed = function (e) { notReached (plain, html, e); };
     try {
       if (html && navigator.clipboard.write && typeof ClipboardItem !== 'undefined')
         navigator.clipboard.write ([new ClipboardItem ({
