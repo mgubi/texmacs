@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "locale.hpp"
+#include <time.h>
 
 #ifndef OS_MINGW
 #include <langinfo.h>
@@ -299,15 +300,90 @@ simplify_date (string s) {
   return r;
 }
 
+static string
+system_date (string lan, string fm) {
+  // the output of the date command for the format fm, in the language lan
+  lan= language_to_locale (lan);
+  string lvar= "LC_TIME";
+  if (get_env (lvar) == "") lvar= "LC_ALL";
+  if (get_env (lvar) == "") lvar= "LANG";
+  string old= get_env (lvar);
+  set_env (lvar, lan);
+  string date= var_eval_system ("date +\"" * fm * "\"");
+  if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
+    date= il2_to_cork (date);
+  // if (lan == "ru_RU") date= iso_to_koi8 (date);
+  set_env (lvar, old);
+  return date;
+}
+
+static string
+two_digits (int n) {
+  return (n < 10? string ("0"): string ("")) * as_string (n);
+}
+
+static string
+pattern_date (string lan, string fm) {
+  // the current date in the format fm, with the patterns of Qt (which
+  // the Qt version of get_date uses): d dd ddd dddd for the day, M MM MMM
+  // MMMM for the month, yy yyyy for the year, and 'text' quoted. The names
+  // of the months and days come from date, in the language lan; the format
+  // itself is never passed to the shell.
+  time_t ti;
+  time (&ti);
+  struct tm now= *localtime (&ti);
+  string r;
+  int i= 0, n= N(fm);
+  while (i < n) {
+    char c= fm[i];
+    if (c == '\'') {
+      // quoted text; two quotes are a quote, inside quoted text too
+      i++;
+      if (i < n && fm[i] == '\'') { r << '\''; i++; continue; }
+      while (i < n) {
+        if (fm[i] != '\'') r << fm[i++];
+        else if (i+1 < n && fm[i+1] == '\'') { r << '\''; i += 2; }
+        else break;
+      }
+      if (i < n) i++;
+      continue;
+    }
+    int k= i;
+    while (k < n && fm[k] == c) k++;
+    int count= k - i;
+    if (c == 'd') {
+      if (count == 1) r << as_string (now.tm_mday);
+      else if (count == 2) r << two_digits (now.tm_mday);
+      else if (count == 3) r << system_date (lan, "%a");
+      else r << system_date (lan, "%A");
+    }
+    else if (c == 'M') {
+      if (count == 1) r << as_string (now.tm_mon + 1);
+      else if (count == 2) r << two_digits (now.tm_mon + 1);
+      else if (count == 3) r << system_date (lan, "%b");
+      else r << system_date (lan, "%B");
+    }
+    else if (c == 'y' && count == 2) r << two_digits ((now.tm_year + 1900) % 100);
+    else if (c == 'y' && count == 4) r << as_string (now.tm_year + 1900);
+    else r << fm (i, k);
+    i= k;
+  }
+  return r;
+}
+
 string
 get_date (string lan, string fm) {
 //#ifdef OS_MINGW
 //  return win32::get_date(lan, fm);
-  if (invalid_format (fm)) {
+  // as the Qt version: a strftime format if fm starts with %, the default
+  // of the language if fm is empty, and Qt patterns otherwise
+  if (N(fm) > 0 && fm[0] == '%' && !invalid_format (fm))
+    return system_date (lan, fm);
+  if (N(fm) == 0 || fm[0] == '%') {
     if ((lan == "british") || (lan == "english") || (lan == "american"))
-      fm= "%B %d, %Y";
+      fm= "MMMM d, yyyy";
     else if (lan == "german")
-      fm= "%d. %B %Y";
+      fm= "d. MMMM yyyy";
     else if (lan == "chinese" || lan == "japanese" ||
 	     lan == "korean" || lan == "taiwanese")
       {
@@ -318,20 +394,9 @@ get_date (string lan, string fm) {
           return y * "<#b144> " * m * "<#c6d4> " * d * "<#c77c>";
 	      return y * "<#5e74>" * m * "<#6708>" * d * "<#65e5>";
       }
-    else fm= "%d %B %Y";
+    else fm= "d MMMM yyyy";
   }
-  lan= language_to_locale (lan);
-  string lvar= "LC_TIME";
-  if (get_env (lvar) == "") lvar= "LC_ALL";
-  if (get_env (lvar) == "") lvar= "LANG";
-  string old= get_env (lvar);
-  set_env (lvar, lan);
-  string date= simplify_date (var_eval_system ("date +\"" * fm * "\""));
-  if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
-    date= il2_to_cork (date);
-  // if (lan == "ru_RU") date= iso_to_koi8 (date);
-  set_env (lvar, old);
-  return date;
+  return pattern_date (lan, fm);
 }
 
 string
