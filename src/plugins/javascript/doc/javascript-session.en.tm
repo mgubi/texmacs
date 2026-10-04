@@ -113,6 +113,13 @@
     plug-ins: <verbatim|"scheme"> (a <TeXmacs> tree), <verbatim|"html">,
     <verbatim|"latex">...
 
+    <item*|<verbatim|TeXmacs.show (format, data)>>shows <TeXmacs> content
+    at once in the output of the input which runs, before its value: code
+    which waits (<verbatim|await>) shows what it makes as it goes, as
+    <verbatim|console.log> does for text. <verbatim|TeXmacs.show (value)>
+    shows a value (a string as text). Its value is <verbatim|false>, and
+    nothing is shown, when no input runs.
+
     <item*|<verbatim|TeXmacs.module>>the program of <TeXmacs>, as
     <name|Emscripten> made it.
   </description>
@@ -255,6 +262,26 @@
     TeXmacs.output ("scheme", '(tabular (table ' + langs.map (l =\<gtr\>
 
     \ \ '(row (cell "' + l + '") (cell "' + new Date ().toLocaleDateString (l, {weekday: "long", year: "numeric", month: "long", day: "numeric"}) + '"))').join (" ") + '))')
+  <|script-input>
+    
+  </script-input>
+
+  Content of <TeXmacs> shown as it is computed (<verbatim|TeXmacs.show>), here the partial sums of a series:
+
+  <\script-input|javascript|default>
+    var s = 0;
+
+    for (var n = 1; n \<less\>= 6; n++) {
+
+    \ \ s += 1 / (n * n);
+
+    \ \ TeXmacs.show ("latex", "$\\\\sum_{k=1}^{" + n + "} \\\\frac{1}{k^2} = " + s.toFixed (6) + "$");
+
+    \ \ await new Promise (ok =\<gtr\> setTimeout (ok, 600));
+
+    }
+
+    return "the limit is pi^2/6 = " + (Math.PI * Math.PI / 6).toFixed (6);
   <|script-input>
     
   </script-input>

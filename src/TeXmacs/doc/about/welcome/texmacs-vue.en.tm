@@ -154,6 +154,10 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>In a JavaScript session, <verbatim|TeXmacs.show> shows <TeXmacs>
+    content at once, while asynchronous code runs; executable folds show
+    their output as it comes, as sessions do, with every plug-in.
+
     <item>More examples in the help of the Asymptote, TikZ and JavaScript
     plug-ins, and a link to it at the start of their sessions.
 

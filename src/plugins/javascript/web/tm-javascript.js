@@ -12,7 +12,10 @@
 // function declarations stay for the next inputs (let and const only within
 // one input). A promise is waited for; code with await is run as the body of
 // an async function, whose value is the one it returns. What console.log
-// and the others write meanwhile is shown in the session too.
+// and the others write meanwhile is shown in the session too, and so is
+// what TeXmacs.show gives (misc/wasm/javascript.js): each piece of output is
+// a block of the protocol, which TeXmacs puts in the session as soon as it
+// comes, before the prompt which ends the answer.
 
 var B = '\x02', E = '\x05';
 var PROMPT = B + 'prompt#js] ' + E;
@@ -128,6 +131,12 @@ var METHODS = ['log', 'info', 'debug', 'warn', 'error'];
 
 function capture (gen) {
   var saved = {};
+  // TeXmacs.show: a string as text, the other values as answers are
+  var sink = function (v) {
+    if (gen !== generation) return;
+    out (typeof v === 'string' ? text (v) : answer (v));
+  };
+  if (typeof TeXmacs !== 'undefined') TeXmacs.showSink = sink;
   METHODS.forEach (function (m) {
     saved[m] = console[m];
     console[m] = function () {
@@ -136,11 +145,17 @@ function capture (gen) {
       var line = Array.prototype.map.call (arguments, function (a) {
         return typeof a === 'string' ? a : describe (a, 0, []);
       }).join (' ');
+      // what the page itself writes meanwhile (packages.js: a file loaded on
+      // demand...) is not the output of the input
+      if (/^TeXmacs[:\]]/.test (line)) return;
       if (m === 'warn' || m === 'error') tm.post ({ err: text (line + '\n') });
       else out (text (line + '\n'));
     };
   });
-  return function () { METHODS.forEach (function (m) { console[m] = saved[m]; }); };
+  return function () {
+    METHODS.forEach (function (m) { console[m] = saved[m]; });
+    if (typeof TeXmacs !== 'undefined' && TeXmacs.showSink === sink) TeXmacs.showSink = null;
+  };
 }
 
 /******************************************************************************
@@ -203,7 +218,8 @@ function banner () {
           s (' declarations stay for the next inputs, '), tt ('let'), s (' and '), tt ('const'),
           s (' do not. A promise is waited for; with '), tt ('await'), s (', the value is the one of '),
           tt ('return'), s ('.')),
-    line (tt ('TeXmacs.output ("scheme", "(strong \\"hi\\")")'), s (' shows TeXmacs content ("html" and "latex" too).')),
+    line (tt ('TeXmacs.output ("scheme", "(strong \\"hi\\")")'), s (' is a value shown as TeXmacs content ("html" and "latex" too); '),
+          tt ('TeXmacs.show (...)'), s (' shows it at once, while the input runs.')),
     line (s ('JavaScript run at each start: Developer > Open my-init-javascript.js (with Tools > Developer tool).')),
     line ('(hlink ' + s ('Examples and help') + ' ' + s (HELP_URL) + ')', s (' (Help > Plug-ins > JavaScript)')),
     line (s (where))

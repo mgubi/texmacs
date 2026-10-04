@@ -259,6 +259,15 @@
   (when (and (tm-func? t 'document) (tm-func? u 'document))
     (tree-insert! t (tree-arity t) (var-tree-children u))))
 
+;; A silent evaluation gives its output when it is over. When its options
+;; hold a procedure, it is called with the output and the errors so far each
+;; time some come, before the end: a plug-in which writes its output as it
+;; goes (a long computation, asynchronous code) is seen doing so.
+(define (silent-progress opts)
+  (cond ((null? opts) #f)
+        ((procedure? (car opts)) (car opts))
+        (else (silent-progress (cdr opts)))))
+
 (define (silent-notify lan ses ch t)
   ;;(display* "Silent notify " lan ", " ses ", " ch ", " t "\n")
   (with l (pending-ref lan ses)
@@ -266,7 +275,10 @@
       (cond ((== ch "output")
              (silent-output out t))
             ((== ch "error")
-             (silent-output err t))))))
+             (silent-output err t)))
+      (with progress (silent-progress opts)
+        (when (and progress (in? ch '("output" "error")))
+          (progress (tm->stree out) (tm->stree err)))))))
 
 (define (silent-cancel lan ses dead?)
   ;;(display* "Silent cancel " lan ", " ses ", " dead? "\n")

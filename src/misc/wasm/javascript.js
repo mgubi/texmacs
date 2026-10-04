@@ -14,6 +14,12 @@
 //                                    a value which the JavaScript session
 //                                    shows as TeXmacs content, in a format
 //                                    of the plugins (scheme, html, latex...)
+//   TeXmacs.show ("latex", "$x^2$") or TeXmacs.show (value)
+//                                    shown at once in the output of the
+//                                    input of the JavaScript session which
+//                                    runs (asynchronous code shows what it
+//                                    makes as it goes); false, and nothing
+//                                    shown, when no input runs
 //   TeXmacs.module                   the Module of Emscripten
 //
 // TeXmacs.scheme may not be used while TeXmacs itself runs (from code that
@@ -35,6 +41,14 @@ var TeXmacs = (function () {
     output: function (format, data) {
       return { texmacsOutput: String (format), data: String (data) };
     },
+    show: function (format, data) {
+      var v = arguments.length > 1 ? TeXmacs.output (format, data) : format;
+      if (!TeXmacs.showSink) return false;
+      TeXmacs.showSink (v);
+      return true;
+    },
+    // set by the JavaScript session while one of its inputs runs
+    showSink: null,
     module: Module
   };
 })();
