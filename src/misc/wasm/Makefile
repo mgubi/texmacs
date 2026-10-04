@@ -52,9 +52,12 @@ OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
 
-# the GPU renderer of the Vue port (src/Plugins/Vue/vue_gpu.cpp, asked for
-# with ?gpu=1): THORVG=<prefix> where misc/thorvg/build-thorvg.sh <dir>
-# wasm installed ThorVG (<dir>/wasm)
+# the GPU renderer of the Vue port (src/Plugins/Vue/vue_gpu.cpp), which the
+# page uses unless ?gpu=0: THORVG=<prefix> where misc/thorvg/build-thorvg.sh
+# <dir> wasm installed ThorVG (<dir>/wasm); by default the one built in the
+# build directory (sh misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm),
+# and none (MuPDF only) when there is none
+THORVG   ?= $(wildcard $(CURDIR)/thorvg/wasm)
 ifneq ($(THORVG),)
 CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1
 endif

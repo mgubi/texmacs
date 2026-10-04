@@ -59,8 +59,18 @@ Module['preRun'].push(function () {
   // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
   var prof = /^\d+$/.exec (tmAddress.get ('profile') || '');
   if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[0];
-  // texmacs.html?gpu=1: drawn by WebGL2 (vue_gpu.cpp), in a build with ThorVG
-  if (tmAddress.get ('gpu') === '1') ENV['TEXMACS_VUE_GPU'] = '1';
+  // drawn by WebGL2 (vue_gpu.cpp) in a build with ThorVG, unless the
+  // address says texmacs.html?gpu=0 or the browser has no WebGL2 (the window
+  // of SDL would then have no surface for MuPDF to draw on)
+  if (tmAddress.get ('gpu') !== '0') {
+    var webgl2 = false;
+    try {
+      var probe = document.createElement ('canvas');
+      webgl2 = !!(probe.getContext && probe.getContext ('webgl2'));
+    } catch (e) {}
+    if (webgl2) ENV['TEXMACS_VUE_GPU'] = '1';
+    else console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
+  }
   // ?slug=1: the glyphs drawn from their outlines (vue_gpu.cpp, Slug)
   if (tmAddress.get ('slug') === '1') ENV['TEXMACS_VUE_SLUG'] = '1';
   // ?gpusync=1: the profile waits for the GPU (vue_gpu.cpp, gpu_finish)
