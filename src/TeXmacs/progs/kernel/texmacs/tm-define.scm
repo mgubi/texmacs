@@ -238,47 +238,54 @@
             ,(begin* body)
             ,(apply* 'former head)))))
 
+;; The work of a tm-define is done by tm-define-install, so that the code
+;; produced by the macro stays small: it is expanded and evaluated for each
+;; of the thousands of tm-defines which are run at start-up.
+
+(define-public (tm-define-install var src conds make)
+  ;; make the master variable exist in texmacs-user and export it
+  (when (not (module-local-variable texmacs-user var))
+    (module-define! texmacs-user var (lambda args #f))
+    (module-export! texmacs-user (list var))
+    (cond-expand
+      (guile-2
+       (set-procedure-property! (module-ref texmacs-user var #f) 'name var)
+       (hash-clear! (module-import-obarray (current-module))))
+      (else #t)))
+  ;; a name declared by lazy-define counts as defined (by its stub), so
+  ;; that its module is only loaded when the routine is called
+  (when (and (not (ahash-ref tm-defined-table var))
+             (not (ahash-ref lazy-define-table var)))
+    (when (nnull? conds)
+      (display* "warning: conditional master routine " var "\n")
+      (display* "   " src "\n"))
+    (ahash-set! tm-defined-table var '())
+    (ahash-set! tm-defined-module var '()))
+  (ahash-set! tm-defined-table var
+              (cons src (or (ahash-ref tm-defined-table var) '())))
+  (ahash-set! tm-defined-module var
+              (cons (module-name (current-module))
+                    (or (ahash-ref tm-defined-module var) '())))
+  (let ((p (make (module-ref texmacs-user var))))
+    (module-set! texmacs-user var p)
+    ;; the name of the new procedure, for procedure-name
+    (ahash-set! tm-defined-name p var)
+    (cond-expand
+      (guile-2
+       ;; module-set! does not set the name property, which is used to
+       ;; fetch the properties of the routine
+       (when (procedure? p)
+         (set-procedure-property! p 'name var)
+         (set-procedure-property! p 'tm-source src)))
+      (else #t))))
+
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
-         (nval (make-lambda head nbody))
-         (s `(begin
-             (eval-when (load eval)
-                  (when (not (module-local-variable texmacs-user ',var))
-                    (module-define! texmacs-user ',var (lambda args #f))
-                    (module-export! texmacs-user '(,var))
-                    (cond-expand (guile-2
-                        (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
-                        (hash-clear! (module-import-obarray (current-module)))) (else #t))))
-             (let ((first? (and (not (ahash-ref tm-defined-table ',var))
-                           (begin (lazy-define-force ',var) (and (not (ahash-ref tm-defined-table ',var)))))))
-              (if first?
-                 (begin
-                   (when (nnull? ',cur-conds)
-                     (display* "warning: conditional master routine " ',var "\n")
-                     (display* "   " ',nval "\n"))
-                  (ahash-set! tm-defined-table ',var '())
-                  (ahash-set! tm-defined-module ',var '())))
-               (ahash-set! tm-defined-table ',var
-                       (cons ',nval (ahash-ref tm-defined-table ',var)))
-               (ahash-set! tm-defined-module ',var
-                       (cons (module-name (current-module))
-                           (ahash-ref tm-defined-module ',var)))
-               (let ((former ,var))
-                     (module-set! texmacs-user ',var ,nval))
-               ;; the name of the new procedure, for procedure-name
-               (ahash-set! tm-defined-name (module-ref texmacs-user ',var) ',var)
-               (cond-expand (guile-2
-               ;; Tricky: module-set! do not set up the procedure name property
-               ;; we have to do it ourselves.
-               ;; We rely on the name to fetch properties
-               (if (procedure? (module-ref texmacs-user ',var #f))
-                   (begin
-                      (set-procedure-property! (module-ref texmacs-user ',var #f) 'name ',var)
-                      (set-procedure-property! (module-ref texmacs-user ',var #f) 'tm-source ',nval)))) (else #t))
-            ,@(map property-rewrite cur-props)))))
-        ;(display s) (newline)
-         s))
+         (nval (make-lambda head nbody)))
+    `(begin
+       (tm-define-install ',var ',nval ',cur-conds (lambda (former) ,nval))
+       ,@(map property-rewrite cur-props))))
 
 (define-public (tm-define-sub head body)
   (if (and (pair? (car body)) (keyword? (caar body)))

@@ -130,9 +130,21 @@ mupad-input: context-dependent predicates) fail the same way with 1.8.
 Typesetting `doc/main/start/man-conventions.en.tm` to PDF gives the same
 pixels with Guile 3 and Guile 1.8 (same configure).
 
-Start-up, `texmacs.bin -headless -x '(quit-TeXmacs)'`, warm, macOS arm64:
-Guile 1.8 wip_fixes 1.6-1.7 s; this branch on Guile 1.8 2.0-2.2 s;
-Guile 3 interpreted 1.85-1.95 s.
+Start-up, `texmacs.bin -headless -x '(quit-TeXmacs)'`, warm, macOS arm64,
+median of 5-6 runs: Guile 1.8 wip_fixes 1.49 s; this branch on Guile 1.8
+1.46 s; Guile 3 interpreted about 2.0 s (noisy, 1.6-2.8 s).
+
+The branch was first 0.45 s slower on Guile 1.8 than wip_fixes. Bisecting
+the Scheme files (the C++ difference costs nothing) showed it came from
+`tm-define-overloaded`: each `tm-define` expanded to a large block
+(`eval-when`, `cond-expand`, module operations) that was expanded and
+interpreted for every one of the thousands of tm-defines run at start-up.
+The work is now done by the procedure `tm-define-install`, and the macro
+only produces a call to it. 2000 new tm-defines take 226 ms on Guile 1.8
+(342 ms on wip_fixes, 860 ms before the change) and 52 ms on Guile 3 (365
+ms before). A name declared by `lazy-define` now counts as defined, as
+when the stub was a tm-define, instead of forcing its module to load when
+another module defines the name.
 
 ## Remaining issues
 
@@ -147,8 +159,6 @@ Guile 3 interpreted 1.85-1.95 s.
   the unconditional one now warns at start-up ("conditional master routine
   focus-hidden-menu"): `generic-menu` loads `graphics-menu`, whose
   overloads are then replaced by the master of `generic-menu`.
-- This branch is slower to start with Guile 1.8 than wip_fixes (about
-  +0.3 s); not investigated.
 - `display`/`write` of inexact numbers print up to 17 digits on Guile 3.
 - File names: TeXmacs passes file names to Guile as Latin-1 strings, which
   Guile encodes with the locale when it opens files: non-ASCII paths are
