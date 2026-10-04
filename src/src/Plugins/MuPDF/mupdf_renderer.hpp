@@ -31,6 +31,11 @@ unsigned int mupdf_glyph_index (fz_font* font, int i);
 // and the size of an em in pixels of a renderer at zoom 1; false when the
 // font has no file, whose glyphs are bitmaps (for vue_gpu.cpp)
 bool mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em);
+// the same glyph rendered by MuPDF as draw renders it, its origin on a
+// pixel: its coverage (a byte a pixel, rows from the top), its size, and
+// the offset of its top left corner from the origin (pixels, y down)
+bool mupdf_glyph_bitmap (string fontname, int c, string& cov,
+                         int& w, int& h, int& x0, int& y0);
 
 /******************************************************************************
 * Graphic renderer
