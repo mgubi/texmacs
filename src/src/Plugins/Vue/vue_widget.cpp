@@ -31,6 +31,8 @@
 #include "poly_line.hpp" // for ink widget
 
 #include "../MuPDF/mupdf_picture.hpp"
+#include "vue_gpu.hpp"
+extern bool vue_profile_on; // TEXMACS_VUE_PROFILE (vue_gui.cpp)
 #include "../MuPDF/mupdf_renderer.hpp" // draw_picture_scaled (the smooth zoom)
 
 widget make_menu_widget (object wid);
@@ -5869,6 +5871,22 @@ string vue_type_simple_widget("simple_widget");
 
 list<vue_simple_widget_rep*> paint_list;
 
+// The backing store of an editor and its renderer: a texture when the
+// windows are drawn by the GPU (vue_gpu.cpp), else an opaque MuPDF pixmap,
+// so that blitting it into the window needs no test per pixel (see
+// native_opaque_picture)
+static picture
+backing_picture (int w, int h) {
+  if (vue_gpu_windows ()) return gpu_backing_picture (w, h);
+  return native_opaque_picture (w, h, 0, 0);
+}
+
+static renderer
+backing_renderer (picture p) {
+  if (is_gpu_picture (p)) return gpu_picture_renderer (p, std_shrinkf * retina_factor);
+  return picture_renderer (p, std_shrinkf * retina_factor);
+}
+
 vue_simple_widget_rep::vue_simple_widget_rep ()
 : vue_widget_rep (vue_type_simple_widget),
   win (NULL),
@@ -5891,10 +5909,8 @@ vue_simple_widget_rep::vue_simple_widget_rep ()
 {
   // note that size is set to an arbitrary value to init the backing_store
   // create a backing store and the renderer
-  // opaque, so that blitting it into the window needs no test per pixel
-  // (see native_opaque_picture)
-  backing_store= native_opaque_picture (size.x1, size.x2, 0, 0);
-  ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+  backing_store= backing_picture (size.x1, size.x2);
+  ren= backing_renderer (backing_store);
   ren_retina= retina_factor;
   paint_list= list<vue_simple_widget_rep*>(this, paint_list);
 };
@@ -6362,6 +6378,10 @@ vue_simple_widget_rep::is_invalid () {
 // invalidated by the caller
 void
 vue_simple_widget_rep::translate_backing_store (int dpx, int dpy) {
+  if (is_gpu_picture (backing_store)) {
+    gpu_translate_picture (backing_store, dpx, dpy);
+    return;
+  }
   fz_pixmap *pix=  ((mupdf_picture_rep*)backing_store->get_handle())->pix;
   if (pix == NULL || pix->samples == NULL) return;
   int w= pix->w, h= pix->h, n= pix->n;
@@ -6442,9 +6462,9 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   if (ren_retina != retina_factor) {
     SI old_w= bs_w * ren->pixel, old_h= bs_h * ren->pixel;
     bs_w= size.x1; bs_h= size.x2;
-    backing_store= native_opaque_picture (bs_w, bs_h, 0, 0);
+    backing_store= backing_picture (bs_w, bs_h);
     delete_renderer (ren);
-    ren= picture_renderer (backing_store, std_shrinkf * retina_factor);
+    ren= backing_renderer (backing_store);
     ren_retina= retina_factor;
     backing_valid= false;
     invalidate_all ();
@@ -6523,8 +6543,8 @@ vue_simple_widget_rep::repaint_invalid_regions () {
     // the viewport size changed, reset the backing store
     // cout << "viewport changed (" << bs_w << "," << bs_h << ") (" << new_bs_w << "," << new_bs_h << ")" << LF;
     // create a new backing store with updated viewport and the renderer
-    picture new_backing_store= native_opaque_picture (new_bs_w, new_bs_h, 0, 0);
-    renderer ren2= picture_renderer (new_backing_store, std_shrinkf * retina_factor);
+    picture new_backing_store= backing_picture (new_bs_w, new_bs_h);
+    renderer ren2= backing_renderer (new_backing_store);
     
     // copy the old backingstore
     SI x1=0, y1=0, x2=bs_w, y2=bs_h;
@@ -6584,6 +6604,8 @@ vue_simple_widget_rep::repaint_invalid_regions () {
       invalid_regions= invalid_regions->next;
     }
     invalid_regions= new_regions;
+    // the profile counts the time the GPU took to draw it
+    if (vue_profile_on && is_gpu_picture (backing_store)) gpu_finish ();
   } // if (!is_nil (invalid_regions))
   backing_valid= true;
   update_text_input_area ();
@@ -6671,6 +6693,8 @@ vue_simple_widget_rep::render (void *data) {
 bool
 vue_simple_widget_rep::renders_opaque (int w, int h) {
   if (!is_nil (zoom_snap) || is_nil (backing_store)) return false;
+  if (is_gpu_picture (backing_store)) // a texture, opaque
+    return backing_store->get_width () >= w && backing_store->get_height () >= h;
   mupdf_picture_rep* p= (mupdf_picture_rep*) backing_store->get_handle ();
   return p != NULL && p->opaque && p->w >= w && p->h >= h;
 }
@@ -6700,6 +6724,15 @@ vue_simple_widget_rep::start_zoom_transition (double new_zoom) {
   double r= new_zoom / old_zoom;
   if (fabs (log (r)) < 0.03 || !backing_valid || is_nil (backing_store)) return;
   if (get_preference ("smooth zoom", "on") == "off") return;
+  if (is_gpu_picture (backing_store)) {
+    zoom_snap= gpu_copy_picture (backing_store);
+    if (is_nil (zoom_snap)) return;
+    zoom_ratio= r;
+    zoom_pos= backing_pos;
+    zoom_start= 0;
+    vue_animation_until= max (vue_animation_until, texmacs_time () + 1000);
+    return;
+  }
   mupdf_picture_rep* pict=
     (mupdf_picture_rep*) as_mupdf_picture (backing_store)->get_handle ();
   if (pict == NULL || pict->pix == NULL) return;
@@ -6724,13 +6757,14 @@ bool
 vue_simple_widget_rep::render_zoom (void *data) {
   vue_render_ren_data* d= (vue_render_ren_data*) data;
   mupdf_renderer_rep* mr= dynamic_cast<mupdf_renderer_rep*> (d->ren);
+  bool gpu= is_gpu_renderer (d->ren);
   time_t now= texmacs_time ();
   if (zoom_start == 0) {
     zoom_start= now;
     vue_animation_until= now + (time_t) zoom_duration + 20;
   }
   double t= (now - zoom_start) / zoom_duration;
-  if (mr == NULL || t >= 1.0 || t < 0.0) { zoom_snap= picture (); return false; }
+  if ((mr == NULL && !gpu) || t >= 1.0 || t < 0.0) { zoom_snap= picture (); return false; }
   double u= 1.0 - (1.0 - t) * (1.0 - t) * (1.0 - t); // ease out
   // a point of the view (pixels from its top left) moves by the zoom from
   // x to r x + T, as the editor scrolled (backing_pos: the top left of the
@@ -6744,21 +6778,23 @@ vue_simple_widget_rep::render_zoom (void *data) {
   double cx= tx / (1.0 - r), cy= ty / (1.0 - r);
   double s= pow (r, u);
   rectangle rr= d->r;
-  SI P= mr->pixel;
-  mr->clip (rr->x1, rr->y1, rr->x2, rr->y2);
+  renderer R= d->ren;
+  SI P= R->pixel;
+  R->clip (rr->x1, rr->y1, rr->x2, rr->y2);
   // the room which the pictures leave, in the colour of the canvas
-  mr->set_pencil (backing_store->get_pixel (0, 0));
-  mr->fill (rr->x1, rr->y1, rr->x2, rr->y2);
+  R->set_pencil (backing_store->get_pixel (0, 0));
+  R->fill (rr->x1, rr->y1, rr->x2, rr->y2);
   auto place= [&] (picture p, double sc, int alpha) {
     double left= cx * (1.0 - sc), top= cy * (1.0 - sc);
     SI x= rr->x1 + (SI) (left * P);
     SI y= rr->y2 - (SI) ((top + p->get_height () * sc) * P);
-    mr->draw_picture_scaled (p, x, y, sc, alpha);
+    if (gpu) gpu_draw_picture_scaled (R, p, x, y, sc, alpha);
+    else mr->draw_picture_scaled (p, x, y, sc, alpha);
   };
   uint64_t TMPT0= SDL_GetTicksNS ();
   place (backing_store, s / r, 255);
   place (zoom_snap, s, (int) (255.0 * (1.0 - u)));
-  mr->unclip ();
+  R->unclip ();
   cout << "TMPF t=" << (int) (t*1000) << " draw " << (int) ((SDL_GetTicksNS () - TMPT0)/1000000) << "ms" << LF;
   return true;
 }

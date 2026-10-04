@@ -956,3 +956,76 @@ removed (September 2026). To look at it again:
 git show 94277cec8a:./src/Plugins/NanoVG/nanovg_renderer.cpp
 git checkout 94277cec8a -- src/Plugins/NanoVG
 ```
+
+### The GPU renderer
+
+With `--with-thorvg=<prefix>` (ThorVG built by `misc/thorvg/build-thorvg.sh
+<prefix>`, `[wasm]` for the browser) and `TEXMACS_VUE_GPU=1`, the windows
+are drawn by OpenGL (WebGL2 in the browser) instead of MuPDF
+(`vue_gpu.cpp`, `vue_sdl_gpu_window_rep` in `vue_gui.cpp`). Without the
+variable, or when no GL context can be made, everything is as before.
+`misc/thorvg-bench` has the measurements which chose the design.
+
+* **One context.** The windows are created with `SDL_WINDOW_OPENGL`, and
+  the first one makes the GL context, which is made current for each
+  window as it is drawn (`vue_gpu_attach`): textures and framebuffers
+  belong to all the windows, and an editor can move between them. The
+  context exists before anything is drawn, since an editor makes its
+  backing store when it is made.
+* **The windows** replay the same Clay commands on a `gpu_renderer_rep` of
+  their default framebuffer at every frame, clear included, and present
+  with `SDL_GL_SwapWindow`. The host of the single window composes its
+  virtual windows the same way (`composite_virtual_windows`), so the
+  browser needs nothing more.
+* **The editors** keep their backing store as a texture with a
+  framebuffer (`gpu_backing_picture`, made when first drawn), repainted
+  incrementally as the MuPDF pixmap was: the incremental paths are the
+  same (`backing_picture`, `backing_renderer` in `vue_widget.cpp`). A
+  scroll copies the texture, shifted, into a second one and swaps the two
+  (`gpu_translate_picture`), the smooth zoom copies it
+  (`gpu_copy_picture`). The shadow is a proxy on the same target, as in
+  the MuPDF renderer; the store of the active graphics a real copy.
+* **Text and fills** are textured quads in one batch: the glyphs are the
+  glyph bitmaps of TeXmacs (`shrink`, as the X11 and the Qt ports draw
+  them, placed as the MuPDF renderer places its bitmap glyphs) in an atlas
+  (one R8 texture, emptied when full), the fills sample a white corner of
+  it. A batch is drawn when its target, its texture or its clip (a
+  scissor) changes. Thin horizontal and vertical lines (the rules of
+  mathematics, the borders of tables) are quads too. Glyphs filled with a
+  pattern multiply the coverage by the pattern, sampled from the origin of
+  the document (mode 3 of the shader).
+* **Pictures** (icons, images: `cached_load_picture` gives the same picture
+  again) are uploaded once, as textures keyed by their unique id (at most
+  512 and 256 MB, the least used going first); patterns and the neutral
+  pattern of `clear_device` once per size of their tiles, repeated.
+* **Vector graphics** (lines which are not thin rules, polygons, arcs,
+  rounded rectangles) go to ThorVG's GL engine. It draws into a
+  multisampled framebuffer of its own and ends a pass by copying all of it
+  over its target, so it cannot draw over what is there, and its
+  `viewport` does not limit that copy: it draws into a scratch texture,
+  and the box it drew is composed over the target. Consecutive vector
+  operations within one clip are one pass; a pass which fits in 512x512
+  pixels is drawn on a small canvas, moved to its origin through a scene,
+  since each pass costs a copy of its whole canvas.
+* **OpenGL on macOS.** ThorVG's static library defines its GL entry points
+  as global function pointers named as the functions (`glCreateProgram`):
+  a call to the function was linked to the pointer, and crashed. The
+  functions used by `vue_gpu.cpp` are loaded from the OpenGL framework into
+  pointers of their own (`VUE_GL_FUNCTIONS`).
+* **The profile** (`TEXMACS_VUE_PROFILE`) waits for the GPU at the end of
+  an editor's repaint and of a redraw (`gpu_finish`), so that its times
+  include what the GPU did.
+
+Measured on an Apple M4 (`bench.script`, forced full repaints of the
+document of 200 paragraphs, with `gpu_finish`): 1.8 ms a repaint, against
+1.2 to 2.0 ms for the MuPDF renderer on the same machine, where the native
+build vectorises MuPDF's loops. What the GPU saves there is the upload of
+the window (0.2 ms against 1 to 1.7 ms a frame).
+
+Differences from the MuPDF renderer: the glyphs are TeXmacs' bitmaps, not
+MuPDF's rendering of the font files (they look like the X11 port's); the
+pixels are not the same, so the A/B tests of the MuPDF renderer do not
+apply. Still open: `SDL_GL_SwapWindow` waits for the display on macOS even
+with no swap interval, so a frame which changes nothing should not be
+presented; draw_spacial and transformed glyphs (bitmaps sampled under the
+transformation) are untested.
