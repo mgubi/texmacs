@@ -16,9 +16,8 @@
 	(utils library cursor)
 	(utils edit auto-close)
 	(math math-drd)
-    (generic format-geometry-edit)
-    (convert tools tmconcat)
-    (version version-compare)))
+        (generic format-geometry-edit)
+        (convert tools tmconcat)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Some drd properties, which should go into table-drd.scm later on
