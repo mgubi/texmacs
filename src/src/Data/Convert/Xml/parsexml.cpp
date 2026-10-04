@@ -469,8 +469,10 @@ xml_html_parser::parse () {
         if (html && is_tuple (t, "begin") && N(t) >= 2 &&
             (t[1] == "script" || t[1] == "style")) {
           // raw text: no tags or entities up to the closing tag
+          // up to the closing tag, which may be in any case (</Script>)
           string end= "</" * t[1]->label, raw;
-          while (s && !test (s, end) && !test (s, upcase_all (end)))
+          while (s && !(s[0] == '<' &&
+                        locase_all (s->get_string (N(end))) == end))
             raw << s->read (1);
           if (N(raw) != 0) a << tree (raw);
         }
