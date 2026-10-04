@@ -26,7 +26,7 @@ function send (file, res, opts, rate) {
 }
 
 export function serve (dir, port, host = '127.0.0.1', onServed = null, rate = 0) {
-  const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json',
                   '.wasm': 'application/wasm', '.data': 'application/octet-stream',
                   '.png': 'image/png', '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.tm': 'text/plain',
                   '.pack': 'application/octet-stream' };

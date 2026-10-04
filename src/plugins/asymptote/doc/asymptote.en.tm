@@ -1,12 +1,14 @@
-<TeXmacs|1.0.7.11>
+<TeXmacs|2.1.5>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|asymptote>>
 
 <\body>
   <tmdoc-title|The <name|Asymptote> plug-in>
 
   <\traverse>
     <branch|Short description|asymptote-abstract.en.tm>
+
+    <branch|<name|Asymptote> in a web browser|asymptote-browser.en.tm>
 
     <branch|Example sessions|asymptote-demo.en.tm>
   </traverse>

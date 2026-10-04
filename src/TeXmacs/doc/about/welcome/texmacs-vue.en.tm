@@ -127,8 +127,8 @@
     need an external program are missing: the compilation with <LaTeX>,
     Ghostscript, ImageMagick, the spell checker, Git. The sessions which
     exist in the browser are those whose program runs in the page itself:
-    <name|JavaScript> and <name|TikZ> (see the help of their plug-ins, in
-    <menu|Help|Plug-ins>).
+    <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
+    their plug-ins, in <menu|Help|Plug-ins>).
 
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
     WebSocket, on the same computer only for now.
@@ -152,6 +152,12 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>The <name|Asymptote> plug-in in the browser: sessions and
+    executable folds (<menu|Insert|Session|Asymptote>) make <name|Asymptote>
+    pictures with <name|Asymptote> itself, compiled to <name|WebAssembly>;
+    their labels are set by <TeXmacs> from their <LaTeX> and can be edited,
+    and in a fold the code follows. See <menu|Help|Plug-ins|Asymptote>.
+
     <item><name|JavaScript> sessions and executable folds
     (<menu|Insert|Session|JavaScript>): the <name|JavaScript> of the page
     itself, with <TeXmacs> at hand (<verbatim|TeXmacs.scheme>), and a file
