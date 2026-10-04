@@ -28,6 +28,11 @@
     `unbound variable alength`.
   - **Workaround:** TeXmacs macros define their helpers at module level
     (§3.2).
+  - Since `define` is no longer the `curried-define` macro in the user
+    module, the case which crashed TeXmacs (an internal recursive
+    definition, the second time the enclosing function ran) is gone; the
+    regression test `internal recursive define, twice` of `compat-s7-test`
+    covers it.
   - **To do:** report it upstream.
 - **Memo tables no longer cache `#f`.** Storing `#f` in an s7 hash table
   doesn't create an entry, so `logic-holds?` (`logic-data.scm`) and
@@ -49,7 +54,10 @@
 - **The user module must not be entered** with `with-let` or `with-module`
   after boot. It would make lookups slower, not wrong (§2.3).
 - **A `set!` of a public variable in its own module** is not seen by the
-  other modules, which use the rootlet binding (§2.2).
+  other modules, which use the rootlet binding (§2.2). Macros which expand
+  into references to such variables are affected too, since the expansion
+  is evaluated in the caller's module. `tm-plugins.scm` gives accessors for
+  its flag and table for this reason (§4.3).
 - **`:use` is not enforced.** Every module sees the rootlet and the user
   module.
 - **Macros are expanded on every evaluation** (s7 run-time macros).
@@ -57,8 +65,6 @@
   - `varlet` refuses already-bound symbols in non-root lets;
   - macro bodies should not define local helper functions (§3.2);
   - shared files can't use s7 reader syntax such as `#_define`.
-- **`curried-define` exists only in `*texmacs-user-module*`.** Code evaluated
-  in the rootlet can't use `(define ((f a) b) …)`.
 - **Some compat functions differ from their Guile originals:**
   - `assoc-set!` returns a new list instead of mutating, and it is defined
     twice in `compat-s7.scm`;

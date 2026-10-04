@@ -94,6 +94,10 @@ did not work on s7.
 | New upstream server code used SRFI-14 char-sets and `*random-state*` | `compat-s7.scm` |
 | The HTML export used `hash-map->list` and `string-prefix?`, and printed keywords | `compat-s7.scm`, `tmhtml.scm` |
 | `latex-needs?` ran a logic query for every document node | `latex-tools.scm`, `logic-rules.scm` |
+| `plugin-configure` expanded into references to `reconfigure-flag?` and `plugin-data-table`, which `tm-plugins.scm` changes with `set!`: on s7 the plugins configured outside that module saw stale values (§6.2). It now expands into calls of `plugin-data` and `plugin-configure-start`; other modules read and set the flag with `plugin-reconfigure?` and `plugin-reconfigure-set!` | `tm-plugins.scm`, `init-maxima.scm`, `plugins-test.scm` |
+| A conditional master routine (a first `tm-define` with `:require`) tested `cur-conds` when the definition ran instead of when it was expanded; on s7 the code saw the empty list, so its `former` was unbound | `tm-define.scm` |
+| `procedure-name` returned the procedure itself on s7; it now returns its name, as with Guile | `tm-define.scm` |
+| The doxygen package used Guile's `(ice-9 rdelim)` to read a file | `utils/misc/doxygen.scm` |
 
 ## 4.4 Tests
 
@@ -145,8 +149,7 @@ TEXMACS_HOME_PATH=<scratch dir> QT_QPA_PLATFORM=offscreen \
   `(string->symbol "")`, and the error would stop the whole run. Compare
   `symbol->string` of the result instead, as the `null PI` test of
   `xmltm-test.scm` does.
-- **Test modules run in module environments.** `define` there is
-  `curried-define`, and `tm-define` definitions are global, so give them
-  distinctive names.
+- **Test modules run in module environments.** `tm-define` definitions are
+  global, so give them distinctive names.
 
 The C++ tests in `tests/` do not exercise Scheme.
