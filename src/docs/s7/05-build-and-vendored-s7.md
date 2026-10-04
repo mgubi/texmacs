@@ -74,7 +74,8 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 ## 5.2 The vendored s7
 
 `src/Scheme/S7/s7.c` and `s7.h` are **s7 11.9 (21-Sep-2026) as released**
-(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), byte for byte.
+(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with one local patch
+(below).
 `mus-config.h` is an empty placeholder that `s7.c` includes.
 
 - **Compiled as C.** s7 11.9 no longer compiles as C++: in C++ mode it
@@ -96,7 +97,15 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 - internal definitions in macro bodies;
 - how lookups use let ids.
 
-**No local patch.** Earlier versions of the port patched s7's symbol
+**One local patch, in the printer.** `string_to_port` writes a string of
+more than 1000 copies of one character as `(make-string n c)`, in every
+mode, `display` and `write` included. TeXmacs writes trees as Scheme data
+(`object->string`, `save-object`, the tree cache, the client/server
+protocol) and reads them back with `read`, which gives a list instead of the
+string. The patch, marked `TeXmacs:` in `s7.c`, keeps the abbreviation in
+readable mode only, where it evaluates back to the string.
+
+**No patch of the lookups.** Earlier versions of the port patched s7's symbol
 lookup:
 - first by moving found slots to the front of their let, which was unsound,
   because it reordered lets that s7 iterates over or refills by position;
@@ -110,7 +119,8 @@ first patch broke.
 
 ### Upgrading s7
 
-1. Copy the new `s7.c` and `s7.h` into `src/Scheme/S7`.
+1. Copy the new `s7.c` and `s7.h` into `src/Scheme/S7`, and apply the
+   printer patch again (search the old `s7.c` for `TeXmacs:`).
 2. Rebuild from clean.
 3. Run `run-all-tests` and the portable suites on both interpreters (§4.4).
 4. Check the timings of [07](07-performance.md), at least boot and the LaTeX

@@ -35345,7 +35345,10 @@ static void string_to_port(s7_scheme *sc, s7_pointer obj, s7_pointer port, use_w
   if (string_length(obj) > 0)
     {
       /* since string_length is a scheme length, not C, this write can embed nulls from C's point of view */
-      if (string_length(obj) > 1000) /* was 10000 28-Feb-18 */
+      /* TeXmacs: only in readable mode, where (make-string ...) reads back as the string;
+       *   write and display must give the characters (TeXmacs reads its trees back as data)
+       */
+      if ((use_write == p_Readable) && (string_length(obj) > 1000)) /* was 10000 28-Feb-18 */
 	{
 	  size_t size;
 	  char buf[Out_Bufsize];
