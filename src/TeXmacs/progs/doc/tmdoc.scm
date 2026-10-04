@@ -19,6 +19,7 @@
 
 (define (tmdoc-down level)
   (cond ((== level 'title) 'chapter)
+	((== level 'title*) 'part)
 	((== level 'part) 'chapter)
 	((== level 'tmdoc-title) 'section)
 	((== level 'tmdoc-title*) 'section)
@@ -28,6 +29,40 @@
 	((== level 'subsection) 'subsubsection)
 	((== level 'subsubsection) 'paragraph)
 	(else 'subparagraph)))
+
+;; Sectioning commands inside a page are relative to the level of the page:
+;; a section of a page which becomes a chapter is a section, a section of a
+;; page which becomes a section is a subsection, and so on.
+
+(define tmdoc-sectioning
+  '(section subsection subsubsection paragraph subparagraph))
+
+(define tmdoc-sectioning*
+  '(section* subsection* subsubsection* paragraph* subparagraph*))
+
+(define tmdoc-starred
+  '(part chapter section subsection subsubsection))
+
+(define (tmdoc-sectioning? x)
+  (and (pair? x) (or (in? (car x) tmdoc-sectioning)
+                     (in? (car x) tmdoc-sectioning*))))
+
+(define (tmdoc-heading? x)
+  (or (tmdoc-sectioning? x)
+      (and (func? x 'concat) (nnull? (cdr x))
+           (tmdoc-sectioning? (cadr x)))))
+
+(define (tmdoc-demote-level level n)
+  (if (<= n 0) level (tmdoc-demote-level (tmdoc-down level) (- n 1))))
+
+(define (tmdoc-demote tag level)
+  (let* ((star? (in? tag tmdoc-sectioning*))
+         (l (if star? tmdoc-sectioning* tmdoc-sectioning))
+         (n (- (length l) (length (memq tag l))))
+         (new (tmdoc-demote-level level (+ n 1))))
+    (if (and star? (in? new tmdoc-starred))
+        (string->symbol (string-append (symbol->string new) "*"))
+        new)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main expansions routines
@@ -85,15 +120,20 @@
     (cond ((or (func? x 'tmdoc-title) (func? x 'tmdoc-title*))
 	   (cond (omit? '(document))
                  ((== level 'title) (cons level (cdr x)))
+                 ((== level 'title*) (cons 'title (cdr x)))
                  (else
                    (let* ((name (url-basename (url-basename cur)))
                           (lab  (string-append "sec-" (url->string name))))
                      `(concat ,(cons level (cdr x)) (label ,lab))))))
           ((and (func? x 'concat)
                 (or (func? (tm-ref x 0) 'tmdoc-title)
-                    (func? (tm-ref x 0) 'tmdoc-title*)))
+                    (func? (tm-ref x 0) 'tmdoc-title*)
+                    (tmdoc-sectioning? (tm-ref x 0))))
            `(concat ,@(map (cut tmdoc-rewrite-one <> root cur the-level done)
                            (tm-children x))))
+          ((tmdoc-sectioning? x)
+           (cons (tmdoc-demote (car x) level)
+                 (tmdoc-substitute-sub (cdr x) root cur)))
 	  ((func? x 'tmdoc-license)
 	   '(document))
 	  ((func? x 'traverse)
@@ -110,11 +150,23 @@
 	   '(document))
 	  (else (tmdoc-substitute x root cur)))))
 
+(define (tmdoc-before-traverse? l)
+  ;; does a traverse come before the next heading?
+  (cond ((null? l) #f)
+        ((func? (car l) 'traverse) #t)
+        ((tmdoc-heading? (car l)) #f)
+        (else (tmdoc-before-traverse? (cdr l)))))
+
 (define (tmdoc-rewrite l root cur level done)
   (if (null? l) l
+      ;; a heading such as "Contents of this chapter" which introduces the
+      ;; list of branches would remain empty, since the branches become its
+      ;; siblings: leave it out
+      (if (and (tmdoc-heading? (car l)) (tmdoc-before-traverse? (cdr l)))
+          (tmdoc-rewrite (cdr l) root cur level done)
       (let ((d1 (tmdoc-rewrite-one (car l) root cur level done))
 	    (d2 (tmdoc-rewrite (cdr l) root cur level done)))
-	(if (func? d1 'document) (append (cdr d1) d2) (cons d1 d2)))))
+	(if (func? d1 'document) (append (cdr d1) d2) (cons d1 d2))))))
 
 (define (tmdoc-expand root cur level . opts)
   ;;(display* "tmdoc-expand " cur "\n")
@@ -210,6 +262,17 @@
 (define-preferences
   ("manual style" "tmmanual" (lambda args (noop))))
 
+(define (tmdoc-book-parts? root)
+  ;; a root document whose initial environment sets tmdoc-book-parts to
+  ;; true is compiled with parts as the top level divisions, which leaves
+  ;; more numbered levels for deeply nested documentation
+  (with t (tree->stree (tree-import root "texmacs"))
+    (and (pair? t)
+         (with init (assoc 'initial (cdr t))
+           (and init (pair? (cdr init)) (pair? (cadr init))
+                (in? '(associate "tmdoc-book-parts" "true")
+                     (cdadr init)))))))
+
 (tmfs-permission-handler (help name type)
   (and (== type "read")
        (let* ((file (or (tmfs-cdr name) ""))
@@ -241,7 +304,9 @@
           ((== type "normal")
            (tm->stree (tree-import root "texmacs")))
           ((== type "book")
-           (let* ((body* (tmdoc-expand root root 'title))
+           (let* ((body* (tmdoc-expand root root
+                                       (if (tmdoc-book-parts? root)
+                                           'title* 'title)))
                   (body (tmdoc-internalize body*))
                   (lan (tmdoc-language root)))
              (tm->stree
