@@ -23,7 +23,7 @@ first module inherited at boot (see §2.1). In addition:
 | Promises | `make-promise`, `delay`, `delay-force`, `force` | Taken from s7's `r7rs.scm`. |
 | Hashing | `(hash obj [bound])` | `(modulo (hash-code obj) bound)` |
 | Loops | `while` | Uses `call-with-exit`. `break` and `continue` are bound inside the body. |
-| `define` | `curried-define` | A macro for Guile's curried definitions, `(curried-define ((f a) b) …)`. It is **not** installed as `define`: a macro in place of `define` made s7 crash the second time a function with an internal recursive definition ran (a stale annotation of the expanded body, `op_safe_closure_p_a_1` "wants opt2_fx" with `S7_DEBUGGING`), and it was what made macros lose their internal definitions (see [06](06-open-issues.md)). The TeXmacs code writes the curried definitions it needs with an explicit `lambda`, which both interpreters read. |
+| `define` | none | Guile's curried definitions, `(define ((f a) b) …)`, are handled by s7's own `define`: the vendored s7 is patched for them (patch 0003, see [05](05-build-and-vendored-s7.md#s7-version-and-local-patch)). An earlier version rebound `define` in the user module to a run-time macro, which made s7 crash (patch 0002) and re-expanded every internal definition at each call. |
 
 The file ends with a "TODO/FIXME" about redefining `error` to match Guile's
 calling convention. That has not been done.
@@ -52,14 +52,13 @@ vendored s7 11.9.
   defines helper functions can lose them between recursive calls of those
   helpers. Seen with `case-lambda` used inside a function body with two or
   more clauses: `unbound variable alength`.
-  - In standalone s7 it reproduces only when the internal `define` is
-    TeXmacs's `curried-define` macro.
+  - In standalone s7 it reproduces only when the internal `define` is a
+    run-time macro, as TeXmacs's `define` once was.
   - Inside TeXmacs it also happened with the builtin `#_define`.
   - The helpers of `case-lambda` are now module-level functions.
   - The other macros with internal definitions (`and-let*`,
     `regression-test-group`, `trace-variables`, `kbd-symbols`,
-    `texmacs-module`) use the builtin `#_define`, so they do not go through
-    `curried-define`.
+    `texmacs-module`) use the builtin `#_define`.
 - **Multiple values splice** ✓. `(+ 1 (values 2 3))` is `6`. An empty
   `(values)` used as an argument is `#<unspecified>`, but `map` drops such
   results: `(map (lambda (x) (if (odd? x) x (values))) '(1 2 3))` is

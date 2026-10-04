@@ -284,6 +284,84 @@
            1))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The local patches of the vendored s7 (src/Scheme/S7/patches)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; 0003: curried define, as in Guile
+(define ((boot-test-adder a) b) (+ a b))
+(define (((boot-test-adder3 a) b) c) (+ a b c))
+(define ((boot-test-adder* a) . l) (apply + a l))
+(define ((boot-test-rest . l) x) (cons x l))
+(define-public ((boot-test-public-adder a) b) (+ a b))
+
+(define (boot-test-butlast l) (reverse (cdr (reverse l))))
+
+(define (boot-test-scale-all k l)
+  ;; an internal curried definition next to an internal recursive one
+  (define ((scale k) x) (* k x))
+  (define (walk l)
+    (if (null? l) '() (cons ((scale k) (car l)) (walk (cdr l)))))
+  (walk (boot-test-butlast l)))
+
+;; 0002: a run-time macro which builds the lambda of a local recursive
+;; function, called from the function body with the value of a Scheme
+;; function: the second call crashed s7
+(define-macro (boot-test-define-lambda head . body)
+  `(define ,(car head) (lambda ,(cdr head) ,@body)))
+
+(define (boot-test-pairs t)
+  (boot-test-define-lambda (pairs l)
+    (if (or (null? l) (null? (cdr l))) '()
+        (cons (cons (car l) (cadr l)) (pairs (cddr l)))))
+  (pairs (boot-test-butlast (cdr t))))
+
+(define (regtest-boot-patches)
+  (regression-test-group
+   "boot-s7, patches of s7" "patches"
+   :none :none
+   ;; 0001
+   (test "write gives the characters of a long string of one character"
+         (object->string (make-string 1500 #\x))
+         (string-append "\"" (make-string 1500 #\x) "\""))
+   (test "a long string of one character reads back as a string"
+         (with-input-from-string (object->string (make-string 1500 #\space))
+           read)
+         (make-string 1500 #\space))
+   (test "readable output still abbreviates"
+         (object->string (make-string 1500 #\x) :readable)
+         "(make-string 1500 #\\x)")
+   ;; 0002
+   (test "closure made by a macro at each call, twice"
+         (list (boot-test-pairs '(with a 1 b 2 x))
+               (boot-test-pairs '(with a 1 x)))
+         '(((a . 1) (b . 2)) ((a . 1))))
+   ;; 0003
+   (test "curried define" ((boot-test-adder 1) 2) 3)
+   (test "curried define, two levels" (((boot-test-adder3 1) 2) 3) 6)
+   (test "curried define, rest arguments inside" ((boot-test-adder* 1) 2 3 4) 10)
+   (test "curried define, rest arguments outside"
+         ((boot-test-rest 1 2) 0) '(0 1 2))
+   (test "curried define, its source"
+         (procedure-source boot-test-adder)
+         '(lambda (a) (lambda (b) (+ a b))))
+   (test "internal curried define"
+         (let () (define ((mul a) b) (* a b)) ((mul 6) 7))
+         42)
+   (test "internal curried and recursive definitions, twice"
+         (list (boot-test-scale-all 2 '(1 2 3 0))
+               (boot-test-scale-all 3 '(1 2 0)))
+         '((2 4 6) (3 6)))
+   (test "define-public with a curried head exports the name"
+         (and (memq 'boot-test-public-adder *exports*) #t) #t)
+   (test "define-public with a curried head publishes the function"
+         ((((rootlet) 'boot-test-public-adder) 1) 2) 3)
+   (test "plain define is unchanged" (let () (define x 5) x) 5)
+   (test "define* is not curried"
+         (catch #t (lambda () (eval '(define* ((f a) b) b) (inlet)) 'defined)
+           (lambda args 'error))
+         'error)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -292,6 +370,7 @@
               (regtest-boot-catch)
               (regtest-boot-macros)
               (regtest-boot-modules)
-              (regtest-boot-lookup))))
+              (regtest-boot-lookup)
+              (regtest-boot-patches))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of boot-s7: ok\n")))

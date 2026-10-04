@@ -162,15 +162,14 @@
 ;; Cursor movement
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (inside-named-chunk? name nr same-type? other?)
-  (lambda (t)
-    (and-with c (tree-search-upwards t tm-chunk?)
-      (and (or (not same-type?)
-               (tm-equal? (tm-ref c 0) name))
-           (or (not other?)
-               (!= (tree->path (tree-ref c 0))
-                   (tree->path name)))
-           (cursor-inside? (tm-ref c nr))))))
+(define ((inside-named-chunk? name nr same-type? other?) t)
+  (and-with c (tree-search-upwards t tm-chunk?)
+    (and (or (not same-type?)
+             (tm-equal? (tm-ref c 0) name))
+         (or (not other?)
+             (!= (tree->path (tree-ref c 0))
+                 (tree->path name)))
+         (cursor-inside? (tm-ref c nr)))))
 
 (define (go-to-next-in-chunk fun same-type? other?)
   (with-innermost t tm-chunk?

@@ -2797,9 +2797,8 @@
 (define (tmtex-menu s l)
   (tex-concat (cons (tmtex-menu-one (car l)) (tmtex-menu-list (cdr l)))))
 
-(define (tmtex-rename into)
-  (lambda (s l)
-    (tmtex-apply into (tmtex-list l))))
+(define ((tmtex-rename into) s l)
+  (tmtex-apply into (tmtex-list l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Citations

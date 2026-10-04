@@ -189,14 +189,14 @@
 (define (property-rewrite l)
   `(property-set! ,@l (list ,@cur-conds)))
 
-(define (define-property . l) (lambda (opt decl)
+(define ((define-property . l) opt decl)
   (for (which l)
     (set! cur-props (cons `(',(ca*adr decl) ,which ',opt) cur-props)))
-  decl))
+  decl)
 
-(define (define-property* which) (lambda (opt decl)
+(define ((define-property* which) opt decl)
   (set! cur-props (cons `(',(ca*adr decl) ,which (list ,@opt)) cur-props))
-  decl))
+  decl)
 
 (define (compute-arguments decl)
   (cond ((pair? (cadr decl)) (cdadr decl))

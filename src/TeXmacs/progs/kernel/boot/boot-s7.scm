@@ -102,7 +102,8 @@
   (varlet (rootlet) name value))
 
 (define-macro (define-public head . body)
-  (let ((name (if (pair? head) (car head) head)))
+  ;; the name is the innermost car of a curried head, ((f a) b)
+  (let ((name (let loop ((h head)) (if (pair? h) (loop (car h)) h))))
     `(begin
        (define ,head ,@body)
        (export ,name)

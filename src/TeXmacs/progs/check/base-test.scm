@@ -298,6 +298,26 @@
   (check= ((non <) 2 1) #t)
   (check= ((non (lambda () #f))) #t))
 
+;; Guile's curried define, which the TeXmacs code uses (the vendored s7 is
+;; patched for it)
+(define ((base-test-adder a) b) (+ a b))
+(define (((base-test-adder3 a) b) . l) (apply + a b l))
+
+(define (base-test-curried-twice k l)
+  (define ((scale k) x) (* k x))
+  (define (walk l) (if (null? l) '() (cons ((scale k) (car l)) (walk (cdr l)))))
+  (walk (cdr l)))
+
+(define (test-curried-define)
+  (check-group "curried define")
+  (check= ((base-test-adder 1) 2) 3)
+  (check= (map (base-test-adder 10) '(1 2)) '(11 12))
+  (check= (((base-test-adder3 1) 2) 3 4) 10)
+  (check= (((base-test-adder3 1) 2)) 3)
+  (check= (let () (define ((mul a) b) (* a b)) ((mul 6) 7)) 42)
+  (check= (base-test-curried-twice 2 '(0 1 2)) '(2 4))
+  (check= (base-test-curried-twice 3 '(0 1 2)) '(3 6)))
+
 ;; object->string* writes the kinds of data it knows and #f for others
 (define (test-objects)
   (check-group "objects")
@@ -574,6 +594,7 @@
   (test-alists)
   (test-symbols)
   (test-functions)
+  (test-curried-define)
   (test-objects)
   (test-urls)
   (test-output)

@@ -142,14 +142,13 @@
 (define (filter-on-type item)
   (navigation-allow-type? (link-item-type item)))
 
-(define (filter-on-event event)
-  (lambda (item)
-    (with type (link-item-type item)
-      ;;(display* "Filter: " item " on " event "\n")
-      ;;(display* "Filter: " type " on " event "\n")
-      (or (and (== event "click") (nin? type (list "focus" "mouse-over")))
-          (== event "hover")
-          (== (link-item-type item) event)))))
+(define ((filter-on-event event) item)
+  (with type (link-item-type item)
+    ;;(display* "Filter: " item " on " event "\n")
+    ;;(display* "Filter: " type " on " event "\n")
+    (or (and (== event "click") (nin? type (list "focus" "mouse-over")))
+        (== event "hover")
+        (== (link-item-type item) event))))
 
 (define (filter-link-list l event)
   (let* ((f1 (if (navigation-bidirectional?) l
@@ -158,9 +157,8 @@
          (f3 (list-filter f2 (filter-on-event event))))
     f3))
 
-(define (exclude-type type)
-  (lambda (item)
-    (!= (link-item-type item) type)))
+(define ((exclude-type type) item)
+  (!= (link-item-type item) type))
 
 (define (exclude-link-list l type)
   (list-filter l (exclude-type type)))

@@ -253,35 +253,6 @@
          #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Curried define (the macro curried-define; define is s7's own)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(curried-define ((adder a) b) (+ a b))
-(curried-define (((adder3 a) b) c) (+ a b c))
-(curried-define ((adder* a) . l) (apply + a l))
-
-(define (regtest-compat-curried)
-  (regression-test-group
-   "compat-s7, curried define" "curried"
-   :none :none
-   (test "one level" ((adder 1) 2) 3)
-   (test "two levels" (((adder3 1) 2) 3) 6)
-   (test "rest arguments" ((adder* 1) 2 3 4) 10)
-   (test "plain define still works" (let () (define x 5) x) 5)
-   (test "internal curried define"
-         (let () (curried-define ((mul a) b) (* a b)) ((mul 6) 7))
-         42)
-   (test "internal recursive define, twice"
-         (let ()
-           (define (pairs-of l)
-             (define (pairs l)
-               (if (or (null? l) (null? (cdr l))) '()
-                   (cons (cons (car l) (cadr l)) (pairs (cddr l)))))
-             (pairs l))
-           (list (pairs-of '(a 1 b 2)) (pairs-of '(c 3))))
-         '(((a . 1) (b . 2)) ((c . 3))))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -290,7 +261,6 @@
               (regtest-compat-misc)
               (regtest-compat-strings)
               (regtest-compat-char-sets)
-              (regtest-compat-data)
-              (regtest-compat-curried))))
+              (regtest-compat-data))))
     (display* "Total: " (object->string n) " tests.\n")
     (display "Test suite of compat-s7: ok\n")))
