@@ -78,12 +78,19 @@ var tmClipboard = (function () {
     var c = typeof navigator !== 'undefined' && navigator.clipboard;
     if (!c || !c.write || typeof ClipboardItem === 'undefined') return;
     if (copying) copying.fail ();
+    // the types are given before TeXmacs copies: the text, and HTML (that
+    // of TeXmacs, or the text as HTML when it has none)
     var job = {};
     var text = new Promise (function (ok, ko) { job.ok = ok; job.ko = ko; });
-    job.fail = function () { copying = copying === job ? null : copying; job.ko (new Error ('nothing copied')); };
+    var html = new Promise (function (ok, ko) { job.okHtml = ok; job.koHtml = ko; });
+    job.fail = function () {
+      copying = copying === job ? null : copying;
+      job.ko (new Error ('nothing copied'));
+      job.koHtml (new Error ('nothing copied'));
+    };
     job.timer = setTimeout (job.fail, COPY_WAIT);
     try {
-      job.written = c.write ([new ClipboardItem ({ 'text/plain': text })])
+      job.written = c.write ([new ClipboardItem ({ 'text/plain': text, 'text/html': html })])
         .then (function () { log ('copy written in the key'); return true; },
                function (e) { log ('copy in the key: ' + e); return false; });
       copying = job;
@@ -367,6 +374,7 @@ var tmClipboard = (function () {
         copying = null;
         clearTimeout (job.timer);
         job.ok (new Blob ([plain], { type: 'text/plain' }));
+        job.okHtml (new Blob ([html || asHtml (plain)], { type: 'text/html' }));
         job.written.then (function (ok) { if (!ok) writeLate (plain, html); });
         return;
       }
@@ -380,11 +388,30 @@ var tmClipboard = (function () {
     }
   };
 
-  // the write of a copy after the key (Firefox, Chrome), its HTML too when
-  // it has one (the write of the key has the text only)
+  // the text of a copy as HTML, for the HTML of the write of a key
+  function asHtml (plain) {
+    return '<pre>' + plain.replace (/&/g, '&amp;').replace (/</g, '&lt;')
+                          .replace (/>/g, '&gt;') + '</pre>';
+  }
+
+  // a copy which did not reach the system (Safari, after a menu: the browser
+  // gives its clipboard only to the handler of a key or a click, and the
+  // menus of TeXmacs run their commands later): TeXmacs has it, the other
+  // programs have not; the status bar says so, and how to copy for them
+  function notReached (e) {
+    console.warn ('TeXmacs: cannot copy to the clipboard: ' + e);
+    if (typeof _vue_web_scheme === 'undefined') return;
+    var key = mac ? 'Cmd+C' : 'Ctrl+C';
+    var msg = 'Copied in TeXmacs only: ' + key + ' copies for other programs too';
+    var cmd = '(set-message ' + JSON.stringify (msg) + ' "Copy")';
+    withStackSave (function () { _vue_web_scheme (stringToUTF8OnStack (cmd)); });
+  }
+
+  // the write of a copy after the key or the menu (Firefox, Chrome accept
+  // it), its HTML too when it has one
   function writeLate (plain, html) {
     var done = function () {};
-    var failed = function (e) { console.warn ('TeXmacs: cannot copy to the clipboard: ' + e); };
+    var failed = notReached;
     try {
       if (html && navigator.clipboard.write && typeof ClipboardItem !== 'undefined')
         navigator.clipboard.write ([new ClipboardItem ({
