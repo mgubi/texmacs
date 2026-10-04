@@ -167,10 +167,19 @@
 (tm-define (search-remote-identifier rname)
   (file-name->resource (tmfs-cdr rname)))
 
+(tm-define (search-remote-identifier rname)
+  (:require (with s (url->string rname)
+              (or (string-starts? s "tmfs://remote-file/")
+                  (string-starts? s "tmfs://remote-dir/"))))
+  ;; the url of a remote file, as shared by share-document
+  (search-remote-identifier (tmfs-cdr (string-drop (url->string rname) 7))))
+
 (define (inheritance-reserved-attributes)
+  ;; the version message and author describe one version and are not
+  ;; inherited by the next one
   (append (db-reserved-attributes)
           (db-meta-attributes)
-          (list "name" "version-list" "version-nr")))
+          (list "name" "version-list" "version-nr" "version-msg" "version-by")))
 
 (define (inherit-property? x)
   (nin? (car x) (inheritance-reserved-attributes)))
@@ -464,7 +473,7 @@
 
 (tm-define (server-file-save uid rname doc msg)
   (let* ((fid (file-name->resource (tmfs-cdr rname)))
-         (vid (version-get-list fid))
+         (vid (and fid (version-get-list fid)))
          (fname (repository-get fid)))
       (cond ((not uid)
              (list :error "Error: not logged in"))
