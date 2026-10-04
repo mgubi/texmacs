@@ -44,6 +44,10 @@ void     gpu_begin_screen (renderer ren, int w, int h);
 void     gpu_flush ();
 // the same, and wait for the GPU (the profile: TEXMACS_VUE_PROFILE)
 void     gpu_finish ();
+// what the window being drawn drew in this frame, as a hash: a frame which
+// draws what the last one drew is not presented (on macOS a present waits
+// for the display, even with no swap interval)
+unsigned long long gpu_frame_hash ();
 // the default framebuffer as a (MuPDF) picture, for the snapshots
 picture  gpu_read_screen (int w, int h);
 

@@ -1012,6 +1012,19 @@ variable, or when no GL context can be made, everything is as before.
   a call to the function was linked to the pointer, and crashed. The
   functions used by `vue_gpu.cpp` are loaded from the OpenGL framework into
   pointers of their own (`VUE_GL_FUNCTIONS`).
+* **Unchanged frames are not presented.** On macOS `SDL_GL_SwapWindow`
+  waits for the display, even with no swap interval, and the loop draws
+  every window at every iteration: a present per window and per frame
+  held the loop. What a frame draws on the screen is folded into a hash
+  as it is drawn (`gpu_frame_hash`: the quads, the state of their batches,
+  the paths and colors of the vector shapes, the unique id of a picture
+  and the generation of a backing store, which changes whenever it is
+  drawn into, scrolled or copied), and a window presents only a frame
+  whose hash differs from the one it presented last (and always after it
+  was hidden or minimized). Every frame is drawn in full into the back
+  buffer, so nothing stale can show. In the benchmark below, the frames
+  between the repaints (pointer moves which change nothing) are no longer
+  presented: 6 presents in 10 frames instead of 10.
 * **The profile** (`TEXMACS_VUE_PROFILE`) waits for the GPU at the end of
   an editor's repaint and of a redraw (`gpu_finish`), so that its times
   include what the GPU did.
@@ -1029,7 +1042,5 @@ upload (2 ms) gone.
 Differences from the MuPDF renderer: the glyphs are TeXmacs' bitmaps, not
 MuPDF's rendering of the font files (they look like the X11 port's); the
 pixels are not the same, so the A/B tests of the MuPDF renderer do not
-apply. Still open: `SDL_GL_SwapWindow` waits for the display on macOS even
-with no swap interval, so a frame which changes nothing should not be
-presented; draw_spacial and transformed glyphs (bitmaps sampled under the
+apply. Still open: draw_spacial and transformed glyphs (bitmaps sampled under the
 transformation) are untested.
