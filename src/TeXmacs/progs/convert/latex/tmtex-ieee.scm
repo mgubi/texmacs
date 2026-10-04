@@ -131,7 +131,7 @@
   (:mode ieee-tran-style?)
   (:require clustered?)
   (set! l (filter nnull? l))
-  (if (null? l) ()
+  (if (null? l) '()
     (let* ((sep   '(!concat (!linefeed)))
            (names (map (lambda (au)
                          (filter (lambda (x)

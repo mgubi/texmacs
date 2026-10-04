@@ -46,8 +46,13 @@
 ;; Memory
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the error happens when the menu is made, not when it is defined:
+;; Guile 2/3 expand the definition of a menu when it is loaded
+(define (provoke-menu-error)
+  (texmacs-error "provoke-error-menu" "deliberate menu error"))
+
 (menu-bind provoke-error-menu
-  (xxx))
+  (dynamic (provoke-menu-error)))
 
 (menu-bind debug-menu
   (-> "Guile"

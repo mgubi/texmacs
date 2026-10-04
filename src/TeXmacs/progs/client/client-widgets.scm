@@ -326,9 +326,10 @@
   (with cb (lambda (ret)
 	     (client-stop server)
 	     (if (== ret "done")
-               (client-notify-account server-name port pseudo
-                                      (map car credentials) #f)
-               (client-login-home server-name port pseudo credential noop)
+               (begin
+                 (client-notify-account server-name port pseudo
+                                        (list (car credential)) #f)
+                 (client-login-home server-name port pseudo credential noop))
                (client-open-error
                  (string-append "account confirmation failed: " ret))))
     (client-remote-eval*
