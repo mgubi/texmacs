@@ -2596,6 +2596,38 @@ EM_JS (void, vue_web_paste_dialog, (const char* choices, int chosen), {
     tmClipboard.fromBrowser (UTF8ToString (choices), chosen);
 });
 
+// (web-javascript code): the JavaScript of the page, evaluated in its global
+// scope (plugins/javascript, my-init-javascript.js); its value as a string
+// (a string as it is, undefined as "", the rest as JSON or as String gives
+// it; an exception as "Error: ...")
+EM_JS_DEPS (vue_web_javascript, "$stringToNewUTF8,$UTF8ToString");
+EM_JS (char*, vue_web_javascript, (const char* code), {
+  var r;
+  try {
+    var v = (0, eval) (UTF8ToString (code));
+    if (v === undefined) r = '';
+    else if (typeof v === 'string') r = v;
+    else {
+      try { r = JSON.stringify (v); } catch (e) { r = undefined; }
+      if (r === undefined) r = String (v);
+    }
+  }
+  catch (e) { r = 'Error: ' + (e && e.message ? e.message : e); }
+  return stringToNewUTF8 (r);
+});
+
+static s7_pointer
+web_javascript_s7 (s7_scheme* sc, s7_pointer args) {
+  s7_pointer a= s7_car (args);
+  if (!s7_is_string (a)) return s7_wrong_type_arg_error (sc, "web-javascript", 1, a, "a string");
+  c_string code (cork_to_utf8 (string (s7_string (a))));
+  char* r= vue_web_javascript (code);
+  string res= utf8_to_cork (string (r));
+  free (r);
+  c_string out (res);
+  return s7_make_string (sc, out);
+}
+
 // (web-paste-dialog choices chosen): Edit > Paste from browser, the dialog
 // of the page which gets the clipboard of the browser (a menu has no paste
 // event), and then runs the Scheme command which pastes it in the format
@@ -2623,6 +2655,10 @@ void gui_open (int& argc, char** argv) {
   if (tm_s7 != NULL)
     s7_define_function (tm_s7, "web-open-external", web_open_external_s7, 3, 0, false,
                         "(web-open-external target file? name): a link left to the browser");
+  if (tm_s7 != NULL)
+    s7_define_function (tm_s7, "web-javascript", web_javascript_s7, 1, 0, false,
+                        "(web-javascript code): JavaScript evaluated in the page, "
+                        "its value as a string");
   if (tm_s7 != NULL)
     s7_define_function (tm_s7, "web-paste-dialog", web_paste_dialog_s7, 2, 0, false,
                         "(web-paste-dialog choices chosen): the clipboard of the browser, "
@@ -4298,6 +4334,26 @@ extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_scheme (const char* cmd) {
   exec_delayed (scheme_cmd (web_scheme_text (string (cmd))));
   gui_needs_update= true;
+}
+
+// TeXmacs.scheme (misc/wasm/javascript.js): a Scheme expression evaluated
+// now, for the JavaScript of the page, its value as text in UTF-8 (a string
+// as it is, the rest as object->string writes it, an error as (error ...)).
+// Only out of TeXmacs: from an event, a timer or a promise of the page, not
+// from code which TeXmacs runs. The text stays until the next call.
+extern "C" EMSCRIPTEN_KEEPALIVE const char*
+vue_web_scheme_eval (const char* cmd) {
+  static char* last= NULL;
+  string expr= "(let ((r (catch #t (lambda () (begin " *
+               web_scheme_text (string (cmd)) *
+               "\n)) (lambda args (cons 'error args)))))"
+               " (if (string? r) r (object->string r)))";
+  object o= eval (expr);
+  string r= is_string (o) ? as_string (o) : string ("");
+  if (last != NULL) tm_delete_array (last);
+  last= as_charp (cork_to_utf8 (r));
+  gui_needs_update= true;
+  return last;
 }
 
 // a document of the page is shown in its tab if it has one, else opened in

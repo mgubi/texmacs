@@ -145,6 +145,24 @@ tm_server_rep::tm_server_rep ()
   if (exists (tm_init_file)) exec_file (tm_init_file);
   if (exists (my_init_file)) exec_file (my_init_file);
   bench_cumul ("initialize scheme");
+#ifdef __EMSCRIPTEN__
+  // in a page, the JavaScript of the user too (plugins/javascript): run once
+  // TeXmacs has started, out of it, so that it may use TeXmacs.scheme
+  {
+    url js= "$TEXMACS_HOME_PATH/progs/my-init-javascript.js";
+    string code;
+    if (!is_headless () && exists (js) && !load_string (js, code, false)) {
+      c_string c (code);
+      EM_ASM ({
+        var code = UTF8ToString ($0);
+        setTimeout (function () {
+          try { (0, eval) (code); }
+          catch (e) { console.error ('TeXmacs: my-init-javascript.js: ' + e); }
+        }, 0);
+      }, (char*) c);
+    }
+  }
+#endif
   if (my_init_cmds != "") {
     my_init_cmds= "(begin" * my_init_cmds * ")";
     exec_delayed (scheme_cmd (my_init_cmds));

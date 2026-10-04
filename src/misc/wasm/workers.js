@@ -20,6 +20,15 @@
 // What a worker sends is kept here until TeXmacs takes it (tmWorkers.take,
 // at each pass of the interpose handler of the server), and the loop of the
 // page is woken up, which otherwise sleeps while nothing happens.
+//
+// A plugin which must run in the page itself (the JavaScript of the page,
+// plugins/javascript) says (:worker "page:<file>"), <file> a script of the
+// file system of TeXmacs. The script is the body of a function of one
+// argument, tm, which returns the plugin: {message (m)}, with the messages
+// of a worker ({input}, {interrupt}), and maybe {stop ()}. It answers with
+// tm.post ({out} or {err} or {exit}), as a worker with postMessage. Its
+// messages are given to it later, out of TeXmacs (which writes them while it
+// runs), as those of a worker are.
 
 var tmWorkers = (function () {
   var workers = {}, next = 1;
@@ -35,11 +44,47 @@ var tmWorkers = (function () {
     if (typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
   }
 
+  // a plugin of the page, with the interface of a worker
+  function pageWorker (path) {
+    var code = FS.readFile (path, { encoding: 'utf8' });
+    var pw = { onmessage: null, plugin: null, stopped: false };
+    var tm = {
+      post: function (m) {
+        if (!pw.stopped && pw.onmessage) pw.onmessage ({ data: m });
+      }
+    };
+    // made once start has set onmessage (what it posts at first is not
+    // lost), before the messages, which come later too
+    setTimeout (function () {
+      try { pw.plugin = (new Function ('tm', code)) (tm); }
+      catch (e) {
+        tm.post ({ err: 'Error in the plugin ' + path + ': ' + e + '\n' });
+        tm.post ({ exit: 1 });
+      }
+    }, 0);
+    pw.postMessage = function (m) {
+      setTimeout (function () {
+        if (pw.stopped || !pw.plugin) return;
+        try { pw.plugin.message (m); }
+        catch (e) { tm.post ({ err: 'Error in the plugin ' + path + ': ' + e + '\n' }); }
+      }, 0);
+    };
+    pw.terminate = function () {
+      pw.stopped = true;
+      if (pw.plugin && pw.plugin.stop) pw.plugin.stop ();
+    };
+    return pw;
+  }
+
   return {
     // a new worker, its number (or -1)
     start: function (url) {
       var w;
-      try { w = { worker: new Worker (url), pending: [[], []], alive: true }; }
+      try {
+        w = { worker: url.indexOf ('page:') == 0 ? pageWorker (url.slice (5))
+                                                 : new Worker (url),
+              pending: [[], []], alive: true };
+      }
       catch (e) {
         console.error ('TeXmacs: cannot start the worker ' + url + ': ' + e);
         return -1;
