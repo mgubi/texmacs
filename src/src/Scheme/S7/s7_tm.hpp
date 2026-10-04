@@ -62,8 +62,18 @@ tmscm string_to_tmscm (string s);
 tmscm symbol_to_tmscm (string s);
 
 inline bool tmscm_to_bool (tmscm obj) { return s7_boolean (tm_s7, obj); }
-inline int tmscm_to_int (tmscm obj) { return s7_integer (obj); }
-inline unsigned int tmscm_to_uint (tmscm obj) { return (unsigned int) s7_integer (obj); }
+// s7 integers are 64 bits: as Guile's scm_to_int, raise out-of-range rather
+// than truncate an integer which does not fit
+inline int tmscm_to_int (tmscm obj) {
+  s7_int i= s7_integer (obj);
+  if (i < -2147483647 - 1 || i > 2147483647)
+    s7_out_of_range_error (tm_s7, "tmscm_to_int", 1, obj, "a 32-bit integer");
+  return (int) i; }
+inline unsigned int tmscm_to_uint (tmscm obj) {
+  s7_int i= s7_integer (obj);
+  if (i < 0 || i > 4294967295LL)
+    s7_out_of_range_error (tm_s7, "tmscm_to_uint", 1, obj, "a 32-bit unsigned integer");
+  return (unsigned int) i; }
 inline double tmscm_to_double (tmscm obj) { return s7_real (obj); }
 string tmscm_to_string (tmscm obj);
 string tmscm_to_symbol (tmscm obj);
