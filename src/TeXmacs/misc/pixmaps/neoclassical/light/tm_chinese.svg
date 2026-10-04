@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns:svg="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" height="16" id="svg2" version="1.0" width="16">
+ <defs id="defs16"/>
+ <g id="g9570" transform="matrix(0.0625,0,0,0.05859363,0,0.51955681)" style="opacity:0.75">
+  <rect y="42.333" x="0" width="256" style="fill:#de2910" id="rect4" height="170.66701"/>
+  <path style="fill:#ffde00" id="star" d="m 27.690213,105.63795 5.674025,-17.645436 -14.910905,-10.939121 18.46692,-0.0344 5.753705,-17.619334 5.739158,17.624134 18.466884,0.0498 -14.919927,10.926721 5.659465,17.650136 -14.960179,-10.871123 -14.969146,10.858623 0,0 z"/>
+  <use y="0" xlink:href="#star" x="0" width="3000" transform="matrix(0.3128368,0.1151017,-0.1151013,0.3128368,81.815407,87.649317)" id="use7" height="2000"/>
+  <use y="0" xlink:href="#star" x="0" width="3000" transform="matrix(0.3330938,-0.0127962,0.01279615,0.3330938,87.130954,74.29826)" id="use9" height="2000"/>
+  <use y="0" xlink:href="#star" x="0" width="3000" transform="matrix(0.2988346,-0.1476936,0.147693,0.2988346,77.058704,57.361021)" id="use11" height="2000"/>
+  <use y="0" xlink:href="#star" x="0" width="3000" transform="matrix(0.3070677,0.1297109,-0.1297105,0.3070677,83.21088,27.749418)" id="use13" height="2000"/>
+ </g>
+</svg>

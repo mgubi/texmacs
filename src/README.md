@@ -107,6 +107,37 @@ markup in a balloon, to insert them with a click.
 The work started from the partial support written by Ke Shi for Mogan
 (OSPP 2024), itself built on a `MATH` table reader from 2021.
 
+## Icon sets (branch `wip_icons`)
+
+This branch gives TeXmacs a choice of three icon sets, in
+**Preferences › General › Icon set** (after a restart). The original icons
+and the original code that finds them are unchanged; the new sets are added
+on top of them.
+
+**Classical.** The original TeXmacs icons, the default.
+
+![Classical icons](doc/icons/classical-toolbars.png)
+
+**Monochrome.** The classical ideas drawn in the manner of the macOS symbols:
+filled objects with an outline, in one graphite tint and its light tones, red
+kept for errors and removals, letters in Latin Modern.
+
+![Monochrome icons](doc/icons/monochrome-toolbars.png)
+
+**Neo-classical.** The compositions and colours of the classical icons,
+modernized: a soft palette, light gradients, dark grey outlines, rounded
+corners; flat in the focus bar.
+
+![Neo-classical icons](doc/icons/neoclassical-toolbars.png)
+
+The pictures show the main, text and focus toolbars on the light and dark
+themes. Every icon of each set, with its name, is in the specimen sheets
+[classical.pdf](doc/icons/classical.pdf),
+[monochrome.pdf](doc/icons/monochrome.pdf) and
+[neoclassical.pdf](doc/icons/neoclassical.pdf).
+[doc/icons/README.md](doc/icons/README.md) describes how the sets are chosen
+and the scripts that generate them (`misc/icons/`).
+
 ## Documentation
 GNU TeXmacs is self-documented. You may browse the manual in the `Help` menu or browse the online [one](https://www.texmacs.org/tmweb/manual/web-manual.en.html).
 

@@ -108,6 +108,11 @@
       ("light" "Bright")
       ("dark" "Dark"))
 
+(define-preference-names-and-validate "icon set"
+  ("classical" "Classical")
+  ("monochrome" "Monochrome")
+  ("neo-classical" "Neo-classical"))
+
 (define-preference-names-and-validate "gui density"
   ("compact" "Compact")
   ("normal" "Normal")
@@ -162,6 +167,11 @@
                 '("Default" "Bright" "Dark" "Native" "Legacy" "")
             )
             (get-pretty-preference "gui theme")
+            "18em"))
+    (item (text "Icon set:")
+      (enum (set-pretty-preference "icon set" answer)
+            '("Classical" "Monochrome" "Neo-classical")
+            (get-pretty-preference "icon set")
             "18em"))
     (assuming (support-functionality? "density")
       (item (text "Interface density:")
