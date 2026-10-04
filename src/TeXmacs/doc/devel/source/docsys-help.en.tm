@@ -77,6 +77,22 @@
     <verbatim|server-buffers.en.tm>). At the top of a book the level is
     <verbatim|title> and the title becomes the title of the book.
 
+    <item*|Sectioning commands>(<markup|section>, <markup|subsection>,
+    <markup|subsubsection>, <markup|paragraph>, <markup|subparagraph> and
+    their starred variants) are taken relative to the level of the page:
+    a <markup|section> becomes the level just below the heading of the
+    page, a <markup|subsection> the level below that, and so on
+    (<scm|tmdoc-demote>). In a page which becomes a chapter, sections thus
+    stay sections; in a page which becomes a section, they become
+    subsections. Pages without sectioning commands, like most pages of the
+    user manual, are not affected.
+
+    <item*|A heading which introduces the branches>(a heading such as
+    <verbatim|Contents of this chapter> which is followed by a
+    <markup|traverse> before any other heading) is removed, since the
+    expanded branches become its siblings and it would remain empty; the
+    text between the heading and the <markup|traverse> is kept.
+
     <item*|<markup|traverse>>is replaced by the expansion of its branches.
 
     <item*|<markup|branch>>expands the target one level deeper, according
@@ -86,7 +102,12 @@
     <verbatim|subsubsection>, <verbatim|paragraph> and finally
     <verbatim|subparagraph> for all deeper levels. The level of the root
     page of an article is <verbatim|tmdoc-title>, so its branches become
-    sections.
+    sections. A deeply nested book may start with parts instead of
+    chapters: if the initial environment of its root file sets
+    <verbatim|tmdoc-book-parts> to <verbatim|true>, the root level is
+    <verbatim|title*>, whose branches become parts. The developer guide
+    (<verbatim|devel/source/source.en.tm>) and the whole developer
+    documentation (<verbatim|devel/devel.en.tm>) use this.
 
     <item*|<markup|continue>>expands the target at the <em|same> level and
     drops its title, so that a long page can be split into several files.

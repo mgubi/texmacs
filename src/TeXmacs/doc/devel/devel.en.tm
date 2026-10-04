@@ -66,4 +66,5 @@
 </body>
 
 <initial|<\collection>
+  <associate|tmdoc-book-parts|true>
 </collection>>

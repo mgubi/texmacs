@@ -8,17 +8,15 @@
   This part of the documentation describes the internals of <TeXmacs>: the
   <c++> kernel and the <scheme> code which is closely tied to it. It is
   meant for developers who want to understand, debug or extend the program
-  itself. The first two chapters give the general architecture and explain
-  how to build and test the program; the other chapters are grouped by
+  itself. The first part gives the general architecture and explains how
+  to build, test and document the program; the other parts are grouped by
   subsystem, roughly from the bottom up: the foundations on which
   everything is built, the document and its typesetting, fonts, the
   server and the editor, the user interface, data formats, and the
   connections to the outside world.
 
   <\traverse>
-    <branch|General architecture of <TeXmacs>|architecture.en.tm>
-
-    <branch|Building <TeXmacs> and running the tests|build.en.tm>
+    <branch|Working on <TeXmacs>|source-working.en.tm>
 
     <branch|Foundations: data types, strings, <scheme> and the system
     layer|source-foundations.en.tm>
@@ -34,8 +32,6 @@
     <branch|Data formats, converters and databases|source-data.en.tm>
 
     <branch|Plug-ins, collaboration and remote services|source-external.en.tm>
-
-    <branch|The documentation system|docsys.en.tm>
   </traverse>
 
   The document format itself, as seen by authors of documents and style
@@ -56,4 +52,5 @@
 </body>
 
 <initial|<\collection>
+  <associate|tmdoc-book-parts|true>
 </collection>>

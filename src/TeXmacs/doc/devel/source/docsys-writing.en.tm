@@ -36,6 +36,23 @@
     it; when describing behaviour, state what the code does, not what it
     was meant to do, and mark claims that were not checked.
 
+    <item>Never put markup which writes an index entry (<markup|menu>,
+    <markup|tmstyle>, <markup|tmpackage>, <markup|tmdtd>,
+    <markup|name*>, <markup|indexed>, ...) in a title or sectioning
+    command. The title is copied into the table of contents, so every
+    regeneration of the table of contents adds automatic labels, all the
+    following <verbatim|auto-<em|n>> labels are renumbered, and the page
+    numbers of the table of contents and the index of a compiled book never
+    converge.
+
+    <item>Labels of description items are unbreakable boxes. When labels
+    are long, for instance lists of several file names, use
+    <markup|description-paragraphs> instead of <markup|description>.
+
+    <item>Give every page a base name which is unique in the whole
+    documentation: compiled books label each page <verbatim|sec-<em|name>>
+    after its base name.
+
     <item>Use the markup of the <tmstyle|tmdoc> style:
     <markup|cpp>, <markup|scm>, <markup|verbatim>, <markup|markup>,
     <markup|tmstyle>, <markup|tmpackage>, <markup|explain> with
@@ -106,13 +123,13 @@
   <section|Pitfalls and known problems>
 
   <\itemize>
-    <item><em|Sectional levels in books.> The expansion turns page titles
-    into headings of the right level, but leaves the <markup|section>,
-    <markup|subsection>, ... tags <em|inside> a page unchanged. In a book,
-    a page which is three levels deep (and whose title therefore becomes a
-    <markup|subsubsection>) may contain <markup|section> headings, so that
-    the numbering and the table of contents of deep hierarchies are
-    inconsistent (<verbatim|progs/doc/tmdoc.scm>, <scm|tmdoc-rewrite-one>).
+    <item><em|Deep sectioning in books.> Sectioning commands inside a page
+    are taken relative to the level of the page (see <hlink|expansion|docsys-help.en.tm>).
+    In a deep hierarchy this quickly reaches the unnumbered levels: the
+    <markup|subsection>s of a page four levels below the root become
+    <markup|paragraph>s, and its <markup|paragraph>s run-in
+    <markup|subparagraph>s. Keep the hierarchy shallow, or let the root
+    start with parts (<verbatim|tmdoc-book-parts>).
 
     <item><em|Labels from base names.> The label of each page in an
     expansion is <verbatim|sec-<em|name>>, built from the base name only.
