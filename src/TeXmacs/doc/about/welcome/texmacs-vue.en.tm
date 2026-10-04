@@ -156,7 +156,9 @@
   <\itemize>
     <item>The keys which compose: the dead keys of many keyboards (the
     <verbatim|^> or the diaeresis of a Swiss or a French keyboard), the accents of a Mac, and the input methods of Chinese,
-    Japanese or Korean; the text being composed is shown in the document.
+    Japanese or Korean; the text being composed is shown in the document,
+    and the panel of the system (the accents of a held key, the candidates of
+    an input method) appears at the cursor.
 
     <item>A copy keeps its structure when it is pasted into another tab of
     <TeXmacs>, or into the page reloaded (it was pasted as text).

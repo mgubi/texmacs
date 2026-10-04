@@ -53,6 +53,9 @@ extern bool menu_caching;
 // Clay
 
 #include <SDL3/SDL.h> // SDL_GetSystemTheme (the themes)
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h> // EM_ASM (the input area of the page)
+#endif
 #include "clay.h"
 #include "clay_grid.h"
 
@@ -6626,23 +6629,31 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 // which has the keyboard: SDL is told where it is (SDL_SetTextInputArea, in
 // points of the window), as Qt answers ImCursorRectangle from the position
 // of SLOT_CURSOR. Done after the scroll, which moves the cursor in the
-// window, and only when it changed.
+// window, and only when it changed. A virtual window (a tab, a dialog of
+// single-window mode) is shown in its host, the area is set there. In the
+// browser, where SDL has no input method, the hidden text area of the page
+// in which they compose goes there (tmIme.caret, misc/wasm/ime.js).
 void
 vue_simple_widget_rep::update_text_input_area () {
   if (win == NULL || win->kbd_focus != this) return;
-  SDL_Window* sw= (SDL_Window*) win->platform_window ();
-  if (sw == NULL) return; // a virtual window (single-window mode)
+  float dx, dy;
+  SDL_Window* sw= (SDL_Window*) vue_shown_in (win, dx, dy);
+  if (sw == NULL) return;
   SI x= cursor_pos.x1, y= cursor_pos.x2;
   ren->set_origin (-backing_pos.x1, -backing_pos.x2);
   ren->decode (x, y); // pixels of the backing store, from its top left
   float d= (win->density > 0.0f) ? win->density : 1.0f;
-  int px= (int) ((origin.x1 + x) / d), py= (int) ((origin.x2 + y) / d);
+  int px= (int) (dx + (origin.x1 + x) / d), py= (int) (dy + (origin.x2 + y) / d);
   if (!cursor_moved && px == ime_x && py == ime_y) return;
   cursor_moved= false;
   ime_x= px; ime_y= py;
   // a thin box on the baseline, the candidates go below it
   SDL_Rect r= { px, py - 12, 2, 16 };
   SDL_SetTextInputArea (sw, &r, 0);
+#ifdef __EMSCRIPTEN__
+  EM_ASM ({ if (typeof tmIme !== 'undefined' && tmIme) tmIme.caret ($0, $1, $2); },
+          r.x, r.y, r.h);
+#endif
 }
 
 void

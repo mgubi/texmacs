@@ -2404,6 +2404,19 @@ route_keys (vue_window win) {
   return win;
 }
 
+void*
+vue_shown_in (vue_window win, float& dx, float& dy) {
+  dx= dy= 0;
+  if (win == NULL) return NULL;
+  if (win->platform_window () != NULL) return win->platform_window ();
+  vue_virtual_window_rep* v= dynamic_cast<vue_virtual_window_rep*> (win);
+  if (v == NULL || !v->shown || the_host == NULL) return NULL;
+  float hx, hy, hw, hh;
+  host_geometry (hx, hy, hw, hh);
+  dx= v->x - hx; dy= v->y - hy;
+  return the_host->platform_window ();
+}
+
 // the tab of the window widget w of TeXmacs, if any
 static vue_virtual_window_rep*
 find_tab_of (widget w) {

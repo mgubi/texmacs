@@ -269,6 +269,10 @@ extern void* vue_render_text;
 void layout_text (string s, int style, color c);
 void layout_keys (string s, int style, color c); // a keyboard shortcut
 
+// the SDL window which shows win (its host for a virtual window), and where
+// the top left corner of win is in it (points)
+void* vue_shown_in (vue_window win, float& dx, float& dy);
+
 extern vue_window current_window;
 class with_window {
 public:
