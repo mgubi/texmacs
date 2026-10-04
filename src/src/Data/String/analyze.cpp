@@ -1595,7 +1595,7 @@ differences (string s1, string s2) {
   int i1= 0, i2= 0, j1= n1, j2= n2;
   while (i1<j1 && i2<j2 && s1[i1] == s2[i2]) { i1++; i2++; }
   while (i1<j1 && i2<j2 && s1[j1-1] == s2[j2-1]) { j1--; j2--; }
-  if (i1 == i2 && j1 == j2) return array<int> ();
+  if (i1 == j1 && i2 == j2) return array<int> ();
   if (i1 > 0 || i2 > 0 || j1 < n1 || j2 < n2) {
     array<int> r= differences (s1 (i1, j1), s2 (i2, j2));
     for (int k=0; k<N(r); k+=4) {
