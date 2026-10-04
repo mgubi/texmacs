@@ -38,6 +38,8 @@
 
     <branch|Wide accents|keyboard/man-wide.en.tm>
 
+    <branch|Mathematical fonts|fonts/man-math-fonts.en.tm>
+
     <branch|Semantic editing facilities|semantics/man-semantics.en.tm>
 
     <branch|Common errors and syntax correction|semantics/man-syntax-correction.en.tm>

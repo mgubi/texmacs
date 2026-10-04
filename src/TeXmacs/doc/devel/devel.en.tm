@@ -27,6 +27,9 @@
     how to connect <TeXmacs> to computer algebra systems and other external
     programs.
 
+    <item*|Fonts>How fonts are configured, selected and resolved, down to
+    the glyphs, including virtual fonts.
+
     <item*|The source code>The internals of the <c++> kernel and of the
     <scheme> code which is closely tied to it: data types and the system
     layer, typesetting, fonts, the server and the editor, the graphical
@@ -48,6 +51,8 @@
     <branch|Interfacing <TeXmacs> with other
     programs|interface/interface.en.tm>
 
+    <branch|Fonts, from selection to glyph|fonts/fonts.en.tm>
+
     <branch|About the source code of <TeXmacs>|source/source.en.tm>
   </traverse>
 
@@ -66,5 +71,7 @@
 </body>
 
 <initial|<\collection>
+  <associate|language|english>
+
   <associate|tmdoc-book-parts|true>
 </collection>>

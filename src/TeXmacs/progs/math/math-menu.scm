@@ -1136,6 +1136,8 @@
       ("Left-right arrow" (make-wide-under "<wide-varleftrightarrow>"))
       ("Wide bar" (make-wide-under "<wide-bar>")))
   (-> "Symbol" (link symbol-menu))
+  ("All symbols..." (open-math-symbols))
+  ("Symbols in a side tool" (open-math-symbols-tool))
   (-> "Textual operator" (link textual-operator-menu))
   (if (== (get-preference "semantic editing") "on")
       (-> "Semantics" (link semantic-annotation-menu)))

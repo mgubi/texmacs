@@ -569,6 +569,24 @@ edit_main_rep::show_box () {
   stretched_print (eb);
 }
 
+// Read-only access to the typeset boxes, for tools that inspect how the
+// document was typeset (the font inspector and the font report)
+box
+edit_main_rep::get_box_root () {
+  return eb;
+}
+
+path
+edit_main_rep::get_box_path_at (bool at_mouse) {
+  // the box path of the cursor, or of the last position of the mouse, in
+  // the root box; the empty path when there is none
+  if (is_nil (eb)) return path ();
+  bool found= false;
+  path bp= at_mouse? eb->find_box_path (last_x, last_y, 0, false, found):
+                     eb->find_box_path (tp, found);
+  return found? bp: path ();
+}
+
 void
 edit_main_rep::show_env () {
   cout << env << "\n";

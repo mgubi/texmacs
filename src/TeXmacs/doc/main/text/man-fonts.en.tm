@@ -7,8 +7,11 @@
 
   In <TeXmacs>, the global document font can be specified using
   <menu|Document|Font>. It is also possible to locally use another font using
-  <menu|Format|Font>. Both <menu|Document|Font> and <menu|Format|Font> open
-  the <TeXmacs> font browser. Fonts have three main characteristics:
+  <menu|Format|Font>. When the preference <menu|Complex actions> (in the
+  tab <menu|General> of the preferences) is set to popup windows, both open
+  the <TeXmacs> font browser; when it is set to menus,
+  <menu|Document|Font> is a submenu, and <menu|Format> lists the fonts
+  itself. Fonts have three main characteristics:
 
   <\description>
     <item*|Family>Fonts are grouped together into <em|families> with a
@@ -84,12 +87,29 @@
   (for instance).
 
   It should be noticed that <TeXmacs> comes with a limited number of
-  preinstalled fonts, such as the <with|font|Stix|Stix> fonts and several
-  fonts prefixed by \PTeXmacs\Q. Documents which only use these fonts will be
+  preinstalled fonts: the fonts prefixed by \PTeXmacs\Q, the
+  <with|font|Stix|Stix> fonts, Linux Libertine and Biolinum, OpenDyslexic,
+  and the text and mathematical fonts shown in
+  the section <hlink|<em|The fonts which come with
+  <TeXmacs>>|../math/fonts/man-math-font-catalogue.en.tm>, among them Latin
+  Modern, <name|TeX Gyre>, Libertinus and Fira. Documents which only use
+  these fonts will be
   rendered the same on different systems (assuming the same version of
   <TeXmacs>). When your documents contain other fonts as well, then these
   fonts may be replaced by closest matches when opening your document under a
   different operating system.
+
+  Formulas are set in the mathematical font which goes with the main font
+  of the document. The section <hlink|<em|Mathematical
+  fonts>|../math/fonts/man-math-fonts.en.tm> explains how, shows every
+  mathematical font which comes with <TeXmacs> with a sample, and lists the
+  ones you may install.
+
+  The chapter <hlink|<em|Fonts, from selection to
+  glyph>|../../devel/fonts/fonts.en.tm> of the reference guide explains what
+  happens behind this dialog: which variables a font selection sets, how a
+  character is turned into a glyph, which files decide what a font name
+  means, and how the virtual fonts draw the symbols that no font provides.
 
   <tmdoc-copyright|1998--2014|Joris van der Hoeven>
 

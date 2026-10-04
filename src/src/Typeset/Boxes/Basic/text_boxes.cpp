@@ -60,6 +60,12 @@ struct text_box_rep: public box_rep {
   SI        lsup_correction ();
   SI        rsub_correction ();
   SI        rsup_correction ();
+  SI        lsub_correction_at (SI h);
+  SI        lsup_correction_at (SI h);
+  SI        rsub_correction_at (SI h);
+  SI        rsup_correction_at (SI h);
+  bool      extended_shape ();
+  bool      top_accent (SI& x);
   SI        sub_lo_base (int level);
   SI        sub_hi_lim  (int level);
   SI        sup_lo_lim  (int level);
@@ -162,6 +168,20 @@ SI text_box_rep::rsub_correction () {
   return fn->get_rsub_correction (str); }
 SI text_box_rep::rsup_correction () {
   return fn->get_rsup_correction (str); }
+SI text_box_rep::lsub_correction_at (SI h) {
+  return fn->get_lsub_correction_at (str, h); }
+SI text_box_rep::lsup_correction_at (SI h) {
+  return fn->get_lsup_correction_at (str, h); }
+SI text_box_rep::rsub_correction_at (SI h) {
+  return fn->get_rsub_correction_at (str, h); }
+SI text_box_rep::rsup_correction_at (SI h) {
+  return fn->get_rsup_correction_at (str, h); }
+bool text_box_rep::extended_shape () {
+  if (tm_string_length (str) != 1) return true;
+  return fn->is_extended_shape (str); }
+bool text_box_rep::top_accent (SI& x) {
+  if (tm_string_length (str) != 1) return false;
+  return fn->get_top_accent (str, x); }
 
 SI
 text_box_rep::sub_lo_base (int level) {
@@ -392,6 +412,11 @@ get_delimiter (string s, font fn, SI height) {
   int ns= N(s);
   ASSERT (ns >= 2 && s[0] == '<' && s[ns-1] == '>',
 	  "invalid rubber character");
+  // fonts which know their size variants (OpenType MATH) answer directly
+  if (!is_digit (s[ns-2])) {
+    string r;
+    if (fn->get_rubber_variant (s, height - PIXEL, r)) return r;
+  }
   if (is_digit (s[ns-2])) {
     int pos;
     int plus= get_number (s, pos);
@@ -457,6 +482,11 @@ static string
 get_wide (string s, font fn, SI width) {
   ASSERT (N(s) >= 2 && s[0] == '<' && s[N(s)-1] == '>',
 	  "invalid rubber character");
+  // fonts which know their width variants (OpenType MATH) answer directly
+  if (!is_digit (s[N(s)-2])) {
+    string r;
+    if (fn->get_wide_variant (s, width, r)) return r;
+  }
   string radical= s (0, N(s)-1) * "-";
   string first  = radical * "0>";
   metric ex;
@@ -577,6 +607,36 @@ wide_box (path ip, string s, font fn, pencil pen, SI width) {
   return macro_box (ip, b, fn);
 }
 
+// A long arrow has to cover its labels: get_wide gives the widest size
+// which is not wider than the width (what an accent wants), so the next
+// sizes are tried as long as they fall short. A font without horizontal
+// variants (Fira Math has none for its arrows) otherwise leaves the arrow
+// at the size of its base glyph under a wider label.
+box
+wide_box_covering (path ip, string s, font fn, pencil pen, SI width) {
+  string r= get_wide (s, fn, width);
+  metric ex;
+  fn->get_extents (r, ex);
+  int pos= search_backwards ("-", N(r), r);
+  if (ex->x2 - ex->x1 < width && pos > 0 && ends (r, ">") &&
+      is_int (r (pos + 1, N(r) - 1))) {
+    string radical= r (0, pos + 1);
+    int n= as_int (r (pos + 1, N(r) - 1));
+    SI  w= ex->x2 - ex->x1;
+    for (int k= n + 1; k <= n + 30; k++) {
+      string test= radical * as_string (k) * ">";
+      metric ey;
+      fn->get_extents (test, ey);
+      SI wk= ey->x2 - ey->x1;
+      if (wk <= w) break;                      // no longer growing
+      r= test; w= wk;
+      if (w >= width) break;
+    }
+  }
+  box b= text_box (ip, 0, r, fn, pen);
+  return macro_box (ip, b, fn);
+}
+
 box
 wide_stix_box (path ip, string s, font fn, pencil pen, SI width) {
   string r= get_wide_stix (s, fn, width);
@@ -590,3 +650,4 @@ box
 text_box (path ip, int pos, string s, font fn, pencil pen) {
   return tm_new<text_box_rep> (ip, pos, s, fn, pen, xkerning ());
 }
+

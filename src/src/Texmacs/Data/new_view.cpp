@@ -293,6 +293,39 @@ get_passive_view (url name) {
   return get_new_view (buf->buf->name);
 }
 
+// The font inspector and the font report ask the editor for its typeset
+// boxes and the box path at the cursor or the mouse, and the boxes for the
+// fonts they were typeset with (font_debug_boxes.cpp)
+static tree
+editor_font_debug_info (editor ed, bool at_mouse) {
+  return box_font_debug_info (ed->get_box_root (),
+                              ed->get_box_path_at (at_mouse), at_mouse);
+}
+
+// The glyph at the cursor (or at the last position of the mouse)
+tree
+font_debug_info (bool at_mouse) {
+  return editor_font_debug_info (get_current_editor (), at_mouse);
+}
+
+// The same in another buffer: the font inspector keeps looking at the
+// document it was opened on while another buffer, such as its font report,
+// has the focus. Only a view shown in a window is asked; none is created.
+tree
+font_debug_info_of (url name, bool at_mouse) {
+  array<url> vs= buffer_to_views (name);
+  for (int i=0; i<N(vs); i++)
+    if (!is_none (view_to_window (vs[i])))
+      return editor_font_debug_info (view_to_editor (vs[i]), at_mouse);
+  return tree (TUPLE);
+}
+
+// Every character of the typeset document, counted by the route its font took
+tree
+font_debug_report () {
+  return box_font_debug_report (get_current_editor ()->get_box_root ());
+}
+
 url
 get_recent_view (url name) {
   // Get (most) recent view on a buffer, with a preference for

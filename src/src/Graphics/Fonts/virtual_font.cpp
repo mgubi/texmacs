@@ -267,9 +267,11 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
     if (r == "#28") r= "(";
     if (r == "#29") r= ")";
     if (N(r)>1) r= "<" * r * ">";
-    if (!extend || base_fn->supports (r) || !virt->dict->contains (r))
-      return base_fn->supports (r);
-    if (!virt->dict->contains (r)) return false;
+    if (!extend || base_fn->supports (r) || !virt->dict->contains (r)) {
+      // a base which is a virtual font may itself draw r as a bitmap
+      if (!base_fn->supports (r)) return false;
+      return !svg || virtual_font_draws_vectors (base_fn, r);
+    }
     return supported (virt->virt_def [virt->dict [r]], svg);
   }
 
@@ -317,6 +319,7 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
 
   if (is_tuple (t, "glue-above", 3) ||
       is_tuple (t, "glue-below", 3) ||
+      is_tuple (t, "glue*", 3) ||
       is_tuple (t, "stack", 3) ||
       (is_tuple (t, "left-fit", 3) && is_double (t[3])) ||
       (is_tuple (t, "right-fit", 3) && is_double (t[3]))) {
@@ -356,6 +359,8 @@ virtual_font_rep::supported (scheme_tree t, bool svg) {
       is_tuple (t, "hor-extend", 4) ||
       is_tuple (t, "ver-extend", 3) ||
       is_tuple (t, "ver-extend", 4) ||
+      is_tuple (t, "hor-take", 3) ||
+      is_tuple (t, "hor-take", 4) ||
       is_tuple (t, "ver-take", 3) ||
       is_tuple (t, "ver-take", 4) ||
       (is_tuple (t, "unserif") && !svg) ||
@@ -555,11 +560,13 @@ virtual_font_rep::compile_bis (scheme_tree t, metric& ex) {
     return join (gl1, move (gl2, dx, 0));
   }
 
-  if (is_tuple (t, "glue*", 2)) {
+  if (is_tuple (t, "glue*", 2) || is_tuple (t, "glue*", 3)) {
     metric ey;
     glyph gl1= compile (t[1], ex);
     glyph gl2= compile (t[2], ey);
     SI dx= ex->x2;
+    if (N(t) >= 4 && is_double (t[3]))
+      dx += (SI) (as_double (t[3]) * hunit);
     outer_fit (ex, ey, dx, 0);
     return join (gl1, move (gl2, dx, 0));
   }
@@ -932,6 +939,22 @@ virtual_font_rep::compile_bis (scheme_tree t, metric& ex) {
     return hor_extend (gl, pos, by);
   }
 
+  if (is_tuple (t, "hor-take", 3) || is_tuple (t, "hor-take", 4)) {
+    glyph gl = compile (t[1], ex);
+    int   pos= (int) (as_double (t[2]) * gl->width);
+    SI    add= (SI) (as_double (t[3]) * (ex->x2 - ex->x1));
+    if (is_tuple (t, "hor-take", 4))
+      add= (SI) (as_double (t[3]) * as_double (t[4]) * (ex->x2 - ex->x1));
+    int nr= add / PIXEL;
+    if (pos < 0) pos= 0;
+    if (pos >= gl->width) pos= gl->width - 1;
+    ex->x1= 0;
+    ex->x2= add;
+    ex->x3= 0;
+    ex->x4= nr * PIXEL;
+    return hor_take (gl, pos, nr);
+  }
+
   if (is_tuple (t, "ver-extend", 3) || is_tuple (t, "ver-extend", 4)) {
     glyph gl= compile (t[1], ex);
     int pos= (int) ((1.0 - as_double (t[2])) * gl->height);
@@ -1259,10 +1282,12 @@ virtual_font_rep::draw_tree (renderer ren, scheme_tree t, SI x, SI y) {
     return;
   }
 
-  if (is_tuple (t, "glue*", 2)) {
+  if (is_tuple (t, "glue*", 2) || is_tuple (t, "glue*", 3)) {
     metric ex;
     get_metric (t[1], ex);
     SI dx= ex->x2;
+    if (N(t) >= 4 && is_double (t[3]))
+      dx += (SI) (as_double (t[3]) * hunit);
     draw_tree (ren, t[1], x, y);
     draw_tree (ren, t[2], x + dx, y);
     return;
@@ -1526,6 +1551,25 @@ virtual_font_rep::draw_tree (renderer ren, scheme_tree t, SI x, SI y) {
     return;
   }
 
+  if (is_tuple (t, "hor-take", 3) || is_tuple (t, "hor-take", 4)) {
+    metric ex;
+    get_metric (t[1], ex);
+    SI pos= (SI) (as_double (t[2]) * (ex->x2 - ex->x1));
+    SI add= (SI) (as_double (t[3]) * (ex->x2 - ex->x1));
+    if (is_tuple (t, "hor-take", 4))
+      add= (SI) (as_double (t[3]) * as_double (t[4]) * (ex->x2 - ex->x1));
+    if (add > 0 && ex->x2 > ex->x1) {
+      SI  w = ex->x2 - ex->x1;
+      int n = (int) ((20 * add + w - 1) / w);
+      SI  dx= (add + n - 1) / n;
+      SI  hx= (add + 2 * n - 1) / (2 * n);
+      for (int i= 0; i < n; i++)
+        draw_clipped (ren, t[1], x + i * dx - (ex->x3 + pos), y,
+                      ex->x3 + pos - hx, ex->y3, ex->x3 + pos + hx, ex->y4);
+    }
+    return;
+  }
+  
   if (is_tuple (t, "ver-extend", 3) || is_tuple (t, "ver-extend", 4)) {
     metric ex;
     get_metric (t[1], ex);
@@ -2065,6 +2109,33 @@ virtually_defined (string c, string name) {
   if (vdefined [name * "-" * c]) return true;
   string nr;
   return vdefined [name * "-" * decode_sharp (c, nr)];
+}
+
+/******************************************************************************
+* For the font debugging tools
+******************************************************************************/
+
+// Whether the character s of a virtual font is drawn by one of its
+// constructions rather than taken from the font it extends; an extended
+// font may extend another virtual font, whose constructions count too
+bool
+virtual_font_constructs (font fn, string s) {
+  virtual_font_rep* v= dynamic_cast<virtual_font_rep*> (fn.rep);
+  if (v == NULL) return false;
+  if (v->extend && v->base_fn->supports (s))
+    return virtual_font_constructs (v->base_fn, s);
+  return v->virt->dict->contains (s);
+}
+
+// Whether the PDF writer can draw the character s of a virtual font as
+// vectors; otherwise it embeds a bitmap of it, in a Type 3 font
+bool
+virtual_font_draws_vectors (font fn, string s) {
+  virtual_font_rep* v= dynamic_cast<virtual_font_rep*> (fn.rep);
+  if (v == NULL) return true;
+  if (v->extend && v->base_fn->supports (s))
+    return virtual_font_draws_vectors (v->base_fn, s);
+  return v->supported (s, true);
 }
 
 font

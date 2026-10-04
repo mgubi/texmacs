@@ -1396,6 +1396,106 @@ tmg_new_fontsP () {
 }
 
 tmscm
+tmg_set_hand_tuned_math_fonts (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "set-hand-tuned-math-fonts");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  set_hand_tuned_math_fonts (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_math_font_profile_set (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-font-profile-set");
+  TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "math-font-profile-set");
+
+  string in1= tmscm_to_string (arg1);
+  scheme_tree in2= tmscm_to_scheme_tree (arg2);
+
+  // TMSCM_DEFER_INTS;
+  math_font_profile_set (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_math_font_profile (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-font-profile");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  scheme_tree out= math_font_profile (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return scheme_tree_to_tmscm (out);
+}
+
+tmscm
+tmg_math_font_profile_families () {
+  // TMSCM_DEFER_INTS;
+  array_string out= math_font_profile_families ();
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_math_font_profile_attr (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-font-profile-attr");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "math-font-profile-attr");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= math_font_profile_attr (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_math_family_for_text (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "math-family-for-text");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= math_family_for_text (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_text_family_for_math (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "text-family-for-math");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  string out= text_family_for_math (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
+tmg_hand_tuned_math_fontsP () {
+  // TMSCM_DEFER_INTS;
+  bool out= get_hand_tuned_math_fonts ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_tmtm_eqnumber_2nonumber (tmscm arg1) {
   TMSCM_ASSERT_TREE (arg1, TMSCM_ARG1, "tmtm-eqnumber->nonumber");
 
@@ -1676,6 +1776,38 @@ tmg_font_database_search (tmscm arg1, tmscm arg2) {
 
   // TMSCM_DEFER_INTS;
   array_string out= font_database_search (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_available_features (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-available-features");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= ot_font_features (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_font_logical_search (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "font-logical-search");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "font-logical-search");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "font-logical-search");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "font-logical-search");
+
+  string in1= tmscm_to_string (arg1);
+  string in2= tmscm_to_string (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= font_database_search (in1, in2, in3, in4);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
@@ -10934,6 +11066,43 @@ tmg_alt_window_set_on_top (tmscm arg1, tmscm arg2) {
 }
 
 tmscm
+tmg_font_debug_info (tmscm arg1) {
+  TMSCM_ASSERT_BOOL (arg1, TMSCM_ARG1, "font-debug-info");
+
+  bool in1= tmscm_to_bool (arg1);
+
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_info (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_info_of (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "font-debug-info-of");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "font-debug-info-of");
+
+  url in1= tmscm_to_url (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_info_of (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
+tmg_font_debug_report () {
+  // TMSCM_DEFER_INTS;
+  tree out= font_debug_report ();
+  // TMSCM_ALLOW_INTS;
+
+  return tree_to_tmscm (out);
+}
+
+tmscm
 tmg_alt_window_get_size (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-get-size");
 
@@ -11421,6 +11590,14 @@ initialize_glue_basic () {
   tmscm_install_procedure ("glyph-recognize",  tmg_glyph_recognize, 1, 0, 0);
   tmscm_install_procedure ("set-new-fonts",  tmg_set_new_fonts, 1, 0, 0);
   tmscm_install_procedure ("new-fonts?",  tmg_new_fontsP, 0, 0, 0);
+  tmscm_install_procedure ("set-hand-tuned-math-fonts",  tmg_set_hand_tuned_math_fonts, 1, 0, 0);
+  tmscm_install_procedure ("math-font-profile-set",  tmg_math_font_profile_set, 2, 0, 0);
+  tmscm_install_procedure ("math-font-profile",  tmg_math_font_profile, 1, 0, 0);
+  tmscm_install_procedure ("math-font-profile-families",  tmg_math_font_profile_families, 0, 0, 0);
+  tmscm_install_procedure ("math-font-profile-attr",  tmg_math_font_profile_attr, 2, 0, 0);
+  tmscm_install_procedure ("math-family-for-text",  tmg_math_family_for_text, 1, 0, 0);
+  tmscm_install_procedure ("text-family-for-math",  tmg_text_family_for_math, 1, 0, 0);
+  tmscm_install_procedure ("hand-tuned-math-fonts?",  tmg_hand_tuned_math_fontsP, 0, 0, 0);
   tmscm_install_procedure ("tmtm-eqnumber->nonumber",  tmg_tmtm_eqnumber_2nonumber, 1, 0, 0);
   tmscm_install_procedure ("busy-versioning?",  tmg_busy_versioningP, 0, 0, 0);
   tmscm_install_procedure ("players-set-elapsed",  tmg_players_set_elapsed, 2, 0, 0);
@@ -11445,6 +11622,8 @@ initialize_glue_basic () {
   tmscm_install_procedure ("font-database-delta-families",  tmg_font_database_delta_families, 0, 0, 0);
   tmscm_install_procedure ("font-database-styles",  tmg_font_database_styles, 1, 0, 0);
   tmscm_install_procedure ("font-database-search",  tmg_font_database_search, 2, 0, 0);
+  tmscm_install_procedure ("font-available-features",  tmg_font_available_features, 1, 0, 0);
+  tmscm_install_procedure ("font-logical-search",  tmg_font_logical_search, 4, 0, 0);
   tmscm_install_procedure ("font-database-characteristics",  tmg_font_database_characteristics, 2, 0, 0);
   tmscm_install_procedure ("font-database-substitutions",  tmg_font_database_substitutions, 1, 0, 0);
   tmscm_install_procedure ("font-family->master",  tmg_font_family_2master, 1, 0, 0);
@@ -12101,6 +12280,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("alt-window-show",  tmg_alt_window_show, 1, 0, 0);
   tmscm_install_procedure ("alt-window-hide",  tmg_alt_window_hide, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-on-top",  tmg_alt_window_set_on_top, 2, 0, 0);
+  tmscm_install_procedure ("font-debug-info",  tmg_font_debug_info, 1, 0, 0);
+  tmscm_install_procedure ("font-debug-info-of",  tmg_font_debug_info_of, 2, 0, 0);
+  tmscm_install_procedure ("font-debug-report",  tmg_font_debug_report, 0, 0, 0);
   tmscm_install_procedure ("alt-window-get-size",  tmg_alt_window_get_size, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-size",  tmg_alt_window_set_size, 3, 0, 0);
   tmscm_install_procedure ("alt-window-get-position",  tmg_alt_window_get_position, 1, 0, 0);

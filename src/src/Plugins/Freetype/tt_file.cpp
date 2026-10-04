@@ -42,6 +42,30 @@ tt_extend_font_path (url u) {
   }
 }
 
+// OpenType and TrueType font directories of the TeX Live installations
+// found under the usual roots, whatever their year
+static url
+texlive_font_dirs () {
+  url r= url_none ();
+  const char* roots[]= { "/usr/local/texlive", "/usr/share/texlive",
+                         "/opt/texlive", "$HOME/texlive" };
+  for (int i= 0; i < 4; i++) {
+    url root= url_system (roots[i]);
+    if (!is_directory (root)) continue;
+    bool err= false;
+    array<string> a= read_directory (root, err);
+    if (err) continue;
+    for (int j= 0; j < N(a); j++) {
+      if (starts (a[j], ".")) continue;
+      url fonts= root * url (a[j]) * url ("texmf-dist") * url ("fonts");
+      if (!is_directory (fonts)) continue;
+      r= r | search_sub_dirs (fonts * url ("opentype"))
+           | search_sub_dirs (fonts * url ("truetype"));
+    }
+  }
+  return r;
+}
+
 url
 tt_font_path () {
   string xtt= get_env ("TEXMACS_FONT_PATH");
@@ -66,12 +90,7 @@ tt_font_path () {
     search_sub_dirs ("/opt/local/share/texmf-texlive/fonts/truetype") |
     search_sub_dirs ("/opt/local/share/texmf-texlive-dist/fonts/opentype") |
     search_sub_dirs ("/opt/local/share/texmf-texlive-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/truetype");
+    texlive_font_dirs ();
 #else
     search_sub_dirs ("$HOME/.fonts") |
     search_sub_dirs ("/usr/share/fonts/opentype") |
@@ -142,16 +161,19 @@ tt_font_find_sub (string name) {
   //cout << "tt_font_find " << name << "\n";
   url u= tt_unpack (name);
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".pfb");
-  //if (!is_none (u)) cout << name << " -> " << u << "\n";
+  // The sfnt formats come first, and Type 1 last. A TeX distribution ships
+  // many families in both forms, and the Type 1 file carries the encoding
+  // of the TeX world: in XCharter-Roman.pfb the code of 'a' is the pound
+  // sign and the code of 'A' is 'a'. TeXmacs asks for characters by Unicode
+  // and needs the cmap of the sfnt file. The same choice gives the PDF
+  // writer real glyph indices instead of character codes.
+  u= tt_locate (name * ".otf");
   if (!is_none (u)) return u;
   u= tt_locate (name * ".ttf");
-  //if (!is_none (u)) cout << name << " -> " << u << "\n";
-  //else cout << name << " -> ???\n";
   if (!is_none (u)) return u;
   u= tt_locate (name * ".ttc");
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".otf");
+  u= tt_locate (name * ".pfb");
   if (!is_none (u)) return u;
   u= tt_locate (name * ".dfont");
   return u;
@@ -159,7 +181,13 @@ tt_font_find_sub (string name) {
 
 url
 tt_font_find (string name) {
-  string s= "ttf:" * name;
+  // The prefix of the key records which files this routine prefers. The
+  // answers are cached in the home directory, which outlives an upgrade
+  // and is shared by every installation, so a cache written when Type 1
+  // came first still named the .pfb file of a family whose .otf TeXmacs
+  // now wants; the font then had no OpenType feature and no MATH table.
+  // Change the prefix whenever tt_font_find_sub changes its order.
+  string s= "sfnt:" * name;
   if (is_cached ("font_cache.scm", s)) {
     string r= cache_get ("font_cache.scm", s) -> label;
     if (r == "") return url_none ();

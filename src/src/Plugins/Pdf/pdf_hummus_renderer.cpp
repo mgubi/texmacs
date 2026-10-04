@@ -1138,6 +1138,10 @@ t3font_rep::write_char (glyph gl, ObjectIDType inCharID) {
   if (is_nil (gl)) {
     // write d0 command
     data  << "0 0 d0\r\n";
+  } else if (cwidth <= 0 || cheight <= 0) {
+    // a glyph without ink: its advance only, since an image of width or
+    // height 0 is not valid PDF
+    data << as_string (lwidth) << " 0 d0\r\n";
   } else {
     update_bbox (llx, lly, urx, ury);
     data << as_string (lwidth) << " 0 ";

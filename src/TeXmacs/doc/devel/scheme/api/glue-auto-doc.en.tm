@@ -963,6 +963,70 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(set-hand-tuned-math-fonts <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_hand_tuned_math_fonts> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile-set <scm-arg|string> <scm-arg|scheme_tree>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile_set> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile> which returns
+    <scm|scheme_tree>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile-families)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile_families> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(math-font-profile-attr <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_font_profile_attr> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(math-family-for-text <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|math_family_for_text> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(text-family-for-math <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|text_family_for_math> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(hand-tuned-math-fonts?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|get_hand_tuned_math_fonts> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(tmtm-eqnumber-\<gtr\>nonumber <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -1148,6 +1212,22 @@ source code.
 
   <\explain>
     <scm|(font-database-search <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_database_search> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(font-available-features <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|ot_font_features> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(font-logical-search <scm-arg|string> <scm-arg|string> <scm-arg|string> <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|font_database_search> which returns
@@ -6392,6 +6472,38 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|window_hide> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(alt-window-set-on-top <scm-arg|int> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|window_set_on_top> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-info <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_info> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-info-of <scm-arg|url> <scm-arg|bool>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_info_of> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(font-debug-report)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|font_debug_report> which returns
+    <scm|tree>.
   </explain>
 
   <\explain>

@@ -107,7 +107,9 @@
   ;;    ("Update web site" (tmweb-interactive-update)))
   (-> "Fonts"
       ("Scan disk for fonts" (scan-disk-for-fonts))
-      ("Clear font cache" (clear-font-cache)))
+      ("Clear font cache" (clear-font-cache))
+      ---
+      ("Font inspector" (open-font-inspector)))
   (-> "Equation editor" (link tools-equation-editor-menu))
   (-> "Miscellaneous"
       ("Clear undo history" (clear-undo-history))
