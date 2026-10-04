@@ -342,18 +342,24 @@ any git revision (`HEAD`, a branch), `INDEX`, and `BASE`, `OURS` and
 ## 9. Tests
 
 ```sh
-doc/tests/run-git-tests.sh <scratch-dir>         # headless: 100 checks
+src/tests/scheme/check.sh git version            # headless: 340 + 224 checks
+doc/tests/run-git-tests.sh <scratch-dir>         # the same, in a fresh home
 doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 51 checks
 ```
 
-The scripts create scratch repositories (with spaces in paths, a linked
+The headless checks are the suite `git` of the test harness
+(`src/TeXmacs/progs/check/git-test.scm`, also run by `check.sh all`), and
+the git group of the suite `version`, which checks the dispatch of the
+`version-*` interface. The tests create scratch repositories (with spaces in paths, a linked
 worktree, a bare remote with clones, and conflicting merges). They use a
 private, freshly created `TEXMACS_HOME_PATH` and open no windows. The
 runner exits with a failure status if a check fails, if the tests do not
 complete (crash or time out), or if any Scheme error appears in the log.
 The checks cover:
 
-* detection and every file state;
+* the parsers and helpers which do not run Git;
+* detection (also of linked worktrees) and every file state;
+* upstream branches (ahead and behind), the footer and the menu label;
 * quoting;
 * history and revisions;
 * every page;

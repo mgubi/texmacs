@@ -304,11 +304,23 @@ about a second per merged document.
 
 ## Testing
 
-`doc/tests/run-git-tests.sh [dir]` builds a repository whose path contains
-spaces, adds a linked worktree, and runs `doc/tests/git-test.scm` with
-`texmacs.bin -headless` and a private `TEXMACS_HOME_PATH`. It covers
-detection, all file states, quoting, history and revisions, every page,
-branches, tags, stashes, renames and conflicts.
+The headless tests are the suite `git` of the test harness,
+`src/TeXmacs/progs/check/git-test.scm`, run by `src/tests/scheme/check.sh
+git` (and by `check.sh all`, as the regression suites). The suite builds
+its repositories in the temporary directory (paths with spaces, a linked
+worktree, a bare remote with two clones, a repository whose configuration
+would run a program), sets their identity in their own configuration and
+ignores the global and system configurations of Git (`GIT_CONFIG_GLOBAL`,
+`GIT_CONFIG_NOSYSTEM`), and puts back the preferences it changes. It covers
+the parsers and helpers, trust, detection, all file states, quoting,
+history (following renames) and revisions, every page, branches, tags,
+stashes, renames and conflicts, upstream tracking, the footer, the merge
+engine and the merge driver, names which could be taken for options,
+restoring, new repositories, signing (with a fake GnuPG), blame, projects
+and snapshots. The git group of the suite `version` (`version-test.scm`)
+checks that `version-tmfs.scm` dispatches the `version-*` interface to the
+Git support. `doc/tests/run-git-tests.sh [dir]` runs both suites in a fresh
+`TEXMACS_HOME_PATH`.
 
 `doc/tests/run-git-tests.sh --gui [dir]` runs `git-gui-test.scm` in the
 Qt GUI with `QT_QPA_PLATFORM=offscreen`, so that the event loop runs but

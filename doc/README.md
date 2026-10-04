@@ -25,5 +25,5 @@ which has the same version-control code as `svn_sync`.
 
 | Also here | |
 |-----------|---|
-| [tests/](tests/) | `run-git-tests.sh` builds a scratch repository (spaces in paths, a linked worktree) and runs `git-test.scm` in headless TeXmacs. |
+| [tests/](tests/) | `run-git-tests.sh` runs the headless suites `git` and `version` of the test harness (`src/TeXmacs/progs/check/git-test.scm`, `version-test.scm`), or with `--gui` the offscreen `git-gui-test.scm`. |
 | [git-implementation.md](git-implementation.md) | How the new git support is organised (modules, data formats, conventions). |

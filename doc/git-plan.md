@@ -111,7 +111,8 @@ others. Until it exists, network commands run synchronously behind a
   `git` in `init-texmacs.scm`.
 * Write a test document and a scripted test (`texmacs -x '(load ...)'`) that
   builds a temporary repository in the scratch directory and runs the git
-  layer headlessly. (Done: see `doc/tests/`.)
+  layer headlessly. (Done: the suite `git` of the test harness, and
+  `doc/tests/` for the offscreen GUI tests.)
 
 ### Phase 1: a solid core (fix what exists)
 
@@ -244,3 +245,4 @@ Version menu, **Git** group, for the current buffer:
 | 2026-09-24 | Second round of features: blame by paragraph; compare with tags, upstream, ORIG_HEAD or any revision; project-aware commits; state in the Git menu label; pull falling back to a merge; simple mode with snapshots; restore of versions; suggested commit messages; clone dialog and recent repositories; branch graph; signed commits and tags; large-file warning and default `.gitignore`; remote management. Fixed a focus crash (shared aux buffer) and a double close of pipe descriptors in `unix_system`. |
 | 2026-09-24 | UI work (see git-ui-design.md): footer status, automatic versioning tool, dialogs, failure explanations, review bar, restructured menu, new panel, preferences dialog, first-run mode, shortcuts, styled pages, coloured graph. |
 | 2026-09-24 | Audit (git-audit.md) and its fixes: trusted repositories and `core.fsmonitor=false`; safe restores; saving before commits; a commit box that survives refreshes; merge-driver fallback; robustness, performance and wording fixes; a test runner with a real exit status. The layout ended up flat in `version/` (not in `git/`), and `git-root` walks up the directories instead of running `rev-parse`. |
+| 2026-10-04 | Rebased on `wip_fixes`, which has the test harness (`tests/scheme/check.sh`). The headless Git tests became its suite `git` (`progs/check/git-test.scm`, 340 checks, self-contained, also new checks of the parsers, upstream tracking, the footer, merge state, rename-following history and linked worktrees); the git group of the suite `version` was rewritten for the new API. |

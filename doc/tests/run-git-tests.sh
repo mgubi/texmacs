@@ -1,7 +1,8 @@
 #!/bin/sh
 # Run the Git tests against the TeXmacs built in this checkout.
 # Usage: doc/tests/run-git-tests.sh [--gui] [scratch-dir]
-#   without --gui: headless tests (git-test.scm)
+#   without --gui: the suites git and version of tests/scheme/check.sh
+#                  (TeXmacs/progs/check/git-test.scm and version-test.scm)
 #   with --gui:    tests needing the event loop (git-gui-test.scm), run with
 #                  the offscreen Qt platform, so that no window is shown
 # A private TEXMACS_HOME_PATH is used, so the user's settings are not touched.
@@ -12,7 +13,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 src=$(cd "$here/../../src" && pwd)
 dir=${1:-$(mktemp -d)}
 # every run starts from fresh preferences and repositories
-rm -rf "$dir/home" "$dir/new repo" "$dir/outside.tm"
+rm -rf "$dir/home" "$dir/outside.tm"
 mkdir -p "$dir/home"
 
 tm () {
@@ -20,76 +21,8 @@ tm () {
 }
 
 if test $gui = no; then
-  rm -rf "$dir/repo test" "$dir/wt test"
-  mkdir -p "$dir/repo test/sub dir"
-  (
-    cd "$dir/repo test" || exit 1
-    git init -q && git symbolic-ref HEAD refs/heads/main
-    git config user.email test@example.com
-    git config user.name "Test User"
-    tm "Hello world." > "sub dir/a b.tm"
-    echo base > base.txt
-    git add base.txt
-    git commit -q -m base
-    git worktree add -q "$dir/wt test" -b wt
-    # a repository for the merge driver
-    rm -rf "$dir/drv" && mkdir -p "$dir/drv" && cd "$dir/drv" || exit 1
-    git init -q && git symbolic-ref HEAD refs/heads/main
-    git config user.email test@example.com
-    git config user.name "Test User"
-    tm "The quick brown fox jumps." > paper.tm
-    git add paper.tm
-    git commit -q -m base
-    git checkout -q -b theirs
-    tm "The quick brown fox leaps." > paper.tm
-    git commit -q -a -m theirs
-    git checkout -q -b conflict
-    tm "The fast brown fox leaps." > paper.tm
-    git commit -q -a -m conflict
-    git checkout -q main
-    tm "The slow brown fox jumps." > paper.tm
-    git commit -q -a -m ours
-  )
-  # a repository for blame, change descriptions, projects and snapshots
-  rm -rf "$dir/proj" && mkdir -p "$dir/proj" && cd "$dir/proj" || exit 1
-  git init -q && git symbolic-ref HEAD refs/heads/main
-  git config user.email test@example.com
-  git config user.name "Test User"
-  doc () {
-    printf '<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n'
-    for p in "$@"; do printf '  %s\n\n' "$p"; done
-    printf '</body>\n'
-  }
-  doc "<section|Intro>" "One." "Two." "Three." > paper.tm
-  git add paper.tm && git commit -q -m c1
-  git config user.name "Second Author"
-  doc "<section|Intro>" "One." "Two, revised." "Three." > paper.tm
-  git commit -q -a -m c2
-  git config user.name "Third Author"
-  doc "<section|Intro>" "One." "Two, revised." "Three." "<section|Results>" "Four." > paper.tm
-  git commit -q -a -m c3
-  git config user.name "Test User"
-  doc "<section|Intro>" "One, not committed." "Two, revised." "Three." "<section|Results>" "Four." > paper.tm
-  doc "<include|part.tm>" "<image|fig.png|1par|||>" "<bibliography|bib|tm-plain|refs|<\\bib-list|0>\n  </bib-list>>" > main.tm
-  doc "A part." > part.tm
-  echo png > fig.png
-  echo "@article{a, title={A}}" > refs.bib
-  git add main.tm && git commit -q -m main
-  # a repository whose configuration runs a program
-  rm -rf "$dir/evil" "$dir/evil-pwned" && mkdir -p "$dir/evil" && cd "$dir/evil" || exit 1
-  git init -q
-  echo x > a.tm
-  git config core.fsmonitor "touch '$dir/evil-pwned'; false"
-  # a fake GnuPG, which signs anything
-  cat > "$dir/fake-gpg" <<'GPG'
-#!/bin/sh
-cat > /dev/null
-printf '\n[GNUPG:] SIG_CREATED D 1 8 00 1234567890 ABCDEF\n' >&2
-printf -- '-----BEGIN PGP SIGNATURE-----\n\nfake\n-----END PGP SIGNATURE-----\n'
-GPG
-  chmod +x "$dir/fake-gpg"
-  test=git-test.scm
-  opts=-headless
+  # the headless tests are the suites git and version of the test harness
+  TM_TEST_HOME="$dir/home" exec "$src/tests/scheme/check.sh" git version
 else
   rm -rf "$dir/remote" "$dir/conflict" "$dir/conflict2"
   mkdir -p "$dir/remote" "$dir/conflict"
