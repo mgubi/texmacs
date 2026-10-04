@@ -994,6 +994,20 @@ variable, or when no GL context can be made, everything is as before.
   mathematics, the borders of tables) are quads too. Glyphs filled with a
   pattern multiply the coverage by the pattern, sampled from the origin of
   the document (mode 3 of the shader).
+* **Glyphs from their outlines** (`TEXMACS_VUE_SLUG=1`, `?slug=1` in the
+  browser; off by default): the glyphs of the fonts which have a file are
+  drawn by the fragment shader from their outlines (Slug, measured in
+  `misc/thorvg-bench`), instead of from bitmaps in the atlas. The outlines
+  come from MuPDF (`mupdf_glyph_outline`: the font and the glyph as the
+  MuPDF renderer draws them, the cubics of Type 1 and CFF fonts split into
+  quadratics), with bands of curves in two textures which grow as glyphs
+  are met; a glyph is an instance of a quad (batch mode 4). An outline
+  serves every size, so a change of zoom makes no new glyph bitmaps, and
+  the glyphs are placed and shaped as MuPDF's: a frame differs from the
+  MuPDF renderer's on a third of the pixels the bitmap glyphs differ on.
+  The glyphs of fonts with no file, glyphs filled with a pattern and glyphs
+  under a transformation keep the atlas. On the Apple M4 a full repaint
+  takes the same CPU time (0.5 ms) and some 0.9 ms more of the GPU.
 * **Pictures** (icons, images: `cached_load_picture` gives the same picture
   again) are uploaded once, as textures keyed by their unique id (at most
   512 and 256 MB, the least used going first); patterns and the neutral

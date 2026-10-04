@@ -2152,6 +2152,110 @@ mupdf_glyph_index (fz_font* font, int i) {
   return g;
 }
 
+/******************************************************************************
+* The outlines of glyphs, for the GPU renderer of the Vue port, which draws
+* them in its fragment shader (vue_gpu.cpp, Slug): the font and the glyph
+* as draw uses them, the curves as quadratics in em units (y up)
+******************************************************************************/
+
+struct outline_walk {
+  array<double>* q;
+  double lx, ly, sx, sy;
+};
+
+static void
+outline_quad (outline_walk* w, double x2, double y2, double x3, double y3) {
+  (*w->q) << w->lx << w->ly << x2 << y2 << x3 << y3;
+  w->lx= x3; w->ly= y3;
+}
+
+static void
+outline_close (fz_context* ctx, void* arg) {
+  (void) ctx;
+  outline_walk* w= (outline_walk*) arg;
+  if (w->lx != w->sx || w->ly != w->sy)
+    outline_quad (w, (w->lx + w->sx) / 2, (w->ly + w->sy) / 2, w->sx, w->sy);
+}
+
+static void
+outline_move (fz_context* ctx, void* arg, float x, float y) {
+  outline_walk* w= (outline_walk*) arg;
+  outline_close (ctx, arg);
+  w->lx= w->sx= x; w->ly= w->sy= y;
+}
+
+static void
+outline_line (fz_context* ctx, void* arg, float x, float y) {
+  (void) ctx;
+  outline_walk* w= (outline_walk*) arg;
+  outline_quad (w, (w->lx + x) / 2, (w->ly + y) / 2, x, y);
+}
+
+static void
+outline_quadto (fz_context* ctx, void* arg, float x1, float y1, float x2, float y2) {
+  (void) ctx;
+  outline_quad ((outline_walk*) arg, x1, y1, x2, y2);
+}
+
+// a cubic as n quadratics, n from the size of its third derivative (the
+// error of each piece goes as 1/n^3): at most 1/2048 of an em
+static void
+outline_curve (fz_context* ctx, void* arg, float x1, float y1,
+               float x2, float y2, float x3, float y3) {
+  (void) ctx;
+  outline_walk* w= (outline_walk*) arg;
+  double x0= w->lx, y0= w->ly;
+  double ex= x3 - 3*x2 + 3*x1 - x0, ey= y3 - 3*y2 + 3*y1 - y0;
+  double err= sqrt (ex*ex + ey*ey) * sqrt (3.0) / 36.0;
+  int n= max (1, min (8, (int) ceil (cbrt (err * 2048.0))));
+  for (int i= 0; i < n; i++) {
+    double ta= (double) i / n, tb= (double) (i+1) / n, h= tb - ta;
+    auto P= [&] (double t, double& x, double& y) {
+      double m= 1 - t;
+      x= m*m*m*x0 + 3*m*m*t*x1 + 3*m*t*t*x2 + t*t*t*x3;
+      y= m*m*m*y0 + 3*m*m*t*y1 + 3*m*t*t*y2 + t*t*t*y3; };
+    auto D= [&] (double t, double& x, double& y) {
+      double m= 1 - t;
+      x= 3*(m*m*(x1-x0) + 2*m*t*(x2-x1) + t*t*(x3-x2));
+      y= 3*(m*m*(y1-y0) + 2*m*t*(y2-y1) + t*t*(y3-y2)); };
+    double ax, ay, bx, by, dax, day, dbx, dby;
+    P (ta, ax, ay); P (tb, bx, by); D (ta, dax, day); D (tb, dbx, dby);
+    // the control point: the mean of the two tangent estimates
+    outline_quad (w, (ax + dax*h/2 + bx - dbx*h/2) / 2,
+                  (ay + day*h/2 + by - dby*h/2) / 2, bx, by);
+  }
+}
+
+bool
+mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em) {
+  if (!native_fonts->contains (fontname)) {
+    pdf_font_desc* fd= load_pdf_font (fontname);
+    native_fonts (fontname)= mupdf_font (fd);
+    if (fd != NULL) pdf_drop_font (mupdf_context (), fd);
+  }
+  pdf_font_desc* fd= native_fonts (fontname)->fn;
+  if (fd == NULL || fd->font == NULL) return false;
+  em= font_size (fontname) / std_shrinkf;
+  fz_font* font= fd->font;
+  unsigned int gid= mupdf_glyph_index (font, c);
+  fz_context* ctx= mupdf_context ();
+  fz_path* path= NULL;
+  if (!mupdf_protected ("mupdf_glyph_outline", [&] () {
+        path= fz_outline_glyph (ctx, font, (int) gid, fz_identity); }))
+    return false;
+  q= array<double> ();
+  if (path == NULL) return true; // a glyph with no ink (a space)
+  outline_walk w= { &q, 0, 0, 0, 0 };
+  fz_path_walker walker= { outline_move, outline_line, outline_curve,
+                           outline_close, outline_quadto, NULL, NULL, NULL };
+  mupdf_protected ("mupdf_glyph_outline, walk", [&] () {
+    fz_walk_path (ctx, path, &walker, &w);
+  });
+  outline_close (ctx, &w);
+  fz_drop_path (ctx, path);
+  return true;
+}
+
 void
 mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   if (pen->get_type () == pencil_brush &&

@@ -102,6 +102,7 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
   X(glDeleteTextures) \
   X(glDisable) \
   X(glDrawArrays) \
+  X(glDrawArraysInstanced) \
   X(glEnable) \
   X(glEnableVertexAttribArray) \
   X(glFinish) \
@@ -126,6 +127,8 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
   X(glUniform1i) \
   X(glUniform2f) \
   X(glUseProgram) \
+  X(glVertexAttribDivisor) \
+  X(glVertexAttribIPointer) \
   X(glVertexAttribPointer) \
   X(glViewport)
 #define VUE_GL_POINTER(f) static decltype (&::f) vue_##f= NULL;
@@ -161,6 +164,7 @@ vue_gl_load () {
 #define glDeleteTextures vue_glDeleteTextures
 #define glDisable vue_glDisable
 #define glDrawArrays vue_glDrawArrays
+#define glDrawArraysInstanced vue_glDrawArraysInstanced
 #define glEnable vue_glEnable
 #define glEnableVertexAttribArray vue_glEnableVertexAttribArray
 #define glFinish vue_glFinish
@@ -185,11 +189,15 @@ vue_gl_load () {
 #define glUniform1i vue_glUniform1i
 #define glUniform2f vue_glUniform2f
 #define glUseProgram vue_glUseProgram
+#define glVertexAttribDivisor vue_glVertexAttribDivisor
+#define glVertexAttribIPointer vue_glVertexAttribIPointer
 #define glVertexAttribPointer vue_glVertexAttribPointer
 #define glViewport vue_glViewport
 #endif
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
+#include <utility>
 #include <cmath>
 
 /******************************************************************************
@@ -248,6 +256,14 @@ struct glyph_slot {
   SI xo, yo;            // the offsets of shrink
 };
 
+struct slug_glyph {
+  float bx0, by0, bx1, by1;  // the box of the outline, in em units (y up)
+  unsigned offset;           // of its header in the texture of bands
+  unsigned nb;               // bands in each direction (0: no ink)
+  float em;                  // pixels a em
+  bool outline;              // false: the font has no file, a bitmap then
+};
+
 struct cached_texture {
   GLuint tex;
   int w, h;
@@ -274,6 +290,7 @@ struct gpu_state {
   GLuint atlas= 0;
   int ax= 4, ay= 0, arow= 4;
   std::unordered_map<glyph_key, glyph_slot, glyph_key_hash> glyphs;
+  std::unordered_map<glyph_key, slug_glyph, glyph_key_hash> slugs;
   std::vector<font_glyphs> fonts;  // kept alive: their address is the key
   // ThorVG: canvases drawing into scratch targets, a pass pending. The
   // pass ends by copying all of the scratch target (GlBlitTask), whatever
@@ -295,6 +312,16 @@ struct gpu_state {
   size_t texture_bytes= 0;
   // the default framebuffer of the window being drawn
   gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true, 0 };
+  // glyphs drawn from their outlines (Slug, TEXMACS_VUE_SLUG=1)
+  bool slug_on= false;
+  GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0, curve_tex= 0, index_tex= 0;
+  GLint su_size= -1, su_curves= -1, su_bands= -1;
+  int curve_rows= 0, index_rows= 0;      // allocated rows of the textures
+  std::vector<float> curves;             // 4 floats a texel, 2 texels a curve
+  std::vector<unsigned> bands;           // headers and lists of curves
+  size_t curves_sent= 0, bands_sent= 0;  // what the textures hold
+  std::vector<float> slug_inst;          // the instances of the batch
+  std::vector<font_glyphs> slug_fonts;   // kept alive: their address is a key
   // what is drawn on the screen in this frame, folded into a hash
   // (gpu_frame_hash): a frame which draws what the last one drew is not
   // presented
@@ -384,6 +411,93 @@ static const char* fragment_src= GLSL_HEADER
   "  else o_col= texture (u_atlas, v_uv).r * v_col;\n"
   "}\n";
 
+/******************************************************************************
+* Glyphs drawn from their outlines (Slug: E. Lengyel, "GPU-Centered Font
+* Rendering Directly from Glyph Outlines", JCGT 6 (2), 2017; measured in
+* misc/thorvg-bench). The outline of a glyph is a list of quadratic curves
+* in em units (mupdf_glyph_outline), in a texture of curves (two texels a
+* curve); its box is cut into bands, horizontal and vertical, each listing
+* the curves which cross it, sorted by decreasing maximal x or y, in a
+* texture of indices. For each pixel the fragment shader casts a ray
+* towards +x through the curves of its horizontal band and one towards +y
+* through those of its vertical band; each curve adds or removes coverage
+* from its crossings, the roots which count chosen by the signs of its
+* control points (the 0x2E74 table of the paper, which keeps the winding
+* number right where curves meet); the two estimates are weighted by how
+* close their nearest crossings are to the pixel. A glyph is an instance
+* of a quad: its origin, its size, its box, its bands, its color.
+******************************************************************************/
+
+static const int SLUG_W= 1024;   // the width of the two textures
+
+static const char* slug_vertex_src= GLSL_HEADER
+  "layout(location=0) in vec3 i_org;\n"   // origin (pixels), pixels a em
+  "layout(location=1) in vec4 i_box;\n"   // the box (em)
+  "layout(location=2) in uvec2 i_band;\n" // offset of the header, bands
+  "layout(location=3) in vec4 i_col;\n"
+  "uniform vec2 u_size;\n"
+  "out vec2 v_em; flat out vec4 v_box; flat out uvec2 v_band;\n"
+  "flat out vec4 v_col; flat out float v_scale;\n"
+  "void main () {\n"
+  "  int id= gl_VertexID;\n"
+  "  vec2 c= vec2 ((id == 1 || id == 3 || id == 4) ? 1.0 : 0.0,\n"
+  "                (id == 2 || id == 4 || id == 5) ? 1.0 : 0.0);\n"
+  "  float pad= 1.0 / i_org.z;\n"
+  "  vec2 em= mix (i_box.xy - pad, i_box.zw + pad, c);\n"
+  "  vec2 p= i_org.xy + vec2 (em.x, -em.y) * i_org.z;\n"
+  "  v_em= em; v_box= i_box; v_band= i_band; v_col= i_col; v_scale= i_org.z;\n"
+  "  gl_Position= vec4 (p.x / u_size.x * 2.0 - 1.0, 1.0 - p.y / u_size.y * 2.0, 0.0, 1.0);\n"
+  "}\n";
+
+static const char* slug_fragment_src= GLSL_HEADER
+  "precision highp int; precision highp usampler2D;\n"
+  "uniform sampler2D u_curves; uniform usampler2D u_bands;\n"
+  "in vec2 v_em; flat in vec4 v_box; flat in uvec2 v_band;\n"
+  "flat in vec4 v_col; flat in float v_scale;\n"
+  "out vec4 o_col;\n"
+  "const int W= 1024;\n"
+  "uint idx (uint i) { return texelFetch (u_bands, ivec2 (int (i) % W, int (i) / W), 0).r; }\n"
+  "vec4 crv (uint k, int j) { int i= int (k) * 2 + j; return texelFetch (u_curves, ivec2 (i % W, i / W), 0); }\n"
+  "float ray (uint start, uint count, bool vertical, out float near) {\n"
+  "  float cov= 0.0; near= 1.0e9;\n"
+  "  for (uint n= 0u; n < count; n++) {\n"
+  "    uint k= idx (start + n);\n"
+  "    vec4 a= crv (k, 0); vec4 b= crv (k, 1);\n"
+  "    vec2 p1= a.xy - v_em, p2= a.zw - v_em, p3= b.xy - v_em;\n"
+  "    if (vertical) { p1= p1.yx; p2= p2.yx; p3= p3.yx; }\n"
+  "    if (max (max (p1.x, p2.x), p3.x) * v_scale < -0.5) break;\n"
+  "    uint code= (0x2E74u >> ((p1.y > 0.0 ? 2u : 0u) + (p2.y > 0.0 ? 4u : 0u) +\n"
+  "                            (p3.y > 0.0 ? 8u : 0u))) & 3u;\n"
+  "    if (code == 0u) continue;\n"
+  "    vec2 A= p1 - p2 * 2.0 + p3, B= p1 - p2;\n"
+  "    float t1, t2;\n"
+  "    if (abs (A.y) < 1.0e-5) { t1= t2= p1.y * 0.5 / B.y; }\n"
+  "    else {\n"
+  "      float ra= 1.0 / A.y, d= sqrt (max (B.y * B.y - A.y * p1.y, 0.0));\n"
+  "      t1= (B.y - d) * ra; t2= (B.y + d) * ra;\n"
+  "    }\n"
+  "    float x1= (A.x * t1 - B.x * 2.0) * t1 + p1.x;\n"
+  "    float x2= (A.x * t2 - B.x * 2.0) * t2 + p1.x;\n"
+  "    if ((code & 1u) != 0u) {\n"
+  "      cov += clamp (x1 * v_scale + 0.5, 0.0, 1.0); near= min (near, abs (x1 * v_scale)); }\n"
+  "    if (code > 1u) {\n"
+  "      cov -= clamp (x2 * v_scale + 0.5, 0.0, 1.0); near= min (near, abs (x2 * v_scale)); }\n"
+  "  }\n"
+  "  return cov;\n"
+  "}\n"
+  "void main () {\n"
+  "  uint nb= v_band.y, h= v_band.x;\n"
+  "  vec2 rel= (v_em - v_box.xy) / max (v_box.zw - v_box.xy, vec2 (1.0e-6));\n"
+  "  uint by= uint (clamp (floor (rel.y * float (nb)), 0.0, float (nb) - 1.0));\n"
+  "  uint bx= uint (clamp (floor (rel.x * float (nb)), 0.0, float (nb) - 1.0));\n"
+  "  float nx, ny;\n"
+  "  float cx= abs (ray (idx (h + 2u * by), idx (h + 2u * by + 1u), false, nx));\n"
+  "  float cy= abs (ray (idx (h + 2u * (nb + bx)), idx (h + 2u * (nb + bx) + 1u), true, ny));\n"
+  "  float wx= clamp (1.0 - nx * 2.0, 0.0, 1.0), wy= clamp (1.0 - ny * 2.0, 0.0, 1.0);\n"
+  "  float c= max ((cx * wx + cy * wy) / max (wx + wy, 1.0 / 65536.0), min (cx, cy));\n"
+  "  o_col= v_col * clamp (c, 0.0, 1.0);\n"
+  "}\n";
+
 static GLuint
 compile_shader (GLenum type, const char* src) {
   GLuint s= glCreateShader (type);
@@ -426,6 +540,29 @@ init_gl () {
   glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  // the program of Slug (TEXMACS_VUE_SLUG=1)
+  G.slug_on= (get_env ("TEXMACS_VUE_SLUG") == "1");
+  if (G.slug_on) {
+    G.slug_prog= glCreateProgram ();
+    glAttachShader (G.slug_prog, compile_shader (GL_VERTEX_SHADER, slug_vertex_src));
+    glAttachShader (G.slug_prog, compile_shader (GL_FRAGMENT_SHADER, slug_fragment_src));
+    glLinkProgram (G.slug_prog);
+    glGetProgramiv (G.slug_prog, GL_LINK_STATUS, &ok);
+    if (!ok) {
+      cout << "TeXmacs] GPU: the program of Slug does not link, bitmap glyphs" << LF;
+      G.slug_on= false;
+    }
+    else {
+      G.su_size  = glGetUniformLocation (G.slug_prog, "u_size");
+      G.su_curves= glGetUniformLocation (G.slug_prog, "u_curves");
+      G.su_bands = glGetUniformLocation (G.slug_prog, "u_bands");
+      glGenVertexArrays (1, &G.slug_vao);
+      glGenBuffers (1, &G.slug_vbo);
+      glGenTextures (1, &G.curve_tex);
+      glGenTextures (1, &G.index_tex);
+      cout << "TeXmacs] GPU: glyphs drawn from their outlines (Slug)" << LF;
+    }
+  }
   // ThorVG
   if (tvg::Initializer::init (0) != tvg::Result::Success) {
     cout << "TeXmacs] GPU: ThorVG does not start" << LF; return false; }
@@ -504,8 +641,11 @@ set_scissor (gpu_target* t, int x1, int y1, int x2, int y2) {
   glScissor (x1, t->h - y2, x2 - x1, y2 - y1);
 }
 
+static void flush_slug ();
+
 static void
 flush_quads () {
+  if (G.mode == 4) { flush_slug (); return; }
   if (G.verts.empty () || G.target == NULL) { G.verts.clear (); return; }
   gpu_target* t= G.target;
   bind_target (t);
@@ -542,6 +682,146 @@ flush_quads () {
   glBindVertexArray (0);
   G.verts.clear ();
   t->gen++;
+}
+
+
+// the rows of the textures of Slug which are not there yet; a texture
+// which is full is made twice as tall and sent again
+static void
+send_rows (GLuint tex, int& rows, size_t& sent, size_t total, size_t per_texel,
+           bool is_float, const void* data) {
+  size_t texels= total / per_texel;
+  int need= (int) ((texels + SLUG_W - 1) / SLUG_W);
+  if (need == 0) return;
+  glBindTexture (GL_TEXTURE_2D, tex);
+  glPixelStorei (GL_UNPACK_ALIGNMENT, 4);
+  GLenum ifmt= is_float ? GL_RGBA32F : GL_R32UI;
+  GLenum fmt= is_float ? GL_RGBA : GL_RED_INTEGER;
+  GLenum type= is_float ? GL_FLOAT : GL_UNSIGNED_INT;
+  if (need > rows) {
+    int nr= max (need, max (16, rows * 2));
+    std::vector<unsigned char> zero ((size_t) nr * SLUG_W * per_texel * 4, 0);
+    memcpy (zero.data (), data, total * 4);
+    glTexImage2D (GL_TEXTURE_2D, 0, ifmt, SLUG_W, nr, 0, fmt, type, zero.data ());
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    rows= nr; sent= total;
+    return;
+  }
+  if (sent >= total) return;
+  // from the row of the first texel not sent, whole rows
+  int r0= (int) ((sent / per_texel) / SLUG_W);
+  std::vector<unsigned char> buf ((size_t) (need - r0) * SLUG_W * per_texel * 4, 0);
+  size_t from= (size_t) r0 * SLUG_W * per_texel;
+  memcpy (buf.data (), (const char*) data + from * 4, (total - from) * 4);
+  glTexSubImage2D (GL_TEXTURE_2D, 0, 0, r0, SLUG_W, need - r0, fmt, type, buf.data ());
+  sent= total;
+}
+
+static void
+flush_slug () {
+  gpu_target* t= G.target;
+  if (G.slug_inst.empty () || t == NULL) { G.slug_inst.clear (); return; }
+  send_rows (G.curve_tex, G.curve_rows, G.curves_sent, G.curves.size (), 4, true,
+             G.curves.data ());
+  send_rows (G.index_tex, G.index_rows, G.bands_sent, G.bands.size (), 1, false,
+             G.bands.data ());
+  bind_target (t);
+  set_scissor (t, G.sx1, G.sy1, G.sx2, G.sy2);
+  glDisable (GL_DEPTH_TEST);
+  glDisable (GL_STENCIL_TEST);
+  glDisable (GL_CULL_FACE);
+  glEnable (GL_BLEND);
+  glBlendEquation (GL_FUNC_ADD);
+  glBlendFunc (GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+  glUseProgram (G.slug_prog);
+  glUniform2f (G.su_size, (float) t->w, (float) t->h);
+  glActiveTexture (GL_TEXTURE0);
+  glBindTexture (GL_TEXTURE_2D, G.curve_tex);
+  glUniform1i (G.su_curves, 0);
+  glActiveTexture (GL_TEXTURE1);
+  glBindTexture (GL_TEXTURE_2D, G.index_tex);
+  glUniform1i (G.su_bands, 1);
+  glActiveTexture (GL_TEXTURE0);
+  glBindVertexArray (G.slug_vao);
+  glBindBuffer (GL_ARRAY_BUFFER, G.slug_vbo);
+  glBufferData (GL_ARRAY_BUFFER, G.slug_inst.size () * 4, G.slug_inst.data (), GL_STREAM_DRAW);
+  const int st= 13 * 4;  // x y em, box, offset nb, color
+  glEnableVertexAttribArray (0); glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE, st, (void*) 0);
+  glEnableVertexAttribArray (1); glVertexAttribPointer (1, 4, GL_FLOAT, GL_FALSE, st, (void*) 12);
+  glEnableVertexAttribArray (2); glVertexAttribIPointer (2, 2, GL_UNSIGNED_INT, st, (void*) 28);
+  glEnableVertexAttribArray (3); glVertexAttribPointer (3, 4, GL_FLOAT, GL_FALSE, st, (void*) 36);
+  for (int i= 0; i < 4; i++) glVertexAttribDivisor (i, 1);
+  glDrawArraysInstanced (GL_TRIANGLES, 0, 6, (GLsizei) (G.slug_inst.size () / 13));
+  for (int i= 0; i < 4; i++) glVertexAttribDivisor (i, 0);
+  glBindVertexArray (0);
+  G.slug_inst.clear ();
+  t->gen++;
+}
+
+// the outline of a glyph, made once: NULL when its font has no file
+static slug_glyph*
+slug_lookup (font_glyphs fng, int c) {
+  glyph_key k { (void*) fng.rep, c };
+  auto it= G.slugs.find (k);
+  if (it != G.slugs.end ()) return it->second.outline ? &it->second : NULL;
+  slug_glyph g= { 0, 0, 0, 0, 0, 0, 0, false };
+  array<double> q;
+  double em= 0;
+  G.slug_fonts.push_back (fng);
+  if (!mupdf_glyph_outline (fng->res_name, c, q, em) || em <= 0) {
+    G.slugs[k]= g;
+    return NULL;
+  }
+  g.outline= true;
+  g.em= (float) em;
+  int n= N(q) / 6;
+  if (n > 0) {
+    float bx0= 1e9, by0= 1e9, bx1= -1e9, by1= -1e9;
+    for (int i= 0; i < n; i++)
+      for (int j= 0; j < 3; j++) {
+        bx0= min (bx0, (float) q[6*i+2*j]); bx1= max (bx1, (float) q[6*i+2*j]);
+        by0= min (by0, (float) q[6*i+2*j+1]); by1= max (by1, (float) q[6*i+2*j+1]);
+      }
+    g.bx0= bx0; g.by0= by0; g.bx1= bx1; g.by1= by1;
+    unsigned first= (unsigned) (G.curves.size () / 8);
+    for (int i= 0; i < n; i++) {
+      float v[8]= { (float) q[6*i], (float) q[6*i+1], (float) q[6*i+2],
+                    (float) q[6*i+3], (float) q[6*i+4], (float) q[6*i+5], 0, 0 };
+      G.curves.insert (G.curves.end (), v, v + 8);
+    }
+    unsigned nb= (unsigned) max (1, min (8, n / 3));
+    g.nb= nb;
+    g.offset= (unsigned) G.bands.size ();
+    G.bands.resize (G.bands.size () + 4 * nb, 0);
+    for (int dir= 0; dir < 2; dir++)
+      for (unsigned b= 0; b < nb; b++) {
+        float lo, hi;
+        if (dir == 0) { float bh= (by1 - by0) / nb; lo= by0 + b*bh; hi= lo + bh; }
+        else          { float bw= (bx1 - bx0) / nb; lo= bx0 + b*bw; hi= lo + bw; }
+        std::vector<std::pair<float, unsigned> > in;
+        for (int i= 0; i < n; i++) {
+          const double* c3= &q[6*i];
+          int o= (dir == 0) ? 1 : 0;   // the coordinate across the ray
+          double a0= std::min (c3[o], std::min (c3[o+2], c3[o+4]));
+          double a1= std::max (c3[o], std::max (c3[o+2], c3[o+4]));
+          if (a1 < lo || a0 > hi) continue;
+          if (a0 == a1) continue;      // along the ray: never crossed
+          int r= 1 - o;                // the coordinate along the ray
+          double key= std::max (c3[r], std::max (c3[r+2], c3[r+4]));
+          in.push_back ({ (float) key, first + (unsigned) i });
+        }
+        std::sort (in.begin (), in.end (),
+                   [] (const std::pair<float, unsigned>& p, const std::pair<float, unsigned>& r) {
+                     return p.first > r.first; });
+        unsigned h= g.offset + 2 * (dir * nb + b);
+        G.bands[h]= (unsigned) G.bands.size ();
+        G.bands[h + 1]= (unsigned) in.size ();
+        for (auto& p: in) G.bands.push_back (p.second);
+      }
+  }
+  G.slugs[k]= g;
+  return &G.slugs[k];
 }
 
 static void flush_vectors ();
@@ -1199,6 +1479,31 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   // the glyph bitmaps of TeXmacs (as the X11 and the Qt ports), in the
   // atlas; a pencil with a pattern draws them in its color for now
   if (!ready ()) return;
+  bool pattern= pen->get_type () == pencil_brush && !is_nil (pen->get_brush ()) &&
+                pen->get_brush ()->get_type () == brush_pattern;
+  if (G.slug_on && trs.empty () && !pattern) {
+    // from its outline (Slug), where the MuPDF renderer draws it: the
+    // glyph of its font file at the origin, a em of g->em pixels
+    slug_glyph* g= slug_lookup (fng, c);
+    if (g != NULL) {
+      if (g->nb == 0) return; // no ink
+      int s1, s2, s3, s4;
+      clip_box (s1, s2, s3, s4);
+      batch (t, 4, 0, s1, s2, s3, s4);
+      int r, gg, b, a;
+      get_rgb_color (fg, r, gg, b, a);
+      if (get_reverse_colors ()) reverse (r, gg, b);
+      float fa= a / 255.f;
+      float ox_= (float) to_x (x), oy_= (float) -to_y (y);
+      unsigned off= g->offset, nb= g->nb;
+      float inst[13]= { ox_, oy_, g->em, g->bx0, g->by0, g->bx1, g->by1, 0, 0,
+                        r / 255.f * fa, gg / 255.f * fa, b / 255.f * fa, fa };
+      memcpy (&inst[7], &off, 4); memcpy (&inst[8], &nb, 4);
+      G.slug_inst.insert (G.slug_inst.end (), inst, inst + 13);
+      if (on_screen (t)) feed (inst);
+      return;
+    }
+  }
   glyph_key k { (void*) fng.rep, c };
   auto it= G.glyphs.find (k);
   if (it == G.glyphs.end ()) {
