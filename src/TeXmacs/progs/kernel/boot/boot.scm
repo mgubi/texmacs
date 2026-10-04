@@ -197,8 +197,9 @@
                   (else (define-module ,name)))
                ;; (ice-9 curried-definitions) needs to be imported every time since has bindings replacing core bindings
                (use-modules (ice-9 curried-definitions)) 
-               ,@l
+               ;; before the options: :inherit uses inherit-modules
                (eval-when (expand load eval) (module-use! (current-module) (resolve-interface '(guile-user))))
+               ,@l
                ;; (eval-when (expand) (display "* END MODULE HEADER: ") (display ',name) (display "\n"))
               )))
         (export-syntax texmacs-module)))
