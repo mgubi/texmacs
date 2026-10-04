@@ -468,6 +468,17 @@
     (check= (us (url-resolve (url-append both "a.txt") "r"))
             (us (tmp-file "a.txt")))
     (check= (url-none? (url-resolve (url-append both "zz.txt") "r")) #t))
+  ;; any number of directories followed by a file name
+  (let ((any (url-append (tmp-dir) (url-any))))
+    (check= (map us (url->list (url-expand
+                                (url-complete (url-append any "d.txt") "fr"))))
+            (list (us (tmp-file "sub/d.txt"))))
+    (check= (map us (url->list (url-expand
+                                (url-complete (url-append any "a.txt") "fr"))))
+            (list (us (tmp-file "a.txt"))))
+    (check= (us (url-resolve (url-append any "d.txt") "r"))
+            (us (tmp-file "sub/d.txt")))
+    (check= (url-none? (url-resolve (url-append any "zz.txt") "r")) #t))
   (check= (us (url-grep "def" (url-append (tmp-dir) (url-wildcard "*.txt"))))
           (us (tmp-file "a.txt")))
   (check= (url-none? (url-grep "zzz" (url-append (tmp-dir)
