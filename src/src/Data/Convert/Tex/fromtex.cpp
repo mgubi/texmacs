@@ -2035,7 +2035,7 @@ latex_command_to_tree (tree t) {
   }
   
   if (is_tuple (t, "\\boxed", 1))
-    return tree (APPLY, "frame", l2e (t[1]));
+    return compound ("boxed", l2e (t[1]));
 
   if (is_tuple (t, "\\marginpar", 1))
     return tree (APPLY, "marginal-note", "normal", "", l2e (t[1]));
@@ -2540,8 +2540,11 @@ latex_command_to_tree (tree t) {
       is_tuple (t, "\\mbox", 1) || is_tuple (t, "\\hbox", 1) ||
       is_tuple (t, "\\makebox", 1))
     return var_m2e (t, MODE, "text");
+  // FIXME: the width and position of \makebox[width][pos] are dropped
   if (is_tuple (t, "\\makebox*", 2))
     return var_m2e (tuple ("\\makebox", t[2]), MODE, "text");
+  if (is_tuple (t, "\\makebox**", 3))
+    return var_m2e (tuple ("\\makebox", t[3]), MODE, "text");
   if (is_tuple (t, "\\mathchoice", 4))
     return compound ("math-choice",
         l2e (t[1]), l2e (t[2]), l2e (t[3]), l2e (t[4]));
@@ -2722,6 +2725,9 @@ latex_command_to_tree (tree t) {
   }
   if (is_tuple (t, "\\fbox", 1)) return compound ("frame", l2e (t[1]));
   if (is_tuple (t, "\\framebox", 1)) return compound ("frame", l2e (t[1]));
+  // FIXME: the width and position of \framebox[width][pos] are dropped
+  if (is_tuple (t, "\\framebox*", 2)) return compound ("frame", l2e (t[2]));
+  if (is_tuple (t, "\\framebox**", 3)) return compound ("frame", l2e (t[3]));
   if (is_tuple (t, "\\centerline", 1)) return compound ("center", l2e (t[1]));
   if (is_tuple (t, "\\hline")) return tree (APPLY, "hline");
   if (is_tuple (t, "\\hdashline")) return "";

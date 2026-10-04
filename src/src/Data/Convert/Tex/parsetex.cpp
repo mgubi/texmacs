@@ -952,7 +952,8 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     u = tree(TUPLE, copy (cmd)); // unparsed arguments
     // Should be in a drd.
 
-    bool option2= (cmd == "\\def" || cmd == "\\newenvironment");
+    bool option2= (cmd == "\\def" || cmd == "\\newenvironment" ||
+                   cmd == "\\makebox" || cmd == "\\framebox");
     if (is_def (t)) change--;
 
     while (i<n && arity>=0 && (arity>0 || option)) {
