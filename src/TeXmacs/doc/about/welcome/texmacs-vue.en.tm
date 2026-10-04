@@ -67,6 +67,32 @@
     overwrite each other.
   </warning*>
 
+  <section|Passwords and keys: the wallet>
+
+  The wallet of <TeXmacs> keeps passwords and keys (the keys of the
+  services of artificial intelligence, the passwords of <TeXmacs> servers)
+  encrypted. In the browser it is encrypted by the browser itself, and
+  opened with a passphrase or with a passkey: <menu|Edit|Preferences>, tab
+  <with|font-series|bold|Security>.
+
+  <\itemize>
+    <item><with|font-series|bold|Initialize> makes the wallet, with its
+    passphrase. Nothing of it is kept in the clear: only what is encrypted
+    goes to the storage of the browser.
+
+    <item>While the wallet is on, <with|font-series|bold|Add a passkey> lets
+    the passkey of your computer or phone (Touch ID, Windows Hello, a
+    security key...) open it too, where the browser allows it.
+
+    <item><with|font-series|bold|Turn on> opens the wallet, with the
+    passphrase or the passkey, once per session; <with|font-series|bold|Turn
+    off> forgets what it holds until it is opened again.
+  </itemize>
+
+  While the wallet is on, the code which runs in the page (a
+  <name|JavaScript> session for instance) could read what it holds: only
+  run code which you trust.
+
   <section|Keyboard, clipboard and printing>
 
   <TeXmacs> keeps its usual keyboard shortcuts, but the browser keeps some
@@ -150,6 +176,20 @@
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|5 October 2026>
+
+  <\itemize>
+    <item>The wallet works in the browser, encrypted by the browser and
+    opened with a passphrase or a passkey (Touch ID...): the tab
+    <with|font-series|bold|Security> of the preferences. The key of the
+    <name|Albert> service of artificial intelligence goes there when it is
+    on.
+
+    <item>The input fields of the dialogs whose width is given as a
+    multiple of the default one are no longer as wide as the window (the
+    buttons of the dialogs of the wallet were out of sight).
+  </itemize>
 
   <paragraph|4 October 2026>
 

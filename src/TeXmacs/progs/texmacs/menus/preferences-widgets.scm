@@ -850,10 +850,12 @@
       (bold (text "Wallet"))
       ===
       (dynamic (wallet-preferences-widget))
-      ====== ======
-      (bold (text "Encryption"))
-      ===
-      (dynamic (gpg-preferences-widget))
+      ;; GnuPG is a program, which a web browser cannot run
+      (assuming (not (defined? 'web-javascript))
+        ====== ======
+        (bold (text "Encryption"))
+        ===
+        (dynamic (gpg-preferences-widget)))
       ;;====== ======
       ;;(bold (text "Scripts")) 
       ;;===
@@ -1159,7 +1161,9 @@
           (dynamic (math-preferences-widget))))
       (icon-tab "tm_prefs_convert.xpm" (text "Convert")
         (dynamic (conversion-preferences-widget)))
-      (assuming (== (get-preference "experimental encryption") "on")
+      ;; in a web browser the wallet (web-wallet.scm) is there anyway
+      (assuming (or (== (get-preference "experimental encryption") "on")
+                    (defined? 'web-javascript))
         (icon-tab "tm_prefs_security.xpm" (text "Security")
           (centered
             (dynamic (security-preferences-widget)))))

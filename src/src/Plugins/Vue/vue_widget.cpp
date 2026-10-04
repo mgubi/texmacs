@@ -4687,6 +4687,18 @@ vue_input_text_widget_rep::do_layout () {
   if (!greyed) sig= button_logic (cid);
   Clay_ElementData ed= Clay_GetElementData (cid);
   Clay_SizingAxis sw= input_fill ? CLAY_SIZING_GROW (0) : CLAY_SIZING_FIXED (w_px);
+  // a width in "w" is a multiple of the default width of an input, as in
+  // Qt (qt_decode_length: of its size hint), not of the window: "10w", as
+  // the passphrase of the wallet asks, was ten windows wide and pushed the
+  // buttons of its dialog out of sight. It fills the room it is given, up
+  // to that width.
+  if (!input_fill) {
+    double w_len; string w_unit;
+    parse_length (width, w_len, w_unit);
+    if (w_unit == "w")
+      sw= CLAY_SIZING_GROW (.min= ui_pxf (60),
+                            .max= (float) (w_len * ui_pxf (150)));
+  }
   CLAY(cid, {
     .layout= { .sizing= { sw, CLAY_SIZING_FIXED (h_px) } },
     .custom= { .customData= vue_render_widget },

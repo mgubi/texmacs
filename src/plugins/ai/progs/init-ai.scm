@@ -60,6 +60,49 @@
 (with key (getenv "ALBERT_API_KEY")
   (when key (set-preference "albert api key" key)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; API keys: in the wallet when it is on, else a preference, else the
+;; environment. A key given while the wallet is on goes to the wallet (and
+;; the preference is emptied), so that it is only kept encrypted; the plug-ins
+;; are set up again when a key changes or the wallet is turned on, since
+;; which engines are there depends on their keys.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ai-key-entry engine) (list "ai" engine "api key"))
+
+(define (ai-wallet-key engine)
+  (and (supports-wallet?) (wallet-on?)
+       (with k (wallet-get (ai-key-entry engine))
+         (and (string? k) (!= k "") k))))
+
+(tm-define (ai-api-key engine env)
+  (or (ai-wallet-key engine)
+      (with p (get-preference (string-append engine " api key"))
+        (and (string? p) (!= p "") p))
+      (with e (getenv env)
+        (and e (!= e "") e))
+      ""))
+
+(define ai-in-wallet "(in the wallet)")
+
+(tm-define (ai-api-key-shown engine)
+  (if (ai-wallet-key engine) ai-in-wallet
+      (get-preference (string-append engine " api key"))))
+
+(tm-define (ai-set-api-key engine key)
+  (when (!= key ai-in-wallet)
+    (if (and (supports-wallet?) (wallet-on?))
+        (begin
+          (if (== key "")
+              (wallet-delete (ai-key-entry engine))
+              (wallet-set (ai-key-entry engine) key))
+          (set-preference (string-append engine " api key") ""))
+        (set-preference (string-append engine " api key") key))
+    (reinit-plugin-single "ai")))
+
+(when (supports-wallet?)
+  (wallet-add-on-hook (lambda () (reinit-plugin-single "ai"))))
+
 (tm-define (ai-models)
   (list "chatgpt" "gemini" "open-mistral-7b" "albert" "ollama"))
 
@@ -84,10 +127,10 @@
     (with model (string-append name " model")
       (aligned
 	(item (text "API key")
-          (enum (set-preference "albert api key" answer)
-                (list (get-preference "albert api key")
+          (enum (ai-set-api-key "albert" answer)
+                (list (ai-api-key-shown "albert")
 		      (or (getenv "ALBERT_API_KEY") ""))
-		(get-preference "albert api key") "11em"))
+		(ai-api-key-shown "albert") "11em"))
         (item (text model)
           (enum (set-preference model answer)
 		(albert-variants)
@@ -201,7 +244,7 @@
         (dynamic (focus-ai-agents-interlocutor (focus-session-language*))))))
 
 (tm-define (has-albert?)
-  (!= (get-preference "albert api key") ""))
+  (!= (ai-api-key "albert" "ALBERT_API_KEY") ""))
 
 (plugin-configure albert
   (:require (has-albert?))
