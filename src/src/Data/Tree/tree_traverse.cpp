@@ -651,7 +651,8 @@ init_sections () {
     eval ("(use-modules (text text-drd))");
     object l= eval ("(append (section-tag-list) (section*-tag-list))");
     while (!is_null (l)) {
-      section_tags->insert (as_tree_label (as_symbol (car (l))));
+      // make_tree_label: the labels may not exist yet (see is_equation_env)
+      section_tags->insert (make_tree_label (as_symbol (car (l))));
       l= cdr (l);
     }
   }
