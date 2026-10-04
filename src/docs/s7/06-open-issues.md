@@ -74,11 +74,12 @@
   its flag and table for this reason (§4.3).
 - **`:use` is not enforced.** Every module sees the rootlet and the user
   module.
-- **Macros are expanded on every evaluation** (s7 run-time macros; Guile
-  expands a macro call once and keeps the expansion). Measured on 4 October
-  2026 with a counter in `s7.c` around the macro bodies (outermost
-  expansions only, so the time is the expansion itself, not running its
-  result):
+- **Macros were expanded on every evaluation** (s7 run-time macros; Guile
+  expands a macro call once and keeps the expansion). Patch 0005 now caches
+  the expansions ([05](05-build-and-vendored-s7.md#s7-version-and-local-patch)).
+  Measured on 4 October 2026, before the patch, with a counter in `s7.c`
+  around the macro bodies (outermost expansions only, so the time is the
+  expansion itself, not running its result):
 
   | Workload | Expansions | Time expanding | Of the total |
   |---|---:|---:|---:|
@@ -90,9 +91,7 @@
   A few macros make most of them: `with` everywhere; `receive`, `cut` and
   `logic-ref` in the LaTeX export; `match-cup` and the menu macros (`$list`,
   `$menu-link`, `$balloon`, `$=>`…) while editing, when the menus are
-  rebuilt. Expanding the macro calls of a function body once, when it is
-  defined (as `fully-expand` in `s7test.scm` suggests), would save most of
-  that time; so would cheaper expansions of these few macros.
+  rebuilt. With patch 0005 the warm LaTeX exports are 13–20% faster.
 - **s7 11 quirks to keep in mind when writing kernel code:**
   - `varlet` refuses already-bound symbols in non-root lets;
   - macro bodies should not define local helper functions (§3.2);
