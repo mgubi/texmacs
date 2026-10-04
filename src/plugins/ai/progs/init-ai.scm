@@ -16,10 +16,10 @@
 ;; Ollama command line tools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; in a web browser there is no ollama program to ask (the model is chosen
-;; in the preferences)
+;; in a web browser there is no ollama program to ask: the models are those
+;; which its server gave (ai-update-models, a button of the preferences)
 (tm-define (ollama-models)
-  (if (defined? 'web-javascript) (list)
+  (if (defined? 'web-javascript) (ai-models-downloaded "ollama")
       (ollama-models-listed)))
 
 (define (ollama-models-listed)
@@ -135,8 +135,166 @@
 (define (ai-key-env name)
   (with e (assoc name ai-keyed-engines) (if e (cadr e) "")))
 
+;; the models proposed: those which the engine gave last (ai-update-models),
+;; else a few known ones; "" for another one
 (define (ai-model-variants name)
-  (with e (assoc name ai-keyed-engines) (if e (cddr e) (list ""))))
+  (with l (ai-models-downloaded name)
+    (if (nnull? l) (append l (list ""))
+        (with e (assoc name ai-keyed-engines) (if e (cddr e) (list ""))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The models which an engine has, asked to it (with its key)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ai-quote-js s)
+  (string-append "\"" (string-replace (string-replace s "\\" "\\\\")
+                                       "\"" "\\\"") "\""))
+
+(define (ai-quote-shell s)
+  (string-append "'" (string-replace s "'" "'\\''") "'"))
+
+;; a GET request, its answer as text ("" when there is none): by the browser
+;; in a web browser (a synchronous request), else by curl
+(define (ai-http-get url headers)
+  (if (defined? 'web-javascript)
+      (web-javascript
+       (string-append
+        "(function () { var x = new XMLHttpRequest (); "
+        "x.open ('GET', " (ai-quote-js url) ", false); "
+        (apply string-append
+               (map (lambda (h)
+                      (string-append "x.setRequestHeader ("
+                                     (ai-quote-js (car h)) ", "
+                                     (ai-quote-js (cdr h)) "); "))
+                    headers))
+        "try { x.send (); } catch (e) { return ''; } "
+        "return x.responseText; }) ()"))
+      (eval-system
+       (string-append
+        "curl --silent "
+        (apply string-append
+               (map (lambda (h)
+                      (string-append "-H " (ai-quote-shell
+                                            (string-append (car h) ": " (cdr h)))
+                                     " "))
+                    headers))
+        (ai-quote-shell url)))))
+
+;; a value of a JSON object (as json->tree reads it)
+(define (json-ref t key)
+  (and (pair? t) (== (car t) 'attr)
+       (let loop ((l (cdr t)))
+         (cond ((or (null? l) (null? (cdr l))) #f)
+               ((== (car l) key) (cadr l))
+               (else (loop (cddr l)))))))
+
+(define (json-items t)
+  (if (and (pair? t) (== (car t) 'tuple)) (cdr t) (list)))
+
+(define (json-string t) (if (string? t) t ""))
+
+(define (ai-models-request name)
+  (with key (ai-api-key name (ai-key-env name))
+    (cond ((== name "chatgpt")
+           (list "https://api.openai.com/v1/models"
+                 (list (cons "Authorization" (string-append "Bearer " key)))))
+          ((== name "claude")
+           (list "https://api.anthropic.com/v1/models?limit=100"
+                 (list (cons "x-api-key" key)
+                       (cons "anthropic-version" "2023-06-01")
+                       (cons "anthropic-dangerous-direct-browser-access"
+                             "true"))))
+          ((== name "gemini")
+           (list "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
+                 (list (cons "x-goog-api-key" key))))
+          ((== name "open-mistral-7b")
+           (list "https://api.mistral.ai/v1/models"
+                 (list (cons "Authorization" (string-append "Bearer " key)))))
+          ((== name "albert")
+           (list "https://albert.api.etalab.gouv.fr/v1/models"
+                 (list (cons "Authorization"
+                             (string-append "Bearer "
+                                            (ai-api-key "albert"
+                                                        "ALBERT_API_KEY"))))))
+          ((== name "ollama")
+           (list (string-append "http://" (get-preference "ollama server")
+                                ":" (get-preference "ollama port")
+                                "/api/tags")
+                 (list)))
+          (else #f))))
+
+;; the models of the answer which can chat
+(define (ai-models-of name t)
+  (cond ((== name "gemini")
+         (map (lambda (m)
+                (with n (json-string (json-ref m "name"))
+                  (if (string-starts? n "models/") (string-drop n 7) n)))
+              (list-filter
+               (json-items (json-ref t "models"))
+               (lambda (m)
+                 (in? "generateContent"
+                      (json-items (json-ref m "supportedGenerationMethods")))))))
+        ((== name "ollama")
+         (map (lambda (m) (json-string (json-ref m "name")))
+              (json-items (json-ref t "models"))))
+        (else
+         (with l (map (lambda (m) (cons (json-string (json-ref m "id")) m))
+                      (json-items (json-ref t "data")))
+           (map car
+                (list-filter
+                 l
+                 (lambda (p)
+                   (let ((id (car p)) (m (cdr p)))
+                     (cond ((== id "") #f)
+                           ((== name "chatgpt")
+                            (and (or (string-starts? id "gpt-")
+                                     (and (string-starts? id "o")
+                                          (> (string-length id) 1)
+                                          (char-numeric? (string-ref id 1))))
+                                 (not (list-or
+                                       (map (lambda (w) (string-contains? id w))
+                                            '("audio" "realtime" "tts"
+                                              "transcribe" "image" "search"
+                                              "embedding" "instruct"))))))
+                           ((== name "open-mistral-7b")
+                            (with c (json-ref m "capabilities")
+                              (or (not c)
+                                  (== (json-ref c "completion_chat") "true"))))
+                           (else #t))))))))))
+
+(define (ai-models-downloaded name)
+  (with s (get-preference (string-append name " models"))
+    (if (or (not (string? s)) (== s "") (== s "default")) (list)
+        (string-decompose s " "))))
+
+;; asks the engine its models, keeps them in the preferences; the number of
+;; models, or a text which says why there are none
+(tm-define (ai-update-models name)
+  (with r (ai-models-request name)
+    (if (not r) "this engine gives no list of its models"
+        (let* ((ans (ai-http-get (car r) (cadr r)))
+               (t (if (== ans "") #f
+                      (catch #t (lambda () (tree->stree (json->tree ans)))
+                        (lambda args #f))))
+               (l (if t (sort (ai-models-of name t) string<=?) (list))))
+          (cond ((nnull? l)
+                 (set-preference (string-append name " models")
+                                 (string-recompose l " "))
+                 (length l))
+                ((== ans "") "no answer (network, key, or the site refuses the page)")
+                ((and t (json-ref t "error"))
+                 (with e (json-ref t "error")
+                   (or (and (pair? e) (json-string (json-ref e "message")))
+                       (json-string e))))
+                (else "no models in the answer"))))))
+
+(define (ai-update-models-message name)
+  (with r (ai-update-models name)
+    (set-message (if (number? r)
+                     (string-append (number->string r) " models")
+                     (string-append "No models: " r))
+                 (string-append "Models of " (session-name name)))
+    (refresh-now "ai-model-list")))
 
 (define (ai-has-key? name)
   (!= (ai-api-key name (ai-key-env name)) ""))
@@ -154,9 +312,14 @@
                 (list (ai-api-key-shown name) "")
                 (ai-api-key-shown name) "16em"))
         (item (text "Model")
-          (enum (set-preference model answer)
-                (ai-model-variants name)
-                (get-preference model) "16em"))))
+          (refreshable "ai-model-list"
+            (enum (set-preference model answer)
+                  (ai-model-variants name)
+                  (get-preference model) "16em")))
+        (item (text "")
+          (explicit-buttons
+            ("Update the list of models"
+             (ai-update-models-message name))))))
     === === ===)
   (assuming (== name "ollama")
     (aligned
@@ -167,9 +330,14 @@
         (enum (set-preference "ollama port" answer) '("11434" "")
               (get-preference "ollama port") "16em"))
       (item (text "Ollama model")
-        (enum (set-preference "ollama model" answer)
-              (append (ollama-models) (list ""))
-              (get-preference "ollama model") "16em")))
+        (refreshable "ai-model-list"
+          (enum (set-preference "ollama model" answer)
+                (append (ollama-models) (list ""))
+                (get-preference "ollama model") "16em")))
+      (item (text "")
+        (explicit-buttons
+          ("Update the list of models"
+           (ai-update-models-message "ollama")))))
     === === ===)
   (assuming (== name "albert")
     (with model (string-append name " model")

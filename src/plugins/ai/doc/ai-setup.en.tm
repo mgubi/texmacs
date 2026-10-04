@@ -15,7 +15,9 @@
   <menu|Insert|Session|Preferences>, with the model to use. When the wallet
   of <TeXmacs> is on (<menu|Edit|Preferences|Security>), the key is kept
   there, encrypted, rather than in the preferences. This is also how keys
-  are given in a web browser, which has no environment variables. All the
+  are given in a web browser, which has no environment variables. Once the
+  key is given, <with|font-series|bold|Update the list of models> asks the
+  chatbot which models it offers to this key, and proposes them. All the
   chatbots are asked by HTTP requests (with <verbatim|curl> when <TeXmacs>
   is not built with <name|Qt>, by the browser itself in a web browser).
 
