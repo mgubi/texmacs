@@ -138,8 +138,15 @@
     installed font has it (the font database must be up to date, see
     <hlink|font database|font-database.en.tm>), or define it virtually.
 
-    <item*|Which subfont is used?><verbatim|smart_font.cpp> contains many
-    commented out traces, such as
+    <item*|Which subfont is used?>The font inspector,
+    <menu|Tools|Fonts|Font inspector>, answers this question without
+    recompiling: it reports the route, the subfont, the file and the
+    rewriting of the character at the cursor, read from the smart map
+    (<cpp|smart_font_debug_info>), and can colour every glyph by its route
+    (debug switch <verbatim|fonts>) or list all the characters of a
+    document by route in a font report; see <hlink|inspecting the font
+    system|opentype-tools.en.tm>. For finer questions,
+    <verbatim|smart_font.cpp> contains many commented out traces, such as
     <cpp|//cout \<less\>\<less\> "Found " \<less\>\<less\> c \<less\>\<less\> " in " ...>
     in <cpp|resolve> and
     <cpp|//cout \<less\>\<less\> "Font " \<less\>\<less\> nr ...> at the end of
@@ -163,7 +170,10 @@
 
     <item*|Comparing with the old mechanism>Switching off the preference
     <verbatim|"new style fonts"> makes <cpp|smart_font> fall back on the
-    rule based <cpp|find_font>.
+    rule based <cpp|find_font>. Similarly, <scm|(set-hand-tuned-math-fonts
+    #f)> typesets the fonts which have both hand-tuned tables and a
+    <verbatim|MATH> table (<name|TeX Gyre>, <name|Stix>) from their table
+    only.
 
     <item*|Missing glyph bitmaps>The warning <verbatim|no bitmap available
     for ...> comes from the default <cpp|font_rep::get_glyph>: a virtual or
@@ -227,7 +237,11 @@
     <item><em|Bitmaps in PDF.> Glyphs using bitmap-only operators, and
     bold, blackboard bold, extended, distorted and blurred emulations, are
     embedded as bitmap (<name|Type 3>) fonts. Their quality depends on the
-    resolution of the font.
+    resolution of the font. When the main font has a <verbatim|MATH>
+    table, a symbol whose emulation would be such a bitmap is taken from
+    <name|STIX Two Math> instead, if that font has it; the font report of
+    the inspector says which emulated glyphs are still exported as
+    bitmaps.
 
     <item><em|The magic slant.> The automatic italic emulation uses the
     slant <cpp|0.25001>, which <verbatim|Typeset/Concat/concat_math.cpp>
@@ -244,12 +258,8 @@
   documentation:
 
   <\itemize>
-    <item><verbatim|smart_font.cpp>, <cpp|resolve (c, fam, attempt)>: the
-    negated condition <verbatim|!<em|name>> is tested with
-    <cpp|!in_collection (c, wanted)> where <cpp|wanted> still contains the
-    exclamation mark, so the condition always holds.
-
-    <item><verbatim|smart_font.cpp>, same routine, attempts
+    <item><verbatim|smart_font.cpp>, <cpp|resolve (c, fam, attempt)>,
+    attempts
     <math|k\<gtr\>1>: the test <cpp|v == "rm"> is made on the still empty
     string <cpp|v> instead of <cpp|variant>, so the variant
     <verbatim|rm-<em|range>> is always requested, never just
@@ -292,6 +302,24 @@
     <item><verbatim|charmap.cpp>, <cpp|join_charmap_rep::child>: calls
     <cpp|child (i-sum)> instead of <cpp|child (ch-sum)>; harmless as long
     as all joined charmaps have arity one.
+
+    <item><verbatim|smart_font.cpp>, <cpp|register_profiled_font>: a
+    profiled math font which is missing from the database is registered
+    with <cpp|font_database_extend_local>, which also adds its directory to
+    the preference <verbatim|"imported fonts">; merely opening a document
+    in such a font therefore changes the user preferences and saves the
+    local database.
+
+    <item><verbatim|smart_font.cpp>: <cpp|is_rubber> now also accepts the
+    stretched arrows <verbatim|\<less\>rubber-...\<gtr\>>, but the pseudo
+    ranges <verbatim|mathrubber> and <verbatim|mathlarge> of
+    <cpp|in_unicode_range> do not, so that an entry
+    <verbatim|mathrubber=<em|family>> does not apply to them.
+
+    <item><verbatim|Plugins/Freetype/tt_file.cpp>, <cpp|tt_font_path>:
+    <cpp|texlive_font_dirs>, which finds the <TeX> Live font directories of
+    any year, is only used on <name|macOS>; the other <name|Unix> systems
+    still list <TeX> Live 2020 to 2022 by name.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

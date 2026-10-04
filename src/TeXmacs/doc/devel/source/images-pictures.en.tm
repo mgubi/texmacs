@@ -75,7 +75,7 @@
     Declared in <verbatim|Graphics/Pictures/effect.hpp>; <cpp|effect> is the
     corresponding <cpp|ABSTRACT_NULL> handle. Its methods are
 
-    <\description>
+    <\description-paragraphs>
       <item*|<cpp|rectangle get_logical_extents (array\<less\>rectangle\<gtr\>
       rs)>>The logical extents of the result, given those of the arguments;
       by default the extents of the first argument.
@@ -88,7 +88,7 @@
       pixel)>>Compute the resulting picture. <cpp|pixel> is the size of a
       pixel of the pictures in logical units, which is needed to convert
       lengths of the effect (such as the radius of a pen) into pixels.
-    </description>
+    </description-paragraphs>
   </explain>
 
   <cpp|build_effect (tree t)> (<verbatim|effect.cpp>) translates a

@@ -115,7 +115,7 @@
   <cpp|uni_locase_first> and <cpp|uni_upcase_first>, so accented Cork
   characters are handled.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(bib-locase <scm-arg|t>)>,
     <scm|(bib-upcase <scm-arg|t>)>>Change the case of all text, except
     inside <markup|keepcase>. The <markup|keepcase> tags themselves are
@@ -136,7 +136,7 @@
     changes no case: it removes the <markup|keepcase> tags (keeping their
     contents) and is what <scm|bib-format-field> applies to every field it
     formats.
-  </description>
+  </description-paragraphs>
 
   The analogue of <verbatim|change.case$> with <verbatim|"t"> (title case
   conversion: lower case except the first letter) is obtained in the

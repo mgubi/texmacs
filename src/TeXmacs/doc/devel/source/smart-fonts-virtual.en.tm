@@ -274,7 +274,7 @@
 
   <subsection|Combination>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|(join <em|g<rsub|1>> ... <em|g<rsub|n>>)>>Superposition
     with a common origin; the bounding boxes are merged.
 
@@ -284,8 +284,10 @@
     <item*|<verbatim|(glue <em|g<rsub|1>> <em|g<rsub|2>>)>>Horizontal
     concatenation with a small overlap of <math|1.75> points (in units of
     <cpp|wpt>), suitable for joining strokes.
-    <verbatim|(glue* <em|g<rsub|1>> <em|g<rsub|2>>)> concatenates without
-    overlap.
+    <verbatim|(glue* <em|g<rsub|1>> <em|g<rsub|2>> [<em|d>])> concatenates
+    without overlap; the optional <math|d> shifts <math|g<rsub|2>> further
+    by <math|d> times the size unit of the font (negative for an
+    overlap).
 
     <item*|<verbatim|(row <em|g<rsub|1>> <em|g<rsub|2>>)>>Concatenation of
     the ink of <math|g<rsub|1>> and <math|g<rsub|2>> with a slight overlap,
@@ -326,7 +328,7 @@
 
     <item*|<verbatim|(reslash <em|g> <em|r>)>>The slash <math|g>,
     transformed to fit the box of <math|r>.
-  </description>
+  </description-paragraphs>
 
   <subsection|Geometric transformations>
 
@@ -363,7 +365,12 @@
     the column at the fraction <math|pos> of its width.
     <verbatim|ver-extend> does the same vertically, and
     <verbatim|(ver-take <em|g> <em|pos> <em|n> [<em|f>])> only keeps the
-    repeated part.
+    repeated part. <verbatim|(hor-take <em|g> <em|pos> <em|n> [<em|f>])> is
+    the horizontal counterpart of <verbatim|ver-take>: a piece of width
+    <math|n> (or <math|n\<times\>f>) times the logical width of <math|g>,
+    made of the column at the fraction <math|pos> of its width; on printers
+    it is drawn as vectors, by repeating narrow clipped copies of the
+    glyph.
 
     <item*|<verbatim|(curly <em|g>)>, <verbatim|(unserif <em|g> [<em|c>])>,
     <verbatim|(bottom-edge <em|g> [<em|penh> <em|keepy>])>,
@@ -428,7 +435,7 @@
   <cpp|virtual_font_rep::exec>, which returns numbers as strings (or
   <verbatim|"error">):
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|+>, <verbatim|->, <verbatim|*>, <verbatim|/>,
     <verbatim|min>, <verbatim|max>>Arithmetic (<verbatim|-> and
     <verbatim|/> are binary).
@@ -451,7 +458,7 @@
 
     <item*|<verbatim|(sep-equal)>, <verbatim|(frac-width)>>The distance
     between the bars of <verbatim|=>, and the thickness of a minus sign.
-  </description>
+  </description-paragraphs>
 
   For instance, the <verbatim|approx> symbol of
   <verbatim|emu-fundamental.vfn> superposes two copies of the emulated
@@ -519,7 +526,9 @@
   <cpp|renderer_rep::draw (int, font_glyphs, SI, SI)>; since the font is
   magnified to the zoom factor before drawing, the bitmaps are computed at
   the screen resolution. On printers, <cpp|supported (s, true)> checks
-  that the definition only uses vector-capable operators; if so,
+  that the definition only uses vector-capable operators, and that a
+  component taken from a base font which is itself a virtual font is drawn
+  as vectors there too; if so,
   <cpp|draw_tree> draws the components with the base font, using
   <cpp|ren-\<gtr\>set_transformation> for <verbatim|magnify>,
   <verbatim|scale>, flips and rotations (through
@@ -535,7 +544,14 @@
   <src-arg|s> or if the definition of <src-arg|s> exists and all its
   components are supported. In the latter case, <verbatim|or> succeeds as
   soon as one alternative is supported, and <verbatim|font> checks the
-  name of the base font. <cpp|get_xpositions> treats each virtual symbol as
+  name of the base font. Two routines serve the font inspector:
+  <cpp|virtual_font_constructs (fn, s)> tells whether <src-arg|s> is drawn
+  by a construction rather than taken from the font which the virtual font
+  extends, and <cpp|virtual_font_draws_vectors (fn, s)> whether a
+  <name|PDF> export draws it as vectors; the second also decides when a
+  smart font prefers <name|STIX Two Math> to an emulation (see <hlink|the
+  resolution algorithm|smart-fonts-resolve.en.tm>).
+  <cpp|get_xpositions> treats each virtual symbol as
   one block (inner positions are put in the middle), the slope and right correction come from <verbatim|italic>
   annotations, and <cpp|magnify> rebuilds the virtual font on the
   magnified base font.

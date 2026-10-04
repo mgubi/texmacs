@@ -151,7 +151,7 @@
   <verbatim|generic/generic-menu.scm> from a number of sub-menus, each of
   which takes the focus tree as argument and may be redefined for a tag:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|focus-ancestor-menu>, <scm|focus-ancestor-icons>>Entries
     for enclosing tags (for instance the document title around an author).
 
@@ -167,7 +167,7 @@
     <item*|<scm|focus-hidden-menu>, <scm|focus-extra-menu>,
     <scm|focus-label-menu>>Hidden arguments, mode specific extra entries,
     the label of the tag.
-  </description>
+  </description-paragraphs>
 
   The parallel <verbatim|*-icons> menus build the icon bar. A mode may also
   replace <scm|standard-focus-menu> for some trees altogether, as

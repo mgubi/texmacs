@@ -36,8 +36,12 @@ table sets `font_rep::ot_math` and about forty parameters converted from
 design units through `units_per_EM`: the axis, the fraction and radical
 geometry, the limit and stretch-stack geometry, the script shifts and drops,
 the accent base heights, the bar constants and the script percentages. This happens *before* the
-per-family branches, so a hand-tuned font overwrites what it tunes and keeps
-the rest.
+per-family branches, so a hand-tuned font overwrites the constants it tunes
+and keeps the others. A tuned font keeps its own `math_type`, however, and
+the italic corrections and cut-ins of the table are only consulted for
+`MATH_TYPE_OPENTYPE` (`get_ot_italic_correction`, `get_ot_kerning`), so a
+tuned font takes those from its tables alone; extended shapes and top accent
+attachments, which only need `ot_math`, apply to it as well.
 
 **Glyph-level corrections.** Italic corrections and the MathKern cut-ins are
 exposed as height-aware hooks (`get_*_correction_at`) on `font_rep` and as
@@ -167,7 +171,11 @@ choosing fonts, the user section *Mathematical fonts*
 (`TeXmacs/doc/main/math/fonts/`: how the math fonts work, every shipped font
 with a sample and a table of its characteristics, the fonts to install) and
 the reference chapter *Fonts, from selection to glyph*
-(`TeXmacs/doc/devel/fonts/`).
+(`TeXmacs/doc/devel/fonts/`, entry page `font-guide.en.tm`). The
+implementation is described for developers in the chapter *OpenType fonts*
+of the source code documentation (`TeXmacs/doc/devel/source/opentype*.en.tm`,
+in the Fonts part, next to the chapters on the font database and the smart
+fonts).
 
 ### Where the code is
 
@@ -342,7 +350,8 @@ The short version, with the details in section 7 of
   but not that the companion masters a profile names exist or are installed.
 - Six symbols which only TeXmacs defines (`triangleup`, `blacktriangleup`
   and the four `nblacktriangle...`) are drawn by pixel operations and still
-  export as small bitmaps when the font lacks them. Every other symbol an
+  export as small bitmaps when the font lacks them, and so do the emulated
+  alphabets built with `unserif` (section 7.5 of the design log). Every other symbol an
   OpenType math font lacks is either built as vectors or, when its
   emulation would be a bitmap, taken from the shipped STIX Two Math; glue
   and the MATH assemblies are vectors.

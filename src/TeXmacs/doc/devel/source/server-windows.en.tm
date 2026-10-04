@@ -190,7 +190,7 @@
   A new window is empty; it shows nothing until a view is attached to
   it. The exported routines therefore always combine the two steps:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|open_window (geom)>>Creates a new scratch buffer and shows
     it in a new window (<scm|open-window>).
 
@@ -207,7 +207,7 @@
 
     <item*|<cpp|create_buffer ()>>Creates a new scratch buffer in the
     <em|current> window (<scm|new-buffer>).
-  </description>
+  </description-paragraphs>
 
   The user commands <scm|new-document> and <scm|new-document*> choose
   between <scm|open-window> and <scm|new-buffer> according to the

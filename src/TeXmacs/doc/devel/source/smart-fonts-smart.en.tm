@@ -19,26 +19,49 @@
   the mathematical (resp. program) font and the surrounding text font:
 
   <\cpp-code>
-    case 2:
+    font edit_env_rep::make_current_font (int sz) {
 
-    \ \ fn= smart_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),
+    \ \ switch (mode) {
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_string (MATH_FONT_SERIES), get_string (MATH_FONT_SHAPE),
+    \ \ case 2:
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_string (FONT), get_string (FONT_FAMILY),
+    \ \ \ \ return smart_font (get_string (MATH_FONT), get_string (MATH_FONT_FAMILY),
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_string (FONT_SERIES), "mathitalic",
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_string (MATH_FONT_SERIES), get_string (MATH_FONT_SHAPE),
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_script_size (fn_size, index_level), (int) (magn*dpi));
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_string (FONT), get_string (FONT_FAMILY),
 
-    \ \ break;
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ get_string (FONT_SERIES), "mathitalic",
 
-    ...
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ sz, (int) (magn*dpi));
+
+    \ \ ...
+
+    }
+
+    \;
+
+    int sz= get_script_size (fn_size, index_level);
+
+    fn= make_current_font (sz);
+
+    ... \ // OpenType MATH: script percentages and the ssty feature
+
+    string feat= get_string (FONT_FEATURES);
+
+    if (N(feat) != 0) fn= apply_features (fn, feat);
 
     string eff= get_string (FONT_EFFECTS);
 
     if (N(eff) != 0) fn= apply_effects (fn, eff);
   </cpp-code>
+
+  In scripts, a font with an <name|OpenType> <verbatim|MATH> table is made
+  again at the size given by the percentages of its table (unless
+  <src-var|math-font-sizes> is set), and an untuned one is wrapped in a
+  <cpp|feature_font> for its script size alternates (<verbatim|ssty>); see
+  <hlink|mathematics from the <verbatim|MATH> table|opentype-math.en.tm>
+  and <hlink|<name|OpenType> features|opentype-features.en.tm>.
 
   Notice that the names of the environment variables are slightly
   misleading at this level: <src-var|font> is passed as the <em|family>
@@ -56,9 +79,11 @@
     <src-arg|tv>, <src-arg|tw>, <src-arg|ts>, adapted as follows: if the
     text family is <verbatim|roman>, it is replaced by the mathematical
     family <src-arg|family>; the mathematical variants <verbatim|ms> and
-    <verbatim|mt> select the variants <verbatim|ss> and <verbatim|tt>; and
-    if the mathematical shape is <verbatim|right>, the shape becomes the
-    special shape <verbatim|mathupright>. The result is the six argument
+    <verbatim|mt> select the variants <verbatim|ss> and <verbatim|tt>; a
+    mathematical series other than <verbatim|medium> replaces the text
+    series, so that a family with a real bold math face uses it; and if the
+    mathematical shape is <verbatim|right>, the shape becomes the special
+    shape <verbatim|mathupright>. The result is the six argument
     <cpp|smart_font> applied to the adapted text font. In mathematical mode
     <src-arg|ts> is <verbatim|mathitalic>, so that the main font is the
     upright text font and the smart font takes care of the mathematical
@@ -103,7 +128,7 @@
       <verbatim|Graphics/Fonts/font.cpp>);
 
       <item>normalizes the family list with <cpp|tex_gyre_fix>,
-      <cpp|kepler_fix> and <cpp|math_fix> (see below);
+      <cpp|kepler_fix>, <cpp|math_fix> and <cpp|profile_fix> (see below);
 
       <item>replaces the shapes <verbatim|mathitalic> and
       <verbatim|mathshape> by <verbatim|right> for the main font;
@@ -177,6 +202,9 @@
     <verbatim|basic-letters> (digits, Latin and Greek letters, plain and
     bold);
 
+    <item>a collection name preceded by <verbatim|!>, which holds for the
+    characters <em|not> in that collection;
+
     <item>a code point range <verbatim|<em|c1>:<em|c2>>, where <em|c1> and
     <em|c2> are characters.
   </itemize>
@@ -194,6 +222,19 @@
   remove the suffix <verbatim| Math> according to whether a medium
   mathematical shape is requested, so that the dedicated <name|OpenType>
   math fonts are used in formulas and the text fonts elsewhere.
+
+  The last fix, <cpp|profile_fix>, generalizes this to the profiled
+  <name|OpenType> math fonts (<verbatim|math_font_profiles.cpp>). For each
+  unconditional entry, in a mathematical shape a text family is replaced by
+  the math font of its profile when that font is installed, and in a text
+  shape a math family by its text companion; the variants <verbatim|ss>
+  and <verbatim|tt> are replaced by the sans serif and typewriter
+  companions which the profile declares, and the result is translated into
+  its master (<cpp|font_database_master>), since the selection is driven by
+  masters. A profiled font, or the text companion of one, which is
+  installed but absent from the database is registered on the fly
+  (<cpp|register_profiled_font>). See <hlink|math font profiles, shipped
+  fonts and the database|opentype-profiles.en.tm>.
 
   <section|The <cpp|smart_font_rep> class>
 
@@ -224,11 +265,15 @@
 
     \ \ int\ \ \ \ italic_nr;\ \ \ // subfont for isolated italic letters
 
+    \ \ bool\ \ \ ot_math;\ \ \ \ \ // main font: untuned OpenType math font
+
     \;
 
     \ \ array\<less\>font\<gtr\> fn;\ \ \ \ \ // the subfonts
 
     \ \ smart_map\ \ \ sm;\ \ \ \ \ // shared character -\<gtr\> subfont table
+
+    \ \ array\<less\>int\<gtr\> origins; // debug switch "fonts": route of each subfont
 
     \ \ ...
 
@@ -283,7 +328,11 @@
   horizontally magnified by <cpp|adjust_subfont> if
   <cpp|hdpi != dpi>) and copies the mathematical parameters of the base
   font (<cpp|copy_math_pars>). For the shapes <verbatim|mathitalic>,
-  <verbatim|mathupright> and <verbatim|mathshape> it does more:
+  <verbatim|mathupright> and <verbatim|mathshape> it does more. The flag
+  <cpp|ot_math> is set when the base font has the math type
+  <cpp|MATH_TYPE_OPENTYPE> (an <name|OpenType> math font without hand-tuned
+  tables) and its profile does not say that the letters come from the text
+  italic (key <verbatim|letters>):
 
   <\itemize>
     <item>For the historical <TeX> families recognized by
@@ -300,7 +349,13 @@
     <verbatim|mathitalic> and <verbatim|mathshape> an italic subfont
     <verbatim|("fast-italic")> is created; its number is stored in
     <cpp|italic_nr> and its mathematical parameters are used for the smart
-    font. Then a fixed list of subfonts is pre-registered, so that they get
+    font. When <cpp|ot_math> is set, the subfont of <verbatim|mathitalic>
+    is <verbatim|("ot-italic")> instead: it is the main font itself, with
+    the rewriting <cpp|REWRITE_MATH_ITALIC>, which maps the Latin letters to
+    the mathematical italic alphabet of <name|Unicode> (<verbatim|U+1D434>
+    and following, with the Planck constant <verbatim|U+210E> for
+    <verbatim|h>), so that the italic corrections and the cut-in kerns of
+    the font apply to them. Then a fixed list of subfonts is pre-registered, so that they get
     the same numbers in all smart maps: <verbatim|special>,
     <verbatim|emu-bracket>, <verbatim|other>, <verbatim|regular>, the
     mathematical alphabets <verbatim|bold-math>, <verbatim|italic-math>,
@@ -406,8 +461,26 @@
   <cpp|get_lsub_correction>, <cpp|get_lsup_correction>) or of the last run
   (<cpp|get_right_slope>, <cpp|get_right_correction>,
   <cpp|get_rsub_correction>, <cpp|get_rsup_correction>,
-  <cpp|get_wide_correction>). <cpp|supports> always returns <cpp|true>:
-  a smart font renders every character, if necessary with the error font.
+  <cpp|get_wide_correction>), and so are the height dependent script
+  corrections <cpp|get_lsub_correction_at>, ...,
+  <cpp|get_rsup_correction_at>. The questions which concern a single glyph
+  (<cpp|get_top_accent>, <cpp|is_extended_shape>,
+  <cpp|get_feature_variant>) go to the subfont of the first character;
+  <cpp|get_rubber_variant> and <cpp|get_wide_variant> go to the subfont
+  which renders the numbered sizes of the character (<cpp|rubber_subfont>
+  probes <verbatim|\<less\><em|name>-0\<gtr\>>), since the unnumbered
+  name may be routed elsewhere. <cpp|make_rubber_font> hands the building
+  of the extensible font to the main font when it carries a
+  <verbatim|MATH> table. <cpp|supports> always returns <cpp|true>: a smart
+  font renders every character, if necessary with the error font.
+
+  When the debug switch <verbatim|fonts> is on (<cpp|DEBUG_FONTS>),
+  <cpp|draw_fixed> calls <cpp|debug_draw> instead of the subfont, which
+  draws each run in the colour of its route (<cpp|debug_origin>, computed
+  once per subfont from its specification); <cpp|debug_info> reports the
+  route of one character from the routing tables, without resolving
+  anything, for the font inspector. See <hlink|inspecting the font
+  system|opentype-tools.en.tm>.
 
   <subsection|Glyph extraction and the renderers>
 
@@ -506,6 +579,11 @@
     and <verbatim|\<less\>it-x\<gtr\>> become <verbatim|x>
     (<cpp|substitute_upright>, <cpp|substitute_italic>).
 
+    <item*|<cpp|REWRITE_MATH_ITALIC>>Latin letters are mapped to the
+    mathematical italic alphabet (<verbatim|U+1D434> and following, with
+    <verbatim|U+210E> for <verbatim|h>; <cpp|substitute_math_italic>), for
+    the subfont <verbatim|ot-italic> of an <name|OpenType> math font.
+
     <item*|<cpp|REWRITE_IGNORE>>The empty string. Used for characters which
     must not be drawn: the null delimiters such as
     <verbatim|\<less\>left-.\<gtr\>> and
@@ -563,8 +641,14 @@
     <TeX> fonts.
 
     <item*|<verbatim|up>, <verbatim|upright-greek>,
-    <verbatim|italic-greek>, <verbatim|ignore>>The main font itself, with
-    the corresponding rewriting.
+    <verbatim|italic-greek>, <verbatim|ot-italic>, <verbatim|ignore>>The
+    main font itself, with the corresponding rewriting.
+
+    <item*|<verbatim|shipped-math>><cpp|unicode_font
+    ("STIXTwoMath-Regular", sz, dpi)>, the math font shipped with
+    <TeXmacs>, for the symbols which the main font lacks and whose
+    emulation could only be exported as a bitmap (see <hlink|the
+    resolution algorithm|smart-fonts-resolve.en.tm>).
 
     <item*|<verbatim|virtual>>
     <cpp|virtual_font (this, name, sz, hdpi, dpi, false)>: a virtual font

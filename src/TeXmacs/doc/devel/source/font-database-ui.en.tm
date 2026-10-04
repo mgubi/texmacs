@@ -279,6 +279,25 @@
     Sans,TeX Gyre Pagella"> (<cpp|main_family>).
   </explain>
 
+  <subsection|The <name|OpenType> additions>
+
+  The <name|OpenType> support added a few routines to the same glue file:
+  <scm|font-logical-search> (the four argument <cpp|font_database_search>,
+  from a family, variant, series and shape),
+  <scm|font-available-features> (the <verbatim|GSUB> features of a font,
+  <cpp|ot_font_features>, used by the feature menus of <verbatim|progs/fonts/font-features.scm>), the profile
+  routines <scm|math-font-profile-set>, <scm|math-font-profile>,
+  <scm|math-font-profile-families>, <scm|math-font-profile-attr>,
+  <scm|math-family-for-text> and <scm|text-family-for-math>,
+  <scm|set-hand-tuned-math-fonts> and <scm|hand-tuned-math-fonts?>, which
+  switch off the hand-tuned tables of the fonts that also have a
+  <verbatim|MATH> table, and <scm|font-debug-info>,
+  <scm|font-debug-info-of> and <scm|font-debug-report>, behind the font
+  inspector. They are described in <hlink|math font
+  profiles|opentype-profiles.en.tm>, <hlink|<name|OpenType>
+  features|opentype-features.en.tm> and <hlink|inspecting the font
+  system|opentype-tools.en.tm>.
+
   <section|The font selector>
 
   <subsection|Entry points>
@@ -289,7 +308,7 @@
   latter being used when side tools are enabled (<scm|side-tools?>). The
   public entry points are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(open-font-selector)>>Changes the font at the cursor
     position (<menu|Format|Font> in the compressed menus). The getter is
     <scm|get-env> and the setter <scm|make-multi-with>, which inserts or
@@ -306,7 +325,7 @@
     <scm-arg|prefix> followed by <verbatim|font-series>). It is called from
     the <menu|Other> entry of the parameter menus in
     <verbatim|progs/generic/generic-menu.scm>.
-  </description>
+  </description-paragraphs>
 
   <subsection|State>
 
@@ -340,7 +359,11 @@
     <verbatim|"vmagnify">, <verbatim|"hextended">, <verbatim|"vextended">
     (font effects), whose initial values are parsed from the current values
     of <src-var|font> and <src-var|font-effects>
-    (<scm|initial-customize-get>).
+    (<scm|initial-customize-get>);
+
+    <item>the variable <scm|:features>, a comma separated list of
+    <name|OpenType> features for <src-var|font-features>
+    (<scm|selector-features>), initialized from the document.
   </itemize>
 
   <subsection|From the widgets to the database>
@@ -369,7 +392,12 @@
     <verbatim|"bold=Fira Sans,TeX Gyre Pagella"> that are interpreted by
     the smart fonts; the effects are assembled into a string such as
     <verbatim|"hmagnify=1.1,bold=2"> for <src-var|font-effects>
-    (<scm|selector-font-effects>).
+    (<scm|selector-font-effects>). The <menu|OpenType features> column (a <menu|Features> tab in the side tool) lists the
+    features of the physical font which the dialog will really use
+    (<scm|selector-font-features-available>, through
+    <scm|font-logical-search> and <scm|font-features-of-file>), and its
+    toggles fill <scm|:features>, which goes into <src-var|font-features>;
+    see <hlink|<name|OpenType> features|opentype-features.en.tm>.
 
     <item><scm|selector-get-changes> compares these values with the current
     ones and returns the list of changed variables. Each modification of a
@@ -452,7 +480,12 @@
   live in the files <verbatim|Plugins/Freetype/adjust_*.cpp>, and possibly
   special cases in the smart fonts (<cpp|tex_gyre_fix>, <cpp|math_fix>,
   ...); see <hlink|smart fonts|smart-fonts.en.tm> and
-  <hlink|mathematical typesetting|maths.en.tm>.
+  <hlink|mathematical typesetting|maths.en.tm>. An <name|OpenType> math
+  font needs neither: its <verbatim|MATH> table provides the layout, and a
+  profile declared with <scm|define-math-font-profile> in
+  <verbatim|progs/fonts/fonts-opentype.scm> gives its text, sans serif and
+  typewriter companions and its place in the menus; see <hlink|math font
+  profiles, shipped fonts and the database|opentype-profiles.en.tm>.
 
   <subsection|Supporting a new font format>
 
@@ -474,10 +507,13 @@
     known extensions;
 
     <item><cpp|tt_font_find_sub> (in <verbatim|tt_file.cpp>) decides which
-    extensions are tried when a font name is looked up; currently
-    <verbatim|.pfb>, <verbatim|.ttf>, <verbatim|.ttc>, <verbatim|.otf> and
-    <verbatim|.dfont>, so that <verbatim|.pfb> and <verbatim|.dfont> files
-    can be used by name but are never scanned;
+    extensions are tried when a font name is looked up, and in which order;
+    currently <verbatim|.otf>, <verbatim|.ttf>, <verbatim|.ttc>,
+    <verbatim|.pfb> and <verbatim|.dfont>, so that <verbatim|.pfb> and
+    <verbatim|.dfont> files can be used by name but are never scanned. When
+    the order changes, the prefix of the keys of <verbatim|font_cache.scm>
+    in <cpp|tt_font_find> has to change too, or the answers cached by an
+    older version keep being used;
 
     <item>the font is finally constructed by <cpp|unicode_font> in the
     database fallback of <cpp|find_font_bis>, and analyzed by
@@ -522,20 +558,34 @@
 
   The database code reports on the standard output:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|TeXmacs] missing 'X' family> (or
     <verbatim|master>)>A family used by a document or style is not
-    installed; it is followed by <verbatim|TeXmacs] warning, missing font,
-    loading global substitution list> the first time.
+    installed; it is printed once per name, and followed by
+    <verbatim|TeXmacs] warning, missing font, loading global substitution
+    list> the first time.
 
     <item*|<verbatim|TeXmacs] approximating font ...>>While deriving the
     local database from the global one, a file was identified by name and
     subfont index but not by size.
 
-    <item*|<verbatim|Process ...>, <verbatim|Analyzing ...>, <verbatim|\|
-    Processing ...>>Progress of a disk scan and of the computation of
-    characteristics, followed by the computed characteristics.
-  </description>
+    <item*|<verbatim|TeXmacs] the shipped font database changed, merging
+    it>, <verbatim|TeXmacs] the local font database lost entries, merging
+    again>>The global database is merged into the local one at startup
+    (see <hlink|loading|font-database-storage.en.tm>).
+
+    <item*|<verbatim|TeXmacs] scanned <var|n> new font file(s), skipped
+    <var|m> already known>, <verbatim|TeXmacs] analyzed <var|k> font
+    style(s)>>Summary of a disk scan and of the computation of the
+    missing characteristics. The progress of each file (<verbatim|Process
+    ...>, <verbatim|Analyzing ...>, <verbatim|\| Processing ...>) is
+    only printed when the debug option <verbatim|verbose> is on.
+
+    <item*|<verbatim|TeXmacs] registering <var|family>, the math font of
+    <var|file>>>A profiled <name|OpenType> math font, or its text
+    companion, was installed but missing from the database, and has been
+    added to the local database.
+  </description-paragraphs>
 
   Finer traces can be obtained by uncommenting the <verbatim|cout>
   statements which are already present in <cpp|search_font>,
@@ -546,6 +596,7 @@
 
   In order to make sure that a problem is not caused by stale data, quit
   <TeXmacs> and remove <verbatim|$TEXMACS_HOME_PATH/fonts/font-*.scm>,
+  <verbatim|$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm>,
   <verbatim|$TEXMACS_HOME_PATH/fonts/unpacked> and
   <verbatim|$TEXMACS_HOME_PATH/system/cache/font_cache.scm>. At the next
   start, the local database is derived again from the global one, and the
@@ -564,13 +615,17 @@
 
     <item>The local database only contains fonts of the global database
     which are found on disk, plus the fonts found by explicit scans or
-    imports. A newly installed font is invisible until the disk is
-    scanned, and scanned fonts are forgotten after an upgrade or a cache
-    clearance.
+    imports, plus the profiled <name|OpenType> math fonts registered when a
+    document asked for them. A newly installed font is invisible until the
+    disk is scanned, and scanned fonts are forgotten after an upgrade or a
+    cache clearance. The fonts of a newer global database, on the other
+    hand, are merged automatically at the next start.
 
     <item>Fonts outside the hard coded font path are never found, unless
     they are imported or the path is extended with
-    <verbatim|TEXMACS_FONT_PATH>.
+    <verbatim|TEXMACS_FONT_PATH>. On <name|Unix> systems other than
+    <name|macOS>, the hard coded path only names <TeX> Live 2020 to 2022
+    (see <hlink|the font path|font-database-storage.en.tm>).
 
     <item>Negative answers are cached in <verbatim|font_cache.scm>: a font
     file which was looked up before being installed may remain

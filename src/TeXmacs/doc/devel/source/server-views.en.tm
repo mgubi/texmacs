@@ -105,7 +105,7 @@
   A new view is passive and is not in the view history (see below). Other
   ways to obtain a view are
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|get_passive_view (name)>>An existing view on the buffer
     which is not attached to a window. It loads the buffer if it does not
     exist yet (<cpp|concrete_buffer_insist>) and creates a new view if all
@@ -123,7 +123,7 @@
     passive)>>The first view of the history which passes the given
     filters: on the same buffer, on another buffer, attached to a window,
     not attached.
-  </description>
+  </description-paragraphs>
 
   Views are destroyed with <cpp|delete_view>, which removes the view from
   its buffer and from the history, sets <cpp|ed-\<gtr\>buf> to <cpp|NULL>
@@ -207,7 +207,7 @@
   <verbatim|new_view.cpp> (no other file uses it directly) and manipulated
   by
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|set_current_view (url u)>>Makes <cpp|u> current. As a side
     effect, the global <cpp|the_drd> is set to the <abbr|DRD> of the editor
     and the <cpp|last_visit> time of the buffer is updated. An invalid
@@ -222,7 +222,7 @@
 
     <item*|<cpp|get_current_editor ()>>Returns the editor of the current
     view.
-  </description>
+  </description-paragraphs>
 
   Everything else that is \Pcurrent\Q is derived from the current view:
 

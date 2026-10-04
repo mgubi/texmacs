@@ -365,7 +365,7 @@
 
   User actions are delimited by the editor:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|start_editing ()>>Sets the global current author to the
     author of the editor (<cpp|set_author>). Called at the start of each
     keyboard and mouse event.
@@ -388,7 +388,7 @@
 
     <item*|<cpp|add_undo_mark ()>, <cpp|remove_undo_mark ()>>Confirm the
     current changes, respectively reopen the last undo step.
-  </description>
+  </description-paragraphs>
 
   <cpp|undo> and <cpp|redo> call <cpp|archiver_rep::undo> and
   <cpp|archiver_rep::redo>, which apply the inverse patches (with the flag

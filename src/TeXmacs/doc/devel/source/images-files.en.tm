@@ -168,7 +168,7 @@
   found under <verbatim|C:\\Program Files*\\gs>), or the copy shipped with
   <TeXmacs> when <cpp|GS_EXE> is defined. The functions are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|has_gs>, <cpp|gs_prefix>, <cpp|eps_device>>Availability, the
     quoted command, and the <abbr|EPS> device, <verbatim|eps2write> for
     version 9.14 and later and <verbatim|epswrite> before.
@@ -203,7 +203,7 @@
     <item*|<cpp|pdf_version>>The <abbr|PDF> version of a file, or the
     version selected in the preference <verbatim|texmacs-\<gtr\>pdf:version>
     (1.4 by default).
-  </description>
+  </description-paragraphs>
 
   <verbatim|Plugins/Ghostscript/ghostscript.cpp> is only used by the
   <name|X11> port: <cpp|ghostscript_run> renders a PostScript image into an

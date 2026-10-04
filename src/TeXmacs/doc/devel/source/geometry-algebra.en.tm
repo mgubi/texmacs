@@ -141,7 +141,7 @@
   <cpp|transform (matrix)> and <cpp|enlighten (light)>. There are three
   implementations:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|triangulated (ts, cs)>>(<verbatim|triangulated.cpp>) An
     array of triangles with one color each. Before drawing, the triangles
     are sorted by increasing mean <math|z> coordinate and drawn in that
@@ -158,7 +158,7 @@
     <item*|<cpp|transformed (obj, m)>, <cpp|enlightened (obj,
     light)>>(<verbatim|transformed.cpp>, <verbatim|enlightened.cpp>) Lazy
     wrappers which apply the transformation or the light on first use.
-  </description>
+  </description-paragraphs>
 
   The renderers do not know about three dimensional objects: the generic
   <cpp|renderer_rep::draw_spacial> just calls <cpp|obj-\<gtr\>draw>, which

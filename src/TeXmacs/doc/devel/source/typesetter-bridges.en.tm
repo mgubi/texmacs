@@ -164,7 +164,7 @@
   <verbatim|Typeset/Bridge/bridge.cpp>, which dispatches on the label of
   the subtree:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|bridge_document>>For <markup|document>: one sub-bridge per
     paragraph. This is the bridge that makes typesetting incremental at the
     paragraph level.
@@ -204,7 +204,7 @@
     <item*|<cpp|bridge_default>>For every other primitive: the subtree is an
     ordinary paragraph, and it is re-typeset as a whole when anything inside
     it changes.
-  </description>
+  </description-paragraphs>
 
   In the preamble mode (<cpp|env-\<gtr\>preamble>), all constructs are
   shown in source form through <cpp|make_inactive_bridge>.

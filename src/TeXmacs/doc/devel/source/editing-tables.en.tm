@@ -43,7 +43,7 @@
 
   All public routines start from the cursor. The protected helpers are
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|search_table ()>>The innermost <markup|table> around the
     cursor.
 
@@ -59,14 +59,14 @@
     <item*|<cpp|search_row (fp, row)>, <cpp|search_cell (fp, row,
     col)>>The paths of a row and of the content of a cell (inside the
     <markup|cell> node).
-  </description>
+  </description-paragraphs>
 
   Most public routines call <cpp|search_format (row, col)> and silently do
   nothing when the cursor is not inside a table.
 
   <section|Formats>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|table_get_format (fp)>>All formats which apply to the table:
     the inherited <verbatim|cell-format> of the environment followed by the
     instructions of the <markup|tformat> at <cpp|fp>.
@@ -89,7 +89,7 @@
     <markup|cwith> indices so that rows and columns before the cursor are
     counted from the start and those after it from the end
     (<scm|table-format-center>).
-  </description>
+  </description-paragraphs>
 
   The exported routines <cpp|table_set_format (var, val)> and friends
   (<scm|table-set-format>, ...) act on the table around the cursor, and

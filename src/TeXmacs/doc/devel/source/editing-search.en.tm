@@ -122,7 +122,7 @@
   <cpp|edit_replace_rep> (<verbatim|Edit/Replace/edit_search.cpp>)
   provides the queries which editing code uses to find its context:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|search_upwards (l)>, <cpp|inside (l)>>The innermost
     ancestor of the cursor with the label <cpp|l> (<scm|inside?>). Note
     that the search starts at the <em|grand>parent of the cursor path, that
@@ -141,7 +141,7 @@
     <item*|<cpp|search_previous_compound>,
     <cpp|search_next_compound>>The previous or next accessible tree with a
     given label in document order.
-  </description>
+  </description-paragraphs>
 
   <section|Search and replace>
 

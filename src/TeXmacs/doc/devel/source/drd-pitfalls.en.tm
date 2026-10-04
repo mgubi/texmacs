@@ -204,7 +204,7 @@
 
   <subsection|In style packages>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|packages/customize/math/math-check.ts>>The declaration
     <verbatim|\<less\>drd-props\|extern:math-check\|with-like\|true\|arity\|1\|accessible\|all\|regular\|all\<gtr\>>
     uses <verbatim|true>, which is not a recognized value (only
@@ -218,7 +218,7 @@
     <item*|<verbatim|packages/documentation/standard/scheme-api.ts>>The
     property <verbatim|accesible> (sic) in the declaration of
     <markup|doc-module-header-body> is ignored.
-  </description>
+  </description-paragraphs>
 
   <section|Debugging hints>
 

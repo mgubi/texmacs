@@ -5,6 +5,16 @@
 <\body>
   <tmdoc-title|<TeXmacs> fonts>
 
+  This chapter describes the font classes of the program. How a user or a
+  style file selects fonts, which files describe them and how virtual fonts
+  are written is explained in the reference chapter <hlink|fonts, from
+  selection to glyph|../fonts/font-guide.en.tm>, and the mathematical fonts
+  shipped with <TeXmacs> are presented in the section <hlink|mathematical
+  fonts|../../main/math/fonts/man-math-fonts.en.tm> of the user manual. The
+  support of <name|OpenType> fonts, and in particular of the
+  <verbatim|MATH> table, is the subject of the chapter <hlink|<name|OpenType>
+  fonts|opentype.en.tm>.
+
   <section|Classical conceptions of fonts>
 
   The way <TeXmacs> handles fonts is quite different from classical text
@@ -118,7 +128,12 @@
   <verbatim|"\<less\>big-sum-2\<gtr\>"> (display version). The typesetter
   determines the appropriate size of a delimiter as a function of the height
   of the delimited expression (see <cpp|get_delimiter> in
-  <verbatim|Typeset/Boxes/Basic/text_boxes.cpp>).
+  <verbatim|Typeset/Boxes/Basic/text_boxes.cpp>). A font which knows the
+  size variants of its glyphs, as an <name|OpenType> math font does, is
+  first asked directly with <cpp|get_rubber_variant> (for heights) and
+  <cpp|get_wide_variant> (for the widths of wide accents and arrows,
+  <cpp|get_wide>), and the numbered names are only searched when it cannot
+  tell; see <hlink|stretchable glyphs|opentype-stretch.en.tm>.
 
   <section|The abstract font class>
 
@@ -131,7 +146,7 @@
 
     \ \ int \ \ \ \ \ type; \ \ \ \ \ \ \ \ \ \ \ \ \ // font type
 
-    \ \ int \ \ \ \ \ math_type; \ \ \ \ \ \ \ \ // For TeX Gyre math fonts and Stix
+    \ \ int \ \ \ \ \ math_type; \ \ \ \ \ \ \ \ // normal, Stix, TeX Gyre or OpenType
 
     \ \ SI \ \ \ \ \ \ size; \ \ \ \ \ \ \ \ \ \ \ \ \ // requested size
 
@@ -167,6 +182,10 @@
 
     \ \ ...
 
+    \ \ bool \ \ \ \ ot_math; \ \ \ \ \ \ \ \ \ \ // parameters read from a MATH table
+
+    \ \ SI \ \ \ \ \ \ frac_rule_thickness, ...; // about forty MATH constants
+
     \;
 
     \ \ virtual bool \ \ supports (string c) = 0;
@@ -199,6 +218,16 @@
 
     \ \ virtual SI \ \ \ \ get_rsup_correction \ (string s);
 
+    \ \ virtual SI \ \ \ \ get_rsup_correction_at (string s, SI h);
+
+    \ \ virtual bool \ \ get_rubber_variant (string s, SI height, string& r);
+
+    \ \ virtual bool \ \ get_wide_variant (string s, SI width, string& r);
+
+    \ \ virtual bool \ \ get_top_accent (string s, SI& x);
+
+    \ \ virtual bool \ \ get_feature_variant (string, string, int, string&);
+
     \ \ ...
 
     \;
@@ -230,6 +259,27 @@
   wide accents, tables for character protrusion and tables for the spacing
   between mathematical symbols.
 
+  A font with an <name|OpenType> <verbatim|MATH> table sets <cpp|ot_math>
+  and, unless a hand-tuned branch keeps its own math type, the math type
+  <cpp|MATH_TYPE_OPENTYPE> (see <hlink|activation|opentype-math.en.tm>),
+  and fills about forty further
+  fields with the constants of the table (fraction, radical, limit, stretch
+  stack, script and accent geometry); they stay zero for the other fonts,
+  and <cpp|copy_math_pars> copies them like the older fields. The hooks
+  added for such fonts all have defaults in <cpp|font_rep> which answer
+  \Punknown\Q: the script corrections <cpp|get_lsub_correction_at>, ...,
+  <cpp|get_rsup_correction_at> take the height of the script into account
+  (and fall back on the corrections without height),
+  <cpp|get_rubber_variant>, <cpp|get_wide_variant> and
+  <cpp|is_extended_shape> serve the stretchable glyphs,
+  <cpp|get_top_accent> the placement of accents, and
+  <cpp|get_feature_variant> the glyph substitutions of the <name|OpenType>
+  features. <cpp|make_rubber_font>, which builds the font of the large
+  delimiters (<cpp|rubber_font>), is a virtual method as well, so that a
+  smart font can hand this job to its <name|OpenType> main font. These
+  fields and hooks are described in <hlink|mathematics from the
+  <verbatim|MATH> table|opentype-math.en.tm>.
+
   <section|Implementation of concrete fonts>
 
   Several types of concrete fonts have been implemented in <TeXmacs>:
@@ -251,7 +301,12 @@
     <verbatim|unicode_math_font.cpp>, <verbatim|rubber_unicode_font.cpp>,
     <verbatim|rubber_stix_font.cpp> and <verbatim|rubber_assemble_font.cpp>
     mathematical fonts and their rubber (extensible) variants. The files
-    <verbatim|adjust_*.cpp> contain font specific adjustments.
+    <verbatim|adjust_*.cpp> contain font specific adjustments, which take
+    precedence over the data of an <name|OpenType> <verbatim|MATH> table.
+    <verbatim|tt_tools.cpp> reads the <verbatim|MATH>, <verbatim|GSUB> and
+    <verbatim|GPOS> tables of such fonts and <verbatim|tt_face.cpp> caches
+    them per face; see <hlink|the <name|OpenType> layout
+    tables|opentype-tables.en.tm>.
 
     <item*|System fonts>See <verbatim|Plugins/Qt/qt_font.cpp> and
     <verbatim|Plugins/X11/x_font.cpp>.
@@ -269,14 +324,21 @@
     font merges several fonts: symbols which are not supported by the main
     font are looked up in other fonts, depending on their <name|Unicode>
     range and on the font database, and symbols which are not available at
-    all are rendered using an error font.
+    all are rendered using an error font. The profiles of the named
+    <name|OpenType> math fonts, which give their text, sans serif and
+    typewriter companions, are in <verbatim|math_font_profiles.cpp>; see
+    <hlink|math font profiles|opentype-profiles.en.tm>.
 
     <item*|Synthetic fonts>The files <verbatim|poor_*.cpp> in
     <verbatim|Graphics/Fonts> implement \Ppoor man's\Q fonts, which
     synthesize bold, italic, small capitals, blackboard bold, extended,
     monospaced or distorted variants of existing fonts. Similarly,
     <verbatim|superposed_font.cpp> and <verbatim|recolored_font.cpp>
-    implement superposed and recolored fonts.
+    implement superposed and recolored fonts, and
+    <verbatim|feature_font.cpp> shows a font through one of its
+    <name|OpenType> substitution features (<cpp|feature_font>,
+    <cpp|apply_features>; see <hlink|<name|OpenType>
+    features|opentype-features.en.tm>).
   </description>
 
   In most cases, the lowest layer of the implementation consists of a
@@ -313,7 +375,9 @@
   <verbatim|font-substitutions.scm> in <verbatim|$TEXMACS_PATH/fonts>; a
   local database of the fonts which are installed on the user's system is
   maintained in <verbatim|$TEXMACS_HOME_PATH/fonts>. It can be rebuilt using
-  the <scheme> command <scm|scan-disk-for-fonts>. The implementation can be
+  the <scheme> command <scm|scan-disk-for-fonts>, and the entries of a newer
+  shipped database are merged into it automatically (see <hlink|the font
+  database|font-database.en.tm>). The implementation can be
   found in <verbatim|Graphics/Fonts/font_database.cpp> and
   <verbatim|Graphics/Fonts/font_select.cpp>: requested fonts are translated
   into lists of \Plogical\Q features, which are matched against the

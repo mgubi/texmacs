@@ -129,7 +129,7 @@
   <c++> files are given relative to <verbatim|src/src>, <scheme> files
   relative to <verbatim|src/TeXmacs/progs>.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|System/Link/tm_link.hpp>, <verbatim|tm_link.cpp>>The
     abstract class <cpp|tm_link_rep>, the connection status constants, the
     control characters of the protocol, the factory functions
@@ -208,7 +208,7 @@
 
     <item*|<verbatim|dynamic/scripts-edit.scm>>Evaluation of scripts and
     executable fields in ordinary documents.
-  </description>
+  </description-paragraphs>
 
   Two names are misleading. The function <cpp|init_plugins> in
   <verbatim|System/Boot/init_texmacs.cpp> does not initialize plug-ins in

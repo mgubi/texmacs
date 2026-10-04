@@ -100,7 +100,7 @@
   emulations therefore have a separate printer path which keeps the
   output vectorial:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|poor_italic_font_rep>, <cpp|poor_stretched_font_rep>>On
     printers (<cpp|!ren-\<gtr\>is_screen>), install a transformation
     (<cpp|slanting> resp. <cpp|scaling>) with
@@ -116,7 +116,7 @@
     times with small horizontal offsets (and, for characters which need
     extra width, from a horizontally stretched base font with a slight
     vertical slope), which simulates a thicker pen.
-  </description>
+  </description-paragraphs>
 
   The other emulations (<cpp|poor_bbb_font_rep>,
   <cpp|poor_extended_font_rep>, <cpp|poor_distorted_font_rep>,
@@ -276,7 +276,9 @@
     used for the symbols <verbatim|\<less\>bbb-X\<gtr\>>.
 
     <item><verbatim|rubber>: <cpp|rubber_font> of another subfont, which is
-    usually a <cpp|poor_rubber_font>.
+    usually a <cpp|poor_rubber_font>, but a <cpp|rubber_unicode_font> when
+    the subfont has an <name|OpenType> <verbatim|MATH> table (see
+    <hlink|stretchable glyphs|opentype-stretch.en.tm>).
   </itemize>
 
   <section|Extensible delimiters: <cpp|poor_rubber_font>>
@@ -286,7 +288,11 @@
   <verbatim|\<less\>mid-\|-<em|n>\<gtr\>>, ...) and big operators
   (<verbatim|\<less\>big-sum-1\<gtr\>>, <verbatim|\<less\>big-sum-2\<gtr\>>).
   Ordinary <name|Unicode> text fonts provide none of them.
-  <cpp|poor_rubber_font (base)> builds them from the ordinary glyphs:
+  <cpp|poor_rubber_font (base)> builds them from the ordinary glyphs. A
+  font with a <verbatim|MATH> table does not go through this emulation: its
+  <cpp|make_rubber_font> returns a <cpp|rubber_unicode_font> which uses the
+  size variants and the assemblies of the table, so that the poor rubber
+  font now only serves the fonts which have none.
 
   <\itemize>
     <item>The base font is first enhanced with the bracket emulations:
@@ -302,20 +308,30 @@
     (<cpp|is_thin>). Numbers 10 and 11 are stretched versions of the virtual
     font <verbatim|emu-large>, number 12 is <cpp|rubber_unicode_font
     (base)>, and number 13 is the virtual font <verbatim|emu-large> built
-    on the poor rubber font itself.
+    on the poor rubber font itself. The numbers from 14
+    (<cpp|SLASH_BASE>) to 29 are further stretched versions of the base
+    font for the slashes: a slash cannot be extended by repeating a
+    straight middle part, so beyond the magnified sizes it keeps being
+    stretched, by <math|2<rsup|k/4>> vertically and the fourth root of this
+    factor horizontally.
 
     <item><cpp|search_font (s, r)> maps a requested symbol to a font number
     and a symbol in that font. Small delimiters (size up to
-    <cpp|MAGNIFIED_NUMBER>, as well as slashes and angle brackets of any
-    size) are magnified versions of the base glyph, possibly replaced by an
+    <cpp|MAGNIFIED_NUMBER>, as well as angle brackets of any size) are
+    magnified versions of the base glyph, possibly replaced by an
     <verbatim|emu-...> construction if the base font lacks the glyph.
+    Larger slashes and backslashes go to the fonts from <cpp|SLASH_BASE>
+    on; a backslash whose height differs by more than 5% from the one of
+    the slash is replaced by <verbatim|\<less\>emu-backslash\<gtr\>>, made
+    from the slash, at the largest magnified size.
     Larger delimiters use the parameterized virtual glyphs
     <verbatim|rubber-lparenthesis-#>, <verbatim|rubber-lbracket-#>, ... of
     <verbatim|emu-large.vfn>, with the parameter
     <math|max(n-5,0)+1> (the constant <cpp|HUGE_ADJUST> is 1); they are requested with
     the legacy encoding \Pcode byte followed by the parameter\Q. Big
     operators come from the base font if it has them (<cpp|big_flag>, for
-    the <TeX> Gyre fonts) or from <verbatim|emu-large>.
+    the <TeX> Gyre fonts and for any font with a <verbatim|MATH> table,
+    <cpp|ot_math>) or from <verbatim|emu-large>.
   </itemize>
 
   The global <cpp|has_poor_rubber> (in <verbatim|Graphics/Fonts/font.cpp>,

@@ -23,7 +23,12 @@
   </cpp-code>
 
   The effects are therefore applied to the whole smart font, including all
-  its subfonts (fallback fonts, virtual and emulated symbols). The user
+  its subfonts (fallback fonts, virtual and emulated symbols). Just before
+  the effects, the <name|OpenType> features of <src-var|font-features>,
+  another variable of type <cpp|Env_Font>, are applied in the same way
+  (<cpp|apply_features>), so that an effect such as <verbatim|bold=...>
+  emboldens the substituted glyphs; see <hlink|<name|OpenType>
+  features|opentype-features.en.tm>. The user
   level documentation of the variable is in the <hlink|font environment
   variables|../format/environment/env-font.en.tm>.
 
@@ -62,7 +67,7 @@
   The recognized effects, with the clamping of their values, are
   (<verbatim|Graphics/Fonts/smart_font.cpp>):
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|bold=<em|e>>><math|e\<in\>[1,5]>.
     <cpp|poor_bold_font (fn, fat, fat)> with
     <math|fat=(e-1)\<cdot\>wline/wfn>.
@@ -117,7 +122,7 @@
 
       fn= superposed_font (a, 2);
     </cpp-code>
-  </description>
+  </description-paragraphs>
 
   Parameters inside one effect are separated by semicolons, since the comma
   separates the effects. The values are parsed by the static helpers

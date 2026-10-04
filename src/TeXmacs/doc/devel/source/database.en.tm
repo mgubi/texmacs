@@ -131,7 +131,7 @@
 
   <subsection|Map of the source files>
 
-  <\description>
+  <\description-paragraphs>
     <item*|Engine (<c++>, <verbatim|src/src/>)><verbatim|Plugins/Database/database.hpp>
     (data structures and public functions), <verbatim|database.cpp> (atoms,
     basic operations, table of open databases), <verbatim|db_disk.cpp>
@@ -180,7 +180,7 @@
     bibliography insertion dialogue). The file
     <verbatim|src/TeXmacs/misc/bib/texmacs.bib> contains the entries with
     keys <verbatim|TeXmacs:...> used by <markup|cite-TeXmacs>.
-  </description>
+  </description-paragraphs>
 
   <subsection|Where the data lives>
 

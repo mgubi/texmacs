@@ -147,6 +147,15 @@
     inside fractions or scripts.
   </description>
 
+  A font with an <name|OpenType> <verbatim|MATH> table (<cpp|ot_math>)
+  carries about forty further parameters, read from the constants of the
+  table: fraction, radical, limit and stretch stack geometry, script
+  shifts, drops and gaps, script percentages, accent base heights, and the
+  over- and underbar constants. When they are set, the constructs below
+  take their geometry from them; hand-tuned tables (<name|TeX Gyre>,
+  <name|Stix>) keep precedence wherever they say something. See
+  <hlink|mathematics from the <verbatim|MATH> table|opentype-math.en.tm>.
+
   The individual strings in a font also have several important positioning
   properties. First of all, they always admit left and right slopes.
   Furthermore, they admit left and right italic corrections, which are needed
@@ -159,7 +168,13 @@
   <abbr|etc.> of <cpp|box_rep>. More recent versions of <TeXmacs> also
   implement font-specific microtypographic corrections for the positioning
   of scripts and wide accents (see the files
-  <verbatim|Plugins/Freetype/adjust_*.cpp>).
+  <verbatim|Plugins/Freetype/adjust_*.cpp>). For <name|OpenType> math fonts
+  the corrections may also depend on the height at which the script sits
+  (<cpp|get_rsup_correction_at> and its siblings, <cpp|rsup_correction_at>
+  at the level of boxes), which is how the cut-in kerns of the
+  <verbatim|MATH> table are applied, and accents are placed at the top
+  accent attachment of the glyph (<cpp|get_top_accent>,
+  <cpp|top_accent>).
 
   <section|Some major mathematical constructs>
 
@@ -315,7 +330,9 @@
   First of all, fonts come only with a discrete set of possible sizes for
   large delimiters (see the section on string encodings in the chapter on
   <hlink|fonts|fonts.en.tm>), before the delimiters are assembled from
-  pieces. This is an advantage from the point of view that it favorites
+  pieces; for an <name|OpenType> math font, these are the size variants and
+  the glyph assemblies of its <verbatim|MATH> table (see <hlink|stretchable
+  glyphs|opentype-stretch.en.tm>). This is an advantage from the point of view that it favorites
   delimiters around slightly different expressions to have the same
   baselines. However, it has the disadvantage that delimiters are easily
   made \Pone size too large\Q. For this reason, we actually diminish the

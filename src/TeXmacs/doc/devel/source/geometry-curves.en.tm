@@ -60,7 +60,7 @@
   below). Besides <cpp|direct_transform> and <cpp|inverse_transform>, a
   <cpp|frame_rep> implements
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|jacobian (p, v, error)>,
     <cpp|jacobian_of_inverse>>The derivative at <cpp|p> applied to the
     vector <cpp|v>, used to compute tangents of transformed curves.
@@ -85,11 +85,11 @@
 
     <item*|<cpp|operator tree>>A description for debugging, such as
     <verbatim|(tuple "scale" ...)>.
-  </description>
+  </description-paragraphs>
 
   <subsection|Concrete frames>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|shift_2D (d)>>Translation.
 
     <item*|<cpp|scaling (m, shift)>>The map <math|p\<mapsto\>shift+m p>,
@@ -118,7 +118,7 @@
 
     <item*|<cpp|f1 * f2>, <cpp|invert (f)>>Composition (apply <cpp|f2>
     first) and inversion; both are lazy wrappers.
-  </description>
+  </description-paragraphs>
 
   <section|Curves>
 

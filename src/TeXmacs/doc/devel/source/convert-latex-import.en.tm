@@ -272,7 +272,7 @@
     tree t15= postprocess_metadata (t14);
   </cpp-code>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|kill_space_invaders>>Removes spaces and newlines which
     <TeX> would ignore (<verbatim|fromtex.cpp>).
 
@@ -318,7 +318,7 @@
     <item*|<cpp|guess_missing>, <cpp|postprocess_metadata>>Adds missing
     definitions and structures the metadata (<markup|doc-data>,
     <markup|doc-author>, ...) with <verbatim|metadata_post.cpp>.
-  </description>
+  </description-paragraphs>
 
   For a complete document, the result is assembled into a <TeXmacs> file
   whose style is the <LaTeX> class if a <TeXmacs> style with this name

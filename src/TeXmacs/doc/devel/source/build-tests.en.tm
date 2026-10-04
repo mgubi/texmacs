@@ -143,7 +143,7 @@
   well. The entry points, also available as command line options (see
   <hlink|the main program|server-startup.en.tm>), are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(build-ref-suite <scm-arg|dir>)>, option
     <verbatim|-reference-suite <em|dir>>>Unpacks <scm-arg|dir> into
     <verbatim|<em|dir>-ref> and produces all outputs there. This is done
@@ -161,7 +161,7 @@
     <verbatim|<em|dir>-check/status-report.tm>, which lists missing
     directories and files and changed files; it is removed if there is
     nothing to report.
-  </description>
+  </description-paragraphs>
 
   Outputs are only regenerated when the source is newer than the output
   (<scm|should-update?>), so a second run is fast. The functions take

@@ -417,7 +417,7 @@
   descriptions of tags used by the converters. By convention predicate
   names end with <verbatim|%>. The forms which matter here are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|(logic-group <scm-arg|name> <scm-arg|tag> ...)>>Membership
     facts, tested with <scm|(logic-in? <scm-arg|x> <scm-arg|name>)>. Used
     for instance for the <LaTeX> command classes in
@@ -453,7 +453,7 @@
 
     after which <scm|(logic-ref tmtex-methods% <scm-arg|tag>)> finds the
     routine in either table.
-  </description>
+  </description-paragraphs>
 
   Adding support for a new tag in a converter therefore usually means
   adding an entry to the dispatcher of that converter, not touching the

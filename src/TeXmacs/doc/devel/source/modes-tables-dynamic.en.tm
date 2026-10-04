@@ -17,7 +17,7 @@
   environments (<markup|tabular>, <markup|block>, ...) around a
   <markup|tformat> or <markup|table>.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|table/table-edit.scm>>The groups
     <verbatim|table-tag> and <verbatim|wide-table-tag> (which also make
     tabulars and blocks variants of each other); <key|return> inserts a new
@@ -47,7 +47,7 @@
     <item*|<verbatim|table/table-widgets.scm>,
     <verbatim|table/table-tools.scm>>The table and cell property dialogs
     and side tools.
-  </description>
+  </description-paragraphs>
 
   <section|Dynamic markup>
 

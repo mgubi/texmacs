@@ -99,7 +99,7 @@
 
   <section|Evaluating and calling <scheme> code>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|eval (string expr)>>Parses and evaluates a string (through
     <cpp|eval_scheme>). <cpp|eval (object expr)> instead calls the
     <scheme> function <scm|eval> on an expression which is already a
@@ -120,7 +120,7 @@
     <item*|<cpp|scheme_cmd (s)>>Turns a string or an expression into a
     procedure without arguments, <verbatim|(lambda () <em|s>)>; this is the
     usual argument of <cpp|exec_delayed>.
-  </description>
+  </description-paragraphs>
 
   All of these go through the error catching of the back-end: if the
   <scheme> code fails, the error is printed on the console and the result

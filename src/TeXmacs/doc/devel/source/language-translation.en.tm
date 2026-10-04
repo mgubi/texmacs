@@ -77,7 +77,7 @@
 
   The main functions are
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|translate (s)>, <scm|translate>>Translate a string from
     English into the output language.
 
@@ -100,7 +100,7 @@
     <item*|<cpp|translate (t)> for a tree>Translate the tree and serialize
     it as a string, as needed for window titles and native menus; keyboard
     shortcuts (<markup|render-key>) are rendered in a GUI dependent way.
-  </description>
+  </description-paragraphs>
 
   Menus and widgets call these functions themselves: every label of a menu
   or widget is a string or tree in English, translated when the widget is
@@ -141,7 +141,7 @@
   <verbatim|System/Language/locale.cpp> converts between <TeXmacs> language
   names and system locales:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|get_locale_language ()>>The language of the user, from
     <verbatim|LC_ALL>, <verbatim|LC_MESSAGES>, <verbatim|LANG> or
     <verbatim|GDM_LANG>, from the system settings on <name|macOS>, or from
@@ -165,7 +165,7 @@
     <cpp|pretty_date>>Dates in a given language and format. With <name|Qt>
     they are computed by <name|Qt> (<verbatim|Plugins/Qt/qt_utilities.cpp>);
     otherwise <verbatim|date> is run with the locale of the language.
-  </description>
+  </description-paragraphs>
 
   <section|Pitfalls>
 

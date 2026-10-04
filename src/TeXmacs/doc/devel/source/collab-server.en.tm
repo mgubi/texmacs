@@ -13,7 +13,7 @@
   relevant command line options are parsed in
   <verbatim|Texmacs/Texmacs/texmacs.cpp>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|-server>>Enable server mode (<cpp|set_server>). At the
     end of the initialization, <cpp|server_start> is called provided that
     <cpp|server_can_start> succeeds. The latter refuses to start when
@@ -41,7 +41,7 @@
     <item*|<verbatim|--tls-no-verify>>Client side option: skip the
     verification of server certificates (useful for headless clients which
     cannot ask the user to trust a self-signed certificate).
-  </description>
+  </description-paragraphs>
 
   A typical invocation on a machine without display is therefore
 

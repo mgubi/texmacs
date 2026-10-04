@@ -141,6 +141,13 @@
     entries of the local database which are not in the global one, written
     by <cpp|font_database_save_local_delta>. They are used by maintainers in
     order to inspect new fonts before adding them to the global database.
+
+    <item*|<verbatim|$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm>>Two lines
+    written by <cpp|font_database_load> whenever it merges the global
+    database into the local one: the dates and sizes of the three global
+    files followed by the value of <verbatim|TEXMACS_PATH>
+    (<cpp|shipped_fonts_stamp>), and the number of entries of the local
+    database after the merge (see <hlink|loading|#loading> below).
   </description-paragraphs>
 
   The file <verbatim|$TEXMACS_PATH/fonts/pdf-font-issues.scm> is unrelated
@@ -150,21 +157,33 @@
 
   <section|Lifecycle of the database>
 
-  <subsection|Loading>
+  <subsection|Loading><label|loading>
 
   All query functions start by calling <cpp|font_database_load>, which does
   nothing after the first successful call (flag <cpp|fonts_loaded>).
   Otherwise, it proceeds as follows:
 
   <\enumerate>
-    <item>Load the local database into <cpp|font_table>. If it is empty or
-    missing (first start, or after an upgrade or a cache clearance), load
-    the global database instead, keep only those entries whose files exist
-    on this machine (<cpp|font_database_filter>), and save the result as
-    the local database.
+    <item>Decide whether the shipped database has to be <em|merged> into the
+    local one. This is the case when the first line of
+    <verbatim|shipped-stamp.scm> differs from the current stamp (the global
+    files changed, typically after an upgrade which registers new fonts, or
+    another installation uses the same home directory), or when the stamp is
+    missing (<cpp|shipped_fonts_changed>), and also when the local database
+    has fewer entries than the second line of the stamp records, because
+    another installation rebuilt it without the fonts that this one ships
+    (<cpp|shipped_fonts_shrunk>).
 
-    <item>Similarly load the local features. If there are none, load the
-    global features, keep only those of the families present in
+    <item>Load the local database into <cpp|font_table>. If it is empty or
+    missing (first start, or after an upgrade or a cache clearance), or if
+    a merge is due, load the global database (whose entries are added to
+    the local ones, replacing those with the same key), keep only those
+    entries whose files exist in the font path of this machine
+    (<cpp|font_database_filter>), and save the result as the local
+    database.
+
+    <item>Similarly load the local features. If there are none, or if a
+    merge is due, load the global features, keep only those of the families present in
     <cpp|font_table> (<cpp|font_database_filter_features>) and save them
     locally. While loading features, <cpp|font_variants> is rebuilt.
 
@@ -174,13 +193,30 @@
     <item>Load the global substitutions (<cpp|font_database_load_substitutions>).
     A rule is only retained if its target family has at least one style in
     <cpp|font_table>, so that substitutions never lead to missing fonts.
+
+    <item>After a merge, write the new stamp and the number of entries to
+    <verbatim|shipped-stamp.scm>.
   </enumerate>
+
+  Without the merge, a font that a new version of <TeXmacs> registers in
+  its global database, such as the <name|OpenType> math fonts it now
+  ships, would stay invisible to a home directory written by an older
+  version, and the characters which only that font draws would come out as
+  their names in red.
 
   In other words, on first start the local database is the intersection of
   the global database with the files on disk. Apart from the sizes of the
   files, which are used to identify them, font files are not analyzed at
   this stage. Fonts that are installed but unknown to the global database
-  are only discovered by an explicit scan (see below).
+  are only discovered by an explicit scan (see below), with one exception:
+  a profiled <name|OpenType> math font which is installed but not in the
+  database (the math fonts of a <TeX> distribution are the usual case) is
+  added to the local database the first time a document asks for it, by
+  <cpp|register_profiled_font> in <verbatim|smart_font.cpp>, which calls
+  <cpp|font_database_extend_local> on the file named by the profile (and on
+  the directory of its <verbatim|text-file>). As a side effect, that
+  directory is added to the preference <verbatim|"imported fonts">; see
+  <hlink|math font profiles|opentype-profiles.en.tm>.
 
   <subsection|Filtering the global database>
 
@@ -214,7 +250,8 @@
   local features (functions <cpp|family_to_master> and
   <cpp|master_to_families>, with an exception for the pseudo families
   <verbatim|tc> and <verbatim|tcx>), it prints <verbatim|TeXmacs] missing
-  'name' family> (resp. <verbatim|master>) and calls
+  'name' family> (resp. <verbatim|master>), once per name
+  (<cpp|report_once>), and calls
   <cpp|font_database_global_load>, which itself prints <verbatim|TeXmacs]
   warning, missing font, loading global substitution list>. This function,
   executed at most once (flag <cpp|fonts_global_loaded>), loads the global
@@ -234,10 +271,14 @@
   disjunctions and directories; in directories, only files with extensions
   <verbatim|.ttf>, <verbatim|.ttc> and <verbatim|.otf> are considered (a
   single file given explicitly is processed whatever its extension). Files
-  on a small blacklist (<cpp|on_blacklist>) are skipped. For each file, it
-  prints <verbatim|Process file>, calls <cpp|tt_font_name> to obtain one
-  pair <verbatim|(family style)> per subfont, and registers the location
-  <verbatim|(file index size)> for this pair.
+  on a small blacklist (<cpp|on_blacklist>) are skipped, and so are the
+  files whose name and size are already recorded in <cpp|font_table>: the
+  index <cpp|scanned_files> of such pairs is built from the table by
+  <cpp|font_database_init_scanned> before each scan. For each new file, it
+  calls <cpp|tt_font_name> to obtain one pair <verbatim|(family style)> per
+  subfont, and registers the location <verbatim|(file index size)> for this
+  pair; the names of the processed files are only printed in verbose debug
+  mode, and a scan ends with a count of the new and skipped files.
 
   The scanning functions available to the rest of <TeXmacs> are:
 
@@ -250,8 +291,11 @@
     guesses features for the families that have none
     (<cpp|font_database_guess_features>) and saves the local database. This
     is the implementation of <menu|Tools|Fonts|Scan disk for fonts>
-    (<scm|scan-disk-for-fonts>). It may take several minutes on systems with
-    many fonts, since every new font is rendered for its analysis.
+    (<scm|scan-disk-for-fonts>). Since known files are skipped and the
+    characteristics are only computed for styles which have none, a rescan
+    of a complete database takes seconds; the first scan of a system with
+    many fonts may still take minutes, since every new font is rendered for
+    its analysis.
   </explain>
 
   <\explain>
@@ -316,13 +360,18 @@
     <verbatim|/usr/share/fonts/truetype> and their
     <verbatim|/usr/local> counterparts on other systems; plus the
     <verbatim|opentype> and <verbatim|truetype> font directories of
-    <TeX> Live 2020 to 2022 (and of <name|MacPorts> <TeX> Live on
-    <name|macOS>).
+    <TeX> Live (and of <name|MacPorts> <TeX> Live on <name|macOS>).
   </itemize>
 
-  Fonts in other places (for instance <verbatim|$HOME/.local/share/fonts>,
-  or a more recent <TeX> Live) are only found after an explicit import or
-  through <verbatim|TEXMACS_FONT_PATH>.
+  On <name|macOS>, the <TeX> Live directories are found whatever their
+  year: <cpp|texlive_font_dirs> lists the installations under
+  <verbatim|/usr/local/texlive>, <verbatim|/usr/share/texlive>,
+  <verbatim|/opt/texlive> and <verbatim|$HOME/texlive>. On the other
+  <name|Unix> systems the list still names <TeX> Live 2020 to 2022 only
+  (<verbatim|tt_file.cpp>, <cpp|tt_font_path>), so that fonts in other
+  places (for instance <verbatim|$HOME/.local/share/fonts>, or a more
+  recent <TeX> Live) are only found after an explicit import or through
+  <verbatim|TEXMACS_FONT_PATH>.
 
   <section|Reading font files>
 
@@ -332,7 +381,9 @@
   without extension, such as <verbatim|texgyrepagella-bold> or
   <verbatim|DejaVuSans>. The function <cpp|tt_font_find> maps such a name to
   a <cpp|url>, using the persistent cache <verbatim|font_cache.scm> (key
-  <verbatim|"ttf:"> followed by the name). On a cache miss,
+  <verbatim|"sfnt:"> followed by the name; the prefix was changed from
+  <verbatim|"ttf:"> when the order below changed, so that answers cached by
+  an older version are not reused). On a cache miss,
   <cpp|tt_font_find_sub> successively tries:
 
   <\enumerate>
@@ -343,9 +394,13 @@
     returned. This is how fonts in <verbatim|.ttc> collections are made
     accessible to the rest of <TeXmacs>.
 
-    <item>the extensions <verbatim|.pfb>, <verbatim|.ttf>,
-    <verbatim|.ttc>, <verbatim|.otf> and <verbatim|.dfont>, using
-    <cpp|tt_locate>; <verbatim|.pfb> files are searched in the <TeX>
+    <item>the extensions <verbatim|.otf>, <verbatim|.ttf>,
+    <verbatim|.ttc>, <verbatim|.pfb> and <verbatim|.dfont>, in this order,
+    using <cpp|tt_locate>. The <name|sfnt> formats come before
+    <name|Type 1>: a <TeX> distribution ships many families in both forms,
+    and the <verbatim|.pfb> file carries a <TeX> encoding instead of a
+    <name|Unicode> character map, besides having no <name|OpenType> layout
+    tables; <verbatim|.pfb> files are searched in the <TeX>
     distribution (<cpp|resolve_tex>), the others in <cpp|tt_font_path>
     (and optionally with the system <verbatim|locate> command, when the
     global flag <cpp|use_locate> is set, which is currently never the
@@ -417,6 +472,12 @@
     understand why a font gets a strange name in the database. Exported to
     <scheme> as <scm|tt-dump>.
   </explain>
+
+  The same file contains the readers of the <name|OpenType> layout tables
+  <verbatim|MATH>, <verbatim|GSUB> and <verbatim|GPOS>, which are not used
+  by the database but by the fonts themselves, through the parsed tables
+  that <verbatim|tt_face.cpp> keeps per face; they are described in
+  <hlink|the <name|OpenType> layout tables|opentype-tables.en.tm>.
 
   <section|Font characteristics><label|characteristics>
 
@@ -526,7 +587,7 @@
 
   Besides the local database itself, the following caches are involved:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|$TEXMACS_HOME_PATH/system/cache/font_cache.scm>>The
     persistent cache of <cpp|tt_font_find> and <cpp|tt_find_name>
     (<verbatim|System/Misc/data_cache.cpp>). Positive entries are checked
@@ -546,7 +607,7 @@
     <cpp|search_font> and <cpp|find_closest>; the memo tables of the
     <cpp|guessed_distance> functions; and the table
     <cpp|font::instances> of all constructed fonts, indexed by name.
-  </description>
+  </description-paragraphs>
 
   These caches are invalidated in the following situations:
 
@@ -560,7 +621,8 @@
 
     <item>The command <menu|Tools|Fonts|Clear font cache>
     (<scm|clear-font-cache> in <verbatim|progs/texmacs/texmacs/tm-tools.scm>)
-    removes <verbatim|font_cache.scm> and the three local database files.
+    removes <verbatim|font_cache.scm>, the three local database files and
+    <verbatim|shipped-stamp.scm>.
     It does not touch the in-memory tables, so <TeXmacs> has to be
     restarted; it neither removes the unpacked subfonts.
 

@@ -48,7 +48,7 @@
 
   <section|File tests and attributes>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|is_of_type (u, filter)>>Tests each letter of the filter
     (see <hlink|resolution|system-urls.en.tm>). For web <abbr|URL>s, the
     file is downloaded and only <verbatim|d>, <verbatim|l>, <verbatim|w>
@@ -73,7 +73,7 @@
     <item*|<cpp|file_format (u)>>The format of a file, from its suffix
     (<cpp|suffix_to_format>) or, for <verbatim|tmfs>, from
     <scm|tmfs-format>.
-  </description>
+  </description-paragraphs>
 
   <section|Special names>
 

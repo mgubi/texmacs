@@ -13,7 +13,8 @@
   <cpp|Env_Font_Size> changes, as well as on changes of the mode, the
   magnification or the script level. The size is
   <src-var|font-base-size> times <src-var|font-size>, reduced for scripts by
-  <cpp|get_script_size>. Then, depending on the mode:
+  <cpp|get_script_size>. Then, depending on the mode
+  (<cpp|edit_env_rep::make_current_font>):
 
   <\itemize>
     <item>in text mode, <cpp|smart_font> is called with the values of
@@ -33,14 +34,25 @@
     <verbatim|-tt>.
   </itemize>
 
-  Finally, if <src-var|font-effects> is not empty, the result is wrapped by
-  <cpp|apply_effects>. The ten argument variant of <cpp|smart_font> reduces
+  When the resulting font carries an <name|OpenType> <verbatim|MATH> table
+  and the script level is positive, the size is recomputed from the
+  percentages of the table (<cpp|script_percent>,
+  <cpp|script_script_percent>), unless <src-var|math-font-sizes> is set, and
+  an untuned <name|OpenType> math font is shown through its
+  <verbatim|ssty> feature (<cpp|feature_font>); see <hlink|mathematics from
+  the <verbatim|MATH> table|opentype-math.en.tm>. Finally, if
+  <src-var|font-features> is not empty, the result is wrapped by
+  <cpp|apply_features> (see <hlink|<name|OpenType>
+  features|opentype-features.en.tm>), and if <src-var|font-effects> is not
+  empty, by <cpp|apply_effects>. The ten argument variant of <cpp|smart_font> reduces
   to the six argument one: if the preference <verbatim|"new style fonts">
   is disabled, it directly returns <cpp|find_font> applied to its first four
   arguments; otherwise it uses the second group of arguments, except that a
   text font <verbatim|roman> is replaced by the first family, the math
   variants <verbatim|ms> and <verbatim|mt> are mapped to <verbatim|ss> and
-  <verbatim|tt>, and the shape <verbatim|right> is mapped to
+  <verbatim|tt>, a series other than <verbatim|medium> of the first group
+  replaces the text series (so that <src-var|math-font-series> reaches the
+  math font), and the shape <verbatim|right> is mapped to
   <verbatim|mathupright>.
 
   The six argument <cpp|smart_font> calls <cpp|smart_font_bis>. When the
@@ -63,7 +75,13 @@
     variants);
 
     <item>a few family name fixes are applied (<cpp|tex_gyre_fix>,
-    <cpp|kepler_fix>, <cpp|math_fix>);
+    <cpp|kepler_fix>, <cpp|math_fix>, and last <cpp|profile_fix>, which
+    replaces a text family by the math font of its profile in math shapes,
+    a math family by its text companion in text shapes, takes the sans
+    serif and typewriter companions declared by the profile, translates the
+    result into its master, and registers a profiled font which is
+    installed but missing from the database; see <hlink|math font
+    profiles|opentype-profiles.en.tm>);
 
     <item>the base font is <cpp|closest_font (main_family (family), variant,
     series, shape, sz, dpi)>, where <cpp|main_family> extracts the main
@@ -684,6 +702,14 @@
   and <verbatim|sys-korean> expand to), in which the condition
   <verbatim|cjk> also accepts <verbatim|hangul> and <verbatim|hiragana>
   characters.
+
+  When the main font has a <verbatim|MATH> table (an <name|OpenType> or a
+  <name|TeX Gyre> math font) and a symbol it lacks would be drawn by an
+  emulation which a <name|PDF> export can only hold as a bitmap, the smart
+  font takes the symbol from <name|STIX Two Math>, shipped with <TeXmacs>,
+  instead of asking the database (<cpp|resolve_shipped_math> in
+  <verbatim|smart_font.cpp>), so that the result is the same on every
+  system.
 
   The default <name|CJK> fonts are determined by
   <cpp|default_chinese_font_name>, <cpp|default_japanese_font_name> and

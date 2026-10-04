@@ -29,6 +29,14 @@
   <hlink|smart fonts|smart-fonts.en.tm>. Here we only describe the
   interface between smart fonts and the database, that is, how a smart font
   asks the database for the closest font able to render a given character.
+  How fonts are selected from the user's point of view, and which files make
+  up the database, is described at a higher level in the reference chapter
+  <hlink|fonts, from selection to glyph|../fonts/font-guide.en.tm>; the
+  mathematical fonts shipped with <TeXmacs> are presented in <hlink|the
+  section on mathematical fonts|../../main/math/fonts/man-math-fonts.en.tm>
+  of the user manual, and the way the database registers the
+  <name|OpenType> math fonts in <hlink|math font profiles, shipped fonts and
+  the database|opentype-profiles.en.tm>.
 
   <\traverse>
     <branch|The font database: files, lifecycle and
@@ -85,7 +93,13 @@
     <name|OpenType> files (including <verbatim|.ttc> collections) without
     going through <name|FreeType>, extract the family and style names
     (<cpp|tt_font_name>), and locate font files on disk
-    (<cpp|tt_font_path>, <cpp|tt_font_find>, <cpp|tt_font_exists>). The file
+    (<cpp|tt_font_path>, <cpp|tt_font_find>, <cpp|tt_font_exists>; a name is
+    looked for as <verbatim|.otf>, <verbatim|.ttf> and <verbatim|.ttc> before
+    <verbatim|.pfb>). <verbatim|tt_tools.cpp> also reads the
+    <name|OpenType> layout tables <verbatim|MATH>, <verbatim|GSUB> and
+    <verbatim|GPOS>, which serve the fonts themselves rather than the
+    database (see <hlink|the <name|OpenType> layout
+    tables|opentype-tables.en.tm>). The file
     <verbatim|Plugins/Freetype/tt_analyze.cpp> renders a few glyphs with
     <name|FreeType> in order to compute the characteristics of a font
     (<cpp|tt_analyze>).
@@ -150,8 +164,11 @@
     <item>When the preference <verbatim|"new style fonts"> is enabled (the
     default), <cpp|smart_font_bis> applies a few family name fixes (here
     <cpp|tex_gyre_fix> rewrites <verbatim|pagella> into <verbatim|TeX Gyre
-    Pagella>) and calls <cpp|closest_font> on the main family in order to
-    construct the base font of a new smart font.
+    Pagella>; the last one, <cpp|profile_fix>, replaces a text family by the
+    math font of its profile in math shapes, and conversely, and registers
+    a profiled font which is installed but missing from the database) and
+    calls <cpp|closest_font> on the main family in order to construct the
+    base font of a new smart font.
 
     <item><cpp|find_closest> translates the request into the logical font
     <verbatim|["TeX Gyre Pagella", "bold"]>, applies the substitutions
@@ -200,6 +217,12 @@
     (<cpp|smart_font>, <cpp|main_family>, <cpp|get_unicode_range>), see
     <hlink|smart fonts|smart-fonts.en.tm>.
 
+    <item*|<verbatim|Graphics/Fonts/math_font_profiles.cpp>>The profiles of
+    the named <name|OpenType> math fonts (<cpp|math_font_profile_attr>,
+    <cpp|math_family_for_text>, <cpp|text_family_for_math>), declared from
+    <scheme> in <verbatim|progs/fonts/fonts-opentype.scm>; see <hlink|math
+    font profiles|opentype-profiles.en.tm>.
+
     <item*|<verbatim|Plugins/Freetype/tt_file.cpp>,
     <verbatim|tt_tools.cpp>, <verbatim|tt_analyze.cpp>>Locating, parsing and
     analyzing font files.
@@ -210,8 +233,13 @@
     <item*|<verbatim|progs/fonts/>>Font rules for the old mechanism
     (<verbatim|fonts-*.scm>), the old font menus
     (<verbatim|font-old-menu.scm>), the font selector
-    (<verbatim|font-new-widgets.scm>) and tools for sampling and comparing
-    fonts (<verbatim|font-sample.scm>).
+    (<verbatim|font-new-widgets.scm>), tools for sampling and comparing
+    fonts (<verbatim|font-sample.scm>), the profiles and menus of the
+    <name|OpenType> math fonts (<verbatim|fonts-opentype.scm>,
+    <verbatim|font-short-menu.scm>), the <name|OpenType> features
+    (<verbatim|font-features.scm>) and the font inspector
+    (<verbatim|font-debug.scm>, see <hlink|inspecting the font
+    system|opentype-tools.en.tm>).
   </description-paragraphs>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

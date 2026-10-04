@@ -275,7 +275,7 @@
 
   <section|The concrete language classes>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|prog_language_rep>>The generic highlighter
     (<verbatim|prog_language.cpp>). It derives from
     <cpp|abstract_language_rep>, which owns one instance of each parser of
@@ -335,7 +335,7 @@
     grammar; otherwise no colors are produced. The test language
     <verbatim|minimal> (<verbatim|language/minimal.scm>, markup
     <markup|minimal>) works in this way.
-  </description>
+  </description-paragraphs>
 
   Text and mathematics use other subclasses (<verbatim|text_language.cpp>,
   <verbatim|math_language.cpp>), which are outside the scope of this

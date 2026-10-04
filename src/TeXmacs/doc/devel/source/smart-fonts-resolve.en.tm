@@ -50,7 +50,9 @@
 
     <item>Greek letters (<cpp|is_greek>), unless the shape is
     <verbatim|mathupright> or the family list contains more than one
-    unconditional family (<cpp|use_italic_greek>, a documented hack): if
+    unconditional family (<cpp|use_italic_greek>, a documented hack, which
+    is overridden when the main font is an untuned <name|OpenType> math
+    font, <cpp|ot_math>): if
     the main font has the mathematical italic Greek letter of the
     <verbatim|U+1D6E2> block, use <verbatim|italic-greek> (main font with
     <cpp|REWRITE_ITALIC_GREEK>); otherwise use <verbatim|italic-math>, the
@@ -97,6 +99,16 @@
 
     \ \ for (int i= 0; i \<less\> N(a); i++) {
 
+    \ \ \ \ if (ot_math && is_rubber (c) &&
+
+    \ \ \ \ \ \ \ \ (starts (c, "\<less\>wide-") \|\| starts (c, "\<less\>rubber-"))) {
+
+    \ \ \ \ \ \ int nr= resolve_rubber (c, a[i], attempt);
+
+    \ \ \ \ \ \ if (nr \<gtr\>= 0) return nr;
+
+    \ \ \ \ }
+
     \ \ \ \ int nr= resolve (c, a[i], attempt);
 
     \ \ \ \ if (nr \<gtr\>= 0) return nr;
@@ -130,7 +142,11 @@
   over attempts and the inner loop over families, so all families of the
   list are tried with the exact request before any of them is tried with a
   less close match. <name|Unicode> mathematical alphanumeric symbols only
-  get one attempt, since they have a dedicated fallback (step 3).
+  get one attempt, since they have a dedicated fallback (step 3). An
+  <name|OpenType> math font stretches its own wide accents, braces and
+  arrows: for such a main font, <verbatim|\<less\>wide-...\<gtr\>> and
+  <verbatim|\<less\>rubber-...\<gtr\>> are tried as rubber characters
+  before the emulations which <cpp|resolve> would find.
 
   <subsection|Trying one family>
 
@@ -197,6 +213,17 @@
       subfont <verbatim|("emulate" name)>. In this way a symbol missing in
       the main font is preferably constructed from glyphs <em|of the main
       font>, before looking for it in other fonts.
+
+      There is one exception: when the main font has a <verbatim|MATH> table
+      (math type <cpp|MATH_TYPE_OPENTYPE> or <cpp|MATH_TYPE_TEX_GYRE>) and
+      the construction could only be exported as a bitmap
+      (<cpp|virtual_font_draws_vectors> is false), the symbol is taken from
+      <name|STIX Two Math>, which is shipped with <TeXmacs>, if that font has
+      it (<cpp|resolve_shipped_math>, subfont <verbatim|shipped-math>). The
+      document then looks the same on every system, as with an emulation,
+      but exports as vectors. Only the few symbols which no font has, such
+      as <verbatim|\<less\>triangleup\<gtr\>>, are still exported as
+      bitmaps.
     </enumerate>
 
     <item><em|Attempts <math|k\<gtr\>1>.> The routine looks for a font for
@@ -213,8 +240,10 @@
 
   Characters recognized by <cpp|is_rubber>, that is
   <verbatim|\<less\>left-...\<gtr\>>, <verbatim|\<less\>mid-...\<gtr\>>,
-  <verbatim|\<less\>right-...\<gtr\>> and
-  <verbatim|\<less\>large-...\<gtr\>>, are handled by
+  <verbatim|\<less\>right-...\<gtr\>>,
+  <verbatim|\<less\>large-...\<gtr\>>, and also the wide accents
+  <verbatim|\<less\>wide-...\<gtr\>> and the stretched arrows
+  <verbatim|\<less\>rubber-...\<gtr\>>, are handled by
   <cpp|resolve_rubber (c, fam, attempt)>. It extracts the delimiter name
   (for instance <verbatim|(> from <verbatim|\<less\>left-(-3\<gtr\>>). Null
   delimiters (<verbatim|.> and <verbatim|\<less\>nobracket\<gtr\>>) are
@@ -227,23 +256,35 @@
   brackets. The goal is resolved like an ordinary character in the main
   family of the entry, giving a subfont <math|k>; the delimiter is then
   rendered by the subfont <verbatim|("rubber" k)>, which is
-  <cpp|rubber_font (fn[k])>, if that font supports it. Italic main fonts
-  never provide rubber characters.
+  <cpp|rubber_font (fn[k])>, if that font supports it. A long arrow whose
+  long form the font lacks (<verbatim|\<less\>rubber-longrightarrow\<gtr\>>,
+  for instance) is built on the plain arrow. Italic main fonts never
+  provide rubber characters.
 
   The <cpp|rubber_font> wrapper (in <verbatim|Graphics/Fonts/font.cpp>)
-  caches one extensible font per base font and chooses it in
-  <cpp|make_rubber_font>: <cpp|rubber_stix_font> for <name|Stix>, the base
-  font itself if its name mentions <verbatim|mathlarge=> or
-  <verbatim|mathrubber=> (the font is then expected to handle rubber
-  characters itself), <cpp|poor_rubber_font> for other <name|Unicode> fonts
-  when <cpp|has_poor_rubber> holds (the default), and
+  caches one extensible font per base font and lets the base font choose it
+  with the virtual method <cpp|make_rubber_font>. A <name|Unicode> font
+  with a <verbatim|MATH> table returns a <cpp|rubber_unicode_font> which
+  takes the size variants and the assemblies of the table (see
+  <hlink|stretchable glyphs|opentype-stretch.en.tm>); a smart font whose
+  main font is an <name|OpenType> math font hands the job to it. The
+  default <cpp|font_rep::make_rubber_font> chooses
+  <cpp|rubber_stix_font> for <name|Stix> (unless the hand-tuned tables are
+  switched off, <cpp|hand_tuned_math_fonts>), the base font itself if its
+  name mentions <verbatim|mathlarge=> or <verbatim|mathrubber=> (the font
+  is then expected to handle rubber characters itself),
+  <cpp|poor_rubber_font> for other <name|Unicode> fonts when
+  <cpp|has_poor_rubber> holds (the default), and
   <cpp|rubber_unicode_font> otherwise. See <hlink|emulated
   fonts|smart-fonts-emulated.en.tm> for <cpp|poor_rubber_font>.
 
   <subsection|Wide accents>
 
   Wide accents <verbatim|\<less\>wide-...\<gtr\>> which are not resolved
-  in a family are taken from the main font if it supports them, and
+  in a family are first tried as rubber characters (above), which only
+  succeeds when the extensible font of the family supports them, as the
+  <cpp|rubber_unicode_font> of a font with a <verbatim|MATH> table does;
+  they are then taken from the main font if it supports them, and
   otherwise, in bold series, from a <verbatim|poor-bold> subfont (an
   emulated bold version of the medium font).
 
@@ -286,7 +327,10 @@
 
   <\itemize>
     <item><verbatim|x> is an isolated letter, hence it is sent directly to
-    the italic subfont <cpp|italic_nr> without being resolved.
+    the italic subfont <cpp|italic_nr> without being resolved. (For an
+    untuned <name|OpenType> math font, this subfont is
+    <verbatim|ot-italic>, which draws <verbatim|\<less\>#1D465\<gtr\>>
+    from the main font.)
 
     <item><verbatim|\<less\>leq\<gtr\>>: step 1 does not apply; in the main
     loop the conditional entry <verbatim|mathlarge=TeX Gyre Pagella> fails

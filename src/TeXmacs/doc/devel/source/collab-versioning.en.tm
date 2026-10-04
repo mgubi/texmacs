@@ -91,7 +91,7 @@
 
   <subsection|<verbatim|tmfs> classes for histories and revisions>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|tmfs://history/<em|url>>>A generated page with the
     history of a file (<scm|version-show-history>), with a link to each
     revision.
@@ -106,7 +106,7 @@
     <verbatim|tmfs://git/<em|which>/<em|root>>>Pages for a <name|Git>
     commit (message, parents and diff statistics) and for the global status
     and log of a <name|Git> repository.
-  </description>
+  </description-paragraphs>
 
   For remote files, <verbatim|client/client-tmfs.scm> overloads the
   generic functions so that the history is the server side version list

@@ -17,7 +17,7 @@
   first component of <em|name> is the server name as known to the client,
   optionally followed by <verbatim|:<em|port>>.
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|tmfs://remote-file/<em|server>/~<em|pseudo>/<em|path>>>A
     file stored on the server. The <verbatim|~<em|pseudo>> component is the
     home directory of the user <em|pseudo>; it is also used by
@@ -43,7 +43,7 @@
 
     <item*|<verbatim|tmfs://shared/<em|server>>>The list of resources shared
     with the user.
-  </description>
+  </description-paragraphs>
 
   The <verbatim|tmfs> handlers of the client are registered lazily: the
   boot file <verbatim|init-texmacs.scm> contains
@@ -63,7 +63,7 @@
   identifier is called a <em|resource identifier> (<scm|rid>). The fields
   used by <verbatim|server/server-tmfs.scm> are:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|type>><verbatim|"file">, <verbatim|"dir">,
     <verbatim|"version-list">, <verbatim|"live">, <verbatim|"chat-room">,
     ...
@@ -85,7 +85,7 @@
     <item*|<verbatim|version-list>, <verbatim|version-nr>,
     <verbatim|version-by>, <verbatim|version-msg>>Version information, see
     below.
-  </description>
+  </description-paragraphs>
 
   Names are resolved component by component: <scm|file-name-\<gtr\>resource>
   maps a name such as <verbatim|localhost/~joe/notes/a.tm> to its resource

@@ -369,7 +369,7 @@
   definitions are kept in <em|smart tables> (<verbatim|utils/library/smart-table.scm>)
   in <verbatim|convert/latex/latex-define.scm>:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<scm|latex-texmacs-macro>>Macro bodies, written as <LaTeX>
     strees in which the integers <verbatim|1>, <verbatim|2>, ... denote the
     arguments, <abbr|e.g.> <scm|(tmstrong (textbf 1))>. The special forms
@@ -381,7 +381,7 @@
 
     <item*|<scm|latex-texmacs-preamble>, <scm|latex-texmacs-env-preamble>>Arbitrary
     preamble material needed for a command <abbr|resp.> environment.
-  </description>
+  </description-paragraphs>
 
   The arity of these macros is declared in
   <verbatim|latex-texmacs-drd.scm> (groups <scm|latex-texmacs-0%>,

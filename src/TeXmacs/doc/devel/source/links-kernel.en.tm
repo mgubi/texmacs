@@ -9,7 +9,7 @@
 
   The file <verbatim|Data/Observers/link.cpp> keeps three global tables:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|hashmap\<less\>string,list\<less\>observer\<gtr\> \<gtr\>
     id_resolve>>For each identifier, the observers which point to the
     subtrees carrying it.
@@ -21,7 +21,7 @@
     <item*|<cpp|hashmap\<less\>tree,list\<less\>soft_link\<gtr\> \<gtr\>
     vertex_occurrences>>For each vertex (a tree such as <verbatim|(id
     "x")> or <verbatim|(url "...")>), the links in which it occurs.
-  </description>
+  </description-paragraphs>
 
   and a counter <cpp|type_count> of the registered links of each type,
   which <cpp|all_link_types> enumerates. The low level routines

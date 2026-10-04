@@ -245,7 +245,7 @@
 
     Its methods are:
 
-    <\description>
+    <\description-paragraphs>
       <item*|<cpp|attach_notifier ()>>Calls the <scheme> function
       <scm|buffer-initialize> (defined in <verbatim|part/part-shared.scm>)
       with the buffer name and its body, and registers the body as a locus
@@ -263,7 +263,7 @@
       the undo history of the editors (see <hlink|undo and
       redo|server-editor.en.tm>); this is why a buffer must always keep at least
       one view.
-    </description>
+    </description-paragraphs>
   </explain>
 
   <section|Reference of the buffer routines>
@@ -379,7 +379,7 @@
   document is split with <cpp|detach_data>, its body is stored with
   <cpp|set_document> and a title is proposed. The variants are
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|create_buffer (name, doc)>>Only creates the buffer if it
     does not exist yet.
 
@@ -392,7 +392,7 @@
     <item*|<cpp|get_new_view (name)>, <cpp|get_recent_view (name)>>Create
     an empty buffer as a side effect if there is none; see <hlink|views and
     the current view|server-views.en.tm>.
-  </description>
+  </description-paragraphs>
 
   A freshly created buffer has <em|no view>, and hence no editor: it is
   not typeset, its \Pmodified\Q status is always false, and the

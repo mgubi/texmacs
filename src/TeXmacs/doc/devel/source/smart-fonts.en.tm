@@ -58,6 +58,14 @@
   chapter on the <hlink|font database and font selection|font-database.en.tm>.
   Here we take <cpp|closest_font> as a black box which returns the best
   available physical font, and we concentrate on what happens around it.
+  The routing of characters is presented from the user's point of view,
+  together with the font inspector, in <hlink|from markup to
+  glyph|../fonts/font-guide.en.tm> and the following pages of the reference
+  chapter; the <name|OpenType> math fonts, whose <verbatim|MATH> table
+  changes several of the decisions described here, are treated in the
+  chapter <hlink|<name|OpenType> fonts|opentype.en.tm>, and presented to
+  users in <hlink|mathematical
+  fonts|../../main/math/fonts/man-math-fonts.en.tm>.
 
   <section|Why smart fonts?>
 
@@ -87,10 +95,25 @@
     alphabet if available, <name|Unicode> mathematical alphanumeric symbols
     (<verbatim|U+1D400> and following) are mapped to bold, calligraphic,
     fraktur or double struck variants of the current family, and so on.
+    When the main font is an <name|OpenType> math font without hand-tuned
+    tables, the letters and the Greek are taken from its own mathematical
+    italic alphabet instead, so that its italic corrections and kerns
+    apply.
+
+    <item>A smart font whose main font has a <verbatim|MATH> table forwards
+    the questions of the typesetter about size variants, accents, extended
+    shapes and feature substitutions to the subfont of the character
+    (<cpp|get_rubber_variant>, <cpp|get_wide_variant>,
+    <cpp|get_top_accent>, <cpp|is_extended_shape>,
+    <cpp|get_feature_variant>, and the height dependent script
+    corrections).
 
     <item>Symbols which no font provides are constructed with virtual fonts
     or emulated fonts, and only as a last resort drawn in red using the
-    <em|error font>.
+    <em|error font>. For a main font with a <verbatim|MATH> table, an
+    emulation which a <name|PDF> export could only hold as a bitmap gives
+    way to the glyph of <name|STIX Two Math>, which is shipped with
+    <TeXmacs>.
   </itemize>
 
   <section|Overview of the layers>
@@ -102,6 +125,10 @@
     edit_env_rep::update_font\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ (Typeset/Env/env_semantics.cpp)
 
     \ \ fn = smart_font (family, variant, series, shape, size, dpi)
+
+    \ \ fn = feature_font (fn, "ssty", ...)\ \ \ \ \ \ in scripts, OpenType math only
+
+    \ \ fn = apply_features (fn, font-features)\ -\<gtr\> feature_font
 
     \ \ fn = apply_effects (fn, font-effects)\ \ \ \ -\<gtr\> poor_bold, poor_italic, ...
 
@@ -127,7 +154,9 @@
 
     \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ poor_bold_font (...), poor_bbb_font (...)
 
-    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ rubber_font (fn[j])\ \ \ -\<gtr\> poor_rubber_font, ...
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ unicode_font ("STIXTwoMath-Regular", ...)\ \ \ "shipped-math"
+
+    \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ rubber_font (fn[j])\ \ \ -\<gtr\> poor_rubber_font or MATH
   </verbatim-code>
 
   The rest of this chapter is organized as follows:
@@ -155,7 +184,18 @@
   <\description-paragraphs>
     <item*|<verbatim|Graphics/Fonts/smart_font.cpp>>The smart font, the
     <cpp|smart_map> cache, the rewriting rules, the user entry points
-    <cpp|smart_font>, <cpp|smart_font_bis> and <cpp|apply_effects>.
+    <cpp|smart_font>, <cpp|smart_font_bis> and <cpp|apply_effects>, the
+    profile fixes of the <name|OpenType> math fonts (<cpp|profile_fix>), and
+    the debugging support of the font inspector (<cpp|debug_draw>,
+    <cpp|smart_font_debug_info>; see <hlink|inspecting the font
+    system|opentype-tools.en.tm>).
+
+    <item*|<verbatim|Graphics/Fonts/math_font_profiles.cpp>,
+    <verbatim|feature_font.cpp>>The profiles of the named <name|OpenType>
+    math fonts, and fonts seen through an <name|OpenType> substitution
+    feature (<cpp|feature_font>, <cpp|apply_features>); see <hlink|math font
+    profiles|opentype-profiles.en.tm> and <hlink|<name|OpenType>
+    features|opentype-features.en.tm>.
 
     <item*|<verbatim|Graphics/Fonts/virtual_font.cpp>>Virtual fonts:
     compilation of <verbatim|.vfn> definitions into glyphs, metrics and

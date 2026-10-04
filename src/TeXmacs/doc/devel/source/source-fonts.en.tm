@@ -11,10 +11,18 @@
   second one describes the font database and the algorithm which selects a
   physical font for the requested family, series and shape; the third one
   describes the layer of smart, emulated and virtual fonts which combines
-  several physical fonts and synthesizes missing characters.
+  several physical fonts and synthesizes missing characters. The fourth one
+  describes the support of <name|OpenType>: the layout tables, the
+  mathematics driven by the <verbatim|MATH> table, the features of text
+  fonts and the profiles of the mathematical fonts. The last one covers
+  the fonts of the <TeX> world.
 
-  The environment variables by which documents select fonts are described
-  in <hlink|specifying the current
+  These chapters are about the implementation. The same subjects as seen by
+  users and by authors of documents and style files are described in the
+  reference chapter <hlink|fonts, from selection to
+  glyph|../fonts/font-guide.en.tm>, in the section <hlink|mathematical
+  fonts|../../main/math/fonts/man-math-fonts.en.tm> of the user manual and,
+  for the environment variables, in <hlink|specifying the current
   font|../format/environment/env-font.en.tm>.
 
   <\traverse>
@@ -23,6 +31,8 @@
     <branch|The font database and font selection|font-database.en.tm>
 
     <branch|Smart, virtual and emulated fonts|smart-fonts.en.tm>
+
+    <branch|OpenType fonts|opentype.en.tm>
 
     <branch|TeX fonts: Metafont, PK, TFM and Type 1|texfonts.en.tm>
   </traverse>

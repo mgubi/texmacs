@@ -233,7 +233,7 @@
   (<cpp|env-\<gtr\>mode>): text, mathematics or program code. Compound
   trees are dispatched to specialized methods, spread over several files:
 
-  <\description>
+  <\description-paragraphs>
     <item*|<verbatim|concat_text.cpp>>Strings, <markup|concat>,
     <markup|document> and <markup|para> nested inside a line (typeset as a
     stacked box with <cpp|typeset_as_stack> <abbr|resp.>
@@ -253,7 +253,7 @@
 
     <item*|<verbatim|concat_graphics.cpp>, <verbatim|concat_animate.cpp>,
     <verbatim|concat_gui.cpp>>Graphics, animations, and GUI containers.
-  </description>
+  </description-paragraphs>
 
   Inline macro applications are expanded by the concater itself:
   <cpp|typeset_compound> looks up the macro, pushes the argument bindings

@@ -14,7 +14,7 @@
 
   <section|Running external programs>
 
-  <\description>
+  <\description-paragraphs>
     <item*|<cpp|system (cmd)>>Runs a shell command and returns its exit
     status. On <name|Unix> the output is discarded (the command is run as
     <verbatim|<em|cmd> \<gtr\> /dev/null 2\<gtr\>&1>); with the option
@@ -63,7 +63,7 @@
     <item*|<cpp|get_stacktrace ()>>A printable stack trace, used in crash
     reports (<verbatim|unix_stacktrace.cpp> and its <name|Windows>
     and <name|Android> counterparts).
-  </description>
+  </description-paragraphs>
 
   <section|Web requests>
 
