@@ -1,7 +1,7 @@
 // The tables of the worker of the TikZ plugin (plugins/tikz/web/tm-tikz.js,
 // src/docs/wasm/tikzjax.md), made at build time:
 //
-//   node misc/wasm/tikzjax-tables.mjs <run-tex.js of TikZJax> <TeXmacs/fonts/enc> <out.js>
+//   node misc/wasm/tikzjax-tables.mjs <run-tex.js of TikZJax> <TeXmacs/fonts/enc> <out.js> [version]
 //
 // - glyphs: for each TeX font of dvi2html (cmr10, cmmi7...), the position in
 //   the font of each character of its SVG: dvi2html writes a character as a
@@ -11,11 +11,13 @@
 // - enc: for each encoding of TeX fonts TeXmacs knows (fonts/enc/cmr.enc...),
 //   the TeXmacs string of each position, as translator.cpp reads them: a
 //   name of more than one character is the symbol <name>.
+// - version: the version of TikZJax (the one get-tikzjax.sh fetched), which
+//   the session tells.
 
 import fs from 'node:fs';
 import path from 'node:path';
 
-const [runTex, encDir, out] = process.argv.slice (2);
+const [runTex, encDir, out, version] = process.argv.slice (2);
 if (!out) {
   console.error ('usage: tikzjax-tables.mjs <run-tex.js> <fonts/enc> <out.js>');
   process.exit (2);
@@ -80,6 +82,7 @@ for (const name of ['cmr', 'cmmi', 'cmsy', 'msam', 'msbm']) {
 fs.writeFileSync (out,
   '// made by misc/wasm/tikzjax-tables.mjs: do not edit\n' +
   'var TIKZ_GLYPHS = ' + JSON.stringify (glyphs) + ';\n' +
-  'var TIKZ_ENC = ' + JSON.stringify (enc) + ';\n');
+  'var TIKZ_ENC = ' + JSON.stringify (enc) + ';\n' +
+  'var TIKZJAX_VERSION = ' + JSON.stringify (version || '') + ';\n');
 console.log ('tikzjax-tables: ' + Object.keys (glyphs).length + ' fonts, encodings ' +
              Object.keys (enc).join (' '));

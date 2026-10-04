@@ -200,7 +200,7 @@ function prepare (code) {
 // TeXmacs at the size of TeX. What TeXmacs cannot set (cmex, a position
 // without a symbol, a font it has not) stays in the SVG.
 
-importScripts ('tables.js'); // TIKZ_GLYPHS, TIKZ_ENC (tikzjax-tables.mjs)
+importScripts ('tables.js'); // TIKZ_GLYPHS, TIKZ_ENC, TIKZJAX_VERSION (tikzjax-tables.mjs)
 
 // the TeX fonts set as text by TeXmacs: family, series, shape
 var TEXT_FONTS = {
@@ -522,4 +522,25 @@ onmessage = function (e) {
   }
 };
 
-out (B + 'verbatim:TeXmacs interface to TikZ (TikZJax, in the browser)' + PROMPT + E);
+// the banner of a session: what runs TeX here, and how to use the session
+var TIKZJAX_URL = 'https://github.com/rod2ik/tikzjax';
+function banner () {
+  var v = (typeof TIKZJAX_VERSION === 'string' && TIKZJAX_VERSION) ? ' ' + TIKZJAX_VERSION : '';
+  var s = schemeString;
+  function line () { return '(concat ' + Array.prototype.join.call (arguments, ' ') + ')'; }
+  function tt (x) { return '(verbatim ' + s (x) + ')'; }
+  // in text mode: the output of a session is in its program mode otherwise
+  return '(with "mode" "text" "font-family" "rm" (document ' + [
+    line ('(strong ' + s ('TeXmacs interface to TikZ, in the browser') + ')'),
+    line (s ('TeX runs in this page: TikZJax' + v + ' ('),
+          '(hlink ' + s (TIKZJAX_URL.replace (/^https:\/\//, '')) + ' ' + s (TIKZJAX_URL) + ')',
+          s ('), TeX and PGF/TikZ in WebAssembly. The first picture loads it (about 5 MB).')),
+    line (s ('Type the commands of a picture ('), tt ('\\draw'), s (', '), tt ('\\node'),
+          s ('...), Return to make it, Shift+Return for a new line.')),
+    line (s ('Packages and libraries: first lines such as '), tt ('% packages: tikz-cd, circuitikz'),
+          s (' or '), tt ('% libraries: arrows.meta, calc'), s ('.')),
+    line (s ('The text of the nodes is TeXmacs text, which can be edited. More in Help > Plug-ins > TikZ.'))
+  ].join (' ') + '))';
+}
+
+out (B + 'verbatim:' + B + 'scheme:' + banner () + E + PROMPT + E);

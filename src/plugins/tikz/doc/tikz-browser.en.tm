@@ -7,12 +7,27 @@
 
   In the version of <TeXmacs> which runs in a web browser, the <name|TikZ>
   plug-in does not need <LaTeX> nor <name|Python>: <name|TeX> itself runs in
-  the browser. Pictures are made by <name|TikZJax> (a <name|TeX> compiled to
-  <name|WebAssembly>, with <name|PGF>/<name|TikZ> and a few packages),
-  which runs apart from the page, so that <TeXmacs> stays responsive while a
-  picture is made. The first picture takes a few seconds, the time to load
-  <name|TeX> and its files (about 5<nbsp>MB, kept by the browser
-  afterwards); the next ones are faster.
+  the browser. Pictures are made by <name|TikZJax> 1.6.0, a <name|TeX>
+  compiled to <name|WebAssembly>, with <name|PGF>/<name|TikZ> and a few
+  packages:
+
+  <\itemize>
+    <item>the version used is the one of
+    <hlink|github.com/rod2ik/tikzjax|https://github.com/rod2ik/tikzjax> (its
+    npm package <verbatim|@rod2ik/tikzjax>), which extends
+    <hlink|github.com/kisonecat/tikzjax|https://github.com/kisonecat/tikzjax>
+    by <name|Jim Fowler> and
+    <hlink|github.com/drgrice1/tikzjax|https://github.com/drgrice1/tikzjax>
+    by <name|Glenn Rice>;
+
+    <item>it is free software, under the GNU General Public License,
+    version<nbsp>3 or later.
+  </itemize>
+
+  <name|TikZJax> runs apart from the page, so that <TeXmacs> stays
+  responsive while a picture is made. The first picture takes a few seconds,
+  the time to load <name|TeX> and its files (about 5<nbsp>MB, kept by the
+  browser afterwards); the next ones are faster.
 
   The lines of a picture are drawn as an image, but the text of its nodes is
   typeset by <TeXmacs> over it, in the fonts of the document: it can be
@@ -20,7 +35,9 @@
 
   <paragraph|Sessions and executable folds>
 
-  A <name|TikZ> session is started with <menu|Insert|Session|TikZ>. Type the
+  A <name|TikZ> session is started with <menu|Insert|Session|TikZ>. It
+  begins with a short reminder of what follows: the version of
+  <name|TikZJax>, how to make a picture, and how to ask for packages. Type the
   commands of a picture (what goes inside
   <verbatim|\\begin{tikzpicture}><text-dots><verbatim|\\end{tikzpicture}>,
   which may be omitted) and press <shortcut|(kbd-return)> to make it; use

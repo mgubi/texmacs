@@ -10,6 +10,8 @@
 # of its pages (the text of a picture is typeset by TeXmacs).
 
 set -e
+# a new version: also TIKZJAX in misc/wasm/Makefile (the session tells it)
+# and the version named in plugins/tikz/doc/tikz-browser.en.tm
 V=1.6.0
 SHA=ca7d979a89136910d7f149810dd83b07d68c87fe9000fbb4ed86e28b5d780eed
 DIR="${1:-build-wasm}"
