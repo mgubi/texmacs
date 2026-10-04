@@ -62,11 +62,20 @@
     (cond ((ahash-ref tmfs-handler-table (cons class 'load)) =>
            (lambda (handler)
              (with r (handler name)
-               (if (string? r) r (object->tmstring r)))))
+               ;; a document is read back as TeXmacs Scheme (stm->texmacs),
+               ;; whose strings are escaped twice: written by object->tmstring,
+               ;; they were unescaped once too often (\\ became \)
+               (cond ((string? r) r)
+                     ((and (pair? r) (== (car r) 'document))
+                      (texmacs->stm (stree->tree r)))
+                     (else (object->tmstring r))))))
           ((ahash-ref tmfs-handler-table (cons #t 'load)) =>
            (lambda (handler)
              (with r (handler name)
-               (if (string? r) r (object->tmstring r)))))
+               (cond ((string? r) r)
+                     ((and (pair? r) (== (car r) 'document))
+                      (texmacs->stm (stree->tree r)))
+                     (else (object->tmstring r))))))
           (else ""))))
 
 (define-public (tmfs-save u what)
