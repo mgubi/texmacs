@@ -64,7 +64,6 @@
     twice in `compat-s7.scm`;
   - `ahash-get-handle` returns a fresh cons, so a `set-cdr!` on it doesn't
     write through (no caller does this today);
-  - `string-index` and `string-rindex` take no start/end arguments;
   - `iota` takes only one argument;
   - `append!` and `delq` are non-destructive;
   - `lazy-catch` unwinds before running the handler.

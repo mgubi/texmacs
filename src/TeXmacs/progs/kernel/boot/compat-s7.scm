@@ -343,20 +343,26 @@
 (define-public char-set:upper-case (char-set-from-predicate char-upper-case?))
 (define-public char-set:digit (char-set-from-predicate char-numeric?))
 
-; string-index and string-rindex accepts char-sets
+; string-index and string-rindex accept a character, a char-set or a
+; predicate, and, as in Guile (SRFI-13), an optional start and end
 
-(define-public (string-index str cs)
- (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs)))
-  (define len (string-length str))
-  (do ((pos 0 (+ 1 pos)))
-      ((or (>= pos len) (chr (string-ref str pos)))
-       (and (< pos len) pos)))))
+(define-public (string-index str cs . range)
+ (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs))
+       (start (if (pair? range) (car range) 0))
+       (end (if (and (pair? range) (pair? (cdr range))) (cadr range)
+                (string-length str))))
+  (do ((pos start (+ 1 pos)))
+      ((or (>= pos end) (chr (string-ref str pos)))
+       (and (< pos end) pos)))))
 
-(define-public (string-rindex str cs)
- (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs)))
-  (do ((pos (+ -1 (string-length str)) (+ -1 pos)))
-      ((or (negative? pos) (chr (string-ref str pos)))
-       (and (not (negative? pos)) pos)))))
+(define-public (string-rindex str cs . range)
+ (let ((chr (if (char? cs) (lambda (c) (char=? c cs)) cs))
+       (start (if (pair? range) (car range) 0))
+       (end (if (and (pair? range) (pair? (cdr range))) (cadr range)
+                (string-length str))))
+  (do ((pos (+ -1 end) (+ -1 pos)))
+      ((or (< pos start) (chr (string-ref str pos)))
+       (and (>= pos start) pos)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
