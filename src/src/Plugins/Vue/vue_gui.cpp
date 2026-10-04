@@ -238,6 +238,45 @@ init_window_clay (vue_window_rep* w, int win_w, int win_h) {
   w->transitions_active= false;
 }
 
+#ifndef __EMSCRIPTEN__
+// The logo of TeXmacs Vue (misc/icons/vue-logo), as the icon of its windows
+// (in the Dock of macOS, the task bar elsewhere): read once, with MuPDF, and
+// with its alpha no longer premultiplied, as SDL wants it
+static SDL_Surface*
+vue_logo_surface () {
+  static SDL_Surface* icon= NULL;
+  static bool tried= false;
+  if (tried) return icon;
+  tried= true;
+  url u= resolve (url ("$TEXMACS_PATH") * url ("misc/images/texmacs-vue-256.png"));
+  if (is_none (u)) return NULL;
+  fz_image* im= mupdf_load_image (u);
+  fz_pixmap* pix= mupdf_pixmap_from_image (im);
+  fz_context* ctx= mupdf_context ();
+  if (im != NULL) fz_drop_image (ctx, im);
+  if (pix == NULL) return NULL;
+  int w= fz_pixmap_width (ctx, pix), h= fz_pixmap_height (ctx, pix);
+  if (fz_pixmap_components (ctx, pix) == 4 && fz_pixmap_alpha (ctx, pix)) {
+    icon= SDL_CreateSurface (w, h, SDL_PIXELFORMAT_RGBA32);
+    if (icon != NULL) {
+      unsigned char* src= fz_pixmap_samples (ctx, pix);
+      int stride= fz_pixmap_stride (ctx, pix);
+      for (int y= 0; y < h; y++) {
+        unsigned char* p= src + y * stride;
+        unsigned char* q= ((unsigned char*) icon->pixels) + y * icon->pitch;
+        for (int x= 0; x < w; x++, p += 4, q += 4) {
+          int a= p[3];
+          for (int c= 0; c < 3; c++) q[c]= a == 0 ? 0 : (unsigned char) min (255, (p[c] * 255 + a / 2) / a);
+          q[3]= (unsigned char) a;
+        }
+      }
+    }
+  }
+  fz_drop_pixmap (ctx, pix);
+  return icon;
+}
+#endif
+
 vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _name, bool _popup,
                                                   SDL_Window* adopt)
 : vue_window_rep (_content, _name, _popup), Min_w (0), Min_h (0), Max_w (0), Max_h (0),
@@ -294,6 +333,12 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   
   nr_windows++;
   last_created_window= this;
+#ifndef __EMSCRIPTEN__
+  if (!popup) {
+    SDL_Surface* icon= vue_logo_surface ();
+    if (icon != NULL) SDL_SetWindowIcon (sdl_win, icon);
+  }
+#endif
   SDL_SetWindowPosition (sdl_win, win_x, win_y);
   Window_to_window (sdl_win)= (void*) this;
   id= serial++;
