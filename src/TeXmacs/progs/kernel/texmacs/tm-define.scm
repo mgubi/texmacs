@@ -259,7 +259,6 @@
                      (display* "   " ',nval "\n"))
                   (ahash-set! tm-defined-table ',var '())
                   (ahash-set! tm-defined-module ',var '())))
-               (ahash-set! tm-defined-name ,var ',var)
                (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
                (ahash-set! tm-defined-module ',var
@@ -267,6 +266,8 @@
                            (ahash-ref tm-defined-module ',var)))
                (let ((former ,var))
                      (module-set! texmacs-user ',var ,nval))
+               ;; the name of the new procedure, for procedure-name
+               (ahash-set! tm-defined-name (module-ref texmacs-user ',var) ',var)
                (cond-expand (guile-2
                ;; Tricky: module-set! do not set up the procedure name property
                ;; we have to do it ourselves.
