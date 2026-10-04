@@ -447,11 +447,11 @@
           (string-append "<tm-sym>#3B1</tm-sym>" (u8 #x1F600) "<tm-sym>foo</tm-sym>"))
   (check= (export (cork #x10 #x11 #x15 #x16 #x1c) "tmml-snippet")
           (u8 #x201C #x201D #x2013 #x2014 #xFB01))
-  (let ((doc (tmfile '(document (foo-bar "x") (my_tag "y") (a.b "z")
+  (let ((doc (tmfile `(document (foo-bar "x") (my_tag "y") (a.b "z")
                                 (equation* (document "w"))
                                 "<#3B1><#1F600><foo>\x10\x11\x15\x16\x1c"
                                 "a & b <less> c <gtr> d \"q\" 'r'"
-                                "a\x09b\x0d\x7f\xff"))))
+                                ,(string-append "a\x09" "b\x0d\x7f\xff")))))
     (check= (import (export doc "tmml-document") "tmml-document") doc)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
