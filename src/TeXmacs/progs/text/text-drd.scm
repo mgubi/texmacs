@@ -71,9 +71,12 @@
   table-of-contents bibliography the-index the-glossary
   list-of-figures list-of-tables)
 
+(define-group automatic-section*-tag
+  table-of-contents* bibliography* the-index* the-glossary*)
+
 (define-group long-principal-section-tag
   part part* chapter chapter* appendix appendix*
-  (special-section-tag) (automatic-section-tag))
+  (special-section-tag) (automatic-section-tag) (automatic-section*-tag))
 
 (define-group short-principal-section-tag
   section section* (long-principal-section-tag))
