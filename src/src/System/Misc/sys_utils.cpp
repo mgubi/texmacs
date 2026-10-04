@@ -369,8 +369,96 @@ async_eval_system (string c, int& status, string& outbuf,
   return false;
 }
 
+/******************************************************************************
+* Asynchronous execution of commands without shell
+******************************************************************************/
+
+struct async_process {
+  int    id;
+  object call_back;
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  array<string> result;
+#else
+  unix_process_rep* rep;
+#endif
+};
+
+static array<async_process*> async_processes;
+static int async_process_counter= 0;
+
+int
+async_evaluate_system (array<string> arg, string in, object call_back) {
+  // Run arg[0] with arguments arg[i], i >= 1, without shell, sending in
+  // to its standard input.  When the command terminates, call_back is
+  // called with the list (exit-code stdout stderr).
+  // Returns an identifier for async_evaluate_cancel, or 0 on failure.
+  async_process* p= tm_new<async_process> ();
+  p->id= ++async_process_counter;
+  p->call_back= call_back;
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  array<int> fd_in;
+  array<string> str_in;
+  if (N(in) > 0) { fd_in << 0; str_in << in; }
+  array<int> fd_out;
+  fd_out << 1 << 2;
+  p->result= evaluate_system (arg, fd_in, str_in, fd_out);
+#else
+  p->rep= unix_system_start (arg, in);
+  if (p->rep == NULL) {
+    tm_delete<async_process> (p);
+    return 0;
+  }
+#endif
+  async_processes << p;
+  return p->id;
+}
+
+void
+async_evaluate_cancel (int id) {
+  // Terminate the command with identifier id; its call back will be
+  // called as usual, when it has terminated
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+  (void) id;
+#else
+  for (int i=0; i<N(async_processes); i++)
+    if (async_processes[i]->id == id)
+      unix_system_kill (async_processes[i]->rep);
+#endif
+}
+
+static void
+async_evaluate_pending () {
+  array<async_process*> done;
+  array<async_process*> busy;
+  array<object> results;
+  for (int i=0; i<N(async_processes); i++) {
+    async_process* p= async_processes[i];
+#if defined (OS_MINGW) || defined (OS_ANDROID)
+    int ret= as_int (p->result[0]);
+    string out= p->result[1], err= p->result[2];
+    done << p;
+    results << list_object (object (ret), object (out), object (err));
+#else
+    int ret;
+    string out, err;
+    if (unix_system_finished (p->rep, ret, out, err)) {
+      done << p;
+      results << list_object (object (ret), object (out), object (err));
+    }
+    else busy << p;
+#endif
+  }
+  // NOTE: the call backs might start new processes
+  async_processes= busy;
+  for (int i=0; i<N(done); i++) {
+    call (done[i]->call_back, results[i]);
+    tm_delete<async_process> (done[i]);
+  }
+}
+
 void
 async_eval_pending () {
+  if (N(async_processes) > 0) async_evaluate_pending ();
   for (int i=0; i<N(async_busy); )
     if (async_busy[i]->done) {
       async_handle* handle= async_busy[i];
@@ -412,3 +500,19 @@ string get_user_name () {
   return unix_get_username ();
 #endif
 }
+
+/******************************************************************************
+* Driving the graphical interface from scripts (implemented for Qt)
+******************************************************************************/
+
+#ifndef QTTEXMACS
+int gui_test_snapshot (string dir) { (void) dir; return 0; }
+array<string> gui_test_buttons () { return array<string> (); }
+bool gui_test_click (string label) { (void) label; return false; }
+bool gui_test_menu (string path) { (void) path; return false; }
+array<string> gui_test_menu_entries (string path) {
+  (void) path; return array<string> (); }
+void gui_test_type (string text) { (void) text; }
+void gui_test_click_later (int ms, string dir, string label) {
+  (void) ms; (void) dir; (void) label; }
+#endif

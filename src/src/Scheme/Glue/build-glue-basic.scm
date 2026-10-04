@@ -36,6 +36,13 @@
   (qt-gui? gui_is_qt (bool))
   (vue-gui? gui_is_vue (bool))
   (gui-set-next-window-as-popup gui_set_next_window_as_popup (void))
+  (gui-test-snapshot gui_test_snapshot (int string))
+  (gui-test-buttons gui_test_buttons (array_string))
+  (gui-test-click gui_test_click (bool string))
+  (gui-test-menu gui_test_menu (bool string))
+  (gui-test-menu-entries gui_test_menu_entries (array_string string))
+  (gui-test-type gui_test_type (void string))
+  (gui-test-click-later gui_test_click_later (void int string string))
   (support-functionality? support_functionality (bool string))
   (gui-version gui_version (string))
   (default-look-and-feel default_look_and_feel (string))
@@ -70,6 +77,9 @@
   (evaluate-system evaluate_system
     (array_string array_string array_int array_string array_int))
   (async-eval-system async_eval_system (bool string object))
+  (async-evaluate-system async_evaluate_system
+    (int array_string string object))
+  (async-evaluate-cancel async_evaluate_cancel (void int))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
   (async-http-post async_http_post (bool string array_string string object))

@@ -171,6 +171,62 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(gui-test-snapshot <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_snapshot> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-buttons)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_buttons> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-click <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_click> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-menu <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_menu> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-menu-entries <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_menu_entries> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-type <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_type> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(gui-test-click-later <scm-arg|int> <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_test_click_later> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(support-functionality? <scm-arg|string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -432,6 +488,22 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|async_eval_system> which returns
     <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(async-evaluate-system <scm-arg|array_string> <scm-arg|string> <scm-arg|object>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_evaluate_system> which returns
+    <scm|int>.
+  </explain>
+
+  <\explain>
+    <scm|(async-evaluate-cancel <scm-arg|int>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|async_evaluate_cancel> which returns
+    <scm|void>.
   </explain>
 
   <\explain>

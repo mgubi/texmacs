@@ -32,10 +32,10 @@
 ;;   - version-tmfs.scm finds the version control tool of a file (svn or
 ;;     git, by a .svn or .git directory above it) and dispatches to
 ;;     version-svn.scm or version-git.scm. The git part is checked on a
-;;     throwaway repository in the temporary directory, always through
-;;     "git -c user.name=... -c user.email=...", never with a global
-;;     configuration; svn is only checked on files which are not under
-;;     version control.
+;;     throwaway repository in the temporary directory, whose identity is
+;;     set in its own configuration, never globally (the Git support itself
+;;     is checked by the suite git, git-test.scm); svn is only checked on
+;;     files which are not under version control.
 
 (texmacs-module (check version-test)
   (:use (check check-lib)
@@ -773,12 +773,9 @@
 (define git-dir (tmp-name "repo"))
 
 (define (git-sh . l)
-  ;; a git command in the throwaway repository, never configured globally
-  (apply shell "cd '" git-dir "' && git -c user.name=tester"
-         " -c user.email=tester@example.org " l))
-
-(define (git-available?)
-  (string-starts? (shell "git --version 2>/dev/null") "git version"))
+  ;; a git command in the throwaway repository, whose identity is set in
+  ;; its own configuration, never globally
+  (apply shell "cd '" git-dir "' && git " l))
 
 (define (test-git)
   (check-group "git")
@@ -786,10 +783,13 @@
       (display* "  git is not available, the group is skipped\n")
       (run-group test-git-sub)))
 
+;; The suite "git" (git-test.scm) checks the Git support itself; this group
+;; checks that version-tmfs.scm dispatches the version-* interface to it.
 (define (test-git-sub)
   (system-mkdir (system->url git-dir))
-  (git-sh "init -q . && git -c user.name=tester"
-          " -c user.email=tester@example.org commit -q --allow-empty -m init")
+  (git-sh "init -q . && git config user.name tester"
+          " && git config user.email tester@example.org"
+          " && git commit -q --allow-empty -m init")
   (let* ((root (system->url git-dir))
          (f (system->url (string-append git-dir "/a.tm")))
          (g (system->url (string-append git-dir "/b.tm")))
@@ -804,57 +804,47 @@
     (check-true (version-supports-git-style? f))
     (check-false (version-supports-svn-style? f))
     (check-true (version-supports-history? f))
-    (check= (git-root f) git-dir)
-    (check= (git-root root) git-dir)
-    (check= (git-command f)
-            (string-append "git --work-tree=" git-dir
-                           " --git-dir=" git-dir "/.git"))
-    ;; an untracked file
-    (check= (buffer-status f) "??")
+    (check= (url->system (git-root f)) git-dir)
+    (check= (url->system (git-root root)) git-dir)
+    ;; Git is only run in trusted repositories
+    (check-false (git-trusted? f))
+    (check-false (git-status root))
     (check= (version-status f) "unknown")
-    (check-true (buffer-to-add? f))
-    (check-false (buffer-to-unadd? f))
-    (check-false (buffer-histed? f))
-    (check-false (buffer-has-diff? f))
-    (check= (git-status root) '(("??" "a.tm")))
+    (git-trust root)
+    (check-true (git-trusted? f))
+    ;; an untracked file
+    (check= (git-file-state f) 'untracked)
+    (check= (version-status f) "unknown")
+    (check= (map git-entry-path (git-status-entries root)) '("a.tm"))
     ;; registered
-    (version-register f)
-    (check= (buffer-status f) "A ")
+    (check= (version-register f) "Added file")
+    (check= (git-file-state f) 'added)
     (check= (version-status f) "modified")
-    (check-true (buffer-to-unadd? f))
-    (check-false (buffer-to-add? f))
-    (check= (git-status root) '(("A " "a.tm")))
-    (version-unregister f)
-    (check= (buffer-status f) "??")
-    (version-register f)
+    (check= (version-unregister f) "Stopped tracking file")
+    (check= (git-file-state f) 'untracked)
     ;; committed
-    (git-sh "commit -q -m 'first commit'")
-    (check= (buffer-status f) "  ")
+    (check= (version-commit f "") "Empty commit message")
+    (version-commit f "first commit")
+    (check= (git-file-state f) 'unmodified)
     (check= (version-status f) "unmodified")
-    (check-true (buffer-histed? f))
-    (check-false (buffer-has-diff? f))
-    (check= (git-status root) '())
+    (check= (git-status-entries root) '())
     (let* ((h1 (git-master f))
            (h0 (string-drop-right (git-sh "rev-parse HEAD~1") 1)))
       (check= (string-length h1) 40)
       (check= h1 (string-drop-right (git-sh "rev-parse HEAD") 1))
       (check= (version-beautify-revision f h1) (string-take h1 7))
       (check= (version-revision f h1) doc1)
-      (check= (git-commit-parents root h1) (list h0))
-      (check= (git-commit-parent root h1) h0)
-      (with m (git-commit-message root h1)
-        (check= (car m) (string-append "commit " h1))
-        (check= (cadr m) "Author: tester <tester@example.org>")
-        (check-true (in? "    first commit" m)))
-      (check= (git-commit-diff root h0 h1)
-              `((7 0 (hlink "a.tm" ,(version-revision-url f h1)) 4)))
+      (check= (version-revision f "HEAD") doc1)
+      (with c (git-commit-info root h1)
+        (check= (git-commit-parents c) (list h0))
+        (check= (git-commit-author c) "tester")
+        (check= (git-commit-subject c) "first commit"))
+      (check= (git-commit-message root h1) "first commit\n\n")
+      (check= (git-numstat root h1) '((7 0 "a.tm")))
       ;; the log, newest first
-      (with l (git-log root)
-        (check= (length l) 2)
-        (check= (map cadr l) '("tester" "tester"))
-        (check= (map caddr l) '("first commit" "init"))
-        (check= (cadddr (car l))
-                `(hlink ,(string-take h1 7) ,(tmfs-url-commit root h1))))
+      (with l (git-log root 0 10)
+        (check= (map git-commit-subject l) '("first commit" "init"))
+        (check= (map git-commit-hash l) (list h1 h0)))
       (check= (tmfs-url-commit root h1)
               (string-append "tmfs://commit/" h1 "/"
                              (url->tmfs-string root)))
@@ -862,40 +852,35 @@
       (check= (tmfs-load (version-revision-url f h1)) doc1)
       ;; modified in the working tree
       (string-save doc2 (url->system f))
-      (check= (buffer-status f) " M")
+      (git-invalidate root)
+      (check= (git-file-state f) 'modified)
       (check= (version-status f) "modified")
-      (check-true (buffer-has-diff? f))
-      (check-true (buffer-to-add? f))
-      (check= (git-status root)
-              `((" M" (hlink "a.tm" ,(url->string (url-append root "a.tm"))))))
       (check= (version-revision f h1) doc1)
+      (check= (version-revision f "INDEX") doc1)
       ;; a second commit
       (git-sh "commit -q -a -m 'second commit'")
+      (git-invalidate root)
       (let ((h2 (git-master f)))
         (check-false (== h2 h1))
-        (check= (git-commit-parent root h2) h1)
+        (check= (git-commit-parents (git-commit-info root h2)) (list h1))
         (check= (version-revision f h2) doc2)
         (check= (version-revision f h1) doc1)
-        (check= (git-commit-diff root h1 h2)
-                `((1 1 (hlink "a.tm" ,(version-revision-url f h2)) 4)))
-        ;; the history of a file, newest first, with the current buffer
-        ;; on the file (the history is relative to its repository)
+        ;; the history of a file, newest first, whatever the current
+        ;; buffer (the history is the one of the repository of the file)
+        (with h (version-history f)
+          (check= (map car h)
+                  (list (string-append h2 ":" (url->tmfs-string f))
+                        (string-append h1 ":" (url->tmfs-string f))))
+          (check= (map cadr h) '("tester" "tester"))
+          (check= (map cadddr h) '("second commit" "first commit")))
+        ;; the revision url of a history entry
+        (check= (version-revision-url f (string-append h1 ":"
+                                                       (url->tmfs-string f)))
+                (version-revision-url f h1))
         (let ((old (current-buffer)))
           (load-buffer f)
           (switch-to-buffer* f)
-          (with h (version-history f)
-            (check= (length h) 2)
-            (check= (map car h)
-                    (list (string-append h2 ":" (url->tmfs-string f))
-                          (string-append h1 ":" (url->tmfs-string f))))
-            (check= (map cadr h) '("tester" "tester"))
-            (check= (map cadddr h) '("second commit" "first commit")))
-          (check= (current-git-root) git-dir)
-          (check= (git-commit-master) h2)
-          ;; the revision url of a history entry
-          (check= (version-revision-url f (string-append h1 ":"
-                                                         (url->tmfs-string f)))
-                  (version-revision-url f h1))
+          (check= (url->system (current-git-root)) git-dir)
           ;; comparing the buffer with its first revision
           (compare-with-older (string->url (version-revision-url f h1)))
           ;; "One." and "One more." have no word in common
@@ -906,28 +891,15 @@
           (check= (body) '(document "One."))
           (buffer-pretend-saved f)
           (buffer-close f)
-          (when (buffer-exists? old) (switch-to-buffer old)))
-        ;; FIXME: version-history takes the repository of the current
-        ;; buffer instead of the one of the file (version/version-git.scm:
-        ;; 148, current-git-root): with a buffer outside the repository,
-        ;; (car (car (version-history f))) gives "<hash>:blank/a.tm",
-        ;; expected "<hash>:file/<repository>/a.tm".
-        ))
+          (when (buffer-exists? old) (switch-to-buffer old)))))
     ;; a file which is not in the repository yet
     (string-save doc1 (url->system g))
+    (git-invalidate root)
     (check= (version-status g) "unknown")
-    (check= (git-status root) '(("??" "b.tm")))
-    (with c (git-status-content root)
-      (check= (car c) 'document)
-      (check= (tm-ref c 2 0) '(document (tmfs-title "Git Status")
-                                        (description-long
-                                         (document
-                                          (concat (item* "Changes to be committed")
-                                                  "")
-                                          (concat (item* "Changes not staged for commit")
-                                                  "")
-                                          (concat (item* "Untracked files")
-                                                  (concat "b.tm" (new-line))))))))))
+    (check= (map git-entry-path (git-status-entries root)) '("b.tm"))
+    (with s (tmfs-load (tmfs-url-git root "status"))
+      (check-true (string-contains? s "Untracked files"))
+      (check-true (string-contains? s "b.tm")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main

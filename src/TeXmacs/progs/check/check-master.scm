@@ -49,6 +49,7 @@
         (check text-structure-test)
         (check graphics-edit-test)
         (check version-test)
+        (check git-test)
         (check links-test)
         (check misc-modules-test)
         (check remote-test)
@@ -166,6 +167,9 @@
     ("graphics-edit" graphics-edit-test-failures count)
     ;; makes a throwaway git repository in the temporary directory
     ("version" version-test-failures count)
+    ;; makes throwaway git repositories in the temporary directory, and
+    ;; runs this TeXmacs as their merge driver
+    ("git" git-test-failures count)
     ("misc-modules" misc-modules-test-failures count)
     ;; loads the keyword tables of the program languages
     ("parse" parse-test-failures count)

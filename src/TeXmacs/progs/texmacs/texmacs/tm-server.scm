@@ -149,7 +149,7 @@
   ("presentation tool" "off" notify-tool)
   ("remote tool" "off" notify-tool)
   ("source tool" "off" notify-tool)
-  ("versioning tool" "off" notify-tool)
+  ("versioning tool" "auto" notify-tool)
   ("experimental alpha" "on" notify-tool)
   ("new style fonts" "on" notify-new-fonts)
   ("hand tuned math fonts" "on" notify-hand-tuned-math-fonts)
@@ -308,3 +308,15 @@
 
 (tm-define (close-document*)
   (if (window-per-buffer?) (safely-kill-buffer) (safely-kill-window)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; When to show the versioning tool
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (versioning-tool-is? what)
+  (== (get-preference "versioning tool") what))
+
+(tm-define (set-versioning-tool what)
+  (:synopsis "When to show the versioning tool")
+  (:check-mark "*" versioning-tool-is?)
+  (set-preference "versioning tool" what))

@@ -70,3 +70,5 @@ src/makefile
 packages/macos/TeXmacs.xcodeproj/project.xcworkspace
 packages/macos/TeXmacs.xcodeproj/xcuserdata
 config.status
+packages/msix/AppxManifest.xml
+packages/msix/AppxManifestStore.xml

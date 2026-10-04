@@ -20,6 +20,8 @@
 #include <sys/wait.h>
 #include <pthread.h>
 #include <pwd.h>
+#include <signal.h>
+#include <errno.h>
 
 int
 unix_system (string s) {
@@ -135,7 +137,11 @@ struct _pipe_t {
     fl= fcntl (rep[1], F_GETFL);
     fl= fl & (~(int) O_NONBLOCK);
     fcntl (rep[1], F_SETFL, fl); }
-  inline ~_pipe_t () { close (rep[0]); close (rep[1]); }
+  inline ~_pipe_t () {
+    if (rep[0] >= 0) close (rep[0]);
+    if (rep[1] >= 0) close (rep[1]); }
+  // the end i was closed elsewhere and should not be closed again
+  inline void release (int i) { rep[i]= -1; }
   inline int in () const { return rep[0]; }
   inline int out () const { return rep[1]; }
   inline int status () const { return st; }
@@ -148,7 +154,9 @@ struct _channel {
   int buffer_size;
   array<char> buffer;
   int status;
-  _channel () : status (0) {}
+  volatile bool finished;
+  bool closed;
+  _channel () : status (0), finished (false), closed (false) {}
   void _init_in (int fd2, string data2, int chunk_size) {
     fd= fd2;
     data.copy (&data2[0], N(data2));
@@ -170,9 +178,13 @@ _background_read_task (void* channel_as_void_ptr) {
   do {
     m= read (fd, b, n);
     // cout << "read " << m << " bytes from " << fd << "\n";
+    if (m < 0 && errno == EINTR) { m= 1; continue; }
     if (m > 0) c->data.append (b, m);
     if (m == 0) { if (close (fd) != 0) c->status= -1; }
   } while (m > 0);
+  if (m < 0) close (fd);
+  c->closed= true;
+  c->finished= true;
   return (void*) NULL;
 }
 
@@ -184,17 +196,23 @@ _background_write_task (void* channel_as_void_ptr) {
   const char* d= c->data.a;
   int n= c->buffer_size;
   int t= (c->data).n, k= 0, o= 0;
-  if (t == 0) return (void*) NULL;
-  if (n == 0) { c->status= -1; return (void*) NULL; }
+  if (t == 0) {
+    // NOTE: the process should see the end of its (empty) input
+    if (close (fd) != 0) c->status= -1;
+    c->closed= true;
+    c->finished= true;
+    return (void*) NULL; }
+  if (n == 0) { c->status= -1; c->finished= true; return (void*) NULL; }
   do {
     int m= min (n, t - k);
     // cout << "writting " << m << " bytes / " << t-k << "\n";
     o= write (fd, (void*) (d + k), m);
     // cout << "written " << o << " bytes to " << fd << "\n";
     if (o > 0) k += o;
-    if (o < 0) { close (fd); c->status= -1; }
-    if (k == t) { if (close (fd) != 0) c->status= -1; }
+    if (o < 0) { close (fd); c->status= -1; c->closed= true; }
+    if (k == t) { if (close (fd) != 0) c->status= -1; c->closed= true; }
   } while (o > 0 && k < t);
+  c->finished= true;
   return (void*) NULL;
 }
 
@@ -279,8 +297,8 @@ unix_system (array<string> arg,
 	     << pid << "\n";
 
   // close useless ports
-  for (int i= 0; i < n_in ; i++) close (pp_in[i].in ());
-  for (int i= 0; i < n_out; i++) close (pp_out[i].out ());
+  for (int i= 0; i < n_in ; i++) { close (pp_in[i].in ()); pp_in[i].release (0); }
+  for (int i= 0; i < n_out; i++) { close (pp_out[i].out ()); pp_out[i].release (1); }
 
   // write to spawn process
   array<_channel> channels_in (n_in);
@@ -321,10 +339,12 @@ unix_system (array<string> arg,
   int thread_status= 0;
   for (int i= 0; i < n_in; i++) {
     pthread_join (threads_write[i], &exit_status);
+    if (channels_in[i].closed) pp_in[i].release (1);
     if (channels_in[i].status < 0) thread_status= -1;
   }
   for (int i= 0; i < n_out; i++) {
     pthread_join (threads_read[i], &exit_status);
+    if (channels_out[i].closed) pp_out[i].release (0);
     *(str_out[i])= string (channels_out[i].data.a,
                            channels_out[i].data.n);
     if (channels_out[i].status < 0) thread_status= -1;
@@ -335,6 +355,155 @@ unix_system (array<string> arg,
   return WEXITSTATUS(status);
 }
 
+/******************************************************************************
+* Asynchronous evaluation via standard input, output and error
+******************************************************************************/
+
+struct unix_process_rep {
+  pid_t     pid;
+  int       killed;
+  bool      exited;
+  int       status;
+  bool      has_in, has_out, has_err;
+  _channel  in, out, err;
+  pthread_t th_in, th_out, th_err;
+};
+
+// exception safe spawn attributes
+struct _spawnattr_t {
+  posix_spawnattr_t rep;
+  int st;
+  inline _spawnattr_t () { st= posix_spawnattr_init (&rep); }
+  inline ~_spawnattr_t () { posix_spawnattr_destroy (&rep); }
+  inline int status () const { return st; }
+};
+
+static void
+_close_fds (int* fd, int n) {
+  for (int i= 0; i < n; i++) close (fd[i]);
+}
+
+unix_process_rep*
+unix_system_start (array<string> arg, string input) {
+  // Start the command arg[0] with arguments arg[i], i >= 1, send input
+  // to its standard input and collect its standard output and error.
+  // Returns NULL on failure; use unix_system_finished to wait for the end.
+  if (N(arg) == 0) return NULL;
+  int fd[6];
+  if (pipe (fd) != 0) return NULL;
+  if (pipe (fd + 2) != 0) { _close_fds (fd, 2); return NULL; }
+  if (pipe (fd + 4) != 0) { _close_fds (fd, 4); return NULL; }
+  // the ends of the parent should not leak into other child processes
+  fcntl (fd[1], F_SETFD, FD_CLOEXEC);
+  fcntl (fd[2], F_SETFD, FD_CLOEXEC);
+  fcntl (fd[4], F_SETFD, FD_CLOEXEC);
+  _file_actions_t file_actions;
+  bool ok= file_actions.status () == 0;
+  ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[0], 0) == 0;
+  ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[3], 1) == 0;
+  ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[5], 2) == 0;
+  for (int i= 0; i < 6; i++)
+    ok= ok && posix_spawn_file_actions_addclose (&file_actions.rep, fd[i]) == 0;
+  // run the command in a new session (or at least process group), so
+  // that it can be killed together with the processes that it starts;
+  // without controlling terminal, it cannot be stopped by prompts (SIGTTIN)
+  _spawnattr_t attr;
+  ok= ok && attr.status () == 0;
+#ifdef POSIX_SPAWN_SETSID
+  ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETSID) == 0;
+#else
+  ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETPGROUP) == 0;
+  ok= ok && posix_spawnattr_setpgroup (&attr.rep, 0) == 0;
+#endif
+  if (!ok) { _close_fds (fd, 6); return NULL; }
+
+  array<char*> _arg;
+  for (int j= 0; j < N(arg); j++)
+    _arg << as_charp (arg[j]);
+  _arg << (char*) NULL;
+  pid_t pid;
+  int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, &attr.rep,
+			    A(_arg), environ);
+  for (int j= 0; j < N(arg); j++)
+    tm_delete_array (_arg[j]);
+  if (status != 0) {
+    if (DEBUG_IO) debug_io << "unix_system_start, failed " << arg << "\n";
+    _close_fds (fd, 6);
+    return NULL;
+  }
+  if (DEBUG_IO)
+    debug_io << "unix_system_start, pid " << pid << ": " << arg << "\n";
+  close (fd[0]); close (fd[3]); close (fd[5]);
+
+  // the threads close the remaining file descriptors when they are done
+  unix_process_rep* rep= tm_new<unix_process_rep> ();
+  rep->pid= pid;
+  rep->killed= 0;
+  rep->exited= false;
+  rep->status= 0;
+  rep->has_in= N(input) > 0;
+  rep->out._init_out (fd[2], 1 << 12);
+  rep->err._init_out (fd[4], 1 << 12);
+  if (rep->has_in) {
+    rep->in._init_in (fd[1], input, 1 << 12);
+    if (pthread_create (&rep->th_in, NULL, _background_write_task,
+			(void*) &(rep->in)))
+      { close (fd[1]); rep->has_in= false; }
+  }
+  else close (fd[1]);
+  // NOTE: the output threads are always created
+  rep->has_out= pthread_create (&rep->th_out, NULL, _background_read_task,
+				(void*) &(rep->out)) == 0;
+  if (!rep->has_out) { close (fd[2]); rep->out.finished= true; }
+  rep->has_err= pthread_create (&rep->th_err, NULL, _background_read_task,
+				(void*) &(rep->err)) == 0;
+  if (!rep->has_err) { close (fd[4]); rep->err.finished= true; }
+  return rep;
+}
+
+bool
+unix_system_finished (unix_process_rep* rep,
+		      int& ret, string& out, string& err) {
+  // Check whether the process has terminated and all its output has been
+  // read; if so, then retrieve its exit code and output, and release rep.
+  // NOTE: processes started by the command may still hold the output
+  // pipes, so we do not wait for the threads before they are finished.
+  if (!rep->exited) {
+    int status;
+    pid_t wret= waitpid (rep->pid, &status, WNOHANG);
+    if (wret == 0) return false;
+    rep->exited= true;
+    if (wret < 0 || WIFEXITED (status) == 0) rep->status= -1;
+    else rep->status= WEXITSTATUS (status);
+  }
+  if ((rep->has_in && !rep->in.finished) ||
+      !rep->out.finished || !rep->err.finished)
+    return false;
+  void* exit_status;
+  if (rep->has_in) pthread_join (rep->th_in, &exit_status);
+  if (rep->has_out) pthread_join (rep->th_out, &exit_status);
+  if (rep->has_err) pthread_join (rep->th_err, &exit_status);
+  out= string (rep->out.data.a, rep->out.data.n);
+  err= string (rep->err.data.a, rep->err.data.n);
+  ret= rep->status;
+  if (DEBUG_IO)
+    debug_io << "unix_system_finished, pid " << rep->pid
+	     << " exited with " << ret << "\n";
+  tm_delete<unix_process_rep> (rep);
+  return true;
+}
+
+void
+unix_system_kill (unix_process_rep* rep) {
+  // Terminate the process and the processes which it started; they are
+  // woken up in case they were stopped, and killed at the second attempt.
+  // NOTE: once the process has been reaped, its pid may be reused
+  if (rep->exited) return;
+  rep->killed++;
+  kill (-rep->pid, rep->killed > 1 ? SIGKILL : SIGTERM);
+  kill (-rep->pid, SIGCONT);
+}
+
 #else
 
 int
@@ -343,6 +512,24 @@ unix_system (array<string> arg,
 	     array<int> fd_out, array<string*> str_out) {
   (void) arg; (void) fd_in; (void) str_in; (void) fd_out; (void) str_out;
   FAILED ("unsupported system call");
+}
+
+unix_process_rep*
+unix_system_start (array<string> arg, string input) {
+  (void) arg; (void) input;
+  return NULL;
+}
+
+bool
+unix_system_finished (unix_process_rep* rep,
+		      int& ret, string& out, string& err) {
+  (void) rep; ret= -1; out= ""; err= "";
+  return true;
+}
+
+void
+unix_system_kill (unix_process_rep* rep) {
+  (void) rep;
 }
 
 #endif

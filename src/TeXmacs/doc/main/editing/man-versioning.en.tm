@@ -7,19 +7,21 @@
 
   When writing documents in collaboration with other authors, it frequently
   arises that one wants to go through changes made by the other authors, and
-  either accept, discard or further correct them. After enabling the
-  versioning tool through <menu|Tools|Versioning tool>, a special menu
-  <menu|Version> appears in the main menu bar, which makes this process
-  automatic. Below, we will describe in more detail how this tool works.
+  either accept, discard or further correct them. For this purpose, a
+  special menu <menu|Version> appears in the main menu bar, which makes
+  this process automatic. By default, this menu is shown for documents
+  under version control; using <menu|Tools|Versioning tool|Always>, it is
+  shown for all documents. Below, we will describe in more detail how this
+  tool works.
 
   In addition, there exist many stand-alone programs for maintaining several
   versions of a same file, such as <hlink|<name|Subversion>|https://en.wikipedia.org/wiki/Apache_Subversion>,
   <hlink|<name|Git>|http://git-scm.com/>,
   <hlink|<name|Darcs>|http://darcs.net/>, <hlink|<name|GNU
   Arch>|http://www.gnu.org/software/gnu-arch/>, just to mention a few of
-  them. <TeXmacs> currently provides a rudimentary support for
-  <name|Subversion> and <name|Git>, but interfaces for the other systems
-  could easily be added.
+  them. <TeXmacs> currently provides a basic support for <name|Subversion>
+  and an extensive support for <name|Git>, but interfaces for the other
+  systems could easily be added.
 
   <paragraph*|Comparing two versions>
 
@@ -34,7 +36,7 @@
   <menu|Version|Compare|With newer version>.
 
   It is possible to go through all the differences between the old and new
-  versions either from the items in the submenu <menu|Version|Move>, or using
+  versions either from the items in the submenu <menu|Version|Differences>, or using
   the keyboard shortcuts <shortcut|(version-previous-difference)> and
   <shortcut|(version-next-difference)>. One may also use the more general
   structured navigation shortcuts <shortcut|(kbd-select-if-active
@@ -50,7 +52,7 @@
   the new version in dark green.
 
   The visualization style can be specified individually for each individual
-  change, via <menu|Version|Show> or the keyboard shortcuts
+  change, via <menu|Version|Differences|Show> or the keyboard shortcuts
   <shortcut|(version-show 'version-old)> (old version),
   <shortcut|(version-show 'version-new)> (new version) and
   <shortcut|(version-show 'version-both)> (both versions). One may also cycle
@@ -66,7 +68,7 @@
   and progressively retain either one or the other version for each
   individual difference. Assuming that the cursor is inside a given
   difference, this can be done from entries in the submenu
-  <menu|Version|Retain>. Alternatively, one may use the shortcuts
+  <menu|Version|Differences|Retain>. Alternatively, one may use the shortcuts
   <shortcut|(version-retain 0)>, <shortcut|(version-retain 1)> and
   <shortcut|(kbd-control-return)> to retain the old, new and currently
   displayed version, respectively. If both versions are displayed, then
@@ -83,11 +85,11 @@
   <shortcut|(version-show 'version-old)> and <shortcut|(version-show
   'version-new)> to select the preferred version. As soon as all differences
   have been processed, you select the entire document and click on
-  <menu|Version|Retain|Current version>.
+  <menu|Version|Differences|Retain|Current version>.
 
   <paragraph*|Grain control and reactualizing the differences>
 
-  The entries in the submenu <menu|Version|Grain> allow you to control the
+  The entries in the submenu <menu|Version|Differences|Grain> allow you to control the
   grain with which differences between versions are computed. By default, we
   use the finest grain <menu|Detailed>. It is also possible to compute
   differences on a paragraph-based level, using <menu|Block>. In that case,
@@ -96,9 +98,9 @@
   occurs somewhere inside.
 
   The grain is used when comparing two documents using
-  <menu|Version|File|Compare>, but it is also possible to change the grain
+  <menu|Version|Compare>, but it is also possible to change the grain
   for a selected portion of text: simply select the text and choose the new
-  grain in the submenu <menu|Version|Grain>. This can in particular be
+  grain in the submenu <menu|Version|Differences|Grain>. This can in particular be
   applied on the entire buffer. Similarly, if you change the grain inside a
   difference, then the difference will be recomputed using the new grain.
 
@@ -117,20 +119,22 @@
   control>
 
   If the file you are editing belongs to a directory that is under version
-  control (only <name|Subversion> and <name|Git> is currently supported,
+  control (only <name|Subversion> and <name|Git> are currently supported,
   although other systems might follow), then the first part of the
   <menu|Version> menu will contain some clickable entries.
 
   First of all, if the current buffer is under version control, then you may
-  take a look at its history using <menu|Version|History>. The history
+  take a look at its history using <menu|Version|History of this document>. The history
   contains a list of hyperlinks to older revisions, together with short
   information about who changed what and when. Older revisions cannot be
   saved, but you may compare them to the current user version (on disk or
-  being edited) using <menu|Version|Compare|With current user version>.
+  being edited) using <menu|Version|Compare with|Current user version>.
 
-  After making some changes to a file under version control, the version
-  inside the editor or on disk no longer corresponds to the version in the
-  repository. Using<nbsp><menu|Version|Commit>, the current user's version
+  For <name|Subversion>, the <menu|Version> menu also contains the
+  following entries; the corresponding tools for <name|Git> are described
+  below. After making some changes to a file under version control, the
+  version inside the editor or on disk no longer corresponds to the version
+  in the repository. Using<nbsp><menu|Version|Commit>, the current user's version
   can be committed to the repository. When doing so, you will be prompted for
   a small explanatory message about the changes that you have made. A file
   that is not yet under version control can be added to the version control
@@ -140,8 +144,18 @@
 
   If, while you were editing, changes to the file were made in the
   repository, then you may merge the result with your current version using
-  <menu|Version|Update>. At the moment, no conflict resolution has been
-  implemented yet, although this is planned for the future.
+  <menu|Version|Update>. No conflict resolution has been implemented yet
+  for <name|Subversion>.
+
+  <paragraph*|Working with <name|Git>>
+
+  For documents inside a <name|Git> working tree, the <menu|Version> menu
+  gives access to a complete interface to <name|Git>: committing changes
+  or saving snapshots, comparing the document with any earlier version,
+  restoring versions, seeing who changed what, synchronizing with
+  coauthors, branches and tags, and the structured resolution of
+  conflicts. These tools are described in the chapter <hlink|working with
+  <name|Git>|man-git.en.tm>.
 
   <tmdoc-copyright|2010\U2019|Joris van der Hoeven|Darcy Shen>
 

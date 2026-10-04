@@ -128,4 +128,14 @@
   ("Presentation tool" (toggle-preference "presentation tool"))
   ("Remote tool" (toggle-preference "remote tool"))
   ("Source macros tool" (toggle-preference "source tool"))
-  ("Versioning tool" (toggle-preference "versioning tool")))
+  (-> "Versioning tool"
+      ("Automatic" (set-versioning-tool "auto"))
+      ("Always" (set-versioning-tool "on"))
+      ("Never" (set-versioning-tool "off"))
+      ---
+      ;; NOTE: also here, since the Version menu is not shown by default
+      ;; for documents outside repositories
+      (when (and (url-exists? (current-buffer))
+                 (not (versioning-directory (current-buffer))))
+        ("Create Git repository" (git-interactive-init (current-buffer))))
+      ("Clone Git repository" (git-interactive-clone))))
