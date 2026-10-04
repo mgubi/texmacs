@@ -324,6 +324,18 @@ the preferences or the environment (`ai-api-key` in `init-ai.scm`).
   the preferences of an engine, where its key is given, exist before it has
   a key. The plug-ins are configured again (`reinit-plugin-single "ai"`)
   when a key changes or the wallet is turned on.
+- In the browser the answer of a session or a fold is streamed
+  (`"stream": true`, Gemini's `streamGenerateContent?alt=sse`): `fetch`
+  reads it as it comes (`slot.parts` in `web_files.cpp`), the request link
+  decodes the events so far (`request_link_rep::partial`,
+  `ai_stream_text`), and the connection gives them on the channel
+  `"progress"`, which a session shows in grey before the busy sign
+  (`session-show-progress`) and a fold through its progress procedure,
+  until the output replaces them. A session begins with the engine and its
+  model (`set-request-banner!` in `tm-plugins.scm`, used by `plugin-start`).
+- A fold of a request plug-in, before any session of it, starts its
+  connection first (`plugin-connected`, `plugin-starting` in
+  `plugin-eval.scm`): it was never made, and the fold waited forever.
 - *Update the list of models* (`ai-update-models`) asks each API its models
   with a synchronous GET (an `XMLHttpRequest` through `web-javascript`, curl
   on the desktop) and keeps those which chat in the preference

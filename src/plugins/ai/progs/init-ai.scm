@@ -288,6 +288,28 @@
                        (json-string e))))
                 (else "no models in the answer"))))))
 
+;; the model which a session of the engine asks (as ai.cpp chooses it)
+(define (ai-session-model name)
+  (let* ((pref (cond ((== name "ollama") "ollama model")
+                     (else (string-append name " model"))))
+         (m (get-preference pref))
+         (known (with e (assoc name ai-keyed-engines)
+                  (and e (pair? (cddr e)) (caddr e)))))
+    (cond ((and (string? m) (!= m "") (!= m "default")) m)
+          ((== name "ollama") (ollama-default-model))
+          ((== name "albert") name)
+          (known known)
+          (else ""))))
+
+;; the first line of a session: the engine and its model
+(define (ai-banner lan)
+  (with m (ai-session-model lan)
+    `(document
+       (concat (strong ,(session-name lan))
+               ,(if (== m "") "" `(concat ", model " (verbatim ,m)))))))
+
+(for-each (lambda (name) (set-request-banner! name ai-banner)) (ai-models))
+
 (define (ai-update-models-message name)
   (with r (ai-update-models name)
     (set-message (if (number? r)

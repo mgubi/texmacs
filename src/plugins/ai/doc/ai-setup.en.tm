@@ -18,7 +18,9 @@
   are given in a web browser, which has no environment variables. Once the
   key is given, <with|font-series|bold|Update the list of models> asks the
   chatbot which models it offers to this key, and proposes them in
-  <with|font-series|bold|Model>.
+  <with|font-series|bold|Model>. A session begins with the name of the model
+  which it asks; in a web browser the answer is shown as it comes (in grey),
+  and replaced by the answer set by <TeXmacs> when it is complete.
 
   The key of an API is not that of a subscription: <name|ChatGPT Plus> or
   <name|Claude Pro> do not include the use of the API, which is paid apart,

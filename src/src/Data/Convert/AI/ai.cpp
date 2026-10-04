@@ -381,6 +381,12 @@ ai_async_eval_command (tree t, object callback) {
 // a web page (CORS) but Albert; Ollama does when the page is among its
 // OLLAMA_ORIGINS.
 
+// In a web browser the answer of a session (ai_latex_request) is streamed
+// (server-sent events, see ai_stream_text): the request link shows it as it
+// comes (request_link_rep::partial). The other requests (translate,
+// correct), and those of the desktop, have the answer at once.
+static bool ai_stream= false;
+
 static string
 ai_key (string engine, string env) {
   return as_string (call ("ai-api-key", engine, env));
@@ -425,8 +431,10 @@ openai_messages (string agent, array<string> conv) {
 static tree
 openai_style_command (string url, array<string> headers, string model_name,
                       string agent, array<string> conv) {
-  tree data= json_object (array<tree> ("model", model_name,
-                                       "messages", openai_messages (agent, conv)));
+  array<tree> d (tree ("model"), tree (model_name),
+                 tree ("messages"), openai_messages (agent, conv));
+  if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
+  tree data= json_object (d);
   tree h (TUPLE);
   for (int i= 0; i < N(headers); i++) h << headers[i];
   return compound ("http_post", url, h, data);
@@ -503,8 +511,9 @@ gemini_command (string s, string model, string agent,
       << json_object ("parts", json_array (json_object ("text", agent)));
   d << tree ("contents") << json_array (contents);
   return compound ("http_post",
-    "https://generativelanguage.googleapis.com/v1beta/models/" *
-      name * ":generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/" * name *
+      (ai_stream? string (":streamGenerateContent?alt=sse")
+                : string (":generateContent")),
     tuple ("x-goog-api-key", key, "Content-Type", "application/json"),
     json_object (d));
 }
@@ -525,6 +534,7 @@ claude_command (string s, string model, string agent,
     << tree ("max_tokens") << compound ("json-number", "8192");
   if (agent != "") d << tree ("system") << tree (agent);
   d << tree ("messages") << json_array (msgs);
+  if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
   tree h (TUPLE);
   h << tree ("x-api-key") << tree (key)
     << tree ("anthropic-version") << tree ("2023-06-01")
@@ -576,7 +586,12 @@ ai_latex_command (string s, string model, string chat) {
 string
 ai_latex_request (string s, string model, string chat) {
   string agent= ai_latex_agent_description (model);
-  return tree_to_scheme (ai_command (s, model, agent, chat, true));
+#ifdef __EMSCRIPTEN__
+  ai_stream= true;
+#endif
+  tree t= ai_command (s, model, agent, chat, true);
+  ai_stream= false;
+  return tree_to_scheme (t);
 }
 
 /******************************************************************************
@@ -654,13 +669,65 @@ ai_plain_spaces (string r) {
   return s;
 }
 
+// A streamed answer (server-sent events): lines "data: {...}", each with a
+// piece of the text (OpenAI, Mistral, Ollama, Albert: choices[0].delta;
+// Claude: the delta of a content_block_delta; Gemini: as an answer). The
+// text of the complete lines so far; err, the message of an error event.
+static bool
+ai_is_stream (string s) {
+  int i= 0;
+  while (i < N(s) && (s[i] == ' ' || s[i] == '\n' || s[i] == '\r')) i++;
+  return test (s, i, "data:") || test (s, i, "event:");
+}
+
+string
+ai_stream_text (string s, string model, string& err) {
+  string engine= ai_engine (model);
+  string r;
+  err= "";
+  int i= 0, n= N(s);
+  while (i < n) {
+    int e= i;
+    while (e < n && s[e] != '\n') e++;
+    if (e >= n) break; // an incomplete line: later
+    string line= s (i, e);
+    i= e + 1;
+    if (N(line) > 0 && line[N(line)-1] == '\r') line= line (0, N(line) - 1);
+    if (!starts (line, "data:")) continue;
+    string d= line (5, N(line));
+    while (N(d) > 0 && d[0] == ' ') d= d (1, N(d));
+    if (d == "" || d == "[DONE]") continue;
+    tree t= http_from_json (d);
+    tree er= json_get (t, "error");
+    if (is_func (er, ATTR)) err= json_text (json_get (er, "message"));
+    else if (is_atomic (er) && er->label != "") err= er->label;
+    if (engine == "claude") {
+      tree delta= json_get (t, "delta");
+      if (json_text (json_get (delta, "type")) == "text_delta")
+        r << json_text (json_get (delta, "text"));
+    }
+    else if (engine == "gemini") r << gemini_style_output (t);
+    else {
+      tree c= json_get (t, "choices");
+      if (is_func (c, TUPLE) && N(c) > 0)
+        r << json_text (json_get (json_get (c[0], "delta"), "content"));
+    }
+  }
+  return r;
+}
+
 string
 ai_output (string s, string model, string chat) {
   ai_set_continuation (s, model, chat);
   string engine= ai_engine (model);
   tree t= http_from_json (s);
   string r;
-  if (engine == "gemini") r= gemini_style_output (t);
+  if (ai_is_stream (s)) {
+    string err;
+    r= ai_stream_text (s * "\n", model, err);
+    if (r == "" && err != "") return "Error: " * err;
+  }
+  else if (engine == "gemini") r= gemini_style_output (t);
   else if (engine == "claude") r= claude_style_output (t);
   else if (engine != "unknown") r= openai_style_output (t);
   if (r == "") return ai_error_text (s, t);

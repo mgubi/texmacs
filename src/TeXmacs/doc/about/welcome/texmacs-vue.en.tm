@@ -193,8 +193,10 @@
     <name|Gemini>, <name|Mistral> and <name|Ollama>, asked by the browser.
     Their keys are given in <menu|Insert|Session|Preferences>, and kept in
     the wallet when it is on; <with|font-series|bold|Update the list of
-    models> asks each one which models the key gives. See the help of the
-    AI plug-in in <menu|Help|Plug-ins>.
+    models> asks each one which models the key gives. A session begins with
+    the name of its model, and the answers are shown as they come, then set
+    by <TeXmacs> when they are complete; executable folds of chatbots work
+    too. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
     <item>The input fields of the dialogs whose width is given as a
     multiple of the default one are no longer as wide as the window (the

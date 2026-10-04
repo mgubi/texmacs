@@ -89,9 +89,30 @@ EM_JS (int, web_http_start, (const char* url, const char* headers,
       if (xhr.status === 0) failed (); else done (xhr.status, b);
     } catch (e) { failed (e); }
   }
+  // the answer is read as it comes (an answer streamed by the AI engines):
+  // its pieces so far are slot.parts, which a request link shows
   else fetch (u, { method: post ? 'POST' : 'GET', headers: hs, body: data })
     .then (function (r) {
-      return r.arrayBuffer ().then (function (a) { done (r.status, new Uint8Array (a)); });
+      if (!r.body || !r.body.getReader)
+        return r.arrayBuffer ().then (function (a) { done (r.status, new Uint8Array (a)); });
+      var reader = r.body.getReader ();
+      slot.parts = []; slot.length = 0;
+      function pump () {
+        return reader.read ().then (function (x) {
+          if (x.done) {
+            var b = new Uint8Array (slot.length), at = 0;
+            slot.parts.forEach (function (p) { b.set (p, at); at += p.length; });
+            slot.parts = null;
+            done (r.status, b);
+            return;
+          }
+          slot.parts.push (x.value);
+          slot.length += x.value.length;
+          if (typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
+          return pump ();
+        });
+      }
+      return pump ();
     })
     .catch (failed);
   return id;
@@ -101,6 +122,19 @@ EM_JS (int, web_http_start, (const char* url, const char* headers,
 EM_JS (int, web_http_status, (int id), {
   var slot = Module.tmWebHttp && Module.tmWebHttp.slots[id];
   return slot ? slot.status : 0;
+});
+
+// what came so far of an answer which has not ended: its size, and its
+// bytes copied to buf (which has that size)
+EM_JS (int, web_http_partial_length, (int id), {
+  var slot = Module.tmWebHttp && Module.tmWebHttp.slots[id];
+  return slot && slot.parts ? slot.length : 0;
+});
+EM_JS (void, web_http_partial_take, (int id, char* buf), {
+  var slot = Module.tmWebHttp && Module.tmWebHttp.slots[id];
+  if (!slot || !slot.parts || !buf) return;
+  var at = 0;
+  slot.parts.forEach (function (p) { HEAPU8.set (p, buf + at); at += p.length; });
 });
 
 // the size of the answer, and its bytes copied to buf (which has that
@@ -207,7 +241,19 @@ web_async_pending () {
   for (int i= 0; i < N(web_async_busy); ) {
     web_async_handle* h= web_async_busy[i];
     int st; string out;
-    if (!web_answer (h->id, st, out)) { i++; continue; }
+    if (!web_answer (h->id, st, out)) {
+      // a request link sees what came so far (its status is not changed:
+      // it is still waiting)
+      if (h->outbuf != NULL) {
+        int n= web_http_partial_length (h->id);
+        if (n != N(*(h->outbuf))) {
+          string r (n);
+          if (n > 0) web_http_partial_take (h->id, &(r[0]));
+          *(h->outbuf)= r;
+        }
+      }
+      i++; continue;
+    }
     web_async_busy= append (range (web_async_busy, 0, i),
                             range (web_async_busy, i + 1, N(web_async_busy)));
     if (h->status == NULL) call (h->call_back, out);
