@@ -55,7 +55,7 @@
   ;; versions of Guile.  These erroneous versions incorrectly recognize
   ;; characters such as A0 (hexadecimal), which breaks certain routines
   ;; involving unicode or cork.
-  (in? c '(#\space #\ht #\newline #\return)))
+  (in? c (list #\space (integer->char 9) #\newline #\return)))
 
 (define-public (string-tail s n)
   "Return all but the first @n chars of @s."
