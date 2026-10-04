@@ -239,10 +239,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define lazy-input-converter-table (make-ahash-table)))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define (lazy-input-converter-force plugin2)
   (with plugin (if (string? plugin2) (string->symbol plugin2) plugin2)
     (with module (ahash-ref lazy-input-converter-table plugin)
@@ -251,10 +251,14 @@
             (ahash-remove! lazy-input-converter-table plugin)
             (module-load module)))))))
 
-(tm-define-macro (lazy-input-converter module plugin)
+(tm-define (lazy-input-converter-add module plugin)
   (lazy-input-converter-force plugin)
-  (ahash-set! lazy-input-converter-table plugin module)
-  '(noop))
+  (ahash-set! lazy-input-converter-table plugin module))
+
+;; the converter is registered when the form is evaluated, not when it is
+;; expanded: Guile 2/3 expand both branches of a conditional
+(tm-define-macro (lazy-input-converter module plugin)
+  `(lazy-input-converter-add ',module ',plugin))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization subroutines
@@ -262,7 +266,7 @@
 
 (define plugin-input-current-plugin "generic")
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define (plugin-input-converters-rules name l)
   (if (null? l) '()
       (cons (let* ((rule (car l))

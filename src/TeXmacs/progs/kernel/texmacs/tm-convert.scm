@@ -20,9 +20,15 @@
 
 (define lazy-format-todo '())
 
+(define-public (lazy-format-add module)
+  (set! lazy-format-todo (cons module lazy-format-todo)))
+
+;; the module is registered when the form is evaluated, not when it is
+;; expanded: Guile 2/3 expand both branches of a conditional
 (define-public-macro (lazy-format module . ignored)
-  (set! lazy-format-todo (cons module lazy-format-todo))
-  `(delayed (:idle 2000) (import-from ,module)))
+  `(begin
+     (lazy-format-add ',module)
+     (delayed (:idle 2000) (import-from ,module))))
 
 (define (lazy-format-force)
   (if (nnull? lazy-format-todo)
