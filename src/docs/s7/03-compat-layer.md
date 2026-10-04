@@ -23,7 +23,7 @@ first module inherited at boot (see §2.1). In addition:
 | Promises | `make-promise`, `delay`, `delay-force`, `force` | Taken from s7's `r7rs.scm`. |
 | Hashing | `(hash obj [bound])` | `(modulo (hash-code obj) bound)` |
 | Loops | `while` | Uses `call-with-exit`. `break` and `continue` are bound inside the body. |
-| `define` | `curried-define` | A macro for Guile's curried definitions, `(curried-define ((f a) b) …)`. It is **not** installed as `define`: a macro in place of `define` made s7 crash the second time a function with an internal recursive definition ran (a stale annotation of the expanded body, `op_safe_closure_p_a_1` "wants opt2_fx" with `S7_DEBUGGING`), and it was what made macros lose their internal definitions (see [06](06-open-issues.md)). The TeXmacs code writes the curried definitions it needs with an explicit `lambda`, which both interpreters read. |
+| `define` | `curried-define` | A macro for Guile's curried definitions, `(curried-define ((f a) b) …)`. It is **not** installed as `define`: a macro in place of `define` made s7 crash the second time a function with an internal recursive definition ran (an s7 optimizer bug, now patched in the vendored s7, see [05](05-build-and-vendored-s7.md#s7-version-and-local-patch); the macro would also make every internal definition expand and be optimized again at each call, several times slower), and it was what made macros lose their internal definitions (see [06](06-open-issues.md)). The TeXmacs code writes the curried definitions it needs with an explicit `lambda`, which both interpreters read. |
 
 The file ends with a "TODO/FIXME" about redefining `error` to match Guile's
 calling convention. That has not been done.

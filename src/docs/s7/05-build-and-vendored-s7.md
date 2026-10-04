@@ -74,8 +74,8 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 ## 5.2 The vendored s7
 
 `src/Scheme/S7/s7.c` and `s7.h` are **s7 11.9 (21-Sep-2026) as released**
-(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with one local patch
-(below).
+(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with two local
+patches (below).
 `mus-config.h` is an empty placeholder that `s7.c` includes.
 
 - **Compiled as C.** s7 11.9 no longer compiles as C++: in C++ mode it
@@ -97,13 +97,28 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 - internal definitions in macro bodies;
 - how lookups use let ids.
 
-**One local patch, in the printer.** `string_to_port` writes a string of
+**Local patch 1, in the printer.** `string_to_port` writes a string of
 more than 1000 copies of one character as `(make-string n c)`, in every
 mode, `display` and `write` included. TeXmacs writes trees as Scheme data
 (`object->string`, `save-object`, the tree cache, the client/server
 protocol) and reads them back with `read`, which gives a list instead of the
 string. The patch, marked `TeXmacs:` in `s7.c`, keeps the abbreviation in
 readable mode only, where it evaluates back to the string.
+
+**Local patch 2, in the optimizer.** A call site optimized for a closure
+records it (`opt1_lambda`), and the optimizer annotates that closure's body
+for the fast paths (`fx_annotate_arg` for `op_safe_closure_p_a`).
+`closure_is_ok_1`, `closure_is_fine_1` and `closure_star_is_fine_1` then
+accepted any other closure of the same type and arity at that call site,
+whose body did not have the annotations. A local function remade from the
+same source has the same body, so this never mattered in ordinary code, but
+a closure made from new code each time does not: a `lambda` built by a
+run-time macro, as when `define` was the `curried-define` macro.
+`op_safe_closure_p_a_1` then called a null `fx` function, which crashed
+graphics-edit (§3.1). The patch (`closure_has_same_body`) also requires the
+same body; otherwise the call site goes back to the general path. Ordinary
+code is not slower, and s7's own `s7test.scm` gives the same output with and
+without the patch. Reported upstream; a reproducer is in the commit message.
 
 **No patch of the lookups.** Earlier versions of the port patched s7's symbol
 lookup:
@@ -120,7 +135,8 @@ first patch broke.
 ### Upgrading s7
 
 1. Copy the new `s7.c` and `s7.h` into `src/Scheme/S7`, and apply the
-   printer patch again (search the old `s7.c` for `TeXmacs:`).
+   two patches again (search the old `s7.c` for `TeXmacs:`), unless
+   upstream has fixed them.
 2. Rebuild from clean.
 3. Run `run-all-tests` and the portable suites on both interpreters (§4.4).
 4. Check the timings of [07](07-performance.md), at least boot and the LaTeX

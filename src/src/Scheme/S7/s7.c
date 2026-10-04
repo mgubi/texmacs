@@ -97263,6 +97263,17 @@ static bool c_function_is_ok_cadr_caddadr(s7_scheme *sc, s7_pointer p)
  * closure_np_is_ok accepts safe/unsafe etc
  */
 
+/* TeXmacs: a call site optimized for one closure may be given another one with the same
+ *   type and arity, but the annotations made for the first closure's body (fx_annotate_arg
+ *   for op_safe_closure_p_a etc) are only found on that body.  A local function remade from
+ *   the same source has the same body; a closure made from new code (a lambda built by a
+ *   run-time macro at each call) does not, and op_safe_closure_p_a_1 then called a null fx.
+ */
+static inline bool closure_has_same_body(s7_pointer old, s7_pointer clo)
+{
+  return((old) && (is_any_closure(old)) && (closure_body(old) == closure_body(clo)));
+}
+
 static /* inline */ bool closure_is_ok_1(s7_scheme *sc, s7_pointer code, uint16_t type, int32_t args)
 {
   const s7_pointer clo = lookup_unexamined(sc, car(code));
@@ -97270,6 +97281,7 @@ static /* inline */ bool closure_is_ok_1(s7_scheme *sc, s7_pointer code, uint16_
       ((clo) && /* this fixup check does save time (e.g. cb) */
        (low_type_bits(clo) == type) &&
        ((closure_arity(clo) == args) || (closure_arity_to_int(sc, clo) == args)) && /* 3 type bits to replace this but not hit enough to warrant them */
+       (closure_has_same_body(opt1_lambda_unchecked(code), clo)) &&
        (set_opt1_lambda(code, clo))))
     return(true);
   sc->last_function = clo;
@@ -97283,6 +97295,7 @@ static /* inline */ bool closure_is_fine_1(s7_scheme *sc, s7_pointer code, uint1
       ((clo) &&
        ((low_type_bits(clo) & (Type_Mask | T_Safe_Closure)) == type) &&
        ((closure_arity(clo) == args) || (closure_arity_to_int(sc, clo) == args)) &&
+       (closure_has_same_body(opt1_lambda_unchecked(code), clo)) &&
        (set_opt1_lambda(code, clo))))
     return(true);
   sc->last_function = clo;
@@ -97336,6 +97349,7 @@ static bool closure_star_is_fine_1(s7_scheme *sc, s7_pointer code, uint16_t type
       ((val) &&
        ((low_type_bits(val) & (T_Safe_Closure | Type_Mask)) == type) &&
        (star_arity_is_ok(sc, val, args)) &&
+       (closure_has_same_body(opt1_lambda_unchecked(code), val)) &&
        (set_opt1_lambda(code, val))))
     return(true);
   sc->last_function = val;
