@@ -46,6 +46,9 @@
 ;; Memory
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(menu-bind provoke-error-menu
+  (xxx))
+
 (menu-bind debug-menu
   (-> "Guile"
       ("Backtrace errors" (debug-toggle-backtrace-errors)))
@@ -85,10 +88,9 @@
   (-> "Miscellaneous"
       ("Test routine" (edit-test))
       ("Provoke scheme error" (oops))
-      ("Provoke C++ error" (cpp-error)))
-;;FIXME: the code below does not compile
-;;      (-> "Provoke menu error"
-;;          (link provoke-error-menu)))
+      ("Provoke C++ error" (cpp-error))
+      (-> "Provoke menu error"
+          (link provoke-error-menu)))
   ---
   ("auto" (debug-toggle "auto"))
   ("verbose" (debug-toggle "verbose"))
