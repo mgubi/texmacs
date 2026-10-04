@@ -1,10 +1,35 @@
-# GNU TeXmacs — branch `wip_other_guis`
+# Max's TeXmacs — branch `maxs_texmacs`
 
-Work in progress: the graphical interfaces of [GNU TeXmacs](https://texmacs.org)
-other than the Qt one. TeXmacs draws its documents itself and asks a GUI
-plugin only for windows, menus, bars, dialogs and events (see
+This is **Max's TeXmacs**, an integration branch of
+[GNU TeXmacs](https://texmacs.org): it gathers in one tree several lines
+of work which are not (yet) in the official TeXmacs, so that they can be
+built, used and tested together. It is stock TeXmacs (the `svn_sync`
+branch, the mirror of the SVN trunk) plus the following branches, merged
+in:
+
+| Branch | What it brings |
+|---|---|
+| `wip_fixes` | **Fixes of TeXmacs which are not upstreamed**: bugs reported on Savannah and in the issues of this repository (the Scheme bridge, LaTeX export, the Qt list views, the editing modes, ...), header dependencies in the autotools build, and the test suites below |
+| `wip_opentype` | **OpenType mathematics**: formulas laid out from the `MATH` table of any OpenType math font, stretchable delimiters and accents from the font's own variants and assemblies, the OpenType features of text fonts, profiles which pair two dozen math fonts with their text companions (sixteen of the fonts are shipped), and a font inspector — see [OPENTYPEMATH.md](src/src/OPENTYPEMATH.md) |
+| `wip_other_guis` | **Other graphical interfaces and GUI improvements**: Vue (a toolkit of its own, on Clay, SDL3 and MuPDF), a native Cocoa interface for macOS, SDL and Qtwk, fixes to X11, and changes which serve every interface (the MuPDF renderer, windows which stay above the editor windows, ...) — see [the graphical interfaces](#the-graphical-interfaces) below |
+| `wip_dev_docs` | **Extensive developer documentation**, inside TeXmacs (Help ▸ Developer documentation): some 365 pages, about 200 of them on the internals of the source code — the data types, the typesetter, fonts and OpenType, the server, buffers, views and windows, the editor, the GUI ports, converters, plug-ins, collaboration — which compile into a book of more than a thousand pages ([`src/TeXmacs/doc/devel/`](src/TeXmacs/doc/devel/)) |
+| (tests, with `wip_fixes`) | **More tests**: unit tests of the kernel in C++, Scheme test suites for editing, conversions, the typesetter, menus, links and more, regression tests on documents, a headless typesetting of the whole documentation, and the OpenType renders — see [src/tests/README.md](src/tests/README.md) |
+
+The branches are merged, not rebased, so each one can still be followed,
+updated and proposed upstream on its own; fixes found while integrating
+them go back to the branch they belong to.
+
+Building is as for TeXmacs (from `src/`, `./configure && make`, with Guile
+1.8: `./configure --with-guile=<path to guile-config of Guile 1.8>`); the
+interface is chosen when configuring, see below.
+
+## The graphical interfaces
+
+TeXmacs draws its documents itself and asks a GUI plugin only for windows,
+menus, bars, dialogs and events (see
 [how the core talks to a GUI plugin](src/docs/texmacs-gui-architecture.md)),
-so one editor can have several faces. This branch brings back or adds:
+so one editor can have several faces. The branch `wip_other_guis` brings
+back or adds:
 
 * **Vue**, an interface which owes nothing to a widget toolkit: it draws
   the editor, the bars, the menus, the dialogs and the tools itself, on
@@ -15,11 +40,6 @@ so one editor can have several faces. This branch brings back or adds:
 * **SDL**, the Widkit widgets of the X11 interface on SDL3 and MuPDF;
 * **Qtwk**, the Widkit widgets on Qt as a window system, and fixes to the
   **X11** interface.
-
-Outside the plugins it is stock TeXmacs (the `svn_sync` branch, the mirror
-of the SVN trunk), save for the places which had to learn that the GUI is
-not always Qt, and fixes which serve every interface (the MuPDF renderer,
-the preferences, windows which stay above the editor windows...).
 
 The interface is chosen when configuring, from `src/`:
 
@@ -36,13 +56,13 @@ The interface is chosen when configuring, from `src/`:
 [build-and-debug.md](src/docs/build-and-debug.md) says what each needs
 (Guile 1.8, MuPDF for Vue and SDL, the X11 headers...).
 
-## The interfaces
+### One document in each interface
 
 The screenshots show one document, [sample.tm](src/docs/screenshots/sample.tm),
 in each interface, in the window each one opens with, taken on a Mac at 2x
 and reduced to 1x.
 
-### Qt — the reference
+#### Qt — the reference
 
 ![TeXmacs with the Qt interface](src/docs/screenshots/qt.png)
 
@@ -52,7 +72,7 @@ the footer, the dialogs of Qt. The Scheme code of TeXmacs is written for
 it, and the other interfaces follow what it does. (A Qt 6 build of the
 same TeXmacs, 2.1.5.)
 
-### Cocoa — native macOS
+#### Cocoa — native macOS
 
 ![TeXmacs with the Cocoa interface](src/docs/screenshots/cocoa.png)
 
@@ -65,7 +85,7 @@ application (arm64 and x86_64) for macOS 12 and later is built as a DMG by
 the CI (`.github/workflows/macos-ns.yml`, on the branch `ns_ci`). Status,
 known gaps and testing aids: [doc/ns-port.md](doc/ns-port.md).
 
-### Vue — a toolkit of its own
+#### Vue — a toolkit of its own
 
 ![TeXmacs with the Vue interface](src/docs/screenshots/vue.png)
 
@@ -97,7 +117,7 @@ Developer notes: [the graphics stack](src/docs/vue-graphics-stack.md),
 (scripted events and snapshots, some fifty tests in
 `src/src/Plugins/Vue/tests/`).
 
-### SDL — the Widkit widgets on SDL3
+#### SDL — the Widkit widgets on SDL3
 
 ![TeXmacs with the SDL interface](src/docs/screenshots/sdl.png)
 
@@ -106,7 +126,7 @@ SDL3 windows, with MuPDF as the renderer: the classic look of TeXmacs
 without X11. Its event loop, its text input and its clipboard are made as
 those of Vue.
 
-### Qtwk and X11
+#### Qtwk and X11
 
 Not shown. Qtwk puts the same Widkit widgets on Qt windows. The X11
 interface is the historical one of TeXmacs, and needs an X server (XQuartz
@@ -117,6 +137,14 @@ editor windows).
 
 ## Documentation
 
+* [src/TeXmacs/doc/devel/](src/TeXmacs/doc/devel/): the developer
+  documentation, read in TeXmacs with Help ▸ Developer documentation, or
+  compiled into a book with Help ▸ Full manuals ▸ Developer documentation
+* [src/src/OPENTYPEMATH.md](src/src/OPENTYPEMATH.md) and
+  [src/doc/opentype-math-design.md](src/doc/opentype-math-design.md): the
+  OpenType mathematics, its status and its design
+* [src/tests/README.md](src/tests/README.md): the tests and how to run
+  them
 * [src/docs/](src/docs/README.md): the Vue plugin, how the core talks to a
   GUI plugin, building and debugging, the PDF output with MuPDF, a design
   for separating the editor from its front end
