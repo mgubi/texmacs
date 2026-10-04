@@ -9349,7 +9349,7 @@ printf "%s\n" "#define GUILE_B 1" >>confdefs.h
       (1.8 | 1.9)
 printf "%s\n" "#define GUILE_C 1" >>confdefs.h
  ;;
-      (2.*)
+      (2.* | 3.*)
 printf "%s\n" "#define GUILE_D 1" >>confdefs.h
  ;;
       (0) as_fn_error $? "Please set $GUILE_VERSION for cross compiling" "$LINENO" 5 ;;

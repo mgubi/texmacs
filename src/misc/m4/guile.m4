@@ -267,7 +267,7 @@ AC_DEFUN([LC_GUILE],[
       (1.0 | 1.1 | 1.2 | 1.3 | 1.4 | 1.5) AC_DEFINE([GUILE_A],[1],[Guile version]) ;;
       (1.6 | 1.7) AC_DEFINE(GUILE_B,[1],[Guile version]) ;;
       (1.8 | 1.9) AC_DEFINE(GUILE_C,[1],[Guile version]) ;;
-      (2.*) AC_DEFINE(GUILE_D,[1],[Guile version]) ;;
+      (2.* | 3.*) AC_DEFINE(GUILE_D,[1],[Guile version]) ;;
       (0) AC_MSG_ERROR([Please set $GUILE_VERSION for cross compiling]) ;;
       (*) AC_MSG_ERROR([Guile version unmanaged.]) ;;
     esac
