@@ -7,8 +7,14 @@
 // what the last paste event brought.
 //
 // Copy: TeXmacs writes its text (and its HTML, when it has one) with
-// navigator.clipboard, which the browser allows just after a key or a click
-// of the user, which is when TeXmacs copies.
+// navigator.clipboard, which Firefox and Chrome allow just after a key or a
+// click of the user, which is when TeXmacs copies. Safari allows it only in
+// the handler of the key itself, and TeXmacs copies a frame later: for the
+// keys of a copy (Ctrl+C, Cmd+C, Ctrl+X, Cmd+X) the page starts the write
+// in their keydown, with a promise of the text (a ClipboardItem of
+// promises, as Safari wants), which the copy of TeXmacs fulfils; when that
+// write fails (an older browser), TeXmacs's copy writes as before. Without
+// it, the system kept its old clipboard, which the next paste brought back.
 //
 // Paste: SDL cancels the keys with Ctrl, which cancels the paste event of
 // the browser with them, and the canvas is not editable, so that the browser
@@ -52,6 +58,11 @@ var tmClipboard = (function () {
     var sel = window.getSelection && window.getSelection ();
     return !!(sel && !sel.isCollapsed && String (sel) !== '');
   }
+  function isCopy (e) {
+    var k = (e.key || '').toLowerCase ();
+    var c = k === 'c' || k === 'x' || e.code === 'KeyC' || e.code === 'KeyX';
+    return c && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+  }
   function isPaste (e) {
     var v = (e.key === 'v' || e.key === 'V' || e.code === 'KeyV');
     return (v && (e.ctrlKey || e.metaKey) && !e.altKey) ||
@@ -59,6 +70,26 @@ var tmClipboard = (function () {
   }
 
   var WAIT = 60; // ms for the paste of a key into the text area
+
+  // the write of a copy key, waiting for the text of TeXmacs's copy
+  var copying = null;
+  var COPY_WAIT = 1000; // ms: no copy by then (nothing selected), no write
+  function startCopy () {
+    var c = typeof navigator !== 'undefined' && navigator.clipboard;
+    if (!c || !c.write || typeof ClipboardItem === 'undefined') return;
+    if (copying) copying.fail ();
+    var job = {};
+    var text = new Promise (function (ok, ko) { job.ok = ok; job.ko = ko; });
+    job.fail = function () { copying = copying === job ? null : copying; job.ko (new Error ('nothing copied')); };
+    job.timer = setTimeout (job.fail, COPY_WAIT);
+    try {
+      job.written = c.write ([new ClipboardItem ({ 'text/plain': text })])
+        .then (function () { log ('copy written in the key'); return true; },
+               function (e) { log ('copy in the key: ' + e); return false; });
+      copying = job;
+    }
+    catch (e) { log ('copy in the key: ' + e); clearTimeout (job.timer); }
+  }
 
   function release () {
     if (!pending) return;
@@ -137,6 +168,7 @@ var tmClipboard = (function () {
         return;
       }
       if (!isPaste (e)) {
+        if (isCopy (e)) startCopy ();
         if (unshifted (e)) redispatch (e);
         else if (e.metaKey) e.preventDefault ();
         return;
@@ -329,16 +361,16 @@ var tmClipboard = (function () {
     write: function (plain, html) {
       known = { plain: plain, html: html };
       if (typeof navigator === 'undefined' || !navigator.clipboard) return;
-      var done = function () {};
-      var failed = function (e) { console.warn ('TeXmacs: cannot copy to the clipboard: ' + e); };
-      try {
-        if (html && navigator.clipboard.write && typeof ClipboardItem !== 'undefined')
-          navigator.clipboard.write ([new ClipboardItem ({
-            'text/plain': new Blob ([plain], { type: 'text/plain' }),
-            'text/html': new Blob ([html], { type: 'text/html' }) })])
-            .then (done, function () { navigator.clipboard.writeText (plain).then (done, failed); });
-        else navigator.clipboard.writeText (plain).then (done, failed);
-      } catch (e) { failed (e); }
+      // the write started by the key of the copy (Safari), else as below
+      var job = copying;
+      if (job) {
+        copying = null;
+        clearTimeout (job.timer);
+        job.ok (new Blob ([plain], { type: 'text/plain' }));
+        job.written.then (function (ok) { if (!ok) writeLate (plain, html); });
+        return;
+      }
+      writeLate (plain, html);
     },
     // what TeXmacs pastes: null when there is nothing of that type
     read: function (mime) {
@@ -347,6 +379,21 @@ var tmClipboard = (function () {
       return s ? s : null;
     }
   };
+
+  // the write of a copy after the key (Firefox, Chrome), its HTML too when
+  // it has one (the write of the key has the text only)
+  function writeLate (plain, html) {
+    var done = function () {};
+    var failed = function (e) { console.warn ('TeXmacs: cannot copy to the clipboard: ' + e); };
+    try {
+      if (html && navigator.clipboard.write && typeof ClipboardItem !== 'undefined')
+        navigator.clipboard.write ([new ClipboardItem ({
+          'text/plain': new Blob ([plain], { type: 'text/plain' }),
+          'text/html': new Blob ([html], { type: 'text/html' }) })])
+          .then (done, function () { navigator.clipboard.writeText (plain).then (done, failed); });
+      else navigator.clipboard.writeText (plain).then (done, failed);
+    } catch (e) { failed (e); }
+  }
 })();
 
 // Control and a click on a Mac (the right click of a trackpad or of a mouse
