@@ -463,7 +463,18 @@ xml_html_parser::parse () {
       else if (test (s, "<![CDATA[")) a << parse_cdata ();
       else if (test (s, "<!DOCTYPE")) a << parse_doctype ();
       else if (test (s, "<!")) a << parse_misc ();
-      else a << parse_opening ();
+      else {
+        tree t= parse_opening ();
+        a << t;
+        if (html && is_tuple (t, "begin") && N(t) >= 2 &&
+            (t[1] == "script" || t[1] == "style")) {
+          // raw text: no tags or entities up to the closing tag
+          string end= "</" * t[1]->label, raw;
+          while (s && !test (s, end) && !test (s, upcase_all (end)))
+            raw << s->read (1);
+          if (N(raw) != 0) a << tree (raw);
+        }
+      }
       r= "";
     }
     else if (s[0] == '&') r << parse_entity ();
