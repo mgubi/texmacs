@@ -23,6 +23,7 @@
 
 s7_scheme *tm_s7;
 s7_pointer user_env;
+static s7_pointer catch_call;
 
 int tm_s7_argc;
 char **tm_s7_argv;
@@ -45,7 +46,25 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   // make a new user environment (used in evaluation)
   user_env = s7_inlet (tm_s7, s7_nil (tm_s7));
   s7_gc_protect (tm_s7, user_env);
-  
+
+  // (catch-call f args) applies f to args and catches the errors, which it
+  // reports and returns as (type . info): as in the Guile version, an error
+  // stops at the C++ code which called Scheme, instead of jumping over it to
+  // an enclosing catch (the function runs in the environment of this lambda,
+  // inside the user environment, where (defined? 'sym) also sees the
+  // arguments: they have unlikely names)
+  catch_call= s7_eval_c_string_with_environment (tm_s7,
+    "(lambda (catch-call-fun catch-call-args)"
+    "  (#_catch #t"
+    "    (lambda () (#_apply catch-call-fun catch-call-args))"
+    "    (lambda (type info)"
+    "      (#_format *stderr* \"Error: ~A~%\""
+    "        (#_catch #t"
+    "          (lambda () (#_apply #_format #f info))"
+    "          (lambda _ (#_list type info))))"
+    "      (#_cons type info))))", user_env);
+  s7_gc_protect (tm_s7, catch_call);
+
   call_back (argc, argv);
 }
 
@@ -89,7 +108,7 @@ TeXmacs_call_scm (arg_list *args) {
   tmscm l= s7_nil (tm_s7);
   for (i=args->n; i>=1; i--)
     l= s7_cons (tm_s7, args->a[i], l);
-  return s7_call (tm_s7, args->a[0], l);
+  return s7_call (tm_s7, catch_call, s7_list (tm_s7, 2, args->a[0], l));
 }
 
 tmscm
