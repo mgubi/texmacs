@@ -18,18 +18,8 @@
     (define-public (filter pred? l)
       (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l))))
 
-;; Curried define, (curried-define ((f a) b) ...), as Guile's define does.
-;; It is not installed as define: a macro in place of define made s7 crash
-;; the second time a function with an internal recursive definition ran
-;; (op_safe_closure_p_a_1 "wants opt2_fx" with S7_DEBUGGING, a stale
-;; annotation of the expanded body). The TeXmacs code writes the curried
-;; definitions it needs with an explicit lambda, which both interpreters
-;; read.
-(define base-define define)
-(define-public-macro (curried-define head . body)
-    (if (pair? head)
-      `(,curried-define ,(car head) (lambda ,(cdr head) ,@body))
-      `(,base-define ,head ,@body)))
+;; Guile's curried define, (define ((f a) b) ...), is s7's own define: the
+;; vendored s7 is patched for it (src/Scheme/S7/patches/0003-curried-define).
 
 
 ;(define primitive-string->symbol string->symbol)

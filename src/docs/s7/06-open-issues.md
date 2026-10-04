@@ -23,16 +23,18 @@
   worked around. A macro whose body defines helper functions can lose them
   between recursive calls of those helpers.
   - **Reproduction:** load the original `case-lambda` of `srfi.scm` in a let
-    whose `define` is `curried-define`, then evaluate
+    whose `define` is a run-time macro for curried definitions,
+    `` (define-macro (cdefine head . body) (if (pair? head) `(,cdefine ,(car head) (lambda ,(cdr head) ,@body)) `(,#_define ,head ,@body))) ``,
+    then evaluate
     `(let ((f (case-lambda ((x) 1) ((x y) 2)))) (f 1))`. It raises
     `unbound variable alength`.
   - **Workaround:** TeXmacs macros define their helpers at module level
     (§3.2).
-  - Since `define` is no longer the `curried-define` macro in the user
-    module, the case which crashed TeXmacs (an internal recursive
-    definition, the second time the enclosing function ran) is gone; the
-    regression test `internal recursive define, twice` of `compat-s7-test`
-    covers it.
+  - `define` is no longer a macro (curried definitions are s7's own, patch
+    0003), so TeXmacs does not meet this case. The crash of an internal
+    recursive definition, the second time the enclosing function ran, was
+    another bug, fixed by patch 0002 ([05](05-build-and-vendored-s7.md#s7-version-and-local-patch));
+    this one still reproduces with that patch.
   - **To do:** report it upstream.
 - **Memo tables no longer cache `#f`.** Storing `#f` in an s7 hash table
   doesn't create an entry, so `logic-holds?` (`logic-data.scm`) and

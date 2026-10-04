@@ -160,9 +160,10 @@ must not stop in the user module, and three rules make sure of that:
 - `list?`, rebound to `proper-list?`, is bound in the rootlet like the
   public definitions;
 - `define` is s7's own everywhere: rebinding it in the rootlet silently ends
-  s7's current `load`, and the curried `define` which used to be bound in
-  the user module crashed s7 (see [03](03-compat-layer.md)); curried
-  definitions use an explicit `lambda` or the `curried-define` macro.
+  s7's current `load`. Guile's curried definitions work because the
+  vendored s7 is patched for them ([05](05-build-and-vendored-s7.md#s7-version-and-local-patch)).
+  The run-time macro which used to be bound as `define` in the user module
+  for them made s7 crash (see [03](03-compat-layer.md)).
 
 With these rules TeXmacs runs on s7 as released. An earlier version copied
 every export into the user module, which grew to about a thousand bindings.
