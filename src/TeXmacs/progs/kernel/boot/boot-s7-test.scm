@@ -315,6 +315,10 @@
         (cons (cons (car l) (cadr l)) (pairs (cddr l)))))
   (pairs (boot-test-butlast (cdr t))))
 
+;; 0004: (string-ref a 0) on a parameter (a trap in WebAssembly only)
+(define (boot-test-first-char a b) (string-ref a 0))
+(define (boot-test-first-char-of x) (boot-test-first-char x (+ 1 2)))
+
 (define (regtest-boot-patches)
   (regression-test-group
    "boot-s7, patches of s7" "patches"
@@ -356,6 +360,10 @@
    (test "define-public with a curried head publishes the function"
          ((((rootlet) 'boot-test-public-adder) 1) 2) 3)
    (test "plain define is unchanged" (let () (define x 5) x) 5)
+   ;; 0004
+   (test "string-ref of 0 on a parameter"
+         (list (boot-test-first-char-of "abc") (boot-test-first-char-of "xyz"))
+         '(#\a #\x))
    (test "define* is not curried"
          (catch #t (lambda () (eval '(define* ((f a) b) b) (inlet)) 'defined)
            (lambda args 'error))

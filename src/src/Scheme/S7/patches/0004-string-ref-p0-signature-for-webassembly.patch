@@ -1,0 +1,28 @@
+(string-ref s 0) on a parameter no longer traps in WebAssembly (upstream since 5-Oct-2026)
+
+In the p_pi case of its tree rewriting (fx_c_si_direct -> fx_c_ti_direct),
+the optimizer replaced string_ref_p_pi by string_ref_p_p0, a p_pp
+function, which fx_c_ti_direct then calls as p_pi. Native code does not
+mind the mismatched signature; WebAssembly traps on it ("indirect call
+signature mismatch"):
+
+  (define (f a b) (string-ref a 0))
+  (define (g x) (f x (+ 1 2)))
+  (g "abc")      ; trapped in WebAssembly
+
+s7 5-Oct-2026 has the same fix: drop this patch when upgrading.
+
+--- a/s7.c
++++ b/s7.c
+@@ -61613,8 +61613,9 @@
+ 	{
+ 	  if (opt3_direct(cdr(expr)) == (s7_pointer)vector_ref_p_pi)
+ 	    return(with_fx(tree, fx_vector_ref_tc));
+-	  if ((opt3_direct(cdr(expr)) == (s7_pointer)string_ref_p_pi) && (integer(caddr(expr)) == 0))
+-	    set_opt3_direct(cdr(expr), string_ref_p_p0);
++	  /* TeXmacs: not string_ref_p_p0 here, a p_pp function which fx_c_ti_direct
++	   *   would call as p_pi: WebAssembly traps on the mismatched signature
++	   *   (indirect call signature mismatch) where native code does not */
+ 	  return(with_fx(tree, (opt3_direct(cdr(expr)) == (s7_pointer)remainder_p_pi) ? fx_c_ti_remainder : fx_c_ti_direct));
+ 	}
+       if (pfunc == fx_is_eq_sc)    return(with_fx(tree, fx_is_eq_tc));
