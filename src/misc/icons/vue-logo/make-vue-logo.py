@@ -7,8 +7,9 @@
 #
 # from the top of the source tree, writes TeXmacs/misc/images/texmacs-vue.svg
 # (the logo), texmacs-vue-small.svg (for 32 px and less: three wider pins a
-# side, a larger Sigma, a thicker outline) and texmacs-vue-<n>.png. It needs
-# fontTools and rsvg-convert; the files it writes are in the tree, so that
+# side, a larger Sigma, a thicker outline), texmacs-vue-<n>.png and
+# texmacs-vue.ico (16, 32 and 48 px: the icon Safari takes for a page). It
+# needs fontTools, rsvg-convert and Pillow; the files it writes are in the tree, so that
 # the build needs neither.
 
 import os, subprocess
@@ -78,3 +79,10 @@ open(big, 'w').write(logo(False))
 open(small, 'w').write(logo(True))
 for n in SIZES_SMALL: print(render(small, n))
 for n in SIZES: print(render(big, n))
+
+# the icon of the web page, as Safari wants it (it ignores the PNG ones)
+from PIL import Image
+ims = [Image.open(os.path.join(OUT, f'texmacs-vue-{n}.png')).convert('RGBA') for n in (48, 32, 16)]
+ico = os.path.join(OUT, 'texmacs-vue.ico')
+ims[0].save(ico, format='ICO', sizes=[(48, 48), (32, 32), (16, 16)], append_images=ims[1:])
+print(ico)
