@@ -78,6 +78,7 @@ extern "C" int  vue_clay_capacity_report (char* buf, int n); // clay.c
 
 // pointer info (the per-window events are stored in vue_window_rep::input)
 extern unsigned int mouse_state;
+extern unsigned int mouse_presses; // counts the presses (the help balloons)
 
 // scripted events (development aid, see TEXMACS_VUE_SCRIPT below)
 static bool script_active= false;
@@ -4568,6 +4569,7 @@ process_event (SDL_Event *event) {
       win= get_window_from_ID (event->button.windowID);
       float bx= event->button.x, by= event->button.y;
       bool down= (event->button.type == SDL_EVENT_MOUSE_BUTTON_DOWN);
+      if (down) mouse_presses++;
       if (down) dismiss_wait_indicator ();
       win= route_pointer (win, bx, by, down ? 1 : 2);
       if (win && popup_grab (win, bx, by, down)) {

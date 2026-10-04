@@ -397,6 +397,7 @@ int mouse_y;
 int mouse_ticket= 0; // the payload of a "drop" action
 int mouse_clicks= 1; // the count of the clicks of a press (2: double click)
 unsigned int mouse_state= 0;
+unsigned int mouse_presses= 0; // the presses of a button so far
 array<double> mouse_data;
 
 bool current_popup; // is there an active popup?
@@ -456,6 +457,7 @@ bool fill_parent= false;
 
 uint32_t current_balloon;
 time_t balloon_time;
+static unsigned int balloon_presses= 0; // mouse_presses when it was hovered
 
 // list of commands
 list<command> cmd_list;
@@ -3094,6 +3096,14 @@ vue_ui_rep::do_layout () {
         // hovered and not active, then become active and start counting time
         current_balloon= id;
         balloon_time= texmacs_time ();
+        balloon_presses= mouse_presses;
+      }
+      // a click puts it away (or keeps it from coming) until the pointer
+      // leaves the widget, as a tooltip does; the press and its release
+      // may both come between two layouts, hence the count
+      if (mouse_presses != balloon_presses) {
+        balloon_presses= mouse_presses;
+        balloon_time= texmacs_time () - 5000;
       }
       time_t elapsed= texmacs_time () - balloon_time;
       if ((elapsed > 1000) && (elapsed < 5000)) {
