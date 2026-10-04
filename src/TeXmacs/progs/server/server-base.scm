@@ -457,10 +457,6 @@
     (server-return envelope (get-accounts-user-list limit offset))
     (server-return envelope "remote accounts list is not allowed")))
 
-(tm-service (remote-deletion-plan user)
-  (with-verify-delete-rights
-    (server-return envelope (server-deletion-plan-entries target-uid))))
-
 (tm-define-macro (with-verify-delete-rights . body)
   `(let* ((caller-uid (server-get-user envelope))
          (is-admin? (server-check-admin? envelope))
@@ -486,6 +482,10 @@
         (server-error envelope "only admin can delete other accounts"))
        (else
          ,@body))))
+
+(tm-service (remote-deletion-plan user)
+  (with-verify-delete-rights
+    (server-return envelope (server-deletion-plan-entries target-uid))))
 
 (tm-service (remote-delete-account user)
   (with-verify-delete-rights
