@@ -47,6 +47,16 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   guile_argv = argv;
 #if (defined(GUILE_C) || defined(GUILE_D))
   old_call_back= call_back;
+#if (defined(GUILE_D))
+  // Guile 2/3 compiles every module it loads through use-modules and
+  // caches the result. TeXmacs code does not compile: many of its macros
+  // call helpers defined in the same file, which only exist when the file
+  // is evaluated form by form, and the compiler silently falls back to
+  // the interpreter after a costly failed attempt. We therefore run all
+  // TeXmacs Scheme code interpreted. The variable must be set before
+  // Guile is initialised, since Guile reads it while booting.
+  setenv ("GUILE_AUTO_COMPILE", "0", 1);
+#endif
   scm_boot_guile (argc, argv, new_call_back, 0);
 #else
 #ifdef DOTS_OK
@@ -82,12 +92,25 @@ TeXmacs_catcher (void *data, SCM tag, SCM args) {
  * Evaluation of files
  ******************************************************************************/
 
+#if (defined(GUILE_D))
+static SCM
+TeXmacs_primitive_load (char *file) {
+  // primitive-load is redefined in initialize_scheme, so that TeXmacs
+  // files are read as Latin-1, as Guile 1.8 did
+  SCM load= scm_variable_ref (scm_c_lookup ("primitive-load"));
+  return scm_call_1 (load, scm_from_locale_string (file));
+}
+#define TM_PRIMITIVE_LOAD TeXmacs_primitive_load
+#else
+#define TM_PRIMITIVE_LOAD scm_c_primitive_load
+#endif
+
 #ifndef DEBUG_ON
 static SCM
 TeXmacs_lazy_eval_file (char *file) {
 #if (defined(GUILE_D))
   return scm_c_with_throw_handler (SCM_BOOL_T,
-                                  (scm_t_catch_body) scm_c_primitive_load, file,
+                                  (scm_t_catch_body) TM_PRIMITIVE_LOAD, file,
                                   (scm_t_catch_handler) TeXmacs_lazy_catcher, file, 0);
 #else
   return scm_internal_lazy_catch (SCM_BOOL_T,
@@ -104,7 +127,7 @@ TeXmacs_eval_file (char *file) {
                              (scm_t_catch_body) TeXmacs_lazy_eval_file, file,
                              (scm_t_catch_handler) TeXmacs_catcher, file);
 #else
-  return 	scm_c_primitive_load (file);
+  return 	TM_PRIMITIVE_LOAD (file);
 #endif
 }
 
@@ -396,61 +419,43 @@ string_to_tmscm (string s) {
 
 #ifdef GUILE_D
 
-// Guile-2 uses proper encoding of strings...
-//
-//  we have to hardcode some implementation details from libguile
-// since we need to peek at the internals of strings
-// in order to understand if they have a wide representation
-// or can be smuggled into a latin1 encoding
+// Guile 2/3 strings are sequences of Unicode characters, while TeXmacs
+// strings are sequences of bytes in its own (Cork based) encoding.
+// string_to_tmscm smuggles the bytes into Scheme as Latin-1 characters,
+// so that every TeXmacs string survives the round trip unchanged.
+// Strings which do not come from TeXmacs (literals in Scheme files,
+// results of Guile library functions) may also contain characters beyond
+// Latin-1; such strings are taken to be Unicode text and converted to
+// Cork. We only use the public API: the string is read as UTF-8, which
+// is pure ASCII in the most frequent case.
 
-// situation with strings is currently quite messy since TeXmacs uses its own
-// encoding while guile >1.8 want an explicit standard exconding
-// so we just inject everything into a latin1 (which allow to use 8-bits)
-// with this default we have the problem of scheme strings which contains
-// unicode chars, for example. They do not fit in 8-bit and some conversions is needed.
-// in this case we just convert them into a proper latin1
-
-
-#define STRINGBUF_F_WIDE        SCM_I_STRINGBUF_F_WIDE
-#define STRINGBUF_F_MUTABLE     SCM_I_STRINGBUF_F_MUTABLE
-
-#define STRINGBUF_WIDE(buf)     (SCM_CELL_WORD_0(buf) & STRINGBUF_F_WIDE)
-#define STRING_STRINGBUF(str) (SCM_CELL_OBJECT_1(str))
-
-/* (from libguile) True if the string is 'narrow', meaning it has a 8-bit Latin-1
-   encoding.  False if it is 'wide', having a 32-bit UCS-4
-   encoding.  */
-int
-scm_i_is_narrow_string (SCM str)
-{
-  return !STRINGBUF_WIDE (STRING_STRINGBUF (str));
+static string
+guile_utf8_to_tm (const char* s, size_t n) {
+  size_t i;
+  for (i=0; i<n; i++)
+    if (((unsigned char) s[i]) >= 0x80) break;
+  if (i == n) return string (s, (int) n);  // ASCII
+  string r;
+  for (i=0; i<n; ) {
+    unsigned char c= (unsigned char) s[i];
+    if (c < 0x80) { r << ((char) c); i++; }
+    else if ((c & 0xe0) == 0xc0 && c <= 0xc3 && i+1 < n) {
+      // a character of Latin-1, that is a byte of TeXmacs
+      r << ((char) (((c & 0x03) << 6) | (((unsigned char) s[i+1]) & 0x3f)));
+      i += 2;
+    }
+    else return utf8_to_cork (string (s, (int) n));
+  }
+  return r;
 }
 
 string
 tmscm_to_string (tmscm s) {
-  guile_str_size_t len_r;
-  char* _r;
-  
-  if (scm_i_is_narrow_string(s)) {
-    _r = scm_scm2str (s, &len_r);
-    string r (_r, len_r);
-    #ifdef OS_WIN32
-      scm_must_free(_r);
-    #else
-      free (_r);
-    #endif
-    return r;
-  } else {
-    _r = scm_to_utf8_stringn (s, &len_r);
-    string r (_r, len_r);
-    string rr= utf8_to_cork (r);
-    #ifdef OS_WIN32
-      scm_must_free(_r);
-    #else
-      free (_r);
-    #endif
-    return rr;
-  }
+  size_t len_r;
+  char* _r= scm_to_utf8_stringn (s, &len_r);
+  string r= guile_utf8_to_tm (_r, len_r);
+  free (_r);
+  return r;
 }
 #else
 string
@@ -480,13 +485,22 @@ bool tmscm_is_symbol (tmscm s) {
 
 tmscm
 symbol_to_tmscm (string s) {
+#ifdef GUILE_D
+  // as for strings: the bytes of TeXmacs are Latin-1 characters
+  c_string _s (s);
+  return scm_from_latin1_symboln (_s, N(s));
+#else
   c_string _s (s);
   SCM r= scm_symbol2scm (_s);
   return r;
+#endif
 }
 
 string
 tmscm_to_symbol (tmscm s) {
+#ifdef GUILE_D
+  return tmscm_to_string (scm_symbol_to_string (s));
+#else
   guile_str_size_t len_r;
   char* _r= scm_scm2symbol (s, &len_r);
   string r (_r, len_r);
@@ -496,6 +510,7 @@ tmscm_to_symbol (tmscm s) {
   free (_r);
 #endif
   return r;
+#endif
 }
 
 /******************************************************************************
@@ -658,6 +673,47 @@ initialize_scheme () {
   "(define object-stack '(()))";
   
   scm_c_eval_string (init_prg);
+#if (defined(GUILE_D))
+  // TeXmacs strings are sequences of bytes, which we pass to Guile as
+  // Latin-1 characters (see string_to_tmscm). Guile 2/3 reads source
+  // files as UTF-8 by default, so that a string literal with non ASCII
+  // characters would not hold the bytes of the file, as it did with
+  // Guile 1.8 and as the rest of TeXmacs expects. We therefore read the
+  // Scheme files of TeXmacs (but not those of Guile itself) as Latin-1,
+  // by redefining primitive-load and primitive-load-path, which are used
+  // by load and by the module system. The standard ports also use
+  // Latin-1, so that displayed strings come out byte for byte.
+  const char* load_prg =
+  "(define (texmacs-guile-file? f)\n"
+  "  (or (string-prefix? (%package-data-dir) f)\n"
+  "      (string-prefix? (%global-site-dir) f)\n"
+  "      (string-prefix? (%site-dir) f)))\n"
+  "(define (texmacs-load-latin1 file)\n"
+  "  (if %load-hook (%load-hook file))\n"
+  "  (call-with-port\n"
+  "    (open-input-file file #:encoding \"ISO-8859-1\")\n"
+  "    (lambda (port)\n"
+  "      (let loop ()\n"
+  "        (let ((form ((or (fluid-ref current-reader) read) port)))\n"
+  "          (if (not (eof-object? form))\n"
+  "              (begin (primitive-eval form) (loop))))))))\n"
+  "(define texmacs-guile-primitive-load primitive-load)\n"
+  "(define texmacs-guile-primitive-load-path primitive-load-path)\n"
+  "(set! primitive-load\n"
+  "  (lambda (file)\n"
+  "    (if (texmacs-guile-file? file)\n"
+  "        (texmacs-guile-primitive-load file)\n"
+  "        (texmacs-load-latin1 file))))\n"
+  "(set! primitive-load-path\n"
+  "  (lambda (name . opt)\n"
+  "    (let ((file (%search-load-path name)))\n"
+  "      (if (and file (not (texmacs-guile-file? file)))\n"
+  "          (texmacs-load-latin1 file)\n"
+  "          (apply texmacs-guile-primitive-load-path name opt)))))\n"
+  "(set-port-encoding! (current-output-port) \"ISO-8859-1\")\n"
+  "(set-port-encoding! (current-error-port) \"ISO-8859-1\")\n";
+  scm_c_eval_string (load_prg);
+#endif
   initialize_smobs ();
   initialize_glue ();
   object_stack= scm_lookup_string ("object-stack");
