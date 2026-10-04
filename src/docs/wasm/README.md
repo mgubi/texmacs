@@ -186,10 +186,13 @@ make -C build-wasm -f ../misc/wasm/Makefile THORVG=<dir>/wasm ... web
 and the page draws with the GPU when its address has `?gpu=1` (which sets
 `TEXMACS_VUE_GPU`); without it, it draws with MuPDF as before. Measured in
 headless Firefox on an Apple M1 (Retina, the document of 200 paragraphs of
-`TeXmacs.later`-driven forced repaints, `?profile=20`, times with the GPU's):
-a full repaint of the editor 3.5 ms against 6.6 ms with MuPDF (19.1 ms
-before the work of October 2026 on the MuPDF renderer), and the canvas
-upload of every frame (2 ms) is gone.
+`TeXmacs.later`-driven forced repaints, `?profile=20`): a full repaint of
+the editor takes 2.2 ms of CPU (3.5 ms with `?gpusync=1`, which makes the
+profile wait for the GPU) against 6.6 ms with MuPDF (19.1 ms before the
+work of October 2026 on the MuPDF renderer), and the canvas upload of
+every frame (2 ms) is gone. Scrolling and zooming the math font catalogue,
+the GPU path draws more frames than MuPDF in every phase, at 1 to 2.3 ms
+of CPU a frame against 4.4 to 5 ms.
 
 ## Optimization
 

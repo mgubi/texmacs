@@ -61,8 +61,8 @@ Module['preRun'].push(function () {
   if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[0];
   // texmacs.html?gpu=1: drawn by WebGL2 (vue_gpu.cpp), in a build with ThorVG
   if (tmAddress.get ('gpu') === '1') ENV['TEXMACS_VUE_GPU'] = '1';
-  // ?gpusync=0: the profile does not wait for the GPU (vue_gpu.cpp, gpu_finish)
-  if (tmAddress.get ('gpusync') === '0') ENV['TEXMACS_VUE_GPU_SYNC'] = '0';
+  // ?gpusync=1: the profile waits for the GPU (vue_gpu.cpp, gpu_finish)
+  if (tmAddress.get ('gpusync') === '1') ENV['TEXMACS_VUE_GPU_SYNC'] = '1';
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');
