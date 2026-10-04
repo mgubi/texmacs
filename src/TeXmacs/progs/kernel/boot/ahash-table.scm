@@ -179,13 +179,21 @@
     (ahash-set! h elem #t))
   (for-each insert l))
 
-(define-public-macro (define-collection name . l)
-  `(begin
-     (when (not (defined? ',name))
-       (if (defined? 'tm-define)
-           (tm-define ,name (make-ahash-table))
-           (define-public ,name (make-ahash-table))))
-     (define-collection-decls ,name ,(list 'quasiquote l))))
+(cond-expand
+  (guile-2
+    ;; define is not allowed in expression context
+    (define-public-macro (define-collection name . l)
+      `(begin
+         (define-public ,name (make-ahash-table))
+         (define-collection-decls ,name ,(list 'quasiquote l)))))
+  (else
+    (define-public-macro (define-collection name . l)
+      `(begin
+         (when (not (defined? ',name))
+           (if (defined? 'tm-define)
+               (tm-define ,name (make-ahash-table))
+               (define-public ,name (make-ahash-table))))
+         (define-collection-decls ,name ,(list 'quasiquote l))))))
 
 (define-public-macro (extend-collection name . l)
   `(define-collection-decls ,name ,(list 'quasiquote l)))
