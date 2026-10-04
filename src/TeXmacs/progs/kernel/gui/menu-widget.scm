@@ -403,7 +403,9 @@
   "Helper routines for menu-widget and kbd-define"
   (and (procedure? action)
        (with source (tm-procedure-source action)
-         (and (== (car source) 'lambda)
+         ;; Guile 2/3 only know the source of tagged-lambda
+         (and (pair? source)
+              (== (car source) 'lambda)
               (== (cadr source) '())
               (null? (cdddr source))
               (caddr source)))))
