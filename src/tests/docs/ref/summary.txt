@@ -1,6 +1,5 @@
 book	devel/scheme/scheme.en.tm	bad-arity	line/1
 book	main/man-user-manual.de.tm	log	warning, missing font, loading global substitution list
-book	main/man-user-manual.de.tm	undefined-reference	auto-* (123 page numbers of the table of contents or the index are ?)
 book	main/man-user-manual.de.tm	unknown-tag	initial
 book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as A.1
 book	main/man-user-manual.en.tm	log	typeset-warning, Redefined sec-man-preferences as E.3
@@ -194,7 +193,7 @@ stat	devel/source/source.en.tm	toc	88
 stat	devel/source/source.fr.tm	idx	2
 stat	devel/source/source.fr.tm	pages	47
 stat	devel/source/source.fr.tm	toc	88
-stat	main/man-user-manual.de.tm	idx	1061
+stat	main/man-user-manual.de.tm	idx	1058
 stat	main/man-user-manual.de.tm	pages	234
 stat	main/man-user-manual.de.tm	toc	297
 stat	main/man-user-manual.en.tm	idx	1251
