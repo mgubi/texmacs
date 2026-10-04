@@ -76,7 +76,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -97,6 +97,35 @@ $(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist
 	cp $(TIKZJAX)/dist/run-tex.js $(TIKZJAX)/dist/tex.wasm.gz $(TIKZJAX)/dist/core.dump.gz $(TIKZJAX)/LICENSE $(OUT)/web/tikzjax/
 	rm -rf $(OUT)/web/tikzjax/tex_files; cp -R $(TIKZJAX)/dist/tex_files $(OUT)/web/tikzjax/
 	cp $(TM)/plugins/tikz/web/tm-tikz.js $@
+
+# the program of the Asymptote plugin (plugins/asymptote, docs/wasm/asymptote.md):
+# Asymptote-web, Asymptote in WebAssembly, fetched by get-asymptote.sh, and
+# the worker of the plugin, in out/web/asymptote/; version.js tells the
+# versions to the worker (the one of Asymptote is that of the package)
+ASYMPTOTE := asymptote-web-0.3.3
+ASYMPTOTE_VERSION := 3.15
+ASY_FILES := asymptote.js asymptote.wasm asy.data asymptote-web.js utils.js
+asymptote: $(OUT)/web/asymptote/asymptote.wasm $(OUT)/web/asymptote/tm-asy.mjs $(OUT)/web/asymptote/version.js
+
+$(ASYMPTOTE)/dist/asymptote.wasm:
+	sh $(W)/get-asymptote.sh $(CURDIR)
+
+$(OUT)/web/asymptote/version.js: $(ASYMPTOTE)/dist/asymptote.wasm
+	@mkdir -p $(OUT)/web/asymptote
+	printf 'export const ASYMPTOTE_VERSION = "%s";\nexport const ASYMPTOTE_WEB_VERSION = "%s";\n' \
+	  $(ASYMPTOTE_VERSION) $(ASYMPTOTE:asymptote-web-%=%) > $@
+
+# Asymptote-web, with brotli copies of its large files for the servers
+$(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm
+	@mkdir -p $(OUT)/web/asymptote
+	cd $(ASYMPTOTE)/dist && cp $(ASY_FILES) $(CURDIR)/$(OUT)/web/asymptote/
+	-command -v brotli > /dev/null && cd $(OUT)/web/asymptote && \
+	  for f in asymptote.wasm asy.data asymptote.js; do brotli -f -q 9 -k $$f; done
+	touch $@
+
+$(OUT)/web/asymptote/tm-asy.mjs: $(TM)/plugins/asymptote/web/tm-asy.mjs
+	@mkdir -p $(OUT)/web/asymptote
+	cp $< $@
 
 $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
 	@mkdir -p $(OUT)/web
@@ -172,4 +201,4 @@ $(OBJ)/%.o: $(S)/%.c
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax
+.PHONY: all web node clean tikzjax asymptote

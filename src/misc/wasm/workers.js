@@ -81,8 +81,10 @@ var tmWorkers = (function () {
     start: function (url) {
       var w;
       try {
+        // a script whose name ends in .mjs is a module (it imports others)
         w = { worker: url.indexOf ('page:') == 0 ? pageWorker (url.slice (5))
-                                                 : new Worker (url),
+                    : /\.mjs$/.test (url) ? new Worker (url, { type: 'module' })
+                    : new Worker (url),
               pending: [[], []], alive: true };
       }
       catch (e) {
