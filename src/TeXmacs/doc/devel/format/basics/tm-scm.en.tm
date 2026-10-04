@@ -18,21 +18,23 @@
   </tm-fragment>
 
   The <scheme> representation may also be useful in order to represent
-  complex macros with a lot of programatic content. Finally, <scheme> is the
+  complex macros with a lot of programmatic content. Finally, <scheme> is the
   safest format when incorporating <TeXmacs> snippets into emails. Indeed,
   both the standard <TeXmacs> format and the XML serialization may be quite
   sensitive to white-space.
 
-  In order to save or load a document in <scheme> format, you may use
-  <menu|File|Export|Scheme> <abbr|resp.> <menu|File|Import|Scheme>. Files
+  In order to save or load a document in <scheme> format (using the
+  <verbatim|.stm> extension), you may use <menu|File|Export|TeXmacs Scheme>
+  <abbr|resp.> <menu|File|Import|TeXmacs Scheme>. Files
   saved in <scheme> format can easily be processed by external <scheme>
   programs, in the same way as files saved in XML format can easily be
   processed by tools for processing XML, like XSLT.
 
   In order to copy a document fragment to an email in <scheme> format, you
-  may use <menu|Edit|Copy to|Scheme>. Similarly, you may paste external
-  <scheme> fragments into <TeXmacs> using <menu|Edit|Paste from|Scheme>. The
-  <scheme> format may also used interactively inside <scheme> sessions or
+  may use <menu|Edit|Copy to|TeXmacs Scheme>. Similarly, you may paste
+  external <scheme> fragments into <TeXmacs> using <menu|Edit|Paste
+  from|TeXmacs Scheme>. The
+  <scheme> format may also be used interactively inside <scheme> sessions or
   interactive commands. For instance, typing <shortcut|(interactive
   exec-interactive-command)> followed by the interactive command
 

@@ -1,4 +1,4 @@
-<TeXmacs|1.0.7.21>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -11,14 +11,25 @@
   following a path which meets specific criteria. For instance, one might to
   select the second child of the last child or all square roots inside
   numerators of fractions. The syntax of the selection patterns is also used
-  for high level tree accessors.
+  for high level tree accessors. The implementation can be found in
+  <verbatim|kernel/regexp/regexp-select.scm>.
 
   <\explain>
     <scm|(select <scm-arg|expr> <scm-arg|pattern>)><explain-synopsis|select
     subexpressions following a pattern>
   <|explain>
     Select all subtrees inside a hybrid tree <scm-arg|expr> according to a
-    specific path <scm-arg|pattern>.
+    specific path <scm-arg|pattern>. The result is a list of subtrees.
+  </explain>
+
+  <\explain>
+    <scm|(tm-ref <scm-arg|expr> <scm-arg|pattern-1> ...
+    <scm-arg|pattern-n>)><explain-synopsis|first selected subexpression>
+  <|explain>
+    Return the first subexpression selected by the path pattern
+    <scm|(<scm-arg|pattern-1> ... <scm-arg|pattern-n>)>, or <scm|#f> if no
+    subexpression matches. For instance, <scm|(tm-ref t 1 0)> returns the
+    first child of the second child of <scm|t>.
   </explain>
 
   Patterns are lists of atomic patterns of one of the following forms:
@@ -40,7 +51,8 @@
     <scm|(:range <scm-arg|start> <scm-arg|end>)><explain-synopsis|select
     children in a range>
   <|explain>
-    Select all children in a specified range.
+    Select all children with indices <math|i> such that
+    <math|<scm-arg|start>\<leqslant\>i\<less\><scm-arg|end>>.
   </explain>
 
   <\explain>
@@ -55,6 +67,14 @@
         ((strong "x") (strong "y"))
       </unfolded-io>
     </session>
+  </explain>
+
+  <\explain>
+    <scm|(:exclude <scm-arg|label-1> ... <scm-arg|label-n>)><explain-synopsis|select
+    children with other labels>
+  <|explain>
+    Select all compound children whose label is none of <scm-arg|label-1>
+    until <scm-arg|label-n>.
   </explain>
 
   <\explain>
@@ -95,24 +115,22 @@
       </unfolded-io>
     </session>
 
-    Example with creation of a custom predicate:
-
-    <\session|scheme|default>
-      <\unfolded-io|Scheme] >
-        (select '(foo "x" (bar)) '(:* (:match :tree-atomic?)))
-      <|unfolded-io>
-        ()
-      </unfolded-io>
-
-      <\input|Scheme] >
-        \;
-      </input>
-    </session>
-
-    List of useful predicates:
+    Any <scheme> predicate can be used in this way (see the description of
+    <scm|:<scm-arg|pred?>> in the section on <hlink|matching regular
+    expressions|utils-match.en.tm>). Notice that the predicate is applied to
+    the subexpression as it is: for instance, <scm|:tree-atomic?> does not
+    hold for the <scheme> string <scm|"x">, so that <scm|(select '(foo "x"
+    (bar)) '(:* (:match :tree-atomic?)))> returns <scm|()>.
   </explain>
 
-  \;
+  <\explain>
+    <scm|'<scm-arg|var>><explain-synopsis|variables>
+  <|explain>
+    Select the input tree itself, while binding it to the variable
+    <scm-arg|var>. As in the case of <scm|match?>, the same variable may
+    occur several times in a pattern, in which case the corresponding
+    subexpressions must coincide.
+  </explain>
 
   <\explain>
     <scm|(:or <scm-arg|pattern-1> ... <scm-arg|pattern-n>)>
@@ -122,6 +140,22 @@
   <|explain>
     These rules allow for the selection of all subtrees which satisfy one
     among or all patterns <scm-arg|pattern-1> until <scm-arg|pattern-n>.
+  </explain>
+
+  <\explain>
+    <scm|(:and-not <scm-arg|pattern> <scm-arg|pattern-1> ...
+    <scm-arg|pattern-n>)><explain-synopsis|difference>
+  <|explain>
+    Select all subtrees which are selected by <scm-arg|pattern>, but by none
+    of the patterns <scm-arg|pattern-1> until <scm-arg|pattern-n>.
+  </explain>
+
+  <\explain>
+    <scm|(:group <scm-arg|pattern-1> ... <scm-arg|pattern-n>)><explain-synopsis|grouping>
+  <|explain>
+    Group the path pattern <scm|(<scm-arg|pattern-1> ...
+    <scm-arg|pattern-n>)> into a single atomic pattern, which is useful
+    inside <scm|:or> and <scm|:and>.
   </explain>
 
   In the case when the input tree is active, the function <scm|select>
@@ -154,6 +188,10 @@
     If the input tree is the <math|i>-th child of its parent, then this
     pattern will select the <math|<around|(|i-1|)>>-th child.
   </explain>
+
+  The patterns <scm|:first> and <scm|:last> also work for active trees, in
+  which case they select the first <abbr|resp.> last child of the input
+  tree, and the pattern <scm|:same> selects the input tree itself.
 
   <tmdoc-copyright|2007|Joris van der Hoeven>
 

@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.16>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Manipulating <TeXmacs> windows>
@@ -8,14 +8,15 @@
   <\explain>
     <scm|(window-list)><explain-synopsis|list of all <TeXmacs> windows>
   <|explain>
-    Return the list of all <TeXmacs> windows.
+    Return the list of all <TeXmacs> windows. The number of windows is
+    returned by <scm|(windows-number)>.
   </explain>
 
   <\explain>
     <scm|(current-window)><explain-synopsis|current window>
   <|explain>
-    Return the current window. The program may abort if there exists no
-    current window.
+    Return the window in which the current view is displayed. If the current
+    view is not displayed in a window, then an empty <abbr|URL> is returned.
   </explain>
 
   <\explain>
@@ -23,7 +24,9 @@
     displayed in window>
   <|explain>
     This routine returns the buffer which is currently being displayed in the
-    window <scm-arg|win>. Warning: in the future, when a window will be
+    window <scm-arg|win>, or <scm|#f>. The glued variant
+    <scm|window-to-buffer> returns <scm|(url-none)> instead of <scm|#f>.
+    Warning: in the future, when a window will be
     allowed to contain multiple buffers, this routine might be replaced by
     <scm|window-\<gtr\>buffers>.
   </explain>
@@ -33,8 +36,8 @@
     in window>
   <|explain>
     This routine returns the view which is currently being displayed in the
-    window <scm-arg|win>. Warning: in the future, when a window will be
-    allowed to contain multiple views, this routine might be replaced by
+    window <scm-arg|win>, or <scm|(url-none)>. Warning: in the future, when a
+    window will be allowed to contain multiple views, this routine might be replaced by
     <scm|window-\<gtr\>views>.
   </explain>
 
@@ -42,15 +45,20 @@
     <scm|(window-set-buffer <scm-arg|win>
     <scm-arg|buf>)><explain-synopsis|show buffer in window>
   <|explain>
-    Display the buffer <scm-arg|buf> in the window <scm-arg|win>.
+    Display the buffer <scm-arg|buf> in the window <scm-arg|win>, using a
+    view on <scm-arg|buf> which is not yet displayed in another window (a new
+    view is created if necessary).
   </explain>
 
   <\explain>
-    <scm|(window-set-view <scm-arg|win> <scm-arg|vw>)><explain-synopsis|show
-    view in window>
+    <scm|(window-set-view <scm-arg|win> <scm-arg|vw>
+    <scm-arg|focus?>)><explain-synopsis|show view in window>
   <|explain>
-    Display the view <scm-arg|vw> in the window <scm-arg|win>. The program
-    may abort if the view was already attached to another window.
+    Display the view <scm-arg|vw> in the window <scm-arg|win>. If
+    <scm-arg|focus?> is <scm|#t>, or if the view previously displayed in
+    <scm-arg|win> was the current view, then <scm-arg|vw> becomes the
+    current view. The program aborts if the view was already attached to
+    another window.
   </explain>
 
   <\explain>
@@ -64,15 +72,24 @@
   </explain>
 
   <\explain>
-    <scm|(open-window)><explain-synopsis|create new window>
+    <scm|(switch-to-window <scm-arg|win>)><explain-synopsis|switch to another
+    window>
   <|explain>
-    Create a new window with an empty buffer and return the <abbr|URL> of the
-    window.
+    Map the window <scm-arg|win> and give it the keyboard focus.
   </explain>
 
   <\explain>
-    <scm|(open-buffer-in-window <scm-arg|buf> <scm-arg|cnt> <scm-arg|attrs>)>
-    <explain-synopsis|No synopsis available>
+    <scm|(open-window)><explain-synopsis|create new window>
+  <|explain>
+    Create a new window with an empty buffer and return the <abbr|URL> of the
+    window. The variant <scm|(open-window-geometry <scm-arg|geom>)> in
+    addition specifies the geometry of the new window, and
+    <scm|(clone-window)> opens a new window on the current buffer.
+  </explain>
+
+  <\explain>
+    <scm|(open-buffer-in-window <scm-arg|buf> <scm-arg|cnt>
+    <scm-arg|attrs>)><explain-synopsis|open buffer in new window>
   <|explain>
     Create a new window and set its main buffer to that identified by the
     <abbr|URL> <scm-arg|buf>. If <scm-arg|buf> is not yet a valid buffer, it
@@ -80,8 +97,21 @@
     parameter is ignored. The window is created with its attributes set to
     <scm-arg|attrs> (currently only the geometry is taken into account, but
     this might be extended in the future, see the <c++> function <cpp|url
-    new_window (bool map_flag= true, tree geom= "")>)
+    new_window (bool map_flag= true, tree geom= "")> in
+    <verbatim|Texmacs/Data/new_window.cpp>). The <abbr|URL> of the new window
+    is returned.
   </explain>
+
+  <\explain>
+    <scm|(kill-window <scm-arg|win>)><explain-synopsis|close a window>
+  <|explain>
+    Close the window <scm-arg|win>, without closing the buffer which it
+    displays. If this was the last window, then <TeXmacs> quits (unless it
+    is running as a server).
+  </explain>
+
+  See <hlink|windows|../../source/server-windows.en.tm> for the corresponding <c++> data
+  structures.
 
   <tmdoc-copyright|2012|Joris van der Hoeven>
 
@@ -92,3 +122,6 @@
   Texts. A copy of the license is included in the section entitled "GNU Free
   Documentation License".>
 </body>
+
+<initial|<\collection>
+</collection>>

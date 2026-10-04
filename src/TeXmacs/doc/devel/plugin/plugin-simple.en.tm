@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.18>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Example of a plug-in with <scheme> code>
@@ -29,7 +29,9 @@
 
   to <verbatim|$TEXMACS_PATH/plugins> or <verbatim|$TEXMACS_HOME_PATH/plugins>.
   When relaunching <TeXmacs>, the plug-in should now be automatically
-  recognized (a <menu|World> menu should appear in the menu bar).
+  recognized: shortly after startup, the message <verbatim|Using world
+  plug-in!> is printed in the terminal from which <TeXmacs> was
+  launched.
 
   <paragraph*|How it works>
 
@@ -59,9 +61,39 @@
   In general, this kind of initialization code should be very short and
   rather load a module which takes care of the real initialization. Indeed,
   keeping the <verbatim|init-<em|myplugin>.scm> files simple will reduce the
-  startup time of<nbsp><TeXmacs>.
+  startup time of<nbsp><TeXmacs>. Notice also that initialization files are
+  loaded <em|lazily>: <TeXmacs> only loads them once it has been idle for
+  about one second, or as soon as it needs information about all
+  plug-ins (for instance when opening the <menu|Insert|Session> menu).
+
+  A plug-in with more <scheme> code usually puts it into separate modules
+  in its <verbatim|progs> directory, which is automatically added to the
+  load path. For instance, a module <verbatim|progs/world-menus.scm>
+  starting with <scm|(texmacs-module (world-menus))> can be loaded from
+  the initialization file using <scm|(import-from (world-menus))>, or
+  lazily using <scm|lazy-menu>, <scm|lazy-keyboard> or <scm|lazy-define>.
+  In order to add a menu to the main menu bar, such a module may extend
+  the menu <scm|plugin-menu>, as in
+
+  <\scm-code>
+    (menu-bind plugin-menu
+
+    \ \ (:require (in-world?))
+
+    \ \ (=\<gtr\> "World" ("Hello" (insert "Hello world"))))
+  </scm-code>
+
+  where <scm|in-world?> is the predicate which is automatically defined by
+  <scm|plugin-configure> (see the <hlink|summary of configuration
+  options|plugin-config.en.tm>). Since the <verbatim|world> plug-in does
+  not provide sessions, this predicate would only hold inside documents
+  whose programming language has been set to <verbatim|world>; a menu
+  which should always be present may use <scm|(:require
+  (supports-world?))> instead.
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
@@ -71,8 +103,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

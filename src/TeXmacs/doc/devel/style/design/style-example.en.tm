@@ -12,23 +12,16 @@
 
   <verbatim| \ \ \ $HOME/.TeXmacs/packages>
 
-  Notice that the button <menu|Texts> in the file browser corresponds to the
-  directory
-
-  <verbatim| \ \ \ $HOME/.TeXmacs/texts>
-
-  Consequently, you can go to the style package directory from there, by
-  double clicking on <verbatim|..> and next on <verbatim|packages>.
   Similarly, the directory
 
   <verbatim| \ \ \ $HOME/.TeXmacs/styles>
 
   contains your personal style files. After saving your empty style package,
-  it should automatically appear in the <menu|Document|Package> menu. Notice
-  that style files must be saved using the <verbatim|.ts> file extension. If
-  you save the style file in a subdirectory of
+  it should automatically appear in the <menu|Document|Style|Add package>
+  menu. Notice that style files must be saved using the <verbatim|.ts> file
+  extension. If you save the style file in a subdirectory of
   <verbatim|$HOME/.TeXmacs/packages>, then it will automatically appear in
-  the corresponding submenu of <menu|Document|Package>.
+  the corresponding submenu of <menu|Document|Style|Add package>.
 
   Let us now create a simple macro <markup|hi> which displays ``Hello
   world''. First type <shortcut|(make 'assign)>, so as to create an assignment. You should
@@ -53,7 +46,7 @@
   </tm-fragment>
 
   After saving your style package, opening a new document and selecting your
-  package in the <menu|Document|Use package> menu, you may now use the macro
+  package in the <menu|Document|Style|Add package> menu, you may now use the macro
   <markup|hi> in your document by typing <key|\\ h i> and hitting
   <shortcut|(kbd-return)>.
 

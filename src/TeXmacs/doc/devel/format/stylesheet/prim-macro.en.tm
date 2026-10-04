@@ -65,9 +65,10 @@
     When more than one argument is specified,
     <explain-macro|arg|var|index-1|<math|\<cdots\>>|index-n> expands to a
     subtree of the argument <src-arg|var>. The value of the named argument
-    must be a compound tree (not a string). The operands <src-arg|var> until
-    <src-arg|index-n> must all evaluate to positive integers and give the
-    path to the subtree of the macro argument.
+    must be a compound tree (not a string). The operands <src-arg|index-1>
+    until <src-arg|index-n> are evaluated; they must yield non-negative
+    integers (counting from zero) and give the path to the subtree of the
+    macro argument. The name <src-arg|var> itself is not evaluated.
   </explain>
 
   <\explain>
@@ -95,7 +96,11 @@
     <src-arg|foo> to the children of the macro argument with name
     <src-arg|var>.
 
-    By default, the macro <src-arg|foo> is applied to all children. If
+    The arguments <src-arg|foo>, <src-arg|root> and <src-arg|var> are
+    literal strings. By default, the macro <src-arg|foo> is applied to all
+    children. As a special case, when <src-arg|foo> is
+    <verbatim|identity>, the children are copied without applying any
+    macro. If
     <src-arg|first> has been specified, then we rather start at the
     <math|i>-th child of <src-arg|var>, where <math|i> is the result of
     evaluating <src-arg|first>. If <src-arg|last> has been specified too,
@@ -108,7 +113,7 @@
     of the macro argument <src-arg|var> (or a range of subtrees if
     <src-arg|first> and <src-arg|last> are specified) and collects the result
     in a tree with label <src-arg|root>. In addition, the second argument to
-    <src-arg|foo> gives its position of the first argument in the expansion
+    <src-arg|foo> gives the position of the first argument in the expansion
     of <src-arg|var>.
 
     The <markup|map-args> is analogue to the <scheme> function
@@ -131,12 +136,13 @@
   </explain>
 
   <\explain>
-    <explain-macro|eval-args|var><explain-synopsis|macro with a variable
-    arity>
+    <explain-macro|eval-args|var><explain-synopsis|evaluate the arguments
+    of a compound argument>
   <|explain>
     This primitive evaluates to the tree with the same label as the expansion
     of the argument <src-arg|var> and whose subtrees are the result of the
-    evaluation of the subtrees of the expansion of <src-arg|var>.
+    evaluation of the subtrees of the expansion of <src-arg|var>. The value
+    of the macro argument <src-arg|var> must be a compound tree.
   </explain>
 
   <\explain>
@@ -184,21 +190,60 @@
     The arity and children accessibility of tags defined by macros are
     determined heuristically by default. The <markup|drd-props> primitive
     overrides this default for the environment variable (usually a macro)
-    with name <src-arg|var>. The currently supported property-value pairs
-    are:
+    with name <src-arg|var>. Its arguments are not evaluated. The main
+    supported property-value pairs are:
 
     <\description-dash>
       <item*|(arity, <math|n>)>Sets the arity to the given fixed value
-      <math|n> (literal integer).
+      <math|n> (literal integer). Variable arities may be specified with
+      the values <explain-macro|tuple|repeat|a|b>,
+      <explain-macro|tuple|repeat*|a|b> and
+      <explain-macro|tuple|options|a|b>.
 
-      <item*|(accessible, all)>Make it impossible to deactivate the tag with
-      normal editor actions. Inaccessible children become effectively
-      uneditable.
+      <item*|(accessible, <math|i>)>, (hidden, <math|i>), (unaccessible,
+      <math|i>)Make the <math|i>-th child always accessible, hidden (it may
+      require unfolding in order to be accessed) or inaccessible (only
+      accessible in source mode). The value may also be <verbatim|all>, for
+      all children, or <verbatim|none>, which makes all children
+      inaccessible.
 
-      <item*|(accessible, none)>Make it impossible to position the caret
-      within the tag when it is active, so children can only be edited when
-      the tag is inactive.
+      <item*|(border, <math|v>)>Specifies whether the cursor may be
+      positioned at the outer and inner borders of the tag (<math|v> is one
+      of <verbatim|yes>, <verbatim|inner>, <verbatim|outer> or
+      <verbatim|no>).
+
+      <item*|(name, <math|s>)>Sets the name under which the tag is
+      presented to the user.
+
+      <item*|(syntax, <math|t>)>Sets the syntax used when parsing
+      mathematical formulas which contain the tag.
+
+      <item*|(with-like, <math|v>)>Declares the tag to behave like
+      <markup|with> (<verbatim|yes> or <verbatim|no>).
+
+      <item*|(locals, <math|t>)>Sets local environment variables for all
+      children.
+
+      <item*|(normal-writability, <math|i>)>, (disable-writability,
+      <math|i>), (enable-writability, <math|i>)Control whether the
+      <math|i>-th child (or <verbatim|all> children) can be edited.
+
+      <item*|(returns, <math|type>)>, (parameter, <math|type>),
+      (macro-parameter, <math|type>)Declare the type of the value returned
+      by the tag, or declare the variable to be a style parameter of a
+      given type.
+
+      <item*|(<math|type>, <math|i>)>Declare the type of the <math|i>-th
+      child (or of <verbatim|all> children), where <math|type> is one of the
+      <abbr|D.R.D.> types, such as <verbatim|regular>, <verbatim|boolean>,
+      <verbatim|integer>, <verbatim|length>, <verbatim|color> or
+      <verbatim|url>.
     </description-dash>
+
+    The complete list can be found in <cpp|edit_env_rep::exec_drd_props>
+    (<verbatim|Typeset/Env/env_exec.cpp>). See also the section on
+    <hlink|<markup|drd-props>|../../source/macro-expansion-drd.en.tm> in the
+    chapter on the data relation descriptor.
   </explain>
 
   <\explain>

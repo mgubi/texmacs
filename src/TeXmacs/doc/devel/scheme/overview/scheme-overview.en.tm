@@ -29,7 +29,7 @@
 
   <\itemize-minus>
     <item><hlink|The <scheme> programming
-    language|http://www.scheme.com/tspl2d/index.html>.
+    language|https://www.scheme.com/tspl4/>.
 
     <item><hlink|Guile reference manual|https://www.gnu.org/software/guile/manual/>.
   </itemize-minus>

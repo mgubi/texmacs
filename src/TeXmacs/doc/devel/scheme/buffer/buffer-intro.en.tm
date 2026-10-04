@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.15>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Introduction>
@@ -13,21 +13,30 @@
     to files on disk or elsewhere on the web. Some buffers are of a<nbsp>more
     auxiliary nature, such as automatically generated help buffers. All
     buffers admit a unique URL. In the case of auxiliary buffers, this URL is
-    really a read-only ``placeholder'', so saving this kind of buffers is
+    really a read-only \Pplaceholder\Q, so saving this kind of buffers is
     impossible (of course, it remains possible to save the buffer under a new
     name).
 
     <item*|Views>It is possible to have multiple views on the same buffer.
     Every view is identified by a<nbsp>unique automatically generated URL,
-    which again acts as a placeholder.
+    which again acts as a placeholder. View URLs have the form
+    <verbatim|tmfs://view/<em|n>/<em|buffer>>, where <em|n> is a number and
+    <em|buffer> an encoding of the URL of the underlying buffer.
 
     <item*|Windows>Views (contrary to the buffers themselves) can be
     displayed in actual windows. Currently, any <TeXmacs> window contains a
     unique view and a view may only be displayed in one window at the same
     time (of course, it is possible to display different views on the same
     buffer in different windows). Windows are again represented by
-    automatically generated<nbsp>URLS.
+    automatically generated<nbsp>URLs of the form
+    <verbatim|tmfs://window/<em|n>>.
   </description>
+
+  At any moment, there is at most one <em|current view>; the current buffer
+  and the current window are the buffer of the current view and the window
+  in which it is displayed. Most editing routines act on the current view.
+  The <c++> implementation of these objects is described in <hlink|the
+  server: buffers, views and windows|../../source/server.en.tm>.
 
   <\remark>
     In the future, views and windows should really be considered as documents
@@ -48,3 +57,6 @@
   Texts. A copy of the license is included in the section entitled "GNU Free
   Documentation License".>
 </body>
+
+<initial|<\collection>
+</collection>>

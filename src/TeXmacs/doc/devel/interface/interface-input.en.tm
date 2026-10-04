@@ -1,6 +1,6 @@
-<TeXmacs|1.0.7.18>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Mathematical and customized input>
@@ -19,15 +19,22 @@
   </scm-code>
 
   specifies a scheme function for converting <TeXmacs> trees to string input
-  for your application, thereby overriding the default method. This method
-  allows you for instance to treat multi-line input in a particular way or
-  the perform transformations on the <TeXmacs> tree.
+  for your application, thereby overriding the default method. The routine
+  is called as <scm|(<em|routine> <em|plugin-name> <em|tree>)>, where
+  <em|tree> is the input in <scheme> form, and should return the string to
+  be sent, including the final newline. This method allows you for
+  instance to treat multi-line input in a particular way or to perform
+  transformations on the <TeXmacs> tree. The default serializer is
+  <scm|verbatim-serialize> (in <verbatim|utils/plugins/plugin-cmd.scm>);
+  custom serializers usually start by calling <scm|(pre-serialize
+  <em|plugin-name> <em|tree>)>, which converts mathematical content using
+  the rules described below.
 
-  The <scm|:serialize> option is a very powerful, but also a very abstract
+  The <scm|:serializer> option is a very powerful, but also a very abstract
   way to customize input: it forces you to write a complete input
   transformation function. In many circumstances, the user really wants to
   rewrite two dimensional mathematical input to a more standard form, like
-  rewriting <no-break><math|<frac|a|b>> to <verbatim|((a)/(b))>. Therefore, a
+  rewriting <no-break><math|<frac|a|b>> to <verbatim|(a/b)>. Therefore, a
   second way for customizing the input is to use the command
 
   <\scm-code>
@@ -37,7 +44,7 @@
   </scm-code>
 
   This command specifies input conversion rules for <verbatim|<em|myplugin>>
-  for ``mathematical input'' and reasonable defaults are provided by
+  for \Pmathematical input\Q and reasonable defaults are provided by
   <TeXmacs>. Each rule is of one of the following two forms:
 
   <\description>
@@ -98,14 +105,14 @@
 
     \;
 
-    (when (supports-initialize?)
+    (when (supports-input?)
 
     \ \ (lazy-input-converter (input-input) input))
   </scm-code>
 
-  The predicate <verbatim|supports-initialize?> tests whether the plug-in is
+  The predicate <scm|supports-input?> tests whether the plug-in is
   indeed operational (that is, whether <verbatim|input.bin> exists in the
-  path). The conversion rules in the module <verbatim|(input input)> are
+  path). The conversion rules in the module <verbatim|(input-input)> are
   added in a lazy manner. In other words, the file <verbatim|input-input.scm>
   will only be loaded when we explicitly request to make a conversion. The
   conversion rules in <verbatim|input-input.scm> are given by
@@ -161,7 +168,7 @@
   </scm-code>
 
   As to the <c++> code in <verbatim|input.cpp>, the startup banner
-  automatically puts the shell session in mathematical input mode:
+  attempts to put the shell session in mathematical input mode:
 
   <\cpp-code>
     cout \<less\>\<less\> DATA_BEGIN \<less\>\<less\> "verbatim:";
@@ -178,7 +185,16 @@
     cout.flush ();
   </cpp-code>
 
-  In the main loop, we content ourselves the reproduce the input as output:
+  However, the command <scm|session-use-math-input> no longer exists in
+  the current version of <TeXmacs>, so this command fails. Mathematical
+  input is now switched on by the user, using the entry
+  <menu|Mathematical input> of the input options of the session (this
+  entry is only available for plug-ins which declared input converters, and
+  calls <scm|toggle-session-math-input>). The default for new sessions of a
+  plug-in <verbatim|<em|myplugin>> is taken from the boolean preference
+  <verbatim|<em|myplugin>-math-input>.
+
+  In the main loop, we content ourselves to reproduce the input as output:
 
   <\cpp-code>
     char buffer[100];
@@ -196,6 +212,8 @@
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
   or any later version published by the Free Software Foundation; with no
@@ -204,8 +222,5 @@
   Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|language|english>
-  </collection>
-</initial>
+<initial|<\collection>
+</collection>>

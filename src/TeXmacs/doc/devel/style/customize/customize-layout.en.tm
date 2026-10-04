@@ -24,12 +24,18 @@
     </inactive*>
   </tm-fragment>
 
+  By default, the margins <src-var|page-odd>, <src-var|page-even>,
+  <src-var|page-right>, <src-var|page-top> and <src-var|page-bot> are set to
+  <verbatim|auto>, in which case they are computed automatically from the
+  paper size.
+
   It should be noticed that the environment variables for page layout are
   quite different in <TeXmacs> and <TeX>/<LaTeX>. In order to make it easier
   to adapt <LaTeX> style files to <TeXmacs>, we have therefore provided the
-  <tmpackage|std-latex> package, which emulates the environment variables
-  from <TeX>/<LaTeX>. Typically, this allows you determine the global layout
-  by lines like
+  <tmpackage|std-latex> package (which is not loaded by default, so that you
+  need to include it explicitly using <markup|use-package>), which emulates
+  the environment variables from <TeX>/<LaTeX>. Typically, this allows you
+  to determine the global layout by lines like
 
   <\tm-fragment>
     <\inactive*>

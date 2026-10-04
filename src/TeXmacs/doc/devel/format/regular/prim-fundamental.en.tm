@@ -39,14 +39,20 @@
     least one argument are called ``block environments''.
   </explain>
 
-  <\explain|<explain-macro|paragraph|unit-1|<math|\<cdots\>>|unit-n><explain-synopsis|vertical
+  <\explain|<explain-macro|para|unit-1|<math|\<cdots\>>|unit-n><explain-synopsis|vertical
   sequence of paragraph units>>
-    This not yet implemented primitive is a variant of <markup|document>.
-    While a document is made up of logical paragraphs, a paragraph is made up
-    of ``paragraph units''. From a visual point of view, different paragraphs
-    are singled out using some additional space or indentation. New paragraph
-    units rather correspond to simple new lines. Typically, displayed
-    equations are also paragraph units in a larger paragraph.
+    This primitive (whose tag name is <markup|para>; it is displayed as
+    ``paragraph'' in the editor) is a variant of <markup|document>. While a
+    document is made up of logical paragraphs, a paragraph is made up of
+    ``paragraph units''. From a visual point of view, different paragraphs
+    are singled out using some additional space or indentation. New
+    paragraph units rather correspond to simple new lines. Typically,
+    displayed equations are also paragraph units in a larger paragraph.
+
+    This primitive is not yet fully implemented: the current typesetter
+    (<verbatim|concater_rep::typeset_paragraph> in
+    <verbatim|Typeset/Concat/concat_text.cpp>) only formats the first unit
+    <src-arg|unit-1> as a paragraph and ignores the others.
   </explain>
 
   <\explain|<explain-macro|concat|item-1|<math|\<cdots\>>|item-n><explain-synopsis|horizontal
@@ -79,7 +85,7 @@
 
     <\tm-fragment>
       <with|src-special|raw|<\inactive*>
-        A simple document.
+        Multiple paragraphs.
 
         Some <em|emphasized> text.
       </inactive*>>

@@ -16,7 +16,10 @@
   The global typesetting process can be subdivided into two major parts
   (which are currently done at the same stage, but this may change in the
   future): evaluation of the <TeXmacs> tree using the stylesheet language,
-  and the actual typesetting.
+  and the actual typesetting. The implementation of these two stages is
+  described in more detail in the chapters on <hlink|macro
+  expansion|../../source/macro-expansion.en.tm> and on the
+  <hlink|typesetter|../../source/typesetter.en.tm>.
 
   The <hlink|typesetting primitives|../regular/regular.en.tm> are designed to
   be very fast and they are built-in into the editor. For instance, one has
@@ -61,7 +64,7 @@
   preserved, the more natural it becomes for the user to edit the markup.
 
   It should be noticed that <TeXmacs> also produces some auxiliary data as a
-  byproduct of the typesetting product. For instance, the correct values of
+  byproduct of the typesetting process. For instance, the correct values of
   references and page numbers, as well as tables of contents, indexes,
   <abbr|etc.> are determined during the typesetting stage and memorized at a
   special place. Even though auxiliary data may be determined automatically

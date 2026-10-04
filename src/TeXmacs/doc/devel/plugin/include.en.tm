@@ -1,107 +1,82 @@
-<TeXmacs|1.0.1.11>
+<TeXmacs|2.1.4>
 
-<style|tmdoc>
+<style|<tuple|tmdoc|english>>
 
 <\body>
-  <expand|tmdoc-title|Supporting your system inside <apply|TeXmacs>>
+  <tmdoc-title|Supporting your system inside <TeXmacs>>
 
-  Assume that you have successfully written a first interface with
-  <apply|TeXmacs> as explained in the previous section. Then it is time now
-  to include support for your system in the standard <apply|TeXmacs>
-  distribution, after which further improvements can be made.
+  Assume that you have successfully written a first interface with <TeXmacs>
+  as explained in the previous section. Then it is time now to include
+  support for your system in the standard <TeXmacs> distribution, after
+  which further improvements can be made.
 
-  From version 1.0.1.5 on, it has become quite easy to adapt your interface
-  in such a way that it can be directly integrated into <TeXmacs>. The idea
-  is to create a directory:
+  It is quite easy to adapt your interface in such a way that it can be
+  directly integrated into <TeXmacs>. The idea is to create a directory
 
-  <\verbatim>
-    \ \ \ \ $TEXMACS_HOME_PATH/plugins/myplugin
-  </verbatim>
+  <\verbatim-code>
+    $TEXMACS_HOME_PATH/plugins/myplugin
+  </verbatim-code>
 
-  where <verbatim|myplugin> is the name of your plugin. Here we recall that
-  <verbatim|$TEXMACS_HOME_PATH> is bound to <verbatim|~/.TeXmacs>, by
-  default. In the directory <verbatim|$TEXMACS_PATH/plugins> you can find all
-  standard plugins, which are shipped with your <TeXmacs> distribution. These
-  provide good examples which you may imitate.
+  where <verbatim|myplugin> is the name of your plug-in. Here we recall
+  that <verbatim|$TEXMACS_HOME_PATH> is bound to <verbatim|~/.TeXmacs>, by
+  default. In the directory <verbatim|$TEXMACS_PATH/plugins> you can find
+  all standard plug-ins, which are shipped with your <TeXmacs> distribution
+  (in the source code of <TeXmacs>, they can be found in
+  <verbatim|src/plugins>). These provide good examples which you may
+  imitate.
 
   The above <verbatim|myplugin> directory should contain a similar
-  subdirectory structure as <verbatim|$TEXMACS_PATH> itself, but you may omit
-  directories which you do not actually use. In any case, you need to provide
-  a file <verbatim|progs/init-myplugin.scm> which describes how to initialize
-  your plugin. Usually, this file contains just one <name|Scheme> instruction
-  of the following form:
+  subdirectory structure as <verbatim|$TEXMACS_PATH> itself, but you may
+  omit directories which you do not actually use. In any case, you need to
+  provide a file <verbatim|progs/init-myplugin.scm> which describes how to
+  initialize your plug-in. Usually, this file contains a <scheme>
+  instruction of the following form:
 
-  <\verbatim>
-    \ \ \ \ (plugin-configure myplugin<format|next line> \ \ \ \ \ (:require
-    (file-in-path "myplugin"))<format|next line> \ \ \ \ \ (:launch
-    "shell-cmd")<format|next line> \ \ \ \ \ (:format "input-format"
-    "output-format")<format|next line> \ \ \ \ \ (:session "Myplugin"))
-  </verbatim>
+  <\scm-code>
+    (plugin-configure myplugin
 
-  The first instruction is a predicate which checks whether your plugin can
-  be used on a particular system. Usually, it tests whether a certain program
-  is available in the path. The remainder of the instructions is only
-  executed if the requirement is fulfilled. The <verbatim|:launch>
-  instruction specifies that your plugin should be launched using
-  <verbatim|shell-cmd>. The command <verbatim|shell-cmd> is usually of the
-  form <verbatim|myplugin --texmacs>. The <verbatim|:format> instruction
-  specifies which formats are used for the input and output. Usually, the
-  <verbatim|input-format> is <verbatim|verbatim> and the
-  <verbatim|output-format> is <verbatim|generic>. Other available formats are
-  <verbatim|scheme>, <verbatim|latex>, <verbatim|html> and <verbatim|ps>. The
-  <verbatim|:session> instruction makes shell sessions available for your
-  plugin from the menu <apply|menu|Insert|Session|Myplugin>.
+    \ \ (:require (url-exists-in-path? "myplugin"))
+
+    \ \ (:launch "myplugin --texmacs")
+
+    \ \ (:session "Myplugin"))
+  </scm-code>
+
+  The first instruction is a predicate which checks whether your plug-in
+  can be used on a particular system. Usually, it tests whether a certain
+  program is available in the path. The remainder of the instructions is
+  only executed if the requirement is fulfilled. The <scm|:launch>
+  instruction specifies that your plug-in should be launched using the
+  given shell command, which is usually of the form <verbatim|myplugin
+  --texmacs>. The <scm|:session> instruction makes shell sessions available
+  for your plug-in from the menu <menu|Insert|Session|Myplugin>.
+
+  By default, the input is sent to your program as a single line of plain
+  text, and the output of your program is interpreted according to the
+  formats specified in its <verbatim|DATA_BEGIN>-<verbatim|DATA_END> blocks
+  (<verbatim|verbatim>, <verbatim|latex>, <verbatim|scheme>,
+  <verbatim|html>, <verbatim|ps> and others). The input format can be
+  customized using the <scm|:serializer> option and the mathematical input
+  converters; notice that an option <verbatim|:format> for specifying the
+  input and output formats, which existed in early versions of <TeXmacs>,
+  is no longer supported. The complete list of options is given in the
+  <hlink|summary of configuration options|plugin-config.en.tm>.
 
   If everything works well, and you wish to make it possible for others to
-  use your system inside the official <apply|TeXmacs> distribution, then
-  contact me at <verbatim|vdhoeven@texmacs.org>.
+  use your system inside the official <TeXmacs> distribution, then contact
+  the <TeXmacs> developers.
 
-  <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>
+  <tmdoc-copyright|1998--2002|Joris van der Hoeven>
 
-  <expand|tmdoc-license|Permission is granted to copy, distribute and/or
-  modify this document under the terms of the GNU Free Documentation License,
-  Version 1.1 or any later version published by the Free Software Foundation;
-  with no Invariant Sections, with no Front-Cover Texts, and with no
-  Back-Cover Texts. A copy of the license is included in the section entitled
-  "GNU Free Documentation License".>
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
 </body>
 
-<\initial>
-  <\collection>
-    <associate|paragraph width|150mm>
-    <associate|odd page margin|30mm>
-    <associate|shrinking factor|4>
-    <associate|page right margin|30mm>
-    <associate|page top margin|30mm>
-    <associate|reduction page right margin|25mm>
-    <associate|page type|a4>
-    <associate|reduction page bottom margin|15mm>
-    <associate|even page margin|30mm>
-    <associate|reduction page left margin|25mm>
-    <associate|page bottom margin|30mm>
-    <associate|reduction page top margin|15mm>
-    <associate|language|english>
-  </collection>
-</initial>
-
-<\references>
-  <\collection>
-    <associate|idx-5|<tuple|<uninit>|?>>
-    <associate|toc-1|<tuple|<uninit>|?>>
-    <associate|idx-1|<tuple|<uninit>|?>>
-    <associate|toc-2|<tuple|<uninit>|?>>
-    <associate|idx-2|<tuple|<uninit>|?>>
-    <associate|idx-3|<tuple|<uninit>|?>>
-    <associate|idx-4|<tuple|<uninit>|?>>
-  </collection>
-</references>
-
-<\auxiliary>
-  <\collection>
-    <\associate|idx>
-      <tuple|<tuple|<with|font family|<quote|ss>|Insert>|<with|font
-      family|<quote|ss>|Session>|<with|font
-      family|<quote|ss>|Myplugin>>|<pageref|idx-1>>
-    </associate>
-  </collection>
-</auxiliary>
+<initial|<\collection>
+</collection>>

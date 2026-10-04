@@ -14,7 +14,7 @@
   style file or package.
 
   First of all, for certain pieces of content the user may prefer to see them
-  in their ``activated'' form instead as dead source code. This may for
+  in their ``activated'' form instead of as dead source code. This may for
   instance be the case for embedded images, or for mathematical symbols, like
   in
 
@@ -31,7 +31,7 @@
 
   A piece of code can be activated by selecting it and using
   <menu|Source|Activation|Activate> or <shortcut|(make-mod-active 'active*)>. Similarly, a piece of
-  content may be deactivated using <key|<group|M->-> (we used this in the
+  content may be deactivated using <shortcut|(make-mod-active 'inactive*)> (we used this in the
   second example above for the rendering of the arguments <src-arg|var> and
   <src-arg|dim>). Activation and deactivation either apply to the whole tree,
   or to the root only (<abbr|e.g.> <menu|Source|Activation|Activate once>).

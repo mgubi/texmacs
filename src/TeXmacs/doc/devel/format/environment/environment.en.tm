@@ -13,8 +13,11 @@
   are subdivided into two categories: built-in variables and additional
   variables provided by style files. Built-in variables usually affect the
   layout, while additional variables mostly serve computational purposes. In
-  the next sections of this chapter, we will describe all built-in
-  environment variables.
+  the next sections of this chapter, we will describe the built-in
+  environment variables. Their names are declared in
+  <verbatim|Data/Drd/vars.cpp> and their built-in default values are set in
+  <verbatim|Typeset/Env/env_default.cpp> in the <c++> sources; style files
+  frequently override these defaults.
 
   A typical built-in environment variable is <src-var|color>. The value of an
   environment variable may be <hlink|changed|../stylesheet/prim-env.en.tm>
@@ -56,8 +59,8 @@
   of <src-var|item-nr> is restored on exit.
 
   Each document comes with an <hlink|initial
-  environment|../basics/tm-docs.en.tm#init-env> with the initial values of
-  environment values, <abbr|i.e.> their values just before we typeset the
+  environment|../basics/tm-docs.en.tm#initial-env> with the initial values of
+  environment variables, <abbr|i.e.> their values just before we typeset the
   document. If an environment variable does not occur in the initial
   environment, then its initial value defaults to its value after typesetting
   the document style and possible additional packages. The initial
@@ -80,6 +83,8 @@
     <branch|Page layout|env-page.en.tm>
 
     <branch|Table layout|env-table.en.tm>
+
+    <branch|Graphics|env-graphics.en.tm>
 
     <branch|Editing source trees|env-src.en.tm>
 

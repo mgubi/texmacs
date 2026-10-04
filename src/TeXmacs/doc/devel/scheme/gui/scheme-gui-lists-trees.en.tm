@@ -13,8 +13,10 @@
     <scm-arg|width>)><explain-synopsis|a combo box>
   <|explain>
     Builds a combo box which will execute <scm-arg|cmd> whenever the user
-    makes a choice. The <scm-arg|width> may be given in any <TeXmacs> length
-    unit.
+    makes a choice; the chosen string is available in <scm-arg|cmd> as the
+    variable <scm|answer>. The <scm-arg|width> may be given in any <TeXmacs>
+    length unit. If the last element of <scm-arg|items> is the empty string
+    <scm|"">, the user may also type in an arbitrary value.
 
     <\session|scheme|default>
       <\unfolded-io|Scheme] >
@@ -24,7 +26,7 @@
 
         \ \ \ \ \ \ \ \ '("gnu" "gnat" "zebra")
 
-        \ \ \ \ \ \ \ \ "zebra" "10em")))
+        \ \ \ \ \ \ \ \ "zebra" "10em"))
       <|unfolded-io>
         \;
       </unfolded-io>
@@ -103,13 +105,14 @@
     </session>
   </explain>
 
-  <paragraph|Displaying trees with <scm|tree-widget>>
+  <paragraph|Displaying trees with <scm|tree-view>>
 
   <\explain>
-    <scm|(tree-widget cmd <scm-arg|data> <scm-arg|data-roles>)><explain-synopsis|a
-    tree view>
+    <scm|(tree-view <scm-arg|cmd> <scm-arg|data>
+    <scm-arg|data-roles>)><explain-synopsis|a tree view>
   <|explain>
-    The <scm|tree-widget> provides a graphical representation of a <TeXmacs>
+    The <scm|tree-view> widget (currently only implemented for <name|Qt>)
+    provides a graphical representation of a <TeXmacs>
     tree <scm-arg|data> (not a <scheme> tree!). This may be part of a
     document or any other tree. The first node in <scm-arg|data> won't be
     displayed. All other nodes may have attributes called <em|data roles>
@@ -147,7 +150,7 @@
     </scm-code>
 
     Notice that the node <scm|root> won't be displayed by the
-    <scm|tree-widget> and needs no data roles. Here <scm|UserRole:1> is used
+    <scm|tree-view> and needs no data roles. Here <scm|UserRole:1> is used
     to store database ids but it can be anything else. The supported data
     roles are:
 
@@ -185,9 +188,10 @@
     wildcards must be given). The default <scm|CommandRole> is the subtree
     itself (see below).
 
-    <paragraph|Using commands>The first argument of <scm|tree-widget>,
-    <scm-arg|cmd>, \ is a <scheme> lambda that will be called when items are
-    clicked. The procedure must have the following signature:
+    <paragraph|Using commands>The first argument of <scm|tree-view>,
+    <scm-arg|cmd>, is a <scheme> procedure (not a piece of code as for the
+    other widgets) that will be called when items are clicked or selected.
+    The procedure must have the following signature:
 
     <\scm-code>
       (lambda (Event CommandRole . UserRoles) (...))
@@ -196,9 +200,11 @@
     where:
 
     <\itemize-dot>
-      <item><scm|Event> is an integer: either 1, 2 or 4 for a single, right
-      or middle click respectively. In the future, other events could be
-      supported (like double clicks, drag&drop, unfold, etc.)
+      <item><scm|Event> is an integer: either 1, 2 or 4 for a left, right
+      or middle click respectively (the <name|Qt> mouse button flags), or -1
+      when the selection is changed with the keyboard. In the future, other
+      events could be supported (like double clicks, drag&drop, unfold,
+      etc.)
 
       <item><scm|CommandRole> is either the value of that role if given for
       the data item, or the subtree itself otherwise.
@@ -215,18 +221,16 @@
 
     <paragraph|Examples>See <scm|widget10> in
     <hlink|<verbatim|menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>
-    and ``<hlink|Displaying lists and trees|$TEXMACS_PATH/doc/devel/scheme/gui/scheme-gui-lists-trees.en.tm>''.
+    and the examples below.
   </explain>
 
   <paragraph|An example using data roles>
 
   We build on the previous example, but now we add a command. Notice how the
   way one adds commands to <scm|tree-view> departs from that of other
-  widgets, where instead of a procedure one must provide a list with code
-  expecting one or two arguments with fixed names (usually <scm|answer> and
-  <scm|filter>). <with|font-shape|italic|Note to self>: this is easily
-  changed in <scm|$tree-view>, but it seems easier to manage empty arguments
-  this way.
+  widgets: instead of a piece of code using variables with fixed names
+  (usually <scm|answer> and <scm|filter>), one must provide a procedure,
+  which is applied to the arguments described above.
 
   <\session|scheme|default>
     <\input|Scheme] >
@@ -266,13 +270,13 @@
 
       \ \ (display* "clicked= " clicked ", cmd-role= " cmd-role
 
-      \ \ \ \ \ \ \ \ \ \ \ \ ", user-roles= " user-roles "\\n")))
+      \ \ \ \ \ \ \ \ \ \ \ \ ", user-roles= " user-roles "\\n"))
     </input>
 
     <\input|Scheme] >
       (tm-widget (widget-library)
 
-      \ \ (resize ("150px" "400px" "9000px") ("300px" "600px" "9000px")
+      \ \ (resize '("150px" "400px" "9000px") '("300px" "600px" "9000px")
 
       \ \ \ \ (vertical
 
@@ -293,7 +297,7 @@
 
   <subparagraph|An example using the buffer tree>
 
-  We can even use the <scm|buffer-tree> as argument to <scm|tree-widget>.
+  We can even use the <scm|buffer-tree> as argument to <scm|tree-view>.
   Changes in the buffer will show up immediately in the widget. In this
   example we use the default data role specification.
 
@@ -311,7 +315,7 @@
     <\input|Scheme] >
       (tm-widget (widget-buffer)
 
-      \ \ (resize ("150px" "400px" "9000px") ("300px" "600px" "9000px")
+      \ \ (resize '("150px" "400px" "9000px") '("300px" "600px" "9000px")
 
       \ \ \ \ (vertical
 
@@ -330,22 +334,28 @@
 
   <subparagraph|An example with the side tools>
 
-  If your <TeXmacs> has the side tools enabled, you can try this:
+  Side tools are defined with <scm|tm-tool> (see
+  <verbatim|progs/kernel/gui/menu-widget.scm>) and opened with
+  <scm|tool-select>. The following code shows the document tree in a panel
+  on the right hand side of the current window:
 
   <\session|scheme|default>
     <\input|Scheme] >
-      (tm-widget (texmacs-side-tools)
+      (tm-tool (document-tree-tool win)
 
-      \ \ (vertical
+      \ \ (:name "Document tree")
 
-      \ \ \ \ (hlist (glue #t #f 15 0) (text "Document tree:") (glue #t #f 15
-      0))
-
-      \ \ \ \ ---
+      \ \ (resize '("150px" "300px" "9000px") '("300px" "600px" "9000px")
 
       \ \ \ \ (tree-view noop (buffer-tree) (stree-\<gtr\>tree '(unused)))))
     </input>
+
+    <\input|Scheme] >
+      (tool-select :right 'document-tree-tool)
+    </input>
   </session>
+
+  The panel can be closed with the cross in its title bar.
 
   <tmdoc-copyright|2013|the <TeXmacs> team.>
 

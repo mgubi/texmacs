@@ -1,0 +1,186 @@
+<TeXmacs|2.1.4>
+
+<style|<tuple|tmdoc|english>>
+
+<\body>
+  <tmdoc-title|Programming languages and syntax highlighting>
+
+  <section|Introduction>
+
+  <TeXmacs> can display fragments of computer programs inside documents:
+  inline code such as <markup|cpp> or <markup|python>, blocks of code such
+  as <markup|cpp-code> or <markup|python-code>, the input fields of
+  interactive sessions, and whole source files (a <verbatim|.scm> or
+  <verbatim|.py> file opened in <TeXmacs>). In all these cases the text is
+  typeset in a special <em|programming mode> (the environment variable
+  <src-var|mode> equals <verbatim|prog>), and the programming language is
+  given by the environment variable <src-var|prog-language>. While a string
+  is typeset in programming mode, a <em|language object> chops it into
+  lexical tokens and assigns a color to each of them. This is what users
+  perceive as syntax highlighting.
+
+  This chapter describes how this works inside the C++ kernel and the
+  <scheme> layer. It covers:
+
+  <\itemize>
+    <item>the path from a code environment in a document to colored text
+    boxes, through the typesetting environment and the typesetter;
+
+    <item>the language registry, i.e. how the name stored in
+    <src-var|prog-language> is mapped to a C++ object of class
+    <cpp|language_rep>, and the various implementations of this class;
+
+    <item>the small library of hand-written <em|parsers> in
+    <verbatim|Data/Parser/>, the generic language class
+    <cpp|prog_language_rep> which is configured from <scheme>, and the
+    <scheme> definitions (<scm|parser-feature>) by which a language is
+    described;
+
+    <item>the alternative highlighting mechanism based on packrat grammars
+    and the <scm|define-language> macro;
+
+    <item>how colors are assigned, how they can be customized through
+    preferences and how they are adapted by themes such as the dark theme;
+
+    <item>editing support for code: keyboard modes, automatic brackets,
+    bracket highlighting, indentation, copy and paste;
+
+    <item>a complete walk-through for adding a new language, performance
+    considerations and known pitfalls.
+  </itemize>
+
+  All C++ file names below are relative to <verbatim|src/src/>, and all
+  <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>, unless
+  stated otherwise. The language definitions which live in plugins are found
+  in the source tree in <verbatim|src/plugins/> (for instance
+  <verbatim|src/plugins/code/progs/cpp-lang.scm>); they are installed into
+  <verbatim|$TEXMACS_PATH/plugins/> by the build. Style packages are relative
+  to <verbatim|src/TeXmacs/packages/>.
+
+  <section|Overview of the data flow>
+
+  The following chain of events turns a block of <name|Python> code in a
+  document into colored text.
+
+  <\enumerate>
+    <item>The document contains <markup|python-code> whose body is a
+    <markup|document>, one string per line. The macro <markup|python-code>
+    (<verbatim|environment/env-program.ts>) expands to <markup|python>, which
+    sets <src-var|mode> to <verbatim|prog> and <src-var|prog-language> to
+    <verbatim|python>.
+
+    <item>When the typesetter executes this <markup|with>, the environment
+    notices that a variable of type <cpp|Env_Mode> or <cpp|Env_Language> was
+    modified and calls <cpp|edit_env_rep::update_language>
+    (<verbatim|Typeset/Env/env_semantics.cpp>). In programming mode this
+    sets <cpp|env-\<gtr\>lan= prog_language ("python")>.
+
+    <item><cpp|prog_language> (<verbatim|System/Language/prog_language.cpp>)
+    looks up the language object in a global cache. The first time, it
+    creates a <cpp|prog_language_rep>, whose constructor loads the <scheme>
+    module <verbatim|(python-lang)> and asks it, through
+    <scm|parser-feature>, for keywords, operators, number and string syntax
+    and comment delimiters.
+
+    <item>Each line of the program is an atomic tree. The concatenator
+    (<verbatim|Typeset/Concat/concater.cpp>) sees that <cpp|env-\<gtr\>mode
+    == 3> and calls <cpp|concater_rep::typeset_prog_string>
+    (<verbatim|Typeset/Concat/concat_text.cpp>).
+
+    <item><cpp|typeset_prog_string> repeatedly calls
+    <cpp|env-\<gtr\>lan-\<gtr\>advance (t, pos)>, which advances
+    <cpp|pos> over one token, and then
+    <cpp|env-\<gtr\>lan-\<gtr\>get_color (t, start, pos)>, which returns a
+    color specification for the token.
+
+    <item><cpp|concater_rep::typeset_colored_substring> turns this
+    specification into a <cpp|color>: if it names an environment variable
+    (such as <verbatim|keyword-color>) the value of that variable is used,
+    otherwise the string is interpreted as a color name. A text box with
+    this color is appended to the line.
+  </enumerate>
+
+  Editing commands (indentation, bracket handling, copy and paste) do not use
+  the language object; they are implemented in <scheme> in the directory
+  <verbatim|prog/> and dispatched on <src-var|prog-language> through the
+  mode predicates <scm|in-prog-python?>, <scm|in-prog-cpp?>, and so on.
+
+  <section|Main source files>
+
+  <\description-paragraphs>
+    <item*|<verbatim|System/Language/language.hpp>,
+    <verbatim|language.cpp>>The abstract class <cpp|language_rep>, text
+    properties, the registry functions and the encoding and decoding of
+    syntax colors.
+
+    <item*|<verbatim|System/Language/impl_language.hpp>,
+    <verbatim|impl_language.cpp>>Declarations of the concrete language
+    classes for programming languages, and shared helpers for multi-line
+    comments.
+
+    <item*|<verbatim|System/Language/prog_language.cpp>>The generic
+    <cpp|prog_language_rep> configured from <scheme>, and the dispatcher
+    <cpp|prog_language>.
+
+    <item*|<verbatim|System/Language/scheme_language.cpp>,
+    <verbatim|cpp_language.cpp>, <verbatim|mathemagix_language.cpp>,
+    <verbatim|r_language.cpp>, <verbatim|scilab_language.cpp>,
+    <verbatim|fortran_language.cpp>>Hand-written highlighters for specific
+    languages.
+
+    <item*|<verbatim|System/Language/verb_language.cpp>>The fallback
+    language, which also implements highlighting through packrat grammars.
+
+    <item*|<verbatim|Data/Parser/>>Small reusable parsers: blanks,
+    identifiers, keywords, operators, numbers, strings, escaped characters,
+    inline comments and preprocessor directives.
+
+    <item*|<verbatim|Typeset/Concat/concat_text.cpp>>The typesetting of
+    strings in programming mode (<cpp|typeset_prog_string>).
+
+    <item*|<verbatim|kernel/texmacs/tm-language.scm>>The
+    <scm|define-language> macro for packrat grammars.
+
+    <item*|<verbatim|prog/default-lang.scm> and the
+    <verbatim|*-lang.scm> files>The default and the per-language
+    <scm|parser-feature> definitions.
+
+    <item*|<verbatim|prog/prog-edit.scm>, <verbatim|prog/prog-kbd.scm>,
+    <verbatim|prog/*-edit.scm>>Editing support for code.
+
+    <item*|<verbatim|environment/env-program.ts>>The markup for inline code
+    and blocks of code.
+
+    <item*|<verbatim|themes/base/base-colors.ts>,
+    <verbatim|themes/dark/dark-scene.ts>>The theme for highlighting colors.
+  </description-paragraphs>
+
+  <section|Contents of this chapter>
+
+  <\traverse>
+    <branch|From a code environment to colored
+    text|syntax-highlighting-pipeline.en.tm>
+
+    <branch|Parsers and the language definition
+    interface|syntax-highlighting-parsers.en.tm>
+
+    <branch|Colors, preferences and themes|syntax-highlighting-colors.en.tm>
+
+    <branch|Editing support for code|syntax-highlighting-editing.en.tm>
+
+    <branch|Adding a language, performance and
+    pitfalls|syntax-highlighting-howto.en.tm>
+  </traverse>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
+
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
+</body>
+
+<initial|<\collection>
+</collection>>

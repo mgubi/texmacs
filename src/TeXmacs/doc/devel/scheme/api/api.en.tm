@@ -1,6 +1,6 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|About the API documentation>
@@ -10,8 +10,8 @@
   reading the manual as a book. However it often happens that some <scheme>
   module or procedure needs documenting but doesn't fit into any of the
   available sections of the manual. The purpose of this section is precisely
-  to assemble all those pieces of information. Currently (jan. 2016) there
-  are very sketchy pages for:
+  to assemble all those pieces of information. Currently, there are pages
+  for:
 
   <\traverse>
     <branch|<verbatim|tmfs>: the <TeXmacs> file system.|tmfs/tmfs.en.tm>
@@ -25,12 +25,12 @@
 
   <tmdoc-copyright|2016|the <TeXmacs> team>
 
-  <tmdoc-license|Permission is granted to copy, distribute and/or modify
-  this\ndocument under the terms of the GNU Free Documentation License,
-  Version 1.1 or\nany later version published by the Free Software
-  Foundation; with no Invariant\nSections, with no Front-Cover Texts, and
-  with no Back-Cover Texts. A copy of\nthe license is included in the section
-  entitled "GNU Free Documentation License".>
+  <tmdoc-license|Permission is granted to copy, distribute and/or modify this
+  document under the terms of the GNU Free Documentation License, Version 1.1
+  or any later version published by the Free Software Foundation; with no
+  Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+  Texts. A copy of the license is included in the section entitled "GNU Free
+  Documentation License".>
 </body>
 
 <\initial>

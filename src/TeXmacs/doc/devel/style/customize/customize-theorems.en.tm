@@ -64,9 +64,11 @@
   </with>
 
   By default, the theorems are rendered as remarks with the only difference
-  that their bodies are typeset in an italic font. Hence, redefining the
-  <markup|render-remark> macro will also affect the rendering of theorems.
-  The default <markup|render-proof> macro is also based on
+  that their bodies are typeset in an italic font: both
+  <markup|render-theorem> and <markup|render-remark> are based on the common
+  macro <markup|render-enunciation> (see <tmpackage|env-enunciation>). Hence,
+  redefining <markup|render-enunciation> will affect the rendering of both
+  theorems and remarks. The default <markup|render-proof> macro is based on
   <markup|render-remark>.
 
   Instead of redefining the entire rendering, the user might just wish to
@@ -74,6 +76,11 @@
   between the name and the body. As the user may have noticed by examining
   the above redefinition of <markup|render-theorem>, these aspects are
   controlled by the macros <markup|theorem-name> and <markup|theorem-sep>.
+  Similarly, the names and separators of remarks and exercises are
+  controlled by <markup|remark-name>, <markup|remark-sep>,
+  <markup|exercise-name> and <markup|exercise-sep>; by default, these macros
+  (as well as <markup|theorem-name> and <markup|theorem-sep>) are all based
+  on <markup|enunciation-name> and <markup|enunciation-sep>.
   For instance, consider the following redefinitions:
 
   <\tm-fragment>
@@ -88,7 +95,7 @@
   <\with|theorem-name|<macro|name|<with|color|dark
   red|font-series|bold|<arg|name>>>|theorem-sep|<macro|: >>
     <\proposition>
-      This proposition is rendered in is a fancy way.
+      This proposition is rendered in a fancy way.
     </proposition>
   </with>
 

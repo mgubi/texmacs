@@ -1,6 +1,6 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|Manipulating <TeXmacs> views>
@@ -16,7 +16,16 @@
   <\explain>
     <scm|(current-view)><explain-synopsis|current view>
   <|explain>
-    Return the current view or <scm|#f>.
+    Return the current view or <scm|#f>. The underlying glued routine
+    <scm|(current-view-url)> returns <scm|(url-none)> if there is no current
+    view.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-\<gtr\>views <scm-arg|buf>)><explain-synopsis|views on a
+    buffer>
+  <|explain>
+    Return the list of all views on the buffer <scm-arg|buf>.
   </explain>
 
   <\explain>
@@ -32,7 +41,8 @@
     the view is attached>
   <|explain>
     This routine returns the window in which the view <scm-arg|vw> is being
-    displayed or <scm|#f>.
+    displayed or <scm|#f>. The glued variant <scm|view-\<gtr\>window-url>
+    returns <scm|(url-none)> instead of <scm|#f>.
   </explain>
 
   <\explain>
@@ -49,8 +59,21 @@
     then a new one is created. The last routine <scm|view-recent> returns the
     most recent existing view, with a preference for the current view, or
     another visible view. Again, a new view is created if no suitable recent
-    view exists.
+    view exists. The routines <scm|view-new> and <scm|view-passive> create
+    the buffer <scm-arg|buf> if it does not exist yet (<scm|view-passive>
+    attempts to load it from disk).
   </explain>
+
+  <\explain>
+    <scm|(view-delete <scm-arg|vw>)><explain-synopsis|delete a view>
+  <|explain>
+    Delete the view <scm-arg|vw>. The view should not be displayed in a
+    window.
+  </explain>
+
+  The <c++> counterparts of these routines can be found in
+  <verbatim|Texmacs/Data/new_view.cpp>; see <hlink|views and the current
+  view|../../source/server-views.en.tm> for more details.
 
   <tmdoc-copyright|2012|Joris van der Hoeven>
 

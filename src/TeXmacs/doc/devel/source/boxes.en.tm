@@ -1,6 +1,6 @@
-<TeXmacs|1.99.8>
+<TeXmacs|2.1.4>
 
-<style|<tuple|tmdoc|english|old-spacing>>
+<style|<tuple|tmdoc|english>>
 
 <\body>
   <tmdoc-title|The boxes produced by the typesetter>
@@ -28,10 +28,24 @@
     <item>Event handlers for dynamic content.
   </itemize>
 
-  The logical bounding box is used by the typesetter to position the box with
+  The abstract class <cpp|box_rep> and the class <cpp|box> are declared in
+  <verbatim|Typeset/boxes.hpp>. The concrete box classes are implemented in
+  the subdirectories of <verbatim|Typeset/Boxes>: <verbatim|Basic> (text
+  boxes, rubber boxes such as large delimiters, empty boxes, <abbr|etc.>),
+  <verbatim|Composite> (concatenations, stacks, fractions, roots, scripts,
+  superpositions, <abbr|etc.>), <verbatim|Modifier> (boxes which modify the
+  rendering of a single child, such as color changes, clipping or
+  highlighting), <verbatim|Graphics> (graphics and grids) and
+  <verbatim|Animate> (animations). The ways in which boxes are drawn on the
+  screen are described in the chapter on <hlink|renderers|renderer.en.tm>.
+
+  The logical bounding box (fields <cpp|x1>, <cpp|y1>, <cpp|x2>,
+  <cpp|y2>) is used by the typesetter to position the box with
   respect to other boxes. A certain amount of other information, such as the
-  slant of the box, is also stored for the typesetter. The physical bounding
-  box encloses the graphical representation of the box. This knowledge is
+  slant of the box, is also stored for the typesetter or can be computed
+  by virtual methods. The physical (or ink) bounding box (fields <cpp|x3>,
+  <cpp|y3>, <cpp|x4>, <cpp|y4>) encloses the graphical representation of
+  the box. This knowledge is
   needed when partially redrawing a box in an efficient way.
 
   In order to position the cursor or when making a selection, it is necessary
@@ -69,6 +83,11 @@
   also necessary to quickly change the source locations when modifying the
   source tree, for instance by inserting a new paragraph.
 
+  Inverse paths do not only occur in boxes: each subtree of the global edit
+  tree knows its own inverse path through an observer (see
+  <verbatim|Data/Observers/ip_observer.cpp> and the function
+  <cpp|obtain_ip>), which is updated whenever the tree is modified.
+
   In order to cope with the third difficulty, the inverse path may start with
   a negative number, which indicates that the box can not directly be edited
   (we also say that the box is a decoration). In this case, the tail of the
@@ -91,9 +110,18 @@
     <item*|Inverse paths>These are just reverted tree paths (with shared
     tails), with an optional negative head. A negative head indicates that
     the tree path is not accessible, i.e. the corresponding subtree does not
-    correspond to editable content. If the negative value is <math|-2>,
-    <math|-3> or <hgroup|<math|-4>>, then a zero or one has to be put behind
-    the tree path, depending on the value and the cursor position.
+    correspond to editable content. The possible negative values are defined
+    in <verbatim|Typeset/boxes.hpp>. For <cpp|DECORATION> (<math|-1>), the
+    tail of the inverse path already includes a position. For
+    <cpp|DECORATION_LEFT>, <cpp|DECORATION_MIDDLE> and
+    <cpp|DECORATION_RIGHT> (<math|-2>, <math|-3> and <hgroup|<math|-4>>), a
+    zero or one has to be put behind the tree path: always zero,
+    <abbr|resp.> depending on the cursor position, <abbr|resp.> always one
+    (see the function <cpp|descend_decode>). Such inverse paths are
+    constructed using <cpp|decorate>, <cpp|decorate_left>,
+    <cpp|decorate_middle> and <cpp|decorate_right>. Finally, the value
+    <cpp|DETACHED> (<math|-5>) is used for trees which are not attached to
+    any document.
 
     <item*|Box paths>These paths correspond to logical paths in the box tree.
     Again, the path minus its last item points to a subbox of the main box,
@@ -107,31 +135,33 @@
   <subsection|The conversion routines>
 
   In order to implement the conversion between the three kinds of paths,
-  every box comes with a reference inverse path <verbatim|ip> in the source
+  every box comes with a reference inverse path <cpp|ip> in the source
   tree. Composite boxes also come with a left and a right inverse path
-  <verbatim|lip> <abbr|resp.> <verbatim|rip>, which correspond to the
-  left-most and right-most accessible paths in its subboxes (if there are
-  such subboxes).
+  <cpp|lip> <abbr|resp.> <cpp|rip>, which correspond to the left-most and
+  right-most accessible paths in its subboxes (if there are such subboxes).
+  These are returned by the virtual methods <cpp|find_lip> and
+  <cpp|find_rip>.
 
   The routine:
 
-  <\verbatim>
-    \ \ \ \ virtual path box_rep::find_tree_path (path bp)
-  </verbatim>
+  <\cpp-code>
+    virtual path box_rep::find_tree_path (path bp);
+  </cpp-code>
 
   transforms a box path into a tree path. This routine (which only uses
-  <verbatim|ip>) is fast and has a linear time complexity as a function of
+  <cpp|ip>) is fast and has a linear time complexity as a function of
   the lengths of the paths. The routine:\ 
 
-  <\verbatim>
-    \ \ \ \ virtual path box_rep::find_box_path (path p)
-  </verbatim>
+  <\cpp-code>
+    virtual path box_rep::find_box_path (path p, bool& found);
+  </cpp-code>
 
-  does the inverse conversion. Unfortunately, in the worst case, it may be
-  necessary to search for the matching tree path in all subboxes.
-  Nevertheless, in the best case, a dichotomic algorithm (which uses
-  <verbatim|lip> and <verbatim|rip>), finds the right branch how to descend
-  in a logarithmic time. This algorithm also has a quadratic time complexity
+  does the inverse conversion; the flag <cpp|found> is set to
+  <cpp|false> if no exact match could be found. Unfortunately, in the worst
+  case, it may be necessary to search for the matching tree path in all
+  subboxes. Nevertheless, in the best case, a dichotomic algorithm (which
+  uses <cpp|lip> and <cpp|rip>), finds the right branch how to descend in a
+  logarithmic time. This algorithm also has a quadratic time complexity
   as a function of the lengths of the paths, because we frequently need to
   revert paths.
 
@@ -150,36 +180,42 @@
   then represented by a box with an infinitesimal width. Although the
   <math|\<delta\>>-position of the cursor is always zero when you select
   using the mouse, it may be non zero when moving around using the cursor
-  keys. The linear time routine:\ 
+  keys. The routine
 
-  <\verbatim>
-    \ \ \ \ virtual path box_rep::find_box_path (SI x, SI y, SI delta)
-  </verbatim>
+  <\cpp-code>
+    virtual path box_rep::find_box_path (SI x, SI y, SI delta, bool force, bool& found);
+  </cpp-code>
 
-  as a function of the length of the path searches the box path which
-  corresponds to a cursor position. Inversely, the routine:\ 
+  which is linear time as a function of the length of the path, searches
+  the box path which corresponds to a cursor position. The non virtual
+  method <cpp|find_tree_path (SI x, SI y, SI delta)> combines this routine
+  with the conversion into a tree path. Inversely, the routine
 
-  <\verbatim>
-    \ \ \ \ virtual cursor box_rep::find_cursor (box bp)
-  </verbatim>
+  <\cpp-code>
+    virtual cursor box_rep::find_cursor (path bp);
+  </cpp-code>
 
-  yields a graphical representation for the cursor at a certain box path. The
-  cursor is given by its <math|x>, <math|y> and <math|\<delta\>> coordinates
-  and a line segment relative to this origin, given by its extremities
-  <math|<around|(|x<rsub|1>,y<rsub|1>|)>> and
-  <math|<around|(|x<rsub|2>,y<rsub|2>|)>>.
+  yields a graphical representation for the cursor at a certain box path.
+  The cursor (see the class <cpp|cursor_rep> in <verbatim|Typeset/boxes.hpp>)
+  is given by the coordinates <math|x>, <math|y> and <math|\<delta\>> of its
+  origin (the fields <cpp|ox>, <cpp|oy> and <cpp|delta>), and a line segment
+  relative to this origin, which is determined by its vertical extremities
+  <math|y<rsub|1>> and <math|y<rsub|2>> and its <cpp|slope>.
 
-  In a similar way, the routine:\ 
+  In a similar way, the routine
 
-  <\verbatim>
-    \ \ \ \ virtual selection box_rep::find_selection (box lbp, box rbp)
-  </verbatim>
+  <\cpp-code>
+    virtual selection box_rep::find_selection (path lbp, path rbp);
+  </cpp-code>
 
   computes the selection between two given box paths. This selection
-  comprises two delimiting tree paths and a graphical representation in the
-  form of a list of rectangles.
+  comprises two delimiting tree paths (the fields <cpp|start> and
+  <cpp|end>) and a graphical representation in the form of a list of
+  rectangles (the field <cpp|rs>).
 
   <tmdoc-copyright|1998--2002|Joris van der Hoeven>
+
+  <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this
   document under the terms of the GNU Free Documentation License, Version 1.1
