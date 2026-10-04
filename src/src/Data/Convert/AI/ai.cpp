@@ -399,12 +399,23 @@ ai_model_name (string engine, string fallback) {
   return m;
 }
 
-// the conversation: (role, text) pairs, the last one the prompt
+// the conversation: (role, text) pairs, the last one the prompt. In a
+// session it is the one of the session (ai-session-context in init-ai.scm:
+// the questions and the answers of the fields above, as LaTeX), else the
+// last prompts and answers kept here.
 static array<string>
 ai_conversation (string s, string model, string chat, bool history) {
   array<string> v;
   if (history) {
     ai_set_current_prompt (s, model, chat);
+    object c= call ("ai-session-context", model, chat);
+    if (is_array_string (c)) {
+      array<string> a= as_array_string (c);
+      for (int i= 0; i+1 < N(a); i += 2)
+        v << string ("user") << a[i] << string ("assistant") << a[i+1];
+      v << string ("user") << s;
+      return v;
+    }
     list<string> last_prompts= reverse (ai_get_last_prompts (model, chat));
     list<string> last_answers= reverse (ai_get_last_answers (model, chat));
     while (!is_nil (last_prompts) && !is_nil (last_answers)) {

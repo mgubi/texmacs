@@ -301,6 +301,63 @@
           (known known)
           (else ""))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The conversation of a session, sent with a question as its context
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define ai-io-tags
+  '(unfolded-io folded-io unfolded-io-text folded-io-text
+    unfolded-io-math folded-io-math))
+
+(define (ai-context-size name)
+  (with s (get-preference (string-append name " context size"))
+    (if (and (string? s) (string->number s)) (string->number s) 10)))
+
+;; the text of a field (as the input is sent: LaTeX, in UTF-8); an answer
+;; is in text mode (ai_latex_output), which would be \text{...}
+(define (ai-unwrap x)
+  (cond ((and (tm-func? x 'document 1)) (ai-unwrap (cadr x)))
+        ((and (tm-func? x 'with 3) (== (cadr x) "mode") (== (caddr x) "text"))
+         (ai-unwrap (cadddr x)))
+        (else x)))
+
+(define (ai-field-text name t)
+  (with s (ai-serialize name (ai-unwrap (tm->stree t)))
+    (if (string? s) s "")))
+
+;; The questions and answers of the fields of the session above the one
+;; which is evaluated, the last ones (ai-context-size), as a list (question
+;; answer ...); #f when the evaluation is not in a session (a fold): the
+;; engine then has the last exchanges kept in memory (ai.cpp)
+(tm-define (ai-session-context name chat)
+  (let* ((l (pending-ref name chat))
+         (item (and (nnull? l) (car l)))
+         (p (and item (>= (length item) 4) (third item))))
+    (if (or (not p) (tree? p)) #f
+        (let* ((out (catch #t (lambda () (tree-pointer->tree p))
+                      (lambda args #f)))
+               (field (and (tree? out) (tree-up out)))
+               (doc (and field (tree-up field))))
+          (if (not (and doc (tm-func? doc 'document))) #f
+              (let* ((i (tree-index field))
+                     (pairs
+                      (append-map
+                       (lambda (j)
+                         (with f (tree-ref doc j)
+                           (if (not (tree-in? f ai-io-tags)) (list)
+                               (let ((q (ai-field-text name (tree-ref f 1)))
+                                     (a (ai-field-text name (tree-ref f 2))))
+                                 (if (or (== q "") (== a "")
+                                         (string-starts? a "Error:"))
+                                     (list)
+                                     (list (list q a)))))))
+                       (.. 0 i)))
+                     (n (ai-context-size name))
+                     (kept (if (> (length pairs) n)
+                               (list-tail pairs (- (length pairs) n))
+                               pairs)))
+                (apply append kept)))))))
+
 ;; the first line of a session: the engine and its model
 (define (ai-banner lan)
   (with m (ai-session-model lan)
@@ -341,7 +398,11 @@
         (item (text "")
           (explicit-buttons
             ("Update the list of models"
-             (ai-update-models-message name))))))
+             (ai-update-models-message name))))
+        (item (text "Context")
+          (enum (set-preference (string-append name " context size") answer)
+                '("10" "5" "20" "50" "0" "")
+                (number->string (ai-context-size name)) "5em"))))
     === === ===)
   (assuming (== name "ollama")
     (aligned

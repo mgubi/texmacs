@@ -22,6 +22,12 @@
   which it asks; in a web browser the answer is shown as it comes (in grey),
   and replaced by the answer set by <TeXmacs> when it is complete.
 
+  A question of a session is sent with the conversation above it in the
+  session, as its context: the last questions and answers (10 by default,
+  <with|font-series|bold|Context> in the preferences of the chatbot). The
+  context is the one of the document: it is there again when the document
+  is opened again, and follows the changes made to it.
+
   The key of an API is not that of a subscription: <name|ChatGPT Plus> or
   <name|Claude Pro> do not include the use of the API, which is paid apart,
   according to use. In the console of the service, set a limit to the

@@ -196,7 +196,8 @@
     models> asks each one which models the key gives. A session begins with
     the name of its model, and the answers are shown as they come, then set
     by <TeXmacs> when they are complete; executable folds of chatbots work
-    too. See the help of the AI plug-in in <menu|Help|Plug-ins>.
+    too. A question is sent with the conversation above it in the session
+    as its context. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
     <item>The input fields of the dialogs whose width is given as a
     multiple of the default one are no longer as wide as the window (the
