@@ -1054,8 +1054,7 @@ document of 200 paragraphs, with `gpu_finish`): 1.8 ms a repaint, against
 build vectorises MuPDF's loops. What the GPU saves there is the upload of
 the window (0.2 ms against 1 to 1.7 ms a frame).
 
-Differences from the MuPDF renderer: the glyphs are TeXmacs' bitmaps, not
-MuPDF's rendering of the font files (they look like the X11 port's); the
-pixels are not the same, so the A/B tests of the MuPDF renderer do not
-apply. Still open: draw_spacial and transformed glyphs (bitmaps sampled under the
+Differences from the MuPDF renderer: a frame of the document of 200
+paragraphs differs on some 200 pixels by more than a tenth (the icons,
+sampled as textures), the text being MuPDF's. Still open: draw_spacial and transformed glyphs (bitmaps sampled under the
 transformation) are untested.
