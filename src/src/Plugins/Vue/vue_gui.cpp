@@ -1163,10 +1163,11 @@ vue_sdl_mupdf_window_rep::get_viewport_size (void *data, int& w, int& h) {
 class vue_sdl_gpu_window_rep : public vue_sdl_base_window_rep {
 public:
   renderer ren;
+  unsigned long long presented; // the hash of the frame last presented
 
   vue_sdl_gpu_window_rep (vue_widget w, string name, bool popup= false,
                           SDL_Window* adopt= NULL)
-    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL) {
+    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), presented (0) {
     with_window frame (this);
     Clay_SetMeasureTextFunction (ren_measure_text, this);
   }
@@ -1187,7 +1188,10 @@ public:
 void
 vue_sdl_gpu_window_rep::process_redraw () {
   if (!shown || (SDL_GetWindowFlags (sdl_win) &
-                 (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) return;
+                 (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) {
+    presented= 0; // shown again: presented again, whatever it draws
+    return;
+  }
   track_geometry ();
 #ifndef OS_MACOS
   follow_app_focus ();
@@ -1227,6 +1231,13 @@ vue_sdl_gpu_window_rep::process_redraw () {
   if (vue_profile_on) gpu_finish (); // with the time the GPU took
   else gpu_flush ();
   if (vue_profile_on) vue_clay_ns += SDL_GetTicksNS () - t_ns;
+  // a frame which draws what the last presented one drew is not presented:
+  // on macOS SDL_GL_SwapWindow waits for the display (even with no swap
+  // interval), and the loop draws every window at every iteration. What
+  // is drawn has been drawn into the back buffer, which every frame draws
+  // in full, so nothing stale can show
+  unsigned long long h= gpu_frame_hash ();
+  bool same= (h == presented);
   static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
   if (N(snapshot_dir) > 0) {
     picture shot= gpu_read_screen (win_w, win_h);
@@ -1244,6 +1255,8 @@ vue_sdl_gpu_window_rep::process_redraw () {
       }
     }
   }
+  if (same) return;
+  presented= h;
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   vue_gpu_present (sdl_win);
   if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;

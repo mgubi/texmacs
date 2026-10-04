@@ -53,6 +53,7 @@ picture  gpu_copy_picture (picture p) { return p; }
 renderer gpu_screen_renderer (double z) { (void) z; return NULL; }
 void     gpu_begin_screen (renderer r, int w, int h) { (void) r; (void) w; (void) h; }
 void     gpu_flush () {}
+unsigned long long gpu_frame_hash () { return 0; }
 void     gpu_finish () {}
 picture  gpu_read_screen (int w, int h) { (void) w; (void) h; return picture (); }
 bool gpu_draw_picture_scaled (renderer r, picture p, SI x, SI y, double s, int a) {
@@ -201,6 +202,7 @@ struct gpu_target {
   GLuint fbo2, tex2;    // the other one of a scrolled backing store
   bool screen;
   bool made;            // the GL objects exist (made when first drawn)
+  unsigned long long gen; // changes with what the texture shows
 };
 
 static void gpu_flush_all ();
@@ -292,10 +294,28 @@ struct gpu_state {
   unsigned long long tick= 0;
   size_t texture_bytes= 0;
   // the default framebuffer of the window being drawn
-  gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true };
+  gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true, 0 };
+  // what is drawn on the screen in this frame, folded into a hash
+  // (gpu_frame_hash): a frame which draws what the last one drew is not
+  // presented
+  unsigned long long frame_hash= 0;
 };
 
 static gpu_state G;
+
+// folding what is drawn on the screen into the hash of the frame (FNV-1a)
+static inline void
+feed_bytes (const void* p, size_t n) {
+  const unsigned char* b= (const unsigned char*) p;
+  unsigned long long h= G.frame_hash;
+  for (size_t i= 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ULL; }
+  G.frame_hash= h;
+}
+template<typename T> static inline void
+feed (const T& v) { feed_bytes (&v, sizeof (T)); }
+
+static inline bool
+on_screen (gpu_target* t) { return t != NULL && t->screen; }
 
 bool
 vue_gpu_enabled () {
@@ -521,6 +541,7 @@ flush_quads () {
   glDrawArrays (GL_TRIANGLES, 0, (GLsizei) (G.verts.size () / 8));
   glBindVertexArray (0);
   G.verts.clear ();
+  t->gen++;
 }
 
 static void flush_vectors ();
@@ -538,6 +559,11 @@ batch (gpu_target* t, int mode, GLuint tex, int x1, int y1, int x2, int y2,
     G.target= t; G.mode= mode; G.tex= tex;
     G.sx1= x1; G.sy1= y1; G.sx2= x2; G.sy2= y2;
     G.porig_x= pox; G.porig_y= poy; G.ptile_w= ptw; G.ptile_h= pth;
+    if (on_screen (t)) {
+      int st[6]= { mode, (int) tex, x1, y1, x2, y2 };
+      float pt[4]= { pox, poy, ptw, pth };
+      feed (st); feed (pt);
+    }
   }
 }
 
@@ -548,6 +574,11 @@ quad (const float* px, const float* py, float u0, float v0, float u1, float v1,
       float r, float g, float b, float a) {
   float c[4][4]= { { px[0], py[0], u0, v0 }, { px[1], py[1], u1, v0 },
                    { px[2], py[2], u0, v1 }, { px[3], py[3], u1, v1 } };
+  if (on_screen (G.target)) {
+    float d[16]= { px[0], py[0], px[1], py[1], px[2], py[2], px[3], py[3],
+                   u0, v0, u1, v1, r, g, b, a };
+    feed (d);
+  }
   int order[6]= { 0, 1, 2, 1, 3, 2 };
   for (int k= 0; k < 6; k++) {
     float* v= c[order[k]];
@@ -651,7 +682,7 @@ flush_vectors () {
 
 // a ThorVG shape for the target, within the clip, covering a box
 static void
-add_vector (gpu_target* t, tvg::Paint* p, int sx1, int sy1, int sx2, int sy2,
+add_vector (gpu_target* t, tvg::Shape* p, int sx1, int sy1, int sx2, int sy2,
             float bx1, float by1, float bx2, float by2) {
   flush_quads ();
   if (G.pending && (G.vtarget != t || G.vsx1 != sx1 || G.vsy1 != sy1 ||
@@ -659,6 +690,24 @@ add_vector (gpu_target* t, tvg::Paint* p, int sx1, int sy1, int sx2, int sy2,
     flush_vectors ();
   int x1= (int) floor (bx1) - 1, y1= (int) floor (by1) - 1;
   int x2= (int) ceil (bx2) + 1, y2= (int) ceil (by2) + 1;
+  if (on_screen (t)) {
+    // the shape as drawn: its path, its fill and its stroke
+    int k[9]= { 9, sx1, sy1, sx2, sy2, x1, y1, x2, y2 };
+    feed (k);
+    const tvg::PathCommand* cmds= NULL; const tvg::Point* pts= NULL;
+    uint32_t nc= 0, np= 0;
+    if (p->path (&cmds, &nc, &pts, &np) == tvg::Result::Success) {
+      if (nc > 0) feed_bytes (cmds, nc * sizeof (tvg::PathCommand));
+      if (np > 0) feed_bytes (pts, np * sizeof (tvg::Point));
+    }
+    uint8_t c[8]= { 0, 0, 0, 0, 0, 0, 0, 0 };
+    p->fill (&c[0], &c[1], &c[2], &c[3]);
+    p->strokeFill (&c[4], &c[5], &c[6], &c[7]);
+    feed (c);
+    feed (p->strokeWidth ());
+    feed (p->fillRule ());
+    feed (p->strokeCap ());
+  }
   if (!G.pending) {
     G.pending= true; G.vtarget= t;
     G.vsx1= sx1; G.vsy1= sy1; G.vsx2= sx2; G.vsy2= sy2;
@@ -828,6 +877,7 @@ gpu_translate_picture (picture p, int dpx, int dpy) {
   // the strips which were not copied are repainted by the caller
   std::swap (t.fbo, t.fbo2);
   std::swap (t.tex, t.tex2);
+  t.gen++;
 }
 
 picture
@@ -839,6 +889,7 @@ gpu_copy_picture (picture p) {
   picture cp (c);
   if (!ensure_target (&c->t)) return picture ();
   blit (g->t.fbo, g->t.h, 0, 0, g->t.w, g->t.h, c->t.fbo, c->t.h, 0, 0);
+  c->t.gen++;
   c->ox= g->ox; c->oy= g->oy;
   return cp;
 }
@@ -1403,11 +1454,13 @@ gpu_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double sc, int alp
   if (g != NULL) {
     if (!ensure_target (&g->t)) return;
     // the texture of a target: its first row at the bottom
+    if (on_screen (t)) feed (g->t.gen);
     user_quad (left, bottom, left + w, bottom + h, 1, g->t.tex, 0, 1, 1, 0, a, a, a, a);
     return;
   }
   cached_texture* ct= picture_texture (p);
   if (ct == NULL) return;
+  if (on_screen (t)) feed (p->get_unique_id ());
   user_quad (left, bottom, left + w, bottom + h, 1, ct->tex, 0, 0, 1, 1, a, a, a, a);
 }
 
@@ -1468,6 +1521,7 @@ gpu_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   gpu_flush_all ();
   blit (t->screen ? 0 : t->fbo, t->h, x1, y2, x2, y1,
         sh->t->fbo, sh->t->h, x1, y2);
+  sh->t->gen++;
 }
 
 void
@@ -1481,6 +1535,8 @@ gpu_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   gpu_flush_all ();
   blit (sh->t->fbo, sh->t->h, x1, y2, x2, y1,
         t->screen ? 0 : t->fbo, t->h, x1, y2);
+  t->gen++;
+  if (on_screen (t)) { SI k[5]= { 7, x1, y1, x2, y2 }; feed (k); }
 }
 
 void
@@ -1510,6 +1566,8 @@ gpu_renderer_rep::fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y) {
   if (src->t == t) return; // within one target: see gpu_translate_picture
   blit (src->t->screen ? 0 : src->t->fbo, src->t->h, x, y - (y1 - y2), x + (x2 - x1), y,
         t->screen ? 0 : t->fbo, t->h, x1, y2);
+  t->gen++;
+  if (on_screen (t)) { SI k[6]= { 8, x1, y1, x2, y2, (SI) src->t->gen }; feed (k); }
 }
 
 /******************************************************************************
@@ -1532,8 +1590,17 @@ void
 gpu_begin_screen (renderer ren, int w, int h) {
   gpu_flush_all ();
   G.screen.w= w; G.screen.h= h;
+  G.frame_hash= 14695981039346656037ULL;
+  int sz[2]= { w, h };
+  feed (sz);
   gpu_renderer_rep* g= dynamic_cast<gpu_renderer_rep*> (ren);
   if (g != NULL) { g->w= w; g->h= h; g->trs.clear (); }
+}
+
+unsigned long long
+gpu_frame_hash () {
+  gpu_flush_all (); // a pending batch is fed when it is made, not drawn
+  return G.frame_hash;
 }
 
 bool
