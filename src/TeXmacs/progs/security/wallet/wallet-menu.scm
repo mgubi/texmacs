@@ -14,7 +14,7 @@
 (texmacs-module (security wallet wallet-menu)
   (:use (security wallet wallet-base)))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (when (os-macos?) 
   (use-modules (security keychain macos-security)))
 

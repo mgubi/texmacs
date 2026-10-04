@@ -243,7 +243,7 @@
          (nbody (tm-add-condition var head body))
          (nval (make-lambda head nbody))
          (s `(begin
-             (eval-when (expand load eval)
+             (eval-when (load eval)
                   (when (not (module-local-variable texmacs-user ',var))
                     (module-define! texmacs-user ',var (lambda args #f))
                     (module-export! texmacs-user '(,var))
@@ -293,7 +293,7 @@
   (tm-define-sub head body))
 
 (define-public-macro (tm-define-once head . body)
-  `(eval-when (expand load eval) (if (not (ahash-ref tm-defined-table ',(ca*r head)))
+  `(eval-when (load eval) (if (not (ahash-ref tm-defined-table ',(ca*r head)))
      (tm-define ,head ,@body))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -312,7 +312,7 @@
     ;;(display* "   " `(define-public-macro ,head
     ;;                   ,(apply* (ca*r macro-head) head)) "\n")
     `(begin
-       (eval-when (expand load eval) (tm-define ,macro-head ,@body))
+       (eval-when (load eval) (tm-define ,macro-head ,@body))
        (with-module texmacs-user
          (define-public-macro ,head
             ,(apply* (ca*r macro-head) head))))))
@@ -349,7 +349,7 @@
   (let* ((old (ahash-ref lazy-define-table name))
          (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-    `(eval-when (expand load eval) (if (not (module-ref texmacs-user ',name #f))
+    `(eval-when (load eval) (if (not (module-ref texmacs-user ',name #f))
          (begin
            (module-define! texmacs-user ',name
             (lambda args

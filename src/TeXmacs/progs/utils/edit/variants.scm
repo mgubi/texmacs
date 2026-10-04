@@ -18,7 +18,7 @@
 ;; Definition of tag groups (could be done using drds in the future)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (expand load eval)
+(eval-when (load eval)
   (tm-define group-table (make-ahash-table))
   (tm-define group-resolve-table (make-ahash-table)))
 
@@ -33,7 +33,7 @@
   (ahash-ref group-resolve-table which))
 
 (tm-define-macro (define-group group . l)
-`(eval-when (expand load eval)
+`(eval-when (load eval)
   (set! group-resolve-table (make-ahash-table))
   (with old (ahash-ref group-table ',group)
     (if old

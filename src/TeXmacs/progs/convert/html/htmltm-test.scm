@@ -209,7 +209,7 @@
      (regtest-htmltm-list-kinds)
      (regtest-htmltm-list-br)))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define (define-self-evaluating* syms)
   (map (lambda (name)
          (let ((sym (gensym)))

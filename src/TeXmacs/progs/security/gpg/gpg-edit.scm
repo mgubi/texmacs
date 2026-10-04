@@ -51,7 +51,7 @@
 ;; User id attached to document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (tm-define (tm-gpg-get-key-user-id t)
   (:secure #t)
   (:synopsis "Retrieve user id from fingerprint @t")

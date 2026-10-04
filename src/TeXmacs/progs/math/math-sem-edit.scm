@@ -158,7 +158,7 @@
 		 (!= p (buffer-path))
 		 (math-correct? (cDr p)))))))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define (try-correct-rewrite l)
   (cond ((null? l) `#f)
         ((and (null? (cdr l)) (func? (car l) 'else))

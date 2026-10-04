@@ -3328,7 +3328,7 @@
 ;; Tags which are customized in particular style files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (tm-define (style-dependent-declare x)
   (with (tag fun narg) x
     (with fun+bis (symbol-append fun '+bis)
@@ -3342,7 +3342,7 @@
              (tm-define-once (,fun+bis s l)
                (,fun (append (list (string->symbol s)) l)))))))))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (tm-define (style-dependent-transform x)
   (with (tag fun narg) x
     (with fun+bis (symbol-append fun '+bis)

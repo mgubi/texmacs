@@ -20,7 +20,7 @@
 ;; Definition of dynamic menus
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 
 (define (require-format x pattern)
   (if (not (match? x pattern))
@@ -416,7 +416,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Table with Gui primitives and dispatching
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define-table gui-make-table
   (eval ,gui-make-eval)
   (dynamic ,gui-make-dynamic)
@@ -508,7 +508,7 @@
   (form-choices ,gui-make-form-choices)
   (form-toggle ,gui-make-form-toggle)))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (tm-define (gui-make x)
   ;;(display* "x= " x "\n")
   (cond ((symbol? x)

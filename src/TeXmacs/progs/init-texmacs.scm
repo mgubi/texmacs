@@ -45,6 +45,10 @@
 
 ; Guile 2 has separate expand and evaluation phases so we have several eval-when in the code
 ; which can be ignored in previous Guile versions.
+; TeXmacs runs its Scheme code interpreted (see start_scheme in guile_tm.cpp): each top-level
+; form is expanded and evaluated before the next one is expanded, so (eval-when (load eval) ...)
+; suffices. The expand situation must be avoided for code with side effects, since the
+; interpreter then evaluates the body twice: once when expanding it and once when evaluating it.
 
 (cond-expand (guile-2 #t)
   (else

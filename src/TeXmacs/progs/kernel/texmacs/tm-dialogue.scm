@@ -40,7 +40,7 @@
 ;; Delayed execution of commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define (delayed-sub body)
   (cond ((or (npair? body) (nlist? (car body)) (not (keyword? (caar body))))
          `(lambda () ,@body #t))

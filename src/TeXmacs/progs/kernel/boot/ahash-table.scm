@@ -168,7 +168,7 @@
 
 (define-public-macro (define-table name . l)
   `(begin
-     (eval-when (expand load eval) (tm-define ,name (make-ahash-table)))
+     (eval-when (load eval) (tm-define ,name (make-ahash-table)))
      (define-table-decls ,name ,(list 'quasiquote l))))
 
 (define-public-macro (extend-table name . l)

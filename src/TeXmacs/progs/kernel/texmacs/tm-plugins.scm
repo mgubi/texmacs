@@ -618,7 +618,7 @@
     `(begin
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
-       (eval-when (expand load eval)
+       (eval-when (load eval)
          (tm-define (,supports-name?)
            (or (ahash-ref plugin-data-table ,name)
                (remote-connection-defined? ,name))))

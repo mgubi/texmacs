@@ -20,7 +20,7 @@
 ;; Defining new modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(eval-when (expand load eval)
+(eval-when (load eval)
    (define (texmacs-mode-pred mode)
      (let* ((mode-str (symbol->string mode))
            (mode-root (substring mode-str 0 (- (string-length mode-str) 1)))

@@ -21,7 +21,7 @@
 
 ;;NOTE: This section is OK
 ;; State variables
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define-state graphics-state
   (slots ((graphics-action #f)
 	  (current-graphical-object #f)
@@ -70,7 +70,7 @@
 
 ;; State stack (1)
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (tm-define state-slots
   `(quote ,(state-names graphics-state))))
 
@@ -382,12 +382,12 @@
 
 (ahash-set! define-option-table :state define-option-state)
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (define (define-option-state-slots opt decl)
   (with (fun head . body) decl
     `(,fun ,head (with-state-slots-by-name ,(car opt) ,@body)))))
 
-(eval-when (expand load eval)
+(eval-when (load eval)
 (ahash-set! define-option-table :state-slots define-option-state-slots))
 
 
