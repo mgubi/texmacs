@@ -65,7 +65,21 @@ void merge_stack (array<page_item>& l, stack_border& sb,
 		  array<page_item> l2, stack_border sb2);
 
 void snap_stack_spacing (array<box> bs, array<SI>& spc, SI snap);
-void shove_cache_new_pass ();
-void shove_cache_end_pass ();
+struct shove_entry {
+  box b1, b2;
+  SI  par[6];
+  SI  delta;
+};
+
+// memo of the shoves between paragraphs, owned by a typesetter:
+// entries of the current and of the previous pass, by their second box
+struct shove_memo {
+  hashmap<pointer,shove_entry> cur, prev;
+  shove_memo* outer;  // memo of an enclosing pass, if any
+  inline shove_memo (): outer (NULL) {}
+};
+
+void shove_cache_new_pass (shove_memo& m);
+void shove_cache_end_pass (shove_memo& m);
 
 #endif // defined STACKER_H

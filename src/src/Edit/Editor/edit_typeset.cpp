@@ -45,7 +45,12 @@ edit_typeset_rep::edit_typeset_rep ():
     init_update ();
 }
 
-edit_typeset_rep::~edit_typeset_rep () { delete_typesetter (ttt); }
+static void drd_update_forget (drd_info drd);
+
+edit_typeset_rep::~edit_typeset_rep () {
+  drd_update_forget (drd);
+  delete_typesetter (ttt);
+}
 
 void
 edit_typeset_rep::set_data (new_data data) {
@@ -367,6 +372,18 @@ extern int drd_change_stamp;
 static drd_info* drd_update_last_drd= NULL;
 static hashmap<string,tree> drd_update_last_env;
 static int drd_update_last_stamp= -1;
+
+static void
+drd_update_forget (drd_info drd) {
+  // do not keep the drd and the environment of a closed buffer alive
+  if (drd_update_last_drd != NULL &&
+      drd_update_last_drd->operator-> () == drd.operator-> ()) {
+    tm_delete (drd_update_last_drd);
+    drd_update_last_drd= NULL;
+    drd_update_last_env= hashmap<string,tree> ();
+    drd_update_last_stamp= -1;
+  }
+}
 
 static bool
 same_environment (hashmap<string,tree> a, hashmap<string,tree> b) {

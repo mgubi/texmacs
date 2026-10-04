@@ -268,7 +268,7 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
-  shove_cache_new_pass ();
+  shove_cache_new_pass (shoves);
   last_body= box ();
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
@@ -277,7 +277,7 @@ typesetter_rep::typeset () {
     env->touched  = hashmap<string,bool> (false);
   }
   br->typeset (PROCESSED+ WANTED_PARAGRAPH);
-  shove_cache_end_pass ();
+  shove_cache_end_pass (shoves);
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
   if (!paper) ppp->snap= snap_pixel;
   box rb= ppp->make_pages ();

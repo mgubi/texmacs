@@ -12,6 +12,7 @@
 #include "bridge.hpp"
 #include "Boxes/construct.hpp"
 #include "Stack/stacker.hpp"
+#include <stdint.h>
 
 bridge bridge_document (typesetter, tree, path);
 bridge bridge_surround (typesetter, tree, path);
@@ -307,8 +308,6 @@ extern tree the_et;
 * so that an edit only changes the chunk in which it occurs, and chunks are
 * cached from one typesetting pass to the next.
 ******************************************************************************/
-
-#include <stdint.h>
 
 #define CHUNK_MIN 16
 #define CHUNK_MAX 256

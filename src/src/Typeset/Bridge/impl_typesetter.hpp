@@ -40,6 +40,8 @@ public:
   SI   shift_dy;            // moved by shift_dy (0: nothing to move)
   rectangles shift_rects;   // then the areas to repaint (not their union)
   box  last_body;           // body stack made by the pager at this pass
+  shove_memo shoves;        // memoized shoves (after change_log, in which
+                            // its boxes log when they are destroyed)
 
 public:
   typesetter_rep (edit_env& env, tree et, path ip);

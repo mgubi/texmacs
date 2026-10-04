@@ -228,17 +228,13 @@ shove (page_item& item1, page_item& item2,
 * generation is dropped as soon as the paragraphs have been typeset: boxes
 * log the area to be repainted when they are destroyed, so keeping the
 * lines of the previous pass alive until the next one would leave removed
-* lines on the screen.
+* lines on the screen.  For the same reason, the memo belongs to the
+* typesetter (see shove_memo): its boxes must not outlive the change log
+* of the typesetter in which they log.
 ******************************************************************************/
 
-struct shove_entry {
-  box b1, b2;
-  SI  par[6];
-  SI  delta;
-};
-
-// entries of the current and of the previous pass, by their second box
-static hashmap<pointer,shove_entry> shove_cur, shove_prev;
+// memo of the typesetter which is currently typesetting (NULL outside passes)
+static shove_memo* shove_current= NULL;
 
 void
 snap_stack_spacing (array<box> bs, array<SI>& spc, SI snap) {
@@ -257,14 +253,18 @@ snap_stack_spacing (array<box> bs, array<SI>& spc, SI snap) {
 }
 
 void
-shove_cache_new_pass () {
-  shove_prev= shove_cur;
-  shove_cur = hashmap<pointer,shove_entry> ();
+shove_cache_new_pass (shove_memo& m) {
+  m.prev = m.cur;
+  m.cur  = hashmap<pointer,shove_entry> ();
+  m.outer= shove_current;
+  shove_current= &m;
 }
 
 void
-shove_cache_end_pass () {
-  shove_prev= hashmap<pointer,shove_entry> ();
+shove_cache_end_pass (shove_memo& m) {
+  m.prev = hashmap<pointer,shove_entry> ();
+  shove_current= m.outer;
+  m.outer= NULL;
 }
 
 static void
@@ -276,6 +276,15 @@ cached_shove (page_item& item1, page_item& item2,
                max (sb->hor_sep, sb2->hor_sep_before),
                max (sb->ver_sep, sb2->ver_sep_before),
                sb->bot, sb2->top };
+  if (shove_current == NULL) {
+    // merge_stack outside a typesetting pass: no memo
+    item1->spc= item1->spc +
+      space (shove_delta (b1, b2, par[0], par[1], par[2], par[3],
+                          par[4], par[5], array<SI> ()));
+    return;
+  }
+  hashmap<pointer,shove_entry>& shove_cur = shove_current->cur;
+  hashmap<pointer,shove_entry>& shove_prev= shove_current->prev;
   pointer key= (pointer) b2.operator-> ();
   bool in_cur= shove_cur->contains (key);
   if (in_cur || shove_prev->contains (key)) {
@@ -336,7 +345,6 @@ void
 merge_stack (array<page_item>& l, stack_border& sb,
 	     array<page_item> l2, stack_border sb2)
 {
-  array<SI> swell;
   int i= N(l)-1, j=0;
   while ((i >= 0) && (l[i]->type != PAGE_LINE_ITEM)) i--;
   while ((j < N(l2)) && (l2[j]->type != PAGE_LINE_ITEM)) j++;
