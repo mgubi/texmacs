@@ -154,6 +154,9 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>The arrows of the submenus, and of the other menus and lists, are
+    solid triangles.
+
     <item>The keys which compose: the dead keys of many keyboards (the
     <verbatim|^> or the diaeresis of a Swiss or a French keyboard), the accents of a Mac, and the input methods of Chinese,
     Japanese or Korean; the text being composed is shown in the document,

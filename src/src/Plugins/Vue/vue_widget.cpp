@@ -1278,18 +1278,43 @@ render_marker_fn (renderer ren, void* data, rectangle r) {
   }
 }
 
+// a solid triangle, as the characters U+25B8, U+25BE... of the arrows of the
+// widgets: data is dir as for render_marker_fn, plus 4 when it is grey
+static void
+render_triangle_fn (renderer ren, void* data, rectangle r) {
+  int code= (int) (intptr_t) data, dir= code & 3;
+  SI cx= (r->x1 + r->x2) / 2, cy= (r->y1 + r->y2) / 2;
+  SI a= (min (r->x2 - r->x1, r->y2 - r->y1) * 3) / 8; // half the long side
+  SI b= (a * 7) / 8;                             // half the height
+  array<SI> x (3), y (3);
+  switch (dir) {
+    case 0:  x[0]= cx + b; y[0]= cy + a; x[1]= cx + b; y[1]= cy - a;
+             x[2]= cx - b; y[2]= cy; break;
+    case 1:  x[0]= cx - b; y[0]= cy + a; x[1]= cx - b; y[1]= cy - a;
+             x[2]= cx + b; y[2]= cy; break;
+    case 2:  x[0]= cx - a; y[0]= cy - b; x[1]= cx + a; y[1]= cy - b;
+             x[2]= cx; y[2]= cy + b; break;
+    default: x[0]= cx - a; y[0]= cy + b; x[1]= cx + a; y[1]= cy + b;
+             x[2]= cx; y[2]= cy - b; break;
+  }
+  Clay_Color c= (code & 4) ? the_theme.text_grey : the_theme.text;
+  ren->set_brush (theme_color (c));
+  ren->polygon (x, y, true);
+}
+
 // An arrow of the widgets (dir as for render_marker_fn): the character of
-// the interface font when it has one, the drawn chevron otherwise (Fira, the
-// font of the browser, has no U+25B8 and no U+25BE)
+// the interface font when it has one, a drawn solid triangle otherwise
+// (Fira, the font of the browser, has no U+25B8 and no U+25BE)
 static void
 layout_arrow (string glyph, int dir, color c) {
   font fn= get_default_styled_font (0);
   if (fn->supports (glyph)) { layout_text (glyph, 0, c); return; }
   float s= (float) retina_factor * ((fn->y2 - fn->y1) / 3) / PIXEL;
+  int grey= (c == black) ? 0 : 4;
   CLAY_AUTO_ID({
     .layout= { .sizing= { CLAY_SIZING_FIXED(s), CLAY_SIZING_FIXED(s) }},
-    .custom= { .customData= (void*) &render_marker_fn },
-    .userData= (void*) (intptr_t) dir }) {}
+    .custom= { .customData= (void*) &render_triangle_fn },
+    .userData= (void*) (intptr_t) (dir + grey) }) {}
 }
 
 static void
