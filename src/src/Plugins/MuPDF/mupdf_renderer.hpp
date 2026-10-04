@@ -26,6 +26,12 @@ fz_context* mupdf_context ();
 void mupdf_select_custom_charmap (fz_font* font);
 unsigned int mupdf_glyph_index (fz_font* font, int i);
 
+// the outline of the glyph of the character c of a TeXmacs font, as
+// quadratic curves (six numbers each: the three points) in em units, y up,
+// and the size of an em in pixels of a renderer at zoom 1; false when the
+// font has no file, whose glyphs are bitmaps (for vue_gpu.cpp)
+bool mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em);
+
 /******************************************************************************
 * Graphic renderer
 ******************************************************************************/
