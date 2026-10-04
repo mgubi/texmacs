@@ -152,6 +152,13 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>A copy keeps its structure when it is pasted into another tab of
+    <TeXmacs>, or into the page reloaded (it was pasted as text).
+
+    <item>The shortcuts with Option, Control or Command work in browsers
+    which hide these keys from the page, as LibreWolf (Option+arrows moved
+    by characters instead of words).
+
     <item>The <name|Asymptote> plug-in in the browser: sessions and
     executable folds (<menu|Insert|Session|Asymptote>) make <name|Asymptote>
     pictures with <name|Asymptote> itself, compiled to <name|WebAssembly>;

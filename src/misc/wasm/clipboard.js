@@ -36,10 +36,15 @@
 // act on those (Cmd+S would save the page), save those it keeps for itself
 // (Cmd+W, Cmd+T, Cmd+N, Cmd+Q).
 //
+// The TeXmacs format of a copy (its structure) goes into its HTML, in an
+// empty element <span data-texmacs-clipboard="base64">, so that another page
+// of TeXmacs (another tab, the page reloaded) gets it back from the HTML of
+// its paste; a paste without it pastes text, as before.
+//
 // The C++ side is in src/Plugins/Vue/vue_gui.cpp ("Clipboard support").
 
 var tmClipboard = (function () {
-  var known = { plain: '', html: '' };
+  var known = { plain: '', html: '', texmacs: null };
   var pending = null; // the key of a paste, until its paste event
   var sink = null, back = null; // the hidden text area, the focus before it
   var held = false; // Ctrl or Cmd is down, the focus is in the text area
@@ -71,6 +76,8 @@ var tmClipboard = (function () {
 
   var WAIT = 60; // ms for the paste of a key into the text area
   var DIALOG_OFF = 'tm-copy-dialog-off'; // the copy dialog turned off (localStorage)
+  // the element of the HTML of a copy which holds its TeXmacs format
+  var MARK = /<span\b[^>]*\bdata-texmacs-clipboard="([A-Za-z0-9+\/=]*)"[^>]*>/;
 
   // the write of a copy key, waiting for the text of TeXmacs's copy
   var copying = null;
@@ -105,7 +112,7 @@ var tmClipboard = (function () {
     pending = null;
     clearTimeout (p.timer);
     if (!p.pasted && sink && sink.value)
-      known = { plain: sink.value.replace (/\r\n?/g, '\n'), html: '' };
+      known = { plain: sink.value.replace (/\r\n?/g, '\n'), html: '', texmacs: null };
     if (sink) sink.value = '';
     log ('the key to TeXmacs, ' + (p.pasted ? 'with a paste event' : 'the text area: ' +
          JSON.stringify (known.plain.slice (0, 40))));
@@ -215,7 +222,7 @@ var tmClipboard = (function () {
       log ('paste event on ' + e.target.nodeName + ', types ' + (d ? Array.from (d.types) : 'none'));
       var plain = d ? d.getData ('text/plain') || '' : '', html = d ? d.getData ('text/html') || '' : '';
       if (!plain && !html) return; // into the text area, read by release
-      known = { plain: plain, html: html };
+      known = { plain: plain, html: html, texmacs: fromHtml (html) };
       e.preventDefault ();
       if (pending) pending.pasted = true;
       release ();
@@ -286,7 +293,7 @@ var tmClipboard = (function () {
       function take (plain, html) {
         plain = (plain || '').replace (/\r\n?/g, '\n');
         if (!plain && !html) { note.textContent = 'The clipboard has no text.'; return; }
-        known = { plain: plain, html: html || '' };
+        known = { plain: plain, html: html || '', texmacs: fromHtml (html) };
         log ('from the browser: ' + JSON.stringify (plain.slice (0, 40)));
         got = true;
         close ();
@@ -366,8 +373,11 @@ var tmClipboard = (function () {
   return {
     fromBrowser: fromBrowser,
     // what TeXmacs copies: kept here, and given to the system
-    write: function (plain, html) {
-      known = { plain: plain, html: html };
+    write: function (plain, html, texmacs) {
+      known = { plain: plain, html: html, texmacs: texmacs || null };
+      // the HTML for the system: that of TeXmacs (or the text), with the
+      // TeXmacs format in it
+      html = withTeXmacs (html || (texmacs ? asHtml (plain) : ''), texmacs);
       if (typeof navigator === 'undefined' || !navigator.clipboard) return;
       // the write started by the key of the copy (Safari), else as below
       var job = copying;
@@ -382,6 +392,8 @@ var tmClipboard = (function () {
       writeLate (plain, html);
     },
     // what TeXmacs pastes: null when there is nothing of that type
+    // the TeXmacs format of the clipboard (bytes), or null
+    texmacs: function () { return known.texmacs; },
     read: function (mime) {
       var s = mime === 'text/html' ? known.html
             : /^text\/plain/.test (mime) ? known.plain : '';
@@ -390,6 +402,25 @@ var tmClipboard = (function () {
   };
 
   // the text of a copy as HTML, for the HTML of the write of a key
+  // the TeXmacs format in the HTML of a copy, and back (MARK, above)
+  function withTeXmacs (html, texmacs) {
+    if (!html || !texmacs || !texmacs.length) return html;
+    var bin = '';
+    for (var i = 0; i < texmacs.length; i += 0x8000)
+      bin += String.fromCharCode.apply (null, texmacs.subarray (i, i + 0x8000));
+    return '<span data-texmacs-clipboard="' + btoa (bin) + '"></span>' + html;
+  }
+  function fromHtml (html) {
+    var m = html && MARK.exec (html);
+    if (!m) return null;
+    try {
+      var bin = atob (m[1]), r = new Uint8Array (bin.length);
+      for (var i = 0; i < bin.length; i++) r[i] = bin.charCodeAt (i);
+      log ('the TeXmacs format of the paste, ' + r.length + ' bytes');
+      return r;
+    } catch (e) { return null; }
+  }
+
   function asHtml (plain) {
     return '<pre>' + plain.replace (/&/g, '&amp;').replace (/</g, '&lt;')
                           .replace (/>/g, '&gt;') + '</pre>';
@@ -516,6 +547,45 @@ var tmClipboard = (function () {
       else navigator.clipboard.writeText (plain).then (done, failed);
     } catch (e) { failed (e); }
   }
+})();
+
+// The modifiers which the browser does not report as keys: Firefox with
+// privacy.resistFingerprinting (the default of LibreWolf) sends no keydown
+// nor keyup for Alt, Control, Meta and Shift, only their flags on the other
+// keys and on the clicks. SDL follows the keys of the modifiers: Option+Left
+// was Left for it (no word to the left), Option+Tab Tab. The flags of each
+// key and click are compared with what SDL was told, and the press or the
+// release of a modifier it missed is given to it first.
+(function () {
+  if (typeof window === 'undefined') return;
+  var MODS = [['altKey', 'Alt', 'AltLeft'], ['ctrlKey', 'Control', 'ControlLeft'],
+              ['metaKey', 'Meta', 'MetaLeft'], ['shiftKey', 'Shift', 'ShiftLeft']];
+  var down = {};   // the modifiers down, as SDL knows them
+  function modifier (key) {
+    for (var i = 0; i < MODS.length; i++) if (MODS[i][1] === key) return MODS[i];
+    return null;
+  }
+  function sync (e) {
+    MODS.forEach (function (m) {
+      var flag = !!e[m[0]];
+      if (flag === !!down[m[1]]) return;
+      down[m[1]] = flag;
+      window.dispatchEvent (new KeyboardEvent (flag ? 'keydown' : 'keyup', {
+        key: m[1], code: m[2], location: 1, bubbles: true, cancelable: true,
+        altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey }));
+    });
+  }
+  function key (e) {
+    if (!e.isTrusted) return;
+    if (modifier (e.key)) { down[e.key] = e.type === 'keydown'; return; } // reported
+    sync (e);
+  }
+  window.addEventListener ('keydown', key, true);
+  window.addEventListener ('keyup', key, true);
+  ['pointerdown', 'pointerup'].forEach (function (t) {
+    window.addEventListener (t, function (e) { if (e.isTrusted) sync (e); }, true);
+  });
+  window.addEventListener ('blur', function (e) { if (e.target === window) down = {}; });
 })();
 
 // Control and a click on a Mac (the right click of a trackpad or of a mouse

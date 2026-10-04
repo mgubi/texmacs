@@ -4866,9 +4866,27 @@ static hashmap<string,string> selection_s ("");
 // clipboard is the one which was copied with it.
 EM_JS_DEPS (vue_web_clipboard, "$stringToNewUTF8,$UTF8ToString");
 
-EM_JS (void, vue_web_clipboard_write, (const char* plain, const char* html), {
+// the copy, to the page: its text and its HTML in UTF-8, and the TeXmacs
+// format (n bytes, in the encoding of TeXmacs), which the page puts into the
+// HTML it gives to the system, so that another page of TeXmacs (another tab,
+// the page reloaded) pastes it with its structure
+EM_JS (void, vue_web_clipboard_write, (const char* plain, const char* html,
+                                       const char* tm, int n), {
   if (typeof tmClipboard !== 'undefined')
-    tmClipboard.write (UTF8ToString (plain), UTF8ToString (html));
+    tmClipboard.write (UTF8ToString (plain), UTF8ToString (html),
+                       n > 0 ? HEAPU8.slice (tm, tm + n) : null);
+});
+
+// the TeXmacs format which came with the clipboard of the page (from a copy
+// of another page of TeXmacs, in its HTML): its length, then its bytes
+EM_JS (int, vue_web_clipboard_texmacs_length, (), {
+  var t = (typeof tmClipboard !== 'undefined') ? tmClipboard.texmacs () : null;
+  return t ? t.length : 0;
+});
+
+EM_JS (void, vue_web_clipboard_texmacs_take, (char* buf), {
+  var t = tmClipboard.texmacs ();
+  if (t) HEAPU8.set (t, buf);
 });
 
 EM_JS (char*, vue_web_clipboard_read, (const char* mime), {
@@ -4882,11 +4900,19 @@ static void*
 web_clipboard_get (const char* mime, size_t* size) {
   string m (mime);
   if (m == "application/x-texmacs-clipboard") {
-    if (N(web_clip_texmacs) == 0) return NULL;
     char* p= vue_web_clipboard_read ("text/plain");
     bool same= (p != NULL) && string (p) == web_clip_plain;
     free (p);
-    if (!same) return NULL;
+    if (N(web_clip_texmacs) == 0 || !same) {
+      // the TeXmacs format of a copy made in another page of TeXmacs
+      int n= vue_web_clipboard_texmacs_length ();
+      if (n <= 0) return NULL;
+      char* r= (char*) SDL_malloc (n + 1);
+      vue_web_clipboard_texmacs_take (r);
+      r[n]= '\0';
+      *size= n;
+      return r;
+    }
     c_string c (web_clip_texmacs);
     void* r= SDL_malloc (N(web_clip_texmacs) + 1);
     memcpy (r, (char*) c, N(web_clip_texmacs) + 1);
@@ -5099,8 +5125,8 @@ bool set_selection (string key, tree t,
                                              : clip_data->texmacs_data;
   web_clip_plain  = plain;
   web_clip_texmacs= clip_data->texmacs_data;
-  c_string c_plain (plain), c_html (clip_data->html_text);
-  vue_web_clipboard_write (c_plain, c_html);
+  c_string c_plain (plain), c_html (clip_data->html_text), c_tm (web_clip_texmacs);
+  vue_web_clipboard_write (c_plain, c_html, c_tm, N(web_clip_texmacs));
   delete clip_data;
   return true;
 #endif
