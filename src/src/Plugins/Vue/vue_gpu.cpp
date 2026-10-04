@@ -254,6 +254,8 @@ struct glyph_key_hash {
 struct glyph_slot {
   int x, y, w, h;       // in the atlas
   SI xo, yo;            // the offsets of shrink
+  bool mupdf;           // rendered by MuPDF: placed by dx, dy instead
+  int dx, dy;           // its top left corner from the origin (pixels, y down)
 };
 
 struct slug_glyph {
@@ -1507,11 +1509,22 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   glyph_key k { (void*) fng.rep, c };
   auto it= G.glyphs.find (k);
   if (it == G.glyphs.end ()) {
-    glyph pre_gl= fng->get (c);
-    if (is_nil (pre_gl)) return;
-    SI xo, yo;
-    glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
-    int w= gl->width, h= gl->height;
+    // the glyph rendered by MuPDF when its font has a file, antialiased at
+    // its size and as the MuPDF renderer draws it; else the bitmap of
+    // TeXmacs, rendered at std_shrinkf times its size and shrunk
+    string mcov;
+    int mw= 0, mh= 0, mx= 0, my= 0;
+    bool from_mupdf= mupdf_glyph_bitmap (fng->res_name, c, mcov, mw, mh, mx, my);
+    glyph gl;
+    SI xo= 0, yo= 0;
+    int w, h;
+    if (from_mupdf) { w= mw; h= mh; }
+    else {
+      glyph pre_gl= fng->get (c);
+      if (is_nil (pre_gl)) return;
+      gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, 1.0);
+      w= gl->width; h= gl->height;
+    }
     if (w > 512 || h > 512) return;
     if (G.ax + w + 1 > ATLAS) { G.ax= 0; G.ay += G.arow + 1; G.arow= 0; }
     if (G.ay + h + 1 > ATLAS) {
@@ -1522,28 +1535,39 @@ gpu_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
       G.ax= 4; G.ay= 0; G.arow= 4;
     }
     if (w > 0 && h > 0) {
-      int nr_cols= std_shrinkf * std_shrinkf;
-      if (nr_cols >= 64) nr_cols= 64;
       std::vector<unsigned char> cov ((size_t) w * h);
-      for (int j= 0; j < h; j++)
-        for (int i= 0; i < w; i++)
-          cov[j*w + i]= (unsigned char) min (255, (255 * gl->get_x (i, j)) / nr_cols);
+      if (from_mupdf) memcpy (cov.data (), &mcov[0], (size_t) w * h);
+      else {
+        int nr_cols= std_shrinkf * std_shrinkf;
+        if (nr_cols >= 64) nr_cols= 64;
+        for (int j= 0; j < h; j++)
+          for (int i= 0; i < w; i++)
+            cov[j*w + i]= (unsigned char) min (255, (255 * gl->get_x (i, j)) / nr_cols);
+      }
       // what is queued from the atlas is drawn before it changes
       if (G.mode == 2) flush_quads ();
       glBindTexture (GL_TEXTURE_2D, G.atlas);
       glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
       glTexSubImage2D (GL_TEXTURE_2D, 0, G.ax, G.ay, w, h, GL_RED, GL_UNSIGNED_BYTE, cov.data ());
     }
-    G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo };
+    G.glyphs[k]= { G.ax, G.ay, w, h, xo, yo, from_mupdf, mx, my };
     G.fonts.push_back (fng);
     G.ax += w + 1; G.arow= max (G.arow, h);
     it= G.glyphs.find (k);
   }
   const glyph_slot& s= it->second;
   if (s.w <= 0 || s.h <= 0) return;
-  // placed as the MuPDF renderer places its glyph images
-  double left= to_x (x - s.xo * std_shrinkf);
-  double bottom= to_y (y + s.yo * std_shrinkf - s.h * pixel);
+  // placed as the MuPDF renderer places its glyphs: rendered by MuPDF from
+  // the origin, or as its images of the bitmaps of TeXmacs
+  double left, bottom;
+  if (s.mupdf) {
+    left= to_x (x) + s.dx;
+    bottom= to_y (y) - s.dy - s.h;  // y up: the top is s.dy below the origin
+  }
+  else {
+    left= to_x (x - s.xo * std_shrinkf);
+    bottom= to_y (y + s.yo * std_shrinkf - s.h * pixel);
+  }
   float A= (float) ATLAS;
   if (pen->get_type () == pencil_brush && !is_nil (pen->get_brush ()) &&
       pen->get_brush ()->get_type () == brush_pattern) {

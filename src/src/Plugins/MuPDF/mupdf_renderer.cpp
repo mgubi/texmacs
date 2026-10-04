@@ -2226,17 +2226,55 @@ outline_curve (fz_context* ctx, void* arg, float x1, float y1,
   }
 }
 
-bool
-mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em) {
+// the MuPDF font of a TeXmacs font, as draw loads it, and the size of an
+// em in pixels; NULL when the font has no file
+static fz_font*
+glyph_font (string fontname, double& em) {
   if (!native_fonts->contains (fontname)) {
     pdf_font_desc* fd= load_pdf_font (fontname);
     native_fonts (fontname)= mupdf_font (fd);
     if (fd != NULL) pdf_drop_font (mupdf_context (), fd);
   }
   pdf_font_desc* fd= native_fonts (fontname)->fn;
-  if (fd == NULL || fd->font == NULL) return false;
+  if (fd == NULL || fd->font == NULL) return NULL;
   em= font_size (fontname) / std_shrinkf;
-  fz_font* font= fd->font;
+  return fd->font;
+}
+
+bool
+mupdf_glyph_bitmap (string fontname, int c, string& cov,
+                    int& w, int& h, int& x0, int& y0) {
+  double em= 0;
+  fz_font* font= glyph_font (fontname, em);
+  if (font == NULL) return false;
+  unsigned int gid= mupdf_glyph_index (font, c);
+  fz_context* ctx= mupdf_context ();
+  // the glyph space (y up, an em a unit) to the device (y down), the
+  // origin on a whole pixel, as the text of draw lands
+  fz_matrix ctm= fz_make_matrix ((float) em, 0, 0, (float) -em, 0, 0);
+  fz_irect scissor= fz_infinite_irect;
+  fz_pixmap* pix= NULL;
+  if (!mupdf_protected ("mupdf_glyph_bitmap", [&] () {
+        pix= fz_render_glyph_pixmap (ctx, font, (int) gid, &ctm, &scissor,
+                                     fz_text_aa_level (ctx)); }))
+    return false;
+  cov= string ();
+  w= h= x0= y0= 0;
+  if (pix == NULL) return true; // a glyph with no ink (a space)
+  w= pix->w; h= pix->h; x0= pix->x; y0= pix->y;
+  cov= string ((int) (w * h));
+  for (int y= 0; y < h; y++) {
+    const unsigned char* sp= pix->samples + (size_t) y * pix->stride;
+    for (int x= 0; x < w; x++, sp += pix->n) cov[y*w + x]= (char) sp[pix->n - 1];
+  }
+  fz_drop_pixmap (ctx, pix);
+  return true;
+}
+
+bool
+mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em) {
+  fz_font* font= glyph_font (fontname, em);
+  if (font == NULL) return false;
   unsigned int gid= mupdf_glyph_index (font, c);
   fz_context* ctx= mupdf_context ();
   fz_path* path= NULL;

@@ -985,11 +985,16 @@ variable, or when no GL context can be made, everything is as before.
   (`gpu_translate_picture`), the smooth zoom copies it
   (`gpu_copy_picture`). The shadow is a proxy on the same target, as in
   the MuPDF renderer; the store of the active graphics a real copy.
-* **Text and fills** are textured quads in one batch: the glyphs are the
-  glyph bitmaps of TeXmacs (`shrink`, as the X11 and the Qt ports draw
-  them, placed as the MuPDF renderer places its bitmap glyphs) in an atlas
-  (one R8 texture, emptied when full), the fills sample a white corner of
-  it. A batch is drawn when its target, its texture or its clip (a
+* **Text and fills** are textured quads in one batch: the glyphs are in
+  an atlas (one R8 texture, emptied when full), the fills sample a white
+  corner of it. A glyph of a font with a file is rendered by MuPDF
+  (`mupdf_glyph_bitmap`: antialiased at its size, its origin on a pixel,
+  as the MuPDF renderer draws its text), so that the text is the MuPDF
+  renderer's to a level or two; the others are the glyph bitmaps of
+  TeXmacs (rendered at `std_shrinkf` = 5 times their size in black and
+  white, then `shrink`, as the X11 port draws them), placed as the MuPDF
+  renderer places them. The bitmaps of TeXmacs were half of a repaint on a
+  page of many fonts, each new glyph rasterized at 25 times its area. A batch is drawn when its target, its texture or its clip (a
   scissor) changes. Thin horizontal and vertical lines (the rules of
   mathematics, the borders of tables) are quads too. Glyphs filled with a
   pattern multiply the coverage by the pattern, sampled from the origin of
