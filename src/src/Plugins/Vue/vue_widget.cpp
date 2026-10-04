@@ -1284,7 +1284,7 @@ static void
 render_triangle_fn (renderer ren, void* data, rectangle r) {
   int code= (int) (intptr_t) data, dir= code & 3;
   SI cx= (r->x1 + r->x2) / 2, cy= (r->y1 + r->y2) / 2;
-  SI a= (min (r->x2 - r->x1, r->y2 - r->y1) * 3) / 8; // half the long side
+  SI a= (min (r->x2 - r->x1, r->y2 - r->y1) * 5) / 16; // half the long side
   SI b= (a * 7) / 8;                             // half the height
   array<SI> x (3), y (3);
   switch (dir) {
