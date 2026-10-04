@@ -59,6 +59,8 @@ Module['preRun'].push(function () {
   // the console (TEXMACS_VUE_PROFILE, see vue_profile_frame in vue_gui.cpp)
   var prof = /^\d+$/.exec (tmAddress.get ('profile') || '');
   if (prof) ENV['TEXMACS_VUE_PROFILE'] = prof[0];
+  // texmacs.html?gpu=1: drawn by WebGL2 (vue_gpu.cpp), in a build with ThorVG
+  if (tmAddress.get ('gpu') === '1') ENV['TEXMACS_VUE_GPU'] = '1';
   FS.mkdirTree ('/home/web');
   FS.mount (IDBFS, { autoPersist: false }, '/home/web');
   addRunDependency ('home');

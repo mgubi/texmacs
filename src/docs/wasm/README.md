@@ -173,6 +173,24 @@ Locally:
   program had been compiled: the two downloads followed each other. `serve.mjs [dir] [port] [KB/s]` and
   `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
 
+## Drawing with the GPU: `texmacs.html?gpu=1`
+
+A build with ThorVG draws the windows with WebGL2 instead of MuPDF (see
+*The GPU renderer* in [../vue-graphics-stack.md](../vue-graphics-stack.md)):
+
+```sh
+sh misc/thorvg/build-thorvg.sh <dir> wasm          # ThorVG in <dir>/wasm
+make -C build-wasm -f ../misc/wasm/Makefile THORVG=<dir>/wasm ... web
+```
+
+and the page draws with the GPU when its address has `?gpu=1` (which sets
+`TEXMACS_VUE_GPU`); without it, it draws with MuPDF as before. Measured in
+headless Firefox on an Apple M1 (Retina, the document of 200 paragraphs of
+`TeXmacs.later`-driven forced repaints, `?profile=20`, times with the GPU's):
+a full repaint of the editor 3.5 ms against 6.6 ms with MuPDF (19.1 ms
+before the work of October 2026 on the MuPDF renderer), and the canvas
+upload of every frame (2 ms) is gone.
+
 ## Optimization
 
 `OPT` of the Makefile (`-O2` by default) is that of the compilation and of

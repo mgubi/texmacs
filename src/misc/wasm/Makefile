@@ -52,6 +52,13 @@ OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
 
+# the GPU renderer of the Vue port (src/Plugins/Vue/vue_gpu.cpp, asked for
+# with ?gpu=1): THORVG=<prefix> where misc/thorvg/build-thorvg.sh <dir>
+# wasm installed ThorVG (<dir>/wasm)
+ifneq ($(THORVG),)
+CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1
+endif
+
 # the headers each object includes (obj/....d): a change of a header, of
 # config.h (-include) or of those of MuPDF compiles again the objects which
 # include it, else an object built against the old layout of a class gives
@@ -62,6 +69,10 @@ LDFLAGS  := $(OPT) $(EH) -sUSE_SDL=3 -sALLOW_MEMORY_GROWTH=1 \
   -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=16777216 \
   -sEXIT_RUNTIME=0 -sFORCE_FILESYSTEM=1
 LIBS     := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a -lm
+ifneq ($(THORVG),)
+LIBS     += $(THORVG)/lib/libthorvg-1.a
+LDFLAGS  += -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2
+endif
 # a new MuPDF (build-mupdf.sh, its patches) links the program again
 LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a
 
