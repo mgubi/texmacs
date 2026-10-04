@@ -92,13 +92,23 @@
 
 (define glue-redefined '())
 
+;; Guile 2/3 have neither closure? nor the arity procedure property
+(cond-expand
+  (guile-2
+    (use-modules (system vm program))
+    (define (glue-closure? f) (not (primitive-code? (program-code f))))
+    (define (glue-arity f) (procedure-minimum-arity f)))
+  (else
+    (define (glue-closure? f) (closure? f))
+    (define (glue-arity f) (procedure-property f 'arity))))
+
 ;; the procedure bound to a glue name, as the glue installed it: a name
 ;; which Scheme code has redefined (tm-define) is a closure, not the glue
 ;; primitive, and is left out of the checks of the primitive
 (define (glue-primitive name)
   (and (defined? name)
        (with f (eval name)
-         (and (procedure? f) (not (closure? f)) f))))
+         (and (procedure? f) (not (glue-closure? f)) f))))
 
 (define (test-glue-bindings decls)
   (for (e decls)
@@ -109,10 +119,10 @@
             ((not (procedure? (eval name)))
              (glue-check "bindings" (symbol->string name) #f
                          "not a procedure"))
-            ((closure? (eval name))
+            ((glue-closure? (eval name))
              (set! glue-redefined (cons name glue-redefined)))
             (else
-             (with arity (procedure-property (eval name) 'arity)
+             (with arity (glue-arity (eval name))
                (glue-check "bindings" (symbol->string name)
                            (equal? arity (list nr 0 #f))
                            (string-append "declared with "

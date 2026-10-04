@@ -643,7 +643,8 @@
 
 (define (arity-ok? f n)
   ;; f can be called with n arguments
-  (with a (procedure-property f 'arity)
+  (with a (cond-expand (guile-2 (procedure-minimum-arity f))
+                       (else (procedure-property f 'arity)))
     (or (not a)
         (and (<= (car a) n)
              (or (caddr a) (<= n (+ (car a) (cadr a))))))))
