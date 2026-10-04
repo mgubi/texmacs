@@ -5,9 +5,9 @@ TeXmacs has three icon sets. The choice is made in
 
 | Set | Directory | Source |
 |---|---|---|
-| Classical (default) | `TeXmacs/misc/pixmaps/{light,dark}`, `pixmaps/modern`, `pixmaps/traditional` | the original icons, unchanged |
+| Classical | `TeXmacs/misc/pixmaps/{light,dark}`, `pixmaps/modern`, `pixmaps/traditional` | the original icons, unchanged |
 | Monochrome | `TeXmacs/misc/pixmaps/monochrome/{light,dark}` | `misc/icons/make-icons.py` |
-| Neo-classical | `TeXmacs/misc/pixmaps/neoclassical/{light,dark}` | `misc/icons/neoclassical/make-neoclassical.py` |
+| Neo-classical (default) | `TeXmacs/misc/pixmaps/neoclassical/{light,dark}` | `misc/icons/neoclassical/make-neoclassical.py` |
 
 Specimen sheets, with every icon of a set and its name on light and dark
 pages: [classical.pdf](classical.pdf), [monochrome.pdf](monochrome.pdf),

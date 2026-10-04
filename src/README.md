@@ -114,7 +114,7 @@ This branch gives TeXmacs a choice of three icon sets, in
 and the original code that finds them are unchanged; the new sets are added
 on top of them.
 
-**Classical.** The original TeXmacs icons, the default.
+**Classical.** The original TeXmacs icons.
 
 ![Classical icons](doc/icons/classical-toolbars.png)
 
@@ -126,7 +126,8 @@ kept for errors and removals, letters in Latin Modern.
 
 **Neo-classical.** The compositions and colours of the classical icons,
 modernized: a soft palette, light gradients, dark grey outlines, rounded
-corners; flat in the focus bar.
+corners; flat in the focus bar. This is the default set, when the
+preference has not been set.
 
 ![Neo-classical icons](doc/icons/neoclassical-toolbars.png)
 
