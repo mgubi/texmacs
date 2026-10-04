@@ -389,3 +389,26 @@ async_eval_pending () {
     }
     else i++;
 }
+
+/******************************************************************************
+* User information
+******************************************************************************/
+
+string get_user_login () {
+#ifdef OS_MINGW
+  return get_env ("USERNAME");
+#else
+  return unix_get_login ();
+#endif
+}
+
+string get_user_name () {
+#ifdef OS_MINGW
+  // the Windows entry point stores the display name (GetUserNameExW) in
+  // TEXMACS_DISPLAYNAME (see Plugins/Windows64/windows64_entrypoint.cpp)
+  string name= get_env ("TEXMACS_DISPLAYNAME");
+  return name == ""? get_env ("USERNAME"): name;
+#else // Linux and macOS
+  return unix_get_username ();
+#endif
+}

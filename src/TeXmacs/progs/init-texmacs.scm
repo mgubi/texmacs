@@ -11,117 +11,10 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cond ((os-mingw?)
-       (debug-set! stack 0))
-      ((os-macos?)
-       (debug-set! stack 2000000))
-      (else
-       (debug-set! stack 1000000)))
+;; Loaded by init-s7.scm or init-guile.scm, after init-kernel.scm; common
+;; to both interpreters. The initialization file that TeXmacs loads first
+;; is the one of the Scheme backend (scheme_init_file in C++).
 
-(define boot-start (texmacs-time))
-(define remote-client-list (list))
-
-(define developer-mode?
-  (equal? (cpp-get-preference "developer tool" "off") "on"))
-
-(if developer-mode?
-    (debug-enable 'backtrace 'debug))
-
-(define (%new-read-hook sym) (noop)) ; for autocompletion
-
-(define-public macro-keywords '(define-macro define-public-macro 
-                                tm-define-macro))
-(define-public def-keywords
-  `(define-public provide-public
-    tm-define tm-menu menu-bind tm-widget ,@macro-keywords))
-
-(define tm-interactive-hook tm-interactive)
-
-(define old-read read)
-(define (new-read port)
-  "A redefined reader which stores line number and file name in symbols."
-  ;; FIXME: handle overloaded definitions
-  (let ((form (old-read port)))
-    (if (and (pair? form) (member (car form) def-keywords))
-        (let* ((l (source-property form 'line))
-               (c (source-property form 'column))
-               (f (source-property form 'filename))
-               (sym  (if (pair? (cadr form)) (caadr form) (cadr form))))
-          (if (symbol? sym) ; Just in case
-              (let ((old (or (symbol-property sym 'defs) '()))
-                    (new `(,f ,l ,c)))
-                (%new-read-hook sym)
-                (if (and (member (car form) macro-keywords)
-                         (not (member sym def-keywords)))
-                    (set! def-keywords (cons sym def-keywords)))
-                (if (not (member new old))
-                    (set-symbol-property! sym 'defs (cons new old)))))))
-    form))
-
-(define old-primitive-load primitive-load)
-(define (new-primitive-load filename)
-  (if (member (scheme-dialect) (list "guile-a" "guile-b"))
-      (old-primitive-load filename)
-      ;; We explicitly circumvent guile's decision to set the current-reader
-      ;; to #f inside ice-9/boot-9.scm, try-module-autoload
-      (with-fluids ((current-reader read))
-                   (old-primitive-load filename))))
-
-(if developer-mode?
-    (begin
-      (module-export! (current-module)
-                      '(%new-read-hook old-read new-read def-keywords))
-      (set! read new-read)
-      (module-export! (current-module)
-                      '(old-primitive-load new-primitive-load))
-      (set! primitive-load new-primitive-load)))
-
-;; TODO: scheme file caching using (set! primitive-load ...) and
-;; (set! %search-load-path)
-
-;;(debug-enable 'backtrace 'debug)
-;; (define load-indent 0)
-;; (define old-primitive-load primitive-load)
-;; (define (new-primitive-load . x)
-;;   (for-each display (make-list load-indent "  "))
-;;   (display "Load ") (apply display x) (display "\n")
-;;   (set! load-indent (+ load-indent 1))
-;;   (apply old-primitive-load x)
-;;   (set! load-indent (- load-indent 1))
-;;   (for-each display (make-list load-indent "  "))
-;;   (display "Done\n"))
-;; (set! primitive-load new-primitive-load)
-
-;(display "Booting TeXmacs kernel functionality\n")
-(if (and (os-mingw?) (string= (gui-version) "qt4"))
-    (load "kernel/boot/boot.scm")
-    (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
-(inherit-modules (kernel boot compat) (kernel boot abbrevs)
-                 (kernel boot debug) (kernel boot srfi)
-                 (kernel boot ahash-table) (kernel boot prologue))
-(inherit-modules (kernel library base) (kernel library list)
-                 (kernel library tree) (kernel library content)
-                 (kernel library patch))
-(inherit-modules (kernel regexp regexp-match) (kernel regexp regexp-select))
-(inherit-modules (kernel logic logic-rules) (kernel logic logic-query)
-                 (kernel logic logic-data))
-(inherit-modules (kernel texmacs tm-define)
-                 (kernel texmacs tm-preferences) (kernel texmacs tm-modes)
-                 (kernel texmacs tm-plugins) (kernel texmacs tm-secure)
-                 (kernel texmacs tm-convert) (kernel texmacs tm-dialogue)
-                 (kernel texmacs tm-language) (kernel texmacs tm-file-system)
-                 (kernel texmacs tm-states))
-(inherit-modules (kernel gui gui-markup)
-                 (kernel gui menu-define) (kernel gui menu-widget)
-                 (kernel gui kbd-define)
-                 (kernel gui speech-define)
-                 (kernel gui kbd-handlers)
-                 (kernel gui menu-test)
-                 (kernel old-gui old-gui-widget)
-                 (kernel old-gui old-gui-factory)
-                 (kernel old-gui old-gui-form)
-                 (kernel old-gui old-gui-test))
-(lazy-define (kernel gui menu-convert) make-menu-widget**)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -435,7 +328,7 @@
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
 ;(display "Booting database facilities\n")
-(lazy-define (database db-widget) open-db-chooser)
+(lazy-define (database db-widgets) open-db-chooser)
 (lazy-define (database db-menu) db-show-toolbar)
 (lazy-define (database db-convert) db-url?)
 (lazy-define (database bib-db) zealous-bib-import zealous-bib-export)
@@ -577,3 +470,40 @@
 (delayed (:idle 10000) (autosave-delayed))
 (texmacs-banner)
 ;(display "Initialization done\n")
+
+;; Benchmarks for developers (not run at boot):
+;;   (benchmark-menu-expand), or texmacs.bin -x "(benchmark-manual)"
+
+(tm-define (benchmark-menu-expand)
+  (display "------------------------------------------------------\n")
+  (display "Benchmark menu-expand\n")
+  (let ((start (texmacs-time)))
+  (display (menu-expand '(horizontal (link texmacs-main-icons))))
+  (newline)
+  (display "Time: ") (display (- (texmacs-time) start)) (newline))
+  (display "------------------------------------------------------\n")
+)
+
+
+(tm-define (benchmark-manual)
+(exec-delayed (lambda ()
+(let ((root (url-resolve (url-unix "$TEXMACS_DOC_PATH" "main/man-manual.en.tm") "r"))
+      (start-time (texmacs-time))
+      (update (lambda (cont)
+                (generate-all-aux)
+                (update-current-buffer)
+                (exec-delayed cont))))
+  (tmdoc-expand-help root "book")
+  (exec-delayed
+    (lambda ()
+      (update
+        (lambda ()
+          (update
+            (lambda ()
+              (update
+                (lambda ()
+                  (buffer-pretend-saved (current-buffer))
+                  (display "Timing:") (display (- (texmacs-time) start-time)) (newline)
+                  ;(quit-TeXmacs)
+                  ))))))))))))
+

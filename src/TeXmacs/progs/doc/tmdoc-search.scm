@@ -45,9 +45,10 @@
 ;; Other useful subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define ((wrap-explain pred?) t)
-  (and (tm-func? t 'explain 2)
-       (tm-find (tree-ref t 0) pred?)))
+(define (wrap-explain pred?)
+  (lambda (t)
+    (and (tm-func? t 'explain 2)
+         (tm-find (tree-ref t 0) pred?))))
 
 (define (url-search-exact u what)
   (with pred? (wrap-explain (cut tm-equal? <> what))

@@ -197,16 +197,6 @@
         ((== x #t) "true")
         (else x)))
 
-(define-public (procedure-symbol-name fun)
-  (cond ((symbol? fun) fun)
-        ((string? fun) (string->symbol fun))
-        ((and (procedure? fun) (procedure-name fun)) => identity)
-        (else #f)))
-
-(define-public (procedure-string-name fun)
-  (and-with name (procedure-symbol-name fun)
-    (symbol->string name)))
-
 (define (interactive-password-args fun)
   ;; the positions ("0", "1"...) of the arguments of @fun of type password:
   ;; what is typed there is not learned, since the learned values are saved
@@ -336,7 +326,7 @@
 
 (tm-define (interactive-title fun)
   (let* ((val (property fun :synopsis))
-         (name (procedure-name fun))
+         (name (procedure-symbol-name fun))
          (name* (and name (symbol->string name))))
     (or (and (list-1? val) (string? (car val)) (car val))
         (and name (string-append "Interactive command '" name* "'"))

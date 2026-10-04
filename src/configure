@@ -768,6 +768,7 @@ ICONV_CFLAGS
 ICONV_CPP
 ICONV_CXX
 CXXCPP
+SCHEME_DIR
 GUILE_LIBS
 GUILE_LDFLAGS
 GUILE_CFLAGS
@@ -929,6 +930,7 @@ enable_dumpflags
 with_tmrepo
 with_texmacs_builder
 enable_static
+with_scheme
 with_guile
 enable_guile2
 with_iconv
@@ -1646,6 +1648,8 @@ Optional Packages:
   --with-tmrepo[=no]      absolute texmacs sdk path
   --with-texmacs-builder[=no]
                           absolute texmacs builder path
+  --with-scheme[=s7|guile]
+                          Scheme interpreter to use [default=s7]
   --with-guile[=system]   path to to find guile-config or [embedded] if any
                           tm-guile package included
   --with-iconv[=DIR]      where to find iconv []
@@ -9171,6 +9175,33 @@ printf '%s\n' "$as_me: INTL_LDFLAGS:$INTL_LDFLAGS" >&6;}
 
 
 
+
+# Check whether --with-scheme was given.
+if test ${with_scheme+y}
+then :
+  withval=$with_scheme;
+else case e in #(
+  e) with_scheme=s7 ;;
+esac
+fi
+
+  case "$with_scheme" in
+    (s7 | S7)
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: using the S7 Scheme interpreter (vendored in src/Scheme/S7)" >&5
+printf '%s\n' "$as_me: using the S7 Scheme interpreter (vendored in src/Scheme/S7)" >&6;}
+
+printf '%s\n' "#define USE_S7 1" >>confdefs.h
+
+      SCHEME_DIR=S7
+      ;;
+    (guile | Guile)
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: using the Guile Scheme interpreter" >&5
+printf '%s\n' "$as_me: using the Guile Scheme interpreter" >&6;}
+
+printf '%s\n' "#define USE_GUILE 1" >>confdefs.h
+
+      SCHEME_DIR=Guile
+
   # configure enters cross-compilation mode if and only if --host is passed.
   if test $cross_compiling = "yes"; then
     { printf '%s\n' "$as_me:${as_lineno-$LINENO}: Guile version $GUILE_VERSION" >&5
@@ -13335,6 +13366,13 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
 
     ;;
   esac
+
+      ;;
+    (*)
+      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7 or guile" "$LINENO" 5
+      ;;
+  esac
+
 
 
   { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for library containing dlopen" >&5

@@ -13,7 +13,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (convert html htmltm-test)
+  (:use (kernel boot abbrevs-test)
+        (kernel logic logic-engine-test)
+        (kernel texmacs tm-define-test)
+        (kernel texmacs tm-dialogue-test)
+        (kernel texmacs tm-convert-test)
+        (kernel texmacs tm-glue-test)
+        (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
         (convert tools tmlength-test)
@@ -53,6 +59,10 @@
         (check macro-drd-test)
         (check crypto-test)
         (check plugins-test)))
+
+;; test suites which only make sense with S7
+(if (s7-scheme?)
+    (use-modules (kernel boot compat-s7-test) (kernel boot boot-s7-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -116,6 +126,11 @@
 ;; the first one) or integration (integration-test-group adds them to
 ;; integration-failure-total).
 (define regression-suites
+  (append
+   (if (s7-scheme?)
+       '(("compat-s7" regtest-compat-s7 error)
+         ("boot-s7" regtest-boot-s7 error))
+       '())
   '(("htmltm" regtest-htmltm error)
     ("xmltm" regtest-xmltm error)
     ("tmlength" regtest-tmlength error)
@@ -165,8 +180,13 @@
     ("kbd-menu" kbd-menu-test-failures count)
     ;; loads every style package, and with them the Scheme modules they use
     ("macro-drd" macro-drd-test-failures count)
+    ("tm-define-regression" regtest-tm-define error)
+    ("tm-dialogue" regtest-tm-dialogue error)
+    ("abbrevs" regtest-abbrevs error)
+    ("logic" regtest-logic error)
+    ("tm-glue" regtest-tm-glue error)
     ;; last, since it defines modes and functions in the running TeXmacs
-    ("tm-define" define-test-failures count)))
+    ("tm-define" define-test-failures count))))
 
 (define integration-suites
   '(("deletion-plan" regtest-deletion-plan integration)

@@ -388,23 +388,25 @@
 ;; the one of Scheme.
 (define (test-dates)
   (check-group "dates")
-  (let* ((now (localtime (current-time)))
-         (fmt (lambda (f) (strftime f now))))
-    (check= (ev '(date "%Y-%m-%d")) (fmt "%Y-%m-%d"))
-    (check= (ev '(date "%Y")) (fmt "%Y"))
-    (check= (ev '(date "yyyy")) (fmt "%Y"))
-    (check= (ev '(date "MM/dd" "english")) (fmt "%m/%d"))
-    (check= (ev '(date "MMMM" "english")) (fmt "%B"))
-    (check= (ev '(date)) (ev '(date "MMMM d, yyyy" "british")))
-    (check= (ev '(date "" "german")) (ev '(date "d. MMMM yyyy" "german")))
-    (check= (ev '(date "" "french")) (ev '(date "d MMMM yyyy" "french")))
-    (check= (ev '(date "" "chinese"))
-            (string-append (fmt "%Y") "<#5e74>"
-                           (number->string (+ 1 (tm:mon now))) "<#6708>"
-                           (number->string (tm:mday now)) "<#65e5>"))
-    (check= (ev '(with "language" "german" (date "" "german")))
-            `(with "language" "german" ,(ev '(date "" "german"))))
-    (check= (ev '(date "a" "b" "c")) '(error "bad date"))))
+  ;; S7 has no localtime and strftime to compute the expected dates
+  (when (not (s7-scheme?))
+    (let* ((now (localtime (current-time)))
+           (fmt (lambda (f) (strftime f now))))
+      (check= (ev '(date "%Y-%m-%d")) (fmt "%Y-%m-%d"))
+      (check= (ev '(date "%Y")) (fmt "%Y"))
+      (check= (ev '(date "yyyy")) (fmt "%Y"))
+      (check= (ev '(date "MM/dd" "english")) (fmt "%m/%d"))
+      (check= (ev '(date "MMMM" "english")) (fmt "%B"))
+      (check= (ev '(date "" "chinese"))
+              (string-append (fmt "%Y") "<#5e74>"
+                             (number->string (+ 1 (tm:mon now))) "<#6708>"
+                             (number->string (tm:mday now)) "<#65e5>"))))
+  (check= (ev '(date)) (ev '(date "MMMM d, yyyy" "british")))
+  (check= (ev '(date "" "german")) (ev '(date "d. MMMM yyyy" "german")))
+  (check= (ev '(date "" "french")) (ev '(date "d MMMM yyyy" "french")))
+  (check= (ev '(with "language" "german" (date "" "german")))
+          `(with "language" "german" ,(ev '(date "" "german"))))
+  (check= (ev '(date "a" "b" "c")) '(error "bad date")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Counters

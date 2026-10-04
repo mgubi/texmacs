@@ -60,9 +60,10 @@
       (and (tree-is? s 'cell-ref)
 	   (cell-ref-decode (texmacs->string (tree-ref s 0))))))
 
-(define ((cell-ref-range-sub c1 c2) r)
-  (map (lambda (c) (cell-ref-encode (list r c)))
-       (... c1 c2)))
+(define (cell-ref-range-sub c1 c2)
+  (lambda (r)
+    (map (lambda (c) (cell-ref-encode (list r c)))
+         (... c1 c2))))
 
 (tm-define (cell-ref-range x1 x2)
   (with (r1 c1) (cell-ref-decode x1)

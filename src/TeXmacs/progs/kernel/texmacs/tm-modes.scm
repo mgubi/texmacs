@@ -32,7 +32,12 @@
            (deps* (map list (map texmacs-mode-pred deps)))
            (l (if (== action #t) deps* (cons action deps*)))
            (test (if (null? l) #t (if (null? (cdr l)) (car l) (cons 'and l))))
-           (defn `(define-public (,pred) ,test))
+           (defn (if (s7-scheme?)
+                     ;; register the name: s7 procedures do not know their name
+                     `(begin
+                        (varlet *texmacs-module* ',pred (lambda () ,test))
+                        (ahash-set! tm-defined-name ,pred ',pred))
+                     `(define-public (,pred) ,test)))
            (rules (map (lambda (dep) (list dep mode)) deps))
            (logic-cmd `(logic-rules ,@rules))
            (arch1 `(set-symbol-procedure! ',mode ,pred))
@@ -43,15 +48,23 @@
           (list 'begin defn arch1 arch2 logic-cmd)))))
 
 (define-public-macro (texmacs-modes . l)
-  `(begin
-     (set! temp-module ,(current-module))
-     (set-current-module texmacs-user)
-     ,@(map texmacs-mode l)
-     (set-current-module temp-module)))
+  (if (s7-scheme?)
+      `(begin
+         ,@(map texmacs-mode l))
+      `(begin
+         (set! temp-module ,(current-module))
+         (set-current-module texmacs-user)
+         ,@(map texmacs-mode l)
+         (set-current-module temp-module))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Checking modes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;FIXME: in-active-graphics% and developer-mode%
+; seems to be the only two modes which do not have the associated procedure
+; is the code below meaningful? why we need to do the eval?
+; I want maybe to have the catch inside the eval
 
 (define-public (texmacs-in-mode? mode)
   (with proc (symbol-procedure mode)
@@ -61,7 +74,7 @@
 (define-public (texmacs-mode-mode pred)
   "Get drd predicate name associated to scheme predicate or symbol"
   (if (procedure? pred)
-      (with name (procedure-name pred)
+      (with name (procedure-symbol-name pred)
         (if name (texmacs-mode-mode name) 'unknown%))
       (let* ((pred-str (symbol->string pred))
              (pred-root (substring pred-str 0 (- (string-length pred-str) 1)))

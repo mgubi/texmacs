@@ -139,6 +139,17 @@ themes. Every icon of each set, with its name, is in the specimen sheets
 [doc/icons/README.md](doc/icons/README.md) describes how the sets are chosen
 and the scripts that generate them (`misc/icons/`).
 
+## S7 Scheme (branch `wip_s7`)
+
+TeXmacs can run its Scheme code on [s7](https://ccrma.stanford.edu/software/snd/snd/s7.html)
+instead of Guile 1.8. The interpreter is a build option, `./configure
+--with-scheme=s7|guile` (CMake: `-DSCHEME_IMPL=...`); an s7 build needs no
+Guile at all, not even to regenerate the glue. s7 is vendored unmodified,
+the C++ side talks to it through the usual `tmscm` layer, and the modules
+are s7 environments. The notes in [`docs/s7/`](docs/s7/README.md) describe
+the binding, the boot and the module system, the compatibility layer, the
+build, the open issues and the performance against Guile.
+
 ## Documentation
 GNU TeXmacs is self-documented. You may browse the manual in the `Help` menu or browse the online [one](https://www.texmacs.org/tmweb/manual/web-manual.en.html).
 
