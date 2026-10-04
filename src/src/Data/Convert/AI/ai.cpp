@@ -32,6 +32,7 @@ ai_engine (string model) {
   if (starts (model, "ollama")) return "ollama";
   if (starts (model, "open-mistral")) return "mistral";
   if (starts (model, "albert")) return "albert";
+  if (starts (model, "claude")) return "claude";
   return "unknown";
 }
 
@@ -239,6 +240,7 @@ static hashmap<string,list<string> > ai_last_answers (null_string_list);
 
 static int
 ai_get_history_size () {
+  // the setting of the plug-ins (in the preferences of Albert)
   string s= get_preference ("albert chat history size");
   if (is_int (s)) return as_int (s);
   return ai_default_history_size;
@@ -358,7 +360,7 @@ ai_async_eval_command (tree t, object callback) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))
     return async_eval_system (t[0]->label, callback);
   if (is_compound (t, "http_post", 3) && is_atomic (t[0])
-      && is_tuple (t[1]) && is_atomic (t[2])) {
+      && is_tuple (t[1])) {
     string url; tree data; array<string> headers; 
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
@@ -371,109 +373,183 @@ ai_async_eval_command (tree t, object callback) {
 * Producing the query command for various engines
 ******************************************************************************/
 
-tree
-chatgpt_command (string s, string model, string chat) {
-  (void) model;
-  (void) chat;
-  url u ("$TEXMACS_HOME_PATH/system/tmp/chatgpt.txt");
-  if (save_string (u, s)) return "";
-  string cmd= "openai -k 5000 complete " * as_string (u);
-  return compound ("eval_system", cmd);
+// Every engine is asked by an HTTP request with a JSON body (http_post): by
+// the request link of its plug-in (request_link.cpp), with Qt, curl or, in
+// a web browser, fetch (web_files.cpp). The agent (what the engine is asked
+// to be) is the instruction of the system, and the last prompts and answers
+// of the chat come before the new prompt. All of them answer the requests of
+// a web page (CORS) but Albert; Ollama does when the page is among its
+// OLLAMA_ORIGINS.
+
+static string
+ai_key (string engine, string env) {
+  return as_string (call ("ai-api-key", engine, env));
 }
 
-tree
-gemini_command (string s, string model, string chat) {
-  (void) model;
-  (void) chat;
-  string key= get_env ("GEMINI_API_KEY");
-  string gem= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-  string cmd= "curl \"" * gem * "\" \\\n";
-  cmd << "  -H 'Content-Type: application/json' \\\n"
-      << "  -H 'X-goog-api-key: " << key << "' \\\n"
-      << "  -X POST \\"
-      << "  -d '{\n"
-      << "    \"contents\": [ {\n"
-      << "      \"parts\": [ {\n"
-      << "        \"text\": \"" << ai_quote (s) << "\"\n"
-      << "      } ]\n"
-      << "    } ]\n"
-      << "  }'";
-  return compound ("eval_system", cmd);
+static string
+ai_model_name (string engine, string fallback) {
+  string m= get_preference (engine * " model", fallback);
+  if (m == "" || m == "default") m= fallback;
+  return m;
 }
 
-tree
-ollama_command (string s, string model, string chat) {
-  (void) chat;
-  string server= get_preference ("ollama server", "localhost");
-  string port  = get_preference ("ollama port", "11434");
-  string model_= get_preference ("ollama model", "default");
-  if (model_ == "default") model_= as_string (call ("ollama-default-model"));
-  string cmd= "curl http://" * server * ":" * port * "/api/generate -d '{\n";
-  cmd << "\"model\": \"" << model_ << "\",\n"
-      << "\"prompt\": \"" << ai_quote (s) << "\",\n"
-      << "\"stream\": false\n"
-      << "}'";
-  return compound ("eval_system", cmd);
-}
-
-tree
-mistral_command (string s, string model, string chat) {
-  (void) chat;
-  string key= get_env ("MISTRAL_API_KEY");
-  string cmd= "curl -X POST \\\n";
-  cmd << "  -H \"Authorization: Bearer " << key << "\" \\\n"
-      << "  -H \"Content-Type: application/json\" \\\n"
-      << "  -d '{\n"
-      << "    \"model\": \"" << model << "\",\n"
-      << "    \"messages\": [ {\n"
-      << "      \"role\": \"user\",\n"
-      << "      \"content\": \"" << ai_quote (s) << "\"\n"
-      << "    } ]\n"
-      << "  }' \\\n"
-      << "  https://api.mistral.ai/v1/chat/completions";
-  return compound ("eval_system", cmd);
-}
-
-tree
-albert_command (string s, string model, string agent,
-		string chat, bool history) {
-  (void) chat;
-  // the wallet, the preference or the environment (init-ai.scm)
-  string key= as_string (call ("ai-api-key", "albert", "ALBERT_API_KEY"));
-  string model_= get_preference (model * " model", model);
-  array<tree> v;
-  v << json_object ("role", "system", "content", agent);
+// the conversation: (role, text) pairs, the last one the prompt
+static array<string>
+ai_conversation (string s, string model, string chat, bool history) {
+  array<string> v;
   if (history) {
     ai_set_current_prompt (s, model, chat);
     list<string> last_prompts= reverse (ai_get_last_prompts (model, chat));
     list<string> last_answers= reverse (ai_get_last_answers (model, chat));
     while (!is_nil (last_prompts) && !is_nil (last_answers)) {
-      v << json_object ("role", "user", "content", last_prompts->item);
-      v << json_object ("role", "assistant", "content", last_answers->item);
+      v << string ("user") << last_prompts->item;
+      v << string ("assistant") << last_answers->item;
       last_prompts= last_prompts->next;
       last_answers= last_answers->next;
     }
   }
-  v << json_object ("role", "user", "content", s);
-  tree msg= json_array (v);
-  tree data= json_object (array<tree> ("model", model_, "messages", msg));
+  v << string ("user") << s;
+  return v;
+}
+
+// the messages of the APIs of OpenAI (also those of Mistral, Albert, Ollama)
+static tree
+openai_messages (string agent, array<string> conv) {
+  array<tree> v;
+  if (agent != "") v << json_object ("role", "system", "content", agent);
+  for (int i= 0; i+1 < N(conv); i += 2)
+    v << json_object ("role", conv[i], "content", conv[i+1]);
+  return json_array (v);
+}
+
+static tree
+openai_style_command (string url, array<string> headers, string model_name,
+                      string agent, array<string> conv) {
+  tree data= json_object (array<tree> ("model", model_name,
+                                       "messages", openai_messages (agent, conv)));
+  tree h (TUPLE);
+  for (int i= 0; i < N(headers); i++) h << headers[i];
+  return compound ("http_post", url, h, data);
+}
+
+tree
+chatgpt_command (string s, string model, string agent,
+                 string chat, bool history) {
+  string key= ai_key ("chatgpt", "OPENAI_API_KEY");
+  return openai_style_command (
+    "https://api.openai.com/v1/chat/completions",
+    array<string> ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json"),
+    ai_model_name ("chatgpt", "gpt-5-mini"), agent,
+    ai_conversation (s, model, chat, history));
+}
+
+tree
+mistral_command (string s, string model, string agent,
+                 string chat, bool history) {
+  string key= ai_key ("open-mistral-7b", "MISTRAL_API_KEY");
+  return openai_style_command (
+    "https://api.mistral.ai/v1/chat/completions",
+    array<string> ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json"),
+    ai_model_name ("open-mistral-7b", "mistral-small-latest"), agent,
+    ai_conversation (s, model, chat, history));
+}
+
+tree
+albert_command (string s, string model, string agent,
+		string chat, bool history) {
+  string key= ai_key ("albert", "ALBERT_API_KEY");
+  return openai_style_command (
+    "https://albert.api.etalab.gouv.fr/v1/chat/completions",
+    array<string> ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json"),
+    get_preference (model * " model", model), agent,
+    ai_conversation (s, model, chat, history));
+}
+
+// the API of Ollama which is that of OpenAI
+tree
+ollama_command (string s, string model, string agent,
+                string chat, bool history) {
+  string server= get_preference ("ollama server", "localhost");
+  string port  = get_preference ("ollama port", "11434");
+  string model_= get_preference ("ollama model", "default");
+  if (model_ == "default" || model_ == "")
+    model_= as_string (call ("ollama-default-model"));
+  return openai_style_command (
+    "http://" * server * ":" * port * "/v1/chat/completions",
+    array<string> ("Content-Type", "application/json"),
+    model_, agent, ai_conversation (s, model, chat, history));
+}
+
+// the API of Gemini: the agent is the instruction of the system, the answers
+// are those of the "model"
+tree
+gemini_command (string s, string model, string agent,
+                string chat, bool history) {
+  string key= ai_key ("gemini", "GEMINI_API_KEY");
+  string name= ai_model_name ("gemini", "gemini-2.5-flash");
+  array<string> conv= ai_conversation (s, model, chat, history);
+  array<tree> contents;
+  for (int i= 0; i+1 < N(conv); i += 2) {
+    tree part= json_object ("text", conv[i+1]);
+    contents << json_object ("role", conv[i] == "user"? "user": "model",
+                             "parts", json_array (part));
+  }
+  array<tree> d;
+  if (agent != "")
+    d << tree ("systemInstruction")
+      << json_object ("parts", json_array (json_object ("text", agent)));
+  d << tree ("contents") << json_array (contents);
   return compound ("http_post",
-		   "https://albert.api.etalab.gouv.fr/v1/chat/completions",
-		   tuple ("Authorization", "Bearer " * key,
-			  "Content-Type", "application/json"), data);
+    "https://generativelanguage.googleapis.com/v1beta/models/" *
+      name * ":generateContent",
+    tuple ("x-goog-api-key", key, "Content-Type", "application/json"),
+    json_object (d));
+}
+
+// the API of Claude (Anthropic): the agent is the system prompt; a page asks
+// with anthropic-dangerous-direct-browser-access, as its key is in the page
+tree
+claude_command (string s, string model, string agent,
+                string chat, bool history) {
+  string key= ai_key ("claude", "ANTHROPIC_API_KEY");
+  string name= ai_model_name ("claude", "claude-sonnet-5-5");
+  array<string> conv= ai_conversation (s, model, chat, history);
+  array<tree> msgs;
+  for (int i= 0; i+1 < N(conv); i += 2)
+    msgs << json_object ("role", conv[i], "content", conv[i+1]);
+  array<tree> d;
+  d << tree ("model") << tree (name)
+    << tree ("max_tokens") << compound ("json-number", "8192");
+  if (agent != "") d << tree ("system") << tree (agent);
+  d << tree ("messages") << json_array (msgs);
+  tree h (TUPLE);
+  h << tree ("x-api-key") << tree (key)
+    << tree ("anthropic-version") << tree ("2023-06-01")
+    << tree ("anthropic-dangerous-direct-browser-access") << tree ("true")
+    << tree ("Content-Type") << tree ("application/json");
+  return compound ("http_post", "https://api.anthropic.com/v1/messages", h,
+                   json_object (d));
 }
 
 tree
 ai_command (string s, string model, string agent, string chat, bool history) {
   ai_get_continuation (s, model, chat);
   string engine= ai_engine (model);
-  string s_= agent * " " * s;
-  if (engine == "chatgpt") return chatgpt_command (s_, model, chat);
-  if (engine == "gemini") return gemini_command (s_, model, chat);
-  if (engine == "ollama") return ollama_command (s_, model, chat);
-  if (engine == "mistral") return mistral_command (s_, model, chat);
+  if (engine == "chatgpt")
+    return chatgpt_command (s, model, agent, chat, history);
+  if (engine == "gemini")
+    return gemini_command (s, model, agent, chat, history);
+  if (engine == "ollama")
+    return ollama_command (s, model, agent, chat, history);
+  if (engine == "mistral")
+    return mistral_command (s, model, agent, chat, history);
   if (engine == "albert")
     return albert_command (s, model, agent, chat, history);
+  if (engine == "claude")
+    return claude_command (s, model, agent, chat, history);
   return "";
 }
 
@@ -507,131 +583,96 @@ ai_latex_request (string s, string model, string chat) {
 * Extracting the output for various engines
 ******************************************************************************/
 
-string
-chatgpt_output (string val, string model, string chat) {
-  (void) model; (void) chat;
-  return val;
+// the text of an answer, from its JSON
+static string
+json_text (tree t) {
+  return is_atomic (t)? t->label: string ("");
 }
 
-string
-gemini_output (string val, string model, string chat) {
-  //string x= val;
-  //x= "> " * replace (x, "\n", "\n> ");
-  //cout << x << "\n";
-  (void) chat;
-  (void) model;
-  int pos= search_forwards ("\"text\": \"", val);
-  if (pos < 0) return "";
-  pos += 9;
-  int end= pos;
-  while (true) {
-    end= search_forwards ("\"\n", end, val);
-    if (end < 0) return "";
-    int next= end + 2;
-    while (next < N(val) && val[next] == ' ') next++;
-    if (val[next] == '}') break;
-    end= next;
+// the message of an error which the engine gave instead of an answer (or
+// what it sent, when it is not JSON: no network, a refused request)
+static string
+ai_error_text (string val, tree t) {
+  if (val == "") return ""; // not yet, or no answer (said by the link)
+  tree e= json_get (t, "error");
+  if (is_func (e, ATTR)) {
+    string m= json_text (json_get (e, "message"));
+    if (m != "") return "Error: " * m;
   }
-  string r= ai_unquote (val (pos, end));
-  r= replace (r, "\\u0026", "&");
-  r= replace (r, "\\u003c", "<");
-  r= replace (r, "\\u003e", ">");
+  if (is_atomic (e) && e->label != "") return "Error: " * e->label;
+  string m= json_text (json_get (t, "message"));
+  if (m == "") m= json_text (json_get (t, "detail")); // Mistral
+  if (m != "") return "Error: " * m;
+  if (N(val) > 500) val= val (0, 500) * "...";
+  return "Error: unexpected answer: " * val;
+}
+
+static string
+openai_style_output (tree t) {
+  tree c= json_get (t, "choices");
+  if (!is_func (c, TUPLE) || N(c) == 0) return "";
+  tree m= json_get (c[0], "message");
+  return json_text (json_get (m, "content"));
+}
+
+static string
+gemini_style_output (tree t) {
+  tree c= json_get (t, "candidates");
+  if (!is_func (c, TUPLE) || N(c) == 0) return "";
+  tree parts= json_get (json_get (c[0], "content"), "parts");
+  if (!is_func (parts, TUPLE)) return "";
+  string r;
+  for (int i= 0; i < N(parts); i++)
+    r << json_text (json_get (parts[i], "text"));
   return r;
 }
 
-string
-ollama_output (string val, string model, string chat) {
-  (void) chat;
-  (void) model;
-  int pos= search_forwards ("\"response\":\"", val);
-  if (pos < 0) return "";
-  pos += 12;
-  int end= search_forwards ("\",\"done\":", pos, val);
-  if (end < 0) return "";
-  string r= ai_unquote (val (pos, end));
-  r= replace (r, "\r\n", "\n");
-  r= replace (r, "`\\u003c", "<");
-  r= replace (r, "\\u003e`", ">");
-  r= replace (r, "\\u0026", "&");
-  r= replace (r, "\\u003c", "<");
-  r= replace (r, "\\u003e", ">");
-  if (occurs ("u003cbodyu003e", r) ||
-      occurs ("u003cdiv id=", r)) {
-    r= replace (r, "u003c", "<");
-    r= replace (r, "u003e", ">");
-  }
+static string
+claude_style_output (tree t) {
+  tree c= json_get (t, "content");
+  if (!is_func (c, TUPLE)) return "";
+  string r;
+  for (int i= 0; i < N(c); i++)
+    if (json_text (json_get (c[i], "type")) == "text")
+      r << json_text (json_get (c[i], "text"));
   return r;
 }
 
-string
-mistral_output (string val, string model, string chat) {
-  (void) chat;
-  (void) model;
-  int pos= search_forwards ("\"content\":\"", val);
-  if (pos < 0) return "";
-  pos += 11;
-  int end= search_forwards ("\"}}]", pos, val);
-  if (end < 0) return "";
-  string r= ai_unquote (val (pos, end));
-  return r;
-}
-
-string
-albert_output (string val, string model, string chat) {
-  (void) chat;
-  (void) model;
-  tree t= http_from_json (val);
-  t= json_get (t, "choices");
-  if (t == tree () || !is_func (t, TUPLE) || N(t) == 0) {
-    //io_error << "albert_output, unexpected json object: " << val << LF;
-    return "";
-  }
-  t= json_get (t[0], "message");
-  if (t == tree () || !is_func (t, ATTR)) {
-    //io_error << "albert_output, unexpected json object: " << val << LF;
-    return "";
-  }
-  t= json_get (t, "content");
-  if (t == tree () || !is_string (t)) {
-    //io_error << "albert_output, unexpected json object: " << val << LF;
-    return "";
-  }
-  string r= as_string (t);
-  if (N(ai_get_current_prompt (model, chat)) > 0) {
-    ai_set_last_prompt (ai_get_current_prompt (model, chat), model, chat);
-    ai_set_last_answer (r, model, chat);
-  }
-  r= replace_tikz_by_pdf (r);
-  r= extract_svg (r);
-  // replace uft8 e2 80 af by ' '
-  char* aux= (char*) malloc (N(r)+1);
-  int j= 0;
+// replaces the narrow no-break spaces (U+202F, in UTF-8 e2 80 af) by spaces
+static string
+ai_plain_spaces (string r) {
+  string s;
   for (int i= 0; i < N(r); i++) {
     if (i+2 < N(r) &&
 	(unsigned char) r[i]   == 0xe2 &&
 	(unsigned char) r[i+1] == 0x80 &&
 	(unsigned char) r[i+2] == 0xaf) {
-      aux[j]= ' ';
-      j++; i+=2;
-      continue;
+      s << ' '; i += 2; continue;
     }
-    aux[j]= r[i]; j++;
+    s << r[i];
   }
-  r= string (aux, j);
-  free (aux);
-  return r;
+  return s;
 }
 
 string
 ai_output (string s, string model, string chat) {
   ai_set_continuation (s, model, chat);
   string engine= ai_engine (model);
-  if (engine == "chatgpt") return chatgpt_output (s, model, chat);
-  if (engine == "gemini") return gemini_output (s, model, chat);
-  if (engine == "ollama") return ollama_output (s, model, chat);
-  if (engine == "mistral") return mistral_output (s, model, chat);
-  if (engine == "albert") return albert_output (s, model, chat);
-  return "";
+  tree t= http_from_json (s);
+  string r;
+  if (engine == "gemini") r= gemini_style_output (t);
+  else if (engine == "claude") r= claude_style_output (t);
+  else if (engine != "unknown") r= openai_style_output (t);
+  if (r == "") return ai_error_text (s, t);
+  if (N(ai_get_current_prompt (model, chat)) > 0) {
+    ai_set_last_prompt (ai_get_current_prompt (model, chat), model, chat);
+    ai_set_last_answer (r, model, chat);
+  }
+  if (engine == "albert") {
+    r= replace_tikz_by_pdf (r);
+    r= extract_svg (r);
+  }
+  return ai_plain_spaces (r);
 }
 
 string
@@ -695,10 +736,11 @@ ai_latex_output (string s, string model, string chat) {
     debug_io << x << "\n";
   }
   string pre, post;
+  // an answer which is not a LaTeX document (or an error) is text in UTF-8
   int start= search_forwards ("\\begin{document}", r);
-  if (start < 0) { pre= ""; post= ""; return r; }
+  if (start < 0) return utf8_to_cork (r);
   int end= search_forwards ("\\end{document}", start, r);
-  if (end < 0) { pre= ""; post= ""; return r; }
+  if (end < 0) return utf8_to_cork (r);
   start += 16;
   pre= r (0, start);
   post= r (end, N(r));

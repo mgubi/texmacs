@@ -76,6 +76,32 @@ json_skip (string s, int& pos) {
   }
 }
 
+static unsigned int
+json_hex4 (string s, int pos) {
+  unsigned int c= 0;
+  for (int i= 0; i < 4; i++) {
+    char x= s[pos + i];
+    c <<= 4;
+    if (x >= '0' && x <= '9') c += x - '0';
+    else if (x >= 'a' && x <= 'f') c += x - 'a' + 10;
+    else if (x >= 'A' && x <= 'F') c += x - 'A' + 10;
+  }
+  return c;
+}
+
+static void
+json_utf8 (string& r, unsigned int c) {
+  if (c < 0x80) r << (char) c;
+  else if (c < 0x800) {
+    r << (char) (0xC0 | (c >> 6)) << (char) (0x80 | (c & 0x3F)); }
+  else if (c < 0x10000) {
+    r << (char) (0xE0 | (c >> 12)) << (char) (0x80 | ((c >> 6) & 0x3F))
+      << (char) (0x80 | (c & 0x3F)); }
+  else {
+    r << (char) (0xF0 | (c >> 18)) << (char) (0x80 | ((c >> 12) & 0x3F))
+      << (char) (0x80 | ((c >> 6) & 0x3F)) << (char) (0x80 | (c & 0x3F)); }
+}
+
 tree
 json_parse_string (string s, int& pos, int mode) {
   string r;
@@ -84,12 +110,28 @@ json_parse_string (string s, int& pos, int mode) {
     if (s[pos] == '\"') { pos++; break; }
     else if (s[pos] == '\\' && pos + 1 < N(s)) {
       pos++;
-      if (s[pos] == '\"' || s[pos] == '\\') r << s[pos++];
+      if (s[pos] == '\"' || s[pos] == '\\' || s[pos] == '/') r << s[pos++];
       else if (s[pos] == 'b') { pos++; r << '\b'; }
-      else if (s[pos] == 'f') { pos++; r << '\b'; }
+      else if (s[pos] == 'f') { pos++; r << '\f'; }
       else if (s[pos] == 'n') { pos++; r << '\n'; }
       else if (s[pos] == 'r') { pos++; r << '\r'; }
       else if (s[pos] == 't') { pos++; r << '\t'; }
+      else if (s[pos] == 'u' && pos + 4 < N(s)) {
+        // a code point in UTF-16 (a pair of surrogates beyond U+FFFF), in
+        // UTF-8 as the rest of the string
+        unsigned int c= json_hex4 (s, pos + 1);
+        pos += 5;
+        if (c >= 0xD800 && c < 0xDC00 && pos + 5 < N(s) &&
+            s[pos] == '\\' && s[pos+1] == 'u') {
+          unsigned int d= json_hex4 (s, pos + 2);
+          if (d >= 0xDC00 && d < 0xE000) {
+            c= 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00);
+            pos += 6;
+          }
+        }
+        json_utf8 (r, c);
+      }
+      else r << s[pos++];
     }
     else r << s[pos++];
   return r;
@@ -234,7 +276,10 @@ json_print_string (string& r, string s, int mode) {
     case '\r': r << "\\r"; break;
     case '\"': r << '\\' << s[i]; break;
     case '\\': r << '\\' << s[i]; break;
-    default: r << s[i];
+    default:
+      if (((unsigned char) s[i]) < 0x20)
+        r << "\\u00" << as_hexadecimal ((int) (unsigned char) s[i], 2);
+      else r << s[i];
     }
   r << "\"";
 }

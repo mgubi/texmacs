@@ -66,7 +66,11 @@ EM_JS (int, web_http_start, (const char* url, const char* headers,
   if (post && !Object.keys (hs).some (function (k) { return k.toLowerCase () === 'content-type'; }))
     hs['Content-Type'] = 'application/x-www-form-urlencoded'; // as curl
   var data = post ? HEAPU8.slice (body, body + len) : null;
-  function done (status, bytes) { slot.status = status; slot.bytes = bytes; }
+  function done (status, bytes) {
+    slot.status = status; slot.bytes = bytes;
+    // the loop of the page, which may sleep, takes the answer at once
+    if (!sync && typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
+  }
   function failed (e) {
     console.warn ('TeXmacs: no answer from ' + u + (e ? ': ' + e : '') +
                   (new URL (u, location.href).origin !== location.origin ?
@@ -178,6 +182,7 @@ web_post (string& ret, string url, array<string> headers_attr, string body) {
 // the requests made with fetch whose answers are awaited
 struct web_async_handle {
   int id;
+  string url;
   object call_back;
   int* status; string* outbuf; string* errbuf;
 };
@@ -189,6 +194,7 @@ web_async_post (string url, array<string> headers_attr, string body,
                 string* errbuf= NULL) {
   web_async_handle* h= tm_new<web_async_handle> ();
   h->id= web_request (url, headers_attr, body, true, false);
+  h->url= url;
   h->call_back= call_back;
   h->status= status; h->outbuf= outbuf; h->errbuf= errbuf;
   web_async_busy << h;
@@ -205,7 +211,15 @@ web_async_pending () {
     web_async_busy= append (range (web_async_busy, 0, i),
                             range (web_async_busy, i + 1, N(web_async_busy)));
     if (h->status == NULL) call (h->call_back, out);
-    else { *(h->status)= 0; *(h->outbuf)= out; *(h->errbuf)= ""; }
+    else {
+      // no answer at all (no network, or the site does not let a page ask
+      // it: CORS) is said on the channel of the errors of the link
+      *(h->status)= 0; *(h->outbuf)= out;
+      *(h->errbuf)= (st == 0 && N(out) == 0)
+        ? "No answer from " * h->url *
+          " (no network, or the site does not answer the requests of a web page)\n"
+        : string ("");
+    }
     tm_delete<web_async_handle> (h);
   }
 }

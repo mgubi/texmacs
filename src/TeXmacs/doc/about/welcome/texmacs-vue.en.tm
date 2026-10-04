@@ -156,7 +156,10 @@
     Ghostscript, ImageMagick, the spell checker, Git. The sessions which
     exist in the browser are those whose program runs in the page itself:
     <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
-    their plug-ins, in <menu|Help|Plug-ins>).
+    their plug-ins, in <menu|Help|Plug-ins>), and those of the chatbots
+    which the page asks through the web: <name|ChatGPT>, <name|Claude>,
+    <name|Gemini>, <name|Mistral> with a key, and <name|Ollama> on your
+    computer if it allows the page. <name|Albert> does not answer web pages.
 
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
     WebSocket, on the same computer only for now.
@@ -185,6 +188,11 @@
     <with|font-series|bold|Security> of the preferences. The key of the
     <name|Albert> service of artificial intelligence goes there when it is
     on.
+
+    <item>Sessions of chatbots: <name|ChatGPT>, <name|Claude> (new),
+    <name|Gemini>, <name|Mistral> and <name|Ollama>, asked by the browser.
+    Their keys are given in <menu|Edit|Preferences|Plug-ins>, and kept in
+    the wallet when it is on; see <menu|Help|Plug-ins|AI>.
 
     <item>The input fields of the dialogs whose width is given as a
     multiple of the default one are no longer as wide as the window (the

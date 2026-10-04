@@ -11,6 +11,14 @@
   startup file for shell sessions, such as <hgroup|<verbatim|~/.bashrc>> or
   <verbatim|~/.profile>.
 
+  Instead of an environment variable, the key of a chatbot can be given in
+  <menu|Edit|Preferences|Plug-ins>, with the model to use. When the wallet
+  of <TeXmacs> is on (<menu|Edit|Preferences|Security>), the key is kept
+  there, encrypted, rather than in the preferences. This is also how keys
+  are given in a web browser, which has no environment variables. All the
+  chatbots are asked by HTTP requests (with <verbatim|curl> when <TeXmacs>
+  is not built with <name|Qt>, by the browser itself in a web browser).
+
   <subsection*|ChatGPT>
 
   Please follow the following instructions for setting up <name|ChatGPT> for
@@ -28,32 +36,29 @@
       green|<em|your_key>>>>
     </shell-code>
 
-    <item>You need to install <verbatim|openai-cli>, the <name|OpenAI>
-    command line interface. This is a bit tricky, because it requires you to
-    create a <name|Python> virtual environment (assuming that you already
-    have <name|Python> on your computer; otherwise install <name|Python>
-    first). You can do this in any directory <verbatim|<with|color|dark
-    green|<em|dir>>> from where you wish to launch <TeXmacs>, as
-    follows:<no-break-here>
+    <item>When launching <TeXmacs>, you should now be able to use
+    <name|ChatGPT>.
+  </itemize>
+
+  <subsection*|Claude>
+
+  Please follow the following instructions in order to setup <name|Claude>
+  for use inside <TeXmacs>.
+
+  <\itemize>
+    <item>Create an account on the console of <name|Anthropic> and obtain an
+    API key. Keys typically start with <verbatim|sk-ant->.
+
+    <item>In your terminal, set the <verbatim|ANTHROPIC_API_KEY> environment
+    variable with your key, or give it in the preferences:
 
     <\shell-code>
-      cd <text|<verbatim|<with|color|dark green|<em|dir>>>>
-
-      python3 -m venv <text|<verbatim|<with|color|dark green|<em|myenv>>>>
-
-      source <text|<verbatim|<with|color|dark
-      green|<em|dir>>>>/<text|<verbatim|<with|color|dark
-      green|<em|myenv>>>>/bin/activate
-    </shell-code>
-
-    <item>Now install the <name|OpenAI> command line interface:
-
-    <\shell-code>
-      pip3 install openai-cli
+      export ANTHROPIC_API_KEY=<text|<verbatim|<with|color|dark
+      green|<em|your_key>>>>
     </shell-code>
 
     <item>When launching <TeXmacs>, you should now be able to use
-    <name|ChatGPT>.
+    <name|Claude>.
   </itemize>
 
   <subsection*|Gemini>
@@ -99,6 +104,16 @@
     3>.
   </itemize>
 
+  In a web browser, <verbatim|ollama> answers the page only if it allows
+  the address of the page, for instance for <TeXmacs> on
+  <verbatim|mgubi.github.io>:
+
+  <\shell-code>
+    OLLAMA_ORIGINS=https://mgubi.github.io ollama serve
+  </shell-code>
+
+  The server and the model are chosen in <menu|Edit|Preferences|Plug-ins>.
+
   <subsection*|Mistral>
 
   Please follow the following instructions for setting up <name|Mistral> for
@@ -120,6 +135,9 @@
   </itemize>
 
   <subsection*|Albert (by DINUM, for French administrations only)>
+
+  The server of <name|Albert> does not answer the requests of a web page:
+  <name|Albert> cannot be used in a web browser.
 
   Please follow the following instructions for setting up <name|Albert> for
   use inside <TeXmacs>.

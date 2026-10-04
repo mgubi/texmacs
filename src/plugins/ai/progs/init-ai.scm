@@ -16,7 +16,13 @@
 ;; Ollama command line tools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; in a web browser there is no ollama program to ask (the model is chosen
+;; in the preferences)
 (tm-define (ollama-models)
+  (if (defined? 'web-javascript) (list)
+      (ollama-models-listed)))
+
+(define (ollama-models-listed)
   (let* ((ret (eval-system "ollama list"))
          (lines** (string-decompose ret "\n"))
          (lines* (if (null? lines**) lines** (cdr lines**)))
@@ -50,6 +56,11 @@
   ("chatgpt-text-input" "on" noop)
   ("gemini-text-input" "on" noop)
   ("open-mistral-7b-text-input" "on" noop)
+  ("claude-text-input" "on" noop)
+  ("chatgpt model" "gpt-5-mini" noop)
+  ("gemini model" "gemini-2.5-flash" noop)
+  ("open-mistral-7b model" "mistral-small-latest" noop)
+  ("claude model" "claude-sonnet-5-5" noop)
   ("albert api key" "" noop)
   ("albert-text-input" "on" noop)
   ("albert ai-agents corrector" "default" noop)
@@ -104,13 +115,45 @@
   (wallet-add-on-hook (lambda () (reinit-plugin-single "ai"))))
 
 (tm-define (ai-models)
-  (list "chatgpt" "gemini" "open-mistral-7b" "albert" "ollama"))
+  (list "chatgpt" "claude" "gemini" "open-mistral-7b" "albert" "ollama"))
+
+;; the engines which are asked with a key, its environment variable, and the
+;; models proposed in the preferences ("" for another one)
+(define ai-keyed-engines
+  '(("chatgpt" "OPENAI_API_KEY" "gpt-5-mini" "gpt-5" "gpt-5-nano" "")
+    ("claude" "ANTHROPIC_API_KEY"
+     "claude-sonnet-5-5" "claude-opus-5-5" "claude-haiku-4-5" "")
+    ("gemini" "GEMINI_API_KEY"
+     "gemini-2.5-flash" "gemini-2.5-pro" "gemini-2.5-flash-lite" "")
+    ("open-mistral-7b" "MISTRAL_API_KEY" "mistral-small-latest"
+     "mistral-medium-latest" "mistral-large-latest" "open-mistral-7b" "")))
+
+(define (ai-key-env name)
+  (with e (assoc name ai-keyed-engines) (if e (cadr e) "")))
+
+(define (ai-model-variants name)
+  (with e (assoc name ai-keyed-engines) (if e (cddr e) (list ""))))
+
+(define (ai-has-key? name)
+  (!= (ai-api-key name (ai-key-env name)) ""))
 
 (tm-define (albert-variants)
   (list "openweight-large" "openweight-medium" "openweight-small" ""))
 
 (tm-widget (plugin-preferences-widget name)
   (:require (in? name (ai-models)))
+  (assuming (assoc name ai-keyed-engines)
+    (with model (string-append name " model")
+      (aligned
+        (item (text "API key")
+          (enum (ai-set-api-key name answer)
+                (list (ai-api-key-shown name) "")
+                (ai-api-key-shown name) "16em"))
+        (item (text "Model")
+          (enum (set-preference model answer)
+                (ai-model-variants name)
+                (get-preference model) "16em"))))
+    === === ===)
   (assuming (== name "ollama")
     (aligned
       (item (text "Ollama server")
@@ -120,7 +163,8 @@
         (enum (set-preference "ollama port" answer) '("11434" "")
               (get-preference "ollama port") "16em"))
       (item (text "Ollama model")
-        (enum (set-preference "ollama model" answer) (ollama-models)
+        (enum (set-preference "ollama model" answer)
+              (append (ollama-models) (list ""))
               (get-preference "ollama model") "16em")))
     === === ===)
   (assuming (== name "albert")
@@ -165,14 +209,15 @@
 ;; ChatGPT
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; All the engines are asked by HTTP requests (ai.cpp), with a key of the
+;; wallet, of the preferences or of the environment (ai-api-key)
+
 (tm-define (has-chatgpt?)
-  (and (url-exists-in-path? "openai")
-       (getenv "OPENAI_API_KEY")
-       (!= (getenv "OPENAI_API_KEY") "")))
+  (ai-has-key? "chatgpt"))
 
 (plugin-configure chatgpt
   (:require (has-chatgpt?))
-  (:cmdline ,ai-cmdline ,ai-result)
+  (:request ,ai-request ,ai-result)
   (:preferences #t)
   (:session "ChatGPT")
   (:serializer ,ai-serialize))
@@ -181,13 +226,26 @@
 ;; Gemini
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Claude
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (has-claude?)
+  (ai-has-key? "claude"))
+
+(plugin-configure claude
+  (:require (has-claude?))
+  (:request ,ai-request ,ai-result)
+  (:preferences #t)
+  (:session "Claude")
+  (:serializer ,ai-serialize))
+
 (tm-define (has-gemini?)
-  (and (getenv "GEMINI_API_KEY")
-       (!= (getenv "GEMINI_API_KEY") "")))
+  (ai-has-key? "gemini"))
 
 (plugin-configure gemini
   (:require (has-gemini?))
-  (:cmdline ,ai-cmdline ,ai-result)
+  (:request ,ai-request ,ai-result)
   (:preferences #t)
   (:session "Gemini")
   (:serializer ,ai-serialize))
@@ -196,12 +254,15 @@
 ;; Ollama
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; in a web browser Ollama is asked where the preferences say (localhost by
+;; default), if it lets the page do it (OLLAMA_ORIGINS)
 (tm-define (has-ollama?)
-  (url-exists-in-path? "ollama"))
+  (or (defined? 'web-javascript)
+      (url-exists-in-path? "ollama")))
 
 (plugin-configure ollama
   (:require (has-ollama?))
-  (:cmdline ,ai-cmdline ,ai-result)
+  (:request ,ai-request ,ai-result)
   (:preferences #t)
   (:session "Ollama")
   (:serializer ,ai-serialize))
@@ -211,14 +272,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (has-open-mistral-7b?)
-  (and (getenv "MISTRAL_API_KEY")
-       (!= (getenv "MISTRAL_API_KEY") "")))
+  (ai-has-key? "open-mistral-7b"))
 
 (plugin-configure open-mistral-7b
   (:require (has-open-mistral-7b?))
-  (:cmdline ,ai-cmdline ,ai-result)
+  (:request ,ai-request ,ai-result)
   (:preferences #t)
-  (:session "Mistral 7B")
+  (:session "Mistral")
   (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
