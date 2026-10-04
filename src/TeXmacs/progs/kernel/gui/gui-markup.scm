@@ -289,7 +289,7 @@
   (:synopsis "Make button")
   (if developer-mode?
     (ahash-set! all-translations text #t))
-  `(list ,text (lambda () ,@cmds)))
+  `(list ,text (tagged-lambda () ,@cmds)))
 
 (tm-define-macro ($check text check pred?)
   (:synopsis "Make check")
@@ -331,7 +331,7 @@
   (:synopsis "Make a menu symbol")
   (if (null? l)
       `(list 'symbol ,sym)
-      `(list 'symbol ,sym (lambda () ,(car l)))))
+      `(list 'symbol ,sym (tagged-lambda () ,(car l)))))
 
 (tm-define-macro ($menu-group text)
   (:synopsis "Make a menu group")

@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (kernel texmacs tm-plugins)
-  (:use (kernel texmacs tm-define) (kernel texmacs tm-modes)))
+  (:use (kernel texmacs tm-define) (kernel texmacs tm-modes) (kernel texmacs tm-dialogue)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Lazy exports from other modules and other overridable routines
@@ -618,9 +618,10 @@
     `(begin
        (texmacs-modes (,in-name (== (get-env "prog-language") ,name)))
        (texmacs-modes (,name-scripts (== (get-env "prog-scripts") ,name)))
-       (tm-define (,supports-name?)
-         (or (ahash-ref plugin-data-table ,name)
-             (remote-connection-defined? ,name)))
+       (eval-when (expand load eval)
+         (tm-define (,supports-name?)
+           (or (ahash-ref plugin-data-table ,name)
+               (remote-connection-defined? ,name))))
        (if reconfigure-flag? (ahash-set! plugin-data-table ,name #t))
        (plugin-configure-cmds ,name
          ,(list 'quasiquote (map plugin-configure-sub options))))))

@@ -11,6 +11,47 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(cond-expand (guile-2
+;; we remove all optimizations from the compiler
+;; this allows for faster loading times
+((@ (system base compile) default-optimization-level) 0))
+(else #t))
+
+;(cond-expand (guile-2 (display "Guile-2\n")) (else #t))
+
+(cond-expand (guile-2
+  (set! %auto-compilation-options
+    '(#:warnings (shadowed-toplevel macro-use-before-definition
+                  arity-mismatch format duplicate-case-datum
+                  bad-case-datum))))
+  (else #t))
+
+(cond-expand (guile-2 (module-export-all! (current-module))) (else #t))
+
+; we import some modules which are standard in versions of Guile before 2.2
+(cond-expand
+  (guile-2
+    (use-modules (ice-9 curried-definitions)))
+  (else #t))
+
+; conditional expansion of code via macros
+; Guile 2 does not allow to have top-level definitions inside conditional statements
+; we go around this at macroexpansion
+; note that this macro introduces a binding which can clash with others!!!
+
+(define-macro (tm-cond-expand cond . code)
+  `(begin (define-macro (tm-cond-expand-init-TEMP) (if ,cond '(begin ,@code) '(begin #t))) (tm-cond-expand-init-TEMP)))
+(export-syntax tm-cond-expand)
+
+; Guile 2 has separate expand and evaluation phases so we have several eval-when in the code
+; which can be ignored in previous Guile versions.
+
+(cond-expand (guile-2 #t)
+  (else
+    (define-macro (eval-when a . b) `(begin ,@b)) (export-syntax eval-when)))
+
+; continue with initialization
+
 (cond ((os-mingw?)
        (debug-set! stack 0))
       ((os-macos?)
@@ -25,7 +66,9 @@
   (equal? (cpp-get-preference "developer tool" "off") "on"))
 
 (if developer-mode?
-    (debug-enable 'backtrace 'debug))
+   (if (equal? (scheme-dialect) "guile-d")
+     (debug-enable 'backtrace)
+     (debug-enable 'backtrace 'debug)))
 
 (define (%new-read-hook sym) (noop)) ; for autocompletion
 
@@ -33,7 +76,7 @@
                                 tm-define-macro))
 (define-public def-keywords
   `(define-public provide-public
-    tm-define tm-menu menu-bind tm-widget ,@macro-keywords))
+    tm-define tm-define-once tm-menu menu-bind tm-widget ,@macro-keywords))
 
 (define tm-interactive-hook tm-interactive)
 
@@ -93,9 +136,20 @@
 ;; (set! primitive-load new-primitive-load)
 
 ;(display "Booting TeXmacs kernel functionality\n")
+
+; this boots the main TeXmacs module system facilities
+
 (if (and (os-mingw?) (string= (gui-version) "qt4"))
     (load "kernel/boot/boot.scm")
     (load (url-concretize "$TEXMACS_PATH/progs/kernel/boot/boot.scm")))
+
+(cond-expand (guile-2
+(export! display write object->string string-replace) ;; silence some warnings
+) (else #t))
+
+; now we collect basic functionalities by re-exporting all the public symbols
+; as part of the current module
+
 (inherit-modules (kernel boot compat) (kernel boot abbrevs)
                  (kernel boot debug) (kernel boot srfi)
                  (kernel boot ahash-table) (kernel boot prologue))
@@ -105,6 +159,11 @@
 (inherit-modules (kernel regexp regexp-match) (kernel regexp regexp-select))
 (inherit-modules (kernel logic logic-rules) (kernel logic logic-query)
                  (kernel logic logic-data))
+
+(cond-expand (guile-2
+(export! ... compose select) ;; silence some warnings
+) (else #t))
+
 (inherit-modules (kernel texmacs tm-define)
                  (kernel texmacs tm-preferences) (kernel texmacs tm-modes)
                  (kernel texmacs tm-plugins) (kernel texmacs tm-secure)
@@ -143,6 +202,7 @@
 (lazy-define (utils automate auto-tmfs) auto-load-help)
 (lazy-define (utils misc gui-keyboard) get-keyboard)
 (lazy-keyboard (utils automate auto-kbd) in-auto?)
+;;FIXME: handle the evaluation phase of the following two lines
 (define supports-email? (url-exists-in-path? "mmail"))
 (if supports-email? (use-modules (utils email email-tmfs)))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")

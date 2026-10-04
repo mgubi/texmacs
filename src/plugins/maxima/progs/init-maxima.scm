@@ -66,7 +66,7 @@
   (:session "Maxima")
   (:scripts "Maxima"))
 
-(when (supports-maxima?)
+(tm-cond-expand (supports-maxima?)
   (import-from (maxima-kbd))
   (import-from (maxima-menus))
   (lazy-input-converter (maxima-input) maxima)
