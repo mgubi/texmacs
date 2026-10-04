@@ -154,6 +154,9 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>A simpler panel while the page loads: a bar and one line which
+    says what happens. It fades out once <TeXmacs> is ready.
+
     <item>A click puts the help balloon of a button away, and no balloon
     comes while a menu is open, where it would hide the menu.
 
