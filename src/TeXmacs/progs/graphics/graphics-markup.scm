@@ -77,8 +77,9 @@
 ;; Electrical diagrams
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define ((rescale z0 dz) p)
-  (complex->point (+ z0 (* dz (point->complex p)))))
+(define (rescale z0 dz)
+  (lambda (p)
+    (complex->point (+ z0 (* dz (point->complex p))))))
 
 (tm-define (electrical im scale p1 p2 p3)
   (let* ((z1 (if (tm-point? p1) (point->complex p1) 0))

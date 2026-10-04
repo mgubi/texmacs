@@ -18,13 +18,18 @@
     (define-public (filter pred? l)
       (apply append (map (lambda (x) (if (pred? x) (list x) (list))) l))))
 
-;; curried define
+;; Curried define, (curried-define ((f a) b) ...), as Guile's define does.
+;; It is not installed as define: a macro in place of define made s7 crash
+;; the second time a function with an internal recursive definition ran
+;; (op_safe_closure_p_a_1 "wants opt2_fx" with S7_DEBUGGING, a stale
+;; annotation of the expanded body). The TeXmacs code writes the curried
+;; definitions it needs with an explicit lambda, which both interpreters
+;; read.
 (define base-define define)
 (define-public-macro (curried-define head . body)
     (if (pair? head)
       `(,curried-define ,(car head) (lambda ,(cdr head) ,@body))
       `(,base-define ,head ,@body)))
-(varlet *texmacs-user-module* 'define curried-define)
 
 
 ;(define primitive-string->symbol string->symbol)
@@ -107,6 +112,15 @@
 ;; Guile's closure?: a procedure written in Scheme, which s7 recognizes by
 ;; its source (the source of a C function is the empty list)
 (define-public (closure? f) (and (procedure? f) (pair? (procedure-source f))))
+;; Guile's procedure-documentation: #f for a procedure without documentation
+(define-public (procedure-documentation f)
+  (let ((d (documentation f)))
+    (and (string? d) (not (string-null? d)) d)))
+;; Guile's debug options: s7 has no backtrace option to toggle (the debug
+;; menu shows the option as off)
+(define-public (debug-options . args) '())
+(define-public (debug-enable . opts) (noop))
+(define-public (debug-disable . opts) (noop))
 ;; Guile's procedure-property, for the arity only: a list of the required
 ;; and the optional arguments and whether there is a rest argument (s7's
 ;; arity is a pair of the minimum and the maximum, very large with a rest)
@@ -182,23 +196,14 @@
 (define-public (append! . ls) (apply append ls))
 
 (define-public (string-split str ch)
+  ;; as Guile's: the pieces between the occurrences of ch, so that there is
+  ;; always one more piece than occurrences ("" gives (""), "a," ("a" ""))
   (let ((len (string-length str)))
-    (letrec
-      ((split
-        (lambda (a b)
-          (cond
-            ((>= b len) (if (= a b) '() (cons (substring str a b) '())))
-            ((char=? ch (string-ref str b))
-             (cond
-               ((!= a b)
-                (cons (substring str a b) (split b b)))
-               ((and (= a b) (or (= b 0) (= b (- len 1))))
-                (cons "" (split (+ 1 b) (+ 1 b))))
-               (else
-                (split (+ 1 b) (+ 1 b)))))
-            (else
-             (split a (+ 1 b)))))))
-      (split 0 0))))
+    (let loop ((i (- len 1)) (end len) (acc '()))
+      (cond ((< i 0) (cons (substring str 0 end) acc))
+            ((char=? (string-ref str i) ch)
+             (loop (- i 1) i (cons (substring str (+ i 1) end) acc)))
+            (else (loop (- i 1) end acc))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;guile-style records

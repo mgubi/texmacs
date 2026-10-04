@@ -127,9 +127,10 @@
 (define (in-comments-editor?)
   (string-starts? (url->string (current-buffer)) "tmfs://comments/"))
 
-(define ((comment-by-id? id) t)
-  (and (any-comment-context? t)
-       (== (comment-id t) id)))
+(define (comment-by-id? id)
+  (lambda (t)
+    (and (any-comment-context? t)
+         (== (comment-id t) id))))
 
 (define (search-comment t id)
   (with l (tree-search t (comment-by-id? id))

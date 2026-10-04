@@ -109,9 +109,9 @@
    :none :none
    (test "string-split" (string-split "a,b,c" #\,) '("a" "b" "c"))
    (test "string-split, empty fields"
-         (string-split ",a,,b," #\,) '("" "a" "b" ""))
+         (string-split ",a,,b," #\,) '("" "a" "" "b" ""))
    (test "string-split, no separator" (string-split "abc" #\,) '("abc"))
-   (test "string-split, empty string" (string-split "" #\,) '())
+   (test "string-split, empty string" (string-split "" #\,) '(""))
    (test "string-index, char" (string-index "hello" #\l) 2)
    (test "string-index, missing char" (string-index "hello" #\z) #f)
    (test "string-rindex, char" (string-rindex "hello" #\l) 3)
@@ -253,12 +253,12 @@
          #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Curried define (only available in modules)
+;; Curried define (the macro curried-define; define is s7's own)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define ((adder a) b) (+ a b))
-(define (((adder3 a) b) c) (+ a b c))
-(define ((adder* a) . l) (apply + a l))
+(curried-define ((adder a) b) (+ a b))
+(curried-define (((adder3 a) b) c) (+ a b c))
+(curried-define ((adder* a) . l) (apply + a l))
 
 (define (regtest-compat-curried)
   (regression-test-group
@@ -269,8 +269,17 @@
    (test "rest arguments" ((adder* 1) 2 3 4) 10)
    (test "plain define still works" (let () (define x 5) x) 5)
    (test "internal curried define"
-         (let () (define ((mul a) b) (* a b)) ((mul 6) 7))
-         42)))
+         (let () (curried-define ((mul a) b) (* a b)) ((mul 6) 7))
+         42)
+   (test "internal recursive define, twice"
+         (let ()
+           (define (pairs-of l)
+             (define (pairs l)
+               (if (or (null? l) (null? (cdr l))) '()
+                   (cons (cons (car l) (cadr l)) (pairs (cddr l)))))
+             (pairs l))
+           (list (pairs-of '(a 1 b 2)) (pairs-of '(c 3))))
+         '(((a . 1) (b . 2)) ((c . 3))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test suite

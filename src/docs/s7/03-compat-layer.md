@@ -13,15 +13,17 @@ first module inherited at boot (see §2.1). In addition:
 | SRFI-1 / Guile list functions | `filter` (only if missing), `delq` (non-destructive), `acons`, `last-pair`, `list-copy` (via generic `copy`), `copy-tree`, `map-in-order` (= `map`), `append!` (= non-destructive `append`) | |
 | Association lists | `assoc-ref`, `assoc-set!` | `assoc-set!` is defined twice (identical copies) and returns the new list. Guile's version mutates in place, so callers must use the return value. |
 | Arithmetic and misc | `1+`, `1-` (as macros), `noop`, `symbol-append`, `seed->random-state`, `*random-state*`, `force-output`, `iota` (single-argument form only) | `*random-state*` lives in the rootlet. Its setter reseeds `(*s7* 'default-random-state)`. |
-| Strings | `string-null?`, `string-split` (char separator), `string-index` / `string-rindex` (char, char-set or predicate, no start/end) | |
+| Strings | `string-null?`, `string-split` (char separator), `string-index` / `string-rindex` (char, char-set or predicate, optional start and end) | |
 | Char-sets (SRFI-14 subset) | `char-set`, `string->char-set`, `char-set-adjoin`, `char-set-complement`, `char-set-intersection`, `char-set-union`, `char-set-contains?`, `char-set-size`, `char-set:whitespace`, `char-set:lower-case`, `char-set:upper-case`, `char-set:digit` | Char-sets are hash tables mapping characters to `#t`. They are applicable, so `(cs ch)` tests membership. Predicates are accepted wherever a char-set is expected. Closures are avoided because of an s7 optimizer bug (see [06](06-open-issues.md)). |
 | Sorting | `(sort l op)` = `(sort! (copy l) op)` | s7's `sort!` is destructive. |
 | Errors | `lazy-catch` = `catch` | Guile's `lazy-catch` runs the handler before unwinding; here it unwinds first. |
+| Debugging | `debug-options` (the empty list), `debug-enable`, `debug-disable` (do nothing) | Used by the "Backtrace errors" item of the debug menu, which stays unchecked. |
+| Procedures | `module-ref`, `closure?`, `procedure-property` (`arity` only), `procedure-documentation` (`#f` without documentation) | |
 | Records | `make-record-type`, `record-constructor`, `record-accessor` (a macro), `record-predicate` | Records are `inlet`s with a `'type` slot. The constructor is built with `eval`. |
 | Promises | `make-promise`, `delay`, `delay-force`, `force` | Taken from s7's `r7rs.scm`. |
 | Hashing | `(hash obj [bound])` | `(modulo (hash-code obj) bound)` |
 | Loops | `while` | Uses `call-with-exit`. `break` and `continue` are bound inside the body. |
-| `define` | `curried-define` | Installed as `define` **only** in `*texmacs-user-module*`, so module files (whose parent is that environment) can use `(define ((f a) b) …)`. Code evaluated in the rootlet cannot. Rebinding `define` in the rootlet itself aborts s7's `load`. |
+| `define` | `curried-define` | A macro for Guile's curried definitions, `(curried-define ((f a) b) …)`. It is **not** installed as `define`: a macro in place of `define` made s7 crash the second time a function with an internal recursive definition ran (a stale annotation of the expanded body, `op_safe_closure_p_a_1` "wants opt2_fx" with `S7_DEBUGGING`), and it was what made macros lose their internal definitions (see [06](06-open-issues.md)). The TeXmacs code writes the curried definitions it needs with an explicit `lambda`, which both interpreters read. |
 
 The file ends with a "TODO/FIXME" about redefining `error` to match Guile's
 calling convention. That has not been done.

@@ -147,8 +147,7 @@ must not stop in the user module, and three rules make sure of that:
   than twice as slow.
 - **Nothing enters the user module afterwards.** It would then become newer
   than every module loaded so far. Lookups from their code of the names that
-  live in the user module itself would then scan their environment. These
-  are mainly `define`, the curried `define` of `compat-s7.scm`.
+  live in the user module itself would then scan their environment.
   - `tm-define-macro` therefore defines its macro with `eval` in the user
     module, which does not renumber it (§2.5).
   - The C++ entry points don't renumber either (§1.3).
@@ -160,8 +159,10 @@ must not stop in the user module, and three rules make sure of that:
 **Two names bound outside the rootlet on purpose:**
 - `list?`, rebound to `proper-list?`, is bound in the rootlet like the
   public definitions;
-- the curried `define` stays in the user module, because rebinding `define`
-  itself in the rootlet silently ends s7's current `load`.
+- `define` is s7's own everywhere: rebinding it in the rootlet silently ends
+  s7's current `load`, and the curried `define` which used to be bound in
+  the user module crashed s7 (see [03](03-compat-layer.md)); curried
+  definitions use an explicit `lambda` or the `curried-define` macro.
 
 With these rules TeXmacs runs on s7 as released. An earlier version copied
 every export into the user module, which grew to about a thousand bindings.
