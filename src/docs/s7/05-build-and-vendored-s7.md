@@ -74,7 +74,7 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 ## 5.2 The vendored s7
 
 `src/Scheme/S7/s7.c` and `s7.h` are **s7 11.9 (21-Sep-2026) as released**
-(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with three local
+(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with four local
 patches (below). The patches are kept in `src/Scheme/S7/patches/`, made
 one after the other from stock s7, with a description at the top of each
 and a `README.md`; the changed code is marked `TeXmacs:` in `s7.c`.
@@ -132,6 +132,13 @@ from the innermost head. Before the patch, `define` in the user module was a
 run-time macro: it was expanded again each time an internal definition ran,
 and it triggered the crash of patch 0002.
 
+**Patch 0004, a fix from upstream.** In the `p_pi` case of its tree
+rewriting, the optimizer replaced `string_ref_p_pi` by `string_ref_p_p0`, a
+`p_pp` function which `fx_c_ti_direct` then called as `p_pi`. Native code
+does not mind; WebAssembly traps ("indirect call signature mismatch"), on
+`(string-ref a 0)` where `a` is a parameter. s7 5-Oct-2026 has the same fix,
+so the patch goes with the next upgrade.
+
 **No patch of the lookups.** Earlier versions of the port patched s7's symbol
 lookup:
 - first by moving found slots to the front of their let, which was unsound,
@@ -149,7 +156,7 @@ first patch broke.
 1. Copy the new `s7.c` and `s7.h` into `src/Scheme/S7` and apply the
    patches in order, as `src/Scheme/S7/patches/README.md` says. Drop a patch
    which upstream has made unnecessary, and refresh one which no longer
-   applies. The `patches` group of `boot-s7-test.scm` tests all three.
+   applies. The `patches` group of `boot-s7-test.scm` tests all four.
 2. Rebuild from clean.
 3. Run `run-all-tests` and the portable suites on both interpreters (§4.4).
 4. Check the timings of [07](07-performance.md), at least boot and the LaTeX

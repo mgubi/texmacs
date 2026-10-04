@@ -10,6 +10,7 @@ marked `TeXmacs:` in `s7.c`.
 | `0001-write-long-strings-of-one-character.patch` | `write`/`display` no longer print long strings of one character as `(make-string n c)` |
 | `0002-call-site-keeps-closure-only-with-same-body.patch` | fixes a segfault when a call site is given a closure made from new code (reported upstream) |
 | `0003-curried-define.patch` | Guile's curried `define`, `(define ((f a) b) ...)` |
+| `0004-string-ref-p0-signature-for-webassembly.patch` | `(string-ref s 0)` on a parameter no longer traps in WebAssembly; upstream since s7 5-Oct-2026, drop it then |
 
 To upgrade s7, from `src/src/Scheme/S7`:
 
