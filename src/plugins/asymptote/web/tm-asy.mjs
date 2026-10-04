@@ -234,6 +234,35 @@ function sizeOf (latex) {
 }
 
 /******************************************************************************
+* The options of a picture: a first line "% -width 300 -height 200", as in
+* the plugin of the desktop (tmpy/graph/graph.py), taken out of the code
+******************************************************************************/
+
+// a length of the options in bp: a number alone is in pixels, as on the
+// desktop; null for what is not a length
+const UNITS = { px: 0.75, pt: 72 / 72.27, bp: 1, mm: 72 / 25.4, cm: 72 / 2.54, in: 72 };
+function lengthBp (v) {
+  const m = /^\s*([0-9]*\.?[0-9]+)\s*([a-z]*)\s*$/.exec (v || '');
+  if (!m) return null;
+  const u = m[2] || 'px';
+  return u in UNITS ? parseFloat (m[1]) * UNITS[u] : null;
+}
+
+function options (code) {
+  if (!/^\s*%/.test (code)) return { code, width: null, height: null };
+  const nl = code.indexOf ('\n');
+  const line = nl < 0 ? code : code.slice (0, nl);
+  const args = line.replace (/^\s*%/, '').trim ().split (/\s+/);
+  const r = { code: nl < 0 ? '' : code.slice (nl + 1), width: null, height: null };
+  for (let i = 0; i + 1 < args.length; i += 2) {
+    if (args[i] === '-width') r.width = lengthBp (args[i + 1]);
+    else if (args[i] === '-height') r.height = lengthBp (args[i + 1]);
+    // -output: the picture is always SVG here
+  }
+  return r;
+}
+
+/******************************************************************************
 * The picture
 ******************************************************************************/
 
@@ -267,13 +296,26 @@ function sides (ax, ay) {
   return [h, v];
 }
 
-function picture (source, eps, labels) {
+function picture (source, eps, labels, opts) {
   const conv = epsToSvg (eps);
   const m = markers (typeof conv === 'string' ? conv : conv.svg);
   const root = /<svg\b[^>]*>/.exec (m.svg);
   const attr = (n) => { const a = root && new RegExp ('\\b' + n + '="([^"]*)"').exec (root[0]); return a ? parseFloat (a[1]) : 0; };
   const w = attr ('width'), h = attr ('height');
-  const W = num (w * BP) + 'pt', H = num (h * BP) + 'pt';
+  // the scale of the options (-width, -height): the image, and the places
+  // and the sizes of its labels with it
+  let kx = 1, ky = 1;
+  if (opts && opts.width && w > 0) kx = opts.width / w;
+  if (opts && opts.height && h > 0) ky = opts.height / h;
+  if (opts && opts.width && !opts.height) ky = kx;
+  if (opts && opts.height && !opts.width) kx = ky;
+  const W = num (w * kx * BP) + 'pt', H = num (h * ky * BP) + 'pt';
+  // the SVG at that size (its viewBox unchanged): the renderer of the browser
+  // draws an image at its own size, then stretches it
+  if ((kx !== 1 || ky !== 1) && root && /\bviewBox=/.test (root[0]))
+    m.svg = m.svg.replace (root[0], root[0]
+      .replace (/\bwidth="[^"]*"/, 'width="' + num (w * kx) + '"')
+      .replace (/\bheight="[^"]*"/, 'height="' + num (h * ky) + '"'));
   const items = [];
   for (const n of Object.keys (m.places)) {
     const l = labels[n], p = m.places[n];
@@ -284,13 +326,13 @@ function picture (source, eps, labels) {
     // plain_picture.asy, adds it to the place of the label once more)
     const x = p.x + l.ax * 0.3 * l.size, y = p.y - l.ay * 0.3 * l.size;
     const env = ['"mode" "text"', '"font" "roman"',
-                 '"font-base-size" "' + num (l.size * BP) + '"', '"font-size" "1"'];
+                 '"font-base-size" "' + num (l.size * Math.min (kx, ky) * BP) + '"', '"font-size" "1"'];
     if (l.color.length === 3 && (l.color[0] || l.color[1] || l.color[2]))
       env.push ('"color" "' + hex (l.color) + '"');
     const src = '(asy-latex ' + schemeString (l.latex) + ')';
     items.push ('(with "text-at-halign" "' + ha + '" "text-at-valign" "' + va + '" ' +
                 '(text-at (with ' + env.join (' ') + ' (asy-label "' + n + '" ' + src + ' ' + src + ')) ' +
-                '(point "' + num (x * BP) + '" "' + num ((h - y) * BP) + '")))');
+                '(point "' + num (x * kx * BP) + '" "' + num ((h - y) * ky * BP) + '")))');
   }
   const image = '(asy-drawing (image (tuple (raw-data ' + schemeString (m.svg) + ') "asymptote.svg") "' +
                 W + '" "' + H + '" "" ""))';
@@ -316,7 +358,9 @@ function asyError (lines) {
 let input = '';
 let queue = Promise.resolve ();
 
-async function evaluate (code) {
+async function evaluate (source) {
+  const opts = options (source);
+  const code = opts.code;
   let m;
   try { m = await asymptote (); }
   catch (e) {
@@ -365,7 +409,7 @@ async function evaluate (code) {
     return;
   }
   let answer;
-  try { answer = picture (code, eps, labelsPatched ? readLabels (m) : {}); }
+  try { answer = picture (source, eps, labelsPatched ? readLabels (m) : {}, opts); }
   catch (e) {
     err (B + 'utf8:The picture could not be converted: ' + e + E);
     out (B + 'verbatim:' + PROMPT + E);

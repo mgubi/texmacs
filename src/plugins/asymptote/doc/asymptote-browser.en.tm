@@ -180,6 +180,11 @@
     <item>There are no pictures in three dimensions, and no other output
     than the picture in the document.
 
+    <item>As on the desktop, a first line <verbatim|% -width 300 -height
+    200> gives the size of the picture, in pixels or with a unit
+    (<verbatim|pt>, <verbatim|cm>, <verbatim|mm>, <verbatim|in>); its
+    labels are scaled with it.
+
     <item>A first line <verbatim|// debug: svg> shows the picture as
     <name|Asymptote> made it, with its labels, as text.
   </itemize>

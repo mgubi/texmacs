@@ -83,6 +83,13 @@ Asymptote's own font: a step can be given (`LeftTicks(Step=1)`).
 A rotated label is set upright (the rotation of TeXmacs is not right in the
 renderer of the browser yet); a label squashed to nothing stays Asymptote's.
 
+A first line `% -width 300 -height 200`, as for the plugin of the desktop
+(`tmpy/graph/graph.py`), is taken out of the code and scales the picture: a
+number alone is in pixels, a unit can be given (pt, bp, mm, cm, in); the SVG
+gets the new size (its viewBox unchanged: the renderer draws an image at its
+own size before stretching it), and the places and sizes of the labels are
+scaled with it.
+
 A first line `// debug: svg` returns the SVG and the label records as text.
 
 ## Editing
