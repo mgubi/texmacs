@@ -44,6 +44,7 @@ protected:
   int       clip_level;
   int       transform_level; // how deep in set_transformation
   bool      fill_is_pattern; // the PDF fill color is a pattern (no direct fill)
+  bool      proxy;           // a shadow drawing into its master's pixmap
   
 //  pencil    pen;
 //  brush     bgb, fgb;
@@ -87,6 +88,11 @@ protected:
   bool draw_pixmap_direct (fz_pixmap* src, SI x, SI y, int alpha,
                            bool opaque= false);
   bool draw_pixmap_scaled_direct (fz_pixmap* src, SI x, SI y, double s, int alpha);
+  bool tile_direct (SI x1, SI y1, SI x2, SI y2, fz_pixmap* tile);
+
+  // the text of a proxy is drawn at its end (ET): before its pixels are used
+  static void flush_proxy_text (fz_pixmap* pix);
+  void reset_proxy (fz_pixmap* pix);
 
 public:
   mupdf_renderer_rep (int w = 0, int h = 0);

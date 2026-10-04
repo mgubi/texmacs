@@ -320,7 +320,7 @@ mupdf_renderer_rep::mupdf_renderer_rep (int w2, int h2)
     pixmap (NULL), dev (NULL), proc (NULL),
     fg (-1), bg (-1),
     lw (-1), clip_level (0), transform_level (0), fill_is_pattern (false),
-    in_text (false), cfn ("")
+    proxy (false), in_text (false), cfn ("")
 {
   reset_zoom_factor();
 }
@@ -436,10 +436,22 @@ mupdf_renderer_rep::end () {
   }
 }
 
+// The proxy whose text is pending. The run processor collects the glyphs
+// of a text object and draws them at its end (ET); a proxy draws into the
+// pixmap of another renderer, which must not use those pixels before.
+static mupdf_renderer_rep* proxy_with_text= NULL;
+
+void
+mupdf_renderer_rep::flush_proxy_text (fz_pixmap* pix) {
+  if (proxy_with_text != NULL && proxy_with_text->pixmap == pix)
+    proxy_with_text->end_text ();
+}
+
 void
 mupdf_renderer_rep::begin_text () {
   if (!in_text) {
     in_text= true;
+    if (proxy) proxy_with_text= this;
     prev_text_x= to_x(0);
     prev_text_y= to_y(0);
     proc->op_BT (mupdf_context (), proc);
@@ -451,6 +463,7 @@ void
 mupdf_renderer_rep::end_text () {
   if (in_text) {
     in_text= false;
+    if (proxy_with_text == this) proxy_with_text= NULL;
     proc->op_ET (mupdf_context (), proc);
   }
 }
@@ -507,6 +520,7 @@ mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
   renderer_rep::set_clipping (x1, y1, x2, y2, restore);
 
   end_text();
+  if (!proxy) flush_proxy_text (pixmap);
   
   outer_round (x1, y1, x2, y2);
   // protected: q and a clip past MuPDF's limits of nesting are errors;
@@ -841,6 +855,92 @@ mupdf_renderer_rep::set_brush (brush br) {
   }
   //select_alpha (br->get_alpha ());
 }
+// The tile of the neutral pattern, composed over white once: what
+// clear_device draws is white with the pattern over it, so the tile is
+// opaque and the rectangle is tiled by copying rows (tile_direct). It is
+// kept for one size at a time, the size following the density. It is
+// keyed by the size of the brush and the pixel, which give its size in
+// device pixels: get_pattern_data resolves the file of the pattern, which
+// is not to be done at every repaint.
+static fz_pixmap* neutral_tile= NULL;
+static SI neutral_key_w= 0, neutral_key_h= 0, neutral_key_pixel= 0;
+
+static fz_pixmap*
+get_neutral_tile (brush neutral, SI bw, SI bh, SI pixel) {
+  if (bw == neutral_key_w && bh == neutral_key_h && pixel == neutral_key_pixel)
+    return neutral_tile;
+  fz_context* ctx= mupdf_context ();
+  if (neutral_tile != NULL) fz_drop_pixmap (ctx, neutral_tile);
+  neutral_tile= NULL;
+  neutral_key_w= bw; neutral_key_h= bh; neutral_key_pixel= pixel;
+  url u;
+  SI w, h;
+  tree eff;
+  get_pattern_data (u, w, h, eff, neutral, pixel);
+  fz_pixmap* src= mupdf_load_pixmap (u, w, h, eff, pixel);
+  if (src == NULL) return NULL;
+  if (src->w == w && src->h == h && src->s == 0 &&
+      ((src->n == 4 && src->alpha) || (src->n == 3 && !src->alpha)) &&
+      (src->colorspace == fz_device_rgb (ctx) ||
+       src->colorspace == fz_device_bgr (ctx))) {
+    fz_pixmap* tile= mupdf_new_pixmap (w, h);
+    if (tile->w == w && tile->h == h) {
+      int r= (src->colorspace == fz_device_bgr (ctx)) ? 2 : 0, b= 2 - r;
+      for (int y= 0; y < h; y++) {
+        const unsigned char* sp= src->samples + (ptrdiff_t) y * src->stride;
+        unsigned char* d= tile->samples + (ptrdiff_t) y * tile->stride;
+        for (int x= 0; x < w; x++, sp += src->n, d += 4) {
+          // premultiplied over white
+          int ia= (src->n == 4) ? 255 - sp[3] : 0;
+          d[0]= (unsigned char) (sp[r] + ia);
+          d[1]= (unsigned char) (sp[1] + ia);
+          d[2]= (unsigned char) (sp[b] + ia);
+          d[3]= 255;
+        }
+      }
+      neutral_tile= tile;
+    }
+    else fz_drop_pixmap (ctx, tile);
+  }
+  fz_drop_pixmap (ctx, src);
+  return neutral_tile;
+}
+
+// tile the box with an opaque RGB tile whose corner is at the origin of
+// the document, as the patterns of placed_pattern; false if MuPDF must do it
+bool
+mupdf_renderer_rep::tile_direct (SI x1, SI y1, SI x2, SI y2, fz_pixmap* tile) {
+  if (tile == NULL || tile->samples == NULL || pixmap == NULL) return false;
+  if (pixmap->n != 4 || pixmap->s != 0 || !pixmap->alpha) return false;
+  if (tile->n != 4 || tile->w <= 0 || tile->h <= 0) return false;
+  fz_context* ctx= mupdf_context ();
+  bool bgr= (pixmap->colorspace == fz_device_bgr (ctx));
+  if (!bgr && pixmap->colorspace != fz_device_rgb (ctx)) return false;
+  end_text ();
+  int px1, py1, px2, py2;
+  if (!device_box (x1, y1, x2, y2, px1, py1, px2, py2)) return true;
+  // the device position of the origin, and the tile pixel of each device
+  // pixel: (x - dx0) mod w, (y - dy0) mod h, as MuPDF lays the tiles out
+  int dx0= (int) to_x (0), dy0= (int) -to_y (0);
+  int tw= tile->w, th= tile->h;
+  for (int py= py1; py < py2; py++) {
+    int ty= ((py - dy0) % th + th) % th;
+    const unsigned char* srow= tile->samples + (ptrdiff_t) ty * tile->stride;
+    unsigned char* d= pixmap->samples + (ptrdiff_t) py * pixmap->stride + 4 * px1;
+    int tx= ((px1 - dx0) % tw + tw) % tw;
+    for (int left= px2 - px1; left > 0; ) {
+      int k= min (left, tw - tx);
+      const unsigned char* sp= srow + 4 * tx;
+      if (!bgr) memcpy (d, sp, (size_t) k * 4);
+      else
+        for (int i= 0; i < k; i++, sp += 4)
+          { d[4*i]= sp[2]; d[4*i+1]= sp[1]; d[4*i+2]= sp[0]; d[4*i+3]= 255; }
+      d += 4 * k; left -= k; tx= 0;
+    }
+  }
+  return true;
+}
+
 void
 mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
   // the neutral pattern around the pages, as in the Qt port: white, then
@@ -856,12 +956,23 @@ mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
   // at its natural size whatever the zoom, as in the Qt port: the size is
   // given in the units of the renderer, a pixel of the image being a point
   // of the screen (retina_factor device pixels)
-  brush neutral;
-  if (!is_none (u) && iw > 0 && ih > 0)
-    neutral= brush (compound ("pattern", as_string (u),
-                              as_string ((int) (iw * retina_factor * pixel)),
-                              as_string ((int) (ih * retina_factor * pixel))),
-                    255);
+  static brush neutral;
+  static SI neutral_w= 0, neutral_h= 0;
+  if (!is_none (u) && iw > 0 && ih > 0) {
+    SI nw= (SI) (iw * retina_factor * pixel), nh= (SI) (ih * retina_factor * pixel);
+    if (is_nil (neutral) || nw != neutral_w || nh != neutral_h) {
+      neutral= brush (compound ("pattern", as_string (u),
+                                as_string ((int) nw), as_string ((int) nh)),
+                      255);
+      neutral_w= nw; neutral_h= nh;
+    }
+  }
+  else neutral= brush ();
+  SI px= (brushpx == -1 ? pixel : brushpx);
+  if (!is_nil (neutral) &&
+      tile_direct (x1, y1, x2, y2,
+                   get_neutral_tile (neutral, neutral_w, neutral_h, px)))
+    return;
   end_text ();
   float xx1= to_x (min (x1, x2));
   float yy1= to_y (min (y1, y2));
@@ -1652,6 +1763,7 @@ void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
+  flush_proxy_text (pict->pix);
   if (draw_pixmap_direct (pict->pix, x - p->get_origin_x () * pixel,
                           y - p->get_origin_y () * pixel, alpha, pict->opaque))
     return;
@@ -1677,6 +1789,7 @@ mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
                                          int alpha) {
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
+  flush_proxy_text (pict->pix);
   if (pict->opaque && draw_pixmap_scaled_direct (pict->pix, x, y, s, alpha))
     return;
   fz_image* im= mupdf_image_from_pixmap (pict->pix);
@@ -2174,23 +2287,65 @@ mupdf_renderer_rep::fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y)
  * Shadow management methods 
  ******************************************************************************/
 
+/******************************************************************************
+* The shadow of a renderer is a proxy, as in the Qt port: a renderer of its
+* own (its own device and graphics state) on the same pixmap, so that the
+* editor draws straight into its backing store. The shadow used to be a
+* pixmap of its own, and a full repaint copied the backing store into it,
+* each paragraph back as it was drawn (apply_shadow) and the whole
+* rectangle once more at the end: a third of the time of a repaint went to
+* those copies. A proxy makes them no-ops. The shadow of a proxy (the
+* store of the active graphics of the editor) is a real copy, again as in
+* the Qt port.
+******************************************************************************/
+
 void
 mupdf_renderer_rep::new_shadow (renderer& ren) {
   SI mw, mh, sw, sh;
   get_extents (mw, mh);
+  bool want_proxy= !proxy;
   if (ren != NULL) {
+    mupdf_renderer_rep* old= static_cast<mupdf_renderer_rep*>(ren);
     ren->get_extents (sw, sh);
-    if (sw != mw || sh != mh) {
+    if (sw != mw || sh != mh || old->proxy != want_proxy) {
       delete_shadow (ren);
       ren= NULL;
     }
+    else if (want_proxy && old->pixmap != pixmap)
+      old->begin (pixmap); // our pixmap was replaced (resize, density)
   }
   if (ren == NULL)  {
-    ren= (renderer) tm_new<mupdf_renderer_rep> (mw, mh);
-    fz_pixmap *pix= mupdf_new_pixmap (mw, mh);
-    static_cast<mupdf_renderer_rep*>(ren)->begin(pix);
-    fz_drop_pixmap (mupdf_context (), pix);
+    mupdf_renderer_rep* sh= tm_new<mupdf_renderer_rep> (mw, mh);
+    if (want_proxy) {
+      sh->proxy= true;
+      sh->begin (pixmap);
+    }
+    else {
+      fz_pixmap *pix= mupdf_new_pixmap (mw, mh);
+      sh->begin (pix);
+      fz_drop_pixmap (mupdf_context (), pix);
+    }
+    ren= (renderer) sh;
   }
+}
+
+// back to the state of begin on the same device, or begin on pix
+void
+mupdf_renderer_rep::reset_proxy (fz_pixmap* pix) {
+  if (dev == NULL || proc == NULL || pixmap != pix || transform_level != 0) {
+    begin (pix);
+    return;
+  }
+  end_text ();
+  fz_context* ctx= mupdf_context ();
+  mupdf_protected ("reset_proxy", [&] () {
+    while (clip_level > 0) { proc->op_Q (ctx, proc); clip_level--; }
+  });
+  clip_level= 0;
+  fg= -1; bg= -1; lw= -1;
+  current_width= -1.0;
+  cfn= "";
+  fill_is_pattern= false;
 }
 
 void 
@@ -2228,6 +2383,28 @@ mupdf_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   
   decode (x1, y1);
   decode (x2, y2);
+  if (shadow->pixmap == pixmap) {
+    // a proxy: the state of the outermost q (no clip left from the previous
+    // repaint) and the rectangle as its clip, in the space of the processor
+    // (y up). The device and the processor are kept: making them anew at
+    // each repaint cost a fifth of it (freeing the processor gives its
+    // memory back to the system)
+    shadow->reset_proxy (pixmap);
+    if (x1 >= x2 || y2 >= y1) x2= x1, y1= y2; // nothing visible
+    fz_context* ctx= mupdf_context ();
+    pdf_processor* sp= shadow->proc;
+    bool saved= false;
+    mupdf_protected ("get_shadow", [&] () {
+      sp->op_q (ctx, sp);
+      saved= true;
+      sp->op_re (ctx, sp, x1, -y1, x2-x1, y1-y2);
+      sp->op_W (ctx, sp);
+      sp->op_n (ctx, sp);
+    });
+    if (saved) shadow->clip_level++;
+    return;
+  }
+  end_text ();
   if (x1<x2 && y2<y1) {
     fz_irect rect= fz_make_irect (x1, y2, x2, y1);
     fz_copy_pixmap_rect (mupdf_context(), shadow->pixmap, pixmap, rect, NULL);
@@ -2240,6 +2417,8 @@ mupdf_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   ASSERT (ren != NULL, "invalid renderer");
   if (ren->is_printer ()) return;
   mupdf_renderer_rep* shadow= static_cast<mupdf_renderer_rep*>(ren);
+  shadow->end_text ();
+  if (shadow->pixmap == pixmap) return; // a proxy drew in place
   outer_round (x1, y1, x2, y2);
   x1= max (x1, cx1- ox);
   y1= max (y1, cy1- oy);

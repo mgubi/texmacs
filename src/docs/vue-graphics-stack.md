@@ -762,7 +762,38 @@ behaviour. Feature status against those two:
   pattern images are scaled to their requested size (`fz_scale_pixmap` in
   `mupdf_load_pixmap`), which the pattern sizes of the style files rely on;
 * **`clear_device`**: white plus the tiled `neutral-pattern.png`, as Qt
-  (visible between pages in paper mode; `draw_surround` covers the sides);
+  (visible between pages in paper mode; `draw_surround` covers the sides).
+  The tile is composed over white once (`get_neutral_tile`, kept for one
+  size, which follows the density) and the rectangle is tiled by copying
+  rows of it (`tile_direct`), with the phase of the PDF pattern it
+  replaces (a corner at the origin of the document): the same pixels, but
+  the tiling through MuPDF (`fz_end_tile`) and the resolution of the
+  pattern's URL at every call were 40 % of a full repaint of the editor.
+  The PDF pattern remains the fallback for pixmaps of another format;
+* **the shadow is a proxy**, as in the Qt port: `new_shadow` gives a
+  renderer of its own (device, processor, graphics state) on the pixmap of
+  its master, so the editor draws straight into its backing store, clipped
+  to the rectangle of `get_shadow`; `put_shadow` and `apply_shadow`
+  between the two do nothing. The shadow used to be a pixmap of its own:
+  a full repaint copied the backing store into it, each paragraph back
+  as it was drawn (`apply_shadow`, the progressive display) and the whole
+  rectangle once more at the end, a third of the time of the repaint. The
+  device and the processor are kept from one repaint to the next
+  (`reset_proxy` closes the clips left open): making them anew cost a
+  fifth of the repaint, freeing the processor giving its memory back to
+  the system. The run processor draws the glyphs of a text object at its
+  end (`ET`), so a proxy whose text is pending is flushed before its
+  master uses the pixels (`flush_proxy_text`: when the master's clip is
+  set or restored, which `repaint_invalid_regions` does after each
+  region, and when the pixmap is drawn as a picture). The shadow of a
+  proxy (`stored`, the active graphics of the editor) is a real copy, as
+  in Qt. Measured on a document of 200 paragraphs of text and formulas,
+  a Retina window, forced full repaints (`TEXMACS_VUE_PROFILE`): 3.3–3.4
+  ms a repaint before, 1.4 ms after, the same pixels (a repaint
+  without scrolling compared with the build before, and the `pattern*`,
+  `figures`, `tmoutput`, `drag-scroll` and `scroll-shift` tests; the
+  `macro-editor` test differs on two pixels, where the cursor meets a
+  bracket in the embedded editor);
 * **direct pixel access** (`fill_direct`, `draw_pixmap_direct`,
   `device_box`): axis-aligned boxes land on integer device pixels (`to_x`/
   `to_y` divide SI by the pixel size), so plain-color fills (`fill`, `clear`
