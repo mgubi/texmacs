@@ -16,7 +16,7 @@
 #include "string.hpp"
 #include "scheme.hpp"
 #include "server_log.hpp"
-#include "gnutls.hpp"
+#include <Gnutls/gnutls.hpp>
 
 // Error codes
 const int TM_NET_SUCCESS = 0;

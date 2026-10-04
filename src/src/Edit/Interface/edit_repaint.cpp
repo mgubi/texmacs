@@ -129,7 +129,9 @@ edit_interface_rep::draw_surround (renderer ren, rectangle r) {
   ren->set_background (tm_background);
   string medium= get_init_string (PAGE_MEDIUM);
   if (medium == "automatic") return;
-  if (medium == "beamer" && full_screen) return;
+  // around the slides of a presentation, black (the background of the
+  // window in Qt, where the canvas is only the size of the page)
+  if (medium == "beamer" && full_screen) ren->set_background (black);
   ren->clear (r->x1, r->y1, max (r->x1, eb->x1), r->y2);
   ren->clear (min (r->x2, eb->x2), r->y1, r->x2, r->y2);
   if (medium == "papyrus") return;
@@ -153,7 +155,7 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
   for (int i=0; i<N(alt_selection_rects); i++) {
     color col= get_env_color (MATCH_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined (SDLTEXMACS) || defined(VUETEXMACS) || defined (AQUATEXMACS)
     ren->draw_selection (alt_selection_rects[i] & visible);
 #else
     ren->draw_rectangles (alt_selection_rects[i] & visible);
@@ -162,7 +164,7 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
   for (int i=0; i<N(spell_error_rects); i++) {
     color col= get_env_color (SPELL_ERROR_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (AQUATEXMACS)
     ren->draw_selection (spell_error_rects[i] & visible);
 #else
     ren->draw_rectangles (spell_error_rects[i] & visible);
@@ -172,7 +174,7 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
     color col= get_env_color (SELECTION_COLOR);
     if (table_selection) col= get_env_color (TABLE_SELECTION_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#ifdef QTTEXMACS
+#if defined(QTTEXMACS) || defined (SDLTEXMACS) || defined(VUETEXMACS) || defined (AQUATEXMACS)
     ren->draw_selection (selection_rects & visible);
 #else
     ren->draw_rectangles (selection_rects & visible);

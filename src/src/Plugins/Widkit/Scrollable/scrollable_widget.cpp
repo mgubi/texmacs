@@ -14,8 +14,8 @@
 #include "Widkit/scroll_widget.hpp"
 #include "Widkit/layout.hpp"
 
-SI get_dx (gravity grav, int w);
-SI get_dy (gravity grav, int h);
+SI get_dx (gravity grav, SI w);
+SI get_dy (gravity grav, SI h);
 
 inline bool is_nil (wk_widget_rep* x) { return x==NULL; }
 

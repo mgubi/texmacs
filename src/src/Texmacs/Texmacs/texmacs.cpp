@@ -35,7 +35,13 @@
 void mac_fix_paths ();
 #endif
 
-#ifdef QTTEXMACS
+#if defined(QTWKTEXMACS)
+#include "Qtwk/QTWKApplication.hpp"
+#include "Qt/qt_utilities.hpp"
+#include <QDir>
+#define QTMApplication QTWKApplication
+#define QTMCoreApplication QTWKCoreApplication
+#elif defined(QTTEXMACS)
 #include "Qt/QTMApplication.hpp"
 #include "Qt/qt_utilities.hpp"
 #include <QDir>
@@ -533,6 +539,7 @@ set_global_options  (int argc, char** argv)  {
 #endif
   // End options via environment variables
 
+#if defined(QTTEXMACS)
   // Further user preferences
   string native= (gui_version () == "qt4"? string ("on"): string ("off"));
   string unify = (gui_version () == "qt4"? string ("on"): string ("off"));
@@ -545,6 +552,7 @@ set_global_options  (int argc, char** argv)  {
 #endif
   use_mini_bars      = get_preference ("use minibars",         mini) == "on";
   // End user preferences
+#endif
 }
  
 /******************************************************************************
@@ -567,7 +575,14 @@ TeXmacs_main (int argc, char** argv) {
   
   { // opening scope for server sv
     if (DEBUG_STD) debug_boot << "Starting server...\n";
+#ifdef __EMSCRIPTEN__
+    // in the browser the main loop is left by unwinding the stack (see
+    // gui_start_loop in the Vue plugin): the server must not be on it
+    server& sv= *tm_new<server> ();
+    (void) sv;
+#else
     server sv;
+#endif
   
     // append commands to open standard welcome messages if needed
     if (install_status == 1) {
@@ -742,7 +757,7 @@ immediate_options (int argc, char** argv) {
 #endif
     }
 
-#ifdef QTTEXMACS
+#if defined (QTTEXMACS) || defined (VUETEXMACS)
     else if (s == "-headless" || s == "-H" || s == "-C" ||
 	     s == "-build-website" || s == "-W" ||
 	     s == "-update-website" || s == "-U")
@@ -859,8 +874,8 @@ texmacs_entrypoint (int argc, char** argv) {
 #  else
     tmapp()->set_window_icon("/misc/images/texmacs-512.png");
 #  endif
-#endif
   }
+#endif
   //cout << "Bench  ] Started TeXmacs\n";
   the_et     = tuple ();
   the_et->obs= ip_observer (path ());

@@ -15,9 +15,11 @@
 #include "sys_utils.hpp"
 #include "analyze.hpp"
 
+#if defined(QTTEXMACS)
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#endif
 
 #include <vector>
 #include <unistd.h>

@@ -37,6 +37,7 @@ CPPFLAGS = @CPPFLAGS@ @QT_CPPFLAGS@ -D@CONFIG_GUI_DEFINE@
 CXXX11 = @X11_CXX@
 CXXCOCOA = @COCOA_CFLAGS@
 CXXQT = @QT_CXXFLAGS@
+CXXQTWK = $(CXXQT)
 CXXGUI = $(CXX@CONFIG_GUI@)
 CXXAXEL = @AXEL_CXX@
 CXXCAIRO = @CAIRO_CXX@
@@ -48,17 +49,23 @@ CXXICONV = @ICONV_CXX@
 CXXGUILE = @GUILE_CFLAGS@
 CXXSPARKLE = @SPARKLE_CXX@ @SPARKLE_CPP@
 CXXPDF = @PDF_CFLAGS@
+CXXMUPDF = @MUPDF_CFLAGS@
+CXXSDL = @SDL_CFLAGS@
+CXXVUE = @VUE_CFLAGS@
 CXXRESVG = @RESVG_CFLAGS@
 
 LD = @CXX@
 LDFLAGS = @LDFLAGS@ @CONFIG_BFLAGS@ @QT_LDFLAGS@ $(CXXPROFILE) $(CXXSANITIZERS)
-LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @LIBS@ 
+LIBS = @GUILE_STATIC@ @SPARKLE_LIBS@ @MUPDF_LIBS@ @LIBS@ 
 LDSTATIC = @CONFIG_BSTATIC@
 LDSHARED = @CONFIG_BSHARED@
 LDPATH = @CONFIG_BPATH@
 LDX11 =
 LDCOCOA = @COCOA_LDFLAGS@
 LDQT = @QT_LIBS@
+LDSDL = @SDL_LDFLAGS@
+LDVUE = @VUE_LDFLAGS@
+LDQTWK = $(LDQT)
 LDGUI = $(LD@CONFIG_GUI@)
 LDGNUTLS= @GNUTLS_LDFLAGS@
 LDRESVG = @RESVG_LDFLAGS@ @RESVG_LIBS@
@@ -113,7 +120,18 @@ x11_src      := $(call findsrc_in,Plugins,@CONFIG_X11@)
 cocoa_m_src  := $(call findm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@)
 cocoa_mm_src := $(call findmm_in,Plugins,@CONFIG_COCOA@ @CONFIG_MACOS@ @CONFIG_SPARKLE@)
 os_src       := $(call findsrc_in,Plugins,@CONFIG_OS_COMPAT@)
+ifeq "@CONFIG_QT@" "Qtwk Widkit"
+# the Widkit-on-Qt port takes the few Qt sources it needs from Plugins/Qt
+# (Plugins/Qt6 has the same file names, so the directory is explicit)
+QT_SRC_DIR   := Qt
+qtwk_src     := $(call findsrc_in,Plugins,Qtwk Widkit)
+qt_src       := qt_font.cpp qt_picture.cpp qt_pipe_link.cpp qt_renderer.cpp qt_utilities.cpp \
+                QTMPipeLink.cpp QTMSockets.cpp qt_http.cpp
+else
+QT_SRC_DIR   := $(QT_PLUGIN_DIR)
+qtwk_src     :=
 qt_src       := $(call findsrc_in,Plugins,$(QT_PLUGIN_DIR))
+endif
 gs_src       := $(call findsrc_in,Plugins,@CONFIG_GS@)
 resvg_src    := $(call findsrc_in,Plugins,Resvg)
 style_src    := $(call findsrc_in,Style,@CONFIG_EXPERIMENTAL@)
@@ -125,6 +143,11 @@ pdf_src      := $(call findsrc_in,Plugins,@CONFIG_PDF@)
 pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
 gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
+mupdf_src    := $(call findsrc_in,Plugins,@CONFIG_MUPDF@)
+mupdf_c_src  := $(call findc_in,Plugins,@CONFIG_MUPDF@)
+sdl_src    	 := $(call findsrc_in,Plugins,@CONFIG_SDL@)
+vue_src    	 := $(call findsrc_in,Plugins,@CONFIG_VUE@)
+vue_c_src    := $(if $(strip @CONFIG_VUE@),clay.c,)
 
 make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
 
@@ -151,7 +174,8 @@ data_incl     := $(system_incl)
 graphics_incl := $(system_incl)
 plugins_incl  := $(system_incl)
 x11_incl      := $(system_incl)
-cocoa_incl    := $(system_incl)
+cocoa_incl    := $(system_incl) \
+	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset)
 os_incl       := $(system_incl)
 qt_incl       := $(system_incl) \
 	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset Plugins/Gnutls)
@@ -168,6 +192,10 @@ pdf_incl      := $(system_incl) \
   $(call incl_flags,Plugins/Pdf/LibAesgm Texmacs/Data)
 freetype_incl := $(system_incl)
 gnutls_incl   := $(system_incl)
+mupdf_incl    := $(system_incl)
+sdl_incl      := $(system_incl)
+vue_incl      := $(system_incl)  \
+	$(call incl_flags,Texmacs Texmacs/Data Edit Typeset Plugins/Gnutls)
 
 ###############################################################################
 # MOC files
@@ -178,14 +206,25 @@ gnutls_incl   := $(system_incl)
 
 ifeq "@CONFIG_QT@" ""
 qt_moc := 
+qtwk_moc :=
+else ifeq "@CONFIG_QT@" "Qtwk Widkit"
+qt_moc :=  QTMSockets.hpp QTMPipeLink.hpp qt_http.hpp
+qtwk_moc :=  QTWKGuiHelper.hpp QTWKWindow.hpp QTWKApplication.hpp
 else
 qt_moc := $(notdir $(wildcard ./Plugins/$(QT_PLUGIN_DIR)/*.hpp))
+qtwk_moc :=
 endif
 
 qt_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qt_moc))
-qt_moc_paths = $(patsubst %,./Plugins/$(QT_PLUGIN_DIR)/%,$(qt_moc_src))
+qt_moc_paths = $(patsubst %,./Plugins/$(QT_SRC_DIR)/%,$(qt_moc_src))
 
-$(qt_moc_paths): ./Plugins/$(QT_PLUGIN_DIR)/moc_%.cpp: ./Plugins/$(QT_PLUGIN_DIR)/%.hpp
+$(qt_moc_paths): ./Plugins/$(QT_SRC_DIR)/moc_%.cpp: ./Plugins/$(QT_SRC_DIR)/%.hpp
+	$(MOC) $(MOCFLAGS) $< -o $@
+
+qtwk_moc_src = $(patsubst %.hpp, moc_%.cpp,$(qtwk_moc))
+qtwk_moc_paths = $(patsubst %,./Plugins/Qtwk/%,$(qtwk_moc_src))
+
+$(qtwk_moc_paths): ./Plugins/Qtwk/moc_%.cpp: ./Plugins/Qtwk/%.hpp
 	$(MOC) $(MOCFLAGS) $< -o $@
 
 ###############################################################################
@@ -245,7 +284,9 @@ cocoa_m_obj  := $(call makeobj_m,$(cocoa_m_src))
 cocoa_mm_obj := $(call makeobj_mm,$(cocoa_mm_src))
 os_obj       := $(call makeobj,$(os_src))
 moc_obj	     := $(call makeobj,$(qt_moc_src))
+moc_obj_2	 := $(call makeobj,$(qtwk_moc_src))
 qt_obj 	     := $(filter-out $(moc_obj), $(call makeobj,$(qt_src)))
+qtwk_obj     := $(call makeobj,$(qtwk_src))
 gs_obj       := $(call makeobj,$(gs_src))
 resvg_obj    := $(call makeobj,$(resvg_src))
 plugins_obj  := $(call makeobj,$(plugins_src))
@@ -256,6 +297,11 @@ style_obj    := $(call makeobj,$(style_src))
 pdf_obj      := $(call makeobj,$(pdf_src))
 freetype_obj := $(call makeobj,$(freetype_src))
 gnutls_obj   := $(call makeobj,$(gnutls_src))
+mupdf_obj    := $(call makeobj,$(mupdf_src))
+mupdf_c_obj  := $(call makeobj_c,$(mupdf_c_src))
+sdl_obj      := $(call makeobj,$(sdl_src))
+vue_obj      := $(call makeobj,$(vue_src))
+vue_c_obj    := $(call makeobj_c,$(vue_c_src))
 
 # To enforce some degree of modularity, each object file must be
 # compiled with only a specific set of include flags. To achieve that,
@@ -287,7 +333,7 @@ objc_incl  = $(call objc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS))
 
 $(system_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(system_incl) -I$(tmsrc)/include $(CXXGUI))
+	$(call cxx_incl,$(system_incl) -I$(tmsrc)/include $(CXXGNUTLS) $(CXXGUI))
 $(kernel_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(kernel_incl))
 $(data_obj): Objects/%.o: %.cpp
@@ -306,10 +352,14 @@ $(x11_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(x11_incl) $(CXXX11) $(CXXGUILE))
 $(os_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(os_incl) $(CXXQT) $(CXXGUILE))
-$(qt_obj): Objects/%.o: ./Plugins/$(QT_PLUGIN_DIR)/%.cpp
+$(qt_obj): Objects/%.o: ./Plugins/$(QT_SRC_DIR)/%.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE) $(CXXRESVG))
-$(moc_obj): Objects/%.o: ./Plugins/$(QT_PLUGIN_DIR)/%.cpp
+$(qtwk_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
+$(moc_obj): Objects/%.o: ./Plugins/$(QT_SRC_DIR)/%.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE) $(CXXRESVG))
+$(moc_obj_2): Objects/%.o: ./Plugins/Qtwk/%.cpp
+	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE))
 $(gs_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gs_incl)  $(CXXX11))
 $(resvg_obj): Objects/%.o: %.cpp
@@ -319,7 +369,7 @@ $(cocoa_m_obj): Objects/%.o: %.m
 $(cocoa_mm_obj): Objects/%.o: %.mm
 	$(call objcxx_incl,$(cocoa_incl) $(CXXCOCOA) $(CXXSPARKLE) $(CXXGUI))
 $(texmacs_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(texmacs_incl) $(CXXGUI))
+	$(call cxx_incl,$(texmacs_incl) $(CXXGNUTLS) $(CXXGUI))
 $(texmacs_open_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(texmacs_incl) $(CXXGUI))
 $(typeset_obj): Objects/%.o: %.cpp
@@ -330,6 +380,16 @@ $(pdf_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(pdf_incl) $(CXXFREETYPE) $(CXXPDF) $(CXXGUI))
 $(freetype_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(freetype_incl) $(CXXFREETYPE))
+$(mupdf_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(mupdf_incl) $(CXXFREETYPE) $(CXXMUPDF))
+$(mupdf_c_obj): Objects/%.o: %.c
+	$(call cc_flags,-I./Plugins/MuPDF $(CXXFREETYPE) $(CXXMUPDF))
+$(sdl_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,$(sdl_incl) $(CXXMUPDF) $(CXXSDL))
+$(vue_obj): Objects/%.o: %.cpp
+	$(call cxx_incl,-std=c++20 $(vue_incl) $(CXXMUPDF) $(CXXVUE))
+$(vue_c_obj): Objects/%.o: %.c
+	$(call cc_flags,$(vue_incl) $(CXXMUPDF) $(CXXVUE))
 $(gnutls_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(gnutls_incl) $(CXXGNUTLS) $(CXXQT))
 $(texmacs_c_deps):   Objects/%.o: %.c
@@ -382,7 +442,8 @@ uses_graphics := $(graphics_obj)
 uses_plugins  := $(plugins_obj) $(plugins_c_obj)
 uses_x11      := $(x11_obj)
 uses_os       := $(os_obj)
-uses_qt       := $(qt_obj) $(moc_obj)
+uses_qt       := $(qt_obj) $(moc_obj) $(moc_obj_2)
+uses_qtwk     := $(qtwk_obj)
 uses_gs       := $(gs_obj)
 uses_resvg    := $(resvg_obj)
 uses_cocoa    := $(cocoa_m_obj) $(cocoa_mm_obj)
@@ -394,13 +455,16 @@ uses_texmacs  := $(texmacs_obj)
 uses_pdf      := $(pdf_obj)
 uses_freetype := $(freetype_obj)
 uses_gnutls   := $(gnutls_obj)
+uses_mupdf    := $(mupdf_obj) $(mupdf_c_obj)
+uses_sdl      := $(sdl_obj)
+uses_vue      := $(vue_obj) $(vue_c_obj)
 #"uses_windowsres" is defined above
 
 # Compilation rules
 
 TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
- plugins x11 os qt gs resvg cocoa style typeset edit scheme texmacs pdf\
- freetype gnutls windowsres)) $(texmacs_c_deps)
+ plugins x11 os qt qtwk gs resvg cocoa style typeset edit scheme texmacs pdf\
+ freetype gnutls mupdf sdl vue windowsres)) $(texmacs_c_deps)
 
 TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o \
 	$(filter-out Objects/windows64_entrypoint.o Objects/Plugins/Windows64/windows64_entrypoint.o,$(TEXMACS_objects))

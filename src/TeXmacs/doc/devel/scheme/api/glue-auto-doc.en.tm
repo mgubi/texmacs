@@ -155,6 +155,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(vue-gui?)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|gui_is_vue> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(gui-set-next-window-as-popup)>
 <explain-synopsis|no synopsis>
   <|explain>

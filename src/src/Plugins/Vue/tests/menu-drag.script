@@ -1,0 +1,61 @@
+# needs menu-drag.scm: a title opens its menu as it is pressed (d1); the
+# button dragged to Delta highlights it (d2) and released there chooses it
+# ("SUB delta" in the log) and closes the menu (d3). A click on a title
+# leaves its menu open (d4); the submenu of More (d5) closes when the
+# pointer rests on the disabled item (d6), on the rule (d7) and on the
+# group title (d8), each time after it was opened again (d6b, d7b); a
+# press on the title of the open menu closes it (d9).
+# A drag from the first title over the second opens the second menu (d10),
+# and the release on Epsilon chooses it ("SUB epsilon").
+wait 6000
+window Menu drag
+resize 400 300
+wait 800
+press 30 16
+wait 600
+snapshot d1
+move 50 60
+wait 100
+move 60 149
+wait 300
+snapshot d2
+release 60 149
+wait 500
+snapshot d3
+click 30 16
+wait 500
+snapshot d4
+move 60 69
+wait 700
+snapshot d5
+move 60 99
+wait 700
+snapshot d6
+move 60 69
+wait 700
+snapshot d6b
+move 60 85
+wait 700
+snapshot d7
+move 60 69
+wait 700
+snapshot d7b
+move 60 124
+wait 700
+snapshot d8
+press 30 16
+wait 100
+release 30 16
+wait 500
+snapshot d9
+press 30 16
+wait 300
+move 60 16
+move 95 16
+wait 500
+snapshot d10
+move 110 44
+wait 300
+release 110 44
+wait 500
+snapshot d11

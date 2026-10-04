@@ -89,14 +89,17 @@ function bundle_lib {
     case $lib in
     /System*) ;;
     /Library*) ;;
-    /+(opt/local|sw|Users|usr/local)/*/lib*.dylib|/usr/lib/libltdl.*.dylib)
+    /+(opt/local|opt/homebrew|sw|Users|usr/local)/*/lib*.dylib|/usr/lib/libltdl.*.dylib)
     local blib="$(basename $lib)"
     if ! test -f "$libdest/$blib"
     then 
       cp "$lib" "$libdest" && chmod u+w "$libdest/$blib" || return 11
+      install_name_tool -id @executable_path/../Resources/lib/$blib "$libdest/$blib"
       bundle_lib "$libdest/$blib" || return $?
-      change="$change -change $lib  @executable_path/../Resources/lib/$blib"
     fi
+    # NOTE: the reference is changed even if the library was already copied
+    # (for instance as a dependency of another library)
+    change="$change -change $lib  @executable_path/../Resources/lib/$blib"
     ;; 
     @rpath/*.framework/*)
     # we don't scan the framework lib they might be well built
@@ -118,17 +121,18 @@ function bundle_lib {
     return 11
     ;;
     @rpath/*) #some extra libs
-    for p in "${rpath[@]}"
-    do fullname=${lib/@rpath\//$p}
+    for p in "${trpath[@]}" $absLibPath
+    do fullname=${lib/@rpath/$p}
       if test -f "$fullname"
       then 
         local blib=$(basename $lib)
         if test ! -f "$libdest/$blib"
         then 
-          cp "$fullname" "$libdest" 
+          cp "$fullname" "$libdest" && chmod u+w "$libdest/$blib" || return 11
           bundle_lib "$libdest/$blib" || return $?
-          setrpath=$(($setrpath|2))
         fi
+        # NOTE: also when the library was already copied (for another one)
+        setrpath=$(($setrpath|2))
         continue 2
       fi
     done

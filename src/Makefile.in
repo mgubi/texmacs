@@ -480,7 +480,6 @@ MACOS_BUNDLE: TEXMACS
 
 	$(CP) $(MACOS_PACKAGE_SRC)/TeXmacs-document.icns \
 				$(MACOS_PACKAGE_RESOURCES)
-	$(CP) src/Plugins/Cocoa/English.lproj $(MACOS_PACKAGE_RESOURCES)
 	$(CP) misc/admin/texmacs_updates_dsa_pub.pem $(MACOS_PACKAGE_RESOURCES)
 	$(CP) TeXmacs $(MACOS_PACKAGE_RESOURCES)/share
 	$(RM) $(MACOS_PACKAGE_TEXMACS)/bin/texmacs.bin
@@ -495,9 +494,22 @@ MACOS_BUNDLE: TEXMACS
 		$(MACOS_PACKAGE_SRC)/bundle-libs.sh $(MACOS_PACKAGE_CONTENTS)/MacOS/TeXmacs
 	@echo ----------------------------------------------------
 	@echo TeXmacs has been bundled in $(MACOS_PACKAGE_APP)
+	@# NOTE: the libraries modified by bundle-libs.sh are signed first
+	@# (--deep does not sign the libraries in Resources/lib, and macOS
+	@# kills the processes which load a library with a broken signature;
+	@# there are none when they are linked statically)
 	@if test -n "@SIGNID@";then \
-		codesign --timestamp --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
-		echo "Bundle successfully signed" || echo "Signing failed"; fi
+		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
+			codesign --force --timestamp -s @SIGNID@ {} + &&\
+		codesign --force --timestamp --deep -s @SIGNID@ $(MACOS_PACKAGE_APP) &&\
+		echo "Bundle successfully signed" ||\
+		{ echo "Signing failed"; exit 1; }; \
+	else \
+		find $(MACOS_PACKAGE_RESOURCES)/lib -name '*.dylib' -exec \
+			codesign --force -s - {} + &&\
+		codesign --force --deep -s - $(MACOS_PACKAGE_APP) &&\
+		echo "Bundle signed ad hoc (no identity given to configure)" ||\
+		{ echo "Signing failed"; exit 1; }; fi
 
 
 MACOS_PACKAGE: MACOS_BUNDLE

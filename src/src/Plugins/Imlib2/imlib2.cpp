@@ -138,7 +138,7 @@ imlib2_image_size (url u, int& w, int& h) {
 }
 
 void
-imlib2_display (Display* dpy, Pixmap pm, url u, SI w, SI h) {
+imlib2_display (Display* dpy, Pixmap pm, url u, int w, int h) {
   Imlib_Image image= imlib2_load_image (u);
   if (image) {
     Visual *vis= DefaultVisual (dpy, DefaultScreen (dpy));
@@ -173,7 +173,7 @@ imlib2_image_size (url u, int& w, int& h) {
 
 #ifdef X11TEXMACS
 void
-imlib2_display (Display* dpy, Pixmap pm, url u, SI w, SI h) {
+imlib2_display (Display* dpy, Pixmap pm, url u, int w, int h) {
   (void) dpy; (void) pm;
   (void) u; (void) w; (void) h;
   FAILED ("imlib2 is not present");

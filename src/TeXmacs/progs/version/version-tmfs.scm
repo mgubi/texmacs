@@ -40,8 +40,10 @@
           (with tool (ahash-ref version-tool-table name)
             (and (!= tool "") tool))
           (with tool
-              (cond ((svn-active? name) "svn")
-                    ((git-active? name) "git")
+              ;; the tool is needed as well as its directory (a copy of a
+              ;; project with its .git, in the browser, has no git)
+              (cond ((and (svn-active? name) (url-exists-in-path? "svn")) "svn")
+                    ((and (git-active? name) (url-exists-in-path? "git")) "git")
                     (else ""))
             (ahash-set! version-tool-table name tool)
             (when (and tool (not (ahash-ref version-tool-loaded tool)))

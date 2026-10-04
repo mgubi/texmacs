@@ -138,6 +138,18 @@
 (define-public (set-message-notify)
   (set! message-serial (+ message-serial 1)))
 
+;; is the status bar showing the properties of the text at the cursor and
+;; the tags around it (and not a message)? The editor says so each time it
+;; updates the status bar; an interactive status bar replaces only those
+;; (texmacs menus footer-menu)
+(define footer-environment #f)
+
+(define-public (footer-environment?)
+  footer-environment)
+
+(define-public (footer-environment-notify flag)
+  (set! footer-environment flag))
+
 (define-public (recall-message-after len)
   (with current message-serial
     (delayed
@@ -195,11 +207,31 @@
   (and-with name (procedure-symbol-name fun)
     (symbol->string name)))
 
+(define (interactive-password-args fun)
+  ;; the positions ("0", "1"...) of the arguments of @fun of type password:
+  ;; what is typed there is not learned, since the learned values are saved
+  ;; in clear in $TEXMACS_HOME_PATH/system/interactive.scm (a passphrase of
+  ;; the wallet was, and the password of a PDF would be)
+  (catch #t
+    (lambda ()
+      (with args (and (procedure? fun) (property fun :arguments))
+        (if (not (list? args)) '()
+            (let loop ((l args) (i 0) (acc '()))
+              (if (null? l) acc
+                  (loop (cdr l) (+ i 1)
+                        (if (== (compute-interactive-arg-type fun (car l))
+                                "password")
+                            (cons (number->string i) acc)
+                            acc)))))))
+    (lambda err '())))
+
 (define-public (learn-interactive fun assoc-t)
   "Learn interactive values for @fun"
+  (with pw (interactive-password-args fun)
+    (set! assoc-t (list-filter assoc-t (lambda (x) (nin? (car x) pw)))))
   (set! assoc-t (map (lambda (x) (cons (car x) (as-stree (cdr x)))) assoc-t))
   (set! fun (procedure-symbol-name fun))
-  (when (symbol? fun)
+  (when (and (symbol? fun) (nnull? assoc-t))
     (let* ((l1 (or (ahash-ref interactive-arg-table fun) '()))
            (l2 (cons assoc-t (list-but l1 (list assoc-t)))))
       (ahash-set! interactive-arg-table fun l2))))

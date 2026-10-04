@@ -1,0 +1,37 @@
+# needs input-edit.scm (the interactive prompt, Name= Joe): the mouse in a
+# text input. A double click selects the word under the pointer (cut with
+# M-x), a triple click the whole field, and the context menu of a right
+# click pastes over it. Expected: "got: Smith / 42"
+wait 5000
+window Enter data
+focus
+key M-a
+text Bob Smith Jr
+wait 200
+click 100 17
+click 100 17 left 2
+wait 300
+snapshot im0
+key M-x
+wait 200
+snapshot im1
+click 80 17
+click 80 17 left 2
+click 80 17 left 3
+wait 300
+snapshot im2
+click 80 17 right
+wait 500
+window Popup
+snapshot im3
+# Paste, the third item of the menu
+click 40 59
+wait 300
+window Enter data
+snapshot im4
+key Tab
+wait 300
+text 42
+wait 300
+key Return
+wait 800

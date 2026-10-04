@@ -275,6 +275,11 @@ typeset (typesetter ttt, SI& x1, SI& y1, SI& x2, SI& y2) {
 }
 
 box
+typeset (typesetter ttt) {
+  return ttt->typeset ();
+}
+
+box
 typeset_as_document (edit_env env, tree t, path ip) {
   env->style_init_env ();
   env->update ();

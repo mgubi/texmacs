@@ -10,7 +10,9 @@
 ******************************************************************************/
 
 #include "QTMStyle.hpp"
+#ifndef QTWKTEXMACS
 #include "QTMApplication.hpp"
+#endif
 #include "qt_utilities.hpp"
 #include <time.h>
 
@@ -47,7 +49,14 @@
 #include "scheme.hpp"
 #include "wencoding.hpp"
 
+#if  defined(QTWKTEXMACS)
+#define center TEXMACS_center // avoid name clash
+#include "../Qtwk/qtwk_gui.hpp"    // gui_maximal_extents()
+#undef center
+#elif defined(QTTEXMACS)
 #include "qt_gui.hpp"    // gui_maximal_extents()
+#endif
+
 #include "editor.hpp"
 #include "new_view.hpp"  // get_current_editor()
 
@@ -660,6 +669,7 @@ qt_apply_tm_style (QWidget* qwid, int style) {
   qwid->setStyleSheet (sheet);
   qwid->setEnabled (! (style & WIDGET_STYLE_INERT));
 
+#ifndef QTWKTEXMACS // the application of the Qt port follows the theme
   if (!qwid->property("tm_theme_connected").toBool()) {
     QTMApplication *app = qobject_cast<QTMApplication*>(QCoreApplication::instance());
     if (app) {
@@ -669,6 +679,7 @@ qt_apply_tm_style (QWidget* qwid, int style) {
       qwid->setProperty("tm_theme_connected", true);
     }
   }
+#endif
 }
 
 void
@@ -691,6 +702,7 @@ qt_apply_tm_style (QWidget* qwid, int style, color c) {
   qwid->setEnabled (! (style & WIDGET_STYLE_INERT));
   qwid->setStyleSheet (sheet);
 
+#ifndef QTWKTEXMACS // the application of the Qt port follows the theme
   if (!qwid->property("tm_theme_connected").toBool()) {
     QTMApplication *app = qobject_cast<QTMApplication*>(QCoreApplication::instance());
     if (app) {
@@ -700,6 +712,7 @@ qt_apply_tm_style (QWidget* qwid, int style, color c) {
       qwid->setProperty("tm_theme_connected", true);
     }
   }
+#endif
 }
 
 

@@ -14,6 +14,7 @@
 
 #include "socket_notifier.hpp"
 #include "list.hpp"
+#include "array.hpp"
 #include "iterator.hpp"
 #include "config.h"
 
@@ -47,31 +48,45 @@ remove_notifier (socket_notifier sn)  {
   notifiers->remove (sn);
 }
 
+bool
+notifiers_active () {
+  return N(notifiers) > 0;
+}
+
+// Call the notifiers whose socket is ready (readable, or writable for the
+// write notifiers), until nothing is ready or after a bounded number of
+// rounds (a writable socket is ready as long as its notifier is kept: the
+// socket links remove theirs once their output is flushed). The notifiers
+// may add or remove notifiers while being called: iterate over a copy.
 void 
 perform_select () {
 #ifndef OS_MINGW
-  while (true) {
-    fd_set rfds;
+  for (int rounds= 0; rounds < 64; rounds++) {
+    fd_set rfds, wfds;
     FD_ZERO (&rfds);
+    FD_ZERO (&wfds);
     int max_fd= 0;
+    array<socket_notifier> current;
     iterator<socket_notifier> it = iterate (notifiers);
     while (it->busy ()) {
       socket_notifier sn= it->next ();
-      FD_SET (sn->fd, &rfds);
+      if (sn->fd < 0 || sn->fd >= FD_SETSIZE) continue;
+      current << sn;
+      if (sn->write) FD_SET (sn->fd, &wfds);
+      else FD_SET (sn->fd, &rfds);
       if (sn->fd >= max_fd) max_fd= sn->fd+1;
     }
     if (max_fd == 0) break;
-    
     struct timeval tv;
     tv.tv_sec  = 0;
     tv.tv_usec = 0;
-    int nr = select (max_fd, &rfds, NULL, NULL, &tv);
-    if (nr==0) break;
-    
-    it = iterate (notifiers);
-    while (it->busy ()) {
-      socket_notifier sn=  it->next ();
-      if (FD_ISSET (sn->fd, &rfds)) sn->notify ();
+    int nr = select (max_fd, &rfds, &wfds, NULL, &tv);
+    if (nr <= 0) break;
+    for (int i= 0; i < N(current); i++) {
+      socket_notifier sn= current[i];
+      if (!notifiers->contains (sn)) continue; // removed by a previous notifier
+      if (sn->write ? FD_ISSET (sn->fd, &wfds) : FD_ISSET (sn->fd, &rfds))
+        sn->notify ();
     }
   }
 #else

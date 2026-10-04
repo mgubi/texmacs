@@ -179,6 +179,15 @@ tmg_qt_guiP () {
 }
 
 tmscm
+tmg_vue_guiP () {
+  // TMSCM_DEFER_INTS;
+  bool out= gui_is_vue ();
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_gui_set_next_window_as_popup () {
   // TMSCM_DEFER_INTS;
   gui_set_next_window_as_popup ();
@@ -10910,6 +10919,21 @@ tmg_alt_window_hide (tmscm arg1) {
 }
 
 tmscm
+tmg_alt_window_set_on_top (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-set-on-top");
+  TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "alt-window-set-on-top");
+
+  int in1= tmscm_to_int (arg1);
+  bool in2= tmscm_to_bool (arg2);
+
+  // TMSCM_DEFER_INTS;
+  window_set_on_top (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_alt_window_get_size (tmscm arg1) {
   TMSCM_ASSERT_INT (arg1, TMSCM_ARG1, "alt-window-get-size");
 
@@ -11296,6 +11320,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("has-printing-cmd?",  tmg_has_printing_cmdP, 0, 0, 0);
   tmscm_install_procedure ("x-gui?",  tmg_x_guiP, 0, 0, 0);
   tmscm_install_procedure ("qt-gui?",  tmg_qt_guiP, 0, 0, 0);
+  tmscm_install_procedure ("vue-gui?",  tmg_vue_guiP, 0, 0, 0);
   tmscm_install_procedure ("gui-set-next-window-as-popup",  tmg_gui_set_next_window_as_popup, 0, 0, 0);
   tmscm_install_procedure ("support-functionality?",  tmg_support_functionalityP, 1, 0, 0);
   tmscm_install_procedure ("gui-version",  tmg_gui_version, 0, 0, 0);
@@ -12075,6 +12100,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("alt-window-delete",  tmg_alt_window_delete, 1, 0, 0);
   tmscm_install_procedure ("alt-window-show",  tmg_alt_window_show, 1, 0, 0);
   tmscm_install_procedure ("alt-window-hide",  tmg_alt_window_hide, 1, 0, 0);
+  tmscm_install_procedure ("alt-window-set-on-top",  tmg_alt_window_set_on_top, 2, 0, 0);
   tmscm_install_procedure ("alt-window-get-size",  tmg_alt_window_get_size, 1, 0, 0);
   tmscm_install_procedure ("alt-window-set-size",  tmg_alt_window_set_size, 3, 0, 0);
   tmscm_install_procedure ("alt-window-get-position",  tmg_alt_window_get_position, 1, 0, 0);

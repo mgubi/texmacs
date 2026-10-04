@@ -829,6 +829,10 @@ void
 box_rep::display_links (renderer ren) {
   if (!is_nil (ip) && ip->item >= 0 && x2 > x1 && y2 > y1) {
     path p= reverse (ip);
+    // a link is registered by every typesetter which typeset its locus --
+    // when printing, the editor's and the printer's -- so the same one may
+    // be found twice: it is drawn once
+    list<string> done;
     while (N(p) > 1) {
       // FIXME: we might want to sort out overlapping and adjacent links
       if (has_subtree (the_et, p)) {
@@ -842,7 +846,10 @@ box_rep::display_links (renderer ren) {
                 is_compound (lns[j][3], "url", 1) &&
                 is_atomic (lns[j][3][0])) {
               string dest= lns[j][3][0]->label;
-              ren->href (dest, x1, y1, x2, y2);
+              if (!contains (done, dest)) {
+                ren->href (dest, x1, y1, x2, y2);
+                done= list<string> (dest, done);
+              }
             }
         }
       }

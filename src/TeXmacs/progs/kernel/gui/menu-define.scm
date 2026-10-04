@@ -621,12 +621,222 @@
   '("black" "darker grey" "dark grey" "#a0a0a0"
     "light grey" "pastel grey" "#f0f0f0" "white"))
 
-(tm-menu (standard-color-menu cmd)
+;; Palettes for typographic design (Vue), in several sets, the one in use
+;; being the preference "typographic palette set"; the first one of the list,
+;; "Classical", is the standard grid of colours. A set has families of hues, the columns (eight in the sets
+;; below, a neutral one first), each in five tones, the rows, grouped by
+;; their use in a document: the inks and the deep tones are dark enough for
+;; text on white paper, the medium ones are accents (headings, emphasis,
+;; rules), the soft ones and the tints are backgrounds (boxes, highlighted
+;; text, table cells) on which the inks stay legible. Within a column the
+;; colours go together; across a row they have the same weight, so that any
+;; two of them can be mixed.
+;;
+;; The sets are defined with define-typographic-palette, or computed from a
+;; colour per column with define-typographic-palette-from-colors; a user
+;; adds or replaces sets in the same way, from ~/.TeXmacs/progs/
+;; my-init-texmacs.scm (see src/docs/typographic-palettes.md).
+
+(define typographic-palettes (list)) ; (name ink deep medium soft tint)
+
+(define (typographic-palette-error name what)
+  (texmacs-error "define-typographic-palette" "~S: ~A" name what))
+
+(define-public (define-typographic-palette name ink deep medium soft tint)
+  ;; the set @name, given by its five rows of colours (as many columns in
+  ;; each, colours of TeXmacs: "#rrggbb", "dark red"...); a set of the same
+  ;; name is replaced, where it was in the list
+  (let ((rows (list ink deep medium soft tint)))
+    (cond ((not (string? name))
+           (typographic-palette-error name "the name must be a string"))
+          ((== name "Classical")
+           (typographic-palette-error name "the name of the standard grid"))
+          ((not (and (list-and (map list? rows))
+                     (list-and (map (lambda (r) (list-and (map string? r))) rows))))
+           (typographic-palette-error name "the rows must be lists of colours"))
+          ((or (null? ink)
+               (list-or (map (lambda (r) (!= (length r) (length ink))) rows)))
+           (typographic-palette-error name "the rows must have the same length"))
+          ((assoc name typographic-palettes)
+           (set! typographic-palettes
+                 (map (lambda (p) (if (== (car p) name) (cons name rows) p))
+                      typographic-palettes)))
+          (else
+           (set! typographic-palettes
+                 (append typographic-palettes (list (cons name rows))))))))
+
+;; the tones of a colour, from the tones of its hue at some lightnesses and
+;; with its saturation scaled (the algorithm of the HLS model)
+
+(define (hex->rgb c)
+  (map (lambda (i) (/ (string->number (substring c i (+ i 2)) 16) 255.0))
+       (list 1 3 5)))
+
+(define (rgb->hex l)
+  (string-downcase
+   (apply string-append "#"
+         (map (lambda (v)
+                (integer->padded-hexadecimal
+                 (inexact->exact (round (* 255 (max 0.0 (min 1.0 v))))) 2))
+              l))))
+
+(define (fraction x) (- x (floor x)))
+
+(define (rgb->hls r g b)
+  (let* ((mx (max r g b)) (mn (min r g b)) (l (/ (+ mx mn) 2)))
+    (if (== mx mn) (list 0.0 l 0.0)
+        (let* ((d (- mx mn))
+               (s (if (<= l 0.5) (/ d (+ mx mn)) (/ d (- 2.0 mx mn))))
+               (rc (/ (- mx r) d)) (gc (/ (- mx g) d)) (bc (/ (- mx b) d))
+               (h (cond ((== r mx) (- bc gc))
+                        ((== g mx) (+ 2.0 (- rc bc)))
+                        (else (+ 4.0 (- gc rc))))))
+          (list (fraction (/ h 6.0)) l s)))))
+
+(define (hls-value m1 m2 h)
+  (let ((h (fraction h)))
+    (cond ((< h (/ 1.0 6)) (+ m1 (* (- m2 m1) h 6.0)))
+          ((< h 0.5) m2)
+          ((< h (/ 2.0 3)) (+ m1 (* (- m2 m1) (- (/ 2.0 3) h) 6.0)))
+          (else m1))))
+
+(define (hls->rgb h l s)
+  (if (== s 0.0) (list l l l)
+      (let* ((m2 (if (<= l 0.5) (* l (+ 1.0 s)) (- (+ l s) (* l s))))
+             (m1 (- (* 2.0 l) m2)))
+        (list (hls-value m1 m2 (+ h (/ 1.0 3)))
+              (hls-value m1 m2 h)
+              (hls-value m1 m2 (- h (/ 1.0 3)))))))
+
+(define-public (typographic-color-tones c lightnesses saturations)
+  ;; the colour @c ("#rrggbb") at each of the @lightnesses (from 0 to 1),
+  ;; with its saturation multiplied by the corresponding factor
+  (with (h l s) (apply rgb->hls (hex->rgb c))
+    (map (lambda (l2 f) (rgb->hex (hls->rgb h l2 (min 1.0 (* s f)))))
+         lightnesses saturations)))
+
+(define-public (define-typographic-palette-from-colors name colors . opt)
+  ;; the set @name whose columns are the tones of the @colors ("#rrggbb",
+  ;; a neutral one first, say); optionally, the five lightnesses of the
+  ;; tones (ink, deep, medium, soft, tint) and five factors for their
+  ;; saturation
+  (let* ((ls (if (>= (length opt) 1) (car opt) (list 0.17 0.30 0.50 0.78 0.94)))
+         (ss (if (>= (length opt) 2) (cadr opt) (list 0.8 0.8 0.85 0.9 1.0)))
+         (cols (map (lambda (c) (typographic-color-tones c ls ss)) colors))
+         (row (lambda (i) (map (lambda (col) (list-ref col i)) cols))))
+    (define-typographic-palette name (row 0) (row 1) (row 2) (row 3) (row 4))))
+
+;; the sets of TeXmacs: muted colours; the inks of printing; the colours of
+;; the earth; cold northern ones; pastels; the colours of Solarized (Ethan
+;; Schoonover). The columns: neutral, red, brown, ochre, green, teal, blue,
+;; violet; the rows: ink, deep, medium, soft, tint
+
+(define-typographic-palette "Muted"
+  '("#212529" "#7a1f1f" "#5c3b1e" "#6b5510" "#1f4d2b" "#134e4a" "#1b2f5e" "#3f2358")
+  '("#495057" "#a8323a" "#8a5a2b" "#967a17" "#2f7040" "#1d6f6a" "#2a4a8c" "#5e3a82")
+  '("#868e96" "#d4575b" "#b98347" "#c9a227" "#4f9a60" "#2f9c94" "#4a72c2" "#8763b0")
+  '("#ced4da" "#eba5a3" "#dcb98c" "#e6d08a" "#a3cfa9" "#95d0ca" "#a3bce6" "#c2acdc")
+  '("#f1f3f5" "#fbe9e7" "#f6ecdf" "#fbf5dc" "#e8f4ea" "#e3f4f2" "#e8effa" "#f1ebf8"))
+
+(define-typographic-palette "Classic print"
+  '("#212121" "#390c0a" "#37200b" "#3f2e04" "#123013" "#00423a" "#0b1b37" "#270a38")
+  '("#454545" "#761914" "#734316" "#825f08" "#256528" "#008a79" "#173973" "#511575")
+  '("#6b6b6b" "#ac312a" "#a8692e" "#bc8d1a" "#419545" "#1f8f80" "#2e5ba8" "#7b2bab")
+  '("#cccccc" "#e7b4b1" "#e6cbb2" "#eedaaa" "#badebc" "#b3dcd6" "#b2c5e6" "#d3b1e7")
+  '("#f2f2f2" "#f9edec" "#f8f2ec" "#faf6ea" "#eef6ef" "#eaf5f3" "#ecf1f8" "#f4ecf9"))
+
+(define-typographic-palette "Earth"
+  '("#2f2b28" "#3d211a" "#392e1d" "#3b351b" "#2a3423" "#24332f" "#252b31" "#31262b")
+  '("#524c47" "#6b3a2e" "#655134" "#695e30" "#4b5b3e" "#3f5a54" "#424c57" "#56434c")
+  '("#898076" "#b3614c" "#a88757" "#ae9d51" "#7c9867" "#6a958b" "#6e7f91" "#8f7080")
+  '("#ccc7c2" "#e2b7ac" "#dccbb2" "#dfd6ae" "#c5d4ba" "#bbd2cd" "#bec7d0" "#cfbfc7")
+  '("#efedec" "#f6e8e4" "#f4efe6" "#f5f2e5" "#edf2e9" "#e9f1ef" "#eaedf0" "#f0eaed"))
+
+(define-typographic-palette "Nordic"
+  '("#303337" "#3b2b2d" "#39332d" "#3b382b" "#2b3b34" "#253b41" "#29333d" "#2e2d39")
+  '("#4e545a" "#61474a" "#5f5449" "#635e46" "#456356" "#3c636d" "#435465" "#4b495f")
+  '("#7b858e" "#997074" "#968573" "#9b936e" "#6e9b88" "#5f9bab" "#6a859f" "#767496")
+  '("#c7ccd1" "#d7c1c4" "#d5ccc3" "#d8d4c0" "#c0d8ce" "#b8d8e0" "#beccda" "#c4c3d5")
+  '("#eef0f1" "#f3eced" "#f3f0ed" "#f4f2ec" "#ecf4f0" "#e9f4f6" "#ebf0f4" "#ededf3"))
+
+(define-typographic-palette "Pastel"
+  '("#3e3f41" "#542c2c" "#543d2b" "#534b2c" "#354a3a" "#334c4b" "#2c3653" "#3f3050")
+  '("#595b5f" "#7e3a3a" "#7f5738" "#7d703a" "#496e53" "#46716f" "#3a4b7d" "#5b4077")
+  '("#a5a8ac" "#ce8383" "#cfa381" "#cdbe84" "#94bd9e" "#91c0be" "#8396cd" "#a88ac7")
+  '("#d5d6d8" "#e8c4c4" "#e9d4c4" "#e8e1c5" "#cde0d1" "#cbe1e0" "#c5cee8" "#d6c8e4")
+  '("#f2f2f3" "#f9ecec" "#f9f1ec" "#f8f6ec" "#eff6f1" "#eef6f6" "#eceff8" "#f2edf7"))
+
+(define-typographic-palette "Solarized"
+  '("#002b36" "#460d0c" "#4a1b08" "#523e00" "#475200" "#11413d" "#0d2e45" "#17193a")
+  '("#073642" "#781917" "#7e3111" "#8b6a04" "#798b04" "#206f69" "#185076" "#2a2e64")
+  '("#586e75" "#dc322f" "#cb4b16" "#b58900" "#859900" "#2aa198" "#268bd2" "#6c71c4")
+  '("#eee8d5" "#e5b3b3" "#e9c0af" "#f0dea8" "#e6f0a8" "#b7e1de" "#b3d0e5" "#bdbedb")
+  '("#fdf6e3" "#f5e6e6" "#f6eae5" "#f8f3e2" "#f5f8e2" "#e7f3f2" "#e6eef5" "#e9e9f2"))
+
+(define-public (typographic-palette-names)
+  (cons "Classical" (map car typographic-palettes)))
+
+(tm-define (typographic-palette-set)
+  (with name (get-preference "typographic palette set")
+    (if (assoc name typographic-palettes) name "Classical")))
+
+(tm-define (set-typographic-palette-set name)
+  (set-preference "typographic palette set" name)
+  (refresh-now "typographic-palette"))
+
+(define (typographic-palette-rows from to)
+  (with p (assoc (typographic-palette-set) typographic-palettes)
+    (if p (apply append (sublist (cdr p) from to)) (list))))
+
+
+(tm-define (typographic-palette?)
+  (and (vue-gui?) (!= (typographic-palette-set) "Classical")))
+
+(tm-menu (typographic-color-tiles cmd l)
+  ;; eight colours a line (tile wants a number, not an expression): the
+  ;; rows of a set of eight columns are lines of the grid
+  (tile 8
+    (for (col l)
+      (explicit-buttons
+        ((color col #f #f 32 24)
+         (cmd col))))))
+
+(tm-menu (typographic-color-menu cmd)
+  (group "Text")
+  (dynamic (typographic-color-tiles cmd (typographic-palette-rows 0 2)))
+  (group "Accents")
+  (dynamic (typographic-color-tiles cmd (typographic-palette-rows 2 3)))
+  (group "Backgrounds")
+  (dynamic (typographic-color-tiles cmd (typographic-palette-rows 3 5))))
+
+(tm-menu (standard-color-tiles cmd)
   (tile 8
     (for (col (append (standard-color-list) (standard-grey-list)))
       (explicit-buttons
         ((color col #f #f 32 24)
          (cmd col))))))
+
+(tm-menu (standard-color-grid cmd)
+  (hlist
+    // // (text "Palette:") //
+    (enum (set-typographic-palette-set answer)
+          (typographic-palette-names) (typographic-palette-set) "10em")
+    >>)
+  (if (typographic-palette?)
+      (dynamic (typographic-color-menu cmd)))
+  (if (not (typographic-palette?))
+      (dynamic (standard-color-tiles cmd))))
+
+(tm-menu (standard-color-menu cmd)
+  ;; in Vue, a typographic palette can replace the standard one (Classical),
+  ;; and the choice of it (an enum, which does not close the menu) changes
+  ;; the grid in place: a promise in a refreshable, whose items are made
+  ;; again when it is refreshed
+  (if (vue-gui?)
+      (refreshable "typographic-palette"
+        (promise (cons 'vertical (standard-color-grid cmd)))))
+  (if (not (vue-gui?))
+      (dynamic (standard-color-tiles cmd))))
 
 (define (gui-make-pick-color x)
   `(menu-dynamic
@@ -737,7 +947,7 @@
   (pick-background ,gui-make-pick-background))
 
 (tm-define (allow-pattern-colors?)
-  (qt-gui?))
+  (or (qt-gui?) (vue-gui?)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Extra RGB color picker

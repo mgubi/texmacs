@@ -34,7 +34,15 @@
 #include "analyze.hpp"
 #include "hashmap.hpp"
 #include "scheme.hpp"
+#include "picture.hpp"
+#include "effect.hpp"
+#include "renderer.hpp" // PIXEL
 #include "Imlib2/imlib2.hpp"
+#ifdef MUPDF_RENDERER
+// in Plugins/MuPDF/mupdf_picture.cpp (declared here: this file is compiled
+// without the headers of MuPDF)
+bool mupdf_image_size (url u, int& w, int& h);
+#endif
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_images.h"
@@ -386,6 +394,16 @@ image_size_sub (url image, int& w, int& h) { // returns w,h in units of pt (1/72
     return;
   }
 #endif
+#ifdef MUPDF_RENDERER
+  // bitmaps and svg (the browser has neither the system loaders nor the
+  // external programs)
+  if (mupdf_image_size (image, w, h)) {
+    if (DEBUG_CONVERT)
+      debug_convert << "image_size_sub, size found by mupdf_image_size: "
+		    << w << " x " << h << "\n";
+    return;
+  }
+#endif
   if(imagemagick_image_size(image, w, h)) {
     if (DEBUG_CONVERT)
       debug_convert<< "image_size_sub, size found by imagemagick_image_size: "
@@ -410,6 +428,9 @@ pdf_image_size (url image, int& w, int& h) {
 #ifdef PDF_RENDERER
   hummus_pdf_image_size (image, w, h);
   return;
+#endif
+#ifdef MUPDF_RENDERER
+  if (mupdf_image_size (image, w, h)) return;
 #endif
 #ifdef USE_GS
   gs_PDFimage_size (image, w, h);
@@ -754,5 +775,15 @@ void
 apply_effect (tree eff, array<url> src, url dest, int w, int h) {
 #ifdef QTTEXMACS
   qt_apply_effect (eff, src, dest, w, h);
+#else
+  // the effects (blurs, shadows, degradations...) are computed on pictures
+  // by Graphics/Effects, which needs no GUI: load the sources, apply, save.
+  // Without this the whole feature silently did nothing outside Qt.
+  array<picture> a;
+  for (int i= 0; i < N(src); i++)
+    a << load_picture (src[i], w, h, "", PIXEL);
+  effect e= build_effect (eff);
+  if (is_nil (e)) return;
+  save_picture (dest, e->apply (a, PIXEL));
 #endif
 }

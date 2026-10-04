@@ -1,0 +1,14 @@
+# needs choice-style.scm: the four styles of a choice list side by side.
+# A click on "Third" of the inert list must neither select it nor print;
+# the same click on the plain list selects and prints "plain: Third".
+wait 6000
+window Choice styles
+snapshot cs0
+# the inert list is the rightmost column
+click 285 65
+wait 600
+snapshot cs1
+# the plain list is the leftmost one
+click 45 65
+wait 600
+snapshot cs2

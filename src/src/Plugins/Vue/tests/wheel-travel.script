@@ -1,0 +1,36 @@
+# Scrolling with the wheel. Needs -debug-events and *no* TEXMACS_VUE_SNAPSHOT:
+# the checks are on the deltas in SI of the "handling wheel" lines of the log,
+# and saving a PNG per frame would stretch the iterations of the loop past the
+# 16 ms which tell a second notch from a swipe (see wheel_event in vue_gui.cpp).
+# The cursor is at the end, so the wheel scrolls up.
+#
+#  * a notch is not a jump: the first stream below asks for 3 x 80 points
+#    (3 x 80 x 256 = 61440 SI) and travels them over some twenty frames with
+#    decaying deltas
+#  * three more notches 40 ms apart add up: the deltas rise again at each of
+#    them and the view comes to rest shortly after the last one, having
+#    travelled 3 x 61440 SI in all
+#  * a swipe which opens with a whole delta must scroll the ten points of a
+#    unit and not the eighty of a notch: the deltas of the last stream add up
+#    to (1 + 0.4 + 0.5 + 0.3) x 10 x 256 = 5632 SI and none of them is
+#    negative, nothing having to be taken back
+wait 7000
+window #2
+# the document is inserted by wheel-travel.scm
+wait 500
+wheel 300 400 0 3
+wait 700
+wheel 300 400 0 3
+wait 40
+wheel 300 400 0 3
+wait 40
+wheel 300 400 0 3
+wait 900
+wheel 300 400 0 1
+wait 10
+wheel 300 400 0 0.4
+wait 10
+wheel 300 400 0 0.5
+wait 10
+wheel 300 400 0 0.3
+wait 900

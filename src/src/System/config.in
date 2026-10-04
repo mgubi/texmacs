@@ -126,6 +126,9 @@
 /* Link imlib2 library with TeXmacs */
 #undef LINKED_IMLIB2
 
+/* Link MuPDF library with TeXmacs */
+#undef LINKED_MUPDF
+
 /* Link sqlite3 library with TeXmacs */
 #undef LINKED_SQLITE3
 
@@ -140,6 +143,9 @@
 
 /* Max fast alloc // WORD_LENGTH more than power of 2 */
 #undef MAX_FAST
+
+/* Enabling native MuPDF backend */
+#undef MUPDF_RENDERER
 
 /* Disable fast memory allocator */
 #undef NO_FAST_ALLOC
@@ -216,14 +222,20 @@
 /* Enabling Qt pipes */
 #undef QTPIPES
 
-/* Enable experimental Qt port */
+/* Enable Qt port */
 #undef QTTEXMACS
+
+/* Enable experimental Qt port with Widkit */
+#undef QTWKTEXMACS
 
 /* sanitizers linked */
 #undef SANITIZERS_ON
 
 /* Enable checks style rewriting code */
 #undef SANITY_CHECKS
+
+/* Enable experimental SDL port */
+#undef SDLTEXMACS
 
 /* signtool location */
 #undef SIGNTOOL
@@ -287,8 +299,14 @@
 /* Use intl library */
 #undef USE_INTL
 
+/* Use MuPDF library */
+#undef USE_MUPDF
+
 /* Use resvg library for SVG rendering */
 #undef USE_RESVG
+
+/* Use SDL3 library */
+#undef USE_SDL3
 
 /* Use Sparkle framework */
 #undef USE_SPARKLE
@@ -298,6 +316,9 @@
 
 /* Use C++ stack backtraces */
 #undef USE_STACK_TRACE
+
+/* Enable experimental Vue port */
+#undef VUETEXMACS
 
 /* Pointer size */
 #undef WORD_LENGTH

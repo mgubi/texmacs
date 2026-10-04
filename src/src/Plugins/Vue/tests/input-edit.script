@@ -1,0 +1,32 @@
+# needs input-edit.scm (the interactive prompt of dialog.scm, Name= Joe):
+# editing in the text input: select all and replace, word moves, cut and
+# paste, a mouse click placing the cursor. Expected: "got: Bob Smith / 42"
+wait 5000
+window Enter data
+focus
+key M-a
+text Bob Smith
+wait 200
+snapshot ie0
+# select "Smith" backwards by words and cut it, paste it back at the end
+key A-S-left
+wait 200
+snapshot ie1
+key M-x
+wait 200
+snapshot ie2
+key M-v
+wait 200
+# home, then a word right and a shift+end selection to check the drawing
+key Home
+key A-right
+key S-End
+wait 300
+snapshot ie3
+key End
+key Tab
+wait 300
+text 42
+wait 300
+key Return
+wait 800

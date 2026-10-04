@@ -853,6 +853,15 @@ edit_interface_rep::apply_changes () {
   
   // cout << "Handling extents\n";
   if (env_change & (THE_TREE+THE_ENVIRONMENT+THE_EXTENTS)) {
+    // the parts between the old and the new box of the document pass from
+    // its background to its surroundings or back (a slide which overflows
+    // its page, for instance): the changes of the text do not cover them
+    rectangle nb (eb->x1, eb->y1, eb->x2, eb->y2);
+    if (nb != last_extents) {
+      rectangles o (last_extents), n (nb);
+      invalidate ((n - o) | (o - n));
+      last_extents= nb;
+    }
     string medium= get_init_string (PAGE_MEDIUM);
     SI ex1= (SI) (((double) eb->x1) * magf);
     SI ey1= (SI) (((double) eb->y1) * magf);
@@ -863,7 +872,7 @@ edit_interface_rep::apply_changes () {
     SI w, h;
     widget me= ::get_canvas (widget (cvw));
     ::get_size (me, w, h);
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
     w -= 2*PIXEL;
     h -= 2*PIXEL;
 #endif
@@ -873,7 +882,7 @@ edit_interface_rep::apply_changes () {
       if (medium == "automatic")
         ex2= ex1 + w;
       else {
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
         ex1= (ex1 + ex2 - w) / 2;
         abs_round (ex1);
         ex2= ex1 + w;
@@ -884,7 +893,7 @@ edit_interface_rep::apply_changes () {
       if (medium == "papyrus" || medium == "automatic")
         ey1= ey2 - h;
       else {
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS) || defined(VUETEXMACS)
         ey1= (ey1 + ey2 - h) / 2;
         abs_round (ey1);
         ey2= ey1 + h;
@@ -994,7 +1003,7 @@ edit_interface_rep::apply_changes () {
       table_selection= selection_active_table ();
       selection sel; selection_get (sel);
       rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#ifndef QTTEXMACS
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS)||defined(AQUATEXMACS))
       rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
       selection_rects= rs;
@@ -1016,7 +1025,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (alt_sel[i], alt_sel[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#ifndef QTTEXMACS
+#if !(defined(QTTEXMACS)||defined(SDLTEXMACS)||defined(VUETEXMACS)||defined(AQUATEXMACS))
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) alt_selection_rects << rs;
@@ -1046,7 +1055,7 @@ edit_interface_rep::apply_changes () {
         range_set sub_sel= simple_range (errs[i], errs[i+1]);
         selection sel= compute_selection (sub_sel);
         rectangles rs= thicken (sel->rs, pixel, 3*pixel);
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS) && !defined (AQUATEXMACS)
         rs= simplify (::correct (rs - thicken (rs, -pixel, -pixel)));
 #endif
         if (N(rs) != 0) spell_error_rects << rs;

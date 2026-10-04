@@ -158,6 +158,14 @@
 
 /* GUI */
 #cmakedefine QTTEXMACS 1
+
+/* The Vue (Clay, SDL3, MuPDF) and SDL (Widkit on SDL3) ports */
+#cmakedefine VUETEXMACS 1
+#cmakedefine SDLTEXMACS 1
+
+/* MuPDF: its pictures and its PDF */
+#cmakedefine USE_MUPDF 1
+#cmakedefine MUPDF_RENDERER 1
 #cmakedefine QTPIPES 1
 
 /* Type sizes */

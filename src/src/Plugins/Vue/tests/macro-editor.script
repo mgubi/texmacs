@@ -1,0 +1,9 @@
+# needs macro-editor.scm: the embedded editor of the macro editor dialog
+wait 9000
+window #4
+snapshot mc0
+click 300 120
+wait 400
+text Hi
+wait 800
+snapshot mc1

@@ -153,7 +153,7 @@ x_drawable_rep::draw_picture (picture p, SI x, SI y, int alpha) {
   int x0= pict->ox, y0= pict->h - 1 - pict->oy;
   decode (x, y);
   x -= x0; y -= y0;
-  int x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
+  SI x1=cx1-ox, y1=cy2-oy, x2= cx2-ox, y2= cy1-oy;
   outer_round (x1, y1, x2, y2);
   decode (x1, y1);
   decode (x2, y2);

@@ -31,7 +31,10 @@
 #include "Ghostscript/gs_utilities.hpp"
 #endif
 
-#ifdef QTTEXMACS
+#if defined(QTWKTEXMACS)
+#include "Qtwk/qtwk_gui.hpp"
+#include "Qt/qt_utilities.hpp"
+#elif defined(QTTEXMACS)
 #include "Qt/qt_gui.hpp"
 #include "Qt/qt_utilities.hpp"
 #endif
@@ -208,12 +211,29 @@ edit_main_rep::get_metadata (string kind) {
 string printing_dpi ("600");
 string printing_on ("a4");
 
+// Is the PDF written by the MuPDF renderer? It is a prototype, so it is
+// off unless it is asked for, by the preference or by the environment
+// (see docs/pdf-output-with-mupdf.md).
+bool
+use_mupdf_pdf () {
+#ifdef __EMSCRIPTEN__
+  return true; // the only way to a PDF in the browser (no Ghostscript)
+#elif defined(MUPDF_RENDERER)
+  if (get_env ("TEXMACS_PDF_MUPDF") == "1") return true;
+  return get_preference ("native pdf renderer", "default") == "mupdf";
+#else
+  return false;
+#endif
+}
+
 bool
 use_pdf () {
 #ifdef PDF_RENDERER
   return get_preference ("native pdf", "on") == "on";
 #else
-  return false;
+  // without a PDF renderer the document goes out as PostScript and
+  // Ghostscript makes the PDF; the MuPDF renderer writes it itself
+  return use_mupdf_pdf ();
 #endif
 }
 
@@ -271,9 +291,17 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     env->write (PAGE_PRINTED, "true");
   }
 
-  // Typeset pages for printing
+  // Typeset pages for printing. The typesetter is kept until the pages
+  // are drawn, not dropped as typeset_as_document drops it: the links of
+  // the document (hlink and the like) are registered by the typesetter,
+  // and a box finds its own when it is drawn (box_rep::display_links).
+  // Dropped, they were found only when the editor had typeset the same
+  // document on the screen before -- never in a batch export (texmacs -c).
 
-  box the_box= typeset_as_document (env, subtree (et, rp), reverse (rp));
+  env->style_init_env ();
+  env->update ();
+  typesetter ttt= new_typesetter (env, subtree (et, rp), reverse (rp));
+  box the_box= ::typeset (ttt);
 
   // Determine parameters for printer
 
@@ -318,6 +346,7 @@ edit_main_rep::print_doc (url name, bool conform, int first, int last) {
     }
   }
   tm_delete (ren);
+  delete_typesetter (ttt);
 
 #ifdef USE_GS
   if (!use_pdf () && pdf) {
@@ -395,7 +424,7 @@ edit_main_rep::print_snippet (url name, tree t, bool conserve_preamble) {
   string s= suffix (name);
   bool bitmap=
     (s == "png" || s == "jpg" || s == "jpeg" || s == "tif" || s == "tiff");
-#ifndef QTTEXMACS
+#if !defined (QTTEXMACS) && !defined (VUETEXMACS) && !defined (AQUATEXMACS)
   bitmap= false;
 #endif
   bool ps= (s == "ps" || s == "eps");
@@ -443,6 +472,12 @@ edit_main_rep::graphics_file_to_clipboard (url name) {
 #ifdef QTTEXMACS
   the_gui->put_graphics_on_clipboard (name);
   return true;
+#elif defined (AQUATEXMACS)
+  bool ns_put_graphics_on_clipboard (url file);
+  return ns_put_graphics_on_clipboard (name);
+#elif defined (VUETEXMACS)
+  bool vue_put_graphics_on_clipboard (url file);
+  return vue_put_graphics_on_clipboard (name);
 #else 
   return false;
 #endif

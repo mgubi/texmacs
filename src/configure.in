@@ -126,6 +126,7 @@ LC_GS
 LC_SQL
 LC_GNUTLS
 LC_SPARKLE
+LC_MUPDF
 LC_RESVG
 
 
@@ -137,6 +138,7 @@ TM_FASTALLOC
 TM_MACOS
 TM_WINDOWS
 TM_GUI
+TM_MUPDF_FOR_GUI
 LC_HUMMUS
 TM_DEBUG
 TM_OPTIMIZE
@@ -157,6 +159,10 @@ if [[[ "0$QT_MAJOR" -ge 6 ]]]; then
       if [[[ "${CXX}" =~ "clang" ]]]; then
         A=(${CXX// / })
         CXX="${A[[0]]} -std=c++17"
+      fi
+      if [[[ "${OBJCXX}" =~ "clang" ]]]; then
+        A=(${OBJCXX// / })
+        OBJCXX="${A[[0]]} -std=c++17"
       fi
     ;;
   esac

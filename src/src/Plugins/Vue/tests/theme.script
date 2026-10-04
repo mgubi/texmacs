@@ -1,0 +1,4 @@
+# needs theme.scm: the widgets under the current theme
+wait 6000
+window Theme
+snapshot th

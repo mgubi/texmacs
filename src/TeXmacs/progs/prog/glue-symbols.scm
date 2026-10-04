@@ -44,6 +44,7 @@
 "has-printing-cmd?"
 "x-gui?"
 "qt-gui?"
+"vue-gui?"
 "gui-set-next-window-as-popup"
 "support-functionality?"
 "gui-version"

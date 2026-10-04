@@ -105,6 +105,49 @@
         (buffer-close buf))
       (print-to-file fname)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A PDF with a password (the MuPDF renderer only, see pdf-encryption?)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (pdf-encryption?)
+  ;; whether the PDF will be written by the MuPDF renderer, which encrypts
+  ;; (as use_mupdf_pdf in edit_main.cpp): anything else would ignore the
+  ;; passwords and write a PDF which is not protected
+  (and (supports-native-pdf?)
+       (or (== (getenv "TEXMACS_PDF_MUPDF") "1")
+           (== (get-preference "native pdf renderer") "mupdf"))))
+
+(define pdf-password-target #f)
+
+(tm-define (print-to-pdf-with-password upw opw perm)
+  (:synopsis "Export to a PDF which asks for a password")
+  (:argument upw "password" "Password to open the PDF")
+  (:argument opw "password" "Owner password, which lifts the restrictions (empty: the same)")
+  (:argument perm "string" "Allowed without it (all, or print, copy, modify, annotate...)")
+  (:proposals perm '("all" "print,copy" "print" "none"))
+  ;; The passwords go to the renderer through the environment, for this one
+  ;; export only (mupdf_pdf_renderer.cpp, pdf_encryption): neither the
+  ;; preferences nor the document keep them, which would put them on the
+  ;; disk in clear.
+  (when pdf-password-target
+    (let ((fname pdf-password-target)
+          (clear (lambda ()
+                   (system-setenv "TEXMACS_PDF_USER_PASSWORD" "")
+                   (system-setenv "TEXMACS_PDF_OWNER_PASSWORD" "")
+                   (system-setenv "TEXMACS_PDF_PERMISSIONS" ""))))
+      (set! pdf-password-target #f)
+      (dynamic-wind
+        (lambda ()
+          (system-setenv "TEXMACS_PDF_USER_PASSWORD" upw)
+          (system-setenv "TEXMACS_PDF_OWNER_PASSWORD" opw)
+          (system-setenv "TEXMACS_PDF_PERMISSIONS" perm))
+        (lambda () (wrapped-print-to-file fname))
+        clear))))
+
+(tm-define (choose-pdf-with-password fname)
+  (set! pdf-password-target fname)
+  (interactive print-to-pdf-with-password))
+
 (tm-define (wrapped-print-to-pdf-embeded-with-tm fname)
     (unless (string=? (url-suffix fname) "pdf")
       (texmacs-error "Wrapped-print-to-pdf-embeded-with-tm" "fname is not a pdf"))
@@ -126,16 +169,56 @@
       (unless (attach-doc-to-exported-pdf fname)
           (notify-now "Fail to attach tm to pdf")))))
 
+(define (pdf-embedded-name s)
+  ;; a linked file by its name alone, when it is given by a path
+  (if (or (string-index s #\/) (string-index s #\\))
+      (url->string (url-tail (system->url s)))
+      s))
+
+(define (pdf-embedded-bare-names s)
+  ;; The copy of the document which goes into the PDF names the files it
+  ;; links to by their names alone: they go in next to it, and come out
+  ;; next to it (wrapped-import-pdf-embeded-with-tm), in either build. The
+  ;; paths pdf-replace-linked-path leaves are the author's, absolute ones --
+  ;; they worked, but every PDF told where the author's files are kept.
+  ;; On the stree, and a new one made: a subtree of a tree which is in no
+  ;; buffer cannot be assigned (tree-assign only rebinds it).
+  (cond ((not (pair? s)) s)
+        ((and (in? (car s) '(image include)) (pair? (cdr s)) (string? (cadr s)))
+         (cons* (car s) (pdf-embedded-name (cadr s))
+                (map pdf-embedded-bare-names (cddr s))))
+        ((and (== (car s) 'style) (pair? (cdr s)))
+         (with a (cadr s)
+           (cons* 'style
+                  (cond ((string? a) (pdf-embedded-name a))
+                        ((and (pair? a) (== (car a) 'tuple))
+                         (cons 'tuple
+                               (map (lambda (x)
+                                      (if (string? x) (pdf-embedded-name x) x))
+                                    (cdr a))))
+                        (else a))
+                  (cddr s))))
+        (else (cons (car s) (map pdf-embedded-bare-names (cdr s))))))
+
 (tm-define (attach-doc-to-exported-pdf fname)
+  ;; The document goes in with its linked files (images, included documents,
+  ;; styles of its own), and the copy which goes in names them by their file
+  ;; names alone (pdf-embedded-bare-names), which is where they come out.
+  ;; It is given a copy of the document, since it changes the tree it is
+  ;; given in place -- given the tree of the buffer, it rewrote the paths of
+  ;; the open document, behind the editor's back, and the next save kept
+  ;; them -- and it is that copy which goes in.
   (let* ((tem-url (buffer-new))
          (new-url (url-relative tem-url (string-append (url-basename fname) ".tm")))
          (cur-url (current-buffer-url))
-         (cur-tree (buffer-get cur-url))
+         (cur-tree (tree-copy (buffer-get cur-url)))
          (linked-file (pdf-get-linked-file-paths cur-tree cur-url))
          (linked-file-with-main (array-url-append new-url linked-file))
          (new-tree (pdf-replace-linked-path cur-tree cur-url)))
     (buffer-rename tem-url new-url)
     (buffer-copy cur-url new-url)
+    (buffer-set new-url
+                (stree->tree (pdf-embedded-bare-names (tree->stree new-tree))))
     ;; copy also attachments and auxiliary data
     (with-buffer cur-url
       (let* ((attl (list-attachments)) 

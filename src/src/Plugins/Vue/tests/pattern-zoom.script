@@ -1,0 +1,7 @@
+# needs pattern-zoom.scm: patterns keep their size across a zoom change
+# (z1 at zoom 1, z2 at zoom 2)
+wait 7000
+window #2
+snapshot z1
+wait 12000
+snapshot z2

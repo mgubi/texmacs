@@ -713,6 +713,12 @@ window_hide (int win) {
   set_visibility (pww, false);
 }
 
+void
+window_set_on_top (int win, bool flag) {
+  ASSERT (window_table->contains (win), "window does not exist");
+  set_on_top (window_table [win], flag);
+}
+
 scheme_tree
 window_get_size (int win) {
   ASSERT (window_table->contains (win), "window does not exist");
@@ -757,9 +763,21 @@ windows_refresh (string kind) {
   while (it->busy ()) {
     int id= it->next ();
     send_refresh (window_table[id], kind);
-#ifdef X11TEXMACS
+#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS)
     if (kind == "auto") refresh_size (window_table[id], false);
 #endif
+  }
+  // a refresh asked for by name (refresh-now) reaches the windows of the
+  // editors too, which window_table does not hold: else it was lost while
+  // no other window was open (the widgets of that kind in the menus of an
+  // editor window, e.g. the typographic palette of the colour menus, which
+  // changes as it is chosen in the open menu)
+  if (kind != "auto") {
+    array<url> l= windows_list ();
+    for (int i=0; i<N(l); i++) {
+      tm_window w= concrete_window (l[i]);
+      if (w != NULL) send_refresh (w->win, kind);
+    }
   }
   if (kind == "auto") windows_delayed_refresh (1000000000);
 }

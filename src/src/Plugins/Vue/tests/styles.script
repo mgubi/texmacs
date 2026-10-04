@@ -1,0 +1,6 @@
+# needs styles.scm: the widget styles side by side (mini, monospaced, grey,
+# inert, bold, centered), to compare with the Qt port
+wait 8000
+window Vue styles
+snapshot styles
+wait 800

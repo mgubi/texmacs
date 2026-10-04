@@ -15,7 +15,7 @@
 #include "message.hpp"
 #include "window.hpp"
 #include "dictionary.hpp"
-#include "Scheme/object.hpp"
+#include "scheme.hpp"
 
 #define THIS wk_widget (this)
 
@@ -108,6 +108,19 @@ tabs_widget (array<widget> tabs, array<widget> bodies) {
 widget
 icon_tabs_widget (array<url> us, array<widget> tabs, array<widget> bodies) {
   return abstract (icon_tabs_widget (us, concrete (tabs), concrete (bodies)));
+}
+
+// Widkit has no layout of its own for the "responsive" tabs (which move
+// their tabs to a side when the window is narrow): the plain ones
+widget
+responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
+  return tabs_widget (tabs, bodies);
+}
+
+widget
+responsive_icon_tabs_widget (array<url> us, array<widget> tabs,
+                             array<widget> bodies) {
+  return icon_tabs_widget (us, tabs, bodies);
 }
 
 widget
@@ -239,6 +252,39 @@ pullright_button (widget w, promise<widget> pw) {
 widget
 toggle_widget (command cmd, bool on, int style) {
   return abstract (toggle_wk_widget (cmd, on, style));
+}
+
+// the "setting" widgets of the preferences: a description followed by the
+// control (a check box, a menu of values), and a titled group of them
+widget
+setting_toggle_widget (command cmd, string text, bool on, int style) {
+  array<widget> a;
+  a << toggle_widget (cmd, on, style)
+    << glue_widget (false, false, 6*PIXEL, 0)
+    << text_widget (text, style, black, true)
+    << glue_widget (true, false, 0, 0);
+  return horizontal_list (a);
+}
+
+widget
+setting_enum_widget (command cb, string text, array<string> vals, string val,
+                     int style, string width) {
+  array<widget> a;
+  a << text_widget (text, style, black, true)
+    << glue_widget (true, false, 6*PIXEL, 0)
+    << enum_widget (cb, vals, val, style, width);
+  return horizontal_list (a);
+}
+
+widget
+setting_group_widget (string text, array<widget> vals, int style) {
+  array<widget> a;
+  a << text_widget (text, style | WIDGET_STYLE_BOLD, black, true);
+  for (int i= 0; i < N(vals); i++) {
+    if (is_nil (vals[i])) break;
+    a << vals[i];
+  }
+  return vertical_list (a);
 }
 
 widget
@@ -647,6 +693,10 @@ wk_widget_rep::send (slot s, blackbox val) {
   case SLOT_FULL_SCREEN:
     check_type<bool> (val, "SLOT_FULL_SCREEN");
     win->set_full_screen (open_box<bool> (val));
+    break;
+  case SLOT_ON_TOP:
+    check_type<bool> (val, "SLOT_ON_TOP");
+    win->set_on_top (open_box<bool> (val));
     break;
   case SLOT_NAME:
     send_string (THIS, "window name", val);

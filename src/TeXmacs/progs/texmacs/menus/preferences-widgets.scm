@@ -968,7 +968,7 @@
         (meti (hlist // (text "Case-insensitive search"))
           (toggle (set-boolean-preference "case-insensitive-match" answer)
                   (get-boolean-preference "case-insensitive-match")))
-        (assuming (qt-gui?)  ; TODO: recode the dialogue in scheme
+        (assuming (or (qt-gui?) (vue-gui?))  ; TODO: recode the dialogue in scheme
           (meti (hlist // (text "Use print dialogue"))
             (toggle (set-boolean-preference "gui:print dialogue" answer)
                     (get-boolean-preference "gui:print dialogue"))))
@@ -1031,7 +1031,7 @@
     ;;(meti (hlist // (text "Case-insensitive search"))
     ;;  (toggle (set-boolean-preference "case-insensitive-match" answer)
     ;;          (get-boolean-preference "case-insensitive-match")))
-    (assuming (qt-gui?)  ; TODO: recode the dialogue in scheme
+    (assuming (or (qt-gui?) (vue-gui?))  ; TODO: recode the dialogue in scheme
       (meti (hlist // (text "Use print dialogue"))
         (toggle (set-boolean-preference "gui:print dialogue" answer)
                 (get-boolean-preference "gui:print dialogue"))))

@@ -1,0 +1,24 @@
+# no .scm needed: the composition of an input method (opt+` then a on a
+# Mac) is shown in the editor as a pre-edit, then the committed text arrives
+wait 7000
+window #2
+focus
+click 300 400
+wait 300
+text ab
+wait 300
+compose `
+wait 600
+snapshot pe1
+compose
+text à
+wait 600
+snapshot pe2
+# a plain letter, as the input methods of the CJK languages compose
+compose n
+wait 600
+snapshot pe3
+compose
+text n
+wait 600
+snapshot pe4

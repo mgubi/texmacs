@@ -1,0 +1,22 @@
+# needs pre-edit-input.scm (the interactive prompt of dialog.scm): the
+# composition of an input method is shown inside the text field (p1), and
+# the committed text replaces it (p2); the prompt ends with "got: ab` / 1"
+# replaced by the accented character
+wait 5000
+window Enter data
+focus
+key M-a
+text ab
+wait 300
+compose `
+wait 600
+snapshot p1
+compose
+text à
+wait 600
+snapshot p2
+key Tab
+wait 300
+text 1
+key Return
+wait 800

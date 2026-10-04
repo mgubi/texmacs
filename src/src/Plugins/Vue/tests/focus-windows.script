@@ -1,0 +1,28 @@
+# needs focus-windows.scm (the interactive prompt of dialog.scm): the
+# keyboard focus moves between windows and back; the prompt must end with
+# "got: BobBy / 42" and the editor must have received "xyz" (snapshot fw1)
+wait 5000
+window Enter data
+key Backspace
+key Backspace
+key Backspace
+text Bob
+wait 300
+window #2
+click 300 400
+wait 300
+text xyz
+wait 500
+snapshot fw1
+window Enter data
+click 100 20
+wait 300
+key End
+text By
+wait 300
+key Tab
+wait 300
+text 42
+wait 300
+key Return
+wait 800

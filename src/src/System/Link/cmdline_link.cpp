@@ -140,7 +140,7 @@ process_all_cmdlines () {
 /******************************************************************************
 * Routines for cmdline_links
 ******************************************************************************/
-
+// NOTE: the copy in pipe_link.cpp is local to it
 #ifndef OS_MINGW
 void
 execute_shell (string s) {
@@ -152,7 +152,7 @@ execute_shell (string s) {
   argv[3] = NULL;
   execve ("/bin/sh", argv, environ);
 }
-#endif
+#endif 
 
 string
 cmdline_link_rep::start () {
@@ -197,6 +197,14 @@ cmdline_link_rep::write (string s, int channel) {
   int e2= pipe (pp_out); (void) e2;
   int e3= pipe (pp_err); (void) e3;
   pid= fork ();
+  if (pid < 0) { // no process (a page has none): not a live program
+    int* fds[3]= { pp_in, pp_out, pp_err };
+    for (int i= 0; i < 3; i++)
+      for (int j= 0; j < 2; j++)
+        if (fds[i][j] >= 0) { close (fds[i][j]); fds[i][j]= -1; }
+    errbuf << "Error: cannot start '" << cmd << "'\n";
+    return;
+  }
   if (pid==0) { // the child
     setsid();
     close (pp_in  [CMDOUT]);

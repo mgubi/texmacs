@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "X11/x_window.hpp"
+#include <X11/Xatom.h>
 #include "message.hpp"
 #include "boot.hpp"
 #include "x_picture.hpp"
@@ -339,6 +340,29 @@ x_window_rep::set_visibility (bool flag) {
 }
 
 void
+x_window_rep::set_on_top (bool flag) {
+  // _NET_WM_STATE_ABOVE (EWMH): the property for a window which is not
+  // mapped yet, a message to the window manager for one which is
+  Atom state= XInternAtom (dpy, "_NET_WM_STATE", False);
+  Atom above= XInternAtom (dpy, "_NET_WM_STATE_ABOVE", False);
+  if (flag)
+    XChangeProperty (dpy, win, state, XA_ATOM, 32, PropModeReplace,
+                     (unsigned char*) &above, 1);
+  else XDeleteProperty (dpy, win, state);
+  XEvent ev;
+  memset (&ev, 0, sizeof (ev));
+  ev.xclient.type        = ClientMessage;
+  ev.xclient.window      = win;
+  ev.xclient.message_type= state;
+  ev.xclient.format      = 32;
+  ev.xclient.data.l[0]   = flag? 1: 0; // _NET_WM_STATE_ADD or _REMOVE
+  ev.xclient.data.l[1]   = above;
+  ev.xclient.data.l[3]   = 1;          // from an application
+  XSendEvent (dpy, DefaultRootWindow (dpy), False,
+              SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+}
+
+void
 x_window_rep::set_full_screen (bool flag) {
   if (full_screen_flag == flag) return;
   string old_name= get_name ();
@@ -443,7 +467,8 @@ x_window_rep::focus_out_event () {
 }
 
 void
-x_window_rep::mouse_event (string ev, int x, int y, time_t t) {
+x_window_rep::mouse_event (string ev, int x0, int y0, time_t t) {
+  SI x= x0, y= y0;
   if (is_nil (gui->grab_ptr) || (get_x_window (gui->grab_ptr->item) == NULL)) {
     ren->set_origin (0, 0);
     ren->encode (x, y);

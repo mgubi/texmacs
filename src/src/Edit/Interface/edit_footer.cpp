@@ -494,11 +494,16 @@ edit_interface_rep::set_footer () {
     cout << "instance  " << instance_count << "\n";
   )
 
+  // tell whether the footer shows the environment at the cursor (and
+  // not a message): an interactive footer replaces only that, see
+  // (texmacs menus footer-menu)
+  call ("footer-environment-notify", object (false));
   if ((message_l == "") && (message_r == "")) {
     last_l= ""; last_r= "";
     tree st= subtree (et, path_up (tp));
     if (set_latex_footer (st)) return;
     if (set_hybrid_footer (st)) return;
+    call ("footer-environment-notify", object (true));
     set_left_footer();
     set_right_footer();
   }

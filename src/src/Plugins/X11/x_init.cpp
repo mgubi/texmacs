@@ -20,6 +20,9 @@
 #include "colors.hpp"
 #include "locale.hpp"
 #include <locale.h>
+#if defined(MACOSX_EXTENSIONS)
+#include "MacOS/mac_app.h" // init_mac_application
+#endif
 
 x_gui_rep* the_gui= NULL;
 extern hashmap<Window,pointer> Window_to_window;
