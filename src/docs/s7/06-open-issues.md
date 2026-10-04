@@ -74,7 +74,25 @@
   its flag and table for this reason (§4.3).
 - **`:use` is not enforced.** Every module sees the rootlet and the user
   module.
-- **Macros are expanded on every evaluation** (s7 run-time macros).
+- **Macros are expanded on every evaluation** (s7 run-time macros; Guile
+  expands a macro call once and keeps the expansion). Measured on 4 October
+  2026 with a counter in `s7.c` around the macro bodies (outermost
+  expansions only, so the time is the expansion itself, not running its
+  result):
+
+  | Workload | Expansions | Time expanding | Of the total |
+  |---|---:|---:|---:|
+  | Boot | 57 000 | 0.05 s | about 7% |
+  | 8 warm LaTeX exports of the change log | 1 120 000 | 0.67 s | 27% (2.49 s) |
+  | 22 headless regression suites | 950 000 | 0.50 s | 4% (12.1 s) |
+  | Editing suites (editing, math-edit, table, text-structure) | 1 490 000 | 1.29 s | 9% (13.9 s) |
+
+  A few macros make most of them: `with` everywhere; `receive`, `cut` and
+  `logic-ref` in the LaTeX export; `match-cup` and the menu macros (`$list`,
+  `$menu-link`, `$balloon`, `$=>`…) while editing, when the menus are
+  rebuilt. Expanding the macro calls of a function body once, when it is
+  defined (as `fully-expand` in `s7test.scm` suggests), would save most of
+  that time; so would cheaper expansions of these few macros.
 - **s7 11 quirks to keep in mind when writing kernel code:**
   - `varlet` refuses already-bound symbols in non-root lets;
   - macro bodies should not define local helper functions (§3.2);
