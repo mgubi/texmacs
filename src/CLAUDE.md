@@ -79,3 +79,9 @@ TeXmacs -x "(run-all-tests)" -q     # Command line
 - **Version Control**: Primary SVN repository on Savannah, GitHub mirror for visibility
 - **Plugin Integration**: New plugins follow established patterns in `plugins/` directory
 - **Testing**: C++ tests in `tests/` directory use CTest, Scheme tests integrated into application
+
+## Browser Port (Vue + WebAssembly)
+
+- The browser build: `misc/wasm/` (Makefile, page scripts, packaging), the Vue interface `src/Plugins/Vue/`, notes in `docs/wasm/README.md`.
+- **Keep the help page of the port up to date**: every new feature or user-visible fix of the browser port gets a line in the "Recent changes" section of `TeXmacs/doc/about/welcome/texmacs-vue.en.tm` (Help > TeXmacs in the browser), in the same commit or right after: a `<paragraph|D Month YYYY>` block per day, newest first, short items written for users. Correct the other sections of the page when a change makes them wrong (e.g. "What does not work").
+- `.tm` files are ASCII (Cork encoding): no raw UTF-8; use `<name>` symbols such as `\<less\>`.
