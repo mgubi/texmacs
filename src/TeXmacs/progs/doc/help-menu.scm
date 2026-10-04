@@ -70,7 +70,7 @@
 		 (load-help-article "main/math/fonts/man-math-font-others"))
 		---
 		("Fonts, from selection to glyph"
-		 (load-help-article "devel/fonts/fonts")))
+		 (load-help-article "devel/fonts/font-guide")))
 	    ("Tabular material"
 	     (load-help-article "main/table/man-table"))
 	    ("Automatic content generation"
@@ -108,7 +108,7 @@
 	    ("Stylesheet language"
 	     (load-help-article "devel/format/stylesheet/stylesheet"))
 	    ("Fonts, from selection to glyph"
-	     (load-help-article "devel/fonts/fonts"))
+	     (load-help-article "devel/fonts/font-guide"))
 	    ("Standard TeXmacs styles"
 	     (load-help-article "main/styles/styles"))
 	    ("Compatibility with other formats"
@@ -128,7 +128,7 @@
 	    ("Interfacing TeXmacs with other programs"
 	     (load-help-article "devel/interface/interface"))
 	    ("Fonts, from selection to glyph"
-	     (load-help-article "devel/fonts/fonts"))
+	     (load-help-article "devel/fonts/font-guide"))
 	    ("About the source code of TeXmacs"
 	     (load-help-article "devel/source/source"))))
   (-> "Plug-ins"

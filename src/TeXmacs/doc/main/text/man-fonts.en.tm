@@ -106,7 +106,7 @@
   ones you may install.
 
   The chapter <hlink|<em|Fonts, from selection to
-  glyph>|../../devel/fonts/fonts.en.tm> of the reference guide explains what
+  glyph>|../../devel/fonts/font-guide.en.tm> of the reference guide explains what
   happens behind this dialog: which variables a font selection sets, how a
   character is turned into a glyph, which files decide what a font name
   means, and how the virtual fonts draw the symbols that no font provides.

@@ -14,7 +14,7 @@
 
     <branch|The style-sheet language|../devel/format/stylesheet/stylesheet.en.tm>
 
-    <branch|Fonts, from selection to glyph|../devel/fonts/fonts.en.tm>
+    <branch|Fonts, from selection to glyph|../devel/fonts/font-guide.en.tm>
 
     <branch|Standard <TeXmacs> styles|styles/styles.en.tm>
 

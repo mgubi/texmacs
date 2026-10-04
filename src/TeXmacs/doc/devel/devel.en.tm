@@ -51,7 +51,7 @@
     <branch|Interfacing <TeXmacs> with other
     programs|interface/interface.en.tm>
 
-    <branch|Fonts, from selection to glyph|fonts/fonts.en.tm>
+    <branch|Fonts, from selection to glyph|fonts/font-guide.en.tm>
 
     <branch|About the source code of <TeXmacs>|source/source.en.tm>
   </traverse>

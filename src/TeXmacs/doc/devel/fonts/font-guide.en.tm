@@ -12,6 +12,12 @@
   and how the virtual fonts let <TeXmacs> draw characters which no font on
   your system provides.
 
+  The implementation of all this, for developers who want to change it, is
+  described in the <hlink|fonts|../source/source-fonts.en.tm> part of the
+  source code documentation, in particular in the chapters on the
+  <hlink|smart fonts|../source/smart-fonts.en.tm> and on <hlink|<name|OpenType>
+  fonts|../source/opentype.en.tm>.
+
   <\traverse>
     <branch|Selecting fonts|font-selection.en.tm>
 
