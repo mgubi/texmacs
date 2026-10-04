@@ -100,6 +100,20 @@
                  (else (loop (cdr prev))))))))
 
 (define-public (sort l op) (sort! (copy l) op))
+;; Guile's module-ref: a TeXmacs module is an s7 environment, in which the
+;; module's own bindings are looked up (used by tests which call functions a
+;; module does not export)
+(define-public (module-ref module sym) (let-ref module sym))
+;; Guile's closure?: a procedure written in Scheme, which s7 recognizes by
+;; its source (the source of a C function is the empty list)
+(define-public (closure? f) (and (procedure? f) (pair? (procedure-source f))))
+;; Guile's procedure-property, for the arity only: a list of the required
+;; and the optional arguments and whether there is a rest argument (s7's
+;; arity is a pair of the minimum and the maximum, very large with a rest)
+(define-public (procedure-property f key)
+  (and (== key 'arity) (procedure? f)
+       (let* ((a (arity f)) (rest? (>= (cdr a) 536870912)))
+         (list (car a) (if rest? 0 (- (cdr a) (car a))) rest?))))
 
 ;; SRFI-13 string functions which Guile provides and s7 does not
 ;; (character arguments may be a char, a predicate or a char-set)
