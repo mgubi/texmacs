@@ -2372,21 +2372,26 @@ video_for_pdf (url u, int ms, array<url>& temps) {
     return url_none ();
   url dir= url_temp ("");
   mkdir (dir);
-  string frames= concretize (dir) * "/f_%05d.png";
-  system (imagemagick_cmd () * " " * escape_sh (concretize (u)) *
-          " -coalesce -background white -alpha remove -alpha off +adjoin " *
-          escape_sh (frames));
+  string frames= sys_concretize (dir * "f_%05d.png");
   url out= url_temp (".mp4");
-  string rate= "1000/" * as_string (ms);
-  string cmd= "ffmpeg -nostdin -loglevel error -y -framerate " * rate *
-    " -i " * escape_sh (frames) * " -r " * rate *
-    " -vf 'scale=trunc(iw/2)*2:trunc(ih/2)*2' -pix_fmt yuv420p"
-    " -map_metadata -1 -fflags +bitexact -flags:v +bitexact"
-    " -movflags +faststart ";
-  system (cmd * "-c:v libx264 -crf 18 " * escape_sh (concretize (out)));
-  if (!exists (out))  // ffmpeg built without libx264
-    system (cmd * "-c:v mpeg4 -q:v 2 " * escape_sh (concretize (out)));
-  system ("rm -rf " * escape_sh (concretize (dir)));
+  if (system (imagemagick_cmd () * " " * sys_concretize (u) *
+              " -coalesce -background white -alpha remove -alpha off"
+              " +adjoin " * frames) == 0) {
+    string rate= "1000/" * as_string (ms);
+    string cmd= "ffmpeg -nostdin -loglevel error -y -framerate " * rate *
+      " -i " * frames * " -r " * rate *
+      " -vf 'scale=trunc(iw/2)*2:trunc(ih/2)*2' -pix_fmt yuv420p"
+      " -map_metadata -1 -fflags +bitexact -flags:v +bitexact"
+      " -movflags +faststart ";
+    // a failed run may leave a partial file: drop it, so that the mpeg4
+    // fallback (ffmpeg built without libx264) or no video is used
+    if (system (cmd * "-c:v libx264 -crf 18 " * sys_concretize (out)) != 0)
+      remove (out);
+    if (!exists (out) &&
+        system (cmd * "-c:v mpeg4 -q:v 2 " * sys_concretize (out)) != 0)
+      remove (out);
+  }
+  rmdir_recursive (dir);
   if (!exists (out)) return url_none ();
   temps << out;
   return out;
@@ -2456,12 +2461,19 @@ pdf_hummus_renderer_rep::flush_videos () {
       convert_error << "Cannot read video " << v << "\n";
       data= "";
     }
-    string obj;
-    obj << "<< /Type /EmbeddedFile /Subtype /video#2Fmp4"
+    string pre;
+    pre << "<< /Type /EmbeddedFile /Subtype /video#2Fmp4"
         << " /Params << /Size " << as_string (N(data)) << " >>"
-        << " /Length " << as_string (N(data)) << " >>\r\nstream\r\n"
-        << data << "\r\nendstream\r\n";
-    write_indirect_obj (oc, id, obj);
+        << " /Length " << as_string (N(data)) << " >>\r\nstream\r\n";
+    string post= "\r\nendstream\r\n";
+    // write the (possibly large) video data without copying it
+    oc.StartNewIndirectObject (id);
+    IByteWriter* w= oc.StartFreeContext ();
+    w->Write ((unsigned char*) &(pre[0]), N(pre));
+    if (N(data) > 0) w->Write ((unsigned char*) &(data[0]), N(data));
+    w->Write ((unsigned char*) &(post[0]), N(post));
+    oc.EndFreeContext ();
+    oc.EndIndirectObject ();
   }
 }
 
