@@ -73,3 +73,16 @@
                   (guile-number->string (round-15 x))
                   (apply guile-number->string x radix))))))
   (else (noop)))
+
+;;; Guile 2/3 do not keep the source of procedures (procedure-source
+;;; returns #f). tm-define, tagged-lambda and lazy-define store the source
+;;; of the procedures they make in the tm-source property: procedure-source
+;;; returns it.
+(cond-expand
+  (guile-2
+    (let ((guile-procedure-source procedure-source))
+      (set! procedure-source
+            (lambda (p)
+              (or (and (procedure? p) (procedure-property p 'tm-source))
+                  (guile-procedure-source p))))))
+  (else (noop)))

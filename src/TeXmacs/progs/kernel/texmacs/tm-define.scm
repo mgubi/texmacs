@@ -350,19 +350,24 @@
   (let* ((old (ahash-ref lazy-define-table name))
          (new (if old (cons module old) (list module))))
     (ahash-set! lazy-define-table name new))
-    `(eval-when (load eval) (if (not (module-ref texmacs-user ',name #f))
-         (begin
-           (module-define! texmacs-user ',name
-            (lambda args
-              (let* ((m (resolve-module ',module))
+  ;; the stub raises an error instead of calling itself for ever when the
+  ;; module does not define the name; its tm-source (procedure-source)
+  ;; shows what it is
+  (with body `(let* ((m (resolve-module ',module))
                      (r (module-ref texmacs-user ',name #f)))
-                (if (not r)
+                (if (or (not r) (eq? r stub))
                     (texmacs-error "lazy-define"
                                   ,(string-append "Could not retrieve "
                                                 (symbol->string name))))
-                ;;(display* "lazy:" ',name "\n")
-                (apply r args))))
-           (module-export! texmacs-user '(,name))))))
+                (apply r args))
+    `(eval-when (load eval) (if (not (module-ref texmacs-user ',name #f))
+         (begin
+           (module-define! texmacs-user ',name
+            (letrec ((stub (lambda args ,body)))
+              (set-procedure-property! stub 'tm-source
+                                       '(lambda args ,body))
+              stub))
+           (module-export! texmacs-user '(,name)))))))
 
 (define-public-macro (lazy-define module . names)
    `(begin
