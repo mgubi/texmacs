@@ -77,8 +77,8 @@
 ;; With a valid plugin cache, plugin-configure does not evaluate :require
 ;; and takes the availability of a plugin from the cache, where the test
 ;; plugins are not: they are configured as if the cache were being rebuilt.
-(define saved-reconfigure-flag reconfigure-flag?)
-(set! reconfigure-flag? #t)
+(define saved-reconfigure-flag (plugin-reconfigure?))
+(plugin-reconfigure-set! #t)
 
 (define (raw-serialize lan t)
   ;; the test plugins receive exactly the string which is evaluated
@@ -130,7 +130,7 @@
             ,(lambda (name chat res) (tm->tree (string-append "res=" res))))
   (:session "Cmdline test"))
 
-(set! reconfigure-flag? saved-reconfigure-flag)
+(plugin-reconfigure-set! saved-reconfigure-flag)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; What the plugins notify
