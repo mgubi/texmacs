@@ -315,6 +315,33 @@
         (cons (cons (car l) (cadr l)) (pairs (cddr l)))))
   (pairs (boot-test-butlast (cdr t))))
 
+;; 0005: macro expansions cached at their call sites
+(define boot-test-expansions 0)
+(define-macro (boot-test-counted . args)
+  (set! boot-test-expansions (+ boot-test-expansions 1))
+  `(+ ,@args))
+(define (boot-test-counted-call x) (boot-test-counted x 1))
+(define (boot-test-count-expansions n)
+  (set! boot-test-expansions 0)
+  (do ((i 0 (+ i 1))) ((= i n)) (boot-test-counted-call i))
+  boot-test-expansions)
+(define-macro* (boot-test-macro* a (b 5)) `(list ,a ,b))
+(define-macro (boot-test-loop test . body)
+  `(let continue () (if ,test (begin ,@body (continue)) #f)))
+(define (boot-test-first-match l pred?)
+  ;; the named let of the cached expansion must see the variables of each call
+  (boot-test-loop (and (pair? l) (not (pred? (car l)))) (set! l (cdr l)))
+  (and (pair? l) (car l)))
+(define (boot-test-macro*-call x) (boot-test-macro* x))
+(define-macro (boot-test-listed-twice x) `(list ,x ,x))
+(define (boot-test-redefine-counted times-ten?)
+  (set! boot-test-counted
+        (if times-ten?
+            (macro args `(* 10 ,@args))
+            (macro args
+              (set! boot-test-expansions (+ boot-test-expansions 1))
+              `(+ ,@args)))))
+
 ;; 0004: (string-ref a 0) on a parameter (a trap in WebAssembly only)
 (define (boot-test-first-char a b) (string-ref a 0))
 (define (boot-test-first-char-of x) (boot-test-first-char x (+ 1 2)))
@@ -335,10 +362,11 @@
          (object->string (make-string 1500 #\x) :readable)
          "(make-string 1500 #\\x)")
    ;; 0002
-   (test "closure made by a macro at each call, twice"
+   (test "closure made by a macro at each call, three times"
          (list (boot-test-pairs '(with a 1 b 2 x))
-               (boot-test-pairs '(with a 1 x)))
-         '(((a . 1) (b . 2)) ((a . 1))))
+               (boot-test-pairs '(with a 1 x))
+               (boot-test-pairs '(with c 3 x)))
+         '(((a . 1) (b . 2)) ((a . 1)) ((c . 3))))
    ;; 0003
    (test "curried define" ((boot-test-adder 1) 2) 3)
    (test "curried define, two levels" (((boot-test-adder3 1) 2) 3) 6)
@@ -360,6 +388,30 @@
    (test "define-public with a curried head publishes the function"
          ((((rootlet) 'boot-test-public-adder) 1) 2) 3)
    (test "plain define is unchanged" (let () (define x 5) x) 5)
+   ;; 0005
+   (test "caching of macro expansions is on"
+         (*s7* 'cache-macro-expansions?) #t)
+   (test "a macro call is expanded at most twice in 100 calls"
+         (<= (boot-test-count-expansions 100) 2) #t)
+   (test "the cached expansion gives the right values"
+         (map boot-test-counted-call '(1 2 3)) '(2 3 4))
+   (test "a loop macro with a named let, called again"
+         (list (boot-test-first-match '(1 2 3) (lambda (x) (> x 5)))
+               (boot-test-first-match '(1) odd?)
+               (boot-test-first-match '(1 2 3 4 5 6) (lambda (x) (> x 4))))
+         '(#f 1 5))
+   (test "define-macro* calls are cached and right"
+         (map boot-test-macro*-call '(1 2)) '((1 5) (2 5)))
+   (test "a macro applied by for-each sees each argument"
+         (let ((l '())) (for-each (lambda (x) (set! l (cons (boot-test-listed-twice x) l))) '(1 2)) l)
+         '((2 2) (1 1)))
+   (test "a redefined macro is used at once"
+         (let ((before (boot-test-counted-call 1)))
+           (boot-test-redefine-counted #t)
+           (let ((after (boot-test-counted-call 2)))
+             (boot-test-redefine-counted #f)
+             (list before after (boot-test-counted-call 3))))
+         '(2 20 4))
    ;; 0004
    (test "string-ref of 0 on a parameter"
          (list (boot-test-first-char-of "abc") (boot-test-first-char-of "xyz"))

@@ -74,7 +74,7 @@ the generators (`build-glue.scm`, `make-apidoc-*.scm`).
 ## 5.2 The vendored s7
 
 `src/Scheme/S7/s7.c` and `s7.h` are **s7 11.9 (21-Sep-2026) as released**
-(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with four local
+(`https://ccrma.stanford.edu/software/s7/s7.tar.gz`), with five local
 patches (below). The patches are kept in `src/Scheme/S7/patches/`, made
 one after the other from stock s7, with a description at the top of each
 and a `README.md`; the changed code is marked `TeXmacs:` in `s7.c`.
@@ -88,7 +88,8 @@ and a `README.md`; the changed code is marked `TeXmacs:` in `s7.c`.
   defaults: `WITH_GMP 0`, `WITH_PURE_S7 0`, `WITH_SYSTEM_EXTRAS 1`,
   `WITH_HISTORY 0`, `WITH_WARNINGS 0`, `WITH_MAIN 0`.
 - **Runtime settings,** made in `start_scheme` (§1.3):
-  `(*s7* 'symbol-quote?)` is `#t`, and the initial heap is 1 M cells.
+  `(*s7* 'symbol-quote?)` is `#t`, `(*s7* 'cache-macro-expansions?)` is `#t`
+  (patch 0005), and the initial heap is 1 M cells.
 
 **s7 11 behaviors that TeXmacs adapts to** (see §2.1–2.3 and
 [03](03-compat-layer.md)):
@@ -139,6 +140,30 @@ does not mind; WebAssembly traps ("indirect call signature mismatch"), on
 `(string-ref a 0)` where `a` is a parameter. s7 5-Oct-2026 has the same fix,
 so the patch goes with the next upgrade.
 
+**Patch 0005, caching macro expansions.** s7 expands a macro call each time
+it is evaluated; Guile 1.8 expands it once and keeps the expansion, and the
+TeXmacs code was written for that. The patch adds an `*s7*` field,
+`cache-macro-expansions?` (`#f` by default, so stock behavior is
+unchanged), which `start_scheme` sets to `#t`.
+- A call evaluated again reuses its expansion if its macro is still the
+  same one. The key is the argument list of the call, which is the same
+  list each time the same code runs, in a weak `eq?` hash table.
+- Only calls from code (`op_macro_d`) are cached: a macro applied as a
+  function (`apply`, `for-each`, `sort!`) can get a list which s7 reuses
+  with other contents. Bacros, calls without arguments and expansions
+  returning several values are not cached.
+- The optimizer treats an expansion as code evaluated once and leaves
+  information there which holds only for that evaluation: reusing the
+  same pairs made a named let in the expansion of a loop macro see the
+  variables of the first call. So the pairs which the macro made (not
+  those of its arguments, which are the caller's code) are copied each time
+  the expansion is used.
+- `s7test.scm` gives the same results with the field on and off. In
+  TeXmacs, the warm LaTeX exports of the change log are 13–20% faster; the
+  editing suites gain about 5%, within the noise of a loaded machine. Less
+  than the time the macros took (§6.2) because the copied pairs are still
+  optimized again at each use.
+
 **No patch of the lookups.** Earlier versions of the port patched s7's symbol
 lookup:
 - first by moving found slots to the front of their let, which was unsound,
@@ -156,7 +181,7 @@ first patch broke.
 1. Copy the new `s7.c` and `s7.h` into `src/Scheme/S7` and apply the
    patches in order, as `src/Scheme/S7/patches/README.md` says. Drop a patch
    which upstream has made unnecessary, and refresh one which no longer
-   applies. The `patches` group of `boot-s7-test.scm` tests all four.
+   applies. The `patches` group of `boot-s7-test.scm` tests all five.
 2. Rebuild from clean.
 3. Run `run-all-tests` and the portable suites on both interpreters (§4.4).
 4. Check the timings of [07](07-performance.md), at least boot and the LaTeX

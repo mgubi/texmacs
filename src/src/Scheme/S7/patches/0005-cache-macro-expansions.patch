@@ -1,0 +1,290 @@
+Cache macro expansions at their call sites, as Guile does ((*s7* 'cache-macro-expansions?))
+
+s7 expands a macro call each time it is evaluated. With the new *s7*
+field cache-macro-expansions? set to #t (it is #f by default, so stock
+behavior is unchanged), a macro call evaluated again reuses its
+expansion instead of calling the macro.
+
+- The key is the argument list of the call, cdr of the call form, which
+  is the same list each time the same code runs; the values of a weak
+  eq? hash table are (macro expansion . made), and the entry is used only
+  if the macro of the call is still that macro (redefined or shadowed
+  macros are expanded again).
+- Only op_macro_d caches: a macro applied as a function (by apply,
+  for-each, sort!...) can be given a list which s7 reuses with other
+  contents. The first call of some code goes through apply, which turns
+  it into OP_MACRO_D, so the expansion is cached from the second call on.
+- Not cached: bacros (expanded in the caller's environment), calls
+  without arguments, expansions which are multiple values.
+- The optimizer treats an expansion as new code, evaluated once, and can
+  leave there information which holds only for that evaluation (a named
+  let in the expansion of a loop macro then saw the variables of the
+  first call). So made is the set of the pairs which the macro made (not
+  those of its arguments, which are the caller's code, shared as
+  before), and these pairs are copied each time the expansion is used:
+  the evaluator gets new pairs, as from the macro.
+- The table is emptied when it reaches 100000 entries.
+
+s7test.scm gives the same results with the field #t and #f (and, with
+#f, as without the patch, apart from the number of fields of *s7*).
+In TeXmacs: the LaTeX export of the change log is 13-20% faster.
+
+--- a/s7.c
++++ b/s7.c
+@@ -1275,6 +1275,9 @@
+   s7_uint capture_let_counter;
+   bool short_print, is_autoloading, in_with_let, object_out_locked, has_openlets, is_expanding, accept_all_keyword_arguments;
+   bool got_tc, got_rec, not_tc, muffle_warnings, symbol_quote, reset_error_hook;
++  bool cache_macro_expansions, macro_cache_hit; /* TeXmacs: see macro_cache_hit_1 */
++  s7_pointer macro_cache;
++  s7_int macro_cache_loc;
+   s7_int rec_tc_args;
+   s7_int let_number;
+   unsigned char number_separator;
+@@ -4549,7 +4552,7 @@
+ 
+       OP_READ_INTERNAL, OP_EVAL, OP_EVAL_ARGS, OP_EVAL_ARGS1, OP_EVAL_ARGS2, OP_EVAL_ARGS3, OP_EVAL_ARGS4, OP_EVAL_ARGS5,
+       OP_EVAL_SET1_NO_MV, OP_EVAL_SET2, OP_EVAL_SET2_MV, OP_EVAL_SET2_NO_MV, OP_EVAL_SET3, OP_EVAL_SET3_MV, OP_EVAL_SET3_NO_MV,
+-      OP_APPLY, OP_EVAL_MACRO, OP_LAMBDA, OP_QUOTE, OP_QUOTE_UNCHECKED, OP_MACROEXPAND, OP_CALL_CC, OP_CALL_WITH_EXIT, OP_CALL_WITH_EXIT_O,
++      OP_APPLY, OP_EVAL_MACRO, OP_EVAL_MACRO_CACHE, OP_LAMBDA, OP_QUOTE, OP_QUOTE_UNCHECKED, OP_MACROEXPAND, OP_CALL_CC, OP_CALL_WITH_EXIT, OP_CALL_WITH_EXIT_O,
+       OP_C_CATCH, OP_C_CATCH_ALL, OP_C_CATCH_ALL_O, OP_C_CATCH_ALL_A,
+ 
+       OP_DEFINE, OP_DEFINE1, OP_BEGIN, OP_BEGIN_HOOK, OP_BEGIN_NO_HOOK, OP_BEGIN_UNCHECKED, OP_BEGIN_2_UNCHECKED, OP_BEGIN_NA, OP_BEGIN_AA,
+@@ -4764,7 +4767,7 @@
+ 
+       "read_internal", "eval", "eval_args", "eval_args1", "eval_args2", "eval_args3", "eval_args4", "eval_args5",
+       "eval_set1_no_mv", "eval_set2", "eval_set2_mv", "eval_set2_no_mv", "eval_set3", "eval_set3_mv", "eval_set3_no_mv",
+-      "apply", "eval_macro", "lambda", "quote", "quote_unchecked", "macroexpand", "call/cc", "call_with_exit", "call_with_exit_o",
++      "apply", "eval_macro", "eval_macro_cache", "lambda", "quote", "quote_unchecked", "macroexpand", "call/cc", "call_with_exit", "call_with_exit_o",
+       "c_catch", "c_catch_all", "c_catch_all_o", "c_catch_all_a",
+ 
+       "define", "define1", "begin", "begin_hook", "begin_no_hook", "begin_unchecked", "begin_2_unchecked", "begin_na", "begin_aa",
+@@ -4896,7 +4899,7 @@
+ }
+ 
+ /* if this changes, remember to change lint.scm */
+-typedef enum {sl_No_Field=0, sl_Accept_All_Keyword_Arguments, sl_Autoloading, sl_Bignum_Precision, sl_Catches, sl_Cpu_Time, sl_C_Types,
++typedef enum {sl_No_Field=0, sl_Accept_All_Keyword_Arguments, sl_Autoloading, sl_Bignum_Precision, sl_Cache_Macro_Expansions, sl_Catches, sl_Cpu_Time, sl_C_Types,
+ 	      sl_Debug, sl_Default_Hash_Table_Length, sl_Default_Random_State, sl_Default_Rationalize_Error, sl_Equivalent_Float_Epsilon,
+ 	      sl_Expansions, sl_Filenames, sl_File_Names, sl_Float_Format_Precision, sl_Free_Heap_Size, sl_gc_Freed, sl_Gc_Info,
+ 	      sl_Gc_Protected_Objects, sl_Gc_Resize_Heap_By_4_Fraction, sl_Gc_Resize_Heap_Fraction, sl_Gc_Stats, sl_Gc_Temps_Size,
+@@ -4910,7 +4913,7 @@
+ 	      sl_Num_Fields} starlet_t;
+ 
+ static const char *starlet_names[sl_Num_Fields] =
+-  {"no-field", "accept-all-keyword-arguments", "autoloading?", "bignum-precision", "catches", "cpu-time", "c-types",
++  {"no-field", "accept-all-keyword-arguments", "autoloading?", "bignum-precision", "cache-macro-expansions?", "catches", "cpu-time", "c-types",
+    "debug", "default-hash-table-length", "default-random-state", "default-rationalize-error", "equivalent-float-epsilon",
+    "expansions?", "filenames", "file-names", "float-format-precision", "free-heap-size", "gc-freed", "gc-info",
+    "gc-protected-objects", "gc-resize-heap-by-4-fraction", "gc-resize-heap-fraction", "gc-stats", "gc-temps-size",
+@@ -83998,8 +84001,120 @@
+   if (closure_arity_unknown(mac))
+     closure_set_arity(mac, s7_list_length(sc, closure_pars(mac)));
+   return(op);
++}
++
++/* TeXmacs: caching macro expansions, as Guile does ((*s7* 'cache-macro-expansions?), #f by default).
++ *   op_macro_d calls a macro with the arguments of its call, cdr of the call, which is the same list each
++ *   time the same code runs: it is the key of a weak eq? hash table whose values are (macro . expansion).
++ *   Only op_macro_d caches: a macro applied as a function (by apply, for-each, sort!...) can be given a
++ *   list which s7 reuses with other contents.  The first call of some code goes through apply, which
++ *   turns the call into OP_MACRO_D, so the expansion is cached from the second call on.
++ *   When the macro of a call is the one of the entry (not redefined, not shadowed), the expansion is
++ *   evaluated without calling the macro again; otherwise OP_EVAL_MACRO_CACHE stores the new expansion.
++ *   Not cached: bacros (expanded in the caller's environment), calls without arguments (no key of
++ *   their own), and expansions which are multiple values.  The table is emptied when it gets large.
++ *   The optimizer treats an expansion as new code, evaluated once: it can leave there information
++ *   which holds only for that evaluation (a named let in the expansion of a loop macro then sees the
++ *   variables of the first call).  So the entry also has the set of the pairs which the macro made
++ *   (not the ones of its arguments, which are code of the caller, shared as before), and each time
++ *   the expansion is used again, those pairs are copied: the evaluator gets new pairs, as from the
++ *   macro, which is not called.
++ */
++#define Macro_Cache_Max_Entries 100000
++
++static void macro_cache_reset(s7_scheme *sc)
++{
++  if (sc->macro_cache_loc >= 0)
++    {
++      s7_gc_unprotect_at(sc, sc->macro_cache_loc);
++      sc->macro_cache_loc = -1;
++    }
++  sc->macro_cache = sc->F;
++  if (sc->cache_macro_expansions)
++    {
++      sc->macro_cache = g_make_weak_hash_table(sc, list_2(sc, make_integer(sc, 1024), global_value(sc->is_eq_symbol)));
++      sc->macro_cache_loc = s7_gc_protect(sc, sc->macro_cache);
++    }
++}
++
++static s7_pointer macro_cache_copy(s7_scheme *sc, s7_pointer made, s7_pointer p)
++{
++  /* a copy of the pairs of p which are in the set made, sharing the others */
++  s7_pointer head, tail;
++  if ((!is_pair(p)) || (s7_hash_table_ref(sc, made, p) == sc->F)) return(p);
++  head = cons(sc, macro_cache_copy(sc, made, car(p)), sc->nil);
++  tail = head;
++  for (p = cdr(p); (is_pair(p)) && (s7_hash_table_ref(sc, made, p) != sc->F); p = cdr(p))
++    {
++      set_cdr(tail, cons(sc, macro_cache_copy(sc, made, car(p)), sc->nil));
++      tail = cdr(tail);
++    }
++  set_cdr(tail, p);
++  return(head);
++}
++
++static bool macro_cache_hit_1(s7_scheme *sc) /* sc->code: the macro, sc->args: the arguments of the call */
++{
++  s7_pointer entry;
++  if ((!is_pair(sc->args)) || (!is_hash_table(sc->macro_cache))) return(false);
++  entry = s7_hash_table_ref(sc, sc->macro_cache, sc->args);
++  if ((is_pair(entry)) && (car(entry) == sc->code))
++    {
++      const bool old_gc_off = sc->gc_off;
++      sc->gc_off = true;                    /* the copy is small, and its pieces are not yet protected */
++      sc->code = macro_cache_copy(sc, cddr(entry), cadr(entry));
++      sc->gc_off = old_gc_off;
++      return(true);
++    }
++  return(false);
++}
++
++static void macro_cache_mark_pairs(s7_scheme *sc, s7_pointer set, s7_pointer p)
++{
++  /* all the pairs of p in set (cdr iteratively, car recursively) */
++  while ((is_pair(p)) && (s7_hash_table_ref(sc, set, p) == sc->F))
++    {
++      s7_hash_table_set(sc, set, p, sc->T);
++      macro_cache_mark_pairs(sc, set, car(p));
++      p = cdr(p);
++    }
+ }
+ 
++static void macro_cache_made_pairs(s7_scheme *sc, s7_pointer set, s7_pointer p, s7_pointer made)
++{
++  /* the pairs of p which are not in set (the pairs of the arguments, and those already seen), put in made */
++  while ((is_pair(p)) && (s7_hash_table_ref(sc, set, p) == sc->F))
++    {
++      s7_hash_table_set(sc, set, p, sc->T);
++      s7_hash_table_set(sc, made, p, sc->T);
++      macro_cache_made_pairs(sc, set, car(p), made);
++      p = cdr(p);
++    }
++}
++
++#define macro_cache_lookup(Sc) ((Sc->cache_macro_expansions) && (macro_cache_hit_1(Sc)))
++
++static void macro_cache_store(s7_scheme *sc) /* OP_EVAL_MACRO_CACHE: sc->code: the macro, sc->args: the key, sc->value: the expansion */
++{
++  if ((is_pair(sc->args)) && (is_hash_table(sc->macro_cache)) && (!is_multiple_value(sc->value)))
++    {
++      if (hash_table_entries(sc->macro_cache) >= Macro_Cache_Max_Entries)
++	macro_cache_reset(sc);
++      begin_temp(sc->y, g_make_hash_table(sc, list_2(sc, make_integer(sc, 64), global_value(sc->is_eq_symbol))));
++      macro_cache_mark_pairs(sc, sc->y, sc->args);
++      begin_temp(sc->v, g_make_hash_table(sc, list_2(sc, make_integer(sc, 16), global_value(sc->is_eq_symbol))));
++      macro_cache_made_pairs(sc, sc->y, sc->value, sc->v);
++      sc->v = cons(sc, sc->value, sc->v);
++      sc->v = cons(sc, sc->code, sc->v);
++      s7_hash_table_set(sc, sc->macro_cache, sc->args, sc->v);
++      end_temp(sc->v);
++      end_temp(sc->y);
++    }
++}
++
++#define push_eval_macro(Sc) \
++  do {if (Sc->cache_macro_expansions) push_stack(Sc, OP_EVAL_MACRO_CACHE, Sc->args, Sc->code); else push_stack_op_let(Sc, OP_EVAL_MACRO);} while (0)
++
+ static inline bool op_macro_d(s7_scheme *sc, uint8_t typ)
+ {
+   sc->value = lookup(sc, car(sc->code));
+@@ -84008,8 +84123,13 @@
+   /* if unknown_any returns true, see below for fast? path */
+   sc->args = cdr(sc->code);                       /* used to copy here, but that appears to be unnecessary */
+   sc->code = sc->value;                           /* the macro */
++  if (macro_cache_lookup(sc))                     /* TeXmacs: sc->code is the expansion, see the callers */
++    {
++      sc->macro_cache_hit = true;
++      return(false);
++    }
+   check_stack_size(sc);                           /* (define-macro (f) (f)) (f) */
+-  push_stack_op_let(sc, OP_EVAL_MACRO);
++  push_eval_macro(sc);
+   set_curlet(sc, inline_make_let(sc, closure_let(sc->code)));
+   return(false);                                  /* fall into apply_lambda */
+ }
+@@ -84019,6 +84139,7 @@
+ static bool op_macro_star_d(s7_scheme *sc)
+ {
+   if (op_macro_d(sc, T_MACRO_STAR)) return(true); /* if (eval_args_no_eval_args(sc)) goto Apply; goto Top_No_Pop; */
++  if (sc->macro_cache_hit) return(false);         /* TeXmacs: the expansion was cached */
+   apply_macro_star_1(sc);
+   return(false);
+ }
+@@ -98331,8 +98452,12 @@
+ 	    default:                      eval_apply_error_nr(sc);
+ 	    }
+ 
+-	case OP_MACRO_STAR_D: if (op_macro_star_d(sc))     goto Eval_Args_Top; goto Begin;
+-	case OP_MACRO_D:      if (op_macro_d(sc, T_MACRO)) goto Eval_Args_Top; /* fall through presumably */
++	case OP_MACRO_STAR_D: if (op_macro_star_d(sc))     goto Eval_Args_Top;
++	  if (sc->macro_cache_hit) {sc->macro_cache_hit = false; goto Eval;}
++	  goto Begin;
++	case OP_MACRO_D:      if (op_macro_d(sc, T_MACRO)) goto Eval_Args_Top;
++	  if (sc->macro_cache_hit) {sc->macro_cache_hit = false; goto Eval;}
++	  /* fall through presumably */
+ 	  /* goto Eval_Args_Top if the "macro" has changed type in midstream -- normally we fall through */
+ 
+ 	Apply_Lambda:
+@@ -98953,6 +99078,7 @@
+ 
+ 
+ 	case OP_EVAL_MACRO:    op_eval_macro(sc);                  goto Eval;
++	case OP_EVAL_MACRO_CACHE: macro_cache_store(sc); op_eval_macro(sc); goto Eval;
+ 	case OP_EVAL_MACRO_MV: if (op_eval_macro_mv(sc)) continue; goto Eval;
+ 	case OP_EXPANSION_MV:  op_finish_expansion(sc);            continue;
+ 
+@@ -100301,6 +100427,7 @@
+     case sl_Accept_All_Keyword_Arguments:  return(make_boolean(sc, sc->accept_all_keyword_arguments));
+     case sl_Autoloading:                   return(make_boolean(sc, sc->is_autoloading));
+     case sl_Bignum_Precision:              return(make_integer(sc, sc->bignum_precision));
++    case sl_Cache_Macro_Expansions:        return(make_boolean(sc, sc->cache_macro_expansions));
+     case sl_Catches:                       return(sl_active_catches_to_list(sc));
+     case sl_Cpu_Time:                      return(make_real(sc, (double)clock() / (double)CLOCKS_PER_SEC)); /* cpu, not wall-clock time */
+     case sl_C_Types:                       return(sl_c_types_to_list(sc));
+@@ -100706,6 +100833,16 @@
+ 		 set_elist_2(sc, wrap_string(sc, "(*s7* 'symbol-printer) function, ~A, should take one argument", 61), val));
+     }
+   sc->symbol_printer = val;
++  return(val);
++}
++
++static void macro_cache_reset(s7_scheme *sc);
++
++static s7_pointer sl_set_cache_macro_expansions(s7_scheme *sc, s7_pointer sym, s7_pointer val)
++{
++  if (!is_boolean(val)) starlet_wrong_type_error_nr(sc, sym, val, sc->type_names[T_BOOLEAN]);
++  sc->cache_macro_expansions = s7_boolean(sc, val);
++  macro_cache_reset(sc);
+   return(val);
+ }
+ 
+@@ -101385,6 +101522,7 @@
+     case sl_Accept_All_Keyword_Arguments:  return(sl_set_accept_all_keyword_arguments(sc, sym, val));
+     case sl_Autoloading:                   return(sl_set_autoloading(sc, sym, val));
+     case sl_Bignum_Precision:              return(sl_set_bignum_precision(sc, sym, val));
++    case sl_Cache_Macro_Expansions:        return(sl_set_cache_macro_expansions(sc, sym, val));
+     case sl_Catches:                       sl_unsettable_error_nr(sc, sym);
+     case sl_Cpu_Time:                      sl_unsettable_error_nr(sc, sym);
+     case sl_C_Types:                       sl_unsettable_error_nr(sc, sym);
+@@ -103745,6 +103883,10 @@
+   sc->accept_all_keyword_arguments = false;
+   sc->muffle_warnings = false;
+   sc->symbol_quote = false;
++  sc->cache_macro_expansions = false;
++  sc->macro_cache_hit = false;
++  sc->macro_cache = sc->F;
++  sc->macro_cache_loc = -1;
+   sc->initial_string_port_length = 128;
+   sc->format_depth = -1;
+   sc->singletons = (s7_pointer *)Calloc(Num_Chars, sizeof(s7_pointer));

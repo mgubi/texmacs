@@ -43,6 +43,10 @@ start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   // instead of growing it step by step, with fewer collections meanwhile
   s7_eval_c_string (tm_s7, "(set! (*s7* 'heap-size) 1024000)");
 
+  // expand each macro call once and keep its expansion, as Guile does,
+  // instead of expanding it at each evaluation (local patch 0005)
+  s7_eval_c_string (tm_s7, "(set! (*s7* 'cache-macro-expansions?) #t)");
+
   // make a new user environment (used in evaluation)
   user_env = s7_inlet (tm_s7, s7_nil (tm_s7));
   s7_gc_protect (tm_s7, user_env);
