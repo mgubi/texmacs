@@ -33,12 +33,11 @@
 (tm-define (tie-context? t)
   (or (label-context? t) (reference-context? t) (citation-context? t)))
 
-(define (named-context? pred? . ids)
-  (lambda (t)
-    (and (pred? t)
-         (exists? (lambda (id)
-                    (exists? (cut tm-equal? <> id) (tm-children t)))
-                  ids))))
+(define ((named-context? pred? . ids) t)
+  (and (pred? t)
+       (exists? (lambda (id)
+                  (exists? (cut tm-equal? <> id) (tm-children t)))
+                ids)))
 
 (tm-define (and-nnull? l)
   (and (nnull? l) l))
@@ -79,10 +78,9 @@
   (cond ((tm-in? t '(cite-detail)) (list (tm-ref t 0)))
         (else (tm-children t))))
 
-(define (tie-in? t)
-  (lambda (ref)
-    (with l (map tm->string (tm-keys ref))
-      (forall? (lambda (s) (ahash-ref t s)) l))))
+(define ((tie-in? t) ref)
+  (with l (map tm->string (tm-keys ref))
+    (forall? (lambda (s) (ahash-ref t s)) l)))
 
 (define (strip-bib s)
   (if (string-starts? s "bib-") (string-drop s 4) s))

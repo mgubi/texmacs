@@ -346,11 +346,10 @@
       (db-search (list (list "version-list" vid)
                        (list :order "version-nr" #t))))))
 
-(define (readable-by? uid)
-  (lambda (info)
-    (with (rid date name by msg) info
-      (with-time (+ (string->number date) 5)
-        (db-allow? rid uid "readable")))))
+(define ((readable-by? uid) info)
+  (with (rid date name by msg) info
+    (with-time (+ (string->number date) 5)
+      (db-allow? rid uid "readable"))))
 
 (tm-service (remote-get-versions rname)
   ;;(display* "remote-get-versions " rname "\n")

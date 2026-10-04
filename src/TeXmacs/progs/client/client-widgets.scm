@@ -53,10 +53,9 @@
 ;; Server preferences
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (save-license-as doc)
-  (lambda (f)
-    (with s (convert doc "texmacs-stree" "texmacs-document")
-      (string-save s f))))
+(define ((save-license-as doc) f)
+  (with s (convert doc "texmacs-stree" "texmacs-document")
+    (string-save s f)))
 
 (define (client-server-license server-preferences)
   (cond ((null? server-preferences) #f)
