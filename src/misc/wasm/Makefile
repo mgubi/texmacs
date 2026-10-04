@@ -135,10 +135,10 @@ $(OUT)/web/favicon.ico: $(TM)/TeXmacs/misc/images/texmacs-vue.ico
 	@mkdir -p $(OUT)/web
 	cp $< $@
 
-$(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/workers.js $(W)/javascript.js $(W)/shell.html
+$(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/workers.js $(W)/javascript.js $(W)/ime.js $(W)/shell.html
 	@mkdir -p $(OUT)/web
 	em++ $(LDFLAGS) -lidbfs.js --pre-js $(W)/progress.js --pre-js $(W)/packages.js --pre-js $(W)/web-pre.js \
-	  --pre-js $(W)/files.js --pre-js $(W)/frame.js --pre-js $(W)/clipboard.js --pre-js $(W)/print.js --pre-js $(W)/workers.js --pre-js $(W)/javascript.js --shell-file $(W)/shell.html \
+	  --pre-js $(W)/files.js --pre-js $(W)/frame.js --pre-js $(W)/clipboard.js --pre-js $(W)/print.js --pre-js $(W)/workers.js --pre-js $(W)/javascript.js --pre-js $(W)/ime.js --shell-file $(W)/shell.html \
 	  $(OBJECTS) $(LIBS) -o $@
 	perl -pi -e "s/\@TM_WASM_SIZE\@/$$(wc -c < $(OUT)/web/texmacs.wasm | tr -d ' ')/" $@
 	perl -pi -e "s/\@TM_VERSION\@/$$(sed -n 's/^#define TEXMACS_VERSION \"\(.*\)\"/\1/p' $(W)/tm_configure.hpp)/" $@

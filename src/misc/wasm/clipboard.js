@@ -53,7 +53,9 @@ var tmClipboard = (function () {
   function log (s) { if (trace) console.log ('clipboard: ' + s); }
 
   function editable (t) {
-    return t && t.nodeType === 1 && t !== sink &&
+    // (not the text areas of the page: the sink, and the one of the input
+    // methods, ime.js, data-tm-input, whose keys are TeXmacs's)
+    return t && t.nodeType === 1 && t !== sink && !t.hasAttribute ('data-tm-input') &&
            (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test (t.tagName));
   }
   // a dialog of the page is open (frame.js), or text of the page is

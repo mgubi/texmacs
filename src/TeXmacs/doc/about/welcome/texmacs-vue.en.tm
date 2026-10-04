@@ -73,7 +73,9 @@
   for itself (a new window, a new tab, closing a tab, reloading the page):
   use the menus of <TeXmacs>, or the <verbatim|+> of the tabs, for those. On
   a Mac, they use the command key, as those of the browser: <key|M-c>,
-  <key|M-x> and <key|M-v> copy, cut and paste.
+  <key|M-x> and <key|M-v> copy, cut and paste. The keys which compose (dead
+  keys, the accents of a Mac, the input methods of Chinese or Japanese) work
+  as in the other programs.
 
   Copy, cut and paste go through the clipboard of the system, so that text
   can be exchanged with the other programs; a copy made in <TeXmacs> keeps
@@ -152,6 +154,10 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>The keys which compose: the dead keys of many keyboards (the
+    <verbatim|^> or the diaeresis of a Swiss or a French keyboard), the accents of a Mac, and the input methods of Chinese,
+    Japanese or Korean; the text being composed is shown in the document.
+
     <item>A copy keeps its structure when it is pasted into another tab of
     <TeXmacs>, or into the page reloaded (it was pasted as text).
 

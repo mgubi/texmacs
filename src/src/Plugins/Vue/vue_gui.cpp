@@ -4336,6 +4336,62 @@ vue_web_scheme (const char* cmd) {
   gui_needs_update= true;
 }
 
+// The composition of the browser (misc/wasm/ime.js): SDL has no input method
+// on the web (its text comes from keypress events, one character each), and
+// a dead key, the accents of a Mac or a CJK input method compose in a hidden
+// text area of the page instead. Its composition comes here as the pre-edit
+// of SDL (SDL_EVENT_TEXT_EDITING, shown by the editor as the Qt port does),
+// its committed text as text input (one key per character, see
+// SDL_EVENT_TEXT_INPUT): commit 0, the text being composed (empty: none),
+// commit 1, the text composed. SDL keeps the pointers of the events: their
+// texts live in a ring of buffers.
+static const char*
+web_compose_text (string s) {
+  static c_string ring[16];
+  static int next= 0;
+  next= (next + 1) % 16;
+  ring[next]= c_string (s);
+  return (const char*) (char*) ring[next];
+}
+
+static void
+web_push_editing (SDL_WindowID id, string text) {
+  SDL_Event ev;
+  SDL_zero (ev);
+  ev.type= SDL_EVENT_TEXT_EDITING;
+  ev.edit.timestamp= SDL_GetTicksNS ();
+  ev.edit.windowID= id;
+  ev.edit.text= web_compose_text (text);
+  // the cursor at the end of the composition (in characters)
+  int n= 0;
+  for (int i= 0; i < N(text); i++)
+    if ((((unsigned char) text[i]) & 0xC0) != 0x80) n++;
+  ev.edit.start= n;
+  ev.edit.length= 0;
+  SDL_PushEvent (&ev);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_compose (const char* text, int commit) {
+  SDL_Window* w= SDL_GetKeyboardFocus ();
+  SDL_WindowID id= (w != NULL) ? SDL_GetWindowID (w) : 0;
+  string t (text);
+  if (!commit) web_push_editing (id, t);
+  else {
+    web_push_editing (id, "");
+    if (N(t) > 0) {
+      SDL_Event ev;
+      SDL_zero (ev);
+      ev.type= SDL_EVENT_TEXT_INPUT;
+      ev.text.timestamp= SDL_GetTicksNS ();
+      ev.text.windowID= id;
+      ev.text.text= web_compose_text (t);
+      SDL_PushEvent (&ev);
+    }
+  }
+  gui_needs_update= true;
+}
+
 // TeXmacs.scheme (misc/wasm/javascript.js): a Scheme expression evaluated
 // now, for the JavaScript of the page, its value as text in UTF-8 (a string
 // as it is, the rest as object->string writes it, an error as (error ...)).
