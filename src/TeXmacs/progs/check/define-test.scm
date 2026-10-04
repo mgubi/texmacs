@@ -259,7 +259,9 @@
   ;; tm-property adds a property, not a definition
   (check= (length (procedure-sources define-test-later)) 1)
   ;; the definitions are global, in the module texmacs-user
-  (check-true (module-defined? texmacs-user 'define-test-f))
+  (if (s7-scheme?)
+      (check-true (defined? 'define-test-f (rootlet)))
+      (check-true (module-defined? texmacs-user 'define-test-f)))
   (check-true (predicate-option? 'foo?))
   (check-false (predicate-option? 'foo))
   (check-true (predicate-option? '(lambda (x) x)))
@@ -405,10 +407,19 @@
   (check= (define-test-pub) 'pub)
   ;; (the module of this file, not the current one: when the suite runs,
   ;; the current module is the one which called it)
-  (check-true (module-defined?
-               (module-public-interface (resolve-module '(check define-test)))
-               'define-test-pub))
+  (if (s7-scheme?)
+      (check-true (memq 'define-test-pub
+                        ((resolve-module '(check define-test)) '*exports*)))
+      (check-true (module-defined?
+                   (module-public-interface
+                    (resolve-module '(check define-test)))
+                   'define-test-pub)))
+  ;; S7 modules see everything in the rootlet, where the public names are
+  ;; published, and :use is not enforced (see src/docs/s7)
+  (when (not (s7-scheme?))
+    (test-texmacs-module)))
 
+(define (test-texmacs-module)
   (check-group "texmacs-module")
   (define-test-make-module
     '(texmacs-module (check define-test-mod-a) (:use (check check-lib))))

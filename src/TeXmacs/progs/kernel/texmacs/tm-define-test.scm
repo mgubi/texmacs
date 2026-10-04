@@ -18,14 +18,10 @@
   (regression-test-group
    "procedure" "procedure"
    procedure-name :none
-   ;; s7 procedures do not know their names: procedure-name returns the
-   ;; procedure itself there, and its name with Guile
-   (test "procedures defined via define-public" string->float
-         (if (s7-scheme?) string->float 'string->float))
-   (test "procedures defined via glue symbols" utf8->cork
-         (if (s7-scheme?) utf8->cork 'utf8->cork))
+   (test "procedures defined via define-public" string->float 'string->float)
+   (test "procedures defined via glue symbols" utf8->cork 'utf8->cork)
    (test "procedures defined via tm-define" regtest-tm-define
-         (if (s7-scheme?) regtest-tm-define 'regtest-tm-define))
+         'regtest-tm-define)
    (test "invalid input" 1 #f)))
 
 (define (regtest-procedure-symbol-name)
