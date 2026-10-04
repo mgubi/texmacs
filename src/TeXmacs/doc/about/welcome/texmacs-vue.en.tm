@@ -202,6 +202,9 @@
     <item>The input fields of the dialogs whose width is given as a
     multiple of the default one are no longer as wide as the window (the
     buttons of the dialogs of the wallet were out of sight).
+
+    <item>Faster Scheme: the macros of a piece of code are expanded once,
+    not each time the code runs (the export to <LaTeX> is about 15% faster).
   </itemize>
 
   <paragraph|4 October 2026>
