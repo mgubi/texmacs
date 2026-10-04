@@ -86,10 +86,14 @@
        (with k (wallet-get (ai-key-entry engine))
          (and (string? k) (!= k "") k))))
 
+;; the key of the preferences ("default" when there is none)
+(define (ai-preference-key engine)
+  (with p (get-preference (string-append engine " api key"))
+    (and (string? p) (!= p "") (!= p "default") p)))
+
 (tm-define (ai-api-key engine env)
   (or (ai-wallet-key engine)
-      (with p (get-preference (string-append engine " api key"))
-        (and (string? p) (!= p "") p))
+      (ai-preference-key engine)
       (with e (getenv env)
         (and e (!= e "") e))
       ""))
@@ -98,7 +102,7 @@
 
 (tm-define (ai-api-key-shown engine)
   (if (ai-wallet-key engine) ai-in-wallet
-      (get-preference (string-append engine " api key"))))
+      (or (ai-preference-key engine) "")))
 
 (tm-define (ai-set-api-key engine key)
   (when (!= key ai-in-wallet)
@@ -216,10 +220,11 @@
   (ai-has-key? "chatgpt"))
 
 (plugin-configure chatgpt
-  (:require (has-chatgpt?))
-  (:request ,ai-request ,ai-result)
+  ;; before :require, so that its key can be given in its preferences
   (:preferences #t)
   (:session "ChatGPT")
+  (:require (has-chatgpt?))
+  (:request ,ai-request ,ai-result)
   (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -234,20 +239,22 @@
   (ai-has-key? "claude"))
 
 (plugin-configure claude
-  (:require (has-claude?))
-  (:request ,ai-request ,ai-result)
+  ;; before :require, so that its key can be given in its preferences
   (:preferences #t)
   (:session "Claude")
+  (:require (has-claude?))
+  (:request ,ai-request ,ai-result)
   (:serializer ,ai-serialize))
 
 (tm-define (has-gemini?)
   (ai-has-key? "gemini"))
 
 (plugin-configure gemini
-  (:require (has-gemini?))
-  (:request ,ai-request ,ai-result)
+  ;; before :require, so that its key can be given in its preferences
   (:preferences #t)
   (:session "Gemini")
+  (:require (has-gemini?))
+  (:request ,ai-request ,ai-result)
   (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -275,10 +282,11 @@
   (ai-has-key? "open-mistral-7b"))
 
 (plugin-configure open-mistral-7b
-  (:require (has-open-mistral-7b?))
-  (:request ,ai-request ,ai-result)
+  ;; before :require, so that its key can be given in its preferences
   (:preferences #t)
   (:session "Mistral")
+  (:require (has-open-mistral-7b?))
+  (:request ,ai-request ,ai-result)
   (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -307,8 +315,9 @@
   (!= (ai-api-key "albert" "ALBERT_API_KEY") ""))
 
 (plugin-configure albert
-  (:require (has-albert?))
-  (:request ,ai-request ,ai-result)
+  ;; before :require, so that its key can be given in its preferences
   (:preferences #t)
   (:session "Albert")
+  (:require (has-albert?))
+  (:request ,ai-request ,ai-result)
   (:serializer ,ai-serialize))

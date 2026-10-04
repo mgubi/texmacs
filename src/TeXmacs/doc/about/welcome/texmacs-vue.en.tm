@@ -191,7 +191,7 @@
 
     <item>Sessions of chatbots: <name|ChatGPT>, <name|Claude> (new),
     <name|Gemini>, <name|Mistral> and <name|Ollama>, asked by the browser.
-    Their keys are given in <menu|Edit|Preferences|Plug-ins>, and kept in
+    Their keys are given in <menu|Insert|Session|Preferences>, and kept in
     the wallet when it is on; see <menu|Help|Plug-ins|AI>.
 
     <item>The input fields of the dialogs whose width is given as a

@@ -12,7 +12,7 @@
   <verbatim|~/.profile>.
 
   Instead of an environment variable, the key of a chatbot can be given in
-  <menu|Edit|Preferences|Plug-ins>, with the model to use. When the wallet
+  <menu|Insert|Session|Preferences>, with the model to use. When the wallet
   of <TeXmacs> is on (<menu|Edit|Preferences|Security>), the key is kept
   there, encrypted, rather than in the preferences. This is also how keys
   are given in a web browser, which has no environment variables. All the
@@ -112,7 +112,7 @@
     OLLAMA_ORIGINS=https://mgubi.github.io ollama serve
   </shell-code>
 
-  The server and the model are chosen in <menu|Edit|Preferences|Plug-ins>.
+  The server and the model are chosen in <menu|Insert|Session|Preferences>.
 
   <subsection*|Mistral>
 
