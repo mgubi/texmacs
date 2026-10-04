@@ -177,11 +177,11 @@
   (check= (cAr (ev '(with "f" (macro "x" (arg "x" "1" "0"))
                       (f (tuple "a" (tuple "b" "c"))))))
           "b")
-  ;; FIXME: the error of an arg whose path leaves the argument is made
-  ;; with the label of a compound tree (Typeset/Env/env_exec.cpp:907,
-  ;; r->label after r= r[nr]): (with "f" (macro "x" (arg "x" "5"))
-  ;; (f (tuple "a"))) gives (error "arg ") followed by garbage bytes,
-  ;; expected (error "arg x").
+  ;; an arg whose path leaves the argument is an error, which names it
+  (check= (cAr (ev '(with "f" (macro "x" (arg "x" "5")) (f (tuple "a")))))
+          '(error "arg x"))
+  (check= (cAr (ev '(with "f" (macro "x" (arg "x" "0" "0")) (f (tuple "a")))))
+          '(error "arg x"))
   (check= (cAr (ev '(with "f" (xmacro "x" (concat (arg "x" "2") (arg "x" "0")))
                       (f "a" "b" "c"))))
           "ca")
@@ -1072,14 +1072,15 @@
      (check-true (cursor-accessible?))
      (go-to (at 0 1))
      (check-true (cursor-accessible?))
-     ;; FIXME: path-next and path-previous (next_valid, previous_valid)
-     ;; go into the children which are not accessible: move_valid_bis
-     ;; (Data/Tree/tree_traverse.cpp:282) tests is_accessible_path on the
-     ;; whole cursor path, whose last item is a position and not a child,
-     ;; so that a cursor path is never seen as accessible and the move is
-     ;; made in source mode. In (concat "x" (label "lab") "y"),
-     ;; (path-next (buffer-tree) '(2 1 0)) gives (2 1 0 0), inside the
-     ;; label, where cursor-accessible? is false; expected (2 1 1).
+     ;; path-next and path-previous skip the children which are not
+     ;; accessible, and go into those which are
+     (check= (path-next (buffer-tree) '(2 0)) '(2 1))
+     (check= (path-previous (buffer-tree) '(2 1)) '(2 0))
+     (check= (path-next (buffer-tree) '(0 0 2)) '(0 1))
+     (check= (path-previous (buffer-tree) '(0 0 0)) '(0 0))
+     (check= (path-next (buffer-tree) '(5 0 1)) '(5 1))
+     (check= (path-next (buffer-tree) '(3 0)) '(3 0 0))
+     (check= (path-next (buffer-tree) '(5 0)) '(5 0 0))
      (go-to (at 2 0))
      (check-true (cursor-accessible?))
      (go-to (at 2 1))

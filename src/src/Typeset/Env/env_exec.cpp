@@ -888,7 +888,8 @@ edit_env_rep::exec_arg (tree t) {
     return tree (_ERROR, "bad arg");
   if (is_nil (macro_arg) || (!macro_arg->item->contains (r->label)))
     return tree (_ERROR, "arg " * r->label);
-  r= macro_arg->item [r->label];
+  string name= r->label;
+  r= macro_arg->item [name];
   list<hashmap<string,tree> > old_var= macro_arg;
   list<hashmap<string,path> > old_src= macro_src;
   if (!is_nil (macro_arg)) macro_arg= macro_arg->next;
@@ -904,7 +905,7 @@ edit_env_rep::exec_arg (tree t) {
       r= r[nr];
     }
   }
-  if (err) r= tree (_ERROR, "arg " * r->label);
+  if (err) r= tree (_ERROR, "arg " * name);
   else r= exec (r);
   macro_arg= old_var;
   macro_src= old_src;
