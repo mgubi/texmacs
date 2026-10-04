@@ -1020,7 +1020,11 @@ Measured on an Apple M4 (`bench.script`, forced full repaints of the
 document of 200 paragraphs, with `gpu_finish`): 1.8 ms a repaint, against
 1.2 to 2.0 ms for the MuPDF renderer on the same machine, where the native
 build vectorises MuPDF's loops. What the GPU saves there is the upload of
-the window (0.2 ms against 1 to 1.7 ms a frame).
+the window (0.2 ms against 1 to 1.7 ms a frame). In the browser
+(`texmacs.html?gpu=1`, headless Firefox on an Apple M1, Retina; see
+docs/wasm/README.md on the browser branch): 3.5 ms a full repaint against
+6.6 ms with MuPDF, and a frame of 4.35 ms against 5.95 ms, the canvas
+upload (2 ms) gone.
 
 Differences from the MuPDF renderer: the glyphs are TeXmacs' bitmaps, not
 MuPDF's rendering of the font files (they look like the X11 port's); the
