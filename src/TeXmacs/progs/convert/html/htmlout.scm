@@ -82,8 +82,23 @@
         (output-text " " (symbol->string (car x)) "=")
         (output-verbatim "\"" (cadr x) "\""))))
 
+(define (htmlout-attributes l)
+  ;; the attributes in their order, without repetitions (the last value
+  ;; of a repeated attribute wins); the order of a hash table depends on
+  ;; the hash function of the Scheme implementation
+  (let ((t (list->ahash-table l))
+        (seen (make-ahash-table)))
+    (list-filter
+     (map (lambda (x)
+            (and (not (ahash-ref seen (car x)))
+                 (begin
+                   (ahash-set! seen (car x) #t)
+                   (cons (car x) (ahash-ref t (car x))))))
+          l)
+     identity)))
+
 (define (htmlout-open-tags s l)
-  (with ll (ahash-table->list (list->ahash-table l))
+  (with ll (htmlout-attributes l)
     (htmlout-text "<" (symbol->string s))
     (for-each htmlout-tag ll)
     (htmlout-text ">")

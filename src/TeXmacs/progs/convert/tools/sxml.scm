@@ -93,7 +93,8 @@
 (tm-define (sxml-set-attrs e attrs)
   ;; Set several attributes of an element e. Attrs is a list of attributes.
   ;; Create the attribute list or attributes if necessary.
-  (let rec ((e e) (attrs attrs))
+  ;; The attributes come first, in the order of @attrs.
+  (let rec ((e e) (attrs (reverse attrs)))
     (if (null? attrs) e
 	(rec (sxml-set-attr e (car attrs)) (cdr attrs)))))
 
