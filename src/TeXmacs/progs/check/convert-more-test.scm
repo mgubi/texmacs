@@ -124,10 +124,12 @@
   (check= (texmacs->mathml "123") '(m:mn "123"))
   (check= (texmacs->mathml "") '(m:mrow))
   (check= (texmacs->mathml '(concat "sin" "x")) '(m:mrow (m:mi "sin") (m:mi "x")))
-  ;; FIXME: a decimal number is cut at the point, which becomes an
-  ;; identifier (tmconcat-math-sub in tmconcat.scm:71 only eats digits):
-  ;; (texmacs->mathml "12.5") gives (m:mrow (m:mn "12") (m:mi ".") (m:mn "5")),
-  ;; expected (m:mn "12.5").
+  ;; a decimal number is one mn; a point which is not between digits is not
+  ;; part of the number
+  (check= (texmacs->mathml "12.5") '(m:mn "12.5"))
+  (check= (texmacs->mathml "x=0.25") '(m:mrow (m:mi "x") (m:mo "=") (m:mn "0.25")))
+  (check= (texmacs->mathml "1.2.3") '(m:mrow (m:mn "1.2") (m:mi ".") (m:mn "3")))
+  (check= (texmacs->mathml "2.") '(m:mrow (m:mn "2") (m:mi ".")))
   (check= (texmacs->mathml '(concat "x" (rsup "2"))) '(m:msup (m:mi "x") (m:mn "2")))
   (check= (texmacs->mathml '(concat "x" (rsub "i"))) '(m:msub (m:mi "x") (m:mi "i")))
   (check= (texmacs->mathml '(concat "x" (rsub "i") (rsup "2")))
@@ -189,11 +191,13 @@
   (check= (texmacs->mathml '(tformat (table (row (cell "a")) (row (cell "1")))))
           '(m:mtable (@ (columnalign "left"))
                      (m:mtr (m:mtd (m:mi "a"))) (m:mtr (m:mtd (m:mn "1")))))
-  ;; FIXME: a table without tformat raises an error (tmmath-table in
-  ;; tmmath.scm:238 gives '() as row and cell formats, of which
-  ;; tmmath-make-rows takes the car, and wraps the table in a list):
-  ;; (texmacs->mathml '(table (row (cell "a")))) raises wrong-type-arg,
-  ;; expected (m:mtable (@ (columnalign "left")) (m:mtr (m:mtd (m:mi "a")))).
+  ;; a table without tformat
+  (check= (texmacs->mathml '(table (row (cell "a"))))
+          '(m:mtable (@ (columnalign "left")) (m:mtr (m:mtd (m:mi "a")))))
+  (check= (texmacs->mathml '(table (row (cell "a") (cell "b")) (row (cell "1") (cell "2"))))
+          '(m:mtable (@ (columnalign "left left"))
+                     (m:mtr (m:mtd (m:mi "a")) (m:mtd (m:mi "b")))
+                     (m:mtr (m:mtd (m:mn "1")) (m:mtd (m:mn "2")))))
   ;; with: the color, the series, the text mode
   (check= (texmacs->mathml '(with "color" "red" "x"))
           '(m:mstyle (@ (mathcolor "red")) (m:mi "x")))
@@ -245,19 +249,8 @@
 
 ;; MathML in an HTML document, in the namespace of MathML (as TeXmacs and
 ;; most tools write it), becomes a math tag, or an equation* with
-;; display="block".
-;; FIXME: MathML without the xmlns attribute, as HTML5 allows it, loses its
-;; first element and makes a paragraph of its own (htmltm-math in
-;; htmltm.scm:363 puts the list of the children as one child,
-;; `,(replace-nsprefix-in-stree c ...)` instead of `,@`, so that the first
-;; child becomes the name of a node, and the handler of h:math is :block):
-;; (convert "<math><mi>x</mi><mo>+</mo><mn>1</mn></math>" "html-snippet"
-;; "texmacs-tree") gives (math "+1"), expected (math "x+1"); and
-;; "<p>Let <math><mi>x</mi></math> be.</p>" gives
-;; (document "Let" (math "") "be."), expected (concat "Let " (math "x") " be.").
-;; FIXME: merror raises an error, a typo in mathtm.scm:154 (matthtm-error):
-;; (mathml-import "<merror><mi>x</mi></merror>") raises unbound-variable,
-;; expected (math (with "color" "red" "x")).
+;; display="block". MathML without the xmlns attribute, as HTML5 allows it,
+;; is read in the same way.
 (define (test-mathml-import)
   (check-group "mathml import")
   (check= (mathml-import "<mi>x</mi>") '(math "x"))
@@ -332,7 +325,19 @@
   (check= (import (string-append "<m:math xmlns:m=\"http://www.w3.org/1998/Math/"
                                  "MathML\"><m:mi>x</m:mi></m:math>")
                   "html-snippet")
-          '(math "x")))
+          '(math "x"))
+  ;; without xmlns
+  (check= (import "<math><mi>x</mi><mo>+</mo><mn>1</mn></math>" "html-snippet")
+          '(math "x+1"))
+  (check= (import "<math><mfrac><mi>a</mi><mi>b</mi></mfrac></math>" "html-snippet")
+          '(math (frac "a" "b")))
+  (check= (import "<p>Let <math><mi>x</mi></math> be.</p>" "html-snippet")
+          '(concat "Let " (math "x") " be."))
+  (check= (import "<math display=\"block\"><mi>x</mi></math>" "html-snippet")
+          '(equation* "x"))
+  ;; an error is shown in red
+  (check= (mathml-import "<merror><mi>x</mi></merror>")
+          '(math (with "color" "red" "x"))))
 
 ;; TeXmacs -> MathML in HTML -> TeXmacs: the formula comes back in a math
 ;; tag.
@@ -349,10 +354,14 @@
   ;; the bar comes back as the wide bar
   (check= (import (html-math '(with "mode" "math" (wide "x" "<bar>"))) "html-snippet")
           '(math (wide "x" "<wide-bar>")))
-  ;; FIXME: a hat does not come back: the export writes the accent as the
-  ;; entity &Hat;, which the import reads as a symbol, not as an accent
-  ;; (mathtm-mover in mathtm.scm:304 only knows the characters): (wide "x" "^")
-  ;; gives (math (above "x" "<#005E>")), expected (math (wide "x" "^")).
+  ;; the hat, which the export writes as the entity &Hat;
+  (check= (import (html-math '(with "mode" "math" (wide "x" "^"))) "html-snippet")
+          '(math (wide "x" "^")))
+  (check= (mathml-import "<mover><mi>x</mi><mo>&Hat;</mo></mover>")
+          '(math (wide "x" "^")))
+  ;; decimal numbers
+  (check= (import (html-math '(with "mode" "math" "x=12.5")) "html-snippet")
+          '(math "x=12.5"))
   (check= (import (html-math '(concat "a " (with "mode" "math" "x") " b"))
                   "html-snippet")
           '(concat "a " (math "x") " b")))

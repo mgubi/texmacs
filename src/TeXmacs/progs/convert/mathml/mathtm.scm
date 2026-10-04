@@ -151,7 +151,7 @@
   `((with "color" "red" ,message)))
 
 (define (mathtm-merror env a c)
-  (matthtm-error (mathtm-mrow env a c)))
+  (mathtm-error (mathtm-args-serial env c)))
 
 ;(define (mathtm-mstyle env a c)
 ;  (let* ((attrs (mathtm-style a))
