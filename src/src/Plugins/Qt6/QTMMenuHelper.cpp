@@ -379,6 +379,9 @@ QTMLazyMenu::attachTo (QAction* a) {
   QObject::connect (a,  &QAction::destroyed,
                     this, &QTMLazyMenu::destroy);
 #endif
+  // A submenu never plays an application menu role: otherwise, on macOS,
+  // Qt's text heuristic would move e.g. Help -> About to the application menu
+  a->setMenuRole (QAction::NoRole);
   a->setMenu (this);
 }
 
@@ -1170,9 +1173,22 @@ void QTMScrollArea::setWidgetAndConnect (QWidget* w) {
 }
 
 void QTMScrollArea::onTrackedListViewDestroyed(QObject *obj) {
-  QTMListView *listView = qobject_cast<QTMListView *>(obj);
-  if (listView == nullptr) return;
-  listViews.removeAll(listView);
+  // obj is already destroyed down to QObject, so qobject_cast would fail;
+  // the pointer is only compared, never dereferenced
+  listViews.removeAll(static_cast<QTMListView *>(obj));
+}
+
+/*! Disconnects the tracked list views before destruction.
+
+ The list views are descendants of the scroll area and are only deleted by
+ the QWidget destructor, after ~QTMScrollArea has run. Their signals
+ (destroyed, selectionHasChanged) must not reach this half-destroyed object.
+ The views are looked up again rather than taken from listViews, which may
+ still hold views that were deleted earlier.
+ */
+QTMScrollArea::~QTMScrollArea () {
+  for (QTMListView* listView : findChildren<QTMListView*> ())
+    QObject::disconnect (listView, nullptr, this, nullptr);
 }
 
 /*! Scrolls the area to a given index in a QTMListView. */

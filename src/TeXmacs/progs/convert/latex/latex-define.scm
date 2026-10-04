@@ -206,7 +206,7 @@
   (nospace "")
   (nocomma "")
   (noplus "")
-  (nosymbol "")
+  (nosymbol "\\ensuremath{\\mathord{}}")
   (dotminus "\\mathaccent95{-}")
   (dotpm "\\mathaccent95{\\pm}")
   (dotmp "\\mathaccent95{\\mp}")

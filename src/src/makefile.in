@@ -126,29 +126,10 @@ pdf_c_src    := $(call findc_in,Plugins,@CONFIG_PDF@/LibAesgm)
 freetype_src := $(call findsrc_in,Plugins,Freetype)
 gnutls_src   := $(call findsrc_in,Plugins,Gnutls)
 
-# Each makefile will have its own Deps directory. Okay that is a bit
-# inefficient, but that is much simpler to maintain.
-#
-# The enclosing makefile should accumulate a dependences file name in
-# $(deps) and define an rule without command for every source file it
-# compiles.
-
-make_cpp_deps = $(patsubst %.cpp,Deps/%.d,$(notdir $(1)))
 make_c_deps = $(patsubst %.c,Objects/%.o,$(notdir $(1)))
-make_m_deps = $(patsubst %.m,Deps/%.d,$(notdir $(1)))
-make_mm_deps = $(patsubst %.mm,Deps/%.d,$(notdir $(1)))
 
-texmacs_cpp_deps := $(call make_cpp_deps,$(system_src) $(kernel_src) $(data_src)\
- $(edit_src) $(scheme_src) $(graphics_src)\
- $(plugins_src) $(x11_src) $(texmacs_src)\
- $(typeset_src) $(style_src) $(qt_src) $(gs_src) $(resvg_src) $(os_src)\
- $(pdf_src) $(freetype_src) $(gnutls_src))
-texmacs_m_deps += $(call make_m_deps,$(cocoa_m_src))
-texmacs_mm_deps += $(call make_mm_deps,$(cocoa_mm_src))
 texmacs_c_deps := $(call make_c_deps, $(call findc_in,System,Misc))
 texmacs_c_deps += $(call make_c_deps, $(pdf_c_src))
-
-#deps += $(texmacs_cpp_deps) $(texmacs_m_deps) $(texmacs_mm_deps)
 
 ###############################################################################
 # Include files
@@ -228,47 +209,21 @@ endif
 # Dependencies
 ###############################################################################
 
-deps_incl = $(call incl_flags,System System/Boot System/Classes System/Files \
-  System/Link System/Misc System/Language Kernel/Abstractions \
-  Kernel/Containers Kernel/Types Data/Convert \
-  Data/Document Data/Drd Data/History Data/Parser \
-  Data/Observers Data/Document Data/String Data/Tmfs Data/Tree Graphics \
-  Plugins Plugins/Pdf/LibAesgm Plugins/$(QT_PLUGIN_DIR) \
-  Style/Environment Style/Evaluate Style/Memorizer \
-  Typeset Edit Texmacs Texmacs/Data Scheme Graphics/Bitmap_fonts \
-  Graphics/Colors Graphics/Fonts \
-  Graphics/Gui Graphics/Mathematics Graphics/Renderer Graphics/Pictures \
-  Graphics/Handwriting Graphics/Types Graphics/Spacial)
+# The compiler writes the dependencies of each object file on the headers
+# it includes into Deps/<name>.d as a side effect of the compilation
+# (-MMD; -MP adds a dummy rule for each header, so that removing a header
+# does not break the build).  These files are included below; an object
+# file without its .d file has never been compiled and is rebuilt anyway.
 
-deps_flags = $(deps_incl) \
- $(CPPFLAGS) $(CXXAXEL) $(CXXCAIRO) $(CXXIMLIB2) $(CXXSQLITE3) $(CXXFREETYPE) \
- $(CXXICONV) $(CXXGUILE) $(CXXGNUTLS) $(CXXRESVG) -I$(tmsrc)/include $(CXXGUI)
-# we should use -I- to separate local includes from system includes, but
-# headers of guile 1.6.0 use includes in quotes with names relative to the
-# current directory, and that feature is disable by -I-.
+depflags = -MMD -MP -MF Deps/$*.d -MT $@
 
-$(texmacs_cpp_deps): Deps/%.d: %.cpp
-$(texmacs_m_deps): Deps/%.d: %.m
-$(texmacs_mm_deps): Deps/%.d: %.mm
+-include $(wildcard Deps/*.d)
 
-$(deps):
-	@ echo "make deps: $@"
-	@ set -e; $(CXX) -M $(deps_flags) $< \
-	  | sed 's|\($*\)\.o[ :]*|Objects/\1.o $@ : |g' > $@; \
-	  [ -s $@ ] || $(RM) $@
-
-# To avoid unneeded processing, the Deps will not be included (and thus
-# remade if needed) unless the "deps" target has been previously made,
-# by hand.
-
-deps: $(deps)
-	$(TOUCH) Deps/stamp
+# Kept for compatibility: dependencies are no longer computed in a
+# separate pass, so there is nothing to do here.
+deps:
 
 .PHONY: deps
-
-ifeq ($(shell test -f Deps/stamp && echo yes || echo no),yes)
-include $(deps)
-endif
 
 ###############################################################################
 # Object files
@@ -312,22 +267,22 @@ gnutls_obj   := $(call makeobj,$(gnutls_src))
 %.o: %.c # Disable implicit compilation rule
 
 ifneq "@PREPROC@" "yes"
-cxx_flags = $(strip $(CXX) $(1) -c $< -o $@)
+cxx_flags = $(strip $(CXX) $(1) $(depflags) -c $< -o $@)
 else
 define cxx_flags
 $(strip $(CXX) $(1) -E $< -o $@.lst)
-$(strip $(CXX) $(1) -c $< -o $@)
+$(strip $(CXX) $(1) $(depflags) -c $< -o $@)
 endef
 endif
 cxx_incl     = $(call cxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS)) 
-objcxx_flags = $(strip $(OBJCXX) $(1) -c $< -o $@)
+objcxx_flags = $(strip $(OBJCXX) $(1) $(depflags) -c $< -o $@)
 objcxx_incl  = $(call objcxx_flags,$(1) \
  $(CPPFLAGS) $(CXXFLAGS))
-cc_flags    = $(strip $(CC) $(1) -c $< -o $@)
+cc_flags    = $(strip $(CC) $(1) $(depflags) -c $< -o $@)
 cc_incl     = $(call cc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS)) 
-objc_flags = $(strip $(OBJC) $(1) -c $< -o $@)
+objc_flags = $(strip $(OBJC) $(1) $(depflags) -c $< -o $@)
 objc_incl  = $(call objc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS))
 
@@ -515,7 +470,6 @@ $(gluesrc)/glue_server.cpp: $(gluesrc)/build-glue-server.scm
 
 DISTR: 
 	$(RM) Deps/*.*
-	$(RM) Deps/stamp
 
 CLEAN: DISTR
 	$(RM) Objects/*.o

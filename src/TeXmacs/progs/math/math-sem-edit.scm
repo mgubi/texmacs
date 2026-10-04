@@ -323,9 +323,9 @@
   (wrap-insert (lambda () (former s))))
 
 (tm-define (make . l)
+  (:require (in-sem?))
   (with cmd (lambda () (apply former l))
-    (cond ((not (in-sem?)) (cmd))
-          ((in-math?) (wrap-insert cmd))
+    (cond ((in-math?) (wrap-insert cmd))
           (else
             (cmd)
             (when (in-math-mode?)

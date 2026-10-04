@@ -33,7 +33,7 @@
     \ <TeXmacs>. Viene anche spiegato come creare stili personalizzati e
     preamboli.
 
-    <item>Il menu <hlink|<menu|Help|Apropos>|../../about/about.en.tm>
+    <item>Il menu <hlink|<menu|Help|About>|../../about/about.en.tm>
     contiene ulteriori informazioni su <TeXmacs> come informazioni
     riguardanti gli <hlink|autori|../../about/authors/authors.it.tm>, su come
     <hlink|contattarci|../../about/authors/contact.it.tm> e sui

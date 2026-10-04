@@ -102,8 +102,10 @@
 (define (cursor) (rel (cursor-path)))
 
 (define (with-buffer-body doc thunk)
-  ;; run @thunk in a new buffer holding @doc, then close the buffer
+  ;; run @thunk in a new buffer holding @doc, then close the buffers it
+  ;; opened, also when it renamed the new buffer (save-buffer-as)
   (let* ((old (current-buffer))
+         (before (buffer-list))
          (u (new-buffer)))
     ;; new-buffer shows the buffer in the current window; switching to it
     ;; again would make a second view (see test-buffers)
@@ -114,7 +116,8 @@
     (with r (check-run thunk)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
-      (buffer-close u)
+      (for (b (buffer-list))
+        (when (nin? b before) (buffer-close b)))
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
