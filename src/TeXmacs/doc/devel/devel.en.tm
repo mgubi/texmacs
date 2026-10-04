@@ -27,7 +27,7 @@
 
     <branch|Interfacing <TeXmacs> with other programs|interface/interface.en.tm>
 
-    <branch|Fonts, from selection to glyph|fonts/fonts.en.tm>
+    <branch|Fonts, from selection to glyph|fonts/font-guide.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>

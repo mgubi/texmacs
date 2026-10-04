@@ -128,7 +128,7 @@
   on every system only when it uses fonts which come with <TeXmacs>; the
   next page shows them all. After installing new fonts, <menu|Tools|Fonts|Scan
   disk for fonts> makes them known. The chapter <hlink|<em|Fonts, from
-  selection to glyph>|../../../devel/fonts/fonts.en.tm> of the reference guide
+  selection to glyph>|../../../devel/fonts/font-guide.en.tm> of the reference guide
   explains the machinery in detail.
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
