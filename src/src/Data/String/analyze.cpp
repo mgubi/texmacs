@@ -825,29 +825,19 @@ escape_sh (string s) {
 #ifdef OS_MINGW
   return raw_quote (s);
 #else
+  // Protect every character which is not known to be harmless, so that
+  // the result is always a single shell word with the value s
   int i, n= N(s);
   string r;
-  for (i=0; i<n; i++)
-    switch (s[i]) {
-    case '(':
-    case ')':
-    case '<':
-    case '>':
-    case '?':
-    case '&':
-    case '$':
-    case '`':
-    case '\"':
-    case '\\':
-    case ' ':
-      r << '\\' << s[i];
-      break;
-    case '\n':
-      r << "\\n";
-      break;
-    default:
-      r << s[i];
-    }
+  for (i=0; i<n; i++) {
+    char c= s[i];
+    if (is_alpha (c) || is_digit (c) || ((unsigned char) c) >= 128 ||
+        c == '_' || c == '-' || c == '.' || c == '/' || c == ',' ||
+        c == ':' || c == '+' || c == '@' || c == '%' || c == '=')
+      r << c;
+    else if (c == '\n') r << "'\n'";
+    else r << '\\' << c;
+  }
   return r;
 #endif
 }
