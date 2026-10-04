@@ -602,10 +602,12 @@ gpu_flush () {
 
 void
 gpu_finish () {
-  // TEXMACS_VUE_GPU_SYNC=0: the profile counts what the CPU does only,
-  // the GPU working in parallel as it does when nothing is measured
+  // the profile counts what the CPU does, the GPU working in parallel as
+  // it does when nothing is measured (its work shows as more or fewer
+  // frames); TEXMACS_VUE_GPU_SYNC=1 waits for it, so that the times of
+  // the phases include what the GPU did (an upper bound: nothing overlaps)
   static int sync= -1;
-  if (sync < 0) sync= (get_env ("TEXMACS_VUE_GPU_SYNC") == "0") ? 0 : 1;
+  if (sync < 0) sync= (get_env ("TEXMACS_VUE_GPU_SYNC") == "1") ? 1 : 0;
   gpu_flush_all ();
   if (G.ctx != NULL && sync) glFinish ();
 }
