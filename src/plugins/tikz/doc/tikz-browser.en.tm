@@ -37,7 +37,8 @@
 
   A <name|TikZ> session is started with <menu|Insert|Session|TikZ>. It
   begins with a short reminder of what follows: the version of
-  <name|TikZJax>, how to make a picture, and how to ask for packages. Type the
+  <name|TikZJax>, how to make a picture, how to ask for packages, and a
+  link to this page. Type the
   commands of a picture (what goes inside
   <verbatim|\\begin{tikzpicture}><text-dots><verbatim|\\end{tikzpicture}>,
   which may be omitted) and press <shortcut|(kbd-return)> to make it; use
@@ -224,6 +225,130 @@
   own preamble. Other packages, and fonts other than those of <name|Computer
   Modern> and the <name|AMS>, are not available in the browser. When
   <name|TeX> fails, its error is shown in place of the picture.
+
+  <paragraph|More examples>
+
+  More pictures, with loops, plots and some of the packages of <name|TikZJax>. As above, each is an executable fold: <shortcut|(kbd-shift-return)> makes the picture (a picture of <verbatim|pgfplots> takes a few seconds more; its three-dimensional plots are not shown in the browser).
+
+  A graph with <verbatim|pgfplots>, two functions and their legend:
+
+  <\script-input|tikz|default>
+    % packages: pgfplots
+
+    \\begin{tikzpicture}
+
+    \\begin{axis}[width=8cm, height=5cm, axis lines=middle, xlabel=$x$, ylabel=$y$, legend pos=outer north east, samples=60]
+
+    \\addplot[blue, thick, domain=-2:2] {x^3 - x};
+
+    \\addplot[red, thick, domain=-2:2] {3*x^2 - 1};
+
+    \\legend{$f(x)=x^3-x$, $f'(x)$}
+
+    \\end{axis}
+
+    \\end{tikzpicture}
+  <|script-input>
+    
+  </script-input>
+
+  A square wave and the first sums of its <name|Fourier> series, plots of formulas:
+
+  <\script-input|tikz|default>
+    \\draw[-\<gtr\>] (0,0) -- (6.8,0) node[right] {$x$};
+
+    \\draw[-\<gtr\>] (0,-1.5) -- (0,1.6);
+
+    \\draw[gray, thick] (0,1) -- (3.14,1) -- (3.14,-1) -- (6.28,-1);
+
+    \\draw[blue!35, domain=0:6.28, samples=100] plot (\\x, {4/pi*sin(\\x r)});
+
+    \\draw[blue!65, domain=0:6.28, samples=150] plot (\\x, {4/pi*(sin(\\x r)+sin(3*\\x r)/3)});
+
+    \\draw[blue, thick, domain=0:6.28, samples=200] plot (\\x, {4/pi*(sin(\\x r)+sin(3*\\x r)/3+sin(5*\\x r)/5)});
+
+    \\node[right] at (3.4,1.1) {$\\displaystyle\\frac{4}{\\pi}\\sum_{k=1,3,5}\\frac{\\sin kx}{k}$};
+  <|script-input>
+    
+  </script-input>
+
+  A pattern made by a loop (<verbatim|\foreach>), each square turned and coloured:
+
+  <\script-input|tikz|default>
+    \\foreach \\i [evaluate=\\i as \\c using 100-3*\\i] in {1,...,30}
+
+    \ \ \\draw[rotate=6*\\i, blue!\\c!red, thick] (-\\i/15,-\\i/15) rectangle (\\i/15,\\i/15);
+  <|script-input>
+    
+  </script-input>
+
+  A Feynman diagram, with the package <verbatim|tikz-feynhand>:
+
+  <\script-input|tikz|default>
+    % packages: tikz-feynhand
+
+    \\begin{tikzpicture}
+
+    \\begin{feynhand}
+
+    \\vertex (a) at (0,1) {$e^-$}; \\vertex (b) at (0,-1) {$e^+$};
+
+    \\vertex [dot] (c) at (1.2,0) {}; \\vertex [dot] (d) at (2.8,0) {};
+
+    \\vertex (e) at (4,1) {$\\mu^-$}; \\vertex (f) at (4,-1) {$\\mu^+$};
+
+    \\propag [fer] (a) to (c); \\propag [fer] (c) to (b);
+
+    \\propag [pho] (c) to [edge label=$\\gamma$] (d);
+
+    \\propag [fer] (f) to (d); \\propag [fer] (d) to (e);
+
+    \\end{feynhand}
+
+    \\end{tikzpicture}
+  <|script-input>
+    
+  </script-input>
+
+  A quantum circuit, with the package <verbatim|yquant>:
+
+  <\script-input|tikz|default>
+    % packages: yquant
+
+    \\begin{tikzpicture}
+
+    \\begin{yquant}
+
+    qubit {$\\vert 0\\rangle$} q[2];
+
+    h q[0];
+
+    cnot q[1] \| q[0];
+
+    measure q;
+
+    \\end{yquant}
+
+    \\end{tikzpicture}
+  <|script-input>
+    
+  </script-input>
+
+  A molecule, with the package <verbatim|chemfig>:
+
+  <\script-input|tikz|default>
+    \\documentclass{article}
+
+    \\usepackage{chemfig}
+
+    \\begin{document}
+
+    \\chemfig{*6((-OH)=-=(-CH_3)-=-)}
+
+    \\end{document}
+  <|script-input>
+    
+  </script-input>
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 

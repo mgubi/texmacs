@@ -185,6 +185,9 @@ function evaluate (code, gen) {
 * The session
 ******************************************************************************/
 
+// its help page, in the help of TeXmacs (Help > Plug-ins > JavaScript)
+var HELP_URL = 'tmfs://help/article/tm/plugins/javascript/doc/javascript-session.en.tm';
+
 function banner () {
   var s = schemeString;
   function line () { return '(concat ' + Array.prototype.join.call (arguments, ' ') + ')'; }
@@ -202,6 +205,7 @@ function banner () {
           tt ('return'), s ('.')),
     line (tt ('TeXmacs.output ("scheme", "(strong \\"hi\\")")'), s (' shows TeXmacs content ("html" and "latex" too).')),
     line (s ('JavaScript run at each start: Developer > Open my-init-javascript.js (with Tools > Developer tool).')),
+    line ('(hlink ' + s ('Examples and help') + ' ' + s (HELP_URL) + ')', s (' (Help > Plug-ins > JavaScript)')),
     line (s (where))
   ].join (' ') + '))';
 }

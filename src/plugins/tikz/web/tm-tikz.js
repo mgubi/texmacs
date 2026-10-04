@@ -524,6 +524,8 @@ onmessage = function (e) {
 
 // the banner of a session: what runs TeX here, and how to use the session
 var TIKZJAX_URL = 'https://github.com/rod2ik/tikzjax';
+// its help page, in the help of TeXmacs (Help > Plug-ins > TikZ)
+var HELP_URL = 'tmfs://help/article/tm/plugins/tikz/doc/tikz-browser.en.tm';
 function banner () {
   var v = (typeof TIKZJAX_VERSION === 'string' && TIKZJAX_VERSION) ? ' ' + TIKZJAX_VERSION : '';
   var s = schemeString;
@@ -539,7 +541,8 @@ function banner () {
           s ('...), Return to make it, Shift+Return for a new line.')),
     line (s ('Packages and libraries: first lines such as '), tt ('% packages: tikz-cd, circuitikz'),
           s (' or '), tt ('% libraries: arrows.meta, calc'), s ('.')),
-    line (s ('The text of the nodes is TeXmacs text, which can be edited. More in Help > Plug-ins > TikZ.'))
+    line (s ('The text of the nodes is TeXmacs text, which can be edited.')),
+    line ('(hlink ' + s ('Examples and help') + ' ' + s (HELP_URL) + ')', s (' (Help > Plug-ins > TikZ)'))
   ].join (' ') + '))';
 }
 

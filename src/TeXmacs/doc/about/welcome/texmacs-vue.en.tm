@@ -154,6 +154,9 @@
   <paragraph|4 October 2026>
 
   <\itemize>
+    <item>More examples in the help of the Asymptote, TikZ and JavaScript
+    plug-ins, and a link to it at the start of their sessions.
+
     <item>A simpler panel while the page loads: a bar and one line which
     says what happens. It fades out once <TeXmacs> is ready.
 

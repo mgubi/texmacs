@@ -434,6 +434,8 @@ onmessage = function (e) {
 
 // the banner of a session: what runs Asymptote, and how to use the session
 const ASYWEB_URL = 'https://github.com/Julieisbaka/Asymptote-web';
+// its help page, in the help of TeXmacs (Help > Plug-ins > Asymptote)
+const HELP_URL = 'tmfs://help/article/tm/plugins/asymptote/doc/asymptote-browser.en.tm';
 function banner () {
   const s = schemeString;
   const line = (...a) => '(concat ' + a.join (' ') + ')';
@@ -445,7 +447,8 @@ function banner () {
           s ('). The first picture loads it (about 7 MB).')),
     line (s ('Type the code of a picture ('), tt ('size(5cm); draw(unitcircle);'),
           s ('), Return to make it, Shift+Return for a new line.')),
-    line (s ('The labels are set by TeXmacs from their LaTeX, and can be edited. More in Help > Plug-ins > Asymptote.'))
+    line (s ('The labels are set by TeXmacs from their LaTeX, and can be edited.')),
+    line ('(hlink ' + s ('Examples and help') + ' ' + s (HELP_URL) + ')', s (' (Help > Plug-ins > Asymptote)'))
   ].join (' ') + '))';
 }
 

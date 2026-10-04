@@ -189,6 +189,146 @@
     <name|Asymptote> made it, with its labels, as text.
   </itemize>
 
+  <paragraph|More examples>
+
+  More pictures, to try and to change. As above, each is an executable fold: <shortcut|(kbd-shift-return)> makes the picture.
+
+  A Koch snowflake, made by a recursive function:
+
+  <\script-input|asymptote|default>
+    size(6cm);
+
+    path koch(pair a, pair b, int n) {
+
+    \ \ if (n == 0) return a--b;
+
+    \ \ pair c = a + (b-a)/3, e = a + 2*(b-a)/3;
+
+    \ \ pair d = c + rotate(60)*(e-c);
+
+    \ \ return koch(a, c, n-1) & koch(c, d, n-1) & koch(d, e, n-1) & koch(e, b, n-1);
+
+    }
+
+    pair A = (0,0), B = dir(60), C = (1,0);
+
+    filldraw(koch(A, B, 4) & koch(B, C, 4) & koch(C, A, 4) & cycle, lightcyan, blue);
+
+    label("$n=4$: $3\\cdot 4^4$ sides", (0.5,-0.45));
+  <|script-input>
+    
+  </script-input>
+
+  A Riemann sum, its value computed by <name|Asymptote> and written in a label:
+
+  <\script-input|asymptote|default>
+    import graph;
+
+    size(8cm, 5cm, IgnoreAspect);
+
+    real f(real x) {return 1 + x/4 + sin(2x)/2;}
+
+    int n = 8;
+
+    real a = 0, b = 4, h = (b-a)/n, s = 0;
+
+    for (int i = 0; i \<less\> n; ++i) {
+
+    \ \ real x = a + (i+0.5)*h;
+
+    \ \ s += f(x)*h;
+
+    \ \ filldraw(box((a+i*h,0), (a+(i+1)*h,f(x))), lightgreen, darkgreen);
+
+    }
+
+    draw(graph(f, a, b), red+1bp);
+
+    xaxis("$x$", Bottom, LeftTicks(Step=1));
+
+    yaxis("$y$", Left, RightTicks(Step=1));
+
+    label("$\\sum_i f(x_i)\\,h = " + format("%.4f", s) + "$", (1.4,2.2));
+  <|script-input>
+    
+  </script-input>
+
+  A vector field, and the circles along which it flows:
+
+  <\script-input|asymptote|default>
+    import graph;
+
+    size(6cm);
+
+    path arrowAt(pair z) {return (0,0)--0.25*(-z.y, z.x);}
+
+    add(vectorfield(arrowAt, (-1,-1), (1,1), 9, gray));
+
+    for (real r = 0.4; r \<less\> 1.3; r += 0.4) draw(circle((0,0), r), blue);
+
+    label("$\\dot z = i z$", (0,-1.35));
+  <|script-input>
+    
+  </script-input>
+
+  A Venn diagram:
+
+  <\script-input|asymptote|default>
+    size(6cm);
+
+    path A = circle((0,0), 1), B = circle((1.2,0), 1), C = circle((0.6,-1), 1);
+
+    draw(A, red+1.5bp); draw(B, heavygreen+1.5bp); draw(C, blue+1.5bp);
+
+    label("$A$", (-0.6,0.6)); label("$B$", (1.8,0.6)); label("$C$", (0.6,-1.7));
+
+    label("$A\\cap B\\cap C$", (0.6,-0.35));
+  <|script-input>
+    
+  </script-input>
+
+  A bar chart, from data:
+
+  <\script-input|asymptote|default>
+    size(8cm, 5cm, IgnoreAspect);
+
+    string[] day = {"Mon", "Tue", "Wed", "Thu", "Fri"};
+
+    real[] v = {3, 5, 2, 6, 4};
+
+    for (int i = 0; i \<less\> v.length; ++i) {
+
+    \ \ filldraw(box((i+0.15,0), (i+0.85,v[i])), lightblue, blue);
+
+    \ \ label(day[i], (i+0.5,0), S);
+
+    \ \ label("$" + string(v[i]) + "$", (i+0.5,v[i]), N);
+
+    }
+
+    draw((0,0)--(v.length,0));
+  <|script-input>
+    
+  </script-input>
+
+  A Lissajous curve, its colour changing along the way:
+
+  <\script-input|asymptote|default>
+    size(5cm);
+
+    pair L(real t) {return (sin(3t), sin(4t));}
+
+    int n = 400;
+
+    for (int i = 0; i \<less\> n; ++i)
+
+    \ \ draw(L(2pi*i/n)--L(2pi*(i+1)/n), interp(red, blue, i/n)+1.5bp);
+
+    label("$(\\sin 3t,\\ \\sin 4t)$", (0,-1.3));
+  <|script-input>
+    
+  </script-input>
+
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify

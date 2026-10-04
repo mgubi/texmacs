@@ -159,6 +159,122 @@
     which you trust.
   </itemize>
 
+  <paragraph|More examples>
+
+  More examples, which use the browser and <TeXmacs> together. As above, each is an executable fold: <shortcut|(kbd-shift-return)> evaluates it.
+
+  A drawing made by a program, as a <TeXmacs> picture:
+
+  <\script-input|javascript|default>
+    var pts = [];
+
+    for (var i = 0; i \<less\>= 80; i++) {
+
+    \ \ var x = -4 + i / 10;
+
+    \ \ pts.push ('(point "' + x + '" "' + Math.sin (2 * x) * Math.exp (-x * x / 8) + '")');
+
+    }
+
+    TeXmacs.output ("scheme",
+
+    \ \ '(with "gr-geometry" (tuple "geometry" "9cm" "3cm") "gr-frame" (tuple "scale" "1cm" (tuple "0.5gw" "0.5gh")) ' +
+
+    \ \ '(graphics (with "color" "grey" (line (point "-4" "0") (point "4" "0"))) ' +
+
+    \ \ '(with "color" "blue" "line-width" "1.5ln" (line ' + pts.join (" ") + '))))')
+  <|script-input>
+    
+  </script-input>
+
+  Exact integers of any size (<verbatim|BigInt>):
+
+  <\script-input|javascript|default>
+    var f = 1n;
+
+    for (var i = 1n; i \<less\>= 25n; i++) f *= i;
+
+    "25! = " + f
+  <|script-input>
+    
+  </script-input>
+
+  A matrix written in <LaTeX>, here the triangle of Pascal:
+
+  <\script-input|javascript|default>
+    var n = 6, rows = [];
+
+    for (var i = 0; i \<less\> n; i++) {
+
+    \ \ var r = [];
+
+    \ \ for (var j = 0; j \<less\> n; j++) r.push (j \<gtr\> i ? "" : String (binom (i, j)));
+
+    \ \ rows.push (r.join (" & "));
+
+    }
+
+    function binom (a, b) { var c = 1; for (var k = 1; k \<less\>= b; k++) c = c * (a - k + 1) / k; return c; }
+
+    TeXmacs.output ("latex", "$\\\\begin{pmatrix}" + rows.join (" \\\\\\\\ ") + "\\\\end{pmatrix}$")
+  <|script-input>
+    
+  </script-input>
+
+  The files of <TeXmacs> in this browser, a table made from a file of the page:
+
+  <\script-input|javascript|default>
+    var m = await (await fetch ("texmacs-files.json")).json ();
+
+    var row = (a, b) =\<gtr\> '(row (cell "' + a + '") (cell "' + b + '"))';
+
+    return TeXmacs.output ("scheme", '(tabular (table ' + row ("package", "size (KB)") + ' ' +
+
+    \ \ m.packages.map (p =\<gtr\> row (p.name, Math.round (p.size / 1024))).join (" ") + '))');
+  <|script-input>
+    
+  </script-input>
+
+  A digest of a text by the cryptography of the browser:
+
+  <\script-input|javascript|default>
+    var data = new TextEncoder ().encode ("GNU TeXmacs");
+
+    var hash = await crypto.subtle.digest ("SHA-256", data);
+
+    return [...new Uint8Array (hash)].map (b =\<gtr\> b.toString (16).padStart (2, "0")).join ("");
+  <|script-input>
+    
+  </script-input>
+
+  Today in several languages:
+
+  <\script-input|javascript|default>
+    var langs = ["en", "fr", "de", "it", "es", "nl"];
+
+    TeXmacs.output ("scheme", '(tabular (table ' + langs.map (l =\<gtr\>
+
+    \ \ '(row (cell "' + l + '") (cell "' + new Date ().toLocaleDateString (l, {weekday: "long", year: "numeric", month: "long", day: "numeric"}) + '"))').join (" ") + '))')
+  <|script-input>
+    
+  </script-input>
+
+  A count down, waited for, with what it writes shown as it goes:
+
+  <\script-input|javascript|default>
+    for (var i = 3; i \<gtr\> 0; i--) {
+
+    \ \ console.log (i + "...");
+
+    \ \ await new Promise (ok =\<gtr\> setTimeout (ok, 1000));
+
+    }
+
+    return "lift-off";
+  <|script-input>
+    
+  </script-input>
+
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify
