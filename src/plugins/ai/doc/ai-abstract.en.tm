@@ -5,19 +5,23 @@
 <\body>
   <tmdoc-title|Introduction to AI tools inside <TeXmacs>>
 
-  <TeXmacs> contains experimental support for various chatbots. For
-  conversations with programs such as <TeXmacs> (which are not recognized as
-  web browsers), most chatbots require you to generate a private key for all
-  conversations (they can often generate such keys for free). Below, you will
-  find specific instructions how to setup various chatbots for communication
-  with <TeXmacs>.
+  <TeXmacs> contains experimental support for various chatbots:
+  <name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>, <name|Llama>
+  and other models through <name|Ollama>, and <name|Albert>. For
+  conversations with programs such as <TeXmacs>, most chatbots require you to
+  generate a private key, the key of their API (some give such keys for
+  free). The key is given in <menu|Insert|Session|Preferences>, or in an
+  environment variable; when the wallet of <TeXmacs> is on, it is kept there,
+  encrypted. Below, you will find specific instructions how to setup various
+  chatbots for communication with <TeXmacs>. They also work in the version of
+  <TeXmacs> which runs in a web browser, except <name|Albert>.
 
   Assuming that your chatbot, say <name|ChatGPT> is recognized by <TeXmacs>,
   you may use it the following ways:
 
   <\enumerate>
-    <item>For direct chats, inside a traditional shell session, using
-    <menu|Insert|Shell|ChatGPT>. In that case, <TeXmacs> allows you to
+    <item>For direct chats, inside a session, using
+    <menu|Insert|Session|ChatGPT>. In that case, <TeXmacs> allows you to
     directly put mathematical formulas in your queries and output with
     mathematical formulas can directly be cut and pasted into your documents.
 

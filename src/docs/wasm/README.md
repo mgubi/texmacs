@@ -269,6 +269,69 @@ address to the mail program, a file of the page in the viewer of the browser
 (PDF, pictures, text) or downloaded. When the browser refuses the tab (too
 long after the click), a notice offers to open it.
 
+## The wallet
+
+The wallet of TeXmacs (`progs/security/wallet`) keeps passwords and keys
+encrypted; on the desktop GnuPG encrypts it, which a page cannot run. In the
+browser `web-wallet.scm` and `misc/wasm/wallet.js` do it with WebCrypto:
+
+- a random data key (AES-GCM, 256 bits) encrypts the table of the wallet;
+- the data key is kept wrapped by a key derived from the passphrase
+  (PBKDF2, SHA-256, 600000 rounds) and maybe by one derived from a passkey
+  (the PRF extension of WebAuthn: Touch ID, Windows Hello, a security key);
+- the file, `~/.TeXmacs/system/wallet/browser-wallet.json`, holds only what
+  is encrypted, the salts and the id of the passkey. While the wallet is on,
+  the table is in Scheme and the data key in the page; turning it off
+  forgets both.
+
+WebCrypto and WebAuthn are asynchronous: `tmWallet` answers with
+`(web-wallet-answer id ok? text)` through `TeXmacs.later`, and the
+dialogues of `wallet-menu.scm` wait for it in the browser (they call
+`web-wallet-create`, `-unlock`, `-unlock-passkey`, `-change-passphrase`,
+`-add-passkey` with a procedure). `wallet-base.scm` uses the web wallet when
+`web-javascript` is defined. The Security tab of the preferences is shown in
+the browser, without the part on GnuPG. `wallet-add-on-hook` tells the
+plug-ins which take their keys there (the AI ones) that it was turned on.
+
+A page of `mgubi.github.io` shares its storage with every other page of that
+origin: what the wallet keeps is encrypted by a key which is not stored.
+Tested: the passphrase in Firefox; the passkey in Chrome for Testing with a
+virtual authenticator which has PRF (puppeteer, CDP `WebAuthn`).
+
+## The AI plug-ins
+
+`plugins/ai` and `src/Data/Convert/AI/ai.cpp`: every engine is asked by an
+`http_post` with a JSON body, sent by the request link of its plug-in
+(`request_link.cpp`; with Qt, curl or, in the browser, `fetch`). ChatGPT,
+Mistral, Albert and Ollama (its OpenAI endpoint) use the chat API of OpenAI,
+Gemini `generateContent`, Claude the messages API of Anthropic (with
+`anthropic-dangerous-direct-browser-access`). The keys come from the wallet,
+the preferences or the environment (`ai-api-key` in `init-ai.scm`).
+
+| Engine | Answers a page (CORS) |
+|---|---|
+| OpenAI, Anthropic, Gemini, Mistral | yes |
+| Ollama | if `OLLAMA_ORIGINS` allows the page |
+| Albert | no (405 on the preflight) |
+
+- The Vue server processes the request links in its interpose handler
+  (`process_all_requests`; Qt and Cocoa do it with their pipes): without
+  it a request session waited forever.
+- No answer at all (no network, CORS) is said on the error channel of the
+  link, with its URL; an answer wakes the loop of the page.
+- `:preferences` and `:session` come before `:require` in the
+  `plugin-configure` of the engines, which stops at a failing `:require`:
+  the preferences of an engine, where its key is given, exist before it has
+  a key. The plug-ins are configured again (`reinit-plugin-single "ai"`)
+  when a key changes or the wallet is turned on.
+- *Update the list of models* (`ai-update-models`) asks each API its models
+  with a synchronous GET (an `XMLHttpRequest` through `web-javascript`, curl
+  on the desktop) and keeps those which chat in the preference
+  `<engine> models`.
+- Tested with dummy keys (each service answers its error) and a mock of
+  Ollama (`/v1/chat/completions` and `/api/tags`); not yet with real keys
+  of every service.
+
 ## The clipboard
 
 TeXmacs reads the clipboard synchronously when it pastes; the browser gives

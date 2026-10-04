@@ -17,7 +17,14 @@
   there, encrypted, rather than in the preferences. This is also how keys
   are given in a web browser, which has no environment variables. Once the
   key is given, <with|font-series|bold|Update the list of models> asks the
-  chatbot which models it offers to this key, and proposes them. All the
+  chatbot which models it offers to this key, and proposes them in
+  <with|font-series|bold|Model>.
+
+  The key of an API is not that of a subscription: <name|ChatGPT Plus> or
+  <name|Claude Pro> do not include the use of the API, which is paid apart,
+  according to use. In the console of the service, set a limit to the
+  spending, and make a key for <TeXmacs> alone, which you can revoke without
+  the others. Never put a key in a document. All the
   chatbots are asked by HTTP requests (with <verbatim|curl> when <TeXmacs>
   is not built with <name|Qt>, by the browser itself in a web browser).
 
@@ -27,8 +34,11 @@
   use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account for <name|ChatGPT> and obtain a key. Keys
-    typically start with <verbatim|sk->.
+    <item>Create an account on
+    <hlink|platform.openai.com|https://platform.openai.com> (not the site of
+    <name|ChatGPT> itself), add credit in <with|font-series|bold|Billing>, and
+    create a key in <with|font-series|bold|API keys>. Keys typically start
+    with <verbatim|sk->.
 
     <item>In your terminal, set the <verbatim|OPENAI_API_KEY> environment
     variables with your key:
@@ -48,8 +58,11 @@
   for use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account on the console of <name|Anthropic> and obtain an
-    API key. Keys typically start with <verbatim|sk-ant->.
+    <item>Create an account on the console of <name|Anthropic>,
+    <hlink|console.anthropic.com|https://console.anthropic.com>, add credit
+    in <with|font-series|bold|Billing>, and create a key in
+    <with|font-series|bold|API Keys>. Keys typically start with
+    <verbatim|sk-ant->.
 
     <item>In your terminal, set the <verbatim|ANTHROPIC_API_KEY> environment
     variable with your key, or give it in the preferences:
@@ -69,7 +82,9 @@
   for use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account for <name|Gemini> and obtain a key.
+    <item>Obtain a key in <name|Google AI Studio>,
+    <hlink|aistudio.google.com|https://aistudio.google.com> (<with|font-series|bold|Get
+    API key>). It has a free tier, which is enough to try.
 
     <item>In your terminal, set the <verbatim|GEMINI_API_KEY> environment
     variables with your key:
@@ -122,7 +137,9 @@
   use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account for <name|Mistral> and obtain a key.
+    <item>Create an account on
+    <hlink|console.mistral.ai|https://console.mistral.ai> and obtain a
+    key.
 
     <item>In your terminal, set the <verbatim|MISTRAL_API_KEY> environment
     variables with your key:
