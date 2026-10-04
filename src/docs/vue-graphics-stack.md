@@ -716,7 +716,14 @@ zoom` (`off`) turns the transition off.
 `vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the
 background of the theme (red in the F1 debug mode, to spot uncovered
 areas), replays the
-Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
+Clay commands and presents the SDL surface. Only the parts which no
+command paints opaque are cleared (`uncovered_area`): the opaque
+rectangles without rounded corners and the widgets which say that they
+cover their box (`renders_opaque`: an editor whose backing store is as
+large as its box, outside the smooth zoom), each within its clip and one
+pixel in from its edges. Clearing the whole window at every frame was two
+thirds of a frame of the browser build; a pixel left out is painted
+opaque later in the same frame, so the screen is the same. Editors (`vue_simple_widget_rep`)
 own a backing store picture repainted incrementally (`invalid_regions`, in
 document coordinates) and blitted by their custom render callback.
 The backing store is allocated by `native_opaque_picture`: cleared to opaque
@@ -808,7 +815,11 @@ behaviour. Feature status against those two:
   `wheel-travel.scm` + a script of 300 wheel steps). Pattern fills,
   rounded corners, arcs and text still go through MuPDF; what remains of a
   frame is the editor repaint (`clear_device` tiles, glyphs), the blit and
-  `SDL_UpdateWindowSurface`;
+  `SDL_UpdateWindowSurface`. An opaque fill writes its first row by
+  doubling copies and the other rows as copies of it: written a byte at a
+  time, which the native build vectorises and WebAssembly without SIMD
+  does not, the fills were 45 % of a repaint and two thirds of a frame in
+  the browser;
 * polygons: nonzero winding for convex, even-odd otherwise (as the PDF and
   X11 renderers; Qt uses the winding rule for non-convex ones);
 * lines/arcs/rounded rectangles, clipping, linear transformations
@@ -839,10 +850,19 @@ behaviour. Feature status against those two:
   is also kept drawn, at its size on the screen, in a pixmap with a
   transparent background (`form_pixmap`), blitted until the size changes:
   0.8 ms and 5.2 ms. Not under a transformation of the graphics
-  (`transform_level`), where it is drawn as a drawing; at most eight
-  figures and 64 MB, the oldest going first, and `image_gc` forgets them.
+  (`transform_level`), where it is drawn as a drawing; at most 32
+  pictures and 64 MB, the oldest going first, and `image_gc` forgets them.
   The screen is the same as drawn as a drawing, to the anti-aliasing of the
-  edges (the pixmap is put on whole pixels);
+  edges (the pixmap is put on whole pixels). Bitmap images are kept the
+  same way (`image_pixmap`): drawn through MuPDF they were decoded and
+  converted to the colorspace of the screen, with a transform of lcms made
+  anew, at every repaint. The image is drawn into a pixmap of whole pixels
+  with its bottom on the bottom of the pixmap, so that blitted it covers
+  the pixels it would, with the same fractions at its edges; MuPDF's
+  scaling and composing round a little differently, by at most 3 levels of
+  255 inside the image. A page with four pictures (`TEXMACS_VUE_PROFILE`,
+  forced repaints, with the other changes of this section): 4.2 ms a
+  repaint before, 1.0 ms after;
 * **PDF and PostScript figures as drawing**: an EPS or PS figure is made a
   PDF once (`image_to_pdf`, Ghostscript, which keeps it a drawing;
   `load_ps_form`) and then drawn as a PDF is, where it went to a PNG at

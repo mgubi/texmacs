@@ -1114,11 +1114,22 @@ mupdf_renderer_rep::fill_direct (SI x1, SI y1, SI x2, SI y2, color c) {
   unsigned char* row= pixmap->samples + (ptrdiff_t) py1 * pixmap->stride + 4 * px1;
   int n= px2 - px1;
   if (a >= 255) {
+    // the first row by copies of what is already there (doubling), the
+    // others copied from it: a byte at a time, as before, cost two thirds
+    // of a frame of the browser build (WebAssembly without SIMD does not
+    // vectorise the loop), where memcpy is the native memory.copy
     unsigned char c[4]= { (unsigned char) r, (unsigned char) g, (unsigned char) b, 255 };
-    for (int py= py1; py < py2; py++, row += pixmap->stride) {
-      unsigned char* d= row;
-      for (int i= 0; i < n; i++, d += 4) { d[0]= c[0]; d[1]= c[1]; d[2]= c[2]; d[3]= c[3]; }
+    unsigned char* first= row;
+    size_t len= (size_t) n * 4, done= 4;
+    memcpy (first, c, 4);
+    while (done < len) {
+      size_t k= (done < len - done) ? done : len - done;
+      memcpy (first + done, first, k);
+      done += k;
     }
+    row += pixmap->stride;
+    for (int py= py1 + 1; py < py2; py++, row += pixmap->stride)
+      memcpy (row, first, (size_t) n * 4);
   }
   else {
     // source-over with a premultiplied source color
@@ -1672,12 +1683,17 @@ draw_form (fz_context *ctx, pdf_processor *proc, mupdf_form fm, int alpha,
 // graphics (a figure turned in a drawing): that is drawn as a drawing.
 // At most form_cache_max figures, and form_cache_bytes bytes, the oldest
 // going first; image_gc empties it for the file it names.
+//
+// Bitmap images are kept the same way (image_pixmap): drawn through MuPDF
+// they were decoded, and converted to the colorspace of the screen (a
+// transform of lcms made anew each time), at every repaint -- a sixth of a
+// repaint of the browser build for one picture in the page.
 struct form_pixmap_entry {
   tree key;          // (the file, width, height)
   fz_pixmap* pix;
 };
 static array<form_pixmap_entry> form_cache;
-static const int form_cache_max= 8;
+static const int form_cache_max= 32;
 static const size_t form_cache_bytes= 64 << 20;
 
 static void
@@ -1731,10 +1747,40 @@ render_form_pixmap (mupdf_form fm, int w, int h) {
   return pix;
 }
 
-// the pixmap of a figure at a size, drawn now or kept from before
+// a bitmap image of wf x hf device pixels (fractions of them: the size it
+// has in the document) drawn into a transparent pw x ph pixmap, with its
+// bottom on the bottom of the pixmap: blitted with its bottom left corner
+// where the image would have it, it covers the pixels it would, with the
+// same fractions at its edges
 static fz_pixmap*
-form_pixmap (tree name, mupdf_form fm, int w, int h) {
-  tree key= tuple (name, as_string (w), as_string (h));
+render_image_pixmap (fz_image* img, double wf, double hf, int pw, int ph) {
+  fz_context* ctx= mupdf_context ();
+  fz_pixmap* pix= NULL;
+  fz_device* dev= NULL;
+  fz_var (pix); fz_var (dev);
+  fz_try (ctx) {
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), pw, ph, NULL, 1);
+    fz_clear_pixmap (ctx, pix);
+    dev= fz_new_draw_device (ctx, fz_identity, pix);
+    // the first row of the image at the top (v= 0), as the PDF processor
+    // draws it after the flip of its page
+    fz_matrix ctm= fz_make_matrix ((float) wf, 0, 0, (float) hf, 0, (float) (ph - hf));
+    fz_fill_image (ctx, dev, img, ctm, 1.0f, fz_default_color_params);
+    fz_close_device (ctx, dev);
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    pix= NULL;
+  }
+  return pix;
+}
+
+// a pixmap kept under key, made the newest; NULL if there is none
+static fz_pixmap*
+cached_pixmap (tree key) {
   for (int i=0; i<N(form_cache); i++)
     if (form_cache[i].key == key) {
       form_pixmap_entry e= form_cache[i];   // the newest goes last
@@ -1744,8 +1790,36 @@ form_pixmap (tree name, mupdf_form fm, int w, int h) {
       form_cache= rest;
       return e.pix;
     }
-  fz_pixmap* pix= render_form_pixmap (fm, w, h);
-  if (pix == NULL) return NULL;
+  return NULL;
+}
+
+static void cache_pixmap (tree key, fz_pixmap* pix);
+
+// the pixmap of a figure at a size, drawn now or kept from before
+static fz_pixmap*
+form_pixmap (tree name, mupdf_form fm, int w, int h) {
+  tree key= tuple (name, as_string (w), as_string (h));
+  fz_pixmap* pix= cached_pixmap (key);
+  if (pix != NULL) return pix;
+  pix= render_form_pixmap (fm, w, h);
+  if (pix != NULL) cache_pixmap (key, pix);
+  return pix;
+}
+
+// the pixmap of a bitmap image at a size, drawn now or kept from before
+static fz_pixmap*
+image_pixmap (tree name, fz_image* img, double wf, double hf, int pw, int ph) {
+  tree key= tuple (name, "image", as_string (wf), as_string (hf));
+  fz_pixmap* pix= cached_pixmap (key);
+  if (pix != NULL) return pix;
+  pix= render_image_pixmap (img, wf, hf, pw, ph);
+  if (pix != NULL) cache_pixmap (key, pix);
+  return pix;
+}
+
+// keep pix under key, the oldest going when there are too many
+static void
+cache_pixmap (tree key, fz_pixmap* pix) {
   form_pixmap_entry e= { key, pix };
   form_cache << e;
   size_t total= 0;
@@ -1756,7 +1830,6 @@ form_pixmap (tree name, mupdf_form fm, int w, int h) {
     total -= (size_t) form_cache[0].pix->stride * form_cache[0].pix->h;
     form_cache_drop (0);
   }
-  return pix;
 }
 
 void
@@ -1861,6 +1934,14 @@ mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
     SI w= r->x2 - r->x1, h= r->y2 - r->y1;
     int ox= r->x1, oy= r->y1;
     end_text ();
+    // kept drawn at its size on the screen (see image_pixmap)
+    double wf= ((double) w)/pixel, hf= ((double) h)/pixel;
+    int pw= (int) ceil (wf), ph= (int) ceil (hf);
+    if (transform_level == 0 && pw > 0 && ph > 0 && pw <= 8000 && ph <= 8000) {
+      fz_pixmap* pix= image_pixmap (u->t, im2->img, wf, hf, pw, ph);
+      if (pix != NULL && draw_pixmap_direct (pix, x - ox, y - oy, alpha))
+        return;
+    }
     image (mupdf_context (), proc, im2, alpha,
            ((double)w)/pixel, 0,
            0, ((double)h)/pixel ,

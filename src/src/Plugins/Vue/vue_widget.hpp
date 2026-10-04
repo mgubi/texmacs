@@ -63,6 +63,9 @@ public:
   virtual void do_layout () {};     // layout the widget
   virtual bool post_layout () { return false; } // postprocessing, returns true if relayout is needed
   virtual void render (void *data); // rendering callback
+  // whether render paints every pixel of a w x h box (device pixels) with
+  // an opaque color: the window does not clear what it covers first
+  virtual bool renders_opaque (int w, int h) { (void) w; (void) h; return false; }
 };
 
 template<> void tm_delete<vue_widget_rep>(vue_widget_rep *);
@@ -123,6 +126,7 @@ public:
   
   void do_layout ();
   void render (void *data);
+  bool renders_opaque (int w, int h);
 
   // protocol for simple widgets to be used by the editor
   virtual bool is_editor_widget ();
