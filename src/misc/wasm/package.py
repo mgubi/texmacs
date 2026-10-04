@@ -35,6 +35,10 @@ import gzip, hashlib, json, os, re, subprocess, sys, fnmatch
 EXCLUDE = ['bin', 'plugins/*/bin', 'plugins/*/doc', 'misc/images/windows',
            '*.DS_Store', 'CMakeLists.txt']
 
+# the documentation of the plugins which work in the browser, kept although
+# that of the others is not (in the package doc)
+PLUGIN_DOCS = ['plugins/tikz/doc']
+
 BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/',
                'langs/encoding/', 'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/',
                'misc/pixmaps/neoclassical/light/']
@@ -50,7 +54,7 @@ PACKAGES = [
   ('fonts', ['fonts/']),
   ('icons', ['misc/pixmaps/']),
   ('langs', ['langs/']),
-  ('doc',   ['doc/']),
+  ('doc',   ['doc/'] + [d + '/' for d in PLUGIN_DOCS]),
   ('misc',  ['']),
 ]
 CHUNK = 4 * 1024 * 1024
@@ -64,6 +68,7 @@ def lazy (rel):
           os.path.splitext (rel)[1].lower () in LAZY_EXTS)
 
 def excluded (rel):
+  if any (rel == d or rel.startswith (d + '/') for d in PLUGIN_DOCS): return False
   return any (fnmatch.fnmatch (rel, e) or rel.startswith (e + '/') for e in EXCLUDE)
 
 # SVNREV holds the version TeXmacs checks its files against: that of the
@@ -100,7 +105,8 @@ def main ():
   groups = [('boot', [])] + [(name, []) for name, _ in PACKAGES]
   lazies = []
   for rel in files:
-    if rel in boot or rel in BOOT_FILES or any (rel.startswith (g) for g in BOOT_GROUPS):
+    if rel in boot or rel in BOOT_FILES or any (rel.startswith (g) for g in BOOT_GROUPS) \
+       and not any (rel.startswith (d + '/') for d in PLUGIN_DOCS):
       groups[0][1].append (rel)
       continue
     if lazy (rel):

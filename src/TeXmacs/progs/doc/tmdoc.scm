@@ -175,6 +175,18 @@
 ;; Further subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tmdoc-plugin-packages file-name)
+  ;; the style packages of a plug-in which a page uses (the markup of its
+  ;; sessions, for instance), kept in the help built from it
+  (with t (tree->stree (tree-import file-name "texmacs"))
+    (with st (and (pair? t) (assoc 'style (cdr t)))
+      (with l (cond ((not st) '())
+                    ((string? (cadr st)) (list (cadr st)))
+                    ((func? (cadr st) 'tuple) (cdadr st))
+                    (else '()))
+        (with plugins (map symbol->string (plugin-list))
+          (list-filter l (lambda (p) (and (string? p) (in? p plugins)))))))))
+
 (define (tmdoc-language file-name)
   (with t (tree-import file-name "texmacs")
     (tmfile-language t)))
@@ -256,7 +268,7 @@
              (tm->stree
               `(document
                  (TeXmacs ,(texmacs-version))
-                 (style (tuple "tmdoc" ,lan))
+                 (style (tuple "tmdoc" ,@(tmdoc-plugin-packages root) ,lan))
                  (body ,body))))))))
 
 (define (tmdoc-find-title-list l)
