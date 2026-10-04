@@ -93,6 +93,16 @@
     expanded branches become its siblings and it would remain empty; the
     text between the heading and the <markup|traverse> is kept.
 
+    <item*|The opening of a page with branches>consists of the headings
+    which come before its <markup|traverse>, typically
+    <verbatim|Introduction>, <verbatim|Overview> and <verbatim|Source
+    files>. A heading which directly follows the title is removed, so that
+    its text opens the chapter (or section, ...) of the page; the other
+    ones become unnumbered headings without entry in the table of contents
+    (<scm|tmdoc-mark-opening>). The numbered divisions of the page are
+    thus exactly its branches. In the help browser, where pages are shown
+    one by one, the headings are unchanged.
+
     <item*|<markup|traverse>>is replaced by the expansion of its branches.
 
     <item*|<markup|branch>>expands the target one level deeper, according

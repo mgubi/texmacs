@@ -136,6 +136,9 @@
                  (tmdoc-substitute-sub (cdr x) root cur)))
 	  ((func? x 'tmdoc-license)
 	   '(document))
+	  ((func? x 'tmdoc-opening)
+	   (if (caddr x) '(document)
+	       (tmdoc-opening-heading (cadr x) level root cur)))
 	  ((func? x 'traverse)
 	   (cons 'document (tmdoc-rewrite (cdadr x) root cur level done)))
 	  ((match? x '(branch :%2))
@@ -156,6 +159,49 @@
         ((func? (car l) 'traverse) #t)
         ((tmdoc-heading? (car l)) #f)
         (else (tmdoc-before-traverse? (cdr l)))))
+
+;; In a page with branches, the headings before the branches open the
+;; chapter (or section, ...) of the page: the introduction, an overview,
+;; the list of source files.  In articles and books, a heading which
+;; directly follows the title is left out, and the other ones become
+;; unnumbered headings without entry in the table of contents, so that
+;; the numbered divisions of the page are its branches.
+
+(define (tmdoc-title-item? x)
+  (or (func? x 'tmdoc-title) (func? x 'tmdoc-title*)
+      (and (func? x 'concat) (nnull? (cdr x))
+           (or (func? (cadr x) 'tmdoc-title) (func? (cadr x) 'tmdoc-title*)))))
+
+(define (tmdoc-mark-opening l)
+  (if (not (list-or (map (cut func? <> 'traverse) l))) l
+      (let loop ((l l) (content? #f) (acc '()))
+        (cond ((null? l) (reverse acc))
+              ((func? (car l) 'traverse) (append (reverse acc) l))
+              ((and (tmdoc-heading? (car l))
+                    (not (tmdoc-before-traverse? (cdr l))))
+               (loop (cdr l) #t
+                     (cons (list 'tmdoc-opening (car l) (not content?)) acc)))
+              (else
+               (loop (cdr l) (or content? (not (tmdoc-title-item? (car l))))
+                     (cons (car l) acc)))))))
+
+(define (tmdoc-opening-heading x level root cur)
+  ;; an unnumbered heading without entry in the table of contents
+  (let* ((h (if (func? x 'concat) (cadr x) x))
+         (rest (if (func? x 'concat) (cddr x) '()))
+         (tag (tmdoc-demote (car h) level))
+         (base (symbol->string tag))
+         (base (if (string-ends? base "*")
+                   (substring base 0 (- (string-length base) 1))
+                   base))
+         (star (string->symbol (string-append base "*")))
+         (new (if (in? (string->symbol base) tmdoc-starred) star
+                  (string->symbol base)))
+         (title (tmdoc-substitute-sub (cdr h) root cur))
+         (body (cons new title)))
+    `(with ,(string-append base "-toc") (macro "name" "")
+       ,(if (null? rest) body
+            `(concat ,body ,@(tmdoc-substitute-sub rest root cur))))))
 
 (define (tmdoc-rewrite l root cur level done)
   (if (null? l) l
@@ -182,7 +228,8 @@
 		'(document ""))
 	      (with u (cadr (assoc 'body (cdr t)))
 		(cons 'document
-		      (tmdoc-rewrite (cdr u) root cur level done))))))))
+		      (tmdoc-rewrite (tmdoc-mark-opening (cdr u))
+                                     root cur level done))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Make all TeXmacs hyperlinks internal to the document
