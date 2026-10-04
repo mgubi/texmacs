@@ -548,7 +548,7 @@
 
 ;(display "Booting regression testing\n")
 (lazy-define (check check-master) check-all run-checks run-all-tests
-             run-integration-tests)
+             run-integration-tests run-regression-suite test-suite-names)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

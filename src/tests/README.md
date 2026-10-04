@@ -108,3 +108,100 @@ reference of `languages` holds those characters until the writer is fixed.
 When a change is intended, run `check.sh -u` and commit the new references
 together with the change, so that the diff of the references documents what
 moved.
+
+## Scheme tests
+
+`tests/scheme/check.sh` runs the Scheme test suites without a window and
+exits with their status:
+
+```
+tests/scheme/check.sh                     # the regression suites
+tests/scheme/check.sh integration         # the integration suites
+tests/scheme/check.sh glue tmhtml         # some suites, by name
+tests/scheme/check.sh path/to/foo-test.scm  # a suite not listed yet
+```
+
+The suites are listed in `TeXmacs/progs/check/check-master.scm`: the
+regression suites, which `run-all-tests` runs, and the integration suites
+(server backup, cache, notifications and tmfs), which have side effects and
+which `run-integration-tests` runs. Both run every suite, also after one
+has failed, and return the number of failed suites; `run-regression-suite`
+runs one suite by name. `integration-test-group` adds the tests which
+fail to `integration-failure-total`, which is how their failures are
+counted.
+
+New suites use `TeXmacs/progs/check/check-lib.scm`: `check=`, `check-true`,
+`check-false` and `check-error` run every check and report a failure with
+the expression which failed, and the suite of `foo-test.scm` is a function
+`foo-test-failures` which returns their number:
+
+```scheme
+(texmacs-module (check lists-test)
+  (:use (check check-lib)))
+
+(tm-define (lists-test-failures)
+  (check-suite "lists")
+  (check-group "sublists")
+  (check= (sublist '(a b c d) 1 3) '(b c))
+  (check-error (car '()) #t)
+  (check-end))
+```
+
+Such a file runs with `check.sh path/to/lists-test.scm` while it is being
+written, and joins the others once it is in the `:use` list and the table
+of suites of `check-master.scm`.
+
+Four suites test the Scheme library on which the rest is built:
+`lists-test.scm` (`kernel/library/list.scm`, the abbreviations and macros
+of `kernel/boot/abbrevs.scm`, `kernel/library/iterator.scm`), `base-test.scm`
+(the strings, numbers and characters of `kernel/library/base.scm`, and the
+hash tables of `kernel/boot/ahash-table.scm`), `trees-test.scm` (trees,
+content and the `tm-` functions, modifications and patches, on detached
+trees) and `define-test.scm` (`tm-define` and its overloading by condition
+and mode, `former`, properties, modes and sub-modes, `lazy-define` and the
+module macros). What needs a buffer, the cursor or the GUI is left out;
+checks which fail because of a bug in the sources are left out with a
+`FIXME` at their place.
+
+Three more test the document level. `latex-test.scm` converts to and from
+LaTeX (special characters, accents, structure, formulas, tables, theorems,
+macros, whole documents) and checks round trips, including the ones which
+lose information on purpose. `formats-test.scm` does the same for the .tm,
+Scheme, TMML, HTML and plain text formats, round-trips a common table of
+samples through the TeXmacs formats, and checks the format registry.
+`editing-test.scm` opens buffers and edits them through the commands a user
+or a plugin uses (inserting, the cursor, selections and the clipboard,
+structured editing, the environment, undo and redo, saving and exporting),
+each action wrapped like a key press of the event loop so that it reaches
+the undo history. Moving the cursor by characters and lines needs a window
+and is left out.
+
+Five more reach further into the system. `typeset-test.scm` checks the
+typesetter as Scheme sees it: evaluation of the style language, lengths,
+the environment and the numbering at paths, the extents of boxes (text,
+mathematics, tables), line breaking, hyphenation, paragraphs and pages.
+`bibtex-test.scm` checks the .bib parser, the BibTeX engine and its styles,
+the export to .bib and the bibliography of a document. `database-test.scm`
+checks the TeXmacs database (fields, history, queries, persistence and the
+Scheme layer) on databases of its own in the temporary directory.
+`crypto-test.scm` checks base64, tree hashes, passwords, the encrypted
+blocks and documents, and GnuPG and GnuTLS, which it skips when they are
+missing (it never touches `~/.gnupg`). `plugins-test.scm` checks plugin
+configuration, the protocol of plugin answers, and live shell and Python
+sessions when they are installed, stopping every process it starts.
+
+`TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
+(`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
+the source tree (1181 functions) and checks that each one is bound to a
+procedure with the declared number of arguments, and that a first
+argument of the wrong type is refused with `wrong-type-arg` before any C++
+code runs. It then checks that values cross the glue unchanged: trees and
+Scheme trees, content given as a string, a tree or a Scheme tree, strings
+with every byte, integers up to the limits of a C int (and `out-of-range`
+beyond), paths, urls, lists of strings, booleans and doubles. The
+functions which Scheme code redefines are listed and left out.
+
+An error in an expression given with `-x` keeps TeXmacs from quitting, so
+the runner catches every error and exits itself, and stops a run after
+`TM_TEST_TIMEOUT` seconds (600 by default); `TM_TEST_HOME` chooses the
+scratch home directory.
