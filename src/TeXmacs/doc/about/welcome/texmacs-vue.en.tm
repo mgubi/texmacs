@@ -136,6 +136,15 @@
     <item><TeXmacs> <name|Vue> is slower than the desktop program.
   </itemize>
 
+  <section|Reporting problems>
+
+  <TeXmacs> <name|Vue> is experimental. A problem which does not happen with the
+  <TeXmacs> you install on your computer is a problem of this port: please
+  report it on the <hlink|issue page of the
+  port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
+  project. The sources and the notes of the port are on
+  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/wip_wasm_vue>.
+
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
@@ -293,15 +302,6 @@
     and folders dropped on it), and the files of <TeXmacs> loaded in the
     background.
   </itemize>
-
-  <section|Reporting problems>
-
-  <TeXmacs> <name|Vue> is experimental. A problem which does not happen with the
-  <TeXmacs> you install on your computer is a problem of this port: please
-  report it on the <hlink|issue page of the
-  port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
-  project. The sources and the notes of the port are on
-  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/wip_wasm_vue>.
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>
 
