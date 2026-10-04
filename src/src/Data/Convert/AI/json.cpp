@@ -366,9 +366,9 @@ void
 json_print (string& r, tree t, int mode, int indent) {
   if (is_atomic (t))
     json_print_string (r, t->label, mode);
-  else if (is_func (t, TUPLE))
+  else if (L(t) == TUPLE)
     json_print_array (r, t, mode, indent);
-  else if (is_func (t, ATTR))
+  else if (L(t) == ATTR)
     json_print_object (r, t, mode, indent);
   else if (is_compound (t, "json-null")) {
     json_space (r); r << "null"; }
