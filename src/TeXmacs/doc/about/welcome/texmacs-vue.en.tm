@@ -84,6 +84,12 @@
   program since: it opens a small dialog, in which <key|M-v> (or its button)
   pastes.
 
+  In the same way, some browsers (Safari) let a page write its clipboard
+  only during a key or a click: <key|M-c> and <key|M-x> always copy for the
+  other programs, but a copy from a menu (<menu|Edit|Copy>, the formats of
+  <menu|Edit|Copy to>) opens a small dialog, <with|font-series|bold|Copy for
+  other programs>, whose button gives it to them.
+
   <menu|File|Print> makes a PDF of the document and opens it in a new tab
   of the browser, from which it can be printed or saved.
 
@@ -117,14 +123,175 @@
 
   <\itemize>
     <item>A web page cannot run other programs. There are therefore no
-    plugins and no sessions of other programs (Maxima, Python, R...), and
-    the tools which need an external program are missing: the compilation
-    with <LaTeX>, Ghostscript, ImageMagick, the spell checker, Git.
+    sessions of other programs (Maxima, Python, R...), and the tools which
+    need an external program are missing: the compilation with <LaTeX>,
+    Ghostscript, ImageMagick, the spell checker, Git. The sessions which
+    exist in the browser are those whose program runs in the page itself:
+    <name|JavaScript> and <name|TikZ> (see the help of their plug-ins, in
+    <menu|Help|Plug-ins>).
 
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
     WebSocket, on the same computer only for now.
 
     <item><TeXmacs> <name|Vue> is slower than the desktop program.
+  </itemize>
+
+  <section|Recent changes>
+
+  The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|4 October 2026>
+
+  <\itemize>
+    <item><name|JavaScript> sessions and executable folds
+    (<menu|Insert|Session|JavaScript>): the <name|JavaScript> of the page
+    itself, with <TeXmacs> at hand (<verbatim|TeXmacs.scheme>), and a file
+    <verbatim|my-init-javascript.js> run at each start
+    (<menu|Developer|Open my-init-javascript.js>). See
+    <menu|Help|Plug-ins|JavaScript>.
+
+    <item>Copy in Safari: <key|M-c> and <key|M-x> copy for the other
+    programs too (the system kept its old clipboard), with the HTML of the
+    copy; a copy from a menu offers the dialog <with|font-series|bold|Copy
+    for other programs>.
+
+    <item>Executable folds evaluate again in every case (depending on the
+    order <TeXmacs> started in, <key|return> could turn a fold into an
+    empty output).
+
+    <item>A crash of the page on some keys (in the editing of a formula)
+    fixed in the interpreter of <name|Scheme>.
+
+    <item>The help pages keep the backslashes of their examples of code.
+  </itemize>
+
+  <paragraph|3 October 2026>
+
+  <\itemize>
+    <item>The <name|TikZ> plug-in in the browser: sessions and executable
+    folds (<menu|Insert|Session|TikZ>) make <name|TikZ> pictures with
+    <name|TikZJax>, a <name|TeX> which runs in the page; the text of a
+    picture is set by <TeXmacs> and can be edited, and in a fold the source
+    follows. See <menu|Help|Plug-ins|TikZ>.
+
+    <item>Plug-ins in the browser, which run beside the page (as <name|Web
+    Workers>); the list of the plug-ins is made again after an update of the
+    page, and a plug-in which fails no longer hides the others.
+  </itemize>
+
+  <paragraph|2 October 2026>
+
+  <\itemize>
+    <item>Tighter tool bars.
+
+    <item>The full manuals (<menu|Help|Full manuals>) no longer crash the
+    page.
+  </itemize>
+
+  <paragraph|1 October 2026>
+
+  <\itemize>
+    <item><menu|Edit|Paste from browser...>: a dialog which gets what was
+    copied in another page or program, in the formats of
+    <menu|Edit|Paste from>.
+
+    <item>Fast typing no longer lags behind the keys.
+
+    <item>The <menu|Remote> menu connects with secure WebSockets
+    (<verbatim|wss>) when the page is served over <verbatim|https>.
+
+    <item>The loading panel shows <TeXmacs>, its version, and what it loads.
+
+    <item>The keys of the shortcuts are shown with the symbols of a Mac, in
+    the font of the menus.
+  </itemize>
+
+  <paragraph|30 September 2026>
+
+  <\itemize>
+    <item>This page, <menu|Help|TeXmacs in the browser>.
+
+    <item>The fonts are loaded one by one, the first time a document uses
+    them, instead of all of them in the background (28<nbsp>MB less).
+
+    <item>An interactive status bar: the character before the cursor, a
+    swatch of the colour, and a right click on a tag opens its
+    <menu|Focus> menu.
+
+    <item>The panel of the files: a PDF or an image opens in a tab of the
+    browser; its buttons say that the files stay in this browser.
+
+    <item>On a Mac, Control+click is a right click.
+  </itemize>
+
+  <paragraph|29 September 2026>
+
+  <\itemize>
+    <item>Downloads and requests to the web are made by the browser:
+    documents can be opened from the web.
+
+    <item>The links to other sites open in the browser.
+
+    <item>The logo of <TeXmacs> <name|Vue>, which is also the icon of the
+    page.
+
+    <item>A document at an address with a port opens instead of crashing.
+  </itemize>
+
+  <paragraph|28 September 2026>
+
+  <\itemize>
+    <item>The address of the page opens a document
+    (<verbatim|?open=...>) and passes options to <TeXmacs>.
+
+    <item>Presentation mode, in full screen.
+
+    <item>The shortcuts with Shift and the command key on a Mac.
+
+    <item>The page uses no processor while nothing happens.
+
+    <item>The bars and the side tools of the <menu|View> menu apply to all
+    the tabs.
+  </itemize>
+
+  <paragraph|27 September 2026>
+
+  <\itemize>
+    <item><TeXmacs> <name|Vue> is published on <name|GitHub Pages>, built
+    by the continuous integration of the repository.
+
+    <item>The clipboard of the system, with the shortcuts of the platform of
+    the browser.
+
+    <item>Printing: the PDF of the document in a tab of the browser.
+
+    <item>Scrolling with a trackpad follows the fingers.
+
+    <item>The <menu|Remote> menu, through a <TeXmacs> server which accepts
+    WebSocket clients.
+
+    <item>The storage of the page: its size, its removal, and the files of
+    <TeXmacs> itself.
+
+    <item>The <with|font-series|bold|TeXmacs <name|Vue>> menu: the progress
+    of the loading, the software of the page, more information and the
+    limits.
+
+    <item>The fonts of the PDF files are embedded correctly (a fix to
+    <name|MuPDF>).
+
+    <item>A plug-in which cannot start its program no longer freezes the
+    page.
+  </itemize>
+
+  <paragraph|26 September 2026>
+
+  <\itemize>
+    <item>The first version of <TeXmacs> in the browser: <TeXmacs> compiled
+    to <name|WebAssembly> with the <name|Vue> interface, a tab per
+    document, the frame of the page, the files of the page (with the files
+    and folders dropped on it), and the files of <TeXmacs> loaded in the
+    background.
   </itemize>
 
   <section|Reporting problems>
