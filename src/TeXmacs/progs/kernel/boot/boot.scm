@@ -163,10 +163,18 @@
 (define-public (module-exported-symbols m)
   (module-map (lambda (sym var) sym) (module-public-interface (resolve-module m))))
 
+;; each module is re-exported before the next one is loaded: Guile 2/3
+;; expands a whole top-level form when it is evaluated, so the macros of
+;; a module must be visible before the next modules are loaded
 (define-public-macro (inherit-modules . which-list)
- `(begin (use-modules ,@which-list)
-     (eval-when (expand load) ,@(map (lambda (m) `(module-re-export! (current-module) (module-exported-symbols ',m))) which-list))
-     ))
+  `(begin
+     ,@(map (lambda (m)
+              `(begin
+                 (use-modules ,m)
+                 (eval-when (expand load)
+                   (module-re-export! (current-module)
+                                      (module-exported-symbols ',m)))))
+            which-list)))
 
 (cond-expand
     (guile-2
@@ -223,6 +231,9 @@
   (resolve-module module)
   ;(display "---\n")
   )
+
+(define-public (module-provide m)
+  (if (not (module-available? m)) (module-load m)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
