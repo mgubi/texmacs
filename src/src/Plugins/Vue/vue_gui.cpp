@@ -4286,6 +4286,14 @@ web_scheme_text (string s) {
   return r;
 }
 
+// a plugin which is a Web Worker sent something (misc/wasm/workers.js): the
+// loop, which sleeps while nothing happens, takes it at its next pass (the
+// interpose handler of the server, process_all_workers)
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_wake () {
+  gui_needs_update= true;
+}
+
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_scheme (const char* cmd) {
   exec_delayed (scheme_cmd (web_scheme_text (string (cmd))));
