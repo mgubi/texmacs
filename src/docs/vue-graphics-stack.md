@@ -716,7 +716,14 @@ zoom` (`off`) turns the transition off.
 `vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the
 background of the theme (red in the F1 debug mode, to spot uncovered
 areas), replays the
-Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
+Clay commands and presents the SDL surface. Only the parts which no
+command paints opaque are cleared (`uncovered_area`): the opaque
+rectangles without rounded corners and the widgets which say that they
+cover their box (`renders_opaque`: an editor whose backing store is as
+large as its box, outside the smooth zoom), each within its clip and one
+pixel in from its edges. Clearing the whole window at every frame was two
+thirds of a frame of the browser build; a pixel left out is painted
+opaque later in the same frame, so the screen is the same. Editors (`vue_simple_widget_rep`)
 own a backing store picture repainted incrementally (`invalid_regions`, in
 document coordinates) and blitted by their custom render callback.
 The backing store is allocated by `native_opaque_picture`: cleared to opaque
@@ -762,7 +769,38 @@ behaviour. Feature status against those two:
   pattern images are scaled to their requested size (`fz_scale_pixmap` in
   `mupdf_load_pixmap`), which the pattern sizes of the style files rely on;
 * **`clear_device`**: white plus the tiled `neutral-pattern.png`, as Qt
-  (visible between pages in paper mode; `draw_surround` covers the sides);
+  (visible between pages in paper mode; `draw_surround` covers the sides).
+  The tile is composed over white once (`get_neutral_tile`, kept for one
+  size, which follows the density) and the rectangle is tiled by copying
+  rows of it (`tile_direct`), with the phase of the PDF pattern it
+  replaces (a corner at the origin of the document): the same pixels, but
+  the tiling through MuPDF (`fz_end_tile`) and the resolution of the
+  pattern's URL at every call were 40 % of a full repaint of the editor.
+  The PDF pattern remains the fallback for pixmaps of another format;
+* **the shadow is a proxy**, as in the Qt port: `new_shadow` gives a
+  renderer of its own (device, processor, graphics state) on the pixmap of
+  its master, so the editor draws straight into its backing store, clipped
+  to the rectangle of `get_shadow`; `put_shadow` and `apply_shadow`
+  between the two do nothing. The shadow used to be a pixmap of its own:
+  a full repaint copied the backing store into it, each paragraph back
+  as it was drawn (`apply_shadow`, the progressive display) and the whole
+  rectangle once more at the end, a third of the time of the repaint. The
+  device and the processor are kept from one repaint to the next
+  (`reset_proxy` closes the clips left open): making them anew cost a
+  fifth of the repaint, freeing the processor giving its memory back to
+  the system. The run processor draws the glyphs of a text object at its
+  end (`ET`), so a proxy whose text is pending is flushed before its
+  master uses the pixels (`flush_proxy_text`: when the master's clip is
+  set or restored, which `repaint_invalid_regions` does after each
+  region, and when the pixmap is drawn as a picture). The shadow of a
+  proxy (`stored`, the active graphics of the editor) is a real copy, as
+  in Qt. Measured on a document of 200 paragraphs of text and formulas,
+  a Retina window, forced full repaints (`TEXMACS_VUE_PROFILE`): 3.3–3.4
+  ms a repaint before, 1.4 ms after, the same pixels (a repaint
+  without scrolling compared with the build before, and the `pattern*`,
+  `figures`, `tmoutput`, `drag-scroll` and `scroll-shift` tests; the
+  `macro-editor` test differs on two pixels, where the cursor meets a
+  bracket in the embedded editor);
 * **direct pixel access** (`fill_direct`, `draw_pixmap_direct`,
   `device_box`): axis-aligned boxes land on integer device pixels (`to_x`/
   `to_y` divide SI by the pixel size), so plain-color fills (`fill`, `clear`
@@ -777,7 +815,11 @@ behaviour. Feature status against those two:
   `wheel-travel.scm` + a script of 300 wheel steps). Pattern fills,
   rounded corners, arcs and text still go through MuPDF; what remains of a
   frame is the editor repaint (`clear_device` tiles, glyphs), the blit and
-  `SDL_UpdateWindowSurface`;
+  `SDL_UpdateWindowSurface`. An opaque fill writes its first row by
+  doubling copies and the other rows as copies of it: written a byte at a
+  time, which the native build vectorises and WebAssembly without SIMD
+  does not, the fills were 45 % of a repaint and two thirds of a frame in
+  the browser;
 * polygons: nonzero winding for convex, even-odd otherwise (as the PDF and
   X11 renderers; Qt uses the winding rule for non-convex ones);
 * lines/arcs/rounded rectangles, clipping, linear transformations
@@ -808,10 +850,19 @@ behaviour. Feature status against those two:
   is also kept drawn, at its size on the screen, in a pixmap with a
   transparent background (`form_pixmap`), blitted until the size changes:
   0.8 ms and 5.2 ms. Not under a transformation of the graphics
-  (`transform_level`), where it is drawn as a drawing; at most eight
-  figures and 64 MB, the oldest going first, and `image_gc` forgets them.
+  (`transform_level`), where it is drawn as a drawing; at most 32
+  pictures and 64 MB, the oldest going first, and `image_gc` forgets them.
   The screen is the same as drawn as a drawing, to the anti-aliasing of the
-  edges (the pixmap is put on whole pixels);
+  edges (the pixmap is put on whole pixels). Bitmap images are kept the
+  same way (`image_pixmap`): drawn through MuPDF they were decoded and
+  converted to the colorspace of the screen, with a transform of lcms made
+  anew, at every repaint. The image is drawn into a pixmap of whole pixels
+  with its bottom on the bottom of the pixmap, so that blitted it covers
+  the pixels it would, with the same fractions at its edges; MuPDF's
+  scaling and composing round a little differently, by at most 3 levels of
+  255 inside the image. A page with four pictures (`TEXMACS_VUE_PROFILE`,
+  forced repaints, with the other changes of this section): 4.2 ms a
+  repaint before, 1.0 ms after;
 * **PDF and PostScript figures as drawing**: an EPS or PS figure is made a
   PDF once (`image_to_pdf`, Ghostscript, which keeps it a drawing;
   `load_ps_form`) and then drawn as a PDF is, where it went to a PNG at

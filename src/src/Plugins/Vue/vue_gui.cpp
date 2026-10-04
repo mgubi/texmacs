@@ -944,6 +944,67 @@ uint64_t vue_text_ns= 0, vue_editor_ns= 0, vue_other_ns= 0;
 int      vue_text_n= 0,  vue_editor_n= 0,  vue_other_n= 0;
 
 
+// The parts of a w x h window (device pixels, y down) which no render
+// command paints with an opaque color: the background of the window is
+// filled there only. Filling all of it at every frame, as before, cost two
+// thirds of a frame of the browser build, where the editors and the bars
+// paint nearly everything anyway. Counted as opaque: the rectangles of an
+// opaque color without rounded corners, and the widgets which say so
+// (renders_opaque: the editors), each within the clip it is drawn in and
+// one pixel in from its edges (where the rounding of the renderer could
+// leave a pixel unpainted; those pixels are filled, then painted over).
+// A pixel which is filled or not ends the same: every pixel left out is
+// painted opaque later in the frame, over whatever it held.
+static rectangles
+uncovered_area (Clay_RenderCommandArray* rc, int w, int h) {
+  rectangle win (0, 0, w, h);
+  rectangles covered;
+  array<rectangle> clips;
+  for (int32_t i= 0; i < rc->length; i++) {
+    Clay_RenderCommand* cmd= Clay_RenderCommandArray_Get (rc, i);
+    Clay_BoundingBox bb= cmd->boundingBox;
+    rectangle box ((SI) ceil (bb.x) + 1, (SI) ceil (bb.y) + 1,
+                   (SI) floor (bb.x + bb.width) - 1,
+                   (SI) floor (bb.y + bb.height) - 1);
+    rectangle clip= N(clips) == 0 ? win : clips[N(clips) - 1];
+    bool opaque= false;
+    switch (cmd->commandType) {
+      case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
+        rectangle c ((SI) floor (bb.x), (SI) floor (bb.y),
+                     (SI) ceil (bb.x + bb.width), (SI) ceil (bb.y + bb.height));
+        clips << rectangle (max (c->x1, clip->x1), max (c->y1, clip->y1),
+                            min (c->x2, clip->x2), min (c->y2, clip->y2));
+        break;
+      }
+      case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END:
+        if (N(clips) > 0) clips->resize (N(clips) - 1);
+        break;
+      case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
+        Clay_RectangleRenderData* d= &cmd->renderData.rectangle;
+        opaque= d->backgroundColor.a >= 255 &&
+                d->cornerRadius.topLeft <= 0 && d->cornerRadius.topRight <= 0 &&
+                d->cornerRadius.bottomLeft <= 0 && d->cornerRadius.bottomRight <= 0;
+        break;
+      }
+      case CLAY_RENDER_COMMAND_TYPE_CUSTOM:
+        opaque= cmd->renderData.custom.customData == vue_render_widget &&
+                cmd->userData != NULL &&
+                ((vue_widget_rep*) cmd->userData)->renders_opaque
+                  ((int) ceil (bb.width), (int) ceil (bb.height));
+        break;
+      default:
+        break;
+    }
+    if (!opaque) continue;
+    SI x1= max (box->x1, clip->x1), y1= max (box->y1, clip->y1);
+    SI x2= min (box->x2, clip->x2), y2= min (box->y2, clip->y2);
+    // small ones are not worth the fragments they cut the rest into
+    if (x2 - x1 >= 32 && y2 - y1 >= 32)
+      covered= rectangles (rectangle (x1, y1, x2, y2), covered);
+  }
+  return rectangles (win) - covered;
+}
+
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
   // a hidden or minimized window is neither drawn nor uploaded (the loop
@@ -991,7 +1052,15 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   // areas not covered by any element: red in the debug mode (F1) to spot them
   ren->set_pencil (clay_debug ? rgb_color (255, 0, 0)
                               : theme_color (the_theme.background));
-  ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
+  if (clay_debug)
+    ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
+  else
+    for (rectangles l= uncovered_area (&render_commands, win_w, win_h);
+         !is_nil (l); l= l->next) {
+      rectangle u= l->item;
+      ren->fill (u->x1 * ren->pixel, -u->y2 * ren->pixel,
+                 u->x2 * ren->pixel, -u->y1 * ren->pixel);
+    }
   if (vue_profile_on) {
     vue_fill_ns += SDL_GetTicksNS () - t_ns;
     vue_commands += render_commands.length;

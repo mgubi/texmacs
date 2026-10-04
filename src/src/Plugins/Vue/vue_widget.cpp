@@ -6749,6 +6749,17 @@ vue_simple_widget_rep::render (void *data) {
   current_window->draw_picture (data, backing_store);
 }
 
+// the backing store is opaque (native_opaque_picture) and drawn at the
+// corner of the box: it covers the box when it is as large, which it is
+// but while the box is being resized (and during the smooth zoom, which
+// draws something else)
+bool
+vue_simple_widget_rep::renders_opaque (int w, int h) {
+  if (!is_nil (zoom_snap) || is_nil (backing_store)) return false;
+  mupdf_picture_rep* p= (mupdf_picture_rep*) backing_store->get_handle ();
+  return p != NULL && p->opaque && p->w >= w && p->h >= h;
+}
+
 /******************************************************************************
 * The smooth zoom
 *
