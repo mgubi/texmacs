@@ -1184,14 +1184,16 @@
       (check-false (cell-spans-more?))
       (edit (table-go-to 3 1))
       (check= (cursor) '(0 0 2 2 0 0 1))
-      ;; FIXME: the structured movements do not leave a joined cell
-      ;; (TeXmacs/progs/table/table-edit.scm:190, cell-move-relative moves
-      ;; by one cell from the upper left one, and table-go-to brings the
-      ;; covered cell back to the joined one): in the cell (1,1) spanning
-      ;; two rows and two columns, structured-right gives the cursor
-      ;; (0 0 2 0 0 0 1) in the same cell, expected (0 0 2 0 2 0 1) in the
-      ;; cell (1,3); structured-down likewise stays, expected the cell (3,1).
-      ;; From the cells around, they do go into it:
+      ;; the structured movements leave a joined cell past the rows and
+      ;; columns it covers, and go into it from the cells around
+      (edit (table-go-to 1 1) (structured-right))
+      (check= (cursor) '(0 0 2 0 2 0 1))
+      (edit (table-go-to 1 1) (structured-down))
+      (check= (cursor) '(0 0 2 2 0 0 1))
+      (edit (table-go-to 1 1) (structured-left))
+      (check= (cursor) '(0 0 2 0 0 0 1))
+      (edit (table-go-to 1 1) (structured-up))
+      (check= (cursor) '(0 0 2 0 0 0 1))
       (edit (table-go-to 1 3) (structured-left))
       (check= (cursor) '(0 0 2 0 0 0 1))
       (edit (table-go-to 3 1) (structured-up))
@@ -1424,9 +1426,101 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Left out: the decorations of rows and columns (table-row-decoration,
-;; table-column-decoration of the Table menu), since typesetting a table
-;; with a cell-decoration corrupts the memory (see the report of the suite).
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Decorations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A cell-decoration (made by table-row-decoration and table-column-decoration,
+;; the "table b" keys) puts the cells of a table around the decorated cell:
+;; its tmarker stands for the cell. The decorated table is typeset as the
+;; table with the decorations as cells of their own.
+(define deco-c '(tformat (table (row (tmarker) (cell "c")))))
+
+(define deco-big
+  '(tformat (table (row (cell "1") (cell "2") (tmarker) (cell "3") (cell "4"))
+                   (row (cell "5") (cell "6") (cell "7") (cell "8") (cell "9")))))
+
+(define (tab3-deco . l)
+  ;; the 3x3 tabular with the decorations @l, of the form (row col cells)
+  `(tabular (tformat ,@(map (lambda (x)
+                              (cwith (car x) (car x) (cadr x) (cadr x)
+                                     "cell-decoration"
+                                     `(tformat (table ,@(caddr x)))))
+                            l)
+                     ,(rows '("a" "b") '("d" "e") '("g" "h")))))
+
+(define (test-decorations)
+  (check-group "decorations")
+  ;; typesetting: a 1x2 table whose second cell is decorated by a cell to
+  ;; its right is laid out as the 1x3 table
+  (with r0 #f
+    (with-table-body `(document ,(tab '() '("a" "b" "c"))) '(0 0 0 0 0 0 0)
+      (lambda () (set! r0 (rect 0))))
+    (with-table-body `(document ,(tab (list (cwith "1" "1" "2" "2"
+                                                   "cell-decoration" deco-c))
+                                      '("a" "b")))
+                     '(0 0 1 0 0 0 0)
+      (lambda ()
+        (check= (rect 0) r0)
+        (check= (cursor) '(0 0 1 0 0 0 0)))))
+  ;; decorations which add many rows and columns, typeset several times
+  (for-each
+   (lambda (k)
+     (with-table-body `(document ,(tab (list (cwith "1" "-1" "1" "-1"
+                                                    "cell-decoration" deco-big))
+                                       '("a" "b") '("c" "d")))
+                      '(0 0 1 0 0 0 0)
+       (lambda ()
+         (with r (rect 0)
+           (check-true (> (- (caddr r) (car r)) (* 2 (- (cadddr r) (cadr r))))))
+         (edit (insert "x"))
+         (check= (cursor) '(0 0 1 0 0 0 1)))))
+   '(1 2 3))
+  ;; Table > Column decoration and Row decoration, and their undo
+  (with-table-body `(document ,(tab3)) '(0 0 0 1 1 0 0)
+    (lambda ()
+      (edit (table-column-decoration #t))
+      (check= (body) `(document ,(tab3-deco '("1" "2" ((row (tmarker) (cell "c"))))
+                                            '("2" "2" ((row (tmarker) (cell "f"))))
+                                            '("3" "2" ((row (tmarker) (cell "i")))))))
+      (check= (cursor) '(0 0 3 1 1 0 0))
+      (edit (table-row-decoration #f))
+      (check= (body)
+              `(document
+                (tabular
+                 (tformat
+                  ,(cwith "1" "1" "2" "2" "cell-decoration"
+                          '(tformat (table (row (cell "b") (cell "c"))
+                                           (row (tmarker) (cell "f")))))
+                  ,(cwith "2" "2" "2" "2" "cell-decoration"
+                          '(tformat (table (row (tmarker) (cell "i")))))
+                  ,(cwith "1" "1" "1" "1" "cell-decoration"
+                          '(tformat (table (row (cell "a")) (row (tmarker)))))
+                  ,(rows '("d" "e") '("g" "h"))))))
+      (check= (cursor) '(0 0 3 0 1 0 0))
+      (edit (undo 0))
+      (check= (body) `(document ,(tab3-deco '("1" "2" ((row (tmarker) (cell "c"))))
+                                            '("2" "2" ((row (tmarker) (cell "f"))))
+                                            '("3" "2" ((row (tmarker) (cell "i")))))))
+      (edit (undo 0))
+      (check= (body) `(document ,(tab3)))))
+  ;; a decoration of several cells is first split into one per cell
+  (with-table-body `(document ,(tab (list (cwith "1" "-1" "2" "2"
+                                                 "cell-decoration" deco-c))
+                                    '("a" "b") '("d" "e")))
+                   '(0 0 1 0 0 0 0)
+    (lambda ()
+      (edit (table-column-decoration #t))
+      (check= (body)
+              `(document
+                (tabular
+                 (tformat
+                  ,(cwith "1" "1" "1" "1" "cell-decoration"
+                          '(tformat (table (row (tmarker) (cell "b") (cell "c")))))
+                  ,(cwith "2" "2" "1" "1" "cell-decoration"
+                          '(tformat (table (row (tmarker) (cell "e") (cell "c")))))
+                  ,(rows '("a") '("d"))))))
+      (check= (cursor) '(0 0 2 0 0 0 0)))))
 
 (tm-define (table-test-failures)
   (:synopsis "Run the tests of table editing and return the number of failures")
@@ -1446,6 +1540,7 @@
   (test-cell-borders)
   (test-table-formats)
   (test-joined-cells)
+  (test-decorations)
   (test-structure)
   (test-clipboard)
   (test-undo)
