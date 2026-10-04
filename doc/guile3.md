@@ -146,6 +146,52 @@ ms before). A name declared by `lazy-define` now counts as defined, as
 when the stub was a tm-define, instead of forcing its module to load when
 another module defines the name.
 
+## Porting notes for plugins and user code
+
+Scheme code outside the TeXmacs tree (plugin `init-*.scm` files, user
+`my-init-*.scm`, third-party packages) keeps working unchanged with
+Guile 1.8. With Guile 3 (interpreted), each top-level form is expanded
+completely before it runs, and Guile 3 is stricter than 1.8, so the
+following patterns need a change. All the replacements also work with
+Guile 1.8.
+
+- **Top-level definitions under a run-time condition.** Forms such as
+  `lazy-input-converter`, `lazy-format`, `menu-bind`, `texmacs-modes` or
+  `define` inside `when`/`if` are expanded (and register their effect)
+  whatever the condition says. Use `tm-cond-expand`, which evaluates the
+  condition when the file is loaded and only expands the body if it holds:
+  ```scheme
+  ;; before
+  (when (supports-foo?)
+    (lazy-input-converter (foo-input) foo)
+    (menu-bind foo-menu ...))
+  ;; after
+  (tm-cond-expand (supports-foo?)
+    (lazy-input-converter (foo-input) foo)
+    (menu-bind foo-menu ...))
+  ```
+  Do not nest `tm-cond-expand` (it defines a helper macro with a fixed
+  name); combine the conditions with `and` instead.
+- **`define` inside an expression** (e.g. in a branch of `if` or `cond`)
+  is a syntax error: use `let`/`let*`, or define at the top of a body.
+- **Removed Guile 1.8 internals:** `the-environment`, `local-eval`,
+  `procedure->memoizing-macro`, `procedure->macro`. Write a `define-macro`
+  (or `define-syntax`) instead.
+- **`procedure-source`** returns `#f` for ordinary closures in Guile 3.
+  `tm-define`d routines keep their source: use `tm-procedure-source`, or
+  `procedure-sources` for all the overloads of a routine.
+- **Macros used before their definition** in the same file, or defined in
+  a module loaded later, are not expanded: define (or `:use` the module
+  defining) a macro before the first form that uses it.
+- **Hash-table order** differs between Guile versions: do not rely on the
+  order of `ahash-table->list` or `hash-fold` when writing documents or
+  output; sort the entries.
+- **Inexact numbers:** `number->string` keeps Guile 1.8's 15 significant
+  digits, but `display`/`write` of a float print up to 17 digits on Guile 3
+  (`0.30000000000000004`). Use `number->string` for output.
+- Non-ASCII (Cork) characters in string literals keep working: TeXmacs
+  reads its `.scm` files as Latin-1, as Guile 1.8 did.
+
 ## Remaining issues
 
 - Hash-table order: code which writes the entries of a hash table in
