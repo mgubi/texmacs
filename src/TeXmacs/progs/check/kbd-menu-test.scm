@@ -556,27 +556,38 @@
   ;; the modeless reverse binding, as the documentation shows it
   (check= (kbd-find-rev-binding "(insert \"bee\")") "A-F12 A-F12 b")
   ;; removing them
-  ;; FIXME: kbd-unmap does not rewrite the keys as kbd-map does
-  ;; (kbd-define.scm:248-249, no kbd-pre-rewrite): (kbd-map ("A-F12 n var"
-  ;; "y")) (kbd-unmap "A-F12 n var") leaves (kbd-find-key-binding
-  ;; "A-F12 n tab") at ("y" ""), expected #f; the same for "S-C-F12".
-  ;; The suite removes "A-F12 A-F12 b var" by its rewritten key.
   (kbd-unmap
     (:mode in-text?)
-    "A-F12 A-F12 a" "A-F12 A-F12 b" "A-F12 A-F12 b tab")
+    "A-F12 A-F12 a" "A-F12 A-F12 b" "A-F12 A-F12 b var")
   (check-false (text-binding "A-F12 A-F12 a"))
   (check-false (text-binding "A-F12 A-F12 b"))
   (check-false (text-binding "A-F12 A-F12 b var"))
-  ;; FIXME: removing or redefining the binding of a key forgets all the
-  ;; reverse bindings of its command, also those of other keys:
-  ;; kbd-delete-key-binding2 removes the key from (kbd-get-inv cmd)
-  ;; instead of (kbd-get-rev cmd) (kbd-define.scm:132). After
-  ;; (kbd-map ("A-F12 u" (insert "uu")) ("A-F12 v" (insert "uu")))
-  ;; (kbd-map ("A-F12 v" (insert "vv"))), (kbd-find-rev-binding
-  ;; "(insert \"uu\")") gives #f, expected "A-F12 u".
   (in-buffer '(document "") '(0 0)
     (lambda ()
       (check= (kbd-find-inv-binding '(insert "bee")) "")))
+  (check-false (kbd-find-rev-binding "(insert \"bee\")"))
+  ;; kbd-unmap rewrites the keys as kbd-map does
+  (kbd-map ("A-F12 n var" "y") ("S-C-F12 n" "w"))
+  (check= (text-binding "A-F12 n var") "y")
+  (check= (text-binding "S-C-F12 n") "w")
+  (kbd-unmap "A-F12 n var" "S-C-F12 n")
+  (check-false (text-binding "A-F12 n var"))
+  (check-false (text-binding "S-C-F12 n"))
+  ;; redefining or removing the binding of a key keeps the reverse
+  ;; bindings of the other keys of its command
+  (kbd-map ("A-F12 u" (insert "uu")) ("A-F12 v" (insert "uu")))
+  (kbd-map ("A-F12 v" (insert "vv")))
+  (check= (kbd-find-rev-binding "(insert \"uu\")") "A-F12 u")
+  (check= (kbd-find-rev-binding "(insert \"vv\")") "A-F12 v")
+  (kbd-unmap "A-F12 v")
+  (check= (kbd-find-rev-binding "(insert \"uu\")") "A-F12 u")
+  (check-false (kbd-find-rev-binding "(insert \"vv\")"))
+  (kbd-unmap "A-F12 u")
+  (check-false (kbd-find-rev-binding "(insert \"uu\")"))
+  (kbd-map ("A-F12 w" "ww"))
+  (check= (kbd-find-rev-binding "ww") "A-F12 w")
+  (kbd-unmap "A-F12 w")
+  (check-false (kbd-find-rev-binding "ww"))
   ;; bindings under a condition
   (kbd-map
     (:require kbd-test-on?)
@@ -587,15 +598,18 @@
   (check= (text-binding "A-F12 A-F12 c") "<gamma>")
   (check= (math-binding "A-F12 A-F12 c") "<gamma>")
   (check= (typed "A-F12 A-F12 c") "<gamma>")
-  ;; FIXME: the conditions of a kbd-map block with :require are made of a
-  ;; new closure for each binding (kbd-define.scm:219-220, 230-231), which
-  ;; ctx-find never finds again: kbd-unmap with the same :require removes
-  ;; nothing, and a binding "k var" after "k" in the same block replaces
-  ;; the binding of "k" by the prefix "k".
-  ;; (kbd-map (:require on?) ("A-F12 k" "x")) (kbd-unmap (:require on?)
-  ;; "A-F12 k") leaves (kbd-find-key-binding "A-F12 k") at ("x" ""),
-  ;; expected #f; (kbd-map (:require on?) ("A-F12 j" "y") ("A-F12 j var"
-  ;; "z")) gives ("A-F12j" "") for "A-F12 j", expected ("y" "").
+  ;; kbd-unmap with the same condition removes them
+  (kbd-map (:require kbd-test-on?) ("A-F12 k" "x"))
+  (check= (text-binding "A-F12 k") "x")
+  (kbd-unmap (:require kbd-test-on?) "A-F12 k")
+  (check-false (text-binding "A-F12 k"))
+  ;; a binding "j var" after "j" in the same block keeps that of "j"
+  (kbd-map (:require kbd-test-on?) ("A-F12 j" "y") ("A-F12 j var" "z"))
+  (check= (text-binding "A-F12 j") "y")
+  (check= (text-binding "A-F12 j var") "z")
+  (kbd-unmap (:require kbd-test-on?) "A-F12 j var" "A-F12 j")
+  (check-false (text-binding "A-F12 j"))
+  (check-false (text-binding "A-F12 j var"))
   (set! kbd-test-on? #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -991,17 +1005,17 @@
   (in-buffer graphics-doc '(0 1)
     (lambda ()
       (check-true (in-graphics?))
-      ;; FIXME: the lazy-menu of (graphics graphics-menu) declares neither
-      ;; graphics-insert-menu nor graphics-focus-menu (init-texmacs.scm:323),
-      ;; which texmacs-menu links in graphics (main-menu.scm:42-44), and
-      ;; edit-menu.scm:57 calls graphics-selection-active? of (graphics
-      ;; graphics-group), which nothing declares either: until the lazy
-      ;; menus are loaded when TeXmacs is idle (never without a window),
-      ;; expanding texmacs-menu in graphics gives the errors "Unbound
-      ;; variable: graphics-selection-active?", "graphics-insert-menu" and
-      ;; "graphics-focus-menu". The suite loads the module as the idle
-      ;; loading does.
-      (module-provide '(graphics graphics-menu))
+      ;; the menus of graphics work before the lazy menus are loaded
+      ;; (when TeXmacs is idle, never without a window): texmacs-menu
+      ;; links graphics-insert-menu and graphics-focus-menu of (graphics
+      ;; graphics-menu), and the edit menu calls graphics-selection-active?
+      ;; of (graphics graphics-group)
+      (check-true (lazy-declared? '(graphics graphics-menu)
+                                  'graphics-insert-menu))
+      (check-true (lazy-declared? '(graphics graphics-menu)
+                                  'graphics-focus-menu))
+      (check-true (lazy-declared? '(graphics graphics-group)
+                                  'graphics-selection-active?))
       (with l (visible-labels (texmacs-menu))
         (check-true (in? "Insert" l))
         (check-true (in? "Focus" l))
@@ -1031,6 +1045,13 @@
     (map cdr (list-filter forms
                           (lambda (x) (and (pair? x) (== (car x) kind)
                                            (pair? (cdr x))))))))
+
+(define (lazy-declared? module name)
+  ;; is name declared by lazy-menu or lazy-define of module?
+  (with decls (append (lazy-declarations 'lazy-menu)
+                      (lazy-declarations 'lazy-define))
+    (list-or (map (lambda (d) (and (== (car d) module) (in? name (cdr d))))
+                  decls))))
 
 (define (lazy-stub? f)
   ;; a function of lazy-define which the module did not replace

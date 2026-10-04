@@ -127,10 +127,10 @@
   (with im (ctx-find (kbd-get-map key) conds)
     (if im
 	(let* ((com (kbd-source (car im)))
-	       (cmd (object->string com)))
+	       (cmd (if (string? com) com (object->string com))))
 	  (kbd-set-map! key (ctx-remove (kbd-get-map key) conds))
 	  (kbd-set-inv! com (ctx-remove (kbd-get-inv com) conds))
-	  (kbd-set-rev! cmd (simple-remove (kbd-get-inv cmd) key))))))
+	  (kbd-set-rev! cmd (simple-remove (kbd-get-rev cmd) key))))))
 
 (tm-define (kbd-find-key-binding key)
   (:synopsis "Find the command associated to the keystroke @key")
@@ -212,12 +212,26 @@
 ;; Definition of keyboard shortcuts
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define kbd-require-table (make-ahash-table))
+
+(tm-define (kbd-require-condition expr pred)
+  (:synopsis "Helper routine for the option :require of kbd-map and kbd-unmap")
+  ;; The same condition in the same module gives the same predicate @pred,
+  ;; so that the bindings made under it can be found again.
+  (with key (list (module-name (current-module)) expr)
+    (or (ahash-ref kbd-require-table key)
+	(begin
+	  (ahash-set! kbd-require-table key pred)
+	  pred))))
+
 (define (kbd-add-condition conds opt)
   ;;(display* "Add condition " opt "\n")
   (cond ((== (car opt) :mode)
          (ctx-add-condition conds 0 (cadr opt)))
 	((== (car opt) :require)
-         (ctx-add-condition conds 0 `(lambda () ,(cadr opt))))
+         (ctx-add-condition conds 0 `(kbd-require-condition
+                                      ',(cadr opt)
+                                      (lambda () ,(cadr opt)))))
 	(else (texmacs-error "kbd-add-condition"
 			     "Bad keyboard option ~S" opt))))
 
@@ -246,7 +260,7 @@
   `(begin ,@(kbd-map-body '() l)))
 
 (define (kbd-remove-one conds key)
-  `(kbd-delete-key-binding2 (list ,@conds) ,key))
+  `(kbd-delete-key-binding2 (list ,@conds) (kbd-pre-rewrite ,key)))
 
 (define (kbd-remove-body conds l)
   (cond ((null? l) '())
