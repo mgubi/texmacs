@@ -1065,8 +1065,7 @@ more frames than MuPDF in every phase (1070 against 800 scrolling at
 zoom 1) at 1 to 2.3 ms of CPU a frame against 4.4 to 5 ms; what costs most
 in its repaints is making the glyph bitmaps of the atlas (`shrink`).
 
-Differences from the MuPDF renderer: the glyphs are TeXmacs' bitmaps, not
-MuPDF's rendering of the font files (they look like the X11 port's); the
-pixels are not the same, so the A/B tests of the MuPDF renderer do not
-apply. Still open: draw_spacial and transformed glyphs (bitmaps sampled under the
+Differences from the MuPDF renderer: a frame of the document of 200
+paragraphs differs on some 200 pixels by more than a tenth (the icons,
+sampled as textures), the text being MuPDF's. Still open: draw_spacial and transformed glyphs (bitmaps sampled under the
 transformation) are untested.
