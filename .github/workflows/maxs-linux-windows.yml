@@ -340,6 +340,7 @@ jobs:
           # turns of the event loop), to see where it stops
           HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
             TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" TEXMACS_VUE_PROFILE=60 \
+            TEXMACS_UNBUFFERED=1 \
             "$exe" -d "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" \
             -x "(begin (display* \"CI now: \" (buffer-list) \"\\n\") (delayed (:pause 5000) (display* \"CI after 5 s: \" (buffer-list) \"\\n\")) (delayed (:pause 150000) (quit-TeXmacs)))" \
             > "$home/log.txt" 2>&1 &
@@ -372,7 +373,7 @@ jobs:
           kill $pid 2> /dev/null || true
           taskkill //F //IM texmacs.exe > /dev/null 2>&1 || true
           grep "GPU" "$home/log.txt" || true
-          grep -v "approximating font" "$home/log.txt" | tail -60
+          grep -v "approximating font\|debug-fonts" "$home/log.txt" | head -150
           [ $ok = yes ] || { echo "error: the document is not shown"; exit 1; }
 
       # NOTE: also when the smoke test fails (to try the bundle elsewhere)

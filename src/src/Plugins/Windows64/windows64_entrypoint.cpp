@@ -125,6 +125,14 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, LPWSTR cmdline, int ncmd) {
 }
 
 int main(int argc, char** argv) {
+  // NOTE: TEXMACS_UNBUFFERED=1: the output written at once, also into a
+  // file or a pipe (where Windows keeps it until the buffer is full, and
+  // loses it when the program is stopped: the logs of the tests)
+  char* unbuffered= getenv ("TEXMACS_UNBUFFERED");
+  if (unbuffered != NULL && unbuffered[0] == '1') {
+    setvbuf (stdout, NULL, _IONBF, 0);
+    setvbuf (stderr, NULL, _IONBF, 0);
+  }
   return CommonMain();
 }
 
