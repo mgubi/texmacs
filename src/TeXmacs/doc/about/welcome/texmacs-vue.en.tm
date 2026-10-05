@@ -185,6 +185,11 @@
   <paragraph|5 October 2026>
 
   <\itemize>
+    <item>The window which turns on the wallet takes the passphrase at
+    <shortcut|(kbd-return)> as well as with <with|font-series|bold|Ok>, and
+    says so when the passphrase is wrong (before, <shortcut|(kbd-return)>
+    did nothing and a wrong passphrase was not reported).
+
     <item>Citations from <name|Zotero>, read from your library on
     <verbatim|zotero.org> with an API key (made on
     <verbatim|zotero.org/settings/keys>, given in
