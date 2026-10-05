@@ -198,14 +198,15 @@
   </enumerate>
 
   Without the database tool, only the file of the bibliography is read, by
-  <c++>: if it is the user's, Zotero is not used; if it is managed, it
-  holds the items of Zotero.
+  <c++>: if it is managed, it holds the items of Zotero; if it is the
+  user's, the references of Zotero which it lacks are added to it (see
+  below).
 
   <subsection|Managed <BibTeX> files>
 
   A managed file starts with the line <verbatim|% Exported from Zotero by
   TeXmacs on <em|date>; replaced by ...> (<scm|zotero-managed-file?>); any
-  other file is the user's, and is never written. It holds exactly the
+  other file is the user's. It holds exactly the
   items which the document cites and which no earlier source has
   (<scm|zotero-write-bibliography>). <scm|zotero-before-update> refreshes
   it before the bibliography is generated; when Zotero is not available,
@@ -215,6 +216,30 @@
   <verbatim|<em|document>-zotero.bib> without the database tool, and
   without file with it (its references are then in the document, see
   below).
+
+  The dates are written as <verbatim|YYYY-MM-DD> by <scm|zotero-iso-date>:
+  <scm|pretty-date> knows no <abbr|ISO> format.
+
+  <subsection|References added to the user's file>
+
+  <scm|(zotero-add-to-bib-file <scm-arg|file> <scm-arg|keys>)> appends to
+  the user's <BibTeX> file the references of Zotero which it lacks, among
+  the cited <scm-arg|keys>, each after a line
+
+  <\tm-fragment>
+    <verbatim|% Added from Zotero by TeXmacs on <em|date>:
+    zotero://select/library/items/<em|item>>
+  </tm-fragment>
+
+  (<verbatim|zotero://select/groups/<em|id>/items/<em|item>> for a group).
+  The rest of the file is kept byte for byte, and an added reference is not
+  changed later. <scm|zotero-before-update> and
+  <scm|zotero-update-bibliography> call it without the database tool,
+  unless the preference <verbatim|"zotero add to bib file"> is off.
+  <scm|zotero-bib-file-items> reads the comments back as
+  <scm|(<em|key> <em|item> <em|library>)>, which <scm|zotero-check-missing>
+  adds to the items recorded with the document: a key renamed in Zotero is
+  found even from another document which uses the same file.
 
   <subsection|The source <scm|:zotero>>
 
@@ -308,8 +333,12 @@
   project which were not open are saved. <menu|Check against Zotero...>
   (<scm|zotero-check-document>) reports the keys found in Zotero or
   elsewhere, renamed, deleted, missing, used by another source for another
-  work (same key, different normalized title or year), and the unmarked
-  copies.
+  work, and the unmarked copies. Two references are the same work
+  (<scm|zotero-same-work?>) when they have the same <abbr|DOI>, if both
+  have one (<scm|zotero-normalized-doi> removes the prefixes such as
+  <verbatim|https://doi.org/> and lowercases it), and otherwise when they
+  have the same normalized title and year; the items carry their
+  <abbr|DOI> (<scm|zotero-entry-doi>).
 
   <section|Projects>
 
@@ -327,7 +356,20 @@
   <verbatim|generic-edit.scm> without the database tool and in
   <verbatim|bib-kbd.scm> with it) adds the keys of Zotero with the typed
   prefix (<scm|zotero-completion-suffixes>, an interactive request),
-  unless the preference <verbatim|"zotero completion"> is off.
+  unless the preference <verbatim|"zotero completion"> is off. The keys of
+  each prefix are remembered while no library changes, and a longer prefix
+  is answered from a shorter one whose answer was complete (fewer items
+  than the limit of the search), so that typing makes one request per new
+  prefix at most.
+
+  <subsection|Importing into the database>
+
+  Besides the automatic import of the attached references,
+  <menu|Document|Bibliography|Import the citations into the database>
+  (<scm|zotero-import-citations>) and <menu|Focus|Import into the
+  database> (<scm|zotero-import-entry>, offered when
+  <scm|zotero-can-import?>) import references of Zotero by hand, through
+  <scm|zotero-import-items>.
 
   <subsection|The search window of references>
 
@@ -389,11 +431,14 @@
     <item*|<verbatim|"zotero in database search">>Zotero in the search
     window of references;
 
+    <item*|<verbatim|"zotero add to bib file">>the references added to the
+    user's <BibTeX> file;
+
     <item*|<verbatim|"zotero sync version">>the versions of the libraries
     at the last sync (internal).
   </description>
 
-  The first five are in <menu|Document|Bibliography|Zotero settings...>.
+  The first six are in <menu|Document|Bibliography|Zotero settings...>.
 
   <section|Tests>
 
@@ -434,6 +479,12 @@
     <item>An input field of a widget also runs its command when it loses
     the focus, and a list (<markup|choices>) gives back its items converted
     to utf8 and back: compare them after the same conversion.
+
+    <item>Under Vue, a dialog gave the keyboard to an embedded editor
+    (<markup|texmacs-input>) rather than to its first field: what was typed
+    in the search window of references went into the list of results. A
+    field now claims the focus of a window which has none
+    (<verbatim|vue_widget.cpp>).
 
     <item>A definition with <scm|:require> must come after the default
     definition (without condition) of the same function, otherwise the
