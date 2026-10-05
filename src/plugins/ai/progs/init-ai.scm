@@ -522,6 +522,8 @@
          (s (if field
                 (and s (tree-is? s 'session) s)
                 (and (defined? 'ai-fold-pop) (ai-fold-pop name)))))
+    (when (and (not field) (defined? 'ai-fold-result-push))
+      (ai-fold-result-push name s))
     (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
     (set! ai-document-of-request
           (if (and s (== (ai-session-var s "ai-document") "true"))
@@ -1055,10 +1057,12 @@
   ---
   ((check "Send the document as context" "v" (ai-session-document? lan))
    (ai-toggle-session-document lan))
-  (with u (ai-session-usage-text lan)
-    (if u
-        ---
-        ((eval u) (noop))))
+  (let* ((u (ai-session-usage-text lan))
+         (d (ai-document-usage-text)))
+    (if (or u d) ---)
+    (if u ((eval u) (noop)))
+    (if (and d (or (not u) (!= (ai-usage-numbers d) (ai-usage-numbers u))))
+        ((eval d) (noop))))
   ("Preferences" (open-plugin-preferences lan)))
 
 ;; the reasoning asked of the models of the engine (a preference of the
@@ -1096,30 +1100,56 @@
 ;; The tokens of a session, its answers in the document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; the tokens of the answers of a session and their cost (the lines of
-;; ai_usage_line in ai.cpp: "in out cached reasoning cost")
+;; the tokens of the answers and their cost ("in out cached reasoning
+;; cost", then "estimated" for a cost from the prices of the model): the
+;; lines of the answers of the sessions (ai_usage_line in ai.cpp), and the
+;; variable ai-usage around a fold (its answer alone)
 (define (ai-usage-data x)
   (cond ((not (pair? x)) '())
-        ((and (tm-func? x 'with 3) (== (cadr x) "ai-usage")
-              (string? (caddr x)))
-         (list (map string->number (string-tokenize-by-char (caddr x) #\space))))
+        ((and (== (car x) 'with) (odd? (length (cdr x))))
+         (let loop ((l (cdr x)) (acc '()))
+           (if (or (null? l) (null? (cdr l)))
+               (append (reverse acc) (if (null? l) '() (ai-usage-data (car l))))
+               (loop (cddr l)
+                     (if (and (== (car l) "ai-usage") (string? (cadr l)))
+                         (with w (string-tokenize-by-char (cadr l) #\space)
+                           (cons (append (map string->number
+                                              (list-head w (min 5 (length w))))
+                                         (if (in? "estimated" w) '(#t) '()))
+                                 acc))
+                         acc)))))
         (else (append-map ai-usage-data (cdr x)))))
 
-(define (ai-session-usage-text lan)
-  (let* ((s (ai-cursor-session lan))
-         (l (if s (ai-usage-data (tree->stree s)) '()))
-         (l (list-filter l (lambda (u) (and (== (length u) 5)
-                                            (list-and (map number? u)))))))
+(define (ai-usage-text what x)
+  (let* ((l (ai-usage-data x))
+         (l (list-filter l (lambda (u) (and (>= (length u) 5)
+                                            (list-and (map number? (list-head u 5))))))))
     (and (nnull? l)
          (let* ((in (apply + (map car l)))
                 (out (apply + (map cadr l)))
                 (costs (list-filter (map (cut list-ref <> 4) l)
                                     (lambda (c) (>= c 0))))
-                (cost (apply + costs)))
-           (string-append "This session: " (number->string in) " tokens in, "
+                (cost (apply + costs))
+                (estimated? (list-or (map (lambda (u) (> (length u) 5)) l))))
+           (string-append what ": " (number->string in) " tokens in, "
                           (number->string out) " out"
                           (if (null? costs) ""
-                              (string-append ", $" (ai-cost-string cost))))))))
+                              (string-append (if estimated? ", about $" ", $")
+                                             (ai-cost-string cost))))))))
+
+;; those of the session or the fold at the cursor (with its with), and those
+;; of the answers of the document
+(define (ai-session-usage-text lan)
+  (with s (ai-cursor-session lan)
+    (and s (ai-usage-text (if (tree-is? s 'session) "This session" "This answer")
+                          (tree->stree (or (ai-session-with s) s))))))
+
+(define (ai-usage-numbers s)
+  (with i (string-search-forwards ": " 0 s)
+    (if (>= i 0) (substring s i (string-length s)) s)))
+
+(define (ai-document-usage-text)
+  (ai-usage-text "The answers of this document" (tree->stree (buffer-tree))))
 
 (define (ai-cost-string c)
   (let* ((n (inexact->exact (round (* c 10000))))
@@ -1185,13 +1215,30 @@
   (with s (ai-cursor-session lan)
     (when s (ai-set-session-var s "ai-document" "true"))))
 
-;; the answer in a fold: the answer alone, its tokens on the status bar
+;; the answer in a fold: the answer alone, its tokens on the status bar and
+;; around the fold (ai-usage); the fold of the answer is the one which
+;; ai-request-prepare gave to tools/ai/ai-folds.scm (ai-fold-result-push)
+
+(define (ai-usage-fields x)
+  ;; the data of the line of the tokens (ai_usage_line in ai.cpp)
+  (cond ((not (pair? x)) '())
+        ((and (tm-func? x 'with 3) (== (cadr x) "ai-usage") (string? (caddr x)))
+         (list (caddr x)))
+        (else (append-map ai-usage-fields (cdr x)))))
+
 (tm-define (ai-result-filter name chat t)
   (if (ai-pending-field name chat) t
       (let* ((x (tm->stree t))
-             (u (ai-usage-strings x)))
+             (u (ai-usage-strings x))
+             (data (ai-usage-fields x))
+             ;; (the plug-in may give an empty result first)
+             (f (and (not (in? x '("" (document) (document ""))))
+                     (defined? 'ai-fold-result-pop)
+                     (ai-fold-result-pop name))))
         (when (nnull? u)
           (set-message (car u) (session-name name)))
+        (when (and f (nnull? data))
+          (ai-set-session-var f "ai-usage" (car data)))
         (if (pair? x)
             (stree->tree (ai-unwrap (ai-answer-only x)))
             t))))

@@ -410,6 +410,12 @@
     question, or <with|font-series|bold|Ask again>, does). Its focus bar
     says <with|font-series|bold|Question changed> when its question was
     changed since its answer.
+
+    <item>The cost of an answer of <name|ChatGPT>, <name|Claude>,
+    <name|Gemini> or <name|Mistral> is estimated from the prices of its
+    model (<with|font-series|bold|about $...>); the menu of the model also
+    gives the tokens and the cost of all the answers of the document (those
+    of the folds among them).
   </itemize>
 
   <paragraph|4 October 2026>

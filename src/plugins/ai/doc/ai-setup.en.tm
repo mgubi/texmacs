@@ -83,8 +83,13 @@
   <with|font-series|bold|High> ask for more and more (and cost more). Each
   answer is followed by its tokens: those of the question with its context
   (and the part read from the cache of the engine), those of the answer
-  (and those of its reasoning), and its cost with <name|OpenRouter>, which
-  gives it; the menu of the model gives the sum for the session.
+  (and those of its reasoning), and its cost: the one which
+  <name|OpenRouter> gives, else an estimate from the prices of the model
+  (<name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>: those
+  which <name|OpenRouter> lists for them, fetched once), said
+  <with|font-series|bold|about>. The menu of the model gives the sum for
+  the session, or the tokens of the answer of a fold, and the sum for the
+  answers of the document.
   <with|font-series|bold|Show the tokens and the cost> in the preferences
   removes them. <with|font-series|bold|Insert answer> in the focus bar puts
   the answer at the cursor (else the last one) after the session, as

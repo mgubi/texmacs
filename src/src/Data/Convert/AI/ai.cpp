@@ -960,7 +960,9 @@ ai_split_think (string r, string& reasoning) {
 
 struct ai_usage_rep {
   double in, out, cached, reasoning, cost;
-  ai_usage_rep (): in (0), out (0), cached (0), reasoning (0), cost (-1) {}
+  bool estimated; // a cost from the prices of the model (ai_estimate_cost)
+  ai_usage_rep ():
+    in (0), out (0), cached (0), reasoning (0), cost (-1), estimated (false) {}
 };
 
 static double
@@ -1035,7 +1037,7 @@ ai_usage_text (ai_usage_rep u) {
   if (u.cost >= 0) {
     char buf[64];
     snprintf (buf, sizeof (buf), u.cost >= 0.01? "%.4f": "%.6f", u.cost);
-    r << ", $" << buf;
+    r << (u.estimated? ", about $": ", $") << buf;
   }
   return r;
 }
@@ -1044,7 +1046,8 @@ static tree
 ai_usage_line (ai_usage_rep u) {
   string data= ai_count (u.in) * " " * ai_count (u.out) * " " *
     ai_count (u.cached) * " " * ai_count (u.reasoning) * " " *
-    (u.cost >= 0? as_string (u.cost): string ("-1"));
+    (u.cost >= 0? as_string (u.cost): string ("-1")) *
+    (u.estimated? string (" estimated"): string (""));
   return compound ("with", "ai-usage", data,
                    compound ("with", "color", "dark grey", "font-size", "0.84",
                              ai_usage_text (u)));
@@ -1053,6 +1056,85 @@ ai_usage_line (ai_usage_rep u) {
 // the reasoning of the last answer which ai_output read, and its usage
 static string       ai_last_reasoning;
 static ai_usage_rep ai_last_usage;
+
+// The cost of an answer of an engine which does not give it: from the
+// prices of its model in the list of the models of OpenRouter (public,
+// fetched once), where the models of OpenAI, Anthropic, Google and Mistral
+// have the prices which they ask directly; an estimate (the writes to the
+// cache of Claude cost more, for instance). Ollama and Albert: none.
+static bool ai_prices_fetched= false;
+static tree ai_prices= "";
+
+static tree
+ai_price_list () {
+  if (!ai_prices_fetched) {
+    ai_prices_fetched= true;
+    string r= http_get ("https://openrouter.ai/api/v1/models",
+                        array<string> ());
+    ai_prices= json_get (http_from_json (r), "data");
+  }
+  return ai_prices;
+}
+
+// the name of a model without its date (gpt-5-mini-2025-08-07,
+// claude-sonnet-4-5-20250929)
+static string
+ai_undated (string m) {
+  int n= N(m);
+  if (n > 11 && m[n-11] == '-' && m[n-6] == '-' && m[n-3] == '-') {
+    bool ok= true;
+    for (int i= n-10; i < n; i++)
+      if (i != n-6 && i != n-3 && !is_digit (m[i])) ok= false;
+    if (ok) return m (0, n-11);
+  }
+  if (n > 9 && m[n-9] == '-') {
+    bool ok= true;
+    for (int i= n-8; i < n; i++) if (!is_digit (m[i])) ok= false;
+    if (ok) return m (0, n-9);
+  }
+  return m;
+}
+
+// the name of a model in OpenRouter (provider/model, the version of Claude
+// with a point: claude-sonnet-4-5 is anthropic/claude-sonnet-4.5)
+static string
+ai_openrouter_id (string engine, string m) {
+  m= ai_undated (m);
+  if (engine == "chatgpt") return "openai/" * m;
+  if (engine == "gemini") return "google/" * m;
+  if (engine == "mistral") return "mistralai/" * replace (m, "-latest", "");
+  if (engine == "claude") {
+    int n= N(m), i= n;
+    while (i > 0 && is_digit (m[i-1])) i--;
+    if (i < n && i >= 2 && m[i-1] == '-' && is_digit (m[i-2]))
+      m= m (0, i-1) * "." * m (i, n);
+    return "anthropic/" * m;
+  }
+  return "";
+}
+
+static void
+ai_estimate_cost (string engine, string model, ai_usage_rep& u) {
+  string id= ai_openrouter_id (engine, model);
+  if (id == "" || model == "") return;
+  tree l= ai_price_list ();
+  if (!is_func (l, TUPLE)) return;
+  tree found= "";
+  for (int i= 0; i < N(l) && found == ""; i++)
+    if (json_text (json_get (l[i], "id")) == id) found= l[i];
+  // (the models of Mistral named by their family: its first version)
+  for (int i= 0; i < N(l) && found == "" && engine == "mistral"; i++)
+    if (starts (json_text (json_get (l[i], "id")), id)) found= l[i];
+  if (found == "") return;
+  tree p= json_get (found, "pricing");
+  double in= json_double (json_get (p, "prompt"));
+  double out= json_double (json_get (p, "completion"));
+  double cr= json_double (json_get (p, "input_cache_read"));
+  if (in <= 0 && out <= 0) return;
+  if (cr <= 0) cr= in;
+  u.cost= (u.in - u.cached) * in + u.cached * cr + u.out * out;
+  u.estimated= true;
+}
 
 // replaces the narrow no-break spaces (U+202F, in UTF-8 e2 80 af) by spaces
 static string
@@ -1777,8 +1859,11 @@ ai_latex_output (string s, string model, string chat) {
   if (is_func (t, DOCUMENT)) doc << A(t);
   else doc << t;
   if ((ai_last_usage.in > 0 || ai_last_usage.out > 0) &&
-      get_preference ("ai show usage", "on") == "on")
+      get_preference ("ai show usage", "on") == "on") {
+    if (ai_last_usage.cost < 0)
+      ai_estimate_cost (ai_engine (model), ai_answer_model (s), ai_last_usage);
     doc << ai_usage_line (ai_last_usage);
+  }
   if (get_preference ("ai raw answer", "on") == "on")
     doc << ai_raw_fold (raw, ai_answer_model (s));
   if (N(doc) == 1 && !is_func (t, DOCUMENT)) return t;
