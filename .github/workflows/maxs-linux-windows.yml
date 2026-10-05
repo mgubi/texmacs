@@ -344,6 +344,21 @@ jobs:
             ls "$shots"/window-*.png > /dev/null 2>&1 &&
               python3 packages/macos/png-has-red.py "$shots"/window-*.png && { ok=yes; break; }
           done
+          # what is on the screen (when the windows do not show the document)
+          if [ $ok = no ]; then
+            cat > "$home/screen.ps1" << 'EOT'
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
+          $bmp.Save($args[0])
+          EOT
+            powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$home/screen.ps1")" \
+              "$(cygpath -w "$shots")\screen.png" || true
+            tasklist | grep -i texmacs || true
+          fi
           kill $pid 2> /dev/null || true
           taskkill //F //IM texmacs.exe > /dev/null 2>&1 || true
           grep "GPU" "$home/log.txt" || true
