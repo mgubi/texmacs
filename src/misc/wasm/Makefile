@@ -34,6 +34,13 @@ SOURCES  := $(shell cat $(W)/sources.txt)
 # emsdk, which the CI puts on the PATH ("node: Permission denied")
 NODE     ?= $(shell command -v node)
 OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
+# the spell checker, Hunspell, in the program (src/Plugins/Ispell/
+# ispell_hunspell.cpp), from the sources fetched by get-hunspell.sh
+HUNSPELL := hunspell-1.7.2
+HUNSPELL_SRC := affentry affixmgr csutil filemgr hashmgr hunspell hunzip \
+  phonet replist suggestmgr
+HUNSPELL_OBJECTS := $(patsubst %,$(OBJ)/hunspell/%.o,$(HUNSPELL_SRC))
+OBJECTS  += $(HUNSPELL_OBJECTS)
 
 INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \
   System/Misc System/Language Kernel/Abstractions Kernel/Containers \
@@ -51,7 +58,8 @@ INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \
 EH       := -fwasm-exceptions -sSUPPORT_LONGJMP=wasm
 CPPFLAGS := -I$(W) -include $(W)/config.h $(patsubst %,-I$(S)/%,$(INCLUDE_DIRS)) \
   -I$(TM)/TeXmacs/include -I$(MUPDF)/include \
-  -I$(MUPDF)/thirdparty/freetype/include -sUSE_SDL=3
+  -I$(MUPDF)/thirdparty/freetype/include -sUSE_SDL=3 \
+  -I$(CURDIR)/$(HUNSPELL)/src -DHUNSPELL_STATIC
 OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
@@ -94,7 +102,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -153,6 +161,14 @@ python: $(OUT)/web/python/tm-python.mjs
 
 $(OUT)/web/python/tm-python.mjs: $(TM)/plugins/python/web/tm-python.mjs
 	@mkdir -p $(OUT)/web/python
+	cp $< $@
+
+# the worker of the R plugin (plugins/r), in out/web/r/: it loads R in
+# WebAssembly (webR) from webr.r-wasm.org
+r: $(OUT)/web/r/tm-r.mjs
+
+$(OUT)/web/r/tm-r.mjs: $(TM)/plugins/r/web/tm-r.mjs
+	@mkdir -p $(OUT)/web/r
 	cp $< $@
 
 $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
@@ -221,6 +237,18 @@ $(OBJ)/Plugins/Vue/%.o: $(S)/Plugins/Vue/%.cpp
 	@mkdir -p $(dir $@)
 	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -std=c++20 -c $< -o $@
 
+$(HUNSPELL)/src/hunspell/hunspell.hxx:
+	sh $(W)/get-hunspell.sh $(CURDIR)
+
+# (the sources come with the header)
+$(HUNSPELL)/src/hunspell/%.cxx: $(HUNSPELL)/src/hunspell/hunspell.hxx ;
+
+$(HUNSPELL_OBJECTS): $(OBJ)/hunspell/%.o: $(HUNSPELL)/src/hunspell/%.cxx
+	@mkdir -p $(dir $@)
+	em++ $(CXXFLAGS) -DHUNSPELL_STATIC -c $< -o $@
+
+$(OBJ)/Plugins/Ispell/ispell_hunspell.o: $(HUNSPELL)/src/hunspell/hunspell.hxx
+
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
 	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
@@ -234,4 +262,4 @@ $(OBJ)/%.o: $(S)/%.c
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote python plugins-sync
+.PHONY: all web node clean tikzjax asymptote python r plugins-sync

@@ -151,11 +151,12 @@
 
   <\itemize>
     <item>A web page cannot run other programs. There are therefore no
-    sessions of other programs (Maxima, R...), and the tools which need an
+    sessions of other programs (Maxima...), and the tools which need an
     external program are missing: the compilation with <LaTeX>,
-    Ghostscript, ImageMagick, the spell checker, Git. The sessions which
+    Ghostscript, ImageMagick, Git. The sessions which
     exist in the browser are those whose program runs in the page itself:
-    <name|Python> (<name|Pyodide>, loaded from the network),
+    <name|Python> (<name|Pyodide>) and <name|R> (<name|webR>), loaded
+    from the network,
     <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
     their plug-ins, in <menu|Help|Plug-ins>), and those of the chatbots
     which the page asks through the web: <name|ChatGPT>, <name|Claude>,
@@ -441,6 +442,22 @@
     results of <name|SymPy> are formulas, the figures of <name|matplotlib>
     pictures. <menu|Stop> ends <name|Python> while it computes; it starts
     again with the next input. See <menu|Help|Plug-ins|Python>.
+
+    <item>Spell checking (<menu|Edit|Spell>, and the words underlined while
+    typing with <with|font-series|bold|Continuous spell checking> in the
+    preferences): <name|Hunspell> is in the page, and the dictionary of a
+    language is fetched the first time it is needed (from the dictionaries
+    of <hlink|github.com/wooorm/dictionaries|https://github.com/wooorm/dictionaries>,
+    for about thirty languages), then kept in the browser with the words
+    which you insert. The misspelled words are highlighted, not hidden by a
+    box.
+
+    <item><name|R> sessions and executable folds (<menu|Insert|Session|R>):
+    <name|R> runs in the page (<name|webR>, loaded from the network by the
+    first input), its plots are shown after the inputs which make them, and
+    <verbatim|install.packages> installs the packages built for
+    <name|webR>. <menu|Stop> ends <name|R> while it computes; it starts
+    again with the next input. See <menu|Help|Plug-ins|R>.
   </itemize>
 
   <paragraph|4 October 2026>

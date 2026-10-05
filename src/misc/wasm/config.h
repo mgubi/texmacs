@@ -47,6 +47,8 @@
 #define USE_MUPDF 1
 #define USE_S7 1
 #define USE_SDL3 1
+// the spell checker in the program (src/Plugins/Ispell/ispell_hunspell.cpp)
+#define USE_HUNSPELL 1
 #define VUETEXMACS 1
 #define WORD_LENGTH 4
 #define WORD_LENGTH_INC 3

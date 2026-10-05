@@ -231,6 +231,7 @@ Plugins/Gnutls/gnutls.cpp
 Plugins/Imlib2/imlib2.cpp
 Plugins/Ispell/ispell.cpp
 Plugins/Ispell/ispell_exe.cpp
+Plugins/Ispell/ispell_hunspell.cpp
 Plugins/LaTeX_Preview/latex_preview.cpp
 Plugins/Metafont/adjust_cmr.cpp
 Plugins/Metafont/load_pk.cpp
