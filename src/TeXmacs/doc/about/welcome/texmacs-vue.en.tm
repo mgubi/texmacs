@@ -399,6 +399,9 @@
 
     <item>The long lists of models (<name|OpenRouter>) are in alphabetical
     ranges: a few entries at the top, then the providers, then their models.
+    <menu|Insert|Session|AI> lists the chatbots alone: a session starts with
+    the model of the preferences, and another one is chosen in its focus
+    bar.
   </itemize>
 
   <paragraph|4 October 2026>
