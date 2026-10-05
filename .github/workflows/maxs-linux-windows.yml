@@ -155,9 +155,10 @@ jobs:
       - name: Place of the libraries
         run: echo "DEPS=$HOME/vue-deps" >> "$GITHUB_ENV"
 
+      # NOTE: saved once built, even when TeXmacs does not build
       - name: Cache of the libraries
         id: deps-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ~/vue-deps
           key: vue-deps-linux-${{ hashFiles('src/misc/vue/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
@@ -165,6 +166,12 @@ jobs:
       - name: Libraries (SDL3, SDL3_ttf, MuPDF, ThorVG)
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: misc/vue/build-deps.sh "$DEPS"
+
+      - uses: actions/cache/save@v4
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/vue-deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
       - name: Configure
         run: |
@@ -258,9 +265,10 @@ jobs:
             mingw-w64-x86_64-sdl3
             mingw-w64-x86_64-sdl3-ttf
 
+      # NOTE: saved once built, even when TeXmacs does not build
       - name: Cache of the libraries
         id: deps-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}\vue-deps
           key: vue-deps-windows-${{ hashFiles('src/misc/vue/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
@@ -272,6 +280,12 @@ jobs:
       - name: Libraries (MuPDF, ThorVG)
         if: steps.deps-cache.outputs.cache-hit != 'true'
         run: misc/vue/build-deps.sh "$DEPS" mupdf,thorvg
+
+      - uses: actions/cache/save@v4
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}\vue-deps
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
       - name: Configure
         run: |
