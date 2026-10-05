@@ -531,6 +531,8 @@ lc_make (string url, array<string> headers_attr, string body,
   curl_easy_setopt (r->easy, CURLOPT_ERRORBUFFER, r->error);
   curl_easy_setopt (r->easy, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt (r->easy, CURLOPT_NOSIGNAL, 1L);
+  // (a server which cannot be reached does not hold TeXmacs for long)
+  curl_easy_setopt (r->easy, CURLOPT_CONNECTTIMEOUT, 15L);
   curl_easy_setopt (r->easy, CURLOPT_USERAGENT, "TeXmacs");
   curl_easy_setopt (r->easy, CURLOPT_PRIVATE, (void*) r);
   string proxy= http_proxy (url);

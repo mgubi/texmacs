@@ -96,16 +96,35 @@
   (former lan ses in out opts))
 
 ;; the fold of the next request of the engine, #f if it is not in a fold
-(tm-define (ai-fold-pop name)
-  (with l (or (ahash-ref ai-fold-queue name) '())
+(define (ai-queue-pop table name)
+  (with l (or (ahash-ref table name) '())
     (and (nnull? l)
          (begin
-           (ahash-set! ai-fold-queue name (cdr l))
+           (ahash-set! table name (cdr l))
            (and (car l)
                 (with f (catch #t (lambda () (tree-pointer->tree (car l)))
                           (lambda args #f))
                   (tree-pointer-detach (car l))
                   (and (ai-fold? f) f)))))))
+
+(tm-define (ai-fold-pop name)
+  (ai-queue-pop ai-fold-queue name))
+
+;; the fold whose answer is awaited (#f for a request which is not in a
+;; fold): the answer is put there with its tokens (ai-result-filter,
+;; init-ai.scm). An engine answers one request at a time: one per engine,
+;; replaced by the next request (the result of a request which was stopped
+;; before its answer does not come)
+(define ai-fold-results (make-ahash-table)) ; engine -> (pointer to a fold)
+
+(tm-define (ai-fold-result-push name f)
+  (with old (ahash-ref ai-fold-results name)
+    (when (and (pair? old) (car old)) (tree-pointer-detach (car old))))
+  (ahash-set! ai-fold-results name
+              (list (and (ai-fold? f) (tree->tree-pointer f)))))
+
+(tm-define (ai-fold-result-pop name)
+  (ai-queue-pop ai-fold-results name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The focus bar of a fold: its model, the reasoning, Ask again
