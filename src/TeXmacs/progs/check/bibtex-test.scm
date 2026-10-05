@@ -254,13 +254,8 @@
 ;; last jr), in the three forms of BibTeX: "First von Last", "von Last,
 ;; First" and "von Last, Jr, First"; a braced group is one name.
 (define (test-parse-names)
-  ;; FIXME: bib_set_fields (bibtex_functions.cpp:881) reads past the end of
-  ;; the parsed values while it collects names, with no bound check; when
-  ;; the names end the file this read can crash TeXmacs, depending on the
-  ;; memory, e.g. @misc{k, author = {A. Zed and B. Bee and others}} in some
-  ;; sessions. A field after the names keeps the read inside the values.
-  (define (names s) (bib-value (string-append "@misc{k, author = {" s
-                                              "}, year = 2000}")
+  ;; the names end the values, which are not read past their end (#173)
+  (define (names s) (bib-value (string-append "@misc{k, author = {" s "}}")
                                "author"))
   (check-group "parse: names")
   (check= (names "John Smith") '(bib-names (bib-name "John" "" "Smith" "")))
@@ -282,6 +277,9 @@
           '(bib-names (bib-name "A." "" "Zed" "") (bib-name "B." "" "Bee" "")
                       (bib-name "" "" "others" "")))
   (check= (length (names "A and B and C and D")) 5)
+  (check= (bib-value "@misc{k, author = {A. Zed and B. Bee}, year = 2000}"
+                     "author")
+          '(bib-names (bib-name "A." "" "Zed" "") (bib-name "B." "" "Bee" "")))
   (check= (bib-value "@misc{k, editor = {Ed, E. and Fd, F.}}" "editor")
           '(bib-names (bib-name "E." "" "Ed" "") (bib-name "F." "" "Fd" ""))))
 
