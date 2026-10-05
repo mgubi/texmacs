@@ -193,7 +193,9 @@
     completed from it, and the bibliography takes its references. The
     Zotero application itself cannot be reached from a web page. The
     answers of <verbatim|zotero.org> come in the background, without
-    stopping the page. See the
+    stopping the page. Without a key, <TeXmacs> asks for it when it is needed,
+    after opening the wallet if it is closed (as for the keys of the
+    chatbots). See the
     page <with|font-shape|italic|Citations from Zotero> of the manual, in
     the chapter on links and bibliographies.
 
