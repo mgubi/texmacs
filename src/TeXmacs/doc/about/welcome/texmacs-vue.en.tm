@@ -396,6 +396,9 @@
     <item>A question which an engine refuses for a while (too many requests,
     an engine overloaded) is asked again after a few seconds, three times
     at most.
+
+    <item>The long lists of models (<name|OpenRouter>) are in alphabetical
+    ranges: a few entries at the top, then the providers, then their models.
   </itemize>
 
   <paragraph|4 October 2026>
