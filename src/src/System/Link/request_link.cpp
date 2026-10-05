@@ -45,7 +45,9 @@ public:
   void    listen (int msecs);
   void    interrupt ();
   void    stop ();
-  string  partial ();
+  tree    partial ();
+  string  partial_text;  // the text of the answer so far
+  tree    partial_tree;  // and what is shown of it
 
   void    feed (int channel);
 };
@@ -57,6 +59,8 @@ request_link_rep::request_link_rep (string name2): name (name2) {
   errbuf = "";
   kill   = false;
   alive  = false;
+  partial_text= "";
+  partial_tree= "";
 }
 
 request_link_rep::~request_link_rep () {
@@ -139,6 +143,7 @@ request_link_rep::write (string s, int channel) {
   tree t= scheme_to_tree (cmd);
   if (DEBUG_IO) debug_io << "Requesting '" << http_mask_request (t) << "'\n";
   status= 1; outbuf= ""; errbuf= ""; kill= false;
+  partial_text= ""; partial_tree= "";
   alive= !eval_request (t, status, outbuf, errbuf, kill);
 }
 
@@ -189,19 +194,18 @@ request_link_rep::listen (int msecs) {
   feed (LINK_IN);
 }
 
-// the text of a streamed answer which has not ended (ai_stream_text)
-string
+// what is shown of a streamed answer which has not ended (ai_stream_text,
+// ai_latex_partial: the LaTeX set as far as all is closed in it)
+tree
 request_link_rep::partial () {
   if (!alive || outbuf == "") return "";
   string err;
   string r= ai_stream_text (outbuf, name, err);
-  // an answer asked as a LaTeX document: its body only, while it comes
-  int b= search_forwards ("\\begin{document}", r);
-  if (b >= 0) r= r (b + 16, N(r));
-  int e= search_forwards ("\\end{document}", r);
-  if (e >= 0) r= r (0, e);
-  while (N(r) > 0 && (r[0] == '\n' || r[0] == ' ')) r= r (1, N(r));
-  return r;
+  if (r != partial_text) {
+    partial_text= r;
+    partial_tree= ai_latex_partial (r);
+  }
+  return partial_tree;
 }
 
 void
