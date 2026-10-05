@@ -431,6 +431,17 @@ follow in any order.
     which were not open, as the message says.
   - **Settings:** *Document -> Bibliography -> Zotero settings...*: server,
     libraries, export format, completion, and a connection test.
+  - **One search window (after trying it, 2026-10-05):** the separate
+    dialog of the combined search (*Insert -> Citation -> From Zotero...*)
+    was removed. The search window of citations (*Focus -> Search
+    references*, the alternate Tab) does it, in both modes: with the
+    database, the database then Zotero; without it, the BibTeX file of the
+    bibliography then Zotero (`zotero-file-search-results`, through the
+    database marker `:bib-file` of `open-db-chooser`). Each reference says
+    its source (Database, Database from Zotero, the file name, Zotero and
+    the group). The preference "zotero in database search" leaves Zotero
+    out. In database mode, *Update from Zotero* adds a bibliography
+    without file: its references are kept in the document.
   - **Differences from §3.5 and §4:** the footer cannot carry a
     *Details* button, so the generation reports renamed and deleted keys
     in the footer, and *Check against Zotero...* gives the details. The

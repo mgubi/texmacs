@@ -229,9 +229,7 @@
         (check= (map zotero-entry-item l) '("AAAA1111" "BBBB2222"))
         (check= (map zotero-entry-year l) '("2020" "2020"))
         (check= (map zotero-entry-version l) '(3 4))
-        (check= (zotero-entry-creators (cadr l)) "Smith and Jones")
-        (check= (zotero-entry-label (car l))
-                "Smith (2020): On gravity  [smith2020]"))
+        (check= (zotero-entry-creators (cadr l)) "Smith and Jones"))
       ;; the query is sent in utf8, the texts come back in cork
       (with l (zotero-search (utf8->cork (cork->utf8 "M<#FC>ller")))
         (check= (map zotero-entry-key l) '("muller2019"))
@@ -703,8 +701,8 @@
    "@book{muller2019,\n editor = {M{\\\"u}ller, Hans},\n"
    " title = {Another book},\n year = {2019},\n}\n"))
 
-(define (test-combined)
-  (check-group "combined")
+(define (test-summaries)
+  (check-group "summaries")
   (check= (zotero-creators-summary
            '(bib-names (bib-name "John" "" "Smith" "")))
           "Smith")
@@ -722,19 +720,6 @@
                                        '("k" "On Gravity" "Smith" "2020" #f)))
   (check-false (zotero-summary-matches? "gravity 2021"
                                         '("k" "On Gravity" "Smith" "2020" #f)))
-  ;; the same work is one line; different works with one key collide
-  (let* ((z1 '("smith2020" "On gravity" "Smith" "2020" (z1)))
-         (f1 '("smith2020" "On Gravity" "Smith" "2020" #f))
-         (f2 '("muller2019" "Another book" "M" "2019" #f))
-         (z2 '("muller2019" "Cafe physics" "M" "2019" (z2)))
-         (lines (zotero-combine `(("F" ,f1 ,f2) ("Z" ,z1 ,z2)))))
-    (check= (map zotero-line-key lines) '("smith2020" "muller2019" "muller2019"))
-    (check= (map zotero-line-marks lines) '(("F" "Z") ("F") ("Z")))
-    (check= (map zotero-line-collision? lines) '(#f #t #t))
-    ;; the merged line keeps the Zotero entry
-    (check= (zotero-line-entry (car lines)) '(z1))
-    (check= (zotero-collision-message lines (lambda (m) m))
-            "muller2019 is defined by F and by Z"))
   (with-fake
     (lambda ()
       (eval-system (string-append "mkdir -p '" zotero-dir "'"))
@@ -755,66 +740,7 @@
           (doc-tm "  <\\bibliography|bib|tm-plain|own>\n  </bibliography>\n")
         (lambda ()
           (check= (url->system (zotero-own-bib-file))
-                  (string-append zotero-dir "/own.bib"))
-          (with lines (zotero-combine (zotero-search-sources "gravity"))
-            (check= (map zotero-line-key lines) '("smith2020" "smith2020a"))
-            (check= (map zotero-line-marks lines) '(("F" "Z") ("Z")))
-            (check= (zotero-line-label (car lines))
-                    "[F Z] Smith (2020): On Gravity  [smith2020]"))
-          (with lines (zotero-combine (zotero-search-sources "muller"))
-            (check= (map zotero-line-marks lines) '(("F") ("Z")))
-            (check-true (zotero-line-collision? (car lines)))
-            (check-true (string-starts? (zotero-line-label (car lines))
-                                        "(!) [F]")))
-          (check= (zotero-search-sources "") '())
-          ;; without Zotero, the other sources still answer
-          (set-status! 0)
-          (check= (map zotero-line-marks
-                       (zotero-combine (zotero-search-sources "gravity")))
-                  '(("F")))
-          (set-status! 200)))
-      (with-libraries "all"
-        (lambda ()
-          (with l (zotero-combine (list (cons "Z" (map zotero-entry-summary
-                                                       (zotero-search
-                                                        "group work")))))
-            (check= (zotero-line-label (car l))
-                    "[Z: Physics group] Group (2021): Group work  [group2021]")))))))
-
-(define (test-selection)
-  (check-group "selection")
-  ;; the widget gives back the labels converted to utf8 and back
-  (let* ((long "Underground test of gravity-related wave function collapse -- again")
-         (l1 (list (list "k1" long "Donadi" "2021" #f) '("F") #f))
-         (l2 (list (list "k2" "Short" "Roe" "2020" #f) '("F") #f))
-         (back (lambda (l) (utf8->cork (cork->utf8 (zotero-line-label l))))))
-    (check-true (string-contains? (zotero-line-label l1) "..."))
-    (check-false (== (back l1) (zotero-line-label l1)))
-    (check= (map zotero-line-key
-                 (zotero-selected-lines (list l1 l2) (list (back l1))))
-            '("k1"))
-    (check= (map zotero-line-key
-                 (zotero-selected-lines (list l1 l2)
-                                        (list (zotero-line-label l2))))
-            '("k2"))))
-
-(define (test-combined-database)
-  (check-group "combined database")
-  (with-fake
-    (lambda ()
-      (with-test-database
-        (lambda ()
-          (zotero-import-items (list (zotero-find-key "smith2020")))
-          (with-document "d.tm" (doc-tm "")
-            (lambda ()
-              (with src (zotero-database-sources "gravity")
-                (check= (map car src) '("L" "D"))
-                (check= (map car (cdr (assoc "D" src))) '("smith2020")))
-              (with lines (zotero-combine (zotero-search-sources "gravity"))
-                (check= (map zotero-line-key lines)
-                        '("smith2020" "smith2020a"))
-                (check= (map zotero-line-marks lines)
-                        '(("D" "Z") ("Z")))))))))))
+                  (string-append zotero-dir "/own.bib")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keys renamed and items deleted in Zotero
@@ -958,6 +884,40 @@
                 (check= (zotero-source-text e #t) "Zotero, Physics group")
                 (check= (zotero-source-text e #f)
                         "Database, from Zotero")))))))))
+
+(define (test-file-search)
+  (check-group "file search")
+  ;; without the database tool, the search window has the BibTeX file of
+  ;; the bibliography and Zotero
+  (module-provide '(bibtex zotero-db))
+  (with-fake
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      (string-save own-bib (tmp "own.bib"))
+      (with-document "fs.tm"
+          (doc-tm "  <\\bibliography|bib|tm-plain|own>\n  </bibliography>\n")
+        (lambda ()
+          (check-false (supports-db?))
+          (go-to (append (buffer-path) '(0 1 0 0)))
+          (check-true (focus-can-search? (tree-innermost 'cite)))
+          (check= (result-sources (zotero-file-search-results "gravity"))
+                  '(("smith2020" "own.bib") ("smith2020a" "Zotero")))
+          (check= (result-sources (zotero-file-search-results "dark"))
+                  '(("jones2021" "own.bib")))
+          (check= (zotero-file-search-results "nothing like this")
+                  '("No matching items"))
+          (set-status! 0)
+          (check= (result-sources (zotero-file-search-results "gravity"))
+                  '(("smith2020" "own.bib")))
+          (set-status! 200)))
+      (with-document "fn.tm" (doc-tm "")
+        (lambda ()
+          (check= (result-sources (zotero-file-search-results "gravity"))
+                  '(("smith2020" "Zotero") ("smith2020a" "Zotero")))
+          (set-status! 0)
+          (check= (zotero-file-search-results "gravity")
+                  '("No bibliography file, and Zotero is not available"))
+          (set-status! 200))))))
 
 (define (test-update-database)
   (check-group "update database")
@@ -1142,29 +1102,6 @@
 
 (define (body) (tree->stree (buffer-get-body (current-buffer))))
 
-(define (test-insert)
-  (check-group "insert")
-  (with-buffer-body '(document "Text ")
-    (lambda ()
-      (zotero-insert-citation '("smith2020" "muller2019"))
-      (check= (body) '(document (concat "Text " (cite "smith2020"
-                                                       "muller2019"))))
-      (zotero-insert-citation '())
-      (check= (body) '(document (concat "Text " (cite "smith2020"
-                                                       "muller2019"))))))
-  ;; inside a citation, the keys are added to it
-  (with-buffer-body '(document (cite "smith2020"))
-    (lambda ()
-      (go-to (append (buffer-path) '(0 0 0)))
-      (zotero-insert-citation '("muller2019"))
-      (check= (body) '(document (cite "smith2020" "muller2019")))))
-  ;; the empty key of a new citation is replaced
-  (with-buffer-body '(document (cite ""))
-    (lambda ()
-      (go-to (append (buffer-path) '(0 0 0)))
-      (zotero-insert-citation '("smith2020a"))
-      (check= (body) '(document (cite "smith2020a"))))))
-
 (define (citation-at-cursor)
   (tree-innermost '(cite nocite cite-detail)))
 
@@ -1215,16 +1152,14 @@
   (test-update)
   (test-database)
   (test-groups)
-  (test-combined)
-  (test-combined-database)
-  (test-selection)
+  (test-summaries)
   (test-renamed)
   (test-database-search)
+  (test-file-search)
   (test-update-database)
   (test-renamed-database)
   (test-copies)
   (test-project)
-  (test-insert)
   (test-focus)
   (eval-system (string-append "rm -rf '" zotero-dir "'"))
   (check-end))

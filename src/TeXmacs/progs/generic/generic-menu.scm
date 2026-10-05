@@ -549,7 +549,7 @@
   (dynamic (focus-tag-customize-menu (tree-label t))))
 
 (tm-menu (focus-search-menu t)
-  ("Search in database" (focus-open-search-tool t)))
+  ("Search references" (focus-open-search-tool t)))
 
 (tm-menu (focus-tag-menu t)
   (with l (focus-variants-of t)
@@ -576,7 +576,7 @@
   (assuming (focus-has-search-menu? t)
     (-> "Search" (dynamic (focus-search-menu t))))
   (assuming (focus-can-search? t)
-    ("Search in database" (focus-open-search-tool t)))
+    ("Search references" (focus-open-search-tool t)))
   (assuming (and (tree-in? t '(cite nocite cite-detail))
                  (zotero-citation-entry t))
     ("Show in Zotero" (zotero-show-item (zotero-citation-entry t)))))
@@ -721,7 +721,7 @@
     (=> (balloon (icon "tm_focus_search.xpm") "Search")
         (dynamic (focus-search-menu t))))
   (assuming (focus-can-search? t)
-    ((balloon (icon "tm_focus_search.xpm") "Search in database")
+    ((balloon (icon "tm_focus_search.xpm") "Search references")
      (focus-open-search-tool t)))
   (assuming (and (tree-in? t '(cite nocite cite-detail))
                  (zotero-citation-entry t))

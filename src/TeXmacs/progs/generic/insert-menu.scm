@@ -61,9 +61,7 @@
                 ("Abbreviated authors" (make 'cite-author-link))
                 ("Full author list" (make 'cite-author*-link))
                 ("Year" (make 'cite-year-link))
-                ("Invisible" (make 'nocite)))
-            ---
-            ("From Zotero..." (open-zotero-search)))
+                ("Invisible" (make 'nocite))))
         (-> "Index entry"
             ("Main" (make 'index))
             ("Sub" (make 'subindex))

@@ -98,6 +98,13 @@
           r))))
 
 (define (db-search-results db kind query)
+  (if (== db :bib-file)
+      ;; without the database tool: the BibTeX file of the document, and
+      ;; Zotero (see bibtex/zotero-db.scm)
+      (zotero-file-search-results query)
+      (db-search-results-in db kind query)))
+
+(define (db-search-results-in db kind query)
   (with-database db
     (with-limit 20
       ;; TODO: filter on user permissions

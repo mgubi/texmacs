@@ -33,24 +33,19 @@
 
   <subsubsection*|Inserting citations>
 
-  <menu|Insert|Link|Citation|From Zotero...> opens a search window. Type
-  names of authors, words of the title or a year, then select one or more
-  references and press <menu|Cite>. Inside a citation, the chosen keys are
-  added to it.
+  Insert a citation as usual, with <menu|Insert|Link|Citation>, and type
+  its key. <shortcut|(kbd-tab)> completes the key, with the keys of the
+  bibliography and those of Zotero. <shortcut|(kbd-alternate-tab)>, or
+  <menu|Focus|Search references>, opens a search window: type names of
+  authors, words of the title or a year, and click on a reference to cite
+  it. The window lists the references of the bibliography first (those of
+  its <BibTeX> file, or of the database when it is used), then those of
+  Zotero; each one says where it comes from. The preference
+  <menu|Search Zotero in the search of references>, in the Zotero settings,
+  leaves Zotero out of this window.
 
-  The window also searches the other sources of the document, and marks
-  each reference with the sources which have it: <verbatim|L> for the
-  entries of the document, <verbatim|F> for the <BibTeX> file of its
-  bibliography, <verbatim|D> for the database and <verbatim|Z> for Zotero.
-  A reference of a group library also shows the name of the group. When two
-  sources use the same key for different works, the lines are marked with
-  <verbatim|(!)>, and the source which comes first in the list above wins.
-  <menu|Show in Zotero> selects the chosen item in Zotero.
-
-  While typing a key in a citation, <shortcut|(kbd-tab)> completes it,
-  with the keys of the bibliography and those of Zotero. When the cursor is
-  on a key which comes from Zotero, <menu|Focus|Show in Zotero> shows its
-  item in Zotero.
+  When the cursor is on a key which comes from Zotero,
+  <menu|Focus|Show in Zotero> shows its item in Zotero.
 
   <subsubsection*|Generating the bibliography>
 
@@ -77,13 +72,10 @@
   without file when the document has none, and generates it. The
   references of the bibliography are then kept in the document itself. The
   database of the user comes first, then Zotero, then the references kept
-  in the document, which serve when Zotero is not running. The search window of
-  the database (<shortcut|(kbd-alternate-tab)> in a citation) also lists
-  the matching references of Zotero.
+  in the document, which serve when Zotero is not running.
 
-  References from Zotero can be copied into the database, with
-  <menu|Import into database> in the search window, or automatically, when
-  the database imports the references of the documents. These copies stay
+  References from Zotero are copied into the database when it imports the
+  references of the documents. These copies stay
   in sync with Zotero: <menu|Document|Update|Bibliography> and
   <menu|Document|Bibliography|Synchronize with Zotero> bring in the changes
   made in Zotero. When a reference was changed both in <TeXmacs> and in

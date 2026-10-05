@@ -339,13 +339,11 @@
                     (cut string-starts? <> prefix)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The combined search: Zotero and the other sources of the document
+;; Summaries of references (for the check of the citations)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A summary of a reference is (key title creators year zotero-entry), in
-;; cork, the Zotero entry being #f for the other sources. The sources are
-;; marked L (the entries of the document), F (a BibTeX file), D (the
-;; database) and Z (Zotero), and come in this order of precedence
+;; cork, the Zotero entry being #f for the other sources
 
 (tm-define (zotero-flat-text t)
   (:synopsis "The text of the stree @t, without its markup")
@@ -432,65 +430,6 @@
   (and (== (normalized-title (second a)) (normalized-title (second b)))
        (or (== (fourth a) (fourth b)) (== (fourth a) "") (== (fourth b) ""))))
 
-;; A line of the combined search is (summary marks collision?)
-(tm-define (zotero-line-summary l) (car l))
-(tm-define (zotero-line-key l) (first (car l)))
-(tm-define (zotero-line-marks l) (cadr l))
-(tm-define (zotero-line-collision? l) (caddr l))
-(tm-define (zotero-line-entry l) (fifth (car l)))
-
-(tm-define (zotero-combine sources)
-  (:synopsis "The lines of the combined search of the @sources")
-  ;; @sources are (mark summary ...), in their order of precedence. The
-  ;; same work with the same key is one line, with the marks of all its
-  ;; sources; different works with the same key are a collision
-  (let ((lines '()))
-    (for (src sources)
-      (for (sum (cdr src))
-        (with old (list-find lines (lambda (l)
-                                     (and (== (zotero-line-key l) (car sum))
-                                          (same-work? (car l) sum))))
-          (if old
-              (set! lines
-                    (map (lambda (l)
-                           (if (not (eq? l old)) l
-                               (list (if (zotero-line-entry l) (car l)
-                                         ;; the Zotero entry, for its item
-                                         (rcons (sublist (car l) 0 4)
-                                                (fifth sum)))
-                                     (list-remove-duplicates
-                                      (rcons (cadr l) (car src)))
-                                     #f)))
-                         lines))
-              (set! lines (rcons lines (list sum (list (car src)) #f)))))))
-    (map (lambda (l)
-           (list (car l) (cadr l)
-                 (> (length (list-filter lines
-                                         (lambda (x) (== (zotero-line-key x)
-                                                         (zotero-line-key l)))))
-                    1)))
-         lines)))
-
-(tm-define (zotero-collision-message lines source-name)
-  (:synopsis "The warning for the keys of the @lines in several works")
-  ;; @source-name gives the name of a source from its mark
-  (let* ((keys (list-remove-duplicates
-                (map zotero-line-key
-                     (list-filter lines zotero-line-collision?))))
-         (describe
-          (lambda (k)
-            (with marks (list-remove-duplicates
-                         (append-map zotero-line-marks
-                                     (list-filter lines
-                                                  (lambda (l)
-                                                    (== (zotero-line-key l)
-                                                        k)))))
-              (string-append k " is defined by "
-                             (string-recompose (map source-name marks)
-                                               " and by "))))))
-    (and (nnull? keys)
-         (string-recompose (map describe keys) "; "))))
-
 ;; NOTE: needs the bibliography of the document, defined below
 (tm-define (zotero-own-bib-file)
   (:synopsis "The BibTeX file of the user in the bibliography, or #f")
@@ -499,24 +438,6 @@
   (and (current-buffer)
        (and-with f (zotero-master-bibliography-file)
          (and (url-exists? f) (not (zotero-managed-file? f)) f))))
-
-(tm-define (zotero-search-sources q)
-  (:synopsis "The (mark summary ...) of the sources of the current document")
-  ;; for the combined search of @q, in their order of precedence; Zotero
-  ;; is left out when it is unavailable
-  (let* ((db (if (supports-db?) (zotero-database-sources q) '()))
-         (f (zotero-own-bib-file))
-         (empty? (== (tm-string-trim-both q) "")))
-    (if empty? '()
-        (list-filter
-         (list (assoc "L" db)
-               (and f (cons "F" (list-filter (zotero-bib-file-summaries f)
-                                             (cut zotero-summary-matches?
-                                                  q <>))))
-               (assoc "D" db)
-               (and (zotero-ready?)
-                    (cons "Z" (map zotero-entry-summary (zotero-search q)))))
-         identity))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Showing an item in Zotero

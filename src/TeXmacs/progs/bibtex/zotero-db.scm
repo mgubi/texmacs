@@ -31,7 +31,9 @@
   (:use (bibtex zotero)
         (database db-base)
         (database db-convert)
-        (database bib-db)))
+        (database bib-db)
+        (database bib-manage)
+        (database db-widgets)))
 
 (tm-define (zotero-in-database? key)
   (:synopsis "Does the database of the user have the reference @key?")
@@ -143,7 +145,8 @@
                             (lambda (z)
                               (let ((k (zotero-entry-key z)))
                                 (and (nin? k exclude)
-                                     (not (zotero-in-database? k))))))
+                                     (not (and (supports-db?)
+                                               (zotero-in-database? k)))))))
         (map cdr (convert-entries zs)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -159,9 +162,11 @@
 
 (tm-define (zotero-source-text e zotero?)
   (:synopsis "The source of the entry @e, for the search window")
-  ;; @zotero? when it comes from Zotero, otherwise it is in the database
+  ;; @zotero? is #t when it comes from Zotero, #f when it is in the
+  ;; database, or the name of its source (a BibTeX file)
   (with lib (zotero-entry-meta e "zotero-library")
-    (cond ((not zotero?) (if lib "Database, from Zotero" "Database"))
+    (cond ((string? zotero?) zotero?)
+          ((not zotero?) (if lib "Database, from Zotero" "Database"))
           ((and lib (!= (zotero-normalize-library lib) (zotero-user-library)))
            (string-append "Zotero, " (zotero-library-name lib)))
           (else "Zotero"))))
@@ -189,8 +194,64 @@
                                                                  zotero?)))))))
        results))
 
+;; Without the database tool, the same window searches the BibTeX file of
+;; the bibliography and Zotero
+
+(define bib-file-cache (make-ahash-table))
+
+(define (bib-file-entries f)
+  ;; The database entries of the BibTeX file @f, while it does not change
+  (let* ((name (url->system f))
+         (date (url-last-modified f))
+         (cached (ahash-ref bib-file-cache name)))
+    (if (and cached (== (car cached) date)) (cdr cached)
+        (let* ((t (tm->stree (zealous-bib-import (string-load f))))
+               (l (if (tm-func? t 'document)
+                      (list-filter (cdr t) db-entry-any?) '())))
+          (ahash-set! bib-file-cache name (cons date l))
+          l))))
+
+(tm-define (zotero-file-search-results query)
+  (:synopsis "The results of the search of @query, without the database")
+  ;; At most 20 references of the BibTeX file of the bibliography (unless
+  ;; it is managed by Zotero: its items are those of Zotero), then those of
+  ;; Zotero, each with its source
+  (let* ((f (zotero-own-bib-file))
+         (fl (if (not f) '()
+                 (list-filter (bib-file-entries f)
+                              (lambda (e)
+                                (zotero-summary-matches?
+                                 query (db-entry-summary e))))))
+         (fl* (if (> (length fl) 20) (sublist fl 0 20) fl))
+         (zl (if (zotero-in-database-search?)
+                 (zotero-search-entries query (map entry-name fl*))
+                 '()))
+         (r (if (null? fl*) '()
+                (zotero-mark-results (db-pretty fl* "bib" :pretty) fl*
+                                     (url->system (url-tail f)))))
+         (z (if (null? zl) '()
+                (zotero-mark-results (db-pretty zl "bib" :pretty) zl #t))))
+    (cond ((nnull? (append r z))
+           (append r (if (> (length fl) 20) (list "More items follow") '())
+                   z))
+          ((and (not f) (not (zotero-ready?)))
+           (list "No bibliography file, and Zotero is not available"))
+          (else (list "No matching items")))))
+
+(tm-define (zotero-open-search-tool t)
+  (:synopsis "Search a reference for the citation @t, without the database")
+  (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))
+    (open-db-chooser
+     :bib-file "bib" "Search bibliographic reference"
+     (lambda (key)
+       (when (and key
+                  (tree->path u)
+                  (tree-in? (tree-up u)
+                            '(cite nocite cite-detail cite-TeXmacs)))
+         (tree-set! u key))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The other sources of the combined search
+;; Summaries of the entries of the database
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (db-entry-summary e)
@@ -198,30 +259,6 @@
                   (map (lambda (f) (cons (cadr f) (caddr f)))
                        (list-filter (entry-fields e)
                                     (cut tm-func? <> 'db-field 2)))))
-
-(define (local-entries)
-  ;; the entries of the document (attachments *-biblio)
-  (append-map (lambda (name)
-                (with t (tm->stree (get-attachment name))
-                  (if (pair? t) (list-filter (cdr t) db-entry-any?) '())))
-              (list-filter (list-attachments)
-                           (cut string-ends? <> "-biblio"))))
-
-(tm-define (zotero-database-sources q)
-  (:synopsis "The (mark summary ...) of the document and the database")
-  ;; L for the entries of the document, D for the database of the user,
-  ;; for the combined search of @q; at most 20 entries of the database
-  (let* ((local (list-filter (map db-entry-summary (local-entries))
-                             (cut zotero-summary-matches? q <>)))
-         (types (smart-ref db-kind-table "bib"))
-         (db (if (== (tm-string-trim-both q) "") '()
-                 (with-database (bib-database)
-                   (with-limit 20
-                     (map db-load-entry
-                          (db-search (list (list :completes q)
-                                           (cons "type" types)))))))))
-    (list (cons "L" local)
-          (cons "D" (map db-entry-summary db)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keeping the imported entries in sync
