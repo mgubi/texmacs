@@ -257,6 +257,7 @@ jobs:
           install: >-
             make perl rsync zip curl tar git
             mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-clang
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -292,10 +293,13 @@ jobs:
           path: ${{ runner.temp }}\vue-deps
           key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
+      # NOTE: clang, as on Linux and macOS: gcc does not take the designated
+      # initializers of Clay in C++ (out of the order of the fields)
       - name: Configure
         run: |
           ./configure --with-gui=vue --with-scheme=s7 --with-sdl3 \
-            --with-mupdf="$DEPS" --with-thorvg="$DEPS" LIBS=-lws2_32
+            --with-mupdf="$DEPS" --with-thorvg="$DEPS" LIBS=-lws2_32 \
+            CC=clang CXX=clang++
 
       - name: Build
         run: make -k -j"$(nproc)"

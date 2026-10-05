@@ -26,8 +26,10 @@
 #include <fcntl.h>
 #include <io.h>
 
+#ifdef QTTEXMACS
 #include <QApplication>
 #include <QDebug>
+#endif
 #include <iostream>
 
 #ifdef USE_GUILE

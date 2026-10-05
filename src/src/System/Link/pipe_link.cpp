@@ -306,8 +306,9 @@ pipe_link_rep::read (int channel) {
 void
 pipe_link_rep::listen (int msecs) {
 #ifdef OS_MINGW
-  using namespace wsoc;
-#endif
+  // NOTE: no pipes (start), and select only waits for sockets on Windows
+  (void) msecs;
+#else
   if (!alive) return;
   time_t wait_until= texmacs_time () + msecs;
   while ((outbuf == "") && (errbuf == "")) {
@@ -323,6 +324,7 @@ pipe_link_rep::listen (int msecs) {
     if (nr != 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
     if (texmacs_time () - wait_until > 0) break;
   }
+#endif
 }
 
 void
