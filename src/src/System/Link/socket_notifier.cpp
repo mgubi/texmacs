@@ -28,6 +28,9 @@
 #include <netdb.h>
 #endif
 #include <errno.h>
+#if defined (OS_MINGW) && !defined (QTTEXMACS)
+#include "tm_sockets.hpp" // winsock, in the namespace wsoc
+#endif
 
 static hashset<socket_notifier> notifiers;
 
@@ -89,9 +92,40 @@ perform_select () {
         sn->notify ();
     }
   }
+#elif !defined (QTTEXMACS)
+  // Windows without Qt (the Vue port): the notifiers are those of sockets
+  // (there are no pipes, pipe_link.cpp), which select of winsock waits for
+  using namespace wsoc;
+  for (int rounds= 0; rounds < 64; rounds++) {
+    fd_set rfds, wfds;
+    FD_ZERO (&rfds);
+    FD_ZERO (&wfds);
+    array<socket_notifier> current;
+    iterator<socket_notifier> it = iterate (notifiers);
+    while (it->busy ()) {
+      socket_notifier sn= it->next ();
+      if (sn->fd < 0 || N(current) >= FD_SETSIZE) continue;
+      current << sn;
+      if (sn->write) FD_SET ((SOCKET) sn->fd, &wfds);
+      else FD_SET ((SOCKET) sn->fd, &rfds);
+    }
+    if (N(current) == 0) break;
+    struct timeval tv;
+    tv.tv_sec  = 0;
+    tv.tv_usec = 0;
+    int nr = select (0, &rfds, &wfds, NULL, &tv);
+    if (nr <= 0) break;
+    for (int i= 0; i < N(current); i++) {
+      socket_notifier sn= current[i];
+      if (!notifiers->contains (sn)) continue; // removed by a previous notifier
+      if (sn->write ? FD_ISSET ((SOCKET) sn->fd, &wfds)
+                    : FD_ISSET ((SOCKET) sn->fd, &rfds))
+        sn->notify ();
+    }
+  }
 #else
   io_error << "perform_select is not implemented";
-#endif  
+#endif
 }
 
 // NOTE: commented out after creation of cmdline_link.cpp
