@@ -2,7 +2,7 @@
 
 // TeXmacs: custom elements (editors, pictures) are drawn by the Vue widgets
 void vue_render (SDL_Renderer *, void *, SDL_FRect*);
-#include <SDL3/SDL_main.h>
+// TeXmacs: not SDL_main.h, which replaces main (TeXmacs has its own)
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 // TeXmacs: not SDL3_image (none of it is used, and it is not linked)
