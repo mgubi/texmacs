@@ -5,7 +5,7 @@ void vue_render (SDL_Renderer *, void *, SDL_FRect*);
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
-#include <SDL3_image/SDL_image.h>
+// TeXmacs: not SDL3_image (none of it is used, and it is not linked)
 
 typedef struct {
     SDL_Renderer *renderer;
