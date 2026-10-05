@@ -83,10 +83,42 @@ as_native_picture (picture pict) {
   return as_ns_picture (pict);
 }
 
+static NSImage*
+svg_icon (url file_name) {
+  // The vector version of an icon, looked up as by the Qt and Vue interfaces:
+  // name.svg in the light variant of the icon sets on $TEXMACS_PIXMAP_PATH.
+  // The set chosen in the preferences (neo-classical by default) comes first
+  // on the path, and its icons only exist as SVG files.
+  if (suffix (file_name) != "xpm") return nil;
+  url base= unglue (file_name, 4);
+  url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url ("light") *
+                    glue (tail (base), ".svg") |
+                    url ("$TEXMACS_PIXMAP_PATH") * glue (base, ".svg"));
+  string sss;
+  if (is_none (svg) || load_string (svg, sss, false) || sss == "") return nil;
+  c_string buf (sss);
+  NSData* data= [NSData dataWithBytes: (char*) buf length: N(sss)];
+  return [[NSImage alloc] initWithData: data];
+}
+
+static NSBitmapImageRep*
+render_icon (NSImage* im, int w, int h) {
+  // The icon drawn at w x h pixels (retained)
+  picture p= native_picture (w, h, 0, 0);
+  NSBitmapImageRep* rep= ((ns_picture_rep*) p->get_handle ())->pict;
+  [NSGraphicsContext saveGraphicsState];
+  [NSGraphicsContext
+   setCurrentContext: [NSGraphicsContext graphicsContextWithBitmapImageRep: rep]];
+  [im drawInRect: NSMakeRect (0, 0, w, h)];
+  [NSGraphicsContext restoreGraphicsState];
+  return [rep retain];
+}
+
 NSBitmapImageRep*
 xpm_image (url file_name) {
-  // As in qt_load_xpm, the PNG equivalents of the icons are used (at double
-  // resolution on retina screens); the size of the image is in points
+  // As in qt_load_xpm, the SVG version of the icon is drawn when there is
+  // one, and otherwise its PNG equivalent (at double resolution on retina
+  // screens); the size of the image is in points
   static hashmap<string,pointer> cache (NULL);
   string key= as_string (file_name);
   if (cache->contains (key)) return (NSBitmapImageRep*) cache[key];
@@ -107,6 +139,18 @@ xpm_image (url file_name) {
     NSData* data= [NSData dataWithBytes: (char*) buf length: N(sss)];
     im= [[NSBitmapImageRep alloc] initWithData: data];
     if (im) [im setSize: NSMakeSize ([im pixelsWide] / f, [im pixelsHigh] / f)];
+  }
+  if (NSImage* svg= svg_icon (file_name)) {
+    // the size of the raster icon when there is one, since a few SVG files
+    // declare the size of the drawing they were made from (the flags)
+    NSSize sz= im ? [im size] : [svg size];
+    int s= max (retina_icons, 1);
+    NSBitmapImageRep* rep= render_icon (svg, (int) (s * sz.width + 0.5),
+                                        (int) (s * sz.height + 0.5));
+    [rep setSize: sz];
+    [svg release];
+    [im release];
+    im= rep;
   }
   if (!im) {
     // FIXME: the conversion of the XPM pictures loses the transparency
@@ -316,6 +360,25 @@ qt_load_xpm (url file_name) {
   if (sss == "" && suffix (file_name) == "xpm") {
     url png_equiv= glue (unglue (file_name, 3), "png");
     load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
+  }
+  NSImage* svg= svg_icon (file_name);
+  if (svg) {
+    // drawn at the size in pixels of the raster icon when there is one
+    // (see xpm_image)
+    int s= max (retina_icons, 1);
+    NSSize sz= NSMakeSize (s * [svg size].width, s * [svg size].height);
+    if (sss != "") {
+      c_string buf (sss);
+      NSBitmapImageRep* r= [NSBitmapImageRep imageRepWithData:
+                             [NSData dataWithBytes: (char*) buf length: N(sss)]];
+      if (r) sz= NSMakeSize ([r pixelsWide], [r pixelsHigh]);
+    }
+    NSBitmapImageRep* rep= render_icon (svg, (int) (sz.width + 0.5),
+                                        (int) (sz.height + 0.5));
+    [svg release];
+    picture p= ns_picture (rep, 0, 0);
+    [rep release];
+    return p;
   }
   if (sss == "")
     load_string ("$TEXMACS_PIXMAP_PATH" * file_name, sss, false);
