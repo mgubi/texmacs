@@ -186,7 +186,8 @@ jobs:
           The latest build of GNU TeXmacs with the native interface of macOS
           (Cocoa), from the branch \`wip_other_guis\` (commit
           ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)); it is replaced at each
-          build. Work in progress: see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md).
+          build. The tag \`cocoa-latest\` does not follow the builds: the
+          commit built is the one named here. Work in progress: see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md).
 
           * One application for Apple silicon and Intel, macOS 12 or later.
           * Signed ad hoc and not notarized: macOS refuses to open it the
@@ -198,6 +199,19 @@ jobs:
 
           Built by [this run](https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}).
           EOF
-          gh release delete "$tag" --cleanup-tag --yes || true
-          gh release create "$tag" "$dmg" --target "$GITHUB_SHA" --prerelease \
-            --title "TeXmacs for macOS (Cocoa), latest build" --notes-file notes.md
+          # The release is updated in place and its tag never moves: the token
+          # of the workflow cannot create a tag on a commit whose workflow
+          # files are no longer those of the branch (HTTP 403, it needs the
+          # scope workflow), which happens as soon as a build is overtaken.
+          # Deleting and recreating the release lost it at the first refusal.
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" "$dmg" --clobber
+            for old in $(gh release view "$tag" --json assets -q '.assets[].name'); do
+              [ "$old" = "$(basename "$dmg")" ] || gh release delete-asset "$tag" "$old" --yes
+            done
+            gh release edit "$tag" --notes-file notes.md
+          else
+            gh release create "$tag" "$dmg" --target "$GITHUB_SHA" --prerelease \
+              --title "TeXmacs for macOS (Cocoa), latest build" --notes-file notes.md ||
+              { echo "error: create the release $tag once by hand (gh release create with the scope workflow)"; exit 1; }
+          fi
