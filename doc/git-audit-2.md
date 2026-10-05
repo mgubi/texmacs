@@ -163,4 +163,5 @@ asynchronous commands, submodules.
 
 | Findings | Commit | Notes |
 |----------|--------|-------|
-| A1 | this commit | Outside working trees only `init` and `clone` run; every other command gets `--git-dir`/`--work-tree` for the checked root. Tests: a bare repository with a signed commit, through a commit page and a document which includes it; a symbolic link from a trusted tree into a directory of an untrusted one; clone outside working trees. |
+| A1 | 8573d90dae | Outside working trees only `init` and `clone` run; every other command gets `--git-dir`/`--work-tree` for the checked root. Tests: a bare repository with a signed commit, through a commit page and a document which includes it; a symbolic link from a trusted tree into a directory of an untrusted one; clone outside working trees. |
+| A2 | this commit | `git-save-buffer` (buffer-save returns #t on an error and marks the buffer saved itself on success); `git-when-saved`, `git-commit-file*` and `git-mark-resolved-now` stop when a document cannot be saved. Test: a read-only document with unsaved edits. |

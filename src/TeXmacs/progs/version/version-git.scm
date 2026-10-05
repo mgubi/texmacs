@@ -137,6 +137,21 @@
     (git-reload root watch)
     ret))
 
+(tm-define (git-save-buffer u)
+  (:synopsis "Save the buffer @u; return #f (with a message) on failure")
+  ;; NOTE: buffer-save returns #t on an error, and marks the buffer as
+  ;; saved only on success, so that unsaved edits are never forgotten
+  (or (not (buffer-save u))
+      (begin
+        (set-message `(concat "Could not save "
+                              (verbatim ,(url->system (url-tail u))))
+                     "Git")
+        #f)))
+
+(tm-define (git-save-buffers l)
+  (:synopsis "Save the buffers @l; return #f if one could not be saved")
+  (list-and (map git-save-buffer l)))
+
 (tm-define (git-when-saved root cont)
   (:synopsis "Execute @cont after asking to save the modified documents")
   (with l (git-modified-buffers root)
@@ -145,8 +160,7 @@
         (user-confirm "Save the modified documents in this repository first?"
                       #t
           (lambda (answ)
-            (when answ
-              (for-each (lambda (u) (buffer-save u) (buffer-pretend-saved u)) l)
+            (when (and answ (git-save-buffers l))
               (cont)))))))
 
 (tm-define (git-report ret what)
@@ -283,10 +297,10 @@
           ((== (tm-string-trim-both msg) "") (cons #f "Empty commit message"))
           ((git-merging? root)
            (cons #f "A merge is in progress; commit the whole working tree"))
+          ((and (buffer-exists? name) (buffer-modified? name)
+                (not (git-save-buffer name)))
+           (cons #f "The document could not be saved"))
           (else
-            (when (and (buffer-exists? name) (buffer-modified? name))
-              (buffer-save name)
-              (buffer-pretend-saved name))
             (git-invalidate root)
             (with path (git-relative root name)
               (when (== (git-file-state name) 'untracked)
@@ -407,11 +421,9 @@
                          "Resolve conflict")))))
 
 (tm-define (git-mark-resolved-now name)
-  (when (buffer-exists? name)
-    (buffer-save name)
-    (buffer-pretend-saved name))
-  (git-stage name)
-  (refresh-now "version-review"))
+  (when (or (not (buffer-exists? name)) (git-save-buffer name))
+    (git-stage name)
+    (refresh-now "version-review")))
 
 (tm-define (git-mark-resolved name)
   (:synopsis "Save @name and mark its merge conflict as resolved")
