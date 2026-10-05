@@ -759,7 +759,10 @@ packrat_context (string lan, string s, tree in, path in_pos) {
   par->compress (kind, begin, end);
   object ret= null_object ();
   for (int i=0; i<N(kind); i++) {
-    object x1 (symbol_object (packrat_decode[kind[i]][0]->label));
+    // the structure of a left recursive rule is (partial (symbol "Name"))
+    tree t= packrat_decode[kind[i]];
+    if (is_compound (t, "partial", 1)) t= t[0];
+    object x1 (symbol_object (t[0]->label));
     object x2 (par->decode_tree_position (begin[i]));
     object x3 (par->decode_tree_position (end[i]));
     ret= cons (list_object (x1, x2, x3), ret);
@@ -818,8 +821,13 @@ packrat_highlight_subtree (string lan, string s, tree in) {
   packrat_parser par= make_packrat_parser (lan, in);
   C sym = encode_symbol (compound ("symbol", s));
   if (par->parse (sym, 0) == N(par->current_input)) {
+    // the parser works on its own copy of the input, but the highlighting
+    // has to be attached to the given tree (of the same structure)
+    tree copy= par->current_tree;
+    par->current_tree= in;
     par->current_hl_lan= hl_lan;
     par->highlight (sym, 0);
+    par->current_tree= copy;
   }
 }
 
