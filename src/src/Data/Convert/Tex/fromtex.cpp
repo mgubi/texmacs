@@ -2565,10 +2565,13 @@ latex_command_to_tree (tree t) {
     return tree (ABOVE, l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\underset", 2))
     return tree (BELOW, l2e (t[2]), l2e (t[1]));
+  // (its text is text, also in a formula, as that of \text)
   if (is_tuple (t, "\\parbox", 2))
-    return compound ("mini-paragraph", v2e (t[1]), l2e (t[2]));
+    return compound ("mini-paragraph", v2e (t[1]),
+                     var_m2e (tuple ("\\text", t[2]), MODE, "text"));
   if (is_tuple (t, "\\parbox*", 3))
-    return compound ("mini-paragraph", v2e (t[2]), l2e (t[3]));
+    return compound ("mini-paragraph", v2e (t[2]),
+                     var_m2e (tuple ("\\text", t[3]), MODE, "text"));
 
   int dtype= 0;
   if (is_large_delimiter (t, dtype)) {
