@@ -793,6 +793,26 @@
     (check-true (zotero-same-work? a d))
     (check-true (zotero-same-work? c e))
     (check= (zotero-normalized-doi " DOI:10.1/X ") "10.1/x"))
+  ;; the formulas of Zotero's BibTeX are LaTeX again
+  (check= (zotero-unescape-math
+           "\ttitle = {\\${\\textbackslash}{Phi}{\\textasciicircum}4\\_3\\$ is orthogonal to {GFF}},")
+          "\ttitle = {$\\Phi^4_3$ is orthogonal to {GFF}},")
+  (check= (zotero-unescape-math
+           "\ttitle = {on \\${\\textbackslash}mathbf\\{{R}\\}{\\textasciicircum}2\\$ and \\${\\textbackslash}mathrm\\{{SU}\\}(2)\\$},")
+          "\ttitle = {on $\\mathbf{{R}}^2$ and $\\mathrm{{SU}}(2)$},")
+  (check= (zotero-unescape-math
+           "title = {Phase {Transitions} for \\$\\${\\textbackslash}phi {\\textasciicircum}4\\_3\\$\\$},")
+          "title = {Phase {Transitions} for $\\phi ^4_3$},")
+  (check= (zotero-unescape-math "title = {the {Yukawa}\\$\\_2\\$ theory, \\${\\textbackslash}delta{\\textgreater}3\\$}")
+          "title = {the {Yukawa}$_2$ theory, $\\delta>3$}")
+  ;; a literal brace of the formula, and a dollar alone
+  (check= (zotero-unescape-math
+           "t = {\\${\\textbackslash}\\{x{\\textbackslash}\\}\\$}")
+          "t = {$\\{x\\}$}")
+  (check= (zotero-unescape-math "@article{k,\n\tfile = {Full Text:/Users/me/x.pdf:application/pdf},\n\tyear = {2020},\n}")
+          "@article{k,\n\tyear = {2020},\n}")
+  (check= (zotero-unescape-math "note = {costs \\$10, {\\textbackslash}o}")
+          "note = {costs \\$10, {\\textbackslash}o}")
   (check= (zotero-iso-date 0) "1970-01-01")
   (check= (zotero-iso-date 951782400) "2000-02-29")
   (check= (zotero-iso-date 1791158400) "2026-10-05")

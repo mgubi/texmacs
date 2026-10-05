@@ -24,6 +24,11 @@
   <verbatim|zotero:><em|key>, where <em|key> is the key of the item in
   Zotero; you may give it a better citation key in Zotero at any time.
 
+  Formulas written in LaTeX in the fields of Zotero, such as a title
+  <verbatim|On the $\\Phi^4_3$ model>, become formulas in the
+  bibliography. The references which <TeXmacs> obtains from Zotero do not
+  include the paths of the files attached to the items on your computer.
+
   The settings are in <menu|Document|Bibliography|Zotero settings...>:
 
   <\description>

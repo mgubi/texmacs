@@ -504,9 +504,13 @@
 
 (tm-define (zotero-show-item e)
   (:synopsis "Show the item of the Zotero entry @e in Zotero")
+  ;; NOTE: the url only has letters, digits, / and :; on Windows, as for
+  ;; the links of documents (load-external), start takes a title first
   (with url (zotero-select-url e)
-    ;; NOTE: the url only has letters, digits, / and :
-    (system (string-append (default-open) " " url))))
+    (cond ((os-mingw64?) (eval-system url))
+          ((or (os-mingw?) (os-win32?))
+           (system (string-append "start \"\" " url)))
+          (else (system (string-append (default-open) " " url))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Resolving citation keys
@@ -615,12 +619,77 @@
                        (substring bib comma (string-length bib)))
         bib)))
 
+;; Zotero writes the LaTeX of its fields as text in its BibTeX: the title
+;; "on $\Phi^4_3$" becomes on \${\textbackslash}{Phi}{\textasciicircum}4\_3\$.
+;; Between two \$ of a line, the escapes are undone, so that the formula is
+;; LaTeX again, as written in Zotero; a dollar alone is left as it is
+
+(define math-unescapes
+  '(("{\\textbackslash}" . "\\") ("{\\textasciicircum}" . "^")
+    ("{\\textasciitilde}" . "~") ("{\\textgreater}" . ">")
+    ("{\\textless}" . "<") ("{\\textbar}" . "|")
+    ("\\{" . "{") ("\\}" . "}") ("\\_" . "_") ("\\&" . "&")
+    ("\\#" . "#") ("\\%" . "%")))
+
+(define (letters-end s i)
+  ;; the end of the letters of @s from @i
+  (if (and (< i (string-length s)) (char-alphabetic? (string-ref s i)))
+      (letters-end s (+ i 1)) i))
+
+(define (unbrace-commands s)
+  ;; {\textbackslash}{Phi} (a command whose name Zotero protected) -> \Phi
+  (let* ((pat "{\\textbackslash}{")
+         (pos (string-search-forwards pat 0 s)))
+    (if (< pos 0) s
+        (let* ((start (+ pos (string-length pat)))
+               (end (letters-end s start)))
+          (if (and (> end start) (< end (string-length s))
+                   (== (string-ref s end) #\}))
+              (string-append (substring s 0 pos) "\\" (substring s start end)
+                             (unbrace-commands
+                              (substring s (+ end 1) (string-length s))))
+              (string-append (substring s 0 start)
+                             (unbrace-commands
+                              (substring s start (string-length s)))))))))
+
+(define (unescape-math-segment s)
+  (let loop ((s (unbrace-commands s)) (l math-unescapes))
+    (if (null? l) s
+        (loop (string-replace s (caar l) (cdar l)) (cdr l)))))
+
+(define (unescape-math-line line)
+  ;; NOTE: a displayed formula ($$...$$) becomes an inline one
+  (with parts (string-decompose (string-replace line "\\$\\$" "\\$") "\\$")
+    (if (or (< (length parts) 3) (even? (length parts))) line
+        ;; parts: text, math, text, math, ..., text
+        (let loop ((l parts) (math? #f) (acc '()))
+          (if (null? l) (apply string-append (reverse acc))
+              (loop (cdr l) (not math?)
+                    (cons (if math? (unescape-math-segment (car l)) (car l))
+                          (if (null? acc) acc (cons "$" acc)))))))))
+
+(define (file-field? line)
+  ;; the field file: the paths of the attachments on this computer, which
+  ;; have no place in a BibTeX file given to others (and their names repeat
+  ;; the title, with its formula)
+  (and (string-starts? (tm-string-trim-both line) "file = {")
+       (or (string-ends? line "},") (string-ends? line "}"))))
+
+(tm-define (zotero-unescape-math bib)
+  (:synopsis "The BibTeX @bib of Zotero, with its formulas as LaTeX")
+  ;; and without the paths of the attachments (the field file)
+  (string-recompose
+   (map unescape-math-line
+        (list-filter (string-decompose bib "\n") (negate file-field?)))
+   "\n"))
+
 (define (export-items lib items)
   ;; The BibTeX of the @items (at most 50) of the library @lib
-  (or (zotero-get lib (string-append
-                       "items?format=" (get-preference "zotero export format")
-                       "&itemKey=" (string-recompose items ",")))
-      ""))
+  (zotero-unescape-math
+   (or (zotero-get lib (string-append
+                        "items?format=" (get-preference "zotero export format")
+                        "&itemKey=" (string-recompose items ",")))
+       "")))
 
 (tm-define (zotero-export-as e key)
   (:synopsis "The BibTeX of the Zotero entry @e, with the citation key @key")
