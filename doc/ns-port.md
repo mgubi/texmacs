@@ -64,8 +64,10 @@ The appearance is light or dark after the preference `gui theme`, and by
 default that of the system. The icons are drawn from the SVG files of the
 light or dark variant of the icon sets on `TEXMACS_PIXMAP_PATH`, as in Qt
 (so the set of the preference `icon set` is used), otherwise from their PNG
-equivalents; their variant is the appearance at the first icon, and does
-not follow a later change of the appearance of the system.
+equivalents. They follow a change of the appearance of the system: the
+icons of the native controls are drawn in the appearance of their view
+(`to_nsimage`), and the canvases are drawn again with the other variant
+(`TMAppearanceObserver`).
 
 The look follows macOS where Qt has its own: the selection is translucent
 as in Qt; the icon bars are flat, with a small triangle in the corner of

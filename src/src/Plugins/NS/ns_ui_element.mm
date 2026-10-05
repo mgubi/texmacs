@@ -32,10 +32,18 @@ NSColor* to_nscolor (color col);
 
 static NSImage*
 to_nsimage (url u) {
-  NSBitmapImageRep* rep= xpm_image (u);
+  // The icon is drawn in the variant (light or dark) of the appearance it is
+  // drawn in, so that it follows a change of the appearance of the system
+  NSBitmapImageRep* rep= xpm_image (u, ns_icon_theme ());
   if (!rep) return nil;
-  NSImage* img= [[[NSImage alloc] initWithSize: [rep size]] autorelease];
-  [img addRepresentation: rep];
+  NSImage* img= [NSImage imageWithSize: [rep size] flipped: NO
+                        drawingHandler: ^BOOL (NSRect r) {
+    string theme= ns_icon_theme ([NSAppearance currentDrawingAppearance]);
+    NSBitmapImageRep* cur= xpm_image (u, theme);
+    if (cur) [cur drawInRect: r];
+    return YES;
+  }];
+  [img setCacheMode: NSImageCacheNever];
   return img;
 }
 
