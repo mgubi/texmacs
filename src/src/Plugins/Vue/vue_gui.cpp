@@ -10,6 +10,7 @@
 
 #include "vue_gui.hpp"
 #include "vue_widget.hpp"
+#include "vue_gpu.hpp"
 
 #include "array.hpp"
 #include "hashmap.hpp"
@@ -104,6 +105,8 @@ void gui_finalize_context();
 int nr_windows= 0;
 hashmap<SDL_Window*, pointer> Window_to_window;
 hashmap<int, pointer> id_to_window;
+
+static bool single_window_mode ();
 
 class vue_sdl_base_window_rep : public vue_window_rep {
 public:
@@ -316,6 +319,10 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     // they are shown via SLOT_VISIBILITY once positioned
     flags= SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_BORDERLESS |
            SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_HIDDEN | SDL_WINDOW_NOT_FOCUSABLE;
+  // drawn by the GPU (vue_gpu.cpp): every window has a GL drawable, and the
+  // first one makes the context which they all share
+  bool gpu= vue_gpu_enabled ();
+  if (gpu) { vue_gpu_prepare (); flags |= SDL_WINDOW_OPENGL; }
   int win_w= 200, win_h= 200;
   int win_x=30, win_y= 30;
   // the name a window is created with is its title until TeXmacs gives it
@@ -330,6 +337,9 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
     SDL_LogError (SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window: %s", SDL_GetError ());
     FAILED ("Vue: cannot create a window");
   }
+  // the context exists before anything is drawn: the editors make their
+  // backing stores before their window is first drawn
+  if (gpu) vue_gpu_attach (sdl_win);
   
   nr_windows++;
   last_created_window= this;
@@ -943,6 +953,67 @@ uint64_t vue_text_ns= 0, vue_editor_ns= 0, vue_other_ns= 0;
 int      vue_text_n= 0,  vue_editor_n= 0,  vue_other_n= 0;
 
 
+// The parts of a w x h window (device pixels, y down) which no render
+// command paints with an opaque color: the background of the window is
+// filled there only. Filling all of it at every frame, as before, cost two
+// thirds of a frame of the browser build, where the editors and the bars
+// paint nearly everything anyway. Counted as opaque: the rectangles of an
+// opaque color without rounded corners, and the widgets which say so
+// (renders_opaque: the editors), each within the clip it is drawn in and
+// one pixel in from its edges (where the rounding of the renderer could
+// leave a pixel unpainted; those pixels are filled, then painted over).
+// A pixel which is filled or not ends the same: every pixel left out is
+// painted opaque later in the frame, over whatever it held.
+static rectangles
+uncovered_area (Clay_RenderCommandArray* rc, int w, int h) {
+  rectangle win (0, 0, w, h);
+  rectangles covered;
+  array<rectangle> clips;
+  for (int32_t i= 0; i < rc->length; i++) {
+    Clay_RenderCommand* cmd= Clay_RenderCommandArray_Get (rc, i);
+    Clay_BoundingBox bb= cmd->boundingBox;
+    rectangle box ((SI) ceil (bb.x) + 1, (SI) ceil (bb.y) + 1,
+                   (SI) floor (bb.x + bb.width) - 1,
+                   (SI) floor (bb.y + bb.height) - 1);
+    rectangle clip= N(clips) == 0 ? win : clips[N(clips) - 1];
+    bool opaque= false;
+    switch (cmd->commandType) {
+      case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
+        rectangle c ((SI) floor (bb.x), (SI) floor (bb.y),
+                     (SI) ceil (bb.x + bb.width), (SI) ceil (bb.y + bb.height));
+        clips << rectangle (max (c->x1, clip->x1), max (c->y1, clip->y1),
+                            min (c->x2, clip->x2), min (c->y2, clip->y2));
+        break;
+      }
+      case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END:
+        if (N(clips) > 0) clips->resize (N(clips) - 1);
+        break;
+      case CLAY_RENDER_COMMAND_TYPE_RECTANGLE: {
+        Clay_RectangleRenderData* d= &cmd->renderData.rectangle;
+        opaque= d->backgroundColor.a >= 255 &&
+                d->cornerRadius.topLeft <= 0 && d->cornerRadius.topRight <= 0 &&
+                d->cornerRadius.bottomLeft <= 0 && d->cornerRadius.bottomRight <= 0;
+        break;
+      }
+      case CLAY_RENDER_COMMAND_TYPE_CUSTOM:
+        opaque= cmd->renderData.custom.customData == vue_render_widget &&
+                cmd->userData != NULL &&
+                ((vue_widget_rep*) cmd->userData)->renders_opaque
+                  ((int) ceil (bb.width), (int) ceil (bb.height));
+        break;
+      default:
+        break;
+    }
+    if (!opaque) continue;
+    SI x1= max (box->x1, clip->x1), y1= max (box->y1, clip->y1);
+    SI x2= min (box->x2, clip->x2), y2= min (box->y2, clip->y2);
+    // small ones are not worth the fragments they cut the rest into
+    if (x2 - x1 >= 32 && y2 - y1 >= 32)
+      covered= rectangles (rectangle (x1, y1, x2, y2), covered);
+  }
+  return rectangles (win) - covered;
+}
+
 void
 vue_sdl_mupdf_window_rep::process_redraw () {
   // a hidden or minimized window is neither drawn nor uploaded (the loop
@@ -990,7 +1061,15 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   // areas not covered by any element: red in the debug mode (F1) to spot them
   ren->set_pencil (clay_debug ? rgb_color (255, 0, 0)
                               : theme_color (the_theme.background));
-  ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
+  if (clay_debug)
+    ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
+  else
+    for (rectangles l= uncovered_area (&render_commands, win_w, win_h);
+         !is_nil (l); l= l->next) {
+      rectangle u= l->item;
+      ren->fill (u->x1 * ren->pixel, -u->y2 * ren->pixel,
+                 u->x2 * ren->pixel, -u->y1 * ren->pixel);
+    }
   if (vue_profile_on) {
     vue_fill_ns += SDL_GetTicksNS () - t_ns;
     vue_commands += render_commands.length;
@@ -1072,6 +1151,114 @@ vue_sdl_mupdf_window_rep::get_viewport_size (void *data, int& w, int& h) {
   vue_render_ren_data* d= (vue_render_ren_data*)data;
   w= (d->r->x2 - d->r->x1) / d->ren->pixel;
   h= (d->r->y2 - d->r->y1) / d->ren->pixel;
+}
+
+/******************************************************************************
+* Windows drawn by the GPU (vue_gpu.cpp): the same commands, replayed on a
+* renderer of the default framebuffer, every frame (the editors keep their
+* backing stores as textures, which this draws as quads)
+******************************************************************************/
+
+class vue_sdl_gpu_window_rep : public vue_sdl_base_window_rep {
+public:
+  renderer ren;
+  unsigned long long presented; // the hash of the frame last presented
+
+  vue_sdl_gpu_window_rep (vue_widget w, string name, bool popup= false,
+                          SDL_Window* adopt= NULL)
+    : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), presented (0) {
+    with_window frame (this);
+    Clay_SetMeasureTextFunction (ren_measure_text, this);
+  }
+  ~vue_sdl_gpu_window_rep () {
+    forget_host (this); if (ren != NULL) delete_renderer (ren); }
+
+  void process_redraw ();
+  void process_layout () { vue_sdl_base_window_rep::process_layout (); }
+  void draw_picture (void *data, picture pic) {
+    vue_render_ren_data* d= (vue_render_ren_data*) data;
+    d->ren->draw_picture (pic, d->r->x1, d->r->y1); }
+  void get_viewport_size (void *data, int& w, int& h) {
+    vue_render_ren_data* d= (vue_render_ren_data*) data;
+    w= (d->r->x2 - d->r->x1) / d->ren->pixel;
+    h= (d->r->y2 - d->r->y1) / d->ren->pixel; }
+};
+
+void
+vue_sdl_gpu_window_rep::process_redraw () {
+  if (!shown || (SDL_GetWindowFlags (sdl_win) &
+                 (SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED))) {
+    presented= 0; // shown again: presented again, whatever it draws
+    return;
+  }
+  track_geometry ();
+#ifndef OS_MACOS
+  follow_app_focus ();
+#endif
+  with_window frame (this);
+  if (!vue_gpu_attach (sdl_win)) return;
+  int win_w= 0, win_h= 0;
+  SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
+  if (win_w <= 0 || win_h <= 0) return;
+  if (ren == NULL) ren= gpu_screen_renderer (std_shrinkf * retina_factor);
+  gpu_begin_screen (ren, win_w, win_h);
+  // as the MuPDF window: no clip of its own, the elements clip
+  ren->cx1= ren->ox - (1 << 28); ren->cx2= ren->ox + (1 << 28);
+  ren->cy1= ren->oy - (1 << 28); ren->cy2= ren->oy + (1 << 28);
+  uint64_t t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
+  // the background of the theme (red in the F1 debug mode): a clear of the
+  // GPU, at no cost worth avoiding
+  ren->set_pencil (clay_debug ? rgb_color (255, 0, 0)
+                              : theme_color (the_theme.background));
+  ren->fill (0, -win_h * ren->pixel, win_w * ren->pixel, 0);
+  if (vue_profile_on) {
+    vue_fill_ns += SDL_GetTicksNS () - t_ns;
+    vue_commands += render_commands.length;
+  }
+  if (is_host (this)) {
+    // the virtual windows go between the contents of the host and its
+    // floating elements, as in the MuPDF window (host_overlay_start)
+    int32_t k= host_overlay_start (render_commands);
+    Clay_RenderCommandArray below= render_commands, above= render_commands;
+    below.length= k;
+    above.internalArray += k; above.length -= k; above.capacity -= k;
+    render_clay_commands (ren, &below);
+    composite_virtual_windows (this, ren);
+    render_clay_commands (ren, &above);
+  }
+  else render_clay_commands (ren, &render_commands);
+  if (vue_profile_on) gpu_finish (); // with the time the GPU took
+  else gpu_flush ();
+  if (vue_profile_on) vue_clay_ns += SDL_GetTicksNS () - t_ns;
+  // a frame which draws what the last presented one drew is not presented:
+  // on macOS SDL_GL_SwapWindow waits for the display (even with no swap
+  // interval), and the loop draws every window at every iteration. What
+  // is drawn has been drawn into the back buffer, which every frame draws
+  // in full, so nothing stale can show
+  unsigned long long h= gpu_frame_hash ();
+  bool same= (h == presented);
+  static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
+  if (N(snapshot_dir) > 0) {
+    picture shot= gpu_read_screen (win_w, win_h);
+    if (!is_nil (shot)) {
+      fz_pixmap* pix= ((mupdf_picture_rep*) shot->get_handle ())->pix;
+      save_pixmap_as_png (mupdf_context (), pix,
+                          snapshot_dir * "/window-" * as_string (id) * ".png");
+      bool target= (snapshot_win == this) ||
+                   (snapshot_win != NULL && snapshot_win->platform_window () == NULL &&
+                    is_host (this));
+      if (target && N(snapshot_name) > 0) {
+        save_pixmap_as_png (mupdf_context (), pix,
+                            snapshot_dir * "/" * snapshot_name * ".png");
+        snapshot_name= "";
+      }
+    }
+  }
+  if (same) return;
+  presented= h;
+  t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
+  vue_gpu_present (sdl_win);
+  if (vue_profile_on) vue_upload_ns += SDL_GetTicksNS () - t_ns;
 }
 
 void
@@ -1437,7 +1624,7 @@ single_window_mode () {
 }
 
 class vue_virtual_window_rep;
-static vue_sdl_mupdf_window_rep* the_host= NULL;       // holds the others
+static vue_sdl_base_window_rep* the_host= NULL;       // holds the others
 static bool host_is_bare= false; // the host outlived its own window, see forget_host
 static array<vue_virtual_window_rep*> virtual_windows; // back to front
 static vue_virtual_window_rep* focused_virtual= NULL;  // gets the keys
@@ -1935,7 +2122,7 @@ promote_editor () {
 static void
 forget_host (vue_window w) {
   if (!is_host (w)) return;
-  vue_sdl_mupdf_window_rep* old= the_host;
+  vue_sdl_base_window_rep* old= the_host;
   the_host= NULL;
   host_is_bare= false;
   host_w= host_h= -1;
@@ -1946,7 +2133,9 @@ forget_host (vue_window w) {
   Window_to_window->reset (sw);
   old->sdl_win= NULL; // not destroyed with the old window
   vue_widget empty (tm_new<vue_widget_rep> ("vue_host"));
-  the_host= tm_new<vue_sdl_mupdf_window_rep> (empty, "", false, sw);
+  if (vue_gpu_windows ())
+    the_host= tm_new<vue_sdl_gpu_window_rep> (empty, "", false, sw);
+  else the_host= tm_new<vue_sdl_mupdf_window_rep> (empty, "", false, sw);
   host_is_bare= true;
   SDL_SetWindowTitle (sw, "TeXmacs");
   promote_editor ();
@@ -2234,6 +2423,13 @@ route_keys (vue_window win) {
   return win;
 }
 
+// the windows are drawn by the GPU, and the editors keep their backing
+// stores as textures
+bool
+vue_gpu_windows () {
+  return vue_gpu_enabled ();
+}
+
 //******************************************************************************
 // entrypoints for top-level windows
 
@@ -2242,6 +2438,12 @@ plain_window (vue_widget wwid, string name, bool popup, bool document) {
   // headless: the windows are virtual as well, with no host to be drawn in
   if (is_headless () || (single_window_mode () && the_host != NULL))
     return tm_new<vue_virtual_window_rep> (wwid, name, popup);
+  if (vue_gpu_windows ()) {
+    vue_sdl_gpu_window_rep* g= tm_new<vue_sdl_gpu_window_rep> (wwid, name, popup);
+    g->document= document && !popup;
+    if (single_window_mode () && the_host == NULL && !popup) the_host= g;
+    return g;
+  }
   vue_sdl_mupdf_window_rep* w= tm_new<vue_sdl_mupdf_window_rep> (wwid, name, popup);
   w->document= document && !popup;
   if (single_window_mode () && the_host == NULL && !popup) the_host= w;
@@ -3217,6 +3419,9 @@ get_window_from_ID (Uint32 ID) {
 *   focus                           pretend the target window got the keyboard focus
 *   drop x y <path>|text:<text>     drag and drop of one item at that position
 *   repaint                         invalidate every editor (repaint from scratch)
+*   scheme <expression>             run a Scheme command, as -x does (at the
+*                                   next turn of the loop): a zoom, a marker
+*                                   which (display) prints in the log...
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
@@ -3450,6 +3655,8 @@ script_step () {
       win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
     else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
       vue_simple_widget_rep::invalidate_all_editors ();
+    else if (cmd == "scheme" && N(line) > 7)
+      exec_delayed (scheme_cmd (line (7, N(line))));
     else if (cmd == "focus") {
       // pretend the window got the keyboard focus (a test instance launched
       // while another application is in use never gets it)

@@ -85,10 +85,18 @@ public:
   
   // this needs to be accesible from TMView
   NSBitmapImageRep*       backingPixmap;
+  int                     ring;  //!< the first row of the view in it
+  int                     cring; //!< its first column
+  bool backing_piece (int i, double a, double b, bool vertical,
+                      double& pa, double& pb, double& off);
+  void draw_backing_store (NSRect rect); //!< TMView drawRect
+  void unroll_backing_store ();          //!< ring 0 (to save it, say)
   NSPoint                 cursor_pos;  //!< for the input methods
   void follow_visible_part ();  //!< the canvas follows the scrolling
   NSRect viewport ();           //!< the visible part, as in Qt
   coord4 extents;               //!< the extents of the document
+  void invalidate_all ();       //!< also for the benchmark (ns_gui.mm)
+  bool is_invalid ();
 
 protected:
   
@@ -98,9 +106,9 @@ protected:
   NSSize                  last_viewport; // as notified to TeXmacs (resizes)
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
-  void invalidate_all ();
-  bool is_invalid ();
   void repaint_invalid_regions ();
+  void repaint_invalid_regions_bis ();
+  void shift_backing_store (int dx, int dy);
   basic_renderer get_renderer ();
 
 

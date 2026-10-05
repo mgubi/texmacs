@@ -256,6 +256,91 @@ tt_font_glyphs_rep::tt_font_glyphs_rep (
   if (bad_font_glyphs) return;
 }
 
+/******************************************************************************
+* Outlines of glyphs, for the renderers which rasterize them themselves (the
+* Cocoa port, with Core Graphics): the glyph of get, unhinted, at its size
+* and resolution, as a path whose commands are 0 move, 1 line, 2 quadratic
+* (a control point and the end), 3 cubic (two controls and the end) and
+* 4 close, with their points, in pixels of the font (y up, the origin of the
+* glyph at 0)
+******************************************************************************/
+
+bool
+tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& pts) {
+  tt_font_glyphs_rep* g= dynamic_cast<tt_font_glyphs_rep*> (fng.operator-> ());
+  if (g == NULL || g->face->bad_face) return false;
+  FT_Face face= g->face->ft_face;
+  ft_set_char_size (face, 0, g->size<<6, g->hdpi, g->vdpi);
+  FT_UInt glyph_index= decode_index (face, i);
+  if (ft_load_glyph (face, glyph_index, FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP))
+    return false;
+  FT_GlyphSlot slot= face->glyph;
+  if (slot->format != FT_GLYPH_FORMAT_OUTLINE) return false;
+  FT_Outline& o= slot->outline;
+  cmds= array<int> ();
+  pts= array<double> ();
+  auto add= [&] (int c, const FT_Vector* v, int n) {
+    cmds << c;
+    for (int k= 0; k < n; k++) pts << (v[k].x / 64.0) << (v[k].y / 64.0);
+  };
+  auto tag= [&] (int k) { return FT_CURVE_TAG (o.tags[k]); };
+  int first= 0;
+  for (int n= 0; n < o.n_contours; n++) {
+    int last= o.contours[n], limit= last;
+    if (last < first) return false;
+    FT_Vector v_start= o.points[first], v_last= o.points[last];
+    int p= first;
+    if (tag (first) == FT_CURVE_TAG_CUBIC) return false;
+    if (tag (first) == FT_CURVE_TAG_CONIC) {
+      // a contour which starts off the curve: from its last point if that
+      // one is on it, else from the middle of the two
+      if (tag (last) == FT_CURVE_TAG_ON) { v_start= v_last; limit--; }
+      else {
+        v_start.x= (v_start.x + v_last.x) / 2;
+        v_start.y= (v_start.y + v_last.y) / 2;
+      }
+      p--;   // the first point is then a control point
+    }
+    add (0, &v_start, 1);
+    bool closed= false;
+    while (p < limit && !closed) {
+      p++;
+      int t= tag (p);
+      if (t == FT_CURVE_TAG_ON) { add (1, &o.points[p], 1); continue; }
+      if (t == FT_CURVE_TAG_CONIC) {
+        FT_Vector control= o.points[p];
+        while (true) {
+          if (p < limit) {
+            p++;
+            FT_Vector v= o.points[p];
+            int t2= tag (p);
+            if (t2 == FT_CURVE_TAG_ON) {
+              FT_Vector q[2]= { control, v }; add (2, q, 2); break; }
+            if (t2 != FT_CURVE_TAG_CONIC) return false;
+            FT_Vector mid= { (control.x + v.x) / 2, (control.y + v.y) / 2 };
+            FT_Vector q[2]= { control, mid }; add (2, q, 2);
+            control= v;
+            continue;
+          }
+          FT_Vector q[2]= { control, v_start }; add (2, q, 2);
+          closed= true;
+          break;
+        }
+        continue;
+      }
+      // cubic: two control points
+      if (p + 1 > limit || tag (p + 1) != FT_CURVE_TAG_CUBIC) return false;
+      FT_Vector c1= o.points[p], c2= o.points[p + 1];
+      p += 2;
+      if (p <= limit) { FT_Vector q[3]= { c1, c2, o.points[p] }; add (3, q, 3); }
+      else { FT_Vector q[3]= { c1, c2, v_start }; add (3, q, 3); closed= true; }
+    }
+    cmds << 4;
+    first= last + 1;
+  }
+  return true;
+}
+
 glyph&
 tt_font_glyphs_rep::get (int i) {
   if (!face->bad_face && !fng->contains(i)) {

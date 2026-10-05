@@ -716,7 +716,14 @@ zoom` (`off`) turns the transition off.
 `vue_sdl_mupdf_window_rep::process_redraw` clears the surface with the
 background of the theme (red in the F1 debug mode, to spot uncovered
 areas), replays the
-Clay commands and presents the SDL surface. Editors (`vue_simple_widget_rep`)
+Clay commands and presents the SDL surface. Only the parts which no
+command paints opaque are cleared (`uncovered_area`): the opaque
+rectangles without rounded corners and the widgets which say that they
+cover their box (`renders_opaque`: an editor whose backing store is as
+large as its box, outside the smooth zoom), each within its clip and one
+pixel in from its edges. Clearing the whole window at every frame was two
+thirds of a frame of the browser build; a pixel left out is painted
+opaque later in the same frame, so the screen is the same. Editors (`vue_simple_widget_rep`)
 own a backing store picture repainted incrementally (`invalid_regions`, in
 document coordinates) and blitted by their custom render callback.
 The backing store is allocated by `native_opaque_picture`: cleared to opaque
@@ -762,7 +769,38 @@ behaviour. Feature status against those two:
   pattern images are scaled to their requested size (`fz_scale_pixmap` in
   `mupdf_load_pixmap`), which the pattern sizes of the style files rely on;
 * **`clear_device`**: white plus the tiled `neutral-pattern.png`, as Qt
-  (visible between pages in paper mode; `draw_surround` covers the sides);
+  (visible between pages in paper mode; `draw_surround` covers the sides).
+  The tile is composed over white once (`get_neutral_tile`, kept for one
+  size, which follows the density) and the rectangle is tiled by copying
+  rows of it (`tile_direct`), with the phase of the PDF pattern it
+  replaces (a corner at the origin of the document): the same pixels, but
+  the tiling through MuPDF (`fz_end_tile`) and the resolution of the
+  pattern's URL at every call were 40 % of a full repaint of the editor.
+  The PDF pattern remains the fallback for pixmaps of another format;
+* **the shadow is a proxy**, as in the Qt port: `new_shadow` gives a
+  renderer of its own (device, processor, graphics state) on the pixmap of
+  its master, so the editor draws straight into its backing store, clipped
+  to the rectangle of `get_shadow`; `put_shadow` and `apply_shadow`
+  between the two do nothing. The shadow used to be a pixmap of its own:
+  a full repaint copied the backing store into it, each paragraph back
+  as it was drawn (`apply_shadow`, the progressive display) and the whole
+  rectangle once more at the end, a third of the time of the repaint. The
+  device and the processor are kept from one repaint to the next
+  (`reset_proxy` closes the clips left open): making them anew cost a
+  fifth of the repaint, freeing the processor giving its memory back to
+  the system. The run processor draws the glyphs of a text object at its
+  end (`ET`), so a proxy whose text is pending is flushed before its
+  master uses the pixels (`flush_proxy_text`: when the master's clip is
+  set or restored, which `repaint_invalid_regions` does after each
+  region, and when the pixmap is drawn as a picture). The shadow of a
+  proxy (`stored`, the active graphics of the editor) is a real copy, as
+  in Qt. Measured on a document of 200 paragraphs of text and formulas,
+  a Retina window, forced full repaints (`TEXMACS_VUE_PROFILE`): 3.3–3.4
+  ms a repaint before, 1.4 ms after, the same pixels (a repaint
+  without scrolling compared with the build before, and the `pattern*`,
+  `figures`, `tmoutput`, `drag-scroll` and `scroll-shift` tests; the
+  `macro-editor` test differs on two pixels, where the cursor meets a
+  bracket in the embedded editor);
 * **direct pixel access** (`fill_direct`, `draw_pixmap_direct`,
   `device_box`): axis-aligned boxes land on integer device pixels (`to_x`/
   `to_y` divide SI by the pixel size), so plain-color fills (`fill`, `clear`
@@ -777,7 +815,11 @@ behaviour. Feature status against those two:
   `wheel-travel.scm` + a script of 300 wheel steps). Pattern fills,
   rounded corners, arcs and text still go through MuPDF; what remains of a
   frame is the editor repaint (`clear_device` tiles, glyphs), the blit and
-  `SDL_UpdateWindowSurface`;
+  `SDL_UpdateWindowSurface`. An opaque fill writes its first row by
+  doubling copies and the other rows as copies of it: written a byte at a
+  time, which the native build vectorises and WebAssembly without SIMD
+  does not, the fills were 45 % of a repaint and two thirds of a frame in
+  the browser;
 * polygons: nonzero winding for convex, even-odd otherwise (as the PDF and
   X11 renderers; Qt uses the winding rule for non-convex ones);
 * lines/arcs/rounded rectangles, clipping, linear transformations
@@ -808,10 +850,19 @@ behaviour. Feature status against those two:
   is also kept drawn, at its size on the screen, in a pixmap with a
   transparent background (`form_pixmap`), blitted until the size changes:
   0.8 ms and 5.2 ms. Not under a transformation of the graphics
-  (`transform_level`), where it is drawn as a drawing; at most eight
-  figures and 64 MB, the oldest going first, and `image_gc` forgets them.
+  (`transform_level`), where it is drawn as a drawing; at most 32
+  pictures and 64 MB, the oldest going first, and `image_gc` forgets them.
   The screen is the same as drawn as a drawing, to the anti-aliasing of the
-  edges (the pixmap is put on whole pixels);
+  edges (the pixmap is put on whole pixels). Bitmap images are kept the
+  same way (`image_pixmap`): drawn through MuPDF they were decoded and
+  converted to the colorspace of the screen, with a transform of lcms made
+  anew, at every repaint. The image is drawn into a pixmap of whole pixels
+  with its bottom on the bottom of the pixmap, so that blitted it covers
+  the pixels it would, with the same fractions at its edges; MuPDF's
+  scaling and composing round a little differently, by at most 3 levels of
+  255 inside the image. A page with four pictures (`TEXMACS_VUE_PROFILE`,
+  forced repaints, with the other changes of this section): 4.2 ms a
+  repaint before, 1.0 ms after;
 * **PDF and PostScript figures as drawing**: an EPS or PS figure is made a
   PDF once (`image_to_pdf`, Ghostscript, which keeps it a drawing;
   `load_ps_form`) and then drawn as a PDF is, where it went to a PNG at
@@ -905,3 +956,116 @@ removed (September 2026). To look at it again:
 git show 94277cec8a:./src/Plugins/NanoVG/nanovg_renderer.cpp
 git checkout 94277cec8a -- src/Plugins/NanoVG
 ```
+
+### The GPU renderer
+
+With `--with-thorvg=<prefix>` (ThorVG built by `misc/thorvg/build-thorvg.sh
+<prefix>`, `[wasm]` for the browser) and `TEXMACS_VUE_GPU=1`, the windows
+are drawn by OpenGL (WebGL2 in the browser) instead of MuPDF
+(`vue_gpu.cpp`, `vue_sdl_gpu_window_rep` in `vue_gui.cpp`). Without the
+variable, or when no GL context can be made, everything is as before.
+`misc/thorvg-bench` has the measurements which chose the design.
+
+* **One context.** The windows are created with `SDL_WINDOW_OPENGL`, and
+  the first one makes the GL context, which is made current for each
+  window as it is drawn (`vue_gpu_attach`): textures and framebuffers
+  belong to all the windows, and an editor can move between them. The
+  context exists before anything is drawn, since an editor makes its
+  backing store when it is made.
+* **The windows** replay the same Clay commands on a `gpu_renderer_rep` of
+  their default framebuffer at every frame, clear included, and present
+  with `SDL_GL_SwapWindow`. The host of the single window composes its
+  virtual windows the same way (`composite_virtual_windows`), so the
+  browser needs nothing more.
+* **The editors** keep their backing store as a texture with a
+  framebuffer (`gpu_backing_picture`, made when first drawn), repainted
+  incrementally as the MuPDF pixmap was: the incremental paths are the
+  same (`backing_picture`, `backing_renderer` in `vue_widget.cpp`). A
+  scroll copies the texture, shifted, into a second one and swaps the two
+  (`gpu_translate_picture`), the smooth zoom copies it
+  (`gpu_copy_picture`). The shadow is a proxy on the same target, as in
+  the MuPDF renderer; the store of the active graphics a real copy.
+* **Text and fills** are textured quads in one batch: the glyphs are in
+  an atlas (one R8 texture, emptied when full), the fills sample a white
+  corner of it. A glyph of a font with a file is rendered by MuPDF
+  (`mupdf_glyph_bitmap`: antialiased at its size, its origin on a pixel,
+  as the MuPDF renderer draws its text), so that the text is the MuPDF
+  renderer's to a level or two; the others are the glyph bitmaps of
+  TeXmacs (rendered at `std_shrinkf` = 5 times their size in black and
+  white, then `shrink`, as the X11 port draws them), placed as the MuPDF
+  renderer places them. The bitmaps of TeXmacs were half of a repaint on a
+  page of many fonts, each new glyph rasterized at 25 times its area. A batch is drawn when its target, its texture or its clip (a
+  scissor) changes. Thin horizontal and vertical lines (the rules of
+  mathematics, the borders of tables) are quads too. Glyphs filled with a
+  pattern multiply the coverage by the pattern, sampled from the origin of
+  the document (mode 3 of the shader).
+* **Glyphs from their outlines** (`TEXMACS_VUE_SLUG=1`, `?slug=1` in the
+  browser; off by default): the glyphs of the fonts which have a file are
+  drawn by the fragment shader from their outlines (Slug, measured in
+  `misc/thorvg-bench`), instead of from bitmaps in the atlas. The outlines
+  come from MuPDF (`mupdf_glyph_outline`: the font and the glyph as the
+  MuPDF renderer draws them, the cubics of Type 1 and CFF fonts split into
+  quadratics), with bands of curves in two textures which grow as glyphs
+  are met; a glyph is an instance of a quad (batch mode 4). An outline
+  serves every size, so a change of zoom makes no new glyph bitmaps, and
+  the glyphs are placed and shaped as MuPDF's: a frame differs from the
+  MuPDF renderer's on a third of the pixels the bitmap glyphs differ on.
+  The glyphs of fonts with no file, glyphs filled with a pattern and glyphs
+  under a transformation keep the atlas. On the Apple M4 a full repaint
+  takes the same CPU time (0.5 ms) and some 0.9 ms more of the GPU.
+* **Pictures** (icons, images: `cached_load_picture` gives the same picture
+  again) are uploaded once, as textures keyed by their unique id (at most
+  512 and 256 MB, the least used going first); patterns and the neutral
+  pattern of `clear_device` once per size of their tiles, repeated.
+* **Vector graphics** (lines which are not thin rules, polygons, arcs,
+  rounded rectangles) go to ThorVG's GL engine. It draws into a
+  multisampled framebuffer of its own and ends a pass by copying all of it
+  over its target, so it cannot draw over what is there, and its
+  `viewport` does not limit that copy: it draws into a scratch texture,
+  and the box it drew is composed over the target. Consecutive vector
+  operations within one clip are one pass; a pass which fits in 512x512
+  pixels is drawn on a small canvas, moved to its origin through a scene,
+  since each pass costs a copy of its whole canvas.
+* **OpenGL on macOS.** ThorVG's static library defines its GL entry points
+  as global function pointers named as the functions (`glCreateProgram`):
+  a call to the function was linked to the pointer, and crashed. The
+  functions used by `vue_gpu.cpp` are loaded from the OpenGL framework into
+  pointers of their own (`VUE_GL_FUNCTIONS`).
+* **Unchanged frames are not presented.** On macOS `SDL_GL_SwapWindow`
+  waits for the display, even with no swap interval, and the loop draws
+  every window at every iteration: a present per window and per frame
+  held the loop. What a frame draws on the screen is folded into a hash
+  as it is drawn (`gpu_frame_hash`: the quads, the state of their batches,
+  the paths and colors of the vector shapes, the unique id of a picture
+  and the generation of a backing store, which changes whenever it is
+  drawn into, scrolled or copied), and a window presents only a frame
+  whose hash differs from the one it presented last (and always after it
+  was hidden or minimized). Every frame is drawn in full into the back
+  buffer, so nothing stale can show. In the benchmark below, the frames
+  between the repaints (pointer moves which change nothing) are no longer
+  presented: 6 presents in 10 frames instead of 10.
+* **The profile** (`TEXMACS_VUE_PROFILE`) counts what the CPU does, the
+  GPU working in parallel as it does when nothing is measured: its work
+  shows as more or fewer frames. `TEXMACS_VUE_GPU_SYNC=1` (`?gpusync=1` in
+  the browser) waits for the GPU at the end of an editor's repaint and of a
+  redraw (`gpu_finish`), so that the times include what it did: an upper
+  bound, since nothing overlaps.
+
+Measured on an Apple M4 (`bench.script`, forced full repaints of the
+document of 200 paragraphs): 0.9 ms of CPU a repaint (1.8 ms waiting for
+the GPU), against 1.2 to 2.0 ms for the MuPDF renderer on the same
+machine, where the native build vectorises MuPDF's loops. What the GPU saves there is the upload of
+the window (0.2 ms against 1 to 1.7 ms a frame). In the browser
+(`texmacs.html?gpu=1`, headless Firefox on an Apple M1, Retina; see
+docs/wasm/README.md on the browser branch): 2.2 ms of CPU a full repaint
+(3.5 ms waiting for the GPU) against 6.6 ms with MuPDF, the canvas upload
+of every frame (2 ms) gone. On a long help page with formulas in many
+fonts (the math font catalogue), scrolled and zoomed, the GPU path draws
+more frames than MuPDF in every phase (1070 against 800 scrolling at
+zoom 1) at 1 to 2.3 ms of CPU a frame against 4.4 to 5 ms; what costs most
+in its repaints is making the glyph bitmaps of the atlas (`shrink`).
+
+Differences from the MuPDF renderer: a frame of the document of 200
+paragraphs differs on some 200 pixels by more than a tenth (the icons,
+sampled as textures), the text being MuPDF's. Still open: draw_spacial and transformed glyphs (bitmaps sampled under the
+transformation) are untested.

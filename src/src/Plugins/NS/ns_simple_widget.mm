@@ -19,6 +19,21 @@
 #include "ns_utilities.h"
 #include "ns_renderer.h"
 #include "ns_gui.h"
+#include <time.h>
+
+// The benchmark (TEXMACS_NS_BENCH, ns_gui.mm): the time spent drawing into
+// the backing stores (TeXmacs and the renderer), and showing them (the
+// views drawing the backing stores into the window), in seconds, and the
+// pixels drawn into the backing stores
+double ns_bench_paint= 0.0, ns_bench_display= 0.0, ns_bench_pixels= 0.0;
+double ns_bench_move= 0.0, ns_bench_repaint= 0.0;
+
+double
+ns_bench_now () {
+  struct timespec ts;
+  clock_gettime (CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec + 1e-9 * ts.tv_nsec;
+}
 #import "TMView.h"
 
 
@@ -91,7 +106,7 @@
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
-  backingPixmap (nil), extents (coord4 (0, 0, 0, 0)),
+  backingPixmap (nil), ring (0), cring (0), extents (coord4 (0, 0, 0, 0)),
   last_viewport (NSZeroSize) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
@@ -625,8 +640,148 @@ ns_simple_widget_rep::get_renderer() {
 inline float mmin (float a, float b) { return (a>b? b: a); }
 inline float mmax (float a, float b) { return (a>b? a: b); }
 
+// NOTE: the backing store wraps around in both directions: the pixel
+// (x, y) of the view (in the pixels of the backing store, from the top
+// left, as the invalid rectangles and the device coordinates of the
+// renderer) is the pixel ((x + cring) mod W, (y + ring) mod H) of the
+// backing store (W x H its size, in the same coordinates; in its memory,
+// the row is H-1 - that, since the backing store is drawn upside down). A
+// scroll only changes cring and ring: moving all the pixels (a new backing
+// store and a copy, or a memmove: about 1 ms for 2000x1300 pixels) took
+// most of a step of a scroll. The views draw the backing store, and the
+// canvas paints into it, in up to four pieces where it wraps.
+
+static unsigned int
+uncovered_pixel () {
+  // what is uncovered: transparent until it is repainted (red with
+  // TEXMACS_NS_DEBUG_RED; NSBitmapFormatAlphaFirst, the bytes A R G B)
+  static int red= -1;
+  if (red < 0) red= (getenv ("TEXMACS_NS_DEBUG_RED") != NULL);
+  unsigned int fill= 0;
+  if (red) {
+    unsigned char px[4]= { 255, 255, 0, 0 };
+    memcpy (&fill, px, 4);
+  }
+  return fill;
+}
+
+void
+ns_simple_widget_rep::shift_backing_store (int dx, int dy) {
+  // the pixel (x, y) of the view gets the pixel (x + dx, y + dy)
+  unsigned char* data= [backingPixmap bitmapData];
+  int W= (int) [backingPixmap pixelsWide], H= (int) [backingPixmap pixelsHigh];
+  int bpr= (int) [backingPixmap bytesPerRow];
+  if (!data || W < 1 || H < 1) return;
+  unsigned int fill= uncovered_pixel ();
+  if (dx != 0) {
+    cring= (((cring + dx) % W) + W) % W;
+    int x0= dx > 0? max (W - dx, 0): 0, x1= dx > 0? W: min (-dx, W);
+    for (int r= 0; r < H; r++) {
+      unsigned int* row= (unsigned int*) (data + r*bpr);
+      for (int x= x0; x < x1; x++) row[(x + cring) % W]= fill;
+    }
+  }
+  if (dy != 0) {
+    ring= (((ring + dy) % H) + H) % H;
+    int y0= dy > 0? max (H - dy, 0): 0, y1= dy > 0? H: min (-dy, H);
+    for (int y= y0; y < y1; y++) {
+      unsigned int* row= (unsigned int*) (data + (H-1 - (y + ring) % H)*bpr);
+      for (int c= 0; c < W; c++) row[c]= fill;
+    }
+  }
+}
+
+void
+ns_simple_widget_rep::unroll_backing_store () {
+  // the pixels in the order of the view (cring and ring 0)
+  if ((ring == 0 && cring == 0) || !backingPixmap) return;
+  unsigned char* data= [backingPixmap bitmapData];
+  int W= (int) [backingPixmap pixelsWide], H= (int) [backingPixmap pixelsHigh];
+  int bpr= (int) [backingPixmap bytesPerRow];
+  if (!data || W < 1 || H < 1) { ring= cring= 0; return; }
+  unsigned char* old= (unsigned char*) malloc (bpr * H);
+  memcpy (old, data, bpr * H);
+  for (int y= 0; y < H; y++) {
+    unsigned char* to= data + (H-1 - y)*bpr;
+    unsigned char* from= old + (H-1 - (y + ring) % H)*bpr;
+    // the columns [0, W - cring) of the view, then [W - cring, W)
+    memcpy (to, from + 4*cring, 4*(W - cring));
+    memcpy (to + 4*(W - cring), from, 4*cring);
+  }
+  free (old);
+  ring= cring= 0;
+}
+
+bool
+ns_simple_widget_rep::backing_piece (int i, double a, double b, bool vertical,
+                                     double& pa, double& pb, double& off) {
+  // the piece i (0 or 1) of [a, b) (in the pixels of the view), before and
+  // after where the backing store wraps, and how far it is moved in it
+  double N= vertical? [backingPixmap pixelsHigh]: [backingPixmap pixelsWide];
+  double o= vertical? ring: cring;
+  double cut= N - o;
+  pa= i == 0? a: max (a, cut);
+  pb= i == 0? min (b, cut): b;
+  off= i == 0? o: o - N;
+  return pb > pa;
+}
+
+void
+ns_simple_widget_rep::draw_backing_store (NSRect rect) {
+  // the part rect of the view (in points), in at most four pieces
+  // NOTE: through an image which reads the pixels of the backing store
+  // where they are: drawing the NSBitmapImageRep made its memory copy on
+  // write, so that the first change of each of its pages after it was
+  // shown copied the page (0.7 ms for the columns uncovered by a step of
+  // a horizontal scroll, which touch all the pages, 2000x1100 pixels)
+  unsigned char* data= [backingPixmap bitmapData];
+  int W= (int) [backingPixmap pixelsWide], H= (int) [backingPixmap pixelsHigh];
+  int bpr= (int) [backingPixmap bytesPerRow];
+  if (!data || W < 1 || H < 1) return;
+  CGContextRef cgc= [[NSGraphicsContext currentContext] CGContext];
+  CGDataProviderRef prov= CGDataProviderCreateWithData (NULL, data, bpr * H, NULL);
+  CGColorSpaceRef cs= CGColorSpaceCreateDeviceRGB ();
+  // NSBitmapFormatAlphaFirst, premultiplied: the bytes A R G B
+  CGImageRef img= CGImageCreate (W, H, 8, 32, bpr, cs,
+                                 kCGImageAlphaPremultipliedFirst |
+                                 kCGBitmapByteOrder32Big,
+                                 prov, NULL, false, kCGRenderingIntentDefault);
+  CGColorSpaceRelease (cs);
+  CGDataProviderRelease (prov);
+  if (!img) return;
+  double k= retina_factor;
+  double x0= rect.origin.x * k, x1= (rect.origin.x + rect.size.width) * k;
+  double y0= rect.origin.y * k, y1= (rect.origin.y + rect.size.height) * k;
+  for (int i= 0; i < 2; i++) {
+    double xa, xb, xo;
+    if (!backing_piece (i, x0, x1, false, xa, xb, xo)) continue;
+    for (int j= 0; j < 2; j++) {
+      double ya, yb, yo;
+      if (!backing_piece (j, y0, y1, true, ya, yb, yo)) continue;
+      // the rows [ya+yo, yb+yo) of the backing store are those from H-(yb+yo)
+      // in its memory (the top of the image); the image is drawn upside
+      // down in the flipped view, as the NSBitmapImageRep with
+      // respectFlipped: NO
+      CGImageRef sub= CGImageCreateWithImageInRect (img,
+        CGRectMake (xa + xo, H - (yb + yo), xb - xa, yb - ya));
+      if (!sub) continue;
+      CGContextDrawImage (cgc, CGRectMake (xa / k, ya / k, (xb - xa) / k,
+                                           (yb - ya) / k), sub);
+      CGImageRelease (sub);
+    }
+  }
+  CGImageRelease (img);
+}
+
 void
 ns_simple_widget_rep::repaint_invalid_regions () {
+  double tr0= ns_bench_now ();
+  repaint_invalid_regions_bis ();
+  ns_bench_repaint += ns_bench_now () - tr0;
+}
+
+void
+ns_simple_widget_rep::repaint_invalid_regions_bis () {
   
   follow_visible_part ();
   NSPoint origin = [view frame].origin;
@@ -647,34 +802,14 @@ ns_simple_widget_rep::repaint_invalid_regions () {
   int dx = (int) round (retina_factor * (origin.x - backing_pos.x));
   int dy = (int) round (retina_factor * (origin.y - backing_pos.y));
   if (dx != 0 || dy != 0) {
+    double tm0= ns_bench_now ();
     moved= true;
     if (getenv ("TEXMACS_NS_DEBUG_DRAW"))
       fprintf (stderr, "SHIFT %g -> %g dy %d size %g\n", backing_pos.y, origin.y, dy, [backingPixmap size].height);
     backing_pos.x += dx / (double) retina_factor;
     backing_pos.y += dy / (double) retina_factor;
-    NSBitmapImageRep *newBackingPixmap = [[NSBitmapImageRep alloc]
-                                          initWithBitmapDataPlanes:NULL
-                                          pixelsWide:sz.width
-                                          pixelsHigh:sz.height
-                                          bitsPerSample:8
-                                          samplesPerPixel:4
-                                          hasAlpha:YES
-                                          isPlanar:NO
-                                          colorSpaceName:NSDeviceRGBColorSpace
-                                          bitmapFormat:NSBitmapFormatAlphaFirst
-                                          bytesPerRow:0
-                                          bitsPerPixel:0];
-    NSGraphicsContext* gc = [NSGraphicsContext graphicsContextWithBitmapImageRep: newBackingPixmap];
-    [NSGraphicsContext saveGraphicsState];
-    [NSGraphicsContext setCurrentContext: gc];
-    if (getenv ("TEXMACS_NS_DEBUG_RED")) {
-      [[NSColor redColor] setFill];
-      NSRectFill (NSMakeRect (0, 0, sz.width, sz.height));
-    }
-    [backingPixmap drawAtPoint: NSMakePoint (-dx, -dy)];
-    [NSGraphicsContext restoreGraphicsState];
-    [backingPixmap release];
-    backingPixmap = newBackingPixmap;
+    // NOTE: nothing is moved: where the view starts in the backing store
+    shift_backing_store (dx, dy);
     //cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
     
     rectangles invalid;
@@ -688,6 +823,7 @@ ns_simple_widget_rep::repaint_invalid_regions () {
     }
     
     sz = [backingPixmap size]; // new size
+    ns_bench_move += ns_bench_now () - tm0;
     
     invalid_regions = invalid & rectangles (rectangle (0,0,
                                                       sz.width,sz.height));
@@ -730,6 +866,7 @@ ns_simple_widget_rep::repaint_invalid_regions () {
     if (_newSize.width < 1 || _newSize.height < 1) return;
     if ((_newSize.width != _oldSize.width)||(_newSize.height != _oldSize.height)) {
       moved= true;
+      unroll_backing_store ();
       // cout << "RESIZING BITMAP"<< LF;
       NSBitmapImageRep *newBackingPixmap = [[NSBitmapImageRep alloc]
                                          initWithBitmapDataPlanes:NULL
@@ -780,19 +917,33 @@ ns_simple_widget_rep::repaint_invalid_regions () {
       invalid_regions = rectangles();
       
       NSSize bs= NSMakeSize ([backingPixmap pixelsWide], [backingPixmap pixelsHigh]);
+      double t0= ns_bench_now ();
       while (!is_nil (rects)) {
         // NOTE: with a margin of one pixel, since the conversion to the
         // coordinates of TeXmacs loses the first row (seams while scrolling)
         rectangle r0 = rects->item;
-        rectangle r = rectangle (max (r0->x1 - 1, (SI) 0), max (r0->y1 - 1, (SI) 0),
-                                 min (r0->x2 + 1, (SI) bs.width),
-                                 min (r0->y2 + 1, (SI) bs.height));
+        rectangle rr = rectangle (max (r0->x1 - 1, (SI) 0), max (r0->y1 - 1, (SI) 0),
+                                  min (r0->x2 + 1, (SI) bs.width),
+                                  min (r0->y2 + 1, (SI) bs.height));
         //cout << "repainting " << r0 << "\n";
-        ren->set_origin (ox, oy);
-        ren->encode (r->x1, r->y1);
-        ren->encode (r->x2, r->y2);
-        ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
-        handle_repaint (ren, r->x1, r->y2, r->x2, r->y1);
+        ns_bench_pixels += (double) (rr->x2 - rr->x1) * (rr->y2 - rr->y1);
+        // in pieces, where the backing store wraps
+        for (int i= 0; i < 4; i++) {
+          double xa, xb, xo, ya, yb, yo;
+          if (!backing_piece (i & 1, rr->x1, rr->x2, false, xa, xb, xo) ||
+              !backing_piece (i >> 1, rr->y1, rr->y2, true, ya, yb, yo))
+            continue;
+          // the pixels [xa, xb) x [ya, yb) of the view are moved by (xo, yo)
+          // in the backing store: so are the device coordinates of the renderer
+          SI ix= (SI) xo, iy= (SI) yo;
+          rectangle r= rectangle ((SI) xa + ix, (SI) ya + iy,
+                                  (SI) xb + ix, (SI) yb + iy);
+          ren->set_origin (ox + ix * ren->pixel, oy - iy * ren->pixel);
+          ren->encode (r->x1, r->y1);
+          ren->encode (r->x2, r->y2);
+          ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
+          handle_repaint (ren, r->x1, r->y2, r->x2, r->y1);
+        }
         if (gui_interrupted ()) {
           //cout << "interrupted repainting of  " << r0 << "\n";
           //ren->set_pencil (green);
@@ -804,6 +955,8 @@ ns_simple_widget_rep::repaint_invalid_regions () {
         rects = rects->next;
       }
       ren->end();
+      double t1= ns_bench_now ();
+      ns_bench_paint += t1 - t0;
       
       // propagate immediately the changes to the screen
       if (!moved) {
@@ -811,10 +964,15 @@ ns_simple_widget_rep::repaint_invalid_regions () {
         [view displayRect: NSMakeRect (lub->x1 / k, lub->y1 / k,
                                        (lub->x2 - lub->x1) / k,
                                        (lub->y2 - lub->y1) / k)];
+        ns_bench_display += ns_bench_now () - t1;
       }
     } // !is_nil (invalid_regions)
   }
-  if (moved) [view display];
+  if (moved) {
+    double t2= ns_bench_now ();
+    [view display];
+    ns_bench_display += ns_bench_now () - t2;
+  }
 }
 
 hashset<pointer> ns_simple_widget_rep::all_widgets;
