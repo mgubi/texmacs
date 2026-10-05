@@ -244,7 +244,7 @@ cmdline_link_rep::feed (int channel) {
   else r = ::read (err, tempout, 1024);
   if (r == -1) {
     io_error << "Read failed for '" << name << "'\n";
-    wait (NULL);
+    waitpid (pid, NULL, 0);
   }
   else if (r == 0) {
     if (channel != LINK_OUT) return;
@@ -341,7 +341,7 @@ cmdline_link_rep::stop () {
   alive= false;    
   //cout << "Alive = false, stop\n";
   close (in);
-  wait (NULL);
+  waitpid (pid, NULL, 0);
 
   remove_notifier (snout);
   remove_notifier (snerr);

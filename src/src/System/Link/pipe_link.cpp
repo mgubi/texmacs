@@ -197,7 +197,7 @@ pipe_link_rep::start () {
         sleep(2);
         killpg(pid,SIGKILL);
       }
-      wait (NULL);
+      waitpid (pid, NULL, 0);
       if (r == -1) return "Error: the application does not reply";
       else
         return "Error: the application did not send its usual startup banner";
@@ -247,7 +247,7 @@ pipe_link_rep::feed (int channel) {
   else r = ::read (err, tempout, 1024);
   if (r == -1) {
     io_error << "Read failed for '" << cmd << "'\n";
-    wait (NULL);
+    waitpid (pid, NULL, 0);
   }
   else if (r == 0) {
     if (-1 != killpg(pid,SIGTERM)) {
@@ -331,7 +331,7 @@ pipe_link_rep::stop () {
   alive= false;    
   close (in);
   alive= false;
-  wait (NULL);
+  waitpid (pid, NULL, 0);
 
   remove_notifier (snout);
   remove_notifier (snerr);

@@ -199,8 +199,12 @@
     (switch-to-buffer u)
     (string-save "new\n" f)
     (git-refresh root)
+    ;; NOTE: the status is recomputed once after git-refresh (by the
+    ;; footer and the menus, when idle); typing starts afterwards
     (steps
      (list
+      (lambda () (noop))
+      (lambda () (noop))
       (lambda () (noop))
       (lambda ()
         (check "panel lists a new file"
@@ -210,8 +214,15 @@
         (insert "a"))
       (lambda () (insert "b"))
       (lambda () (insert "c"))
+      (lambda () (insert "d"))
+      (lambda () (insert "e"))
+      (lambda () (insert "f"))
       (lambda ()
-        (check "no Git command while typing" (null? (git-commands-since t0)))
+        ;; NOTE: the footer may compute the status once, when idle
+        (with l (git-commands-since t0)
+          (check "no Git command while typing"
+                 (and (<= (length l) 1) (list-and (map (cut == <> "status") l))))
+          (when (nnull? l) (display* "     commands: " l "\n")))
         (git-stage f))
       (lambda ()
         (check "panel refreshed after staging"

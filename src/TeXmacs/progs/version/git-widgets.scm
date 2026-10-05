@@ -863,7 +863,12 @@
   (refresh-now "version-review"))
 
 (define (review-conflict? u)
-  (and (url? u) (git-root u) (== (git-file-state u) 'conflicted)))
+  ;; NOTE: the review bar is expanded after each change of the document, so
+  ;; that the state of the file is cached until the working tree changes
+  (and-with root (and (url? u) (git-root u))
+    (== (git-memo root (list 'state (url->system u))
+                  (lambda () (git-file-state u)))
+        'conflicted)))
 
 (tm-widget (version-review-contents win)
   (let* ((u (window->buffer win))
