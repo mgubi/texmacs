@@ -99,7 +99,8 @@
   said on the status bar). It is kept: unfolding the fold again, or
   unfolding all the folds of the document, shows it without asking again;
   <key|Return> in its question, or <with|font-series|bold|Ask again> in its
-  focus bar, asks again.
+  focus bar, asks again. When its question was changed since its answer,
+  its focus bar says <with|font-series|bold|Question changed>.
 
   When an engine says that it has too many requests, or that it is
   overloaded, the question is asked again after a few seconds (as long as

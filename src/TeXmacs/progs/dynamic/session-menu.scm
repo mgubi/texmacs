@@ -95,11 +95,8 @@
 
 (tm-menu (supported-session-item name)
   (let* ((menu-name (session-name name))
-         (l (local-connection-variants name))
-         (m (session-insert-menu name)))
-    (assuming (and (nnull? l) m)
-      (dynamic (m name)))
-    (assuming (and (nnull? l) (not m))
+         (l (local-connection-variants name)))
+    (assuming (nnull? l)
       (assuming (== l (list "default"))
         ((eval menu-name) (make-session name "default")))
       (assuming (!= l (list "default"))
@@ -296,11 +293,7 @@
       ((balloon (icon "tm_stop.xpm") "Interrupt execution")
        (plugin-interrupt))
       ((balloon (icon "tm_clsession.xpm") "Close session")
-       (plugin-stop)))
-  ;; those of the plug-in (set-session-focus-menu!)
-  (with lan (get-env "prog-language")
-    (with m (session-focus-menu lan)
-      (if m (dynamic (m lan))))))
+       (plugin-stop))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Help icons

@@ -350,6 +350,10 @@
           (w (tree-insert! w (- (tree-arity w) 1) (list var val)))
           (else (tree-insert-node! s 2 `(with ,var ,val))))))
 
+;; (for tools/ai/ai-folds.scm)
+(tm-define (ai-tree-var s var) (ai-session-var s var))
+(tm-define (ai-tree-set-var! s var val) (ai-set-session-var s var val))
+
 (define (ai-tree-model s name)
   (or (ai-session-var s "ai-model") (ai-default-model name)))
 
@@ -1165,10 +1169,7 @@
         (insert-return)
         (insert (stree->tree x))))))
 
-;; (not an overloading of focus-extra-icons: the plug-in is loaded again
-;; when a key is given, and each loading would add its icons)
-(for-each (lambda (name) (set-session-focus-menu! name focus-ai-icons))
-          (ai-models))
+;; (in the focus bar of the sessions of the engines: tools/ai/ai-sessions.scm)
 
 ;; Ask about the selection: a session of the engine after the paragraph of
 ;; the selection, whose input holds the selection, for the question which is
@@ -1220,10 +1221,14 @@
                      "How much the model reasons before it answers")
             (dynamic (focus-ai-reasoning-menu lan))))
     //
+    (if (ai-fold-stale? t)
+        (inert ("Question changed" (noop))))
     ((balloon "Ask again" "Ask the question of the fold again")
      (ai-fold-ask-again t))))
 
-(use-modules (tools ai ai-folds))
+;; the focus bars of the sessions and the folds, and what the folds do:
+;; modules loaded once (this file is loaded again when a key is given)
+(use-modules (tools ai ai-sessions) (tools ai ai-folds))
 
 ;; the chatbots in a submenu AI of Insert > Session, each starting a session
 ;; of its default model (the model is then chosen in the focus bar)
