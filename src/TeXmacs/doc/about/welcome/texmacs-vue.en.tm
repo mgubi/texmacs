@@ -215,6 +215,10 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item><LaTeX> import: no multiplication is put before a text in a
+    formula (<verbatim|$a\\text{ if }b$> gave <math|a*<text| if >b>), and
+    <verbatim|\\parbox[t][3cm][c]{2cm}{...}> is read with all its options.
+
     <item>Code copied out of <TeXmacs> (a code block, the answer of a
     chatbot as it came) keeps its <verbatim|...>, which became an ellipsis
     (<verbatim|\\foreach \\x in {0,...,5}> of <name|TikZ> then failed).
