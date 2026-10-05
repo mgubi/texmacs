@@ -16,7 +16,7 @@
 #include "convert.hpp"
 #include "locale.hpp"
 
-#if !USE_ASPELL
+#if !USE_ASPELL && !USE_HUNSPELL
 
 string ispell_encode (string lan, string s);
 string ispell_decode (string lan, string s);

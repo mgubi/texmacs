@@ -34,6 +34,13 @@ SOURCES  := $(shell cat $(W)/sources.txt)
 # emsdk, which the CI puts on the PATH ("node: Permission denied")
 NODE     ?= $(shell command -v node)
 OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
+# the spell checker, Hunspell, in the program (src/Plugins/Ispell/
+# ispell_hunspell.cpp), from the sources fetched by get-hunspell.sh
+HUNSPELL := hunspell-1.7.2
+HUNSPELL_SRC := affentry affixmgr csutil filemgr hashmgr hunspell hunzip \
+  phonet replist suggestmgr
+HUNSPELL_OBJECTS := $(patsubst %,$(OBJ)/hunspell/%.o,$(HUNSPELL_SRC))
+OBJECTS  += $(HUNSPELL_OBJECTS)
 
 INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \
   System/Misc System/Language Kernel/Abstractions Kernel/Containers \
@@ -51,7 +58,8 @@ INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \
 EH       := -fwasm-exceptions -sSUPPORT_LONGJMP=wasm
 CPPFLAGS := -I$(W) -include $(W)/config.h $(patsubst %,-I$(S)/%,$(INCLUDE_DIRS)) \
   -I$(TM)/TeXmacs/include -I$(MUPDF)/include \
-  -I$(MUPDF)/thirdparty/freetype/include -sUSE_SDL=3
+  -I$(MUPDF)/thirdparty/freetype/include -sUSE_SDL=3 \
+  -I$(CURDIR)/$(HUNSPELL)/src -DHUNSPELL_STATIC
 OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
@@ -220,6 +228,18 @@ $(OUT)/texmacs.js: $(OBJECTS)
 $(OBJ)/Plugins/Vue/%.o: $(S)/Plugins/Vue/%.cpp
 	@mkdir -p $(dir $@)
 	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -std=c++20 -c $< -o $@
+
+$(HUNSPELL)/src/hunspell/hunspell.hxx:
+	sh $(W)/get-hunspell.sh $(CURDIR)
+
+# (the sources come with the header)
+$(HUNSPELL)/src/hunspell/%.cxx: $(HUNSPELL)/src/hunspell/hunspell.hxx ;
+
+$(HUNSPELL_OBJECTS): $(OBJ)/hunspell/%.o: $(HUNSPELL)/src/hunspell/%.cxx
+	@mkdir -p $(dir $@)
+	em++ $(CXXFLAGS) -DHUNSPELL_STATIC -c $< -o $@
+
+$(OBJ)/Plugins/Ispell/ispell_hunspell.o: $(HUNSPELL)/src/hunspell/hunspell.hxx
 
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
