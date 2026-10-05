@@ -485,7 +485,9 @@ TEXMACS_objects := $(strip $(call uses,system kernel data graphics\
 TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_alloc.o Objects/tree.o \
 	$(filter-out Objects/windows64_entrypoint.o Objects/Plugins/Windows64/windows64_entrypoint.o,$(TEXMACS_objects))
 
-link_options:=-L$(tmsrc)/lib -lm $(LDPATH) $(LDGUI) $(LDICONV) $(CXXFLAGS)\
+# NOTE: not $(LDPATH) (-Wl,-rpath, on Linux) alone, which took the first
+# option of $(LDGUI) for its path (-L<the SDL3 of the Vue port>)
+link_options:=-L$(tmsrc)/lib -lm $(LDGUI) $(LDICONV) $(CXXFLAGS)\
    $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) $(LDRESVG) @SPARKLE_LDFLAGS@
 
 
