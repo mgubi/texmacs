@@ -320,8 +320,9 @@ var tmFrame = (function () {
       'Only the fonts which come with TeXmacs: the page cannot see the fonts of the system.',
       'The remote tools (the Remote menu) connect over WebSocket to a TeXmacs server of ' +
       'this branch, on this machine only for now (no encrypted wss yet).',
-      'Two tabs of the browser with this page share the same storage, and their saves ' +
-      'may overwrite each other: keep TeXmacs Vue open in one tab.',
+      'TeXmacs Vue keeps your files from one tab of the browser at a time: in another ' +
+      'tab it shows them, but does not keep its changes, until you move TeXmacs there ' +
+      '("Use TeXmacs here").',
       'It is slower than the desktop program. Its first visit loads some 9 MB before it ' +
       'starts and 8 MB more in the background; the fonts come when a document first uses them.']]
   ];

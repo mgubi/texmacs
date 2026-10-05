@@ -62,10 +62,15 @@
   <\warning*>
     Clearing the data of the site deletes your files, and Safari deletes the
     data of a site which was not visited for seven days. Save a copy of the
-    documents you want to keep. Keep <TeXmacs> <name|Vue> open in a single tab of
-    the browser: two tabs share the same storage, and their saves may
-    overwrite each other.
+    documents you want to keep.
   </warning*>
+
+  Your files are kept by one tab of the browser at a time. When <TeXmacs>
+  <name|Vue> is already open in another tab, a new tab shows your files but
+  does not keep its changes, and says so; <with|font-series|bold|Use
+  TeXmacs here> moves <TeXmacs> to it (the other tab keeps its last changes
+  first). When the tab which has <TeXmacs> is closed, the others offer to
+  reload.
 
   <section|Passwords and keys: the wallet>
 
@@ -188,6 +193,14 @@
   <paragraph|5 October 2026>
 
   <\itemize>
+    <item>Your files are kept as soon as they change (within a second),
+    and no longer every five seconds; a large folder of files no longer
+    slows this down.
+
+    <item>Two tabs no longer overwrite each other's files: a second tab of
+    <TeXmacs> <name|Vue> is read-only, says so, and can take <TeXmacs> over
+    with <with|font-series|bold|Use TeXmacs here>.
+
     <item>A reference of <name|Zotero> cited from the search window is
     copied at once into the database (or into the <BibTeX> file of the
     bibliography), and the document remembers its item: the bibliography
