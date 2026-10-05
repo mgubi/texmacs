@@ -407,7 +407,9 @@
     each asks its question alone (with the document, if it is chosen in its
     focus bar), with its own model, and keeps its answer, which is the answer
     alone; unfolding it again does not ask again (<key|Return> in its
-    question, or <with|font-series|bold|Ask again>, does).
+    question, or <with|font-series|bold|Ask again>, does). Its focus bar
+    says <with|font-series|bold|Question changed> when its question was
+    changed since its answer.
   </itemize>
 
   <paragraph|4 October 2026>

@@ -109,15 +109,6 @@
   (with f (ahash-ref request-banners name)
     (and f (f name))))
 
-;; the icons of a plug-in in the focus bar of its sessions: a menu of the
-;; plug-in, from its name (a table, which a plug-in loaded again replaces,
-;; where a menu defined again would be added to the one before it)
-(define session-focus-menus (make-ahash-table))
-(define-public (set-session-focus-menu! name m)
-  (ahash-set! session-focus-menus name m))
-(define-public (session-focus-menu name)
-  (ahash-ref session-focus-menus name))
-
 ;; the sessions of a group are in a submenu of the menus which list them
 ;; (Insert > Session: AI for the chatbots), whose name is the group
 (define session-groups (make-ahash-table))
@@ -125,14 +116,6 @@
   (ahash-set! session-groups name group))
 (define-public (session-group name)
   (ahash-ref session-groups name))
-
-;; the entry of a session in Insert > Session, if its plug-in gives one: a
-;; menu of the plug-in, from its name (the chatbots: a submenu of models)
-(define session-insert-menus (make-ahash-table))
-(define-public (set-session-insert-menu! name m)
-  (ahash-set! session-insert-menus name m))
-(define-public (session-insert-menu name)
-  (ahash-ref session-insert-menus name))
 
 ;; the names of the sessions l and of their groups, in the order of their
 ;; names in the menus; a group as (group name ...)

@@ -40,6 +40,21 @@
 ;; The answer which is kept, and the question asked again
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; the question of the answer which a fold keeps: a short sign of it, kept
+;; around the fold (ai-asked), which tells when it changed since
+(define (ai-question-sign t)
+  (let* ((s (object->string (tree->stree (tree-ref t 2))))
+         (n (string-length s)))
+    (let loop ((i 0) (h 0))
+      (if (>= i n) (number->string h 16)
+          (loop (+ i 1) (modulo (+ (* h 31) (char->integer (string-ref s i)))
+                                1000000007))))))
+
+(tm-define (ai-fold-stale? t)
+  (and (ai-fold? t) (ai-fold-answered? t)
+       (with sign (ai-tree-var t "ai-asked")
+         (and sign (!= sign (ai-question-sign t))))))
+
 (define ai-fold-asked? #f)
 
 (tm-define (ai-fold-ask-again t)
@@ -51,6 +66,9 @@
 (tm-define (alternate-toggle t)
   (:require (and (tree-is? t 'script-input) (ai-fold? t)
                  (not ai-fold-asked?) (ai-fold-answered? t)))
+  (when (ai-fold-stale? t)
+    (set-message "The question changed since this answer: Return in it, or Ask again, asks it"
+                 (session-name (tree->string (tree-ref t 0)))))
   (tree-assign-node! t 'script-output)
   (tree-go-to t 3 :end))
 
@@ -70,6 +88,8 @@
 (tm-define (script-feed lan ses in out opts)
   (:require (in? lan (ai-models)))
   (with f (and (tree? out) (tree-up out))
+    (when (ai-fold? f)
+      (ai-tree-set-var! f "ai-asked" (ai-question-sign f)))
     (ahash-set! ai-fold-queue lan
                 (append (or (ahash-ref ai-fold-queue lan) '())
                         (list (and (ai-fold? f) (tree->tree-pointer f))))))
