@@ -43,6 +43,9 @@
 #include "socket_notifier.hpp" // notifiers_active (pause of the loop)
 
 #include <SDL3/SDL.h>
+// SDL_SetMainReady, without SDL replacing main (TeXmacs has its own)
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL_main.h>
 #include <unistd.h> // usleep (the headless loop)
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h> // emscripten_set_main_loop
