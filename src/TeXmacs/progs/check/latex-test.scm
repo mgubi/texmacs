@@ -468,6 +468,11 @@
   (check= (lt "$\\mathbf{x}$") '(math "<b-up-x>"))
   (check= (lt "$\\operatorname{rank} A$")
           '(math (concat (math-up "rank") "A")))
+  ;; a text separates the factors around it: no multiplication across it
+  (check= (lt "$a\\text{if}b$") '(math (concat "a" (text "if") "b")))
+  (check= (lt "$x\\text{ for all }y$")
+          '(math (concat "x" (text "for all ") "y")))
+  (check= (lt "$ab$") '(math "a*b"))
   (check= (lt "$\\frac{a}{b}$") '(math (frac "a" "b")))
   (check= (lt "$a\\over b$") '(math (frac "a" "b")))
   (check= (lt "$\\sqrt{x}$") '(math (sqrt "x")))
@@ -672,6 +677,7 @@
     (math (concat (big "sum") (rsub "i") "x"))
     (math (concat (big "int") (rsub "0") (rsup "1") "f"))
     (math (binom "n" "k")) (math (op "lim"))
+    (math (concat "a" (text "if") "b"))
     (math (wide "x" "^")) (math (wide "x" "~")) (math (wide "x" "<bar>"))
     (math (wide "x" "<vect>")) (math (wide* "x" "<bar>"))
     (math "<bbb-R>") (math "<cal-A>")
@@ -693,8 +699,7 @@
 ;;   - a left subscript is written {}_b, which is read back on the left
 ;;     atom;
 ;;   - text underline and math under-bar are both \underline;
-;;   - math bold is \tmmathbf, read back as a bold letter;
-;;   - a text in a formula ends an implicit product.
+;;   - math bold is \tmmathbf, read back as a bold letter.
 (define round-trip-lossy
   '(((math (around* "(" "x" ")")) (math (around "(" "x" ")")))
     ((math (concat (left "(") "x" (right ")"))) (math (around "(" "x" ")")))
@@ -702,7 +707,6 @@
     ((math (concat "a" (lsub "b"))) (math (concat "a" (rsub "b"))))
     ((underline "u") (wide* "u" "<bar>"))
     ((math (with "math-font-series" "bold" "x")) (math "<b-x>"))
-    ((math (concat "a" (text "if") "b")) (math (concat "a*" (text "if") "b")))
     ((verbatim (document "a" "b")) (verbatim-code (document "a" "b")))
     ((math (det (tformat (table (row (cell "a") (cell "b"))))))
      (math (around* "|" (tabular* (tformat
