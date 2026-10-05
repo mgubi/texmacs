@@ -215,6 +215,10 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>Code copied out of <TeXmacs> (a code block, the answer of a
+    chatbot as it came) keeps its <verbatim|...>, which became an ellipsis
+    (<verbatim|\\foreach \\x in {0,...,5}> of <name|TikZ> then failed).
+
     <item>An error of <TeXmacs> (a menu of a plug-in which cannot be
     built...) is shown in the window of the error messages and in the status
     bar, as on the desktop: it stopped the page, which had to be reloaded.
