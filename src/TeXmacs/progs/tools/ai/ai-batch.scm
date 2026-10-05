@@ -23,7 +23,7 @@
     (set! t (tm-ref t 0)))
   (if (tm-atomic? t)
       (with s (tm->string t)
-        (cork->utf8 s))
+        (cork->sourcecode s))
       (with s (convert (tm->stree t) "texmacs-stree" "latex-snippet"
                        (cons "texmacs->latex:encoding" "utf-8"))
         ;;(display* "s = " s "\n")
@@ -57,12 +57,15 @@
 (define ai-pictures (make-ahash-table))   ; code -> output of the plug-in
 (define ai-pictures-busy (make-ahash-table)) ; code -> folds which wait
 
+;; (cork->sourcecode as the code of a fold is sent: cork->utf8 would make the
+;; ... of \foreach an ellipsis)
 (define (ai-picture-code doc)
   (if (tm-func? doc 'document)
-      (string-recompose (map (lambda (l) (if (string? l) (cork->utf8 l) ""))
+      (string-recompose (map (lambda (l)
+                               (if (string? l) (cork->sourcecode l) ""))
                              (cdr doc))
                         "\n")
-      (if (string? doc) (cork->utf8 doc) "")))
+      (if (string? doc) (cork->sourcecode doc) "")))
 
 (define (ai-picture-input code)
   `(document ,@(map utf8->cork (string-decompose code "\n"))))

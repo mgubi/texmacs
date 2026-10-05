@@ -416,9 +416,10 @@
          (with code (select (cadddr x) '(:* verbatim-code 0))
            (and (nnull? code)
                 (with d (car code)
-                  ;; (each line converted: a newline is a character of Cork)
+                  ;; (each line converted: a newline is a character of Cork;
+                  ;; as source code, which keeps ... as it is)
                   (string-recompose
-                   (map (lambda (l) (if (string? l) (cork->utf8 l) ""))
+                   (map (lambda (l) (if (string? l) (cork->sourcecode l) ""))
                         (if (tm-func? d 'document) (cdr d) (list d)))
                    "\n")))))
         (else (list-or (map ai-raw-text (cdr x))))))

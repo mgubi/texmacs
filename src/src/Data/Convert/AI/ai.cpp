@@ -1121,7 +1121,8 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
       }
       end += N(close);
       string head= ai_tikz_header (pre);
-      string code= head * s (best, end);
+      // (an ellipsis, U+2026, where TikZ wants ..., as in \foreach)
+      string code= head * replace (s (best, end), "\xe2\x80\xa6", "...");
       if (starts (head, "\\documentclass")) code << "\n\\end{document}";
       block= ai_picture_fold (code);
     }

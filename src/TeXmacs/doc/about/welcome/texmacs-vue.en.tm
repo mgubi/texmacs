@@ -215,6 +215,11 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The <name|TikZ> pictures of an answer whose code has
+    <verbatim|...> (as <verbatim|\\foreach \\x in {0,1,...,5}>) are drawn:
+    the dots became an ellipsis, which <name|TikZ> refuses. The conversation
+    sent again keeps them too.
+
     <item>The chatbots are in <menu|Insert|Session> before they have a
     key. A session without a key asks for it: it opens the preferences of the
     chatbot, or first the wallet if it is closed (it may hold the key). A key
