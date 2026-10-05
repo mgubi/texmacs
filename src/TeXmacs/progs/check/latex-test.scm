@@ -436,7 +436,17 @@
   (check= (lt "\\begin{description}\\item[x] a\\end{description}")
           '(document (description (document (concat (item* "x") "a")))))
   (check= (lt "\\begin{itemize}\\item[*] a\\end{itemize}")
-          '(document (itemize (document (concat (item* "*") "a"))))))
+          '(document (itemize (document (concat (item* "*") "a")))))
+  ;; the options of enumitem are dropped, the lists kept
+  (check= (lt "\\begin{itemize}[nosep]\n\\item a\n\\item b\n\\end{itemize}")
+          '(document (itemize (document (concat (item) "a")
+                                        (concat (item) "b")))))
+  (check= (lt "\\begin{description}[style=nextline]\\item[x] a\\end{description}")
+          '(document (description (document (concat (item* "x") "a")))))
+  (check= (lt "\\begin{compactitem}[nosep]\\item a\\end{compactitem}")
+          '(document (itemize (document (concat (item) "a")))))
+  (check= (lt "\\begin{enumerate}[label=(\\alph*)]\\item \\href{http://x.org}{x}\\end{enumerate}")
+          '(document (enumerate (document (concat (item) (hlink "x" "http://x.org")))))))
 
 (define (test-import-references)
   (check-group "import: labels, references, notes")
