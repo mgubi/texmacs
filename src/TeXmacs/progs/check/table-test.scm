@@ -1346,7 +1346,9 @@
       (edit (clipboard-cut "table-test"))
       (check= (body) `(document "x" ,(tab '() '("" "" "") '("d" "e" "f")) "y"))
       (check= (tree->stree (clipboard-get "table-test"))
-              `(tuple "texmacs" (tformat ,(rows '("a" "b" "c"))) "text" "british"))
+              ;; the language of the document: that of the locale
+              `(tuple "texmacs" (tformat ,(rows '("a" "b" "c"))) "text"
+                      ,(get-preference "language")))
       (clipboard-clear "table-test"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

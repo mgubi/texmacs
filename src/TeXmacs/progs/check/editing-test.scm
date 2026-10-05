@@ -640,7 +640,9 @@
         (with doc (tree->stree (tree-import f "texmacs"))
           (check= (doc-part doc 'body) `(body ,saved-doc))
           ;; the style, followed by the language package of the locale
-          (check= (cadr (cadr (doc-part doc 'style))) "generic")
+          ;; (none for English: the style is then "generic" alone)
+          (with st (cadr (doc-part doc 'style))
+            (check= (if (pair? st) (cadr st) st) "generic"))
           (check-true (string-contains? (object->string (doc-part doc 'initial))
                                         "font-base-size")))
         ;; save-buffer after a change
