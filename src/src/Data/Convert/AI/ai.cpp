@@ -903,6 +903,24 @@ ai_cut_picture (string code) {
   return doc;
 }
 
+// The fold of a TikZ picture: with its picture when it was made (the
+// pictures are made as soon as they are complete, while the answer still
+// comes, and kept by their code: ai-picture in ai-batch.scm), else asked
+// for, and pending (ai-run-pending-folds fills it once it is there)
+static tree
+ai_picture_fold (string code) {
+  tree fold= ai_script_fold ("tikz", code);
+  object made= call ("ai-picture", code);
+  if (is_tree (made)) {
+    fold= tree (L(fold), fold[0], fold[1], fold[2], as_tree (made));
+    return compound ("script-output", A(fold));
+  }
+  (void) call ("ai-picture-request", code);
+  tree busy= compound ("script-output", fold[0], fold[1], fold[2],
+                       compound ("script-busy"));
+  return compound ("with", "ai-tikz", "pending", busy);
+}
+
 // the pictures of s replaced by marks; their trees in blocks
 static string
 ai_set_aside (string s, string pre, array<tree>& blocks) {
@@ -950,12 +968,10 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
         break;
       }
       end += N(close);
-      // evaluated when it is in the document (ai-run-pending-folds)
       string head= ai_tikz_header (pre);
       string code= head * s (best, end);
       if (starts (head, "\\documentclass")) code << "\n\\end{document}";
-      block= compound ("with", "ai-tikz", "pending",
-                       ai_script_fold ("tikz", code));
+      block= ai_picture_fold (code);
     }
     // a verbatim around a picture (where it is asked for an SVG) goes with
     // it, also when the picture was cut before its end
@@ -1219,6 +1235,7 @@ ai_latex_partial (string r) {
     if (occurs ("\\documentclass", r)) return "";
     return verbatim_to_tree (r, false, "utf-8");
   }
+  string pre= r (0, b);
   r= r (b + 16, N(r));
   int e= search_forwards ("\\end{document}", r);
   if (e >= 0) r= r (0, e);
@@ -1226,7 +1243,11 @@ ai_latex_partial (string r) {
   int k= 0;
   while (k < N(r) && (r[k] == ' ' || r[k] == '\n' || r[k] == '\r')) k++;
   if (k == N(r)) return "";
-  return tree (WITH, MODE, "text", ai_latex_body_to_tree (r));
+  // its complete pictures: SVG images at once, TikZ ones made now
+  array<tree> blocks;
+  string aside= ai_set_aside (r, pre, blocks);
+  return tree (WITH, MODE, "text",
+               ai_put_back (ai_latex_body_to_tree (aside), blocks));
 }
 
 /******************************************************************************

@@ -43,8 +43,59 @@
         (ai-run-pending-folds)))
     t))
 
-;; The TikZ pictures of an answer are executable folds of the TikZ plug-in
-;; (ai.cpp), marked as pending: once in the document they are evaluated
+;; The TikZ pictures of an answer are folds of the TikZ plug-in (ai.cpp).
+;; Each is made once, as soon as it is complete, while the answer still
+;; comes: it is evaluated apart (a silent evaluation, not in a fold of the
+;; document, which the answer so far replaces at each piece), and its
+;; picture kept by its code (ai-picture, asked by ai.cpp). The folds whose
+;; picture is not there yet are pending: once in the document they are
+;; filled when it comes.
+
+(define ai-pictures (make-ahash-table))   ; code -> output of the plug-in
+(define ai-pictures-busy (make-ahash-table)) ; code -> folds which wait
+
+(define (ai-picture-code doc)
+  (if (tm-func? doc 'document)
+      (string-recompose (map (lambda (l) (if (string? l) (cork->utf8 l) ""))
+                             (cdr doc))
+                        "\n")
+      (if (string? doc) (cork->utf8 doc) "")))
+
+(define (ai-picture-input code)
+  `(document ,@(map utf8->cork (string-decompose code "\n"))))
+
+;; the picture of the code (in UTF-8), if it was made
+(tm-define (ai-picture code)
+  (with r (ahash-ref ai-pictures code)
+    (and r (stree->tree r))))
+
+;; the picture of the code is made, unless it is or is being made
+(tm-define (ai-picture-request code)
+  (when (and (not (ahash-ref ai-pictures code))
+             (not (ahash-ref ai-pictures-busy code)))
+    (ahash-set! ai-pictures-busy code (list))
+    (when (not (in? "tikz" (get-style-list)))
+      (add-style-package "tikz"))
+    (silent-feed* "tikz" "default" (ai-picture-input code)
+                  (lambda (r) (ai-picture-made code r))
+                  '(:math-input :simplify-output)))
+  "")
+
+(define (ai-fill-fold p r)
+  (with t (tree-pointer->tree p)
+    (tree-pointer-detach p)
+    (when (and (tree? t) (tree-is? t 'script-output) (== (tree-arity t) 4))
+      (tree-set! t 3 r))))
+
+(define (ai-picture-made code r)
+  (ahash-set! ai-pictures code r)
+  (with waiting (or (ahash-ref ai-pictures-busy code) (list))
+    (ahash-remove! ai-pictures-busy code)
+    (for (p waiting) (ai-fill-fold p r))))
+
+;; the pending folds of the document (not those of an answer which is
+;; still coming, which the next piece replaces): filled now, or when their
+;; picture comes
 (tm-define (ai-run-pending-folds)
   (with l (select (buffer-tree) '(:* with))
     (with pending (list-filter l (lambda (w)
@@ -57,13 +108,16 @@
         (for (w pending)
           (with t (tree-ref w 2)
             (tree-remove-node! w 2)
-            (when (tree-is? t 'script-input)
-              (script-eval-at (tree-ref t 3)
-                              (tree->string (tree-ref t 0))
-                              (tree->string (tree-ref t 1))
-                              (tree->stree (tree-ref t 2))
-                              :math-input :simplify-output)
-              (tree-assign-node! t 'script-output))))))))
+            (when (tree-is? t 'script-output)
+              (let* ((code (ai-picture-code (tree->stree (tree-ref t 2))))
+                     (r (ahash-ref ai-pictures code)))
+                (if r (tree-set! t 3 r)
+                    (begin
+                      (ai-picture-request code)
+                      (ahash-set! ai-pictures-busy code
+                                  (cons (tree->tree-pointer t)
+                                        (or (ahash-ref ai-pictures-busy code)
+                                            (list))))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic correction

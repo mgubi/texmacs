@@ -202,6 +202,9 @@
     the <name|TikZ> plug-in, its <name|SVG> pictures images, and the answer
     as it came is kept in a fold after it. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
+    <item>The pictures of an answer of a chatbot are made as soon as they
+    are complete, while the rest of the answer comes.
+
     <item>The chatbots are told how to write <LaTeX> which <TeXmacs> takes
     well; these instructions can be changed for each one (Instructions,
     Edit, in its preferences). The lists with options of

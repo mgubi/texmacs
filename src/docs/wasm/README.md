@@ -374,6 +374,12 @@ the preferences or the environment (`ai-api-key` in `init-ai.scm`).
   (with its fence and XML declaration) an image of raw data. The answer as
   it came is kept after it, folded (`ai_raw_fold`, preference
   `ai raw answer`), and is what `ai-session-context` sends back.
+- The pictures are made as soon as they are complete, in the answer so far
+  too (`ai_latex_partial` sets them aside): a TikZ one by a silent
+  evaluation of the TikZ plug-in, not in a fold of the document (which the
+  next piece replaces), kept by its code (`ai-picture`,
+  `ai-picture-request` in `ai-batch.scm`). The fold of a picture which is
+  not made yet is pending, filled when it comes (`ai-run-pending-folds`).
 - The system prompt of an engine is `ai-instructions` (init-ai.scm): the
   file `~/.TeXmacs/system/ai/<engine>-instructions.txt` when the user has
   one (Instructions, Edit, in the preferences), else a default which tells

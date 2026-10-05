@@ -34,7 +34,8 @@
   (<verbatim|tikzpicture>, <verbatim|tikzcd>, <verbatim|circuitikz>)
   becomes an executable fold of the <name|TikZ> plug-in, made at once, with
   the libraries and packages which the answer asks for; an <name|SVG>
-  picture becomes an image. Each answer ends with a folded copy of the
+  picture becomes an image. In a web browser, each picture is made as soon
+  as it is complete, while the rest of the answer comes. Each answer ends with a folded copy of the
   answer as it came, to see what the chatbot wrote (it is also what is sent
   back as the context); <with|font-series|bold|Show the answer as it came>
   in the preferences removes it.
