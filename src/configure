@@ -36496,7 +36496,7 @@ printf '%s\n' "enabling the GPU renderer with ThorVG in $with_thorvg" >&6; }
 
 printf '%s\n' "#define USE_THORVG 1" >>confdefs.h
 
-        THORVG_CFLAGS="-I$with_thorvg/include/thorvg-1 -DGL_SILENCE_DEPRECATION"
+        THORVG_CFLAGS="-I$with_thorvg/include/thorvg-1 -DGL_SILENCE_DEPRECATION -DTVG_STATIC"
         THORVG_LDFLAGS="$with_thorvg/lib/libthorvg-1.a"
         case "${host}" in
           *darwin*) THORVG_LDFLAGS="$THORVG_LDFLAGS -framework OpenGL" ;;

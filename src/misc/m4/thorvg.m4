@@ -15,7 +15,7 @@ AC_DEFUN([LC_THORVG],[
               -f "$with_thorvg/lib/libthorvg-1.a" ; then
         AC_MSG_RESULT([enabling the GPU renderer with ThorVG in $with_thorvg])
         AC_DEFINE(USE_THORVG, 1, [Use ThorVG and OpenGL for the Vue renderer])
-        THORVG_CFLAGS="-I$with_thorvg/include/thorvg-1 -DGL_SILENCE_DEPRECATION"
+        THORVG_CFLAGS="-I$with_thorvg/include/thorvg-1 -DGL_SILENCE_DEPRECATION -DTVG_STATIC"
         THORVG_LDFLAGS="$with_thorvg/lib/libthorvg-1.a"
         case "${host}" in
           *darwin*) THORVG_LDFLAGS="$THORVG_LDFLAGS -framework OpenGL" ;;

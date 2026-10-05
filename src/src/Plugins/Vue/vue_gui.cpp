@@ -2475,6 +2475,7 @@ void gui_open (int& argc, char** argv) {
   // trackpads: macOS itself generates the momentum events of a gesture
   // (SDL drops them by default), see the kinetic scrolling notes below
   SDL_SetHint (SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
+  SDL_SetMainReady (); // TeXmacs has its own main (no SDL_main.h)
   if (!SDL_Init (SDL_INIT_VIDEO)) { // no audio backend is needed
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);
