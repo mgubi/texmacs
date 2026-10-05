@@ -1569,7 +1569,9 @@ ai_chat (string s, string model, string agent, string chat) {
   //  debug_io << "input, " << cmd << LF;
   //  debug_io << "output, " << val << LF;
   //}
-  string r= ai_output (val, model, chat);
+  // (without the spaces and newlines which end the answer: the text which
+  // replaces a selection)
+  string r= trim_spaces_right (ai_output (val, model, chat));
   if (DEBUG_IO) {
     debug_io << "ai input, " << s << LF;
     debug_io << "ai output, " << r << LF;
