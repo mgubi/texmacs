@@ -110,8 +110,7 @@
   (if (wallet-key) "(in the wallet)"
       (get-preference "zotero api key")))
 
-(tm-define (zotero-set-api-key key)
-  (:synopsis "Use the API key @key of zotero.org")
+(define (store-api-key key)
   (if (and (supports-wallet?) (wallet-on?))
       (begin
         (if (== key "") (wallet-delete key-entry) (wallet-set key-entry key))
@@ -119,7 +118,108 @@
       (set-preference "zotero api key" key))
   (set-preference "zotero user" "")
   (zotero-forget-state)
-  (zotero-forget-keys))
+  (zotero-forget-keys)
+  ;; the search window of references shows its sources and results again
+  (catch #t (lambda () (db-search-refresh)) (lambda args #f)))
+
+(define (wallet-closed?)
+  ;; a wallet which is there but closed: it may hold the key
+  (and (supports-wallet?) (wallet-initialized?) (wallet-off?)))
+
+(define (open-wallet then)
+  ;; the dialog which turns the wallet on; @then is called afterwards
+  (module-provide '(security wallet wallet-menu))
+  (wallet-dialogue-turn-on then))
+
+(tm-define (zotero-set-api-key key . opt-then)
+  (:synopsis "Use the API key @key of zotero.org")
+  ;; as the keys of the AI engines: a key given while the wallet is closed
+  ;; opens it first, to keep the key there (if it stays closed, the key is
+  ;; kept in the preferences); then the procedure given as option is called
+  (with then (if (null? opt-then) noop (car opt-then))
+    (if (and (!= key "") (wallet-closed?))
+        (open-wallet
+         (lambda (r)
+           (when (!= r "Ok")
+             (set-message (zotero-tr "The key is kept in the preferences, not encrypted")
+                          "Zotero"))
+           (store-api-key key)
+           (then)))
+        (begin
+          (store-api-key key)
+          (then)))))
+
+;; The key is asked when an operation needs it: the wallet is opened if it
+;; is closed (it may hold the key), else a dialog asks for the key
+(define asking-key? #f)
+(define key-declined? #f)
+(define key-wanted? #f)
+
+(tm-define (zotero-key-missing?)
+  (:synopsis "Does zotero.org lack a key to read the library?")
+  (and (zotero-web?) (not (zotero-api-key))))
+
+(tm-define (zotero-ask-key . opt-again)
+  (:synopsis "Ask for the API key of zotero.org; then run the option")
+  (with again (if (null? opt-again) noop (car opt-again))
+    (when (not asking-key?)
+      (set! asking-key? #t)
+      (delayed
+        (:idle 10)
+        (set! asking-key? #f)
+        (if (wallet-closed?)
+            (open-wallet
+             (lambda (r)
+               (zotero-forget-state)
+               (zotero-forget-keys)
+               (if (zotero-api-key)
+                   (begin
+                     ;; the key was in the wallet
+                     (catch #t (lambda () (db-search-refresh))
+                       (lambda args #f))
+                     (again))
+                   (zotero-key-dialog again))))
+            (zotero-key-dialog again))))))
+
+(tm-define (zotero-key-given key again)
+  (:synopsis "The answer of the dialog which asks for the key")
+  (if (and (string? key) (!= (tm-string-trim-both key) ""))
+      (begin
+        (set! key-declined? #f)
+        (zotero-set-api-key (tm-string-trim-both key) again))
+      (set! key-declined? #t)))
+
+(tm-define (zotero-key-wanted . opt-again)
+  (:synopsis "Ask for the key when an operation needed it")
+  ;; after an operation, when it needed zotero.org without a key (and the
+  ;; key was not declined before); the option runs it once the key is there
+  (when key-wanted?
+    (set! key-wanted? #f)
+    (when (and (zotero-key-missing?) (not key-declined?))
+      (apply zotero-ask-key opt-again))))
+
+(tm-define (zotero-forget-key-wanted)
+  (set! key-wanted? #f))
+
+(tm-define (zotero-search-opened)
+  (:synopsis "The search window of references was opened")
+  ;; without the key of zotero.org, it is asked, when the window searches
+  ;; Zotero; the window shows the references of Zotero once it is given
+  (when (and (!= (get-preference "zotero in database search") "off")
+             (zotero-key-missing?))
+    (zotero-ask-key)))
+
+(tm-define (zotero-open-url url)
+  (:synopsis "Open @url in the web browser")
+  ;; NOTE: the url has no spaces or quotes; on Windows, as for the links of
+  ;; documents (load-external), start takes a title first
+  (cond ((zotero-in-browser?)
+         ((eval 'web-javascript)
+          (string-append "window.open(" (js-string url) ",'_blank');")))
+        ((os-mingw64?) (eval-system url))
+        ((or (os-mingw?) (os-win32?))
+         (system (string-append "start \"\" " url)))
+        (else (system (string-append (default-open) " " url)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Requests
@@ -223,12 +323,22 @@
   (:synopsis "Does an operation wait for answers of zotero.org?")
   (and (zotero-in-browser?) (zotero-pending?)))
 
+(tm-define (zotero-waiting?)
+  (:synopsis "Does the operation being run wait for answers of zotero.org?")
+  ;; NOTE: it runs again once they have come (zotero-with-retry)
+  (and current-retry (zotero-pending?)
+       (memq current-retry waiting-retries) #t))
+
 (tm-define (zotero-command again thunk)
   (:synopsis "Run the command @thunk, which runs @again when answered")
   ;; a command which waits for zotero.org says so; it runs again when the
-  ;; answers have come
-  (zotero-with-retry again thunk)
-  (when (zotero-asking?) (set-message "Asking zotero.org..." "Zotero")))
+  ;; answers have come. Without the key of zotero.org, it is asked first,
+  ;; and the command runs once it is given
+  (if (zotero-key-missing?)
+      (zotero-ask-key again)
+      (begin
+        (zotero-with-retry again thunk)
+        (when (zotero-asking?) (show-progress)))))
 
 (define (answer-delay url)
   ;; how long an answer is used again: the requests of the state, briefly
@@ -243,7 +353,121 @@
   (set! answers (make-ahash-table))
   (set! pending (make-ahash-table))
   (set! pending-ids (make-ahash-table))
-  (set! waiting-retries '()))
+  (set! waiting-retries '())
+  (set! asked-since #f)
+  (set! asked-failures '()))
+
+;; While answers are awaited, the footer says what is asked, and for how
+;; long; once they have all come, how long it took, or what failed
+
+(define asked-since #f)      ; when the requests awaited began, or #f
+(define asked-failures '())  ; the statuses of the failed answers meanwhile
+
+(define (url-decode s)
+  ;; the (utf8) string percent-encoded in @s
+  (let loop ((l (string->list s)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (== (car l) #\%) (pair? (cdr l)) (pair? (cddr l))
+                (string->number (string (cadr l) (caddr l)) 16))
+           (loop (cdddr l)
+                 (cons (integer->char (string->number
+                                       (string (cadr l) (caddr l)) 16))
+                       acc)))
+          ((== (car l) #\+) (loop (cdr l) (cons #\space acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define (url-parameter url name)
+  ;; the value of the parameter @name of @url, decoded, or #f
+  (let* ((key (string-append name "="))
+         (at (lambda (sep)
+               (with pos (string-search-forwards (string-append sep key) 0 url)
+                 (and (>= pos 0) pos))))
+         (pos (or (at "?") (at "&"))))
+    (and pos
+         (let* ((start (+ pos 1 (string-length key)))
+                (end (string-search-forwards "&" start url)))
+           (url-decode (substring url start (if (>= end 0) end
+                                                (string-length url))))))))
+
+(tm-define (zotero-request-label url)
+  (:synopsis "What the request @url asks of Zotero, for the messages")
+  (let* ((items (url-parameter url "itemKey"))
+         (n (if items (length (string-tokenize-by-char items #\,)) 1))
+         (refs (lambda (one several)
+                 (if (== n 1) (zotero-tr one)
+                     (zotero-tr several (number->string n))))))
+    (cond ((string-contains? url "keys/current")
+           (zotero-tr "checking the API key"))
+          ((string-contains? url "groups?")
+           (zotero-tr "listing your groups"))
+          ((string-contains? url "limit=1&format=keys")
+           (zotero-tr "checking the library"))
+          ((url-parameter url "q")
+           => (lambda (q)
+                (zotero-tr "searching %1"
+                           (string-append "``" (utf8->cork q) "''"))))
+          ((string-contains? url "format=versions")
+           (refs "looking for changes of 1 reference"
+                 "looking for changes of %1 references"))
+          ((or (string-contains? url "format=bibtex")
+               (string-contains? url "format=biblatex"))
+           (refs "exporting 1 reference" "exporting %1 references"))
+          (else (refs "fetching 1 reference" "fetching %1 references")))))
+
+(define (seconds ms)
+  ;; @ms milliseconds, in seconds with one decimal
+  (with d (quotient (+ ms 50) 100)
+    (string-append (number->string (quotient d 10)) "."
+                   (number->string (remainder d 10)))))
+
+(tm-define (zotero-progress-message)
+  (:synopsis "What is asked of zotero.org, while answers are awaited")
+  ;; NOTE: the newest request first, which is what was asked last (as the
+  ;; search being typed)
+  (let* ((urls (map cdr (sort (ahash-table->list pending-ids)
+                              (lambda (a b) (> (car a) (car b))))))
+         (what (cond ((null? urls) #f)
+                     ((null? (cdr urls)) (zotero-request-label (car urls)))
+                     (else (zotero-tr "%1, and %2 more"
+                                      (zotero-request-label (car urls))
+                                      (number->string (- (length urls) 1))))))
+         (t (if asked-since (- (texmacs-time) asked-since) 0)))
+    (cond ((not what) #f)
+          ((< t 2000) (zotero-tr "Asking zotero.org: %1..." what))
+          ((< t 10000)
+           (zotero-tr "Asking zotero.org: %1 (%2 s)..." what
+                      (number->string (quotient t 1000))))
+          (else
+           (zotero-tr "zotero.org is slow to answer: %1 (%2 s)..." what
+                      (number->string (quotient t 1000)))))))
+
+(define last-answered #f)
+
+(tm-define (zotero-answered-message)
+  (:synopsis "What came back from zotero.org, when all was last answered")
+  last-answered)
+
+(define (answered-message)
+  (let* ((t (if asked-since (- (texmacs-time) asked-since) 0))
+         (failed (list-filter asked-failures (lambda (st) (!= st 200)))))
+    (if (null? failed)
+        (zotero-tr "zotero.org answered in %1 s" (seconds t))
+        (zotero-status-message (status->state (car failed))))))
+
+(define ticking? #f)
+
+(define (show-progress)
+  ;; the footer says what is awaited, again each second while it is
+  (and-with msg (zotero-progress-message)
+    (set-message msg "Zotero")
+    (when (not ticking?)
+      (set! ticking? #t)
+      (delayed
+        (:pause 1000)
+        (set! ticking? #f)
+        ;; (and the sources line of the search window)
+        (refresh-now "db-search-sources")
+        (when (zotero-pending?) (show-progress))))))
 
 (tm-define (zotero-start-request id url headers)
   (:synopsis "Ask for @url asynchronously; zotero-async-answer gets the answer")
@@ -270,15 +494,24 @@
 
 (tm-define (zotero-async-answer id status version body64)
   (:synopsis "The answer of the asynchronous request @id")
+  ;; NOTE: the operations which waited may set their own message, or ask
+  ;; for more (then the time counts from the first request)
   (and-with url (ahash-ref pending-ids id)
     (ahash-remove! pending-ids id)
     (ahash-remove! pending url)
     (ahash-set! answers url (list (texmacs-time) status (decode-base64 body64)
                                   (and (> version 0) version)))
-    (when (not (zotero-pending?))
-      (with l (reverse waiting-retries)
-        (set! waiting-retries '())
-        (for (r l) (r))))))
+    (when (!= status 200)
+      (set! asked-failures (cons status asked-failures)))
+    (if (zotero-pending?) (show-progress)
+        (with l (reverse waiting-retries)
+          (set! last-answered (answered-message))
+          (set-message last-answered "Zotero")
+          (set! waiting-retries '())
+          (for (r l) (r))
+          (when (not (zotero-pending?))
+            (set! asked-since #f)
+            (set! asked-failures '()))))))
 
 (define (async-get url headers)
   (or (known-answer url)
@@ -286,10 +519,13 @@
         (when (not (memq current-retry waiting-retries))
           (set! waiting-retries (cons current-retry waiting-retries)))
         (when (not (ahash-ref pending url))
+          (when (not (zotero-pending?))
+            (set! asked-since (or asked-since (texmacs-time))))
           (ahash-set! pending url #t)
           (set! async-serial (+ async-serial 1))
           (ahash-set! pending-ids async-serial url)
-          (zotero-start-request async-serial url headers))
+          (zotero-start-request async-serial url headers)
+          (show-progress))
         (list 'pending "" #f))))
 
 (define (http-get url headers interactive?)
@@ -350,7 +586,9 @@
              (curl-get (string-append (get-preference "zotero server")
                                       "/api/" path)
                        (list "Zotero-API-Version: 3") interactive?)))
-        ((not (zotero-api-key)) (list 401 "" #f))
+        ((not (zotero-api-key))
+         (set! key-wanted? #t)
+         (list 401 "" #f))
         ((not (web-user))
          (list (if (== key-status 200) 0 key-status) "" #f))
         (else
@@ -403,7 +641,11 @@
         last-state)))
 
 (tm-define (zotero-ready?)
-  (== (zotero-status) 'ready))
+  (with st (zotero-status)
+    ;; NOTE: an operation which needs zotero.org without a key may ask for
+    ;; it afterwards (zotero-key-wanted)
+    (when (== st 'no-key) (set! key-wanted? #t))
+    (== st 'ready)))
 
 (tm-define (zotero-library-version)
   (:synopsis "The version of the Zotero library, or #f")
@@ -521,6 +763,10 @@
           (set! groups-cache l)
           (set! groups-time (texmacs-time)))
         l)))
+
+(tm-define (zotero-known-groups)
+  (:synopsis "The group libraries known so far, without asking Zotero")
+  (map car (or groups-cache '())))
 
 (tm-define (zotero-libraries)
   (:synopsis "The libraries in which TeXmacs looks for citations")
@@ -841,14 +1087,7 @@
   (:synopsis "Show the item of the Zotero entry @e in Zotero")
   ;; NOTE: the url only has letters, digits, / and :; on Windows, as for
   ;; the links of documents (load-external), start takes a title first
-  (with url (if (zotero-web?) (zotero-web-url e) (zotero-select-url e))
-    (cond ((zotero-in-browser?)
-           ((eval 'web-javascript)
-            (string-append "window.open(" (js-string url) ",'_blank');")))
-          ((os-mingw64?) (eval-system url))
-          ((or (os-mingw?) (os-win32?))
-           (system (string-append "start \"\" " url)))
-          (else (system (string-append (default-open) " " url))))))
+  (zotero-open-url (if (zotero-web?) (zotero-web-url e) (zotero-select-url e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Resolving citation keys
@@ -1440,6 +1679,11 @@
            (cons (string-append "groups/" (cadr l)) (cadddr l)))
           (else #f))))
 
+(tm-define (zotero-keys-not-in-file f keys)
+  (:synopsis "The @keys which the BibTeX file @f lacks")
+  (with have (map car (bib-chunks (string-load f)))
+    (list-filter keys (lambda (k) (nin? k have)))))
+
 (tm-define (zotero-add-to-bib-file f keys)
   (:synopsis "Add to the BibTeX file @f the references of Zotero it lacks")
   ;; Of the @keys, those which no source before Zotero provides and which
@@ -1723,33 +1967,85 @@
   ;; NOTE: called by update-document (Document -> Update). In a web browser
   ;; the answers of zotero.org may be awaited: then it says wait, and the
   ;; update is made again when they have come
+  (zotero-forget-key-wanted)
   (zotero-with-retry (lambda () (update-document what))
                      (lambda () (before-update what)))
+  (zotero-key-wanted (lambda () (update-document what)))
   (if (zotero-asking?)
       (begin
-        (set-message "Asking zotero.org..." "Zotero")
+        (show-progress)
         'wait)
       'done))
 
+;; Without the database, a bibliography without file, or whose file does
+;; not exist yet, has no references: when Zotero has references which the
+;; document cites, its file is exported from Zotero, as with Update from
+;; Zotero; a bibliography without file is given one named after the
+;; document (Zotero is not asked about when its key is missing)
+
+(define (empty-bibliography t)
+  ;; the bibliography tag without file in the tree @t, or #f
+  (cond ((and (tree-is? t 'bibliography) (== (tree-arity t) 4))
+         (and (tree-atomic? (tree-ref t 2))
+              (== (tree->string (tree-ref t 2)) "")
+              t))
+        ((tree-compound? t)
+         (list-or (map empty-bibliography (tree-children t))))
+        (else #f)))
+
+(define (zotero-has-citations?)
+  (with keys (zotero-project-citations)
+    (and (nnull? keys) (zotero-ready?) (nnull? (zotero-resolve keys)))))
+
+(define (fill-missing-bibliography)
+  ;; #t when the bibliography is to be exported from Zotero
+  (let* ((u (current-buffer))
+         (ok? (and u (not (url-rooted-tmfs? u)) (not (supports-db?))
+                   (not (zotero-key-missing?))))
+         (t (and ok? (== (zotero-master) u)
+                 (empty-bibliography (buffer-get-body u))))
+         (f (and ok? (not t) (zotero-master-bibliography-file))))
+    (cond ((and t (zotero-has-citations?))
+           (with name (string-append (url-basename u) "-zotero")
+             (tree-set! t 2 name)
+             (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
+                                     (string-append name ".bib"))
+                          "Zotero")
+             #t))
+          ((and f (not (url-rooted-tmfs? f)) (not (url-exists? f))
+                (zotero-has-citations?))
+           (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
+                                   (url->system (url-tail f)))
+                        "Zotero")
+           #t)
+          (else #f))))
+
 (define (before-update what)
   (when (in? what '("all" "bibliography"))
-    ;; with the database, the bibliography asks Zotero while it is made:
-    ;; in a web browser its references are asked first
-    (when (and (zotero-in-browser?) (supports-db?) (zotero-ready?))
-      (zotero-db-entries (list-filter (zotero-project-citations)
-                                      (negate zotero-in-database?))))
-    (when (with-zotero-bibliography?)
+    ;; with the database, the bibliography asks Zotero while it is made
+    ;; for the keys which the database lacks: in a web browser their
+    ;; references are asked first
+    ;; NOTE: Zotero is only asked about (and the key with it) when some
+    ;; reference may come from it
+    (when (supports-db?)
+      (with keys (list-filter (zotero-project-citations)
+                              (negate zotero-in-database?))
+        (when (and (nnull? keys) (zotero-ready?) (zotero-in-browser?))
+          (zotero-db-entries keys))))
+    (when (or (fill-missing-bibliography) (with-zotero-bibliography?))
       (zotero-refresh-bibliography #t))
     ;; the references of Zotero which the file of the user lacks
     (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))
                  (zotero-master-bibliography-file))
-      (when (and (add-to-own-file? f) (zotero-ready?))
+      (when (and (add-to-own-file? f)
+                 (nnull? (zotero-keys-not-in-file f (zotero-project-citations)))
+                 (zotero-ready?))
         (with (added missing) (zotero-add-to-bib-file
                                f (zotero-project-citations))
           (when (nnull? added)
             (set-message (zotero-add-message added '() f) "Zotero")))))
     ;; the entries imported from Zotero into the database follow it
-    (when (and (supports-db?) (zotero-ready?))
+    (when (and (supports-db?) (zotero-imported?) (zotero-ready?))
       (and-with r (zotero-sync-database)
         (and-with msg (zotero-sync-message r)
           (set-message msg "Zotero"))))))

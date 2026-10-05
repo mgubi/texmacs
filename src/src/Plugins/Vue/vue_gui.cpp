@@ -3091,6 +3091,7 @@ static string print_key_info ( SDL_KeyboardEvent *key );
 void process_event (SDL_Event *event);
 void close_help_balloon ();
 void dismiss_wait_indicator ();
+bool dismiss_finished_wait (); // below: the operation which waited is over
 
 // The payloads of the drops, read back by call_drop_event (edit_mouse.cpp)
 // through the ticket carried by the "drop" mouse action.
@@ -3750,6 +3751,7 @@ static void
 loop_iteration_body () {
   int& delay= loop_delay;
   time_t t1= 0, t2= 0;
+  if (dismiss_finished_wait ()) gui_needs_update= true;
 #ifdef __EMSCRIPTEN__
   // The browser calls this once per frame (60 or 120 times a second), where
   // the desktop sleeps until an event comes or the pause ends (loop_wait,
@@ -5823,6 +5825,21 @@ dismiss_wait_indicator () {
   close_wait_window ();
 }
 
+// The loop runs again, so the operation which asked for the wait indicator
+// is over, though it did not take its message back (Update -> All pushes
+// "Updating current buffer" and never pops it: the panel stayed until a
+// key). An operation made of several steps shows it again at each step,
+// which comes before this delay
+static time_t wait_shown_at= 0;
+
+bool
+dismiss_finished_wait () {
+  if (is_nil (wait_messages) || texmacs_time () - wait_shown_at < 500)
+    return false;
+  dismiss_wait_indicator ();
+  return true;
+}
+
 void show_wait_indicator (widget base, string message, string argument) {
   // Display a wait indicator with a message and an optional argument, at
   // the centre of the window which triggered the lengthy operation; an
@@ -5841,6 +5858,7 @@ void show_wait_indicator (widget base, string message, string argument) {
 
   close_wait_window ();
   if (is_nil (wait_messages) || !has_current_window ()) return;
+  wait_shown_at= texmacs_time ();
 
   string outer= wait_messages->item, inner;
   for (list<string> l= wait_messages; !is_nil (l); l= l->next) outer= l->item;

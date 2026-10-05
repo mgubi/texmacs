@@ -49,7 +49,9 @@
              zotero-before-update zotero-managed-file?
              zotero-completion-suffixes zotero-citation-entry
              zotero-show-item zotero-update-citations
-             zotero-with-retry zotero-pending?)
+             zotero-with-retry zotero-pending? zotero-asking?
+             zotero-waiting?
+             zotero-search-opened)
 (lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
              zotero-import-items zotero-in-database? zotero-search-entries
              zotero-database-renames
@@ -58,9 +60,10 @@
              zotero-mark-results zotero-file-search-results
              zotero-open-search-tool zotero-search-sources-text
              zotero-import-citations zotero-import-entry zotero-can-import?
+             zotero-imported? zotero-searching-results
              zotero-conflict-fields zotero-merge-entries)
 (lazy-menu (bibtex zotero-widgets) zotero-synchronize
-           open-zotero-check open-zotero-settings)
+           open-zotero-check open-zotero-settings zotero-key-dialog)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

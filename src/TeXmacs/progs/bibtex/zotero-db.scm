@@ -291,7 +291,10 @@
   ;; At most 20 references of the BibTeX file of the bibliography (unless
   ;; it is managed by Zotero: its items are those of Zotero), then those of
   ;; Zotero, each with its source
-  (let* ((f (zotero-own-bib-file))
+  ;; NOTE: the state of Zotero is asked first, so that the results are
+  ;; shown again when it comes, in a web browser
+  (let* ((ready? (zotero-ready?))
+         (f (zotero-own-bib-file))
          (fl (if (not f) '()
                  (list-filter (bib-file-entries f)
                               (lambda (e)
@@ -308,23 +311,39 @@
                 (zotero-mark-results (db-pretty zl "bib" :pretty) zl #t))))
     (cond ((nnull? (append r z))
            (append r (if (> (length fl) 20) (list "More items follow") '())
-                   z))
-          ((and (not f) (not (zotero-ready?)))
+                   z (zotero-searching-results)))
+          ((zotero-waiting?) (zotero-searching-results))
+          ((and (not f) (not ready?))
            (list (zotero-tr "No bibliography file, and Zotero is not available")))
           (else (list (zotero-tr "No matching items"))))))
 
+(tm-define (zotero-searching-results)
+  (:synopsis "A line of the search results, while zotero.org is asked")
+  ;; NOTE: only for the answers which these results wait for
+  (if (and (zotero-in-database-search?) (zotero-waiting?))
+      (list (zotero-tr "Searching zotero.org..."))
+      '()))
+
 (define (zotero-source-state)
-  ;; Zotero, as a source of the search window
+  ;; Zotero, as a source of the search window; while answers of zotero.org
+  ;; are awaited, what is asked (the footer of the document is not shown
+  ;; again while the search window has the focus)
   (let ((where (if (zotero-web?) "zotero.org" "Zotero")))
     (cond ((not (zotero-in-database-search?))
            (zotero-tr "Zotero is left out (see the Zotero settings)"))
+          ;; (the state is asked first: the line is shown again when it
+          ;; comes)
+          ((begin (zotero-ready?) (zotero-asking?))
+           (zotero-progress-message))
           ((zotero-ready?)
-           (if (== (get-preference "zotero libraries") "all")
-               (with n (length (zotero-groups))
-                 (zotero-tr (if (== n 1) "%1 (My Library and %2 group)"
-                                "%1 (My Library and %2 groups)")
-                            where (number->string n)))
-               (zotero-tr "%1 (My Library)" where)))
+           (with libs (if (== (get-preference "zotero libraries") "all")
+                          (with n (length (zotero-groups))
+                            (zotero-tr (if (== n 1)
+                                           "%1 (My Library and %2 group)"
+                                           "%1 (My Library and %2 groups)")
+                                       where (number->string n)))
+                          (zotero-tr "%1 (My Library)" where))
+             libs))
           ((== (zotero-status) 'disabled)
            (zotero-tr "Zotero refuses the requests (enable its local API)"))
           ((and (== (zotero-status) 'not-running) (not (zotero-web?)))
@@ -355,6 +374,7 @@
 (tm-define (zotero-open-search-tool t)
   (:synopsis "Search a reference for the citation @t, without the database")
   (zotero-forget-state)
+  (zotero-search-opened)
   (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))
     (open-db-chooser
      :bib-file "bib" "Search bibliographic reference"
@@ -390,6 +410,14 @@
                      (map car (zotero-groups)))
     (with-database (bib-database)
       (map db-load-entry (db-search (list (cons "zotero-library" libs)))))))
+
+(tm-define (zotero-imported?)
+  (:synopsis "Has the database entries which come from Zotero?")
+  ;; NOTE: without asking Zotero (the groups known so far)
+  (with-database (bib-database)
+    (nnull? (db-search (list (cons "zotero-library"
+                                   (cons* "user" (zotero-user-library)
+                                          (zotero-known-groups))))))))
 
 (define (entry-library e)
   (zotero-normalize-library (zotero-entry-meta e "zotero-library")))

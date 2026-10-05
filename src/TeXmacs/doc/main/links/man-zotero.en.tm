@@ -27,13 +27,23 @@
   (reading access to your library, and to your groups if you want them, is
   enough), and give it in the settings, with <menu|Read the library
   from|zotero.org>. The key is kept in your wallet when it is open, and
-  otherwise in your preferences. In <TeXmacs> in a web browser, the library
+  otherwise in your preferences. When <TeXmacs> needs the key and has none
+  (when you open the search window of references, use a command of Zotero,
+  or update a bibliography which needs Zotero), it opens your wallet if it
+  is closed, since the key may be there, and otherwise asks you for it,
+  with a button which opens the page of <verbatim|zotero.org> where keys
+  are made. In <TeXmacs> in a web browser, the library
   is always read from <verbatim|zotero.org>: Zotero refuses the requests of
   web pages, also when the application runs on the same computer. There,
   the answers of <verbatim|zotero.org> come in the background: the search
   window, the completion of keys and the bibliography are completed when
-  they arrive, and the footer says <with|font-shape|italic|Asking
-  zotero.org...> meanwhile.
+  they arrive. Meanwhile, the footer says what is asked, such as
+  <with|font-shape|italic|Asking zotero.org: searching ``gauss''...>, with
+  the seconds spent after two seconds; in the search window, its line of
+  sources says it, and <with|font-shape|italic|Searching zotero.org...>
+  follows the results. Once
+  all is answered, the footer says how long it took, or why it failed (the
+  key refused, too many requests, <verbatim|zotero.org> not reached).
 
   The citations use the citation keys of Zotero, which Zotero (or the
   Better<nbsp>BibTeX extension) stores in the field <verbatim|citationKey>.
@@ -115,7 +125,10 @@
   When the bibliography of the document has no <BibTeX> file yet,
   <menu|Document|Bibliography|Update from Zotero> adds a bibliography with a
   file <verbatim|<em|name>-zotero.bib>, named after the document, and fills
-  it with the references of the citations. Such a file starts with the line
+  it with the references of the citations. <menu|Document|Update|All> does
+  the same for a bibliography without file (as inserted by
+  <menu|Insert|Automatic|Bibliography>), when Zotero has references which
+  the document cites. Such a file starts with the line
   <verbatim|% Exported from Zotero by TeXmacs>, and only contains the items
   which the document cites. <TeXmacs> rewrites it at each
   <menu|Document|Update|Bibliography> (or <menu|Document|Update|All>), so
