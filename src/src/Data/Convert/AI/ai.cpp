@@ -1022,6 +1022,9 @@ ai_tikz_header (string pre) {
       if (starts (l, settings[m])) other << l << "\n";
   }
   string r;
+#ifdef __EMSCRIPTEN__
+  // (TikZJax, in a web browser: the packages and the libraries as comments,
+  // which its plug-in reads, and a whole document only for settings)
   if (other == "") {
     if (pkgs != "") r << "% packages: " << pkgs << "\n";
     if (libs != "") r << "% libraries: " << libs << "\n";
@@ -1029,6 +1032,12 @@ ai_tikz_header (string pre) {
   }
   // with settings: a whole document (the TikZ plug-in takes its preamble)
   r << "\\documentclass{article}\n";
+#else
+  // (the TikZ plug-in of the desktop, plugins/tmpy/graph/tikz.py, compiles
+  // with LaTeX a document which it is given as it is: a picture alone, the
+  // size of its drawing, as it makes its own)
+  r << "\\documentclass[tikz]{standalone}\n";
+#endif
   if (pkgs != "") r << "\\usepackage{" << pkgs << "}\n";
   if (libs != "") r << "\\usetikzlibrary{" << libs << "}\n";
   r << other << "\\begin{document}\n";
