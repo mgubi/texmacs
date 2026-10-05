@@ -209,6 +209,11 @@ jobs:
           home=$(mktemp -d)
           shots="$PWD/../snapshots"
           mkdir -p "$shots"
+          # NOTE: a first run sets the home up (otherwise the welcome page,
+          # loaded at the first run, replaces the document in its window)
+          HOME="$home" TEXMACS_PATH="$PWD/TeXmacs" timeout 180 \
+            xvfb-run -a -s "-screen 0 1600x1200x24" \
+            TeXmacs/bin/texmacs -x "(quit-TeXmacs)" > "$home/first.txt" 2>&1 || true
           HOME="$home" TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_VUE_SNAPSHOT="$shots" \
             xvfb-run -a -s "-screen 0 1600x1200x24" \
             TeXmacs/bin/texmacs "$PWD/packages/macos/ci-colors.tm" > "$home/log.txt" 2>&1 &
@@ -317,6 +322,11 @@ jobs:
           shots="$(cygpath -u "$GITHUB_WORKSPACE")/snapshots"
           mkdir -p "$shots"
           exe=../distr/TeXmacs-Windows/bin/texmacs.exe
+          # NOTE: a first run sets the home up (otherwise the welcome page,
+          # loaded at the first run, replaces the document in its window)
+          HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
+            timeout 180 "$exe" -x "(quit-TeXmacs)" > "$home/first.txt" 2>&1 || true
+          tail -5 "$home/first.txt" || true
           HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
             TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" \
             "$exe" "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" > "$home/log.txt" 2>&1 &
