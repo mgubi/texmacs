@@ -85,6 +85,9 @@ public:
   
   // this needs to be accesible from TMView
   NSBitmapImageRep*       backingPixmap;
+  int                     ring;  //!< the first row of the view in it
+  void draw_backing_store (NSRect rect); //!< TMView drawRect
+  void unroll_backing_store ();          //!< ring 0 (to save it, say)
   NSPoint                 cursor_pos;  //!< for the input methods
   void follow_visible_part ();  //!< the canvas follows the scrolling
   NSRect viewport ();           //!< the visible part, as in Qt
@@ -101,6 +104,8 @@ protected:
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
   void repaint_invalid_regions ();
+  void repaint_invalid_regions_bis ();
+  void shift_backing_store (int dx, int dy);
   basic_renderer get_renderer ();
 
 

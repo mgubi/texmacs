@@ -955,6 +955,7 @@ find_document_scroll_view (NSView* v) {
     for (NSView* w in [[sv documentView] subviews])
       if ([NSStringFromClass ([w class]) isEqualToString: @"TMView"]) canvas= w;
     widget_rep* wr= canvas? (widget_rep*) [(id) canvas widget]: NULL;
+    if (wr) ((ns_simple_widget_rep*) wr)->unroll_backing_store ();
     NSBitmapImageRep* bp= wr? ((ns_simple_widget_rep*) wr)->backingPixmap: nil;
     if (bp) {
       NSData* data= [bp representationUsingType: NSBitmapImageFileTypePNG
@@ -995,13 +996,17 @@ find_canvas (NSView* v) {
 //   repaint:<n>  n repaints of the whole canvas (invalidate_all)
 //   scroll:<n>   n scrolls of 40 points (TEXMACS_NS_SCROLL_STEP) down, then
 //                n up (the strips uncovered are repainted)
+//   hscroll:<n>  the same, to the right then back to the left
 //   zoom:<z>     the zoom becomes z (set-window-zoom-factor, which is not
 //                saved as a preference): a step, until nothing is invalid
+//   snap         the window is saved as bench-<i>.png in the directory
+//                TEXMACS_NS_SNAPSHOT (not timed, not in the table)
 // For each phase: the steps; the time of a step (mean, median, worst); what
 // the canvas spent drawing into its backing store (TeXmacs typesetting and
 // the renderer) and showing it, and the pixels drawn, a step on average.
 
 extern double ns_bench_paint, ns_bench_display, ns_bench_pixels;
+extern double ns_bench_move, ns_bench_repaint;
 double ns_bench_now ();
 static NSView* find_canvas (NSView* v);
 
@@ -1019,7 +1024,7 @@ canvas_frame () {
   NSArray* phases;
   int phase, step, settle;
   array<double> walls;
-  double paint0, display0, pixels0;
+  double paint0, display0, pixels0, move0, repaint0;
   string table;
 }
 - (void) step: (NSTimer*) timer;
@@ -1038,10 +1043,11 @@ canvas_frame () {
   double k= n > 0? 1000.0 / n: 0.0;
   char buf[256];
   snprintf (buf, sizeof (buf),
-            "%-14s %5d %8.2f %8.2f %8.2f %8.2f %8.2f %8.2f\n",
+            "%-14s %5d %8.2f %8.2f %8.2f %8.2f %8.2f %8.2f %8.2f %8.2f\n",
             [name UTF8String], n, sum * k, n? 1000.0 * w[n/2]: 0.0,
             n? 1000.0 * w[n-1]: 0.0, (ns_bench_paint - paint0) * k,
             (ns_bench_display - display0) * k,
+            (ns_bench_move - move0) * k, (ns_bench_repaint - repaint0) * k,
             n? (ns_bench_pixels - pixels0) / n / 1.0e6: 0.0);
   table << string (buf);
   walls= array<double> ();
@@ -1055,8 +1061,8 @@ canvas_frame () {
             "zoom:0.75,repaint:30,scroll:20,zoom:1";
     phases= [[to_nsstring (spec) componentsSeparatedByString: @","] retain];
     phase= step= 0;
-    table= "phase          steps     mean   median    worst    paint  display  Mpixels\n";
-    paint0= ns_bench_paint; display0= ns_bench_display; pixels0= ns_bench_pixels;
+    table= "phase          steps     mean   median    worst    paint  display     move  canvas   Mpixels\n";
+    paint0= ns_bench_paint; display0= ns_bench_display; move0= ns_bench_move; repaint0= ns_bench_repaint; pixels0= ns_bench_pixels;
     // the window at the same size in every run (TEXMACS_NS_BENCH_SIZE,
     // in points), then some turns of the loop for it to settle
     NSWindow* w= [NSApp keyWindow];
@@ -1077,7 +1083,7 @@ canvas_frame () {
     settle--;
     the_gui->force_update ();
     if (settle == 0) {
-      paint0= ns_bench_paint; display0= ns_bench_display;
+      paint0= ns_bench_paint; display0= ns_bench_display; move0= ns_bench_move; repaint0= ns_bench_repaint;
       pixels0= ns_bench_pixels;
     }
     return;
@@ -1114,13 +1120,16 @@ canvas_frame () {
     the_gui->force_update ();
     done= ++step >= [arg intValue];
   }
-  else if ([kind isEqualToString: @"scroll"]) {
+  else if ([kind isEqualToString: @"scroll"] ||
+           [kind isEqualToString: @"hscroll"]) {
+    bool h= [kind isEqualToString: @"hscroll"];
     int n= [arg intValue];
     double st= get_env ("TEXMACS_NS_SCROLL_STEP") == ""? 40.0:
                as_double (get_env ("TEXMACS_NS_SCROLL_STEP"));
     NSClipView* clip= [sv contentView];
     NSPoint p= [clip bounds].origin;
-    p.y += (step < n? st: -st);
+    if (h) p.x += (step < n? st: -st);
+    else   p.y += (step < n? st: -st);
     [clip scrollToPoint: [clip constrainBoundsRect:
                            NSMakeRect (p.x, p.y, [clip bounds].size.width,
                                        [clip bounds].size.height)].origin];
@@ -1136,12 +1145,28 @@ canvas_frame () {
     }
     done= true;
   }
+  else if ([kind isEqualToString: @"snap"]) {
+    // the window, as TEXMACS_NS_SCROLL saves it (not timed)
+    static int nr= 0;
+    NSView* v= [[win contentView] superview];
+    NSBitmapImageRep* rep= [v bitmapImageRepForCachingDisplayInRect: [v bounds]];
+    [v cacheDisplayInRect: [v bounds] toBitmapImageRep: rep];
+    NSData* data= [rep representationUsingType: NSBitmapImageFileTypePNG
+                                    properties: [NSDictionary dictionary]];
+    string dir= get_env ("TEXMACS_NS_SNAPSHOT");
+    if (dir == "") dir= ".";
+    [data writeToFile: to_nsstring (dir * "/bench-" * as_string (nr++) * ".png")
+           atomically: NO];
+    phase++; step= 0;
+    paint0= ns_bench_paint; display0= ns_bench_display; move0= ns_bench_move; repaint0= ns_bench_repaint; pixels0= ns_bench_pixels;
+    return;
+  }
   else done= true;
   walls << (ns_bench_now () - t0);
   if (done) {
     [self finishPhase: [phases objectAtIndex: phase]];
     phase++; step= 0;
-    paint0= ns_bench_paint; display0= ns_bench_display; pixels0= ns_bench_pixels;
+    paint0= ns_bench_paint; display0= ns_bench_display; move0= ns_bench_move; repaint0= ns_bench_repaint; pixels0= ns_bench_pixels;
   }
 }
 @end

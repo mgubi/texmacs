@@ -368,13 +368,7 @@ initkeymap () {
   if (dbg) fprintf (stderr, "DRAWRECT %.0f,%.0f %.0fx%.0f of %.0fx%.0f\n",
                     rect.origin.x, rect.origin.y, rect.size.width, rect.size.height,
                     [self bounds].size.width, [self bounds].size.height);
-  NSRect src= NSMakeRect (rect.origin.x * retina_factor,
-                          rect.origin.y * retina_factor,
-                          rect.size.width * retina_factor,
-                          rect.size.height * retina_factor);
-  [wid->backingPixmap drawInRect: rect fromRect: src
-                       operation: NSCompositingOperationSourceOver
-                        fraction: 1.0 respectFlipped: NO hints: nil];
+  wid->draw_backing_store (rect);
 }
 
 /******************************************************************************

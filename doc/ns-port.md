@@ -110,7 +110,8 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   the canvas has repainted): `repaint:<n>` repaints the whole canvas n
   times, `scroll:<n>` scrolls n steps of 40 points down and n up,
   `zoom:<z>` sets the zoom with `set-window-zoom-factor` (not saved as a
-  preference); then a table is printed and TeXmacs quits (see
+  preference), `hscroll:<n>` scrolls to the right and back, `snap` saves
+  the window as `bench-<i>.png` in `TEXMACS_NS_SNAPSHOT`; then a table is printed and TeXmacs quits (see
   "Benchmark" below);
 * `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
   `shrink`, as before the outlines (to compare);
@@ -142,8 +143,9 @@ HOME=<test home> TEXMACS_PATH=$PWD/TeXmacs TEXMACS_NS_BENCH=1 \
 
 For each phase, in ms a step: the time of a step (mean, median, worst);
 in it, what the canvas spent drawing into its backing store (`paint`:
-TeXmacs and the renderer) and showing it (`display`); and the Mpixels
-drawn a step. The rest of a step is the update of TeXmacs (at a zoom,
+TeXmacs and the renderer), showing it (`display`), moving it (`move`), and
+all it did (`canvas`: the three and the checks of its size); and the
+Mpixels drawn a step. The rest of a step is the update of TeXmacs (at a zoom,
 mostly typesetting) and the moves of the backing store. `retina_factor`
 is that of the main screen when TeXmacs starts (2 on a Retina screen, 1 on
 most external ones): for runs which compare, put `("retina-factor" "on")`
@@ -164,9 +166,22 @@ retina_factor 2, outline glyphs vs bitmap glyphs, ms):
 Once the glyphs are cached, both draw a screen in the same time (the
 images of the glyphs are the same size); the outlines make the new glyphs
 of a zoom three times cheaper than `shrink` at zoom 2. With retina_factor 1
-(0.5 Mpixels) a repaint is 1.4-1.6 ms and a scroll 0.6 ms. A scroll spends
-a quarter of its time painting the strip: the rest is the update of TeXmacs
-and the new backing store of each move (allocated and copied at each step).
+(0.5 Mpixels) a repaint is 1.4-1.6 ms and a scroll 0.6 ms.
+
+The backing store is a ring of rows (`ring` in `ns_simple_widget_rep`): a
+vertical scroll changes where the view starts in it, and paints the strip
+uncovered, where it used to make a new backing store and copy the old one
+into it at each step (`move` about 1 ms of a step of 1.6 ms at
+retina_factor 2; moving the rows in place with `memmove` costs as much).
+The canvas paints, and the view draws, in two pieces where the ring wraps;
+`unroll_backing_store` puts the rows back in order (before a resize, and
+for `backing.png`). A step of a scroll, retina_factor 2: 1.5-2.0 ms before,
+0.6-0.8 ms after (`move` 0.1 ms, the strip painted 0.3 ms, the rest the
+update of TeXmacs); retina_factor 1: 0.55-0.6 ms before, 0.35-0.5 after.
+The windows of each step of `TEXMACS_NS_SCROLL` (steps of 40 and of 13.5
+points, both factors) and the backing stores are the same as before, to the
+pixel. A horizontal scroll still moves the columns (`memmove`, 0.9 ms a
+step at zoom 2), as it is rare.
 
 ### What was done
 
