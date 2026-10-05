@@ -324,9 +324,15 @@ jobs:
           exe=../distr/TeXmacs-Windows/bin/texmacs.exe
           # NOTE: a first run sets the home up (otherwise the welcome page,
           # loaded at the first run, replaces the document in its window)
+          mkdir -p "$shots/first"
           HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
-            timeout 180 "$exe" -x "(quit-TeXmacs)" > "$home/first.txt" 2>&1 || true
-          tail -5 "$home/first.txt" || true
+            TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots/first")" \
+            timeout 120 "$exe" -x "(quit-TeXmacs)" > "$home/first.txt" 2>&1 || true
+          # NOTE: timeout does not stop a program of Windows
+          taskkill //F //IM texmacs.exe > /dev/null 2>&1 || true
+          echo "== the first run"
+          tail -20 "$home/first.txt" || true
+          ls -la "$shots/first" || true
           HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
             TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" \
             "$exe" "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" > "$home/log.txt" 2>&1 &
