@@ -997,6 +997,8 @@ find_canvas (NSView* v) {
 //   scroll:<n>   n scrolls of 40 points (TEXMACS_NS_SCROLL_STEP) down, then
 //                n up (the strips uncovered are repainted)
 //   hscroll:<n>  the same, to the right then back to the left
+//   down:<n>, right:<n>  n steps down, or to the right, only (up, or to
+//                the left, if n < 0)
 //   zoom:<z>     the zoom becomes z (set-window-zoom-factor, which is not
 //                saved as a preference): a step, until nothing is invalid
 //   snap         the window is saved as bench-<i>.png in the directory
@@ -1023,11 +1025,14 @@ canvas_frame () {
 {
   NSArray* phases;
   int phase, step, settle;
+  NSRect frame0;  // the window, put back before quitting (its size is a
+                  // preference, saved when it changes)
   array<double> walls;
   double paint0, display0, pixels0, move0, repaint0;
   string table;
 }
 - (void) step: (NSTimer*) timer;
+- (void) quit;
 @end
 
 @implementation TMBenchHelper
@@ -1052,6 +1057,10 @@ canvas_frame () {
   table << string (buf);
   walls= array<double> ();
 }
+- (void) quit
+{
+  _exit (0);
+}
 - (void) step: (NSTimer*) timer
 {
   if (!phases) {
@@ -1070,6 +1079,7 @@ canvas_frame () {
     string sz= get_env ("TEXMACS_NS_BENCH_SIZE");
     if (sz == "") sz= "1000x800";
     int x= search_forwards ("x", sz);
+    if (w) frame0= [w frame];
     if (w && x > 0) {
       NSRect f= [w frame];
       double fw= as_double (sz (0, x)), fh= as_double (sz (x+1, N(sz)));
@@ -1078,6 +1088,7 @@ canvas_frame () {
       [w setFrame: f display: YES];
     }
     settle= 200;
+    fprintf (stderr, "TEXMACS_NS_BENCH started\n");
   }
   if (settle > 0) {
     settle--;
@@ -1090,14 +1101,21 @@ canvas_frame () {
   }
   if (phase >= (int) [phases count]) {
     [timer invalidate];
-    NSRect f= canvas_frame ();
+    NSWindow* w= [NSApp keyWindow];
+    if (!w) w= [[NSApp orderedWindows] firstObject];
+    NSRect cf= canvas_frame ();
+    if (w && frame0.size.width > 0) {
+      [w setFrame: frame0 display: YES];
+      for (int i= 0; i < 5; i++) the_gui->force_update ();
+    }
     fprintf (stderr, "TEXMACS_NS_BENCH (ms a step; retina_factor %d, "
              "canvas %.0fx%.0f points, glyphs %s)\n%s", retina_factor,
-             f.size.width, f.size.height,
+             cf.size.width, cf.size.height,
              get_env ("TEXMACS_NS_GLYPHS") == "bitmap"? "bitmap": "outline",
              as_charp (table));
     fflush (stderr);
-    _exit (0);
+    // NOTE: after some turns of the loop, which saves the size put back
+    [self performSelector: @selector(quit) withObject: nil afterDelay: 0.5];
   }
   NSArray* pv= [[phases objectAtIndex: phase] componentsSeparatedByString: @":"];
   NSString* kind= [pv objectAtIndex: 0];
@@ -1121,20 +1139,24 @@ canvas_frame () {
     done= ++step >= [arg intValue];
   }
   else if ([kind isEqualToString: @"scroll"] ||
-           [kind isEqualToString: @"hscroll"]) {
-    bool h= [kind isEqualToString: @"hscroll"];
+           [kind isEqualToString: @"hscroll"] ||
+           [kind isEqualToString: @"down"] ||
+           [kind isEqualToString: @"right"]) {
+    bool h= [kind isEqualToString: @"hscroll"] || [kind isEqualToString: @"right"];
+    bool one= [kind isEqualToString: @"down"] || [kind isEqualToString: @"right"];
     int n= [arg intValue];
     double st= get_env ("TEXMACS_NS_SCROLL_STEP") == ""? 40.0:
                as_double (get_env ("TEXMACS_NS_SCROLL_STEP"));
     NSClipView* clip= [sv contentView];
     NSPoint p= [clip bounds].origin;
-    if (h) p.x += (step < n? st: -st);
-    else   p.y += (step < n? st: -st);
+    double d= one? (n < 0? -st: st): (step < n? st: -st);
+    if (h) p.x += d;
+    else   p.y += d;
     [clip scrollToPoint: [clip constrainBoundsRect:
                            NSMakeRect (p.x, p.y, [clip bounds].size.width,
                                        [clip bounds].size.height)].origin];
     [sv reflectScrolledClipView: clip];
-    done= ++step >= 2*n;
+    done= ++step >= (one? abs (n): 2*n);
   }
   else if ([kind isEqualToString: @"zoom"]) {
     eval ("(set-window-zoom-factor " * as_string ([arg doubleValue]) * ")");

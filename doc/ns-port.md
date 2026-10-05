@@ -110,9 +110,11 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   the canvas has repainted): `repaint:<n>` repaints the whole canvas n
   times, `scroll:<n>` scrolls n steps of 40 points down and n up,
   `zoom:<z>` sets the zoom with `set-window-zoom-factor` (not saved as a
-  preference), `hscroll:<n>` scrolls to the right and back, `snap` saves
-  the window as `bench-<i>.png` in `TEXMACS_NS_SNAPSHOT`; then a table is printed and TeXmacs quits (see
-  "Benchmark" below);
+  preference), `hscroll:<n>` scrolls to the right and back, `down:<n>`
+  and `right:<n>` only down or to the right (up or left if n < 0), `snap`
+  saves the window as `bench-<i>.png` in `TEXMACS_NS_SNAPSHOT`; then a
+  table is printed, the window is put back at its size (a preference) and
+  TeXmacs quits (see "Benchmark" below);
 * `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
   `shrink`, as before the outlines (to compare);
 * `TEXMACS_NS_DEBUG_RED=1`: when the backing store moves (scrolling), the
@@ -168,20 +170,33 @@ images of the glyphs are the same size); the outlines make the new glyphs
 of a zoom three times cheaper than `shrink` at zoom 2. With retina_factor 1
 (0.5 Mpixels) a repaint is 1.4-1.6 ms and a scroll 0.6 ms.
 
-The backing store is a ring of rows (`ring` in `ns_simple_widget_rep`): a
-vertical scroll changes where the view starts in it, and paints the strip
-uncovered, where it used to make a new backing store and copy the old one
-into it at each step (`move` about 1 ms of a step of 1.6 ms at
-retina_factor 2; moving the rows in place with `memmove` costs as much).
-The canvas paints, and the view draws, in two pieces where the ring wraps;
-`unroll_backing_store` puts the rows back in order (before a resize, and
-for `backing.png`). A step of a scroll, retina_factor 2: 1.5-2.0 ms before,
-0.6-0.8 ms after (`move` 0.1 ms, the strip painted 0.3 ms, the rest the
-update of TeXmacs); retina_factor 1: 0.55-0.6 ms before, 0.35-0.5 after.
+The backing store wraps around in both directions (`cring`, `ring` in
+`ns_simple_widget_rep`): a scroll changes where the view starts in it and
+paints the strips uncovered, where it used to make a new backing store and
+copy the old one into it at each step (`move` about 1 ms of a step of 1.6
+ms at retina_factor 2; moving the pixels in place with `memmove` costs as
+much). The canvas paints, and the view draws, in up to four pieces where it
+wraps; `unroll_backing_store` puts the pixels back in order (before a
+resize, and for `backing.png`). The view draws the backing store through a
+`CGImage` which reads its pixels where they are: drawing the
+`NSBitmapImageRep` made its memory copy on write, so that the first change
+of each page after it was shown copied the page (0.7 ms for the columns of
+a horizontal step, which touch all the pages; a part of each repaint too).
+
+A step, before and after (ms; horizontal: a window of 600x700 points at
+zoom 2):
+
+| | retina_factor 2 | retina_factor 1 |
+|---|---|---|
+| vertical scroll | 1.5-2.0 -> 0.5-0.6 | 0.55-0.6 -> 0.4-0.5 |
+| horizontal scroll | 1.1-1.3 -> 0.3-0.5 | 0.45 -> 0.3 |
+| repaint, 1.3 Mpixels | 2.9 -> 2.0 | |
+
 The windows of each step of `TEXMACS_NS_SCROLL` (steps of 40 and of 13.5
-points, both factors) and the backing stores are the same as before, to the
-pixel. A horizontal scroll still moves the columns (`memmove`, 0.9 ms a
-step at zoom 2), as it is rare.
+points, both factors) and the backing stores are the same as before, to
+the pixel; after scrolls down, right, up and left (`down`, `right`), the
+window is the same as after a repaint (but for the scroll bars, which
+fade).
 
 ### What was done
 

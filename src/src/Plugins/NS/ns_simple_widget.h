@@ -86,6 +86,9 @@ public:
   // this needs to be accesible from TMView
   NSBitmapImageRep*       backingPixmap;
   int                     ring;  //!< the first row of the view in it
+  int                     cring; //!< its first column
+  bool backing_piece (int i, double a, double b, bool vertical,
+                      double& pa, double& pb, double& off);
   void draw_backing_store (NSRect rect); //!< TMView drawRect
   void unroll_backing_store ();          //!< ring 0 (to save it, say)
   NSPoint                 cursor_pos;  //!< for the input methods

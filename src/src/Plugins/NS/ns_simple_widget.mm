@@ -106,7 +106,7 @@ ns_bench_now () {
 
 ns_simple_widget_rep::ns_simple_widget_rep ()
 : ns_widget_rep (simple_widget),  sequencer (0), view (nil), doc (nil),
-  backingPixmap (nil), ring (0), extents (coord4 (0, 0, 0, 0)),
+  backingPixmap (nil), ring (0), cring (0), extents (coord4 (0, 0, 0, 0)),
   last_viewport (NSZeroSize) { }
 
 ns_simple_widget_rep::~ns_simple_widget_rep () {
@@ -640,15 +640,16 @@ ns_simple_widget_rep::get_renderer() {
 inline float mmin (float a, float b) { return (a>b? b: a); }
 inline float mmax (float a, float b) { return (a>b? a: b); }
 
-// NOTE: the backing store is a ring of rows: the row y of the view (in the
-// pixels of the backing store, from the top, as the invalid rectangles and
-// the device coordinates of the renderer) is the row (y + ring) mod H of
-// the backing store (H its height, in the same coordinates; in its memory,
-// the row H-1 - that, since the backing store is drawn upside down). A
-// vertical scroll only changes ring: moving all the pixels (a new backing
+// NOTE: the backing store wraps around in both directions: the pixel
+// (x, y) of the view (in the pixels of the backing store, from the top
+// left, as the invalid rectangles and the device coordinates of the
+// renderer) is the pixel ((x + cring) mod W, (y + ring) mod H) of the
+// backing store (W x H its size, in the same coordinates; in its memory,
+// the row is H-1 - that, since the backing store is drawn upside down). A
+// scroll only changes cring and ring: moving all the pixels (a new backing
 // store and a copy, or a memmove: about 1 ms for 2000x1300 pixels) took
 // most of a step of a scroll. The views draw the backing store, and the
-// canvas paints into it, in two pieces where the ring wraps.
+// canvas paints into it, in up to four pieces where it wraps.
 
 static unsigned int
 uncovered_pixel () {
@@ -666,24 +667,20 @@ uncovered_pixel () {
 
 void
 ns_simple_widget_rep::shift_backing_store (int dx, int dy) {
+  // the pixel (x, y) of the view gets the pixel (x + dx, y + dy)
   unsigned char* data= [backingPixmap bitmapData];
   int W= (int) [backingPixmap pixelsWide], H= (int) [backingPixmap pixelsHigh];
   int bpr= (int) [backingPixmap bytesPerRow];
   if (!data || W < 1 || H < 1) return;
   unsigned int fill= uncovered_pixel ();
-  // the rows: the column c gets the column c + dx (the rows do not move)
   if (dx != 0) {
-    int ox= max (dx, 0), nx= W - abs (dx), cx= max (-dx, 0);
-    if (nx > 0)
-      for (int r= 0; r < H; r++)
-        memmove (data + r*bpr + 4*cx, data + r*bpr + 4*ox, 4*nx);
-    int c0= dx > 0? max (W - dx, 0): 0, c1= dx > 0? W: min (-dx, W);
+    cring= (((cring + dx) % W) + W) % W;
+    int x0= dx > 0? max (W - dx, 0): 0, x1= dx > 0? W: min (-dx, W);
     for (int r= 0; r < H; r++) {
       unsigned int* row= (unsigned int*) (data + r*bpr);
-      for (int c= c0; c < c1; c++) row[c]= fill;
+      for (int x= x0; x < x1; x++) row[(x + cring) % W]= fill;
     }
   }
-  // the view: the row y gets the row y + dy
   if (dy != 0) {
     ring= (((ring + dy) % H) + H) % H;
     int y0= dy > 0? max (H - dy, 0): 0, y1= dy > 0? H: min (-dy, H);
@@ -696,38 +693,84 @@ ns_simple_widget_rep::shift_backing_store (int dx, int dy) {
 
 void
 ns_simple_widget_rep::unroll_backing_store () {
-  // the rows in the order of the view (ring 0)
-  if (ring == 0 || !backingPixmap) return;
+  // the pixels in the order of the view (cring and ring 0)
+  if ((ring == 0 && cring == 0) || !backingPixmap) return;
   unsigned char* data= [backingPixmap bitmapData];
-  int H= (int) [backingPixmap pixelsHigh];
+  int W= (int) [backingPixmap pixelsWide], H= (int) [backingPixmap pixelsHigh];
   int bpr= (int) [backingPixmap bytesPerRow];
-  if (!data || H < 1) { ring= 0; return; }
+  if (!data || W < 1 || H < 1) { ring= cring= 0; return; }
   unsigned char* old= (unsigned char*) malloc (bpr * H);
   memcpy (old, data, bpr * H);
-  for (int y= 0; y < H; y++)
-    memcpy (data + (H-1 - y)*bpr, old + (H-1 - (y + ring) % H)*bpr, bpr);
+  for (int y= 0; y < H; y++) {
+    unsigned char* to= data + (H-1 - y)*bpr;
+    unsigned char* from= old + (H-1 - (y + ring) % H)*bpr;
+    // the columns [0, W - cring) of the view, then [W - cring, W)
+    memcpy (to, from + 4*cring, 4*(W - cring));
+    memcpy (to + 4*(W - cring), from, 4*cring);
+  }
   free (old);
-  ring= 0;
+  ring= cring= 0;
+}
+
+bool
+ns_simple_widget_rep::backing_piece (int i, double a, double b, bool vertical,
+                                     double& pa, double& pb, double& off) {
+  // the piece i (0 or 1) of [a, b) (in the pixels of the view), before and
+  // after where the backing store wraps, and how far it is moved in it
+  double N= vertical? [backingPixmap pixelsHigh]: [backingPixmap pixelsWide];
+  double o= vertical? ring: cring;
+  double cut= N - o;
+  pa= i == 0? a: max (a, cut);
+  pb= i == 0? min (b, cut): b;
+  off= i == 0? o: o - N;
+  return pb > pa;
 }
 
 void
 ns_simple_widget_rep::draw_backing_store (NSRect rect) {
-  // the part rect of the view (in points), in at most two pieces
+  // the part rect of the view (in points), in at most four pieces
+  // NOTE: through an image which reads the pixels of the backing store
+  // where they are: drawing the NSBitmapImageRep made its memory copy on
+  // write, so that the first change of each of its pages after it was
+  // shown copied the page (0.7 ms for the columns uncovered by a step of
+  // a horizontal scroll, which touch all the pages, 2000x1100 pixels)
+  unsigned char* data= [backingPixmap bitmapData];
+  int W= (int) [backingPixmap pixelsWide], H= (int) [backingPixmap pixelsHigh];
+  int bpr= (int) [backingPixmap bytesPerRow];
+  if (!data || W < 1 || H < 1) return;
+  CGContextRef cgc= [[NSGraphicsContext currentContext] CGContext];
+  CGDataProviderRef prov= CGDataProviderCreateWithData (NULL, data, bpr * H, NULL);
+  CGColorSpaceRef cs= CGColorSpaceCreateDeviceRGB ();
+  // NSBitmapFormatAlphaFirst, premultiplied: the bytes A R G B
+  CGImageRef img= CGImageCreate (W, H, 8, 32, bpr, cs,
+                                 kCGImageAlphaPremultipliedFirst |
+                                 kCGBitmapByteOrder32Big,
+                                 prov, NULL, false, kCGRenderingIntentDefault);
+  CGColorSpaceRelease (cs);
+  CGDataProviderRelease (prov);
+  if (!img) return;
   double k= retina_factor;
-  double H= (double) [backingPixmap pixelsHigh];
-  double cut= H - ring;  // the row of the view at the row 0 of the ring
+  double x0= rect.origin.x * k, x1= (rect.origin.x + rect.size.width) * k;
   double y0= rect.origin.y * k, y1= (rect.origin.y + rect.size.height) * k;
-  double x0= rect.origin.x * k, w= rect.size.width * k;
-  for (int piece= 0; piece < 2; piece++) {
-    double a= piece == 0? y0: max (y0, cut);
-    double b= piece == 0? min (y1, cut): y1;
-    double off= piece == 0? ring: ring - H;
-    if (b <= a) continue;
-    [backingPixmap drawInRect: NSMakeRect (x0 / k, a / k, w / k, (b - a) / k)
-                     fromRect: NSMakeRect (x0, a + off, w, b - a)
-                    operation: NSCompositingOperationSourceOver
-                     fraction: 1.0 respectFlipped: NO hints: nil];
+  for (int i= 0; i < 2; i++) {
+    double xa, xb, xo;
+    if (!backing_piece (i, x0, x1, false, xa, xb, xo)) continue;
+    for (int j= 0; j < 2; j++) {
+      double ya, yb, yo;
+      if (!backing_piece (j, y0, y1, true, ya, yb, yo)) continue;
+      // the rows [ya+yo, yb+yo) of the backing store are those from H-(yb+yo)
+      // in its memory (the top of the image); the image is drawn upside
+      // down in the flipped view, as the NSBitmapImageRep with
+      // respectFlipped: NO
+      CGImageRef sub= CGImageCreateWithImageInRect (img,
+        CGRectMake (xa + xo, H - (yb + yo), xb - xa, yb - ya));
+      if (!sub) continue;
+      CGContextDrawImage (cgc, CGRectMake (xa / k, ya / k, (xb - xa) / k,
+                                           (yb - ya) / k), sub);
+      CGImageRelease (sub);
+    }
   }
+  CGImageRelease (img);
 }
 
 void
@@ -765,7 +808,7 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
       fprintf (stderr, "SHIFT %g -> %g dy %d size %g\n", backing_pos.y, origin.y, dy, [backingPixmap size].height);
     backing_pos.x += dx / (double) retina_factor;
     backing_pos.y += dy / (double) retina_factor;
-    // NOTE: the columns are moved in place, the rows by the ring
+    // NOTE: nothing is moved: where the view starts in the backing store
     shift_backing_store (dx, dy);
     //cout << "SCROLL CONTENTS BY " << dx << " " << dy << LF;
     
@@ -884,17 +927,18 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
                                   min (r0->y2 + 1, (SI) bs.height));
         //cout << "repainting " << r0 << "\n";
         ns_bench_pixels += (double) (rr->x2 - rr->x1) * (rr->y2 - rr->y1);
-        // the rows of the view before the end of the ring, then those after
-        SI cut= (SI) bs.height - ring;
-        for (int piece= 0; piece < 2; piece++) {
-          SI a= piece == 0? rr->y1: max (rr->y1, cut);
-          SI b= piece == 0? min (rr->y2, cut): rr->y2;
-          SI off= piece == 0? ring: ring - (SI) bs.height;
-          if (b <= a) continue;
-          // the rows [a, b) of the view are the rows [a+off, b+off) of the
-          // backing store: the device coordinates of the renderer move by off
-          rectangle r= rectangle (rr->x1, a + off, rr->x2, b + off);
-          ren->set_origin (ox, oy - off * ren->pixel);
+        // in pieces, where the backing store wraps
+        for (int i= 0; i < 4; i++) {
+          double xa, xb, xo, ya, yb, yo;
+          if (!backing_piece (i & 1, rr->x1, rr->x2, false, xa, xb, xo) ||
+              !backing_piece (i >> 1, rr->y1, rr->y2, true, ya, yb, yo))
+            continue;
+          // the pixels [xa, xb) x [ya, yb) of the view are moved by (xo, yo)
+          // in the backing store: so are the device coordinates of the renderer
+          SI ix= (SI) xo, iy= (SI) yo;
+          rectangle r= rectangle ((SI) xa + ix, (SI) ya + iy,
+                                  (SI) xb + ix, (SI) yb + iy);
+          ren->set_origin (ox + ix * ren->pixel, oy - iy * ren->pixel);
           ren->encode (r->x1, r->y1);
           ren->encode (r->x2, r->y2);
           ren->set_clipping (r->x1, r->y2, r->x2, r->y1);
