@@ -24833,6 +24833,15 @@ fi
     if ls "$MUPDF_DIR"/lib/libmupdf-third.* > /dev/null 2>&1; then
       MUPDF_LIBS="$MUPDF_LIBS -lmupdf-third"
     fi
+    # a static MuPDF only (misc/vue/build-deps.sh): with the libraries of
+    # the system it was built with (FreeType, zlib)
+    if test -f "$MUPDF_DIR/lib/libmupdf.a" &&
+       ! ls "$MUPDF_DIR"/lib/libmupdf.so* "$MUPDF_DIR"/lib/libmupdf*.dylib \
+            "$MUPDF_DIR"/lib/libmupdf*.dll* > /dev/null 2>&1; then
+      MUPDF_SYS_LIBS=`pkg-config --static --libs freetype2 2> /dev/null`
+      test -z "$MUPDF_SYS_LIBS" && MUPDF_SYS_LIBS="-lfreetype"
+      MUPDF_LIBS="$MUPDF_LIBS $MUPDF_SYS_LIBS -lz -lm"
+    fi
   elif pkg-config --exists mupdf 2> /dev/null; then
     MUPDF_CFLAGS=`pkg-config --cflags mupdf`
     MUPDF_LIBS=`pkg-config --libs mupdf`
