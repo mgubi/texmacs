@@ -258,6 +258,29 @@ cache_initialize () {
   texmacs_home_path_string = concretize (texmacs_home_path);
   texmacs_doc_path_string = concretize (texmacs_doc_path);
   texmacs_font_path_string = concretize (texmacs_home_path * "fonts/");
+
+#ifdef __EMSCRIPTEN__
+  // In a web browser every build has the version of TeXmacs, which is what
+  // makes the caches be cleared (init_upgrade): the times of the files of
+  // TeXmacs kept in stat_cache.scm made the styles, the files and the
+  // documentation of an old build look up to date. They are cleared when
+  // the build changes (TEXMACS_WEB_BUILD, the hashes of its packages).
+  {
+    string build= get_env ("TEXMACS_WEB_BUILD");
+    url stamp= texmacs_home_path * url ("system/cache/web-build.txt");
+    string old;
+    if (build != "" && (load_string (stamp, old, false) || old != build)) {
+      url cache= texmacs_home_path * url ("system/cache");
+      remove (cache * url_wildcard ("__*"));
+      remove (cache * url ("dir_cache.scm"));
+      remove (cache * url ("doc_cache"));
+      remove (cache * url ("file_cache"));
+      remove (cache * url ("stat_cache.scm"));
+      remove (cache * url ("validate_cache.scm"));
+      save_string (stamp, build, false);
+    }
+  }
+#endif
    
   cache_refresh ();
   if (is_recursively_up_to_date (texmacs_path * "fonts/type1") &&
