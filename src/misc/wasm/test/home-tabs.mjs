@@ -1,7 +1,7 @@
 // The home directory of the browser build in IndexedDB, with several tabs
 // (tmHome in misc/wasm/web-pre.js), in a headless Firefox, or in Safari:
 //
-//   node misc/wasm/test/home-tabs.mjs [--safari | --browser <path>]
+//   node misc/wasm/test/home-tabs.mjs [--safari | --chrome | --browser <path>]
 //                                     [src directory] [profile directory]
 //
 // from src/, after the "web" target of misc/wasm/Makefile (the defaults:
@@ -9,7 +9,9 @@
 // first). puppeteer-core is looked for in build-wasm/tools, as by
 // misc/wasm/browser-run.mjs. --browser gives another browser for
 // puppeteer: a Chrome or a Chromium (Chrome for Testing) is driven as such,
-// headless. With --safari, Safari is driven by its
+// headless; --chrome is the Chrome for Testing installed in build-wasm/tools
+// (cd build-wasm/tools && ./node_modules/.bin/browsers install chrome@stable
+// --path $PWD/chrome). With --safari, Safari is driven by its
 // WebDriver (safaridriver, started here; "Allow Remote Automation" in the
 // Develop menu of Safari, or safaridriver --enable once): its window is on
 // the screen, its storage is that of an automation session (empty at the
@@ -21,7 +23,19 @@ import { createRequire } from 'node:module';
 
 const SAFARI = process.argv.includes ('--safari');
 const bi = process.argv.indexOf ('--browser');
-const BROWSER = bi > 0 ? process.argv[bi + 1] : '/Applications/Firefox.app/Contents/MacOS/firefox';
+let BROWSER = bi > 0 ? process.argv[bi + 1] : '/Applications/Firefox.app/Contents/MacOS/firefox';
+if (process.argv.includes ('--chrome')) {
+  // the newest Chrome for Testing of build-wasm/tools/chrome
+  const top = path.join (path.resolve (positionalSrc ()), 'build-wasm/tools/chrome/chrome');
+  const v = fs.existsSync (top) ? fs.readdirSync (top).filter (d => /^mac/.test (d)).sort ().pop () : null;
+  const app = v && fs.readdirSync (path.join (top, v)).map (d => path.join (top, v, d,
+    'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing')).find (f => fs.existsSync (f));
+  if (!app) { console.error ('no Chrome for Testing in ' + top); process.exit (2); }
+  BROWSER = app;
+}
+function positionalSrc () {
+  return process.argv.slice (2).filter ((a, i, l) => !a.startsWith ('--') && l[i - 1] !== '--browser')[0] || '.';
+}
 const CHROME = /chrom/i.test (path.basename (BROWSER));
 const positional = process.argv.slice (2).filter ((a, i, l) => !a.startsWith ('--') && l[i - 1] !== '--browser');
 const SRC = path.resolve (positional[0] || '.');
