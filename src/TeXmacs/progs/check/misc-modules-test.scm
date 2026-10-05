@@ -1239,16 +1239,49 @@
       (edit (tree-go-to (buffer-tree) 0 0 1 0))
       (edit (structured-remove-horizontal (bt 0) #t))
       (check= (body) '(document (mc (mc-field "false" "b"))))))
-  ;; FIXME: deleting forwards in the last field adds a procedure to a
-  ;; number (education/edu-edit.scm:379, (+ i -)): with the cursor in the
-  ;; last field of (mc (mc-field "false" "a") (mc-field "false" "b")),
-  ;; (structured-remove-horizontal t #t), or kbd-delete in an empty last
-  ;; field, raises wrong-type-arg, expected the field to be removed.
-  ;; FIXME: structured-insert-vertical and structured-remove-vertical on a
-  ;; list use the unbound variable forwards? instead of their argument
-  ;; downwards? (education/edu-edit.scm:368,409):
-  ;; (structured-insert-vertical t #t) raises unbound-variable, expected a
-  ;; new field.
+  ;; deleting forwards in the last field removes it, the cursor goes to the
+  ;; previous one
+  (with-buffer-doc '(document (mc (mc-field "false" "a")
+                                  (mc-field "false" "b")))
+      '("generic")
+    (lambda ()
+      (edit (tree-go-to (buffer-tree) 0 1 1 0))
+      (edit (structured-remove-horizontal (bt 0) #t))
+      (check= (body) '(document (mc (mc-field "false" "a"))))
+      (check= (list-head (rel (cursor-path)) 2) '(0 0))))
+  (with-buffer-doc '(document (mc (mc-field "false" "a")
+                                  (mc-field "false" "")))
+      '("generic")
+    (lambda ()
+      (edit (tree-go-to (buffer-tree) 0 1 1 0))
+      (edit (kbd-delete))
+      (check= (body) '(document (mc (mc-field "false" "a"))))
+      (check= (list-head (rel (cursor-path)) 2) '(0 0))))
+  ;; vertical insertion and removal, downwards and upwards
+  (with-buffer-doc '(document (mc (mc-field "false" "a")
+                                  (mc-field "false" "b")))
+      '("generic")
+    (lambda ()
+      (edit (tree-go-to (buffer-tree) 0 0 1 0))
+      (edit (structured-insert-vertical (bt 0) #t))
+      (check= (body) '(document (mc (mc-field "false" "a")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "b"))))
+      (check= (rel (cursor-path)) '(0 1 1 0))
+      (edit (structured-insert-vertical (bt 0) #f))
+      (check= (body) '(document (mc (mc-field "false" "a")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "b"))))
+      (check= (rel (cursor-path)) '(0 1 1 0))
+      (edit (structured-remove-vertical (bt 0) #t))
+      (check= (body) '(document (mc (mc-field "false" "a")
+                                    (mc-field "false" "")
+                                    (mc-field "false" "b"))))
+      (check= (list-head (rel (cursor-path)) 2) '(0 1))
+      (edit (structured-remove-vertical (bt 0) #f))
+      (check= (body) '(document (mc (mc-field "false" "")
+                                    (mc-field "false" "b"))))))
   ;; popups: one field is selected, the new one
   (with-buffer-doc '(document (mc-popup (mc-field "true" "a")
                                         (mc-field "false" "b")))
