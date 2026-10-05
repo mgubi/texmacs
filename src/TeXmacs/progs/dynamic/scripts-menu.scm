@@ -36,14 +36,6 @@
   (:require (evaluate-context? t))
   "Evaluate")
 
-;; the icons of the plug-in of an executable fold (set-fold-focus-menu!)
-(tm-menu (focus-extra-icons t)
-  (:require (and (tree-in? t '(script-input script-output))
-                 (tree-atomic? (tree-ref t 0))
-                 (fold-focus-menu (tree->string (tree-ref t 0)))))
-  (with m (fold-focus-menu (tree->string (tree-ref t 0)))
-    (dynamic (m (tree->string (tree-ref t 0)) t))))
-
 (tm-define (alternate-second-name t)
   (:require (plot-context? t))
   "Plot")

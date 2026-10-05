@@ -508,41 +508,18 @@
 (define ai-model-of-request "")
 (tm-define (ai-model-override) ai-model-of-request)
 
-;; The executable folds of the engines: each asks its question alone (no
-;; context but the document, when the fold sends it), with its model and its
-;; settings (as a session: ai-session-var), and keeps its answer, which is
-;; asked again only on demand (set-fold-keeps-output!). Its answer is the
-;; answer alone; its tokens are said on the status bar. A fold which is
-;; evaluated is queued here (script-feed, set-fold-feed-hook!) until its
-;; request is made, in the order of the requests of the engine.
-(define ai-fold-queue (make-ahash-table)) ; engine -> pointers to the folds
-
-(define (ai-fold-fed name out)
-  (with f (and (tree? out) (tree-up out))
-    (ahash-set! ai-fold-queue name
-                (append (or (ahash-ref ai-fold-queue name) '())
-                        (list (and f (tree-in? f '(script-input script-output))
-                                   (tree->tree-pointer f)))))))
-
-(define (ai-fold-pop name)
-  (with l (or (ahash-ref ai-fold-queue name) '())
-    (and (nnull? l)
-         (begin
-           (ahash-set! ai-fold-queue name (cdr l))
-           (and (car l)
-                (with f (catch #t (lambda () (tree-pointer->tree (car l)))
-                          (lambda args #f))
-                  (tree-pointer-detach (car l))
-                  (and (tree? f) (tree-in? f '(script-input script-output))
-                       f)))))))
-
+;; The executable folds of the engines (tools/ai/ai-folds.scm): each asks
+;; its question alone (no context but the document, when the fold sends
+;; it), with its model and its settings (as a session: ai-session-var), and
+;; keeps its answer, which is the answer alone (its tokens on the status
+;; bar). ai-fold-pop gives the fold of a request which is not in a session.
 (tm-define (ai-request-prepare name chat)
   (let* ((field (ai-pending-field name chat))
          (doc (and field (tree-up field)))
          (s (and doc (tree-up doc)))
          (s (if field
                 (and s (tree-is? s 'session) s)
-                (ai-fold-pop name))))
+                (and (defined? 'ai-fold-pop) (ai-fold-pop name)))))
     (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
     (set! ai-document-of-request
           (if (and s (== (ai-session-var s "ai-document") "true"))
@@ -1244,13 +1221,9 @@
             (dynamic (focus-ai-reasoning-menu lan))))
     //
     ((balloon "Ask again" "Ask the question of the fold again")
-     (script-evaluate-again t))))
+     (ai-fold-ask-again t))))
 
-(for-each (lambda (name)
-            (set-fold-keeps-output! name)
-            (set-fold-feed-hook! name (lambda (out) (ai-fold-fed name out)))
-            (set-fold-focus-menu! name ai-fold-icons))
-          (ai-models))
+(use-modules (tools ai ai-folds))
 
 ;; the chatbots in a submenu AI of Insert > Session, each starting a session
 ;; of its default model (the model is then chosen in the focus bar)

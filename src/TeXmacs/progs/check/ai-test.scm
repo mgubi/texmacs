@@ -143,8 +143,9 @@
   (check= (answer (openai "<think>Hmm.</think>\n\nAnswer.") "ollama")
           `(document ,(reasoning-fold "Hmm.") (with "mode" "text" "Answer.")))
   (check= (ai-reasoning "claude") "default")
-  ;; the folds of the chatbots keep their answer (asked again on demand)
-  (check-true (fold-keeps-output? "claude")))
+  ;; the executable folds of the chatbots (tools/ai/ai-folds.scm)
+  (check-true (ai-fold? (stree->tree '(script-input "claude" "default" "" ""))))
+  (check-false (ai-fold? (stree->tree '(script-input "scheme" "default" "" "")))))
 
 (define (test-pictures)
   (check-group "pictures")
