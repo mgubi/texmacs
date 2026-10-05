@@ -202,6 +202,13 @@
     the <name|TikZ> plug-in, its <name|SVG> pictures images, and the answer
     as it came is kept in a fold after it. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
+    <item><name|TikZ>: the libraries of <verbatim|pgfplots> which
+    <name|TikZJax> lacked (<verbatim|fill between>, group plots, polar
+    axes...). The pictures of the answers of the chatbots keep the settings
+    of their preamble, and their minipages are set as their contents; an
+    answer which comes no longer gives errors for a command whose arguments
+    have not come yet.
+
     <item>The <with|font-series|bold|Busy> sign of a session or a fold
     which waits for its answer is animated.
 

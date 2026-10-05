@@ -845,9 +845,28 @@ ai_tikz_header (string pre) {
     }
     i= e;
   }
+  // the other settings of the pictures (pgfplots libraries, styles, colors)
+  string other;
+  static const char* settings[]= {
+    "\\usepgfplotslibrary", "\\pgfplotsset", "\\tikzset", "\\definecolor",
+    "\\colorlet", NULL };
+  array<string> lines= tokenize (pre, "\n");
+  for (int k= 0; k < N(lines); k++) {
+    string l= trim_spaces (lines[k]);
+    for (int m= 0; settings[m] != NULL; m++)
+      if (starts (l, settings[m])) other << l << "\n";
+  }
   string r;
-  if (pkgs != "") r << "% packages: " << pkgs << "\n";
-  if (libs != "") r << "% libraries: " << libs << "\n";
+  if (other == "") {
+    if (pkgs != "") r << "% packages: " << pkgs << "\n";
+    if (libs != "") r << "% libraries: " << libs << "\n";
+    return r;
+  }
+  // with settings: a whole document (the TikZ plug-in takes its preamble)
+  r << "\\documentclass{article}\n";
+  if (pkgs != "") r << "\\usepackage{" << pkgs << "}\n";
+  if (libs != "") r << "\\usetikzlibrary{" << libs << "}\n";
+  r << other << "\\begin{document}\n";
   return r;
 }
 
@@ -909,8 +928,11 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
       if (end < 0) break;
       end += N(close);
       // evaluated when it is in the document (ai-run-pending-folds)
+      string head= ai_tikz_header (pre);
+      string code= head * s (best, end);
+      if (starts (head, "\\documentclass")) code << "\n\\end{document}";
       block= compound ("with", "ai-tikz", "pending",
-                       ai_script_fold ("tikz", ai_tikz_header (pre) * s (best, end)));
+                       ai_script_fold ("tikz", code));
     }
     // a fence ```svg ... ``` (```latex, ```tex...) around it goes with it
     {
@@ -1085,9 +1107,25 @@ ai_latex_closed_prefix (string s) {
     }
     else i++;
   next:
-    if (depth == 0 && !math && !dmath && N(envs) == 0) safe= i;
+    // a point is safe when what follows is known and does not go on with a
+    // command (its arguments: \section*{...}, \frac{a}{b}, \item[...])
+    if (depth == 0 && !math && !dmath && N(envs) == 0 && i < n &&
+        s[i] != '{' && s[i] != '[' && s[i] != '*')
+      safe= i;
   }
   return s (0, safe);
+}
+
+// the constructs of LaTeX which the style of a session does not have, as
+// their contents (a minipage of a figure)
+static tree
+ai_simplify (tree t) {
+  if (is_atomic (t)) return t;
+  if (is_compound (t, "minipage") && N(t) > 0) return ai_simplify (t[N(t)-1]);
+  int i, n= N(t);
+  tree r (t, n);
+  for (i= 0; i < n; i++) r[i]= ai_simplify (t[i]);
+  return r;
 }
 
 tree
@@ -1095,7 +1133,7 @@ ai_latex_body_to_tree (string r) {
   r= replace (r, "\\maketitle", "");
   r= replace (r, "\\begin{lstlisting}", "\\begin{verbatim}");
   r= replace (r, "\\end{lstlisting}", "\\end{verbatim}");
-  return generic_to_tree (r, "latex-snippet");
+  return ai_simplify (generic_to_tree (r, "latex-snippet"));
 }
 
 // what is shown of an answer which is still coming: a LaTeX document is set

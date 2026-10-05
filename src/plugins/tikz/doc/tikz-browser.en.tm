@@ -205,7 +205,12 @@
 
   <paragraph|Packages and libraries>
 
-  The packages of <name|TikZJax> are <verbatim|pgfplots>,
+  The packages of <name|TikZJax> are <verbatim|pgfplots> (with its
+  libraries <verbatim|fillbetween>, <verbatim|groupplots>,
+  <verbatim|polar>, <verbatim|statistics>, <verbatim|dateplot>,
+  <verbatim|units>, <verbatim|patchplots>, <verbatim|ternary>,
+  <verbatim|smithchart>, asked for by <verbatim|\\usepgfplotslibrary> in a
+  whole document),
   <verbatim|tikz-cd>, <verbatim|circuitikz>, <verbatim|chemfig>,
   <verbatim|tkz-tab>, <verbatim|yquant>, <verbatim|braids>,
   <verbatim|kinematikz>, <verbatim|tikz-feynhand>, <verbatim|physics>,

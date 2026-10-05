@@ -110,10 +110,12 @@ $(OUT)/web/tikzjax/tables.js: $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js
 $(TIKZJAX)/dist/run-tex.js:
 	sh $(W)/get-tikzjax.sh $(CURDIR)
 
-$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js
+$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js $(wildcard $(W)/tikzjax-extra/*.tex)
 	@mkdir -p $(OUT)/web/tikzjax
 	cp $(TIKZJAX)/dist/run-tex.js $(TIKZJAX)/dist/tex.wasm.gz $(TIKZJAX)/dist/core.dump.gz $(TIKZJAX)/LICENSE $(OUT)/web/tikzjax/
 	rm -rf $(OUT)/web/tikzjax/tex_files; cp -R $(TIKZJAX)/dist/tex_files $(OUT)/web/tikzjax/
+	# the libraries of pgfplots which TikZJax lacks (misc/wasm/tikzjax-extra)
+	for f in $(W)/tikzjax-extra/*.tex; do gzip -9 -n -c $$f > $(OUT)/web/tikzjax/tex_files/`basename $$f`.gz; done
 	cp $(TM)/plugins/tikz/web/tm-tikz.js $@
 
 # the program of the Asymptote plugin (plugins/asymptote, docs/wasm/asymptote.md):
