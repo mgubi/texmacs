@@ -973,6 +973,138 @@
           (check= (zotero-entry-item (zotero-find-key "roe2001old"))
                   "XXXX9999"))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Asynchronous requests (in a web browser)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The browser is simulated: the requests are recorded, and answered by the
+;; test with zotero-async-answer
+(define sim-browser? #f)
+(define sim-requests '())
+
+(tm-define (zotero-in-browser?)
+  (:require sim-browser?)
+  #t)
+
+(tm-define (zotero-start-request id url headers)
+  (:require sim-browser?)
+  (set! sim-requests (append sim-requests (list (list id url headers)))))
+
+(define (sim-answer! url-part status version body)
+  ;; answer the first recorded request whose url contains @url-part
+  (with r (list-find sim-requests (lambda (r) (string-contains? (cadr r)
+                                                                 url-part)))
+    (set! sim-requests (list-filter sim-requests (lambda (x) (not (eq? x r)))))
+    (zotero-async-answer (car r) status version (encode-base64 body))))
+
+(define (with-sim-browser thunk)
+  (with-preferences '(("zotero source" . "web")
+                      ("zotero api key" . "secret")
+                      ("zotero user" . "123 alice"))
+    (lambda ()
+      (set! sim-browser? #t)
+      (set! sim-requests '())
+      (set! fake-library (default-library))
+      (set! fake-current fake-library)
+      (zotero-forget-state)
+      (zotero-forget-keys)
+      (with r (check-run thunk)
+        (set! sim-browser? #f)
+        (zotero-forget-state)
+        (zotero-forget-keys)
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r)))))))
+
+(define (test-async)
+  (check-group "async")
+  (with-sim-browser
+    (lambda ()
+      (let* ((runs 0)
+             (again (lambda () (set! runs (+ runs 1)))))
+        ;; the state is asked asynchronously: awaited first
+        (check= (zotero-with-retry again zotero-status) 'pending)
+        (check-true (zotero-pending?))
+        (check= (map cadr sim-requests)
+                '("https://api.zotero.org/users/123/items/top?limit=1&format=keys"))
+        ;; the key goes in a header
+        (check-true (in? "Zotero-API-Key: secret" (caddr (car sim-requests))))
+        (check= (zotero-status-message 'pending) "Asking zotero.org...")
+        ;; the operation which waited runs again once answered
+        (sim-answer! "format=keys" 200 7 "AAAA1111\n")
+        (check= runs 1)
+        (check-false (zotero-pending?))
+        (check= (zotero-with-retry again zotero-status) 'ready)
+        ;; a search: nothing at first, the items once answered
+        (check= (zotero-with-retry again (lambda () (zotero-search "gravity")))
+                '())
+        (check= (length sim-requests) 1)
+        ;; the same request is not asked twice while it is awaited
+        (zotero-with-retry again (lambda () (zotero-search "gravity")))
+        (check= (length sim-requests) 1)
+        (set! fake-current fake-library)
+        (sim-answer! "q=gravity" 200 7
+                     ((eval 'fake-library-answer
+                            (resolve-module '(check zotero-test)))
+                      "items/top?format=json&q=gravity"))
+        (check= runs 2)
+        (check= (map zotero-entry-key
+                     (zotero-with-retry again (lambda ()
+                                                (zotero-search "gravity"))))
+                '("smith2020" "smith2020a"))
+        (check= sim-requests '())
+        ;; an awaited answer is no deleted item
+        (with-buffer-body '(document (cite "smith2020"))
+          (lambda ()
+            (zotero-record-items
+             (list '("smith2020" "AAAA1111" "" "" "" 3 "users/0")))
+            (zotero-with-retry again
+                               (lambda ()
+                                 (check= (zotero-check-missing '("smith2020"))
+                                         '(() ()))))
+            (check-true (zotero-pending?))
+            (zotero-forget-keys)
+            (set! sim-requests '())))
+        ;; a failure is an answer too: no request again for a while
+        (zotero-forget-keys)
+        (zotero-forget-state)
+        (zotero-with-retry again zotero-status)
+        (sim-answer! "format=keys" 0 0 "")
+        (check= (zotero-with-retry again zotero-status) 'not-running)
+        (check= sim-requests '())
+        ;; without retry, the request is synchronous (not recorded here)
+        (check-false (zotero-pending?)))))
+  (check-group "async update")
+  (with-sim-browser
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      (with f (tmp "async.bib")
+        (string-save "@article{other, title={Other}}\n" f)
+        (with-document "as.tm"
+            (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                           "  See <cite|smith2020>.\n\n"
+                           "  <\\bibliography|bib|tm-plain|async>\n"
+                           "  </bibliography>\n</body>\n")
+          (lambda ()
+            ;; an update waits for the answers, and is made again then
+            (check= (zotero-before-update "bibliography") 'wait)
+            (sim-answer! "format=keys" 200 7 "AAAA1111\n")
+            (check= (zotero-before-update "bibliography") 'wait)
+            (set! fake-current fake-library)
+            (sim-answer! "q=smith2020" 200 7
+                         ((eval 'fake-library-answer
+                                (resolve-module '(check zotero-test)))
+                          "items/top?format=json&q=smith2020"))
+            (check= (zotero-before-update "bibliography") 'wait)
+            (sim-answer! "format=bibtex" 200 7
+                         ((eval 'fake-library-answer
+                                (resolve-module '(check zotero-test)))
+                          "items?format=bibtex&itemKey=AAAA1111"))
+            ;; all is known: the reference is added to the file
+            (check= (zotero-before-update "bibliography") 'done)
+            (check= (map car (zotero-bib-chunks-of (string-load f)))
+                    '("other" "smith2020"))))
+        (system-remove f)))))
+
 (define (test-renamed)
   (check-group "renamed")
   (check= (map car (zotero-bib-chunks-of
@@ -1379,6 +1511,7 @@
   (test-groups)
   (test-summaries)
   (test-web)
+  (test-async)
   (test-renamed)
   (test-database-search)
   (test-file-search)

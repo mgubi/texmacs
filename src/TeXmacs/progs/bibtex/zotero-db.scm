@@ -94,7 +94,7 @@
                     (number->string (zotero-entry-version z)))
               (cons "zotero-synced" (fields->string (entry-fields e))))))
 
-(define (convert-entries zs)
+(define (convert-now zs)
   ;; The database entries of the Zotero entries @zs, as (key . entry)
   (if (null? zs) '()
       (let* ((bib (zotero-export zs))
@@ -108,6 +108,30 @@
                   (and z (cons (zotero-entry-key z) (mark e z)))))
               es)
          identity))))
+
+;; The entries converted before, per item: (version key . entry). An item is
+;; exported again only when its version or its key changed; so a
+;; bibliography made after its references were asked (in a web browser,
+;; where the answers come later) needs no request
+(define converted (make-ahash-table))
+
+(define (converted-entry z)
+  (with c (ahash-ref converted (list (zotero-entry-library z)
+                                     (zotero-entry-item z)))
+    (and c (== (car c) (zotero-entry-version z))
+         (== (cadr c) (zotero-entry-key z))
+         (cons (cadr c) (cddr c)))))
+
+(define (convert-entries zs)
+  ;; The database entries of the Zotero entries @zs, as (key . entry)
+  (let* ((todo (list-filter zs (negate converted-entry)))
+         (new (convert-now todo)))
+    (for (x new)
+      (with z (list-find todo (lambda (z) (== (zotero-entry-key z) (car x))))
+        (ahash-set! converted (list (zotero-entry-library z)
+                                    (zotero-entry-item z))
+                    (cons (zotero-entry-version z) x))))
+    (list-filter (map converted-entry zs) identity)))
 
 (define (rename-entry e name)
   (list (car e) (cadr e) (caddr e) name (list-ref e 4) (list-ref e 5)))
@@ -145,28 +169,43 @@
   ;; those of Zotero which the database does not have yet
   (:interactive #t)
   (zotero-forget-state)
+  (zotero-command import-citations-again import-citations))
+
+(define (import-citations-again)
+  (zotero-command import-citations-again import-citations))
+
+(define (import-citations)
   (if (not (zotero-ready?))
       (set-message (zotero-status-message (zotero-status)) "Zotero")
       (let* ((keys (list-filter (zotero-project-citations)
                                 (negate zotero-in-database?)))
-             (n (zotero-import-items (map cdr (zotero-resolve keys)))))
-        (set-message
-         (if (== n 0) "The database has all the references of the citations"
-             (string-append "Imported " (number->string n)
-                            (if (== n 1) " reference" " references")
-                            " from Zotero into the database"))
-         "Zotero"))))
+             (found (zotero-resolve keys)))
+        ;; NOTE: in a web browser, once all the answers have come
+        (when (not (zotero-asking?))
+          (with n (zotero-import-items (map cdr found))
+            (set-message
+             (if (== n 0) "The database has all the references of the citations"
+                 (zotero-tr (if (== n 1)
+                                "Imported %1 reference from Zotero into the database"
+                                "Imported %1 references from Zotero into the database")
+                            (number->string n)))
+             "Zotero"))))))
 
 (tm-define (zotero-import-entry e)
   (:synopsis "Import into the database the reference of the Zotero entry @e")
   (:interactive #t)
+  (zotero-command (lambda () (zotero-import-entry e))
+                  (lambda () (import-entry e))))
+
+(define (import-entry e)
   (with n (zotero-import-items (list e))
-    (set-message (if (== n 1)
-                     (string-append "Imported " (zotero-entry-key e)
-                                    " from Zotero into the database")
-                     (string-append (zotero-entry-key e)
-                                    " could not be imported"))
-                 "Zotero")))
+    (when (not (zotero-asking?))
+      (set-message (if (== n 1)
+                       (zotero-tr "Imported %1 from Zotero into the database"
+                                  (zotero-entry-key e))
+                       (zotero-tr "%1 could not be imported"
+                                  (zotero-entry-key e)))
+                   "Zotero"))))
 
 (tm-define (zotero-can-import? e)
   (:synopsis "Can the reference of the Zotero entry @e enter the database?")
@@ -202,7 +241,7 @@
   ;; database, or the name of its source (a BibTeX file)
   (with lib (zotero-entry-meta e "zotero-library")
     (cond ((string? zotero?) zotero?)
-          ((not zotero?) (if lib "Database, from Zotero" "Database"))
+          ((not zotero?) (zotero-tr (if lib "Database, from Zotero" "Database")))
           ((and lib (!= (zotero-normalize-library lib) (zotero-user-library)))
            (string-append "Zotero, " (zotero-library-name lib)))
           (else "Zotero"))))
@@ -271,47 +310,51 @@
            (append r (if (> (length fl) 20) (list "More items follow") '())
                    z))
           ((and (not f) (not (zotero-ready?)))
-           (list "No bibliography file, and Zotero is not available"))
-          (else (list "No matching items")))))
+           (list (zotero-tr "No bibliography file, and Zotero is not available")))
+          (else (list (zotero-tr "No matching items"))))))
 
 (define (zotero-source-state)
   ;; Zotero, as a source of the search window
-  (cond ((not (zotero-in-database-search?))
-         "Zotero is left out (see the Zotero settings)")
-        ((zotero-ready?)
-         (if (== (get-preference "zotero libraries") "all")
-             (with n (length (zotero-groups))
-               (string-append (if (zotero-web?) "zotero.org" "Zotero")
-                              " (My Library and "
-                              (number->string n)
-                              (if (== n 1) " group)" " groups)")))
-             (if (zotero-web?) "zotero.org (My Library)"
-                 "Zotero (My Library)")))
-        ((== (zotero-status) 'disabled)
-         "Zotero refuses the requests (enable its local API)")
-        ((and (== (zotero-status) 'not-running) (not (zotero-web?)))
-         "Zotero is not running")
-        ((== (zotero-status) 'no-key) "Zotero (give the API key of zotero.org)")
-        (else (zotero-status-message (zotero-status)))))
+  (let ((where (if (zotero-web?) "zotero.org" "Zotero")))
+    (cond ((not (zotero-in-database-search?))
+           (zotero-tr "Zotero is left out (see the Zotero settings)"))
+          ((zotero-ready?)
+           (if (== (get-preference "zotero libraries") "all")
+               (with n (length (zotero-groups))
+                 (zotero-tr (if (== n 1) "%1 (My Library and %2 group)"
+                                "%1 (My Library and %2 groups)")
+                            where (number->string n)))
+               (zotero-tr "%1 (My Library)" where)))
+          ((== (zotero-status) 'disabled)
+           (zotero-tr "Zotero refuses the requests (enable its local API)"))
+          ((and (== (zotero-status) 'not-running) (not (zotero-web?)))
+           (zotero-tr "Zotero is not running"))
+          ((== (zotero-status) 'no-key)
+           (zotero-tr "Zotero (give the API key of zotero.org)"))
+          (else (zotero-status-message (zotero-status))))))
 
 (tm-define (zotero-search-sources-text db)
   (:synopsis "The sources of the search window of references, for @db")
-  ;; @db is :bib-file without the database tool
-  (zotero-forget-state)
-  (string-append
-   "Sources: "
-   (if (== db :bib-file)
-       (with f (zotero-own-bib-file)
-         (cond (f (url->system (url-tail f)))
-               ((with m (zotero-master-bibliography-file)
-                  (and m (url-exists? m)))
-                "the BibTeX file exported from Zotero")
-               (else "no BibTeX file in the bibliography")))
-       "your database")
-   "; " (zotero-source-state)))
+  ;; @db is :bib-file without the database tool; in a web browser, the
+  ;; state of Zotero may come later, and shows the line again
+  (zotero-with-retry (lambda () (refresh-now "db-search-sources"))
+                     (lambda () (search-sources-text db))))
+
+(define (search-sources-text db)
+  (zotero-tr "Sources: %1; %2"
+             (if (== db :bib-file)
+                 (with f (zotero-own-bib-file)
+                   (cond (f (url->system (url-tail f)))
+                         ((with m (zotero-master-bibliography-file)
+                            (and m (url-exists? m)))
+                          (zotero-tr "the BibTeX file exported from Zotero"))
+                         (else (zotero-tr "no BibTeX file in the bibliography"))))
+                 (zotero-tr "your database"))
+             (zotero-source-state)))
 
 (tm-define (zotero-open-search-tool t)
   (:synopsis "Search a reference for the citation @t, without the database")
+  (zotero-forget-state)
   (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))
     (open-db-chooser
      :bib-file "bib" "Search bibliographic reference"
@@ -403,27 +446,40 @@
                               ((== kind 'conflict)
                                (set! conflicts
                                      (cons (cons e new) conflicts))))))))
-              (for (lib libs)
-                (let* ((here (list-filter old (lambda (e) (== (entry-library e)
-                                                              lib))))
-                       (versions (zotero-item-versions (map entry-item here)
-                                                       lib))
-                       ;; items changed in Zotero
-                       (changed (list-filter here (cut newer? <> versions)))
-                       (zs (zotero-items-entries (map entry-item changed) lib))
-                       (new (convert-entries zs)))
-                  ;; items no longer in Zotero
-                  (for (e here)
-                    (when (not (assoc (entry-item e) versions))
-                      (when (!= (zotero-entry-meta e "zotero-deleted") "yes")
-                        (set-meta! e "zotero-deleted" "yes"))
-                      (set! deleted (cons (entry-name e) deleted))))
-                  (for (e changed)
-                    (let* ((z (list-find zs (lambda (z) (== (zotero-entry-item z)
-                                                            (entry-item e)))))
-                           (x (and z (assoc (zotero-entry-key z) new))))
-                      (when x
-                        (sync-entry e (cdr x) z (report e (cdr x))))))))
+              ;; first what Zotero says of each library, then the changes:
+              ;; NOTE: in a web browser an awaited answer would look like
+              ;; deleted items, so that nothing is changed then
+              (let* ((gathered
+                      (map (lambda (lib)
+                             (let* ((here (list-filter
+                                           old (lambda (e) (== (entry-library e)
+                                                               lib))))
+                                    (versions (zotero-item-versions
+                                               (map entry-item here) lib))
+                                    ;; items changed in Zotero
+                                    (changed (list-filter
+                                              here (cut newer? <> versions)))
+                                    (zs (zotero-items-entries
+                                         (map entry-item changed) lib))
+                                    (new (convert-entries zs)))
+                               (list here versions changed zs new)))
+                           libs)))
+                (when (zotero-asking?) (set! v #f) (set! gathered '()))
+                (for (g gathered)
+                  (with (here versions changed zs new) g
+                    ;; items no longer in Zotero
+                    (for (e here)
+                      (when (not (assoc (entry-item e) versions))
+                        (when (!= (zotero-entry-meta e "zotero-deleted") "yes")
+                          (set-meta! e "zotero-deleted" "yes"))
+                        (set! deleted (cons (entry-name e) deleted))))
+                    (for (e changed)
+                      (let* ((z (list-find zs (lambda (z)
+                                                (== (zotero-entry-item z)
+                                                    (entry-item e)))))
+                             (x (and z (assoc (zotero-entry-key z) new))))
+                        (when x
+                          (sync-entry e (cdr x) z (report e (cdr x)))))))))
               (when v (set-preference "zotero sync version" v))
               (list (reverse updated) (reverse renamed) (reverse deleted)
                     (reverse conflicts)))))))
@@ -457,19 +513,19 @@
   (with (updated renamed deleted conflicts) r
     (with l (append
              (if (null? updated) '()
-                 (list (string-append (number->string (length updated))
-                                      " updated")))
+                 (list (zotero-tr "%1 updated"
+                                  (number->string (length updated)))))
              (if (null? renamed) '()
-                 (list (string-append (number->string (length renamed))
-                                      " renamed in Zotero")))
+                 (list (zotero-tr "%1 renamed in Zotero"
+                                  (number->string (length renamed)))))
              (if (null? deleted) '()
-                 (list (string-append (number->string (length deleted))
-                                      " no longer in Zotero")))
+                 (list (zotero-tr "%1 no longer in Zotero"
+                                  (number->string (length deleted)))))
              (if (null? conflicts) '()
-                 (list (string-append (number->string (length conflicts))
-                                      " changed on both sides"))))
+                 (list (zotero-tr "%1 changed on both sides"
+                                  (number->string (length conflicts))))))
       (and (nnull? l)
-           (string-append "Zotero references: " (string-recompose l ", "))))))
+           (zotero-tr "Zotero references: %1" (string-recompose l ", "))))))
 
 (tm-define (zotero-database-renames keys)
   (:synopsis "The (old . new) of the @keys renamed in Zotero, by the sync")

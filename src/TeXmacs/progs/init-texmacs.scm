@@ -48,7 +48,8 @@
 (lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
              zotero-before-update zotero-managed-file?
              zotero-completion-suffixes zotero-citation-entry
-             zotero-show-item zotero-update-citations)
+             zotero-show-item zotero-update-citations
+             zotero-with-retry zotero-pending?)
 (lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
              zotero-import-items zotero-in-database? zotero-search-entries
              zotero-database-renames
