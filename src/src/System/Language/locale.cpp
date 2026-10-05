@@ -322,16 +322,28 @@ two_digits (int n) {
   return (n < 10? string ("0"): string ("")) * as_string (n);
 }
 
+static bool
+has_am_pm (string fm) {
+  // whether fm contains an AM/PM marker (a or A) outside quoted text
+  bool quoted= false;
+  for (int i=0; i<N(fm); i++)
+    if (fm[i] == '\'') quoted= !quoted;
+    else if (!quoted && (fm[i] == 'a' || fm[i] == 'A')) return true;
+  return false;
+}
+
 static string
 pattern_date (string lan, string fm) {
   // the current date in the format fm, with the patterns of Qt (which
   // the Qt version of get_date uses): d dd ddd dddd for the day, M MM MMM
-  // MMMM for the month, yy yyyy for the year, and 'text' quoted. The names
-  // of the months and days come from date, in the language lan; the format
-  // itself is never passed to the shell.
+  // MMMM for the month, yy yyyy for the year, h hh H HH m mm s ss for the
+  // time (h and hh on 12 hours when there is an AM/PM marker AP A ap a),
+  // and 'text' quoted. The names of the months and days come from date,
+  // in the language lan; the format itself is never passed to the shell.
   time_t ti;
   time (&ti);
   struct tm now= *localtime (&ti);
+  bool am_pm= has_am_pm (fm);
   string r;
   int i= 0, n= N(fm);
   while (i < n) {
@@ -365,6 +377,18 @@ pattern_date (string lan, string fm) {
     }
     else if (c == 'y' && count == 2) r << two_digits ((now.tm_year + 1900) % 100);
     else if (c == 'y' && count == 4) r << as_string (now.tm_year + 1900);
+    else if ((c == 'h' || c == 'H' || c == 'm' || c == 's') && count <= 2) {
+      int v= (c == 'm'? now.tm_min: c == 's'? now.tm_sec: now.tm_hour);
+      if (c == 'h' && am_pm) v= (v % 12 == 0? 12: v % 12);
+      r << (count == 1? as_string (v): two_digits (v));
+    }
+    else if (c == 'A' || c == 'a') {
+      // AP, A, ap or a
+      bool up= (c == 'A');
+      r << (now.tm_hour < 12? (up? "AM": "am"): (up? "PM": "pm"));
+      k= i + 1;
+      if (k < n && fm[k] == (up? 'P': 'p')) k++;
+    }
     else r << fm (i, k);
     i= k;
   }
