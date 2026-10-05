@@ -36658,7 +36658,7 @@ printf '%s\n' "#define LINKED_MUPDF 1" >>confdefs.h
 
 printf '%s\n' "#define MUPDF_RENDERER 1" >>confdefs.h
 
-        CONFIG_MUPDF="MuPdf"
+        CONFIG_MUPDF="MuPDF" # the directory Plugins/MuPDF (filesystems with case)
       else
         case "$CONFIG_GUI" in
           SDL | VUE)

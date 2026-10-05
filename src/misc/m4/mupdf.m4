@@ -95,7 +95,7 @@ AC_DEFUN([TM_MUPDF_FOR_GUI], [
           AC_DEFINE(LINKED_MUPDF, 1, [Link MuPDF library with TeXmacs])
         fi
         AC_DEFINE(MUPDF_RENDERER, 1, [Enabling native MuPDF backend])
-        CONFIG_MUPDF="MuPdf"
+        CONFIG_MUPDF="MuPDF" # the directory Plugins/MuPDF (filesystems with case)
       else
         case "$CONFIG_GUI" in
           SDL | VUE)
