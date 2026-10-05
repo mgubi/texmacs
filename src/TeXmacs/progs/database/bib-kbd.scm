@@ -26,7 +26,7 @@
       (let* ((db (with-database (bib-database)
                    (sort (index-get-name-completions key) string<=?)))
              (local (map (cut string-drop <> (string-length key)) db))
-             (zotero (zotero-completion-suffixes key))
+             (zotero (zotero-completion-suffixes key (null? local)))
              (all (list-remove-duplicates (append local zotero))))
         (if (null? all)
             (set-message "No completions" "complete bibliographic reference")
