@@ -340,7 +340,9 @@ jobs:
           # turns of the event loop), to see where it stops
           HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
             TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" TEXMACS_VUE_PROFILE=60 \
-            "$exe" -d "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" > "$home/log.txt" 2>&1 &
+            "$exe" -d "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" \
+            -x "(begin (display* \"CI now: \" (buffer-list) \"\\n\") (delayed (:pause 5000) (display* \"CI after 5 s: \" (buffer-list) \"\\n\")) (delayed (:pause 150000) (quit-TeXmacs)))" \
+            > "$home/log.txt" 2>&1 &
           pid=$!
           ok=no
           for i in $(seq 1 60); do
@@ -351,6 +353,9 @@ jobs:
           done
           # what is on the screen (when the windows do not show the document)
           if [ $ok = no ]; then
+            # NOTE: TeXmacs quits by itself (-x above): its output is then
+            # complete (taskkill /F loses what it has not written yet)
+            for i in $(seq 1 60); do kill -0 $pid 2> /dev/null || break; sleep 2; done
             cat > "$home/screen.ps1" << 'EOT'
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
