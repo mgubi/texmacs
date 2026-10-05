@@ -20,8 +20,27 @@ CMD="(catch #t (lambda () (load \"$SCRIPT\"))
   (lambda args (display* \"CI-TESTS-FAILED: \" args \"\\n\") (quit-TeXmacs)))"
 
 # perl's alarm gives a portable timeout (GNU timeout is missing on macOS)
-perl -e 'alarm shift; exec @ARGV' 600 "$BIN" -x "$CMD" > tests.log 2>&1
-echo "texmacs exited with status $?"
+perl -e 'alarm shift; exec @ARGV' 600 "$BIN" -x "$CMD" > tests.log 2>&1 &
+pid=$!
+# the suites as they run (the log is lost when the runner itself is
+# stopped), and on Linux the memory of TeXmacs every 15 seconds
+tail --pid=$pid -n +1 -f tests.log 2> /dev/null |
+  grep --line-buffered "^Test suite of\|FAILED\|^Total:\|Throwing" &
+tailpid=$!
+monpid=""
+if [ -r /proc/meminfo ]; then
+  ( while kill -0 $pid 2> /dev/null; do
+      sleep 15
+      echo "memory: TeXmacs $(ps -o rss= -p $pid 2> /dev/null) kB," \
+           "available $(awk '/MemAvailable/ {print $2}' /proc/meminfo) kB"
+    done ) &
+  monpid=$!
+fi
+wait $pid
+status=$?
+sleep 1
+kill $tailpid $monpid 2> /dev/null
+echo "texmacs exited with status $status"
 
 grep -v "approximating font\|propagateSizeHints\|does not support" tests.log
 grep -q "CI-TESTS-OK" tests.log
