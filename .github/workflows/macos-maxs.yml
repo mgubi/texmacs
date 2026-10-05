@@ -1,0 +1,245 @@
+# TeXmacs of the branch maxs_texmacs for macOS 13 and later, with S7, as
+# two disk images for Apple silicon and Intel: the native interface of
+# macOS (Cocoa, doc/ns-port.md) and the Vue port (SDL3 and Clay, drawn by
+# the GPU with OpenGL and ThorVG, src/docs/vue-graphics-stack.md):
+#   * deps (for arm64 and x86_64, the latter under Rosetta): the libraries
+#     which do not come with macOS (libpng, FreeType, SDL3, SDL3_ttf,
+#     MuPDF, ThorVG) built for macOS 13 with packages/macos/build-deps.sh
+#     (cached, until it, misc/thorvg/build-thorvg.sh or the version of
+#     macOS change; S7 is in the sources);
+#   * app (for each interface and architecture): TeXmacs.app with
+#     packages/macos/build-ns-app.sh;
+#   * dmg (for each interface): both applications merged
+#     (packages/macos/merge-universal.sh), its disk image, and a check that
+#     the application of the disk image opens a document given on the
+#     command line with each architecture and shows its colors
+#     (packages/macos/ci-colors.tm, png-has-red.py). The disk images and
+#     the snapshots of the windows are artifacts of the run;
+#   * release (on maxs_ci only): both disk images published as the
+#     pre-release maxs-latest of the repository, replaced at each build
+#     (its tag moved to the commit built):
+#     https://github.com/<owner>/<repo>/releases/tag/maxs-latest
+#
+# The applications are signed ad hoc and not notarized: Gatekeeper rejects
+# them on another machine until the quarantine is removed,
+#   xattr -dr com.apple.quarantine /Applications/TeXmacs.app
+#
+# It runs on the branch maxs_ci only: a state of maxs_texmacs is built by
+# moving maxs_ci to it,
+#   git push -f origin maxs_texmacs:maxs_ci
+# (or by hand, from the Actions tab, on any branch)
+
+name: macOS (maxs_texmacs, Cocoa and Vue)
+
+on:
+  push:
+    branches: [maxs_ci]
+  workflow_dispatch:
+
+env:
+  MIN_MACOS: "13.0"
+
+jobs:
+  deps:
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rosetta
+        if: matrix.arch == 'x86_64'
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license || arch -x86_64 /usr/bin/true
+
+      - name: Place of the libraries
+        run: echo "DEPS=$RUNNER_TOOL_CACHE/texmacs-deps-maxs-${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+      - name: Cache of the libraries
+        id: deps-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.DEPS }}
+          key: texmacs-deps-maxs-${{ matrix.arch }}-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+
+      - name: Libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: packages/macos/build-deps.sh "$DEPS" ${{ matrix.arch }} "$MIN_MACOS" vue
+
+  app:
+    needs: deps
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
+        gui: [cocoa, vue]
+    runs-on: macos-15
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rosetta
+        if: matrix.arch == 'x86_64'
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license || arch -x86_64 /usr/bin/true
+
+      - name: Place of the libraries
+        run: echo "DEPS=$RUNNER_TOOL_CACHE/texmacs-deps-maxs-${{ matrix.arch }}" >> "$GITHUB_ENV"
+
+      # the libraries made by the job deps (the same key)
+      - name: The libraries
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.DEPS }}
+          key: texmacs-deps-maxs-${{ matrix.arch }}-${{ env.MIN_MACOS }}-${{ hashFiles('src/packages/macos/build-deps.sh', 'src/misc/thorvg/build-thorvg.sh') }}
+          fail-on-cache-miss: true
+
+      - name: TeXmacs.app
+        run: |
+          packages/macos/build-ns-app.sh --deps "$DEPS" --gui ${{ matrix.gui }} \
+            --scheme s7 --arch ${{ matrix.arch }} --min-macos "$MIN_MACOS"
+          tar -C ../distr -czf ../distr/TeXmacs-${{ matrix.gui }}-${{ matrix.arch }}.tar.gz TeXmacs.app
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-${{ matrix.gui }}-${{ matrix.arch }}
+          path: distr/TeXmacs-${{ matrix.gui }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+
+  dmg:
+    needs: app
+    strategy:
+      fail-fast: false
+      matrix:
+        gui: [cocoa, vue]
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Rosetta
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license || arch -x86_64 /usr/bin/true
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: app-${{ matrix.gui }}-*
+          path: distr
+          merge-multiple: true
+
+      - name: Universal application and its disk image
+        run: |
+          for a in arm64 x86_64; do
+            mkdir -p ../distr/$a
+            tar -C ../distr/$a -xzf ../distr/TeXmacs-${{ matrix.gui }}-$a.tar.gz
+          done
+          version=$(plutil -extract CFBundleShortVersionString raw \
+                      ../distr/arm64/TeXmacs.app/Contents/Info.plist)
+          mkdir -p ../distr/macos
+          # upload-artifact wants a path without ".."
+          dmg="$(cd ../distr/macos && pwd)/TeXmacs-$version-${{ matrix.gui }}-universal.dmg"
+          packages/macos/merge-universal.sh ../distr/arm64/TeXmacs.app \
+            ../distr/x86_64/TeXmacs.app ../distr/TeXmacs.app "$dmg"
+          echo "DMG=$dmg" >> "$GITHUB_ENV"
+          ls -l "$dmg"
+
+      # the application of the disk image, with each architecture: a test
+      # home, a document with big red text on the command line, and the
+      # windows saved as PNGs (every 3 seconds with Cocoa, at each redraw
+      # with Vue) until one shows the red text; the Vue port says whether
+      # it draws with the GPU (the runners have no GPU of their own: the
+      # software renderer of OpenGL, or MuPDF when there is no context)
+      - name: Smoke test (the application of the disk image shows a document)
+        run: |
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG"
+          status=0
+          for a in arm64 x86_64; do
+            home=$(mktemp -d)
+            mkdir -p ../distr/snapshots/$a
+            shots=$(cd ../distr/snapshots/$a && pwd)
+            HOME="$home" TEXMACS_HOME_PATH="$home/.TeXmacs" \
+              TEXMACS_NS_SNAPSHOT="$shots" TEXMACS_VUE_SNAPSHOT="$shots" \
+              arch -$a "$mnt/TeXmacs.app/Contents/MacOS/TeXmacs" \
+              "$PWD/packages/macos/ci-colors.tm" > "$home/log.txt" 2>&1 &
+            pid=$!
+            ok=no
+            for i in $(seq 1 60); do
+              sleep 3
+              kill -0 $pid 2> /dev/null || break
+              ls "$shots"/window-*.png > /dev/null 2>&1 &&
+                packages/macos/png-has-red.py "$shots"/window-*.png && { ok=yes; break; }
+            done
+            kill $pid 2> /dev/null || true
+            wait $pid 2> /dev/null || true
+            echo "== $a"
+            grep "GPU" "$home/log.txt" || true
+            tail -20 "$home/log.txt"
+            [ $ok = yes ] || { echo "error: the document is not shown with $a"; status=1; }
+          done
+          hdiutil detach "$mnt"
+          exit $status
+
+      # not zipped: the artifact downloads as the .dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          path: ${{ env.DMG }}
+          archive: false
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: snapshots-${{ matrix.gui }}
+          path: distr/snapshots
+          if-no-files-found: ignore
+
+  release:
+    needs: dmg
+    if: github.ref == 'refs/heads/maxs_ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: TeXmacs-*-universal.dmg
+          path: dist
+          merge-multiple: true
+
+      - name: The pre-release maxs-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls dist/*-cocoa-universal.dmg dist/*-vue-universal.dmg || { echo "error: a disk image is missing"; exit 1; }
+          tag=maxs-latest
+          cat > notes.md << EOF
+          The latest build of GNU TeXmacs from the branch \`maxs_texmacs\`
+          (commit ${GITHUB_SHA:0:10}, $(date -u +%Y-%m-%d)), with the S7
+          Scheme interpreter; it is replaced at each build.
+
+          * \`TeXmacs-*-cocoa-universal.dmg\`: the native interface of macOS
+            (Cocoa), see [doc/ns-port.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/doc/ns-port.md).
+          * \`TeXmacs-*-vue-universal.dmg\`: the Vue port (SDL3 and Clay),
+            drawn by the GPU (OpenGL and ThorVG; \`TEXMACS_VUE_GPU=0\` to
+            draw with MuPDF), see [vue-graphics-stack.md](https://github.com/${GH_REPO}/blob/${GITHUB_SHA}/src/docs/vue-graphics-stack.md).
+          * One application for Apple silicon and Intel, macOS 13 or later.
+          * Signed ad hoc and not notarized: macOS refuses to open it the
+            first time. Open it from the context menu (Open), or allow it
+            in System Settings > Privacy & Security, or remove the
+            quarantine: \`xattr -dr com.apple.quarantine /Applications/TeXmacs.app\`
+
+          Built by [this run](https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}).
+          EOF
+          gh release delete "$tag" --cleanup-tag --yes || true
+          gh release create "$tag" dist/*.dmg --target "$GITHUB_SHA" --prerelease \
+            --title "TeXmacs maxs_texmacs for macOS (Cocoa and Vue), latest build" --notes-file notes.md
