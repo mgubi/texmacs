@@ -24,28 +24,57 @@
   <verbatim|zotero:><em|key>, where <em|key> is the key of the item in
   Zotero; you may give it a better citation key in Zotero at any time.
 
-  The settings are in <menu|Document|Bibliography|Zotero settings...>: the
-  address of Zotero (<verbatim|http://localhost:23119> by default), the
-  libraries to search (your own library only, or also the libraries of your
-  groups), the format of the exported references (<verbatim|bibtex> or
-  <verbatim|biblatex>), and whether citation keys are completed from Zotero.
+  The settings are in <menu|Document|Bibliography|Zotero settings...>:
+
+  <\description>
+    <item*|Zotero server>The address of Zotero,
+    <verbatim|http://localhost:23119> by default.
+
+    <item*|Libraries>Your own library only (<verbatim|My Library>), or also
+    the libraries of the groups which you belong to. When two libraries
+    have the same key, your own library wins.
+
+    <item*|Export format>The format of the references which <TeXmacs>
+    obtains from Zotero: <verbatim|bibtex> or <verbatim|biblatex>.
+
+    <item*|Complete keys from Zotero>Whether <shortcut|(kbd-tab)> also
+    completes the keys of Zotero.
+
+    <item*|Search Zotero in the search of references>Whether the search
+    window of citations also lists the references of Zotero.
+  </description>
+
   <menu|Test the connection> tells whether Zotero answers.
 
   <subsubsection*|Inserting citations>
 
   Insert a citation as usual, with <menu|Insert|Link|Citation>, and type
   its key. <shortcut|(kbd-tab)> completes the key, with the keys of the
-  bibliography and those of Zotero. <shortcut|(kbd-alternate-tab)>, or
-  <menu|Focus|Search references>, opens a search window: type names of
-  authors, words of the title or a year, and click on a reference to cite
-  it. The window lists the references of the bibliography first (those of
-  its <BibTeX> file, or of the database when it is used), then those of
-  Zotero; each one says where it comes from. The preference
-  <menu|Search Zotero in the search of references>, in the Zotero settings,
-  leaves Zotero out of this window.
+  bibliography and those of Zotero.
 
-  When the cursor is on a key which comes from Zotero,
-  <menu|Focus|Show in Zotero> shows its item in Zotero.
+  <shortcut|(kbd-alternate-tab)> in a citation, or <menu|Focus|Search
+  references>, opens the search window of references. Type names of
+  authors, words of the title or a year, and click on a reference to cite
+  it. A line at the top of the window names the sources which it searches,
+  and says why Zotero is left out when it is (not running, or left out in
+  the settings). The window lists:
+
+  <\itemize>
+    <item>without the database, the references of the <BibTeX> file of the
+    bibliography, marked with the name of the file, then those of Zotero;
+
+    <item>with the database (see below), the references of your database,
+    marked <verbatim|Database>, or <verbatim|Database, from Zotero> for
+    those which come from Zotero and follow it, then those of Zotero which
+    the database does not have.
+  </itemize>
+
+  The references of Zotero are marked <verbatim|Zotero>, or
+  <verbatim|Zotero, <em|group>> for those of a group library.
+
+  When the cursor is on a key which <TeXmacs> has already found in Zotero,
+  <menu|Focus|Show in Zotero> (or the button <verbatim|Z> of the focus
+  bar) selects its item in Zotero.
 
   <subsubsection*|Generating the bibliography>
 
@@ -64,6 +93,11 @@
   which it includes go into the file of the bibliography of the master
   document.
 
+  Without the database, a bibliography has a single <BibTeX> file. When it
+  is your own file, the references are taken from it only, and a key which
+  only Zotero has stays unresolved (shown as <verbatim|?>): use a file
+  written from Zotero, or the database, to combine both.
+
   <subsubsection*|With the database>
 
   With the bibliographic database (<menu|Tools|Database tool>), Zotero is
@@ -74,8 +108,11 @@
   database of the user comes first, then Zotero, then the references kept
   in the document, which serve when Zotero is not running.
 
-  References from Zotero are copied into the database when it imports the
-  references of the documents. These copies stay
+  References from Zotero are copied into your database when you open a
+  document whose bibliography uses them, as the other references of
+  documents are (the database preference <with|font-shape|italic|Automatically
+  import bibliographies when opening files>, on by default). These copies
+  stay
   in sync with Zotero: <menu|Document|Update|Bibliography> and
   <menu|Document|Bibliography|Synchronize with Zotero> bring in the changes
   made in Zotero. When a reference was changed both in <TeXmacs> and in

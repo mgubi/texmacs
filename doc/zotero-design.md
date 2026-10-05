@@ -125,21 +125,24 @@ such keys, so users see that they can set a better one in Zotero.
 
 ### 3.3 Search and completion
 
-**One search for both modes.**
-- `open-zotero-search` (the first version) becomes a **combined search**:
-  Zotero, plus the document's own sources (the `.bib` file in file mode;
-  the local entries and the default database in database mode).
-- Each line shows its source: `[Z]` Zotero, `[F]` file, `[D]` database,
-  `[L]` local entry. Duplicate keys are merged when they are the same work
-  (same DOI, or same title and year), and shown as a collision otherwise.
-- **In database mode**, the alternate key in a citation
-  (`focus-open-search-tool`) keeps the database's own search window. A
-  hook (`db-search-results` for kind "bib") appends the Zotero results,
-  formatted with the same `db-pretty` style, under a heading *"From
-  Zotero"*. These results are built from the exported BibTeX of the
-  matching items (`bib->db`), so they look like the others.
-- **Search as you type** reuses the database window's 200 ms delay: one
-  request to Zotero per pause, not per key.
+**One search window for both modes** (revised after trying it).
+- The search window of citations (`open-db-chooser`, opened by
+  *Focus -> Search references* and the alternate Tab) is the only search.
+  The first version had a separate dialog (*From Zotero...*), then a
+  combined search dialog with merged lines; both were removed, since the
+  window of the database already did most of it.
+- **With the database**, it lists the entries of the database, then the
+  Zotero items which the database lacks (`db-search-results` for kind
+  "bib"). **Without it**, the window opens on the marker `:bib-file`, and
+  lists the entries of the `.bib` file of the bibliography (unless it is
+  managed: its items are Zotero's), then the Zotero items.
+- Each reference says its source: *Database*, *Database, from Zotero*,
+  the name of the `.bib` file, *Zotero* or *Zotero, <group>*. A line at
+  the top names the sources and why Zotero is left out, when it is.
+- The Zotero results are built from the exported BibTeX of the matching
+  items (`bib->db`), and formatted with the same `db-pretty` style.
+- **Search as you type** reuses the window's 200 ms delay: one request to
+  Zotero per pause, not per key.
 
 **Completion (Tab in a citation)**:
 - The candidates are the keys from the usual source (the `.bib` file in
@@ -345,20 +348,17 @@ in §3.5, and syncs them from then on.
 
 ## 4. User interface
 
-**Insert → Citation:**
-- *From Zotero…*, the combined search (§3.3). Its title says which
-  sources are active: "Search references (Zotero, refs.bib)".
-
 **Document → Bibliography:**
 - *Update from Zotero* (explicit refresh of the managed file / attachments);
 - *Synchronize with Zotero* (§3.11);
 - *Check against Zotero* (§3.6, §3.7);
-- *Zotero settings…* (server, libraries, precedence, import into database,
-  export format), also reachable from the database preferences.
+- *Zotero settings…* (server, libraries, export format, completion,
+  Zotero in the search window, connection test).
 
 **In a citation:**
 - Tab completes (§3.3); the alternate key opens the search window.
-- In database mode, it is the database's window with the Zotero section.
+- It is the window of references of §3.3, in both modes (*Focus ->
+  Search references*).
 - The focus bar of a citation shows a small `[Z]` when its key comes from
   Zotero. Clicking it offers **Show in Zotero**, which opens
   `zotero://select/library/items/<itemKey>`.
@@ -401,15 +401,9 @@ follow in any order.
     `users/0`), and the sync works library by library, even for groups
     which TeXmacs no longer searches. The sync version is the list of the
     versions of the libraries involved.
-  - **Combined search:** `zotero-search-sources` gives the sources in
-    their order of precedence (L, F, D, Z); `zotero-combine` merges the
-    same work (same normalized title and year: the summaries have no DOI)
-    and flags a key used for different works. The dialog shows the
-    sources, the collisions, *Show in Zotero* and *Import into database*
-    (only for items which the database lacks).
   - **Show in Zotero:** `zotero://select/library/items/<key>` (or
-    `groups/<id>/items/<key>`), from the dialog and from the focus menu
-    and focus bar of a citation. The menus only use what TeXmacs already
+    `groups/<id>/items/<key>`), from the focus menu and focus bar of a
+    citation. The menus only use what TeXmacs already
     knows (the keys found before, the `zotero-items` attachment): they
     never wait for Zotero.
   - **Renamed and deleted keys:** the `zotero-items` attachment holds

@@ -11,8 +11,9 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; NOTE: (bibtex zotero-db) is only loaded when the database is used (it
-;; loads the modules of the database), through the lazy definitions
+;; NOTE: (bibtex zotero-db) loads the modules of the database: it is only
+;; loaded when they are needed (the database tool, or the search window of
+;; references), through the lazy definitions
 (texmacs-module (bibtex zotero-widgets)
   (:use (bibtex zotero)))
 

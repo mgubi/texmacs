@@ -14,6 +14,9 @@
 ;; With the database tool, Zotero is one of the sources of the references
 ;; of a bibliography (bib-retrieve-entries, in database/bib-manage.scm),
 ;; after the database of the user, which wins (see doc/zotero-design.md).
+;; The search window of references (open-db-chooser) lists the references
+;; of Zotero after those of the database, or, without the database tool,
+;; after those of the BibTeX file of the bibliography.
 ;;
 ;; The entries which come from Zotero carry the meta attributes
 ;;   zotero-item     the key of the Zotero item
@@ -24,8 +27,9 @@
 ;;   zotero-key      the citation key in Zotero, when it was renamed there
 ;;   zotero-deleted  "yes" when the item is no longer in Zotero
 ;; and the contributor "Zotero". When they enter the database (by "auto bib
-;; import" or by an explicit import), they are kept in sync with Zotero,
-;; from Zotero to TeXmacs only: zotero-sync-database.
+;; import", zotero-import-items, or the adoption of a copy made by hand),
+;; they are kept in sync with Zotero, from Zotero to TeXmacs only:
+;; zotero-sync-database.
 
 (texmacs-module (bibtex zotero-db)
   (:use (bibtex zotero)

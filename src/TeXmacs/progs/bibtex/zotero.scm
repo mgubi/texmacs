@@ -339,7 +339,7 @@
                     (cut string-starts? <> prefix)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Summaries of references (for the check of the citations)
+;; Summaries of references (for the check and the search of citations)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; A summary of a reference is (key title creators year zotero-entry), in
