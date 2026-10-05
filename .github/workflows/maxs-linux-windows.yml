@@ -190,6 +190,11 @@ jobs:
           nm -D --defined-only "$DEPS/lib/libSDL3_ttf.so" | grep -c " T TTF_" || true
           nm -D --defined-only "$DEPS/lib/libSDL3_ttf.so" | grep "TTF_OpenFont" || true
           readelf -d "$DEPS/lib/libSDL3_ttf.so" | head -20
+          # the link again, with where TTF_OpenFont is looked for
+          cd src
+          cmd=$(make -n Objects/texmacs.bin 2> /dev/null | grep -- "-o Objects/texmacs.bin" | tail -1)
+          echo "${cmd:0:200}..."
+          eval "$cmd -Wl,--trace-symbol=TTF_OpenFont -Wl,--trace" 2>&1 | grep -i "sdl\|TTF_OpenFont\|vue-deps" | head -40 || true
 
       # SDL3 and SDL3_ttf next to TeXmacs (the script TeXmacs/bin/texmacs
       # puts TeXmacs/lib in LD_LIBRARY_PATH)
