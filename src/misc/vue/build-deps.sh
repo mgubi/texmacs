@@ -76,16 +76,20 @@ fi
 
 if has mupdf; then
   echo "== MuPDF $MUPDF_VERSION"
+  # NOTE: with MinGW, MuPDF takes SSE for granted (_M_AMD64), and its SSE
+  # 4.1 code needs the option (which Windows 11 has, SSE 4.2 even)
+  xcflags=-fPIC
+  case "$(uname -s)" in MINGW*|MSYS*) xcflags="$xcflags -msse4.1";; esac
   fetch "https://mupdf.com/downloads/archive/mupdf-$MUPDF_VERSION-source.tar.gz" $MUPDF_SHA256
   # its own third-party libraries (libmupdf-third), but FreeType and zlib
   # (those of TeXmacs); no viewers, no OCR; position independent, for the
   # programs of the distributions (PIE)
   make -j"$jobs" prefix="$prefix" build=release HAVE_X11=no HAVE_GLUT=no \
     HAVE_CURL=no USE_SYSTEM_LIBS=no USE_SYSTEM_FREETYPE=yes USE_SYSTEM_ZLIB=yes \
-    XCFLAGS=-fPIC shared=no libs
+    XCFLAGS="$xcflags" shared=no libs
   make prefix="$prefix" build=release HAVE_X11=no HAVE_GLUT=no \
     HAVE_CURL=no USE_SYSTEM_LIBS=no USE_SYSTEM_FREETYPE=yes USE_SYSTEM_ZLIB=yes \
-    XCFLAGS=-fPIC shared=no install-libs
+    XCFLAGS="$xcflags" shared=no install-libs
 fi
 
 if has thorvg; then

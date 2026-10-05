@@ -147,7 +147,9 @@ jobs:
             build-essential pkg-config cmake ninja-build meson \
             libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev libsqlite3-dev \
             libgl-dev libegl-dev libx11-dev libxext-dev libxrandr-dev \
-            libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxkbcommon-dev \
+            libxcursor-dev libxi-dev libxss-dev libxfixes-dev libxtst-dev \
+            libxkbcommon-dev libdrm-dev libgbm-dev libgles-dev \
+            libwayland-dev wayland-protocols libdecor-0-dev \
             xvfb xauth libgl1-mesa-dri
 
       - name: Place of the libraries
