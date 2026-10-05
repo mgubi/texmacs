@@ -558,14 +558,12 @@
 (define (ai-has-key? name)
   (!= (ai-api-key name (ai-key-env* name)) ""))
 
-;; An engine without a key is there all the same in a web browser (where
-;; nothing else tells how to give one), or when the wallet, closed, may hold
-;; its key: a session of it asks for the key when it starts, and when a
-;; question is asked without one (ai-key-missing in ai-batch.scm): the wallet
-;; is opened if it is closed, else the preferences of the engine, where the
-;; key is given.
-(define (ai-available? name)
-  (or (ai-has-key? name) (web-wallet?) (ai-wallet-closed?)))
+;; An engine without a key is there all the same (in the submenu AI of
+;; Insert > Session): a session of it asks for the key when it starts, and
+;; when a question is asked without one (ai-key-missing in ai-batch.scm):
+;; the wallet is opened if it is closed (it may hold the key), else the
+;; preferences of the engine, where the key is given.
+(define (ai-available? name) #t)
 
 (define ai-asking-key? #f)
 
