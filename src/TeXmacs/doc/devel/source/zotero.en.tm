@@ -141,6 +141,17 @@
   requests. A request without key answers 401 (state <scm|no-key>); a key
   refused gives <scm|forbidden>.
 
+  As for the keys of the AI engines, the key is asked when it is needed
+  (<scm|zotero-ask-key>): when the wallet is there but closed, its dialog
+  opens first (it may hold the key), else a dialog asks for the key
+  (<scm|zotero-key-dialog>); the operation which needed it is then run
+  again. The commands ask before they run (<scm|zotero-command>), the
+  search window when it opens (<scm|zotero-search-opened>), and
+  <scm|update-document> after it ran, only if it needed Zotero
+  (<scm|zotero-key-wanted>: <scm|zotero-ready?> notes that the key lacked);
+  once declined, the updates do not ask again. A key given while the wallet
+  is closed opens it first, to keep the key there.
+
   The requests are made by <verbatim|curl> on the desktop, with the headers
   in a temporary file (<verbatim|--header @<em|file>>), so that the key is
   never on a command line; in a browser, by a synchronous
