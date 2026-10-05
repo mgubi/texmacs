@@ -362,7 +362,7 @@
           "tmfs://remote-dir/h/~u")
   (check= (url->string (remote-parent (string->url "tmfs://remote-dir/h")))
           "tmfs://remote-dir/h")
-  (check= (check-unix (url->string (remote-parent (string->url (check-abs "tmp/a/b.tm")))))
+  (check= (check-unix (url->string (remote-parent (string->url (check-unix-abs "tmp/a/b.tm")))))
           (check-abs "tmp/a"))
 
   (check-group "versions in remote names")
@@ -1364,7 +1364,7 @@
     (check= (status #f "6" "5" "s" "r") "conflict**")
     (check= (status #f #f "5" "s" "r") "conflict-*")
     (check= (status #f "6" "5" #f "r") "conflict*-")
-    (with r (get-sync-status (list #f (string->url (check-abs "l/a")) "lid" "5" #f #f)
+    (with r (get-sync-status (list #f (string->url (check-unix-abs "l/a")) "lid" "5" #f #f)
                              (string->url "tmfs://remote-file/h/~u/a") #f)
       (check= (list (car r) (cadr r) (check-unix (caddr r)) (cadddr r)
                     (list-ref r 4) (list-ref r 5))
