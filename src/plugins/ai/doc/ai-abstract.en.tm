@@ -37,6 +37,16 @@
     <item>For correcting the spelling and grammar of a text. This works in a
     similar way as translation, except that you should now do
     <menu|Tools|Correct>.
+
+    <item>For questions about your document. <menu|Tools|Ask about the
+    selection> puts a session of the engine of <menu|Tools|AI engine> after
+    the paragraph of the selection, with the selection in its input: type
+    your question after it. <menu|Tools|Ask about the document> puts a
+    session at the cursor which sends the whole document (as <LaTeX>,
+    without the sessions of chatbots) with each question. This is a setting
+    of the session, <with|font-series|bold|Send the document as context> in
+    the menu of the model in its focus bar. <name|Claude> keeps the document
+    in its cache, so that the next questions about it cost less.
   </enumerate>
 
   If setting up a chatbot for <TeXmacs> is too much work, or if you wish to

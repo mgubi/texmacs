@@ -372,6 +372,16 @@
     (<verbatim|eqnarray>, <verbatim|align>...) are imported as in a desktop
     version which has run before (the first time, their content did not
     become a block).
+
+    <item>Questions about the document: <menu|Tools|Ask about the selection>
+    puts a session of the chatbot of <menu|Tools|AI engine> after the
+    paragraph of the selection, with the selection in its input, for the
+    question which is typed after it; <menu|Tools|Ask about the document>
+    puts one at the cursor which sends the document with each question. The
+    menu of the model in the focus bar of a session turns this on or off
+    (<with|font-series|bold|Send the document as context>): the document is
+    sent as <LaTeX>, without the sessions of chatbots, and <name|Claude>
+    keeps it in its cache, so that the next questions about it cost less.
   </itemize>
 
   <paragraph|4 October 2026>
