@@ -185,6 +185,12 @@
   <paragraph|5 October 2026>
 
   <\itemize>
+    <item>While <name|Zotero> answers come from <verbatim|zotero.org>,
+    the footer says what is asked (a search, the references of a
+    bibliography...) and for how long, then how long it took or why it
+    failed; the search window of a citation shows
+    <with|font-shape|italic|Searching zotero.org...> under its results.
+
     <item>The window which turns on the wallet takes the passphrase at
     <shortcut|(kbd-return)> as well as with <with|font-series|bold|Ok>, and
     says so when the passphrase is wrong (before, <shortcut|(kbd-return)>

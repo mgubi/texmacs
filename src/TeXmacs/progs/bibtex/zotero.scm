@@ -323,6 +323,12 @@
   (:synopsis "Does an operation wait for answers of zotero.org?")
   (and (zotero-in-browser?) (zotero-pending?)))
 
+(tm-define (zotero-waiting?)
+  (:synopsis "Does the operation being run wait for answers of zotero.org?")
+  ;; NOTE: it runs again once they have come (zotero-with-retry)
+  (and current-retry (zotero-pending?)
+       (memq current-retry waiting-retries) #t))
+
 (tm-define (zotero-command again thunk)
   (:synopsis "Run the command @thunk, which runs @again when answered")
   ;; a command which waits for zotero.org says so; it runs again when the
@@ -332,7 +338,7 @@
       (zotero-ask-key again)
       (begin
         (zotero-with-retry again thunk)
-        (when (zotero-asking?) (set-message "Asking zotero.org..." "Zotero")))))
+        (when (zotero-asking?) (show-progress)))))
 
 (define (answer-delay url)
   ;; how long an answer is used again: the requests of the state, briefly
@@ -347,7 +353,121 @@
   (set! answers (make-ahash-table))
   (set! pending (make-ahash-table))
   (set! pending-ids (make-ahash-table))
-  (set! waiting-retries '()))
+  (set! waiting-retries '())
+  (set! asked-since #f)
+  (set! asked-failures '()))
+
+;; While answers are awaited, the footer says what is asked, and for how
+;; long; once they have all come, how long it took, or what failed
+
+(define asked-since #f)      ; when the requests awaited began, or #f
+(define asked-failures '())  ; the statuses of the failed answers meanwhile
+
+(define (url-decode s)
+  ;; the (utf8) string percent-encoded in @s
+  (let loop ((l (string->list s)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (== (car l) #\%) (pair? (cdr l)) (pair? (cddr l))
+                (string->number (string (cadr l) (caddr l)) 16))
+           (loop (cdddr l)
+                 (cons (integer->char (string->number
+                                       (string (cadr l) (caddr l)) 16))
+                       acc)))
+          ((== (car l) #\+) (loop (cdr l) (cons #\space acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define (url-parameter url name)
+  ;; the value of the parameter @name of @url, decoded, or #f
+  (let* ((key (string-append name "="))
+         (at (lambda (sep)
+               (with pos (string-search-forwards (string-append sep key) 0 url)
+                 (and (>= pos 0) pos))))
+         (pos (or (at "?") (at "&"))))
+    (and pos
+         (let* ((start (+ pos 1 (string-length key)))
+                (end (string-search-forwards "&" start url)))
+           (url-decode (substring url start (if (>= end 0) end
+                                                (string-length url))))))))
+
+(tm-define (zotero-request-label url)
+  (:synopsis "What the request @url asks of Zotero, for the messages")
+  (let* ((items (url-parameter url "itemKey"))
+         (n (if items (length (string-tokenize-by-char items #\,)) 1))
+         (refs (lambda (one several)
+                 (if (== n 1) (zotero-tr one)
+                     (zotero-tr several (number->string n))))))
+    (cond ((string-contains? url "keys/current")
+           (zotero-tr "checking the API key"))
+          ((string-contains? url "groups?")
+           (zotero-tr "listing your groups"))
+          ((string-contains? url "limit=1&format=keys")
+           (zotero-tr "checking the library"))
+          ((url-parameter url "q")
+           => (lambda (q)
+                (zotero-tr "searching %1"
+                           (string-append "``" (utf8->cork q) "''"))))
+          ((string-contains? url "format=versions")
+           (refs "looking for changes of 1 reference"
+                 "looking for changes of %1 references"))
+          ((or (string-contains? url "format=bibtex")
+               (string-contains? url "format=biblatex"))
+           (refs "exporting 1 reference" "exporting %1 references"))
+          (else (refs "fetching 1 reference" "fetching %1 references")))))
+
+(define (seconds ms)
+  ;; @ms milliseconds, in seconds with one decimal
+  (with d (quotient (+ ms 50) 100)
+    (string-append (number->string (quotient d 10)) "."
+                   (number->string (remainder d 10)))))
+
+(tm-define (zotero-progress-message)
+  (:synopsis "What is asked of zotero.org, while answers are awaited")
+  ;; NOTE: the newest request first, which is what was asked last (as the
+  ;; search being typed)
+  (let* ((urls (map cdr (sort (ahash-table->list pending-ids)
+                              (lambda (a b) (> (car a) (car b))))))
+         (what (cond ((null? urls) #f)
+                     ((null? (cdr urls)) (zotero-request-label (car urls)))
+                     (else (zotero-tr "%1, and %2 more"
+                                      (zotero-request-label (car urls))
+                                      (number->string (- (length urls) 1))))))
+         (t (if asked-since (- (texmacs-time) asked-since) 0)))
+    (cond ((not what) #f)
+          ((< t 2000) (zotero-tr "Asking zotero.org: %1..." what))
+          ((< t 10000)
+           (zotero-tr "Asking zotero.org: %1 (%2 s)..." what
+                      (number->string (quotient t 1000))))
+          (else
+           (zotero-tr "zotero.org is slow to answer: %1 (%2 s)..." what
+                      (number->string (quotient t 1000)))))))
+
+(define last-answered #f)
+
+(tm-define (zotero-answered-message)
+  (:synopsis "What came back from zotero.org, when all was last answered")
+  last-answered)
+
+(define (answered-message)
+  (let* ((t (if asked-since (- (texmacs-time) asked-since) 0))
+         (failed (list-filter asked-failures (lambda (st) (!= st 200)))))
+    (if (null? failed)
+        (zotero-tr "zotero.org answered in %1 s" (seconds t))
+        (zotero-status-message (status->state (car failed))))))
+
+(define ticking? #f)
+
+(define (show-progress)
+  ;; the footer says what is awaited, again each second while it is
+  (and-with msg (zotero-progress-message)
+    (set-message msg "Zotero")
+    (when (not ticking?)
+      (set! ticking? #t)
+      (delayed
+        (:pause 1000)
+        (set! ticking? #f)
+        ;; (and the sources line of the search window)
+        (refresh-now "db-search-sources")
+        (when (zotero-pending?) (show-progress))))))
 
 (tm-define (zotero-start-request id url headers)
   (:synopsis "Ask for @url asynchronously; zotero-async-answer gets the answer")
@@ -374,15 +494,24 @@
 
 (tm-define (zotero-async-answer id status version body64)
   (:synopsis "The answer of the asynchronous request @id")
+  ;; NOTE: the operations which waited may set their own message, or ask
+  ;; for more (then the time counts from the first request)
   (and-with url (ahash-ref pending-ids id)
     (ahash-remove! pending-ids id)
     (ahash-remove! pending url)
     (ahash-set! answers url (list (texmacs-time) status (decode-base64 body64)
                                   (and (> version 0) version)))
-    (when (not (zotero-pending?))
-      (with l (reverse waiting-retries)
-        (set! waiting-retries '())
-        (for (r l) (r))))))
+    (when (!= status 200)
+      (set! asked-failures (cons status asked-failures)))
+    (if (zotero-pending?) (show-progress)
+        (with l (reverse waiting-retries)
+          (set! last-answered (answered-message))
+          (set-message last-answered "Zotero")
+          (set! waiting-retries '())
+          (for (r l) (r))
+          (when (not (zotero-pending?))
+            (set! asked-since #f)
+            (set! asked-failures '()))))))
 
 (define (async-get url headers)
   (or (known-answer url)
@@ -390,10 +519,13 @@
         (when (not (memq current-retry waiting-retries))
           (set! waiting-retries (cons current-retry waiting-retries)))
         (when (not (ahash-ref pending url))
+          (when (not (zotero-pending?))
+            (set! asked-since (or asked-since (texmacs-time))))
           (ahash-set! pending url #t)
           (set! async-serial (+ async-serial 1))
           (ahash-set! pending-ids async-serial url)
-          (zotero-start-request async-serial url headers))
+          (zotero-start-request async-serial url headers)
+          (show-progress))
         (list 'pending "" #f))))
 
 (define (http-get url headers interactive?)
@@ -1841,7 +1973,7 @@
   (zotero-key-wanted (lambda () (update-document what)))
   (if (zotero-asking?)
       (begin
-        (set-message "Asking zotero.org..." "Zotero")
+        (show-progress)
         'wait)
       'done))
 

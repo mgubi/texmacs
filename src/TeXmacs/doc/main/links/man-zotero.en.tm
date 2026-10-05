@@ -37,8 +37,13 @@
   web pages, also when the application runs on the same computer. There,
   the answers of <verbatim|zotero.org> come in the background: the search
   window, the completion of keys and the bibliography are completed when
-  they arrive, and the footer says <with|font-shape|italic|Asking
-  zotero.org...> meanwhile.
+  they arrive. Meanwhile, the footer says what is asked, such as
+  <with|font-shape|italic|Asking zotero.org: searching ``gauss''...>, with
+  the seconds spent after two seconds; in the search window, its line of
+  sources says it, and <with|font-shape|italic|Searching zotero.org...>
+  follows the results. Once
+  all is answered, the footer says how long it took, or why it failed (the
+  key refused, too many requests, <verbatim|zotero.org> not reached).
 
   The citations use the citation keys of Zotero, which Zotero (or the
   Better<nbsp>BibTeX extension) stores in the field <verbatim|citationKey>.

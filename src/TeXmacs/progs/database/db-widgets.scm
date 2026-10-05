@@ -137,18 +137,23 @@
 	     (r (db-pretty-cached l kind :pretty))
              ;; the references of Zotero, after those of the database, when
              ;; the preference asks for them; each one says its source
-             (zl (if (and (== kind "bib") (zotero-in-database-search?))
+             ;; (with a line while they are awaited)
+             (zs (if (and (== kind "bib") (zotero-in-database-search?))
                      (zotero-with-retry
                       (db-search-again db kind query)
                       (lambda ()
-                        (zotero-search-entries query (map get-name r))))
-                     '()))
+                        (with l (zotero-search-entries query (map get-name r))
+                          (cons l (zotero-searching-results)))))
+                     (cons '() '())))
+             (zl (car zs))
              (z (if (null? zl) '() (db-pretty zl kind :pretty)))
              (r* (if (== kind "bib") (zotero-mark-results r l #f) r))
-             (z* (zotero-mark-results z zl #t)))
-	(cond ((and (null? r) (null? z)) (list "No matching items"))
-	      ((>= (length r) 20) (append (rcons r* "More items follow") z*))
-	      (else (append r* z*)))))))
+             (z* (zotero-mark-results z zl #t))
+             (s* (cdr zs)))
+	(cond ((and (null? r) (null? z) (nnull? s*)) s*)
+              ((and (null? r) (null? z)) (list "No matching items"))
+	      ((>= (length r) 20) (append (rcons r* "More items follow") z* s*))
+	      (else (append r* z* s*)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search the database
