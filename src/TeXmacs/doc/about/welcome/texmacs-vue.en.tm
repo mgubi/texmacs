@@ -166,7 +166,10 @@
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
     WebSocket, on the same computer only for now.
 
-    <item><TeXmacs> <name|Vue> is slower than the desktop program.
+    <item><TeXmacs> <name|Vue> types, scrolls and typesets as fast as the
+    desktop program, but its <name|Scheme> runs two to three times slower,
+    which shows in the commands which are mostly <name|Scheme> (the
+    conversions, some menus) and at the start.
   </itemize>
 
   <section|Reporting problems>
@@ -475,6 +478,11 @@
     <verbatim|install.packages> installs the packages built for
     <name|webR>. <menu|Stop> ends <name|R> while it computes; it starts
     again with the next input. See <menu|Help|Plug-ins|R>.
+
+    <item>A third faster start on the next visits (about 1<nbsp>s instead of
+    1.5<nbsp>s once the page is loaded): the files of <TeXmacs> had the time
+    of each visit, so that it merged its font database again at every start
+    and lost the caches of its fonts and of its directories.
   </itemize>
 
   <paragraph|4 October 2026>
