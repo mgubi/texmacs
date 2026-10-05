@@ -1105,6 +1105,73 @@
                     '("other" "smith2020"))))
         (system-remove f)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The key of zotero.org, asked when it is needed
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (asking-key?) (zotero-private 'asking-key?))
+
+(define (stop-asking!)
+  ;; the question is asked when idle (a dialog): the test forgets it
+  (eval '(set! asking-key? #f) (resolve-module '(bibtex zotero))))
+
+(define (test-key)
+  (check-group "key")
+  (with-preferences '(("zotero source" . "web")
+                      ("zotero api key" . "")
+                      ("zotero user" . ""))
+    (lambda ()
+      (zotero-forget-state)
+      (check-true (zotero-key-missing?))
+      (check= (zotero-status) 'no-key)
+      ;; an operation which needed zotero.org without a key asks for it
+      (stop-asking!)
+      (zotero-forget-key-wanted)
+      (zotero-ready?)
+      (zotero-key-wanted)
+      (check-true (asking-key?))
+      (stop-asking!)
+      ;; a command asks first, and runs once the key is given
+      (let* ((ran 0) (again (lambda () (set! ran (+ ran 1)))))
+        (zotero-command again again)
+        (check= ran 0)
+        (check-true (asking-key?))
+        (stop-asking!)
+        (zotero-key-given "  abc123  " again)
+        (check= ran 1)
+        (check= (zotero-api-key) "abc123")
+        (check-false (zotero-key-missing?))
+        ;; an empty answer: no key, and the updates do not ask again
+        (zotero-set-api-key "")
+        (zotero-key-given "" again)
+        (check= ran 1)
+        (zotero-ready?)
+        (zotero-key-wanted)
+        (check-false (asking-key?))
+        (zotero-key-given "abc123" again)
+        (check= ran 2))
+      (zotero-set-api-key "")))
+  ;; the application needs no key
+  (with-preferences '(("zotero source" . "local"))
+    (lambda () (check-false (zotero-key-missing?))))
+  ;; an update which needs nothing from Zotero does not ask for the key
+  (with-preferences '(("zotero source" . "web")
+                      ("zotero api key" . ""))
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      (with f (tmp "nokey.bib")
+        (string-save "@article{smith2020, title={Mine}}\n" f)
+        (with-document "nk.tm"
+            (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                           "  See <cite|smith2020>.\n\n"
+                           "  <\\bibliography|bib|tm-plain|nokey>\n"
+                           "  </bibliography>\n</body>\n")
+          (lambda ()
+            (stop-asking!)
+            (zotero-before-update "bibliography")
+            (check-false (asking-key?))))
+        (system-remove f)))))
+
 (define (test-renamed)
   (check-group "renamed")
   (check= (map car (zotero-bib-chunks-of
@@ -1512,6 +1579,7 @@
   (test-summaries)
   (test-web)
   (test-async)
+  (test-key)
   (test-renamed)
   (test-database-search)
   (test-file-search)
