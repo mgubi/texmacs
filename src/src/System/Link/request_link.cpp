@@ -45,6 +45,7 @@ public:
   void    listen (int msecs);
   void    interrupt ();
   void    stop ();
+  string  partial ();
 
   void    feed (int channel);
 };
@@ -186,6 +187,21 @@ request_link_rep::listen (int msecs) {
   if (!alive) return;
   feed (LINK_OUT);
   feed (LINK_IN);
+}
+
+// the text of a streamed answer which has not ended (ai_stream_text)
+string
+request_link_rep::partial () {
+  if (!alive || outbuf == "") return "";
+  string err;
+  string r= ai_stream_text (outbuf, name, err);
+  // an answer asked as a LaTeX document: its body only, while it comes
+  int b= search_forwards ("\\begin{document}", r);
+  if (b >= 0) r= r (b + 16, N(r));
+  int e= search_forwards ("\\end{document}", r);
+  if (e >= 0) r= r (0, e);
+  while (N(r) > 0 && (r[0] == '\n' || r[0] == ' ')) r= r (1, N(r));
+  return r;
 }
 
 void

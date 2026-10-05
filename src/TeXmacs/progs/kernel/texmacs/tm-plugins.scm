@@ -100,6 +100,15 @@
               ""))
         "")))
 
+;; the first output of a session of a request (which has no program to
+;; write a banner): a procedure of the plug-in, from its name to a tree
+(define request-banners (make-ahash-table))
+(define-public (set-request-banner! name f)
+  (ahash-set! request-banners name f))
+(define-public (request-banner name)
+  (with f (ahash-ref request-banners name)
+    (and f (f name))))
+
 (define-public (connection-request? name)
   (with info (connection-info name "default")
     (and (func? info 'tuple 3) (== (cadr info) "request"))))
