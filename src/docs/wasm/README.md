@@ -234,6 +234,35 @@ All the builds keep `-O2`: `-Os -flto` would save 8 % of the download
 12 % more CPU time, not worth a slower or separate build. The page and the
 PDF are the same with all of them.
 
+## Speed against the desktop (2026-10-05)
+
+Measured in headless Firefox (warm: the profile of the browser kept, as
+for a user who comes back) and in the desktop build of Vue (the same
+program, native, `-O2`), on an Apple M1, with a document of 100 sections
+of text and formulas (`?profile=10`, `TEXMACS_VUE_PROFILE=10`):
+
+| | browser | desktop (native) |
+|---|---|---|
+| typesetting the document (25 pages) | 442 ms | 324 ms |
+| typing 95 characters (interpose + layout + redraw) | 1689 ms (17 ms a key) | 1592 ms |
+| 30 page-downs | 555 ms | 737 ms |
+| pure Scheme (a list of 200000 strings sorted) | 119 ms | 48 ms |
+| the document to LaTeX | 301 ms | 170 ms |
+| start, once the program and the files are there | 0.7 s | 0.6 s |
+
+Editing is as fast as on the desktop; S7 is 2 to 2.5 times slower in
+WebAssembly (`-O3` for `s7.c` changes nothing measurable), which shows in
+what is mostly Scheme. The start was 1.2 s more until the files of TeXmacs
+got one time per build (`packages.js`, `buildTime`): with the time of the
+visit they all looked changed at each start, the font database of the home
+was merged again (`shipped_fonts_changed`), its save emptied the caches
+filled during the boot (`cache_refresh`: the CJK fonts which
+`fonts-truetype.scm` looks for, 35 ms each when not cached) and the
+directories were never up to date (22000 `stat` at each start, now 2300).
+`?debug=bench` prints the steps of the start. After the start, three modules
+are loaded when the user is idle (`math-adjust-en`, `math-adjust-fr`,
+`tmtex-widgets`), about 100 ms each.
+
 ## A viewer: `texmacs.html?open=<url>`
 
 The page opens the document at `<url>` once TeXmacs runs, in a tab of its

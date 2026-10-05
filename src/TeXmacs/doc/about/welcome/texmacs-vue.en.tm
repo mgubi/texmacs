@@ -166,7 +166,10 @@
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
     WebSocket, on the same computer only for now.
 
-    <item><TeXmacs> <name|Vue> is slower than the desktop program.
+    <item><TeXmacs> <name|Vue> types, scrolls and typesets as fast as the
+    desktop program, but its <name|Scheme> runs two to three times slower,
+    which shows in the commands which are mostly <name|Scheme> (the
+    conversions, some menus) and at the start.
   </itemize>
 
   <section|Reporting problems>
