@@ -3,10 +3,11 @@
 # Usage: run-tests.sh <texmacs binary>   (from the top of the TeXmacs source
 # tree, which contains TeXmacs/)
 #
-# Each suite runs in a TeXmacs of its own (tests/scheme/check.sh): with S7,
-# the memory of TeXmacs grows from suite to suite and is never given back,
-# so that all the suites in one TeXmacs took more than the 16 GB of the
-# Linux runner, which GitHub then stopped (a shutdown signal, and no log).
+# Each suite runs in a TeXmacs of its own (tests/scheme/check.sh): a crash
+# or a timeout loses only that suite, and each suite starts from a fresh
+# TeXmacs. (This began as a workaround: with S7, all the suites in one
+# TeXmacs once took more than the 16 GB of the Linux runner, a heap forced
+# to grow by the macro cache of s7; since that fix, they take about 1 GB.)
 # Without check.sh, they all run in one TeXmacs (run-tests.scm).
 
 BIN=${1:-TeXmacs/bin/texmacs.bin}
