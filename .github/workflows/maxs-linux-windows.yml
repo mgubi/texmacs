@@ -333,9 +333,11 @@ jobs:
           echo "== the first run"
           tail -20 "$home/first.txt" || true
           ls -la "$shots/first" || true
+          # NOTE: -d (the steps of the boot) and the profile (a line every 60
+          # turns of the event loop), to see where it stops
           HOME="$home" TEXMACS_HOME_PATH="$(cygpath -m "$home")/.TeXmacs" \
-            TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" \
-            "$exe" "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" > "$home/log.txt" 2>&1 &
+            TEXMACS_VUE_SNAPSHOT="$(cygpath -m "$shots")" TEXMACS_VUE_PROFILE=60 \
+            "$exe" -d "$(cygpath -m "$PWD/packages/macos/ci-colors.tm")" > "$home/log.txt" 2>&1 &
           pid=$!
           ok=no
           for i in $(seq 1 60); do
@@ -362,7 +364,7 @@ jobs:
           kill $pid 2> /dev/null || true
           taskkill //F //IM texmacs.exe > /dev/null 2>&1 || true
           grep "GPU" "$home/log.txt" || true
-          tail -20 "$home/log.txt"
+          grep -v "approximating font" "$home/log.txt" | tail -60
           [ $ok = yes ] || { echo "error: the document is not shown"; exit 1; }
 
       - uses: actions/upload-artifact@v4
