@@ -13,9 +13,13 @@
 #include "convert.hpp"
 #include "qt_utilities.hpp"
 
+array<string> http_mask_headers (array<string> headers_attr);
+
 #if QT_VERSION >= 0x060000
 
 #include <QNetworkAccessManager>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QEventLoop>
@@ -27,9 +31,35 @@
 #include <QJsonDocument>
 
 // Use a single manager in order to share connections several times
+// the proxy: the preference "http proxy" ("host:port", "socks5://host:port",
+// "direct" for none), else the one of the system (its settings on macOS and
+// Windows, the variables of the environment elsewhere)
+static void
+set_proxy (QNetworkAccessManager* manager) {
+  static string last= "?";
+  string p= get_preference ("http proxy", "");
+  if (p == "default") p= "";
+  if (p == last) return;
+  last= p;
+  if (p == "") {
+    QNetworkProxyFactory::setUseSystemConfiguration (true);
+    manager->setProxy (QNetworkProxy (QNetworkProxy::DefaultProxy));
+  }
+  else if (p == "direct")
+    manager->setProxy (QNetworkProxy (QNetworkProxy::NoProxy));
+  else {
+    if (!occurs ("://", p)) p= "http://" * p;
+    QUrl u (to_qstring (p));
+    QNetworkProxy::ProxyType type= u.scheme ().startsWith ("socks")?
+      QNetworkProxy::Socks5Proxy: QNetworkProxy::HttpProxy;
+    manager->setProxy (QNetworkProxy (type, u.host (), u.port (8080)));
+  }
+}
+
 static QNetworkAccessManager*
 get_manager () {
   static QNetworkAccessManager* manager= new QNetworkAccessManager ();
+  set_proxy (manager);
   static bool first= true;
   if (first) {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
@@ -46,7 +76,7 @@ qt_http_post (string& ret, string url, array<string> headers_attr,
 	      const char* data, long long n) {
   if (DEBUG_IO)
     debug_io << "qt_http_post" << LF
-	     << headers_attr << LF
+	     << http_mask_headers (headers_attr) << LF
 	     << string (data, n) << LF;
   ret= "";
   QUrl qurl (utf8_to_qstring (url));
@@ -88,6 +118,38 @@ int
 qt_http_post (string& ret, string url, array<string> headers_attr,
 	      string data) {
   return qt_http_post (ret, url, headers_attr, &data[0], N(data));
+}
+
+// a GET request (the models of an AI engine)
+int
+qt_http_get (string& ret, string url, array<string> headers_attr) {
+  ret= "";
+  QUrl qurl (utf8_to_qstring (url));
+  if (!qurl.isValid ()) {
+    io_error << "qt_http_get, invalid URL: " << url << LF;
+    return -1;
+  }
+  QNetworkRequest request (qurl);
+  for (int i= 0; i+1 < N(headers_attr); i += 2) {
+    string name= headers_attr[i];
+    string value= headers_attr[i+1];
+    request.setRawHeader (QByteArray (&name[0], N(name)),
+			  QByteArray (&value[0], N(value)));
+  }
+  QNetworkReply* reply= get_manager ()->get (request);
+  if (reply == NULL) {
+    io_error << "qt_http_get, cannot connect to " << url << LF;
+    return -2;
+  }
+  QEventLoop loop;
+  QObject::connect (reply, &QNetworkReply::finished,
+		    &loop, &QEventLoop::quit);
+  loop.exec();
+  // (an answer with an error status, such as a refused key, is read too)
+  QByteArray b= reply->readAll ();
+  ret= string (b.constData (), b.size ());
+  delete reply;
+  return 0;
 }
 
 // conversion from TeXmacs Json
@@ -236,7 +298,7 @@ qt_async_http_post (string url, array<string> headers_attr,
 		    const char* data, long long n, object callback) {
   if (DEBUG_IO)
     debug_io << "qt_async_http_post" << LF
-	     << headers_attr << LF
+	     << http_mask_headers (headers_attr) << LF
 	     << string (data, n) << LF;
   QUrl qurl (utf8_to_qstring (url));
   if (!qurl.isValid ()) {

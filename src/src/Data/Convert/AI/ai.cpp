@@ -20,6 +20,7 @@
 #include "file.hpp"
 #include "scheme.hpp"
 #include "web_files.hpp"
+#include "base64.hpp"
 
 /******************************************************************************
 * Various engines
@@ -32,6 +33,8 @@ ai_engine (string model) {
   if (starts (model, "ollama")) return "ollama";
   if (starts (model, "open-mistral")) return "mistral";
   if (starts (model, "albert")) return "albert";
+  if (starts (model, "claude")) return "claude";
+  if (starts (model, "openrouter")) return "openrouter";
   return "unknown";
 }
 
@@ -51,6 +54,12 @@ ai_quote (string s) {
     case '\n':
       r << "\\n";
       break;
+    case '\r':
+      r << "\\r";
+      break;
+    case '\t':
+      r << "\\t";
+      break;
     case '\'':
       r << "'\\''";
       break;
@@ -58,7 +67,9 @@ ai_quote (string s) {
       r << '\\' << s[i];
       break;
     default:
-      r << s[i];
+      if (((unsigned char) s[i]) < 0x20)
+        r << "\\u00" << as_hexadecimal ((unsigned char) s[i], 2);
+      else r << s[i];
     }
   return r;
 }
@@ -239,6 +250,7 @@ static hashmap<string,list<string> > ai_last_answers (null_string_list);
 
 static int
 ai_get_history_size () {
+  // the setting of the plug-ins (in the preferences of Albert)
   string s= get_preference ("albert chat history size");
   if (is_int (s)) return as_int (s);
   return ai_default_history_size;
@@ -314,11 +326,6 @@ get_post_data (string& url, array<string>& headers, tree& data,
     if (is_atomic (t[1][i])) headers << t[1][i]->label;
 }
 
-static inline string
-shell_quote (string s) {
-  return "'" * replace (s, "'", "'\\''") * "'";
-}
-
 static string
 to_shell_command (tree t) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))
@@ -327,14 +334,13 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string cmd= "curl --silent -X POST " * shell_quote (url) * " \\\n";
-    for (int i= 0; i+1 < N(headers); i += 2)
-      cmd << "  -H " << shell_quote (headers[i])
-	  << ":"  << shell_quote (headers[i+1]) << " \\\n";
-    cmd << "  --data-binary " << shell_quote (tree_to_json (data));
-    return cmd;
+    string args= "--silent --no-buffer" * curl_proxy_option (url) *
+      " -X POST " * shell_quote (url) * " \\\n";
+    args << "  --data-binary " << shell_quote (tree_to_json (data));
+    return curl_command (args, headers);
   }
-  io_error << "as_shell_command, unknown command type: " << t << LF;
+  io_error << "as_shell_command, unknown command type: "
+           << http_mask_request (t) << LF;
   return "";
 }
 
@@ -349,7 +355,8 @@ ai_eval_command (tree t) {
     get_post_data (url, headers, data, t);
     return http_post_json (url, headers, data);
   }
-  io_error << "ai_eval_command, wrong command: " << t << LF;
+  io_error << "ai_eval_command, wrong command: "
+           << http_mask_request (t) << LF;
   return "";
 }
 
@@ -358,137 +365,429 @@ ai_async_eval_command (tree t, object callback) {
   if (is_compound (t, "eval_system", 1) && is_atomic (t[0]))
     return async_eval_system (t[0]->label, callback);
   if (is_compound (t, "http_post", 3) && is_atomic (t[0])
-      && is_tuple (t[1]) && is_atomic (t[2])) {
+      && is_tuple (t[1])) {
     string url; tree data; array<string> headers; 
     get_post_data (url, headers, data, t);
     return async_http_post_json (url, headers, data, callback);
   }
-  io_error << "ai_eval_command, wrong command: " << t << LF;
-  return "";
+  io_error << "ai_async_eval_command, wrong command: "
+           << http_mask_request (t) << LF;
+  return true;
 }
 
 /******************************************************************************
 * Producing the query command for various engines
 ******************************************************************************/
 
-tree
-chatgpt_command (string s, string model, string chat) {
-  (void) model;
-  (void) chat;
-  url u ("$TEXMACS_HOME_PATH/system/tmp/chatgpt.txt");
-  if (save_string (u, s)) return "";
-  string cmd= "openai -k 5000 complete " * as_string (u);
-  return compound ("eval_system", cmd);
+// Every engine is asked by an HTTP request with a JSON body (http_post): by
+// the request link of its plug-in (request_link.cpp), with Qt, curl or, in
+// a web browser, fetch (web_files.cpp). The agent (what the engine is asked
+// to be) is the instruction of the system, and the last prompts and answers
+// of the chat come before the new prompt. All of them answer the requests of
+// a web page (CORS) but Albert; Ollama does when the page is among its
+// OLLAMA_ORIGINS.
+
+// In a web browser the answer of a session (ai_latex_request) is streamed
+// (server-sent events, see ai_stream_text): the request link shows it as it
+// comes (request_link_rep::partial). The other requests (translate,
+// correct), and those of the desktop, have the answer at once.
+static bool ai_stream= false;
+
+static string
+ai_key (string engine, string env) {
+  return as_string (call ("ai-api-key", engine, env));
+}
+
+// the model of the session which asks (ai-model-override in init-ai.scm:
+// a session may have its own model), "" for the one of the preferences
+static string
+ai_session_model () {
+  object o= call ("ai-model-override");
+  return is_string (o)? as_string (o): string ("");
+}
+
+// the document of the session which asks, as LaTeX, when the session sends
+// it as context (ai-document-override in init-ai.scm), else ""
+static string
+ai_session_document () {
+  object o= call ("ai-document-override");
+  return is_string (o)? as_string (o): string ("");
+}
+
+static string
+ai_document_intro () {
+  return "The user is writing the following document (in LaTeX), "
+         "which the questions may be about:\n\n";
+}
+
+static string
+ai_model_name (string engine, string fallback) {
+  string sm= ai_session_model ();
+  if (sm != "") return sm;
+  string m= get_preference (engine * " model", fallback);
+  if (m == "" || m == "default") m= fallback;
+  return m;
+}
+
+// the models which draw pictures (PNG, JPEG): those of Gemini whose name
+// says "image", gpt-image and dall-e of OpenAI
+static bool
+ai_image_model (string name) {
+  return occurs ("image", name) || starts (name, "dall-e");
+}
+
+// the reasoning asked of the models of an engine (preference "<engine>
+// reasoning": "default", where the model decides and nothing is sent, else
+// "low", "medium" or "high"), for the questions of the sessions only
+static string
+ai_reasoning_effort (string engine) {
+  if (!ai_stream) return "";
+  string e= get_preference (engine * " reasoning", "default");
+  if (e == "low" || e == "medium" || e == "high") return e;
+  return "";
+}
+
+static tree
+json_number (int i) {
+  return compound ("json-number", as_string (i));
+}
+
+static tree
+json_true () {
+  return compound ("json-boolean", "true");
+}
+
+// their instructions: the text of the LaTeX ones would have them draw in
+// TikZ, and their answer is a picture, with a few words
+static string ai_image_agent=
+  "You are inside GNU TeXmacs, a scientific editor. Draw the picture "
+  "which is asked for as an image, and say in a sentence or two what it "
+  "shows, in plain text, in the language of the question.";
+
+// the agent is the default instructions (those of the user are kept)
+static bool
+ai_default_agent (string model, string agent) {
+  return agent == as_string (call ("ai-default-instructions", model));
+}
+
+// the conversation: (role, text) pairs, the last one the prompt. In a
+// session it is the one of the session (ai-session-context in init-ai.scm:
+// the questions and the answers of the fields above, as LaTeX), else the
+// last prompts and answers kept here.
+static array<string>
+ai_conversation (string s, string model, string chat, bool history) {
+  array<string> v;
+  if (history) {
+    ai_set_current_prompt (s, model, chat);
+    object c= call ("ai-session-context", model, chat);
+    if (is_array_string (c)) {
+      array<string> a= as_array_string (c);
+      for (int i= 0; i+1 < N(a); i += 2)
+        v << string ("user") << a[i] << string ("assistant") << a[i+1];
+      v << string ("user") << s;
+      return v;
+    }
+    list<string> last_prompts= reverse (ai_get_last_prompts (model, chat));
+    list<string> last_answers= reverse (ai_get_last_answers (model, chat));
+    while (!is_nil (last_prompts) && !is_nil (last_answers)) {
+      v << string ("user") << last_prompts->item;
+      v << string ("assistant") << last_answers->item;
+      last_prompts= last_prompts->next;
+      last_answers= last_answers->next;
+    }
+  }
+  v << string ("user") << s;
+  return v;
+}
+
+// the messages of the APIs of OpenAI (also those of Mistral, Albert, Ollama)
+static tree
+openai_messages (string agent, array<string> conv) {
+  array<tree> v;
+  if (agent != "") v << json_object ("role", "system", "content", agent);
+  for (int i= 0; i+1 < N(conv); i += 2)
+    v << json_object ("role", conv[i], "content", conv[i+1]);
+  return json_array (v);
+}
+
+static tree
+openai_style_command (string url, array<string> headers, string model_name,
+                      string agent, array<string> conv, bool images= false,
+                      array<tree> extra= array<tree> ()) {
+  array<tree> d (tree ("model"), tree (model_name),
+                 tree ("messages"), openai_messages (agent, conv));
+  if (images) {
+    array<tree> m (tree ("image"), tree ("text"));
+    d << tree ("modalities") << json_array (m);
+  }
+  if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
+  d << extra;
+  tree data= json_object (d);
+  tree h (TUPLE);
+  for (int i= 0; i < N(headers); i++) h << headers[i];
+  return compound ("http_post", url, h, data);
 }
 
 tree
-gemini_command (string s, string model, string chat) {
-  (void) model;
-  (void) chat;
-  string key= get_env ("GEMINI_API_KEY");
-  string gem= "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-  string cmd= "curl \"" * gem * "\" \\\n";
-  cmd << "  -H 'Content-Type: application/json' \\\n"
-      << "  -H 'X-goog-api-key: " << key << "' \\\n"
-      << "  -X POST \\"
-      << "  -d '{\n"
-      << "    \"contents\": [ {\n"
-      << "      \"parts\": [ {\n"
-      << "        \"text\": \"" << ai_quote (s) << "\"\n"
-      << "      } ]\n"
-      << "    } ]\n"
-      << "  }'";
-  return compound ("eval_system", cmd);
+chatgpt_command (string s, string model, string agent,
+                 string chat, bool history) {
+  string key= ai_key ("chatgpt", "OPENAI_API_KEY");
+  string name= ai_model_name ("chatgpt", "gpt-5-mini");
+  if (ai_image_model (name)) {
+    // a picture (b64_json in the answer): the prompt alone, not streamed
+    // (the instructions of the user, if they changed them, come first)
+    string prompt= s;
+    if (agent != "" && !ai_default_agent (model, agent))
+      prompt= agent * "\n\n" * s;
+    array<tree> d (tree ("model"), tree (name), tree ("prompt"), tree (prompt));
+    d << tree ("n") << compound ("json-number", "1");
+    if (starts (name, "dall-e"))
+      d << tree ("response_format") << tree ("b64_json");
+    tree h (TUPLE);
+    h << tree ("Authorization") << tree ("Bearer " * key)
+      << tree ("Content-Type") << tree ("application/json");
+    return compound ("http_post",
+                     "https://api.openai.com/v1/images/generations", h,
+                     json_object (d));
+  }
+  array<tree> extra;
+  // (the tokens of the answer, in a last piece of the stream)
+  if (ai_stream)
+    extra << tree ("stream_options") << json_object ("include_usage", json_true ());
+  string effort= ai_reasoning_effort ("chatgpt");
+  if (effort != "") extra << tree ("reasoning_effort") << tree (effort);
+  return openai_style_command (
+    "https://api.openai.com/v1/chat/completions",
+    array<string> ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json"),
+    name, agent,
+    ai_conversation (s, model, chat, history), false, extra);
 }
 
 tree
-ollama_command (string s, string model, string chat) {
-  (void) chat;
-  string server= get_preference ("ollama server", "localhost");
-  string port  = get_preference ("ollama port", "11434");
-  string model_= get_preference ("ollama model", "default");
-  if (model_ == "default") model_= as_string (call ("ollama-default-model"));
-  string cmd= "curl http://" * server * ":" * port * "/api/generate -d '{\n";
-  cmd << "\"model\": \"" << model_ << "\",\n"
-      << "\"prompt\": \"" << ai_quote (s) << "\",\n"
-      << "\"stream\": false\n"
-      << "}'";
-  return compound ("eval_system", cmd);
-}
-
-tree
-mistral_command (string s, string model, string chat) {
-  (void) chat;
-  string key= get_env ("MISTRAL_API_KEY");
-  string cmd= "curl -X POST \\\n";
-  cmd << "  -H \"Authorization: Bearer " << key << "\" \\\n"
-      << "  -H \"Content-Type: application/json\" \\\n"
-      << "  -d '{\n"
-      << "    \"model\": \"" << model << "\",\n"
-      << "    \"messages\": [ {\n"
-      << "      \"role\": \"user\",\n"
-      << "      \"content\": \"" << ai_quote (s) << "\"\n"
-      << "    } ]\n"
-      << "  }' \\\n"
-      << "  https://api.mistral.ai/v1/chat/completions";
-  return compound ("eval_system", cmd);
+mistral_command (string s, string model, string agent,
+                 string chat, bool history) {
+  string key= ai_key ("open-mistral-7b", "MISTRAL_API_KEY");
+  return openai_style_command (
+    "https://api.mistral.ai/v1/chat/completions",
+    array<string> ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json"),
+    ai_model_name ("open-mistral-7b", "mistral-small-latest"), agent,
+    ai_conversation (s, model, chat, history));
 }
 
 tree
 albert_command (string s, string model, string agent,
 		string chat, bool history) {
-  (void) chat;
-  string key= get_env ("ALBERT_API_KEY");
-  if (key == "")
-    key= get_preference ("albert api key");
-  string model_= get_preference (model * " model", model);
-  array<tree> v;
-  v << json_object ("role", "system", "content", agent);
-  if (history) {
-    ai_set_current_prompt (s, model, chat);
-    list<string> last_prompts= reverse (ai_get_last_prompts (model, chat));
-    list<string> last_answers= reverse (ai_get_last_answers (model, chat));
-    while (!is_nil (last_prompts) && !is_nil (last_answers)) {
-      v << json_object ("role", "user", "content", last_prompts->item);
-      v << json_object ("role", "assistant", "content", last_answers->item);
-      last_prompts= last_prompts->next;
-      last_answers= last_answers->next;
+  string key= ai_key ("albert", "ALBERT_API_KEY");
+  return openai_style_command (
+    "https://albert.api.etalab.gouv.fr/v1/chat/completions",
+    array<string> ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json"),
+    ai_session_model () != ""? ai_session_model ():
+                               get_preference (model * " model", model),
+    agent, ai_conversation (s, model, chat, history));
+}
+
+// the API of Ollama which is that of OpenAI
+tree
+ollama_command (string s, string model, string agent,
+                string chat, bool history) {
+  string server= get_preference ("ollama server", "localhost");
+  string port  = get_preference ("ollama port", "11434");
+  string model_= ai_session_model ();
+  if (model_ == "") model_= get_preference ("ollama model", "default");
+  if (model_ == "default" || model_ == "")
+    model_= as_string (call ("ollama-default-model"));
+  array<tree> extra;
+  if (ai_stream)
+    extra << tree ("stream_options") << json_object ("include_usage", json_true ());
+  string effort= ai_reasoning_effort ("ollama");
+  if (effort != "") extra << tree ("reasoning_effort") << tree (effort);
+  return openai_style_command (
+    "http://" * server * ":" * port * "/v1/chat/completions",
+    array<string> ("Content-Type", "application/json"),
+    model_, agent, ai_conversation (s, model, chat, history), false, extra);
+}
+
+// the API of OpenRouter, which is that of OpenAI, for the models of many
+// providers (named provider/model); those which draw give their images as
+// data URLs (message.images), when asked for them (modalities)
+tree
+openrouter_command (string s, string model, string agent,
+                    string chat, bool history) {
+  string key= ai_key ("openrouter", "OPENROUTER_API_KEY");
+  string name= ai_model_name ("openrouter", "openrouter/auto");
+  bool image= ai_image_model (name);
+  if (image && ai_default_agent (model, agent)) agent= ai_image_agent;
+  array<string> h ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json");
+  // (who asks, which OpenRouter shows with the use of the key)
+  h << string ("HTTP-Referer") << string ("https://github.com/mgubi/texmacs")
+    << string ("X-Title") << string ("GNU TeXmacs");
+  array<tree> extra;
+  string effort= ai_reasoning_effort ("openrouter");
+  if (effort != "") extra << tree ("reasoning") << json_object ("effort", effort);
+  return openai_style_command (
+    "https://openrouter.ai/api/v1/chat/completions", h,
+    name, agent, ai_conversation (s, model, chat, history), image, extra);
+}
+
+// the API of Gemini: the agent is the instruction of the system, the answers
+// are those of the "model"
+tree
+gemini_command (string s, string model, string agent,
+                string chat, bool history) {
+  string key= ai_key ("gemini", "GEMINI_API_KEY");
+  string name= ai_model_name ("gemini", "gemini-2.5-flash");
+  array<string> conv= ai_conversation (s, model, chat, history);
+  array<tree> contents;
+  for (int i= 0; i+1 < N(conv); i += 2) {
+    tree part= json_object ("text", conv[i+1]);
+    contents << json_object ("role", conv[i] == "user"? "user": "model",
+                             "parts", json_array (part));
+  }
+  bool image= ai_image_model (name);
+  if (image && ai_default_agent (model, agent)) agent= ai_image_agent;
+  array<tree> d;
+  if (agent != "")
+    d << tree ("systemInstruction")
+      << json_object ("parts", json_array (json_object ("text", agent)));
+  d << tree ("contents") << json_array (contents);
+  array<tree> gc;
+  if (image) {
+    array<tree> m (tree ("TEXT"), tree ("IMAGE"));
+    gc << tree ("responseModalities") << json_array (m);
+  }
+  string effort= ai_reasoning_effort ("gemini");
+  if (effort != "" && !image) {
+    // Gemini 3: a level; Gemini 2.5: a budget of tokens; with the summary
+    // of the thoughts (the parts marked thought)
+    array<tree> tc;
+    if (starts (name, "gemini-2"))
+      tc << tree ("thinkingBudget")
+         << json_number (effort == "low"? 1024: effort == "medium"? 8192: 24576);
+    else tc << tree ("thinkingLevel") << tree (effort);
+    tc << tree ("includeThoughts") << json_true ();
+    gc << tree ("thinkingConfig") << json_object (tc);
+  }
+  if (N(gc) > 0) d << tree ("generationConfig") << json_object (gc);
+  return compound ("http_post",
+    "https://generativelanguage.googleapis.com/v1beta/models/" * name *
+      (ai_stream? string (":streamGenerateContent?alt=sse")
+                : string (":generateContent")),
+    tuple ("x-goog-api-key", key, "Content-Type", "application/json"),
+    json_object (d));
+}
+
+// the models of Claude which think as much as they need (from Claude 4.7:
+// thinking adaptive, with an effort), the others with a budget of tokens
+static bool
+claude_adaptive_thinking (string name) {
+  int i= 0, n= N(name);
+  while (i < n && !is_digit (name[i])) i++;
+  int major= 0, minor= 0;
+  while (i < n && is_digit (name[i])) major= 10*major + (name[i++] - '0');
+  if (i < n && name[i] == '-' && i+1 < n && is_digit (name[i+1])) {
+    i++;
+    // (not a date: claude-sonnet-4-20250514)
+    int j= i;
+    while (j < n && is_digit (name[j])) j++;
+    if (j - i <= 2)
+      while (i < n && is_digit (name[i])) minor= 10*minor + (name[i++] - '0');
+  }
+  return major > 4 || (major == 4 && minor >= 7);
+}
+
+// the API of Claude (Anthropic): the agent is the system prompt; a page asks
+// with anthropic-dangerous-direct-browser-access, as its key is in the page
+tree
+claude_command (string s, string model, string agent,
+                string chat, bool history) {
+  string key= ai_key ("claude", "ANTHROPIC_API_KEY");
+  string name= ai_model_name ("claude", "claude-sonnet-5-5");
+  array<string> conv= ai_conversation (s, model, chat, history);
+  array<tree> msgs;
+  for (int i= 0; i+1 < N(conv); i += 2)
+    msgs << json_object ("role", conv[i], "content", conv[i+1]);
+  array<tree> d;
+  d << tree ("model") << tree (name)
+    << tree ("max_tokens")
+    // (without streaming, Anthropic refuses the requests which may be long)
+    << compound ("json-number", ai_stream? string ("32000"): string ("16000"));
+  string doc= ai_stream? ai_session_document (): string ("");
+  if (doc != "") {
+    // the document as a second block of the system prompt, which Anthropic
+    // caches: the next questions about it cost less
+    array<tree> sys;
+    if (agent != "") sys << json_object ("type", "text", "text", agent);
+    array<tree> b (tree ("type"), tree ("text"),
+                   tree ("text"), tree (ai_document_intro () * doc));
+    b << tree ("cache_control") << json_object ("type", "ephemeral");
+    sys << json_object (b);
+    d << tree ("system") << json_array (sys);
+  }
+  else if (agent != "") d << tree ("system") << tree (agent);
+  d << tree ("messages") << json_array (msgs);
+  string effort= ai_reasoning_effort ("claude");
+  if (effort != "") {
+    if (claude_adaptive_thinking (name)) {
+      // (summarized: the text of the thinking, which is else left out)
+      d << tree ("thinking")
+        << json_object ("type", "adaptive", "display", "summarized");
+      d << tree ("output_config") << json_object ("effort", effort);
+    }
+    else {
+      int budget= effort == "low"? 2048: effort == "medium"? 8192: 16384;
+      d << tree ("thinking")
+        << json_object ("type", "enabled", "budget_tokens", json_number (budget));
     }
   }
-  v << json_object ("role", "user", "content", s);
-  tree msg= json_array (v);
-  tree data= json_object (array<tree> ("model", model_, "messages", msg));
-  return compound ("http_post",
-		   "https://albert.api.etalab.gouv.fr/v1/chat/completions",
-		   tuple ("Authorization", "Bearer " * key,
-			  "Content-Type", "application/json"), data);
+  if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
+  tree h (TUPLE);
+  h << tree ("x-api-key") << tree (key)
+    << tree ("anthropic-version") << tree ("2023-06-01")
+    << tree ("anthropic-dangerous-direct-browser-access") << tree ("true")
+    << tree ("Content-Type") << tree ("application/json");
+  return compound ("http_post", "https://api.anthropic.com/v1/messages", h,
+                   json_object (d));
 }
 
 tree
 ai_command (string s, string model, string agent, string chat, bool history) {
   ai_get_continuation (s, model, chat);
   string engine= ai_engine (model);
-  string s_= agent * " " * s;
-  if (engine == "chatgpt") return chatgpt_command (s_, model, chat);
-  if (engine == "gemini") return gemini_command (s_, model, chat);
-  if (engine == "ollama") return ollama_command (s_, model, chat);
-  if (engine == "mistral") return mistral_command (s_, model, chat);
+  if (engine == "chatgpt")
+    return chatgpt_command (s, model, agent, chat, history);
+  if (engine == "gemini")
+    return gemini_command (s, model, agent, chat, history);
+  if (engine == "ollama")
+    return ollama_command (s, model, agent, chat, history);
+  if (engine == "mistral")
+    return mistral_command (s, model, agent, chat, history);
   if (engine == "albert")
     return albert_command (s, model, agent, chat, history);
+  if (engine == "claude")
+    return claude_command (s, model, agent, chat, history);
+  if (engine == "openrouter")
+    return openrouter_command (s, model, agent, chat, history);
   return "";
 }
 
+// the instructions of the engine (its system prompt): those of the user for
+// it, else the default ones, which tell how to write LaTeX which TeXmacs
+// takes well (ai-instructions in init-ai.scm); Albert adds its agent
 static string
 ai_latex_agent_description (string model) {
   string engine= ai_engine (model);
-  if (engine == "albert") {
-    return string ("Provide your answer in ")
-    * "the form of an untitled utf-8 LaTeX document without any comments. "
-    * "Use svg format 1.0 for images. Embed images in filecontent* environments. "
-    * as_string (call ("ai-agents-get-interlocutor", object (engine)));
-  }
-  return string ("Please provide your answer in the form of an ")
-    * "untitled LaTeX document.";
+  string r= as_string (call ("ai-instructions", model));
+  if (engine == "albert")
+    r << "\n" << as_string (call ("ai-agents-get-interlocutor", object (engine)));
+  // the document as context (Claude has it in a block of its own)
+  string doc= ai_session_document ();
+  if (doc != "" && engine != "claude")
+    r << "\n\n" << ai_document_intro () << doc;
+  return r;
 }
 
 string
@@ -501,138 +800,489 @@ ai_latex_command (string s, string model, string chat) {
 string
 ai_latex_request (string s, string model, string chat) {
   string agent= ai_latex_agent_description (model);
-  return tree_to_scheme (ai_command (s, model, agent, chat, true));
+  // (the request links read the answers as they come: fetch in a web
+  // browser, QNetworkReply with Qt, the output of curl elsewhere)
+  ai_stream= true;
+  tree t= ai_command (s, model, agent, chat, true);
+  ai_stream= false;
+  return tree_to_scheme (t);
 }
 
 /******************************************************************************
 * Extracting the output for various engines
 ******************************************************************************/
 
-string
-chatgpt_output (string val, string model, string chat) {
-  (void) model; (void) chat;
-  return val;
+// the text of an answer, from its JSON
+static string
+json_text (tree t) {
+  return is_atomic (t)? t->label: string ("");
 }
 
-string
-gemini_output (string val, string model, string chat) {
-  //string x= val;
-  //x= "> " * replace (x, "\n", "\n> ");
-  //cout << x << "\n";
-  (void) chat;
-  (void) model;
-  int pos= search_forwards ("\"text\": \"", val);
-  if (pos < 0) return "";
-  pos += 9;
-  int end= pos;
-  while (true) {
-    end= search_forwards ("\"\n", end, val);
-    if (end < 0) return "";
-    int next= end + 2;
-    while (next < N(val) && val[next] == ' ') next++;
-    if (val[next] == '}') break;
-    end= next;
+// the message of an error object, with what OpenRouter adds to it: the
+// error of the provider of the model (metadata.raw: "...is temporarily
+// rate-limited upstream...", where the message is "Provider returned
+// error"), and its name
+static string
+ai_error_message (tree e) {
+  string m= json_text (json_get (e, "message"));
+  tree md= json_get (e, "metadata");
+  if (is_func (md, ATTR)) {
+    string raw= json_text (json_get (md, "raw"));
+    string prov= json_text (json_get (md, "provider_name"));
+    if (raw != "" && raw != m) m= (m == "")? raw: m * ": " * raw;
+    if (prov != "") m << " (" << prov << ")";
   }
-  string r= ai_unquote (val (pos, end));
-  r= replace (r, "\\u0026", "&");
-  r= replace (r, "\\u003c", "<");
-  r= replace (r, "\\u003e", ">");
+  return m;
+}
+
+// the message of an error which the engine gave instead of an answer (or
+// what it sent, when it is not JSON: no network, a refused request)
+static string
+ai_error_text (string val, tree t) {
+  if (val == "") return ""; // not yet, or no answer (said by the link)
+  tree e= json_get (t, "error");
+  if (is_func (e, ATTR)) {
+    string m= ai_error_message (e);
+    if (m != "") return "Error: " * m;
+  }
+  if (is_atomic (e) && e->label != "") return "Error: " * e->label;
+  string m= json_text (json_get (t, "message"));
+  if (m == "") m= json_text (json_get (t, "detail")); // Mistral
+  if (m != "") return "Error: " * m;
+  if (N(val) > 500) val= val (0, 500) * "...";
+  return "Error: unexpected answer: " * val;
+}
+
+// a picture of an answer, in its text: as an image of Markdown with a data
+// URL (which ai_set_aside makes an image of TeXmacs)
+static string
+ai_image_text (string mime, string data) {
+  if (mime == "") mime= "image/png";
+  return "\n\n![](data:" * mime * ";base64," * data * ")\n\n";
+}
+
+// the images of a message, or of a piece of it (OpenRouter: images, each
+// with an image_url whose url is a data URL)
+static string
+openai_images (tree m) {
+  tree im= json_get (m, "images");
+  if (!is_func (im, TUPLE)) return "";
+  string r;
+  for (int i= 0; i < N(im); i++) {
+    string u= json_text (json_get (json_get (im[i], "image_url"), "url"));
+    if (starts (u, "data:image/")) r << "\n\n![](" << u << ")\n\n";
+  }
   return r;
 }
 
-string
-ollama_output (string val, string model, string chat) {
-  (void) chat;
-  (void) model;
-  int pos= search_forwards ("\"response\":\"", val);
-  if (pos < 0) return "";
-  pos += 12;
-  int end= search_forwards ("\",\"done\":", pos, val);
-  if (end < 0) return "";
-  string r= ai_unquote (val (pos, end));
-  r= replace (r, "\r\n", "\n");
-  r= replace (r, "`\\u003c", "<");
-  r= replace (r, "\\u003e`", ">");
-  r= replace (r, "\\u0026", "&");
-  r= replace (r, "\\u003c", "<");
-  r= replace (r, "\\u003e", ">");
-  if (occurs ("u003cbodyu003e", r) ||
-      occurs ("u003cdiv id=", r)) {
-    r= replace (r, "u003c", "<");
-    r= replace (r, "u003e", ">");
+static string
+openai_style_output (tree t) {
+  tree c= json_get (t, "choices");
+  tree pics= json_get (t, "data"); // an answer of images/generations
+  if (is_func (pics, TUPLE) && N(pics) > 0 &&
+      json_text (json_get (pics[0], "b64_json")) != "") {
+    string r= json_text (json_get (pics[0], "revised_prompt"));
+    string fmt= json_text (json_get (t, "output_format"));
+    for (int i= 0; i < N(pics); i++)
+      r << ai_image_text (fmt == "jpeg"? string ("image/jpeg"):
+                          fmt == "webp"? string ("image/webp"):
+                          string ("image/png"),
+                          json_text (json_get (pics[i], "b64_json")));
+    return r;
+  }
+  if (!is_func (c, TUPLE) || N(c) == 0) return "";
+  tree m= json_get (c[0], "message");
+  return json_text (json_get (m, "content")) * openai_images (m);
+}
+
+static bool
+json_is_true (tree t) {
+  return t == "true" || (is_compound (t, "json-boolean", 1) && t[0] == "true");
+}
+
+// the text of the parts of an answer of Gemini: those of the answer, or
+// those of its thoughts (marked thought, with includeThoughts)
+static string
+gemini_style_output (tree t, bool thoughts= false) {
+  tree c= json_get (t, "candidates");
+  if (!is_func (c, TUPLE) || N(c) == 0) return "";
+  tree parts= json_get (json_get (c[0], "content"), "parts");
+  if (!is_func (parts, TUPLE)) return "";
+  string r;
+  for (int i= 0; i < N(parts); i++) {
+    if (json_is_true (json_get (parts[i], "thought")) != thoughts) continue;
+    tree in= json_get (parts[i], "inlineData");
+    if (is_func (in, ATTR))
+      r << ai_image_text (json_text (json_get (in, "mimeType")),
+                          json_text (json_get (in, "data")));
+    else r << json_text (json_get (parts[i], "text"));
   }
   return r;
 }
 
-string
-mistral_output (string val, string model, string chat) {
-  (void) chat;
-  (void) model;
-  int pos= search_forwards ("\"content\":\"", val);
-  if (pos < 0) return "";
-  pos += 11;
-  int end= search_forwards ("\"}}]", pos, val);
-  if (end < 0) return "";
-  string r= ai_unquote (val (pos, end));
+static string
+claude_style_output (tree t, bool thoughts= false) {
+  tree c= json_get (t, "content");
+  if (!is_func (c, TUPLE)) return "";
+  string r;
+  for (int i= 0; i < N(c); i++)
+    if (thoughts) {
+      if (json_text (json_get (c[i], "type")) == "thinking")
+        r << json_text (json_get (c[i], "thinking"));
+    }
+    else if (json_text (json_get (c[i], "type")) == "text")
+      r << json_text (json_get (c[i], "text"));
   return r;
 }
 
-string
-albert_output (string val, string model, string chat) {
-  (void) chat;
-  (void) model;
-  tree t= http_from_json (val);
-  t= json_get (t, "choices");
-  if (t == tree () || !is_func (t, TUPLE) || N(t) == 0) {
-    //io_error << "albert_output, unexpected json object: " << val << LF;
-    return "";
+// the reasoning of a message, or of a piece of it (OpenRouter, Ollama:
+// reasoning; DeepSeek, vLLM: reasoning_content)
+static string
+openai_reasoning (tree m) {
+  string r= json_text (json_get (m, "reasoning"));
+  if (r == "") r= json_text (json_get (m, "reasoning_content"));
+  return r;
+}
+
+// the models which think in their text: <think>...</think> first (DeepSeek
+// R1, Qwen with Ollama), which goes to the reasoning
+static string
+ai_split_think (string r, string& reasoning) {
+  int i= 0;
+  while (i < N(r) && (r[i] == ' ' || r[i] == '\n' || r[i] == '\r')) i++;
+  if (!test (r, i, "<think>")) return r;
+  int e= search_forwards ("</think>", i, r);
+  if (e < 0) { reasoning << r (i+7, N(r)); return ""; }
+  reasoning << r (i+7, e);
+  i= e + 8;
+  while (i < N(r) && (r[i] == ' ' || r[i] == '\n' || r[i] == '\r')) i++;
+  return r (i, N(r));
+}
+
+/******************************************************************************
+* The tokens of an answer, and its cost (OpenRouter)
+******************************************************************************/
+
+struct ai_usage_rep {
+  double in, out, cached, reasoning, cost;
+  bool estimated; // a cost from the prices of the model (ai_estimate_cost)
+  ai_usage_rep ():
+    in (0), out (0), cached (0), reasoning (0), cost (-1), estimated (false) {}
+};
+
+static double
+json_double (tree t) {
+  if (is_compound (t, "json-number", 1)) t= t[0];
+  if (is_atomic (t) && t->label != "" && t->label != "null")
+    return as_double (t->label);
+  return 0;
+}
+
+static void
+ai_max (double& x, double y) {
+  if (y > x) x= y;
+}
+
+// the usage which a piece of an answer gives (the numbers only grow: those
+// of a stream are the ones so far, Claude gives them in two events):
+// OpenAI, Mistral, OpenRouter, Ollama (usage, the last piece of a stream),
+// Claude (usage, message.usage), Gemini (usageMetadata)
+static void
+ai_read_usage (tree t, ai_usage_rep& u) {
+  tree us= json_get (t, "usage");
+  if (!is_func (us, ATTR)) us= json_get (json_get (t, "message"), "usage");
+  if (is_func (us, ATTR)) {
+    double in= json_double (json_get (us, "prompt_tokens"));
+    double cr= json_double (json_get (json_get (us, "prompt_tokens_details"),
+                                      "cached_tokens"));
+    if (in == 0) {
+      // Claude: the input without the part read from, or written to, cache
+      cr= json_double (json_get (us, "cache_read_input_tokens"));
+      in= json_double (json_get (us, "input_tokens")) + cr +
+          json_double (json_get (us, "cache_creation_input_tokens"));
+    }
+    double out= json_double (json_get (us, "completion_tokens"));
+    if (out == 0) out= json_double (json_get (us, "output_tokens"));
+    double re= json_double (json_get (json_get (us, "completion_tokens_details"),
+                                      "reasoning_tokens"));
+    if (re == 0)
+      re= json_double (json_get (json_get (us, "output_tokens_details"),
+                                 "thinking_tokens"));
+    ai_max (u.in, in); ai_max (u.cached, cr);
+    ai_max (u.out, out); ai_max (u.reasoning, re);
+    tree c= json_get (us, "cost");
+    // (only OpenRouter gives it)
+    if ((is_atomic (c) && c->label != "" && c->label != "null") ||
+        is_compound (c, "json-number", 1))
+      ai_max (u.cost, json_double (c));
   }
-  t= json_get (t[0], "message");
-  if (t == tree () || !is_func (t, ATTR)) {
-    //io_error << "albert_output, unexpected json object: " << val << LF;
-    return "";
+  tree um= json_get (t, "usageMetadata");
+  if (is_func (um, ATTR)) {
+    double th= json_double (json_get (um, "thoughtsTokenCount"));
+    ai_max (u.in, json_double (json_get (um, "promptTokenCount")));
+    ai_max (u.cached, json_double (json_get (um, "cachedContentTokenCount")));
+    ai_max (u.out, json_double (json_get (um, "candidatesTokenCount")) + th);
+    ai_max (u.reasoning, th);
   }
-  t= json_get (t, "content");
-  if (t == tree () || !is_string (t)) {
-    //io_error << "albert_output, unexpected json object: " << val << LF;
-    return "";
+}
+
+static string
+ai_count (double x) {
+  return as_string ((int) (x + 0.5));
+}
+
+// "1234 tokens in (1000 cached), 567 out (300 for the reasoning), $0.0012"
+static string
+ai_usage_text (ai_usage_rep u) {
+  string r= ai_count (u.in) * " tokens in";
+  if (u.cached > 0) r << " (" << ai_count (u.cached) << " cached)";
+  r << ", " << ai_count (u.out) << " out";
+  if (u.reasoning > 0)
+    r << " (" << ai_count (u.reasoning) << " for the reasoning)";
+  if (u.cost >= 0) {
+    char buf[64];
+    snprintf (buf, sizeof (buf), u.cost >= 0.01? "%.4f": "%.6f", u.cost);
+    r << (u.estimated? ", about $": ", $") << buf;
   }
-  string r= as_string (t);
-  if (N(ai_get_current_prompt (model, chat)) > 0) {
-    ai_set_last_prompt (ai_get_current_prompt (model, chat), model, chat);
-    ai_set_last_answer (r, model, chat);
+  return r;
+}
+
+static tree
+ai_usage_line (ai_usage_rep u) {
+  string data= ai_count (u.in) * " " * ai_count (u.out) * " " *
+    ai_count (u.cached) * " " * ai_count (u.reasoning) * " " *
+    (u.cost >= 0? as_string (u.cost): string ("-1")) *
+    (u.estimated? string (" estimated"): string (""));
+  return compound ("with", "ai-usage", data,
+                   compound ("with", "color", "dark grey", "font-size", "0.84",
+                             ai_usage_text (u)));
+}
+
+// the reasoning of the last answer which ai_output read, and its usage
+static string       ai_last_reasoning;
+static ai_usage_rep ai_last_usage;
+
+// The cost of an answer of an engine which does not give it: from the
+// prices of its model in the list of the models of OpenRouter (public,
+// fetched once), where the models of OpenAI, Anthropic, Google and Mistral
+// have the prices which they ask directly; an estimate (the writes to the
+// cache of Claude cost more, for instance). Ollama and Albert: none.
+static bool ai_prices_fetched= false;
+static tree ai_prices= "";
+
+static tree
+ai_price_list () {
+  if (!ai_prices_fetched) {
+    ai_prices_fetched= true;
+    string r= http_get ("https://openrouter.ai/api/v1/models",
+                        array<string> ());
+    ai_prices= json_get (http_from_json (r), "data");
   }
-  r= replace_tikz_by_pdf (r);
-  r= extract_svg (r);
-  // replace uft8 e2 80 af by ' '
-  char* aux= (char*) malloc (N(r)+1);
-  int j= 0;
+  return ai_prices;
+}
+
+// the name of a model without its date (gpt-5-mini-2025-08-07,
+// claude-sonnet-4-5-20250929)
+static string
+ai_undated (string m) {
+  int n= N(m);
+  if (n > 11 && m[n-11] == '-' && m[n-6] == '-' && m[n-3] == '-') {
+    bool ok= true;
+    for (int i= n-10; i < n; i++)
+      if (i != n-6 && i != n-3 && !is_digit (m[i])) ok= false;
+    if (ok) return m (0, n-11);
+  }
+  if (n > 9 && m[n-9] == '-') {
+    bool ok= true;
+    for (int i= n-8; i < n; i++) if (!is_digit (m[i])) ok= false;
+    if (ok) return m (0, n-9);
+  }
+  return m;
+}
+
+// the name of a model in OpenRouter (provider/model, the version of Claude
+// with a point: claude-sonnet-4-5 is anthropic/claude-sonnet-4.5)
+static string
+ai_openrouter_id (string engine, string m) {
+  m= ai_undated (m);
+  if (engine == "chatgpt") return "openai/" * m;
+  if (engine == "gemini") return "google/" * m;
+  if (engine == "mistral") return "mistralai/" * replace (m, "-latest", "");
+  if (engine == "claude") {
+    int n= N(m), i= n;
+    while (i > 0 && is_digit (m[i-1])) i--;
+    if (i < n && i >= 2 && m[i-1] == '-' && is_digit (m[i-2]))
+      m= m (0, i-1) * "." * m (i, n);
+    return "anthropic/" * m;
+  }
+  return "";
+}
+
+static void
+ai_estimate_cost (string engine, string model, ai_usage_rep& u) {
+  string id= ai_openrouter_id (engine, model);
+  if (id == "" || model == "") return;
+  tree l= ai_price_list ();
+  if (!is_func (l, TUPLE)) return;
+  tree found= "";
+  for (int i= 0; i < N(l) && found == ""; i++)
+    if (json_text (json_get (l[i], "id")) == id) found= l[i];
+  // (the models of Mistral named by their family: its first version)
+  for (int i= 0; i < N(l) && found == "" && engine == "mistral"; i++)
+    if (starts (json_text (json_get (l[i], "id")), id)) found= l[i];
+  if (found == "") return;
+  tree p= json_get (found, "pricing");
+  double in= json_double (json_get (p, "prompt"));
+  double out= json_double (json_get (p, "completion"));
+  double cr= json_double (json_get (p, "input_cache_read"));
+  if (in <= 0 && out <= 0) return;
+  if (cr <= 0) cr= in;
+  u.cost= (u.in - u.cached) * in + u.cached * cr + u.out * out;
+  u.estimated= true;
+}
+
+// replaces the narrow no-break spaces (U+202F, in UTF-8 e2 80 af) by spaces
+static string
+ai_plain_spaces (string r) {
+  string s;
   for (int i= 0; i < N(r); i++) {
     if (i+2 < N(r) &&
 	(unsigned char) r[i]   == 0xe2 &&
 	(unsigned char) r[i+1] == 0x80 &&
 	(unsigned char) r[i+2] == 0xaf) {
-      aux[j]= ' ';
-      j++; i+=2;
+      s << ' '; i += 2; continue;
+    }
+    s << r[i];
+  }
+  return s;
+}
+
+// A streamed answer (server-sent events): lines "data: {...}", each with a
+// piece of the text (OpenAI, Mistral, Ollama, Albert: choices[0].delta;
+// Claude: the delta of a content_block_delta; Gemini: as an answer). The
+// text of the complete lines so far; err, the message of an error event.
+static bool
+ai_is_stream (string s) {
+  int i= 0;
+  while (true) {
+    while (i < N(s) && (s[i] == ' ' || s[i] == '\n' || s[i] == '\r')) i++;
+    // the comments of the stream (OpenRouter: ": OPENROUTER PROCESSING",
+    // while the model has not begun to answer)
+    if (i < N(s) && s[i] == ':') {
+      while (i < N(s) && s[i] != '\n') i++;
       continue;
     }
-    aux[j]= r[i]; j++;
+    break;
   }
-  r= string (aux, j);
-  free (aux);
-  return r;
+  return test (s, i, "data:") || test (s, i, "event:");
 }
+
+static string
+ai_stream_parts (string s, string model, string& err,
+                 string& reasoning, ai_usage_rep& u) {
+  string engine= ai_engine (model);
+  string r;
+  err= "";
+  reasoning= "";
+  int i= 0, n= N(s);
+  while (i < n) {
+    int e= i;
+    while (e < n && s[e] != '\n') e++;
+    if (e >= n) break; // an incomplete line: later
+    string line= s (i, e);
+    i= e + 1;
+    if (N(line) > 0 && line[N(line)-1] == '\r') line= line (0, N(line) - 1);
+    if (!starts (line, "data:")) continue;
+    string d= line (5, N(line));
+    while (N(d) > 0 && d[0] == ' ') d= d (1, N(d));
+    if (d == "" || d == "[DONE]") continue;
+    tree t= http_from_json (d);
+    tree er= json_get (t, "error");
+    if (is_func (er, ATTR)) err= ai_error_message (er);
+    else if (is_atomic (er) && er->label != "") err= er->label;
+    ai_read_usage (t, u);
+    if (engine == "claude") {
+      tree delta= json_get (t, "delta");
+      string type= json_text (json_get (delta, "type"));
+      if (type == "text_delta")
+        r << json_text (json_get (delta, "text"));
+      else if (type == "thinking_delta")
+        reasoning << json_text (json_get (delta, "thinking"));
+    }
+    else if (engine == "gemini") {
+      r << gemini_style_output (t);
+      reasoning << gemini_style_output (t, true);
+    }
+    else {
+      tree c= json_get (t, "choices");
+      if (is_func (c, TUPLE) && N(c) > 0) {
+        tree delta= json_get (c[0], "delta");
+        r << json_text (json_get (delta, "content")) << openai_images (delta);
+        reasoning << openai_reasoning (delta);
+      }
+    }
+  }
+  return ai_split_think (r, reasoning);
+}
+
+string
+ai_stream_text (string s, string model, string& err, string& reasoning) {
+  ai_usage_rep u;
+  return ai_stream_parts (s, model, err, reasoning, u);
+}
+
+string
+ai_stream_text (string s, string model, string& err) {
+  string reasoning;
+  return ai_stream_text (s, model, err, reasoning);
+}
+
+static string ai_short_images (string s);
 
 string
 ai_output (string s, string model, string chat) {
   ai_set_continuation (s, model, chat);
   string engine= ai_engine (model);
-  if (engine == "chatgpt") return chatgpt_output (s, model, chat);
-  if (engine == "gemini") return gemini_output (s, model, chat);
-  if (engine == "ollama") return ollama_output (s, model, chat);
-  if (engine == "mistral") return mistral_output (s, model, chat);
-  if (engine == "albert") return albert_output (s, model, chat);
-  return "";
+  tree t= http_from_json (s);
+  string r;
+  ai_last_reasoning= "";
+  ai_last_usage= ai_usage_rep ();
+  if (ai_is_stream (s)) {
+    string err;
+    r= ai_stream_parts (s * "\n", model, err, ai_last_reasoning,
+                        ai_last_usage);
+    // (a stream which brought no text: an error, or nothing, when the
+    // question was interrupted before the engine began to answer)
+    if (r == "") return (err != "")? "Error: " * err: string ("");
+  }
+  else {
+    if (engine == "gemini") {
+      r= gemini_style_output (t);
+      ai_last_reasoning= gemini_style_output (t, true);
+    }
+    else if (engine == "claude") {
+      r= claude_style_output (t);
+      ai_last_reasoning= claude_style_output (t, true);
+    }
+    else if (engine != "unknown") {
+      r= openai_style_output (t);
+      tree c= json_get (t, "choices");
+      if (is_func (c, TUPLE) && N(c) > 0)
+        ai_last_reasoning= openai_reasoning (json_get (c[0], "message"));
+    }
+    r= ai_split_think (r, ai_last_reasoning);
+    ai_read_usage (t, ai_last_usage);
+  }
+  if (r == "") return ai_error_text (s, t);
+  if (N(ai_get_current_prompt (model, chat)) > 0) {
+    ai_set_last_prompt (ai_get_current_prompt (model, chat), model, chat);
+    ai_set_last_answer (ai_short_images (r), model, chat);
+  }
+  if (engine == "albert") {
+    r= replace_tikz_by_pdf (r);
+    r= extract_svg (r);
+  }
+  return ai_plain_spaces (r);
 }
 
 string
@@ -687,30 +1337,706 @@ embed_images (tree t) {
   return tree (L(t), a);
 }
 
+/******************************************************************************
+* Pictures in the answers: TikZ (as executable folds of the TikZ plug-in)
+* and SVG (as images), set aside while the rest is converted
+******************************************************************************/
+
+static string ai_block_mark= "TMAIBLOCK";
+
+// the lines of the preamble which a TikZ picture needs: its libraries, and
+// the packages which TikZJax has (as the TikZ plug-in asks for them)
+static string
+ai_tikz_header (string pre) {
+  static const char* known[]= {
+    "pgfplots", "tikz-cd", "circuitikz", "chemfig", "tkz-tab", "yquant",
+    "braids", "kinematikz", "tikz-feynhand", "physics", "pgf-spectra",
+    "amsmath", "amssymb", "mathtools", "bm", "cancel", "mhchem", NULL };
+  string libs, pkgs;
+  int i= 0;
+  while ((i= search_forwards ("\\usetikzlibrary{", i, pre)) >= 0) {
+    int e= search_forwards ("}", i, pre);
+    if (e < 0) break;
+    if (libs != "") libs << ", ";
+    libs << pre (i + 16, e);
+    i= e;
+  }
+  // calc, which the models often use ($(a)!0.5!(b)$) without loading it
+  if (!occurs ("calc", libs)) {
+    if (libs != "") libs << ", ";
+    libs << "calc";
+  }
+  i= 0;
+  while ((i= search_forwards ("\\usepackage", i, pre)) >= 0) {
+    int b= search_forwards ("{", i, pre);
+    int e= (b < 0)? -1: search_forwards ("}", b, pre);
+    if (e < 0) break;
+    array<string> l= tokenize (pre (b + 1, e), ",");
+    for (int k= 0; k < N(l); k++) {
+      string p= trim_spaces (l[k]);
+      for (int m= 0; known[m] != NULL; m++)
+        if (p == string (known[m])) {
+          if (pkgs != "") pkgs << ", ";
+          pkgs << p;
+        }
+    }
+    i= e;
+  }
+  // the other settings of the pictures (pgfplots libraries, styles, colors)
+  string other;
+  static const char* settings[]= {
+    "\\usepgfplotslibrary", "\\pgfplotsset", "\\tikzset", "\\definecolor",
+    "\\colorlet", NULL };
+  array<string> lines= tokenize (pre, "\n");
+  for (int k= 0; k < N(lines); k++) {
+    string l= trim_spaces (lines[k]);
+    for (int m= 0; settings[m] != NULL; m++)
+      if (starts (l, settings[m])) other << l << "\n";
+  }
+  string r;
+#ifdef __EMSCRIPTEN__
+  // (TikZJax, in a web browser: the packages and the libraries as comments,
+  // which its plug-in reads, and a whole document only for settings)
+  if (other == "") {
+    if (pkgs != "") r << "% packages: " << pkgs << "\n";
+    if (libs != "") r << "% libraries: " << libs << "\n";
+    return r;
+  }
+  // with settings: a whole document (the TikZ plug-in takes its preamble)
+  r << "\\documentclass{article}\n";
+#else
+  // (the TikZ plug-in of the desktop, plugins/tmpy/graph/tikz.py, compiles
+  // with LaTeX a document which it is given as it is: a picture alone, the
+  // size of its drawing, as it makes its own)
+  r << "\\documentclass[tikz]{standalone}\n";
+#endif
+  if (pkgs != "") r << "\\usepackage{" << pkgs << "}\n";
+  if (libs != "") r << "\\usetikzlibrary{" << libs << "}\n";
+  r << other << "\\begin{document}\n";
+  return r;
+}
+
+// a fold of a plug-in, whose code is text in UTF-8
+static tree
+ai_script_fold (string lan, string code) {
+  array<string> lines= tokenize (code, "\n");
+  tree doc (DOCUMENT);
+  for (int i= 0; i < N(lines); i++)
+    doc << tree (utf8_to_cork (lines[i]));
+  return compound ("script-input", lan, "default", doc, "");
+}
+
+static tree
+ai_svg_image (string svg) {
+  static int counter= 0;
+  counter++;
+  tree data= tuple (tree (RAW_DATA, svg), "answer-" * as_string (counter) * ".svg");
+  return tree (IMAGE, data, "", "", "", "");
+}
+
+// the next picture given as a data URL in s from i (data:image/png;base64,
+// ...): its type, and where its URL begins and ends; -1 if none
+static bool
+ai_base64_char (char c) {
+  return is_alpha (c) || is_digit (c) || c == '+' || c == '/' || c == '=';
+}
+
+static int
+ai_find_data_image (string s, int i, string& mime, int& end) {
+  while ((i= search_forwards ("data:image/", i, s)) >= 0) {
+    int k= i + 11;
+    while (k < N(s) && (is_alpha (s[k]) || s[k] == '+' || s[k] == '-')) k++;
+    if (test (s, k, ";base64,")) {
+      mime= s (i + 5, k);
+      int e= k + 8;
+      while (e < N(s) && ai_base64_char (s[e])) e++;
+      if (e > k + 8) { end= e; return i; }
+    }
+    i++;
+  }
+  return -1;
+}
+
+static tree
+ai_raster_image (string mime, string data) {
+  static int counter= 0;
+  counter++;
+  string ext= mime (6, N(mime));
+  if (ext == "jpeg") ext= "jpg";
+  if (ext == "svg+xml") ext= "svg";
+  string name= "answer-picture-" * as_string (counter) * "." * ext;
+  tree img= tuple (tree (RAW_DATA, decode_base64 (data)), name);
+  return tree (IMAGE, img, ext == "svg"? "": "0.6par", "", "", "");
+}
+
+// the pictures of s given as data URLs shortened (in the answer kept as it
+// came, and in the conversation sent again)
+static string
+ai_short_images (string s) {
+  string r, mime;
+  int i= 0, end;
+  while (true) {
+    int p= ai_find_data_image (s, i, mime, end);
+    if (p < 0) break;
+    int b= search_forwards (",", p, s) + 1;
+    r << s (i, b) << "... (" << as_string ((end - b) / 4 * 3) << " bytes)";
+    i= end;
+  }
+  r << s (i, N(s));
+  return r;
+}
+
+// a picture which does not end (the answer was cut, by the limit of its
+// length): its code, and why
+static tree
+ai_cut_picture (string code) {
+  tree doc (DOCUMENT);
+  doc << compound ("with", "color", "dark red", "font-shape", "italic",
+                   "The answer was cut before the end of this picture:");
+  array<string> lines= tokenize (code, "\n");
+  tree v (DOCUMENT);
+  for (int k= 0; k < N(lines); k++) v << tree (utf8_to_cork (lines[k]));
+  doc << compound ("verbatim-code", v);
+  return doc;
+}
+
+// The fold of a TikZ picture: with its picture when it was made (the
+// pictures are made as soon as they are complete, while the answer still
+// comes, and kept by their code: ai-picture in ai-batch.scm), else asked
+// for, and pending (ai-run-pending-folds fills it once it is there)
+static tree
+ai_picture_fold (string code) {
+  tree fold= ai_script_fold ("tikz", code);
+  object made= call ("ai-picture", code);
+  if (is_tree (made)) {
+    fold= tree (L(fold), fold[0], fold[1], fold[2], as_tree (made));
+    return compound ("script-output", A(fold));
+  }
+  (void) call ("ai-picture-request", code);
+  tree busy= compound ("script-output", fold[0], fold[1], fold[2],
+                       compound ("script-busy"));
+  return compound ("with", "ai-tikz", "pending", busy);
+}
+
+// the pictures of s replaced by marks; their trees in blocks
+static string
+ai_set_aside (string s, string pre, array<tree>& blocks) {
+  string r;
+  int i= 0, n= N(s);
+  static const char* envs[]= { "tikzpicture", "tikzcd", "circuitikz", NULL };
+  while (i < n) {
+    int best= -1, kind= -1;
+    for (int k= 0; envs[k] != NULL; k++) {
+      int p= search_forwards ("\\begin{" * string (envs[k]) * "}", i, s);
+      if (p >= 0 && (best < 0 || p < best)) { best= p; kind= k; }
+    }
+    int sp= search_forwards ("<svg", i, s);
+    if (sp >= 0 && (best < 0 || sp < best)) { best= sp; kind= 100; }
+    string dmime;
+    int dend;
+    int dp= ai_find_data_image (s, i, dmime, dend);
+    if (dp >= 0 && (best < 0 || dp < best)) { best= dp; kind= 200; }
+    if (best < 0) break;
+    int end;
+    bool cut= false; // the picture does not end: the answer was cut
+    tree block;
+    if (kind == 200) {
+      // as an image of Markdown, \includegraphics, or <img src="...">
+      block= ai_raster_image (dmime, s (search_forwards (",", best, s) + 1,
+                                        dend));
+      end= dend;
+      int x= best;
+      if (x >= 2 && s (x - 2, x) == "](" && test (s, end, ")")) {
+        int y= search_backwards ("![", x, s);
+        int nl= (y >= i)? search_forwards ("\n", y, s): -1;
+        if (y >= i && (nl < 0 || nl > x)) { best= y; end++; }
+      }
+      else if (x >= 1 && s[x-1] == '{' && test (s, end, "}")) {
+        int y= search_backwards ("\\includegraphics", x, s);
+        if (y >= i && x - y < 200) { best= y; end++; }
+      }
+      else if (x >= 1 && (s[x-1] == '"' || s[x-1] == '\'')) {
+        int y= search_backwards ("<img", x, s);
+        int z= search_forwards (">", end, s);
+        if (y >= i && x - y < 200 && z >= 0 && z - end < 200) {
+          best= y; end= z + 1;
+        }
+      }
+    }
+    else if (kind == 100) {
+      end= search_forwards ("</svg>", best, s);
+      if (end < 0) { cut= true; end= n; }
+      else end += 6;
+      if (cut) block= ai_cut_picture (s (best, end));
+      else
+      block= ai_svg_image (s (best, end));
+      // the XML declaration, and a fence ```svg ... ``` around it, go with it
+      int b= best;
+      int x= b;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      if (x >= 2 && s (x - 2, x) == "?>") {
+        int y= search_backwards ("<?xml", x, s);
+        if (y >= i) { b= y; x= y; }
+        while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      }
+      best= b;
+    }
+    else {
+      string env= envs[kind];
+      string close= "\\end{" * env * "}";
+      end= search_forwards (close, best, s);
+      if (end < 0) {
+        r << s (i, best) << "\n" << ai_block_mark << as_string (N(blocks)) << "Z\n";
+        blocks << ai_cut_picture (s (best, n));
+        i= n;
+        break;
+      }
+      end += N(close);
+      string head= ai_tikz_header (pre);
+      // (an ellipsis, U+2026, where TikZ wants ..., as in \foreach)
+      string code= head * replace (s (best, end), "\xe2\x80\xa6", "...");
+      if (starts (head, "\\documentclass")) code << "\n\\end{document}";
+      block= ai_picture_fold (code);
+    }
+    // a verbatim around a picture (where it is asked for an SVG) goes with
+    // it, also when the picture was cut before its end
+    {
+      int x= best, z= end;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      while (z < n && (s[z] == ' ' || s[z] == '\n')) z++;
+      string bv= "\\begin{verbatim}", ev= "\\end{verbatim}";
+      if (x - N(bv) >= i && s (x - N(bv), x) == bv) {
+        if (test (s, z, ev)) { best= x - N(bv); end= z + N(ev); }
+        else if (cut) best= x - N(bv);
+      }
+    }
+    // a picture alone in a formula (\[ ... \], $$ ... $$) is not a formula
+    {
+      int x= best, z= end;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      while (z < n && (s[z] == ' ' || s[z] == '\n')) z++;
+      if (x - 2 >= i && (s (x - 2, x) == "\\[" || s (x - 2, x) == "$$")) {
+        string close= (s (x - 2, x) == "$$")? string ("$$"): string ("\\]");
+        if (test (s, z, close)) { best= x - 2; end= z + 2; }
+      }
+    }
+    // a fence ```svg ... ``` (```latex, ```tex...) around it goes with it
+    {
+      int x= best;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      static const char* fences[]= {
+        "```svg", "```xml", "```html", "```latex", "```tex", "```tikz",
+        "```", NULL };
+      for (int f= 0; fences[f] != NULL; f++) {
+        string fe= fences[f];
+        if (x - N(fe) >= i && s (x - N(fe), x) == fe) {
+          int z= end;
+          while (z < n && (s[z] == ' ' || s[z] == '\n')) z++;
+          if (test (s, z, "```")) { best= x - N(fe); end= z + 3; }
+          break;
+        }
+      }
+    }
+    r << s (i, best) << "\n" << ai_block_mark << as_string (N(blocks)) << "Z\n";
+    blocks << block;
+    i= end;
+  }
+  r << s (i, n);
+  return r;
+}
+
+// the marks of t replaced by the trees they stand for
+static tree
+ai_put_back (tree t, array<tree> blocks) {
+  if (N(blocks) == 0) return t;
+  if (is_atomic (t)) {
+    string s= t->label;
+    int p= search_forwards (ai_block_mark, s);
+    if (p < 0) return t;
+    int q= p + N(ai_block_mark), e= q;
+    while (e < N(s) && is_digit (s[e])) e++;
+    if (e == q || e >= N(s) || s[e] != 'Z') return t;
+    int k= as_int (s (q, e));
+    if (k < 0 || k >= N(blocks)) return t;
+    tree before= s (0, p), after= ai_put_back (s (e + 1, N(s)), blocks);
+    if (before == "" && after == "") return blocks[k];
+    tree c (CONCAT);
+    if (before != "") c << before;
+    c << blocks[k];
+    if (after != "") {
+      if (is_func (after, CONCAT)) c << A(after);
+      else c << after;
+    }
+    return c;
+  }
+  int i, n= N(t);
+  tree r (t, n);
+  for (i= 0; i < n; i++) r[i]= ai_put_back (t[i], blocks);
+  return r;
+}
+
+// the answer as it came, folded, for those who want to see it
+// the model which gave an answer, as the engine says it (OpenAI, Claude,
+// Mistral, OpenRouter, Ollama: "model"; Gemini: "modelVersion"), "" if it
+// does not
+static string
+ai_answer_model (string s) {
+  const char* keys[]= { "\"modelVersion\"", "\"model\"", NULL };
+  for (int k= 0; keys[k] != NULL; k++) {
+    int i= search_forwards (keys[k], s);
+    if (i < 0) continue;
+    i += N(string (keys[k]));
+    while (i < N(s) && (s[i] == ' ' || s[i] == ':')) i++;
+    if (i >= N(s) || s[i] != '\"') continue;
+    int e= ++i;
+    while (e < N(s) && s[e] != '\"' && e - i < 200) e++;
+    if (e < N(s) && s[e] == '\"' && e > i) return s (i, e);
+  }
+  return "";
+}
+
+static tree
+ai_raw_fold (string raw, string model= "") {
+  raw= ai_short_images (raw);
+  array<string> lines= tokenize (raw, "\n");
+  tree doc (DOCUMENT);
+  for (int i= 0; i < N(lines); i++)
+    doc << tree (utf8_to_cork (lines[i]));
+  string title= (model == "")? string ("The answer as it came"):
+    "The answer of " * utf8_to_cork (model) * " as it came";
+  tree fold= compound ("folded", compound ("with", "font-shape", "italic",
+                                          title),
+                       compound ("verbatim-code", doc));
+  return compound ("with", "ai-raw", "true", fold);
+}
+
+// the reasoning of a model (Markdown, in UTF-8), folded before its answer
+static tree
+ai_reasoning_fold (string reasoning) {
+  tree doc= verbatim_to_tree (trim_spaces (reasoning), false, "utf-8");
+  if (!is_func (doc, DOCUMENT)) doc= tree (DOCUMENT, doc);
+  tree fold= compound ("folded",
+                       compound ("with", "font-shape", "italic", "The reasoning"),
+                       compound ("with", "color", "dark grey", doc));
+  return compound ("with", "ai-reasoning", "true", fold);
+}
+
+// what is shown while a model thinks and its answer has not begun: the end
+// of its reasoning so far
+tree
+ai_reasoning_partial (string reasoning) {
+  string r= trim_spaces (reasoning);
+  if (N(r) > 1200) {
+    int i= N(r) - 1200;
+    while (i < N(r) && r[i] != '\n' && r[i] != ' ') i++;
+    // (not in the middle of a character of UTF-8)
+    while (i < N(r) && (((unsigned char) r[i]) & 0xc0) == 0x80) i++;
+    r= "..." * r (i, N(r));
+  }
+  tree doc (DOCUMENT);
+  doc << compound ("with", "font-shape", "italic", "Thinking...");
+  tree body= verbatim_to_tree (r, false, "utf-8");
+  if (is_func (body, DOCUMENT)) doc << A(body);
+  else if (body != "") doc << body;
+  return compound ("with", "color", "dark grey", doc);
+}
+
+/******************************************************************************
+* A question asked again: the engine said that it has too many requests, or
+* that it is overloaded (see request_link.cpp)
+******************************************************************************/
+
+// the seconds in "retry in 23.4s", "try again in 1.5s", "retryDelay": "23s"
+// ("10ms": 1), -1 when the answer does not say it
+static double
+ai_said_delay (string s) {
+  const char* keys[]= { "retry in ", "try again in ", "retryDelay\": \"",
+                        "retryDelay\":\"", NULL };
+  for (int k= 0; keys[k] != NULL; k++) {
+    int i= search_forwards (keys[k], locase_all (s));
+    if (i < 0) i= search_forwards (keys[k], s);
+    if (i < 0) continue;
+    i += N(string (keys[k]));
+    int e= i;
+    while (e < N(s) && (is_digit (s[e]) || s[e] == '.')) e++;
+    if (e == i) continue;
+    double d= as_double (s (i, e));
+    if (test (s, e, "ms")) d= d / 1000.0;
+    return d;
+  }
+  return -1;
+}
+
+// the seconds to wait before a question which failed so is asked again
+// (attempt: the times it was already asked again), 0 when the answer is no
+// such failure, or when the wait is too long (a quota of the day); why says
+// what happened
+int
+ai_retry_delay (string s, string model, int attempt, string& why) {
+  string engine= ai_engine (model);
+  if (engine == "unknown" || s == "") return 0;
+  // an answer which began is not asked again
+  string text, err, reasoning;
+  if (ai_is_stream (s)) {
+    ai_usage_rep u;
+    text= ai_stream_parts (s * "\n", model, err, reasoning, u);
+  }
+  else {
+    tree t= http_from_json (s);
+    if (engine == "gemini") text= gemini_style_output (t);
+    else if (engine == "claude") text= claude_style_output (t);
+    else text= openai_style_output (t);
+  }
+  if (text != "") return 0;
+  string l= locase_all (s);
+  if (occurs ("insufficient_quota", l) || occurs ("billing", l) ||
+      occurs ("credit", l))
+    return 0;
+  bool overloaded= occurs ("overloaded", l) || occurs ("\"code\":529", l) ||
+    occurs ("\"code\": 529", l) || occurs ("\"code\":503", l) ||
+    occurs ("\"code\": 503", l) || occurs ("\"unavailable\"", l) ||
+    occurs ("temporarily unavailable", l);
+  bool limited= occurs ("rate_limit", l) || occurs ("rate limit", l) ||
+    occurs ("rate-limit", l) || occurs ("too many requests", l) ||
+    occurs ("resource_exhausted", l) || occurs ("\"code\":429", l) ||
+    occurs ("\"code\": 429", l) || occurs ("rate limited", l);
+  if (!overloaded && !limited) return 0;
+  double said= ai_said_delay (s);
+  if (said > 60) return 0;
+  int d= 2 << attempt; // 2, 4, 8 seconds
+  if (said > d) d= (int) (said + 0.999);
+  why= limited? string ("too many requests"):
+                string ("the engine is overloaded");
+  return d;
+}
+
 tree
 ai_latex_output (string s, string model, string chat) {
   string r= ai_output (s, model, chat);
   if (DEBUG_IO) {
-    string x= un_escape_cr (r);
-    x= "] " * replace (x, "\n", "\n] ");
+    string x= "] " * replace (r, "\n", "\n] ");
     debug_io << x << "\n";
   }
-  string pre, post;
+  string raw= r;
+  tree t;
+  array<tree> blocks;
   int start= search_forwards ("\\begin{document}", r);
-  if (start < 0) { pre= ""; post= ""; return r; }
-  int end= search_forwards ("\\end{document}", start, r);
-  if (end < 0) { pre= ""; post= ""; return r; }
-  start += 16;
-  pre= r (0, start);
-  post= r (end, N(r));
-  r= r (start, end);
+  int end= (start < 0)? -1: search_forwards ("\\end{document}", start, r);
+  // a document which was cut (the limit of the length of the answer)
+  if (start >= 0 && end < 0) end= N(r);
+  if (start < 0 || end < 0) {
+    // an answer which is not a LaTeX document (or an error): text in UTF-8,
+    // with its pictures
+    string aside= ai_set_aside (r, "", blocks);
+    if (starts (r, "Error:") || r == "") t= utf8_to_cork (r);
+    else if (N(blocks) == 0)
+      // (in the font of the text, as the LaTeX answers, with its paragraphs)
+      t= tree (WITH, MODE, "text", verbatim_to_tree (r, false, "utf-8"));
+    else {
+      t= ai_put_back (verbatim_to_tree (aside, false, "utf-8"), blocks);
+      // without the empty lines around it (those of a picture alone)
+      if (is_func (t, DOCUMENT)) {
+        int b= 0, e= N(t);
+        while (b < e && t[b] == "") b++;
+        while (e > b && t[e-1] == "") e--;
+        if (b > 0 || e < N(t)) t= t (b, e);
+      }
+      t= tree (WITH, MODE, "text", t);
+    }
+  }
+  else {
+    string pre= r (0, start);
+    r= r (start + 16, end);
+    // (the answers are decoded from JSON: their \n are newlines already, and
+    // un_escape_cr would make \nu a newline followed by u)
+    string aside= ai_set_aside (r, pre, blocks);
+    t= ai_put_back (ai_latex_body_to_tree (aside), blocks);
+    t= embed_images (t);
+    t= tree (WITH, MODE, "text", t);
+  }
+  if (starts (raw, "Error:") || raw == "") return t;
+  // the reasoning before the answer, folded; its tokens and its cost after
+  // it; then the answer as it came, folded
+  tree doc (DOCUMENT);
+  if (ai_last_reasoning != "" &&
+      get_preference ("ai show reasoning", "on") == "on")
+    doc << ai_reasoning_fold (ai_last_reasoning);
+  if (is_func (t, DOCUMENT)) doc << A(t);
+  else doc << t;
+  if ((ai_last_usage.in > 0 || ai_last_usage.out > 0) &&
+      get_preference ("ai show usage", "on") == "on") {
+    if (ai_last_usage.cost < 0)
+      ai_estimate_cost (ai_engine (model), ai_answer_model (s), ai_last_usage);
+    doc << ai_usage_line (ai_last_usage);
+  }
+  if (get_preference ("ai raw answer", "on") == "on")
+    doc << ai_raw_fold (raw, ai_answer_model (s));
+  if (N(doc) == 1 && !is_func (t, DOCUMENT)) return t;
+  return doc;
+}
+
+/******************************************************************************
+* An answer which is not complete yet (a streamed one, see request_link.cpp)
+******************************************************************************/
+
+static bool
+ai_verbatim_env (string env) {
+  return env == "verbatim" || env == "lstlisting" || env == "minted" ||
+         env == "verbatim*" || env == "filecontents" || env == "filecontents*";
+}
+
+// the longest beginning of the LaTeX s after which all is closed: the
+// environments, the groups, the formulas ($, $$, \(, \[); an environment
+// which is not closed yet, and what follows it, waits for its end
+static string
+ai_latex_closed_prefix (string s) {
+  int n= N(s), i= 0, depth= 0, safe= 0;
+  bool math= false, dmath= false;
+  array<string> envs;
+  while (i < n) {
+    char c= s[i];
+    if (c == '%') {
+      while (i < n && s[i] != '\n') i++;
+    }
+    else if (c == '\\') {
+      int j= i + 1;
+      if (j >= n) break; // a command which is not written yet
+      if (is_alpha (s[j])) {
+        while (j < n && is_alpha (s[j])) j++;
+        if (j >= n) break; // its name may go on
+        string name= s (i + 1, j);
+        if (name == "begin" || name == "end") {
+          if (j >= n || s[j] != '{') { i= j; goto next; }
+          int k= search_forwards ("}", j, s);
+          if (k < 0) break;
+          string env= s (j + 1, k);
+          j= k + 1;
+          if (name == "begin") {
+            envs << env;
+            if (ai_verbatim_env (env)) {
+              int e= search_forwards ("\\end{" * env * "}", j, s);
+              if (e < 0) break;
+              j= e + N(env) + 6;
+              envs->resize (N(envs) - 1);
+            }
+          }
+          else if (N(envs) > 0 && envs[N(envs)-1] == env)
+            envs->resize (N(envs) - 1);
+        }
+        i= j;
+      }
+      else {
+        if (s[j] == '(' || s[j] == '[') math= true;
+        else if (s[j] == ')' || s[j] == ']') math= false;
+        i= j + 1;
+      }
+    }
+    else if (c == '{') { depth++; i++; }
+    else if (c == '}') { if (depth > 0) depth--; i++; }
+    else if (c == '$') {
+      if (i + 1 < n && s[i+1] == '$') { dmath= !dmath; i += 2; }
+      else if (i + 1 >= n) break; // $ or $$
+      else { math= !math; i++; }
+    }
+    else i++;
+  next:
+    // a point is safe when what follows is known and does not go on with a
+    // command (its arguments: \section*{...}, \frac{a}{b}, \item[...])
+    if (depth == 0 && !math && !dmath && N(envs) == 0 && i < n &&
+        s[i] != '{' && s[i] != '[' && s[i] != '*')
+      safe= i;
+  }
+  return s (0, safe);
+}
+
+// the constructs of LaTeX which the style of a session does not have, as
+// their contents (a minipage of a figure)
+static tree
+ai_simplify (tree t) {
+  if (is_atomic (t)) return t;
+  if (is_compound (t, "minipage") && N(t) > 0) return ai_simplify (t[N(t)-1]);
+  // a paragraph box alone in a displayed formula (\[ \parbox{...}{...} \]):
+  // its text, as a paragraph
+  if (is_compound (t, "equation*", 1)) {
+    tree b= t[0];
+    while (is_func (b, DOCUMENT, 1)) b= b[0];
+    if (is_compound (b, "mini-paragraph", 2)) {
+      tree x= b[1]; // (the text of the box: text out of a formula)
+      if (is_compound (x, "text", 1)) x= x[0];
+      return ai_simplify (x);
+    }
+  }
+  int i, n= N(t);
+  tree r (t, n);
+  for (i= 0; i < n; i++) r[i]= ai_simplify (t[i]);
+  if (is_func (r, DOCUMENT)) {
+    // (the paragraphs of such a text in the document around it)
+    tree d (DOCUMENT);
+    for (i= 0; i < n; i++)
+      if (is_func (r[i], DOCUMENT)) d << A(r[i]);
+      else d << r[i];
+    return d;
+  }
+  return r;
+}
+
+// the options of the lists (enumitem: \begin{itemize}[nosep]), which the
+// import of LaTeX takes for the first item, losing the others
+static string
+ai_drop_list_options (string s) {
+  static const char* lists[]= { "itemize", "enumerate", "description", NULL };
+  for (int k= 0; lists[k] != NULL; k++) {
+    string b= "\\begin{" * string (lists[k]) * "}";
+    int i= 0;
+    while ((i= search_forwards (b, i, s)) >= 0) {
+      int j= i + N(b);
+      while (j < N(s) && s[j] == ' ') j++;
+      if (j < N(s) && s[j] == '[') {
+        int depth= 0, e= j;
+        for (; e < N(s); e++) {
+          if (s[e] == '[' || s[e] == '{') depth++;
+          else if (s[e] == ']' || s[e] == '}') { depth--; if (depth == 0) break; }
+        }
+        if (e < N(s)) s= s (0, i + N(b)) * s (e + 1, N(s));
+      }
+      i += N(b);
+    }
+  }
+  return s;
+}
+
+tree
+ai_latex_body_to_tree (string r) {
+  r= ai_drop_list_options (r);
   r= replace (r, "\\maketitle", "");
   r= replace (r, "\\begin{lstlisting}", "\\begin{verbatim}");
   r= replace (r, "\\end{lstlisting}", "\\end{verbatim}");
-  r= un_escape_cr (r);
-  tree t= generic_to_tree (r, "latex-snippet");
-  t= embed_images (t);
-  return tree (WITH, MODE, "text", t);
+  return ai_simplify (generic_to_tree (r, "latex-snippet"));
+}
+
+// what is shown of an answer which is still coming: a LaTeX document is set
+// as far as all is closed in it (nothing while its preamble comes), any
+// other text is shown as it is
+tree
+ai_latex_partial (string r) {
+  int b= search_forwards ("\\begin{document}", r);
+  if (b < 0) {
+    if (occurs ("\\documentclass", r)) return "";
+    return verbatim_to_tree (r, false, "utf-8");
+  }
+  string pre= r (0, b);
+  r= r (b + 16, N(r));
+  int e= search_forwards ("\\end{document}", r);
+  if (e >= 0) r= r (0, e);
+  r= ai_latex_closed_prefix (r);
+  int k= 0;
+  while (k < N(r) && (r[k] == ' ' || r[k] == '\n' || r[k] == '\r')) k++;
+  if (k == N(r)) return "";
+  // its complete pictures: SVG images at once, TikZ ones made now
+  array<tree> blocks;
+  string aside= ai_set_aside (r, pre, blocks);
+  return tree (WITH, MODE, "text",
+               ai_put_back (ai_latex_body_to_tree (aside), blocks));
 }
 
 /******************************************************************************
@@ -725,7 +2051,9 @@ ai_chat (string s, string model, string agent, string chat) {
   //  debug_io << "input, " << cmd << LF;
   //  debug_io << "output, " << val << LF;
   //}
-  string r= ai_output (val, model, chat);
+  // (without the spaces and newlines which end the answer: the text which
+  // replaces a selection)
+  string r= trim_spaces_right (ai_output (val, model, chat));
   if (DEBUG_IO) {
     debug_io << "ai input, " << s << LF;
     debug_io << "ai output, " << r << LF;
@@ -812,7 +2140,7 @@ ai_correct (tree t, string lan, string model, string chat) {
   tree u= decompress_html (r);
   //cout << "u = " << u << "\n";
   tree ret= tree (TUPLE);
-  ret << ai_post (r, u);
+  ret << ai_post (t, u);
   for (int i= 0; i < N(comments); i++)
     ret << decompress_html (comments[i]);
   return ret;
@@ -848,5 +2176,5 @@ ai_translate (tree t, string from, string into, string model, string chat) {
   //cout << "r= " << r << "\n";
   tree u= decompress_html (r);
   //cout << "u = " << u << "\n";
-  return ai_post (r, u);
+  return ai_post (t, u);
 }

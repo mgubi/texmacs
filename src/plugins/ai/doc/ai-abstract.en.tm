@@ -5,19 +5,27 @@
 <\body>
   <tmdoc-title|Introduction to AI tools inside <TeXmacs>>
 
-  <TeXmacs> contains experimental support for various chatbots. For
-  conversations with programs such as <TeXmacs> (which are not recognized as
-  web browsers), most chatbots require you to generate a private key for all
-  conversations (they can often generate such keys for free). Below, you will
-  find specific instructions how to setup various chatbots for communication
-  with <TeXmacs>.
+  <TeXmacs> contains experimental support for various chatbots:
+  <name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>, the models
+  of many providers through <name|OpenRouter>, <name|Llama> and other models
+  through <name|Ollama>, and <name|Albert>. For
+  conversations with programs such as <TeXmacs>, most chatbots require you to
+  generate a private key, the key of their API (some give such keys for
+  free). The key is given in <menu|Insert|Session|Preferences>, or in an
+  environment variable; when the wallet of <TeXmacs> is on, it is kept there,
+  encrypted. Below, you will find specific instructions how to setup various
+  chatbots for communication with <TeXmacs>. They also work in the version of
+  <TeXmacs> which runs in a web browser, except <name|Albert>.
 
   Assuming that your chatbot, say <name|ChatGPT> is recognized by <TeXmacs>,
   you may use it the following ways:
 
   <\enumerate>
-    <item>For direct chats, inside a traditional shell session, using
-    <menu|Insert|Shell|ChatGPT>. In that case, <TeXmacs> allows you to
+    <item>For direct chats, inside a session, using
+    <menu|Insert|Session|AI>, which lists the chatbots
+    (<menu|Insert|Session|AI|ChatGPT>); the session starts with the model of
+    the preferences, and another one is chosen in its focus bar. In that
+    case, <TeXmacs> allows you to
     directly put mathematical formulas in your queries and output with
     mathematical formulas can directly be cut and pasted into your documents.
 
@@ -31,6 +39,16 @@
     <item>For correcting the spelling and grammar of a text. This works in a
     similar way as translation, except that you should now do
     <menu|Tools|Correct>.
+
+    <item>For questions about your document. <menu|Tools|Ask about the
+    selection> puts a session of the engine of <menu|Tools|AI engine> after
+    the paragraph of the selection, with the selection in its input: type
+    your question after it. <menu|Tools|Ask about the document> puts a
+    session at the cursor which sends the whole document (as <LaTeX>,
+    without the sessions of chatbots) with each question. This is a setting
+    of the session, <with|font-series|bold|Send the document as context> in
+    the menu of the model in its focus bar. <name|Claude> keeps the document
+    in its cache, so that the next questions about it cost less.
   </enumerate>
 
   If setting up a chatbot for <TeXmacs> is too much work, or if you wish to

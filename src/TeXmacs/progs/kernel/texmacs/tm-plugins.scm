@@ -100,6 +100,38 @@
               ""))
         "")))
 
+;; the first output of a session of a request (which has no program to
+;; write a banner): a procedure of the plug-in, from its name to a tree
+(define request-banners (make-ahash-table))
+(define-public (set-request-banner! name f)
+  (ahash-set! request-banners name f))
+(define-public (request-banner name)
+  (with f (ahash-ref request-banners name)
+    (and f (f name))))
+
+;; the sessions of a group are in a submenu of the menus which list them
+;; (Insert > Session: AI for the chatbots), whose name is the group
+(define session-groups (make-ahash-table))
+(define-public (set-session-group! name group)
+  (ahash-set! session-groups name group))
+(define-public (session-group name)
+  (ahash-ref session-groups name))
+
+;; the names of the sessions l and of their groups, in the order of their
+;; names in the menus; a group as (group name ...)
+(define-public (session-menu-entries l)
+  (let* ((alone (list-filter l (lambda (n) (not (session-group n)))))
+         (groups (list-remove-duplicates
+                  (list-filter (map session-group l) (lambda (g) g))))
+         (entries (append alone
+                          (map (lambda (g)
+                                 (cons g (list-filter
+                                          l (lambda (n)
+                                              (== (session-group n) g)))))
+                               groups)))
+         (label (lambda (x) (if (pair? x) (car x) (session-name x)))))
+    (sort entries (lambda (x y) (string<=? (label x) (label y))))))
+
 (define-public (connection-request? name)
   (with info (connection-info name "default")
     (and (func? info 'tuple 3) (== (cadr info) "request"))))

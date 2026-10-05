@@ -11,14 +11,136 @@
   startup file for shell sessions, such as <hgroup|<verbatim|~/.bashrc>> or
   <verbatim|~/.profile>.
 
+  Instead of an environment variable, the key of a chatbot can be given in
+  <menu|Insert|Session|Preferences>, with the model to use. When the wallet
+  of <TeXmacs> is on (<menu|Edit|Preferences|Security>), the key is kept
+  there, encrypted, rather than in the preferences. This is also how keys
+  are given in a web browser, which has no environment variables. A key
+  given while the wallet is there but off turns it on first (its passphrase
+  is asked), to keep the key in it. A session of a chatbot which has no key
+  asks for one: it turns the wallet on if it is off (it may hold the key),
+  else it opens the preferences of the chatbot, and a question asked
+  without a key says so. The chatbots are listed in
+  <menu|Insert|Session|AI> before they have a key. Once the
+  key is given, <with|font-series|bold|Update the list of models> asks the
+  chatbot which models it offers to this key, and proposes them in
+  <with|font-series|bold|Model>: it is the model of the new sessions. Each
+  session has its own model, kept in the document: the one chosen in
+  <menu|Insert|Session|AI>, shown in the focus bar in a menu which changes
+  it for the next questions of this session (each answer says the model
+  which gave it, in the fold of the answer as it came). A session begins
+  with the name of the model
+  which it asks; in a web browser the answer is shown as it comes (in grey),
+  set by <TeXmacs> as far as it can be: up to the last environment, group
+  or formula which is not closed yet. It is replaced by the whole answer
+  when it is complete.
+
+  A question of a session is sent with the conversation above it in the
+  session, as its context: the last questions and answers (10 by default,
+  <with|font-series|bold|Context> in the preferences of the chatbot). The
+  context is the one of the document: it is there again when the document
+  is opened again, and follows the changes made to it.
+
+  The pictures of an answer are shown: a <name|TikZ> picture
+  (<verbatim|tikzpicture>, <verbatim|tikzcd>, <verbatim|circuitikz>)
+  becomes an executable fold of the <name|TikZ> plug-in, made at once, with
+  the libraries and packages which the answer asks for; an <name|SVG>
+  picture becomes an image. In a web browser, each picture is made as soon
+  as it is complete, while the rest of the answer comes. Each answer ends with a folded copy of the
+  answer as it came, to see what the chatbot wrote (it is also what is sent
+  back as the context); <with|font-series|bold|Show the answer as it came>
+  in the preferences removes it.
+
+  Images in <name|PNG> or <name|JPEG> (a painting, an artistic rendition
+  of an idea) come from the models which draw: those of <name|Gemini> whose
+  name says <verbatim|image> (<verbatim|gemini-2.5-flash-image>...), and
+  <verbatim|gpt-image-1> or <verbatim|dall-e-3> of <name|ChatGPT>, and
+  those of <name|OpenRouter> whose name says <verbatim|image>; choose
+  one as the model of the session (<with|font-series|bold|Update the list
+  of models> lists them). Their images are put in the answer; the
+  conversation sent again holds only a mention of them. The other models
+  do not make images (<name|Claude> among them): they draw in <name|TikZ> or
+  <name|SVG>.
+
+  The chatbot is told how to write its answers: as a <LaTeX> document which
+  <TeXmacs> takes well (sections, lists, mathematics, <name|TikZ> or
+  <name|SVG> pictures, nothing which only matters for printing). These
+  instructions can be changed for each chatbot:
+  <with|font-series|bold|Instructions> <with|font-series|bold|Edit> in its
+  preferences opens them as a text file, whose changes are used once it is
+  saved; <with|font-series|bold|Default> comes back to the instructions of
+  <TeXmacs>.
+
+  The models which reason before they answer show their reasoning while it
+  comes, and keep it folded before their answer
+  (<with|font-series|bold|Show the reasoning> in the preferences removes
+  it). How much they reason is chosen with
+  <with|font-series|bold|Reasoning> in the preferences of <name|ChatGPT>,
+  <name|Claude>, <name|Gemini>, <name|OpenRouter> and <name|Ollama>, or with
+  <with|font-series|bold|Reasoning> in the focus bar of a session:
+  <with|font-series|bold|Default> lets the model decide,
+  <with|font-series|bold|Low>, <with|font-series|bold|Medium> and
+  <with|font-series|bold|High> ask for more and more (and cost more). Each
+  answer is followed by its tokens: those of the question with its context
+  (and the part read from the cache of the engine), those of the answer
+  (and those of its reasoning), and its cost: the one which
+  <name|OpenRouter> gives, else an estimate from the prices of the model
+  (<name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>: those
+  which <name|OpenRouter> lists for them, fetched once), said
+  <with|font-series|bold|about>. The menu of the model gives the sum for
+  the session, or the tokens of the answer of a fold, and the sum for the
+  answers of the document.
+  <with|font-series|bold|Show the tokens and the cost> in the preferences
+  removes them. <with|font-series|bold|Insert answer> in the focus bar puts
+  the answer at the cursor (else the last one) after the session, as
+  paragraphs of the document.
+
+  A chatbot can also answer in an executable fold
+  (<menu|Insert|Fold|Executable|AI>), whose answer becomes part of the
+  document. A fold asks its question alone, without the questions and
+  answers around it, so that it always asks the same; it has its model, its
+  reasoning and <with|font-series|bold|Send the document as context> in its
+  focus bar, as a session. Its answer is the answer alone (its tokens are
+  said on the status bar). It is kept: unfolding the fold again, or
+  unfolding all the folds of the document, shows it without asking again;
+  <key|Return> in its question, or <with|font-series|bold|Ask again> in its
+  focus bar, asks again. When its question was changed since its answer,
+  its focus bar says <with|font-series|bold|Question changed>.
+
+  When an engine says that it has too many requests, or that it is
+  overloaded, the question is asked again after a few seconds (as long as
+  the engine says, if it says it), three times at most; the session says
+  so while it waits.
+
+  The key of an API is not that of a subscription: <name|ChatGPT Plus> or
+  <name|Claude Pro> do not include the use of the API, which is paid apart,
+  according to use. In the console of the service, set a limit to the
+  spending, and make a key for <TeXmacs> alone, which you can revoke without
+  the others. Never put a key in a document. All the
+  chatbots are asked by HTTP requests (with <verbatim|libcurl> or the
+  <verbatim|curl> program when <TeXmacs> is not built with <name|Qt>, by the
+  browser itself in a web browser).
+
+  Behind a proxy, the requests go through the one of the system: the
+  settings of <name|macOS> (with their exceptions and their automatic
+  configuration) and <name|Windows>, the variables
+  <verbatim|https_proxy>, <verbatim|http_proxy>, <verbatim|all_proxy> and
+  <verbatim|no_proxy> of the environment elsewhere (and before the settings
+  of <name|macOS>). Another one is given in
+  <menu|Edit|Preferences|AI|Proxy>: <verbatim|host:port>,
+  <verbatim|socks5://host:port>, or <verbatim|direct> for none.
+
   <subsection*|ChatGPT>
 
   Please follow the following instructions for setting up <name|ChatGPT> for
   use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account for <name|ChatGPT> and obtain a key. Keys
-    typically start with <verbatim|sk->.
+    <item>Create an account on
+    <hlink|platform.openai.com|https://platform.openai.com> (not the site of
+    <name|ChatGPT> itself), add credit in <with|font-series|bold|Billing>, and
+    create a key in <with|font-series|bold|API keys>. Keys typically start
+    with <verbatim|sk->.
 
     <item>In your terminal, set the <verbatim|OPENAI_API_KEY> environment
     variables with your key:
@@ -28,32 +150,32 @@
       green|<em|your_key>>>>
     </shell-code>
 
-    <item>You need to install <verbatim|openai-cli>, the <name|OpenAI>
-    command line interface. This is a bit tricky, because it requires you to
-    create a <name|Python> virtual environment (assuming that you already
-    have <name|Python> on your computer; otherwise install <name|Python>
-    first). You can do this in any directory <verbatim|<with|color|dark
-    green|<em|dir>>> from where you wish to launch <TeXmacs>, as
-    follows:<no-break-here>
+    <item>When launching <TeXmacs>, you should now be able to use
+    <name|ChatGPT>.
+  </itemize>
+
+  <subsection*|Claude>
+
+  Please follow the following instructions in order to setup <name|Claude>
+  for use inside <TeXmacs>.
+
+  <\itemize>
+    <item>Create an account on the console of <name|Anthropic>,
+    <hlink|console.anthropic.com|https://console.anthropic.com>, add credit
+    in <with|font-series|bold|Billing>, and create a key in
+    <with|font-series|bold|API Keys>. Keys typically start with
+    <verbatim|sk-ant->.
+
+    <item>In your terminal, set the <verbatim|ANTHROPIC_API_KEY> environment
+    variable with your key, or give it in the preferences:
 
     <\shell-code>
-      cd <text|<verbatim|<with|color|dark green|<em|dir>>>>
-
-      python3 -m venv <text|<verbatim|<with|color|dark green|<em|myenv>>>>
-
-      source <text|<verbatim|<with|color|dark
-      green|<em|dir>>>>/<text|<verbatim|<with|color|dark
-      green|<em|myenv>>>>/bin/activate
-    </shell-code>
-
-    <item>Now install the <name|OpenAI> command line interface:
-
-    <\shell-code>
-      pip3 install openai-cli
+      export ANTHROPIC_API_KEY=<text|<verbatim|<with|color|dark
+      green|<em|your_key>>>>
     </shell-code>
 
     <item>When launching <TeXmacs>, you should now be able to use
-    <name|ChatGPT>.
+    <name|Claude>.
   </itemize>
 
   <subsection*|Gemini>
@@ -62,7 +184,9 @@
   for use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account for <name|Gemini> and obtain a key.
+    <item>Obtain a key in <name|Google AI Studio>,
+    <hlink|aistudio.google.com|https://aistudio.google.com> (<with|font-series|bold|Get
+    API key>). It has a free tier, which is enough to try.
 
     <item>In your terminal, set the <verbatim|GEMINI_API_KEY> environment
     variables with your key:
@@ -99,13 +223,25 @@
     3>.
   </itemize>
 
+  In a web browser, <verbatim|ollama> answers the page only if it allows
+  the address of the page, for instance for <TeXmacs> on
+  <verbatim|mgubi.github.io>:
+
+  <\shell-code>
+    OLLAMA_ORIGINS=https://mgubi.github.io ollama serve
+  </shell-code>
+
+  The server and the model are chosen in <menu|Insert|Session|Preferences>.
+
   <subsection*|Mistral>
 
   Please follow the following instructions for setting up <name|Mistral> for
   use inside <TeXmacs>.
 
   <\itemize>
-    <item>Create an account for <name|Mistral> and obtain a key.
+    <item>Create an account on
+    <hlink|console.mistral.ai|https://console.mistral.ai> and obtain a
+    key.
 
     <item>In your terminal, set the <verbatim|MISTRAL_API_KEY> environment
     variables with your key:
@@ -119,7 +255,39 @@
     <name|Mistral>.
   </itemize>
 
+  <subsection*|OpenRouter>
+
+  <name|OpenRouter> gives the models of many providers (<name|OpenAI>,
+  <name|Anthropic>, <name|Google>, <name|DeepSeek>, <name|Meta>...) with
+  a single key, named <verbatim|provider/model>, such as
+  <verbatim|anthropic/claude-sonnet-4.5>; <verbatim|openrouter/auto> chooses
+  one for each question.
+
+  <\itemize>
+    <item>Create an account on <hlink|openrouter.ai|https://openrouter.ai>,
+    add credit in <with|font-series|bold|Credits> (the models whose name
+    ends with <verbatim|:free> need none, with limits), and create a key in
+    <with|font-series|bold|Keys>. Keys typically start with
+    <verbatim|sk-or->.
+
+    <item>Give it in the preferences of <name|OpenRouter>, or set the
+    <verbatim|OPENROUTER_API_KEY> environment variable:
+
+    <\shell-code>
+      export OPENROUTER_API_KEY=<text|<verbatim|<with|color|dark
+      green|<em|your_key>>>>
+    </shell-code>
+
+    <item><with|font-series|bold|Update the list of models> lists all its
+    models (several hundreds); a model whose name says <verbatim|image>
+    (<verbatim|google/gemini-2.5-flash-image>,
+    <verbatim|openai/gpt-5-image>...) draws images.
+  </itemize>
+
   <subsection*|Albert (by DINUM, for French administrations only)>
+
+  The server of <name|Albert> does not answer the requests of a web page:
+  <name|Albert> cannot be used in a web browser.
 
   Please follow the following instructions for setting up <name|Albert> for
   use inside <TeXmacs>.

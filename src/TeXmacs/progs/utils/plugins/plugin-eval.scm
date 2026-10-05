@@ -89,10 +89,24 @@
     (when (nnull? l)
       (ahash-set! plugin-author (list lan ses) (fifth (caar l))))))
 
+;; A session of a request (an HTTP API, as the AI engines) has no program to
+;; write a banner: its plug-in may give one (set-request-banner!)
+;; the plug-ins which are starting: connection-start may already say that
+;; they are (connection-notify-status), before their connection is there
+(define plugin-starting (make-ahash-table))
+(define plugin-connected (make-ahash-table)) ; started at least once
+
 (define (plugin-start lan ses)
   (when (!= lan "scheme")
     (plugin-set-author lan ses)
-    (connection-start lan ses)))
+    (ahash-set! plugin-starting (list lan ses) #t)
+    (when (connection-request? lan)
+      (with b (request-banner lan)
+        (when b (connection-notify lan ses "output" (stree->tree b)))))
+    (with r (connection-start lan ses)
+      (ahash-remove! plugin-starting (list lan ses))
+      (ahash-set! plugin-connected (list lan ses) #t)
+      r)))
 
 (tm-define (plugin-write lan ses t mode)
   (ahash-set! plugin-started (list lan ses) (texmacs-time))
@@ -110,29 +124,41 @@
           (connection-notify lan ses "output" r))
         (connection-notify-status lan ses 2))))
 
+(define (plugin-push-start lan ses l)
+  (with author 0
+    (when (!= lan "scheme")
+      (set! author (new-author))
+      (start-slave author))
+    (with p (silent-encode :start noop '())
+      (set! p (cons (rcons (car p) author) (cdr p)))
+      (pending-set lan ses (cons p l))
+      (plugin-do lan ses))))
+
 (define (plugin-do lan ses)
   (with l (pending-ref lan ses)
+    (if (and (nnull? l) (ahash-ref plugin-starting (list lan ses)))
+        ;; the next evaluation, once the start is over
+        (delayed (plugin-do lan ses))
     (when (nnull? l)
       (with status (plugin-status lan ses)
         (cond ((and (> (length (car l)) 2) (== (second (car l)) :start))
                (if (== status 0)
                    (plugin-start lan ses)
                    (plugin-next lan ses)))
+              ;; the plug-ins of a command line or of requests, whose status
+              ;; stays 0, start once (an executable fold before any session
+              ;; of them): their connection is not made otherwise
+              ((and (or (connection-cmdline? lan) (connection-request? lan))
+                    (not (ahash-ref plugin-connected (list lan ses))))
+               (plugin-push-start lan ses l))
               ((connection-cmdline? lan)
                ((first (caar l)) lan ses))
               ((connection-request? lan)
                ((first (caar l)) lan ses))
               ((== status 0)
-               (with author 0
-                 (when (!= lan "scheme")
-                   (set! author (new-author))
-                   (start-slave author))
-                 (with p (silent-encode :start noop '())
-                   (set! p (cons (rcons (car p) author) (cdr p)))
-                   (pending-set lan ses (cons p l))
-                   (plugin-do lan ses))))
+               (plugin-push-start lan ses l))
               (#t
-               ((first (caar l)) lan ses)))))))
+               ((first (caar l)) lan ses))))))))
 
 (tm-define (plugin-next lan ses)
   (with l (pending-ref lan ses)
@@ -254,6 +280,15 @@
   (when (and (tm-func? t 'document) (tm-func? u 'document))
     (tree-insert! t (tree-arity t) (var-tree-children u))))
 
+;; A silent evaluation gives its output when it is over. When its options
+;; hold a procedure, it is called with the output and the errors so far each
+;; time some come, before the end: a plug-in which writes its output as it
+;; goes (a long computation, asynchronous code) is seen doing so.
+(define (silent-progress opts)
+  (cond ((null? opts) #f)
+        ((procedure? (car opts)) (car opts))
+        (else (silent-progress (cdr opts)))))
+
 (define (silent-notify lan ses ch t)
   ;;(display* "Silent notify " lan ", " ses ", " ch ", " t "\n")
   (with l (pending-ref lan ses)
@@ -261,7 +296,16 @@
       (cond ((== ch "output")
              (silent-output out t))
             ((== ch "error")
-             (silent-output err t))))))
+             (silent-output err t)))
+      (with progress (silent-progress opts)
+        (cond ((and progress (in? ch '("output" "error")))
+               (progress (tm->stree out) (tm->stree err)))
+              ;; the answer so far of a request (see session-notify)
+              ((and progress (== ch "progress"))
+               (progress (append (tm->stree out)
+                                 (list `(with "color" "dark grey"
+                                          ,(tm->stree t))))
+                         (tm->stree err))))))))
 
 (define (silent-cancel lan ses dead?)
   ;;(display* "Silent cancel " lan ", " ses ", " dead? "\n")
