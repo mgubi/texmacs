@@ -346,6 +346,11 @@ is_of_type (url name, string filter) {
             !S_ISLNK (lbuf.st_mode)) return false;
       }
       break;
+#else
+    case 'l':
+      // stat does not tell the links of Windows: none (otherwise every
+      // file, even a missing one, was a symbolic link)
+      return false;
 #endif
     case 'r':
       if (err) return false;
