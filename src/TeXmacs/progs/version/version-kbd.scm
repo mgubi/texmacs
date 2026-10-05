@@ -19,15 +19,44 @@
 (texmacs-modes
   (in-git-document% (git-context? (current-buffer)) with-versioning-tool%))
 
+;; The shortcuts make the same checks as the menus, and explain why they
+;; do nothing otherwise
+
+(define (shortcut-refused msg)
+  (set-message msg "Git")
+  #f)
+
+(define (shortcut-root)
+  (with root (current-git-root)
+    (cond ((not (git-available?))
+           (shortcut-refused
+            "Git was not found: see Version -> Git preferences"))
+          ((not root) (shortcut-refused "Not in a Git working tree"))
+          ((not (git-trusted? root))
+           (shortcut-refused (string-append "This repository is not trusted: "
+                                            "use Version -> Use Git in this "
+                                            "folder")))
+          (else root))))
+
+(define (shortcut-compare)
+  (and-with root (shortcut-root)
+    (with u (current-buffer)
+      (cond ((or (url-rooted-tmfs? u) (not (git-texmacs-file? u)))
+             (shortcut-refused "Only TeXmacs documents can be compared"))
+            ((in? (git-file-state u) '(untracked added))
+             (shortcut-refused "This document is not in the last commit"))
+            (else (git-compare-with u "HEAD"))))))
+
 (kbd-map
   (:mode in-git-document?)
-  ("version g" (git-open-tool))
-  ("version c" (if (git-simple-mode?)
-                   (git-interactive-save-snapshot (current-git-root))
-                   (git-interactive-commit)))
-  ("version y" (git-sync (current-git-root)))
-  ("version s" (git-show-status))
-  ("version =" (git-compare-with (current-buffer) "HEAD")))
+  ("version g" (when (shortcut-root) (git-open-tool)))
+  ("version c" (and-with root (shortcut-root)
+                 (if (git-simple-mode?)
+                     (git-interactive-save-snapshot root)
+                     (git-interactive-commit))))
+  ("version y" (and-with root (shortcut-root) (git-sync root)))
+  ("version s" (and-with root (shortcut-root) (git-show-status root)))
+  ("version =" (shortcut-compare)))
 
 (kbd-map
   (:mode with-versioning-tool?)

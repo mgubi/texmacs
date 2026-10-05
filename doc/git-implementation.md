@@ -1,6 +1,6 @@
 # How the new git support is organised
 
-The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2026-09-24.
+The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2026-10-05.
 
 ## Modules
 
@@ -47,12 +47,19 @@ therefore load even before anyone has opened the Version menu.
 * **Trust:** `git-run` and `git-run-async` refuse to run in a working tree
   that is not listed in the preference `"git trusted repositories"`. The
   list is filled by `git-trust`, which is called by init, clone and
-  *Use Git in this folder…*.
+  *Use Git in this folder…*. Outside working trees, only `init` and
+  `clone` are run: the directory of a bare repository has no `.git`
+  entry, but Git would use its configuration. Every other command gets
+  `--git-dir=<root>/.git --work-tree=<root>` for the root found by
+  `git-root` (`git-pinned`), so that Git uses exactly the repository
+  whose trust was checked, and not one it would find by itself (through
+  a symbolic link to a directory of another repository, or `GIT_DIR`).
 * The first call sets `GIT_TERMINAL_PROMPT=0` and `GIT_OPTIONAL_LOCKS=0` in
   TeXmacs's own environment (`system-setenv`), so git never waits for a
   password on a terminal that isn't there.
 * The last 50 commands are kept as `(time root-string args result)` in
-  `git-command-history` and shown on the "Git output" page.
+  `git-history` (returned by `git-command-history`) and shown on the "Git
+  output" page.
 * `git-root u` walks up the directories looking for a `.git` **entry**,
   which can be a file (worktrees, submodules) or a directory. It never starts
   a process.
@@ -155,10 +162,17 @@ pull and stash.
 has a sync bar and the tabs Changes (with a commit box), History and
 Branches (see git-features.md, section 1b).
 
-Only the parts that depend on the state of the working tree (the sync
-bar, the lists, the History and Branches tabs) are `refreshable
-"git-tool"`; `git-refresh` calls `(refresh-now "git-tool")`. The commit
-box is **not** refreshed. Rebuilding the `texmacs-input` of its message
+Side tools are converted to markup, and TeXmacs rebuilds them whenever the
+menus are updated (after each change of the document, and when the window
+shows another document) **and** the expansion of the menu has changed;
+`refreshable` and `refresh-now` have no effect on them. Since the panel is
+expanded after each keystroke, it only reads cached information: the
+status, the history of the document and the branches come from `git-memo`
+(cleared by `git-invalidate`, at most 30 s old, for changes made outside
+TeXmacs), so that typing runs no Git command. After a Git action or a save,
+`git-refresh` invalidates the caches and calls `git-update-tools`, which
+updates the menus, so that the panel shows the new state. The commit
+box is **not** rebuilt. Rebuilding the `texmacs-input` of its message
 while the user types would destroy an editor with pending updates (a
 crash), and would lose the message. Its aux buffer
 `tmfs://aux/git-panel-<n>` is created per window. When the window switches
@@ -176,7 +190,8 @@ evaluated eagerly, so the git layer accepts `#f` roots.
 `texmacs-input` for the message (aux buffer `tmfs://aux/git-commit-<n>`,
 converted with `cpp-texmacs->verbatim ... "utf-8"`), a `choices` list with
 every changed file, and an "Amend" toggle. The files that start out
-selected are the ones with staged changes. When you commit:
+selected are the ones with staged changes, or all changed tracked files
+when nothing is staged (`initially-selected`). When you commit:
 
 * a selected file without staged changes is staged entirely;
 * a selected file with staged changes is committed with exactly its staged
@@ -378,7 +393,8 @@ the TeXmacs windows, so snapshots must be taken from inside.
 * A focus crash showed that two dialogs must never share an aux buffer:
   each commit dialog gets its own `tmfs://aux/git-commit-<n>`.
 * The panel follows the current document (TeXmacs rebuilds side tools
-  when the buffer changes), and is refreshed after git actions and saves,
-  through the `version-notify-saved` hook called by `save-buffer-post` in
-  `tm-files.scm`. Its look has not been checked visually, since
+  when the buffer changes), and is updated after git actions and saves
+  (`git-update-tools`; saves go through the `version-notify-saved` hook
+  called by `save-buffer-post` in `tm-files.scm`). The offscreen test
+  checks both, and that typing runs no Git command. Its look has not been checked visually, since
   the tests run offscreen.

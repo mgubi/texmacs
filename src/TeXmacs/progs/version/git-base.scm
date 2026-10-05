@@ -49,6 +49,21 @@
              (reverse (cons (substring s start (string-length s)) acc)))
             (else (reverse acc))))))
 
+(tm-define (git-utf8-prefix s n)
+  (:synopsis "The first @n bytes of the utf8 string @s, without cutting")
+  ;; NOTE: a character is not cut, whence the result may be shorter
+  (if (<= (string-length s) n) s
+      (let loop ((i n))
+        (if (and (> i 0)
+                 (== (logand (char->integer (string-ref s i)) #xc0) #x80))
+            (loop (- i 1))
+            (substring s 0 i)))))
+
+(tm-define (git-utf8-shorten s n)
+  (:synopsis "The utf8 string @s, shortened with ... to at most @n bytes")
+  (if (<= (string-length s) n) s
+      (string-append (git-utf8-prefix s (- n 3)) "...")))
+
 (define (git-chomp s)
   (if (string-ends? s "\n") (git-chomp (string-drop-right s 1)) s))
 
@@ -96,6 +111,20 @@
     ;; Do not take the index lock merely for displaying the status
     (system-setenv "GIT_OPTIONAL_LOCKS" "0")))
 
+(define (git-rootless? args)
+  ;; the commands which may run outside a working tree
+  (and (pair? args) (in? (car args) '("init" "clone"))))
+
+(define (git-pinned root args)
+  ;; NOTE: Git finds the repository by itself, which may not be the one
+  ;; whose trust was checked (a bare repository has no .git entry, a
+  ;; symbolic link may lead to another repository, GIT_DIR may be set), so
+  ;; that the repository and the working tree are given explicitly
+  (with r (and (not (git-rootless? args)) (git-root root))
+    (if (not r) '()
+        (list (string-append "--git-dir=" (url->system (url-append r ".git")))
+              (string-append "--work-tree=" (url->system r))))))
+
 (tm-define (git-arguments root args)
   ;; NOTE: the messages of Git are in English (LC_ALL=C), since some are
   ;; analyzed; this is not done on Windows, which has no env command
@@ -105,9 +134,10 @@
                 "-c" "core.quotepath=off"
                 "-c" "color.ui=false"
                 ;; never run the file system monitor of a repository
-                "-c" "core.fsmonitor=false"
-                ;; file names are never patterns
-                "--literal-pathspecs")
+                "-c" "core.fsmonitor=false")
+          (git-pinned root args)
+          ;; file names are never patterns
+          (list "--literal-pathspecs")
           args))
 
 (define (git-remember root args ret)
@@ -156,15 +186,26 @@
   (:synopsis "Run Git with @args in @root, sending @input to its stdin")
   ;; NOTE: widgets evaluate their contents eagerly, so that root may be #f
   (if (not root)
-      (list -1 "" "not in a Git working tree")
+      no-root-result
       (git-run-in root input args)))
 
 (define untrusted-result
   (list -1 "" "This repository is not trusted: use Version -> Use Git in this folder"))
 
+(define no-root-result
+  (list -1 "" "not in a Git working tree"))
+
+(define (git-refusal root args)
+  ;; #f if Git may be run with @args in @root, otherwise the result
+  ;; NOTE: outside working trees, only init and clone are run (in the
+  ;; directory of a bare repository, Git would use its configuration)
+  (cond ((git-rootless? args) (and (not (git-trusted? root)) untrusted-result))
+        ((not (git-root root)) no-root-result)
+        ((not (git-trusted? root)) untrusted-result)
+        (else #f)))
+
 (define (git-run-in root input args)
-  (if (not (git-trusted? root))
-      untrusted-result
+  (or (git-refusal root args)
       (git-run-trusted root input args)))
 
 (define (git-run-trusted root input args)
@@ -199,8 +240,8 @@
                  (ahash-remove! git-busy-table key)
                  (git-remember root args r)
                  (cont r))))
-    (cond ((not (git-trusted? root))
-           (cont untrusted-result))
+    (cond ((git-refusal root args)
+           (cont (git-refusal root args)))
           ((ahash-ref git-busy-table key)
            (cont (list -1 "" "Another Git command is still running")))
           ((not (spawn-supported?))
@@ -365,12 +406,35 @@
 
 (define git-remotes-table (make-ahash-table))
 
+;; Other information which is expensive to compute (the history of a file,
+;; the branches) is kept until the working tree changes, for at most
+;; git-memo-delay milliseconds (for the changes made outside TeXmacs)
+
+(define git-memo-table (make-ahash-table))
+(define git-memo-delay 30000)
+
+(tm-define (git-memo root key thunk)
+  (:synopsis "The value of @thunk for @root and @key, computed once")
+  (let* ((k (and root (list (url->system root) key)))
+         (old (and k (ahash-ref git-memo-table k))))
+    (cond ((not k) (thunk))
+          ((and old (< (- (texmacs-time) (car old)) git-memo-delay))
+           (cdr old))
+          (else
+            (with v (thunk)
+              (ahash-set! git-memo-table k (cons (texmacs-time) v))
+              v)))))
+
 (tm-define (git-invalidate root)
   (:synopsis "Forget cached information about the working tree @root")
   (when root
-    (ahash-remove! git-status-table (url->system root))
-    (ahash-remove! git-tracked-table (url->system root))
-    (ahash-remove! git-remotes-table (url->system root))))
+    (with key (url->system root)
+      (ahash-remove! git-status-table key)
+      (ahash-remove! git-tracked-table key)
+      (ahash-remove! git-remotes-table key)
+      (for (k (map car (ahash-table->list git-memo-table)))
+        (when (== (car k) key)
+          (ahash-remove! git-memo-table k))))))
 
 (tm-define (git-status root)
   (:synopsis "Status of the working tree @root (or #f)")

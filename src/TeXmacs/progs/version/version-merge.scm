@@ -159,7 +159,18 @@
   (and (pair? o) (pair? a) (pair? b)
        (== (car o) (car a)) (== (car o) (car b))
        (== (length o) (length a)) (== (length o) (length b))
-       (nin? (car o) '(graphics table tformat))))
+       (nin? (car o) '(graphics))))
+
+(define (merge-tformat o a b)
+  ;; Tables are merged cell by cell; the formatting is taken from the side
+  ;; which changed it, and is never merged (version markup would break it)
+  (let* ((fo (cDr (cdr o)))
+         (fa (cDr (cdr a)))
+         (fb (cDr (cdr b)))
+         (f (cond ((== fa fb) fa) ((== fo fa) fb) ((== fo fb) fa) (else #f))))
+    (if (not f)
+        (compare-versions a b)
+        `(tformat ,@f ,(merge-versions (cAr o) (cAr a) (cAr b))))))
 
 (tm-define (merge-versions o a b)
   (:synopsis "Three way merge of @a and @b with common ancestor @o")
@@ -176,6 +187,8 @@
                                              (cdr (as-concat o))
                                              (cdr (as-concat a))
                                              (cdr (as-concat b))))))
+        ((and (tm-is? o 'tformat) (tm-is? a 'tformat) (tm-is? b 'tformat))
+         (merge-tformat o a b))
         ((same-shape? o a b)
          (cons (car o) (map merge-versions (cdr o) (cdr a) (cdr b))))
         (else (compare-versions a b))))

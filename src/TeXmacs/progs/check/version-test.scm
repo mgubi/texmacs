@@ -781,7 +781,13 @@
   (check-group "git")
   (if (not (git-available?))
       (display* "  git is not available, the group is skipped\n")
-      (run-group test-git-sub)))
+      ;; the configuration of the user is ignored (see git-test.scm), and
+      ;; the trusted repositories are put back
+      (let* ((key "git trusted repositories")
+             (old (and (cpp-has-preference? key) (get-preference key))))
+        (check-isolate-git)
+        (run-group test-git-sub)
+        (if old (set-preference key old) (reset-preference key)))))
 
 ;; The suite "git" (git-test.scm) checks the Git support itself; this group
 ;; checks that version-tmfs.scm dispatches the version-* interface to it.

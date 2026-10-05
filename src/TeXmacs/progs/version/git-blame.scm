@@ -114,7 +114,8 @@
      ,(if (not c)
           "Not committed yet"
           `(concat (hlink ,(string-take (git-commit-hash c) 7)
-                          ,(tmfs-url-commit root (git-commit-hash c)))
+                          ,(git-link-target
+                            (tmfs-url-commit root (git-commit-hash c))))
                    " " (strong ,(utf8->cork (git-commit-author c)))
                    ", " ,(git-commit-date c)
                    ,(if earlier? " or earlier" "")

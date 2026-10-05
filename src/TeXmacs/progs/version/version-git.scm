@@ -38,8 +38,7 @@
   (if (>= (string-length rev) 40) (string-take rev 7) rev))
 
 (tm-define (git-short-message msg)
-  (if (<= (string-length msg) 50) msg
-      (string-append (substring msg 0 47) "...")))
+  (git-utf8-shorten msg 50))
 
 (tm-define (git-texmacs-file? u)
   (in? (url-suffix u) '("tm" "ts" "tp" "stm" "tmml")))
@@ -108,7 +107,14 @@
   (for (u (buffer-list))
     (when (and (git-page? u root) (nnull? (buffer->windows u)))
       (git-reload-buffer u)))
-  (refresh-now "git-tool"))
+  (git-update-tools))
+
+(tm-define (git-update-tools)
+  (:synopsis "Show the new state of the working trees in the Git panel")
+  ;; NOTE: the side tools are markup, which refreshables do not refresh:
+  ;; they are rebuilt when the menus are updated
+  (refresh-now "git-tool")
+  (delayed (when (current-buffer) (update-menus))))
 
 (define (file-contents u)
   (if (url-exists? u) (string-load u) ""))
@@ -125,7 +131,7 @@
       (when (and (url-exists? u) (!= (file-contents u) old))
         (if (buffer-modified? u)
             (set-message `(concat "Modified on disk: "
-                                  (verbatim ,(url->system u)))
+                                  (verbatim ,(utf8->cork (url->system u))))
                          "Git")
             (git-reload-buffer u)))))
   (git-refresh root))
@@ -137,6 +143,21 @@
     (git-reload root watch)
     ret))
 
+(tm-define (git-save-buffer u)
+  (:synopsis "Save the buffer @u; return #f (with a message) on failure")
+  ;; NOTE: buffer-save returns #t on an error, and marks the buffer as
+  ;; saved only on success, so that unsaved edits are never forgotten
+  (or (not (buffer-save u))
+      (begin
+        (set-message `(concat "Could not save "
+                              (verbatim ,(url->system (url-tail u))))
+                     "Git")
+        #f)))
+
+(tm-define (git-save-buffers l)
+  (:synopsis "Save the buffers @l; return #f if one could not be saved")
+  (list-and (map git-save-buffer l)))
+
 (tm-define (git-when-saved root cont)
   (:synopsis "Execute @cont after asking to save the modified documents")
   (with l (git-modified-buffers root)
@@ -145,8 +166,7 @@
         (user-confirm "Save the modified documents in this repository first?"
                       #t
           (lambda (answ)
-            (when answ
-              (for-each (lambda (u) (buffer-save u) (buffer-pretend-saved u)) l)
+            (when (and answ (git-save-buffers l))
               (cont)))))))
 
 (tm-define (git-report ret what)
@@ -283,10 +303,10 @@
           ((== (tm-string-trim-both msg) "") (cons #f "Empty commit message"))
           ((git-merging? root)
            (cons #f "A merge is in progress; commit the whole working tree"))
+          ((and (buffer-exists? name) (buffer-modified? name)
+                (not (git-save-buffer name)))
+           (cons #f "The document could not be saved"))
           (else
-            (when (and (buffer-exists? name) (buffer-modified? name))
-              (buffer-save name)
-              (buffer-pretend-saved name))
             (git-invalidate root)
             (with path (git-relative root name)
               (when (== (git-file-state name) 'untracked)
@@ -307,7 +327,7 @@
 (tm-define (git-stage name)
   (:synopsis "Stage the changes of the file @name")
   (if (git-large-file? name)
-      (user-confirm (string-append (url->system (url-tail name))
+      (user-confirm (string-append (utf8->cork (url->system (url-tail name)))
                                    " is large; versioning it makes the "
                                    "repository big and slow. Stage anyway?")
                     #f
@@ -407,11 +427,9 @@
                          "Resolve conflict")))))
 
 (tm-define (git-mark-resolved-now name)
-  (when (buffer-exists? name)
-    (buffer-save name)
-    (buffer-pretend-saved name))
-  (git-stage name)
-  (refresh-now "version-review"))
+  (when (or (not (buffer-exists? name)) (git-save-buffer name))
+    (git-stage name)
+    (refresh-now "version-review")))
 
 (tm-define (git-mark-resolved name)
   (:synopsis "Save @name and mark its merge conflict as resolved")
@@ -451,8 +469,10 @@
         ((and (buffer-exists? name) (buffer-modified? name))
          (set-message "Please save or revert the document first" "Restore"))
         (else
-          (user-confirm (string-append "Replace the current version by the "
-                                       "version " (short-hash rev) "?"
+          (user-confirm (string-append "Replace "
+                                       (utf8->cork (url->system
+                                                    (url-tail name)))
+                                       " by its version " (short-hash rev) "?"
                                        (if (in? (git-file-state name)
                                                 '(modified partial))
                                            (string-append
@@ -487,7 +507,8 @@
     (with hash (and root (git-rev-parse root (string-append rev "^{commit}")))
       (if hash
           (git-compare-with name hash)
-          (set-message (string-append "Unknown revision " rev) "Compare")))))
+          (set-message (string-append "Unknown revision " (utf8->cork rev))
+                       "Compare")))))
 
 (tm-define (git-compare-with name rev)
   (:synopsis "Compare the document @name with its revision @rev")
@@ -545,14 +566,15 @@
   (:synopsis "Create a new branch @branch at HEAD and switch to it")
   ;; With the optional argument #f, the new branch is not checked out
   (cond ((not (git-safe-name? branch)) (bad-name "branch name"))
-        ((and (nnull? opt-switch) (not (car opt-switch)))
-         (git-report (git-run root "branch" branch)
-                     (string-append "Created branch " branch))
-         (git-refresh root))
         (else
-          (git-report (git-run root "checkout" "--quiet" "-b" branch)
-                      (string-append "Created branch " branch))
-          (git-refresh root))))
+          ;; Returns #t on success
+          (with ok? (git-report
+                     (if (and (nnull? opt-switch) (not (car opt-switch)))
+                         (git-run root "branch" branch)
+                         (git-run root "checkout" "--quiet" "-b" branch))
+                     (string-append "Created branch " branch))
+            (git-refresh root)
+            ok?))))
 
 (tm-define (git-valid-branch-name? root name)
   (and (git-safe-name? name)
@@ -566,7 +588,7 @@
 (tm-define (git-delete-branch root branch)
   (if (not (git-safe-name? branch))
       (bad-name "branch name")
-      (user-confirm (string-append "Delete branch " branch "?") #f
+      (user-confirm (string-append "Delete branch " (utf8->cork branch) "?") #f
         (lambda (answ)
           (when answ
             (git-report (git-run root "branch" "--delete" branch)
@@ -588,15 +610,17 @@
   ;; The message @msg is in the utf8 encoding
   (if (not (git-safe-name? tag))
       (bad-name "tag name")
-      (begin
-        (git-report (cond ((if (null? opt-sign) (git-signing?) (car opt-sign))
-                           (git-run-with-input root (if (== msg "") tag msg)
-                                               "tag" "--sign" "--file=-" tag))
-                          ((== msg "") (git-run root "tag" tag))
-                          (else (git-run-with-input root msg "tag" "--annotate"
-                                                    "--file=-" tag)))
-                    (string-append "Created tag " tag))
-        (git-refresh root))))
+      ;; Returns #t on success
+      (with ok? (git-report
+                 (cond ((if (null? opt-sign) (git-signing?) (car opt-sign))
+                        (git-run-with-input root (if (== msg "") tag msg)
+                                            "tag" "--sign" "--file=-" tag))
+                       ((== msg "") (git-run root "tag" tag))
+                       (else (git-run-with-input root msg "tag" "--annotate"
+                                                 "--file=-" tag)))
+                 (string-append "Created tag " tag))
+        (git-refresh root)
+        ok?)))
 
 (tm-define (git-stash root)
   (git-when-saved root
@@ -662,7 +686,7 @@
               (git-report ret what))
             (git-reload root watch)
             (when done (done ret))))
-        (refresh-now "git-tool"))))
+        (git-update-tools))))
 
 (tm-define (git-fetch root . opt-done)
   (git-remote root "Fetch" (list "fetch" "--all" "--prune")
@@ -736,15 +760,17 @@
   (:synopsis "Add the remote repository @url under the name @name")
   (if (not (and (git-safe-name? name) (git-safe-name? url)))
       (bad-name "remote")
-      (begin
-        (git-report (git-run root "remote" "add" name url)
-                    (string-append "Added remote " name))
-        (git-refresh root))))
+      ;; Returns #t on success
+      (with ok? (git-report (git-run root "remote" "add" name url)
+                            (string-append "Added remote " name))
+        (git-refresh root)
+        ok?)))
 
 (tm-define (git-remove-remote root name)
   (if (not (git-safe-name? name))
       (bad-name "remote")
-      (user-confirm (string-append "Remove the remote " name "?") #f
+      (user-confirm (string-append "Remove the remote " (utf8->cork name) "?")
+                    #f
         (lambda (answ)
           (when answ
             (git-report (git-run root "remote" "remove" name)
@@ -757,12 +783,14 @@
          (parent (url-head dest))
          (done (and (nnull? opt-done) (car opt-done))))
     (cond ((url-exists? dest)
-           (set-message (string-append dir " already exists") "Clone"))
+           (set-message (string-append (utf8->cork dir) " already exists")
+                        "Clone"))
           ((not (url-directory? parent))
-           (set-message (string-append (url->system parent)
+           (set-message (string-append (utf8->cork (url->system parent))
                                        " is not a directory") "Clone"))
           (else
-            (set-message (string-append "Cloning " repository "...") "Git")
+            (set-message (string-append "Cloning " (utf8->cork repository)
+                                        "...") "Git")
             (git-run-async parent
                            (list "clone" "--" repository
                                  (url->system (url-tail dest)))
@@ -835,6 +863,11 @@
   (when (page-context? root-s)
     (git-stage-all (string-root root-s))))
 
+(tm-define (git-page-snapshot root-s)
+  (:secure #t)
+  (when (page-context? root-s)
+    (git-interactive-save-snapshot (string-root root-s))))
+
 (tm-define (git-page-commit root-s)
   (:secure #t)
   (when (page-context? root-s)
@@ -887,6 +920,11 @@
 ;; Git pages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (git-link-target s)
+  (:synopsis "The target @s (in utf8) of a link on a Git page")
+  ;; NOTE: links are followed after converting their targets from cork
+  (utf8->cork s))
+
 (tm-define (tmfs-url-git root which)
   (string-append "tmfs://git/" which "/" (url->tmfs-string root)))
 
@@ -935,7 +973,7 @@
   (with r (root-string root)
     `(concat (with "font-size" "0.84"
              (concat ,(git-action "Status" "git-page-show" r "status") " "
-             ,(git-action "Log" "git-page-show" r "log") " "
+             ,(git-action "History" "git-page-show" r "log") " "
              ,(git-action "Graph" "git-page-show" r "graph") " "
              ,(git-action "Branches" "git-page-show" r "branches") " "
              ,(git-action "Output" "git-page-show" r "output") " "
@@ -972,28 +1010,39 @@
   (let* ((path (git-entry-path e))
          (u (git-absolute root path)))
     (if (url-exists? u)
-        ($link (url->unix u) ($verbatim (utf8->cork path)))
+        ($link (git-link-target (url->unix u))
+          ($verbatim (utf8->cork path)))
         ($verbatim (utf8->cork path)))))
 
 (define (status-row root e which)
   (let* ((r (root-string root))
          (path (git-entry-path e))
          (u (git-absolute root path))
-         (code (if (== which 'staged) (git-entry-index e) (git-entry-worktree e)))
-         (kind (cond ((== which 'untracked) "new")
+         (new? (or (== which 'untracked)
+                   (and (== which 'simple) (git-entry-untracked? e))))
+         (code (cond ((== which 'staged) (git-entry-index e))
+                     ((and (== which 'simple) (not new?)
+                           (== (git-entry-worktree e) #\.))
+                      (git-entry-index e))
+                     (else (git-entry-worktree e))))
+         (kind (cond (new? "new")
                      ((== which 'conflict) "conflict")
                      ((== which 'staged) "staged")
                      (else "changed")))
-         (desc (cond ((== which 'untracked) "new file")
+         (desc (cond (new? "new file")
                      ((== which 'conflict) "conflict")
                      (else (status-code code))))
          (cmp? (and (git-texmacs-file? u) (url-exists? u)
-                    (nin? which '(untracked conflict)) (!= code #\A)))
+                    (not new?) (nin? which '(conflict)) (!= code #\A)))
          (acts (append
                 (if cmp? (list (git-action "compare" "git-page-compare"
                                            r path "HEAD"))
                     '())
-                (cond ((== which 'staged)
+                (cond ((== which 'simple)
+                       (if (git-entry-untracked? e) '()
+                           (list (git-action "discard" "git-page-discard"
+                                             r path))))
+                      ((== which 'staged)
                        (list (git-action "unstage" "git-page-unstage" r path)))
                       ((== which 'conflict)
                        (append
@@ -1001,7 +1050,7 @@
                             (list (git-action "resolve" "git-page-resolve"
                                               r path))
                             '())
-                        (list (git-action "mark resolved"
+                        (list (git-action "mark as resolved"
                                           "git-page-mark-resolved" r path))))
                       ((== which 'untracked)
                        (list (git-action "add" "git-page-stage" r path)))
@@ -1041,8 +1090,9 @@
          (oid (git-status-ref st 'oid)))
     `(concat "On branch " (strong ,(utf8->cork (or head "?")))
              ,(if (and oid (!= oid "(initial)"))
-                  `(concat " at " ,($link (tmfs-url-commit root oid)
-                                     (short-hash oid)))
+                  `(concat " at "
+                           ,($link (git-link-target (tmfs-url-commit root oid))
+                              (short-hash oid)))
                   " (no commits yet)")
              ,(if up
                   `(concat ", tracking " ,(utf8->cork up)
@@ -1059,7 +1109,9 @@
          (conflicts (list-filter l git-entry-conflicted?))
          (staged (list-filter l git-entry-staged?))
          (unstaged (list-filter l git-entry-unstaged?))
-         (untracked (list-filter l git-entry-untracked?)))
+         (untracked (list-filter l git-entry-untracked?))
+         ;; NOTE: git-project.scm, which defines the mode, may not be loaded
+         (simple? (== (get-preference "git simple mode") "on")))
     (if (not st)
         (git-page root "Git status"
                   (if (git-trusted? root)
@@ -1072,8 +1124,13 @@
                 (list root "Git status"
                       (status-branch root st)
                       `(concat
-                        ,(git-action "Commit..." "git-page-commit" r) " "
-                        ,(git-action "Stage all" "git-page-stage-all" r) " "
+                        ,@(if simple?
+                              (list (git-action "Save snapshot..."
+                                                "git-page-snapshot" r) " ")
+                              (list (git-action "Commit..." "git-page-commit" r)
+                                    " "
+                                    (git-action "Stage all"
+                                                "git-page-stage-all" r) " "))
                         ,(git-action "Fetch" "git-page-remote" r "fetch") " "
                         ,(git-action "Get changes" "git-page-remote" r "pull")
                         " "
@@ -1088,11 +1145,17 @@
                                                  "git-page-add-remote" r))))
                     '())
                 (status-section root "Conflicts" conflicts 'conflict)
-                (status-section root "Changes to be committed" staged 'staged)
-                (status-section root "Changes not staged for commit"
-                                unstaged 'unstaged)
-                (status-section root "Untracked files" untracked
-                                'untracked))))))
+                (if simple?
+                    (status-section root "Changes"
+                                    (list-filter l (non git-entry-conflicted?))
+                                    'simple)
+                    (append
+                     (status-section root "Changes to be committed"
+                                     staged 'staged)
+                     (status-section root "Changes not staged for commit"
+                                     unstaged 'unstaged)
+                     (status-section root "Untracked files" untracked
+                                     'untracked))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Log page
@@ -1101,7 +1164,8 @@
 (define (log-item root c)
   (describe-item
    `(concat "Commit " (hlink ,(short-hash (git-commit-hash c))
-                             ,(tmfs-url-commit root (git-commit-hash c)))
+                             ,(git-link-target
+                               (tmfs-url-commit root (git-commit-hash c))))
             " by " ,(utf8->cork (git-commit-author c))
             " on " ,(git-commit-date c))
    (utf8->cork (git-commit-subject c))))
@@ -1110,7 +1174,7 @@
   (let* ((n (git-log-length))
          (h (git-log root skip n))
          (r (root-string root)))
-    (git-page root "Git log"
+    (git-page root "Git history"
       (if (null? h)
           "No commits."
           `(description-long
@@ -1148,7 +1212,8 @@
         (let* ((hash (first c))
                (refs (if (>= (length c) 6) (sixth c) "")))
           `(concat ,(graph-prefix prefix)
-                   (hlink ,(short-hash hash) ,(tmfs-url-commit root hash))
+                   (hlink ,(short-hash hash)
+                          ,(git-link-target (tmfs-url-commit root hash)))
                    " "
                    ,(if (== refs "") ""
                         `(concat (strong ,(utf8->cork (string-append
@@ -1281,8 +1346,9 @@
          (u (git-absolute root path))
          (r (root-string root))
          (name ($verbatim (utf8->cork path)))
-         (link ($link (version-revision-url
-                       u (string-append rev ":" (url->tmfs-string u)))
+         (link ($link (git-link-target
+                       (version-revision-url
+                        u (string-append rev ":" (url->tmfs-string u))))
                  name)))
     `(row (cell ,(if (and added removed) link name))
           (cell ,(if (and added removed)
@@ -1319,8 +1385,10 @@
           `(concat ,(if (<= (length parents) 1) "Parent: " "Parents: ")
                    ,@(if (null? parents) (list "none")
                          (list-intersperse
-                          (map (lambda (p) ($link (tmfs-url-commit root p)
-                                             (short-hash p)))
+                          (map (lambda (p)
+                                 ($link (git-link-target
+                                         (tmfs-url-commit root p))
+                                   (short-hash p)))
                                parents)
                           ", ")))
           (verbatim-lines (git-commit-message root rev))

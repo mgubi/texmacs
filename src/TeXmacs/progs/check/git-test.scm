@@ -24,9 +24,10 @@
 ;;
 ;; The repositories are made in git-test in the temporary directory, with
 ;; their identity in their own configuration; the global and system
-;; configurations of Git are ignored (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM),
-;; so that the settings of the user (commit.gpgsign, hooks...) do not matter.
-;; The preferences which the suite changes are put back at the end.
+;; configurations of Git are ignored (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM,
+;; with Git 2.32 or newer), so that the settings of the user
+;; (commit.gpgsign, hooks...) do not matter. The preferences which the
+;; suite changes are put back at the end.
 ;; The asynchronous commands (fetch, pull, push, clone) need the event loop,
 ;; and are checked by doc/tests/git-gui-test.scm instead.
 
@@ -37,7 +38,9 @@
         (version version-merge)
         (version git-drivers)
         (version git-blame)
-        (version git-project)))
+        (version git-project)
+        (version version-menu)
+        (version version-kbd)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -83,12 +86,18 @@
     "git large file size" "git sign" "git log length" "git executable"))
 
 (define (save-preferences)
+  ;; #f for a preference which has no value of its own (the default)
   (set! saved-preferences
-        (map (lambda (p) (cons p (get-preference p))) test-preferences)))
+        (map (lambda (p) (cons p (and (cpp-has-preference? p)
+                                      (get-preference p))))
+             test-preferences)))
 
 (define (restore-preferences)
   (for (x saved-preferences)
-    (set-preference (car x) (cdr x))))
+    (if (cdr x)
+        (set-preference (car x) (cdr x))
+        (reset-preference (car x)))))
+
 
 ;; The main repository, with a space in its name and in a subdirectory
 (define R #f)
@@ -98,9 +107,7 @@
 (define (setup)
   (shell "rm -rf '" T "'")
   (system-mkdir (system->url T))
-  ;; the configuration of the user is not used
-  (system-setenv "GIT_CONFIG_GLOBAL" "/dev/null")
-  (system-setenv "GIT_CONFIG_NOSYSTEM" "1")
+  (check-isolate-git)
   (make-repo (path "repo test"))
   (system-mkdir (dir "repo test/sub dir"))
   (string-save (tm "Hello world.") (dir "repo test/sub dir/a b.tm"))
@@ -206,6 +213,10 @@
   (sh (path "evil") "git config core.fsmonitor \"touch '"
       (path "evil-pwned") "'; false\"")
   (with E (dir "evil")
+    ;; the program does run when Git is called without precautions
+    (shell "cd '" (path "evil") "' && git status > /dev/null 2>&1")
+    (check-true (url-exists? (dir "evil-pwned")))
+    (system-remove (dir "evil-pwned"))
     (check-false (git-trusted? E))
     (check-false (git-status E))
     (check-true (git-status-known? E))
@@ -248,6 +259,71 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; States of files, staging and commits
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Git must use the repository whose trust was checked, which may not be
+;; the one it would find by itself (audit 2, A1)
+(define (marker-program name)
+  ;; a program which leaves the file @name in the scratch directory
+  (with f (path name ".sh")
+    (string-save (string-append "#!/bin/sh\ntouch '" (path name) "'\nexit 1\n")
+                 (system->url f))
+    (shell "chmod +x '" f "'")
+    f))
+
+(define (test-pinning)
+  (check-group "pinning")
+  ;; a bare repository with a signed commit, whose configuration names a
+  ;; program for checking signatures
+  (string-save fake-gpg (dir "fake-gpg"))
+  (shell "chmod +x '" (path "fake-gpg") "'")
+  (make-repo (path "signed"))
+  (sh (path "signed") "echo a > a.txt && git add a.txt"
+      " && git -c gpg.program='" (path "fake-gpg") "'"
+      " -c user.signingkey=test commit -q -S -m signed"
+      " && cd .. && git clone -q --bare signed bare.git"
+      " && git -C bare.git config gpg.program '" (marker-program "bare-ran")
+      "'")
+  (let* ((B (dir "bare.git"))
+         (brev (string-drop-right (sh (path "signed") "git rev-parse HEAD") 1))
+         (doc (dir "includes.tm")))
+    (check-false (git-root B))
+    (check= (git-run B "log") (list -1 "" "not in a Git working tree"))
+    (check-false (git-signature B brev))
+    (check-false (url-exists? (dir "bare-ran")))
+    (tmfs-load (tmfs-url-commit B brev))
+    (check-false (url-exists? (dir "bare-ran")))
+    ;; a document which includes the page of the commit
+    (string-save (tm (string-append "<include|" (tmfs-url-commit B brev) ">"))
+                 doc)
+    (load-buffer doc)
+    (update-forced)
+    (buffer-pretend-saved doc)
+    (buffer-close doc)
+    (check-false (url-exists? (dir "bare-ran")))
+    ;; the same signature check runs in a trusted repository
+    (git-trust (dir "signed"))
+    (git-run (dir "signed") "config" "gpg.program" (marker-program "signed-ran"))
+    (check-false (git-signature (dir "signed") brev))
+    (check-true (url-exists? (dir "signed-ran")))
+    ;; a symbolic link from a trusted working tree into a directory of an
+    ;; untrusted one (a link to its root has a .git entry, and is not
+    ;; trusted)
+    (shell "git clone -q '" (path "signed") "' '" (path "untrusted2") "'")
+    (sh (path "untrusted2") "mkdir sub && git config gpg.program '"
+        (marker-program "link-ran") "'")
+    (shell "ln -s '" (path "untrusted2/sub") "' '" (path "repo test/lnk") "'")
+    (with L (dir "repo test/lnk")
+      (check= (git-root L) R)
+      (check-false (git-signature L brev))
+      ;; Git uses the trusted repository, never the one of the link
+      (check= (git-rev-parse L "HEAD") (git-rev-parse R "HEAD"))
+      (check-false (url-exists? (dir "link-ran"))))
+    (shell "rm '" (path "repo test/lnk") "'")
+    (git-invalidate R)
+    ;; init and clone still run outside working trees
+    (check-true (git-ok? (git-run (dir "") "clone" "--quiet" "--"
+                                  (path "bare.git") (path "cloned"))))
+    (check-true (url-exists? (dir "cloned/a.txt")))))
 
 (define (test-states)
   (check-group "states")
@@ -628,7 +704,19 @@
     (check= (document-body (document-set-body doc '(document "B.")))
             '(document "B."))
     (check-false (document-body '(document "A.")))
-    (check-false (document-body "A."))))
+    (check-false (document-body "A.")))
+  ;; tables are merged cell by cell (audit 2, B7)
+  (let* ((tab (lambda (c1 c2 . opt)
+                `(document (tabular (tformat ,@opt (table (row (cell ,c1)
+                                                               (cell ,c2))))))))
+         (bold '(cwith "1" "1" "1" "1" "cell-background" "pastel red")))
+    (check-merge (tab "1" "2") (tab "1x" "2") (tab "1" "2y") (tab "1x" "2y") 0)
+    (check-merge (tab "1" "2") (tab "1x" "2") (tab "1y" "2") #f 1)
+    (check-merge (tab "1" "2") (tab "1" "2" bold) (tab "1" "2y")
+                 (tab "1" "2y" bold) 0)
+    (check-merge (tab "1" "2" bold) (tab "1" "2")
+                 (tab "1" "2" '(cwith "1" "1" "1" "1" "cell-background" "blue"))
+                 #f 1)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Merge driver
@@ -693,6 +781,34 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Safety: names which could be taken for options, quoting
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-unsaved)
+  ;; a document which cannot be saved is never marked as saved (audit 2, A2)
+  (check-group "unsaved")
+  (with f (file "ro.tm")
+    (string-save (tm "Original.") f)
+    (git-stage f)
+    (git-commit-staged R "ro")
+    (load-buffer f)
+    (buffer-set-body f (stree->tree '(document "Precious edits.")))
+    (buffer-pretend-modified f)
+    (check-true (buffer-modified? f))
+    (shell "chmod 444 '" (url->system f) "'")
+    (check-false (git-save-buffer f))
+    (check-true (buffer-modified? f))
+    (check= (git-commit-file* f "edits") '(#f . "The document could not be saved"))
+    (check-true (buffer-modified? f))
+    (git-mark-resolved-now f)
+    (check-true (buffer-modified? f))
+    (check= (git-file-state f) 'unmodified)
+    (check-true (string-contains? (string-load f) "Original."))
+    (shell "chmod 644 '" (url->system f) "'")
+    (check-true (git-save-buffer f))
+    (check-false (buffer-modified? f))
+    (check-true (string-contains? (string-load f) "Precious edits."))
+    (check= (car (git-commit-file* f "edits")) #t)
+    (check= (git-file-state f) 'unmodified)
+    (buffer-close f)))
 
 (define (test-safety)
   (check-group "safety")
@@ -960,6 +1076,101 @@
 ;; Robustness
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The strings in the expansion of the menu @m
+(define (menu-strings m)
+  (let loop ((x (menu-expand m)))
+    (cond ((string? x) (list x))
+          ((pair? x) (append-map loop x))
+          (else '()))))
+
+(define (with-document u thunk)
+  ;; Run @thunk with the document @u as the current buffer
+  (let ((old (current-buffer)))
+    (load-buffer u)
+    (switch-to-buffer* u)
+    (check-run thunk)
+    (when (and old (buffer-exists? old)) (switch-to-buffer* old))))
+
+(define (kbd-call name)
+  ;; Call the function @name of version-kbd.scm (a shortcut)
+  (eval (list name) (resolve-module '(version version-kbd))))
+
+(define (test-names)
+  ;; A repository and a document with accented names (audit 2, B10, B11)
+  (check-group "names")
+  (let* ((dname (cork->utf8 "d<#E9>p<#F4>t"))
+         (fname (cork->utf8 "r<#E9>sum<#E9>.tm"))
+         (d (dir dname))
+         (f (url-append d fname)))
+    (make-repo (path dname))
+    (string-save (tm "Accents.") f)
+    (git-trust d)
+    (check= (git-root f) d)
+    (check= (git-file-state f) 'untracked)
+    (git-stage f)
+    (git-commit-staged d (cork->utf8 "Caf<#E9>"))
+    (check= (git-file-state f) 'unmodified)
+    (check= (git-commit-subject (git-commit-info d "HEAD"))
+            (cork->utf8 "Caf<#E9>"))
+    (check= (map cadddr (version-history f)) (list (cork->utf8 "Caf<#E9>")))
+    (check-true (string-contains? (version-revision f "HEAD") "Accents."))
+    (string-save "x\n" (url-append d "new.txt"))
+    (git-invalidate d)
+    (check-true (string-contains? (tmfs-load (tmfs-url-git d "log"))
+                                  (utf8->cork (cork->utf8 "Caf<#E9>"))))
+    ;; links are followed after a conversion from cork
+    (with t (tmfs-url-commit d (git-rev-parse d "HEAD"))
+      (check= (cork->utf8 (git-link-target t)) t)
+      (check-true (string-contains? (tmfs-load (tmfs-url-git d "log"))
+                                    (git-link-target t))))
+    ;; NOTE: the history of git is in utf8, the texts shown in cork
+    (check= (version-history-text f (cork->utf8 "Caf<#E9>"))
+            (utf8->cork (cork->utf8 "Caf<#E9>")))
+    (check= (version-history-text f (cork->utf8 "<#E9><#E9><#E9>") 5)
+            (string-append (utf8->cork (cork->utf8 "<#E9>")) "..."))
+    (check= (git-utf8-prefix (cork->utf8 "a<#E9>") 2) "a")
+    (check= (git-utf8-prefix (cork->utf8 "a<#E9>") 3) (cork->utf8 "a<#E9>"))
+    (check= (git-utf8-shorten "abcdef" 5) "ab...")
+    (check= (git-utf8-shorten (cork->utf8 "<#E9><#E9><#E9>") 6)
+            (cork->utf8 "<#E9><#E9><#E9>"))
+    (check= (git-utf8-shorten (cork->utf8 "<#E9><#E9><#E9>") 5)
+            (string-append (cork->utf8 "<#E9>") "..."))
+    (check= (git-short-message "short") "short")))
+
+(define (test-shortcuts)
+  ;; The shortcuts make the checks of the menus (audit 2, B9)
+  (check-group "shortcuts")
+  (make-repo (path "kbd"))
+  (with f (dir "kbd/k.tm")
+    (string-save (tm "Kept.") f)
+    (sh (path "kbd") "git add k.tm && git commit -q -m k")
+    (with-document f
+      (lambda ()
+        (check-false (kbd-call 'shortcut-root))
+        (kbd-call 'shortcut-compare)
+        (check= (tree->stree (buffer-get-body f)) '(document "Kept."))
+        (git-trust (dir "kbd"))
+        (check= (kbd-call 'shortcut-root) (dir "kbd"))))
+    (buffer-close f))
+  (with-document (file "renamed.txt")
+    (lambda ()
+      (check-false (kbd-call 'shortcut-compare))))
+  (buffer-close (file "renamed.txt")))
+
+(define (test-new-repositories)
+  ;; A repository created outside TeXmacs is noticed (audit 2, B12)
+  (check-group "new repositories")
+  (system-mkdir (dir "later"))
+  (with f (dir "later/x.tm")
+    (string-save (tm "x") f)
+    (check-false (versioning-directory f))
+    (make-repo (path "later"))
+    (eval '(set! versioning-directory-delay 0)
+          (resolve-module '(kernel texmacs tm-modes)))
+    (check= (versioning-directory f) (dir "later"))
+    (eval '(set! versioning-directory-delay 10000)
+          (resolve-module '(kernel texmacs tm-modes)))))
+
 (define (test-robustness)
   (check-group "robustness")
   (git-run R "branch" "topic/with-slash")
@@ -997,6 +1208,13 @@
   (set-preference "git executable" "no-such-git-executable")
   (check-false (git-available?))
   (check-false (git-ok? (git-run R "status")))
+  ;; the menus do not offer Git, but explain how to find it (audit 2, B8)
+  (with-document F
+    (lambda ()
+      (with l (menu-strings '(link version-menu))
+        (check-true (in? "Git was not found: locate it in the preferences" l))
+        (check-false (in? "Commit" l))
+        (check-false (in? "Git panel" l)))))
   (set-preference "git executable" "git")
   (check-true (git-available?))
   (check-true (git-ok? (git-run R "status"))))
@@ -1015,6 +1233,7 @@
         (run-group test-subroutines)
         (run-group test-trust)
         (run-group test-detection)
+        (run-group test-pinning)
         (run-group test-states)
         (run-group test-history)
         (run-group test-pages)
@@ -1023,10 +1242,14 @@
         (run-group test-upstream)
         (run-group test-merge)
         (run-group test-driver)
+        (run-group test-unsaved)
         (run-group test-safety)
         (run-group test-restore)
         (run-group test-signing)
         (run-group test-project)
+        (run-group test-names)
+        (run-group test-shortcuts)
+        (run-group test-new-repositories)
         (run-group test-robustness)
         (restore-preferences)
         (version-tool-reset)

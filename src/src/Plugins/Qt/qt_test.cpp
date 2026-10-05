@@ -235,7 +235,8 @@ gui_test_type (string text) {
   // Send the characters of text (in utf8) to the widget with the focus
   QWidget* w= QApplication::focusWidget ();
   if (w == NULL) return;
-  QString s= QString::fromUtf8 (as_charp (text));
+  c_string _text (text);
+  QString s= QString::fromUtf8 ((char*) _text);
   for (int i=0; i<s.size (); i++) {
     QKeyEvent press (QEvent::KeyPress, 0, Qt::NoModifier, QString (s[i]));
     QKeyEvent release (QEvent::KeyRelease, 0, Qt::NoModifier, QString (s[i]));

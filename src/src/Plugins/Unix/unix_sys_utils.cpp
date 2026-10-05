@@ -22,6 +22,7 @@
 #include <pwd.h>
 #include <signal.h>
 #include <errno.h>
+#include <atomic>
 
 int
 unix_system (string s) {
@@ -151,12 +152,16 @@ struct _pipe_t {
 struct _channel {
   int fd;
   _ts_string data;
+  _mutex data_lock;  // for reading the data before the thread has finished
   int buffer_size;
   array<char> buffer;
   int status;
-  volatile bool finished;
-  bool closed;
+  std::atomic<bool> finished;
+  std::atomic<bool> closed;
   _channel () : status (0), finished (false), closed (false) {}
+  string get_data () {
+    _mutex_lock lock (data_lock);
+    return string (data.a, data.n); }
   void _init_in (int fd2, string data2, int chunk_size) {
     fd= fd2;
     data.copy (&data2[0], N(data2));
@@ -179,7 +184,7 @@ _background_read_task (void* channel_as_void_ptr) {
     m= read (fd, b, n);
     // cout << "read " << m << " bytes from " << fd << "\n";
     if (m < 0 && errno == EINTR) { m= 1; continue; }
-    if (m > 0) c->data.append (b, m);
+    if (m > 0) { _mutex_lock lock (c->data_lock); c->data.append (b, m); }
     if (m == 0) { if (close (fd) != 0) c->status= -1; }
   } while (m > 0);
   if (m < 0) close (fd);
@@ -208,6 +213,7 @@ _background_write_task (void* channel_as_void_ptr) {
     // cout << "writting " << m << " bytes / " << t-k << "\n";
     o= write (fd, (void*) (d + k), m);
     // cout << "written " << o << " bytes to " << fd << "\n";
+    if (o < 0 && errno == EINTR) { o= 1; continue; }
     if (o > 0) k += o;
     if (o < 0) { close (fd); c->status= -1; c->closed= true; }
     if (k == t) { if (close (fd) != 0) c->status= -1; c->closed= true; }
@@ -226,6 +232,40 @@ struct _file_actions_t {
     posix_spawn_file_actions_destroy (&rep); }
   inline int status () const { return st; }
 };
+
+// exception safe spawn attributes
+struct _spawnattr_t {
+  posix_spawnattr_t rep;
+  int st;
+  inline _spawnattr_t () { st= posix_spawnattr_init (&rep); }
+  inline ~_spawnattr_t () { posix_spawnattr_destroy (&rep); }
+  inline int status () const { return st; }
+};
+
+static bool
+_new_session (_spawnattr_t& attr) {
+  // run the command in a new session (or at least process group), so that
+  // it can be killed together with the processes that it starts; without
+  // controlling terminal, it cannot be stopped by prompts (SIGTTIN)
+  if (attr.status () != 0) return false;
+#ifdef POSIX_SPAWN_SETSID
+  return posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETSID) == 0;
+#else
+  return posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETPGROUP) == 0 &&
+         posix_spawnattr_setpgroup (&attr.rep, 0) == 0;
+#endif
+}
+
+// time during which the output of a terminated command is still collected
+// (processes which it started in the background may hold its pipes)
+#define _LINGER_TIME 2000
+
+static bool
+_wait_finished (_channel* c, time_t start) {
+  while (!c->finished && texmacs_time () - start < _LINGER_TIME)
+    usleep (1000);
+  return c->finished;
+}
 
 // Texmacs warning for long spawn commands
 static void
@@ -278,12 +318,17 @@ unix_system (array<string> arg,
   for (int j= 0; j < N(arg_); j++)
     _arg << as_charp (arg_[j]);
   _arg << (char*) NULL;
+  _spawnattr_t attr;
+  if (!_new_session (attr)) {
+    for (int j= 0; j < N(arg_); j++) tm_delete_array (_arg[j]);
+    return -1;
+  }
   pid_t pid;
 #ifdef __EMSCRIPTEN__
   // no processes in the browser: the command fails as if not found
   int status= -1; pid= 0;
 #else
-  int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, NULL,
+  int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, &attr.rep,
 			    A(_arg), environ);
 #endif
   for (int j= 0; j < N(arg_); j++)
@@ -300,25 +345,30 @@ unix_system (array<string> arg,
   for (int i= 0; i < n_in ; i++) { close (pp_in[i].in ()); pp_in[i].release (0); }
   for (int i= 0; i < n_out; i++) { close (pp_out[i].out ()); pp_out[i].release (1); }
 
+  // NOTE: the channels are allocated on the heap, since a thread may
+  // outlive this function (see below)
+
   // write to spawn process
-  array<_channel> channels_in (n_in);
+  array<_channel*> channels_in (n_in);
   array<pthread_t> threads_write (n_in);
   for (int i= 0; i < n_in; i++) {
-    channels_in[i]._init_in (pp_in[i].out (), str_in[i], 1 << 12);
+    channels_in[i]= tm_new<_channel> ();
+    channels_in[i]->_init_in (pp_in[i].out (), str_in[i], 1 << 12);
     if (pthread_create (&threads_write[i], NULL /* &attr */,
 			_background_write_task,
-			(void *) &(channels_in[i])))
+			(void *) channels_in[i]))
       return -1;
   }
 
   // read from spawn process
-  array<_channel> channels_out (n_out);
+  array<_channel*> channels_out (n_out);
   array<pthread_t> threads_read (n_out);
   for (int i= 0; i < n_out; i++) {
-    channels_out[i]._init_out (pp_out[i].in (), 1 << 12); 
+    channels_out[i]= tm_new<_channel> ();
+    channels_out[i]->_init_out (pp_out[i].in (), 1 << 12);
     if (pthread_create (&threads_read[i], NULL /* &attr */,
 			_background_read_task,
-			(void *) &(channels_out[i])))
+			(void *) channels_out[i]))
       return -1;
   }
 
@@ -335,19 +385,41 @@ unix_system (array<string> arg,
     debug_io << "unix_system, pid " << pid << " terminated" << "\n"; 
 
   // wait for terminating threads
+  // NOTE: processes started in the background by the command (e.g. by a
+  // hook of git) may keep its pipes open; after a while, we stop waiting
+  // for them, and the threads finish on their own, with their channels
+  // and file descriptors (which are therefore neither freed nor closed)
   void* exit_status;
   int thread_status= 0;
+  time_t exit_time= texmacs_time ();
   for (int i= 0; i < n_in; i++) {
+    _channel* c= channels_in[i];
+    if (!_wait_finished (c, exit_time)) {
+      pthread_detach (threads_write[i]);
+      pp_in[i].release (1);
+      continue;
+    }
     pthread_join (threads_write[i], &exit_status);
-    if (channels_in[i].closed) pp_in[i].release (1);
-    if (channels_in[i].status < 0) thread_status= -1;
+    if (c->closed) pp_in[i].release (1);
+    if (c->status < 0) thread_status= -1;
+    tm_delete<_channel> (c);
   }
   for (int i= 0; i < n_out; i++) {
+    _channel* c= channels_out[i];
+    if (!_wait_finished (c, exit_time)) {
+      if (DEBUG_IO)
+        debug_io << "unix_system, pid " << pid
+                 << ": output still open, not waiting any longer\n";
+      *(str_out[i])= c->get_data ();
+      pthread_detach (threads_read[i]);
+      pp_out[i].release (0);
+      continue;
+    }
     pthread_join (threads_read[i], &exit_status);
-    if (channels_out[i].closed) pp_out[i].release (0);
-    *(str_out[i])= string (channels_out[i].data.a,
-                           channels_out[i].data.n);
-    if (channels_out[i].status < 0) thread_status= -1;
+    if (c->closed) pp_out[i].release (0);
+    *(str_out[i])= c->get_data ();
+    if (c->status < 0) thread_status= -1;
+    tm_delete<_channel> (c);
   }
 
   if (thread_status < 0) return thread_status;
@@ -367,15 +439,6 @@ struct unix_process_rep {
   bool      has_in, has_out, has_err;
   _channel  in, out, err;
   pthread_t th_in, th_out, th_err;
-};
-
-// exception safe spawn attributes
-struct _spawnattr_t {
-  posix_spawnattr_t rep;
-  int st;
-  inline _spawnattr_t () { st= posix_spawnattr_init (&rep); }
-  inline ~_spawnattr_t () { posix_spawnattr_destroy (&rep); }
-  inline int status () const { return st; }
 };
 
 static void
@@ -404,16 +467,17 @@ unix_system_start (array<string> arg, string input) {
   ok= ok && posix_spawn_file_actions_adddup2 (&file_actions.rep, fd[5], 2) == 0;
   for (int i= 0; i < 6; i++)
     ok= ok && posix_spawn_file_actions_addclose (&file_actions.rep, fd[i]) == 0;
-  // run the command in a new session (or at least process group), so
-  // that it can be killed together with the processes that it starts;
-  // without controlling terminal, it cannot be stopped by prompts (SIGTTIN)
   _spawnattr_t attr;
-  ok= ok && attr.status () == 0;
-#ifdef POSIX_SPAWN_SETSID
-  ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETSID) == 0;
-#else
-  ok= ok && posix_spawnattr_setflags (&attr.rep, POSIX_SPAWN_SETPGROUP) == 0;
-  ok= ok && posix_spawnattr_setpgroup (&attr.rep, 0) == 0;
+  ok= ok && _new_session (attr);
+#if defined(POSIX_SPAWN_CLOEXEC_DEFAULT)
+  // only the standard file descriptors are inherited (macOS)
+  short flags= 0;
+  ok= ok && posix_spawnattr_getflags (&attr.rep, &flags) == 0;
+  ok= ok && posix_spawnattr_setflags (&attr.rep,
+                                      flags | POSIX_SPAWN_CLOEXEC_DEFAULT) == 0;
+#elif defined(__GLIBC__) && (__GLIBC__ > 2 || __GLIBC_MINOR__ >= 34)
+  // only the standard file descriptors are inherited (glibc 2.34)
+  ok= ok && posix_spawn_file_actions_addclosefrom_np (&file_actions.rep, 3) == 0;
 #endif
   if (!ok) { _close_fds (fd, 6); return NULL; }
 
@@ -422,8 +486,13 @@ unix_system_start (array<string> arg, string input) {
     _arg << as_charp (arg[j]);
   _arg << (char*) NULL;
   pid_t pid;
+#ifdef __EMSCRIPTEN__
+  // no processes in the browser: the command fails as if not found
+  int status= -1; pid= 0;
+#else
   int status= posix_spawnp (&pid, _arg[0], &file_actions.rep, &attr.rep,
 			    A(_arg), environ);
+#endif
   for (int j= 0; j < N(arg); j++)
     tm_delete_array (_arg[j]);
   if (status != 0) {
@@ -468,17 +537,22 @@ unix_system_finished (unix_process_rep* rep,
   // read; if so, then retrieve its exit code and output, and release rep.
   // NOTE: processes started by the command may still hold the output
   // pipes, so we do not wait for the threads before they are finished.
+  // NOTE: the process is only reaped at the end, so that its process
+  // group still exists, and can be killed (see unix_system_kill)
   if (!rep->exited) {
-    int status;
-    pid_t wret= waitpid (rep->pid, &status, WNOHANG);
-    if (wret == 0) return false;
+    siginfo_t info;
+    info.si_pid= 0;
+    int wret= waitid (P_PID, rep->pid, &info, WEXITED | WNOHANG | WNOWAIT);
+    if (wret == 0 && info.si_pid == 0) return false;
     rep->exited= true;
-    if (wret < 0 || WIFEXITED (status) == 0) rep->status= -1;
-    else rep->status= WEXITSTATUS (status);
+    if (wret != 0 || info.si_code != CLD_EXITED) rep->status= -1;
+    else rep->status= info.si_status;
   }
   if ((rep->has_in && !rep->in.finished) ||
       !rep->out.finished || !rep->err.finished)
     return false;
+  int status;
+  waitpid (rep->pid, &status, 0);
   void* exit_status;
   if (rep->has_in) pthread_join (rep->th_in, &exit_status);
   if (rep->has_out) pthread_join (rep->th_out, &exit_status);
@@ -497,8 +571,9 @@ void
 unix_system_kill (unix_process_rep* rep) {
   // Terminate the process and the processes which it started; they are
   // woken up in case they were stopped, and killed at the second attempt.
-  // NOTE: once the process has been reaped, its pid may be reused
-  if (rep->exited) return;
+  // NOTE: this also works once the process has exited, while processes
+  // that it started still hold its pipes: it is only reaped once they
+  // are closed, so that its process group cannot have been reused
   rep->killed++;
   kill (-rep->pid, rep->killed > 1 ? SIGKILL : SIGTERM);
   kill (-rep->pid, SIGCONT);

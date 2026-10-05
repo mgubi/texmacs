@@ -135,7 +135,9 @@
       ---
       ;; NOTE: also here, since the Version menu is not shown by default
       ;; for documents outside repositories
-      (when (and (url-exists? (current-buffer))
+      (when (and (not (url-rooted-web? (current-buffer)))
+                 (not (url-rooted-tmfs? (current-buffer)))
+                 (url-exists? (current-buffer))
                  (not (versioning-directory (current-buffer))))
         ("Create Git repository" (git-interactive-init (current-buffer))))
       ("Clone Git repository" (git-interactive-clone))))

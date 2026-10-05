@@ -89,7 +89,7 @@
 
   <paragraph*|The history of the repository>
 
-  <menu|Version|Git|Log> lists all commits of the current branch, and
+  <menu|Version|Git|History> lists all commits of the current branch, and
   <menu|Version|Git|Graph> shows the history of all branches as a graph,
   with the names of the branches and tags. Clicking on a commit opens its
   page, with its author, date, message and the list of files which it

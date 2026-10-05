@@ -26,9 +26,31 @@
   (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n  "
                  text "\n</body>\n"))
 
+(define finished? #f)
+
 (define (finish)
+  (set! finished? #t)
   (display* "FAILURES: " failures "\n")
   (quit-TeXmacs))
+
+;; NOTE: the tests are one chain of callbacks: an error in a callback stops
+;; it, which is then reported instead of waiting for the alarm of the runner
+(delayed
+  (:pause 240000)
+  (when (not finished?)
+    (check "the tests completed (an error stopped the chain)" #f)
+    (finish)))
+
+(define (menu-strings m)
+  ;; The strings in the expansion of the menu @m
+  (let loop ((x (menu-expand m)))
+    (cond ((string? x) (list x))
+          ((pair? x) (append-map loop x))
+          (else '()))))
+
+(define (menu-has? m . l)
+  (with s (menu-strings m)
+    (list-and (map (lambda (x) (in? x s)) l))))
 
 ;; Conflict resolution with the structured comparison
 (define (test-conflict)
@@ -86,21 +108,27 @@
   ;; The menus and dialogs can be built without errors
   (with u (system->url (string-append T "/remote/clone c/doc.tm"))
     (switch-to-buffer u)
-    (check "version menu" (pair? (menu-expand '(link version-menu))))
-    (check "git menu" (pair? (menu-expand '(link git-repository-menu))))
+    (check "version menu" (menu-has? '(link version-menu)
+                                     "Commit" "Git panel" "This file"))
+    (check "git menu" (menu-has? '(link git-repository-menu)
+                                 "Status" "History" "New branch"))
     (git-interactive-clone)
     (git-compare-with-revision u "HEAD~1")
     (check "compare with revision"
            (nnull? (tree-search (buffer-get u)
                                 (lambda (t) (tree-in? t '(version-both))))))
-    (check "compare menu" (pair? (menu-expand '(link git-compare-menu))))
+    (check "compare menu" (menu-has? '(link git-compare-menu) "Last commit"))
     (git-interactive-commit (git-root u))
     (git-interactive-commit-project u)
     (set-preference "git simple mode" "on")
-    (check "simple file menu" (pair? (menu-expand '(link version-menu))))
-    (check "simple git menu" (pair? (menu-expand '(link git-repository-menu))))
+    (check "simple file menu"
+           (and (menu-has? '(link version-menu) "Save snapshot")
+                (not (menu-has? '(link version-menu) "This file"))
+                (not (menu-has? '(link version-menu) "Commit"))))
+    (check "simple git menu" (menu-has? '(link git-simple-repository-menu)
+                                        "History"))
     (set-preference "git simple mode" "off")
-    (check "restore menu" (pair? (menu-expand '(link git-restore-menu))))
+    (check "restore menu" (nnull? (menu-strings '(link git-restore-menu))))
     (check "review bar opened"
            (in? '(version-review-tool)
                 (window->tools (current-window) :transient-bottom)))
@@ -177,7 +205,66 @@
         (check "panel keeps the message"
                (== (buffer-get-body p) (tm->tree '(document
                                                    "a message being typed"))))))
-    (test-diverged)))
+    (test-panel)))
+
+(define (steps l)
+  ;; Execute the thunks @l, leaving time for the interface in between
+  (when (nnull? l)
+    ((car l))
+    (delayed (:pause 600) (steps (cdr l)))))
+
+(define (git-commands-since t0)
+  (map (lambda (x) (car (caddr x)))
+       (list-filter (git-command-history) (lambda (x) (> (car x) t0)))))
+
+(define (test-panel)
+  ;; The panel follows the working tree and the document, and runs no
+  ;; Git command while typing (audit 2, C1 and C2)
+  (let* ((u (system->url (string-append T "/remote/clone c/doc.tm")))
+         (root (git-root u))
+         (f (url-append root "panel-new.txt"))
+         (t0 0))
+    (switch-to-buffer u)
+    (string-save "new\n" f)
+    (git-refresh root)
+    ;; NOTE: the status is recomputed once after git-refresh (by the
+    ;; footer and the menus, when idle); typing starts afterwards
+    (steps
+     (list
+      (lambda () (noop))
+      (lambda () (noop))
+      (lambda () (noop))
+      (lambda ()
+        (check "panel lists a new file"
+               (in? "panel-new.txt" (gui-test-buttons)))
+        (check "panel offers to stage it" (in? "Stage" (gui-test-buttons)))
+        (set! t0 (texmacs-time))
+        (insert "a"))
+      (lambda () (insert "b"))
+      (lambda () (insert "c"))
+      (lambda () (insert "d"))
+      (lambda () (insert "e"))
+      (lambda () (insert "f"))
+      (lambda ()
+        ;; NOTE: the footer may compute the status once, when idle
+        (with l (git-commands-since t0)
+          (check "no Git command while typing"
+                 (and (<= (length l) 1) (list-and (map (cut == <> "status") l))))
+          (when (nnull? l) (display* "     commands: " l "\n")))
+        (git-stage f))
+      (lambda ()
+        (check "panel refreshed after staging"
+               (in? "Unstage" (gui-test-buttons)))
+        (switch-to-buffer DA))
+      (lambda ()
+        (check "panel follows the document"
+               (not (in? "panel-new.txt" (gui-test-buttons))))
+        (switch-to-buffer u)
+        (git-unstage f)
+        (system-remove f)
+        (revert-buffer-revert u)
+        (git-refresh root))
+      (lambda () (test-diverged))))))
 
 (define (test-diverged)
   ;; Pull when the local and remote branches diverged: merge them
