@@ -103,6 +103,8 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
 * `TEXMACS_NS_SCROLL_STEP=<points>`: the steps of `TEXMACS_NS_SCROLL`
   (trackpads give fractional ones); with `TEXMACS_NS_SNAPSHOT`, the backing
   store of the canvas is saved as `backing.png` at the end (upside down);
+* `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
+  `shrink`, as before the outlines (to compare);
 * `TEXMACS_NS_DEBUG_RED=1`: when the backing store moves (scrolling), the
   parts which it does not keep are red until they are repainted;
 * `TEXMACS_NS_DEBUG_DRAW=1`: the rectangles redrawn by the canvas are
@@ -148,6 +150,12 @@ TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
   renderer, patterns (cached as in Qt, at the size asked for), effects,
   arcs, shadows drawing in the context of their master (which they do not
   end when they are deleted).
+  The glyphs of the fonts with a file (what FreeType reads: TrueType,
+  OpenType, Type 1) are drawn from their outlines (`tt_glyph_outline`),
+  filled by Core Graphics with its antialiasing into images cached as the
+  bitmaps were (one per glyph, size and color), at the place of the bitmaps
+  to the pixel; the other glyphs (TeX's bitmap fonts, patterns) keep the
+  bitmaps made by `shrink`, which are a little bolder.
 * **Generic code**: `AQUATEXMACS` is treated as Qt where the generic code
   has Qt specific parts (delayed commands, native pictures, drops, bitmap
   exports, texmacs output widgets, the repainting and the mouse of the

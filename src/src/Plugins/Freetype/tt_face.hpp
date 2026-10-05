@@ -52,6 +52,10 @@ struct tt_font_glyphs_rep: font_glyphs_rep {
 };
 
 tt_face load_tt_face (string name);
+// the outline of the glyph of a character of a FreeType font, unhinted, as
+// get makes its bitmap: false when the font is not a FreeType font (see
+// tt_face.cpp for the commands and the units)
+bool tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds, array<double>& pts);
 font_metric tt_font_metric (string family, int size, int hdpi, int vdpi);
 //font_glyphs tt_font_glyphs (string family, int size, int hdpi, int vdpi);
 

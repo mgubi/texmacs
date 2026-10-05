@@ -19,6 +19,12 @@
 
 #include "ns_utilities.h"
 #include "MacOS/mac_images.h"
+#include "sys_utils.hpp"
+#ifdef USE_FREETYPE
+// Freetype/tt_face.hpp, which needs the headers of FreeType
+bool tt_glyph_outline (font_glyphs fng, int i, array<int>& cmds,
+                       array<double>& pts);
+#endif
 
 
 /******************************************************************************
@@ -708,6 +714,67 @@ ns_renderer_rep::draw_bis (int c, font_glyphs fng, SI x, SI y) {
   CGImageRelease (im);
 }
 
+// The glyph of a font with a file (TrueType, OpenType, Type 1: what
+// FreeType reads) from its outline, rasterized by Core Graphics with its
+// antialiasing, in the color of the pen, at the size and the resolution of
+// the bitmaps of TeXmacs (tt_glyph_outline: pixels of the font, which has
+// std_shrinkf pixels for each pixel of the screen). The rows go down, as
+// those of the bitmaps (glyph_pixel): the outline is drawn upside down.
+// NULL with no ink; false when the font has no outline (a bitmap then).
+static bool
+outline_glyph (font_glyphs fng, int c, int r, int g, int b, int a,
+               CGImageRef& im, SI& xo, SI& yo, int& w, int& h) {
+#ifdef USE_FREETYPE
+  static int on= -1;
+  if (on < 0) on= (get_env ("TEXMACS_NS_GLYPHS") == "bitmap") ? 0 : 1;
+  if (!on) return false;
+  array<int> cmds;
+  array<double> pts;
+  if (!tt_glyph_outline (fng, c, cmds, pts)) return false;
+  double s= 1.0 / std_shrinkf;
+  CGMutablePathRef path= CGPathCreateMutable ();
+  int k= 0;
+  for (int i= 0; i < N(cmds); i++)
+    switch (cmds[i]) {
+    case 0: CGPathMoveToPoint (path, NULL, pts[k]*s, pts[k+1]*s); k += 2; break;
+    case 1: CGPathAddLineToPoint (path, NULL, pts[k]*s, pts[k+1]*s); k += 2; break;
+    case 2: CGPathAddQuadCurveToPoint (path, NULL, pts[k]*s, pts[k+1]*s,
+                                       pts[k+2]*s, pts[k+3]*s); k += 4; break;
+    case 3: CGPathAddCurveToPoint (path, NULL, pts[k]*s, pts[k+1]*s, pts[k+2]*s,
+                                   pts[k+3]*s, pts[k+4]*s, pts[k+5]*s); k += 6; break;
+    default: CGPathCloseSubpath (path); break;
+    }
+  im= NULL; xo= yo= 0; w= h= 0;
+  CGRect box= CGPathGetPathBoundingBox (path);
+  if (CGRectIsEmpty (box) || CGRectIsNull (box)) { CGPathRelease (path); return true; }
+  // the pixels it touches: [L, R) to the right of the origin, [B, T) above
+  int L= (int) floor (box.origin.x), R= (int) ceil (box.origin.x + box.size.width);
+  int B= (int) floor (box.origin.y), T= (int) ceil (box.origin.y + box.size.height);
+  w= max (R - L, 1); h= max (T - B, 1);
+  CGContextRef ic= MyCreateBitmapContext (w, h);
+  if (ic == NULL) { CGPathRelease (path); w= h= 0; return true; }
+  CGContextSetShouldAntialias (ic, true);
+  CGContextSetAllowsAntialiasing (ic, true);
+  CGContextTranslateCTM (ic, -L, T);
+  CGContextScaleCTM (ic, 1.0, -1.0);
+  CGContextSetRGBFillColor (ic, r / 255.0, g / 255.0, b / 255.0, a / 255.0);
+  CGContextAddPath (ic, path);
+  CGContextFillPath (ic);   // nonzero winding, as the fonts are drawn
+  CGPathRelease (path);
+  im= CGBitmapContextCreateImage (ic);
+  CGContextRelease (ic);
+  // the offsets in the units of shrink (a pixel of the screen is PIXEL):
+  // draw puts the top left corner at (x - xo*std_shrinkf, y + yo*std_shrinkf)
+  xo= -L * PIXEL;
+  yo= (T - 1) * PIXEL;
+  return true;
+#else
+  (void) fng; (void) c; (void) r; (void) g; (void) b; (void) a;
+  (void) im; (void) xo; (void) yo; (void) w; (void) h;
+  return false;
+#endif
+}
+
 void
 ns_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
   if (pen->get_type () == pencil_brush) {
@@ -724,6 +791,19 @@ ns_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
     get_rgb (fgc, r, g, b, a);
     if (get_reverse_colors ()) reverse (r, g, b);
     SI xo, yo;
+    {
+      CGImageRef oim= NULL;
+      int ow= 0, oh= 0;
+      if (outline_glyph (fng, c, r, g, b, a, oim, xo, yo, ow, oh)) {
+        cg_image mi2 (oim, xo, yo, ow, oh);
+        mi= mi2;
+        if (oim) CGImageRelease (oim); // cg_image retains it
+        character_image (xc)= mi;
+        if (mi->img)
+          draw_clipped (mi->img, mi->w, mi->h, x- mi->xo*std_shrinkf, y+ mi->yo*std_shrinkf);
+        return;
+      }
+    }
     glyph pre_gl= fng->get (c); if (is_nil (pre_gl)) return;
     glyph gl= shrink (pre_gl, std_shrinkf, std_shrinkf, xo, yo, pixel_ratio);
     int i, j, w= gl->width, h= gl->height;
