@@ -158,18 +158,18 @@ test_jacobian () {
 }
 
 // jacobian_of_inverse is the jacobian of the inverse map, checked here
-// for all invertible frames but slanting, whose jacobian_of_inverse
-// applies the direct slant (frame.cpp)
+// for all invertible frames
 static void
 test_jacobian_of_inverse () {
   frame fs[]= { shift_2D (point (3.0, -1.0)),
                 scaling (2.5, point (1.0, 2.0)),
                 scaling (point (2.0, -0.5), point (0.0, 1.0)),
                 rotation_2D (point (1.0, 1.0), 0.6),
-                linear_2D (matrix_2D<double> (2.0, 1.0, -1.0, 3.0)) };
+                linear_2D (matrix_2D<double> (2.0, 1.0, -1.0, 3.0)),
+                slanting (point (0.5, -1.0), 0.25) };
   array<point> ps= samples ();
   point v (2.0, -3.0);
-  for (int i=0; i<5; i++)
+  for (int i=0; i<6; i++)
     for (int j=0; j<N(ps); j++) {
       point p= ps[j];
       bool error= true;
