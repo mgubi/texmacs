@@ -14,6 +14,9 @@ looks for references.
 - TeXmacs only reads from Zotero. Writing (for instance adding an item from
   a DOI) may come later, through the authorized write requests of the local
   API (Zotero 10).
+- Items without a citation key get the key `zotero:<itemKey>` (§3.2).
+- An entry changed both in TeXmacs and in Zotero is resolved field by
+  field (§3.11).
 
 ## 1. What TeXmacs does today (facts the design relies on)
 
@@ -312,8 +315,20 @@ Zotero, from Zotero to TeXmacs only.
 6. **A copy edited by hand in TeXmacs** (`modus manual` in the database)
    whose Zotero item also changed:
    - the TeXmacs edit is kept, since the database wins;
-   - the report says "changed in Zotero too" and offers to take Zotero's
-     version, which then becomes the newest version.
+   - the report says "changed in Zotero too" and opens a **field-by-field
+     comparison**:
+     - one line per field which differs (title, authors, year, journal,
+       pages, DOI, ...), with the TeXmacs value, the Zotero value and, when
+       known, the value at the last sync;
+     - for each field, the user keeps one value;
+     - fields changed only in Zotero are taken from Zotero by default;
+       fields changed only in TeXmacs are kept by default;
+     - the result is saved as a new version of the entry, still marked
+       `modus manual`, with the new `zotero-version`, so that it isn't
+       reported again until Zotero changes the item once more.
+   - The comparison uses the document comparison of TeXmacs
+     (`compare-versions`) on the values of each field, so that a small
+     change inside a long title shows as such.
 7. Record the library version as the version of this sync.
 
 **Cost.** Your library, with no change since the last sync: one request.
@@ -374,11 +389,15 @@ follow in any order.
 
 ## 6. Open questions
 
-1. **Derived keys** `zotero:<itemKey>` for libraries without Better
-   BibTeX. Is the colon acceptable in all bibliography styles, LaTeX export
-   included? The alternative is a key generated like Better BibTeX does
-   (author + year + title word), which is readable but can collide.
-2. **Sync of copies edited on both sides.** The rule below keeps the
-   TeXmacs edit and reports the Zotero change. Should the report offer a
-   field-by-field comparison (with the existing document comparison of
-   TeXmacs) rather than "take Zotero's version / keep mine"?
+None at the moment. Settled on 2026-10-05:
+- the database wins over Zotero;
+- imported items are kept in sync;
+- the `.bib` holds only asked items;
+- reading only;
+- `zotero:<itemKey>` keys;
+- field-by-field comparison.
+
+For the field-by-field comparison, sync must remember the values at the
+last sync, to tell which side changed a field. They are kept with the
+entry (`zotero-synced`, the fields as last exported). This adds one field
+per imported entry.
