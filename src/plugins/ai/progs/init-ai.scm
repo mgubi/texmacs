@@ -353,9 +353,11 @@
 (define (ai-tree-model s name)
   (or (ai-session-var s "ai-model") (ai-default-model name)))
 
-;; the session of the engine at the cursor, if any
+;; the session of the engine at the cursor, or its executable fold, if any
+;; (both have their model and their settings: ai-session-var)
 (define (ai-cursor-session name)
-  (with s (tree-innermost 'session)
+  (with s (tree-innermost (lambda (t) (tree-in? t '(session script-input
+                                                     script-output))))
     (and s (tree-atomic? (tree-ref s 0))
          (== (tree->string (tree-ref s 0)) name)
          s)))
@@ -506,11 +508,41 @@
 (define ai-model-of-request "")
 (tm-define (ai-model-override) ai-model-of-request)
 
+;; The executable folds of the engines: each asks its question alone (no
+;; context but the document, when the fold sends it), with its model and its
+;; settings (as a session: ai-session-var), and keeps its answer, which is
+;; asked again only on demand (set-fold-keeps-output!). Its answer is the
+;; answer alone; its tokens are said on the status bar. A fold which is
+;; evaluated is queued here (script-feed, set-fold-feed-hook!) until its
+;; request is made, in the order of the requests of the engine.
+(define ai-fold-queue (make-ahash-table)) ; engine -> pointers to the folds
+
+(define (ai-fold-fed name out)
+  (with f (and (tree? out) (tree-up out))
+    (ahash-set! ai-fold-queue name
+                (append (or (ahash-ref ai-fold-queue name) '())
+                        (list (and f (tree-in? f '(script-input script-output))
+                                   (tree->tree-pointer f)))))))
+
+(define (ai-fold-pop name)
+  (with l (or (ahash-ref ai-fold-queue name) '())
+    (and (nnull? l)
+         (begin
+           (ahash-set! ai-fold-queue name (cdr l))
+           (and (car l)
+                (with f (catch #t (lambda () (tree-pointer->tree (car l)))
+                          (lambda args #f))
+                  (tree-pointer-detach (car l))
+                  (and (tree? f) (tree-in? f '(script-input script-output))
+                       f)))))))
+
 (tm-define (ai-request-prepare name chat)
   (let* ((field (ai-pending-field name chat))
          (doc (and field (tree-up field)))
          (s (and doc (tree-up doc)))
-         (s (and s (tree-is? s 'session) s)))
+         (s (if field
+                (and s (tree-is? s 'session) s)
+                (ai-fold-pop name))))
     (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
     (set! ai-document-of-request
           (if (and s (== (ai-session-var s "ai-document") "true"))
@@ -533,8 +565,8 @@
   (if (or (not (tree-up t)) (tree-is-buffer? t)) t (ai-buffer-body (tree-up t))))
 
 (define (ai-session-stree? x)
-  (or (and (pair? x) (== (car x) 'session) (>= (length x) 2)
-           (in? (cadr x) (ai-models)))
+  (or (and (pair? x) (in? (car x) '(session script-input script-output))
+           (>= (length x) 2) (in? (cadr x) (ai-models)))
       (and (pair? x) (== (car x) 'with) (ai-session-stree? (cAr x)))))
 
 (define (ai-strip-sessions x)
@@ -572,7 +604,8 @@
 (tm-define (ai-session-context name chat)
   (let* ((field (ai-pending-field name chat))
          (doc (and field (tree-up field))))
-    (if (not field) #f
+    ;; (a fold: its question alone)
+    (if (not field) '()
         (let ()
           (if (not (and doc (tm-func? doc 'document))) #f
               (let* ((i (tree-index field))
@@ -909,7 +942,7 @@
     (if (not s)
         (set-preference (string-append lan " model") m)
         (begin
-          (ai-update-banner s m)
+          (when (tree-is? s 'session) (ai-update-banner s m))
           (ai-set-session-var s "ai-model" m))))
   (set-message (string-append "The next questions ask " m)
                (string-append "Model of " (session-name lan)))
@@ -1178,6 +1211,46 @@
   (make-session lan "default")
   (with s (ai-cursor-session lan)
     (when s (ai-set-session-var s "ai-document" "true"))))
+
+;; the answer in a fold: the answer alone, its tokens on the status bar
+(tm-define (ai-result-filter name chat t)
+  (if (ai-pending-field name chat) t
+      (let* ((x (tm->stree t))
+             (u (ai-usage-strings x)))
+        (when (nnull? u)
+          (set-message (car u) (session-name name)))
+        (if (pair? x)
+            (stree->tree (ai-unwrap (ai-answer-only x)))
+            t))))
+
+(define (ai-usage-strings x)
+  ;; the text of the line of the tokens (ai_usage_line in ai.cpp)
+  (cond ((not (pair? x)) '())
+        ((and (tm-func? x 'with 3) (== (cadr x) "ai-usage"))
+         (with in (cadddr x)
+           (if (and (pair? in) (string? (cAr in))) (list (cAr in)) '())))
+        (else (append-map ai-usage-strings (cdr x)))))
+
+;; the focus bar of a fold: its model, the reasoning, and Ask again
+(tm-menu (ai-fold-icons lan t)
+  (mini #t
+    //
+    (=> (balloon (eval (ai-session-model lan)) "Model of the fold")
+        (dynamic (focus-ai-model-menu lan)))
+    (if (in? lan ai-reasoning-engines)
+        //
+        (=> (balloon (eval (ai-reasoning-label lan))
+                     "How much the model reasons before it answers")
+            (dynamic (focus-ai-reasoning-menu lan))))
+    //
+    ((balloon "Ask again" "Ask the question of the fold again")
+     (script-evaluate-again t))))
+
+(for-each (lambda (name)
+            (set-fold-keeps-output! name)
+            (set-fold-feed-hook! name (lambda (out) (ai-fold-fed name out)))
+            (set-fold-focus-menu! name ai-fold-icons))
+          (ai-models))
 
 ;; the chatbots in a submenu AI of Insert > Session, each starting a session
 ;; of its default model (the model is then chosen in the focus bar)

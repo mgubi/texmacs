@@ -134,6 +134,30 @@
 (define-public (session-insert-menu name)
   (ahash-ref session-insert-menus name))
 
+;; The executable folds of a plug-in (script-input, script-output): whether
+;; they keep their output (a fold which has one shows it again when it is
+;; unfolded, and Enter in its input asks again: the chatbots, whose answers
+;; cost and change), what the plug-in does when one of them is evaluated
+;; (with the tree of its output), and the icons of their focus bar (a menu
+;; of the plug-in, from its name and the fold)
+(define fold-keeps-outputs (make-ahash-table))
+(define-public (set-fold-keeps-output! name)
+  (ahash-set! fold-keeps-outputs name #t))
+(define-public (fold-keeps-output? name)
+  (ahash-ref fold-keeps-outputs name))
+
+(define fold-feed-hooks (make-ahash-table))
+(define-public (set-fold-feed-hook! name f)
+  (ahash-set! fold-feed-hooks name f))
+(define-public (fold-feed-hook name)
+  (ahash-ref fold-feed-hooks name))
+
+(define fold-focus-menus (make-ahash-table))
+(define-public (set-fold-focus-menu! name m)
+  (ahash-set! fold-focus-menus name m))
+(define-public (fold-focus-menu name)
+  (ahash-ref fold-focus-menus name))
+
 ;; the names of the sessions l and of their groups, in the order of their
 ;; names in the menus; a group as (group name ...)
 (define-public (session-menu-entries l)

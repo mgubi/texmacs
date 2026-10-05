@@ -85,6 +85,8 @@
                        " is not a scripting language")
         (set-message m "Evaluate")))
     (when ok?
+      (with hook (fold-feed-hook lan)
+        (when hook (hook out)))
       (tree-set! out '(script-busy))
       (let* ((ptr (tree->tree-pointer out))
              ;; the output so far, above the busy sign, while it comes
@@ -141,13 +143,30 @@
 	 (ses (get-env "prog-session")))
     (make-script-input* lan ses)))
 
+(define (script-output-empty? out)
+  (in? (tree->stree out) '("" (document) (document "") (script-busy))))
+
+;; the folds of the plug-ins which keep their output (set-fold-keeps-output!)
+;; are evaluated again only when it is asked (Enter in their input, or
+;; script-evaluate-again); else unfolding them shows their output
+(define script-asked-again? #f)
+
+(tm-define (script-evaluate-again t)
+  (when (tree-in? t '(script-input script-output))
+    (if (tree-is? t 'script-output) (tree-assign-node! t 'script-input))
+    (set! script-asked-again? #t)
+    (alternate-toggle t)
+    (set! script-asked-again? #f)))
+
 (tm-define (alternate-toggle t)
   (:require (tree-is? t 'script-input))
   (let* ((lan (tree->string (tree-ref t 0)))
          (session (tree->string (tree-ref t 1)))
          (in (tree->stree (tree-ref t 2)))
          (out (tree-ref t 3)))
-    (script-eval-at out lan session in :math-input :simplify-output)
+    (when (or script-asked-again? (not (fold-keeps-output? lan))
+              (script-output-empty? out))
+      (script-eval-at out lan session in :math-input :simplify-output))
     (tree-assign-node! t 'script-output)
     (tree-go-to t 3 :end)))
 
@@ -163,7 +182,7 @@
   (cond ((tree-is? t 'script-output)
          (alternate-toggle t))
         ((xor (not forwards?) (tree-is? t 2 'document))
-         (alternate-toggle t))
+         (script-evaluate-again t))
         (else
          (if (not (tree-is? t 2 'document))
              (tree-set t 2 `(document ,(tree-ref t 2))))

@@ -33,18 +33,20 @@
   (cpp-ai-latex-command cmd name chat))
 
 (tm-define (ai-request name chat cmd)
+  ;; (the model of the session or the fold which asks, init-ai.scm)
+  (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
   (with missing (and (defined? (quote ai-key-missing)) (ai-key-missing name))
-    (if missing
-        (object->string `(error ,missing)) ; no request (request_link.cpp)
-        (begin
-          ;; (the model of the session which asks, init-ai.scm)
-          (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
-          (with r (cpp-ai-latex-request cmd name chat)
-            (when (defined? 'ai-request-done) (ai-request-done))
-            r)))))
+    (with r (if missing
+                (object->string `(error ,missing)) ; no request (request_link)
+                (cpp-ai-latex-request cmd name chat))
+      (when (defined? 'ai-request-done) (ai-request-done))
+      r)))
 
 (tm-define (ai-result name chat res)
   (with t (cpp-ai-latex-output res name chat)
+    ;; (in a fold: the answer alone, init-ai.scm)
+    (when (defined? 'ai-result-filter)
+      (set! t (ai-result-filter name chat t)))
     (when (string-contains? (object->string (tm->stree t)) "ai-tikz")
       (delayed
         (:idle 100)

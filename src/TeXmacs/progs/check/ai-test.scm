@@ -142,7 +142,9 @@
   ;; a model which thinks in its text (<think>, with Ollama)
   (check= (answer (openai "<think>Hmm.</think>\n\nAnswer.") "ollama")
           `(document ,(reasoning-fold "Hmm.") (with "mode" "text" "Answer.")))
-  (check= (ai-reasoning "claude") "default"))
+  (check= (ai-reasoning "claude") "default")
+  ;; the folds of the chatbots keep their answer (asked again on demand)
+  (check-true (fold-keeps-output? "claude")))
 
 (define (test-pictures)
   (check-group "pictures")
