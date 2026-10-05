@@ -107,7 +107,8 @@
       (list (cork->html s))))
 
 (define (tmhtml-text s)
-  (if (or (ahash-ref tmhtml-env :math) (ahash-ref tmhtml-env :preformatted))
+  (if (or (ahash-ref tmhtml-env :math) (ahash-ref tmhtml-env :preformatted)
+          (ahash-ref tmhtml-env :verbatim))
       (tmhtml-string s)
       (tmhtml-string (make-ligatures s))))
 
@@ -1542,11 +1543,17 @@
       (when (func? body 'action)
         (set! body (cadr body))
         (set! pre? (string? body)))
-      (if (or (stm-block-structure? body) pre?)
-          (verbatim-pre
-           (ahash-with tmhtml-env :preformatted #t
-             (tmhtml body)))
-          (verbatim-tt (tmhtml body))))))
+      (ahash-with tmhtml-env :verbatim #t
+        (if (or (stm-block-structure? body) pre?)
+            (verbatim-pre
+             (ahash-with tmhtml-env :preformatted #t
+               (tmhtml body)))
+            (verbatim-tt (tmhtml body)))))))
+
+(define (tmhtml-code* l)
+  ;; Inline code: no ligatures (e.g. "--" must not become an en-dash)
+  (ahash-with tmhtml-env :verbatim #t
+    (tmhtml-post-simplify-element (cons 'h:code (tmhtml-list l)))))
 
 (define (verbatim-tt content)
   `((h:tt (@ (class "verbatim")) ,@content)))
@@ -1859,9 +1866,10 @@
     (ahash-with tmhtml-env :math #f
       (ahash-with tmhtml-env :math-display #f
         (ahash-with tmhtml-env :preformatted #f
-          (ahash-with tmhtml-env :left-margin 0
-            (ahash-with tmhtml-env :right-margin 0
-              (tmhtml x))))))))
+          (ahash-with tmhtml-env :verbatim #f
+            (ahash-with tmhtml-env :left-margin 0
+              (ahash-with tmhtml-env :right-margin 0
+                (tmhtml x)))))))))
 
 (define (tmhtml x)
   ;; Main conversion function.
@@ -2050,7 +2058,7 @@
   (strong (h:strong))
   (em (h:em))
   (dfn (h:dfn))
-  (code* (h:code))
+  (code* ,tmhtml-code*)
   (samp (h:samp)) ; WARNING: semantic documentation does not match HTML4
   (kbd (h:kbd))
   (var (h:var))
