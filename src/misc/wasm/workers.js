@@ -16,6 +16,10 @@
 //                                          format, the data, \5...
 //                    {err: string}         its errors (stderr)
 //                    {exit: code}          it ended
+//                    {busy: true/false}    it runs something which does not
+//                                          see the messages until it ends
+//                                          (Python): an interrupt then
+//                                          stops the worker
 //
 // What a worker sends is kept here until TeXmacs takes it (tmWorkers.take,
 // at each pass of the interpose handler of the server), and the loop of the
@@ -95,6 +99,7 @@ var tmWorkers = (function () {
       workers[id] = w;
       w.worker.onmessage = function (e) {
         var m = e.data || {};
+        if (m.busy !== undefined) w.busy = !!m.busy;
         if (m.out !== undefined) keep (w, 0, m.out);
         if (m.err !== undefined) keep (w, 1, m.err);
         if (m.exit !== undefined) {
@@ -134,7 +139,18 @@ var tmWorkers = (function () {
     },
     interrupt: function (id) {
       var w = workers[id];
-      if (w && w.alive) w.worker.postMessage ({ interrupt: true });
+      if (!w || !w.alive) return;
+      if (w.busy) {
+        // a worker which cannot see the interrupt while it runs: stopped,
+        // and started again by the next input of its session
+        w.worker.terminate ();
+        w.alive = false;
+        keep (w, 1, '\x02utf8:Interrupted: the program was stopped, ' +
+                    'and starts again with the next input.\x05');
+        if (typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
+        return;
+      }
+      w.worker.postMessage ({ interrupt: true });
     },
     stop: function (id) {
       var w = workers[id];

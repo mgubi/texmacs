@@ -52,6 +52,7 @@ MuPDF writer) in about 4 s, boot included.
 | file dialogs | the Files panel of the page | |
 | fonts | Fira for the interface (the TeX fonts lack its arrows) | |
 | clipboard | copy (text, HTML) with `navigator.clipboard`; paste by the paste event of the browser; the look and feel of the platform of the browser (Cmd on a Mac); Edit > Paste from browser... (a dialog of the page: one Paste button) | |
+| python | sessions and folds of Python in a Web Worker (`plugins/python/web/tm-python.mjs`): Pyodide 314.0.7 (Python 3.14) loaded from jsDelivr by the first input, the packages of an input from its imports; the value of the last expression (LaTeX for SymPy), the figures of matplotlib as SVG, top-level `await`; an interrupt stops the worker while Python runs (`{busy}` in `workers.js`: no SharedArrayBuffer to interrupt it) | Pyodide served with the page (offline) |
 | remote (TeXmacs server) | client over WebSocket: login, remote files, directories; `wss` from a page over https; the servers serve WebSocket clients, over TLS too; a failed connection says where it went and why it may have failed | |
 
 ## Windows and the frame of the page
