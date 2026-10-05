@@ -409,7 +409,13 @@
   (check= (lt "{\\bf x}") '(with "font-series" "bold" "x"))
   (check= (lt "\\textit{x}") '(with "font-shape" "italic" "x"))
   (check= (lt "\\texttt{x}") '(with "font-family" "tt" "x"))
-  (check= (lt "\\textsuperscript{a}") '(rsup "a")))
+  (check= (lt "\\textsuperscript{a}") '(rsup "a"))
+  ;; a space which begins the argument of a command of text is typeset
+  (check= (lt "a\\textbf{ b}") '(concat "a" (with "font-series" "bold" " b")))
+  (check= (lt "a\\emph{ b}") '(concat "a" (em " b")))
+  (check= (lt "a\\mbox{ b }c") "a b c")
+  (check= (lt "$a,\\text{ if }b$") '(math (concat "a," (text " if ") "b")))
+  (check= (lt "\\section{ Intro}") '(section "Intro")))
 
 (define (test-import-sections)
   (check-group "import: sections, paragraphs, spaces")
@@ -480,8 +486,9 @@
           '(math (concat (math-up "rank") "A")))
   ;; a text separates the factors around it: no multiplication across it
   (check= (lt "$a\\text{if}b$") '(math (concat "a" (text "if") "b")))
+  ;; (the space which begins the argument of \text is kept, as in LaTeX)
   (check= (lt "$x\\text{ for all }y$")
-          '(math (concat "x" (text "for all ") "y")))
+          '(math (concat "x" (text " for all ") "y")))
   (check= (lt "$ab$") '(math "a*b"))
   (check= (lt "$\\frac{a}{b}$") '(math (frac "a" "b")))
   (check= (lt "$a\\over b$") '(math (frac "a" "b")))
