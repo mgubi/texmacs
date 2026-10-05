@@ -22,7 +22,11 @@ expansion instead of calling the macro.
   first call). So made is the set of the pairs which the macro made (not
   those of its arguments, which are the caller's code, shared as
   before), and these pairs are copied each time the expansion is used:
-  the evaluator gets new pairs, as from the macro.
+  the evaluator gets new pairs, as from the macro. The copy is made with
+  the GC off (its pieces are not yet protected), after making room for
+  it above the trigger of new_cell: with the GC off, a cell taken below
+  the trigger forces the heap to grow by 4, and the heap never shrinks
+  (the heap of a test suite grew from 4M to 65M cells, 4 GB, that way).
 - The table is emptied when it reaches 100000 entries.
 
 s7test.scm gives the same results with the field #t and #f (and, with
@@ -77,7 +81,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
     "debug", "default-hash-table-length", "default-random-state", "default-rationalize-error", "equivalent-float-epsilon",
     "expansions?", "filenames", "file-names", "float-format-precision", "free-heap-size", "gc-freed", "gc-info",
     "gc-protected-objects", "gc-resize-heap-by-4-fraction", "gc-resize-heap-fraction", "gc-stats", "gc-temps-size",
-@@ -83998,8 +84001,120 @@
+@@ -83998,8 +84001,124 @@
    if (closure_arity_unknown(mac))
      closure_set_arity(mac, s7_list_length(sc, closure_pars(mac)));
    return(op);
@@ -141,14 +145,18 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
 +  if ((is_pair(entry)) && (car(entry) == sc->code))
 +    {
 +      const bool old_gc_off = sc->gc_off;
-+      sc->gc_off = true;                    /* the copy is small, and its pieces are not yet protected */
++      /* room for the copy first (one pair for each pair of the set), above the trigger of new_cell: with the
++       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow, by 4, and a heap never shrinks
++       */
++      check_free_heap_size(sc, hash_table_entries(cddr(entry)) + Gc_Trigger_Size + 8);
++      sc->gc_off = true;                    /* the pieces of the copy are not yet protected */
 +      sc->code = macro_cache_copy(sc, cddr(entry), cadr(entry));
 +      sc->gc_off = old_gc_off;
 +      return(true);
 +    }
 +  return(false);
-+}
-+
+ }
+ 
 +static void macro_cache_mark_pairs(s7_scheme *sc, s7_pointer set, s7_pointer p)
 +{
 +  /* all the pairs of p in set (cdr iteratively, car recursively) */
@@ -158,8 +166,8 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
 +      macro_cache_mark_pairs(sc, set, car(p));
 +      p = cdr(p);
 +    }
- }
- 
++}
++
 +static void macro_cache_made_pairs(s7_scheme *sc, s7_pointer set, s7_pointer p, s7_pointer made)
 +{
 +  /* the pairs of p which are not in set (the pairs of the arguments, and those already seen), put in made */
@@ -198,7 +206,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
  static inline bool op_macro_d(s7_scheme *sc, uint8_t typ)
  {
    sc->value = lookup(sc, car(sc->code));
-@@ -84008,8 +84123,13 @@
+@@ -84008,8 +84127,13 @@
    /* if unknown_any returns true, see below for fast? path */
    sc->args = cdr(sc->code);                       /* used to copy here, but that appears to be unnecessary */
    sc->code = sc->value;                           /* the macro */
@@ -213,7 +221,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
    set_curlet(sc, inline_make_let(sc, closure_let(sc->code)));
    return(false);                                  /* fall into apply_lambda */
  }
-@@ -84019,6 +84139,7 @@
+@@ -84019,6 +84143,7 @@
  static bool op_macro_star_d(s7_scheme *sc)
  {
    if (op_macro_d(sc, T_MACRO_STAR)) return(true); /* if (eval_args_no_eval_args(sc)) goto Apply; goto Top_No_Pop; */
@@ -221,7 +229,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
    apply_macro_star_1(sc);
    return(false);
  }
-@@ -98331,8 +98452,12 @@
+@@ -98331,8 +98456,12 @@
  	    default:                      eval_apply_error_nr(sc);
  	    }
  
@@ -236,7 +244,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
  	  /* goto Eval_Args_Top if the "macro" has changed type in midstream -- normally we fall through */
  
  	Apply_Lambda:
-@@ -98953,6 +99078,7 @@
+@@ -98953,6 +99082,7 @@
  
  
  	case OP_EVAL_MACRO:    op_eval_macro(sc);                  goto Eval;
@@ -244,7 +252,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
  	case OP_EVAL_MACRO_MV: if (op_eval_macro_mv(sc)) continue; goto Eval;
  	case OP_EXPANSION_MV:  op_finish_expansion(sc);            continue;
  
-@@ -100301,6 +100427,7 @@
+@@ -100301,6 +100431,7 @@
      case sl_Accept_All_Keyword_Arguments:  return(make_boolean(sc, sc->accept_all_keyword_arguments));
      case sl_Autoloading:                   return(make_boolean(sc, sc->is_autoloading));
      case sl_Bignum_Precision:              return(make_integer(sc, sc->bignum_precision));
@@ -252,13 +260,10 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
      case sl_Catches:                       return(sl_active_catches_to_list(sc));
      case sl_Cpu_Time:                      return(make_real(sc, (double)clock() / (double)CLOCKS_PER_SEC)); /* cpu, not wall-clock time */
      case sl_C_Types:                       return(sl_c_types_to_list(sc));
-@@ -100706,6 +100833,16 @@
- 		 set_elist_2(sc, wrap_string(sc, "(*s7* 'symbol-printer) function, ~A, should take one argument", 61), val));
-     }
-   sc->symbol_printer = val;
-+  return(val);
-+}
-+
+@@ -100709,6 +100840,16 @@
+   return(val);
+ }
+ 
 +static void macro_cache_reset(s7_scheme *sc);
 +
 +static s7_pointer sl_set_cache_macro_expansions(s7_scheme *sc, s7_pointer sym, s7_pointer val)
@@ -266,10 +271,13 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
 +  if (!is_boolean(val)) starlet_wrong_type_error_nr(sc, sym, val, sc->type_names[T_BOOLEAN]);
 +  sc->cache_macro_expansions = s7_boolean(sc, val);
 +  macro_cache_reset(sc);
-   return(val);
- }
- 
-@@ -101385,6 +101522,7 @@
++  return(val);
++}
++
+ static s7_pointer sl_set_symbol_quote(s7_scheme *sc, s7_pointer sym, s7_pointer val)
+ {
+   if (!is_boolean(val)) starlet_wrong_type_error_nr(sc, sym, val, sc->type_names[T_BOOLEAN]);
+@@ -101385,6 +101526,7 @@
      case sl_Accept_All_Keyword_Arguments:  return(sl_set_accept_all_keyword_arguments(sc, sym, val));
      case sl_Autoloading:                   return(sl_set_autoloading(sc, sym, val));
      case sl_Bignum_Precision:              return(sl_set_bignum_precision(sc, sym, val));
@@ -277,7 +285,7 @@ In TeXmacs: the LaTeX export of the change log is 13-20% faster.
      case sl_Catches:                       sl_unsettable_error_nr(sc, sym);
      case sl_Cpu_Time:                      sl_unsettable_error_nr(sc, sym);
      case sl_C_Types:                       sl_unsettable_error_nr(sc, sym);
-@@ -103745,6 +103883,10 @@
+@@ -103745,6 +103887,10 @@
    sc->accept_all_keyword_arguments = false;
    sc->muffle_warnings = false;
    sc->symbol_quote = false;
