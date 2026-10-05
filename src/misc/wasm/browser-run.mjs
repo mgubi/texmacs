@@ -9,7 +9,8 @@
 //   --size <w>x<h>     the size of the page (default 1280x800)
 //   --scale <r>        the device pixel ratio (default 1; 2 as a Retina
 //                      screen: the page draws at 2x, the screenshots too)
-//   --browser <path>   the browser (default: the Firefox of /Applications)
+//   --browser <path>   the browser (default: the Firefox of /Applications; a
+//                      Chrome or Chromium is driven as such)
 //   --query <string>   appended to the url of the page
 //   --port <n>         the port of the server (the IndexedDB of a page
 //                      belongs to its origin: keep it with --profile)
@@ -90,12 +91,15 @@ args.forEach ((a, i) => {
   const s = v.join ('=');
   prefs[k] = s === 'true' ? true : s === 'false' ? false : /^-?\d+$/.test (s) ? Number (s) : s;
 });
+// (a Chrome, or a Chromium, given by --browser: to compare the engines)
+const chrome = /chrom/i.test (path.basename (browserPath));
 const browser = await puppeteer.launch ({
-  browser: 'firefox', executablePath: browserPath, headless: !process.argv.includes ('--headed'),
-  extraPrefsFirefox: prefs,
+  browser: chrome ? 'chrome' : 'firefox', executablePath: browserPath,
+  headless: !process.argv.includes ('--headed'),
+  ...(chrome ? {} : { extraPrefsFirefox: prefs }),
   acceptInsecureCerts: process.argv.includes ('--insecure'),
   ...(profile ? { userDataDir: path.resolve (profile) } : {}),
-  args: [`--width=${W}`, `--height=${H}`]
+  args: chrome ? [`--window-size=${W},${H}`] : [`--width=${W}`, `--height=${H}`]
 });
 const page = await browser.newPage ();
 await page.setViewport ({ width: W, height: H,

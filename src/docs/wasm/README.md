@@ -259,6 +259,20 @@ was merged again (`shipped_fonts_changed`), its save emptied the caches
 filled during the boot (`cache_refresh`: the CJK fonts which
 `fonts-truetype.scm` looks for, 35 ms each when not cached) and the
 directories were never up to date (22000 `stat` at each start, now 2300).
+Most of the slowness of S7 is that of Firefox: in Chrome (154, headless,
+`browser-run.mjs --browser <chrome>`) the same build gives 58 ms for the
+pure Scheme (Firefox 119, native 48), 210 ms for the LaTeX (Firefox 301,
+native 170), 1302 ms for the typing and 188 ms for the page-downs; the
+start of a later visit is the same (0.94 s). In Safari (26.0.1, driven by
+`safaridriver`, its WebDriver: Develop > Allow Remote Automation) the pure
+Scheme takes 42 ms once warm (90 ms the first time), the LaTeX 213 to
+246 ms; a start of a later visit, from the navigation to the first answer
+of Scheme, 1.2 s. The standardized encoding of
+the exceptions of WebAssembly (`-sWASM_LEGACY_EXCEPTIONS=0`, S7 uses them
+for its `setjmp`) was measured in Firefox: the LaTeX 28 % faster, the
+typing and the scrolling some 10 %, the pure Scheme slower, a program 15 %
+larger, and no older browser (Safari before 18.4); not kept.
+
 `?debug=bench` prints the steps of the start. After the start, three modules
 are loaded when the user is idle (`math-adjust-en`, `math-adjust-fr`,
 `tmtex-widgets`), about 100 ms each.
