@@ -2417,6 +2417,26 @@ fill_rounded (renderer ren, int x1, int y1, int x2, int y2, float r) {
   ren->polygon (xs, ys);
 }
 
+// A popup without frame whose contents are a box with rounded corners which
+// covers it (the wait indicator): it paints its own background, and the
+// background of the window would show at the corners, outside the curve
+static bool
+rounded_popup (vue_virtual_window_rep* v, int W, int H) {
+  if (!v->popup || v->decorated ()) return false;
+  Clay_RenderCommandArray& a= v->render_commands;
+  for (int32_t i= 0; i < a.length; i++) {
+    Clay_RenderCommand* c= Clay_RenderCommandArray_Get (&a, i);
+    if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) continue;
+    if (c->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) return false;
+    Clay_RectangleRenderData* d= &c->renderData.rectangle;
+    Clay_BoundingBox bb= c->boundingBox;
+    return d->backgroundColor.a >= 255 && d->cornerRadius.topLeft > 0 &&
+           bb.x <= 0.5f && bb.y <= 0.5f &&
+           bb.x + bb.width >= W - 0.5f && bb.y + bb.height >= H - 0.5f;
+  }
+  return false;
+}
+
 // draw the visible virtual windows over the host, back to front
 static void
 composite_virtual_windows (vue_window host, renderer ren) {
@@ -2469,8 +2489,10 @@ composite_virtual_windows (vue_window host, renderer ren) {
     }
     ren->set_origin (X*px, -Y*px);
     ren->clip (0, -H*px, W*px, 0);
-    ren->set_pencil (theme_color (the_theme.background));
-    ren->fill (0, -H*px, W*px, 0);
+    if (!rounded_popup (v, W, H)) {
+      ren->set_pencil (theme_color (the_theme.background));
+      ren->fill (0, -H*px, W*px, 0);
+    }
     {
       with_window frame (v);
       render_clay_commands (ren, &v->render_commands);

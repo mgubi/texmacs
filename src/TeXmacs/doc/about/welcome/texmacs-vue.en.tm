@@ -196,7 +196,8 @@
 
     <item>The panel <with|font-shape|italic|Updating current buffer, please
     wait> of <menu|Document|Update|All> goes away once the update is done
-    (it stayed until a key or a click). A bibliography inserted without
+    (it stayed until a key or a click), and its rounded corners no longer
+    show a square frame. A bibliography inserted without
     file takes the references of <name|Zotero> which the document cites,
     in a file exported from <name|Zotero>, at <menu|Document|Update|All>.
 

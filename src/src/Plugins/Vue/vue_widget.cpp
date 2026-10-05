@@ -5040,7 +5040,10 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 void
 vue_plain_window_widget_rep::do_layout () {
   Clay_BorderElementConfig border= {};
-  if (popup) border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
+  // (not around the wait indicator, a panel with its own rounded frame: the
+  // square line showed at its corners)
+  if (popup && name != "Wait")
+    border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
   // no background: process_redraw clears the window with the same colour
   // before replaying the commands, and painting it again here cost a fill
   // of the whole window per frame (see "Rendering details" in
