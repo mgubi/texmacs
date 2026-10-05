@@ -4611,6 +4611,12 @@ vue_input_text_widget_rep::render (void *data) {
 void
 vue_input_text_widget_rep::do_layout () {
   win= current_window; // see focus_on_named_input
+  // a window without keyboard focus gives it to its first field, as a Qt
+  // dialog does (an editor embedded in the dialog does not take it from
+  // the field, see vue_texmacs_widget_rep::do_layout)
+  if (current_window->kbd_focus == NULL && !greyed &&
+      is_nil (current_window->default_focus))
+    current_window->default_focus= this;
   bool is_focused= current_window->kbd_focus == this;
   SI w= decode_length (width, current_window, style);
   font fn= get_font ();
@@ -5668,7 +5674,11 @@ void vue_texmacs_widget_rep::do_layout () {
   // repainted with the change pending ("Invalid situation" in
   // edit_interface_rep::handle_repaint). The loop gives it just before
   // the interpose handler (apply_default_focus in vue_gui.cpp)
-  if (win->kbd_focus == NULL) win->default_focus= main_widget;
+  // an embedded editor (mask 0: texmacs-input in a dialog or a tool) leaves
+  // it to a field of the window laid out before it, as Qt gives the
+  // keyboard of a dialog to its first field
+  if (win->kbd_focus == NULL && (mask != 0 || is_nil (win->default_focus)))
+    win->default_focus= main_widget;
   // the bars follow the mask given at creation and the visibility slots
   // (the icon bars go with the header, as in Qt: presentation mode hides
   // the header only);
