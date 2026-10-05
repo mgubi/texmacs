@@ -12,12 +12,29 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (security wallet wallet-base)
-  (:use (security gpg gpg-wallet)))
+  (:use (security gpg gpg-wallet) (security wallet web-wallet)))
+
+;; In a web browser the wallet is that of web-wallet.scm (the cryptography of
+;; the browser instead of GnuPG); its opening and its changes are
+;; asynchronous, and are done by the dialogues of wallet-menu.scm, so that
+;; wallet-turn-on, wallet-initialize, wallet-reinitialize and
+;; wallet-correct-passphrase? are not used there.
 
 ;; So far portable implementation is based on GnuPG
 (tm-define (supports-wallet?)
   (:synopsis "Tells if the platform provides a wallet implementation")
-  (supports-gpg?))
+  (if (web-wallet?) (web-wallet-supported?) (supports-gpg?)))
+
+;; What wants to know when the wallet is turned on (the plug-ins which take
+;; their keys there)
+(define wallet-on-hooks (list))
+
+(tm-define (wallet-add-on-hook f)
+  (:synopsis "Call @f each time the wallet is turned on")
+  (set! wallet-on-hooks (append wallet-on-hooks (list f))))
+
+(tm-define (wallet-notify-on)
+  (for-each (lambda (f) (f)) wallet-on-hooks))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Initialization
@@ -25,7 +42,7 @@
 
 (tm-define (wallet-initialized?)
   (:synopsis "Tells if wallet has been initialized") 
-  (gpg-wallet-initialized?))
+  (if (web-wallet?) (web-wallet-initialized?) (gpg-wallet-initialized?)))
 
 (tm-define (wallet-initialize passphrase)
   (:synopsis "Initialize a new wallet") 
@@ -46,7 +63,7 @@
 
 (tm-define (wallet-destroy)
   (:synopsis "Destroy wallet") 
-  (gpg-wallet-destroy))
+  (if (web-wallet?) (web-wallet-destroy) (gpg-wallet-destroy)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Status
@@ -54,7 +71,7 @@
 
 (tm-define (wallet-on?)
   (:synopsis "Tells if wallet is turned on") 
-  (gpg-wallet-on?))
+  (if (web-wallet?) (web-wallet-on?) (gpg-wallet-on?)))
 
 (tm-define (wallet-off?)
   (:synopsis "Tells if wallet is turned off") 
@@ -94,12 +111,15 @@
   (:synopsis "Turn wallet on using @passphrase") 
   (:interactive #t)
   (:argument passphrase "password" "Wallet passphrase")
-  (gpg-wallet-turn-on passphrase)
-  (set-preference "wallet persistent status" "on"))
+  (and (gpg-wallet-turn-on passphrase)
+       (begin
+         (set-preference "wallet persistent status" "on")
+         (wallet-notify-on)
+         #t)))
 
 (tm-define (wallet-turn-off)
   (:synopsis "Turn wallet off") 
-  (gpg-wallet-turn-off)
+  (if (web-wallet?) (web-wallet-lock) (gpg-wallet-turn-off))
   (set-preference "wallet persistent status" "off"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -108,15 +128,15 @@
 
 (tm-define (wallet-set key val)
   (:synopsis "Insert binding @key ~> @val into wallet")
-  (gpg-wallet-set key val))
+  (if (web-wallet?) (web-wallet-set key val) (gpg-wallet-set key val)))
 
 (tm-define (wallet-get key)
   (:synopsis "Get value for @key from the wallet")
-  (gpg-wallet-get key))
+  (if (web-wallet?) (web-wallet-get key) (gpg-wallet-get key)))
 
 (tm-define (wallet-delete key)
   (:synopsis "Delete binding for @key in the wallet")
-  (gpg-wallet-delete key))
+  (if (web-wallet?) (web-wallet-delete key) (gpg-wallet-delete key)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; List entries
@@ -124,4 +144,4 @@
 
 (tm-define (wallet-entries)
   (:synopsis "List all entries of the wallet")
-  (gpg-wallet-entries))
+  (if (web-wallet?) (web-wallet-entries) (gpg-wallet-entries)))

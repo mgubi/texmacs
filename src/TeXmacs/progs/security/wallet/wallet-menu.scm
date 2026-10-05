@@ -65,6 +65,27 @@
 (define (wallet-strong-passphrase? passphrase)
   (not (wallet-weak-passphrase? passphrase)))
 
+;; In a web browser (web-wallet.scm) the wallet is opened or changed after
+;; the dialogue: these are called with the answer
+(define (wallet-web-done cmd)
+  (lambda (ok? msg)
+    (if ok?
+        (begin
+          (when (wallet-on?)
+            (set-preference "wallet persistent status" "on")
+            (wallet-notify-on))
+          (cmd "Ok"))
+        (set-message (string-append "Wallet: " msg) "Wallet"))))
+
+(define (wallet-web-opened cmd wrong)
+  (lambda (ok? msg)
+    (if ok?
+        (begin
+          (set-preference "wallet persistent status" "on")
+          (wallet-notify-on)
+          (cmd "Ok"))
+        (wrong msg))))
+
 (tm-widget (wallet-widget-initialize cmd)
   (with wallet-widget-weak-passphrase? #f
     (resize "500px" "200px"
@@ -73,11 +94,11 @@
           (hlist
             (text "Wallet passphrase:") // //
             (form-input "passphrase" "password" '() "10w") >>)
-          (when (wallet-can-remember-passphrase?)
+          (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             ===
             (hlist
               (text "Retrieve wallet passphrase automatically at login?") // //
-              (form-enum "remember?" '("yes" "no") "no" "4em") >>))
+              (form-enum "remember?" '("yes" "no") "no" "4em") >>)))
           (refreshable "wallet-widget-reask-passphrase"
             (if wallet-widget-weak-passphrase?
                 (centered
@@ -93,11 +114,15 @@
                           (or wallet-widget-weak-passphrase?
                               (wallet-strong-passphrase?
                                (first (form-values)))))
-                 (system-wait "Initializing wallet" "please wait")
-                 (when (and (wallet-initialize (first (form-values)))
-                            (> n 1) (== (second (form-values)) "yes"))
-                   (wallet-save-passphrase (first (form-values))))
-                 (cmd "Ok")))
+                 (if (web-wallet?)
+                     (web-wallet-create (first (form-values))
+                                        (wallet-web-done cmd))
+                     (begin
+                       (system-wait "Initializing wallet" "please wait")
+                       (when (and (wallet-initialize (first (form-values)))
+                                  (> n 1) (== (second (form-values)) "yes"))
+                         (wallet-save-passphrase (first (form-values))))
+                       (cmd "Ok")))))
              (set! wallet-widget-weak-passphrase? #t)
              (refresh-now "wallet-widget-reask-passphrase"))))))))
 
@@ -117,11 +142,11 @@
           (hlist
             (text "New wallet passphrase:") // //
             (form-input "passphrase" "password" '() "10w") >>)
-          (when (wallet-can-remember-passphrase?)
+          (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             ===
             (hlist
               (text "Retrieve wallet passphrase automatically at login?") // //
-              (form-enum "remember?" '("yes" "no") "no" "4em") >>))
+              (form-enum "remember?" '("yes" "no") "no" "4em") >>)))
           (refreshable "wallet-widget-reask-new-passphrase"
             (if wallet-widget-weak-passphrase?
                 (centered
@@ -137,11 +162,15 @@
                           (or wallet-widget-weak-passphrase?
                               (wallet-strong-passphrase?
                                (first (form-values)))))
-                 (system-wait "Reinitializing wallet" "please wait")
-                 (when (wallet-reinitialize "" (first (form-values)))
-                   (when (and (> n 1) (== (second (form-values)) "yes"))
-                     (wallet-save-passphrase (first (form-values)))))
-                 (cmd "Ok")))
+                 (if (web-wallet?)
+                     (web-wallet-change-passphrase (first (form-values))
+                                                   (wallet-web-done cmd))
+                     (begin
+                       (system-wait "Reinitializing wallet" "please wait")
+                       (when (wallet-reinitialize "" (first (form-values)))
+                         (when (and (> n 1) (== (second (form-values)) "yes"))
+                           (wallet-save-passphrase (first (form-values)))))
+                       (cmd "Ok")))))
              (set! wallet-widget-weak-passphrase? #t)
              (refresh-now "wallet-widget-reask-new-passphrase"))))))))
 
@@ -169,24 +198,37 @@
             (text "Wallet passphrase:") // //
             (form-input "passphrase" "password" '() "2w") >>)
           ===
-          (when (wallet-can-remember-passphrase?)
+          (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             (hlist
               (text "Retrieve wallet passphrase automatically at login?") // //
-              (form-enum "remember?" '("yes" "no") "no" "4em") >>))
+              (form-enum "remember?" '("yes" "no") "no" "4em") >>)))
           === ===
           (bottom-buttons
+            (if (and (web-wallet?) (web-wallet-has-passkey?))
+                ("Use passkey"
+                 (web-wallet-unlock-passkey
+                  (wallet-web-opened cmd (lambda (msg)
+                                           (set-message msg "Wallet"))))))
             >>
             ("Cancel" (wallet-turn-off) (cmd "Cancel")) // //
             ("Ok"
              (with n (length (form-values))
                (when (and (> n 0) (string? (first (form-values))))
-                 (when (wallet-correct-passphrase? (first (form-values)))
-                   (when (and (wallet-turn-on (first (form-values)))
-                              (> n 1) (== (second (form-values)) "yes"))
-                     (wallet-save-passphrase (first (form-values))))
-                   (cmd "Ok"))))
-             (set! wallet-widget-wrong-passphrase? #t)
-             (refresh-now "wallet-widget-reask-passphrase"))))))))
+                 (if (web-wallet?)
+                     (web-wallet-unlock
+                      (first (form-values))
+                      (wallet-web-opened
+                       cmd (lambda (msg)
+                             (set! wallet-widget-wrong-passphrase? #t)
+                             (refresh-now "wallet-widget-reask-passphrase"))))
+                     (when (wallet-correct-passphrase? (first (form-values)))
+                       (when (and (wallet-turn-on (first (form-values)))
+                                  (> n 1) (== (second (form-values)) "yes"))
+                         (wallet-save-passphrase (first (form-values))))
+                       (cmd "Ok")))))
+             (when (not (web-wallet?))
+               (set! wallet-widget-wrong-passphrase? #t)
+               (refresh-now "wallet-widget-reask-passphrase")))))))))
 
 (tm-define (wallet-dialogue-turn-on . callback)
   (let* ((cb (if (null? callback) noop (car callback)))
@@ -293,10 +335,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-widget (wallet-not-supported-preferences-widget)
-  (centered
+  (if (web-wallet?)
+      (centered
+        (text "This browser gives no cryptography to the page:")
+        (text "the wallet needs a secure page (https or localhost).")))
+  (if (not (web-wallet?))
+   (centered
     (text "Passphrase wallet facilities are not currently available.")
     (text "Please install GnuPG software from https://www.gnupg.org/,")
-    (text "and perform casual settings from the \"Encryption\" tab.")))
+    (text "and perform casual settings from the \"Encryption\" tab."))))
 
 (tm-widget (wallet-initialized-preferences-widget)
   (with cb (lambda (x) (refresh-now "security-preferences-refresher"))
@@ -314,6 +361,23 @@
             ("Delete entries" (wallet-dialogue-delete)) // //
             ("Change passphrase"
              (wallet-dialogue-reinitialize cb)) >>)))
+    (if (and (wallet-on?) (web-wallet?) (web-wallet-passkey-supported?))
+        ===
+        (hlist
+          (text "Passkey:") // //
+          (if (not (web-wallet-has-passkey?))
+              (explicit-buttons
+                ("Add a passkey"
+                 (web-wallet-add-passkey
+                  (lambda (ok? msg)
+                    (set-message (if ok? "Wallet: the passkey opens it too"
+                                     (string-append "Wallet: " msg))
+                                 "Wallet")
+                    (cb "Ok")))) >>))
+          (if (web-wallet-has-passkey?)
+              (explicit-buttons
+                ("Remove the passkey"
+                 (web-wallet-remove-passkey) (cb "Ok")) >>))))
     ===
     (hlist
       (text "Automatically remember all passphrases in the wallet?") // //
