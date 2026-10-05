@@ -1029,15 +1029,29 @@
         ;; the key goes in a header
         (check-true (in? "Zotero-API-Key: secret" (caddr (car sim-requests))))
         (check= (zotero-status-message 'pending) "Asking zotero.org...")
+        ;; the footer says what is asked
+        (check= (zotero-progress-message)
+                "Asking zotero.org: checking the library...")
         ;; the operation which waited runs again once answered
         (sim-answer! "format=keys" 200 7 "AAAA1111\n")
         (check= runs 1)
         (check-false (zotero-pending?))
+        (check-false (zotero-progress-message))
         (check= (zotero-with-retry again zotero-status) 'ready)
         ;; a search: nothing at first, the items once answered
         (check= (zotero-with-retry again (lambda () (zotero-search "gravity")))
                 '())
         (check= (length sim-requests) 1)
+        (check= (zotero-progress-message)
+                "Asking zotero.org: searching ``gravity''...")
+        ;; the search window says so
+        (check= (zotero-searching-results) '("Searching zotero.org..."))
+        (check= (zotero-with-retry again
+                                   (lambda ()
+                                     (zotero-file-search-results "gravity")))
+                '("Searching zotero.org..."))
+        ;; (its own request, with fewer items)
+        (sim-answer! "limit=10" 200 7 "[]")
         ;; the same request is not asked twice while it is awaited
         (zotero-with-retry again (lambda () (zotero-search "gravity")))
         (check= (length sim-requests) 1)
@@ -1070,9 +1084,44 @@
         (zotero-with-retry again zotero-status)
         (sim-answer! "format=keys" 0 0 "")
         (check= (zotero-with-retry again zotero-status) 'not-running)
+        ;; which is said once all is answered
+        (check= (zotero-answered-message) "zotero.org cannot be reached")
         (check= sim-requests '())
         ;; without retry, the request is synchronous (not recorded here)
         (check-false (zotero-pending?)))))
+  (check-group "async messages")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items/top?format=json&limit=50&q=caf%C3%A9%20au")
+          (string-append "searching ``caf" (string (integer->char 233))
+                         " au''"))
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items/top?format=json&limit=9&qmode=everything&q=smith")
+          "searching ``smith''")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items?format=bibtex&itemKey=A,B,C")
+          "exporting 3 references")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items?format=json&itemKey=A")
+          "fetching 1 reference")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items?format=versions&itemKey=A,B")
+          "looking for changes of 2 references")
+  (check= (zotero-request-label "https://api.zotero.org/keys/current")
+          "checking the API key")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/groups?format=json&limit=100")
+          "listing your groups")
+  (with-sim-browser
+    (lambda ()
+      (let* ((again (lambda () (noop))))
+        (zotero-with-retry again zotero-status)
+        (sim-answer! "format=keys" 200 7 "AAAA1111\n")
+        (zotero-with-retry again (lambda () (zotero-search "gravity")))
+        (zotero-with-retry again (lambda () (zotero-search "smith")))
+        (check= (zotero-progress-message)
+                "Asking zotero.org: searching ``smith'', and 1 more...")
+        (set! sim-requests '())
+        (zotero-forget-keys))))
   (check-group "async update")
   (with-sim-browser
     (lambda ()

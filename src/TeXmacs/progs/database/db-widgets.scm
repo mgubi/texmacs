@@ -145,10 +145,12 @@
                      '()))
              (z (if (null? zl) '() (db-pretty zl kind :pretty)))
              (r* (if (== kind "bib") (zotero-mark-results r l #f) r))
-             (z* (zotero-mark-results z zl #t)))
-	(cond ((and (null? r) (null? z)) (list "No matching items"))
-	      ((>= (length r) 20) (append (rcons r* "More items follow") z*))
-	      (else (append r* z*)))))))
+             (z* (zotero-mark-results z zl #t))
+             (s* (if (== kind "bib") (zotero-searching-results) '())))
+	(cond ((and (null? r) (null? z) (nnull? s*)) s*)
+              ((and (null? r) (null? z)) (list "No matching items"))
+	      ((>= (length r) 20) (append (rcons r* "More items follow") z* s*))
+	      (else (append r* z* s*)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search the database
