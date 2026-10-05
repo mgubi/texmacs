@@ -222,8 +222,25 @@ var tmPackages = (function () {
     return node;
   }
 
+  // The time of the files of TeXmacs: one per build, the same at each visit.
+  // They were made at the time of the visit, so that TeXmacs saw them all
+  // changed at each start (last_modified): it merged the font database of
+  // its home again (shipped_fonts_changed), which emptied the caches of the
+  // fonts looked for at the start (cache_refresh), and found its directories
+  // never up to date. From the hashes of the packages: another build has
+  // another time (its files may differ).
+  function buildTime () {
+    var s = ENV['TEXMACS_WEB_BUILD'] || '', h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt (i)) >>> 0;
+    return Date.UTC (2020, 0, 1) + (h % (5 * 365 * 86400)) * 1000;
+  }
+  function setTime (node, t) {
+    node.timestamp = node.atime = node.mtime = node.ctime = t;
+  }
+
   function createTree () {
     var made = {};
+    var time = buildTime ();
     function mkdir (d) {
       if (made[d]) return;
       made[d] = true;
@@ -234,7 +251,9 @@ var tmPackages = (function () {
       pkg.files.forEach (function (f) {
         var p = ROOT + '/' + f[0], i = p.lastIndexOf ('/'), dir = p.slice (0, i);
         mkdir (dir);
-        pending[pkg.name].push (placeholder (dir, p.slice (i + 1), pkg, f[1], f[2]));
+        var node = placeholder (dir, p.slice (i + 1), pkg, f[1], f[2]);
+        setTime (node, time);
+        pending[pkg.name].push (node);
       });
     });
     // the fonts: a placeholder each, whose "package" is the font's own file
@@ -243,7 +262,14 @@ var tmPackages = (function () {
       mkdir (dir);
       var pkg = { name: f[0], url: f[1], size: f[2], lazy: true };
       var u = url (f[1]);
-      (lazyNodes[u] = lazyNodes[u] || []).push (placeholder (dir, p.slice (i + 1), pkg, 0, f[2]));
+      var node = placeholder (dir, p.slice (i + 1), pkg, 0, f[2]);
+      setTime (node, time);
+      (lazyNodes[u] = lazyNodes[u] || []).push (node);
+    });
+    // the directories last (a file made in one changes its time)
+    Object.keys (made).forEach (function (d) {
+      for (; d.length >= ROOT.length; d = d.slice (0, d.lastIndexOf ('/')))
+        try { setTime (FS.lookupPath (d).node, time); } catch (e) {}
     });
   }
 

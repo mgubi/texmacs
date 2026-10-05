@@ -456,6 +456,11 @@
     <verbatim|install.packages> installs the packages built for
     <name|webR>. <menu|Stop> ends <name|R> while it computes; it starts
     again with the next input. See <menu|Help|Plug-ins|R>.
+
+    <item>A third faster start on the next visits (about 1<nbsp>s instead of
+    1.5<nbsp>s once the page is loaded): the files of <TeXmacs> had the time
+    of each visit, so that it merged its font database again at every start
+    and lost the caches of its fonts and of its directories.
   </itemize>
 
   <paragraph|4 October 2026>
