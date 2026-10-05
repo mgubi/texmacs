@@ -234,6 +234,7 @@ cached_load_picture (url file_name, int w, int h, tree eff,
 picture qt_load_xpm (url file_name);
 picture mupdf_load_xpm (url file_name);
 string  mupdf_get_icon_theme ();
+string  ns_icon_theme ();
 
 picture 
 raw_load_xpm (url file_name) {
@@ -311,6 +312,9 @@ load_xpm (url file_name) {
   string name= as_string (file_name) * "#" * as_string (retina_factor);
 #ifdef MUPDF_RENDERER
   name= name * "#" * mupdf_get_icon_theme ();
+#endif
+#ifdef AQUATEXMACS
+  name= name * "#" * ns_icon_theme ();
 #endif
   if (cache->contains (name)) return cache[name];
 

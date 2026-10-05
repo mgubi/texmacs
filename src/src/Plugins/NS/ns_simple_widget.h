@@ -96,6 +96,7 @@ public:
   NSRect viewport ();           //!< the visible part, as in Qt
   coord4 extents;               //!< the extents of the document
   void invalidate_all ();       //!< also for the benchmark (ns_gui.mm)
+  static void invalidate_every (); //!< all the widgets (change of theme)
   bool is_invalid ();
 
 protected:

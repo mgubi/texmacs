@@ -83,30 +83,30 @@ as_native_picture (picture pict) {
   return as_ns_picture (pict);
 }
 
-static string
-icon_theme () {
-  // The variant of the icons, light or dark, after the appearance of the
-  // application (see gui_open). It is fixed at the first icon, since the
-  // icons already made are not made again when the appearance changes.
-  static string theme= "";
-  if (theme == "") {
-    NSAppearanceName name= [[NSApp effectiveAppearance]
-      bestMatchFromAppearancesWithNames:
-        @[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
-    theme= [name isEqualToString: NSAppearanceNameDarkAqua]? "dark": "light";
-  }
-  return theme;
+string
+ns_icon_theme (NSAppearance* appearance) {
+  // The variant of the icons, light or dark, for an appearance
+  NSAppearanceName name= [appearance bestMatchFromAppearancesWithNames:
+                            @[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
+  return [name isEqualToString: NSAppearanceNameDarkAqua]? "dark": "light";
+}
+
+string
+ns_icon_theme () {
+  // The variant of the icons for the appearance of the application (see
+  // gui_open); it follows the system when the theme is the default one
+  return ns_icon_theme ([NSApp effectiveAppearance]);
 }
 
 static NSImage*
-svg_icon (url file_name) {
+svg_icon (url file_name, string theme) {
   // The vector version of an icon, looked up as by the Qt and Vue interfaces:
   // name.svg in the light or dark variant of the icon sets on
   // $TEXMACS_PIXMAP_PATH. The set chosen in the preferences (neo-classical
   // by default) comes first on the path, and its icons only exist as SVG.
   if (suffix (file_name) != "xpm") return nil;
   url base= unglue (file_name, 4);
-  url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url (icon_theme ()) *
+  url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url (theme) *
                     glue (tail (base), ".svg") |
                     url ("$TEXMACS_PIXMAP_PATH") * glue (base, ".svg"));
   string sss;
@@ -130,12 +130,12 @@ render_icon (NSImage* im, int w, int h) {
 }
 
 NSBitmapImageRep*
-xpm_image (url file_name) {
+xpm_image (url file_name, string theme) {
   // As in qt_load_xpm, the SVG version of the icon is drawn when there is
   // one, and otherwise its PNG equivalent (at double resolution on retina
   // screens); the size of the image is in points
   static hashmap<string,pointer> cache (NULL);
-  string key= as_string (file_name);
+  string key= as_string (file_name) * "#" * theme;
   if (cache->contains (key)) return (NSBitmapImageRep*) cache[key];
   string sss;
   double f= 1.0;
@@ -155,7 +155,7 @@ xpm_image (url file_name) {
     im= [[NSBitmapImageRep alloc] initWithData: data];
     if (im) [im setSize: NSMakeSize ([im pixelsWide] / f, [im pixelsHigh] / f)];
   }
-  if (NSImage* svg= svg_icon (file_name)) {
+  if (NSImage* svg= svg_icon (file_name, theme)) {
     // the size of the raster icon when there is one, since a few SVG files
     // declare the size of the drawing they were made from (the flags)
     NSSize sz= im ? [im size] : [svg size];
@@ -376,7 +376,7 @@ qt_load_xpm (url file_name) {
     url png_equiv= glue (unglue (file_name, 3), "png");
     load_string ("$TEXMACS_PIXMAP_PATH" * png_equiv, sss, false);
   }
-  NSImage* svg= svg_icon (file_name);
+  NSImage* svg= svg_icon (file_name, ns_icon_theme ());
   if (svg) {
     // drawn at the size in pixels of the raster icon when there is one
     // (see xpm_image)
