@@ -166,8 +166,17 @@
   ;; escape-shell protects the characters special to a POSIX shell
   (check= (escape-shell "abc") "abc")
   (check= (escape-shell "a b(c)$d") "a\\ b\\(c\\)\\$d")
-  (check= (escape-shell "x\ny") "x\\ny")
+  (check= (escape-shell "x\ny") "x'\n'y")
   (check= (escape-shell "a&b<c>d?") "a\\&b\\<c\\>d\\?")
+  (check= (escape-shell "a;b|c'd*e~f#g") "a\\;b\\|c\\'d\\*e\\~f\\#g")
+  (check= (escape-shell "/usr/bin/x-y_z.1,2:3+4@5%6=7")
+          "/usr/bin/x-y_z.1,2:3+4@5%6=7")
+  ;; the shell reads the escaped string back unchanged
+  (when (not (or (os-win32?) (os-mingw?)))
+    (for (s (list "a b" "a;echo INJECTED" "it's" "x|y" "a*" "~/f" "#c"
+                  "$(echo no)" "`echo no`" "x\ny" "t\tu" "[ab]" "{a,b}"))
+      (check= (eval-system (string-append "printf %s " (escape-shell s)))
+              s)))
   ;; escape-to-ascii writes the bytes above 127 as \xhh, which
   ;; unescape-guile reads back
   (check= (escape-to-ascii "abc") "abc")
