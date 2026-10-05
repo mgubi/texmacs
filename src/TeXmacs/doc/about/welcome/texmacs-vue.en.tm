@@ -212,6 +212,11 @@
 
     <item>Faster Scheme: the macros of a piece of code are expanded once,
     not each time the code runs (the export to <LaTeX> is about 15% faster).
+
+    <item>The windows are drawn by the graphics card (WebGL2): scrolling,
+    zooming and every frame cost the processor two to four times less, with
+    the same text as before. Add <verbatim|?gpu=0> to the address of the page
+    to draw as before, in a browser where something looks wrong.
   </itemize>
 
   <paragraph|4 October 2026>

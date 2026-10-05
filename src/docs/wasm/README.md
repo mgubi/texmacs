@@ -173,6 +173,35 @@ Locally:
   program had been compiled: the two downloads followed each other. `serve.mjs [dir] [port] [KB/s]` and
   `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
 
+## Drawing with the GPU (the default; `texmacs.html?gpu=0` for MuPDF)
+
+A build with ThorVG draws the windows with WebGL2 instead of MuPDF (see
+*The GPU renderer* in [../vue-graphics-stack.md](../vue-graphics-stack.md)):
+
+```sh
+sh misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm  # found by the Makefile
+make -C build-wasm -f ../misc/wasm/Makefile ... web    # or THORVG=<dir>/wasm
+```
+
+(the CI does the same, with a cache). The page draws with the GPU (it sets
+`TEXMACS_VUE_GPU`) unless its address has `?gpu=0` or the browser has no
+WebGL2, where it draws with MuPDF as before; a build without ThorVG draws
+with MuPDF whatever the address says. Measured in
+headless Firefox on an Apple M1 (Retina, the document of 200 paragraphs of
+`TeXmacs.later`-driven forced repaints, `?profile=20`): a full repaint of
+the editor takes 2.2 ms of CPU (3.5 ms with `?gpusync=1`, which makes the
+profile wait for the GPU) against 6.6 ms with MuPDF (19.1 ms before the
+work of October 2026 on the MuPDF renderer), and the canvas upload of
+every frame (2 ms) is gone. Scrolling and zooming the math font catalogue,
+the GPU path draws more frames than MuPDF in every phase, at 1 to 2.3 ms
+of CPU a frame against 4.4 to 5 ms.
+
+`?slug=1` (with `?gpu=1`) draws the glyphs from their outlines instead of
+from bitmaps (Slug, see *The GPU renderer*): on the same benchmark the
+repaints at zoom 2, where the bitmaps of the glyphs are made, cost 0.4 ms
+of CPU a frame instead of 1.2 ms, and the other phases are the same or a
+little faster.
+
 ## Optimization
 
 `OPT` of the Makefile (`-O2` by default) is that of the compilation and of

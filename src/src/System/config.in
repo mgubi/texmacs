@@ -323,6 +323,9 @@
 /* Use C++ stack backtraces */
 #undef USE_STACK_TRACE
 
+/* Use ThorVG and OpenGL for the Vue renderer */
+#undef USE_THORVG
+
 /* Enable experimental Vue port */
 #undef VUETEXMACS
 

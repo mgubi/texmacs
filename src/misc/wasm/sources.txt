@@ -257,6 +257,7 @@ Plugins/Unix/unix_system.cpp
 Plugins/Updater/tm_updater.cpp
 Plugins/Updater/tm_winsparkle.cpp
 Plugins/Vue/clay.c
+Plugins/Vue/vue_gpu.cpp
 Plugins/Vue/vue_gui.cpp
 Plugins/Vue/vue_widget.cpp
 Scheme/S7/s7.c
