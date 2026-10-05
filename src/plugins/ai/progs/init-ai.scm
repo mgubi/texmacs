@@ -330,7 +330,7 @@
                 (else "no models in the answer"))))))
 
 ;; the model which a session of the engine asks (as ai.cpp chooses it)
-(define (ai-session-model name)
+(define (ai-default-model name)
   (let* ((pref (cond ((== name "ollama") "ollama model")
                      (else (string-append name " model"))))
          (m (get-preference pref))
@@ -341,6 +341,31 @@
           ((== name "albert") name)
           (known known)
           (else ""))))
+
+;; The model of a session: in the document, as (with "ai-model" m session)
+;; around it, else the one of the preferences of the engine (which the
+;; sessions without a model of their own, and the folds, ask)
+(define (ai-model-with s)
+  (with w (and s (tree-up s))
+    (and w (tree-is? w 'with) (== (tree-arity w) 3)
+         (tree-atomic? (tree-ref w 0))
+         (== (tree->string (tree-ref w 0)) "ai-model")
+         (tree-atomic? (tree-ref w 1))
+         w)))
+
+(define (ai-tree-model s name)
+  (with w (ai-model-with s)
+    (if w (tree->string (tree-ref w 1)) (ai-default-model name))))
+
+;; the session of the engine at the cursor, if any
+(define (ai-cursor-session name)
+  (with s (tree-innermost 'session)
+    (and s (tree-atomic? (tree-ref s 0))
+         (== (tree->string (tree-ref s 0)) name)
+         s)))
+
+(define (ai-session-model name)
+  (ai-tree-model (ai-cursor-session name) name))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The instructions of the engines (their system prompt): a text file of the
@@ -455,15 +480,38 @@
 ;; which is evaluated, the last ones (ai-context-size), as a list (question
 ;; answer ...); #f when the evaluation is not in a session (a fold): the
 ;; engine then has the last exchanges kept in memory (ai.cpp)
-(tm-define (ai-session-context name chat)
+;; the field of the session which is evaluated (its output is where the
+;; answer goes), #f for a fold
+(define (ai-pending-field name chat)
   (let* ((l (pending-ref name chat))
          (item (and (nnull? l) (car l)))
          (p (and item (>= (length item) 4) (third item))))
-    (if (or (not p) (tree? p)) #f
-        (let* ((out (catch #t (lambda () (tree-pointer->tree p))
-                      (lambda args #f)))
-               (field (and (tree? out) (tree-up out)))
-               (doc (and field (tree-up field))))
+    (and p (not (tree? p))
+         (let ((out (catch #t (lambda () (tree-pointer->tree p))
+                      (lambda args #f))))
+           (and (tree? out) (tree-up out))))))
+
+;; The model of a request: that of the session of the field which is
+;; evaluated (ai-request sets it while ai.cpp makes the request, and
+;; ai_model_name asks it), else the one of the preferences
+(define ai-model-of-request "")
+(tm-define (ai-model-override) ai-model-of-request)
+
+(tm-define (ai-request-prepare name chat)
+  (let* ((field (ai-pending-field name chat))
+         (doc (and field (tree-up field)))
+         (s (and doc (tree-up doc)))
+         (w (and s (tree-is? s 'session) (ai-model-with s))))
+    (set! ai-model-of-request (if w (tree->string (tree-ref w 1)) ""))))
+
+(tm-define (ai-request-done)
+  (set! ai-model-of-request ""))
+
+(tm-define (ai-session-context name chat)
+  (let* ((field (ai-pending-field name chat))
+         (doc (and field (tree-up field))))
+    (if (not field) #f
+        (let ()
           (if (not (and doc (tm-func? doc 'document))) #f
               (let* ((i (tree-index field))
                      (pairs
@@ -754,8 +802,30 @@
     ;; with the current one, which may not be in the list
     (if (or (== m "") (in? m l)) l (cons m l))))
 
+;; the model in the first line of a session (ai-banner), while it has no
+;; answer yet: after one, it stays the model with which it began (each
+;; answer says the model which gave it, in the fold of the answer as it
+;; came)
+(define (ai-update-banner s m)
+  (let* ((body (tree-ref s 2))
+         (n (if (tree-is? body 'document) (tree-arity body) 0)))
+    (when (and (> n 0) (tree-is? (tree-ref body 0) 'output)
+               (list-and (map (lambda (i)
+                                (not (tree-in? (tree-ref body i) ai-io-tags)))
+                              (.. 1 n))))
+      (with v (tree-search (tree-ref body 0) (lambda (t) (tree-is? t 'verbatim)))
+        (when (and (pair? v) (tree-atomic? (tree-ref (car v) 0)))
+          (tree-assign (tree-ref (car v) 0) m))))))
+
 (tm-define (ai-set-session-model lan m)
-  (set-preference (string-append lan " model") m)
+  ;; the session at the cursor, else the default model of the engine
+  (with s (ai-cursor-session lan)
+    (if (not s)
+        (set-preference (string-append lan " model") m)
+        (with w (ai-model-with s)
+          (ai-update-banner s m)
+          (if w (tree-assign (tree-ref w 1) m)
+              (tree-insert-node! s 2 `(with "ai-model" ,m))))))
   (set-message (string-append "The next questions ask " m)
                (string-append "Model of " (session-name lan)))
   (refresh-now "ai-model-list"))
@@ -765,10 +835,10 @@
   (with i (string-index m #\/)
     (if i (substring m 0 i) "")))
 
-;; the model chosen, and with start? a new session of it
+;; the model chosen, and with start? a new session of it, which asks it
 (define (ai-choose-model lan m start?)
-  (ai-set-session-model lan m)
-  (when start? (make-session lan "default")))
+  (when start? (make-session lan "default"))
+  (ai-set-session-model lan m))
 
 (tm-menu (focus-ai-model-items lan l start?)
   (for (m l)

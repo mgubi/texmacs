@@ -394,8 +394,18 @@ ai_key (string engine, string env) {
   return as_string (call ("ai-api-key", engine, env));
 }
 
+// the model of the session which asks (ai-model-override in init-ai.scm:
+// a session may have its own model), "" for the one of the preferences
+static string
+ai_session_model () {
+  object o= call ("ai-model-override");
+  return is_string (o)? as_string (o): string ("");
+}
+
 static string
 ai_model_name (string engine, string fallback) {
+  string sm= ai_session_model ();
+  if (sm != "") return sm;
   string m= get_preference (engine * " model", fallback);
   if (m == "" || m == "default") m= fallback;
   return m;
@@ -527,8 +537,9 @@ albert_command (string s, string model, string agent,
     "https://albert.api.etalab.gouv.fr/v1/chat/completions",
     array<string> ("Authorization", "Bearer " * key,
                    "Content-Type", "application/json"),
-    get_preference (model * " model", model), agent,
-    ai_conversation (s, model, chat, history));
+    ai_session_model () != ""? ai_session_model ():
+                               get_preference (model * " model", model),
+    agent, ai_conversation (s, model, chat, history));
 }
 
 // the API of Ollama which is that of OpenAI
@@ -537,7 +548,8 @@ ollama_command (string s, string model, string agent,
                 string chat, bool history) {
   string server= get_preference ("ollama server", "localhost");
   string port  = get_preference ("ollama port", "11434");
-  string model_= get_preference ("ollama model", "default");
+  string model_= ai_session_model ();
+  if (model_ == "") model_= get_preference ("ollama model", "default");
   if (model_ == "default" || model_ == "")
     model_= as_string (call ("ollama-default-model"));
   return openai_style_command (
@@ -1256,15 +1268,36 @@ ai_put_back (tree t, array<tree> blocks) {
 }
 
 // the answer as it came, folded, for those who want to see it
+// the model which gave an answer, as the engine says it (OpenAI, Claude,
+// Mistral, OpenRouter, Ollama: "model"; Gemini: "modelVersion"), "" if it
+// does not
+static string
+ai_answer_model (string s) {
+  const char* keys[]= { "\"modelVersion\"", "\"model\"", NULL };
+  for (int k= 0; keys[k] != NULL; k++) {
+    int i= search_forwards (keys[k], s);
+    if (i < 0) continue;
+    i += N(string (keys[k]));
+    while (i < N(s) && (s[i] == ' ' || s[i] == ':')) i++;
+    if (i >= N(s) || s[i] != '\"') continue;
+    int e= ++i;
+    while (e < N(s) && s[e] != '\"' && e - i < 200) e++;
+    if (e < N(s) && s[e] == '\"' && e > i) return s (i, e);
+  }
+  return "";
+}
+
 static tree
-ai_raw_fold (string raw) {
+ai_raw_fold (string raw, string model= "") {
   raw= ai_short_images (raw);
   array<string> lines= tokenize (raw, "\n");
   tree doc (DOCUMENT);
   for (int i= 0; i < N(lines); i++)
     doc << tree (utf8_to_cork (lines[i]));
+  string title= (model == "")? string ("The answer as it came"):
+    "The answer of " * utf8_to_cork (model) * " as it came";
   tree fold= compound ("folded", compound ("with", "font-shape", "italic",
-                                          "The answer as it came"),
+                                          title),
                        compound ("verbatim-code", doc));
   return compound ("with", "ai-raw", "true", fold);
 }
@@ -1314,7 +1347,7 @@ ai_latex_output (string s, string model, string chat) {
     tree doc (DOCUMENT);
     if (is_func (t, DOCUMENT)) doc << A(t);
     else doc << t;
-    doc << ai_raw_fold (raw);
+    doc << ai_raw_fold (raw, ai_answer_model (s));
     t= doc;
   }
   return t;

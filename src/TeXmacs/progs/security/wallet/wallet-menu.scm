@@ -230,13 +230,34 @@
                (set! wallet-widget-wrong-passphrase? #t)
                (refresh-now "wallet-widget-reask-passphrase")))))))))
 
+;; The callbacks of the requests which wait for the dialogue to turn on the
+;; wallet (#f while there is none): a request made while it is open (a key
+;; asked for and a key given, by two parts of a plug-in) waits for it too,
+;; rather than opening a second one; its answer, or "Cancel" when it is
+;; closed by its close box, goes to all of them.
+(define wallet-turn-on-waiting #f)
+
+(define (wallet-turn-on-answer r)
+  (with l (or wallet-turn-on-waiting (list))
+    (set! wallet-turn-on-waiting #f)
+    (for-each (lambda (cb) (cb r)) l)))
+
 (tm-define (wallet-dialogue-turn-on . callback)
   (let* ((cb (if (null? callback) noop (car callback)))
 	 (passphrase (wallet-load-passphrase)))
-    (if (and passphrase (!= passphrase "")
-	     (wallet-correct-passphrase? passphrase))
-	(begin (wallet-turn-on passphrase) (cb "Ok"))
-	(dialogue-window wallet-widget-turn-on cb "Turn on wallet"))))
+    (cond ((and passphrase (!= passphrase "")
+                (wallet-correct-passphrase? passphrase))
+           (wallet-turn-on passphrase)
+           (cb "Ok"))
+          ((wallet-on?) (cb "Ok"))
+          (wallet-turn-on-waiting
+           (set! wallet-turn-on-waiting
+                 (append wallet-turn-on-waiting (list cb))))
+          (else
+           (set! wallet-turn-on-waiting (list cb))
+           (dialogue-window wallet-widget-turn-on wallet-turn-on-answer
+                            "Turn on wallet"
+                            (lambda () (wallet-turn-on-answer "Cancel")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Destroy wallet

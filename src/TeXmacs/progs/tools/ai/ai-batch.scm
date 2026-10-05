@@ -36,7 +36,12 @@
   (with missing (and (defined? (quote ai-key-missing)) (ai-key-missing name))
     (if missing
         (object->string `(error ,missing)) ; no request (request_link.cpp)
-        (cpp-ai-latex-request cmd name chat))))
+        (begin
+          ;; (the model of the session which asks, init-ai.scm)
+          (when (defined? 'ai-request-prepare) (ai-request-prepare name chat))
+          (with r (cpp-ai-latex-request cmd name chat)
+            (when (defined? 'ai-request-done) (ai-request-done))
+            r)))))
 
 (tm-define (ai-result name chat res)
   (with t (cpp-ai-latex-output res name chat)

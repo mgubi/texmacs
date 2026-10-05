@@ -215,6 +215,15 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>Each session of a chatbot has its own model, kept in the
+    document: two sessions of <name|Gemini> may ask two models. The menu of
+    the focus bar changes the model of its session, and each answer says
+    which model gave it (in the fold of the answer as it came).
+
+    <item>When the wallet is asked to be turned on twice at once (a key
+    asked for, a key given), there is one dialogue, whose answer goes to
+    both: a second one stayed open.
+
     <item><LaTeX> import: no multiplication is put before a text in a
     formula (<verbatim|$a\\text{ if }b$> gave <math|a*<text| if >b>), and
     <verbatim|\\parbox[t][3cm][c]{2cm}{...}> is read with all its options.
