@@ -37,6 +37,7 @@
         (check editing-test)
         (check typeset-test)
         (check bibtex-test)
+        (check zotero-test)
         (check database-test)
         (check math-edit-test)
         (check table-test)
@@ -137,6 +138,8 @@
     ;; widget of a view which editing closed reaches is_embedded_widget,
     ;; which reads the buffer of the editor, NULL since delete_view
     ("bibtex" bibtex-test-failures count)
+    ;; with a fake Zotero; writes a bibliography in the temporary directory
+    ("zotero" zotero-test-failures count)
     ;; generates the auxiliary data of documents in the temporary directory;
     ;; FIXME: before editing too, for the same reason as bibtex
     ("links" links-test-failures count)

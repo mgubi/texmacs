@@ -152,6 +152,8 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
+(lazy-define (bibtex zotero) zotero-update-bibliography zotero-status)
+(lazy-menu (bibtex zotero-widgets) open-zotero-search)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

@@ -851,7 +851,8 @@
   (-> "Metadata" (link document-metadata-menu))
   (-> "Bibliography"
       (when (buffer-has-biblio? (current-buffer))
-	("Local entries" (open-biblio))))
+	("Local entries" (open-biblio)))
+      ("Update from Zotero" (zotero-update-bibliography)))
   ---
   (-> "Magnification" (link document-magnification-menu))
   (-> "Colors" (link document-colors-menu))
