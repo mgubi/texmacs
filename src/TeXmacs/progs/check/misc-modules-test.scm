@@ -224,13 +224,13 @@
     ;; the answer is cached
     (check-true (url-exists-in-help? "main/man-manual.en.tm"))
     (check-true (url-none? (resolve "main/no-such-topic")))
-    (check-true (ends? (url->system (resolve "main/man-manual"))
+    (check-true (ends? (check-unix (url->system (resolve "main/man-manual")))
                        (if en? "/doc/main/man-manual.en.tm"
                            ".tm")))
     (when en?
-      (check-true (ends? (url->system (resolve "about/about"))
+      (check-true (ends? (check-unix (url->system (resolve "about/about")))
                          "/doc/about/about.en.tm"))
-      (check-true (ends? (url->system (resolve "devel/style/style"))
+      (check-true (ends? (check-unix (url->system (resolve "devel/style/style")))
                          "/doc/devel/style/style.en.tm")))
     ;; every article of the Help menu exists
     (check= (list-filter help-menu-topics
@@ -459,8 +459,10 @@
                  (system-search-score (tmp-file "one.en.tm") '("first"))))
   ;; a search in a directory gives a page of links, the best one first
   (let* ((docgrep (priv '(doc docgrep) 'docgrep))
-         (r (docgrep "second" misc-dir "*.en.tm"))
-         (none (docgrep "zzzqqq" misc-dir "*.en.tm")))
+         ;; the directory as the application gives it (unix->url)
+         (dir (url->unix (system->url misc-dir)))
+         (r (docgrep "second" dir "*.en.tm"))
+         (none (docgrep "zzzqqq" dir "*.en.tm")))
     (check= (car r) 'document)
     (check= (map url->system (hlinks r))
             (list (url->system (tmp-file "two.en.tm"))))

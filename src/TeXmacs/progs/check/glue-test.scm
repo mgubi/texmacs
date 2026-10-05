@@ -256,10 +256,12 @@
                     (lambda () (path-strip '(1 . 2) '())) 'wrong-type-arg)
   (glue-check-error "paths" "a string for a path"
                     (lambda () (path-strip "x" '())) 'wrong-type-arg)
-  (for (s (list "a.tm" "a/b/c.tm" "/abs/path.tm" "a b.tm" ""))
-    (glue-check-equal "urls" s (lambda () (url->string (string->url s))) s))
+  ;; (check-abs: an absolute name of the system, check-unix: written with /)
+  (for (s (list "a.tm" "a/b/c.tm" (check-abs "abs/path.tm") "a b.tm" ""))
+    (glue-check-equal "urls" s
+                      (lambda () (check-unix (url->string (string->url s)))) s))
   (glue-check-equal "urls" "a string for an url"
-                    (lambda () (url->string "x/y.tm")) "x/y.tm"))
+                    (lambda () (check-unix (url->string "x/y.tm"))) "x/y.tm"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite
