@@ -2842,8 +2842,9 @@ web_javascript_s7 (s7_scheme* sc, s7_pointer args) {
   char* r= vue_web_javascript (code);
   string res= utf8_to_cork (string (r));
   free (r);
-  c_string out (res);
-  return s7_make_string (sc, out);
+  // (with its length: a backquote is the character 0 of Cork, which would
+  // end a C string, as in the descriptions of the models of OpenRouter)
+  return s7_make_string_with_length (sc, N(res) == 0? "": &res[0], N(res));
 }
 
 // (web-paste-dialog choices chosen): Edit > Paste from browser, the dialog

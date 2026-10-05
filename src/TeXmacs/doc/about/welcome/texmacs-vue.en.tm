@@ -215,6 +215,14 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item><name|OpenRouter> sessions: the models of many providers with a
+    single key (<verbatim|anthropic/claude-sonnet-4.5>,
+    <verbatim|deepseek/deepseek-chat>..., or <verbatim|openrouter/auto>
+    which chooses), its image models among them.
+    <with|font-series|bold|Update the list of models> lists them all (a
+    list of models was cut at the first backquote of the descriptions of
+    the models).
+
     <item>The <name|TikZ> pictures of an answer whose code has
     <verbatim|...> (as <verbatim|\\foreach \\x in {0,1,...,5}>) are drawn:
     the dots became an ellipsis, which <name|TikZ> refuses. The conversation

@@ -57,11 +57,13 @@
   ("gemini-text-input" "on" noop)
   ("open-mistral-7b-text-input" "on" noop)
   ("claude-text-input" "on" noop)
+  ("openrouter-text-input" "on" noop)
   ("ai raw answer" "on" noop)
   ("chatgpt model" "gpt-5-mini" noop)
   ("gemini model" "gemini-2.5-flash" noop)
   ("open-mistral-7b model" "mistral-small-latest" noop)
   ("claude model" "claude-sonnet-5-5" noop)
+  ("openrouter model" "openrouter/auto" noop)
   ("albert api key" "" noop)
   ("albert-text-input" "on" noop)
   ("albert ai-agents corrector" "default" noop)
@@ -136,7 +138,8 @@
   (wallet-add-on-hook (lambda () (reinit-plugin-single "ai"))))
 
 (tm-define (ai-models)
-  (list "chatgpt" "claude" "gemini" "open-mistral-7b" "albert" "ollama"))
+  (list "chatgpt" "claude" "gemini" "open-mistral-7b" "openrouter" "albert"
+        "ollama"))
 
 ;; the engines which are asked with a key, its environment variable, and the
 ;; models proposed in the preferences ("" for another one)
@@ -147,7 +150,12 @@
     ("gemini" "GEMINI_API_KEY"
      "gemini-2.5-flash" "gemini-2.5-pro" "gemini-2.5-flash-lite" "")
     ("open-mistral-7b" "MISTRAL_API_KEY" "mistral-small-latest"
-     "mistral-medium-latest" "mistral-large-latest" "open-mistral-7b" "")))
+     "mistral-medium-latest" "mistral-large-latest" "open-mistral-7b" "")
+    ;; the models of many providers, named provider/model; openrouter/auto
+    ;; chooses one for each question
+    ("openrouter" "OPENROUTER_API_KEY" "openrouter/auto" "openai/gpt-5-mini"
+     "anthropic/claude-sonnet-4.5" "google/gemini-2.5-flash"
+     "deepseek/deepseek-chat" "google/gemini-2.5-flash-image" "")))
 
 (define (ai-key-env name)
   (with e (assoc name ai-keyed-engines) (if e (cadr e) "")))
@@ -224,6 +232,9 @@
           ((== name "gemini")
            (list "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
                  (list (cons "x-goog-api-key" key))))
+          ((== name "openrouter")
+           (list "https://openrouter.ai/api/v1/models"
+                 (list (cons "Authorization" (string-append "Bearer " key)))))
           ((== name "open-mistral-7b")
            (list "https://api.mistral.ai/v1/models"
                  (list (cons "Authorization" (string-append "Bearer " key)))))
@@ -277,6 +288,12 @@
                                             '("audio" "realtime" "tts"
                                               "transcribe" "image" "search"
                                               "embedding" "instruct"))))))
+                           ((== name "openrouter")
+                            ;; those which write, or draw
+                            (with o (json-items
+                                     (json-ref (json-ref m "architecture")
+                                               "output_modalities"))
+                              (or (null? o) (in? "text" o) (in? "image" o))))
                            ((== name "open-mistral-7b")
                             (with c (json-ref m "capabilities")
                               (or (not c)
@@ -297,7 +314,10 @@
                (t (if (== ans "") #f
                       (catch #t (lambda () (tree->stree (json->tree ans)))
                         (lambda args #f))))
-               (l (if t (sort (ai-models-of name t) string<=?) (list))))
+               (l (if t (sort (ai-models-of name t) string<=?) (list)))
+               ;; (the model which chooses one, not in the list)
+               (l (if (and (== name "openrouter") (nnull? l))
+                      (cons "openrouter/auto" l) l)))
           (cond ((nnull? l)
                  (set-preference (string-append name " models")
                                  (string-recompose l " "))
@@ -646,6 +666,21 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Gemini
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; OpenRouter
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (has-openrouter?)
+  (ai-available? "openrouter"))
+
+(plugin-configure openrouter
+  ;; before :require, so that its key can be given in its preferences
+  (:preferences #t)
+  (:session "OpenRouter")
+  (:require (has-openrouter?))
+  (:request ,ai-request ,ai-result)
+  (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Claude

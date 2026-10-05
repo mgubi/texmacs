@@ -49,7 +49,8 @@
   Images in <name|PNG> or <name|JPEG> (a painting, an artistic rendition
   of an idea) come from the models which draw: those of <name|Gemini> whose
   name says <verbatim|image> (<verbatim|gemini-2.5-flash-image>...), and
-  <verbatim|gpt-image-1> or <verbatim|dall-e-3> of <name|ChatGPT>; choose
+  <verbatim|gpt-image-1> or <verbatim|dall-e-3> of <name|ChatGPT>, and
+  those of <name|OpenRouter> whose name says <verbatim|image>; choose
   one as the model of the session (<with|font-series|bold|Update the list
   of models> lists them). Their images are put in the answer; the
   conversation sent again holds only a mention of them. The other models
@@ -196,6 +197,35 @@
 
     <item>When launching <TeXmacs>, you should now be able to use
     <name|Mistral>.
+  </itemize>
+
+  <subsection*|OpenRouter>
+
+  <name|OpenRouter> gives the models of many providers (<name|OpenAI>,
+  <name|Anthropic>, <name|Google>, <name|DeepSeek>, <name|Meta>...) with
+  a single key, named <verbatim|provider/model>, such as
+  <verbatim|anthropic/claude-sonnet-4.5>; <verbatim|openrouter/auto> chooses
+  one for each question.
+
+  <\itemize>
+    <item>Create an account on <hlink|openrouter.ai|https://openrouter.ai>,
+    add credit in <with|font-series|bold|Credits> (the models whose name
+    ends with <verbatim|:free> need none, with limits), and create a key in
+    <with|font-series|bold|Keys>. Keys typically start with
+    <verbatim|sk-or->.
+
+    <item>Give it in the preferences of <name|OpenRouter>, or set the
+    <verbatim|OPENROUTER_API_KEY> environment variable:
+
+    <\shell-code>
+      export OPENROUTER_API_KEY=<text|<verbatim|<with|color|dark
+      green|<em|your_key>>>>
+    </shell-code>
+
+    <item><with|font-series|bold|Update the list of models> lists all its
+    models (several hundreds); a model whose name says <verbatim|image>
+    (<verbatim|google/gemini-2.5-flash-image>,
+    <verbatim|openai/gpt-5-image>...) draws images.
   </itemize>
 
   <subsection*|Albert (by DINUM, for French administrations only)>

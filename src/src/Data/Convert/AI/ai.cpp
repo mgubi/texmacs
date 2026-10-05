@@ -34,6 +34,7 @@ ai_engine (string model) {
   if (starts (model, "open-mistral")) return "mistral";
   if (starts (model, "albert")) return "albert";
   if (starts (model, "claude")) return "claude";
+  if (starts (model, "openrouter")) return "openrouter";
   return "unknown";
 }
 
@@ -462,9 +463,13 @@ openai_messages (string agent, array<string> conv) {
 
 static tree
 openai_style_command (string url, array<string> headers, string model_name,
-                      string agent, array<string> conv) {
+                      string agent, array<string> conv, bool images= false) {
   array<tree> d (tree ("model"), tree (model_name),
                  tree ("messages"), openai_messages (agent, conv));
+  if (images) {
+    array<tree> m (tree ("image"), tree ("text"));
+    d << tree ("modalities") << json_array (m);
+  }
   if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
   tree data= json_object (d);
   tree h (TUPLE);
@@ -539,6 +544,26 @@ ollama_command (string s, string model, string agent,
     "http://" * server * ":" * port * "/v1/chat/completions",
     array<string> ("Content-Type", "application/json"),
     model_, agent, ai_conversation (s, model, chat, history));
+}
+
+// the API of OpenRouter, which is that of OpenAI, for the models of many
+// providers (named provider/model); those which draw give their images as
+// data URLs (message.images), when asked for them (modalities)
+tree
+openrouter_command (string s, string model, string agent,
+                    string chat, bool history) {
+  string key= ai_key ("openrouter", "OPENROUTER_API_KEY");
+  string name= ai_model_name ("openrouter", "openrouter/auto");
+  bool image= ai_image_model (name);
+  if (image && ai_default_agent (model, agent)) agent= ai_image_agent;
+  array<string> h ("Authorization", "Bearer " * key,
+                   "Content-Type", "application/json");
+  // (who asks, which OpenRouter shows with the use of the key)
+  h << string ("HTTP-Referer") << string ("https://github.com/mgubi/texmacs")
+    << string ("X-Title") << string ("GNU TeXmacs");
+  return openai_style_command (
+    "https://openrouter.ai/api/v1/chat/completions", h,
+    name, agent, ai_conversation (s, model, chat, history), image);
 }
 
 // the API of Gemini: the agent is the instruction of the system, the answers
@@ -619,6 +644,8 @@ ai_command (string s, string model, string agent, string chat, bool history) {
     return albert_command (s, model, agent, chat, history);
   if (engine == "claude")
     return claude_command (s, model, agent, chat, history);
+  if (engine == "openrouter")
+    return openrouter_command (s, model, agent, chat, history);
   return "";
 }
 
@@ -688,6 +715,20 @@ ai_image_text (string mime, string data) {
   return "\n\n![](data:" * mime * ";base64," * data * ")\n\n";
 }
 
+// the images of a message, or of a piece of it (OpenRouter: images, each
+// with an image_url whose url is a data URL)
+static string
+openai_images (tree m) {
+  tree im= json_get (m, "images");
+  if (!is_func (im, TUPLE)) return "";
+  string r;
+  for (int i= 0; i < N(im); i++) {
+    string u= json_text (json_get (json_get (im[i], "image_url"), "url"));
+    if (starts (u, "data:image/")) r << "\n\n![](" << u << ")\n\n";
+  }
+  return r;
+}
+
 static string
 openai_style_output (tree t) {
   tree c= json_get (t, "choices");
@@ -705,7 +746,7 @@ openai_style_output (tree t) {
   }
   if (!is_func (c, TUPLE) || N(c) == 0) return "";
   tree m= json_get (c[0], "message");
-  return json_text (json_get (m, "content"));
+  return json_text (json_get (m, "content")) * openai_images (m);
 }
 
 static string
@@ -792,8 +833,10 @@ ai_stream_text (string s, string model, string& err) {
     else if (engine == "gemini") r << gemini_style_output (t);
     else {
       tree c= json_get (t, "choices");
-      if (is_func (c, TUPLE) && N(c) > 0)
-        r << json_text (json_get (json_get (c[0], "delta"), "content"));
+      if (is_func (c, TUPLE) && N(c) > 0) {
+        tree delta= json_get (c[0], "delta");
+        r << json_text (json_get (delta, "content")) << openai_images (delta);
+      }
     }
   }
   return r;

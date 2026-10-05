@@ -6,8 +6,9 @@
   <tmdoc-title|Introduction to AI tools inside <TeXmacs>>
 
   <TeXmacs> contains experimental support for various chatbots:
-  <name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>, <name|Llama>
-  and other models through <name|Ollama>, and <name|Albert>. For
+  <name|ChatGPT>, <name|Claude>, <name|Gemini>, <name|Mistral>, the models
+  of many providers through <name|OpenRouter>, <name|Llama> and other models
+  through <name|Ollama>, and <name|Albert>. For
   conversations with programs such as <TeXmacs>, most chatbots require you to
   generate a private key, the key of their API (some give such keys for
   free). The key is given in <menu|Insert|Session|Preferences>, or in an

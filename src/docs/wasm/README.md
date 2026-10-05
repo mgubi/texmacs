@@ -332,14 +332,16 @@ virtual authenticator which has PRF (puppeteer, CDP `WebAuthn`).
 `plugins/ai` and `src/Data/Convert/AI/ai.cpp`: every engine is asked by an
 `http_post` with a JSON body, sent by the request link of its plug-in
 (`request_link.cpp`; with Qt, curl or, in the browser, `fetch`). ChatGPT,
-Mistral, Albert and Ollama (its OpenAI endpoint) use the chat API of OpenAI,
+Mistral, Albert, OpenRouter and Ollama (its OpenAI endpoint) use the chat API
+of OpenAI (OpenRouter's image models: `modalities`, and `images` in the
+answer),
 Gemini `generateContent`, Claude the messages API of Anthropic (with
 `anthropic-dangerous-direct-browser-access`). The keys come from the wallet,
 the preferences or the environment (`ai-api-key` in `init-ai.scm`).
 
 | Engine | Answers a page (CORS) |
 |---|---|
-| OpenAI, Anthropic, Gemini, Mistral | yes |
+| OpenAI, Anthropic, Gemini, Mistral, OpenRouter | yes |
 | Ollama | if `OLLAMA_ORIGINS` allows the page |
 | Albert | no (405 on the preflight) |
 
