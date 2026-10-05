@@ -85,6 +85,7 @@ tm_link find_socket_link (int fd);
 
 void close_all_pipes ();
 void process_all_pipes ();
+void process_all_requests ();
 void close_all_sockets ();
 void close_all_servers ();
 int  number_of_servers ();

@@ -218,6 +218,11 @@ tm_server_rep::interpose_handler () {
   exec_pending_commands ();
 #endif
   async_eval_pending ();
+#if !defined (QTTEXMACS) && !defined (AQUATEXMACS)
+  // the plug-ins which make HTTP requests (request_link.cpp, the AI
+  // engines): Qt and Cocoa process them with their pipes (process_all_pipes)
+  process_all_requests ();
+#endif
 
   if (!headless_mode) {
     int i, j;
