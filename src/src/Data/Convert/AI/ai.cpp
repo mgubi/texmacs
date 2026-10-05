@@ -701,6 +701,23 @@ json_text (tree t) {
   return is_atomic (t)? t->label: string ("");
 }
 
+// the message of an error object, with what OpenRouter adds to it: the
+// error of the provider of the model (metadata.raw: "...is temporarily
+// rate-limited upstream...", where the message is "Provider returned
+// error"), and its name
+static string
+ai_error_message (tree e) {
+  string m= json_text (json_get (e, "message"));
+  tree md= json_get (e, "metadata");
+  if (is_func (md, ATTR)) {
+    string raw= json_text (json_get (md, "raw"));
+    string prov= json_text (json_get (md, "provider_name"));
+    if (raw != "" && raw != m) m= (m == "")? raw: m * ": " * raw;
+    if (prov != "") m << " (" << prov << ")";
+  }
+  return m;
+}
+
 // the message of an error which the engine gave instead of an answer (or
 // what it sent, when it is not JSON: no network, a refused request)
 static string
@@ -708,7 +725,7 @@ ai_error_text (string val, tree t) {
   if (val == "") return ""; // not yet, or no answer (said by the link)
   tree e= json_get (t, "error");
   if (is_func (e, ATTR)) {
-    string m= json_text (json_get (e, "message"));
+    string m= ai_error_message (e);
     if (m != "") return "Error: " * m;
   }
   if (is_atomic (e) && e->label != "") return "Error: " * e->label;
@@ -844,7 +861,7 @@ ai_stream_text (string s, string model, string& err) {
     if (d == "" || d == "[DONE]") continue;
     tree t= http_from_json (d);
     tree er= json_get (t, "error");
-    if (is_func (er, ATTR)) err= json_text (json_get (er, "message"));
+    if (is_func (er, ATTR)) err= ai_error_message (er);
     else if (is_atomic (er) && er->label != "") err= er->label;
     if (engine == "claude") {
       tree delta= json_get (t, "delta");
@@ -966,6 +983,11 @@ ai_tikz_header (string pre) {
     if (libs != "") libs << ", ";
     libs << pre (i + 16, e);
     i= e;
+  }
+  // calc, which the models often use ($(a)!0.5!(b)$) without loading it
+  if (!occurs ("calc", libs)) {
+    if (libs != "") libs << ", ";
+    libs << "calc";
   }
   i= 0;
   while ((i= search_forwards ("\\usepackage", i, pre)) >= 0) {
@@ -1320,7 +1342,10 @@ ai_latex_output (string s, string model, string chat) {
     // an answer which is not a LaTeX document (or an error): text in UTF-8,
     // with its pictures
     string aside= ai_set_aside (r, "", blocks);
-    if (N(blocks) == 0) t= utf8_to_cork (r);
+    if (starts (r, "Error:") || r == "") t= utf8_to_cork (r);
+    else if (N(blocks) == 0)
+      // (in the font of the text, as the LaTeX answers, with its paragraphs)
+      t= tree (WITH, MODE, "text", verbatim_to_tree (r, false, "utf-8"));
     else {
       t= ai_put_back (verbatim_to_tree (aside, false, "utf-8"), blocks);
       // without the empty lines around it (those of a picture alone)
@@ -1330,6 +1355,7 @@ ai_latex_output (string s, string model, string chat) {
         while (e > b && t[e-1] == "") e--;
         if (b > 0 || e < N(t)) t= t (b, e);
       }
+      t= tree (WITH, MODE, "text", t);
     }
   }
   else {

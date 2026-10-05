@@ -215,6 +215,14 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>Answers of the chatbots: an error of <name|OpenRouter> says what
+    the provider of the model answered (a free model which is
+    <with|font-shape|italic|temporarily rate-limited upstream>, for
+    instance), where it said <with|font-shape|italic|Provider returned
+    error>; an answer in plain text (the words with an image) is in the font
+    of the text; the <name|TikZ> pictures may compute coordinates
+    (<verbatim|$(a)!0.5!(b)$>, library <verbatim|calc>) without loading it.
+
     <item>Each session of a chatbot has its own model, kept in the
     document: two sessions of <name|Gemini> may ask two models. The menu of
     the focus bar changes the model of its session, and each answer says
