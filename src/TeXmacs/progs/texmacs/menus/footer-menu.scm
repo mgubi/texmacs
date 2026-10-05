@@ -23,6 +23,8 @@
 (texmacs-module (texmacs menus footer-menu)
   (:use (generic format-menu)
         (fonts font-old-menu)
+        (fonts font-short-menu)
+        (fonts fonts-opentype)
         (text text-menu)
         (texmacs menus main-menu)))
 
@@ -68,9 +70,95 @@
 (tm-define (footer-color-label)
   (get-env "color"))
 
+;; The fonts as in the menu of the font of the document in the focus bar
+;; (document-short-font-menu: the fonts of text and mathematics, those of
+;; text only by kind, the selector for the others), set at the cursor. A
+;; submenu is expanded when it is opened and loses the arguments of its
+;; menu: one menu without arguments for each list.
+(define (footer-local-font? f) (== (get-env "font") f))
+
+(tm-menu (footer-math-text-serif-menu)
+  (for (p (opentype-math-font-group-list "Serif"))
+    ((check (eval (car p)) "*" (opentype-font-local? (cadr p)))
+     (make-multi-with (opentype-font-local-vars (cadr p))))))
+
+(tm-menu (footer-math-text-sans-menu)
+  (for (p (opentype-math-font-group-list "Sans serif"))
+    ((check (eval (car p)) "*" (opentype-font-local? (cadr p)))
+     (make-multi-with (opentype-font-local-vars (cadr p))))))
+
+(tm-menu (footer-math-text-other-menu)
+  (for (p (opentype-math-font-group-list "Other"))
+    ((check (eval (car p)) "*" (opentype-font-local? (cadr p)))
+     (make-multi-with (opentype-font-local-vars (cadr p))))))
+
+(tm-menu (footer-text-serif-menu)
+  (for (p (text-font-list 'serif))
+    ((check (eval (car p)) "*" (footer-local-font? (cadr p)))
+     (make-with "font" (cadr p)))))
+
+(tm-menu (footer-text-sans-menu)
+  (for (p (text-font-list 'sans))
+    ((check (eval (car p)) "*" (footer-local-font? (cadr p)))
+     (make-with "font" (cadr p)))))
+
+(tm-menu (footer-text-mono-menu)
+  (for (p (text-font-list 'mono))
+    ((check (eval (car p)) "*" (footer-local-font? (cadr p)))
+     (make-with "font" (cadr p)))))
+
+(tm-menu (footer-text-other-menu)
+  (for (p (text-font-list 'other))
+    ((check (eval (car p)) "*" (footer-local-font? (cadr p)))
+     (make-with "font" (cadr p)))))
+
+(tm-menu (footer-text-font-menu)
+  ((check "Default" "*" (footer-local-font? (get-init "font")))
+   (make-with "font" (get-init "font")))
+  ---
+  (group "Text and mathematics")
+  ((check "Roman" "*" (footer-local-font? "roman"))
+   (make-with "font" "roman"))
+  (if (font-exists-in-tt? "STIX-Regular")
+      ((check "Stix" "*" (footer-local-font? "stix"))
+       (make-with "font" "stix")))
+  (assuming (nnull? (opentype-math-font-group-list "Serif"))
+    (group "Serif text and mathematics")
+    (link footer-math-text-serif-menu))
+  (assuming (nnull? (opentype-math-font-group-list "Sans serif"))
+    (group "Sans serif text and mathematics")
+    (link footer-math-text-sans-menu))
+  (assuming (nnull? (opentype-math-font-group-list "Other"))
+    (-> "Other OpenType math fonts" (link footer-math-text-other-menu)))
+  ---
+  (group "Text only")
+  (assuming (nnull? (text-font-list 'serif))
+    (-> "Serif" (link footer-text-serif-menu)))
+  (assuming (nnull? (text-font-list 'sans))
+    (-> "Sans serif" (link footer-text-sans-menu)))
+  (assuming (nnull? (text-font-list 'mono))
+    (-> "Typewriter" (link footer-text-mono-menu)))
+  (assuming (nnull? (text-font-list 'other))
+    (-> "Decorative" (link footer-text-other-menu)))
+  ---
+  ("Other" (open-font-selector)))
+
+;; in a formula, its font
+(tm-menu (footer-math-font-menu)
+  ((check "Default" "*" (== (get-env "math-font") (get-init "math-font")))
+   (make-with "math-font" (get-init "math-font")))
+  ---
+  ((check "Roman" "*" (== (get-env "math-font") "roman"))
+   (make-with "math-font" "roman"))
+  (for (p (opentype-math-font-list))
+    ((check (eval (car p)) "*" (== (get-env "math-font") (cadr p)))
+     (make-with "math-font" (cadr p))))
+  ---
+  ("Other" (open-font-selector)))
+
 (menu-bind footer-font-menu
-  (if (in-math?) (link math-font-menu))
-  (if (not (in-math?)) (link text-font-menu)))
+  (if (in-math?) (dynamic (footer-math-font-menu)))
+  (if (not (in-math?)) (dynamic (footer-text-font-menu))))
 
 (menu-bind texmacs-footer-environment
   (if (in-text?)

@@ -215,6 +215,11 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The menu of the font in the footer (when it is interactive) is
+    the one of the focus bar: the fonts of text and mathematics, those of
+    text only by kind, and the selector for the others; it sets the font at
+    the cursor (in a formula, its font). It was the old menu of the fonts.
+
     <item>Answers of the chatbots: an error of <name|OpenRouter> says what
     the provider of the model answered (a free model which is
     <with|font-shape|italic|temporarily rate-limited upstream>, for
