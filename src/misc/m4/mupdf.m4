@@ -92,6 +92,12 @@ AC_DEFUN([TM_MUPDF_FOR_GUI], [
           SDL | VUE)
             AC_MSG_ERROR([--with-gui=$gui_selector needs MuPDF: use --with-mupdf=DIR]) ;;
         esac
+        # NOTE: not the libraries which were tried (-lmupdf -lmupdf-third
+        # when there is no MuPDF at all), which the link would ask for
+        MUPDF_CFLAGS=""
+        MUPDF_LIBS=""
+        MUPDF_CPPFLAGS=""
+        MUPDF_LDFLAGS=""
       fi
       ;;
   esac

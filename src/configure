@@ -36692,6 +36692,12 @@ printf '%s\n' "#define MUPDF_RENDERER 1" >>confdefs.h
           SDL | VUE)
             as_fn_error $? "--with-gui=$gui_selector needs MuPDF: use --with-mupdf=DIR" "$LINENO" 5 ;;
         esac
+        # NOTE: not the libraries which were tried (-lmupdf -lmupdf-third
+        # when there is no MuPDF at all), which the link would ask for
+        MUPDF_CFLAGS=""
+        MUPDF_LIBS=""
+        MUPDF_CPPFLAGS=""
+        MUPDF_LDFLAGS=""
       fi
       ;;
   esac
