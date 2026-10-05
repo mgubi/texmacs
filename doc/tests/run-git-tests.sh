@@ -5,13 +5,28 @@
 #                  (TeXmacs/progs/check/git-test.scm and version-test.scm)
 #   with --gui:    tests needing the event loop (git-gui-test.scm), run with
 #                  the offscreen Qt platform, so that no window is shown
-# A private TEXMACS_HOME_PATH is used, so the user's settings are not touched.
+# A private TEXMACS_HOME_PATH is used, so the user's settings are not touched,
+# and the configurations of Git of the user are ignored (Git 2.32 or newer).
+# The scratch directory must be empty or have been made by this script; a
+# temporary one is removed after a successful run.
 
 gui=no
 if test "$1" = "--gui"; then gui=yes; shift; fi
 here=$(cd "$(dirname "$0")" && pwd)
 src=$(cd "$here/../../src" && pwd)
-dir=${1:-$(mktemp -d)}
+if test -n "$1"; then
+  dir=$1 temporary=no
+  mkdir -p "$dir" || exit 1
+  if test -n "$(ls -A "$dir")" && ! test -f "$dir/.git-tests-dir"; then
+    echo "$dir is not empty and was not made by $0" >&2
+    exit 1
+  fi
+else
+  dir=$(mktemp -d) temporary=yes
+fi
+touch "$dir/.git-tests-dir"
+GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+export GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
 # every run starts from fresh preferences and repositories
 rm -rf "$dir/home" "$dir/outside.tm"
 mkdir -p "$dir/home"
@@ -22,7 +37,10 @@ tm () {
 
 if test $gui = no; then
   # the headless tests are the suites git and version of the test harness
-  TM_TEST_HOME="$dir/home" exec "$src/tests/scheme/check.sh" git version
+  TM_TEST_HOME="$dir/home" "$src/tests/scheme/check.sh" git version
+  status=$?
+  test $status = 0 && test $temporary = yes && rm -rf "$dir"
+  exit $status
 else
   rm -rf "$dir/remote" "$dir/conflict" "$dir/conflict2"
   mkdir -p "$dir/remote" "$dir/conflict"
@@ -68,7 +86,6 @@ else
     git merge theirs > /dev/null 2>&1
   )
   test=git-gui-test.scm
-  opts=
   QT_QPA_PLATFORM=offscreen
   export QT_QPA_PLATFORM
 fi
@@ -76,7 +93,7 @@ fi
 cd "$src" || exit 1
 log="$dir/test.log"
 GIT_TEST_DIR="$dir" TEXMACS_HOME_PATH="$dir/home" TEXMACS_PATH="$src/TeXmacs" \
-  perl -e 'alarm 300; exec @ARGV' TeXmacs/bin/texmacs.bin $opts \
+  perl -e 'alarm 300; exec @ARGV' TeXmacs/bin/texmacs.bin \
   -x "(begin (catch #t (lambda () (load \"$here/$test\")) (lambda args (display* \"TEST-ERROR \" args \"\\n\") (quit-TeXmacs))) (if (headless?) (quit-TeXmacs)))" \
   > "$log" 2>&1
 grep -E '^(ok|FAIL|FAILURES|TEST-ERROR)' "$log"
@@ -89,6 +106,7 @@ fi
 # the exit status tells whether all tests ran and passed
 if grep -q '^FAILURES: 0$' "$log" && test "$n" = "0" &&
    ! grep -q -E '^(FAIL |TEST-ERROR)' "$log"; then
+  test $temporary = yes && rm -rf "$dir"
   exit 0
 else
   grep -q '^FAILURES:' "$log" || echo "FAIL the tests did not complete (crash or time out), see $log"

@@ -102,6 +102,26 @@
 (define-public-macro (check-error expr key)
   `(check-raises ,(object->string expr) (lambda () ,expr) ,key))
 
+(tm-define (check-isolate-git)
+  (:synopsis "Ignore the global and system configurations of Git")
+  ;; NOTE: tests/scheme/check.sh sets them for all suites already; they
+  ;; cannot be unset afterwards (the empty value also means no global
+  ;; configuration), so that they stay for the rest of the process.
+  ;; GIT_CONFIG_GLOBAL needs Git 2.32 or newer.
+  (system-setenv "GIT_CONFIG_GLOBAL" "/dev/null")
+  (system-setenv "GIT_CONFIG_NOSYSTEM" "1")
+  (with v (string->list (eval-system "git --version 2>/dev/null"))
+    (with n (map string->number
+                 (string-tokenize-by-char
+                  (list->string (list-filter v (lambda (c)
+                                                 (or (char-numeric? c)
+                                                     (== c #\.)))))
+                  #\.))
+      (when (and (>= (length n) 2) (car n) (cadr n)
+                 (or (< (car n) 2) (and (== (car n) 2) (< (cadr n) 32))))
+        (display* "  warning: Git older than 2.32 reads the global "
+                  "configuration of the user\n")))))
+
 (tm-define (check-end)
   (:synopsis "End the test suite and return its number of failures")
   (display* "Total: " (number->string check-count) " checks, "

@@ -24,9 +24,10 @@
 ;;
 ;; The repositories are made in git-test in the temporary directory, with
 ;; their identity in their own configuration; the global and system
-;; configurations of Git are ignored (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM),
-;; so that the settings of the user (commit.gpgsign, hooks...) do not matter.
-;; The preferences which the suite changes are put back at the end.
+;; configurations of Git are ignored (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM,
+;; with Git 2.32 or newer), so that the settings of the user
+;; (commit.gpgsign, hooks...) do not matter. The preferences which the
+;; suite changes are put back at the end.
 ;; The asynchronous commands (fetch, pull, push, clone) need the event loop,
 ;; and are checked by doc/tests/git-gui-test.scm instead.
 
@@ -83,12 +84,18 @@
     "git large file size" "git sign" "git log length" "git executable"))
 
 (define (save-preferences)
+  ;; #f for a preference which has no value of its own (the default)
   (set! saved-preferences
-        (map (lambda (p) (cons p (get-preference p))) test-preferences)))
+        (map (lambda (p) (cons p (and (cpp-has-preference? p)
+                                      (get-preference p))))
+             test-preferences)))
 
 (define (restore-preferences)
   (for (x saved-preferences)
-    (set-preference (car x) (cdr x))))
+    (if (cdr x)
+        (set-preference (car x) (cdr x))
+        (reset-preference (car x)))))
+
 
 ;; The main repository, with a space in its name and in a subdirectory
 (define R #f)
@@ -98,9 +105,7 @@
 (define (setup)
   (shell "rm -rf '" T "'")
   (system-mkdir (system->url T))
-  ;; the configuration of the user is not used
-  (system-setenv "GIT_CONFIG_GLOBAL" "/dev/null")
-  (system-setenv "GIT_CONFIG_NOSYSTEM" "1")
+  (check-isolate-git)
   (make-repo (path "repo test"))
   (system-mkdir (dir "repo test/sub dir"))
   (string-save (tm "Hello world.") (dir "repo test/sub dir/a b.tm"))
@@ -206,6 +211,10 @@
   (sh (path "evil") "git config core.fsmonitor \"touch '"
       (path "evil-pwned") "'; false\"")
   (with E (dir "evil")
+    ;; the program does run when Git is called without precautions
+    (shell "cd '" (path "evil") "' && git status > /dev/null 2>&1")
+    (check-true (url-exists? (dir "evil-pwned")))
+    (system-remove (dir "evil-pwned"))
     (check-false (git-trusted? E))
     (check-false (git-status E))
     (check-true (git-status-known? E))
