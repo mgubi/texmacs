@@ -1194,13 +1194,18 @@ smart_font_rep::resolve (string c) {
   array<string> a= trimmed_tokenize (family, ",");
 
   if (starts (c, "<#") && ends (c, ">")) {
-    // a code point with a Cork equivalent (e.g. <#E9>) is typeset exactly
-    // like the typed character (e.g. the Cork byte for e acute)
+    // a code point with a Cork equivalent in the upper half of the Cork
+    // encoding (e.g. <#E9>, the byte for e acute) is drawn with the font
+    // and glyph of the typed character; not below 128, where Unicode fonts
+    // read the bytes as ASCII (the Cork quotes ` and ' are curly in TeX
+    // fonts, grave and straight in Unicode fonts)
     string cc= rewrite (c, REWRITE_CORK);
-    if (N(cc) == 1) {
+    if (N(cc) == 1 && ((unsigned char) cc[0]) >= 128 &&
+        strict_cork_to_utf8 (cc) == strict_cork_to_utf8 (c)) {
       int cnr= sm->chv[(int) (unsigned char) cc[0]];
       if (cnr == -1) cnr= resolve (cc);
-      if (cnr >= 0 && sm->fn_rewr[cnr] == REWRITE_NONE) {
+      if (cnr >= 0 && cnr != SUBFONT_ERROR &&
+          sm->fn_rewr[cnr] == REWRITE_NONE) {
         tree key= tuple ("cork", as_string (cnr));
         int nr= sm->add_font (key, REWRITE_CORK);
         initialize_font (nr);
