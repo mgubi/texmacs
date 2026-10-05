@@ -421,6 +421,7 @@ get_from_web (url name) {
   
   if (tool == "curl") {
     cmd= "curl --user-agent TeXmacs-" TEXMACS_VERSION;
+    cmd << curl_proxy_option (as_string (name));
     cmd << " " << escape_sh (web_encode (as_string (name)));
     cmd << " --output " << tmp_s;
   }
@@ -435,6 +436,168 @@ get_from_web (url name) {
     return url_none ();
   }
   else return set_cache (name, tmp);
+}
+
+/******************************************************************************
+* The proxy of a request (libcurl and the curl program; Qt and the browsers
+* find it themselves): the preference "http proxy" ("host:port", or with a
+* scheme, "socks5h://host:port"; "direct" for none), else the variables of
+* the environment (http_proxy, https_proxy, all_proxy, no_proxy, which curl
+* reads itself), else, on macOS, the settings of the system (System
+* Settings > Network > Proxies), with their exceptions and their automatic
+* configuration (a PAC file). "" when curl decides, "direct" for none.
+******************************************************************************/
+
+#if defined(OS_MACOS) && !defined(__EMSCRIPTEN__)
+#include <CoreFoundation/CoreFoundation.h>
+#include <CFNetwork/CFNetwork.h>
+
+static string
+cf_to_string (CFStringRef s) {
+  if (s == NULL) return "";
+  char buf[1024];
+  if (!CFStringGetCString (s, buf, sizeof (buf), kCFStringEncodingUTF8))
+    return "";
+  return string (buf);
+}
+
+// the PAC script at u (fetched without proxy, kept for 5 minutes)
+static string
+macos_pac_script (string u) {
+  static string last_url, last_script;
+  static time_t last_time= 0;
+  time_t now= time (NULL);
+  if (u == last_url && now - last_time < 300) return last_script;
+  string s;
+  if (starts (u, "file://")) {
+    if (load_string (url_system (u (7, N(u))), s, false)) s= "";
+  }
+  else {
+    string cmd= "curl --silent --max-time 5 --noproxy '*' '" *
+      replace (u, "'", "'\\''") * "'";
+    if (system (cmd, s) != 0) s= "";
+  }
+  last_url= u; last_script= s; last_time= now;
+  return s;
+}
+
+static string
+macos_proxy_entry (CFDictionaryRef p, CFURLRef target, int depth);
+
+static string
+macos_proxy_list (CFArrayRef ps, CFURLRef target, int depth) {
+  if (ps == NULL) return "";
+  for (CFIndex i= 0; i < CFArrayGetCount (ps); i++) {
+    CFDictionaryRef p= (CFDictionaryRef) CFArrayGetValueAtIndex (ps, i);
+    string r= macos_proxy_entry (p, target, depth);
+    if (r != "") return r;
+  }
+  return "";
+}
+
+static string
+macos_proxy_entry (CFDictionaryRef p, CFURLRef target, int depth) {
+  CFStringRef type= (CFStringRef) CFDictionaryGetValue (p, kCFProxyTypeKey);
+  if (type == NULL) return "";
+  if (CFEqual (type, kCFProxyTypeNone)) return "direct";
+  if (CFEqual (type, kCFProxyTypeHTTP) || CFEqual (type, kCFProxyTypeHTTPS) ||
+      CFEqual (type, kCFProxyTypeSOCKS)) {
+    string host= cf_to_string ((CFStringRef)
+      CFDictionaryGetValue (p, kCFProxyHostNameKey));
+    CFNumberRef pn= (CFNumberRef) CFDictionaryGetValue (p, kCFProxyPortNumberKey);
+    int port= 0;
+    if (pn != NULL) CFNumberGetValue (pn, kCFNumberIntType, &port);
+    if (host == "") return "";
+    string r= CFEqual (type, kCFProxyTypeSOCKS)? string ("socks5h://"):
+                                                 string ("http://");
+    r << host;
+    if (port > 0) r << ":" << as_string (port);
+    return r;
+  }
+  if (depth > 0) return "";
+  // an automatic configuration: its script tells the proxies of the url
+  CFStringRef script= NULL;
+  bool release= false;
+  if (CFEqual (type, kCFProxyTypeAutoConfigurationJavaScript))
+    script= (CFStringRef)
+      CFDictionaryGetValue (p, kCFProxyAutoConfigurationJavaScriptKey);
+  else if (CFEqual (type, kCFProxyTypeAutoConfigurationURL)) {
+    CFURLRef pac= (CFURLRef)
+      CFDictionaryGetValue (p, kCFProxyAutoConfigurationURLKey);
+    if (pac == NULL) return "";
+    string js= macos_pac_script (cf_to_string (CFURLGetString (pac)));
+    if (js == "") return "";
+    c_string cjs (js);
+    script= CFStringCreateWithCString (NULL, (char*) cjs, kCFStringEncodingUTF8);
+    release= true;
+  }
+  if (script == NULL) return "";
+  CFErrorRef err= NULL;
+  CFArrayRef ps= CFNetworkCopyProxiesForAutoConfigurationScript
+                   (script, target, &err);
+  if (release) CFRelease (script);
+  if (err != NULL) CFRelease (err);
+  string r= macos_proxy_list (ps, target, depth + 1);
+  if (ps != NULL) CFRelease (ps);
+  return r;
+}
+
+static string
+macos_system_proxy (string u) {
+  CFDictionaryRef settings= CFNetworkCopySystemProxySettings ();
+  if (settings == NULL) return "";
+  c_string cu (u);
+  CFURLRef target= CFURLCreateWithBytes (NULL, (const UInt8*) (char*) cu,
+                                         N(u), kCFStringEncodingUTF8, NULL);
+  string r;
+  if (target != NULL) {
+    CFArrayRef ps= CFNetworkCopyProxiesForURL (target, settings);
+    r= macos_proxy_list (ps, target, 0);
+    if (ps != NULL) CFRelease (ps);
+    CFRelease (target);
+  }
+  CFRelease (settings);
+  return r;
+}
+#endif
+
+static bool
+proxy_in_environment () {
+  const char* vars[]= { "http_proxy", "HTTP_PROXY", "https_proxy",
+                        "HTTPS_PROXY", "all_proxy", "ALL_PROXY", NULL };
+  for (int i= 0; vars[i] != NULL; i++) {
+    const char* v= getenv (vars[i]);
+    if (v != NULL && v[0] != '\0') return true;
+  }
+  return false;
+}
+
+string
+http_proxy (string u) {
+#ifdef __EMSCRIPTEN__
+  (void) u;
+  return "";
+#else
+  string p= get_preference ("http proxy", "");
+  if (p == "default") p= "";
+  if (p != "") return p;
+  if (proxy_in_environment ()) return "";
+#if defined(OS_MACOS)
+  return macos_system_proxy (u);
+#else
+  (void) u;
+  return "";
+#endif
+#endif
+}
+
+// the option of a curl command line for the proxy of u
+string
+curl_proxy_option (string u) {
+  string p= http_proxy (u);
+  if (p == "") return "";
+  if (p == "direct") return " --noproxy '*'";
+  return " --proxy '" * replace (p, "'", "'\\''") * "'";
 }
 
 /******************************************************************************
@@ -586,8 +749,15 @@ lc_make (string url, array<string> headers_attr, string body,
   curl_easy_setopt (r->easy, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt (r->easy, CURLOPT_USERAGENT, "TeXmacs");
   curl_easy_setopt (r->easy, CURLOPT_PRIVATE, (void*) r);
+  string proxy= http_proxy (url);
+  if (proxy == "direct") curl_easy_setopt (r->easy, CURLOPT_PROXY, "");
+  else if (proxy != "") {
+    c_string cp (proxy);
+    curl_easy_setopt (r->easy, CURLOPT_PROXY, (char*) cp);
+  }
   if (DEBUG_IO)
-    debug_io << "http_post (libcurl), " << url << LF;
+    debug_io << "http_post (libcurl), " << url
+             << (proxy == ""? string (""): ", proxy " * proxy) << LF;
   return r;
 }
 
@@ -733,7 +903,8 @@ shell_quote (string s) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, string data) {
-  string cmd= "curl --silent --no-buffer -X POST " * shell_quote (url) * "\\\n";
+  string cmd= "curl --silent --no-buffer" * curl_proxy_option (url) *
+    " -X POST " * shell_quote (url) * "\\\n";
   for (int i= 0; i+1 < N(headers_attr); i += 2)
     cmd << "  -H "
 	<< shell_quote (headers_attr[i] * ":" * headers_attr[i+1]) << "\\\n";
@@ -751,7 +922,8 @@ to_shell_command (string url, array<string> headers_attr, tree data) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, array<string> attr) {
-  string cmd= "curl --silent --no-buffer -X POST " * shell_quote (url) * " \\\n";
+  string cmd= "curl --silent --no-buffer" * curl_proxy_option (url) *
+    " -X POST " * shell_quote (url) * " \\\n";
   for (int i= 0; i+1 < N(headers_attr); i += 2)
     cmd << "  -H "
 	<< shell_quote (headers_attr[i] * ":" * headers_attr[i+1]) << "\\\n";
@@ -781,7 +953,7 @@ http_get (string& ret, string url, array<string> headers_attr) {
 #ifdef USE_LIBCURL
   return lc_perform (ret, url, headers_attr, "", false);
 #endif
-  string cmd= "curl --silent";
+  string cmd= "curl --silent" * curl_proxy_option (url);
   for (int i= 0; i+1 < N(headers_attr); i += 2)
     cmd << " -H " << shell_quote (headers_attr[i] * ": " * headers_attr[i+1]);
   cmd << " " << shell_quote (url);

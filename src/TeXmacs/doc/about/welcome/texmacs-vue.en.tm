@@ -382,6 +382,20 @@
     (<with|font-series|bold|Send the document as context>): the document is
     sent as <LaTeX>, without the sessions of chatbots, and <name|Claude>
     keeps it in its cache, so that the next questions about it cost less.
+
+    <item>Chatbots which reason: their reasoning is shown while it comes and
+    kept folded before the answer; <with|font-series|bold|Reasoning> (in the
+    menu of the model in the focus bar, or in the preferences of the
+    session) asks for more or less of it.
+
+    <item>Each answer of a chatbot is followed by its tokens (and its cost
+    with <name|OpenRouter>); the menu of the model gives the sum for the
+    session. <with|font-series|bold|Insert answer> in the focus bar puts an
+    answer after the session, as paragraphs of the document.
+
+    <item>A question which an engine refuses for a while (too many requests,
+    an engine overloaded) is asked again after a few seconds, three times
+    at most.
   </itemize>
 
   <paragraph|4 October 2026>

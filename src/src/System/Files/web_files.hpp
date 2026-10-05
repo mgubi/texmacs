@@ -134,6 +134,12 @@ http_get (string url, array<string> headers_attr) {
   return ret;
 }
 
+// the proxy of a request to u (libcurl, curl): "" when curl decides (the
+// variables of the environment), "direct" for none, else the proxy; and the
+// option of a curl command line which says it
+string http_proxy (string u);
+string curl_proxy_option (string u);
+
 // the requests made with libcurl (web_files.cpp): driven at each turn of the
 // main loop, and those whose answer goes to outbuf stopped and forgotten (no
 // operation without libcurl)

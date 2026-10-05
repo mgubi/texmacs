@@ -724,6 +724,10 @@
                 (get-boolean-preference
                  "image->texmacs:svg-prefer-inkscape"))))))
 
+(define (http-proxy-shown)
+  (with p (get-preference "http proxy")
+    (if (in? p '("" "default")) "default" p)))
+
 (tm-widget (ai-preferences-widget)
   ======
   (bold (text "AI connexions"))
@@ -732,7 +736,15 @@
     (item (hlist // (text "Network timeout in seconds:"))
       (enum (set-preference "http request timeout" answer)
                 '("60" "30" "10" "5" "2" "1" "")
-                (get-preference "http request timeout") "6em")))
+                (get-preference "http request timeout") "6em"))
+    ;; (default: the proxy of the system; host:port, socks5://host:port,
+    ;; or direct; a browser has its own)
+    (assuming (not (defined? 'web-javascript))
+      (item (hlist // (text "Proxy:"))
+        (enum (set-preference "http proxy"
+                              (if (== answer "") "default" answer))
+              (list (http-proxy-shown) "default" "direct" "")
+              (http-proxy-shown) "14em"))))
   ======
   (bold (text "AI corrections"))
   ===

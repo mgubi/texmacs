@@ -59,6 +59,8 @@
   ("claude-text-input" "on" noop)
   ("openrouter-text-input" "on" noop)
   ("ai raw answer" "on" noop)
+  ("ai show reasoning" "on" noop)
+  ("ai show usage" "on" noop)
   ("chatgpt model" "gpt-5-mini" noop)
   ("gemini model" "gemini-2.5-flash" noop)
   ("open-mistral-7b model" "mistral-small-latest" noop)
@@ -465,8 +467,21 @@
   (let* ((x (tm->stree t))
          (raw (ai-raw-text x)))
     (or raw
-        (with s (ai-serialize name (ai-unwrap x))
+        (with s (ai-serialize name (ai-unwrap (ai-answer-only x)))
           (if (string? s) s "")))))
+
+;; an answer without what ai.cpp puts around it: its reasoning, its tokens,
+;; the answer as it came
+(define (ai-extra? x)
+  (or (and (tm-func? x 'with 3) (string? (cadr x))
+           (in? (cadr x) '("ai-raw" "ai-usage" "ai-reasoning")))
+      (tm-func? x 'errput)))
+
+(define (ai-answer-only x)
+  (if (tm-func? x 'document)
+      (with l (list-filter (cdr x) (lambda (y) (not (ai-extra? y))))
+        (cons 'document (if (null? l) (list "") l)))
+      x))
 
 ;; The questions and answers of the fields of the session above the one
 ;; which is evaluated, the last ones (ai-context-size), as a list (question
@@ -639,6 +654,16 @@
               "give it in the preferences of the session")
           ", then ask again."))))
 
+;; the reasoning asked of the models of an engine (ai.cpp, ai_reasoning_effort)
+(define ai-reasoning-engines '("chatgpt" "claude" "gemini" "openrouter" "ollama"))
+(define ai-reasoning-levels '("default" "low" "medium" "high"))
+
+(define (ai-reasoning-pref name) (string-append name " reasoning"))
+
+(tm-define (ai-reasoning name)
+  (with e (get-preference (ai-reasoning-pref name))
+    (if (in? e ai-reasoning-levels) e "default")))
+
 (tm-define (albert-variants)
   (list "openweight-large" "openweight-medium" "openweight-small" ""))
 
@@ -664,6 +689,10 @@
           (enum (set-preference (string-append name " context size") answer)
                 '("10" "5" "20" "50" "0" "")
                 (number->string (ai-context-size name)) "5em"))
+        (assuming (in? name ai-reasoning-engines)
+          (item (text "Reasoning")
+            (enum (set-preference (ai-reasoning-pref name) answer)
+                  ai-reasoning-levels (ai-reasoning name) "8em")))
         (item (text "Instructions")
           (explicit-buttons
             ("Edit" (ai-edit-instructions name)) // //
@@ -686,6 +715,9 @@
         (explicit-buttons
           ("Update the list of models"
            (ai-update-models-message "ollama"))))
+      (item (text "Reasoning")
+        (enum (set-preference (ai-reasoning-pref "ollama") answer)
+              ai-reasoning-levels (ai-reasoning "ollama") "8em"))
       (item (text "Instructions")
         (explicit-buttons
           ("Edit" (ai-edit-instructions "ollama")) // //
@@ -734,7 +766,13 @@
 		(get-boolean-preference textual-input)))
       (meti (hlist // (text "Show the answer as it came"))
 	(toggle (set-boolean-preference "ai raw answer" answer)
-		(get-boolean-preference "ai raw answer"))))))
+		(get-boolean-preference "ai raw answer")))
+      (meti (hlist // (text "Show the reasoning"))
+	(toggle (set-boolean-preference "ai show reasoning" answer)
+		(get-boolean-preference "ai show reasoning")))
+      (meti (hlist // (text "Show the tokens and the cost"))
+	(toggle (set-boolean-preference "ai show usage" answer)
+		(get-boolean-preference "ai show usage"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ChatGPT
@@ -908,9 +946,18 @@
   (dynamic (ai-model-choices lan #f))
   (if (and (!= lan "albert") (ai-models-request lan))
       ("Update the list of models" (ai-update-models-message lan)))
+  (if (in? lan ai-reasoning-engines)
+      (-> "Reasoning"
+          (for (e ai-reasoning-levels)
+            ((check (eval (upcase-first e)) "v" (== (ai-reasoning lan) e))
+             (set-preference (ai-reasoning-pref lan) e)))))
   ---
   ((check "Send the document as context" "v" (ai-session-document? lan))
    (ai-toggle-session-document lan))
+  (with u (ai-session-usage-text lan)
+    (if u
+        ---
+        ((eval u) (noop))))
   ("Preferences" (open-plugin-preferences lan)))
 
 (tm-menu (focus-ai-icons lan)
@@ -921,7 +968,83 @@
           (dynamic (focus-ai-agents-interlocutor lan))))
     //
     (=> (balloon (eval (ai-session-model lan)) "Model of the session")
-        (dynamic (focus-ai-model-menu lan)))))
+        (dynamic (focus-ai-model-menu lan)))
+    (if (ai-answer-field lan)
+        //
+        ((balloon "Insert answer" "Insert the answer after the session")
+         (ai-insert-answer lan)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The tokens of a session, its answers in the document
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the tokens of the answers of a session and their cost (the lines of
+;; ai_usage_line in ai.cpp: "in out cached reasoning cost")
+(define (ai-usage-data x)
+  (cond ((not (pair? x)) '())
+        ((and (tm-func? x 'with 3) (== (cadr x) "ai-usage")
+              (string? (caddr x)))
+         (list (map string->number (string-tokenize-by-char (caddr x) #\space))))
+        (else (append-map ai-usage-data (cdr x)))))
+
+(define (ai-session-usage-text lan)
+  (let* ((s (ai-cursor-session lan))
+         (l (if s (ai-usage-data (tree->stree s)) '()))
+         (l (list-filter l (lambda (u) (and (== (length u) 5)
+                                            (list-and (map number? u)))))))
+    (and (nnull? l)
+         (let* ((in (apply + (map car l)))
+                (out (apply + (map cadr l)))
+                (costs (list-filter (map (cut list-ref <> 4) l)
+                                    (lambda (c) (>= c 0))))
+                (cost (apply + costs)))
+           (string-append "This session: " (number->string in) " tokens in, "
+                          (number->string out) " out"
+                          (if (null? costs) ""
+                              (string-append ", $" (ai-cost-string cost))))))))
+
+(define (ai-cost-string c)
+  (let* ((n (inexact->exact (round (* c 10000))))
+         (d (number->string (remainder n 10000))))
+    (string-append (number->string (quotient n 10000)) "."
+                   (make-string (- 4 (string-length d)) #\0) d)))
+
+;; the field of the answer which goes to the document: the one at the
+;; cursor, else the last one of the session which has an answer
+(define (ai-field-answered? f)
+  (and (tree-in? f ai-io-tags) (>= (tree-arity f) 3)
+       (with o (tree->stree (tree-ref f 2))
+         (and (not (in? o '("" (document) (document ""))))
+              (not (ai-error-answer? o))))))
+
+(define (ai-error-answer? o)
+  (with x (if (and (tm-func? o 'document) (nnull? (cdr o))) (cadr o) o)
+    (and (string? x) (string-starts? x "Error:"))))
+
+(define (ai-answer-field lan)
+  (let* ((s (ai-cursor-session lan))
+         (f (tree-innermost ai-io-tags)))
+    (cond ((not s) #f)
+          ((and f (ai-field-answered? f)) f)
+          (else
+           (with body (tree-ref s 2)
+             (with l (list-filter (if (tree-compound? body)
+                                      (tree-children body) '())
+                                  ai-field-answered?)
+               (and (nnull? l) (cAr l))))))))
+
+;; the answer, without its reasoning, its tokens, the answer as it came,
+;; as paragraphs after the session
+(tm-define (ai-insert-answer lan)
+  (let* ((s (ai-cursor-session lan))
+         (f (ai-answer-field lan)))
+    (when (and s f)
+      (let* ((x (ai-unwrap (ai-answer-only (tree->stree (tree-ref f 2)))))
+             (x (if (tm-func? x 'document) x `(document ,x)))
+             (w (or (ai-session-with s) s)))
+        (go-to (append (tree->path w) '(1)))
+        (insert-return)
+        (insert (stree->tree x))))))
 
 ;; (not an overloading of focus-extra-icons: the plug-in is loaded again
 ;; when a key is given, and each loading would add its icons)
