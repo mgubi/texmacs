@@ -90,6 +90,17 @@
   the answer at the cursor (else the last one) after the session, as
   paragraphs of the document.
 
+  A chatbot can also answer in an executable fold
+  (<menu|Insert|Fold|Executable|AI>), whose answer becomes part of the
+  document. A fold asks its question alone, without the questions and
+  answers around it, so that it always asks the same; it has its model, its
+  reasoning and <with|font-series|bold|Send the document as context> in its
+  focus bar, as a session. Its answer is the answer alone (its tokens are
+  said on the status bar). It is kept: unfolding the fold again, or
+  unfolding all the folds of the document, shows it without asking again;
+  <key|Return> in its question, or <with|font-series|bold|Ask again> in its
+  focus bar, asks again.
+
   When an engine says that it has too many requests, or that it is
   overloaded, the question is asked again after a few seconds (as long as
   the engine says, if it says it), three times at most; the session says

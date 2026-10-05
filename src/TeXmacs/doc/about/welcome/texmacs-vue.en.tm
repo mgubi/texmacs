@@ -402,6 +402,12 @@
     <menu|Insert|Session|AI> lists the chatbots alone: a session starts with
     the model of the preferences, and another one is chosen in its focus
     bar.
+
+    <item>Executable folds of chatbots (<menu|Insert|Fold|Executable|AI>):
+    each asks its question alone (with the document, if it is chosen in its
+    focus bar), with its own model, and keeps its answer, which is the answer
+    alone; unfolding it again does not ask again (<key|Return> in its
+    question, or <with|font-series|bold|Ask again>, does).
   </itemize>
 
   <paragraph|4 October 2026>
