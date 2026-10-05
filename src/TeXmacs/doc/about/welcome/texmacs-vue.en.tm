@@ -199,6 +199,13 @@
     too. A question is sent with the conversation above it in the session
     as its context. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
+    <item>The <with|font-series|bold|Busy> sign of a session or a fold
+    which waits for its answer is animated.
+
+    <item>After an update of the page, the caches of <TeXmacs> in your
+    browser are cleared: the styles, files and documentation of the previous
+    version were sometimes still used.
+
     <item>The input fields of the dialogs whose width is given as a
     multiple of the default one are no longer as wide as the window (the
     buttons of the dialogs of the wallet were out of sight).
