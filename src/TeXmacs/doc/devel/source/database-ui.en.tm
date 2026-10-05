@@ -202,19 +202,31 @@
     <verbatim|tmfs://aux/db-search-results>; clicking a result
     (<scm|db-confirm-result>) calls <scm-arg|call-back> with the name of the
     entry. Queries and loaded entries are cached for the life of the
-    dialogue.
+    dialogue. The result areas can be resized.
   </explain>
 
   For bibliographies, <scm|open-bib-chooser> opens this dialogue on
   <scm|(bib-database)>. It is used by the focus search tool inside
-  citations (<scm|focus-open-search-tool> in <verbatim|bib-menu.scm>) and
-  by the alternate tab key (<scm|kbd-alternate-tab>, which calls
-  <scm|kbd-alternate-variant>) in a citation, while <key|tab>
-  (<scm|kbd-variant> in <verbatim|bib-kbd.scm>) completes the
-  citation key with <scm|index-get-name-completions>. When the database tool
-  is off, <key|tab> in a citation instead completes keys from the
-  <verbatim|.bib> file of the document (<scm|citekey-completions> in
-  <verbatim|bibtex/bib-complete.scm>).
+  citations (<scm|focus-open-search-tool> in <verbatim|bib-menu.scm>,
+  <menu|Focus|Search references>) and by the alternate tab key
+  (<scm|kbd-alternate-tab>, which calls <scm|kbd-alternate-variant>) in a
+  citation, while <key|tab> (<scm|kbd-variant> in
+  <verbatim|bib-kbd.scm>) completes the citation key with
+  <scm|index-get-name-completions>. For the kind <verbatim|"bib">, the
+  dialogue also lists the matching references of Zotero after those of the
+  database, puts the source of each reference before it, and names its
+  sources in a line above the input field (see <hlink|Citations from
+  Zotero|zotero.en.tm>).
+
+  When the database tool is off, <key|tab> in a citation completes keys
+  from the <verbatim|.bib> file of the document (<scm|citekey-completions>
+  in <verbatim|bibtex/bib-complete.scm>) and from Zotero, and the same
+  dialogue is opened on the marker <scm|:bib-file> instead of a database
+  (<scm|zotero-open-search-tool>, through the definitions of
+  <scm|focus-can-search?> and <scm|focus-open-search-tool> for citations
+  in <verbatim|generic-edit.scm>): <scm|db-search-results> then lists the
+  entries of the <verbatim|.bib> file of the bibliography, and those of
+  Zotero.
 
   <subsection|Pretty printing>
 
@@ -271,7 +283,8 @@
     open-db-chooser)> in <verbatim|init-texmacs.scm> names a module
     <verbatim|db-widget> which does not exist (the file is
     <verbatim|db-widgets.scm>). In practice <verbatim|db-widgets.scm> is
-    loaded through <verbatim|db-menu.scm> before the chooser is needed.
+    loaded through <verbatim|db-menu.scm> before the chooser is needed,
+    and, without the database tool, by <verbatim|bibtex/zotero-db.scm>.
 
     <item>No lazy <verbatim|tmfs> handler is declared for
     <verbatim|biblio>: <verbatim|tmfs://biblio/...> <abbr|URL>s only work
