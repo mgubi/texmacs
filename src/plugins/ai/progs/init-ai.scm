@@ -1179,15 +1179,9 @@
   (with s (ai-cursor-session lan)
     (when s (ai-set-session-var s "ai-document" "true"))))
 
-;; the chatbots in a submenu AI of Insert > Session, each a submenu of its
-;; models, which starts a session of the one chosen
-(tm-menu (ai-insert-session-menu lan)
-  (-> (eval (session-name lan))
-      (dynamic (ai-model-choices lan #t))))
-
-(for-each (lambda (name)
-            (set-session-group! name "AI")
-            (set-session-insert-menu! name ai-insert-session-menu))
+;; the chatbots in a submenu AI of Insert > Session, each starting a session
+;; of its default model (the model is then chosen in the focus bar)
+(for-each (lambda (name) (set-session-group! name "AI"))
           (ai-models))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
