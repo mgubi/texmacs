@@ -47,7 +47,7 @@
     recursive definition, the second time the enclosing function ran, was
     another bug, fixed by patch 0002 ([05](05-build-and-vendored-s7.md#s7-version-and-local-patch));
     this one still reproduces with that patch.
-  - **Report:** drafted with these two examples, to send upstream.
+  - **Reported upstream** on 5 October 2026, with these two examples.
 - **Memo tables no longer cache `#f`.** Storing `#f` in an s7 hash table
   doesn't create an entry, so `logic-holds?` (`logic-data.scm`) and
   `texmacs-submode?` (`tm-modes.scm`) recompute negative answers on every
