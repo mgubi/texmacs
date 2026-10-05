@@ -172,8 +172,9 @@ jobs:
             --with-mupdf="$DEPS" --with-thorvg="$DEPS" \
             PKG_CONFIG_PATH="$DEPS/lib/pkgconfig"
 
+      # NOTE: -k, so that a run shows all the files which do not compile
       - name: Build
-        run: make -j"$(nproc)"
+        run: make -k -j"$(nproc)"
 
       # SDL3 and SDL3_ttf next to TeXmacs (the script TeXmacs/bin/texmacs
       # puts TeXmacs/lib in LD_LIBRARY_PATH)
@@ -270,7 +271,7 @@ jobs:
             --with-mupdf="$DEPS" --with-thorvg="$DEPS" LIBS=-lws2_32
 
       - name: Build
-        run: make -j"$(nproc)"
+        run: make -k -j"$(nproc)"
 
       - name: Bundle
         run: |

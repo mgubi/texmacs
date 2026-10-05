@@ -13,6 +13,7 @@
 #include "config.h"
 
 #include <chrono>
+#include <string.h> // strerror (with S7 and without Qt, nothing includes it)
 
 #ifdef USE_GUILE
 #include "Guile/guile_tm.hpp"
