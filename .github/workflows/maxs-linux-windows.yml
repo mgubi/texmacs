@@ -234,7 +234,7 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            make perl rsync zip curl tar
+            make perl rsync zip curl tar git
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-cmake
