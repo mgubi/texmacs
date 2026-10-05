@@ -156,6 +156,15 @@
   (check= (list-fold-right (lambda (a b acc) (cons (list a b) acc)) '()
                            '(1 2 3) '(x y))
           '((1 x) (2 y)))
+  ;; the arguments come from the right, and long lists do not overflow the
+  ;; stack
+  (with calls '()
+    (list-fold-right (lambda (x acc) (set! calls (cons x calls)) acc) 'z '(1 2 3))
+    (check= calls '(1 2 3)))
+  (check= (length (list-fold-right cons '() (make-list 100000 'a))) 100000)
+  (check= (length (list-fold-right (lambda (a b acc) (cons a acc)) '()
+                                   (make-list 100000 'a) (make-list 99999 'b)))
+          99999)
   (check= (pair-fold cons '() '(a b c)) '((c) (b c) (a b c)))
   (check= (pair-fold cons 'z '()) 'z)
   (check= (pair-fold (lambda (p q acc) (cons (append p q) acc)) '()

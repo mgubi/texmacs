@@ -406,7 +406,15 @@
   (check= (ev '(date "" "french")) (ev '(date "d MMMM yyyy" "french")))
   (check= (ev '(with "language" "german" (date "" "german")))
           `(with "language" "german" ,(ev '(date "" "german"))))
-  (check= (ev '(date "a" "b" "c")) '(error "bad date")))
+  (check= (ev '(date "a" "b" "c")) '(error "bad date"))
+  ;; the Qt patterns, also without Qt: quoted text, and the widths
+  (check= (ev '(date "'quoted text'" "english")) "quoted text")
+  (check= (ev '(date "'o''clock'" "english")) "o'clock")
+  (check= (string-length (ev '(date "yyyy" "english"))) 4)
+  (check= (string-length (ev '(date "yy-MM-dd" "english"))) 8)
+  (check= (string-length (ev '(date "%Y-%m-%d"))) 10)
+  (check= (string-length (ev '(date "HH:mm:ss" "english"))) 8)
+  (check-true (in? (ev '(date "AP" "english")) '("AM" "PM"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Counters

@@ -138,8 +138,11 @@
   (check= (export "plain" "texmacs-snippet") "plain")
   (check= (export "a<less>b" "texmacs-snippet") "a\\<less\\>b")
   (check= (export "a|b\\c" "texmacs-snippet") "a\\|b\\\\c")
-  ;; only a space at the start or before another space needs the escape
-  (check= (export "  x " "texmacs-snippet") "\\ \\ x ")
+  ;; only a space at the start, before another space or at the end needs
+  ;; the escape
+  (check= (export "  x " "texmacs-snippet") "\\ \\ x\\ ")
+  (check= (import (export "  x " "texmacs-snippet") "texmacs-snippet")
+          '(document "  x "))
   (check= (export "x  y" "texmacs-snippet") "x \\ y")
   (check= (export "\x01\x1f" "texmacs-snippet") "\\A\\_")
   (check= (export "Caf\xe9" "texmacs-snippet") "Caf\xe9")
