@@ -167,7 +167,7 @@
              zotero-mark-results zotero-file-search-results
              zotero-open-search-tool zotero-search-sources-text
              zotero-import-citations zotero-import-entry zotero-can-import?
-             zotero-imported? zotero-searching-results
+             zotero-imported? zotero-searching-results zotero-cited
              zotero-conflict-fields zotero-merge-entries)
 (lazy-menu (bibtex zotero-widgets) zotero-synchronize
            open-zotero-check open-zotero-settings zotero-key-dialog)

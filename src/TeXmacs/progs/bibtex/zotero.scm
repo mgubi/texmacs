@@ -851,7 +851,19 @@
 
 (define (items-entries lib s)
   ;; The entries of the items in the answer @s for the library @lib
-  (list-filter (map (cut item-entry <> lib) (json-items s)) identity))
+  (with l (list-filter (map (cut item-entry <> lib) (json-items s)) identity)
+    (for (e l) (note-item! e))
+    l))
+
+;; The items which Zotero gave (searches, completions...), by their
+;; citation key: a citation made from them is then found by its item, the
+;; identifier of Zotero, which does not change (see zotero-item-of)
+(define seen-items (make-ahash-table)) ; key -> (item library)
+
+(define (note-item! e)
+  (when (!= (zotero-entry-key e) "")
+    (ahash-set! seen-items (zotero-entry-key e)
+                (list (zotero-entry-item e) (zotero-entry-library e)))))
 
 (tm-define (zotero-entry-key e) (first e))
 (tm-define (zotero-entry-item e) (second e))
@@ -1110,6 +1122,7 @@
 (tm-define (zotero-forget-keys)
   (:synopsis "Forget the citation keys found in Zotero")
   (forget-answers)
+  (set! seen-items (make-ahash-table))
   (set! resolved (make-ahash-table))
   (set! completions (make-ahash-table))
   (set! library-versions (make-ahash-table)))
@@ -1166,8 +1179,9 @@
                                                    "?format=json"))
                         (and-with e (list-find (items-entries lib s) identity)
                           (and (== (zotero-entry-key e) key) e))))
-                    (list-or (map (cut find-in-library <> key)
-                                  (zotero-libraries))))
+                    (or (find-by-item key)
+                        (list-or (map (cut find-in-library <> key)
+                                      (zotero-libraries)))))
           ;; NOTE: not while an answer is awaited, which is no answer
           (when (and (zotero-ready?) (not (zotero-asking?)))
             (ahash-set! resolved key (or e 'none)))
@@ -1213,11 +1227,63 @@
                                            (string-recompose l ",")))))
      (if (null? items) '() (chunks items 50)))))
 
+(tm-define (zotero-item-of key)
+  (:synopsis "The (item library) of the citation @key, when it is known")
+  ;; as remembered with the document, in the comments of the BibTeX file
+  ;; of the user, or given by Zotero during this session
+  (or (assoc-ref (zotero-recorded-items) key)
+      (with f (zotero-own-bib-file)
+        (and f (assoc-ref (zotero-bib-file-items f) key)))
+      (ahash-ref seen-items key)))
+
+(define (find-by-item key)
+  ;; the entry of @key, asked for by its item; #f when that item has
+  ;; another key now (renamed: see zotero-check-missing) or is gone
+  (and-with x (zotero-item-of key)
+    (and (in? (cadr x) (zotero-libraries))
+         (and-with s (zotero-get (cadr x) (string-append
+                                           "items/" (car x) "?format=json"))
+           (list-find (items-entries (cadr x) s)
+                      (lambda (e) (== (zotero-entry-key e) key)))))))
+
+(define (resolve-by-items! keys)
+  ;; ask for the items of the @keys, by library and at once, and remember
+  ;; those which still have their key
+  (let* ((l (list-filter (map (lambda (k)
+                                (and (not (zotero-derived-key? k))
+                                     (not (ahash-ref resolved k))
+                                     (and-with x (zotero-item-of k)
+                                       (cons k x))))
+                              keys)
+                         identity))
+         (libs (list-remove-duplicates (map caddr l))))
+    (for (lib libs)
+      (when (in? lib (zotero-libraries))
+        (let* ((mine (list-filter l (lambda (x) (== (caddr x) lib))))
+               (es (zotero-items-entries (map cadr mine) lib)))
+          (for (x mine)
+            (and-with e (list-find es (lambda (e)
+                                        (and (== (zotero-entry-item e) (cadr x))
+                                             (== (zotero-entry-key e)
+                                                 (car x)))))
+              (ahash-set! resolved (car x) e))))))))
+
 (tm-define (zotero-resolve keys)
   (:synopsis "The (key . entry) for the @keys which Zotero has")
-  (list-filter (map (lambda (k) (and-with e (zotero-find-key k) (cons k e)))
-                    keys)
-               identity))
+  ;; the keys whose item is known are asked for by their items first; the
+  ;; others are searched (while the items are awaited, nothing is searched)
+  (if (not (zotero-ready?)) '()
+      (begin
+        (resolve-by-items! keys)
+        (if (zotero-waiting?) '()
+            (list-filter (map (lambda (k)
+                                (and-with e (zotero-find-key k) (cons k e)))
+                              keys)
+                         identity)))))
+
+(tm-define (zotero-seen? key)
+  (:synopsis "Did Zotero give the item of @key during this session?")
+  (and (ahash-ref seen-items key) #t))
 
 (define (chunks l n)
   (if (<= (length l) n) (list l)
@@ -1780,13 +1846,23 @@
   (:synopsis "Remember with the document the Zotero items of its citations")
   ;; The (key item library) are kept in an attachment of the document, so
   ;; that a key renamed in Zotero can be found again
-  (when (nnull? entries)
+  (record-items (map (lambda (e)
+                       (list (zotero-entry-key e) (zotero-entry-item e)
+                             (zotero-entry-library e)))
+                     entries)))
+
+(define (record-items l)
+  ;; remember the (key item library) of @l with the document
+  (when (and (nnull? l)
+             (list-or (map (lambda (x) (!= (assoc-ref (zotero-recorded-items)
+                                                      (car x))
+                                           (cdr x)))
+                           l)))
     (let* ((h (make-ahash-table)))
       (for (x (zotero-recorded-items))
         (ahash-set! h (car x) (cdr x)))
-      (for (e entries)
-        (ahash-set! h (zotero-entry-key e)
-                    (list (zotero-entry-item e) (zotero-entry-library e))))
+      (for (x l)
+        (ahash-set! h (car x) (cdr x)))
       (set-attachment "zotero-items"
                       (stree->tree
                        `(tuple ,@(map (lambda (x) `(tuple ,(car x) ,@(cdr x)))
@@ -2050,6 +2126,20 @@
                         "Zotero")
            #t)
           (else #f))))
+
+(tm-define (zotero-file-citations keys)
+  (:synopsis "Put the references of Zotero of @keys in the BibTeX file")
+  ;; the file of the bibliography, without the database: added at the end
+  ;; of a file of the user, or exported into a file of Zotero (also when
+  ;; it does not exist yet, or the bibliography has no file)
+  (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))
+               (zotero-master-bibliography-file))
+    (cond ((add-to-own-file? f)
+           (with (added missing) (zotero-add-to-bib-file f keys)
+             (when (and (nnull? added) (not (zotero-asking?)))
+               (set-message (zotero-add-message added '() f) "Zotero"))))
+          ((or (fill-missing-bibliography) (with-zotero-bibliography?))
+           (zotero-refresh-bibliography #t)))))
 
 (define (before-update what)
   (when (in? what '("all" "bibliography"))

@@ -1227,6 +1227,120 @@
         (system-remove f)))))
 
 
+(define (test-by-item)
+  (check-group "by item")
+  ;; a citation is found by its item, the identifier of Zotero, when it
+  ;; is known: on zotero.org, which does not search the citation keys, a
+  ;; key which is not "author...year" is found that way only
+  (with-fake
+    (lambda ()
+      (set! fake-library
+            (append (default-library)
+                    (list '("FFFF6666" "Weird2021" "Strange title" "Nobody"
+                            "2021" 1 "journalArticle"))))
+      (with-preferences '(("zotero source" . "web")
+                          ("zotero api key" . "secret")
+                          ("zotero user" . "12345 alice"))
+        (lambda ()
+          (with-document "item.tm"
+              (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                             "  See <cite|Weird2021>.\n</body>\n")
+            (lambda ()
+              (check-false (zotero-find-key "Weird2021"))
+              ;; an item which Zotero gave (the search window) is known
+              (zotero-forget-keys)
+              (check= (map zotero-entry-key (zotero-search "strange"))
+                      '("Weird2021"))
+              (check= (zotero-item-of "Weird2021") '("FFFF6666" "users/0"))
+              ;; the citation made from it remembers it with the document
+              (zotero-cited "Weird2021" (current-buffer))
+              (check= (zotero-recorded-items)
+                      '(("Weird2021" "FFFF6666" "users/0")))
+              ;; which is enough, later: it is asked for by its item
+              (zotero-forget-keys)
+              (set! fake-requests '())
+              (check= (map car (zotero-resolve '("Weird2021" "smith2020")))
+                      '("Weird2021" "smith2020"))
+              (check-true (list-find fake-requests
+                                     (cut string-contains? <>
+                                          "items?format=json&itemKey=FFFF6666")))
+              ;; a renamed item is no longer found under the old key, and
+              ;; is reported as renamed
+              (set! fake-library
+                    (map (lambda (x)
+                           (if (== (car x) "FFFF6666")
+                               '("FFFF6666" "Weird2021b" "Strange title"
+                                 "Nobody" "2021" 2 "journalArticle")
+                               x))
+                         fake-library))
+              (zotero-forget-keys)
+              (check-false (zotero-find-key "Weird2021"))
+              (check= (map car (car (zotero-check-missing '("Weird2021"))))
+                      '("Weird2021")))))))))
+
+(define (test-cited)
+  (check-group "cited")
+  ;; a reference of Zotero chosen in the search window is copied at once
+  ;; where the bibliography reads it
+  (with-fake
+    (lambda ()
+      (set! fake-library
+            (append (default-library)
+                    (list '("FFFF6666" "Weird2021" "Strange title" "Nobody"
+                            "2021" 1 "journalArticle"))))
+      (with-preferences '(("zotero source" . "web")
+                          ("zotero api key" . "secret")
+                          ("zotero user" . "12345 alice"))
+        (lambda ()
+          (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+          (with cite-doc (lambda (bib)
+                           (string-append
+                            "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                            "  See <cite|Weird2021>.\n\n" bib "</body>\n"))
+            ;; at the end of the BibTeX file of the user
+            (with f (tmp "mine.bib")
+              (string-save "@article{other, title={Other}}\n" f)
+              (with-document "c1.tm"
+                  (cite-doc "  <\\bibliography|bib|tm-plain|mine>\n  </bibliography>\n")
+                (lambda ()
+                  (zotero-search "strange")
+                  (zotero-cited "Weird2021" (current-buffer))
+                  (check= (map car (zotero-bib-chunks-of (string-load f)))
+                          '("other" "Weird2021"))
+                  (check= (zotero-bib-file-items f)
+                          '(("Weird2021" "FFFF6666" "users/0")))
+                  (check= (zotero-recorded-items)
+                          '(("Weird2021" "FFFF6666" "users/0")))))
+              (system-remove f))
+            ;; into a file of Zotero, for a bibliography without file
+            (with-document "c2.tm"
+                (cite-doc "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+              (lambda ()
+                (with f (tmp "c2-zotero.bib")
+                  (zotero-search "strange")
+                  (zotero-cited "Weird2021" (current-buffer))
+                  (check-true (zotero-managed-file? f))
+                  (check= (map car (zotero-bib-chunks-of (string-load f)))
+                          '("Weird2021"))
+                  (system-remove f))))
+            ;; not a reference which Zotero did not give
+            (with-document "c3.tm"
+                (cite-doc "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+              (lambda ()
+                (zotero-forget-keys)
+                (zotero-cited "Weird2021" (current-buffer))
+                (check= (zotero-recorded-items) '())
+                (check-false (url-exists? (tmp "c3-zotero.bib")))))
+            ;; into the database, with the database
+            (with-test-database
+              (lambda ()
+                (with-document "c4.tm" (cite-doc "")
+                  (lambda ()
+                    (zotero-search "strange")
+                    (check-false (zotero-in-database? "Weird2021"))
+                    (zotero-cited "Weird2021" (current-buffer))
+                    (check-true (zotero-in-database? "Weird2021"))))))))))))
+
 (define (test-async-database)
   (check-group "async database")
   ;; with the database, Update -> All in a web browser: the references of
@@ -1726,6 +1840,8 @@
   (test-web)
   (test-async)
   (test-async-database)
+  (test-by-item)
+  (test-cited)
   (test-key)
   (test-renamed)
   (test-database-search)
