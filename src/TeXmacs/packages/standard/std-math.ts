@@ -179,9 +179,7 @@
 
   <assign|genfrac|<macro|left|right|sep|disp|x|y|<style-only*|<with|mode|math|<shrink-inline|<around*|<inactive*|<arg|left>>|<resize|<tabular*|<tformat|<cwith|1|-1|1|1|cell-lsep|0spc>|<cwith|1|-1|1|1|cell-rsep|0spc>|<cwith|1|1|1|-1|cell-bborder|sep>|<table|<row|<cell|<inactive*|<arg|x>>>>|<row|<cell|<inactive*|<arg|y>>>>>>>||<plus|1b|2.5sep>||<minus|1t|2.5sep>>|<inactive*|<arg|right>>>>>>>>
 
-  <assign|boxed|<macro|body|<style-with|src-compact|none|<tformat|<twith|table-valign|B>|<cwith|1|1|1|1|cell-lsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-rsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-bsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-tsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-lborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-rborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-bborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-tborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-vcorrect|n>|<table|<row|<cell|<with|mode|math|math-display|true|<arg|body>>>>>>>>>
-
-  <drd-props|boxed|arity|1|accessible|all>
+  <assign|boxed|<macro|body|<style-with|src-compact|none|<tformat|<twith|table-valign|B>|<cwith|1|1|1|1|cell-lsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-rsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-bsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-tsep|<value|boxed-sep>>|<cwith|1|1|1|1|cell-lborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-rborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-bborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-tborder|<value|boxed-border>>|<cwith|1|1|1|1|cell-vcorrect|n>|<table|<row|<cell|<with|mode|math|math-display|true|math-level|0|<arg|body>>>>>>>>>
 
   <assign|left-script|<macro|body|s|<active*|<tabular|<tformat|<cwith|1|1|1|-1|cell-lsep|0spc>|<cwith|1|1|1|-1|cell-rsep|0spc>|<cwith|1|1|1|-1|cell-bsep|0spc>|<cwith|1|1|1|-1|cell-tsep|0spc>|<cwith|1|1|1|-1|cell-vcorrect|n>|<cwith|1|1|1|-1|cell-valign|c>|<cwith|1|1|1|1|cell-halign|r>|<cwith|1|1|2|2|cell-halign|c>|<cwith|1|1|3|3|cell-halign|l>|<table|<row|<cell|<with|math-level|<plus|<value|math-level>|1>|<resize|<arg|s>|<minus|1r|1.5ex>||<minus|1r|0.5ex>|>>>|<cell|<arg|body>>|<cell|<with|math-level|<plus|<value|math-level>|1>|<resize||0ex||1ex|>>>>>>>>>>
 
