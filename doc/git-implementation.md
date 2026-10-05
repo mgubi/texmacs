@@ -47,7 +47,13 @@ therefore load even before anyone has opened the Version menu.
 * **Trust:** `git-run` and `git-run-async` refuse to run in a working tree
   that is not listed in the preference `"git trusted repositories"`. The
   list is filled by `git-trust`, which is called by init, clone and
-  *Use Git in this folder…*.
+  *Use Git in this folder…*. Outside working trees, only `init` and
+  `clone` are run: the directory of a bare repository has no `.git`
+  entry, but Git would use its configuration. Every other command gets
+  `--git-dir=<root>/.git --work-tree=<root>` for the root found by
+  `git-root` (`git-pinned`), so that Git uses exactly the repository
+  whose trust was checked, and not one it would find by itself (through
+  a symbolic link to a directory of another repository, or `GIT_DIR`).
 * The first call sets `GIT_TERMINAL_PROMPT=0` and `GIT_OPTIONAL_LOCKS=0` in
   TeXmacs's own environment (`system-setenv`), so git never waits for a
   password on a terminal that isn't there.

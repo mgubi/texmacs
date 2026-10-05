@@ -156,3 +156,11 @@ hand; the merge, shell-quoting and parsing checks are listed above. Its
 scope (core logic and data loss) may deserve a second pass on the parts it
 did not reach: stash and discard with open documents, caching races with
 asynchronous commands, submodules.
+
+---
+
+## Resolution
+
+| Findings | Commit | Notes |
+|----------|--------|-------|
+| A1 | this commit | Outside working trees only `init` and `clone` run; every other command gets `--git-dir`/`--work-tree` for the checked root. Tests: a bare repository with a signed commit, through a commit page and a document which includes it; a symbolic link from a trusted tree into a directory of an untrusted one; clone outside working trees. |

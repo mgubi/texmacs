@@ -249,6 +249,71 @@
 ;; States of files, staging and commits
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Git must use the repository whose trust was checked, which may not be
+;; the one it would find by itself (audit 2, A1)
+(define (marker-program name)
+  ;; a program which leaves the file @name in the scratch directory
+  (with f (path name ".sh")
+    (string-save (string-append "#!/bin/sh\ntouch '" (path name) "'\nexit 1\n")
+                 (system->url f))
+    (shell "chmod +x '" f "'")
+    f))
+
+(define (test-pinning)
+  (check-group "pinning")
+  ;; a bare repository with a signed commit, whose configuration names a
+  ;; program for checking signatures
+  (string-save fake-gpg (dir "fake-gpg"))
+  (shell "chmod +x '" (path "fake-gpg") "'")
+  (make-repo (path "signed"))
+  (sh (path "signed") "echo a > a.txt && git add a.txt"
+      " && git -c gpg.program='" (path "fake-gpg") "'"
+      " -c user.signingkey=test commit -q -S -m signed"
+      " && cd .. && git clone -q --bare signed bare.git"
+      " && git -C bare.git config gpg.program '" (marker-program "bare-ran")
+      "'")
+  (let* ((B (dir "bare.git"))
+         (brev (string-drop-right (sh (path "signed") "git rev-parse HEAD") 1))
+         (doc (dir "includes.tm")))
+    (check-false (git-root B))
+    (check= (git-run B "log") (list -1 "" "not in a Git working tree"))
+    (check-false (git-signature B brev))
+    (check-false (url-exists? (dir "bare-ran")))
+    (tmfs-load (tmfs-url-commit B brev))
+    (check-false (url-exists? (dir "bare-ran")))
+    ;; a document which includes the page of the commit
+    (string-save (tm (string-append "<include|" (tmfs-url-commit B brev) ">"))
+                 doc)
+    (load-buffer doc)
+    (update-forced)
+    (buffer-pretend-saved doc)
+    (buffer-close doc)
+    (check-false (url-exists? (dir "bare-ran")))
+    ;; the same signature check runs in a trusted repository
+    (git-trust (dir "signed"))
+    (git-run (dir "signed") "config" "gpg.program" (marker-program "signed-ran"))
+    (check-false (git-signature (dir "signed") brev))
+    (check-true (url-exists? (dir "signed-ran")))
+    ;; a symbolic link from a trusted working tree into a directory of an
+    ;; untrusted one (a link to its root has a .git entry, and is not
+    ;; trusted)
+    (shell "git clone -q '" (path "signed") "' '" (path "untrusted2") "'")
+    (sh (path "untrusted2") "mkdir sub && git config gpg.program '"
+        (marker-program "link-ran") "'")
+    (shell "ln -s '" (path "untrusted2/sub") "' '" (path "repo test/lnk") "'")
+    (with L (dir "repo test/lnk")
+      (check= (git-root L) R)
+      (check-false (git-signature L brev))
+      ;; Git uses the trusted repository, never the one of the link
+      (check= (git-rev-parse L "HEAD") (git-rev-parse R "HEAD"))
+      (check-false (url-exists? (dir "link-ran"))))
+    (shell "rm '" (path "repo test/lnk") "'")
+    (git-invalidate R)
+    ;; init and clone still run outside working trees
+    (check-true (git-ok? (git-run (dir "") "clone" "--quiet" "--"
+                                  (path "bare.git") (path "cloned"))))
+    (check-true (url-exists? (dir "cloned/a.txt")))))
+
 (define (test-states)
   (check-group "states")
   (check= (git-file-state F) 'untracked)
@@ -1015,6 +1080,7 @@
         (run-group test-subroutines)
         (run-group test-trust)
         (run-group test-detection)
+        (run-group test-pinning)
         (run-group test-states)
         (run-group test-history)
         (run-group test-pages)
