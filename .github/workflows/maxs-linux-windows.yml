@@ -89,6 +89,7 @@ jobs:
           install: >-
             make perl rsync zip
             mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-ntldd
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-qt6-base
             mingw-w64-x86_64-qt6-svg
