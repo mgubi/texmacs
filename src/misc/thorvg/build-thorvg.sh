@@ -19,7 +19,10 @@ TARGET=${2:-native}
 THORVG_VERSION=${THORVG_VERSION:-v1.1.2}
 mkdir -p "$PREFIX"; PREFIX=$(cd "$PREFIX" && pwd)
 
-if [ ! -x "$PREFIX/venv/bin/meson" ]; then
+# NOTE: meson and ninja of the PATH when there are both (MSYS2, where pip
+# has no ninja), otherwise in a venv
+if [ ! -x "$PREFIX/venv/bin/meson" ] &&
+   ! { command -v meson > /dev/null && command -v ninja > /dev/null; }; then
   PY=python3
   for p in /opt/homebrew/opt/python@3.13/bin/python3.13 /opt/homebrew/bin/python3; do
     [ -x "$p" ] && { PY=$p; break; }
