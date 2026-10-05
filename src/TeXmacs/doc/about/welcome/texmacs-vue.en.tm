@@ -219,6 +219,7 @@
     a menu which changes it for the next questions (by provider for
     <name|OpenRouter>), with <with|font-series|bold|Other model>,
     <with|font-series|bold|Update the list of models> and its preferences.
+    (It was there twice after a key was given or the wallet opened.)
 
     <item>The answers of <name|OpenRouter> which come after its messages of
     waiting (<verbatim|: OPENROUTER PROCESSING>) are read; they were an

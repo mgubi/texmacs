@@ -282,7 +282,11 @@
       ((balloon (icon "tm_stop.xpm") "Interrupt execution")
        (plugin-interrupt))
       ((balloon (icon "tm_clsession.xpm") "Close session")
-       (plugin-stop))))
+       (plugin-stop)))
+  ;; those of the plug-in (set-session-focus-menu!)
+  (with lan (get-env "prog-language")
+    (with m (session-focus-menu lan)
+      (if m (dynamic (m lan))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Help icons

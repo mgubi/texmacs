@@ -786,14 +786,20 @@
       ("Update the list of models" (ai-update-models-message lan)))
   ("Preferences" (open-plugin-preferences lan)))
 
-(tm-menu (focus-extra-icons t)
-  (:require (in? (get-env "prog-language") (ai-models)))
-  (dynamic (former t))
+(tm-menu (focus-ai-icons lan)
   (mini #t
+    (if (== lan "albert")
+      //
+      (=> (eval (get-preference "albert ai-agents interlocutor"))
+          (dynamic (focus-ai-agents-interlocutor lan))))
     //
-    (with lan (get-env "prog-language")
-      (=> (balloon (eval (ai-session-model lan)) "Model of the session")
-          (dynamic (focus-ai-model-menu lan))))))
+    (=> (balloon (eval (ai-session-model lan)) "Model of the session")
+        (dynamic (focus-ai-model-menu lan)))))
+
+;; (not an overloading of focus-extra-icons: the plug-in is loaded again
+;; when a key is given, and each loading would add its icons)
+(for-each (lambda (name) (set-session-focus-menu! name focus-ai-icons))
+          (ai-models))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Albert
@@ -805,17 +811,6 @@
       ((check (eval s) "v" (== (get-preference pref) s))
        (set-preference pref s)))))
 
-(define (focus-session-language*)
-  (string-downcase (focus-session-language)))
-
-(tm-menu (focus-extra-icons t)
-  (:require (in? (focus-session-language*) (list "albert"))) ;;(ai-models)))
-  (dynamic (former t))
-  (mini #t
-    //
-    (=> (eval (get-preference (string-append (focus-session-language*)
-					     " ai-agents interlocutor")))
-        (dynamic (focus-ai-agents-interlocutor (focus-session-language*))))))
 
 (tm-define (has-albert?)
   (ai-available? "albert"))
