@@ -25,9 +25,9 @@ bool rescue_mode= false;
 
 string get_system_date () {
   std::time_t now= std::time (nullptr);
-  std::tm* local_time= std::localtime (&now);
+  std::tm* utc_time= std::gmtime (&now);
   char buffer[1024];
-  size_t len = std::strftime(buffer, sizeof(buffer), "%a %b %d %H:%M:%S %Z %Y", local_time);
+  size_t len = std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", utc_time);
   if (len > 0) {
     return string(buffer, len);
   } else {

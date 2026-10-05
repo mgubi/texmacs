@@ -330,7 +330,22 @@ test_case_escapes () {
   CHECK_EQ (uni_upcase_char ("<#44F>"), string ("<#42F>"));
   CHECK_EQ (uni_locase_char ("<#460>"), string ("<#461>"));
   CHECK_EQ (uni_upcase_char ("<#461>"), string ("<#460>"));
-  // FIXME: from 0x4C1 to 0x4CE the capitals are odd, which is not handled
+  // from 0x4C1 to 0x4CE the capitals are odd, the palochka pairs 0x4C0
+  // with 0x4CF, and the signs from 0x482 to 0x489 have no case
+  CHECK_EQ (uni_locase_char ("<#4C1>"), string ("<#4C2>"));
+  CHECK_EQ (uni_upcase_char ("<#4C2>"), string ("<#4C1>"));
+  CHECK_EQ (uni_locase_char ("<#4C2>"), string ("<#4C2>"));
+  CHECK_EQ (uni_upcase_char ("<#4C1>"), string ("<#4C1>"));
+  CHECK_EQ (uni_locase_char ("<#4CD>"), string ("<#4CE>"));
+  CHECK_EQ (uni_upcase_char ("<#4CE>"), string ("<#4CD>"));
+  CHECK_EQ (uni_locase_char ("<#4C0>"), string ("<#4CF>"));
+  CHECK_EQ (uni_upcase_char ("<#4CF>"), string ("<#4C0>"));
+  CHECK_EQ (uni_locase_char ("<#482>"), string ("<#482>"));
+  CHECK_EQ (uni_upcase_char ("<#483>"), string ("<#483>"));
+  CHECK_EQ (uni_locase_char ("<#4D0>"), string ("<#4D1>"));
+  CHECK_EQ (uni_upcase_char ("<#4FF>"), string ("<#4FE>"));
+  // final sigma has the capital of sigma
+  CHECK_EQ (uni_upcase_char ("<#3C2>"), string ("<#3A3>"));
   // lower case hexadecimal digits are understood, and the result is
   // written in upper case
   CHECK_EQ (uni_locase_char ("<#3a3>"), string ("<#3C3>"));
@@ -344,8 +359,7 @@ static void
 test_case_pairs () {
   int bad= 0;
   for (int c=0x391; c<=0x3A9; c++) {
-    // FIXME: 0x3A2 is unassigned, yet it is the upper case of 0x3C2
-    if (c == 0x3A2) continue;
+    if (c == 0x3A2) continue;  // unassigned
     string up= "<#" * as_hexadecimal (c) * ">";
     string lo= "<#" * as_hexadecimal (c + 0x20) * ">";
     if ((uni_locase_char (up) != lo || uni_upcase_char (lo) != up) && bad++ < 5)
@@ -429,6 +443,17 @@ test_letters () {
   CHECK (!uni_is_letter ("1"));
   CHECK (!uni_is_letter ("+"));
   CHECK (uni_is_letter ("\xe9"));
+  // above 127 every Cork character is a letter, sharp s and the ligatures
+  // included, but the section sign, the inverted marks and the pound sign
+  CHECK (uni_is_letter ("\xff"));   // sharp s
+  CHECK (uni_is_letter ("\xdf"));   // SS
+  CHECK (uni_is_letter ("\xd7"));   // OE
+  CHECK (uni_is_letter ("\xf7"));   // oe
+  CHECK (uni_is_letter ("\x80"));   // A breve
+  CHECK (!uni_is_letter ("\x9f"));  // section sign
+  CHECK (!uni_is_letter ("\xbd"));  // inverted exclamation mark
+  CHECK (!uni_is_letter ("\xbe"));  // inverted question mark
+  CHECK (!uni_is_letter ("\xbf"));  // pound sign
   CHECK (uni_is_letter ("<alpha>"));
   CHECK (uni_is_letter ("<Omega>"));
   CHECK (uni_is_letter ("<varphi>"));
@@ -446,6 +471,21 @@ test_before () {
   CHECK (uni_before ("\xc9" "cole", "ecolf"));
   CHECK (uni_before ("ecole", "\xc9" "COLE"));
   CHECK (uni_before ("\xc9" "COLE", "ecole"));
+}
+
+// the code points of the Cyrillic letters become their bytes in T2A, the
+// encoding of the Cyrillic TeX fonts, and any other character is left
+// alone: a Latin letter such as <#E7> used to become the T2A byte 0xE7,
+// so that the roman font drew c cedilla with a Cyrillic glyph
+static void
+test_cyrillic_t2a () {
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#430>"), "\xe0");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#44F>"), "\xff");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#401>"), "\x9c");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#E7>"), "<#E7>");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#E9>"), "<#E9>");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#4E2D>"), "<#4E2D>");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("a"), "a");
 }
 
 int
@@ -469,5 +509,6 @@ main () {
   RUN (test_translit);
   RUN (test_letters);
   RUN (test_before);
+  RUN (test_cyrillic_t2a);
   return test_report ();
 }

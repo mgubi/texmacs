@@ -45,6 +45,20 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
+(lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
+             zotero-before-update zotero-managed-file?
+             zotero-completion-suffixes zotero-citation-entry
+             zotero-show-item zotero-update-citations)
+(lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
+             zotero-import-items zotero-in-database? zotero-search-entries
+             zotero-database-renames
+             zotero-rename-database-entries zotero-database-entry-info
+             zotero-adopt-entries zotero-in-database-search?
+             zotero-mark-results zotero-file-search-results
+             zotero-open-search-tool zotero-search-sources-text
+             zotero-conflict-fields zotero-merge-entries)
+(lazy-menu (bibtex zotero-widgets) zotero-synchronize
+           open-zotero-check open-zotero-settings)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 
@@ -218,7 +232,7 @@
 
 ;(display "Booting graphics mode\n")
 (lazy-keyboard (graphics graphics-kbd) in-active-graphics? graphics-wheel)
-(lazy-menu (graphics graphics-menu) graphics-menu graphics-icons
+(lazy-menu (graphics graphics-menu) graphics-icons
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)

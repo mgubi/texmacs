@@ -582,9 +582,13 @@ buffer_export (url name, url dest, string fm) {
   return export_tree (doc, dest, fm);
 }
 
+// The macros of a document are expanded by the editor of a view on it; a
+// document converted without a view, as from Scheme, is left as it is
+
 tree
 latex_expand (tree doc, url name) {
   tm_view vw= concrete_view (get_recent_view (name));
+  if (vw == NULL) return doc;
   tree body= vw->ed->exec_latex (extract (doc, "body"));
   return change_doc_attr (doc, "body", body);
 }
@@ -592,6 +596,7 @@ latex_expand (tree doc, url name) {
 tree
 latex_expand (tree doc) {
   tm_view vw= concrete_view (url (as_string (extract (doc, "view"))));
+  if (vw == NULL) return remove_doc_attr (doc, "view");
   tree body= vw->ed->exec_latex (extract (doc, "body"));
   doc= change_doc_attr (doc, "body", body);
   return remove_doc_attr (doc, "view");

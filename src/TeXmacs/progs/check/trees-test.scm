@@ -429,8 +429,7 @@
   (check= (map tm-compound? (frac-forms)) '(#t #t))
   (check= (map tm-compound? (atom-forms)) '(#f #f))
   (check= (map tm-arity (frac-forms)) '(2 2))
-  ;; FIXME: tm-arity gives 0 for a string but the length of the string
-  ;; for an atomic tree: (tm-arity (stree->tree "abc")) is 3.
+  (check= (map tm-arity (atom-forms)) '(0 0))
   (check= (map tm-length (frac-forms)) '(2 2))
   (check= (map tm-length (atom-forms)) '(3 3))
   (check= (map tm->string (atom-forms)) '("abc" "abc"))
@@ -735,12 +734,20 @@
       (check= (patch->scheme (scheme->patch (patch->scheme p)))
               (patch->scheme p)))
     (check-false (scheme->patch '(nosuch)))))
-;; FIXME: the Scheme forms of birth and author patches do not come back:
-;; patch->scheme writes (birth BIRTH? AUTHOR) but scheme->patch calls
-;; (patch-birth BIRTH? AUTHOR) whose arguments are (author birth?), which
-;; raises wrong-type-arg; scheme->patch builds an author patch with
-;; patch-birth instead of patch-author; and patch->scheme leaves the
-;; child of an author patch as a patch, not as its Scheme form.
+;; the Scheme forms of birth and author patches come back too
+(define (test-patch-birth-author)
+  (check-group "patch birth and author")
+  (let* ((pa (scheme->patch '(pair (assign (0) "a") (assign (0) "b"))))
+         (bi (patch-birth 3.0 #t))
+         (au (patch-author 2.0 pa)))
+    (check= (patch->scheme au)
+            '(author 2.0 (pair (assign (0) "a") (assign (0) "b"))))
+    (for (p (list bi (patch-birth 4.0 #f) au))
+      (check= (patch->scheme (scheme->patch (patch->scheme p)))
+              (patch->scheme p)))
+    (check= (patch-get-author (scheme->patch (patch->scheme bi))) 3.0)
+    (check-true (patch-birth? (scheme->patch (patch->scheme bi))))
+    (check-true (patch-author? (scheme->patch (patch->scheme au))))))
 
 ;; applying, inverting and composing patches
 (define (test-patch-apply)
@@ -821,6 +828,7 @@
   (test-modification-apply)
   (test-modification-push)
   (test-patch-forms)
+  (test-patch-birth-author)
   (test-patch-apply)
   (test-patch-push)
   (check-end))
