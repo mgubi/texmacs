@@ -331,7 +331,7 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string cmd= "curl --silent -X POST " * shell_quote (url) * " \\\n";
+    string cmd= "curl --silent --no-buffer -X POST " * shell_quote (url) * " \\\n";
     for (int i= 0; i+1 < N(headers); i += 2)
       cmd << "  -H " << shell_quote (headers[i])
 	  << ":"  << shell_quote (headers[i+1]) << " \\\n";
@@ -683,9 +683,9 @@ ai_latex_command (string s, string model, string chat) {
 string
 ai_latex_request (string s, string model, string chat) {
   string agent= ai_latex_agent_description (model);
-#ifdef __EMSCRIPTEN__
+  // (the request links read the answers as they come: fetch in a web
+  // browser, QNetworkReply with Qt, the output of curl elsewhere)
   ai_stream= true;
-#endif
   tree t= ai_command (s, model, agent, chat, true);
   ai_stream= false;
   return tree_to_scheme (t);
@@ -891,7 +891,9 @@ ai_output (string s, string model, string chat) {
   if (ai_is_stream (s)) {
     string err;
     r= ai_stream_text (s * "\n", model, err);
-    if (r == "" && err != "") return "Error: " * err;
+    // (a stream which brought no text: an error, or nothing, when the
+    // question was interrupted before the engine began to answer)
+    if (r == "") return (err != "")? "Error: " * err: string ("");
   }
   else if (engine == "gemini") r= gemini_style_output (t);
   else if (engine == "claude") r= claude_style_output (t);
@@ -1017,6 +1019,9 @@ ai_tikz_header (string pre) {
       if (starts (l, settings[m])) other << l << "\n";
   }
   string r;
+#ifdef __EMSCRIPTEN__
+  // (TikZJax, in a web browser: the packages and the libraries as comments,
+  // which its plug-in reads, and a whole document only for settings)
   if (other == "") {
     if (pkgs != "") r << "% packages: " << pkgs << "\n";
     if (libs != "") r << "% libraries: " << libs << "\n";
@@ -1024,6 +1029,12 @@ ai_tikz_header (string pre) {
   }
   // with settings: a whole document (the TikZ plug-in takes its preamble)
   r << "\\documentclass{article}\n";
+#else
+  // (the TikZ plug-in of the desktop, plugins/tmpy/graph/tikz.py, compiles
+  // with LaTeX a document which it is given as it is: a picture alone, the
+  // size of its drawing, as it makes its own)
+  r << "\\documentclass[tikz]{standalone}\n";
+#endif
   if (pkgs != "") r << "\\usepackage{" << pkgs << "}\n";
   if (libs != "") r << "\\usetikzlibrary{" << libs << "}\n";
   r << other << "\\begin{document}\n";

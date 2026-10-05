@@ -215,6 +215,12 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>Desktop version of the chatbots: their answers are shown as they
+    come, as in the browser, and a question which is interrupted stops its
+    request; their <name|TikZ> pictures are drawn by the <name|TikZ>
+    plug-in of the desktop (they made a whole page). A question interrupted
+    before the chatbot began to answer no longer gives an error.
+
     <item>The menu of the font in the footer (when it is interactive) is
     the one of the focus bar: the fonts of text and mathematics, those of
     text only by kind, and the selector for the others; it sets the font at

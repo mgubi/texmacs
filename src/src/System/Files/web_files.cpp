@@ -500,7 +500,7 @@ shell_quote (string s) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, string data) {
-  string cmd= "curl --silent -X POST " * shell_quote (url) * "\\\n";
+  string cmd= "curl --silent --no-buffer -X POST " * shell_quote (url) * "\\\n";
   for (int i= 0; i+1 < N(headers_attr); i += 2)
     cmd << "  -H "
 	<< shell_quote (headers_attr[i] * ":" * headers_attr[i+1]) << "\\\n";
@@ -518,7 +518,7 @@ to_shell_command (string url, array<string> headers_attr, tree data) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, array<string> attr) {
-  string cmd= "curl --silent -X POST " * shell_quote (url) * " \\\n";
+  string cmd= "curl --silent --no-buffer -X POST " * shell_quote (url) * " \\\n";
   for (int i= 0; i+1 < N(headers_attr); i += 2)
     cmd << "  -H "
 	<< shell_quote (headers_attr[i] * ":" * headers_attr[i+1]) << "\\\n";

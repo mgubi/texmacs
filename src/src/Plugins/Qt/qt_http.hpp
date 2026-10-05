@@ -59,6 +59,7 @@ public:
     reply->deleteLater ();
     reply= NULL; }
 public slots:
+  void onReadyRead ();
   void onFinished ();
 };
 
