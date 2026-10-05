@@ -437,6 +437,16 @@
             (check-true (string-contains? (string-load f)
                                           "@article{smith2020,"))
             (system-remove f))))
+      ;; nor a bibliography whose file does not exist yet
+      (with-document "nofile2.tm"
+          (doc-tm "  <\\bibliography|bib|tm-plain|refs>\n  </bibliography>\n")
+        (lambda ()
+          (with f (tmp "refs.bib")
+            (zotero-before-update "all")
+            (check-true (zotero-managed-file? f))
+            (check-true (string-contains? (string-load f)
+                                          "@article{smith2020,"))
+            (system-remove f))))
       ;; not when it has none
       (with-document "nozotero.tm"
           (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
