@@ -110,8 +110,7 @@
   (if (wallet-key) "(in the wallet)"
       (get-preference "zotero api key")))
 
-(tm-define (zotero-set-api-key key)
-  (:synopsis "Use the API key @key of zotero.org")
+(define (store-api-key key)
   (if (and (supports-wallet?) (wallet-on?))
       (begin
         (if (== key "") (wallet-delete key-entry) (wallet-set key-entry key))
@@ -119,7 +118,108 @@
       (set-preference "zotero api key" key))
   (set-preference "zotero user" "")
   (zotero-forget-state)
-  (zotero-forget-keys))
+  (zotero-forget-keys)
+  ;; the search window of references shows its sources and results again
+  (catch #t (lambda () (db-search-refresh)) (lambda args #f)))
+
+(define (wallet-closed?)
+  ;; a wallet which is there but closed: it may hold the key
+  (and (supports-wallet?) (wallet-initialized?) (wallet-off?)))
+
+(define (open-wallet then)
+  ;; the dialog which turns the wallet on; @then is called afterwards
+  (module-provide '(security wallet wallet-menu))
+  (wallet-dialogue-turn-on then))
+
+(tm-define (zotero-set-api-key key . opt-then)
+  (:synopsis "Use the API key @key of zotero.org")
+  ;; as the keys of the AI engines: a key given while the wallet is closed
+  ;; opens it first, to keep the key there (if it stays closed, the key is
+  ;; kept in the preferences); then the procedure given as option is called
+  (with then (if (null? opt-then) noop (car opt-then))
+    (if (and (!= key "") (wallet-closed?))
+        (open-wallet
+         (lambda (r)
+           (when (!= r "Ok")
+             (set-message (zotero-tr "The key is kept in the preferences, not encrypted")
+                          "Zotero"))
+           (store-api-key key)
+           (then)))
+        (begin
+          (store-api-key key)
+          (then)))))
+
+;; The key is asked when an operation needs it: the wallet is opened if it
+;; is closed (it may hold the key), else a dialog asks for the key
+(define asking-key? #f)
+(define key-declined? #f)
+(define key-wanted? #f)
+
+(tm-define (zotero-key-missing?)
+  (:synopsis "Does zotero.org lack a key to read the library?")
+  (and (zotero-web?) (not (zotero-api-key))))
+
+(tm-define (zotero-ask-key . opt-again)
+  (:synopsis "Ask for the API key of zotero.org; then run the option")
+  (with again (if (null? opt-again) noop (car opt-again))
+    (when (not asking-key?)
+      (set! asking-key? #t)
+      (delayed
+        (:idle 10)
+        (set! asking-key? #f)
+        (if (wallet-closed?)
+            (open-wallet
+             (lambda (r)
+               (zotero-forget-state)
+               (zotero-forget-keys)
+               (if (zotero-api-key)
+                   (begin
+                     ;; the key was in the wallet
+                     (catch #t (lambda () (db-search-refresh))
+                       (lambda args #f))
+                     (again))
+                   (zotero-key-dialog again))))
+            (zotero-key-dialog again))))))
+
+(tm-define (zotero-key-given key again)
+  (:synopsis "The answer of the dialog which asks for the key")
+  (if (and (string? key) (!= (tm-string-trim-both key) ""))
+      (begin
+        (set! key-declined? #f)
+        (zotero-set-api-key (tm-string-trim-both key) again))
+      (set! key-declined? #t)))
+
+(tm-define (zotero-key-wanted . opt-again)
+  (:synopsis "Ask for the key when an operation needed it")
+  ;; after an operation, when it needed zotero.org without a key (and the
+  ;; key was not declined before); the option runs it once the key is there
+  (when key-wanted?
+    (set! key-wanted? #f)
+    (when (and (zotero-key-missing?) (not key-declined?))
+      (apply zotero-ask-key opt-again))))
+
+(tm-define (zotero-forget-key-wanted)
+  (set! key-wanted? #f))
+
+(tm-define (zotero-search-opened)
+  (:synopsis "The search window of references was opened")
+  ;; without the key of zotero.org, it is asked, when the window searches
+  ;; Zotero; the window shows the references of Zotero once it is given
+  (when (and (!= (get-preference "zotero in database search") "off")
+             (zotero-key-missing?))
+    (zotero-ask-key)))
+
+(tm-define (zotero-open-url url)
+  (:synopsis "Open @url in the web browser")
+  ;; NOTE: the url has no spaces or quotes; on Windows, as for the links of
+  ;; documents (load-external), start takes a title first
+  (cond ((zotero-in-browser?)
+         ((eval 'web-javascript)
+          (string-append "window.open(" (js-string url) ",'_blank');")))
+        ((os-mingw64?) (eval-system url))
+        ((or (os-mingw?) (os-win32?))
+         (system (string-append "start \"\" " url)))
+        (else (system (string-append (default-open) " " url)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Requests
@@ -226,9 +326,13 @@
 (tm-define (zotero-command again thunk)
   (:synopsis "Run the command @thunk, which runs @again when answered")
   ;; a command which waits for zotero.org says so; it runs again when the
-  ;; answers have come
-  (zotero-with-retry again thunk)
-  (when (zotero-asking?) (set-message "Asking zotero.org..." "Zotero")))
+  ;; answers have come. Without the key of zotero.org, it is asked first,
+  ;; and the command runs once it is given
+  (if (zotero-key-missing?)
+      (zotero-ask-key again)
+      (begin
+        (zotero-with-retry again thunk)
+        (when (zotero-asking?) (set-message "Asking zotero.org..." "Zotero")))))
 
 (define (answer-delay url)
   ;; how long an answer is used again: the requests of the state, briefly
@@ -350,7 +454,9 @@
              (curl-get (string-append (get-preference "zotero server")
                                       "/api/" path)
                        (list "Zotero-API-Version: 3") interactive?)))
-        ((not (zotero-api-key)) (list 401 "" #f))
+        ((not (zotero-api-key))
+         (set! key-wanted? #t)
+         (list 401 "" #f))
         ((not (web-user))
          (list (if (== key-status 200) 0 key-status) "" #f))
         (else
@@ -403,7 +509,11 @@
         last-state)))
 
 (tm-define (zotero-ready?)
-  (== (zotero-status) 'ready))
+  (with st (zotero-status)
+    ;; NOTE: an operation which needs zotero.org without a key may ask for
+    ;; it afterwards (zotero-key-wanted)
+    (when (== st 'no-key) (set! key-wanted? #t))
+    (== st 'ready)))
 
 (tm-define (zotero-library-version)
   (:synopsis "The version of the Zotero library, or #f")
@@ -521,6 +631,10 @@
           (set! groups-cache l)
           (set! groups-time (texmacs-time)))
         l)))
+
+(tm-define (zotero-known-groups)
+  (:synopsis "The group libraries known so far, without asking Zotero")
+  (map car (or groups-cache '())))
 
 (tm-define (zotero-libraries)
   (:synopsis "The libraries in which TeXmacs looks for citations")
@@ -841,14 +955,7 @@
   (:synopsis "Show the item of the Zotero entry @e in Zotero")
   ;; NOTE: the url only has letters, digits, / and :; on Windows, as for
   ;; the links of documents (load-external), start takes a title first
-  (with url (if (zotero-web?) (zotero-web-url e) (zotero-select-url e))
-    (cond ((zotero-in-browser?)
-           ((eval 'web-javascript)
-            (string-append "window.open(" (js-string url) ",'_blank');")))
-          ((os-mingw64?) (eval-system url))
-          ((or (os-mingw?) (os-win32?))
-           (system (string-append "start \"\" " url)))
-          (else (system (string-append (default-open) " " url))))))
+  (zotero-open-url (if (zotero-web?) (zotero-web-url e) (zotero-select-url e))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Resolving citation keys
@@ -1440,6 +1547,11 @@
            (cons (string-append "groups/" (cadr l)) (cadddr l)))
           (else #f))))
 
+(tm-define (zotero-keys-not-in-file f keys)
+  (:synopsis "The @keys which the BibTeX file @f lacks")
+  (with have (map car (bib-chunks (string-load f)))
+    (list-filter keys (lambda (k) (nin? k have)))))
+
 (tm-define (zotero-add-to-bib-file f keys)
   (:synopsis "Add to the BibTeX file @f the references of Zotero it lacks")
   ;; Of the @keys, those which no source before Zotero provides and which
@@ -1723,8 +1835,10 @@
   ;; NOTE: called by update-document (Document -> Update). In a web browser
   ;; the answers of zotero.org may be awaited: then it says wait, and the
   ;; update is made again when they have come
+  (zotero-forget-key-wanted)
   (zotero-with-retry (lambda () (update-document what))
                      (lambda () (before-update what)))
+  (zotero-key-wanted (lambda () (update-document what)))
   (if (zotero-asking?)
       (begin
         (set-message "Asking zotero.org..." "Zotero")
@@ -1733,23 +1847,30 @@
 
 (define (before-update what)
   (when (in? what '("all" "bibliography"))
-    ;; with the database, the bibliography asks Zotero while it is made:
-    ;; in a web browser its references are asked first
-    (when (and (zotero-in-browser?) (supports-db?) (zotero-ready?))
-      (zotero-db-entries (list-filter (zotero-project-citations)
-                                      (negate zotero-in-database?))))
+    ;; with the database, the bibliography asks Zotero while it is made
+    ;; for the keys which the database lacks: in a web browser their
+    ;; references are asked first
+    ;; NOTE: Zotero is only asked about (and the key with it) when some
+    ;; reference may come from it
+    (when (supports-db?)
+      (with keys (list-filter (zotero-project-citations)
+                              (negate zotero-in-database?))
+        (when (and (nnull? keys) (zotero-ready?) (zotero-in-browser?))
+          (zotero-db-entries keys))))
     (when (with-zotero-bibliography?)
       (zotero-refresh-bibliography #t))
     ;; the references of Zotero which the file of the user lacks
     (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))
                  (zotero-master-bibliography-file))
-      (when (and (add-to-own-file? f) (zotero-ready?))
+      (when (and (add-to-own-file? f)
+                 (nnull? (zotero-keys-not-in-file f (zotero-project-citations)))
+                 (zotero-ready?))
         (with (added missing) (zotero-add-to-bib-file
                                f (zotero-project-citations))
           (when (nnull? added)
             (set-message (zotero-add-message added '() f) "Zotero")))))
     ;; the entries imported from Zotero into the database follow it
-    (when (and (supports-db?) (zotero-ready?))
+    (when (and (supports-db?) (zotero-imported?) (zotero-ready?))
       (and-with r (zotero-sync-database)
         (and-with msg (zotero-sync-message r)
           (set-message msg "Zotero"))))))

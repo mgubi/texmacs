@@ -285,3 +285,32 @@
             (zotero-tr "Zotero (local API) at %1"
                        (get-preference "zotero server"))))
   (dialogue-window (zotero-settings-widget) noop "Zotero settings"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The key of zotero.org, when it is needed
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define key-answer "")
+
+(tm-widget ((zotero-key-widget) cmd)
+  (padded
+    (text "TeXmacs reads your Zotero library on zotero.org with an API key.")
+    (text "Create a key with read access to your library, and give it here.")
+    ===
+    (hlist
+      (text "API key of zotero.org:") // //
+      (input (when answer (set! key-answer answer) (cmd answer))
+             "string" (list "") "24em"))
+    ===
+    (bottom-buttons
+      ("Create a key..."
+       (zotero-open-url "https://www.zotero.org/settings/keys/new")) >>
+      ("Cancel" (cmd #f)) // //
+      ("Ok" (cmd key-answer)))))
+
+(tm-define (zotero-key-dialog again)
+  (:synopsis "Ask for the API key of zotero.org; then call @again")
+  (set! key-answer "")
+  (dialogue-window (zotero-key-widget)
+                   (lambda (key) (zotero-key-given key again))
+                   "API key of zotero.org"))

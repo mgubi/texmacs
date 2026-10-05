@@ -355,6 +355,7 @@
 (tm-define (zotero-open-search-tool t)
   (:synopsis "Search a reference for the citation @t, without the database")
   (zotero-forget-state)
+  (zotero-search-opened)
   (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))
     (open-db-chooser
      :bib-file "bib" "Search bibliographic reference"
@@ -390,6 +391,14 @@
                      (map car (zotero-groups)))
     (with-database (bib-database)
       (map db-load-entry (db-search (list (cons "zotero-library" libs)))))))
+
+(tm-define (zotero-imported?)
+  (:synopsis "Has the database entries which come from Zotero?")
+  ;; NOTE: without asking Zotero (the groups known so far)
+  (with-database (bib-database)
+    (nnull? (db-search (list (cons "zotero-library"
+                                   (cons* "user" (zotero-user-library)
+                                          (zotero-known-groups))))))))
 
 (define (entry-library e)
   (zotero-normalize-library (zotero-entry-meta e "zotero-library")))
