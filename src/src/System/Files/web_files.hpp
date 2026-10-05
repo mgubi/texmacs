@@ -24,6 +24,13 @@ url get_from_ramdisc (url u);
 
 bool save_to_server (url u, string s);
 
+// Secrets in HTTP headers
+bool http_secret_header (string name);
+array<string> http_mask_headers (array<string> headers_attr);
+tree http_mask_request (tree t);
+string shell_quote (string s);
+string curl_command (string args, array<string> headers_attr);
+
 // HTTP requests
 #if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
 
