@@ -700,6 +700,21 @@
         (check-false (buffer-modified? (current-buffer)))
         (check= (body) saved-doc)))))
 
+;; The text which a copy gives to the other programs (verbatim-snippet, as
+;; selection_set makes it): in code (a verbatim-code, the font tt), ... and
+;; the backquote are kept as they are, in UTF-8 where the conversion makes
+;; an ellipsis and a quote of them in text.
+(define (test-copy-as-text)
+  (check-group "copy as text")
+  (with-buffer-body '(document (verbatim-code (document "x in {0,...,5} `a`")))
+    (lambda ()
+      (tree-go-to (tree-ref (buffer-tree) 0 0 0) 3)
+      (check= (get-env "font-family") "tt")
+      (with r (convert (stree->tree "x in {0,...,5} `a`")
+                       "texmacs-tree" "verbatim-snippet"
+                       (cons "texmacs->verbatim:encoding" "utf-8"))
+        (check= r "x in {0,...,5} `a`")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -720,5 +735,6 @@
   (test-undo-save)
   (test-save)
   (test-export)
+  (test-copy-as-text)
   (remove-tmp-files)
   (check-end))
