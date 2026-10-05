@@ -155,7 +155,8 @@
     external program are missing: the compilation with <LaTeX>,
     Ghostscript, ImageMagick, Git. The sessions which
     exist in the browser are those whose program runs in the page itself:
-    <name|Python> (<name|Pyodide>, loaded from the network),
+    <name|Python> (<name|Pyodide>) and <name|R> (<name|webR>), loaded
+    from the network,
     <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
     their plug-ins, in <menu|Help|Plug-ins>), and those of the chatbots
     which the page asks through the web: <name|ChatGPT>, <name|Claude>,
@@ -446,6 +447,13 @@
     for about thirty languages), then kept in the browser with the words
     which you insert. The misspelled words are highlighted, not hidden by a
     box.
+
+    <item><name|R> sessions and executable folds (<menu|Insert|Session|R>):
+    <name|R> runs in the page (<name|webR>, loaded from the network by the
+    first input), its plots are shown after the inputs which make them, and
+    <verbatim|install.packages> installs the packages built for
+    <name|webR>. <menu|Stop> ends <name|R> while it computes; it starts
+    again with the next input. See <menu|Help|Plug-ins|R>.
   </itemize>
 
   <paragraph|4 October 2026>

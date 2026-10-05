@@ -102,7 +102,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python r
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -161,6 +161,14 @@ python: $(OUT)/web/python/tm-python.mjs
 
 $(OUT)/web/python/tm-python.mjs: $(TM)/plugins/python/web/tm-python.mjs
 	@mkdir -p $(OUT)/web/python
+	cp $< $@
+
+# the worker of the R plugin (plugins/r), in out/web/r/: it loads R in
+# WebAssembly (webR) from webr.r-wasm.org
+r: $(OUT)/web/r/tm-r.mjs
+
+$(OUT)/web/r/tm-r.mjs: $(TM)/plugins/r/web/tm-r.mjs
+	@mkdir -p $(OUT)/web/r
 	cp $< $@
 
 $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
@@ -254,4 +262,4 @@ $(OBJ)/%.o: $(S)/%.c
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote python plugins-sync
+.PHONY: all web node clean tikzjax asymptote python r plugins-sync
