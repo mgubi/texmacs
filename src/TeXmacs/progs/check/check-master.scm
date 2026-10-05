@@ -52,7 +52,8 @@
         (check parse-test)
         (check macro-drd-test)
         (check crypto-test)
-        (check plugins-test)))
+        (check plugins-test)
+        (check ai-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -156,6 +157,8 @@
     ("parse" parse-test-failures count)
     ("database" database-test-failures count)
     ("crypto" crypto-test-failures count)
+    ;; the answers of the AI engines, converted without a network
+    ("ai" ai-test-failures count)
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
     ("remote" remote-test-failures count)
