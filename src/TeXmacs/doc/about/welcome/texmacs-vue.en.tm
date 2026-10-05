@@ -215,6 +215,12 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>Desktop version without <name|Qt> (Vue): the requests to the web
+    (the chatbots) are made with the library libcurl rather than the program
+    curl, when it is there (as on macOS and Linux): an interrupted answer
+    really stops (the chatbot stops writing it), and the keys are no longer
+    on a command line.
+
     <item><menu|Tools|AI engine>, <with|font-series|bold|Correct> and
     <with|font-series|bold|Translate>: without a key, the key is asked for;
     an error of the chatbot is said on the status bar, and the selection is
