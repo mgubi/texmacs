@@ -18,7 +18,7 @@
 struct SDL_Window;
 
 // Whether the windows are drawn by the GPU: compiled with ThorVG
-// (--with-thorvg) and asked for (TEXMACS_VUE_GPU=1). Decided once.
+// (--with-thorvg), unless TEXMACS_VUE_GPU=0. Decided once.
 bool vue_gpu_enabled ();
 // the windows are drawn by the GPU (vue_gui.cpp: not in the single window)
 bool vue_gpu_windows ();

@@ -349,8 +349,9 @@ on_screen (gpu_target* t) { return t != NULL && t->screen; }
 bool
 vue_gpu_enabled () {
   static int on= -1;
-  if (on < 0) on= (N (get_env ("TEXMACS_VUE_GPU")) > 0 &&
-                   get_env ("TEXMACS_VUE_GPU") != "0") ? 1 : 0;
+  // NOTE: on, as in the browser, unless TEXMACS_VUE_GPU=0 (and drawn with
+  // MuPDF when there is no GL context)
+  if (on < 0) on= (get_env ("TEXMACS_VUE_GPU") != "0") ? 1 : 0;
   return on == 1 && !G.failed;
 }
 

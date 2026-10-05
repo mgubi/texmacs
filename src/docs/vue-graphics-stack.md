@@ -960,10 +960,11 @@ git checkout 94277cec8a -- src/Plugins/NanoVG
 ### The GPU renderer
 
 With `--with-thorvg=<prefix>` (ThorVG built by `misc/thorvg/build-thorvg.sh
-<prefix>`, `[wasm]` for the browser) and `TEXMACS_VUE_GPU=1`, the windows
-are drawn by OpenGL (WebGL2 in the browser) instead of MuPDF
-(`vue_gpu.cpp`, `vue_sdl_gpu_window_rep` in `vue_gui.cpp`). Without the
-variable, or when no GL context can be made, everything is as before.
+<prefix>`, `[wasm]` for the browser), the windows are drawn by OpenGL
+(WebGL2 in the browser) instead of MuPDF (`vue_gpu.cpp`,
+`vue_sdl_gpu_window_rep` in `vue_gui.cpp`). With `TEXMACS_VUE_GPU=0`, or
+when no GL context can be made, everything is as before (until 2026-10-05
+the desktop needed `TEXMACS_VUE_GPU=1`).
 `misc/thorvg-bench` has the measurements which chose the design.
 
 * **One context.** The windows are created with `SDL_WINDOW_OPENGL`, and
