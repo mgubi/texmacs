@@ -114,6 +114,11 @@ bool async_http_post_json (string url, array<string> headers_attr, tree data,
 
 #endif
 
+#ifdef __EMSCRIPTEN__
+// the requests made by the browser whose answer goes to outbuf: stopped
+void web_async_cancel (string* outbuf);
+#endif
+
 inline string
 http_post (string url, array<string> headers_attr, string data) {
   string ret; 

@@ -72,6 +72,7 @@ EM_JS (int, web_http_start, (const char* url, const char* headers,
     if (!sync && typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
   }
   function failed (e) {
+    if (e && e.name === 'AbortError') return; // stopped: nobody waits for it
     console.warn ('TeXmacs: no answer from ' + u + (e ? ': ' + e : '') +
                   (new URL (u, location.href).origin !== location.origin ?
                    ' (does the site allow it? CORS)' : ''));
@@ -91,31 +92,45 @@ EM_JS (int, web_http_start, (const char* url, const char* headers,
   }
   // the answer is read as it comes (an answer streamed by the AI engines):
   // its pieces so far are slot.parts, which a request link shows
-  else fetch (u, { method: post ? 'POST' : 'GET', headers: hs, body: data })
-    .then (function (r) {
-      if (!r.body || !r.body.getReader)
-        return r.arrayBuffer ().then (function (a) { done (r.status, new Uint8Array (a)); });
-      var reader = r.body.getReader ();
-      slot.parts = []; slot.length = 0;
-      function pump () {
-        return reader.read ().then (function (x) {
-          if (x.done) {
-            var b = new Uint8Array (slot.length), at = 0;
-            slot.parts.forEach (function (p) { b.set (p, at); at += p.length; });
-            slot.parts = null;
-            done (r.status, b);
-            return;
-          }
-          slot.parts.push (x.value);
-          slot.length += x.value.length;
-          if (typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
-          return pump ();
-        });
-      }
-      return pump ();
-    })
-    .catch (failed);
+  else {
+    // it may be stopped (web_http_abort: a session interrupted)
+    slot.controller = typeof AbortController !== 'undefined' ? new AbortController () : null;
+    fetch (u, { method: post ? 'POST' : 'GET', headers: hs, body: data,
+                signal: slot.controller ? slot.controller.signal : undefined })
+      .then (function (r) {
+        if (!r.body || !r.body.getReader)
+          return r.arrayBuffer ().then (function (a) { done (r.status, new Uint8Array (a)); });
+        var reader = r.body.getReader ();
+        slot.parts = []; slot.length = 0;
+        function pump () {
+          return reader.read ().then (function (x) {
+            if (x.done) {
+              var b = new Uint8Array (slot.length), at = 0;
+              slot.parts.forEach (function (p) { b.set (p, at); at += p.length; });
+              slot.parts = null;
+              done (r.status, b);
+              return;
+            }
+            slot.parts.push (x.value);
+            slot.length += x.value.length;
+            if (typeof _vue_web_wake !== 'undefined') _vue_web_wake ();
+            return pump ();
+          });
+        }
+        return pump ();
+      })
+      .catch (failed);
+  }
   return id;
+});
+
+// a request whose answer is no longer wanted: stopped (the server stops
+// sending it, an AI engine stops writing it), and forgotten
+EM_JS (void, web_http_abort, (int id), {
+  var web = Module.tmWebHttp, slot = web && web.slots[id];
+  if (!slot) return;
+  if (slot.controller) try { slot.controller.abort (); } catch (e) {}
+  delete web.slots[id];
 });
 
 // the status of the answer of request id, -2 while there is none yet
@@ -233,6 +248,21 @@ web_async_post (string url, array<string> headers_attr, string body,
   h->status= status; h->outbuf= outbuf; h->errbuf= errbuf;
   web_async_busy << h;
   return false; // no error (async_eval_system returns true when it fails)
+}
+
+// the requests whose answer goes to outbuf (a request link which is
+// interrupted, stopped, or asks again): stopped and forgotten, so that an
+// answer which comes later does not go where the next one is awaited
+void
+web_async_cancel (string* outbuf) {
+  for (int i= 0; i < N(web_async_busy); ) {
+    web_async_handle* h= web_async_busy[i];
+    if (h->outbuf != outbuf) { i++; continue; }
+    web_http_abort (h->id);
+    web_async_busy= append (range (web_async_busy, 0, i),
+                            range (web_async_busy, i + 1, N(web_async_busy)));
+    tm_delete<web_async_handle> (h);
+  }
 }
 
 // the answers which came (called by async_eval_pending)

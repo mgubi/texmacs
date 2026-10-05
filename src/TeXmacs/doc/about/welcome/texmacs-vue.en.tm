@@ -215,6 +215,11 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The answer of a chatbot can be stopped (the stop
+    button of the session, <with|font-series|bold|Interrupt execution>, or
+    <menu|Focus|Interrupt execution>): its service is told to stop writing
+    it, and the question can be changed and asked again.
+
     <item>The name of a file can be typed again in the panel of
     <menu|File|Save as> (the characters did not come in).
 

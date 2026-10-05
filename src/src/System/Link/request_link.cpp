@@ -141,6 +141,9 @@ request_link_rep::write (string s, int channel) {
   }
   tree t= scheme_to_tree (cmd);
   if (DEBUG_IO) debug_io << "Requesting '" << t << "'\n";
+#ifdef __EMSCRIPTEN__
+  web_async_cancel (&outbuf); // an answer still awaited is no longer wanted
+#endif
   status= 1; outbuf= ""; errbuf= ""; kill= false;
   partial_text= ""; partial_tree= "";
   alive= !eval_request (t, status, outbuf, errbuf, kill);
@@ -212,6 +215,10 @@ request_link_rep::interrupt () {
   if (!alive) return;
   alive= false;
   kill= true;
+#ifdef __EMSCRIPTEN__
+  // the answer which comes is stopped (the engine stops writing it)
+  web_async_cancel (&outbuf);
+#endif
 }
 
 void
@@ -219,6 +226,9 @@ request_link_rep::stop () {
   if (!alive) return;
   alive= false;    
   kill= true;
+#ifdef __EMSCRIPTEN__
+  web_async_cancel (&outbuf);
+#endif
 }
 
 /******************************************************************************
