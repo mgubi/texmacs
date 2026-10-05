@@ -522,6 +522,34 @@
             `(("<sterling>" ,(cork #xbf)) ("<guillemotleft>" ,(cork #x13))
               ("<guillemotright>" ,(cork #x14))))))
 
+;; The symbols of tmuniversaltounicode-extra: all give their code point
+;; and come back, since none takes a code point which another table reads
+;; back as something else; <mathhyphen> exports to the Cork hyphen, one way.
+(define (test-extra-symbols)
+  (check-group "extra symbols")
+  (let* ((t (read-table "tmuniversaltounicode-extra"))
+         (l (list-filter t (lambda (e) (and (list? e) (= (length e) 2)
+                                            (string? (car e))
+                                            (string-starts? (car e) "<")
+                                            (hex-code (cadr e)))))))
+    (check-true (>= (length l) 150))
+    (check= (list-filter
+             (map (lambda (e)
+                    (and (!= (cork->utf8 (car e)) (u8 (hex-code (cadr e)))) e))
+                  l)
+             identity)
+            '())
+    (check= (list-filter
+             (map (lambda (e)
+                    (and (!= (utf8->cork (u8 (hex-code (cadr e)))) (car e))
+                         (not (member (cadr e) '("#200B")))
+                         (list (car e) (utf8->cork (u8 (hex-code (cadr e)))))))
+                  l)
+             identity)
+            '()))
+  (check= (cork->utf8 "<mathhyphen>") (u8 #x2010))
+  (check= (utf8->cork (u8 #x2010)) (cork #x7f)))
+
 (define greek
   '(("alpha" #x3B1) ("beta" #x3B2) ("gamma" #x3B3) ("delta" #x3B4)
     ("varepsilon" #x3B5) ("zeta" #x3B6) ("eta" #x3B7) ("theta" #x3B8)
@@ -1120,7 +1148,7 @@
   (for-each run-group
             (list test-mathml-export test-mathml-html test-mathml-import
                   test-mathml-round-trip test-xml-parser test-xml-names
-                  test-tmml-special test-cork-table test-cork-symbols
+                  test-tmml-special test-cork-table test-extra-symbols test-cork-symbols
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
                   test-format-registry test-vernac test-json test-compress

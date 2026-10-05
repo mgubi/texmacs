@@ -300,3 +300,8 @@
 
 ("<nobracket>"    "#200B")
 ("<nosymbol>"     "#200B")
+
+;; <mathhyphen> (tmuniversaltounicode-extra.scm) is exported as U+2010, but
+;; U+2010 is the Cork hyphen (byte #7F) of corktounicode, which it must
+;; stay when it is read back
+("<mathhyphen>"		"#2010")	; hyphen [12 fonts]

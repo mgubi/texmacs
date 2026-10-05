@@ -66,6 +66,9 @@ def load_reference (path):
 
 NAME_TO_CODE = re.compile (r'\("(<[^"]+>)"\s+"#([0-9A-Fa-f]+)"\)')
 CODE_TO_NAME = re.compile (r'\("#([0-9A-Fa-f]+)"\s+"(<[^"]+>)"\)')
+# the bytes of corktounicode, which is used both ways: their code points are
+# taken (U+2010 is the Cork hyphen #7F, <mathhyphen> may only export to it)
+BYTE_TO_CODE = re.compile (r'\("#([0-9A-Fa-f]{1,2})"\s+"#([0-9A-Fa-f]+)"\)')
 # the tables keep the gaps as comments, in Unicode order, with the name the
 # symbol would deserve: `; end of proof "#220E"`
 NOTED = re.compile (r';\s*(.+?)\s+"#([0-9A-Fa-f]+)"')
@@ -116,6 +119,9 @@ def load_named (texmacs, include_extra=False):
                     two_way[m.group (1)] = (code, path, nr)
             m = CODE_TO_NAME.match (line)
             if m: named[int (m.group (1), 16)].add (m.group (2))
+            m = BYTE_TO_CODE.match (line)
+            if m and os.path.basename (path) == 'corktounicode.scm':
+                named[int (m.group (2), 16)].add ('cork #%s' % m.group (1).upper ())
     return named, noted, where, two_way, any_way, doubles
 
 # The alphabets smart_font.cpp generates names for. Keep this list in step
