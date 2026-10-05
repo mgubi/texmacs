@@ -13,6 +13,8 @@ BIN=${1:-TeXmacs/bin/texmacs.bin}
 TOP=$(pwd)
 export QT_QPA_PLATFORM=offscreen
 export TEXMACS_PATH="$TOP/TeXmacs"
+# the programs of TeXmacs (fig2ps...), as the script texmacs puts them
+export PATH="$TOP/TeXmacs/bin:$PATH"
 export TEXMACS_HOME_PATH="${RUNNER_TEMP:-/tmp}/texmacs-home"
 mkdir -p "$TEXMACS_HOME_PATH"
 
