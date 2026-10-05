@@ -233,7 +233,7 @@
 
   <paragraph|More examples>
 
-  More pictures, with loops, plots and some of the packages of <name|TikZJax>. As above, each is an executable fold: <shortcut|(kbd-shift-return)> makes the picture (a picture of <verbatim|pgfplots> takes a few seconds more; its three-dimensional plots are not shown in the browser).
+  More pictures, with loops, plots and some of the packages of <name|TikZJax>. As above, each is an executable fold: <shortcut|(kbd-shift-return)> makes the picture (a picture of <verbatim|pgfplots> takes a few seconds more).
 
   A graph with <verbatim|pgfplots>, two functions and their legend:
 

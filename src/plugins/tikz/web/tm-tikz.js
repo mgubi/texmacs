@@ -498,10 +498,92 @@ var queue = Promise.resolve ();
 // repeated roots have the viewBox of the first one: they are dropped.
 function repairSvg (svg) {
   var first = true;
-  return svg.replace (/<svg\b[^>]*>/g, function (m) {
+  svg = svg.replace (/<svg\b[^>]*>/g, function (m) {
     if (first) { first = false; return m; }
     return '';
   });
+  return depthOf (svg) > 200 ? flattenSvg (svg) : svg;
+}
+
+// how deep the elements of an SVG go
+function depthOf (svg) {
+  var re = /<(\/?)[\w:-]+(?:[^>"']|"[^"]*"|'[^']*')*?(\/?)>/g, t, d = 0, m = 0;
+  while ((t = re.exec (svg))) {
+    if (t[1]) d--;
+    else if (!t[2]) { d++; if (d > m) m = d; }
+  }
+  return m;
+}
+
+// The SVG of TikZJax opens a group at each change of color or of transform,
+// and closes them all at the end: a surface of pgfplots (its hundreds of
+// patches) goes thousands of groups deep, which MuPDF cannot draw (its
+// stack of exceptions overflows). The groups are dropped: each element
+// which is drawn gets the transform of its groups and the attributes which
+// it inherits from them; the definitions (defs, clipPath...) and the texts
+// are kept whole.
+var INHERITED = ['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width',
+  'stroke-opacity', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap',
+  'stroke-linejoin', 'stroke-miterlimit', 'font-family', 'font-size',
+  'font-weight', 'font-style', 'color', 'clip-path', 'opacity'];
+var WHOLE = { defs: 1, clipPath: 1, linearGradient: 1, radialGradient: 1,
+              pattern: 1, mask: 1, marker: 1, symbol: 1, text: 1, a: 1 };
+
+function flattenSvg (svg) {
+  var re = /<(\/?)([\w:-]+)((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>|([^<]+)/g, t;
+  var out = [], stack = [{ m: [1, 0, 0, 1, 0, 0], a: {} }];
+  var whole = null, wholeDepth = 0, root = 0;
+  function own (tag, name) { return attr (tag, name); }
+  function opening (name, rest, top, self) {
+    // the element with its transform and the attributes it inherits
+    var m = mul (top.m, transform (attr (rest, 'transform')));
+    var r = rest.replace (/\stransform="[^"]*"/, '');
+    for (var k in top.a)
+      if (own (r, k) === null) r += ' ' + k + '="' + top.a[k] + '"';
+    var id = m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 1 && m[4] === 0 && m[5] === 0;
+    if (!id) r += ' transform="matrix(' + m.map (num).join (' ') + ')"';
+    return '<' + name + r + (self ? '/>' : '>');
+  }
+  while ((t = re.exec (svg))) {
+    if (t[5] !== undefined) { if (whole) out.push (t[5]); continue; }
+    var closing = t[1] === '/', name = t[2], rest = t[3], self = t[4] === '/';
+    if (whole) {
+      // inside an element kept whole: copied as it is
+      out.push (t[0]);
+      if (name === whole && !self) wholeDepth += closing ? -1 : 1;
+      if (wholeDepth === 0) whole = null;
+      continue;
+    }
+    var top = stack[stack.length - 1];
+    if (name === 'svg') {
+      out.push (t[0]);
+      root += closing ? -1 : 1;
+      continue;
+    }
+    if (name === 'g') {
+      if (closing) { if (stack.length > 1) stack.pop (); }
+      else if (!self) {
+        var a = {};
+        for (var k in top.a) a[k] = top.a[k];
+        INHERITED.forEach (function (n) {
+          var v = attr (rest, n);
+          if (v !== null) a[n] = v;
+        });
+        stack.push ({ m: mul (top.m, transform (attr (rest, 'transform'))), a: a });
+      }
+      continue;
+    }
+    if (closing) { out.push (t[0]); continue; }
+    if (WHOLE[name] && !self) {
+      // the definitions are not drawn where they are: kept as they are; a
+      // text gets the transform and the attributes of its groups
+      out.push (name === 'text' || name === 'a' ? opening (name, rest, top, false) : t[0]);
+      whole = name; wholeDepth = 1;
+      continue;
+    }
+    out.push (opening (name, rest, top, self));
+  }
+  return out.join ('');
 }
 
 function evaluate (code) {

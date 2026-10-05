@@ -215,6 +215,10 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item><name|TikZ>: the surfaces of <verbatim|pgfplots>
+    (<verbatim|\\addplot3[surf]>) are drawn; their drawing went too deep
+    for <name|MuPDF>.
+
     <item><name|TikZ>: the diagrams of <verbatim|tikz-cd> whose drawing
     was lost (its <name|SVG> was not well formed) are drawn. In an answer of
     a chatbot, a diagram alone in a displayed formula is a picture, and a
