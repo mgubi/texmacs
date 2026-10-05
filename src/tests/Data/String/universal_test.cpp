@@ -473,6 +473,21 @@ test_before () {
   CHECK (uni_before ("\xc9" "COLE", "ecole"));
 }
 
+// the code points of the Cyrillic letters become their bytes in T2A, the
+// encoding of the Cyrillic TeX fonts, and any other character is left
+// alone: a Latin letter such as <#E7> used to become the T2A byte 0xE7,
+// so that the roman font drew c cedilla with a Cyrillic glyph
+static void
+test_cyrillic_t2a () {
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#430>"), "\xe0");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#44F>"), "\xff");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#401>"), "\x9c");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#E7>"), "<#E7>");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#E9>"), "<#E9>");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("<#4E2D>"), "<#4E2D>");
+  CHECK_BYTES (code_point_to_cyrillic_subset_in_t2a ("a"), "a");
+}
+
 int
 main () {
   RUN (test_utf8_all_code_points);
@@ -494,5 +509,6 @@ main () {
   RUN (test_translit);
   RUN (test_letters);
   RUN (test_before);
+  RUN (test_cyrillic_t2a);
   return test_report ();
 }
