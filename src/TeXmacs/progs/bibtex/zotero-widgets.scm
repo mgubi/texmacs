@@ -175,7 +175,7 @@
     (refreshable "zotero-results"
       (hlist (text search-message) >>)
       ===
-      (resize "650px" "300px"
+      (resize '("400px" "650px" "9999px") '("150px" "300px" "9999px")
         (scrollable
           (choices (set! search-selected
                          (if (string? answer) (list answer) answer))
@@ -228,7 +228,7 @@
     ===
     (text "Choose the value to keep for each field")
     ===
-    (resize "650px" "320px"
+    (resize '("400px" "650px" "9999px") '("150px" "320px" "9999px")
       (scrollable
         ;; NOTE: no for inside aligned
         (vlist
@@ -314,7 +314,7 @@
 
 (tm-widget ((zotero-check-widget r) cmd)
   (padded
-    (resize "600px" "250px"
+    (resize '("400px" "600px" "9999px") '("150px" "250px" "9999px")
       (scrollable
         (vlist
           (for (l (zotero-check-lines r))
@@ -385,7 +385,11 @@
               (get-preference "zotero export format") "20em"))
       (item (text "Complete keys from Zotero:")
         (toggle (set-preference "zotero completion" (if answer "on" "off"))
-                (== (get-preference "zotero completion") "on"))))
+                (== (get-preference "zotero completion") "on")))
+      (item (text "Search Zotero in the database search:")
+        (toggle (set-preference "zotero in database search"
+                                (if answer "on" "off"))
+                (!= (get-preference "zotero in database search") "off"))))
     ===
     (refreshable "zotero-settings-status"
       (hlist (text settings-status) >>))

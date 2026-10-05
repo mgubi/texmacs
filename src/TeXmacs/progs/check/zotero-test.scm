@@ -914,6 +914,51 @@
             (check= (body-citations)
                     '("smith2020" "smith2020a" "zotero:EEEE5555"))))))))
 
+(define (result-sources l)
+  ;; the (name source) of the results of the search window of the database
+  (map (lambda (res)
+         (list (cadr res)
+               (let find ((t (caddr res)))
+                 (cond ((and (tm-func? t 'concat 3) (== (cadr t) "["))
+                        (caddr t))
+                       ((pair? t) (list-or (map find (cdr t))))
+                       (else #f)))))
+       (list-filter l (cut tm-func? <> 'db-result 2))))
+
+(define (test-database-search)
+  (check-group "database search")
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (zotero-import-items (list (zotero-find-key "smith2020")))
+          (save-in-database!
+           "@article{mine2020,\n\ttitle = {Gravity of mine},\n\tyear = {2020},\n}\n")
+          ;; NOTE: the pretty results come from the bibliographic database
+          (module-provide '(database bib-manage))
+          (with search (lambda (q)
+                         (in-module `((eval 'db-search-results
+                                            (resolve-module
+                                             '(database db-widgets)))
+                                      (bib-database) "bib" ,q)))
+            ;; the source of each reference
+            (check= (result-sources (search "gravity"))
+                    '(("mine2020" "Database")
+                      ("smith2020" "Database, from Zotero")
+                      ("smith2020a" "Zotero")))
+            ;; Zotero is searched only when the preference says so
+            (with old (get-preference "zotero in database search")
+              (set-preference "zotero in database search" "off")
+              (check= (map car (result-sources (search "gravity")))
+                      '("mine2020" "smith2020"))
+              (set-preference "zotero in database search" old)))
+          (with-libraries "all"
+            (lambda ()
+              (with e (cdar (zotero-db-entries '("group2021")))
+                (check= (zotero-source-text e #t) "Zotero, Physics group")
+                (check= (zotero-source-text e #f)
+                        "Database, from Zotero")))))))))
+
 (define (test-update-database)
   (check-group "update database")
   ;; with the database, Update from Zotero adds a bibliography without file
@@ -1174,6 +1219,7 @@
   (test-combined-database)
   (test-selection)
   (test-renamed)
+  (test-database-search)
   (test-update-database)
   (test-renamed-database)
   (test-copies)

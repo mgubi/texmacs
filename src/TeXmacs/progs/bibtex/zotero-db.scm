@@ -147,6 +147,49 @@
         (map cdr (convert-entries zs)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The search window of the database
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-preferences
+  ("zotero in database search" "on" noop))
+
+(tm-define (zotero-in-database-search?)
+  (:synopsis "Does the search window of the database also search Zotero?")
+  (== (get-preference "zotero in database search") "on"))
+
+(tm-define (zotero-source-text e zotero?)
+  (:synopsis "The source of the entry @e, for the search window")
+  ;; @zotero? when it comes from Zotero, otherwise it is in the database
+  (with lib (zotero-entry-meta e "zotero-library")
+    (cond ((not zotero?) (if lib "Database, from Zotero" "Database"))
+          ((and lib (!= (zotero-normalize-library lib) (zotero-user-library)))
+           (string-append "Zotero, " (zotero-library-name lib)))
+          (else "Zotero"))))
+
+(define (with-source val src)
+  ;; The pretty reference @val, preceded by its source @src
+  (with mark `(with "color" "dark green" "font-shape" "small-caps"
+                (concat "[" ,src "] "))
+    (cond ((tm-func? val 'concat) `(concat ,mark ,@(cdr val)))
+          ((tm-func? val 'document)
+           (if (null? (cdr val)) `(document ,mark)
+               `(document (concat ,mark ,(cadr val)) ,@(cddr val))))
+          (else `(concat ,mark ,val)))))
+
+(tm-define (zotero-mark-results results entries zotero?)
+  (:synopsis "The search @results with the sources of their @entries")
+  (map (lambda (res)
+         (if (not (and (tm-func? res 'db-result 2) (string? (cadr res)))) res
+             (with e (list-find entries
+                                (lambda (e) (== (entry-name e) (cadr res))))
+               (if (not e) res
+                   `(db-result ,(cadr res)
+                               ,(with-source (caddr res)
+                                             (zotero-source-text e
+                                                                 zotero?)))))))
+       results))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The other sources of the combined search
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

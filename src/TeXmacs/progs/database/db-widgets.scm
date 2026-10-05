@@ -107,14 +107,17 @@
 	     (ids (db-search-cached q))
 	     (l (map db-get-result-cached ids))
 	     (r (db-pretty-cached l kind :pretty))
-             ;; the references of Zotero, after those of the database
-             (z (if (!= kind "bib") '()
-                    (db-pretty (zotero-search-entries query (map get-name r))
-                               kind :pretty)))
-             (zr (if (null? z) '() (cons "From Zotero:" z))))
+             ;; the references of Zotero, after those of the database, when
+             ;; the preference asks for them; each one says its source
+             (zl (if (and (== kind "bib") (zotero-in-database-search?))
+                     (zotero-search-entries query (map get-name r))
+                     '()))
+             (z (if (null? zl) '() (db-pretty zl kind :pretty)))
+             (r* (if (== kind "bib") (zotero-mark-results r l #f) r))
+             (z* (zotero-mark-results z zl #t)))
 	(cond ((and (null? r) (null? z)) (list "No matching items"))
-	      ((>= (length r) 20) (append (rcons r "More items follow") zr))
-	      (else (append r zr)))))))
+	      ((>= (length r) 20) (append (rcons r* "More items follow") z*))
+	      (else (append r* z*)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search the database
@@ -156,7 +159,7 @@
 	       "search-database" (list "") "650px"))
       === ===
       (refreshable "db-search-results"
-	(resize "750px" "500px"
+	(resize '("400px" "750px" "9999px") '("200px" "500px" "9999px")
 	  (texmacs-input `(document ,@(db-search-results db kind query))
 			 `(style (tuple ,(db-get-style kind)))
 			 (db-search-results-buffer)))))))
@@ -176,7 +179,7 @@
 	       "search-database" (list "") "300px"))
       === ===
       (refreshable "db-search-results"
-	(resize "400px" "600px"
+	(resize '("300px" "400px" "9999px") '("200px" "600px" "9999px")
 	  (texmacs-input `(document ,@(db-search-results db kind query))
 			 `(style (tuple ,(db-get-style kind) "side-tools"))
 			 (db-search-results-buffer)))))))

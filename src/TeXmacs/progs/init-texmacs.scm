@@ -160,7 +160,8 @@
              zotero-import-items zotero-in-database? zotero-search-entries
              zotero-database-sources zotero-database-renames
              zotero-rename-database-entries zotero-database-entry-info
-             zotero-adopt-entries
+             zotero-adopt-entries zotero-in-database-search?
+             zotero-mark-results
              zotero-conflict-fields zotero-merge-entries)
 (lazy-menu (bibtex zotero-widgets) open-zotero-search zotero-synchronize
            open-zotero-check open-zotero-settings)
