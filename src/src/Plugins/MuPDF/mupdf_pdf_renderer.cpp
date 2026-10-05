@@ -42,6 +42,7 @@
 #include "link.hpp"        // get_locus_rendering
 #include "tm_configure.hpp"  // TEXMACS_VERSION
 
+#include <time.h> // time, for the creation date
 #include <mupdf/fitz.h>
 #include <mupdf/pdf.h>
 #include <ft2build.h>
