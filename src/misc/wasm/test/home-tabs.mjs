@@ -1,12 +1,15 @@
 // The home directory of the browser build in IndexedDB, with several tabs
 // (tmHome in misc/wasm/web-pre.js), in a headless Firefox, or in Safari:
 //
-//   node misc/wasm/test/home-tabs.mjs [--safari] [src directory] [profile directory]
+//   node misc/wasm/test/home-tabs.mjs [--safari | --browser <path>]
+//                                     [src directory] [profile directory]
 //
 // from src/, after the "web" target of misc/wasm/Makefile (the defaults:
 // the current directory, and build-wasm/home-profile, which is emptied
 // first). puppeteer-core is looked for in build-wasm/tools, as by
-// misc/wasm/browser-run.mjs. With --safari, Safari is driven by its
+// misc/wasm/browser-run.mjs. --browser gives another browser for
+// puppeteer: a Chrome or a Chromium (Chrome for Testing) is driven as such,
+// headless. With --safari, Safari is driven by its
 // WebDriver (safaridriver, started here; "Allow Remote Automation" in the
 // Develop menu of Safari, or safaridriver --enable once): its window is on
 // the screen, its storage is that of an automation session (empty at the
@@ -17,7 +20,10 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const SAFARI = process.argv.includes ('--safari');
-const positional = process.argv.slice (2).filter (a => !a.startsWith ('--'));
+const bi = process.argv.indexOf ('--browser');
+const BROWSER = bi > 0 ? process.argv[bi + 1] : '/Applications/Firefox.app/Contents/MacOS/firefox';
+const CHROME = /chrom/i.test (path.basename (BROWSER));
+const positional = process.argv.slice (2).filter ((a, i, l) => !a.startsWith ('--') && l[i - 1] !== '--browser');
 const SRC = path.resolve (positional[0] || '.');
 const PROFILE = path.resolve (positional[1] || path.join (SRC, 'build-wasm/home-profile'));
 fs.rmSync (PROFILE, { recursive: true, force: true });
@@ -115,12 +121,13 @@ async function safari () {
   };
 }
 
-async function firefox () {
+async function puppet () {
   const require = createRequire (path.join (SRC, 'build-wasm/tools/package.json'));
   const puppeteer = require ('puppeteer-core');
   const b = await puppeteer.launch ({
-    browser: 'firefox', executablePath: '/Applications/Firefox.app/Contents/MacOS/firefox',
-    headless: true, userDataDir: PROFILE, args: ['--width=1280', '--height=800']
+    browser: CHROME ? 'chrome' : 'firefox', executablePath: BROWSER,
+    headless: true, userDataDir: PROFILE,
+    args: CHROME ? ['--window-size=1280,800'] : ['--width=1280', '--height=800']
   });
   return {
     async newPage () {
@@ -134,8 +141,8 @@ async function firefox () {
   };
 }
 
-const browser = SAFARI ? await safari () : await firefox ();
-console.log ('browser: ' + (SAFARI ? 'Safari' : 'Firefox'));
+const browser = SAFARI ? await safari () : await puppet ();
+console.log ('browser: ' + (SAFARI ? 'Safari' : CHROME ? 'Chrome' : 'Firefox'));
 
 async function open (name) {
   const page = await browser.newPage ();
@@ -234,6 +241,9 @@ const C = await open ('C');
 check (await C.evaluate (() => tmHome.readOnly ()), 'C is read only');
 // 3. B takes over: A writes its last change first
 await A.evaluate (() => FS.writeFile ('/home/web/last.txt', 'last'));
+// the button is clicked in the tab which is shown (a tab in the background
+// has no frames, so that TeXmacs would not start there)
+await B.bringToFront ();
 const reload = B.waitForNavigation ({ waitUntil: 'load', timeout: 120000 });
 await B.evaluate (() => { setTimeout (() => document.querySelector ('#tm-home-notice button').click (), 100); });
 await reload;
@@ -260,6 +270,7 @@ check (/no longer open in another tab/.test (noticeC2), 'C offers to reload: ' +
 await C.close ();
 const noticeA2 = await A.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
 check (/no longer open in another tab/.test (noticeA2), 'A offers to reload: ' + noticeA2.slice (0, 80));
+await A.bringToFront ();
 try { await A.evaluate (() => { setTimeout (() => location.reload (), 100); }); } catch (e) {}
 await sleep (1000);
 await ready (A);
