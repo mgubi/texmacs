@@ -17,7 +17,7 @@
 ;;
 ;; The entries which come from Zotero carry the meta attributes
 ;;   zotero-item     the key of the Zotero item
-;;   zotero-library  the library ("user")
+;;   zotero-library  the library (users/0, or groups/<id>)
 ;;   zotero-version  the version of the item when it was last exported
 ;;   zotero-synced   the fields as they were then (to tell which side
 ;;                   changed a field)
@@ -83,7 +83,7 @@
         (list (cons "contributor" "Zotero")
               (cons "modus" "imported")
               (cons "zotero-item" (zotero-entry-item z))
-              (cons "zotero-library" "user")
+              (cons "zotero-library" (zotero-entry-library z))
               (cons "zotero-version"
                     (number->string (zotero-entry-version z)))
               (cons "zotero-synced" (fields->string (entry-fields e))))))
@@ -130,6 +130,40 @@
         (map cdr (convert-entries zs)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The other sources of the combined search
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (db-entry-summary e)
+  (zotero-summary (entry-name e)
+                  (map (lambda (f) (cons (cadr f) (caddr f)))
+                       (list-filter (entry-fields e)
+                                    (cut tm-func? <> 'db-field 2)))))
+
+(define (local-entries)
+  ;; the entries of the document (attachments *-biblio)
+  (append-map (lambda (name)
+                (with t (tm->stree (get-attachment name))
+                  (if (pair? t) (list-filter (cdr t) db-entry-any?) '())))
+              (list-filter (list-attachments)
+                           (cut string-ends? <> "-biblio"))))
+
+(tm-define (zotero-database-sources q)
+  (:synopsis "The (mark summary ...) of the document and the database")
+  ;; L for the entries of the document, D for the database of the user,
+  ;; for the combined search of @q; at most 20 entries of the database
+  (let* ((local (list-filter (map db-entry-summary (local-entries))
+                             (cut zotero-summary-matches? q <>)))
+         (types (smart-ref db-kind-table "bib"))
+         (db (if (== (tm-string-trim-both q) "") '()
+                 (with-database (bib-database)
+                   (with-limit 20
+                     (map db-load-entry
+                          (db-search (list (list :completes q)
+                                           (cons "type" types)))))))))
+    (list (cons "L" local)
+          (cons "D" (map db-entry-summary db)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keeping the imported entries in sync
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -138,8 +172,18 @@
 
 (define (imported-entries)
   ;; The current entries of the database which come from Zotero
-  (with-database (bib-database)
-    (map db-load-entry (db-search (list (list "zotero-library" "user"))))))
+  ;; NOTE: the libraries of the groups are those of the user now, even if
+  ;; TeXmacs does not look for citations in them
+  (with libs (append (list "user" (zotero-user-library))
+                     (map car (zotero-groups)))
+    (with-database (bib-database)
+      (map db-load-entry (db-search (list (cons "zotero-library" libs)))))))
+
+(define (entry-library e)
+  (zotero-normalize-library (zotero-entry-meta e "zotero-library")))
+
+(define (entry-item e)
+  (zotero-entry-meta e "zotero-item"))
 
 (define (update-entry! e new)
   ;; Make @new the current version of the database entry @e
@@ -156,65 +200,62 @@
   (with-database (bib-database)
     (db-set-field (cadr e) key (list val))))
 
+(define (newer? e versions)
+  ;; Has the item of the entry @e a newer version in Zotero?
+  (with x (assoc (entry-item e) versions)
+    (and x (> (cdr x)
+              (or (string->number (or (zotero-entry-meta e "zotero-version")
+                                      "0"))
+                  0)))))
+
 (tm-define (zotero-sync-database . opt-force)
   (:synopsis "Update the entries of the database which come from Zotero")
   ;; Returns (updated renamed deleted conflicts), lists of names, the
   ;; conflicts being (old-entry . new-entry); #f when Zotero is unavailable
   ;; or nothing changed in Zotero since the last sync
   (let* ((force? (and (nnull? opt-force) (car opt-force)))
-         (v (zotero-library-version))
+         (old (if (zotero-ready?) (imported-entries) '()))
+         (libs (list-remove-duplicates
+                (cons (zotero-user-library) (map entry-library old))))
+         (v (zotero-libraries-versions libs))
          (last (get-preference "zotero sync version")))
     (cond ((not (zotero-ready?)) #f)
-          ((and (not force?) v (== (number->string v) last)) #f)
+          ((and (not force?) v (== v last)) #f)
           (else
-            (let* ((old (imported-entries))
-                   (items (map (cut zotero-entry-meta <> "zotero-item") old))
-                   (versions (zotero-item-versions items))
-                   (updated '()) (renamed '()) (deleted '()) (conflicts '()))
-              ;; items no longer in Zotero
-              (for (e old)
-                (with item (zotero-entry-meta e "zotero-item")
-                  (when (not (assoc item versions))
-                    (when (!= (zotero-entry-meta e "zotero-deleted") "yes")
-                      (set-meta! e "zotero-deleted" "yes"))
-                    (set! deleted (cons (entry-name e) deleted)))))
-              ;; items changed in Zotero
-              (let* ((changed
-                      (list-filter
-                       old
-                       (lambda (e)
-                         (with x (assoc (zotero-entry-meta e "zotero-item")
-                                        versions)
-                           (and x (> (cdr x)
-                                     (or (string->number
-                                          (or (zotero-entry-meta
-                                               e "zotero-version") "0"))
-                                         0)))))))
-                     (zs (zotero-items-entries
-                          (map (cut zotero-entry-meta <> "zotero-item")
-                               changed)))
-                     (new (convert-entries zs)))
-                (for (e changed)
-                  (let* ((item (zotero-entry-meta e "zotero-item"))
-                         (z (list-find zs (lambda (z) (== (zotero-entry-item z)
-                                                          item))))
-                         (x (and z (assoc (zotero-entry-key z) new))))
-                    (when x
-                      (sync-entry e (cdr x) z
-                                  (lambda (kind)
-                                    (cond ((== kind 'updated)
-                                           (set! updated
-                                                 (cons (entry-name e) updated)))
-                                          ((== kind 'renamed)
-                                           (set! renamed
-                                                 (cons (entry-name e) renamed))
-                                           (set! updated
-                                                 (cons (entry-name e) updated)))
-                                          ((== kind 'conflict)
-                                           (set! conflicts
-                                                 (cons (cons e (cdr x))
-                                                       conflicts))))))))))
-              (when v (set-preference "zotero sync version" (number->string v)))
+            (let* ((updated '()) (renamed '()) (deleted '()) (conflicts '())
+                   (report
+                    (lambda (e new)
+                      (lambda (kind)
+                        (cond ((== kind 'updated)
+                               (set! updated (cons (entry-name e) updated)))
+                              ((== kind 'renamed)
+                               (set! renamed (cons (entry-name e) renamed))
+                               (set! updated (cons (entry-name e) updated)))
+                              ((== kind 'conflict)
+                               (set! conflicts
+                                     (cons (cons e new) conflicts))))))))
+              (for (lib libs)
+                (let* ((here (list-filter old (lambda (e) (== (entry-library e)
+                                                              lib))))
+                       (versions (zotero-item-versions (map entry-item here)
+                                                       lib))
+                       ;; items changed in Zotero
+                       (changed (list-filter here (cut newer? <> versions)))
+                       (zs (zotero-items-entries (map entry-item changed) lib))
+                       (new (convert-entries zs)))
+                  ;; items no longer in Zotero
+                  (for (e here)
+                    (when (not (assoc (entry-item e) versions))
+                      (when (!= (zotero-entry-meta e "zotero-deleted") "yes")
+                        (set-meta! e "zotero-deleted" "yes"))
+                      (set! deleted (cons (entry-name e) deleted))))
+                  (for (e changed)
+                    (let* ((z (list-find zs (lambda (z) (== (zotero-entry-item z)
+                                                            (entry-item e)))))
+                           (x (and z (assoc (zotero-entry-key z) new))))
+                      (when x
+                        (sync-entry e (cdr x) z (report e (cdr x))))))))
+              (when v (set-preference "zotero sync version" v))
               (list (reverse updated) (reverse renamed) (reverse deleted)
                     (reverse conflicts)))))))
 

@@ -22,11 +22,17 @@
 ;; one is cited as zotero:<item key>. See doc/zotero-design.md for the
 ;; precedence of the sources of references and the other situations.
 
-(texmacs-module (bibtex zotero))
+(texmacs-module (bibtex zotero)
+  (:use (convert bibtex bibtextm)))
 
 (define-preferences
   ("zotero server" "http://localhost:23119" noop)
-  ("zotero export format" "bibtex" noop))
+  ("zotero export format" "bibtex" noop)
+  ;; "user" for the library of the user, "all" for the groups too
+  ("zotero libraries" "user" noop))
+
+;; A library is the start of the paths of its requests
+(define user-library "users/0")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Requests
@@ -54,13 +60,13 @@
 (define batch-timeout "20")
 
 (tm-define (zotero-request path interactive?)
-  (:synopsis "Ask Zotero for @path; return (status body version)")
+  (:synopsis "Ask Zotero for @path (after /api/); return (status body version)")
   ;; The status is the HTTP status, or 0 when Zotero cannot be reached or
   ;; does not answer in time; the body is the answer, in utf8; the version
   ;; is the version of the library (Last-Modified-Version), or #f
   ;; NOTE: %header needs curl 7.84; with an older one, the version is #f
   (let* ((url (string-append (get-preference "zotero server")
-                             "/api/users/0/" path))
+                             "/api/" path))
          (cmd (list "curl" "--silent"
                     "--max-time" (if interactive? interactive-timeout
                                      batch-timeout)
@@ -109,8 +115,10 @@
   (if (and last-state
            (< (- (texmacs-time) last-state-time) (state-delay last-state)))
       last-state
-      (with (st body version) (zotero-request "items/top?limit=1&format=keys"
-                                              #t)
+      (with (st body version) (zotero-request
+                               (string-append user-library
+                                              "/items/top?limit=1&format=keys")
+                               #t)
         (when version (set! last-version version))
         (remember-state! (status->state st))
         last-state)))
@@ -133,20 +141,21 @@
         ((== st 'ready) "Zotero is ready")
         (else "Zotero answered with an error")))
 
-(define (zotero-get path . opt-interactive)
-  ;; The body of the answer to @path, or #f; nothing is asked while Zotero
-  ;; is known not to answer
+(define (zotero-get lib path . opt-interactive)
+  ;; The body of the answer to @path in the library @lib, or #f; nothing is
+  ;; asked while Zotero is known not to answer
   (with interactive? (and (nnull? opt-interactive) (car opt-interactive))
     (and (zotero-ready?)
-         (with (st body version) (zotero-request path interactive?)
-           (when version (note-version! version))
+         (with (st body version) (zotero-request (string-append lib "/" path)
+                                                 interactive?)
+           (when version (note-version! lib version))
            (if (== st 200) body
                (begin
                  (remember-state! (status->state st))
                  #f))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Items
+;; Answers of Zotero
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; json->tree gives objects as (attr key value ...) and arrays as (tuple ...),
@@ -174,15 +183,91 @@
   ;; the utf8 string @x, in cork
   (if (string? x) (utf8->cork x) ""))
 
+(define (json-string x)
+  ;; a number or a string of json, as a string
+  (cond ((string? x) x)
+        ((number? x) (number->string x))
+        (else "")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Libraries
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The library of the user is users/0, a group library groups/<id>
+
+(tm-define (zotero-user-library) user-library)
+
+(define groups-cache #f)
+(define groups-time 0)
+
+(tm-define (zotero-groups)
+  (:synopsis "The (library . name) of the group libraries of the user")
+  ;; NOTE: remembered for a minute
+  (if (and groups-cache (< (- (texmacs-time) groups-time) 60000))
+      groups-cache
+      (with l (list-filter
+               (map (lambda (g)
+                      (let* ((id (json-string (zotero-attr-ref g "id")))
+                             (data (zotero-attr-ref g "data"))
+                             (name (and data (zotero-attr-ref data "name"))))
+                        (and (!= id "")
+                             (cons (string-append "groups/" id)
+                                   (if (string? name) (utf8->cork name)
+                                       id)))))
+                    (json-items (zotero-get user-library
+                                            "groups?format=json")))
+               identity)
+        (when (zotero-ready?)
+          (set! groups-cache l)
+          (set! groups-time (texmacs-time)))
+        l)))
+
+(tm-define (zotero-libraries)
+  (:synopsis "The libraries in which TeXmacs looks for citations")
+  ;; the library of the user first: its keys win over those of the groups
+  (cons user-library
+        (if (== (get-preference "zotero libraries") "all")
+            (map car (zotero-groups))
+            '())))
+
+(tm-define (zotero-library-name lib)
+  (:synopsis "The name of the library @lib, for the user")
+  (cond ((== lib user-library) "My Library")
+        ((assoc lib (or groups-cache '())) => cdr)
+        (else lib)))
+
+(tm-define (zotero-normalize-library lib)
+  ;; NOTE: the first entries imported into the database had "user"
+  (if (in? lib '(#f "" "user")) user-library lib))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Items
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; An item without citation key is cited as zotero:<item key> in the
+;; library of the user, as zotero:g<id>:<item key> in a group library
 (define derived-prefix "zotero:")
 
 (tm-define (zotero-derived-key? key)
   (string-starts? key derived-prefix))
 
-(define (item-entry it)
-  ;; (citation-key item-key title creators year version), in cork, or #f for
-  ;; a note, an attachment or an annotation; an item without citation key
-  ;; is cited as zotero:<item key>
+(define (derived-key lib item)
+  (if (== lib user-library)
+      (string-append derived-prefix item)
+      (string-append derived-prefix "g" (string-drop lib 7) ":" item)))
+
+(tm-define (zotero-derived-item key)
+  (:synopsis "The (library . item) of the derived key @key")
+  (let* ((s (string-drop key (string-length derived-prefix)))
+         (pos (string-search-forwards ":" 0 s)))
+    (if (and (string-starts? s "g") (> pos 1))
+        (cons (string-append "groups/" (substring s 1 pos))
+              (substring s (+ pos 1) (string-length s)))
+        (cons user-library s))))
+
+(define (item-entry it lib)
+  ;; (citation-key item-key title creators year version library), in cork,
+  ;; or #f for a note, an attachment or an annotation
   (let* ((data (zotero-attr-ref it "data"))
          (meta (zotero-attr-ref it "meta"))
          (key (string-or-empty (zotero-attr-ref it "key")))
@@ -192,7 +277,7 @@
          (nin? type '("note" "attachment" "annotation"))
          (!= key "")
          (list (if (and (string? ck) (!= ck "")) (utf8->cork ck)
-                   (string-append derived-prefix key))
+                   (derived-key lib key))
                key
                (string-or-empty (zotero-attr-ref data "title"))
                (string-or-empty (zotero-attr-ref meta "creatorSummary"))
@@ -200,7 +285,12 @@
                  (if (>= (string-length d) 4) (substring d 0 4) d))
                (or (string->number
                     (string-or-empty (zotero-attr-ref it "version")))
-                   0)))))
+                   0)
+               lib))))
+
+(define (items-entries lib s)
+  ;; The entries of the items in the answer @s for the library @lib
+  (list-filter (map (cut item-entry <> lib) (json-items s)) identity))
 
 (tm-define (zotero-entry-key e) (first e))
 (tm-define (zotero-entry-item e) (second e))
@@ -208,21 +298,25 @@
 (tm-define (zotero-entry-creators e) (fourth e))
 (tm-define (zotero-entry-year e) (fifth e))
 (tm-define (zotero-entry-version e) (sixth e))
+(tm-define (zotero-entry-library e) (list-ref e 6))
+
+(define (search-library lib q n interactive?)
+  (items-entries lib
+                 (zotero-get lib (string-append
+                                  "items/top?format=json&limit="
+                                  (number->string n) "&q="
+                                  (zotero-url-encode (cork->utf8 q)))
+                             interactive?)))
 
 (tm-define (zotero-search q . opt)
-  (:synopsis "The items of the library matching @q (author, title, year)")
+  (:synopsis "The items of the libraries matching @q (author, title, year)")
   ;; @q is in cork, as typed in TeXmacs; the options are the maximal number
   ;; of items (50 by default) and whether the request is interactive
-  (let ((n (if (null? opt) 50 (car opt)))
-        (interactive? (and (pair? opt) (pair? (cdr opt)) (cadr opt))))
-    (list-filter
-     (map item-entry
-          (json-items
-           (zotero-get (string-append "items/top?format=json&limit="
-                                      (number->string n) "&q="
-                                      (zotero-url-encode (cork->utf8 q)))
-                       interactive?)))
-     identity)))
+  (let* ((n (if (null? opt) 50 (car opt)))
+         (interactive? (and (pair? opt) (pair? (cdr opt)) (cadr opt)))
+         (l (append-map (cut search-library <> q n interactive?)
+                        (zotero-libraries))))
+    (if (> (length l) n) (sublist l 0 n) l)))
 
 (define-preferences
   ("zotero completion" "on" noop))
@@ -238,52 +332,291 @@
   (:synopsis "The citation keys of Zotero which start with @prefix")
   ;; NOTE: the search of Zotero also matches the prefixes of citation keys
   (if (< (string-length prefix) 2) '()
-      (list-filter (map zotero-entry-key (zotero-search prefix 50 #t))
-                   (cut string-starts? <> prefix))))
+      (list-remove-duplicates
+       (list-filter (map zotero-entry-key (zotero-search prefix 50 #t))
+                    (cut string-starts? <> prefix)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The combined search: Zotero and the other sources of the document
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A summary of a reference is (key title creators year zotero-entry), in
+;; cork, the Zotero entry being #f for the other sources. The sources are
+;; marked L (the entries of the document), F (a BibTeX file), D (the
+;; database) and Z (Zotero), and come in this order of precedence
+
+(tm-define (zotero-flat-text t)
+  (:synopsis "The text of the stree @t, without its markup")
+  (cond ((string? t) t)
+        ((tm-func? t 'name-sep) ", ")
+        ((pair? t) (apply string-append (map zotero-flat-text (cdr t))))
+        (else "")))
+
+(define (last-names t)
+  ;; the last names in an author field, as BibTeX (bib-names) or as the
+  ;; database (name) gives it
+  (cond ((tm-func? t 'bib-name 4) (list (zotero-flat-text (list-ref t 3))))
+        ((tm-func? t 'name) (list (zotero-flat-text t)))
+        ((pair? t) (append-map last-names (cdr t)))
+        (else '())))
+
+(tm-define (zotero-creators-summary t)
+  (:synopsis "The authors of the field @t, as Zotero summarizes them")
+  (with l (list-filter (last-names t) (lambda (x) (!= x "")))
+    (cond ((null? l) "")
+          ((null? (cdr l)) (car l))
+          ((null? (cddr l)) (string-append (car l) " and " (cadr l)))
+          (else (string-append (car l) " et al.")))))
+
+(tm-define (zotero-summary key fields)
+  (:synopsis "The summary of the reference @key with the @fields")
+  ;; @fields are (name . value), the values being strees
+  (let* ((get (lambda (name) (assoc-ref fields name)))
+         (who (or (get "author") (get "editor"))))
+    (list key
+          (zotero-flat-text (or (get "title") ""))
+          (if who (zotero-creators-summary who) "")
+          (zotero-flat-text (or (get "year") ""))
+          #f)))
+
+(tm-define (zotero-entry-summary e)
+  (:synopsis "The summary of the Zotero entry @e")
+  (list (zotero-entry-key e) (zotero-entry-title e) (zotero-entry-creators e)
+        (zotero-entry-year e) e))
+
+(define bib-file-cache (make-ahash-table))
+
+(tm-define (zotero-bib-file-summaries f)
+  (:synopsis "The summaries of the references of the BibTeX file @f")
+  ;; NOTE: remembered while the file does not change
+  (let* ((name (url->system f))
+         (date (url-last-modified f))
+         (cached (ahash-ref bib-file-cache name)))
+    (if (and cached (== (car cached) date)) (cdr cached)
+        (let* ((t (bibtex->texmacs (parse-bibtex-document (string-load f))))
+               (l (let walk ((t t))
+                    (cond ((tm-func? t 'bib-entry 3)
+                           (list (zotero-summary
+                                  (cadr (cdr t))
+                                  (map (lambda (x) (cons (symbol->string*
+                                                          (cadr x))
+                                                         (caddr x)))
+                                       (list-filter (cdr (cadddr t))
+                                                    (cut tm-func? <>
+                                                         'bib-field 2))))))
+                          ((pair? t) (append-map walk (cdr t)))
+                          (else '())))))
+          (ahash-set! bib-file-cache name (cons date l))
+          l))))
+
+(define (symbol->string* x)
+  (if (symbol? x) (symbol->string x) x))
+
+(tm-define (zotero-summary-matches? q sum)
+  (:synopsis "Does the summary @sum match all the words of the query @q?")
+  (with text (locase-all (string-append (first sum) " " (second sum) " "
+                                        (third sum) " " (fourth sum)))
+    (list-and (map (lambda (w) (string-contains? text (locase-all w)))
+                   (list-filter (string-tokenize-by-char q #\space)
+                                (lambda (w) (!= w "")))))))
+
+(define (normalized-title s)
+  (list->string (list-filter (string->list (locase-all s))
+                             (lambda (c) (or (char-alphabetic? c)
+                                             (char-numeric? c))))))
+
+(define (same-work? a b)
+  ;; NOTE: without the DOI, the same title and year
+  (and (== (normalized-title (second a)) (normalized-title (second b)))
+       (or (== (fourth a) (fourth b)) (== (fourth a) "") (== (fourth b) ""))))
+
+;; A line of the combined search is (summary marks collision?)
+(tm-define (zotero-line-summary l) (car l))
+(tm-define (zotero-line-key l) (first (car l)))
+(tm-define (zotero-line-marks l) (cadr l))
+(tm-define (zotero-line-collision? l) (caddr l))
+(tm-define (zotero-line-entry l) (fifth (car l)))
+
+(tm-define (zotero-combine sources)
+  (:synopsis "The lines of the combined search of the @sources")
+  ;; @sources are (mark summary ...), in their order of precedence. The
+  ;; same work with the same key is one line, with the marks of all its
+  ;; sources; different works with the same key are a collision
+  (let ((lines '()))
+    (for (src sources)
+      (for (sum (cdr src))
+        (with old (list-find lines (lambda (l)
+                                     (and (== (zotero-line-key l) (car sum))
+                                          (same-work? (car l) sum))))
+          (if old
+              (set! lines
+                    (map (lambda (l)
+                           (if (not (eq? l old)) l
+                               (list (if (zotero-line-entry l) (car l)
+                                         ;; the Zotero entry, for its item
+                                         (rcons (sublist (car l) 0 4)
+                                                (fifth sum)))
+                                     (list-remove-duplicates
+                                      (rcons (cadr l) (car src)))
+                                     #f)))
+                         lines))
+              (set! lines (rcons lines (list sum (list (car src)) #f)))))))
+    (map (lambda (l)
+           (list (car l) (cadr l)
+                 (> (length (list-filter lines
+                                         (lambda (x) (== (zotero-line-key x)
+                                                         (zotero-line-key l)))))
+                    1)))
+         lines)))
+
+(tm-define (zotero-collision-message lines source-name)
+  (:synopsis "The warning for the keys of the @lines in several works")
+  ;; @source-name gives the name of a source from its mark
+  (let* ((keys (list-remove-duplicates
+                (map zotero-line-key
+                     (list-filter lines zotero-line-collision?))))
+         (describe
+          (lambda (k)
+            (with marks (list-remove-duplicates
+                         (append-map zotero-line-marks
+                                     (list-filter lines
+                                                  (lambda (l)
+                                                    (== (zotero-line-key l)
+                                                        k)))))
+              (string-append k " is defined by "
+                             (string-recompose (map source-name marks)
+                                               " and by "))))))
+    (and (nnull? keys)
+         (string-recompose (map describe keys) "; "))))
+
+;; NOTE: needs the bibliography of the document, defined below
+(tm-define (zotero-own-bib-file)
+  (:synopsis "The BibTeX file of the user in the bibliography, or #f")
+  ;; the file of the bibliography of the current document, unless it is
+  ;; managed by Zotero (its items are then those of Zotero)
+  (and-with u (current-buffer)
+    (and-with f (zotero-bibliography-file u (tree->stree (buffer-tree)))
+      (and (url-exists? f) (not (zotero-managed-file? f)) f))))
+
+(tm-define (zotero-search-sources q)
+  (:synopsis "The (mark summary ...) of the sources of the current document")
+  ;; for the combined search of @q, in their order of precedence; Zotero
+  ;; is left out when it is unavailable
+  (let* ((db (if (supports-db?) (zotero-database-sources q) '()))
+         (f (zotero-own-bib-file))
+         (empty? (== (tm-string-trim-both q) "")))
+    (if empty? '()
+        (list-filter
+         (list (assoc "L" db)
+               (and f (cons "F" (list-filter (zotero-bib-file-summaries f)
+                                             (cut zotero-summary-matches?
+                                                  q <>))))
+               (assoc "D" db)
+               (and (zotero-ready?)
+                    (cons "Z" (map zotero-entry-summary (zotero-search q)))))
+         identity))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Showing an item in Zotero
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (zotero-select-url e)
+  (:synopsis "The url which shows the item of the Zotero entry @e in Zotero")
+  (with lib (zotero-entry-library e)
+    (string-append "zotero://select/"
+                   (if (== lib user-library) "library"
+                       lib)
+                   "/items/" (zotero-entry-item e))))
+
+(tm-define (zotero-show-item e)
+  (:synopsis "Show the item of the Zotero entry @e in Zotero")
+  (with url (zotero-select-url e)
+    ;; NOTE: the url only has letters, digits, / and :
+    (system (string-append (default-open) " " url))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Resolving citation keys
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The entries found for keys, as long as the library does not change
+;; The entries found for keys, as long as no library changes
 (define resolved (make-ahash-table))
-(define resolved-version #f)
+(define library-versions (make-ahash-table))
 
-(define (note-version! v)
-  (set! last-version v)
-  (when (!= v resolved-version)
+(define (note-version! lib v)
+  (when (== lib user-library) (set! last-version v))
+  (when (!= v (ahash-ref library-versions lib))
     (set! resolved (make-ahash-table))
-    (set! resolved-version v)))
+    (ahash-set! library-versions lib v)))
+
+(tm-define (zotero-forget-keys)
+  (:synopsis "Forget the citation keys found in Zotero")
+  (set! resolved (make-ahash-table))
+  (set! library-versions (make-ahash-table)))
+
+(define (find-in-library lib key)
+  ;; NOTE: the search also finds longer keys containing key
+  (list-find (search-library lib key 100 #f)
+             (lambda (e) (== (zotero-entry-key e) key))))
 
 (tm-define (zotero-find-key key)
   (:synopsis "The entry of the item with the citation key @key, or #f")
+  ;; the first library which has it wins
   (with cached (ahash-ref resolved key)
     (if cached (and (pair? cached) cached)
         (with e (if (zotero-derived-key? key)
-                    (with item (string-drop key (string-length derived-prefix))
-                      (and-with s (zotero-get (string-append "items/" item
-                                                             "?format=json"))
-                        (and-with e (list-find (map item-entry (json-items s))
-                                               identity)
+                    (let* ((p (zotero-derived-item key))
+                           (lib (car p))
+                           (item (cdr p)))
+                      (and-with s (zotero-get lib (string-append
+                                                   "items/" item
+                                                   "?format=json"))
+                        (and-with e (list-find (items-entries lib s) identity)
                           (and (== (zotero-entry-key e) key) e))))
-                    ;; NOTE: the search also finds longer keys containing key
-                    (list-find (zotero-search key 100)
-                               (lambda (e) (== (zotero-entry-key e) key))))
+                    (list-or (map (cut find-in-library <> key)
+                                  (zotero-libraries))))
           (when (zotero-ready?)
             (ahash-set! resolved key (or e 'none)))
           e))))
 
-(tm-define (zotero-items-entries items)
+(tm-define (zotero-key-libraries key)
+  (:synopsis "The libraries which have an item with the citation key @key")
+  ;; more than one when the key is ambiguous
+  (list-filter (zotero-libraries) (cut find-in-library <> key)))
+
+(tm-define (zotero-known-entry key)
+  (:synopsis "The Zotero entry of @key which TeXmacs knows, or #f")
+  ;; without asking Zotero (for menus): the key found before, or the item
+  ;; recorded with the document
+  (with c (ahash-ref resolved key)
+    (if (pair? c) c
+        (with x (assoc key (zotero-recorded-items))
+          (and x (list key (cadr x) "" "" "" 0 (caddr x)))))))
+
+(define cite-tags* '(cite nocite cite-detail))
+
+(tm-define (zotero-citation-entry t)
+  (:synopsis "The Zotero entry of the key at the cursor in the citation @t")
+  (and (tree-in? t cite-tags*)
+       (cursor-inside? t)
+       (let* ((p (cursor-path))
+              (tp (tree->path t))
+              (i (and (> (length p) (length tp))
+                      (list-ref p (length tp))))
+              (k (and i (< i (tree-arity t)) (tree-ref t i))))
+         (and k (tree-atomic? k)
+              (not (and (tree-is? t 'cite-detail) (!= i 0)))
+              (zotero-known-entry (tree->string k))))))
+
+(tm-define (zotero-items-entries items . opt-lib)
   (:synopsis "The entries of the Zotero @items (item keys) which still exist")
-  (append-map
-   (lambda (l)
-     (list-filter
-      (map item-entry
-           (json-items (zotero-get (string-append
-                                    "items?format=json&itemKey="
-                                    (string-recompose l ",")))))
-      identity))
-   (if (null? items) '() (chunks items 50))))
+  ;; in the library of the user, or the library given as option
+  (with lib (if (null? opt-lib) user-library (car opt-lib))
+    (append-map
+     (lambda (l)
+       (items-entries lib (zotero-get lib (string-append
+                                           "items?format=json&itemKey="
+                                           (string-recompose l ",")))))
+     (if (null? items) '() (chunks items 50)))))
 
 (tm-define (zotero-resolve keys)
   (:synopsis "The (key . entry) for the @keys which Zotero has")
@@ -306,47 +639,71 @@
 
 (tm-define (zotero-export entries)
   (:synopsis "The BibTeX of the Zotero @entries, in utf8")
-  ;; At most 50 items per request, as for the web API; the items cited as
-  ;; zotero:<item key> are exported one by one, since Zotero gives them
-  ;; keys of its own
+  ;; At most 50 items per request, as for the web API, and one library per
+  ;; request; the items cited as zotero:<item key> are exported one by one,
+  ;; since Zotero gives them keys of its own
   (let* ((format (get-preference "zotero export format"))
-         (export (lambda (items)
-                   (or (zotero-get (string-append
-                                    "items?format=" format "&itemKey="
-                                    (string-recompose items ",")))
+         (export (lambda (lib items)
+                   (or (zotero-get lib (string-append
+                                        "items?format=" format "&itemKey="
+                                        (string-recompose items ",")))
                        "")))
-         (plain (list-filter entries
-                             (lambda (e) (not (zotero-derived-key?
-                                               (zotero-entry-key e))))))
-         (derived (list-filter entries
-                               (lambda (e) (zotero-derived-key?
-                                            (zotero-entry-key e))))))
+         (derived? (lambda (e) (zotero-derived-key? (zotero-entry-key e))))
+         (plain (list-filter entries (negate derived?)))
+         (libs (list-remove-duplicates (map zotero-entry-library plain))))
     (apply string-append
            (append
-            (map export
-                 (if (null? plain) '()
-                     (chunks (map zotero-entry-item plain) 50)))
+            (append-map
+             (lambda (lib)
+               (with items (map zotero-entry-item
+                                (list-filter plain
+                                             (lambda (e)
+                                               (== (zotero-entry-library e)
+                                                   lib))))
+                 (map (cut export lib <>) (chunks items 50))))
+             libs)
             (map (lambda (e)
-                   (rekey (export (list (zotero-entry-item e)))
+                   (rekey (export (zotero-entry-library e)
+                                  (list (zotero-entry-item e)))
                           (zotero-entry-key e)))
-                 derived)))))
+                 (list-filter entries derived?))))))
 
-(tm-define (zotero-item-versions items)
+(tm-define (zotero-item-versions items . opt-lib)
   (:synopsis "The (item . version) of the @items which Zotero still has")
+  ;; in the library of the user, or the library given as option
   ;; NOTE: the local API has no list of deleted items: an item which is
-  ;; not returned has been deleted (or moved to the trash)
-  (append-map
-   (lambda (l)
-     (with t (zotero-json (zotero-get (string-append
-                                       "items?format=versions&itemKey="
-                                       (string-recompose l ","))))
-       (if (not (tm-func? t 'attr)) '()
-           (let loop ((r (cdr t)) (acc '()))
-             (if (or (null? r) (null? (cdr r))) (reverse acc)
-                 (loop (cddr r)
-                       (cons (cons (car r) (or (string->number (cadr r)) 0))
-                             acc)))))))
-   (if (null? items) '() (chunks items 50))))
+  ;; not returned has been deleted (or moved to the trash). It also returns
+  ;; the children (attachments, notes) of the items, which are not asked for
+  (with lib (if (null? opt-lib) user-library (car opt-lib))
+    (append-map
+     (lambda (l)
+       (with t (zotero-json (zotero-get lib (string-append
+                                             "items?format=versions&itemKey="
+                                             (string-recompose l ","))))
+         (if (not (tm-func? t 'attr)) '()
+             (let loop ((r (cdr t)) (acc '()))
+               (if (or (null? r) (null? (cdr r))) (reverse acc)
+                   (loop (cddr r)
+                         (cons (cons (car r)
+                                     (or (string->number (json-string (cadr r)))
+                                         0))
+                               acc)))))))
+     (if (null? items) '() (chunks items 50)))))
+
+(tm-define (zotero-libraries-versions libs)
+  (:synopsis "The versions of the libraries @libs, as a string")
+  ;; NOTE: it changes with any change of one of them
+  (zotero-forget-state)
+  (and (zotero-ready?)
+       (string-recompose
+        (map (lambda (lib)
+               (with (st body version)
+                   (zotero-request (string-append
+                                    lib "/items/top?limit=1&format=keys") #f)
+                 (string-append lib "=" (if version
+                                            (number->string version) "?"))))
+             libs)
+        " ")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Citations of a document
@@ -435,22 +792,35 @@
     (zotero-record-items (map cdr found))
     missing))
 
+(tm-define (zotero-recorded-items)
+  (:synopsis "The (key item library) of the Zotero items of the citations")
+  ;; as remembered with the current document
+  (with t (tm->stree (get-attachment "zotero-items"))
+    (if (not (tm-func? t 'tuple)) '()
+        (list-filter
+         (map (lambda (p)
+                (cond ((tm-func? p 'tuple 2)
+                       (list (cadr p) (caddr p) user-library))
+                      ((tm-func? p 'tuple 3) (cdr p))
+                      (else #f)))
+              (cdr t))
+         (lambda (x) (and x (string? (car x)) (string? (cadr x))
+                          (string? (caddr x))))))))
+
 (tm-define (zotero-record-items entries)
   (:synopsis "Remember with the document the Zotero items of its citations")
-  ;; The pairs (key item) are kept in an attachment of the document, so that
-  ;; a key renamed in Zotero can be found again
+  ;; The (key item library) are kept in an attachment of the document, so
+  ;; that a key renamed in Zotero can be found again
   (when (nnull? entries)
-    (let* ((old (with t (get-attachment "zotero-items")
-                  (if (tm-func? (tm->stree t) 'tuple)
-                      (cdr (tm->stree t)) '())))
-           (h (make-ahash-table)))
-      (for (p old)
-        (when (tm-func? p 'tuple 2) (ahash-set! h (cadr p) (caddr p))))
+    (let* ((h (make-ahash-table)))
+      (for (x (zotero-recorded-items))
+        (ahash-set! h (car x) (cdr x)))
       (for (e entries)
-        (ahash-set! h (zotero-entry-key e) (zotero-entry-item e)))
+        (ahash-set! h (zotero-entry-key e)
+                    (list (zotero-entry-item e) (zotero-entry-library e))))
       (set-attachment "zotero-items"
                       (stree->tree
-                       `(tuple ,@(map (lambda (x) `(tuple ,(car x) ,(cdr x)))
+                       `(tuple ,@(map (lambda (x) `(tuple ,(car x) ,@(cdr x)))
                                       (sort (ahash-table->list h)
                                             (lambda (x y)
                                               (string<? (car x)

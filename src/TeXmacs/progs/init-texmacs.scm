@@ -154,9 +154,11 @@
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
 (lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
              zotero-before-update zotero-managed-file?
-             zotero-completion-suffixes)
+             zotero-completion-suffixes zotero-citation-entry
+             zotero-show-item)
 (lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
              zotero-import-items zotero-in-database? zotero-search-entries
+             zotero-database-sources
              zotero-conflict-fields zotero-merge-entries)
 (lazy-menu (bibtex zotero-widgets) open-zotero-search zotero-synchronize)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")

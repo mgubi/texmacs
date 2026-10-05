@@ -44,10 +44,14 @@
 ;; The search dialog
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The dialog searches Zotero and the other sources of the document (see
+;; zotero-search-sources): each line is marked with its sources
+
 (define search-query "")
 (define search-results '())
 (define search-selected '())
 (define search-message "")
+(define search-file #f)
 
 (define (shorten s n)
   (if (<= (string-length s) n) s
@@ -62,56 +66,117 @@
                  ": " (shorten (zotero-entry-title e) 60)
                  "  [" (zotero-entry-key e) "]"))
 
-(define (search-labels)
-  (map zotero-entry-label search-results))
+(tm-define (zotero-source-name mark)
+  (cond ((== mark "L") "the document")
+        ((== mark "F") (if search-file (url->system (url-tail search-file))
+                           "the BibTeX file"))
+        ((== mark "D") "the database")
+        (else "Zotero")))
 
-(define (selected-entries)
+(tm-define (zotero-line-label l)
+  ;; [sources] creators (year): title  [key], with (!) for a collision
+  (let* ((sum (zotero-line-summary l))
+         (e (zotero-line-entry l))
+         (lib (and e (!= (zotero-entry-library e) (zotero-user-library))
+                   (zotero-library-name (zotero-entry-library e)))))
+    (string-append (if (zotero-line-collision? l) "(!) " "")
+                   "[" (string-recompose (zotero-line-marks l) " ")
+                   (if lib (string-append ": " lib) "") "] "
+                   (third sum)
+                   (if (== (fourth sum) "") ""
+                       (string-append " (" (fourth sum) ")"))
+                   ": " (shorten (second sum) 60)
+                   "  [" (first sum) "]")))
+
+(define (search-labels)
+  (map zotero-line-label search-results))
+
+(define (selected-lines)
   (list-filter search-results
-               (lambda (e) (in? (zotero-entry-label e) search-selected))))
+               (lambda (l) (in? (zotero-line-label l) search-selected))))
 
 (define (selected-keys)
-  (map zotero-entry-key (selected-entries)))
+  (list-remove-duplicates (map zotero-line-key (selected-lines))))
+
+(define (selected-zotero-entries . opt-new)
+  ;; the Zotero items of the selected lines (for Show in Zotero), or only
+  ;; those which the database does not have yet (for an import)
+  (with new? (and (nnull? opt-new) (car opt-new))
+    (list-filter (map zotero-line-entry
+                      (list-filter (selected-lines)
+                                   (lambda (l)
+                                     (not (and new?
+                                               (in? "D" (zotero-line-marks
+                                                         l)))))))
+                 identity)))
+
+(define (count-message n)
+  (cond ((== n 0) "Nothing found")
+        ((== n 1) "1 reference")
+        (else (string-append (number->string n) " references"))))
 
 (define (search-now q)
   (set! search-query q)
   (set! search-selected '())
-  (with st (zotero-status)
-    (if (!= st 'ready)
-        (begin
-          (set! search-results '())
-          (set! search-message (zotero-status-message st)))
-        (begin
-          (set! search-results
-                (if (== (tm-string-trim-both q) "") '() (zotero-search q)))
-          (set! search-message
-                (cond ((== (tm-string-trim-both q) "")
-                       "Type authors, words of the title or a year")
-                      ((null? search-results) "Nothing found")
-                      ((== (length search-results) 1) "1 item")
-                      (else (string-append (number->string
-                                            (length search-results))
-                                           " items")))))))
+  (set! search-file (zotero-own-bib-file))
+  (let* ((empty? (== (tm-string-trim-both q) ""))
+         (st (zotero-status)))
+    (set! search-results
+          (if empty? '() (zotero-combine (zotero-search-sources q))))
+    (set! search-message
+          (cond (empty? "Type authors, words of the title or a year")
+                (else
+                  (string-append
+                   (count-message (length search-results))
+                   (if (== st 'ready) ""
+                       (string-append " (" (zotero-status-message st) ")"))
+                   (with c (zotero-collision-message search-results
+                                                     zotero-source-name)
+                     (if c (string-append ". " c) "")))))))
   (refresh-now "zotero-results"))
+
+(define (search-sources-title)
+  ;; the sources which the dialog searches
+  (string-append "Search references ("
+                 (string-recompose
+                  (append (list "Zotero")
+                          (if search-file
+                              (list (url->system (url-tail search-file))) '())
+                          (if (supports-db?) (list "database") '()))
+                  ", ")
+                 ")"))
+
+(define (show-selected)
+  (with l (selected-zotero-entries)
+    (if (null? l)
+        (set-message "Select a reference from Zotero" "Zotero")
+        (zotero-show-item (car l)))))
 
 (tm-widget ((zotero-search-widget) cmd)
   (padded
     (hlist
-      (text "Search Zotero:") // //
+      (text "Search:") // //
       (input (when answer (search-now answer))
              "string" (list search-query) "40em"))
     ===
     (refreshable "zotero-results"
       (hlist (text search-message) >>)
       ===
-      (resize "600px" "300px"
+      (resize "650px" "300px"
         (scrollable
           (choices (set! search-selected answer)
                    (search-labels) search-selected))))
     ===
-    (bottom-buttons >>
+    (hlist
+      (text "L: the document, F: the BibTeX file, D: the database, Z: Zotero")
+      >>)
+    ===
+    (bottom-buttons
+      ("Show in Zotero" (show-selected)) >>
       ("Cancel" (cmd '())) // //
       (assuming (supports-db?)
-        ("Import into database" (cmd (list :import (selected-entries))))
+        ("Import into database"
+         (cmd (list :import (selected-zotero-entries #t))))
         // //)
       ("Cite" (cmd (selected-keys))))))
 
@@ -124,10 +189,10 @@
       (zotero-insert-citation r)))
 
 (tm-define (open-zotero-search)
-  (:synopsis "Search the Zotero library and cite the chosen items")
+  (:synopsis "Search Zotero and the sources of the document for citations")
   (:interactive #t)
   (search-now "")
-  (dialogue-window (zotero-search-widget) search-done "Cite from Zotero"))
+  (dialogue-window (zotero-search-widget) search-done (search-sources-title)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keeping the database in sync, entries changed on both sides
