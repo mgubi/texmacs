@@ -458,6 +458,16 @@ follow in any order.
       into the database* and *Focus -> Import into the database*.
     - *Dates*: `pretty-date` knows no ISO format (Qt patterns, or `date`
       without Qt); `zotero-iso-date` computes `YYYY-MM-DD` (UTC).
+    - *Formulas*: Zotero's BibTeX writes the LaTeX of its fields as text
+      (`$\Phi^4_3$` -> `\${\textbackslash}{Phi}{\textasciicircum}4\_3\$`);
+      `zotero-unescape-math` undoes it between pairs of `\$` (`$$` becomes
+      `$`), and drops the field `file` (local paths of the attachments).
+      A value which the LaTeX parser of `parse_bib` cannot read made the
+      whole file unconverted (#75 item 10): fixed by PR #91, not merged.
+    - *Translations*: the menus and dialogs in Italian, French, German,
+      Spanish, Portuguese, Dutch, Russian, Chinese and Japanese.
+    - *Windows*: Show in Zotero opens the link as `load-external` does
+      (`start ""` takes a title first).
     - *Vue*: the search window was checked under Vue (SDL's dummy video
       driver, scripted events and snapshots); a Vue dialog now gives the
       keyboard to its first field, as Qt does (wip_other_guis 8ceec36b23).
