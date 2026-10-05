@@ -590,7 +590,15 @@
   (check= (tree->stree (latex->texmacs (parse-latex "\\emph{x} $a_1$")))
           '(concat (em "x") " " (math (concat "a" (rsub "1")))))
   (check= (tree->stree (parse-latex "\\emph{x}")) '(concat (tuple "\\emph" "x")))
-  (check= (tree->stree (parse-latex-document "x")) '(!file (concat "x"))))
+  (check= (tree->stree (parse-latex-document "x")) '(!file (concat "x")))
+  ;; \parbox[pos][height][inner]{width}{text}: the options after the first
+  ;; are dropped, not read as text
+  (check= (lt "\\parbox[t][3cm][c]{2cm}{a b} c")
+          '(concat (mini-paragraph "2cm" "a b") " c"))
+  (check= (lt "\\parbox[t][3cm]{2cm}{a b} c")
+          '(concat (mini-paragraph "2cm" "a b") " c"))
+  (check= (lt "\\parbox{2cm}{a b} [x] c")
+          '(concat (mini-paragraph "2cm" "a b") " [x] c")))
 
 ;; \begin{document}: in a snippet, the class and the body; in a document,
 ;; the style, the preamble definitions (hidden) and the title
