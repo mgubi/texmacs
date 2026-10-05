@@ -52,6 +52,8 @@
     <branch|Editing databases|database-ui.en.tm>
 
     <branch|Bibliographies|database-bibliography.en.tm>
+
+    <branch|Citations from Zotero|zotero.en.tm>
   </traverse>
 
   <section|Architecture overview>

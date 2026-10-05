@@ -163,37 +163,37 @@
 ;; Collected keys
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define gpg-collected-public-keys-url
+(define (gpg-collected-public-keys-url)
   (url-append (gpg-homedir) "collected-public-keys.scm"))
 
 (tm-define (gpg-collected-public-keys)
   (when (supports-gpg?)
     (with t (make-ahash-table)
-      (when (url-exists? gpg-collected-public-keys-url)
+      (when (url-exists? (gpg-collected-public-keys-url))
 	(set! t (list->ahash-table
-		 (load-object gpg-collected-public-keys-url))))
+		 (load-object (gpg-collected-public-keys-url)))))
       t)))
 
 (tm-define (gpg-add-collected-public-keys ckeys)
   (when (supports-gpg?)
     (with t (make-ahash-table)
-      (when (url-exists? gpg-collected-public-keys-url)
+      (when (url-exists? (gpg-collected-public-keys-url))
 	(set! t (list->ahash-table
-		 (load-object gpg-collected-public-keys-url))))
+		 (load-object (gpg-collected-public-keys-url)))))
       (for (f (ahash-entries ckeys))
 	(ahash-set! t f (ahash-ref ckeys f)))
-      (save-object gpg-collected-public-keys-url
+      (save-object (gpg-collected-public-keys-url)
 		   (ahash-table->list t)))))
 
 (tm-define (gpg-delete-collected-public-keys fingerprints)
   (when (supports-gpg?)
     (with t (make-ahash-table)
-      (when (url-exists? gpg-collected-public-keys-url)
+      (when (url-exists? (gpg-collected-public-keys-url))
 	(set! t (list->ahash-table
-		 (load-object gpg-collected-public-keys-url))))
+		 (load-object (gpg-collected-public-keys-url)))))
       (for (f fingerprints)
 	(ahash-remove! t f))
-      (save-object gpg-collected-public-keys-url
+      (save-object (gpg-collected-public-keys-url)
 		   (ahash-table->list t)))))
 
 (tm-define (gpg-import-public-key-from-collected fingerprint)

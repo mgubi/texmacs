@@ -13,6 +13,9 @@ in:
 | `wip_opentype` | **OpenType mathematics**: formulas laid out from the `MATH` table of any OpenType math font, stretchable delimiters and accents from the font's own variants and assemblies, the OpenType features of text fonts, profiles which pair two dozen math fonts with their text companions (sixteen of the fonts are shipped), and a font inspector — see [OPENTYPEMATH.md](src/src/OPENTYPEMATH.md) |
 | `wip_other_guis` | **Other graphical interfaces and GUI improvements**: Vue (a toolkit of its own, on Clay, SDL3 and MuPDF), a native Cocoa interface for macOS, SDL and Qtwk, fixes to X11, and changes which serve every interface (the MuPDF renderer, windows which stay above the editor windows, ...) — see [the graphical interfaces](#the-graphical-interfaces) below |
 | `wip_icons` | **Icon sets**: besides the original icons (classical), a monochrome set in the manner of the macOS symbols and a neo-classical set, the classical compositions modernized, which is the default; chosen in Preferences ▸ General ▸ Icon set — see [src/doc/icons/README.md](src/doc/icons/README.md) |
+| `wip_s7` | **TeXmacs on [s7](https://ccrma.stanford.edu/software/snd/snd/s7.html)** instead of Guile 1.8: the interpreter is a build option (`./configure --with-scheme=s7\|guile`), s7 (vendored, 11.9) is the default and needs no Guile at all; one Scheme code base serves both, and with s7 the first window is ready in about 0.7 s instead of 1.9 s — see [src/docs/s7/](src/docs/s7/README.md) |
+| `wip-git-versioning` | **Git support**: Version ▸ Git with a side panel, a commit dialog, clickable status, log and branch pages, branches, tags and stashes, fetch, pull, push and clone in the background, comparison with any revision, a simple mode of snapshots, and **structured three-way merges of TeXmacs documents** (also as a git merge driver), with Git never run in a folder until it is trusted — see the manual chapter *Working with Git* and [doc/git-features.md](doc/git-features.md) |
+| `wip_zotero` | **Citations from [Zotero](https://www.zotero.org)**, read from the Zotero desktop application (its local API): the search window of citations lists the references of Zotero after those of the `.bib` file or of the database, with their sources; keys completed from Zotero; a bibliography file written from Zotero, or Zotero as a source of the database, whose copies of Zotero items follow Zotero (with a field-by-field choice when both sides changed); keys renamed in Zotero followed in the citations; group libraries — see the manual page *Citations from Zotero* and [doc/zotero-design.md](doc/zotero-design.md) |
 | `wip_dev_docs` | **Extensive developer documentation**, inside TeXmacs (Help ▸ Developer documentation): some 365 pages, about 200 of them on the internals of the source code — the data types, the typesetter, fonts and OpenType, the server, buffers, views and windows, the editor, the GUI ports, converters, plug-ins, collaboration — which compile into a book of more than a thousand pages ([`src/TeXmacs/doc/devel/`](src/TeXmacs/doc/devel/)) |
 | (tests, with `wip_fixes`) | **More tests**: unit tests of the kernel in C++, Scheme test suites for editing, conversions, the typesetter, menus, links and more, regression tests on documents, a headless typesetting of the whole documentation, and the OpenType renders — see [src/tests/README.md](src/tests/README.md) |
 
@@ -20,9 +23,11 @@ The branches are merged, not rebased, so each one can still be followed,
 updated and proposed upstream on its own; fixes found while integrating
 them go back to the branch they belong to.
 
-Building is as for TeXmacs (from `src/`, `./configure && make`, with Guile
-1.8: `./configure --with-guile=<path to guile-config of Guile 1.8>`); the
-interface is chosen when configuring, see below.
+Building is as for TeXmacs (from `src/`, `./configure && make`). The
+Scheme interpreter is s7 by default, which needs nothing installed;
+`./configure --with-scheme=guile --with-guile=<path to guile-config of
+Guile 1.8>` builds with Guile instead. The interface is chosen when
+configuring, see below.
 
 ## The graphical interfaces
 
@@ -150,6 +155,15 @@ editor windows).
   GUI plugin, building and debugging, the PDF output with MuPDF, a design
   for separating the editor from its front end
 * [doc/ns-port.md](doc/ns-port.md): the Cocoa interface
+* [src/docs/s7/](src/docs/s7/README.md): TeXmacs on s7, the differences
+  with Guile, the build, the open issues and the performance
+* [doc/README.md](doc/README.md): the Git support, its features, design,
+  implementation and audits; the user manual has a chapter *Working with
+  Git* (Help ▸ Manual, in the chapter *Editing tools*)
+* [doc/zotero-design.md](doc/zotero-design.md): the design of the Zotero
+  integration; the user manual page *Citations from Zotero* (in the
+  chapter on links and bibliographies) and the developer chapter
+  *Citations from Zotero* (with the database and bibliographies)
 
 ## This repository
 
@@ -158,7 +172,7 @@ The layout is the one of the TeXmacs SVN trunk, which this is a mirror of:
 | Directory | Contents |
 |---|---|
 | [`src/`](src/README.md) | the editor: sources, Scheme, styles, documentation, packaging. **Its [`README.md`](src/README.md) is the README of the project** |
-| `doc/` | notes on the Cocoa interface |
+| `doc/` | notes on the Cocoa interface, the Git support and the Zotero integration |
 | `misc/` | build scripts, plugins and other odds and ends |
 | `web/` | the sources of the web site |
 | `guile-texmacs/` | the vendored Guile 1.8 |

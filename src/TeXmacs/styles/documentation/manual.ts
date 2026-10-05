@@ -59,9 +59,9 @@
 
   <assign|verbatim|<macro|body|<style-with|src-compact|none|<surround|<vspace*|0.5fn><no-page-break*>|<vspace|0.5fn><no-indent*>|<with|font-family|tt|language|verbatim|<arg|body>>>>>>
 
-  <assign|big-figure|<macro|fig|cap|<style-with|src-compact|none|<surround|<style-with|src-compact|none|<vspace*|1fn><no-indent><assign|figure-nr|<plus|<figure-nr>|1>><assign|the-label|<prefix><figure-nr>>>|<style-with|src-compact|none|<vspace|1fn><no-indent*>>|<tabular*|<tformat|<twith|table-width|1par>|<cwith|3|3|1|1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-lsep|0spc>|<cwith|1|-1|1|-1|cell-rsep|0spc>|<cwith|2|2|1|1|cell-height|0.5fn>|<table|<row|<cell|<arg|fig>>>|<row|<cell|>>|<row|<\cell>
+  <assign|big-figure|<macro|fig|cap|<style-with|src-compact|none|<surround|<style-with|src-compact|none|<vspace*|1fn><no-indent><next-figure>>|<style-with|src-compact|none|<vspace|1fn><no-indent*>>|<tabular*|<tformat|<twith|table-width|1par>|<cwith|3|3|1|1|cell-hyphen|t>|<cwith|1|-1|1|-1|cell-lsep|0spc>|<cwith|1|-1|1|-1|cell-rsep|0spc>|<cwith|2|2|1|1|cell-height|0.5fn>|<table|<row|<cell|<arg|fig>>>|<row|<cell|>>|<row|<\cell>
     <with|font-size|0.84|<surround|<with|font-series|bold|<localize|Figure>
-    <prefix><figure-nr>. >||<arg|cap>>>
+    <the-figure>. >||<arg|cap>>>
   </cell>>>>>>>>>
 
   \;

@@ -242,10 +242,11 @@
   (and (git-document?) (not (git-state? 'untracked 'added))))
 
 (menu-bind version-differences-menu
-  ("First difference" (version-first-difference))
-  ("Previous difference" (version-previous-difference))
-  ("Next difference" (version-next-difference))
-  ("Last difference" (version-last-difference))
+  (when (version-has-differences?)
+    ("First difference" (version-first-difference))
+    ("Previous difference" (version-previous-difference))
+    ("Next difference" (version-next-difference))
+    ("Last difference" (version-last-difference)))
   ---
   (when (or (inside-version?) (selection-active-any?))
     (-> "Show"

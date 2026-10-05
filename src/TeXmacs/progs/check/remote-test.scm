@@ -162,31 +162,39 @@
 (define loop-queue '())
 (define loop-log '())
 (define loop-blocked '())
-(define saved-client-write #f)
-(define saved-server-write #f)
+(define loop-active? #f)
+
+;; NOTE: the messages are intercepted where they are sent, in client-send
+;; and server-send, and not by replacing the primitives client-write and
+;; server-write: S7 calls the primitives which a function used when it was
+;; first evaluated, whatever their names are bound to later on.
+
+(define (next-serial module var)
+  ;; the serial number @var of the messages sent by @module, incremented
+  (with m (resolve-module module)
+    (with n (eval var m)
+      (eval `(set! ,var ,(+ n 1)) m)
+      n)))
+
+(tm-define (client-send server cmd)
+  (:require (and loop-active? (loop-server? server)))
+  (with n (next-serial '(client client-base) 'client-serial)
+    (set! loop-queue
+          (rcons loop-queue
+                 (list 'server server (object->string* (list n cmd)))))))
+
+(tm-define (server-send client cmd)
+  (:require (and loop-active? (loop-client? client)))
+  (with n (next-serial '(server server-base) 'server-serial)
+    (set! loop-queue
+          (rcons loop-queue
+                 (list 'client client (object->string* (list n cmd)))))))
 
 (define (loop-install!)
-  (when (not saved-client-write)
-    (set! saved-client-write client-write)
-    (set! saved-server-write server-write)
-    (set! client-write
-          (lambda (fd s)
-            (if (loop-server? fd)
-                (begin (set! loop-queue (rcons loop-queue (list 'server fd s)))
-                       0)
-                (saved-client-write fd s))))
-    (set! server-write
-          (lambda (fd s)
-            (if (loop-client? fd)
-                (set! loop-queue (rcons loop-queue (list 'client fd s)))
-                (saved-server-write fd s))))))
+  (set! loop-active? #t))
 
 (define (loop-uninstall!)
-  (when saved-client-write
-    (set! client-write saved-client-write)
-    (set! server-write saved-server-write)
-    (set! saved-client-write #f)
-    (set! saved-server-write #f)))
+  (set! loop-active? #f))
 
 (define (loop-pump)
   ;; deliver the queued messages, including those sent while delivering

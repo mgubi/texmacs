@@ -67,6 +67,14 @@
     bibliography.
   </itemize>
 
+  Inside a citation, <shortcut|(kbd-tab)> completes the key, and
+  <shortcut|(kbd-alternate-tab)> (or <menu|Focus|Search references>) opens
+  a search window, in which a click on a reference cites it. The window
+  searches the <verbatim|.bib> file of the bibliography, or the
+  bibliographic database when <menu|Tools|Database tool> is enabled, and
+  also the library of Zotero, as explained in <hlink|Citations from
+  Zotero|man-zotero.en.tm>.
+
   Notice that additional BiB<TeX> styles should be put in the directory
   <verbatim|~/.TeXmacs/system/bib>.
 

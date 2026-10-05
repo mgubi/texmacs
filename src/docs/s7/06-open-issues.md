@@ -48,6 +48,18 @@
     another bug, fixed by patch 0002 ([05](05-build-and-vendored-s7.md#s7-version-and-local-patch));
     this one still reproduces with that patch.
   - **Reported upstream** on 5 October 2026, with these two examples.
+- **Deep recursion runs on the C stack.** A non-tail recursion as deep as a
+  long list can exhaust the C stack, and then the evaluation is abandoned
+  without an error (a `-x` script just stops). `list-fold-right`, which
+  recursed once per element, did that in the HTML import of about 1800
+  paragraphs; it now folds the reversed list (PR #218). Checked on
+  5 October 2026: the list functions of `kernel/library` on 100000 elements,
+  the conversions of a document of 20000 paragraphs (LaTeX, HTML and TMML
+  both ways, verbatim, TeXmacs and Scheme), and structures nested 1000
+  deep, all pass. (With Guile, the LaTeX export of 10000 paragraphs raises
+  `stack-overflow`.) Converting a document to `latex-document` directly
+  requires the `view` attribute which `export-buffer` adds; without it,
+  `latex_expand` dereferences a null view.
 - **Memo tables no longer cache `#f`.** Storing `#f` in an s7 hash table
   doesn't create an entry, so `logic-holds?` (`logic-data.scm`) and
   `texmacs-submode?` (`tm-modes.scm`) recompute negative answers on every

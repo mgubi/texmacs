@@ -51,16 +51,16 @@ effect turbulence (effect e, long seed, double w, double h, int oct);
 effect fractal_noise (effect e, long seed, double w, double h, int oct);
 effect hatch (effect eff, int sx, int sy, double fill_prop, double deform);
 
-effect gaussian_pen (double r);
-effect oval_pen (double r);
-effect rectangular_pen (double r);
-effect gaussian_pen (double rx, double ry, double phi= 0);
-effect oval_pen (double rx, double ry, double phi= 0);
-effect rectangular_pen (double rx, double ry, double phi= 0);
-effect motion_pen (double dx, double dy);
+effect gaussian_pen_effect (double r);
+effect oval_pen_effect (double r);
+effect rectangular_pen_effect (double r);
+effect gaussian_pen_effect (double rx, double ry, double phi= 0);
+effect oval_pen_effect (double rx, double ry, double phi= 0);
+effect rectangular_pen_effect (double rx, double ry, double phi= 0);
+effect motion_pen_effect (double dx, double dy);
 
 effect blur (effect eff, effect pen);
-effect outline (effect eff, effect pen);
+effect outlines (effect eff, effect pen);
 effect thicken (effect eff, effect pen);
 effect erode (effect eff, effect pen);
 

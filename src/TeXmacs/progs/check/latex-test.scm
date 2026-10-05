@@ -739,6 +739,23 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; a whole document converted from Scheme has no view, whose editor would
+;; expand its macros; it is converted without that expansion (it used to
+;; crash TeXmacs in latex_expand)
+(define (test-export-without-view)
+  (check-group "export: documents without a view")
+  (with s (convert '(document (TeXmacs "2.1.5") (style (tuple "article"))
+                              (body (document (section "A") "text")))
+                   "texmacs-stree" "latex-document")
+    ;; NOTE: string-contains is Guile only
+    (with pos (lambda (x) (string-search-forwards x 0 s))
+      (check-true (string? s))
+      (check-true (>= (pos "\\documentclass{article}") 0))
+      (check-true (>= (pos "\\section{A}") 0))
+      (check-true (>= (pos "text") 0))
+      (check-true (< -1 (pos "\\begin{document}") (pos "\\section{A}")
+                     (pos "\\end{document}"))))))
+
 (tm-define (latex-test-failures)
   (check-suite "latex")
   (test-export-special)
@@ -772,7 +789,5 @@
   (test-import-parse)
   (test-import-documents)
   (test-round-trips)
-  ;; FIXME: (convert doc "texmacs-stree" "latex-document") crashes TeXmacs
-  ;; (segmentation fault in latex_expand, new_buffer.cpp) when doc has no
-  ;; view attribute, as outside an export from a buffer
+  (test-export-without-view)
   (check-end))

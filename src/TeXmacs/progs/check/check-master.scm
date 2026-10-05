@@ -43,6 +43,7 @@
         (check editing-test)
         (check typeset-test)
         (check bibtex-test)
+        (check zotero-test)
         (check database-test)
         (check math-edit-test)
         (check table-test)
@@ -174,6 +175,10 @@
     ;; loads the keyword tables of the program languages
     ("parse" parse-test-failures count)
     ("database" database-test-failures count)
+    ;; with a fake Zotero; opens documents (so after links) and loads the
+    ;; modules of the bibliographic database (so after database); writes
+    ;; bibliographies and a database in the temporary directory
+    ("zotero" zotero-test-failures count)
     ("crypto" crypto-test-failures count)
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans
