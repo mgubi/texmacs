@@ -9,8 +9,8 @@
 (catch #t
   (lambda ()
     (lazy-define-force run-all-tests)
-    (run-all-tests)
-    (ci-finish #t))
+    ;; run-all-tests gives the number of the suites which failed
+    (ci-finish (== (run-all-tests) 0)))
   (lambda (key . args)
     (display* "CI error: " key " " args "\n")
     (ci-finish #f)))
