@@ -24,7 +24,9 @@
   chatbots are listed in <menu|Insert|Session> before they have a key. Once the
   key is given, <with|font-series|bold|Update the list of models> asks the
   chatbot which models it offers to this key, and proposes them in
-  <with|font-series|bold|Model>. A session begins with the name of the model
+  <with|font-series|bold|Model>. In a session, the model is also shown in
+  the focus bar, in a menu which changes it for the next questions. A
+  session begins with the name of the model
   which it asks; in a web browser the answer is shown as it comes (in grey),
   set by <TeXmacs> as far as it can be: up to the last environment, group
   or formula which is not closed yet. It is replaced by the whole answer

@@ -800,7 +800,16 @@ ai_plain_spaces (string r) {
 static bool
 ai_is_stream (string s) {
   int i= 0;
-  while (i < N(s) && (s[i] == ' ' || s[i] == '\n' || s[i] == '\r')) i++;
+  while (true) {
+    while (i < N(s) && (s[i] == ' ' || s[i] == '\n' || s[i] == '\r')) i++;
+    // the comments of the stream (OpenRouter: ": OPENROUTER PROCESSING",
+    // while the model has not begun to answer)
+    if (i < N(s) && s[i] == ':') {
+      while (i < N(s) && s[i] != '\n') i++;
+      continue;
+    }
+    break;
+  }
   return test (s, i, "data:") || test (s, i, "event:");
 }
 

@@ -215,6 +215,15 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The model of a session of a chatbot is shown in its focus bar, in
+    a menu which changes it for the next questions (by provider for
+    <name|OpenRouter>), with <with|font-series|bold|Other model>,
+    <with|font-series|bold|Update the list of models> and its preferences.
+
+    <item>The answers of <name|OpenRouter> which come after its messages of
+    waiting (<verbatim|: OPENROUTER PROCESSING>) are read; they were an
+    unexpected answer.
+
     <item><name|OpenRouter> sessions: the models of many providers with a
     single key (<verbatim|anthropic/claude-sonnet-4.5>,
     <verbatim|deepseek/deepseek-chat>..., or <verbatim|openrouter/auto>

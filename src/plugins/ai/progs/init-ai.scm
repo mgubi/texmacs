@@ -741,6 +741,61 @@
   (:serializer ,ai-serialize))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The model, in the focus bar of a session: a menu which shows it and
+;; changes it (the preference of the engine, which the next questions ask)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ai-focus-models lan)
+  (list-filter (cond ((== lan "ollama") (ollama-models))
+                     ((== lan "albert") (albert-variants))
+                     (else (ai-model-variants lan)))
+               (lambda (m) (and (string? m) (!= m "")))))
+
+(tm-define (ai-set-session-model lan m)
+  (set-preference (string-append lan " model") m)
+  (set-message (string-append "The next questions ask " m)
+               (string-append "Model of " (session-name lan)))
+  (refresh-now "ai-model-list"))
+
+;; provider/model: the provider of a model of OpenRouter
+(define (ai-model-provider m)
+  (with i (string-index m #\/)
+    (if i (substring m 0 i) "")))
+
+(tm-menu (focus-ai-model-items lan l)
+  (for (m l)
+    ((check (eval m) "v" (== (ai-session-model lan) m))
+     (ai-set-session-model lan m))))
+
+(tm-menu (focus-ai-model-menu lan)
+  (with l (ai-focus-models lan)
+    (if (<= (length l) 30)
+        (dynamic (focus-ai-model-items lan l)))
+    (if (> (length l) 30)
+        ;; many models (OpenRouter): by provider
+        (for (p (list-remove-duplicates (map ai-model-provider l)))
+          (-> (eval (if (== p "") "Others" p))
+              (dynamic (focus-ai-model-items
+                        lan (list-filter l (lambda (m)
+                                             (== (ai-model-provider m) p)))))))))
+  ---
+  ("Other model"
+   (interactive (lambda (m) (when (!= m "") (ai-set-session-model lan m)))
+     (list "Model" "string" (ai-session-model lan))))
+  (if (and (!= lan "albert") (ai-models-request lan))
+      ("Update the list of models" (ai-update-models-message lan)))
+  ("Preferences" (open-plugin-preferences lan)))
+
+(tm-menu (focus-extra-icons t)
+  (:require (in? (get-env "prog-language") (ai-models)))
+  (dynamic (former t))
+  (mini #t
+    //
+    (with lan (get-env "prog-language")
+      (=> (balloon (eval (ai-session-model lan)) "Model of the session")
+          (dynamic (focus-ai-model-menu lan))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Albert
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
