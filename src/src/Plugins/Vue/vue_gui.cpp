@@ -2430,6 +2430,8 @@ route_keys (vue_window win) {
 // stores as textures
 bool
 vue_gpu_windows () {
+  // NOTE: OpenGL is probed once, before the first window is made
+  vue_gpu_prepare ();
   return vue_gpu_enabled ();
 }
 

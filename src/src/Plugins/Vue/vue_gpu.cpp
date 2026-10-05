@@ -386,6 +386,28 @@ vue_gpu_prepare () {
   SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 0);
   SDL_GL_SetAttribute (SDL_GL_STENCIL_SIZE, 0);
   SDL_GL_SetAttribute (SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
+#ifndef __EMSCRIPTEN__
+  // NOTE: whether there is OpenGL 3, before the first window is made: the
+  // windows made for the GPU are not drawn without it (Windows with the
+  // driver of Microsoft only, as on the runners of GitHub, has OpenGL 1.1)
+  bool ok= false;
+  SDL_Window* probe= SDL_CreateWindow ("", 1, 1,
+                                       SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+  if (probe != NULL) {
+    SDL_GLContext c= SDL_GL_CreateContext (probe);
+    if (c != NULL) {
+      ok= vue_gl_load ();
+      SDL_GL_MakeCurrent (probe, NULL);
+      SDL_GL_DestroyContext (c);
+    }
+    SDL_DestroyWindow (probe);
+  }
+  if (!ok) {
+    cout << "TeXmacs] GPU: no OpenGL 3 (" << SDL_GetError ()
+         << "), drawing with MuPDF" << LF;
+    G.failed= true;
+  }
+#endif
 }
 
 /******************************************************************************
