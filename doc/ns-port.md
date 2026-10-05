@@ -60,6 +60,13 @@ in Qt; the moves and sizes of the windows are kept; the full screen of
 macOS and the one of TeXmacs are the same. The windows are not restored at
 the start (`ApplePersistenceIgnoreState`).
 
+The appearance is light or dark after the preference `gui theme`, and by
+default that of the system. The icons are drawn from the SVG files of the
+light or dark variant of the icon sets on `TEXMACS_PIXMAP_PATH`, as in Qt
+(so the set of the preference `icon set` is used), otherwise from their PNG
+equivalents; their variant is the appearance at the first icon, and does
+not follow a later change of the appearance of the system.
+
 The look follows macOS where Qt has its own: the selection is translucent
 as in Qt; the icon bars are flat, with a small triangle in the corner of
 the icons with a pull-down menu (a chevron after text buttons), and a line
@@ -115,6 +122,8 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
   saves the window as `bench-<i>.png` in `TEXMACS_NS_SNAPSHOT`; then a
   table is printed, the window is put back at its size (a preference) and
   TeXmacs quits (see "Benchmark" below);
+* `TEXMACS_NS_THEME=light|dark`: the appearance, instead of the preference
+  `gui theme`;
 * `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
   `shrink`, as before the outlines (to compare);
 * `TEXMACS_NS_DEBUG_RED=1`: when the backing store moves (scrolling), the
