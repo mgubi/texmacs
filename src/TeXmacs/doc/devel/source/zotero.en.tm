@@ -119,6 +119,43 @@
   <verbatim|versions> and <verbatim|bibtex> (or <verbatim|biblatex>), at
   most 50 keys per request, and <verbatim|users/0/groups>.
 
+  <subsection|zotero.org>
+
+  The library may also be read from the web <abbr|API> of
+  <verbatim|zotero.org> (<verbatim|https://api.zotero.org/>), with an
+  <abbr|API> key of the user. The preference <verbatim|"zotero source">
+  chooses: <verbatim|"local"> (the application), <verbatim|"web">, or
+  <verbatim|"auto"> (<scm|zotero-web?>: <verbatim|zotero.org> in a web
+  browser, where <scm|zotero-in-browser?> holds, the application
+  elsewhere). The application cannot be used from a web page: its server
+  closes every request which carries an <verbatim|Origin> header (local
+  <abbr|API>, connector, Better<nbsp>BibTeX), and the Zotero Connector
+  offers nothing to pages.
+
+  The key is kept in the wallet when it is on, else in the preference
+  <verbatim|"zotero api key"> (<scm|zotero-api-key>,
+  <scm|zotero-set-api-key>). The user it belongs to is asked once
+  (<verbatim|keys/current>) and remembered in <verbatim|"zotero user">.
+  The library of the user stays <verbatim|users/0> in <TeXmacs> (in the
+  documents and the database), and becomes <verbatim|users/<em|id>> in the
+  requests. A request without key answers 401 (state <scm|no-key>); a key
+  refused gives <scm|forbidden>.
+
+  The requests are made by <verbatim|curl> on the desktop, with the headers
+  in a temporary file (<verbatim|--header @<em|file>>), so that the key is
+  never on a command line; in a browser, by a synchronous
+  <verbatim|XMLHttpRequest> written in JavaScript and run by
+  <scm|web-javascript>, which answers with the status, the header
+  <verbatim|Last-Modified-Version> and the body in base64 (decoded by
+  <scm|decode-base64>: the body stays the bytes of utf8).
+  <verbatim|zotero.org> sends the headers which this needs (CORS).
+
+  The web <abbr|API> searches the citation keys only with
+  <verbatim|qmode=everything>, which the searches of keys
+  (<scm|zotero-find-key>, completion) ask for; the other searches keep the
+  default (title, creators, year). <menu|Show in Zotero> opens the page of
+  the item on <verbatim|zotero.org> (<scm|zotero-web-url>).
+
   <subsection|State and caches>
 
   <scm|zotero-status> asks Zotero for one key, and remembers the answer:
@@ -434,11 +471,20 @@
     <item*|<verbatim|"zotero add to bib file">>the references added to the
     user's <BibTeX> file;
 
+    <item*|<verbatim|"zotero source">><verbatim|"auto">,
+    <verbatim|"local"> or <verbatim|"web">;
+
+    <item*|<verbatim|"zotero api key">>the key of <verbatim|zotero.org>,
+    when it is not in the wallet;
+
+    <item*|<verbatim|"zotero user">>the user of the key (internal);
+
     <item*|<verbatim|"zotero sync version">>the versions of the libraries
     at the last sync (internal).
   </description>
 
-  The first six are in <menu|Document|Bibliography|Zotero settings...>.
+  The first eight are in <menu|Document|Bibliography|Zotero settings...>
+  (the key as <menu|API key of zotero.org>).
 
   <section|Tests>
 
