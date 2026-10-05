@@ -29,6 +29,10 @@ OBJ      := obj
 OUT      := out
 
 SOURCES  := $(shell cat $(W)/sources.txt)
+# node, as the shell finds it: make looks the command up itself, and takes
+# the first "node" on the PATH even when it is a directory, as the one of
+# emsdk, which the CI puts on the PATH ("node: Permission denied")
+NODE     ?= $(shell command -v node)
 OBJECTS  := $(patsubst %,$(OBJ)/%.o,$(basename $(SOURCES)))
 
 INCLUDE_DIRS := System System/Boot System/Classes System/Files System/Link \
@@ -101,7 +105,7 @@ tikzjax: $(OUT)/web/tikzjax/tm-tikz.js $(OUT)/web/tikzjax/tables.js
 # the tables of the worker: the codes of dvi2html, the encodings of TeXmacs
 $(OUT)/web/tikzjax/tables.js: $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(wildcard $(TM)/TeXmacs/fonts/enc/*.enc)
 	@mkdir -p $(OUT)/web/tikzjax
-	node $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(TM)/TeXmacs/fonts/enc $@ $(TIKZJAX:tikzjax-%=%)
+	$(NODE) $(W)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(TM)/TeXmacs/fonts/enc $@ $(TIKZJAX:tikzjax-%=%)
 
 $(TIKZJAX)/dist/run-tex.js:
 	sh $(W)/get-tikzjax.sh $(CURDIR)
