@@ -23,6 +23,7 @@
 #include "socket_notifier.hpp"
 #include "new_style.hpp"
 #include "Database/database.hpp"
+#include "web_files.hpp"
 
 server* the_server= NULL;
 bool texmacs_started= false;
@@ -218,6 +219,7 @@ tm_server_rep::interpose_handler () {
   exec_pending_commands ();
 #endif
   async_eval_pending ();
+  http_async_pending (); // the requests made with libcurl
 #if !defined (QTTEXMACS) && !defined (AQUATEXMACS)
   // the plug-ins which make HTTP requests (request_link.cpp, the AI
   // engines): Qt and Cocoa process them with their pipes (process_all_pipes)

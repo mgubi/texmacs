@@ -287,6 +287,9 @@
 /* Use intl library */
 #undef USE_INTL
 
+/* Make the HTTP requests with libcurl */
+#undef USE_LIBCURL
+
 /* Use resvg library for SVG rendering */
 #undef USE_RESVG
 

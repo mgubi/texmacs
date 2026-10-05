@@ -721,6 +721,11 @@ SPARKLE_CXX
 WINSPARKLE_PATH
 WINSPARKLE_DLL
 CONFIG_SPARKLE
+LIBCURL_LIBS
+LIBCURL_LDFLAGS
+LIBCURL_CFLAGS
+LIBCURL_CPP
+LIBCURL_CXX
 GNUTLS_LIBS
 GNUTLS_LDFLAGS
 GNUTLS_CFLAGS
@@ -939,6 +944,7 @@ with_axel
 enable_gs
 with_sqlite3
 with_gnutls
+with_libcurl
 with_sparkle
 with_appcast
 with_resvg
@@ -1656,6 +1662,8 @@ Optional Packages:
   --with-axel[=ARG]       with axel support [ARG=no]
   --with-sqlite3[=ARG]    with sqlite3 support [ARG=no]
   --with-gnutls[=ARG]     with GnuTLS support [ARG=no]
+  --with-libcurl[=ARG]    make the HTTP requests with libcurl [ARG=yes when
+                          found]
   --with-sparkle[=ARG]    with Sparkle autoupdater [ARG=no or path for
                           winSparkle or yes for mac (framework should be in
                           the standard user frameworks location)]
@@ -23263,6 +23271,106 @@ printf "%s\n" "$as_me: GNUTLS_LDFLAGS:$GNUTLS_LDFLAGS" >&6;}
   fi
 # adaptation layer remove when finished
   GNUTLS_CFLAGS="$GNUTLS_CXXFLAGS $GNUTLS_CPPFLAGS"
+
+
+
+
+
+
+
+# Check whether --with-libcurl was given.
+if test ${with_libcurl+y}
+then :
+  withval=$with_libcurl; with_libcurl=$withval
+else case e in #(
+  e) with_libcurl="auto" ;;
+esac
+fi
+
+
+  SAVE_CPPFLAGS="$CPPFLAGS"
+  SAVE_LDFLAGS="$LDFLAGS"
+  SAVE_LIBS="$LIBS"
+  if test "$with_libcurl" = "no"; then
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling libcurl support" >&5
+printf '%s\n' "disabling libcurl support" >&6; }
+  else
+    if command -v curl-config > /dev/null 2>&1; then
+      CPPFLAGS=`curl-config --cflags`
+      LIBS=`curl-config --libs`
+    else
+      CPPFLAGS=`pkg-config --cflags libcurl 2> /dev/null`
+      LIBS=`pkg-config --libs libcurl 2> /dev/null`
+      if test "$LIBS" = ""; then LIBS="-lcurl"; fi
+    fi
+    { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for libcurl" >&5
+printf %s "checking for libcurl... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <curl/curl.h>
+
+int
+main (void)
+{
+
+    CURLM* m= curl_multi_init ();
+    curl_multi_cleanup (m);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"
+then :
+
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf '%s\n' "yes" >&6; }
+
+printf '%s\n' "#define USE_LIBCURL 1" >>confdefs.h
+
+      LIBCURL_CPPFLAGS="$CPPFLAGS"
+      LIBCURL_LDFLAGS="$LIBS"
+
+else case e in #(
+  e)
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf '%s\n' "no" >&6; }
+      if test "$with_libcurl" = "yes"; then
+        as_fn_error $? "libcurl was asked for but cannot be linked" "$LINENO" 5
+      fi
+     ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam \
+    conftest$ac_exeext conftest.$ac_ext
+  fi
+  CPPFLAGS="$SAVE_CPPFLAGS"
+  LDFLAGS="$SAVE_LDFLAGS"
+  LIBS="$SAVE_LIBS"
+
+
+  LIBCURL_CXX=$LIBCURL_CXXFLAGS
+
+  LIBCURL_CPP=$LIBCURL_CPPFLAGS
+
+  if [[ $enable_dumpflags =~ $(echo "(^|[[:space:]])(LIBCURL|ALL)($|[[:space:]])") ]]
+  then
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: LIBCURL_CFLAGS:$LIBCURL_CFLAGS" >&5
+printf '%s\n' "$as_me: LIBCURL_CFLAGS:$LIBCURL_CFLAGS" >&6;}
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: LIBCURL_CXXFLAGS:$LIBCURL_CXXFLAGS" >&5
+printf '%s\n' "$as_me: LIBCURL_CXXFLAGS:$LIBCURL_CXXFLAGS" >&6;}
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: LIBCURL_CPPFLAGS:$LIBCURL_CPPFLAGS" >&5
+printf '%s\n' "$as_me: LIBCURL_CPPFLAGS:$LIBCURL_CPPFLAGS" >&6;}
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: LIBCURL_LIBS:$LIBCURL_LIBS" >&5
+printf '%s\n' "$as_me: LIBCURL_LIBS:$LIBCURL_LIBS" >&6;}
+  { printf '%s\n' "$as_me:${as_lineno-$LINENO}: LIBCURL_LDFLAGS:$LIBCURL_LDFLAGS" >&5
+printf '%s\n' "$as_me: LIBCURL_LDFLAGS:$LIBCURL_LDFLAGS" >&6;}
+
+
+  fi
+# adaptation layer remove when finished
+  LIBCURL_CFLAGS="$LIBCURL_CXXFLAGS $LIBCURL_CPPFLAGS"
 
 
 

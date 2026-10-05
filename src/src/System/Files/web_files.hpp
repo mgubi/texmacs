@@ -142,4 +142,10 @@ http_post_query (string url, array<string> headers_attr, array<string> attr) {
   return ret;
 }
 
+// the requests made with libcurl (web_files.cpp): driven at each turn of the
+// main loop, and those whose answer goes to outbuf stopped and forgotten (no
+// operation without libcurl)
+void http_async_pending ();
+void http_async_cancel (string* outbuf);
+
 #endif // defined WEB_FILES_H

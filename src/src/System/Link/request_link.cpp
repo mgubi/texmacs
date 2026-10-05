@@ -65,6 +65,8 @@ request_link_rep::request_link_rep (string name2): name (name2) {
 
 request_link_rep::~request_link_rep () {
   stop ();
+  // (no transfer may write into this link any more: libcurl)
+  http_async_cancel (&outbuf);
   request_link_set->remove ((pointer) this);
 }
 
@@ -148,6 +150,7 @@ request_link_rep::write (string s, int channel) {
   }
   tree t= scheme_to_tree (cmd);
   if (DEBUG_IO) debug_io << "Requesting '" << http_mask_request (t) << "'\n";
+  http_async_cancel (&outbuf); // an answer still awaited is no longer wanted
   status= 1; outbuf= ""; errbuf= ""; kill= false;
   partial_text= ""; partial_tree= "";
   alive= !eval_request (t, status, outbuf, errbuf, kill);
@@ -219,6 +222,8 @@ request_link_rep::interrupt () {
   if (!alive) return;
   alive= false;
   kill= true;
+  // the answer which comes is stopped (the engine stops writing it)
+  http_async_cancel (&outbuf);
 }
 
 void
@@ -226,6 +231,7 @@ request_link_rep::stop () {
   if (!alive) return;
   alive= false;    
   kill= true;
+  http_async_cancel (&outbuf);
 }
 
 /******************************************************************************
