@@ -76,8 +76,8 @@
   (<with|font-series|bold|Show the reasoning> in the preferences removes
   it). How much they reason is chosen with
   <with|font-series|bold|Reasoning> in the preferences of <name|ChatGPT>,
-  <name|Claude>, <name|Gemini>, <name|OpenRouter> and <name|Ollama>, or in
-  the menu of the model in the focus bar of a session:
+  <name|Claude>, <name|Gemini>, <name|OpenRouter> and <name|Ollama>, or with
+  <with|font-series|bold|Reasoning> in the focus bar of a session:
   <with|font-series|bold|Default> lets the model decide,
   <with|font-series|bold|Low>, <with|font-series|bold|Medium> and
   <with|font-series|bold|High> ask for more and more (and cost more). Each

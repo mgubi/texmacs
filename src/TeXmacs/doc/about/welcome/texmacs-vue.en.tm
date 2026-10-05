@@ -384,9 +384,9 @@
     keeps it in its cache, so that the next questions about it cost less.
 
     <item>Chatbots which reason: their reasoning is shown while it comes and
-    kept folded before the answer; <with|font-series|bold|Reasoning> (in the
-    menu of the model in the focus bar, or in the preferences of the
-    session) asks for more or less of it.
+    kept folded before the answer; <with|font-series|bold|Reasoning> in the
+    focus bar of the session (or in its preferences) asks for more or less
+    of it.
 
     <item>Each answer of a chatbot is followed by its tokens (and its cost
     with <name|OpenRouter>); the menu of the model gives the sum for the
