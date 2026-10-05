@@ -202,6 +202,10 @@
     the <name|TikZ> plug-in, its <name|SVG> pictures images, and the answer
     as it came is kept in a fold after it. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
+    <item>The <name|SVG> pictures (those of <name|TikZ> among them) are in
+    the PDF which is printed, as drawings: they were the sign of an unknown
+    image.
+
     <item>The pictures of an answer of a chatbot are made as soon as they
     are complete, while the rest of the answer comes.
 
