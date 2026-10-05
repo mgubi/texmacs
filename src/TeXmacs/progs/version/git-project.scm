@@ -125,7 +125,7 @@
 
 (define (plain-text t)
   (with s (tm-string-trim-both (cpp-texmacs->verbatim (tm->tree t) #f "utf-8"))
-    (if (> (string-length s) 40) (string-append (substring s 0 37) "...") s)))
+    (git-utf8-shorten s 40)))
 
 (define (section-title p)
   (and (pair? p) (in? (car p) section-tags) (pair? (cdr p))

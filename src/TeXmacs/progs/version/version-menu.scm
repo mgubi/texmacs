@@ -34,11 +34,10 @@
         (with (rev by date msg) line
           (let* ((cur (current-buffer))
                  (head (if (version-revision? cur) (version-head cur) cur))
-                 (msg* (if (<= (string-length msg) 50) msg
-                           (string-append (substring msg 0 50) "...")))
                  (name (string-append
                         "Version " (version-beautify-revision cur rev)
-                        " by " by " on " date ": " msg*))
+                        " by " (version-history-text head by) " on " date ": "
+                        (version-history-text head msg 53)))
                  (dest (version-revision-url head rev)))
             (when (!= (url->url dest) (url->url cur))
               ((eval name)
@@ -227,7 +226,17 @@
 (define (git-document?)
   ;; Is the current buffer a document in a Git working tree?
   (and (versioned? (current-buffer))
-       (version-supports-git-style? (current-buffer))))
+       (version-supports-git-style? (current-buffer))
+       (git-available?)))
+
+(define (git-menu-root)
+  ;; The working tree for the Git entries of the menus
+  ;; NOTE: they are hidden when Git cannot be run
+  (and (git-available?) (current-git-root)))
+
+(define (git-missing?)
+  (with u (current-buffer)
+    (and u (git-directory? u) (not (git-available?)))))
 
 (define (git-history-document?)
   (and (git-document?) (not (git-state? 'untracked 'added))))
@@ -256,7 +265,7 @@
 
 (define (untrusted-git-document?)
   (with u (current-buffer)
-    (and u (git-directory? u) (not (git-trusted? u)))))
+    (and u (git-directory? u) (not (git-trusted? u)) (git-available?))))
 
 (menu-bind version-menu
   (assuming (untrusted-git-document?)
@@ -289,7 +298,7 @@
     ("Mark as resolved" (git-mark-resolved (current-buffer)))
     ---)
   ;; The most frequent actions
-  (assuming (current-git-root)
+  (assuming (git-menu-root)
     (assuming (git-simple-mode?)
       ("Save snapshot" (git-interactive-save-snapshot (current-git-root))))
     (assuming (not (git-simple-mode?))
@@ -360,9 +369,12 @@
     (-> "This file" (link git-file-menu)))
   (assuming (and (git-document?) (git-texmacs-file? (current-buffer)))
     (-> "Project" (link git-project-menu)))
-  (assuming (current-git-root)
+  (assuming (git-menu-root)
     (-> (eval (git-menu-label (current-git-root)))
         (link git-repository-menu)))
+  (assuming (git-missing?)
+    ("Git was not found: locate it in the preferences"
+     (open-git-preferences)))
   (assuming (git-can-init? (current-buffer))
     ("Create Git repository" (git-interactive-init (current-buffer))))
   (assuming (git-available?)

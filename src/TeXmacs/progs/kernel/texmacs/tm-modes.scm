@@ -133,9 +133,11 @@
 ;; With the preference "versioning tool" set to "auto", the versioning tool
 ;; is active for documents inside a working tree of Git or Subversion.
 ;; NOTE: this is tested very often (e.g. for the keyboard), hence the cache;
-;; no external command is run here.
+;; no external command is run here. Directories which are not versioned are
+;; tested again after a while, for repositories created outside TeXmacs.
 
 (define versioning-directory-table (make-ahash-table))
+(define versioning-directory-delay 10000)
 
 (define (versioning-directory-sub dir)
   (cond ((or (url-exists? (url-append dir ".git"))
@@ -150,9 +152,12 @@
        (let* ((dir (url-head u))
               (key (url->system dir))
               (old (ahash-ref versioning-directory-table key)))
-         (if old (and (!= old 'none) old)
+         (if (and old (or (url? old)
+                          (< (- (texmacs-time) old) versioning-directory-delay)))
+             (and (url? old) old)
              (with r (versioning-directory-sub dir)
-               (ahash-set! versioning-directory-table key (or r 'none))
+               ;; NOTE: the time is kept for directories which are not versioned
+               (ahash-set! versioning-directory-table key (or r (texmacs-time)))
                r)))))
 
 (define-public (git-directory? u)

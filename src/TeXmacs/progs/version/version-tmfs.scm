@@ -115,6 +115,15 @@
     (string-append "tmfs://revision/" (string-replace rev ":" "/"))
     (string-append "tmfs://revision/" rev "/" (url->tmfs-string u))))
 
+(tm-define (version-history-text u s . opt-max)
+  ;; Text @s (author, message) of the history of @u, for display
+  ;; NOTE: the history of git is in utf8, the one of svn is already in cork;
+  ;; the optional argument is a maximal length
+  (if (git-active? u)
+      (utf8->cork (if (null? opt-max) s (git-utf8-shorten s (car opt-max))))
+      (if (or (null? opt-max) (<= (string-length s) (car opt-max))) s
+          (string-append (substring s 0 (- (car opt-max) 3)) "..."))))
+
 (tmfs-load-handler (history name)
   (let* ((u (tmfs-string->url name))
          (h (version-history u))
@@ -133,8 +142,8 @@
                ($with dest (version-revision-url u rev)
                  ($describe-item
                      ($inline Version " " ($link dest rev*)
-                              " by " (utf8->cork by) " on " date)
-                   (utf8->cork msg)))))))))))
+                              " by " (version-history-text u by) " on " date)
+                   (version-history-text u msg)))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Showing a particular revision

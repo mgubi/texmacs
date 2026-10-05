@@ -38,8 +38,7 @@
   (if (>= (string-length rev) 40) (string-take rev 7) rev))
 
 (tm-define (git-short-message msg)
-  (if (<= (string-length msg) 50) msg
-      (string-append (substring msg 0 47) "...")))
+  (git-utf8-shorten msg 50))
 
 (tm-define (git-texmacs-file? u)
   (in? (url-suffix u) '("tm" "ts" "tp" "stm" "tmml")))
@@ -132,7 +131,7 @@
       (when (and (url-exists? u) (!= (file-contents u) old))
         (if (buffer-modified? u)
             (set-message `(concat "Modified on disk: "
-                                  (verbatim ,(url->system u)))
+                                  (verbatim ,(utf8->cork (url->system u))))
                          "Git")
             (git-reload-buffer u)))))
   (git-refresh root))
@@ -328,7 +327,7 @@
 (tm-define (git-stage name)
   (:synopsis "Stage the changes of the file @name")
   (if (git-large-file? name)
-      (user-confirm (string-append (url->system (url-tail name))
+      (user-confirm (string-append (utf8->cork (url->system (url-tail name)))
                                    " is large; versioning it makes the "
                                    "repository big and slow. Stage anyway?")
                     #f
@@ -508,7 +507,8 @@
     (with hash (and root (git-rev-parse root (string-append rev "^{commit}")))
       (if hash
           (git-compare-with name hash)
-          (set-message (string-append "Unknown revision " rev) "Compare")))))
+          (set-message (string-append "Unknown revision " (utf8->cork rev))
+                       "Compare")))))
 
 (tm-define (git-compare-with name rev)
   (:synopsis "Compare the document @name with its revision @rev")
@@ -587,7 +587,7 @@
 (tm-define (git-delete-branch root branch)
   (if (not (git-safe-name? branch))
       (bad-name "branch name")
-      (user-confirm (string-append "Delete branch " branch "?") #f
+      (user-confirm (string-append "Delete branch " (utf8->cork branch) "?") #f
         (lambda (answ)
           (when answ
             (git-report (git-run root "branch" "--delete" branch)
@@ -765,7 +765,8 @@
 (tm-define (git-remove-remote root name)
   (if (not (git-safe-name? name))
       (bad-name "remote")
-      (user-confirm (string-append "Remove the remote " name "?") #f
+      (user-confirm (string-append "Remove the remote " (utf8->cork name) "?")
+                    #f
         (lambda (answ)
           (when answ
             (git-report (git-run root "remote" "remove" name)
@@ -778,12 +779,14 @@
          (parent (url-head dest))
          (done (and (nnull? opt-done) (car opt-done))))
     (cond ((url-exists? dest)
-           (set-message (string-append dir " already exists") "Clone"))
+           (set-message (string-append (utf8->cork dir) " already exists")
+                        "Clone"))
           ((not (url-directory? parent))
-           (set-message (string-append (url->system parent)
+           (set-message (string-append (utf8->cork (url->system parent))
                                        " is not a directory") "Clone"))
           (else
-            (set-message (string-append "Cloning " repository "...") "Git")
+            (set-message (string-append "Cloning " (utf8->cork repository)
+                                        "...") "Git")
             (git-run-async parent
                            (list "clone" "--" repository
                                  (url->system (url-tail dest)))
@@ -908,6 +911,11 @@
 ;; Git pages
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (git-link-target s)
+  (:synopsis "The target @s (in utf8) of a link on a Git page")
+  ;; NOTE: links are followed after converting their targets from cork
+  (utf8->cork s))
+
 (tm-define (tmfs-url-git root which)
   (string-append "tmfs://git/" which "/" (url->tmfs-string root)))
 
@@ -993,7 +1001,8 @@
   (let* ((path (git-entry-path e))
          (u (git-absolute root path)))
     (if (url-exists? u)
-        ($link (url->unix u) ($verbatim (utf8->cork path)))
+        ($link (git-link-target (url->unix u))
+          ($verbatim (utf8->cork path)))
         ($verbatim (utf8->cork path)))))
 
 (define (status-row root e which)
@@ -1062,8 +1071,9 @@
          (oid (git-status-ref st 'oid)))
     `(concat "On branch " (strong ,(utf8->cork (or head "?")))
              ,(if (and oid (!= oid "(initial)"))
-                  `(concat " at " ,($link (tmfs-url-commit root oid)
-                                     (short-hash oid)))
+                  `(concat " at "
+                           ,($link (git-link-target (tmfs-url-commit root oid))
+                              (short-hash oid)))
                   " (no commits yet)")
              ,(if up
                   `(concat ", tracking " ,(utf8->cork up)
@@ -1122,7 +1132,8 @@
 (define (log-item root c)
   (describe-item
    `(concat "Commit " (hlink ,(short-hash (git-commit-hash c))
-                             ,(tmfs-url-commit root (git-commit-hash c)))
+                             ,(git-link-target
+                               (tmfs-url-commit root (git-commit-hash c))))
             " by " ,(utf8->cork (git-commit-author c))
             " on " ,(git-commit-date c))
    (utf8->cork (git-commit-subject c))))
@@ -1169,7 +1180,8 @@
         (let* ((hash (first c))
                (refs (if (>= (length c) 6) (sixth c) "")))
           `(concat ,(graph-prefix prefix)
-                   (hlink ,(short-hash hash) ,(tmfs-url-commit root hash))
+                   (hlink ,(short-hash hash)
+                          ,(git-link-target (tmfs-url-commit root hash)))
                    " "
                    ,(if (== refs "") ""
                         `(concat (strong ,(utf8->cork (string-append
@@ -1302,8 +1314,9 @@
          (u (git-absolute root path))
          (r (root-string root))
          (name ($verbatim (utf8->cork path)))
-         (link ($link (version-revision-url
-                       u (string-append rev ":" (url->tmfs-string u)))
+         (link ($link (git-link-target
+                       (version-revision-url
+                        u (string-append rev ":" (url->tmfs-string u))))
                  name)))
     `(row (cell ,(if (and added removed) link name))
           (cell ,(if (and added removed)
@@ -1340,8 +1353,10 @@
           `(concat ,(if (<= (length parents) 1) "Parent: " "Parents: ")
                    ,@(if (null? parents) (list "none")
                          (list-intersperse
-                          (map (lambda (p) ($link (tmfs-url-commit root p)
-                                             (short-hash p)))
+                          (map (lambda (p)
+                                 ($link (git-link-target
+                                         (tmfs-url-commit root p))
+                                   (short-hash p)))
                                parents)
                           ", ")))
           (verbatim-lines (git-commit-message root rev))

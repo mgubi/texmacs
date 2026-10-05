@@ -981,7 +981,7 @@
   (:interactive #t)
   (with dir (url-head name)
     (user-confirm (string-append "Create a Git repository in "
-                                 (url->system dir) "?") #t
+                                 (utf8->cork (url->system dir)) "?") #t
       (lambda (answ)
         (when answ
           (git-init dir)

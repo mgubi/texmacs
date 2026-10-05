@@ -49,6 +49,21 @@
              (reverse (cons (substring s start (string-length s)) acc)))
             (else (reverse acc))))))
 
+(tm-define (git-utf8-prefix s n)
+  (:synopsis "The first @n bytes of the utf8 string @s, without cutting")
+  ;; NOTE: a character is not cut, whence the result may be shorter
+  (if (<= (string-length s) n) s
+      (let loop ((i n))
+        (if (and (> i 0)
+                 (== (logand (char->integer (string-ref s i)) #xc0) #x80))
+            (loop (- i 1))
+            (substring s 0 i)))))
+
+(tm-define (git-utf8-shorten s n)
+  (:synopsis "The utf8 string @s, shortened with ... to at most @n bytes")
+  (if (<= (string-length s) n) s
+      (string-append (git-utf8-prefix s (- n 3)) "...")))
+
 (define (git-chomp s)
   (if (string-ends? s "\n") (git-chomp (string-drop-right s 1)) s))
 
