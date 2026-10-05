@@ -84061,7 +84061,11 @@ static bool macro_cache_hit_1(s7_scheme *sc) /* sc->code: the macro, sc->args: t
   if ((is_pair(entry)) && (car(entry) == sc->code))
     {
       const bool old_gc_off = sc->gc_off;
-      sc->gc_off = true;                    /* the copy is small, and its pieces are not yet protected */
+      /* room for the copy first (one pair for each pair of the set), above the trigger of new_cell: with the
+       *   gc off, a cell taken below Gc_Trigger_Size forces the heap to grow, by 4, and a heap never shrinks
+       */
+      check_free_heap_size(sc, hash_table_entries(cddr(entry)) + Gc_Trigger_Size + 8);
+      sc->gc_off = true;                    /* the pieces of the copy are not yet protected */
       sc->code = macro_cache_copy(sc, cddr(entry), cadr(entry));
       sc->gc_off = old_gc_off;
       return(true);
