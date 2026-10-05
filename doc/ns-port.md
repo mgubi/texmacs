@@ -103,6 +103,15 @@ keys typed meanwhile go to TeXmacs, and the real mouse also reaches it.
 * `TEXMACS_NS_SCROLL_STEP=<points>`: the steps of `TEXMACS_NS_SCROLL`
   (trackpads give fractional ones); with `TEXMACS_NS_SNAPSHOT`, the backing
   store of the canvas is saved as `backing.png` at the end (upside down);
+* `TEXMACS_NS_BENCH=1` (or phases separated by commas: `repaint:<n>`,
+  `scroll:<n>`, `zoom:<z>`): after 4 seconds, the front window is set to
+  `TEXMACS_NS_BENCH_SIZE` points (default `1000x800`) and the canvas is
+  timed a step at a time (each step returns once TeXmacs has updated and
+  the canvas has repainted): `repaint:<n>` repaints the whole canvas n
+  times, `scroll:<n>` scrolls n steps of 40 points down and n up,
+  `zoom:<z>` sets the zoom with `set-window-zoom-factor` (not saved as a
+  preference); then a table is printed and TeXmacs quits (see
+  "Benchmark" below);
 * `TEXMACS_NS_GLYPHS=bitmap`: all the glyphs from the bitmaps of
   `shrink`, as before the outlines (to compare);
 * `TEXMACS_NS_DEBUG_RED=1`: when the backing store moves (scrolling), the
@@ -123,6 +132,41 @@ For example, to check the result:
 TEXMACS_NS_CLICK=30,113 TEXMACS_NS_TYPE='X' texmacs.bin -x \
   '(delayed (:pause 5000) (display* (buffer-get-body (current-buffer))) (quit-TeXmacs))'
 ```
+
+### Benchmark
+
+```sh
+HOME=<test home> TEXMACS_PATH=$PWD/TeXmacs TEXMACS_NS_BENCH=1 \
+  [TEXMACS_NS_GLYPHS=bitmap] TeXmacs/bin/texmacs.bin TeXmacs/doc/main/faq/faq.en.tm
+```
+
+For each phase, in ms a step: the time of a step (mean, median, worst);
+in it, what the canvas spent drawing into its backing store (`paint`:
+TeXmacs and the renderer) and showing it (`display`); and the Mpixels
+drawn a step. The rest of a step is the update of TeXmacs (at a zoom,
+mostly typesetting) and the moves of the backing store. `retina_factor`
+is that of the main screen when TeXmacs starts (2 on a Retina screen, 1 on
+most external ones): for runs which compare, put `("retina-factor" "on")`
+(or `"off"`) in `.TeXmacs/system/preferences.scm` of the test home.
+
+Results (2026-10-05, Apple M4, the FAQ, a canvas of 1000x641 points,
+retina_factor 2, outline glyphs vs bitmap glyphs, ms):
+
+| phase | outline: step | paint | bitmap: step | paint |
+|---|---|---|---|---|
+| repaint at zoom 1 (1.9 Mpixels) | 4.1 | 4.0 | 4.2 | 4.0 |
+| scroll at zoom 1 | 1.7 | 0.4 | 1.8 | 0.5 |
+| zoom to 2 (new glyphs) | 52 | 6.4 | 70 | 22.7 |
+| repaint at zoom 2 (2.6 Mpixels) | 4.5 | 4.4 | 5.0 | 4.8 |
+| zoom to 0.75 (new glyphs) | 57 | 6.8 | 62 | 10.4 |
+| repaint at zoom 0.75 | 4.1 | 3.9 | 3.8 | 3.7 |
+
+Once the glyphs are cached, both draw a screen in the same time (the
+images of the glyphs are the same size); the outlines make the new glyphs
+of a zoom three times cheaper than `shrink` at zoom 2. With retina_factor 1
+(0.5 Mpixels) a repaint is 1.4-1.6 ms and a scroll 0.6 ms. A scroll spends
+a quarter of its time painting the strip: the rest is the update of TeXmacs
+and the new backing store of each move (allocated and copied at each step).
 
 ### What was done
 

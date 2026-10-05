@@ -984,6 +984,168 @@ find_canvas (NSView* v) {
   return nil;
 }
 
+/******************************************************************************
+* The benchmark (TEXMACS_NS_BENCH)
+******************************************************************************/
+
+// NOTE: TEXMACS_NS_BENCH=1 (or a list of phases separated by commas), after
+// 4 seconds, times what the canvas of the front window draws, a step at a
+// time, each step done at once (TeXmacs updates and the canvas repaints
+// before the step returns), then prints a table and quits:
+//   repaint:<n>  n repaints of the whole canvas (invalidate_all)
+//   scroll:<n>   n scrolls of 40 points (TEXMACS_NS_SCROLL_STEP) down, then
+//                n up (the strips uncovered are repainted)
+//   zoom:<z>     the zoom becomes z (set-window-zoom-factor, which is not
+//                saved as a preference): a step, until nothing is invalid
+// For each phase: the steps; the time of a step (mean, median, worst); what
+// the canvas spent drawing into its backing store (TeXmacs typesetting and
+// the renderer) and showing it, and the pixels drawn, a step on average.
+
+extern double ns_bench_paint, ns_bench_display, ns_bench_pixels;
+double ns_bench_now ();
+static NSView* find_canvas (NSView* v);
+
+static NSRect
+canvas_frame () {
+  NSWindow* win= [NSApp keyWindow];
+  if (!win) win= [[NSApp orderedWindows] firstObject];
+  NSView* canvas= find_canvas ([win contentView]);
+  NSScrollView* sv= find_document_scroll_view ([win contentView]);
+  return sv? [[sv contentView] bounds]: (canvas? [canvas frame]: NSZeroRect);
+}
+
+@interface TMBenchHelper : NSObject
+{
+  NSArray* phases;
+  int phase, step, settle;
+  array<double> walls;
+  double paint0, display0, pixels0;
+  string table;
+}
+- (void) step: (NSTimer*) timer;
+@end
+
+@implementation TMBenchHelper
+- (void) finishPhase: (NSString*) name
+{
+  int n= N(walls);
+  array<double> w= walls;
+  for (int i= 0; i < n; i++)          // sort (the median)
+    for (int j= i+1; j < n; j++)
+      if (w[j] < w[i]) { double t= w[i]; w[i]= w[j]; w[j]= t; }
+  double sum= 0.0;
+  for (int i= 0; i < n; i++) sum += w[i];
+  double k= n > 0? 1000.0 / n: 0.0;
+  char buf[256];
+  snprintf (buf, sizeof (buf),
+            "%-14s %5d %8.2f %8.2f %8.2f %8.2f %8.2f %8.2f\n",
+            [name UTF8String], n, sum * k, n? 1000.0 * w[n/2]: 0.0,
+            n? 1000.0 * w[n-1]: 0.0, (ns_bench_paint - paint0) * k,
+            (ns_bench_display - display0) * k,
+            n? (ns_bench_pixels - pixels0) / n / 1.0e6: 0.0);
+  table << string (buf);
+  walls= array<double> ();
+}
+- (void) step: (NSTimer*) timer
+{
+  if (!phases) {
+    string spec= get_env ("TEXMACS_NS_BENCH");
+    if (spec == "1" || spec == "")
+      spec= "repaint:30,scroll:20,zoom:2,repaint:30,scroll:20,"
+            "zoom:0.75,repaint:30,scroll:20,zoom:1";
+    phases= [[to_nsstring (spec) componentsSeparatedByString: @","] retain];
+    phase= step= 0;
+    table= "phase          steps     mean   median    worst    paint  display  Mpixels\n";
+    paint0= ns_bench_paint; display0= ns_bench_display; pixels0= ns_bench_pixels;
+    // the window at the same size in every run (TEXMACS_NS_BENCH_SIZE,
+    // in points), then some turns of the loop for it to settle
+    NSWindow* w= [NSApp keyWindow];
+    if (!w) w= [[NSApp orderedWindows] firstObject];
+    string sz= get_env ("TEXMACS_NS_BENCH_SIZE");
+    if (sz == "") sz= "1000x800";
+    int x= search_forwards ("x", sz);
+    if (w && x > 0) {
+      NSRect f= [w frame];
+      double fw= as_double (sz (0, x)), fh= as_double (sz (x+1, N(sz)));
+      f.origin.y += f.size.height - fh;
+      f.size= NSMakeSize (fw, fh);
+      [w setFrame: f display: YES];
+    }
+    settle= 200;
+  }
+  if (settle > 0) {
+    settle--;
+    the_gui->force_update ();
+    if (settle == 0) {
+      paint0= ns_bench_paint; display0= ns_bench_display;
+      pixels0= ns_bench_pixels;
+    }
+    return;
+  }
+  if (phase >= (int) [phases count]) {
+    [timer invalidate];
+    NSRect f= canvas_frame ();
+    fprintf (stderr, "TEXMACS_NS_BENCH (ms a step; retina_factor %d, "
+             "canvas %.0fx%.0f points, glyphs %s)\n%s", retina_factor,
+             f.size.width, f.size.height,
+             get_env ("TEXMACS_NS_GLYPHS") == "bitmap"? "bitmap": "outline",
+             as_charp (table));
+    fflush (stderr);
+    _exit (0);
+  }
+  NSArray* pv= [[phases objectAtIndex: phase] componentsSeparatedByString: @":"];
+  NSString* kind= [pv objectAtIndex: 0];
+  NSString* arg= [pv count] > 1? [pv objectAtIndex: 1]: @"1";
+  NSWindow* win= [NSApp keyWindow];
+  if (!win) win= [[NSApp orderedWindows] firstObject];
+  NSView* canvas= find_canvas ([win contentView]);
+  ns_simple_widget_rep* wid= canvas?
+    (ns_simple_widget_rep*) (widget_rep*) [(id) canvas widget]: NULL;
+  NSScrollView* sv= find_document_scroll_view ([win contentView]);
+  if (!wid || !sv) {
+    fprintf (stderr, "TEXMACS_NS_BENCH no document\n");
+    [timer invalidate];
+    _exit (1);
+  }
+  bool done= false;
+  double t0= ns_bench_now ();
+  if ([kind isEqualToString: @"repaint"]) {
+    wid->invalidate_all ();
+    the_gui->force_update ();
+    done= ++step >= [arg intValue];
+  }
+  else if ([kind isEqualToString: @"scroll"]) {
+    int n= [arg intValue];
+    double st= get_env ("TEXMACS_NS_SCROLL_STEP") == ""? 40.0:
+               as_double (get_env ("TEXMACS_NS_SCROLL_STEP"));
+    NSClipView* clip= [sv contentView];
+    NSPoint p= [clip bounds].origin;
+    p.y += (step < n? st: -st);
+    [clip scrollToPoint: [clip constrainBoundsRect:
+                           NSMakeRect (p.x, p.y, [clip bounds].size.width,
+                                       [clip bounds].size.height)].origin];
+    [sv reflectScrolledClipView: clip];
+    done= ++step >= 2*n;
+  }
+  else if ([kind isEqualToString: @"zoom"]) {
+    eval ("(set-window-zoom-factor " * as_string ([arg doubleValue]) * ")");
+    // the change of size, the typesetting and the repaint: several updates
+    for (int i= 0, clean= 0; i < 50 && clean < 2; i++) {
+      the_gui->force_update ();
+      clean= wid->is_invalid ()? 0: clean + 1;
+    }
+    done= true;
+  }
+  else done= true;
+  walls << (ns_bench_now () - t0);
+  if (done) {
+    [self finishPhase: [phases objectAtIndex: phase]];
+    phase++; step= 0;
+    paint0= ns_bench_paint; display0= ns_bench_display; pixels0= ns_bench_pixels;
+  }
+}
+@end
+
 @interface TMDropHelper : NSObject
 - (void) drop: (NSTimer*) timer;
 @end
@@ -1150,7 +1312,8 @@ ns_gui_rep::event_loop () {
       if (sel && [NSApp sendAction: sel to: nil from: nil]) return nil;
       return e;
     }];
-  if (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_SNAPSHOT") != "") {
+  if (get_env ("TEXMACS_NS_TYPE") != "" || get_env ("TEXMACS_NS_SNAPSHOT") != "" ||
+      get_env ("TEXMACS_NS_BENCH") != "") {
     // NOTE: when testing, TeXmacs is started in the background; the window
     // must be the key window, otherwise the editor loses its focus
     [NSApp activateIgnoringOtherApps: YES];
@@ -1162,6 +1325,15 @@ ns_gui_rep::event_loop () {
                                       selector: @selector(step:)
                                       userInfo: nil repeats: YES];
     [t setFireDate: [NSDate dateWithTimeIntervalSinceNow: 3.0]];
+    [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
+  }
+  if (get_env ("TEXMACS_NS_BENCH") != "") {
+    // NOTE: a step at each turn of the loop (the events in between)
+    TMBenchHelper* h= [[TMBenchHelper alloc] init];
+    NSTimer* t= [NSTimer timerWithTimeInterval: 0.001 target: h
+                                      selector: @selector(step:)
+                                      userInfo: nil repeats: YES];
+    [t setFireDate: [NSDate dateWithTimeIntervalSinceNow: 4.0]];
     [[NSRunLoop currentRunLoop] addTimer: t forMode: NSRunLoopCommonModes];
   }
   if (get_env ("TEXMACS_NS_DROP") != "") {

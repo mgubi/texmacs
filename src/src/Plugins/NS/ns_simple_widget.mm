@@ -19,6 +19,20 @@
 #include "ns_utilities.h"
 #include "ns_renderer.h"
 #include "ns_gui.h"
+#include <time.h>
+
+// The benchmark (TEXMACS_NS_BENCH, ns_gui.mm): the time spent drawing into
+// the backing stores (TeXmacs and the renderer), and showing them (the
+// views drawing the backing stores into the window), in seconds, and the
+// pixels drawn into the backing stores
+double ns_bench_paint= 0.0, ns_bench_display= 0.0, ns_bench_pixels= 0.0;
+
+double
+ns_bench_now () {
+  struct timespec ts;
+  clock_gettime (CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec + 1e-9 * ts.tv_nsec;
+}
 #import "TMView.h"
 
 
@@ -780,6 +794,7 @@ ns_simple_widget_rep::repaint_invalid_regions () {
       invalid_regions = rectangles();
       
       NSSize bs= NSMakeSize ([backingPixmap pixelsWide], [backingPixmap pixelsHigh]);
+      double t0= ns_bench_now ();
       while (!is_nil (rects)) {
         // NOTE: with a margin of one pixel, since the conversion to the
         // coordinates of TeXmacs loses the first row (seams while scrolling)
@@ -788,6 +803,7 @@ ns_simple_widget_rep::repaint_invalid_regions () {
                                  min (r0->x2 + 1, (SI) bs.width),
                                  min (r0->y2 + 1, (SI) bs.height));
         //cout << "repainting " << r0 << "\n";
+        ns_bench_pixels += (double) (r->x2 - r->x1) * (r->y2 - r->y1);
         ren->set_origin (ox, oy);
         ren->encode (r->x1, r->y1);
         ren->encode (r->x2, r->y2);
@@ -804,6 +820,8 @@ ns_simple_widget_rep::repaint_invalid_regions () {
         rects = rects->next;
       }
       ren->end();
+      double t1= ns_bench_now ();
+      ns_bench_paint += t1 - t0;
       
       // propagate immediately the changes to the screen
       if (!moved) {
@@ -811,10 +829,15 @@ ns_simple_widget_rep::repaint_invalid_regions () {
         [view displayRect: NSMakeRect (lub->x1 / k, lub->y1 / k,
                                        (lub->x2 - lub->x1) / k,
                                        (lub->y2 - lub->y1) / k)];
+        ns_bench_display += ns_bench_now () - t1;
       }
     } // !is_nil (invalid_regions)
   }
-  if (moved) [view display];
+  if (moved) {
+    double t2= ns_bench_now ();
+    [view display];
+    ns_bench_display += ns_bench_now () - t2;
+  }
 }
 
 hashset<pointer> ns_simple_widget_rep::all_widgets;

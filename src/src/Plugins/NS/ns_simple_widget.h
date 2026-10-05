@@ -89,6 +89,8 @@ public:
   void follow_visible_part ();  //!< the canvas follows the scrolling
   NSRect viewport ();           //!< the visible part, as in Qt
   coord4 extents;               //!< the extents of the document
+  void invalidate_all ();       //!< also for the benchmark (ns_gui.mm)
+  bool is_invalid ();
 
 protected:
   
@@ -98,8 +100,6 @@ protected:
   NSSize                  last_viewport; // as notified to TeXmacs (resizes)
   
   void invalidate_rect (int x1, int y1, int x2, int y2);
-  void invalidate_all ();
-  bool is_invalid ();
   void repaint_invalid_regions ();
   basic_renderer get_renderer ();
 
