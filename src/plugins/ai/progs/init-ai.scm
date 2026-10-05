@@ -320,17 +320,36 @@
 ;; The model of a session: in the document, as (with "ai-model" m session)
 ;; around it, else the one of the preferences of the engine (which the
 ;; sessions without a model of their own, and the folds, ask)
-(define (ai-model-with s)
+(define (ai-session-with s)
+  ;; the with which holds the variables of the session s (its last child)
   (with w (and s (tree-up s))
-    (and w (tree-is? w 'with) (== (tree-arity w) 3)
-         (tree-atomic? (tree-ref w 0))
-         (== (tree->string (tree-ref w 0)) "ai-model")
-         (tree-atomic? (tree-ref w 1))
+    (and w (tree-is? w 'with) (odd? (tree-arity w))
+         (== (tree-index s) (- (tree-arity w) 1))
          w)))
 
+(define (ai-session-var-index w var)
+  (let loop ((i 0))
+    (cond ((>= (+ i 1) (tree-arity w)) #f)
+          ((and (tree-atomic? (tree-ref w i))
+                (== (tree->string (tree-ref w i)) var)) i)
+          (else (loop (+ i 2))))))
+
+;; a variable of a session (ai-model, ai-document), #f when it has none
+(define (ai-session-var s var)
+  (let* ((w (ai-session-with s))
+         (i (and w (ai-session-var-index w var))))
+    (and i (tree-atomic? (tree-ref w (+ i 1)))
+         (tree->string (tree-ref w (+ i 1))))))
+
+(define (ai-set-session-var s var val)
+  (let* ((w (ai-session-with s))
+         (i (and w (ai-session-var-index w var))))
+    (cond (i (tree-assign (tree-ref w (+ i 1)) val))
+          (w (tree-insert! w (- (tree-arity w) 1) (list var val)))
+          (else (tree-insert-node! s 2 `(with ,var ,val))))))
+
 (define (ai-tree-model s name)
-  (with w (ai-model-with s)
-    (if w (tree->string (tree-ref w 1)) (ai-default-model name))))
+  (or (ai-session-var s "ai-model") (ai-default-model name)))
 
 ;; the session of the engine at the cursor, if any
 (define (ai-cursor-session name)
@@ -476,11 +495,64 @@
   (let* ((field (ai-pending-field name chat))
          (doc (and field (tree-up field)))
          (s (and doc (tree-up doc)))
-         (w (and s (tree-is? s 'session) (ai-model-with s))))
-    (set! ai-model-of-request (if w (tree->string (tree-ref w 1)) ""))))
+         (s (and s (tree-is? s 'session) s)))
+    (set! ai-model-of-request (or (and s (ai-session-var s "ai-model")) ""))
+    (set! ai-document-of-request
+          (if (and s (== (ai-session-var s "ai-document") "true"))
+              (ai-document-latex s) ""))))
 
 (tm-define (ai-request-done)
-  (set! ai-model-of-request ""))
+  (set! ai-model-of-request "")
+  (set! ai-document-of-request ""))
+
+;; The document as the context of a session (its variable ai-document): the
+;; document which holds the session, as LaTeX, without the sessions of the
+;; chatbots; ai.cpp gives it after the instructions (to Claude as a block of
+;; its system prompt which it caches)
+(define ai-document-of-request "")
+(tm-define (ai-document-override) ai-document-of-request)
+
+(define ai-document-max 400000) ; characters
+
+(define (ai-buffer-body t)
+  (if (or (not (tree-up t)) (tree-is-buffer? t)) t (ai-buffer-body (tree-up t))))
+
+(define (ai-session-stree? x)
+  (or (and (pair? x) (== (car x) 'session) (>= (length x) 2)
+           (in? (cadr x) (ai-models)))
+      (and (pair? x) (== (car x) 'with) (ai-session-stree? (cAr x)))))
+
+(define (ai-strip-sessions x)
+  (cond ((not (pair? x)) x)
+        ((ai-session-stree? x) "")
+        ((== (car x) 'document)
+         (with l (map ai-strip-sessions
+                      (list-filter (cdr x) (lambda (y) (not (ai-session-stree? y)))))
+           (cons 'document (if (null? l) (list "") l))))
+        (else (cons (car x) (map ai-strip-sessions (cdr x))))))
+
+(define (ai-document-latex s)
+  (let* ((body (ai-buffer-body s))
+         (x (ai-strip-sessions (tree->stree body)))
+         (l (catch #t
+              (lambda () (convert (stree->tree x) "texmacs-tree" "latex-snippet"))
+              (lambda args ""))))
+    (if (> (string-length l) ai-document-max)
+        (string-append (substring l 0 ai-document-max) "\n[...]")
+        l)))
+
+(tm-define (ai-session-document? lan)
+  (with s (ai-cursor-session lan)
+    (and s (== (ai-session-var s "ai-document") "true"))))
+
+(tm-define (ai-toggle-session-document lan)
+  (with s (ai-cursor-session lan)
+    (when s
+      (with on? (== (ai-session-var s "ai-document") "true")
+        (ai-set-session-var s "ai-document" (if on? "false" "true"))
+        (set-message (if on? "The questions are sent without the document"
+                         "The questions are sent with the document")
+                     (session-name lan))))))
 
 (tm-define (ai-session-context name chat)
   (let* ((field (ai-pending-field name chat))
@@ -798,10 +870,9 @@
   (with s (ai-cursor-session lan)
     (if (not s)
         (set-preference (string-append lan " model") m)
-        (with w (ai-model-with s)
+        (begin
           (ai-update-banner s m)
-          (if w (tree-assign (tree-ref w 1) m)
-              (tree-insert-node! s 2 `(with "ai-model" ,m))))))
+          (ai-set-session-var s "ai-model" m))))
   (set-message (string-append "The next questions ask " m)
                (string-append "Model of " (session-name lan)))
   (refresh-now "ai-model-list"))
@@ -842,6 +913,9 @@
   (dynamic (ai-model-choices lan #f))
   (if (and (!= lan "albert") (ai-models-request lan))
       ("Update the list of models" (ai-update-models-message lan)))
+  ---
+  ((check "Send the document as context" "v" (ai-session-document? lan))
+   (ai-toggle-session-document lan))
   ("Preferences" (open-plugin-preferences lan)))
 
 (tm-menu (focus-ai-icons lan)
@@ -858,6 +932,25 @@
 ;; when a key is given, and each loading would add its icons)
 (for-each (lambda (name) (set-session-focus-menu! name focus-ai-icons))
           (ai-models))
+
+;; Ask about the selection: a session of the engine after the paragraph of
+;; the selection, whose input holds the selection, for the question which is
+;; typed after it
+(tm-define (ai-ask-about-selection lan)
+  (when (selection-active-any?)
+    (with t (tree-copy (selection-tree))
+      (selection-cancel)
+      (go-end-paragraph)
+      (insert-return)
+      (make-session lan "default")
+      (insert t)
+      (insert-return))))
+
+;; Ask about the document: a session at the cursor which sends the document
+(tm-define (ai-ask-about-document lan)
+  (make-session lan "default")
+  (with s (ai-cursor-session lan)
+    (when s (ai-set-session-var s "ai-document" "true"))))
 
 ;; the chatbots in a submenu AI of Insert > Session, each a submenu of its
 ;; models, which starts a session of the one chosen

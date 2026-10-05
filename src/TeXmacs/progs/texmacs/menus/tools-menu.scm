@@ -98,7 +98,11 @@
              (selection-active-any?))
     ("Correct" (ai-correct (get-preference "ai")))
     (-> "Translate"
-        (link ai-translate-menu)))
+        (link ai-translate-menu))
+    ("Ask about the selection" (ai-ask-about-selection (get-preference "ai"))))
+  (when (and (cpp-has-preference? "ai")
+             (not (selection-active-any?)))
+    ("Ask about the document" (ai-ask-about-document (get-preference "ai"))))
   (-> "External AI"
       (when (selection-active-any?)
         ("Copy" (ai-copy))

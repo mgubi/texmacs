@@ -405,6 +405,20 @@ ai_session_model () {
   return is_string (o)? as_string (o): string ("");
 }
 
+// the document of the session which asks, as LaTeX, when the session sends
+// it as context (ai-document-override in init-ai.scm), else ""
+static string
+ai_session_document () {
+  object o= call ("ai-document-override");
+  return is_string (o)? as_string (o): string ("");
+}
+
+static string
+ai_document_intro () {
+  return "The user is writing the following document (in LaTeX), "
+         "which the questions may be about:\n\n";
+}
+
 static string
 ai_model_name (string engine, string fallback) {
   string sm= ai_session_model ();
@@ -631,7 +645,19 @@ claude_command (string s, string model, string agent,
     << tree ("max_tokens")
     // (without streaming, Anthropic refuses the requests which may be long)
     << compound ("json-number", ai_stream? string ("32000"): string ("16000"));
-  if (agent != "") d << tree ("system") << tree (agent);
+  string doc= ai_stream? ai_session_document (): string ("");
+  if (doc != "") {
+    // the document as a second block of the system prompt, which Anthropic
+    // caches: the next questions about it cost less
+    array<tree> sys;
+    if (agent != "") sys << json_object ("type", "text", "text", agent);
+    array<tree> b (tree ("type"), tree ("text"),
+                   tree ("text"), tree (ai_document_intro () * doc));
+    b << tree ("cache_control") << json_object ("type", "ephemeral");
+    sys << json_object (b);
+    d << tree ("system") << json_array (sys);
+  }
+  else if (agent != "") d << tree ("system") << tree (agent);
   d << tree ("messages") << json_array (msgs);
   if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
   tree h (TUPLE);
@@ -673,6 +699,10 @@ ai_latex_agent_description (string model) {
   string r= as_string (call ("ai-instructions", model));
   if (engine == "albert")
     r << "\n" << as_string (call ("ai-agents-get-interlocutor", object (engine)));
+  // the document as context (Claude has it in a block of its own)
+  string doc= ai_session_document ();
+  if (doc != "" && engine != "claude")
+    r << "\n\n" << ai_document_intro () << doc;
   return r;
 }
 
