@@ -124,7 +124,7 @@ socket_debug_io_string (string s, int max) {
     else if (c == DATA_END) r << "[END]";
     else if (c == DATA_COMMAND) r << "[COMMAND]";
     else if (c == DATA_ESCAPE) r << "[ESCAPE]";
-    else if (std::isprint(c) || std::isspace(c)) r << s[i];
+    else if (isprint ((int) c) || isspace ((int) c)) r << s[i];
     else r << "\\x" << as_hexadecimal(c);
   }
   if (n > max) {

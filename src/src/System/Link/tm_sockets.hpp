@@ -29,6 +29,21 @@
 
 #else
 
+// NOTE: the headers of the C library and of Windows which winsock2.h and
+// ws2tcpip.h include, outside the namespace (once there, the headers of
+// the C++ library which follow found std inside wsoc); with Qt, Qt has
+// included them already
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <windows.h>
 namespace wsoc {
 #include <winsock2.h>
 #include <ws2tcpip.h>
