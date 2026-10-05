@@ -1552,6 +1552,15 @@ void gui_open (int& argc, char** argv)
     static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
     [NSApp setDelegate: delegate];
   }
+  // The theme of the preferences (TEXMACS_NS_THEME overrides it, for the
+  // tests): light or dark, or by default that of the system. The icons
+  // follow the appearance (see icon_theme in ns_picture.mm)
+  string theme= get_env ("TEXMACS_NS_THEME");
+  if (N(theme) == 0) theme= get_user_preference ("gui theme", "default");
+  if (theme == "light")
+    [NSApp setAppearance: [NSAppearance appearanceNamed: NSAppearanceNameAqua]];
+  else if (theme == "dark")
+    [NSApp setAppearance: [NSAppearance appearanceNamed: NSAppearanceNameDarkAqua]];
   if (!pool) {
     // create autorelease pool 
     pool = [[NSAutoreleasePool alloc] init];

@@ -83,15 +83,30 @@ as_native_picture (picture pict) {
   return as_ns_picture (pict);
 }
 
+static string
+icon_theme () {
+  // The variant of the icons, light or dark, after the appearance of the
+  // application (see gui_open). It is fixed at the first icon, since the
+  // icons already made are not made again when the appearance changes.
+  static string theme= "";
+  if (theme == "") {
+    NSAppearanceName name= [[NSApp effectiveAppearance]
+      bestMatchFromAppearancesWithNames:
+        @[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
+    theme= [name isEqualToString: NSAppearanceNameDarkAqua]? "dark": "light";
+  }
+  return theme;
+}
+
 static NSImage*
 svg_icon (url file_name) {
   // The vector version of an icon, looked up as by the Qt and Vue interfaces:
-  // name.svg in the light variant of the icon sets on $TEXMACS_PIXMAP_PATH.
-  // The set chosen in the preferences (neo-classical by default) comes first
-  // on the path, and its icons only exist as SVG files.
+  // name.svg in the light or dark variant of the icon sets on
+  // $TEXMACS_PIXMAP_PATH. The set chosen in the preferences (neo-classical
+  // by default) comes first on the path, and its icons only exist as SVG.
   if (suffix (file_name) != "xpm") return nil;
   url base= unglue (file_name, 4);
-  url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url ("light") *
+  url svg= resolve (url ("$TEXMACS_PIXMAP_PATH") * url (icon_theme ()) *
                     glue (tail (base), ".svg") |
                     url ("$TEXMACS_PIXMAP_PATH") * glue (base, ".svg"));
   string sss;
