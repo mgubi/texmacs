@@ -486,8 +486,9 @@
           '(math (concat (math-up "rank") "A")))
   ;; a text separates the factors around it: no multiplication across it
   (check= (lt "$a\\text{if}b$") '(math (concat "a" (text "if") "b")))
+  ;; (the space which begins the argument of \text is kept, as in LaTeX)
   (check= (lt "$x\\text{ for all }y$")
-          '(math (concat "x" (text "for all ") "y")))
+          '(math (concat "x" (text " for all ") "y")))
   (check= (lt "$ab$") '(math "a*b"))
   (check= (lt "$\\frac{a}{b}$") '(math (frac "a" "b")))
   (check= (lt "$a\\over b$") '(math (frac "a" "b")))
