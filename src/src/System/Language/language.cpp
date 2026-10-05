@@ -376,9 +376,13 @@ ad_hoc_language_rep::ad_hoc_language_rep (string nm, language lan, tree hyphs):
   language_rep (nm), base (lan), hyphens ("?")
 {
   if (is_atomic (hyphs)) {
-    string h= hyphs->label;
-    string s= replace (h, "-", "");
-    hyphens (s)= h;
+    array<string> words= tokenize (hyphs->label, " ");
+    for (int i=0; i<N(words); i++)
+      if (N(words[i]) != 0) {
+        string h= words[i];
+        string s= replace (h, "-", "");
+        hyphens (s)= h;
+      }
   }
 }
 
