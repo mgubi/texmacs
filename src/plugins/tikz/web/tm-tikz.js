@@ -492,12 +492,25 @@ function texError (e) {
 var input = '';
 var queue = Promise.resolve ();
 
+// The SVG of TikZJax (dvi2html) opens the root <svg ...> again inside the
+// picture for some of its parts (the cells of the matrix of a tikzcd), and
+// does not close it: the SVG is not well formed, and cannot be drawn. These
+// repeated roots have the viewBox of the first one: they are dropped.
+function repairSvg (svg) {
+  var first = true;
+  return svg.replace (/<svg\b[^>]*>/g, function (m) {
+    if (first) { first = false; return m; }
+    return '';
+  });
+}
+
 function evaluate (code) {
   var p = prepare (code);
   var t = texWorker ();
   return t.ready
     .then (function () { return call (t, 'texify', [p.body, p.options]); })
     .then (function (svg) {
+      svg = repairSvg (svg);
       if (p.options.debug && p.options.debug.indexOf ('svg') >= 0)
         out (B + 'verbatim:' + B + 'utf8:' + svg + E + PROMPT + E);
       else

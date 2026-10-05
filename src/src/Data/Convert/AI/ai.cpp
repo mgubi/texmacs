@@ -542,7 +542,9 @@ claude_command (string s, string model, string agent,
     msgs << json_object ("role", conv[i], "content", conv[i+1]);
   array<tree> d;
   d << tree ("model") << tree (name)
-    << tree ("max_tokens") << compound ("json-number", "8192");
+    << tree ("max_tokens")
+    // (without streaming, Anthropic refuses the requests which may be long)
+    << compound ("json-number", ai_stream? string ("32000"): string ("16000"));
   if (agent != "") d << tree ("system") << tree (agent);
   d << tree ("messages") << json_array (msgs);
   if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
@@ -887,6 +889,20 @@ ai_svg_image (string svg) {
   return tree (IMAGE, data, "", "", "", "");
 }
 
+// a picture which does not end (the answer was cut, by the limit of its
+// length): its code, and why
+static tree
+ai_cut_picture (string code) {
+  tree doc (DOCUMENT);
+  doc << compound ("with", "color", "dark red", "font-shape", "italic",
+                   "The answer was cut before the end of this picture:");
+  array<string> lines= tokenize (code, "\n");
+  tree v (DOCUMENT);
+  for (int k= 0; k < N(lines); k++) v << tree (utf8_to_cork (lines[k]));
+  doc << compound ("verbatim-code", v);
+  return doc;
+}
+
 // the pictures of s replaced by marks; their trees in blocks
 static string
 ai_set_aside (string s, string pre, array<tree>& blocks) {
@@ -903,11 +919,14 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
     if (sp >= 0 && (best < 0 || sp < best)) { best= sp; kind= 100; }
     if (best < 0) break;
     int end;
+    bool cut= false; // the picture does not end: the answer was cut
     tree block;
     if (kind == 100) {
       end= search_forwards ("</svg>", best, s);
-      if (end < 0) break;
-      end += 6;
+      if (end < 0) { cut= true; end= n; }
+      else end += 6;
+      if (cut) block= ai_cut_picture (s (best, end));
+      else
       block= ai_svg_image (s (best, end));
       // the XML declaration, and a fence ```svg ... ``` around it, go with it
       int b= best;
@@ -924,7 +943,12 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
       string env= envs[kind];
       string close= "\\end{" * env * "}";
       end= search_forwards (close, best, s);
-      if (end < 0) break;
+      if (end < 0) {
+        r << s (i, best) << "\n" << ai_block_mark << as_string (N(blocks)) << "Z\n";
+        blocks << ai_cut_picture (s (best, n));
+        i= n;
+        break;
+      }
       end += N(close);
       // evaluated when it is in the document (ai-run-pending-folds)
       string head= ai_tikz_header (pre);
@@ -932,6 +956,28 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
       if (starts (head, "\\documentclass")) code << "\n\\end{document}";
       block= compound ("with", "ai-tikz", "pending",
                        ai_script_fold ("tikz", code));
+    }
+    // a verbatim around a picture (where it is asked for an SVG) goes with
+    // it, also when the picture was cut before its end
+    {
+      int x= best, z= end;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      while (z < n && (s[z] == ' ' || s[z] == '\n')) z++;
+      string bv= "\\begin{verbatim}", ev= "\\end{verbatim}";
+      if (x - N(bv) >= i && s (x - N(bv), x) == bv) {
+        if (test (s, z, ev)) { best= x - N(bv); end= z + N(ev); }
+        else if (cut) best= x - N(bv);
+      }
+    }
+    // a picture alone in a formula (\[ ... \], $$ ... $$) is not a formula
+    {
+      int x= best, z= end;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      while (z < n && (s[z] == ' ' || s[z] == '\n')) z++;
+      if (x - 2 >= i && (s (x - 2, x) == "\\[" || s (x - 2, x) == "$$")) {
+        string close= (s (x - 2, x) == "$$")? string ("$$"): string ("\\]");
+        if (test (s, z, close)) { best= x - 2; end= z + 2; }
+      }
     }
     // a fence ```svg ... ``` (```latex, ```tex...) around it goes with it
     {
@@ -1013,6 +1059,8 @@ ai_latex_output (string s, string model, string chat) {
   array<tree> blocks;
   int start= search_forwards ("\\begin{document}", r);
   int end= (start < 0)? -1: search_forwards ("\\end{document}", start, r);
+  // a document which was cut (the limit of the length of the answer)
+  if (start >= 0 && end < 0) end= N(r);
   if (start < 0 || end < 0) {
     // an answer which is not a LaTeX document (or an error): text in UTF-8,
     // with its pictures
