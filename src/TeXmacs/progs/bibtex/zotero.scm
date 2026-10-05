@@ -1977,10 +1977,11 @@
         'wait)
       'done))
 
-;; A bibliography without file has no references, without the database:
-;; when Zotero has references which the document cites, its file becomes
-;; one exported from Zotero, named after the document, as with Update from
-;; Zotero (Zotero is not asked about when its key is missing)
+;; Without the database, a bibliography without file, or whose file does
+;; not exist yet, has no references: when Zotero has references which the
+;; document cites, its file is exported from Zotero, as with Update from
+;; Zotero; a bibliography without file is given one named after the
+;; document (Zotero is not asked about when its key is missing)
 
 (define (empty-bibliography t)
   ;; the bibliography tag without file in the tree @t, or #f
@@ -1992,20 +1993,32 @@
          (list-or (map empty-bibliography (tree-children t))))
         (else #f)))
 
-(define (name-empty-bibliography)
+(define (zotero-has-citations?)
+  (with keys (zotero-project-citations)
+    (and (nnull? keys) (zotero-ready?) (nnull? (zotero-resolve keys)))))
+
+(define (fill-missing-bibliography)
+  ;; #t when the bibliography is to be exported from Zotero
   (let* ((u (current-buffer))
-         (t (and u (not (url-rooted-tmfs? u)) (not (supports-db?))
-                 (== (zotero-master) u) (not (zotero-key-missing?))
+         (ok? (and u (not (url-rooted-tmfs? u)) (not (supports-db?))
+                   (not (zotero-key-missing?))))
+         (t (and ok? (== (zotero-master) u)
                  (empty-bibliography (buffer-get-body u))))
-         (keys (if t (zotero-project-citations) '())))
-    ;; #t when the bibliography was given a file
-    (and (nnull? keys) (zotero-ready?) (nnull? (zotero-resolve keys))
-         (with name (string-append (url-basename u) "-zotero")
-           (tree-set! t 2 name)
+         (f (and ok? (not t) (zotero-master-bibliography-file))))
+    (cond ((and t (zotero-has-citations?))
+           (with name (string-append (url-basename u) "-zotero")
+             (tree-set! t 2 name)
+             (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
+                                     (string-append name ".bib"))
+                          "Zotero")
+             #t))
+          ((and f (not (url-rooted-tmfs? f)) (not (url-exists? f))
+                (zotero-has-citations?))
            (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
-                                   (string-append name ".bib"))
+                                   (url->system (url-tail f)))
                         "Zotero")
-           #t))))
+           #t)
+          (else #f))))
 
 (define (before-update what)
   (when (in? what '("all" "bibliography"))
@@ -2019,7 +2032,7 @@
                               (negate zotero-in-database?))
         (when (and (nnull? keys) (zotero-ready?) (zotero-in-browser?))
           (zotero-db-entries keys))))
-    (when (or (name-empty-bibliography) (with-zotero-bibliography?))
+    (when (or (fill-missing-bibliography) (with-zotero-bibliography?))
       (zotero-refresh-bibliography #t))
     ;; the references of Zotero which the file of the user lacks
     (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))
