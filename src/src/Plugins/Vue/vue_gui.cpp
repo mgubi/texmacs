@@ -2998,6 +2998,21 @@ vue_profile_frame () {
        << (total / 1e6) << " ms, "
        << (total > 0 ? (vue_frames * 1e9 / total) : 0.0) << " frames/s, "
        << (vue_total_commands / vue_frames) << " render commands/frame\n";
+  // the windows: their sizes and their state (hidden, minimized, occluded:
+  // a window laid out at 0 x 0 has no render commands)
+  iterator<SDL_Window*> wit= iterate (Window_to_window);
+  while (wit->busy ()) {
+    SDL_Window* sw= wit->next ();
+    int ww= 0, wh= 0, pw= 0, ph= 0;
+    SDL_GetWindowSize (sw, &ww, &wh);
+    SDL_GetWindowSizeInPixels (sw, &pw, &ph);
+    char flags[32];
+    snprintf (flags, sizeof (flags), "%llx",
+              (unsigned long long) SDL_GetWindowFlags (sw));
+    cout << "  window " << (int) SDL_GetWindowID (sw) << ": " << ww << " x "
+         << wh << " points, " << pw << " x " << ph << " pixels, flags 0x"
+         << flags << "\n";
+  }
   for (int i= 0; i < VP_N; i++) {
     double t= (double) vue_phase_total[i];
     cout << "  " << vue_phase_name[i] << "\t"
