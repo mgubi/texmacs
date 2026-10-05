@@ -198,7 +198,9 @@
     far as their <LaTeX> is complete (an environment or a formula which is
     not closed yet waits for its end); executable folds of chatbots work
     too. A question is sent with the conversation above it in the session
-    as its context. See the help of the AI plug-in in <menu|Help|Plug-ins>.
+    as its context. The <name|TikZ> pictures of an answer become folds of
+    the <name|TikZ> plug-in, its <name|SVG> pictures images, and the answer
+    as it came is kept in a fold after it. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
     <item>The <with|font-series|bold|Busy> sign of a session or a fold
     which waits for its answer is animated.

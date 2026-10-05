@@ -57,6 +57,7 @@
   ("gemini-text-input" "on" noop)
   ("open-mistral-7b-text-input" "on" noop)
   ("claude-text-input" "on" noop)
+  ("ai raw answer" "on" noop)
   ("chatgpt model" "gpt-5-mini" noop)
   ("gemini model" "gemini-2.5-flash" noop)
   ("open-mistral-7b model" "mistral-small-latest" noop)
@@ -321,9 +322,26 @@
          (ai-unwrap (cadddr x)))
         (else x)))
 
+;; the answer as it came, if it is kept in the field (ai.cpp, ai_raw_fold)
+(define (ai-raw-text x)
+  (cond ((not (pair? x)) #f)
+        ((and (tm-func? x 'with 3) (== (cadr x) "ai-raw"))
+         (with code (select (cadddr x) '(:* verbatim-code 0))
+           (and (nnull? code)
+                (with d (car code)
+                  ;; (each line converted: a newline is a character of Cork)
+                  (string-recompose
+                   (map (lambda (l) (if (string? l) (cork->utf8 l) ""))
+                        (if (tm-func? d 'document) (cdr d) (list d)))
+                   "\n")))))
+        (else (list-or (map ai-raw-text (cdr x))))))
+
 (define (ai-field-text name t)
-  (with s (ai-serialize name (ai-unwrap (tm->stree t)))
-    (if (string? s) s "")))
+  (let* ((x (tm->stree t))
+         (raw (ai-raw-text x)))
+    (or raw
+        (with s (ai-serialize name (ai-unwrap x))
+          (if (string? s) s "")))))
 
 ;; The questions and answers of the fields of the session above the one
 ;; which is evaluated, the last ones (ai-context-size), as a list (question
@@ -458,7 +476,10 @@
     (aligned
       (meti (hlist // (text "Textual input"))
 	(toggle (set-boolean-preference textual-input answer)
-		(get-boolean-preference textual-input))))))
+		(get-boolean-preference textual-input)))
+      (meti (hlist // (text "Show the answer as it came"))
+	(toggle (set-boolean-preference "ai raw answer" answer)
+		(get-boolean-preference "ai raw answer"))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ChatGPT

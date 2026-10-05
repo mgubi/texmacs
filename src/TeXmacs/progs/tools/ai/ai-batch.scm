@@ -36,7 +36,34 @@
   (cpp-ai-latex-request cmd name chat))
 
 (tm-define (ai-result name chat res)
-  (cpp-ai-latex-output res name chat))
+  (with t (cpp-ai-latex-output res name chat)
+    (when (string-contains? (object->string (tm->stree t)) "ai-tikz")
+      (delayed
+        (:idle 100)
+        (ai-run-pending-folds)))
+    t))
+
+;; The TikZ pictures of an answer are executable folds of the TikZ plug-in
+;; (ai.cpp), marked as pending: once in the document they are evaluated
+(tm-define (ai-run-pending-folds)
+  (with l (select (buffer-tree) '(:* with))
+    (with pending (list-filter l (lambda (w)
+                                   (and (== (tree-arity w) 3)
+                                        (tm-equal? (tree-ref w 0) "ai-tikz")
+                                        (tm-equal? (tree-ref w 1) "pending"))))
+      (when (nnull? pending)
+        (when (not (in? "tikz" (get-style-list)))
+          (add-style-package "tikz"))
+        (for (w pending)
+          (with t (tree-ref w 2)
+            (tree-remove-node! w 2)
+            (when (tree-is? t 'script-input)
+              (script-eval-at (tree-ref t 3)
+                              (tree->string (tree-ref t 0))
+                              (tree->string (tree-ref t 1))
+                              (tree->stree (tree-ref t 2))
+                              :math-input :simplify-output)
+              (tree-assign-node! t 'script-output))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Automatic correction

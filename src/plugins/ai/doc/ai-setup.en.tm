@@ -30,6 +30,15 @@
   context is the one of the document: it is there again when the document
   is opened again, and follows the changes made to it.
 
+  The pictures of an answer are shown: a <name|TikZ> picture
+  (<verbatim|tikzpicture>, <verbatim|tikzcd>, <verbatim|circuitikz>)
+  becomes an executable fold of the <name|TikZ> plug-in, made at once, with
+  the libraries and packages which the answer asks for; an <name|SVG>
+  picture becomes an image. Each answer ends with a folded copy of the
+  answer as it came, to see what the chatbot wrote (it is also what is sent
+  back as the context); <with|font-series|bold|Show the answer as it came>
+  in the preferences removes it.
+
   The key of an API is not that of a subscription: <name|ChatGPT Plus> or
   <name|Claude Pro> do not include the use of the API, which is paid apart,
   according to use. In the console of the service, set a limit to the

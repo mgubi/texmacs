@@ -365,6 +365,15 @@ the preferences or the environment (`ai-api-key` in `init-ai.scm`).
   (`session-show-progress`) and a fold through its progress procedure,
   until the output replaces them. A session begins with the engine and its
   model (`set-request-banner!` in `tm-plugins.scm`, used by `plugin-start`).
+- The pictures of an answer are set aside before its LaTeX is converted
+  (`ai_set_aside`) and put back after (`ai_put_back`): a `tikzpicture`,
+  `tikzcd` or `circuitikz` becomes a `script-input` of the TikZ plug-in,
+  with the `\usetikzlibrary` and the TikZJax packages of the preamble as
+  its first lines, wrapped in `(with "ai-tikz" "pending" ...)` until
+  `ai-run-pending-folds` evaluates it once it is in the document; an `<svg>`
+  (with its fence and XML declaration) an image of raw data. The answer as
+  it came is kept after it, folded (`ai_raw_fold`, preference
+  `ai raw answer`), and is what `ai-session-context` sends back.
 - A fold of a request plug-in, before any session of it, starts its
   connection first (`plugin-connected`, `plugin-starting` in
   `plugin-eval.scm`): it was never made, and the fold waited forever.

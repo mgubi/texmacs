@@ -805,29 +805,219 @@ embed_images (tree t) {
   return tree (L(t), a);
 }
 
+/******************************************************************************
+* Pictures in the answers: TikZ (as executable folds of the TikZ plug-in)
+* and SVG (as images), set aside while the rest is converted
+******************************************************************************/
+
+static string ai_block_mark= "TMAIBLOCK";
+
+// the lines of the preamble which a TikZ picture needs: its libraries, and
+// the packages which TikZJax has (as the TikZ plug-in asks for them)
+static string
+ai_tikz_header (string pre) {
+  static const char* known[]= {
+    "pgfplots", "tikz-cd", "circuitikz", "chemfig", "tkz-tab", "yquant",
+    "braids", "kinematikz", "tikz-feynhand", "physics", "pgf-spectra",
+    "amsmath", "amssymb", "mathtools", "bm", "cancel", "mhchem", NULL };
+  string libs, pkgs;
+  int i= 0;
+  while ((i= search_forwards ("\\usetikzlibrary{", i, pre)) >= 0) {
+    int e= search_forwards ("}", i, pre);
+    if (e < 0) break;
+    if (libs != "") libs << ", ";
+    libs << pre (i + 16, e);
+    i= e;
+  }
+  i= 0;
+  while ((i= search_forwards ("\\usepackage", i, pre)) >= 0) {
+    int b= search_forwards ("{", i, pre);
+    int e= (b < 0)? -1: search_forwards ("}", b, pre);
+    if (e < 0) break;
+    array<string> l= tokenize (pre (b + 1, e), ",");
+    for (int k= 0; k < N(l); k++) {
+      string p= trim_spaces (l[k]);
+      for (int m= 0; known[m] != NULL; m++)
+        if (p == string (known[m])) {
+          if (pkgs != "") pkgs << ", ";
+          pkgs << p;
+        }
+    }
+    i= e;
+  }
+  string r;
+  if (pkgs != "") r << "% packages: " << pkgs << "\n";
+  if (libs != "") r << "% libraries: " << libs << "\n";
+  return r;
+}
+
+// a fold of a plug-in, whose code is text in UTF-8
+static tree
+ai_script_fold (string lan, string code) {
+  array<string> lines= tokenize (code, "\n");
+  tree doc (DOCUMENT);
+  for (int i= 0; i < N(lines); i++)
+    doc << tree (utf8_to_cork (lines[i]));
+  return compound ("script-input", lan, "default", doc, "");
+}
+
+static tree
+ai_svg_image (string svg) {
+  static int counter= 0;
+  counter++;
+  tree data= tuple (tree (RAW_DATA, svg), "answer-" * as_string (counter) * ".svg");
+  return tree (IMAGE, data, "", "", "", "");
+}
+
+// the pictures of s replaced by marks; their trees in blocks
+static string
+ai_set_aside (string s, string pre, array<tree>& blocks) {
+  string r;
+  int i= 0, n= N(s);
+  static const char* envs[]= { "tikzpicture", "tikzcd", "circuitikz", NULL };
+  while (i < n) {
+    int best= -1, kind= -1;
+    for (int k= 0; envs[k] != NULL; k++) {
+      int p= search_forwards ("\\begin{" * string (envs[k]) * "}", i, s);
+      if (p >= 0 && (best < 0 || p < best)) { best= p; kind= k; }
+    }
+    int sp= search_forwards ("<svg", i, s);
+    if (sp >= 0 && (best < 0 || sp < best)) { best= sp; kind= 100; }
+    if (best < 0) break;
+    int end;
+    tree block;
+    if (kind == 100) {
+      end= search_forwards ("</svg>", best, s);
+      if (end < 0) break;
+      end += 6;
+      block= ai_svg_image (s (best, end));
+      // the XML declaration, and a fence ```svg ... ``` around it, go with it
+      int b= best;
+      int x= b;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      if (x >= 2 && s (x - 2, x) == "?>") {
+        int y= search_backwards ("<?xml", x, s);
+        if (y >= i) { b= y; x= y; }
+        while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      }
+      best= b;
+    }
+    else {
+      string env= envs[kind];
+      string close= "\\end{" * env * "}";
+      end= search_forwards (close, best, s);
+      if (end < 0) break;
+      end += N(close);
+      // evaluated when it is in the document (ai-run-pending-folds)
+      block= compound ("with", "ai-tikz", "pending",
+                       ai_script_fold ("tikz", ai_tikz_header (pre) * s (best, end)));
+    }
+    // a fence ```svg ... ``` (```latex, ```tex...) around it goes with it
+    {
+      int x= best;
+      while (x > i && (s[x-1] == ' ' || s[x-1] == '\n')) x--;
+      static const char* fences[]= {
+        "```svg", "```xml", "```html", "```latex", "```tex", "```tikz",
+        "```", NULL };
+      for (int f= 0; fences[f] != NULL; f++) {
+        string fe= fences[f];
+        if (x - N(fe) >= i && s (x - N(fe), x) == fe) {
+          int z= end;
+          while (z < n && (s[z] == ' ' || s[z] == '\n')) z++;
+          if (test (s, z, "```")) { best= x - N(fe); end= z + 3; }
+          break;
+        }
+      }
+    }
+    r << s (i, best) << "\n" << ai_block_mark << as_string (N(blocks)) << "Z\n";
+    blocks << block;
+    i= end;
+  }
+  r << s (i, n);
+  return r;
+}
+
+// the marks of t replaced by the trees they stand for
+static tree
+ai_put_back (tree t, array<tree> blocks) {
+  if (N(blocks) == 0) return t;
+  if (is_atomic (t)) {
+    string s= t->label;
+    int p= search_forwards (ai_block_mark, s);
+    if (p < 0) return t;
+    int q= p + N(ai_block_mark), e= q;
+    while (e < N(s) && is_digit (s[e])) e++;
+    if (e == q || e >= N(s) || s[e] != 'Z') return t;
+    int k= as_int (s (q, e));
+    if (k < 0 || k >= N(blocks)) return t;
+    tree before= s (0, p), after= ai_put_back (s (e + 1, N(s)), blocks);
+    if (before == "" && after == "") return blocks[k];
+    tree c (CONCAT);
+    if (before != "") c << before;
+    c << blocks[k];
+    if (after != "") {
+      if (is_func (after, CONCAT)) c << A(after);
+      else c << after;
+    }
+    return c;
+  }
+  int i, n= N(t);
+  tree r (t, n);
+  for (i= 0; i < n; i++) r[i]= ai_put_back (t[i], blocks);
+  return r;
+}
+
+// the answer as it came, folded, for those who want to see it
+static tree
+ai_raw_fold (string raw) {
+  array<string> lines= tokenize (raw, "\n");
+  tree doc (DOCUMENT);
+  for (int i= 0; i < N(lines); i++)
+    doc << tree (utf8_to_cork (lines[i]));
+  tree fold= compound ("folded", compound ("with", "font-shape", "italic",
+                                          "The answer as it came"),
+                       compound ("verbatim-code", doc));
+  return compound ("with", "ai-raw", "true", fold);
+}
+
 tree
 ai_latex_output (string s, string model, string chat) {
   string r= ai_output (s, model, chat);
   if (DEBUG_IO) {
-    string x= un_escape_cr (r);
-    x= "] " * replace (x, "\n", "\n] ");
+    string x= "] " * replace (r, "\n", "\n] ");
     debug_io << x << "\n";
   }
-  string pre, post;
-  // an answer which is not a LaTeX document (or an error) is text in UTF-8
+  string raw= r;
+  tree t;
+  array<tree> blocks;
   int start= search_forwards ("\\begin{document}", r);
-  if (start < 0) return utf8_to_cork (r);
-  int end= search_forwards ("\\end{document}", start, r);
-  if (end < 0) return utf8_to_cork (r);
-  start += 16;
-  pre= r (0, start);
-  post= r (end, N(r));
-  r= r (start, end);
-  // (the answers are decoded from JSON: their \n are newlines already, and
-  // un_escape_cr would make \nu a newline followed by u)
-  tree t= ai_latex_body_to_tree (r);
-  t= embed_images (t);
-  return tree (WITH, MODE, "text", t);
+  int end= (start < 0)? -1: search_forwards ("\\end{document}", start, r);
+  if (start < 0 || end < 0) {
+    // an answer which is not a LaTeX document (or an error): text in UTF-8,
+    // with its pictures
+    string aside= ai_set_aside (r, "", blocks);
+    if (N(blocks) == 0) t= utf8_to_cork (r);
+    else t= ai_put_back (verbatim_to_tree (aside, false, "utf-8"), blocks);
+  }
+  else {
+    string pre= r (0, start);
+    r= r (start + 16, end);
+    // (the answers are decoded from JSON: their \n are newlines already, and
+    // un_escape_cr would make \nu a newline followed by u)
+    string aside= ai_set_aside (r, pre, blocks);
+    t= ai_put_back (ai_latex_body_to_tree (aside), blocks);
+    t= embed_images (t);
+    t= tree (WITH, MODE, "text", t);
+  }
+  if (get_preference ("ai raw answer", "on") == "on" &&
+      !starts (raw, "Error:") && raw != "") {
+    tree doc (DOCUMENT);
+    if (is_func (t, DOCUMENT)) doc << A(t);
+    else doc << t;
+    doc << ai_raw_fold (raw);
+    t= doc;
+  }
+  return t;
 }
 
 /******************************************************************************
