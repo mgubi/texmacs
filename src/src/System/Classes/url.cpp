@@ -887,6 +887,12 @@ complete (url base, url sub, url u, string filter, bool flag) {
     url res= complete (sub[1], sub[2], u, filter, flag);
     return sub[1] * res;
   }
+  if (is_concat (sub)) {
+    // NOTE: sub[2] may hold alternatives, as obtained by completing
+    // url_any (), so that base * sub would not be a valid base
+    url res= complete (base * sub[1], sub[2], u, filter, flag);
+    return sub[1] * res;
+  }
   return sub * complete (base * sub, u, filter, flag);
 }
 

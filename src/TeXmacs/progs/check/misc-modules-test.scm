@@ -1412,17 +1412,12 @@
     "pine" "reddish" "ridged-paper" "rough-paper" "xperiment"))
 
 ;; the files of the package of the theme @th, in a subdirectory of themes
-;; FIXME: completing a url-any followed by a plain file name aborts TeXmacs
-;; (System/Classes/url.cpp:909, complete, "invalid base url"):
-;; (url-complete (url-append (url-append "$TEXMACS_PATH/packages/themes"
-;; (url-any)) "pine.ts") "fr") throws a C++ exception which is not caught,
-;; expected the url of themes/pine/pine.ts; a wildcard works.
 (define (theme-files th)
   (url->list
    (url-expand
     (url-complete
      (url-append (url-append "$TEXMACS_PATH/packages/themes" (url-any))
-                 (url-wildcard (string-append th ".ts")))
+                 (string-append th ".ts"))
      "fr"))))
 
 (define (test-posters-themes)
@@ -1437,6 +1432,10 @@
                        (lambda (th)
                          (null? (theme-files th))))
           '())
+  (check= (map url->string (theme-files "pine"))
+          (list (url->string (url-expand (url-complete
+                  "$TEXMACS_PATH/packages/themes/pine/pine.ts" "fr")))))
+  (check= (theme-files "no-such-theme") '())
   (check= (style-category "plain-poster-title") :poster-title-style)
   (check-true (style-includes? "poster" "boring-white"))
   (check-true (style-includes? "poster" "framed-poster-title"))
