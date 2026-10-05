@@ -334,7 +334,8 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string args= "--silent --no-buffer -X POST " * shell_quote (url) * " \\\n";
+    string args= "--silent --no-buffer" * curl_proxy_option (url) *
+      " -X POST " * shell_quote (url) * " \\\n";
     args << "  --data-binary " << shell_quote (tree_to_json (data));
     return curl_command (args, headers);
   }
@@ -435,6 +436,27 @@ ai_image_model (string name) {
   return occurs ("image", name) || starts (name, "dall-e");
 }
 
+// the reasoning asked of the models of an engine (preference "<engine>
+// reasoning": "default", where the model decides and nothing is sent, else
+// "low", "medium" or "high"), for the questions of the sessions only
+static string
+ai_reasoning_effort (string engine) {
+  if (!ai_stream) return "";
+  string e= get_preference (engine * " reasoning", "default");
+  if (e == "low" || e == "medium" || e == "high") return e;
+  return "";
+}
+
+static tree
+json_number (int i) {
+  return compound ("json-number", as_string (i));
+}
+
+static tree
+json_true () {
+  return compound ("json-boolean", "true");
+}
+
 // their instructions: the text of the LaTeX ones would have them draw in
 // TikZ, and their answer is a picture, with a few words
 static string ai_image_agent=
@@ -490,7 +512,8 @@ openai_messages (string agent, array<string> conv) {
 
 static tree
 openai_style_command (string url, array<string> headers, string model_name,
-                      string agent, array<string> conv, bool images= false) {
+                      string agent, array<string> conv, bool images= false,
+                      array<tree> extra= array<tree> ()) {
   array<tree> d (tree ("model"), tree (model_name),
                  tree ("messages"), openai_messages (agent, conv));
   if (images) {
@@ -498,6 +521,7 @@ openai_style_command (string url, array<string> headers, string model_name,
     d << tree ("modalities") << json_array (m);
   }
   if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
+  d << extra;
   tree data= json_object (d);
   tree h (TUPLE);
   for (int i= 0; i < N(headers); i++) h << headers[i];
@@ -526,12 +550,18 @@ chatgpt_command (string s, string model, string agent,
                      "https://api.openai.com/v1/images/generations", h,
                      json_object (d));
   }
+  array<tree> extra;
+  // (the tokens of the answer, in a last piece of the stream)
+  if (ai_stream)
+    extra << tree ("stream_options") << json_object ("include_usage", json_true ());
+  string effort= ai_reasoning_effort ("chatgpt");
+  if (effort != "") extra << tree ("reasoning_effort") << tree (effort);
   return openai_style_command (
     "https://api.openai.com/v1/chat/completions",
     array<string> ("Authorization", "Bearer " * key,
                    "Content-Type", "application/json"),
     name, agent,
-    ai_conversation (s, model, chat, history));
+    ai_conversation (s, model, chat, history), false, extra);
 }
 
 tree
@@ -569,10 +599,15 @@ ollama_command (string s, string model, string agent,
   if (model_ == "") model_= get_preference ("ollama model", "default");
   if (model_ == "default" || model_ == "")
     model_= as_string (call ("ollama-default-model"));
+  array<tree> extra;
+  if (ai_stream)
+    extra << tree ("stream_options") << json_object ("include_usage", json_true ());
+  string effort= ai_reasoning_effort ("ollama");
+  if (effort != "") extra << tree ("reasoning_effort") << tree (effort);
   return openai_style_command (
     "http://" * server * ":" * port * "/v1/chat/completions",
     array<string> ("Content-Type", "application/json"),
-    model_, agent, ai_conversation (s, model, chat, history));
+    model_, agent, ai_conversation (s, model, chat, history), false, extra);
 }
 
 // the API of OpenRouter, which is that of OpenAI, for the models of many
@@ -590,9 +625,12 @@ openrouter_command (string s, string model, string agent,
   // (who asks, which OpenRouter shows with the use of the key)
   h << string ("HTTP-Referer") << string ("https://github.com/mgubi/texmacs")
     << string ("X-Title") << string ("GNU TeXmacs");
+  array<tree> extra;
+  string effort= ai_reasoning_effort ("openrouter");
+  if (effort != "") extra << tree ("reasoning") << json_object ("effort", effort);
   return openai_style_command (
     "https://openrouter.ai/api/v1/chat/completions", h,
-    name, agent, ai_conversation (s, model, chat, history), image);
+    name, agent, ai_conversation (s, model, chat, history), image, extra);
 }
 
 // the API of Gemini: the agent is the instruction of the system, the answers
@@ -616,17 +654,49 @@ gemini_command (string s, string model, string agent,
     d << tree ("systemInstruction")
       << json_object ("parts", json_array (json_object ("text", agent)));
   d << tree ("contents") << json_array (contents);
+  array<tree> gc;
   if (image) {
     array<tree> m (tree ("TEXT"), tree ("IMAGE"));
-    d << tree ("generationConfig")
-      << json_object ("responseModalities", json_array (m));
+    gc << tree ("responseModalities") << json_array (m);
   }
+  string effort= ai_reasoning_effort ("gemini");
+  if (effort != "" && !image) {
+    // Gemini 3: a level; Gemini 2.5: a budget of tokens; with the summary
+    // of the thoughts (the parts marked thought)
+    array<tree> tc;
+    if (starts (name, "gemini-2"))
+      tc << tree ("thinkingBudget")
+         << json_number (effort == "low"? 1024: effort == "medium"? 8192: 24576);
+    else tc << tree ("thinkingLevel") << tree (effort);
+    tc << tree ("includeThoughts") << json_true ();
+    gc << tree ("thinkingConfig") << json_object (tc);
+  }
+  if (N(gc) > 0) d << tree ("generationConfig") << json_object (gc);
   return compound ("http_post",
     "https://generativelanguage.googleapis.com/v1beta/models/" * name *
       (ai_stream? string (":streamGenerateContent?alt=sse")
                 : string (":generateContent")),
     tuple ("x-goog-api-key", key, "Content-Type", "application/json"),
     json_object (d));
+}
+
+// the models of Claude which think as much as they need (from Claude 4.7:
+// thinking adaptive, with an effort), the others with a budget of tokens
+static bool
+claude_adaptive_thinking (string name) {
+  int i= 0, n= N(name);
+  while (i < n && !is_digit (name[i])) i++;
+  int major= 0, minor= 0;
+  while (i < n && is_digit (name[i])) major= 10*major + (name[i++] - '0');
+  if (i < n && name[i] == '-' && i+1 < n && is_digit (name[i+1])) {
+    i++;
+    // (not a date: claude-sonnet-4-20250514)
+    int j= i;
+    while (j < n && is_digit (name[j])) j++;
+    if (j - i <= 2)
+      while (i < n && is_digit (name[i])) minor= 10*minor + (name[i++] - '0');
+  }
+  return major > 4 || (major == 4 && minor >= 7);
 }
 
 // the API of Claude (Anthropic): the agent is the system prompt; a page asks
@@ -659,6 +729,18 @@ claude_command (string s, string model, string agent,
   }
   else if (agent != "") d << tree ("system") << tree (agent);
   d << tree ("messages") << json_array (msgs);
+  string effort= ai_reasoning_effort ("claude");
+  if (effort != "") {
+    if (claude_adaptive_thinking (name)) {
+      d << tree ("thinking") << json_object ("type", "adaptive");
+      d << tree ("output_config") << json_object ("effort", effort);
+    }
+    else {
+      int budget= effort == "low"? 2048: effort == "medium"? 8192: 16384;
+      d << tree ("thinking")
+        << json_object ("type", "enabled", "budget_tokens", json_number (budget));
+    }
+  }
   if (ai_stream) d << tree ("stream") << compound ("json-boolean", "true");
   tree h (TUPLE);
   h << tree ("x-api-key") << tree (key)
@@ -811,14 +893,22 @@ openai_style_output (tree t) {
   return json_text (json_get (m, "content")) * openai_images (m);
 }
 
+static bool
+json_is_true (tree t) {
+  return t == "true" || (is_compound (t, "json-boolean", 1) && t[0] == "true");
+}
+
+// the text of the parts of an answer of Gemini: those of the answer, or
+// those of its thoughts (marked thought, with includeThoughts)
 static string
-gemini_style_output (tree t) {
+gemini_style_output (tree t, bool thoughts= false) {
   tree c= json_get (t, "candidates");
   if (!is_func (c, TUPLE) || N(c) == 0) return "";
   tree parts= json_get (json_get (c[0], "content"), "parts");
   if (!is_func (parts, TUPLE)) return "";
   string r;
   for (int i= 0; i < N(parts); i++) {
+    if (json_is_true (json_get (parts[i], "thought")) != thoughts) continue;
     tree in= json_get (parts[i], "inlineData");
     if (is_func (in, ATTR))
       r << ai_image_text (json_text (json_get (in, "mimeType")),
@@ -829,15 +919,143 @@ gemini_style_output (tree t) {
 }
 
 static string
-claude_style_output (tree t) {
+claude_style_output (tree t, bool thoughts= false) {
   tree c= json_get (t, "content");
   if (!is_func (c, TUPLE)) return "";
   string r;
   for (int i= 0; i < N(c); i++)
-    if (json_text (json_get (c[i], "type")) == "text")
+    if (thoughts) {
+      if (json_text (json_get (c[i], "type")) == "thinking")
+        r << json_text (json_get (c[i], "thinking"));
+    }
+    else if (json_text (json_get (c[i], "type")) == "text")
       r << json_text (json_get (c[i], "text"));
   return r;
 }
+
+// the reasoning of a message, or of a piece of it (OpenRouter, Ollama:
+// reasoning; DeepSeek, vLLM: reasoning_content)
+static string
+openai_reasoning (tree m) {
+  string r= json_text (json_get (m, "reasoning"));
+  if (r == "") r= json_text (json_get (m, "reasoning_content"));
+  return r;
+}
+
+// the models which think in their text: <think>...</think> first (DeepSeek
+// R1, Qwen with Ollama), which goes to the reasoning
+static string
+ai_split_think (string r, string& reasoning) {
+  int i= 0;
+  while (i < N(r) && (r[i] == ' ' || r[i] == '\n' || r[i] == '\r')) i++;
+  if (!test (r, i, "<think>")) return r;
+  int e= search_forwards ("</think>", i, r);
+  if (e < 0) { reasoning << r (i+7, N(r)); return ""; }
+  reasoning << r (i+7, e);
+  i= e + 8;
+  while (i < N(r) && (r[i] == ' ' || r[i] == '\n' || r[i] == '\r')) i++;
+  return r (i, N(r));
+}
+
+/******************************************************************************
+* The tokens of an answer, and its cost (OpenRouter)
+******************************************************************************/
+
+struct ai_usage_rep {
+  double in, out, cached, reasoning, cost;
+  ai_usage_rep (): in (0), out (0), cached (0), reasoning (0), cost (-1) {}
+};
+
+static double
+json_double (tree t) {
+  if (is_compound (t, "json-number", 1)) t= t[0];
+  if (is_atomic (t) && t->label != "" && t->label != "null")
+    return as_double (t->label);
+  return 0;
+}
+
+static void
+ai_max (double& x, double y) {
+  if (y > x) x= y;
+}
+
+// the usage which a piece of an answer gives (the numbers only grow: those
+// of a stream are the ones so far, Claude gives them in two events):
+// OpenAI, Mistral, OpenRouter, Ollama (usage, the last piece of a stream),
+// Claude (usage, message.usage), Gemini (usageMetadata)
+static void
+ai_read_usage (tree t, ai_usage_rep& u) {
+  tree us= json_get (t, "usage");
+  if (!is_func (us, ATTR)) us= json_get (json_get (t, "message"), "usage");
+  if (is_func (us, ATTR)) {
+    double in= json_double (json_get (us, "prompt_tokens"));
+    double cr= json_double (json_get (json_get (us, "prompt_tokens_details"),
+                                      "cached_tokens"));
+    if (in == 0) {
+      // Claude: the input without the part read from, or written to, cache
+      cr= json_double (json_get (us, "cache_read_input_tokens"));
+      in= json_double (json_get (us, "input_tokens")) + cr +
+          json_double (json_get (us, "cache_creation_input_tokens"));
+    }
+    double out= json_double (json_get (us, "completion_tokens"));
+    if (out == 0) out= json_double (json_get (us, "output_tokens"));
+    double re= json_double (json_get (json_get (us, "completion_tokens_details"),
+                                      "reasoning_tokens"));
+    if (re == 0)
+      re= json_double (json_get (json_get (us, "output_tokens_details"),
+                                 "thinking_tokens"));
+    ai_max (u.in, in); ai_max (u.cached, cr);
+    ai_max (u.out, out); ai_max (u.reasoning, re);
+    tree c= json_get (us, "cost");
+    // (only OpenRouter gives it)
+    if ((is_atomic (c) && c->label != "" && c->label != "null") ||
+        is_compound (c, "json-number", 1))
+      ai_max (u.cost, json_double (c));
+  }
+  tree um= json_get (t, "usageMetadata");
+  if (is_func (um, ATTR)) {
+    double th= json_double (json_get (um, "thoughtsTokenCount"));
+    ai_max (u.in, json_double (json_get (um, "promptTokenCount")));
+    ai_max (u.cached, json_double (json_get (um, "cachedContentTokenCount")));
+    ai_max (u.out, json_double (json_get (um, "candidatesTokenCount")) + th);
+    ai_max (u.reasoning, th);
+  }
+}
+
+static string
+ai_count (double x) {
+  return as_string ((int) (x + 0.5));
+}
+
+// "1234 tokens in (1000 cached), 567 out (300 for the reasoning), $0.0012"
+static string
+ai_usage_text (ai_usage_rep u) {
+  string r= ai_count (u.in) * " tokens in";
+  if (u.cached > 0) r << " (" << ai_count (u.cached) << " cached)";
+  r << ", " << ai_count (u.out) << " out";
+  if (u.reasoning > 0)
+    r << " (" << ai_count (u.reasoning) << " for the reasoning)";
+  if (u.cost >= 0) {
+    char buf[64];
+    snprintf (buf, sizeof (buf), u.cost >= 0.01? "%.4f": "%.6f", u.cost);
+    r << ", $" << buf;
+  }
+  return r;
+}
+
+static tree
+ai_usage_line (ai_usage_rep u) {
+  string data= ai_count (u.in) * " " * ai_count (u.out) * " " *
+    ai_count (u.cached) * " " * ai_count (u.reasoning) * " " *
+    (u.cost >= 0? as_string (u.cost): string ("-1"));
+  return compound ("with", "ai-usage", data,
+                   compound ("with", "color", "dark grey", "font-size", "0.84",
+                             ai_usage_text (u)));
+}
+
+// the reasoning of the last answer which ai_output read, and its usage
+static string       ai_last_reasoning;
+static ai_usage_rep ai_last_usage;
 
 // replaces the narrow no-break spaces (U+202F, in UTF-8 e2 80 af) by spaces
 static string
@@ -875,11 +1093,13 @@ ai_is_stream (string s) {
   return test (s, i, "data:") || test (s, i, "event:");
 }
 
-string
-ai_stream_text (string s, string model, string& err) {
+static string
+ai_stream_parts (string s, string model, string& err,
+                 string& reasoning, ai_usage_rep& u) {
   string engine= ai_engine (model);
   string r;
   err= "";
+  reasoning= "";
   int i= 0, n= N(s);
   while (i < n) {
     int e= i;
@@ -896,21 +1116,41 @@ ai_stream_text (string s, string model, string& err) {
     tree er= json_get (t, "error");
     if (is_func (er, ATTR)) err= ai_error_message (er);
     else if (is_atomic (er) && er->label != "") err= er->label;
+    ai_read_usage (t, u);
     if (engine == "claude") {
       tree delta= json_get (t, "delta");
-      if (json_text (json_get (delta, "type")) == "text_delta")
+      string type= json_text (json_get (delta, "type"));
+      if (type == "text_delta")
         r << json_text (json_get (delta, "text"));
+      else if (type == "thinking_delta")
+        reasoning << json_text (json_get (delta, "thinking"));
     }
-    else if (engine == "gemini") r << gemini_style_output (t);
+    else if (engine == "gemini") {
+      r << gemini_style_output (t);
+      reasoning << gemini_style_output (t, true);
+    }
     else {
       tree c= json_get (t, "choices");
       if (is_func (c, TUPLE) && N(c) > 0) {
         tree delta= json_get (c[0], "delta");
         r << json_text (json_get (delta, "content")) << openai_images (delta);
+        reasoning << openai_reasoning (delta);
       }
     }
   }
-  return r;
+  return ai_split_think (r, reasoning);
+}
+
+string
+ai_stream_text (string s, string model, string& err, string& reasoning) {
+  ai_usage_rep u;
+  return ai_stream_parts (s, model, err, reasoning, u);
+}
+
+string
+ai_stream_text (string s, string model, string& err) {
+  string reasoning;
+  return ai_stream_text (s, model, err, reasoning);
 }
 
 static string ai_short_images (string s);
@@ -921,16 +1161,34 @@ ai_output (string s, string model, string chat) {
   string engine= ai_engine (model);
   tree t= http_from_json (s);
   string r;
+  ai_last_reasoning= "";
+  ai_last_usage= ai_usage_rep ();
   if (ai_is_stream (s)) {
     string err;
-    r= ai_stream_text (s * "\n", model, err);
+    r= ai_stream_parts (s * "\n", model, err, ai_last_reasoning,
+                        ai_last_usage);
     // (a stream which brought no text: an error, or nothing, when the
     // question was interrupted before the engine began to answer)
     if (r == "") return (err != "")? "Error: " * err: string ("");
   }
-  else if (engine == "gemini") r= gemini_style_output (t);
-  else if (engine == "claude") r= claude_style_output (t);
-  else if (engine != "unknown") r= openai_style_output (t);
+  else {
+    if (engine == "gemini") {
+      r= gemini_style_output (t);
+      ai_last_reasoning= gemini_style_output (t, true);
+    }
+    else if (engine == "claude") {
+      r= claude_style_output (t);
+      ai_last_reasoning= claude_style_output (t, true);
+    }
+    else if (engine != "unknown") {
+      r= openai_style_output (t);
+      tree c= json_get (t, "choices");
+      if (is_func (c, TUPLE) && N(c) > 0)
+        ai_last_reasoning= openai_reasoning (json_get (c[0], "message"));
+    }
+    r= ai_split_think (r, ai_last_reasoning);
+    ai_read_usage (t, ai_last_usage);
+  }
   if (r == "") return ai_error_text (s, t);
   if (N(ai_get_current_prompt (model, chat)) > 0) {
     ai_set_last_prompt (ai_get_current_prompt (model, chat), model, chat);
@@ -1368,6 +1626,106 @@ ai_raw_fold (string raw, string model= "") {
   return compound ("with", "ai-raw", "true", fold);
 }
 
+// the reasoning of a model (Markdown, in UTF-8), folded before its answer
+static tree
+ai_reasoning_fold (string reasoning) {
+  tree doc= verbatim_to_tree (trim_spaces (reasoning), false, "utf-8");
+  if (!is_func (doc, DOCUMENT)) doc= tree (DOCUMENT, doc);
+  tree fold= compound ("folded",
+                       compound ("with", "font-shape", "italic", "The reasoning"),
+                       compound ("with", "color", "dark grey", doc));
+  return compound ("with", "ai-reasoning", "true", fold);
+}
+
+// what is shown while a model thinks and its answer has not begun: the end
+// of its reasoning so far
+tree
+ai_reasoning_partial (string reasoning) {
+  string r= trim_spaces (reasoning);
+  if (N(r) > 1200) {
+    int i= N(r) - 1200;
+    while (i < N(r) && r[i] != '\n' && r[i] != ' ') i++;
+    // (not in the middle of a character of UTF-8)
+    while (i < N(r) && (((unsigned char) r[i]) & 0xc0) == 0x80) i++;
+    r= "..." * r (i, N(r));
+  }
+  tree doc (DOCUMENT);
+  doc << compound ("with", "font-shape", "italic", "Thinking...");
+  tree body= verbatim_to_tree (r, false, "utf-8");
+  if (is_func (body, DOCUMENT)) doc << A(body);
+  else if (body != "") doc << body;
+  return compound ("with", "color", "dark grey", doc);
+}
+
+/******************************************************************************
+* A question asked again: the engine said that it has too many requests, or
+* that it is overloaded (see request_link.cpp)
+******************************************************************************/
+
+// the seconds in "retry in 23.4s", "try again in 1.5s", "retryDelay": "23s"
+// ("10ms": 1), -1 when the answer does not say it
+static double
+ai_said_delay (string s) {
+  const char* keys[]= { "retry in ", "try again in ", "retryDelay\": \"",
+                        "retryDelay\":\"", NULL };
+  for (int k= 0; keys[k] != NULL; k++) {
+    int i= search_forwards (keys[k], locase_all (s));
+    if (i < 0) i= search_forwards (keys[k], s);
+    if (i < 0) continue;
+    i += N(string (keys[k]));
+    int e= i;
+    while (e < N(s) && (is_digit (s[e]) || s[e] == '.')) e++;
+    if (e == i) continue;
+    double d= as_double (s (i, e));
+    if (test (s, e, "ms")) d= d / 1000.0;
+    return d;
+  }
+  return -1;
+}
+
+// the seconds to wait before a question which failed so is asked again
+// (attempt: the times it was already asked again), 0 when the answer is no
+// such failure, or when the wait is too long (a quota of the day); why says
+// what happened
+int
+ai_retry_delay (string s, string model, int attempt, string& why) {
+  string engine= ai_engine (model);
+  if (engine == "unknown" || s == "") return 0;
+  // an answer which began is not asked again
+  string text, err, reasoning;
+  if (ai_is_stream (s)) {
+    ai_usage_rep u;
+    text= ai_stream_parts (s * "\n", model, err, reasoning, u);
+  }
+  else {
+    tree t= http_from_json (s);
+    if (engine == "gemini") text= gemini_style_output (t);
+    else if (engine == "claude") text= claude_style_output (t);
+    else text= openai_style_output (t);
+  }
+  if (text != "") return 0;
+  string l= locase_all (s);
+  if (occurs ("insufficient_quota", l) || occurs ("billing", l) ||
+      occurs ("credit", l))
+    return 0;
+  bool overloaded= occurs ("overloaded", l) || occurs ("\"code\":529", l) ||
+    occurs ("\"code\": 529", l) || occurs ("\"code\":503", l) ||
+    occurs ("\"code\": 503", l) || occurs ("\"unavailable\"", l) ||
+    occurs ("temporarily unavailable", l);
+  bool limited= occurs ("rate_limit", l) || occurs ("rate limit", l) ||
+    occurs ("rate-limit", l) || occurs ("too many requests", l) ||
+    occurs ("resource_exhausted", l) || occurs ("\"code\":429", l) ||
+    occurs ("\"code\": 429", l) || occurs ("rate limited", l);
+  if (!overloaded && !limited) return 0;
+  double said= ai_said_delay (s);
+  if (said > 60) return 0;
+  int d= 2 << attempt; // 2, 4, 8 seconds
+  if (said > d) d= (int) (said + 0.999);
+  why= limited? string ("too many requests"):
+                string ("the engine is overloaded");
+  return d;
+}
+
 tree
 ai_latex_output (string s, string model, string chat) {
   string r= ai_output (s, model, chat);
@@ -1412,15 +1770,22 @@ ai_latex_output (string s, string model, string chat) {
     t= embed_images (t);
     t= tree (WITH, MODE, "text", t);
   }
-  if (get_preference ("ai raw answer", "on") == "on" &&
-      !starts (raw, "Error:") && raw != "") {
-    tree doc (DOCUMENT);
-    if (is_func (t, DOCUMENT)) doc << A(t);
-    else doc << t;
+  if (starts (raw, "Error:") || raw == "") return t;
+  // the reasoning before the answer, folded; its tokens and its cost after
+  // it; then the answer as it came, folded
+  tree doc (DOCUMENT);
+  if (ai_last_reasoning != "" &&
+      get_preference ("ai show reasoning", "on") == "on")
+    doc << ai_reasoning_fold (ai_last_reasoning);
+  if (is_func (t, DOCUMENT)) doc << A(t);
+  else doc << t;
+  if ((ai_last_usage.in > 0 || ai_last_usage.out > 0) &&
+      get_preference ("ai show usage", "on") == "on")
+    doc << ai_usage_line (ai_last_usage);
+  if (get_preference ("ai raw answer", "on") == "on")
     doc << ai_raw_fold (raw, ai_answer_model (s));
-    t= doc;
-  }
-  return t;
+  if (N(doc) == 1 && !is_func (t, DOCUMENT)) return t;
+  return doc;
 }
 
 /******************************************************************************

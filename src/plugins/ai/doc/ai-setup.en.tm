@@ -71,13 +71,47 @@
   saved; <with|font-series|bold|Default> comes back to the instructions of
   <TeXmacs>.
 
+  The models which reason before they answer show their reasoning while it
+  comes, and keep it folded before their answer
+  (<with|font-series|bold|Show the reasoning> in the preferences removes
+  it). How much they reason is chosen with
+  <with|font-series|bold|Reasoning> in the preferences of <name|ChatGPT>,
+  <name|Claude>, <name|Gemini>, <name|OpenRouter> and <name|Ollama>, or in
+  the menu of the model in the focus bar of a session:
+  <with|font-series|bold|Default> lets the model decide,
+  <with|font-series|bold|Low>, <with|font-series|bold|Medium> and
+  <with|font-series|bold|High> ask for more and more (and cost more). Each
+  answer is followed by its tokens: those of the question with its context
+  (and the part read from the cache of the engine), those of the answer
+  (and those of its reasoning), and its cost with <name|OpenRouter>, which
+  gives it; the menu of the model gives the sum for the session.
+  <with|font-series|bold|Show the tokens and the cost> in the preferences
+  removes them. <with|font-series|bold|Insert answer> in the focus bar puts
+  the answer at the cursor (else the last one) after the session, as
+  paragraphs of the document.
+
+  When an engine says that it has too many requests, or that it is
+  overloaded, the question is asked again after a few seconds (as long as
+  the engine says, if it says it), three times at most; the session says
+  so while it waits.
+
   The key of an API is not that of a subscription: <name|ChatGPT Plus> or
   <name|Claude Pro> do not include the use of the API, which is paid apart,
   according to use. In the console of the service, set a limit to the
   spending, and make a key for <TeXmacs> alone, which you can revoke without
   the others. Never put a key in a document. All the
-  chatbots are asked by HTTP requests (with <verbatim|curl> when <TeXmacs>
-  is not built with <name|Qt>, by the browser itself in a web browser).
+  chatbots are asked by HTTP requests (with <verbatim|libcurl> or the
+  <verbatim|curl> program when <TeXmacs> is not built with <name|Qt>, by the
+  browser itself in a web browser).
+
+  Behind a proxy, the requests go through the one of the system: the
+  settings of <name|macOS> (with their exceptions and their automatic
+  configuration) and <name|Windows>, the variables
+  <verbatim|https_proxy>, <verbatim|http_proxy>, <verbatim|all_proxy> and
+  <verbatim|no_proxy> of the environment elsewhere (and before the settings
+  of <name|macOS>). Another one is given in
+  <menu|Edit|Preferences|AI|Proxy>: <verbatim|host:port>,
+  <verbatim|socks5://host:port>, or <verbatim|direct> for none.
 
   <subsection*|ChatGPT>
 

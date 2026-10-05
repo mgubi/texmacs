@@ -47,6 +47,10 @@ AC_DEFUN([LC_LIBCURL],[
       AC_DEFINE(USE_LIBCURL, 1, [Make the HTTP requests with libcurl])
       LIBCURL_CPPFLAGS="$CPPFLAGS"
       LIBCURL_LDFLAGS="$LIBS"
+      # (the proxies of the settings of macOS: CFNetwork)
+      if test "$CONFIG_OS" = "MACOS"; then
+        LIBCURL_LDFLAGS="$LIBCURL_LDFLAGS -framework CFNetwork -framework CoreFoundation"
+      fi
     ],[
       AC_MSG_RESULT(no)
       if test "$with_libcurl" = "yes"; then

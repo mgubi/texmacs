@@ -128,6 +128,12 @@ bool async_http_post_json (string url, array<string> headers_attr, tree data,
 
 #endif
 
+// the proxy of a request to u (libcurl, curl): "" when curl decides (the
+// variables of the environment), "direct" for none, else the proxy; and the
+// option of a curl command line which says it
+string http_proxy (string u);
+string curl_proxy_option (string u);
+
 inline string
 http_post (string url, array<string> headers_attr, string data) {
   string ret; 

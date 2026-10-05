@@ -23331,6 +23331,10 @@ printf '%s\n' "#define USE_LIBCURL 1" >>confdefs.h
 
       LIBCURL_CPPFLAGS="$CPPFLAGS"
       LIBCURL_LDFLAGS="$LIBS"
+      # (the proxies of the settings of macOS: CFNetwork)
+      if test "$CONFIG_OS" = "MACOS"; then
+        LIBCURL_LDFLAGS="$LIBCURL_LDFLAGS -framework CFNetwork -framework CoreFoundation"
+      fi
 
 else case e in #(
   e)

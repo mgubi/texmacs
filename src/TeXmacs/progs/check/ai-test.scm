@@ -95,6 +95,55 @@
   (check= (answer "{\"error\": {\"message\": \"invalid key\"}}" "chatgpt")
           "Error: invalid key"))
 
+(define (reasoning-fold text)
+  `(with "ai-reasoning" "true"
+     (folded (with "font-shape" "italic" "The reasoning")
+             (with "color" "dark grey" (document ,text)))))
+
+(define (usage-line data text)
+  `(with "ai-usage" ,data (with "color" "dark grey" "font-size" "0.84" ,text)))
+
+(define (test-reasoning)
+  (check-group "reasoning and tokens")
+  ;; OpenRouter: the reasoning, the text, then the tokens and the cost
+  (check= (answer (string-append
+                   "data: {\"choices\": [{\"delta\": "
+                   "{\"reasoning\": \"Let me think.\"}}]}\n\n"
+                   "data: {\"choices\": [{\"delta\": "
+                   "{\"content\": \"Yes.\"}}]}\n\n"
+                   "data: {\"choices\": [], \"usage\": {\"prompt_tokens\": 10, "
+                   "\"completion_tokens\": 5, \"completion_tokens_details\": "
+                   "{\"reasoning_tokens\": 2}, \"cost\": 0.5}}\n\n"
+                   "data: [DONE]\n\n")
+                  "openrouter")
+          `(document ,(reasoning-fold "Let me think.")
+                     (with "mode" "text" "Yes.")
+                     ,(usage-line "10 5 0 2 0.5"
+                                  "10 tokens in, 5 out (2 for the reasoning), $0.5000")))
+  ;; Claude: its thinking, and its tokens in two events (the input with the
+  ;; part read from the cache)
+  (check= (answer (string-append
+                   "event: message_start\n"
+                   "data: {\"type\": \"message_start\", \"message\": "
+                   "{\"model\": \"claude-x\", \"usage\": {\"input_tokens\": 3, "
+                   "\"cache_read_input_tokens\": 100, \"output_tokens\": 1}}}\n\n"
+                   "data: {\"type\": \"content_block_delta\", \"delta\": "
+                   "{\"type\": \"thinking_delta\", \"thinking\": \"Hmm.\"}}\n\n"
+                   "data: {\"type\": \"content_block_delta\", \"delta\": "
+                   "{\"type\": \"text_delta\", \"text\": \"Ok.\"}}\n\n"
+                   "data: {\"type\": \"message_delta\", \"delta\": "
+                   "{\"stop_reason\": \"end_turn\"}, \"usage\": "
+                   "{\"output_tokens\": 7}}\n\n")
+                  "claude")
+          `(document ,(reasoning-fold "Hmm.")
+                     (with "mode" "text" "Ok.")
+                     ,(usage-line "103 7 100 0 -1"
+                                  "103 tokens in (100 cached), 7 out")))
+  ;; a model which thinks in its text (<think>, with Ollama)
+  (check= (answer (openai "<think>Hmm.</think>\n\nAnswer.") "ollama")
+          `(document ,(reasoning-fold "Hmm.") (with "mode" "text" "Answer.")))
+  (check= (ai-reasoning "claude") "default"))
+
 (define (test-pictures)
   (check-group "pictures")
   ;; an SVG in the text
@@ -137,6 +186,7 @@
     (test-stream)
     (test-errors)
     (test-pictures)
+    (test-reasoning)
     (set-preference "ai raw answer" old))
   (test-raw-fold)
   (check-end))

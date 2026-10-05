@@ -18,6 +18,8 @@ array<string> http_mask_headers (array<string> headers_attr);
 #if QT_VERSION >= 0x060000
 
 #include <QNetworkAccessManager>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QEventLoop>
@@ -29,9 +31,35 @@ array<string> http_mask_headers (array<string> headers_attr);
 #include <QJsonDocument>
 
 // Use a single manager in order to share connections several times
+// the proxy: the preference "http proxy" ("host:port", "socks5://host:port",
+// "direct" for none), else the one of the system (its settings on macOS and
+// Windows, the variables of the environment elsewhere)
+static void
+set_proxy (QNetworkAccessManager* manager) {
+  static string last= "?";
+  string p= get_preference ("http proxy", "");
+  if (p == "default") p= "";
+  if (p == last) return;
+  last= p;
+  if (p == "") {
+    QNetworkProxyFactory::setUseSystemConfiguration (true);
+    manager->setProxy (QNetworkProxy (QNetworkProxy::DefaultProxy));
+  }
+  else if (p == "direct")
+    manager->setProxy (QNetworkProxy (QNetworkProxy::NoProxy));
+  else {
+    if (!occurs ("://", p)) p= "http://" * p;
+    QUrl u (to_qstring (p));
+    QNetworkProxy::ProxyType type= u.scheme ().startsWith ("socks")?
+      QNetworkProxy::Socks5Proxy: QNetworkProxy::HttpProxy;
+    manager->setProxy (QNetworkProxy (type, u.host (), u.port (8080)));
+  }
+}
+
 static QNetworkAccessManager*
 get_manager () {
   static QNetworkAccessManager* manager= new QNetworkAccessManager ();
+  set_proxy (manager);
   string s= get_preference ("http request timeout");
   long t= 10000; // default value is 10s
   if (is_int (s) && as_int (s) >= 0) t= 1000 * as_int (s);
