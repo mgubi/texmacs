@@ -267,7 +267,23 @@
       (check= (zotero-completion-suffixes "smith") '())
       (set-preference "zotero completion" "on")
       (set-status! 0)
-      (check= (zotero-completion-suffixes "smith") '()))))
+      (check= (zotero-completion-suffixes "smith") '())))
+  (check-group "completion cache")
+  (with-fake
+    (lambda ()
+      ;; a prefix asked again, or a longer one, needs no request while the
+      ;; answer for the shorter one was complete
+      (check= (zotero-complete "smi") '("smith2020" "smith2020a"))
+      (set! fake-requests '())
+      (check= (zotero-complete "smi") '("smith2020" "smith2020a"))
+      (check= (zotero-complete "smith2020a") '("smith2020a"))
+      (check= (list-filter fake-requests (cut string-contains? <> "q="))
+              '())
+      ;; a change of the library forgets them
+      (rename-in-zotero! "BBBB2222" "smith2021")
+      (check= (zotero-complete "smi") '("smith2020" "smith2021"))
+      (check-true (nnull? (list-filter fake-requests
+                                       (cut string-contains? <> "q=")))))))
 
 (define (test-export)
   (check-group "export")
@@ -398,7 +414,9 @@
                          "EEEE5555"))
             (set-status! 200)
             (system-remove f))))
-      ;; a file of the user is never replaced
+      ;; a file of the user is never replaced: the references of Zotero
+      ;; which it lacks are added at its end, after a comment naming their
+      ;; item
       (with f (tmp "own.bib")
         (string-save "@article{smith2020, title={Mine}}\n" f)
         (with-document "b.tm"
@@ -406,7 +424,54 @@
           (lambda ()
             (check-false (with-zotero-bibliography?))
             (zotero-update-bibliography)
-            (check= (string-load f) "@article{smith2020, title={Mine}}\n")))
+            (with t (string-load f)
+              (check-true (string-starts? t "@article{smith2020, title={Mine}}\n"))
+              (check-true (string-contains?
+                           t (string-append "% Added from Zotero by TeXmacs on ")))
+              (check-true (string-contains?
+                           t ": zotero://select/library/items/EEEE5555\n@article{zotero:EEEE5555,"))
+              (check-false (string-contains? t "zotero_own_key")))
+            (check= (zotero-bib-file-items f)
+                    '(("zotero:EEEE5555" "EEEE5555" "users/0")))
+            ;; once there, it is not added again
+            (zotero-update-bibliography)
+            (zotero-before-update "bibliography")
+            (check= (length (zotero-bib-chunks-of (string-load f))) 2)))
+        (system-remove f))
+      ;; Document -> Update adds them as well, unless the preference says no
+      (with f (tmp "own2.bib")
+        (string-save "@article{other, title={Other}}" f)
+        (with-document "b2.tm"
+            (doc-tm "  <\\bibliography|bib|tm-plain|own2>\n  </bibliography>\n")
+          (lambda ()
+            (with old (get-preference "zotero add to bib file")
+              (set-preference "zotero add to bib file" "off")
+              (zotero-before-update "bibliography")
+              (check= (string-load f) "@article{other, title={Other}}")
+              (set-preference "zotero add to bib file" old))
+            (zotero-before-update "bibliography")
+            (check= (map car (zotero-bib-chunks-of (string-load f)))
+                    '("other" "smith2020" "zotero:EEEE5555"))
+            ;; a newline before the first reference added
+            (check-true (string-starts? (string-load f)
+                                        "@article{other, title={Other}}\n"))))
+        (system-remove f))
+      ;; a key renamed in Zotero is found from the comments of the file,
+      ;; even when the document does not remember its item
+      (with f (tmp "own3.bib")
+        (string-save "" f)
+        (with-document "b3.tm"
+            (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                           "  See <cite|smith2020a>.\n\n"
+                           "  <\\bibliography|bib|tm-plain|own3>\n"
+                           "  </bibliography>\n</body>\n")
+          (lambda ()
+            (zotero-update-bibliography)
+            (check= (map car (zotero-bib-file-items f)) '("smith2020a"))
+            (set-attachment "zotero-items" (stree->tree '(tuple)))
+            (rename-in-zotero! "BBBB2222" "smith2020again")
+            (check= (zotero-citation-renames)
+                    '(("smith2020a" . "smith2020again")))))
         (system-remove f))
       ;; a document without bibliography gets one, with a managed file
       (with-document "c.tm" (doc-tm "")
@@ -715,7 +780,22 @@
           "X et al.")
   (check= (zotero-summary "k" '(("title" . (concat "On " (keepcase "Gravity")))
                                 ("year" . "2020")))
-          '("k" "On Gravity" "" "2020" #f))
+          '("k" "On Gravity" "" "2020" #f ""))
+  ;; the same work: the same DOI when both have one, otherwise the same
+  ;; title and year
+  (let ((a '("k" "On gravity" "Smith" "2020" #f "10.1000/ABC"))
+        (b '("k" "On Gravity!" "Smith" "2020" #f "https://doi.org/10.1000/abc"))
+        (c '("k" "On gravity" "Smith" "2020" #f "10.1000/other"))
+        (d '("k" "Another title" "Smith" "2021" #f "10.1000/abc"))
+        (e '("k" "On gravity" "Smith" "2020" #f "")))
+    (check-true (zotero-same-work? a b))
+    (check-false (zotero-same-work? a c))
+    (check-true (zotero-same-work? a d))
+    (check-true (zotero-same-work? c e))
+    (check= (zotero-normalized-doi " DOI:10.1/X ") "10.1/x"))
+  (check= (zotero-iso-date 0) "1970-01-01")
+  (check= (zotero-iso-date 951782400) "2000-02-29")
+  (check= (zotero-iso-date 1791158400) "2026-10-05")
   (check-true (zotero-summary-matches? "gravity 2020"
                                        '("k" "On Gravity" "Smith" "2020" #f)))
   (check-false (zotero-summary-matches? "gravity 2021"
@@ -935,6 +1015,25 @@
                   (string-append "Sources: no BibTeX file in the "
                                  "bibliography; Zotero is not running"))
           (set-status! 200))))))
+
+(define (test-import)
+  (check-group "import")
+  ;; by hand, into the database: the citations, or one reference
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (with-document "im.tm" rename-doc
+            (lambda ()
+              (check-true (zotero-can-import? (zotero-find-key "smith2020")))
+              (zotero-import-entry (zotero-find-key "smith2020"))
+              (check= (db-field "smith2020" "zotero-item") '("AAAA1111"))
+              (check-false (zotero-can-import? (zotero-find-key "smith2020")))
+              (zotero-import-citations)
+              (check= (db-field "smith2020a" "zotero-item") '("BBBB2222"))
+              (check= (db-field "zotero:EEEE5555" "zotero-item")
+                      '("EEEE5555"))
+              (check= (length (db-ids "smith2020")) 1))))))))
 
 (define (test-update-database)
   (check-group "update database")
@@ -1173,6 +1272,7 @@
   (test-renamed)
   (test-database-search)
   (test-file-search)
+  (test-import)
   (test-update-database)
   (test-renamed-database)
   (test-copies)

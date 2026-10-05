@@ -198,7 +198,11 @@
       (item (text "Search Zotero in the search of references:")
         (toggle (set-preference "zotero in database search"
                                 (if answer "on" "off"))
-                (!= (get-preference "zotero in database search") "off"))))
+                (!= (get-preference "zotero in database search") "off")))
+      (item (text "Add the references of Zotero to the BibTeX file:")
+        (toggle (set-preference "zotero add to bib file"
+                                (if answer "on" "off"))
+                (!= (get-preference "zotero add to bib file") "off"))))
     ===
     (refreshable "zotero-settings-status"
       (hlist (text settings-status) >>))

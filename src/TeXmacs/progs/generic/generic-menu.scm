@@ -579,7 +579,11 @@
     ("Search references" (focus-open-search-tool t)))
   (assuming (and (tree-in? t '(cite nocite cite-detail))
                  (zotero-citation-entry t))
-    ("Show in Zotero" (zotero-show-item (zotero-citation-entry t)))))
+    ("Show in Zotero" (zotero-show-item (zotero-citation-entry t))))
+  (assuming (and (tree-in? t '(cite nocite cite-detail)) (supports-db?)
+                 (zotero-can-import? (zotero-citation-entry t)))
+    ("Import into the database"
+     (zotero-import-entry (zotero-citation-entry t)))))
 
 (tm-menu (focus-move-menu t)
   ("Previous similar" (traverse-previous))

@@ -436,6 +436,31 @@ follow in any order.
     the group). The preference "zotero in database search" leaves Zotero
     out. In database mode, *Update from Zotero* adds a bibliography
     without file: its references are kept in the document.
+  - **After trying it, second round (2026-10-05):**
+    - *The user's BibTeX file* (revises §3.5 and principle "a file without
+      the marker is never written"): without the database, the references
+      of Zotero which the user's `.bib` lacks are appended to it, at
+      *Document -> Update -> Bibliography* and *Update from Zotero*, each
+      after a line `% Added from Zotero by TeXmacs on <date>:
+      zotero://select/...` (`zotero-add-to-bib-file`). Nothing else of
+      the file changes, and an added reference is not updated later (the
+      user may edit it). The comments let TeXmacs find the item again
+      (`zotero-bib-file-items`, used by `zotero-check-missing` for renamed
+      keys) even without the `zotero-items` attachment. Preference "zotero
+      add to bib file" (on).
+    - *Same work*: the same DOI when both summaries have one (normalized:
+      lowercase, without `https://doi.org/` or `doi:`), otherwise the same
+      title and year. The items now carry their DOI (`zotero-entry-doi`).
+    - *Completion cache*: the keys of each prefix are remembered while no
+      library changes; a longer prefix is answered from a shorter one whose
+      answer was complete.
+    - *Import by hand*: *Document -> Bibliography -> Import the citations
+      into the database* and *Focus -> Import into the database*.
+    - *Dates*: `pretty-date` knows no ISO format (Qt patterns, or `date`
+      without Qt); `zotero-iso-date` computes `YYYY-MM-DD` (UTC).
+    - *Vue*: the search window was checked under Vue (SDL's dummy video
+      driver, scripted events and snapshots); a Vue dialog now gives the
+      keyboard to its first field, as Qt does (wip_other_guis 8ceec36b23).
   - **Differences from §3.5 and §4:** the footer cannot carry a
     *Details* button, so the generation reports renamed and deleted keys
     in the footer, and *Check against Zotero...* gives the details. The

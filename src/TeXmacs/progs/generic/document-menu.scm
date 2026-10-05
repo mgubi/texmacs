@@ -814,7 +814,8 @@
 	("Local entries" (open-biblio)))
       ("Update from Zotero" (zotero-update-bibliography))
       (when (supports-db?)
-        ("Synchronize with Zotero" (zotero-synchronize)))
+        ("Synchronize with Zotero" (zotero-synchronize))
+        ("Import the citations into the database" (zotero-import-citations)))
       ("Update the citations" (zotero-update-citations))
       ("Check against Zotero..." (open-zotero-check))
       ---
