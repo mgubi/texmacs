@@ -28,6 +28,7 @@
 ("Stop" "Ausführung abbrechen")
 ("Tab" "Tabulatorabstand")
 ("TeX" "TeX")
+("The bibliography takes the references of Zotero, in %1" "Die Bibliographie übernimmt die Referenzen von Zotero, in %1")
 ("a modifier" "A Modifikator")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Ein Nur-Lese-Schlüssel wird unter https://www.zotero.org/settings/keys erstellt")
 ("abbreviation" "Abkürzung")

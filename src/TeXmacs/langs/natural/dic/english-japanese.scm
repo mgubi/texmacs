@@ -19,6 +19,7 @@
 ("Asking zotero.org: %1 (%2 s)..." "zotero.org に問い合わせ中：%1（%2 秒）...")
 ("Asking zotero.org: %1..." "zotero.org に問い合わせ中：%1...")
 ("Searching zotero.org..." "zotero.org で検索中...")
+("The bibliography takes the references of Zotero, in %1" "参考文献は Zotero の文献を使用します（%1）")
 ("a modifier" "")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "読み取り専用キーは https://www.zotero.org/settings/keys で作成できます")
 ("a series" "")

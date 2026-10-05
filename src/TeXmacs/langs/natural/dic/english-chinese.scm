@@ -19,6 +19,7 @@
 ("Asking zotero.org: %1 (%2 s)..." "正在请求 zotero.org：%1（%2 秒）...")
 ("Asking zotero.org: %1..." "正在请求 zotero.org：%1...")
 ("Searching zotero.org..." "正在 zotero.org 上搜索...")
+("The bibliography takes the references of Zotero, in %1" "参考文献使用 Zotero 的文献，保存在 %1")
 ("a modifier" "")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "只读密钥可在 https://www.zotero.org/settings/keys 创建")
 ("a series" "A 系列")

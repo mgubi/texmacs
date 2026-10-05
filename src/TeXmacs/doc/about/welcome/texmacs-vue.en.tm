@@ -185,6 +185,12 @@
   <paragraph|5 October 2026>
 
   <\itemize>
+    <item>The panel <with|font-shape|italic|Updating current buffer, please
+    wait> of <menu|Document|Update|All> goes away once the update is done
+    (it stayed until a key or a click). A bibliography inserted without
+    file takes the references of <name|Zotero> which the document cites,
+    in a file exported from <name|Zotero>, at <menu|Document|Update|All>.
+
     <item>While <name|Zotero> answers come from <verbatim|zotero.org>,
     the footer says what is asked (a search, the references of a
     bibliography...) and for how long, then how long it took or why it

@@ -19,6 +19,7 @@
 ("Asking zotero.org: %1 (%2 s)..." "Requête à zotero.org : %1 (%2 s)...")
 ("Asking zotero.org: %1..." "Requête à zotero.org : %1...")
 ("Searching zotero.org..." "Recherche sur zotero.org...")
+("The bibliography takes the references of Zotero, in %1" "La bibliographie prend les références de Zotero, dans %1")
 ("\"encryption\" features from the preference panel" "fonctions de chiffrement du panneau de préférences")
 ("(Re)Build autocompletion index" "(Re)Construire l'index d'autocomplétion")
 ("Bibtex command" "commande Bibtex")

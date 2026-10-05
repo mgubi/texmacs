@@ -125,7 +125,10 @@
   When the bibliography of the document has no <BibTeX> file yet,
   <menu|Document|Bibliography|Update from Zotero> adds a bibliography with a
   file <verbatim|<em|name>-zotero.bib>, named after the document, and fills
-  it with the references of the citations. Such a file starts with the line
+  it with the references of the citations. <menu|Document|Update|All> does
+  the same for a bibliography without file (as inserted by
+  <menu|Insert|Automatic|Bibliography>), when Zotero has references which
+  the document cites. Such a file starts with the line
   <verbatim|% Exported from Zotero by TeXmacs>, and only contains the items
   which the document cites. <TeXmacs> rewrites it at each
   <menu|Document|Update|Bibliography> (or <menu|Document|Update|All>), so
