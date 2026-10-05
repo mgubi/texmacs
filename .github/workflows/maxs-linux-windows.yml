@@ -231,7 +231,9 @@ jobs:
           tail -20 "$home/log.txt"
           [ $ok = yes ] || { echo "error: the document is not shown"; exit 1; }
 
+      # NOTE: also when the smoke test fails (to try the bundle elsewhere)
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: texmacs-vue-linux-x86_64
           path: src/texmacs-vue-linux-x86_64.tar.gz
@@ -367,7 +369,9 @@ jobs:
           grep -v "approximating font" "$home/log.txt" | tail -60
           [ $ok = yes ] || { echo "error: the document is not shown"; exit 1; }
 
+      # NOTE: also when the smoke test fails (to try the bundle elsewhere)
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: texmacs-vue-windows-x86_64
           path: texmacs-vue-windows-x86_64.zip
