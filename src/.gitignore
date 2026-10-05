@@ -39,6 +39,7 @@ misc/benchmark/gbench
 
 TeXmacs/progs/ice-9
 src/Plugins/Qt/moc_*.cpp
+src/Plugins/Qtwk/moc_*.cpp
 src/Deps
 src/Objects
 TeXmacs/plugins/
