@@ -194,8 +194,9 @@
     Their keys are given in <menu|Insert|Session|Preferences>, and kept in
     the wallet when it is on; <with|font-series|bold|Update the list of
     models> asks each one which models the key gives. A session begins with
-    the name of its model, and the answers are shown as they come, then set
-    by <TeXmacs> when they are complete; executable folds of chatbots work
+    the name of its model, and the answers are shown as they come, set as
+    far as their <LaTeX> is complete (an environment or a formula which is
+    not closed yet waits for its end); executable folds of chatbots work
     too. A question is sent with the conversation above it in the session
     as its context. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 

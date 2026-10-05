@@ -20,7 +20,9 @@
   chatbot which models it offers to this key, and proposes them in
   <with|font-series|bold|Model>. A session begins with the name of the model
   which it asks; in a web browser the answer is shown as it comes (in grey),
-  and replaced by the answer set by <TeXmacs> when it is complete.
+  set by <TeXmacs> as far as it can be: up to the last environment, group
+  or formula which is not closed yet. It is replaced by the whole answer
+  when it is complete.
 
   A question of a session is sent with the conversation above it in the
   session, as its context: the last questions and answers (10 by default,

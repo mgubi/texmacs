@@ -150,6 +150,8 @@ array<string> ai_get_body (string r);
 string ai_latex_command (string s, string model, string chat= "");
 string ai_latex_request (string s, string model, string chat= "");
 string ai_stream_text (string s, string model, string& err);
+tree ai_latex_body_to_tree (string r);
+tree ai_latex_partial (string r);
 tree ai_latex_output (string s, string model, string chat= "");
 string ai_chat (string s, string model, string agent, string chat= "");
 tree ai_translate (tree t, string from, string into, string m, string c= "");

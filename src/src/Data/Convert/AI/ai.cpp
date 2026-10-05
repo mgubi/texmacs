@@ -823,13 +823,109 @@ ai_latex_output (string s, string model, string chat) {
   pre= r (0, start);
   post= r (end, N(r));
   r= r (start, end);
+  // (the answers are decoded from JSON: their \n are newlines already, and
+  // un_escape_cr would make \nu a newline followed by u)
+  tree t= ai_latex_body_to_tree (r);
+  t= embed_images (t);
+  return tree (WITH, MODE, "text", t);
+}
+
+/******************************************************************************
+* An answer which is not complete yet (a streamed one, see request_link.cpp)
+******************************************************************************/
+
+static bool
+ai_verbatim_env (string env) {
+  return env == "verbatim" || env == "lstlisting" || env == "minted" ||
+         env == "verbatim*" || env == "filecontents" || env == "filecontents*";
+}
+
+// the longest beginning of the LaTeX s after which all is closed: the
+// environments, the groups, the formulas ($, $$, \(, \[); an environment
+// which is not closed yet, and what follows it, waits for its end
+static string
+ai_latex_closed_prefix (string s) {
+  int n= N(s), i= 0, depth= 0, safe= 0;
+  bool math= false, dmath= false;
+  array<string> envs;
+  while (i < n) {
+    char c= s[i];
+    if (c == '%') {
+      while (i < n && s[i] != '\n') i++;
+    }
+    else if (c == '\\') {
+      int j= i + 1;
+      if (j >= n) break; // a command which is not written yet
+      if (is_alpha (s[j])) {
+        while (j < n && is_alpha (s[j])) j++;
+        if (j >= n) break; // its name may go on
+        string name= s (i + 1, j);
+        if (name == "begin" || name == "end") {
+          if (j >= n || s[j] != '{') { i= j; goto next; }
+          int k= search_forwards ("}", j, s);
+          if (k < 0) break;
+          string env= s (j + 1, k);
+          j= k + 1;
+          if (name == "begin") {
+            envs << env;
+            if (ai_verbatim_env (env)) {
+              int e= search_forwards ("\\end{" * env * "}", j, s);
+              if (e < 0) break;
+              j= e + N(env) + 6;
+              envs->resize (N(envs) - 1);
+            }
+          }
+          else if (N(envs) > 0 && envs[N(envs)-1] == env)
+            envs->resize (N(envs) - 1);
+        }
+        i= j;
+      }
+      else {
+        if (s[j] == '(' || s[j] == '[') math= true;
+        else if (s[j] == ')' || s[j] == ']') math= false;
+        i= j + 1;
+      }
+    }
+    else if (c == '{') { depth++; i++; }
+    else if (c == '}') { if (depth > 0) depth--; i++; }
+    else if (c == '$') {
+      if (i + 1 < n && s[i+1] == '$') { dmath= !dmath; i += 2; }
+      else if (i + 1 >= n) break; // $ or $$
+      else { math= !math; i++; }
+    }
+    else i++;
+  next:
+    if (depth == 0 && !math && !dmath && N(envs) == 0) safe= i;
+  }
+  return s (0, safe);
+}
+
+tree
+ai_latex_body_to_tree (string r) {
   r= replace (r, "\\maketitle", "");
   r= replace (r, "\\begin{lstlisting}", "\\begin{verbatim}");
   r= replace (r, "\\end{lstlisting}", "\\end{verbatim}");
-  r= un_escape_cr (r);
-  tree t= generic_to_tree (r, "latex-snippet");
-  t= embed_images (t);
-  return tree (WITH, MODE, "text", t);
+  return generic_to_tree (r, "latex-snippet");
+}
+
+// what is shown of an answer which is still coming: a LaTeX document is set
+// as far as all is closed in it (nothing while its preamble comes), any
+// other text is shown as it is
+tree
+ai_latex_partial (string r) {
+  int b= search_forwards ("\\begin{document}", r);
+  if (b < 0) {
+    if (occurs ("\\documentclass", r)) return "";
+    return verbatim_to_tree (r, false, "utf-8");
+  }
+  r= r (b + 16, N(r));
+  int e= search_forwards ("\\end{document}", r);
+  if (e >= 0) r= r (0, e);
+  r= ai_latex_closed_prefix (r);
+  int k= 0;
+  while (k < N(r) && (r[k] == ' ' || r[k] == '\n' || r[k] == '\r')) k++;
+  if (k == N(r)) return "";
+  return tree (WITH, MODE, "text", ai_latex_body_to_tree (r));
 }
 
 /******************************************************************************

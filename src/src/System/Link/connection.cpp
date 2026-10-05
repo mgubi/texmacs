@@ -45,7 +45,7 @@ struct connection_rep: rep<connection> {
   bool    request_eval;  // request style evaluation
   texmacs_input tm_out;  // texmacs input handler for output from child
   texmacs_input tm_err;  // texmacs input handler for errors from child
-  string shown_partial;  // the partial answer last shown (request links)
+  tree   shown_partial;  // the partial answer last shown (request links)
 
 public:
   connection_rep (string name, string session, tm_link ln);
@@ -210,11 +210,10 @@ connection_rep::listen () {
     connection_notify (this, "error", tm_err->get ("error"));
     if (request_eval && status == WAITING_FOR_OUTPUT) {
       // a request whose answer comes in pieces: the text so far
-      string p= ln->partial ();
+      tree p= ln->partial ();
       if (p != shown_partial) {
         shown_partial= p;
-        if (p != "")
-          connection_notify (this, "progress", verbatim_to_tree (p, false, "utf-8"));
+        if (p != "") connection_notify (this, "progress", p);
       }
     }
     read (LINK_OUT);

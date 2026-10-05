@@ -50,9 +50,9 @@ public:
   virtual void    listen (int msecs) = 0;
   virtual void    interrupt () = 0;
   virtual void    stop () = 0;
-  // the output so far of an answer which is not complete yet ("" when the
-  // link gives none: see request_link.cpp), shown on the channel "progress"
-  virtual string  partial () { return ""; }
+  // what is shown of an answer which is not complete yet ("" when the link
+  // gives none: see request_link.cpp), on the channel "progress"
+  virtual tree    partial () { return ""; }
 
   void write_packet (string s, int channel);
   bool complete_packet (int channel);

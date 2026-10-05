@@ -357,7 +357,10 @@ the preferences or the environment (`ai-api-key` in `init-ai.scm`).
   (`"stream": true`, Gemini's `streamGenerateContent?alt=sse`): `fetch`
   reads it as it comes (`slot.parts` in `web_files.cpp`), the request link
   decodes the events so far (`request_link_rep::partial`,
-  `ai_stream_text`), and the connection gives them on the channel
+  `ai_stream_text`) and sets their LaTeX as far as all is closed in it
+  (`ai_latex_partial`, `ai_latex_closed_prefix`: environments, groups,
+  formulas; a verbatim environment as a whole), and the connection gives
+  them on the channel
   `"progress"`, which a session shows in grey before the busy sign
   (`session-show-progress`) and a fold through its progress procedure,
   until the output replaces them. A session begins with the engine and its
