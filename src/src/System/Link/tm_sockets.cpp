@@ -26,6 +26,7 @@
 #include "gnutls.hpp"
 #include "tm_timer.hpp"
 #include <cctype>
+#include <string.h> // memset, memcpy (without Qt, which included it)
 
 #if defined(OS_MACOS)
   #include "MacOS/mac_utilities.h"
