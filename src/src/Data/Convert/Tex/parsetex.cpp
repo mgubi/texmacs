@@ -671,6 +671,18 @@ is_text_argument (string cmd, int remaining_arity) {
   return cmd == "\\label" || cmd == "\\ref";
 }
 
+// the commands whose argument is a piece of a line of text: a space at the
+// start of it is typeset (a\textbf{ b} is "a b"), where parse skips the
+// spaces which begin a group
+static bool
+keeps_leading_space (string cmd) {
+  return cmd == "\\text" || cmd == "\\textnormal" || cmd == "\\mbox" ||
+         cmd == "\\hbox" || cmd == "\\emph" || cmd == "\\textbf" ||
+         cmd == "\\textit" || cmd == "\\textrm" || cmd == "\\textsf" ||
+         cmd == "\\texttt" || cmd == "\\textsc" || cmd == "\\textsl" ||
+         cmd == "\\textup" || cmd == "\\textmd" || cmd == "\\underline";
+}
+
 void
 skip_linespaces (string s, int& i) {
   int n=N(s);
@@ -988,6 +1000,15 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
         if ((N(t)==1) && (cmd == "\\def")) {
           while ((i<n) && (s[i]!='}')) i++;
           t << s (j, i);
+        }
+        else if (keeps_leading_space (cmd) && i<n &&
+                 (s[i]==' ' || s[i]=='\t')) {
+          tree a= parse (s, i, "}", change);
+          tree c (CONCAT);
+          c << " ";
+          if (is_concat (a)) c << A(a);
+          else if (a != "") c << a;
+          t << c;
         }
         else t << parse (s, i, "}", change);
         if (text_arg) command_type ("!mode")= "math";
