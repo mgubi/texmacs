@@ -5,18 +5,31 @@
 <\body>
   <tmdoc-title|Citations from Zotero>
 
-  <TeXmacs> can take its bibliographic references directly from the library
-  of the <hlink|Zotero|https://www.zotero.org> desktop application (version
-  7 or later). <TeXmacs> only reads the library: it never changes anything
-  in Zotero.
+  <TeXmacs> can take its bibliographic references directly from your
+  <hlink|Zotero|https://www.zotero.org> library: from the Zotero desktop
+  application (version 7 or later), or from <verbatim|zotero.org>, where
+  Zotero keeps a copy of the library when it is synchronized. <TeXmacs>
+  only reads the library: it never changes anything in Zotero.
 
   <subsubsection*|Setting up Zotero>
 
-  Zotero answers the requests of other applications once <with|font-shape|italic|Allow
-  other applications on this computer to communicate with Zotero> is
-  enabled, in the advanced settings of Zotero. Zotero must be running while
-  you cite or update a bibliography; when it is not, <TeXmacs> says so in
-  the footer, and uses the references which it obtained before.
+  <with|font-series|bold|With the Zotero application.> Zotero answers the
+  requests of other applications once <with|font-shape|italic|Allow other
+  applications on this computer to communicate with Zotero> is enabled, in
+  the advanced settings of Zotero. Zotero must be running while you cite or
+  update a bibliography; when it is not, <TeXmacs> says so in the footer,
+  and uses the references which it obtained before.
+
+  <with|font-series|bold|With zotero.org.> When your library is
+  synchronized with <verbatim|zotero.org>, <TeXmacs> can read it there,
+  without the application: create a key on
+  <hlink|zotero.org/settings/keys|https://www.zotero.org/settings/keys>
+  (reading access to your library, and to your groups if you want them, is
+  enough), and give it in the settings, with <menu|Read the library
+  from|zotero.org>. The key is kept in your wallet when it is open, and
+  otherwise in your preferences. In <TeXmacs> in a web browser, the library
+  is always read from <verbatim|zotero.org>: Zotero refuses the requests of
+  web pages, also when the application runs on the same computer.
 
   The citations use the citation keys of Zotero, which Zotero (or the
   Better<nbsp>BibTeX extension) stores in the field <verbatim|citationKey>.
@@ -32,7 +45,14 @@
   The settings are in <menu|Document|Bibliography|Zotero settings...>:
 
   <\description>
-    <item*|Zotero server>The address of Zotero,
+    <item*|Read the library from>The Zotero application,
+    <verbatim|zotero.org>, or <verbatim|Automatic>: <verbatim|zotero.org>
+    in a web browser, the application elsewhere.
+
+    <item*|API key of zotero.org>The key with which <TeXmacs> reads your
+    library on <verbatim|zotero.org>.
+
+    <item*|Zotero server>The address of the Zotero application,
     <verbatim|http://localhost:23119> by default.
 
     <item*|Libraries>Your own library only (<verbatim|My Library>), or also
@@ -83,7 +103,8 @@
 
   When the cursor is on a key which <TeXmacs> has already found in Zotero,
   <menu|Focus|Show in Zotero> (or the button <verbatim|Z> of the focus
-  bar) selects its item in Zotero.
+  bar) selects its item in Zotero, or opens its page on
+  <verbatim|zotero.org> when the library is read there.
 
   <subsubsection*|Generating the bibliography>
 

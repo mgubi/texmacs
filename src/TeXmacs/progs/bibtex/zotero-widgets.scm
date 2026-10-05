@@ -174,12 +174,36 @@
   (zotero-forget-state)
   (zotero-forget-keys))
 
+(define source-names
+  '(("auto" . "Automatic") ("local" . "The Zotero application")
+    ("web" . "zotero.org")))
+
+(define (source-name) (assoc-ref source-names (get-preference "zotero source")))
+
+(define (set-source name)
+  (with x (list-find source-names (lambda (p) (== (cdr p) name)))
+    (when x (set-zotero-preference "zotero source" (car x)))))
+
 (tm-widget ((zotero-settings-widget) cmd)
   (padded
     (aligned
-      (item (text "Zotero server:")
-        (input (when answer (set-zotero-preference "zotero server" answer))
-               "string" (list (get-preference "zotero server")) "20em"))
+      (item (text "Read the library from:")
+        (enum (set-source answer)
+              (map cdr (if (zotero-in-browser?)
+                           ;; NOTE: a web page cannot reach the application
+                           (list-filter source-names
+                                        (lambda (p) (!= (car p) "local")))
+                           source-names))
+              (or (source-name) "Automatic") "20em"))
+      (item (text "API key of zotero.org:")
+        (input (when (and answer (!= answer (zotero-api-key-shown)))
+                 (zotero-set-api-key (tm-string-trim-both answer)))
+               "string" (list (zotero-api-key-shown)) "20em"))
+      ;; NOTE: a web page cannot reach the application
+      (assuming (not (zotero-in-browser?))
+        (item (text "Zotero server:")
+          (input (when answer (set-zotero-preference "zotero server" answer))
+                 "string" (list (get-preference "zotero server")) "20em")))
       (item (text "Libraries:")
         (enum (set-zotero-preference "zotero libraries"
                                      (if (== answer "My Library and groups")
@@ -204,6 +228,10 @@
                                 (if answer "on" "off"))
                 (!= (get-preference "zotero add to bib file") "off"))))
     ===
+    (hlist
+      (text "A read-only key is made at https://www.zotero.org/settings/keys")
+      >>)
+    ===
     (refreshable "zotero-settings-status"
       (hlist (text settings-status) >>))
     ===
@@ -215,5 +243,9 @@
   (:synopsis "The settings of the citations from Zotero")
   (:interactive #t)
   (set! settings-status
-        (string-append "Zotero (local API) at " (get-preference "zotero server")))
+        (if (zotero-web?)
+            (if (zotero-api-key) "zotero.org, with an API key"
+                "zotero.org: give an API key")
+            (string-append "Zotero (local API) at "
+                           (get-preference "zotero server"))))
   (dialogue-window (zotero-settings-widget) noop "Zotero settings"))
