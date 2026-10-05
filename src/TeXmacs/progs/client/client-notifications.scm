@@ -48,6 +48,12 @@
       ((eq? kind 'message)
        (add-notification server nid 'message
                          (lambda () (mail-box-open server)) notif))
+      ((eq? kind 'chat)
+       (and-let* ((data (assoc-ref notif "data"))
+                  (room (and (pair? data) (car data)))
+                  (ok? (string? room)))
+         (add-notification server nid 'chat
+                           (lambda () (chat-room-join server room)) notif)))
       (else #f))))
 
 
