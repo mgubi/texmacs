@@ -20,7 +20,6 @@
 
 ;;; Punctuation
 
-("<mathhyphen>"		"#2010")	; hyphen [12 fonts]
 ("<horizbar>"		"#2015")	; horizontal bar [10 fonts]
 ("<twolowline>"		"#2017")	; double low line (spacing) [9 fonts]
 ("<dprime>"		"#2033")	; double prime or second, not superscripted [10 fonts]
