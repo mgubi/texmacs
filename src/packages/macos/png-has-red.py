@@ -45,6 +45,14 @@ def pixels (path):
     prev= row
 
 def has_red (path):
+  # NOTE: a file being written (the Vue port saves its windows at each
+  # redraw) is not a PNG yet: no red in it, for now
+  try:
+    return has_red_in (path)
+  except Exception:
+    return False
+
+def has_red_in (path):
   count= 0
   for row, bpp in pixels (path):
     for i in range (0, len (row), bpp):

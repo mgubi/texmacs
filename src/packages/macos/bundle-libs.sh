@@ -89,7 +89,9 @@ function bundle_lib {
     case $lib in
     /System*) ;;
     /Library*) ;;
-    /+(opt/local|opt/homebrew|sw|Users|usr/local)/*/lib*.dylib|/usr/lib/libltdl.*.dylib)
+    # NOTE: also the temporary directories (/private, /tmp), where libraries
+    # built for the application may be (packages/macos/build-deps.sh)
+    /+(opt/local|opt/homebrew|sw|Users|usr/local|private|tmp)/*/lib*.dylib|/usr/lib/libltdl.*.dylib)
     local blib="$(basename $lib)"
     if ! test -f "$libdest/$blib"
     then 
