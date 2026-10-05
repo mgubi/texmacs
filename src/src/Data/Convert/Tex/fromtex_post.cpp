@@ -500,6 +500,7 @@ translate_list (string s) {
   if (s == "compactenum") return "enumerate";
   if (s == "itemize*") return "itemize";
   if (s == "enumerate*") return "enumerate";
+  if (s == "description*") return "description";
   if (s == "asparaitem*") return "itemize";
   if (s == "inparaitem*") return "itemize";
   if (s == "compactitem*") return "itemize";
@@ -1677,12 +1678,24 @@ is_hyper_link (string s) {
   return starts (s, "http://") || starts (s, "https://") || starts (s, "ftp://");
 }
 
+// the lists, which may have an option (of enumitem: [nosep],
+// [label=(\alph*)]...) before their items
+static bool
+is_list_tag (tree t) {
+  if (!is_compound (t) || N(t) != 2) return false;
+  string s= as_string (L(t));
+  return s == "itemize" || s == "enumerate" || s == "description" ||
+         starts (s, "itemize-") || starts (s, "enumerate-") ||
+         starts (s, "description-");
+}
+
 tree
 finalize_misc (tree t) {
   if (is_atomic (t)) return t;
   // Fixme: to be improved when TeXmacs will allow easy personalisation
-  else if (is_compound (t, "enumerate", 2))
-    return compound ("enumerate", t[1]);
+  // (the option of a list is dropped; without it, the items were lost)
+  else if (is_list_tag (t))
+    return compound (as_string (L(t)), finalize_misc (t[1]));
   else if (is_compound (t, "verbatim", 1) &&
            is_atomic (t[0]) && is_hyper_link (t[0]->label)) {
     return compound ("slink", finalize_misc (t[0]));

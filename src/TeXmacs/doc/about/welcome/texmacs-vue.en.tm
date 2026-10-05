@@ -215,6 +215,13 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item><LaTeX> import (and answers of the chatbots): a space which
+    begins the argument of <verbatim|\\text>, <verbatim|\\textbf>,
+    <verbatim|\\emph>... is kept (<verbatim|f\\text{ continuous}> showed
+    <with|font-shape|italic|fcontinuous>), and the lists with options
+    (<verbatim|\\begin{itemize}[nosep]>, a <verbatim|description> with
+    options) keep their items.
+
     <item>The text of a <verbatim|\\parbox> imported from <LaTeX> is
     text, also in a formula (it was read as mathematics). In an answer of a
     chatbot, a <verbatim|\\parbox> alone in a displayed formula is shown as
