@@ -360,7 +360,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (htmltm-math env a c)
-(with cm `(m:math (@ ,@a) ,(replace-nsprefix-in-stree c "h:" "m:"))
+(with cm `(m:math (@ ,@a) ,@(replace-nsprefix-in-stree c "h:" "m:"))
   `(,(mathtm-as-serial env cm))
 ))
 
@@ -578,7 +578,7 @@
   (mathjax (handler :collapse :inline htmltm-mathjax))
   
   ;;; Math tag in HTML5 (no namespace prefix)
-  (math (handler :mixed :block htmltm-math))
+  (math (handler :mixed :inline htmltm-math))
   
   ;; Tags present in the previous converter
   ;; Unknown: FIG FN NOTE AU LANG PERSON
