@@ -1114,10 +1114,41 @@
   (set! completions (make-ahash-table))
   (set! library-versions (make-ahash-table)))
 
+(define (key-author-year key)
+  ;; The words "author year" of a citation key made by Better BibTeX (or
+  ;; Zotero), as barashkovF43MeasureGirsanovs2020: the name of the first
+  ;; author in lower case, words of the title, the year; #f otherwise
+  (let* ((l (string->list key))
+         (author (let loop ((l l) (acc '()))
+                   (if (and (pair? l) (char-lower-case? (car l)))
+                       (loop (cdr l) (cons (car l) acc))
+                       (list->string (reverse acc)))))
+         ;; (a letter may follow the year: smith2020a, smith2020b)
+         (r (with r (reverse l)
+              (if (and (pair? r) (pair? (cdr r)) (char-lower-case? (car r))
+                       (char-numeric? (cadr r)))
+                  (cdr r) r)))
+         (year (let loop ((l r) (acc '()))
+                 (if (and (pair? l) (char-numeric? (car l)))
+                     (loop (cdr l) (cons (car l) acc))
+                     (list->string acc)))))
+    (and (>= (string-length author) 2)
+         (< (string-length author) (string-length key))
+         (if (== (string-length year) 4)
+             (string-append author " " year)
+             author))))
+
 (define (find-in-library lib key)
-  ;; NOTE: the search also finds longer keys containing key
-  (list-find (search-library lib key 100 #f #t)
-             (lambda (e) (== (zotero-entry-key e) key))))
+  ;; NOTE: the search also finds longer keys containing key. zotero.org
+  ;; only searches the titles, the creators and the years (also with
+  ;; qmode=everything), not the citation keys: there the items of the
+  ;; author of the year are searched first
+  (let ((match (lambda (l)
+                 (list-find l (lambda (e) (== (zotero-entry-key e) key))))))
+    (or (and (zotero-web?)
+             (and-with q (key-author-year key)
+               (match (search-library lib q 100 #f))))
+        (match (search-library lib key 100 #f #t)))))
 
 (tm-define (zotero-find-key key)
   (:synopsis "The entry of the item with the citation key @key, or #f")
