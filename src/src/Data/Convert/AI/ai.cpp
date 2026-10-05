@@ -20,6 +20,7 @@
 #include "file.hpp"
 #include "scheme.hpp"
 #include "web_files.hpp"
+#include "base64.hpp"
 
 /******************************************************************************
 * Various engines
@@ -399,6 +400,26 @@ ai_model_name (string engine, string fallback) {
   return m;
 }
 
+// the models which draw pictures (PNG, JPEG): those of Gemini whose name
+// says "image", gpt-image and dall-e of OpenAI
+static bool
+ai_image_model (string name) {
+  return occurs ("image", name) || starts (name, "dall-e");
+}
+
+// their instructions: the text of the LaTeX ones would have them draw in
+// TikZ, and their answer is a picture, with a few words
+static string ai_image_agent=
+  "You are inside GNU TeXmacs, a scientific editor. Draw the picture "
+  "which is asked for as an image, and say in a sentence or two what it "
+  "shows, in plain text, in the language of the question.";
+
+// the agent is the default instructions (those of the user are kept)
+static bool
+ai_default_agent (string model, string agent) {
+  return agent == as_string (call ("ai-default-instructions", model));
+}
+
 // the conversation: (role, text) pairs, the last one the prompt. In a
 // session it is the one of the session (ai-session-context in init-ai.scm:
 // the questions and the answers of the fields above, as LaTeX), else the
@@ -455,11 +476,29 @@ tree
 chatgpt_command (string s, string model, string agent,
                  string chat, bool history) {
   string key= ai_key ("chatgpt", "OPENAI_API_KEY");
+  string name= ai_model_name ("chatgpt", "gpt-5-mini");
+  if (ai_image_model (name)) {
+    // a picture (b64_json in the answer): the prompt alone, not streamed
+    // (the instructions of the user, if they changed them, come first)
+    string prompt= s;
+    if (agent != "" && !ai_default_agent (model, agent))
+      prompt= agent * "\n\n" * s;
+    array<tree> d (tree ("model"), tree (name), tree ("prompt"), tree (prompt));
+    d << tree ("n") << compound ("json-number", "1");
+    if (starts (name, "dall-e"))
+      d << tree ("response_format") << tree ("b64_json");
+    tree h (TUPLE);
+    h << tree ("Authorization") << tree ("Bearer " * key)
+      << tree ("Content-Type") << tree ("application/json");
+    return compound ("http_post",
+                     "https://api.openai.com/v1/images/generations", h,
+                     json_object (d));
+  }
   return openai_style_command (
     "https://api.openai.com/v1/chat/completions",
     array<string> ("Authorization", "Bearer " * key,
                    "Content-Type", "application/json"),
-    ai_model_name ("chatgpt", "gpt-5-mini"), agent,
+    name, agent,
     ai_conversation (s, model, chat, history));
 }
 
@@ -516,11 +555,18 @@ gemini_command (string s, string model, string agent,
     contents << json_object ("role", conv[i] == "user"? "user": "model",
                              "parts", json_array (part));
   }
+  bool image= ai_image_model (name);
+  if (image && ai_default_agent (model, agent)) agent= ai_image_agent;
   array<tree> d;
   if (agent != "")
     d << tree ("systemInstruction")
       << json_object ("parts", json_array (json_object ("text", agent)));
   d << tree ("contents") << json_array (contents);
+  if (image) {
+    array<tree> m (tree ("TEXT"), tree ("IMAGE"));
+    d << tree ("generationConfig")
+      << json_object ("responseModalities", json_array (m));
+  }
   return compound ("http_post",
     "https://generativelanguage.googleapis.com/v1beta/models/" * name *
       (ai_stream? string (":streamGenerateContent?alt=sse")
@@ -634,9 +680,29 @@ ai_error_text (string val, tree t) {
   return "Error: unexpected answer: " * val;
 }
 
+// a picture of an answer, in its text: as an image of Markdown with a data
+// URL (which ai_set_aside makes an image of TeXmacs)
+static string
+ai_image_text (string mime, string data) {
+  if (mime == "") mime= "image/png";
+  return "\n\n![](data:" * mime * ";base64," * data * ")\n\n";
+}
+
 static string
 openai_style_output (tree t) {
   tree c= json_get (t, "choices");
+  tree pics= json_get (t, "data"); // an answer of images/generations
+  if (is_func (pics, TUPLE) && N(pics) > 0 &&
+      json_text (json_get (pics[0], "b64_json")) != "") {
+    string r= json_text (json_get (pics[0], "revised_prompt"));
+    string fmt= json_text (json_get (t, "output_format"));
+    for (int i= 0; i < N(pics); i++)
+      r << ai_image_text (fmt == "jpeg"? string ("image/jpeg"):
+                          fmt == "webp"? string ("image/webp"):
+                          string ("image/png"),
+                          json_text (json_get (pics[i], "b64_json")));
+    return r;
+  }
   if (!is_func (c, TUPLE) || N(c) == 0) return "";
   tree m= json_get (c[0], "message");
   return json_text (json_get (m, "content"));
@@ -649,8 +715,13 @@ gemini_style_output (tree t) {
   tree parts= json_get (json_get (c[0], "content"), "parts");
   if (!is_func (parts, TUPLE)) return "";
   string r;
-  for (int i= 0; i < N(parts); i++)
-    r << json_text (json_get (parts[i], "text"));
+  for (int i= 0; i < N(parts); i++) {
+    tree in= json_get (parts[i], "inlineData");
+    if (is_func (in, ATTR))
+      r << ai_image_text (json_text (json_get (in, "mimeType")),
+                          json_text (json_get (in, "data")));
+    else r << json_text (json_get (parts[i], "text"));
+  }
   return r;
 }
 
@@ -728,6 +799,8 @@ ai_stream_text (string s, string model, string& err) {
   return r;
 }
 
+static string ai_short_images (string s);
+
 string
 ai_output (string s, string model, string chat) {
   ai_set_continuation (s, model, chat);
@@ -745,7 +818,7 @@ ai_output (string s, string model, string chat) {
   if (r == "") return ai_error_text (s, t);
   if (N(ai_get_current_prompt (model, chat)) > 0) {
     ai_set_last_prompt (ai_get_current_prompt (model, chat), model, chat);
-    ai_set_last_answer (r, model, chat);
+    ai_set_last_answer (ai_short_images (r), model, chat);
   }
   if (engine == "albert") {
     r= replace_tikz_by_pdf (r);
@@ -889,6 +962,58 @@ ai_svg_image (string svg) {
   return tree (IMAGE, data, "", "", "", "");
 }
 
+// the next picture given as a data URL in s from i (data:image/png;base64,
+// ...): its type, and where its URL begins and ends; -1 if none
+static bool
+ai_base64_char (char c) {
+  return is_alpha (c) || is_digit (c) || c == '+' || c == '/' || c == '=';
+}
+
+static int
+ai_find_data_image (string s, int i, string& mime, int& end) {
+  while ((i= search_forwards ("data:image/", i, s)) >= 0) {
+    int k= i + 11;
+    while (k < N(s) && (is_alpha (s[k]) || s[k] == '+' || s[k] == '-')) k++;
+    if (test (s, k, ";base64,")) {
+      mime= s (i + 5, k);
+      int e= k + 8;
+      while (e < N(s) && ai_base64_char (s[e])) e++;
+      if (e > k + 8) { end= e; return i; }
+    }
+    i++;
+  }
+  return -1;
+}
+
+static tree
+ai_raster_image (string mime, string data) {
+  static int counter= 0;
+  counter++;
+  string ext= mime (6, N(mime));
+  if (ext == "jpeg") ext= "jpg";
+  if (ext == "svg+xml") ext= "svg";
+  string name= "answer-picture-" * as_string (counter) * "." * ext;
+  tree img= tuple (tree (RAW_DATA, decode_base64 (data)), name);
+  return tree (IMAGE, img, ext == "svg"? "": "0.6par", "", "", "");
+}
+
+// the pictures of s given as data URLs shortened (in the answer kept as it
+// came, and in the conversation sent again)
+static string
+ai_short_images (string s) {
+  string r, mime;
+  int i= 0, end;
+  while (true) {
+    int p= ai_find_data_image (s, i, mime, end);
+    if (p < 0) break;
+    int b= search_forwards (",", p, s) + 1;
+    r << s (i, b) << "... (" << as_string ((end - b) / 4 * 3) << " bytes)";
+    i= end;
+  }
+  r << s (i, N(s));
+  return r;
+}
+
 // a picture which does not end (the answer was cut, by the limit of its
 // length): its code, and why
 static tree
@@ -935,11 +1060,38 @@ ai_set_aside (string s, string pre, array<tree>& blocks) {
     }
     int sp= search_forwards ("<svg", i, s);
     if (sp >= 0 && (best < 0 || sp < best)) { best= sp; kind= 100; }
+    string dmime;
+    int dend;
+    int dp= ai_find_data_image (s, i, dmime, dend);
+    if (dp >= 0 && (best < 0 || dp < best)) { best= dp; kind= 200; }
     if (best < 0) break;
     int end;
     bool cut= false; // the picture does not end: the answer was cut
     tree block;
-    if (kind == 100) {
+    if (kind == 200) {
+      // as an image of Markdown, \includegraphics, or <img src="...">
+      block= ai_raster_image (dmime, s (search_forwards (",", best, s) + 1,
+                                        dend));
+      end= dend;
+      int x= best;
+      if (x >= 2 && s (x - 2, x) == "](" && test (s, end, ")")) {
+        int y= search_backwards ("![", x, s);
+        int nl= (y >= i)? search_forwards ("\n", y, s): -1;
+        if (y >= i && (nl < 0 || nl > x)) { best= y; end++; }
+      }
+      else if (x >= 1 && s[x-1] == '{' && test (s, end, "}")) {
+        int y= search_backwards ("\\includegraphics", x, s);
+        if (y >= i && x - y < 200) { best= y; end++; }
+      }
+      else if (x >= 1 && (s[x-1] == '"' || s[x-1] == '\'')) {
+        int y= search_backwards ("<img", x, s);
+        int z= search_forwards (">", end, s);
+        if (y >= i && x - y < 200 && z >= 0 && z - end < 200) {
+          best= y; end= z + 1;
+        }
+      }
+    }
+    else if (kind == 100) {
       end= search_forwards ("</svg>", best, s);
       if (end < 0) { cut= true; end= n; }
       else end += 6;
@@ -1053,6 +1205,7 @@ ai_put_back (tree t, array<tree> blocks) {
 // the answer as it came, folded, for those who want to see it
 static tree
 ai_raw_fold (string raw) {
+  raw= ai_short_images (raw);
   array<string> lines= tokenize (raw, "\n");
   tree doc (DOCUMENT);
   for (int i= 0; i < N(lines); i++)
@@ -1082,7 +1235,16 @@ ai_latex_output (string s, string model, string chat) {
     // with its pictures
     string aside= ai_set_aside (r, "", blocks);
     if (N(blocks) == 0) t= utf8_to_cork (r);
-    else t= ai_put_back (verbatim_to_tree (aside, false, "utf-8"), blocks);
+    else {
+      t= ai_put_back (verbatim_to_tree (aside, false, "utf-8"), blocks);
+      // without the empty lines around it (those of a picture alone)
+      if (is_func (t, DOCUMENT)) {
+        int b= 0, e= N(t);
+        while (b < e && t[b] == "") b++;
+        while (e > b && t[e-1] == "") e--;
+        if (b > 0 || e < N(t)) t= t (b, e);
+      }
+    }
   }
   else {
     string pre= r (0, start);

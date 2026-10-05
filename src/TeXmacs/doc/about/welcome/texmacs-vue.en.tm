@@ -215,6 +215,12 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>Images in <name|PNG> or <name|JPEG> in the answers of the
+    chatbots: the models which draw (<verbatim|gemini-2.5-flash-image> of
+    <name|Gemini>, <verbatim|gpt-image-1> of <name|ChatGPT>...) make a
+    painting or an artistic rendition of what is asked, shown as an image
+    of the answer; their instructions say so.
+
     <item>The answer of a chatbot can be stopped (the stop
     button of the session, <with|font-series|bold|Interrupt execution>, or
     <menu|Focus|Interrupt execution>): its service is told to stop writing

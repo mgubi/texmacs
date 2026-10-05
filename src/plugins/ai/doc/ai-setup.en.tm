@@ -40,6 +40,16 @@
   back as the context); <with|font-series|bold|Show the answer as it came>
   in the preferences removes it.
 
+  Images in <name|PNG> or <name|JPEG> (a painting, an artistic rendition
+  of an idea) come from the models which draw: those of <name|Gemini> whose
+  name says <verbatim|image> (<verbatim|gemini-2.5-flash-image>...), and
+  <verbatim|gpt-image-1> or <verbatim|dall-e-3> of <name|ChatGPT>; choose
+  one as the model of the session (<with|font-series|bold|Update the list
+  of models> lists them). Their images are put in the answer; the
+  conversation sent again holds only a mention of them. The other models
+  do not make images (<name|Claude> among them): they draw in <name|TikZ> or
+  <name|SVG>.
+
   The chatbot is told how to write its answers: as a <LaTeX> document which
   <TeXmacs> takes well (sections, lists, mathematics, <name|TikZ> or
   <name|SVG> pictures, nothing which only matters for printing). These

@@ -247,6 +247,10 @@
                  (lambda (p)
                    (let ((id (car p)) (m (cdr p)))
                      (cond ((== id "") #f)
+                           ((and (== name "chatgpt")
+                                 (or (string-starts? id "gpt-image")
+                                     (string-starts? id "dall-e-3")))
+                            #t) ; they draw pictures
                            ((== name "chatgpt")
                             (and (or (string-starts? id "gpt-")
                                      (and (string-starts? id "o")
@@ -334,6 +338,11 @@
    "The packages for pictures are pgfplots, tikz-cd, circuitikz and chemfig. "
    "Or in SVG: a complete svg element, with its xmlns attribute, inside "
    "\\begin{verbatim}...\\end{verbatim}.\n"
+   "- Images in PNG or JPEG (an artistic rendition, a painting, a "
+   "photograph): if you can make images, make one; it is shown with the "
+   "answer. An image you have as data goes in "
+   "\\includegraphics{data:image/png;base64,...} (or image/jpeg). Do not "
+   "write the data of an image which you did not make.\n"
    "- Do not define new commands, and use no other packages than those "
    "above.\n"
    "- Answer in the language of the question.\n"))
