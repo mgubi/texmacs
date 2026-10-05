@@ -84,19 +84,37 @@
                   (else #t))))
         entries labels)))
 
-(define commit-error "")
+;; The errors shown in the dialogs, one per dialog (several dialogs may be
+;; open at the same time); the identifier is also the one of the
+;; refreshable part of the dialog which shows the error
 
-(define (refuse msg)
-  ;; Explain in the commit dialog why nothing was committed
-  (set! commit-error msg)
-  (refresh-now "git-commit-error")
-  #f)
+(define dialog-errors (make-ahash-table))
+
+(define (dialog-error id)
+  (or (ahash-ref dialog-errors id) ""))
+
+(define (set-dialog-error id msg)
+  (ahash-set! dialog-errors id msg)
+  (refresh-now id))
+
+(define (last-git-failure)
+  ;; Explanation of the failure of the last Git command
+  (with h (git-command-history)
+    (string-append "Git failed: "
+                   (utf8->cork (if (null? h) "" (git-message (cadddr (car h))))))))
+
+(define (commit-error-id u)
+  (string-append "git-commit-error-" (url->string u)))
 
 (define (commit-now root u entries labels selected amend?)
   ;; Returns #t if the dialog can be closed
   (let* ((msg (commit-message u))
          (merging? (git-merging? root))
-         (initial (initially-selected entries labels)))
+         (initial (initially-selected entries labels))
+         (refuse (lambda (msg)
+                   ;; Explain in the dialog why nothing was committed
+                   (set-dialog-error (commit-error-id u) msg)
+                   #f)))
     (cond ((and (== msg "") (not amend?))
            (refuse "Please enter a commit message"))
           ((and merging? (list-find (git-status-entries root)
@@ -118,9 +136,10 @@
                                                        (git-commit-options)))
                                  "Amended commit")
              (git-refresh root)
-             ok?))
-          (amend? (git-commit-staged root msg :amend))
-          (else (git-commit-staged root msg)))))
+             (or ok? (refuse (last-git-failure)))))
+          ((if amend? (git-commit-staged root msg :amend)
+               (git-commit-staged root msg)) #t)
+          (else (refuse (last-git-failure))))))
 
 (define (commit-initial-message root entries labels selected)
   ;; The prepared message of a merge, or a suggested message
@@ -174,9 +193,9 @@
           (scrollable
             (choices (set! selected answer) labels selected))))
       ===
-      (refreshable "git-commit-error"
-        (if (!= commit-error "")
-            (hlist (bold (text commit-error)) >>)))
+      (refreshable (commit-error-id u)
+        (if (!= (dialog-error (commit-error-id u)) "")
+            (hlist (bold (text (dialog-error (commit-error-id u)))) >>)))
       (hlist
         (toggle (set! amend? answer) amend?) // (text "Amend last commit")
         >>
@@ -200,7 +219,12 @@
 (tm-define (git-interactive-commit . opt)
   (:synopsis "Open a dialog for committing changes in the working tree")
   ;; Optional arguments: the root and the paths to be selected initially
+  ;; NOTE: the first time, the user chooses between the simple and the
+  ;; full mode
   (:interactive #t)
+  (git-with-mode (lambda () (apply git-commit-dialog opt))))
+
+(define (git-commit-dialog . opt)
   (and-with root (if (null? opt) (current-git-root) (car opt))
     ;; NOTE: each dialog needs its own buffer for the message
     (set! commit-dialogs (+ commit-dialogs 1))
@@ -211,7 +235,7 @@
       ;; NOTE: Git commits what is on disk
       (git-when-saved root
         (lambda ()
-          (set! commit-error "")
+          (set-dialog-error (commit-error-id u) "")
           (git-invalidate root)
           (buffer-set-master u b)
           (dialogue-window (git-commit-widget root u paths)
@@ -249,9 +273,9 @@
           (else (string-recompose
                  (append
                   (if (> ahead 0) (list (string-append (number->string ahead)
-                                                       " to send")) '())
+                                                       " ahead")) '())
                   (if (> behind 0) (list (string-append (number->string behind)
-                                                        " to get")) '()))
+                                                        " behind")) '()))
                  ", ")))))
 
 (define (tool-sections root simple?)
@@ -281,7 +305,7 @@
       (if (== section "Conflicts")
           (if tm?
               ("Resolve" (begin (load-buffer u) (git-resolve-conflict u))))
-          ("Mark resolved" (git-mark-resolved u)))
+          ("Mark as resolved" (git-mark-resolved u)))
       (if (and (in? section '("Changed" "Changes")) tm? (url-exists? u)
                (not (git-entry-untracked? e)))
           ("Compare" (git-compare-with u "HEAD")))
@@ -412,7 +436,7 @@
            (git-restore-revision name (git-commit-hash c)
                                  (commit-path root c name))))))
     ===
-    (hlist ("Full history" (git-show-log root)) >>)))
+    (hlist ("Repository history" (git-show-log root)) >>)))
 
 (tm-widget (git-tool-branches root)
   (with l (git-memo root 'branches (lambda () (git-branches root)))
@@ -514,9 +538,9 @@
 ;; message explaining why the values are not acceptable, in which case
 ;; the dialog stays open.
 
-(define form-error "")
+(define form-dialogs 0)
 
-(tm-widget ((git-form-widget fields toggles action) quit)
+(tm-widget ((git-form-widget id fields toggles action) quit)
   (let* ((flags (list->vector (map cadr toggles))))
     (padded
       (form "git-form"
@@ -529,9 +553,9 @@
             (toggle (vector-set! flags i answer) (vector-ref flags i))
             // (text (car (list-ref toggles i))) >>))
         ===
-        (refreshable "git-form-error"
-          (if (!= form-error "")
-              (hlist (text form-error) >>)))
+        (refreshable id
+          (if (!= (dialog-error id) "")
+              (hlist (text (dialog-error id)) >>)))
         (bottom-buttons
           >>
           ("Cancel" (quit))
@@ -541,22 +565,21 @@
                              (form-values)))
                   (err (action vals (vector->list flags))))
              (if err
-                 (begin
-                   (set! form-error err)
-                   (refresh-now "git-form-error"))
+                 (set-dialog-error id err)
                  (quit)))))))))
 
 (tm-define (git-form-dialog title fields toggles action)
   (:synopsis "Show a dialog with @fields and @toggles, validated by @action")
-  (set! form-error "")
-  (dialogue-window (git-form-widget fields toggles action) noop title))
+  (set! form-dialogs (+ form-dialogs 1))
+  (with id (string-append "git-form-error-" (number->string form-dialogs))
+    (dialogue-window (git-form-widget id fields toggles action) noop title)))
 
 ;; A dialog with a message (several lines) and some check boxes; the
 ;; action receives the message (in utf8) and the values of the check boxes.
 
 (define message-dialogs 0)
 
-(tm-widget ((git-message-widget prompt u toggles action) quit)
+(tm-widget ((git-message-widget id prompt u toggles action) quit)
   (let* ((flags (list->vector (map cadr toggles))))
     (padded
       (bold (text prompt))
@@ -568,9 +591,9 @@
         (hlist
           (toggle (vector-set! flags i answer) (vector-ref flags i))
           // (text (car (list-ref toggles i))) >>))
-      (refreshable "git-form-error"
-        (if (!= form-error "")
-            (hlist (text form-error) >>)))
+      (refreshable id
+        (if (!= (dialog-error id) "")
+            (hlist (text (dialog-error id)) >>)))
       (bottom-buttons
         >>
         ("Cancel" (quit))
@@ -579,20 +602,18 @@
          (let* ((msg (commit-message u))
                 (err (action msg (vector->list flags))))
            (if err
-               (begin
-                 (set! form-error err)
-                 (refresh-now "git-form-error"))
+               (set-dialog-error id err)
                (quit))))))))
 
 (tm-define (git-message-dialog title prompt toggles action)
   (:synopsis "Show a dialog for entering a message, handled by @action")
-  (set! form-error "")
   (set! message-dialogs (+ message-dialogs 1))
-  (let* ((u (string->url (string-append "tmfs://aux/git-message-"
-                                        (number->string message-dialogs))))
+  (let* ((n (number->string message-dialogs))
+         (u (string->url (string-append "tmfs://aux/git-message-" n)))
+         (id (string-append "git-message-error-" n))
          (b (current-buffer)))
     (buffer-set-master u b)
-    (dialogue-window (git-message-widget prompt u toggles action)
+    (dialogue-window (git-message-widget id prompt u toggles action)
                      noop title u)))
 
 (define (empty? s) (== (tm-string-trim-both s) ""))
@@ -614,11 +635,17 @@
 (tm-define (git-interactive-save-snapshot root)
   (:synopsis "Save a snapshot of all files of @root")
   (:interactive #t)
+  (git-with-mode (lambda () (snapshot-dialog root))))
+
+(define (snapshot-dialog root)
   (git-message-dialog
    "Save snapshot" "Describe this snapshot" '()
    (lambda (msg flags)
+     ;; NOTE: the snapshot may be saved later, after a confirmation
      (if (empty? msg) "Please describe the snapshot"
-         (begin (git-save-snapshot root msg) #f)))))
+         (with result 'pending
+           (git-save-snapshot root msg (lambda (ok?) (set! result ok?)))
+           (and (not result) (last-git-failure)))))))
 
 (tm-define (git-interactive-create-branch root)
   (:interactive #t)
@@ -628,7 +655,8 @@
      (with name (car vals)
        (if (not (git-valid-branch-name? root name))
            "This is not a valid branch name"
-           (begin (git-create-branch root name (car flags)) #f))))))
+           (and (not (git-create-branch root name (car flags)))
+                (last-git-failure)))))))
 
 (tm-define (git-interactive-tag root)
   (:interactive #t)
@@ -641,7 +669,8 @@
               "This is not a valid tag name")
              ((in? name (map git-branch-name (git-tags root)))
               "This tag already exists")
-             (else (git-create-tag root name msg (car flags)) #f))))))
+             ((git-create-tag root name msg (car flags)) #f)
+             (else (last-git-failure)))))))
 
 (tm-define (git-interactive-add-remote root)
   (:interactive #t)
@@ -656,7 +685,8 @@
               "This is not a valid name")
              ((in? name (git-remotes root)) "This remote already exists")
              ((not (git-safe-name? url)) "Please give the URL of the remote")
-             (else (git-add-remote root name url) #f))))))
+             ((git-add-remote root name url) #f)
+             (else (last-git-failure)))))))
 
 (tm-define (git-interactive-compare-with name)
   (:interactive #t)
@@ -717,7 +747,8 @@
               "15em"))
       (item (text "Git executable:")
         (enum (set-preference "git executable" answer)
-              (list (get-preference "git executable") "git" "")
+              (list-remove-duplicates
+               (list (get-preference "git executable") "git" ""))
               (get-preference "git executable") "15em"))
       (item (text "Warn for files larger than (MB):")
         (enum (set-preference "git large file size" answer)

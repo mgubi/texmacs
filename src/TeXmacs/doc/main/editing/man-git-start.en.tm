@@ -127,7 +127,7 @@
   <menu|Version|Git panel> opens a panel on the right of the window, which
   shows the state of the repository of the current document and stays up
   to date while you work. At the top, you find the current branch, the
-  number of commits to send and to get, and buttons for getting and sending
+  number of commits ahead and behind, and buttons for getting and sending
   changes (or for synchronizing, in the simple mode). The panel has three
   tabs:
 

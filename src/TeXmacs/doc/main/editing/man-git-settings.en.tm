@@ -34,7 +34,7 @@
     <menu|Version|Who changed what> looks.
 
     <item*|Commits per page of the log>The number of commits shown at once
-    by <menu|Version|Git|Log>.
+    by <menu|Version|Git|History>.
 
     <item*|Sign commits and tags with GnuPG>Sign your commits and tags with
     your <name|GnuPG> key.

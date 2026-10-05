@@ -199,7 +199,9 @@
 (tm-define (git-toggle-simple-mode)
   (:synopsis "Toggle the simple mode, with snapshots instead of commits")
   (:check-mark "v" git-simple-mode?)
-  (set-preference "git simple mode" (if (git-simple-mode?) "off" "on")))
+  (set-preference "git simple mode" (if (git-simple-mode?) "off" "on"))
+  ;; NOTE: the mode is then no longer asked for
+  (set-preference "git mode chosen" "on"))
 
 (tm-define (git-save-snapshot root msg . opt-done)
   (:synopsis "Save the state of all files of @root, described by @msg")
@@ -212,7 +214,7 @@
           (lambda ()
             (with ret (git-run root "add" "--all")
               (if (not (git-ok? ret))
-                  (git-report ret "Snapshot")
+                  (done (git-report ret "Snapshot"))
                   (done (git-commit-staged root msg)))))))))
 
 (tm-define (git-snapshots root)

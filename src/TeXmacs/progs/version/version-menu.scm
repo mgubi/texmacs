@@ -121,7 +121,7 @@
 (menu-bind git-project-menu
   ("Commit project" (git-interactive-commit-project (current-buffer)))
   (with l (or (git-project-untracked (current-buffer)) '())
-    (when (nnull? l)
+    (assuming (nnull? l)
       ((eval (string-append "Add " (number->string (length l))
                             (if (== (length l) 1) " missing file"
                                 " missing files")))
@@ -158,7 +158,7 @@
 (menu-bind git-full-repository-menu
   ("Status" (git-show-status))
   ("Git panel" (git-open-tool))
-  ("Log" (git-show-log))
+  ("History" (git-show-log))
   ("Graph" (git-show-page (current-git-root) "graph"))
   ("Branches and tags" (git-show-branches))
   ---

@@ -566,14 +566,15 @@
   (:synopsis "Create a new branch @branch at HEAD and switch to it")
   ;; With the optional argument #f, the new branch is not checked out
   (cond ((not (git-safe-name? branch)) (bad-name "branch name"))
-        ((and (nnull? opt-switch) (not (car opt-switch)))
-         (git-report (git-run root "branch" branch)
-                     (string-append "Created branch " branch))
-         (git-refresh root))
         (else
-          (git-report (git-run root "checkout" "--quiet" "-b" branch)
-                      (string-append "Created branch " branch))
-          (git-refresh root))))
+          ;; Returns #t on success
+          (with ok? (git-report
+                     (if (and (nnull? opt-switch) (not (car opt-switch)))
+                         (git-run root "branch" branch)
+                         (git-run root "checkout" "--quiet" "-b" branch))
+                     (string-append "Created branch " branch))
+            (git-refresh root)
+            ok?))))
 
 (tm-define (git-valid-branch-name? root name)
   (and (git-safe-name? name)
@@ -609,15 +610,17 @@
   ;; The message @msg is in the utf8 encoding
   (if (not (git-safe-name? tag))
       (bad-name "tag name")
-      (begin
-        (git-report (cond ((if (null? opt-sign) (git-signing?) (car opt-sign))
-                           (git-run-with-input root (if (== msg "") tag msg)
-                                               "tag" "--sign" "--file=-" tag))
-                          ((== msg "") (git-run root "tag" tag))
-                          (else (git-run-with-input root msg "tag" "--annotate"
-                                                    "--file=-" tag)))
-                    (string-append "Created tag " tag))
-        (git-refresh root))))
+      ;; Returns #t on success
+      (with ok? (git-report
+                 (cond ((if (null? opt-sign) (git-signing?) (car opt-sign))
+                        (git-run-with-input root (if (== msg "") tag msg)
+                                            "tag" "--sign" "--file=-" tag))
+                       ((== msg "") (git-run root "tag" tag))
+                       (else (git-run-with-input root msg "tag" "--annotate"
+                                                 "--file=-" tag)))
+                 (string-append "Created tag " tag))
+        (git-refresh root)
+        ok?)))
 
 (tm-define (git-stash root)
   (git-when-saved root
@@ -757,10 +760,11 @@
   (:synopsis "Add the remote repository @url under the name @name")
   (if (not (and (git-safe-name? name) (git-safe-name? url)))
       (bad-name "remote")
-      (begin
-        (git-report (git-run root "remote" "add" name url)
-                    (string-append "Added remote " name))
-        (git-refresh root))))
+      ;; Returns #t on success
+      (with ok? (git-report (git-run root "remote" "add" name url)
+                            (string-append "Added remote " name))
+        (git-refresh root)
+        ok?)))
 
 (tm-define (git-remove-remote root name)
   (if (not (git-safe-name? name))
@@ -858,6 +862,11 @@
   (:secure #t)
   (when (page-context? root-s)
     (git-stage-all (string-root root-s))))
+
+(tm-define (git-page-snapshot root-s)
+  (:secure #t)
+  (when (page-context? root-s)
+    (git-interactive-save-snapshot (string-root root-s))))
 
 (tm-define (git-page-commit root-s)
   (:secure #t)
@@ -964,7 +973,7 @@
   (with r (root-string root)
     `(concat (with "font-size" "0.84"
              (concat ,(git-action "Status" "git-page-show" r "status") " "
-             ,(git-action "Log" "git-page-show" r "log") " "
+             ,(git-action "History" "git-page-show" r "log") " "
              ,(git-action "Graph" "git-page-show" r "graph") " "
              ,(git-action "Branches" "git-page-show" r "branches") " "
              ,(git-action "Output" "git-page-show" r "output") " "
@@ -1009,21 +1018,31 @@
   (let* ((r (root-string root))
          (path (git-entry-path e))
          (u (git-absolute root path))
-         (code (if (== which 'staged) (git-entry-index e) (git-entry-worktree e)))
-         (kind (cond ((== which 'untracked) "new")
+         (new? (or (== which 'untracked)
+                   (and (== which 'simple) (git-entry-untracked? e))))
+         (code (cond ((== which 'staged) (git-entry-index e))
+                     ((and (== which 'simple) (not new?)
+                           (== (git-entry-worktree e) #\.))
+                      (git-entry-index e))
+                     (else (git-entry-worktree e))))
+         (kind (cond (new? "new")
                      ((== which 'conflict) "conflict")
                      ((== which 'staged) "staged")
                      (else "changed")))
-         (desc (cond ((== which 'untracked) "new file")
+         (desc (cond (new? "new file")
                      ((== which 'conflict) "conflict")
                      (else (status-code code))))
          (cmp? (and (git-texmacs-file? u) (url-exists? u)
-                    (nin? which '(untracked conflict)) (!= code #\A)))
+                    (not new?) (nin? which '(conflict)) (!= code #\A)))
          (acts (append
                 (if cmp? (list (git-action "compare" "git-page-compare"
                                            r path "HEAD"))
                     '())
-                (cond ((== which 'staged)
+                (cond ((== which 'simple)
+                       (if (git-entry-untracked? e) '()
+                           (list (git-action "discard" "git-page-discard"
+                                             r path))))
+                      ((== which 'staged)
                        (list (git-action "unstage" "git-page-unstage" r path)))
                       ((== which 'conflict)
                        (append
@@ -1031,7 +1050,7 @@
                             (list (git-action "resolve" "git-page-resolve"
                                               r path))
                             '())
-                        (list (git-action "mark resolved"
+                        (list (git-action "mark as resolved"
                                           "git-page-mark-resolved" r path))))
                       ((== which 'untracked)
                        (list (git-action "add" "git-page-stage" r path)))
@@ -1090,7 +1109,9 @@
          (conflicts (list-filter l git-entry-conflicted?))
          (staged (list-filter l git-entry-staged?))
          (unstaged (list-filter l git-entry-unstaged?))
-         (untracked (list-filter l git-entry-untracked?)))
+         (untracked (list-filter l git-entry-untracked?))
+         ;; NOTE: git-project.scm, which defines the mode, may not be loaded
+         (simple? (== (get-preference "git simple mode") "on")))
     (if (not st)
         (git-page root "Git status"
                   (if (git-trusted? root)
@@ -1103,8 +1124,13 @@
                 (list root "Git status"
                       (status-branch root st)
                       `(concat
-                        ,(git-action "Commit..." "git-page-commit" r) " "
-                        ,(git-action "Stage all" "git-page-stage-all" r) " "
+                        ,@(if simple?
+                              (list (git-action "Save snapshot..."
+                                                "git-page-snapshot" r) " ")
+                              (list (git-action "Commit..." "git-page-commit" r)
+                                    " "
+                                    (git-action "Stage all"
+                                                "git-page-stage-all" r) " "))
                         ,(git-action "Fetch" "git-page-remote" r "fetch") " "
                         ,(git-action "Get changes" "git-page-remote" r "pull")
                         " "
@@ -1119,11 +1145,17 @@
                                                  "git-page-add-remote" r))))
                     '())
                 (status-section root "Conflicts" conflicts 'conflict)
-                (status-section root "Changes to be committed" staged 'staged)
-                (status-section root "Changes not staged for commit"
-                                unstaged 'unstaged)
-                (status-section root "Untracked files" untracked
-                                'untracked))))))
+                (if simple?
+                    (status-section root "Changes"
+                                    (list-filter l (non git-entry-conflicted?))
+                                    'simple)
+                    (append
+                     (status-section root "Changes to be committed"
+                                     staged 'staged)
+                     (status-section root "Changes not staged for commit"
+                                     unstaged 'unstaged)
+                     (status-section root "Untracked files" untracked
+                                     'untracked))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Log page
@@ -1142,7 +1174,7 @@
   (let* ((n (git-log-length))
          (h (git-log root skip n))
          (r (root-string root)))
-    (git-page root "Git log"
+    (git-page root "Git history"
       (if (null? h)
           "No commits."
           `(description-long

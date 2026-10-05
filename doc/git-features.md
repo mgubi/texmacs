@@ -76,7 +76,7 @@ plain comparison tools.
   * submenus *This file*, *Project*, *Git (branch, state)*, *Differences*.
 * **Git panel** (only its lists are rebuilt when the state changes, so a
   message being typed and the selected tab are kept), in these parts:
-  * a sync bar with the branch, "N to send / N to get", and Get/Send
+  * a sync bar with the branch, "N ahead, N behind", and Get/Send
     changes (or Synchronize in simple mode);
   * a *Changes* tab with sections Conflicts / Staged / Changed / New
     files, Stage/Unstage icons, Compare and Resolve buttons, and a commit
