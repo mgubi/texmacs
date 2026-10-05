@@ -3991,6 +3991,9 @@ get_window_from_ID (Uint32 ID) {
 *   focus                           pretend the target window got the keyboard focus
 *   drop x y <path>|text:<text>     drag and drop of one item at that position
 *   repaint                         invalidate every editor (repaint from scratch)
+*   scheme <expression>             run a Scheme command, as -x does (at the
+*                                   next turn of the loop): a zoom, a marker
+*                                   which (display) prints in the log...
 *   snapshot <name>                 save the target window as <TEXMACS_VUE_SNAPSHOT>/<name>.png
 *   resize w h                      resize the target window (points)
 *   close                           ask to close the target window
@@ -4225,6 +4228,8 @@ script_step () {
       win->set_size (as_int (a[1]) * PIXEL, as_int (a[2]) * PIXEL);
     else if (cmd == "repaint") // every editor from scratch (checks the incremental paths)
       vue_simple_widget_rep::invalidate_all_editors ();
+    else if (cmd == "scheme" && N(line) > 7)
+      exec_delayed (scheme_cmd (line (7, N(line))));
     else if (cmd == "focus") {
       // pretend the window got the keyboard focus (a test instance launched
       // while another application is in use never gets it)

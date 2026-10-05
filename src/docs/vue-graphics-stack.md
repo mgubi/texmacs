@@ -1044,15 +1044,26 @@ variable, or when no GL context can be made, everything is as before.
   buffer, so nothing stale can show. In the benchmark below, the frames
   between the repaints (pointer moves which change nothing) are no longer
   presented: 6 presents in 10 frames instead of 10.
-* **The profile** (`TEXMACS_VUE_PROFILE`) waits for the GPU at the end of
-  an editor's repaint and of a redraw (`gpu_finish`), so that its times
-  include what the GPU did.
+* **The profile** (`TEXMACS_VUE_PROFILE`) counts what the CPU does, the
+  GPU working in parallel as it does when nothing is measured: its work
+  shows as more or fewer frames. `TEXMACS_VUE_GPU_SYNC=1` (`?gpusync=1` in
+  the browser) waits for the GPU at the end of an editor's repaint and of a
+  redraw (`gpu_finish`), so that the times include what it did: an upper
+  bound, since nothing overlaps.
 
 Measured on an Apple M4 (`bench.script`, forced full repaints of the
-document of 200 paragraphs, with `gpu_finish`): 1.8 ms a repaint, against
-1.2 to 2.0 ms for the MuPDF renderer on the same machine, where the native
-build vectorises MuPDF's loops. What the GPU saves there is the upload of
-the window (0.2 ms against 1 to 1.7 ms a frame).
+document of 200 paragraphs): 0.9 ms of CPU a repaint (1.8 ms waiting for
+the GPU), against 1.2 to 2.0 ms for the MuPDF renderer on the same
+machine, where the native build vectorises MuPDF's loops. What the GPU saves there is the upload of
+the window (0.2 ms against 1 to 1.7 ms a frame). In the browser
+(`texmacs.html?gpu=1`, headless Firefox on an Apple M1, Retina; see
+docs/wasm/README.md on the browser branch): 2.2 ms of CPU a full repaint
+(3.5 ms waiting for the GPU) against 6.6 ms with MuPDF, the canvas upload
+of every frame (2 ms) gone. On a long help page with formulas in many
+fonts (the math font catalogue), scrolled and zoomed, the GPU path draws
+more frames than MuPDF in every phase (1070 against 800 scrolling at
+zoom 1) at 1 to 2.3 ms of CPU a frame against 4.4 to 5 ms; what costs most
+in its repaints is making the glyph bitmaps of the atlas (`shrink`).
 
 Differences from the MuPDF renderer: a frame of the document of 200
 paragraphs differs on some 200 pixels by more than a tenth (the icons,
