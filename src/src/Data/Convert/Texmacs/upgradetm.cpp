@@ -4020,9 +4020,12 @@ bool
 is_equation_env (tree t) {
   if (is_atomic (t) || N(t) != 1) return false;
   static hashset<tree_label> H;
+  // make_tree_label, not as_tree_label: the set is made once, maybe before
+  // the styles which define these tags have been loaded (a new home, with
+  // no style caches), and as_tree_label does not know the labels yet
   if (N(H) == 0)
     for (int i=0; equation_tags[i][0] != '\0'; i++)
-      H->insert (as_tree_label (equation_tags[i]));
+      H->insert (make_tree_label (equation_tags[i]));
   return H->contains (L(t));
 }
 
