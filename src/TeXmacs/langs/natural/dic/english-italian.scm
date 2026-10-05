@@ -1636,7 +1636,7 @@
 ("mixed" "misto")
 ("mod" "mod")
 ("mode" "modo")
-("mode dependent icons" "icone dipendenti dalla modalitÃČÂă")
+("mode dependent icons" "icone dipendenti dalla modalità")
 ("modifier" "modificatore")
 ("modify bibliography" "modifica bibliografia")
 ("modify cell alignment" "modifica l'allineamento della cella")

@@ -12,8 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (tools spell spell-lantool)
-  (version version-compare)
-  (tools spell spell-edit))
+  (:use (version version-compare) (tools spell spell-edit)))
 
 (tm-define (lantool-server)
   (string-append (get-preference "languagetool server") "/v2/check"))
