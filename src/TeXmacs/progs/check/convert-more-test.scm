@@ -399,10 +399,18 @@
   (check= (parse-xml "<a><b>unclosed</a>") '(*TOP* (a (b "unclosed"))))
   (check= (parse-xml "<a xml:space=\"preserve\"> </a>")
           '(*TOP* (a (@ (xml:space "preserve")) " ")))
-  ;; FIXME: the HTML parser does not read script as raw text (parsehtml.cpp
-  ;; and parsexml.cpp have no raw text elements): (parse-html
-  ;; "<script>if (a<b) x;</script>") gives (*TOP* (script "if (a" (b (@ ...)))),
-  ;; expected (*TOP* (script "if (a<b) x;")); the import drops scripts anyway.
+  ;; script and style are raw text in HTML: no elements, no entities
+  (check= (parse-html "<script>if (a<b) x;</script>") '(*TOP* (script "if (a<b) x;")))
+  (check= (parse-html "<script type=\"text/javascript\">a&amp;&&<p>b</script><p>c</p>")
+          '(*TOP* (script (@ (type "text/javascript")) "a&amp;&&<p>b") (p "c")))
+  (check= (parse-html "<SCRIPT>x<y</SCRIPT>") '(*TOP* (script "x<y")))
+  (check= (parse-html "<Script>x<y</Script><p>c</p>")
+          '(*TOP* (script "x<y") (p "c")))
+  (check= (parse-html "<script>x</sCrIpT><p>c</p>") '(*TOP* (script "x") (p "c")))
+  (check= (parse-html "<script>x</scr") '(*TOP* (script "x</scr")))
+  (check= (parse-html "<style>a>b {}</style>") '(*TOP* (style "a>b {}")))
+  (check= (parse-html "<script></script><p>c</p>") '(*TOP* (script) (p "c")))
+  (check= (parse-xml "<script>a<b/></script>") '(*TOP* (script "a" (b))))
   (check= (import "<script>if (a<b) x;</script><p>after</p>" "html-snippet") "after"))
 
 ;; The names of the TeXmacs tags and the strings of TeXmacs in XML (TMML):
@@ -932,16 +940,22 @@
   (check= (tree->json (stree->tree '(frac "a" "b"))) "")
   (with s "{\"a\": [\"1\", \"x\"], \"b\": {\"c\": \"d\"}}"
     (check= (st (json->tree (tree->json (json->tree s)))) (st (json->tree s))))
-  ;; FIXME: the parser of numbers knows neither the sign nor the exponent
+  ;; an empty array or object
+  (check= (tree->json (stree->tree '(tuple))) "[]")
+  (check= (tree->json (stree->tree '(attr))) "{}")
+  (check= (tree->json (stree->tree '(attr "a" (tuple) "b" (attr))))
+          "{\n  \"a\": [],\n  \"b\": {}\n}")
+  (check= (tree->json (stree->tree '(tuple (tuple) (attr) (tuple "1"))))
+          "[\n  [],\n  {},\n  [ \"1\" ]\n]")
+  (with s "{\"a\": [], \"b\": {}}"
+    (check= (st (json->tree (tree->json (json->tree s)))) (st (json->tree s))))
+  ;; FIXME (fixed by the open PR #107): the parser of numbers knows neither the sign nor the exponent
   ;; (json_parse_number in json.cpp only reads digits and points, json_skip
   ;; skips the minus): (json->tree "[-1, 2e3, -0.5]") gives (tuple "1" "2"),
   ;; expected (tuple "-1" "2e3" "-0.5").
-  ;; FIXME: \f is read as a backspace (json_parse_string, json.cpp:89), and
+  ;; FIXME (fixed by the open PR #107): \f is read as a backspace (json_parse_string, json.cpp:89), and
   ;; \u is not read: (json->tree "\"a\\fb\"") gives "a\bb", expected "a\fb";
   ;; (json->tree "\"\\u00e9\"") gives "u00e9", expected e acute.
-  ;; FIXME: an empty array or object is printed as nothing (json_print uses
-  ;; is_func, false for no children, json.cpp:324-326): (tree->json (tuple)) gives
-  ;; "", expected "[]"; (tree->json (attr)) gives "", expected "{}".
   )
 
 ;; The compressed trees (for the AI tools): the tags become compressed
@@ -1003,10 +1017,16 @@
   (check= (st (parse-texmacs-snippet (serialize-texmacs-snippet
                                       (stree->tree '(document "a b " "c")))))
           '(document "a b " "c"))
-  ;; FIXME: a space at the very end of a snippet is lost: tree_to_texmacs
-  ;; (totm.cpp:337) flushes it unprotected, unlike write_return, and the
-  ;; reader drops it: (serialize-texmacs-snippet "a ") gives "a ", which
-  ;; parse-texmacs-snippet reads as (document "a"), expected (document "a ").
+  ;; and the space at the very end of a snippet
+  (check= (serialize-texmacs-snippet (stree->tree "a ")) "a\\ ")
+  (check= (st (parse-texmacs-snippet (serialize-texmacs-snippet (stree->tree "a "))))
+          '(document "a "))
+  (check= (st (parse-texmacs-snippet (serialize-texmacs-snippet
+                                      (stree->tree '(document "a" "b ")))))
+          '(document "a" "b "))
+  (check= (st (parse-texmacs-snippet (serialize-texmacs-snippet
+                                      (stree->tree '(concat (em "a") " ")))))
+          '(document (concat (em "a") " ")))
   ;; stree <-> tree
   (check= (st (stree->tree '(concat "a" "b"))) '(concat "a" "b"))
   (check= (st (stree->tree 'foo)) "foo")
@@ -1073,13 +1093,12 @@
                     (system-remove u)
                     r))
                 doc))
-  ;; FIXME: the HTML import of a long document overflows the stack: the
-  ;; export of 2000 paragraphs (concat "a" (with "mode" "math" (frac "a"
-  ;; "b"))), 4000 elements at the top, raises stack-overflow in
-  ;; html-snippet -> texmacs-tree, while 1000 paragraphs work (the recursion
-  ;; of htmltm.scm on the list of the elements).
   (with body (cons 'document (make-list 2000 "x"))
-    (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 2000)))
+    (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 2000))
+  ;; 4000 elements at the top, a paragraph and a table for the fraction
+  (with body (cons 'document (make-list 2000 '(concat "a" (with "mode" "math"
+                                                                (frac "a" "b")))))
+    (check= (length (cdr (import (export body "html-snippet") "html-snippet"))) 4000)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
