@@ -372,7 +372,7 @@
   (tmname (textsc 1))
   (tmsamp (textsf 1))
   (tmabbr 1)
-  (tmdfn (textbf 1))
+  (tmdfn (emph 1))
   (tmkbd (texttt 1))
   (tmvar (texttt 1))
   (tmacronym (textsc 1))
