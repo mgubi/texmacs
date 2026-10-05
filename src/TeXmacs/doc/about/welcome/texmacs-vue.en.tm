@@ -215,6 +215,10 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>An error of <TeXmacs> (a menu of a plug-in which cannot be
+    built...) is shown in the window of the error messages and in the status
+    bar, as on the desktop: it stopped the page, which had to be reloaded.
+
     <item><LaTeX> import (and answers of the chatbots): a space which
     begins the argument of <verbatim|\\text>, <verbatim|\\textbf>,
     <verbatim|\\emph>... is kept (<verbatim|f\\text{ continuous}> showed

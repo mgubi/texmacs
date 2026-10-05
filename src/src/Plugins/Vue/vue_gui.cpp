@@ -2683,8 +2683,11 @@ vue_web_close_tab (int id) {
   vue_virtual_window_rep* t= find_tab (id);
   if (t == NULL) return;
   // as the close box of a window: TeXmacs asks to save what is not saved
-  if (t != active_tab) activate_tab (t);
-  t->destroy_event ();
+  try {
+    if (t != active_tab) activate_tab (t);
+    t->destroy_event ();
+  }
+  catch (string msg) { handle_exceptions (); } // (see loop_iteration)
   gui_needs_relayout= true;
 }
 
@@ -3721,8 +3724,30 @@ web_more_events () {
 // may not keep control: see gui_start_loop).
 static int loop_delay= 10; // the pause of the loop, which grows when idle
 
+static void loop_iteration_body ();
+
+// An error of TeXmacs (FAILED, ASSERT: a menu of Scheme which gives no
+// widget, an error at the C++ boundary) throws a string. The editor catches
+// those of its events (edit_keyboard.cpp, edit_mouse.cpp); the rest reached
+// the browser, which stopped the page ("uncaught exception", reload): it is
+// reported here, as handle_exceptions does on the desktop, and the loop goes
+// on with a redraw.
 static void
 loop_iteration () {
+  try {
+    loop_iteration_body ();
+  }
+  catch (string msg) {
+    handle_exceptions ();
+    try { call ("set-message", "Error: " * msg, ""); }
+    catch (string msg2) {}
+    gui_wait= false;
+    request_partial_redraw= true;
+  }
+}
+
+static void
+loop_iteration_body () {
   int& delay= loop_delay;
   time_t t1= 0, t2= 0;
 #ifdef __EMSCRIPTEN__
@@ -4628,8 +4653,15 @@ vue_web_scheme_eval (const char* cmd) {
                web_scheme_text (string (cmd)) *
                "\n)) (lambda args (cons 'error args)))))"
                " (if (string? r) r (object->string r)))";
-  object o= eval (expr);
-  string r= is_string (o) ? as_string (o) : string ("");
+  string r;
+  try {
+    object o= eval (expr);
+    r= is_string (o) ? as_string (o) : string ("");
+  }
+  catch (string msg) { // an error of TeXmacs (see loop_iteration)
+    handle_exceptions ();
+    r= "(error " * scm_quote (msg) * ")";
+  }
   if (last != NULL) tm_delete_array (last);
   last= as_charp (cork_to_utf8 (r));
   gui_needs_update= true;
@@ -4641,12 +4673,15 @@ vue_web_scheme_eval (const char* cmd) {
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_open_document (const char* path) {
   url u= url_system (utf8_to_cork (string (path)));
-  array<url> ws= buffer_to_windows (u);
-  for (int i= 0; i < N(ws); i++) {
-    tm_window tw= concrete_window (ws[i]);
-    vue_virtual_window_rep* t= (tw != NULL) ? find_tab_of (tw->win) : NULL;
-    if (t != NULL) { activate_tab (t); gui_needs_update= true; return; }
+  try {
+    array<url> ws= buffer_to_windows (u);
+    for (int i= 0; i < N(ws); i++) {
+      tm_window tw= concrete_window (ws[i]);
+      vue_virtual_window_rep* t= (tw != NULL) ? find_tab_of (tw->win) : NULL;
+      if (t != NULL) { activate_tab (t); gui_needs_update= true; return; }
+    }
   }
+  catch (string msg) { handle_exceptions (); } // (see loop_iteration)
   exec_delayed (scheme_cmd ("(load-buffer-in-new-window " *
                             scm_quote (as_string (u)) * ")"));
   gui_needs_update= true;
@@ -5949,7 +5984,8 @@ EM_JS (void, vue_web_save_dialog, (void* res, const char* name), {
 extern "C" EMSCRIPTEN_KEEPALIVE void
 vue_web_dialog_done (void* res, const char* path) {
   const char* list[2]= { path, NULL };
-  file_dialog_callback (res, list, 0);
+  try { file_dialog_callback (res, list, 0); }
+  catch (string msg) { handle_exceptions (); } // (see loop_iteration)
   gui_needs_update= true;
 }
 
