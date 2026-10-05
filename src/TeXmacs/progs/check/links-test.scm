@@ -599,6 +599,50 @@
                                            "Cap")
                                  "2"))))
 
+;; An index entry in a section title or in a caption: the table of
+;; contents and the list of figures get the title or the caption with its
+;; page, but not the assignment of the counter of the automatic labels
+;; and the index entry which writing the title evaluates (these made the
+;; auto-N labels move at each update, so that all the pages of the table of
+;; contents and of the index were "?"); the index has the entry once.
+(define (test-index-in-title)
+  (check-group "index entry in a title")
+  (write-doc "title-index.tm" '("generic") '()
+             '((table-of-contents "toc" (document ""))
+               (section (concat "Foo" (index "foo")))
+               "Text"
+               (big-figure "F" (concat "Cap" (index "cap")))
+               (new-page)
+               (section "Bar")
+               (concat "x" (index "bar"))
+               (the-index "idx" (document ""))
+               (list-of-figures "figure" (document ""))))
+  (open "title-index.tm")
+  (update-all)
+  (let ((toc1 (st 0))
+        (idx1 (st 7)))
+    (generate-all-aux)
+    (update-current-buffer)
+    (update-forced)
+    (check= (st 0) toc1)
+    (check= (st 7) idx1))
+  (with toc (cdr (st 0 1))
+    (check= (length toc) 4)
+    (check= (map toc-page toc) '("1" "2" "2" "2"))
+    (check-true (contains? (car toc) "Foo")))
+  (check= (resolve (st 7 1))
+          '(document (index+1 "bar" "2")
+                     (index+1 "cap" "1")
+                     (index+1 "foo" "1")))
+  (with lof (cdr (st 8 1))
+    (check= (length lof) 1)
+    (check= (toc-page (car lof)) "1"))
+  (for-each (lambda (aux)
+              (with t (tree->stree (get-auxiliary aux))
+                (check-false (find-sub t (lambda (x) (func? x 'assign))))
+                (check-false (find-sub t (lambda (x) (func? x 'write))))))
+            '("toc" "figure")))
+
 ;; Document > Update > Table of contents, Index or Glossary regenerate
 ;; one generated part (generic/document-edit.scm, update-document, which
 ;; calls generate-aux with "table-of-contents", "index" or "glossary").
@@ -1150,6 +1194,7 @@
   (run-group test-toc)
   (run-group test-index)
   (run-group test-glossary)
+  (run-group test-index-in-title)
   (run-group test-generate-one)
   (run-group test-hyperlinks)
   (run-group test-hyperlink-files)
