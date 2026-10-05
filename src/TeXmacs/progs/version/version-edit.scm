@@ -75,9 +75,17 @@
 ;; Moving across the differences between both versions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (version-at-border border)
+  ;; the difference just after (border = 0) or before (border = 1) the cursor
+  (let* ((p (cursor-path))
+         (t (path->tree (cDr p))))
+    (and (== (cAr p) border) (tree-compound? t) (version-context? t) t)))
+
 (tm-define (version-first-difference)
   (go-start)
-  (version-next-difference)
+  ;; path-next-tag goes past a difference at the very start of the document
+  (with t (version-at-border 0)
+    (if t (tree-go-to t 0 :start) (version-next-difference)))
   (refresh-tooltips))
 
 (tm-define (version-previous-difference)
@@ -90,7 +98,10 @@
 
 (tm-define (version-last-difference)
   (go-end)
-  (version-previous-difference)
+  ;; likewise for a difference at the very end of the document
+  (with t (version-at-border 1)
+    (if t (tree-go-to t (- (tree-arity t) 1) :end)
+        (version-previous-difference)))
   (refresh-tooltips))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

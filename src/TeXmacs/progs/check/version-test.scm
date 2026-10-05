@@ -372,13 +372,12 @@
                                 '(document "a" (em "c")))
               '(document "a" (version-both (document (em "b"))
                                            (document (em "c")))))
-      ;; FIXME: the paragraphs of a difference with the block grain keep
-      ;; the words split by denormalize (version/version-compare.scm:242):
-      ;; (compare-versions '(document "b c") '(document "b x")) gives
-      ;; (document (version-both (document (concat "b" " " "c"))
-      ;; (document (concat "b" " " "x")))), expected
-      ;; (document (version-both (document "b c") (document "b x"))).
-      ))
+      ;; the paragraphs of a difference are whole, not split into words
+      (check= (compare-versions '(document "b c") '(document "b x"))
+              '(document (version-both (document "b c") (document "b x"))))
+      (check= (compare-versions '(document "a" "b c d") '(document "a" "b x d"))
+              '(document "a" (version-both (document "b c d")
+                                           (document "b x d"))))))
   (check-true (version-test-grain? "detailed"))
   (check= (compare-versions '(document "a" "b c") '(document "a" "b x"))
           '(document "a" (concat "b " (version-both "c" "x")))))
@@ -437,18 +436,28 @@
       (version-last-difference)
       (check= (cursor) '(1 4))
       (check-false (inside-version?))))
-  ;; FIXME: the first difference of a document which starts with one is
-  ;; skipped, go-start puts the cursor before the tag and path-next-tag
-  ;; goes to the border of the next tag (version/version-edit.scm:78):
-  ;; version-first-difference in (document (version-both "p" "q") "x")
-  ;; gives the cursor (0 0) outside the difference, expected (0 0 0)
-  ;; inside "p".
-  ;; FIXME: likewise the last difference of a document which ends with one
-  ;; is skipped (version/version-edit.scm:91): version-last-difference in
-  ;; (document "x" (version-both "p" "q")) gives the cursor (1 1) after
-  ;; the tag, outside the difference, expected inside "q"; with a
-  ;; difference earlier in the document it goes to the end of that one.
-  )
+  ;; a difference at the very start or end of the document is not skipped
+  (with-buffer-body '(document (version-both "p" "q") "x")
+    (lambda ()
+      (version-first-difference)
+      (check= (cursor) '(0 0 0))
+      (check= (innermost-version) '(version-both "p" "q"))
+      (version-last-difference)
+      (check= (cursor) '(0 1 1))))
+  (with-buffer-body '(document "x" (version-both "p" "q"))
+    (lambda ()
+      (version-last-difference)
+      (check= (cursor) '(1 1 1))
+      (check= (innermost-version) '(version-both "p" "q"))
+      (version-first-difference)
+      (check= (cursor) '(1 0 0))))
+  (with-buffer-body '(document (version-both "a" "b") "x"
+                               (version-both (document "p") (document "q")))
+    (lambda ()
+      (version-last-difference)
+      (check= (cursor) '(2 1 0 1))
+      (version-first-difference)
+      (check= (cursor) '(0 0 0)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Showing the versions
@@ -907,12 +916,12 @@
           (buffer-pretend-saved f)
           (buffer-close f)
           (when (buffer-exists? old) (switch-to-buffer old)))
-        ;; FIXME: version-history takes the repository of the current
-        ;; buffer instead of the one of the file (version/version-git.scm:
-        ;; 148, current-git-root): with a buffer outside the repository,
-        ;; (car (car (version-history f))) gives "<hash>:blank/a.tm",
-        ;; expected "<hash>:file/<repository>/a.tm".
-        ))
+        ;; the history is relative to the repository of the file, also
+        ;; when the current buffer is outside it
+        (check-false (== (current-git-root) git-dir))
+        (check= (map car (version-history f))
+                (list (string-append h2 ":" (url->tmfs-string f))
+                      (string-append h1 ":" (url->tmfs-string f))))))
     ;; a file which is not in the repository yet
     (string-save doc1 (url->system g))
     (check= (version-status g) "unknown")
