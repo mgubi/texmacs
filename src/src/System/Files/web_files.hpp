@@ -119,6 +119,12 @@ bool async_http_post_json (string url, array<string> headers_attr, tree data,
 void web_async_cancel (string* outbuf);
 #endif
 
+// the requests made with libcurl (web_files.cpp): driven at each turn of the
+// main loop, and those whose answer goes to outbuf stopped and forgotten (no
+// operation without libcurl)
+void http_async_pending ();
+void http_async_cancel (string* outbuf);
+
 inline string
 http_post (string url, array<string> headers_attr, string data) {
   string ret; 

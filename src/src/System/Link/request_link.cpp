@@ -65,6 +65,10 @@ request_link_rep::request_link_rep (string name2): name (name2) {
 
 request_link_rep::~request_link_rep () {
   stop ();
+#ifndef __EMSCRIPTEN__
+  // (no transfer may write into this link any more: libcurl)
+  http_async_cancel (&outbuf);
+#endif
   request_link_set->remove ((pointer) this);
 }
 
@@ -149,6 +153,8 @@ request_link_rep::write (string s, int channel) {
   if (DEBUG_IO) debug_io << "Requesting '" << t << "'\n";
 #ifdef __EMSCRIPTEN__
   web_async_cancel (&outbuf); // an answer still awaited is no longer wanted
+#else
+  http_async_cancel (&outbuf);
 #endif
   status= 1; outbuf= ""; errbuf= ""; kill= false;
   partial_text= ""; partial_tree= "";
@@ -221,9 +227,11 @@ request_link_rep::interrupt () {
   if (!alive) return;
   alive= false;
   kill= true;
-#ifdef __EMSCRIPTEN__
   // the answer which comes is stopped (the engine stops writing it)
+#ifdef __EMSCRIPTEN__
   web_async_cancel (&outbuf);
+#else
+  http_async_cancel (&outbuf);
 #endif
 }
 
@@ -234,6 +242,8 @@ request_link_rep::stop () {
   kill= true;
 #ifdef __EMSCRIPTEN__
   web_async_cancel (&outbuf);
+#else
+  http_async_cancel (&outbuf);
 #endif
 }
 

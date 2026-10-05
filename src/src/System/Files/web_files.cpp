@@ -493,6 +493,235 @@ get_from_ramdisc (url u) {
 
 #if !defined(QTTEXMACS) || AC_QT_MAJOR_VERSION < 6
 
+/******************************************************************************
+* The HTTP requests with libcurl (the builds without Qt 6, out of a browser)
+*
+* A request is an easy handle of libcurl. A synchronous one is performed at
+* once. The others are in a multi handle which http_async_pending, called by
+* the main loop at each turn (tm_server.cpp), drives without waiting: what
+* comes is appended to the output of the request as it comes (the answers
+* of the AI engines, streamed, which a request link shows as they grow),
+* and the request ends with its status, or its callback is called with the
+* answer. A request whose kill is set (its session was interrupted) is
+* aborted, and its server stops sending; http_async_cancel forgets the
+* requests of a request link which stops or is destroyed. The headers and
+* the data stay in the memory of TeXmacs: no command line, no file. Without
+* libcurl, the curl program does the same below (to_shell_command).
+******************************************************************************/
+
+#ifdef USE_LIBCURL
+#include <curl/curl.h>
+
+struct lc_request {
+  CURL*       easy;
+  curl_slist* headers;
+  string      out;          // the answer, when it is not written to outbuf
+  object      callback;
+  bool        has_callback;
+  int*        status;       // a request link: its status, output, errors
+  string*     outbuf;
+  string*     errbuf;
+  bool*       kill;
+  char        error[CURL_ERROR_SIZE];
+  lc_request ():
+    easy (NULL), headers (NULL), has_callback (false),
+    status (NULL), outbuf (NULL), errbuf (NULL), kill (NULL) {
+      error[0]= '\0'; }
+};
+
+static CURLM* lc_multi= NULL;
+static array<lc_request*> lc_busy;
+
+static size_t
+lc_write (char* ptr, size_t size, size_t nmemb, void* data) {
+  lc_request* r= (lc_request*) data;
+  size_t n= size * nmemb;
+  if (r->kill != NULL && *(r->kill)) return 0; // aborts the transfer
+  if (r->outbuf != NULL) *(r->outbuf) << string (ptr, (int) n);
+  else r->out << string (ptr, (int) n);
+  return n;
+}
+
+static int
+lc_progress (void* data, curl_off_t dt, curl_off_t dn,
+             curl_off_t ut, curl_off_t un) {
+  (void) dt; (void) dn; (void) ut; (void) un;
+  lc_request* r= (lc_request*) data;
+  return (r->kill != NULL && *(r->kill))? 1: 0;
+}
+
+static lc_request*
+lc_make (string url, array<string> headers_attr, string body) {
+  static bool initialized= false;
+  if (!initialized) {
+    curl_global_init (CURL_GLOBAL_DEFAULT);
+    initialized= true;
+  }
+  lc_request* r= tm_new<lc_request> ();
+  r->easy= curl_easy_init ();
+  if (r->easy == NULL) { tm_delete (r); return NULL; }
+  c_string u (url);
+  curl_easy_setopt (r->easy, CURLOPT_URL, (char*) u);
+  curl_easy_setopt (r->easy, CURLOPT_POST, 1L);
+  curl_easy_setopt (r->easy, CURLOPT_POSTFIELDSIZE, (long) N(body));
+  c_string b (body);
+  curl_easy_setopt (r->easy, CURLOPT_COPYPOSTFIELDS, (char*) b);
+  for (int i= 0; i+1 < N(headers_attr); i += 2) {
+    c_string h (headers_attr[i] * ": " * headers_attr[i+1]);
+    r->headers= curl_slist_append (r->headers, (char*) h);
+  }
+  if (r->headers != NULL)
+    curl_easy_setopt (r->easy, CURLOPT_HTTPHEADER, r->headers);
+  curl_easy_setopt (r->easy, CURLOPT_WRITEFUNCTION, lc_write);
+  curl_easy_setopt (r->easy, CURLOPT_WRITEDATA, (void*) r);
+  curl_easy_setopt (r->easy, CURLOPT_NOPROGRESS, 0L);
+  curl_easy_setopt (r->easy, CURLOPT_XFERINFOFUNCTION, lc_progress);
+  curl_easy_setopt (r->easy, CURLOPT_XFERINFODATA, (void*) r);
+  curl_easy_setopt (r->easy, CURLOPT_ERRORBUFFER, r->error);
+  curl_easy_setopt (r->easy, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt (r->easy, CURLOPT_NOSIGNAL, 1L);
+  curl_easy_setopt (r->easy, CURLOPT_USERAGENT, "TeXmacs");
+  curl_easy_setopt (r->easy, CURLOPT_PRIVATE, (void*) r);
+  if (DEBUG_IO)
+    debug_io << "http_post (libcurl), " << url << LF;
+  return r;
+}
+
+static void
+lc_free (lc_request* r) {
+  if (r->headers != NULL) curl_slist_free_all (r->headers);
+  if (r->easy != NULL) curl_easy_cleanup (r->easy);
+  tm_delete (r);
+}
+
+static string
+lc_error (lc_request* r, CURLcode code) {
+  string m= (r->error[0] != '\0')? string (r->error):
+                                     string (curl_easy_strerror (code));
+  return m;
+}
+
+static int
+lc_perform (string& ret, string url, array<string> headers_attr,
+            string body) {
+  lc_request* r= lc_make (url, headers_attr, body);
+  if (r == NULL) return 1;
+  CURLcode code= curl_easy_perform (r->easy);
+  ret= r->out;
+  if (code != CURLE_OK)
+    io_error << "http_post, " << url << ": " << lc_error (r, code) << LF;
+  lc_free (r);
+  return (code == CURLE_OK)? 0: 1;
+}
+
+static bool
+lc_start (lc_request* r) {
+  if (lc_multi == NULL) lc_multi= curl_multi_init ();
+  if (lc_multi == NULL) { lc_free (r); return true; }
+  curl_multi_add_handle (lc_multi, r->easy);
+  lc_busy << r;
+  http_async_pending (); // the transfer begins at once
+  return false;
+}
+
+static void
+lc_forget (int i) {
+  lc_request* r= lc_busy[i];
+  curl_multi_remove_handle (lc_multi, r->easy);
+  lc_free (r);
+  lc_busy= append (range (lc_busy, 0, i), range (lc_busy, i+1, N(lc_busy)));
+}
+
+static bool
+lc_async (string url, array<string> headers_attr, string body,
+          object callback) {
+  lc_request* r= lc_make (url, headers_attr, body);
+  if (r == NULL) return true;
+  r->callback= callback;
+  r->has_callback= true;
+  return lc_start (r);
+}
+
+static bool
+lc_async (string url, array<string> headers_attr, string body,
+          int& status, string& outbuf, string& errbuf, bool& kill) {
+  lc_request* r= lc_make (url, headers_attr, body);
+  if (r == NULL) return true;
+  r->status= &status; r->outbuf= &outbuf; r->errbuf= &errbuf; r->kill= &kill;
+  return lc_start (r);
+}
+
+// the body of a post of a form, as curl --data-urlencode makes it (a name
+// ending with @ takes the contents of the file which its value names)
+static string
+lc_form (array<string> attr) {
+  string r;
+  CURL* e= curl_easy_init ();
+  for (int i= 0; i+1 < N(attr); i += 2) {
+    string name= attr[i], val= attr[i+1];
+    if (ends (name, "@")) {
+      name= name (0, N(name) - 1);
+      string contents;
+      if (!load_string (url_system (val), contents, false)) val= contents;
+    }
+    c_string v (val);
+    char* esc= curl_easy_escape (e, (char*) v, N(val));
+    if (N(r) > 0) r << "&";
+    r << name << "=" << string (esc);
+    curl_free (esc);
+  }
+  curl_easy_cleanup (e);
+  return r;
+}
+
+void
+http_async_pending () {
+  if (lc_multi == NULL || N(lc_busy) == 0) return;
+  int running= 0;
+  curl_multi_perform (lc_multi, &running);
+  CURLMsg* msg;
+  int left= 0;
+  while ((msg= curl_multi_info_read (lc_multi, &left)) != NULL) {
+    if (msg->msg != CURLMSG_DONE) continue;
+    lc_request* r= NULL;
+    curl_easy_getinfo (msg->easy_handle, CURLINFO_PRIVATE, (char**) &r);
+    int i;
+    for (i= 0; i < N(lc_busy); i++)
+      if (lc_busy[i] == r) break;
+    if (r == NULL || i == N(lc_busy)) continue;
+    CURLcode code= msg->data.result;
+    bool killed= (r->kill != NULL && *(r->kill));
+    if (r->has_callback) {
+      if (code != CURLE_OK)
+        io_error << "http_post: " << lc_error (r, code) << LF;
+      object cb= r->callback;
+      string out= (code == CURLE_OK)? r->out: string ("");
+      lc_forget (i);
+      call (cb, out);
+    }
+    else {
+      if (code != CURLE_OK && !killed && r->errbuf != NULL)
+        *(r->errbuf) << lc_error (r, code) << "\n";
+      if (r->status != NULL) *(r->status)= 0;
+      lc_forget (i);
+    }
+  }
+}
+
+void
+http_async_cancel (string* outbuf) {
+  for (int i= 0; i < N(lc_busy); )
+    if (lc_busy[i]->outbuf == outbuf) lc_forget (i);
+    else i++;
+}
+
+#else
+
+void http_async_pending () {}
+void http_async_cancel (string* outbuf) { (void) outbuf; }
+
+#endif // USE_LIBCURL
+
 static inline string
 shell_quote (string s) {
   return "'" * replace (s, "'", "'\\''") * "'";
@@ -539,6 +768,9 @@ http_post (string& ret, string url,
 #ifdef __EMSCRIPTEN__
   if (web_http_available ()) return web_post (ret, url, headers_attr, data);
 #endif
+#ifdef USE_LIBCURL
+  return lc_perform (ret, url, headers_attr, data);
+#endif
   string cmd= to_shell_command (url, headers_attr, data);
   int st= system (cmd, ret);
   if (st != 0)
@@ -552,6 +784,9 @@ http_post_json (string& ret, string url,
 #ifdef __EMSCRIPTEN__
   if (web_http_available ())
     return web_post (ret, url, headers_attr, tree_to_json (data));
+#endif
+#ifdef USE_LIBCURL
+  return lc_perform (ret, url, headers_attr, tree_to_json (data));
 #endif
   string cmd= to_shell_command (url, headers_attr, data);
   int st= system (cmd, ret);
@@ -567,6 +802,9 @@ http_post_query (string& ret, string url,
   if (web_http_available ())
     return web_post (ret, url, headers_attr, web_query_body (attr));
 #endif
+#ifdef USE_LIBCURL
+  return lc_perform (ret, url, headers_attr, lc_form (attr));
+#endif
   string cmd= to_shell_command (url, headers_attr, attr);
   int st= system (cmd, ret);
   if (st != 0)
@@ -581,6 +819,9 @@ async_http_post (string url, array<string> headers_attr,
   if (web_http_available ())
     return web_async_post (url, headers_attr, data, callback);
 #endif
+#ifdef USE_LIBCURL
+  return lc_async (url, headers_attr, data, callback);
+#endif
   string cmd= to_shell_command (url, headers_attr, data);
   return async_eval_system (cmd, callback);
 }
@@ -592,6 +833,9 @@ async_http_post_json (string url, array<string> headers_attr,
   if (web_http_available ())
     return web_async_post (url, headers_attr, tree_to_json (data), callback);
 #endif
+#ifdef USE_LIBCURL
+  return lc_async (url, headers_attr, tree_to_json (data), callback);
+#endif
   string cmd= to_shell_command (url, headers_attr, data);
   return async_eval_system (cmd, callback);
 }
@@ -602,6 +846,9 @@ async_http_post_query (string url, array<string> headers_attr,
 #ifdef __EMSCRIPTEN__
   if (web_http_available ())
     return web_async_post (url, headers_attr, web_query_body (attr), callback);
+#endif
+#ifdef USE_LIBCURL
+  return lc_async (url, headers_attr, lc_form (attr), callback);
 #endif
   string cmd= to_shell_command (url, headers_attr, attr);
   return async_eval_system (cmd, callback);
@@ -616,9 +863,18 @@ async_http_post_json (string url, array<string> headers_attr, tree data,
     return web_async_post (url, headers_attr, tree_to_json (data), object (),
                            &status, &outbuf, &errbuf);
 #endif
+#ifdef USE_LIBCURL
+  return lc_async (url, headers_attr, tree_to_json (data),
+                   status, outbuf, errbuf, kill);
+#endif
   string cmd= to_shell_command (url, headers_attr, data);
   return async_eval_system (cmd, status, outbuf, errbuf, kill);  
 }
 
 #endif
 
+#if defined(QTTEXMACS) && AC_QT_MAJOR_VERSION >= 6
+// (Qt makes the requests: QNetworkAccessManager, qt_http.cpp)
+void http_async_pending () {}
+void http_async_cancel (string* outbuf) { (void) outbuf; }
+#endif

@@ -302,6 +302,9 @@
 /* Use intl library */
 #undef USE_INTL
 
+/* Make the HTTP requests with libcurl */
+#undef USE_LIBCURL
+
 /* Use MuPDF library */
 #undef USE_MUPDF
 
