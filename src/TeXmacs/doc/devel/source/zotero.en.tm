@@ -156,6 +156,40 @@
   default (title, creators, year). <menu|Show in Zotero> opens the page of
   the item on <verbatim|zotero.org> (<scm|zotero-web-url>).
 
+  <subsection|Asynchronous requests in a web browser>
+
+  A synchronous <verbatim|XMLHttpRequest> stops the page until
+  <verbatim|zotero.org> answers, and a browser allows no time limit for it.
+  So the operations which can wait run with a retry:
+
+  <\explain>
+    <scm|(zotero-with-retry <scm-arg|retry> <scm-arg|thunk>)><explain-synopsis|run
+    with asynchronous requests>
+  <|explain>
+    Runs <scm-arg|thunk>; in a web browser, its requests are made with
+    <verbatim|fetch> (<scm|zotero-start-request>) and answer
+    <scm|(pending "" #f)> at once when their answer is not known yet. The
+    answers come back through <verbatim|TeXmacs.later> to
+    <scm|zotero-async-answer>, into a cache of answers (5 seconds for the
+    request of the state, 60 seconds for the others, forgotten when a
+    library changed); when nothing is awaited any more, the procedures
+    <scm-arg|retry> of the operations which waited are called, and find
+    their answers in the cache. A request made without retry is
+    synchronous, as on the desktop.
+  </explain>
+
+  The search window (which shows its search and its sources again), the
+  completion (which completes again if the cursor did not move),
+  <scm|zotero-before-update> (which answers <scm|wait>, so that
+  <scm|update-document> stops and is called again) and the commands
+  (<scm|zotero-command>) use it. An awaited answer is never taken for a
+  fact: <scm|zotero-check-missing> sees no deleted item, the sync changes
+  nothing, and the caches of keys, completions and groups are not filled
+  (<scm|zotero-asking?>). The converted references are kept per item and
+  version, so that the bibliography made with the database, which asks
+  Zotero while it is made, finds them once <scm|zotero-before-update> has
+  asked for them.
+
   <subsection|State and caches>
 
   <scm|zotero-status> asks Zotero for one key, and remembers the answer:
@@ -451,6 +485,15 @@
   is known without asking Zotero (<scm|zotero-known-entry>: the cache of
   keys, or the attachment <verbatim|zotero-items>).
 
+  <subsection|Messages>
+
+  The messages are built with <scm|(zotero-tr <scm-arg|template>
+  <scm-arg|arg> ...)>, which translates the template and then puts the
+  arguments for <verbatim|%1>, <verbatim|%2>..., so that the keys and the
+  names of files are never translated; the dictionaries have the templates
+  (in nine languages). The menu paths of the messages are translated item
+  by item (<scm|zotero-menu-path>).
+
   <section|Preferences>
 
   <\description>
@@ -531,6 +574,11 @@
     in the search window of references went into the list of results. A
     field now claims the focus of a window which has none
     (<verbatim|vue_widget.cpp>).
+
+    <item>A <markup|refreshable> widget evaluates its items when the window
+    is built: refreshed, it shows the same text. A line which changes is a
+    <markup|promise> in its refreshable, made again at each refresh (the
+    sources of the search window, the state in the settings).
 
     <item>A definition with <scm|:require> must come after the default
     definition (without condition) of the same function, otherwise the

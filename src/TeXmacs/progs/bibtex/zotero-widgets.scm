@@ -33,7 +33,7 @@
 
 (tm-widget ((zotero-conflict-widget name rows) cmd)
   (padded
-    (bold (text (string-append name ": changed in TeXmacs and in Zotero")))
+    (bold (text (zotero-tr "%1: changed in TeXmacs and in Zotero" name)))
     ===
     (text "Choose the value to keep for each field")
     ===
@@ -81,13 +81,21 @@
   (:synopsis "Update the references of the database which come from Zotero")
   (:interactive #t)
   (zotero-forget-state)
+  (zotero-command synchronize-again synchronize))
+
+(define (synchronize-again)
+  (zotero-command synchronize-again synchronize))
+
+(define (synchronize)
   (if (not (zotero-ready?))
       (set-message (zotero-status-message (zotero-status)) "Zotero")
       (with r (zotero-sync-database #t)
-        (set-message (or (zotero-sync-message r)
-                         "The references from Zotero are up to date")
-                     "Zotero")
-        (resolve-conflicts (cadddr r)))))
+        ;; NOTE: in a web browser, once all the answers have come
+        (when (not (zotero-asking?))
+          (set-message (or (zotero-sync-message r)
+                           "The references from Zotero are up to date")
+                       "Zotero")
+          (resolve-conflicts (cadddr r))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Checking the citations against Zotero
@@ -99,27 +107,28 @@
 (tm-define (zotero-check-lines r)
   ;; The lines of the report @r of zotero-check-document
   (let* ((get (lambda (cat) (or (assoc-ref r cat) '())))
-         (count (lambda (n what)
-                  (string-append (number->string n) " " what))))
+         (count (lambda (cat what)
+                  (zotero-tr what (number->string (length (get cat)))))))
     (append
-     (list (count (length (get 'zotero)) "citations found in Zotero")
-           (count (length (get 'elsewhere))
-                  "citations found in the other sources"))
-     (map (lambda (p) (string-append (car p) " is now " (cdr p)
-                                     " in Zotero"))
+     (list (count 'zotero "%1 citations found in Zotero")
+           (count 'elsewhere "%1 citations found in the other sources"))
+     (map (lambda (p) (zotero-tr "%1 is now %2 in Zotero" (car p) (cdr p)))
           (get 'renamed))
      (if (null? (get 'deleted)) '()
-         (list (string-append "No longer in Zotero (the exported copy is "
-                              "kept): " (keys-text (get 'deleted)))))
+         (list (zotero-tr (string-append "No longer in Zotero (the exported "
+                                         "copy is kept): %1")
+                          (keys-text (get 'deleted)))))
      (if (null? (get 'missing)) '()
-         (list (string-append "Not found: " (keys-text (get 'missing)))))
-     (map (lambda (k) (string-append k " is a different work in Zotero "
-                                     "and in the other source, which wins"))
+         (list (zotero-tr "Not found: %1" (keys-text (get 'missing)))))
+     (map (lambda (k)
+            (zotero-tr (string-append "%1 is a different work in Zotero and "
+                                      "in the other source, which wins")
+                       k))
           (get 'collisions))
      (if (null? (get 'copies)) '()
-         (list (string-append "Copies of Zotero items in the database, "
-                              "not kept in sync: "
-                              (keys-text (get 'copies))))))))
+         (list (zotero-tr (string-append "Copies of Zotero items in the "
+                                         "database, not kept in sync: %1")
+                          (keys-text (get 'copies))))))))
 
 (tm-widget ((zotero-check-widget r) cmd)
   (padded
@@ -140,9 +149,17 @@
   (:synopsis "Check the citation keys of the document against Zotero")
   (:interactive #t)
   (zotero-forget-state)
+  (zotero-command check-again check))
+
+(define (check-again)
+  (zotero-command check-again check))
+
+(define (check)
   (if (not (zotero-ready?))
       (set-message (zotero-status-message (zotero-status)) "Zotero")
       (with r (zotero-check-document)
+        ;; NOTE: in a web browser, the report once all the answers have come
+        (when (not (zotero-asking?))
         (dialogue-window
          (zotero-check-widget r)
          (lambda (what)
@@ -150,12 +167,14 @@
                  ((== what 'adopt)
                   (with conflicts (zotero-adopt-entries (assoc-ref r 'copies))
                     (set-message
-                     (string-append "The copies are kept in sync with Zotero"
-                                    (if (null? conflicts) ""
-                                        "; choose the fields of those which differ"))
+                     (zotero-tr (if (null? conflicts)
+                                    "The copies are kept in sync with Zotero"
+                                    (string-append
+                                     "The copies are kept in sync with Zotero; "
+                                     "choose the fields of those which differ")))
                      "Zotero")
                     (resolve-conflicts conflicts)))))
-         "Check against Zotero"))))
+         "Check against Zotero")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Settings
@@ -166,13 +185,26 @@
 (define (settings-test)
   (zotero-forget-state)
   (zotero-forget-keys)
-  (set! settings-status (zotero-status-message (zotero-status)))
+  (settings-show-status))
+
+(define (settings-show-status)
+  ;; in a web browser the state may come later, and is shown again then
+  ;; NOTE: without forgetting again, which would ask again forever
+  (set! settings-status
+        (zotero-with-retry settings-show-status
+                           (lambda () (zotero-status-message (zotero-status)))))
   (refresh-now "zotero-settings-status"))
+
+(define (settings-changed)
+  ;; the search window of references, when it is open, shows its results
+  ;; and its sources again (database/db-widgets.scm, when it is loaded)
+  (catch #t (lambda () (db-search-refresh)) (lambda args #f)))
 
 (define (set-zotero-preference which val)
   (set-preference which val)
   (zotero-forget-state)
-  (zotero-forget-keys))
+  (zotero-forget-keys)
+  (settings-changed))
 
 (define source-names
   '(("auto" . "Automatic") ("local" . "The Zotero application")
@@ -197,7 +229,8 @@
               (or (source-name) "Automatic") "20em"))
       (item (text "API key of zotero.org:")
         (input (when (and answer (!= answer (zotero-api-key-shown)))
-                 (zotero-set-api-key (tm-string-trim-both answer)))
+                 (zotero-set-api-key (tm-string-trim-both answer))
+                 (settings-changed))
                "string" (list (zotero-api-key-shown)) "20em"))
       ;; NOTE: a web page cannot reach the application
       (assuming (not (zotero-in-browser?))
@@ -220,8 +253,10 @@
         (toggle (set-preference "zotero completion" (if answer "on" "off"))
                 (== (get-preference "zotero completion") "on")))
       (item (text "Search Zotero in the search of references:")
-        (toggle (set-preference "zotero in database search"
-                                (if answer "on" "off"))
+        (toggle (begin
+                  (set-preference "zotero in database search"
+                                  (if answer "on" "off"))
+                  (settings-changed))
                 (!= (get-preference "zotero in database search") "off")))
       (item (text "Add the references of Zotero to the BibTeX file:")
         (toggle (set-preference "zotero add to bib file"
@@ -232,8 +267,9 @@
       (text "A read-only key is made at https://www.zotero.org/settings/keys")
       >>)
     ===
+    ;; NOTE: a promise, so that the line is made again when refreshed
     (refreshable "zotero-settings-status"
-      (hlist (text settings-status) >>))
+      (promise (list 'text settings-status)))
     ===
     (bottom-buttons >>
       ("Test the connection" (settings-test)) // //
@@ -244,8 +280,37 @@
   (:interactive #t)
   (set! settings-status
         (if (zotero-web?)
-            (if (zotero-api-key) "zotero.org, with an API key"
-                "zotero.org: give an API key")
-            (string-append "Zotero (local API) at "
-                           (get-preference "zotero server"))))
+            (zotero-tr (if (zotero-api-key) "zotero.org, with an API key"
+                           "zotero.org: give an API key"))
+            (zotero-tr "Zotero (local API) at %1"
+                       (get-preference "zotero server"))))
   (dialogue-window (zotero-settings-widget) noop "Zotero settings"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The key of zotero.org, when it is needed
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define key-answer "")
+
+(tm-widget ((zotero-key-widget) cmd)
+  (padded
+    (text "TeXmacs reads your Zotero library on zotero.org with an API key.")
+    (text "Create a key with read access to your library, and give it here.")
+    ===
+    (hlist
+      (text "API key of zotero.org:") // //
+      (input (when answer (set! key-answer answer) (cmd answer))
+             "string" (list "") "24em"))
+    ===
+    (bottom-buttons
+      ("Create a key..."
+       (zotero-open-url "https://www.zotero.org/settings/keys/new")) >>
+      ("Cancel" (cmd #f)) // //
+      ("Ok" (cmd key-answer)))))
+
+(tm-define (zotero-key-dialog again)
+  (:synopsis "Ask for the API key of zotero.org; then call @again")
+  (set! key-answer "")
+  (dialogue-window (zotero-key-widget)
+                   (lambda (key) (zotero-key-given key again))
+                   "API key of zotero.org"))

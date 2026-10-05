@@ -487,4 +487,6 @@
   (bib-import-current-buffer))
 
 (tm-define (open-bib-chooser cb)
+  ;; the key of zotero.org is asked if the window needs it
+  (zotero-search-opened)
   (open-db-chooser (bib-database) "bib" "Search bibliographic reference" cb))

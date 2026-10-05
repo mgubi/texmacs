@@ -27,9 +27,18 @@
   (reading access to your library, and to your groups if you want them, is
   enough), and give it in the settings, with <menu|Read the library
   from|zotero.org>. The key is kept in your wallet when it is open, and
-  otherwise in your preferences. In <TeXmacs> in a web browser, the library
+  otherwise in your preferences. When <TeXmacs> needs the key and has none
+  (when you open the search window of references, use a command of Zotero,
+  or update a bibliography which needs Zotero), it opens your wallet if it
+  is closed, since the key may be there, and otherwise asks you for it,
+  with a button which opens the page of <verbatim|zotero.org> where keys
+  are made. In <TeXmacs> in a web browser, the library
   is always read from <verbatim|zotero.org>: Zotero refuses the requests of
-  web pages, also when the application runs on the same computer.
+  web pages, also when the application runs on the same computer. There,
+  the answers of <verbatim|zotero.org> come in the background: the search
+  window, the completion of keys and the bibliography are completed when
+  they arrive, and the footer says <with|font-shape|italic|Asking
+  zotero.org...> meanwhile.
 
   The citations use the citation keys of Zotero, which Zotero (or the
   Better<nbsp>BibTeX extension) stores in the field <verbatim|citationKey>.

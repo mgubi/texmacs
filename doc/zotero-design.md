@@ -490,6 +490,30 @@ follow in any order.
     - *The application cannot be used from a web page*: its server closes
       every request with an `Origin` header (local API, connector,
       Better BibTeX), and the Zotero Connector offers nothing to pages.
+  - **Asynchronous requests in a web browser:** a synchronous request
+    stops the page, and the browser allows no time limit for it. The
+    operations which can wait run with a retry (`zotero-with-retry`):
+    their requests use `fetch`, answer `pending` while the answer is not
+    known, and the answers come back through `TeXmacs.later`
+    (`zotero-async-answer`) into a cache (5 s for the state, 60 s
+    otherwise, forgotten when a library changes); once nothing is
+    awaited, the operations which waited run again. The search window,
+    completion (Tab again if the cursor did not move), `update-document`
+    (`zotero-before-update` answers `wait`, and the update is made again)
+    and the commands use it. An awaited answer is never taken for a
+    deletion or a missing key: the sync, the check of renamed keys and
+    the caches of keys, completions and groups skip it. Converted
+    references are kept per item and version, so that a bibliography made
+    with the database needs no request once its references were asked
+    (`before-update` asks them first). Requests without retry stay
+    synchronous.
+  - **Translations:** `zotero-tr` translates a template and then puts the
+    keys and file names in (they are never translated); the messages, the
+    report of the check and the labels of the sources, in nine languages.
+  - **Refreshable lines:** a `refreshable` evaluates its items when the
+    window is built; a line which changes (the sources of the search
+    window, the state in the settings) is a `promise`, made again at each
+    refresh.
   - **Differences from §3.5 and §4:** the footer cannot carry a
     *Details* button, so the generation reports renamed and deleted keys
     in the footer, and *Check against Zotero...* gives the details. The
