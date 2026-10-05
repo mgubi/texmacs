@@ -118,6 +118,37 @@
 (define-public (session-focus-menu name)
   (ahash-ref session-focus-menus name))
 
+;; the sessions of a group are in a submenu of the menus which list them
+;; (Insert > Session: AI for the chatbots), whose name is the group
+(define session-groups (make-ahash-table))
+(define-public (set-session-group! name group)
+  (ahash-set! session-groups name group))
+(define-public (session-group name)
+  (ahash-ref session-groups name))
+
+;; the entry of a session in Insert > Session, if its plug-in gives one: a
+;; menu of the plug-in, from its name (the chatbots: a submenu of models)
+(define session-insert-menus (make-ahash-table))
+(define-public (set-session-insert-menu! name m)
+  (ahash-set! session-insert-menus name m))
+(define-public (session-insert-menu name)
+  (ahash-ref session-insert-menus name))
+
+;; the names of the sessions l and of their groups, in the order of their
+;; names in the menus; a group as (group name ...)
+(define-public (session-menu-entries l)
+  (let* ((alone (list-filter l (lambda (n) (not (session-group n)))))
+         (groups (list-remove-duplicates
+                  (list-filter (map session-group l) (lambda (g) g))))
+         (entries (append alone
+                          (map (lambda (g)
+                                 (cons g (list-filter
+                                          l (lambda (n)
+                                              (== (session-group n) g)))))
+                               groups)))
+         (label (lambda (x) (if (pair? x) (car x) (session-name x)))))
+    (sort entries (lambda (x y) (string<=? (label x) (label y))))))
+
 (define-public (connection-request? name)
   (with info (connection-info name "default")
     (and (func? info 'tuple 3) (== (cadr info) "request"))))
