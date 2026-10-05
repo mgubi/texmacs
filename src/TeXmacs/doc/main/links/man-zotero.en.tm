@@ -29,7 +29,11 @@
   from|zotero.org>. The key is kept in your wallet when it is open, and
   otherwise in your preferences. In <TeXmacs> in a web browser, the library
   is always read from <verbatim|zotero.org>: Zotero refuses the requests of
-  web pages, also when the application runs on the same computer.
+  web pages, also when the application runs on the same computer. There,
+  the answers of <verbatim|zotero.org> come in the background: the search
+  window, the completion of keys and the bibliography are completed when
+  they arrive, and the footer says <with|font-shape|italic|Asking
+  zotero.org...> meanwhile.
 
   The citations use the citation keys of Zotero, which Zotero (or the
   Better<nbsp>BibTeX extension) stores in the field <verbatim|citationKey>.

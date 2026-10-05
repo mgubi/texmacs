@@ -267,8 +267,9 @@
       (text "A read-only key is made at https://www.zotero.org/settings/keys")
       >>)
     ===
+    ;; NOTE: a promise, so that the line is made again when refreshed
     (refreshable "zotero-settings-status"
-      (hlist (text settings-status) >>))
+      (promise (list 'text settings-status)))
     ===
     (bottom-buttons >>
       ("Test the connection" (settings-test)) // //

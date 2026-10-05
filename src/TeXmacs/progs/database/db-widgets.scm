@@ -185,8 +185,9 @@
 	   (query ""))
       (assuming (== kind "bib")
         ;; the sources of the references (see bibtex/zotero-db.scm)
+        ;; NOTE: a promise, so that the line is made again when refreshed
         (refreshable "db-search-sources"
-          (hlist (text (zotero-search-sources-text db)) >>))
+          (promise (list 'text (zotero-search-sources-text db))))
         ===)
       (hlist
 	(text "Search:") // //
@@ -210,8 +211,9 @@
 	   (query ""))
       (assuming (== kind "bib")
         ;; the sources of the references (see bibtex/zotero-db.scm)
+        ;; NOTE: a promise, so that the line is made again when refreshed
         (refreshable "db-search-sources"
-          (hlist (text (zotero-search-sources-text db)) >>))
+          (promise (list 'text (zotero-search-sources-text db))))
         ===)
       (hlist
 	(text "Search:") // //
