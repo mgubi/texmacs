@@ -880,7 +880,12 @@ decode_from_utf8 (string s, int& i) {
   int start= i-1;
   for (; trail > 0; trail--) {
     i++;
-    if (i >= N(s)) i= N(s)-1;
+    if (i >= N(s)) {
+      // truncated at the end of the string: as a sequence broken earlier
+      i= start+1;
+      c= s[i++];
+      return c;
+    }
     c = s[i];
     if ((0xC0 & c) == 0x80)
       code = (code << 6) | (c & 0x3F);
