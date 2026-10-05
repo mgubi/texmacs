@@ -93,6 +93,14 @@ connection_rep::start (bool again) {
     if (again && (message == "ok")) {
       beep ();
       (void) connection_retrieve (name, session);
+      // NOTE: a banner may consist of several blocks (e.g. a warning, then
+      // the banner itself); those which follow at once are part of it, and
+      // would otherwise be taken for the answer of the next evaluation
+      for (int i= 0; i < 10 && ln->alive; i++) {
+        ln->listen (100);
+        if (ln->watch (LINK_OUT) == "" && ln->watch (LINK_ERR) == "") break;
+        (void) connection_retrieve (name, session);
+      }
     }
   }
   tm_out->bof ();

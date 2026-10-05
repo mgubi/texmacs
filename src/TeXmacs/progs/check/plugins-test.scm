@@ -205,7 +205,10 @@
   (string-contains? (stree-text t) what))
 
 (define (pid-alive? pid)
-  (== (system (string-append "kill -0 " pid " 2>/dev/null")) 0))
+  ;; NOTE: a process which has exited but is not reaped yet (a zombie) is
+  ;; not alive; the links without Qt reap it once its output is read
+  (== (system (string-append "ps -o stat= -p " pid
+                             " 2>/dev/null | grep -qv '^Z'")) 0))
 
 (define started '())
 

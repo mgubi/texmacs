@@ -19,6 +19,7 @@
 #include "hashset.hpp"
 #include "iterator.hpp"
 #include "tm_timer.hpp"
+#include "analyze.hpp"
 #include <stdio.h>
 #include <string.h>
 #ifndef OS_MINGW
@@ -176,11 +177,54 @@ execute_shell (string s) {
 }
 #endif
 
+#ifndef OS_MINGW
+static bool
+program_found (string cmd) {
+  // Can the program which @cmd runs be started? As for Qt pipes, which
+  // start the program themselves, a program which is not found is an error;
+  // a command which is not a plain call of a program is left to the shell
+  int i= 0, n= N(cmd);
+  while (i < n && (cmd[i] == ' ' || cmd[i] == '\t')) i++;
+  int start= i;
+  while (i < n && cmd[i] != ' ' && cmd[i] != '\t') i++;
+  string prog= cmd (start, i);
+  if (prog == "") return true;
+  for (int j= 0; j < N(prog); j++)
+    if (!is_alpha (prog[j]) && !is_digit (prog[j]) &&
+        prog[j] != '.' && prog[j] != '_' && prog[j] != '-' &&
+        prog[j] != '+' && prog[j] != '/')
+      return true;
+  if (prog == "exec" || prog == "cd" || prog == "eval" || prog == "." ||
+      prog == "command" || prog == "set" || prog == "export" ||
+      prog == "trap" || prog == "ulimit" || prog == "umask")
+    return true;
+  if (search_forwards ("/", prog) >= 0) {
+    c_string p (prog);
+    return access (p, X_OK) == 0;
+  }
+  string path= get_env ("PATH");
+  int k= 0;
+  while (k <= N(path)) {
+    int e= search_forwards (":", k, path);
+    if (e < 0) e= N(path);
+    string dir= path (k, e);
+    c_string p ((dir == ""? string ("."): dir) * "/" * prog);
+    if (access (p, X_OK) == 0) return true;
+    k= e + 1;
+  }
+  return false;
+}
+#endif
+
 string
 pipe_link_rep::start () {
 #ifndef OS_MINGW
   if (alive) return "busy";
   if (DEBUG_AUTO) debug_io << "Launching '" << cmd << "'\n";
+  if (!program_found (cmd)) {
+    if (DEBUG_IO) debug_io << "Error: cannot start '" << cmd << "'\n";
+    return "Error: cannot start application";
+  }
 
   int e1= pipe (pp_in ); (void) e1;
   int e2= pipe (pp_out); (void) e2;
@@ -303,6 +347,10 @@ pipe_link_rep::watch (int channel) {
 
 string
 pipe_link_rep::read (int channel) {
+  // NOTE: as for Qt pipes, what is pending is read first, so that the
+  // output arrives without the event loop (synchronous evaluations,
+  // interruptions)
+  if (alive && outbuf == "" && errbuf == "") listen (0);
   if (channel == LINK_OUT) {
     string r= outbuf;
     outbuf= "";
