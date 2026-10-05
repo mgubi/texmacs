@@ -965,6 +965,9 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     // Should be in a drd.
 
     bool option2= (cmd == "\\def" || cmd == "\\newenvironment");
+    // \parbox[pos][height][inner]{width}{text}: the options after the
+    // first one, which TeXmacs does not use, are read and dropped
+    int extra_options= (cmd == "\\parbox")? 2: 0;
     if (is_def (t)) change--;
 
     while (i<n && arity>=0 && (arity>0 || option)) {
@@ -972,6 +975,15 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
       while ((j<n) && is_space (s[j])) j++;
       if (j==n) break;
       if (s[i]=='$') break; // in most cases, this should not be an argument
+      if (!option && extra_options > 0 && N(t) == 2 && s[j] == '[') {
+        j++;
+        i=j;
+        (void) parse (s, i, ']', change);
+        u << s (j, i);
+        if ((i<n) && (s[i]==']')) i++;
+        extra_options--;
+        continue;
+      }
       if (option && (is_opening_option (s[j]) ||
                     (type == "algorithm2e" && s[j] == '{'))) {
         char ec= closing_delimiter (s[j]);

@@ -75,6 +75,14 @@
 ;; Moving across the differences between both versions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (tree-contains-version? t)
+  (and (tree-compound? t)
+       (or (version-context? t)
+           (list-find (tree-children t) tree-contains-version?))))
+
+(tm-define (version-has-differences?)
+  (not (not (tree-contains-version? (buffer-tree)))))
+
 (tm-define (version-first-difference)
   (go-start)
   (version-next-difference)

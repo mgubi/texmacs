@@ -489,19 +489,26 @@ fnsymbol_nr (int nr) {
 
 static const char* hex_string= "0123456789ABCDEF";
 
+static string
+as_hexadecimal_unsigned (unsigned long long u) {
+  if (u<16) return hex_string [u & 15];
+  return as_hexadecimal_unsigned (u >> 4) * hex_string [u & 15];
+}
+
+// the magnitude of a negative number as an unsigned one: -i overflows for
+// the smallest value of the type, whose magnitude has no positive form
 string
 as_hexadecimal (int i) {
-  if (i<0) return "-" * as_hexadecimal (-i);
-  if (i<16) return hex_string [i & 15];
-  return as_hexadecimal (i >> 4) * hex_string [i & 15];
+  if (i<0) return "-" * as_hexadecimal_unsigned (0ULL - (long long) i);
+  return as_hexadecimal_unsigned ((unsigned long long) i);
 }
 
 string
 as_hexadecimal (pointer ptr) {
   intptr_t i= (intptr_t) ptr;
-  if (i<0) return "-" * as_hexadecimal (-i);
-  if (i<16) return hex_string [i & 15];
-  return as_hexadecimal (i >> 4) * hex_string [i & 15];
+  if (i<0) return "-" * as_hexadecimal_unsigned
+                          (0ULL - (unsigned long long) i);
+  return as_hexadecimal_unsigned ((unsigned long long) i);
 }
 
 string
@@ -825,29 +832,19 @@ escape_sh (string s) {
 #ifdef OS_MINGW
   return raw_quote (s);
 #else
+  // Protect every character which is not known to be harmless, so that
+  // the result is always a single shell word with the value s
   int i, n= N(s);
   string r;
-  for (i=0; i<n; i++)
-    switch (s[i]) {
-    case '(':
-    case ')':
-    case '<':
-    case '>':
-    case '?':
-    case '&':
-    case '$':
-    case '`':
-    case '\"':
-    case '\\':
-    case ' ':
-      r << '\\' << s[i];
-      break;
-    case '\n':
-      r << "\\n";
-      break;
-    default:
-      r << s[i];
-    }
+  for (i=0; i<n; i++) {
+    char c= s[i];
+    if (is_alpha (c) || is_digit (c) || ((unsigned char) c) >= 128 ||
+        c == '_' || c == '-' || c == '.' || c == '/' || c == ',' ||
+        c == ':' || c == '+' || c == '@' || c == '%' || c == '=')
+      r << c;
+    else if (c == '\n') r << "'\n'";
+    else r << '\\' << c;
+  }
   return r;
 #endif
 }
@@ -1595,7 +1592,7 @@ differences (string s1, string s2) {
   int i1= 0, i2= 0, j1= n1, j2= n2;
   while (i1<j1 && i2<j2 && s1[i1] == s2[i2]) { i1++; i2++; }
   while (i1<j1 && i2<j2 && s1[j1-1] == s2[j2-1]) { j1--; j2--; }
-  if (i1 == i2 && j1 == j2) return array<int> ();
+  if (i1 == j1 && i2 == j2) return array<int> ();
   if (i1 > 0 || i2 > 0 || j1 < n1 || j2 < n2) {
     array<int> r= differences (s1 (i1, j1), s2 (i2, j2));
     for (int k=0; k<N(r); k+=4) {

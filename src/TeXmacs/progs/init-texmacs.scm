@@ -320,7 +320,7 @@
 
 ;(display "Booting graphics mode\n")
 (lazy-keyboard (graphics graphics-kbd) in-active-graphics? graphics-wheel)
-(lazy-menu (graphics graphics-menu) graphics-menu graphics-icons
+(lazy-menu (graphics graphics-menu) graphics-icons
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)

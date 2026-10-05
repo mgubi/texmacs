@@ -309,11 +309,24 @@ system_date (string lan, string fm) {
   if (get_env (lvar) == "") lvar= "LANG";
   string old= get_env (lvar);
   set_env (lvar, lan);
-  string date= var_eval_system ("date +\"" * fm * "\"");
+  string date;
+  int status= system ("date +\"" * fm * "\" 2>/dev/null", date);
+  while (N(date) > 0 && (date[N(date)-1] == '\n' || date[N(date)-1] == '\r'))
+    date= date (0, N(date) - 1);
   if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
     date= il2_to_cork (date);
   // if (lan == "ru_RU") date= iso_to_koi8 (date);
   set_env (lvar, old);
+  if ((status != 0 || N(date) == 0) && N(fm) > 0) {
+    // no date command (a browser has no processes, a system may lack
+    // it): the C library, in its own locale, so the names are in English
+    char buf[256];
+    time_t ti;
+    time (&ti);
+    c_string _fm (fm);
+    size_t len= strftime (buf, sizeof (buf), _fm, localtime (&ti));
+    date= string (buf, (int) len);
+  }
   return date;
 }
 

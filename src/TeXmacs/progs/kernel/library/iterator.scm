@@ -44,7 +44,7 @@
   (with next #f
     (while (and it (begin (set! next (it)) (not (pred? (car next)))))
       (set! it (cdr next)))
-    (and it (lambda () next))))
+    (and it (iterator (car next) (iterator-filter (cdr next) pred?)))))
 
 (define-public-macro (extract var it prop?)
   "Extract all values @var from iterator @it which match the property @prop?."

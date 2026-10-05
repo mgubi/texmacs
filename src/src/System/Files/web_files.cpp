@@ -131,7 +131,7 @@ get_from_web (url name) {
   //cout << "got " << name << " as " << tmp << LF;
 #endif // QTTEXMACS, Qt >= 6.0
 
-  if (file_size (url_system (tmp_s)) <= 0) {
+  if (file_size (tmp) <= 0) {
     remove (tmp);
     return url_none ();
   }

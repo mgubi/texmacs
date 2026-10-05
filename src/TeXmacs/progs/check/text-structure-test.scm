@@ -249,12 +249,13 @@
                (stree->tree '(list-of-figures "figure" (document ""))) #f)
               "List of figures")
       (check= (tm/section-get-title-string "plain" #f) "no title")
-      ;; FIXME: the special titles of the index and of the glossary are
-      ;; never used, since tree-is? is applied to a symbol
-      ;; (TeXmacs/progs/text/text-structure.scm:66-67):
-      ;; (tm/section-get-title-string (stree->tree '(the-index "idx"
-      ;; (document ""))) #f) gives "The index", expected "Index" (and
-      ;; "The glossary" for the-glossary, expected "Glossary").
+      ;; the index and the glossary have titles of their own
+      (check= (tm/section-get-title-string
+               (stree->tree '(the-index "idx" (document ""))) #f)
+              "Index")
+      (check= (tm/section-get-title-string
+               (stree->tree '(the-glossary "gly" (document ""))) #f)
+              "Glossary")
       (check= (texmacs->string (stree->tree '(concat "a" (em "b"))))
               "ab")
       (check-true (principal-section? (node 0)))
@@ -570,20 +571,29 @@
       (check= (snode 2) '(small-figure "tab" "cap"))
       (edit (variant-circulate (node 2) #t))
       (check= (snode 2) '(small-table "tab" "cap"))
-      ;; FIXME: the named form of a table turns back into a figure: its
-      ;; type argument is left empty, and the way back always gives a
-      ;; figure (TeXmacs/progs/text/text-edit.scm:733-738, 749-752):
-      ;; titled-toggle-name twice on (small-table "tab" "cap") gives
-      ;; (small-figure "tab" "cap"), expected (small-table "tab" "cap")
-      ;; (the same for big-table).
+      ;; the named form keeps the type of the figure or table
+      (edit (titled-toggle-name (node 2)))
+      (check= (snode 2) '(render-small-figure "table" "" "tab" "cap"))
+      (edit (titled-toggle-name (node 2)))
+      (check= (snode 2) '(small-table "tab" "cap"))
+      (edit (variant-circulate (node 1) #t))
+      (edit (titled-toggle-name (node 1)))
+      (check= (snode 1) '(render-big-figure "table" "" "pic" "cap"))
+      (edit (titled-toggle-name (node 1)))
+      (check= (snode 1) '(big-table "pic" "cap"))
+      (edit (variant-circulate (node 1) #t))
       (edit (variant-circulate (node 2) #t))
       (check= (snode 2) '(small-figure "tab" "cap"))
       (edit (titled-toggle-name (node 1)))
-      (check= (snode 1) '(render-big-figure "" "" "pic" "cap"))
+      (check= (snode 1) '(render-big-figure "figure" "" "pic" "cap"))
       (edit (titled-toggle-name (node 1)))
       (check= (snode 1) '(big-figure "pic" "cap"))
       (edit (titled-toggle-name (node 2)))
-      (check= (snode 2) '(render-small-figure "" "" "tab" "cap"))
+      (check= (snode 2) '(render-small-figure "figure" "" "tab" "cap"))
+      (edit (titled-toggle-name (node 2)))
+      (check= (snode 2) '(small-figure "tab" "cap"))
+      ;; an unnamed figure with no type is a figure
+      (edit (tree-assign (node 2) '(render-small-figure "" "" "tab" "cap")))
       (edit (titled-toggle-name (node 2)))
       (check= (snode 2) '(small-figure "tab" "cap"))
       ;; a floating figure, anchored at the end of the previous paragraph,
@@ -895,12 +905,14 @@
       (edit (tree-go-to (node 1) 1 :start)
             (automatic-section-rename "Contents"))
       (check= (snode 1) '(table-of-contents* "toc" "Contents" (document "")))
-      ;; FIXME: a renamed automatic section has no title in the menus of
-      ;; document parts and sections, since the starred tags are not
-      ;; automatic sections (TeXmacs/progs/text/text-structure.scm:68-70,
-      ;; text-drd.scm:76): (tm/section-get-title-string (stree->tree
-      ;; '(table-of-contents* "toc" "Contents" (document ""))) #f) gives
-      ;; "no title", expected the new name "Contents".
+      ;; a renamed automatic section is still a principal section, with
+      ;; its new name as title
+      (check= (tm/section-get-title-string (node 1) #f) "Contents")
+      (check-true (principal-section? (node 1)))
+      (check= (tm/section-get-title-string
+               (stree->tree '(bibliography* "bib" "tm-plain" "refs.bib"
+                                            "Sources" (document ""))) #f)
+              "Sources")
       (check-false (automatic-section-context? (node 1))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1427,11 +1439,9 @@
                                    (output (document "Welcome"))
                                    (unfolded-io "> " (document "a")
                                                 (document "1")))))
-      ;; FIXME: the paragraph between the two parts is a document inside
-      ;; the document of the body, not an empty paragraph
-      ;; (TeXmacs/progs/dynamic/session-edit.scm:865): session-split in
-      ;; the second field of session-doc gives (document "") between the
-      ;; sessions, expected "".
+      ;; an empty paragraph between the two parts, with the cursor
+      (check= (snode 2) "")
+      (check= (cursor) '(2 0))
       (check= (snode 3) '(session "scheme" "default"
                                   (document
                                    (folded-io "> " (document "b")

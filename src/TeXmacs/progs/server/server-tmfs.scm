@@ -82,7 +82,7 @@
   ;; Given a resource database ID, resolve it to the current URL
   (and-let* ((rtype (db-get-field-first rid "type" #f))
              (name (db-get-field-first rid "name" #f))
-             (sname (tmfs-car (tmfs-cdr (url->string (url-unroot old-url))))))
+             (sname (tmfs-car (tmfs-cdr (url->unix (url-unroot old-url))))))
     ;(display* "resolving " rid " of type " rtype " with name " name " and old-url " old-url "\n")
     ;(display* " got name = " name " and sname = " sname "\n")
     (cond ((== rtype "live") (string-append "tmfs://live/" sname "/" name))
