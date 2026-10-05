@@ -811,7 +811,15 @@
   (-> "Metadata" (link document-metadata-menu))
   (-> "Bibliography"
       (when (buffer-has-biblio? (current-buffer))
-	("Local entries" (open-biblio))))
+	("Local entries" (open-biblio)))
+      ("Update from Zotero" (zotero-update-bibliography))
+      (when (supports-db?)
+        ("Synchronize with Zotero" (zotero-synchronize))
+        ("Import the citations into the database" (zotero-import-citations)))
+      ("Update the citations" (zotero-update-citations))
+      ("Check against Zotero..." (open-zotero-check))
+      ---
+      ("Zotero settings..." (open-zotero-settings)))
   ---
   (-> "Magnification" (link document-magnification-menu))
   (-> "Colors" (link document-colors-menu))

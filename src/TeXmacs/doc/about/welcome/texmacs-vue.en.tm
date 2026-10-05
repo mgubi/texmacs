@@ -184,6 +184,17 @@
   <paragraph|5 October 2026>
 
   <\itemize>
+    <item>Citations from <name|Zotero>, read from your library on
+    <verbatim|zotero.org> with an API key (made on
+    <verbatim|zotero.org/settings/keys>, given in
+    <menu|Document|Bibliography|Zotero settings...>, and kept in the wallet
+    when it is on): the search window of a citation (<menu|Focus|Search
+    references>) lists the references of <name|Zotero>, the keys are
+    completed from it, and the bibliography takes its references. The
+    Zotero application itself cannot be reached from a web page. See the
+    page <with|font-shape|italic|Citations from Zotero> of the manual, in
+    the chapter on links and bibliographies.
+
     <item>The wallet works in the browser, encrypted by the browser and
     opened with a passphrase or a passkey (Touch ID...): the tab
     <with|font-series|bold|Security> of the preferences. The key of the
