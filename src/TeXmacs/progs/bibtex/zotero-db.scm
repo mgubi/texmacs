@@ -281,14 +281,18 @@
         ((zotero-ready?)
          (if (== (get-preference "zotero libraries") "all")
              (with n (length (zotero-groups))
-               (string-append "Zotero (My Library and "
+               (string-append (if (zotero-web?) "zotero.org" "Zotero")
+                              " (My Library and "
                               (number->string n)
                               (if (== n 1) " group)" " groups)")))
-             "Zotero (My Library)"))
+             (if (zotero-web?) "zotero.org (My Library)"
+                 "Zotero (My Library)")))
         ((== (zotero-status) 'disabled)
          "Zotero refuses the requests (enable its local API)")
-        ((== (zotero-status) 'not-running) "Zotero is not running")
-        (else "Zotero answered with an error")))
+        ((and (== (zotero-status) 'not-running) (not (zotero-web?)))
+         "Zotero is not running")
+        ((== (zotero-status) 'no-key) "Zotero (give the API key of zotero.org)")
+        (else (zotero-status-message (zotero-status)))))
 
 (tm-define (zotero-search-sources-text db)
   (:synopsis "The sources of the search window of references, for @db")
