@@ -72,9 +72,12 @@
   <subsubsection*|With the database>
 
   With the bibliographic database (<menu|Tools|Database tool>), Zotero is
-  one more source of references. The database of the
-  user comes first, then Zotero, then the references attached to the
-  document, which serve when Zotero is not running. The search window of
+  one more source of references, and the bibliography needs no <BibTeX>
+  file: <menu|Document|Bibliography|Update from Zotero> adds a bibliography
+  without file when the document has none, and generates it. The
+  references of the bibliography are then kept in the document itself. The
+  database of the user comes first, then Zotero, then the references kept
+  in the document, which serve when Zotero is not running. The search window of
   the database (<shortcut|(kbd-alternate-tab)> in a citation) also lists
   the matching references of Zotero.
 

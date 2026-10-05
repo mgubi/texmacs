@@ -781,6 +781,23 @@
             (check= (zotero-line-label (car l))
                     "[Z: Physics group] Group (2021): Group work  [group2021]")))))))
 
+(define (test-selection)
+  (check-group "selection")
+  ;; the widget gives back the labels converted to utf8 and back
+  (let* ((long "Underground test of gravity-related wave function collapse -- again")
+         (l1 (list (list "k1" long "Donadi" "2021" #f) '("F") #f))
+         (l2 (list (list "k2" "Short" "Roe" "2020" #f) '("F") #f))
+         (back (lambda (l) (utf8->cork (cork->utf8 (zotero-line-label l))))))
+    (check-true (string-contains? (zotero-line-label l1) "..."))
+    (check-false (== (back l1) (zotero-line-label l1)))
+    (check= (map zotero-line-key
+                 (zotero-selected-lines (list l1 l2) (list (back l1))))
+            '("k1"))
+    (check= (map zotero-line-key
+                 (zotero-selected-lines (list l1 l2)
+                                        (list (zotero-line-label l2))))
+            '("k2"))))
+
 (define (test-combined-database)
   (check-group "combined database")
   (with-fake
@@ -896,6 +913,26 @@
             (edit-step (lambda () (undo 0)))
             (check= (body-citations)
                     '("smith2020" "smith2020a" "zotero:EEEE5555"))))))))
+
+(define (test-update-database)
+  (check-group "update database")
+  ;; with the database, Update from Zotero adds a bibliography without file
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (with-document "nb.tm" (doc-tm "")
+            (lambda ()
+              (zotero-update-bibliography)
+              (check= (select (tree->stree (buffer-tree))
+                              '(:* bibliography))
+                      '((bibliography "bib" "tm-plain" "" (document ""))))
+              (check-false (url-exists? (tmp "nb-zotero.bib")))
+              ;; once there, it is kept as it is
+              (zotero-update-bibliography)
+              (check= (length (select (tree->stree (buffer-tree))
+                                      '(:* bibliography)))
+                      1))))))))
 
 (define (test-renamed-database)
   (check-group "renamed database")
@@ -1135,7 +1172,9 @@
   (test-groups)
   (test-combined)
   (test-combined-database)
+  (test-selection)
   (test-renamed)
+  (test-update-database)
   (test-renamed-database)
   (test-copies)
   (test-project)

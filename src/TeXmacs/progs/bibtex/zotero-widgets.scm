@@ -91,9 +91,20 @@
 (define (search-labels)
   (map zotero-line-label search-results))
 
+(define (normalized-label s)
+  ;; NOTE: the labels come back from the widget converted to utf8 and back
+  ;; (which changes "..." into an ellipsis, "--" into a dash, and so on)
+  (utf8->cork (cork->utf8 s)))
+
+(tm-define (zotero-selected-lines lines selected)
+  ;; The @lines whose labels are the @selected labels of the widget
+  (with sel (map normalized-label selected)
+    (list-filter lines
+                 (lambda (l)
+                   (in? (normalized-label (zotero-line-label l)) sel)))))
+
 (define (selected-lines)
-  (list-filter search-results
-               (lambda (l) (in? (zotero-line-label l) search-selected))))
+  (zotero-selected-lines search-results search-selected))
 
 (define (selected-keys)
   (list-remove-duplicates (map zotero-line-key (selected-lines))))
@@ -156,7 +167,9 @@
   (padded
     (hlist
       (text "Search:") // //
-      (input (when answer (search-now answer))
+      ;; NOTE: the input also answers when it loses the focus (e.g. by a
+      ;; click in the list): searching again would lose the selection
+      (input (when (and answer (!= answer search-query)) (search-now answer))
              "string" (list search-query) "40em"))
     ===
     (refreshable "zotero-results"
@@ -164,7 +177,8 @@
       ===
       (resize "650px" "300px"
         (scrollable
-          (choices (set! search-selected answer)
+          (choices (set! search-selected
+                         (if (string? answer) (list answer) answer))
                    (search-labels) search-selected))))
     ===
     (hlist

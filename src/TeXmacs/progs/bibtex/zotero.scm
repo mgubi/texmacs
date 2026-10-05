@@ -1059,8 +1059,11 @@
     (and (nnull? l) (string-recompose l ". "))))
 
 (define (insert-managed-bibliography)
-  ;; A bibliography with a managed file named after the document
-  (with name (string-append (url-basename (current-buffer)) "-zotero")
+  ;; A bibliography with a managed file named after the document; with the
+  ;; database, a bibliography without file, whose references are kept in
+  ;; the document
+  (with name (if (supports-db?) ""
+                 (string-append (url-basename (current-buffer)) "-zotero"))
     (with body (buffer-get-body (current-buffer))
       (tree-insert! body (tree-arity body)
                     (list (stree->tree
@@ -1072,7 +1075,21 @@
   (let* ((u (zotero-master))
          (file (zotero-master-bibliography-file)))
     (zotero-forget-state)
-    (cond ((url-rooted-tmfs? u)
+    (cond ((and (supports-db?)
+                (not (and file (url-exists? file)
+                          (zotero-managed-file? file))))
+           ;; Zotero is a source of the database: no file is needed
+           (when (not (bibliography-tag (zotero-file-stree u)))
+             (insert-managed-bibliography))
+           (update-document "bibliography")
+           (set-message
+            (if (zotero-ready?)
+                "Updated the bibliography from the database and Zotero"
+                (string-append (zotero-status-message (zotero-status))
+                               ": the bibliography uses the references "
+                               "kept in the document"))
+            "Zotero"))
+          ((url-rooted-tmfs? u)
            (set-message "Save the document first" "Zotero"))
           ((not (zotero-ready?))
            (set-message (zotero-status-message (zotero-status)) "Zotero"))
