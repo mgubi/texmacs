@@ -955,6 +955,7 @@ enable_qt_new
 with_qt
 with_x
 with_sdl3
+with_thorvg
 enable_qtpipes
 enable_pdf_renderer
 enable_profile
@@ -1680,6 +1681,8 @@ Optional Packages:
                           and some default directories to find Qt binaries
   --with-x                use the X Window System
   --with-sdl3[=ARG]       with sdl3 support [ARG=no]
+  --with-thorvg[=ARG]     with the GPU renderer of the Vue port, ThorVG
+                          installed in ARG [ARG=no]
 
 Some influential environment variables:
   CC          C compiler command
@@ -36462,8 +36465,41 @@ printf '%s\n' "SDL3_CFLAGS=$SDL3_CFLAGS" >&6; }
 printf '%s\n' "SDL3_LDFLAGS=$SDL3_LDFLAGS" >&6; }
          { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: SDL3_LIBS=$SDL3_LIBS" >&5
 printf '%s\n' "SDL3_LIBS=$SDL3_LIBS" >&6; }
-         VUE_CFLAGS="$SDL3_CFLAGS"
-         VUE_LDFLAGS="$SDL3_LDFLAGS"
+
+
+# Check whether --with-thorvg was given.
+if test ${with_thorvg+y}
+then :
+  withval=$with_thorvg;
+fi
+
+
+  THORVG_CFLAGS=""
+  THORVG_LDFLAGS=""
+  if test "$with_thorvg" = "no" -o "$with_thorvg" = "" ; then
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling the GPU renderer (no ThorVG)" >&5
+printf '%s\n' "disabling the GPU renderer (no ThorVG)" >&6; }
+  else
+      if test -f "$with_thorvg/include/thorvg-1/thorvg.h" -a \
+              -f "$with_thorvg/lib/libthorvg-1.a" ; then
+        { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: enabling the GPU renderer with ThorVG in $with_thorvg" >&5
+printf '%s\n' "enabling the GPU renderer with ThorVG in $with_thorvg" >&6; }
+
+printf '%s\n' "#define USE_THORVG 1" >>confdefs.h
+
+        THORVG_CFLAGS="-I$with_thorvg/include/thorvg-1 -DGL_SILENCE_DEPRECATION"
+        THORVG_LDFLAGS="$with_thorvg/lib/libthorvg-1.a"
+        case "${host}" in
+          *darwin*) THORVG_LDFLAGS="$THORVG_LDFLAGS -framework OpenGL" ;;
+          *) THORVG_LDFLAGS="$THORVG_LDFLAGS -lGL" ;;
+        esac
+      else
+        as_fn_error $? "no ThorVG in $with_thorvg (see misc/thorvg/build-thorvg.sh)" "$LINENO" 5
+      fi
+  fi
+
+         VUE_CFLAGS="$SDL3_CFLAGS $THORVG_CFLAGS"
+         VUE_LDFLAGS="$SDL3_LDFLAGS $THORVG_LDFLAGS"
          VUE_LIBS="$SDL3_LIBS"
          CONFIG_GUI="VUE"
          ;;
