@@ -167,7 +167,7 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	gzip -9 -n -k -f $(OUT)/web/texmacs.wasm
 
 # made at every build (package.py only writes the packages which changed)
-$(OUT)/web/texmacs-files.json: FORCE | $(TM)/TeXmacs/plugins
+$(OUT)/web/texmacs-files.json: FORCE plugins-sync
 	@mkdir -p $(OUT)/web
 	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
 	-command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack $(OUT)/web/tm-font-*; do \
@@ -180,7 +180,7 @@ FORCE:
 # a variant for node, which sees the host file system as it is (NODERAWFS)
 # and takes its environment: to test the build headless, see
 # docs/wasm/README.md
-node: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV $(TM)/TeXmacs/plugins
+node: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV plugins-sync
 
 # the version TeXmacs checks its files against (test_texmacs_path): made by
 # configure, which a checkout of the sources (the CI) has not run; the node
@@ -191,9 +191,14 @@ $(TM)/TeXmacs/SVNREV:
 
 # the plugins, which the build with configure copies from plugins/ (make at
 # the top): a checkout of the sources has none in TeXmacs/ (and a lazy
-# format of a plugin, looked for at the first conversion, then stopped it)
-$(TM)/TeXmacs/plugins:
-	cp -R $(TM)/plugins $@
+# format of a plugin, looked for at the first conversion, then stopped it).
+# Copied again at each build, so that a change of a plugin is packaged (only
+# the files which changed, with their dates, by rsync)
+plugins-sync: FORCE
+	@mkdir -p $(TM)/TeXmacs/plugins
+	@if command -v rsync > /dev/null; then \
+	  rsync -a $(TM)/plugins/ $(TM)/TeXmacs/plugins/; \
+	else cp -Rp $(TM)/plugins/. $(TM)/TeXmacs/plugins/; fi
 
 $(OUT)/node/texmacs.js: $(OBJECTS) $(LIBDEPS) $(W)/node-pre.js
 	@mkdir -p $(OUT)/node
@@ -221,4 +226,4 @@ $(OBJ)/%.o: $(S)/%.c
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote
+.PHONY: all web node clean tikzjax asymptote plugins-sync

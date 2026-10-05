@@ -15,7 +15,13 @@
   <menu|Insert|Session|Preferences>, with the model to use. When the wallet
   of <TeXmacs> is on (<menu|Edit|Preferences|Security>), the key is kept
   there, encrypted, rather than in the preferences. This is also how keys
-  are given in a web browser, which has no environment variables. Once the
+  are given in a web browser, which has no environment variables. A key
+  given while the wallet is there but off turns it on first (its passphrase
+  is asked), to keep the key in it. A session of a chatbot which has no key
+  asks for one: it turns the wallet on if it is off (it may hold the key),
+  else it opens the preferences of the chatbot, and a question asked
+  without a key says so. In a web browser, and when the wallet is off, the
+  chatbots are listed in <menu|Insert|Session> before they have a key. Once the
   key is given, <with|font-series|bold|Update the list of models> asks the
   chatbot which models it offers to this key, and proposes them in
   <with|font-series|bold|Model>. A session begins with the name of the model

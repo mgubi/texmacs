@@ -33,7 +33,10 @@
   (cpp-ai-latex-command cmd name chat))
 
 (tm-define (ai-request name chat cmd)
-  (cpp-ai-latex-request cmd name chat))
+  (with missing (and (defined? (quote ai-key-missing)) (ai-key-missing name))
+    (if missing
+        (object->string `(error ,missing)) ; no request (request_link.cpp)
+        (cpp-ai-latex-request cmd name chat))))
 
 (tm-define (ai-result name chat res)
   (with t (cpp-ai-latex-output res name chat)

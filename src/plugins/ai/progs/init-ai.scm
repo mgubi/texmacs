@@ -105,16 +105,32 @@
   (if (ai-wallet-key engine) ai-in-wallet
       (or (ai-preference-key engine) "")))
 
+(define (ai-store-api-key engine key)
+  (if (and (supports-wallet?) (wallet-on?))
+      (begin
+        (if (== key "")
+            (wallet-delete (ai-key-entry engine))
+            (wallet-set (ai-key-entry engine) key))
+        (set-preference (string-append engine " api key") ""))
+      (set-preference (string-append engine " api key") key))
+  (reinit-plugin-single "ai"))
+
+;; a wallet which is there but closed: it may hold the keys
+(define (ai-wallet-closed?)
+  (and (supports-wallet?) (wallet-initialized?) (wallet-off?)))
+
+;; a key given while the wallet is closed: it is opened first, to keep the
+;; key there (if it is not opened, the key is kept in the preferences)
 (tm-define (ai-set-api-key engine key)
   (when (!= key ai-in-wallet)
-    (if (and (supports-wallet?) (wallet-on?))
-        (begin
-          (if (== key "")
-              (wallet-delete (ai-key-entry engine))
-              (wallet-set (ai-key-entry engine) key))
-          (set-preference (string-append engine " api key") ""))
-        (set-preference (string-append engine " api key") key))
-    (reinit-plugin-single "ai")))
+    (if (and (!= key "") (ai-wallet-closed?))
+        (wallet-dialogue-turn-on
+         (lambda (r)
+           (when (!= r "Ok")
+             (set-message "The key is kept in the preferences, not encrypted"
+                          (string-append "Key of " (session-name engine))))
+           (ai-store-api-key engine key)))
+        (ai-store-api-key engine key))))
 
 (when (supports-wallet?)
   (wallet-add-on-hook (lambda () (reinit-plugin-single "ai"))))
@@ -449,6 +465,9 @@
 
 ;; the first line of a session: the engine and its model
 (define (ai-banner lan)
+  (when (and (or (assoc lan ai-keyed-engines) (== lan "albert"))
+             (not (ai-has-key? lan)))
+    (ai-ask-key lan))
   (with m (ai-session-model lan)
     `(document
        (concat (strong ,(session-name lan))
@@ -464,8 +483,49 @@
                  (string-append "Models of " (session-name name)))
     (refresh-now "ai-model-list")))
 
+(define (ai-key-env* name)
+  (if (== name "albert") "ALBERT_API_KEY" (ai-key-env name)))
+
 (define (ai-has-key? name)
-  (!= (ai-api-key name (ai-key-env name)) ""))
+  (!= (ai-api-key name (ai-key-env* name)) ""))
+
+;; An engine without a key is there all the same in a web browser (where
+;; nothing else tells how to give one), or when the wallet, closed, may hold
+;; its key: a session of it asks for the key when it starts, and when a
+;; question is asked without one (ai-key-missing in ai-batch.scm): the wallet
+;; is opened if it is closed, else the preferences of the engine, where the
+;; key is given.
+(define (ai-available? name)
+  (or (ai-has-key? name) (web-wallet?) (ai-wallet-closed?)))
+
+(define ai-asking-key? #f)
+
+(define (ai-ask-key name)
+  (when (not ai-asking-key?)
+    (set! ai-asking-key? #t)
+    (delayed
+      (:idle 10)
+      (set! ai-asking-key? #f)
+      (if (ai-wallet-closed?)
+          (wallet-dialogue-turn-on
+           (lambda (r)
+             (when (not (ai-has-key? name))
+               (open-plugin-preferences name))))
+          (open-plugin-preferences name)))))
+
+;; the message of a question asked without a key (and the key asked for),
+;; #f when there is one
+(tm-define (ai-key-missing name)
+  (and (or (assoc name ai-keyed-engines) (== name "albert"))
+       (not (ai-has-key? name))
+       (begin
+         (ai-ask-key name)
+         (string-append
+          "No API key for " (session-name name) ": "
+          (if (ai-wallet-closed?)
+              "open the wallet, which may hold it"
+              "give it in the preferences of the session")
+          ", then ask again."))))
 
 (tm-define (albert-variants)
   (list "openweight-large" "openweight-medium" "openweight-small" ""))
@@ -572,7 +632,7 @@
 ;; wallet, of the preferences or of the environment (ai-api-key)
 
 (tm-define (has-chatgpt?)
-  (ai-has-key? "chatgpt"))
+  (ai-available? "chatgpt"))
 
 (plugin-configure chatgpt
   ;; before :require, so that its key can be given in its preferences
@@ -591,7 +651,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (has-claude?)
-  (ai-has-key? "claude"))
+  (ai-available? "claude"))
 
 (plugin-configure claude
   ;; before :require, so that its key can be given in its preferences
@@ -602,7 +662,7 @@
   (:serializer ,ai-serialize))
 
 (tm-define (has-gemini?)
-  (ai-has-key? "gemini"))
+  (ai-available? "gemini"))
 
 (plugin-configure gemini
   ;; before :require, so that its key can be given in its preferences
@@ -634,7 +694,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (has-open-mistral-7b?)
-  (ai-has-key? "open-mistral-7b"))
+  (ai-available? "open-mistral-7b"))
 
 (plugin-configure open-mistral-7b
   ;; before :require, so that its key can be given in its preferences
@@ -667,7 +727,7 @@
         (dynamic (focus-ai-agents-interlocutor (focus-session-language*))))))
 
 (tm-define (has-albert?)
-  (!= (ai-api-key "albert" "ALBERT_API_KEY") ""))
+  (ai-available? "albert"))
 
 (plugin-configure albert
   ;; before :require, so that its key can be given in its preferences

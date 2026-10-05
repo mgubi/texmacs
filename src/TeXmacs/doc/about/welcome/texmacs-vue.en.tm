@@ -215,6 +215,11 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The chatbots are in <menu|Insert|Session> before they have a
+    key. A session without a key asks for it: it opens the preferences of the
+    chatbot, or first the wallet if it is closed (it may hold the key). A key
+    given while the wallet is closed opens it, to be kept there.
+
     <item>Images in <name|PNG> or <name|JPEG> in the answers of the
     chatbots: the models which draw (<verbatim|gemini-2.5-flash-image> of
     <name|Gemini>, <verbatim|gpt-image-1> of <name|ChatGPT>...) make a

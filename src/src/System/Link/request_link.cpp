@@ -124,6 +124,12 @@ eval_request (tree t, int& status,
     return async_http_post_json (url, headers, data,
 				 status, outbuf, errbuf, kill);
   }
+  if (is_compound (t, "error", 1) && is_atomic (t[0])) {
+    // a request which cannot be made (an AI engine without its key): why,
+    // read as an answer which failed at once (the next feed ends it)
+    status= 0; outbuf= ""; errbuf= t[0]->label; kill= false;
+    return false;
+  }
   io_error << "request_link, unexpected request: " << t << LF;
   return true;
 }
