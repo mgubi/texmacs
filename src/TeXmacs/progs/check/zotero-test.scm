@@ -425,6 +425,27 @@
                          "EEEE5555"))
             (set-status! 200)
             (system-remove f))))
+      ;; a bibliography without file gets one exported from Zotero, when
+      ;; Zotero has references of the citations
+      (with-document "nofile.tm"
+          (doc-tm "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+        (lambda ()
+          (with f (tmp "nofile-zotero.bib")
+            (zotero-before-update "all")
+            (check= (zotero-master-bibliography-file) f)
+            (check-true (zotero-managed-file? f))
+            (check-true (string-contains? (string-load f)
+                                          "@article{smith2020,"))
+            (system-remove f))))
+      ;; not when it has none
+      (with-document "nozotero.tm"
+          (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                         "  See <cite|nowhere2000>.\n\n"
+                         "  <\\bibliography|bib|tm-plain|>\n"
+                         "  </bibliography>\n</body>\n")
+        (lambda ()
+          (zotero-before-update "all")
+          (check-false (zotero-master-bibliography-file))))
       ;; a file of the user is never replaced: the references of Zotero
       ;; which it lacks are added at its end, after a comment naming their
       ;; item

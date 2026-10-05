@@ -26,6 +26,7 @@
 ("M modifier" "modificatore M")
 ("Searching zotero.org..." "Ricerca su zotero.org...")
 ("TeX" "TeX")
+("The bibliography takes the references of Zotero, in %1" "La bibliografia prende i riferimenti di Zotero, in %1")
 ("a modifier" "modificatore A")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Una chiave in sola lettura si crea su https://www.zotero.org/settings/keys")
 ("a series" "serie a")

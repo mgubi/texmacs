@@ -1977,6 +1977,36 @@
         'wait)
       'done))
 
+;; A bibliography without file has no references, without the database:
+;; when Zotero has references which the document cites, its file becomes
+;; one exported from Zotero, named after the document, as with Update from
+;; Zotero (Zotero is not asked about when its key is missing)
+
+(define (empty-bibliography t)
+  ;; the bibliography tag without file in the tree @t, or #f
+  (cond ((and (tree-is? t 'bibliography) (== (tree-arity t) 4))
+         (and (tree-atomic? (tree-ref t 2))
+              (== (tree->string (tree-ref t 2)) "")
+              t))
+        ((tree-compound? t)
+         (list-or (map empty-bibliography (tree-children t))))
+        (else #f)))
+
+(define (name-empty-bibliography)
+  (let* ((u (current-buffer))
+         (t (and u (not (url-rooted-tmfs? u)) (not (supports-db?))
+                 (== (zotero-master) u) (not (zotero-key-missing?))
+                 (empty-bibliography (buffer-get-body u))))
+         (keys (if t (zotero-project-citations) '())))
+    ;; #t when the bibliography was given a file
+    (and (nnull? keys) (zotero-ready?) (nnull? (zotero-resolve keys))
+         (with name (string-append (url-basename u) "-zotero")
+           (tree-set! t 2 name)
+           (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
+                                   (string-append name ".bib"))
+                        "Zotero")
+           #t))))
+
 (define (before-update what)
   (when (in? what '("all" "bibliography"))
     ;; with the database, the bibliography asks Zotero while it is made
@@ -1989,7 +2019,7 @@
                               (negate zotero-in-database?))
         (when (and (nnull? keys) (zotero-ready?) (zotero-in-browser?))
           (zotero-db-entries keys))))
-    (when (with-zotero-bibliography?)
+    (when (or (name-empty-bibliography) (with-zotero-bibliography?))
       (zotero-refresh-bibliography #t))
     ;; the references of Zotero which the file of the user lacks
     (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))

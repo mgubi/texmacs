@@ -21,6 +21,7 @@
 ("Asking zotero.org: %1 (%2 s)..." "Consultando zotero.org: %1 (%2 s)...")
 ("Asking zotero.org: %1..." "Consultando zotero.org: %1...")
 ("Searching zotero.org..." "Buscando en zotero.org...")
+("The bibliography takes the references of Zotero, in %1" "La bibliografía toma las referencias de Zotero, en %1")
 ("a modifier" "modificador A")
 ("GNU" "GNU")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Una clave de solo lectura se crea en https://www.zotero.org/settings/keys")

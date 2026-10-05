@@ -25,6 +25,7 @@
 ("M modifier" "модификатор M")
 ("Searching zotero.org..." "Поиск на zotero.org...")
 ("TeX" "TeX")
+("The bibliography takes the references of Zotero, in %1" "Библиография берёт ссылки из Zotero, в %1")
 ("a modifier" "модификатор a")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Ключ только для чтения создаётся на https://www.zotero.org/settings/keys")
 ("abbreviation" "сокращение")

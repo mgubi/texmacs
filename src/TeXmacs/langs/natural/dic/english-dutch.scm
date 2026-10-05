@@ -19,6 +19,7 @@
 ("Asking zotero.org: %1 (%2 s)..." "Vraag aan zotero.org: %1 (%2 s)...")
 ("Asking zotero.org: %1..." "Vraag aan zotero.org: %1...")
 ("Searching zotero.org..." "Zoeken op zotero.org...")
+("The bibliography takes the references of Zotero, in %1" "De bibliografie neemt de referenties van Zotero over, in %1")
 ("\"encryption\" features from the preference panel" "\"encryptie\"functies van het voorkeurenpaneel")
 ("(Re)Build autocompletion index" "Maak auto-aanvullings index")
 ("GNU" "GNU")

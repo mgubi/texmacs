@@ -25,6 +25,7 @@
 ("M modifier" "modificador M")
 ("Searching zotero.org..." "Pesquisando em zotero.org...")
 ("TeX" "TeX")
+("The bibliography takes the references of Zotero, in %1" "A bibliografia usa as referências do Zotero, em %1")
 ("a read-only key is made at https://www.zotero.org/settings/keys" "Uma chave somente de leitura é criada em https://www.zotero.org/settings/keys")
 ("abbreviation" "abreviação")
 ("about" "sobre TeXmacs")
