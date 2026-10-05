@@ -234,7 +234,14 @@ json_print_string (string& r, string s, int mode) {
     case '\r': r << "\\r"; break;
     case '\"': r << '\\' << s[i]; break;
     case '\\': r << '\\' << s[i]; break;
-    default: r << s[i];
+    default:
+      // the other control characters, which JSON does not allow as such
+      if (((unsigned char) s[i]) < 0x20) {
+        static const char* hex= "0123456789abcdef";
+        r << "\\u00" << hex[((unsigned char) s[i]) >> 4]
+          << hex[((unsigned char) s[i]) & 15];
+      }
+      else r << s[i];
     }
   r << "\"";
 }

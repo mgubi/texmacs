@@ -635,27 +635,16 @@ ai_output (string s, string model, string chat) {
   return "";
 }
 
+// a \n left in the text of an answer (not decoded from its JSON) as a
+// newline; a \n followed by a letter is a command of LaTeX (\nu, \ni,
+// \nexists, \nonumber, \noindent...), which stays
 string
 un_escape_cr (string s) {
   int i, n= N(s);
   string r;
   for (i=0; i<n; )
-    if (test (s, i, "\\n")) {
-      if (test (s, i, "\\nabla")) r << s[i++];
-      else if (test (s, i, "\\ncong")) r << s[i++];
-      else if (test (s, i, "\\nearrow")) r << s[i++];
-      else if (test (s, i, "\\neq")) r << s[i++];
-      else if (test (s, i, "\\new")) r << s[i++];
-      else if (test (s, i, "\\ngeq")) r << s[i++];
-      else if (test (s, i, "\\nleq")) r << s[i++];
-      else if (test (s, i, "\\nmid")) r << s[i++];
-      else if (test (s, i, "\\noindent")) r << s[i++];
-      else if (test (s, i, "\\not")) r << s[i++];
-      else if (test (s, i, "\\nsim")) r << s[i++];
-      else if (test (s, i, "\\nsub")) r << s[i++];
-      else if (test (s, i, "\\nsup")) r << s[i++];
-      else { r << '\n'; i += 2; }
-    }
+    if (test (s, i, "\\n") && (i+2 >= n || !is_alpha (s[i+2]))) {
+      r << '\n'; i += 2; }
     else r << s[i++];
   return r;
 }
