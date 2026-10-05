@@ -951,11 +951,6 @@
   (dynamic (ai-model-choices lan #f))
   (if (and (!= lan "albert") (ai-models-request lan))
       ("Update the list of models" (ai-update-models-message lan)))
-  (if (in? lan ai-reasoning-engines)
-      (-> "Reasoning"
-          (for (e ai-reasoning-levels)
-            ((check (eval (upcase-first e)) "v" (== (ai-reasoning lan) e))
-             (set-preference (ai-reasoning-pref lan) e)))))
   ---
   ((check "Send the document as context" "v" (ai-session-document? lan))
    (ai-toggle-session-document lan))
@@ -964,6 +959,18 @@
         ---
         ((eval u) (noop))))
   ("Preferences" (open-plugin-preferences lan)))
+
+;; the reasoning asked of the models of the engine (a preference of the
+;; engine, ai_reasoning_effort in ai.cpp)
+(define (ai-reasoning-label lan)
+  (with e (ai-reasoning lan)
+    (if (== e "default") "Reasoning"
+        (string-append "Reasoning: " e))))
+
+(tm-menu (focus-ai-reasoning-menu lan)
+  (for (e ai-reasoning-levels)
+    ((check (eval (upcase-first e)) "v" (== (ai-reasoning lan) e))
+     (set-preference (ai-reasoning-pref lan) e))))
 
 (tm-menu (focus-ai-icons lan)
   (mini #t
@@ -974,6 +981,11 @@
     //
     (=> (balloon (eval (ai-session-model lan)) "Model of the session")
         (dynamic (focus-ai-model-menu lan)))
+    (if (in? lan ai-reasoning-engines)
+        //
+        (=> (balloon (eval (ai-reasoning-label lan))
+                     "How much the model reasons before it answers")
+            (dynamic (focus-ai-reasoning-menu lan))))
     (if (ai-answer-field lan)
         //
         ((balloon "Insert answer" "Insert the answer after the session")
