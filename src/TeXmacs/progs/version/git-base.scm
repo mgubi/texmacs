@@ -391,12 +391,35 @@
 
 (define git-remotes-table (make-ahash-table))
 
+;; Other information which is expensive to compute (the history of a file,
+;; the branches) is kept until the working tree changes, for at most
+;; git-memo-delay milliseconds (for the changes made outside TeXmacs)
+
+(define git-memo-table (make-ahash-table))
+(define git-memo-delay 30000)
+
+(tm-define (git-memo root key thunk)
+  (:synopsis "The value of @thunk for @root and @key, computed once")
+  (let* ((k (and root (list (url->system root) key)))
+         (old (and k (ahash-ref git-memo-table k))))
+    (cond ((not k) (thunk))
+          ((and old (< (- (texmacs-time) (car old)) git-memo-delay))
+           (cdr old))
+          (else
+            (with v (thunk)
+              (ahash-set! git-memo-table k (cons (texmacs-time) v))
+              v)))))
+
 (tm-define (git-invalidate root)
   (:synopsis "Forget cached information about the working tree @root")
   (when root
-    (ahash-remove! git-status-table (url->system root))
-    (ahash-remove! git-tracked-table (url->system root))
-    (ahash-remove! git-remotes-table (url->system root))))
+    (with key (url->system root)
+      (ahash-remove! git-status-table key)
+      (ahash-remove! git-tracked-table key)
+      (ahash-remove! git-remotes-table key)
+      (for (k (map car (ahash-table->list git-memo-table)))
+        (when (== (car k) key)
+          (ahash-remove! git-memo-table k))))))
 
 (tm-define (git-status root)
   (:synopsis "Status of the working tree @root (or #f)")

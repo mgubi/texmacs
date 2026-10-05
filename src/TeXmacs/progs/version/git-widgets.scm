@@ -231,8 +231,16 @@
 (define (tool-root win)
   (git-buffer-root (window->buffer win)))
 
+(define (tool-status root)
+  ;; NOTE: the panel is expanded after each change of the document, so that
+  ;; it only uses information which is cached until the working tree changes
+  (git-memo root 'status (lambda () (git-status root))))
+
+(define (tool-entries root)
+  (or (git-status-ref (tool-status root) 'entries) '()))
+
 (define (tool-sync-text root)
-  (let* ((st (git-status root))
+  (let* ((st (tool-status root))
          (up (git-status-ref st 'upstream))
          (ahead (or (git-status-ref st 'ahead) 0))
          (behind (or (git-status-ref st 'behind) 0)))
@@ -248,7 +256,7 @@
 
 (define (tool-sections root simple?)
   ;; List of (title entries) for the changes tab
-  (let* ((l (git-status-entries root))
+  (let* ((l (tool-entries root))
          (conflicts (list-filter l git-entry-conflicted?))
          (staged (list-filter l git-entry-staged?))
          (changed (list-filter l git-entry-unstaged?))
@@ -384,7 +392,10 @@
                                                  (commit-path root c name)))))
 
 (tm-widget (git-tool-history root name)
-  (with l (if (and name (git-root name)) (or (git-file-log name) '()) '())
+  (with l (if (and name (git-root name))
+              (git-memo root (list 'file-log (url->system name))
+                        (lambda () (or (git-file-log name) '())))
+              '())
     (if (null? l) (text "No history for this document"))
     (division "plain"
       (for (c (sublist l 0 (min 20 (length l))))
@@ -404,7 +415,7 @@
     (hlist ("Full history" (git-show-log root)) >>)))
 
 (tm-widget (git-tool-branches root)
-  (with l (git-branches root)
+  (with l (git-memo root 'branches (lambda () (git-branches root)))
     (division "plain"
       (for (b l)
         (hlist
@@ -431,7 +442,10 @@
          (simple? (git-simple-mode?))
          (busy? (and root (git-busy? root)))
          (remote? (and root (nnull? (git-remotes root)) (not busy?)))
-         (branch (if root (or (git-current-branch root) "(detached)") ""))
+         (head (and root (git-status-ref (tool-status root) 'head)))
+         (branch (cond ((not root) "")
+                       ((or (not head) (== head "(detached)")) "(detached)")
+                       (else head)))
          (sync (cond ((not root) "")
                      (busy? "working...")
                      (else (tool-sync-text root)))))
@@ -464,24 +478,22 @@
     (if root (dynamic (git-tool-branches root)))))
 
 (tm-widget (git-tool-contents win)
-  ;; NOTE: only the parts which depend on the state of the working tree
-  ;; are refreshed (all refreshables with the same identifier are)
-  (refreshable "git-tool"
-    (dynamic (git-tool-sync-bar win)))
+  ;; NOTE: the side tools are markup, which is rebuilt whenever the menus
+  ;; are updated (after each change) and their expansion has changed; the
+  ;; panel therefore only uses cached information (see git-memo), and
+  ;; git-refresh updates the menus (refreshables have no effect here)
+  (dynamic (git-tool-sync-bar win))
   ===
   (tabs
     (tab (text "Changes")
       (vlist
-        (refreshable "git-tool"
-          (dynamic (git-tool-changes-of win)))
+        (dynamic (git-tool-changes-of win))
         ===
         (dynamic (git-tool-commit-box win))))
     (tab (text "History")
-      (refreshable "git-tool"
-        (dynamic (git-tool-history-of win))))
+      (dynamic (git-tool-history-of win)))
     (tab (text "Branches")
-      (refreshable "git-tool"
-        (dynamic (git-tool-branches-of win))))))
+      (dynamic (git-tool-branches-of win)))))
 
 (tm-tool* (git-tool win)
   (:name "Git")

@@ -161,10 +161,17 @@ pull and stash.
 has a sync bar and the tabs Changes (with a commit box), History and
 Branches (see git-features.md, section 1b).
 
-Only the parts that depend on the state of the working tree (the sync
-bar, the lists, the History and Branches tabs) are `refreshable
-"git-tool"`; `git-refresh` calls `(refresh-now "git-tool")`. The commit
-box is **not** refreshed. Rebuilding the `texmacs-input` of its message
+Side tools are converted to markup, and TeXmacs rebuilds them whenever the
+menus are updated (after each change of the document, and when the window
+shows another document) **and** the expansion of the menu has changed;
+`refreshable` and `refresh-now` have no effect on them. Since the panel is
+expanded after each keystroke, it only reads cached information: the
+status, the history of the document and the branches come from `git-memo`
+(cleared by `git-invalidate`, at most 30 s old, for changes made outside
+TeXmacs), so that typing runs no Git command. After a Git action or a save,
+`git-refresh` invalidates the caches and calls `git-update-tools`, which
+updates the menus, so that the panel shows the new state. The commit
+box is **not** rebuilt. Rebuilding the `texmacs-input` of its message
 while the user types would destroy an editor with pending updates (a
 crash), and would lose the message. Its aux buffer
 `tmfs://aux/git-panel-<n>` is created per window. When the window switches
@@ -384,7 +391,8 @@ the TeXmacs windows, so snapshots must be taken from inside.
 * A focus crash showed that two dialogs must never share an aux buffer:
   each commit dialog gets its own `tmfs://aux/git-commit-<n>`.
 * The panel follows the current document (TeXmacs rebuilds side tools
-  when the buffer changes), and is refreshed after git actions and saves,
-  through the `version-notify-saved` hook called by `save-buffer-post` in
-  `tm-files.scm`. Its look has not been checked visually, since
+  when the buffer changes), and is updated after git actions and saves
+  (`git-update-tools`; saves go through the `version-notify-saved` hook
+  called by `save-buffer-post` in `tm-files.scm`). The offscreen test
+  checks both, and that typing runs no Git command. Its look has not been checked visually, since
   the tests run offscreen.

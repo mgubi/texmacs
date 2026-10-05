@@ -108,7 +108,14 @@
   (for (u (buffer-list))
     (when (and (git-page? u root) (nnull? (buffer->windows u)))
       (git-reload-buffer u)))
-  (refresh-now "git-tool"))
+  (git-update-tools))
+
+(tm-define (git-update-tools)
+  (:synopsis "Show the new state of the working trees in the Git panel")
+  ;; NOTE: the side tools are markup, which refreshables do not refresh:
+  ;; they are rebuilt when the menus are updated
+  (refresh-now "git-tool")
+  (delayed (when (current-buffer) (update-menus))))
 
 (define (file-contents u)
   (if (url-exists? u) (string-load u) ""))
@@ -463,8 +470,10 @@
         ((and (buffer-exists? name) (buffer-modified? name))
          (set-message "Please save or revert the document first" "Restore"))
         (else
-          (user-confirm (string-append "Replace the current version by the "
-                                       "version " (short-hash rev) "?"
+          (user-confirm (string-append "Replace "
+                                       (utf8->cork (url->system
+                                                    (url-tail name)))
+                                       " by its version " (short-hash rev) "?"
                                        (if (in? (git-file-state name)
                                                 '(modified partial))
                                            (string-append
@@ -674,7 +683,7 @@
               (git-report ret what))
             (git-reload root watch)
             (when done (done ret))))
-        (refresh-now "git-tool"))))
+        (git-update-tools))))
 
 (tm-define (git-fetch root . opt-done)
   (git-remote root "Fetch" (list "fetch" "--all" "--prune")

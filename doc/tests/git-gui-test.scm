@@ -177,7 +177,55 @@
         (check "panel keeps the message"
                (== (buffer-get-body p) (tm->tree '(document
                                                    "a message being typed"))))))
-    (test-diverged)))
+    (test-panel)))
+
+(define (steps l)
+  ;; Execute the thunks @l, leaving time for the interface in between
+  (when (nnull? l)
+    ((car l))
+    (delayed (:pause 600) (steps (cdr l)))))
+
+(define (git-commands-since t0)
+  (map (lambda (x) (car (caddr x)))
+       (list-filter (git-command-history) (lambda (x) (> (car x) t0)))))
+
+(define (test-panel)
+  ;; The panel follows the working tree and the document, and runs no
+  ;; Git command while typing (audit 2, C1 and C2)
+  (let* ((u (system->url (string-append T "/remote/clone c/doc.tm")))
+         (root (git-root u))
+         (f (url-append root "panel-new.txt"))
+         (t0 0))
+    (switch-to-buffer u)
+    (string-save "new\n" f)
+    (git-refresh root)
+    (steps
+     (list
+      (lambda () (noop))
+      (lambda ()
+        (check "panel lists a new file"
+               (in? "panel-new.txt" (gui-test-buttons)))
+        (check "panel offers to stage it" (in? "Stage" (gui-test-buttons)))
+        (set! t0 (texmacs-time))
+        (insert "a"))
+      (lambda () (insert "b"))
+      (lambda () (insert "c"))
+      (lambda ()
+        (check "no Git command while typing" (null? (git-commands-since t0)))
+        (git-stage f))
+      (lambda ()
+        (check "panel refreshed after staging"
+               (in? "Unstage" (gui-test-buttons)))
+        (switch-to-buffer DA))
+      (lambda ()
+        (check "panel follows the document"
+               (not (in? "panel-new.txt" (gui-test-buttons))))
+        (switch-to-buffer u)
+        (git-unstage f)
+        (system-remove f)
+        (revert-buffer-revert u)
+        (git-refresh root))
+      (lambda () (test-diverged))))))
 
 (define (test-diverged)
   ;; Pull when the local and remote branches diverged: merge them
