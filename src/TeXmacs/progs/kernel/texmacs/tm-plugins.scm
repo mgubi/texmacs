@@ -109,6 +109,15 @@
   (with f (ahash-ref request-banners name)
     (and f (f name))))
 
+;; the icons of a plug-in in the focus bar of its sessions: a menu of the
+;; plug-in, from its name (a table, which a plug-in loaded again replaces,
+;; where a menu defined again would be added to the one before it)
+(define session-focus-menus (make-ahash-table))
+(define-public (set-session-focus-menu! name m)
+  (ahash-set! session-focus-menus name m))
+(define-public (session-focus-menu name)
+  (ahash-ref session-focus-menus name))
+
 (define-public (connection-request? name)
   (with info (connection-info name "default")
     (and (func? info 'tuple 3) (== (cadr info) "request"))))
