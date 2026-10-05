@@ -215,6 +215,9 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The name of a file can be typed again in the panel of
+    <menu|File|Save as> (the characters did not come in).
+
     <item><name|TikZ>: the surfaces of <verbatim|pgfplots>
     (<verbatim|\\addplot3[surf]>) are drawn; their drawing went too deep
     for <name|MuPDF>.

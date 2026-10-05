@@ -366,13 +366,20 @@ var tmFiles = (function () {
       if (!current) return;
       current = null;
       root.remove ();
-      document.removeEventListener ('keydown', onkey, true);
+      ['keydown', 'keypress', 'keyup'].forEach (function (t) {
+        document.removeEventListener (t, onkey, true);
+      });
       if (done) done (result);
     }
+    // the keys typed in the panel are not for TeXmacs: all their events are
+    // kept from SDL, which listens on the window, the keypress too (SDL
+    // cancels it, which is what types the character in the name field)
     function onkey (e) {
-      if (e.key === 'Escape') { e.stopPropagation (); e.preventDefault (); close (null); }
-      else if (e.key === 'Enter' && mode !== 'browse') { e.stopPropagation (); e.preventDefault (); accept (); }
-      else e.stopPropagation (); // the keys typed in the panel are not for TeXmacs
+      if (e.type === 'keydown' && e.key === 'Escape') {
+        e.stopPropagation (); e.preventDefault (); close (null); }
+      else if (e.type === 'keydown' && e.key === 'Enter' && mode !== 'browse') {
+        e.stopPropagation (); e.preventDefault (); accept (); }
+      else e.stopPropagation ();
     }
     // a file opened (the Open dialog, or open in the panel): for TeXmacs, or
     // for the browser (a PDF or an image, unless TeXmacs asked for one)
@@ -548,7 +555,9 @@ var tmFiles = (function () {
       }).then (render);
     });
     root.addEventListener ('mousedown', function (e) { if (e.target === root) close (null); });
-    document.addEventListener ('keydown', onkey, true);
+    ['keydown', 'keypress', 'keyup'].forEach (function (t) {
+      document.addEventListener (t, onkey, true);
+    });
     document.body.appendChild (root);
     current = { close: close };
     render ();
