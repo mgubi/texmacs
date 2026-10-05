@@ -10,6 +10,8 @@
 
     <branch|How to use this plugin|python-instructions.en.tm>
 
+    <branch|<name|Python> in a web browser|python-browser.en.tm>
+
     <branch|Some examples|python-demo.en.tm>
 
     <branch|Limitations and things to do|python-limitations.en.tm>

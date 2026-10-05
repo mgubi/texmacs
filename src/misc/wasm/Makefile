@@ -94,7 +94,7 @@ all: $(OUT)/texmacs.js
 # declared in shell.html
 WEB_ICONS := $(foreach n,16 32 48 64 128 192,$(OUT)/web/texmacs-vue-$(n).png) $(OUT)/web/favicon.ico
 
-web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote
+web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) tikzjax asymptote python
 
 # the TeX of the TikZ plugin (plugins/tikz, src/docs/wasm/tikzjax.md):
 # TikZJax, fetched by get-tikzjax.sh, without its fonts and the part of its
@@ -145,6 +145,14 @@ $(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm
 
 $(OUT)/web/asymptote/tm-asy.mjs: $(TM)/plugins/asymptote/web/tm-asy.mjs
 	@mkdir -p $(OUT)/web/asymptote
+	cp $< $@
+
+# the worker of the Python plugin (plugins/python), in out/web/python/: it
+# loads Python in WebAssembly (Pyodide) from the CDN of jsDelivr
+python: $(OUT)/web/python/tm-python.mjs
+
+$(OUT)/web/python/tm-python.mjs: $(TM)/plugins/python/web/tm-python.mjs
+	@mkdir -p $(OUT)/web/python
 	cp $< $@
 
 $(OUT)/web/texmacs-vue-%.png: $(TM)/TeXmacs/misc/images/texmacs-vue-%.png
@@ -226,4 +234,4 @@ $(OBJ)/%.o: $(S)/%.c
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote plugins-sync
+.PHONY: all web node clean tikzjax asymptote python plugins-sync

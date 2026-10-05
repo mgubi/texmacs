@@ -151,10 +151,11 @@
 
   <\itemize>
     <item>A web page cannot run other programs. There are therefore no
-    sessions of other programs (Maxima, Python, R...), and the tools which
-    need an external program are missing: the compilation with <LaTeX>,
+    sessions of other programs (Maxima, R...), and the tools which need an
+    external program are missing: the compilation with <LaTeX>,
     Ghostscript, ImageMagick, the spell checker, Git. The sessions which
     exist in the browser are those whose program runs in the page itself:
+    <name|Python> (<name|Pyodide>, loaded from the network),
     <name|JavaScript>, <name|TikZ> and <name|Asymptote> (see the help of
     their plug-ins, in <menu|Help|Plug-ins>), and those of the chatbots
     which the page asks through the web: <name|ChatGPT>, <name|Claude>,
@@ -429,6 +430,15 @@
     model (<with|font-series|bold|about $...>); the menu of the model also
     gives the tokens and the cost of all the answers of the document (those
     of the folds among them).
+
+    <item><name|Python> sessions and executable folds
+    (<menu|Insert|Session|Python>): <name|Python> 3.14 runs in the page
+    (<name|Pyodide>, loaded from the network by the first input), with the
+    packages which an input imports (<verbatim|numpy>, <verbatim|sympy>,
+    <verbatim|matplotlib>, <verbatim|pandas>, <verbatim|scipy>...). The
+    results of <name|SymPy> are formulas, the figures of <name|matplotlib>
+    pictures. <menu|Stop> ends <name|Python> while it computes; it starts
+    again with the next input. See <menu|Help|Plug-ins|Python>.
   </itemize>
 
   <paragraph|4 October 2026>
