@@ -14,7 +14,6 @@
 ("%1 renamed in Zotero" "%1 renomeadas no Zotero")
 ("%1 updated" "%1 atualizadas")
 ("%1, and %2 more" "%1, e mais %2")
-("%1, searching..." "%1, pesquisando...")
 ("%1: changed in TeXmacs and in Zotero" "%1: alterada no TeXmacs e no Zotero")
 ("A modifier" "modificador A")
 ("API key of zotero.org" "chave de API do zotero.org")

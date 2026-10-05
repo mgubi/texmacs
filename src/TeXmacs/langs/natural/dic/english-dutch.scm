@@ -14,7 +14,6 @@
 ("%1 renamed in Zotero" "%1 hernoemd in Zotero")
 ("%1 updated" "%1 bijgewerkt")
 ("%1, and %2 more" "%1, en %2 andere")
-("%1, searching..." "%1, zoeken...")
 ("%1: changed in TeXmacs and in Zotero" "%1: gewijzigd in TeXmacs en in Zotero")
 ("API key of zotero.org" "API-sleutel van zotero.org")
 ("Asking zotero.org: %1 (%2 s)..." "Vraag aan zotero.org: %1 (%2 s)...")

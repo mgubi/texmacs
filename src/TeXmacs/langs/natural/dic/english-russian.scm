@@ -14,7 +14,6 @@
 ("%1 renamed in Zotero" "переименовано в Zotero: %1")
 ("%1 updated" "обновлено: %1")
 ("%1, and %2 more" "%1 и ещё %2")
-("%1, searching..." "%1, идёт поиск...")
 ("%1: changed in TeXmacs and in Zotero" "%1: изменено в TeXmacs и в Zotero")
 ("A modifier" "модификатор A")
 ("API key of zotero.org" "ключ API zotero.org")

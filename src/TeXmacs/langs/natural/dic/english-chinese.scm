@@ -14,7 +14,6 @@
 ("%1 renamed in Zotero" "在 Zotero 中重命名 %1 条")
 ("%1 updated" "已更新 %1 条")
 ("%1, and %2 more" "%1，以及另外 %2 个")
-("%1, searching..." "%1，正在搜索...")
 ("%1: changed in TeXmacs and in Zotero" "%1：在 TeXmacs 和 Zotero 中均有修改")
 ("API key of zotero.org" "zotero.org 的 API 密钥")
 ("Asking zotero.org: %1 (%2 s)..." "正在请求 zotero.org：%1（%2 秒）...")

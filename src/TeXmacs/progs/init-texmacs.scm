@@ -157,6 +157,7 @@
              zotero-completion-suffixes zotero-citation-entry
              zotero-show-item zotero-update-citations
              zotero-with-retry zotero-pending? zotero-asking?
+             zotero-waiting?
              zotero-search-opened)
 (lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
              zotero-import-items zotero-in-database? zotero-search-entries

@@ -1033,6 +1033,10 @@
         (check= (zotero-progress-message)
                 "Asking zotero.org: checking the library...")
         ;; the operation which waited runs again once answered
+        ;; the results of the search window wait for the state too
+        (check= (zotero-with-retry again
+                                   (lambda () (zotero-file-search-results "")))
+                '("Searching zotero.org..."))
         (sim-answer! "format=keys" 200 7 "AAAA1111\n")
         (check= runs 1)
         (check-false (zotero-pending?))
@@ -1044,14 +1048,21 @@
         (check= (length sim-requests) 1)
         (check= (zotero-progress-message)
                 "Asking zotero.org: searching ``gravity''...")
-        ;; the search window says so
-        (check= (zotero-searching-results) '("Searching zotero.org..."))
+        ;; the search window says so, for the results which wait (and run
+        ;; again), not for others
+        (check= (zotero-searching-results) '())
+        (check= (zotero-with-retry (lambda () (noop)) zotero-searching-results)
+                '())
         (check= (zotero-with-retry again
                                    (lambda ()
                                      (zotero-file-search-results "gravity")))
                 '("Searching zotero.org..."))
         ;; (its own request, with fewer items)
         (sim-answer! "limit=10" 200 7 "[]")
+        ;; its sources line says what is asked
+        (check= (zotero-search-sources-text :bib-file)
+                (string-append "Sources: no BibTeX file in the bibliography; "
+                               "Asking zotero.org: searching ``gravity''..."))
         ;; the same request is not asked twice while it is awaited
         (zotero-with-retry again (lambda () (zotero-search "gravity")))
         (check= (length sim-requests) 1)

@@ -14,7 +14,6 @@
 ("%1 renamed in Zotero" "%1 rinominati in Zotero")
 ("%1 updated" "%1 aggiornati")
 ("%1, and %2 more" "%1, e altre %2")
-("%1, searching..." "%1, ricerca in corso...")
 ("%1: changed in TeXmacs and in Zotero" "%1: modificato in TeXmacs e in Zotero")
 ("(Re)Build autocompletion index" "(Ri)Crea indice di completamento automatico")
 ("A modifier" "modificatore A")

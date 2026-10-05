@@ -323,6 +323,12 @@
   (:synopsis "Does an operation wait for answers of zotero.org?")
   (and (zotero-in-browser?) (zotero-pending?)))
 
+(tm-define (zotero-waiting?)
+  (:synopsis "Does the operation being run wait for answers of zotero.org?")
+  ;; NOTE: it runs again once they have come (zotero-with-retry)
+  (and current-retry (zotero-pending?)
+       (memq current-retry waiting-retries) #t))
+
 (tm-define (zotero-command again thunk)
   (:synopsis "Run the command @thunk, which runs @again when answered")
   ;; a command which waits for zotero.org says so; it runs again when the
@@ -459,6 +465,8 @@
       (delayed
         (:pause 1000)
         (set! ticking? #f)
+        ;; (and the sources line of the search window)
+        (refresh-now "db-search-sources")
         (when (zotero-pending?) (show-progress))))))
 
 (tm-define (zotero-start-request id url headers)

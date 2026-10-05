@@ -14,7 +14,6 @@
 ("%1 renamed in Zotero" "%1 件が Zotero で名前変更")
 ("%1 updated" "%1 件更新")
 ("%1, and %2 more" "%1、ほか %2 件")
-("%1, searching..." "%1、検索中...")
 ("%1: changed in TeXmacs and in Zotero" "%1：TeXmacs と Zotero の両方で変更されました")
 ("API key of zotero.org" "zotero.org の API キー")
 ("Asking zotero.org: %1 (%2 s)..." "zotero.org に問い合わせ中：%1（%2 秒）...")
