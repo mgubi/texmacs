@@ -1,22 +1,27 @@
 // The home directory of the browser build in IndexedDB, with several tabs
-// (tmHome in misc/wasm/web-pre.js), in a headless Firefox:
+// (tmHome in misc/wasm/web-pre.js), in a headless Firefox, or in Safari:
 //
-//   node misc/wasm/test/home-tabs.mjs [src directory] [profile directory]
+//   node misc/wasm/test/home-tabs.mjs [--safari] [src directory] [profile directory]
 //
 // from src/, after the "web" target of misc/wasm/Makefile (the defaults:
 // the current directory, and build-wasm/home-profile, which is emptied
 // first). puppeteer-core is looked for in build-wasm/tools, as by
-// misc/wasm/browser-run.mjs. Each check prints PASS or FAIL.
+// misc/wasm/browser-run.mjs. With --safari, Safari is driven by its
+// WebDriver (safaridriver, started here; "Allow Remote Automation" in the
+// Develop menu of Safari, or safaridriver --enable once): its window is on
+// the screen, its storage is that of an automation session (empty at the
+// start), and the console of the page is not shown. Each check prints PASS
+// or FAIL.
 import path from 'node:path';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
-const SRC = path.resolve (process.argv[2] || '.');
-const PROFILE = path.resolve (process.argv[3] || path.join (SRC, 'build-wasm/home-profile'));
+const SAFARI = process.argv.includes ('--safari');
+const positional = process.argv.slice (2).filter (a => !a.startsWith ('--'));
+const SRC = path.resolve (positional[0] || '.');
+const PROFILE = path.resolve (positional[1] || path.join (SRC, 'build-wasm/home-profile'));
 fs.rmSync (PROFILE, { recursive: true, force: true });
 fs.mkdirSync (PROFILE, { recursive: true });
-const require = createRequire (path.join (SRC, 'build-wasm/tools/package.json'));
-const puppeteer = require ('puppeteer-core');
 const { serve } = await import (path.join (SRC, 'misc/wasm/serve.mjs'));
 const server = await serve (path.join (SRC, 'build-wasm/out/web'), 0, '127.0.0.1', () => {}, 0);
 const url = `http://127.0.0.1:${server.address ().port}/texmacs.html`;
@@ -28,16 +33,112 @@ function check (ok, what) {
 }
 const sleep = ms => new Promise (ok => setTimeout (ok, ms));
 
-const browser = await puppeteer.launch ({
-  browser: 'firefox', executablePath: '/Applications/Firefox.app/Contents/MacOS/firefox',
-  headless: true, userDataDir: PROFILE, args: ['--width=1280', '--height=800']
-});
+// Safari through its WebDriver: a session has one current window, so that
+// each command of a tab first switches to it; the commands go one at a time
+async function safari () {
+  const { spawn } = await import ('node:child_process');
+  const port = 4400 + Math.floor (Math.random () * 500);
+  const driver = spawn ('safaridriver', ['-p', String (port)], { stdio: 'ignore' });
+  const base = `http://127.0.0.1:${port}`;
+  let queue = Promise.resolve (), current = null, sid = null;
+  async function call (method, p, body) {
+    const r = await fetch (base + p, { method, headers: { 'Content-Type': 'application/json' },
+                                       body: body ? JSON.stringify (body) : undefined });
+    const j = await r.json ();
+    if (j.value && j.value.error) throw new Error (j.value.error + ': ' + j.value.message);
+    return j.value;
+  }
+  const serial = f => { const r = queue.then (f); queue = r.catch (() => {}); return r; };
+  for (let i = 0; ; i++) {
+    try { sid = (await call ('POST', '/session', { capabilities: { alwaysMatch: { browserName: 'safari' } } })).sessionId; break; }
+    catch (e) { if (i > 20) throw e; await sleep (500); }
+  }
+  const S = '/session/' + sid;
+  await call ('POST', S + '/timeouts', { script: 120000, pageLoad: 120000 });
+  await call ('POST', S + '/window/rect', { width: 1280, height: 860 });
+  let first = await call ('GET', S + '/window');
+  const go = h => current === h ? null : call ('POST', S + '/window', { handle: h }).then (() => { current = h; });
+  class Page {
+    constructor (h) { this.h = h; }
+    run (f) { return serial (async () => { await go (this.h); return f (); }); }
+    evaluate (fn) {
+      const script = 'const done = arguments[arguments.length - 1];' +
+        'try { Promise.resolve ((' + fn.toString () + ') ()).then (' +
+        'v => done ({ v: v === undefined ? null : v }), e => done ({ e: String (e) })); }' +
+        'catch (e) { done ({ e: String (e) }); }';
+      return this.run (async () => {
+        const r = await call ('POST', S + '/execute/async', { script, args: [] });
+        if (r && r.e) throw new Error (r.e);
+        return r ? r.v : null;
+      });
+    }
+    async waitForFunction (fn, opts) {
+      const t0 = Date.now ();
+      for (;;) {
+        try { if (await this.evaluate (fn)) return; } catch (e) {}
+        if (Date.now () - t0 > opts.timeout) throw new Error ('timeout');
+        await sleep (opts.polling || 500);
+      }
+    }
+    bringToFront () { return this.run (() => null); }
+    waitForNavigation () {
+      const mark = this.evaluate (() => { window.tmNavigated = 1; });
+      return (async () => {
+        await mark;
+        const t0 = Date.now ();
+        for (;;) {
+          await sleep (500);
+          try {
+            if (await this.evaluate (() => typeof window.tmNavigated === 'undefined' &&
+                                           document.readyState === 'complete')) return;
+          } catch (e) {}
+          if (Date.now () - t0 > 120000) throw new Error ('no navigation');
+        }
+      }) ();
+    }
+    close () { return this.run (async () => { await call ('DELETE', S + '/window'); current = null; }); }
+  }
+  let used = false;
+  return {
+    async newPage () {
+      let h = first;
+      if (used) h = (await serial (() => call ('POST', S + '/window/new', { type: 'tab' }))).handle;
+      used = true;
+      const page = new Page (h);
+      await page.run (() => call ('POST', S + '/url', { url }));
+      return page;
+    },
+    async close () {
+      try { await call ('DELETE', S); } catch (e) {}
+      driver.kill ();
+    }
+  };
+}
+
+async function firefox () {
+  const require = createRequire (path.join (SRC, 'build-wasm/tools/package.json'));
+  const puppeteer = require ('puppeteer-core');
+  const b = await puppeteer.launch ({
+    browser: 'firefox', executablePath: '/Applications/Firefox.app/Contents/MacOS/firefox',
+    headless: true, userDataDir: PROFILE, args: ['--width=1280', '--height=800']
+  });
+  return {
+    async newPage () {
+      const page = await b.newPage ();
+      page.on ('console', m => { const t = m.text (); if (/home|TeXmacs:/.test (t)) console.log ('page:', t); });
+      page.on ('pageerror', e => console.log ('page error:', e.message));
+      await page.goto (url, { waitUntil: 'load', timeout: 120000 });
+      return page;
+    },
+    close: () => b.close ()
+  };
+}
+
+const browser = SAFARI ? await safari () : await firefox ();
+console.log ('browser: ' + (SAFARI ? 'Safari' : 'Firefox'));
 
 async function open (name) {
   const page = await browser.newPage ();
-  page.on ('console', m => { const t = m.text (); if (/home|TeXmacs:/.test (t)) console.log (name + ':', t); });
-  page.on ('pageerror', e => console.log (name + ' error:', e.message));
-  await page.goto (url, { waitUntil: 'load', timeout: 120000 });
   await ready (page);
   return page;
 }
@@ -134,7 +235,7 @@ check (await C.evaluate (() => tmHome.readOnly ()), 'C is read only');
 // 3. B takes over: A writes its last change first
 await A.evaluate (() => FS.writeFile ('/home/web/last.txt', 'last'));
 const reload = B.waitForNavigation ({ waitUntil: 'load', timeout: 120000 });
-await B.evaluate (() => document.querySelector ('#tm-home-notice button').click ());
+await B.evaluate (() => { setTimeout (() => document.querySelector ('#tm-home-notice button').click (), 100); });
 await reload;
 await ready (B);
 check (await B.evaluate (() => !tmHome.readOnly ()), 'B writes after "Use TeXmacs here"');
@@ -159,7 +260,7 @@ check (/no longer open in another tab/.test (noticeC2), 'C offers to reload: ' +
 await C.close ();
 const noticeA2 = await A.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
 check (/no longer open in another tab/.test (noticeA2), 'A offers to reload: ' + noticeA2.slice (0, 80));
-await A.evaluate (() => location.reload ());
+try { await A.evaluate (() => { setTimeout (() => location.reload (), 100); }); } catch (e) {}
 await sleep (1000);
 await ready (A);
 check (await A.evaluate (() => !tmHome.readOnly ()), 'A writes again after the reload');

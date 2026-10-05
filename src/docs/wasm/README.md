@@ -562,7 +562,8 @@ tabs in headless Firefox: the changes reach the database within a second
 (files, a renamed folder, a deleted file, a document saved by TeXmacs),
 memory and database agree, a read-only tab keeps nothing, and a takeover
 keeps the last change of the tab which had TeXmacs
-(`node misc/wasm/test/home-tabs.mjs`, after `make ... web`).
+(`node misc/wasm/test/home-tabs.mjs`, after `make ... web`; with `--safari`,
+in Safari through its WebDriver: passes in Safari 26 too).
 
 - **Reset…** deletes the storage of the page and reloads it.
 - **Remove from this browser…** (with a confirmation) deletes it and stops
