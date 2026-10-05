@@ -867,6 +867,8 @@
                                             (resolve-module
                                              '(database db-widgets)))
                                       (bib-database) "bib" ,q)))
+            (check= (zotero-search-sources-text (bib-database))
+                    "Sources: your database; Zotero (My Library)")
             ;; the source of each reference
             (check= (result-sources (search "gravity"))
                     '(("mine2020" "Database")
@@ -902,6 +904,18 @@
           (check-true (focus-can-search? (tree-innermost 'cite)))
           (check= (result-sources (zotero-file-search-results "gravity"))
                   '(("smith2020" "own.bib") ("smith2020a" "Zotero")))
+          (check= (zotero-search-sources-text :bib-file)
+                  "Sources: own.bib; Zotero (My Library)")
+          (with-libraries "all"
+            (lambda ()
+              (check= (zotero-search-sources-text :bib-file)
+                      "Sources: own.bib; Zotero (My Library and 1 group)")))
+          (with old (get-preference "zotero in database search")
+            (set-preference "zotero in database search" "off")
+            (check= (zotero-search-sources-text :bib-file)
+                    (string-append "Sources: own.bib; Zotero is left out "
+                                   "(see the Zotero settings)"))
+            (set-preference "zotero in database search" old))
           (check= (result-sources (zotero-file-search-results "dark"))
                   '(("jones2021" "own.bib")))
           (check= (zotero-file-search-results "nothing like this")
@@ -917,6 +931,9 @@
           (set-status! 0)
           (check= (zotero-file-search-results "gravity")
                   '("No bibliography file, and Zotero is not available"))
+          (check= (zotero-search-sources-text :bib-file)
+                  (string-append "Sources: no BibTeX file in the "
+                                 "bibliography; Zotero is not running"))
           (set-status! 200))))))
 
 (define (test-update-database)

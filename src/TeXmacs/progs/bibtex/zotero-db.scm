@@ -238,6 +238,38 @@
            (list "No bibliography file, and Zotero is not available"))
           (else (list "No matching items")))))
 
+(define (zotero-source-state)
+  ;; Zotero, as a source of the search window
+  (cond ((not (zotero-in-database-search?))
+         "Zotero is left out (see the Zotero settings)")
+        ((zotero-ready?)
+         (if (== (get-preference "zotero libraries") "all")
+             (with n (length (zotero-groups))
+               (string-append "Zotero (My Library and "
+                              (number->string n)
+                              (if (== n 1) " group)" " groups)")))
+             "Zotero (My Library)"))
+        ((== (zotero-status) 'disabled)
+         "Zotero refuses the requests (enable its local API)")
+        ((== (zotero-status) 'not-running) "Zotero is not running")
+        (else "Zotero answered with an error")))
+
+(tm-define (zotero-search-sources-text db)
+  (:synopsis "The sources of the search window of references, for @db")
+  ;; @db is :bib-file without the database tool
+  (zotero-forget-state)
+  (string-append
+   "Sources: "
+   (if (== db :bib-file)
+       (with f (zotero-own-bib-file)
+         (cond (f (url->system (url-tail f)))
+               ((with m (zotero-master-bibliography-file)
+                  (and m (url-exists? m)))
+                "the BibTeX file exported from Zotero")
+               (else "no BibTeX file in the bibliography")))
+       "your database")
+   "; " (zotero-source-state)))
+
 (tm-define (zotero-open-search-tool t)
   (:synopsis "Search a reference for the citation @t, without the database")
   (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))

@@ -160,6 +160,10 @@
   (padded
     (let* ((dummy (set! db-quit-search quit))
 	   (query ""))
+      (assuming (== kind "bib")
+        ;; the sources of the references (see bibtex/zotero-db.scm)
+        (hlist (text (zotero-search-sources-text db)) >>)
+        ===)
       (hlist
 	(text "Search:") // //
 	(input (set! query (db-search-keypress db kind answer query))
@@ -180,6 +184,10 @@
                     (tool-close :any 'db-search-tool noop win)))
            (dummy (set! db-quit-search quit*))
 	   (query ""))
+      (assuming (== kind "bib")
+        ;; the sources of the references (see bibtex/zotero-db.scm)
+        (hlist (text (zotero-search-sources-text db)) >>)
+        ===)
       (hlist
 	(text "Search:") // //
 	(input (set! query (db-search-keypress db kind answer query))

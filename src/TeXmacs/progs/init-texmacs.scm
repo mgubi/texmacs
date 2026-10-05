@@ -162,7 +162,7 @@
              zotero-rename-database-entries zotero-database-entry-info
              zotero-adopt-entries zotero-in-database-search?
              zotero-mark-results zotero-file-search-results
-             zotero-open-search-tool
+             zotero-open-search-tool zotero-search-sources-text
              zotero-conflict-fields zotero-merge-entries)
 (lazy-menu (bibtex zotero-widgets) zotero-synchronize
            open-zotero-check open-zotero-settings)
