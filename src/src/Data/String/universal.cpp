@@ -467,9 +467,11 @@ bool
 uni_is_letter (string s) {
   if (N(s) == 1) {
     unsigned char c= s[0];
+    // above 127 every Cork character is a letter but the section sign, the
+    // inverted marks and the pound sign
     return
       is_alpha (c) ||
-      (((unsigned int) c) >= 128 && (((unsigned int) c) & 97) != 31);
+      (c >= 128 && c != 0x9F && c != 0xBD && c != 0xBE && c != 0xBF);
   }
   else if (starts (s, "<#") && ends (s, ">")) {
     int code= from_hexadecimal (s (2, N(s) - 1));

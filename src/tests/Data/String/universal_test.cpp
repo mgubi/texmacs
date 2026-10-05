@@ -443,6 +443,17 @@ test_letters () {
   CHECK (!uni_is_letter ("1"));
   CHECK (!uni_is_letter ("+"));
   CHECK (uni_is_letter ("\xe9"));
+  // above 127 every Cork character is a letter, sharp s and the ligatures
+  // included, but the section sign, the inverted marks and the pound sign
+  CHECK (uni_is_letter ("\xff"));   // sharp s
+  CHECK (uni_is_letter ("\xdf"));   // SS
+  CHECK (uni_is_letter ("\xd7"));   // OE
+  CHECK (uni_is_letter ("\xf7"));   // oe
+  CHECK (uni_is_letter ("\x80"));   // A breve
+  CHECK (!uni_is_letter ("\x9f"));  // section sign
+  CHECK (!uni_is_letter ("\xbd"));  // inverted exclamation mark
+  CHECK (!uni_is_letter ("\xbe"));  // inverted question mark
+  CHECK (!uni_is_letter ("\xbf"));  // pound sign
   CHECK (uni_is_letter ("<alpha>"));
   CHECK (uni_is_letter ("<Omega>"));
   CHECK (uni_is_letter ("<varphi>"));
