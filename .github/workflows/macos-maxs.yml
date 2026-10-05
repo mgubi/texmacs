@@ -160,7 +160,13 @@ jobs:
       - name: Smoke test (the application of the disk image shows a document)
         run: |
           mnt=$(mktemp -d)
-          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG"
+          # NOTE: again when it fails (Resource temporarily unavailable, on
+          # the runners of GitHub)
+          for i in 1 2 3 4 5; do
+            hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$DMG" && break
+            [ $i = 5 ] && exit 1
+            sleep $((i * 10))
+          done
           status=0
           for a in arm64 x86_64; do
             home=$(mktemp -d)
