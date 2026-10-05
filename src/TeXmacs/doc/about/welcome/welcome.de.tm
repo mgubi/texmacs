@@ -18,7 +18,7 @@
     <item>Im Menü <menu|Help|Manual|Writing your own style files> sind die
     verschiedenen <TeXmacs>-Dokument-Stile erläutert.\ 
 
-    <item>Das Menü <menu|Help |Apropos> enthält weitere Informationen über
+    <item>Das Menü <menu|Help |About> enthält weitere Informationen über
     <TeXmacs>, wie beispielsweise über seine
     <hlink|Autoren|../../about/authors/authors.de.tm>, deren
     <hlink|Kontaktadressen|../../about/authors/contact.de.tm>, und

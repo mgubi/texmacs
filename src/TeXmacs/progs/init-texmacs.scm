@@ -521,7 +521,7 @@
 (lazy-define (tools spell spell-edit) spell-user-words continuous-spell-check)
 (lazy-define (tools spell spell-lantool) lantool-server supports-lantool?
 	     lantool-check)
-(lazy-define (tools spell correct-widgets) open-correct)
+(lazy-define (tools spell correct-widgets) update-correct-widget open-correct)
 (use-modules (tools ai ai-batch))
 (lazy-define (tools ai ai-translate) ai-translate* ai-abort-translate)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
@@ -548,7 +548,7 @@
 
 ;(display "Booting regression testing\n")
 (lazy-define (check check-master) check-all run-checks run-all-tests
-             run-integration-tests)
+             run-integration-tests run-regression-suite test-suite-names)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

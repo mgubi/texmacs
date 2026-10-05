@@ -79,7 +79,8 @@ evaluate_for_each (tree t) {
 tree
 evaluate_include (tree t) {
   url base_file_name (as_string (std_env["base-file-name"]));
-  url incl_file_name= url_system (as_string (evaluate (t[0])));
+  url incl_file_name=
+    relative (base_file_name, url_system (as_string (evaluate (t[0]))));
   tree incl= load_inclusion (incl_file_name);
 
   assoc_environment local (2);

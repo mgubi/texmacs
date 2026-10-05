@@ -1,0 +1,33 @@
+pages: 1
+--- page 1
+Analytical Engine Society
+12 Difference Street
+London
+
+1 October 2026
+
+Mr. Charles Babbage
+1 Dorset Street
+London
+
+Dear Mr. Babbage,
+
+This letter exercises the letter style: the address of the sender and the date flushed to the right, the
+address of the recipient on the left, the opening, the body, the closing and the signature, followed
+by the copies and the enclosures.
+
+The body of a letter is set as ordinary paragraphs. This second paragraph is long enough to wrap
+onto a second line, so that the measure of the letter style and the justification of its lines can be
+checked.
+
+Yours sincerely,
+
+Ada Lovelace
+
+Cc: Mary Somerville
+
+Encl: Notes on the Analytical Engine
+
+1
+
+
