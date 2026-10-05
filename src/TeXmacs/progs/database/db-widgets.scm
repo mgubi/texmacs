@@ -97,11 +97,32 @@
           (ahash-set! db-result-cache id r)
           r))))
 
+;; The search shown in the search window: the answers of Zotero, which
+;; come later in a web browser, show it again (see bibtex/zotero.scm)
+(define db-search-shown #f)
+
+(define (db-search-show db kind query)
+  (with doc `(document ,@(db-search-results db kind query))
+    (buffer-set-body "tmfs://aux/db-search-results" doc)))
+
+(tm-define (db-search-refresh)
+  (:synopsis "Show the search of the search window again, and its sources")
+  (when db-search-shown (apply db-search-show db-search-shown))
+  (refresh-now "db-search-sources"))
+
+(define (db-search-again db kind query)
+  (lambda ()
+    (when (== db-search-shown (list db kind query))
+      (db-search-show db kind query))
+    (refresh-now "db-search-sources")))
+
 (define (db-search-results db kind query)
+  (set! db-search-shown (list db kind query))
   (if (== db :bib-file)
       ;; without the database tool: the BibTeX file of the document, and
       ;; Zotero (see bibtex/zotero-db.scm)
-      (zotero-file-search-results query)
+      (zotero-with-retry (db-search-again db kind query)
+                         (lambda () (zotero-file-search-results query)))
       (db-search-results-in db kind query)))
 
 (define (db-search-results-in db kind query)
@@ -117,7 +138,10 @@
              ;; the references of Zotero, after those of the database, when
              ;; the preference asks for them; each one says its source
              (zl (if (and (== kind "bib") (zotero-in-database-search?))
-                     (zotero-search-entries query (map get-name r))
+                     (zotero-with-retry
+                      (db-search-again db kind query)
+                      (lambda ()
+                        (zotero-search-entries query (map get-name r))))
                      '()))
              (z (if (null? zl) '() (db-pretty zl kind :pretty)))
              (r* (if (== kind "bib") (zotero-mark-results r l #f) r))
@@ -145,8 +169,7 @@
           (delayed
             (:pause 200)
             (when (== db-search-keypress-serial serial)
-              (with doc `(document ,@(db-search-results db kind new-query))
-                (buffer-set-body "tmfs://aux/db-search-results" doc))
+              (db-search-show db kind new-query)
               ;;(refresh-now "db-search-results")
               ))))
       new-query)))
@@ -162,7 +185,8 @@
 	   (query ""))
       (assuming (== kind "bib")
         ;; the sources of the references (see bibtex/zotero-db.scm)
-        (hlist (text (zotero-search-sources-text db)) >>)
+        (refreshable "db-search-sources"
+          (hlist (text (zotero-search-sources-text db)) >>))
         ===)
       (hlist
 	(text "Search:") // //
@@ -186,7 +210,8 @@
 	   (query ""))
       (assuming (== kind "bib")
         ;; the sources of the references (see bibtex/zotero-db.scm)
-        (hlist (text (zotero-search-sources-text db)) >>)
+        (refreshable "db-search-sources"
+          (hlist (text (zotero-search-sources-text db)) >>))
         ===)
       (hlist
 	(text "Search:") // //

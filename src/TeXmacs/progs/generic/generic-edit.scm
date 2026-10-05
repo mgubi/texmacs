@@ -168,7 +168,7 @@
           (let* ((prefix (tree->string ttxt))
                  (local (if (url-none? u) '()
                             (map string->tmstring (citekey-list u prefix))))
-                 (zotero (zotero-completion-suffixes prefix))
+                 (zotero (zotero-completion-suffixes prefix (null? local)))
                  (all (list-remove-duplicates (append local zotero))))
             (if (null? all)
                 (set-message "No completions"

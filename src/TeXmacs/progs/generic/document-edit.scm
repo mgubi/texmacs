@@ -584,16 +584,18 @@
   (update-current-buffer))
 
 (tm-define (update-document what)
-  ;; a bibliography file managed by Zotero is refreshed first
-  (zotero-before-update what)
-  (for (.. 0 doc-update-times)       
-    (delayed    ; allow typesetting/magic to happen before next update
-      (:idle 1)
-      (cursor-after
-       (cond ((== what "all") 
-              (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
-             ((== what "bibliography")
-              (generate-all-aux) (wait-update-current-buffer))
-             ((== what "buffer") 
-              (wait-update-current-buffer))
-             (else (generate-aux what)))))))
+  ;; a bibliography file managed by Zotero is refreshed first; in a web
+  ;; browser, the update may wait for the answers of zotero.org, and is
+  ;; then made again when they come
+  (when (!= (zotero-before-update what) 'wait)
+    (for (.. 0 doc-update-times)       
+      (delayed    ; allow typesetting/magic to happen before next update
+        (:idle 1)
+        (cursor-after
+         (cond ((== what "all") 
+                (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
+               ((== what "bibliography")
+                (generate-all-aux) (wait-update-current-buffer))
+               ((== what "buffer") 
+                (wait-update-current-buffer))
+               (else (generate-aux what))))))))
