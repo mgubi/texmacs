@@ -335,7 +335,8 @@ lc_progress (void* data, curl_off_t dt, curl_off_t dn,
 }
 
 static lc_request*
-lc_make (string url, array<string> headers_attr, string body) {
+lc_make (string url, array<string> headers_attr, string body,
+         bool post= true) {
   static bool initialized= false;
   if (!initialized) {
     curl_global_init (CURL_GLOBAL_DEFAULT);
@@ -346,10 +347,13 @@ lc_make (string url, array<string> headers_attr, string body) {
   if (r->easy == NULL) { tm_delete (r); return NULL; }
   c_string u (url);
   curl_easy_setopt (r->easy, CURLOPT_URL, (char*) u);
-  curl_easy_setopt (r->easy, CURLOPT_POST, 1L);
-  curl_easy_setopt (r->easy, CURLOPT_POSTFIELDSIZE, (long) N(body));
-  c_string b (body);
-  curl_easy_setopt (r->easy, CURLOPT_COPYPOSTFIELDS, (char*) b);
+  if (post) {
+    curl_easy_setopt (r->easy, CURLOPT_POST, 1L);
+    curl_easy_setopt (r->easy, CURLOPT_POSTFIELDSIZE, (long) N(body));
+    c_string b (body);
+    curl_easy_setopt (r->easy, CURLOPT_COPYPOSTFIELDS, (char*) b);
+  }
+  else curl_easy_setopt (r->easy, CURLOPT_HTTPGET, 1L);
   for (int i= 0; i+1 < N(headers_attr); i += 2) {
     c_string h (headers_attr[i] * ": " * headers_attr[i+1]);
     r->headers= curl_slist_append (r->headers, (char*) h);
@@ -387,13 +391,13 @@ lc_error (lc_request* r, CURLcode code) {
 
 static int
 lc_perform (string& ret, string url, array<string> headers_attr,
-            string body) {
-  lc_request* r= lc_make (url, headers_attr, body);
+            string body, bool post= true) {
+  lc_request* r= lc_make (url, headers_attr, body, post);
   if (r == NULL) return 1;
   CURLcode code= curl_easy_perform (r->easy);
   ret= r->out;
   if (code != CURLE_OK)
-    io_error << "http_post, " << url << ": " << lc_error (r, code) << LF;
+    io_error << "http request, " << url << ": " << lc_error (r, code) << LF;
   lc_free (r);
   return (code == CURLE_OK)? 0: 1;
 }
@@ -536,6 +540,17 @@ to_shell_command (string url, array<string> headers_attr, array<string> attr) {
     debug_io << "http_post, launching" << LF
 	     << cmd << LF;
   return cmd;
+}
+
+// a GET request (without libcurl, the curl program, whose headers are
+// given as for the posts, out of its command line: curl_command)
+int
+http_get (string& ret, string url, array<string> headers_attr) {
+#ifdef USE_LIBCURL
+  return lc_perform (ret, url, headers_attr, "", false);
+#endif
+  string cmd= curl_command ("--silent " * shell_quote (url), headers_attr);
+  return system (cmd, ret);
 }
 
 int

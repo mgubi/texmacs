@@ -56,6 +56,12 @@ inline tree
 http_from_json (string s) {
   return qt_http_from_json (s); }
 
+int qt_http_get (string& ret, string url, array<string> headers_attr);
+
+inline int
+http_get (string& ret, string url, array<string> headers_attr) {
+  return qt_http_get (ret, url, headers_attr); }
+
 inline int
 http_post (string& ret, string url,
 	   array<string> headers_attr, string data) {
@@ -103,6 +109,7 @@ http_from_json (string s) {
   const int mode= JSON_NULL | JSON_BOOLEAN | JSON_NUMBER;
   return json_to_tree (s, mode); }
 
+int http_get (string& ret, string url, array<string> headers_attr);
 int http_post (string& ret, string url, array<string> headers_attr,
 	       string data);
 int http_post_json (string& ret, string url, array<string> headers_attr,
@@ -139,6 +146,14 @@ inline string
 http_post_query (string url, array<string> headers_attr, array<string> attr) {
   string ret; 
   http_post_query (ret, url, headers_attr, attr);
+  return ret;
+}
+
+// a GET request (the models of an AI engine): its answer
+inline string
+http_get (string url, array<string> headers_attr) {
+  string ret;
+  http_get (ret, url, headers_attr);
   return ret;
 }
 
