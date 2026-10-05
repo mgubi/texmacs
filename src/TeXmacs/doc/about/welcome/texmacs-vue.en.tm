@@ -188,6 +188,12 @@
   <paragraph|5 October 2026>
 
   <\itemize>
+    <item>A reference of <name|Zotero> cited from the search window is
+    copied at once into the database (or into the <BibTeX> file of the
+    bibliography), and the document remembers its item: the bibliography
+    no longer depends on finding the citation key on <verbatim|zotero.org>,
+    which does not search the keys.
+
     <item>The panel <with|font-shape|italic|Updating current buffer, please
     wait> of <menu|Document|Update|All> goes away once the update is done
     (it stayed until a key or a click). A bibliography inserted without

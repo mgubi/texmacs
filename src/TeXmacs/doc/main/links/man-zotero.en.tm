@@ -115,6 +115,16 @@
   The references of Zotero are marked <verbatim|Zotero>, or
   <verbatim|Zotero, <em|group>> for those of a group library.
 
+  When you cite a reference of Zotero from this window, <TeXmacs> copies
+  it at once where the bibliography reads it: into your database with the
+  database (where it then follows Zotero), and otherwise into the
+  <BibTeX> file of the bibliography, as <menu|Document|Update|Bibliography>
+  would (see below). The document also remembers the Zotero item of the
+  citation, so that the reference is asked of Zotero by this item later,
+  rather than searched by its key (<verbatim|zotero.org> does not search
+  the citation keys: a key typed by hand is found there by the name of the
+  author and the year at its start, as in the keys of Better<nbsp>BibTeX).
+
   When the cursor is on a key which <TeXmacs> has already found in Zotero,
   <menu|Focus|Show in Zotero> (or the button <verbatim|Z> of the focus
   bar) selects its item in Zotero, or opens its page on

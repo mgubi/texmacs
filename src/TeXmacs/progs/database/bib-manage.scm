@@ -489,4 +489,10 @@
 (tm-define (open-bib-chooser cb)
   ;; the key of zotero.org is asked if the window needs it
   (zotero-search-opened)
-  (open-db-chooser (bib-database) "bib" "Search bibliographic reference" cb))
+  (with buf (current-buffer)
+    (open-db-chooser (bib-database) "bib" "Search bibliographic reference"
+                     ;; the item of a reference of Zotero is remembered
+                     ;; with the document
+                     (lambda (key)
+                       (cb key)
+                       (when (string? key) (zotero-cited key buf))))))

@@ -37,7 +37,8 @@
         (database db-convert)
         (database bib-db)
         (database bib-manage)
-        (database db-widgets)))
+        (database db-widgets)
+        (utils library cursor)))
 
 (tm-define (zotero-in-database? key)
   (:synopsis "Does the database of the user have the reference @key?")
@@ -155,6 +156,26 @@
                                           "zotero-key" (car x))))
                         (convert-entries (list (cdr p)))))
                  renamed)))))
+
+(tm-define (zotero-cited key buf)
+  (:synopsis "Take from Zotero the reference of @key, cited in @buf")
+  ;; A citation chosen in the search window, among the references which
+  ;; Zotero gave: its item is remembered with the document, and its
+  ;; reference is copied where the bibliography reads it, into the database
+  ;; or into the BibTeX file of the bibliography; Update then finds it
+  ;; there, without asking Zotero
+  (when (and (string? key) (zotero-seen? key)
+             buf (buffer-exists? buf))
+    (with-buffer buf
+      (zotero-command (lambda () (zotero-cited key buf))
+                      (lambda () (take-cited key))))))
+
+(define (take-cited key)
+  (and-with e (zotero-find-key key)
+    (zotero-record-items (list e))
+    (if (supports-db?)
+        (when (zotero-can-import? e) (import-entry e))
+        (zotero-file-citations (list key)))))
 
 (tm-define (zotero-import-items zs)
   (:synopsis "Import the Zotero entries @zs into the database")
@@ -376,14 +397,17 @@
   (zotero-forget-state)
   (zotero-search-opened)
   (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))
-    (open-db-chooser
-     :bib-file "bib" "Search bibliographic reference"
-     (lambda (key)
-       (when (and key
-                  (tree->path u)
-                  (tree-in? (tree-up u)
-                            '(cite nocite cite-detail cite-TeXmacs)))
-         (tree-set! u key))))))
+    (with buf (current-buffer)
+      (open-db-chooser
+       :bib-file "bib" "Search bibliographic reference"
+       (lambda (key)
+         (when (and key
+                    (tree->path u)
+                    (tree-in? (tree-up u)
+                              '(cite nocite cite-detail cite-TeXmacs)))
+           (tree-set! u key)
+           ;; its item is remembered with the document
+           (zotero-cited key buf)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Summaries of the entries of the database
