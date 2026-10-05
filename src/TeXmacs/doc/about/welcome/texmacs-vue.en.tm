@@ -215,6 +215,11 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The text of a <verbatim|\\parbox> imported from <LaTeX> is
+    text, also in a formula (it was read as mathematics). In an answer of a
+    chatbot, a <verbatim|\\parbox> alone in a displayed formula is shown as
+    a paragraph.
+
     <item>The chatbots are together in <menu|Insert|Session|AI>, each a
     submenu of its models: the session starts with the one chosen (and the
     executable folds of <menu|Insert|Fold|Executable> are grouped the same).

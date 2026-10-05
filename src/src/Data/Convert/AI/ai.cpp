@@ -1400,9 +1400,28 @@ static tree
 ai_simplify (tree t) {
   if (is_atomic (t)) return t;
   if (is_compound (t, "minipage") && N(t) > 0) return ai_simplify (t[N(t)-1]);
+  // a paragraph box alone in a displayed formula (\[ \parbox{...}{...} \]):
+  // its text, as a paragraph
+  if (is_compound (t, "equation*", 1)) {
+    tree b= t[0];
+    while (is_func (b, DOCUMENT, 1)) b= b[0];
+    if (is_compound (b, "mini-paragraph", 2)) {
+      tree x= b[1]; // (the text of the box: text out of a formula)
+      if (is_compound (x, "text", 1)) x= x[0];
+      return ai_simplify (x);
+    }
+  }
   int i, n= N(t);
   tree r (t, n);
   for (i= 0; i < n; i++) r[i]= ai_simplify (t[i]);
+  if (is_func (r, DOCUMENT)) {
+    // (the paragraphs of such a text in the document around it)
+    tree d (DOCUMENT);
+    for (i= 0; i < n; i++)
+      if (is_func (r[i], DOCUMENT)) d << A(r[i]);
+      else d << r[i];
+    return d;
+  }
   return r;
 }
 
