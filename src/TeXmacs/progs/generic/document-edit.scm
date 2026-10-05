@@ -584,6 +584,8 @@
   (update-current-buffer))
 
 (tm-define (update-document what)
+  ;; a bibliography file managed by Zotero is refreshed first
+  (zotero-before-update what)
   (for (.. 0 doc-update-times)       
     (delayed    ; allow typesetting/magic to happen before next update
       (:idle 1)

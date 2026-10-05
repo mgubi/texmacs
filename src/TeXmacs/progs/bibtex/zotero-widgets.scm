@@ -11,6 +11,8 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; NOTE: (bibtex zotero-db) is only loaded when the database is used (it
+;; loads the modules of the database), through the lazy definitions
 (texmacs-module (bibtex zotero-widgets)
   (:use (bibtex zotero)))
 
@@ -63,10 +65,12 @@
 (define (search-labels)
   (map zotero-entry-label search-results))
 
+(define (selected-entries)
+  (list-filter search-results
+               (lambda (e) (in? (zotero-entry-label e) search-selected))))
+
 (define (selected-keys)
-  (map zotero-entry-key
-       (list-filter search-results
-                    (lambda (e) (in? (zotero-entry-label e) search-selected)))))
+  (map zotero-entry-key (selected-entries)))
 
 (define (search-now q)
   (set! search-query q)
@@ -106,11 +110,93 @@
     ===
     (bottom-buttons >>
       ("Cancel" (cmd '())) // //
+      (assuming (supports-db?)
+        ("Import into database" (cmd (list :import (selected-entries))))
+        // //)
       ("Cite" (cmd (selected-keys))))))
+
+(define (search-done r)
+  (if (and (pair? r) (== (car r) :import))
+      (with n (zotero-import-items (cadr r))
+        (set-message (string-append "Imported " (number->string n)
+                                    " references into the database")
+                     "Zotero"))
+      (zotero-insert-citation r)))
 
 (tm-define (open-zotero-search)
   (:synopsis "Search the Zotero library and cite the chosen items")
   (:interactive #t)
   (search-now "")
-  (dialogue-window (zotero-search-widget) zotero-insert-citation
-                   "Cite from Zotero"))
+  (dialogue-window (zotero-search-widget) search-done "Cite from Zotero"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Keeping the database in sync, entries changed on both sides
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (field-text v)
+  ;; The value @v of a field, as one line of text (in cork)
+  (cond ((not v) "(none)")
+        ((string? v) v)
+        (else (with s (convert v "texmacs-stree" "verbatim-snippet")
+                (string-replace (if (string? s) (utf8->cork s) "?")
+                                "\n" " ")))))
+
+(define conflict-choices '())
+
+(tm-widget ((zotero-conflict-widget name rows) cmd)
+  (padded
+    (bold (text (string-append name ": changed in TeXmacs and in Zotero")))
+    ===
+    (text "Choose the value to keep for each field")
+    ===
+    (resize "650px" "320px"
+      (scrollable
+        ;; NOTE: no for inside aligned
+        (vlist
+          (for (row rows)
+            (hlist (bold (text (car row))) >>)
+            (hlist // (text "TeXmacs: ") (text (field-text (cadr row))) >>)
+            (hlist // (text "Zotero: ") (text (field-text (caddr row))) >>)
+            (hlist
+              // (text "Keep: ") //
+              (enum (set! conflict-choices
+                          (assoc-set! conflict-choices (car row)
+                                      (if (== answer "Zotero")
+                                          'zotero 'texmacs)))
+                    '("TeXmacs" "Zotero")
+                    (if (== (list-ref row 4) 'zotero) "Zotero" "TeXmacs")
+                    "8em")
+              >>)
+            ===))))
+    ===
+    (bottom-buttons >>
+      ("Later" (cmd #f)) // //
+      ("Save" (cmd #t)))))
+
+(define (resolve-conflicts l)
+  ;; One dialog per entry changed on both sides
+  (when (nnull? l)
+    (let* ((old (car (car l)))
+           (new (cdr (car l)))
+           (rows (zotero-conflict-fields old new)))
+      (set! conflict-choices
+            (map (lambda (row) (cons (car row) (list-ref row 4))) rows))
+      (dialogue-window
+       (zotero-conflict-widget (list-ref old 3) rows)
+       (lambda (save?)
+         (when save?
+           (zotero-merge-entries old new conflict-choices))
+         (resolve-conflicts (cdr l)))
+       "Reference changed on both sides"))))
+
+(tm-define (zotero-synchronize)
+  (:synopsis "Update the references of the database which come from Zotero")
+  (:interactive #t)
+  (zotero-forget-state)
+  (if (not (zotero-ready?))
+      (set-message (zotero-status-message (zotero-status)) "Zotero")
+      (with r (zotero-sync-database #t)
+        (set-message (or (zotero-sync-message r)
+                         "The references from Zotero are up to date")
+                     "Zotero")
+        (resolve-conflicts (cadddr r)))))

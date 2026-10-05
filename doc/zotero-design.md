@@ -387,6 +387,31 @@ in §3.5, and syncs them from then on.
 Steps 1–5 give option 1 its substance. Steps 6–9 are refinements that can
 follow in any order.
 
+**Status (2026-10-05).**
+- **Done:** steps 1, 2, 3, 3b, 4 and 5, with the conflict dialog, *Import
+  into database* and *Synchronize with Zotero*. The suite `zotero`
+  (`check/zotero-test.scm`, 108 checks, with a fake Zotero) covers them,
+  in both modes.
+- **Not done:** steps 6–9:
+  - the combined search with source marks;
+  - renamed keys in file mode (the item keys are already recorded in the
+    `zotero-items` attachment), and *Update the citations*;
+  - projects, group libraries, the settings dialog;
+  - the manual.
+
+Implementation notes:
+- Zotero's marks (`zotero-*`) are meta attributes of the database
+  (`db-meta-attributes`). Two versions of an entry then compare equal when
+  only the marks differ, and the marks never reach BibTeX.
+- The sync makes the new version with `db-update-entry`, which supersedes
+  the old one explicitly. Saving through `bib-save` would let the
+  versioning compare dates, with one-second resolution.
+- `update-document` calls `zotero-before-update`, a lazy definition, so that
+  a managed file is refreshed even before the Zotero modules are loaded.
+- The suite `zotero` runs after `links` (which crashes after documents were
+  opened and closed) and after `database` (whose checks expect the modules
+  of the bibliographic database not to be loaded yet).
+
 ## 6. Open questions
 
 None at the moment. Settled on 2026-10-05:

@@ -138,8 +138,6 @@
     ;; widget of a view which editing closed reaches is_embedded_widget,
     ;; which reads the buffer of the editor, NULL since delete_view
     ("bibtex" bibtex-test-failures count)
-    ;; with a fake Zotero; writes a bibliography in the temporary directory
-    ("zotero" zotero-test-failures count)
     ;; generates the auxiliary data of documents in the temporary directory;
     ;; FIXME: before editing too, for the same reason as bibtex
     ("links" links-test-failures count)
@@ -158,6 +156,10 @@
     ;; loads the keyword tables of the program languages
     ("parse" parse-test-failures count)
     ("database" database-test-failures count)
+    ;; with a fake Zotero; opens documents (so after links) and loads the
+    ;; modules of the bibliographic database (so after database); writes
+    ;; bibliographies and a database in the temporary directory
+    ("zotero" zotero-test-failures count)
     ("crypto" crypto-test-failures count)
     ;; server and clients in this process, with databases in the temporary
     ;; directory and the server files of the (scratch) home, which it cleans

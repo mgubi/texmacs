@@ -106,10 +106,15 @@
 		      (cons "type" types)))
 	     (ids (db-search-cached q))
 	     (l (map db-get-result-cached ids))
-	     (r (db-pretty-cached l kind :pretty)))
-	(cond ((null? r) (list "No matching items"))
-	      ((>= (length r) 20) (rcons r "More items follow"))
-	      (else r))))))
+	     (r (db-pretty-cached l kind :pretty))
+             ;; the references of Zotero, after those of the database
+             (z (if (!= kind "bib") '()
+                    (db-pretty (zotero-search-entries query (map get-name r))
+                               kind :pretty)))
+             (zr (if (null? z) '() (cons "From Zotero:" z))))
+	(cond ((and (null? r) (null? z)) (list "No matching items"))
+	      ((>= (length r) 20) (append (rcons r "More items follow") zr))
+	      (else (append r zr)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search the database

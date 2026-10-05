@@ -152,8 +152,13 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
-(lazy-define (bibtex zotero) zotero-update-bibliography zotero-status)
-(lazy-menu (bibtex zotero-widgets) open-zotero-search)
+(lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
+             zotero-before-update zotero-managed-file?
+             zotero-completion-suffixes)
+(lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
+             zotero-import-items zotero-in-database? zotero-search-entries
+             zotero-conflict-fields zotero-merge-entries)
+(lazy-menu (bibtex zotero-widgets) open-zotero-search zotero-synchronize)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

@@ -852,7 +852,9 @@
   (-> "Bibliography"
       (when (buffer-has-biblio? (current-buffer))
 	("Local entries" (open-biblio)))
-      ("Update from Zotero" (zotero-update-bibliography)))
+      ("Update from Zotero" (zotero-update-bibliography))
+      (when (supports-db?)
+        ("Synchronize with Zotero" (zotero-synchronize))))
   ---
   (-> "Magnification" (link document-magnification-menu))
   (-> "Colors" (link document-colors-menu))

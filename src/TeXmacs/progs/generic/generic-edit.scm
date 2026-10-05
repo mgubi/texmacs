@@ -160,11 +160,22 @@
 
 (tm-define (kbd-variant t forwards?)
   (:require (and (not (supports-db?)) (bib-cite-context? t)))
+  ;; the keys of the bibliography file, and those of Zotero
   (with u (current-bib-file #t)
     (with ttxt (tree-ref t (cADr (cursor-path)))
-      (if (or (url-none? u) (not ttxt))
-          (set-message "No completions" "You must add a bibliography file")
-          (custom-complete (tm->tree (citekey-completions u ttxt)))))))
+      (if (not (and ttxt (tree-atomic? ttxt)))
+          (set-message "No completions" "complete bibliographic reference")
+          (let* ((prefix (tree->string ttxt))
+                 (local (if (url-none? u) '()
+                            (map string->tmstring (citekey-list u prefix))))
+                 (zotero (zotero-completion-suffixes prefix))
+                 (all (list-remove-duplicates (append local zotero))))
+            (if (null? all)
+                (set-message "No completions"
+                             (if (url-none? u)
+                                 "You must add a bibliography file"
+                                 "complete bibliographic reference"))
+                (custom-complete (tm->tree `(tuple ,prefix ,@all)))))))))
 
 (tm-define (kbd-alternate-variant t forwards?)
   (and-with p (tree-outer t)
