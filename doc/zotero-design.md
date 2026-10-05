@@ -3,8 +3,17 @@
 Branch `wip_zotero`. This document extends the first version (commit
 6053fe6aa5: search dialog, *Update from Zotero*). It designs "option 1":
 Zotero becomes a **live, read-only source** for every place where TeXmacs
-looks for references. Nothing is copied into the TeXmacs database, so
-Zotero stays the only source of truth.
+looks for references.
+
+**Decisions** (2026-10-05):
+- The TeXmacs database wins over Zotero when both have a key.
+- Items imported from Zotero into the TeXmacs database are **kept in sync**
+  with Zotero, from Zotero to TeXmacs only (§3.11).
+- A managed `.bib` holds only the items which TeXmacs asked Zotero for, for
+  this document, never a whole library or collection.
+- TeXmacs only reads from Zotero. Writing (for instance adding an item from
+  a DOI) may come later, through the authorized write requests of the local
+  API (Zotero 10).
 
 ## 1. What TeXmacs does today (facts the design relies on)
 
@@ -57,9 +66,10 @@ There are two modes, chosen by the preference "database tool".
 ## 2. Principles
 
 1. **Zotero is read-only.** TeXmacs never writes to the Zotero library.
-2. **No silent copies into the user's database.** Entries that come from
-   Zotero are not saved into the default TeXmacs database, unless the
-   user asks for it.
+2. **Copies are kept honest.** Entries that come from Zotero into the
+   TeXmacs database, whether imported explicitly or by "auto bib import",
+   are marked as coming from Zotero and kept in sync with it (§3.11). A
+   copy edited by hand in TeXmacs is never overwritten silently.
 3. **Documents stay self-contained.** A document whose references came
    from Zotero still typesets on a machine without Zotero, or for a
    coauthor:
@@ -144,19 +154,17 @@ generation:
 
 1. local entries of the document (database mode);
 2. the bibliography's `.bib` file **if it is not managed by Zotero** (§3.5);
-3. **Zotero**;
-4. the default TeXmacs database (database mode);
+3. the default TeXmacs database (database mode);
+4. **Zotero**;
 5. the attached entries (the document's own snapshot, used when Zotero is
    unavailable).
 
 Rationale:
 - Things the user wrote for this document come first.
-- Zotero comes before the general database, because it is the source of
-  truth and the database may hold stale copies (§3.7).
+- The TeXmacs database wins over Zotero (decision). It may hold copies of
+  Zotero items, which the sync of §3.11 keeps up to date. Its other
+  entries are the user's own, and are the user's choice.
 - The attachments only serve when nothing else answers.
-
-A preference, "zotero precedence" = `before-database` (default) or
-`after-database`, covers users whose TeXmacs database is primary.
 
 ### 3.5 Generating the bibliography
 
@@ -168,19 +176,21 @@ A preference, "zotero precedence" = `before-database` (default) or
   converted with `bibtex->texmacs` and `bib->db`. The result is cached in
   memory per library version.
 - `bib-attach` then attaches them to the document as usual (principle 3).
-- **Auto import:** entries from Zotero are marked with a field
-  `zotero-item` (the item key) and `zotero-library`. `notify-set-attachment`
-  skips the marked entries, so they don't enter the default database
-  (principle 2). A preference, "zotero import into database", off by
-  default, lets them in. They are then saved with contributor "Zotero", so
-  that the versioning (`db-import-entry`) treats a later change in Zotero
-  as a new version of the same entry, not as a duplicate of the user's
-  own entry.
+- **Auto import:** entries from Zotero are marked with the fields
+  `zotero-item` (the item key), `zotero-library` and `zotero-version` (the
+  version of the item). When "auto bib import" saves them into the default
+  database, they keep these marks and the contributor "Zotero". The
+  versioning (`db-import-entry`) then treats a later change in Zotero as a
+  new version of the same entry, not as a duplicate of the user's own
+  entry, and the sync of §3.11 finds them.
 
 **File mode:**
 - The C++ path only reads a `.bib` file, so Zotero is reached through a
   **Zotero-managed `.bib` file**: a file whose first line is the marker
   `% Exported from Zotero by TeXmacs` (as written by the first version).
+- It holds exactly the items which TeXmacs asked Zotero for, for this
+  document: the cited keys which no earlier source (§3.4) resolves. A key
+  cited and then removed leaves the file at the next refresh.
 - *Document → Update → Bibliography* and *Update → All* first refresh a
   Zotero-managed file (an override of `update-document`), then generate as
   usual.
@@ -219,16 +229,20 @@ correction of the title or the year. A citation then points to nothing.
 - The same check is available on demand, *Bibliography → Check against
   Zotero*.
 
-### 3.7 Stale copies
+### 3.7 Copies imported before this design
 
-The default TeXmacs database may hold copies of Zotero items: imported
-by hand, or by auto import before this design. Precedence (§3.4) puts
-Zotero first, so the copies are shadowed.
+The default TeXmacs database may hold copies of Zotero items without the
+`zotero-item` mark: imported by hand from an exported `.bib`, or by auto
+import with the first version of the branch. The database wins (§3.4),
+so these copies are used, and the sync (§3.11) cannot see them.
 
-*Check against Zotero* (§3.6) can also list the database entries whose
-`name` exists in Zotero with different fields, and offer to:
-- mark them as superseded (with the versioning of the database), or
-- leave them.
+*Check against Zotero* (§3.6) finds them: database entries whose `name`
+is also a citation key in Zotero. For each one, it offers to:
+- **adopt it**: mark it with its Zotero item, so that it is synced from
+  then on. When its fields differ from Zotero's, the report shows the
+  difference, and the user chooses which version to keep;
+- **leave it** as the user's own entry, never synced. A collision warning
+  is shown when Zotero has the key for a different work (§3.2).
 
 Nothing is deleted.
 
@@ -261,6 +275,59 @@ Nothing is deleted.
 - LaTeX escapes produced by Zotero (`{\'e}`) are decoded by TeXmacs's
   BibTeX parser, as for any `.bib` file.
 
+### 3.11 Keeping imported items in sync
+
+The entries of the TeXmacs database marked with `zotero-item` (§3.5) are
+copies of Zotero items. Since the database wins (§3.4), they must follow
+Zotero, from Zotero to TeXmacs only.
+
+**When.**
+- At the start of a session, once Zotero is reachable.
+- Before generating a bibliography in database mode.
+- On demand, *Bibliography → Synchronize with Zotero*.
+- Never while typing.
+
+**How**, with what the local API offers (checked on Zotero 10.0.4):
+1. Compare the library version (`Last-Modified-Version`) with the version
+   of the last sync, kept in the database. If they are equal, stop: this
+   costs one request.
+2. Otherwise, ask for the versions of the imported items, 50 item keys per
+   request (`items?itemKey=…&format=versions`, 20-40 ms each).
+3. **An item with a newer version** than its `zotero-version`:
+   - export it again (one batch export for all of them);
+   - save it as a new version of the entry (contributor "Zotero"), which
+     supersedes the previous one in the database's own history, so the old
+     version stays available.
+4. **An item no longer returned** has been deleted, or moved to the trash,
+   in Zotero. The local API has no `/deleted` endpoint, so absence is the
+   signal.
+   - The TeXmacs entry is kept, marked `zotero-deleted`, and listed in the
+     report.
+   - It still resolves citations, and the user decides whether to remove
+     it.
+5. **A key changed in Zotero** (Better BibTeX regenerated it): the entry
+   keeps its old `name`, so existing citations still work. The report
+   offers to rename the entry and the citations of the open documents
+   (§3.6).
+6. **A copy edited by hand in TeXmacs** (`modus manual` in the database)
+   whose Zotero item also changed:
+   - the TeXmacs edit is kept, since the database wins;
+   - the report says "changed in Zotero too" and offers to take Zotero's
+     version, which then becomes the newest version.
+7. Record the library version as the version of this sync.
+
+**Cost.** Your library, with no change since the last sync: one request.
+With changes: a few requests, depending on how many of the imported items
+changed.
+
+**Report.** One footer message ("Zotero: 3 references updated, 1 deleted
+in Zotero"), with *Details* listing them. When nothing changed, there is
+no message.
+
+**Import.** Besides auto import, the search dialog gets an **Import into
+database** button, next to *Cite*. It imports the selected items, marked as
+in §3.5, and syncs them from then on.
+
 ## 4. User interface
 
 **Insert → Citation:**
@@ -269,6 +336,7 @@ Nothing is deleted.
 
 **Document → Bibliography:**
 - *Update from Zotero* (explicit refresh of the managed file / attachments);
+- *Synchronize with Zotero* (§3.11);
 - *Check against Zotero* (§3.6, §3.7);
 - *Zotero settings…* (server, libraries, precedence, import into database,
   export format), also reachable from the database preferences.
@@ -292,7 +360,8 @@ Nothing is deleted.
 |---|---|---|
 | 1 | Status cache, short/long timeouts, circuit breaker; derived keys `zotero:<itemKey>` and rewriting of exported keys. | `zotero.scm` |
 | 2 | Resolution layer: `zotero-resolve keys` gives (key item-key entry) per key, with an in-memory cache per library version. It also records the pairs in the `zotero-items` attachment. | `zotero.scm` |
-| 3 | Database mode: the `:zotero` source in `bib-retrieve-entries`, `bib-compile` and `bib-attach`; the `zotero-item` mark, and its exclusion from auto import. | `bib-manage.scm` (small hooks), `zotero-db.scm` (new) |
+| 3 | Database mode: the `:zotero` source in `bib-retrieve-entries`, `bib-compile` and `bib-attach`, after `:default`; the marks `zotero-item`, `zotero-library`, `zotero-version` and contributor "Zotero" on the entries which come from Zotero. | `bib-manage.scm` (small hooks), `zotero-db.scm` (new) |
+| 3b | Sync of the imported items (§3.11): library version check, item versions, re-export, deleted and renamed items, hand-edited copies; *Import into database*; the report. | `zotero-db.scm` |
 | 4 | File mode: managed `.bib` files, refreshed by `update-document`, with a fallback message; the proposal to insert a bibliography. | `zotero.scm` |
 | 5 | Completion in both modes (overrides of `kbd-variant`), and the Zotero section in the database's search window. | `zotero-db.scm`, `bib-kbd.scm` hook |
 | 6 | Combined search dialog with sources and collisions; *Show in Zotero*. | `zotero-widgets.scm` |
@@ -305,15 +374,11 @@ follow in any order.
 
 ## 6. Open questions
 
-1. **Precedence default.** Is Zotero-before-database right for most users,
-   or should the user's TeXmacs database win by default?
-2. **Derived keys** `zotero:<itemKey>` for libraries without Better
+1. **Derived keys** `zotero:<itemKey>` for libraries without Better
    BibTeX. Is the colon acceptable in all bibliography styles, LaTeX export
    included? The alternative is a key generated like Better BibTeX does
    (author + year + title word), which is readable but can collide.
-3. **Managed `.bib` with all cited items, or with all items of a Zotero
-   collection?** The first is small; the second suits users who organize
-   a paper as a collection. This could be an option per document.
-4. **Writing to Zotero** (adding an item from a DOI typed in TeXmacs) is
-   out of scope. The local API supports writes since Zotero 10, but they
-   need an authorization dialog in Zotero.
+2. **Sync of copies edited on both sides.** The rule below keeps the
+   TeXmacs edit and reports the Zotero change. Should the report offer a
+   field-by-field comparison (with the existing document comparison of
+   TeXmacs) rather than "take Zotero's version / keep mine"?
