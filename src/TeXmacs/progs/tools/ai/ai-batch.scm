@@ -147,16 +147,45 @@
     (if (not (buffer->window name))
 	(load-buffer-main name :new-window))))
 
+(define (ai-empty? t)
+  (or (tm-equal? t "")
+      (and (tm-func? t 'document)
+           (list-and (map (lambda (x) (tm-equal? x "")) (tm-children t))))))
+
+;; The correction and the translation of the selection: the selection is
+;; replaced by the answer only when one came; without a key the key is asked
+;; (ai-key-missing in init-ai.scm), and an error is said on the status bar
+;; rather than put in the document.
+(define (ai-error-text t)
+  (with s (cond ((tm-atomic? t) (tm->string t))
+                ((and (tm-func? t 'document 1) (tm-atomic? (tm-ref t 0)))
+                 (tm->string (tm-ref t 0)))
+                (else ""))
+    (and (string-starts? s "Error:") s)))
+
+(define (ai-key-checked? model what)
+  (with missing (and (defined? 'ai-key-missing) (ai-key-missing model))
+    (when missing (set-message missing what))
+    (not missing)))
+
+(define (ai-answer-ok? t what)
+  (cond ((ai-error-text t)
+         (set-message (ai-error-text t) what) #f)
+        ((ai-empty? t)
+         (set-message "No answer" what) #f)
+        (else #t)))
+
 (tm-define (ai-correct model)
-  (when (selection-active-any?)
+  (when (and (selection-active-any?) (ai-key-checked? model "Correct"))
     (with lan (get-env "language")
       (with t (selection-tree)
-        (clipboard-cut "primary")
         (with r (cpp-ai-correct t lan model)
-          (when (and (tree-func? r 'tuple) (>= (tree-arity r) 1))
+          (when (and (tree-func? r 'tuple) (>= (tree-arity r) 1)
+                     (ai-answer-ok? (tree-ref r 0) "Correct"))
             (let* ((l (tree-children r))
                    (s (car l))
                    (c (cdr l)))
+              (clipboard-cut "primary")
 	      (if (get-boolean-preference "ai-correct show differences")
 		  (with d (compare-versions (tree->stree t) (tree->stree s))
 		    (insert (stree->tree d)))
@@ -170,12 +199,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (ai-translate into model)
-  (when (selection-active-any?)
+  (when (and (selection-active-any?) (ai-key-checked? model "Translate"))
     (with from (get-env "language")
       (with t (selection-tree)
-        (clipboard-cut "primary")
         (with r (cpp-ai-translate t from into model)
-          (insert r))))))
+          (when (ai-answer-ok? r "Translate")
+            (clipboard-cut "primary")
+            (insert r)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Copy and paste while compressing non natural language text

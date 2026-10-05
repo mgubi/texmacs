@@ -215,6 +215,12 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item><menu|Tools|AI engine>, <with|font-series|bold|Correct> and
+    <with|font-series|bold|Translate>: without a key, the key is asked for;
+    an error of the chatbot is said on the status bar, and the selection is
+    replaced only by an answer (it was cut first, and an error took its
+    place).
+
     <item>Desktop version of the chatbots: their answers are shown as they
     come, as in the browser, and a question which is interrupted stops its
     request; their <name|TikZ> pictures are drawn by the <name|TikZ>
