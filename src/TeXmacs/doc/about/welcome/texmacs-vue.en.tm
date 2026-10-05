@@ -215,6 +215,10 @@
     <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
     are no longer lost.
 
+    <item>The chatbots are together in <menu|Insert|Session|AI>, each a
+    submenu of its models: the session starts with the one chosen (and the
+    executable folds of <menu|Insert|Fold|Executable> are grouped the same).
+
     <item>The model of a session of a chatbot is shown in its focus bar, in
     a menu which changes it for the next questions (by provider for
     <name|OpenRouter>), with <with|font-series|bold|Other model>,
@@ -238,7 +242,7 @@
     the dots became an ellipsis, which <name|TikZ> refuses. The conversation
     sent again keeps them too.
 
-    <item>The chatbots are in <menu|Insert|Session> before they have a
+    <item>The chatbots are in <menu|Insert|Session|AI> before they have a
     key. A session without a key asks for it: it opens the preferences of the
     chatbot, or first the wallet if it is closed (it may hold the key). A key
     given while the wallet is closed opens it, to be kept there.

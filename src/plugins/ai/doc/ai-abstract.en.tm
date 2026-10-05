@@ -22,7 +22,8 @@
 
   <\enumerate>
     <item>For direct chats, inside a session, using
-    <menu|Insert|Session|ChatGPT>. In that case, <TeXmacs> allows you to
+    <menu|Insert|Session|AI>, which lists the chatbots, each with its models
+    (<menu|Insert|Session|AI|ChatGPT|gpt-5-mini>). In that case, <TeXmacs> allows you to
     directly put mathematical formulas in your queries and output with
     mathematical formulas can directly be cut and pasted into your documents.
 

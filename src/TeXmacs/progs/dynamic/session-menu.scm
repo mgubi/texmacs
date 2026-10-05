@@ -93,17 +93,31 @@
 ;; Inserting sessions
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-menu (supported-session-item name)
+  (let* ((menu-name (session-name name))
+         (l (local-connection-variants name))
+         (m (session-insert-menu name)))
+    (assuming (and (nnull? l) m)
+      (dynamic (m name)))
+    (assuming (and (nnull? l) (not m))
+      (assuming (== l (list "default"))
+        ((eval menu-name) (make-session name "default")))
+      (assuming (!= l (list "default"))
+        (-> (eval menu-name)
+            (for (variant l)
+              ((eval variant) (make-session name variant))))))))
+
+;; the sessions of a group (set-session-group!) in its submenu
 (tm-menu (supported-sessions-menu)
-  (for (name (session-list))
-    (let* ((menu-name (session-name name))
-           (l (local-connection-variants name)))
-      (assuming (nnull? l)
-        (assuming (== l (list "default"))
-          ((eval menu-name) (make-session name "default")))
-        (assuming (!= l (list "default"))
-          (-> (eval menu-name)
-              (for (variant l)
-                ((eval variant) (make-session name variant)))))))))
+  (for (x (session-menu-entries
+           (list-filter (session-list)
+                        (lambda (n) (nnull? (local-connection-variants n))))))
+    (assuming (string? x)
+      (dynamic (supported-session-item x)))
+    (assuming (pair? x)
+      (-> (eval (car x))
+          (for (name (cdr x))
+            (dynamic (supported-session-item name)))))))
 
 (menu-bind insert-session-menu
   (when (and (style-has? "std-dtd") (in-text?))

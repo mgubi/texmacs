@@ -21,7 +21,7 @@
   asks for one: it turns the wallet on if it is off (it may hold the key),
   else it opens the preferences of the chatbot, and a question asked
   without a key says so. In a web browser, and when the wallet is off, the
-  chatbots are listed in <menu|Insert|Session> before they have a key. Once the
+  chatbots are listed in <menu|Insert|Session|AI> before they have a key. Once the
   key is given, <with|font-series|bold|Update the list of models> asks the
   chatbot which models it offers to this key, and proposes them in
   <with|font-series|bold|Model>. In a session, the model is also shown in

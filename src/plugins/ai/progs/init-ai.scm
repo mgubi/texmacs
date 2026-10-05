@@ -746,10 +746,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (ai-focus-models lan)
-  (list-filter (cond ((== lan "ollama") (ollama-models))
-                     ((== lan "albert") (albert-variants))
-                     (else (ai-model-variants lan)))
-               (lambda (m) (and (string? m) (!= m "")))))
+  (let* ((l (list-filter (cond ((== lan "ollama") (ollama-models))
+                               ((== lan "albert") (albert-variants))
+                               (else (ai-model-variants lan)))
+                         (lambda (m) (and (string? m) (!= m "")))))
+         (m (ai-session-model lan)))
+    ;; with the current one, which may not be in the list
+    (if (or (== m "") (in? m l)) l (cons m l))))
 
 (tm-define (ai-set-session-model lan m)
   (set-preference (string-append lan " model") m)
@@ -762,26 +765,35 @@
   (with i (string-index m #\/)
     (if i (substring m 0 i) "")))
 
-(tm-menu (focus-ai-model-items lan l)
+;; the model chosen, and with start? a new session of it
+(define (ai-choose-model lan m start?)
+  (ai-set-session-model lan m)
+  (when start? (make-session lan "default")))
+
+(tm-menu (focus-ai-model-items lan l start?)
   (for (m l)
     ((check (eval m) "v" (== (ai-session-model lan) m))
-     (ai-set-session-model lan m))))
+     (ai-choose-model lan m start?))))
 
-(tm-menu (focus-ai-model-menu lan)
+(tm-menu (ai-model-choices lan start?)
   (with l (ai-focus-models lan)
     (if (<= (length l) 30)
-        (dynamic (focus-ai-model-items lan l)))
+        (dynamic (focus-ai-model-items lan l start?)))
     (if (> (length l) 30)
         ;; many models (OpenRouter): by provider
         (for (p (list-remove-duplicates (map ai-model-provider l)))
           (-> (eval (if (== p "") "Others" p))
               (dynamic (focus-ai-model-items
                         lan (list-filter l (lambda (m)
-                                             (== (ai-model-provider m) p)))))))))
+                                             (== (ai-model-provider m) p)))
+                        start?))))))
   ---
   ("Other model"
-   (interactive (lambda (m) (when (!= m "") (ai-set-session-model lan m)))
-     (list "Model" "string" (ai-session-model lan))))
+   (interactive (lambda (m) (when (!= m "") (ai-choose-model lan m start?)))
+     (list "Model" "string" (ai-session-model lan)))))
+
+(tm-menu (focus-ai-model-menu lan)
+  (dynamic (ai-model-choices lan #f))
   (if (and (!= lan "albert") (ai-models-request lan))
       ("Update the list of models" (ai-update-models-message lan)))
   ("Preferences" (open-plugin-preferences lan)))
@@ -799,6 +811,17 @@
 ;; (not an overloading of focus-extra-icons: the plug-in is loaded again
 ;; when a key is given, and each loading would add its icons)
 (for-each (lambda (name) (set-session-focus-menu! name focus-ai-icons))
+          (ai-models))
+
+;; the chatbots in a submenu AI of Insert > Session, each a submenu of its
+;; models, which starts a session of the one chosen
+(tm-menu (ai-insert-session-menu lan)
+  (-> (eval (session-name lan))
+      (dynamic (ai-model-choices lan #t))))
+
+(for-each (lambda (name)
+            (set-session-group! name "AI")
+            (set-session-insert-menu! name ai-insert-session-menu))
           (ai-models))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
