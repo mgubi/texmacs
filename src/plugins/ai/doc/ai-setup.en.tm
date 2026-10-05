@@ -39,6 +39,15 @@
   back as the context); <with|font-series|bold|Show the answer as it came>
   in the preferences removes it.
 
+  The chatbot is told how to write its answers: as a <LaTeX> document which
+  <TeXmacs> takes well (sections, lists, mathematics, <name|TikZ> or
+  <name|SVG> pictures, nothing which only matters for printing). These
+  instructions can be changed for each chatbot:
+  <with|font-series|bold|Instructions> <with|font-series|bold|Edit> in its
+  preferences opens them as a text file, whose changes are used once it is
+  saved; <with|font-series|bold|Default> comes back to the instructions of
+  <TeXmacs>.
+
   The key of an API is not that of a subscription: <name|ChatGPT Plus> or
   <name|Claude Pro> do not include the use of the API, which is paid apart,
   according to use. In the console of the service, set a limit to the

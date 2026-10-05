@@ -202,6 +202,12 @@
     the <name|TikZ> plug-in, its <name|SVG> pictures images, and the answer
     as it came is kept in a fold after it. See the help of the AI plug-in in <menu|Help|Plug-ins>.
 
+    <item>The chatbots are told how to write <LaTeX> which <TeXmacs> takes
+    well; these instructions can be changed for each one (Instructions,
+    Edit, in its preferences). The lists with options of
+    <verbatim|enumitem> (<verbatim|\\begin{itemize}[nosep]>) of an answer
+    are no longer lost.
+
     <item><name|TikZ>: the libraries of <verbatim|pgfplots> which
     <name|TikZJax> lacked (<verbatim|fill between>, group plots, polar
     axes...). The pictures of the answers of the chatbots keep the settings

@@ -574,17 +574,16 @@ ai_command (string s, string model, string agent, string chat, bool history) {
   return "";
 }
 
+// the instructions of the engine (its system prompt): those of the user for
+// it, else the default ones, which tell how to write LaTeX which TeXmacs
+// takes well (ai-instructions in init-ai.scm); Albert adds its agent
 static string
 ai_latex_agent_description (string model) {
   string engine= ai_engine (model);
-  if (engine == "albert") {
-    return string ("Provide your answer in ")
-    * "the form of an untitled utf-8 LaTeX document without any comments. "
-    * "Use svg format 1.0 for images. Embed images in filecontent* environments. "
-    * as_string (call ("ai-agents-get-interlocutor", object (engine)));
-  }
-  return string ("Please provide your answer in the form of an ")
-    * "untitled LaTeX document.";
+  string r= as_string (call ("ai-instructions", model));
+  if (engine == "albert")
+    r << "\n" << as_string (call ("ai-agents-get-interlocutor", object (engine)));
+  return r;
 }
 
 string
@@ -1128,8 +1127,34 @@ ai_simplify (tree t) {
   return r;
 }
 
+// the options of the lists (enumitem: \begin{itemize}[nosep]), which the
+// import of LaTeX takes for the first item, losing the others
+static string
+ai_drop_list_options (string s) {
+  static const char* lists[]= { "itemize", "enumerate", "description", NULL };
+  for (int k= 0; lists[k] != NULL; k++) {
+    string b= "\\begin{" * string (lists[k]) * "}";
+    int i= 0;
+    while ((i= search_forwards (b, i, s)) >= 0) {
+      int j= i + N(b);
+      while (j < N(s) && s[j] == ' ') j++;
+      if (j < N(s) && s[j] == '[') {
+        int depth= 0, e= j;
+        for (; e < N(s); e++) {
+          if (s[e] == '[' || s[e] == '{') depth++;
+          else if (s[e] == ']' || s[e] == '}') { depth--; if (depth == 0) break; }
+        }
+        if (e < N(s)) s= s (0, i + N(b)) * s (e + 1, N(s));
+      }
+      i += N(b);
+    }
+  }
+  return s;
+}
+
 tree
 ai_latex_body_to_tree (string r) {
+  r= ai_drop_list_options (r);
   r= replace (r, "\\maketitle", "");
   r= replace (r, "\\begin{lstlisting}", "\\begin{verbatim}");
   r= replace (r, "\\end{lstlisting}", "\\end{verbatim}");

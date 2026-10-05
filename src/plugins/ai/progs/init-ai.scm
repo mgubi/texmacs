@@ -303,6 +303,68 @@
           (else ""))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The instructions of the engines (their system prompt): a text file of the
+;; user for each engine, which the preferences open, else the default one,
+;; which tells how to write LaTeX which TeXmacs takes well
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define ai-default-instructions-text
+  (string-append
+   "You are a chatbot inside GNU TeXmacs, a scientific editor. Your answer "
+   "is converted from LaTeX into a TeXmacs document: it is not compiled by "
+   "LaTeX, so only its structure and its mathematics count.\n"
+   "\n"
+   "Write the answer as one complete LaTeX document: \\documentclass{article}, "
+   "the preamble, \\begin{document}, the answer, \\end{document}. No Markdown, "
+   "and no code fences around the document.\n"
+   "\n"
+   "- Structure: \\section*, \\subsection*, \\paragraph, the environments "
+   "itemize, enumerate and description (without options in brackets), "
+   "tabular, quote, and verbatim for code.\n"
+   "- Mathematics: $...$, \\[...\\], and the environments of amsmath "
+   "(equation, align, gather, cases, pmatrix...), with the symbols of "
+   "amssymb.\n"
+   "- Text: \\emph, \\textbf, \\textit, \\texttt, \\footnote, \\href.\n"
+   "- Leave out what only matters for printing: the packages geometry, "
+   "fontenc, inputenc, lmodern, microtype, enumitem; \\setlength, \\vspace, "
+   "\\hfill, \\newpage, minipage, the placement of figures.\n"
+   "- Pictures: in TikZ, a tikzpicture (or tikzcd, circuitikz), with "
+   "pgfplots for the graphs of functions and data; put \\usepackage{pgfplots}, "
+   "\\usetikzlibrary, \\usepgfplotslibrary and \\pgfplotsset in the preamble. "
+   "The packages for pictures are pgfplots, tikz-cd, circuitikz and chemfig. "
+   "Or in SVG: a complete svg element, with its xmlns attribute, inside "
+   "\\begin{verbatim}...\\end{verbatim}.\n"
+   "- Do not define new commands, and use no other packages than those "
+   "above.\n"
+   "- Answer in the language of the question.\n"))
+
+(tm-define (ai-default-instructions name)
+  ai-default-instructions-text)
+
+(define (ai-instructions-file name)
+  (string-append "$TEXMACS_HOME_PATH/system/ai/" name "-instructions.txt"))
+
+;; the instructions of an engine (text in UTF-8), for ai.cpp
+(tm-define (ai-instructions name)
+  (with u (ai-instructions-file name)
+    (if (url-exists? u) (string-load u) (ai-default-instructions name))))
+
+;; the file of the instructions, in a new tab (made from the default ones
+;; the first time): saving it changes them
+(tm-define (ai-edit-instructions name)
+  (with u (ai-instructions-file name)
+    (when (not (url-exists? u))
+      (with d "$TEXMACS_HOME_PATH/system/ai"
+        (when (not (url-exists? d)) (system-mkdir d)))
+      (string-save (ai-default-instructions name) u))
+    (load-buffer-in-new-window u)))
+
+(tm-define (ai-reset-instructions name)
+  (with u (ai-instructions-file name)
+    (when (url-exists? u) (system-remove u))
+    (set-message "The default instructions are used" (session-name name))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The conversation of a session, sent with a question as its context
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -420,7 +482,11 @@
         (item (text "Context")
           (enum (set-preference (string-append name " context size") answer)
                 '("10" "5" "20" "50" "0" "")
-                (number->string (ai-context-size name)) "5em"))))
+                (number->string (ai-context-size name)) "5em"))
+        (item (text "Instructions")
+          (explicit-buttons
+            ("Edit" (ai-edit-instructions name)) // //
+            ("Default" (ai-reset-instructions name))))))
     === === ===)
   (assuming (== name "ollama")
     (aligned
@@ -438,7 +504,11 @@
       (item (text "")
         (explicit-buttons
           ("Update the list of models"
-           (ai-update-models-message "ollama")))))
+           (ai-update-models-message "ollama"))))
+      (item (text "Instructions")
+        (explicit-buttons
+          ("Edit" (ai-edit-instructions "ollama")) // //
+          ("Default" (ai-reset-instructions "ollama")))))
     === === ===)
   (assuming (== name "albert")
     (with model (string-append name " model")
@@ -470,7 +540,11 @@
 	(item (text "Chat history size")
 	  (enum (set-preference "albert chat history size" answer)
 		'("10" "5" "4" "3" "2" "1" "0" "")
-		(get-preference "albert chat history size") "6em"))))
+		(get-preference "albert chat history size") "6em"))
+        (item (text "Instructions")
+          (explicit-buttons
+            ("Edit" (ai-edit-instructions "albert")) // //
+            ("Default" (ai-reset-instructions "albert"))))))
     === === ===)
   (with textual-input (string-append name "-text-input")
     (aligned

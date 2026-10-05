@@ -374,6 +374,12 @@ the preferences or the environment (`ai-api-key` in `init-ai.scm`).
   (with its fence and XML declaration) an image of raw data. The answer as
   it came is kept after it, folded (`ai_raw_fold`, preference
   `ai raw answer`), and is what `ai-session-context` sends back.
+- The system prompt of an engine is `ai-instructions` (init-ai.scm): the
+  file `~/.TeXmacs/system/ai/<engine>-instructions.txt` when the user has
+  one (Instructions, Edit, in the preferences), else a default which tells
+  how to write LaTeX which TeXmacs imports well. The options of the lists
+  (enumitem, `\begin{itemize}[nosep]`), which the import took for the first
+  item, are dropped (`ai_drop_list_options`).
 - A fold of a request plug-in, before any session of it, starts its
   connection first (`plugin-connected`, `plugin-starting` in
   `plugin-eval.scm`): it was never made, and the fold waited forever.
