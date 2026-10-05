@@ -29,7 +29,10 @@
   ("zotero server" "http://localhost:23119" noop)
   ("zotero export format" "bibtex" noop)
   ;; "user" for the library of the user, "all" for the groups too
-  ("zotero libraries" "user" noop))
+  ("zotero libraries" "user" noop)
+  ;; the references of Zotero which the BibTeX file of the user lacks are
+  ;; added to it (without the database tool)
+  ("zotero add to bib file" "on" noop))
 
 ;; A library is the start of the paths of its requests
 (define user-library "users/0")
@@ -268,8 +271,8 @@
         (cons user-library s))))
 
 (define (item-entry it lib)
-  ;; (citation-key item-key title creators year version library), in cork,
-  ;; or #f for a note, an attachment or an annotation
+  ;; (citation-key item-key title creators year version library doi), in
+  ;; cork, or #f for a note, an attachment or an annotation
   (let* ((data (zotero-attr-ref it "data"))
          (meta (zotero-attr-ref it "meta"))
          (key (string-or-empty (zotero-attr-ref it "key")))
@@ -288,7 +291,8 @@
                (or (string->number
                     (string-or-empty (zotero-attr-ref it "version")))
                    0)
-               lib))))
+               lib
+               (string-or-empty (zotero-attr-ref data "DOI"))))))
 
 (define (items-entries lib s)
   ;; The entries of the items in the answer @s for the library @lib
@@ -301,6 +305,7 @@
 (tm-define (zotero-entry-year e) (fifth e))
 (tm-define (zotero-entry-version e) (sixth e))
 (tm-define (zotero-entry-library e) (list-ref e 6))
+(tm-define (zotero-entry-doi e) (if (> (length e) 7) (list-ref e 7) ""))
 
 (define (search-library lib q n interactive?)
   (items-entries lib
@@ -330,20 +335,46 @@
       (map (cut string-drop <> (string-length prefix))
            (zotero-complete prefix))))
 
+;; The completions of the prefixes asked before, as long as no library
+;; changes: (keys . complete?), complete? when Zotero gave all its matches
+(define completions (make-ahash-table))
+(define completion-limit 50)
+
+(define (cached-completions prefix)
+  ;; the keys for @prefix, from the answer for @prefix or for a shorter
+  ;; prefix which was complete, or #f
+  (let loop ((p prefix))
+    (and (>= (string-length p) 2)
+         (with c (ahash-ref completions p)
+           (cond ((and c (== p prefix)) (car c))
+                 ((and c (cdr c))
+                  (list-filter (car c) (cut string-starts? <> prefix)))
+                 (else (loop (substring p 0 (- (string-length p) 1)))))))))
+
 (tm-define (zotero-complete prefix)
   (:synopsis "The citation keys of Zotero which start with @prefix")
-  ;; NOTE: the search of Zotero also matches the prefixes of citation keys
-  (if (< (string-length prefix) 2) '()
-      (list-remove-duplicates
-       (list-filter (map zotero-entry-key (zotero-search prefix 50 #t))
-                    (cut string-starts? <> prefix)))))
+  ;; NOTE: the search of Zotero also matches the prefixes of citation keys;
+  ;; one request per new prefix while typing, the state of Zotero (which
+  ;; notices a change of the library) being checked first
+  (cond ((< (string-length prefix) 2) '())
+        ((and (zotero-ready?) (cached-completions prefix)) => identity)
+        (else
+          (let* ((l (zotero-search prefix completion-limit #t))
+                 (keys (list-remove-duplicates
+                        (list-filter (map zotero-entry-key l)
+                                     (cut string-starts? <> prefix)))))
+            (when (zotero-ready?)
+              (ahash-set! completions prefix
+                          (cons keys (< (length l) completion-limit))))
+            keys))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Summaries of references (for the check and the search of citations)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; A summary of a reference is (key title creators year zotero-entry), in
-;; cork, the Zotero entry being #f for the other sources
+;; A summary of a reference is (key title creators year zotero-entry doi),
+;; in cork, the Zotero entry being #f for the other sources and the DOI ""
+;; when it is not known
 
 (tm-define (zotero-flat-text t)
   (:synopsis "The text of the stree @t, without its markup")
@@ -377,12 +408,13 @@
           (zotero-flat-text (or (get "title") ""))
           (if who (zotero-creators-summary who) "")
           (zotero-flat-text (or (get "year") ""))
-          #f)))
+          #f
+          (zotero-flat-text (or (get "doi") "")))))
 
 (tm-define (zotero-entry-summary e)
   (:synopsis "The summary of the Zotero entry @e")
   (list (zotero-entry-key e) (zotero-entry-title e) (zotero-entry-creators e)
-        (zotero-entry-year e) e))
+        (zotero-entry-year e) e (zotero-entry-doi e)))
 
 (define bib-file-cache (make-ahash-table))
 
@@ -425,10 +457,29 @@
                              (lambda (c) (or (char-alphabetic? c)
                                              (char-numeric? c))))))
 
-(define (same-work? a b)
-  ;; NOTE: without the DOI, the same title and year
-  (and (== (normalized-title (second a)) (normalized-title (second b)))
-       (or (== (fourth a) (fourth b)) (== (fourth a) "") (== (fourth b) ""))))
+(tm-define (zotero-normalized-doi s)
+  (:synopsis "The DOI @s without its prefixes, in lowercase")
+  (let loop ((s (locase-all (tm-string-trim-both s)))
+             (l '("https://doi.org/" "http://doi.org/" "https://dx.doi.org/"
+                  "http://dx.doi.org/" "doi:")))
+    (cond ((null? l) s)
+          ((string-starts? s (car l))
+           (tm-string-trim-both (string-drop s (string-length (car l)))))
+          (else (loop s (cdr l))))))
+
+(define (summary-doi x)
+  (zotero-normalized-doi (if (> (length x) 5) (sixth x) "")))
+
+(tm-define (zotero-same-work? a b)
+  (:synopsis "Are the summaries @a and @b the same work?")
+  ;; the same DOI when both have one, otherwise the same title and year
+  (let ((da (summary-doi a)) (db (summary-doi b)))
+    (if (and (!= da "") (!= db "")) (== da db)
+        (and (== (normalized-title (second a)) (normalized-title (second b)))
+             (or (== (fourth a) (fourth b))
+                 (== (fourth a) "") (== (fourth b) ""))))))
+
+(define (same-work? a b) (zotero-same-work? a b))
 
 ;; NOTE: needs the bibliography of the document, defined below
 (tm-define (zotero-own-bib-file)
@@ -469,11 +520,13 @@
   (when (== lib user-library) (set! last-version v))
   (when (!= v (ahash-ref library-versions lib))
     (set! resolved (make-ahash-table))
+    (set! completions (make-ahash-table))
     (ahash-set! library-versions lib v)))
 
 (tm-define (zotero-forget-keys)
   (:synopsis "Forget the citation keys found in Zotero")
   (set! resolved (make-ahash-table))
+  (set! completions (make-ahash-table))
   (set! library-versions (make-ahash-table)))
 
 (define (find-in-library lib key)
@@ -647,7 +700,9 @@
   ;; the item under its new key, deleted are the keys whose item is gone.
   ;; Only the keys recorded with the document (zotero-recorded-items) are
   ;; checked, by their item; the others are just missing
-  (let* ((rec (list-filter (zotero-recorded-items)
+  (let* ((rec (list-filter (append (zotero-recorded-items)
+                                   (with f (zotero-own-bib-file)
+                                     (if f (zotero-bib-file-items f) '())))
                            (lambda (x) (in? (car x) keys))))
          (libs (list-remove-duplicates (map caddr rec)))
          (entries (append-map
@@ -829,6 +884,27 @@
 ;; Managed BibTeX files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(tm-define (zotero-iso-date t)
+  (:synopsis "The date of the time @t (seconds since 1970), as YYYY-MM-DD")
+  ;; in UTC; NOTE: pretty-date formats with the patterns of Qt (and runs
+  ;; date without Qt), it knows no ISO format. The civil date of a day
+  ;; number, after Howard Hinnant
+  (define (two n) (string-append (if (< n 10) "0" "") (number->string n)))
+  (let* ((z (+ (quotient t 86400) 719468))
+         (era (quotient z 146097))
+         (doe (- z (* era 146097)))
+         (yoe (quotient (- doe (quotient doe 1460) (- (quotient doe 36524))
+                           (quotient doe 146096))
+                        365))
+         (doy (- doe (- (+ (* 365 yoe) (quotient yoe 4)) (quotient yoe 100))))
+         (mp (quotient (+ (* 5 doy) 2) 153))
+         (d (+ (- doy (quotient (+ (* 153 mp) 2) 5)) 1))
+         (m (if (< mp 10) (+ mp 3) (- mp 9)))
+         (y (+ (* era 400) yoe (if (<= m 2) 1 0))))
+    (string-append (number->string y) "-" (two m) "-" (two d))))
+
+(define (zotero-today) (zotero-iso-date (current-time)))
+
 ;; A BibTeX file whose first line starts with the marker is written by
 ;; TeXmacs from Zotero, and may be replaced; any other one is the user's
 (define managed-marker "% Exported from Zotero by TeXmacs")
@@ -902,13 +978,94 @@
                (apply string-append (map cdr kept)))))
     (string-save (string-append
                   managed-marker " on "
-                  (pretty-date (current-time) "iso8601")
+                  (zotero-today)
                   "; replaced by Document -> Update -> Bibliography\n"
                   bib)
                  file)
     (zotero-record-items (map cdr found))
     (set! last-check (list renamed deleted))
     (list-difference missing (append (map car renamed) (map car kept)))))
+
+;; References of Zotero added to the BibTeX file of the user: each one is
+;; preceded by a comment which names its item, as a link which shows it in
+;; Zotero; nothing else of the file is changed
+(define added-marker "% Added from Zotero by TeXmacs on ")
+
+(tm-define (zotero-bib-file-items f)
+  (:synopsis "The (key item library) of the references added to @f")
+  (let* ((s (string-load f))
+         (n (string-length s)))
+    (let loop ((pos (string-search-forwards added-marker 0 s)) (acc '()))
+      (if (< pos 0) (reverse acc)
+          (let* ((eol (with e (string-search-forwards "\n" pos s)
+                        (if (< e 0) n e)))
+                 (line (substring s pos eol))
+                 (u (string-search-forwards "zotero://select/" 0 line))
+                 (url (and (>= u 0) (substring line u (string-length line))))
+                 (at (string-search-forwards "@" eol s))
+                 (chunk (and (>= at 0) (bib-chunks (substring s at n))))
+                 (key (and (pair? chunk) (caar chunk)))
+                 (item (and url (select-url->item url)))
+                 (next (string-search-forwards added-marker (+ pos 1) s)))
+            (loop next
+                  (if (and key item)
+                      (cons (list key (cdr item) (car item)) acc)
+                      acc)))))))
+
+(define (select-url->item url)
+  ;; (library . item) of a url zotero://select/...
+  (let* ((rest (string-drop url (string-length "zotero://select/")))
+         (l (string-decompose (tm-string-trim-both rest) "/")))
+    (cond ((and (== (length l) 3) (== (car l) "library") (== (cadr l) "items"))
+           (cons user-library (caddr l)))
+          ((and (== (length l) 4) (== (car l) "groups") (== (caddr l) "items"))
+           (cons (string-append "groups/" (cadr l)) (cadddr l)))
+          (else #f))))
+
+(tm-define (zotero-add-to-bib-file f keys)
+  (:synopsis "Add to the BibTeX file @f the references of Zotero it lacks")
+  ;; Of the @keys, those which no source before Zotero provides and which
+  ;; Zotero has; returns (added missing), lists of keys
+  (let* ((s (string-load f))
+         (have (map car (bib-chunks s)))
+         (asked (list-filter keys
+                             (lambda (k)
+                               (not (or (in? k have)
+                                        (zotero-resolved-elsewhere? k))))))
+         (found (zotero-resolve asked))
+         (missing (list-difference asked (map car found))))
+    (when (nnull? found)
+      (let* ((date (zotero-today))
+             (texts (map (lambda (p)
+                           (string-append
+                            "\n" added-marker date ": "
+                            (zotero-select-url (cdr p)) "\n"
+                            (tm-string-trim-both
+                             (zotero-export-as (cdr p) (car p)))
+                            "\n"))
+                         found))
+             (sep (if (or (== s "") (string-ends? s "\n")) "" "\n")))
+        (string-save (apply string-append s sep texts) f)
+        (zotero-record-items (map cdr found))))
+    (list (map car found) missing)))
+
+(tm-define (zotero-add-message added missing f)
+  (:synopsis "The message after the references @added to the file @f")
+  (with l (append
+           (if (null? added) '()
+               (list (string-append
+                      "Added " (number->string (length added))
+                      (if (== (length added) 1) " reference" " references")
+                      " from Zotero to " (url->system (url-tail f)))))
+           (if (null? missing) '()
+               (list (string-append "Not found: "
+                                    (string-recompose missing ", ")))))
+    (and (nnull? l) (string-recompose l ". "))))
+
+(define (add-to-own-file? f)
+  (and f (url-exists? f) (not (zotero-managed-file? f))
+       (not (supports-db?))
+       (== (get-preference "zotero add to bib file") "on")))
 
 (tm-define (zotero-recorded-items)
   (:synopsis "The (key item library) of the Zotero items of the citations")
@@ -1018,10 +1175,19 @@
            (insert-managed-bibliography)
            (zotero-update-bibliography))
           ((and (url-exists? file) (not (zotero-managed-file? file)))
-           (set-message (string-append (url->system (url-tail file))
-                                       " is not managed by Zotero: it is "
-                                       "left as it is")
-                        "Zotero"))
+           (if (!= (get-preference "zotero add to bib file") "on")
+               (set-message (string-append (url->system (url-tail file))
+                                           " is yours: the references of "
+                                           "Zotero are not added to it")
+                            "Zotero")
+               (with (added missing) (zotero-add-to-bib-file
+                                      file (zotero-project-citations))
+                 (update-document "bibliography")
+                 (set-message
+                  (or (zotero-add-message added missing file)
+                      (string-append (url->system (url-tail file))
+                                     " has the references of the citations"))
+                  "Zotero"))))
           (else
             (let* ((keys (zotero-project-citations))
                    (missing (zotero-write-bibliography keys file)))
@@ -1120,6 +1286,14 @@
   (when (in? what '("all" "bibliography"))
     (when (with-zotero-bibliography?)
       (zotero-refresh-bibliography #t))
+    ;; the references of Zotero which the file of the user lacks
+    (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))
+                 (zotero-master-bibliography-file))
+      (when (and (add-to-own-file? f) (zotero-ready?))
+        (with (added missing) (zotero-add-to-bib-file
+                               f (zotero-project-citations))
+          (when (nnull? added)
+            (set-message (zotero-add-message added '() f) "Zotero")))))
     ;; the entries imported from Zotero into the database follow it
     (when (and (supports-db?) (zotero-ready?))
       (and-with r (zotero-sync-database)
