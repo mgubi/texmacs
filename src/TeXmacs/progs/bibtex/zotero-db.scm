@@ -140,6 +140,38 @@
       (bib-save `(document ,@(map cdr l))))
     (length l)))
 
+(tm-define (zotero-import-citations)
+  (:synopsis "Import into the database the references of the citations")
+  ;; those of Zotero which the database does not have yet
+  (:interactive #t)
+  (zotero-forget-state)
+  (if (not (zotero-ready?))
+      (set-message (zotero-status-message (zotero-status)) "Zotero")
+      (let* ((keys (list-filter (zotero-project-citations)
+                                (negate zotero-in-database?)))
+             (n (zotero-import-items (map cdr (zotero-resolve keys)))))
+        (set-message
+         (if (== n 0) "The database has all the references of the citations"
+             (string-append "Imported " (number->string n)
+                            (if (== n 1) " reference" " references")
+                            " from Zotero into the database"))
+         "Zotero"))))
+
+(tm-define (zotero-import-entry e)
+  (:synopsis "Import into the database the reference of the Zotero entry @e")
+  (:interactive #t)
+  (with n (zotero-import-items (list e))
+    (set-message (if (== n 1)
+                     (string-append "Imported " (zotero-entry-key e)
+                                    " from Zotero into the database")
+                     (string-append (zotero-entry-key e)
+                                    " could not be imported"))
+                 "Zotero")))
+
+(tm-define (zotero-can-import? e)
+  (:synopsis "Can the reference of the Zotero entry @e enter the database?")
+  (and e (supports-db?) (not (zotero-in-database? (zotero-entry-key e)))))
+
 (tm-define (zotero-search-entries query exclude)
   (:synopsis "The database entries of the Zotero items matching @query")
   ;; For the search window of the database: at most 10 items, except those
@@ -249,14 +281,18 @@
         ((zotero-ready?)
          (if (== (get-preference "zotero libraries") "all")
              (with n (length (zotero-groups))
-               (string-append "Zotero (My Library and "
+               (string-append (if (zotero-web?) "zotero.org" "Zotero")
+                              " (My Library and "
                               (number->string n)
                               (if (== n 1) " group)" " groups)")))
-             "Zotero (My Library)"))
+             (if (zotero-web?) "zotero.org (My Library)"
+                 "Zotero (My Library)")))
         ((== (zotero-status) 'disabled)
          "Zotero refuses the requests (enable its local API)")
-        ((== (zotero-status) 'not-running) "Zotero is not running")
-        (else "Zotero answered with an error")))
+        ((and (== (zotero-status) 'not-running) (not (zotero-web?)))
+         "Zotero is not running")
+        ((== (zotero-status) 'no-key) "Zotero (give the API key of zotero.org)")
+        (else (zotero-status-message (zotero-status)))))
 
 (tm-define (zotero-search-sources-text db)
   (:synopsis "The sources of the search window of references, for @db")

@@ -436,6 +436,60 @@ follow in any order.
     the group). The preference "zotero in database search" leaves Zotero
     out. In database mode, *Update from Zotero* adds a bibliography
     without file: its references are kept in the document.
+  - **After trying it, second round (2026-10-05):**
+    - *The user's BibTeX file* (revises §3.5 and principle "a file without
+      the marker is never written"): without the database, the references
+      of Zotero which the user's `.bib` lacks are appended to it, at
+      *Document -> Update -> Bibliography* and *Update from Zotero*, each
+      after a line `% Added from Zotero by TeXmacs on <date>:
+      zotero://select/...` (`zotero-add-to-bib-file`). Nothing else of
+      the file changes, and an added reference is not updated later (the
+      user may edit it). The comments let TeXmacs find the item again
+      (`zotero-bib-file-items`, used by `zotero-check-missing` for renamed
+      keys) even without the `zotero-items` attachment. Preference "zotero
+      add to bib file" (on).
+    - *Same work*: the same DOI when both summaries have one (normalized:
+      lowercase, without `https://doi.org/` or `doi:`), otherwise the same
+      title and year. The items now carry their DOI (`zotero-entry-doi`).
+    - *Completion cache*: the keys of each prefix are remembered while no
+      library changes; a longer prefix is answered from a shorter one whose
+      answer was complete.
+    - *Import by hand*: *Document -> Bibliography -> Import the citations
+      into the database* and *Focus -> Import into the database*.
+    - *Dates*: `pretty-date` knows no ISO format (Qt patterns, or `date`
+      without Qt); `zotero-iso-date` computes `YYYY-MM-DD` (UTC).
+    - *Formulas*: Zotero's BibTeX writes the LaTeX of its fields as text
+      (`$\Phi^4_3$` -> `\${\textbackslash}{Phi}{\textasciicircum}4\_3\$`);
+      `zotero-unescape-math` undoes it between pairs of `\$` (`$$` becomes
+      `$`), and drops the field `file` (local paths of the attachments).
+      A value which the LaTeX parser of `parse_bib` cannot read made the
+      whole file unconverted (#75 item 10): fixed by PR #91, not merged.
+    - *Translations*: the menus and dialogs in Italian, French, German,
+      Spanish, Portuguese, Dutch, Russian, Chinese and Japanese.
+    - *Windows*: Show in Zotero opens the link as `load-external` does
+      (`start ""` takes a title first).
+    - *Vue*: the search window was checked under Vue (SDL's dummy video
+      driver, scripted events and snapshots); a Vue dialog now gives the
+      keyboard to its first field, as Qt does (wip_other_guis 8ceec36b23).
+  - **zotero.org (2026-10-05, for the browser port):** the library can be
+    read from the web API (`https://api.zotero.org/`) with an API key:
+    preference "zotero source" ("auto": zotero.org in a web browser, the
+    application elsewhere; "local"; "web"). The key is kept in the wallet
+    when it is on, else in the preference "zotero api key"; the user is
+    found from it (`keys/current`) and remembered ("zotero user"). The
+    library of the user stays `users/0` in TeXmacs (documents and database
+    entries are the same in both cases) and becomes `users/<id>` in the
+    requests. Requests: `curl` with the headers in a temporary file (the
+    key is never on a command line) on the desktop; in a browser a
+    synchronous `XMLHttpRequest` through `web-javascript`, whose answer
+    (status, `Last-Modified-Version`, body in base64) is decoded in Scheme.
+    The web API searches the citation keys only with `qmode=everything`,
+    which the searches of keys ask for. Show in Zotero opens the page of
+    the item on zotero.org. Keys of Better BibTeX in the field extra
+    (`Citation Key: ...`) are read too.
+    - *The application cannot be used from a web page*: its server closes
+      every request with an `Origin` header (local API, connector,
+      Better BibTeX), and the Zotero Connector offers nothing to pages.
   - **Differences from §3.5 and §4:** the footer cannot carry a
     *Details* button, so the generation reports renamed and deleted keys
     in the footer, and *Check against Zotero...* gives the details. The

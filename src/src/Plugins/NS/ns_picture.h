@@ -37,7 +37,9 @@ public:
 };
 
 picture ns_picture (NSBitmapImageRep *im, int ox, int oy);
-NSBitmapImageRep* xpm_image (url file_name);
+NSBitmapImageRep* xpm_image (url file_name, string theme);
+string ns_icon_theme (NSAppearance* appearance);
+string ns_icon_theme ();
 
 class ns_image_renderer_rep: public ns_renderer_rep {
 public:

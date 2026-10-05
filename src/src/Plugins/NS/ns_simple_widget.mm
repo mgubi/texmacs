@@ -978,6 +978,13 @@ ns_simple_widget_rep::repaint_invalid_regions_bis () {
 hashset<pointer> ns_simple_widget_rep::all_widgets;
 
 void
+ns_simple_widget_rep::invalidate_every () {
+  iterator<pointer> i = iterate(ns_simple_widget_rep::all_widgets);
+  while (i->busy())
+    static_cast<ns_simple_widget_rep*>(i->next())->invalidate_all ();
+}
+
+void
 ns_simple_widget_rep::repaint_all () {
   iterator<pointer> i = iterate(ns_simple_widget_rep::all_widgets);
   while (i->busy()) {

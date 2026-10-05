@@ -56,6 +56,7 @@
              zotero-adopt-entries zotero-in-database-search?
              zotero-mark-results zotero-file-search-results
              zotero-open-search-tool zotero-search-sources-text
+             zotero-import-citations zotero-import-entry zotero-can-import?
              zotero-conflict-fields zotero-merge-entries)
 (lazy-menu (bibtex zotero-widgets) zotero-synchronize
            open-zotero-check open-zotero-settings)

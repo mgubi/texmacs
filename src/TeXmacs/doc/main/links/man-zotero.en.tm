@@ -5,18 +5,31 @@
 <\body>
   <tmdoc-title|Citations from Zotero>
 
-  <TeXmacs> can take its bibliographic references directly from the library
-  of the <hlink|Zotero|https://www.zotero.org> desktop application (version
-  7 or later). <TeXmacs> only reads the library: it never changes anything
-  in Zotero.
+  <TeXmacs> can take its bibliographic references directly from your
+  <hlink|Zotero|https://www.zotero.org> library: from the Zotero desktop
+  application (version 7 or later), or from <verbatim|zotero.org>, where
+  Zotero keeps a copy of the library when it is synchronized. <TeXmacs>
+  only reads the library: it never changes anything in Zotero.
 
   <subsubsection*|Setting up Zotero>
 
-  Zotero answers the requests of other applications once <with|font-shape|italic|Allow
-  other applications on this computer to communicate with Zotero> is
-  enabled, in the advanced settings of Zotero. Zotero must be running while
-  you cite or update a bibliography; when it is not, <TeXmacs> says so in
-  the footer, and uses the references which it obtained before.
+  <with|font-series|bold|With the Zotero application.> Zotero answers the
+  requests of other applications once <with|font-shape|italic|Allow other
+  applications on this computer to communicate with Zotero> is enabled, in
+  the advanced settings of Zotero. Zotero must be running while you cite or
+  update a bibliography; when it is not, <TeXmacs> says so in the footer,
+  and uses the references which it obtained before.
+
+  <with|font-series|bold|With zotero.org.> When your library is
+  synchronized with <verbatim|zotero.org>, <TeXmacs> can read it there,
+  without the application: create a key on
+  <hlink|zotero.org/settings/keys|https://www.zotero.org/settings/keys>
+  (reading access to your library, and to your groups if you want them, is
+  enough), and give it in the settings, with <menu|Read the library
+  from|zotero.org>. The key is kept in your wallet when it is open, and
+  otherwise in your preferences. In <TeXmacs> in a web browser, the library
+  is always read from <verbatim|zotero.org>: Zotero refuses the requests of
+  web pages, also when the application runs on the same computer.
 
   The citations use the citation keys of Zotero, which Zotero (or the
   Better<nbsp>BibTeX extension) stores in the field <verbatim|citationKey>.
@@ -24,10 +37,22 @@
   <verbatim|zotero:><em|key>, where <em|key> is the key of the item in
   Zotero; you may give it a better citation key in Zotero at any time.
 
+  Formulas written in LaTeX in the fields of Zotero, such as a title
+  <verbatim|On the $\\Phi^4_3$ model>, become formulas in the
+  bibliography. The references which <TeXmacs> obtains from Zotero do not
+  include the paths of the files attached to the items on your computer.
+
   The settings are in <menu|Document|Bibliography|Zotero settings...>:
 
   <\description>
-    <item*|Zotero server>The address of Zotero,
+    <item*|Read the library from>The Zotero application,
+    <verbatim|zotero.org>, or <verbatim|Automatic>: <verbatim|zotero.org>
+    in a web browser, the application elsewhere.
+
+    <item*|API key of zotero.org>The key with which <TeXmacs> reads your
+    library on <verbatim|zotero.org>.
+
+    <item*|Zotero server>The address of the Zotero application,
     <verbatim|http://localhost:23119> by default.
 
     <item*|Libraries>Your own library only (<verbatim|My Library>), or also
@@ -42,6 +67,10 @@
 
     <item*|Search Zotero in the search of references>Whether the search
     window of citations also lists the references of Zotero.
+
+    <item*|Add the references of Zotero to the <BibTeX> file>Whether the
+    references of Zotero which your own <BibTeX> file lacks are added to
+    it (see below).
   </description>
 
   <menu|Test the connection> tells whether Zotero answers.
@@ -74,7 +103,8 @@
 
   When the cursor is on a key which <TeXmacs> has already found in Zotero,
   <menu|Focus|Show in Zotero> (or the button <verbatim|Z> of the focus
-  bar) selects its item in Zotero.
+  bar) selects its item in Zotero, or opens its page on
+  <verbatim|zotero.org> when the library is read there.
 
   <subsubsection*|Generating the bibliography>
 
@@ -85,18 +115,37 @@
   <verbatim|% Exported from Zotero by TeXmacs>, and only contains the items
   which the document cites. <TeXmacs> rewrites it at each
   <menu|Document|Update|Bibliography> (or <menu|Document|Update|All>), so
-  that it follows the changes made in Zotero. A <BibTeX> file without this
-  line is yours, and <TeXmacs> never changes it: its references come before
-  those of Zotero.
+  that it follows the changes made in Zotero.
+
+  A <BibTeX> file without this line is yours. Its references come first,
+  and <TeXmacs> never changes them. When the document cites a reference of
+  Zotero which the file does not have, <menu|Document|Update|Bibliography>
+  (and <menu|Document|Bibliography|Update from Zotero>) adds it at the end
+  of the file, after a comment line which says where it comes from:
+
+  <\verbatim-code>
+    % Added from Zotero by TeXmacs on 2026-10-05:
+    zotero://select/library/items/T8WH75PX
+
+    @article{aruCharacterisationContinuumGaussian2022,
+
+    \ \ title = {A characterisation of the continuum ...},
+
+    \ \ ...
+
+    }
+  </verbatim-code>
+
+  The link of the comment shows the item in
+  Zotero, and lets <TeXmacs> find the item again when Zotero changes its
+  key. The reference is added once: a later change in Zotero does not
+  change the file, so that you may edit it. To keep your file as it is,
+  turn off <menu|Add the references of Zotero to the BibTeX file> in the
+  settings.
 
   In a project, the citations of the master document and of all the files
   which it includes go into the file of the bibliography of the master
   document.
-
-  Without the database, a bibliography has a single <BibTeX> file. When it
-  is your own file, the references are taken from it only, and a key which
-  only Zotero has stays unresolved (shown as <verbatim|?>): use a file
-  written from Zotero, or the database, to combine both.
 
   <subsubsection*|With the database>
 
@@ -120,6 +169,11 @@
   value to keep for each of them. A reference deleted in Zotero is kept in
   the database.
 
+  <menu|Document|Bibliography|Import the citations into the database>
+  copies at once the references of Zotero which the document cites, and
+  <menu|Focus|Import into the database> the one of the citation at the
+  cursor.
+
   <subsubsection*|Keys renamed in Zotero>
 
   Zotero, and Better<nbsp>BibTeX in particular, may change a citation key,
@@ -135,7 +189,9 @@
   <menu|Document|Bibliography|Check against Zotero...> lists how the
   citations relate to Zotero: the keys found in Zotero or elsewhere, those
   renamed in Zotero, the items no longer in Zotero, the keys found nowhere,
-  and the keys used for different works in Zotero and in another source.
+  and the keys used for different works in Zotero and in another source
+  (two references are the same work when they have the same <abbr|DOI>, or,
+  when one of them has none, the same title and year).
   With the database, it also finds the references of the database which
   are copies of Zotero items made by hand, and offers to keep them in sync
   with Zotero from then on.

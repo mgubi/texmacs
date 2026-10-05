@@ -28,6 +28,7 @@
 #include "ns_gui.h"
 #include "ns_utilities.h"
 #include "ns_renderer.h" // for the_ns_renderer
+#include "ns_picture.h"  // for ns_icon_theme
 #include "MacOS/mac_utilities.h"
 
 
@@ -1450,6 +1451,41 @@ static NSAutoreleasePool *pool = nil;
 }
 @end
 
+/*! Follows the appearance of the application (light or dark), which
+ changes with that of the system when the theme is the default one: the
+ icons drawn by TeXmacs in its canvases are drawn again in the variant of
+ the new appearance. Those of the native controls (menus, icon bars) follow
+ by themselves, since they are drawn in the appearance of their view (see
+ to_nsimage in ns_ui_element.mm). */
+@interface TMAppearanceObserver : NSObject
+{
+  string theme;
+}
+@end
+
+@implementation TMAppearanceObserver
+- (id) init
+{
+  if ((self= [super init])) {
+    theme= ns_icon_theme ();
+    [NSApp addObserver: self forKeyPath: @"effectiveAppearance"
+               options: 0 context: NULL];
+  }
+  return self;
+}
+
+- (void) observeValueForKeyPath: (NSString*) path ofObject: (id) object
+                         change: (NSDictionary*) change context: (void*) context
+{
+  (void) path; (void) object; (void) change; (void) context;
+  string now= ns_icon_theme ();
+  if (now == theme) return;
+  theme= now;
+  ns_simple_widget_rep::invalidate_every ();
+  if (the_gui) the_gui->force_update ();
+}
+@end
+
 /*! The delegate of the application: the files and URLs given by macOS
  (Finder, the Dock, open, the links tmfs://), and the requests to quit from
  outside of TeXmacs (the Dock, logout), which TeXmacs handles itself, with
@@ -1552,6 +1588,17 @@ void gui_open (int& argc, char** argv)
     static TMNSAppDelegate* delegate= [[TMNSAppDelegate alloc] init];
     [NSApp setDelegate: delegate];
   }
+  // The theme of the preferences (TEXMACS_NS_THEME overrides it, for the
+  // tests): light or dark, or by default that of the system. The icons
+  // follow the appearance, also when it changes (see TMAppearanceObserver)
+  string theme= get_env ("TEXMACS_NS_THEME");
+  if (N(theme) == 0) theme= get_user_preference ("gui theme", "default");
+  if (theme == "light")
+    [NSApp setAppearance: [NSAppearance appearanceNamed: NSAppearanceNameAqua]];
+  else if (theme == "dark")
+    [NSApp setAppearance: [NSAppearance appearanceNamed: NSAppearanceNameDarkAqua]];
+  static TMAppearanceObserver* observer= [[TMAppearanceObserver alloc] init];
+  (void) observer;
   if (!pool) {
     // create autorelease pool 
     pool = [[NSAutoreleasePool alloc] init];
