@@ -314,6 +314,16 @@ system_date (string lan, string fm) {
     date= il2_to_cork (date);
   // if (lan == "ru_RU") date= iso_to_koi8 (date);
   set_env (lvar, old);
+  if (N(date) == 0 && N(fm) > 0) {
+    // no date command (in a browser, where there are no processes): the
+    // C library, in its own locale, so that the names are in English
+    char buf[256];
+    time_t ti;
+    time (&ti);
+    c_string _fm (fm);
+    size_t len= strftime (buf, sizeof (buf), _fm, localtime (&ti));
+    date= string (buf, (int) len);
+  }
   return date;
 }
 

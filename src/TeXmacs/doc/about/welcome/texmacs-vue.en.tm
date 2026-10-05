@@ -303,10 +303,10 @@
     the same text as before. Add <verbatim|?gpu=0> to the address of the page
     to draw as before, in a browser where something looks wrong.
 
-    <item>Dates: the formats of <markup|date> such as
-    <verbatim|MMMM d, yyyy> or <verbatim|dd/MM/yy> work (they were printed
-    as they are written), and numbers keep their zeros
-    (<verbatim|2026-10-05>).
+    <item>Dates: <markup|date> gives the date (it gave nothing), its formats
+    such as <verbatim|MMMM d, yyyy> or <verbatim|dd/MM/yy> work, and numbers
+    keep their zeros (<verbatim|2026-10-05>). The names of the months and
+    days are in English.
 
     <item>Long HTML documents are imported (about two thousand paragraphs
     stopped the import without a message), and the equation arrays of LaTeX
