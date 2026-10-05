@@ -40,6 +40,10 @@ key <name> <text>           the key and the text the system sends with it
 text <string>               one text-input event per character
 resize w h                  resize the target window (points)
 repaint                     invalidate every editor (repaint from scratch)
+scheme <expression>         run a Scheme command, as -x does (at the next turn of
+                            the loop): a zoom, or a marker printed in the log, e.g.
+                            scheme (display* "PHASE scroll\n"), in the order of
+                            the events around it
 compose <text>              composition of an input method (no text: ends it)
 commit <text>               an input method commits a text (one key per character)
 drop x y <path>|text:<text> a drag and drop of one item at that position
