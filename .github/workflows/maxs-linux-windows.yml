@@ -176,6 +176,14 @@ jobs:
       - name: Build
         run: make -k -j"$(nproc)"
 
+      - name: What the libraries export (when the build fails)
+        if: failure()
+        run: |
+          ls -la "$DEPS/lib"
+          nm -D --defined-only "$DEPS/lib/libSDL3_ttf.so" | grep -c " T TTF_" || true
+          nm -D --defined-only "$DEPS/lib/libSDL3_ttf.so" | grep "TTF_OpenFont" || true
+          readelf -d "$DEPS/lib/libSDL3_ttf.so" | head -20
+
       # SDL3 and SDL3_ttf next to TeXmacs (the script TeXmacs/bin/texmacs
       # puts TeXmacs/lib in LD_LIBRARY_PATH)
       - name: Package
