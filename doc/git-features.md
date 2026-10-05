@@ -5,8 +5,8 @@ reviewers and testers. For how the code is organised, see
 [git-implementation.md](git-implementation.md); for the plan and its
 history, see [git-plan.md](git-plan.md).
 
-**Base:** `svn_sync`, the TeXmacs 2.1.5 upstream mirror, about 31
-commits ahead as of 2026-09-24.
+**Base:** `wip_fixes` (the TeXmacs 2.1.5 upstream mirror `svn_sync` with
+fixes and the test harness), about 40 commits ahead as of 2026-10-05.
 **Scope:**
 * `src/TeXmacs/progs/version/` (Scheme) and the style package
   `packages/miscellaneous/git-pages.ts`;
@@ -114,7 +114,7 @@ the states where it applies:
 | **This file → Stage changes** | modified, or partially staged | `git add` |
 | **This file → Unstage changes** | staged, partially staged, or newly added | `git reset`; a rename also unstages the removal of the old name |
 | **This file → Commit this file…** | there is something to commit | Saves the document, asks for a message, then commits only this file (adding it first if needed). Refused during a merge. |
-| **This file → Discard changes…** | modified | Restores the staged version after a confirmation, which warns if unsaved edits would also be lost |
+| **This file → Discard changes…** | modified or partially staged | Restores the staged version after a confirmation, which warns if unsaved edits would also be lost |
 | **Compare with → Last commit / Staged version / Remote version / Before the last pull or merge / Other revision… / Tag … / Branch …** | TeXmacs documents | Opens the **structured comparison** between the document and that revision; you then accept or reject each difference |
 | **Who changed what** | TeXmacs documents | **Blame by paragraph**: the document, with each paragraph (or run of paragraphs) annotated with the commit, author and date that last changed it, or "Not committed yet". It follows paragraphs, not source lines, through the last 30 commits (preference `git blame depth`). |
 | **Restore version →** | tracked files | The last 15 versions of the document. Restoring one writes that version into the current file, following renames. The staged version and the history are kept, so this is a new change that can be discarded. Also available as **Restore this version** when viewing an old revision, and as "restore" on commit pages. |
@@ -171,7 +171,8 @@ set.
 ### Commit dialog
 
 * A message editor and a list of all changed files. The files with
-  staged changes start out selected.
+  staged changes start out selected; when nothing is staged, all changed
+  tracked files do.
 * An **Amend last commit** toggle. Amending with an empty message keeps
   the old message.
 * On commit:
@@ -290,7 +291,9 @@ driver get git's usual text merge.
 ## 7. Robustness and safety
 
 * **Paths:** repositories whose paths contain spaces, quotes or
-  non-ASCII characters work, as do linked worktrees and submodules.
+  non-ASCII characters work (tested), as do linked worktrees (tested).
+  Submodules are detected like linked worktrees (their `.git` is a file),
+  but are not tested.
 * **Quoting:** commit messages, branch names and file names are passed
   without a shell, so `"`, `$`, backquotes and `\` are safe.
 * **File names are never patterns**, so discarding `n[1].tm` does not
@@ -342,41 +345,48 @@ any git revision (`HEAD`, a branch), `INDEX`, and `BASE`, `OURS` and
 ## 9. Tests
 
 ```sh
-src/tests/scheme/check.sh git version            # headless: 340 + 224 checks
+src/tests/scheme/check.sh git version            # headless: 400 + 224 checks
 doc/tests/run-git-tests.sh <scratch-dir>         # the same, in a fresh home
-doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 51 checks
+doc/tests/run-git-tests.sh --gui <scratch-dir>   # Qt offscreen: 56 checks
 ```
 
-The headless checks are the suite `git` of the test harness
+The tests create scratch repositories (with spaces and accents in paths, a
+linked worktree, a bare remote with clones, and conflicting merges), ignore
+the global Git configuration of the user (`GIT_CONFIG_GLOBAL`, which needs
+Git 2.32), put back the preferences they change, and open no windows.
+`check.sh` reuses the home `src/tests/build/scheme/home` (or `TM_TEST_HOME`);
+`run-git-tests.sh` makes a fresh one.
+
+The **headless** checks are the suite `git` of the test harness
 (`src/TeXmacs/progs/check/git-test.scm`, also run by `check.sh all`), and
 the git group of the suite `version`, which checks the dispatch of the
-`version-*` interface. The tests create scratch repositories (with spaces in paths, a linked
-worktree, a bare remote with clones, and conflicting merges). They use a
-private, freshly created `TEXMACS_HOME_PATH` and open no windows. The
-runner exits with a failure status if a check fails, if the tests do not
-complete (crash or time out), or if any Scheme error appears in the log.
-The checks cover:
+`version-*` interface. They cover:
 
 * the parsers and helpers which do not run Git;
+* trust (a repository whose `core.fsmonitor` would run a program, a bare
+  repository, a symbolic link into another repository, a document
+  including a Git page);
 * detection (also of linked worktrees) and every file state;
 * upstream branches (ahead and behind), the footer and the menu label;
-* quoting;
-* history and revisions;
+* quoting, names which could be taken for options, accented names;
+* history (across renames) and revisions;
 * every page;
 * branches, tags and stashes;
 * renames and conflicts;
-* the merge engine and the merge driver;
-* push, fetch, pull, clone and cancel;
-* reloading of open documents;
-* the save hook, the side panel, and the review regressions;
-* trust (a repository whose `core.fsmonitor` would run a program), safe
-  restoring, committing unsaved edits, the merge-driver fallback, and the
-  other audit fixes.
+* the merge engine (also of tables) and the merge driver;
+* restoring, snapshots, blame, projects, signing;
+* documents which cannot be saved, the shortcuts, the menus without Git.
 
-Not covered by the tests (see doc/git-audit.md, E4): the logic of the
-commit dialog, confirmations that need an answer (delete branch, drop
-stash, remove remote), the X11 shell fallback, Windows, submodules and
-non-ASCII paths.
+The **offscreen GUI** test (`doc/tests/git-gui-test.scm`) covers push,
+fetch, pull, clone and cancel, the reloading of open documents, the save
+hook, the panel (no Git command while typing, updated after actions,
+following the document), the menus and the dialogs being built, and
+committing unsaved edits. Its runner also fails if a Scheme error appears
+in the log, or if the chain of callbacks stops.
+
+Not covered by the tests: the logic of the commit dialog, confirmations
+that need an answer (delete branch, drop stash, remove remote), the X11
+shell fallback, Windows and submodules.
 
 ---
 
@@ -393,11 +403,13 @@ non-ASCII paths.
 * The merge driver command assumes a POSIX shell (as git itself uses to
   run it) and `texmacs.bin` or a macOS bundle.
 * The keyboard shortcuts only work while the versioning tool is active.
-* A background command finishes only when all its output is closed. A
-  helper that keeps it open makes the command look running until you
-  cancel it.
-* Plugin pipe links may collect a finished git process first, and the
-  command is then reported with exit code −1.
+  Their prefix `version` is `M-C-#` on macOS (Cmd-Ctrl-Shift-3), which the
+  system takes for screenshots unless that shortcut is disabled in the
+  keyboard settings; the menus offer the same commands.
+* A background command finishes when all its output is closed: a helper
+  that keeps it open makes the command look running until you cancel it
+  (which then works). A synchronous command waits at most 2 s for such a
+  helper after git exits.
 * Blame follows the file's linear history (`git log --follow`), not the
   full commit graph, so a paragraph brought in by a merge is attributed to
   the merge commit.

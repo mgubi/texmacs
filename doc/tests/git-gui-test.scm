@@ -26,9 +26,31 @@
   (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n  "
                  text "\n</body>\n"))
 
+(define finished? #f)
+
 (define (finish)
+  (set! finished? #t)
   (display* "FAILURES: " failures "\n")
   (quit-TeXmacs))
+
+;; NOTE: the tests are one chain of callbacks: an error in a callback stops
+;; it, which is then reported instead of waiting for the alarm of the runner
+(delayed
+  (:pause 240000)
+  (when (not finished?)
+    (check "the tests completed (an error stopped the chain)" #f)
+    (finish)))
+
+(define (menu-strings m)
+  ;; The strings in the expansion of the menu @m
+  (let loop ((x (menu-expand m)))
+    (cond ((string? x) (list x))
+          ((pair? x) (append-map loop x))
+          (else '()))))
+
+(define (menu-has? m . l)
+  (with s (menu-strings m)
+    (list-and (map (lambda (x) (in? x s)) l))))
 
 ;; Conflict resolution with the structured comparison
 (define (test-conflict)
@@ -86,21 +108,27 @@
   ;; The menus and dialogs can be built without errors
   (with u (system->url (string-append T "/remote/clone c/doc.tm"))
     (switch-to-buffer u)
-    (check "version menu" (pair? (menu-expand '(link version-menu))))
-    (check "git menu" (pair? (menu-expand '(link git-repository-menu))))
+    (check "version menu" (menu-has? '(link version-menu)
+                                     "Commit" "Git panel" "This file"))
+    (check "git menu" (menu-has? '(link git-repository-menu)
+                                 "Status" "History" "New branch"))
     (git-interactive-clone)
     (git-compare-with-revision u "HEAD~1")
     (check "compare with revision"
            (nnull? (tree-search (buffer-get u)
                                 (lambda (t) (tree-in? t '(version-both))))))
-    (check "compare menu" (pair? (menu-expand '(link git-compare-menu))))
+    (check "compare menu" (menu-has? '(link git-compare-menu) "Last commit"))
     (git-interactive-commit (git-root u))
     (git-interactive-commit-project u)
     (set-preference "git simple mode" "on")
-    (check "simple file menu" (pair? (menu-expand '(link version-menu))))
-    (check "simple git menu" (pair? (menu-expand '(link git-repository-menu))))
+    (check "simple file menu"
+           (and (menu-has? '(link version-menu) "Save snapshot")
+                (not (menu-has? '(link version-menu) "This file"))
+                (not (menu-has? '(link version-menu) "Commit"))))
+    (check "simple git menu" (menu-has? '(link git-simple-repository-menu)
+                                        "History"))
     (set-preference "git simple mode" "off")
-    (check "restore menu" (pair? (menu-expand '(link git-restore-menu))))
+    (check "restore menu" (nnull? (menu-strings '(link git-restore-menu))))
     (check "review bar opened"
            (in? '(version-review-tool)
                 (window->tools (current-window) :transient-bottom)))

@@ -1,6 +1,6 @@
 # How the new git support is organised
 
-The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2026-09-24.
+The code lives in `src/TeXmacs/progs/version/`. This describes the state as of 2026-10-05.
 
 ## Modules
 
@@ -58,7 +58,8 @@ therefore load even before anyone has opened the Version menu.
   TeXmacs's own environment (`system-setenv`), so git never waits for a
   password on a terminal that isn't there.
 * The last 50 commands are kept as `(time root-string args result)` in
-  `git-command-history` and shown on the "Git output" page.
+  `git-history` (returned by `git-command-history`) and shown on the "Git
+  output" page.
 * `git-root u` walks up the directories looking for a `.git` **entry**,
   which can be a file (worktrees, submodules) or a directory. It never starts
   a process.
@@ -189,7 +190,8 @@ evaluated eagerly, so the git layer accepts `#f` roots.
 `texmacs-input` for the message (aux buffer `tmfs://aux/git-commit-<n>`,
 converted with `cpp-texmacs->verbatim ... "utf-8"`), a `choices` list with
 every changed file, and an "Amend" toggle. The files that start out
-selected are the ones with staged changes. When you commit:
+selected are the ones with staged changes, or all changed tracked files
+when nothing is staged (`initially-selected`). When you commit:
 
 * a selected file without staged changes is staged entirely;
 * a selected file with staged changes is committed with exactly its staged

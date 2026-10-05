@@ -49,7 +49,8 @@
   <paragraph*|Keyboard shortcuts>
 
   The following shortcuts are available in documents which belong to a
-  repository:
+  repository, unless the versioning tool is set to
+  <menu|Tools|Versioning tool|Never>:
 
   <\big-table|<descriptive-table|<tformat|<table|<row|<cell|Shortcut>|<cell|Action>>|<row|<cell|<key|version
   g>>|<cell|Open the <name|Git> panel>>|<row|<cell|<key|version
@@ -60,6 +61,11 @@
   commit>>>>>>
     Keyboard shortcuts for <name|Git>.
   </big-table>
+
+  On <name|macOS>, the prefix <key|version> is
+  <key|M-C-#>, which the system uses for
+  screenshots: disable that system shortcut in the keyboard settings, or use
+  the menus.
 
   <paragraph*|When something goes wrong>
 
@@ -88,8 +94,8 @@
     branches.
 
     <item*|The state shown is not up to date>This may happen when files are
-    changed by another program. Use <menu|Version|Git|Refresh>, or the
-    <menu|Refresh> button of the status page.
+    changed by another program. Use <menu|Version|Git|Refresh> (in the
+    full mode), or the <menu|Refresh> button of the status page.
 
     <item*|A document was not reloaded>Documents with unsaved changes are
     never reloaded automatically. Save your changes under another name, or
