@@ -179,6 +179,13 @@
 
 (define-public (force-output) (flush-output-port *stdout*))
 
+;; Guile's display-error, used by format-err (debug.scm) for the errors of
+;; remote services: "subr: message", the message formatted with args
+(define-public (display-error frame port subr message args rest)
+  (when subr (display subr port) (display ": " port))
+  (display (apply format #f message (if (list? args) args '())) port)
+  (newline port))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public (string-null? s) (equal? (length s) 0))

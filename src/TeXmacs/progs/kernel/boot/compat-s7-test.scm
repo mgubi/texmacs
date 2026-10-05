@@ -70,6 +70,22 @@
 ;; Miscellaneous Guile builtins
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (regtest-compat-errors)
+  (regression-test-group
+   "compat-s7, errors" "errors"
+   :none :none
+   (test "display-error"
+         (call-with-output-string
+           (lambda (p) (display-error #f p "car" "bad ~A: ~S" '(arg "x") #f)))
+         "car: bad arg: \"x\"\n")
+   (test "display-error without procedure"
+         (call-with-output-string
+           (lambda (p) (display-error #f p #f "oops" '() #f)))
+         "oops\n")
+   (test "format-err"
+         (format-err 'wrong-type-arg "car" "bad ~A" '(1) #f)
+         "[wrong-type-arg]: car: bad 1\n")))
+
 (define (regtest-compat-misc)
   (regression-test-group
    "compat-s7, miscellaneous builtins" "misc"
@@ -258,6 +274,7 @@
 
 (tm-define (regtest-compat-s7)
   (let ((n (+ (regtest-compat-lists)
+              (regtest-compat-errors)
               (regtest-compat-misc)
               (regtest-compat-strings)
               (regtest-compat-char-sets)
