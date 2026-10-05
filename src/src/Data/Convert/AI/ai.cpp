@@ -729,7 +729,9 @@ claude_command (string s, string model, string agent,
   string effort= ai_reasoning_effort ("claude");
   if (effort != "") {
     if (claude_adaptive_thinking (name)) {
-      d << tree ("thinking") << json_object ("type", "adaptive");
+      // (summarized: the text of the thinking, which is else left out)
+      d << tree ("thinking")
+        << json_object ("type", "adaptive", "display", "summarized");
       d << tree ("output_config") << json_object ("effort", effort);
     }
     else {
