@@ -930,18 +930,110 @@
     ((check (eval m) "v" (== (ai-session-model lan) m))
      (ai-choose-model lan m start?))))
 
+;; A long list in alphabetical ranges, n at most, as (label item ...):
+;; cut between the first letters of the names ("A - C", "D - G"...) when
+;; this gives ranges which are not too long, else in ranges of equal sizes,
+;; named by their first and last names ("gpt-3.5-turbo - gpt-4o"). The
+;; signs before a name are not counted (~anthropic, an alias of OpenRouter).
+(define (ai-sort-key s)
+  (let loop ((i 0))
+    (cond ((>= i (string-length s)) "")
+          ((or (char-alphabetic? (string-ref s i)) (char-numeric? (string-ref s i)))
+           (locase-all (substring s i (string-length s))))
+          (else (loop (+ i 1))))))
+
+(define (ai-first-letter s)
+  (with k (ai-sort-key s)
+    (if (== k "") "" (upcase-all (substring k 0 1)))))
+
+(define (ai-runs l key)
+  ;; the consecutive items of l with the same key, as lists
+  (if (null? l) '()
+      (let loop ((l (cdr l)) (cur (list (car l))) (acc '()))
+        (cond ((null? l) (reverse (cons (reverse cur) acc)))
+              ((== (key (car l)) (key (car cur)))
+               (loop (cdr l) (cons (car l) cur) acc))
+              (else (loop (cdr l) (list (car l)) (cons (reverse cur) acc)))))))
+
+(define (ai-pack groups n)
+  ;; the groups in n chunks at most, of about the same number of items
+  (let* ((total (apply + (map length groups)))
+         (target (max 1 (quotient (+ total n -1) n))))
+    (let loop ((gs groups) (cur '()) (size 0) (acc '()))
+      (cond ((null? gs)
+             (reverse (if (null? cur) acc (cons (apply append (reverse cur)) acc))))
+            ((>= (+ size (length (car gs))) target)
+             (loop (cdr gs) '() 0
+                   (cons (apply append (reverse (cons (car gs) cur))) acc)))
+            (else (loop (cdr gs) (cons (car gs) cur)
+                        (+ size (length (car gs))) acc))))))
+
+(define (ai-range-label a b)
+  (if (== a b) a (string-append a " - " b)))
+
+;; a name as the end of a range: without its variant (":free"), short
+(define (ai-label-name s)
+  (let* ((i (string-index s #\:))
+         (s (if i (substring s 0 i) s)))
+    (if (<= (string-length s) 22) s
+        (string-append (substring s 0 20) "..."))))
+
+(define (ai-name-labels chunks name)
+  (map (lambda (c) (ai-range-label (ai-label-name (name (car c)))
+                                   (ai-label-name (name (cAr c)))))
+       chunks))
+
+(define (ai-ranges l name n)
+  (let* ((l (sort l (lambda (a b) (string<=? (ai-sort-key (name a))
+                                             (ai-sort-key (name b))))))
+         (letter (lambda (x) (ai-first-letter (name x))))
+         (packs (ai-pack (ai-runs l letter) n))
+         (limit (max 30 (quotient (* 3 (length l)) (* 2 n)))))
+    (if (and (> (length packs) 1)
+             (list-and (map (lambda (c) (<= (length c) limit)) packs)))
+        (map (lambda (c) (cons (ai-range-label (letter (car c)) (letter (cAr c))) c))
+             packs)
+        (with chunks (ai-pack (map list l) n)
+          (map cons (ai-name-labels chunks name) chunks)))))
+
+(define (ai-model-short m)
+  ;; the name of a model without its provider
+  (with i (string-index m #\/)
+    (if i (substring m (+ i 1) (string-length m)) m)))
+
+;; models, in ranges when they are many
+(tm-menu (ai-model-items-ranged lan l start?)
+  (if (<= (length l) 25)
+      (dynamic (focus-ai-model-items lan l start?)))
+  (if (> (length l) 25)
+      (for (r (ai-ranges l ai-model-short 5))
+        (-> (eval (car r))
+            (dynamic (focus-ai-model-items lan (cdr r) start?))))))
+
+(define (ai-provider-models l p)
+  (list-filter l (lambda (m) (== (ai-model-provider m) p))))
+
+(tm-menu (ai-provider-items lan l provs start?)
+  (for (p provs)
+    (-> (eval (if (== p "") "Others" p))
+        (dynamic (ai-model-items-ranged lan (ai-provider-models l p) start?)))))
+
 (tm-menu (ai-model-choices lan start?)
   (with l (ai-focus-models lan)
     (if (<= (length l) 30)
         (dynamic (focus-ai-model-items lan l start?)))
     (if (> (length l) 30)
-        ;; many models (OpenRouter): by provider
-        (for (p (list-remove-duplicates (map ai-model-provider l)))
-          (-> (eval (if (== p "") "Others" p))
-              (dynamic (focus-ai-model-items
-                        lan (list-filter l (lambda (m)
-                                             (== (ai-model-provider m) p)))
-                        start?))))))
+        ;; many models (OpenRouter): by provider, the providers in
+        ;; alphabetical ranges (a few entries at the top)
+        (with provs (list-remove-duplicates (map ai-model-provider l))
+          (if (<= (length provs) 1)
+              (dynamic (ai-model-items-ranged lan l start?)))
+          (if (and (> (length provs) 1) (<= (length provs) 8))
+              (dynamic (ai-provider-items lan l provs start?)))
+          (if (> (length provs) 8)
+              (for (r (ai-ranges provs (lambda (p) p) 5))
+                (-> (eval (car r))
+                    (dynamic (ai-provider-items lan l (cdr r) start?))))))))
   ---
   ("Other model"
    (interactive (lambda (m) (when (!= m "") (ai-choose-model lan m start?)))
