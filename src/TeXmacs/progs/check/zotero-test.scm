@@ -800,6 +800,246 @@
                         '(("D" "Z") ("Z")))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Keys renamed and items deleted in Zotero
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (rename-in-zotero! item new-key)
+  ;; a new key for the @item of the library of the user, a new version
+  ;; NOTE: Zotero is asked again, as after a few seconds
+  (set! fake-version (+ fake-version 1))
+  (set! fake-library
+        (map (lambda (x)
+               (if (== (car x) item)
+                   (list (car x) new-key (third x) (fourth x) (fifth x)
+                         fake-version (list-ref x 6))
+                   x))
+             fake-library))
+  (zotero-forget-state))
+
+(define (delete-in-zotero! item)
+  (set! fake-library (list-filter fake-library (lambda (x) (!= (car x) item))))
+  (set! fake-version (+ fake-version 1))
+  (zotero-forget-state))
+
+(define rename-doc
+  (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                 "  See <cite|smith2020|smith2020a> and "
+                 "<cite-detail|smith2020a|p. 2> and <cite|zotero:EEEE5555>."
+                 "\n\n  <\\bibliography|bib|tm-plain|r-refs>\n"
+                 "  </bibliography>\n</body>\n"))
+
+(define (edit-step thunk)
+  ;; one user action, as the event loop wraps a menu action (see the
+  ;; editing suite): the changes can then be undone
+  (archive-state)
+  (start-editing)
+  (with r (thunk)
+    (end-editing)
+    (update-forced)
+    r))
+
+(define (body-citations)
+  (zotero-citations (tree->stree (buffer-tree))))
+
+(define (test-renamed)
+  (check-group "renamed")
+  (check= (map car (zotero-bib-chunks-of
+                    "% x\n@article{a1,\n title={A},\n}\n@book{ b2 ,\n}\n"))
+          '("a1" "b2"))
+  (with-fake
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      (with-document "r.tm" rename-doc
+        (lambda ()
+          (with f (tmp "r-refs.bib")
+            (zotero-update-bibliography)
+            (check= (map car (zotero-recorded-items))
+                    '("smith2020" "smith2020a" "zotero:EEEE5555"))
+            (check= (zotero-citation-renames) '())
+            (rename-in-zotero! "BBBB2222" "smith2020again")
+            (delete-in-zotero! "EEEE5555")
+            (check= (zotero-write-bibliography (body-citations) f) '())
+            ;; the renamed item under its old key, the deleted one kept
+            (with s (string-load f)
+              (check-true (string-contains? s "@article{smith2020a,"))
+              (check-false (string-contains? s "smith2020again"))
+              (check-true (string-contains? s "@article{zotero:EEEE5555,")))
+            (with (renamed deleted) (zotero-last-check)
+              (check= (map car renamed) '("smith2020a"))
+              (check= (zotero-entry-key (cdar renamed)) "smith2020again")
+              (check= deleted '("zotero:EEEE5555"))
+              (check= (zotero-rename-message renamed deleted)
+                      (string-append
+                       "smith2020a is now smith2020again in Zotero; "
+                       "zotero:EEEE5555 is no longer in Zotero: "
+                       "Document -> Bibliography -> Update the citations")))
+            ;; the deleted entry stays while the file is refreshed again
+            (zotero-write-bibliography (body-citations) f)
+            (check-true (string-contains? (string-load f)
+                                          "@article{zotero:EEEE5555,"))
+            (with r (zotero-check-document)
+              (check= (assoc-ref r 'renamed)
+                      '(("smith2020a" . "smith2020again")))
+              (check= (assoc-ref r 'zotero) '("smith2020"))
+              (check= (assoc-ref r 'deleted) '("zotero:EEEE5555"))
+              (check= (assoc-ref r 'missing) '())
+              (check-true (in? "smith2020a is now smith2020again in Zotero"
+                               (zotero-check-lines r))))
+            (check= (zotero-citation-renames)
+                    '(("smith2020a" . "smith2020again")))
+            ;; Update the citations
+            (edit-step zotero-update-citations)
+            (check= (body-citations)
+                    '("smith2020" "smith2020again" "zotero:EEEE5555"))
+            (check= (zotero-citation-renames) '())
+            ;; in one step, which can be undone
+            (edit-step (lambda () (undo 0)))
+            (check= (body-citations)
+                    '("smith2020" "smith2020a" "zotero:EEEE5555"))))))))
+
+(define (test-renamed-database)
+  (check-group "renamed database")
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (zotero-import-items (list (zotero-find-key "smith2020a")))
+          (rename-in-zotero! "BBBB2222" "smith2020again")
+          (zotero-sync-database)
+          (check= (db-field "smith2020a" "zotero-key") '("smith2020again"))
+          (with-document "rd.tm" rename-doc
+            (lambda ()
+              (check= (zotero-citation-renames)
+                      '(("smith2020a" . "smith2020again")))
+              (zotero-update-citations)
+              (check= (body-citations)
+                      '("smith2020" "smith2020again" "zotero:EEEE5555"))
+              ;; the entry of the database follows
+              (check= (db-ids "smith2020a") '())
+              (check= (length (db-ids "smith2020again")) 1)
+              (check= (db-field "smith2020again" "zotero-key") '())
+              (check= (db-field "smith2020again" "zotero-item") '("BBBB2222"))
+              (check= (zotero-citation-renames) '())))))))
+  (check-group "renamed source")
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (with-document "rs.tm" rename-doc
+            (lambda ()
+              ;; the source :zotero records the items with the document
+              (check= (map car (zotero-db-entries '("smith2020a"))) '("smith2020a"))
+              (check= (map car (zotero-recorded-items)) '("smith2020a"))
+              (rename-in-zotero! "BBBB2222" "smith2020again")
+              ;; and gives a renamed item under its old key
+              (with l (zotero-db-entries '("smith2020a"))
+                (check= (map car l) '("smith2020a"))
+                (check= (zotero-entry-meta (cdar l) "zotero-key")
+                        "smith2020again")
+                (check= (list-ref (cdar l) 3) "smith2020a")))))))))
+
+(define master-doc
+  (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                 "  See <cite|smith2020>.\n\n"
+                 "  <include|chap.tm>\n\n"
+                 "  <\\bibliography|bib|tm-plain|m-refs>\n"
+                 "  </bibliography>\n</body>\n"))
+
+(define chapter-doc
+  (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                 "  In the chapter <cite|smith2020a|muller2019>.\n</body>\n"))
+
+(define (test-project)
+  (check-group "project")
+  (with-fake
+    (lambda ()
+      (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+      (string-save chapter-doc (tmp "chap.tm"))
+      (with-document "m.tm" master-doc
+        (lambda ()
+          (check= (map url->system (zotero-project-files))
+                  (list (string-append zotero-dir "/m.tm")
+                        (string-append zotero-dir "/chap.tm")))
+          (check= (zotero-project-citations)
+                  '("smith2020" "smith2020a" "muller2019"))
+          ;; the managed file of the master has the citations of the chapter
+          (zotero-update-bibliography)
+          (with s (string-load (tmp "m-refs.bib"))
+            (check-true (string-contains? s "@article{smith2020a,"))
+            (check-true (string-contains? s "@article{muller2019,")))
+          ;; the citations of the chapter are renamed too
+          (rename-in-zotero! "BBBB2222" "smith2020again")
+          (check= (zotero-citation-renames)
+                  '(("smith2020a" . "smith2020again")))
+          (with r (zotero-rename-citations
+                   '(("smith2020a" . "smith2020again")))
+            (check= (car r) 1)
+            (check= (map url->system (cadr r))
+                    (list (string-append zotero-dir "/chap.tm")))
+            ;; the chapter was not open: it is saved
+            (check= (map url->system (caddr r))
+                    (list (string-append zotero-dir "/chap.tm"))))
+          (with u (tmp "chap.tm")
+            (check-false (buffer-exists? u))
+            (check= (zotero-citations (zotero-file-stree u))
+                    '("smith2020again" "muller2019")))
+          ;; an open chapter is changed, and left to be saved
+          (with u (tmp "chap.tm")
+            (buffer-load u)
+            (with r (zotero-rename-citations
+                     '(("smith2020again" . "smith2020a")))
+              (check= (car r) 1)
+              (check= (caddr r) '()))
+            (check= (zotero-citations (tree->stree (buffer-get u)))
+                    '("smith2020a" "muller2019"))
+            (check= (zotero-citations (tree->stree (tree-import u "texmacs")))
+                    '("smith2020again" "muller2019"))
+            (buffer-close u))))
+      (system-remove (tmp "chap.tm")))))
+
+(define (save-in-database! bib)
+  (in-module `(with-database (bib-database)
+                (bib-save (tm->stree (zealous-bib-import ,bib))))))
+
+(define (test-copies)
+  (check-group "copies")
+  (with-fake
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          ;; copies of Zotero items made by hand, without the marks
+          (save-in-database!
+           (string-append "@article{smith2020,\n\ttitle = {On gravity},\n"
+                          "\tyear = {2020},\n}\n"
+                          "@article{smith2020a,\n\ttitle = {On gravity, again},\n"
+                          "\tyear = {2020},\n\tvolume = {3},\n}\n"
+                          "@article{muller2019,\n\ttitle = {Other},\n"
+                          "\tyear = {2019},\n}\n"))
+          (check= (db-field "smith2020" "zotero-item") '())
+          (with-document "cp.tm" rename-doc
+            (lambda ()
+              (with r (zotero-check-document)
+                (check= (assoc-ref r 'copies) '("smith2020" "smith2020a"))
+                (check= (assoc-ref r 'zotero) '("zotero:EEEE5555"))
+                (check= (assoc-ref r 'collisions) '()))
+              (with conflicts (zotero-adopt-entries '("smith2020" "smith2020a"))
+                ;; the same fields: adopted as it is
+                (check= (db-field "smith2020" "zotero-item") '("AAAA1111"))
+                (check= (db-field "smith2020" "modus") '("imported"))
+                ;; other fields: adopted, and the user chooses
+                (check= (map (lambda (c) (list-ref (car c) 3)) conflicts)
+                        '("smith2020a"))
+                (check= (db-field "smith2020a" "modus") '("manual"))
+                (with c (car conflicts)
+                  (with rows (zotero-conflict-fields (car c) (cdr c))
+                    (check= (map car rows) '("volume"))
+                    (check= (list-ref (car rows) 4) 'texmacs))))
+              (with r (zotero-check-document)
+                (check= (assoc-ref r 'copies) '())
+                (check= (assoc-ref r 'zotero)
+                        '("smith2020" "smith2020a" "zotero:EEEE5555"))))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Inserting citations
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -895,6 +1135,10 @@
   (test-groups)
   (test-combined)
   (test-combined-database)
+  (test-renamed)
+  (test-renamed-database)
+  (test-copies)
+  (test-project)
   (test-insert)
   (test-focus)
   (eval-system (string-append "rm -rf '" zotero-dir "'"))

@@ -388,16 +388,53 @@ Steps 1–5 give option 1 its substance. Steps 6–9 are refinements that can
 follow in any order.
 
 **Status (2026-10-05).**
-- **Done:** steps 1, 2, 3, 3b, 4 and 5, with the conflict dialog, *Import
-  into database* and *Synchronize with Zotero*. The suite `zotero`
-  (`check/zotero-test.scm`, 108 checks, with a fake Zotero) covers them,
-  in both modes.
-- **Not done:** steps 6–9:
-  - the combined search with source marks;
-  - renamed keys in file mode (the item keys are already recorded in the
-    `zotero-items` attachment), and *Update the citations*;
-  - projects, group libraries, the settings dialog;
-  - the manual.
+- **Done:** all steps, 1 to 9. The suite `zotero`
+  (`check/zotero-test.scm`, 243 checks, with a fake Zotero which also has a
+  group library) covers them, in both modes. The manual page is
+  `doc/main/links/man-zotero.en.tm`, linked from the "Links" chapter.
+- Steps 6 to 9, as built:
+  - **Groups:** requests name their library (`users/0`, `groups/<id>`).
+    The preference "zotero libraries" is "user" (default) or "all"; the
+    library of the user comes first, so its keys win. Keys derived in a
+    group are `zotero:g<id>:<itemKey>`. Database entries record their
+    library in `zotero-library` (the first imports said "user", read as
+    `users/0`), and the sync works library by library, even for groups
+    which TeXmacs no longer searches. The sync version is the list of the
+    versions of the libraries involved.
+  - **Combined search:** `zotero-search-sources` gives the sources in
+    their order of precedence (L, F, D, Z); `zotero-combine` merges the
+    same work (same normalized title and year: the summaries have no DOI)
+    and flags a key used for different works. The dialog shows the
+    sources, the collisions, *Show in Zotero* and *Import into database*
+    (only for items which the database lacks).
+  - **Show in Zotero:** `zotero://select/library/items/<key>` (or
+    `groups/<id>/items/<key>`), from the dialog and from the focus menu
+    and focus bar of a citation. The menus only use what TeXmacs already
+    knows (the keys found before, the `zotero-items` attachment): they
+    never wait for Zotero.
+  - **Renamed and deleted keys:** the `zotero-items` attachment holds
+    `(key item library)`; it is written in both modes (the `:zotero`
+    source records too). A missing key whose item now has another key is
+    exported under its old key, in the managed file and by the `:zotero`
+    source; the entry of a deleted item is kept from the previous managed
+    file. *Update the citations* renames the citations of the document or
+    project, and the database entry renamed by the sync (a new version
+    with the new name). *Check against Zotero...* reports the keys found,
+    renamed, deleted, missing, the collisions, and the unmarked copies in
+    the database, which it can adopt (marked and synced; those whose
+    fields differ become manual, and go through the field-by-field dialog,
+    TeXmacs's values by default).
+  - **Projects:** the citations are those of the master and of the files
+    it includes, recursively (a walk of the `include` tags, not the aux:
+    no glue was needed); the bibliography file is the master's. The
+    renaming changes the open files (marked modified) and saves those
+    which were not open, as the message says.
+  - **Settings:** *Document -> Bibliography -> Zotero settings...*: server,
+    libraries, export format, completion, and a connection test.
+  - **Differences from §3.5 and §4:** the footer cannot carry a
+    *Details* button, so the generation reports renamed and deleted keys
+    in the footer, and *Check against Zotero...* gives the details. The
+    database preferences do not link to the Zotero settings.
 
 Implementation notes:
 - Zotero's marks (`zotero-*`) are meta attributes of the database
@@ -408,6 +445,16 @@ Implementation notes:
   versioning compare dates, with one-second resolution.
 - `update-document` calls `zotero-before-update`, a lazy definition, so that
   a managed file is refreshed even before the Zotero modules are loaded.
+- The local API returns, for `itemKey=`, the children of the items too
+  (attachments, notes); they are ignored.
+- The status request also notes the library version, so that the keys
+  found before are forgotten when the library changed;
+  `zotero-find-key` checks the status before its cache for that reason.
+- `buffer-load` returns `#t` when it *fails*; `buffer-pretend-modified`
+  only reaches buffers with a view, hence the saving of the project files
+  which were not open.
+- A tmdb database stays in memory after its file is removed: the test
+  groups use a new file each time.
 - The suite `zotero` runs after `links` (which crashes after documents were
   opened and closed) and after `database` (whose checks expect the modules
   of the bibliographic database not to be loaded yet).

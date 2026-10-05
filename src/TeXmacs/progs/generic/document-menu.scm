@@ -854,7 +854,11 @@
 	("Local entries" (open-biblio)))
       ("Update from Zotero" (zotero-update-bibliography))
       (when (supports-db?)
-        ("Synchronize with Zotero" (zotero-synchronize))))
+        ("Synchronize with Zotero" (zotero-synchronize)))
+      ("Update the citations" (zotero-update-citations))
+      ("Check against Zotero..." (open-zotero-check))
+      ---
+      ("Zotero settings..." (open-zotero-settings)))
   ---
   (-> "Magnification" (link document-magnification-menu))
   (-> "Colors" (link document-colors-menu))

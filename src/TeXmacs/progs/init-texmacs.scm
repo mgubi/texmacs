@@ -155,12 +155,15 @@
 (lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
              zotero-before-update zotero-managed-file?
              zotero-completion-suffixes zotero-citation-entry
-             zotero-show-item)
+             zotero-show-item zotero-update-citations)
 (lazy-define (bibtex zotero-db) zotero-db-entries zotero-sync-database
              zotero-import-items zotero-in-database? zotero-search-entries
-             zotero-database-sources
+             zotero-database-sources zotero-database-renames
+             zotero-rename-database-entries zotero-database-entry-info
+             zotero-adopt-entries
              zotero-conflict-fields zotero-merge-entries)
-(lazy-menu (bibtex zotero-widgets) open-zotero-search zotero-synchronize)
+(lazy-menu (bibtex zotero-widgets) open-zotero-search zotero-synchronize
+           open-zotero-check open-zotero-settings)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")
 

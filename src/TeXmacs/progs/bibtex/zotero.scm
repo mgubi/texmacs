@@ -119,7 +119,9 @@
                                (string-append user-library
                                               "/items/top?limit=1&format=keys")
                                #t)
-        (when version (set! last-version version))
+        ;; NOTE: the keys found before are forgotten when the library of
+        ;; the user changed (those of the groups, at their next request)
+        (when version (note-version! user-library version))
         (remember-state! (status->state st))
         last-state)))
 
@@ -494,9 +496,9 @@
   (:synopsis "The BibTeX file of the user in the bibliography, or #f")
   ;; the file of the bibliography of the current document, unless it is
   ;; managed by Zotero (its items are then those of Zotero)
-  (and-with u (current-buffer)
-    (and-with f (zotero-bibliography-file u (tree->stree (buffer-tree)))
-      (and (url-exists? f) (not (zotero-managed-file? f)) f))))
+  (and (current-buffer)
+       (and-with f (zotero-master-bibliography-file)
+         (and (url-exists? f) (not (zotero-managed-file? f)) f))))
 
 (tm-define (zotero-search-sources q)
   (:synopsis "The (mark summary ...) of the sources of the current document")
@@ -561,7 +563,9 @@
 (tm-define (zotero-find-key key)
   (:synopsis "The entry of the item with the citation key @key, or #f")
   ;; the first library which has it wins
-  (with cached (ahash-ref resolved key)
+  ;; NOTE: the state of Zotero is checked first, since it forgets the keys
+  ;; found before when the library changed
+  (with cached (and (zotero-ready?) (ahash-ref resolved key))
     (if cached (and (pair? cached) cached)
         (with e (if (zotero-derived-key? key)
                     (let* ((p (zotero-derived-item key))
@@ -637,17 +641,24 @@
                        (substring bib comma (string-length bib)))
         bib)))
 
+(define (export-items lib items)
+  ;; The BibTeX of the @items (at most 50) of the library @lib
+  (or (zotero-get lib (string-append
+                       "items?format=" (get-preference "zotero export format")
+                       "&itemKey=" (string-recompose items ",")))
+      ""))
+
+(tm-define (zotero-export-as e key)
+  (:synopsis "The BibTeX of the Zotero entry @e, with the citation key @key")
+  (rekey (export-items (zotero-entry-library e) (list (zotero-entry-item e)))
+         key))
+
 (tm-define (zotero-export entries)
   (:synopsis "The BibTeX of the Zotero @entries, in utf8")
   ;; At most 50 items per request, as for the web API, and one library per
   ;; request; the items cited as zotero:<item key> are exported one by one,
   ;; since Zotero gives them keys of its own
-  (let* ((format (get-preference "zotero export format"))
-         (export (lambda (lib items)
-                   (or (zotero-get lib (string-append
-                                        "items?format=" format "&itemKey="
-                                        (string-recompose items ",")))
-                       "")))
+  (let* ((export export-items)
          (derived? (lambda (e) (zotero-derived-key? (zotero-entry-key e))))
          (plain (list-filter entries (negate derived?)))
          (libs (list-remove-duplicates (map zotero-entry-library plain))))
@@ -706,6 +717,103 @@
         " ")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Keys renamed and items deleted in Zotero
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (zotero-check-missing keys)
+  (:synopsis "The renamed and deleted items of the @keys not in Zotero")
+  ;; Returns (renamed deleted): renamed are (key . entry), the entry of
+  ;; the item under its new key, deleted are the keys whose item is gone.
+  ;; Only the keys recorded with the document (zotero-recorded-items) are
+  ;; checked, by their item; the others are just missing
+  (let* ((rec (list-filter (zotero-recorded-items)
+                           (lambda (x) (in? (car x) keys))))
+         (libs (list-remove-duplicates (map caddr rec)))
+         (entries (append-map
+                   (lambda (lib)
+                     (zotero-items-entries
+                      (map cadr (list-filter rec (lambda (x)
+                                                   (== (caddr x) lib))))
+                      lib))
+                   libs))
+         (entry-of (lambda (x)
+                     (list-find entries
+                                (lambda (e)
+                                  (and (== (zotero-entry-item e) (cadr x))
+                                       (== (zotero-entry-library e)
+                                           (caddr x))))))))
+    (if (not (zotero-ready?)) (list '() '())
+        (list (list-filter
+               (map (lambda (x)
+                      (with e (entry-of x)
+                        (and e (!= (zotero-entry-key e) (car x))
+                             (cons (car x) e))))
+                    rec)
+               identity)
+              (map car (list-filter rec (negate entry-of)))))))
+
+(tm-define (zotero-rename-message renamed deleted)
+  (:synopsis "The message for the @renamed keys and the @deleted items")
+  (with l (append
+           (map (lambda (p)
+                  (string-append (car p) " is now "
+                                 (if (string? (cdr p)) (cdr p)
+                                     (zotero-entry-key (cdr p)))
+                                 " in Zotero"))
+                renamed)
+           (map (lambda (k) (string-append k " is no longer in Zotero"))
+                deleted))
+    (and (nnull? l)
+         (string-append (string-recompose l "; ")
+                        (if (null? renamed) ""
+                            ": Document -> Bibliography -> Update the citations")))))
+
+(define (rename-in! t renames)
+  ;; Rename the keys of the citations in the tree @t
+  (cond ((tree-atomic? t) 0)
+        ((tree-in? t citation-tags)
+         (apply + (map (lambda (i)
+                         (with c (tree-ref t i)
+                           (rename-key! c renames)))
+                       (.. 0 (tree-arity t)))))
+        ((tree-is? t 'cite-detail)
+         (if (> (tree-arity t) 0) (rename-key! (tree-ref t 0) renames) 0))
+        (else (apply + (map (cut rename-in! <> renames)
+                            (tree-children t))))))
+
+(define (rename-key! c renames)
+  (with x (and (tree-atomic? c) (assoc (tree->string c) renames))
+    (if (not x) 0
+        (begin (tree-set! c (cdr x)) 1))))
+
+(tm-define (zotero-rename-citations renames)
+  (:synopsis "Rename the keys of the citations of the document or project")
+  ;; @renames are (old . new); returns (count changed saved): the number of
+  ;; renamed citations, the files changed, and those among them which were
+  ;; not open, and were saved
+  ;; NOTE: the changes of the open documents can be undone
+  (if (null? renames) (list 0 '() '())
+      (let ((n 0) (changed '()) (saved '()))
+        (for (u (zotero-project-files))
+          (let* ((open? (buffer-exists? u))
+                 ;; NOTE: buffer-load returns #t when it fails
+                 (ok? (or open? (not (buffer-load u)))))
+            (when ok?
+              (with k (rename-in! (buffer-get u) renames)
+                (when (> k 0)
+                  (set! n (+ n k))
+                  (set! changed (cons u changed))
+                  (cond ((not open?)
+                         (buffer-save u)
+                         (set! saved (cons u saved)))
+                        ;; NOTE: only the changes to the current buffer pass
+                        ;; through its undo history, which marks it modified
+                        ((!= (url->system u) (url->system (current-buffer)))
+                         (buffer-pretend-modified u))))
+                (when (not open?) (buffer-close u))))))
+        (list n (reverse changed) (reverse saved)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Citations of a document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -748,6 +856,55 @@
              (if (== (url-suffix f) "bib") f (url-glue f ".bib")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Projects
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; In a project, the citations are those of the master document and of
+;; the files it includes, and the bibliography is that of the master
+
+(tm-define (zotero-master)
+  (:synopsis "The master document of the current document")
+  (if (project-attached?) (project-get) (current-buffer)))
+
+(tm-define (zotero-file-stree u)
+  (:synopsis "The document @u, as an stree")
+  ;; the buffer, when it is open, otherwise the file
+  (cond ((buffer-exists? u) (tree->stree (buffer-get u)))
+        ((url-exists? u) (tree->stree (tree-import u "texmacs")))
+        (else '(document ""))))
+
+(define (includes doc)
+  ;; the files included by the stree @doc
+  (let walk ((t doc))
+    (cond ((and (tm-func? t 'include 1) (string? (cadr t))) (list (cadr t)))
+          ((pair? t) (append-map walk (cdr t)))
+          (else '()))))
+
+(tm-define (zotero-project-files)
+  (:synopsis "The master document and the files it includes, recursively")
+  (let loop ((todo (list (zotero-master))) (done '()))
+    (cond ((null? todo) (reverse done))
+          ((in? (url->system (car todo)) (map url->system done))
+           (loop (cdr todo) done))
+          (else
+            (let* ((u (car todo))
+                   (sub (map (lambda (name)
+                               (url-relative u (unix->url name)))
+                             (includes (zotero-file-stree u)))))
+              (loop (append (cdr todo) sub) (cons u done)))))))
+
+(tm-define (zotero-project-citations)
+  (:synopsis "The citation keys of the current document or of its project")
+  (list-remove-duplicates
+   (append-map (lambda (u) (zotero-citations (zotero-file-stree u)))
+               (zotero-project-files))))
+
+(tm-define (zotero-master-bibliography-file)
+  (:synopsis "The BibTeX file of the bibliography of the master document")
+  (with m (zotero-master)
+    (zotero-bibliography-file m (zotero-file-stree m))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Managed BibTeX files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -774,15 +931,54 @@
   ;; database, it comes first
   (and (supports-db?) (zotero-in-database? key)))
 
+(tm-define (zotero-bib-chunks-of s)
+  (:synopsis "The (key . text) of the entries of the BibTeX @s")
+  (bib-chunks s))
+
+(define (bib-chunks s)
+  ;; The (key . text) of the entries of the BibTeX @s, in utf8
+  (let loop ((pos (string-search-forwards "@" 0 s)) (acc '()))
+    (if (< pos 0) (reverse acc)
+        (let* ((next (string-search-forwards "\n@" pos s))
+               (end (if (< next 0) (string-length s) (+ next 1)))
+               (text (substring s pos end))
+               (open (string-search-forwards "{" 0 text))
+               (comma (if (< open 0) -1
+                          (string-search-forwards "," open text)))
+               (key (and (>= comma 0)
+                         (tm-string-trim-both
+                          (substring text (+ open 1) comma)))))
+          (loop (if (< next 0) -1 (+ next 1))
+                (if key (cons (cons (utf8->cork key) text) acc) acc))))))
+
+;; What the last export found about the keys not in Zotero
+(define last-check (list '() '()))
+
+(tm-define (zotero-last-check)
+  (:synopsis "The (renamed deleted) of the last export to a managed file")
+  last-check)
+
 (tm-define (zotero-write-bibliography keys file)
   (:synopsis "Write the BibTeX of the Zotero items with @keys to @file")
   ;; Only the items which TeXmacs asks Zotero for go into the file: the
-  ;; @keys which no source before Zotero provides. Returns the keys which
-  ;; are not in the library of Zotero
+  ;; @keys which no source before Zotero provides. A key renamed in Zotero
+  ;; is exported under its old key, and the entry of a deleted item is
+  ;; kept, until the citations are updated. Returns the keys which are
+  ;; not in the library of Zotero
   (let* ((asked (list-filter keys (negate zotero-resolved-elsewhere?)))
          (found (zotero-resolve asked))
          (missing (list-difference asked (map car found)))
-         (bib (zotero-export (map cdr found))))
+         (check (zotero-check-missing missing))
+         (renamed (car check))
+         (deleted (cadr check))
+         (old (if (url-exists? file) (bib-chunks (string-load file)) '()))
+         (kept (list-filter old (lambda (x) (in? (car x) deleted))))
+         (bib (string-append
+               (zotero-export (map cdr found))
+               (apply string-append
+                      (map (lambda (p) (zotero-export-as (cdr p) (car p)))
+                           renamed))
+               (apply string-append (map cdr kept)))))
     (string-save (string-append
                   managed-marker " on "
                   (pretty-date (current-time) "iso8601")
@@ -790,7 +986,8 @@
                   bib)
                  file)
     (zotero-record-items (map cdr found))
-    missing))
+    (set! last-check (list renamed deleted))
+    (list-difference missing (append (map car renamed) (map car kept)))))
 
 (tm-define (zotero-recorded-items)
   (:synopsis "The (key item library) of the Zotero items of the citations")
@@ -831,9 +1028,7 @@
   ;; Returns #t when the file was refreshed; without Zotero, the existing
   ;; file is kept, with a message saying of when it is
   (let* ((quiet? (and (nnull? opt-quiet) (car opt-quiet)))
-         (u (current-buffer))
-         (doc (tree->stree (buffer-tree)))
-         (file (zotero-bibliography-file u doc)))
+         (file (zotero-master-bibliography-file)))
     (cond ((or (not file) (url-rooted-tmfs? file)) #f)
           ((and (url-exists? file) (not (zotero-managed-file? file))) #f)
           ((not (zotero-ready?))
@@ -846,13 +1041,22 @@
               "Zotero"))
            #f)
           (else
-            (with missing (zotero-write-bibliography (zotero-citations doc)
-                                                     file)
-              (when (and (nnull? missing) (not quiet?))
-                (set-message (string-append "Not found: "
-                                            (string-recompose missing ", "))
-                             "Zotero"))
+            (with missing (zotero-write-bibliography
+                           (zotero-project-citations) file)
+              ;; NOTE: the generation reports the missing keys; the keys
+              ;; renamed in Zotero are always reported
+              (and-with msg (export-message (if quiet? '() missing))
+                (set-message msg "Zotero"))
               #t)))))
+
+(define (export-message missing)
+  ;; The message after an export, for the keys @missing in Zotero
+  (with l (append (with r (apply zotero-rename-message (zotero-last-check))
+                    (if r (list r) '()))
+                  (if (null? missing) '()
+                      (list (string-append "Not found: "
+                                           (string-recompose missing ", ")))))
+    (and (nnull? l) (string-recompose l ". "))))
 
 (define (insert-managed-bibliography)
   ;; A bibliography with a managed file named after the document
@@ -865,9 +1069,8 @@
 
 (tm-define (zotero-update-bibliography)
   (:synopsis "Export the cited items from Zotero and update the bibliography")
-  (let* ((u (current-buffer))
-         (doc (tree->stree (buffer-tree)))
-         (file (zotero-bibliography-file u doc)))
+  (let* ((u (zotero-master))
+         (file (zotero-master-bibliography-file)))
     (zotero-forget-state)
     (cond ((url-rooted-tmfs? u)
            (set-message "Save the document first" "Zotero"))
@@ -882,16 +1085,96 @@
                                        "left as it is")
                         "Zotero"))
           (else
-            (let* ((keys (zotero-citations doc))
+            (let* ((keys (zotero-project-citations))
                    (missing (zotero-write-bibliography keys file)))
               (update-document "bibliography")
               (set-message
-               (if (null? missing)
+               (or (export-message missing)
                    (string-append "Exported the citations to "
-                                  (url->system (url-tail file)))
-                   (string-append "Not found: "
-                                  (string-recompose missing ", ")))
+                                  (url->system (url-tail file))))
                "Zotero"))))))
+
+(tm-define (zotero-citation-renames)
+  (:synopsis "The (old . new) citation keys of the document renamed in Zotero")
+  ;; the keys of the database renamed by the sync, and the keys recorded
+  ;; with the document whose item now has another key
+  (let* ((keys (zotero-project-citations))
+         (db (if (supports-db?) (zotero-database-renames keys) '()))
+         (rest (list-filter keys
+                            (lambda (k)
+                              (not (or (assoc k db)
+                                       (zotero-resolved-elsewhere? k)
+                                       (zotero-find-key k))))))
+         (renamed (car (zotero-check-missing rest))))
+    (append db (map (lambda (p) (cons (car p) (zotero-entry-key (cdr p))))
+                    renamed))))
+
+(tm-define (zotero-update-citations)
+  (:synopsis "Give the citations the keys which Zotero now has")
+  (:interactive #t)
+  (zotero-forget-state)
+  (if (not (zotero-ready?))
+      (set-message (zotero-status-message (zotero-status)) "Zotero")
+      (with renames (zotero-citation-renames)
+        (if (null? renames)
+            (set-message "The citation keys agree with Zotero" "Zotero")
+            (let* ((r (zotero-rename-citations renames))
+                   (n (car r))
+                   (saved (caddr r)))
+              (when (supports-db?) (zotero-rename-database-entries renames))
+              (update-document "bibliography")
+              (set-message
+               (string-append "Renamed " (number->string n)
+                              (if (== n 1) " citation: " " citations: ")
+                              (string-recompose
+                               (map (lambda (p) (string-append (car p) " -> "
+                                                               (cdr p)))
+                                    renames)
+                               ", ")
+                              (if (null? saved) ""
+                                  (string-append
+                                   "; saved "
+                                   (string-recompose
+                                    (map (lambda (u) (url->system (url-tail u)))
+                                         saved)
+                                    ", "))))
+               "Zotero"))))))
+
+(tm-define (zotero-check-document)
+  (:synopsis "How the citation keys of the document relate to Zotero")
+  ;; An association list, of lists of keys: zotero (found in Zotero),
+  ;; elsewhere (found in another source only), renamed ((old . new)),
+  ;; deleted (recorded, but the item is gone), missing (nowhere), collisions
+  ;; (another source has the key for another work), copies (unmarked
+  ;; copies of the Zotero items in the database, which may be adopted)
+  (let* ((keys (zotero-project-citations))
+         (f (zotero-own-bib-file))
+         (own (if f (zotero-bib-file-summaries f) '()))
+         (db? (supports-db?))
+         (renamed (zotero-citation-renames))
+         (r (make-ahash-table))
+         (add! (lambda (cat x)
+                 (ahash-set! r cat (cons x (or (ahash-ref r cat) '())))))
+         (neither '()))
+    (for (k keys)
+      (if (assoc k renamed) (noop)
+          (let* ((info (or (with x (assoc k own) (and x (cons x #f)))
+                           (and db? (zotero-database-entry-info k))))
+                 (z (zotero-find-key k)))
+            (cond ((and info z (cdr info)) (add! 'zotero k))
+                  ((and info z (same-work? (car info)
+                                           (zotero-entry-summary z)))
+                   (add! (if (assoc k own) 'elsewhere 'copies) k))
+                  ((and info z) (add! 'collisions k))
+                  (info (add! 'elsewhere k))
+                  (z (add! 'zotero k))
+                  (else (set! neither (cons k neither)))))))
+    (with deleted (cadr (zotero-check-missing neither))
+      (for (k (reverse neither))
+        (add! (if (in? k deleted) 'deleted 'missing) k)))
+    (cons (cons 'renamed renamed)
+          (map (lambda (cat) (cons cat (reverse (or (ahash-ref r cat) '()))))
+               '(zotero elsewhere deleted missing collisions copies)))))
 
 (tm-define (zotero-before-update what)
   (:synopsis "Refresh the managed BibTeX file before updating @what")
@@ -908,5 +1191,5 @@
 (tm-define (with-zotero-bibliography?)
   (and-with u (current-buffer)
     (and (not (url-rooted-tmfs? u))
-         (and-with f (zotero-bibliography-file u (tree->stree (buffer-tree)))
+         (and-with f (zotero-master-bibliography-file)
            (zotero-managed-file? f)))))

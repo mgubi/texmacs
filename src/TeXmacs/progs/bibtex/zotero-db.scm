@@ -103,11 +103,28 @@
               es)
          identity))))
 
+(define (rename-entry e name)
+  (list (car e) (cadr e) (caddr e) name (list-ref e 4) (list-ref e 5)))
+
 (tm-define (zotero-db-entries names)
   (:synopsis "The (name . entry) for the @names which Zotero has")
-  ;; The source :zotero of bib-retrieve-entries
+  ;; The source :zotero of bib-retrieve-entries. The items are recorded
+  ;; with the document; a key renamed in Zotero still gives its item,
+  ;; under the old name, until the citations are updated
   (if (not (zotero-ready?)) '()
-      (convert-entries (map cdr (zotero-resolve names)))))
+      (let* ((found (zotero-resolve names))
+             (missing (list-difference names (map car found)))
+             (renamed (car (zotero-check-missing missing))))
+        (zotero-record-items (map cdr found))
+        (append (convert-entries (map cdr found))
+                (append-map
+                 (lambda (p)
+                   (map (lambda (x)
+                          (cons (car p)
+                                (meta-set (rename-entry (cdr x) (car p))
+                                          "zotero-key" (car x))))
+                        (convert-entries (list (cdr p)))))
+                 renamed)))))
 
 (tm-define (zotero-import-items zs)
   (:synopsis "Import the Zotero entries @zs into the database")
@@ -301,6 +318,71 @@
                                       " changed on both sides"))))
       (and (nnull? l)
            (string-append "Zotero references: " (string-recompose l ", "))))))
+
+(tm-define (zotero-database-renames keys)
+  (:synopsis "The (old . new) of the @keys renamed in Zotero, by the sync")
+  ;; the entries of the database for @keys, which Zotero now calls otherwise
+  (with-database (bib-database)
+    (list-filter
+     (map (lambda (k)
+            (with ids (db-search (list (list "name" k)))
+              (and (pair? ids)
+                   (with e (db-load-entry (car ids))
+                     (and-with z (zotero-entry-meta e "zotero-key")
+                       (and (!= z k) (cons k z)))))))
+          keys)
+     identity)))
+
+(tm-define (zotero-rename-database-entries renames)
+  (:synopsis "Give the entries of the database the keys of Zotero")
+  ;; @renames are (old . new); the entries renamed in Zotero (zotero-key)
+  ;; get a new version with the new name
+  (with-database (bib-database)
+    (for (p renames)
+      (with ids (db-search (list (list "name" (car p))))
+        (when (pair? ids)
+          (let* ((e (db-load-entry (car ids)))
+                 (l (entry->assoc-list (rename-entry e (cdr p)) #t))
+                 (l* (list-filter l (lambda (f)
+                                      (!= (car f) "zotero-key")))))
+            (when (== (zotero-entry-meta e "zotero-key") (cdr p))
+              (db-update-entry (car ids) l*))))))))
+
+(tm-define (zotero-database-entry-info key)
+  (:synopsis "(summary . from-zotero?) of the entry @key of the database")
+  ;; #f when the database has no entry @key
+  (with-database (bib-database)
+    (with ids (db-search (list (list "name" key)))
+      (and (pair? ids)
+           (with e (db-load-entry (car ids))
+             (cons (db-entry-summary e)
+                   (and (zotero-entry-meta e "zotero-item") #t)))))))
+
+(tm-define (zotero-adopt-entries keys)
+  (:synopsis "Mark the copies of Zotero items with @keys in the database")
+  ;; They are synced from then on. The copies whose fields differ from
+  ;; those of Zotero become manual, and are returned as conflicts
+  ;; (old . new), for the user to choose field by field
+  (let* ((zs (list-filter (map zotero-find-key keys) identity))
+         (new (convert-entries zs))
+         (conflicts '()))
+    (with-database (bib-database)
+      (for (x new)
+        (with ids (db-search (list (list "name" (car x))))
+          (when (pair? ids)
+            (let* ((id (car ids))
+                   (e (db-load-entry id))
+                   (n (cdr x)))
+              (when (not (zotero-entry-meta e "zotero-item"))
+                (for (key '("zotero-item" "zotero-library" "zotero-version"
+                            "zotero-synced"))
+                  (db-set-field id key (list (zotero-entry-meta n key))))
+                (when (!= (fields->string (entry-fields e))
+                          (fields->string (entry-fields n)))
+                  (db-set-field id "modus" (list "manual"))
+                  (set! conflicts
+                        (cons (cons (db-load-entry id) n) conflicts)))))))))
+    (reverse conflicts)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Entries changed on both sides

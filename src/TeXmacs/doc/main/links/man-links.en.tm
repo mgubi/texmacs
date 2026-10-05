@@ -14,6 +14,8 @@
 
     <branch|Compiling a bibliography|man-bibliography.en.tm>
 
+    <branch|Citations from Zotero|man-zotero.en.tm>
+
     <branch|Generating an index|man-index.en.tm>
 
     <branch|Compiling a glossary|man-glossary.en.tm>
