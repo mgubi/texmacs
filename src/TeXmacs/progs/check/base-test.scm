@@ -350,7 +350,7 @@
     (check= (map url->string (url->list (list->url (list a b c))))
             '("a" "b" "c")))
   (check= (url-wrap (string->url "a")) #f)
-  (check= (check-unix (url->string (url-autosave (string->url (check-abs "tmp/a.tm"))
+  (check= (check-unix (url->string (url-autosave (string->url (check-unix-abs "tmp/a.tm"))
                                                  "~")))
           (check-abs "tmp/a.tm~"))
   (check= (url-autosave (string->url "http://www.texmacs.org/a.tm") "~") #f)

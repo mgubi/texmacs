@@ -53,6 +53,12 @@
   (:synopsis "The absolute file name @s (without its first /) of the checks")
   (string-append (check-root) s))
 
+(tm-define (check-unix-abs s)
+  (:synopsis "The absolute name @s (without its first /) in the syntax of urls")
+  ;; the syntax of string->url, that of Unix: /c/a is c:/a on Windows (as
+  ;; in MSYS), where c:/a would be the alternatives c and /a
+  (string-append (if (or (os-mingw?) (os-win32?)) "/c/" "/") s))
+
 (tm-define (check-unix s)
   (:synopsis "The name @s given back by TeXmacs, written as on Unix")
   ;; with / between the parts of a name and : between alternatives, which
