@@ -569,7 +569,20 @@
   ;; block) gives (code (document "" "x" "")): unlike alltt, the line
   ;; breaks after \begin and before \end become empty lines
   ;; an unknown environment becomes a tag of the same name
-  (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x")))
+  (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x"))
+  ;; the text of a \parbox is text, also in a formula
+  (check= (lt "\\parbox{3cm}{a $x$}")
+          '(mini-paragraph "3cm" (concat "a " (math "x"))))
+  (check= (lt "$\\parbox{3cm}{a b}$") '(math (mini-paragraph "3cm" (text "a b"))))
+  (check= (lt "\\[\\parbox{3cm}{Given $x$, \\[a=b\\] for all $s$.}\\]")
+          '(document
+             (equation*
+               (document
+                 (mini-paragraph "3cm"
+                   (document
+                     (text (document (concat "Given " (math "x") ",")
+                                     (equation* (document "a=b"))
+                                     (concat "for all " (math "s") "."))))))))))
 
 ;; definitions become assign/macro and their uses macro applications
 (define (test-import-macros)
