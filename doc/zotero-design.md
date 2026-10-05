@@ -471,6 +471,25 @@ follow in any order.
     - *Vue*: the search window was checked under Vue (SDL's dummy video
       driver, scripted events and snapshots); a Vue dialog now gives the
       keyboard to its first field, as Qt does (wip_other_guis 8ceec36b23).
+  - **zotero.org (2026-10-05, for the browser port):** the library can be
+    read from the web API (`https://api.zotero.org/`) with an API key:
+    preference "zotero source" ("auto": zotero.org in a web browser, the
+    application elsewhere; "local"; "web"). The key is kept in the wallet
+    when it is on, else in the preference "zotero api key"; the user is
+    found from it (`keys/current`) and remembered ("zotero user"). The
+    library of the user stays `users/0` in TeXmacs (documents and database
+    entries are the same in both cases) and becomes `users/<id>` in the
+    requests. Requests: `curl` with the headers in a temporary file (the
+    key is never on a command line) on the desktop; in a browser a
+    synchronous `XMLHttpRequest` through `web-javascript`, whose answer
+    (status, `Last-Modified-Version`, body in base64) is decoded in Scheme.
+    The web API searches the citation keys only with `qmode=everything`,
+    which the searches of keys ask for. Show in Zotero opens the page of
+    the item on zotero.org. Keys of Better BibTeX in the field extra
+    (`Citation Key: ...`) are read too.
+    - *The application cannot be used from a web page*: its server closes
+      every request with an `Origin` header (local API, connector,
+      Better BibTeX), and the Zotero Connector offers nothing to pages.
   - **Differences from §3.5 and §4:** the footer cannot carry a
     *Details* button, so the generation reports renamed and deleted keys
     in the footer, and *Check against Zotero...* gives the details. The

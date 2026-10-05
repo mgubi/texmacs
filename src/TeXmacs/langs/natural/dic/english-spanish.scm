@@ -1,5 +1,6 @@
 ; Copyright David Moriano García (2001), Álvaro Tejero Cantero
 ; (alvaro@antalia.com, 2001,2002,2003).
+("API key of zotero.org" "clave de API de zotero.org")
 ("a modifier" "modificador A")
 ("GNU" "GNU")
 ("add the references of Zotero to the BibTeX file" "añadir las referencias de Zotero al fichero BibTeX")
@@ -990,6 +991,7 @@
 ("quotation" "cita (varios párrafos)")
 ("quote" "cita")
 ("range" "rango")
+("read the library from" "leer la biblioteca desde")
 ("really close it" "cerrarlo de verdad")
 ("really huge" "gigante")
 ("really quit" "salir de verdad")
@@ -1220,6 +1222,7 @@
 ("th root" "ésima raiz")
 ("thai" "tailandés")
 ("the TeXmacs authors" "los autores de TeXmacs")
+("the Zotero application" "la aplicación Zotero")
 ("the application did not send its usual startup banner" "la aplicación no envió su aviso de inicio habitual")
 ("the application does not reply" "la aplicación no responde")
 ("the application is already running" "la aplicación ya se está ejecutando")

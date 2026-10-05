@@ -15,7 +15,10 @@
 ;; its user at http://localhost:23119/api/, with the same requests as the
 ;; Zotero web API (version 3), once "Allow other applications on this
 ;; computer to communicate with Zotero" is enabled in its advanced settings.
-;; Reading needs no key; TeXmacs only reads.
+;; Reading needs no key; TeXmacs only reads. The library may also be read
+;; from zotero.org (https://api.zotero.org/), with an API key of the user:
+;; in a web browser, which cannot reach the application (Zotero refuses the
+;; requests of web pages), or when the application does not run.
 ;;
 ;; The citations use the citation keys of Zotero (the "citationKey" field,
 ;; which Zotero fills since version 7, or Better BibTeX); an item without
@@ -32,7 +35,14 @@
   ("zotero libraries" "user" noop)
   ;; the references of Zotero which the BibTeX file of the user lacks are
   ;; added to it (without the database tool)
-  ("zotero add to bib file" "on" noop))
+  ("zotero add to bib file" "on" noop)
+  ;; where the library is read: "local" (the Zotero application), "web"
+  ;; (zotero.org), or "auto" (zotero.org in a web browser, else local)
+  ("zotero source" "auto" noop)
+  ;; the API key of zotero.org (unless it is in the wallet), and the user
+  ;; it belongs to, "<id> <name>", found from it
+  ("zotero api key" "" noop)
+  ("zotero user" "" noop))
 
 ;; A library is the start of the paths of its requests
 (define user-library "users/0")
@@ -58,27 +68,62 @@
                               (hex-digit (remainder n 16))))))
               (string->list s))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Where the library is read, and the key of zotero.org
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (zotero-in-browser?)
+  (:synopsis "Does TeXmacs run in a web browser?")
+  (defined? 'web-javascript))
+
+(tm-define (zotero-web?)
+  (:synopsis "Is the library read from zotero.org rather than the application?")
+  (with s (get-preference "zotero source")
+    (or (== s "web") (and (!= s "local") (zotero-in-browser?)))))
+
+;; The key is kept in the wallet when it is on (as those of the AI engines),
+;; else in a preference
+(define key-entry '("zotero" "api key"))
+
+(define (wallet-key)
+  (and (supports-wallet?) (wallet-on?)
+       (with k (wallet-get key-entry)
+         (and (string? k) (!= k "") k))))
+
+(tm-define (zotero-api-key)
+  (:synopsis "The API key of zotero.org, or #f")
+  (or (wallet-key)
+      (with p (get-preference "zotero api key")
+        (and (string? p) (!= p "") p))))
+
+(tm-define (zotero-api-key-shown)
+  (:synopsis "The API key as the settings show it")
+  (if (wallet-key) "(in the wallet)"
+      (get-preference "zotero api key")))
+
+(tm-define (zotero-set-api-key key)
+  (:synopsis "Use the API key @key of zotero.org")
+  (if (and (supports-wallet?) (wallet-on?))
+      (begin
+        (if (== key "") (wallet-delete key-entry) (wallet-set key-entry key))
+        (set-preference "zotero api key" ""))
+      (set-preference "zotero api key" key))
+  (set-preference "zotero user" "")
+  (zotero-forget-state)
+  (zotero-forget-keys))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Requests
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;; Interactive requests (completion, search as you type) wait less
 (define interactive-timeout "1.5")
 (define batch-timeout "20")
 
-(tm-define (zotero-request path interactive?)
-  (:synopsis "Ask Zotero for @path (after /api/); return (status body version)")
-  ;; The status is the HTTP status, or 0 when Zotero cannot be reached or
-  ;; does not answer in time; the body is the answer, in utf8; the version
-  ;; is the version of the library (Last-Modified-Version), or #f
-  ;; NOTE: %header needs curl 7.84; with an older one, the version is #f
-  (let* ((url (string-append (get-preference "zotero server")
-                             "/api/" path))
-         (cmd (list "curl" "--silent"
-                    "--max-time" (if interactive? interactive-timeout
-                                     batch-timeout)
-                    "--header" "Zotero-API-Version: 3"
-                    "--write-out"
-                    "\n%{http_code} %header{last-modified-version}" url))
-         (ret (evaluate-system cmd '() '() '(1 2)))
-         (out (cadr ret))
-         (pos (string-search-backwards "\n" (string-length out) out)))
+(define (parse-answer out)
+  ;; (status body version) from the output of curl: the body, a newline,
+  ;; the status and the version
+  (with pos (string-search-backwards "\n" (string-length out) out)
     (if (< pos 0)
         (list 0 "" #f)
         (with l (string-tokenize-by-char
@@ -86,6 +131,121 @@
           (list (or (and (pair? l) (string->number (car l))) 0)
                 (substring out 0 pos)
                 (and (pair? l) (pair? (cdr l)) (string->number (cadr l))))))))
+
+(define (curl-get url headers interactive?)
+  ;; The answer of a GET of @url, as (status body version)
+  ;; NOTE: %header needs curl 7.84; with an older one, the version is #f.
+  ;; The headers are given in a file: the key is never on a command line
+  (let* ((hf (url-temp))
+         (dummy (string-save (apply string-append
+                                    (map (cut string-append <> "\n") headers))
+                             hf))
+         (cmd (list "curl" "--silent"
+                    "--max-time" (if interactive? interactive-timeout
+                                     batch-timeout)
+                    "--header" (string-append "@" (url->system hf))
+                    "--write-out"
+                    "\n%{http_code} %header{last-modified-version}" url))
+         (ret (evaluate-system cmd '() '() '(1 2))))
+    (system-remove hf)
+    (parse-answer (cadr ret))))
+
+(define (js-string s)
+  ;; the string @s (ascii) as a JavaScript literal
+  (string-append "'" (string-replace (string-replace s "\\" "\\\\") "'" "\\'")
+                 "'"))
+
+(define (browser-get url headers)
+  ;; The answer of a GET of @url by the browser (a synchronous request),
+  ;; as (status body version); the body comes in base64, as its bytes
+  (let* ((set-headers
+          (apply string-append
+                 (map (lambda (h)
+                        (with pos (string-search-forwards ": " 0 h)
+                          (string-append "x.setRequestHeader("
+                                         (js-string (substring h 0 pos)) ","
+                                         (js-string (substring h (+ pos 2)
+                                                               (string-length h)))
+                                         ");")))
+                      headers)))
+         (js (string-append
+              "(function(){var x=new XMLHttpRequest();"
+              "try{x.open('GET'," (js-string url) ",false);" set-headers
+              "x.send();}catch(e){return '0 0 ';}"
+              "var v=x.getResponseHeader('Last-Modified-Version')||'0';"
+              "return x.status+' '+v+' '+"
+              "btoa(unescape(encodeURIComponent(x.responseText||'')));})()"))
+         (r ((eval 'web-javascript) js))
+         (l (string-tokenize-by-char r #\space)))
+    (if (< (length l) 2) (list 0 "" #f)
+        (list (or (string->number (car l)) 0)
+              (if (> (length l) 2) (decode-base64 (caddr l)) "")
+              (with v (string->number (cadr l))
+                (and v (> v 0) v))))))
+
+(define (http-get url headers interactive?)
+  (if (zotero-in-browser?)
+      (browser-get url headers)
+      (curl-get url headers interactive?)))
+
+;; zotero.org
+
+(define web-api "https://api.zotero.org/")
+
+(define (web-headers key)
+  (list "Zotero-API-Version: 3" (string-append "Zotero-API-Key: " key)))
+
+(define key-status 200)
+
+(define (web-user)
+  ;; (id name) of the user of the API key, asked once to zotero.org
+  (with u (get-preference "zotero user")
+    (if (!= u "") (string-tokenize-by-char u #\space)
+        (and-with key (zotero-api-key)
+          (with (st body version) (http-get (string-append web-api
+                                                           "keys/current")
+                                            (web-headers key) #f)
+            (set! key-status st)
+            (and (== st 200)
+                 (let* ((t (zotero-json body))
+                        (id (json-string (zotero-attr-ref t "userID")))
+                        (name (with n (zotero-attr-ref t "username")
+                                (if (string? n) n ""))))
+                   (and (!= id "")
+                        (begin
+                          (set-preference "zotero user"
+                                          (string-append id " " name))
+                          (list id name))))))))))
+
+(tm-define (zotero-web-user-name)
+  (:synopsis "The name of the user of the API key of zotero.org, or #f")
+  (with u (web-user)
+    (and u (pair? (cdr u)) (cadr u))))
+
+(define (web-path path)
+  ;; the library of the user is users/0 in TeXmacs, users/<id> on zotero.org
+  (if (string-starts? path "users/0/")
+      (string-append "users/" (car (web-user)) (string-drop path 7))
+      path))
+
+(tm-define (zotero-request path interactive?)
+  (:synopsis "Ask Zotero for @path (after /api/); return (status body version)")
+  ;; The status is the HTTP status, or 0 when Zotero cannot be reached or
+  ;; does not answer in time (401 when zotero.org has no key); the body is
+  ;; the answer, in utf8; the version is the version of the library
+  ;; (Last-Modified-Version), or #f
+  (cond ((not (zotero-web?))
+         (if (zotero-in-browser?)
+             ;; NOTE: the application refuses the requests of web pages
+             (list 0 "" #f)
+             (curl-get (string-append (get-preference "zotero server")
+                                      "/api/" path)
+                       (list "Zotero-API-Version: 3") interactive?)))
+        ((not (zotero-api-key)) (list 401 "" #f))
+        ((not (web-user)) (list (if (== key-status 200) 0 key-status) "" #f))
+        (else
+          (http-get (string-append web-api (web-path path))
+                    (web-headers (zotero-api-key)) interactive?))))
 
 ;; The state of Zotero is remembered for a while, so that menus and typing
 ;; do not wait for it: a failure is not retried at once (circuit breaker)
@@ -96,13 +256,15 @@
 
 (define (state-delay st)
   (cond ((== st 'ready) 5000)
-        ((== st 'disabled) 60000)
+        ((in? st '(disabled no-key forbidden)) 60000)
         (else 30000)))
 
 (define (status->state st)
   (cond ((== st 200) 'ready)
-        ((== st 403) 'disabled)
+        ((== st 401) 'no-key)
+        ((== st 403) (if (zotero-web?) 'forbidden 'disabled))
         ((== st 0) 'not-running)
+        ((in? st '(429 503)) 'busy)
         (else 'error)))
 
 (define (remember-state! st)
@@ -142,7 +304,23 @@
          (string-append "Zotero refuses the request: enable \"Allow other "
                         "applications on this computer to communicate with "
                         "Zotero\" in Settings -> Advanced"))
+        ((== st 'no-key)
+         (string-append "Give the API key of your zotero.org account in "
+                        "Document -> Bibliography -> Zotero settings"))
+        ((== st 'forbidden)
+         "zotero.org refuses the API key, or its access to this library")
+        ((== st 'busy) "zotero.org asks to wait a little")
+        ((and (== st 'not-running) (zotero-web?))
+         "zotero.org cannot be reached")
+        ((and (== st 'not-running) (zotero-in-browser?))
+         (string-append "The Zotero application cannot be reached from a "
+                        "web browser: read the library from zotero.org"))
         ((== st 'not-running) "Zotero is not running")
+        ((and (== st 'ready) (zotero-web?))
+         (with n (zotero-web-user-name)
+           (if (and n (!= n ""))
+               (string-append "zotero.org is ready (library of " n ")")
+               "zotero.org is ready")))
         ((== st 'ready) "Zotero is ready")
         (else "Zotero answered with an error")))
 
@@ -220,7 +398,7 @@
                                    (if (string? name) (utf8->cork name)
                                        id)))))
                     (json-items (zotero-get user-library
-                                            "groups?format=json")))
+                                            "groups?format=json&limit=100")))
                identity)
         (when (zotero-ready?)
           (set! groups-cache l)
@@ -270,6 +448,18 @@
               (substring s (+ pos 1) (string-length s)))
         (cons user-library s))))
 
+(define (non-empty x)
+  (and (string? x) (!= x "") x))
+
+(define (extra-citation-key extra)
+  ;; Better BibTeX before Zotero 7 kept the key in the field extra, as a
+  ;; line "Citation Key: ..."
+  (and (string? extra)
+       (with l (list-find (string-decompose extra "\n")
+                          (cut string-starts? <> "Citation Key:"))
+         (and l (non-empty (tm-string-trim-both
+                            (string-drop l (string-length "Citation Key:"))))))))
+
 (define (item-entry it lib)
   ;; (citation-key item-key title creators year version library doi), in
   ;; cork, or #f for a note, an attachment or an annotation
@@ -277,7 +467,9 @@
          (meta (zotero-attr-ref it "meta"))
          (key (string-or-empty (zotero-attr-ref it "key")))
          (type (and data (zotero-attr-ref data "itemType")))
-         (ck (and data (zotero-attr-ref data "citationKey"))))
+         (ck (and data (or (non-empty (zotero-attr-ref data "citationKey"))
+                           (extra-citation-key
+                            (zotero-attr-ref data "extra"))))))
     (and (string? type)
          (nin? type '("note" "attachment" "annotation"))
          (!= key "")
@@ -307,21 +499,28 @@
 (tm-define (zotero-entry-library e) (list-ref e 6))
 (tm-define (zotero-entry-doi e) (if (> (length e) 7) (list-ref e 7) ""))
 
-(define (search-library lib q n interactive?)
-  (items-entries lib
-                 (zotero-get lib (string-append
-                                  "items/top?format=json&limit="
-                                  (number->string n) "&q="
-                                  (zotero-url-encode (cork->utf8 q)))
-                             interactive?)))
+(define (search-library lib q n interactive? . opt-keys)
+  ;; NOTE: the application also matches the citation keys; zotero.org only
+  ;; in all the fields (qmode=everything), which a search of keys asks for
+  (with keys? (and (nnull? opt-keys) (car opt-keys) (zotero-web?))
+    (items-entries lib
+                   (zotero-get lib (string-append
+                                    "items/top?format=json&limit="
+                                    (number->string n)
+                                    (if keys? "&qmode=everything" "")
+                                    "&q=" (zotero-url-encode (cork->utf8 q)))
+                               interactive?))))
 
 (tm-define (zotero-search q . opt)
   (:synopsis "The items of the libraries matching @q (author, title, year)")
   ;; @q is in cork, as typed in TeXmacs; the options are the maximal number
-  ;; of items (50 by default) and whether the request is interactive
+  ;; of items (50 by default), whether the request is interactive and
+  ;; whether @q is (the start of) a citation key
   (let* ((n (if (null? opt) 50 (car opt)))
          (interactive? (and (pair? opt) (pair? (cdr opt)) (cadr opt)))
-         (l (append-map (cut search-library <> q n interactive?)
+         (keys? (and (pair? opt) (pair? (cdr opt)) (pair? (cddr opt))
+                     (caddr opt)))
+         (l (append-map (cut search-library <> q n interactive? keys?)
                         (zotero-libraries))))
     (if (> (length l) n) (sublist l 0 n) l)))
 
@@ -359,7 +558,7 @@
   (cond ((< (string-length prefix) 2) '())
         ((and (zotero-ready?) (cached-completions prefix)) => identity)
         (else
-          (let* ((l (zotero-search prefix completion-limit #t))
+          (let* ((l (zotero-search prefix completion-limit #t #t))
                  (keys (list-remove-duplicates
                         (list-filter (map zotero-entry-key l)
                                      (cut string-starts? <> prefix)))))
@@ -502,12 +701,24 @@
                        lib)
                    "/items/" (zotero-entry-item e))))
 
+(tm-define (zotero-web-url e)
+  (:synopsis "The page of the item of the Zotero entry @e on zotero.org")
+  (with lib (zotero-entry-library e)
+    (string-append "https://www.zotero.org/"
+                   (if (== lib user-library)
+                       (or (zotero-web-user-name) "")
+                       lib)
+                   "/items/" (zotero-entry-item e))))
+
 (tm-define (zotero-show-item e)
   (:synopsis "Show the item of the Zotero entry @e in Zotero")
   ;; NOTE: the url only has letters, digits, / and :; on Windows, as for
   ;; the links of documents (load-external), start takes a title first
-  (with url (zotero-select-url e)
-    (cond ((os-mingw64?) (eval-system url))
+  (with url (if (zotero-web?) (zotero-web-url e) (zotero-select-url e))
+    (cond ((zotero-in-browser?)
+           ((eval 'web-javascript)
+            (string-append "window.open(" (js-string url) ",'_blank');")))
+          ((os-mingw64?) (eval-system url))
           ((or (os-mingw?) (os-win32?))
            (system (string-append "start \"\" " url)))
           (else (system (string-append (default-open) " " url))))))
@@ -535,7 +746,7 @@
 
 (define (find-in-library lib key)
   ;; NOTE: the search also finds longer keys containing key
-  (list-find (search-library lib key 100 #f)
+  (list-find (search-library lib key 100 #f #t)
              (lambda (e) (== (zotero-entry-key e) key))))
 
 (tm-define (zotero-find-key key)

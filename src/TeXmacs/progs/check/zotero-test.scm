@@ -62,8 +62,14 @@
 
 (define (fake-item key) (assoc key fake-current))
 
+(define (fake-extra x)
+  ;; the field extra of an item, when the list gives one
+  (if (> (length x) 7) (list-ref x 7) ""))
+
 (define (json-item x)
-  (with (key ck title creators date version type) x
+  (let ((key (list-ref x 0)) (ck (list-ref x 1)) (title (list-ref x 2))
+        (creators (list-ref x 3)) (date (list-ref x 4))
+        (version (list-ref x 5)) (type (list-ref x 6)))
     (string-append
      "{\"key\": \"" key "\", \"version\": " (number->string version) ","
      " \"meta\": {\"creatorSummary\": \"" creators "\","
@@ -71,6 +77,8 @@
      " \"data\": {\"key\": \"" key "\", \"itemType\": \"" type "\","
      " \"title\": \"" title "\""
      (if (== ck "") "" (string-append ", \"citationKey\": \"" ck "\""))
+     (if (== (fake-extra x) "") ""
+         (string-append ", \"extra\": \"" (fake-extra x) "\""))
      "}}")))
 
 (define (json-items l)
@@ -121,11 +129,14 @@
          "AAAA1111\n")
         ((string-starts? path "items/top?format=json")
          ;; the search matches the citation keys, titles and creators
-         (with q (locase-all (or (query-ref path "q") ""))
+         (let ((q (locase-all (or (query-ref path "q") "")))
+               (all? (string-contains? path "qmode=everything")))
            (json-items
             (list-filter fake-current
                          (lambda (x)
                            (or (string-contains? (locase-all (cadr x)) q)
+                               (and all? (string-contains?
+                                          (locase-all (fake-extra x)) q))
                                (string-contains? (locase-all (caddr x)) q)
                                (string-contains? (locase-all (cadddr x))
                                                  q)))))))
@@ -884,6 +895,84 @@
 (define (body-citations)
   (zotero-citations (tree->stree (buffer-tree))))
 
+(define (with-preferences l thunk)
+  ;; Run @thunk with the preferences of the pairs @l, set back afterwards
+  (let ((old (map (lambda (p) (cons (car p) (get-preference (car p)))) l)))
+    (for (p l) (set-preference (car p) (cdr p)))
+    (with r (check-run thunk)
+      (for (p old) (set-preference (car p) (cdr p)))
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r))))))
+
+(define (zotero-private name)
+  (eval name (resolve-module '(bibtex zotero))))
+
+(define (test-web)
+  (check-group "web")
+  ;; where the library is read
+  (with-preferences '(("zotero source" . "local"))
+    (lambda () (check-false (zotero-web?))))
+  (with-preferences '(("zotero source" . "web"))
+    (lambda () (check-true (zotero-web?))))
+  (with-preferences '(("zotero source" . "auto"))
+    (lambda () (check= (zotero-web?) (zotero-in-browser?))))
+  ;; the library of the user is users/<id> on zotero.org
+  (with-preferences '(("zotero user" . "12345 alice"))
+    (lambda ()
+      (check= ((zotero-private 'web-path) "users/0/items?format=keys")
+              "users/12345/items?format=keys")
+      (check= ((zotero-private 'web-path) "groups/42/items")
+              "groups/42/items")
+      (check= (zotero-web-user-name) "alice")))
+  (check= ((zotero-private 'js-string) "a'b\\c") "'a\\'b\\\\c'")
+  ;; the citation keys of Better BibTeX in the field extra
+  (check= ((zotero-private 'extra-citation-key)
+           "arXiv: 1234\nCitation Key: smith2020x\nother")
+          "smith2020x")
+  (check-false ((zotero-private 'extra-citation-key) "nothing"))
+  (with-fake
+    (lambda ()
+      (with-preferences '(("zotero source" . "web")
+                          ("zotero user" . "12345 alice"))
+        (lambda ()
+          ;; a search of keys searches all the fields on zotero.org
+          (set! fake-requests '())
+          (zotero-find-key "smith2020a")
+          (check-true (list-find fake-requests
+                                 (cut string-contains? <> "qmode=everything")))
+          (set! fake-requests '())
+          (zotero-search "gravity")
+          (check-false (list-find fake-requests
+                                  (cut string-contains? <> "qmode")))
+          (check= (zotero-web-url (zotero-find-key "smith2020"))
+                  "https://www.zotero.org/alice/items/AAAA1111")
+          (with-libraries "all"
+            (lambda ()
+              (check= (zotero-web-url (zotero-find-key "group2021"))
+                      "https://www.zotero.org/groups/42/items/GGGG1111")))
+          (check-true (string-contains? (zotero-status-message 'ready)
+                                        "library of alice"))
+          (check-true (string-contains? (zotero-status-message 'no-key)
+                                        "API key"))
+          (check= (zotero-status-message 'not-running)
+                  "zotero.org cannot be reached")))
+      ;; the application does not search keys in all the fields
+      (set! fake-requests '())
+      (zotero-find-key "smith2020a")
+      (check-false (list-find fake-requests (cut string-contains? <> "qmode")))))
+  ;; a key of Better BibTeX in extra is the citation key of the item
+  (with-fake
+    (lambda ()
+      (set! fake-library
+            (cons '("XXXX9999" "" "Old style" "Roe" "2001" 3 "book"
+                    "Citation Key: roe2001old")
+                  fake-library))
+      (with-preferences '(("zotero source" . "web")
+                          ("zotero user" . "12345 alice"))
+        (lambda ()
+          (check= (zotero-entry-item (zotero-find-key "roe2001old"))
+                  "XXXX9999"))))))
+
 (define (test-renamed)
   (check-group "renamed")
   (check= (map car (zotero-bib-chunks-of
@@ -1289,6 +1378,7 @@
   (test-database)
   (test-groups)
   (test-summaries)
+  (test-web)
   (test-renamed)
   (test-database-search)
   (test-file-search)
