@@ -248,11 +248,11 @@
   (check= (string-distance "abc" "abc") 0)
   (check= (string-distance "abc" "abXc") 1)
   (check= (string-distance "abcdef" "abXYZef") 3)
-  ;; FIXME: a replacement which keeps the length is no difference
-  ;; (differences in Data/String/analyze.cpp:1598 tests i1 == i2 && j1 == j2
-  ;; where it means that both ranges are empty, i1 == j1 && i2 == j2):
-  ;; (string-differences "abcdef" "abXdef") gives (), expected (2 3 2 3);
-  ;; (string-distance "abcdef" "abXYef") gives 0, expected 2.
+  ;; a replacement which keeps the length
+  (check= (string-differences "abcdef" "abXdef") '(2 3 2 3))
+  (check= (string-differences "abc" "abc") '())
+  (check= (string-distance "abcdef" "abXYef") 2)
+  (check= (string-distance "a" "b") 1)
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -847,12 +847,10 @@
   (check= (logic-unify '(f a) '(f a)) '(()))
   (check= (logic-unify '(f a) '(f b)) #f)
   (check= (logic-unify '(f 'x) '(g 'x)) #f)
-  ;; FIXME: a variable which occurs twice cannot be unified: bind-unify
-  ;; calls unify, which kernel/logic/logic-bind.scm:52 does not import
-  ;; (it is defined in logic-unify.scm, which uses logic-bind):
-  ;; (logic-unify '(f 'x 'x) '(f a a)) raises "Unbound variable: unify",
-  ;; expected (((x . a))); so does (logic-query (structures-test-son% 'x 'x)),
-  ;; expected ().
+  ;; a variable which occurs twice
+  (check= (logic-unify '(f 'x 'x) '(f a a)) '(((x . a))))
+  (check= (logic-unify '(f 'x 'x) '(f a b)) #f)
+  (check= (logic-query (structures-test-son% 'x 'x)) '())
   ;; queries
   (check= (logic-query (structures-test-son% joris piet)) '(()))
   (check= (logic-query (structures-test-son% piet joris)) '())
@@ -891,13 +889,9 @@
   (check= (logic-ref structures-test-op% 'plus) +)
   (check= (logic-dispatch structures-test-op% 'plus 1 2) 3)
   (check= (logic-dispatch structures-test-op% 'plus 1 2 3) 6)
-  ;; FIXME: the form with one object, which dispatches on its car, is taken
-  ;; when one argument follows the key instead of none (kernel/logic/
-  ;; logic-data.scm:160 tests (= (length args) 1) where it means
-  ;; (null? args)): (logic-dispatch structures-test-op% '(first 2 3))
-  ;; raises "Wrong type to apply: #f", expected first, and
-  ;; (logic-dispatch structures-test-op% 'first '(5 6)) raises an error
-  ;; (car of the symbol first), expected 5.
+  ;; the form with one object dispatches on its car
+  (check= (logic-dispatch structures-test-op% '(first 2 3)) 'first)
+  (check= (logic-dispatch structures-test-op% 'first '(5 6)) 5)
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
