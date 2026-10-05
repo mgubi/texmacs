@@ -265,6 +265,7 @@ jobs:
             make perl rsync zip curl tar git
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-clang
+            mingw-w64-x86_64-ntldd
             mingw-w64-x86_64-pkgconf
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
