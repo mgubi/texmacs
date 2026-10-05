@@ -279,7 +279,7 @@ curl_command (string args, array<string> headers_attr) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, string data) {
-  string args= "--silent -X POST " * shell_quote (url) * " \\\n";
+  string args= "--silent --no-buffer -X POST " * shell_quote (url) * " \\\n";
   args << "  --data-binary " << shell_quote (data);
   string cmd= curl_command (args, headers_attr);
   if (DEBUG_IO)
@@ -295,7 +295,7 @@ to_shell_command (string url, array<string> headers_attr, tree data) {
 
 static string
 to_shell_command (string url, array<string> headers_attr, array<string> attr) {
-  string args= "--silent -X POST " * shell_quote (url);
+  string args= "--silent --no-buffer -X POST " * shell_quote (url);
   for (int i= 0; i+1 < N(attr); i += 2) {
     args << " \\\n  --data-urlencode " << shell_quote (attr[i]);
     if (!ends (attr[i], "@")) args << "=";

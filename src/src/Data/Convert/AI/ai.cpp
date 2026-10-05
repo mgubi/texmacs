@@ -334,7 +334,7 @@ to_shell_command (tree t) {
       && is_tuple (t[1])) {    
     string url; tree data; array<string> headers;
     get_post_data (url, headers, data, t);
-    string args= "--silent -X POST " * shell_quote (url) * " \\\n";
+    string args= "--silent --no-buffer -X POST " * shell_quote (url) * " \\\n";
     args << "  --data-binary " << shell_quote (tree_to_json (data));
     return curl_command (args, headers);
   }
@@ -686,9 +686,9 @@ ai_latex_command (string s, string model, string chat) {
 string
 ai_latex_request (string s, string model, string chat) {
   string agent= ai_latex_agent_description (model);
-#ifdef __EMSCRIPTEN__
+  // (the request links read the answers as they come: fetch in a web
+  // browser, QNetworkReply with Qt, the output of curl elsewhere)
   ai_stream= true;
-#endif
   tree t= ai_command (s, model, agent, chat, true);
   ai_stream= false;
   return tree_to_scheme (t);
@@ -894,7 +894,9 @@ ai_output (string s, string model, string chat) {
   if (ai_is_stream (s)) {
     string err;
     r= ai_stream_text (s * "\n", model, err);
-    if (r == "" && err != "") return "Error: " * err;
+    // (a stream which brought no text: an error, or nothing, when the
+    // question was interrupted before the engine began to answer)
+    if (r == "") return (err != "")? "Error: " * err: string ("");
   }
   else if (engine == "gemini") r= gemini_style_output (t);
   else if (engine == "claude") r= claude_style_output (t);

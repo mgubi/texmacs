@@ -214,17 +214,33 @@ qt_http_from_json (string s) {
 
 // Asynchroneous variant
 
+// The answer is read as it comes (a stream of server-sent events of an AI
+// engine, which the request link shows as it grows, request_link_rep::
+// partial), as bytes: a piece may end in the middle of a character. A
+// request which is no longer wanted (kill: its session was interrupted) is
+// aborted, and its server stops sending.
+void
+QTMHTTPHandler::onReadyRead () {
+  if (reply == NULL) return;
+  if (*kill) { reply->abort (); return; }
+  QByteArray b= reply->readAll ();
+  if (b.size () > 0) *outbuf << string (b.constData (), b.size ());
+}
+
 void
 QTMHTTPHandler::onFinished () {
   if (reply == NULL)
     *status= 0;
   else {
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() == QNetworkReply::OperationCanceledError && *kill)
+      *status= 0;
+    else if (reply->error() != QNetworkReply::NoError) {
       *errbuf << from_qstring_utf8 (reply->errorString ());
       *status= -1;
     }
     else {
-      *outbuf << from_qstring_utf8 (QString (reply->readAll ()));
+      QByteArray b= reply->readAll ();
+      if (b.size () > 0) *outbuf << string (b.constData (), b.size ());
       *status= 0;
     }
     reply->close ();
@@ -279,6 +295,8 @@ qt_async_http_post (string url, array<string> headers_attr,
   }
   QTMHTTPHandler* h=
     new QTMHTTPHandler (reply, &status, &outbuf, &errbuf, &kill);
+  QObject::connect (reply, &QNetworkReply::readyRead,
+		    h, &QTMHTTPHandler::onReadyRead);
   QObject::connect (reply, &QNetworkReply::finished,
 		    h, &QTMHTTPHandler::onFinished);
   return h == NULL;
