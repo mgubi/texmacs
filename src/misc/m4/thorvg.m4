@@ -19,6 +19,7 @@ AC_DEFUN([LC_THORVG],[
         THORVG_LDFLAGS="$with_thorvg/lib/libthorvg-1.a"
         case "${host}" in
           *darwin*) THORVG_LDFLAGS="$THORVG_LDFLAGS -framework OpenGL" ;;
+          *mingw* | *cygwin* | *msys*) THORVG_LDFLAGS="$THORVG_LDFLAGS -lopengl32" ;;
           *) THORVG_LDFLAGS="$THORVG_LDFLAGS -lGL" ;;
         esac
       else

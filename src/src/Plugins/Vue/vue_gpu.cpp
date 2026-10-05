@@ -73,13 +73,19 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
 #ifdef __EMSCRIPTEN__
 #include <GLES3/gl3.h>
 #else
+#ifdef __APPLE__
 #include <OpenGL/gl3.h>
-#include <dlfcn.h>
+#else
+// the prototypes of OpenGL 3 (Linux, Windows), for the types below
+#define GL_GLEXT_PROTOTYPES 1
+#include <SDL3/SDL_opengl.h>
+#endif
 // ThorVG's static library defines its OpenGL entry points as global
 // function pointers named as the functions themselves (glCreateProgram...):
 // a call to the function would be linked to its pointer. The functions
-// used here are loaded from the OpenGL framework into pointers of their
-// own, which their names are made to mean.
+// used here are loaded by SDL (from the OpenGL framework, libGL or
+// opengl32, once the context is current, as Windows wants) into pointers
+// of their own, which their names are made to mean.
 #define VUE_GL_FUNCTIONS(X) \
   X(glActiveTexture) \
   X(glAttachShader) \
@@ -135,11 +141,10 @@ bool is_gpu_renderer (renderer r) { (void) r; return false; }
 VUE_GL_FUNCTIONS (VUE_GL_POINTER)
 static bool
 vue_gl_load () {
-  void* lib= dlopen ("/System/Library/Frameworks/OpenGL.framework/OpenGL", RTLD_LAZY);
-  if (lib == NULL) return false;
   bool ok= true;
 #define VUE_GL_LOAD(f) \
-  vue_##f= (decltype (vue_##f)) dlsym (lib, #f); if (vue_##f == NULL) ok= false;
+  vue_##f= (decltype (vue_##f)) SDL_GL_GetProcAddress (#f); \
+  if (vue_##f == NULL) ok= false;
   VUE_GL_FUNCTIONS (VUE_GL_LOAD)
   return ok;
 }
@@ -365,9 +370,16 @@ vue_gpu_prepare () {
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 3);
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #else
+  // NOTE: 4.1 is the core profile of macOS; elsewhere 3.3 (the GLSL of the
+  // shaders, and what ThorVG needs)
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#ifdef __APPLE__
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 4);
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#else
+  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 3);
+#endif
   SDL_GL_SetAttribute (SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
 #endif
   SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
@@ -580,13 +592,6 @@ bool
 vue_gpu_attach (SDL_Window* w) {
   if (!vue_gpu_enabled () || w == NULL) return false;
   if (G.ctx == NULL) {
-#ifndef __EMSCRIPTEN__
-    if (!vue_gl_load ()) {
-      cout << "TeXmacs] GPU: no OpenGL, drawing with MuPDF" << LF;
-      G.failed= true;
-      return false;
-    }
-#endif
     G.ctx= SDL_GL_CreateContext (w);
     if (G.ctx == NULL) {
       cout << "TeXmacs] GPU: no GL context (" << SDL_GetError ()
@@ -595,6 +600,15 @@ vue_gpu_attach (SDL_Window* w) {
       return false;
     }
     SDL_GL_MakeCurrent (w, G.ctx);
+#ifndef __EMSCRIPTEN__
+    if (!vue_gl_load ()) {
+      cout << "TeXmacs] GPU: no OpenGL 3, drawing with MuPDF" << LF;
+      SDL_GL_DestroyContext (G.ctx);
+      G.ctx= NULL;
+      G.failed= true;
+      return false;
+    }
+#endif
     SDL_GL_SetSwapInterval (0); // several windows: each would wait a frame
     if (!init_gl ()) { G.failed= true; return false; }
     cout << "TeXmacs] GPU: " << (const char*) glGetString (GL_RENDERER)
