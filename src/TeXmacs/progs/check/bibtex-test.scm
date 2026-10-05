@@ -485,12 +485,15 @@
           "J. Doe. On things. In E. Ed, editor, Proc. Conf, pages 1\x1510. Paris, 2000. Pub.")
   (check= (one "plain" "@conference{cf, author={Doe, J.}, title={Talk}, booktitle={Conf}, year=2010}")
           "J. Doe. Talk. In Conf. 2010.")
-  ;; FIXME: bib-format-chapter-pages (plain.scm:174) appends ", " and the
-  ;; pages even when there are none, so that an incollection with a chapter
-  ;; and no pages gives "... In Coll, chapter 3.  Pub, 2001." with two
-  ;; spaces, where plain.bst gives "In Coll, chapter 3. Pub, 2001.".
   (check= (one "plain" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3, pages={4--5}}")
           "J. Doe. Chap. In Coll, chapter 3, pages 4\x155. Pub, 2001.")
+  ;; a chapter without pages is not followed by a comma (#173)
+  (check= (one "plain" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3}")
+          "J. Doe. Chap. In Coll, chapter 3. Pub, 2001.")
+  (check= (one "acm" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3}")
+          "J. Doe. Chap. In Coll, chapter 3. Pub, 2001.")
+  (check= (one "siam" "@incollection{ic, author={Doe, J.}, title={Chap}, booktitle={Coll}, publisher={Pub}, year=2001, chapter=3}")
+          "J. Doe. Chap. In Coll, chapter 3. Pub, 2001.")
   (check= (one "plain" "@techreport{tr, author={Doe, J.}, title={Report}, institution={Inst}, number={42}, year=2002}")
           "J. Doe. Report. Technical Report 42, Inst, 2002.")
   (check= (one "plain" "@phdthesis{phd, author={Doe, J.}, title={Thesis}, school={Uni}, year=2003}")
@@ -543,11 +546,13 @@
              "  year         = {2000}\n"
              "}\n\n"))
     (check= (bib-parse out) (bib-parse src)))
-  ;; FIXME: bibtex-name (bibtexout.scm:86) writes a name with a Jr part as
-  ;; "von Last, First, Jr", which BibTeX reads as "von Last, Jr, First":
-  ;; (bib-name "John" "von" "Neumann" "Jr") is saved as
-  ;; {von Neumann, John, Jr} and reads back with first name "Jr" and
-  ;; Jr part "John", where {von Neumann, Jr, John} is expected.
+  ;; a name with a Jr part is written "von Last, Jr, First" (#173)
+  (let* ((src "@misc{k, author = {von Neumann, Jr, John and Doe, Jr, }}")
+         (out (bib-out (bib-parse src))))
+    (check-true (contains? out "{von Neumann, Jr, John and Doe, Jr, }"))
+    (check= (bib-value out "author")
+            '(bib-names (bib-name "John" "von" "Neumann" "Jr")
+                        (bib-name "" "" "Doe" "Jr"))))
   (check= (bib-out '(document (bib-string (document (bib-assign "foo" "Foo")))
                               (bib-preamble (document (bib-latex "\\def\\x{y}")))
                               (bib-entry "misc" "k"
