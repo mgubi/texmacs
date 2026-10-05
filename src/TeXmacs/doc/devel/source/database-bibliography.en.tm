@@ -83,7 +83,10 @@
   <subsection|Triggering the generation>
 
   <menu|Document|Update|Bibliography> calls <scm|(update-document
-  "bibliography")> (<verbatim|generic/document-edit.scm>), which runs
+  "bibliography")> (<verbatim|generic/document-edit.scm>). It first calls
+  <scm|zotero-before-update>, which refreshes a <verbatim|.bib> file
+  written from Zotero and syncs the entries of the database which come
+  from Zotero (see <hlink|Citations from Zotero|zotero.en.tm>), then runs
   <scm|generate-all-aux> and retypesets the buffer (as many times as
   specified by the preference <verbatim|"document update times">). Notice
   that this regenerates all automatic content, not only bibliographies.
@@ -288,18 +291,28 @@
       <item><scm|:local>: the entries edited locally for this document
       (attachments whose name ends with <verbatim|-biblio>);
 
-      <item>the given files: a <verbatim|.tmdb> file is used as a database,
-      a <verbatim|.bib> file is first converted into a cached database (see
-      below);
+      <item>the given files of the user: a <verbatim|.tmdb> file is used as
+      a database, a <verbatim|.bib> file is first converted into a cached
+      database (see below);
 
       <item><scm|:default>: the user's bibliographic database
       <scm|(bib-database)>; if several entries have the same name, those
       contributed by the default user are preferred;
 
+      <item>the given <verbatim|.bib> files which were written from Zotero
+      (they start with the line <verbatim|% Exported from Zotero by
+      TeXmacs>);
+
+      <item><scm|:zotero>: the library of Zotero, when Zotero runs (see
+      <hlink|Citations from Zotero|zotero.en.tm>);
+
       <item><scm|:attached>: the entries that were attached to the document
       the last time its bibliography was compiled (attachments ending with
       <verbatim|-bibliography>).
     </enumerate>
+
+    This order is computed by <scm|bib-sources>, for <scm|bib-compile> and
+    <scm|bib-attach> alike.
 
     If the style is one of <scm|(bib-standard-styles)>, the entries are
     converted with <scm|db-\<gtr\>bib> and formatted by <scm|bib-generate>,
