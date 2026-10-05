@@ -535,30 +535,43 @@
     "TeX Gyre Pagella Math" "TeX Gyre Schola" "TeX Gyre Schola Math"
     "TeX Gyre Termes" "TeX Gyre Termes Math"))
 
+;; NOTE: other fonts may be installed, for instance by TeX Live, with more
+;; styles of the same families (Fira Sans Book, Fira Mono Oblique) and
+;; files of the same names: the checks require the shipped styles and files
+;; to be found, not to be the only ones.
+(define (includes? l required)
+  (and (list? l) (list-and (map (cut in? <> l) required))))
+
 (define (test-font-database)
   (check-group "font database")
   (let ((fams (font-database-families)))
     (check= (list-filter shipped-families (lambda (f) (nin? f fams))) '()))
-  (check= (font-database-styles "TeX Gyre Pagella")
-          '("Bold" "Bold Italic" "Italic" "Regular"))
-  (check= (font-database-styles "Stix")
-          '("Bold" "Bold Italic" "Italic" "Regular"))
-  (check= (font-database-styles "Fira Sans")
-          '("Bold" "Bold Italic" "Italic" "Regular"))
-  (check= (font-database-styles "Fira Mono") '("Bold" "Regular"))
-  (check= (font-database-styles "Linux Biolinum") '("Bold" "Italic" "Regular"))
-  (check= (font-database-styles "Stix Math") '("Regular"))
-  (check= (font-database-styles "TeX Gyre Pagella Math") '("Regular"))
+  (check-true (includes? (font-database-styles "TeX Gyre Pagella")
+                         '("Bold" "Bold Italic" "Italic" "Regular")))
+  (check-true (includes? (font-database-styles "Stix")
+                         '("Bold" "Bold Italic" "Italic" "Regular")))
+  (check-true (includes? (font-database-styles "Fira Sans")
+                         '("Bold" "Bold Italic" "Italic" "Regular")))
+  (check-true (includes? (font-database-styles "Fira Mono")
+                         '("Bold" "Regular")))
+  (check-true (includes? (font-database-styles "Linux Biolinum")
+                         '("Bold" "Italic" "Regular")))
+  (check-true (includes? (font-database-styles "Stix Math")
+                         '("Regular")))
+  (check-true (includes? (font-database-styles "TeX Gyre Pagella Math")
+                         '("Regular")))
   (check= (font-database-styles "No Such Font Zzz") '())
   ;; the files of a style
-  (check= (font-database-search "TeX Gyre Pagella" "Regular")
-          '("texgyrepagella-regular.otf"))
-  (check= (font-database-search "TeX Gyre Pagella Math" "Regular")
-          '("texgyrepagella-math.otf"))
-  (check= (font-database-search "Linux Libertine" "Bold Italic")
-          '("LinLibertine_RBI.otf"))
-  (check= (font-database-search "Fira Mono" "Bold") '("FiraMono-Bold.otf"))
-  (check= (font-database-search "Stix" "Bold") '("STIX-Bold.otf"))
+  (check-true (in? "texgyrepagella-regular.otf"
+                  (font-database-search "TeX Gyre Pagella" "Regular")))
+  (check-true (in? "texgyrepagella-math.otf"
+                  (font-database-search "TeX Gyre Pagella Math" "Regular")))
+  (check-true (in? "LinLibertine_RBI.otf"
+                  (font-database-search "Linux Libertine" "Bold Italic")))
+  (check-true (in? "FiraMono-Bold.otf"
+                  (font-database-search "Fira Mono" "Bold")))
+  (check-true (in? "STIX-Bold.otf"
+                  (font-database-search "Stix" "Bold")))
   (check-true (tt-exists? "texgyrepagella-regular"))
   (check-true (tt-exists? "LinLibertine_R"))
   (check-true (font-exists-in-tt? "FiraSans-Regular"))
@@ -674,7 +687,8 @@
           '("Bold Italic"))
   (check= (search-font-styles "TeX Gyre Pagella" '())
           '("Bold" "Bold Italic" "Italic" "Regular"))
-  (check= (search-font-styles "Fira Sans" '("bold")) '("Bold" "Bold Italic"))
+  (check-true (includes? (search-font-styles "Fira Sans" '("bold"))
+                         '("Bold" "Bold Italic")))
   (check-true (in? "Fira Sans" (search-font-families '("sansserif"))))
   (check-true (in? "TeX Gyre Heros" (search-font-families '("sansserif"))))
   (check-false (in? "TeX Gyre Pagella" (search-font-families '("sansserif"))))
