@@ -70,6 +70,7 @@
   (evaluate-system evaluate_system
     (array_string array_string array_int array_string array_int))
   (async-eval-system async_eval_system (bool string object))
+  (http-get http_get (string string array_string))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
   (async-http-post async_http_post (bool string array_string string object))

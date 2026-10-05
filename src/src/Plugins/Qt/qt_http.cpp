@@ -87,6 +87,38 @@ qt_http_post (string& ret, string url, array<string> headers_attr,
   return qt_http_post (ret, url, headers_attr, &data[0], N(data));
 }
 
+// a GET request (the models of an AI engine)
+int
+qt_http_get (string& ret, string url, array<string> headers_attr) {
+  ret= "";
+  QUrl qurl (utf8_to_qstring (url));
+  if (!qurl.isValid ()) {
+    io_error << "qt_http_get, invalid URL: " << url << LF;
+    return -1;
+  }
+  QNetworkRequest request (qurl);
+  for (int i= 0; i+1 < N(headers_attr); i += 2) {
+    string name= headers_attr[i];
+    string value= headers_attr[i+1];
+    request.setRawHeader (QByteArray (&name[0], N(name)),
+			  QByteArray (&value[0], N(value)));
+  }
+  QNetworkReply* reply= get_manager ()->get (request);
+  if (reply == NULL) {
+    io_error << "qt_http_get, cannot connect to " << url << LF;
+    return -2;
+  }
+  QEventLoop loop;
+  QObject::connect (reply, &QNetworkReply::finished,
+		    &loop, &QEventLoop::quit);
+  loop.exec();
+  // (an answer with an error status, such as a refused key, is read too)
+  QByteArray b= reply->readAll ();
+  ret= string (b.constData (), b.size ());
+  delete reply;
+  return 0;
+}
+
 // conversion from TeXmacs Json
 static QJsonValue
 tree_to_qjson (tree t) {

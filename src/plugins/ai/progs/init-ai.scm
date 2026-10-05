@@ -171,39 +171,12 @@
 ;; The models which an engine has, asked to it (with its key)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (ai-quote-js s)
-  (string-append "\"" (string-replace (string-replace s "\\" "\\\\")
-                                       "\"" "\\\"") "\""))
-
-(define (ai-quote-shell s)
-  (string-append "'" (string-replace s "'" "'\\''") "'"))
-
-;; a GET request, its answer as text ("" when there is none): by the browser
-;; in a web browser (a synchronous request), else by curl
+;; a GET request, its answer as text ("" when there is none): http-get
+;; (web_files.cpp), made by the browser in a web browser, by Qt, by libcurl
+;; or else by the curl program; the headers (the key) stay out of any
+;; command line but with the curl program
 (define (ai-http-get url headers)
-  (if (defined? 'web-javascript)
-      (web-javascript
-       (string-append
-        "(function () { var x = new XMLHttpRequest (); "
-        "x.open ('GET', " (ai-quote-js url) ", false); "
-        (apply string-append
-               (map (lambda (h)
-                      (string-append "x.setRequestHeader ("
-                                     (ai-quote-js (car h)) ", "
-                                     (ai-quote-js (cdr h)) "); "))
-                    headers))
-        "try { x.send (); } catch (e) { return ''; } "
-        "return x.responseText; }) ()"))
-      (eval-system
-       (string-append
-        "curl --silent "
-        (apply string-append
-               (map (lambda (h)
-                      (string-append "-H " (ai-quote-shell
-                                            (string-append (car h) ": " (cdr h)))
-                                     " "))
-                    headers))
-        (ai-quote-shell url)))))
+  (http-get url (append-map (lambda (h) (list (car h) (cdr h))) headers)))
 
 ;; a value of a JSON object (as json->tree reads it)
 (define (json-ref t key)

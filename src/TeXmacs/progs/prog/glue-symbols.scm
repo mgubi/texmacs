@@ -79,6 +79,7 @@
 "var-eval-system"
 "evaluate-system"
 "async-eval-system"
+"http-get"
 "http-post"
 "http-post-query"
 "async-http-post"
