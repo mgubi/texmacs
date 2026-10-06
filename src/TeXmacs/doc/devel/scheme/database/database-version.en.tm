@@ -51,9 +51,14 @@
     <scm|new-id> is given and no entry with this identifier exists yet, then
     it is used as the identifier of the new version; otherwise a new
     identifier is created. If <scm|l> coincides with the current fields of
-    <scm|id> (up to the meta attributes <scm|date>, <scm|contributor>,
-    <scm|modus>, <scm|origin> and <scm|newer>), then nothing is done and
-    <scm|id> is returned.
+    <scm|id> (up to the meta attributes, listed by
+    <scm|(db-meta-attributes)> in
+    <source-link|database/db-format.scm|TeXmacs/progs/database/db-format.scm>:
+    <scm|date>, <scm|contributor>, <scm|modus>, <scm|origin>, <scm|newer>,
+    and the attributes <scm|zotero-item>, <scm|zotero-library>,
+    <scm|zotero-version>, <scm|zotero-key>, <scm|zotero-synced> and
+    <scm|zotero-deleted> of the entries which come from <name|Zotero>),
+    then nothing is done and <scm|id> is returned.
   </explain>
 
   <\explain>
@@ -67,14 +72,17 @@
     manually entered versions take precedence over imported ones, and
     otherwise the most recent <scm|date> wins. Warnings about ignored
     entries are emitted through the <verbatim|database-warning> debug channel
-    when <scm|db-duplicate-warning?> is set.
+    when the variable <scm|db-duplicate-warning?> (defined in
+    <source-link|database/db-convert.scm|TeXmacs/progs/database/db-convert.scm>,
+    <scm|#t> by default) is set.
   </explain>
 
   <\explain>
     <scm|(db-same-entries? l1 l2)><explain-synopsis|compare two entries>
   <|explain>
     Check whether the lists of fields <scm|l1> and <scm|l2> coincide up to
-    the order of the fields and up to the meta attributes.
+    the order of the fields and up to the meta attributes
+    <scm|(db-meta-attributes)>.
   </explain>
 
   <tmdoc-copyright|2015|Joris van der Hoeven>

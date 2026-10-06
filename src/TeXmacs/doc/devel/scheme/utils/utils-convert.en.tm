@@ -85,7 +85,9 @@
       if <scm-arg|cond> evaluates to true. This option (possibly preceded by
       <scm|:penalty>) must come first. It allows for alternative
       implementations of the same converter depending on the availability
-      of external tools: the last valid declaration is retained.
+      of external tools: the last valid declaration is retained. Notice
+      that <scm-arg|cond> is evaluated when the <scm|converter> declaration
+      is expanded, that is, when the module is loaded.
 
       <item*|<scm|(:penalty <scm-arg|x>)>>The cost of the converter (by
       default <math|1.0>), which is used when searching for the cheapest
@@ -154,6 +156,19 @@
   <|explain>
     Determine the format corresponding to a file suffix, the name of a
     format as shown in menus, <abbr|resp.> the default suffix of a format.
+  </explain>
+
+  <\explain>
+    <scm|(lazy-format <scm-arg|module> <scm-arg|format-1> ...)><explain-synopsis|lazy
+    declaration of formats>
+  <|explain>
+    Promise that <scm-arg|module> defines formats and converters. This is
+    how the initialization files declare the formats, as in
+    <scm|(lazy-format (prog prog-format) scheme)> in
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>: the
+    module is loaded when the editor has been idle during two seconds, or
+    as soon as information about formats or converters is needed. The
+    names of the formats after <scm-arg|module> are only informative.
   </explain>
 
   <tmdoc-copyright|2005--2026|Joris van der Hoeven, the <TeXmacs> team>

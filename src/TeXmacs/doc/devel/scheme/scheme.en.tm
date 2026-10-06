@@ -26,6 +26,8 @@
     <branch|Writing <TeXmacs> bibliography
     styles|bibliography/bibliography.en.tm>
 
+    <branch|<TeXmacs> databases|database/scheme-database.en.tm>
+
     <branch|Other topics (tmfs, links, glue symbols...)|api/api.en.tm>
   </traverse>
 

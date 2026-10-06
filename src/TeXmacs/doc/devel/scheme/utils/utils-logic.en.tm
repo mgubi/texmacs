@@ -133,10 +133,10 @@
     a conversion routine to each tag, which is then retrieved using
     <scm|logic-ref>. The macro <scm|logic-dispatch> calls the function
     associated to <scm-arg|key> on the arguments <scm-arg|arg> ...; it is
-    currently not used in the <TeXmacs> sources and its behaviour when
-    exactly one argument <scm-arg|arg> is given is somewhat peculiar (the
-    function associated to <scm|(car <scm-arg|key>)> is applied to
-    <scm-arg|key> itself).
+    currently not used in the <TeXmacs> sources and its behaviour when no
+    argument <scm-arg|arg> is given is somewhat peculiar (the function
+    associated to <scm|(car <scm-arg|key>)> is applied to <scm-arg|key>
+    itself).
   </explain>
 
   <tmdoc-copyright|2005--2026|Joris van der Hoeven, the <TeXmacs> team>

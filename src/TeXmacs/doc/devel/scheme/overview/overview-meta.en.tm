@@ -128,8 +128,8 @@
   likely to increase. <TeXmacs> also supports an additional mechanism for the
   automatic deduction of new meta-properties from existing meta-properties.
   This mechanism is based on a less general, but more efficient form of
-  <em|logical programming>. However, since it is not fully stable yet, it
-  will be documented only later.
+  <em|logical programming>, which is described in the section on
+  <hlink|logical programming|../utils/utils-logic.en.tm>.
 
   <tmdoc-copyright|2005|Joris van der Hoeven>
 

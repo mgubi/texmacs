@@ -96,9 +96,10 @@
   and maximum values in that order, like this:\ 
 
   <scm|(resize '("100px" "200px" "400px") '("100px" "200px" "400px")
-  (some-widget-here))>
+  (dynamic (some-widget-here)))>
 
-  This sets <scm|some-widget-here> to have a default square size of 200x200
+  This sets the <scm|tm-widget> <scm|some-widget-here>, included with
+  <scm|dynamic>, to have a default square size of 200x200
   pixels.
 
   If you want to add the usual buttons you use <scm|bottom-buttons> like in
@@ -130,7 +131,12 @@
   Since the widget now needs an argument, we must use another function to
   display it, namely <scm|(dialogue-window <scm-arg|widget> <scm-arg|cmd>
   <scm-arg|title>)>. It passes to the widget a function which first calls
-  <scm-arg|cmd> with the same arguments and then closes the window.
+  <scm-arg|cmd> with the same arguments and then closes the window. Both
+  <scm|top-window> and <scm|dialogue-window> accept optional arguments
+  after the title: first urls of buffers which belong to the window (a new
+  window for the same buffers closes the former one), then a command
+  which is executed when the window is closed. They are defined in
+  <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>.
 
   <\session|scheme|default>
     <\input|Scheme] >

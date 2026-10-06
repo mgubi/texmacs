@@ -13,6 +13,8 @@
     <branch|Manipulating <TeXmacs> views|view-api.en.tm>
 
     <branch|Manipulating <TeXmacs> windows|window-api.en.tm>
+
+    <branch|Links between buffers, views and windows|buffer-convert.en.tm>
   </traverse>
 
   <tmdoc-copyright|2012|Joris van der Hoeven>

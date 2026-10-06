@@ -402,8 +402,10 @@
     <scm|(object-\<gtr\>tmstring <scm-arg|obj>)><explain-synopsis|serialize
     a <scheme> object>
   <|explain>
-    Serialize <scm-arg|obj> as a string; used by <scm|tmfs-load> to convert
-    the documents returned by load handlers.
+    Serialize <scm-arg|obj> as a string. <scm|tmfs-load> converts a
+    <scm|(document ...)> returned by a load handler with
+    <scm|texmacs-\<gtr\>stm>; it only uses <scm|object-\<gtr\>tmstring> for
+    the other results which are not strings.
   </explain>
 
   The module <scm|(kernel gui gui-markup)> provides macros which simplify

@@ -55,9 +55,10 @@
   <hlink|<verbatim|doc.apidoc>|tmfs://apidoc/type=module&what=doc.apidoc> and
   related modules), and automatically generated content, like the content
   resulting from the interaction with an external version control system
-  (see the handlers <verbatim|history>, <verbatim|revision> and
-  <verbatim|commit> in the module
-  <hlink|<verbatim|version.version-tmfs>|tmfs://apidoc/type=module&what=version.version-tmfs>).
+  (see the handlers <verbatim|history> and <verbatim|revision> in the module
+  <hlink|<verbatim|version.version-tmfs>|tmfs://apidoc/type=module&what=version.version-tmfs>,
+  and <verbatim|git> and <verbatim|commit> in the module
+  <hlink|<verbatim|version.version-git>|tmfs://apidoc/type=module&what=version.version-git>).
 
   <subsection|Implementing a handler>
 

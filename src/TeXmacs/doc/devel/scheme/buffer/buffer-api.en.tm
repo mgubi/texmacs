@@ -8,8 +8,9 @@
   Buffers are identified by their <abbr|URL>s. Most of the routines below
   are glued directly to <c++> functions in <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>
   (see <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>); a few convenience
-  wrappers are defined in <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm> and
-  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>. The underlying <c++> data
+  wrappers are defined in <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>,
+  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>
+  and <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>. The underlying <c++> data
   structures are described in <hlink|buffers|../../source/server-buffers.en.tm>.
 
   <paragraph|Basic buffer management>
@@ -85,7 +86,9 @@
     <scm|(buffer-new)><explain-synopsis|create a new buffer>
   <|explain>
     Create a new buffer with an empty document and return its URL. The URL is
-    a scratch URL of the form <verbatim|no_name_<em|n>.tm>, for which
+    a scratch URL of the form
+    <verbatim|$TEXMACS_HOME_PATH/texts/scratch/no_name_<em|n>.tm> (the first
+    such file which does not exist yet), for which
     <scm|buffer-has-name?> returns <scm|#f>. The buffer is not displayed in
     any window; use <scm|switch-to-buffer> or <scm|open-buffer-in-window> for
     this purpose (the glued routine <scm|(new-buffer)> creates a new buffer
@@ -106,7 +109,9 @@
     <scm|(buffer-close <scm-arg|buf>)><explain-synopsis|close a buffer>
   <|explain>
     Close the buffer <scm-arg|buf> without asking for confirmation, even if
-    it was modified. Windows which displayed the buffer switch to another
+    it was modified. This routine, defined in <source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>,
+    calls the glued <scm|cpp-buffer-close>; redefine it to act on the
+    closing of buffers. Windows which displayed the buffer switch to another
     buffer. Closing the last buffer quits <TeXmacs> (unless it is running as
     a server).
   </explain>
@@ -128,7 +133,8 @@
     displayed in a window) the current view, without changing what is
     displayed in the windows. Returns <scm|#f> if there is no view on
     <scm-arg|buf>. This routine is mainly used through the macro
-    <scm|with-buffer> below.
+    <scm|with-buffer> below. The variant <scm|(buffer-focus*
+    <scm-arg|buf>)> also moves the keyboard focus to the new view.
   </explain>
 
   <\explain>
@@ -182,7 +188,8 @@
     itself. Otherwise, the buffer will behave similarly as its master in some
     respects. For instance, if a buffer <verbatim|a/b.tm> admits
     <verbatim|x/y.tm> as its master, then a hyperlink to <verbatim|c.tm> will
-    point to <verbatim|x/c.tm> and not to <verbatim|a/c.tm>.
+    point to <verbatim|x/c.tm> and not to <verbatim|a/c.tm>. The shorthand
+    <scm|(buffer-master)> returns the master of the current buffer.
   </explain>
 
   <\explain>
@@ -203,7 +210,11 @@
     buffer was visited/saved last>
   <|explain>
     Return the time when the buffer <scm-arg|buf> was saved (an integer)
-    <abbr|resp.> visited (a floating point number) for the last time.
+    <abbr|resp.> visited (a floating point number) for the last time. For a
+    <verbatim|tmfs> buffer which wraps a file or another buffer (see
+    <scm|url-wrap>), <scm|buffer-last-save> returns the time when the
+    wrapped buffer was saved, or the time of last modification of the
+    wrapped file (this wrapper is defined in <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>).
   </explain>
 
   <\explain>
@@ -302,6 +313,115 @@
   <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> in addition take care of opening
   the buffer in a window, of autosave files, permissions, confirmation
   dialogues, <abbr|etc.>
+
+  <\explain>
+    <scm|(tree-inclusion <scm-arg|u>)>
+
+    <scm|(tree-load-style <scm-arg|name>)><explain-synopsis|cached
+    documents>
+  <|explain>
+    Return the body of the document <scm-arg|u>, as included with the
+    <markup|include> tag, <abbr|resp.> the body of the style package
+    <scm-arg|name> (searched in <verbatim|$TEXMACS_STYLE_PATH>, unless the
+    name ends with <verbatim|.ts>). Both results are cached.
+  </explain>
+
+  <paragraph|Auxiliary buffers>
+
+  Auxiliary buffers hold documents which are not files, such as the results
+  of a search or a preview. They are named
+  <verbatim|tmfs://aux/<em|name>>, and are managed by routines of
+  <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>
+  and <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>:
+
+  <\explain>
+    <scm|(aux-name <scm-arg|aux>)>
+
+    <scm|(aux-set-document <scm-arg|aux> <scm-arg|doc>)>
+
+    <scm|(aux-set-master <scm-arg|aux> <scm-arg|master>)><explain-synopsis|auxiliary
+    buffers>
+  <|explain>
+    The first routine returns the URL <verbatim|tmfs://aux/<scm-arg|aux>>
+    of the auxiliary buffer with the name <scm-arg|aux> (a string). The
+    second one sets its document to <scm-arg|doc> (the buffer is created if
+    needed), and the third one its master, which is used for resolving
+    relative links. When nothing was set, the buffer contains an empty
+    document of the <tmstyle|generic> style, and is its own master.
+  </explain>
+
+  <\explain>
+    <scm|(open-auxiliary <scm-arg|aux> <scm-arg|body> .
+    <scm-arg|opt-master>)><explain-synopsis|show an auxiliary buffer>
+  <|explain>
+    Set the document of the auxiliary buffer <scm-arg|aux> to
+    <scm-arg|body>, its master to <scm-arg|opt-master> (by default the
+    master of the current buffer) and show it in the current window.
+  </explain>
+
+  <\explain>
+    <scm|(with-aux <scm-arg|u> <scm-arg|body> ...)><explain-synopsis|work
+    on a copy of a file>
+  <|explain>
+    Load the file <scm-arg|u> into the auxiliary buffer <verbatim|* Aux *>,
+    switch to it, evaluate <scm-arg|body>, switch back to the current buffer
+    and return the value of the last expression.
+  </explain>
+
+  <paragraph|Other routines>
+
+  <\explain>
+    <scm|(buffer-copy <scm-arg|buf> <scm-arg|u>)><explain-synopsis|copy a
+    buffer>
+  <|explain>
+    Create a buffer <scm-arg|u> with a copy of the body, style, initial
+    environment and references of <scm-arg|buf>, and return <scm-arg|u>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-in-menu? <scm-arg|u>)><explain-synopsis|menu of buffers>
+  <|explain>
+    Whether the buffer <scm-arg|u> should be listed in the <menu|Go> menu:
+    buffers of files and of <verbatim|tmfs://part/>,
+    <verbatim|tmfs://help/>, <verbatim|tmfs://remote-file/> and
+    <verbatim|tmfs://apidoc/>.
+  </explain>
+
+  <\explain>
+    <scm|(buffer-attach-notifier <scm-arg|buf>)><explain-synopsis|notify
+    changes>
+  <|explain>
+    Call <scm|buffer-initialize> on the document of <scm-arg|buf>, and
+    from then on <scm|buffer-notify> on each of its modifications. These
+    routines are defined in
+    <source-link|part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>,
+    which uses them to keep shared documents and their copies in sync.
+  </explain>
+
+  <\explain>
+    <scm|(kill-current-window-and-buffer)><explain-synopsis|close the
+    current window>
+  <|explain>
+    Close the current window, and its buffer if it is not displayed in
+    another window. <TeXmacs> quits when it was the last buffer.
+  </explain>
+
+  <\explain>
+    <scm|(project-attach <scm-arg|name>)>
+
+    <scm|(project-detach)>
+
+    <scm|(project-attached?)>
+
+    <scm|(project-get)><explain-synopsis|projects>
+  <|explain>
+    Make the current buffer a part of the project whose main file is
+    <scm-arg|name> (relative to the directory of the buffer; the empty
+    string detaches it), test whether the current buffer belongs to a
+    project, <abbr|resp.> return the URL of the main file of its project.
+    A buffer which belongs to a project shares its references and
+    bibliography.
+  </explain>
 
   <tmdoc-copyright|2012|Joris van der Hoeven>
 

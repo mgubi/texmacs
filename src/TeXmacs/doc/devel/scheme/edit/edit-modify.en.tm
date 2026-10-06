@@ -141,7 +141,25 @@
     <scm|(make-return-after)><explain-synopsis|paragraph breaks>
   <|explain>
     Start a new paragraph (the default action of the return key), <abbr|resp.>
-    insert a new paragraph before or after the current one.
+    insert a new paragraph before or after the current one. The routine
+    <scm|insert-return> is defined in
+    <source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>
+    on top of the glued <scm|insert-raw-return>, so that it can be
+    overloaded in particular modes.
+  </explain>
+
+  <\explain>
+    <scm|(path-insert-with <scm-arg|p> <scm-arg|var> <scm-arg|val>)>
+
+    <scm|(path-remove-with <scm-arg|p> <scm-arg|var>)><explain-synopsis|environment
+    changes at a path>
+  <|explain>
+    Set the environment variable <scm-arg|var> to <scm-arg|val> for the
+    subtree at the path <scm-arg|p>: if this subtree, or its parent, is a
+    <markup|with> tag, the variable is added to it or changed in it;
+    otherwise the subtree is wrapped in a new <markup|with> tag. The second
+    routine removes <scm-arg|var> from such a <markup|with> tag, and
+    removes the tag when it was its only variable.
   </explain>
 
   These routines are mostly defined in

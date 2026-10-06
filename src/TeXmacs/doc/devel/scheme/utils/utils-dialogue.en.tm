@@ -129,6 +129,17 @@
       <scm-arg|ms> milliseconds (usually combined with <scm|:while> or
       <scm|:permanent>).
 
+      <item*|<scm|(:on-cpu-idle <scm-arg|ms>)>>Wait at least <scm-arg|ms>
+      milliseconds, and then until the computer has been idle during 30
+      seconds; with <scm|:permanent>, this is used for periodic maintenance,
+      such as the backups of the server.
+
+      <item*|<scm|(:refresh <scm-arg|ms>)>>Meant to evaluate
+      <scm-arg|body> after a change of the document, once the user has been
+      inactive during <scm-arg|ms> milliseconds. It is not used in the
+      sources, and its current implementation never evaluates
+      <scm-arg|body>.
+
       <item*|<scm|(:require <scm-arg|cond>)>>Postpone the evaluation until
       <scm-arg|cond> holds.
 

@@ -118,9 +118,25 @@
     Any <scheme> predicate can be used in this way (see the description of
     <scm|:<scm-arg|pred?>> in the section on <hlink|matching regular
     expressions|utils-match.en.tm>). Notice that the predicate is applied to
-    the subexpression as it is: for instance, <scm|:tree-atomic?> does not
+    the subexpression as it is: for instance, <scm|:atomic-tree?> does not
     hold for the <scheme> string <scm|"x">, so that <scm|(select '(foo "x"
-    (bar)) '(:* (:match :tree-atomic?)))> returns <scm|()>.
+    (bar)) '(:* (:match :atomic-tree?)))> returns <scm|()>. A predicate
+    which only accepts trees, such as the glue routine
+    <scm|tree-atomic?>, raises an error here, since <scm|:*> also applies it
+    to the lists.
+  </explain>
+
+  <\explain>
+    <scm|(:replace <scm-arg|expr>)><explain-synopsis|substitution>
+  <|explain>
+    Select <scm-arg|expr>, in which the variables bound by the previous
+    patterns are replaced by their values. For instance,
+
+    <\scm-code>
+      (select '(foo "x" (bar "y")) '(:* (:match (bar 'a)) (:replace (baz 'a))))
+    </scm-code>
+
+    returns <scm|((baz "y"))>.
   </explain>
 
   <\explain>
