@@ -276,7 +276,8 @@
 
 (cond ((s7-scheme?)
        (varlet *texmacs-module* 'select tm-select))
-      ((os-mingw?) ;; mingw guile does not define select
+      ((or (os-mingw?) ;; mingw guile does not define select
+           (femtolisp-scheme?))
        (with-module texmacs-user
          (define-public (select . args) (apply tm-select args))))
       (else
