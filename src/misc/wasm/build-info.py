@@ -60,6 +60,7 @@ def tm (s):
 
 def verb (s): return '<verbatim|' + tm (s) + '>' if s else '--'
 def name (s): return '<name|' + tm (s) + '>'
+def patches (ps): return '%d patch%s' % (len (ps), '' if len (ps) == 1 else 'es')
 def short (h, n=12): return h[:n] if h else ''
 
 # --- this build
@@ -85,6 +86,7 @@ sdl_sha512 = grep (sdl_port, r"^HASH = '([^']*)'")
 mupdf_version = grep (os.path.join (mupdf, 'include', 'mupdf', 'fitz', 'version.h'), r'FZ_VERSION "([^"]*)"')
 mupdf_tgz = os.path.join (os.path.dirname (mupdf.rstrip ('/')), 'mupdf-%s-source.tar.gz' % mupdf_version)
 mupdf_sha = sha256 (mupdf_tgz)
+mupdf_patches = [f for f in os.listdir (os.path.join (src, 'misc', 'wasm')) if f.startswith ('mupdf-') and f.endswith ('.patch')]
 third = os.path.join (mupdf, 'thirdparty')
 ft = os.path.join (third, 'freetype', 'include', 'freetype', 'freetype.h')
 freetype = '.'.join (grep (ft, r'define FREETYPE_%s\s+(\d+)' % k) for k in ('MAJOR', 'MINOR', 'PATCH'))
@@ -178,7 +180,7 @@ def items (xs):
   line ()
 # (a sha512 in two lines of 64 digits)
 def checksum (kind, h):
-  if not h: return 'no checksum (not found)'
+  if not h: return 'no checksum (the archive was not kept)'
   return kind + ' ' + ' '.join ('<verbatim|' + tm (h[i:i+64]) + '>' for i in range (0, len (h), 64))
 
 line ('<TeXmacs|%s>' % (version or '2.1.5'))
@@ -219,9 +221,10 @@ line ()
 src_items = [
   '<TeXmacs>: the commit ' + verb (commit) + ' of <hlink|' + tm (repo) + '|' + tm (repo) + '>.',
   name ('S7') + ' ' + tm (s7_version) + ' (' + tm (s7_date) + ') of <hlink|ccrma.stanford.edu/software/snd|https://ccrma.stanford.edu/software/snd/snd/s7.html>, ' +
-  'in the sources of <TeXmacs> (' + verb ('src/Scheme/S7') + '), with ' + tm (len (s7_patches)) + ' patches.',
+  'in the sources of <TeXmacs> (' + verb ('src/Scheme/S7') + '), with ' + patches (s7_patches) + '.',
   name ('MuPDF') + ': ' + verb ('mupdf-%s-source.tar.gz' % mupdf_version) + ' of <hlink|mupdf.com|https://mupdf.com/releases>, ' +
-  checksum ('sha256', mupdf_sha) + '; the libraries it bundles come with it.',
+  checksum ('sha256', mupdf_sha) + ', with ' + patches (mupdf_patches) + ' of <TeXmacs> (' +
+  verb ('misc/wasm/mupdf-*.patch') + '); the libraries it bundles come with it.',
   name ('SDL') + ': ' + verb ('release-%s.zip' % sdl_version) + ' of <hlink|github.com/libsdl-org/SDL|https://github.com/libsdl-org/SDL>, ' +
   'as the port of ' + name ('Emscripten') + ', ' + checksum ('sha512', sdl_sha512) + '.']
 if thorvg_version:
