@@ -288,9 +288,11 @@
 
 (tm-define (db-allow? id uid attr)
   ;;(display* "Allow " id ", " uid ", " attr "\n")
+  ;; the rights are read as the administrator, since db-get-field and
+  ;; db-search for the current user call db-allow? themselves
   (or (== uid #t)
-      (let* ((ids (db-get-field id attr))
-             (exp (db-expand-user uid attr)))
+      (let* ((ids (with-user #t (db-get-field id attr)))
+             (exp (with-user #t (db-expand-user uid attr))))
         ;;(display* "Expanded " uid " -> " exp "\n")
         ;;(display* "Test " ids " -> " (nnull? (list-intersection ids exp)) "\n")
         (or (nnull? (list-intersection ids exp))

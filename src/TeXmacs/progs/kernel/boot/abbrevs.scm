@@ -116,10 +116,15 @@
      ,@body))
 
 (define-public-macro (with-global var val . body)
-  (let ((old (gensym)) (new (gensym)))
+  ;; the variable is restored after an error too
+  (let ((old (gensym)) (new (gensym)) (args (gensym)))
     `(let ((,old ,var))
        (set! ,var ,val)
-       (let ((,new (begin ,@body)))
+       (let ((,new (catch #t
+                     (lambda () ,@body)
+                     (lambda ,args
+                       (set! ,var ,old)
+                       (apply throw ,args)))))
          (set! ,var ,old)
          ,new))))
 
