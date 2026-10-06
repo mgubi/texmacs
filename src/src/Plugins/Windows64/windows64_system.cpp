@@ -401,32 +401,157 @@ void texmacs_init_guile_hooks() {
 #endif
 }
 
+// _wspawnvp joins its arguments with spaces into the command line of the
+// process, which splits it again (CommandLineToArgvW, the C runtime): an
+// argument with a space or a quote must be quoted, else it comes in pieces
+static std::wstring
+quote_argument (const std::wstring& a) {
+  if (!a.empty () && a.find_first_of (L" \t\n\v\"") == std::wstring::npos)
+    return a;
+  std::wstring r= L"\"";
+  size_t i= 0;
+  while (true) {
+    size_t backslashes= 0;
+    while (i < a.size () && a[i] == L'\\') { i++; backslashes++; }
+    if (i == a.size ()) {
+      // before the closing quote, each backslash is doubled
+      r.append (2 * backslashes, L'\\');
+      break;
+    }
+    if (a[i] == L'"')
+      // before a quote, each backslash is doubled and the quote escaped
+      r.append (2 * backslashes + 1, L'\\');
+    else
+      r.append (backslashes, L'\\');
+    r.push_back (a[i]);
+    i++;
+  }
+  r.push_back (L'"');
+  return r;
+}
+
+static HANDLE
+std_handle (int fd) {
+  intptr_t h= _get_osfhandle (fd);
+  return (h == -1 || h == -2)? INVALID_HANDLE_VALUE: (HANDLE) h;
+}
+
+// The process gets as standard input, output and error the descriptors 0, 1
+// and 2 of TeXmacs, which spawn_system has redirected to its pipes. They are
+// given as the standard handles of the process (STARTF_USESTDHANDLES):
+// _wspawnvp passed them only in the descriptors of the C runtime, which
+// TeXmacs, a program without console, does not make standard handles, so
+// a program which reads its standard handle (gpg, the programs of MSYS2)
+// read that of TeXmacs and never saw the end of its input. The handles of
+// the pipes are inherited (a pipe may also be given by its number, as
+// gpg --passphrase-fd), and no console window is opened.
+// Returns the handle of the process (for _cwait) or -1; with _P_WAIT, the
+// exit code of the process.
+
+static bool
+is_file (const std::wstring& f) {
+  DWORD a= GetFileAttributesW (f.c_str ());
+  return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+static bool
+has_suffix (const std::wstring& f, const wchar_t* suf) {
+  size_t n= wcslen (suf);
+  return f.size () >= n && _wcsicmp (f.c_str () + f.size () - n, suf) == 0;
+}
+
+// the file of a program, looked for as _wspawnvp does (not as CreateProcessW,
+// which looks next to texmacs.exe first and only adds .exe): a name with a
+// directory as it is, else in the current directory, then in those of PATH;
+// the name as it is, then with .com, .exe, .bat, .cmd
+static std::wstring
+find_program (const std::wstring& name) {
+  static const wchar_t* sufs[]= { L"", L".com", L".exe", L".bat", L".cmd" };
+  std::vector<std::wstring> dirs;
+  if (name.find_first_of (L"\\/:") != std::wstring::npos) dirs.push_back (L"");
+  else {
+    dirs.push_back (L"");
+    const wchar_t* path= _wgetenv (L"PATH");
+    std::wstring p= path? path: L"";
+    size_t start= 0;
+    while (start <= p.size ()) {
+      size_t end= p.find (L';', start);
+      if (end == std::wstring::npos) end= p.size ();
+      std::wstring d= p.substr (start, end - start);
+      if (d.size () >= 2 && d.front () == L'"' && d.back () == L'"')
+        d= d.substr (1, d.size () - 2);
+      if (!d.empty ()) {
+        if (d.back () != L'\\' && d.back () != L'/') d += L'\\';
+        dirs.push_back (d);
+      }
+      start= end + 1;
+    }
+  }
+  // (the name as it is only if it has a suffix: else a script of the
+  // same name without suffix, as fig2ps or those of MSYS2, would be taken
+  // before the program, and could not be started)
+  size_t sep= name.find_last_of (L"\\/");
+  size_t dot= name.find_last_of (L'.');
+  bool has_suffix= dot != std::wstring::npos &&
+                   (sep == std::wstring::npos || dot > sep);
+  for (const std::wstring& d: dirs)
+    for (const wchar_t* suf: sufs) {
+      if (*suf == 0 && !has_suffix) continue;
+      std::wstring f= d + name + suf;
+      if (is_file (f)) return f;
+    }
+  return L"";
+}
+
 intptr_t texmacs_spawnvp(int mode, string name, array<string> args) {
-  // convert the arguments to a wide string
-  std::vector<wchar_t*> wide_args;
-  for (int i = 0; i < N(args); i++) {
-    std::wstring wide_arg = texmacs_utf8_to_wide(args[i]);
-    wchar_t *c_wide_arg = (wchar_t*)malloc((wide_arg.size() + 1) * sizeof(wchar_t));
-    memcpy(c_wide_arg, &wide_arg[0], wide_arg.size() * sizeof(wchar_t));
-    c_wide_arg[wide_arg.size()] = 0;
-    wide_args.push_back(c_wide_arg);
+  (void) name;  // (the program is the first argument)
+  if (N(args) == 0) return -1;
+  std::wstring prog= find_program (texmacs_utf8_to_wide (args[0]));
+  if (prog.empty ()) {
+    debug_io << "texmacs_spawnvp, program not found: " << args[0] << "\n";
+    return -1;
   }
-
-  wide_args.push_back(nullptr);
-
-  // convert the name to a wide string
-  std::wstring wide_name = texmacs_utf8_to_wide(name);
-
-  // spawn the process
-  intptr_t res = _wspawnvp(mode, wide_name.c_str(), 
-                           (wchar_t* const*)wide_args.data());
-
-  // free the memory
-  for (size_t i = 0; i < wide_args.size(); i++) {
-    free(wide_args[i]);
+  std::wstring cmd= quote_argument (prog);
+  for (int i = 1; i < N(args); i++) {
+    cmd += L' ';
+    cmd += quote_argument (texmacs_utf8_to_wide (args[i]));
   }
+  // a batch file is run by the command interpreter (CreateProcessW cannot
+  // start it): cmd /s /c "<command line>", the outer quotes being removed
+  std::wstring app;
+  if (has_suffix (prog, L".bat") || has_suffix (prog, L".cmd")) {
+    const wchar_t* comspec= _wgetenv (L"ComSpec");
+    app= comspec? comspec: L"cmd.exe";
+    cmd= quote_argument (app) + L" /s /c \"" + cmd + L"\"";
+  }
+  else app= prog;
+  std::vector<wchar_t> cmd_buffer (cmd.begin (), cmd.end ());
+  cmd_buffer.push_back (0);
 
-  return res;
+  STARTUPINFOW si;
+  PROCESS_INFORMATION pi;
+  ZeroMemory (&si, sizeof (si));
+  ZeroMemory (&pi, sizeof (pi));
+  si.cb= sizeof (si);
+  si.dwFlags= STARTF_USESTDHANDLES;
+  si.hStdInput = std_handle (0);
+  si.hStdOutput= std_handle (1);
+  si.hStdError = std_handle (2);
+  if (!CreateProcessW (app.c_str (), cmd_buffer.data (), NULL, NULL, TRUE,
+                       CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+    debug_io << "texmacs_spawnvp, cannot start " << args[0]
+             << " (error " << (int) GetLastError () << ")\n";
+    return -1;
+  }
+  CloseHandle (pi.hThread);
+  if (mode == _P_WAIT) {
+    DWORD code= 0;
+    WaitForSingleObject (pi.hProcess, INFINITE);
+    GetExitCodeProcess (pi.hProcess, &code);
+    CloseHandle (pi.hProcess);
+    return (intptr_t) code;
+  }
+  return (intptr_t) pi.hProcess;
 }
 
 bool IsWindowsDarkMode() {

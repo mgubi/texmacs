@@ -14,6 +14,36 @@
 #include "tm_timer.hpp"
 #include "spawn.hpp"
 
+// _spawnvp joins its arguments with spaces into the command line of the
+// process, which splits it again (the C runtime): an argument with a space
+// or a quote must be quoted, else it comes in pieces
+static ::string
+quote_argument (::string a) {
+  bool plain= N(a) > 0;
+  for (int i= 0; i < N(a); i++)
+    if (a[i] == ' ' || a[i] == '\t' || a[i] == '\n' || a[i] == '\v' ||
+        a[i] == '"') plain= false;
+  if (plain) return a;
+  ::string r= "\"";
+  int i= 0;
+  while (true) {
+    int backslashes= 0;
+    while (i < N(a) && a[i] == '\\') { i++; backslashes++; }
+    if (i == N(a)) {
+      // before the closing quote, each backslash is doubled
+      for (int k= 0; k < 2 * backslashes; k++) r << '\\';
+      break;
+    }
+    // before a quote, each backslash is doubled and the quote escaped
+    int n= (a[i] == '"'? 2 * backslashes + 1: backslashes);
+    for (int k= 0; k < n; k++) r << '\\';
+    r << a[i];
+    i++;
+  }
+  r << '"';
+  return r;
+}
+
 static void
 _unix_system_warn (pid_t pid, ::string which, ::string msg) {
   debug_io << "unix_system, pid " << pid << ", warning: " << msg << "\n";
@@ -58,10 +88,13 @@ mingw_system (::array< ::string> arg,
   debug_io << "unix_system, launching: " << arg_ << "\n"; 
   ::array<char*> _arg;
   for (int j= 0; j < N(arg_); j++)
-    _arg << as_charp (arg_[j]);
+    _arg << as_charp (quote_argument (arg_[j]));
   _arg << (char*) NULL;
 
-  spawn_system process (ch, _arg[0], A(_arg));
+  // (the program is looked for by its name as given, not quoted)
+  char* _name= as_charp (arg_[0]);
+  spawn_system process (ch, _name, A(_arg));
+  tm_delete_array (_name);
   for (int j= 0; j < N(arg_); j++)
     tm_delete_array (_arg[j]);
   if (!process.isRunning ()) {
