@@ -19,16 +19,32 @@ export PATH="$TOP/TeXmacs/bin:$PATH"
 export TEXMACS_HOME_PATH="${RUNNER_TEMP:-/tmp}/texmacs-home"
 mkdir -p "$TEXMACS_HOME_PATH"
 
-# On Linux, the memory of the TeXmacs which runs, every 15 seconds
+# On Linux, the memory of the TeXmacs which runs, every 15 seconds (MSYS2
+# has a /proc/meminfo too, but neither ps -C nor MemAvailable)
 monpid=""
 memory_monitor () {
-  [ -r /proc/meminfo ] || return 0
+  [ "$(uname -s)" = Linux ] && [ -r /proc/meminfo ] || return 0
   ( while kill -0 $1 2> /dev/null; do
       sleep 15
       echo "memory: TeXmacs $(ps -C texmacs.bin -o rss= 2> /dev/null | tr -d ' ' | tr '\n' ' ')kB," \
            "available $(awk '/MemAvailable/ {print $2}' /proc/meminfo) kB"
     done ) &
   monpid=$!
+}
+
+# tests.log as it grows, while the process $1 runs, then the rest: the
+# results as they come (the log is lost when the runner is stopped). Plain
+# sh, where tail --pid is GNU only (macOS printed nothing)
+follow_log () {
+  n=0
+  while kill -0 $1 2> /dev/null; do
+    m=$(wc -l < tests.log)
+    if [ $m -gt $n ]; then sed -n "$((n + 1)),${m}p" tests.log; n=$m; fi
+    sleep 2
+  done
+  sed -n "$((n + 1)),\$p" tests.log
+  # (a log which does not end a line: what follows on a line of its own)
+  [ -z "$(tail -c 1 tests.log)" ] || echo
 }
 
 if [ -f tests/scheme/check.sh ]; then
@@ -40,17 +56,15 @@ if [ -f tests/scheme/check.sh ]; then
            grep -oE "^[ ']*\(*\(\"[a-z0-9-]+\" [a-z]" |
            sed -E 's/.*"([^"]+)".*/\1/')}
   echo "suites: $(echo $SUITES | wc -w)"
-  TM_TEST_HOME="$TEXMACS_HOME_PATH" TM_TEST_TIMEOUT=600 \
+  # (300 s each: the 43 suites stay within the 60 minutes of the job)
+  TM_TEST_HOME="$TEXMACS_HOME_PATH" TM_TEST_TIMEOUT=300 \
     sh tests/scheme/check.sh $SUITES > tests.log 2>&1 &
   pid=$!
-  # the results as they come (the log is lost when the runner is stopped)
-  tail --pid=$pid -n +1 -f tests.log 2> /dev/null &
-  tailpid=$!
   memory_monitor $pid
+  follow_log $pid
   wait $pid
   status=$?
-  sleep 1
-  kill $tailpid $monpid 2> /dev/null
+  kill $monpid 2> /dev/null
   echo "check.sh exited with status $status"
   exit $status
 fi
@@ -67,14 +81,11 @@ CMD="(catch #t (lambda () (load \"$SCRIPT\"))
 # perl's alarm gives a portable timeout (GNU timeout is missing on macOS)
 perl -e 'alarm shift; exec @ARGV' 600 "$BIN" -x "$CMD" > tests.log 2>&1 &
 pid=$!
-tail --pid=$pid -n +1 -f tests.log 2> /dev/null |
-  grep --line-buffered "^Test suite of\|FAILED\|^Total:\|Throwing" &
-tailpid=$!
 memory_monitor $pid
+follow_log $pid | grep --line-buffered "^Test suite of\|FAILED\|^Total:\|Throwing"
 wait $pid
 status=$?
-sleep 1
-kill $tailpid $monpid 2> /dev/null
+kill $monpid 2> /dev/null
 echo "texmacs exited with status $status"
 
 grep -v "approximating font\|propagateSizeHints\|does not support" tests.log
