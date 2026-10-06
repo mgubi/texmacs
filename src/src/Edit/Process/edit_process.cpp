@@ -177,6 +177,7 @@ edit_process_rep::generate_bibliography (
       if (bib_t[i] == "*") star= true;
     if (!bibtex_present () && !starts (style, "tm-")) {
       if (style == "abbrv") style= "tm-abbrv";
+      else if (style == "abstract") style= "tm-abstract";
       else if (style == "acm") style= "tm-acm";
       else if (style == "alpha") style= "tm-alpha";
       else if (style == "elsart-num") style= "tm-elsart-num";
