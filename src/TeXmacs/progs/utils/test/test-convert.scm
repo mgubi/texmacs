@@ -308,7 +308,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define missing-dirs (list))
+(define new-dirs (list))
 (define missing-files (list))
+(define new-files (list))
 (define changed-files (list))
 (define changed-sizes (list))
 (define changed-properties (list))
@@ -320,7 +322,10 @@
     (when (and (not (url-exists? new-file)) (url-exists? ref-file))
       (display* "TeXmacs] Missing file " (url->system x) "\n")
       (set! missing-files (cons new-file missing-files)))
-    (when (and (url-exists? dir) (url-exists? ref))
+    (when (and (url-exists? new-file) (not (url-exists? ref-file)))
+      (display* "TeXmacs] New file " (url->system x) "\n")
+      (set! new-files (cons new-file new-files)))
+    (when (and (url-exists? new-file) (url-exists? ref-file))
       (display* "TeXmacs]   Comparing " (url->system x) "\n")
       (let* ((new-s (string-load new-file))
              (ref-s (string-load ref-file))
@@ -353,7 +358,10 @@
     (when (and (not (url-exists? new-file)) (url-exists? ref-file))
       (display* "TeXmacs] Missing file " (url->system x) "\n")
       (set! missing-files (cons new-file missing-files)))
-    (when (and (url-exists? dir) (url-exists? ref))
+    (when (and (url-exists? new-file) (not (url-exists? ref-file)))
+      (display* "TeXmacs] New file " (url->system x) "\n")
+      (set! new-files (cons new-file new-files)))
+    (when (and (url-exists? new-file) (url-exists? ref-file))
       (display* "TeXmacs]   Comparing " (url->system x) "\n")
       (let* ((new-size (string-length (string-load new-file)))
              (ref-size (string-length (string-load ref-file)))
@@ -416,10 +424,22 @@
              (u2 (url->list (url-expand (url-complete u1 "dr"))))
              (u3 (map url->string (map url-tail u2)))
              (u4 (url->list (url-expand (url-complete u1 "fr"))))
-             (u5 (map url->string (map url-tail u4))))
+             (u5 (map url->string (map url-tail u4)))
+             (v1 (url-append dir (url-wildcard "*")))
+             (v2 (url->list (url-expand (url-complete v1 "fr"))))
+             (v3 (map url->string (map url-tail v2)))
+             (v4 (list-difference v3 u5))
+             (w1 (url->list (url-expand (url-complete v1 "dr"))))
+             (w2 (map url->string (map url-tail w1)))
+             (w3 (list-difference w2 u3)))
+        (for-each (lambda (x)
+                    (display* "TeXmacs] New directory " x "\n")
+                    (set! new-dirs (cons (url-append dir x) new-dirs)))
+                  w3)
         (for-each (lambda (x) (compare-dir (url-append dir x)
                                            (url-append ref x) type)) u3)
-        (for-each (lambda (x) (compare-file x dir ref type)) u5)))))
+        (for-each (lambda (x) (compare-file x dir ref type))
+                  (append u5 v4))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Generate status report
@@ -446,15 +466,19 @@
   (let* ((u (url-append dir "status-report.tm"))
          (l1 (status-section "Missing directories"
                              dir missing-dirs))
+         (l1b (status-section "New directories without reference"
+                              dir new-dirs))
          (l2 (status-section "Missing files"
                              dir missing-files))
+         (l2b (status-section "New files without reference"
+                              dir new-files))
          (l3 (status-section "Files with important changes"
                              dir changed-files))
          (l4 (status-section "Files with changed sizes"
                              dir changed-sizes))
          (l5 (status-section "Pdf files with changed properties"
                              dir changed-properties))
-         (l (append l1 l2 l3 l4 l5)))
+         (l (append l1 l1b l2 l2b l3 l4 l5)))
     (if (null? l)
         (if (url-exists? u) (system-remove u))
         (let* ((body `(document ,@l))
@@ -503,7 +527,9 @@
          (check-dir (url-append head (string-append tail "-check"))))
     (when (url-exists? ref-dir)
       (set! missing-dirs (list))
+      (set! new-dirs (list))
       (set! missing-files (list))
+      (set! new-files (list))
       (set! changed-files (list))
       (set! changed-sizes (list))
       (set! changed-properties (list))
