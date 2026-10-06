@@ -186,6 +186,51 @@
   (display (apply format #f message (if (list? args) args '())) port)
   (newline port))
 
+;; Guile's pretty-print (ice-9 pretty-print), which s7 lacks (its own is in
+;; the library write.scm, not loaded): obj as write gives it, on one line
+;; when it fits in 79 columns, else a list or a vector with one element per
+;; line, indented under the first; then a newline. The text reads back as
+;; obj. The keyword options of Guile are accepted and ignored.
+(define (pp-written x)
+  (call-with-output-string (lambda (p) (write x p))))
+
+(define (pp-indent n port)
+  (newline port)
+  (display (make-string n #\space) port))
+
+(define (pp-object x col port)
+  (let ((s (pp-written x)))
+    (cond ((<= (+ col (string-length s)) 79) (display s port))
+          ((pair? x)
+           (display "(" port)
+           (pp-object (car x) (+ col 1) port)
+           (let loop ((l (cdr x)))
+             (cond ((null? l) (display ")" port))
+                   ((pair? l)
+                    (pp-indent (+ col 1) port)
+                    (pp-object (car l) (+ col 1) port)
+                    (loop (cdr l)))
+                   (else
+                    (pp-indent (+ col 1) port)
+                    (display ". " port)
+                    (pp-object l (+ col 3) port)
+                    (display ")" port)))))
+          ((and (vector? x) (> (vector-length x) 0))
+           (display "#(" port)
+           (pp-object (vector-ref x 0) (+ col 2) port)
+           (do ((i 1 (+ i 1))) ((= i (vector-length x)))
+             (pp-indent (+ col 2) port)
+             (pp-object (vector-ref x i) (+ col 2) port))
+           (display ")" port))
+          (else (display s port)))))
+
+(define-public (pretty-print obj . opts)
+  (let ((port (if (and (pair? opts) (output-port? (car opts)))
+                  (car opts)
+                  (current-output-port))))
+    (pp-object obj 0 port)
+    (newline port)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public (string-null? s) (equal? (length s) 0))
