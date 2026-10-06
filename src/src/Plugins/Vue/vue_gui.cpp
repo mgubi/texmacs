@@ -49,6 +49,9 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h> // emscripten_set_main_loop
 #include <emscripten/version.h> // __EMSCRIPTEN_major__ ... (the info of the page)
+#ifdef USE_THORVG
+#include <thorvg.h> // TVG_VERSION_MAJOR ... (the info of the page)
+#endif
 #endif
 // SDL3_ttf serves only the rendering through SDL's own renderer (see
 // vue_sdl_window_rep), which the browser build leaves out
@@ -2950,6 +2953,12 @@ void gui_open (int& argc, char** argv) {
                  "\",\"emscripten\":\"" * ems * "\"";
 #ifdef USE_S7
     info << ",\"scheme\":\"S7\",\"s7\":\"" S7_VERSION "\",\"s7date\":\"" S7_DATE "\"";
+#endif
+#ifdef USE_THORVG
+    // the GPU renderer (vue_gpu.cpp): whether the page draws with it is
+    // for the page to say (WebGL2, ?gpu=0)
+    info << ",\"thorvg\":\"" << as_string (TVG_VERSION_MAJOR) << "."
+         << as_string (TVG_VERSION_MINOR) << "." << as_string (TVG_VERSION_MICRO) << "\"";
 #endif
     info << "}";
     c_string ci (info);

@@ -943,6 +943,20 @@ var tmFrame = (function () {
     menu.style.left = (bar.getBoundingClientRect ().right + 4) + 'px';
   }
 
+  // how the page draws now: with the GPU (a WebGL2 canvas, a build with
+  // ThorVG) or with MuPDF on a 2D canvas, and why (the GPU may also have
+  // failed at the start, in which case the canvas is a 2D one)
+  function drawnBy () {
+    var c = document.getElementById ('canvas'), gl = null;
+    try { if (c && typeof runtimeInitialized !== 'undefined' && runtimeInitialized)
+            gl = c.getContext ('webgl2'); } catch (e) {}
+    if (gl) return 'Drawn by the GPU (WebGL2 and ThorVG).';
+    var why = !app.thorvg ? 'this build has no ThorVG'
+            : (typeof tmAddress !== 'undefined' && tmAddress.get ('gpu') === '0') ? 'the address says ?gpu=0'
+            : 'the GPU is not available in this browser (WebGL2)';
+    return 'Drawn by MuPDF on a 2D canvas: ' + why + '.';
+  }
+
   function toggleMenu (button) {
     if (menu) { closeMenu (); return; }
     hideBalloon ();
@@ -998,6 +1012,7 @@ var tmFrame = (function () {
       ['S7 Scheme', 'https://ccrma.stanford.edu/software/snd/snd/s7.html',
        app.s7 ? app.s7 + (app.s7date ? ' (' + app.s7date + ')' : '') : '',
        'the extension language'],
+      ['ThorVG', 'https://www.thorvg.org', app.thorvg, 'the drawing with the GPU (WebGL2)'],
       ['Emscripten', 'https://emscripten.org', app.emscripten, 'the compiler to WebAssembly']
     ];
     var grid = el ('div', 'tm-soft');
@@ -1010,6 +1025,7 @@ var tmFrame = (function () {
       grid.appendChild (el ('span', 'tm-ver', e[2]));
     });
     menu.appendChild (grid);
+    text (drawnBy ());
     text ('Built ' + (app.built || '') + '.');
     sep ();
     var files = text ('Files of TeXmacs: …');

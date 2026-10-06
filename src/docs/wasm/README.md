@@ -224,17 +224,30 @@ Locally:
 ## Drawing with the GPU (the default; `texmacs.html?gpu=0` for MuPDF)
 
 A build with ThorVG draws the windows with WebGL2 instead of MuPDF (see
-*The GPU renderer* in [../vue-graphics-stack.md](../vue-graphics-stack.md)):
+*The GPU renderer* in [../vue-graphics-stack.md](../vue-graphics-stack.md)).
+It is the default: the Makefile builds ThorVG in the build directory when
+it is not there yet (`misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm`,
+which fetches ThorVG with git and meson in a venv of python3; the CI
+builds it the same way, with a cache):
 
 ```sh
-sh misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm  # found by the Makefile
-make -C build-wasm -f ../misc/wasm/Makefile ... web    # or THORVG=<dir>/wasm
+make -C build-wasm -f ../misc/wasm/Makefile ... web               # with ThorVG
+make -C build-wasm -f ../misc/wasm/Makefile ... THORVG=<dir>/wasm web  # another one
+make -C build-wasm -f ../misc/wasm/Makefile ... THORVG=none web   # MuPDF only
 ```
 
-(the CI does the same, with a cache). The page draws with the GPU (it sets
-`TEXMACS_VUE_GPU`) unless its address has `?gpu=0` or the browser has no
-WebGL2, where it draws with MuPDF as before; a build without ThorVG draws
-with MuPDF whatever the address says. Measured in
+The flags of the compilation are kept in `obj/.flags`, and the objects are
+compiled again when they change: switching ThorVG on or off compiles
+everything again (an object compiled without it was linked with it, and
+the GPU renderer was missing without a word). The page draws with the GPU
+(it sets `TEXMACS_VUE_GPU`) unless its address has `?gpu=0` or the browser
+has no WebGL2, where it draws with MuPDF as before; a build without ThorVG
+draws with MuPDF whatever the address says. The TeXmacs Vue menu tells
+which: ThorVG with its version among the libraries (when the build has
+it), and a line "Drawn by the GPU (WebGL2 and ThorVG)" or "Drawn by MuPDF
+on a 2D canvas", with the reason (no ThorVG in the build, `?gpu=0`, no
+WebGL2 in the browser, which is also the case of a GPU which failed at
+the start). Measured in
 headless Firefox on an Apple M1 (Retina, the document of 200 paragraphs of
 `TeXmacs.later`-driven forced repaints, `?profile=20`): a full repaint of
 the editor takes 2.2 ms of CPU (3.5 ms with `?gpusync=1`, which makes the

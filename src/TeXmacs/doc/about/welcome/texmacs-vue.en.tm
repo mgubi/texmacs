@@ -203,6 +203,10 @@
   <paragraph|6 October 2026>
 
   <\itemize>
+    <item>The menu <with|font-series|bold|TeXmacs <name|Vue>> says how the
+    page draws: with the GPU (<name|WebGL2> and <name|ThorVG>, whose version
+    is given with the other libraries) or with <name|MuPDF>, and why.
+
     <item>The tabs of the windows are in a column at the left of the page,
     which leaves the whole height to the document; the column folds to
     small tabs with the initials of the windows, which grow into whole

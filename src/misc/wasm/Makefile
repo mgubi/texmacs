@@ -65,13 +65,19 @@ CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
 
 # the GPU renderer of the Vue port (src/Plugins/Vue/vue_gpu.cpp), which the
-# page uses unless ?gpu=0: THORVG=<prefix> where misc/thorvg/build-thorvg.sh
-# <dir> wasm installed ThorVG (<dir>/wasm); by default the one built in the
-# build directory (sh misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm),
-# and none (MuPDF only) when there is none
-THORVG   ?= $(wildcard $(CURDIR)/thorvg/wasm)
+# page uses unless ?gpu=0 or the browser has no WebGL2: ThorVG, by default
+# the one of the build directory (build-wasm/thorvg/wasm), which is built
+# when it is not there (misc/thorvg/build-thorvg.sh, which fetches ThorVG:
+# git, and python3 for meson); THORVG=<dir> one installed elsewhere by
+# build-thorvg.sh (<prefix>/wasm); THORVG=none a build with MuPDF only
+THORVG   ?= $(CURDIR)/thorvg/wasm
+ifeq ($(THORVG),none)
+override THORVG :=
+endif
+THORVG_LIB :=
 ifneq ($(THORVG),)
 CPPFLAGS += -DUSE_THORVG -I$(THORVG)/include/thorvg-1
+THORVG_LIB := $(THORVG)/lib/libthorvg-1.a
 endif
 
 # the headers each object includes (obj/....d): a change of a header, of
@@ -89,7 +95,7 @@ LIBS     += $(THORVG)/lib/libthorvg-1.a
 LDFLAGS  += -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2
 endif
 # a new MuPDF (build-mupdf.sh, its patches) links the program again
-LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a
+LIBDEPS  := $(MUPDF_LIB)/libmupdf.a $(MUPDF_LIB)/libmupdf-third.a $(THORVG_LIB)
 
 all: $(OUT)/texmacs.js
 
@@ -258,6 +264,28 @@ $(OBJ)/%.o: $(S)/%.c
 	emcc $(CPPFLAGS) $(DEPFLAGS) $(CFLAGS) -c $< -o $@
 
 -include $(OBJECTS:.o=.d)
+
+# ThorVG, built in the build directory when it is the default one and is
+# not there yet; the objects need its header. Without the jobs of make in
+# its environment: ninja joins them, which stopped a make -j ("read jobs
+# pipe: Resource temporarily unavailable")
+ifneq ($(THORVG_LIB),)
+$(THORVG_LIB):
+	@if [ "$(THORVG)" = "$(CURDIR)/thorvg/wasm" ]; then \
+	  env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL \
+	    sh $(TM)/misc/thorvg/build-thorvg.sh $(CURDIR)/thorvg wasm; \
+	else echo "no ThorVG in $(THORVG) (THORVG=none for a build without it)"; exit 1; fi
+$(OBJECTS): | $(THORVG_LIB)
+endif
+
+# the flags of the compilation, kept in obj/.flags: an object is compiled
+# again when they change (ThorVG on or off, say), which make does not see
+# by itself (an object of a build without ThorVG was linked with ThorVG)
+FLAGS_FILE := $(OBJ)/.flags
+$(FLAGS_FILE): FORCE
+	@mkdir -p $(OBJ); echo '$(CPPFLAGS) $(CXXFLAGS) $(CFLAGS) $(EH)' > $@.new; \
+	  if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
+$(OBJECTS): $(FLAGS_FILE)
 
 clean:
 	rm -rf $(OBJ) $(OUT)
