@@ -40,14 +40,27 @@ if [ -f tests/scheme/check.sh ]; then
   TM_TEST_HOME="$TEXMACS_HOME_PATH" TM_TEST_TIMEOUT=600 \
     sh tests/scheme/check.sh $SUITES > tests.log 2>&1 &
   pid=$!
-  # the results as they come (the log is lost when the runner is stopped)
-  tail --pid=$pid -n +1 -f tests.log 2> /dev/null &
-  tailpid=$!
+  # the results as they come (the log is lost when the runner is stopped),
+  # with GNU tail; the tail of macOS has no --pid, and then they are shown
+  # at the end
+  live=no
+  if tail --pid=$$ -n 0 /dev/null > /dev/null 2>&1; then
+    tail --pid=$pid -n +1 -f tests.log 2> /dev/null &
+    tailpid=$!
+    live=yes
+  fi
   memory_monitor $pid
   wait $pid
   status=$?
   sleep 1
   kill $tailpid $monpid 2> /dev/null
+  [ $live = yes ] || cat tests.log
+  # the end of the log of each suite which failed
+  for log in $(sed -n 's/.*FAILED.*(see \(.*\.log\)).*/\1/p' tests.log); do
+    echo "::group::$log"
+    tail -60 "$log"
+    echo "::endgroup::"
+  done
   echo "check.sh exited with status $status"
   exit $status
 fi

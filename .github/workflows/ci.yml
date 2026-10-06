@@ -143,6 +143,7 @@ jobs:
             mingw-w64-x86_64-sqlite3
             mingw-w64-x86_64-gmp
             mingw-w64-x86_64-libtool
+            texinfo
 
       - name: Configure
         run: |
