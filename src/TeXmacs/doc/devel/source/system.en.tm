@@ -29,9 +29,9 @@
     <item>the utilities for running external programs, fetching web files,
     sending <abbr|HTTP> requests, printing messages and measuring time;
 
-    <item>the platform layers in <verbatim|Plugins/Unix>,
-    <verbatim|Plugins/MacOS>, <verbatim|Plugins/Windows>,
-    <verbatim|Plugins/Windows64> and <verbatim|Plugins/Android>.
+    <item>the platform layers in <source-link|Plugins/Unix|src/Plugins/Unix>,
+    <verbatim|Plugins/MacOS>, <source-link|Plugins/Windows|src/Plugins/Windows>,
+    <source-link|Plugins/Windows64|src/Plugins/Windows64> and <source-link|Plugins/Android|src/Plugins/Android>.
   </itemize>
 
   Several neighbouring subjects are described elsewhere. The <scheme>
@@ -48,7 +48,7 @@
   libraries used by plug-ins are in <hlink|the plug-in
   machinery|plugin-machinery.en.tm>.
 
-  All file names below are relative to <verbatim|src/src/> unless stated
+  All file names below are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -142,7 +142,7 @@
     directories, the boot lock, the settings file, upgrades and the
     <c++> store of user preferences.
 
-    <item*|<verbatim|Plugins/Unix/>>Entry point, file and directory
+    <item*|<source-link|Plugins/Unix/|src/Plugins/Unix>>Entry point, file and directory
     primitives, <cpp|system>, logging and stack traces for <name|Linux>,
     <name|macOS> and the other <name|Unix> systems.
 
@@ -150,10 +150,10 @@
     (startup modifiers, remote controls, <name|Cocoa> spell checking and
     image conversion, App Nap).
 
-    <item*|<verbatim|Plugins/Windows/>, <verbatim|Plugins/Windows64/>>The
+    <item*|<source-link|Plugins/Windows/|src/Plugins/Windows>, <source-link|Plugins/Windows64/|src/Plugins/Windows64>>The
     32-bit and 64-bit <name|Windows> layers.
 
-    <item*|<verbatim|Plugins/Android/>>The <name|Android> layer.
+    <item*|<source-link|Plugins/Android/|src/Plugins/Android>>The <name|Android> layer.
   </description-paragraphs>
 
   <section|Contents of this chapter>

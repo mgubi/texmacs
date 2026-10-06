@@ -8,7 +8,7 @@
   <section|Overview>
 
   The <scheme> part of the widget system lives in
-  <verbatim|progs/kernel/gui/>:
+  <source-link|progs/kernel/gui/|TeXmacs/progs/kernel/gui>:
 
   <\description>
     <item*|<source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>>the style constants

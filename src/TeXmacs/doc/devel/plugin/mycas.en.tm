@@ -9,7 +9,7 @@
   take a look at the sample \Pcomputer algebra system\Q <verbatim|mycas>,
   which is shipped as a plug-in in the directory
   <verbatim|$TEXMACS_PATH/plugins/mycas> (in the source code of <TeXmacs>,
-  this is <verbatim|src/plugins/mycas>). The file
+  this is <source-link|src/plugins/mycas|plugins/mycas>). The file
   <source-link|src/mycas.cpp|plugins/mycas/src/mycas.cpp> of this plug-in, which is listed at the end of
   this section, contains a very simple program which can be interfaced
   with <TeXmacs>. In order to test the program, you should compile it

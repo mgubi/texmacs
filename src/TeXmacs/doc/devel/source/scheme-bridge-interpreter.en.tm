@@ -9,10 +9,10 @@
 
   <TeXmacs> currently compiles exactly one <scheme> back-end, <name|Guile>.
   Both build systems only include the directories
-  <verbatim|Scheme/Scheme> and <verbatim|Scheme/Guile>:
+  <source-link|Scheme/Scheme|src/Scheme/Scheme> and <source-link|Scheme/Guile|src/Scheme/Guile>:
   <name|CMake> through the <verbatim|TeXmacs_Scheme_SRCS> glob in the top
   level <source-link|CMakeLists.txt|src/CMakeLists.txt> (in the directory above
-  <verbatim|src/src/>), the traditional build through
+  <source-link|src/src/|src>), the traditional build through
   <verbatim|scheme_src> in <source-link|makefile.in|src/makefile.in>. The header
   <source-link|Scheme/Scheme/object.hpp|src/Scheme/Scheme/object.hpp> includes
   <source-link|Scheme/Guile/guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp> unconditionally.
@@ -26,9 +26,9 @@
     system <name|Guile> found with <name|pkg-config> (<verbatim|guile-1.8>,
     <verbatim|guile-3.0>, <verbatim|guile-2.2> or <verbatim|guile-2.0>).
     The traditional build detects <name|Guile> with
-    <verbatim|misc/m4/guile.m4>.
+    <source-link|misc/m4/guile.m4|misc/m4/guile.m4>.
 
-    <item*|<name|TinyScheme>>The directory <verbatim|Scheme/Tiny/>
+    <item*|<name|TinyScheme>>The directory <source-link|Scheme/Tiny/|src/Scheme/Tiny>
     contains an experimental back-end based on <name|TinyScheme>
     (<source-link|tinyscheme_tm.cpp|src/Scheme/Tiny/tinyscheme_tm.cpp>, <source-link|tinyscheme_tm.hpp|src/Scheme/Tiny/tinyscheme_tm.hpp> and the
     interpreter itself). It is not compiled by either build system, and
@@ -73,7 +73,7 @@
 
   <section|The tmscm layer>
 
-  Code outside <verbatim|Scheme/Guile/> should not use the <name|Guile>
+  Code outside <source-link|Scheme/Guile/|src/Scheme/Guile> should not use the <name|Guile>
   <abbr|API> directly, but the abstraction of <source-link|guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp>:
 
   <\description>

@@ -78,7 +78,7 @@
     lists). If the widget may occur in menus or tool bars, also add a case
     to <cpp|as_qaction>, which otherwise fails.
 
-    <item>Make the same changes in <verbatim|Plugins/Qt6>.
+    <item>Make the same changes in <source-link|Plugins/Qt6|src/Plugins/Qt6>.
 
     <item>Provide at least a stub in the other ports, for instance a
     wrapper in <source-link|Plugins/Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>
@@ -100,7 +100,7 @@
   The generated file <source-link|Scheme/Glue/glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp> is kept in the
   repository and must be regenerated, with a working <name|Guile>, by
   running <verbatim|./build-glue build-glue-basic.scm glue_basic.cpp> in
-  <verbatim|src/src/Scheme/Glue> (this is what the <verbatim|GLUE> target
+  <source-link|src/src/Scheme/Glue|src/Scheme/Glue> (this is what the <verbatim|GLUE> target
   of <verbatim|src/src/makefile> does). The script <verbatim|build-auto-doc>,
   called by <verbatim|build-glue>, also updates
   <source-link|progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>. The argument types must be known
@@ -216,7 +216,7 @@
 
   <subsection|What a port consists of>
 
-  A graphical port is a directory in <verbatim|src/src/Plugins> which
+  A graphical port is a directory in <source-link|src/src/Plugins|src/Plugins> which
   implements:
 
   <\enumerate>
@@ -235,14 +235,14 @@
 
   The <name|Qt> port (\P<hlink|The <name|Qt>
   implementation|widgets-qt.en.tm>\Q) is the reference. The older
-  <name|X11> port consists of <verbatim|Plugins/X11> (the display, windows
+  <name|X11> port consists of <source-link|Plugins/X11|src/Plugins/X11> (the display, windows
   implementing <cpp|window_rep> of <source-link|window.hpp|src/Graphics/Gui/window.hpp>, events, fonts and
-  pictures) and <verbatim|Plugins/Widkit>, a complete toolkit of its own
+  pictures) and <source-link|Plugins/Widkit|src/Plugins/Widkit>, a complete toolkit of its own
   whose widgets are drawn with the <TeXmacs> renderer and communicate with
   <cpp|event>s (see the historical document \P<hlink|The graphical user
   interface|gui.en.tm>\Q); <source-link|widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp> maps the abstract
   constructors and slots to <name|Widkit>. The experimental <name|Cocoa>
-  port is in <verbatim|Plugins/Cocoa>. Both lag behind the abstract
+  port is in <source-link|Plugins/Cocoa|src/Plugins/Cocoa>. Both lag behind the abstract
   interface: <name|Widkit> currently has no <cpp|responsive_tabs_widget>,
   <cpp|responsive_icon_tabs_widget>, <cpp|setting_toggle_widget>,
   <cpp|setting_enum_widget> and <cpp|setting_group_widget>, and the

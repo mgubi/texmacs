@@ -20,7 +20,7 @@
   <markup|drd-props> in <hlink|macro
   primitives|../format/stylesheet/prim-macro.en.tm>.
 
-  The code lives in <verbatim|Data/Drd/>. The DRD of built-in tags is
+  The code lives in <source-link|Data/Drd/|src/Data/Drd>. The DRD of built-in tags is
   hard-coded in <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>; the DRD of user tags is mostly
   <em|inferred> from their macro definitions, and can be refined or frozen
   by <markup|drd-props> declarations in style files.

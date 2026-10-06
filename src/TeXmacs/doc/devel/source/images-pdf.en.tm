@@ -117,7 +117,7 @@
 
   <section|The <name|Cairo> renderer>
 
-  <verbatim|Plugins/Cairo/> contains a <cpp|cairo_renderer_rep>, which
+  <source-link|Plugins/Cairo/|src/Plugins/Cairo> contains a <cpp|cairo_renderer_rep>, which
   loads the <name|Cairo> library dynamically (<source-link|tm_cairo.cpp|src/Plugins/Cairo/tm_cairo.cpp>) and
   draws <name|PNG> images directly, converting PostScript and <abbr|PDF>
   images with <verbatim|convert>. It is only compiled with

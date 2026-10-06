@@ -5,7 +5,7 @@
 <\body>
   <tmdoc-title|The wallet, system keychains and passwords>
 
-  File names below are relative to <verbatim|src/TeXmacs/progs/>.
+  File names below are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|The wallet>
 

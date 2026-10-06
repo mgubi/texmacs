@@ -8,12 +8,12 @@
   <section|Overview>
 
   The <abbr|DRD> is consulted in three ways: through the member
-  <cpp|drd> of the editor (code in <verbatim|Edit/>), through
+  <cpp|drd> of the editor (code in <source-link|Edit/|src/Edit>), through
   <cpp|env-\<gtr\>drd> (the typesetter and the evaluator), and through the
   global <cpp|the_drd> (generic tree code, languages and converters, and
   all <scheme> glue). This page lists the main call sites by subsystem, as
   a map for developers who change a property and want to know what will
-  be affected. Paths are relative to <verbatim|src/src/>.
+  be affected. Paths are relative to <source-link|src/src/|src>.
 
   <section|Cursor movement>
 

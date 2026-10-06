@@ -10,7 +10,7 @@
   Tables are edited mostly by <c++> routines of the editor
   (<scm|table-insert-row>, <scm|table-insert-column>, <scm|cell-set-format>,
   <scm|table-set-format>, ...), which the <scheme> code in
-  <verbatim|progs/table/> combines into commands. The mode predicate
+  <source-link|progs/table/|TeXmacs/progs/table> combines into commands. The mode predicate
   <scm|in-table?> holds when the cursor is inside a <markup|table> tag; the
   hooks use the finer predicate <scm|table-markup-context?>
   (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>), which recognizes the table
@@ -51,7 +51,7 @@
 
   <section|Dynamic markup>
 
-  The directory <verbatim|progs/dynamic/> groups the markup whose content
+  The directory <source-link|progs/dynamic/|TeXmacs/progs/dynamic> groups the markup whose content
   changes during editing or presentation. Its modules are loaded lazily
   through their menus and keyboards (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>); the
   folding, script and spreadsheet keyboards are registered for the mode

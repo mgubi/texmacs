@@ -7,8 +7,8 @@
 
   This page summarizes what the mechanisms of this chapter protect against,
   as they are implemented, and lists the known weaknesses and bugs. File
-  names are relative to <verbatim|src/TeXmacs/progs/> for <scheme> files
-  and to <verbatim|src/src/> for <c++> files.
+  names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs> for <scheme> files
+  and to <source-link|src/src/|src> for <c++> files.
 
   <section|What is protected>
 

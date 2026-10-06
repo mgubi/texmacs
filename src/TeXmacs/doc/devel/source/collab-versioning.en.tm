@@ -28,7 +28,7 @@
   </enumerate>
 
   This page covers the last two points. All code lives in
-  <verbatim|progs/version/>.
+  <source-link|progs/version/|TeXmacs/progs/version>.
 
   <section|The generic versioning interface>
 

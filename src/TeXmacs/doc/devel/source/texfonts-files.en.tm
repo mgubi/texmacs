@@ -82,7 +82,7 @@
   The <name|PK> path is built in the same way from
   <verbatim|fonts/pk>, <verbatim|$TEX_PK_PATH>, the <verbatim|PK> setting and
   <verbatim|kpsepath pk>. The <name|Type 1> path uses
-  <verbatim|fonts/type1>, <verbatim|$TEX_PFB_PATH> and the <verbatim|PFB>
+  <source-link|fonts/type1|TeXmacs/fonts/type1>, <verbatim|$TEX_PFB_PATH> and the <verbatim|PFB>
   setting, without <verbatim|kpsepath>.
 
   <section|Looking up a file>
@@ -180,7 +180,7 @@
   startup (the boot lock), by an upgrade to a new version
   (<cpp|init_upgrade>), on <name|macOS> when <TeXmacs> is started with the
   <key|Alt> key pressed, and automatically when the directories
-  <verbatim|fonts/type1> or <verbatim|fonts/truetype> of
+  <source-link|fonts/type1|TeXmacs/fonts/type1> or <source-link|fonts/truetype|TeXmacs/fonts/truetype> of
   <verbatim|$TEXMACS_PATH> or <verbatim|$TEXMACS_HOME_PATH> have changed
   (<source-link|System/Misc/data_cache.cpp|src/System/Misc/data_cache.cpp>).
 

@@ -20,7 +20,7 @@
 
   <\itemize>
     <item><with|font-series|bold|Two copies of the <name|Qt> port.>
-    <verbatim|Plugins/Qt> and <verbatim|Plugins/Qt6> are maintained in
+    <verbatim|Plugins/Qt> and <source-link|Plugins/Qt6|src/Plugins/Qt6> are maintained in
     parallel and synchronized by hand. A fix applied to one directory must
     be applied to the other; <name|CMake> builds only the first, and
     <verbatim|configure --enable-qt-new> (the default on <name|Android>)
@@ -34,7 +34,7 @@
 
     <item><with|font-series|bold|Stale generated files.> An in-tree
     <verbatim|make> build leaves <verbatim|moc_*.cpp> files in
-    <verbatim|Plugins/Qt> (they are ignored by <verbatim|src/.gitignore>).
+    <verbatim|Plugins/Qt> (they are ignored by <source-link|src/.gitignore|.gitignore>).
     The <name|CMake> source list is a glob on
     <verbatim|Plugins/Qt/*.cpp> while <name|CMake> also runs its own
     <verbatim|AUTOMOC> (<source-link|src/CMakeLists.txt|src/CMakeLists.txt>), so a <name|CMake>
@@ -43,7 +43,7 @@
     <item><with|font-series|bold|The <name|Cocoa> port does not link.>
     <cpp|gui_version> is declared in <source-link|gui.hpp|src/Graphics/Gui/gui.hpp> and called
     unconditionally (<source-link|Texmacs/Texmacs/texmacs.cpp:537|src/Texmacs/Texmacs/texmacs.cpp:537>, the glue
-    of <scm|gui-version>), but <verbatim|Plugins/Cocoa> does not define it.
+    of <scm|gui-version>), but <source-link|Plugins/Cocoa|src/Plugins/Cocoa> does not define it.
 
     <item><with|font-series|bold|Print dialog options.> The
     <em|black and white> check box of the <name|Qt> print dialog sets

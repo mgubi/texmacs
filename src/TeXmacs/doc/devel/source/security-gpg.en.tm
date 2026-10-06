@@ -6,10 +6,10 @@
   <tmdoc-title|<name|GnuPG> encryption of documents>
 
   All encryption in <TeXmacs> is delegated to the external program
-  <verbatim|gpg>. The <scheme> code in <verbatim|progs/security/gpg/>
+  <verbatim|gpg>. The <scheme> code in <source-link|progs/security/gpg/|TeXmacs/progs/security/gpg>
   builds the command lines, sends the data and the passphrases to the
   program, and stores the results in documents. Unless stated otherwise,
-  file names below are relative to <verbatim|src/TeXmacs/progs/>.
+  file names below are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Enabling encryption>
 
@@ -155,7 +155,7 @@
   </description-paragraphs>
 
   The packages <verbatim|gpg-info-level-none>, <verbatim|-short> and
-  <verbatim|-detailed> (<verbatim|packages/customize/encryption/>) set
+  <verbatim|-detailed> (<source-link|packages/customize/encryption/|TeXmacs/packages/customize/encryption>) set
   <verbatim|gpg-info-level>, which determines how much information on the
   recipients is shown around decrypted blocks.
 

@@ -3,11 +3,11 @@
 <style|<tuple|tmdoc|english>>
 
 <\body>
-  <tmdoc-title|The experimental evaluator in <verbatim|Style/>>
+  <tmdoc-title|The experimental evaluator in <source-link|Style/|src/Style>>
 
   <section|Status>
 
-  The directory <verbatim|src/src/Style/> contains a second implementation
+  The directory <source-link|src/src/Style/|src/Style> contains a second implementation
   of the evaluator, written with the aim of computing the <em|style
   rewriting> of a whole document (the tree obtained by expanding all
   macros) incrementally, through systematic memoization. It is a
@@ -190,8 +190,8 @@
   graphical primitives). The typesetter only uses
   <cpp|edit_env_rep::exec>. If you fix a bug in the semantics of a
   primitive, the place to fix it is <verbatim|Typeset/Env/> (together with
-  the corresponding typesetting code in <verbatim|Typeset/Concat/> and
-  <verbatim|Typeset/Bridge/>).
+  the corresponding typesetting code in <source-link|Typeset/Concat/|src/Typeset/Concat> and
+  <source-link|Typeset/Bridge/|src/Typeset/Bridge>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

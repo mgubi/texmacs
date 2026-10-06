@@ -15,8 +15,8 @@
   programs|../interface/interface.en.tm>.
 
   The implementation is spread over the following files (<scheme> files are
-  given relative to <verbatim|src/TeXmacs/progs>, <c++> files relative to
-  <verbatim|src/src>):
+  given relative to <source-link|src/TeXmacs/progs|TeXmacs/progs>, <c++> files relative to
+  <source-link|src/src|src>):
 
   <\description>
     <item*|<source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>>Discovery of the plug-in
@@ -45,7 +45,7 @@
     <item*|<source-link|dynamic/scripts-edit.scm|TeXmacs/progs/dynamic/scripts-edit.scm>>Evaluation of scripts inside
     documents.
 
-    <item*|<verbatim|System/Link/>>The <c++> side of connections:
+    <item*|<source-link|System/Link/|src/System/Link>>The <c++> side of connections:
     <source-link|connection.cpp|src/System/Link/connection.cpp> (the <cpp|connection> resource),
     <source-link|tm_link.hpp|src/System/Link/tm_link.hpp> (the abstract <cpp|tm_link_rep> class and the
     control characters), <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>,
@@ -85,7 +85,7 @@
   order to redirect the launchers of other plug-ins.
 
   In the source tree, the plug-ins which are shipped with <TeXmacs> live in
-  <verbatim|src/plugins>; the build system copies them into
+  <source-link|src/plugins|plugins>; the build system copies them into
   <verbatim|TeXmacs/plugins> (which is not under version control), and the
   installation procedure installs them into <verbatim|$TEXMACS_PATH/plugins>.
   The small example plug-ins of the chapter about interfaces live in
@@ -122,8 +122,8 @@
     libraries for <scm|:link>>>|<row|<cell|<verbatim|styles>>|<cell|<verbatim|TEXMACS_STYLE_ROOT>>|<cell|style
     files>>|<row|<cell|<verbatim|packages>>|<cell|<verbatim|TEXMACS_PACKAGE_ROOT>>|<cell|style
     packages>>|<row|<cell|<verbatim|texts>>|<cell|<verbatim|TEXMACS_TEXT_ROOT>>|<cell|text
-    files>>|<row|<cell|<verbatim|doc>>|<cell|<verbatim|TEXMACS_DOC_PATH>>|<cell|documentation>>|<row|<cell|<verbatim|misc/patterns>>|<cell|<verbatim|TEXMACS_PATTERN_PATH>>|<cell|background
-    patterns>>|<row|<cell|<verbatim|misc/pixmaps>>|<cell|<verbatim|TEXMACS_PIXMAP_PATH>>|<cell|icons>>|<row|<cell|<verbatim|misc/themes>>|<cell|<verbatim|TEXMACS_THEME_PATH>>|<cell|themes>>|<row|<cell|<verbatim|langs/natural/dic>>|<cell|<verbatim|TEXMACS_DIC_PATH>>|<cell|dictionaries>>>>>
+    files>>|<row|<cell|<verbatim|doc>>|<cell|<verbatim|TEXMACS_DOC_PATH>>|<cell|documentation>>|<row|<cell|<source-link|misc/patterns|TeXmacs/misc/patterns>>|<cell|<verbatim|TEXMACS_PATTERN_PATH>>|<cell|background
+    patterns>>|<row|<cell|<source-link|misc/pixmaps|TeXmacs/misc/pixmaps>>|<cell|<verbatim|TEXMACS_PIXMAP_PATH>>|<cell|icons>>|<row|<cell|<source-link|misc/themes|TeXmacs/misc/themes>>|<cell|<verbatim|TEXMACS_THEME_PATH>>|<cell|themes>>|<row|<cell|<source-link|langs/natural/dic|TeXmacs/langs/natural/dic>>|<cell|<verbatim|TEXMACS_DIC_PATH>>|<cell|dictionaries>>>>>
 
   The style and package roots are searched recursively (through
   <cpp|search_sub_dirs>), so that a package
@@ -900,7 +900,7 @@
 
     <item>Dynamic linking requires <cpp|TM_DYNAMIC_LINKING> to be defined at
     compile time. The <name|autotools> configuration defines it (as
-    <cpp|dlopen>) through <verbatim|misc/m4/dlopen.m4>; otherwise
+    <cpp|dlopen>) through <source-link|misc/m4/dlopen.m4|misc/m4/dlopen.m4>; otherwise
     <cpp|symbol_install> returns <verbatim|"Dynamic linking not
     implemented">.
 

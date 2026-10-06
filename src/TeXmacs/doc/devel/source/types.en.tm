@@ -7,7 +7,7 @@
 
   In this chapter, we give a rough description of <TeXmacs>'s basic data
   types, most of which can be found in the directory <verbatim|Kernel> of
-  the <c++> sources (<verbatim|src/src/Kernel>). The description of the
+  the <c++> sources (<source-link|src/src/Kernel|src/Kernel>). The description of the
   exported functions is non exhaustive and we refer to the corresponding
   header files for more precision. How these types are implemented, what
   their operations cost and which pitfalls follow are explained in

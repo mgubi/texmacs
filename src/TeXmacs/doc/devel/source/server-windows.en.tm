@@ -599,7 +599,7 @@
     similar way (but without <cpp|enrich_embedded_document> and without
     project data), in units of 5 pixels rounded up; exported as
     <scm|tree-extents>, which is only used by the old GUI code in
-    <verbatim|kernel/old-gui/>.
+    <source-link|kernel/old-gui/|TeXmacs/progs/kernel/old-gui>.
 
     <item*|<cpp|get_texmacs_widget_size (wid)>>The size hint of such a
     widget.

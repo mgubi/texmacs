@@ -25,7 +25,7 @@
     be read as several Cork characters.
 
     <item*|Other formats>The converters of <verbatim|Data/Convert/> and
-    <verbatim|progs/convert/> convert explicitly: <name|XML> and
+    <source-link|progs/convert/|TeXmacs/progs/convert> convert explicitly: <name|XML> and
     <name|HTML> use <scm|cork-\<gtr\>utf8> and <scm|utf8-\<gtr\>cork> (and
     named entities), <LaTeX> uses its own tables and the <name|T2A>
     encoding for Cyrillic, and the <scheme> serialization (<verbatim|stm>)

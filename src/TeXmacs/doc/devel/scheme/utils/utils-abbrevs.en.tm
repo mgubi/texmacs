@@ -9,7 +9,7 @@
   structures which are used throughout the <scheme> code of <TeXmacs>. Most
   of them are defined in <source-link|kernel/boot/abbrevs.scm|TeXmacs/progs/kernel/boot/abbrevs.scm>,
   <source-link|kernel/boot/srfi.scm|TeXmacs/progs/kernel/boot/srfi.scm> and <source-link|kernel/boot/ahash-table.scm|TeXmacs/progs/kernel/boot/ahash-table.scm>
-  (relative to <verbatim|src/TeXmacs/progs/>). Since they are loaded at
+  (relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>). Since they are loaded at
   boot time, they are available in all modules.
 
   <paragraph|Predicates>

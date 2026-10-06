@@ -96,7 +96,7 @@
 
   Files are loaded by <cpp|load_virtual> (<source-link|Graphics/Fonts/translator.cpp|src/Graphics/Fonts/translator.cpp>),
   usually through <cpp|load_translator>, which first looks for an encoding
-  file <verbatim|<em|name>.enc> in <verbatim|fonts/enc> and otherwise
+  file <verbatim|<em|name>.enc> in <source-link|fonts/enc|TeXmacs/fonts/enc> and otherwise
   loads the virtual font. Both produce a <cpp|translator>:
 
   <\cpp-code>

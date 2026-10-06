@@ -7,8 +7,8 @@
 
   <section|Overview>
 
-  The <name|Qt> port lives in <verbatim|src/src/Plugins/Qt>. A second copy
-  with the same structure, <verbatim|Plugins/Qt6>, is used by the
+  The <name|Qt> port lives in <source-link|src/src/Plugins/Qt|src/Plugins/Qt>. A second copy
+  with the same structure, <source-link|Plugins/Qt6|src/Plugins/Qt6>, is used by the
   <verbatim|configure> build when the option <verbatim|--enable-qt-new> is
   given (it is the default on Android); it adds for instance
   <cpp|QTMMainTabWindow>. The <name|CMake> build always uses

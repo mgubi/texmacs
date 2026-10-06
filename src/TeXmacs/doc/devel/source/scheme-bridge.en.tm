@@ -22,7 +22,7 @@
   developer guide|../scheme/scheme.en.tm>, and the list of all exported
   routines in <hlink|the glue auto-documentation|../scheme/api/glue-auto-doc.en.tm>.
 
-  All file names below are relative to <verbatim|src/src/> unless stated
+  All file names below are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -31,7 +31,7 @@
 
   <\description>
     <item*|The interpreter>The only back-end which is compiled is
-    <name|Guile> (<verbatim|Scheme/Guile/>). Everything which depends on
+    <name|Guile> (<source-link|Scheme/Guile/|src/Scheme/Guile>). Everything which depends on
     the <name|Guile> version is hidden behind a thin abstraction, the
     <verbatim|tmscm> layer: the type <cpp|tmscm> (a <name|Guile>
     <cpp|SCM>) and functions such as <cpp|tmscm_cons>,
@@ -109,7 +109,7 @@
     <verbatim|GUILE_D>), <cpp|start_scheme>, <cpp|initialize_scheme>,
     evaluation with error catching, and the black box smob.
 
-    <item*|<verbatim|Scheme/Tiny/>>An experimental <name|TinyScheme>
+    <item*|<source-link|Scheme/Tiny/|src/Scheme/Tiny>>An experimental <name|TinyScheme>
     back-end, not compiled by any of the build systems.
 
     <item*|<source-link|Scheme/Glue/build-glue.scm|src/Scheme/Glue/build-glue.scm>>The glue generator.
@@ -121,11 +121,11 @@
     <item*|<source-link|Scheme/Glue/glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp>, <source-link|glue_editor.cpp|src/Scheme/Glue/glue_editor.cpp>,
     <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp>>The generated wrappers (do not edit).
 
-    <item*|<verbatim|Scheme/Glue/build-glue>, <verbatim|build-auto-doc>,
+    <item*|<source-link|Scheme/Glue/build-glue|src/Scheme/Glue/build-glue>, <verbatim|build-auto-doc>,
     <source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>, <source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm>>Shell
     scripts which run the generator, and generators for the list of glue
     symbols (<source-link|TeXmacs/progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>) and for the
-    glue documentation (<verbatim|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>).
+    glue documentation (<source-link|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>).
 
     <item*|<source-link|Kernel/Abstractions/blackbox.hpp|src/Kernel/Abstractions/blackbox.hpp>>The type tagged
     containers <cpp|blackbox> and <cpp|whitebox_rep\<less\>T\<gtr\>>.

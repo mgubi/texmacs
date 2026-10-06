@@ -484,7 +484,7 @@
     get their creation date as expiration date.
 
     <item><em|No <name|SQLite>.> The functions <scm|sql-exec>,
-    <scm|sql-quote> and <scm|supports-sql?> (<verbatim|Plugins/Sqlite3/>)
+    <scm|sql-quote> and <scm|supports-sql?> (<source-link|Plugins/Sqlite3/|src/Plugins/Sqlite3>)
     are an older experiment which is not used by the database engine nor by
     any <scheme> module.
   </itemize>

@@ -7,10 +7,10 @@
 
   Distribution packages are made by targets of the autotools
   <verbatim|Makefile>, which use the platform files in
-  <verbatim|packages/>. All packages are written to the directory
-  <verbatim|../distr/> next to <verbatim|src/>. The generic targets
+  <source-link|packages/|packages>. All packages are written to the directory
+  <verbatim|../distr/> next to <source-link|src/|src>. The generic targets
   <verbatim|make PACKAGE> and <verbatim|make BUNDLE> are mapped by
-  <verbatim|tm_platform.m4> to the right target of the platform:
+  <source-link|tm_platform.m4|misc/m4/tm_platform.m4> to the right target of the platform:
   <verbatim|GENERIC_PACKAGE> on <name|Linux> and other <name|Unix> systems,
   <verbatim|MACOS_BUNDLE>/<verbatim|MACOS_PACKAGE> on <name|macOS>, and
   <verbatim|WINDOWS_BUNDLE>/<verbatim|WINDOWS_PACKAGE> on <name|Windows>.
@@ -24,23 +24,23 @@
 
   <section|Common steps>
 
-  Every binary package bundles the runtime tree <verbatim|TeXmacs/>, the
+  Every binary package bundles the runtime tree <source-link|TeXmacs/|packages/macos/TeXmacs>, the
   <verbatim|ice-9> directory of the <name|Guile> library (copied from
   <verbatim|GUILE_DATA_PATH> into <verbatim|progs/>, since <TeXmacs> loads
   it from there), <name|Ghostscript> if it was found at configuration time,
-  and the public key <verbatim|misc/admin/texmacs_updates_dsa_pub.pem>
+  and the public key <source-link|misc/admin/texmacs_updates_dsa_pub.pem|misc/admin/texmacs_updates_dsa_pub.pem>
   used to verify automatic updates (see <hlink|automatic
   updates|../scheme/api/automatic-updates.en.tm>). When <verbatim|configure>
-  was given a signing identity (<verbatim|tm_sign.m4>), the executables
+  was given a signing identity (<source-link|tm_sign.m4|misc/m4/tm_sign.m4>), the executables
   and installers are signed.
 
   <section|<name|macOS>>
 
   <verbatim|MACOS_BUNDLE> builds <verbatim|../distr/TeXmacs.app>: it copies
   <verbatim|Info.plist>, <verbatim|PkgInfo>, the icons and
-  <verbatim|Assets.car> from <verbatim|packages/macos/>, the binary as
+  <verbatim|Assets.car> from <source-link|packages/macos/|packages/macos>, the binary as
   <verbatim|Contents/MacOS/TeXmacs>, the localized resources of
-  <verbatim|src/Plugins/Cocoa/English.lproj>, and the runtime tree into
+  <source-link|src/Plugins/Cocoa/English.lproj|src/Plugins/Cocoa/English.lproj>, and the runtime tree into
   <verbatim|Contents/Resources/share/TeXmacs>. The script
   <source-link|packages/macos/bundle-libs.sh|packages/macos/bundle-libs.sh> then copies the <name|Qt>
   frameworks and plug-ins and the other dynamic libraries into the bundle
@@ -65,9 +65,9 @@
   <verbatim|packages/windows/TeXmacs.iss> to make the installer.
   <verbatim|WINDOWS_APPX> additionally makes two <name|MSIX> packages with
   <verbatim|makeappx>: one for direct distribution and one for the
-  <name|Microsoft Store>, from the manifests in <verbatim|packages/msix/>.
+  <name|Microsoft Store>, from the manifests in <source-link|packages/msix/|packages/msix>.
   The <name|Windows> builds are done with <name|MinGW> under <name|MSYS2>;
-  <verbatim|packages/windows/configure-tm-mingw-cross-env> is a helper for
+  <source-link|packages/windows/configure-tm-mingw-cross-env|packages/windows/configure-tm-mingw-cross-env> is a helper for
   cross compiling.
 
   <section|<name|Linux> and other <name|Unix> systems>
@@ -88,14 +88,14 @@
 
     <item*|<name|AppImage>><verbatim|APPIMAGE> installs <TeXmacs> into
     <verbatim|../distr/TeXmacs.AppDir>, adds the desktop entry and the
-    <verbatim|AppRun> script of <verbatim|packages/appimage/>, fixes the
+    <verbatim|AppRun> script of <source-link|packages/appimage/|packages/appimage>, fixes the
     run path of the binary with <verbatim|patchelf> and copies the shared
     libraries of the <abbr|SDK>.
 
     <item*|Source archive><verbatim|SRC_PACKAGE>.
   </description>
 
-  The scripts in <verbatim|packages/linux/> install the icons and the
+  The scripts in <source-link|packages/linux/|packages/linux> install the icons and the
   <name|MIME> types into a desktop environment.
 
   <section|<name|Android>>
@@ -104,7 +104,7 @@
   <verbatim|src/Objects/libtexmacs.a> (configured for an <name|Android>
   cross compiler). <verbatim|ANDROID_BUNDLE> prepares a project in
   <verbatim|../distr/TeXmacs-Android> from the launcher in
-  <verbatim|packages/android/launcher/> (whose <cpp|main> calls
+  <source-link|packages/android/launcher/|packages/android/launcher> (whose <cpp|main> calls
   <cpp|texmacs_entrypoint>), the manifest and resources, and the runtime
   tree collected as assets by <source-link|collect_assets.sh|packages/android/collect_assets.sh>.
   <verbatim|ANDROID_AAB> and <verbatim|ANDROID_DEV_APK> build it with
@@ -116,7 +116,7 @@
 
   <\itemize>
     <item><verbatim|MACOS_RELEASE> archives the wrong path:
-    <verbatim|Makefile.in:518> writes <verbatim|$MACOS_PACKAGE_APP> with a
+    <source-link|Makefile.in:518|Makefile.in:518> writes <verbatim|$MACOS_PACKAGE_APP> with a
     single <verbatim|$>, which <verbatim|make> reads as the (empty)
     variable <verbatim|$M> followed by the text
     <verbatim|ACOS_PACKAGE_APP>, so <verbatim|zip> is asked to archive a

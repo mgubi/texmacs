@@ -7,7 +7,7 @@
 
   <section|The algebra library>
 
-  <verbatim|Graphics/Mathematics/> is a small header-only library of
+  <source-link|Graphics/Mathematics/|src/Graphics/Mathematics> is a small header-only library of
   generic mathematical containers. Only matrices and polynomials are used by
   the rest of <TeXmacs>; the other classes are an experiment in generic
   numerical programming, exercised only by the self test

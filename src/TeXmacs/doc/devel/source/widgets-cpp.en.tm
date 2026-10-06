@@ -8,7 +8,7 @@
   <section|Overview>
 
   The kernel of <TeXmacs> manipulates widgets exclusively through the
-  interface declared in the directory <verbatim|Graphics/Gui>:
+  interface declared in the directory <source-link|Graphics/Gui|src/Graphics/Gui>:
 
   <\description>
     <item*|<source-link|widget.hpp|src/Graphics/Gui/widget.hpp>>The abstract classes <cpp|widget_rep> and
@@ -34,7 +34,7 @@
   </description>
 
   A port implements all these declarations; the kernel (in particular
-  <verbatim|Texmacs/Window> and <verbatim|Edit/Interface>) only calls them.
+  <source-link|Texmacs/Window|src/Texmacs/Window> and <source-link|Edit/Interface|src/Edit/Interface>) only calls them.
   In the same spirit, <c++> code never needs to know which concrete class
   hides behind a <cpp|widget>.
 

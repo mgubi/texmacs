@@ -410,7 +410,7 @@
   <section|The logic programming layer>
 
   The <scheme> kernel also contains a small <name|Prolog>-like engine
-  (<verbatim|kernel/logic/>), loaded at start-up by
+  (<source-link|kernel/logic/|TeXmacs/progs/kernel/logic>), loaded at start-up by
   <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> and documented in <hlink|logical programming
   extensions|../scheme/utils/utils-logic.en.tm>. In the code base it is
   the other half of the \P<abbr|DRD>\Q terminology: declarative

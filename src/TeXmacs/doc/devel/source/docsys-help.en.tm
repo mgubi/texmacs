@@ -116,8 +116,8 @@
     chapters: if the initial environment of its root file sets
     <verbatim|tmdoc-book-parts> to <verbatim|true>, the root level is
     <verbatim|title*>, whose branches become parts. The developer guide
-    (<verbatim|devel/source/source.en.tm>) and the whole developer
-    documentation (<verbatim|devel/devel.en.tm>) use this.
+    (<source-link|devel/source/source.en.tm|TeXmacs/doc/devel/source/source.en.tm>) and the whole developer
+    documentation (<source-link|devel/devel.en.tm|TeXmacs/doc/devel/devel.en.tm>) use this.
 
     <item*|<markup|continue>>expands the target at the <em|same> level and
     drops its title, so that a long page can be split into several files.

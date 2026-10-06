@@ -11,7 +11,7 @@
 
   <section|The plug-in <verbatim|ai>>
 
-  The plug-in lives in <verbatim|src/plugins/ai> (copied to
+  The plug-in lives in <source-link|src/plugins/ai|plugins/ai> (copied to
   <verbatim|TeXmacs/plugins/ai> by the build). Its file
   <source-link|progs/init-ai.scm|plugins/ai/progs/init-ai.scm> declares one plug-in per engine, whose name
   is the model name:

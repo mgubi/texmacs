@@ -41,7 +41,7 @@
 
   <section|<scheme> modules>
 
-  The directory <verbatim|progs/fonts> contains:
+  The directory <source-link|progs/fonts|TeXmacs/progs/fonts> contains:
 
   <\description-paragraphs>
     <item*|<source-link|fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm>, <source-link|fonts-adobe.scm|TeXmacs/progs/fonts/fonts-adobe.scm>,

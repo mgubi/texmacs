@@ -49,13 +49,13 @@
     considerations and known pitfalls.
   </itemize>
 
-  All C++ file names below are relative to <verbatim|src/src/>, and all
-  <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>, unless
+  All C++ file names below are relative to <source-link|src/src/|src>, and all
+  <scheme> file names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>, unless
   stated otherwise. The language definitions which live in plugins are found
-  in the source tree in <verbatim|src/plugins/> (for instance
+  in the source tree in <source-link|src/plugins/|plugins> (for instance
   <source-link|src/plugins/code/progs/cpp-lang.scm|plugins/code/progs/cpp-lang.scm>); they are installed into
   <verbatim|$TEXMACS_PATH/plugins/> by the build. Style packages are relative
-  to <verbatim|src/TeXmacs/packages/>.
+  to <source-link|src/TeXmacs/packages/|TeXmacs/packages>.
 
   <section|Overview of the data flow>
 
@@ -102,7 +102,7 @@
 
   Editing commands (indentation, bracket handling, copy and paste) do not use
   the language object; they are implemented in <scheme> in the directory
-  <verbatim|prog/> and dispatched on <src-var|prog-language> through the
+  <source-link|prog/|TeXmacs/progs/prog> and dispatched on <src-var|prog-language> through the
   mode predicates <scm|in-prog-python?>, <scm|in-prog-cpp?>, and so on.
 
   <section|Main source files>

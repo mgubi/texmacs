@@ -23,7 +23,7 @@
   <verbatim|$TEXMACS_DIC_PATH>, which consists of
   <verbatim|$TEXMACS_HOME_PATH/langs/natural/dic>,
   <verbatim|$TEXMACS_PATH/langs/natural/dic> and the
-  <verbatim|langs/natural/dic> directories of the plug-ins
+  <source-link|langs/natural/dic|TeXmacs/langs/natural/dic> directories of the plug-ins
   (<source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>). All matching files are
   loaded, so a plug-in or the user can add entries. Each file is a sequence
   of pairs

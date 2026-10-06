@@ -22,11 +22,11 @@
   context>>>>>
 
   The <name|CMake> build compiles <verbatim|Plugins/Qt> and
-  <verbatim|Plugins/Pdf> (with <cpp|PDF_RENDERER> set), and nothing of the
+  <source-link|Plugins/Pdf|src/Plugins/Pdf> (with <cpp|PDF_RENDERER> set), and nothing of the
   other back-ends; the <verbatim|configure> based build chooses the
   <abbr|GUI> directory (<verbatim|Qt>, <verbatim|Qt6>, <verbatim|X11>,
   <verbatim|Cocoa>) at configuration time (<verbatim|Qt6> is used for <name|Qt> 6), and always
-  compiles <verbatim|Plugins/Cairo>, whose code is guarded by
+  compiles <source-link|Plugins/Cairo|src/Plugins/Cairo>, whose code is guarded by
   <cpp|USE_CAIRO>. At the time of
   writing, <verbatim|Plugins/Qt/qt_renderer.*> and
   <verbatim|Plugins/Qt6/qt_renderer.*> are identical.

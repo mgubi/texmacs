@@ -119,7 +119,7 @@
     <item*|<verbatim|$TEXMACS_PATH/fonts/font-database.scm>,
     <source-link|font-features.scm|TeXmacs/fonts/font-features.scm>, <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>>The
     <em|global> database, shipped with <TeXmacs> (in the source tree:
-    <verbatim|src/TeXmacs/fonts>). It describes several thousands of fonts
+    <source-link|src/TeXmacs/fonts|TeXmacs/fonts>). It describes several thousands of fonts
     which are commonly found on <name|Linux>, <name|macOS> and
     <name|Windows> systems or in <TeX> distributions (more than a thousand
     families), whether or not they are installed on the current machine. The features are curated by hand.
@@ -539,7 +539,7 @@
     <item*|<verbatim|$TEXMACS_HOME_PATH/fonts/error/>>Markers for <TeX>
     fonts which could not be generated (<source-link|Plugins/Metafont/load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>).
     They are removed at startup by <cpp|cache_initialize> when the
-    <verbatim|fonts/type1> or <verbatim|fonts/truetype> directories of
+    <source-link|fonts/type1|TeXmacs/fonts/type1> or <source-link|fonts/truetype|TeXmacs/fonts/truetype> directories of
     <verbatim|$TEXMACS_PATH> or <verbatim|$TEXMACS_HOME_PATH> changed.
 
     <item*|In memory>The answers of <cpp|tt_font_exists>; the caches of

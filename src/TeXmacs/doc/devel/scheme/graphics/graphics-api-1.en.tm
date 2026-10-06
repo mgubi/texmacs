@@ -10,7 +10,7 @@
     was planned in 2005. Only part of it has been implemented, sometimes
     under different names; the entries below indicate the current status.
     The actual implementation of the graphical editor can be found in
-    <verbatim|progs/graphics/>, mainly in <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>
+    <source-link|progs/graphics/|TeXmacs/progs/graphics>, mainly in <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>
     (enhanced trees), <source-link|graphics-object.scm|TeXmacs/progs/graphics/graphics-object.scm> (the sketch and the
     current object) and <source-link|graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm> (mouse handlers).
   </warning>

@@ -8,9 +8,9 @@
   <section|The <name|X11> port>
 
   The <name|X11> port is the original port of <TeXmacs>. It consists of two
-  parts: <verbatim|Plugins/X11> talks to the <name|X> server (display,
+  parts: <source-link|Plugins/X11|src/Plugins/X11> talks to the <name|X> server (display,
   windows, events, fonts, pictures, selections), and
-  <verbatim|Plugins/Widkit> is a complete widget toolkit whose widgets are
+  <source-link|Plugins/Widkit|src/Plugins/Widkit> is a complete widget toolkit whose widgets are
   drawn with the <TeXmacs> renderer and communicate by <cpp|event>s. The
   design of <name|Widkit> is described in <hlink|the graphical user
   interface (historical Widkit toolkit)|gui.en.tm>, and the mapping of the
@@ -63,7 +63,7 @@
 
   <section|The <name|Cocoa> port>
 
-  <verbatim|Plugins/Cocoa> is an experimental native port for
+  <source-link|Plugins/Cocoa|src/Plugins/Cocoa> is an experimental native port for
   <name|macOS>, written in <name|Objective-C++> with manual reference
   counting (<cpp|NSAutoreleasePool>). It is built with
   <verbatim|configure --enable-cocoa> (<cpp|AQUATEXMACS>), and is

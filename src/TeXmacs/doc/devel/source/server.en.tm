@@ -131,7 +131,7 @@
     the widget (see <hlink|embedded widgets|server-windows.en.tm>).
   </description>
 
-  Everything outside <verbatim|Texmacs/Data/> refers to these objects by
+  Everything outside <source-link|Texmacs/Data/|src/Texmacs/Data> refers to these objects by
   <abbr|URL>, and converts with the <em|concrete> and <em|abstract>
   functions:
 
@@ -185,21 +185,21 @@
     <cpp|abstract_view>, <cpp|concrete_window>, <cpp|abstract_window>.
   </description>
 
-  Code outside <verbatim|Texmacs/Data> should use the <abbr|URL> based
+  Code outside <source-link|Texmacs/Data|src/Texmacs/Data> should use the <abbr|URL> based
   functions. The raw pointers <cpp|tm_buffer>, <cpp|tm_view> and
   <cpp|tm_window> are not reference counted, so they must never be stored
   across operations which might close a buffer or a window.
 
   <section|Source files>
 
-  All file names are relative to <verbatim|src/src/> unless stated
+  All file names are relative to <source-link|src/src/|src> unless stated
   otherwise. The directory <verbatim|Texmacs/> contains the server proper:
 
   <\description-paragraphs>
     <item*|<source-link|Texmacs/server.hpp|src/Texmacs/server.hpp>>The abstract class
     <cpp|server_rep>, the handle <cpp|server>, <cpp|get_server> and a few
     global declarations. It also includes the headers of
-    <verbatim|Texmacs/Data/>, so that including <source-link|server.hpp|src/Texmacs/server.hpp>
+    <source-link|Texmacs/Data/|src/Texmacs/Data>, so that including <source-link|server.hpp|src/Texmacs/server.hpp>
     gives access to the whole <abbr|URL> based buffer, view and window
     interface.
 
@@ -231,7 +231,7 @@
 
     <item*|<source-link|Texmacs/tm_data.hpp|src/Texmacs/tm_data.hpp>>The global array <cpp|bufs> and a
     convenience <cpp|set_message>; included by all files of
-    <verbatim|Texmacs/Data/>.
+    <source-link|Texmacs/Data/|src/Texmacs/Data>.
 
     <item*|<source-link|Texmacs/Data/new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>,
     <source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>>The class <cpp|new_buffer_rep> and all buffer
@@ -271,18 +271,18 @@
   <source-link|Scheme/Glue/build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm> and, for buffers, views and
   windows, in <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>.
 
-  The editor is in <verbatim|Edit/>: the abstract class <cpp|editor_rep>
+  The editor is in <source-link|Edit/|src/Edit>: the abstract class <cpp|editor_rep>
   in <source-link|Edit/editor.hpp|src/Edit/editor.hpp> and its implementation <cpp|edit_main_rep>
   in <source-link|Edit/Editor/edit_main.hpp|src/Edit/Editor/edit_main.hpp>, assembled from the classes in
-  <verbatim|Edit/Interface> (events, cursor, repainting, footer),
-  <verbatim|Edit/Modify> (modifications and undo), <verbatim|Edit/Replace>
-  (selections, search, spell checking) and <verbatim|Edit/Process>. The
-  observers attached to the edit tree are in <verbatim|Data/Observers>,
+  <source-link|Edit/Interface|src/Edit/Interface> (events, cursor, repainting, footer),
+  <source-link|Edit/Modify|src/Edit/Modify> (modifications and undo), <source-link|Edit/Replace|src/Edit/Replace>
+  (selections, search, spell checking) and <source-link|Edit/Process|src/Edit/Process>. The
+  observers attached to the edit tree are in <source-link|Data/Observers|src/Data/Observers>,
   the undo history in <verbatim|Data/History>, and the generic observer
   mechanism in <source-link|Kernel/Abstractions/observer.cpp|src/Kernel/Abstractions/observer.cpp>.
 
   On the <scheme> side, the most relevant files (relative to
-  <verbatim|src/TeXmacs/progs/>) are <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>,
+  <source-link|src/TeXmacs/progs/|TeXmacs/progs>) are <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>,
   <source-link|kernel/gui/kbd-handlers.scm|TeXmacs/progs/kernel/gui/kbd-handlers.scm>, <source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>,
   <source-link|kernel/texmacs/tm-preferences.scm|TeXmacs/progs/kernel/texmacs/tm-preferences.scm>,
   <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>,

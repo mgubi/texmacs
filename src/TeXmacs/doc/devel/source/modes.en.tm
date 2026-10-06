@@ -105,7 +105,7 @@
     <item*|<source-link|kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>>Menus: <scm|menu-bind>,
     <scm|tm-menu>, <scm|lazy-menu>.
 
-    <item*|<verbatim|generic/>>Behaviour common to all modes: the generic
+    <item*|<source-link|generic/|TeXmacs/progs/generic>>Behaviour common to all modes: the generic
     hooks (<source-link|generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>), the basic keyboard
     (<source-link|generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>), the focus menus and focus icon bar
     (<source-link|generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>) and the format, insert and document
@@ -113,18 +113,18 @@
 
     <item*|<verbatim|text/>>Text mode: document titles, sections, lists,
     enunciations, floats and the language specific keyboards
-    (<verbatim|text/chinese/>, <verbatim|text/cyrillic/>, ...).
+    (<source-link|text/chinese/|TeXmacs/progs/text/chinese>, <source-link|text/cyrillic/|TeXmacs/progs/text/cyrillic>, ...).
 
     <item*|<verbatim|math/>>Mathematics: the large mathematical keyboard,
     brackets, scripts, equations and the semantic editing mode.
 
     <item*|<verbatim|table/>>Tables and cells.
 
-    <item*|<verbatim|dynamic/>>Folding, switches, overlays and slides;
+    <item*|<source-link|dynamic/|TeXmacs/progs/dynamic>>Folding, switches, overlays and slides;
     sessions and programs; scripts, plots and converters; spreadsheets;
     animations.
 
-    <item*|<verbatim|texmacs/keyboard/>>Keyboard prefixes and wildcards
+    <item*|<source-link|texmacs/keyboard/|TeXmacs/progs/texmacs/keyboard>>Keyboard prefixes and wildcards
     common to all modes (<source-link|prefix-kbd.scm|TeXmacs/progs/texmacs/keyboard/prefix-kbd.scm>) and the
     <LaTeX> style shortcuts (<source-link|latex-kbd.scm|TeXmacs/progs/texmacs/keyboard/latex-kbd.scm>).
 
@@ -134,7 +134,7 @@
 
   Other modes follow the same pattern and are not described here, notably
   the source mode (<verbatim|source/>), the programming languages
-  (<verbatim|prog/>, see <hlink|syntax highlighting and programming
+  (<source-link|prog/|TeXmacs/progs/prog>, see <hlink|syntax highlighting and programming
   languages|syntax-highlighting.en.tm>), graphics (<verbatim|graphics/>,
   see <hlink|the graphics editor|graphics-editor.en.tm>) and the
   bibliographic database (<verbatim|database/>, see <hlink|the database and

@@ -32,8 +32,8 @@
   (<cpp|load_string>, <cpp|save_string>, <cpp|is_of_type>, ...), a
   <verbatim|tmfs> document can be loaded into a buffer, saved, included,
   linked to or used as an image just like an ordinary file. The paths in
-  this document are relative to <verbatim|src/src/> for <c++> files and to
-  <verbatim|src/TeXmacs/progs/> for <scheme> files.
+  this document are relative to <source-link|src/src/|src> for <c++> files and to
+  <source-link|src/TeXmacs/progs/|TeXmacs/progs> for <scheme> files.
 
   <section|Syntax of <verbatim|tmfs> <abbr|URL>s>
 
@@ -137,7 +137,7 @@
   path with a pseudo protocol:
 
   <\description>
-    <item*|<verbatim|tm/>>A file under <verbatim|$TEXMACS_PATH>, given
+    <item*|<source-link|tm/|plugins/octave/octave/tm>>A file under <verbatim|$TEXMACS_PATH>, given
     relatively to it. For instance
     <verbatim|tm/doc/main/man-manual.en.tm>.
 
@@ -149,7 +149,7 @@
     <item*|<verbatim|here/>>A relative file name.
 
     <item*|<verbatim|http/>, <verbatim|https/>, <verbatim|ftp/>,
-    <verbatim|tmfs/>>A web <abbr|URL> or another <verbatim|tmfs> <abbr|URL>,
+    <source-link|tmfs/|TeXmacs/doc/devel/scheme/api/tmfs>>A web <abbr|URL> or another <verbatim|tmfs> <abbr|URL>,
     without the <verbatim|://>. For instance the <verbatim|tmfs> string of
     <verbatim|tmfs://help/normal/x.tm> is
     <verbatim|tmfs/help/normal/x.tm>.

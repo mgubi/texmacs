@@ -125,7 +125,7 @@
     system, to <name|UTF-8> and call <cpp|texmacs_entrypoint>.
   </enumerate>
 
-  The 32-bit layer (<verbatim|Plugins/Windows/>) uses the
+  The 32-bit layer (<source-link|Plugins/Windows/|src/Plugins/Windows>) uses the
   <verbatim|nowide> library for the conversion of arguments and file
   names. Both layers have their own stack trace and server log
   implementations.

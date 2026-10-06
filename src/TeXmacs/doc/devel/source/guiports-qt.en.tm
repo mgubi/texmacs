@@ -54,9 +54,9 @@
   <cpp|gui_version ()> returns <verbatim|"qt4">, <verbatim|"qt5"> or
   <verbatim|"qt6"> accordingly (<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>).
 
-  <section|The <verbatim|Plugins/Qt6> fork>
+  <section|The <source-link|Plugins/Qt6|src/Plugins/Qt6> fork>
 
-  <verbatim|Plugins/Qt6> was created on 2026-05-27 as a copy of
+  <source-link|Plugins/Qt6|src/Plugins/Qt6> was created on 2026-05-27 as a copy of
   <verbatim|Plugins/Qt> (commit <verbatim|73253e50f1>, \Pduplicating qt
   folder\Q) and is compiled instead of it by <verbatim|configure
   --enable-qt-new>, which requires <name|Qt> 6.10 (see <hlink|selecting

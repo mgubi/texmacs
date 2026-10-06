@@ -10,7 +10,7 @@
   This page lists the handlers of the <TeXmacs> file system defined in the
   <scheme> sources of <TeXmacs>, with the syntax of the names they accept,
   the operations they implement and the module where they are defined
-  (relative to <verbatim|src/TeXmacs/progs/>). In the syntax descriptions,
+  (relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>). In the syntax descriptions,
   <verbatim|<em|file>> stands for a file name encoded with
   <scm|url-\<gtr\>tmfs-string>, such as <verbatim|file/home/joe/paper.tm>
   or <verbatim|tm/doc/main/man-manual.en.tm> (see <hlink|the

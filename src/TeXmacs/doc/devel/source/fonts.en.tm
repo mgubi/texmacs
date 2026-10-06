@@ -246,7 +246,7 @@
     large delimiters and big operators of variable size.
 
     <item*|<name|TrueType> and <name|OpenType> fonts>See
-    <verbatim|Plugins/Freetype>: <source-link|tt_font.cpp|src/Plugins/Freetype/tt_font.cpp> implements fonts with
+    <source-link|Plugins/Freetype|src/Plugins/Freetype>: <source-link|tt_font.cpp|src/Plugins/Freetype/tt_font.cpp> implements fonts with
     a fixed encoding, <source-link|unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp> <name|Unicode> fonts, and
     <source-link|unicode_math_font.cpp|src/Plugins/Freetype/unicode_math_font.cpp>, <source-link|rubber_unicode_font.cpp|src/Plugins/Freetype/rubber_unicode_font.cpp>,
     <source-link|rubber_stix_font.cpp|src/Plugins/Freetype/rubber_stix_font.cpp> and <source-link|rubber_assemble_font.cpp|src/Plugins/Freetype/rubber_assemble_font.cpp>
@@ -280,7 +280,7 @@
   </description>
 
   In most cases, the lowest layer of the implementation consists of a
-  collection of glyphs (see <verbatim|Graphics/Bitmap_fonts>) or of outline
+  collection of glyphs (see <source-link|Graphics/Bitmap_fonts|src/Graphics/Bitmap_fonts>) or of outline
   fonts, together with some font metric information. The font is
   responsible for putting these glyphs together using some appropriate
   spacing. The renderers take care of displaying glyphs in a nice,
@@ -355,7 +355,7 @@
   </scm-code>
 
   When a left hand pattern is matched, it is recursively substituted by the
-  right hand side. The files in the directory <verbatim|progs/fonts> contain
+  right hand side. The files in the directory <source-link|progs/fonts|TeXmacs/progs/fonts> contain
   a large number of rewriting rules, which are declared using
   <scm|set-font-rules>.
 

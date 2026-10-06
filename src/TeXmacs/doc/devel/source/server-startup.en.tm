@@ -269,7 +269,7 @@
     <source-link|QTMPipeLink.cpp|src/Plugins/Qt/QTMPipeLink.cpp>) are also wrapped in the macros
     <cpp|BEGIN_SLOT> and <cpp|END_SLOT> of
     <source-link|Plugins/Qt/qt_gui.hpp|src/Plugins/Qt/qt_gui.hpp>. (The same code exists in
-    <verbatim|Plugins/Qt6/>.)
+    <source-link|Plugins/Qt6/|src/Plugins/Qt6>.)
   </itemize>
 
   The editor and <cpp|protected_call> sites call <cpp|handle_exceptions

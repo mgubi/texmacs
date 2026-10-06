@@ -19,8 +19,8 @@
   <hlink|converters for <LaTeX>|../../main/convert/latex/man-latex.en.tm>
   and <hlink|converters for <name|HTML>|../../main/convert/html/man-html.en.tm>.
 
-  All <c++> file names below are relative to <verbatim|src/src/> and all
-  <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>.
+  All <c++> file names below are relative to <source-link|src/src/|src> and all
+  <scheme> file names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Overview of the four pipelines>
 
@@ -151,7 +151,7 @@
     <source-link|latex-overload.scm|TeXmacs/progs/convert/latex/latex-overload.scm>>Definitions (as <LaTeX> strees) of the
     extra macros and environments which <TeXmacs> puts in the preamble.
 
-    <item*|<verbatim|Data/Convert/Tex/>>The <LaTeX> parser
+    <item*|<source-link|Data/Convert/Tex/|src/Data/Convert/Tex>>The <LaTeX> parser
     (<source-link|parsetex.cpp|src/Data/Convert/Tex/parsetex.cpp>), the importer (<source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp>,
     <source-link|fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>), the importer for class files
     (<source-link|fromcls.cpp|src/Data/Convert/Tex/fromcls.cpp>), the bridge to the <scheme> tables
@@ -161,7 +161,7 @@
     tracking and conservative conversion (<verbatim|tracked_*.cpp>,
     <verbatim|conservative_*.cpp>).
 
-    <item*|<verbatim|Plugins/LaTeX_Preview/>>Rendering of <LaTeX> fragments
+    <item*|<source-link|Plugins/LaTeX_Preview/|src/Plugins/LaTeX_Preview>>Rendering of <LaTeX> fragments
     as pictures during the import.
 
     <item*|<source-link|convert/html/init-html.scm|TeXmacs/progs/convert/html/init-html.scm>>Format declaration and
@@ -173,11 +173,11 @@
 
     <item*|<source-link|convert/html/htmltm.scm|TeXmacs/progs/convert/html/htmltm.scm>>The import from <name|HTML>.
 
-    <item*|<verbatim|convert/mathml/>>Export (<source-link|tmmath.scm|TeXmacs/progs/convert/mathml/tmmath.scm>) and
+    <item*|<source-link|convert/mathml/|TeXmacs/progs/convert/mathml>>Export (<source-link|tmmath.scm|TeXmacs/progs/convert/mathml/tmmath.scm>) and
     import (<source-link|mathtm.scm|TeXmacs/progs/convert/mathml/mathtm.scm>, <source-link|mathml-drd.scm|TeXmacs/progs/convert/mathml/mathml-drd.scm>) of
     <name|MathML>.
 
-    <item*|<verbatim|convert/tools/>>Shared tools: sxml accessors
+    <item*|<source-link|convert/tools/|TeXmacs/progs/convert/tools>>Shared tools: sxml accessors
     (<source-link|sxml.scm|TeXmacs/progs/convert/tools/sxml.scm>, <source-link|sxhtml.scm|TeXmacs/progs/convert/tools/sxhtml.scm>), <name|XML> import helpers
     (<source-link|xmltm.scm|TeXmacs/progs/convert/tools/xmltm.scm>), construction of <TeXmacs> strees
     (<source-link|stm.scm|TeXmacs/progs/convert/tools/stm.scm>, <source-link|tmconcat.scm|TeXmacs/progs/convert/tools/tmconcat.scm>), lengths, colors and

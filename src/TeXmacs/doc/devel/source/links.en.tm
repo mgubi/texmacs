@@ -160,8 +160,8 @@
     references, previews, smart references.
   </description-paragraphs>
 
-  Paths of <c++> files are relative to <verbatim|src/src/>, paths of
-  <scheme> files to <verbatim|src/TeXmacs/>.
+  Paths of <c++> files are relative to <source-link|src/src/|src>, paths of
+  <scheme> files to <source-link|src/TeXmacs/|TeXmacs>.
 
   <section|Contents of this chapter>
 

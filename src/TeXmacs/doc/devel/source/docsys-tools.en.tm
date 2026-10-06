@@ -130,7 +130,7 @@
   The <c++> routines exported to <scheme> are documented separately in
   <hlink|the glue auto-documentation|../scheme/api/glue-auto-doc.en.tm>.
   That file and <source-link|progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm> are generated from
-  the glue declarations by <verbatim|src/src/Scheme/Glue/build-auto-doc>
+  the glue declarations by <source-link|src/src/Scheme/Glue/build-auto-doc|src/Scheme/Glue/build-auto-doc>
   (with <source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm> and
   <source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>); see <hlink|the glue
   generator|scheme-bridge-glue.en.tm>.

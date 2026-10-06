@@ -32,7 +32,7 @@
   interface and the plug-in are wired together. The user level description,
   including how to obtain keys and install the command line tools, is the
   documentation of the plug-in itself
-  (<verbatim|src/plugins/ai/doc/ai.en.tm> and
+  (<source-link|src/plugins/ai/doc/ai.en.tm|plugins/ai/doc/ai.en.tm> and
   <verbatim|ai-setup.en.tm>).
 
   The integration reuses three general mechanisms which are documented
@@ -50,7 +50,7 @@
     <item*|User interface>The <menu|Tools> menu and the preferences
     (<source-link|texmacs/menus/tools-menu.scm|TeXmacs/progs/texmacs/menus/tools-menu.scm>,
     <source-link|preferences-widgets.scm|TeXmacs/progs/texmacs/menus/preferences-widgets.scm>), the <scheme> commands of
-    <verbatim|tools/ai/>, and the plug-in <verbatim|ai>
+    <source-link|tools/ai/|TeXmacs/progs/tools/ai>, and the plug-in <verbatim|ai>
     (<source-link|src/plugins/ai/progs/init-ai.scm|plugins/ai/progs/init-ai.scm>), which configures the
     sessions and their preferences.
 

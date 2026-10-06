@@ -14,7 +14,8 @@
 ;; The developer documentation refers to source files with
 ;;   <source-link|shown text|path[:line]>
 ;; where path is relative to the src directory of the TeXmacs repository
-;; (the directory with src, TeXmacs and plugins).  Clicking the link calls
+;; (the directory with src, TeXmacs and plugins); it may also name a
+;; directory, which is opened with the file manager.  Clicking the link calls
 ;; open-source-link, which opens the file with the tool of the preference
 ;; "developer:source editor": "texmacs" or a command line in which %f is
 ;; replaced by the file and %l by the line.
@@ -115,6 +116,7 @@
                                  " Developer " (math "\\rightarrow")
                                  " Open source links with")
                         "Open source file"))
+          ((url-directory? u) (open-in-system u))
           ((== tool "texmacs") (open-in-texmacs u line))
           ((== tool "default") (open-in-system u))
           (else (open-in-tool tool u line)))))

@@ -375,7 +375,7 @@
   <source-link|System/Language/math_language.cpp|src/System/Language/math_language.cpp> and the grammar
   <source-link|progs/language/std-math.scm|TeXmacs/progs/language/std-math.scm>), and on spacing tables provided
   by the font. Notice that the directory
-  <verbatim|Graphics/Mathematics> is unrelated to mathematical typesetting:
+  <source-link|Graphics/Mathematics|src/Graphics/Mathematics> is unrelated to mathematical typesetting:
   it contains generic templates for polynomials, vectors, matrices and
   formal expressions.
 

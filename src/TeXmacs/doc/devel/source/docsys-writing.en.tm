@@ -11,7 +11,7 @@
   meta information, licenses) are given in <hlink|contributing to the
   <TeXmacs>
   documentation|../../about/contribute/documentation/documentation.en.tm>.
-  For the developer documentation in <verbatim|doc/devel/source/>, the
+  For the developer documentation in <source-link|doc/devel/source/|TeXmacs/doc/devel/source>, the
   following conventions have proved useful:
 
   <\itemize>
@@ -30,7 +30,7 @@
     <item>Source files are referred to with <markup|source-link> (see
     below), which shows the name as written and opens the file when it is
     clicked. In the shown text, paths of <c++> files are given relative to
-    <verbatim|src/src/> and paths of <scheme> files relative to
+    <source-link|src/src/|src> and paths of <scheme> files relative to
     <verbatim|progs/>. Links to other documentation are relative
     <markup|hlink>s, so that they work in the help browser, in books and on
     the web site.
@@ -78,7 +78,9 @@
   <markup|verbatim> font; the second one is the path of the file relative
   to the <verbatim|src> directory of the repository (the directory which
   contains <verbatim|src>, <verbatim|TeXmacs> and <verbatim|plugins>),
-  optionally followed by <verbatim|:<em|line>>. A click calls
+  optionally followed by <verbatim|:<em|line>>. The path may also name a
+  directory, which is opened with the file manager of the system. A click
+  calls
   <scm|open-source-link> of <source-link|doc/source-links.scm|TeXmacs/progs/doc/source-links.scm>,
   which looks for the file in
 
@@ -89,7 +91,7 @@
     <item>otherwise <verbatim|$TEXMACS_SOURCE_PATH>, the source tree
     <TeXmacs> was configured from (empty for the <name|Windows> builds);
 
-    <item>for paths in <verbatim|TeXmacs/>, finally the installed
+    <item>for paths in <source-link|TeXmacs/|packages/macos/TeXmacs>, finally the installed
     <verbatim|$TEXMACS_PATH>, so that the <scheme> files, styles and
     packages can be opened from any installation.
   </enumerate>
@@ -107,11 +109,17 @@
 
   The links are checked by <source-link|tests/docs/source-links.py|tests/docs/source-links.py>,
   which reports every <markup|source-link> whose file is no longer in the
-  repository, and every <markup|verbatim> which names exactly one source
-  file and could be a link; with <verbatim|--convert> it turns the latter
-  into links. Names which match several files are left alone (write more
-  of the path), as are generated files, files of other branches and files
-  of the user's home directory, which stay in <markup|verbatim>.
+  repository, and every <markup|verbatim> which names exactly one file
+  (or one directory) of the repository and could be a link; with
+  <verbatim|--convert> it turns the latter into links. A name is matched by
+  the end of the paths, so <tt|Plugins/Qt/qt_gui.cpp> and
+  <tt|qt_gui.cpp> both work; a name starting with <tt|src/> is
+  read from the root of the repository. Names without a <verbatim|/> are
+  only considered for source files (<verbatim|.cpp>, <verbatim|.scm>,
+  <verbatim|.m4>, ...). Names which match several files or directories
+  are left alone (write more of the path), as are generated files, files
+  of other branches and files of the user's home directory, which stay in
+  <markup|verbatim>.
 
   <section|Encoding>
 
@@ -201,7 +209,7 @@
     <markup|tmdoc-file> and <scm|url-resolve-help> fall back to
     <verbatim|.en.tm>. With a user interface in a language for which the
     target has no translation, the link leads to the <verbatim|Broken
-    link.> page. For instance, <verbatim|main/automated/top-help.en.tm>
+    link.> page. For instance, <source-link|main/automated/top-help.en.tm|TeXmacs/doc/main/automated/top-help.en.tm>
     links to <verbatim|main/editing/man-structured-variants>, which exists
     only in English, French and Chinese.
 

@@ -11,20 +11,20 @@
   programmed there. This page relates the three levels:
 
   <\enumerate>
-    <item>the <c++> routines of <verbatim|Texmacs/Data/>, of the server and
+    <item>the <c++> routines of <source-link|Texmacs/Data/|src/Texmacs/Data>, of the server and
     of the editor;
 
     <item>the <em|glue> routines, which export them under <scheme> names
     and are generated from the files <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>,
     <source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm> and <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>
-    of <verbatim|src/src/Scheme/Glue/> (see <hlink|the <scheme>
+    of <source-link|src/src/Scheme/Glue/|src/Scheme/Glue> (see <hlink|the <scheme>
     interpreter and the glue|scheme-bridge.en.tm>);
 
     <item>the <scheme> library and the user level commands, in
     <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>,
     <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> and
     <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm> (relative to
-    <verbatim|src/TeXmacs/progs/>).
+    <source-link|src/TeXmacs/progs/|TeXmacs/progs>).
   </enumerate>
 
   The user level documentation of the <scheme> functions is in
@@ -41,7 +41,7 @@
   <\description>
     <item*|<source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>Free functions, without a
     receiver. Among those are all buffer, view, window and project routines
-    of <verbatim|Texmacs/Data/> (the block starting with the comment
+    of <source-link|Texmacs/Data/|src/Texmacs/Data> (the block starting with the comment
     <verbatim|;; buffers> in that file). They take buffer names, view
     and window <abbr|URL>s as arguments and therefore work on any buffer.
 
@@ -191,7 +191,7 @@
 
   <section|Exporting a new routine>
 
-  A new routine of <verbatim|Texmacs/Data/> is exported by declaring it in
+  A new routine of <source-link|Texmacs/Data/|src/Texmacs/Data> is exported by declaring it in
   the corresponding header (<source-link|new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>,
   <source-link|new_view.hpp|src/Texmacs/Data/new_view.hpp>, <source-link|new_window.hpp|src/Texmacs/Data/new_window.hpp>) and adding a line
   such as

@@ -45,7 +45,7 @@
   The relevant source files are:
 
   <\description>
-    <item*|<verbatim|Graphics/Renderer/>>The abstract class
+    <item*|<source-link|Graphics/Renderer/|src/Graphics/Renderer>>The abstract class
     (<source-link|renderer.hpp|src/Graphics/Renderer/renderer.hpp>, <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp>), the common base class
     of the screen renderers (<source-link|basic_renderer.hpp|src/Graphics/Renderer/basic_renderer.hpp>,
     <source-link|basic_renderer.cpp|src/Graphics/Renderer/basic_renderer.cpp>), the PostScript renderer
@@ -53,7 +53,7 @@
     (<source-link|pencil.hpp|src/Graphics/Renderer/pencil.hpp>), brushes (<source-link|brush.hpp|src/Graphics/Renderer/brush.hpp>) and paper sizes
     (<source-link|page_type.hpp|src/Graphics/Renderer/page_type.hpp>).
 
-    <item*|<verbatim|Graphics/Pictures/>>The picture abstraction
+    <item*|<source-link|Graphics/Pictures/|src/Graphics/Pictures>>The picture abstraction
     (<source-link|picture.hpp|src/Graphics/Pictures/picture.hpp>), portable raster pictures
     (<source-link|raster.hpp|src/Graphics/Pictures/raster.hpp>, <source-link|raster_picture.hpp|src/Graphics/Pictures/raster_picture.hpp>), scalable images
     (<source-link|scalable.hpp|src/Graphics/Pictures/scalable.hpp>) and graphical effects (<source-link|effect.hpp|src/Graphics/Pictures/effect.hpp>).
@@ -61,16 +61,16 @@
     <item*|<verbatim|Plugins/Qt/>>The <name|Qt> screen renderer
     (<source-link|qt_renderer.hpp|src/Plugins/Qt/qt_renderer.hpp>, <source-link|qt_renderer.cpp|src/Plugins/Qt/qt_renderer.cpp>) and <name|Qt>
     native pictures (<source-link|qt_picture.hpp|src/Plugins/Qt/qt_picture.hpp>, <source-link|qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>).
-    The directory <verbatim|Plugins/Qt6/> contains a copy of these files.
+    The directory <source-link|Plugins/Qt6/|src/Plugins/Qt6> contains a copy of these files.
 
-    <item*|<verbatim|Plugins/Pdf/>>The <abbr|PDF> renderer based on the
+    <item*|<source-link|Plugins/Pdf/|src/Plugins/Pdf>>The <abbr|PDF> renderer based on the
     <name|PDFHummus> library (<source-link|pdf_hummus_renderer.hpp|src/Plugins/Pdf/pdf_hummus_renderer.hpp>,
     <source-link|pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>).
 
     <item*|Other back-ends>The <name|X11> renderer
     (<source-link|Plugins/X11/x_drawable.hpp|src/Plugins/X11/x_drawable.hpp>, <source-link|x_shadow.cpp|src/Plugins/X11/x_shadow.cpp>,
     <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>), and the older <name|Cairo>
-    (<verbatim|Plugins/Cairo/>), <name|Cocoa> (<verbatim|Plugins/Cocoa/>)
+    (<source-link|Plugins/Cairo/|src/Plugins/Cairo>), <name|Cocoa> (<source-link|Plugins/Cocoa/|src/Plugins/Cocoa>)
     and <name|CoreGraphics> (<verbatim|Plugins/MacOS/>) renderers.
   </description>
 

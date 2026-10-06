@@ -7,12 +7,12 @@
 
   <section|Introduction>
 
-  Several low level libraries in <verbatim|src/src/Graphics/> are shared by
+  Several low level libraries in <source-link|src/src/Graphics/|src/Graphics> are shared by
   the typesetter, the renderers, the picture effects and the graphics
   editor:
 
   <\itemize>
-    <item>the <em|color> library (<verbatim|Graphics/Colors/>), which packs
+    <item>the <em|color> library (<source-link|Graphics/Colors/|src/Graphics/Colors>), which packs
     colors into 32 bit words, resolves color names from several
     dictionaries, implements the reverse (dark) display mode and provides
     floating point colors for image processing;
@@ -22,11 +22,11 @@
     the numerical routines for splines, closest points and intersections;
 
     <item>a small generic <em|algebra> library
-    (<verbatim|Graphics/Mathematics/>) with matrices, vectors, polynomials
+    (<source-link|Graphics/Mathematics/|src/Graphics/Mathematics>) with matrices, vectors, polynomials
     and a few experimental classes;
 
     <item>the experimental <em|three dimensional> objects
-    (<verbatim|Graphics/Spacial/>) behind the <markup|object-3d> family of
+    (<source-link|Graphics/Spacial/|src/Graphics/Spacial>) behind the <markup|object-3d> family of
     tags.
   </itemize>
 
@@ -107,7 +107,7 @@
     helpers (<cpp|tm_infinity>, <cpp|tm_PI>, <cpp|square>, <cpp|fnull>,
     ...).
 
-    <item*|<verbatim|Graphics/Mathematics/>>Generic templates:
+    <item*|<source-link|Graphics/Mathematics/|src/Graphics/Mathematics>>Generic templates:
     <source-link|matrix.hpp|src/Graphics/Mathematics/matrix.hpp>, <source-link|vector.hpp|src/Graphics/Mathematics/vector.hpp>,
     <source-link|polynomial.hpp|src/Graphics/Mathematics/polynomial.hpp>, <source-link|ball.hpp|src/Graphics/Mathematics/ball.hpp>,
     <source-link|function.hpp|src/Graphics/Mathematics/function.hpp>, <source-link|function_extra.hpp|src/Graphics/Mathematics/function_extra.hpp>, the operator
@@ -115,7 +115,7 @@
     <source-link|properties.hpp|src/Graphics/Mathematics/properties.hpp>, symbolic trees <source-link|math_tree.hpp|src/Graphics/Mathematics/math_tree.hpp>,
     and the self test <source-link|test_math.cpp|src/Graphics/Mathematics/test_math.cpp>.
 
-    <item*|<verbatim|Graphics/Spacial/>>Triangulated three dimensional
+    <item*|<source-link|Graphics/Spacial/|src/Graphics/Spacial>>Triangulated three dimensional
     objects, their transformations and lighting.
   </description-paragraphs>
 

@@ -202,7 +202,7 @@
   <name|Windows>, by default on port 8085 rather than 8081, so the
   preference must be adapted) or the public service with an optional premium account.
   It is enabled by the preference <verbatim|grammar checking>; the
-  <verbatim|languagetool> plug-in (<verbatim|src/plugins/languagetool/>)
+  <verbatim|languagetool> plug-in (<source-link|src/plugins/languagetool/|plugins/languagetool>)
   only declares the preferences <verbatim|languagetool server>,
   <verbatim|languagetool premium>, <verbatim|languagetool username>,
   <verbatim|languagetool API key> and <verbatim|languagetool use widgets>,

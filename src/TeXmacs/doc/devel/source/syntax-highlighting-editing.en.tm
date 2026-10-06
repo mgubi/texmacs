@@ -8,7 +8,7 @@
   <section|Overview>
 
   The editing behaviour inside code is implemented entirely in <scheme>, in
-  the directory <verbatim|prog/>. It does not use the C++ language objects
+  the directory <source-link|prog/|TeXmacs/progs/prog>. It does not use the C++ language objects
   of the previous chapters: there is no shared tokenizer between highlighting
   and editing. The main files are:
 
@@ -197,7 +197,7 @@
       previous arguments of the enclosing form and uses the indentation arity
       of the head symbol (<scm|indent-get-arity>, from the lists
       <verbatim|nullary-indent>, <verbatim|unary-indent>, ... in
-      <verbatim|tm-mode.el>) to decide between aligning with the previous
+      <source-link|tm-mode.el|TeXmacs/progs/tm-mode.el>) to decide between aligning with the previous
       argument and indenting by a fixed amount;
 
       <item><name|Python> (<source-link|prog/python-edit.scm|TeXmacs/progs/prog/python-edit.scm>): the

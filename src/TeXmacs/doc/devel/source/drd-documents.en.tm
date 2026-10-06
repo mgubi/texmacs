@@ -306,7 +306,7 @@
   <subsection|<cpp|the_drd>>
 
   Most generic routines on trees (<verbatim|Data/Tree/>,
-  <verbatim|System/Language/>, the converters) do not have access to an
+  <source-link|System/Language/|src/System/Language>, the converters) do not have access to an
   editor, and consult the global variable <cpp|the_drd> instead. It is
   set:
 

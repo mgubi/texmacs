@@ -8,7 +8,7 @@
   <section|Enabling the code>
 
   The preprocessor symbol <verbatim|EXPERIMENTAL> controls both the
-  compilation of <verbatim|src/src/Style/> and the hooks in the editor:
+  compilation of <source-link|src/src/Style/|src/Style> and the hooks in the editor:
 
   <\itemize>
     <item>CMake: <verbatim|cmake -DENABLE_EXPERIMENTAL=ON ...>. The option
@@ -16,7 +16,7 @@
     <verbatim|Style/*.cpp> is globbed into <verbatim|TeXmacs_Style_SRCS> and
     <verbatim|add_compile_definitions (EXPERIMENTAL=1)> is executed;
     otherwise <verbatim|TeXmacs_Style_SRCS> is empty. The include
-    directories of <verbatim|Style/> are added in both cases.
+    directories of <source-link|Style/|src/Style> are added in both cases.
 
     <item>Autotools: <verbatim|./configure --enable-experimental>. The
     generated <verbatim|configure> then defines <verbatim|EXPERIMENTAL> in
@@ -29,9 +29,9 @@
   In the default configuration the symbol is undefined
   (<verbatim|System/config.h> contains <verbatim|/* #undef
   EXPERIMENTAL */>), none of the hooks below exist and no file of
-  <verbatim|Style/> is built. As explained in <hlink|the
+  <source-link|Style/|src/Style> is built. As explained in <hlink|the
   pitfalls|rewriter.en.tm>, an experimental build currently fails in three
-  files of <verbatim|Style/Evaluate/>.
+  files of <source-link|Style/Evaluate/|src/Style/Evaluate>.
 
   <section|State kept by the editor>
 

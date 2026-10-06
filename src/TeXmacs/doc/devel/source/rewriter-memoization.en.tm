@@ -5,8 +5,8 @@
 <\body>
   <tmdoc-title|Persistent environments and memoization>
 
-  This page describes <verbatim|src/src/Style/Environment/> and
-  <verbatim|src/src/Style/Memorizer/>. The design summary in <hlink|the
+  This page describes <source-link|src/src/Style/Environment/|src/Style/Environment> and
+  <source-link|src/src/Style/Memorizer/|src/Style/Memorizer>. The design summary in <hlink|the
   experimental evaluator|macro-expansion-style.en.tm> lists the classes; the
   emphasis here is on how they cooperate and on what is actually memoized.
 

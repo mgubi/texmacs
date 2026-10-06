@@ -12,10 +12,10 @@
   <\description>
     <item*|<cpp|QTTEXMACS>><name|Qt> port (<verbatim|Plugins/Qt>).
 
-    <item*|<cpp|X11TEXMACS>><name|X11> port (<verbatim|Plugins/X11> and
-    <verbatim|Plugins/Widkit>).
+    <item*|<cpp|X11TEXMACS>><name|X11> port (<source-link|Plugins/X11|src/Plugins/X11> and
+    <source-link|Plugins/Widkit|src/Plugins/Widkit>).
 
-    <item*|<cpp|AQUATEXMACS>><name|Cocoa> port (<verbatim|Plugins/Cocoa>).
+    <item*|<cpp|AQUATEXMACS>><name|Cocoa> port (<source-link|Plugins/Cocoa|src/Plugins/Cocoa>).
   </description>
 
   Outside the port directories, many files test these macros, typically to
@@ -55,7 +55,7 @@
 
   <section|<verbatim|configure> and <verbatim|make>>
 
-  The autoconf macro <verbatim|TM_GUI> (<verbatim|misc/m4/tm_gui.m4>) is
+  The autoconf macro <verbatim|TM_GUI> (<source-link|misc/m4/tm_gui.m4|misc/m4/tm_gui.m4>) is
   more complete:
 
   <\description>
@@ -75,8 +75,8 @@
     with <verbatim|-framework Cocoa>. Since this test comes after the
     <name|Qt> test, it overrides the default <name|Qt> choice.
 
-    <item*|<verbatim|--enable-qt-new>>Compile <verbatim|Plugins/Qt6>
-    instead of <verbatim|Plugins/Qt> (<verbatim|misc/m4/qt.m4>): the
+    <item*|<verbatim|--enable-qt-new>>Compile <source-link|Plugins/Qt6|src/Plugins/Qt6>
+    instead of <verbatim|Plugins/Qt> (<source-link|misc/m4/qt.m4|misc/m4/qt.m4>): the
     variable <verbatim|QT_PLUGIN_DIR> becomes <verbatim|Qt6>, which selects
     both the sources and the include path <verbatim|-IPlugins/Qt6>. The
     option is on by default when <verbatim|CONFIG_OS> is
@@ -98,12 +98,12 @@
 
   <section|Android>
 
-  The <name|Android> launcher in <verbatim|src/packages/android/launcher>
+  The <name|Android> launcher in <source-link|src/packages/android/launcher|packages/android/launcher>
   is a separate <name|CMake> project which links a prebuilt
   <verbatim|libtexmacs.a> with <name|Qt> 6 or 5 (<verbatim|find_package
   (QT NAMES Qt6 Qt5 ...)>). The library itself is configured with
   <verbatim|configure>, where <verbatim|--enable-qt-new> is the default for
-  <name|Android>, so a library configured for <name|Android> uses <verbatim|Plugins/Qt6>
+  <name|Android>, so a library configured for <name|Android> uses <source-link|Plugins/Qt6|src/Plugins/Qt6>
   unless <verbatim|--disable-qt-new> is given. The operating system side of
   <name|Android> is described in <hlink|platform
   support|system-platforms.en.tm>.

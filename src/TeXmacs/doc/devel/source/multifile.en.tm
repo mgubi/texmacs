@@ -101,8 +101,8 @@
 
   <section|Source files>
 
-  Paths are relative to <verbatim|src/src/> for <c++> files and to
-  <verbatim|src/TeXmacs/> for the others.
+  Paths are relative to <source-link|src/src/|src> for <c++> files and to
+  <source-link|src/TeXmacs/|TeXmacs> for the others.
 
   <\description-paragraphs>
     <item*|<source-link|Texmacs/Data/new_project.cpp|src/Texmacs/Data/new_project.cpp>>Attaching a project to

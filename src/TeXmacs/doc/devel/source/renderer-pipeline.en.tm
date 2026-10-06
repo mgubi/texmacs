@@ -107,7 +107,7 @@
     rectangles are invalidated again and drawn later.
   </itemize>
 
-  Graphics boxes (<verbatim|Typeset/Boxes/Graphics/>) and decorations use
+  Graphics boxes (<source-link|Typeset/Boxes/Graphics/|src/Typeset/Boxes/Graphics>) and decorations use
   <cpp|line>, <cpp|lines>, <cpp|arc>, <cpp|polygon> and the fill routines;
   <cpp|effect_box_rep> uses <cpp|shadow (picture&, ...)> and
   <cpp|draw_picture> (see <hlink|the renderer API|renderer-api.en.tm>); image boxes use <cpp|draw_scalable>.

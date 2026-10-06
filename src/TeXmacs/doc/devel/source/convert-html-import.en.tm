@@ -63,7 +63,7 @@
 
   The result is a tree of the form <verbatim|(*TOP* (html (@ ...) ...))>,
   which is converted into a <scheme> expression by the glue. Unit tests for
-  this parser are in <verbatim|src/tests/Data/Convert/Xml>.
+  this parser are in <source-link|src/tests/Data/Convert/Xml|tests/Data/Convert/Xml>.
 
   <subsection|<name|MathJax>>
 

@@ -112,7 +112,7 @@
   </description-paragraphs>
 
   The database layer is described in the <scheme> modules of
-  <verbatim|progs/database/>. The points which matter for the server are:
+  <source-link|progs/database/|TeXmacs/progs/database>. The points which matter for the server are:
 
   <\itemize>
     <item>The <c++> class <cpp|database_rep>

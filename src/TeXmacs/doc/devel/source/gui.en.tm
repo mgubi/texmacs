@@ -8,12 +8,12 @@
   <\warning>
     This chapter describes the original graphical toolkit of <TeXmacs>,
     called <em|Widkit>, together with its <name|X11> backend. This toolkit
-    still lives in the directories <verbatim|src/src/Plugins/Widkit> and
-    <verbatim|src/src/Plugins/X11>, but it is only used when <TeXmacs> is
+    still lives in the directories <source-link|src/src/Plugins/Widkit|src/Plugins/Widkit> and
+    <source-link|src/src/Plugins/X11|src/Plugins/X11>, but it is only used when <TeXmacs> is
     configured with the <name|X11> interface (<verbatim|./configure
     --disable-qt>). The default user interface is based on <name|Qt>
     (<verbatim|Plugins/Qt>), and all user interfaces implement the abstract
-    widget interface from <verbatim|src/src/Graphics/Gui>. For an up-to-date
+    widget interface from <source-link|src/src/Graphics/Gui|src/Graphics/Gui>. For an up-to-date
     description of the abstract widget system, of the main <TeXmacs> window
     and of the <scheme> widget language, we refer to the chapter on the
     <hlink|abstract widget system|widgets.en.tm>; for the graphical output,
@@ -32,7 +32,7 @@
   window interface has been implemented for X Window.
 
   The <name|X11> implementation of the window interface consists of three
-  main classes (see <verbatim|Plugins/X11>): <cpp|x_gui_rep>,
+  main classes (see <source-link|Plugins/X11|src/Plugins/X11>): <cpp|x_gui_rep>,
   <cpp|x_window_rep> and <cpp|x_drawable_rep>. The <cpp|x_gui_rep> class
   (there is only one instance <cpp|the_gui>) is responsible for
 
@@ -969,7 +969,7 @@
 
   The constructors of the standard widgets are declared in
   <source-link|Plugins/Widkit/wk_widget.hpp|src/Plugins/Widkit/wk_widget.hpp>; their implementations can be
-  found in the subdirectories of <verbatim|Plugins/Widkit>
+  found in the subdirectories of <source-link|Plugins/Widkit|src/Plugins/Widkit>
   (<verbatim|Basic>, <verbatim|Composite>, <verbatim|Attribute>,
   <verbatim|Output>, <verbatim|Button>, <verbatim|Input>,
   <verbatim|Scrollable> and <verbatim|Misc>).

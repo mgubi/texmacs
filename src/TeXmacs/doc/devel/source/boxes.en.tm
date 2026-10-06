@@ -30,7 +30,7 @@
 
   The abstract class <cpp|box_rep> and the class <cpp|box> are declared in
   <source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>. The concrete box classes are implemented in
-  the subdirectories of <verbatim|Typeset/Boxes>: <verbatim|Basic> (text
+  the subdirectories of <source-link|Typeset/Boxes|src/Typeset/Boxes>: <verbatim|Basic> (text
   boxes, rubber boxes such as large delimiters, empty boxes, <abbr|etc.>),
   <verbatim|Composite> (concatenations, stacks, fractions, roots, scripts,
   superpositions, <abbr|etc.>), <verbatim|Modifier> (boxes which modify the

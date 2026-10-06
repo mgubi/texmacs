@@ -27,7 +27,7 @@
   <scm|plugin-configure> are listed in <hlink|the summary of configuration
   options|../plugin/plugin-config.en.tm>. These topics are not repeated here;
   instead, this chapter goes one level deeper: it describes the <c++> classes
-  of <verbatim|System/Link>, the output parser, the integration with the
+  of <source-link|System/Link|src/System/Link>, the output parser, the integration with the
   event loop, and the exact sequence of calls between <scheme> and <c++>
   during the life of a session.
 
@@ -126,8 +126,8 @@
 
   <section|Map of the source files>
 
-  <c++> files are given relative to <verbatim|src/src>, <scheme> files
-  relative to <verbatim|src/TeXmacs/progs>.
+  <c++> files are given relative to <source-link|src/src|src>, <scheme> files
+  relative to <source-link|src/TeXmacs/progs|TeXmacs/progs>.
 
   <\description>
     <item*|<source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>, <source-link|tm_link.cpp|src/System/Link/tm_link.cpp>>The

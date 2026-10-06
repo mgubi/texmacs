@@ -8,7 +8,7 @@
   <section|Overview>
 
   The import of <LaTeX> is almost entirely written in <c++>, in the
-  directory <verbatim|Data/Convert/Tex>. The <scheme> side only declares the
+  directory <source-link|Data/Convert/Tex|src/Data/Convert/Tex>. The <scheme> side only declares the
   converters (<source-link|convert/latex/init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm>) and provides the
   tables which describe the <LaTeX> commands
   (<source-link|convert/latex/latex-command-drd.scm|TeXmacs/progs/convert/latex/latex-command-drd.scm>,

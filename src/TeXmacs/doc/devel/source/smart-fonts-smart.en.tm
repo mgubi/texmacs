@@ -127,7 +127,7 @@
   The <em|family> argument of a smart font is a comma separated list. Each
   entry is either a plain family name or a <em|conditional entry> of the
   form <verbatim|<em|conditions>=<em|family>>. Examples from the style
-  packages in <verbatim|packages/customize/fonts/> and from the code are:
+  packages in <source-link|packages/customize/fonts/|TeXmacs/packages/customize/fonts> and from the code are:
 
   <\verbatim-code>
     mathlarge=TeX Gyre Pagella,Linux Libertine

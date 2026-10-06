@@ -55,7 +55,7 @@
 
   <section|View identifiers>
 
-  Outside <verbatim|Texmacs/Data/>, and in particular in <scheme>, a view
+  Outside <source-link|Texmacs/Data/|src/Texmacs/Data>, and in particular in <scheme>, a view
   is designated by an <abbr|URL> of the form
 
   <\verbatim-code>

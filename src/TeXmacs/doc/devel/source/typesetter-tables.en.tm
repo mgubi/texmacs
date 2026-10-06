@@ -7,7 +7,7 @@
 
   <section|Overview>
 
-  Tables are typeset by the module <verbatim|Typeset/Table/>, with the
+  Tables are typeset by the module <source-link|Typeset/Table/|src/Typeset/Table>, with the
   classes <cpp|table_rep> and <cpp|cell_rep> declared in
   <source-link|Typeset/Table/table.hpp|src/Typeset/Table/table.hpp>. A table is not handled by the bridges:
   it is always typeset as a whole, as part of the paragraph containing it.

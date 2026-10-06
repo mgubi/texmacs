@@ -13,7 +13,7 @@
   <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp> (the widget constructors and the
   message protocol) and of <source-link|Graphics/Renderer/renderer.hpp|src/Graphics/Renderer/renderer.hpp> (the
   drawing surface). A <em|port> is a directory in
-  <verbatim|src/src/Plugins/> which implements these interfaces for one
+  <source-link|src/src/Plugins/|src/Plugins> which implements these interfaces for one
   toolkit. This chapter is a comparative map of the ports which exist in
   this source tree and describes the port specific internals which are not
   covered elsewhere: how each port is selected and built, its event loop,
@@ -30,7 +30,7 @@
   (which are independent of the graphical port) in <hlink|platform
   support|system-platforms.en.tm>.
 
-  All file names are relative to <verbatim|src/src/> unless stated
+  All file names are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -38,14 +38,14 @@
   <descriptive-table|<tformat|<table|<row|<cell|Port>|<cell|Macro>|<cell|Built
   by>|<cell|Status>>|<row|<cell|<verbatim|Plugins/Qt> (<name|Qt> 4, 5,
   6)>|<cell|<cpp|QTTEXMACS>>|<cell|<name|CMake>,
-  <verbatim|configure>>|<cell|reference port>>|<row|<cell|<verbatim|Plugins/Qt6>>|<cell|<cpp|QTTEXMACS>>|<cell|<verbatim|configure
-  --enable-qt-new>>|<cell|experimental fork>>|<row|<cell|<verbatim|Plugins/X11>,
+  <verbatim|configure>>|<cell|reference port>>|<row|<cell|<source-link|Plugins/Qt6|src/Plugins/Qt6>>|<cell|<cpp|QTTEXMACS>>|<cell|<verbatim|configure
+  --enable-qt-new>>|<cell|experimental fork>>|<row|<cell|<source-link|Plugins/X11|src/Plugins/X11>,
   <verbatim|Widkit>>|<cell|<cpp|X11TEXMACS>>|<cell|<verbatim|configure
-  --disable-qt>>|<cell|historical>>|<row|<cell|<verbatim|Plugins/Cocoa>>|<cell|<cpp|AQUATEXMACS>>|<cell|<verbatim|configure
+  --disable-qt>>|<cell|historical>>|<row|<cell|<source-link|Plugins/Cocoa|src/Plugins/Cocoa>>|<cell|<cpp|AQUATEXMACS>>|<cell|<verbatim|configure
   --enable-cocoa>>|<cell|experimental>>|<row|<cell|headless>|<cell|<cpp|QTTEXMACS>>|<cell|option
   <verbatim|-headless>>|<cell|batch use>>>>>
 
-  <verbatim|Plugins/Qt6> needs <name|Qt> 6.10 and is the default of
+  <source-link|Plugins/Qt6|src/Plugins/Qt6> needs <name|Qt> 6.10 and is the default of
   <verbatim|configure> on <name|Android>; <name|CMake> cannot build it. The
   <name|X11> port is kept up with changes of the abstract interface but is
   otherwise historical, and the <name|Cocoa> port (also called <name|Aqua>)
@@ -76,11 +76,11 @@
     <item*|<source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp>, <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>,
     <source-link|message.hpp|src/Graphics/Gui/message.hpp>>The interfaces every port implements.
 
-    <item*|<source-link|CMakeLists.txt|src/CMakeLists.txt> (top level of <verbatim|src/>)>The
+    <item*|<source-link|CMakeLists.txt|src/CMakeLists.txt> (top level of <source-link|src/|src>)>The
     cache variable <verbatim|TEXMACS_GUI> and the selection of <name|Qt> 4,
     5 or 6.
 
-    <item*|<verbatim|misc/m4/tm_gui.m4>>The <verbatim|configure> options
+    <item*|<source-link|misc/m4/tm_gui.m4|misc/m4/tm_gui.m4>>The <verbatim|configure> options
     <verbatim|--disable-qt>, <verbatim|--enable-qtpipes> and
     <verbatim|--enable-cocoa> and the definition of the port macros.
 

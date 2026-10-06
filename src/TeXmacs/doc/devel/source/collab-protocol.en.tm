@@ -33,7 +33,7 @@
   <subsection|The socket classes>
 
   The socket code lives in <source-link|Plugins/Qt/QTMSockets.cpp|src/Plugins/Qt/QTMSockets.cpp> (with a
-  copy in <verbatim|Plugins/Qt6/>). It defines two <name|Qt> objects:
+  copy in <source-link|Plugins/Qt6/|src/Plugins/Qt6>). It defines two <name|Qt> objects:
 
   <\description>
     <item*|<cpp|socket_server_rep>>The listening socket of a server. Its
@@ -378,7 +378,7 @@
 
   The following table lists the services currently declared with
   <scm|tm-service>, grouped by module (all under
-  <verbatim|progs/server/>).
+  <source-link|progs/server/|TeXmacs/progs/server>).
 
   <\description>
     <item*|<source-link|server-base.scm|TeXmacs/progs/server/server-base.scm>><scm|remote-login>,

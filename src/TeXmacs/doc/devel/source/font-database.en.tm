@@ -205,9 +205,9 @@
     analyzing font files.
 
     <item*|<verbatim|$TEXMACS_PATH/fonts/*.scm>>The global database shipped
-    with <TeXmacs> (in the source tree: <verbatim|src/TeXmacs/fonts>).
+    with <TeXmacs> (in the source tree: <source-link|src/TeXmacs/fonts|TeXmacs/fonts>).
 
-    <item*|<verbatim|progs/fonts/>>Font rules for the old mechanism
+    <item*|<source-link|progs/fonts/|TeXmacs/progs/fonts>>Font rules for the old mechanism
     (<verbatim|fonts-*.scm>), the old font menus
     (<source-link|font-old-menu.scm|TeXmacs/progs/fonts/font-old-menu.scm>), the font selector
     (<source-link|font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>) and tools for sampling and comparing

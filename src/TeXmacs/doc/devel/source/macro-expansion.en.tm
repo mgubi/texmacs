@@ -42,7 +42,7 @@
     children, and which is computed to a large extent from the macro
     definitions;
 
-    <item>the experimental memoizing evaluator in <verbatim|Style/>.
+    <item>the experimental memoizing evaluator in <source-link|Style/|src/Style>.
   </itemize>
 
   The semantics of the individual primitives from the point of view of a
@@ -56,8 +56,8 @@
   general organization of the typesetter in bridges and concaters, are
   described in the chapter on the <hlink|typesetter|typesetter.en.tm>.
 
-  All C++ file names below are relative to <verbatim|src/src/>, and all
-  <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>.
+  All C++ file names below are relative to <source-link|src/src/|src>, and all
+  <scheme> file names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Two ways of evaluating a tree>
 
@@ -107,7 +107,7 @@
   is then typeset (or evaluated). Rewriting is designed so that parts of the
   result which come from the document keep their source location.
 
-  Finally, the directory <verbatim|Style/> contains an experimental,
+  Finally, the directory <source-link|Style/|src/Style> contains an experimental,
   memoizing re-implementation of the evaluator which works on persistent
   environments. It is only compiled when <TeXmacs> is configured with the
   <verbatim|ENABLE_EXPERIMENTAL> option of <source-link|CMakeLists.txt|src/CMakeLists.txt> (which
@@ -160,7 +160,7 @@
     <source-link|bridge_expand_as.cpp|src/Typeset/Bridge/bridge_expand_as.cpp>>The corresponding paragraph-level
     (incremental) typesetting.
 
-    <item*|<verbatim|Data/Drd/>>The data relation descriptor:
+    <item*|<source-link|Data/Drd/|src/Data/Drd>>The data relation descriptor:
     <cpp|drd_info> (<source-link|drd_info.hpp|src/Data/Drd/drd_info.hpp>), <cpp|tag_info>
     (<source-link|tag_info.hpp|src/Data/Drd/tag_info.hpp>), the standard <abbr|DRD> for built-in tags
     (<source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>), the global access modes
@@ -175,7 +175,7 @@
     <cpp|typeset_prepare>) and computation of the environment at the cursor
     (<cpp|typeset_exec_until>).
 
-    <item*|<verbatim|Style/>>The experimental memoizing evaluator.
+    <item*|<source-link|Style/|src/Style>>The experimental memoizing evaluator.
 
     <item*|<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>>The <scheme> side of the
     security check for <markup|extern>.
@@ -193,7 +193,7 @@
     <branch|The data relation descriptor|macro-expansion-drd.en.tm>
 
     <branch|The experimental evaluator in
-    <verbatim|Style/>|macro-expansion-style.en.tm>
+    <source-link|Style/|src/Style>|macro-expansion-style.en.tm>
 
     <branch|Pitfalls and debugging hints|macro-expansion-pitfalls.en.tm>
   </traverse>

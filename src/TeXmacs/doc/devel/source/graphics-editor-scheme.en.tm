@@ -8,7 +8,7 @@
   <section|Modules>
 
   The <scheme> part of the graphics editor consists of the modules in
-  <verbatim|src/TeXmacs/progs/graphics/>. At the bottom,
+  <source-link|src/TeXmacs/progs/graphics/|TeXmacs/progs/graphics>. At the bottom,
   <source-link|graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm> is used by <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm> and
   <source-link|graphics-markup.scm|TeXmacs/progs/graphics/graphics-markup.scm>; <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm> is used by
   <source-link|graphics-env.scm|TeXmacs/progs/graphics/graphics-env.scm>, <source-link|graphics-object.scm|TeXmacs/progs/graphics/graphics-object.scm> and

@@ -72,7 +72,7 @@
 
   The parsers and the more performance critical parts of the converters are
   written in <c++> and can be found in the directory
-  <verbatim|src/src/Data/Convert>:
+  <source-link|src/src/Data/Convert|src/Data/Convert>:
 
   <\description>
     <item*|<verbatim|Texmacs>>Parsing and printing the native <TeXmacs>
@@ -108,12 +108,12 @@
   </description>
 
   The remaining parts of the converters are written in <scheme> and can be
-  found in <verbatim|src/TeXmacs/progs/convert>. For instance,
+  found in <source-link|src/TeXmacs/progs/convert|TeXmacs/progs/convert>. For instance,
   <source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm> implements the conversion from
   <TeXmacs> to <LaTeX> and <source-link|convert/latex/texout.scm|TeXmacs/progs/convert/latex/texout.scm> the
   serialization of <LaTeX>; <source-link|convert/html/htmltm.scm|TeXmacs/progs/convert/html/htmltm.scm> and
   <source-link|convert/html/tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm> implement the conversions from
-  <abbr|resp.> to <name|HTML>, and <verbatim|convert/mathml> the conversions
+  <abbr|resp.> to <name|HTML>, and <source-link|convert/mathml|TeXmacs/progs/convert/mathml> the conversions
   from and to <name|MathML>. Plug-ins may define additional formats (see
   for instance the files <verbatim|*-format.scm> in the plug-ins for
   programming languages).

@@ -9,7 +9,7 @@
   implemented in <source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>. The standard
   bindings can be found in the files <verbatim|*-kbd.scm>, such as
   <source-link|generic/generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>, <source-link|math/math-kbd.scm|TeXmacs/progs/math/math-kbd.scm> or
-  <source-link|text/text-kbd.scm|TeXmacs/progs/text/text-kbd.scm> (relative to <verbatim|src/TeXmacs/progs/>).
+  <source-link|text/text-kbd.scm|TeXmacs/progs/text/text-kbd.scm> (relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>).
   See also the user manual section on <hlink|creating your own keyboard
   shortcuts|../../../main/scheme/man-custom-keyboard.en.tm>. The way
   keyboard events reach the editor is described in <hlink|the

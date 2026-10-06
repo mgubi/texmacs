@@ -8,7 +8,7 @@
   <section|Organization>
 
   The <scheme> interface to databases lives in
-  <verbatim|src/TeXmacs/progs/database/>. It is organized as a chain of
+  <source-link|src/TeXmacs/progs/database/|TeXmacs/progs/database>. It is organized as a chain of
   modules, each of which uses the previous one and redefines some of the
   basic routines with <scm|tm-define>, calling the previous definition
   through <scm|former>:

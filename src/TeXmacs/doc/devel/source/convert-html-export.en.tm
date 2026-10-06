@@ -68,7 +68,7 @@
   <scheme> function <scm|ext-tmhtml-eqnarray*>, and
   <source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts> defines
   <markup|tmhtml-render-bibitem>. The package <verbatim|html-font-size>
-  (in <verbatim|packages/html>) is another example.
+  (in <source-link|packages/html|TeXmacs/packages/html>) is another example.
 
   <section|The converter>
 
@@ -344,7 +344,7 @@
     runs regression tests of <scm|tmhtml-root> on small strees; it is part
     of <scm|(run-all-tests)> (<source-link|check/check-master.scm|TeXmacs/progs/check/check-master.scm>), which can
     be run with <verbatim|texmacs -x "(run-all-tests)" -q> (see
-    <verbatim|src/tests/README.md>). The tests are written with
+    <source-link|src/tests/README.md|tests/README.md>). The tests are written with
     <scm|regression-test-group> (<source-link|kernel/boot/debug.scm|TeXmacs/progs/kernel/boot/debug.scm>).
 
     <item>In a <scheme> session, <scm|(texmacs-\<gtr\>html (tree-\<gtr\>stree

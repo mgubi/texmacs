@@ -28,8 +28,8 @@
   they differ from those of <BibTeX>, the style dispatch, the shipped
   styles, and the known problems.
 
-  Paths of <c++> files are relative to <verbatim|src/src/>, paths of
-  <scheme> files to <verbatim|src/TeXmacs/progs/>.
+  Paths of <c++> files are relative to <source-link|src/src/|src>, paths of
+  <scheme> files to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Overview>
 
@@ -128,12 +128,12 @@
     <source-link|bibtex/bib-widgets.scm|TeXmacs/progs/bibtex/bib-widgets.scm>>Completion of citation keys and the
     dialog which inserts or modifies a bibliography.
 
-    <item*|<verbatim|convert/bibtex/>>The registration of the
+    <item*|<source-link|convert/bibtex/|TeXmacs/progs/convert/bibtex>>The registration of the
     <verbatim|bibtex> and <verbatim|tmbib> formats and converters
     (<source-link|init-bibtex.scm|TeXmacs/progs/convert/bibtex/init-bibtex.scm>), and the serializer
     <source-link|bibtexout.scm|TeXmacs/progs/convert/bibtex/bibtexout.scm>.
 
-    <item*|<verbatim|src/TeXmacs/misc/bib/texmacs.bib>>Entries with keys
+    <item*|<source-link|src/TeXmacs/misc/bib/texmacs.bib|TeXmacs/misc/bib/texmacs.bib>>Entries with keys
     <verbatim|TeXmacs:...>, appended to every bibliography so that
     documents may cite the <TeXmacs> papers without a <verbatim|.bib> file.
   </description-paragraphs>

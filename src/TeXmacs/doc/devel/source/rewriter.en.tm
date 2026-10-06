@@ -7,7 +7,7 @@
 
   <section|Introduction>
 
-  The directory <verbatim|src/src/Style/> contains a second, independent
+  The directory <source-link|src/src/Style/|src/Style> contains a second, independent
   implementation of the evaluation of <TeXmacs> documents. Its goal is to
   compute the <em|style rewriting> of a whole document, that is the tree
   obtained by expanding all macros and evaluating all primitives,
@@ -32,13 +32,13 @@
   the typesetter, and in its present state it does not even compile when it
   is enabled (see <hlink|pitfalls|#rewriter-pitfalls>). The short overview in
   <hlink|the experimental evaluator in
-  <verbatim|Style/>|macro-expansion-style.en.tm> describes the design; this
+  <source-link|Style/|src/Style>|macro-expansion-style.en.tm> describes the design; this
   chapter documents the code in more detail, so that it can be repaired,
   evaluated or removed with full knowledge of what it does. The semantics
   of the primitives themselves are those of the real evaluator described in
   <hlink|macro expansion and evaluation|macro-expansion.en.tm>.
 
-  File names below are relative to <verbatim|src/src/>.
+  File names below are relative to <source-link|src/src/|src>.
 
   <section|Status>
 
@@ -52,7 +52,7 @@
     <verbatim|"Memorizer Environment Evaluate"> and defines
     <verbatim|EXPERIMENTAL>; <source-link|makefile.in|src/makefile.in> then compiles those
     three subdirectories (<verbatim|style_src>). In a default build, no file
-    of <verbatim|Style/> is compiled at all.
+    of <source-link|Style/|src/Style> is compiled at all.
 
     <item*|Use>When enabled, the editor maintains a clean copy of its
     document and re-evaluates it after every change, but the result is only
@@ -65,7 +65,7 @@
     placeholders (fixed lengths, <markup|drd-props>, bindings). See
     <hlink|the evaluator|rewriter-evaluator.en.tm>.
 
-    <item*|Health>Three files of <verbatim|Style/Evaluate/> no longer
+    <item*|Health>Three files of <source-link|Style/Evaluate/|src/Style/Evaluate> no longer
     compile, because functions they use have moved to headers they do not
     include. Every call of the main routines also prints a trace on the
     console.
@@ -170,7 +170,7 @@
   <\itemize>
     <item><with|font-series|bold|The experimental build does not compile.>
     Checked with <verbatim|clang++ -fsyntax-only -DEXPERIMENTAL=1> on every
-    file of <verbatim|Style/>:
+    file of <source-link|Style/|src/Style>:
 
     <\itemize>
       <item><verbatim|Style/Evaluate/evaluate_numeric.cpp:214-215> uses
@@ -189,7 +189,7 @@
       not included.
     </itemize>
 
-    The other files of <verbatim|Style/> pass the syntax check. The editor
+    The other files of <source-link|Style/|src/Style> pass the syntax check. The editor
     files could not be checked this way because they need the <name|Qt>
     headers.
 

@@ -9,8 +9,8 @@
 
   Almost every editing command of <TeXmacs>, from typing a character to
   inserting a table column or regenerating the index, ends up in one of the
-  <c++> classes of the directories <verbatim|Edit/Modify/>,
-  <verbatim|Edit/Replace/> and <verbatim|Edit/Process/>. These classes
+  <c++> classes of the directories <source-link|Edit/Modify/|src/Edit/Modify>,
+  <source-link|Edit/Replace/|src/Edit/Replace> and <source-link|Edit/Process/|src/Edit/Process>. These classes
   implement the <em|structured editing operations>: they know how text,
   formulas, tables and macro applications are represented as trees, and turn
   a request such as \Pdelete backwards\Q or \Pmake a fraction\Q into a short
@@ -38,8 +38,8 @@
     in <hlink|languages, hyphenation and spell checking|language.en.tm>.
   </itemize>
 
-  All file names below are relative to <verbatim|src/src/> unless stated
-  otherwise; <scheme> files are relative to <verbatim|src/TeXmacs/progs/>.
+  All file names below are relative to <source-link|src/src/|src> unless stated
+  otherwise; <scheme> files are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Overview>
 
@@ -154,7 +154,7 @@
     command behind <menu|Document|Update>.
 
     <item*|<source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>>(relative to
-    <verbatim|src/TeXmacs/>) The macros which record entries for the
+    <source-link|src/TeXmacs/|TeXmacs>) The macros which record entries for the
     automatic content with the <markup|write> primitive.
   </description-paragraphs>
 

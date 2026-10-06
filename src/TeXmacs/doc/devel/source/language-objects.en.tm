@@ -124,9 +124,9 @@
   slovene, spanish, swedish and ukrainian, plus the four oriental
   languages. <cpp|get_supported_languages ()> returns the same list. To add
   a language, add its hyphenation file to
-  <verbatim|src/TeXmacs/langs/natural/hyphen/>, a case to
+  <source-link|src/TeXmacs/langs/natural/hyphen/|TeXmacs/langs/natural/hyphen>, a case to
   <cpp|text_language> and <cpp|get_supported_languages>, a style package in
-  <verbatim|src/TeXmacs/packages/customize/language/>, an entry to
+  <source-link|src/TeXmacs/packages/customize/language/|TeXmacs/packages/customize/language>, an entry to
   <scm|supported-languages> in <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>, the
   locale codes in <source-link|locale.cpp|src/System/Language/locale.cpp> and, for the user interface, a
   translation dictionary (see <hlink|translation|language-translation.en.tm>).
@@ -193,7 +193,7 @@
   <scm|set-document-language> in
   <source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>) adds the package named after the
   language to the style list, or removes it for English. These packages
-  (<verbatim|src/TeXmacs/packages/customize/language/>) set the
+  (<source-link|src/TeXmacs/packages/customize/language/|TeXmacs/packages/customize/language>) set the
   <verbatim|language> variable together with language specific typography
   such as the dots used in tables of contents. Inside a document, a
   different language can be set locally by changing the

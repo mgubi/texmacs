@@ -293,7 +293,7 @@
     strings, keywords (<verbatim|:foo>) and the symbols listed in
     <scm|highlight-any>, and asks <scheme> whether other symbols are
     <scm|defined?> (the answer is cached in the member <cpp|colored>). The
-    keyword list <scm|highlight-any> is read from <verbatim|tm-mode.el>, the
+    keyword list <scm|highlight-any> is read from <source-link|tm-mode.el|TeXmacs/progs/tm-mode.el>, the
     <name|Emacs> mode for <TeXmacs> <scheme> code, by the module
     <source-link|utils/misc/tm-keywords.scm|TeXmacs/progs/utils/misc/tm-keywords.scm>. The returned colors are names of
     environment variables (<verbatim|comment-color>,

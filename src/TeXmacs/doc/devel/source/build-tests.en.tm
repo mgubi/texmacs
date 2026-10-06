@@ -14,7 +14,7 @@
 
   <section|<c++> unit tests>
 
-  The directory <verbatim|tests/> mirrors the source tree and contains
+  The directory <source-link|tests/|tests> mirrors the source tree and contains
   one test program per file, for instance
   <source-link|tests/Data/String/analyze_test.cpp|tests/Data/String/analyze_test.cpp> or
   <source-link|tests/Kernel/Containers/hashmap_test.cpp|tests/Kernel/Containers/hashmap_test.cpp> (about twenty files:
@@ -46,9 +46,9 @@
   makes one executable per file, linked against the object library
   <verbatim|texmacs_body> of the main build, with a <name|CTest> test of the
   same name, a time limit of 5 seconds, and <verbatim|TEXMACS_PATH> set to
-  the <verbatim|TeXmacs/> directory of the sources (needed for instance by
+  the <source-link|TeXmacs/|packages/macos/TeXmacs> directory of the sources (needed for instance by
   the tests of <cpp|utf8_to_cork>, which load dictionaries).
-  <verbatim|tests/README.md> explains how to run them with
+  <source-link|tests/README.md|tests/README.md> explains how to run them with
   <verbatim|ctest> or directly.
 
   <section|<scheme> regression tests>
@@ -187,9 +187,9 @@
     neither <source-link|CMakeLists.txt|src/CMakeLists.txt> nor <source-link|src/CMakeLists.txt|src/CMakeLists.txt>
     contains <verbatim|add_subdirectory (tests)> or
     <verbatim|enable_testing ()>, so the instructions of
-    <verbatim|tests/README.md> do not work as written.
+    <source-link|tests/README.md|tests/README.md> do not work as written.
 
-    <item>Even when <verbatim|tests/> is added, its
+    <item>Even when <source-link|tests/|tests> is added, its
     <source-link|CMakeLists.txt|src/CMakeLists.txt> links <verbatim|Qt5::Test> unconditionally,
     whereas the default build uses <name|Qt> 6 when it is available.
 

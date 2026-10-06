@@ -262,7 +262,7 @@
     <hlink|example of a graphical primitive|graphics-editor-extend.en.tm>.
 
     <item>Document the primitive in the format documentation
-    (<verbatim|doc/devel/format/regular/>).
+    (<source-link|doc/devel/format/regular/|TeXmacs/doc/devel/format/regular>).
   </enumerate>
 
   Two practical remarks. First, once the primitive exists, its name is

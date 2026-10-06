@@ -13,7 +13,7 @@
 
   <section|Pattern files>
 
-  The patterns live in <verbatim|src/TeXmacs/langs/natural/hyphen/> as
+  The patterns live in <source-link|src/TeXmacs/langs/natural/hyphen/|TeXmacs/langs/natural/hyphen> as
   files <verbatim|hyphen.<em|name>>, where <em|name> is the second argument
   given to the language constructor in <cpp|text_language> (for instance
   <verbatim|us> for English and <verbatim|ukenglish> for British English).

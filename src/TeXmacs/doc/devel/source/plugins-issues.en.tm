@@ -122,7 +122,7 @@
 
   <cpp|connection_rep::start> only reads the startup message of a link
   immediately if the <em|plug-in> is called <verbatim|dynlink>, the name of
-  the example plug-in in <verbatim|src/TeXmacs/examples/plugins/dynlink>:
+  the example plug-in in <source-link|src/TeXmacs/examples/plugins/dynlink|TeXmacs/examples/plugins/dynlink>:
 
   <\cpp-code>
     if (name == "dynlink") {

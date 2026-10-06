@@ -44,8 +44,8 @@
   A <TeXmacs> server is a normal <TeXmacs> process (usually started with the
   <verbatim|-server> command line option, possibly together with
   <verbatim|-headless>) in which the <scheme> modules under
-  <verbatim|progs/server/> have been loaded. A client is any <TeXmacs>
-  process in which the modules under <verbatim|progs/client/> are loaded;
+  <source-link|progs/server/|TeXmacs/progs/server> have been loaded. A client is any <TeXmacs>
+  process in which the modules under <source-link|progs/client/|TeXmacs/progs/client> are loaded;
   they are loaded lazily, the first time the user opens a remote menu or a
   remote <verbatim|tmfs> <abbr|URL> (see the <scm|lazy-define>,
   <scm|lazy-menu> and <scm|lazy-tmfs-handler> declarations in
@@ -55,9 +55,9 @@
   The work is split between <c++> and <scheme> as follows:
 
   <\itemize>
-    <item><c++> (directory <verbatim|src/src/System/Link/>,
+    <item><c++> (directory <source-link|src/src/System/Link/|src/System/Link>,
     <verbatim|src/src/Plugins/Qt/QTMSockets.*> and
-    <verbatim|src/src/Plugins/Gnutls/>) implements the sockets, the optional
+    <source-link|src/src/Plugins/Gnutls/|src/Plugins/Gnutls>) implements the sockets, the optional
     <abbr|TLS> layer, the legacy encryption layer and the framing of
     messages into packets. Only raw strings cross this layer. The socket code
     is only compiled in the <name|Qt> build (<verbatim|QTTEXMACS>); other
@@ -70,13 +70,13 @@
 
     <item>The server keeps its persistent state in a <TeXmacs> database
     (<verbatim|$TEXMACS_HOME_PATH/server/global.tmdb>, implemented in
-    <verbatim|src/src/Plugins/Database/> and wrapped in
-    <verbatim|progs/database/>) together with a few <scheme> files and a
+    <source-link|src/src/Plugins/Database/|src/Plugins/Database> and wrapped in
+    <source-link|progs/database/|TeXmacs/progs/database>) together with a few <scheme> files and a
     directory tree which stores the contents of files. Clients keep their
     own state (accounts, synchronization records) in per-user databases.
 
     <item>Live editing relies on the <c++> patch algebra of
-    <verbatim|src/src/Data/History/> (modifications, patches, inversion and
+    <source-link|src/src/Data/History/|src/Data/History> (modifications, patches, inversion and
     commutation), which is also the basis of the undo/redo system.
   </itemize>
 
@@ -103,7 +103,7 @@
     cache), <source-link|server-backup.scm|TeXmacs/progs/server/server-backup.scm>, <source-link|server-widgets.scm|TeXmacs/progs/server/server-widgets.scm> and
     <source-link|server-menu.scm|TeXmacs/progs/server/server-menu.scm> (user interface), plus the regression tests
     <verbatim|server-*-test.scm> and <source-link|server-fixtures.scm|TeXmacs/progs/server/server-fixtures.scm>. The file
-    <verbatim|server/todo.tm> contains the original design notes.
+    <source-link|server/todo.tm|TeXmacs/progs/server/todo.tm> contains the original design notes.
 
     <item*|Client (<scheme>)><source-link|client/client-base.scm|TeXmacs/progs/client/client-base.scm> (dispatcher,
     connections, accounts, login), <source-link|client-authentication.scm|TeXmacs/progs/client/client-authentication.scm>,

@@ -91,10 +91,10 @@
     Reception of modifications, undo and redo.
 
     <item*|<cpp|edit_text_rep>, <cpp|edit_math_rep>, <cpp|edit_table_rep>,
-    <cpp|edit_dynamic_rep>>(<verbatim|Edit/Modify/>) Structured editing
+    <cpp|edit_dynamic_rep>>(<source-link|Edit/Modify/|src/Edit/Modify>) Structured editing
     operations on text, mathematics, tables and markup.
 
-    <item*|<cpp|edit_process_rep>>(<verbatim|Edit/Process/>) Generation of
+    <item*|<cpp|edit_process_rep>>(<source-link|Edit/Process/|src/Edit/Process>) Generation of
     bibliographies, tables of contents, indexes and glossaries.
 
     <item*|<cpp|edit_select_rep>>(<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>)

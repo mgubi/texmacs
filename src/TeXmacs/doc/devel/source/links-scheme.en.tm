@@ -6,7 +6,7 @@
   <tmdoc-title|Creating and following links from <scheme>>
 
   The <scheme> side of the linking system lives in
-  <verbatim|progs/link/>. Most of it is loaded lazily
+  <source-link|progs/link/|TeXmacs/progs/link>. Most of it is loaded lazily
   (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> declares <scm|link-follow-ids>,
   <scm|link-active-ids>, <scm|link-mouse-ids>, <scm|link-active-upwards>,
   <scm|get-link-locations>, <scm|register-link-locations> and a few others

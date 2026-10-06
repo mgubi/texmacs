@@ -35,7 +35,7 @@
     <item><strong|<cpp|eval_secure> is broken.> It
     evaluates <verbatim|(wrap-eval-secure <em|expr>)>, but
     <scm|wrap-eval-secure> is not defined anywhere in
-    <verbatim|TeXmacs/progs>. The function has no callers; secure
+    <source-link|TeXmacs/progs|TeXmacs/progs>. The function has no callers; secure
     evaluation is implemented in <scheme> (<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>).
 
     <item><strong|Delayed commands and pauses.> Only

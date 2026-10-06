@@ -14,7 +14,7 @@
     Dynamic linking is only available if <TeXmacs> was compiled with the
     macro <cpp|TM_DYNAMIC_LINKING> defined (the <name|autotools>
     configuration script defines it as <cpp|dlopen> when this function is
-    available, see <verbatim|misc/m4/dlopen.m4>). It is not supported under
+    available, see <source-link|misc/m4/dlopen.m4|misc/m4/dlopen.m4>). It is not supported under
     <name|Windows>. Otherwise, starting a session fails with the message
     <verbatim|Dynamic linking not implemented>.
   </warning>
@@ -137,7 +137,7 @@
     \ \ \ \ <example-plugin-link|dynlink/src/dynlink.cpp>
   </verbatim>
 
-  The <verbatim|Makefile> is generated from <verbatim|Makefile.in> by the
+  The <verbatim|Makefile> is generated from <source-link|Makefile.in|Makefile.in> by the
   <name|autotools> configuration script, which substitutes the path of the
   <TeXmacs> sources for <verbatim|@tmsrc@>. It contains
 

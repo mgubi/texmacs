@@ -64,7 +64,7 @@
 
   <\description>
     <item*|The engine (<c++>)>The class <cpp|database> in
-    <verbatim|Plugins/Database/> holds an in-memory table of <em|lines>
+    <source-link|Plugins/Database/|src/Plugins/Database> holds an in-memory table of <em|lines>
     (<cpp|db_line>), each line associating a value to an attribute of an
     identifier during a time interval. All strings are interned as integer
     <em|atoms>. The engine maintains indices from identifiers and values to
@@ -119,7 +119,7 @@
     reading <verbatim|.bbl> files) and <source-link|bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>
     (<c++> versions of the <BibTeX> built-in functions such as
     <verbatim|purify$> or <verbatim|format.name$>), and the <scheme> style
-    engine in <verbatim|progs/bibtex/> (<source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> and one
+    engine in <source-link|progs/bibtex/|TeXmacs/progs/bibtex> (<source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> and one
     file per style) implement the <BibTeX> side.
 
     <item*|The bibliography pipeline>The typesetter collects the keys of
@@ -134,7 +134,7 @@
   <subsection|Map of the source files>
 
   <\description>
-    <item*|Engine (<c++>, <verbatim|src/src/>)><source-link|Plugins/Database/database.hpp|src/Plugins/Database/database.hpp>
+    <item*|Engine (<c++>, <source-link|src/src/|src>)><source-link|Plugins/Database/database.hpp|src/Plugins/Database/database.hpp>
     (data structures and public functions), <source-link|database.cpp|src/Plugins/Database/database.cpp> (atoms,
     basic operations, table of open databases), <source-link|db_disk.cpp|src/Plugins/Database/db_disk.cpp>
     (journal, persistence, compression, concurrent access),
@@ -142,10 +142,10 @@
     <source-link|db_query.cpp|src/Plugins/Database/db_query.cpp> (queries) and <source-link|db_sort.cpp|src/Plugins/Database/db_sort.cpp> (sorting
     of results). The glue is declared in
     <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm> (section <verbatim|;; native
-    TeXmacs databases>). <verbatim|Plugins/Sqlite3/> contains an unrelated
+    TeXmacs databases>). <source-link|Plugins/Sqlite3/|src/Plugins/Sqlite3> contains an unrelated
     and currently unused interface to <name|SQLite>.
 
-    <item*|<scheme> database modules (<verbatim|src/TeXmacs/progs/database/>)><source-link|db-base.scm|TeXmacs/progs/database/db-base.scm>,
+    <item*|<scheme> database modules (<source-link|src/TeXmacs/progs/database/|TeXmacs/progs/database>)><source-link|db-base.scm|TeXmacs/progs/database/db-base.scm>,
     <source-link|db-format.scm|TeXmacs/progs/database/db-format.scm>, <source-link|db-users.scm|TeXmacs/progs/database/db-users.scm>,
     <source-link|db-version.scm|TeXmacs/progs/database/db-version.scm>, <source-link|db-edit.scm|TeXmacs/progs/database/db-edit.scm>,
     <source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm>, <source-link|db-markup.scm|TeXmacs/progs/database/db-markup.scm>,
@@ -160,7 +160,7 @@
     <item*|Styles>The editing styles <source-link|database.ts|TeXmacs/styles/test/database.ts>,
     <source-link|database-bib.ts|TeXmacs/styles/test/database-bib.ts>, <source-link|database-ai-agents.ts|TeXmacs/styles/test/database-ai-agents.ts> and the
     <BibTeX> presentation style <source-link|bibliography.ts|TeXmacs/styles/test/bibliography.ts> live in
-    <verbatim|src/TeXmacs/styles/test/>. The citation and bibliography
+    <source-link|src/TeXmacs/styles/test/|TeXmacs/styles/test>. The citation and bibliography
     markup is defined in <source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts> and
     <source-link|packages/section/section-base.ts|TeXmacs/packages/section/section-base.ts>.
 
@@ -171,7 +171,7 @@
     <source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp> (generation of the
     bibliography).
 
-    <item*|<BibTeX> (<scheme>)><verbatim|progs/convert/bibtex/> (the
+    <item*|<BibTeX> (<scheme>)><source-link|progs/convert/bibtex/|TeXmacs/progs/convert/bibtex> (the
     <verbatim|bibtex> and <verbatim|tmbib> formats and their converters),
     <source-link|progs/bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> (style engine),
     <source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm>, <source-link|abbrv.scm|TeXmacs/progs/bibtex/abbrv.scm>, <source-link|abstract.scm|TeXmacs/progs/bibtex/abstract.scm>,
@@ -180,7 +180,7 @@
     (styles), <source-link|bib-complete.scm|TeXmacs/progs/bibtex/bib-complete.scm> (completion of citation keys
     without the database) and <source-link|bib-widgets.scm|TeXmacs/progs/bibtex/bib-widgets.scm> (the
     bibliography insertion dialogue). The file
-    <verbatim|src/TeXmacs/misc/bib/texmacs.bib> contains the entries with
+    <source-link|src/TeXmacs/misc/bib/texmacs.bib|TeXmacs/misc/bib/texmacs.bib> contains the entries with
     keys <verbatim|TeXmacs:...> used by <markup|cite-TeXmacs>.
   </description>
 

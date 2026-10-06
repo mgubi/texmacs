@@ -277,7 +277,7 @@
   in <source-link|System/Language/impl_language.hpp|src/System/Language/impl_language.hpp>, implement
   <cpp|advance>, <cpp|get_hyphens>, <cpp|hyphenate> and <cpp|get_color>, and
   add a test for its name to <cpp|prog_language> before the generic case.
-  The sources of <verbatim|System/Language/> are collected by a glob in
+  The sources of <source-link|System/Language/|src/System/Language> are collected by a glob in
   <source-link|src/CMakeLists.txt|src/CMakeLists.txt>, so it suffices to re-run <name|CMake>.
   Return names of environment variables from <cpp|get_color> to obtain
   theme-aware colors.

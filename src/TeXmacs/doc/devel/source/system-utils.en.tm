@@ -73,7 +73,7 @@
   the <cpp|async_http_post...> variants deliver it later through the
   asynchronous mechanism above, and <cpp|http_from_json> parses an
   answer. With <name|Qt> 6 they are implemented with the <name|Qt> network
-  classes (<cpp|qt_http_post> in <verbatim|Plugins/Qt6>); otherwise they
+  classes (<cpp|qt_http_post> in <source-link|Plugins/Qt6|src/Plugins/Qt6>); otherwise they
   build a <verbatim|curl> command line. Downloads of web files are
   described in <hlink|URLs, resolution and concretization|system-urls.en.tm>.
 

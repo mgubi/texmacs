@@ -54,7 +54,7 @@
     expressions.
 
     <item*|Encryption>is implemented entirely in <scheme>, in
-    <verbatim|progs/security/>, on top of the external program
+    <source-link|progs/security/|TeXmacs/progs/security>, on top of the external program
     <verbatim|gpg>. The only hooks in <c++> are the call of
     <scm|tree-export-encrypted> in <cpp|export_tree>
     (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>) and the generic
@@ -67,8 +67,8 @@
 
   <section|Source files>
 
-  Paths below are relative to <verbatim|src/TeXmacs/progs/> for <scheme>
-  files and to <verbatim|src/src/> for <c++> files.
+  Paths below are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs> for <scheme>
+  files and to <source-link|src/src/|src> for <c++> files.
 
   <\description-paragraphs>
     <item*|<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>>The checker
@@ -107,9 +107,9 @@
     prompts, recipient selection), menus and preferences.
 
     <item*|<source-link|security/gpg/gpg-wallet.scm|TeXmacs/progs/security/gpg/gpg-wallet.scm>,
-    <verbatim|security/wallet/>>The wallet.
+    <source-link|security/wallet/|TeXmacs/progs/security/wallet>>The wallet.
 
-    <item*|<verbatim|security/keychain/>>Access to the keychain of
+    <item*|<source-link|security/keychain/|TeXmacs/progs/security/keychain>>Access to the keychain of
     <name|macOS> (<verbatim|security> command) and <name|Windows>
     (<verbatim|winwallet> helper).
 

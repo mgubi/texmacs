@@ -9,7 +9,7 @@
 
   The documentation of <TeXmacs>, including the present text, consists of
   ordinary <TeXmacs> documents in the directory
-  <verbatim|src/TeXmacs/doc/> (installed as <verbatim|$TEXMACS_PATH/doc>).
+  <source-link|src/TeXmacs/doc/|TeXmacs/doc> (installed as <verbatim|$TEXMACS_PATH/doc>).
   They are written in the <tmstyle|tmdoc> style, linked together by
   <markup|traverse> blocks, and shown in the help browser, compiled into
   books, converted into the <TeXmacs> web site, scanned for the
@@ -62,7 +62,7 @@
 
   <section|Source files>
 
-  Paths are relative to <verbatim|src/TeXmacs/>.
+  Paths are relative to <source-link|src/TeXmacs/|TeXmacs>.
 
   <\description-paragraphs>
     <item*|<source-link|styles/documentation/texmacs/tmdoc.ts|TeXmacs/styles/documentation/texmacs/tmdoc.ts>>The
@@ -101,9 +101,9 @@
     <item*|<source-link|progs/utils/test/test-convert.scm|TeXmacs/progs/utils/test/test-convert.scm>>Building the
     <abbr|PDF> manuals (<scm|build-manual>).
 
-    <item*|<verbatim|src/src/Scheme/Glue/build-auto-doc>,
+    <item*|<source-link|src/src/Scheme/Glue/build-auto-doc|src/Scheme/Glue/build-auto-doc>,
     <source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm>, <source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>>The
-    generator of <verbatim|doc/devel/scheme/api/glue-auto-doc.en.tm> and
+    generator of <source-link|doc/devel/scheme/api/glue-auto-doc.en.tm|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm> and
     <source-link|progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>.
   </description-paragraphs>
 

@@ -7,7 +7,7 @@
 
   <section|Text mode>
 
-  Text mode is implemented in <verbatim|progs/text/>. Its predicate
+  Text mode is implemented in <source-link|progs/text/|TeXmacs/progs/text>. Its predicate
   <scm|in-text?> holds when the environment variable <verbatim|mode> is
   <verbatim|text> and the cursor is not in a graphics; many definitions
   are further restricted to the standard styles (<scm|in-std-text?>) or to
@@ -88,7 +88,7 @@
 
   <section|Mathematics>
 
-  Math mode is implemented in <verbatim|progs/math/>. Besides
+  Math mode is implemented in <source-link|progs/math/|TeXmacs/progs/math>. Besides
   <scm|in-math?>, the main modes are <scm|in-math-or-hybrid?>,
   <scm|in-math-not-hybrid?> (the <markup|hybrid> command line, entered with the backslash key,
   behaves partially as math),

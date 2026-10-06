@@ -38,7 +38,7 @@
 
     <item><em|The <scheme> state machine.> All actual editing decisions are
     taken in <scheme>, in the modules under
-    <verbatim|src/TeXmacs/progs/graphics/>. These implement the editing
+    <source-link|src/TeXmacs/progs/graphics/|TeXmacs/progs/graphics>. These implement the editing
     modes (point mode, group mode, hand drawing), a state machine which
     remembers what the user is doing (creating a curve, dragging a point,
     moving a group of objects), the <em|sketch> which holds the objects
@@ -58,8 +58,8 @@
   most of the routines described there do not exist anymore. The present
   chapter describes the implementation as it is in the source code.
 
-  All C++ file names below are relative to <verbatim|src/src/>, and all
-  <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>.
+  All C++ file names below are relative to <source-link|src/src/|src>, and all
+  <scheme> file names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Source map>
 
@@ -71,7 +71,7 @@
     <source-link|curve.cpp|src/Graphics/Types/curve.cpp>, <source-link|curve_extras.cpp|src/Graphics/Types/curve_extras.cpp> for the hand drawing
     algorithms), and grids <cpp|grid> (<source-link|grid.hpp|src/Graphics/Types/grid.hpp>).
 
-    <item*|<verbatim|Graphics/Spacial/>>Experimental three dimensional
+    <item*|<source-link|Graphics/Spacial/|src/Graphics/Spacial>>Experimental three dimensional
     objects (<cpp|spacial>): triangulated surfaces, their transformations
     and their lighting.
 
@@ -80,7 +80,7 @@
     <cpp|typeset_line>, <cpp|typeset_text_at>, ...), and the support for
     graphical constraints (<cpp|set_graphical_value> and friends).
 
-    <item*|<verbatim|Typeset/Boxes/Graphics/>>The graphics specific boxes:
+    <item*|<source-link|Typeset/Boxes/Graphics/|src/Typeset/Boxes/Graphics>>The graphics specific boxes:
     <source-link|graphics_boxes.cpp|src/Typeset/Boxes/Graphics/graphics_boxes.cpp> (<cpp|graphics_box>,
     <cpp|graphics_group_box>, <cpp|point_box>, <cpp|curve_box>,
     <cpp|spacial_box>) and <source-link|grid_boxes.cpp|src/Typeset/Boxes/Graphics/grid_boxes.cpp> (<cpp|grid_box>).

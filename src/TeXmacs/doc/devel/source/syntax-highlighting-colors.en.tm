@@ -125,7 +125,7 @@
 
   Such declarations exist for <verbatim|python> (in
   <source-link|src/plugins/python/progs/python-lang.scm|plugins/python/progs/python-lang.scm>), <verbatim|julia> and
-  <verbatim|cpp> (in <verbatim|src/plugins/code/progs/>), <verbatim|scheme>
+  <verbatim|cpp> (in <source-link|src/plugins/code/progs/|plugins/code/progs>), <verbatim|scheme>
   (in <source-link|prog/scheme-edit.scm|TeXmacs/progs/prog/scheme-edit.scm>) and <verbatim|fortran> (in
   <source-link|prog/fortran-edit.scm|TeXmacs/progs/prog/fortran-edit.scm>). The <scheme> and C++ highlighters do
   not use the decoding tables, so their <verbatim|syntax:*> preferences

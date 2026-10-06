@@ -14,7 +14,7 @@
   constructed and connected to <scheme> and to the editors. The buffers,
   views and windows which the server manages are described in the
   following pages; they are not members of the server but global tables
-  of <verbatim|Texmacs/Data/>.
+  of <source-link|Texmacs/Data/|src/Texmacs/Data>.
 
   <section|The class hierarchy>
 
@@ -180,7 +180,7 @@
   uses the prefix <verbatim|get_current_editor()-\<gtr\>>, and
   <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm> exports free functions without a prefix;
   among those are all buffer, view, window and project routines of
-  <verbatim|Texmacs/Data/> (the block starting with the comment
+  <source-link|Texmacs/Data/|src/Texmacs/Data> (the block starting with the comment
   <verbatim|;; buffers> in that file). The correspondence between the <scheme>
   names and the <c++> routines is listed in <hlink|the <scheme>
   interface|server-scheme.en.tm>.

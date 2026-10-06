@@ -181,7 +181,7 @@
     <source-link|math_font.cpp|src/Graphics/Fonts/math_font.cpp>, <source-link|charmap.cpp|src/Graphics/Fonts/charmap.cpp>>Older composite fonts
     used by the rule based font selection.
 
-    <item*|<verbatim|Graphics/Bitmap_fonts/>>Glyph (bitmap) manipulation
+    <item*|<source-link|Graphics/Bitmap_fonts/|src/Graphics/Bitmap_fonts>>Glyph (bitmap) manipulation
     routines used by virtual and emulated fonts (<cpp|join>,
     <cpp|hor_flip>, <cpp|bolden>, <cpp|slanted>, <cpp|make_bbb>, ...).
 

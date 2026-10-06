@@ -47,7 +47,7 @@
   <markup|gr-effect> in <hlink|the graphics editor: typesetting
   pictures|graphics-editor-typeset.en.tm>.
 
-  All file names below are relative to <verbatim|src/src/> unless stated
+  All file names below are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -153,7 +153,7 @@
     files into <cpp|QImage>s with their own cache, icons, effects applied to
     files, and the <name|Qt> based size determination and conversions
     (<cpp|qt_supports>, <cpp|qt_image_size>, <cpp|qt_convert_image>,
-    <cpp|qt_image_to_pdf>). <verbatim|Plugins/Qt6/> contains a copy of these
+    <cpp|qt_image_to_pdf>). <source-link|Plugins/Qt6/|src/Plugins/Qt6> contains a copy of these
     files for <name|Qt> 6.
 
     <item*|<source-link|Plugins/Resvg/resvg.cpp|src/Plugins/Resvg/resvg.cpp>>Size determination and
@@ -180,7 +180,7 @@
     <source-link|pdf_hummus_extract_attachment.cpp|src/Plugins/Pdf/pdf_hummus_extract_attachment.cpp>>Embedding files into
     <abbr|PDF> files and extracting them again.
 
-    <item*|<verbatim|Plugins/Cairo/>>A <name|Cairo> renderer, only compiled
+    <item*|<source-link|Plugins/Cairo/|src/Plugins/Cairo>>A <name|Cairo> renderer, only compiled
     with <cpp|USE_CAIRO>, which the <name|CMake> build does not set.
 
     <item*|<source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>,

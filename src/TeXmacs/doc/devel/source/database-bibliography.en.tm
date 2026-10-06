@@ -211,7 +211,7 @@
   <subsection|The internal style engine>
 
   The internal styles are ordinary <scheme> modules
-  <verbatim|(bibtex <em|name>)> in <verbatim|progs/bibtex/>, and are
+  <verbatim|(bibtex <em|name>)> in <source-link|progs/bibtex/|TeXmacs/progs/bibtex>, and are
   selected by the style name <verbatim|tm-<em|name>>. The entry point is:
 
   <\explain>

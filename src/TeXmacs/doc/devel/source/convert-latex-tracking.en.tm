@@ -13,7 +13,7 @@
   the plain converters, each conversion rewrites the whole document: the
   formatting of the source, the macros of the author and many small details
   are lost. <TeXmacs> therefore implements two complementary mechanisms,
-  written in <c++> in <verbatim|Data/Convert/Tex>:
+  written in <c++> in <source-link|Data/Convert/Tex|src/Data/Convert/Tex>:
 
   <\description>
     <item*|Source tracking>During a conversion, <em|markers> are inserted

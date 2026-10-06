@@ -143,7 +143,7 @@
   <\enumerate>
     <item>Implement the glyph transformation, typically as a function on
     <cpp|glyph> and on <cpp|font_glyphs> (and on <cpp|font_metric> if the
-    metrics change) in <verbatim|Graphics/Bitmap_fonts/>, and declare it in
+    metrics change) in <source-link|Graphics/Bitmap_fonts/|src/Graphics/Bitmap_fonts>, and declare it in
     <source-link|bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp>.
 
     <item>Either add a new kind to an existing wrapper
@@ -162,7 +162,7 @@
 
     <item>Optionally add a macro in <source-link|std-markup.ts|TeXmacs/packages/standard/std-markup.ts> based on
     <markup|add-font-effect>, an entry in <scm|text-font-effects-menu>, and
-    document the effect in <verbatim|doc/devel/format/environment/env-font.en.tm>.
+    document the effect in <source-link|doc/devel/format/environment/env-font.en.tm|TeXmacs/doc/devel/format/environment/env-font.en.tm>.
   </enumerate>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

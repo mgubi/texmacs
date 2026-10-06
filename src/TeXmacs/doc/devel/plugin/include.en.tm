@@ -22,7 +22,7 @@
   default. In the directory <verbatim|$TEXMACS_PATH/plugins> you can find
   all standard plug-ins, which are shipped with your <TeXmacs> distribution
   (in the source code of <TeXmacs>, they can be found in
-  <verbatim|src/plugins>). These provide good examples which you may
+  <source-link|src/plugins|plugins>). These provide good examples which you may
   imitate.
 
   The above <verbatim|myplugin> directory should contain a similar

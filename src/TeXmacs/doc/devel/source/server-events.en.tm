@@ -48,7 +48,7 @@
   <section|The GUI loop and the interpose handler>
 
   With the <name|Qt> back-end (<source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>, and its
-  counterpart in <verbatim|Plugins/Qt6/>), events delivered by <name|Qt> to
+  counterpart in <source-link|Plugins/Qt6/|src/Plugins/Qt6>), events delivered by <name|Qt> to
   <TeXmacs> widgets are not processed immediately. The widgets call
   <cpp|qt_gui_rep::process_keypress>, <cpp|process_mouse>,
   <cpp|process_keyboard_focus>, <cpp|process_resize> or

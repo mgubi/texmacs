@@ -8,7 +8,7 @@
   <section|Declaring glue routines>
 
   The <c++> routines which are visible from <scheme> are listed in three
-  declaration files in <verbatim|Scheme/Glue/>. Each of them is a single
+  declaration files in <source-link|Scheme/Glue/|src/Scheme/Glue>. Each of them is a single
   call of the macro <scm|build>:
 
   <\scm-code>
@@ -181,7 +181,7 @@
   and <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp> are part of the repository, and the
   <name|CMake> build compiles them as they are: it has no rule to
   regenerate them. After changing a declaration file, regenerate the
-  corresponding file by hand, in the directory <verbatim|Scheme/Glue/>:
+  corresponding file by hand, in the directory <source-link|Scheme/Glue/|src/Scheme/Glue>:
 
   <\verbatim-code>
     ./build-glue build-glue-basic.scm glue_basic.cpp [<em|guile-binary>]
@@ -189,7 +189,7 @@
 
   This needs a <name|Guile> interpreter (<verbatim|guile> by default, or
   the binary given as third argument or in <verbatim|GUILE_BIN>). In the
-  traditional build, <verbatim|make GLUE> in <verbatim|src/src/>
+  traditional build, <verbatim|make GLUE> in <source-link|src/src/|src>
   regenerates all three files with the <verbatim|GUILE_BIN> found by
   <verbatim|configure>.
 
@@ -202,7 +202,7 @@
     returned by <scm|all-glued-symbols>, used for the completion of
     <scheme> code (<source-link|prog/scheme-autocomplete.scm|TeXmacs/progs/prog/scheme-autocomplete.scm>);
 
-    <item><verbatim|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>
+    <item><source-link|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>
     (<source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm>), <hlink|the reference of all glue
     routines|../scheme/api/glue-auto-doc.en.tm>.
   </itemize>

@@ -38,8 +38,8 @@
   consumes the hyphenation points is described in <hlink|the typesetting
   algorithm|typesetter-lines.en.tm>.
 
-  All <c++> file names are relative to <verbatim|src/src/>, and all
-  <scheme> file names to <verbatim|src/TeXmacs/progs/>, unless stated
+  All <c++> file names are relative to <source-link|src/src/|src>, and all
+  <scheme> file names to <source-link|src/TeXmacs/progs/|TeXmacs/progs>, unless stated
   otherwise.
 
   <section|Overview>
@@ -72,13 +72,13 @@
   or <name|Aspell> subprocess, or the <name|macOS> spell service) and caches
   the results. On top of it, <source-link|Data/Tree/tree_spell.cpp|src/Data/Tree/tree_spell.cpp> finds all
   misspelled words of a tree, and the <scheme> modules in
-  <source-link|generic/spell-widgets.scm|TeXmacs/progs/generic/spell-widgets.scm> and <verbatim|tools/spell/> implement
+  <source-link|generic/spell-widgets.scm|TeXmacs/progs/generic/spell-widgets.scm> and <source-link|tools/spell/|TeXmacs/progs/tools/spell> implement
   the spell checking and grammar checking tools of the user interface.
 
   Translation of the user interface is done by <em|dictionaries>
   (<source-link|System/Language/dictionary.cpp|src/System/Language/dictionary.cpp>), which are also resources,
   loaded from <scheme> files of pairs of strings in
-  <verbatim|src/TeXmacs/langs/natural/dic/>.
+  <source-link|src/TeXmacs/langs/natural/dic/|TeXmacs/langs/natural/dic>.
 
   <section|Source files>
 
@@ -147,25 +147,25 @@
     <item*|<source-link|generic/spell-widgets.scm|TeXmacs/progs/generic/spell-widgets.scm>>The spell checking tool and
     toolbar.
 
-    <item*|<verbatim|tools/spell/>>Grammar checking: the interface with
+    <item*|<source-link|tools/spell/|TeXmacs/progs/tools/spell>>Grammar checking: the interface with
     <name|LanguageTool> (<source-link|spell-lantool.scm|TeXmacs/progs/tools/spell/spell-lantool.scm>), the editing of
     <markup|spell-error> markup and personal dictionaries
     (<source-link|spell-edit.scm|TeXmacs/progs/tools/spell/spell-edit.scm>), the correction tool and toolbar
     (<source-link|correct-widgets.scm|TeXmacs/progs/tools/spell/correct-widgets.scm>) and the keyboard bindings
     (<source-link|spell-kbd.scm|TeXmacs/progs/tools/spell/spell-kbd.scm>).
 
-    <item*|<verbatim|src/plugins/languagetool/>>The <verbatim|languagetool>
+    <item*|<source-link|src/plugins/languagetool/|plugins/languagetool>>The <verbatim|languagetool>
     plug-in, which only declares the preferences for the server.
 
     <item*|<source-link|language/natural.scm|TeXmacs/progs/language/natural.scm>,
     <source-link|utils/misc/translation-list.scm|TeXmacs/progs/utils/misc/translation-list.scm>>Tools for maintaining the
     translation dictionaries.
 
-    <item*|<verbatim|src/TeXmacs/langs/natural/>>The data:
-    <verbatim|hyphen/> (hyphenation patterns), <verbatim|dic/>
-    (translations) and <verbatim|miss/> (lists of missing translations).
+    <item*|<source-link|src/TeXmacs/langs/natural/|TeXmacs/langs/natural>>The data:
+    <source-link|hyphen/|TeXmacs/langs/natural/hyphen> (hyphenation patterns), <source-link|dic/|TeXmacs/langs/natural/dic>
+    (translations) and <source-link|miss/|TeXmacs/langs/natural/miss> (lists of missing translations).
 
-    <item*|<verbatim|src/TeXmacs/packages/customize/language/>>One style
+    <item*|<source-link|src/TeXmacs/packages/customize/language/|TeXmacs/packages/customize/language>>One style
     package per language, which sets the <verbatim|language> variable and
     language specific typography.
   </description-paragraphs>

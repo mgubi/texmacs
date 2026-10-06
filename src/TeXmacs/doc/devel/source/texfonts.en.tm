@@ -27,14 +27,14 @@
   renderers draw glyphs in <hlink|the renderer interface|renderer.en.tm>.
   These subjects are only summarized here.
 
-  All file names are relative to <verbatim|src/src/> unless stated
+  All file names are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
 
   A <TeX> font is requested by a <em|font tree> such as
   <verbatim|(ec ecrm 10 600)>, which the font rules of
-  <source-link|TeXmacs/progs/fonts/fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm> (relative to <verbatim|src/>)
+  <source-link|TeXmacs/progs/fonts/fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm> (relative to <source-link|src/|src>)
   produce for the roman family, and which
   <cpp|find_font> (<source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>) turns into a call
   of one of the constructors <cpp|tex_font>, <cpp|tex_ec_font>,
@@ -155,7 +155,7 @@
 
     <item*|<source-link|TeXmacs/progs/fonts/fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm>,
     <source-link|fonts-composite.scm|TeXmacs/progs/fonts/fonts-composite.scm>, <source-link|fonts-adobe.scm|TeXmacs/progs/fonts/fonts-adobe.scm>,
-    <source-link|fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>>(relative to <verbatim|src/>) Font rules which
+    <source-link|fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>>(relative to <source-link|src/|src>) Font rules which
     map logical font requests to <TeX> font trees.
   </description-paragraphs>
 

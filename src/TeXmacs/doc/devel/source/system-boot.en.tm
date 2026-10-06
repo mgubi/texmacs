@@ -19,11 +19,11 @@
 
   <verbatim|$TEXMACS_PATH> is the directory with the <scheme> code, styles,
   fonts and documentation of the installation (in the source tree,
-  <verbatim|src/TeXmacs>). It is determined in two places:
+  <source-link|src/TeXmacs|TeXmacs>). It is determined in two places:
 
   <\enumerate>
-    <item>The <cpp|main> functions of <verbatim|Plugins/Unix> and
-    <verbatim|Plugins/Windows64> call <cpp|setup_texmacs_path>. If
+    <item>The <cpp|main> functions of <source-link|Plugins/Unix|src/Plugins/Unix> and
+    <source-link|Plugins/Windows64|src/Plugins/Windows64> call <cpp|setup_texmacs_path>. If
     <verbatim|TEXMACS_PATH> is set and valid, it is kept. Otherwise the
     function tries directories relative to the executable
     (<cpp|texmacs_get_application_directory>): on <name|macOS>

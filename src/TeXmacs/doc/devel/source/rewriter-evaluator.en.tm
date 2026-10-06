@@ -5,7 +5,7 @@
 <\body>
   <tmdoc-title|The evaluator of the style rewriter and its coverage>
 
-  This page describes <verbatim|src/src/Style/Evaluate/> and compares it
+  This page describes <source-link|src/src/Style/Evaluate/|src/Style/Evaluate> and compares it
   with the real evaluator <cpp|edit_env_rep::exec>
   (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>), whose semantics are documented in
   <hlink|evaluation of primitives|macro-expansion-exec.en.tm>.

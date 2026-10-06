@@ -8,7 +8,7 @@
   <section|The formatter data structures>
 
   The intermediate results of the typesetter are described by a few small
-  classes in <verbatim|Typeset/Format/> and <verbatim|Kernel/Types/>.
+  classes in <source-link|Typeset/Format/|src/Typeset/Format> and <verbatim|Kernel/Types/>.
 
   <subsection|Spaces>
 

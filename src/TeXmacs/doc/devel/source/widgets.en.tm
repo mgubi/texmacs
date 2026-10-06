@@ -96,7 +96,7 @@
   <section|Where to find the code>
 
   <\description-paragraphs>
-    <item*|<verbatim|src/src/Graphics/Gui/>>The abstract interface:
+    <item*|<source-link|src/src/Graphics/Gui/|src/Graphics/Gui>>The abstract interface:
     <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>, <source-link|message.hpp|src/Graphics/Gui/message.hpp>, <source-link|gui.hpp|src/Graphics/Gui/gui.hpp>,
     <source-link|window.hpp|src/Graphics/Gui/window.hpp> and <source-link|widget.cpp|src/Graphics/Gui/widget.cpp>.
 
@@ -104,7 +104,7 @@
     <source-link|src/src/Kernel/Containers/promise.hpp|src/Kernel/Containers/promise.hpp>>Commands and promises,
     the two kinds of closures passed to widgets.
 
-    <item*|<verbatim|src/src/Texmacs/Window/>>The kernel side of windows:
+    <item*|<source-link|src/src/Texmacs/Window/|src/Texmacs/Window>>The kernel side of windows:
     <source-link|tm_window.cpp|src/Texmacs/Window/tm_window.cpp> (the class <cpp|tm_window_rep>, menus and icon
     bars of a window, auxiliary windows), <source-link|tm_frame.cpp|src/Texmacs/Window/tm_frame.cpp> (the
     <cpp|tm_frame_rep> part of the server), <source-link|tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp>
@@ -114,16 +114,16 @@
     <item*|<source-link|src/src/Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The <scheme>
     names of the widget constructors (<scm|widget-hmenu> and friends).
 
-    <item*|<verbatim|src/TeXmacs/progs/kernel/gui/>>The <scheme> side:
+    <item*|<source-link|src/TeXmacs/progs/kernel/gui/|TeXmacs/progs/kernel/gui>>The <scheme> side:
     <source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>, <source-link|menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>,
     <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>, <source-link|menu-convert.scm|TeXmacs/progs/kernel/gui/menu-convert.scm> and the examples
     in <source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>.
 
-    <item*|<verbatim|src/src/Plugins/Qt/>>The <name|Qt> port (with a variant
-    in <verbatim|Plugins/Qt6>).
+    <item*|<source-link|src/src/Plugins/Qt/|src/Plugins/Qt>>The <name|Qt> port (with a variant
+    in <source-link|Plugins/Qt6|src/Plugins/Qt6>).
 
-    <item*|<verbatim|src/src/Plugins/Widkit/>, <verbatim|Plugins/X11/>,
-    <verbatim|Plugins/Cocoa/>>The older <name|X11> port, built on the
+    <item*|<source-link|src/src/Plugins/Widkit/|src/Plugins/Widkit>, <source-link|Plugins/X11/|src/Plugins/X11>,
+    <source-link|Plugins/Cocoa/|src/Plugins/Cocoa>>The older <name|X11> port, built on the
     <TeXmacs> own widget kit <name|Widkit>, and an experimental <name|Cocoa>
     port.
   </description-paragraphs>
@@ -157,7 +157,7 @@
   The older document \P<hlink|The graphical user interface|gui.en.tm>\Q
   describes the original <name|X11> toolkit of <TeXmacs> (the widget,
   event and attribute classes that now live in
-  <verbatim|Plugins/Widkit>). It is of historical interest only: the
+  <source-link|Plugins/Widkit|src/Plugins/Widkit>). It is of historical interest only: the
   <name|Qt> port does not use that event model, and the abstract interface
   described here replaced direct use of <name|Widkit> in the kernel.
 
