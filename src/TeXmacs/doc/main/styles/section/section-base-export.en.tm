@@ -49,8 +49,16 @@
     <src-arg|aux> specifies the auxiliary channel with the data for
     generating the bibliography (<verbatim|bib>, by default). The arguments
     <src-arg|style> and <src-arg|file-name> contain the bibliography style
-    and the file with the bibliographic database. The <src-arg|body> argument
-    corresponds to the automatically generated content.
+    and the file with the bibliographic database. The style is either a
+    style of <TeXmacs>, whose name starts with <verbatim|tm-> (such as
+    <verbatim|tm-plain>), or the name of a style of <BibTeX> (a
+    <verbatim|.bst> file). The file is a <verbatim|.bib> file, given
+    without its extension and relative to the document (it is also searched
+    in the directories which contain the document; a <verbatim|.bbl> file of
+    the same name is used when there is none); it may be empty, when the
+    references come from the bibliographic database or from Zotero, or are
+    kept in the document. The <src-arg|body> argument corresponds to the
+    automatically generated content.
   </explain>
 
   <\explain|<explain-macro|table-of-contents|aux|body>>

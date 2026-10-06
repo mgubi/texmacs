@@ -59,7 +59,7 @@
   The settings are in <menu|Document|Bibliography|Zotero settings...>:
 
   <\description>
-    <item*|Read the library from>The Zotero application,
+    <item*|Read the library from><verbatim|The Zotero application>,
     <verbatim|zotero.org>, or <verbatim|Automatic>: <verbatim|zotero.org>
     in a web browser, the application elsewhere.
 
@@ -67,11 +67,13 @@
     library on <verbatim|zotero.org>.
 
     <item*|Zotero server>The address of the Zotero application,
-    <verbatim|http://localhost:23119> by default.
+    <verbatim|http://localhost:23119> by default (not shown in a web
+    browser).
 
     <item*|Libraries>Your own library only (<verbatim|My Library>), or also
-    the libraries of the groups which you belong to. When two libraries
-    have the same key, your own library wins.
+    the libraries of the groups which you belong to (<verbatim|My Library
+    and groups>). When two libraries have the same key, your own library
+    wins.
 
     <item*|Export format>The format of the references which <TeXmacs>
     obtains from Zotero: <verbatim|bibtex> or <verbatim|biblatex>.
@@ -176,7 +178,8 @@
 
   <subsubsection*|With the database>
 
-  With the bibliographic database (<menu|Tools|Database tool>), Zotero is
+  With the <hlink|bibliographic database|man-bib-database.en.tm>
+  (<menu|Tools|Database tool>), Zotero is
   one more source of references, and the bibliography needs no <BibTeX>
   file: <menu|Document|Bibliography|Update from Zotero> adds a bibliography
   without file when the document has none, and generates it. The
@@ -190,8 +193,9 @@
   import bibliographies when opening files>, on by default). These copies
   stay
   in sync with Zotero: <menu|Document|Update|Bibliography> and
-  <menu|Document|Bibliography|Synchronize with Zotero> bring in the changes
-  made in Zotero. When a reference was changed both in <TeXmacs> and in
+  <menu|Document|Bibliography|Synchronize with Zotero> (shown with the
+  database tool only, as <menu|Import the citations into the database>)
+  bring in the changes made in Zotero. When a reference was changed both in <TeXmacs> and in
   Zotero, a window shows the fields which differ, and you choose which
   value to keep for each of them. A reference deleted in Zotero is kept in
   the database.
