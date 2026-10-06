@@ -141,6 +141,17 @@
   requests. A request without key answers 401 (state <scm|no-key>); a key
   refused gives <scm|forbidden>.
 
+  As for the keys of the AI engines, the key is asked when it is needed
+  (<scm|zotero-ask-key>): when the wallet is there but closed, its dialog
+  opens first (it may hold the key), else a dialog asks for the key
+  (<scm|zotero-key-dialog>); the operation which needed it is then run
+  again. The commands ask before they run (<scm|zotero-command>), the
+  search window when it opens (<scm|zotero-search-opened>), and
+  <scm|update-document> after it ran, only if it needed Zotero
+  (<scm|zotero-key-wanted>: <scm|zotero-ready?> notes that the key lacked);
+  once declined, the updates do not ask again. A key given while the wallet
+  is closed opens it first, to keep the key there.
+
   The requests are made by <verbatim|curl> on the desktop, with the headers
   in a temporary file (<verbatim|--header @<em|file>>), so that the key is
   never on a command line; in a browser, by a synchronous
@@ -150,11 +161,21 @@
   <scm|decode-base64>: the body stays the bytes of utf8).
   <verbatim|zotero.org> sends the headers which this needs (CORS).
 
-  The web <abbr|API> searches the citation keys only with
-  <verbatim|qmode=everything>, which the searches of keys
-  (<scm|zotero-find-key>, completion) ask for; the other searches keep the
-  default (title, creators, year). <menu|Show in Zotero> opens the page of
-  the item on <verbatim|zotero.org> (<scm|zotero-web-url>).
+  The searches of <verbatim|zotero.org> (<verbatim|q=>) only look at the
+  titles, the creators and the years, all the words of the query being
+  required, also with <verbatim|qmode=everything> (which adds the full
+  text, not the other fields): the citation keys, the field
+  <verbatim|extra>, the publishers and the <abbr|URL>s are never searched
+  (checked on the public library <verbatim|users/475425>). A citation key
+  is therefore found by its item when it is known (see <hlink|The items of a
+  document|#zotero-items>), and otherwise by the words <verbatim|"<em|author>
+  <em|year>"> which start and end a key of Better<nbsp>BibTeX
+  (<scm|key-author-year>: <verbatim|barashkovF43MeasureGirsanovs2020>
+  gives <verbatim|barashkov 2020>, a letter after the year is skipped),
+  keeping the item whose key is exactly the one asked for. The completion
+  finds the keys which start with the name of an author for the same
+  reason. <menu|Show in Zotero> opens the page of the item on
+  <verbatim|zotero.org> (<scm|zotero-web-url>).
 
   <subsection|Asynchronous requests in a web browser>
 
@@ -189,6 +210,33 @@
   version, so that the bibliography made with the database, which asks
   Zotero while it is made, finds them once <scm|zotero-before-update> has
   asked for them.
+
+  <subsection|Following the requests>
+
+  While answers of <verbatim|zotero.org> are awaited, the footer says what
+  is asked (<scm|zotero-progress-message>): the newest request, described
+  by <scm|zotero-request-label> from its <abbr|URL> (searching
+  <em|query>, fetching, exporting or looking for changes of <em|n>
+  references, checking the key, the library or the groups), the number of
+  the others, the seconds spent after two seconds, and after ten seconds
+  that <verbatim|zotero.org> is slow. A ticker (<scm|delayed> with
+  <scm|:pause>) shows it again each second while answers are awaited. When
+  the last answer comes, <scm|zotero-answered-message> gives the time
+  spent since the first request of the series, or the failure
+  (<scm|zotero-status-message> of the first status which was not 200); the
+  operations which waited run after it, and may set their own message.
+
+  The footer of a document is not drawn again while a dialog has the
+  keyboard focus (<cpp|edit_interface_rep::apply_changes> updates the
+  menus and the footer only when <cpp|idle_time> grows, which it does not
+  without the focus). The search window therefore shows the progress
+  itself: its line of sources gives <scm|zotero-progress-message> while
+  answers are awaited (the ticker refreshes it, <scm|refresh-now
+  "db-search-sources">), and <scm|zotero-searching-results> adds
+  <verbatim|Searching zotero.org...> to the results which wait.
+  <scm|zotero-waiting?> tells whether the operation being run (its retry)
+  waits for answers: unlike <scm|zotero-asking?>, which is true while any
+  answer is awaited, it only holds for results which will be shown again.
 
   <subsection|State and caches>
 
@@ -241,8 +289,16 @@
     key>
   <|explain>
     The item with the citation key <scm-arg|key>, or <scm|#f>: a direct
-    request for a derived key, otherwise a search of each library, keeping
-    the exact match. <scm|zotero-resolve> resolves a list of keys,
+    request for a derived key; otherwise the item of the key when it is
+    known (<scm|zotero-item-of>, asked for by <verbatim|items/<em|item>>
+    and kept if it still has the key); otherwise a search of each library
+    (<scm|find-in-library>: on <verbatim|zotero.org> first
+    <verbatim|"<em|author> <em|year>">, then the key itself, which the
+    application matches), keeping the exact match.
+    <scm|zotero-resolve> resolves a list of keys: the keys whose item is
+    known are asked for first, by library and at once
+    (<verbatim|items?itemKey=...>, <scm|resolve-by-items!>), and nothing is
+    searched while those answers are awaited (<scm|zotero-waiting?>).
     <scm|zotero-export> exports items as <BibTeX> (one request per library
     and per 50 items), <scm|zotero-item-versions> gives the versions of
     items (an item which is not returned has been deleted).
@@ -288,6 +344,18 @@
   without file with it (its references are then in the document, see
   below).
 
+  Without the database tool, a bibliography without file (as
+  <menu|Insert|Automatic|Bibliography> may insert it) or whose file does
+  not exist yet has no references. <scm|zotero-before-update> then exports
+  the references of Zotero into its file when Zotero has some of the
+  citations (<scm|fill-missing-bibliography>): a bibliography without file
+  is given the file <verbatim|<em|document>-zotero.bib> (the third child of
+  the tag is set), a missing file is created under its name. Zotero is not
+  asked about when the key of <verbatim|zotero.org> is missing, so that a
+  user without Zotero is never asked for it. <scm|zotero-file-citations>
+  puts given keys in the file of the bibliography by the same rules (added
+  to a file of the user, exported into a file of Zotero).
+
   The dates are written as <verbatim|YYYY-MM-DD> by <scm|zotero-iso-date>:
   <scm|pretty-date> knows no <abbr|ISO> format.
 
@@ -322,13 +390,40 @@
   running; with <verbatim|"auto bib import">, they enter the database of the
   user when the document is opened.
 
-  <subsection|The items of a document>
+  <subsection|The items of a document><label|zotero-items>
 
-  The attachment <verbatim|zotero-items> of a document holds a
+  The item key of Zotero never changes, while a citation key may, and
+  cannot be searched on <verbatim|zotero.org>: the item is the anchor of a
+  citation. The attachment <verbatim|zotero-items> of a document holds a
   <scm|(tuple <em|key> <em|item> <em|library>)> for each key resolved
   through Zotero (<scm|zotero-record-items>, <scm|zotero-recorded-items>),
-  in both modes. It is what allows to find an item again when its key
-  changed, and <menu|Show in Zotero> to work without asking Zotero.
+  in both modes; the attachment is only rewritten when a record changes.
+  It is what allows to find an item again when its key changed, and
+  <menu|Show in Zotero> to work without asking Zotero.
+
+  <scm|(zotero-item-of <scm-arg|key>)> gives the <scm|(<em|item>
+  <em|library>)> of a key from, in this order, the attachment, the
+  comments of the user's <BibTeX> file (<scm|zotero-bib-file-items>), and
+  the items which Zotero gave during the session: every answer converted by
+  <scm|items-entries> (searches, completions, exports) notes the item of
+  each key (<scm|seen-items>, forgotten by <scm|zotero-forget-keys>).
+
+  <\explain>
+    <scm|(zotero-cited <scm-arg|key> <scm-arg|buffer>)><explain-synopsis|take
+    a citation from Zotero>
+  <|explain>
+    Called by the search window when a reference is chosen for a citation
+    of <scm-arg|buffer> (the buffer is captured when the window opens: the
+    callback runs while the results are the current buffer). When Zotero
+    gave the item of <scm-arg|key> during the session
+    (<scm|zotero-seen?>), the item is recorded with the document and the
+    reference is copied where the bibliography reads it: imported into the
+    database with the database tool (<scm|import-entry>, synced from then
+    on), else put in the file of the bibliography
+    (<scm|zotero-file-citations>). It runs as a command
+    (<scm|zotero-command>), so that it waits for <verbatim|zotero.org> in
+    a browser. Defined in <verbatim|zotero-db.scm>.
+  </explain>
 
   <section|Entries of the database from Zotero>
 
@@ -451,12 +546,14 @@
 
   <\itemize>
     <item>with the database tool, on <scm|(bib-database)>
-    (<scm|open-bib-chooser>, <verbatim|bib-menu.scm>);
+    (<scm|open-bib-chooser>, <verbatim|bib-manage.scm>, whose callback
+    also calls <scm|zotero-cited>);
     <scm|db-search-results> appends the Zotero items which the database
     does not have (<scm|zotero-search-entries>);
 
     <item>without it, on the marker <scm|:bib-file>
-    (<scm|zotero-open-search-tool>): <scm|db-search-results> then calls
+    (<scm|zotero-open-search-tool>, whose callback sets the key and calls
+    <scm|zotero-cited>): <scm|db-search-results> then calls
     <scm|zotero-file-search-results>, which lists the entries of the file
     of the bibliography matching all the words of the query (unless the
     file is managed), then the Zotero items. The entries of the file are
@@ -541,9 +638,46 @@
   the suites <verbatim|links> and <verbatim|database> in
   <verbatim|check-master.scm>.
 
+  The fake library searches as the source does: the application also
+  matches the citation keys (and the field <verbatim|extra> with
+  <verbatim|qmode=everything>), <verbatim|zotero.org> only the titles, the
+  creators and the dates, each word of the query being required. A web
+  browser is simulated by redefining <scm|zotero-in-browser?> and
+  <scm|zotero-start-request> (the requests are recorded, and answered with
+  <scm|zotero-async-answer> one by one or all at once,
+  <scm|sim-answer-all!>); a synchronous request would then fail, which
+  shows that an operation asked for something it had not prefetched. The
+  groups <verbatim|by item> (a key found only through its item, renamed
+  items), <verbatim|cited> (the copies into the user's file, a new file
+  and the database), <verbatim|async database> (<menu|Update> with the
+  database in a browser) and <verbatim|async messages> (labels, progress)
+  cover the work described above. Groups which reach
+  <scm|zotero-command> with the source <verbatim|"web"> need the
+  preference <verbatim|"zotero api key">, else the key is asked for and
+  nothing runs.
+
   <section|Pitfalls>
 
   <\itemize>
+    <item>The searches of <verbatim|zotero.org> do not look at the citation
+    keys, even with <verbatim|qmode=everything> (see above).
+
+    <item><scm|zotero-in-browser?> is <scm|(defined? 'web-javascript)>: a
+    test must never define <scm|web-javascript>, or every group runs as in
+    a browser.
+
+    <item><scm|set-message> is invisible while a dialog has the focus (the
+    footer of the document is not drawn again): feedback for a dialog goes
+    into the dialog.
+
+    <item><scm|string-search-forwards> answers -1 when nothing is found,
+    which is true for <scm|or> and <scm|and>.
+
+    <item><scm|generate-all-aux> in the suite crashes the offscreen Qt
+    platform (the wait indicator takes the focus of a detached editor): the
+    groups check <scm|zotero-db-entries>, which the generation calls,
+    rather than generate the bibliography.
+
     <item>The local <abbr|API> has no list of deleted items: an item which a
     query by key does not return was deleted (or moved to the trash). The
     same queries also return the children (attachments, notes) of the
