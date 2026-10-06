@@ -421,6 +421,9 @@
   (cached in <cpp|src_style>, <cpp|src_special>, ...) and on the DRD types
   of the children (<cpp|drd_info_rep::get_type_child>).
 
+  How source is entered, edited and presented to the user is described in
+  <hlink|source mode|source-mode.en.tm>.
+
   <tmdoc-copyright|2026|the <TeXmacs> team>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

@@ -27,6 +27,8 @@
 
     <branch|Editing modes on the <scheme> side|modes.en.tm>
 
+    <branch|Source mode, the macro editor and the shortcut editor|source-mode.en.tm>
+
     <branch|The graphics editor|graphics-editor.en.tm>
 
     <branch|Syntax highlighting and programming languages|syntax-highlighting.en.tm>
