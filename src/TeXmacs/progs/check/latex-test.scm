@@ -482,8 +482,9 @@
   (check= (lt "\\cite{k}") '(cite "k"))
   (check= (lt "\\cite{ab,cd}") '(cite "ab" "cd"))
   (check= (lt "\\cite{a, bc}") '(cite "a" "bc"))
-  ;; FIXME: a last key of one character is dropped, \cite{ab,c} gives
-  ;; (cite "ab"): latex_cite_to_tree (fromtex.cpp) steps over it
+  ;; keys of one character, also the last one
+  (check= (lt "\\cite{ab,c}") '(cite "ab" "c"))
+  (check= (lt "\\cite{a,b,c}") '(cite "a" "b" "c"))
   (check= (lt "\\cite[p. 3]{k}") '(cite-detail "k" "p. 3"))
   (check= (lt "\\href{http://x}{t}") '(hlink "t" "http://x")))
 
@@ -616,9 +617,11 @@
   (check= (lt "\\verb|a%b|") '(verbatim "a%b"))
   (check= (lt "\\begin{alltt}\na\nb\n\\end{alltt}")
           '(document (verbatim-code (document "a" "b"))))
-  ;; FIXME: \begin{tmcode}\nx\n\end{tmcode} (as exported from a code
-  ;; block) gives (code (document "" "x" "")): unlike alltt, the line
-  ;; breaks after \begin and before \end become empty lines
+  ;; as alltt, the line breaks after \begin{tmcode} and before \end{tmcode}
+  ;; do not become empty lines, and empty lines inside are kept
+  (check= (lt "\\begin{tmcode}\nx\n\\end{tmcode}") '(code (document "x")))
+  (check= (lt "\\begin{tmcode}[cpp]\na\n\nb\n\\end{tmcode}")
+          '(document (cpp-code (document "a" "" "b"))))
   ;; an unknown environment becomes a tag of the same name
   (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x"))
   ;; the text of a \parbox is text, also in a formula
@@ -692,11 +695,15 @@
   (check= (body-of (ld (string-append "\\documentclass{book}\\begin{document}"
                                      "x\n\n\\chapter{C}\n\ny\\end{document}")))
           '(document "x" (chapter "C") "y"))
-  ;; FIXME: a section which starts the body stays in one paragraph with
-  ;; the next one, \begin{document}\section{C}\n\nx\end{document} gives
-  ;; (document (concat (section "C") "x")) where the same snippet gives
-  ;; (document (section "C") "x") (finalize_sections in fromtex_post.cpp
-  ;; splits the other sections)
+  ;; a section which starts the body is a paragraph of its own, as the
+  ;; later ones
+  (check= (body-of (ld (string-append "\\documentclass{article}\\begin{document}"
+                                     "\\section{C}\n\nx\\end{document}")))
+          '(document (section "C") "x"))
+  (check= (body-of (ld (string-append "\\documentclass{article}\\begin{document}"
+                                     "\\section{C}\n\nx\n\n\\section{D}\n\ny"
+                                     "\\end{document}")))
+          '(document (section "C") "x" (section "D") "y"))
   (check= (body-of (ld (string-append
                         "\\documentclass{article}\n\\usepackage{amsmath}\n"
                         "\\newcommand{\\R}{\\mathbb{R}}\n"
@@ -711,8 +718,15 @@
                                (doc-author (author-data (author-name "Ann")))
                                (doc-date (date "")))
                      "x"))
-  ;; FIXME: an author of one character is lost, \author{A} gives no
-  ;; doc-author: get_latex_author_datas (metadata.cpp) skips atomic trees
+  ;; an author of one character is kept
+  (check= (body-of (ld (string-append
+                        "\\documentclass{article}\\begin{document}"
+                        "\\title{T}\\author{A}\\date{D}\\maketitle x"
+                        "\\end{document}")))
+          '(document (doc-data (doc-title "T")
+                               (doc-author (author-data (author-name "A")))
+                               (doc-date "D"))
+                     "x"))
   (check= (body-of (ld (string-append
                         "\\documentclass{article}\\begin{document}"
                         "\\title{T}\\author{Ann}\\date{D}\\maketitle x"
@@ -750,7 +764,7 @@
     (enumerate (document (concat (item) "a")))
     (description (document (concat (item* "x") "a")))
     (label "l") (reference "l") (pageref "l") (eqref "l")
-    (concat "a" (footnote "f")) (cite "k") (cite "ab" "cd")
+    (concat "a" (footnote "f")) (cite "k") (cite "ab" "cd") (cite "k" "l")
     (hlink "t" "http://x") (new-page) (space "1em") (nbsp)
     (verbatim "a%b")
     (math "<alpha>+<infty>") (math "a<leq>b") (math "sin x")
