@@ -26,6 +26,7 @@
 #  include <sys/wait.h>
 #endif
 #include <errno.h>
+#include <QThread>
 
 void close_all_cmdlines ();
 void close_all_requests ();
@@ -142,6 +143,10 @@ qt_pipe_link_rep::listen (int msecs) {
     PipeLink.listenChannel (QProcess::StandardOutput, 0);
     PipeLink.listenChannel (QProcess::StandardError, 0);
     if (texmacs_time () - wait_until > 0) break;
+    // (both channels are polled: wait a little between two polls rather
+    // than keep a processor busy)
+    if (PipeLink.getOutbuf() == "" && PipeLink.getErrbuf() == "")
+      QThread::msleep (1);
   }
 }
 

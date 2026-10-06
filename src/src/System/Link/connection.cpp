@@ -96,10 +96,14 @@ connection_rep::start (bool again) {
       // NOTE: a banner may consist of several blocks (e.g. a warning, then
       // the banner itself); those which follow at once are part of it, and
       // would otherwise be taken for the answer of the next evaluation.
-      // A block which the plugin interrupts for more than 100 ms is not.
+      // This is a best effort, on time: the blocks of the output which come
+      // within 100 ms of the previous one, for at most 1 s, are read with
+      // the banner, and a block which comes later is still taken for the
+      // next answer. The error stream does not extend the wait: what the
+      // plugin writes there is read with the next answer.
       for (int i= 0; i < 10 && ln->alive; i++) {
         ln->listen (100);
-        if (ln->watch (LINK_OUT) == "" && ln->watch (LINK_ERR) == "") break;
+        if (ln->watch (LINK_OUT) == "") break;
         (void) connection_retrieve (name, session);
       }
     }
@@ -369,26 +373,12 @@ connection_get (string name, string session) {
 static void
 connection_append (tree& doc, tree next, bool join) {
   // the answer may come in several reads: the first line of a read
-  // continues the last line of the previous one, as within a read, when
-  // both come from the same stream (output or error)
+  // continues the last line of the previous one, with the rule used within
+  // a read (document_append), when both come from the same stream (output
+  // or error); a piece of the other stream in between is not joined
   if (!is_document (next)) next= tree (DOCUMENT, next);
-  if (!join) {
-    doc << A (next);
-    return;
-  }
-  if (N(doc) == 0 || doc[N(doc)-1] == "") {
-    if (N(doc) != 0) doc= doc (0, N(doc)-1);
-    doc << A (next);
-    return;
-  }
-  if (next[0] != "") {
-    tree last= doc[N(doc)-1], first= next[0];
-    if (!is_concat (last)) last= tree (CONCAT, last);
-    if (!is_concat (first)) first= tree (CONCAT, first);
-    last << A (first);
-    doc[N(doc)-1]= last;
-  }
-  doc << A (next (1, N(next)));
+  if (join && N(doc) != 0) document_append (doc, next);
+  else doc << A (next);
 }
 
 static tree
