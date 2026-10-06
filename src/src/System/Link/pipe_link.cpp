@@ -19,12 +19,14 @@
 #include "hashset.hpp"
 #include "iterator.hpp"
 #include "tm_timer.hpp"
+#include "analyze.hpp"
 #include <stdio.h>
 #include <string.h>
 #ifndef OS_MINGW
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <errno.h>
 #endif
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
 #include <malloc.h>
@@ -77,6 +79,7 @@ public:
   void    stop ();
 
   void    feed (int channel);
+  void    close_fds ();
 };
 
 pipe_link_rep::pipe_link_rep (string cmd2): cmd (cmd2) {
@@ -87,6 +90,7 @@ pipe_link_rep::pipe_link_rep (string cmd2): cmd (cmd2) {
   outbuf = "";
   errbuf = "";
   alive  = false;
+  pid    = -1;  // no process yet: terminate_child does nothing
 }
 
 pipe_link_rep::~pipe_link_rep () {
@@ -99,6 +103,38 @@ make_pipe_link (string cmd) {
   return tm_new<pipe_link_rep> (cmd);
 }
 
+#ifndef OS_MINGW
+static void
+terminate_child (int pid) {
+  // no process (fork failed, or none was made): killpg (-1, ...) fails, and
+  // kill (-1, SIGKILL) below would kill every process of the user
+  if (pid <= 0) return;
+  // Ask the process group of the child to terminate, give it a short
+  // time to do so, kill it otherwise, and reap the child
+  if (-1 != killpg (pid, SIGTERM)) {
+    for (int i=0; i<50; i++) {
+      if (waitpid (pid, NULL, WNOHANG) != 0) {
+        killpg (pid, SIGKILL);
+        return;
+      }
+      usleep (10000);
+    }
+    killpg (pid, SIGKILL);
+  }
+  else kill (pid, SIGKILL);
+  waitpid (pid, NULL, 0);
+}
+#endif
+
+void
+pipe_link_rep::close_fds () {
+#ifndef OS_MINGW
+  if (in  != -1) { close (in ); in = -1; }
+  if (out != -1) { close (out); out= -1; }
+  if (err != -1) { close (err); err= -1; }
+#endif
+}
+
 void
 close_all_pipes () {
 #ifndef OS_MINGW
@@ -106,11 +142,11 @@ close_all_pipes () {
   while (it->busy()) {
     pipe_link_rep* con= (pipe_link_rep*) it->next();
     if (con->alive) {
-      if (-1 != killpg(con->pid,SIGTERM)) {
-sleep(2);
-        killpg(con->pid,SIGKILL);
-      }
+      terminate_child (con->pid);
       con->alive= false;
+      remove_notifier (con->snout);
+      remove_notifier (con->snerr);
+      con->close_fds ();
     }
   }
 #endif
@@ -147,6 +183,45 @@ execute_shell (string s) {
 }
 #endif
 
+#ifndef OS_MINGW
+static bool
+program_found (string cmd) {
+  // Can the program which @cmd runs be started? As for Qt pipes, which
+  // start the program themselves, a program which is not found is an error;
+  // a command which is not a plain call of a program is left to the shell
+  int i= 0, n= N(cmd);
+  while (i < n && (cmd[i] == ' ' || cmd[i] == '\t')) i++;
+  int start= i;
+  while (i < n && cmd[i] != ' ' && cmd[i] != '\t') i++;
+  string prog= cmd (start, i);
+  if (prog == "") return true;
+  for (int j= 0; j < N(prog); j++)
+    if (!is_alpha (prog[j]) && !is_digit (prog[j]) &&
+        prog[j] != '.' && prog[j] != '_' && prog[j] != '-' &&
+        prog[j] != '+' && prog[j] != '/')
+      return true;
+  if (prog == "exec" || prog == "cd" || prog == "eval" || prog == "." ||
+      prog == "command" || prog == "set" || prog == "export" ||
+      prog == "trap" || prog == "ulimit" || prog == "umask")
+    return true;
+  if (search_forwards ("/", prog) >= 0) {
+    c_string p (prog);
+    return access (p, X_OK) == 0;
+  }
+  string path= get_env ("PATH");
+  int k= 0;
+  while (k <= N(path)) {
+    int e= search_forwards (":", k, path);
+    if (e < 0) e= N(path);
+    string dir= path (k, e);
+    c_string p ((dir == ""? string ("."): dir) * "/" * prog);
+    if (access (p, X_OK) == 0) return true;
+    k= e + 1;
+  }
+  return false;
+}
+#endif
+
 string
 pipe_link_rep::start () {
 #ifndef OS_MINGW
@@ -157,6 +232,10 @@ pipe_link_rep::start () {
   // a live program, were read again and again (the page froze)
   return "Error: the programs of the plugins do not run in the browser";
 #endif
+  if (!program_found (cmd)) {
+    if (DEBUG_IO) debug_io << "Error: cannot start '" << cmd << "'\n";
+    return "Error: cannot start application";
+  }
 
   int e1= pipe (pp_in ); (void) e1;
   int e2= pipe (pp_out); (void) e2;
@@ -206,11 +285,10 @@ pipe_link_rep::start () {
       r= ::read (out, outbuf, 1024);
       if (r == 1 && outbuf[0] == TERMCHAR) return "ok";
       alive= false;
-      if (-1 != killpg(pid,SIGTERM)) {
-        sleep(2);
-        killpg(pid,SIGKILL);
-      }
-      wait (NULL);
+      terminate_child (pid);
+      remove_notifier (snout);
+      remove_notifier (snerr);
+      close_fds ();
       if (r == -1) return "Error: the application does not reply";
       else
         return "Error: the application did not send its usual startup banner";
@@ -258,19 +336,17 @@ pipe_link_rep::feed (int channel) {
   char tempout[1024];
   if (channel == LINK_OUT) r = ::read (out, tempout, 1024);
   else r = ::read (err, tempout, 1024);
-  if (r == -1) {
-    io_error << "Read failed for '" << cmd << "'\n";
-    wait (NULL);
-  }
-  else if (r == 0) {
-    if (-1 != killpg(pid,SIGTERM)) {
-      sleep(2);
-      killpg(pid,SIGKILL);
-    }
-
+  // NOTE: an interrupted read is tried again later; after any other
+  // failure, the pipe is closed as at its end, since it would otherwise
+  // be reported readable again and again
+  if (r == -1 && (errno == EINTR || errno == EAGAIN)) return;
+  if (r == -1) io_error << "Read failed for '" << cmd << "'\n";
+  if (r <= 0) {
+    terminate_child (pid);
     alive= false;
     remove_notifier (snout);      
     remove_notifier (snerr);      
+    close_fds ();
   }
   else {
     if (DEBUG_IO) debug_io << debug_io_string (string (tempout, r));
@@ -290,6 +366,10 @@ pipe_link_rep::watch (int channel) {
 
 string
 pipe_link_rep::read (int channel) {
+  // NOTE: as for Qt pipes, what is pending is read first, so that the
+  // output arrives without the event loop (synchronous evaluations,
+  // interruptions)
+  if (alive && outbuf == "" && errbuf == "") listen (0);
   if (channel == LINK_OUT) {
     string r= outbuf;
     outbuf= "";
@@ -310,18 +390,21 @@ pipe_link_rep::listen (int msecs) {
 #endif
   if (!alive) return;
   time_t wait_until= texmacs_time () + msecs;
-  while ((outbuf == "") && (errbuf == "")) {
+  while (alive && (outbuf == "") && (errbuf == "")) {
     fd_set rfds;
     FD_ZERO (&rfds);
     FD_SET (out, &rfds);
     FD_SET (err, &rfds);
+    // NOTE: only the time which is left is waited for, and listen (0)
+    // checks the pipes once (it is called by each read)
+    time_t left= max ((time_t) 0, wait_until - texmacs_time ());
     struct timeval tv;
-    tv.tv_sec  = msecs / 1000;
-    tv.tv_usec = 1000 * (msecs % 1000);
+    tv.tv_sec  = left / 1000;
+    tv.tv_usec = 1000 * (left % 1000);
     int nr= select (max (out, err) + 1, &rfds, NULL, NULL, &tv);
-    if (nr != 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
-    if (nr != 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
-    if (texmacs_time () - wait_until > 0) break;
+    if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
+    if (alive && nr > 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
+    if (msecs == 0 || texmacs_time () - wait_until >= 0) break;
   }
 }
 
@@ -337,17 +420,12 @@ void
 pipe_link_rep::stop () {
 #ifndef OS_MINGW
   if (!alive) return;
-  if (-1 != killpg(pid,SIGTERM)) {
-    sleep(2);
-    killpg(pid,SIGKILL);
-  }
-  alive= false;    
-  close (in);
+  terminate_child (pid);
   alive= false;
-  wait (NULL);
 
   remove_notifier (snout);
   remove_notifier (snerr);
+  close_fds ();
 #endif
 }
 
@@ -361,7 +439,7 @@ void pipe_callback (void *obj, void *info) {
   pipe_link_rep* con= (pipe_link_rep*) obj;  
   bool busy= true;
   bool news= false;
-  while (busy) {
+  while (busy && con->alive) {
     fd_set rfds;
     FD_ZERO (&rfds);
     int max_fd= max (con->err, con->out) + 1;
