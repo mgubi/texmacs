@@ -83,7 +83,16 @@ mouse which left the width as it was, at a limit or finer than a pixel at
 density 2, emptied the canvas until the next change).
 `misc/wasm/test/resize-flicker.mjs` counts such frames, and the frames
 whose canvas is stretched (0 in Firefox and Chrome, at density 1 and 2,
-and in Safari; 116 of 270 before). In
+and in Safari; 116 of 270 before). In single-window mode (the browser) the
+editors are in the virtual windows of the host: the frame drawn at once
+lays them all out and repaints their editors (it laid out and repainted
+those of the host, which are none), with a repaint of its own (the flag of
+an interrupted repaint of the loop cut it short), so that it shows the page
+where it goes; it showed it where it was, and the next frame where it
+goes, so that the page jumped at each step of a drag.
+`misc/wasm/test/resize-jitter.mjs` checks that a width of the canvas
+always comes with the same place of the page (21 of 22 widths came with two
+or three places before). In
 the browser the page has a frame, a column at the left of the canvas
 (`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
 one under the other, labelled with the names of the windows (the title of a

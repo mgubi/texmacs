@@ -5071,6 +5071,18 @@ process_event (SDL_Event *event) {
   } // switch (event->type)
 }
 
+// the editors drawn in a window: in single-window mode (always so in the
+// browser) the editors are in the virtual windows which the host holds
+// (their tabs), not in the host itself, so that those of the host were
+// none, and a resize of the host showed the old picture of the editor (at
+// its old place: the page jumped at each step of a drag of the edge)
+static void
+repaint_editors_of (vue_window win) {
+  if (single_window_mode () && win == (vue_window) the_host)
+    vue_simple_widget_rep::repaint_all ();
+  else vue_simple_widget_rep::repaint_all_in_window (win);
+}
+
 bool event_filter (void *userdata, SDL_Event *event) {
   if (event->type == SDL_EVENT_WINDOW_RESIZED) {
     // A resize is handled here, inside SDL's event pump, so that the window
@@ -5105,11 +5117,22 @@ bool event_filter (void *userdata, SDL_Event *event) {
       Uint32 sid= event->window.windowID;
       auto alive= [vid, sid, win] () {
         return id_to_window->contains (vid) && get_window_from_ID (sid) == win; };
-      win->process_layout();
+      // in single-window mode (always so in the browser) the editors are in
+      // the virtual windows the host holds, fitted to it by their own
+      // layout: the host alone left them at their old size, and the frame
+      // drawn here showed them as they were. All the windows are laid out
+      // (and the host draws them all), so the pools may be released
+      if (single_window_mode () && win == (vue_window) the_host) process_layout ();
+      else win->process_layout();
       vue_simple_widget_rep::notify_resizes ();
       if (the_interpose_handler != NULL) the_interpose_handler ();
       if (gui_needs_relayout) process_layout ();
-      if (alive ()) vue_simple_widget_rep::repaint_all_in_window (win);
+      // a repaint of its own, as the loop starts one (else the flag of a
+      // repaint of the loop which was interrupted cut this one short, and
+      // the frame showed the editor as it was)
+      interrupted= false;
+      interrupt_time= texmacs_time () + 100;
+      if (alive ()) repaint_editors_of (win);
       // the repaint may have replaced widgets, see gui_start_loop
       for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
       if (alive ()) win->process_redraw();

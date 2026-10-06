@@ -206,8 +206,8 @@
     mouse is over them. Its right edge changes its width, and folds the
     column when it is dragged far enough to the left.
 
-    <item>The document no longer flickers while the page or the column is
-    resized.
+    <item>The document no longer flickers or jumps while the page or the
+    column is resized.
   </itemize>
 
   <paragraph|5 October 2026>
