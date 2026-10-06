@@ -109,6 +109,9 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
+  ;; the Vue interface reads it at each layout; at the left by default in
+  ;; a web browser
+  ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-restart)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
@@ -193,6 +196,7 @@
 (validate-enum-preference "document update times" '("1" "2" "3"))
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
+(validate-enum-preference "icon bars" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
 

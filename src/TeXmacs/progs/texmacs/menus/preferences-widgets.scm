@@ -108,6 +108,10 @@
       ("light" "Bright")
       ("dark" "Dark"))
 
+(define-preference-names-and-validate "icon bars"
+  ("top" "Above the document")
+  ("left" "At the left of the document"))
+
 (define-preference-names-and-validate "gui density"
   ("compact" "Compact")
   ("normal" "Normal")
@@ -163,6 +167,12 @@
             )
             (get-pretty-preference "gui theme")
             "18em"))
+    (assuming (vue-gui?)
+      (item (text "Main and mode icon bars:")
+        (enum (set-pretty-preference "icon bars" answer)
+              '("Above the document" "At the left of the document")
+              (get-pretty-preference "icon bars")
+              "18em")))
     (assuming (support-functionality? "density")
       (item (text "Interface density:")
         (enum (set-pretty-preference "gui density" answer)
