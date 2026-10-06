@@ -13,7 +13,8 @@ how it works, what differs from Guile, how it performs, and what is left.
 | [04-progs-changes.md](04-progs-changes.md) | The changes to the Scheme code shared by all the interpreters, and the tests |
 | [05-build-and-vendored-femtolisp.md](05-build-and-vendored-femtolisp.md) | Choosing the interpreter, the vendored femtolisp, its 20 patches, rebuilding the boot image |
 | [06-open-issues.md](06-open-issues.md) | Known differences with Guile, failing checks, fragile spots, what to do next |
-| [07-performance.md](07-performance.md) | Boot time and memory against s7, where the time goes |
+| [07-performance.md](07-performance.md) | femtolisp, s7 and Guile on boot, tests, conversions, LaTeX export, the manual and the C++ boundary |
+| [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds |
 
 ## Summary
 
@@ -41,5 +42,8 @@ how it works, what differs from Guile, how it performs, and what is left.
   code runs, so code written for Guile keeps working.
 - **Tests:** 40 of the 43 regression suites pass; the 4 failing checks are
   listed in [06](06-open-issues.md).
-- **Performance:** boot takes about 1.3 s against 0.65 s for s7, with 165 MB
-  of memory against 400 MB (see [07](07-performance.md)).
+- **Performance** (see [07](07-performance.md)): running Scheme code,
+  femtolisp is as fast as s7 or faster (8 warm LaTeX exports: 1.8 s, s7
+  1.9–3.1 s, Guile 6.7 s), but loading code is slower, since every loaded
+  form is compiled (boot 1.6 s, s7 0.9 s, Guile 1.7 s). Its memory use is
+  close to Guile's, well below s7's.
