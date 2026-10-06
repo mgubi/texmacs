@@ -1368,6 +1368,23 @@ tex_glyph_unicode (int ch, bool t2a) {
   return t2a? t2a_table[ch]: cork_table[ch];
 }
 
+// Whether the font file u is a Cyrillic TeX font in the T2A encoding: the LH
+// fonts of TeXmacs (fonts/type1/la) and the T2A fonts of cm-super are named
+// la + two letters for the shape + the size in hundredths of a point
+// (larm1000, larm700, labx1728, larm0500). Other TeX fonts begin with la
+// too: lasy10 and lasyb10 (the LaTeX symbols), which are not in T2A.
+static bool
+is_t2a_font_file (url u) {
+  if (suffix (u) != "pfb") return false;
+  string s= basename (u);
+  int n= N(s);
+  if (n < 7 || n > 8 || !starts (s, "la")) return false;
+  if (!is_alpha (s[2]) || !is_alpha (s[3])) return false;
+  for (int i= 4; i < n; i++)
+    if (!is_digit (s[i])) return false;
+  return true;
+}
+
 void
 pdf_hummus_renderer_rep::make_pdf_font (string fontname)
 {
@@ -1398,8 +1415,7 @@ pdf_hummus_renderer_rep::make_pdf_font (string fontname)
       string ps_name (_ps_name.c_str ());
       if (starts (ps_name, "EuropeanComputerModern"))
 	EuropeanComputerModern_fonts->insert (fontname);
-      // the Cyrillic TeX fonts (LH, la*.pfb) are in the T2A encoding
-      if (suffix (u) == "pfb" && starts (as_string (tail (u)), "la"))
+      if (is_t2a_font_file (u))
 	T2A_fonts->insert (fontname);
       return;
     }
