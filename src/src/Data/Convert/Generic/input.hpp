@@ -62,4 +62,6 @@ class texmacs_input {
 };
 CONCRETE_CODE(texmacs_input);
 
+void document_append (tree& doc, tree u);
+
 #endif // defined INPUT_H

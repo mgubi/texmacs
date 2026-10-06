@@ -360,7 +360,7 @@
       (if (or (!= ret "0") (!= err ""))
 	  #f
           (with l (password-parse-crypt-style out)
-	    (and (>= (length l) 4) (== (fourth l) enc)))))))
+	    (and l (>= (length l) 4) (== (fourth l) enc)))))))
 
 (define (password-supports-sha256?)
   (and (not (os-mingw?)) (password-encode-sha256 "foo")))
@@ -381,7 +381,7 @@
       (if (or (!= ret "0") (!= err ""))
 	  #f
           (with l (password-parse-crypt-style out)
-                (and (>= (length l) 4) (== (fourth l) enc)))))))
+                (and l (>= (length l) 4) (== (fourth l) enc)))))))
 
 (define (password-supports-sha512?)
   (and (not (os-mingw?)) (password-encode-sha512 "foo")))

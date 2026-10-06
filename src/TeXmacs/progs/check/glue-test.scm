@@ -272,6 +272,32 @@
                     (lambda () (run-test-suite "no-such-test-suite-dir"))
                     'texmacs-error))
 
+;; processes: evaluate-system sends its inputs to the file descriptors of
+;; the process and reads its outputs. An empty input used to be left open,
+;; so that a process which reads it to its end never stopped, nor TeXmacs,
+;; which waits for it (openssl passwd -stdin of an empty password). A long
+;; input is sent in pieces of 4096 bytes on Unix.
+;; Not on Windows: the cat of MSYS2 never sees the end of its input there
+;; (it does not read the redirected descriptors of _wspawnvp, a limitation
+;; of mingw_system which is not addressed here), so the checks would hang.
+(define (test-glue-processes)
+  (if (or (os-mingw?) (os-win32?) (not (url-exists-in-path? "cat")))
+      (display "  no cat command (or Windows), skipped\n")
+      ;; (on Unix, cat is stopped after 20 s when perl is at hand: the check
+      ;; then fails, instead of TeXmacs waiting for cat forever)
+      (let* ((guard (if (and (not (or (os-mingw?) (os-win32?)))
+                             (url-exists-in-path? "perl"))
+                        '("perl" "-e" "alarm 20; exec @ARGV") '()))
+             (cat (lambda (in) (evaluate-system (append guard '("cat"))
+                                                '(0) (list in) '(1 2))))
+             (long (make-string 100000 #\a)))
+        (glue-check-equal "processes" "an input"
+                          (lambda () (cat "abc")) '("0" "abc" ""))
+        (glue-check-equal "processes" "an empty input"
+                          (lambda () (cat "")) '("0" "" ""))
+        (glue-check-equal "processes" "a long input"
+                          (lambda () (cat long)) (list "0" long "")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -299,6 +325,8 @@
   (test-glue-booleans-doubles)
   (glue-group "paths and urls")
   (test-glue-paths-urls)
+  (glue-group "processes")
+  (test-glue-processes)
   (when (nnull? glue-redefined)
     (display* "  redefined in Scheme, not checked: "
               (object->string (reverse glue-redefined)) "\n"))
