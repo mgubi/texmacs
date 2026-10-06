@@ -76,8 +76,14 @@ of the tabs dragged) is handled at once by `event_filter` too, outside an
 iteration of the loop: a change of the size of the canvas clears it, and
 left to the next frame it showed an empty canvas during a drag (the frames
 with events waiting do not repaint the editors).
-`misc/wasm/test/resize-flicker.mjs` counts such frames (0 in Firefox and
-Chrome; 116 of 270 before). In
+The page sends a resize only when the place of the canvas changed: SDL
+sets the size of the canvas at each resize event, which clears it even
+when the size stays, but tells TeXmacs only of a new size (a move of the
+mouse which left the width as it was, at a limit or finer than a pixel at
+density 2, emptied the canvas until the next change).
+`misc/wasm/test/resize-flicker.mjs` counts such frames, and the frames
+whose canvas is stretched (0 in Firefox and Chrome, at density 1 and 2,
+and in Safari; 116 of 270 before). In
 the browser the page has a frame, a column at the left of the canvas
 (`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
 one under the other, labelled with the names of the windows (the title of a

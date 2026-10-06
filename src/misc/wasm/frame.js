@@ -183,10 +183,27 @@ var tmFrame = (function () {
   // in the callbacks of the frame (emscripten_set_main_loop), so that a
   // resize sent from a callback of its own came after the drawing, and the
   // frame showed an empty canvas (the page flickered during a drag)
+  // Only when the place of the canvas changed: SDL sets the size of the
+  // canvas at each resize event, which clears it even when the size stays,
+  // but tells TeXmacs only of a new size, so that the canvas stayed empty
+  // (a move of the mouse which leaves the width as it is, at a limit, or
+  // finer than a pixel on a screen of density 2)
+  var lastBox = '';
+  function boxSize () {
+    var box = document.getElementById ('tm-canvas-box');
+    if (!box) return '';
+    var r = box.getBoundingClientRect ();
+    return r.width + 'x' + r.height;
+  }
   function resized () {
     if (menu) placeMenu ();
+    var now = boxSize ();
+    if (now === lastBox) return;
+    lastBox = now;
     window.dispatchEvent (new Event ('resize'));
   }
+  if (typeof window !== 'undefined')
+    window.addEventListener ('resize', function () { lastBox = boxSize (); });
   function edge (handle) {
     var startX = 0, startW = 0, openW = 0, dragging = false;
     handle.addEventListener ('pointerdown', function (e) {
