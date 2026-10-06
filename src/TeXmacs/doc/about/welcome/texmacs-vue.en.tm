@@ -21,7 +21,9 @@
   <em|tabs> in the column at the left of the page: one per document, with
   its name, a dot when it has unsaved changes, a cross to close it, and
   <with|font-series|bold|New window> for a new document. Its right edge
-  changes its width (a double click gives the usual width back). The chevron at the
+  changes its width (a double click gives the usual width back); dragged
+  far enough to the left, it folds the column, and dragged back, it opens
+  it again. The chevron at the
   bottom of the column folds it, to leave more room to the document: the
   column then keeps the logo and small tabs with the initials of the
   windows, whose names show when the mouse is over them; the browser
@@ -201,7 +203,8 @@
     <item>The tabs of the windows are in a column at the left of the page,
     which leaves the whole height to the document; the column folds to
     small tabs with the initials of the windows, whose names show when the
-    mouse is over them. Its right edge changes its width.
+    mouse is over them. Its right edge changes its width, and folds the
+    column when it is dragged far enough to the left.
   </itemize>
 
   <paragraph|5 October 2026>

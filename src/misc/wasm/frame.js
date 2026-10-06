@@ -40,7 +40,6 @@ var tmFrame = (function () {
     #tm-frame .tm-resize { position:absolute; top:0; right:0; width:5px; height:100%;
       cursor:col-resize; z-index:5 }
     #tm-frame .tm-resize:hover, #tm-frame .tm-resize.dragging { background:rgba(91,127,168,.45) }
-    #tm-frame.collapsed .tm-resize { display:none }
     body.tm-resizing, body.tm-resizing * { cursor:col-resize !important; user-select:none }
     #tm-frame .tm-app { display:flex; align-items:center; height:36px; flex:none; padding:0 12px;
       font-weight:bold; cursor:pointer; color:#fff; background:#5b7fa8;
@@ -159,11 +158,12 @@ var tmFrame = (function () {
 
   // the width of the column when it is open, which its right edge changes
   // (a drag; a double click gives the default back), as the browser
-  // remembers it
-  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 200;
+  // remembers it. A drag below FOLD_AT folds the column, and a drag of the
+  // folded column beyond MIN_WIDTH opens it again
+  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 200, MIN_WIDTH = 100, FOLD_AT = 80;
   function clampWidth (w) {
-    var most = Math.max (140, Math.min (480, Math.floor (window.innerWidth / 2)));
-    return Math.max (140, Math.min (most, Math.round (w)));
+    var most = Math.max (MIN_WIDTH, Math.min (480, Math.floor (window.innerWidth / 2)));
+    return Math.max (MIN_WIDTH, Math.min (most, Math.round (w)));
   }
   function savedWidth () {
     var v = null;
@@ -189,29 +189,42 @@ var tmFrame = (function () {
     });
   }
   function edge (handle) {
-    var startX = 0, startW = 0, dragging = false;
+    var startX = 0, startW = 0, openW = 0, dragging = false;
     handle.addEventListener ('pointerdown', function (e) {
       if (e.button !== 0) return;
       e.preventDefault ();
       hideBalloon ();
       dragging = true; startX = e.clientX; startW = bar.getBoundingClientRect ().width;
+      openW = width; // the width given back when the drag folds the column
       handle.setPointerCapture (e.pointerId);
       handle.classList.add ('dragging');
       document.body.classList.add ('tm-resizing');
     });
     handle.addEventListener ('pointermove', function (e) {
-      if (dragging) setWidth (startW + e.clientX - startX, false);
+      if (!dragging) return;
+      var w = startW + e.clientX - startX, folded = bar.classList.contains ('collapsed');
+      if (!folded && w < FOLD_AT) {
+        width = openW; bar.style.width = width + 'px';
+        setFolded (true, false);
+      }
+      else if (folded && w >= MIN_WIDTH) { setFolded (false, false); setWidth (w, false); }
+      else if (!folded) setWidth (w, false);
     });
     function end (e) {
       if (!dragging) return;
       dragging = false;
       handle.classList.remove ('dragging');
       document.body.classList.remove ('tm-resizing');
-      setWidth (width, true);
+      var folded = bar.classList.contains ('collapsed');
+      setFolded (folded, true);
+      if (!folded) setWidth (width, true);
     }
     handle.addEventListener ('pointerup', end);
     handle.addEventListener ('pointercancel', end);
-    handle.addEventListener ('dblclick', function () { setWidth (DEFAULT_WIDTH, true); });
+    handle.addEventListener ('dblclick', function () {
+      if (bar.classList.contains ('collapsed')) setFolded (false, true);
+      setWidth (DEFAULT_WIDTH, true);
+    });
   }
 
   function svg (d) {
