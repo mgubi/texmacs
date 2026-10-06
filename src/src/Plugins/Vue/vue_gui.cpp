@@ -5167,6 +5167,19 @@ bool event_filter (void *userdata, SDL_Event *event) {
       interrupted= false;
       interrupt_time= texmacs_time () + 100;
       if (alive ()) repaint_editors_of (win);
+      // the repaint is what finds the new size of an editor (a new backing
+      // store, a texture with the GPU renderer): the editor is told of it
+      // only at the next notify_resizes. It is told now, and painted again,
+      // so that the frame drawn here is the last of this size (with the GPU
+      // it showed the page where it was, and the next frame where it goes:
+      // the page jumped at each step of a drag of the column)
+      if (alive ()) {
+        vue_simple_widget_rep::notify_resizes ();
+        if (the_interpose_handler != NULL) the_interpose_handler ();
+        run_commands ();
+        if (gui_needs_relayout) process_layout ();
+        if (alive ()) repaint_editors_of (win);
+      }
       // the repaint may have replaced widgets, see gui_start_loop
       for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
       if (alive ()) win->process_redraw();

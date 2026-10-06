@@ -24,7 +24,9 @@ const require = createRequire (path.join (SRC, 'build-wasm/tools/package.json'))
 const puppeteer = require ('puppeteer-core');
 const { serve } = await import (path.join (SRC, 'misc/wasm/serve.mjs'));
 const server = await serve (path.join (SRC, 'build-wasm/out/web'), 0, '127.0.0.1', () => {}, 0);
-const url = `http://127.0.0.1:${server.address ().port}/texmacs.html`;
+// drawn with MuPDF (?gpu=0): the main loop of the GPU renderer does not go
+// through window.requestAnimationFrame, where the frames are read
+const url = `http://127.0.0.1:${server.address ().port}/texmacs.html?gpu=0`;
 const sleep = ms => new Promise (ok => setTimeout (ok, ms));
 
 const SCALE = Number ((process.argv.find (a => a.startsWith ('--scale=')) || '--scale=1').slice (8));

@@ -92,7 +92,14 @@ where it goes; it showed it where it was, and the next frame where it
 goes, so that the page jumped at each step of a drag.
 `misc/wasm/test/resize-jitter.mjs` checks that a width of the canvas
 always comes with the same place of the page (21 of 22 widths came with two
-or three places before). In
+or three places before). With the GPU renderer the repaint which finds the
+new size of an editor (a new texture) is followed there by a second one,
+after the editor is told of the size (notify_resizes): without it the page
+still jumped at each step (81 of 85 pairs of frames of the same width, in
+the frames Chrome shows during a drag, read by its screencast; 1 after,
+the footer which changes at the end). The two tests read the frames in the
+page, which the main loop of the GPU renderer does not go through
+(requestAnimationFrame): they load the page with `?gpu=0`. In
 the browser the page has a frame, a column at the left of the canvas
 (`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
 one under the other, in the order of TeXmacs (a tab dragged to another
