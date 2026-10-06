@@ -110,7 +110,10 @@ jobs:
         run: |
           # bundle-libs.sh does not handle Homebrew's /opt/homebrew, so the
           # libraries, frameworks and plugins are deployed with macdeployqt
-          make MACOS_BUNDLE MACOS_DEPLOY=none
+          # (bundle-libs.sh bundles the libraries of the program, but not
+          # the Qt plugins of Homebrew, whose frameworks it cannot find: an
+          # empty QT_PLUGINS_LIST leaves them to macdeployqt)
+          make MACOS_BUNDLE QT_PLUGINS_LIST=
           "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
           ditto -c -k --keepParent ../distr/TeXmacs.app texmacs-macos-arm64.zip
 
