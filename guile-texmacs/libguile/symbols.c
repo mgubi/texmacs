@@ -454,6 +454,12 @@ scm_init_symbols ()
  scm_c_define_gsubr (s_scm_symbol_pref, 1, 0, 0, (SCM (*)()) scm_symbol_pref); ;
  scm_c_define_gsubr (s_scm_symbol_fset_x, 2, 0, 0, (SCM (*)()) scm_symbol_fset_x); ;
  scm_c_define_gsubr (s_scm_symbol_pset_x, 2, 0, 0, (SCM (*)()) scm_symbol_pset_x); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_sys_symbols, 0, 0, 0, (SCM (*)()) scm_sys_symbols); ;
+#endif
 
 }
 
