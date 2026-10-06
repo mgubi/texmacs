@@ -194,13 +194,24 @@
   report it on the <hlink|issue page of the
   port|https://github.com/mgubi/texmacs/issues>, not to the <TeXmacs>
   project. The sources and the notes of the port are on
-  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/wip_wasm_vue>.
+  <hlink|GitHub|https://github.com/mgubi/texmacs/tree/maxs_texmacs>.
 
   <include|texmacs-vue-build.en.tm>
 
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|7 October 2026>
+
+  <\itemize>
+    <item>The page is built from the branch <verbatim|maxs_texmacs>, which
+    gathers the other lines of work of the repository: it has their newest
+    state (the <name|OpenType> mathematics, the citations from
+    <name|Zotero>, the icon sets) and the whole developer documentation
+    (<menu|Help|Developer documentation>). Its sources are on
+    <hlink|GitHub|https://github.com/mgubi/texmacs/tree/maxs_texmacs>.
+  </itemize>
 
   <paragraph|6 October 2026>
 

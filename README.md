@@ -34,8 +34,9 @@ configuring, see below.
 
 ![TeXmacs Vue in the browser: the tabs of the documents in a column, the main and mode icon bars at the left, a formula](src/docs/wasm/texmacs-in-the-browser.png)
 
-The same tree builds TeXmacs for a web page (branch `wip_wasm_vue`, merged
-here): the Vue interface draws everything in a canvas, s7 runs the Scheme
+The same tree builds TeXmacs for a web page (it was the branch
+`wip_wasm_vue`, merged here and retired: the browser version is developed
+in `maxs_texmacs` now): the Vue interface draws everything in a canvas, s7 runs the Scheme
 code, and the files of TeXmacs come in packages which the browser keeps.
 Editing and typesetting, the menus and dialogs, a tab per document, the
 files of the user (upload, drag and drop, zip projects, downloads), the PDF
@@ -52,7 +53,7 @@ It is built apart from `configure`, with Emscripten, by
 `misc/wasm/sources.txt`): see [`src/docs/wasm/`](src/docs/wasm/README.md)
 for the build, the design and the tests. The browser version is
 published at <https://mgubi.github.io/texmacs/> by the CI of the branch
-`vue_ci`.
+`wasm_ci` (`git push origin maxs_texmacs:wasm_ci`).
 
 ## The graphical interfaces
 
@@ -127,7 +128,7 @@ clipboard and the input methods. The widgets follow those of Qt (menus as
 on the Mac, combo boxes which can be typed in, tabs, lists, side tools),
 at the density of each window, with animated highlights and rounded
 corners. Nothing in it depends on a platform: the same code runs in a
-browser (branch `wip_wasm_vue`). A single-window mode
+browser (see [TeXmacs in the browser](#texmacs-in-the-browser)). A single-window mode
 (`TEXMACS_VUE_SINGLE_WINDOW=1`) keeps the dialogs and the tools inside the
 main window, as in the browser.
 

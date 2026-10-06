@@ -5,17 +5,17 @@
 # it and serve it (node src/misc/wasm/serve.mjs <dir>), and publishes it on
 # GitHub Pages (the job pages).
 #
-# It runs on the branch vue_ci only: the work goes on in wip_wasm_vue, which
+# It runs on the branch wasm_ci only: the work goes on in maxs_texmacs, which
 # triggers nothing, and a state is built, tested and published by moving
-# vue_ci to it,
-#   git push origin wip_wasm_vue:vue_ci
-# (or by hand, from the Actions tab, on the branch vue_ci)
+# wasm_ci to it,
+#   git push origin maxs_texmacs:wasm_ci
+# (or by hand, from the Actions tab, on the branch wasm_ci)
 
 name: WebAssembly
 
 on:
   push:
-    branches: [vue_ci]
+    branches: [wasm_ci]
   workflow_dispatch:
 
 env:
@@ -95,12 +95,12 @@ jobs:
           if-no-files-found: error
 
   # the page on GitHub Pages (https://<owner>.github.io/<repository>/), from
-  # the branch vue_ci only (see above): the brotli copies are left out
+  # the branch wasm_ci only (see above): the brotli copies are left out
   # (Pages does not send them; the page takes the gzip copies, which it
   # decompresses itself)
   pages:
     needs: wasm
-    if: github.ref == 'refs/heads/vue_ci'
+    if: github.ref == 'refs/heads/wasm_ci'
     runs-on: ubuntu-latest
     permissions:
       pages: write

@@ -1147,7 +1147,7 @@ var tmFrame = (function () {
            'with the ' + (app.scheme || 'S7') + ' Scheme and OpenType fonts, OpenType ' +
            'mathematics included. Expect rough edges: ',
            ['more info and limitations', showAbout], '. ',
-           ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/wip_wasm_vue'],
+           ['Sources and notes on GitHub', 'https://github.com/mgubi/texmacs/tree/maxs_texmacs'],
            '.']);
     para (['A link to this page can open a document from the web, and pass options and ' +
            'Scheme commands to TeXmacs: see ', ['the options of the address', showAddressOptions],

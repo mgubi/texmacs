@@ -1,4 +1,4 @@
-> ## <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="36" align="top"> Branch `wip_wasm_vue` — TeXmacs in the browser (TeXmacs Vue)
+> ## <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="36" align="top"> TeXmacs in the browser (TeXmacs Vue)
 >
 > **Try it: <https://mgubi.github.io/texmacs/>** (experimental). Issues
 > of this port which cannot be reproduced in the official TeXmacs
@@ -7,9 +7,11 @@
 >
 > Work in progress: TeXmacs compiled to WebAssembly and running in a web
 > page, an experimental port called TeXmacs Vue, with OpenType fonts
-> (OpenType mathematics included). The CI runs on the branch `vue_ci` only,
-> which is moved to this one when a state is worth building and publishing:
-> `git push origin wip_wasm_vue:vue_ci`. Nothing is installed and
+> (OpenType mathematics included). It is developed in `maxs_texmacs` (it was the
+> branch `wip_wasm_vue`, merged there and retired on 7 October 2026). The CI
+> of the page runs on the branch `wasm_ci` only, which is moved to
+> `maxs_texmacs` when a state is worth building and publishing:
+> `git push origin maxs_texmacs:wasm_ci`. Nothing is installed and
 > nothing leaves the browser unless it is downloaded.
 >
 > ![TeXmacs Vue in the browser: tabs for the documents, the tool bars, a formula](docs/wasm/texmacs-in-the-browser.png)

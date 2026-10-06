@@ -1,4 +1,4 @@
-# TeXmacs in the browser (branch `wip_wasm_vue`)
+# TeXmacs in the browser (branch `maxs_texmacs`)
 
 Goal: a WebAssembly build of TeXmacs which runs in a web page, on the Vue GUI
 (Clay for the layout, MuPDF for the pixels) and SDL3, with the S7 Scheme
@@ -148,11 +148,12 @@ looks as before; the scripted tests have `tab <id>` to show a tab.
 ## Building and running
 
 The CI of GitHub (`.github/workflows/wasm.yml`, at the top of the
-repository) runs on the branch `vue_ci` only: the work goes on in
-`wip_wasm_vue`, which triggers nothing, and a state is built, tested and
-published by moving `vue_ci` to it,
+repository) runs on the branch `wasm_ci` only: the work goes on in
+`maxs_texmacs` (until 7 October 2026 in `wip_wasm_vue`, now retired), which
+triggers nothing, and a state is built, tested and published by moving
+`wasm_ci` to it,
 
-    git push origin wip_wasm_vue:vue_ci
+    git push origin maxs_texmacs:wasm_ci
 
 (or by hand, from the Actions tab). It builds with Emscripten 6.0.10
 (`emsdk`) the slim MuPDF with its patches (cached), the page and the node
@@ -160,7 +161,7 @@ build, runs a smoke test (the node build turns the Welcome document into a
 PDF), keeps the page as an artifact of the run (`texmacs-wasm-web`: unzip
 it and serve it with `node misc/wasm/serve.mjs <dir>`), and publishes it at
 https://mgubi.github.io/texmacs/ (GitHub Pages, source "GitHub Actions";
-the environment `github-pages` allows the branch `vue_ci`). With emsdk,
+the environment `github-pages` allows the branch `wasm_ci`). With emsdk,
 `emenv.sh` keeps the configuration of emsdk.
 
 Pages has no brotli: the build also writes gzip copies of `texmacs.wasm`
