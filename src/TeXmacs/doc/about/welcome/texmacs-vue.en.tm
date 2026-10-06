@@ -20,7 +20,8 @@
   A web page has a single window. The windows of <TeXmacs> are therefore the
   <em|tabs> in the column at the left of the page: one per document, with
   its name, a dot when it has unsaved changes, a cross to close it, and
-  <with|font-series|bold|New window> for a new document. The chevron at the
+  <with|font-series|bold|New window> for a new document. Its right edge
+  changes its width (a double click gives the usual width back). The chevron at the
   bottom of the column folds it, to leave more room to the document: the
   column then keeps the logo and small tabs with the initials of the
   windows, whose names show when the mouse is over them; the browser
@@ -200,7 +201,7 @@
     <item>The tabs of the windows are in a column at the left of the page,
     which leaves the whole height to the document; the column folds to
     small tabs with the initials of the windows, whose names show when the
-    mouse is over them.
+    mouse is over them. Its right edge changes its width.
   </itemize>
 
   <paragraph|5 October 2026>

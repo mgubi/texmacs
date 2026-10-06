@@ -33,10 +33,15 @@ var tmFrame = (function () {
   }
 
   var style = `
-    #tm-frame { display:flex; flex-direction:column; width:200px; flex:none; background:#d8d8d8;
+    #tm-frame { position:relative; display:flex; flex-direction:column; width:200px; flex:none; background:#d8d8d8;
       border-right:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
       color:#222; user-select:none; overflow:hidden }
-    #tm-frame.collapsed { width:44px }
+    #tm-frame.collapsed { width:44px !important }
+    #tm-frame .tm-resize { position:absolute; top:0; right:0; width:5px; height:100%;
+      cursor:col-resize; z-index:5 }
+    #tm-frame .tm-resize:hover, #tm-frame .tm-resize.dragging { background:rgba(91,127,168,.45) }
+    #tm-frame.collapsed .tm-resize { display:none }
+    body.tm-resizing, body.tm-resizing * { cursor:col-resize !important; user-select:none }
     #tm-frame .tm-app { display:flex; align-items:center; height:36px; flex:none; padding:0 12px;
       font-weight:bold; cursor:pointer; color:#fff; background:#5b7fa8;
       border-bottom:1px solid #4a6b91; white-space:nowrap }
@@ -152,6 +157,63 @@ var tmFrame = (function () {
     return typeof window !== 'undefined' && window.innerWidth < 900;
   }
 
+  // the width of the column when it is open, which its right edge changes
+  // (a drag; a double click gives the default back), as the browser
+  // remembers it
+  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 200;
+  function clampWidth (w) {
+    var most = Math.max (140, Math.min (480, Math.floor (window.innerWidth / 2)));
+    return Math.max (140, Math.min (most, Math.round (w)));
+  }
+  function savedWidth () {
+    var v = null;
+    try { v = Number (localStorage.getItem (WIDTH)); } catch (e) {}
+    return clampWidth (v > 0 ? v : DEFAULT_WIDTH);
+  }
+  var width = DEFAULT_WIDTH;
+  function setWidth (w, remember) {
+    width = clampWidth (w);
+    if (bar) bar.style.width = width + 'px';
+    if (remember) try { localStorage.setItem (WIDTH, String (width)); } catch (e) {}
+    resized ();
+  }
+  // TeXmacs follows the width it is left (once per frame while dragging)
+  var resizePending = false;
+  function resized () {
+    if (resizePending) return;
+    resizePending = true;
+    requestAnimationFrame (function () {
+      resizePending = false;
+      if (menu) placeMenu ();
+      window.dispatchEvent (new Event ('resize'));
+    });
+  }
+  function edge (handle) {
+    var startX = 0, startW = 0, dragging = false;
+    handle.addEventListener ('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault ();
+      hideBalloon ();
+      dragging = true; startX = e.clientX; startW = bar.getBoundingClientRect ().width;
+      handle.setPointerCapture (e.pointerId);
+      handle.classList.add ('dragging');
+      document.body.classList.add ('tm-resizing');
+    });
+    handle.addEventListener ('pointermove', function (e) {
+      if (dragging) setWidth (startW + e.clientX - startX, false);
+    });
+    function end (e) {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove ('dragging');
+      document.body.classList.remove ('tm-resizing');
+      setWidth (width, true);
+    }
+    handle.addEventListener ('pointerup', end);
+    handle.addEventListener ('pointercancel', end);
+    handle.addEventListener ('dblclick', function () { setWidth (DEFAULT_WIDTH, true); });
+  }
+
   function svg (d) {
     return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
   }
@@ -178,11 +240,21 @@ var tmFrame = (function () {
     fold.onclick = function () { hideBalloon (); setFolded (!bar.classList.contains ('collapsed'), true); };
     hover (fold, function () { return bar.classList.contains ('collapsed') ? 'Show the names of the windows'
                                                                             : 'Fold the column'; });
+    var handle = el ('div', 'tm-resize');
+    handle.title = 'Drag to change the width; double-click for the default';
+    edge (handle);
     bar.appendChild (appButton);
     bar.appendChild (strip);
     bar.appendChild (newButton);
     bar.appendChild (fold);
+    bar.appendChild (handle);
+    width = savedWidth ();
+    bar.style.width = width + 'px';
     setFolded (folded (), false);
+    // a smaller page may leave the column too wide
+    window.addEventListener ('resize', function () {
+      if (clampWidth (width) !== width) setWidth (width, false);
+    });
     // a press outside the menu closes it; not one on the TeXmacs button,
     // whose click toggles it (else the press closed it and the click
     // opened it again)
@@ -198,8 +270,7 @@ var tmFrame = (function () {
     bar.classList.toggle ('collapsed', on);
     fold.innerHTML = svg (on ? UNFOLD_ICON : FOLD_ICON);
     if (remember) try { localStorage.setItem (FOLD, on ? 'collapsed' : 'expanded'); } catch (e) {}
-    if (menu) placeMenu ();
-    window.dispatchEvent (new Event ('resize'));
+    resized ();
   }
 
   // the balloon of an element of the column, at its right: the names of the

@@ -76,7 +76,10 @@ the browser the page has a frame, a column at the left of the canvas
 one under the other, labelled with the names of the windows (the title of a
 window on the desktop, and the title of the page for the active one), with
 a marker for unsaved changes, a close box (not on the last tab: TeXmacs
-asks as for a window whether to save), a "New window", a chevron which
+asks as for a window whether to save), a "New window", a right edge which
+changes its width (140 to 480 pixels and half the page at most, remembered
+by the browser; a double click gives the 200 pixels back; TeXmacs follows
+the width once per frame during the drag), a chevron which
 folds the column to 44 pixels (the logo, and small tabs with the initials
 of the windows, or their numbers, "N2" for "No name [2]", whose names show
 in a balloon; the browser remembers it, and a page narrower than 900
