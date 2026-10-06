@@ -99,40 +99,54 @@
 (define (wrong-passphrase-warning wrong?)
   (if wrong? '(text "Wrong passphrase") '(text "")))
 
-;; In a web browser, the passphrase which opens the wallet is sent when
-;; Return is pressed in its field or Ok clicked; the wallet is opened
-;; asynchronously, and a second request is not sent meanwhile.  The field
-;; is a field of a form, which gives its text at each key, with the key
-;; (an input which is not part of a form gives it only at Return, so that
-;; Ok would not know the text)
-(define wallet-web-typed "")
-(define wallet-web-unlocking? #f)
+;; The passphrase which opens the wallet is sent when Return is pressed in
+;; its field or Ok clicked. The field is a field of a form, which gives its
+;; text at each key, with the key, in Qt as in Vue (an input which is not
+;; part of a form gives it only at Return, so that Ok would not know the
+;; text, and a form-input does nothing at Return). In a web browser the
+;; wallet is opened asynchronously, and a second request is not sent
+;; meanwhile; on the desktop the passphrase is checked by GnuPG, and the
+;; choice to retrieve it at login is the field "remember?" of the form.
+(define wallet-typed "")
+(define wallet-unlocking? #f)
 
-(define (wallet-web-key answer cmd wrong)
+(define (wallet-key answer cmd wrong)
   (cond ((and (pair? answer) (string? (car answer)))
-         (set! wallet-web-typed (car answer))
+         (set! wallet-typed (car answer))
          (when (and (pair? (cdr answer)) (== (cadr answer) "return"))
-           (wallet-web-try-unlock wallet-web-typed cmd wrong)))
+           (wallet-try-unlock wallet-typed cmd wrong)))
         ((string? answer)
-         (set! wallet-web-typed answer)
-         (wallet-web-try-unlock answer cmd wrong))))
+         (set! wallet-typed answer)
+         (wallet-try-unlock answer cmd wrong))))
 
-(define (wallet-web-try-unlock pass cmd wrong)
-  (when (and (string? pass) (!= pass "") (not wallet-web-unlocking?))
-    (set! wallet-web-unlocking? #t)
-    (web-wallet-unlock pass
-                       (lambda (ok? msg)
-                         (set! wallet-web-unlocking? #f)
-                         ((wallet-web-opened cmd wrong) ok? msg)))))
+(define (wallet-try-unlock pass cmd wrong)
+  (when (and (string? pass) (!= pass "") (not wallet-unlocking?))
+    (if (web-wallet?)
+        (begin
+          (set! wallet-unlocking? #t)
+          (web-wallet-unlock pass
+                             (lambda (ok? msg)
+                               (set! wallet-unlocking? #f)
+                               ((wallet-web-opened cmd wrong) ok? msg))))
+        (if (and (wallet-correct-passphrase? pass) (wallet-turn-on pass))
+            (begin
+              (when (== (form-named-ref "Ask passphrase" "remember?") "yes")
+                (wallet-save-passphrase pass))
+              (cmd "Ok"))
+            (wrong "Wrong passphrase")))))
 
+;; The windows of the wallet take the size of their contents, and the
+;; passphrase fields a width in em: a width in w is a fraction of the window
+;; in Vue (of the default width of a field in Qt), so that a fixed window
+;; of 500px with a field of 2w or 10w cut off the buttons Ok and Cancel
 (tm-widget (wallet-widget-initialize cmd)
   (with wallet-widget-weak-passphrase? #f
-    (resize "500px" "200px"
+    (vertical
       (padded
         (form "Ask passphrase"
           (hlist
             (text "Wallet passphrase:") // //
-            (form-input "passphrase" "password" '() "10w") >>)
+            (form-input "passphrase" "password" '() "20em") >>)
           (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             ===
             (hlist
@@ -173,12 +187,12 @@
 
 (tm-widget (wallet-widget-reinitialize cmd)
   (with wallet-widget-weak-passphrase? #f
-    (resize "500px" "200px"
+    (vertical
       (padded
         (form "Ask new passphrase"
           (hlist
             (text "New wallet passphrase:") // //
-            (form-input "passphrase" "password" '() "10w") >>)
+            (form-input "passphrase" "password" '() "20em") >>)
           (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             ===
             (hlist
@@ -223,25 +237,20 @@
 
 (tm-widget (wallet-widget-turn-on cmd)
   (with wallet-widget-wrong-passphrase? #f
-    (resize "500px" "150px"
+    (vertical
       (padded
         ;; NOTE: a promise, so that the warning is made when refreshed
         (refreshable "wallet-widget-reask-passphrase"
           (promise (wrong-passphrase-warning wallet-widget-wrong-passphrase?)))
         (form "Ask passphrase"
-          (if (web-wallet?)
-            (hlist
-              (text "Wallet passphrase:") // //
-              (input (wallet-web-key
-                      answer cmd
-                      (lambda (msg)
-                        (set! wallet-widget-wrong-passphrase? #t)
-                        (refresh-now "wallet-widget-reask-passphrase")))
-                     "passphrase#form-wallet-1:password" (list "") "2w") >>))
-          (if (not (web-wallet?))
-            (hlist
-              (text "Wallet passphrase:") // //
-              (form-input "passphrase" "password" '() "2w") >>))
+          (hlist
+            (text "Wallet passphrase:") // //
+            (input (wallet-key
+                    answer cmd
+                    (lambda (msg)
+                      (set! wallet-widget-wrong-passphrase? #t)
+                      (refresh-now "wallet-widget-reask-passphrase")))
+                   "passphrase#form-wallet-1:password" (list "") "20em") >>)
           ===
           (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             (hlist
@@ -257,25 +266,11 @@
             >>
             ("Cancel" (wallet-turn-off) (cmd "Cancel")) // //
             ("Ok"
-             (if (web-wallet?)
-                 (wallet-web-try-unlock
-                  wallet-web-typed cmd
-                  (lambda (msg)
-                    (set! wallet-widget-wrong-passphrase? #t)
-                    (refresh-now "wallet-widget-reask-passphrase")))
-             (with n (length (form-values))
-               (when (and (> n 0) (string? (first (form-values))))
-                 (if (web-wallet?)
-                     (noop)
-                     (when (wallet-correct-passphrase? (first (form-values)))
-                       (when (and (wallet-turn-on (first (form-values)))
-                                  (> (length (form-values)) 1)
-                                  (== (second (form-values)) "yes"))
-                         (wallet-save-passphrase (first (form-values))))
-                       (cmd "Ok"))))))
-             (when (not (web-wallet?))
-               (set! wallet-widget-wrong-passphrase? #t)
-               (refresh-now "wallet-widget-reask-passphrase")))))))))
+             (wallet-try-unlock
+              wallet-typed cmd
+              (lambda (msg)
+                (set! wallet-widget-wrong-passphrase? #t)
+                (refresh-now "wallet-widget-reask-passphrase"))))))))))
 
 ;; The callbacks of the requests which wait for the dialogue to turn on the
 ;; wallet (#f while there is none): a request made while it is open (a key
@@ -302,7 +297,7 @@
                  (append wallet-turn-on-waiting (list cb))))
           (else
            (set! wallet-turn-on-waiting (list cb))
-           (set! wallet-web-typed "")
+           (set! wallet-typed "")
            (dialogue-window wallet-widget-turn-on wallet-turn-on-answer
                             "Turn on wallet"
                             (lambda () (wallet-turn-on-answer "Cancel")))))))
