@@ -1,5 +1,4 @@
-:
-#!/bin/bash -- # -*- perl -*-
+#!/usr/bin/env perl
 # $Id$
 #
 # MuPAD <-> TeXmacs communication link.
@@ -9,11 +8,6 @@
 # in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 #
 # For comments and questions, please mail Christopher Creutzig, ccr@mupad.de.
-#
-# Start perl wherever it is:
-eval 'exec perl -w -S $0 ${1+"$@"}'
-    if 0;
-# It's a NOP for perl, but shells parse line-oriented. Standard hack.
 
 use IO::File;
 use IPC::Open2;

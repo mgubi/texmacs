@@ -132,10 +132,9 @@ references, theorems), mathematics, tables, a drawing, program code,
 languages with accented letters, and a book (table of contents, chapters,
 page breaks, appendix). They use only the fonts which come with TeXmacs.
 Like every `.tm` file they are Cork-encoded: accented letters are Cork
-bytes, not UTF-8. The references record the current output, not the ideal
-one: the text layer of the PDF currently maps the Cork glyphs of oe, sharp
-s and the Spanish inverted marks to the wrong characters, and the
-reference of `languages` holds those characters until the writer is fixed.
+bytes, and Cyrillic letters `<#4xx>` code points, not UTF-8. The text of
+the references is the text layer of the PDF, which for the TeX fonts is
+translated from their Cork and T2A positions to Unicode.
 
 When a change is intended, run `check.sh -u` and commit the new references
 together with the change, so that the diff of the references documents what

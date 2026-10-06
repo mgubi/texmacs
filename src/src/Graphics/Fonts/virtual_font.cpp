@@ -876,7 +876,7 @@ virtual_font_rep::compile_bis (scheme_tree t, metric& ex) {
     ex->x1= 0;
     ex->y1= 0;
     ex->x2= ey->y2- ey->y1;
-    ex->y2= ey->x2- ex->x1;
+    ex->y2= ey->x2- ey->x1;
     ex->x3= ey->y3- ey->y1;
     ex->y3= ey->x2- ey->x4;
     ex->x4= ey->y4- ey->y1;
@@ -1061,8 +1061,8 @@ virtual_font_rep::compile_bis (scheme_tree t, metric& ex) {
     }
     double mx= get_magnification (w, w2, sx);
     double my= get_magnification (h, h2, sy);
-    if (N(t) >= 4 && t[3] == "@") sx= sy;
-    if (N(t) >= 5 && t[4] == "@") sy= sx;
+    if (N(t) >= 4 && t[3] == "@") mx= my;
+    if (N(t) >= 5 && t[4] == "@") my= mx;
     stretch (ex, mx, my);
     if (is_tuple (t, "scale", 4) || is_tuple (t, "scale*", 4))
       return stretched (gl, mx, my);
@@ -1072,7 +1072,7 @@ virtual_font_rep::compile_bis (scheme_tree t, metric& ex) {
       SI penh= (SI) floor (vunit * as_double (t[5]));
       glyph r= gl;
       if (mx != 1.0) r= widen  (gl, mx, penw);
-      if (my != 1.0) r= deepen (gl, my, penh);
+      if (my != 1.0) r= deepen (r, my, penh);
       return r;
     }
   }
@@ -1671,8 +1671,8 @@ virtual_font_rep::draw_tree (renderer ren, scheme_tree t, SI x, SI y) {
     }
     double mx= get_magnification (w, w2, sx);
     double my= get_magnification (h, h2, sy);
-    if (N(t) >= 4 && t[3] == "@") sx= sy;
-    if (N(t) >= 5 && t[4] == "@") sy= sx;
+    if (N(t) >= 4 && t[3] == "@") mx= my;
+    if (N(t) >= 5 && t[4] == "@") my= mx;
     ren->move_origin (x, y);
     ren->set_transformation (scaling (point (mx, my), point (0.0, 0.0)));
     draw_tree (ren, t[1], 0, 0);

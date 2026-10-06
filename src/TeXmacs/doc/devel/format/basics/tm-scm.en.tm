@@ -9,7 +9,7 @@
   language. In that context, <TeXmacs> trees are usually represented by
   <scheme> expressions. The <scheme> syntax was designed to be predictable,
   easy to hand-edit, and expose the complete internal structure of the
-  document. For instance, the formula (<reference|tm-tree-ex>) is represented
+  document. For instance, the formula <hlink|<math|x+y+<frac|1|2>+<sqrt|y+z>>|tm-tree.en.tm#tm-tree-ex> is represented
   by
 
   <\tm-fragment>

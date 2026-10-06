@@ -38,8 +38,6 @@ CMakeLists.txt.user
 misc/benchmark/gbench
 
 TeXmacs/progs/ice-9
-src/Plugins/Qt/moc_*.cpp
-src/Plugins/Qtwk/moc_*.cpp
 src/Deps
 src/Objects
 TeXmacs/plugins/
@@ -73,3 +71,6 @@ packages/macos/TeXmacs.xcodeproj/xcuserdata
 config.status
 packages/msix/AppxManifest.xml
 packages/msix/AppxManifestStore.xml
+
+# moc output of the autotools build
+src/Plugins/Qt*/moc_*.cpp

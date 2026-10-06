@@ -29,7 +29,7 @@
 
 (plugin-configure plantuml
   (:require (url-exists-in-path? "plantuml"))
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:launch ,(plantuml-launcher))
   (:serializer ,plantuml-serialize)
   (:session "PlantUML"))

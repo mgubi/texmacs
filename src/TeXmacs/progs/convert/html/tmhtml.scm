@@ -1940,7 +1940,7 @@
   (new-line tmhtml-new-line)
   (line-sep tmhtml-noop)
   (next-line tmhtml-next-line)
-  (no_break tmhtml-noop)
+  (no-break tmhtml-noop)
   (no-indent tmhtml-noop)
   (yes-indent tmhtml-noop)
   (no-indent* tmhtml-noop)

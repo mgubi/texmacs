@@ -111,7 +111,7 @@
   ("syntax:python:declare_type" "#0000c0" notify-python-syntax)
   ("syntax:python:operator" "#8b008b" notify-python-syntax)
   ("syntax:python:operator_openclose" "#B02020" notify-python-syntax)
-  ("syntax:python:operator_field" "#88888" notify-python-syntax)
+  ("syntax:python:operator_field" "#888888" notify-python-syntax)
   ("syntax:python:operator_special" "orange" notify-python-syntax)
   ("syntax:python:keyword" "#309090" notify-python-syntax)
   ("syntax:python:keyword_conditional" "#309090" notify-python-syntax)
