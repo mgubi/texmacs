@@ -349,7 +349,7 @@ cmdline_link_rep::stop () {
   alive= false;    
   //cout << "Alive = false, stop\n";
   close (in);
-  wait (NULL);
+  waitpid (pid, NULL, 0);  // (its own child, not one of a pipe plugin)
 
   remove_notifier (snout);
   remove_notifier (snerr);
