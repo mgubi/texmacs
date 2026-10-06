@@ -4,11 +4,11 @@
 # regression suites headless, and keeps a runnable bundle of each build as an
 # artifact. The TeXmacs source tree is the src directory of this repository.
 #
-# It runs on the branch wip_fixes_ci: the fixes are tested by moving it to
-# the state to test, for instance
-#   git push -f origin wip_fixes:wip_fixes_ci
-# or a pull request merged into a copy of wip_fixes (or by hand, from the
-# Actions tab, on any branch).
+# It runs on the branch wip_fixes_ci, which is wip_fixes with this workflow:
+# the fixes are tested by merging wip_fixes (or a pull request) into it,
+#   git fetch origin && git merge origin/wip_fixes && git push
+# (not by pushing wip_fixes over it, which would remove the workflow), or by
+# hand, from the Actions tab.
 
 name: CI (wip_fixes)
 
