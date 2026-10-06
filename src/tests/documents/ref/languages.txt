@@ -9,15 +9,16 @@ saves them.
 Le typographe français met une espace fine avant le point-virgule ; le deux-points : le point
 d'exclamation ! et le point d'interrogation ? Les guillemets sont « français », et les mots très longs,
 comme anticonstitutionnellement, se coupent selon des règles qui lui sont propres. Été, maître,
-naïve, c÷ur.
+naïve, cœur.
 
 Die deutsche Sprache kennt sehr lange zusammengesetzte Wörter wie Donaudampfschifffahrts-
-gesellschaftskapitän, die an den richtigen Stellen getrennt werden müssen. Straÿe, Äpfel, Öl und
+gesellschaftskapitän, die an den richtigen Stellen getrennt werden müssen. Straße, Äpfel, Öl und
 Übung.
 
-El español usa signos de apertura: ¾cómo estás? ½Qué bien! El pingüino y el niño.
+El español usa signos de apertura: ¿cómo estás? ¡Qué bien! El pingüino y el niño.
+Съешь же ещё этих мягких французских булок, да выпей чаю.
 L'italiano ha parole come perché, città e virtù.
-English text with “double quotes”, `single quotes', dashes – and —, an ellipsis... and ligatures
+English text with “double quotes”, ‘single quotes', dashes – and —, an ellipsis... and ligatures
 in office, affine and waffle.
 
 Languages
