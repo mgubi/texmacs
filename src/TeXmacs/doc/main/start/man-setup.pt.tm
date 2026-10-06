@@ -22,7 +22,7 @@
   e <prefix|C->. Entretanto, em muitos sistemas X Window estas
   teclas não estão configuradas corretamente, de modo que você pode querer
   redefinir estes atalhos. Mais detalhes podem ser encontrados na seção sobre
-  a <apply|hyper-link|configuração do <TeXmacs>|../config/man-configuration.pt.tm>.
+  a <apply|hyper-link|configuração do <TeXmacs>|../config/man-configuration.en.tm>.
 
   <apply|tmdoc-copyright|1998--2003|Joris van der Hoeven|Ramiro Brito
   Willmersdorf>

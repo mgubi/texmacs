@@ -8,7 +8,7 @@
   <\traverse>
     <apply|branch|L'esempio di <verbatim|mycas>|mycas.it.tm>
 
-    <apply|branch|La tua prima interfaccia|first.it.tm>
+    <apply|branch|La tua prima interfaccia|first.en.tm>
 
     <apply|branch|Inclusione in <TeXmacs>|include.it.tm>
 
