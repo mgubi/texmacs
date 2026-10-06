@@ -242,6 +242,17 @@ bars** in the General tab of the preferences, in the Vue interface only) is
 read at each layout, so that a change shows at once;
 `TEXMACS_VUE_BARS=top` or `left` (`?bars=top` in the browser) overrides it.
 
+The tabs of the windows may also be above the page, as before the column:
+the preference "window tabs" (`left`, the default, or `top`: **Tabs of the
+windows** in the General tab of the preferences, in the browser only),
+whose notification tells the page (`tmFrame.setTabsPosition`, through
+`web-javascript`) at the start of TeXmacs and when it changes; the page
+remembers the last one, so that it is laid out so before TeXmacs starts.
+Above the page the tabs are those of before (the TeXmacs Vue button, the
+tabs, a `+`), and keep what the column brought: they are reordered by a
+drag (sideways), scrolled by the wheel and by chevrons when they do not
+fit.
+
 ## Drawing with the GPU (the default; `texmacs.html?gpu=0` for MuPDF)
 
 A build with ThorVG draws the windows with WebGL2 instead of MuPDF (see

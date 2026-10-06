@@ -48,6 +48,13 @@
   (set-message "Restart in order to let the new theme take effect"
                "graphical interface theme"))
 
+(define (notify-window-tabs var val)
+  ;; the tabs of the windows of the browser (misc/wasm/frame.js): in a
+  ;; column at the left of the page, or above it
+  (when (defined? 'web-javascript)
+    (web-javascript (string-append "tmFrame.setTabsPosition ('"
+                                   (if (== val "top") "top" "left") "')"))))
+
 (define (notify-language var val)
   (set-output-language val)
   (if (and (current-view) (== (buffer-tree) (stree->tree '(document ""))))
@@ -117,6 +124,7 @@
   ("gui theme" "default" notify-gui-theme)
   ("icon set" "neo-classical" notify-restart)
   ("icon bars" "left" noop) ; the Vue interface reads it at each layout
+  ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-restart)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
@@ -204,6 +212,7 @@
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
 (validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical"))
 (validate-enum-preference "icon bars" '("top" "left"))
+(validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
 

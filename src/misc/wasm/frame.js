@@ -113,6 +113,26 @@ var tmFrame = (function () {
     #tm-flyout .tm-close { flex:none; width:20px; height:20px; line-height:20px; margin-right:4px;
       text-align:center; border-radius:4px; color:#555 }
     #tm-flyout .tm-close:hover { background:#c4c4c4; color:#000 }
+    /* the tabs above the page, as before the column (the preference "window
+       tabs" of TeXmacs: setTabsPosition) */
+    body.tm-tabs-top { flex-direction:column !important }
+    #tm-frame.top { flex-direction:row; align-items:stretch; width:auto !important; height:32px;
+      border-right:none; border-bottom:1px solid #a8a8a8 }
+    #tm-frame.top .tm-app { height:auto; padding:0 12px; border-bottom:none; border-right:1px solid #4a6b91 }
+    #tm-frame.top .tm-app .tm-logo { width:20px; height:20px; margin-right:7px }
+    #tm-frame.top .tm-tabs { display:flex; flex-direction:row; flex:1; min-width:0; padding:0;
+      overflow-x:auto; overflow-y:hidden }
+    #tm-frame.top .tm-tab { flex:none; height:auto; margin:0; padding:0 6px 0 12px; border-radius:0;
+      min-width:90px; max-width:240px; border-right:1px solid #b8b8b8; background:#d0d0d0; box-shadow:none }
+    #tm-frame.top .tm-tab:hover { background:#c8c8c8 }
+    #tm-frame.top .tm-tab.active { background:#f0f0f0 }
+    #tm-frame.top .tm-tab .tm-close { visibility:visible }
+    #tm-frame.top .tm-tabs .tm-new { flex:none; height:auto; margin:0; padding:0 12px; border-radius:0 }
+    #tm-frame.top .tm-tabs .tm-new .tm-plus { margin:0 }
+    #tm-frame.top .tm-tabs .tm-new .tm-label { display:none }
+    #tm-frame.top .tm-fold, #tm-frame.top .tm-resize { display:none }
+    #tm-frame.top .tm-scroll { height:auto; width:18px }
+    #tm-frame.top .tm-scroll svg { transform:rotate(-90deg) }
     #tm-balloon { position:fixed; z-index:35; padding:4px 9px; border-radius:5px; background:#333;
       color:#fff; font:12.5px -apple-system,"Fira Sans",Helvetica,sans-serif; white-space:nowrap;
       pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.25); max-width:60vw; overflow:hidden;
@@ -182,6 +202,37 @@ var tmFrame = (function () {
 
   // folded (only the logo and small tabs) or not, as the browser remembers
   // it; a narrow page starts folded
+  // the tabs in the column at the left, or above the page as before (the
+  // preference "window tabs" of TeXmacs, which tells it at its start and
+  // when it changes: setTabsPosition); the page remembers the last one, so
+  // that it is laid out so before TeXmacs has started
+  var TABS = 'texmacs-tabs', tabsTop = false;
+  try { tabsTop = localStorage.getItem (TABS) === 'top'; } catch (e) {}
+  function setTabsPosition (pos) {
+    var top = (pos === 'top');
+    try { localStorage.setItem (TABS, top ? 'top' : 'left'); } catch (e) {}
+    if (top === tabsTop && bar) return;
+    tabsTop = top;
+    if (!bar) return;
+    applyTabsPosition ();
+    render ();
+    resized ();
+  }
+  function applyTabsPosition () {
+    flyIn (true); hideBalloon ();
+    if (typeof document !== 'undefined') document.body.classList.toggle ('tm-tabs-top', tabsTop);
+    bar.classList.toggle ('top', tabsTop);
+    if (tabsTop) {
+      bar.classList.remove ('collapsed');
+      bar.style.width = '';
+    }
+    else {
+      bar.style.width = width + 'px';
+      bar.classList.toggle ('collapsed', folded ());
+      fold.innerHTML = svg (folded () ? UNFOLD_ICON : FOLD_ICON);
+    }
+  }
+
   var FOLD = 'texmacs-sidebar';
   function folded () {
     var v = null;
@@ -208,7 +259,7 @@ var tmFrame = (function () {
   var width = DEFAULT_WIDTH;
   function setWidth (w, remember) {
     width = clampWidth (w);
-    if (bar) bar.style.width = width + 'px';
+    if (bar && !tabsTop) bar.style.width = width + 'px';
     if (remember) try { localStorage.setItem (WIDTH, String (width)); } catch (e) {}
     resized ();
   }
@@ -290,11 +341,14 @@ var tmFrame = (function () {
   // scroll them (as the wheel does), the one at an end dimmed
   function chevrons () {
     if (!strip) return;
-    var over = strip.scrollHeight > strip.clientHeight + 1;
+    var size = tabsTop ? strip.scrollWidth : strip.scrollHeight;
+    var view = tabsTop ? strip.clientWidth : strip.clientHeight;
+    var at = tabsTop ? strip.scrollLeft : strip.scrollTop;
+    var over = size > view + 1;
     scrollUp.classList.toggle ('shown', over);
     scrollDown.classList.toggle ('shown', over);
-    scrollUp.classList.toggle ('off', strip.scrollTop <= 0);
-    scrollDown.classList.toggle ('off', strip.scrollTop + strip.clientHeight >= strip.scrollHeight - 1);
+    scrollUp.classList.toggle ('off', at <= 0);
+    scrollDown.classList.toggle ('off', at + view >= size - 1);
   }
   // the wheel over the column (or over the tab grown from the folded
   // column, which is not in it) scrolls the tabs: the page itself does not
@@ -308,11 +362,12 @@ var tmFrame = (function () {
     e.stopPropagation ();
     if (d === 0) return;
     flyIn (true); hideBalloon ();
-    strip.scrollTop += d;
+    if (tabsTop) strip.scrollLeft += d; else strip.scrollTop += d;
   }
   function scrollTabs (dir) {
-    var by = Math.max (30, strip.clientHeight - 40) * dir;
-    if (strip.scrollBy) strip.scrollBy ({ top: by, behavior: 'smooth' });
+    var by = Math.max (30, (tabsTop ? strip.clientWidth : strip.clientHeight) - 40) * dir;
+    if (strip.scrollBy) strip.scrollBy (tabsTop ? { left: by, behavior: 'smooth' } : { top: by, behavior: 'smooth' });
+    else if (tabsTop) strip.scrollLeft += by;
     else strip.scrollTop += by;
   }
 
@@ -324,36 +379,55 @@ var tmFrame = (function () {
   var dragDone = false;
   function pressTab (e, tab, t) {
     if (e.button !== 0 || (e.target.classList && e.target.classList.contains ('tm-close'))) return;
-    var startY = e.clientY, startScroll = strip.scrollTop, dragging = false;
-    var all = [], from = -1, slot = 0, to = -1;
+    // along the tabs: down the column, or across the bar above the page
+    var H = tabsTop;
+    var pos = function (ev) { return H ? ev.clientX : ev.clientY; };
+    var off = function (o) { return H ? o.offsetLeft : o.offsetTop; };
+    var ext = function (o) { return H ? o.offsetWidth : o.offsetHeight; };
+    var getScroll = function () { return H ? strip.scrollLeft : strip.scrollTop; };
+    var addScroll = function (d) { if (H) strip.scrollLeft += d; else strip.scrollTop += d; };
+    var shifted = function (d) { return (H ? 'translateX(' : 'translateY(') + d + 'px)'; };
+    var start = pos (e), startScroll = getScroll (), dragging = false;
+    var all = [], from = -1, to = -1, step = 0, centers = [];
     function move (ev) {
-      var dy = ev.clientY - startY;
+      var d = pos (ev) - start;
       if (!dragging) {
-        if (Math.abs (dy) < 5) return;
+        if (Math.abs (d) < 5) return;
         dragging = true;
         flyIn (true); hideBalloon ();
         all = Array.prototype.slice.call (strip.querySelectorAll ('.tm-tab'));
         from = all.indexOf (tab); to = from;
         if (from < 0) { dragging = false; return; }
-        slot = all.length > 1 ? Math.abs (all[1].offsetTop - all[0].offsetTop) : tab.offsetHeight + 2;
+        centers = all.map (function (o) { return off (o) + ext (o) / 2; });
+        // the room the tab takes, its gap included (the tabs may differ)
+        var gap = all.length > 1 ? off (all[1]) - off (all[0]) - ext (all[0]) : 0;
+        step = ext (tab) + Math.max (0, gap);
         strip.classList.add ('reordering');
         tab.classList.add ('dragging');
         document.body.classList.add ('tm-reordering');
         try { window.getSelection ().removeAllRanges (); } catch (err) {}
       }
-      // the list scrolls when the mouse is near its ends
+      // the tabs scroll when the mouse is near their ends
       var r = strip.getBoundingClientRect ();
-      if (ev.clientY < r.top + 16) strip.scrollTop -= 6;
-      else if (ev.clientY > r.bottom - 16) strip.scrollTop += 6;
-      dy += strip.scrollTop - startScroll;
-      var lo = -all[from].offsetTop + all[0].offsetTop, hi = all[all.length - 1].offsetTop - all[from].offsetTop;
-      dy = Math.max (lo, Math.min (hi, dy));
-      tab.style.transform = 'translateY(' + dy + 'px)';
-      to = Math.max (0, Math.min (all.length - 1, from + Math.round (dy / slot)));
+      var lo_end = H ? r.left : r.top, hi_end = H ? r.right : r.bottom;
+      if (pos (ev) < lo_end + 16) addScroll (-6);
+      else if (pos (ev) > hi_end - 16) addScroll (6);
+      d += getScroll () - startScroll;
+      var last = all[all.length - 1];
+      d = Math.max (off (all[0]) - off (tab), Math.min (off (last) + ext (last) - ext (tab) - off (tab), d));
+      tab.style.transform = shifted (d);
+      var c = centers[from] + d;
+      to = from;
+      for (var k = 0; k < all.length; k++) {
+        if (k < from && c < centers[k]) { to = k; break; }
+      }
+      for (var k2 = all.length - 1; k2 > from; k2--) {
+        if (c > centers[k2]) { to = k2; break; }
+      }
       all.forEach (function (o, k) {
         if (o === tab) return;
-        var shift = (from < to && k > from && k <= to) ? -slot : (to < from && k >= to && k < from) ? slot : 0;
-        o.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+        var sh = (from < to && k > from && k <= to) ? -step : (to < from && k >= to && k < from) ? step : 0;
+        o.style.transform = sh ? shifted (sh) : '';
       });
     }
     function up () {
@@ -421,6 +495,7 @@ var tmFrame = (function () {
     width = savedWidth ();
     bar.style.width = width + 'px';
     setFolded (folded (), false);
+    if (tabsTop) applyTabsPosition ();
     // a smaller page may leave the column too wide
     window.addEventListener ('resize', function () {
       if (clampWidth (width) !== width) setWidth (width, false);
@@ -456,8 +531,14 @@ var tmFrame = (function () {
       balloon.textContent = t;
       balloon.style.display = 'block';
       var r = e.getBoundingClientRect ();
-      balloon.style.left = (r.right + 8) + 'px';
-      balloon.style.top = Math.max (4, r.top + r.height / 2 - balloon.offsetHeight / 2) + 'px';
+      if (tabsTop) {
+        balloon.style.left = Math.max (4, r.left) + 'px';
+        balloon.style.top = (r.bottom + 6) + 'px';
+      }
+      else {
+        balloon.style.left = (r.right + 8) + 'px';
+        balloon.style.top = Math.max (4, r.top + r.height / 2 - balloon.offsetHeight / 2) + 'px';
+      }
     });
     e.addEventListener ('mouseleave', hideBalloon);
   }
@@ -590,9 +671,16 @@ var tmFrame = (function () {
     chevrons ();
     var at = strip.querySelector ('.tm-tab.active');
     if (at) {
-      var top = at.offsetTop - strip.offsetTop, bottom = top + at.offsetHeight;
-      if (top < strip.scrollTop) strip.scrollTop = top;
-      else if (bottom > strip.scrollTop + strip.clientHeight) strip.scrollTop = bottom - strip.clientHeight;
+      if (tabsTop) {
+        var left = at.offsetLeft - strip.offsetLeft, right = left + at.offsetWidth;
+        if (left < strip.scrollLeft) strip.scrollLeft = left;
+        else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = right - strip.clientWidth;
+      }
+      else {
+        var top = at.offsetTop - strip.offsetTop, bottom = top + at.offsetHeight;
+        if (top < strip.scrollTop) strip.scrollTop = top;
+        else if (bottom > strip.scrollTop + strip.clientHeight) strip.scrollTop = bottom - strip.clientHeight;
+      }
     }
     document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs Vue'
                             : 'TeXmacs Vue';
@@ -940,7 +1028,9 @@ var tmFrame = (function () {
   // the menu beside the column, at the top
   function placeMenu () {
     if (!menu || !bar) return;
-    menu.style.left = (bar.getBoundingClientRect ().right + 4) + 'px';
+    var b = bar.getBoundingClientRect ();
+    menu.style.left = (tabsTop ? 4 : b.right + 4) + 'px';
+    menu.style.top = (tabsTop ? b.bottom + 2 : 4) + 'px';
   }
 
   // how the page draws now: with the GPU (a WebGL2 canvas, a build with
@@ -1122,6 +1212,7 @@ var tmFrame = (function () {
     tabs: function () { return tabs; },
     fullScreen: fullScreen,
     ask: ask,
-    dialog: dialog
+    dialog: dialog,
+    setTabsPosition: setTabsPosition
   };
 })();
