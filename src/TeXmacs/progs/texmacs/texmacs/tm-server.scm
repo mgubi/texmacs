@@ -116,6 +116,7 @@
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
   ("icon set" "neo-classical" notify-restart)
+  ("icon bars" "left" noop) ; the Vue interface reads it at each layout
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-restart)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
@@ -202,6 +203,7 @@
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
 (validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical"))
+(validate-enum-preference "icon bars" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
 

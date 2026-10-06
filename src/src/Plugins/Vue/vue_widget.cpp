@@ -28,6 +28,7 @@
 #include "tm_window.hpp"
 #include "sys_utils.hpp" // for system (printer widget)
 #include "analyze.hpp"   // for occurs (filtered choice)
+#include "boot.hpp"      // for get_user_preference (the icon bars)
 #include "poly_line.hpp" // for ink widget
 
 #include "../MuPDF/mupdf_picture.hpp"
@@ -148,17 +149,20 @@ static bool in_tool_bar= false;
 #define tool_button_pad 4
 #define tool_button_gap 4
 
-// The main and mode icon bars in a column at the left of the editor, rather
-// than in rows above it (a prototype: TEXMACS_VUE_BARS=top, or ?bars=top in
-// the browser, puts them back). While they are laid out, the rows of a bar
-// (its horizontal menus and lists) go from top to bottom, its separators
-// are horizontal and its pull-down menus open to the right
+// The main and mode icon bars in columns at the left of the editor, rather
+// than in rows above it: the preference "icon bars" (left or top, in the
+// General tab of the preferences), read at each layout, so that a change
+// shows at once; TEXMACS_VUE_BARS=top or left (?bars=top in the browser)
+// overrides it. While they are laid out, the rows of a bar (its horizontal
+// menus and lists) go from top to bottom, its separators are horizontal and
+// its pull-down menus open to the right
 static bool in_side_bar= false;
 static bool
 bars_on_side () {
-  static int on= -1;
-  if (on < 0) on= (get_env ("TEXMACS_VUE_BARS") == "top") ? 0 : 1;
-  return on == 1;
+  static string forced= get_env ("TEXMACS_VUE_BARS");
+  if (forced == "top") return false;
+  if (forced == "left") return true;
+  return get_user_preference ("icon bars", "left") != "top";
 }
 
 // The context menu of the editor (texmacs-popup-menu, the Focus menu) at a
@@ -5878,26 +5882,13 @@ void vue_texmacs_widget_rep::do_layout () {
         in_tool_bar= false;
       }
     }
-    if (visibility[0] && visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
-      .layout= {
-         .padding= { bar_hpad, bar_hpad, 0, 0 },
-         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
-         .sizing= {
-            .width=  CLAY_SIZING_GROW(0),
-            .height= CLAY_SIZING_FIT(.min= bar_focus_h) }},
-      .backgroundColor= the_theme.bar_focus,
-      .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
-    {
-      if (!is_nil (focus_icons)) {
-        in_tool_bar= true;
-        layout_bar_content (8*id + 3, focus_icons, the_theme.bar_focus);
-        in_tool_bar= false;
-      }
-    }
-    // the user icon bar, which a document may fill through its style
-    // (the bar was received and stored, and never drawn)
-    if (visibility[0] && visibility[4] && !is_nil (user_icons))
-      CLAY(CLAY_ID_LOCAL("UserToolbar"), {
+    // the main and mode bars as two columns at the left, side by side (see
+    // in_side_bar), from the menu bar down to the footer; the focus bar,
+    // the user bar and the editor with its tools at their right
+    bool main_side= side && visibility[0] && visibility[1] && !is_nil (main_icons);
+    bool mode_side= side && visibility[0] && visibility[2] && !is_nil (mode_icons);
+    auto body= [&] () {
+      if (visibility[0] && visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
         .layout= {
            .padding= { bar_hpad, bar_hpad, 0, 0 },
            .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
@@ -5907,36 +5898,67 @@ void vue_texmacs_widget_rep::do_layout () {
         .backgroundColor= the_theme.bar_focus,
         .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
       {
-        in_tool_bar= true;
-        layout_bar_content (8*id + 4, user_icons, the_theme.bar_focus);
-        in_tool_bar= false;
+        if (!is_nil (focus_icons)) {
+          in_tool_bar= true;
+          layout_bar_content (8*id + 3, focus_icons, the_theme.bar_focus);
+          in_tool_bar= false;
+        }
       }
-    // the middle row: left tools, the editor and the side tools
-    CLAY(CLAY_ID_LOCAL("Middle"), {
-      .layout= {
-        .layoutDirection= CLAY_LEFT_TO_RIGHT,
-        .sizing= layoutExpand }})
-    {
-      // the main and mode bars as two columns at the left, side by side,
-      // each of the height of the editor (see in_side_bar)
-      bool main_side= side && visibility[0] && visibility[1] && !is_nil (main_icons);
-      bool mode_side= side && visibility[0] && visibility[2] && !is_nil (mode_icons);
-      if (main_side) layout_side_bar_content (8*id + 1, main_icons, color_background);
-      if (mode_side) layout_side_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
-      if (visibility[7] && !is_nil (left_tools))
-        layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
-                           win->layout_w, win->layout_h, 1);
-      if (!is_nil (main_widget)) main_widget->do_layout ();
-      if (visibility[6] && !is_nil (side_tools))
-        layout_tool_panel (CLAY_ID_LOCAL("SideTools"), side_tools, true,
-                           win->layout_w, win->layout_h);
-    }
-    if (visibility[8] && !is_nil (bottom_tools))
-      layout_tool_panel (CLAY_ID_LOCAL("BottomTools"), bottom_tools, false,
-                         win->layout_w, win->layout_h, 2);
-    if (visibility[9] && !is_nil (extra_tools))
-      layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
-                         win->layout_w, win->layout_h, 2);
+      // the user icon bar, which a document may fill through its style
+      // (the bar was received and stored, and never drawn)
+      if (visibility[0] && visibility[4] && !is_nil (user_icons))
+        CLAY(CLAY_ID_LOCAL("UserToolbar"), {
+          .layout= {
+             .padding= { bar_hpad, bar_hpad, 0, 0 },
+             .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
+             .sizing= {
+                .width=  CLAY_SIZING_GROW(0),
+                .height= CLAY_SIZING_FIT(.min= bar_focus_h) }},
+          .backgroundColor= the_theme.bar_focus,
+          .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
+        {
+          in_tool_bar= true;
+          layout_bar_content (8*id + 4, user_icons, the_theme.bar_focus);
+          in_tool_bar= false;
+        }
+      // the middle row: left tools, the editor and the side tools
+      CLAY(CLAY_ID_LOCAL("Middle"), {
+        .layout= {
+          .layoutDirection= CLAY_LEFT_TO_RIGHT,
+          .sizing= layoutExpand }})
+      {
+        if (visibility[7] && !is_nil (left_tools))
+          layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
+                             win->layout_w, win->layout_h, 1);
+        if (!is_nil (main_widget)) main_widget->do_layout ();
+        if (visibility[6] && !is_nil (side_tools))
+          layout_tool_panel (CLAY_ID_LOCAL("SideTools"), side_tools, true,
+                             win->layout_w, win->layout_h);
+      }
+      if (visibility[8] && !is_nil (bottom_tools))
+        layout_tool_panel (CLAY_ID_LOCAL("BottomTools"), bottom_tools, false,
+                           win->layout_w, win->layout_h, 2);
+      if (visibility[9] && !is_nil (extra_tools))
+        layout_tool_panel (CLAY_ID_LOCAL("ExtraTools"), extra_tools, false,
+                           win->layout_w, win->layout_h, 2);
+    };
+    if (main_side || mode_side)
+      CLAY(CLAY_ID_LOCAL("Body"), {
+        .layout= {
+          .layoutDirection= CLAY_LEFT_TO_RIGHT,
+          .sizing= layoutExpand }})
+      {
+        if (main_side) layout_side_bar_content (8*id + 1, main_icons, color_background);
+        if (mode_side) layout_side_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
+        CLAY(CLAY_ID_LOCAL("BodyRight"), {
+          .layout= {
+            .layoutDirection= CLAY_TOP_TO_BOTTOM,
+            .sizing= layoutExpand }})
+        {
+          body ();
+        }
+      }
+    else body ();
     if (visibility[5]) CLAY(CLAY_ID_LOCAL("Footer"), {
       .layout= {
         .padding= { bar_hpad, bar_hpad, 0, 0 },

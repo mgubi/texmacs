@@ -230,14 +230,17 @@ Locally:
 
 ## The icon bars at the left (prototype, branch `wip_wasm_vertical_bars`)
 
-The main and mode icon bars are two columns at the left of the editor,
-side by side, each of the height of the editor (it scrolls, with the wheel
-or its markers, when its icons do not fit), rather than rows above it; the
-menu bar and the focus bar stay above. While these bars are laid out
-(`in_side_bar` in `vue_widget.cpp`) their rows go from top to bottom, the
-separators of their groups are horizontal and their pull-down menus open
-to the right. `TEXMACS_VUE_BARS=top` (`?bars=top` in the browser) puts them
-back above the editor.
+The main and mode icon bars are two columns at the left, side by side,
+from the menu bar down to the footer (a column scrolls, with the wheel or
+its markers, when its icons do not fit), rather than rows above the
+editor; the focus bar and the user bar are above the editor, at the right
+of the columns. While these bars are laid out (`in_side_bar` in
+`vue_widget.cpp`) their rows go from top to bottom, the separators of their
+groups are horizontal and their pull-down menus open to the right. The
+preference "icon bars" (`left`, the default, or `top`: **Main and mode icon
+bars** in the General tab of the preferences, in the Vue interface only) is
+read at each layout, so that a change shows at once;
+`TEXMACS_VUE_BARS=top` or `left` (`?bars=top` in the browser) overrides it.
 
 ## Drawing with the GPU (the default; `texmacs.html?gpu=0` for MuPDF)
 
