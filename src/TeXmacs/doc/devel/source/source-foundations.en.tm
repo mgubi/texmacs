@@ -17,6 +17,8 @@
   <\traverse>
     <branch|Basic data types|types.en.tm>
 
+    <branch|Inside the kernel: memory and containers|kernel.en.tm>
+
     <branch|Strings, characters and encodings|strings.en.tm>
 
     <branch|The <scheme> interpreter and the <c++>/<scheme>

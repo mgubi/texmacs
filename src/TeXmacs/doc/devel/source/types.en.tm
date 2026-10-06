@@ -9,7 +9,9 @@
   types, most of which can be found in the directory <verbatim|Kernel> of
   the <c++> sources (<verbatim|src/src/Kernel>). The description of the
   exported functions is non exhaustive and we refer to the corresponding
-  header files for more precision.
+  header files for more precision. How these types are implemented, what
+  their operations cost and which pitfalls follow are explained in
+  <hlink|inside the kernel|kernel.en.tm>.
 
   <section|Memory allocation and data structures in <TeXmacs>>
 
