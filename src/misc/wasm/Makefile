@@ -197,10 +197,19 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	gzip -9 -n -k -f $(OUT)/web/texmacs.wasm
 
 # made at every build (package.py only writes the packages which changed)
-$(OUT)/web/texmacs-files.json: FORCE plugins-sync
+# the help page of the browser version includes the facts of the build
+# (misc/wasm/build-info.py: the commit, the versions, the sizes), written
+# once the program and the files are there, then packaged again
+BUILD_INFO := $(TM)/TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm
+$(OUT)/web/texmacs-files.json: FORCE plugins-sync $(OUT)/web/texmacs.html tikzjax asymptote
 	@mkdir -p $(OUT)/web
 	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
-	-command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack $(OUT)/web/tm-font-*; do \
+	$(BROTLI_PACKS)
+	python3 $(W)/build-info.py $(TM) $(CURDIR) $(MUPDF) "$(THORVG)" $(BUILD_INFO)
+	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
+	$(BROTLI_PACKS)
+
+BROTLI_PACKS = -command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack $(OUT)/web/tm-font-*; do \
 	  case $$f in *.br) continue;; esac; \
 	  [ -f $$f.br ] || brotli -q 9 -k $$f; done; \
 	  brotli -f -q 9 -k $(OUT)/web/texmacs-files.json

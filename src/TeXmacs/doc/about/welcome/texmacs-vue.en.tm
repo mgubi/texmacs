@@ -196,6 +196,8 @@
   project. The sources and the notes of the port are on
   <hlink|GitHub|https://github.com/mgubi/texmacs/tree/wip_wasm_vue>.
 
+  <include|texmacs-vue-build.en.tm>
+
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
@@ -203,6 +205,12 @@
   <paragraph|6 October 2026>
 
   <\itemize>
+    <item>This page tells which commit made the build, the components of
+    the program with their versions and the checksums of their sources, the
+    sizes of the program and of the files, and the plug-ins with the programs
+    they run, where they come from and how large they are (<em|This build>,
+    above).
+
     <item>The plots of the examples of <name|R> and <name|Python> and the
     figure of the page layout (<menu|Help|Developer's guide>) are shown: they
     were
