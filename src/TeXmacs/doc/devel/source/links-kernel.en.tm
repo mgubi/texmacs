@@ -7,7 +7,7 @@
 
   <section|The global tables>
 
-  The file <verbatim|Data/Observers/link.cpp> keeps three global tables:
+  The file <source-link|Data/Observers/link.cpp|src/Data/Observers/link.cpp> keeps three global tables:
 
   <\description>
     <item*|<cpp|hashmap\<less\>string,list\<less\>observer\<gtr\> \<gtr\>
@@ -32,7 +32,7 @@
   The tables are keyed by <em|observers> rather than by trees because
   trees are edited: a locus must still be found after its body has been
   modified, split or replaced. The observers used for loci are
-  <em|tree pointers> (<verbatim|Data/Observers/tree_pointer.cpp>), which
+  <em|tree pointers> (<source-link|Data/Observers/tree_pointer.cpp|src/Data/Observers/tree_pointer.cpp>), which
   follow their subtree through modifications: on an assignment, a
   variant split or a variant join they move to the new subtree, on the
   removal of a node they move to the child which is kept, on detachment
@@ -56,7 +56,7 @@
     <cpp|class link_repository_rep><explain-synopsis|a set of loci and
     links>
   <|explain>
-    Declared in <verbatim|link.hpp>. It holds three lists, <cpp|ids>,
+    Declared in <source-link|link.hpp|src/Data/Observers/link.hpp>. It holds three lists, <cpp|ids>,
     <cpp|loci> (observers, in parallel with <cpp|ids>) and <cpp|links>,
     and has three methods:
 
@@ -159,7 +159,7 @@
   (<cpp|ip_attached>). The buffer notifier installed by
   <cpp|tm_buffer_rep::attach_notifier> is such an observer, on the body of
   the buffer, with the buffer name as identifier and
-  <scm|buffer-notify> (in <verbatim|progs/part/part-shared.scm>) as
+  <scm|buffer-notify> (in <source-link|progs/part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>) as
   callback; it is used to share whole buffers.
 
   <section|Visited loci and locus colours>

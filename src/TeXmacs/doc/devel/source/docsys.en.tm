@@ -29,7 +29,7 @@
 
   <\description>
     <item*|The style>The <tmstyle|tmdoc> style
-    (<verbatim|styles/documentation/texmacs/tmdoc.ts>) loads the package
+    (<source-link|styles/documentation/texmacs/tmdoc.ts|TeXmacs/styles/documentation/texmacs/tmdoc.ts>) loads the package
     <tmpackage|doc>, which combines four packages: <tmpackage|tmdoc-markup>
     (markup for names, files, links and <markup|explain>),
     <tmpackage|tmdoc-gui>, <tmpackage|tmdoc-traversal> (titles, copyright,
@@ -50,10 +50,10 @@
     its <markup|traverse> branches recursively and concatenates all pages
     into one document, turning page titles into sectional headings.
 
-    <item*|Tools>The web site generator (<verbatim|doc/tmweb.scm>) converts
+    <item*|Tools>The web site generator (<source-link|doc/tmweb.scm|TeXmacs/progs/doc/tmweb.scm>) converts
     a directory tree of documents to <name|HTML>; the full text search
-    (<verbatim|doc/docgrep.scm>) and the search for the documentation of a
-    tag, style or function (<verbatim|doc/tmdoc-search.scm>) scan the help
+    (<source-link|doc/docgrep.scm|TeXmacs/progs/doc/docgrep.scm>) and the search for the documentation of a
+    tag, style or function (<source-link|doc/tmdoc-search.scm|TeXmacs/progs/doc/tmdoc-search.scm>) scan the help
     path; the <abbr|API> documentation (<verbatim|doc/apidoc*.scm>) builds
     a cache of all <markup|explain> blocks for <scheme> functions and
     macros, and the glue generator produces the reference of the <c++>
@@ -65,46 +65,46 @@
   Paths are relative to <verbatim|src/TeXmacs/>.
 
   <\description-paragraphs>
-    <item*|<verbatim|styles/documentation/texmacs/tmdoc.ts>>The
+    <item*|<source-link|styles/documentation/texmacs/tmdoc.ts|TeXmacs/styles/documentation/texmacs/tmdoc.ts>>The
     <tmstyle|tmdoc> style: page layout, fonts and the code markup
     (<markup|verbatim>, <markup|scm>, <markup|cpp>, ...).
 
-    <item*|<verbatim|packages/documentation/doc.ts>,
+    <item*|<source-link|packages/documentation/doc.ts|TeXmacs/packages/documentation/doc.ts>,
     <verbatim|packages/documentation/standard/tmdoc-*.ts>>The
-    documentation packages; <verbatim|tmdoc-web.ts> and
-    <verbatim|tmdoc-web2.ts> are used by the web site styles <tmstyle|tmweb> and
+    documentation packages; <source-link|tmdoc-web.ts|TeXmacs/packages/documentation/standard/tmdoc-web.ts> and
+    <source-link|tmdoc-web2.ts|TeXmacs/packages/documentation/standard/tmdoc-web2.ts> are used by the web site styles <tmstyle|tmweb> and
     <tmstyle|tmweb2> (and by the <name|Mathemagix> documentation styles),
-    <verbatim|scheme-api.ts> by the <abbr|API> pages. The style
+    <source-link|scheme-api.ts|TeXmacs/packages/documentation/standard/scheme-api.ts> by the <abbr|API> pages. The style
     <tmstyle|tmmanual> is used for compiled books.
 
-    <item*|<verbatim|progs/doc/help-funcs.scm>>The help path, resolution of
+    <item*|<source-link|progs/doc/help-funcs.scm|TeXmacs/progs/doc/help-funcs.scm>>The help path, resolution of
     help files by language, <scm|load-help-buffer> and friends.
 
-    <item*|<verbatim|progs/doc/help-menu.scm>>The Help menu.
+    <item*|<source-link|progs/doc/help-menu.scm|TeXmacs/progs/doc/help-menu.scm>>The Help menu.
 
-    <item*|<verbatim|progs/doc/tmdoc.scm>>Expansion into articles and
+    <item*|<source-link|progs/doc/tmdoc.scm|TeXmacs/progs/doc/tmdoc.scm>>Expansion into articles and
     books, the <verbatim|tmfs://help/> handler, <scm|tmdoc-include>.
 
-    <item*|<verbatim|progs/doc/tmdoc-edit.scm>, <verbatim|tmdoc-menu.scm>,
-    <verbatim|tmdoc-kbd.scm>, <verbatim|tmdoc-drd.scm>,
-    <verbatim|tmdoc-markup.scm>>Editing support for documentation
+    <item*|<source-link|progs/doc/tmdoc-edit.scm|TeXmacs/progs/doc/tmdoc-edit.scm>, <source-link|tmdoc-menu.scm|TeXmacs/progs/doc/tmdoc-menu.scm>,
+    <source-link|tmdoc-kbd.scm|TeXmacs/progs/doc/tmdoc-kbd.scm>, <source-link|tmdoc-drd.scm|TeXmacs/progs/doc/tmdoc-drd.scm>,
+    <source-link|tmdoc-markup.scm|TeXmacs/progs/doc/tmdoc-markup.scm>>Editing support for documentation
     documents.
 
-    <item*|<verbatim|progs/doc/tmweb.scm>>The web site generator.
+    <item*|<source-link|progs/doc/tmweb.scm|TeXmacs/progs/doc/tmweb.scm>>The web site generator.
 
-    <item*|<verbatim|progs/doc/docgrep.scm>,
-    <verbatim|progs/doc/tmdoc-search.scm>>Searching.
+    <item*|<source-link|progs/doc/docgrep.scm|TeXmacs/progs/doc/docgrep.scm>,
+    <source-link|progs/doc/tmdoc-search.scm|TeXmacs/progs/doc/tmdoc-search.scm>>Searching.
 
     <item*|<verbatim|progs/doc/apidoc*.scm>>The <abbr|API> documentation of
     <scheme> symbols and modules.
 
-    <item*|<verbatim|progs/utils/test/test-convert.scm>>Building the
+    <item*|<source-link|progs/utils/test/test-convert.scm|TeXmacs/progs/utils/test/test-convert.scm>>Building the
     <abbr|PDF> manuals (<scm|build-manual>).
 
     <item*|<verbatim|src/src/Scheme/Glue/build-auto-doc>,
-    <verbatim|make-apidoc-doc.scm>, <verbatim|make-apidoc-module.scm>>The
+    <source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm>, <source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>>The
     generator of <verbatim|doc/devel/scheme/api/glue-auto-doc.en.tm> and
-    <verbatim|progs/prog/glue-symbols.scm>.
+    <source-link|progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>.
   </description-paragraphs>
 
   <section|Contents of this chapter>

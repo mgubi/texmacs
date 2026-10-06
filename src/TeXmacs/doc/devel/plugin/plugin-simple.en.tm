@@ -35,7 +35,7 @@
 
   <paragraph*|How it works>
 
-  The file <verbatim|init-world.scm> essentially contains the following code:
+  The file <source-link|init-world.scm|TeXmacs/examples/plugins/world/progs/init-world.scm> essentially contains the following code:
 
   <\scm-code>
     (plugin-configure world

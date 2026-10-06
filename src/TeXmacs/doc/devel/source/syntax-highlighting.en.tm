@@ -53,7 +53,7 @@
   <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>, unless
   stated otherwise. The language definitions which live in plugins are found
   in the source tree in <verbatim|src/plugins/> (for instance
-  <verbatim|src/plugins/code/progs/cpp-lang.scm>); they are installed into
+  <source-link|src/plugins/code/progs/cpp-lang.scm|plugins/code/progs/cpp-lang.scm>); they are installed into
   <verbatim|$TEXMACS_PATH/plugins/> by the build. Style packages are relative
   to <verbatim|src/TeXmacs/packages/>.
 
@@ -65,17 +65,17 @@
   <\enumerate>
     <item>The document contains <markup|python-code> whose body is a
     <markup|document>, one string per line. The macro <markup|python-code>
-    (<verbatim|environment/env-program.ts>) expands to <markup|python>, which
+    (<source-link|environment/env-program.ts|TeXmacs/packages/environment/env-program.ts>) expands to <markup|python>, which
     sets <src-var|mode> to <verbatim|prog> and <src-var|prog-language> to
     <verbatim|python>.
 
     <item>When the typesetter executes this <markup|with>, the environment
     notices that a variable of type <cpp|Env_Mode> or <cpp|Env_Language> was
     modified and calls <cpp|edit_env_rep::update_language>
-    (<verbatim|Typeset/Env/env_semantics.cpp>). In programming mode this
+    (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>). In programming mode this
     sets <cpp|env-\<gtr\>lan= prog_language ("python")>.
 
-    <item><cpp|prog_language> (<verbatim|System/Language/prog_language.cpp>)
+    <item><cpp|prog_language> (<source-link|System/Language/prog_language.cpp|src/System/Language/prog_language.cpp>)
     looks up the language object in a global cache. The first time, it
     creates a <cpp|prog_language_rep>, whose constructor loads the <scheme>
     module <verbatim|(python-lang)> and asks it, through
@@ -83,9 +83,9 @@
     and comment delimiters.
 
     <item>Each line of the program is an atomic tree. The concatenator
-    (<verbatim|Typeset/Concat/concater.cpp>) sees that <cpp|env-\<gtr\>mode
+    (<source-link|Typeset/Concat/concater.cpp|src/Typeset/Concat/concater.cpp>) sees that <cpp|env-\<gtr\>mode
     == 3> and calls <cpp|concater_rep::typeset_prog_string>
-    (<verbatim|Typeset/Concat/concat_text.cpp>).
+    (<source-link|Typeset/Concat/concat_text.cpp|src/Typeset/Concat/concat_text.cpp>).
 
     <item><cpp|typeset_prog_string> repeatedly calls
     <cpp|env-\<gtr\>lan-\<gtr\>advance (t, pos)>, which advances
@@ -108,51 +108,51 @@
   <section|Main source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|System/Language/language.hpp>,
-    <verbatim|language.cpp>>The abstract class <cpp|language_rep>, text
+    <item*|<source-link|System/Language/language.hpp|src/System/Language/language.hpp>,
+    <source-link|language.cpp|src/System/Language/language.cpp>>The abstract class <cpp|language_rep>, text
     properties, the registry functions and the encoding and decoding of
     syntax colors.
 
-    <item*|<verbatim|System/Language/impl_language.hpp>,
-    <verbatim|impl_language.cpp>>Declarations of the concrete language
+    <item*|<source-link|System/Language/impl_language.hpp|src/System/Language/impl_language.hpp>,
+    <source-link|impl_language.cpp|src/System/Language/impl_language.cpp>>Declarations of the concrete language
     classes for programming languages, and shared helpers for multi-line
     comments.
 
-    <item*|<verbatim|System/Language/prog_language.cpp>>The generic
+    <item*|<source-link|System/Language/prog_language.cpp|src/System/Language/prog_language.cpp>>The generic
     <cpp|prog_language_rep> configured from <scheme>, and the dispatcher
     <cpp|prog_language>.
 
-    <item*|<verbatim|System/Language/scheme_language.cpp>,
-    <verbatim|cpp_language.cpp>, <verbatim|mathemagix_language.cpp>,
-    <verbatim|r_language.cpp>, <verbatim|scilab_language.cpp>,
-    <verbatim|fortran_language.cpp>>Hand-written highlighters for specific
+    <item*|<source-link|System/Language/scheme_language.cpp|src/System/Language/scheme_language.cpp>,
+    <source-link|cpp_language.cpp|src/System/Language/cpp_language.cpp>, <source-link|mathemagix_language.cpp|src/System/Language/mathemagix_language.cpp>,
+    <source-link|r_language.cpp|src/System/Language/r_language.cpp>, <source-link|scilab_language.cpp|src/System/Language/scilab_language.cpp>,
+    <source-link|fortran_language.cpp|src/System/Language/fortran_language.cpp>>Hand-written highlighters for specific
     languages.
 
-    <item*|<verbatim|System/Language/verb_language.cpp>>The fallback
+    <item*|<source-link|System/Language/verb_language.cpp|src/System/Language/verb_language.cpp>>The fallback
     language, which also implements highlighting through packrat grammars.
 
     <item*|<verbatim|Data/Parser/>>Small reusable parsers: blanks,
     identifiers, keywords, operators, numbers, strings, escaped characters,
     inline comments and preprocessor directives.
 
-    <item*|<verbatim|Typeset/Concat/concat_text.cpp>>The typesetting of
+    <item*|<source-link|Typeset/Concat/concat_text.cpp|src/Typeset/Concat/concat_text.cpp>>The typesetting of
     strings in programming mode (<cpp|typeset_prog_string>).
 
-    <item*|<verbatim|kernel/texmacs/tm-language.scm>>The
+    <item*|<source-link|kernel/texmacs/tm-language.scm|TeXmacs/progs/kernel/texmacs/tm-language.scm>>The
     <scm|define-language> macro for packrat grammars.
 
-    <item*|<verbatim|prog/default-lang.scm> and the
+    <item*|<source-link|prog/default-lang.scm|TeXmacs/progs/prog/default-lang.scm> and the
     <verbatim|*-lang.scm> files>The default and the per-language
     <scm|parser-feature> definitions.
 
-    <item*|<verbatim|prog/prog-edit.scm>, <verbatim|prog/prog-kbd.scm>,
+    <item*|<source-link|prog/prog-edit.scm|TeXmacs/progs/prog/prog-edit.scm>, <source-link|prog/prog-kbd.scm|TeXmacs/progs/prog/prog-kbd.scm>,
     <verbatim|prog/*-edit.scm>>Editing support for code.
 
-    <item*|<verbatim|environment/env-program.ts>>The markup for inline code
+    <item*|<source-link|environment/env-program.ts|TeXmacs/packages/environment/env-program.ts>>The markup for inline code
     and blocks of code.
 
-    <item*|<verbatim|themes/base/base-colors.ts>,
-    <verbatim|themes/dark/dark-scene.ts>>The theme for highlighting colors.
+    <item*|<source-link|themes/base/base-colors.ts|TeXmacs/packages/themes/base/base-colors.ts>,
+    <source-link|themes/dark/dark-scene.ts|TeXmacs/packages/themes/dark/dark-scene.ts>>The theme for highlighting colors.
   </description-paragraphs>
 
   <section|Contents of this chapter>

@@ -12,7 +12,7 @@
   select the second child of the last child or all square roots inside
   numerators of fractions. The syntax of the selection patterns is also used
   for high level tree accessors. The implementation can be found in
-  <verbatim|kernel/regexp/regexp-select.scm>.
+  <source-link|kernel/regexp/regexp-select.scm|TeXmacs/progs/kernel/regexp/regexp-select.scm>.
 
   <\explain>
     <scm|(select <scm-arg|expr> <scm-arg|pattern>)><explain-synopsis|select

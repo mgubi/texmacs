@@ -18,7 +18,7 @@
   system|../plugin/plugins.en.tm>, whose last section, <hlink|How the plug-in
   system works internally|../plugin/plugin-internals.en.tm>, already covers
   the discovery of plug-ins, the plug-in cache, the connection tables of
-  <verbatim|tm-plugins.scm>, the control characters and output formats of the
+  <source-link|tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>, the control characters and output formats of the
   pipe protocol, serialization of the input, special commands, background
   evaluation, remote plug-ins and the basic debugging techniques. The
   protocol is described from the point of view of the extern application in
@@ -49,15 +49,15 @@
     <item*|The session layer (<scheme>)>The markup of sessions (the
     <markup|session> tag with its <markup|input>, <markup|unfolded-io>,
     <markup|output> and <markup|errput> children) and the editing routines in
-    <verbatim|dynamic/session-edit.scm>. When an input field is evaluated,
+    <source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm>. When an input field is evaluated,
     this layer builds a request and hands it over to the next layer. When
     output arrives, it inserts it into the document.
 
-    <item*|The request queue (<scheme>)>The module <verbatim|utils/plugins/plugin-eval.scm>
+    <item*|The request queue (<scheme>)>The module <source-link|utils/plugins/plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm>
     keeps, for every pair (language, session), a queue of pending requests
     (<scm|plugin-pending>). Each request carries four call-backs, which
     allows the same queue to serve interactive sessions
-    (<verbatim|session-edit.scm>), silent evaluations
+    (<source-link|session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm>), silent evaluations
     (<scm|silent-feed>, used by scripts) and special commands
     (<scm|plugin-command>, used by tab-completion). It is the only client of
     the <scheme> glue functions <scm|connection-start>,
@@ -66,16 +66,16 @@
     <scm|connection-notify-status> which are called back from <c++>.
 
     <item*|The connection layer (<c++>)>The resource <cpp|connection> in
-    <verbatim|System/Link/connection.cpp>. A connection is identified by the
+    <source-link|System/Link/connection.cpp|src/System/Link/connection.cpp>. A connection is identified by the
     string <verbatim|<em|name>-<em|session>>, owns a link, keeps track of the
     status of the extern program (waiting for input or for output), and owns
     two parsers of type <cpp|texmacs_input>
-    (<verbatim|Data/Convert/Generic/input.cpp>) which turn the byte streams
+    (<source-link|Data/Convert/Generic/input.cpp|src/Data/Convert/Generic/input.cpp>) which turn the byte streams
     of the standard output and the standard error into <TeXmacs> trees, one
     tree per channel.
 
     <item*|The link layer (<c++>)>Subclasses of the abstract class
-    <cpp|tm_link_rep> (<verbatim|System/Link/tm_link.hpp>) which move bytes
+    <cpp|tm_link_rep> (<source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>) which move bytes
     to and from the extern program: <cpp|pipe_link_rep> and
     <cpp|qt_pipe_link_rep> for processes, <cpp|dyn_link_rep> for shared
     libraries, <cpp|cmdline_link_rep> for one shell command per request and
@@ -130,7 +130,7 @@
   relative to <verbatim|src/TeXmacs/progs>.
 
   <\description>
-    <item*|<verbatim|System/Link/tm_link.hpp>, <verbatim|tm_link.cpp>>The
+    <item*|<source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>, <source-link|tm_link.cpp|src/System/Link/tm_link.cpp>>The
     abstract class <cpp|tm_link_rep>, the connection status constants, the
     control characters of the protocol, the factory functions
     <cpp|make_pipe_link>, <cpp|make_dynamic_link>, <cpp|make_cmdline_link>,
@@ -139,84 +139,84 @@
     used by the client/server sockets of the <hlink|collaboration
     tools|collab-protocol.en.tm>, not by plug-ins).
 
-    <item*|<verbatim|System/Link/connect.hpp>,
-    <verbatim|connection.cpp>>The <cpp|connection> resource and the
+    <item*|<source-link|System/Link/connect.hpp|src/System/Link/connect.hpp>,
+    <source-link|connection.cpp|src/System/Link/connection.cpp>>The <cpp|connection> resource and the
     functions <cpp|connection_start>, <cpp|connection_write>,
     <cpp|connection_read>, <cpp|connection_interrupt>,
     <cpp|connection_stop>, <cpp|connection_status>, <cpp|connection_eval>
     and <cpp|connection_cmd>.
 
-    <item*|<verbatim|System/Link/pipe_link.cpp>>Pipes implemented with
+    <item*|<source-link|System/Link/pipe_link.cpp|src/System/Link/pipe_link.cpp>>Pipes implemented with
     <cpp|fork>, <cpp|execve> of <verbatim|/bin/sh> and <cpp|select>. Only
     compiled when <cpp|QTTEXMACS> is not defined, or when neither
     <cpp|OS_MINGW> nor <cpp|QTPIPES> is defined.
 
-    <item*|<verbatim|Plugins/Qt/qt_pipe_link.cpp>,
-    <verbatim|Plugins/Qt/QTMPipeLink.cpp>>Pipes implemented with
-    <cpp|QProcess>; the alternative to <verbatim|pipe_link.cpp> for <name|Qt>
+    <item*|<source-link|Plugins/Qt/qt_pipe_link.cpp|src/Plugins/Qt/qt_pipe_link.cpp>,
+    <source-link|Plugins/Qt/QTMPipeLink.cpp|src/Plugins/Qt/QTMPipeLink.cpp>>Pipes implemented with
+    <cpp|QProcess>; the alternative to <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp> for <name|Qt>
     builds on <name|Windows> or with <cpp|QTPIPES>. The <name|CMake> option
     <verbatim|QTPIPES> is <verbatim|ON> by default, so this is the
     implementation used by most current builds.
 
-    <item*|<verbatim|System/Link/dyn_link.hpp>,
-    <verbatim|dyn_link.cpp>>Dynamic linking of shared libraries
+    <item*|<source-link|System/Link/dyn_link.hpp|src/System/Link/dyn_link.hpp>,
+    <source-link|dyn_link.cpp|src/System/Link/dyn_link.cpp>>Dynamic linking of shared libraries
     (<cpp|symbol_install>, <cpp|dyn_link_rep>), using the interface declared
-    in <verbatim|src/TeXmacs/include/TeXmacs.h>.
+    in <source-link|src/TeXmacs/include/TeXmacs.h|TeXmacs/include/TeXmacs.h>.
 
-    <item*|<verbatim|System/Link/cmdline_link.cpp>,
-    <verbatim|request_link.cpp>>The links behind the <scm|:cmdline> and
+    <item*|<source-link|System/Link/cmdline_link.cpp|src/System/Link/cmdline_link.cpp>,
+    <source-link|request_link.cpp|src/System/Link/request_link.cpp>>The links behind the <scm|:cmdline> and
     <scm|:request> options.
 
-    <item*|<verbatim|System/Link/socket_notifier.hpp>,
-    <verbatim|socket_notifier.cpp>>A minimal registry of file descriptors
+    <item*|<source-link|System/Link/socket_notifier.hpp|src/System/Link/socket_notifier.hpp>,
+    <source-link|socket_notifier.cpp|src/System/Link/socket_notifier.cpp>>A minimal registry of file descriptors
     with call-backs, polled by <cpp|perform_select>.
 
-    <item*|<verbatim|Data/Convert/Generic/input.hpp>,
-    <verbatim|input.cpp>>The parser <cpp|texmacs_input_rep> which converts
+    <item*|<source-link|Data/Convert/Generic/input.hpp|src/Data/Convert/Generic/input.hpp>,
+    <source-link|input.cpp|src/Data/Convert/Generic/input.cpp>>The parser <cpp|texmacs_input_rep> which converts
     the output of a plug-in into trees.
 
-    <item*|<verbatim|Texmacs/Server/tm_server.cpp>>The interpose handler
+    <item*|<source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp>>The interpose handler
     <cpp|tm_server_rep::interpose_handler>, from which pending pipe output is
     processed, and <cpp|close_all_pipes> at exit.
 
-    <item*|<verbatim|Scheme/Glue/build-glue-basic.scm>>The declarations of
+    <item*|<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The declarations of
     the glue functions <scm|connection-start>, <scm|connection-status>,
     <scm|connection-write-string>, <scm|connection-write>,
     <scm|connection-cmd>, <scm|connection-eval>, <scm|connection-interrupt>
     and <scm|connection-stop>, and of <scm|plugin-list>.
 
-    <item*|<verbatim|Edit/Interface/edit_complete.cpp>>The <c++> part of
+    <item*|<source-link|Edit/Interface/edit_complete.cpp|src/Edit/Interface/edit_complete.cpp>>The <c++> part of
     tab-completion in sessions (<cpp|edit_interface_rep::session_complete_command>
     and <cpp|edit_interface_rep::custom_complete>).
 
-    <item*|<verbatim|kernel/texmacs/tm-plugins.scm>>Translation of the
+    <item*|<source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>>Translation of the
     options of <scm|plugin-configure> into launcher descriptions, and the
     functions called from <c++>: <scm|connection-defined?>,
     <scm|connection-info>, <scm|connection-get-handlers>,
     <scm|connection-cmdline>, <scm|connection-request> and
     <scm|connection-result>.
 
-    <item*|<verbatim|utils/plugins/plugin-eval.scm>>The request queue and
+    <item*|<source-link|utils/plugins/plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm>>The request queue and
     the notification call-backs.
 
-    <item*|<verbatim|utils/plugins/plugin-cmd.scm>>Serialization
+    <item*|<source-link|utils/plugins/plugin-cmd.scm|TeXmacs/progs/utils/plugins/plugin-cmd.scm>>Serialization
     (<scm|plugin-serialize>) and formatting of special commands
     (<scm|format-command>), both called from <c++>.
 
-    <item*|<verbatim|dynamic/session-edit.scm>,
-    <verbatim|dynamic/session-menu.scm>>Interactive sessions.
+    <item*|<source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm>,
+    <source-link|dynamic/session-menu.scm|TeXmacs/progs/dynamic/session-menu.scm>>Interactive sessions.
 
-    <item*|<verbatim|dynamic/scripts-edit.scm>>Evaluation of scripts and
+    <item*|<source-link|dynamic/scripts-edit.scm|TeXmacs/progs/dynamic/scripts-edit.scm>>Evaluation of scripts and
     executable fields in ordinary documents.
   </description>
 
   Two names are misleading. The function <cpp|init_plugins> in
-  <verbatim|System/Boot/init_texmacs.cpp> does not initialize plug-ins in
+  <source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp> does not initialize plug-ins in
   the above sense: it loads the user settings and sets up <TeX> (the
   directories of plug-ins are added to the search paths by
   <cpp|init_env_vars>, see <hlink|search
   paths|../plugin/plugin-internals.en.tm>). Similarly, the file
-  <verbatim|Edit/Process/edit_process.cpp> deals with the generation of
+  <source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp> deals with the generation of
   bibliographies, tables of contents and indexes, not with sessions.
 
   <section|Threading and the event loop>
@@ -227,7 +227,7 @@
   notifications into <scheme> are made synchronously from the poll. The only
   exceptions are the <abbr|HTTP> requests of <cpp|request_link_rep>, which
   are run by a detached <name|POSIX> thread created in
-  <cpp|async_eval_system> (<verbatim|System/Misc/sys_utils.cpp>); the result
+  <cpp|async_eval_system> (<source-link|System/Misc/sys_utils.cpp|src/System/Misc/sys_utils.cpp>); the result
   is handed back to the main thread by <cpp|async_eval_pending>.
 
   The central hook is <cpp|tm_server_rep::interpose_handler>, which the
@@ -265,7 +265,7 @@
 
   In the <name|Qt> port, it is called from <cpp|qt_gui_rep::update>, which is
   rescheduled by a single-shot timer every <verbatim|90 / 6> = 15
-  milliseconds when the editor is idle (<verbatim|Plugins/Qt/qt_gui.cpp>),
+  milliseconds when the editor is idle (<source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>),
   and is skipped while keyboard events are being processed. Consequently:
 
   <\itemize>

@@ -9,7 +9,7 @@
 
   The typesetting environment is an object of class <cpp|edit_env>, a
   reference-counted pointer to an <cpp|edit_env_rep>
-  (<verbatim|Typeset/env.hpp>). Each editor owns exactly one environment
+  (<source-link|Typeset/env.hpp|src/Typeset/env.hpp>). Each editor owns exactly one environment
   (the member <cpp|env> of <cpp|edit_typeset_rep>), which is shared by the
   typesetter of that editor (<cpp|typesetter_rep::env>) and by all its
   bridges and concaters. Temporary environments are also created for
@@ -144,16 +144,16 @@
     <verbatim|Env_Page>, <verbatim|Env_Frame> and so on the corresponding
     <verbatim|update_*> method is called. <cpp|update ()> recomputes all
     caches. The table <cpp|default_var_type> is filled by
-    <cpp|initialize_default_var_type> in <verbatim|env_semantics.cpp>; all
+    <cpp|initialize_default_var_type> in <source-link|env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>; all
     variables which are not listed there, and in particular all macros and
     user variables, are of category <verbatim|Env_User>.
   </explain>
 
   When you add a new built-in environment variable whose value must be
   cached in a C++ field of <cpp|edit_env_rep>, you have to declare its name
-  in <verbatim|Data/Drd/vars.hpp> and <verbatim|vars.cpp>, give it a
+  in <source-link|Data/Drd/vars.hpp|src/Data/Drd/vars.hpp> and <source-link|vars.cpp|src/Data/Drd/vars.cpp>, give it a
   default value in <cpp|initialize_default_env>
-  (<verbatim|env_default.cpp>), assign it a category in
+  (<source-link|env_default.cpp|src/Typeset/Env/env_default.cpp>), assign it a category in
   <cpp|initialize_default_var_type> and handle that category in both
   <cpp|update> methods.
 
@@ -192,7 +192,7 @@
   how each paragraph changes the environment, in order to be able to skip
   paragraphs which do not need to be re-typeset. This is implemented by the
   monitored writes and by three methods of <cpp|edit_env_rep>, which are
-  called by <cpp|bridge_rep::typeset> (<verbatim|Typeset/Bridge/bridge.cpp>)
+  called by <cpp|bridge_rep::typeset> (<source-link|Typeset/Bridge/bridge.cpp|src/Typeset/Bridge/bridge.cpp>)
   around the typesetting of a bridge:
 
   <\cpp-code>
@@ -230,7 +230,7 @@
   <section|The default environment>
 
   The global table <cpp|default_env> is filled once by
-  <cpp|initialize_default_env> in <verbatim|Typeset/Env/env_default.cpp>.
+  <cpp|initialize_default_env> in <source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>.
   It contains the default values of all built-in variables (as strings or
   trees), and also a few built-in macros, for instance
 
@@ -260,7 +260,7 @@
   <verbatim|0.5par>, or trees of the form <scm|(tmlen def)> or
   <scm|(tmlen min def max)> whose entries are numbers of internal units
   (<cpp|SI>). The conversion is done by <cpp|as_tmlen> in
-  <verbatim|Typeset/Env/env_length.cpp>:
+  <source-link|Typeset/Env/env_length.cpp|src/Typeset/Env/env_length.cpp>:
 
   <\cpp-code>
     parse_length (s (start, n), len, unit);
@@ -298,7 +298,7 @@
   The initial environment of a buffer is computed from its style (the
   <markup|style> tuple of the document) and from its initial
   environment (the <markup|initial> collection). This happens in
-  <verbatim|Edit/Editor/edit_typeset.cpp>:
+  <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>:
 
   <\cpp-code>
     void
@@ -346,7 +346,7 @@
   <subsection|Loading and caching styles>
 
   <cpp|typeset_style_use_cache> first calls <cpp|preprocess_style>
-  (<verbatim|Data/Document/new_style.cpp>), which turns an atomic style into
+  (<source-link|Data/Document/new_style.cpp|src/Data/Document/new_style.cpp>), which turns an atomic style into
   a tuple and replaces each package name <verbatim|p> by the absolute name
   of a file <verbatim|p.ts> found in the directory of the document or one of
   its ancestors, if there is such a file (this allows documents to override
@@ -402,7 +402,7 @@
 
   <\description>
     <item*|<markup|with-package>>Rewritten by
-    <cpp|with_package_definitions> (<verbatim|Texmacs/Data/new_buffer.cpp>)
+    <cpp|with_package_definitions> (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>)
     into a <markup|with> which binds all variables assigned at the top
     level of the package (loaded with <cpp|load_style_tree>, cached in
     <cpp|style_tree_cache>). Nested packages and non-<markup|assign>
@@ -429,7 +429,7 @@
 
   <\itemize>
     <item>The exact strategy calls <cpp|exec_until (ttt, p / rp)>
-    (<verbatim|Typeset/Bridge/typesetter.cpp>), which delegates to the
+    (<source-link|Typeset/Bridge/typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>), which delegates to the
     bridges; valid bridges replay their cached changes and invalid ones call
     the partial evaluator <cpp|edit_env_rep::exec_until> described in
     <hlink|the evaluator|macro-expansion-exec.en.tm>.

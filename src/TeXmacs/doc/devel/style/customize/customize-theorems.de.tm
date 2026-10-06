@@ -114,7 +114,7 @@
   Aktionen zu berücksichtigen, die von den früheren Werten des Makros
   <markup|inc-theorem> stammen können.
 
-  Der folgende Code von <verbatim|number-long-article.ts> dient dazu, allen
+  Der folgende Code von <source-link|number-long-article.ts|TeXmacs/packages/customize/theorem/number-long-article.ts> dient dazu, allen
   Standard-Kontexten die Nummer des aktuellen Abschnitts als Praefix
   voranzustellen.
 
@@ -126,8 +126,8 @@
 
   \;
 
-  Beachten Sie auch, dass mit den Paketen <verbatim|number-europe.ts>,
-  <verbatim|number-long-article.ts>, <verbatim|number-us.ts>,
+  Beachten Sie auch, dass mit den Paketen <source-link|number-europe.ts|TeXmacs/packages/customize/theorem/number-europe.ts>,
+  <source-link|number-long-article.ts|TeXmacs/packages/customize/theorem/number-long-article.ts>, <source-link|number-us.ts|TeXmacs/packages/customize/theorem/number-us.ts>,
   structured-list.ts (<localize|number-europe, number-long-article,
   number-us, structured-list und structured-section>) die Nummerierung im
   Menü <menu|View|Add package|Customize> angepasst werden kann.

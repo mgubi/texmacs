@@ -6,14 +6,14 @@
   <tmdoc-title|Look at an example>
 
   Before writing your own style file, it may be useful to take a look at some
-  standard style files. For instance, you may open <verbatim|book.ts> using
+  standard style files. For instance, you may open <source-link|book.ts|TeXmacs/styles/book.ts> using
   <menu|File|Open>; it can be found in the directory
   <verbatim|$TEXMACS_PATH/styles>. Alternatively, when editing a document
   whose style is <tmstyle|book>, you may use <menu|Document|Style|Edit style>.
   Style files are shown in source mode, so that all macro and environment
   declarations are visible.
 
-  The file <verbatim|book.ts> itself is very short: it essentially loads the
+  The file <source-link|book.ts|TeXmacs/styles/book.ts> itself is very short: it essentially loads the
   packages <tmpackage|std>, <tmpackage|env>, <tmpackage|title-book>,
   <tmpackage|header-book> and <tmpackage|section-book> and sets a few style
   parameters. Most declarations are contained in these packages and in the

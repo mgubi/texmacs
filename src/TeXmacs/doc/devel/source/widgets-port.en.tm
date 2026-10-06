@@ -13,16 +13,16 @@
   is a good model:
 
   <descriptive-table|<tformat|<table|<row|<cell|Layer>|<cell|File>|<cell|For
-  the toggle>>|<row|<cell|<c++> declaration>|<cell|<verbatim|Graphics/Gui/widget.hpp>>|<cell|<cpp|toggle_widget
+  the toggle>>|<row|<cell|<c++> declaration>|<cell|<source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp>>|<cell|<cpp|toggle_widget
   (command cmd, bool on, int style)>>>|<row|<cell|<name|Qt>
-  constructor>|<cell|<verbatim|Plugins/Qt/qt_widget.cpp>>|<cell|<cpp|qt_ui_element_rep::create
+  constructor>|<cell|<source-link|Plugins/Qt/qt_widget.cpp|src/Plugins/Qt/qt_widget.cpp>>|<cell|<cpp|qt_ui_element_rep::create
   (qt_widget_rep::toggle_widget, ...)>>>|<row|<cell|<name|Qt>
-  rendering>|<cell|<verbatim|Plugins/Qt/qt_ui_element.cpp>>|<cell|<cpp|case
-  toggle_widget> in <cpp|as_qwidget>, <cpp|qt_toggle_command_rep>>>|<row|<cell|<name|Widkit>>|<cell|<verbatim|Plugins/Widkit/Basic/widkit_wrapper.cpp>>|<cell|<cpp|toggle_widget>
-  wrapper>>|<row|<cell|Glue>|<cell|<verbatim|Scheme/Glue/build-glue-basic.scm>>|<cell|<scm|(widget-toggle
+  rendering>|<cell|<source-link|Plugins/Qt/qt_ui_element.cpp|src/Plugins/Qt/qt_ui_element.cpp>>|<cell|<cpp|case
+  toggle_widget> in <cpp|as_qwidget>, <cpp|qt_toggle_command_rep>>>|<row|<cell|<name|Widkit>>|<cell|<source-link|Plugins/Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>>|<cell|<cpp|toggle_widget>
+  wrapper>>|<row|<cell|Glue>|<cell|<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>|<cell|<scm|(widget-toggle
   toggle_widget (widget command bool int))>>>|<row|<cell|Markup
-  macro>|<cell|<verbatim|kernel/gui/gui-markup.scm>>|<cell|<scm|$toggle>>>|<row|<cell|Keyword>|<cell|<verbatim|kernel/gui/menu-define.scm>>|<cell|<scm|gui-make-toggle>,
-  entry <scm|toggle> of <scm|gui-make-table>>>|<row|<cell|Interpreter>|<cell|<verbatim|kernel/gui/menu-widget.scm>>|<cell|grammar
+  macro>|<cell|<source-link|kernel/gui/gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>>|<cell|<scm|$toggle>>>|<row|<cell|Keyword>|<cell|<source-link|kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>>|<cell|<scm|gui-make-toggle>,
+  entry <scm|toggle> of <scm|gui-make-table>>>|<row|<cell|Interpreter>|<cell|<source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>>|<cell|grammar
   <scm|(toggle :%2)>, <scm|make-toggle>, <scm|menu-expand-toggle>>>>>>
 
   In more detail, suppose that we want to add a widget constructor
@@ -33,17 +33,17 @@
   <subsection|The <c++> side>
 
   <\enumerate>
-    <item>Declare <cpp|foo_widget> in <verbatim|Graphics/Gui/widget.hpp>,
+    <item>Declare <cpp|foo_widget> in <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp>,
     with a comment describing its semantics. Every port has to implement
     it, otherwise <TeXmacs> will not link.
 
     <item>In the <name|Qt> port, add a value <cpp|foo_widget> to the
     enumeration <cpp|qt_widget_rep::types> in
-    <verbatim|Plugins/Qt/qt_widget.hpp> and the corresponding string, at the
+    <source-link|Plugins/Qt/qt_widget.hpp|src/Plugins/Qt/qt_widget.hpp> and the corresponding string, at the
     same position, in <cpp|qt_widget_type_strings> (in
     <cpp|type_as_string>).
 
-    <item>Implement the constructor in <verbatim|Plugins/Qt/qt_widget.cpp>:
+    <item>Implement the constructor in <source-link|Plugins/Qt/qt_widget.cpp|src/Plugins/Qt/qt_widget.cpp>:
 
     <\cpp-code>
       widget foo_widget (command cmd, string val, int style) {
@@ -64,7 +64,7 @@
     and add <cpp|foo_widget> to the list of types handled by
     <cpp|qt_ui_element_rep::get_payload>.
 
-    <item>In <verbatim|Plugins/Qt/qt_ui_element.cpp>, add a case to
+    <item>In <source-link|Plugins/Qt/qt_ui_element.cpp|src/Plugins/Qt/qt_ui_element.cpp>, add a case to
     <cpp|as_qwidget> which unpacks the payload with exactly the same tuple
     type (<cpp|triple\<less\>command, string, int\<gtr\>>), creates the
     <name|Qt> widget with <cpp|parent_widget> as parent, stores it in
@@ -81,7 +81,7 @@
     <item>Make the same changes in <verbatim|Plugins/Qt6>.
 
     <item>Provide at least a stub in the other ports, for instance a
-    wrapper in <verbatim|Plugins/Widkit/Basic/widkit_wrapper.cpp>
+    wrapper in <source-link|Plugins/Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>
     returning an existing <name|Widkit> widget.
   </enumerate>
 
@@ -90,29 +90,29 @@
 
   <subsection|Glue>
 
-  Add a line to <verbatim|Scheme/Glue/build-glue-basic.scm>, next to the
+  Add a line to <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>, next to the
   other widgets:
 
   <\scm-code>
     (widget-foo foo_widget (widget command string int))
   </scm-code>
 
-  The generated file <verbatim|Scheme/Glue/glue_basic.cpp> is kept in the
+  The generated file <source-link|Scheme/Glue/glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp> is kept in the
   repository and must be regenerated, with a working <name|Guile>, by
   running <verbatim|./build-glue build-glue-basic.scm glue_basic.cpp> in
   <verbatim|src/src/Scheme/Glue> (this is what the <verbatim|GLUE> target
   of <verbatim|src/src/makefile> does). The script <verbatim|build-auto-doc>,
   called by <verbatim|build-glue>, also updates
-  <verbatim|progs/prog/glue-symbols.scm>. The argument types must be known
+  <source-link|progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>. The argument types must be known
   to the glue generator; types such as <verbatim|command>,
   <verbatim|promise_widget>, <verbatim|array_widget> or
   <verbatim|array_string> are already supported (see
-  <verbatim|Scheme/Scheme/glue.cpp>).
+  <source-link|Scheme/Scheme/glue.cpp|src/Scheme/Scheme/glue.cpp>).
 
   <subsection|The <scheme> side>
 
   <\enumerate>
-    <item>In <verbatim|kernel/gui/gui-markup.scm>, define the macro which
+    <item>In <source-link|kernel/gui/gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>, define the macro which
     builds the menu item, turning the parts that must be recomputed into
     closures:
 
@@ -124,7 +124,7 @@
       \ \ `(list 'foo (lambda (answer) ,cmd) (lambda () ,val)))
     </scm-code>
 
-    <item>In <verbatim|kernel/gui/menu-define.scm>, add the translation
+    <item>In <source-link|kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>, add the translation
     function and register it in <scm|gui-make-table>:
 
     <\scm-code>
@@ -147,7 +147,7 @@
 
     (from another module, <scm|extend-table> can be used instead).
 
-    <item>In <verbatim|kernel/gui/menu-widget.scm>, add <scm|(foo :%2)> to
+    <item>In <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>, add <scm|(foo :%2)> to
     the <scm|:menu-item> grammar, write the builder and register it in
     <scm|make-menu-items-table>:
 
@@ -173,7 +173,7 @@
     reused by <cpp|get_menu_widget> and refresh widgets.
 
     <item>Optionally, add the corresponding <scm|build-*> and
-    <scm|markup-*> functions to <verbatim|kernel/gui/menu-convert.scm>, so
+    <scm|markup-*> functions to <source-link|kernel/gui/menu-convert.scm|TeXmacs/progs/kernel/gui/menu-convert.scm>, so
     that the widget also works with the markup interface.
 
     <item>Document the keyword in the \P<hlink|Widgets reference
@@ -184,12 +184,12 @@
 
   <\enumerate>
     <item>Add <cpp|SLOT_FOO> to the enumeration <cpp|slot_id> in
-    <verbatim|Graphics/Gui/message.hpp>, before <cpp|slot_id__LAST>.
+    <source-link|Graphics/Gui/message.hpp|src/Graphics/Gui/message.hpp>, before <cpp|slot_id__LAST>.
 
     <item>Add <verbatim|"SLOT_FOO"> at the same position in the array of
-    <cpp|slot_name> in <verbatim|Graphics/Gui/widget.cpp>.
+    <cpp|slot_name> in <source-link|Graphics/Gui/widget.cpp|src/Graphics/Gui/widget.cpp>.
 
-    <item>Add typed helper functions to <verbatim|message.hpp>, for
+    <item>Add typed helper functions to <source-link|message.hpp|src/Graphics/Gui/message.hpp>, for
     example
 
     <\cpp-code>
@@ -220,9 +220,9 @@
   implements:
 
   <\enumerate>
-    <item>the system-wide routines of <verbatim|Graphics/Gui/gui.hpp>;
+    <item>the system-wide routines of <source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp>;
 
-    <item>all widget constructors of <verbatim|Graphics/Gui/widget.hpp>,
+    <item>all widget constructors of <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp>,
     with the messages they are expected to understand;
 
     <item>a class <cpp|simple_widget_rep> providing canvases;
@@ -236,11 +236,11 @@
   The <name|Qt> port (\P<hlink|The <name|Qt>
   implementation|widgets-qt.en.tm>\Q) is the reference. The older
   <name|X11> port consists of <verbatim|Plugins/X11> (the display, windows
-  implementing <cpp|window_rep> of <verbatim|window.hpp>, events, fonts and
+  implementing <cpp|window_rep> of <source-link|window.hpp|src/Graphics/Gui/window.hpp>, events, fonts and
   pictures) and <verbatim|Plugins/Widkit>, a complete toolkit of its own
   whose widgets are drawn with the <TeXmacs> renderer and communicate with
   <cpp|event>s (see the historical document \P<hlink|The graphical user
-  interface|gui.en.tm>\Q); <verbatim|widkit_wrapper.cpp> maps the abstract
+  interface|gui.en.tm>\Q); <source-link|widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp> maps the abstract
   constructors and slots to <name|Widkit>. The experimental <name|Cocoa>
   port is in <verbatim|Plugins/Cocoa>. Both lag behind the abstract
   interface: <name|Widkit> currently has no <cpp|responsive_tabs_widget>,
@@ -252,57 +252,57 @@
 
   The port is selected at configuration time: <verbatim|configure> sets
   <verbatim|CONFIG_GUI> and defines one of the macros <cpp|QTTEXMACS>,
-  <cpp|AQUATEXMACS> or <cpp|X11TEXMACS>, and <verbatim|src/src/makefile.in>
+  <cpp|AQUATEXMACS> or <cpp|X11TEXMACS>, and <source-link|src/src/makefile.in|src/makefile.in>
   compiles the corresponding plug-in directories (<verbatim|X11 Widkit> for
-  <name|X11>); <verbatim|CMakeLists.txt> has the cache variable
+  <name|X11>); <source-link|CMakeLists.txt|src/CMakeLists.txt> has the cache variable
   <verbatim|TEXMACS_GUI>, but currently only builds the <name|Qt> port.
   About a hundred places outside the plug-ins test these macros (search
-  for <cpp|QTTEXMACS>), for instance <verbatim|Edit/editor.hpp> and
-  <verbatim|Texmacs/Window/tm_button.cpp>, which choose the header defining
+  for <cpp|QTTEXMACS>), for instance <source-link|Edit/editor.hpp|src/Edit/editor.hpp> and
+  <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>, which choose the header defining
   <cpp|simple_widget_rep>; the fallback in all these places is the
   <name|X11>/<name|Widkit> behaviour, so a new port has to add its own
   branches. The function <cpp|gui_is_qt ()> of
-  <verbatim|Kernel/Abstractions/basic.cpp> and the <scheme> predicate
+  <source-link|Kernel/Abstractions/basic.cpp|src/Kernel/Abstractions/basic.cpp> and the <scheme> predicate
   <scm|qt-gui?> are used for run-time tests.
 
-  <subsection|The routines of <verbatim|gui.hpp>>
+  <subsection|The routines of <source-link|gui.hpp|src/Graphics/Gui/gui.hpp>>
 
   <descriptive-table|<tformat|<table|<row|<cell|Routine>|<cell|Obligation>|<cell|In
   <name|Qt>>>|<row|<cell|<cpp|gui_open>, <cpp|gui_close>>|<cell|create and
-  destroy the application object>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|gui_interpose>>|<cell|remember
-  the handler to call from the main loop>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|gui_start_loop>>|<cell|run
+  destroy the application object>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|gui_interpose>>|<cell|remember
+  the handler to call from the main loop>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|gui_start_loop>>|<cell|run
   the main loop until the last window is
   closed>|<cell|<cpp|qt_gui_rep::event_loop>>>|<row|<cell|<cpp|gui_root_extents>,
   <cpp|gui_maximal_extents>>|<cell|screen size in
-  <cpp|SI>>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|gui_refresh>>|<cell|retranslate
+  <cpp|SI>>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|gui_refresh>>|<cell|retranslate
   and redraw after a language change>|<cell|<cpp|refresh_language>>>|<row|<cell|<cpp|gui_version>>|<cell|a
   name such as <verbatim|"qt5"> or
-  <verbatim|"qt6">>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|set_default_font>,
+  <verbatim|"qt6">>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|set_default_font>,
   <cpp|get_default_font>>|<cell|fonts used in
-  widgets>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|load_system_font>>|<cell|optional
-  system fonts>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|set_selection>,
+  widgets>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|load_system_font>>|<cell|optional
+  system fonts>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|set_selection>,
   <cpp|get_selection>, <cpp|clear_selection>>|<cell|clipboards (named
   <verbatim|"primary">, <verbatim|"mouse">, ...) with format
-  conversions>|<cell|<cpp|qt_gui_rep>>>|<row|<cell|<cpp|beep>>|<cell|>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|needs_update>>|<cell|schedule
+  conversions>|<cell|<cpp|qt_gui_rep>>>|<row|<cell|<cpp|beep>>|<cell|>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|needs_update>>|<cell|schedule
   a pass of the main loop>|<cell|<cpp|qt_gui_rep::need_update>>>|<row|<cell|<cpp|check_event>>|<cell|tell
   the typesetter whether user events are pending, so that it can interrupt
   long repaints>|<cell|<cpp|qt_gui_rep::check_event>>>|<row|<cell|<cpp|show_help_balloon>>|<cell|tooltip
   at a position, hidden on the next event>|<cell|<cpp|qt_gui_rep>>>|<row|<cell|<cpp|show_wait_indicator>>|<cell|message
   during long operations, removed when the message is
   empty>|<cell|<cpp|qt_gui_rep>>>|<row|<cell|<cpp|external_event>>|<cell|events
-  from other devices>|<cell|<verbatim|qt_gui.cpp>>>|<row|<cell|<cpp|gui_interrupted>>|<cell|usually
-  in terms of <cpp|check_event>>|<cell|<verbatim|Graphics/Renderer/basic_renderer.cpp>>>>>>
+  from other devices>|<cell|<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>>|<row|<cell|<cpp|gui_interrupted>>|<cell|usually
+  in terms of <cpp|check_event>>|<cell|<source-link|Graphics/Renderer/basic_renderer.cpp|src/Graphics/Renderer/basic_renderer.cpp>>>>>>
 
   The routines <cpp|get_default_styled_font> and <cpp|get_widget_size> and
   the global variables <cpp|use_native_menubar>, <cpp|tm_style_sheet>,
   <cpp|tm_style_density> and <cpp|use_mini_bars> are defined in
-  <verbatim|widget.cpp> and need not be provided (the variables are
+  <source-link|widget.cpp|src/Graphics/Gui/widget.cpp> and need not be provided (the variables are
   interpreted by the port). <cpp|image_gc> is declared but currently
   neither implemented nor used.
 
   <subsection|Widgets and messages>
 
-  All constructors of <verbatim|widget.hpp> must exist. It is legitimate
+  All constructors of <source-link|widget.hpp|src/Graphics/Gui/widget.hpp> must exist. It is legitimate
   to start with trivial implementations for rarely used widgets (the
   <name|Qt> port itself has none for <cpp|ink_widget>, <cpp|empty_widget>
   and <cpp|wait_widget>), but the following are essential:
@@ -351,7 +351,7 @@
     <cpp|gui_interpose> and by the repainting of the canvases. The
     <scheme> side already defers menu actions with <scm|exec-delayed>; a
     port which does not define <cpp|QTTEXMACS> gets the implementation of
-    <cpp|exec_delayed> of <verbatim|Scheme/Scheme/object.cpp>, whose
+    <cpp|exec_delayed> of <source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>, whose
     pending commands are run by <cpp|exec_pending_commands> from the
     interpose handler of the server.
 
@@ -373,10 +373,10 @@
   <subsection|Canvases>
 
   The class <cpp|simple_widget_rep> must provide the virtual methods listed
-  at the end of <verbatim|widget.hpp> (see \P<hlink|The abstract widget
+  at the end of <source-link|widget.hpp|src/Graphics/Gui/widget.hpp> (see \P<hlink|The abstract widget
   interface in <c++>|widgets-cpp.en.tm>\Q), deliver events to them
   (key names in the <TeXmacs> format, as produced for instance by
-  <verbatim|Plugins/Qt/QTMKeyboard.cpp> and <cpp|QTMWidget>; mouse events
+  <source-link|Plugins/Qt/QTMKeyboard.cpp|src/Plugins/Qt/QTMKeyboard.cpp> and <cpp|QTMWidget>; mouse events
   with kinds such as <verbatim|"press-left"> and modifiers), and repaint
   invalidated regions by calling <cpp|handle_repaint> with a renderer
   drawing on the canvas. It must also understand the canvas slots

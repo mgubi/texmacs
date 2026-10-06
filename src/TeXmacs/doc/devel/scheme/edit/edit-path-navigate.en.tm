@@ -10,9 +10,9 @@
   <em|paths>, <abbr|i.e.> lists of integers. The kernel provides a set of
   routines which compute new cursor paths from old ones, following the
   logical structure of the document. These routines are implemented in
-  <c++> (in <verbatim|src/Data/Tree/tree_cursor.cpp> and
-  <verbatim|src/Data/Tree/tree_traverse.cpp>) and glued to <scheme> (see
-  <verbatim|src/Scheme/Glue/build-glue-basic.scm>). They do not move the
+  <c++> (in <source-link|src/Data/Tree/tree_cursor.cpp|src/Data/Tree/tree_cursor.cpp> and
+  <source-link|src/Data/Tree/tree_traverse.cpp|src/Data/Tree/tree_traverse.cpp>) and glued to <scheme> (see
+  <source-link|src/Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>). They do not move the
   cursor themselves; this is done by <scm|(go-to <scm-arg|p>)>, and the
   current cursor path is returned by <scm|(cursor-path)>.
 
@@ -104,7 +104,7 @@
 
   <paragraph*|Moving the cursor>
 
-  The module <verbatim|progs/utils/library/cursor.scm> defines
+  The module <source-link|progs/utils/library/cursor.scm|TeXmacs/progs/utils/library/cursor.scm> defines
   corresponding commands which move the cursor inside the current buffer:
   <scm|go-to-next>, <scm|go-to-previous>, <scm|go-to-next-word>,
   <scm|go-to-previous-word>, <scm|go-to-next-node>,

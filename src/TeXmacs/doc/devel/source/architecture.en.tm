@@ -26,7 +26,7 @@
     are copied into <verbatim|$TEXMACS_PATH/plugins> when <TeXmacs> is
     built.
 
-    <item>Build support (<verbatim|configure.in>, <verbatim|CMakeLists.txt>,
+    <item>Build support (<source-link|configure.in|configure.in>, <source-link|CMakeLists.txt|src/CMakeLists.txt>,
     <verbatim|misc/m4>, <verbatim|cmake>, <abbr|etc.>) and packaging data in
     <verbatim|src/misc> and <verbatim|src/packages>.
   </itemize>
@@ -47,7 +47,7 @@
   <\description>
     <item*|<verbatim|Kernel>>Basic and generic data structures, which are
     used everywhere else. The subdirectory <verbatim|Kernel/Abstractions>
-    contains the reference counting machinery (<verbatim|basic.hpp>),
+    contains the reference counting machinery (<source-link|basic.hpp|src/Kernel/Abstractions/basic.hpp>),
     commands, observers and black boxes; <verbatim|Kernel/Containers>
     contains arrays, lists, hash tables, hash sets and iterators;
     <verbatim|Kernel/Types> contains strings, trees, tree labels, paths,
@@ -94,7 +94,7 @@
     typesetter.
 
     <item*|<verbatim|Edit>>The editor proper. The abstract class
-    <cpp|editor_rep> is declared in <verbatim|Edit/editor.hpp>; its
+    <cpp|editor_rep> is declared in <source-link|Edit/editor.hpp|src/Edit/editor.hpp>; its
     implementation <cpp|edit_main_rep> (<verbatim|Edit/Editor>) inherits from
     a series of classes which take care of the interface with the user
     (<verbatim|Edit/Interface>), the modification of the document
@@ -106,11 +106,11 @@
     which manages buffers, views, windows and projects
     (<verbatim|Texmacs/Data>, <verbatim|Texmacs/Server>,
     <verbatim|Texmacs/Window>), and the main program
-    <verbatim|Texmacs/Texmacs/texmacs.cpp>.
+    <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>.
 
     <item*|<verbatim|Scheme>>The interface with the <scheme> interpreter. The
     generic <cpp|object> type and the calling conventions are defined in
-    <verbatim|Scheme/scheme.hpp> and <verbatim|Scheme/Scheme>; the binding
+    <source-link|Scheme/scheme.hpp|src/Scheme/scheme.hpp> and <verbatim|Scheme/Scheme>; the binding
     with <name|Guile> lives in <verbatim|Scheme/Guile>. The \Pglue\Q which
     exports <c++> routines to <scheme> is generated from the specifications
     <verbatim|Scheme/Glue/build-glue-*.scm> into the files
@@ -147,7 +147,7 @@
 
   <\description>
     <item*|<verbatim|progs>>The <scheme> programs. The boot sequence starts
-    with <verbatim|progs/init-texmacs.scm>; the kernel of the <scheme> part
+    with <source-link|progs/init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>; the kernel of the <scheme> part
     (<scm|tm-define>, menus, keyboard definitions, modes, plug-in
     declarations, <abbr|etc.>) is in <verbatim|progs/kernel>. The other
     subdirectories correspond to the various editing modes
@@ -161,7 +161,7 @@
     <item*|<verbatim|fonts>>Font data: <TeX> font metrics and <name|Type
     1> fonts, <name|TrueType> and <name|OpenType> fonts shipped with
     <TeXmacs>, encodings and virtual fonts, as well as the font database
-    (<verbatim|font-database.scm> and companions).
+    (<source-link|font-database.scm|TeXmacs/fonts/font-database.scm> and companions).
 
     <item*|<verbatim|langs>>Language data: hyphenation patterns and
     dictionaries (<verbatim|langs/natural>) and character encodings
@@ -184,11 +184,11 @@
 
   <TeXmacs> represents all texts by trees. All open documents are subtrees of
   a single global tree <cpp|the_et> (the <em|edit tree>, declared in
-  <verbatim|Data/Document/new_document.hpp>); each buffer corresponds to a
+  <source-link|Data/Document/new_document.hpp|src/Data/Document/new_document.hpp>); each buffer corresponds to a
   child of <cpp|the_et> and each editor knows the path <cpp|rp> to the root
   of its document. The inner nodes of a tree are labeled by <em|tree
   labels>: the built-in labels of the <TeXmacs> format are enumerated in
-  <verbatim|Kernel/Types/tree_label.hpp>, and new labels are created on the
+  <source-link|Kernel/Types/tree_label.hpp|src/Kernel/Types/tree_label.hpp>, and new labels are created on the
   fly for user defined macros (<cpp|make_tree_label>). The leaves of the tree
   are strings, which are either invisible (such as lengths or the names of
   environment variables) or visible (the real text). Properties of the tags,
@@ -199,7 +199,7 @@
 
   The meaning of the text and the way it is typeset essentially depend on the
   current <em|environment>. The environment (see the class
-  <cpp|edit_env_rep> in <verbatim|Typeset/env.hpp>) mainly consists of a
+  <cpp|edit_env_rep> in <source-link|Typeset/env.hpp|src/Typeset/env.hpp>) mainly consists of a
   hash table of type <cpp|hashmap\<less\>string,tree\<gtr\>>, which maps
   environment variables to their tree values. The current language and the
   current font are examples of system environment variables; new variables
@@ -222,14 +222,14 @@
   characters are interpreted in the <em|Cork> encoding (the <TeX> T1
   encoding); the conversions between this internal encoding and <name|UTF-8>
   are done by routines such as <cpp|utf8_to_cork> and <cpp|cork_to_utf8> in
-  <verbatim|Data/String/converter.cpp>. The meaning of symbols does not
+  <source-link|Data/String/converter.cpp|src/Data/String/converter.cpp>. The meaning of symbols does not
   depend on the font which is used, but different fonts may render them in
   a different way (see the chapter on <hlink|fonts|fonts.en.tm>).
 
   <subsection|The language>
 
   The language of the text (see the abstract class <cpp|language_rep> in
-  <verbatim|System/Language/language.hpp>) is capable of performing a further
+  <source-link|System/Language/language.hpp|src/System/Language/language.hpp>) is capable of performing a further
   semantic analysis of a text phrase. At least, it is capable of splitting a
   phrase into <em|words> (which are smaller phrases) and to inform the
   typesetter about the desired spaces between words and hyphenation
@@ -284,7 +284,7 @@
 
   All modifications of documents eventually break down into nine types of
   <em|elementary modifications>, which are declared in
-  <verbatim|Kernel/Types/modification.hpp>:
+  <source-link|Kernel/Types/modification.hpp|src/Kernel/Types/modification.hpp>:
 
   <\description>
     <item*|<cpp|MOD_ASSIGN>>Replace a subtree by another tree.
@@ -319,7 +319,7 @@
   <abbr|etc.> The corresponding functions <cpp|assign>, <cpp|insert>,
   <cpp|remove>, <cpp|split>, <cpp|join>, <cpp|assign_node>,
   <cpp|insert_node>, <cpp|remove_node> and <cpp|set_cursor> (defined in
-  <verbatim|Kernel/Abstractions/observer.cpp>) take either a reference to a
+  <source-link|Kernel/Abstractions/observer.cpp|src/Kernel/Abstractions/observer.cpp>) take either a reference to a
   tree or a path in <cpp|the_et>, and call <cpp|apply>. From <scheme>, the
   same operations are available as <scm|tree-assign>, <scm|tree-insert>,
   <scm|tree-remove>, <scm|tree-split>, <scm|tree-join>,
@@ -329,7 +329,7 @@
   <subsection|Observers>
 
   Every tree may carry an <em|observer> (the field <cpp|obs> of
-  <cpp|tree_rep>; see <verbatim|Kernel/Abstractions/observer.hpp> and
+  <cpp|tree_rep>; see <source-link|Kernel/Abstractions/observer.hpp|src/Kernel/Abstractions/observer.hpp> and
   <verbatim|Data/Observers>). When an elementary modification is applied to
   a tree, its observers are first <em|announced> the modification, then
   <em|notified> of the precise change (<cpp|notify_assign>,
@@ -338,21 +338,21 @@
   be combined into lists. The most important ones are:
 
   <\itemize>
-    <item>The <em|inverse path> observer (<verbatim|ip_observer.cpp>), which
+    <item>The <em|inverse path> observer (<source-link|ip_observer.cpp|src/Data/Observers/ip_observer.cpp>), which
     allows each subtree of <cpp|the_et> to know its own location. Inverse
     paths are also stored in the boxes; they are the basis for the
     correspondence between the document and its typeset form.
 
-    <item>The <em|editor> observer (<verbatim|edit_observer.cpp>), which
+    <item>The <em|editor> observer (<source-link|edit_observer.cpp|src/Data/Observers/edit_observer.cpp>), which
     forwards the modifications to the editor. The editor updates the cursor
     position and notifies the typesetter, which invalidates the corresponding
     bridges, so that the modified parts will be typeset again during the next
     repaint.
 
-    <item>The <em|undo> observer (<verbatim|undo_observer.cpp>), which
+    <item>The <em|undo> observer (<source-link|undo_observer.cpp|src/Data/Observers/undo_observer.cpp>), which
     records the modifications into the <em|archiver> of the buffer (see
-    <verbatim|Data/History/archiver.hpp>). The archiver stores the history as
-    <em|patches> (<verbatim|Data/History/patch.hpp>), which can be inverted
+    <source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>). The archiver stores the history as
+    <em|patches> (<source-link|Data/History/patch.hpp|src/Data/History/patch.hpp>), which can be inverted
     in order to undo or redo changes.
 
     <item>Tree pointers, tree positions and links, which keep track of

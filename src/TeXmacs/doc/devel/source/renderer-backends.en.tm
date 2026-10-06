@@ -15,7 +15,7 @@
   of a picture>>|<row|<cell|<cpp|printer_rep>>|<cell|<verbatim|Graphics/Renderer/printer.*>>|<cell|PostScript
   file>>|<row|<cell|<cpp|pdf_hummus_renderer_rep>>|<cell|<verbatim|Plugins/Pdf/pdf_hummus_renderer.*>>|<cell|<abbr|PDF>
   file>>|<row|<cell|<cpp|x_drawable_rep>>|<cell|<verbatim|Plugins/X11/x_drawable.*>,
-  <verbatim|x_shadow.cpp>, <verbatim|x_picture.cpp>>|<cell|<name|X11>
+  <source-link|x_shadow.cpp|src/Plugins/X11/x_shadow.cpp>, <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>>|<cell|<name|X11>
   window or pixmap>>|<row|<cell|<cpp|cairo_renderer_rep>>|<cell|<verbatim|Plugins/Cairo/cairo_renderer.*>>|<cell|<name|Cairo>
   context>>|<row|<cell|<cpp|aqua_renderer_rep>>|<cell|<verbatim|Plugins/Cocoa/aqua_renderer.*>>|<cell|<name|Cocoa>
   view>>|<row|<cell|<cpp|cg_renderer_rep>>|<cell|<verbatim|Plugins/MacOS/cg_renderer.*>>|<cell|<name|CoreGraphics>
@@ -40,7 +40,7 @@
   bracket a drawing session on a native device, color helpers <cpp|rgb> and
   <cpp|get_rgb>, and no-op shadow operations. The file also defines
   <cpp|basic_character>, the key of glyph caches, and
-  <cpp|gui_interrupted>. Note that <verbatim|basic_renderer.cpp> is only
+  <cpp|gui_interrupted>. Note that <source-link|basic_renderer.cpp|src/Graphics/Renderer/basic_renderer.cpp> is only
   compiled when <cpp|QTTEXMACS> or <cpp|AQUATEXMACS> is defined.
 
   <subsection|The <name|Qt> renderer>
@@ -205,8 +205,8 @@
   also provide the free functions <cpp|native_picture>,
   <cpp|picture_renderer>, <cpp|load_picture>, <cpp|as_native_picture> and
   <cpp|save_picture>, and adapt the conditional stubs at the end of
-  <verbatim|renderer.cpp>. A printer that should be selectable for export
-  must be hooked into the factory <cpp|printer> in <verbatim|printer.cpp>.
+  <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp>. A printer that should be selectable for export
+  must be hooked into the factory <cpp|printer> in <source-link|printer.cpp|src/Graphics/Renderer/printer.cpp>.
 
   A useful way to proceed is to start from the <name|Qt> renderer, which
   shows how to map each primitive to a modern 2D graphics <abbr|API>, and

@@ -8,10 +8,10 @@
   <section|Introduction>
 
   <TeXmacs> does not talk to a particular toolkit. The kernel only knows the
-  abstract interfaces of <verbatim|Graphics/Gui/gui.hpp> (the application:
+  abstract interfaces of <source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp> (the application:
   main loop, clipboards, fonts, screen size, ...), of
-  <verbatim|Graphics/Gui/widget.hpp> (the widget constructors and the
-  message protocol) and of <verbatim|Graphics/Renderer/renderer.hpp> (the
+  <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp> (the widget constructors and the
+  message protocol) and of <source-link|Graphics/Renderer/renderer.hpp|src/Graphics/Renderer/renderer.hpp> (the
   drawing surface). A <em|port> is a directory in
   <verbatim|src/src/Plugins/> which implements these interfaces for one
   toolkit. This chapter is a comparative map of the ports which exist in
@@ -56,7 +56,7 @@
   The ports differ a lot in size: about 25000 lines for <name|Qt>, 4100
   lines for <name|X11> plus 10400 lines for <name|Widkit>, and 5400 lines
   for <name|Cocoa>. Only the <name|Qt> port implements all 49 widget
-  constructors of <verbatim|widget.hpp>; <name|Widkit> misses the five most
+  constructors of <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>; <name|Widkit> misses the five most
   recent ones (<cpp|responsive_tabs_widget>,
   <cpp|responsive_icon_tabs_widget>, <cpp|setting_toggle_widget>,
   <cpp|setting_enum_widget>, <cpp|setting_group_widget>) and <name|Cocoa>
@@ -68,15 +68,15 @@
   ()> or the <scheme> predicate <scm|qt-gui?>. Many features of the user
   interface are only offered when <scm|qt-gui?> holds, for instance the
   print dialog (<scm|use-print-dialog?> in
-  <verbatim|kernel/texmacs/tm-preferences.scm>).
+  <source-link|kernel/texmacs/tm-preferences.scm|TeXmacs/progs/kernel/texmacs/tm-preferences.scm>).
 
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Gui/gui.hpp>, <verbatim|widget.hpp>,
-    <verbatim|message.hpp>>The interfaces every port implements.
+    <item*|<source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp>, <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>,
+    <source-link|message.hpp|src/Graphics/Gui/message.hpp>>The interfaces every port implements.
 
-    <item*|<verbatim|CMakeLists.txt> (top level of <verbatim|src/>)>The
+    <item*|<source-link|CMakeLists.txt|src/CMakeLists.txt> (top level of <verbatim|src/>)>The
     cache variable <verbatim|TEXMACS_GUI> and the selection of <name|Qt> 4,
     5 or 6.
 
@@ -84,24 +84,24 @@
     <verbatim|--disable-qt>, <verbatim|--enable-qtpipes> and
     <verbatim|--enable-cocoa> and the definition of the port macros.
 
-    <item*|<verbatim|src/makefile.in>>The lists of port directories
+    <item*|<source-link|src/makefile.in|src/makefile.in>>The lists of port directories
     compiled by the <verbatim|make> build.
 
-    <item*|<verbatim|Plugins/Qt/qt_gui.cpp>, <verbatim|QTMWidget.cpp>,
-    <verbatim|QTMKeyboardEvent.cpp>, <verbatim|qt_printer_widget.cpp>,
-    <verbatim|QTMPrinterSettings.cpp>>Main loop, keyboard and input
+    <item*|<source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>, <source-link|QTMWidget.cpp|src/Plugins/Qt/QTMWidget.cpp>,
+    <source-link|QTMKeyboardEvent.cpp|src/Plugins/Qt/QTMKeyboardEvent.cpp>, <source-link|qt_printer_widget.cpp|src/Plugins/Qt/qt_printer_widget.cpp>,
+    <source-link|QTMPrinterSettings.cpp|src/Plugins/Qt/QTMPrinterSettings.cpp>>Main loop, keyboard and input
     methods, clipboards and printing of the <name|Qt> port.
 
-    <item*|<verbatim|Plugins/X11/x_loop.cpp>, <verbatim|x_gui.cpp>,
-    <verbatim|x_window.cpp>, <verbatim|x_init.cpp>>Main loop, keyboard,
+    <item*|<source-link|Plugins/X11/x_loop.cpp|src/Plugins/X11/x_loop.cpp>, <source-link|x_gui.cpp|src/Plugins/X11/x_gui.cpp>,
+    <source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>, <source-link|x_init.cpp|src/Plugins/X11/x_init.cpp>>Main loop, keyboard,
     selections and initialization of the <name|X11> port.
 
-    <item*|<verbatim|Plugins/Widkit/Basic/widkit_wrapper.cpp>>The
+    <item*|<source-link|Plugins/Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>>The
     implementation of the abstract widget constructors in terms of
     <name|Widkit>.
 
-    <item*|<verbatim|Plugins/Cocoa/aqua_gui.mm>, <verbatim|TMView.mm>,
-    <verbatim|aqua_dialogues.mm>>Main loop, keyboard and dialogs of the
+    <item*|<source-link|Plugins/Cocoa/aqua_gui.mm|src/Plugins/Cocoa/aqua_gui.mm>, <source-link|TMView.mm|src/Plugins/Cocoa/TMView.mm>,
+    <source-link|aqua_dialogues.mm|src/Plugins/Cocoa/aqua_dialogues.mm>>Main loop, keyboard and dialogs of the
     <name|Cocoa> port.
   </description-paragraphs>
 

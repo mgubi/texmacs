@@ -74,7 +74,7 @@
     Contrary to <markup|case>, all bodies are typeset beforehand and the
     selection of the displayed body happens at rendering time, without
     retypesetting the document (<verbatim|case_box> in
-    <verbatim|Typeset/Boxes/Composite/case_boxes.cpp>). The
+    <source-link|Typeset/Boxes/Composite/case_boxes.cpp|src/Typeset/Boxes/Composite/case_boxes.cpp>). The
     <src-arg|else-body> is displayed by default. The <src-arg|event-i>
     are evaluated and each of them may be the name of an event received by
     the box, <verbatim|mouse-over> (when the mouse pointer is above the

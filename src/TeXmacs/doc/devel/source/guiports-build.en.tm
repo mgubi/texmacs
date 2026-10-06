@@ -20,9 +20,9 @@
 
   Outside the port directories, many files test these macros, typically to
   include the header which defines <cpp|simple_widget_rep> (for instance
-  <verbatim|Texmacs/Window/tm_button.cpp>, which chooses between
-  <verbatim|Cocoa/aqua_simple_widget.h>, <verbatim|Qt/qt_simple_widget.hpp>
-  and <verbatim|Widkit/simple_wk_widget.hpp>) or to enable features which
+  <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>, which chooses between
+  <source-link|Cocoa/aqua_simple_widget.h|src/Plugins/Cocoa/aqua_simple_widget.h>, <source-link|Qt/qt_simple_widget.hpp|src/Plugins/Qt/qt_simple_widget.hpp>
+  and <source-link|Widkit/simple_wk_widget.hpp|src/Plugins/Widkit/simple_wk_widget.hpp>) or to enable features which
   only exist in one port. In most of these places the <verbatim|#else>
   branch is the <name|X11>/<name|Widkit> code, so a new port must add its
   own branches. Code which depends on the <name|Qt> version tests
@@ -31,7 +31,7 @@
 
   <section|<name|CMake>>
 
-  The top level <verbatim|CMakeLists.txt> declares
+  The top level <source-link|CMakeLists.txt|src/CMakeLists.txt> declares
 
   <\verbatim-code>
     set (TEXMACS_GUI "Qt" CACHE STRING "TeXmacs Gui (Qt, Qt6, Qt5, Qt4, Aqua, X11)")
@@ -89,7 +89,7 @@
     <name|Qt> port.
   </description>
 
-  <verbatim|src/makefile.in> then compiles the port directories through
+  <source-link|src/makefile.in|src/makefile.in> then compiles the port directories through
   the substituted variables: <verbatim|@CONFIG_X11@> for the <name|C++>
   sources of <name|X11>, <verbatim|@CONFIG_COCOA@ @CONFIG_MACOS@> for the
   <name|Objective-C> sources, and, for <name|Qt>, the directory

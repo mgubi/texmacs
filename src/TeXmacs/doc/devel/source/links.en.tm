@@ -98,64 +98,64 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Data/Observers/link.hpp>,
-    <verbatim|link.cpp>>The classes <cpp|soft_link> and
+    <item*|<source-link|Data/Observers/link.hpp|src/Data/Observers/link.hpp>,
+    <source-link|link.cpp|src/Data/Observers/link.cpp>>The classes <cpp|soft_link> and
     <cpp|link_repository>, the global tables, the navigation queries
     (<cpp|get_ids>, <cpp|get_trees>, <cpp|get_links>), visited loci and
     locus rendering preferences, and the propagation of modifications
     through mirror links (<cpp|link_announce>).
 
-    <item*|<verbatim|Data/Observers/tree_pointer.cpp>>The observer which
+    <item*|<source-link|Data/Observers/tree_pointer.cpp|src/Data/Observers/tree_pointer.cpp>>The observer which
     keeps pointing to a locus while the document is edited, with an
     optional <scheme> callback (<cpp|tree_pointer>, <cpp|scheme_observer>).
 
-    <item*|<verbatim|Typeset/Concat/concat_active.cpp>>
+    <item*|<source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>>
     <cpp|build_locus>, which registers the identifiers and links of a
     locus and chooses its colour, and the inline typesetting of loci
     (<cpp|typeset_locus>, <cpp|typeset_set_binding>).
 
-    <item*|<verbatim|Typeset/Bridge/bridge.cpp>,
-    <verbatim|bridge_surround.cpp>, <verbatim|bridge_locus.cpp>,
-    <verbatim|Typeset/Line/lazy_typeset.cpp>>The per-bridge link
+    <item*|<source-link|Typeset/Bridge/bridge.cpp|src/Typeset/Bridge/bridge.cpp>,
+    <source-link|bridge_surround.cpp|src/Typeset/Bridge/bridge_surround.cpp>, <source-link|bridge_locus.cpp|src/Typeset/Bridge/bridge_locus.cpp>,
+    <source-link|Typeset/Line/lazy_typeset.cpp|src/Typeset/Line/lazy_typeset.cpp>>The per-bridge link
     repositories and the block level typesetting of loci.
 
-    <item*|<verbatim|Typeset/Boxes/Modifier/change_boxes.cpp>,
-    <verbatim|Typeset/Boxes/Basic/boxes.cpp>>Locus boxes, and the
+    <item*|<source-link|Typeset/Boxes/Modifier/change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>,
+    <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>>Locus boxes, and the
     hyperlinks and anchors emitted when printing.
 
-    <item*|<verbatim|Typeset/Env/env_default.cpp>,
-    <verbatim|env_exec.cpp>>The default definitions of <markup|label>,
+    <item*|<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>,
+    <source-link|env_exec.cpp|src/Typeset/Env/env_exec.cpp>>The default definitions of <markup|label>,
     <markup|reference>, <markup|pageref>, <markup|hlink> and
     <markup|action>; <cpp|exec_hard_id>, <cpp|exec_set_binding>,
     <cpp|exec_get_binding>.
 
-    <item*|<verbatim|Edit/Interface/edit_mouse.cpp>,
-    <verbatim|edit_interface.cpp>, <verbatim|edit_keyboard.cpp>>Active
+    <item*|<source-link|Edit/Interface/edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>,
+    <source-link|edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>, <source-link|edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp>>Active
     loci under the mouse and the cursor, and the calls of
     <scm|link-follow-ids>.
 
-    <item*|<verbatim|Edit/Editor/edit_typeset.cpp>,
-    <verbatim|Edit/Interface/edit_cursor.cpp>>The reference and auxiliary
+    <item*|<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>,
+    <source-link|Edit/Interface/edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>>The reference and auxiliary
     tables of the editor, <cpp|search_label> and <cpp|go_to_label>.
 
-    <item*|<verbatim|progs/link/locus-edit.scm>>Unique identifiers and
+    <item*|<source-link|progs/link/locus-edit.scm|TeXmacs/progs/link/locus-edit.scm>>Unique identifiers and
     loci.
 
-    <item*|<verbatim|progs/link/link-edit.scm>>Interactive creation and
+    <item*|<source-link|progs/link/link-edit.scm|TeXmacs/progs/link/link-edit.scm>>Interactive creation and
     removal of links.
 
-    <item*|<verbatim|progs/link/link-navigate.scm>>Link lists, navigation
+    <item*|<source-link|progs/link/link-navigate.scm|TeXmacs/progs/link/link-navigate.scm>>Link lists, navigation
     lists and following links.
 
-    <item*|<verbatim|progs/link/link-extern.scm>>Links between files: the
+    <item*|<source-link|progs/link/link-extern.scm|TeXmacs/progs/link/link-extern.scm>>Links between files: the
     file registry and the link locations stored in documents.
 
-    <item*|<verbatim|progs/link/link-extract.scm>,
-    <verbatim|link-menu.scm>, <verbatim|link-kbd.scm>>Pages listing loci,
+    <item*|<source-link|progs/link/link-extract.scm|TeXmacs/progs/link/link-extract.scm>,
+    <source-link|link-menu.scm|TeXmacs/progs/link/link-menu.scm>, <source-link|link-kbd.scm|TeXmacs/progs/link/link-kbd.scm>>Pages listing loci,
     environments and linked files; menus and keyboard shortcuts.
 
-    <item*|<verbatim|progs/link/ref-edit.scm>,
-    <verbatim|ref-markup.scm>, <verbatim|ref-menu.scm>>Tools for labels
+    <item*|<source-link|progs/link/ref-edit.scm|TeXmacs/progs/link/ref-edit.scm>,
+    <source-link|ref-markup.scm|TeXmacs/progs/link/ref-markup.scm>, <source-link|ref-menu.scm|TeXmacs/progs/link/ref-menu.scm>>Tools for labels
     and references: broken references, duplicate labels, inferred
     references, previews, smart references.
   </description-paragraphs>

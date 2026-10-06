@@ -33,7 +33,7 @@
   a <markup|tformat> applied to their argument; they supply default
   formats.
 
-  Inside <verbatim|Edit/Modify/edit_table.cpp>, rows and columns are
+  Inside <source-link|Edit/Modify/edit_table.cpp|src/Edit/Modify/edit_table.cpp>, rows and columns are
   numbered from 0, and the <cpp|cwith> indices are converted with
   <cpp|with_decode> (positive index <math|k> becomes <math|k-1>, negative
   index <math|-k> becomes <math|n-k>). The public routines exported to
@@ -123,7 +123,7 @@
     <verbatim|table-max-cols>, and move the cursor there. These are the
     actions of <scm|structured-insert-vertical> and
     <scm|structured-insert-horizontal> inside tables
-    (<verbatim|table/table-edit.scm>).
+    (<source-link|table/table-edit.scm|TeXmacs/progs/table/table-edit.scm>).
 
     <item*|<cpp|table_remove_row (forward, flag)>,
     <cpp|table_remove_column>>Remove the current or a neighbouring row or
@@ -143,7 +143,7 @@
 
   After a change of the shape, <cpp|table_resize_notify> calls the
   <scheme> hook <scm|table-resize-notify>, which does nothing by default and
-  is overloaded by spreadsheets (<verbatim|dynamic/calc-table.scm>) to
+  is overloaded by spreadsheets (<source-link|dynamic/calc-table.scm|TeXmacs/progs/dynamic/calc-table.scm>) to
   update their cells.
 
   <section|Creating tables>
@@ -202,7 +202,7 @@
     an empty <markup|tformat> when the table has none, even for pure
     queries such as <scm|table-which-row>, so a query may change the document.
 
-    <item>In <cpp|table_get_limits> (<verbatim|Edit/Modify/edit_table.cpp:447>)
+    <item>In <cpp|table_get_limits> (<source-link|Edit/Modify/edit_table.cpp:447|src/Edit/Modify/edit_table.cpp:447>)
     the test for an unset maximum number of columns compares it with the
     minimum number of <em|rows>: <verbatim|if (j2\<less\>i1)> should read
     <verbatim|if (j2\<less\>j1)>. A table whose maximum number of columns
@@ -210,7 +210,7 @@
     maximum number of columns, and conversely a maximum smaller than the
     minimum number of columns is not reset.
 
-    <item>In <cpp|table_write_subtable> (<verbatim|edit_table.cpp:847>)
+    <item>In <cpp|table_write_subtable> (<source-link|edit_table.cpp:847|src/Edit/Modify/edit_table.cpp:847>)
     the loop which skips <markup|tformat> nodes around a cell of the
     subtable indexes the cell with the arity of the <em|row>:
     <verbatim|subc= subc [N(subr)-1]> instead of
@@ -220,7 +220,7 @@
 
     <item><cpp|table_insert> and <cpp|table_remove> reuse their parameter
     <cpp|row> as the counter of the column loop
-    (<verbatim|edit_table.cpp:467>, <verbatim|523>), and then use it again
+    (<source-link|edit_table.cpp:467|src/Edit/Modify/edit_table.cpp:467>, <verbatim|523>), and then use it again
     to shift the row indices of the formats. When rows and columns are
     inserted in the same call, which only happens through
     <cpp|table_set_extents> (<scm|table-set-extents>, used by the table

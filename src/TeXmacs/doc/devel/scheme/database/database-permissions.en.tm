@@ -5,7 +5,7 @@
 <\body>
   <tmdoc-title|Users, groups, and permissions>
 
-  The additional layer <verbatim|database/db-users.scm> allows you to specify
+  The additional layer <source-link|database/db-users.scm|TeXmacs/progs/database/db-users.scm> allows you to specify
   read, write and administration permissions for database entries. There are
   two main types of users of <TeXmacs> databases: individual users (entries
   of type <scm|"user">) and groups (entries of type <scm|"group">). Groups

@@ -6,7 +6,7 @@
   <tmdoc-title|Defining menus>
 
   Menus, toolbars and widgets are defined using the macros below, which are
-  implemented in <verbatim|kernel/gui/menu-define.scm>. The syntax of the
+  implemented in <source-link|kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>. The syntax of the
   menu entries and the available widgets are described in detail in the
   chapter on <hlink|widgets in <scheme>|../gui/scheme-gui.en.tm>, in
   particular in the sections <hlink|menus and
@@ -56,7 +56,7 @@
     Declare that the menus <scm-arg|name> ... are defined in
     <scm-arg|module>, which is only loaded when one of these menus is needed
     (or after some idle time). This mechanism is used extensively in
-    <verbatim|init-texmacs.scm> in order to speed up the boot process.
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> in order to speed up the boot process.
   </explain>
 
   The older macro <scm|menu-extend> is deprecated; use <scm|tm-menu> or

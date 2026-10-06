@@ -16,7 +16,7 @@
   macros: the <markup|doc-data> macro of <tmpackage|title-base> is defined
   as <inactive*|<xmacro|args|<extern|doc-data|<quote-arg|args>|>>>, and the
   actual reorganization of the data is done by the <scheme> function
-  <scm|doc-data> in <verbatim|progs/database/title-markup.scm> (which is
+  <scm|doc-data> in <source-link|progs/database/title-markup.scm|TeXmacs/progs/database/title-markup.scm> (which is
   loaded by <tmpackage|title-base> through <markup|use-module>). Similarly,
   <markup|author-data> is handled by the <scheme> function
   <scm|author-data>.

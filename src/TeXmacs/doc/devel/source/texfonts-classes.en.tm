@@ -6,8 +6,8 @@
   <tmdoc-title|The <TeX> font classes and their output>
 
   This page describes the font classes built on <TeX> fonts
-  (<verbatim|Plugins/Metafont/tex_font.cpp> and
-  <verbatim|tex_rubber_font.cpp>) and how their glyphs end up on the screen,
+  (<source-link|Plugins/Metafont/tex_font.cpp|src/Plugins/Metafont/tex_font.cpp> and
+  <source-link|tex_rubber_font.cpp|src/Plugins/Metafont/tex_rubber_font.cpp>) and how their glyphs end up on the screen,
   in <abbr|PDF> and in PostScript. The general interface of fonts
   (<cpp|font_rep>: extents, positions, corrections, <cpp|index_glyph>) is
   described in <hlink|<TeXmacs> fonts|fonts.en.tm>.
@@ -35,7 +35,7 @@
     <cpp|yfrac>, the rule width <cpp|wline> and the quad <cpp|wquad>. For
     <verbatim|cmr>, <verbatim|ecrm> and <verbatim|cmmi>, the rule width and
     the fraction bar position are tuned per size. It also installs the
-    script and accent correction tables of <verbatim|adjust_cmr.cpp> for
+    script and accent correction tables of <source-link|adjust_cmr.cpp|src/Plugins/Metafont/adjust_cmr.cpp> for
     the families which have them (<verbatim|ecrm>/<verbatim|ecbx>,
     <verbatim|ecss>/<verbatim|ecsx>, <verbatim|cmr>/<verbatim|cmbx>,
     <verbatim|cmmi>/<verbatim|cmmib>, <verbatim|cmsy>/<verbatim|cmbsy>,
@@ -114,7 +114,7 @@
     Created by <cpp|tex_rubber_font (trl, family, size, dpi, dsize)> from a
     tree <verbatim|(tex-rubber <em|translator> <em|family> <em|size>
     <em|dpi> [<em|dsize>])>, for instance <verbatim|(tex-rubber rubber-cmex
-    cmex 10 600)> in <verbatim|progs/fonts/fonts-adobe.scm>. It supports the
+    cmex 10 600)> in <source-link|progs/fonts/fonts-adobe.scm|TeXmacs/progs/fonts/fonts-adobe.scm>. It supports the
     strings <verbatim|\<less\>left-<em|x>-<em|n>\<gtr\>>,
     <verbatim|\<less\>right-...\<gtr\>>, <verbatim|\<less\>mid-...\<gtr\>>,
     <verbatim|\<less\>large-...\<gtr\>> and
@@ -151,7 +151,7 @@
   back-ends|renderer-backends.en.tm>.
 
   <paragraph|In <abbr|PDF>.><cpp|pdf_hummus_renderer_rep::draw (ch, fn, x,
-  y)> (<verbatim|Plugins/Pdf/pdf_hummus_renderer.cpp>) decides once per glyph
+  y)> (<source-link|Plugins/Pdf/pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>) decides once per glyph
   table how to embed it (<cpp|make_pdf_font>). The part of the glyph table
   name before the first colon is taken as a font name and looked up with
   <cpp|tt_font_find>; for a <name|Type 1> substitute the glyph table is
@@ -170,7 +170,7 @@
   <abbr|PDF> file.
 
   <paragraph|In PostScript.><cpp|printer_rep::draw>
-  (<verbatim|Graphics/Renderer/printer.cpp>) records each character used.
+  (<source-link|Graphics/Renderer/printer.cpp|src/Graphics/Renderer/printer.cpp>) records each character used.
   When the document is finished, <cpp|generate_tex_fonts> writes, for each
   glyph table, either the <name|Type 1> font converted from
   <verbatim|.pfb> to <verbatim|.pfa> (<cpp|pfb_to_pfa>) together with a

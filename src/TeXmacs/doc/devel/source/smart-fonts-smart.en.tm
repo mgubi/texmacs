@@ -11,7 +11,7 @@
 
   Whenever one of the font related environment variables changes, the
   typesetter recomputes the current font in
-  <cpp|edit_env_rep::update_font> (<verbatim|Typeset/Env/env_semantics.cpp>).
+  <cpp|edit_env_rep::update_font> (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>).
   In text mode it calls the six argument version of <cpp|smart_font> with
   the values of <src-var|font>, <src-var|font-family>,
   <src-var|font-series> and <src-var|font-shape>; in mathematical mode and
@@ -95,12 +95,12 @@
 
     <\enumerate>
       <item>handles a few special cases: families starting with
-      <verbatim|tc> (legacy symbols of <verbatim|std-symbol.ts>) go directly
+      <verbatim|tc> (legacy symbols of <source-link|std-symbol.ts|TeXmacs/packages/standard/std-symbol.ts>) go directly
       to <cpp|find_font>, and the families <verbatim|sys-chinese>,
       <verbatim|sys-japanese> and <verbatim|sys-korean> are replaced by
       <verbatim|cjk=<em|name>,roman> where <em|name> is the system default
       (<cpp|default_chinese_font_name> and friends in
-      <verbatim|Graphics/Fonts/font.cpp>);
+      <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>);
 
       <item>normalizes the family list with <cpp|tex_gyre_fix>,
       <cpp|kepler_fix> and <cpp|math_fix> (see below);
@@ -117,7 +117,7 @@
 
       <item>constructs a <cpp|smart_font_rep>.
     </enumerate>
-    All other routines in <verbatim|smart_font.cpp> which need a font with a
+    All other routines in <source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp> which need a font with a
     different family, variant, series or shape call <cpp|smart_font_bis>
     again, so subfonts are often smart fonts themselves.
   </explain>
@@ -438,7 +438,7 @@
 
   The drawing itself is not done by the smart font but by the leaf fonts.
   Note that <cpp|draw_fixed> draws at the font's own resolution; the
-  public <cpp|font_rep::draw> (<verbatim|Graphics/Fonts/font.cpp>) takes
+  public <cpp|font_rep::draw> (<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>) takes
   care of zooming. When the renderer has a zoom factor different from one
   and is not a printer, <cpp|draw> creates (and caches in
   <cpp|zoomed_fn>) a magnified version of the font and draws with it. For

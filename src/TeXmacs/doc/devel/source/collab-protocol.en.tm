@@ -32,7 +32,7 @@
 
   <subsection|The socket classes>
 
-  The socket code lives in <verbatim|Plugins/Qt/QTMSockets.cpp> (with a
+  The socket code lives in <source-link|Plugins/Qt/QTMSockets.cpp|src/Plugins/Qt/QTMSockets.cpp> (with a
   copy in <verbatim|Plugins/Qt6/>). It defines two <name|Qt> objects:
 
   <\description>
@@ -48,7 +48,7 @@
     <cpp|start> also calls <scm|server-create-default-admin-account>.
 
     <item*|<cpp|socket_link_rep>>One end of a connection; it derives from
-    both <cpp|QObject> and <cpp|tm_link_rep> (<verbatim|System/Link/tm_link.hpp>).
+    both <cpp|QObject> and <cpp|tm_link_rep> (<source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>).
     Incoming data is accumulated in <cpp|input_buffer> by the slot
     <cpp|data_set_ready> (reads of at most 16384 bytes), outgoing data is
     queued in <cpp|output_buffer> and flushed by <cpp|ready_to_send>. For a
@@ -58,7 +58,7 @@
     can clean up its tables.
   </description>
 
-  A <em|contact> (<verbatim|System/Link/tm_contact.hpp>) abstracts the
+  A <em|contact> (<source-link|System/Link/tm_contact.hpp|src/System/Link/tm_contact.hpp>) abstracts the
   transport underneath the socket: <cpp|tm_contact_rep> has virtual
   methods <cpp|start>, <cpp|stop>, <cpp|send>, <cpp|receive>,
   <cpp|alive>, <cpp|active> and <cpp|last_error>. There are two families:
@@ -70,7 +70,7 @@
     <cpp|make_socket_server_contact>.
 
     <item><abbr|TLS> contacts, created by <cpp|make_tls_client_contact> and
-    <cpp|make_tls_server_contact> (<verbatim|Plugins/Gnutls/gnutls.cpp>).
+    <cpp|make_tls_server_contact> (<source-link|Plugins/Gnutls/gnutls.cpp|src/Plugins/Gnutls/gnutls.cpp>).
     The server always offers its X.509 certificate
     (<verbatim|$TEXMACS_SERVER_CERT_DIR/cert.pem> and <verbatim|key.pem>,
     where <verbatim|TEXMACS_SERVER_CERT_DIR> defaults to
@@ -84,9 +84,9 @@
   <subsection|The <c++> interface>
 
   The functions exported to <scheme> are declared in
-  <verbatim|System/Link/client_server.hpp> and implemented in
-  <verbatim|texmacs_server.cpp> and <verbatim|texmacs_client.cpp>. The glue
-  is declared in <verbatim|Scheme/Glue/build-glue-basic.scm>. Sockets are
+  <source-link|System/Link/client_server.hpp|src/System/Link/client_server.hpp> and implemented in
+  <source-link|texmacs_server.cpp|src/System/Link/texmacs_server.cpp> and <source-link|texmacs_client.cpp|src/System/Link/texmacs_client.cpp>. The glue
+  is declared in <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>. Sockets are
   identified on both sides by their integer file descriptor; this integer is
   what the <scheme> code calls a <em|client> (on the server) or a
   <em|server> (on the client).
@@ -125,7 +125,7 @@
   <|explain>
     Connect to a server and return the socket number, or a negative error
     code. The error codes are <cpp|TM_NET_*> constants in
-    <verbatim|client_server.hpp>; <scm|(server-define-error-codes)> defines
+    <source-link|client_server.hpp|src/System/Link/client_server.hpp>; <scm|(server-define-error-codes)> defines
     the corresponding <scheme> variables <scm|tm_net_success>,
     <scm|tm_net_invalid_port>, <scm|tm_net_no_gnutls>,
     <scm|tm_net_connection_failed>, etc. The <scm-arg|credentials> of
@@ -133,7 +133,7 @@
     always passes <scm|'((anonymous))>. The <scheme> wrappers
     <scm|tls-anonymous-client-start> and
     <scm|legacy-anonymous-client-start> in
-    <verbatim|client/client-authentication.scm> are what the rest of the
+    <source-link|client/client-authentication.scm|TeXmacs/progs/client/client-authentication.scm> are what the rest of the
     code uses; the legacy wrapper immediately calls
     <scm|(enter-secure-mode <scm-arg|server>)>.
   </explain>
@@ -146,7 +146,7 @@
     The client side counterparts of <scm|server-read> and
     <scm|server-write>; <scm|client-stop> closes the connection.
     <scm|(client-protocol-version)> returns the constant
-    <cpp|TM_PROTOCOL_VERSION> of <verbatim|texmacs_client.cpp> (currently 1,
+    <cpp|TM_PROTOCOL_VERSION> of <source-link|texmacs_client.cpp|src/System/Link/texmacs_client.cpp> (currently 1,
     the version which introduced the tree cache).
   </explain>
 
@@ -154,7 +154,7 @@
 
   Packets are produced and parsed by <cpp|tm_link_rep::write_packet>,
   <cpp|complete_packet> and <cpp|read_packet> in
-  <verbatim|System/Link/tm_link.cpp>. A packet is the decimal length of the
+  <source-link|System/Link/tm_link.cpp|src/System/Link/tm_link.cpp>. A packet is the decimal length of the
   payload, a newline, and the payload itself:
 
   <\verbatim-code>
@@ -171,7 +171,7 @@
   the public key (<cpp|secure_server>), and from then on both sides encrypt
   each payload with <cpp|secret_encode>/<cpp|secret_decode>. These
   functions run the external <verbatim|openssl> program through temporary
-  files (<verbatim|Plugins/Openssl/openssl.cpp>). The server itself warns
+  files (<source-link|Plugins/Openssl/openssl.cpp|src/Plugins/Openssl/openssl.cpp>). The server itself warns
   that this mode is weak; it is kept for backward compatibility and for
   builds without <name|GnuTLS>.
 
@@ -180,8 +180,8 @@
   <subsection|Messages>
 
   The <scheme> side is symmetric; the server part lives in
-  <verbatim|server/server-base.scm>, the client part in
-  <verbatim|client/client-base.scm>. A message is sent with
+  <source-link|server/server-base.scm|TeXmacs/progs/server/server-base.scm>, the client part in
+  <source-link|client/client-base.scm|TeXmacs/progs/client/client-base.scm>. A message is sent with
 
   <\scm-code>
     (tm-define (server-send client cmd)
@@ -192,7 +192,7 @@
   </scm-code>
 
   and similarly <scm|client-send> with <scm|client-serial>. The function
-  <scm|object-\<gtr\>string*> (<verbatim|kernel/library/base.scm>) prints lists,
+  <scm|object-\<gtr\>string*> (<source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>) prints lists,
   numbers, strings and symbols with <scm|object-\<gtr\>string> and converts trees
   to <scheme> trees first; any other object is transmitted as <scm|#f>.
   Hence arguments of services must be built out of lists, strings, numbers,
@@ -325,7 +325,7 @@
     displays the message) on an error. The variant
     <scm|client-remote-eval*> uses the same function for both cases. The
     helpers <scm|client-remote-then> and <scm|client-remote-then-cb>
-    implement the common convention of <verbatim|client-base.scm> that a
+    implement the common convention of <source-link|client-base.scm|TeXmacs/progs/client/client-base.scm> that a
     list is a successful result and a string an error message.
   </explain>
 
@@ -351,7 +351,7 @@
   <scm|client-login-then>, then <scm|client-protocol-version-then>, then
   fetches the account information, each step in the continuation of the
   previous one (see <scm|client-login-home> in
-  <verbatim|client/client-widgets.scm>).
+  <source-link|client/client-widgets.scm|TeXmacs/progs/client/client-widgets.scm>).
 
   <subsection|Debugging>
 
@@ -381,7 +381,7 @@
   <verbatim|progs/server/>).
 
   <\description>
-    <item*|<verbatim|server-base.scm>><scm|remote-login>,
+    <item*|<source-link|server-base.scm|TeXmacs/progs/server/server-base.scm>><scm|remote-login>,
     <scm|remote-login-code>, <scm|remote-logout>, <scm|remote-logged?>,
     <scm|remote-protocol-version>, <scm|new-account>,
     <scm|confirm-pending-account>, <scm|remote-reset-credentials>,
@@ -393,35 +393,35 @@
     and the internal <scm|server-remote-result>,
     <scm|server-remote-error>.
 
-    <item*|<verbatim|server-tmfs.scm>><scm|remote-identifier>,
+    <item*|<source-link|server-tmfs.scm|TeXmacs/progs/server/server-tmfs.scm>><scm|remote-identifier>,
     <scm|remote-get-versions>, <scm|remote-file-create>,
     <scm|remote-file-load>, <scm|remote-file-save>,
     <scm|remote-file-remove>, <scm|remote-dir-create>,
     <scm|remote-dir-load>, <scm|remote-dir-remove>.
 
-    <item*|<verbatim|server-db.scm>><scm|remote-get-field>,
+    <item*|<source-link|server-db.scm|TeXmacs/progs/server/server-db.scm>><scm|remote-get-field>,
     <scm|remote-set-field>, <scm|remote-get-attributes>,
     <scm|remote-get-entry>, <scm|remote-set-entry>,
     <scm|remote-create-entry>, <scm|remote-search>,
     <scm|remote-search-user>, <scm|remote-get-user-pseudo>,
     <scm|remote-get-user-name>.
 
-    <item*|<verbatim|server-sync.scm>, <verbatim|server-db-sync.scm>><scm|remote-sync-list>,
+    <item*|<source-link|server-sync.scm|TeXmacs/progs/server/server-sync.scm>, <source-link|server-db-sync.scm|TeXmacs/progs/server/server-db-sync.scm>><scm|remote-sync-list>,
     <scm|remote-upload>, <scm|remote-download>,
     <scm|remote-remove-several>, <scm|remote-db-changes>,
     <scm|remote-db-sync>.
 
-    <item*|<verbatim|server-live.scm>><scm|live-open>, <scm|live-modify>,
+    <item*|<source-link|server-live.scm|TeXmacs/progs/server/server-live.scm>><scm|live-open>, <scm|live-modify>,
     <scm|live-exists?>, <scm|remote-list-live>.
 
-    <item*|<verbatim|server-chat.scm>><scm|remote-chat-room-create>,
+    <item*|<source-link|server-chat.scm|TeXmacs/progs/server/server-chat.scm>><scm|remote-chat-room-create>,
     <scm|remote-list-chat-rooms>, <scm|remote-chat-room-open>,
     <scm|remote-chat-room-messages-reset>, <scm|remote-mail-open>,
     <scm|remote-shared>, <scm|remote-send-message>.
 
     <item*|Others><scm|remote-pending-notifications>,
-    <scm|remote-ack-notifications> (<verbatim|server-notifications.scm>) and
-    <scm|remote-get-cache-ref> (<verbatim|server-cache.scm>).
+    <scm|remote-ack-notifications> (<source-link|server-notifications.scm|TeXmacs/progs/server/server-notifications.scm>) and
+    <scm|remote-get-cache-ref> (<source-link|server-cache.scm|TeXmacs/progs/server/server-cache.scm>).
   </description>
 
   The client call-backs are <scm|client-remote-result>,
@@ -481,7 +481,7 @@
     <item>If the server needs to push data to clients, declare a call-back
     with <scm|tm-call-back> in a client module which is loaded whenever a
     connection exists (for instance a module used by
-    <verbatim|client-base.scm> or <verbatim|client-tmfs.scm>), and send it
+    <source-link|client-base.scm|TeXmacs/progs/client/client-base.scm> or <source-link|client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm>), and send it
     with <scm|server-remote-eval>. The call-back must answer with
     <scm|client-return> or <scm|client-error> if the server supplied a
     meaningful continuation.
@@ -492,7 +492,7 @@
 
     <item>If the service can be disabled by the administrator, add a
     preference named <verbatim|"server service ..."> with
-    <scm|define-preferences> in <verbatim|server-authentication.scm> (or in
+    <scm|define-preferences> in <source-link|server-authentication.scm|TeXmacs/progs/server/server-authentication.scm> (or in
     your module) and test it in the service body, as done for instance in
     <scm|remote-pending-notifications>. Preferences whose name starts with
     <verbatim|"server"> are automatically exposed to remote administrators

@@ -26,7 +26,7 @@
     <src-var|page-height>.
 
     The known page types, together with their default dimensions and
-    margins, are listed in <verbatim|Graphics/Renderer/page_type.cpp>. Besides
+    margins, are listed in <source-link|Graphics/Renderer/page_type.cpp|src/Graphics/Renderer/page_type.cpp>. Besides
     the usual paper formats (<verbatim|a0>, ..., <verbatim|a10>,
     <verbatim|b0>, ..., <verbatim|letter>, <verbatim|legal>,
     <abbr|etc.>), this includes screen formats such as <verbatim|4:3> and

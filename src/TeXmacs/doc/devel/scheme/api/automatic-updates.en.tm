@@ -48,7 +48,7 @@
   <subsection|Client side interface>
 
   The <c++> side of the updater lives in <verbatim|src/src/Plugins/Updater/>:
-  the abstract class <cpp|tm_updater> (<verbatim|tm_updater.hpp>) has the
+  the abstract class <cpp|tm_updater> (<source-link|tm_updater.hpp|src/Plugins/Updater/tm_updater.hpp>) has the
   implementations <cpp|tm_sparkle> (<name|MacOS>) and <cpp|tm_winsparkle>
   (<name|Windows>). Support is only compiled in when <TeXmacs> is configured
   with <verbatim|--with-sparkle>; the <abbr|URL> of the appcast is fixed at
@@ -106,8 +106,8 @@
     no check yet).
   </explain>
 
-  At startup, <verbatim|init-texmacs.scm> loads the module
-  <verbatim|utils/misc/updater.scm> if <scm|(updater-supported?)> holds, and
+  At startup, <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> loads the module
+  <source-link|utils/misc/updater.scm|TeXmacs/progs/utils/misc/updater.scm> if <scm|(updater-supported?)> holds, and
   calls <scm|(updater-initialize)> after a short delay. This routine reads
   the following preference:
 

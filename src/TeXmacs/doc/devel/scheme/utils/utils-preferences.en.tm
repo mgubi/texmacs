@@ -11,7 +11,7 @@
   <verbatim|$TEXMACS_HOME_PATH/system/preferences.scm> as a <scheme> list of
   items like <scm|("name" "value")> which therefore has in principle no
   structure. The <scheme> interface is defined in
-  <verbatim|kernel/texmacs/tm-preferences.scm>, on top of the glued <c++>
+  <source-link|kernel/texmacs/tm-preferences.scm|TeXmacs/progs/kernel/texmacs/tm-preferences.scm>, on top of the glued <c++>
   routines <scm|cpp-get-preference>, <scm|cpp-set-preference>,
   <scm|cpp-reset-preference>, <scm|cpp-has-preference?> and
   <scm|save-preferences>. However, a good practice to avoid conflicts is to

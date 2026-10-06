@@ -29,7 +29,7 @@
   </itemize>
 
   The abstract class <cpp|box_rep> and the class <cpp|box> are declared in
-  <verbatim|Typeset/boxes.hpp>. The concrete box classes are implemented in
+  <source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>. The concrete box classes are implemented in
   the subdirectories of <verbatim|Typeset/Boxes>: <verbatim|Basic> (text
   boxes, rubber boxes such as large delimiters, empty boxes, <abbr|etc.>),
   <verbatim|Composite> (concatenations, stacks, fractions, roots, scripts,
@@ -85,7 +85,7 @@
 
   Inverse paths do not only occur in boxes: each subtree of the global edit
   tree knows its own inverse path through an observer (see
-  <verbatim|Data/Observers/ip_observer.cpp> and the function
+  <source-link|Data/Observers/ip_observer.cpp|src/Data/Observers/ip_observer.cpp> and the function
   <cpp|obtain_ip>), which is updated whenever the tree is modified.
 
   In order to cope with the third difficulty, the inverse path may start with
@@ -111,7 +111,7 @@
     tails), with an optional negative head. A negative head indicates that
     the tree path is not accessible, i.e. the corresponding subtree does not
     correspond to editable content. The possible negative values are defined
-    in <verbatim|Typeset/boxes.hpp>. For <cpp|DECORATION> (<math|-1>), the
+    in <source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>. For <cpp|DECORATION> (<math|-1>), the
     tail of the inverse path already includes a position. For
     <cpp|DECORATION_LEFT>, <cpp|DECORATION_MIDDLE> and
     <cpp|DECORATION_RIGHT> (<math|-2>, <math|-3> and <hgroup|<math|-4>>), a
@@ -196,7 +196,7 @@
   </cpp-code>
 
   yields a graphical representation for the cursor at a certain box path.
-  The cursor (see the class <cpp|cursor_rep> in <verbatim|Typeset/boxes.hpp>)
+  The cursor (see the class <cpp|cursor_rep> in <source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>)
   is given by the coordinates <math|x>, <math|y> and <math|\<delta\>> of its
   origin (the fields <cpp|ox>, <cpp|oy> and <cpp|delta>), and a line segment
   relative to this origin, which is determined by its vertical extremities

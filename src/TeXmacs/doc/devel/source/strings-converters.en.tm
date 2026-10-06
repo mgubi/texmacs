@@ -11,7 +11,7 @@
     <cpp|struct converter_rep><explain-synopsis|a dictionary applied by
     longest match>
   <|explain>
-    Declared in <verbatim|Data/String/converter.hpp>. A converter is a
+    Declared in <source-link|Data/String/converter.hpp|src/Data/String/converter.hpp>. A converter is a
     <cpp|RESOURCE>: it is created once per pair of encodings by
     <cpp|load_converter (from, to)> and cached under the name
     <verbatim|<em|from>-<em|to>> for the rest of the session. Its fields
@@ -53,7 +53,7 @@
   With <cpp|reverse> set, the second column is used as key. Several files
   are usually loaded into the same tree, and a later entry for the same key
   overwrites an earlier one; this is how, for instance,
-  <verbatim|tmuniversaltounicode.scm> overrides the treatment of
+  <source-link|tmuniversaltounicode.scm|TeXmacs/langs/encoding/tmuniversaltounicode.scm> overrides the treatment of
   <verbatim|\<less\>less\<gtr\>> and <verbatim|\<less\>gtr\<gtr\>>. Files
   with <verbatim|oneway> in their name contain mappings which are only
   valid in one direction (for instance several Unicode spaces which all
@@ -92,15 +92,15 @@
     <item*|<verbatim|Cork> to <verbatim|ASCII>><verbatim|cork-escaped-to-ascii>,
     which replaces every byte outside printable <abbr|ASCII> by an escape
     <verbatim|\\x<em|hh>>; it is used to embed <TeXmacs> code in
-    <name|SVG> images (<verbatim|convert/images/tmimage.scm>).
+    <name|SVG> images (<source-link|convert/images/tmimage.scm|TeXmacs/progs/convert/images/tmimage.scm>).
 
     <item*|<verbatim|T2A.CY> and <verbatim|CODEPOINT>>Conversions between
     the Cyrillic part of <name|T2A> and Unicode escapes, used when
-    upgrading old documents (<verbatim|Data/Convert/Texmacs/upgradetm.cpp>)
-    and by smart fonts (<verbatim|Graphics/Fonts/smart_font.cpp>).
+    upgrading old documents (<source-link|Data/Convert/Texmacs/upgradetm.cpp|src/Data/Convert/Texmacs/upgradetm.cpp>)
+    and by smart fonts (<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>).
   </description>
 
-  On top of the converters, <verbatim|converter.cpp> defines the functions
+  On top of the converters, <source-link|converter.cpp|src/Data/String/converter.cpp> defines the functions
   used by the rest of the program:
 
   <\description-paragraphs>
@@ -128,7 +128,7 @@
     <verbatim|0x80> and <verbatim|0xFF> (<scm|utf8-\<gtr\>html>,
     <scm|html-\<gtr\>utf8>). The <name|XML> and <name|HTML> parser
     decodes numeric entities itself, with <cpp|convert_char_entity>
-    (<verbatim|Data/Convert/Xml/parsexml.cpp>; see <hlink|the <LaTeX> and
+    (<source-link|Data/Convert/Xml/parsexml.cpp|src/Data/Convert/Xml/parsexml.cpp>; see <hlink|the <LaTeX> and
     <name|HTML> converters|convert.en.tm>).
 
     <item*|<cpp|convert_utf8_to_LaTeX>,
@@ -171,8 +171,8 @@
     <item*|<cpp|utf8_to_pdf_hex_string (s)>>Converts a Cork string to the
     <name|UTF-16BE> hexadecimal form <verbatim|\<less\>FEFF...\<gtr\>> used
     for text strings in <name|PDF> files (outline entries and document
-    metadata, in <verbatim|Plugins/Pdf/pdf_hummus_renderer.cpp> and
-    <verbatim|Graphics/Renderer/printer.cpp>).
+    metadata, in <source-link|Plugins/Pdf/pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp> and
+    <source-link|Graphics/Renderer/printer.cpp|src/Graphics/Renderer/printer.cpp>).
 
     <item*|<cpp|convert_escapes>, <cpp|convert_char_entities>,
     <cpp|convert_char_entity>, <cpp|hex_digit_to_int>>Helpers for reading
@@ -181,7 +181,7 @@
 
   <section|Guessing the encoding of western text>
 
-  <verbatim|Data/String/wencoding.cpp> decides how to interpret text of
+  <source-link|Data/String/wencoding.cpp|src/Data/String/wencoding.cpp> decides how to interpret text of
   unknown origin (plain text files, clipboard contents, output of external
   programs):
 
@@ -209,7 +209,7 @@
   <section|Other encodings of bytes>
 
   <\description>
-    <item*|<verbatim|base64.cpp>><cpp|encode_base64> (with a line break
+    <item*|<source-link|base64.cpp|src/Data/String/base64.cpp>><cpp|encode_base64> (with a line break
     every 80 output characters) and <cpp|decode_base64>, which ignores
     characters outside the base 64 alphabet and stops at the first
     <verbatim|=>; <scheme>: <scm|encode-base64>, <scm|decode-base64>. In
@@ -218,7 +218,7 @@
 
     <item*|Hexadecimal numbers><cpp|as_hexadecimal (i)>,
     <cpp|as_hexadecimal (i, len)> (zero padded) and <cpp|from_hexadecimal>
-    in <verbatim|analyze.cpp> (<scm|integer-\<gtr\>hexadecimal>,
+    in <source-link|analyze.cpp|src/Data/String/analyze.cpp> (<scm|integer-\<gtr\>hexadecimal>,
     <scm|integer-\<gtr\>padded-hexadecimal>,
     <scm|hexadecimal-\<gtr\>integer>). <cpp|from_hexadecimal> silently
     ignores characters which are not hexadecimal digits (but still shifts
@@ -226,10 +226,10 @@
 
     <item*|Legacy 8-bit encodings><cpp|koi8_to_iso>, <cpp|iso_to_koi8>
     (and the Ukrainian variants), <cpp|il2_to_cork>, <cpp|cork_to_il2> in
-    <verbatim|analyze.cpp>. <cpp|il2_to_cork> and <cpp|cork_to_il2> are
+    <source-link|analyze.cpp|src/Data/String/analyze.cpp>. <cpp|il2_to_cork> and <cpp|cork_to_il2> are
     used for Czech and other <name|ISO-8859-2> selections
-    (<verbatim|Edit/Replace/edit_select.cpp>) and dates
-    (<verbatim|System/Language/locale.cpp>).
+    (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>) and dates
+    (<source-link|System/Language/locale.cpp|src/System/Language/locale.cpp>).
   </description>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

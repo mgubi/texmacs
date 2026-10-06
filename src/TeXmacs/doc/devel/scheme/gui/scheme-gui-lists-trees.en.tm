@@ -220,7 +220,7 @@
     format with e.g. <scm|tree-\<gtr\>stree>)
 
     <paragraph|Examples>See <scm|widget10> in
-    <hlink|<verbatim|menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>
+    <hlink|<source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>
     and the examples below.
   </explain>
 
@@ -335,7 +335,7 @@
   <subparagraph|An example with the side tools>
 
   Side tools are defined with <scm|tm-tool> (see
-  <verbatim|progs/kernel/gui/menu-widget.scm>) and opened with
+  <source-link|progs/kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>) and opened with
   <scm|tool-select>. The following code shows the document tree in a panel
   on the right hand side of the current window:
 

@@ -5,11 +5,11 @@
 <\body>
   <tmdoc-title|Programs, web requests, messages and timing>
 
-  This page describes the utilities of <verbatim|System/Misc/sys_utils.hpp>,
-  the <abbr|HTTP> requests of <verbatim|System/Files/web_files.hpp>, the
-  output streams of <verbatim|System/Files/tm_ostream.hpp>, the timer of
-  <verbatim|System/Classes/tm_timer.hpp> and the server log of
-  <verbatim|System/Misc/server_log.hpp>. Pipes and sockets to plug-ins are
+  This page describes the utilities of <source-link|System/Misc/sys_utils.hpp|src/System/Misc/sys_utils.hpp>,
+  the <abbr|HTTP> requests of <source-link|System/Files/web_files.hpp|src/System/Files/web_files.hpp>, the
+  output streams of <source-link|System/Files/tm_ostream.hpp|src/System/Files/tm_ostream.hpp>, the timer of
+  <source-link|System/Classes/tm_timer.hpp|src/System/Classes/tm_timer.hpp> and the server log of
+  <source-link|System/Misc/server_log.hpp|src/System/Misc/server_log.hpp>. Pipes and sockets to plug-ins are
   described in <hlink|the plug-in machinery|plugin-machinery.en.tm>.
 
   <section|Running external programs>
@@ -20,7 +20,7 @@
     <verbatim|<em|cmd> \<gtr\> /dev/null 2\<gtr\>&1>); with the option
     <verbatim|-verbose> the output is captured and printed on the
     <verbatim|debug-shell> channel. The variants <cpp|system (cmd, u1,
-    ...)> of <verbatim|file.hpp> append concretized and shell quoted file
+    ...)> of <source-link|file.hpp|src/System/Files/file.hpp> append concretized and shell quoted file
     names.
 
     <item*|<cpp|system (cmd, out)>, <cpp|system (cmd, out, err)>>The same,
@@ -61,7 +61,7 @@
     set from the security preference.
 
     <item*|<cpp|get_stacktrace ()>>A printable stack trace, used in crash
-    reports (<verbatim|unix_stacktrace.cpp> and its <name|Windows>
+    reports (<source-link|unix_stacktrace.cpp|src/Plugins/Unix/unix_stacktrace.cpp> and its <name|Windows>
     and <name|Android> counterparts).
   </description>
 
@@ -96,7 +96,7 @@
     <cpp|boot_error>, <cpp|io_error>, <cpp|std_warning>,
     <cpp|io_warning>, <cpp|debug_std>, <cpp|debug_io>, <cpp|debug_boot>,
     <cpp|debug_shell>, ... are streams on named channels. Writing to them
-    calls <cpp|debug_message> (<verbatim|Kernel/Abstractions/basic.cpp>),
+    calls <cpp|debug_message> (<source-link|Kernel/Abstractions/basic.cpp|src/Kernel/Abstractions/basic.cpp>),
     which prints the message on <cpp|cout> with the prefix
     <verbatim|TeXmacs] <em|channel>,>, stores it in the global list
     <cpp|debug_messages> and, once the editor runs, calls the <scheme>
@@ -123,7 +123,7 @@
 
   <section|The server log>
 
-  <verbatim|System/Misc/server_log.hpp> defines log levels from
+  <source-link|System/Misc/server_log.hpp|src/System/Misc/server_log.hpp> defines log levels from
   <cpp|log_emergency> to <cpp|log_debug> and the macros <cpp|SLOG>,
   <cpp|SLOGI>, <cpp|SLOGW>, <cpp|SLOGE> and their <cpp|SERRNO_...>
   variants, which add the system error message. <cpp|server_log_write>
@@ -149,7 +149,7 @@
 
     <item>In <cpp|async_eval_system>, the reading thread and the main
     thread share the flag <cpp|done> and the output buffer without any
-    synchronization (<verbatim|System/Misc/sys_utils.cpp>,
+    synchronization (<source-link|System/Misc/sys_utils.cpp|src/System/Misc/sys_utils.cpp>,
     <cpp|async_read_output> and <cpp|async_eval_pending>), which is a data
     race. The exit status is always reported as 0, standard error is
     discarded, and the <cpp|kill> flag is only tested before the command

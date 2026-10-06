@@ -15,7 +15,7 @@
   <section|In-buffer parts and the preamble mode>
 
   In-buffer parts are implemented entirely in <scheme>, in
-  <verbatim|generic/document-part.scm>, as rewritings of the top level
+  <source-link|generic/document-part.scm|TeXmacs/progs/generic/document-part.scm>, as rewritings of the top level
   <markup|document> of the buffer. The comment at the head of the file
   gives the representations of the four <em|part modes>:
 
@@ -33,10 +33,10 @@
     <em|preamble>)] <em|body>...)>: the ordinary form.
   </description>
 
-  The macros are defined in <verbatim|packages/standard/std-fold.ts>.
+  The macros are defined in <source-link|packages/standard/std-fold.ts|TeXmacs/packages/standard/std-fold.ts>.
   <markup|show-part> typesets its body inside <markup|set-part> (which
   extends the variable <verbatim|current-part> and resets
-  <verbatim|auto-nr>, <verbatim|std-automatic.ts>); <markup|hide-part>
+  <verbatim|auto-nr>, <source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>); <markup|hide-part>
   does the same inside <markup|hidden>, choosing the body or the
   <em|alt-body> according to <markup|sectional-short-style>. Hidden parts
   are still evaluated, so that counters and labels remain correct, and
@@ -46,7 +46,7 @@
 
   The parts are created by <scm|buffer-make-parts>, which calls
   <scm|principal-sections-to-document-parts>
-  (<verbatim|text/text-structure.scm>): the paragraphs are split at each
+  (<source-link|text/text-structure.scm|TeXmacs/progs/text/text-structure.scm>): the paragraphs are split at each
   principal section (chapters in a book, sections in an article), the
   pieces are numbered <verbatim|"1">, <verbatim|"2">, ... as identifiers,
   and the <em|alt-body> is the section heading alone. Parts are referred to
@@ -60,8 +60,8 @@
   <scm|toggle-preamble-mode> and <scm|buffer-make-preamble>. They make up the
   <menu|Document|Part> menu (<scm|document-part-menu>). When the cursor ends
   up inside a hidden part, for instance after a search,
-  <scm|cursor-show-hidden> (<verbatim|utils/edit/variants.scm>) calls the
-  <scm|tree-show-hidden> overload of <verbatim|document-part.scm>, which
+  <scm|cursor-show-hidden> (<source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>) calls the
+  <scm|tree-show-hidden> overload of <source-link|document-part.scm|TeXmacs/progs/generic/document-part.scm>, which
   shows the part.
 
   <section|Part views>
@@ -80,12 +80,12 @@
   system string) and <em|file> is either a name relative to the master,
   prefixed with <verbatim|here/>, or an absolute one. <scm|part-url>,
   <scm|part-master>, <scm|part-file> and <scm|part-open-name>
-  (<verbatim|part/part-tmfs.scm>) build and decompose such names; the split
+  (<source-link|part/part-tmfs.scm|TeXmacs/progs/part/part-tmfs.scm>) build and decompose such names; the split
   is made at the first occurrence of <verbatim|.tm/>, so the second form
   only works for masters with the suffix <verbatim|.tm> (and in
   directories whose names do not contain <verbatim|.tm/>). In a master with inclusions,
   <menu|Document|Part> lists the included files
-  (<scm|document-master-menu>, <verbatim|part/part-menu.scm>), and choosing
+  (<scm|document-master-menu>, <source-link|part/part-menu.scm|TeXmacs/progs/part/part-menu.scm>), and choosing
   one opens <scm|(part-url master file)>.
 
   The handlers registered for the <verbatim|part> protocol are documented
@@ -135,11 +135,11 @@
 
   <subsection|Synchronization of shared material>
 
-  The <markup|shared> macro (<verbatim|std-automatic.ts>) wraps its body in a
+  The <markup|shared> macro (<source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>) wraps its body in a
   locus with the identifier <em|name> and an observer which calls the
-  <scheme> function <scm|mirror-notify> (<verbatim|part/part-shared.scm>) on
+  <scheme> function <scm|mirror-notify> (<source-link|part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>) on
   each modification. The same machinery serves the <markup|mirror> tag of
-  <verbatim|packages/utilities/relate.ts> (live copies of a piece of
+  <source-link|packages/utilities/relate.ts|TeXmacs/packages/utilities/relate.ts> (live copies of a piece of
   document, made with <scm|make-mirror>) and several comment tags. The
   general link and observer mechanism is described in <hlink|the link
   kernel|links-kernel.en.tm>; here is what happens on top of it:
@@ -187,9 +187,9 @@
 
     <item><em|Initial synchronization of <markup|shared> never runs.> The
     <markup|shared> macro passes <verbatim|\<less\>quote-arg\|xbody\<gtr\>> to
-    <scm|mirror-initialize> (<verbatim|std-automatic.ts:329>), but the
+    <scm|mirror-initialize> (<source-link|std-automatic.ts:329|TeXmacs/packages/standard/std-automatic.ts:329>), but the
     macro has no argument <verbatim|xbody>; the <markup|mirror> macro passes
-    <verbatim|\<less\>quote-arg\|body\<gtr\>> (<verbatim|relate.ts:31>).
+    <verbatim|\<less\>quote-arg\|body\<gtr\>> (<source-link|relate.ts:31|TeXmacs/packages/utilities/relate.ts:31>).
     <scm|mirror-initialize> therefore never recognizes the body of a
     <markup|shared> tag, and copies which differ when a view is opened are
     not brought in sync until they are modified.
@@ -199,7 +199,7 @@
     style in a part view has no effect on the file.
 
     <item><em|The part mode is global.> <scm|part-mode> is a single
-    variable of <verbatim|document-part.scm>, shared by all buffers:
+    variable of <source-link|document-part.scm|TeXmacs/progs/generic/document-part.scm>, shared by all buffers:
     choosing <verbatim|:several> in one document changes the meaning of the
     part commands in all others.
 

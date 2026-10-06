@@ -113,7 +113,7 @@
 
   <section|The abstract font class>
 
-  The main abstract <verbatim|font> class is defined in <verbatim|font.hpp>:\ 
+  The main abstract <verbatim|font> class is defined in <source-link|font.hpp|src/Graphics/Fonts/font.hpp>:\ 
 
   <\verbatim>
     \ \ \ \ struct font_rep: rep\<less\>font\<gtr\> {<format|next line>

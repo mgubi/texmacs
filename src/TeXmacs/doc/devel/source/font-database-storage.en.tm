@@ -8,7 +8,7 @@
   <section|The tables of the database>
 
   The font database consists of a few global hash tables, all defined in
-  <verbatim|Graphics/Fonts/font_database.cpp>. Keys and values are
+  <source-link|Graphics/Fonts/font_database.cpp|src/Graphics/Fonts/font_database.cpp>. Keys and values are
   <scheme> trees (<cpp|tree> objects whose leaves are strings), which makes
   it trivial to load and save them as <scheme> files.
 
@@ -113,11 +113,11 @@
   <subsection|Global and local files>
 
   The following files are involved (macros at the top of
-  <verbatim|font_database.cpp>):
+  <source-link|font_database.cpp|src/Graphics/Fonts/font_database.cpp>):
 
   <\description-paragraphs>
     <item*|<verbatim|$TEXMACS_PATH/fonts/font-database.scm>,
-    <verbatim|font-features.scm>, <verbatim|font-characteristics.scm>>The
+    <source-link|font-features.scm|TeXmacs/fonts/font-features.scm>, <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>>The
     <em|global> database, shipped with <TeXmacs> (in the source tree:
     <verbatim|src/TeXmacs/fonts>). It describes several thousands of fonts
     which are commonly found on <name|Linux>, <name|macOS> and
@@ -132,7 +132,7 @@
     never read.
 
     <item*|<verbatim|$TEXMACS_HOME_PATH/fonts/font-database.scm>,
-    <verbatim|font-features.scm>, <verbatim|font-characteristics.scm>>The
+    <source-link|font-features.scm|TeXmacs/fonts/font-features.scm>, <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>>The
     <em|local> database: the fonts which are actually available for the
     user. This is the database that is used for all queries.
 
@@ -146,7 +146,7 @@
   The file <verbatim|$TEXMACS_PATH/fonts/pdf-font-issues.scm> is unrelated
   to the database proper: it lists font files that need a special treatment
   by the <name|PDF> renderer (<cpp|no_font_issues> in
-  <verbatim|Plugins/Pdf/pdf_hummus_renderer.cpp>).
+  <source-link|Plugins/Pdf/pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>).
 
   <section|Lifecycle of the database>
 
@@ -271,10 +271,10 @@
   <|explain>
     For maintainers: reloads the global database, scans <cpp|u>, computes
     the characteristics and guessed features of the new fonts, and writes
-    <verbatim|font-database.scm> and <verbatim|font-characteristics.scm> in
+    <source-link|font-database.scm|TeXmacs/fonts/font-database.scm> and <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm> in
     <verbatim|$TEXMACS_PATH/fonts>. The features are written to
     <verbatim|font-features.bis.scm> instead of
-    <verbatim|font-features.scm>, so that the guessed features can be
+    <source-link|font-features.scm|TeXmacs/fonts/font-features.scm>, so that the guessed features can be
     reviewed and merged by hand. The variant without argument scans the
     whole <cpp|tt_font_path ()>. In <scheme> these are
     <scm|font-database-insert-global> and <scm|font-database-build-global>.
@@ -295,7 +295,7 @@
   <subsection|The font path>
 
   The directories which are scanned, and in which font files are looked up,
-  are given by <cpp|tt_font_path> in <verbatim|Plugins/Freetype/tt_file.cpp>.
+  are given by <cpp|tt_font_path> in <source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>.
   This is a disjunction of the following directories, each of them searched
   recursively (<cpp|search_sub_dirs>):
 
@@ -359,7 +359,7 @@
 
   <subsection|Parsing <name|TrueType> and <name|OpenType> files>
 
-  The file <verbatim|Plugins/Freetype/tt_tools.cpp> reads font files
+  The file <source-link|Plugins/Freetype/tt_tools.cpp|src/Plugins/Freetype/tt_tools.cpp> reads font files
   directly, without <name|FreeType>. A file is loaded into a <cpp|string>
   and accessed with big endian readers (<cpp|get_U16>, <cpp|get_U32>,
   <cpp|get_tag>). The main routines are:
@@ -438,7 +438,7 @@
     1200dpi, temporarily disables fatal errors for missing glyphs
     (<cpp|get_glyph_fatal>), and calls <cpp|analyze_range>,
     <cpp|analyze_special> and <cpp|analyze_major> in
-    <verbatim|Plugins/Freetype/tt_analyze.cpp>. Without <name|FreeType>
+    <source-link|Plugins/Freetype/tt_analyze.cpp|src/Plugins/Freetype/tt_analyze.cpp>. Without <name|FreeType>
     support, it returns an empty array. Exported to <scheme> as
     <scm|tt-analyze>.
   </explain>
@@ -494,7 +494,7 @@
   <subsection|Features guessed from characteristics>
 
   The function <cpp|guessed_features (family, style)> in
-  <verbatim|Graphics/Fonts/font_guess.cpp> translates characteristics back
+  <source-link|Graphics/Fonts/font_guess.cpp|src/Graphics/Fonts/font_guess.cpp> translates characteristics back
   into features:
 
   <\itemize>
@@ -529,7 +529,7 @@
   <\description>
     <item*|<verbatim|$TEXMACS_HOME_PATH/system/cache/font_cache.scm>>The
     persistent cache of <cpp|tt_font_find> and <cpp|tt_find_name>
-    (<verbatim|System/Misc/data_cache.cpp>). Positive entries are checked
+    (<source-link|System/Misc/data_cache.cpp|src/System/Misc/data_cache.cpp>). Positive entries are checked
     for existence and discarded if the file disappeared; negative entries
     (font not found) are trusted.
 
@@ -537,7 +537,7 @@
     from collections. They are never refreshed automatically.
 
     <item*|<verbatim|$TEXMACS_HOME_PATH/fonts/error/>>Markers for <TeX>
-    fonts which could not be generated (<verbatim|Plugins/Metafont/load_tex.cpp>).
+    fonts which could not be generated (<source-link|Plugins/Metafont/load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>).
     They are removed at startup by <cpp|cache_initialize> when the
     <verbatim|fonts/type1> or <verbatim|fonts/truetype> directories of
     <verbatim|$TEXMACS_PATH> or <verbatim|$TEXMACS_HOME_PATH> changed.
@@ -552,14 +552,14 @@
 
   <\itemize>
     <item>When <TeXmacs> is upgraded to a new version, <cpp|init_upgrade>
-    (<verbatim|System/Boot/init_upgrade.cpp>) removes the local database
+    (<source-link|System/Boot/init_upgrade.cpp|src/System/Boot/init_upgrade.cpp>) removes the local database
     files, the <verbatim|fonts/error> markers and several caches; the local
     database is then rebuilt from the global one at the next start. Fonts
     that had been found by scanning the disk are lost and require a new
     scan.
 
     <item>The command <menu|Tools|Fonts|Clear font cache>
-    (<scm|clear-font-cache> in <verbatim|progs/texmacs/texmacs/tm-tools.scm>)
+    (<scm|clear-font-cache> in <source-link|progs/texmacs/texmacs/tm-tools.scm|TeXmacs/progs/texmacs/texmacs/tm-tools.scm>)
     removes <verbatim|font_cache.scm> and the three local database files.
     It does not touch the in-memory tables, so <TeXmacs> has to be
     restarted; it neither removes the unpacked subfonts.

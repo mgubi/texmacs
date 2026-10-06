@@ -41,7 +41,7 @@
   <section|Color classes>
 
   The color classes form a fixed vocabulary, defined in
-  <cpp|initialize_color_encodings> (<verbatim|System/Language/language.cpp>):
+  <cpp|initialize_color_encodings> (<source-link|System/Language/language.cpp|src/System/Language/language.cpp>):
 
   <\explain>
     <cpp|int encode_color (string s)><explain-synopsis|number of a color
@@ -72,7 +72,7 @@
     language. The code <math|-1> (unknown class) is decoded with the
     preference <verbatim|syntax:<em|lan>:none>. This function is exported to
     <scheme> as <scm|(syntax-read-preferences <scm-arg|lan>)>
-    (<verbatim|Scheme/Glue/build-glue-basic.scm>).
+    (<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>).
   </explain>
 
   The classes, their codes and the built-in defaults are:
@@ -94,7 +94,7 @@
   Code 0 means \Pno color\Q; it is the initial value in the highlight arrays
   of the packrat mechanism. Note that a group name which is not in this
   table, such as <verbatim|operator_decoration> used by
-  <verbatim|python-lang.scm> and <verbatim|julia-lang.scm>, is encoded as
+  <source-link|python-lang.scm|plugins/python/progs/python-lang.scm> and <source-link|julia-lang.scm|plugins/code/progs/julia-lang.scm>, is encoded as
   <math|-1> and therefore drawn in the <verbatim|none> color, which is red by
   default.
 
@@ -124,10 +124,10 @@
   </scm-code>
 
   Such declarations exist for <verbatim|python> (in
-  <verbatim|src/plugins/python/progs/python-lang.scm>), <verbatim|julia> and
+  <source-link|src/plugins/python/progs/python-lang.scm|plugins/python/progs/python-lang.scm>), <verbatim|julia> and
   <verbatim|cpp> (in <verbatim|src/plugins/code/progs/>), <verbatim|scheme>
-  (in <verbatim|prog/scheme-edit.scm>) and <verbatim|fortran> (in
-  <verbatim|prog/fortran-edit.scm>). The <scheme> and C++ highlighters do
+  (in <source-link|prog/scheme-edit.scm|TeXmacs/progs/prog/scheme-edit.scm>) and <verbatim|fortran> (in
+  <source-link|prog/fortran-edit.scm|TeXmacs/progs/prog/fortran-edit.scm>). The <scheme> and C++ highlighters do
   not use the decoding tables, so their <verbatim|syntax:*> preferences
   currently have no visible effect. Other languages (<name|Java>,
   <name|Scala>, <abbr|JSON>, ...) simply use the built-in defaults of the
@@ -150,10 +150,10 @@
   <section|Environment variables and themes>
 
   The environment variables used by the <scheme>, C++ and <name|Mathemagix>
-  highlighters are declared in <verbatim|Data/Drd/vars.cpp> (C++ constants
+  highlighters are declared in <source-link|Data/Drd/vars.cpp|src/Data/Drd/vars.cpp> (C++ constants
   <cpp|KEYWORD_COLOR>, <cpp|CONSTANT_COLOR>, ...), get the <abbr|DRD> type
-  <cpp|TYPE_COLOR> in <verbatim|Data/Drd/drd_std.cpp>, and have the
-  following defaults in <verbatim|Typeset/Env/env_default.cpp>:
+  <cpp|TYPE_COLOR> in <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp>, and have the
+  following defaults in <source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>:
 
   <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|font-series|bold>|<table|<row|<cell|Variable>|<cell|Default>|<cell|Use>>|<row|<cell|<src-var|keyword-color>>|<cell|<verbatim|#8020c0>>|<cell|keywords>>|<row|<cell|<src-var|constant-color>>|<cell|<verbatim|#2060c0>>|<cell|constants>>|<row|<cell|<src-var|number-color>>|<cell|<verbatim|#2060c0>>|<cell|numbers>>|<row|<cell|<src-var|string-color>>|<cell|<verbatim|#a06040>>|<cell|strings>>|<row|<cell|<src-var|operator-color>>|<cell|(empty)>|<cell|operators>>|<row|<cell|<src-var|comment-color>>|<cell|<verbatim|brown>>|<cell|comments>>|<row|<cell|<src-var|preprocessor-color>>|<cell|<verbatim|#400040>>|<cell|preprocessor
   directives>>|<row|<cell|<src-var|modifier-color>>|<cell|<verbatim|#8020c0>>|<cell|declaration
@@ -171,7 +171,7 @@
   the <hlink|miscellaneous environment
   variables|../format/environment/env-misc.en.tm>.
 
-  The theme mechanism groups them. In <verbatim|themes/base/base-colors.ts>:
+  The theme mechanism groups them. In <source-link|themes/base/base-colors.ts|TeXmacs/packages/themes/base/base-colors.ts>:
 
   <\tm-fragment>
     <inactive*|<new-theme|highlight-colors|keyword-color|constant-color|number-color|string-color|operator-color|comment-color|preprocessor-color|modifier-color|declaration-color|macro-color|function-color|type-color|defined-color|misc-lexeme-color|alt-keyword-color|alt-constant-color>>
@@ -180,13 +180,13 @@
   </tm-fragment>
 
   The primitive <markup|new-theme> (<cpp|edit_env_rep::exec_new_theme> in
-  <verbatim|Typeset/Env/env_exec.cpp>) creates, for each listed variable
+  <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>) creates, for each listed variable
   <em|v>, a variable <verbatim|highlight-colors-<em|v>> initialized with the
   current value of <em|v>, and a macro <markup|with-highlight-colors> which
   sets each <em|v> to the value of <verbatim|highlight-colors-<em|v>>.
   <markup|copy-theme> builds a new theme from existing ones in the same way.
   A concrete theme then overrides the prefixed variables; for instance
-  <verbatim|themes/dark/dark-scene.ts> starts with
+  <source-link|themes/dark/dark-scene.ts|TeXmacs/packages/themes/dark/dark-scene.ts> starts with
   <inactive*|<copy-theme|dark-scene|all-colors>> and sets
   <verbatim|dark-scene-keyword-color> to <verbatim|#d070f0>,
   <verbatim|dark-scene-comment-color> to <verbatim|#d06030>, and so on.

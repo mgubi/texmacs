@@ -8,7 +8,7 @@
   <section|The stages of the export>
 
   <\enumerate>
-    <item><cpp|buffer_export> (<verbatim|Texmacs/Data/new_buffer.cpp>)
+    <item><cpp|buffer_export> (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>)
     replaces the body of the document by the result of
     <cpp|edit_typeset_rep::exec_html>, which expands all macros which the
     <name|HTML> converter does not handle. The document is then passed to
@@ -17,13 +17,13 @@
 
     <item>The converter graph goes from <verbatim|texmacs-tree> to
     <verbatim|texmacs-stree>, then uses <scm|texmacs-\<gtr\>html>
-    (<verbatim|convert/html/tmhtml.scm>) to produce an sxml expression
+    (<source-link|convert/html/tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm>) to produce an sxml expression
     (<verbatim|html-stree>), and finally <scm|serialize-html>
-    (<verbatim|convert/html/htmlout.scm>) to produce the string
+    (<source-link|convert/html/htmlout.scm|TeXmacs/progs/convert/html/htmlout.scm>) to produce the string
     (<verbatim|html-document>).
   </enumerate>
 
-  When a selection is copied as <name|HTML> (<verbatim|Edit/Replace/edit_select.cpp>),
+  When a selection is copied as <name|HTML> (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>),
   <cpp|exec_html> is applied to the selection and the snippet variants of
   the converters are used.
 
@@ -33,7 +33,7 @@
     <cpp|tree edit_typeset_rep::exec_html (tree t, path p)><explain-synopsis|expand
     macros for the <name|HTML> export>
   <|explain>
-    Implemented in <verbatim|Edit/Editor/edit_typeset.cpp> (accessible from
+    Implemented in <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp> (accessible from
     <scheme> as <scm|html-expand>). It computes the environment at the
     start of the document, joins it with the patch returned by
     <scm|(tmhtml-env-patch)>, replaces each variable
@@ -50,7 +50,7 @@
     (with the additional variable <verbatim|html-doc-title> for the title).
   </explain>
 
-  The patch of <scm|tmhtml-env-patch> (<verbatim|convert/html/tmhtml-expand.scm>)
+  The patch of <scm|tmhtml-env-patch> (<source-link|convert/html/tmhtml-expand.scm|TeXmacs/progs/convert/html/tmhtml-expand.scm>)
   defines identity macros <scm|(xmacro "x" (eval-args "x"))> for the tags
   which the converter handles itself: sectioning titles
   (<markup|section-title>, ...), lists, the logical markup
@@ -60,13 +60,13 @@
   macros. All other macros are expanded. Contrary to the <LaTeX> export,
   the list is fixed (the comment in the code notes that the <abbr|DRD>
   should be used instead). The list must be kept consistent with the
-  dispatch tables of <verbatim|tmhtml.scm>.
+  dispatch tables of <source-link|tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm>.
 
   Style files use the <verbatim|tmhtml-> prefix to adapt their macros to
-  the <name|HTML> export. For instance <verbatim|packages/environment/env-math.ts>
+  the <name|HTML> export. For instance <source-link|packages/environment/env-math.ts|TeXmacs/packages/environment/env-math.ts>
   defines <markup|tmhtml-eqnarray*> as an <markup|extern> call of the
   <scheme> function <scm|ext-tmhtml-eqnarray*>, and
-  <verbatim|packages/standard/std-automatic.ts> defines
+  <source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts> defines
   <markup|tmhtml-render-bibitem>. The package <verbatim|html-font-size>
   (in <verbatim|packages/html>) is another example.
 
@@ -95,7 +95,7 @@
   <name|XML> processing instruction, an <name|XHTML> 1.1 doctype (with
   <name|MathML> 2.0 when <name|MathML> is enabled) and the namespace
   declarations. Helper functions for sxml are in
-  <verbatim|convert/tools/sxml.scm> and <verbatim|sxhtml.scm>.
+  <source-link|convert/tools/sxml.scm|TeXmacs/progs/convert/tools/sxml.scm> and <source-link|sxhtml.scm|TeXmacs/progs/convert/tools/sxhtml.scm>.
 
   All handlers return a <em|node list> (a list of sxml nodes and strings),
   which allows a <TeXmacs> construct to produce zero or several <name|HTML>
@@ -182,7 +182,7 @@
   <verbatim|.xhtml>) by <scm|tmhtml-suffix>, so that links between the pages
   of a converted web site keep working. Tables are converted by
   <scm|tmhtml-table> and <scm|tmhtml-tformat> with the table parser of
-  <verbatim|convert/tools/tmtable.scm>; cell formatting becomes
+  <source-link|convert/tools/tmtable.scm|TeXmacs/progs/convert/tools/tmtable.scm>; cell formatting becomes
   attributes and CSS styles.
 
   <subsection|The <verbatim|html> head>
@@ -227,9 +227,9 @@
 
     <item*|<name|MathML> (<verbatim|"texmacs-\<gtr\>html:mathml">)>Each
     formula is converted by <scm|texmacs-\<gtr\>mathml>
-    (<verbatim|convert/mathml/tmmath.scm>, dispatch table
+    (<source-link|convert/mathml/tmmath.scm|TeXmacs/progs/convert/mathml/tmmath.scm>, dispatch table
     <scm|tmmath-primitives%>); symbols and operators are translated with the
-    tables of <verbatim|convert/mathml/mathml-drd.scm>. The output file then
+    tables of <source-link|convert/mathml/mathml-drd.scm|TeXmacs/progs/convert/mathml/mathml-drd.scm>. The output file then
     gets the suffix <verbatim|.xhtml> when a whole site is converted.
 
     <item*|Images (<verbatim|"texmacs-\<gtr\>html:images">)>Each formula
@@ -272,12 +272,12 @@
 
   <section|Customized <name|HTML> generation>
 
-  The standard styles (<verbatim|packages/standard/std-markup.ts>) define
+  The standard styles (<source-link|packages/standard/std-markup.ts|TeXmacs/packages/standard/std-markup.ts>) define
   tags which only have an effect on the <name|HTML> export:
   <markup|html-tag>, <markup|html-attr>, <markup|html-style>,
   <markup|html-class>, <markup|html-div-style>, <markup|html-div-class>,
   <markup|html-javascript>, <markup|html-javascript-src> and
-  <markup|html-video>. Their handlers in <verbatim|tmhtml.scm> wrap the
+  <markup|html-video>. Their handlers in <source-link|tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm> wrap the
   converted content into an arbitrary element or add attributes to it
   (<scm|tmhtml-append-attribute>). Similarly, <scm|(specific "html"
   <scm-arg|s>)> inserts raw <name|HTML> code and <scm|(specific "html*"
@@ -286,7 +286,7 @@
   <section|Converting a web site>
 
   The menu <menu|Tools|Create web site> opens a dialog
-  (<scm|open-website-builder> in <verbatim|doc/tmweb.scm>) which calls
+  (<scm|open-website-builder> in <source-link|doc/tmweb.scm|TeXmacs/progs/doc/tmweb.scm>) which calls
   <scm|tmweb-convert-dir> or <scm|tmweb-update-dir>. These functions walk
   through the source directory, convert every <verbatim|.tm> file with
   <scm|export-buffer-main> (setting <scm|current-save-target> so that the
@@ -307,7 +307,7 @@
   as images.>>|<row|<cell|<verbatim|texmacs-\<gtr\>html:css-stylesheet>>|<cell|<verbatim|--->>|<cell|External
   style sheet.>>>>>>
     Options of the converter <verbatim|texmacs-stree> <math|\<rightarrow\>>
-    <verbatim|html-stree> (<verbatim|init-html.scm>).
+    <verbatim|html-stree> (<source-link|init-html.scm|TeXmacs/progs/convert/html/init-html.scm>).
   </big-table>
 
   The first four options are read from the option list by
@@ -330,7 +330,7 @@
     <scm|tmhtml> to convert the arguments).
 
     <item>Add the tag to the list in <scm|tmhtml-env-patch>
-    (<verbatim|tmhtml-expand.scm>), otherwise it is expanded before the
+    (<source-link|tmhtml-expand.scm|TeXmacs/progs/convert/html/tmhtml-expand.scm>), otherwise it is expanded before the
     converter sees it.
 
     <item>For the reverse direction, add a rule to <scm|htmltm-methods%>,
@@ -340,12 +340,12 @@
   <section|Testing>
 
   <\itemize>
-    <item><scm|(regtest-tmhtml)> (<verbatim|convert/html/tmhtml-test.scm>)
+    <item><scm|(regtest-tmhtml)> (<source-link|convert/html/tmhtml-test.scm|TeXmacs/progs/convert/html/tmhtml-test.scm>)
     runs regression tests of <scm|tmhtml-root> on small strees; it is part
-    of <scm|(run-all-tests)> (<verbatim|check/check-master.scm>), which can
+    of <scm|(run-all-tests)> (<source-link|check/check-master.scm|TeXmacs/progs/check/check-master.scm>), which can
     be run with <verbatim|texmacs -x "(run-all-tests)" -q> (see
     <verbatim|src/tests/README.md>). The tests are written with
-    <scm|regression-test-group> (<verbatim|kernel/boot/debug.scm>).
+    <scm|regression-test-group> (<source-link|kernel/boot/debug.scm|TeXmacs/progs/kernel/boot/debug.scm>).
 
     <item>In a <scheme> session, <scm|(texmacs-\<gtr\>html (tree-\<gtr\>stree
     <scm-arg|t>) '())> shows the sxml for a tree, and

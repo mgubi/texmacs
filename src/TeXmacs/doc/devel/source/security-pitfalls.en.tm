@@ -41,7 +41,7 @@
 
     <item><em|The trust status is computed once.> The environment of an
     editor takes its <cpp|secure> flag from the master of the buffer when
-    the editor is created (<verbatim|Typeset/Env/env.cpp:37>);
+    the editor is created (<source-link|Typeset/Env/env.cpp:37|src/Typeset/Env/env.cpp:37>);
     <cpp|edit_typeset_rep::typeset_prepare> updates the base file name but
     not the flag. A document keeps the trust status of its original
     location after <menu|Save as> (in both directions) until it is
@@ -88,11 +88,11 @@
   <paragraph|Secure functions with side effects.>Several functions of the
   encryption code are declared <scm|:secure> although they open dialogs or
   change persistent state: the dialogs which ask for passphrases or
-  recipients (<verbatim|security/gpg/gpg-edit.scm>),
+  recipients (<source-link|security/gpg/gpg-edit.scm|TeXmacs/progs/security/gpg/gpg-edit.scm>),
   <scm|gpg-set-default-key-fingerprint>, which sets a preference
-  (<verbatim|security/gpg/gpg-widgets.scm:51>),
+  (<source-link|security/gpg/gpg-widgets.scm:51|TeXmacs/progs/security/gpg/gpg-widgets.scm:51>),
   <scm|tm-gpg-collect-public-keys-from-buffer>, which writes the file of
-  collected keys (<verbatim|security/gpg/gpg-base.scm:225>), and
+  collected keys (<source-link|security/gpg/gpg-base.scm:225|TeXmacs/progs/security/gpg/gpg-base.scm:225>), and
   <scm|gpg-get-default-key-fingerprint>, which reveals the fingerprint of the user's default key.
   Untrusted documents can call all of them.
 
@@ -105,22 +105,22 @@
   and its <verbatim|~> autosave file, so this happens for instance when an
   encrypted document is exported in <TeXmacs> format to another file name,
   and for the <verbatim|#> autosave file written in rescue mode
-  (<verbatim|texmacs/texmacs/tm-files.scm:389>). The hook should refuse to
+  (<source-link|texmacs/texmacs/tm-files.scm:389|TeXmacs/progs/texmacs/texmacs/tm-files.scm:389>). The hook should refuse to
   write instead. Also, <cpp|export_tree> calls the hook whenever the
   variable <verbatim|encryption> is present, whatever its value.
 
   <paragraph|Deleting a public key deletes the secret key.>
   <scm|gpg-delete-public-key> builds its command with
   <scm|gpg-executable-delete-secret-and-public-key>
-  (<verbatim|security/gpg/gpg-base.scm:429>), so deleting a public key in
-  the key manager (<verbatim|security/gpg/gpg-widgets.scm:606>) also
+  (<source-link|security/gpg/gpg-base.scm:429|TeXmacs/progs/security/gpg/gpg-base.scm:429>), so deleting a public key in
+  the key manager (<source-link|security/gpg/gpg-widgets.scm:606|TeXmacs/progs/security/gpg/gpg-widgets.scm:606>) also
   deletes the corresponding secret key, although the confirmation dialog
   only mentions public keys.
 
   <paragraph|Passphrase encrypted regions cannot be decrypted.>
   <scm|tm-gpg-dialogue-passphrase-decrypt> calls
   <scm|gpg-ask-ask-standalone-passphrase>
-  (<verbatim|security/gpg/gpg-edit.scm:362>), which is not defined (the
+  (<source-link|security/gpg/gpg-edit.scm:362|TeXmacs/progs/security/gpg/gpg-edit.scm:362>), which is not defined (the
   function is <scm|gpg-ask-standalone-passphrase>). All menu entries, icons
   and <scm|alternate-toggle> for passphrase encrypted regions end in an
   unbound variable error.
@@ -137,11 +137,11 @@
     <item>The error path of
     <scm|system-security-delete-generic-password> on <name|Windows> refers
     to an unbound variable <scm|cmd>
-    (<verbatim|security/keychain/win-security.scm:61>).
+    (<source-link|security/keychain/win-security.scm:61|TeXmacs/progs/security/keychain/win-security.scm:61>).
 
     <item>The wallet dialogs read the second form value (the \Premember
     passphrase\Q choice) even when that field is not shown because no
-    system keychain is available (<verbatim|security/wallet/wallet-menu.scm:98>,
+    system keychain is available (<source-link|security/wallet/wallet-menu.scm:98|TeXmacs/progs/security/wallet/wallet-menu.scm:98>,
     <verbatim|142>, <verbatim|185>).
 
     <item>When the wallet is on, <scm|gpg-wallet-reinitialize> restores the
@@ -151,15 +151,15 @@
 
     <item><scm|generate-password> draws the characters with
     <name|GnuTLS> but shuffles them with the ordinary <scm|random>
-    (<verbatim|security/password.scm:33>), and falls back to
+    (<source-link|security/password.scm:33|TeXmacs/progs/security/password.scm:33>), and falls back to
     <scm|random> entirely without <name|GnuTLS> (line 26).
 
     <item>The file of collected public keys is computed once, when
-    <verbatim|gpg-base.scm> is loaded (line 166), from the user who is the
+    <source-link|gpg-base.scm|TeXmacs/progs/security/gpg/gpg-base.scm> is loaded (line 166), from the user who is the
     default user at that time.
 
     <item>The field <cpp|new_buffer_rep::secure>
-    (<verbatim|Texmacs/Data/new_buffer.hpp:31>) is initialized but never
+    (<source-link|Texmacs/Data/new_buffer.hpp:31|src/Texmacs/Data/new_buffer.hpp:31>) is initialized but never
     read; the checks use the flag of the typesetting environment.
   </itemize>
 

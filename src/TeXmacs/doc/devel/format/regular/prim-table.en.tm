@@ -136,7 +136,7 @@
     This macro implements standard left aligned tables without borders.
     Although the <markup|tabular> macro is built-in into <TeXmacs>, it should
     not really be considered as a primitive: it is defined in the default
-    environment (<verbatim|Typeset/Env/env_default.cpp>) as
+    environment (<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>) as
     <inactive*|<macro|x|<tformat|<arg|x>>>>, but it is not part of any
     style file either.
   </explain>

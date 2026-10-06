@@ -13,7 +13,7 @@
   <|explain>
     Returns the value of <cpp|t>. Strings evaluate to themselves. For
     compound trees, <cpp|exec> dispatches on the label
-    (<verbatim|Typeset/Env/env_exec.cpp>). Environment primitives,
+    (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>). Environment primitives,
     macro primitives, control structures, computational primitives, length
     units, graphical and animation primitives all have their own
     <cpp|exec_*> method. The result is a new tree without source location.
@@ -357,7 +357,7 @@
 
     <item*|<markup|rewrite-inactive>>Produces the source code rendering of
     an argument (<cpp|rewrite_inactive> in
-    <verbatim|Typeset/Env/env_inactive.cpp>). This is how
+    <source-link|Typeset/Env/env_inactive.cpp|src/Typeset/Env/env_inactive.cpp>). This is how
     <markup|inactive> tags, the preamble and style files are displayed.
     The rendering is built from <markup|arg> references with index paths
     (the function <cpp|subvar> appends an index to the current
@@ -425,13 +425,13 @@
     document, and if the function returns it (or one of its subtrees)
     unchanged inside its result, the typesetter recognizes its inverse path
     and the user can edit it. The demonstration package
-    <verbatim|packages/example/extern-demo.ts> uses this idiom:
+    <source-link|packages/example/extern-demo.ts|TeXmacs/packages/example/extern-demo.ts> uses this idiom:
 
     <\verbatim-code>
       \<less\>assign\|hello\|\<less\>macro\|body\|\<less\>extern\|ext-hello\|\<less\>quote-arg\|body\<gtr\>\<gtr\>\<gtr\>\<gtr\>
     </verbatim-code>
 
-    with, in <verbatim|utils/misc/extern-demo.scm>,
+    with, in <source-link|utils/misc/extern-demo.scm|TeXmacs/progs/utils/misc/extern-demo.scm>,
 
     <\scm-code>
       (tm-define (ext-hello t)
@@ -444,7 +444,7 @@
     <item>Unless the document is trusted (<cpp|secure>, determined by
     <cpp|is_secure> from the file name) or the user accepted all scripts
     (<cpp|script_status> is 2), the expression is first checked by the
-    <scheme> predicate <scm|secure?> (<verbatim|kernel/texmacs/tm-secure.scm>).
+    <scheme> predicate <scm|secure?> (<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>).
     A function passes this check if it has the property <scm|:secure>, which
     is set by the <scm|(:secure #t)> option of <scm|tm-define> or by
     <scm|define-secure-symbols>. Otherwise the result is the error
@@ -465,7 +465,7 @@
     <item>By default, the children of <markup|extern> are not accessible
     for the DRD. A style can declare accessibility for a particular
     function <verbatim|f> through the pseudo tag <verbatim|extern:f>, as in
-    <verbatim|packages/customize/math/math-check.ts>:
+    <source-link|packages/customize/math/math-check.ts|TeXmacs/packages/customize/math/math-check.ts>:
 
     <\verbatim-code>
       \<less\>drd-props\|extern:math-check\|with-like\|true\|arity\|1\|accessible\|all\|regular\|all\<gtr\>

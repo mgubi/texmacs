@@ -115,7 +115,7 @@
 
   <\description>
     <item*|Buffers>are owned by the global array <cpp|bufs>
-    (<verbatim|new_buffer.cpp>). They are created by <cpp|insert_buffer>
+    (<source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>). They are created by <cpp|insert_buffer>
     and destroyed by <cpp|remove_buffer>.
 
     <item*|Views>are owned by their buffer (the array
@@ -124,7 +124,7 @@
     removed.
 
     <item*|Windows>are owned by the static table <cpp|tm_window_table>
-    (<verbatim|new_window.cpp>), which maps window identifiers to
+    (<source-link|new_window.cpp|src/Texmacs/Data/new_window.cpp>), which maps window identifiers to
     <cpp|tm_window_rep*>. They are created by <cpp|new_window> and
     destroyed by <cpp|delete_window>. The windows of embedded <TeXmacs>
     widgets are the exception: they are not in this table and are owned by
@@ -160,8 +160,8 @@
 
   <section|Navigating between the objects>
 
-  The following functions (declared in <verbatim|Data/new_buffer.hpp>,
-  <verbatim|Data/new_view.hpp> and <verbatim|Data/new_window.hpp>) navigate
+  The following functions (declared in <source-link|Data/new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>,
+  <source-link|Data/new_view.hpp|src/Texmacs/Data/new_view.hpp> and <source-link|Data/new_window.hpp|src/Texmacs/Data/new_window.hpp>) navigate
   between the three kinds of objects. They take and return <abbr|URL>s;
   <cpp|url_none ()> is returned when there is no answer.
 
@@ -196,99 +196,99 @@
   otherwise. The directory <verbatim|Texmacs/> contains the server proper:
 
   <\description-paragraphs>
-    <item*|<verbatim|Texmacs/server.hpp>>The abstract class
+    <item*|<source-link|Texmacs/server.hpp|src/Texmacs/server.hpp>>The abstract class
     <cpp|server_rep>, the handle <cpp|server>, <cpp|get_server> and a few
     global declarations. It also includes the headers of
-    <verbatim|Texmacs/Data/>, so that including <verbatim|server.hpp>
+    <verbatim|Texmacs/Data/>, so that including <source-link|server.hpp|src/Texmacs/server.hpp>
     gives access to the whole <abbr|URL> based buffer, view and window
     interface.
 
-    <item*|<verbatim|Texmacs/tm_server.hpp>,
-    <verbatim|Texmacs/Server/tm_server.cpp>>The concrete server
+    <item*|<source-link|Texmacs/tm_server.hpp|src/Texmacs/tm_server.hpp>,
+    <source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp>>The concrete server
     <cpp|tm_server_rep>, its constructor (which boots <scheme>), the
     interpose and wait handlers, printing settings, global typesetting
     invalidation and <cpp|quit>.
 
-    <item*|<verbatim|Texmacs/tm_config.hpp>,
-    <verbatim|Texmacs/Server/tm_config.cpp>>The partial server
+    <item*|<source-link|Texmacs/tm_config.hpp|src/Texmacs/tm_config.hpp>,
+    <source-link|Texmacs/Server/tm_config.cpp|src/Texmacs/Server/tm_config.cpp>>The partial server
     <cpp|tm_config_rep>: font rules and the keyboard configuration.
 
-    <item*|<verbatim|Texmacs/tm_frame.hpp>,
-    <verbatim|Texmacs/Window/tm_frame.cpp>, <verbatim|Texmacs/Window/tm_dialogue.cpp>>The
+    <item*|<source-link|Texmacs/tm_frame.hpp|src/Texmacs/tm_frame.hpp>,
+    <source-link|Texmacs/Window/tm_frame.cpp|src/Texmacs/Window/tm_frame.cpp>, <source-link|Texmacs/Window/tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp>>The
     partial server <cpp|tm_frame_rep>: properties, menus, toolbars, canvas,
     footer and full screen mode of the current window; dialog windows, file
     choosers and interactive commands.
 
-    <item*|<verbatim|Texmacs/tm_buffer.hpp>>The class
+    <item*|<source-link|Texmacs/tm_buffer.hpp|src/Texmacs/tm_buffer.hpp>>The class
     <cpp|tm_buffer_rep>.
 
-    <item*|<verbatim|Texmacs/tm_window.hpp>,
-    <verbatim|Texmacs/Window/tm_window.cpp>>The classes <cpp|tm_window_rep> and
+    <item*|<source-link|Texmacs/tm_window.hpp|src/Texmacs/tm_window.hpp>,
+    <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>>The classes <cpp|tm_window_rep> and
     <cpp|tm_view_rep> (whose constructor is in
-    <verbatim|Texmacs/Data/new_view.cpp>); window geometry, embedded <TeXmacs> widgets, menu
+    <source-link|Texmacs/Data/new_view.cpp|src/Texmacs/Data/new_view.cpp>); window geometry, embedded <TeXmacs> widgets, menu
     caching, interactive input in the footer, and the \Palternative\Q top
     level windows used for <scheme> dialogs.
 
-    <item*|<verbatim|Texmacs/tm_data.hpp>>The global array <cpp|bufs> and a
+    <item*|<source-link|Texmacs/tm_data.hpp|src/Texmacs/tm_data.hpp>>The global array <cpp|bufs> and a
     convenience <cpp|set_message>; included by all files of
     <verbatim|Texmacs/Data/>.
 
-    <item*|<verbatim|Texmacs/Data/new_buffer.hpp>,
-    <verbatim|new_buffer.cpp>>The class <cpp|new_buffer_rep> and all buffer
+    <item*|<source-link|Texmacs/Data/new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>,
+    <source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>>The class <cpp|new_buffer_rep> and all buffer
     level routines: list of buffers, names and titles, contents, save
     status, loading, saving and inclusions.
 
-    <item*|<verbatim|Texmacs/Data/new_view.hpp>,
-    <verbatim|new_view.cpp>>View identifiers, the current view, the view
+    <item*|<source-link|Texmacs/Data/new_view.hpp|src/Texmacs/Data/new_view.hpp>,
+    <source-link|new_view.cpp|src/Texmacs/Data/new_view.cpp>>View identifiers, the current view, the view
     history, creation and destruction of views, attaching views to windows,
     and focus changes.
 
-    <item*|<verbatim|Texmacs/Data/new_window.hpp>,
-    <verbatim|new_window.cpp>>Window identifiers, creation and destruction
+    <item*|<source-link|Texmacs/Data/new_window.hpp|src/Texmacs/Data/new_window.hpp>,
+    <source-link|new_window.cpp|src/Texmacs/Data/new_window.cpp>>Window identifiers, creation and destruction
     of windows, and the high level commands which open, clone and close
     windows and buffers.
 
-    <item*|<verbatim|Texmacs/Data/new_project.hpp>,
-    <verbatim|new_project.cpp>>Projects.
+    <item*|<source-link|Texmacs/Data/new_project.hpp|src/Texmacs/Data/new_project.hpp>,
+    <source-link|new_project.cpp|src/Texmacs/Data/new_project.cpp>>Projects.
 
-    <item*|<verbatim|Texmacs/Window/tm_button.cpp>>Widgets which display a
+    <item*|<source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>>Widgets which display a
     typeset box (<cpp|box_widget>, <cpp|texmacs_output_widget>) and the
     computation of the size of a typeset document (<cpp|tree_extents>).
 
-    <item*|<verbatim|Texmacs/Server/tm_debug.cpp>>System and editor status reports,
+    <item*|<source-link|Texmacs/Server/tm_debug.cpp|src/Texmacs/Server/tm_debug.cpp>>System and editor status reports,
     crash reports and the fatal error handler <cpp|tm_failure>.
 
-    <item*|<verbatim|Texmacs/Texmacs/texmacs.cpp>>The main program:
+    <item*|<source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>>The main program:
     <cpp|texmacs_entrypoint>, <cpp|TeXmacs_main>, the command line options
     and the startup preferences.
   </description-paragraphs>
 
   Two closely related files live elsewhere:
-  <verbatim|Data/Document/new_data.hpp> (the class <cpp|new_data_rep>,
+  <source-link|Data/Document/new_data.hpp|src/Data/Document/new_data.hpp> (the class <cpp|new_data_rep>,
   with <cpp|attach_data> and <cpp|detach_data>) and
-  <verbatim|Data/Document/new_document.cpp> (the global edit tree
+  <source-link|Data/Document/new_document.cpp|src/Data/Document/new_document.cpp> (the global edit tree
   <cpp|the_et>). The <scheme> glue which exports the server is declared in
-  <verbatim|Scheme/Glue/build-glue-server.scm> and, for buffers, views and
-  windows, in <verbatim|Scheme/Glue/build-glue-basic.scm>.
+  <source-link|Scheme/Glue/build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm> and, for buffers, views and
+  windows, in <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>.
 
   The editor is in <verbatim|Edit/>: the abstract class <cpp|editor_rep>
-  in <verbatim|Edit/editor.hpp> and its implementation <cpp|edit_main_rep>
-  in <verbatim|Edit/Editor/edit_main.hpp>, assembled from the classes in
+  in <source-link|Edit/editor.hpp|src/Edit/editor.hpp> and its implementation <cpp|edit_main_rep>
+  in <source-link|Edit/Editor/edit_main.hpp|src/Edit/Editor/edit_main.hpp>, assembled from the classes in
   <verbatim|Edit/Interface> (events, cursor, repainting, footer),
   <verbatim|Edit/Modify> (modifications and undo), <verbatim|Edit/Replace>
   (selections, search, spell checking) and <verbatim|Edit/Process>. The
   observers attached to the edit tree are in <verbatim|Data/Observers>,
   the undo history in <verbatim|Data/History>, and the generic observer
-  mechanism in <verbatim|Kernel/Abstractions/observer.cpp>.
+  mechanism in <source-link|Kernel/Abstractions/observer.cpp|src/Kernel/Abstractions/observer.cpp>.
 
   On the <scheme> side, the most relevant files (relative to
-  <verbatim|src/TeXmacs/progs/>) are <verbatim|kernel/library/base.scm>,
-  <verbatim|kernel/gui/kbd-handlers.scm>, <verbatim|kernel/gui/kbd-define.scm>,
-  <verbatim|kernel/texmacs/tm-preferences.scm>,
-  <verbatim|kernel/texmacs/tm-file-system.scm>,
-  <verbatim|utils/library/cursor.scm>,
-  <verbatim|texmacs/texmacs/tm-files.scm> and
-  <verbatim|texmacs/texmacs/tm-server.scm>.
+  <verbatim|src/TeXmacs/progs/>) are <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>,
+  <source-link|kernel/gui/kbd-handlers.scm|TeXmacs/progs/kernel/gui/kbd-handlers.scm>, <source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>,
+  <source-link|kernel/texmacs/tm-preferences.scm|TeXmacs/progs/kernel/texmacs/tm-preferences.scm>,
+  <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>,
+  <source-link|utils/library/cursor.scm|TeXmacs/progs/utils/library/cursor.scm>,
+  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> and
+  <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>.
 
   <section|Contents of this chapter>
 

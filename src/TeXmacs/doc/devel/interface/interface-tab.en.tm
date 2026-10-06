@@ -55,7 +55,7 @@
     will correspond to the serialization of the <TeXmacs> input. Notice
     that the command is computed by
     <cpp|edit_interface_rep::session_complete_command> (in
-    <verbatim|src/Edit/Interface/edit_complete.cpp>) using the default
+    <source-link|src/Edit/Interface/edit_complete.cpp|src/Edit/Interface/edit_complete.cpp>) using the default
     serializer <scm|verbatim-serialize>, and not the custom serializer of
     the plug-in. The answer of the application is passed to the <scheme>
     function <scm|custom-complete>, which ignores answers which are not a
@@ -83,7 +83,7 @@
     \ \ \ \ <example-plugin-link|complete/src/complete.cpp>
   </verbatim>
 
-  The startup banner in <verbatim|complete.cpp> takes care of part of the
+  The startup banner in <source-link|complete.cpp|TeXmacs/examples/plugins/complete/src/complete.cpp> takes care of part of the
   configuration:
 
   <\cpp-code>

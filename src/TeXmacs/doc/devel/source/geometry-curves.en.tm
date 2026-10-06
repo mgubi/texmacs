@@ -15,7 +15,7 @@
   <section|Points and axes>
 
   A <cpp|point> is an <cpp|array\<less\>double\<gtr\>>
-  (<verbatim|Graphics/Types/point.hpp>). Points usually have two
+  (<source-link|Graphics/Types/point.hpp|src/Graphics/Types/point.hpp>). Points usually have two
   coordinates, three for the <hlink|three dimensional
   objects|geometry-algebra.en.tm>; the empty array serves as an
   <em|invalid> point, which is what <cpp|as_point> returns for a tree that
@@ -41,7 +41,7 @@
   three points) and <cpp|intersection (axis, axis)> operate on them.
   Degenerate cases return invalid points rather than failing.
 
-  <verbatim|Graphics/Types/math_util.hpp> defines the constants
+  <source-link|Graphics/Types/math_util.hpp|src/Graphics/Types/math_util.hpp> defines the constants
   <cpp|tm_infinity> (the largest <cpp|float>), <cpp|tm_PI> and <cpp|tm_E>,
   and helpers <cpp|square>, <cpp|norm (double)>, <cpp|nearest>,
   <cpp|sign>, <cpp|fnull (x, eps)> and an integer power <cpp|pow (double,
@@ -51,7 +51,7 @@
 
   <subsection|The abstract interface>
 
-  A <cpp|frame> (<verbatim|Graphics/Types/frame.hpp>) is an invertible map
+  A <cpp|frame> (<source-link|Graphics/Types/frame.hpp|src/Graphics/Types/frame.hpp>) is an invertible map
   from <em|local> coordinates to the coordinates of a <em|parent> system.
   <cpp|f (p)> applies the direct map and <cpp|f [p]> the inverse one; both
   are also defined on <cpp|rectangle>s (<cpp|enclose> transforms the four
@@ -73,8 +73,8 @@
     <item*|<cpp|direct_scalar (x)>, <cpp|inverse_scalar>>The length of the
     image of a horizontal vector of length <math|x>. The typesetter uses
     <cpp|inverse_scalar> to convert pixel sizes and pen widths into
-    graphical units (<verbatim|Typeset/Concat/concat_graphics.cpp>,
-    <verbatim|Edit/Interface/edit_graphics.cpp>). The header itself notes
+    graphical units (<source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>,
+    <source-link|Edit/Interface/edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>). The header itself notes
     that this is \Perror-prone\Q: it is only meaningful for conformal
     maps.
 
@@ -100,13 +100,13 @@
     <item*|<cpp|rotation_2D (center, angle)>, <cpp|slanting (center,
     slant)>>Rotation (angle in radians) and horizontal slanting; the latter
     is used by the poor man's italic fonts
-    (<verbatim|Graphics/Fonts/poor_italic.cpp>).
+    (<source-link|Graphics/Fonts/poor_italic.cpp|src/Graphics/Fonts/poor_italic.cpp>).
 
     <item*|<cpp|linear_2D (m)>>A linear map given by a <math|2\<times\>2>
     matrix, inverted once at construction. The transformations of the form
     <verbatim|(tuple "linear" a b c d)> given to <markup|gr-transform>
-    (<cpp|get_transformation> in <verbatim|concat_graphics.cpp>) and the
-    glyph transformations of <verbatim|Graphics/Bitmap_fonts/glyph_transforms.cpp>
+    (<cpp|get_transformation> in <source-link|concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>) and the
+    glyph transformations of <source-link|Graphics/Bitmap_fonts/glyph_transforms.cpp|src/Graphics/Bitmap_fonts/glyph_transforms.cpp>
     produce such frames.
 
     <item*|<cpp|affine_2D (m)>>An affine map given by a <math|3\<times\>3>
@@ -124,7 +124,7 @@
 
   <subsection|The abstract interface>
 
-  A <cpp|curve> (<verbatim|Graphics/Types/curve.hpp>) is a map from
+  A <cpp|curve> (<source-link|Graphics/Types/curve.hpp|src/Graphics/Types/curve.hpp>) is a map from
   <math|[0,1]> to points: <cpp|c (t)> evaluates it. The virtual methods of
   <cpp|curve_rep> are
 
@@ -136,7 +136,7 @@
     approximating the curve within <cpp|eps> (without the starting point);
     <cpp|rectify (eps)> returns the full polyline. This is how curves are
     drawn: <cpp|curve_box> rectifies its curve with a precision of a quarter
-    of <cpp|PIXEL> (<verbatim|Typeset/Boxes/Graphics/graphics_boxes.cpp>).
+    of <cpp|PIXEL> (<source-link|Typeset/Boxes/Graphics/graphics_boxes.cpp|src/Typeset/Boxes/Graphics/graphics_boxes.cpp>).
 
     <item*|<cpp|bound (t, eps)>>A parameter distance within which the curve
     moves by less than <cpp|eps>. The default implementation divides
@@ -170,7 +170,7 @@
     With <cpp|interpol> (the default) the control points are first computed
     by solving a tridiagonal (or, for closed splines, cyclic tridiagonal)
     system so that the curve passes through the given points; the solvers
-    are in <verbatim|Graphics/Types/equations.cpp> (<cpp|tridiag_solve>,
+    are in <source-link|Graphics/Types/equations.cpp|src/Graphics/Types/equations.cpp> (<cpp|tridiag_solve>,
     <cpp|xtridiag_solve>, <cpp|quasitridiag_solve>). The
     <markup|spline> and <markup|cspline> tags produce such curves.
 
@@ -191,7 +191,7 @@
     portion, eps)>>Reversed parameterization, a portion of a curve, and the initial
     part of a curve covering a given portion of its length. <cpp|part> is used to cut
     curves at the white zones around arrow heads and dots
-    (<cpp|adjust_extremities> in <verbatim|concat_graphics.cpp>).
+    (<cpp|adjust_extremities> in <source-link|concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>).
 
     <item*|<cpp|f (c)>>The image of a curve by a frame. Its
     <cpp|rectify_cumul> rectifies the original curve with precision
@@ -207,8 +207,8 @@
 
   <cpp|closest (c, p)> refines <cpp|find_closest_point> up to ten times and
   returns the closest point on the curve; the graphics editor uses it to
-  snap to curves (<verbatim|Edit/Interface/edit_graphics.cpp>,
-  <verbatim|Typeset/Boxes/Modifier/change_boxes.cpp>).
+  snap to curves (<source-link|Edit/Interface/edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>,
+  <source-link|Typeset/Boxes/Modifier/change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>).
   <cpp|intersection (f, g, p0, eps)> looks for an intersection of two
   (two dimensional) curves near <cpp|p0>: it starts from the closest points
   of both curves to <cpp|p0> and runs a Newton iteration on the parameters,
@@ -219,9 +219,9 @@
 
   <subsection|Polyline helpers>
 
-  <verbatim|Graphics/Types/curve_extras.cpp> contains routines on arrays of
+  <source-link|Graphics/Types/curve_extras.cpp|src/Graphics/Types/curve_extras.cpp> contains routines on arrays of
   points, all used by the <markup|calligraphy> tag
-  (<cpp|typeset_calligraphy> in <verbatim|concat_graphics.cpp>):
+  (<cpp|typeset_calligraphy> in <source-link|concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>):
   <cpp|refine> and <cpp|smoothen> (subdivision and moving average),
   <cpp|bezier_fit> (a piecewise cubic approximation within a tolerance),
   <cpp|rectify_bezier>, <cpp|oval_profile> (the outline of an elliptic pen)
@@ -232,7 +232,7 @@
 
   <section|Grids>
 
-  A <cpp|grid> (<verbatim|Graphics/Types/grid.hpp>) produces the curves to
+  A <cpp|grid> (<source-link|Graphics/Types/grid.hpp|src/Graphics/Types/grid.hpp>) produces the curves to
   be drawn within given limits (<cpp|get_curves>), the curves near a point
   (<cpp|get_curves_around>) and the closest grid point
   (<cpp|find_closest_point>, <cpp|find_point_around>). The concrete grids
@@ -246,7 +246,7 @@
 
   <\itemize>
     <item>The Jacobian of the inverse of a slanting uses <cpp|+slant>
-    instead of <cpp|-slant> (<verbatim|Graphics/Types/frame.cpp:172>), so
+    instead of <cpp|-slant> (<source-link|Graphics/Types/frame.cpp:172|src/Graphics/Types/frame.cpp:172>), so
     tangents of curves mapped by an inverted slanting are wrong.
 
     <item>The bounds of <cpp|shift_2D>, <cpp|rotation_2D>,
@@ -273,7 +273,7 @@
     <cpp|a> has them (<verbatim|curve.cpp:691-696>).
 
     <item>A closed <cpp|spline> appends two points to the array it was
-    given, which is shared with the caller (<verbatim|curve.cpp:392>).
+    given, which is shared with the caller (<source-link|curve.cpp:392|src/Graphics/Types/curve.cpp:392>).
 
     <item><cpp|arg (p)> divides by the norm and is undefined for the zero
     vector; <cpp|pow (double, int)> returns 1 for negative exponents.

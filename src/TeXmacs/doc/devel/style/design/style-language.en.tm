@@ -17,7 +17,7 @@
   visible after enabling <menu|Tools|Source macros tool>. Alternatively, you
   may use the <prefix|special> and <prefix|executable> keyboard prefixes in
   source mode and the<nbsp><prefix|inactive> and<nbsp><prefix|executable>
-  prefixes otherwise (see <verbatim|progs/source/source-kbd.scm>). Furthermore, we recall
+  prefixes otherwise (see <source-link|progs/source/source-kbd.scm|TeXmacs/progs/source/source-kbd.scm>). Furthermore, we recall
   that the hybrid <key|\\>-key may be used for creating macro-applications or
   arguments, depending on the context. Finally, the
   <shortcut|(structured-insert-right)> and <shortcut|(structured-insert-left)>

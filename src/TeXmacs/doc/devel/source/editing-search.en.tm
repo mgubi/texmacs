@@ -8,7 +8,7 @@
   <section|Selections>
 
   The selection of an editor is a <cpp|range_set> <cpp|cur_sel> of
-  <cpp|edit_select_rep> (<verbatim|Edit/Replace/edit_select.cpp>): a flat
+  <cpp|edit_select_rep> (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>): a flat
   array of paths <math|(s<rsub|1>,e<rsub|1>,s<rsub|2>,e<rsub|2>,\<ldots\>)>,
   of which normally only the first range is used. The overall organization
   of the editor state is described in <hlink|the editor|server-editor.en.tm>; here are the details which matter for editing
@@ -112,14 +112,14 @@
   </itemize>
 
   The <scheme> commands <scm|clipboard-copy>, <scm|clipboard-cut> and
-  <scm|clipboard-paste> (<verbatim|utils/library/cpp-wrap.scm>) are
+  <scm|clipboard-paste> (<source-link|utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm>) are
   overloaded in several contexts (sessions, folding, comments), and
-  <verbatim|utils/edit/selections.scm> adds commands such as
+  <source-link|utils/edit/selections.scm|TeXmacs/progs/utils/edit/selections.scm> adds commands such as
   <scm|clipboard-copy-export>.
 
   <section|Structural searches>
 
-  <cpp|edit_replace_rep> (<verbatim|Edit/Replace/edit_search.cpp>)
+  <cpp|edit_replace_rep> (<source-link|Edit/Replace/edit_search.cpp|src/Edit/Replace/edit_search.cpp>)
   provides the queries which editing code uses to find its context:
 
   <\description>
@@ -151,7 +151,7 @@
 
   The search and replace commands of the menus and keyboard
   (<scm|interactive-search>, <scm|interactive-replace>) are implemented in
-  <scheme>, in <verbatim|generic/search-widgets.scm>. They open either a
+  <scheme>, in <source-link|generic/search-widgets.scm|TeXmacs/progs/generic/search-widgets.scm>. They open either a
   toolbar or a search tool with an embedded <TeXmacs> input field, whose
   contents is an arbitrary <TeXmacs> tree, the <em|pattern>. After each
   change of the pattern, <scm|perform-search>:
@@ -159,7 +159,7 @@
   <\enumerate>
     <item>calls the glue function <scm|tree-search-tree-at>, that is,
     <cpp|search (t, what, p, pos, limit)> in
-    <verbatim|Data/Tree/tree_search.cpp>, on the body of the document
+    <source-link|Data/Tree/tree_search.cpp|src/Data/Tree/tree_search.cpp>, on the body of the document
     being searched, starting near the cursor and with an initial limit of
     100 matches;
 
@@ -208,11 +208,11 @@
   shortcuts or menus (which call <scm|interactive-search> and
   <scm|interactive-replace>), but its glue routines are still exported
   (<scm|search-start>, <scm|replace-start>, and <scm|replace-start-forward>
-  in <verbatim|utils/library/cursor.scm>). <cpp|search_start (forward)>
+  in <source-link|utils/library/cursor.scm|TeXmacs/progs/utils/library/cursor.scm>). <cpp|search_start (forward)>
   (<scm|search-start>) puts the editor in the input mode
   <cpp|INPUT_SEARCH>; each typed key is then passed by the
   <scm|keyboard-press> overload for <scm|search-mode?>
-  (<verbatim|generic/generic-edit.scm>) to <cpp|search_keypress>
+  (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>) to <cpp|search_keypress>
   (<scm|key-press-search>), which extends the pattern and moves to the next
   match with <cpp|next_match>, a walk through accessible positions in
   document order (<cpp|step_horizontal>, <cpp|step_ascend>,
@@ -229,7 +229,7 @@
 
   <\itemize>
     <item>The case insensitive search only lowercases the <em|document>:
-    <cpp|search_string> (<verbatim|Data/Tree/tree_search.cpp:256>) compares
+    <cpp|search_string> (<source-link|Data/Tree/tree_search.cpp:256|src/Data/Tree/tree_search.cpp:256>) compares
     the lowercased text with the pattern as it is, and the other matching
     routines (<cpp|match>, <cpp|match_atomic>, used for compound and
     wildcard patterns) ignore the flag altogether. The search toolbar

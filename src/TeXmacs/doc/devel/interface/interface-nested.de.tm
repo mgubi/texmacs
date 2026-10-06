@@ -32,7 +32,7 @@
     \ \ \ \ <example-plugin-link|formula/src/formula.cpp>
   </verbatim>
 
-  Der Rumpf der Hauptschleife in <verbatim|formula.cpp> besteht aus den
+  Der Rumpf der Hauptschleife in <source-link|formula.cpp|TeXmacs/examples/plugins/formula/src/formula.cpp> besteht aus den
   folgenden Zeilen:
 
   <\cpp-fragment>
@@ -128,7 +128,7 @@
   </tm-fragment>
 
   Das Makro <markup|foo> wird jetzt folgendermaÿen im Rumpf der Hauptschleife
-  von <verbatim|markup.cpp> genutzt:
+  von <source-link|markup.cpp|TeXmacs/examples/plugins/markup/src/markup.cpp> genutzt:
 
   <\cpp-fragment>
     char buffer[100];

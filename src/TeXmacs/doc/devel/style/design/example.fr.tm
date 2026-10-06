@@ -7,17 +7,17 @@
 
   Avant de créer vos propres fichiers de style, il est utile d'étudier
   certains fichiers de style standards. Par exemple, vous pouvez charger le
-  fichier <verbatim|book.ts> avec <apply|menu|File|Load> (pas besoin de
+  fichier <source-link|book.ts|TeXmacs/styles/book.ts> avec <apply|menu|File|Load> (pas besoin de
   chemin ici, puisque le répertoire de style est inclus dans le chemin par
   défaut des fichiers).
 
-  Après avoir chargé <verbatim|book.ts>, vous verrez de nombreuses
+  Après avoir chargé <source-link|book.ts|TeXmacs/styles/book.ts>, vous verrez de nombreuses
   déclarations de fonction et d'environnement (ces déclarations sont
   visibles, car les fichiers de style sont écrits en <space|0.2spc>mode
   préambule<space|0.2spc> - voir <apply|menu|Document|Mode de préambule>).
   D'autres déclarations sont contenues dans les fichiers <verbatim|basic.ts>,
-  <verbatim|list.ts>, <verbatim|theorem.ts> et <verbatim|program.ts>, sur
-  lesquels <verbatim|book.ts> est basé. Ces fichiers contiennent
+  <verbatim|list.ts>, <verbatim|theorem.ts> et <source-link|program.ts|TeXmacs/packages/compute/program.ts>, sur
+  lesquels <source-link|book.ts|TeXmacs/styles/book.ts> est basé. Ces fichiers contiennent
   respectivement les environnements de base, de listes, de théorèmes et de
   programmation.
 

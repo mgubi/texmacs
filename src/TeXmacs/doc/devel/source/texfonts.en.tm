@@ -34,9 +34,9 @@
 
   A <TeX> font is requested by a <em|font tree> such as
   <verbatim|(ec ecrm 10 600)>, which the font rules of
-  <verbatim|TeXmacs/progs/fonts/fonts-ec.scm> (relative to <verbatim|src/>)
+  <source-link|TeXmacs/progs/fonts/fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm> (relative to <verbatim|src/>)
   produce for the roman family, and which
-  <cpp|find_font> (<verbatim|Graphics/Fonts/find_font.cpp>) turns into a call
+  <cpp|find_font> (<source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>) turns into a call
   of one of the constructors <cpp|tex_font>, <cpp|tex_ec_font>,
   <cpp|tex_cm_font>, <cpp|tex_la_font>, <cpp|tex_gr_font>,
   <cpp|tex_adobe_font>, <cpp|tex_rubber_font> or
@@ -97,65 +97,65 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Plugins/Metafont/tex_files.hpp>,
-    <verbatim|tex_files.cpp>>Search paths for <verbatim|.tfm>,
+    <item*|<source-link|Plugins/Metafont/tex_files.hpp|src/Plugins/Metafont/tex_files.hpp>,
+    <source-link|tex_files.cpp|src/Plugins/Metafont/tex_files.cpp>>Search paths for <verbatim|.tfm>,
     <verbatim|.pk> and <verbatim|.pfb> files (<cpp|reset_tfm_path>,
     <cpp|reset_pk_path>, <cpp|reset_pfb_path>), lookup
     (<cpp|resolve_tex>, <cpp|exists_in_tex>, <verbatim|kpsewhich>,
     <verbatim|kpsepath>) and generation (<cpp|make_tex_tfm>,
     <cpp|make_tex_pk>).
 
-    <item*|<verbatim|Plugins/Metafont/tex_init.cpp>>Detection of the <TeX>
+    <item*|<source-link|Plugins/Metafont/tex_init.cpp|src/Plugins/Metafont/tex_init.cpp>>Detection of the <TeX>
     helper programs and of the standard <TeX> font directories at the first
     run (<cpp|setup_tex>), and initialization of the paths at each run
     (<cpp|init_tex>).
 
-    <item*|<verbatim|Plugins/Metafont/load_tex.hpp>,
-    <verbatim|load_tex.cpp>>The search for a metric and glyphs of a given
+    <item*|<source-link|Plugins/Metafont/load_tex.hpp|src/Plugins/Metafont/load_tex.hpp>,
+    <source-link|load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>>The search for a metric and glyphs of a given
     family, size and resolution (<cpp|load_tex>, <cpp|load_tex_tfm>,
     <cpp|load_tex_pk>), including the substitution by <name|Type 1> fonts and
     the error cache.
 
-    <item*|<verbatim|Plugins/Metafont/load_tfm.hpp>,
-    <verbatim|load_tfm.cpp>>The class <cpp|tex_font_metric_rep>: decoding of
+    <item*|<source-link|Plugins/Metafont/load_tfm.hpp|src/Plugins/Metafont/load_tfm.hpp>,
+    <source-link|load_tfm.cpp|src/Plugins/Metafont/load_tfm.cpp>>The class <cpp|tex_font_metric_rep>: decoding of
     <verbatim|.tfm> files, the ligature and kerning program, extensible
     recipes.
 
-    <item*|<verbatim|Plugins/Metafont/load_pk.hpp>,
-    <verbatim|load_pk.cpp>>The <cpp|pk_loader>, which decodes
+    <item*|<source-link|Plugins/Metafont/load_pk.hpp|src/Plugins/Metafont/load_pk.hpp>,
+    <source-link|load_pk.cpp|src/Plugins/Metafont/load_pk.cpp>>The <cpp|pk_loader>, which decodes
     <verbatim|.pk> files into glyphs.
 
-    <item*|<verbatim|Plugins/Metafont/tex_font.cpp>>The class
+    <item*|<source-link|Plugins/Metafont/tex_font.cpp|src/Plugins/Metafont/tex_font.cpp>>The class
     <cpp|tex_font_rep> and its six variants, and <cpp|tfm_font_metric>.
 
-    <item*|<verbatim|Plugins/Metafont/tex_rubber_font.cpp>>Rubber
+    <item*|<source-link|Plugins/Metafont/tex_rubber_font.cpp|src/Plugins/Metafont/tex_rubber_font.cpp>>Rubber
     (extensible) characters from <TeX> fonts: <cpp|tex_rubber_font_rep> and
     <cpp|tex_dummy_rubber_font_rep>.
 
-    <item*|<verbatim|Plugins/Metafont/adjust_cmr.cpp>>Hand-tuned script
+    <item*|<source-link|Plugins/Metafont/adjust_cmr.cpp|src/Plugins/Metafont/adjust_cmr.cpp>>Hand-tuned script
     and accent position corrections for the Computer Modern and related
     families.
 
-    <item*|<verbatim|Graphics/Bitmap_fonts/bitmap_font.hpp>,
-    <verbatim|glyph.cpp>, <verbatim|bitmap_font.cpp>,
-    <verbatim|glyph_shrink.cpp>>The classes <cpp|glyph>,
+    <item*|<source-link|Graphics/Bitmap_fonts/bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp>,
+    <source-link|glyph.cpp|src/Graphics/Bitmap_fonts/glyph.cpp>, <source-link|bitmap_font.cpp|src/Graphics/Bitmap_fonts/bitmap_font.cpp>,
+    <source-link|glyph_shrink.cpp|src/Graphics/Bitmap_fonts/glyph_shrink.cpp>>The classes <cpp|glyph>,
     <cpp|font_metric> and <cpp|font_glyphs>, and the shrinking of glyphs for
     display. The other files of this directory implement glyph
     transformations, which are described in <hlink|emulated
     fonts|smart-fonts-emulated.en.tm>.
 
-    <item*|<verbatim|Plugins/Freetype/tt_file.cpp>,
-    <verbatim|tt_face.cpp>>Location of <verbatim|.pfb> files and their
+    <item*|<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>,
+    <source-link|tt_face.cpp|src/Plugins/Freetype/tt_face.cpp>>Location of <verbatim|.pfb> files and their
     rasterization through <name|FreeType> (<cpp|tt_find_name>,
     <cpp|tt_font_find>, <cpp|tt_font_glyphs>).
 
-    <item*|<verbatim|Plugins/Pdf/pdf_hummus_renderer.cpp>,
-    <verbatim|Graphics/Renderer/printer.cpp>>Embedding of <TeX> fonts in
+    <item*|<source-link|Plugins/Pdf/pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>,
+    <source-link|Graphics/Renderer/printer.cpp|src/Graphics/Renderer/printer.cpp>>Embedding of <TeX> fonts in
     <abbr|PDF> and PostScript output.
 
-    <item*|<verbatim|TeXmacs/progs/fonts/fonts-ec.scm>,
-    <verbatim|fonts-composite.scm>, <verbatim|fonts-adobe.scm>,
-    <verbatim|fonts-math.scm>>(relative to <verbatim|src/>) Font rules which
+    <item*|<source-link|TeXmacs/progs/fonts/fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm>,
+    <source-link|fonts-composite.scm|TeXmacs/progs/fonts/fonts-composite.scm>, <source-link|fonts-adobe.scm|TeXmacs/progs/fonts/fonts-adobe.scm>,
+    <source-link|fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>>(relative to <verbatim|src/>) Font rules which
     map logical font requests to <TeX> font trees.
   </description-paragraphs>
 

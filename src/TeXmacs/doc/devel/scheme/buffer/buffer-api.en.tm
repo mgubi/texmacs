@@ -6,10 +6,10 @@
   <tmdoc-title|Manipulating <TeXmacs> buffers>
 
   Buffers are identified by their <abbr|URL>s. Most of the routines below
-  are glued directly to <c++> functions in <verbatim|Texmacs/Data/new_buffer.cpp>
-  (see <verbatim|Scheme/Glue/build-glue-basic.scm>); a few convenience
-  wrappers are defined in <verbatim|kernel/library/base.scm> and
-  <verbatim|texmacs/texmacs/tm-files.scm>. The underlying <c++> data
+  are glued directly to <c++> functions in <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>
+  (see <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>); a few convenience
+  wrappers are defined in <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm> and
+  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>. The underlying <c++> data
   structures are described in <hlink|buffers|../../source/server-buffers.en.tm>.
 
   <paragraph|Basic buffer management>
@@ -142,7 +142,7 @@
     <scm|(with-window <scm-arg|win> <scm-arg|body> ...)> executes
     <scm-arg|body> in the context of the buffer displayed in the window
     <scm-arg|win>. Both macros are defined in
-    <verbatim|utils/library/cursor.scm>.
+    <source-link|utils/library/cursor.scm|TeXmacs/progs/utils/library/cursor.scm>.
   </explain>
 
   <paragraph|Information associated to buffers>
@@ -299,7 +299,7 @@
 
   These are low level routines. The interactive commands
   <scm|(load-buffer <scm-arg|name>)> and <scm|(save-buffer)> from
-  <verbatim|texmacs/texmacs/tm-files.scm> in addition take care of opening
+  <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> in addition take care of opening
   the buffer in a window, of autosave files, permissions, confirmation
   dialogues, <abbr|etc.>
 

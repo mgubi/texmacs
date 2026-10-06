@@ -165,11 +165,11 @@
   </quotation>
 
   so that running it will create a dynamic library
-  <verbatim|dynlink/lib/libtmdynlink.so> from <verbatim|dynlink.cpp> (the
+  <verbatim|dynlink/lib/libtmdynlink.so> from <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp> (the
   <verbatim|lib> directory must exist). The <verbatim|tmsrc> variable
   should contain <verbatim|$TEXMACS_PATH>, so as to find the include file
-  <verbatim|TeXmacs.h>. The configuration file
-  <verbatim|init-dynlink.scm> simply contains
+  <source-link|TeXmacs.h|TeXmacs/include/TeXmacs.h>. The configuration file
+  <source-link|init-dynlink.scm|TeXmacs/examples/plugins/dynlink/progs/init-dynlink.scm> simply contains
 
   <\scm-code>
     (plugin-configure dynlink
@@ -183,7 +183,7 @@
     \ \ (:session "Dynlink"))
   </scm-code>
 
-  As to the <c++> file <verbatim|dynlink.cpp>, it contains a string
+  As to the <c++> file <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp>, it contains a string
 
   <\cpp-code>
     static char* output= NULL;

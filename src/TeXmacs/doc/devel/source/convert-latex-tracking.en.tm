@@ -32,7 +32,7 @@
   options\Q):
 
   <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|font-series|bold>|<table|<row|<cell|Preference>|<cell|Default>>|<row|<cell|<verbatim|latex-\<gtr\>texmacs:source-tracking>>|<cell|<verbatim|off>>>|<row|<cell|<verbatim|latex-\<gtr\>texmacs:conservative>>|<cell|<verbatim|off>>>|<row|<cell|<verbatim|latex-\<gtr\>texmacs:transparent-source-tracking>>|<cell|<verbatim|off>>>|<row|<cell|<verbatim|texmacs-\<gtr\>latex:source-tracking>>|<cell|<verbatim|off>>>|<row|<cell|<verbatim|texmacs-\<gtr\>latex:conservative>>|<cell|<verbatim|on>>>|<row|<cell|<verbatim|texmacs-\<gtr\>latex:transparent-source-tracking>>|<cell|<verbatim|on>>>>>>>
-    Preferences for source tracking (defaults from <verbatim|init-latex.scm>).
+    Preferences for source tracking (defaults from <source-link|init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm>).
   </big-table>
 
   The dialog sets the import and export variants of each preference
@@ -44,7 +44,7 @@
     <cpp|tree tracked_latex_to_texmacs (string s, bool as_pic)><explain-synopsis|import
     with source tracking>
   <|explain>
-    Defined in <verbatim|tracked_fromtex.cpp>. If
+    Defined in <source-link|tracked_fromtex.cpp|src/Data/Convert/Tex/tracked_fromtex.cpp>. If
     <verbatim|"latex-\<gtr\>texmacs:source-tracking"> is off, this is just
     <cpp|latex_document_to_tree>. Otherwise:
 
@@ -89,7 +89,7 @@
     <cpp|string conservative_texmacs_to_latex (tree doc, object
     opts)><explain-synopsis|export reusing the original source>
   <|explain>
-    Defined in <verbatim|conservative_totex.cpp>. If
+    Defined in <source-link|conservative_totex.cpp|src/Data/Convert/Tex/conservative_totex.cpp>. If
     <verbatim|"texmacs-\<gtr\>latex:conservative"> is off, or if the
     document has no <verbatim|latex-source> attachment, the function simply
     calls <cpp|tracked_texmacs_to_latex>. Otherwise:
@@ -128,7 +128,7 @@
     <cpp|string tracked_texmacs_to_latex (tree doc, object
     opts)><explain-synopsis|export with source tracking>
   <|explain>
-    Defined in <verbatim|tracked_totex.cpp>. After the macro expansion by
+    Defined in <source-link|tracked_totex.cpp|src/Data/Convert/Tex/tracked_totex.cpp>. After the macro expansion by
     <cpp|latex_expand>, the document is exported by
     <cpp|tree_to_latex_document> if
     <verbatim|"texmacs-\<gtr\>latex:source-tracking"> is off. Otherwise
@@ -169,7 +169,7 @@
     <cpp|tree conservative_latex_to_texmacs (string s, bool
     as_pic)><explain-synopsis|import reusing the original document>
   <|explain>
-    Defined in <verbatim|conservative_fromtex.cpp>. If
+    Defined in <source-link|conservative_fromtex.cpp|src/Data/Convert/Tex/conservative_fromtex.cpp>. If
     <verbatim|"latex-\<gtr\>texmacs:conservative"> is off, or if <verbatim|s>
     does not end with a block <verbatim|Begin TeXmacs source>
     (<cpp|get_texmacs_attachments>), this is <cpp|tracked_latex_to_texmacs>.
@@ -204,13 +204,13 @@
   <section|Error localization>
 
   The markers are also used by <cpp|try_latex_export>
-  (<verbatim|latex_recover.cpp>), called by the <menu|Tools|LaTeX|Run>
+  (<source-link|latex_recover.cpp|src/Data/Convert/Tex/latex_recover.cpp>), called by the <menu|Tools|LaTeX|Run>
   command. It exports the buffer with markers, runs <verbatim|pdflatex>,
   parses the log file (<cpp|get_latex_errors>) and, for each error, finds
   the position in the <LaTeX> source (<cpp|latex_error_find>) and the
   corresponding path in the <TeXmacs> document
   (<cpp|texmacs_error_find>). The widget of
-  <verbatim|convert/latex/tmtex-widgets.scm> uses this information to show
+  <source-link|convert/latex/tmtex-widgets.scm|TeXmacs/progs/convert/latex/tmtex-widgets.scm> uses this information to show
   the error next to the offending markup.
 
   <section|Remarks>
@@ -230,7 +230,7 @@
     succeeds.
 
     <item>A similar conservative mechanism exists for <name|BibTeX>
-    (<verbatim|Data/Convert/BibTeX/conservative_bib.cpp>, preference
+    (<source-link|Data/Convert/BibTeX/conservative_bib.cpp|src/Data/Convert/BibTeX/conservative_bib.cpp>, preference
     <verbatim|"texmacs-\<gtr\>bibtex:conservative">).
   </itemize>
 

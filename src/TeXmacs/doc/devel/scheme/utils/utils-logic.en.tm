@@ -24,7 +24,7 @@
     written as quoted symbols <scm|'x>. A special rule <scm|(assume
     <scm-arg|cond> ...)> adds the given conditions to all subsequent rules
     in the same declaration. For instance (from
-    <verbatim|kernel/logic/logic-test.scm>):
+    <source-link|kernel/logic/logic-test.scm|TeXmacs/progs/kernel/logic/logic-test.scm>):
 
     <\scm-code>
       (logic-rules
@@ -104,7 +104,7 @@
     the same value to several keys. The macro <scm|logic-ref> returns the
     unique value associated to <scm-arg|key> (or <scm|#f>), whereas
     <scm|logic-ref-list> returns the list of all associated values. For
-    instance, <verbatim|utils/base/environment.scm> declares
+    instance, <source-link|utils/base/environment.scm|TeXmacs/progs/utils/base/environment.scm> declares
 
     <\scm-code>
       (logic-table env-var-description%
@@ -129,7 +129,7 @@
   <|explain>
     A dispatcher is a table which associates functions to keys; contrary
     to <scm|logic-table>, the values <scm-arg|fun> are evaluated. Converters
-    such as <verbatim|convert/html/tmhtml.scm> use dispatchers to associate
+    such as <source-link|convert/html/tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm> use dispatchers to associate
     a conversion routine to each tag, which is then retrieved using
     <scm|logic-ref>. The macro <scm|logic-dispatch> calls the function
     associated to <scm-arg|key> on the arguments <scm-arg|arg> ...; it is

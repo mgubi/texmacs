@@ -10,7 +10,7 @@
   <\explain>
     <cpp|class drd_info_rep><explain-synopsis|a data relation descriptor>
   <|explain>
-    Declared in <verbatim|Data/Drd/drd_info.hpp>, with three data members:
+    Declared in <source-link|Data/Drd/drd_info.hpp|src/Data/Drd/drd_info.hpp>, with three data members:
 
     <\description>
       <item*|<cpp|string name>>A name used only for printing
@@ -38,7 +38,7 @@
   <|explain>
     The second constructor creates a <abbr|DRD> which <em|inherits> from
     <cpp|base>. The member <cpp|info> is a <em|relative hash map>
-    (<verbatim|Kernel/Containers/rel_hashmap.hpp>): a list of hash maps in
+    (<source-link|Kernel/Containers/rel_hashmap.hpp|src/Kernel/Containers/rel_hashmap.hpp>): a list of hash maps in
     which a lookup <cpp|info[l]> returns the entry of the first map that
     contains <cpp|l>, and an access for writing <cpp|info(l)> first copies
     the entry from the base into the local map. Hence modifications never
@@ -52,7 +52,7 @@
   <verbatim|TYPE_REGULAR>, border <verbatim|BORDER_YES>. Code which needs to
   know whether a label is described at all uses
   <cpp|drd_info_rep::contains (string l)>, which looks through the whole
-  chain. For instance, <cpp|correct_node> (<verbatim|Data/Tree/tree_modify.cpp>)
+  chain. For instance, <cpp|correct_node> (<source-link|Data/Tree/tree_modify.cpp|src/Data/Tree/tree_modify.cpp>)
   and <cpp|edit_dynamic_rep::insert_argument> only enforce arities of
   described labels.
 
@@ -71,7 +71,7 @@
   <\explain>
     <cpp|class tag_info_rep><explain-synopsis|the properties of one tag>
   <|explain>
-    A <cpp|tag_info> (<verbatim|Data/Drd/tag_info.hpp>) consists of
+    A <cpp|tag_info> (<source-link|Data/Drd/tag_info.hpp|src/Data/Drd/tag_info.hpp>) consists of
 
     <\description>
       <item*|<cpp|parent_info pi>>the properties of the tag itself;
@@ -103,7 +103,7 @@
   <cpp|type>, <cpp|accessible>, <cpp|hidden>, <cpp|disable_writable>,
   <cpp|enable_writable>, <cpp|locals>, <cpp|name> and <cpp|long_name>
   modify the record and return it again as a <cpp|tag_info>, so that they
-  can be chained in the declarative style of <verbatim|drd_std.cpp>:
+  can be chained in the declarative style of <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>:
 
   <\cpp-code>
     fixed (2) -\<gtr\> name ("fraction") -\<gtr\>
@@ -154,7 +154,7 @@
     <item*|<verbatim|ARITY_NORMAL>><math|n=base+extra> (fixed arity).
 
     <item*|<verbatim|ARITY_OPTIONS>><math|base\<leqslant\>n\<leqslant\>base+extra>
-    (optional trailing arguments; the comment in <verbatim|tag_info.hpp>
+    (optional trailing arguments; the comment in <source-link|tag_info.hpp|src/Data/Drd/tag_info.hpp>
     says <math|\<less\>> but the code uses <math|\<leqslant\>>).
 
     <item*|<verbatim|ARITY_REPEAT>><math|n=base+k\<cdot\>extra> for
@@ -171,7 +171,7 @@
   cm)> stores its arguments swapped (<cpp|arity_base= extra>,
   <cpp|arity_extra= arity>), so that <cpp|arity> is the length of the
   repeated group and <cpp|extra> the number of trailing children, as for
-  the helper <cpp|var_repeat> of <verbatim|drd_std.cpp>. The derived
+  the helper <cpp|var_repeat> of <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>. The derived
   queries are:
 
   <\explain>
@@ -204,7 +204,7 @@
     positions inside the prefix or at the start of a group; for
     <verbatim|ARITY_VAR_REPEAT> at the start of a group or inside the
     trailing part. Used by <cpp|insert_argument> and
-    <cpp|remove_empty_argument> (<verbatim|Edit/Modify/edit_dynamic.cpp>)
+    <cpp|remove_empty_argument> (<source-link|Edit/Modify/edit_dynamic.cpp|src/Edit/Modify/edit_dynamic.cpp>)
     to implement structured insertion of arguments.
   </explain>
 
@@ -280,16 +280,16 @@
     The cursor may not be positioned at the start of the first accessible
     child or the end of the last one; the positions outside the tag are
     used instead (see <cpp|is_accessible_cursor> in
-    <verbatim|Data/Tree/tree_cursor.cpp>).
+    <source-link|Data/Tree/tree_cursor.cpp|src/Data/Tree/tree_cursor.cpp>).
   </explain>
 
   <cpp|var_without_border (tree_label l)> is true for non-primitive tags
   with the <verbatim|BORDER_INNER> bit; the editor treats such macros like
   <markup|concat> when selecting (<cpp|edit_select_rep::select_enlarge> in
-  <verbatim|Edit/Replace/edit_select.cpp>, <cpp|selection_adjust_border>
-  in <verbatim|Data/Tree/tree_select.cpp>) and when removing structure
+  <source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>, <cpp|selection_adjust_border>
+  in <source-link|Data/Tree/tree_select.cpp|src/Data/Tree/tree_select.cpp>) and when removing structure
   (<cpp|edit_text_rep::remove_structure_upwards> in
-  <verbatim|Edit/Modify/edit_delete.cpp>). The heuristics never set the
+  <source-link|Edit/Modify/edit_delete.cpp|src/Edit/Modify/edit_delete.cpp>). The heuristics never set the
   border; it is only changed by <cpp|drd_std.cpp> and by
   <markup|drd-props>.
 
@@ -299,14 +299,14 @@
     <item*|<cpp|block>>Meant to tell whether the tag is block or inline
     content (<verbatim|BLOCK_OR>: a block if one of its children which
     admit both is a block). The getters and setters are declared in
-    <verbatim|drd_info.hpp> but not implemented, and no code reads the
+    <source-link|drd_info.hpp|src/Data/Drd/drd_info.hpp> but not implemented, and no code reads the
     field: it is currently unused.
 
     <item*|<cpp|with_like>>The tag only modifies the environment of its
     last child, like <markup|with>, <markup|with-package> or a macro such
     as <markup|strong>. Queried by <cpp|is_with_like (tree t)> (which also
     requires <cpp|N(t)\<gtr\>0>); used by the correction routines of
-    <verbatim|Data/Tree/tree_analyze.cpp> and <verbatim|tree_correct.cpp>
+    <source-link|Data/Tree/tree_analyze.cpp|src/Data/Tree/tree_analyze.cpp> and <source-link|tree_correct.cpp|src/Data/Tree/tree_correct.cpp>
     (<scm|with-correct> and friends), by the heuristics
     (<cpp|heuristic_with_like>) and by <cpp|make_compound>, which delegates
     the insertion of with-like tags to the <scheme> routine
@@ -317,11 +317,11 @@
     <verbatim|VAR_MACRO_PARAMETER> for macros which are used as parameters
     (a zero-argument macro holding a length or a localized string). The
     free functions <cpp|is_macro> and <cpp|is_parameter>
-    (<verbatim|Data/Tree/tree_traverse.cpp>, glue
+    (<source-link|Data/Tree/tree_traverse.cpp|src/Data/Tree/tree_traverse.cpp>, glue
     <scm|tree-label-macro?> and <scm|tree-label-parameter?>) test
     <cpp|var_type != VAR_PARAMETER>, <abbr|resp.> <cpp|var_type !=
     VAR_MACRO>; they are used to build the focus menus of style parameters
-    in <verbatim|generic/generic-menu.scm>.
+    in <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>.
   </description>
 
   <subsection|Freezing>
@@ -370,7 +370,7 @@
     cursor enter <cpp|t[i]>?>
   <|explain>
     Translates <cpp|i> with <cpp|get_index> and compares the stored value
-    with the global access mode (<verbatim|Data/Drd/drd_mode.hpp>):
+    with the global access mode (<source-link|Data/Drd/drd_mode.hpp|src/Data/Drd/drd_mode.hpp>):
     <verbatim|DRD_ACCESS_NORMAL> accepts only
     <verbatim|ACCESSIBLE_ALWAYS>, <verbatim|DRD_ACCESS_HIDDEN> also
     <verbatim|ACCESSIBLE_HIDDEN>, and <verbatim|DRD_ACCESS_SOURCE> accepts
@@ -378,7 +378,7 @@
     a string <verbatim|f>, the record of the pseudo-label
     <verbatim|extern:f> is used, which allows style files to declare the
     accessibility of the arguments of individual <scheme> functions with
-    <markup|drd-props> (see <verbatim|packages/customize/math/math-check.ts>).
+    <markup|drd-props> (see <source-link|packages/customize/math/math-check.ts|TeXmacs/packages/customize/math/math-check.ts>).
   </explain>
 
   Related queries: <cpp|is_accessible_path (t, p)> (all children along a
@@ -401,13 +401,13 @@
   <verbatim|WRITABILITY_DISABLE> makes the whole subtree of the child
   read-only, except for descendants whose writability is re-enabled with
   <verbatim|WRITABILITY_ENABLE>. The routine <cpp|is_accessible_cursor>
-  (<verbatim|Data/Tree/tree_cursor.cpp>) switches the global writable mode
+  (<source-link|Data/Tree/tree_cursor.cpp|src/Data/Tree/tree_cursor.cpp>) switches the global writable mode
   (<cpp|set_writable_mode>) to <verbatim|DRD_WRITABLE_INPUT> when it
   enters a disabled child and back to <verbatim|DRD_WRITABLE_NORMAL> when
   it enters an enabled one; in <verbatim|DRD_WRITABLE_INPUT> mode no
   cursor position in a string is accessible (outside source mode). The
   macros <markup|disable-writability> and <markup|enable-writability> of
-  <verbatim|packages/gui/gui-widget.ts> are declared this way. Query:
+  <source-link|packages/gui/gui-widget.ts|TeXmacs/packages/gui/gui-widget.ts> are declared this way. Query:
   <cpp|get_writability_child (t, i)>.
 
   <subsection|Block requirements>
@@ -496,8 +496,8 @@
     default \Pparsed as its expansion\Q; <cpp|get_syntax (tree t, path
     p)> performs the substitution of the arguments (wrapping them in
     <markup|quasi> trees with their paths if <cpp|p> is given). Consumers:
-    <verbatim|System/Language/packrat_serializer.cpp> and
-    <cpp|symbol_type> in <verbatim|Data/Tree/tree_analyze.cpp>.
+    <source-link|System/Language/packrat_serializer.cpp|src/System/Language/packrat_serializer.cpp> and
+    <cpp|symbol_type> in <source-link|Data/Tree/tree_analyze.cpp|src/Data/Tree/tree_analyze.cpp>.
   </description>
 
   <section|Types><label|types>
@@ -553,10 +553,10 @@
   </description-paragraphs>
 
   The child types are used for syntax coloring in source mode
-  (<cpp|highlight> in <verbatim|Typeset/Env/env_inactive.cpp> maps them to
+  (<cpp|highlight> in <source-link|Typeset/Env/env_inactive.cpp|src/Typeset/Env/env_inactive.cpp> maps them to
   <markup|src-regular>, <markup|src-var>, <markup|src-length>, ...), by
   the focus bar to choose an input field for inaccessible children
-  (<scm|type-\<gtr\>format> in <verbatim|generic/generic-menu.scm>), by the
+  (<scm|type-\<gtr\>format> in <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>), by the
   correction routine <cpp|is_correctable_child>, and by the heuristics to
   infer the types of macro arguments.
 

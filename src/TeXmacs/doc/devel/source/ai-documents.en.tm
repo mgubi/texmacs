@@ -14,11 +14,11 @@
     an opaque identifier, the model is asked to work on an <name|HTML>
     document which only contains text, paragraphs and these identifiers,
     and the identifiers are expanded again in the answer
-    (<verbatim|compress.cpp>);
+    (<source-link|compress.cpp|src/Data/Convert/AI/compress.cpp>);
 
     <item>for <em|sessions>, the prompt is sent as <LaTeX> and the model is
     asked to answer with a <LaTeX> document, which is imported with the
-    <LaTeX> converter (<cpp|ai_latex_output> in <verbatim|ai.cpp>).
+    <LaTeX> converter (<cpp|ai_latex_output> in <source-link|ai.cpp|src/Data/Convert/AI/ai.cpp>).
   </itemize>
 
   <section|Compression of markup>
@@ -87,8 +87,8 @@
   outside the codes; it is used to skip paragraphs without text.
 
   The same encoding is used by the <name|LanguageTool> spell checker
-  (<verbatim|tools/spell/spell-lantool.scm>): <cpp|lantool_correct (s,
-  out)> (<verbatim|lantool.cpp>) takes the compressed <name|HTML> that was
+  (<source-link|tools/spell/spell-lantool.scm|TeXmacs/progs/tools/spell/spell-lantool.scm>): <cpp|lantool_correct (s,
+  out)> (<source-link|lantool.cpp|src/Data/Convert/AI/lantool.cpp>) takes the compressed <name|HTML> that was
   sent and the <name|JSON> reply of the server, and inserts a
   <markup|spell-error> node for every match with replacements, skipping
   matches which fall inside the <name|HTML> markup or the codes.
@@ -137,7 +137,7 @@
 
   <\description>
     <item*|The prompt>The session input is serialized by
-    <scm|ai-serialize> (<verbatim|tools/ai/ai-batch.scm>): a document with a
+    <scm|ai-serialize> (<source-link|tools/ai/ai-batch.scm|TeXmacs/progs/tools/ai/ai-batch.scm>): a document with a
     single paragraph is unwrapped, plain text is sent as <name|UTF-8>, and
     anything else is converted to a <LaTeX> snippet with <name|UTF-8>
     encoding.
@@ -191,7 +191,7 @@
   <\itemize>
     <item><cpp|ai_correct> and <cpp|ai_translate> call <verbatim|ai_post
     (r, u)> with the <em|answer string> <cpp|r> instead of the original
-    tree <cpp|t> (<verbatim|ai.cpp:815> and <verbatim|851>). Since a string
+    tree <cpp|t> (<source-link|ai.cpp:815|src/Data/Convert/AI/ai.cpp:815> and <verbatim|851>). Since a string
     is never a <markup|document>, <cpp|ai_post> never removes the trailing
     empty paragraphs it was written to remove.
 

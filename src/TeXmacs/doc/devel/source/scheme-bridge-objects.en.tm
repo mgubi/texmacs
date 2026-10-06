@@ -10,8 +10,8 @@
   <\explain>
     <cpp|class object><explain-synopsis|a <scheme> value seen from <c++>>
   <|explain>
-    Declared in <verbatim|Scheme/scheme.hpp> as a <cpp|CONCRETE> handle;
-    its representation <cpp|tmscm_object_rep> (<verbatim|Scheme/Scheme/object.hpp>)
+    Declared in <source-link|Scheme/scheme.hpp|src/Scheme/scheme.hpp> as a <cpp|CONCRETE> handle;
+    its representation <cpp|tmscm_object_rep> (<source-link|Scheme/Scheme/object.hpp|src/Scheme/Scheme/object.hpp>)
     holds the <name|Guile> value. Objects are built from the usual
     <TeXmacs> types:
 
@@ -107,8 +107,8 @@
 
     <item*|<cpp|eval_file (string)>, <cpp|exec_file (url)>>Load a file.
     <cpp|exec_file> is the one used for the initialization files of the
-    server and of new views (<verbatim|Texmacs/Server/tm_server.cpp>,
-    <verbatim|Texmacs/Data/new_view.cpp>).
+    server and of new views (<source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp>,
+    <source-link|Texmacs/Data/new_view.cpp|src/Texmacs/Data/new_view.cpp>).
 
     <item*|<cpp|call (fun, a1, ..., a4)>, <cpp|call (fun,
     array\<less\>object\<gtr\>)>>Apply a function. <cpp|fun> may be an
@@ -137,7 +137,7 @@
     Returns an <cpp|object_command_rep>, a <cpp|command_rep> holding the
     procedure. Applying the command without arguments calls the procedure
     without arguments; <cpp|apply (cmd, args)>
-    (<verbatim|Kernel/Abstractions/command.hpp>) passes the elements of
+    (<source-link|Kernel/Abstractions/command.hpp|src/Kernel/Abstractions/command.hpp>) passes the elements of
     the list <cpp|args> as arguments. This is how <scheme> callbacks are
     passed to widgets, timers and dialogs.
 
@@ -155,8 +155,8 @@
   <cpp|exec_delayed (cmd)> appends a procedure without arguments to a
   queue which is processed by the event loop, in the order of insertion.
   With <name|Qt> the queue is <cpp|command_queue> in
-  <verbatim|Plugins/Qt/qt_gui.cpp>; with the other toolkits it is the
-  static queue of <verbatim|Scheme/Scheme/object.cpp>, processed by
+  <source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>; with the other toolkits it is the
+  static queue of <source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>, processed by
   <cpp|exec_pending_commands> from the interpose handler. Both
   implementations behave in the same way:
 
@@ -170,7 +170,7 @@
     any other result removes it from the queue.
   </itemize>
 
-  The <scheme> macro <scm|delayed> (<verbatim|kernel/texmacs/tm-dialogue.scm>)
+  The <scheme> macro <scm|delayed> (<source-link|kernel/texmacs/tm-dialogue.scm|TeXmacs/progs/kernel/texmacs/tm-dialogue.scm>)
   is built on the second form: options such as <scm|:pause>,
   <scm|:idle>, <scm|:every>, <scm|:while> or <scm|:refresh> compile to a
   procedure which returns the number of milliseconds left as long as its
@@ -182,8 +182,8 @@
   <section|Protected calls>
 
   <cpp|protected_call (cmd)>, exported as <scm|protected-call>, is used
-  by the menu code (<verbatim|kernel/gui/menu-widget.scm>,
-  <verbatim|menu-convert.scm>) to run the action of a menu entry. It
+  by the menu code (<source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>,
+  <source-link|menu-convert.scm|TeXmacs/progs/kernel/gui/menu-convert.scm>) to run the action of a menu entry. It
   brackets the call with <cpp|before_menu_action> and
   <cpp|after_menu_action> of the current editor, and, if a <c++>
   exception is raised, calls <cpp|cancel_menu_action> and reports it with
@@ -193,7 +193,7 @@
   <section|Preferences>
 
   <cpp|get_preference>, <cpp|set_preference> and <cpp|notify_preference>
-  are also declared in <verbatim|scheme.hpp>, because the preferences are
+  are also declared in <source-link|scheme.hpp|src/Scheme/scheme.hpp>, because the preferences are
   managed in <scheme>. Before <cpp|notify_preferences_booted> has been
   called, they fall back on the <c++> table of user preferences
   (<cpp|get_user_preference>, <cpp|set_user_preference>), which is what

@@ -37,7 +37,7 @@
     \ \ \ \ make
   </verbatim>
 
-  ausführen und so den Programmcode <verbatim|minimal.cpp> zu einer
+  ausführen und so den Programmcode <source-link|minimal.cpp|TeXmacs/examples/plugins/minimal/src/minimal.cpp> zu einer
   Binärdatei kompilieren
 
   <\verbatim>
@@ -51,9 +51,9 @@
 
   Das <verbatim|minimal> Plugin demonstriert eine Minimal-Schnittstelle
   zwischen <TeXmacs> und einem externen Programm. Dieses Programm und sein
-  Quellcode in <verbatim|minimal.cpp> wird eingehender im Kapitel über
+  Quellcode in <source-link|minimal.cpp|TeXmacs/examples/plugins/minimal/src/minimal.cpp> wird eingehender im Kapitel über
   <hyper-link|Schittstellen|../interface/interface-pipes.de.tm> erklärt. Die
-  Initialisierungs-Datei <verbatim|init-minimal.scm> enthält den folgenden
+  Initialisierungs-Datei <source-link|init-minimal.scm|TeXmacs/examples/plugins/minimal/progs/init-minimal.scm> enthält den folgenden
   Code:
 
   <\scheme-fragment>

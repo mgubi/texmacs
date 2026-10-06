@@ -27,13 +27,13 @@
     reference to an earlier abbreviation is only found if it is written in
     lower case: <cpp|bib_strings_dict> stores the names in lower case but
     looks them up with their original case
-    (<verbatim|Plugins/Bibtex/bibtex_functions.cpp:1045>). With
+    (<source-link|Plugins/Bibtex/bibtex_functions.cpp:1045|src/Plugins/Bibtex/bibtex_functions.cpp:1045>). With
     <verbatim|@string{Foo = "X"} @string{bar = FOO # "Y"}>, <verbatim|bar>
     is <verbatim|"Y">.
 
     <item><em|(checked)> An unknown abbreviation is kept as its name when
     it is the whole value, but replaced by nothing inside a <verbatim|#>
-    concatenation (<cpp|bib_subst_str>, <verbatim|bibtex_functions.cpp:1063>),
+    concatenation (<cpp|bib_subst_str>, <source-link|bibtex_functions.cpp:1063|src/Plugins/Bibtex/bibtex_functions.cpp:1063>),
     without any warning.
 
     <item>The month abbreviations <verbatim|jan>, ..., <verbatim|dec>,
@@ -41,13 +41,13 @@
     the internal styles <verbatim|month = jan> prints <verbatim|jan>.
 
     <item><em|(checked)> <verbatim|@preamble> items are parsed but dropped
-    from the result of <cpp|parse_bib> (<verbatim|parsebib.cpp:411>), so
+    from the result of <cpp|parse_bib> (<source-link|parsebib.cpp:411|src/Data/Convert/BibTeX/parsebib.cpp:411>), so
     macros defined there are unknown when the field values are converted
     and are not available to the internal styles.
 
     <item>The conversion of field values is all or nothing: if the number
     of pieces produced by the <LaTeX> parser does not match the number of
-    fields, <cpp|bib_parse_fields> (<verbatim|bibtex_functions.cpp:957>)
+    fields, <cpp|bib_parse_fields> (<source-link|bibtex_functions.cpp:957|src/Plugins/Bibtex/bibtex_functions.cpp:957>)
     converts <em|no> field of the file, and every value of every entry
     stays a raw <LaTeX> string. One unusual value can therefore spoil the
     whole bibliography.
@@ -55,7 +55,7 @@
     <item><em|(checked)> Page ranges which do not start with a digit
     (article numbers such as <verbatim|e1002--e1010>, roman numerals) become
     <verbatim|(bib-pages "0")> (<cpp|bib_field_pages>,
-    <verbatim|bibtex_functions.cpp:824>). The original value is lost, also
+    <source-link|bibtex_functions.cpp:824|src/Plugins/Bibtex/bibtex_functions.cpp:824>). The original value is lost, also
     when a modified entry is saved back to the <verbatim|.bib> file.
   </itemize>
 
@@ -63,14 +63,14 @@
 
   <\itemize>
     <item><em|(checked)> <cpp|bib_tree_length>
-    (<verbatim|bibtex_functions.cpp:692>) adds up the lengths of the
+    (<source-link|bibtex_functions.cpp:692|src/Plugins/Bibtex/bibtex_functions.cpp:692>) adds up the lengths of the
     children of a <markup|concat> in a local variable but then returns
     <verbatim|0>, so <scm|bib-text-length> is <verbatim|0> for every
     compound tree. The styles then use a non-breaking space where a space
     was intended after long compound values.
 
     <item><em|(checked)> <cpp|bib_get_prefix>
-    (<verbatim|bibtex_functions.cpp:713>) computes the index of the body of
+    (<source-link|bibtex_functions.cpp:713|src/Plugins/Bibtex/bibtex_functions.cpp:713>) computes the index of the body of
     a <markup|with> but never descends into it, so <scm|bib-prefix> of a
     formatted value is empty. It also counts bytes, so that the prefix of
     <verbatim|\<less\>Ccaron\<gtr\>apek> of length three is the invalid
@@ -95,7 +95,7 @@
 
   <\itemize>
     <item>The command line built by <cpp|bibtex_run>
-    (<verbatim|Plugins/Bibtex/bibtex.cpp:192>) starts with <verbatim|cd
+    (<source-link|Plugins/Bibtex/bibtex.cpp:192|src/Plugins/Bibtex/bibtex.cpp:192>) starts with <verbatim|cd
     $TEXMACS_HOME_PATH/system/bib;> without quotes, so it fails when the
     home path contains spaces; the directory of the <verbatim|.bib> file is
     quoted with double quotes, which does not protect it against
@@ -103,16 +103,16 @@
 
     <item>Any non-zero exit status of the shell command is reported as an
     error, with the whole log, and the warnings are then not extracted
-    (<verbatim|bibtex.cpp:202>). In both cases <verbatim|temp.bbl> is
+    (<source-link|bibtex.cpp:202|src/Plugins/Bibtex/bibtex.cpp:202>). In both cases <verbatim|temp.bbl> is
     loaded afterwards: if <verbatim|bibtex> stopped before writing it (for
     instance because the style does not exist), the bibliography of the
     previous run is silently used.
 
     <item>All runs share <verbatim|temp.aux>, <verbatim|temp.log> and
-    <verbatim|temp.bbl> (<verbatim|bibtex.cpp:186>), so two instances of
+    <verbatim|temp.bbl> (<source-link|bibtex.cpp:186|src/Plugins/Bibtex/bibtex.cpp:186>), so two instances of
     <TeXmacs> generating bibliographies at the same time interfere.
 
-    <item><cpp|copy_bst_file> (<verbatim|Edit/Process/edit_process.cpp:71>)
+    <item><cpp|copy_bst_file> (<source-link|Edit/Process/edit_process.cpp:71|src/Edit/Process/edit_process.cpp:71>)
     only copies a <verbatim|.bst> file from the directory of the document
     if no copy exists yet, so a later version of the file is not copied.
     Whether <verbatim|bibtex> then uses the old copy or the new file depends
@@ -122,12 +122,12 @@
 
     <item>When <verbatim|TeXmacs:> keys are cited, <cpp|complete_bib_file>
     writes <verbatim|<em|name>-extended.bib> in the directory of the
-    user's <verbatim|.bib> file (<verbatim|bibtex.cpp:157>), which may be
+    user's <verbatim|.bib> file (<source-link|bibtex.cpp:157|src/Plugins/Bibtex/bibtex.cpp:157>), which may be
     read only or under version control.
 
     <item><cpp|bibtex_load_bbl> accesses the second argument of every
     <markup|bibitem*> and <markup|bibitem-with-key> item
-    (<verbatim|bibtex.cpp:121>) after only checking that it has at least
+    (<source-link|bibtex.cpp:121|src/Plugins/Bibtex/bibtex.cpp:121>) after only checking that it has at least
     one, so an unusual <verbatim|.bbl> file can read past the end of the
     tree.
   </itemize>
@@ -136,7 +136,7 @@
 
   <\itemize>
     <item><em|(checked)> <scm|serialize-bibtex> writes atomic values
-    verbatim between braces (<verbatim|convert/bibtex/bibtexout.scm:133>).
+    verbatim between braces (<source-link|convert/bibtex/bibtexout.scm:133|TeXmacs/progs/convert/bibtex/bibtexout.scm:133>).
     <verbatim|50\\% caf\\'e> read from a <verbatim|.bib> file is written
     back as <verbatim|50% caf> followed by the raw Cork byte of
     <verbatim|e> acute: the percent sign then starts a <LaTeX> comment, and
@@ -148,7 +148,7 @@
 
   <\itemize>
     <item><scm|bib-define-style> sets the global <scm|bib-default-style> to
-    the fallback of the style being loaded (<verbatim|bibtex/bib-utils.scm:83>,
+    the fallback of the style being loaded (<source-link|bibtex/bib-utils.scm:83|TeXmacs/progs/bibtex/bib-utils.scm:83>,
     <verbatim|87>), and <scm|bib-mode?> also tests this global. All shipped
     styles use <verbatim|plain> as fallback, so this is harmless today, but
     a style with another fallback would make the overrides of that fallback
@@ -156,13 +156,13 @@
 
     <item>The preview of the bibliography dialog loads the module
     <verbatim|(bibtex <em|name>)> for whatever style is selected
-    (<verbatim|bibtex/bib-widgets.scm:49>); for an external style such as
+    (<source-link|bibtex/bib-widgets.scm:49|TeXmacs/progs/bibtex/bib-widgets.scm:49>); for an external style such as
     <verbatim|amsplain> there is no such module. The preview also formats
     every entry of the <verbatim|.bib> file, which is slow for large files.
 
     <item>Completion of citation keys resolves the file name of the
     <markup|bibliography> tag directly relative to the buffer
-    (<verbatim|bibtex/bib-complete.scm:47>), without the <verbatim|.bib>
+    (<source-link|bibtex/bib-complete.scm:47|TeXmacs/progs/bibtex/bib-complete.scm:47>), without the <verbatim|.bib>
     suffix and ancestor directory search of <cpp|find_bib_file>, so it may
     find nothing for bibliographies which compile fine. The result is
     cached per buffer, and the code itself notes that a change of the file

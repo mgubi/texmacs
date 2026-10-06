@@ -6,10 +6,10 @@
   <tmdoc-title|Files and caches>
 
   This page describes the file routines of
-  <verbatim|System/Files/file.hpp> and <verbatim|file.cpp>, the caches of
-  <verbatim|System/Misc/data_cache.cpp>, the persistent store of
-  <verbatim|System/Misc/persistent.cpp> and the generated files of
-  <verbatim|System/Files/make_file.cpp>. All of them take <abbr|URL>s (see
+  <source-link|System/Files/file.hpp|src/System/Files/file.hpp> and <source-link|file.cpp|src/System/Files/file.cpp>, the caches of
+  <source-link|System/Misc/data_cache.cpp|src/System/Misc/data_cache.cpp>, the persistent store of
+  <source-link|System/Misc/persistent.cpp|src/System/Misc/persistent.cpp> and the generated files of
+  <source-link|System/Files/make_file.cpp|src/System/Files/make_file.cpp>. All of them take <abbr|URL>s (see
   <hlink|URLs, resolution and concretization|system-urls.en.tm>) and end up
   in the platform functions <cpp|texmacs_fopen>, <cpp|texmacs_stat>, ...
   of <hlink|the platform layers|system-platforms.en.tm>.
@@ -169,7 +169,7 @@
     only loaded when a documentation file is first read.
 
     <item*|<verbatim|font_cache.scm>>Locations of <name|TrueType> fonts,
-    used by <verbatim|Plugins/Freetype/tt_file.cpp>.
+    used by <source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>.
 
     <item*|<verbatim|validate_cache.scm>>For each directory, the
     modification time it had when its entries were cached.
@@ -233,9 +233,9 @@
 
   The same directory holds caches which are managed elsewhere: the style
   caches <verbatim|__<em|style>__...> of
-  <verbatim|Data/Document/new_style.cpp> (see <hlink|style and document
+  <source-link|Data/Document/new_style.cpp|src/Data/Document/new_style.cpp> (see <hlink|style and document
   DRDs|drd-documents.en.tm>), <verbatim|plugin_cache.scm> of
-  <verbatim|kernel/texmacs/tm-plugins.scm>, and the persistent stores of
+  <source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>, and the persistent stores of
   the <scheme> documentation tools (below). The command line options
   <verbatim|-delete-cache>, <verbatim|-delete-style-cache>,
   <verbatim|-delete-file-cache>, <verbatim|-delete-doc-cache>,
@@ -244,11 +244,11 @@
 
   <section|The persistent store>
 
-  <verbatim|System/Misc/persistent.cpp> implements a simple key-value
+  <source-link|System/Misc/persistent.cpp|src/System/Misc/persistent.cpp> implements a simple key-value
   store of strings on disk, exported to <scheme> as <scm|persistent-set>,
   <scm|persistent-get>, <scm|persistent-has?>, <scm|persistent-remove>
   and <scm|persistent-file-name> (and <scm|persistent-ref> in
-  <verbatim|kernel/boot/abbrevs.scm>). A store is a directory. The entries
+  <source-link|kernel/boot/abbrevs.scm|TeXmacs/progs/kernel/boot/abbrevs.scm>). A store is a directory. The entries
   are distributed over files according to a hash of the key: a file holds
   at most 10 entries and 4096 bytes, after which it is replaced by a
   directory of up to 26 files <verbatim|a> to <verbatim|z>, selected by the
@@ -257,11 +257,11 @@
   the subdirectory <verbatim|_> of a store, using a counter stored in the
   file <verbatim|_/_>. The documentation tools use this to keep the
   collected <scheme> and macro documentation
-  (<verbatim|doc/apidoc-collect.scm>).
+  (<source-link|doc/apidoc-collect.scm|TeXmacs/progs/doc/apidoc-collect.scm>).
 
   <section|Generated files>
 
-  <cpp|make_file (cmd, data, args)> (<verbatim|System/Files/make_file.cpp>)
+  <cpp|make_file (cmd, data, args)> (<source-link|System/Files/make_file.cpp|src/System/Files/make_file.cpp>)
   produces a file in <verbatim|$TEXMACS_HOME_PATH/system/make> whose name
   is a hash of the command and its arguments. The commands are
   <cpp|CMD_GET_FROM_WEB> and <cpp|CMD_GET_FROM_SERVER> (local copies of
@@ -298,7 +298,7 @@
     <verbatim|$TEXMACS_PATH/LICENSE>, <scm|(url-newer? a b)> returns
     <scm|#f> although the first file is more recent. This affects in
     particular the incremental update of web sites built from the
-    documentation (<verbatim|doc/tmweb.scm>).
+    documentation (<source-link|doc/tmweb.scm|TeXmacs/progs/doc/tmweb.scm>).
 
     <item>The filter <verbatim|l> never succeeds on <name|Unix>: the
     attributes come from <cpp|texmacs_stat>, which follows symbolic links

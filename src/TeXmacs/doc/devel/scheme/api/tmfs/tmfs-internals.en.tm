@@ -13,19 +13,19 @@
   implementation is split between two layers:
 
   <\itemize>
-    <item>The <c++> file layer (<verbatim|System/Classes/url.cpp>,
-    <verbatim|System/Files/file.cpp>, <verbatim|System/Files/web_files.cpp>)
+    <item>The <c++> file layer (<source-link|System/Classes/url.cpp|src/System/Classes/url.cpp>,
+    <source-link|System/Files/file.cpp|src/System/Files/file.cpp>, <source-link|System/Files/web_files.cpp|src/System/Files/web_files.cpp>)
     recognizes <verbatim|tmfs> <abbr|URL>s and, instead of accessing the disk,
     calls a small number of <scheme> entry points: <scm|tmfs-load>,
     <scm|tmfs-save>, <scm|tmfs-permission?>, <scm|tmfs-format>,
     <scm|tmfs-title> and <scm|tmfs-can-autosave?>.
 
-    <item>The <scheme> module <verbatim|kernel/texmacs/tm-file-system.scm>
+    <item>The <scheme> module <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>
     implements these entry points by dispatching on the <em|class> of the
     <abbr|URL> (its first component) to <em|handlers> registered by other
     modules, with default behaviors for missing handlers. Some further
     operations (dates, removal, autosave, masters) are only used from
-    <scheme>, mainly by <verbatim|texmacs/texmacs/tm-files.scm>.
+    <scheme>, mainly by <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>.
   </itemize>
 
   Since all file operations of <TeXmacs> go through the same <c++> routines
@@ -41,7 +41,7 @@
 
   <TeXmacs> represents <abbr|URL>s as trees (see <hlink|the <abbr|URL>
   system|../url.en.tm>). When a string is converted into a <abbr|URL>, the
-  generic constructor <cpp|url_general> in <verbatim|System/Classes/url.cpp>
+  generic constructor <cpp|url_general> in <source-link|System/Classes/url.cpp|src/System/Classes/url.cpp>
   checks for known protocol prefixes. For <verbatim|tmfs://> it calls
 
   <\cpp-code>
@@ -61,7 +61,7 @@
   <verbatim|help>, <verbatim|normal>, <verbatim|tm>, ... Nothing else is
   interpreted: query strings such as <verbatim|type=module&what=doc.apidoc>
   are simply parts of names. The following predicates are declared in
-  <verbatim|System/Classes/url.hpp>:
+  <source-link|System/Classes/url.hpp|src/System/Classes/url.hpp>:
 
   <\description>
     <item*|<cpp|is_root_tmfs (url u)>>Whether <cpp|u> is the root
@@ -75,13 +75,13 @@
     <cpp|u> is a <verbatim|tmfs> <abbr|URL> whose class is
     <cpp|sub_protocol>. Exported to <scheme> as
     <scm|url-rooted-tmfs-protocol?>. For instance,
-    <verbatim|Texmacs/Window/tm_dialogue.cpp> uses
+    <source-link|Texmacs/Window/tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp> uses
     <cpp|is_rooted_tmfs (buf, "part")> to recognize partial documents.
   </description>
 
   <verbatim|tmfs> <abbr|URL>s count as rooted <abbr|URL>s: relative
   names can be completed against them (<cpp|complete> in
-  <verbatim|System/Classes/url.cpp> accepts them in the same way as web
+  <source-link|System/Classes/url.cpp|src/System/Classes/url.cpp> accepts them in the same way as web
   <abbr|URL>s), which is how relative hyperlinks and images inside a
   generated document can work. When the directory of a <verbatim|tmfs> document
   is not meaningful, a <em|master> should be provided (see below).
@@ -111,7 +111,7 @@
   handler table, although <scm|lazy-tmfs-handler> takes symbols.
 
   How the name is structured is up to each handler. Two conventions are
-  supported by helper functions in <verbatim|kernel/texmacs/tm-file-system.scm>:
+  supported by helper functions in <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>:
 
   <\description>
     <item*|Queries>A name of the form <verbatim|var1=val1&var2=val2> is
@@ -174,7 +174,7 @@
   <subsection|Testing and resolving>
 
   File tests are implemented by <cpp|is_of_type (url name, string filter)>
-  in <verbatim|System/Files/file.cpp>, where <cpp|filter> is a string of
+  in <source-link|System/Files/file.cpp|src/System/Files/file.cpp>, where <cpp|filter> is a string of
   letters. For <verbatim|tmfs> <abbr|URL>s:
 
   <\itemize>
@@ -193,7 +193,7 @@
   same as asking for read permission; the load handler is not called.
   <cpp|file_size> returns <cpp|-1> and <cpp|last_modified> returns the
   smallest possible date for <verbatim|tmfs> <abbr|URL>s; on the <scheme>
-  side, <verbatim|texmacs/texmacs/tm-files.scm> redefines
+  side, <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> redefines
   <scm|url-last-modified> and <scm|url-newer?> so that they use
   <scm|tmfs-date> instead. <cpp|file_format> calls <scm|tmfs-format>
   instead of guessing the format from the suffix.
@@ -203,8 +203,8 @@
   Reading a file always goes through resolution and <em|concretization>,
   which maps a resolved <abbr|URL> to a local file name. For
   <verbatim|tmfs> <abbr|URL>s, <cpp|concretize_url> in
-  <verbatim|System/Classes/url.cpp> calls <cpp|get_from_server> in
-  <verbatim|System/Files/web_files.cpp>:
+  <source-link|System/Classes/url.cpp|src/System/Classes/url.cpp> calls <cpp|get_from_server> in
+  <source-link|System/Files/web_files.cpp|src/System/Files/web_files.cpp>:
 
   <\cpp-code>
     url
@@ -258,7 +258,7 @@
     each time the document is read.
 
     <item>Any code which needs a local copy of a file (images, inclusions,
-    <cpp|make_file> in <verbatim|System/Files/make_file.cpp> with the
+    <cpp|make_file> in <source-link|System/Files/make_file.cpp|src/System/Files/make_file.cpp> with the
     command <cpp|CMD_GET_FROM_SERVER>) works for <verbatim|tmfs> too. As a
     special case, <cpp|make_file> first looks for
     <verbatim|tmfs://artwork/...> files in
@@ -291,7 +291,7 @@
     autosave names ending with <verbatim|~> or <verbatim|#>.
 
     <item*|<scm|(tmfs-title name doc)>>From <cpp|propose_title> in
-    <verbatim|Texmacs/Data/new_buffer.cpp>.
+    <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>.
   </description>
 
   <section|Loading and saving buffers>
@@ -302,12 +302,12 @@
   <verbatim|tmfs://help/normal/tm/doc/main/man-manual.en.tm> is as follows.
 
   <\enumerate>
-    <item><scm|load-buffer> (<verbatim|texmacs/texmacs/tm-files.scm>)
+    <item><scm|load-buffer> (<source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>)
     checks permissions with <scm|url-test?>: the tests <verbatim|"f"> and
     <verbatim|"r"> end up in <scm|tmfs-permission?>.
 
     <item><scm|buffer-load> calls <cpp|buffer_load> in
-    <verbatim|Texmacs/Data/new_buffer.cpp>, which determines the format with
+    <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>, which determines the format with
     <cpp|file_format> (hence <scm|tmfs-format>, by default
     <verbatim|"stm">) and calls <cpp|import_tree>.
 
@@ -324,7 +324,7 @@
     and the buffer is filled with <cpp|set_buffer_tree>. The buffer title is
     computed by <cpp|propose_title>, which calls <scm|tmfs-title>.
 
-    <item>Finally, <scm|load-buffer-open> in <verbatim|tm-files.scm> asks
+    <item>Finally, <scm|load-buffer-open> in <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> asks
     for <scm|(tmfs-master name)> and, if it differs from the name, makes it
     the master of the buffer with <scm|buffer-set-master>.
   </enumerate>
@@ -366,7 +366,7 @@
 
   A load handler must return immediately. Handlers whose contents come
   from a remote server, such as those of the remote file system in
-  <verbatim|client/client-tmfs.scm>, therefore send a request, return a
+  <source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm>, therefore send a request, return a
   placeholder document, and replace the contents of the buffer when the
   answer arrives:
 
@@ -468,12 +468,12 @@
   different view on an ordinary file. For instance, the <verbatim|part>
   handler returns the file the part is taken from. The wrapped file is used
   by the default handlers for permissions, dates, removal and autosave, and
-  by <scm|buffer-last-save> in <verbatim|tm-files.scm>, which asks the
+  by <scm|buffer-last-save> in <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>, which asks the
   buffer of the wrapped file, if it is open, for its last save time.
 
   <subsection|Autosave>
 
-  <verbatim|tm-files.scm> redefines <scm|url-autosave> so that, for
+  <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> redefines <scm|url-autosave> so that, for
   <verbatim|tmfs> <abbr|URL>s, the autosave location is obtained from
   <scm|tmfs-autosave>. The remote file system, for example, stores the
   autosave copies of remote files in the local backup directory:
@@ -496,13 +496,13 @@
   its file <abbr|URL>, a generated buffer by its <verbatim|tmfs>
   <abbr|URL>. New documents which have not been saved yet get a
   <verbatim|no_name_...tm> name in <verbatim|$TEXMACS_HOME_PATH/texts/scratch>
-  (see <cpp|is_scratch> in <verbatim|System/Files/file.cpp>). There is no
+  (see <cpp|is_scratch> in <source-link|System/Files/file.cpp|src/System/Files/file.cpp>). There is no
   special <verbatim|tmfs://buffer/...> scheme. The buffer layer itself is
   described in <hlink|the <TeXmacs> server|../../../source/server.en.tm> and
   in <hlink|the buffer <abbr|API>|../../buffer/buffer-api.en.tm>.
 
   The title of a buffer is computed by <cpp|propose_title> in
-  <verbatim|Texmacs/Data/new_buffer.cpp>. For <verbatim|tmfs> buffers it is
+  <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>. For <verbatim|tmfs> buffers it is
   the result of <scm|tmfs-title>; if several buffers would get the same
   title, a number is appended, as in <verbatim|Help - Title (2)>.
 
@@ -515,7 +515,7 @@
   <\itemize>
     <item>A view is named
     <verbatim|tmfs://view/<em|nr>/<em|buffer>> by <cpp|abstract_view> in
-    <verbatim|Texmacs/Data/new_view.cpp>, where <em|nr> is a counter
+    <source-link|Texmacs/Data/new_view.cpp|src/Texmacs/Data/new_view.cpp>, where <em|nr> is a counter
     specific to the buffer and <em|buffer> encodes the name of the buffer:
     <verbatim|here/> followed by the path for relative names,
     <verbatim|default> followed by the absolute path for local files, and
@@ -525,7 +525,7 @@
     decodes such names.
 
     <item>A window is named <verbatim|tmfs://window/<em|nr>> by
-    <cpp|create_window_id> in <verbatim|Texmacs/Data/new_window.cpp>, with a
+    <cpp|create_window_id> in <source-link|Texmacs/Data/new_window.cpp|src/Texmacs/Data/new_window.cpp>, with a
     global counter starting at <verbatim|1>.
   </itemize>
 
@@ -543,9 +543,9 @@
   navigate. Normally the master is the buffer itself; <scm|load-buffer-open>
   replaces it by the result of <scm|tmfs-master> for <verbatim|tmfs>
   buffers. Some generators set the master explicitly instead; for example
-  <scm|version-show-history> in <verbatim|version/version-tmfs.scm> makes the
+  <scm|version-show-history> in <source-link|version/version-tmfs.scm|TeXmacs/progs/version/version-tmfs.scm> makes the
   history buffer point to the file whose history is shown. The <c++>
-  predicate <cpp|is_aux_buffer> (<verbatim|Texmacs/Data/new_buffer.cpp>)
+  predicate <cpp|is_aux_buffer> (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>)
   considers a buffer as auxiliary as soon as its master differs from its
   name.
 
@@ -553,7 +553,7 @@
 
   Many dialogs and side tools of <TeXmacs> edit small documents in buffers
   of the class <verbatim|aux>, defined in
-  <verbatim|kernel/texmacs/tm-file-system.scm>. Their contents are not
+  <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>. Their contents are not
   generated, but stored in the <scheme> table <scm|aux-buffers>, and their
   masters in <scm|aux-masters>:
 
@@ -588,29 +588,29 @@
   <scm|(aux-name <scm-arg|aux>)> returns the <abbr|URL>
   <verbatim|tmfs://aux/> followed by the string <scm-arg|aux>,
   <scm|aux-set-document> and <scm|aux-set-master> set the contents and the
-  master, and <scm|open-auxiliary> in <verbatim|tm-files.scm> combines them
+  master, and <scm|open-auxiliary> in <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> combines them
   and switches to the auxiliary buffer; the macro <scm|with-aux> evaluates
   some code with an auxiliary buffer holding a given file. The title of an
   auxiliary buffer is its name.
 
   Examples of auxiliary buffers are <verbatim|tmfs://aux/search> and
-  <verbatim|tmfs://aux/replace> (<verbatim|generic/search-widgets.scm>),
-  <verbatim|tmfs://aux/spell> (<verbatim|generic/spell-widgets.scm>),
-  <verbatim|tmfs://aux/latex-source> (<verbatim|convert/latex/tmtex-widgets.scm>)
-  and <verbatim|tmfs://aux/macro-editor> (<verbatim|source/macro-widgets.scm>).
+  <verbatim|tmfs://aux/replace> (<source-link|generic/search-widgets.scm|TeXmacs/progs/generic/search-widgets.scm>),
+  <verbatim|tmfs://aux/spell> (<source-link|generic/spell-widgets.scm|TeXmacs/progs/generic/spell-widgets.scm>),
+  <verbatim|tmfs://aux/latex-source> (<source-link|convert/latex/tmtex-widgets.scm|TeXmacs/progs/convert/latex/tmtex-widgets.scm>)
+  and <verbatim|tmfs://aux/macro-editor> (<source-link|source/macro-widgets.scm|TeXmacs/progs/source/macro-widgets.scm>).
   On the <c++> side, <cpp|embedded_name> in
-  <verbatim|Texmacs/Window/tm_window.cpp> names the buffers of embedded
+  <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp> names the buffers of embedded
   editor widgets <verbatim|tmfs://aux/TeXmacs-input-<em|nr>>, and
   <cpp|edit_interface_rep::is_embedded_widget> recognizes such widgets by
   the prefix <verbatim|tmfs://aux/>. When the current buffer is auxiliary
   (but not a <verbatim|part> buffer), interactive commands ask their
   questions in a popup rather than in the footer
-  (<verbatim|Texmacs/Window/tm_dialogue.cpp>).
+  (<source-link|Texmacs/Window/tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp>).
 
   <section|Importation of foreign formats>
 
   When a file is imported from a format different from its natural one,
-  <verbatim|tm-files.scm> opens it as
+  <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> opens it as
   <verbatim|tmfs://import/<em|format>/<em|file>>, where <em|file> is the
   output of <scm|url-\<gtr\>tmfs-string>. The <verbatim|import> handler
   converts the file with <scm|tree-import> and completes the result with
@@ -622,10 +622,10 @@
   <TeXmacs> server as <verbatim|tmfs://remote-file/...> and
   <verbatim|tmfs://remote-dir/...> <abbr|URL>s (see the
   <hlink|catalogue|tmfs-handlers.en.tm>). The client handlers in
-  <verbatim|client/client-tmfs.scm> forward loading and saving to
+  <source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm> forward loading and saving to
   <scheme> services such as <scm|remote-file-load> and
   <scm|remote-file-save>, implemented on the server by
-  <verbatim|server/server-tmfs.scm>, which stores the files in a repository
+  <source-link|server/server-tmfs.scm|TeXmacs/progs/server/server-tmfs.scm>, which stores the files in a repository
   under <verbatim|$TEXMACS_HOME_PATH/server> and keeps their metadata in a
   database. The server side itself does not define any <verbatim|tmfs>
   handler. These mechanisms are described in <hlink|collaborative

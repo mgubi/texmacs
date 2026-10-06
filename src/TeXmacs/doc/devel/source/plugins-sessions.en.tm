@@ -10,7 +10,7 @@
   <subsection|Data structure>
 
   A connection is a <em|resource> in the sense of
-  <verbatim|Kernel/Abstractions/resource.hpp>: a global object which is
+  <source-link|Kernel/Abstractions/resource.hpp|src/Kernel/Abstractions/resource.hpp>: a global object which is
   registered under a name when it is created and which can be retrieved from
   anywhere by constructing <cpp|connection (<em|name>)>. The name of a
   connection is <verbatim|<em|lan>-<em|ses>>, where <em|lan> is the name of
@@ -18,7 +18,7 @@
   <em|ses> the name of the session (the value of
   <verbatim|prog-session>, <verbatim|default> unless the user chose another
   session). The structure is private to
-  <verbatim|System/Link/connection.cpp>:
+  <source-link|System/Link/connection.cpp|src/System/Link/connection.cpp>:
 
   <\cpp-code>
     RESOURCE(connection);
@@ -68,7 +68,7 @@
 
   <subsection|Status>
 
-  The status constants are defined in <verbatim|System/Link/tm_link.hpp>:
+  The status constants are defined in <source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>:
 
   <descriptive-table|<tformat|<cwith|1|1|1|-1|cell-font-series|bold>|<table|<row|<cell|Constant>|<cell|Value>|<cell|Meaning>>|<row|<cell|<cpp|CONNECTION_DEAD>>|<cell|0>|<cell|the
   link is not alive>>|<row|<cell|<cpp|CONNECTION_DYING>>|<cell|1>|<cell|the
@@ -161,7 +161,7 @@
   The functions <cpp|connection_declared>, <cpp|connection_info> and
   <cpp|connection_handlers> are thin wrappers around the <scheme> functions
   <scm|connection-defined?>, <scm|connection-info> and
-  <scm|connection-get-handlers> of <verbatim|tm-plugins.scm>, which are
+  <scm|connection-get-handlers> of <source-link|tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>, which are
   described in <hlink|connection tables and
   predicates|../plugin/plugin-internals.en.tm>. Notice that the result of
   <cpp|connection_handlers> is cached in a static table on first use, so
@@ -338,7 +338,7 @@
   <subsection|State>
 
   The class <cpp|texmacs_input_rep>, declared in
-  <verbatim|Data/Convert/Generic/input.hpp>, turns a stream of bytes into
+  <source-link|Data/Convert/Generic/input.hpp|src/Data/Convert/Generic/input.hpp>, turns a stream of bytes into
   documents. One instance is created for the standard output (with
   <cpp|type> equal to <verbatim|"output">) and one for the standard error
   (<cpp|type> equal to <verbatim|"error">); the type is the default channel.
@@ -491,7 +491,7 @@
   commands to <TeXmacs>|../interface/interface-commands.en.tm>), but it means
   that the output of untrusted programs should never be piped into a
   session. The method <cpp|ispell_flush> is declared in
-  <verbatim|input.hpp> but has no implementation and no mode.
+  <source-link|input.hpp|src/Data/Convert/Generic/input.hpp> but has no implementation and no mode.
 
   <subsection|Accumulating the output>
 
@@ -521,7 +521,7 @@
   <subsection|Requests and call-backs>
 
   All asynchronous traffic with a connection goes through the queue of the
-  pair (<em|lan>, <em|ses>) in <verbatim|utils/plugins/plugin-eval.scm>. A
+  pair (<em|lan>, <em|ses>) in <source-link|utils/plugins/plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm>. A
   request is a list whose head is a list of five elements
 
   <\scm-code>
@@ -543,7 +543,7 @@
   The <em|author> is a fresh number obtained with <scm|new-author> when the
   request is queued. <scm|plugin-feed> registers it with
   <scm|start-slave> (which calls <cpp|archiver_rep::start_slave> in
-  <verbatim|Data/History/archiver.cpp>), and the notifications run inside
+  <source-link|Data/History/archiver.cpp|src/Data/History/archiver.cpp>), and the notifications run inside
   <scm|with-author>, which temporarily switches the current author and
   commits the changes. This way, the modifications which the asynchronous
   output makes to the document are attributed to the request in the undo
@@ -615,7 +615,7 @@
   <section|The life of a session>
 
   This section follows a session from its creation to its end. The
-  functions are in <verbatim|dynamic/session-edit.scm> unless stated
+  functions are in <source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm> unless stated
   otherwise.
 
   <subsection|Creating the session>

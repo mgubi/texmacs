@@ -56,53 +56,53 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Kernel/Types/string.hpp>,
-    <verbatim|string.cpp>>The byte string class; see <hlink|basic data
+    <item*|<source-link|Kernel/Types/string.hpp|src/Kernel/Types/string.hpp>,
+    <source-link|string.cpp|src/Kernel/Types/string.cpp>>The byte string class; see <hlink|basic data
     types|types.en.tm>.
 
-    <item*|<verbatim|Data/String/analyze.hpp>,
-    <verbatim|analyze.cpp>>Character tests and case changes on Cork bytes,
+    <item*|<source-link|Data/String/analyze.hpp|src/Data/String/analyze.hpp>,
+    <source-link|analyze.cpp|src/Data/String/analyze.cpp>>Character tests and case changes on Cork bytes,
     the <cpp|tm_*> routines on universal characters, quoting and escaping,
     parsing helpers, search and replace, Roman numbers and hexadecimal
     numbers, completions, and a few special purpose conversions (<name|KOI8>,
     <name|ISO-8859-2>, <verbatim|ispanish>, <verbatim|igerman>).
 
-    <item*|<verbatim|Data/String/universal.hpp>,
-    <verbatim|universal.cpp>>Case changes, transliteration, removal of
+    <item*|<source-link|Data/String/universal.hpp|src/Data/String/universal.hpp>,
+    <source-link|universal.cpp|src/Data/String/universal.cpp>>Case changes, transliteration, removal of
     accents, letter tests and sorting for universal strings
     (<cpp|uni_*>).
 
-    <item*|<verbatim|Data/String/converter.hpp>,
-    <verbatim|converter.cpp>>The table driven <cpp|converter> class, the
+    <item*|<source-link|Data/String/converter.hpp|src/Data/String/converter.hpp>,
+    <source-link|converter.cpp|src/Data/String/converter.cpp>>The table driven <cpp|converter> class, the
     conversion functions between Cork, <name|UTF-8>, <name|HTML>, <LaTeX>,
     <name|T2A> and <verbatim|SourceCode>, the <name|iconv> wrapper and the
     <name|UTF-8> encoding and decoding primitives.
 
-    <item*|<verbatim|Data/String/wencoding.hpp>,
-    <verbatim|wencoding.cpp>>Heuristics which guess the encoding of
+    <item*|<source-link|Data/String/wencoding.hpp|src/Data/String/wencoding.hpp>,
+    <source-link|wencoding.cpp|src/Data/String/wencoding.cpp>>Heuristics which guess the encoding of
     western text (<cpp|guess_wencoding>, <cpp|western_to_cork>).
 
-    <item*|<verbatim|Data/String/base64.hpp>,
-    <verbatim|base64.cpp>>Base 64 encoding and decoding.
+    <item*|<source-link|Data/String/base64.hpp|src/Data/String/base64.hpp>,
+    <source-link|base64.cpp|src/Data/String/base64.cpp>>Base 64 encoding and decoding.
 
-    <item*|<verbatim|Data/String/fast_search.hpp>,
-    <verbatim|fast_search.cpp>>Indexed substring search and longest common
+    <item*|<source-link|Data/String/fast_search.hpp|src/Data/String/fast_search.hpp>,
+    <source-link|fast_search.cpp|src/Data/String/fast_search.cpp>>Indexed substring search and longest common
     substrings, used by the conservative <LaTeX> converters.
 
-    <item*|<verbatim|Data/String/merge_sort.hpp>>A generic merge sort on
+    <item*|<source-link|Data/String/merge_sort.hpp|src/Data/String/merge_sort.hpp>>A generic merge sort on
     arrays.
 
     <item*|<verbatim|$TEXMACS_PATH/langs/encoding/*.scm>>The conversion
     tables.
 
-    <item*|<verbatim|Plugins/Qt/qt_utilities.cpp>,
-    <verbatim|QTMKeyboardEvent.cpp>, <verbatim|qt_gui.cpp>>Conversions for
+    <item*|<source-link|Plugins/Qt/qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>,
+    <source-link|QTMKeyboardEvent.cpp|src/Plugins/Qt/QTMKeyboardEvent.cpp>, <source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>>Conversions for
     widgets, key presses and the clipboard.
 
-    <item*|<verbatim|Data/Convert/Verbatim/verbatim.cpp>>Encodings of
+    <item*|<source-link|Data/Convert/Verbatim/verbatim.cpp|src/Data/Convert/Verbatim/verbatim.cpp>>Encodings of
     plain text import and export.
 
-    <item*|<verbatim|Scheme/Glue/build-glue-basic.scm>>The <scheme> glue
+    <item*|<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The <scheme> glue
     for the routines above (<scm|utf8-\<gtr\>cork>,
     <scm|tmstring-length>, <scm|tmstring-upcase-all>, ...).
   </description-paragraphs>

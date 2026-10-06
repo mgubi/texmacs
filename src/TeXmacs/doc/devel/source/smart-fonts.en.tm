@@ -17,7 +17,7 @@
 
   <\description>
     <item*|Smart fonts>A <em|smart font> (<cpp|smart_font_rep> in
-    <verbatim|Graphics/Fonts/smart_font.cpp>) is the font which the
+    <source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>) is the font which the
     typesetter actually uses when the preference <verbatim|"new style
     fonts"> is on. It is a dispatcher: it cuts each string into runs of
     characters, finds for every character a <em|subfont> which can render
@@ -26,7 +26,7 @@
     lazily and the decisions are cached.
 
     <item*|Virtual fonts>A <em|virtual font> (<cpp|virtual_font_rep> in
-    <verbatim|Graphics/Fonts/virtual_font.cpp>) builds new glyphs out of
+    <source-link|Graphics/Fonts/virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>) builds new glyphs out of
     glyphs of a base font, following definitions written in a small
     <scheme>-like language in the files
     <verbatim|$TEXMACS_PATH/fonts/virtual/*.vfn>. Long arrows, negated
@@ -48,7 +48,7 @@
   and emulated fonts among its subfonts, a virtual font may be built on top
   of a smart font or of an emulated font, and the font effects are applied
   on top of the smart font. All of them are subclasses of the abstract
-  <cpp|font_rep> (see <verbatim|Graphics/Fonts/font.hpp> and the
+  <cpp|font_rep> (see <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp> and the
   <hlink|overview|fonts.en.tm>) and are therefore interchangeable from the
   point of view of the typesetter and of the <hlink|renderers|renderer.en.tm>.
 
@@ -153,16 +153,16 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Fonts/smart_font.cpp>>The smart font, the
+    <item*|<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>>The smart font, the
     <cpp|smart_map> cache, the rewriting rules, the user entry points
     <cpp|smart_font>, <cpp|smart_font_bis> and <cpp|apply_effects>.
 
-    <item*|<verbatim|Graphics/Fonts/virtual_font.cpp>>Virtual fonts:
+    <item*|<source-link|Graphics/Fonts/virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>>Virtual fonts:
     compilation of <verbatim|.vfn> definitions into glyphs, metrics and
-    vector drawing. <verbatim|Graphics/Fonts/virtual_enhance.cpp> adds
+    vector drawing. <source-link|Graphics/Fonts/virtual_enhance.cpp|src/Graphics/Fonts/virtual_enhance.cpp> adds
     virtual definitions to an existing font.
 
-    <item*|<verbatim|Graphics/Fonts/translator.cpp>>Loading of
+    <item*|<source-link|Graphics/Fonts/translator.cpp|src/Graphics/Fonts/translator.cpp>>Loading of
     <verbatim|.enc> encodings and <verbatim|.vfn> files into
     <cpp|translator> objects.
 
@@ -172,13 +172,13 @@
     <verbatim|poor_stretched>, <verbatim|poor_extended>,
     <verbatim|poor_mono>, <verbatim|poor_distorted>,
     <verbatim|poor_effected> and <verbatim|poor_rubber>, together with
-    <verbatim|recolored_font.cpp> and <verbatim|superposed_font.cpp>.
+    <source-link|recolored_font.cpp|src/Graphics/Fonts/recolored_font.cpp> and <source-link|superposed_font.cpp|src/Graphics/Fonts/superposed_font.cpp>.
 
-    <item*|<verbatim|Graphics/Fonts/font.cpp>>The base class, the error font
+    <item*|<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>>The base class, the error font
     and <cpp|rubber_font>.
 
-    <item*|<verbatim|Graphics/Fonts/compound_font.cpp>,
-    <verbatim|math_font.cpp>, <verbatim|charmap.cpp>>Older composite fonts
+    <item*|<source-link|Graphics/Fonts/compound_font.cpp|src/Graphics/Fonts/compound_font.cpp>,
+    <source-link|math_font.cpp|src/Graphics/Fonts/math_font.cpp>, <source-link|charmap.cpp|src/Graphics/Fonts/charmap.cpp>>Older composite fonts
     used by the rule based font selection.
 
     <item*|<verbatim|Graphics/Bitmap_fonts/>>Glyph (bitmap) manipulation

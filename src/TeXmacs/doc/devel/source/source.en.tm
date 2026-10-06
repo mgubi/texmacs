@@ -15,6 +15,12 @@
   server and the editor, the user interface, data formats, and the
   connections to the outside world.
 
+  The names of source files are links: a click opens the file, in
+  <TeXmacs> or in the editor chosen in <menu|Developer|Open source links
+  with>. The links need the source tree of <TeXmacs>; see <hlink|links to
+  the source files|docsys-writing.en.tm> for how files are found and how
+  to choose the editor.
+
   <\traverse>
     <branch|Working on <TeXmacs>|source-working.en.tm>
 

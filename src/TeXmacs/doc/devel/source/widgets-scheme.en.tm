@@ -11,28 +11,28 @@
   <verbatim|progs/kernel/gui/>:
 
   <\description>
-    <item*|<verbatim|gui-markup.scm>>the style constants
+    <item*|<source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>>the style constants
     <scm|widget-style-*> and the low-level macros <scm|$list>, <scm|$when>,
     <scm|$-\<gtr\>>, <scm|$input>, ... which build <em|menu items>;
     also the <scm|$form> macros and, in its second half, macros for
     generating documents (<scm|$para>, <scm|$itemize>, ...), which are
     not discussed here.
 
-    <item*|<verbatim|menu-define.scm>>the user-level macros
+    <item*|<source-link|menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>>the user-level macros
     <scm|menu-bind>, <scm|tm-menu>, <scm|tm-widget>, <scm|menu-dynamic>
     and the translator <scm|gui-make> with its table
     <scm|gui-make-table>.
 
-    <item*|<verbatim|menu-widget.scm>>the grammar of menu items, the
+    <item*|<source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>>the grammar of menu items, the
     interpreter <scm|make-menu-widget> which turns them into <c++> widgets,
     <scm|menu-expand>, the top-level window functions (<scm|top-window>,
     <scm|dialogue-window>, ...) and the side tools
     (<scm|tm-tool>).
 
-    <item*|<verbatim|menu-convert.scm>>an alternative, experimental
+    <item*|<source-link|menu-convert.scm|TeXmacs/progs/kernel/gui/menu-convert.scm>>an alternative, experimental
     interpreter which renders menu items as <TeXmacs> markup.
 
-    <item*|<verbatim|menu-test.scm>>test widgets.
+    <item*|<source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>>test widgets.
   </description>
 
   How to <em|write> menus and widgets is explained in \P<hlink|Extending the
@@ -61,7 +61,7 @@
 
     At <em|macro expansion> time, each keyword is translated by
     <scm|gui-make> into a call of a <scm|$>-macro of
-    <verbatim|gui-markup.scm>.
+    <source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>.
 
     <item><em|Menu items.> When <scm|(my-widget cmd)> is called, the
     <scm|$>-macros build a plain list, the <em|menu item>, such as
@@ -81,7 +81,7 @@
     predicates, proposals) are closures. The syntax of menu items is
     specified by the grammar <scm|:menu-item> given with
     <scm|define-regexp-grammar> at the beginning of
-    <verbatim|menu-widget.scm>.
+    <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>.
 
     <item><em|<c++> widgets.> The interpreter <scm|make-menu-widget> walks
     through the menu item and calls the glued constructors
@@ -131,7 +131,7 @@
     Declares that the menus <scm-arg|names> are defined in
     <scm-arg|module>, which is loaded on first use (via
     <scm|lazy-define>), or after an idle delay. It is used extensively in
-    <verbatim|init-texmacs.scm>. Before building the bars of a window, the
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>. Before building the bars of a window, the
     kernel evaluates <scm|(lazy-initialize-force)>.
   </explain>
 
@@ -149,7 +149,7 @@
   list whose head is a string or a label, as <scm|("Ok" (cmd "ok"))>,
   becomes a button <scm|($\<gtr\> "Ok" (cmd "ok"))>, which evaluates to
   <scm|(list "Ok" (lambda () (cmd "ok")))>. New keywords can be added with
-  <scm|extend-table>, as <verbatim|menu-define.scm> itself does for
+  <scm|extend-table>, as <source-link|menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm> itself does for
   <scm|section-tabs>, <scm|pick-color> and <scm|pick-background>.
 
   The main subtlety is <em|when> the various parts are evaluated. The
@@ -205,7 +205,7 @@
   variable <scm|answer> in the user code. <scm|toggle>, <scm|enum>,
   <scm|choice>, <scm|choices>, <scm|filtered-choice>, <scm|color-input>,
   <scm|tree-view>, <scm|texmacs-input> and <scm|texmacs-output> follow the
-  same pattern (see their <scm|$>-macros in <verbatim|gui-markup.scm>).
+  same pattern (see their <scm|$>-macros in <source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>).
   Style keywords (<scm|inert>, <scm|explicit-buttons>, <scm|bold>,
   <scm|grey>, <scm|mono>, <scm|verb>, <scm|plain-style>) become
   <scm|(style <scm-arg|n> . <scm-arg|items>)>, where <scm-arg|n> is a
@@ -423,7 +423,7 @@
 
   <section|Windows and dialogs>
 
-  <verbatim|menu-widget.scm> provides the standard ways of showing a
+  <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm> provides the standard ways of showing a
   widget in its own window, on top of the <scm|alt-window-*> primitives:
 
   <\explain>
@@ -454,11 +454,11 @@
   <c++> (the printer and color picker dialogs): its promise receives a
   <c++> command and returns a widget.
 
-  <scm|(interactive <scm-arg|fun>)> (<verbatim|kernel/texmacs/tm-dialogue.scm>)
+  <scm|(interactive <scm-arg|fun>)> (<source-link|kernel/texmacs/tm-dialogue.scm|TeXmacs/progs/kernel/texmacs/tm-dialogue.scm>)
   asks the user for the arguments of a function, using its
   <scm|:argument>, <scm|:proposals> and <scm|:default> properties. It calls
   <scm|tm-interactive-hook>, which is <scm|tm-interactive-new> of
-  <verbatim|generic/generic-menu.scm>: when side tools are enabled, the
+  <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>: when side tools are enabled, the
   question is shown in a transient bottom tool built in <scheme>;
   otherwise the <c++> function <cpp|tm_frame_rep::interactive> (glue
   <scm|tm-interactive>) is used, which asks in the footer or builds an
@@ -488,7 +488,7 @@
   The side, left and bottom tools of the main window are widgets too. The
   bars are filled by the kernel with <verbatim|(dynamic (texmacs-side-tools
   <em|win>))> and similar expressions; <scm|texmacs-side-tools> (in
-  <verbatim|texmacs/menus/main-menu.scm>) lists, for each position, the
+  <source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>) lists, for each position, the
   tools attached to the window with <scm|(window-\<gtr\>tools <scm-arg|win>
   . <scm-arg|positions>)> and displays each of them with
   <scm|texmacs-side-tool>.
@@ -506,7 +506,7 @@
 
   <section|The markup interpreter>
 
-  <verbatim|menu-convert.scm> contains a second interpreter,
+  <source-link|menu-convert.scm|TeXmacs/progs/kernel/gui/menu-convert.scm> contains a second interpreter,
   <scm|build-menu-widget>, which has the same structure as
   <scm|make-menu-widget> but turns menu items into <TeXmacs> <em|markup>
   (via functions <scm|markup-hlist>, <scm|markup-menu-button>, ...).

@@ -14,7 +14,7 @@
   <em|status list> describing what has changed on either side since the
   last synchronization, lets the user resolve conflicts, and then applies
   the resulting operations with a few bulk requests. Both are experimental
-  and are mainly driven by the widgets in <verbatim|client/client-widgets.scm>
+  and are mainly driven by the widgets in <source-link|client/client-widgets.scm|TeXmacs/progs/client/client-widgets.scm>
   (<scm|open-sync-widget>, <scm|remote-interactive-sync>,
   <scm|client-auto-sync>).
 
@@ -38,7 +38,7 @@
   <subsection|Computing the status list>
 
   <scm|(client-sync-status <scm-arg|local-base> <scm-arg|remote-base>
-  <scm-arg|cont>)> in <verbatim|client/client-sync.scm> proceeds as
+  <scm-arg|cont>)> in <source-link|client/client-sync.scm|TeXmacs/progs/client/client-sync.scm> proceeds as
   follows.
 
   <\enumerate>
@@ -99,22 +99,22 @@
   deletions. After each successful transfer the bookkeeping entry is
   updated with the new modification time and remote identifier
   (<scm|post-upload>, <scm|post-download>). On the server
-  (<verbatim|server/server-sync.scm>), the upload service creates missing
+  (<source-link|server/server-sync.scm|TeXmacs/progs/server/server-sync.scm>), the upload service creates missing
   directories and files and saves existing ones through the same functions
   as the remote file system services, so that every upload creates a new
   version. Remaining conflicts which the user decided to keep are not
   touched.
 
   The functions <scm|remote-upload> and <scm|remote-download> of
-  <verbatim|client-sync.scm> (not to be confused with the services of the
+  <source-link|client-sync.scm|TeXmacs/progs/client/client-sync.scm> (not to be confused with the services of the
   same names) implement one-way transfers: they treat all conflicts as
   uploads, resp. downloads. <scm|sync-repair> removes bookkeeping entries
   whose local file no longer exists.
 
   <section|Database synchronization>
 
-  <verbatim|client/client-db-sync.scm> and
-  <verbatim|server/server-db-sync.scm> synchronize database entries of
+  <source-link|client/client-db-sync.scm|TeXmacs/progs/client/client-db-sync.scm> and
+  <source-link|server/server-db-sync.scm|TeXmacs/progs/server/server-db-sync.scm> synchronize database entries of
   given <em|kinds>. A kind stands for a set of entry types (table
   <scm|db-kind-table>); <scm|db-sync-kinds> currently only returns
   <verbatim|"bib"> (the user's bibliographic database), unless disabled with
@@ -126,7 +126,7 @@
     <scm|(user-database "sync")> (<scm|db-last-sync>).
 
     <item><scm|db-client-sync-status> computes the local changes since the
-    local time with <scm|db-change-list> (<verbatim|database/db-convert.scm>,
+    local time with <scm|db-change-list> (<source-link|database/db-convert.scm|TeXmacs/progs/database/db-convert.scm>,
     which uses the <scm|:modified> query of the database), and asks the
     server for its changes since the remote time with
     <scm|remote-db-changes>. For each name, <scm|db-change-status>

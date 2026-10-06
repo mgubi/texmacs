@@ -12,7 +12,7 @@
 
   <\itemize>
     <item>CMake: <verbatim|cmake -DENABLE_EXPERIMENTAL=ON ...>. The option
-    is declared in <verbatim|CMakeLists.txt:466>; when it is on,
+    is declared in <source-link|CMakeLists.txt:466|src/CMakeLists.txt:466>; when it is on,
     <verbatim|Style/*.cpp> is globbed into <verbatim|TeXmacs_Style_SRCS> and
     <verbatim|add_compile_definitions (EXPERIMENTAL=1)> is executed;
     otherwise <verbatim|TeXmacs_Style_SRCS> is empty. The include
@@ -22,7 +22,7 @@
     generated <verbatim|configure> then defines <verbatim|EXPERIMENTAL> in
     the configuration header and sets <verbatim|CONFIG_EXPERIMENTAL> to
     <verbatim|"Memorizer Environment Evaluate">, which
-    <verbatim|src/makefile.in> uses as the list of subdirectories of
+    <source-link|src/makefile.in|src/makefile.in> uses as the list of subdirectories of
     <verbatim|Style> to compile (<verbatim|style_src>).
   </itemize>
 
@@ -35,7 +35,7 @@
 
   <section|State kept by the editor>
 
-  Under <verbatim|EXPERIMENTAL>, <cpp|editor_rep> (<verbatim|Edit/editor.hpp>)
+  Under <verbatim|EXPERIMENTAL>, <cpp|editor_rep> (<source-link|Edit/editor.hpp|src/Edit/editor.hpp>)
   has three extra fields and one extra virtual method:
 
   <\description>
@@ -62,7 +62,7 @@
 
   <\itemize>
     <item>The constructor of <cpp|edit_main_rep>
-    (<verbatim|Edit/Editor/edit_main.cpp>) sets <verbatim|cct= copy
+    (<source-link|Edit/Editor/edit_main.cpp|src/Edit/Editor/edit_main.cpp>) sets <verbatim|cct= copy
     (subtree (et, rp))> and calls <cpp|copy_ip (subtree (et, rp), cct)>,
     and initializes <cpp|mem> to the null memorizer.
 
@@ -72,10 +72,10 @@
     mod / ed-\<gtr\>rp)>.
   </itemize>
 
-  <cpp|copy_announce> (<verbatim|Style/Memorizer/clean_copy.cpp>) replaces
+  <cpp|copy_announce> (<source-link|Style/Memorizer/clean_copy.cpp|src/Style/Memorizer/clean_copy.cpp>) replaces
   <cpp|cct> by <cpp|clean_apply (cct, mod)>. The functions
   <cpp|clean_assign>, <cpp|clean_insert>, ... of
-  <verbatim|Kernel/Types/modification.cpp> rebuild only the nodes on the
+  <source-link|Kernel/Types/modification.cpp|src/Kernel/Types/modification.cpp> rebuild only the nodes on the
   path of the modification and reuse all other subtrees, so that
   unmodified parts of the new clean copy are <em|the same tree objects> as
   in the old one. <cpp|copy_ip> then gives the new nodes the inverse paths

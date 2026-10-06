@@ -53,9 +53,9 @@
 
   From <scheme>, urls are represented by a special data type; the routines
   below also accept strings, which are converted using the system format.
-  The <c++> implementation can be found in <verbatim|System/Classes/url.cpp>
-  and <verbatim|System/Files/file.cpp>, and the glue definitions in
-  <verbatim|Scheme/Glue/build-glue-basic.scm>.
+  The <c++> implementation can be found in <source-link|System/Classes/url.cpp|src/System/Classes/url.cpp>
+  and <source-link|System/Files/file.cpp|src/System/Files/file.cpp>, and the glue definitions in
+  <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>.
 
   <subsection|Construction and conversion>
 

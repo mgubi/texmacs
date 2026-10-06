@@ -216,6 +216,7 @@
   ---
   (group "Documentation")
   (link apidoc-menu)
+  (-> "Open source links with" (link source-links-menu))
   ---
   (group "Configuration")
   ((replace "Open %1" (verbatim "my-init-texmacs.scm"))

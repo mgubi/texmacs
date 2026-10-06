@@ -13,7 +13,7 @@
   <section|Identity versus equality>
 
   Everything in the rewriter is keyed on <em|identity>.
-  <verbatim|environment.hpp> defines
+  <source-link|environment.hpp|src/Style/Environment/environment.hpp> defines
 
   <\cpp-code>
     inline int \ weak_hash (tree t) \ \ \ \ \ \ \ \ \ \ { return hash ((void*) t.rep); }
@@ -55,7 +55,7 @@
     memoization is not affected.
 
     <item*|<cpp|std_environment>>The environment of the evaluator
-    (<verbatim|std_environment.cpp>). Fields: <cpp|pure> (true for the
+    (<source-link|std_environment.cpp|src/Style/Environment/std_environment.cpp>). Fields: <cpp|pure> (true for the
     environment opened by a <markup|with>), <cpp|env> (the local bindings),
     <cpp|next> (the enclosing environment), <cpp|accel> (a list environment
     with all bindings visible here, used for lookups) and <cpp|args> (macro
@@ -93,7 +93,7 @@
     <item*|<cpp|macro_down>, <cpp|macro_redown>, <cpp|macro_up>>Push and pop
     macro argument frames. They are only compiled with
     <verbatim|CLASSICAL_MACRO_EXPANSION>, which is commented out in
-    <verbatim|environment.hpp> in favour of
+    <source-link|environment.hpp|src/Style/Environment/environment.hpp> in favour of
     <verbatim|ALTERNATIVE_MACRO_EXPANSION> (expansion by substitution).
   </description>
 
@@ -124,7 +124,7 @@
 
   <section|Memorizers>
 
-  <verbatim|Style/Memorizer/memorizer.hpp> defines the abstract
+  <source-link|Style/Memorizer/memorizer.hpp|src/Style/Memorizer/memorizer.hpp> defines the abstract
   <cpp|memorizer_rep> with the virtual methods <cpp|type>, <cpp|hash>,
   <cpp|equal>, <cpp|print>, <cpp|compute>, the accessors
   <cpp|get_tree>/<cpp|set_tree> and
@@ -137,7 +137,7 @@
   <verbatim|MEMORIZE_MACRO_UP> (15) for environment operations.
 
   The tree memorizers are compound: for instance
-  <cpp|evaluate_memorizer_rep> (<verbatim|Style/Evaluate/evaluate_main.cpp>)
+  <cpp|evaluate_memorizer_rep> (<source-link|Style/Evaluate/evaluate_main.cpp|src/Style/Evaluate/evaluate_main.cpp>)
   stores the input environment and tree, the output environment and tree,
   and the memorizers of all sub-evaluations, so that the result of an
   evaluation is a <em|tree of memorizers> mirroring the computation.
@@ -146,7 +146,7 @@
 
   The handle class <cpp|memorizer> is not an ordinary reference counted
   pointer. Its constructor from a <cpp|memorizer_rep*>
-  (<verbatim|memorizer.cpp:288>) first looks the new object up in a global
+  (<source-link|memorizer.cpp:288|src/Style/Memorizer/memorizer.cpp:288>) first looks the new object up in a global
   hash table (<cpp|bigmem_insert>: buckets indexed by
   <cpp|hash () & mask>, compared with <cpp|type> and <cpp|equal>, the
   number of buckets doubling as the table grows). If an equal memorizer

@@ -16,7 +16,7 @@
   <section|Images in the <abbr|PDF> renderer>
 
   All image related state of <cpp|pdf_hummus_renderer_rep>
-  (<verbatim|Plugins/Pdf/pdf_hummus_renderer.cpp>) lives in four tables:
+  (<source-link|Plugins/Pdf/pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>) lives in four tables:
 
   <\description>
     <item*|<cpp|image_pool>>Image files, keyed by <abbr|URL>, each with a
@@ -99,7 +99,7 @@
 
   <section|Images in the PostScript renderer>
 
-  <cpp|printer_rep> (<verbatim|Graphics/Renderer/printer.cpp>) includes
+  <cpp|printer_rep> (<source-link|Graphics/Renderer/printer.cpp|src/Graphics/Renderer/printer.cpp>) includes
   images as encapsulated PostScript, between <verbatim|@beginspecial> and
   <verbatim|@endspecial> in the style of <verbatim|dvips>:
 
@@ -117,7 +117,7 @@
   <section|The <name|Cairo> renderer>
 
   <verbatim|Plugins/Cairo/> contains a <cpp|cairo_renderer_rep>, which
-  loads the <name|Cairo> library dynamically (<verbatim|tm_cairo.cpp>) and
+  loads the <name|Cairo> library dynamically (<source-link|tm_cairo.cpp|src/Plugins/Cairo/tm_cairo.cpp>) and
   draws <name|PNG> images directly, converting PostScript and <abbr|PDF>
   images with <verbatim|convert>. It is only compiled with
   <cpp|USE_CAIRO>, which the <name|CMake> build never sets, and has not
@@ -130,8 +130,8 @@
   document> contains the <TeXmacs> source of the document, and the
   external files it uses, as embedded files. <menu|File|Import|Pdf with
   embedded document> recovers them. The <c++> side is in
-  <verbatim|Plugins/Pdf/pdf_hummus_make_attachment.cpp> and
-  <verbatim|pdf_hummus_extract_attachment.cpp>; without
+  <source-link|Plugins/Pdf/pdf_hummus_make_attachment.cpp|src/Plugins/Pdf/pdf_hummus_make_attachment.cpp> and
+  <source-link|pdf_hummus_extract_attachment.cpp|src/Plugins/Pdf/pdf_hummus_extract_attachment.cpp>; without
   <cpp|PDF_RENDERER> all functions are stubs which fail.
 
   <\explain>
@@ -171,17 +171,17 @@
 
   On the <scheme> side, export is done by
   <scm|wrapped-print-to-pdf-embeded-with-tm> and
-  <scm|attach-doc-to-exported-pdf> (<verbatim|texmacs/texmacs/tm-print.scm>).
+  <scm|attach-doc-to-exported-pdf> (<source-link|texmacs/texmacs/tm-print.scm|TeXmacs/progs/texmacs/texmacs/tm-print.scm>).
   The latter prints the document, saves a copy of it (with its attachments
   and auxiliary data) in a temporary buffer named after the <abbr|PDF>
   file, and calls <scm|pdf-make-attachments> with this copy followed by
   the linked files. Import is done by
   <scm|wrapped-import-pdf-embeded-with-tm>
-  (<verbatim|texmacs/menus/file-menu.scm>), which extracts the
+  (<source-link|texmacs/menus/file-menu.scm|TeXmacs/progs/texmacs/menus/file-menu.scm>), which extracts the
   attachments, rewrites the paths of the main document, saves it as
   <verbatim|extracted.tm> in a temporary directory and opens it. The
   export of a selection as <abbr|PDF> (<scm|embbed-tm-selection-in-pdf> in
-  <verbatim|convert/images/tmimage.scm>) attaches the selection in the same
+  <source-link|convert/images/tmimage.scm|TeXmacs/progs/convert/images/tmimage.scm>) attaches the selection in the same
   way.
 
   <section|Pitfalls>

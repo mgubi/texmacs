@@ -9,8 +9,8 @@
 
   The box side is documented in <hlink|the boxes document|boxes.en.tm>; the
   interaction with the renderer is concentrated in a few methods of
-  <cpp|box_rep> (<verbatim|Typeset/boxes.hpp>,
-  <verbatim|Typeset/Boxes/Basic/boxes.cpp>):
+  <cpp|box_rep> (<source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>,
+  <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>):
 
   <\description-paragraphs>
     <item*|<cpp|virtual void display (renderer ren) = 0>>Paint the box
@@ -160,7 +160,7 @@
   <subsection|Repainting a document>
 
   <cpp|edit_interface_rep::handle_repaint> (in
-  <verbatim|Edit/Interface/edit_repaint.cpp>) divides the rectangle by
+  <source-link|Edit/Interface/edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>) divides the rectangle by
   <cpp|magf> and calls <cpp|draw_with_stored>. The main steps are:
 
   <\description>
@@ -201,14 +201,14 @@
 
   Other widgets follow the same protocol at a smaller scale: for instance
   <cpp|box_widget_rep::handle_repaint> in
-  <verbatim|Texmacs/Window/tm_button.cpp> redraws a single box, and
+  <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp> redraws a single box, and
   <cpp|QTMImpressIconEngine> repaints a widget into an icon using a
   temporary <cpp|qt_renderer_rep>.
 
   <section|Printing and export>
 
   Printing uses the same box traversal with a printer renderer, created by
-  the factory function declared in <verbatim|Graphics/Renderer/printer.hpp>:
+  the factory function declared in <source-link|Graphics/Renderer/printer.hpp|src/Graphics/Renderer/printer.hpp>:
 
   <\explain>
     <cpp|renderer printer (url ps_file_name, int dpi, int nr_pages= 1,
@@ -224,7 +224,7 @@
     deleted.
   </explain>
 
-  <cpp|edit_main_rep::print_doc> (in <verbatim|Edit/Editor/edit_main.cpp>)
+  <cpp|edit_main_rep::print_doc> (in <source-link|Edit/Editor/edit_main.cpp|src/Edit/Editor/edit_main.cpp>)
   typesets the document for paper at the printing resolution, creates the
   printer, sets the metadata, and then for each page:
 
@@ -261,7 +261,7 @@
   bitmap formats with <name|Qt>, <cpp|make_raster_image (url name, box b,
   double zoomf)>, which creates a <cpp|native_picture>, draws on it with a
   <cpp|picture_renderer> and saves it with <cpp|save_picture>. Both are
-  defined in <verbatim|Typeset/Boxes/Basic/boxes.cpp>.
+  defined in <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

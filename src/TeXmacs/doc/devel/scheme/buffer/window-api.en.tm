@@ -98,7 +98,7 @@
     <scm-arg|attrs> (currently only the geometry is taken into account, but
     this might be extended in the future, see the <c++> function <cpp|url
     new_window (bool map_flag= true, tree geom= "")> in
-    <verbatim|Texmacs/Data/new_window.cpp>). The <abbr|URL> of the new window
+    <source-link|Texmacs/Data/new_window.cpp|src/Texmacs/Data/new_window.cpp>). The <abbr|URL> of the new window
     is returned.
   </explain>
 

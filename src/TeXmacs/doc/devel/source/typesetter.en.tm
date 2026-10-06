@@ -29,8 +29,8 @@
 
   All C++ file names in this chapter are relative to <verbatim|src/src/>.
   The typesetter lives in <verbatim|Typeset/>, with the public interface in
-  <verbatim|Typeset/typesetter.hpp>. It is driven by the editor from
-  <verbatim|Edit/Editor/edit_typeset.cpp>.
+  <source-link|Typeset/typesetter.hpp|src/Typeset/typesetter.hpp>. It is driven by the editor from
+  <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>.
 
   <section|Overview of the pipeline>
 
@@ -58,7 +58,7 @@
     <item><em|Line breaking and paragraph formatting>
     (<verbatim|Typeset/Line/>). A <cpp|lazy_paragraph_rep> splits the line
     items into paragraph units, calls the line breaker
-    (<verbatim|Typeset/Line/line_breaker.cpp>) to find optimal break points,
+    (<source-link|Typeset/Line/line_breaker.cpp|src/Typeset/Line/line_breaker.cpp>) to find optimal break points,
     justifies each line and turns it into a <cpp|phrase_box>.
 
     <item><em|Vertical stacking> (<verbatim|Typeset/Stack/>). The lines are
@@ -73,8 +73,8 @@
     and finally builds page boxes with headers and footers. On screen, in
     <verbatim|papyrus> mode, a single tall page is produced.
 
-    <item><em|Screen update> (<verbatim|Edit/Editor/edit_typeset.cpp>,
-    <verbatim|Edit/Interface/edit_interface.cpp>). The editor stores the
+    <item><em|Screen update> (<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>,
+    <source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>). The editor stores the
     resulting box as <cpp|eb>, determines the rectangle of the screen that
     really changed and invalidates it.
   </enumerate>
@@ -88,7 +88,7 @@
   <section|Source map>
 
   <\description>
-    <item*|<verbatim|Typeset/typesetter.hpp>>The public interface:
+    <item*|<source-link|Typeset/typesetter.hpp|src/Typeset/typesetter.hpp>>The public interface:
     <cpp|new_typesetter>, the <cpp|notify_*> functions, <cpp|typeset>, and
     the helpers <cpp|typeset_as_concat>, <cpp|typeset_as_box>,
     <cpp|typeset_as_atomic>, <cpp|typeset_as_stack>,
@@ -96,41 +96,41 @@
     <cpp|typeset_as_paragraph> and <cpp|typeset_as_document>.
 
     <item*|<verbatim|Typeset/Bridge/>>The <cpp|typesetter_rep> class
-    (<verbatim|impl_typesetter.hpp>, <verbatim|typesetter.cpp>), the
-    abstract <cpp|bridge_rep> (<verbatim|bridge.hpp>,
-    <verbatim|bridge.cpp>) and one file per kind of bridge.
+    (<source-link|impl_typesetter.hpp|src/Typeset/Bridge/impl_typesetter.hpp>, <source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>), the
+    abstract <cpp|bridge_rep> (<source-link|bridge.hpp|src/Typeset/Bridge/bridge.hpp>,
+    <source-link|bridge.cpp|src/Typeset/Bridge/bridge.cpp>) and one file per kind of bridge.
 
-    <item*|<verbatim|Typeset/Format/>, <verbatim|Typeset/formatter.hpp>>The
+    <item*|<verbatim|Typeset/Format/>, <source-link|Typeset/formatter.hpp|src/Typeset/formatter.hpp>>The
     formatter data structures: <cpp|line_item>, <cpp|page_item>,
     <cpp|stack_border>, and the <cpp|format> and <cpp|lazy> classes.
 
     <item*|<verbatim|Typeset/Concat/>>The concater: strings and spacing
-    (<verbatim|concat_text.cpp>), mathematics (<verbatim|concat_math.cpp>),
-    macros (<verbatim|concat_macro.cpp>), other active and inactive markup,
+    (<source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>), mathematics (<source-link|concat_math.cpp|src/Typeset/Concat/concat_math.cpp>),
+    macros (<source-link|concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>), other active and inactive markup,
     graphics, animations, and post-processing of brackets and scripts
-    (<verbatim|concat_post.cpp>).
+    (<source-link|concat_post.cpp|src/Typeset/Concat/concat_post.cpp>).
 
     <item*|<verbatim|Typeset/Line/>>Paragraph formatting
-    (<verbatim|lazy_paragraph.cpp>), line breaking
-    (<verbatim|line_breaker.cpp>), lazy structures for documents and other
-    vertical material (<verbatim|lazy_typeset.cpp>,
-    <verbatim|lazy_vstream.cpp>, <verbatim|lazy_gui.cpp>).
+    (<source-link|lazy_paragraph.cpp|src/Typeset/Line/lazy_paragraph.cpp>), line breaking
+    (<source-link|line_breaker.cpp|src/Typeset/Line/line_breaker.cpp>), lazy structures for documents and other
+    vertical material (<source-link|lazy_typeset.cpp|src/Typeset/Line/lazy_typeset.cpp>,
+    <source-link|lazy_vstream.cpp|src/Typeset/Line/lazy_vstream.cpp>, <source-link|lazy_gui.cpp|src/Typeset/Line/lazy_gui.cpp>).
 
     <item*|<verbatim|Typeset/Stack/>>The stacker.
 
     <item*|<verbatim|Typeset/Table/>>Tables and cells.
 
-    <item*|<verbatim|Typeset/Page/>>The pager (<verbatim|pager.cpp>,
-    <verbatim|make_pages.cpp>), the page breakers
-    (<verbatim|new_breaker.cpp>, <verbatim|columns_breaker.cpp> and the
-    older <verbatim|page_breaker.cpp>), and the auxiliary types
-    <cpp|pagelet>, <cpp|insertion> (<verbatim|skeleton.hpp>) and
-    <cpp|vpenalty> (<verbatim|vpenalty.hpp>).
+    <item*|<verbatim|Typeset/Page/>>The pager (<source-link|pager.cpp|src/Typeset/Page/pager.cpp>,
+    <source-link|make_pages.cpp|src/Typeset/Page/make_pages.cpp>), the page breakers
+    (<source-link|new_breaker.cpp|src/Typeset/Page/new_breaker.cpp>, <source-link|columns_breaker.cpp|src/Typeset/Page/columns_breaker.cpp> and the
+    older <source-link|page_breaker.cpp|src/Typeset/Page/page_breaker.cpp>), and the auxiliary types
+    <cpp|pagelet>, <cpp|insertion> (<source-link|skeleton.hpp|src/Typeset/Page/skeleton.hpp>) and
+    <cpp|vpenalty> (<source-link|vpenalty.hpp|src/Typeset/Page/vpenalty.hpp>).
 
     <item*|<verbatim|Typeset/Boxes/>>The box classes; see <hlink|the
     boxes|boxes.en.tm>.
 
-    <item*|<verbatim|Typeset/Env/>, <verbatim|Typeset/env.hpp>>The
+    <item*|<verbatim|Typeset/Env/>, <source-link|Typeset/env.hpp|src/Typeset/env.hpp>>The
     typesetting environment <cpp|edit_env>; see <hlink|macro
     expansion|macro-expansion.en.tm>.
   </description>

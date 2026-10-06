@@ -34,7 +34,7 @@
     converters|convert.en.tm>.
 
     <item*|Plain text>Import and export of verbatim text
-    (<verbatim|Data/Convert/Verbatim/verbatim.cpp>) follow the preferences
+    (<source-link|Data/Convert/Verbatim/verbatim.cpp|src/Data/Convert/Verbatim/verbatim.cpp>) follow the preferences
     <verbatim|verbatim-\<gtr\>texmacs:encoding> and
     <verbatim|texmacs-\<gtr\>verbatim:encoding>. On import,
     <verbatim|auto> uses <cpp|western_to_cork> (see <hlink|converters
@@ -54,7 +54,7 @@
     encoding set to <verbatim|iso-8859-2> converts with <cpp|cork_to_il2>
     and <cpp|il2_to_cork>; Spanish and German text goes through
     <cpp|spanish_to_ispanish> and <cpp|german_to_igerman> and back
-    (<verbatim|Edit/Replace/edit_select.cpp>).
+    (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>).
   </description>
 
   <section|Keyboard and input methods>
@@ -67,7 +67,7 @@
 
   <\description>
     <item*|<name|Qt>><cpp|QTMKeyboardEvent::computeUnicodeToCork>
-    (<verbatim|Plugins/Qt/QTMKeyboardEvent.cpp>) converts the text of the
+    (<source-link|Plugins/Qt/QTMKeyboardEvent.cpp|src/Plugins/Qt/QTMKeyboardEvent.cpp>) converts the text of the
     key event to <name|UTF-8> and then with <cpp|utf8_to_cork>. A result of
     the form <verbatim|\<less\><em|name>\<gtr\>> (but not
     <verbatim|\<less\>#...\<gtr\>>) loses its brackets, and
@@ -79,18 +79,18 @@
     <cpp|from_qstring>, that is, from <name|UTF-8> to Cork.
 
     <item*|<name|X11>><cpp|Xutf8LookupString> is followed by
-    <cpp|utf8_to_cork> (<verbatim|Plugins/X11/x_loop.cpp>).
+    <cpp|utf8_to_cork> (<source-link|Plugins/X11/x_loop.cpp|src/Plugins/X11/x_loop.cpp>).
 
     <item*|Editor>When it shows keyboard shortcuts or handles pre-edit
     text, the editor converts back with <cpp|cork_to_utf8>
-    (<verbatim|Edit/Interface/edit_keyboard.cpp>).
+    (<source-link|Edit/Interface/edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp>).
   </description>
 
   <section|Widgets and the clipboard>
 
   <\description>
     <item*|<cpp|to_qstring (s)>>Converts a string for display in a
-    <name|Qt> widget (<verbatim|Plugins/Qt/qt_utilities.cpp>). Since many
+    <name|Qt> widget (<source-link|Plugins/Qt/qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>). Since many
     callers pass <name|UTF-8> (file names, titles computed in <scheme>)
     while most pass Cork, it <em|guesses>: a string which decodes as
     <name|UTF-8> and is neither pure <abbr|ASCII> nor a universal string is
@@ -104,7 +104,7 @@
     the <name|UTF-8> step.
 
     <item*|Clipboard>When pasting, <cpp|qt_gui_rep::get_selection>
-    (<verbatim|Plugins/Qt/qt_gui.cpp>) takes the native <TeXmacs> format if
+    (<source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>) takes the native <TeXmacs> format if
     available, and otherwise <name|HTML> or plain text as <name|UTF-8>
     bytes, and passes them to the <scheme> converters (for instance from
     <verbatim|verbatim-snippet> or <verbatim|html-snippet> to
@@ -119,7 +119,7 @@
 
   <\description>
     <item*|Plug-in sessions>Output of a plug-in is converted line by line
-    in <verbatim|Data/Convert/Generic/input.cpp>: in <verbatim|utf8> mode
+    in <source-link|Data/Convert/Generic/input.cpp|src/Data/Convert/Generic/input.cpp>: in <verbatim|utf8> mode
     with <cpp|utf8_to_cork> (<cpp|texmacs_input_rep::utf8_flush>), in
     <verbatim|verbatim> mode with the <verbatim|auto> guess of
     <cpp|western_to_cork> (<cpp|verbatim_flush>); structured output in
@@ -137,13 +137,13 @@
 
     <item*|<scheme> strings>The glue passes strings between <c++> and
     <scheme> as byte sequences (<cpp|string_to_tmscm>,
-    <cpp|tmscm_to_string> in <verbatim|Scheme/Guile/guile_tm.cpp>; see
+    <cpp|tmscm_to_string> in <source-link|Scheme/Guile/guile_tm.cpp|src/Scheme/Guile/guile_tm.cpp>; see
     <hlink|the <scheme> interpreter and the glue|scheme-bridge.en.tm>), so
     <scheme> code sees Cork bytes and universal symbols, and must use
     <scm|tmstring-length> and friends rather than <scm|string-length> to
     count characters. Both supported dialects use
     <cpp|scm_from_locale_stringn> and <cpp|scm_to_locale_stringn>
-    (<verbatim|Scheme/Guile/guile_tm.hpp>). With <name|Guile> 1.8
+    (<source-link|Scheme/Guile/guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp>). With <name|Guile> 1.8
     (<verbatim|GUILE_C>, which includes the default embedded interpreter)
     they copy bytes unchanged; with <name|Guile> 2 and 3
     (<verbatim|GUILE_D>) they decode and encode according to the locale,

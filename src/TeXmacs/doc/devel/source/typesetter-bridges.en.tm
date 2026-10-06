@@ -8,7 +8,7 @@
   <section|The typesetter object>
 
   A typesetter is an instance of <cpp|typesetter_rep>, declared in
-  <verbatim|Typeset/Bridge/impl_typesetter.hpp>; the type <cpp|typesetter>
+  <source-link|Typeset/Bridge/impl_typesetter.hpp|src/Typeset/Bridge/impl_typesetter.hpp>; the type <cpp|typesetter>
   is a plain pointer to it. Its main fields are:
 
   <\cpp-code>
@@ -53,7 +53,7 @@
   below.
 
   The method <cpp|typesetter_rep::typeset ()> (in
-  <verbatim|Typeset/Bridge/typesetter.cpp>) performs one complete pass:
+  <source-link|Typeset/Bridge/typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>) performs one complete pass:
 
   <\enumerate>
     <item>It resets <cpp|l>, <cpp|sb>, <cpp|a>, <cpp|b> and
@@ -86,7 +86,7 @@
   from, through an <em|inverse path> <cpp|ip>: the path from the root of the
   edit tree to the subtree, stored in reverse order so that common prefixes
   are shared. The details are explained in <hlink|the boxes|boxes.en.tm>;
-  here we only recall the helpers from <verbatim|Typeset/boxes.hpp> which
+  here we only recall the helpers from <source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp> which
   are used throughout the typesetter:
 
   <\description-paragraphs>
@@ -122,7 +122,7 @@
 
   <subsection|The bridge classes>
 
-  A bridge (<verbatim|Typeset/Bridge/bridge.hpp>) connects a subtree of the
+  A bridge (<source-link|Typeset/Bridge/bridge.hpp|src/Typeset/Bridge/bridge.hpp>) connects a subtree of the
   document to its typeset representation:
 
   <\cpp-code>
@@ -161,7 +161,7 @@
   equals the desired status.
 
   Bridges are created by <cpp|make_bridge> in
-  <verbatim|Typeset/Bridge/bridge.cpp>, which dispatches on the label of
+  <source-link|Typeset/Bridge/bridge.cpp|src/Typeset/Bridge/bridge.cpp>, which dispatches on the label of
   the subtree:
 
   <\description>
@@ -199,7 +199,7 @@
 
     <item*|<cpp|bridge_ornament>, <cpp|bridge_art_box>,
     <cpp|bridge_canvas>>For the GUI-like containers in
-    <verbatim|bridge_gui.cpp>.
+    <source-link|bridge_gui.cpp|src/Typeset/Bridge/bridge_gui.cpp>.
 
     <item*|<cpp|bridge_default>>For every other primitive: the subtree is an
     ordinary paragraph, and it is re-typeset as a whole when anything inside
@@ -219,13 +219,13 @@
   <subsection|Notification of changes>
 
   The editor informs the typesetter about each elementary modification of
-  the edit tree. The functions in <verbatim|Edit/Modify/edit_modify.cpp>
+  the edit tree. The functions in <source-link|Edit/Modify/edit_modify.cpp|src/Edit/Modify/edit_modify.cpp>
   (<cpp|edit_modify_rep::notify_assign> <abbr|etc.>) convert the path to a
   path relative to the root of the document (<cpp|p / rp>) and call the
   global <cpp|notify_assign>, <cpp|notify_insert>, <cpp|notify_remove>,
   <cpp|notify_split>, <cpp|notify_join>, <cpp|notify_assign_node>,
   <cpp|notify_insert_node> and <cpp|notify_remove_node> from
-  <verbatim|Typeset/Bridge/typesetter.cpp>. These in turn call the virtual
+  <source-link|Typeset/Bridge/typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>. These in turn call the virtual
   methods of the root bridge. An assignment at the empty path replaces the
   root bridge altogether; the three <cpp|*_node> variants are rewritten
   into assignments of the parent.
@@ -402,7 +402,7 @@
   kept separately.
 
   The accelerator <cpp|bridge_docrange> in
-  <verbatim|Typeset/Bridge/bridge_docrange.cpp>, which would organize long
+  <source-link|Typeset/Bridge/bridge_docrange.cpp|src/Typeset/Bridge/bridge_docrange.cpp>, which would organize long
   documents in a binary tree of ranges, is currently disabled
   (<cpp|bridge_document_rep::initialize_acc> always sets <cpp|acc> to the
   nil bridge).
@@ -432,7 +432,7 @@
 
   References, tables of contents and page numbers need several passes. The
   loop in <cpp|edit_typeset_rep::typeset> (in
-  <verbatim|Edit/Editor/edit_typeset.cpp>) calls <cpp|typeset_sub>, which
+  <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>) calls <cpp|typeset_sub>, which
   calls the typesetter, as long as the pass was complete and there remain
   undefined (<cpp|env-\<gtr\>missing>) or redefined
   (<cpp|env-\<gtr\>redefined>) labels whose number decreases. Each new pass
@@ -463,7 +463,7 @@
   After a pass, only the parts of the screen which actually changed need to
   be repainted. This is achieved without comparing box trees, using the
   following trick. Every line of text in a paragraph is a
-  <cpp|phrase_box> (<verbatim|Typeset/Boxes/Composite/concat_boxes.cpp>),
+  <cpp|phrase_box> (<source-link|Typeset/Boxes/Composite/concat_boxes.cpp|src/Typeset/Boxes/Composite/concat_boxes.cpp>),
   a concatenation box with two extra fields: a pointer <cpp|logs_ptr> to a
   change log and the absolute position <cpp|ox>, <cpp|oy> at which it was
   last placed.
@@ -472,7 +472,7 @@
     <item>At the end of each pass, <cpp|typesetter_rep::typeset (SI& x1,
     SI& y1, SI& x2, SI& y2)> calls <cpp|b-\<gtr\>position_at (0, 0,
     change_log)> on the new document box. The default implementation in
-    <verbatim|Typeset/Boxes/Basic/boxes.cpp> just recurses into the
+    <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp> just recurses into the
     subboxes with updated offsets. When a <cpp|phrase_box> is reached, it
     prepends a pair to the log: its old rectangle (or the empty rectangle
     if the box is new) and its new rectangle.
@@ -483,7 +483,7 @@
     rectangle, old rectangle) to the same log.
 
     <item>The static function <cpp|requires_update> in
-    <verbatim|typesetter.cpp> scans these pairs: it keeps the new rectangle
+    <source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp> scans these pairs: it keeps the new rectangle
     of new lines, the old rectangle of deleted lines, and both rectangles
     for lines that moved. Lines that were cached and did not move produce
     two equal rectangles and are ignored.
@@ -499,7 +499,7 @@
   <subsection|The editor side>
 
   The editor class <cpp|edit_typeset_rep>
-  (<verbatim|Edit/Editor/edit_typeset.cpp>) owns the typesetter <cpp|ttt>,
+  (<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>) owns the typesetter <cpp|ttt>,
   created in its constructor on the subtree <cpp|subtree (et, rp)> of the
   edit tree. The relevant methods are:
 
@@ -545,7 +545,7 @@
 
   The actual update of the screen happens in
   <cpp|edit_interface_rep::apply_changes>
-  (<verbatim|Edit/Interface/edit_interface.cpp>). When the change flags
+  (<source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>). When the change flags
   contain <cpp|THE_TREE> or <cpp|THE_ENVIRONMENT>, it clears the cache of
   cursor environments (<cpp|typeset_invalidate_env>), calls
   <cpp|typeset (x1, y1, x2, y2)>, and invalidates the returned rectangle

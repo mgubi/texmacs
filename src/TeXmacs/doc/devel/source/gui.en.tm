@@ -49,7 +49,7 @@
   </itemize>
 
   The <cpp|x_window_rep> class implements the abstract class
-  <cpp|window_rep> from <verbatim|Graphics/Gui/window.hpp> and is
+  <cpp|window_rep> from <source-link|Graphics/Gui/window.hpp|src/Graphics/Gui/window.hpp> and is
   responsible for
 
   <\itemize>
@@ -65,7 +65,7 @@
 
   The graphical routines are provided by the <cpp|x_drawable_rep> class,
   which inherits from the abstract <cpp|renderer_rep> class
-  (<verbatim|Graphics/Renderer/renderer.hpp>). The same renderer interface
+  (<source-link|Graphics/Renderer/renderer.hpp|src/Graphics/Renderer/renderer.hpp>). The same renderer interface
   is implemented for printing and for other output devices. Hence, user
   applications draw their graphics on a <cpp|renderer>, which allows them
   to visualize them in a window or to print them. In the original design,
@@ -76,7 +76,7 @@
   widget oriented. A large number of widget classes are implemented, which
   all inherit from the abstract <cpp|wk_widget_rep> class, which itself
   derives from the abstract <cpp|widget_rep> class of
-  <verbatim|Graphics/Gui/widget.hpp>. Widgets may have a finite number of
+  <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp>. Widgets may have a finite number of
   children and they are responsible for
 
   <\itemize>
@@ -166,7 +166,7 @@
   particular virtual event handler, possibly after some processing.
 
   For example, instances of the <cpp|basic_widget_rep> class
-  (<verbatim|Plugins/Widkit/basic_widget.hpp>) can handle the most common
+  (<source-link|Plugins/Widkit/basic_widget.hpp|src/Plugins/Widkit/basic_widget.hpp>) can handle the most common
   events, such as keyboard, mouse, repaint events and so on. If a key is
   pressed, then the virtual function <cpp|basic_widget_rep::handle_keypress>
   is called with an argument of type <cpp|keypress_event>. The default
@@ -279,20 +279,20 @@
   </cpp-code>
 
   Real widgets, such as the text widget in
-  <verbatim|Plugins/Widkit/Output/text_widget.cpp>, follow this pattern
+  <source-link|Plugins/Widkit/Output/text_widget.cpp|src/Plugins/Widkit/Output/text_widget.cpp>, follow this pattern
   but take additional care of styles, colors and shrinking factors.
 
   <section|The abstract window interface>
 
   The abstract interface for windows is the class <cpp|window_rep> in
-  <verbatim|Graphics/Gui/window.hpp>. It provides methods to change the
+  <source-link|Graphics/Gui/window.hpp|src/Graphics/Gui/window.hpp>. It provides methods to change the
   name, the size, the position and the visibility of the window, to
   invalidate regions (<cpp|invalidate>), to translate regions, to manage
   the keyboard focus (<cpp|set_keyboard_focus>) and to grab the mouse
   (<cpp|set_mouse_grab>). Global operations, such as opening and closing
   the connection with the graphical system, the event loop, selections and
   default fonts are provided by the functions in
-  <verbatim|Graphics/Gui/gui.hpp>, such as <cpp|gui_open>,
+  <source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp>, such as <cpp|gui_open>,
   <cpp|gui_start_loop>, <cpp|gui_close>, <cpp|set_selection> and
   <cpp|get_selection>.
 
@@ -309,7 +309,7 @@
   <subsubsection|The widget representation class>
 
   The definition of the <cpp|wk_widget_rep> class
-  (<verbatim|Plugins/Widkit/wk_widget.hpp>) goes essentially as follows:
+  (<source-link|Plugins/Widkit/wk_widget.hpp|src/Plugins/Widkit/wk_widget.hpp>) goes essentially as follows:
 
   <\cpp-code>
     class wk_widget_rep: public widget_rep {
@@ -365,8 +365,8 @@
   <cpp|true> if the event could be handled and <cpp|false> if not. The
   methods <cpp|send>, <cpp|query>, <cpp|notify>, <cpp|read> and
   <cpp|write> implement the abstract widget interface from
-  <verbatim|Graphics/Gui/widget.hpp> in terms of Widkit events (see
-  <verbatim|Plugins/Widkit/Basic/widkit_wrapper.cpp>).
+  <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp> in terms of Widkit events (see
+  <source-link|Plugins/Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>).
 
   <subsubsection|The widget class>
 
@@ -427,7 +427,7 @@
   <subsubsection|The event representation class>
 
   The definition of the <cpp|event_rep> structure
-  (<verbatim|Plugins/Widkit/event.hpp>) is as follows:
+  (<source-link|Plugins/Widkit/event.hpp|src/Plugins/Widkit/event.hpp>) is as follows:
 
   <\cpp-code>
     struct event_rep: public abstract_struct {
@@ -477,7 +477,7 @@
   Concrete event classes again come into two parts: the class itself and its
   representation class. For instance, the representation class for
   <cpp|get_widget> events is defined in
-  <verbatim|Plugins/Widkit/Event/basic_event.hpp> by
+  <source-link|Plugins/Widkit/Event/basic_event.hpp|src/Plugins/Widkit/Event/basic_event.hpp> by
 
   <\cpp-code>
     struct get_widget_event_rep: public event_rep {
@@ -493,7 +493,7 @@
     EVENT(get_widget_event);
   </cpp-code>
 
-  The macro <cpp|EVENT> from <verbatim|event_codes.hpp> defines the
+  The macro <cpp|EVENT> from <source-link|event_codes.hpp|src/Plugins/Widkit/Event/event_codes.hpp> defines the
   corresponding <cpp|get_widget_event> class as
   <cpp|event_ptr\<less\>get_widget_event_rep\<gtr\>>. The template
   <cpp|event_ptr> provides the operator <cpp|-\<gtr\>> for accessing the
@@ -594,7 +594,7 @@
   care of the following steps:
 
   <\itemize>
-    <item>Add a new event type to <verbatim|event_codes.hpp>.
+    <item>Add a new event type to <source-link|event_codes.hpp|src/Plugins/Widkit/Event/event_codes.hpp>.
 
     <item>Declare and implement the event type and its representation type.
 
@@ -608,7 +608,7 @@
   <subsection|The main event loop>
 
   The main event loop (<cpp|x_gui_rep::event_loop> in
-  <verbatim|Plugins/X11/x_loop.cpp>) does the following
+  <source-link|Plugins/X11/x_loop.cpp|src/Plugins/X11/x_loop.cpp>) does the following
 
   <\itemize>
     <item>As long as the application did not destroy all its windows (and
@@ -850,7 +850,7 @@
   </verbatim-code>
 
   The complete translation of the <name|X11> key symbols can be found in
-  <verbatim|Plugins/X11/x_init.cpp>. The same naming conventions are used by
+  <source-link|Plugins/X11/x_init.cpp|src/Plugins/X11/x_init.cpp>. The same naming conventions are used by
   the other user interfaces, and by the keyboard bindings in <scheme>.
 
   <subsection|The mouse>
@@ -942,7 +942,7 @@
   useful to abort repainting if a key is pressed. The arrival of an event
   which aborts repainting can be checked using the function
   <cpp|check_event (INTERRUPT_EVENT)> or <cpp|gui_interrupted ()> from
-  <verbatim|Graphics/Gui/gui.hpp>.
+  <source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp>.
 
   If the application decides to abort repainting, it sets
   <cpp|ev-\<gtr\>stop> to <cpp|true>. The rectangle which was being
@@ -968,7 +968,7 @@
   <subsection|The toolkit>
 
   The constructors of the standard widgets are declared in
-  <verbatim|Plugins/Widkit/wk_widget.hpp>; their implementations can be
+  <source-link|Plugins/Widkit/wk_widget.hpp|src/Plugins/Widkit/wk_widget.hpp>; their implementations can be
   found in the subdirectories of <verbatim|Plugins/Widkit>
   (<verbatim|Basic>, <verbatim|Composite>, <verbatim|Attribute>,
   <verbatim|Output>, <verbatim|Button>, <verbatim|Input>,

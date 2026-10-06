@@ -52,11 +52,11 @@
     for instance <scm|kbd-backspace> calls <scm|(kbd-remove (focus-tree)
     #f)>, and <scm|kbd-remove> has specialized definitions for sessions,
     folding environments, databases, ... before falling back on
-    <scm|remove-text> (<verbatim|generic/generic-edit.scm>). Thin wrappers
+    <scm|remove-text> (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>). Thin wrappers
     such as <scm|insert>, <scm|make>, <scm|make-fraction> or
-    <scm|clipboard-paste> are defined in <verbatim|utils/library/cpp-wrap.scm>.
+    <scm|clipboard-paste> are defined in <source-link|utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm>.
 
-    <item>A glue routine of <verbatim|Scheme/Glue/build-glue-editor.scm>,
+    <item>A glue routine of <source-link|Scheme/Glue/build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>,
     such as <scm|cpp-insert> (<cpp|insert_tree>), <scm|remove-text>
     (<cpp|remove_text>), <scm|cpp-make> (<cpp|make_compound>) or
     <scm|table-insert-column> (<cpp|table_insert_column>), which calls the
@@ -95,65 +95,65 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Edit/Modify/edit_text.hpp>, <verbatim|edit_text.cpp>,
-    <verbatim|edit_delete.cpp>>The class <cpp|edit_text_rep>: insertion of
+    <item*|<source-link|Edit/Modify/edit_text.hpp|src/Edit/Modify/edit_text.hpp>, <source-link|edit_text.cpp|src/Edit/Modify/edit_text.cpp>,
+    <source-link|edit_delete.cpp|src/Edit/Modify/edit_delete.cpp>>The class <cpp|edit_text_rep>: insertion of
     trees and paragraphs, normalization of <markup|concat> nodes, spaces,
-    images, and the general deletion algorithm (<verbatim|edit_delete.cpp>).
+    images, and the general deletion algorithm (<source-link|edit_delete.cpp|src/Edit/Modify/edit_delete.cpp>).
 
-    <item*|<verbatim|Edit/Modify/edit_math.hpp>,
-    <verbatim|edit_math.cpp>>The class <cpp|edit_math_rep>: constructors for
+    <item*|<source-link|Edit/Modify/edit_math.hpp|src/Edit/Modify/edit_math.hpp>,
+    <source-link|edit_math.cpp|src/Edit/Modify/edit_math.cpp>>The class <cpp|edit_math_rep>: constructors for
     fractions, roots, scripts, primes, wide accents, negations and trees,
     and the deletion rules for brackets, primes, wide accents and trees.
 
-    <item*|<verbatim|Edit/Modify/edit_dynamic.hpp>,
-    <verbatim|edit_dynamic.cpp>>The class <cpp|edit_dynamic_rep>: insertion
+    <item*|<source-link|Edit/Modify/edit_dynamic.hpp|src/Edit/Modify/edit_dynamic.hpp>,
+    <source-link|edit_dynamic.cpp|src/Edit/Modify/edit_dynamic.cpp>>The class <cpp|edit_dynamic_rep>: insertion
     of arbitrary tags (<cpp|make_compound>), activation of inactive tags,
     insertion and removal of arguments, <markup|with> and
     <markup|style-with>, hybrid commands and <LaTeX>-like commands, and the
     general deletion rules for macro applications.
 
-    <item*|<verbatim|Edit/Modify/edit_table.hpp>,
-    <verbatim|edit_table.cpp>>The class <cpp|edit_table_rep>: everything
+    <item*|<source-link|Edit/Modify/edit_table.hpp|src/Edit/Modify/edit_table.hpp>,
+    <source-link|edit_table.cpp|src/Edit/Modify/edit_table.cpp>>The class <cpp|edit_table_rep>: everything
     about tables.
 
-    <item*|<verbatim|Edit/Modify/edit_modify.hpp>,
-    <verbatim|edit_modify.cpp>>The class <cpp|edit_modify_rep>, which
+    <item*|<source-link|Edit/Modify/edit_modify.hpp|src/Edit/Modify/edit_modify.hpp>,
+    <source-link|edit_modify.cpp|src/Edit/Modify/edit_modify.cpp>>The class <cpp|edit_modify_rep>, which
     receives the modifications and implements undo and redo; see
     <hlink|undo and redo|server-editor.en.tm>.
 
-    <item*|<verbatim|Edit/Replace/edit_select.hpp>,
-    <verbatim|edit_select.cpp>>The class <cpp|edit_select_rep>: the
+    <item*|<source-link|Edit/Replace/edit_select.hpp|src/Edit/Replace/edit_select.hpp>,
+    <source-link|edit_select.cpp|src/Edit/Replace/edit_select.cpp>>The class <cpp|edit_select_rep>: the
     selection, semantic selections, the clipboard, cutting, the focus and
     alternative selections.
 
-    <item*|<verbatim|Edit/Replace/edit_replace.hpp>,
-    <verbatim|edit_search.cpp>, <verbatim|edit_spell.cpp>>The class
+    <item*|<source-link|Edit/Replace/edit_replace.hpp|src/Edit/Replace/edit_replace.hpp>,
+    <source-link|edit_search.cpp|src/Edit/Replace/edit_search.cpp>, <source-link|edit_spell.cpp|src/Edit/Replace/edit_spell.cpp>>The class
     <cpp|edit_replace_rep>: structural searches upwards from the cursor, the
     keyboard driven search and replace mode, and the spell checking mode.
 
-    <item*|<verbatim|Data/Tree/tree_search.cpp>>The pattern matcher used by
+    <item*|<source-link|Data/Tree/tree_search.cpp|src/Data/Tree/tree_search.cpp>>The pattern matcher used by
     the search and replace tools (<scm|tree-search-tree-at>).
 
-    <item*|<verbatim|Edit/Process/edit_process.hpp>,
-    <verbatim|edit_process.cpp>>The class <cpp|edit_process_rep>:
+    <item*|<source-link|Edit/Process/edit_process.hpp|src/Edit/Process/edit_process.hpp>,
+    <source-link|edit_process.cpp|src/Edit/Process/edit_process.cpp>>The class <cpp|edit_process_rep>:
     generation of bibliographies, tables of contents, indexes, glossaries
     and lists of figures and tables.
 
-    <item*|<verbatim|utils/library/cpp-wrap.scm>>The <scheme> wrappers
+    <item*|<source-link|utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm>>The <scheme> wrappers
     <scm|insert>, <scm|make>, <scm|make-with>, the math constructors and
     the clipboard commands.
 
-    <item*|<verbatim|generic/generic-edit.scm>>The generic keyboard
+    <item*|<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>>The generic keyboard
     dispatchers (<scm|kbd-remove>, <scm|kbd-enter>, <scm|kbd-variant>,
     <scm|structured-insert-horizontal>, ...).
 
-    <item*|<verbatim|generic/search-widgets.scm>>The search and replace
+    <item*|<source-link|generic/search-widgets.scm|TeXmacs/progs/generic/search-widgets.scm>>The search and replace
     tools and toolbars.
 
-    <item*|<verbatim|generic/document-edit.scm>>The <scm|update-document>
+    <item*|<source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>>The <scm|update-document>
     command behind <menu|Document|Update>.
 
-    <item*|<verbatim|packages/standard/std-automatic.ts>>(relative to
+    <item*|<source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>>(relative to
     <verbatim|src/TeXmacs/>) The macros which record entries for the
     automatic content with the <markup|write> primitive.
   </description-paragraphs>

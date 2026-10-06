@@ -24,7 +24,7 @@
   read-only.
 
   A handler is only available once its module has been loaded. For the
-  classes registered in <verbatim|init-texmacs.scm> with
+  classes registered in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> with
   <scm|lazy-tmfs-handler> (<verbatim|automate>, <verbatim|grep>,
   <verbatim|help>, <verbatim|apidoc>, <verbatim|part>, <verbatim|db> and
   <verbatim|remote-file>) this happens automatically; the other modules are
@@ -33,7 +33,7 @@
 
   <section|Kernel handlers>
 
-  These handlers are defined in <verbatim|kernel/texmacs/tm-file-system.scm>
+  These handlers are defined in <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>
   and are always available.
 
   <\description>
@@ -50,7 +50,7 @@
 
     <item*|<verbatim|tmfs://import/<em|format>/<em|file>>>The file converted
     from <em|format> to <TeXmacs> with <scm|tree-import>. Used by
-    <verbatim|texmacs/texmacs/tm-files.scm> when a file is imported from a
+    <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> when a file is imported from a
     format other than its natural one. Operations: <verbatim|load>,
     <verbatim|title>.
   </description>
@@ -59,7 +59,7 @@
 
   <\description>
     <item*|<verbatim|tmfs://help/<em|type>/<em|file>>>Help pages
-    (<verbatim|doc/tmdoc.scm>, registered lazily). The <em|type> selects
+    (<source-link|doc/tmdoc.scm|TeXmacs/progs/doc/tmdoc.scm>, registered lazily). The <em|type> selects
     how the file is presented:
 
     <\itemize>
@@ -81,20 +81,20 @@
     <verbatim|load>, <verbatim|title> (<verbatim|Help - > followed by the
     title found in the document), <verbatim|permission> (read only). The
     help menus generate such <abbr|URL>s with <scm|tmdoc-expand-help>; for
-    instance the <c++> startup code (<verbatim|Texmacs/Texmacs/texmacs.cpp>)
+    instance the <c++> startup code (<source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>)
     opens <verbatim|tmfs://help/plain/tm/doc/about/changes/changes-recent.en.tm>
     to show the recent changes.
 
     <item*|<verbatim|tmfs://apidoc/type=<em|kind>&what=<em|name>>>Automatically
     generated documentation of <scheme> symbols and modules
-    (<verbatim|doc/apidoc.scm>, registered lazily). <em|kind> is
+    (<source-link|doc/apidoc.scm|TeXmacs/progs/doc/apidoc.scm>, registered lazily). <em|kind> is
     <verbatim|symbol> or <verbatim|module>; an empty <em|name> lists all
     symbols or modules. Operations: <verbatim|load>, <verbatim|title>,
     <verbatim|permission> (always granted). See <scm|apidoc-all-symbols> and
     <scm|apidoc-all-modules>.
 
     <item*|<verbatim|tmfs://grep/type=<em|where>&what=<em|words>>>Search
-    results (<verbatim|doc/docgrep.scm>, registered lazily). <em|where> is one
+    results (<source-link|doc/docgrep.scm|TeXmacs/progs/doc/docgrep.scm>, registered lazily). <em|where> is one
     of <verbatim|doc> (documentation in the current language),
     <verbatim|texts> (files in <verbatim|$TEXMACS_FILE_PATH>),
     <verbatim|recent> (recently opened files), <verbatim|Scheme>,
@@ -105,7 +105,7 @@
     <verbatim|load>, <verbatim|title>.
 
     <item*|<verbatim|tmfs://automate/<em|bindings>/<em|file>>>An
-    automated document (<verbatim|utils/automate/auto-tmfs.scm>, registered
+    automated document (<source-link|utils/automate/auto-tmfs.scm|TeXmacs/progs/utils/automate/auto-tmfs.scm>, registered
     lazily), built by <scm|build-document> from <em|file> with the variable
     bindings <verbatim|var1=val1,var2=val2>. The document is built in safe
     mode when <em|file> is itself a <verbatim|tmfs://help/...> page (see
@@ -114,8 +114,8 @@
 
   <section|Version control>
 
-  These handlers are defined in <verbatim|version/version-tmfs.scm>, except
-  for <verbatim|git> which is defined in <verbatim|version/version-git.scm>.
+  These handlers are defined in <source-link|version/version-tmfs.scm|TeXmacs/progs/version/version-tmfs.scm>, except
+  for <verbatim|git> which is defined in <source-link|version/version-git.scm|TeXmacs/progs/version/version-git.scm>.
   They are not registered lazily; the modules are loaded by the versioning
   menus and commands.
 
@@ -151,7 +151,7 @@
 
   <\description>
     <item*|<verbatim|tmfs://part/<em|master>[/<em|file>]>>A part of a
-    document split into several files (<verbatim|part/part-tmfs.scm>,
+    document split into several files (<source-link|part/part-tmfs.scm|TeXmacs/progs/part/part-tmfs.scm>,
     registered lazily). <em|master> is the main file and <em|file> an
     included file, encoded relatively to the master (<verbatim|here/...>) or
     absolutely; the master alone is shown if <em|file> is omitted. The
@@ -163,7 +163,7 @@
     <verbatim|wrap> (both return <em|file>).
 
     <item*|<verbatim|tmfs://db/<em|var>=<em|val>/.../<em|kind>/<em|file>>>A
-    view on a database (<verbatim|database/db-tmfs.scm>, registered lazily),
+    view on a database (<source-link|database/db-tmfs.scm|TeXmacs/progs/database/db-tmfs.scm>, registered lazily),
     for instance <verbatim|tmfs://db/bib/global> for the global
     bibliographic database. Leading components containing an equal sign are
     parameters (<verbatim|search>, <verbatim|order>, <verbatim|direction>,
@@ -174,18 +174,18 @@
 
     <item*|<verbatim|tmfs://biblio/<em|bib>/<em|file>>>The entries of the
     local bibliography <em|bib> attached to the document <em|file>
-    (<verbatim|database/bib-local.scm>, loaded lazily through
+    (<source-link|database/bib-local.scm|TeXmacs/progs/database/bib-local.scm>, loaded lazily through
     <scm|open-biblio>). Built by <scm|biblio-url>. Operations:
     <verbatim|load>, <verbatim|save>, <verbatim|title>,
     <verbatim|permission> (read and write).
 
     <item*|<verbatim|tmfs://comments/<em|file>>>The comments of the open
     buffer <em|file>, for the comments editor
-    (<verbatim|tools/comment/comment-widgets.scm>). Operations:
+    (<source-link|tools/comment/comment-widgets.scm|TeXmacs/progs/tools/comment/comment-widgets.scm>). Operations:
     <verbatim|load>, <verbatim|title>, <verbatim|permission> (read only).
 
     <item*|<verbatim|tmfs://artwork/<em|path>>>An image or pattern from the
-    <TeXmacs> artwork collection (<verbatim|utils/misc/artwork.scm>, loaded
+    <TeXmacs> artwork collection (<source-link|utils/misc/artwork.scm|TeXmacs/progs/utils/misc/artwork.scm>, loaded
     at startup). The file is downloaded from
     <verbatim|https://www.texmacs.org/artwork> and cached in
     <verbatim|$TEXMACS_HOME_PATH/misc>; if the download fails, a thumbnail
@@ -193,7 +193,7 @@
     <verbatim|format> (from the suffix).
 
     <item*|<verbatim|tmfs://email/<em|id>>>Email messages read with the
-    external program <verbatim|mmail> (<verbatim|utils/email/email-tmfs.scm>,
+    external program <verbatim|mmail> (<source-link|utils/email/email-tmfs.scm|TeXmacs/progs/utils/email/email-tmfs.scm>,
     loaded at startup only if <verbatim|mmail> is found in the path). The
     special names <verbatim|mailbox> and <verbatim|inbox> list the messages.
     Operations: <verbatim|load>, <verbatim|title>.
@@ -210,7 +210,7 @@
 
   <\description>
     <item*|<verbatim|tmfs://remote-file/<em|server>/~<em|user>/<em|path>>>A
-    file stored on a server (<verbatim|client/client-tmfs.scm>, registered
+    file stored on a server (<source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm>, registered
     lazily). A component <verbatim|time=<em|t>> right after the server
     name designates an older version. Loading is asynchronous: the handler
     sends <scm|remote-file-load> to the server, returns an empty document,
@@ -224,35 +224,35 @@
 
     <item*|<verbatim|tmfs://remote-dir/<em|server>/~<em|user>/<em|path>>>A
     directory on a server, shown as a file browser
-    (<verbatim|client/client-tmfs.scm>; not registered lazily). The home
+    (<source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm>; not registered lazily). The home
     directory of the current user is returned by
     <scm|remote-home-directory>. Operations: <verbatim|load>.
 
     <item*|<verbatim|tmfs://chat-rooms/<em|server>>,
     <verbatim|tmfs://shared/<em|server>>>The list of chat rooms and the list
-    of resources shared with the user (<verbatim|client/client-chat.scm>).
+    of resources shared with the user (<source-link|client/client-chat.scm|TeXmacs/progs/client/client-chat.scm>).
     Operations: <verbatim|load>, <verbatim|permission> (read only, and only
     if the client is connected to <em|server>).
 
     <item*|<verbatim|tmfs://chat/<em|server>/<em|room>>>A chat room
-    (<verbatim|client/client-chat.scm>). Operations: <verbatim|load>,
+    (<source-link|client/client-chat.scm|TeXmacs/progs/client/client-chat.scm>). Operations: <verbatim|load>,
     <verbatim|title>, <verbatim|permission> (read only).
 
     <item*|<verbatim|tmfs://live-list/<em|server>>>The list of live
-    documents on the server (<verbatim|client/client-live.scm>). Operations:
+    documents on the server (<source-link|client/client-live.scm|TeXmacs/progs/client/client-live.scm>). Operations:
     <verbatim|load>, <verbatim|permission> (read only, when connected).
 
     <item*|<verbatim|tmfs://live/<em|server>/<em|name>>>A live document,
-    edited simultaneously by several users (<verbatim|client/client-live.scm>).
+    edited simultaneously by several users (<source-link|client/client-live.scm|TeXmacs/progs/client/client-live.scm>).
     Operations: <verbatim|load>, <verbatim|title>, <verbatim|permission>
     (read and write).
   </description>
 
-  The modules <verbatim|client/client-chat.scm> and
-  <verbatim|client/client-live.scm> are imported by
-  <verbatim|client/client-widgets.scm>, so that their handlers are
+  The modules <source-link|client/client-chat.scm|TeXmacs/progs/client/client-chat.scm> and
+  <source-link|client/client-live.scm|TeXmacs/progs/client/client-live.scm> are imported by
+  <source-link|client/client-widgets.scm|TeXmacs/progs/client/client-widgets.scm>, so that their handlers are
   available as soon as the remote tools are used. On the server,
-  <verbatim|server/server-tmfs.scm> does not define <verbatim|tmfs>
+  <source-link|server/server-tmfs.scm|TeXmacs/progs/server/server-tmfs.scm> does not define <verbatim|tmfs>
   handlers, but the services (<scm|remote-file-load>,
   <scm|remote-file-save>, <scm|remote-dir-load>, ...) called by the client
   handlers; it analyzes the names with <scm|tmfs-\<gtr\>list> and the macro

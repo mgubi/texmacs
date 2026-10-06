@@ -13,7 +13,7 @@
   inverse path whose head is negative is a <em|decoration>: the box does
   not correspond to editable content, and the rest of the path indicates
   where the cursor should go when the box is clicked. The relevant
-  definitions are in <verbatim|Typeset/boxes.hpp>:
+  definitions are in <source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>:
 
   <\cpp-code>
     #define DECORATION        (-1)
@@ -44,7 +44,7 @@
   a decorated tree share the decoration of its root.
 
   Trees know their own inverse path through an <cpp|ip_observer>
-  (<verbatim|Data/Observers/ip_observer.cpp>). <cpp|obtain_ip (t)> returns
+  (<source-link|Data/Observers/ip_observer.cpp|src/Data/Observers/ip_observer.cpp>). <cpp|obtain_ip (t)> returns
   it, or <verbatim|DETACHED> if <cpp|t> has no inverse path or if its path
   contains a negative number anywhere. Trees which are produced by the
   evaluator are detached. The function
@@ -55,7 +55,7 @@
   <|explain>
     returns <cpp|ref> itself if it already has a valid inverse path, and
     otherwise a copy of <cpp|ref> whose nodes are recursively attached to
-    <cpp|dip> and its descendants (<verbatim|Typeset/Boxes/Basic/boxes.cpp>).
+    <cpp|dip> and its descendants (<source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>).
     The macros <cpp|attach_here (t, ip)> and <cpp|attach_right (t, ip)>
     expand to the two arguments <cpp|attach_dip (t, ip), ip>, respectively
     <cpp|attach_dip (t, decorate_right (ip)), decorate_right (ip)>, which
@@ -86,7 +86,7 @@
 
   Inline macro applications are typeset by
   <cpp|concater_rep::typeset_compound (tree t, path ip)>
-  (<verbatim|Typeset/Concat/concat_macro.cpp>). After looking up the macro
+  (<source-link|Typeset/Concat/concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>). After looking up the macro
   <cpp|f> exactly as <cpp|exec_compound> does (an undefined tag is typeset
   with <cpp|typeset_error>), it proceeds as follows:
 
@@ -327,7 +327,7 @@
 
   At the paragraph level the document is typeset incrementally by
   <em|bridges> (see the chapter on the <hlink|typesetter|typesetter.en.tm>).
-  <cpp|make_bridge> (<verbatim|Typeset/Bridge/bridge.cpp>) chooses the
+  <cpp|make_bridge> (<source-link|Typeset/Bridge/bridge.cpp|src/Typeset/Bridge/bridge.cpp>) chooses the
   bridge class according to the label:
 
   <\description>
@@ -411,7 +411,7 @@
   reference to it. The result is ordinary markup using the style macros
   <markup|src-regular>, <markup|src-var>, <markup|src-arg>,
   <markup|src-unknown> and so on (see the static function
-  <cpp|highlight> in <verbatim|env_inactive.cpp>), whose children are
+  <cpp|highlight> in <source-link|env_inactive.cpp|src/Typeset/Env/env_inactive.cpp>), whose children are
   again <markup|arg> references with index paths such as
   <scm|(arg "x" "1" "0")>. When this rendering is typeset, each reference is
   resolved by <cpp|typeset_argument>, which yields boxes with the correct

@@ -24,8 +24,8 @@
 
   Data formats and converters are declared in <scheme>, using the macros
   <scm|define-format> and <scm|converter> from
-  <verbatim|progs/kernel/texmacs/tm-convert.scm>. For instance,
-  <verbatim|progs/convert/latex/init-latex.scm> contains declarations such
+  <source-link|progs/kernel/texmacs/tm-convert.scm|TeXmacs/progs/kernel/texmacs/tm-convert.scm>. For instance,
+  <source-link|progs/convert/latex/init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm> contains declarations such
   as
 
   <\scm-code>
@@ -65,7 +65,7 @@
   implemented by an external program (option <scm|:shell>), in which case it
   is only enabled when the program is found in the path. The routines
   <cpp|generic_to_tree> and <cpp|tree_to_generic> in
-  <verbatim|Data/Convert/Generic/generic.cpp> allow <c++> code to call the
+  <source-link|Data/Convert/Generic/generic.cpp|src/Data/Convert/Generic/generic.cpp> allow <c++> code to call the
   converters from <scheme>.
 
   <subsection|Where to find the converters>
@@ -76,16 +76,16 @@
 
   <\description>
     <item*|<verbatim|Texmacs>>Parsing and printing the native <TeXmacs>
-    format (<verbatim|fromtm.cpp>, <verbatim|totm.cpp>) and the upgrade of
+    format (<source-link|fromtm.cpp|src/Data/Convert/Texmacs/fromtm.cpp>, <source-link|totm.cpp|src/Data/Convert/Texmacs/totm.cpp>) and the upgrade of
     documents written with older versions of <TeXmacs>
-    (<verbatim|upgradetm.cpp>).
+    (<source-link|upgradetm.cpp|src/Data/Convert/Texmacs/upgradetm.cpp>).
 
     <item*|<verbatim|Scheme>>Conversion between trees and <scheme>
     expressions.
 
-    <item*|<verbatim|Tex>>The <LaTeX> parser (<verbatim|parsetex.cpp>), the
+    <item*|<verbatim|Tex>>The <LaTeX> parser (<source-link|parsetex.cpp|src/Data/Convert/Tex/parsetex.cpp>), the
     conversion of the parsed <LaTeX> into <TeXmacs>
-    (<verbatim|fromtex.cpp>, <verbatim|fromtex_post.cpp>), the importation of
+    (<source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp>, <source-link|fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>), the importation of
     metadata for various journal styles (<verbatim|metadata*.cpp>) and the
     \Pconservative\Q and \Ptracked\Q converters, which attach source
     tracking information to the exported <LaTeX> so that it can be
@@ -93,7 +93,7 @@
     <verbatim|tracked_*.cpp>).
 
     <item*|<verbatim|Xml>>Parsers for <name|XML> and <name|HTML>
-    (<verbatim|parsexml.cpp>, <verbatim|parsehtml.cpp>) and some cleaning
+    (<source-link|parsexml.cpp|src/Data/Convert/Xml/parsexml.cpp>, <source-link|parsehtml.cpp|src/Data/Convert/Xml/parsehtml.cpp>) and some cleaning
     routines.
 
     <item*|<verbatim|BibTeX>>The <name|BibTeX> parser and the conservative
@@ -109,10 +109,10 @@
 
   The remaining parts of the converters are written in <scheme> and can be
   found in <verbatim|src/TeXmacs/progs/convert>. For instance,
-  <verbatim|convert/latex/tmtex.scm> implements the conversion from
-  <TeXmacs> to <LaTeX> and <verbatim|convert/latex/texout.scm> the
-  serialization of <LaTeX>; <verbatim|convert/html/htmltm.scm> and
-  <verbatim|convert/html/tmhtml.scm> implement the conversions from
+  <source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm> implements the conversion from
+  <TeXmacs> to <LaTeX> and <source-link|convert/latex/texout.scm|TeXmacs/progs/convert/latex/texout.scm> the
+  serialization of <LaTeX>; <source-link|convert/html/htmltm.scm|TeXmacs/progs/convert/html/htmltm.scm> and
+  <source-link|convert/html/tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm> implement the conversions from
   <abbr|resp.> to <name|HTML>, and <verbatim|convert/mathml> the conversions
   from and to <name|MathML>. Plug-ins may define additional formats (see
   for instance the files <verbatim|*-format.scm> in the plug-ins for
@@ -143,7 +143,7 @@
   \Ppolished\Q by a certain number of additional steps. These additional
   steps may take care of some very particular layout issues which can not be
   treated conveniently at the main step. For instance, the <c++> function
-  <cpp|latex_to_tree> in <verbatim|Data/Convert/Tex/fromtex_post.cpp>
+  <cpp|latex_to_tree> in <source-link|Data/Convert/Tex/fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>
   successively filters the preamble, converts the parsed <LaTeX> into a
   rough <TeXmacs> tree, finalizes the document structure (paragraphs,
   sections, algorithms, matrices), handles the preamble and matching
@@ -174,7 +174,7 @@
   As a result of this anomaly, converted texts have to be postprocessed, so
   as to insert paragraph breaks at strategic places (in the <LaTeX> importer,
   this is done by <cpp|finalize_layout> and <cpp|make_paragraphs> in
-  <verbatim|fromtex_post.cpp>). It should be noticed that this step may be
+  <source-link|fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>). It should be noticed that this step may be
   independent from the format which is actually being converted and that a
   similar reverse step may be implemented for backward conversions. We also
   notice that one needs an exhaustive list of all similar exceptional
@@ -194,7 +194,7 @@
   <verbatim|"texmacs-\<gtr\>latex:expand-macros"> and
   <verbatim|"texmacs-\<gtr\>latex:expand-user-macros">), while the
   <name|HTML> exporter expands the document before the conversion (see
-  <verbatim|convert/html/tmhtml-expand.scm>). Graphics and other constructs
+  <source-link|convert/html/tmhtml-expand.scm|TeXmacs/progs/convert/html/tmhtml-expand.scm>). Graphics and other constructs
   without a counterpart in the target format may also be exported as images
   (see for instance the option <verbatim|"texmacs-\<gtr\>html:images">).
 

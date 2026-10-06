@@ -39,17 +39,17 @@
     with <scm|menu-bind>, <scm|tm-menu> and <scm|tm-widget>, using keywords
     such as <scm|=\<gtr\>>, <scm|-\<gtr\>>, <scm|hlist>, <scm|toggle> or
     <scm|refreshable>. These macros are defined in
-    <verbatim|kernel/gui/menu-define.scm> and
-    <verbatim|kernel/gui/gui-markup.scm>.
+    <source-link|kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm> and
+    <source-link|kernel/gui/gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>.
 
     <item><em|Menu items.> Calling a function defined in this way does not
     create any widget: it returns a plain <scheme> list (a <em|menu item>),
     in which the dynamic parts are represented by closures. The grammar of
     menu items is given at the start of
-    <verbatim|kernel/gui/menu-widget.scm>.
+    <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>.
 
     <item><em|The interpreter.> The function <scm|make-menu-widget> of
-    <verbatim|kernel/gui/menu-widget.scm> walks through a menu item and calls
+    <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm> walks through a menu item and calls
     the glued <c++> constructors (<scm|widget-hmenu>, <scm|widget-text>,
     <scm|widget-toggle>, ...), wrapping <scheme> closures into <c++>
     <cpp|command> and <cpp|promise\<less\>widget\<gtr\>> objects.
@@ -57,10 +57,10 @@
     <item><em|The abstract <c++> interface.> The class <cpp|widget> and the
     constructors such as <cpp|horizontal_menu>, <cpp|text_widget> or
     <cpp|texmacs_widget> are declared in
-    <verbatim|Graphics/Gui/widget.hpp>; the message protocol (slots) in
-    <verbatim|Graphics/Gui/message.hpp>; the system-wide <abbr|GUI> routines
-    in <verbatim|Graphics/Gui/gui.hpp>. The kernel (for instance
-    <verbatim|Texmacs/Window/tm_window.cpp>) only uses this interface.
+    <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp>; the message protocol (slots) in
+    <source-link|Graphics/Gui/message.hpp|src/Graphics/Gui/message.hpp>; the system-wide <abbr|GUI> routines
+    in <source-link|Graphics/Gui/gui.hpp|src/Graphics/Gui/gui.hpp>. The kernel (for instance
+    <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>) only uses this interface.
 
     <item><em|The port.> The constructors and the message handlers are
     implemented by a plug-in, typically <verbatim|Plugins/Qt>. In the
@@ -97,27 +97,27 @@
 
   <\description-paragraphs>
     <item*|<verbatim|src/src/Graphics/Gui/>>The abstract interface:
-    <verbatim|widget.hpp>, <verbatim|message.hpp>, <verbatim|gui.hpp>,
-    <verbatim|window.hpp> and <verbatim|widget.cpp>.
+    <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>, <source-link|message.hpp|src/Graphics/Gui/message.hpp>, <source-link|gui.hpp|src/Graphics/Gui/gui.hpp>,
+    <source-link|window.hpp|src/Graphics/Gui/window.hpp> and <source-link|widget.cpp|src/Graphics/Gui/widget.cpp>.
 
-    <item*|<verbatim|src/src/Kernel/Abstractions/command.hpp>,
-    <verbatim|src/src/Kernel/Containers/promise.hpp>>Commands and promises,
+    <item*|<source-link|src/src/Kernel/Abstractions/command.hpp|src/Kernel/Abstractions/command.hpp>,
+    <source-link|src/src/Kernel/Containers/promise.hpp|src/Kernel/Containers/promise.hpp>>Commands and promises,
     the two kinds of closures passed to widgets.
 
     <item*|<verbatim|src/src/Texmacs/Window/>>The kernel side of windows:
-    <verbatim|tm_window.cpp> (the class <cpp|tm_window_rep>, menus and icon
-    bars of a window, auxiliary windows), <verbatim|tm_frame.cpp> (the
-    <cpp|tm_frame_rep> part of the server), <verbatim|tm_dialogue.cpp>
-    (dialogs and interactive commands) and <verbatim|tm_button.cpp> (widgets
+    <source-link|tm_window.cpp|src/Texmacs/Window/tm_window.cpp> (the class <cpp|tm_window_rep>, menus and icon
+    bars of a window, auxiliary windows), <source-link|tm_frame.cpp|src/Texmacs/Window/tm_frame.cpp> (the
+    <cpp|tm_frame_rep> part of the server), <source-link|tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp>
+    (dialogs and interactive commands) and <source-link|tm_button.cpp|src/Texmacs/Window/tm_button.cpp> (widgets
     displaying typeset boxes).
 
-    <item*|<verbatim|src/src/Scheme/Glue/build-glue-basic.scm>>The <scheme>
+    <item*|<source-link|src/src/Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The <scheme>
     names of the widget constructors (<scm|widget-hmenu> and friends).
 
     <item*|<verbatim|src/TeXmacs/progs/kernel/gui/>>The <scheme> side:
-    <verbatim|gui-markup.scm>, <verbatim|menu-define.scm>,
-    <verbatim|menu-widget.scm>, <verbatim|menu-convert.scm> and the examples
-    in <verbatim|menu-test.scm>.
+    <source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>, <source-link|menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>,
+    <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>, <source-link|menu-convert.scm|TeXmacs/progs/kernel/gui/menu-convert.scm> and the examples
+    in <source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>.
 
     <item*|<verbatim|src/src/Plugins/Qt/>>The <name|Qt> port (with a variant
     in <verbatim|Plugins/Qt6>).

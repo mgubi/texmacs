@@ -7,16 +7,16 @@
 
   Antes de escrever seu próprio arquivo de estilo, pode ser útil dar uma
   olhada em alguns dos arquivos padrão. Por exemplo, você pode abrir
-  <verbatim|book.ts> usando <apply|menu|File|Load> (não é necessário escolher
+  <source-link|book.ts|TeXmacs/styles/book.ts> usando <apply|menu|File|Load> (não é necessário escolher
   um diretório, já que o diretório de estilos já se encontra no caminho de
   busca padrão).
 
-  Depois de abrir o arquivo <verbatim|book.ts>, você verá muitas declarações
+  Depois de abrir o arquivo <source-link|book.ts|TeXmacs/styles/book.ts>, você verá muitas declarações
   de funções e ambientes (as declarações são visíveis já que os arquivos de
   estilo são escritos no ``modo de preâmbulo (veja
   <apply|menu|Options|Mode>)). Outras declarações estão nos arquivos
   <verbatim|basic.ts>, <verbatim|list.ts>, <verbatim|theorem.ts> e
-  <verbatim|program.ts> nos quais baseia-se o arquivo <verbatim|book.ts>.
+  <source-link|program.ts|TeXmacs/packages/compute/program.ts> nos quais baseia-se o arquivo <source-link|book.ts|TeXmacs/styles/book.ts>.
   Estes arquivos contém, respectivamente, os ambientes básicos, para listas
   teoremas e programação.
 

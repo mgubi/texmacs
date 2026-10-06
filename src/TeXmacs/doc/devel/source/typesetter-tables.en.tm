@@ -9,9 +9,9 @@
 
   Tables are typeset by the module <verbatim|Typeset/Table/>, with the
   classes <cpp|table_rep> and <cpp|cell_rep> declared in
-  <verbatim|Typeset/Table/table.hpp>. A table is not handled by the bridges:
+  <source-link|Typeset/Table/table.hpp|src/Typeset/Table/table.hpp>. A table is not handled by the bridges:
   it is always typeset as a whole, as part of the paragraph containing it.
-  There are three entry points in <verbatim|Typeset/Table/table.cpp>:
+  There are three entry points in <source-link|Typeset/Table/table.cpp|src/Typeset/Table/table.cpp>:
 
   <\explain>
     <cpp|box typeset_as_table (edit_env env, tree t, path

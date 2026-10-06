@@ -11,24 +11,24 @@
   interface declared in the directory <verbatim|Graphics/Gui>:
 
   <\description>
-    <item*|<verbatim|widget.hpp>>The abstract classes <cpp|widget_rep> and
+    <item*|<source-link|widget.hpp|src/Graphics/Gui/widget.hpp>>The abstract classes <cpp|widget_rep> and
     <cpp|widget>, the style flags <cpp|WIDGET_STYLE_*> and the list of all
     widget constructors that a port has to provide.
 
-    <item*|<verbatim|message.hpp>>The enumeration <cpp|slot_id> of message
+    <item*|<source-link|message.hpp|src/Graphics/Gui/message.hpp>>The enumeration <cpp|slot_id> of message
     slots, the class <cpp|slot>, and typed helper functions such as
     <cpp|set_size>, <cpp|send_keyboard_focus> or <cpp|set_main_menu> which
     encode messages into the generic calls of <cpp|widget_rep>.
 
-    <item*|<verbatim|gui.hpp>>System-wide routines (opening the <abbr|GUI>,
+    <item*|<source-link|gui.hpp|src/Graphics/Gui/gui.hpp>>System-wide routines (opening the <abbr|GUI>,
     running the main loop, clipboard, default fonts, help balloons,
     interruption checks).
 
-    <item*|<verbatim|window.hpp>>An abstract class <cpp|window_rep> for
+    <item*|<source-link|window.hpp|src/Graphics/Gui/window.hpp>>An abstract class <cpp|window_rep> for
     toolkit windows. It is only used by ports which build on
     <name|Widkit>; the <name|Qt> port does not implement it.
 
-    <item*|<verbatim|widget.cpp>>The few port-independent parts: connection
+    <item*|<source-link|widget.cpp|src/Graphics/Gui/widget.cpp>>The few port-independent parts: connection
     management, the default message handlers, <cpp|slot_name> and
     <cpp|get_default_styled_font>.
   </description>
@@ -42,7 +42,7 @@
 
   <cpp|widget> is a reference-counted pointer to a <cpp|widget_rep>, built
   with the usual <cpp|ABSTRACT_NULL> macros of
-  <verbatim|Kernel/Abstractions/basic.hpp>. A widget can be nil, which is used for instance as
+  <source-link|Kernel/Abstractions/basic.hpp|src/Kernel/Abstractions/basic.hpp>. A widget can be nil, which is used for instance as
   the \Pno widget\Q value of <cpp|read>. The representation class is:
 
   <\cpp-code>
@@ -118,13 +118,13 @@
     state change>
   <|explain>
     Informs the widget that the state variable in slot <cpp|s> changed.
-    The default implementation in <verbatim|widget.cpp> forwards the value
+    The default implementation in <source-link|widget.cpp|src/Graphics/Gui/widget.cpp> forwards the value
     to all widgets connected with <cpp|connect>, by calling their
     <cpp|send>.
   </explain>
 
   The default implementations of <cpp|send>, <cpp|query>, <cpp|read> and
-  <cpp|write> in <verbatim|widget.cpp> simply fail (<cpp|FAILED ("no default
+  <cpp|write> in <source-link|widget.cpp|src/Graphics/Gui/widget.cpp> simply fail (<cpp|FAILED ("no default
   implementation")>), so that every concrete widget class must decide which
   slots it understands. Ports usually derive from a common base class which
   provides lenient defaults (the <name|Qt> base class
@@ -138,27 +138,27 @@
   widgets.
 
   Because widgets are allocated with the <TeXmacs> fast allocator,
-  <verbatim|widget.hpp> declares a specialization of
+  <source-link|widget.hpp|src/Graphics/Gui/widget.hpp> declares a specialization of
   <cpp|tm_delete\<less\>widget_rep\<gtr\>>, which uses the virtual method
   <cpp|derived_this> to find the start of the most derived object before
   freeing it. Ports with their own base class do the same (see
   <cpp|tm_delete\<less\>qt_widget_rep\<gtr\>> in
-  <verbatim|Plugins/Qt/qt_widget.cpp>).
+  <source-link|Plugins/Qt/qt_widget.cpp|src/Plugins/Qt/qt_widget.cpp>).
 
   <section|Blackboxes and typed messages>
 
   The values carried by messages are <cpp|blackbox>es
-  (<verbatim|Kernel/Abstractions/blackbox.hpp>): type-erased, reference
+  (<source-link|Kernel/Abstractions/blackbox.hpp|src/Kernel/Abstractions/blackbox.hpp>): type-erased, reference
   counted containers. <cpp|close_box\<less\>T\<gtr\> (x)> wraps a value,
   <cpp|open_box\<less\>T\<gtr\> (bb)> unwraps it (and asserts that the type
   is right) and <cpp|type_box (bb)> returns the type identifier, which is
   <cpp|type_helper\<less\>T\<gtr\>::id> for a value of type <cpp|T>.
   Messages with several arguments use the tuple types <cpp|pair>,
   <cpp|triple>, <cpp|quartet> and <cpp|quintuple> of
-  <verbatim|Kernel/Containers/ntuple.hpp>.
+  <source-link|Kernel/Containers/ntuple.hpp|src/Kernel/Containers/ntuple.hpp>.
 
   Nobody calls <cpp|send> or <cpp|query> with explicit blackboxes. Instead,
-  <verbatim|message.hpp> provides templates which do the packing:
+  <source-link|message.hpp|src/Graphics/Gui/message.hpp> provides templates which do the packing:
 
   <\cpp-code>
     template\<less\>class T1, class T2\<gtr\> void
@@ -203,20 +203,20 @@
   The receiving side must therefore open the blackbox with exactly the same
   type. The <name|Qt> port provides <cpp|check_type\<less\>T\<gtr\> (val,
   s)>, <cpp|check_type_id\<less\>T\<gtr\> (type_id, s)> and
-  <cpp|check_type_void (index, s)> in <verbatim|Plugins/Qt/qt_utilities.hpp>
+  <cpp|check_type_void (index, s)> in <source-link|Plugins/Qt/qt_utilities.hpp|src/Plugins/Qt/qt_utilities.hpp>
   to catch mismatches early, and uses the abbreviations
   <cpp|coord2>=<cpp|pair\<less\>SI,SI\<gtr\>> and
   <cpp|coord4>=<cpp|quartet\<less\>SI,SI,SI,SI\<gtr\>>.
 
   Coordinates and sizes passed in messages are in <cpp|SI> units (see the
-  constant <cpp|PIXEL> in <verbatim|renderer.hpp>), with the conventions of
+  constant <cpp|PIXEL> in <source-link|renderer.hpp|src/Graphics/Renderer/renderer.hpp>), with the conventions of
   the <TeXmacs> renderer.
 
   <section|Slots>
 
   A <cpp|slot> is a thin wrapper around the enumeration <cpp|slot_id> of
-  <verbatim|message.hpp>; the function <cpp|slot_name> in
-  <verbatim|widget.cpp> returns a printable name for debugging. The
+  <source-link|message.hpp|src/Graphics/Gui/message.hpp>; the function <cpp|slot_name> in
+  <source-link|widget.cpp|src/Graphics/Gui/widget.cpp> returns a printable name for debugging. The
   enumeration ends with <cpp|slot_id__LAST>, which is used by some ports to
   size tables indexed by slots (for instance <cpp|sent_slots> in
   <cpp|qt_simple_widget_rep>).
@@ -341,7 +341,7 @@
 
   Widgets receive behaviour from the kernel through two kinds of closures.
 
-  <paragraph|Commands.>A <cpp|command> (<verbatim|Kernel/Abstractions/command.hpp>)
+  <paragraph|Commands.>A <cpp|command> (<source-link|Kernel/Abstractions/command.hpp|src/Kernel/Abstractions/command.hpp>)
   is a reference-counted pointer to a <cpp|command_rep> with the virtual
   methods <cpp|apply ()> and <cpp|apply (object args)>. Commands can be
   built from a plain function pointer, from a callback with two
@@ -364,9 +364,9 @@
     };
   </cpp-code>
 
-  (from <verbatim|Texmacs/Window/tm_window.cpp>). Commands built from
+  (from <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>). Commands built from
   <scheme> closures are instances of <cpp|object_command_rep>
-  (<verbatim|Scheme/Scheme/object.cpp>), created by <cpp|as_command (object)>
+  (<source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>), created by <cpp|as_command (object)>
   and exported to <scheme> as <scm|object-\<gtr\>command>; their
   <cpp|apply (object args)> calls the closure with the elements of the list
   <cpp|args>. This is how input widgets pass their result: the <name|Qt> port
@@ -375,7 +375,7 @@
   <scm|command-apply> invoke a command.
 
   <paragraph|Promises.>A <cpp|promise\<less\>T\<gtr\>>
-  (<verbatim|Kernel/Containers/promise.hpp>) is a delayed computation of a
+  (<source-link|Kernel/Containers/promise.hpp|src/Kernel/Containers/promise.hpp>) is a delayed computation of a
   value of type <cpp|T>: its representation has one virtual method
   <cpp|T eval ()>, and <cpp|p ()> evaluates it. Widget promises are used for
   the contents of submenus, which are only computed when the submenu is
@@ -394,10 +394,10 @@
   <section|The widget constructors>
 
   Every widget is created by one of the global functions declared in
-  <verbatim|widget.hpp>. The kernel calls some of them directly; most of
+  <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>. The kernel calls some of them directly; most of
   them are exported to <scheme> in
-  <verbatim|Scheme/Glue/build-glue-basic.scm> under the names listed below,
-  and used by the interpreter of <verbatim|kernel/gui/menu-widget.scm>. The
+  <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm> under the names listed below,
+  and used by the interpreter of <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>. The
   third column gives the keyword of the <scheme> widget language that
   produces them.
 
@@ -508,15 +508,15 @@
 
   A few constructors are not provided by the ports but by the kernel, in
   terms of the others: <cpp|texmacs_output_widget (doc, style)>
-  (<verbatim|Texmacs/Window/tm_button.cpp>, glue
+  (<source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>, glue
   <scm|widget-texmacs-output>) typesets a document into a box and shows it
   in a <cpp|box_widget_rep>; <cpp|texmacs_input_widget (doc, style, name)>
-  (<verbatim|Texmacs/Window/tm_window.cpp>, glue <scm|widget-texmacs-input>)
+  (<source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>, glue <scm|widget-texmacs-input>)
   creates a hidden buffer and embeds a complete editor in the widget; the
   two <cpp|box_widget> functions declared in
-  <verbatim|Texmacs/tm_frame.hpp> (the second one is glued as
+  <source-link|Texmacs/tm_frame.hpp|src/Texmacs/tm_frame.hpp> (the second one is glued as
   <scm|widget-box>) also return a <cpp|box_widget_rep>, a class of
-  <verbatim|tm_button.cpp> derived from <cpp|simple_widget_rep> which
+  <source-link|tm_button.cpp|src/Texmacs/Window/tm_button.cpp> derived from <cpp|simple_widget_rep> which
   paints a typeset box.
 
   <section|Style flags>
@@ -534,22 +534,22 @@
   text>>>>>
 
   The <scheme> constants <scm|widget-style-mini>, ...,
-  <scm|widget-style-bold> of <verbatim|kernel/gui/gui-markup.scm> have the
+  <scm|widget-style-bold> of <source-link|kernel/gui/gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm> have the
   same values. The additional <scheme> constant <scm|widget-style-verb>
   (256) is only interpreted on the <scheme> side (it suppresses the
   translation of the entries of an <scm|enum>). The function
-  <cpp|get_default_styled_font> of <verbatim|widget.cpp> maps a style to one
+  <cpp|get_default_styled_font> of <source-link|widget.cpp|src/Graphics/Gui/widget.cpp> maps a style to one
   of the default fonts.
 
   <section|The <cpp|simple_widget_rep> contract>
 
   Besides the constructors, a port must provide a class
   <cpp|simple_widget_rep>, from which the kernel derives the editor
-  (<cpp|editor_rep> in <verbatim|Edit/editor.hpp>) and the box widgets of
-  <verbatim|tm_button.cpp>. It represents a canvas that the kernel paints
+  (<cpp|editor_rep> in <source-link|Edit/editor.hpp|src/Edit/editor.hpp>) and the box widgets of
+  <source-link|tm_button.cpp|src/Texmacs/Window/tm_button.cpp>. It represents a canvas that the kernel paints
   itself with a <cpp|renderer>, and which receives raw events. The virtual
   methods the kernel overrides are listed in a comment at the end of
-  <verbatim|widget.hpp>:
+  <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>:
 
   <\cpp-code>
     bool is_editor_widget ();
@@ -575,18 +575,18 @@
   </cpp-code>
 
   Which header defines <cpp|simple_widget_rep> is chosen at compile time:
-  <verbatim|Edit/editor.hpp> and <verbatim|Texmacs/Window/tm_button.cpp>
-  include <verbatim|Qt/qt_simple_widget.hpp> when <cpp|QTTEXMACS> is
-  defined, <verbatim|Cocoa/aqua_simple_widget.h> when <cpp|AQUATEXMACS> is
-  defined, and <verbatim|Widkit/simple_wk_widget.hpp> otherwise. The
+  <source-link|Edit/editor.hpp|src/Edit/editor.hpp> and <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>
+  include <source-link|Qt/qt_simple_widget.hpp|src/Plugins/Qt/qt_simple_widget.hpp> when <cpp|QTTEXMACS> is
+  defined, <source-link|Cocoa/aqua_simple_widget.h|src/Plugins/Cocoa/aqua_simple_widget.h> when <cpp|AQUATEXMACS> is
+  defined, and <source-link|Widkit/simple_wk_widget.hpp|src/Plugins/Widkit/simple_wk_widget.hpp> otherwise. The
   <name|Qt> header simply ends with <cpp|typedef qt_simple_widget_rep
   simple_widget_rep>.
 
   <section|System-wide routines>
 
-  <verbatim|gui.hpp> declares the routines that do not concern a particular
+  <source-link|gui.hpp|src/Graphics/Gui/gui.hpp> declares the routines that do not concern a particular
   widget. The main ones are <cpp|gui_open>, <cpp|gui_start_loop> and
-  <cpp|gui_close> (called from <verbatim|Texmacs/Texmacs/texmacs.cpp>),
+  <cpp|gui_close> (called from <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>),
   <cpp|gui_interpose>, which registers the function that the main loop must
   call regularly (the server registers
   <cpp|texmacs_interpose_handler>), <cpp|needs_update> and

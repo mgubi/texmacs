@@ -34,7 +34,7 @@
   <section|Overview>
 
   Without the database tool, <cpp|edit_process_rep::generate_bibliography>
-  (<verbatim|Edit/Process/edit_process.cpp>) follows one of three paths:
+  (<source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp>) follows one of three paths:
 
   <\verbatim-code>
     style tm-xxx, or no bibtex program \ \ \ \ \ \ \ \ \ \ \ \ \ \ other style
@@ -81,7 +81,7 @@
     strings. See <hlink|the built-in functions|bibtex-functions.en.tm>.
 
     <item*|Styles (<scheme>)>The style engine of
-    <verbatim|bibtex/bib-utils.scm> and the shipped styles, which override
+    <source-link|bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> and the shipped styles, which override
     each other through <scheme> modes. See <hlink|the style
     engine and the shipped styles|bibtex-styles.en.tm>.
   </description>
@@ -89,49 +89,49 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Plugins/Bibtex/bibtex.cpp>, <verbatim|bibtex.hpp>>The
+    <item*|<source-link|Plugins/Bibtex/bibtex.cpp|src/Plugins/Bibtex/bibtex.cpp>, <source-link|bibtex.hpp|src/Plugins/Bibtex/bibtex.hpp>>The
     interface to the external program: <cpp|set_bibtex_command>,
     <cpp|bibtex_present>, <cpp|bibtex_run>, <cpp|bibtex_load_bbl>.
 
-    <item*|<verbatim|Plugins/Bibtex/bibtex_functions.cpp>,
-    <verbatim|bibtex_functions.hpp>>The built-in functions, the splitting
+    <item*|<source-link|Plugins/Bibtex/bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>,
+    <source-link|bibtex_functions.hpp|src/Plugins/Bibtex/bibtex_functions.hpp>>The built-in functions, the splitting
     of names, the conversion of field values (<cpp|bib_parse_fields>), the
     <verbatim|@string> dictionary and the selection of cited entries
     (<cpp|bib_entries>).
 
-    <item*|<verbatim|Data/Convert/BibTeX/parsebib.cpp>>The parser
+    <item*|<source-link|Data/Convert/BibTeX/parsebib.cpp|src/Data/Convert/BibTeX/parsebib.cpp>>The parser
     <cpp|parse_bib>.
 
-    <item*|<verbatim|Data/Convert/BibTeX/conservative_bib.cpp>>Conservative
+    <item*|<source-link|Data/Convert/BibTeX/conservative_bib.cpp|src/Data/Convert/BibTeX/conservative_bib.cpp>>Conservative
     import and export, see <hlink|the database
     chapter|database-bibliography.en.tm>.
 
-    <item*|<verbatim|Edit/Process/edit_process.cpp>><cpp|generate_bibliography>
+    <item*|<source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp>><cpp|generate_bibliography>
     and its helpers <cpp|find_bib_file>, <cpp|copy_bst_file>,
     <cpp|arrange_bib>.
 
-    <item*|<verbatim|Scheme/Glue/build-glue-basic.scm>>The glue:
+    <item*|<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The glue:
     <scm|set-bibtex-command>, <scm|supports-bibtex?>, <scm|bibtex-run>,
     <scm|parse-bib>, <scm|conservative-bib-import>,
     <scm|conservative-bib-export> and the <scm|bib-...> built-ins.
 
-    <item*|<verbatim|bibtex/bib-utils.scm>>The style engine
+    <item*|<source-link|bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm>>The style engine
     (<scm|bib-process>, <scm|bib-define-style>, the output helpers).
 
-    <item*|<verbatim|bibtex/plain.scm> and the other files of
+    <item*|<source-link|bibtex/plain.scm|TeXmacs/progs/bibtex/plain.scm> and the other files of
     <verbatim|bibtex/>>The shipped styles <verbatim|plain>,
     <verbatim|abbrv>, <verbatim|abstract>, <verbatim|acm>,
     <verbatim|alpha>, <verbatim|elsart-num>, <verbatim|ieeetr>,
     <verbatim|siam> and <verbatim|unsrt>.
 
-    <item*|<verbatim|bibtex/bib-complete.scm>,
-    <verbatim|bibtex/bib-widgets.scm>>Completion of citation keys and the
+    <item*|<source-link|bibtex/bib-complete.scm|TeXmacs/progs/bibtex/bib-complete.scm>,
+    <source-link|bibtex/bib-widgets.scm|TeXmacs/progs/bibtex/bib-widgets.scm>>Completion of citation keys and the
     dialog which inserts or modifies a bibliography.
 
     <item*|<verbatim|convert/bibtex/>>The registration of the
     <verbatim|bibtex> and <verbatim|tmbib> formats and converters
-    (<verbatim|init-bibtex.scm>), and the serializer
-    <verbatim|bibtexout.scm>.
+    (<source-link|init-bibtex.scm|TeXmacs/progs/convert/bibtex/init-bibtex.scm>), and the serializer
+    <source-link|bibtexout.scm|TeXmacs/progs/convert/bibtex/bibtexout.scm>.
 
     <item*|<verbatim|src/TeXmacs/misc/bib/texmacs.bib>>Entries with keys
     <verbatim|TeXmacs:...>, appended to every bibliography so that

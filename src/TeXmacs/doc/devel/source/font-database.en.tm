@@ -80,17 +80,17 @@
 
   <\description>
     <item*|Direct access to font files>The files
-    <verbatim|Plugins/Freetype/tt_tools.cpp> and
-    <verbatim|Plugins/Freetype/tt_file.cpp> read <name|TrueType> and
+    <source-link|Plugins/Freetype/tt_tools.cpp|src/Plugins/Freetype/tt_tools.cpp> and
+    <source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp> read <name|TrueType> and
     <name|OpenType> files (including <verbatim|.ttc> collections) without
     going through <name|FreeType>, extract the family and style names
     (<cpp|tt_font_name>), and locate font files on disk
     (<cpp|tt_font_path>, <cpp|tt_font_find>, <cpp|tt_font_exists>). The file
-    <verbatim|Plugins/Freetype/tt_analyze.cpp> renders a few glyphs with
+    <source-link|Plugins/Freetype/tt_analyze.cpp|src/Plugins/Freetype/tt_analyze.cpp> renders a few glyphs with
     <name|FreeType> in order to compute the characteristics of a font
     (<cpp|tt_analyze>).
 
-    <item*|The database>The file <verbatim|Graphics/Fonts/font_database.cpp>
+    <item*|The database>The file <source-link|Graphics/Fonts/font_database.cpp|src/Graphics/Fonts/font_database.cpp>
     maintains the global hash tables <cpp|font_table>,
     <cpp|font_features>, <cpp|font_variants>,
     <cpp|font_characteristics> and <cpp|font_substitutions>, loads and
@@ -100,16 +100,16 @@
     <cpp|font_database_characteristics>, ...).
 
     <item*|Logical fonts and distances>The file
-    <verbatim|Graphics/Fonts/font_select.cpp> translates physical fonts into
+    <source-link|Graphics/Fonts/font_select.cpp|src/Graphics/Fonts/font_select.cpp> translates physical fonts into
     logical fonts (<cpp|logical_font>, <cpp|logical_font_exact>), defines
     a distance between logical fonts and implements the search for the
     closest physical font (<cpp|search_font>). The file
-    <verbatim|Graphics/Fonts/font_guess.cpp> derives features from
+    <source-link|Graphics/Fonts/font_guess.cpp|src/Graphics/Fonts/font_guess.cpp> derives features from
     characteristics (<cpp|guessed_features>) and defines a finer
     \Pguessed\Q distance used to break ties (<cpp|guessed_distance>).
 
     <item*|Translation to the internal scheme>The file
-    <verbatim|Graphics/Fonts/font_translate.cpp> converts between the
+    <source-link|Graphics/Fonts/font_translate.cpp|src/Graphics/Fonts/font_translate.cpp> converts between the
     internal scheme and logical fonts (<cpp|logical_font> with four
     arguments, <cpp|get_family>, <cpp|get_variant>, <cpp|get_series>,
     <cpp|get_shape>), upgrades old family names
@@ -118,22 +118,22 @@
     given internal description, possibly decorated with synthetic bold,
     italic, small capitals or blackboard bold.
 
-    <item*|Font construction>The file <verbatim|Graphics/Fonts/find_font.cpp>
+    <item*|Font construction>The file <source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>
     constructs the actual font objects from font names, either through
     rewriting rules declared in <scheme> (the \Pold\Q mechanism) or, when no
     rule exists for a family, through the database.
 
     <item*|Smart fonts and the typesetter>The typesetter calls
     <cpp|smart_font> from <cpp|edit_env_rep::update_font>
-    (<verbatim|Typeset/Env/env_semantics.cpp>) whenever a font related
+    (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>) whenever a font related
     environment variable changes. Smart fonts call <cpp|closest_font>
     repeatedly, for the main font and for each character that the main
     font cannot render.
 
     <item*|<scheme> and the user interface>Most database and selection
     routines are exported to <scheme> (see
-    <verbatim|Scheme/Glue/build-glue-basic.scm>). The font selector dialog
-    and side tool in <verbatim|progs/fonts/font-new-widgets.scm> are written
+    <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>). The font selector dialog
+    and side tool in <source-link|progs/fonts/font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm> are written
     entirely in terms of these routines.
   </description>
 
@@ -155,7 +155,7 @@
 
     <item><cpp|find_closest> translates the request into the logical font
     <verbatim|["TeX Gyre Pagella", "bold"]>, applies the substitutions
-    from <verbatim|font-substitutions.scm>, and calls <cpp|search_font>,
+    from <source-link|font-substitutions.scm|TeXmacs/fonts/font-substitutions.scm>, and calls <cpp|search_font>,
     which returns the physical font <verbatim|("TeX Gyre Pagella",
     "Bold")>. This pair is translated back into the internal description
     <verbatim|("TeX Gyre Pagella", "rm", "bold", "right")>.
@@ -175,33 +175,33 @@
   <subsection|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Fonts/font.hpp>>Declarations of all public
+    <item*|<source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>>Declarations of all public
     database and selection routines (sections \PFont database\Q and \PFont
     selection\Q at the end of the file) and of <cpp|FONT_ATTEMPTS>.
 
-    <item*|<verbatim|Graphics/Fonts/font_database.cpp>>The database tables,
+    <item*|<source-link|Graphics/Fonts/font_database.cpp|src/Graphics/Fonts/font_database.cpp>>The database tables,
     their loading, saving, filtering and building.
 
-    <item*|<verbatim|Graphics/Fonts/font_select.cpp>>Features, logical fonts,
+    <item*|<source-link|Graphics/Fonts/font_select.cpp|src/Graphics/Fonts/font_select.cpp>>Features, logical fonts,
     distances, <cpp|search_font>, <cpp|patch_font>,
     <cpp|apply_substitutions>.
 
-    <item*|<verbatim|Graphics/Fonts/font_guess.cpp>>Features guessed from
+    <item*|<source-link|Graphics/Fonts/font_guess.cpp|src/Graphics/Fonts/font_guess.cpp>>Features guessed from
     characteristics and guessed distances.
 
-    <item*|<verbatim|Graphics/Fonts/font_translate.cpp>>Translation from and
+    <item*|<source-link|Graphics/Fonts/font_translate.cpp|src/Graphics/Fonts/font_translate.cpp>>Translation from and
     to the internal naming scheme, <cpp|find_closest>,
     <cpp|closest_font>.
 
-    <item*|<verbatim|Graphics/Fonts/find_font.cpp>>Font rules and the
+    <item*|<source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>>Font rules and the
     construction of fonts from names (<cpp|find_font>).
 
-    <item*|<verbatim|Graphics/Fonts/smart_font.cpp>>Smart fonts
+    <item*|<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>>Smart fonts
     (<cpp|smart_font>, <cpp|main_family>, <cpp|get_unicode_range>), see
     <hlink|smart fonts|smart-fonts.en.tm>.
 
-    <item*|<verbatim|Plugins/Freetype/tt_file.cpp>,
-    <verbatim|tt_tools.cpp>, <verbatim|tt_analyze.cpp>>Locating, parsing and
+    <item*|<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>,
+    <source-link|tt_tools.cpp|src/Plugins/Freetype/tt_tools.cpp>, <source-link|tt_analyze.cpp|src/Plugins/Freetype/tt_analyze.cpp>>Locating, parsing and
     analyzing font files.
 
     <item*|<verbatim|$TEXMACS_PATH/fonts/*.scm>>The global database shipped
@@ -209,9 +209,9 @@
 
     <item*|<verbatim|progs/fonts/>>Font rules for the old mechanism
     (<verbatim|fonts-*.scm>), the old font menus
-    (<verbatim|font-old-menu.scm>), the font selector
-    (<verbatim|font-new-widgets.scm>) and tools for sampling and comparing
-    fonts (<verbatim|font-sample.scm>).
+    (<source-link|font-old-menu.scm|TeXmacs/progs/fonts/font-old-menu.scm>), the font selector
+    (<source-link|font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>) and tools for sampling and comparing
+    fonts (<source-link|font-sample.scm|TeXmacs/progs/fonts/font-sample.scm>).
   </description-paragraphs>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

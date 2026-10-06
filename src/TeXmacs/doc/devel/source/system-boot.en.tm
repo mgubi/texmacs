@@ -11,8 +11,8 @@
   setting the environment variables which all search paths are built
   from, creating the user directories, managing temporary directories,
   and keeping the settings file. The code is in
-  <verbatim|System/Boot/init_texmacs.cpp>, <verbatim|init_upgrade.cpp>,
-  <verbatim|Texmacs/Texmacs/texmacs.cpp> and the entry points of the
+  <source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>, <source-link|init_upgrade.cpp|src/System/Boot/init_upgrade.cpp>,
+  <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> and the entry points of the
   platform layers.
 
   <section|Finding the installation>
@@ -41,7 +41,7 @@
     time). This prevents an executable from silently running with the
     files of another <TeXmacs> version.
 
-    <item><cpp|TeXmacs_init_paths> in <verbatim|texmacs.cpp> then handles
+    <item><cpp|TeXmacs_init_paths> in <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> then handles
     bundles: on <name|macOS> it sets <verbatim|TEXMACS_PATH> to
     <verbatim|../Resources/share/TeXmacs> if it is still unset, adds the
     bundle's <verbatim|Plugins>, <verbatim|Frameworks> and
@@ -86,7 +86,7 @@
     <item*|<verbatim|GUILE_LOAD_PATH>><verbatim|$TEXMACS_PATH/progs>, the
     previous value, <verbatim|$TEXMACS_HOME_PATH/progs> and the
     <verbatim|progs> directories of plug-ins.
-    <verbatim|init-texmacs.scm> must be found in the first two, or the boot
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> must be found in the first two, or the boot
     fails.
 
     <item*|<verbatim|PATH>, <verbatim|LD_LIBRARY_PATH>>The previous value
@@ -198,7 +198,7 @@
   <\itemize>
     <item><cpp|process_running> looks for the lower case word
     <verbatim|texmacs> in the output of <verbatim|ps>
-    (<verbatim|System/Boot/init_texmacs.cpp:151>). The executable of the
+    (<source-link|System/Boot/init_texmacs.cpp:151|src/System/Boot/init_texmacs.cpp:151>). The executable of the
     <name|macOS> bundle is <verbatim|.../TeXmacs.app/Contents/MacOS/TeXmacs>,
     which does not contain it. A running bundled instance is therefore
     considered dead, and any other instance which starts later (another
@@ -225,7 +225,7 @@
     start of <TeXmacs> accordingly.
 
     <item><verbatim|setup_texmacs_home_path> in
-    <verbatim|Plugins/Windows64/windows64_entrypoint.cpp> (which would use
+    <source-link|Plugins/Windows64/windows64_entrypoint.cpp|src/Plugins/Windows64/windows64_entrypoint.cpp> (which would use
     the <em|local> application data directory) is never called; the home
     directory on <name|Windows> is the roaming
     <verbatim|%APPDATA%\\TeXmacs> set by <cpp|immediate_options>.

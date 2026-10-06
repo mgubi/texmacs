@@ -60,7 +60,7 @@
     When loading using <shortcut|(interactive load-buffer)>, these paths are in the standard load
     path. For instance, if you want to take a look at the
     <tmpackage|std-markup> package, then it suffices to type <shortcut|(interactive load-buffer)>,
-    followed by the file name <verbatim|std-markup.ts> and
+    followed by the file name <source-link|std-markup.ts|TeXmacs/packages/standard/std-markup.ts> and
     <shortcut|(kbd-return)>.
   </remark>
 

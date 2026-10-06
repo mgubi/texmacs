@@ -53,7 +53,7 @@
   A new <verbatim|.vfn> file is not used automatically: the list of
   emulation fonts is hard-coded in <cpp|emu_font_names> and the list of
   traditional fonts in <cpp|initialize_virtual>, both in
-  <verbatim|Graphics/Fonts/smart_font.cpp>. The order of these lists is
+  <source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>. The order of these lists is
   the order in which the files are searched.
 
   <section|Extending the smart font>
@@ -112,15 +112,15 @@
     through <cpp|ren-\<gtr\>draw> on the screen and, if possible, through
     renderer transformations on printers, a <cpp|magnify> and a
     constructor function with a unique resource name. Declare it in
-    <verbatim|Graphics/Fonts/font.hpp> and add the file to the build.
+    <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp> and add the file to the build.
 
-    <item>In <cpp|find_closest> (<verbatim|Graphics/Fonts/font_translate.cpp>),
+    <item>In <cpp|find_closest> (<source-link|Graphics/Fonts/font_translate.cpp|src/Graphics/Fonts/font_translate.cpp>),
     append a new suffix (like <verbatim|-poorbf>) to the series, shape or
     variant when the requested logical feature is not provided by the
     font which was found.
 
     <item>In <cpp|find_font (family, variant, series, shape, sz, dpi)>
-    (<verbatim|Graphics/Fonts/find_font.cpp>), recognize the suffix, find
+    (<source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>), recognize the suffix, find
     the font without it, wrap it with the new emulation, and store the
     result in <cpp|font::instances> under the full name.
 
@@ -138,7 +138,7 @@
     installed font has it (the font database must be up to date, see
     <hlink|font database|font-database.en.tm>), or define it virtually.
 
-    <item*|Which subfont is used?><verbatim|smart_font.cpp> contains many
+    <item*|Which subfont is used?><source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp> contains many
     commented out traces, such as
     <cpp|//cout \<less\>\<less\> "Found " \<less\>\<less\> c \<less\>\<less\> " in " ...>
     in <cpp|resolve> and
@@ -154,7 +154,7 @@
     <scm|(debug-set "std" #t)>.
 
     <item*|Character tables><scm|build-character-table> in
-    <verbatim|progs/fonts/font-sample.scm> builds, as <scheme> markup, a
+    <source-link|progs/fonts/font-sample.scm|TeXmacs/progs/fonts/font-sample.scm> builds, as <scheme> markup, a
     table with all characters between two code points, for instance
     <scm|(insert (stree-\<gtr\>tree (build-character-table #x2190
     #x21FF)))>. Inserting such tables with various values of
@@ -168,7 +168,7 @@
     <item*|Missing glyph bitmaps>The warning <verbatim|no bitmap available
     for ...> comes from the default <cpp|font_rep::get_glyph>: a virtual or
     emulated font was built on a font which cannot export glyphs. Setting
-    <cpp|get_glyph_fatal> in <verbatim|Graphics/Fonts/font.cpp> turns these
+    <cpp|get_glyph_fatal> in <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp> turns these
     warnings into failures, which gives a backtrace.
 
     <item*|Fatal errors><verbatim|"invalid virtual character"> (with the
@@ -230,7 +230,7 @@
     resolution of the font.
 
     <item><em|The magic slant.> The automatic italic emulation uses the
-    slant <cpp|0.25001>, which <verbatim|Typeset/Concat/concat_math.cpp>
+    slant <cpp|0.25001>, which <source-link|Typeset/Concat/concat_math.cpp|src/Typeset/Concat/concat_math.cpp>
     recognizes; do not change one without the other.
 
     <item><em|Accumulating effects.> <markup|add-font-effect> appends to
@@ -244,52 +244,52 @@
   documentation:
 
   <\itemize>
-    <item><verbatim|smart_font.cpp>, <cpp|resolve (c, fam, attempt)>: the
+    <item><source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>, <cpp|resolve (c, fam, attempt)>: the
     negated condition <verbatim|!<em|name>> is tested with
     <cpp|!in_collection (c, wanted)> where <cpp|wanted> still contains the
     exclamation mark, so the condition always holds.
 
-    <item><verbatim|smart_font.cpp>, same routine, attempts
+    <item><source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>, same routine, attempts
     <math|k\<gtr\>1>: the test <cpp|v == "rm"> is made on the still empty
     string <cpp|v> instead of <cpp|variant>, so the variant
     <verbatim|rm-<em|range>> is always requested, never just
     <verbatim|<em|range>>.
 
-    <item><verbatim|smart_font.cpp>, <cpp|in_unicode_range>: for an empty
+    <item><source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>, <cpp|in_unicode_range>: for an empty
     conversion it executes <cpp|return "";> in a function returning
     <cpp|bool>, which yields <cpp|true>.
 
-    <item><verbatim|virtual_font.cpp>, <cpp|compile_bis> for
+    <item><source-link|virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>, <cpp|compile_bis> for
     <verbatim|scale>: the <verbatim|@> arguments are processed after the
     magnifications have been computed and have no effect, so
     <verbatim|(scale <em|g> <em|r> @ 1)> only scales vertically.
 
-    <item><verbatim|virtual_font.cpp>, <verbatim|fscale>: the vertical
+    <item><source-link|virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>, <verbatim|fscale>: the vertical
     <cpp|deepen> is applied to the original glyph instead of the result of
     <cpp|widen>.
 
-    <item><verbatim|virtual_font.cpp>, <verbatim|rot-right>: the logical
+    <item><source-link|virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>, <verbatim|rot-right>: the logical
     height is computed as <cpp|ey-\<gtr\>x2- ex-\<gtr\>x1> (with
     <cpp|ex-\<gtr\>x1> just set to zero) instead of
     <cpp|ey-\<gtr\>x2- ey-\<gtr\>x1> as for <verbatim|rot-left>.
 
-    <item><verbatim|virtual_font.cpp>: <verbatim|deepen> and
+    <item><source-link|virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>: <verbatim|deepen> and
     <verbatim|widen> are declared vector-capable in <cpp|supported> but
     are not handled by <cpp|draw_tree>; a glyph using them on vector
     components would be missing on printers. (The only current use applies
     them to a <verbatim|circle>, which forces the bitmap path.)
 
-    <item><verbatim|poor_effected.cpp>, <cpp|get_extents>: the top of the
+    <item><source-link|poor_effected.cpp|src/Graphics/Fonts/poor_effected.cpp>, <cpp|get_extents>: the top of the
     ink box is merged with <cpp|min> instead of <cpp|max>.
 
-    <item><verbatim|poor_extended.cpp>, <cpp|get_xpositions>: the loops
+    <item><source-link|poor_extended.cpp|src/Graphics/Fonts/poor_extended.cpp>, <cpp|get_xpositions>: the loops
     rescale <cpp|xpos[0..N(s)-1]> but not the final position
     <cpp|xpos[N(s)]>.
 
-    <item><verbatim|math_font.cpp>: <cpp|operator !=> on fonts returns
+    <item><source-link|math_font.cpp|src/Graphics/Fonts/math_font.cpp>: <cpp|operator !=> on fonts returns
     <cpp|fn1.rep == fn2.rep>.
 
-    <item><verbatim|charmap.cpp>, <cpp|join_charmap_rep::child>: calls
+    <item><source-link|charmap.cpp|src/Graphics/Fonts/charmap.cpp>, <cpp|join_charmap_rep::child>: calls
     <cpp|child (i-sum)> instead of <cpp|child (ch-sum)>; harmless as long
     as all joined charmaps have arity one.
   </itemize>

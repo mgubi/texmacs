@@ -77,7 +77,7 @@
   </scm-code>
 
   For more concrete examples, we recommend the user to take a look at the
-  standard initialization file <hlink|<verbatim|init-texmacs.scm>|$TEXMACS_PATH/progs/init-texmacs.scm>.
+  standard initialization file <hlink|<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>|$TEXMACS_PATH/progs/init-texmacs.scm>.
 
   <label|redefinitions>On the negative side, the mechanism for lazy loading
   has the important consequence that you can no longer make assumptions on

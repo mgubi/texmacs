@@ -14,19 +14,19 @@
 
   <section|Raster pictures>
 
-  <cpp|raster\<less\>C\<gtr\>> (<verbatim|Graphics/Pictures/raster.hpp>) is a
+  <cpp|raster\<less\>C\<gtr\>> (<source-link|Graphics/Pictures/raster.hpp|src/Graphics/Pictures/raster.hpp>) is a
   reference counted array of pixels of type <cpp|C> with a width <cpp|w>, a
   height <cpp|h> and an origin <cpp|(ox, oy)>; the pixels are stored row by
   row in <cpp|a>. The header implements, as templates, the generic
   operations on such arrays: mapping a pixel operator over a raster,
   composing two rasters with one of the operators of
-  <verbatim|raster_operators.hpp>, shifting, magnifying, convolving with a
+  <source-link|raster_operators.hpp|src/Graphics/Pictures/raster_operators.hpp>, shifting, magnifying, convolving with a
   pen, and so on. The pixel type used in practice is <cpp|true_color>
-  (<verbatim|Graphics/Colors/true_color.hpp>), four doubles with
+  (<source-link|Graphics/Colors/true_color.hpp|src/Graphics/Colors/true_color.hpp>), four doubles with
   non-premultiplied alpha.
 
   <cpp|raster_picture_rep\<less\>C\<gtr\>>
-  (<verbatim|raster_picture.hpp>) wraps a raster as a <cpp|picture>. Pixels
+  (<source-link|raster_picture.hpp|src/Graphics/Pictures/raster_picture.hpp>) wraps a raster as a <cpp|picture>. Pixels
   outside the raster read as transparent black and writes to them are
   ignored. Two helpers convert between the representations:
   <cpp|raster_picture (raster\<less\>C\<gtr\>)> wraps a raster, and
@@ -36,13 +36,13 @@
   <cpp|raster_picture (w, h, ox, oy)> creates an empty
   <cpp|true_color> picture.
 
-  <verbatim|raster_picture.cpp> implements all the picture operations
-  declared in <verbatim|picture.hpp> (<cpp|compose>, <cpp|draw_on>,
+  <source-link|raster_picture.cpp|src/Graphics/Pictures/raster_picture.cpp> implements all the picture operations
+  declared in <source-link|picture.hpp|src/Graphics/Pictures/picture.hpp> (<cpp|compose>, <cpp|draw_on>,
   <cpp|shift>, <cpp|magnify>, <cpp|blur>, <cpp|thicken>, <cpp|color_matrix>,
   <cpp|make_transparent>, ...) by converting their arguments with
   <cpp|as_raster\<less\>true_color\<gtr\>>, calling the raster template and
   wrapping the result. Every operation therefore returns a fresh raster
-  picture, whatever the kind of its arguments. <verbatim|raster_random.cpp>
+  picture, whatever the kind of its arguments. <source-link|raster_random.cpp|src/Graphics/Pictures/raster_random.cpp>
   contains the random functions behind <cpp|turbulence>,
   <cpp|fractal_noise>, <cpp|degrade>, <cpp|distort> and <cpp|gnaw>.
 
@@ -72,7 +72,7 @@
   <\explain>
     <cpp|class effect_rep><explain-synopsis|an effect>
   <|explain>
-    Declared in <verbatim|Graphics/Pictures/effect.hpp>; <cpp|effect> is the
+    Declared in <source-link|Graphics/Pictures/effect.hpp|src/Graphics/Pictures/effect.hpp>; <cpp|effect> is the
     corresponding <cpp|ABSTRACT_NULL> handle. Its methods are
 
     <\description>
@@ -91,7 +91,7 @@
     </description>
   </explain>
 
-  <cpp|build_effect (tree t)> (<verbatim|effect.cpp>) translates a
+  <cpp|build_effect (tree t)> (<source-link|effect.cpp|src/Graphics/Pictures/effect.cpp>) translates a
   description into an effect object. The empty string stands for the first
   argument (<cpp|argument_effect (0)>) and an integer <math|i> for the
   argument number <math|i>; compound trees are dispatched on their label:
@@ -129,13 +129,13 @@
 
   Each effect class (<cpp|blur_effect_rep>, <cpp|compose_effect_rep>, ...)
   first applies its sub-effects to the argument pictures and then calls the
-  corresponding picture operation of <verbatim|raster_picture.cpp>.
+  corresponding picture operation of <source-link|raster_picture.cpp|src/Graphics/Pictures/raster_picture.cpp>.
 
   <section|Scalable images>
 
-  A <cpp|scalable> (<verbatim|Graphics/Pictures/scalable.hpp>) is described
+  A <cpp|scalable> (<source-link|Graphics/Pictures/scalable.hpp|src/Graphics/Pictures/scalable.hpp>) is described
   in <hlink|the renderer API|renderer-api.en.tm>. Its only implementation,
-  <cpp|scalable_image_rep> (<verbatim|scalable.cpp>), holds an image file
+  <cpp|scalable_image_rep> (<source-link|scalable.cpp|src/Graphics/Pictures/scalable.cpp>), holds an image file
   <cpp|u>, a size <cpp|(w, h)> in logical units, an effect <cpp|eff> and the
   pixel size <cpp|px> at which it was last drawn. Its logical and physical
   extents are those of the effect applied to the rectangle
@@ -155,14 +155,14 @@
 
   <\description>
     <item*|The size cache>The table <cpp|img_box> of
-    <verbatim|System/Files/image_files.cpp> maps the tree of an image
+    <source-link|System/Files/image_files.cpp|src/System/Files/image_files.cpp> maps the tree of an image
     <abbr|URL> to its size in points and, for PostScript files, the origin
     of its bounding box. It is filled by <cpp|image_size>,
     <cpp|ps_bounding_box> and <cpp|gs_image_size> and cleared entry by entry
     with <cpp|clear_imgbox_cache>, or completely with
     <cpp|clearall_imgbox_cache>.
 
-    <item*|The picture cache>The tables of <verbatim|picture.cpp> map a key
+    <item*|The picture cache>The tables of <source-link|picture.cpp|src/Graphics/Pictures/picture.cpp> map a key
     <verbatim|(url, w, h, effect)>, where <verbatim|w> and <verbatim|h> are
     sizes in pixels, to the loaded <cpp|picture> and to the modification
     time of the file when it was loaded (<cpp|picture_stamp>). A reference
@@ -172,7 +172,7 @@
     zero are put on a black list.
 
     <item*|The <name|Qt> image cache>The table <cpp|qt_pic_cache> of
-    <verbatim|Plugins/Qt/qt_picture.cpp> maps
+    <source-link|Plugins/Qt/qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp> maps
     <verbatim|(url, w, h)> (plus the effect and the pixel size when there is
     an effect) to the <cpp|QImage> read from disk.
   </description>
@@ -187,14 +187,14 @@
   pictures of image boxes which still exist are kept.
 
   <cpp|picture_cache_clean ()> is called after each typesetting pass
-  (<cpp|edit_typeset_rep::typeset_sub>, in <verbatim|Edit/Editor/edit_typeset.cpp>).
+  (<cpp|edit_typeset_rep::typeset_sub>, in <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>).
   At most once per minute, it removes the black listed entries whose count
   is still zero. <cpp|picture_cache_reset ()> empties the picture cache, the
   size cache and the <name|Qt> image cache; it is exported as
   <scm|picture-cache-reset> and called by <scm|picture-gc> in
-  <verbatim|texmacs/texmacs/tm-tools.scm>.
+  <source-link|texmacs/texmacs/tm-tools.scm|TeXmacs/progs/texmacs/texmacs/tm-tools.scm>.
 
-  With <name|Qt>, <cpp|load_picture> (<verbatim|qt_picture.cpp>) calls
+  With <name|Qt>, <cpp|load_picture> (<source-link|qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>) calls
   <cpp|get_image>, which looks in <cpp|qt_pic_cache> and otherwise calls
   <cpp|get_image_for_real>:
 
@@ -215,7 +215,7 @@
 
   If the image cannot be read, <cpp|load_picture> returns
   <cpp|error_picture (w, h)>, a translucent red rectangle. The <name|X11>
-  version of <cpp|load_picture> (<verbatim|Plugins/X11/x_picture.cpp>)
+  version of <cpp|load_picture> (<source-link|Plugins/X11/x_picture.cpp|src/Plugins/X11/x_picture.cpp>)
   renders the file into a pixmap with <name|Imlib2> if possible and with
   <name|Ghostscript> otherwise (<cpp|ghostscript_run>, which converts the
   image to PostScript first).
@@ -231,7 +231,7 @@
   rescaled to the interface scale, and with a dark style sheet their colors
   are inverted (except for the flags of languages). Without <name|Qt>,
   <cpp|load_xpm> parses the <verbatim|xpm> file itself
-  (<cpp|xpm_load> in <verbatim|image_files.cpp>).
+  (<cpp|xpm_load> in <source-link|image_files.cpp|src/System/Files/image_files.cpp>).
 
   <section|Saving pictures>
 
@@ -242,7 +242,7 @@
   transparent pixels, a one bit mask (pixels with an opacity of at most 32
   are masked); colors are first blended with white according to their
   opacity. It is used by the PostScript printer to draw pictures.
-  <cpp|apply_effect (eff, src, dest, w, h)> (<verbatim|image_files.cpp>,
+  <cpp|apply_effect (eff, src, dest, w, h)> (<source-link|image_files.cpp|src/System/Files/image_files.cpp>,
   exported as <scm|apply-effect>) loads image files at a given size,
   applies an effect to them and saves the result; it only works with
   <name|Qt> (<cpp|qt_apply_effect>).
@@ -260,7 +260,7 @@
 
     <item>In <cpp|build_effect>, the test for <markup|eff-color-matrix>
     reads <verbatim|NR (m) != 4 && NC (m) != 5>
-    (<verbatim|Graphics/Pictures/effect.cpp:783>); it should use
+    (<source-link|Graphics/Pictures/effect.cpp:783|src/Graphics/Pictures/effect.cpp:783>); it should use
     <verbatim|\|\|>. A matrix with four rows and fewer than five columns
     passes the test and is then read out of bounds.
 
@@ -271,9 +271,9 @@
     a tag with too few children makes the effect parser read past the end
     of the tree.
 
-    <item><verbatim|effect.hpp> declares <cpp|gaussian_pen>,
+    <item><source-link|effect.hpp|src/Graphics/Pictures/effect.hpp> declares <cpp|gaussian_pen>,
     <cpp|oval_pen>, <cpp|rectangular_pen>, <cpp|motion_pen> and
-    <cpp|outline>, but <verbatim|effect.cpp> defines
+    <cpp|outline>, but <source-link|effect.cpp|src/Graphics/Pictures/effect.cpp> defines
     <cpp|gaussian_pen_effect>, ..., <cpp|motion_pen_effect> and
     <cpp|outlines> instead; the declared names have no definition, and a
     call to them fails at link time.

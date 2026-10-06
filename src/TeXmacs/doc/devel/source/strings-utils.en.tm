@@ -8,7 +8,7 @@
   <section|Byte level utilities>
 
   Besides the routines of the previous pages,
-  <verbatim|Data/String/analyze.cpp> collects general purpose functions on
+  <source-link|Data/String/analyze.cpp|src/Data/String/analyze.cpp> collects general purpose functions on
   byte strings. Unless stated otherwise they ignore the universal encoding,
   so a symbol counts as several characters and a search may match inside a
   symbol; use the <cpp|tm_*> variants when this matters.
@@ -16,7 +16,7 @@
   <\description>
     <item*|Character tests><cpp|is_alpha>, <cpp|is_digit>,
     <cpp|is_hex_digit>, <cpp|is_space>, <cpp|is_punctuation>, ... on
-    <abbr|ASCII> characters (inline in <verbatim|analyze.hpp>), and
+    <abbr|ASCII> characters (inline in <source-link|analyze.hpp|src/Data/String/analyze.hpp>), and
     <cpp|is_iso_alpha>, <cpp|is_iso_locase>, <cpp|is_iso_upcase> which also
     accept Cork letters.
 
@@ -60,7 +60,7 @@
 
     <item*|Completions and differences><cpp|as_completions>,
     <cpp|close_completions>, <cpp|strip_completions> (used by
-    tab-completion, <verbatim|Edit/Interface/edit_complete.cpp>);
+    tab-completion, <source-link|Edit/Interface/edit_complete.cpp|src/Edit/Interface/edit_complete.cpp>);
     <cpp|differences (s1, s2)>, which returns the differing ranges as
     quadruples <math|(b<rsub|1>,e<rsub|1>,b<rsub|2>,e<rsub|2>)> found by
     recursively matching common substrings, and <cpp|distance>, which sums
@@ -74,7 +74,7 @@
   </description>
 
   <paragraph|Indexed search.><cpp|string_searcher>
-  (<verbatim|Data/String/fast_search.hpp>) builds, for a fixed string, a
+  (<source-link|Data/String/fast_search.hpp|src/Data/String/fast_search.hpp>) builds, for a fixed string, a
   table of hash codes of all substrings whose length is a power of two, and
   uses it to find the occurrences of a pattern quickly
   (<cpp|search_next>, <cpp|search_all>). <cpp|get_longest_common (s1, s2,
@@ -82,7 +82,7 @@
   used by the conservative <LaTeX> converters to recognize the parts of a
   document which did not change.
 
-  <paragraph|Sorting.><verbatim|Data/String/merge_sort.hpp> provides
+  <paragraph|Sorting.><source-link|Data/String/merge_sort.hpp|src/Data/String/merge_sort.hpp> provides
   <cpp|merge_sort (a)> for arrays of any type with an <cpp|\<less\>=>
   operator and <cpp|merge_sort_leq\<less\>T,LEQ\<gtr\> (a)> with an explicit
   comparison class. The sort is stable.
@@ -125,7 +125,7 @@
   a tab into <verbatim|U+00AF> and a newline into <verbatim|U+02D9>
   (verified: <scm|(cork-\<gtr\>utf8 "a\\nb")> gives an a, a dot accent and
   a b). Multi-line text must be converted line by line, as
-  <cpp|var_cork_to_utf8> in <verbatim|Data/Convert/Verbatim/verbatim.cpp>
+  <cpp|var_cork_to_utf8> in <source-link|Data/Convert/Verbatim/verbatim.cpp|src/Data/Convert/Verbatim/verbatim.cpp>
   does. In the other direction, <cpp|utf8_to_cork> keeps tabs and newlines
   as bytes, so the two functions are not inverse to each other on such
   strings. Code points <verbatim|U+0080>--<verbatim|U+009F> (the C1
@@ -146,47 +146,47 @@
     <cpp|uni_upcase_char> raises <verbatim|0xA0>--<verbatim|0xBF>,
     including the inverted exclamation and question marks and the pound
     sign, which become an I with dot, a D with stroke and the section sign
-    (<verbatim|Data/String/universal.cpp:199>, <verbatim|:250>). This
+    (<source-link|Data/String/universal.cpp:199|src/Data/String/universal.cpp:199>, <verbatim|:250>). This
     affects <scm|tmstring-upcase-all> and friends, and hence
     capitalization in bibliographies and titles. The byte level routines
-    of <verbatim|analyze.cpp> exclude these positions correctly.
+    of <source-link|analyze.cpp|src/Data/String/analyze.cpp> exclude these positions correctly.
 
     <item>D with stroke (<verbatim|0x9E>) is unaccented to a lower case
-    <verbatim|d> (verified; <verbatim|universal.cpp:400>).
+    <verbatim|d> (verified; <source-link|universal.cpp:400|src/Data/String/universal.cpp:400>).
 
     <item><cpp|uni_is_letter> considers every byte above 127 a letter,
     including the section, pound and inverted punctuation signs (verified):
-    the test <verbatim|(c & 97) != 31> at <verbatim|universal.cpp:460> is
+    the test <verbatim|(c & 97) != 31> at <source-link|universal.cpp:460|src/Data/String/universal.cpp:460> is
     always true.
 
     <item><cpp|html_to_utf8> only decodes hexadecimal entities between
-    <verbatim|0x80> and <verbatim|0xFF> (<verbatim|converter.cpp:924>), so
+    <verbatim|0x80> and <verbatim|0xFF> (<source-link|converter.cpp:924|src/Data/String/converter.cpp:924>), so
     it does not invert <cpp|utf8_to_html>, which encodes all non-<abbr|ASCII>
     characters (verified: <verbatim|&#x2013;> is left unchanged).
 
     <item>An unterminated <verbatim|\<less\>#> at the end of a string makes
     <cpp|cork_to_utf8> (and its variants) output a NUL byte (verified;
-    <verbatim|converter.cpp:379> and the analogous lines).
+    <source-link|converter.cpp:379|src/Data/String/converter.cpp:379> and the analogous lines).
 
     <item><cpp|decode_from_utf8> on a sequence truncated at the end of the
-    string reads the last byte again (<verbatim|converter.cpp:880>), so a
+    string reads the last byte again (<source-link|converter.cpp:880|src/Data/String/converter.cpp:880>), so a
     wrong code point is produced instead of the failsafe byte.
 
     <item><cpp|decode_base64> drops a final group without padding
     (verified: <verbatim|"QUI"> decodes to the empty string), indexes its
     table with a negative value for bytes above 127
-    (<verbatim|base64.cpp:88>), and decodes an empty group, reading past
+    (<source-link|base64.cpp:88|src/Data/String/base64.cpp:88>), and decodes an empty group, reading past
     the end of an empty array, when <verbatim|=> follows a complete group
-    (<verbatim|base64.cpp:69>).
+    (<source-link|base64.cpp:69|src/Data/String/base64.cpp:69>).
 
     <item><cpp|looks_universal> only accepts decimal digits in
-    <verbatim|\<less\>#...\<gtr\>> (<verbatim|wencoding.cpp:99>), so
+    <verbatim|\<less\>#...\<gtr\>> (<source-link|wencoding.cpp:99|src/Data/String/wencoding.cpp:99>), so
     <cpp|western_to_cork> escapes <abbr|ASCII> text containing an escape
     such as <verbatim|\<less\>#E9\<gtr\>> with <cpp|tm_encode>.
 
     <item>The <verbatim|iso-8859-1> setting for plain text import and
     export applies <cpp|tm_encode> and <cpp|tm_decode> without converting
-    bytes (<verbatim|Data/Convert/Verbatim/verbatim.cpp:247>,
+    bytes (<source-link|Data/Convert/Verbatim/verbatim.cpp:247|src/Data/Convert/Verbatim/verbatim.cpp:247>,
     <verbatim|:282>), as if Cork were <name|ISO-8859-1>; characters in the
     range <verbatim|0x80>--<verbatim|0xBF> and the four differing positions
     are mangled, and on export <cpp|tm_decode> drops all symbols. Since
@@ -194,21 +194,21 @@
     also happens on systems with a <name|Latin-1> locale.
 
     <item><cpp|replace> and <cpp|tokenize> loop forever when the pattern
-    or separator is empty (<verbatim|analyze.cpp:1263>, <verbatim|:1311>);
+    or separator is empty (<source-link|analyze.cpp:1263|src/Data/String/analyze.cpp:1263>, <verbatim|:1311>);
     both are reachable from <scheme> (<scm|string-replace>,
     <scm|cpp-string-tokenize>).
 
     <item><cpp|string_searcher_rep::search_sub> indexes its table out of
     range when the pattern is longer than the indexed string, or when the
-    indexed string is empty (<verbatim|fast_search.cpp:90>).
+    indexed string is empty (<source-link|fast_search.cpp:90|src/Data/String/fast_search.cpp:90>).
 
     <item><cpp|from_qstring_utf8> builds the result from a C string
-    (<verbatim|Plugins/Qt/qt_utilities.cpp:346>), so text containing a NUL
+    (<source-link|Plugins/Qt/qt_utilities.cpp:346|src/Plugins/Qt/qt_utilities.cpp:346>), so text containing a NUL
     character is truncated.
 
     <item>The combining tilde is recognized as <verbatim|U+033E> (combining
     vertical tilde) instead of <verbatim|U+0303>
-    (<verbatim|Plugins/Qt/QTMKeyboardEvent.cpp:137>); probably a typo.
+    (<source-link|Plugins/Qt/QTMKeyboardEvent.cpp:137|src/Plugins/Qt/QTMKeyboardEvent.cpp:137>); probably a typo.
 
     <item>The <name|iconv> wrapper returns the whole input unchanged when a
     conversion fails, and <cpp|tm_decode> silently drops symbols and

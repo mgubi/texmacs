@@ -42,7 +42,7 @@
   <verbatim|Contents/MacOS/TeXmacs>, the localized resources of
   <verbatim|src/Plugins/Cocoa/English.lproj>, and the runtime tree into
   <verbatim|Contents/Resources/share/TeXmacs>. The script
-  <verbatim|packages/macos/bundle-libs.sh> then copies the <name|Qt>
+  <source-link|packages/macos/bundle-libs.sh|packages/macos/bundle-libs.sh> then copies the <name|Qt>
   frameworks and plug-ins and the other dynamic libraries into the bundle
   and rewrites their install names, and the bundle is signed with
   <verbatim|codesign> if a signing identity was configured.
@@ -60,7 +60,7 @@
   the runtime tree, the binary renamed to <verbatim|texmacs.exe>, the
   <name|Aspell> dictionaries of the <abbr|SDK>, the <name|Qt> plug-ins, and
   all the <abbr|DLL>s the executables depend on (found by
-  <verbatim|packages/windows/copydll.sh>). <verbatim|WINDOWS_PACKAGE> runs
+  <source-link|packages/windows/copydll.sh|packages/windows/copydll.sh>). <verbatim|WINDOWS_PACKAGE> runs
   <name|Inno Setup> (<verbatim|iscc>) on
   <verbatim|packages/windows/TeXmacs.iss> to make the installer.
   <verbatim|WINDOWS_APPX> additionally makes two <name|MSIX> packages with
@@ -106,7 +106,7 @@
   <verbatim|../distr/TeXmacs-Android> from the launcher in
   <verbatim|packages/android/launcher/> (whose <cpp|main> calls
   <cpp|texmacs_entrypoint>), the manifest and resources, and the runtime
-  tree collected as assets by <verbatim|collect_assets.sh>.
+  tree collected as assets by <source-link|collect_assets.sh|packages/android/collect_assets.sh>.
   <verbatim|ANDROID_AAB> and <verbatim|ANDROID_DEV_APK> build it with
   <name|CMake> and the <name|Android> <abbr|NDK> and <abbr|SDK> into an
   application bundle or a development <abbr|APK>. The platform layer is

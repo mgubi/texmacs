@@ -13,7 +13,7 @@
 
   The plug-in lives in <verbatim|src/plugins/ai> (copied to
   <verbatim|TeXmacs/plugins/ai> by the build). Its file
-  <verbatim|progs/init-ai.scm> declares one plug-in per engine, whose name
+  <source-link|progs/init-ai.scm|plugins/ai/progs/init-ai.scm> declares one plug-in per engine, whose name
   is the model name:
 
   <\scm-code>
@@ -56,11 +56,11 @@
 
   <\enumerate>
     <item>The input field is serialized by the plug-in serializer
-    <scm|ai-serialize> (<verbatim|tools/ai/ai-batch.scm>), as plain text or
+    <scm|ai-serialize> (<source-link|tools/ai/ai-batch.scm|TeXmacs/progs/tools/ai/ai-batch.scm>), as plain text or
     as a <LaTeX> snippet.
 
     <item>The link calls the <scheme> function <scm|connection-cmdline> or
-    <scm|connection-request> (<verbatim|kernel/texmacs/tm-plugins.scm>)
+    <scm|connection-request> (<source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>)
     with the plug-in name, the chat name and the serialized input, which
     calls the function given in the configuration:
 
@@ -78,7 +78,7 @@
 
     <item>When the command or the request has finished, the collected
     output goes to <cpp|texmacs_input_rep::cmdline_flush>
-    (<verbatim|Data/Convert/Generic/input.cpp>), which calls
+    (<source-link|Data/Convert/Generic/input.cpp|src/Data/Convert/Generic/input.cpp>), which calls
     <scm|connection-result>, hence <scm|ai-result>, that is,
     <scm|cpp-ai-latex-output>, and writes the resulting tree as the output
     of the session.
@@ -87,11 +87,11 @@
   The preference <verbatim|<em|name>-text-input> (the <verbatim|Textual
   input> toggle of the plug-in preferences, on by default) makes the input
   fields of the session text rather than mathematics
-  (<scm|session-text-input?> in <verbatim|dynamic/session-edit.scm>).
+  (<scm|session-text-input?> in <source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm>).
 
   <section|The Tools menu>
 
-  The AI entries of <verbatim|texmacs/menus/tools-menu.scm> are:
+  The AI entries of <source-link|texmacs/menus/tools-menu.scm|TeXmacs/progs/texmacs/menus/tools-menu.scm> are:
 
   <\description>
     <item*|<menu|AI engine>>Sets or resets the preference
@@ -111,8 +111,8 @@
     markup.
   </description>
 
-  These commands are defined in <verbatim|tools/ai/ai-batch.scm>, which is
-  loaded at startup by <verbatim|init-texmacs.scm>:
+  These commands are defined in <source-link|tools/ai/ai-batch.scm|TeXmacs/progs/tools/ai/ai-batch.scm>, which is
+  loaded at startup by <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>:
 
   <\description>
     <item*|<scm|ai-correct>>Takes the selection, cuts it to the
@@ -135,14 +135,14 @@
 
   <section|Asynchronous translation>
 
-  <verbatim|tools/ai/ai-translate.scm> implements <scm|(ai-translate*
+  <source-link|tools/ai/ai-translate.scm|TeXmacs/progs/tools/ai/ai-translate.scm> implements <scm|(ai-translate*
   <em|lan>)>, which translates the selection, or the whole document if
   there is no selection, paragraph by paragraph and in the background, and
   <scm|ai-abort-translate>, which stops it. Both are declared lazily in
-  <verbatim|init-texmacs.scm>; no menu entry calls them at present.
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>; no menu entry calls them at present.
 
   The work is organized with the process utilities of
-  <verbatim|utils/library/process.scm>: <scm|make-process> splits the
+  <source-link|utils/library/process.scm|TeXmacs/progs/utils/library/process.scm>: <scm|make-process> splits the
   document into paragraphs and calls the processing function on each of
   them in turn, through tree pointers so that the user may keep editing.
   For each paragraph, <scm|translate-process-one> compresses it, skips it
@@ -158,7 +158,7 @@
 
   An <em|agent> is a named set of instructions which is added to the
   requests of a given kind. Agents are stored in the user database of kind
-  <verbatim|"ai-agents"> (<verbatim|database/ai-agents-db.scm>), with three
+  <verbatim|"ai-agents"> (<source-link|database/ai-agents-db.scm|TeXmacs/progs/database/ai-agents-db.scm>), with three
   entry types, <verbatim|corrector>, <verbatim|interlocutor> and
   <verbatim|translator>, each with a single field
   <verbatim|instructions>. They are edited like bibliographies, through
@@ -173,7 +173,7 @@
   return the instructions of the selected agent; the defaults are a short
   built-in description for the corrector and nothing for the others. If
   the selected agent no longer exists, a warning is issued and the
-  preference is reset to <verbatim|default>. <verbatim|ai.cpp> calls these
+  preference is reset to <verbatim|default>. <source-link|ai.cpp|src/Data/Convert/AI/ai.cpp> calls these
   functions only for <name|Albert>, and only the <name|Albert> preferences
   widget offers the choice.
 
@@ -210,14 +210,14 @@
   <\itemize>
     <item><strong|All sessions of an engine share one conversation.> The
     links always pass the chat name <verbatim|"default">
-    (<verbatim|System/Link/cmdline_link.cpp:191>,
-    <verbatim|request_link.cpp:130> and
-    <verbatim|Data/Convert/Generic/input.cpp:478>), so the <name|Albert>
+    (<source-link|System/Link/cmdline_link.cpp:191|src/System/Link/cmdline_link.cpp:191>,
+    <source-link|request_link.cpp:130|src/System/Link/request_link.cpp:130> and
+    <source-link|Data/Convert/Generic/input.cpp:478|src/Data/Convert/Generic/input.cpp:478>), so the <name|Albert>
     history is shared by all <name|Albert> sessions and is never reset.
 
     <item><strong|A failed correction removes the selection.>
     <scm|ai-correct> and <scm|ai-translate> cut the selection before the
-    request is made (<verbatim|tools/ai/ai-batch.scm:62> and <verbatim|84>);
+    request is made (<source-link|tools/ai/ai-batch.scm:62|TeXmacs/progs/tools/ai/ai-batch.scm:62> and <verbatim|84>);
     if the request fails, the answer is empty and the selection is replaced
     by nothing. The original is still in the <verbatim|primary> clipboard.
 

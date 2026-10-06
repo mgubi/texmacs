@@ -29,7 +29,7 @@
   examples in the other subsections of \P<hlink|Extending the graphical user
   interface|scheme-gui.en.tm>\Q. If you'd rather see the sources, the whole
   list of keywords is in the table <scm|gui-make-table> inside
-  <hlink|<verbatim|menu-define.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-define.scm>.
+  <hlink|<source-link|menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-define.scm>.
   How the widget language is implemented is explained in \P<hlink|The
   <scheme> widget language and its
   interpreter|../../source/widgets-scheme.en.tm>\Q.
@@ -156,7 +156,7 @@
 
   From here you can go on reading \P<hlink|Extending the graphical user
   interface|scheme-gui.en.tm>\Q or see the sample widgets in
-  <hlink|<verbatim|menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>.
+  <hlink|<source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>.
   This file also defines the helper <scm|(show <scm-arg|widget>)>, which is
   short for <scm|(top-window <scm-arg|widget> "Simple widget")> and is used
   in the examples of the following sections.

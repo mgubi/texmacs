@@ -8,13 +8,13 @@
   <section|The two inclusion tags>
 
   The kernel knows two inclusion primitives, both with one argument, the
-  name of the included file (<verbatim|Data/Drd/drd_std.cpp> gives it the
+  name of the included file (<source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp> gives it the
   type <abbr|URL>):
 
   <\description>
     <item*|<markup|include> (<cpp|INCLUDE>)>Typeset by
     <cpp|concater_rep::typeset_include>
-    (<verbatim|Typeset/Concat/concat_macro.cpp>). The typesetter loads the
+    (<source-link|Typeset/Concat/concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>). The typesetter loads the
     file with <cpp|load_inclusion>, typesets the result with
     <cpp|typeset_dynamic>, and sets the current file name and the
     <cpp|secure> flag of the environment to those of the included file
@@ -23,10 +23,10 @@
     <item*|<markup|include*> (<cpp|VAR_INCLUDE>)>A <em|rewriting>
     primitive, like <markup|extern> and <markup|with-package>: the
     environment replaces it by the contents of the file
-    (<cpp|edit_env_rep::rewrite>, <verbatim|Typeset/Env/env_exec.cpp>), and
+    (<cpp|edit_env_rep::rewrite>, <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>), and
     the bridge typesets the rewritten tree
     (<cpp|bridge_rewrite_rep::my_typeset>,
-    <verbatim|Typeset/Bridge/bridge_rewrite.cpp>), again with the current
+    <source-link|Typeset/Bridge/bridge_rewrite.cpp|src/Typeset/Bridge/bridge_rewrite.cpp>), again with the current
     file name and the <cpp|secure> flag of the included file. An
     inclusion which resolves to the base file name (the master, see
     below) is replaced by the error <verbatim|"invalid self include">.
@@ -36,7 +36,7 @@
   </description>
 
   In practice, documents use <markup|include>, but the standard style
-  redefines it as a macro (<verbatim|packages/standard/std-automatic.ts>):
+  redefines it as a macro (<source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>):
 
   <\verbatim-code>
     \<less\>assign\|include\|\<less\>macro\|name\|\<less\>surround\|\<less\>part-info\|\<less\>arg\|name\<gtr\>\<gtr\>\|\|\<less\>include*\|\<less\>arg\|name\<gtr\>\<gtr\>\<gtr\>\<gtr\>\<gtr\>
@@ -73,7 +73,7 @@
   <section|The inclusion cache>
 
   All inclusions go through <cpp|load_inclusion (url)>
-  (<verbatim|Texmacs/Data/new_buffer.cpp>), which keeps a global table
+  (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>), which keeps a global table
   <cpp|document_inclusions> from the file name (as a string) to the
   included tree:
 
@@ -83,7 +83,7 @@
     <item>Otherwise the file is imported with <cpp|import_tree (name,
     "generic")>, so that any format with a converter can be included, and
     reduced to a body by <cpp|extract_document>
-    (<verbatim|Data/Convert/Texmacs/fromtm.cpp>).
+    (<source-link|Data/Convert/Texmacs/fromtm.cpp|src/Data/Convert/Texmacs/fromtm.cpp>).
     <cpp|extract_document> wraps the body in a <markup|with> which sets the
     initial environment of the included file, except for the page layout
     variables and, when the included file belongs to a project, its page
@@ -106,14 +106,14 @@
 
   <\description-paragraphs>
     <item*|<scm|tm-get-includes>, <scm|buffer-get-includes>,
-    <scm|buffer-contains-includes?>>(<verbatim|generic/document-part.scm>)
+    <scm|buffer-contains-includes?>>(<source-link|generic/document-part.scm|TeXmacs/progs/generic/document-part.scm>)
     List the names of the files included by a document, looking through
     <markup|document> and <markup|with> nodes. The list drives the
     <menu|Document|Part> menu of a master (<scm|document-master-menu> in
-    <verbatim|part/part-menu.scm>), each entry of which opens the included
+    <source-link|part/part-menu.scm|TeXmacs/progs/part/part-menu.scm>), each entry of which opens the included
     file as a part view.
 
-    <item*|<scm|include-list>, <scm|project-file-list>>(<verbatim|generic/document-menu.scm>)
+    <item*|<scm|include-list>, <scm|project-file-list>>(<source-link|generic/document-menu.scm|TeXmacs/progs/generic/document-menu.scm>)
     The same for the <menu|Document|Project> menu, but only at the top
     level of the master and with resolved <abbr|URL>s.
 

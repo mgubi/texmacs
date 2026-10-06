@@ -12,7 +12,7 @@
   <markup|extern> primitive. Functional operators operate on six main types
   of arguments: strings, numbers, lengths, booleans, tuples and colors. Some
   operators are overloaded, so that they can be used for several types.
-  Their implementation can be found in <verbatim|Typeset/Env/env_exec.cpp>
+  Their implementation can be found in <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>
   (the methods <cpp|edit_env_rep::exec_plus_minus>,
   <cpp|edit_env_rep::exec_merge>, <abbr|etc.>).
 

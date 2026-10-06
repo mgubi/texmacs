@@ -37,7 +37,7 @@
     <scm|:returns>, <scm|:note>, <scm|:argument>, <scm|:default>,
     <scm|:proposals>, <scm|:secure>, <scm|:check-mark>, <scm|:interactive>
     and <scm|:balloon>. The implementation can be found in
-    <verbatim|kernel/texmacs/tm-define.scm>.
+    <source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>.
   </explain>
 
   <\explain>
@@ -198,7 +198,7 @@
     with <scm|file> (such as <scm|smart-file>) and the type
     <scm|"directory"> allow the user to choose a file or directory, and tab
     completion in the interactive prompt will traverse the file system. For
-    instance, <scm|load-buffer> in <verbatim|texmacs/texmacs/tm-files.scm> is
+    instance, <scm|load-buffer> in <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> is
     declared using <scm|(:argument name smart-file "File name")>.
   </explain>
 

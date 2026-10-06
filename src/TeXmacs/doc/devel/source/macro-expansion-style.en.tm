@@ -16,7 +16,7 @@
   <\itemize>
     <item>It is only compiled when <TeXmacs> is configured with the CMake
     option <verbatim|ENABLE_EXPERIMENTAL> (or the corresponding
-    <verbatim|CONFIG_EXPERIMENTAL> setting of <verbatim|makefile.in>), which
+    <verbatim|CONFIG_EXPERIMENTAL> setting of <source-link|makefile.in|src/makefile.in>), which
     defines the preprocessor symbol <verbatim|EXPERIMENTAL>; the default is
     off.
 
@@ -43,7 +43,7 @@
 
   <section|Persistent environments>
 
-  <verbatim|Style/Environment/environment.hpp> defines an abstract class
+  <source-link|Style/Environment/environment.hpp|src/Style/Environment/environment.hpp> defines an abstract class
   <cpp|environment_rep> with methods <cpp|contains>, <cpp|read>,
   <cpp|write>, <cpp|remove> and <cpp|print>, keyed by integers: variable
   names are converted to integers with <cpp|make_tree_label>. The
@@ -61,7 +61,7 @@
     looked up from the head; it counts lookup <cpp|misses> and flattens
     itself with <cpp|compress> when there are too many.
 
-    <item*|<cpp|std_environment>>(in <verbatim|std_environment.cpp>) The
+    <item*|<cpp|std_environment>>(in <source-link|std_environment.cpp|src/Style/Environment/std_environment.cpp>) The
     environment actually used by the evaluator. It has a flag <cpp|pure>, a
     list of local variables <cpp|env>, a link <cpp|next> to the enclosing
     environment, an accelerated lookup list <cpp|accel> and a list
@@ -82,7 +82,7 @@
 
   <section|Memoization>
 
-  A <cpp|memorizer> (<verbatim|Style/Memorizer/memorizer.hpp>) represents
+  A <cpp|memorizer> (<source-link|Style/Memorizer/memorizer.hpp|src/Style/Memorizer/memorizer.hpp>) represents
   one computation: its inputs, its outputs and the memorizers of its
   sub-computations. Memorizers are hash-consed in a global table: the
   constructor <cpp|memorizer (memorizer_rep*)> looks for an existing
@@ -148,14 +148,14 @@
 
   <section|Macro expansion by substitution>
 
-  <verbatim|environment.hpp> defines
+  <source-link|environment.hpp|src/Style/Environment/environment.hpp> defines
   <verbatim|ALTERNATIVE_MACRO_EXPANSION> (the alternative,
   <verbatim|CLASSICAL_MACRO_EXPANSION>, is commented out). In this mode
   <cpp|evaluate_compound> does not push argument frames. It builds an
   <cpp|assoc_environment> binding the parameters to the argument trees and
   <em|substitutes> them into the body with
   <cpp|expand (tree t, assoc_environment env)>
-  (<verbatim|Style/Evaluate/evaluate_macro.cpp>):
+  (<source-link|Style/Evaluate/evaluate_macro.cpp|src/Style/Evaluate/evaluate_macro.cpp>):
 
   <\itemize>
     <item><scm|(arg x i1 ... ik)> is replaced by the corresponding subtree
@@ -186,7 +186,7 @@
   <cpp|rewrite> and <cpp|edit_env_rep::rewrite>, the re-entrancy variable
   <cpp|reenter_rewrite_env> and <cpp|current_rewrite_env>), but they do not
   share code, and the Style evaluator has not been kept in sync with all
-  later additions to <verbatim|env_exec.cpp> (themes, animations, several
+  later additions to <source-link|env_exec.cpp|src/Typeset/Env/env_exec.cpp> (themes, animations, several
   graphical primitives). The typesetter only uses
   <cpp|edit_env_rep::exec>. If you fix a bug in the semantics of a
   primitive, the place to fix it is <verbatim|Typeset/Env/> (together with

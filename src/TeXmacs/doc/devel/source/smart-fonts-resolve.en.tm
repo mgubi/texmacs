@@ -29,7 +29,7 @@
   </enumerate>
 
   The number of attempts is bounded by <cpp|FONT_ATTEMPTS> (20, see
-  <verbatim|Graphics/Fonts/font.hpp>). Attempt 1 means \Pthe font
+  <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>). Attempt 1 means \Pthe font
   requested by the user\Q; the subsequent attempts ask the font database
   for less and less close matches (see <hlink|font
   selection|font-database-selection.en.tm>).
@@ -219,7 +219,7 @@
   (for instance <verbatim|(> from <verbatim|\<less\>left-(-3\<gtr\>>). Null
   delimiters (<verbatim|.> and <verbatim|\<less\>nobracket\<gtr\>>) are
   sent to <verbatim|ignore>. When the global <cpp|has_poor_rubber>
-  (<verbatim|Graphics/Fonts/font.cpp>) is set, some delimiters are replaced
+  (<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>) is set, some delimiters are replaced
   by a simpler <em|goal> whose presence in the font is enough to build the
   delimiter: <verbatim|\<less\>mid\<gtr\>> for
   <verbatim|\<less\>sqrt\<gtr\>> and double bars, <verbatim|/> for angle
@@ -230,7 +230,7 @@
   <cpp|rubber_font (fn[k])>, if that font supports it. Italic main fonts
   never provide rubber characters.
 
-  The <cpp|rubber_font> wrapper (in <verbatim|Graphics/Fonts/font.cpp>)
+  The <cpp|rubber_font> wrapper (in <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>)
   caches one extensible font per base font and chooses it in
   <cpp|make_rubber_font>: <cpp|rubber_stix_font> for <name|Stix>, the base
   font itself if its name mentions <verbatim|mathlarge=> or
@@ -303,7 +303,7 @@
     <verbatim|TeX Gyre Pagella> is tried; <cpp|tex_gyre_fix> turns it into
     <verbatim|TeX Gyre Pagella Math> for the medium math shape, whose
     <name|Unicode> font supports the big operators natively (see
-    <cpp|tex_gyre_native> in <verbatim|Plugins/Freetype/unicode_font.cpp>).
+    <cpp|tex_gyre_native> in <source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>).
 
     <item><verbatim|\<less\>alpha\<gtr\>>: step 1 sends it to
     <verbatim|italic-greek> if the main font has

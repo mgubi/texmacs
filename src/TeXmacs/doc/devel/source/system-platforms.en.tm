@@ -11,20 +11,20 @@
   are declared and implemented once per platform:
 
   <\description>
-    <item*|<verbatim|Plugins/Unix/unix_system.hpp>>Used on <name|Linux>,
+    <item*|<source-link|Plugins/Unix/unix_system.hpp|src/Plugins/Unix/unix_system.hpp>>Used on <name|Linux>,
     <name|macOS> and the other <name|Unix> systems.
 
-    <item*|<verbatim|Plugins/Windows64/windows64_system.hpp>>Used for
+    <item*|<source-link|Plugins/Windows64/windows64_system.hpp|src/Plugins/Windows64/windows64_system.hpp>>Used for
     64-bit <name|Windows> builds (<verbatim|OS_MINGW64>).
 
-    <item*|<verbatim|Plugins/Windows/windows32_system.hpp>>Used for the
+    <item*|<source-link|Plugins/Windows/windows32_system.hpp|src/Plugins/Windows/windows32_system.hpp>>Used for the
     older 32-bit <name|Windows> builds.
 
-    <item*|<verbatim|Plugins/Android/android_system.hpp>>Used on
+    <item*|<source-link|Plugins/Android/android_system.hpp|src/Plugins/Android/android_system.hpp>>Used on
     <name|Android>.
   </description>
 
-  <verbatim|System/Files/file.cpp> and <verbatim|System/Misc/sys_utils.hpp>
+  <source-link|System/Files/file.cpp|src/System/Files/file.cpp> and <source-link|System/Misc/sys_utils.hpp|src/System/Misc/sys_utils.hpp>
   include the right header with preprocessor tests.
 
   <section|The common interface>
@@ -52,7 +52,7 @@
     <cpp|texmacs_init_guile_hooks>.
   </description>
 
-  Processes are run by <verbatim|unix_sys_utils.cpp> on <name|Unix>, by
+  Processes are run by <source-link|unix_sys_utils.cpp|src/Plugins/Unix/unix_sys_utils.cpp> on <name|Unix>, by
   <cpp|windows_system> and <cpp|mingw_system> on 64-bit <name|Windows>,
   and by <name|Qt> (<cpp|qt_system>) on 32-bit <name|Windows> and
   <name|Android>; see <hlink|programs, web requests, messages and
@@ -65,7 +65,7 @@
   (<cpp|LOCK_EX>), and <cpp|texmacs_stat> is <cpp|stat>.
   <cpp|texmacs_get_application_directory> uses <verbatim|/proc/self/exe> on
   <name|Linux> and <cpp|_NSGetExecutablePath> on <name|macOS>.
-  <verbatim|unix_entrypoint.cpp> contains <cpp|main>: it installs the
+  <source-link|unix_entrypoint.cpp|src/Plugins/Unix/unix_entrypoint.cpp> contains <cpp|main>: it installs the
   <scheme> hooks, finds <verbatim|TEXMACS_PATH> (<hlink|paths, directories
   and settings|system-boot.en.tm>), adds the <verbatim|usr/bin>
   directories of an <name|AppImage> to <verbatim|PATH>, forces the
@@ -80,7 +80,7 @@
   <name|macOS>:
 
   <\description>
-    <item*|<verbatim|mac_utilities.mm>><cpp|mac_alternate_startup> (is
+    <item*|<source-link|mac_utilities.mm|src/Plugins/MacOS/mac_utilities.mm>><cpp|mac_alternate_startup> (is
     the <key|Alt> key held during startup, in which case the settings and
     caches are reset), the event filter which repairs <key|Ctrl+Tab> in
     some <name|Qt> versions, the support for <name|Apple> remote controls,
@@ -89,13 +89,13 @@
     <TeXmacs> server to sleep (App Nap), and the unified title bar of the
     windows.
 
-    <item*|<verbatim|mac_spellservice.mm>>Spell checking with the system
+    <item*|<source-link|mac_spellservice.mm|src/Plugins/MacOS/mac_spellservice.mm>>Spell checking with the system
     dictionaries.
 
-    <item*|<verbatim|mac_images.mm>>Image sizes and conversions with
+    <item*|<source-link|mac_images.mm|src/Plugins/MacOS/mac_images.mm>>Image sizes and conversions with
     <name|Cocoa>.
 
-    <item*|<verbatim|mac_app.mm>, <verbatim|cg_renderer.cpp>>Support for
+    <item*|<source-link|mac_app.mm|src/Plugins/MacOS/mac_app.mm>, <source-link|cg_renderer.cpp|src/Plugins/MacOS/cg_renderer.cpp>>Support for
     the older <name|Cocoa> and <name|X11> front ends.
   </description>
 
@@ -103,12 +103,12 @@
 
   The 64-bit layer converts all names and environment variables between
   <name|UTF-8> and the wide character <abbr|API>s of <name|Windows>
-  (<verbatim|windows64_encoding.cpp>), opens files in binary mode, and
+  (<source-link|windows64_encoding.cpp|src/Plugins/Windows64/windows64_encoding.cpp>), opens files in binary mode, and
   locks them with <cpp|LockFileEx>. <cpp|texmacs_init_guile_hooks>
   installs wide character versions of the file functions used by
   <name|Guile> (<cpp|stat>, <cpp|open>, <cpp|readdir>, <cpp|getenv>,
   ...), so that <scheme> code also works with non-<abbr|ASCII> names.
-  <verbatim|windows64_entrypoint.cpp> defines <cpp|main>,
+  <source-link|windows64_entrypoint.cpp|src/Plugins/Windows64/windows64_entrypoint.cpp> defines <cpp|main>,
   <cpp|WinMain> and <cpp|wWinMain>, which all:
 
   <\enumerate>
@@ -139,7 +139,7 @@
   derived from their <abbr|MIME> type (<cpp|android_suffix_from_mime>),
   and <cpp|resolve_in_path> looks for programs in
   <verbatim|$TEXMACS_PATH/bin>. The application directory is the home
-  directory. <verbatim|android.cpp> starts a background service and
+  directory. <source-link|android.cpp|src/Plugins/Android/android.cpp> starts a background service and
   exports the <abbr|JNI> function <cpp|callScheme>, by which the
   <name|Java> side can run a <scheme> command in the main thread.
 
@@ -148,14 +148,14 @@
   <\itemize>
     <item><cpp|mac_begin_server> declares a <em|local> variable
     <cpp|background_activity> which hides the static one
-    (<verbatim|Plugins/MacOS/mac_utilities.mm:547>). The static variable
+    (<source-link|Plugins/MacOS/mac_utilities.mm:547|src/Plugins/MacOS/mac_utilities.mm:547>). The static variable
     stays <cpp|nil>, so <cpp|mac_end_server> never ends the activity, each
     start of the server creates and retains a new one, and App Nap
     remains disabled after the server is stopped. <cpp|mac_end_server>
     also does not reset the variable after releasing it.
 
     <item><cpp|mac_fix_paths> is declared in
-    <verbatim|Texmacs/Texmacs/texmacs.cpp> but only defined for the old
+    <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> but only defined for the old
     <name|Cocoa> front end and never called.
 
     <item>The behaviour of locks differs: advisory <cpp|flock> locks on

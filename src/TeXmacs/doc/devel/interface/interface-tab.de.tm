@@ -75,7 +75,7 @@
     \ \ \ \ <example-plugin-link|complete/src/complete.cpp>
   </verbatim>
 
-  Die Begrüÿungs-Botschaft in <verbatim|complete.cpp> sorgt für einen Teil
+  Die Begrüÿungs-Botschaft in <source-link|complete.cpp|TeXmacs/examples/plugins/complete/src/complete.cpp> sorgt für einen Teil
   der Konfiguration:t
 
   <\cpp-fragment>

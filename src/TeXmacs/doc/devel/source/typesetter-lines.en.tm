@@ -12,7 +12,7 @@
 
   <subsection|Spaces>
 
-  A <cpp|space> (<verbatim|Kernel/Types/space.hpp>) is a triple of lengths
+  A <cpp|space> (<source-link|Kernel/Types/space.hpp|src/Kernel/Types/space.hpp>) is a triple of lengths
   <cpp|min>, <cpp|def> and <cpp|max>: the minimal, default and maximal
   extent of a stretchable space, in the internal unit <cpp|SI>. Spaces can
   be added, subtracted, multiplied by scalars and compared with <cpp|max>.
@@ -22,7 +22,7 @@
   <subsection|Line items>
 
   The concater produces arrays of <cpp|line_item>s
-  (<verbatim|Typeset/Format/line_item.hpp>):
+  (<source-link|Typeset/Format/line_item.hpp|src/Typeset/Format/line_item.hpp>):
 
   <\cpp-code>
     class line_item_rep: public concrete_struct {
@@ -54,7 +54,7 @@
   penalty for breaking the line after it. Penalties are integers; the
   constants <cpp|HYPH_STD> (<math|10<rsup|4>>), <cpp|HYPH_PANIC>
   (<math|10<rsup|6>>) and <cpp|HYPH_INVALID> (<math|10<rsup|8>>, meaning
-  <em|forbidden>) are defined in <verbatim|System/Language/language.hpp>.
+  <em|forbidden>) are defined in <source-link|System/Language/language.hpp|src/System/Language/language.hpp>.
   The main item types are:
 
   <\description-paragraphs>
@@ -98,7 +98,7 @@
   <subsection|Page items and stack borders>
 
   After line breaking, each line becomes a <cpp|page_item>
-  (<verbatim|Typeset/Format/page_item.hpp>):
+  (<source-link|Typeset/Format/page_item.hpp|src/Typeset/Format/page_item.hpp>):
 
   <\cpp-code>
     class page_item_rep: public concrete_struct {
@@ -133,7 +133,7 @@
   one; the <cpp|penalty> is the cost of a page break after the line. Floats
   and footnotes whose anchor lies on the line are attached in <cpp|fl>.
 
-  A <cpp|stack_border> (<verbatim|Typeset/Format/stack_border.hpp>)
+  A <cpp|stack_border> (<source-link|Typeset/Format/stack_border.hpp|src/Typeset/Format/stack_border.hpp>)
   describes how a block of page items interacts with the blocks above and
   below it: the default baseline distance <cpp|height>, the separation
   parameters <cpp|sep>, <cpp|hor_sep>, <cpp|ver_sep>, the corresponding
@@ -146,7 +146,7 @@
 
   <subsection|Formats and lazy structures>
 
-  The file <verbatim|Typeset/formatter.hpp> defines a small protocol for
+  The file <source-link|Typeset/formatter.hpp|src/Typeset/formatter.hpp> defines a small protocol for
   material which cannot be typeset before its width is known, such as the
   contents of floats, of multi-paragraph table cells and of GUI containers.
   A <cpp|lazy> is a partially typeset object of a certain
@@ -175,11 +175,11 @@
     table columns.
   </explain>
 
-  The format classes (<verbatim|Typeset/Format/format.hpp>) are
+  The format classes (<source-link|Typeset/Format/format.hpp|src/Typeset/Format/format.hpp>) are
   <cpp|format_none>, <cpp|format_width>, <cpp|format_cell> (width, vertical
   alignment, depth and height of a cell), <cpp|format_vstream> (width plus
   line items to put before and after) and <cpp|query_vstream_width>. The
-  function <cpp|make_lazy> in <verbatim|Typeset/Line/lazy_typeset.cpp>
+  function <cpp|make_lazy> in <source-link|Typeset/Line/lazy_typeset.cpp|src/Typeset/Line/lazy_typeset.cpp>
   plays for lazy structures the role that <cpp|make_bridge> plays for
   bridges: it dispatches on the tag and builds a <cpp|lazy_document>,
   <cpp|lazy_surround>, <cpp|lazy_table>, a lazy paragraph, <abbr|etc.>
@@ -190,7 +190,7 @@
 
   <subsection|Entry points>
 
-  The concater (<verbatim|Typeset/Concat/concater.hpp>) turns a tree into
+  The concater (<source-link|Typeset/Concat/concater.hpp|src/Typeset/Concat/concater.hpp>) turns a tree into
   an array of line items. A <cpp|concater_rep> holds the environment, the
   array <cpp|a> of items being produced and a flag <cpp|rigid> which is set
   when the result will surely not be broken into lines. It is used through
@@ -228,31 +228,31 @@
   <subsection|Traversal>
 
   <cpp|concater_rep::typeset (tree t, path ip)> in
-  <verbatim|Typeset/Concat/concater.cpp> is a large switch on the label of
+  <source-link|Typeset/Concat/concater.cpp|src/Typeset/Concat/concater.cpp> is a large switch on the label of
   <cpp|t>. Strings are handled according to the current mode
   (<cpp|env-\<gtr\>mode>): text, mathematics or program code. Compound
   trees are dispatched to specialized methods, spread over several files:
 
   <\description>
-    <item*|<verbatim|concat_text.cpp>>Strings, <markup|concat>,
+    <item*|<source-link|concat_text.cpp|src/Typeset/Concat/concat_text.cpp>>Strings, <markup|concat>,
     <markup|document> and <markup|para> nested inside a line (typeset as a
     stacked box with <cpp|typeset_as_stack> <abbr|resp.>
     <cpp|typeset_as_paragraph>), spaces, moves and resizes, floats, notes,
     <markup|datoms>/<markup|dlines>/<markup|dpages>.
 
-    <item*|<verbatim|concat_math.cpp>>Brackets, big operators, scripts,
+    <item*|<source-link|concat_math.cpp|src/Typeset/Concat/concat_math.cpp>>Brackets, big operators, scripts,
     fractions, roots, wide accents, trees and inline tables.
 
-    <item*|<verbatim|concat_macro.cpp>>The macro primitives:
+    <item*|<source-link|concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>>The macro primitives:
     <markup|assign>, <markup|with>, <markup|compound> (macro application),
     <markup|arg>, <markup|value>, <markup|mark>, <markup|eval>, ...
 
-    <item*|<verbatim|concat_active.cpp>, <verbatim|concat_inactive.cpp>>Other
+    <item*|<source-link|concat_active.cpp|src/Typeset/Concat/concat_active.cpp>, <source-link|concat_inactive.cpp|src/Typeset/Concat/concat_inactive.cpp>>Other
     active markup (conditionals, loci, references, <markup|specific>, flags)
     and source-mode rendering.
 
-    <item*|<verbatim|concat_graphics.cpp>, <verbatim|concat_animate.cpp>,
-    <verbatim|concat_gui.cpp>>Graphics, animations, and GUI containers.
+    <item*|<source-link|concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>, <source-link|concat_animate.cpp|src/Typeset/Concat/concat_animate.cpp>,
+    <source-link|concat_gui.cpp|src/Typeset/Concat/concat_gui.cpp>>Graphics, animations, and GUI containers.
   </description>
 
   Inline macro applications are expanded by the concater itself:
@@ -304,7 +304,7 @@
   <subsection|Post-processing>
 
   When the traversal is over, <cpp|concater_rep::finish> in
-  <verbatim|Typeset/Concat/concat_post.cpp> performs four passes over the
+  <source-link|Typeset/Concat/concat_post.cpp|src/Typeset/Concat/concat_post.cpp> performs four passes over the
   item array:
 
   <\enumerate>
@@ -331,7 +331,7 @@
   <subsection|From line items to page items>
 
   A paragraph of the document is formatted by
-  <cpp|typeset_stack> in <verbatim|Typeset/Line/lazy_paragraph.cpp>:
+  <cpp|typeset_stack> in <source-link|Typeset/Line/lazy_paragraph.cpp|src/Typeset/Line/lazy_paragraph.cpp>:
 
   <\cpp-code>
     array\<less\>page_item\<gtr\>
@@ -436,7 +436,7 @@
 
   <subsection|Break points>
 
-  The line breaker lives in <verbatim|Typeset/Line/line_breaker.cpp>. Its
+  The line breaker lives in <source-link|Typeset/Line/line_breaker.cpp|src/Typeset/Line/line_breaker.cpp>. Its
   interface is:
 
   <\explain>
@@ -519,7 +519,7 @@
   <subsection|Hyphenation hooks>
 
   The line breaker never interprets words itself. It relies on two virtual
-  methods of <cpp|language_rep> (<verbatim|System/Language/language.hpp>):
+  methods of <cpp|language_rep> (<source-link|System/Language/language.hpp|src/System/Language/language.hpp>):
 
   <\itemize>
     <item><cpp|array\<less\>int\<gtr\> get_hyphens (string s)> returns, for
@@ -532,7 +532,7 @@
   </itemize>
 
   Natural languages implement them with hyphenation patterns
-  (<verbatim|System/Language/hyphenate.cpp>); programming languages allow
+  (<source-link|System/Language/hyphenate.cpp|src/System/Language/hyphenate.cpp>); programming languages allow
   breaks only at certain characters. A new language, or a new hyphenation
   strategy, therefore only has to implement these methods (together with
   <cpp|advance>, which determines word boundaries, spaces and break
@@ -541,7 +541,7 @@
 
   <section|Vertical stacking>
 
-  The <cpp|stacker_rep> (<verbatim|Typeset/Stack/stacker.hpp>) collects the
+  The <cpp|stacker_rep> (<source-link|Typeset/Stack/stacker.hpp|src/Typeset/Stack/stacker.hpp>) collects the
   lines of a paragraph into an array <cpp|l> of page items and maintains
   the border properties <cpp|sb>. Its methods are called by the paragraph
   formatter:
@@ -594,9 +594,9 @@
   the page items of the whole document.
 
   Two simpler functions are used for vertical material inside lines:
-  <cpp|typeset_as_stack> (in <verbatim|Typeset/Stack/stacker.cpp>) stacks
+  <cpp|typeset_as_stack> (in <source-link|Typeset/Stack/stacker.cpp|src/Typeset/Stack/stacker.cpp>) stacks
   the children of a <markup|document> each typeset on a single line, and
-  <cpp|typeset_as_paragraph> (in <verbatim|Typeset/Line/lazy_vstream.cpp>)
+  <cpp|typeset_as_paragraph> (in <source-link|Typeset/Line/lazy_vstream.cpp|src/Typeset/Line/lazy_vstream.cpp>)
   formats a paragraph with a <cpp|lazy_paragraph> and returns the lines as
   a single box with <cpp|format_vstream_as_box>.
 

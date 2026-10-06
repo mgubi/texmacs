@@ -49,7 +49,7 @@
     <verbatim|mt> of <src-var|math-font-family> select sans serif and
     typewriter variants of the text font, and the value <verbatim|right> of
     <src-var|math-font-shape> selects upright mathematics (see
-    <cpp|smart_font> in <verbatim|Graphics/Fonts/smart_font.cpp>).
+    <cpp|smart_font> in <source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>).
   </remark>
 
   <\explain>
@@ -184,7 +184,7 @@
     <verbatim|hextended>, <verbatim|mono>,
     <verbatim|degraded>, <verbatim|distorted>, <verbatim|gnawed>,
     <verbatim|blurred> and <verbatim|enhanced> (see <cpp|apply_effects> in
-    <verbatim|Graphics/Fonts/smart_font.cpp>). For instance,
+    <source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>). For instance,
     <verbatim|bold=2,slant=0.25> produces a poor man's bold slanted variant
     of the current font.
   </explain>

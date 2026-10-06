@@ -5,13 +5,13 @@
 <\body>
   <tmdoc-title|The main program and crash handling>
 
-  This page describes <verbatim|Texmacs/Texmacs/texmacs.cpp>, which
-  contains the main program, and <verbatim|Texmacs/Server/tm_debug.cpp>,
+  This page describes <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>, which
+  contains the main program, and <source-link|Texmacs/Server/tm_debug.cpp|src/Texmacs/Server/tm_debug.cpp>,
   which handles fatal errors. The platform specific <cpp|main> functions
-  (<verbatim|Plugins/Unix/unix_entrypoint.cpp>,
-  <verbatim|Plugins/Windows/windows32_entrypoint.cpp>,
-  <verbatim|Plugins/Windows64/windows64_entrypoint.cpp> and, for
-  <name|Android>, <verbatim|src/packages/android/launcher/main.cpp>)
+  (<source-link|Plugins/Unix/unix_entrypoint.cpp|src/Plugins/Unix/unix_entrypoint.cpp>,
+  <source-link|Plugins/Windows/windows32_entrypoint.cpp|src/Plugins/Windows/windows32_entrypoint.cpp>,
+  <source-link|Plugins/Windows64/windows64_entrypoint.cpp|src/Plugins/Windows64/windows64_entrypoint.cpp> and, for
+  <name|Android>, <source-link|src/packages/android/launcher/main.cpp|packages/android/launcher/main.cpp>)
   prepare the environment and the arguments (the <TeXmacs> path, the
   <name|AppImage> search path and the <name|Qt> platform on <name|Unix>,
   conversion of the arguments to <name|UTF-8> on <name|Windows>) and then
@@ -54,7 +54,7 @@
     <item>The fonts are initialized, the global edit tree is created with
     its root <cpp|ip_observer>, the caches are initialized
     (<cpp|cache_initialize>), and <cpp|init_texmacs>
-    (<verbatim|System/Boot/init_texmacs.cpp>) performs the remaining
+    (<source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>) performs the remaining
     system initialization: the main paths, the user directories, the boot
     lock (if the lock file of a previous run is still there, that run
     crashed during startup, and the settings and caches are reset; the
@@ -123,7 +123,7 @@
     appended (unless the option <verbatim|-X> was given, which sets
     <cpp|exec_exit> to false). These commands are wrapped in a single
     <scm|begin> and scheduled by the constructor of <cpp|tm_server_rep>,
-    right after <verbatim|init-texmacs.scm> and
+    right after <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> and
     <verbatim|my-init-texmacs.scm> have been loaded.
 
     <item*|<cpp|extra_init_cmd>>Filled with a <scm|load-buffer> for each
@@ -136,7 +136,7 @@
 
   The delayed commands are executed by the event loop in the order in
   which they were scheduled (<cpp|exec_pending> in
-  <verbatim|Plugins/Qt/qt_gui.cpp> processes a FIFO queue). This has two
+  <source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp> processes a FIFO queue). This has two
   consequences:
 
   <\itemize>
@@ -175,8 +175,8 @@
     <verbatim|-disable-error-recovery>, <verbatim|-log-file <em|file>>.
 
     <item*|Initialization><verbatim|-i <em|file>> (replaces
-    <verbatim|init-texmacs.scm>), <verbatim|-b <em|file>> (replaces
-    <verbatim|init-buffer.scm>), <verbatim|-x <em|cmd>> (execute a
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>), <verbatim|-b <em|file>> (replaces
+    <source-link|init-buffer.scm|TeXmacs/progs/init-buffer.scm>), <verbatim|-x <em|cmd>> (execute a
     <scheme> command), <verbatim|-q> (append <scm|(quit-TeXmacs)> at this point of
     the command line),
     <verbatim|-X> (do not quit automatically in headless mode).
@@ -224,24 +224,24 @@
 
   <section|Global flags>
 
-  <verbatim|texmacs.cpp> defines a few global flags: <cpp|headless_mode>
+  <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> defines a few global flags: <cpp|headless_mode>
   (read through <cpp|is_headless ()> or directly as an <cpp|extern>, for
   instance by the interpose handler, which skips all screen updates in
   this mode), <cpp|tls_no_verify> (<cpp|is_tls_no_verify ()>) and
-  <cpp|disable_error_recovery> (used only in <verbatim|texmacs.cpp>).
-  <verbatim|tm_server.cpp> defines <cpp|texmacs_started>, which is set
+  <cpp|disable_error_recovery> (used only in <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>).
+  <source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp> defines <cpp|texmacs_started>, which is set
   just before the event loop starts and is used by the wait handler to
   decide whether a window can be used.
 
   <section|Fatal errors and crash handling>
 
   Internal errors are signalled with the macros <cpp|ASSERT (cond, msg)>
-  and <cpp|FAILED (msg)> of <verbatim|Kernel/Abstractions/basic.hpp>. What
+  and <cpp|FAILED (msg)> of <source-link|Kernel/Abstractions/basic.hpp|src/Kernel/Abstractions/basic.hpp>. What
   they do depends on <verbatim|USE_EXCEPTIONS>, which that header
   currently always defines.
 
   <paragraph|With exceptions (the default).>Both macros call
-  <cpp|tm_throw (msg)> (<verbatim|Kernel/Abstractions/basic.cpp>). It
+  <cpp|tm_throw (msg)> (<source-link|Kernel/Abstractions/basic.cpp|src/Kernel/Abstractions/basic.cpp>). It
   stores the message in <cpp|the_exception>, builds a crash report with
   <cpp|get_crash_report> (see below), prints it on the console and throws
   the message as a <cpp|string>. The exception is caught at the
@@ -254,21 +254,21 @@
     <cpp|update_mouse_loci> ignores the exception);
 
     <item>menu and toolbar actions (<cpp|protected_call> in
-    <verbatim|Scheme/Scheme/object.cpp>, which calls
+    <source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>, which calls
     <cpp|cancel_menu_action> on the current editor);
 
-    <item>typesetting (<verbatim|edit_typeset.cpp>), which does not
+    <item>typesetting (<source-link|edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>), which does not
     cancel anything: it reports \PTypesetting failure, resetting to empty
     document\Q, <em|replaces the body of the buffer by an empty document>
     and typesets again;
 
     <item>as a last resort, every <name|Qt> event:
     <cpp|QTMApplication::notify> and <cpp|QTMCoreApplication::notify>
-    catch the exception; a few slots (in <verbatim|QTMMenuHelper.cpp>,
-    <verbatim|QTMGuiHelper.cpp>, <verbatim|QTMFileDialog.cpp> and
-    <verbatim|QTMPipeLink.cpp>) are also wrapped in the macros
+    catch the exception; a few slots (in <source-link|QTMMenuHelper.cpp|src/Plugins/Qt/QTMMenuHelper.cpp>,
+    <source-link|QTMGuiHelper.cpp|src/Plugins/Qt/QTMGuiHelper.cpp>, <source-link|QTMFileDialog.cpp|src/Plugins/Qt/QTMFileDialog.cpp> and
+    <source-link|QTMPipeLink.cpp|src/Plugins/Qt/QTMPipeLink.cpp>) are also wrapped in the macros
     <cpp|BEGIN_SLOT> and <cpp|END_SLOT> of
-    <verbatim|Plugins/Qt/qt_gui.hpp>. (The same code exists in
+    <source-link|Plugins/Qt/qt_gui.hpp|src/Plugins/Qt/qt_gui.hpp>. (The same code exists in
     <verbatim|Plugins/Qt6/>.)
   </itemize>
 
@@ -282,7 +282,7 @@
 
   <paragraph|Without exceptions.>If <verbatim|USE_EXCEPTIONS> is not
   defined, the macros call <cpp|tm_failure (msg)>
-  (<verbatim|Texmacs/Server/tm_debug.cpp>), followed by <cpp|assert> when
+  (<source-link|Texmacs/Server/tm_debug.cpp|src/Texmacs/Server/tm_debug.cpp>), followed by <cpp|assert> when
   <verbatim|DEBUG_ASSERT> is defined (which the <name|CMake> build does).
   <cpp|tm_failure> tries to save as much as possible:
 

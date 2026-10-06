@@ -12,10 +12,10 @@
     <item>a low level interface to an external spell checker, with three
     implementations;
 
-    <item>a cache and session layer in <verbatim|System/Language/language.cpp>;
+    <item>a cache and session layer in <source-link|System/Language/language.cpp|src/System/Language/language.cpp>;
 
     <item>the spell checking of whole trees in
-    <verbatim|Data/Tree/tree_spell.cpp>;
+    <source-link|Data/Tree/tree_spell.cpp|src/Data/Tree/tree_spell.cpp>;
 
     <item>the <scheme> tools: continuous spell checking, the spell tool and
     toolbar, and grammar checking with <name|LanguageTool>.
@@ -23,7 +23,7 @@
 
   <section|Spell checking engines>
 
-  The low level interface is declared in <verbatim|Plugins/Ispell/ispell.hpp>:
+  The low level interface is declared in <source-link|Plugins/Ispell/ispell.hpp|src/Plugins/Ispell/ispell.hpp>:
 
   <\cpp-code>
     string ispell_start (string lan);
@@ -55,19 +55,19 @@
 
   <\description>
     <item*|<name|macOS> spell service>When <verbatim|MACOSX_EXTENSIONS> is
-    defined, <verbatim|language.cpp> and <verbatim|edit_spell.cpp> map the
+    defined, <source-link|language.cpp|src/System/Language/language.cpp> and <source-link|edit_spell.cpp|src/Edit/Replace/edit_spell.cpp> map the
     five functions to <cpp|mac_spell_start>, ... in
-    <verbatim|Plugins/MacOS/mac_spellservice.mm>, which use
+    <source-link|Plugins/MacOS/mac_spellservice.mm|src/Plugins/MacOS/mac_spellservice.mm>, which use
     <cpp|NSSpellChecker>.
 
     <item*|<name|Aspell> library>Otherwise, if <verbatim|USE_ASPELL> is set
     (the <name|CMake> option of the same name, on by default, which is
-    effective only if the library is found), <verbatim|ispell.cpp> links
+    effective only if the library is found), <source-link|ispell.cpp|src/Plugins/Ispell/ispell.cpp> links
     with <verbatim|libaspell>. It looks for dictionaries in
     <verbatim|$TEXMACS_PATH/aspell-0.60> if that directory exists (as in
     bundled distributions), and otherwise uses the system ones.
 
-    <item*|External process>Otherwise <verbatim|ispell_exe.cpp> starts
+    <item*|External process>Otherwise <source-link|ispell_exe.cpp|src/Plugins/Ispell/ispell_exe.cpp> starts
     <verbatim|hunspell -a -i utf-8 -d <em|locale>> or, failing that,
     <verbatim|aspell -a --encoding=utf-8 --language-tag=<em|locale>>
     through a pipe (on <name|Windows> it also looks in the usual
@@ -85,7 +85,7 @@
   <section|The session and cache layer>
 
   The rest of <TeXmacs> does not call the engine directly but the
-  functions at the end of <verbatim|language.cpp>, exported to <scheme>
+  functions at the end of <source-link|language.cpp|src/System/Language/language.cpp>, exported to <scheme>
   as follows:
 
   <\description>
@@ -116,7 +116,7 @@
 
     <item*|<scm|spell-insert>><cpp|spell_insert> adds a word to the
     personal dictionary of the engine and clears the cache of
-    <verbatim|tree_spell.cpp>.
+    <source-link|tree_spell.cpp|src/Data/Tree/tree_spell.cpp>.
 
     <item*|<scm|spell-notify-insert>><cpp|spell_notify_insert> only marks a
     word as correct in the cache; it is used by the grammar tool for words
@@ -131,7 +131,7 @@
 
   <section|Spell checking trees>
 
-  <verbatim|Data/Tree/tree_spell.cpp> finds all misspelled words of a tree
+  <source-link|Data/Tree/tree_spell.cpp|src/Data/Tree/tree_spell.cpp> finds all misspelled words of a tree
   and returns them as a <cpp|range_set> (a flat array of start and end
   paths). The front ends, exported as <scm|tree-spell>, <scm|tree-spell-at>
   and <scm|tree-spell-selection>, take the language, the tree, its path and
@@ -162,7 +162,7 @@
 
   When the preference <verbatim|continuous spell checking> is on, the
   editor calls the <scheme> function <scm|continuous-spell-check>
-  (<verbatim|tools/spell/spell-edit.scm>) from
+  (<source-link|tools/spell/spell-edit.scm|TeXmacs/progs/tools/spell/spell-edit.scm>) from
   <cpp|edit_interface_rep::apply_changes> whenever the tree or the
   environment changed. After 100 ms of idle time, this function runs
   <scm|tree-spell*> on the whole buffer in the language of the document and
@@ -170,12 +170,12 @@
   <verbatim|"spell-errors">, notifying <cpp|THE_SPELL_ERRORS>. The editor
   then computes the rectangles of the errors, restricted to about one
   hundred errors around the visible part of the document, and draws them
-  (<verbatim|Edit/Interface/edit_repaint.cpp>).
+  (<source-link|Edit/Interface/edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>).
 
   <section|The spell tool>
 
   The <menu|Edit|Spell> command, <scm|interactive-spell>
-  (<verbatim|generic/spell-widgets.scm>), computes the errors from the
+  (<source-link|generic/spell-widgets.scm|TeXmacs/progs/generic/spell-widgets.scm>), computes the errors from the
   cursor position (or in the selection), and then opens either a toolbar
   at the bottom of the window (preference <verbatim|toolbar spell>, the
   default) or a spell tool in the side tools or in a dialog. While it is
@@ -187,7 +187,7 @@
   <verbatim|tmfs://aux/spell>.
 
   The editor also contains an older, key driven spell checking mode
-  (<verbatim|Edit/Replace/edit_spell.cpp>, <scm|spell-start> and
+  (<source-link|Edit/Replace/edit_spell.cpp|src/Edit/Replace/edit_spell.cpp>, <scm|spell-start> and
   <scm|key-press-spell>): it walks through the document with
   <cpp|ispell_check> directly, bypassing the cache layer, and asks for an
   action in the footer (<verbatim|a> accept, <verbatim|r> replace,
@@ -198,7 +198,7 @@
 
   Grammar checking uses an external <name|LanguageTool> server, either a
   local one (by default <verbatim|http://localhost:8081>; the script
-  <verbatim|src/TeXmacs/misc/scripts/languagetool-server.ps1> starts one on
+  <source-link|src/TeXmacs/misc/scripts/languagetool-server.ps1|TeXmacs/misc/scripts/languagetool-server.ps1> starts one on
   <name|Windows>, by default on port 8085 rather than 8081, so the
   preference must be adapted) or the public service with an optional premium account.
   It is enabled by the preference <verbatim|grammar checking>; the
@@ -209,16 +209,16 @@
   and the corresponding preferences widget.
 
   <paragraph|Checking.><menu|Edit|Check grammar> (<scm|lantool-check> in
-  <verbatim|tools/spell/spell-lantool.scm>) is shown when
+  <source-link|tools/spell/spell-lantool.scm|TeXmacs/progs/tools/spell/spell-lantool.scm>) is shown when
   <scm|supports-lantool?> succeeds, that is, when a test query to the server
   returns a valid answer (the result is cached for the session). It starts
-  an asynchronous <em|process> (<verbatim|utils/library/process.scm>) which
+  an asynchronous <em|process> (<source-link|utils/library/process.scm|TeXmacs/progs/utils/library/process.scm>) which
   visits the paragraphs of the document, or of the selection, one by one.
   For each paragraph:
 
   <\enumerate>
     <item>The paragraph is converted to a <em|compressed> <name|HTML>
-    string with <scm|compress-html> (<verbatim|Data/Convert/AI/compress.cpp>):
+    string with <scm|compress-html> (<source-link|Data/Convert/AI/compress.cpp|src/Data/Convert/AI/compress.cpp>):
     text is kept, and every piece of non textual markup is replaced by an
     opaque identifier <verbatim|x<em|n>> in an <verbatim|\<less\>a
     id\<gtr\>> or <verbatim|\<less\>div id\<gtr\>> element, so that the
@@ -230,7 +230,7 @@
     cached by language and string.
 
     <item>The <name|JSON> answer is merged into the string by
-    <scm|lantool-correct> (<verbatim|Data/Convert/AI/lantool.cpp>): every
+    <scm|lantool-correct> (<source-link|Data/Convert/AI/lantool.cpp|src/Data/Convert/AI/lantool.cpp>): every
     match whose text is not part of the markup becomes a
     <markup|spell-error> element with the original text, the message and up
     to nine replacements. Before it is inserted, the <scheme> function
@@ -243,10 +243,10 @@
   </enumerate>
 
   <paragraph|Correcting.>The <markup|spell-error> tag (defined in
-  <verbatim|src/TeXmacs/packages/standard/std-fold.ts>, and grouped as
-  <scm|spell-tag> in <verbatim|version/version-drd.scm>) is rendered by the
+  <source-link|src/TeXmacs/packages/standard/std-fold.ts|TeXmacs/packages/standard/std-fold.ts>, and grouped as
+  <scm|spell-tag> in <source-link|version/version-drd.scm|TeXmacs/progs/version/version-drd.scm>) is rendered by the
   <scheme> function <scm|ext-spell-error> as the original text with a
-  balloon listing the message and the proposals. <verbatim|spell-edit.scm>
+  balloon listing the message and the proposals. <source-link|spell-edit.scm|TeXmacs/progs/tools/spell/spell-edit.scm>
   provides the navigation between errors (<scm|spell-go-to-next>, ...), the
   resolution of an error by one of its alternatives (<scm|spell-retain>) or
   by a typed replacement (<scm|spell-replace>), the personal dictionary of
@@ -254,7 +254,7 @@
   <verbatim|$TEXMACS_HOME_PATH/langs/natural/spell/<em|lan>.scm>), and the
   removal of all remaining <markup|spell-error> tags
   (<menu|Edit|Terminate grammar>, <scm|spell-terminate>). The correction
-  tool <verbatim|tools/spell/correct-widgets.scm> (<menu|Edit|Correct
+  tool <source-link|tools/spell/correct-widgets.scm|TeXmacs/progs/tools/spell/correct-widgets.scm> (<menu|Edit|Correct
   grammar>, <scm|open-correct>) shows the current error with its message
   and proposals, either in a bottom toolbar or in a widget.
 
@@ -263,9 +263,9 @@
   <\itemize>
     <item>The <name|Aspell> library backend returns the checked word, not
     the number of suggestions, as the first element of the tuple
-    (<verbatim|Plugins/Ispell/ispell.cpp:122>). The <scheme> tools ignore
+    (<source-link|Plugins/Ispell/ispell.cpp:122|src/Plugins/Ispell/ispell.cpp:122>). The <scheme> tools ignore
     this element, but the old key driven mode
-    (<verbatim|Edit/Replace/edit_spell.cpp:182>) reads it as a number: with
+    (<source-link|Edit/Replace/edit_spell.cpp:182|src/Edit/Replace/edit_spell.cpp:182>) reads it as a number: with
     this backend a digit key accepts the word instead of choosing a
     suggestion.
 
@@ -283,16 +283,16 @@
     the first are unknown to the grammar tool.
 
     <item>When an engine cannot be started, <cpp|spell_check> also clears
-    the global session flag (<verbatim|language.cpp:521>), which ends a
+    the global session flag (<source-link|language.cpp:521|src/System/Language/language.cpp:521>), which ends a
     session opened by another tool.
 
-    <item><verbatim|spell-lantool.scm> declares its dependencies without
+    <item><source-link|spell-lantool.scm|TeXmacs/progs/tools/spell/spell-lantool.scm> declares its dependencies without
     the <scm|:use> keyword (<verbatim|tools/spell/spell-lantool.scm:13-16>),
     so <scm|texmacs-module> ignores them; the module only works because
-    <verbatim|spell-kbd.scm>, which is loaded at startup, imports
-    <verbatim|spell-edit.scm>.
+    <source-link|spell-kbd.scm|TeXmacs/progs/tools/spell/spell-kbd.scm>, which is loaded at startup, imports
+    <source-link|spell-edit.scm|TeXmacs/progs/tools/spell/spell-edit.scm>.
 
-    <item>The tables of compressed markup in <verbatim|compress.cpp> are
+    <item>The tables of compressed markup in <source-link|compress.cpp|src/Data/Convert/AI/compress.cpp> are
     global and are never emptied, so they grow during a session.
 
     <item>The locale codes used to select dictionaries and the

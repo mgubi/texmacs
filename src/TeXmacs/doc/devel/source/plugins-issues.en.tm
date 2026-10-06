@@ -19,7 +19,7 @@
   <menu|Debug> menu (available after enabling <menu|Tools|Debugging
   tool>), or from <scheme> with <scm|(debug-set "io" #t)>; they correspond to the <c++> macros <cpp|DEBUG_IO>,
   <cpp|DEBUG_AUTO> and <cpp|DEBUG_VERBOSE> of
-  <verbatim|Kernel/Abstractions/basic.hpp>.
+  <source-link|Kernel/Abstractions/basic.hpp|src/Kernel/Abstractions/basic.hpp>.
 
   <\description>
     <item*|<verbatim|io>>The <name|POSIX> pipe link prints every chunk it
@@ -62,8 +62,8 @@
   with <menu|Interrupt execution> (which empties the queue even if the
   program does not react) followed by <menu|Close session>. The
   <scm|display*> calls which are commented out at the beginning of the
-  call-backs in <verbatim|plugin-eval.scm> and
-  <verbatim|session-edit.scm> are a convenient way to trace the scheduler.
+  call-backs in <source-link|plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm> and
+  <source-link|session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm> are a convenient way to trace the scheduler.
 
   The protocol can also be exercised without any program: a launcher such as
 
@@ -111,7 +111,7 @@
 
   The <scm|:socket> option produces a launcher description <scm|(tuple
   "socket" <em|host> <em|port>)>, but <cpp|connection_start> has no branch
-  for it, and the socket functions declared in <verbatim|tm_link.hpp> are
+  for it, and the socket functions declared in <source-link|tm_link.hpp|src/System/Link/tm_link.hpp> are
   not defined (see <hlink|sockets|plugins-links.en.tm>). Worse, when
   <cpp|connection_start> is called for the first time with a description
   which matches none of its branches, the variable <cpp|con> is still the
@@ -205,12 +205,12 @@
     and another one has started in the meantime.
 
     <item><em|Simplification of output.> In
-    <scm|plugin-output-std-simplify> (<verbatim|plugin-eval.scm>), the test
+    <scm|plugin-output-std-simplify> (<source-link|plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm>), the test
     <scm|(func? 'concat 0)> lacks its first argument <scm|t>, so that an
     empty <markup|concat> is not simplified to the empty string.
 
     <item><em|Dead declarations.> <cpp|connection_stop_all> (in
-    <verbatim|connect.hpp>) and <cpp|texmacs_input_rep::ispell_flush> are
+    <source-link|connect.hpp|src/System/Link/connect.hpp>) and <cpp|texmacs_input_rep::ispell_flush> are
     declared but not defined; <cpp|cmdline_link_rep::write> tests whether the
     command is empty only after having appended
     <verbatim|2\<gtr\> /dev/null> to it.

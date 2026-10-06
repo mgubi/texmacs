@@ -11,13 +11,13 @@
   generic mathematical containers. Only matrices and polynomials are used by
   the rest of <TeXmacs>; the other classes are an experiment in generic
   numerical programming, exercised only by the self test
-  <cpp|test_math> (<verbatim|test_math.cpp>), which is called from
+  <cpp|test_math> (<source-link|test_math.cpp|src/Graphics/Mathematics/test_math.cpp>), which is called from
   <cpp|texmacs_entrypoint> only when <verbatim|ENABLE_TESTS> is defined in
-  <verbatim|Texmacs/Texmacs/texmacs.cpp> (it is commented out).
+  <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> (it is commented out).
 
   <subsection|Matrices>
 
-  <cpp|matrix\<less\>T\<gtr\>> (<verbatim|matrix.hpp>) is a concrete
+  <cpp|matrix\<less\>T\<gtr\>> (<source-link|matrix.hpp|src/Graphics/Mathematics/matrix.hpp>) is a concrete
   reference counted structure holding <cpp|NR (m)> rows and <cpp|NC (m)>
   columns in row major order; <cpp|m (i, j)> accesses an entry. The
   constructor <cpp|matrix\<less\>T\<gtr\> (c, rows, cols)> creates a
@@ -28,7 +28,7 @@
   <\itemize>
     <item>componentwise <cpp|+>, <cpp|-> and unary operations
     (<cpp|unary> and <cpp|binary> with an operator class from
-    <verbatim|operators.hpp>);
+    <source-link|operators.hpp|src/Graphics/Mathematics/operators.hpp>);
 
     <item>the matrix product, and the product of a matrix with a
     <cpp|vector\<less\>T\<gtr\>> or an <cpp|array\<less\>T\<gtr\>> (both
@@ -50,24 +50,24 @@
 
   Matrices are used by the <cpp|linear_2D> and <cpp|affine_2D> frames
   (see <hlink|points, frames, curves and grids|geometry-curves.en.tm>), by
-  the glyph transformations of <verbatim|Graphics/Bitmap_fonts/glyph_transforms.cpp>,
+  the glyph transformations of <source-link|Graphics/Bitmap_fonts/glyph_transforms.cpp|src/Graphics/Bitmap_fonts/glyph_transforms.cpp>,
   by the <verbatim|(tuple "linear" ...)> transformations of
   <markup|gr-transform> and the three dimensional graphics in
-  <verbatim|Typeset/Concat/concat_graphics.cpp>, and by the (unused) least
-  squares Bezier fitting of <verbatim|Graphics/Types/curve_extras.cpp>.
+  <source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>, and by the (unused) least
+  squares Bezier fitting of <source-link|Graphics/Types/curve_extras.cpp|src/Graphics/Types/curve_extras.cpp>.
 
   <subsection|Polynomials and vectors>
 
-  <cpp|polynomial\<less\>T\<gtr\>> (<verbatim|polynomial.hpp>) stores its
+  <cpp|polynomial\<less\>T\<gtr\>> (<source-link|polynomial.hpp|src/Graphics/Mathematics/polynomial.hpp>) stores its
   coefficients by increasing degree. <cpp|p (x)> evaluates it with
   Horner's scheme and <cpp|p (x, k)> evaluates its <math|k>-th derivative;
   there are <cpp|+>, <cpp|->, <cpp|*>, <cpp|derive> and products with
-  scalars and arrays. The spline curves of <verbatim|Graphics/Types/curve.cpp>
+  scalars and arrays. The spline curves of <source-link|Graphics/Types/curve.cpp|src/Graphics/Types/curve.cpp>
   represent each basis function piece as a <cpp|polynomial\<less\>double\<gtr\>>
   (<cpp|dpol>), and each piece of the curve as a vector of such
   polynomials (<cpp|dpols>), one per coordinate.
 
-  <cpp|vector\<less\>T\<gtr\>> (<verbatim|vector.hpp>) is a fixed size
+  <cpp|vector\<less\>T\<gtr\>> (<source-link|vector.hpp|src/Graphics/Mathematics/vector.hpp>) is a fixed size
   vector with componentwise arithmetic, elementary functions, scalar
   operations, <cpp|square_norm>, <cpp|norm> and <cpp|derive>. Note that the
   geometric <cpp|point> type is <em|not> a <cpp|vector> but an
@@ -76,25 +76,25 @@
   <subsection|Experimental classes>
 
   <\description>
-    <item*|<cpp|ball\<less\>C\<gtr\>>>(<verbatim|ball.hpp>) Ball (interval)
+    <item*|<cpp|ball\<less\>C\<gtr\>>>(<source-link|ball.hpp|src/Graphics/Mathematics/ball.hpp>) Ball (interval)
     arithmetic: a center and a radius, with arithmetic and elementary
     functions which enclose the exact result.
 
-    <item*|<cpp|function\<less\>F,T\<gtr\>>>(<verbatim|function.hpp>,
-    <verbatim|function_extra.hpp>) Abstract functions which can be evaluated
+    <item*|<cpp|function\<less\>F,T\<gtr\>>>(<source-link|function.hpp|src/Graphics/Mathematics/function.hpp>,
+    <source-link|function_extra.hpp|src/Graphics/Mathematics/function_extra.hpp>) Abstract functions which can be evaluated
     at a point or on a ball, built from constants, coordinates, arithmetic
     and elementary functions, piecewise definitions
     (<cpp|pw_function>), vectors of functions and polynomials.
 
-    <item*|Operators and properties>(<verbatim|operators.hpp>,
-    <verbatim|properties.hpp>) Operator classes such as <cpp|add_op> or
+    <item*|Operators and properties>(<source-link|operators.hpp|src/Graphics/Mathematics/operators.hpp>,
+    <source-link|properties.hpp|src/Graphics/Mathematics/properties.hpp>) Operator classes such as <cpp|add_op> or
     <cpp|neg_op>, with an <cpp|op> method and a <cpp|diff> method for the
     derivative, and traits classes giving the scalar, norm and product
     types of a type. The operator classes are also used by the raster
-    pictures (<verbatim|Graphics/Pictures/raster_operators.hpp>).
+    pictures (<source-link|Graphics/Pictures/raster_operators.hpp|src/Graphics/Pictures/raster_operators.hpp>).
 
-    <item*|Symbolic trees>(<verbatim|math_tree.hpp>,
-    <verbatim|math_tree.cpp>) Arithmetic on trees (<cpp|add>, <cpp|mul>,
+    <item*|Symbolic trees>(<source-link|math_tree.hpp|src/Graphics/Mathematics/math_tree.hpp>,
+    <source-link|math_tree.cpp|src/Graphics/Mathematics/math_tree.cpp>) Arithmetic on trees (<cpp|add>, <cpp|mul>,
     <cpp|sqrt>, ...), which lets the generic code run on symbolic values,
     and <cpp|as_math_string> to print them.
   </description>
@@ -107,7 +107,7 @@
   <markup|transform-3d> and <markup|light-3d> describe a scene made of
   colored triangles, which is drawn inside a <markup|graphics>. They are
   listed among the <hlink|graphical primitives|../format/regular/prim-graphics.en.tm>
-  and declared in <verbatim|Data/Drd/drd_std.cpp>:
+  and declared in <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp>:
 
   <\description>
     <item*|<markup|triangle-3d>>Three <markup|point>s with three
@@ -125,24 +125,24 @@
     coordinates.
   </description>
 
-  <cpp|concater_rep::typeset_graphics_3d> (<verbatim|concat_graphics.cpp>)
+  <cpp|concater_rep::typeset_graphics_3d> (<source-link|concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>)
   evaluates the tag, converts it with <cpp|as_spacial> and composes the
   result with a <math|4\<times\>4> matrix built from the frame
   <cpp|env-\<gtr\>fr> of the picture and the variable
   <src-var|gr-transformation>; the <math|z> coordinate is kept for depth
   sorting. Invalid input gives the error <verbatim|"bad spacial object">.
-  The result is a <cpp|spacial_box> (<verbatim|Typeset/Boxes/Graphics/graphics_boxes.cpp>),
+  The result is a <cpp|spacial_box> (<source-link|Typeset/Boxes/Graphics/graphics_boxes.cpp|src/Typeset/Boxes/Graphics/graphics_boxes.cpp>),
   which draws itself by <cpp|renderer_rep::draw_spacial>.
 
   <subsection|Spacial objects>
 
-  A <cpp|spacial> (<verbatim|Graphics/Spacial/spacial.hpp>) is an abstract
+  A <cpp|spacial> (<source-link|Graphics/Spacial/spacial.hpp|src/Graphics/Spacial/spacial.hpp>) is an abstract
   handle with the methods <cpp|get_extents>, <cpp|draw (renderer)>,
   <cpp|transform (matrix)> and <cpp|enlighten (light)>. There are three
   implementations:
 
   <\description>
-    <item*|<cpp|triangulated (ts, cs)>>(<verbatim|triangulated.cpp>) An
+    <item*|<cpp|triangulated (ts, cs)>>(<source-link|triangulated.cpp|src/Graphics/Spacial/triangulated.cpp>) An
     array of triangles with one color each. Before drawing, the triangles
     are sorted by increasing mean <math|z> coordinate and drawn in that
     order (a painter's algorithm, without splitting of intersecting
@@ -156,7 +156,7 @@
     <hlink|colors|geometry-colors.en.tm>).
 
     <item*|<cpp|transformed (obj, m)>, <cpp|enlightened (obj,
-    light)>>(<verbatim|transformed.cpp>, <verbatim|enlightened.cpp>) Lazy
+    light)>>(<source-link|transformed.cpp|src/Graphics/Spacial/transformed.cpp>, <source-link|enlightened.cpp|src/Graphics/Spacial/enlightened.cpp>) Lazy
     wrappers which apply the transformation or the light on first use.
   </description>
 
@@ -176,12 +176,12 @@
     matrices.
 
     <item>The diagonal constructor sets the entries whose linear index is a
-    multiple of <math|cols+1> (<verbatim|matrix.hpp:54>), which also hits
+    multiple of <math|cols+1> (<source-link|matrix.hpp:54|src/Graphics/Mathematics/matrix.hpp:54>), which also hits
     off-diagonal entries when a matrix has more than <math|cols+1> rows.
 
     <item><cpp|invert> asserts invertibility for large matrices but divides
     by a zero determinant without warning for <math|2\<times\>2> matrices
-    (<verbatim|matrix.hpp:249>); a singular <verbatim|(tuple "linear" ...)>
+    (<source-link|matrix.hpp:249|src/Graphics/Mathematics/matrix.hpp:249>); a singular <verbatim|(tuple "linear" ...)>
     transformation therefore produces infinite coordinates.
 
     <item>The depth sorting of <cpp|triangulated> does not resolve

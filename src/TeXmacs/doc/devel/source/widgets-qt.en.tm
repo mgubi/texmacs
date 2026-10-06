@@ -22,7 +22,7 @@
   <\description-paragraphs>
     <item*|<verbatim|qt_widget.hpp/cpp>>the base class
     <cpp|qt_widget_rep> and the implementation of all the constructors of
-    <verbatim|widget.hpp>;
+    <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>;
 
     <item*|<verbatim|qt_ui_element.hpp/cpp>>the class
     <cpp|qt_ui_element_rep>, which implements most constructors;
@@ -53,7 +53,7 @@
 
     <item*|<verbatim|qt_gui.hpp/cpp>, <verbatim|QTMGuiHelper.*>>the
     <cpp|qt_gui_rep> singleton <cpp|the_gui>, the event queue and the
-    functions of <verbatim|gui.hpp>.
+    functions of <source-link|gui.hpp|src/Graphics/Gui/gui.hpp>.
   </description-paragraphs>
 
   <section|The base class <cpp|qt_widget_rep>>

@@ -5,10 +5,10 @@
 <\body>
   <tmdoc-title|The standard DRD and new primitives>
 
-  <section|Role of <verbatim|drd_std.cpp>>
+  <section|Role of <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>>
 
-  The file <verbatim|Data/Drd/drd_std.cpp> defines three global objects
-  (declared in <verbatim|drd_std.hpp>):
+  The file <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp> defines three global objects
+  (declared in <source-link|drd_std.hpp|src/Data/Drd/drd_std.hpp>):
 
   <\description>
     <item*|<cpp|drd_info std_drd ("tm")>>The standard <abbr|DRD>, which
@@ -27,12 +27,12 @@
 
   The function <cpp|init_std_drd> fills these objects. It is called once
   during start-up (<cpp|init_texmacs> in
-  <verbatim|System/Boot/init_texmacs.cpp>) and, defensively, by
+  <source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>) and, defensively, by
   <cpp|get_style_drd>; a static flag makes further calls no-ops.
 
   Besides describing the primitives, <cpp|init_std_drd> has a second,
   less obvious, role: it is the place where the members of the
-  enumeration <cpp|tree_label> (<verbatim|Kernel/Types/tree_label.hpp>)
+  enumeration <cpp|tree_label> (<source-link|Kernel/Types/tree_label.hpp|src/Kernel/Types/tree_label.hpp>)
   receive their string names. Each declaration
 
   <\cpp-code>
@@ -53,14 +53,14 @@
     }
   </cpp-code>
 
-  registers the name in the tables of <verbatim|tree_label.cpp> (so that
+  registers the name in the tables of <source-link|tree_label.cpp|src/Kernel/Types/tree_label.cpp> (so that
   <cpp|as_string (FRAC)> is <verbatim|"frac"> and
   <cpp|as_tree_label ("frac")> is <cpp|FRAC>), records it in
   <cpp|STD_CODE>, installs the <cpp|tag_info>, and freezes the arity and
   border. Since <cpp|STD_CODE> is used by the readers of documents
-  (<cpp|tm_reader> in <verbatim|Data/Convert/Texmacs/fromtm.cpp>,
-  <cpp|get_codes> in <verbatim|upgradetm.cpp>,
-  <cpp|scheme_tree_to_tree> in <verbatim|Data/Convert/Scheme/from_scheme.cpp>),
+  (<cpp|tm_reader> in <source-link|Data/Convert/Texmacs/fromtm.cpp|src/Data/Convert/Texmacs/fromtm.cpp>,
+  <cpp|get_codes> in <source-link|upgradetm.cpp|src/Data/Convert/Texmacs/upgradetm.cpp>,
+  <cpp|scheme_tree_to_tree> in <source-link|Data/Convert/Scheme/from_scheme.cpp|src/Data/Convert/Scheme/from_scheme.cpp>),
   a label which is not declared here is not recognized as a primitive when
   a document is loaded. At the time of writing every member of the
   enumeration has a declaration; two further labels, <markup|shown> and
@@ -92,14 +92,14 @@
   which gives the variable a <verbatim|VAR_PARAMETER> record with a type,
   for instance <cpp|init_var (FONT_SIZE, TYPE_FONT_SIZE)> or
   <cpp|init_var (PAGE_ODD_HEADER, TYPE_REGULAR, "odd page header")>. The
-  variable names are the string constants of <verbatim|Data/Drd/vars.hpp>.
+  variable names are the string constants of <source-link|Data/Drd/vars.hpp|src/Data/Drd/vars.hpp>.
   Variables which are not declared here receive their type from the
   heuristics (see <hlink|style and document DRDs|drd-documents.en.tm>).
 
   <section|The declaration language>
 
   The declarations are written in a small embedded language of helper
-  functions and macros, defined at the top of <verbatim|drd_std.cpp>. The
+  functions and macros, defined at the top of <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>. The
   arity is given by one of four constructors, which all create frozen
   records:
 
@@ -225,7 +225,7 @@
 
   <\enumerate>
     <item>Add a member to the enumeration <cpp|tree_label> in
-    <verbatim|Kernel/Types/tree_label.hpp>, before
+    <source-link|Kernel/Types/tree_label.hpp|src/Kernel/Types/tree_label.hpp>, before
     <cpp|START_EXTENSIONS>. The numbering of the enumeration is not stored
     in documents, so the position is free.
 
@@ -243,7 +243,7 @@
     focus bar shows an input field for each inaccessible child whose type
     is not <verbatim|adhoc>, <verbatim|raw>, <verbatim|graphical>,
     <verbatim|point>, <verbatim|obsolete> or <verbatim|unknown>, labelled by
-    the child name (<verbatim|generic/generic-menu.scm>), and source mode
+    the child name (<source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>), and source mode
     colors children by type.
 
     <item>Declare with <cpp|locals> any environment change in a child which
@@ -254,9 +254,9 @@
     and <cpp|with_like ()> if the tag only modifies the environment of its
     last child.
 
-    <item>Implement the evaluation (<verbatim|Typeset/Env/env_exec.cpp>) and
-    the typesetting (<verbatim|Typeset/Concat/concater.cpp> or
-    <verbatim|Typeset/Stack/stacker.cpp>), and, if needed, the
+    <item>Implement the evaluation (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>) and
+    the typesetting (<source-link|Typeset/Concat/concater.cpp|src/Typeset/Concat/concater.cpp> or
+    <source-link|Typeset/Stack/stacker.cpp|src/Typeset/Stack/stacker.cpp>), and, if needed, the
     converters. See the <hlink|typesetter|typesetter.en.tm> and
     <hlink|macro expansion|macro-expansion.en.tm> chapters, and the
     <hlink|example of a graphical primitive|graphics-editor-extend.en.tm>.
@@ -268,21 +268,21 @@
   Two practical remarks. First, once the primitive exists, its name is
   reserved: older documents or styles defining a macro of the same name
   will see the primitive instead (the upgrader in
-  <verbatim|Data/Convert/Texmacs/upgradetm.cpp> exists to rename such
+  <source-link|Data/Convert/Texmacs/upgradetm.cpp|src/Data/Convert/Texmacs/upgradetm.cpp> exists to rename such
   conflicts). Second, the style <abbr|DRD>s cached on disk in
   <verbatim|$TEXMACS_HOME_PATH/system/cache> are only removed
   automatically when the version of <TeXmacs> changes, after a crash
   during start-up, or with the option <verbatim|-setup>; during
   development, clear them with <menu|Tools|Update|Styles>
-  (<scm|style-clear-cache>) after changing <verbatim|drd_std.cpp>.
+  (<scm|style-clear-cache>) after changing <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>.
 
   <section|Properties of the built-in environment variables>
 
   About 310 variables are declared with <cpp|init_var>. The types are
   used for the focus menus of style parameters
-  (<verbatim|generic/generic-menu.scm> checks <scm|tree-label-type> to
+  (<source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm> checks <scm|tree-label-type> to
   offer a color chooser, for instance), by the documentation generator
-  (<verbatim|generic/generic-doc.scm>) and in source mode. A few variables
+  (<source-link|generic/generic-doc.scm|TeXmacs/progs/generic/generic-doc.scm>) and in source mode. A few variables
   carry a name (the page headers and footers). Variables which are not
   declared, such as those introduced by style files, are typed by
   <cpp|heuristic_init_parameter> from their name (<verbatim|color>,

@@ -28,7 +28,7 @@
     geometry of the objects is computed.
 
     <item><em|C++ editor hooks.> The class <cpp|edit_graphics_rep>
-    (<verbatim|Edit/Interface/edit_graphics.cpp>) is a component of the
+    (<source-link|Edit/Interface/edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>) is a component of the
     editor. It decides whether the cursor and the mouse are inside a
     picture, converts mouse positions from screen coordinates to graphical
     coordinates, snaps them to points, curves and grids, forwards the mouse
@@ -66,84 +66,84 @@
   <\description-paragraphs>
     <item*|<verbatim|Graphics/Types/>>Geometric types:
     <cpp|point> (an <cpp|array\<less\>double\<gtr\>>, in
-    <verbatim|point.hpp>), coordinate transformations <cpp|frame>
-    (<verbatim|frame.hpp>), curves <cpp|curve> (<verbatim|curve.hpp>,
-    <verbatim|curve.cpp>, <verbatim|curve_extras.cpp> for the hand drawing
-    algorithms), and grids <cpp|grid> (<verbatim|grid.hpp>).
+    <source-link|point.hpp|src/Graphics/Types/point.hpp>), coordinate transformations <cpp|frame>
+    (<source-link|frame.hpp|src/Graphics/Types/frame.hpp>), curves <cpp|curve> (<source-link|curve.hpp|src/Graphics/Types/curve.hpp>,
+    <source-link|curve.cpp|src/Graphics/Types/curve.cpp>, <source-link|curve_extras.cpp|src/Graphics/Types/curve_extras.cpp> for the hand drawing
+    algorithms), and grids <cpp|grid> (<source-link|grid.hpp|src/Graphics/Types/grid.hpp>).
 
     <item*|<verbatim|Graphics/Spacial/>>Experimental three dimensional
     objects (<cpp|spacial>): triangulated surfaces, their transformations
     and their lighting.
 
-    <item*|<verbatim|Typeset/Concat/concat_graphics.cpp>>Typesetting of all
+    <item*|<source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>>Typesetting of all
     graphical primitives (<cpp|concater_rep::typeset_graphics>,
     <cpp|typeset_line>, <cpp|typeset_text_at>, ...), and the support for
     graphical constraints (<cpp|set_graphical_value> and friends).
 
     <item*|<verbatim|Typeset/Boxes/Graphics/>>The graphics specific boxes:
-    <verbatim|graphics_boxes.cpp> (<cpp|graphics_box>,
+    <source-link|graphics_boxes.cpp|src/Typeset/Boxes/Graphics/graphics_boxes.cpp> (<cpp|graphics_box>,
     <cpp|graphics_group_box>, <cpp|point_box>, <cpp|curve_box>,
-    <cpp|spacial_box>) and <verbatim|grid_boxes.cpp> (<cpp|grid_box>).
+    <cpp|spacial_box>) and <source-link|grid_boxes.cpp|src/Typeset/Boxes/Graphics/grid_boxes.cpp> (<cpp|grid_box>).
     The <cpp|text_at_box> lives in
-    <verbatim|Typeset/Boxes/Modifier/change_boxes.cpp>. The constructors are
-    declared in <verbatim|Typeset/Boxes/graphics.hpp>.
+    <source-link|Typeset/Boxes/Modifier/change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>. The constructors are
+    declared in <source-link|Typeset/Boxes/graphics.hpp|src/Typeset/Boxes/graphics.hpp>.
 
-    <item*|<verbatim|Typeset/boxes.hpp>, <verbatim|Typeset/Boxes/Basic/boxes.cpp>>The
+    <item*|<source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>, <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>>The
     graphical selection type <cpp|gr_selection>, and the default
     implementations of <cpp|box_rep::find_frame>, <cpp|find_grid>,
     <cpp|find_limits> and <cpp|graphical_select>.
 
-    <item*|<verbatim|Typeset/Env/env_semantics.cpp>>Computation of the
+    <item*|<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>>Computation of the
     current frame <cpp|edit_env_rep::fr> and clipping limits from the
     variables <src-var|gr-frame> and <src-var|gr-geometry>
     (<cpp|update_frame>, <cpp|update_geometry>) and of the cached graphical
     attributes (point style, arrows, text alignment, ...).
 
-    <item*|<verbatim|Edit/Interface/edit_graphics.hpp>,
-    <verbatim|edit_graphics.cpp>>The editor component
+    <item*|<source-link|Edit/Interface/edit_graphics.hpp|src/Edit/Interface/edit_graphics.hpp>,
+    <source-link|edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>>The editor component
     <cpp|edit_graphics_rep>.
 
-    <item*|<verbatim|Edit/Interface/edit_mouse.cpp>,
-    <verbatim|edit_repaint.cpp>, <verbatim|edit_interface.cpp>>The places
+    <item*|<source-link|Edit/Interface/edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>,
+    <source-link|edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>, <source-link|edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>>The places
     where the generic editor calls the graphics component: mouse dispatch,
     drawing of the overlay and of the graphical cursor, and the transfer of
     the snapping parameters.
 
-    <item*|<verbatim|graphics/graphics-drd.scm>>Groups of graphical tags,
+    <item*|<source-link|graphics/graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm>>Groups of graphical tags,
     the table of graphical attributes and their defaults.
 
-    <item*|<verbatim|graphics/graphics-utils.scm>>Access to the innermost
+    <item*|<source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>>Access to the innermost
     <markup|graphics>, its properties and the objects inside it; insertion of
     new objects; <scm|make-graphics>.
 
-    <item*|<verbatim|graphics/graphics-env.scm>>The state
+    <item*|<source-link|graphics/graphics-env.scm|TeXmacs/progs/graphics/graphics-env.scm>>The state
     <scm|graphics-state> of the editor, the state stack, the filtering of
     graphical selections and <scm|graphics-reset-context>.
 
-    <item*|<verbatim|graphics/graphics-object.scm>>Construction of the
+    <item*|<source-link|graphics/graphics-object.scm|TeXmacs/progs/graphics/graphics-object.scm>>Construction of the
     graphical object (the overlay) and management of the sketch.
 
-    <item*|<verbatim|graphics/graphics-edit.scm>>Entry points for the mouse
+    <item*|<source-link|graphics/graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm>>Entry points for the mouse
     events coming from C++, and z-ordering.
 
-    <item*|<verbatim|graphics/graphics-single.scm>>Point mode: creation
+    <item*|<source-link|graphics/graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm>>Point mode: creation
     and modification of single objects, and hand drawing.
 
-    <item*|<verbatim|graphics/graphics-group.scm>>Group mode: selection,
+    <item*|<source-link|graphics/graphics-group.scm|TeXmacs/progs/graphics/graphics-group.scm>>Group mode: selection,
     moving, resizing, rotating, grouping, properties and the clipboard.
 
-    <item*|<verbatim|graphics/graphics-main.scm>>Global properties of a
+    <item*|<source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>>Global properties of a
     picture: extents, frame, zoom, grids, editing mode, default properties
     of new objects and snapping options.
 
-    <item*|<verbatim|graphics/graphics-markup.scm>>User defined graphical
+    <item*|<source-link|graphics/graphics-markup.scm|TeXmacs/progs/graphics/graphics-markup.scm>>User defined graphical
     macros (<scm|define-graphics>).
 
-    <item*|<verbatim|graphics/graphics-animate.scm>>Editing of animated
+    <item*|<source-link|graphics/graphics-animate.scm|TeXmacs/progs/graphics/graphics-animate.scm>>Editing of animated
     pictures.
 
-    <item*|<verbatim|graphics/graphics-kbd.scm>,
-    <verbatim|graphics/graphics-menu.scm>>Keyboard shortcuts, menus and
+    <item*|<source-link|graphics/graphics-kbd.scm|TeXmacs/progs/graphics/graphics-kbd.scm>,
+    <source-link|graphics/graphics-menu.scm|TeXmacs/progs/graphics/graphics-menu.scm>>Keyboard shortcuts, menus and
     toolbars.
   </description-paragraphs>
 

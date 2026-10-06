@@ -7,7 +7,7 @@
 
   <section|The parser>
 
-  <cpp|tree parse_bib (string s)> (<verbatim|Data/Convert/BibTeX/parsebib.cpp>,
+  <cpp|tree parse_bib (string s)> (<source-link|Data/Convert/BibTeX/parsebib.cpp|src/Data/Convert/BibTeX/parsebib.cpp>,
   glue <scm|parse-bib>) parses the text of a <verbatim|.bib> file. It is a
   hand written recursive descent parser which never fails: errors are
   reported on the <verbatim|convert-error> debug channel (with the key of
@@ -58,7 +58,7 @@
 
   All <verbatim|@string> definitions of the file are collected first and
   turned into a dictionary by <cpp|bib_strings_dict>
-  (<verbatim|Plugins/Bibtex/bibtex_functions.cpp>). The dictionary is
+  (<source-link|Plugins/Bibtex/bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>). The dictionary is
   pre-filled with the twenty journal abbreviations of the standard
   <BibTeX> styles (<verbatim|acmcs>, <verbatim|cacm>, <verbatim|jacm>,
   <verbatim|tcs>, ...); the month abbreviations <verbatim|jan>, ...,
@@ -204,12 +204,12 @@
   <section|Serialization>
 
   The format <verbatim|bibtex> (hidden, suffix <verbatim|rawbib>) and its
-  converters are registered in <verbatim|convert/bibtex/init-bibtex.scm>:
+  converters are registered in <source-link|convert/bibtex/init-bibtex.scm|TeXmacs/progs/convert/bibtex/init-bibtex.scm>:
   <verbatim|bibtex-document> and <verbatim|bibtex-snippet> are parsed with
   <scm|parse-bib>, and the inverse is <scm|serialize-bibtex>
-  (<verbatim|convert/bibtex/bibtexout.scm>). The user visible format
+  (<source-link|convert/bibtex/bibtexout.scm|TeXmacs/progs/convert/bibtex/bibtexout.scm>). The user visible format
   <verbatim|tmbib> (suffix <verbatim|bib>) goes through the database
-  representation (<verbatim|database/bib-db.scm>) but uses the same parser
+  representation (<source-link|database/bib-db.scm|TeXmacs/progs/database/bib-db.scm>) but uses the same parser
   and serializer.
 
   <scm|serialize-bibtex> writes one item per entry, with field names padded
@@ -245,7 +245,7 @@
 
   <\itemize>
     <item>The program name comes from the preference <verbatim|"bibtex
-    command"> (<verbatim|texmacs/texmacs/tm-server.scm>), passed to
+    command"> (<source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>), passed to
     <cpp|set_bibtex_command>; <cpp|bibtex_present> tests whether it is in
     the search path.
 

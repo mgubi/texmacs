@@ -21,7 +21,7 @@
   primitives|../format/stylesheet/prim-macro.en.tm>.
 
   The code lives in <verbatim|Data/Drd/>. The DRD of built-in tags is
-  hard-coded in <verbatim|drd_std.cpp>; the DRD of user tags is mostly
+  hard-coded in <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>; the DRD of user tags is mostly
   <em|inferred> from their macro definitions, and can be refined or frozen
   by <markup|drd-props> declarations in style files.
 
@@ -55,7 +55,7 @@
     array <cpp|array\<less\>child_info\<gtr\> ci> with properties of its
     children, and a tree <cpp|extra> for miscellaneous attributes (names,
     syntax). Both structures are bit fields
-    (<verbatim|Data/Drd/tag_info.hpp>):
+    (<source-link|Data/Drd/tag_info.hpp|src/Data/Drd/tag_info.hpp>):
 
     <\description>
       <item*|<cpp|parent_info>><cpp|type> (the type of the value of the tag,
@@ -74,7 +74,7 @@
       (<verbatim|ACCESSIBLE_NEVER>, <verbatim|ACCESSIBLE_HIDDEN>,
       <verbatim|ACCESSIBLE_ALWAYS>), <cpp|writability>, <cpp|block>,
       <cpp|env> (an index into a global table of environment trees, see
-      <cpp|drd_encode> and <cpp|drd_decode> in <verbatim|tag_info.cpp>) and
+      <cpp|drd_encode> and <cpp|drd_decode> in <source-link|tag_info.cpp|src/Data/Drd/tag_info.cpp>) and
       the corresponding <verbatim|freeze_*> bits.
     </description>
   </explain>
@@ -85,7 +85,7 @@
   sets. Hence explicit declarations always win over the heuristics,
   whatever the order in which they are executed.
 
-  The global variable <cpp|the_drd> (<verbatim|drd_std.hpp>) points to the
+  The global variable <cpp|the_drd> (<source-link|drd_std.hpp|src/Data/Drd/drd_std.hpp>) points to the
   DRD of the current buffer; it is set by the editor and window code, and
   can be changed temporarily with the helper struct <cpp|with_drd>. The
   environment instead uses the DRD of its own buffer, through the
@@ -95,7 +95,7 @@
 
   <cpp|drd_info_rep::is_accessible_child (tree t, int i)> decides whether
   the cursor may enter the <verbatim|i>-th child of <cpp|t>. The answer
-  depends on the global access mode (<verbatim|drd_mode.hpp>):
+  depends on the global access mode (<source-link|drd_mode.hpp|src/Data/Drd/drd_mode.hpp>):
   <verbatim|DRD_ACCESS_NORMAL> only accepts <verbatim|ACCESSIBLE_ALWAYS>,
   <verbatim|DRD_ACCESS_HIDDEN> also accepts <verbatim|ACCESSIBLE_HIDDEN>,
   and <verbatim|DRD_ACCESS_SOURCE> (used in source mode) makes every child

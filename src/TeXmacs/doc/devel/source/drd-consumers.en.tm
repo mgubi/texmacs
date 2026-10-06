@@ -20,7 +20,7 @@
   The notion of a valid cursor position is entirely <abbr|DRD>-driven.
 
   <\description>
-    <item*|<verbatim|Data/Tree/tree_cursor.cpp>><cpp|is_accessible_cursor
+    <item*|<source-link|Data/Tree/tree_cursor.cpp|src/Data/Tree/tree_cursor.cpp>><cpp|is_accessible_cursor
     (t, p)> decides whether the path <cpp|p> is a valid cursor position in
     <cpp|t>. It refuses positions on child-enforcing tags
     (<cpp|is_child_enforcing>) and at the inner borders of
@@ -34,14 +34,14 @@
     the access mode for their body (<cpp|is_modified_accessible>).
     <cpp|closest_accessible> and friends use the same predicates.
 
-    <item*|<verbatim|Data/Tree/tree_traverse.cpp>>The abstract cursor
+    <item*|<source-link|Data/Tree/tree_traverse.cpp|src/Data/Tree/tree_traverse.cpp>>The abstract cursor
     movements (<cpp|next_valid>, <cpp|previous_valid>, word and argument
     movement such as <cpp|move_argument>, <cpp|next_tag>,
     <cpp|previous_tag>, <cpp|next_argument>, ...) skip inaccessible
     children; <cpp|move_valid_bis> temporarily switches to source mode
     when the starting path is itself inaccessible.
 
-    <item*|<verbatim|Edit/Interface/edit_cursor.cpp>><cpp|make_cursor_accessible>
+    <item*|<source-link|Edit/Interface/edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>><cpp|make_cursor_accessible>
     moves an inaccessible cursor to the closest valid position, in source
     access mode if the document is in source mode.
     <cpp|edit_interface_rep::resume> calls it with <cpp|the_drd> set to the
@@ -51,7 +51,7 @@
   <section|Structured editing>
 
   <\description>
-    <item*|<verbatim|Edit/Modify/edit_dynamic.cpp>>
+    <item*|<source-link|Edit/Modify/edit_dynamic.cpp|src/Edit/Modify/edit_dynamic.cpp>>
 
     <\itemize>
       <item><cpp|make_compound (l, n)> chooses the smallest admissible
@@ -79,12 +79,12 @@
       use <cpp|contains (name)> to recognize names of primitives.
     </itemize>
 
-    <item*|<verbatim|Edit/Modify/edit_delete.cpp>><cpp|remove_structure_upwards>
+    <item*|<source-link|Edit/Modify/edit_delete.cpp|src/Edit/Modify/edit_delete.cpp>><cpp|remove_structure_upwards>
     treats macros without border (<cpp|var_without_border>) like
     <markup|concat>.
 
-    <item*|<verbatim|Edit/Replace/edit_select.cpp>><cpp|select_enlarge>
-    and <cpp|selection_adjust_border> (<verbatim|Data/Tree/tree_select.cpp>)
+    <item*|<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>><cpp|select_enlarge>
+    and <cpp|selection_adjust_border> (<source-link|Data/Tree/tree_select.cpp|src/Data/Tree/tree_select.cpp>)
     enlarge selections which would end at an invisible border;
     <cpp|semantic_root> uses the environment of the first child
     (<cpp|get_env>) to find the enclosing mathematical or program
@@ -94,39 +94,39 @@
   <section|Search, replace, spell checking and completion>
 
   <\description>
-    <item*|<verbatim|Edit/Replace/edit_search.cpp>>Searching for tags
+    <item*|<source-link|Edit/Replace/edit_search.cpp|src/Edit/Replace/edit_search.cpp>>Searching for tags
     (<cpp|search_previous_compound>, <cpp|search_next_compound>) only
     returns positions with <cpp|is_accessible_path>; the incremental search
     of <cpp|next_match> runs in <verbatim|DRD_ACCESS_HIDDEN> mode, or
     source mode in source documents.
 
-    <item*|<verbatim|Data/Tree/tree_search.cpp>><cpp|is_accessible_for_search>
+    <item*|<source-link|Data/Tree/tree_search.cpp|src/Data/Tree/tree_search.cpp>><cpp|is_accessible_for_search>
     accepts accessible children, the body of <markup|hidden>, and in source
     mode all children except <markup|raw-data>.
 
-    <item*|<verbatim|Data/Tree/tree_spell.cpp>>Spell checking descends into
+    <item*|<source-link|Data/Tree/tree_spell.cpp|src/Data/Tree/tree_spell.cpp>>Spell checking descends into
     accessible children and follows the <src-var|mode> and
     <src-var|language> of each child (<cpp|get_env_child (t, i, MODE,
     mode)>, <cpp|get_env_child (t, i, LANGUAGE, lan)>), so that formulas
     and program code are skipped and foreign-language fragments are checked
     with the right dictionary.
 
-    <item*|<verbatim|Edit/Interface/edit_complete.cpp>>Word completion
+    <item*|<source-link|Edit/Interface/edit_complete.cpp|src/Edit/Interface/edit_complete.cpp>>Word completion
     collects words in accessible children only.
   </description>
 
   <section|User interface>
 
   <\description>
-    <item*|<verbatim|Edit/Interface/edit_footer.cpp>>The footer names the
+    <item*|<source-link|Edit/Interface/edit_footer.cpp|src/Edit/Interface/edit_footer.cpp>>The footer names the
     tags around the cursor with <cpp|get_name>, and recognizes primitives
     with <cpp|contains> when completing <markup|hybrid> commands.
 
-    <item*|<verbatim|Edit/Interface/edit_interface.cpp>><cpp|compute_env_rects>
+    <item*|<source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>><cpp|compute_env_rects>
     does not draw context rectangles around child-enforcing tags.
 
     <item*|Focus bar and menus>On the <scheme> side
-    (<verbatim|generic/generic-menu.scm>), the variant menus use the tag
+    (<source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>), the variant menus use the tag
     names (<scm|tree-name>), and the input fields for the
     \Phidden\Q, <abbr|i.e.> inaccessible, children of the focus tag are
     built from <scm|tree-accessible-child?>, <scm|tree-child-type>,
@@ -149,65 +149,65 @@
   <section|Typesetting and evaluation>
 
   <\description>
-    <item*|<verbatim|Typeset/Bridge/bridge_compound.cpp>>When a macro is
+    <item*|<source-link|Typeset/Bridge/bridge_compound.cpp|src/Typeset/Bridge/bridge_compound.cpp>>When a macro is
     typeset, a marker box for cursor positioning around it is inserted
     unless the macro is child-enforcing (<cpp|is_child_enforcing> on
     <cpp|the_drd>).
 
-    <item*|<verbatim|Typeset/Env/env_inactive.cpp>>In source mode and for
+    <item*|<source-link|Typeset/Env/env_inactive.cpp|src/Typeset/Env/env_inactive.cpp>>In source mode and for
     inactive markup, every argument is wrapped in <markup|src-regular>,
     <markup|src-var>, <markup|src-length>, ... according to
     <cpp|get_type_child> (function <cpp|highlight>).
 
-    <item*|<verbatim|Typeset/Concat/concater.cpp>>The flags shown for
+    <item*|<source-link|Typeset/Concat/concater.cpp|src/Typeset/Concat/concater.cpp>>The flags shown for
     vertical spaces and similar invisible primitives use <cpp|get_name>.
 
-    <item*|<verbatim|Typeset/Concat/concat_graphics.cpp>>Graphical
+    <item*|<source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>>Graphical
     constraints are recognized by the type of the tag
     (<verbatim|TYPE_CONSTRAINT>).
 
-    <item*|<verbatim|Typeset/Env/env_exec.cpp>>When the evaluator expands
+    <item*|<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>>When the evaluator expands
     a macro application to find an accessible subtree
     (<cpp|edit_env_rep::expand> with <cpp|search_accessible>), it returns
     the first child which is both accessible according to the
     <abbr|DRD> and attached to the source. The experimental evaluator has
-    the same logic in <verbatim|Style/Evaluate/evaluate_macro.cpp>.
+    the same logic in <source-link|Style/Evaluate/evaluate_macro.cpp|src/Style/Evaluate/evaluate_macro.cpp>.
 
-    <item*|<verbatim|Data/Tree/tree_cache.cpp>>Only images with regular
+    <item*|<source-link|Data/Tree/tree_cache.cpp|src/Data/Tree/tree_cache.cpp>>Only images with regular
     type are cached for client/server communication.
   </description>
 
   <section|Correction, analysis and languages>
 
   <\description>
-    <item*|<verbatim|Data/Tree/tree_modify.cpp>><cpp|correct_node>
+    <item*|<source-link|Data/Tree/tree_modify.cpp|src/Data/Tree/tree_modify.cpp>><cpp|correct_node>
     replaces trees with a wrong arity by the empty string (for tags which
     the <abbr|DRD> describes).
 
-    <item*|<verbatim|Data/Tree/tree_correct.cpp>><cpp|drd_correct (drd,
+    <item*|<source-link|Data/Tree/tree_correct.cpp|src/Data/Tree/tree_correct.cpp>><cpp|drd_correct (drd,
     t)> does the same recursively for an explicit <abbr|DRD>. The
     correctors for superfluous <markup|with>, invisible operators,
     homoglyphs and missing <markup|document> tags track the mode of each
     child through <cpp|get_env_child> and decide which children may be
     rewritten by their type (<cpp|is_correctable_child> in
-    <verbatim|tree_analyze.cpp>). They run under
+    <source-link|tree_analyze.cpp|src/Data/Tree/tree_analyze.cpp>). They run under
     <cpp|with_drd drd (get_document_drd (t))>.
 
-    <item*|<verbatim|Data/Tree/tree_brackets.cpp>>,
-    <verbatim|tree_math_stats.cpp>Bracket upgrading and math statistics
+    <item*|<source-link|Data/Tree/tree_brackets.cpp|src/Data/Tree/tree_brackets.cpp>>,
+    <source-link|tree_math_stats.cpp|src/Data/Tree/tree_math_stats.cpp>Bracket upgrading and math statistics
     follow the <src-var|mode> of children.
 
-    <item*|<verbatim|Data/Tree/tree_analyze.cpp>><cpp|is_with_like>;
+    <item*|<source-link|Data/Tree/tree_analyze.cpp|src/Data/Tree/tree_analyze.cpp>><cpp|is_with_like>;
     <cpp|symbol_type> classifies symbols of mathematical formulas using
     <cpp|get_syntax>.
 
-    <item*|<verbatim|System/Language/packrat_serializer.cpp>>The packrat
+    <item*|<source-link|System/Language/packrat_serializer.cpp|src/System/Language/packrat_serializer.cpp>>The packrat
     parser serializes formulas for parsing; a tag with a <verbatim|syntax>
     attribute, or a macro, is serialized as its syntax (<cpp|get_syntax
     (t, p)>), which is how user macros take part in mathematical
     grammar checking.
 
-    <item*|<verbatim|System/Language/dictionary.cpp>>The translation of
+    <item*|<source-link|System/Language/dictionary.cpp|src/System/Language/dictionary.cpp>>The translation of
     menu and dialog texts (<cpp|tree_translate>) only translates accessible
     children.
   </description>
@@ -215,20 +215,20 @@
   <section|Converters>
 
   <\description>
-    <item*|<verbatim|Data/Convert/Verbatim/verbatim.cpp>>Conversion to
+    <item*|<source-link|Data/Convert/Verbatim/verbatim.cpp|src/Data/Convert/Verbatim/verbatim.cpp>>Conversion to
     plain text outputs accessible children only (<cpp|the_drd>), and
     uses <cpp|std_drd-\<gtr\>get_env_child> for the mode.
 
-    <item*|<verbatim|Data/Convert/Tex/fromtex_post.cpp>>The result of
+    <item*|<source-link|Data/Convert/Tex/fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>>The result of
     <LaTeX> import is cleaned with <cpp|drd_correct (std_drd, t)>.
 
-    <item*|<verbatim|Data/Convert/AI/compress.cpp>><cpp|compress_tree>
+    <item*|<source-link|Data/Convert/AI/compress.cpp|src/Data/Convert/AI/compress.cpp>><cpp|compress_tree>
     only rewrites accessible children in text mode and the current
     language.
 
     <item*|<scheme> converters>The <LaTeX> exporter computes the mode of
     every subtree with <scm|tree-child-env> (<scm|compute-mode-stats> in
-    <verbatim|convert/latex/tmtex.scm>); most converters otherwise rely on
+    <source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>); most converters otherwise rely on
     <scheme> tables declared with the logic engine rather than on the
     <c++> <abbr|DRD>.
   </description>

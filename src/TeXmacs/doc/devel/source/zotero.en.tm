@@ -43,16 +43,16 @@
     Zotero, libraries, items and citation keys, the resolution of keys,
     the export of <BibTeX>, the citations of a document or project, the
     managed <BibTeX> files, renamed keys, completion. It does not load the
-    modules of the database, and uses <verbatim|convert/bibtex/bibtextm.scm>
+    modules of the database, and uses <source-link|convert/bibtex/bibtextm.scm|TeXmacs/progs/convert/bibtex/bibtextm.scm>
     to read <BibTeX> files.
 
     <item*|<verbatim|bibtex/zotero-db.scm>>Zotero as a source of the
     database: conversion of items into database entries, the source
     <scm|:zotero>, the sync of imported entries, conflicts, adoption of
     copies, renamed entries, and the search window of references (in both
-    modes). It uses <verbatim|database/db-base.scm>,
-    <verbatim|db-convert.scm>, <verbatim|bib-db.scm>,
-    <verbatim|bib-manage.scm> and <verbatim|db-widgets.scm>, so it is
+    modes). It uses <source-link|database/db-base.scm|TeXmacs/progs/database/db-base.scm>,
+    <source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm>, <source-link|bib-db.scm|TeXmacs/progs/database/bib-db.scm>,
+    <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm> and <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm>, so it is
     only loaded when one of its functions is called.
 
     <item*|<verbatim|bibtex/zotero-widgets.scm>>The dialogs: the window of
@@ -61,31 +61,31 @@
   </description>
 
   Everything else reaches these modules through lazy definitions in
-  <verbatim|init-texmacs.scm> (<scm|lazy-define> for the functions,
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> (<scm|lazy-define> for the functions,
   <scm|lazy-menu> for the dialogs), so that nothing is loaded before
   Zotero is used. The hooks in other files are:
 
   <\description>
-    <item*|<verbatim|generic/document-edit.scm>><scm|update-document> calls
+    <item*|<source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>><scm|update-document> calls
     <scm|(zotero-before-update <scm-arg|what>)> first, which refreshes a
     managed file and syncs the database.
 
-    <item*|<verbatim|database/bib-manage.scm>>The source <scm|:zotero> in
+    <item*|<source-link|database/bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>>The source <scm|:zotero> in
     <scm|bib-retrieve-entries-from-one> and <scm|bib-get-db>, and the
     order of the sources, <scm|bib-sources>, used by
     <scm|bib-compile-sub> and <scm|bib-attach>.
 
-    <item*|<verbatim|database/db-format.scm>>The meta attributes of the
+    <item*|<source-link|database/db-format.scm|TeXmacs/progs/database/db-format.scm>>The meta attributes of the
     entries from Zotero, in <scm|db-meta-attributes>.
 
-    <item*|<verbatim|database/db-widgets.scm>>The results of Zotero and
+    <item*|<source-link|database/db-widgets.scm|TeXmacs/progs/database/db-widgets.scm>>The results of Zotero and
     the sources line in the search window of references.
 
-    <item*|<verbatim|generic/generic-edit.scm>, <verbatim|database/bib-kbd.scm>>Completion
+    <item*|<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>, <source-link|database/bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm>>Completion
     of keys with <scm|zotero-completion-suffixes>, and the search window of
     citations without the database tool.
 
-    <item*|<verbatim|generic/generic-menu.scm>, <verbatim|generic/document-menu.scm>>The
+    <item*|<source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>, <source-link|generic/document-menu.scm|TeXmacs/progs/generic/document-menu.scm>>The
     entries <menu|Search references> and <menu|Show in Zotero> of the focus
     menus, and the Zotero entries of <menu|Document|Bibliography>.
   </description>
@@ -307,7 +307,7 @@
   <section|Sources of references>
 
   The sources of a bibliography come in one order, given by
-  <scm|bib-sources> in <verbatim|bib-manage.scm>:
+  <scm|bib-sources> in <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>:
 
   <\enumerate>
     <item><scm|:local>, the entries of the document;
@@ -519,8 +519,8 @@
   <subsection|Completion>
 
   <key|tab> in a citation (<scm|kbd-variant>, in
-  <verbatim|generic-edit.scm> without the database tool and in
-  <verbatim|bib-kbd.scm> with it) adds the keys of Zotero with the typed
+  <source-link|generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm> without the database tool and in
+  <source-link|bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm> with it) adds the keys of Zotero with the typed
   prefix (<scm|zotero-completion-suffixes>, an interactive request),
   unless the preference <verbatim|"zotero completion"> is off. The keys of
   each prefix are remembered while no library changes, and a longer prefix
@@ -546,7 +546,7 @@
 
   <\itemize>
     <item>with the database tool, on <scm|(bib-database)>
-    (<scm|open-bib-chooser>, <verbatim|bib-manage.scm>, whose callback
+    (<scm|open-bib-chooser>, <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>, whose callback
     also calls <scm|zotero-cited>);
     <scm|db-search-results> appends the Zotero items which the database
     does not have (<scm|zotero-search-entries>);
@@ -574,7 +574,7 @@
 
   <scm|focus-can-search?> and <scm|focus-open-search-tool> have
   definitions for citations without the database tool, in
-  <verbatim|generic-edit.scm>, after their default definitions. The focus
+  <source-link|generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>, after their default definitions. The focus
   menu and the focus bar of a citation offer <menu|Show in Zotero>
   (<scm|zotero-citation-entry>, <scm|zotero-show-item>, which opens
   <verbatim|zotero://select/library/items/<em|item>> or
@@ -636,7 +636,7 @@
   database (<scm|bib-database> is redefined), a new file each time, and
   load <verbatim|zotero-db.scm> only when they run. The suite runs after
   the suites <verbatim|links> and <verbatim|database> in
-  <verbatim|check-master.scm>.
+  <source-link|check-master.scm|TeXmacs/progs/check/check-master.scm>.
 
   The fake library searches as the source does: the application also
   matches the citation keys (and the field <verbatim|extra> with

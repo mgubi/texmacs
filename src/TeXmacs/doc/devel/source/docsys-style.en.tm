@@ -16,7 +16,7 @@
   <section|The style files>
 
   <\description>
-    <item*|<tmstyle|tmdoc>>(<verbatim|styles/documentation/texmacs/tmdoc.ts>)
+    <item*|<tmstyle|tmdoc>>(<source-link|styles/documentation/texmacs/tmdoc.ts|TeXmacs/styles/documentation/texmacs/tmdoc.ts>)
     loads <tmpackage|std>, <tmpackage|env>, <tmpackage|title-generic>,
     <tmpackage|header-article>, <tmpackage|section-article>,
     <tmpackage|doc> and <tmpackage|pagella-font>. It sets the page layout
@@ -28,7 +28,7 @@
     <markup|cpp>, <markup|python>, <markup|scilab>, <markup|mmx> and the
     session environments.
 
-    <item*|<tmpackage|doc>>(<verbatim|packages/documentation/doc.ts>) just
+    <item*|<tmpackage|doc>>(<source-link|packages/documentation/doc.ts|TeXmacs/packages/documentation/doc.ts>) just
     loads <tmpackage|tmdoc-markup>, <tmpackage|tmdoc-gui>,
     <tmpackage|tmdoc-traversal> and <tmpackage|tmdoc-framed>. It is also
     used by <tmstyle|tmmanual>, the style of compiled books, together with
@@ -41,7 +41,7 @@
 
   <section|Titles, copyright and license>
 
-  <markup|tmdoc-title> (<verbatim|tmdoc-traversal.ts>) draws the logo and
+  <markup|tmdoc-title> (<source-link|tmdoc-traversal.ts|TeXmacs/packages/documentation/standard/tmdoc-traversal.ts>) draws the logo and
   the title in the title font, with a rule below. <markup|tmdoc-title*>
   adds a subtitle and <markup|tmdoc-title**> a line above the title as
   well. <markup|tmdoc-copyright> takes a period and any number of holders
@@ -76,7 +76,7 @@
 
   Links and branches give file names <em|without> language:
   <verbatim|<em|name>.en.tm> is common, but <verbatim|<em|name>> alone is
-  also accepted. The macro <markup|tmdoc-file> (<verbatim|tmdoc-markup.ts>)
+  also accepted. The macro <markup|tmdoc-file> (<source-link|tmdoc-markup.ts|TeXmacs/packages/documentation/standard/tmdoc-markup.ts>)
   tries, in this order,
 
   <\enumerate>
@@ -95,7 +95,7 @@
   </enumerate>
 
   The expansion code uses the same rules (<scm|tmdoc-relative> in
-  <verbatim|progs/doc/tmdoc.scm>), so that a page written in one language
+  <source-link|progs/doc/tmdoc.scm|TeXmacs/progs/doc/tmdoc.scm>), so that a page written in one language
   can be read in a translation wherever one exists.
 
   <section|Translations>
@@ -122,7 +122,7 @@
     pages which are part of the same expansion are turned into internal
     links (<scm|tmdoc-internalize>).
 
-    <item*|<markup|help-link>>(<verbatim|tmdoc-markup.ts>) builds the
+    <item*|<markup|help-link>>(<source-link|tmdoc-markup.ts|TeXmacs/packages/documentation/standard/tmdoc-markup.ts>) builds the
     <abbr|URL> <verbatim|tmfs://help/article/tm/doc/<em|name>.<em|xx>.tm>
     from a path relative to <verbatim|doc/> and opens it as an article. Unlike
     <markup|tmdoc-file>, it does not fall back to English; see the pitfalls
@@ -138,16 +138,16 @@
 
   When a document uses <tmstyle|tmdoc> and is edited directly, that is,
   not opened through a <verbatim|tmfs://> <abbr|URL> (the mode
-  <scm|in-manual?> of <verbatim|kernel/texmacs/tm-modes.scm>), the files
-  <verbatim|tmdoc-edit.scm>, <verbatim|tmdoc-menu.scm>,
-  <verbatim|tmdoc-kbd.scm> and <verbatim|tmdoc-drd.scm> add a
-  <menu|Manual> menu (<verbatim|texmacs/menus/main-menu.scm>) and icons with
+  <scm|in-manual?> of <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>), the files
+  <source-link|tmdoc-edit.scm|TeXmacs/progs/doc/tmdoc-edit.scm>, <source-link|tmdoc-menu.scm|TeXmacs/progs/doc/tmdoc-menu.scm>,
+  <source-link|tmdoc-kbd.scm|TeXmacs/progs/doc/tmdoc-kbd.scm> and <source-link|tmdoc-drd.scm|TeXmacs/progs/doc/tmdoc-drd.scm> add a
+  <menu|Manual> menu (<source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>) and icons with
   entries
   to insert the title, copyright and license (<scm|tmdoc-insert-title>,
   <scm|tmdoc-insert-copyright>, <scm|tmdoc-insert-license>,
   <scm|tmdoc-insert-gnu-fdl>), traversal tags (<scm|tmdoc-make-branch>
   inserts a new item after the current one), <markup|explain> blocks and
-  the markup for keys, menus and GUI elements. <verbatim|tmdoc-drd.scm>
+  the markup for keys, menus and GUI elements. <source-link|tmdoc-drd.scm|TeXmacs/progs/doc/tmdoc-drd.scm>
   declares tag groups such as <scm|tmdoc-traversal-tag> and
   <scm|tmdoc-link-tag>, which drive the variants and the focus toolbar
   (see <hlink|the DRD from Scheme|drd-scheme.en.tm>). The same files hold

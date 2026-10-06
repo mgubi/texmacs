@@ -18,7 +18,7 @@
     make install
   </verbatim-code>
 
-  run from <verbatim|src/>. When <verbatim|configure.in> or one of the
+  run from <verbatim|src/>. When <source-link|configure.in|configure.in> or one of the
   macros in <verbatim|misc/m4/> has changed, <verbatim|configure> must be
   regenerated first with <verbatim|autoreconf -fi> (as in the
   <verbatim|Dockerfile>). The build is done in the source tree: objects go
@@ -27,7 +27,7 @@
 
   <section|Configuration>
 
-  <verbatim|configure.in> checks the compilers (preferring
+  <source-link|configure.in|configure.in> checks the compilers (preferring
   <verbatim|clang> and <verbatim|clang++>, with <name|Objective-C> for
   <name|macOS>), the sizes of the basic types and a few headers, and then
   calls one macro per subject. The options which matter most are:
@@ -88,7 +88,7 @@
   <section|Generated files>
 
   <verbatim|configure> writes
-  <verbatim|src/System/config.h> (from <verbatim|src/System/config.in>, as
+  <verbatim|src/System/config.h> (from <source-link|src/System/config.in|src/System/config.in>, as
   declared by <verbatim|AC_CONFIG_HEADERS>) and the files listed in
   <verbatim|AC_CONFIG_FILES>, among which:
 
@@ -97,7 +97,7 @@
     <verbatim|misc/admin/admin.makefile>;
 
     <item><verbatim|src/System/tm_configure.hpp> (from
-    <verbatim|tm_configure.in>), with the version and the build
+    <source-link|tm_configure.in|src/System/tm_configure.in>), with the version and the build
     description;
 
     <item>the scripts <verbatim|misc/scripts/texmacs> and
@@ -169,7 +169,7 @@
     <name|CMake>|build-cmake.en.tm>).
 
     <item>The configuration is cached in <verbatim|config.status>; after
-    switching branches with different <verbatim|configure.in> files, run
+    switching branches with different <source-link|configure.in|configure.in> files, run
     <verbatim|autoreconf -fi> and <verbatim|./configure> again rather than
     relying on <verbatim|config.status --recheck>.
   </itemize>

@@ -11,8 +11,8 @@
   <hlink|architecture|architecture.en.tm>) is assembled from several
   components by virtual inheritance. The graphics component is
   <cpp|edit_graphics_rep>, declared in
-  <verbatim|Edit/Interface/edit_graphics.hpp>. Its public methods are also
-  declared as pure virtual functions in <verbatim|Edit/editor.hpp>, so that
+  <source-link|Edit/Interface/edit_graphics.hpp|src/Edit/Interface/edit_graphics.hpp>. Its public methods are also
+  declared as pure virtual functions in <source-link|Edit/editor.hpp|src/Edit/editor.hpp>, so that
   the other components and the glue can call them. Its state is small:
 
   <\cpp-code>
@@ -43,7 +43,7 @@
 
   Besides these fields, the snapping parameters are kept in the static
   variables <cpp|snap_mode> and <cpp|snap_distance> of
-  <verbatim|edit_graphics.cpp>, set by <cpp|set_snap_mode> and
+  <source-link|edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>, set by <cpp|set_snap_mode> and
   <cpp|set_snap_distance>. The field <cpp|cur_pos> is not used.
 
   <subsection|Where am I?>
@@ -129,14 +129,14 @@
   <\enumerate>
     <item>The <abbr|GUI> back-end calls
     <cpp|edit_interface_rep::handle_mouse>
-    (<verbatim|Edit/Interface/edit_mouse.cpp>). It detects drags
+    (<source-link|Edit/Interface/edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>). It detects drags
     (<cpp|detect_left_drag>, <cpp|detect_right_drag>), which turns raw
     presses and motions into the event types <verbatim|start-drag-left>,
     <verbatim|dragging-left>, <verbatim|end-drag-left>, and passes the event
     to the <scheme> function <scm|mouse-event>.
 
     <item>Unless it is overridden (by tooltips, comments and the like),
-    <scm|mouse-event> (<verbatim|kernel/gui/kbd-handlers.scm>) calls
+    <scm|mouse-event> (<source-link|kernel/gui/kbd-handlers.scm|TeXmacs/progs/kernel/gui/kbd-handlers.scm>) calls
     <scm|mouse-any>, glued to <cpp|edit_interface_rep::mouse_any>.
 
     <item><cpp|mouse_any> performs the generic work (pointer, popups,
@@ -229,7 +229,7 @@
     <verbatim|wheel> events are converted into a relative displacement and
     sent to <scm|graphics-wheel>, which scrolls the picture.
 
-    <item>The <scheme> handlers in <verbatim|graphics/graphics-edit.scm>
+    <item>The <scheme> handlers in <source-link|graphics/graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm>
     (<scm|graphics-move>, <scm|graphics-release-left>,
     <scm|graphics-start-drag-left>, ...) dispatch on the current mode to the
     functions <scm|edit_move>, <scm|edit_left-button>, ... described in the
@@ -240,7 +240,7 @@
 
     <item>At the next repaint, the modified document is retypeset, and
     <cpp|edit_interface_rep::draw_graphics>
-    (<verbatim|Edit/Interface/edit_repaint.cpp>) draws the graphical object
+    (<source-link|Edit/Interface/edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>) draws the graphical object
     and the graphical cursor.
   </enumerate>
 
@@ -295,7 +295,7 @@
     <cpp|snap_mode> and <cpp|snap_distance>.
 
     <item*|Undo><cpp|edit_modify_rep::undo>
-    (<verbatim|Edit/Modify/edit_modify.cpp>) consults the <scheme> variable
+    (<source-link|Edit/Modify/edit_modify.cpp|src/Edit/Modify/edit_modify.cpp>) consults the <scheme> variable
     <scm|graphics-undo-enabled>. While an object is being created or moved
     this variable is false, and undo only calls
     <scm|(graphics-reset-context 'undo)>, which cancels the current
@@ -303,12 +303,12 @@
     <scm|(graphics-reset-context 'undo)> resynchronizes the <scheme> state.
 
     <item*|Clipboard><cpp|selection_copy>, <cpp|selection_paste> and
-    <cpp|selection_cut> (<verbatim|Edit/Replace/edit_select.cpp>) call
+    <cpp|selection_cut> (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>) call
     <scm|graphics-copy>, <scm|graphics-paste> and <scm|graphics-cut> when
     the cursor is in an active picture.
 
     <item*|Deletion><cpp|back_in_text_at> is called by the deletion
-    routines (<verbatim|Edit/Modify/edit_delete.cpp>) when backspace or
+    routines (<source-link|Edit/Modify/edit_delete.cpp|src/Edit/Modify/edit_delete.cpp>) when backspace or
     delete is pressed at the start of an empty label: the
     <markup|text-at> (and its surrounding <markup|with>) is removed from the
     picture.
@@ -344,7 +344,7 @@
       group, ...) is returned at once if no grid point was met before it;
 
       <item>otherwise all pairs of candidates with curves are intersected
-      (<cpp|intersection> from <verbatim|Graphics/Types/curve.hpp>, with a
+      (<cpp|intersection> from <source-link|Graphics/Types/curve.hpp|src/Graphics/Types/curve.hpp>, with a
       precision of a tenth of a pixel), except for pairs of two grid lines,
       pairs mixing a point type with a text border, and pairs involving a
       handle; the
@@ -379,7 +379,7 @@
   The snap mode is a tuple of category names; the category
   <verbatim|all> allows everything, and a non-tuple value (no setting) also
   allows everything. On the <scheme> side
-  (<verbatim|graphics/graphics-main.scm>) the mode is stored in the
+  (<source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>) the mode is stored in the
   property <src-var|gr-snap> of the picture; <scm|graphics-get-snap-mode>
   returns the empty tuple in hand drawing mode, which disables snapping
   for hand drawings. The snap distance is <src-var|gr-snap-distance>
@@ -453,8 +453,8 @@
   <section|Glue functions>
 
   The following functions are exported to <scheme> in
-  <verbatim|Scheme/Glue/build-glue-editor.scm> and
-  <verbatim|build-glue-basic.scm>:
+  <source-link|Scheme/Glue/build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm> and
+  <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>:
 
   <descriptive-table|<tformat|<table|<row|<cell|<scheme>>|<cell|C++>>|<row|<cell|<scm|in-graphics?>>|<cell|<cpp|inside_graphics>>>|<row|<cell|<scm|get-graphical-x>,
   <scm|get-graphical-y>>|<cell|<cpp|get_x>,
@@ -481,7 +481,7 @@
   <scm|graphics-get-snap-mode>, <scm|graphics-get-snap-distance>,
   <scm|graphics-copy>, <scm|graphics-cut>, <scm|graphics-paste> and
   <scm|graphics-notify-extents>. Most of them are declared with
-  <scm|lazy-define> in <verbatim|init-texmacs.scm>, so that the graphics
+  <scm|lazy-define> in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>, so that the graphics
   modules are only loaded when needed.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

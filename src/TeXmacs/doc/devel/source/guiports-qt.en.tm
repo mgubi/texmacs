@@ -19,10 +19,10 @@
   are handled by about 270 tests of <cpp|QT_VERSION> in the port (most of
   them <verbatim|QT_VERSION \<gtr\>= 0x060000>, <verbatim|\<less\>
   0x060000> and <verbatim|\<gtr\>= 0x050000>) and by a few outside it, for
-  instance in <verbatim|Texmacs/Texmacs/texmacs.cpp>,
-  <verbatim|Texmacs/Window/tm_button.cpp>,
-  <verbatim|Edit/Interface/edit_interface.cpp> and
-  <verbatim|System/Files/web_files.cpp>. Notable differences are:
+  instance in <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>,
+  <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>,
+  <source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp> and
+  <source-link|System/Files/web_files.cpp|src/System/Files/web_files.cpp>. Notable differences are:
 
   <\itemize>
     <item>High resolution screens. Below <name|Qt> 6, <TeXmacs> manages the
@@ -30,18 +30,18 @@
     <cpp|retina_zoom>, <cpp|retina_icons> and <cpp|retina_scale>, set by
     the options <verbatim|-retina> and <verbatim|-no-retina> and the
     environment variables <verbatim|TEXMACS_RETINA> and
-    <verbatim|TEXMACS_RETINA_ICONS> (<verbatim|texmacs.cpp>). With
+    <verbatim|TEXMACS_RETINA_ICONS> (<source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>). With
     <name|Qt> 6 these options do not exist; the device pixel ratio of
     <name|Qt> is used instead (<cpp|QTMWidget::checkDprChange>) and the
     rounding policy is set to <verbatim|Round> at startup.
 
-    <item>HTTP requests. <verbatim|qt_http.cpp> is only compiled in
+    <item>HTTP requests. <source-link|qt_http.cpp|src/Plugins/Qt/qt_http.cpp> is only compiled in
     with <name|Qt> 6 (<verbatim|#if QT_VERSION \<gtr\>= 0x060000>);
     otherwise <cpp|http_post> falls back to external programs, see
     <hlink|system utilities|system-utils.en.tm>.
 
     <item>The native menu bar. Its default depends on the version and the
-    platform (<verbatim|use native menubar> in <verbatim|texmacs.cpp>); on
+    platform (<verbatim|use native menubar> in <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>); on
     <name|macOS> before <name|Qt> 6 it is only used when the preference is
     <verbatim|force>.
 
@@ -52,7 +52,7 @@
   </itemize>
 
   <cpp|gui_version ()> returns <verbatim|"qt4">, <verbatim|"qt5"> or
-  <verbatim|"qt6"> accordingly (<verbatim|qt_gui.cpp>).
+  <verbatim|"qt6"> accordingly (<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>).
 
   <section|The <verbatim|Plugins/Qt6> fork>
 
@@ -67,9 +67,9 @@
     <item>adds <verbatim|QTMMainTab> and <verbatim|QTMMainTabWindow>, main
     windows with tabs which can be moved from one window to another;
 
-    <item>changes mostly <verbatim|qt_http.cpp>,
-    <verbatim|qt_utilities.cpp>, <verbatim|qt_tm_widget.cpp>,
-    <verbatim|QTMToolbar.cpp> and <verbatim|QTMResponsiveTabWidget.cpp>
+    <item>changes mostly <source-link|qt_http.cpp|src/Plugins/Qt/qt_http.cpp>,
+    <source-link|qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>, <source-link|qt_tm_widget.cpp|src/Plugins/Qt/qt_tm_widget.cpp>,
+    <source-link|QTMToolbar.cpp|src/Plugins/Qt/QTMToolbar.cpp> and <source-link|QTMResponsiveTabWidget.cpp|src/Plugins/Qt/QTMResponsiveTabWidget.cpp>
     (31 files differ in total), with work on responsive layouts for small
     screens and on <name|Android> according to the commit messages.
   </itemize>
@@ -82,10 +82,10 @@
   <section|Keyboard and input methods>
 
   Key presses arrive in <cpp|QTMWidget::keyPressEvent>
-  (<verbatim|QTMWidget.cpp>). A <cpp|QTMKeyboardEvent> translates the
+  (<source-link|QTMWidget.cpp|src/Plugins/Qt/QTMWidget.cpp>). A <cpp|QTMKeyboardEvent> translates the
   <name|Qt> key code, modifiers and text into a <TeXmacs> key combination
   such as <verbatim|"C-x"> or <verbatim|"A-S-left">, using the global
-  keyboard settings of <cpp|QTMKeyboard> (<verbatim|QTMKeyboard.hpp>, held
+  keyboard settings of <cpp|QTMKeyboard> (<source-link|QTMKeyboard.hpp|src/Plugins/Qt/QTMKeyboard.hpp>, held
   by the application object). An empty combination means that the key is
   ignored. Otherwise <cpp|qt_gui_rep::process_keypress> queues a
   <verbatim|QP_KEYPRESS> event, which the event loop later delivers to the
@@ -101,7 +101,7 @@
     key presses (<cpp|kbdEvent>). When the <verbatim|speech> preference is
     on and no preedit is in progress, it is sent instead as one key
     <verbatim|"speech:<em|text>">, which <cpp|handle_speech> in
-    <verbatim|Edit/Interface/edit_keyboard.cpp> interprets.
+    <source-link|Edit/Interface/edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp> interprets.
 
     <item>Preedit text is sent as the key
     <verbatim|"pre-edit:<em|pos>:<em|text>">, where <em|pos> is the cursor
@@ -136,7 +136,7 @@
   <verbatim|texmacs-\<gtr\>verbatim:encoding>). For the formats
   <verbatim|html> and <verbatim|latex> the converted text is published as
   <name|HTML> or plain text. The caller, <cpp|edit_select_rep::selection_set>
-  (<verbatim|Edit/Replace/edit_select.cpp>), computes <cpp|sv> only in the
+  (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>), computes <cpp|sv> only in the
   <name|Qt> port.
 
   <paragraph|Pasting.><cpp|qt_gui_rep::get_selection> first decides
@@ -155,7 +155,7 @@
 
   <section|Printing>
 
-  <scm|print-buffer> (<verbatim|texmacs/texmacs/tm-files.scm>) uses a
+  <scm|print-buffer> (<source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>) uses a
   dialog only if <scm|use-print-dialog?> holds, that is, in the <name|Qt>
   port with the preference <verbatim|gui:print dialogue> set to
   <verbatim|on>. Otherwise it calls <scm|print>, which typesets the
@@ -165,9 +165,9 @@
   With the dialog, <scm|interactive-print-buffer> first prints to the file
   <verbatim|$TEXMACS_HOME_PATH/system/tmp/tmpprint.<em|suffix>> and then
   opens <scm|widget-printer> in an alternative window
-  (<scm|interactive-print> in <verbatim|kernel/gui/menu-widget.scm>). In
+  (<scm|interactive-print> in <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>). In
   <name|Qt> this widget is a <cpp|qt_printer_widget_rep>
-  (<verbatim|qt_printer_widget.cpp>) showing a <cpp|QTMPrintDialog>. As the
+  (<source-link|qt_printer_widget.cpp|src/Plugins/Qt/qt_printer_widget.cpp>) showing a <cpp|QTMPrintDialog>. As the
   comment of that file says, all options are applied as a postprocessing of
   the already typeset file: <cpp|QTMPrinterSettings::toSystemCommand> turns
   them into a command line which is run with <cpp|qt_system>. On

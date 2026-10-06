@@ -23,7 +23,7 @@
 
   All file names in this chapter are relative to the directory
   <verbatim|src/> of the repository (the one which contains
-  <verbatim|configure.in> and <verbatim|CMakeLists.txt>), unless stated
+  <source-link|configure.in|configure.in> and <source-link|CMakeLists.txt|src/CMakeLists.txt>), unless stated
   otherwise.
 
   <section|Overview>
@@ -32,15 +32,15 @@
 
   <\description>
     <item*|<name|GNU> autotools>The traditional build: <verbatim|configure>
-    (generated from <verbatim|configure.in> and the macros in
+    (generated from <source-link|configure.in|configure.in> and the macros in
     <verbatim|misc/m4/>) produces <verbatim|Makefile>,
     <verbatim|src/makefile> and the configuration headers, and
     <verbatim|make> builds the binary. This build also knows how to make
     the distribution packages (<verbatim|make PACKAGE>, <verbatim|make
     BUNDLE>) and how to regenerate the glue (<verbatim|make GLUE>).
 
-    <item*|<name|CMake>>The newer build (<verbatim|CMakeLists.txt>,
-    <verbatim|src/CMakeLists.txt> and <verbatim|cmake/>), which is
+    <item*|<name|CMake>>The newer build (<source-link|CMakeLists.txt|src/CMakeLists.txt>,
+    <source-link|src/CMakeLists.txt|src/CMakeLists.txt> and <verbatim|cmake/>), which is
     convenient with <name|Ninja>, with IDEs and for the <c++> unit tests. It
     only builds and installs the program; packaging is left to the
     autotools build and to the scripts in <verbatim|packages/>.
@@ -49,7 +49,7 @@
   Both builds produce the same layout: the runtime tree <verbatim|TeXmacs/>
   (style files, <scheme> programs, fonts, documentation, ...) with the
   binary <verbatim|TeXmacs/bin/texmacs.bin> inside it, and a small shell
-  script <verbatim|texmacs> (from <verbatim|misc/scripts/texmacs.in>) which
+  script <verbatim|texmacs> (from <source-link|misc/scripts/texmacs.in|misc/scripts/texmacs.in>) which
   sets <verbatim|TEXMACS_PATH> and the library path before starting the
   binary. A freshly built tree can therefore be run without installing it,
   by pointing <verbatim|TEXMACS_PATH> to the <verbatim|TeXmacs/> directory.
@@ -70,25 +70,25 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|configure.in>, <verbatim|misc/m4/*.m4>>The autoconf
+    <item*|<source-link|configure.in|configure.in>, <verbatim|misc/m4/*.m4>>The autoconf
     input: one macro file per dependency or feature (<verbatim|guile.m4>,
     <verbatim|qt.m4>, <verbatim|freetype.m4>, <verbatim|tm_gui.m4>,
     <verbatim|tm_platform.m4>, <verbatim|tm_debug.m4>, ...).
 
-    <item*|<verbatim|Makefile.in>, <verbatim|src/makefile.in>>The top level
+    <item*|<verbatim|Makefile.in>, <source-link|src/makefile.in|src/makefile.in>>The top level
     makefile (installation, plug-ins, packages) and the makefile which
     compiles the sources and the glue.
 
-    <item*|<verbatim|CMakeLists.txt>, <verbatim|src/CMakeLists.txt>>The
+    <item*|<source-link|CMakeLists.txt|src/CMakeLists.txt>, <source-link|src/CMakeLists.txt|src/CMakeLists.txt>>The
     <name|CMake> build: options, dependencies, source lists, configuration
     headers, and the executable targets per platform.
 
-    <item*|<verbatim|cmake/>>Find modules (<verbatim|FindCairo.cmake>,
-    <verbatim|FindGMP.cmake>, <verbatim|FindSQLite3.cmake>, ...) and a few
+    <item*|<verbatim|cmake/>>Find modules (<source-link|FindCairo.cmake|cmake/FindCairo.cmake>,
+    <source-link|FindGMP.cmake|cmake/FindGMP.cmake>, <source-link|FindSQLite3.cmake|cmake/FindSQLite3.cmake>, ...) and a few
     helper scripts.
 
-    <item*|<verbatim|src/System/config.in>, <verbatim|config.h.cmake>,
-    <verbatim|tm_configure.in>, <verbatim|tm_configure.hpp.cmake>>Templates
+    <item*|<source-link|src/System/config.in|src/System/config.in>, <source-link|config.h.cmake|src/System/config.h.cmake>,
+    <source-link|tm_configure.in|src/System/tm_configure.in>, <source-link|tm_configure.hpp.cmake|src/System/tm_configure.hpp.cmake>>Templates
     of the two generated configuration headers.
 
     <item*|<verbatim|src/Scheme/Glue/>>The glue declarations and the glue
@@ -105,8 +105,8 @@
 
     <item*|<verbatim|tests/>>The <c++> unit tests.
 
-    <item*|<verbatim|TeXmacs/progs/check/check-master.scm>,
-    <verbatim|TeXmacs/progs/kernel/boot/debug.scm>,
+    <item*|<source-link|TeXmacs/progs/check/check-master.scm|TeXmacs/progs/check/check-master.scm>,
+    <source-link|TeXmacs/progs/kernel/boot/debug.scm|TeXmacs/progs/kernel/boot/debug.scm>,
     <verbatim|TeXmacs/progs/utils/test/>>The <scheme> regression tests and
     their macros, and the document test suites.
   </description-paragraphs>

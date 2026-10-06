@@ -46,7 +46,7 @@
     drawing, a final instruction (skip byte 128 or more) is still applied if
     it matches the next character, as in <TeX>. In <cpp|get_xpositions>, the
     stop test comes before the match test
-    (<verbatim|Plugins/Metafont/load_tfm.cpp:264>), so a matching final
+    (<source-link|Plugins/Metafont/load_tfm.cpp:264|src/Plugins/Metafont/load_tfm.cpp:264>), so a matching final
     instruction is ignored. The positions computed for selections and the
     cursor can then differ from what is drawn, by the amount of that kern.
     The commented-out code at line 148 shows that <cpp|execute> once had
@@ -71,8 +71,8 @@
 
     <item><strong|Unchecked input in the <verbatim|.tfm> decoder.>
     <cpp|load_tfm> ignores the result of <cpp|load_string>
-    (<verbatim|load_tfm.cpp:386>) and the <cpp|parse> helpers of
-    <verbatim|Data/String/analyze.cpp> do not check the string length. The
+    (<source-link|load_tfm.cpp:386|src/Plugins/Metafont/load_tfm.cpp:386>) and the <cpp|parse> helpers of
+    <source-link|Data/String/analyze.cpp|src/Data/String/analyze.cpp> do not check the string length. The
     consistency test on <cpp|lf> catches most corrupted files, but an empty
     or truncated file is read past its end first. Likewise <cpp|tag (c)> and
     <cpp|rem (c)> (lines 81-82) do not check that <cpp|c> lies in
@@ -81,7 +81,7 @@
     <item><strong|Wrong destination of <verbatim|maketfm> and
     <verbatim|makepk>.> The <name|Windows> generators are given the
     destination <verbatim|get_env("$TEXMACS_HOME_PATH")> (in
-    <verbatim|tex_files.cpp:147>, <verbatim|180> and <verbatim|185>). The
+    <source-link|tex_files.cpp:147|src/Plugins/Metafont/tex_files.cpp:147>, <verbatim|180> and <verbatim|185>). The
     environment variable is called <verbatim|TEXMACS_HOME_PATH>, without
     the dollar sign, so the result is empty and the files are written to
     <verbatim|\\fonts\\tfm> and <verbatim|\\fonts\\pk> at the root of the
@@ -96,14 +96,14 @@
     default was probably meant.
 
     <item><strong|Font names do not identify the font.> The resource names
-    of <cpp|tex_font> and its variants (<verbatim|tex_font.cpp:1110> and
+    of <cpp|tex_font> and its variants (<source-link|tex_font.cpp:1110|src/Plugins/Metafont/tex_font.cpp:1110> and
     following) do not contain the fall-back design size <cpp|dsize>, and the
-    name of <cpp|tex_rubber_font> (<verbatim|tex_rubber_font.cpp:108>) does
+    name of <cpp|tex_rubber_font> (<source-link|tex_rubber_font.cpp:108|src/Plugins/Metafont/tex_rubber_font.cpp:108>) does
     not contain the translator. Two requests which differ only in these
     arguments share the font which was created first.
 
     <item><strong|Missing glyphs in the metric table.>
-    <cpp|tfm_font_metric_rep::get> (<verbatim|tex_font.cpp:1086>) uses the
+    <cpp|tfm_font_metric_rep::get> (<source-link|tex_font.cpp:1086|src/Plugins/Metafont/tex_font.cpp:1086>) uses the
     glyph of a character to compute its ink box without checking that it
     exists. Characters of the <verbatim|.tfm> range which have no glyph in
     the <name|PK> file give a nil glyph. The current callers only ask for
@@ -117,13 +117,13 @@
     the pieces in all builds.
 
     <item><strong|Dead and stale code.> In <cpp|try_pk>
-    (<verbatim|load_tex.cpp:207>), the test
+    (<source-link|load_tex.cpp:207|src/Plugins/Metafont/load_tex.cpp:207>), the test
     <cpp|font_glyphs::instances-\<gtr\>contains (tt_name)> can never succeed,
     because <cpp|tt_font_glyphs> registers its tables under another name;
     the function works because <cpp|tt_font_glyphs> itself returns the
     cached instance. The comment <verbatim|we need pfbtopfa> which excludes
     <name|Type 1> embedding in PostScript on <name|Windows>
-    (<verbatim|Graphics/Renderer/printer.cpp:490>) is stale: the conversion
+    (<source-link|Graphics/Renderer/printer.cpp:490|src/Graphics/Renderer/printer.cpp:490>) is stale: the conversion
     is done by the internal <cpp|pfb_to_pfa>.
   </enumerate>
 

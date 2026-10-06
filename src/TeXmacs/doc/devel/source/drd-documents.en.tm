@@ -36,7 +36,7 @@
     <cpp|bool compute_env_and_drd (tree style)><explain-synopsis|compute and
     memorize environment and DRD of a style>
   <|explain>
-    Defined in <verbatim|Data/Document/new_style.cpp>. The argument is a
+    Defined in <source-link|Data/Document/new_style.cpp|src/Data/Document/new_style.cpp>. The argument is a
     style tuple such as <verbatim|(tuple "article" "number-europe")>. The
     function creates <cpp|drd_info drd ("none", std_drd)> and an
     <cpp|edit_env> whose <cpp|drd> member refers to it. Then:
@@ -86,8 +86,8 @@
     current <cpp|the_drd> is used if it looks like a real document style
     is loaded (the <markup|theorem> tag has a syntax), and the
     <verbatim|generic> style otherwise. Used, through <cpp|with_drd>, by
-    the correction routines of <verbatim|Data/Tree/tree_correct.cpp> and
-    <verbatim|tree_brackets.cpp>.
+    the correction routines of <source-link|Data/Tree/tree_correct.cpp|src/Data/Tree/tree_correct.cpp> and
+    <source-link|tree_brackets.cpp|src/Data/Tree/tree_brackets.cpp>.
   </explain>
 
   <section|Caching>
@@ -118,7 +118,7 @@
   menu <menu|Tools|Update|Styles>), which then notifies all editors so
   that they recompute their environment. <scm|style-clear-cache> is also
   called automatically when a file with suffix <verbatim|.ts> is saved
-  from <TeXmacs> (<verbatim|texmacs/texmacs/tm-files.scm>). Style files
+  from <TeXmacs> (<source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>). Style files
   edited with another editor are not detected: the cache must then be
   cleared by hand.
 
@@ -132,7 +132,7 @@
   <section|The DRD of an editor>
 
   Each editor owns a <cpp|drd_info drd>, created by the constructor of
-  <cpp|editor_rep> (<verbatim|Edit/Editor/edit_main.cpp>) as
+  <cpp|editor_rep> (<source-link|Edit/Editor/edit_main.cpp|src/Edit/Editor/edit_main.cpp>) as
   <cpp|drd_info (buf-\<gtr\>buf-\<gtr\>title, std_drd)>. Its typesetting
   environment <cpp|env> is constructed with a reference to this member, so
   that assignments to <cpp|drd> are seen by the environment, and
@@ -228,7 +228,7 @@
   <section|Explicit declarations: <markup|drd-props>>
 
   <markup|drd-props> is evaluated by
-  <cpp|edit_env_rep::exec_drd_props> (<verbatim|Typeset/Env/env_exec.cpp>)
+  <cpp|edit_env_rep::exec_drd_props> (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>)
   whenever the tree is executed: when a style is loaded, when the preamble
   is processed, or when a <markup|drd-props> in the body of a document is
   typeset (<cpp|concater_rep::typeset_drd_props>, which also displays a
@@ -312,12 +312,12 @@
 
   <\itemize>
     <item>to the <abbr|DRD> of the editor of the current view, by
-    <cpp|set_current_view> (<verbatim|Texmacs/Data/new_view.cpp>), which is
+    <cpp|set_current_view> (<source-link|Texmacs/Data/new_view.cpp|src/Texmacs/Data/new_view.cpp>), which is
     called whenever the focus changes to another view;
 
     <item>to the <abbr|DRD> of the view of a given buffer, by
     <cpp|set_current_drd (url)> (glue <scm|set-drd>, used by
-    <verbatim|texmacs/texmacs/tm-print.scm> while printing);
+    <source-link|texmacs/texmacs/tm-print.scm|TeXmacs/progs/texmacs/texmacs/tm-print.scm> while printing);
 
     <item>temporarily, to the <abbr|DRD> of the editor of a window while its
     menus are computed (<cpp|tm_window_rep::get_menu_widget>), and to the
@@ -350,7 +350,7 @@
   <subsection|Access and writable modes>
 
   Whether a child is \Paccessible\Q depends not only on the <abbr|DRD> but
-  also on a global <em|access mode> (<verbatim|Data/Drd/drd_mode.hpp>):
+  also on a global <em|access mode> (<source-link|Data/Drd/drd_mode.hpp|src/Data/Drd/drd_mode.hpp>):
 
   <\description>
     <item*|<verbatim|DRD_ACCESS_NORMAL>>The default: only
@@ -388,7 +388,7 @@
   model|drd-model.en.tm>. From <scheme>, the access mode is available as
   <scm|get-access-mode> and <scm|set-access-mode> (with the integer
   values <math|0>, <math|1>, <math|2>), as in <scm|tree-perform-search>
-  (<verbatim|generic/search-widgets.scm>).
+  (<source-link|generic/search-widgets.scm|TeXmacs/progs/generic/search-widgets.scm>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

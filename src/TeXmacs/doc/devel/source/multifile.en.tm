@@ -42,7 +42,7 @@
 
   <\itemize>
     <item><em|Inclusions> are a typesetting feature. In the standard styles
-    <markup|include> is a macro (<verbatim|std-automatic.ts>) which records
+    <markup|include> is a macro (<source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>) which records
     some information about the included file with the macro
     <markup|part-info> and expands to the primitive <markup|include*>. The
     primitive is evaluated like a macro: the typesetter loads the included
@@ -61,11 +61,11 @@
     <item><em|Document parts> are a <scheme> feature. In-buffer parts are
     ordinary markup (<markup|show-part>, <markup|hide-part>,
     <markup|show-preamble>, <markup|hide-preamble>) manipulated by
-    <verbatim|generic/document-part.scm>. Part views are documents of the
+    <source-link|generic/document-part.scm|TeXmacs/progs/generic/document-part.scm>. Part views are documents of the
     <TeXmacs> file system, produced and saved by the handlers of
-    <verbatim|part/part-tmfs.scm>; the expanded inclusions are wrapped in
+    <source-link|part/part-tmfs.scm|TeXmacs/progs/part/part-tmfs.scm>; the expanded inclusions are wrapped in
     <markup|shared> tags, whose modifications are forwarded to the
-    corresponding buffers by <verbatim|part/part-shared.scm>.
+    corresponding buffers by <source-link|part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>.
   </itemize>
 
   The following picture summarizes the data flow for a book
@@ -105,53 +105,53 @@
   <verbatim|src/TeXmacs/> for the others.
 
   <\description-paragraphs>
-    <item*|<verbatim|Texmacs/Data/new_project.cpp>>Attaching a project to
+    <item*|<source-link|Texmacs/Data/new_project.cpp|src/Texmacs/Data/new_project.cpp>>Attaching a project to
     the current buffer, implicit projects, <cpp|project_get>.
 
-    <item*|<verbatim|Texmacs/Data/new_buffer.cpp>>Loading the project
+    <item*|<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>>Loading the project
     buffer in <cpp|set_buffer_tree>; the inclusion cache
     (<cpp|load_inclusion>, <cpp|reset_inclusions>, <cpp|reset_inclusion>).
 
-    <item*|<verbatim|Edit/Editor/edit_typeset.cpp>>Binding of the
+    <item*|<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>>Binding of the
     reference and auxiliary tables of the master
     (<cpp|edit_typeset_rep> constructor), <cpp|init_update>,
     <cpp|clear_local_info>.
 
-    <item*|<verbatim|Typeset/Env/env_exec.cpp>,
-    <verbatim|Typeset/Bridge/bridge_rewrite.cpp>>Evaluation and
+    <item*|<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>,
+    <source-link|Typeset/Bridge/bridge_rewrite.cpp|src/Typeset/Bridge/bridge_rewrite.cpp>>Evaluation and
     typesetting of <markup|include*>.
 
-    <item*|<verbatim|Typeset/Concat/concat_macro.cpp>>Typesetting of the
+    <item*|<source-link|Typeset/Concat/concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>>Typesetting of the
     <markup|include> primitive (<cpp|typeset_include>).
 
-    <item*|<verbatim|Data/Convert/Texmacs/fromtm.cpp>>
+    <item*|<source-link|Data/Convert/Texmacs/fromtm.cpp|src/Data/Convert/Texmacs/fromtm.cpp>>
     <cpp|extract_document>, which turns an included file into a body.
 
-    <item*|<verbatim|Texmacs/Server/tm_server.cpp>>
+    <item*|<source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp>>
     <cpp|inclusions_gc>.
 
-    <item*|<verbatim|packages/standard/std-automatic.ts>>The macros
+    <item*|<source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>>The macros
     <markup|include>, <markup|part-info> and <markup|shared>.
 
-    <item*|<verbatim|packages/standard/std-fold.ts>>The macros
+    <item*|<source-link|packages/standard/std-fold.ts|TeXmacs/packages/standard/std-fold.ts>>The macros
     <markup|show-part>, <markup|hide-part>, <markup|show-preamble> and
     <markup|hide-preamble>.
 
-    <item*|<verbatim|progs/generic/document-part.scm>>Preamble mode,
+    <item*|<source-link|progs/generic/document-part.scm|TeXmacs/progs/generic/document-part.scm>>Preamble mode,
     in-buffer document parts, the list of inclusions, expanding
     inclusions, the <menu|Document|Part> and project management menus.
 
-    <item*|<verbatim|progs/generic/document-menu.scm>>The
+    <item*|<source-link|progs/generic/document-menu.scm|TeXmacs/progs/generic/document-menu.scm>>The
     <menu|Document|Project> menu and the update commands.
 
-    <item*|<verbatim|progs/part/part-tmfs.scm>>The <verbatim|part> handlers
+    <item*|<source-link|progs/part/part-tmfs.scm|TeXmacs/progs/part/part-tmfs.scm>>The <verbatim|part> handlers
     of the <TeXmacs> file system.
 
-    <item*|<verbatim|progs/part/part-shared.scm>>Synchronization of
+    <item*|<source-link|progs/part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>>Synchronization of
     <markup|shared> and <markup|mirror> tags with each other and with whole
     buffers.
 
-    <item*|<verbatim|progs/part/part-menu.scm>>The menus which open the
+    <item*|<source-link|progs/part/part-menu.scm|TeXmacs/progs/part/part-menu.scm>>The menus which open the
     included files as part views.
   </description-paragraphs>
 

@@ -7,8 +7,8 @@
 
   The <TeXmacs> <scheme> kernel defines a few abbreviations and control
   structures which are used throughout the <scheme> code of <TeXmacs>. Most
-  of them are defined in <verbatim|kernel/boot/abbrevs.scm>,
-  <verbatim|kernel/boot/srfi.scm> and <verbatim|kernel/boot/ahash-table.scm>
+  of them are defined in <source-link|kernel/boot/abbrevs.scm|TeXmacs/progs/kernel/boot/abbrevs.scm>,
+  <source-link|kernel/boot/srfi.scm|TeXmacs/progs/kernel/boot/srfi.scm> and <source-link|kernel/boot/ahash-table.scm|TeXmacs/progs/kernel/boot/ahash-table.scm>
   (relative to <verbatim|src/TeXmacs/progs/>). Since they are loaded at
   boot time, they are available in all modules.
 
@@ -206,7 +206,7 @@
   <paragraph|Strings and lists>
 
   Among the many small utilities on strings and lists defined in
-  <verbatim|kernel/library/base.scm> and <verbatim|kernel/library/list.scm>,
+  <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm> and <source-link|kernel/library/list.scm|TeXmacs/progs/kernel/library/list.scm>,
   let us mention <scm|string-starts?>, <scm|string-ends?>,
   <scm|string-contains?>, <scm|string-tail>, <scm|string-split-lines>,
   <scm|string-decompose>, <scm|list-filter>, <scm|list-find>,

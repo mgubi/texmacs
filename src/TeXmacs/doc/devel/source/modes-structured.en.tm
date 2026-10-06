@@ -8,10 +8,10 @@
   <section|The focus tree and outward recursion>
 
   Most editing commands act on the <em|focus tree>, returned by
-  <scm|(focus-tree)> (<verbatim|kernel/library/tree.scm>), which is the tree
+  <scm|(focus-tree)> (<source-link|kernel/library/tree.scm|TeXmacs/progs/kernel/library/tree.scm>), which is the tree
   at the path <scm|(get-focus-path)> computed by the editor
   (<cpp|edit_select_rep::focus_get> in
-  <verbatim|Edit/Replace/edit_select.cpp>):
+  <source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>):
 
   <\itemize>
     <item>if a focus has been set explicitly (for instance by clicking on a
@@ -55,7 +55,7 @@
     \ \ (kbd-enter (focus-tree) #f))
   </scm-code>
 
-  (<verbatim|generic/generic-edit.scm>; <scm|tree-outer> returns the parent
+  (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>; <scm|tree-outer> returns the parent
   except for the buffer tree). A mode handles a tag by a conditional
   redefinition for that tag; the first enclosing tag which has a specific
   definition handles the command. This pattern, introduced in <hlink|the
@@ -66,7 +66,7 @@
 
   <subsection|Keyboard>
 
-  The keys of <verbatim|generic/generic-kbd.scm> call parameterless
+  The keys of <source-link|generic/generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm> call parameterless
   commands, which call the following hooks on the focus tree:
 
   <\description-paragraphs>
@@ -121,7 +121,7 @@
 
     <item*|<scm|(variant-circulate <scm-arg|t> <scm-arg|forward?>)>>Cycle
     through the variants of a tag (<key|structured:cmd tab>); the default
-    uses the <verbatim|variant-tag> groups (<verbatim|utils/edit/variants.scm>).
+    uses the <verbatim|variant-tag> groups (<source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>).
 
     <item*|<scm|(alternate-toggle <scm-arg|t>)>>Fold or unfold, toggle
     between two alternative forms (<key|C-*>); the default uses the pairs
@@ -133,7 +133,7 @@
     <item*|<scm|geometry-horizontal>, <scm|geometry-vertical>,
     <scm|geometry-default>, ...>Change the position or size of the focus
     (spaces, brackets, table extents, animations; see
-    <verbatim|generic/format-geometry-edit.scm>).
+    <source-link|generic/format-geometry-edit.scm|TeXmacs/progs/generic/format-geometry-edit.scm>).
 
     <item*|<scm|structured-maximize>, <scm|structured-minimize>,
     <scm|swipe-horizontal>, <scm|swipe-vertical>>Gestures.
@@ -148,7 +148,7 @@
 
   The <menu|Focus> menu and the focus icon bar are built by
   <scm|standard-focus-menu> and <scm|standard-focus-icons> in
-  <verbatim|generic/generic-menu.scm> from a number of sub-menus, each of
+  <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm> from a number of sub-menus, each of
   which takes the focus tree as argument and may be redefined for a tag:
 
   <\description>
@@ -171,7 +171,7 @@
 
   The parallel <verbatim|*-icons> menus build the icon bar. A mode may also
   replace <scm|standard-focus-menu> for some trees altogether, as
-  <verbatim|table/table-menu.scm> does for tables.
+  <source-link|table/table-menu.scm|TeXmacs/progs/table/table-menu.scm> does for tables.
 
   Several predicates and data functions feed these menus and are
   redefined per tag: <scm|focus-has-variants?>, <scm|focus-has-toggles?>,

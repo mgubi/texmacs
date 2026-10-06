@@ -6,7 +6,7 @@
   <tmdoc-title|Computational markup>
 
   The following commands can be used for performing dynamic computations
-  (see <verbatim|progs/source/source-kbd.scm> for the complete list; the same
+  (see <source-link|progs/source/source-kbd.scm|TeXmacs/progs/source/source-kbd.scm> for the complete list; the same
   primitives are also available from the menus <menu|Source|Arithmetic>,
   <menu|Source|Text>, <menu|Source|Tuple> and <menu|Source|Condition>):
 

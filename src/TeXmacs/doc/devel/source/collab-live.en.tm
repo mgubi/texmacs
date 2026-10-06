@@ -16,13 +16,13 @@
     <item>The <c++> algebra of <em|modifications> and <em|patches>, which
     also underlies undo and redo.
 
-    <item>A purely local layer (<verbatim|utils/relate/live-document.scm>
-    and <verbatim|live-view.scm>) which maintains, for each live document,
+    <item>A purely local layer (<source-link|utils/relate/live-document.scm|TeXmacs/progs/utils/relate/live-document.scm>
+    and <source-link|live-view.scm|TeXmacs/progs/utils/relate/live-view.scm>) which maintains, for each live document,
     its current value, a history of states, and the <em|views> which
     display it.
 
-    <item>A network layer (<verbatim|utils/relate/live-connection.scm>,
-    <verbatim|client/client-live.scm> and <verbatim|server/server-live.scm>)
+    <item>A network layer (<source-link|utils/relate/live-connection.scm|TeXmacs/progs/utils/relate/live-connection.scm>,
+    <source-link|client/client-live.scm|TeXmacs/progs/client/client-live.scm> and <source-link|server/server-live.scm|TeXmacs/progs/server/server-live.scm>)
     in which the server holds the reference copy of the document and
     orders the modifications of the clients.
   </enumerate>
@@ -35,20 +35,20 @@
 
   <section|Modifications and patches>
 
-  A <em|modification> (<verbatim|Kernel/Types/modification.hpp>) is an
+  A <em|modification> (<source-link|Kernel/Types/modification.hpp|src/Kernel/Types/modification.hpp>) is an
   elementary change of a tree at a given path. Its kind is one of
   <cpp|MOD_ASSIGN>, <cpp|MOD_INSERT>, <cpp|MOD_REMOVE>, <cpp|MOD_SPLIT>,
   <cpp|MOD_JOIN>, <cpp|MOD_ASSIGN_NODE>, <cpp|MOD_INSERT_NODE>,
   <cpp|MOD_REMOVE_NODE> and <cpp|MOD_SET_CURSOR>; in <scheme> it is
   printed as a list <scm|(<scm-arg|kind> <scm-arg|path> <scm-arg|tree>)>
   by <scm|modification-\<gtr\>scheme> and read back by
-  <scm|scheme-\<gtr\>modification> (<verbatim|kernel/library/patch.scm>), with
+  <scm|scheme-\<gtr\>modification> (<source-link|kernel/library/patch.scm|TeXmacs/progs/kernel/library/patch.scm>), with
   kinds <scm|assign>, <scm|insert>, <scm|remove>, <scm|split>, <scm|join>,
   <scm|assign-node>, <scm|insert-node>, <scm|remove-node> and
   <scm|set-cursor>. This is the form in which changes travel over the
   network.
 
-  A <em|patch> (<verbatim|Data/History/patch.hpp>) is either a pair of a
+  A <em|patch> (<source-link|Data/History/patch.hpp|src/Data/History/patch.hpp>) is either a pair of a
   modification and its inverse (<cpp|PATCH_MODIFICATION>), a sequence of
   patches (<cpp|PATCH_COMPOUND>), a set of alternatives
   (<cpp|PATCH_BRANCH>, used for redo trees), a birth or death marker
@@ -61,7 +61,7 @@
     (<scm|patch-invert>), application (<scm|patch-apply>,
     <scm|patch-applicable?>);
 
-    <item>commutation (<verbatim|Data/History/commute.cpp>):
+    <item>commutation (<source-link|Data/History/commute.cpp|src/Data/History/commute.cpp>):
     <cpp|swap (p1, p2)> tries to rewrite <math|p<rsub|1>;p<rsub|2>> as
     <math|p<rsub|2><rprime|*>;p<rsub|1><rprime|*>> with the same effect, and
     <cpp|can_pull>, <cpp|pull> and <cpp|co_pull> (<scm|patch-can-pull?>,
@@ -73,14 +73,14 @@
 
   The conversion between patches and the network form is done by
   <scm|patch-\<gtr\>modlist> and <scm|modlist-\<gtr\>patch>
-  (<verbatim|utils/relate/live-connection.scm>); the latter needs the tree
+  (<source-link|utils/relate/live-connection.scm|TeXmacs/progs/utils/relate/live-connection.scm>); the latter needs the tree
   to which the modifications apply in order to compute the inverses.
 
   <section|Local live documents>
 
   <subsection|States and history>
 
-  <verbatim|utils/relate/live-document.scm> keeps three tables indexed by a
+  <source-link|utils/relate/live-document.scm|TeXmacs/progs/utils/relate/live-document.scm> keeps three tables indexed by a
   <em|live identifier> <scm|lid> (for remote documents, the <abbr|URL>
   <verbatim|tmfs://live/<em|server>/<em|name>>):
 
@@ -113,8 +113,8 @@
   <subsection|Views>
 
   A view is a subtree of an ordinary buffer marked up with
-  <markup|live-io> (<verbatim|packages/utilities/live.ts>) or
-  <markup|live-io*> (<verbatim|packages/miscellaneous/live-document.ts>):
+  <markup|live-io> (<source-link|packages/utilities/live.ts|TeXmacs/packages/utilities/live.ts>) or
+  <markup|live-io*> (<source-link|packages/miscellaneous/live-document.ts|TeXmacs/packages/miscellaneous/live-document.ts>):
 
   <\verbatim-code>
     \<less\>live-io\|view-id\|live-id\|body\<gtr\>
@@ -124,7 +124,7 @@
   identifier, attaches an <markup|observer> which calls the <scheme>
   function <scm|live-notify> on every modification of the view, and
   contains a hidden <markup|extern> call to <scm|live-initialize>, which
-  is evaluated when the view is first typeset. <verbatim|live-view.scm>
+  is evaluated when the view is first typeset. <source-link|live-view.scm|TeXmacs/progs/utils/relate/live-view.scm>
   keeps, for each view identifier, the state of the live document which it
   displays.
 
@@ -158,12 +158,12 @@
   <subsection|Opening a remote live document>
 
   The load handler of <verbatim|tmfs://live/<em|server>/<em|name>>
-  (<verbatim|client/client-live.scm>) returns a document in the style
+  (<source-link|client/client-live.scm|TeXmacs/progs/client/client-live.scm>) returns a document in the style
   <verbatim|live-document> whose body is a single
   <markup|live-io*> view with an empty body. When the view is
   initialized, the overloaded <scm|live-retrieve> sends <scm|(live-open
   <scm-arg|lid>)> to the server. The service <scm|live-open>
-  (<verbatim|server/server-live.scm>) creates the document if necessary (a
+  (<source-link|server/server-live.scm|TeXmacs/progs/server/server-live.scm>) creates the document if necessary (a
   database entry of type <verbatim|"live"> and a file in the repository),
   loads it into memory, checks read access, registers the connection with
   <scm|live-connect> and answers <scm|(<scm-arg|state>
@@ -180,7 +180,7 @@
   <subsection|Client to server>
 
   When a local edit is applied to a remote live document, the overloaded
-  <scm|live-apply-patch> of <verbatim|client-live.scm> sends
+  <scm|live-apply-patch> of <source-link|client-live.scm|TeXmacs/progs/client/client-live.scm> sends
 
   <\scm-code>
     (live-modify lid mods old-state new-state)
@@ -211,7 +211,7 @@
 
   <subsection|Rebasing on the client>
 
-  The call-back <scm|live-modify> of <verbatim|client-live.scm> receives a
+  The call-back <scm|live-modify> of <source-link|client-live.scm|TeXmacs/progs/client/client-live.scm> receives a
   patch <math|p> based on <scm|old-state>, a state which the client
   necessarily has in its history (it is the last state which the server
   acknowledged or sent). The local history may contain changes made since
@@ -269,7 +269,7 @@
 
   <section|Interaction with undo and redo>
 
-  Each buffer has an <cpp|archiver> (<verbatim|Data/History/archiver.hpp>)
+  Each buffer has an <cpp|archiver> (<source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>)
   which records modifications as patches labeled with their author. Changes
   coming from other participants are applied to the views under the author
   <scm|live-author>, so they are recorded as changes of another author.

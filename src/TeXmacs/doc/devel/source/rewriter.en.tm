@@ -44,13 +44,13 @@
 
   <\description>
     <item*|Build>Off by default. The CMake option
-    <verbatim|ENABLE_EXPERIMENTAL> (<verbatim|CMakeLists.txt:466>) adds all
+    <verbatim|ENABLE_EXPERIMENTAL> (<source-link|CMakeLists.txt:466|src/CMakeLists.txt:466>) adds all
     of <verbatim|Style/*.cpp> to the sources and defines
     <verbatim|EXPERIMENTAL>; without it, <verbatim|TeXmacs_Style_SRCS> is
     empty. With the autotools build, <verbatim|configure
     --enable-experimental> sets <verbatim|CONFIG_EXPERIMENTAL> to
     <verbatim|"Memorizer Environment Evaluate"> and defines
-    <verbatim|EXPERIMENTAL>; <verbatim|makefile.in> then compiles those
+    <verbatim|EXPERIMENTAL>; <source-link|makefile.in|src/makefile.in> then compiles those
     three subdirectories (<verbatim|style_src>). In a default build, no file
     of <verbatim|Style/> is compiled at all.
 
@@ -104,7 +104,7 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Style/Environment/environment.hpp>>The abstract
+    <item*|<source-link|Style/Environment/environment.hpp|src/Style/Environment/environment.hpp>>The abstract
     <cpp|environment_rep> (integer keys obtained with
     <cpp|make_tree_label>), the handle <cpp|environment>, the identity
     functions <cpp|weak_hash> and <cpp|weak_equal> for trees and
@@ -130,29 +130,29 @@
     <cpp|evaluate>, the dispatcher <cpp|evaluate_impl> and the declarations
     of all <cpp|evaluate_*> routines.
 
-    <item*|<verbatim|evaluate_macro.cpp>>Assignments, <markup|with>,
+    <item*|<source-link|evaluate_macro.cpp|src/Style/Evaluate/evaluate_macro.cpp>>Assignments, <markup|with>,
     values, macro application by substitution (<cpp|expand>),
     <markup|drd-props>.
 
     <item*|Other <verbatim|evaluate_*.cpp>>The families of primitives:
-    <verbatim|evaluate_control.cpp>, <verbatim|evaluate_boolean.cpp>,
-    <verbatim|evaluate_numeric.cpp>, <verbatim|evaluate_textual.cpp>,
-    <verbatim|evaluate_length.cpp> and <verbatim|evaluate_quote.cpp>.
+    <source-link|evaluate_control.cpp|src/Style/Evaluate/evaluate_control.cpp>, <source-link|evaluate_boolean.cpp|src/Style/Evaluate/evaluate_boolean.cpp>,
+    <source-link|evaluate_numeric.cpp|src/Style/Evaluate/evaluate_numeric.cpp>, <source-link|evaluate_textual.cpp|src/Style/Evaluate/evaluate_textual.cpp>,
+    <source-link|evaluate_length.cpp|src/Style/Evaluate/evaluate_length.cpp> and <source-link|evaluate_quote.cpp|src/Style/Evaluate/evaluate_quote.cpp>.
 
-    <item*|<verbatim|evaluate_rewrite.cpp>,
-    <verbatim|evaluate_inactive.cpp>>The memoized rewriting of
+    <item*|<source-link|evaluate_rewrite.cpp|src/Style/Evaluate/evaluate_rewrite.cpp>,
+    <source-link|evaluate_inactive.cpp|src/Style/Evaluate/evaluate_inactive.cpp>>The memoized rewriting of
     <markup|extern>, <markup|include>, <markup|with-package> and the
     rendering of inactive markup.
 
-    <item*|<verbatim|evaluate_misc.cpp>>Formatting tags, tables,
+    <item*|<source-link|evaluate_misc.cpp|src/Style/Evaluate/evaluate_misc.cpp>>Formatting tags, tables,
     <markup|hard-id>, scripts, bindings, patterns and points.
   </description-paragraphs>
 
-  The hooks in the editor are in <verbatim|Edit/editor.hpp>,
-  <verbatim|Edit/Editor/edit_main.cpp>,
-  <verbatim|Edit/Editor/edit_typeset.cpp>,
-  <verbatim|Edit/Modify/edit_modify.cpp> and
-  <verbatim|Edit/Interface/edit_interface.cpp>, all under
+  The hooks in the editor are in <source-link|Edit/editor.hpp|src/Edit/editor.hpp>,
+  <source-link|Edit/Editor/edit_main.cpp|src/Edit/Editor/edit_main.cpp>,
+  <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>,
+  <source-link|Edit/Modify/edit_modify.cpp|src/Edit/Modify/edit_modify.cpp> and
+  <source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>, all under
   <verbatim|#ifdef EXPERIMENTAL>.
 
   <section|Contents of this chapter>
@@ -175,17 +175,17 @@
     <\itemize>
       <item><verbatim|Style/Evaluate/evaluate_numeric.cpp:214-215> uses
       <cpp|is_color_name> and <cpp|named_color>, now declared in
-      <verbatim|Graphics/Colors/colors.hpp>, which is not included;
+      <source-link|Graphics/Colors/colors.hpp|src/Graphics/Colors/colors.hpp>, which is not included;
 
-      <item><verbatim|Style/Evaluate/evaluate_rewrite.cpp:142> calls
+      <item><source-link|Style/Evaluate/evaluate_rewrite.cpp:142|src/Style/Evaluate/evaluate_rewrite.cpp:142> calls
       <cpp|exec_string>, which is a member of <cpp|edit_env_rep>
-      (<verbatim|Typeset/env.hpp:445>), not a free function
+      (<source-link|Typeset/env.hpp:445|src/Typeset/env.hpp:445>), not a free function
       (<cpp|evaluate_string> is meant), and line 143 uses
       <cpp|with_package_definitions> from
-      <verbatim|Texmacs/Data/new_buffer.hpp>, which is not included;
+      <source-link|Texmacs/Data/new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>, which is not included;
 
-      <item><verbatim|Style/Evaluate/evaluate_textual.cpp:128> uses
-      <cpp|get_date> from <verbatim|System/Language/locale.hpp>, which is
+      <item><source-link|Style/Evaluate/evaluate_textual.cpp:128|src/Style/Evaluate/evaluate_textual.cpp:128> uses
+      <cpp|get_date> from <source-link|System/Language/locale.hpp|src/System/Language/locale.hpp>, which is
       not included.
     </itemize>
 
@@ -196,9 +196,9 @@
     <item><with|font-series|bold|Environment changes are never memoized.>
     <cpp|assign> and <cpp|begin_with> are memoized on the pointer of their
     <cpp|assoc_environment> argument (<cpp|assign_memorizer_rep::hash>,
-    <verbatim|std_environment.cpp:138>), but <cpp|evaluate_assign> and
+    <source-link|std_environment.cpp:138|src/Style/Environment/std_environment.cpp:138>), but <cpp|evaluate_assign> and
     <cpp|evaluate_with> build a fresh <cpp|assoc_environment> at each call
-    (<verbatim|evaluate_macro.cpp:24>, <verbatim|37>). Hence each assignment
+    (<source-link|evaluate_macro.cpp:24|src/Style/Evaluate/evaluate_macro.cpp:24>, <verbatim|37>). Hence each assignment
     or <markup|with> on the path of a modification produces a new
     environment object, and every evaluation in that environment (the body
     of the <markup|with>, the siblings following the assignment) misses the
@@ -224,7 +224,7 @@
 
     <item>Creating a memorizer outside of <cpp|memorize_initialize> /
     <cpp|memorize_finalize> dereferences the null stack
-    (<verbatim|memorizer.cpp:293>). All current constructions happen
+    (<source-link|memorizer.cpp:293|src/Style/Memorizer/memorizer.cpp:293>). All current constructions happen
     inside <cpp|evaluate (environment, tree)>.
 
     <item>The main routines print unconditionally (<cpp|cout> at

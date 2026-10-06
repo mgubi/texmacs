@@ -7,7 +7,7 @@
 
   From the high-level point of view, it is often useful to manipulate
   database values as other objects than raw strings. In
-  <verbatim|database/db-format.scm>,
+  <source-link|database/db-format.scm|TeXmacs/progs/database/db-format.scm>,
   an additional layer is added to the basic database API which allows you to
   specify encoding and decoding schemes between raw strings and user defined
   data formats for specific types of entries and attributes. More precisely,
@@ -22,7 +22,7 @@
     <item*|<scm|db-format-table>>For each entry type, specify the format of
     the fields: mandatory fields, alternative fields and/or optional fields,
     using the combinators <scm|and>, <scm|or> and <scm|optional>. See
-    <verbatim|database/bib-db.scm> for examples. The routine
+    <source-link|database/bib-db.scm|TeXmacs/progs/database/bib-db.scm> for examples. The routine
     <scm|(format-\<gtr\>attributes fm)> returns the list of attributes which
     occur in such a format.
 
@@ -33,7 +33,7 @@
     the keyword <scm|:texmacs> is used, which encodes <TeXmacs> snippets as
     strings. Keywords for which no encoder (<abbr|resp.> decoder) has been
     defined, such as <scm|:identity>, leave the values unchanged. For
-    instance, <verbatim|database/db-users.scm> uses the keyword
+    instance, <source-link|database/db-users.scm|TeXmacs/progs/database/db-users.scm> uses the keyword
     <scm|:users> for the permission attributes under the encoding scheme
     <scm|:pseudos>.
 

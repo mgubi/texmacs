@@ -60,9 +60,9 @@
   <paragraph*|Current <abbr|D.R.D.> properties and applications>
 
   Currently, the <abbr|D.R.D.> of a document contains the following
-  information (see <verbatim|Data/Drd/drd_info.hpp> and
-  <verbatim|Data/Drd/tag_info.hpp> in the <c++> sources, and
-  <verbatim|Data/Drd/drd_std.cpp> for the properties of the built-in
+  information (see <source-link|Data/Drd/drd_info.hpp|src/Data/Drd/drd_info.hpp> and
+  <source-link|Data/Drd/tag_info.hpp|src/Data/Drd/tag_info.hpp> in the <c++> sources, and
+  <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp> for the properties of the built-in
   primitives):
 
   <\itemize>

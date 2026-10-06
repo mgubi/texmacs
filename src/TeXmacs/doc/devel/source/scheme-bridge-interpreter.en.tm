@@ -11,17 +11,17 @@
   Both build systems only include the directories
   <verbatim|Scheme/Scheme> and <verbatim|Scheme/Guile>:
   <name|CMake> through the <verbatim|TeXmacs_Scheme_SRCS> glob in the top
-  level <verbatim|CMakeLists.txt> (in the directory above
+  level <source-link|CMakeLists.txt|src/CMakeLists.txt> (in the directory above
   <verbatim|src/src/>), the traditional build through
-  <verbatim|scheme_src> in <verbatim|makefile.in>. The header
-  <verbatim|Scheme/Scheme/object.hpp> includes
-  <verbatim|Scheme/Guile/guile_tm.hpp> unconditionally.
+  <verbatim|scheme_src> in <source-link|makefile.in|src/makefile.in>. The header
+  <source-link|Scheme/Scheme/object.hpp|src/Scheme/Scheme/object.hpp> includes
+  <source-link|Scheme/Guile/guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp> unconditionally.
 
   <\description>
     <item*|<name|Guile>>The <name|CMake> option <verbatim|SCHEME_IMPL>
     selects either the embedded <name|Guile> 1.8 (the default
     <verbatim|embedded18>, which expects a <verbatim|tm-guile188>
-    directory next to the top level <verbatim|CMakeLists.txt>; it is not
+    directory next to the top level <source-link|CMakeLists.txt|src/CMakeLists.txt>; it is not
     part of this source tree and has to be provided separately) or a
     system <name|Guile> found with <name|pkg-config> (<verbatim|guile-1.8>,
     <verbatim|guile-3.0>, <verbatim|guile-2.2> or <verbatim|guile-2.0>).
@@ -30,9 +30,9 @@
 
     <item*|<name|TinyScheme>>The directory <verbatim|Scheme/Tiny/>
     contains an experimental back-end based on <name|TinyScheme>
-    (<verbatim|tinyscheme_tm.cpp>, <verbatim|tinyscheme_tm.hpp> and the
+    (<source-link|tinyscheme_tm.cpp|src/Scheme/Tiny/tinyscheme_tm.cpp>, <source-link|tinyscheme_tm.hpp|src/Scheme/Tiny/tinyscheme_tm.hpp> and the
     interpreter itself). It is not compiled by either build system, and
-    the commented out include in <verbatim|object.hpp> refers to a file
+    the commented out include in <source-link|object.hpp|src/Scheme/Scheme/object.hpp> refers to a file
     name (<verbatim|tinytmscm_tm.hpp>) which does not exist. It is useful
     as an illustration of what a back-end must provide, but should not be
     expected to build.
@@ -46,7 +46,7 @@
   The <name|Guile> <abbr|API> changed several times. The configuration
   defines exactly one of the macros <verbatim|GUILE_A>,
   <verbatim|GUILE_B>, <verbatim|GUILE_C> or <verbatim|GUILE_D>
-  (<verbatim|System/config.h.cmake>), and <verbatim|guile_tm.hpp> maps a
+  (<source-link|System/config.h.cmake|src/System/config.h.cmake>), and <source-link|guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp> maps a
   common set of names (<cpp|scm_is_list>, <cpp|scm_str2scm>,
   <cpp|scm_new_procedure>, <cpp|scm_lookup_string>, ...) onto the
   corresponding calls of that generation:
@@ -66,7 +66,7 @@
   </description>
 
   The glue routine <scm|scheme-dialect> returns <verbatim|"guile-a"> to
-  <verbatim|"guile-d">. For instance, <verbatim|init-texmacs.scm> uses it to
+  <verbatim|"guile-d">. For instance, <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> uses it to
   decide how to wrap <scm|primitive-load>: for the newer versions it binds
   the <scm|current-reader> fluid explicitly, so that files loaded through
   the module system are read with the right reader options.
@@ -74,7 +74,7 @@
   <section|The tmscm layer>
 
   Code outside <verbatim|Scheme/Guile/> should not use the <name|Guile>
-  <abbr|API> directly, but the abstraction of <verbatim|guile_tm.hpp>:
+  <abbr|API> directly, but the abstraction of <source-link|guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp>:
 
   <\description>
     <item*|The type>A <cpp|tmscm> is a <name|Guile> <cpp|SCM>.
@@ -95,7 +95,7 @@
     <cpp|tmscm_to_bool>, <cpp|tmscm_to_int>, <cpp|tmscm_to_uint>,
     <cpp|tmscm_to_double>, <cpp|tmscm_to_string>, <cpp|tmscm_to_symbol>.
     The conversions of all other types are in
-    <verbatim|Scheme/Scheme/glue.cpp> (see <hlink|the glue|scheme-bridge-glue.en.tm>).
+    <source-link|Scheme/Scheme/glue.cpp|src/Scheme/Scheme/glue.cpp> (see <hlink|the glue|scheme-bridge-glue.en.tm>).
 
     <item*|Evaluation><cpp|eval_scheme (string)>,
     <cpp|eval_scheme_file (string)> and <cpp|call_scheme (fun, ...)> with
@@ -135,7 +135,7 @@
     objects in C++|scheme-bridge-objects.en.tm>), registers the black box
     smob type (<cpp|initialize_smobs>) and installs all glue routines
     (<cpp|initialize_glue>). Only then does the server load
-    <verbatim|init-texmacs.scm>.
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>.
   </description>
 
   <section|Error handling>
@@ -163,7 +163,7 @@
   <section|Black boxes>
 
   All <c++> values which have no natural <scheme> representation are
-  passed as black boxes. A <cpp|blackbox> (<verbatim|Kernel/Abstractions/blackbox.hpp>)
+  passed as black boxes. A <cpp|blackbox> (<source-link|Kernel/Abstractions/blackbox.hpp|src/Kernel/Abstractions/blackbox.hpp>)
   is a reference counted pointer to a <cpp|whitebox_rep\<less\>T\<gtr\>>,
   which holds a copy of a value of type <cpp|T> together with the type
   identifier <cpp|type_helper\<less\>T\<gtr\>::id>; <cpp|close_box> and
@@ -171,7 +171,7 @@
   the type matches.
 
   On the <scheme> side there is a single smob type, created by
-  <cpp|initialize_smobs> in <verbatim|guile_tm.cpp>. The smob holds a
+  <cpp|initialize_smobs> in <source-link|guile_tm.cpp|src/Scheme/Guile/guile_tm.cpp>. The smob holds a
   heap allocated <cpp|blackbox>; its free function deletes it (which
   decrements the reference count of the boxed value), its print function
   shows <verbatim|\<less\>tree ...\<gtr\>>, <verbatim|\<less\>url

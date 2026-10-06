@@ -12,7 +12,7 @@
   a<nbsp>few additional prefix tables which allow us to search for
   uncompleted keywords (prefixes of up to six characters). For efficiency
   reasons, the indexation is done at a low level in <c++> (see
-  <verbatim|src/src/Plugins/Database/db_index.cpp> and <hlink|the <TeXmacs>
+  <source-link|src/src/Plugins/Database/db_index.cpp|src/Plugins/Database/db_index.cpp> and <hlink|the <TeXmacs>
   database|../../source/database.en.tm>). All field values are indexed
   automatically, except for the values of the <scm|contributor> attribute;
   values of <scm|name> fields are in addition indexed as a whole for the

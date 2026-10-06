@@ -241,7 +241,7 @@
     </description-dash>
 
     The complete list can be found in <cpp|edit_env_rep::exec_drd_props>
-    (<verbatim|Typeset/Env/env_exec.cpp>). See also the section on
+    (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>). See also the section on
     <hlink|<markup|drd-props>|../../source/macro-expansion-drd.en.tm> in the
     chapter on the data relation descriptor.
   </explain>

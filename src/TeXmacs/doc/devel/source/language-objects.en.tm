@@ -11,7 +11,7 @@
     <cpp|struct language_rep: rep\<less\>language\<gtr\>><explain-synopsis|a
     language>
   <|explain>
-    Declared in <verbatim|System/Language/language.hpp>. The macro
+    Declared in <source-link|System/Language/language.hpp|src/System/Language/language.hpp>. The macro
     <cpp|RESOURCE(language)> makes <cpp|language> a handle to a named
     resource: the constructor <cpp|language_rep (name)> registers the new
     object in the table <cpp|language::instances>, and <cpp|language
@@ -72,7 +72,7 @@
     </description>
 
     The text languages do not allocate properties: they return pointers to
-    the predefined global objects declared in <verbatim|impl_language.hpp>,
+    the predefined global objects declared in <source-link|impl_language.hpp|src/System/Language/impl_language.hpp>,
     such as <cpp|tp_normal_rep>, <cpp|tp_space_rep> (a breakable space),
     <cpp|tp_nb_space_rep> (a space before punctuation, which may not be
     broken), <cpp|tp_nb_thin_space_rep>, <cpp|tp_period_rep> (a space after
@@ -82,7 +82,7 @@
 
   <section|Text languages>
 
-  <cpp|text_language (name)> (<verbatim|text_language.cpp>) maps a
+  <cpp|text_language (name)> (<source-link|text_language.cpp|src/System/Language/text_language.cpp>) maps a
   language name to an implementation and to the name of a hyphenation
   pattern file. There are five implementations:
 
@@ -112,7 +112,7 @@
     unit.
 
     <item*|<cpp|verb_language_rep>>The <verbatim|verbatim> language
-    (<verbatim|verb_language.cpp>): no hyphenation; breaks are allowed at
+    (<source-link|verb_language.cpp|src/System/Language/verb_language.cpp>): no hyphenation; breaks are allowed at
     spaces and after the separators <verbatim|- / \\ , ?>. It is also
     returned, with a warning, for unknown language names.
   </description>
@@ -127,13 +127,13 @@
   <verbatim|src/TeXmacs/langs/natural/hyphen/>, a case to
   <cpp|text_language> and <cpp|get_supported_languages>, a style package in
   <verbatim|src/TeXmacs/packages/customize/language/>, an entry to
-  <scm|supported-languages> in <verbatim|kernel/texmacs/tm-modes.scm>, the
-  locale codes in <verbatim|locale.cpp> and, for the user interface, a
+  <scm|supported-languages> in <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>, the
+  locale codes in <source-link|locale.cpp|src/System/Language/locale.cpp> and, for the user interface, a
   translation dictionary (see <hlink|translation|language-translation.en.tm>).
 
   <section|Wrappers>
 
-  Two functions of <verbatim|language.cpp> derive new languages from an
+  Two functions of <source-link|language.cpp|src/System/Language/language.cpp> derive new languages from an
   existing one. Both forward <cpp|advance> to the base language and are
   created once per name.
 
@@ -141,7 +141,7 @@
     <item*|<cpp|hyphenless_language (base)>>Named
     <verbatim|<em|base>-hyphenless>; <cpp|get_hyphens> forbids all breaks.
     It implements the primitive <markup|hgroup>
-    (<cpp|concater_rep::typeset_hgroup>, <verbatim|Typeset/Concat/concat_text.cpp>),
+    (<cpp|concater_rep::typeset_hgroup>, <source-link|Typeset/Concat/concat_text.cpp|src/Typeset/Concat/concat_text.cpp>),
     which also forbids breaks between the boxes of its body.
 
     <item*|<cpp|ad_hoc_language (base, hyphs)>>Uses an explicit
@@ -150,14 +150,14 @@
     hyphenation gets a number, so the language is named
     <verbatim|<em|base>-<em|n>>. It implements the primitive
     <markup|hyphenate-as> (<cpp|concater_rep::typeset_hyphenate_as>,
-    <verbatim|Typeset/Concat/concat_active.cpp>).
+    <source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>).
   </description>
 
   <section|How the typesetter uses languages>
 
   The typesetting environment holds the current language in
   <cpp|edit_env_rep::lan>. It is recomputed by
-  <cpp|edit_env_rep::update_language> (<verbatim|Typeset/Env/env_semantics.cpp>)
+  <cpp|edit_env_rep::update_language> (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>)
   whenever the <verbatim|language>, <verbatim|math-language>,
   <verbatim|prog-language> or <verbatim|mode> variable changes:
 
@@ -176,22 +176,22 @@
   where mode 1 is text, 2 math, 3 prog and 0 any other mode (such as
   <verbatim|src>). The defaults are <verbatim|english>,
   <verbatim|std-math> and <verbatim|scheme>
-  (<verbatim|Typeset/Env/env_default.cpp>).
+  (<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>).
 
-  The concatenation typesetter (<verbatim|Typeset/Concat/concat_text.cpp>)
+  The concatenation typesetter (<source-link|Typeset/Concat/concat_text.cpp|src/Typeset/Concat/concat_text.cpp>)
   calls <cpp|env-\<gtr\>lan-\<gtr\>advance> repeatedly to cut each string
   into units. For each unit it typesets the substring as a text box,
   records the language in the resulting line item, inserts the spaces
   requested by <cpp|spc_before> and <cpp|spc_after>, and sets the break
   penalties from <cpp|pen_before> and <cpp|pen_after>. Later, the line
-  breaker (<verbatim|Typeset/Line/line_breaker.cpp>) calls
+  breaker (<source-link|Typeset/Line/line_breaker.cpp|src/Typeset/Line/line_breaker.cpp>) calls
   <cpp|get_hyphens> and <cpp|hyphenate> on the language stored in the item
   when a word has to be split; see <hlink|line breaking|typesetter-lines.en.tm>.
 
   At the document level, the language is chosen with a style package: the
   submenu <menu|Document|Language> (shown with detailed menus;
   <scm|set-document-language> in
-  <verbatim|generic/document-edit.scm>) adds the package named after the
+  <source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>) adds the package named after the
   language to the style list, or removes it for English. These packages
   (<verbatim|src/TeXmacs/packages/customize/language/>) set the
   <verbatim|language> variable together with language specific typography
@@ -202,15 +202,15 @@
   <section|Mathematical and programming languages>
 
   For completeness: mathematical languages
-  (<verbatim|math_language.cpp>) classify symbols by operator type,
+  (<source-link|math_language.cpp|src/System/Language/math_language.cpp>) classify symbols by operator type,
   priority and spacing using the packrat grammar
-  <verbatim|language/std-math.scm>; their <cpp|advance> returns properties
+  <source-link|language/std-math.scm|TeXmacs/progs/language/std-math.scm>; their <cpp|advance> returns properties
   with a meaningful <cpp|op_type>, and the table
-  <cpp|succession_status_table> (<verbatim|language.cpp>, initialized by
+  <cpp|succession_status_table> (<source-link|language.cpp|src/System/Language/language.cpp>, initialized by
   <cpp|init_succession_status_table> at startup) tells the typesetter
   which spaces to remove between two successive operators. They are
   described in <hlink|mathematical typesetting|maths.en.tm>. Programming
-  languages (<verbatim|prog_language.cpp> and the <verbatim|*_language.cpp>
+  languages (<source-link|prog_language.cpp|src/System/Language/prog_language.cpp> and the <verbatim|*_language.cpp>
   files) are described in <hlink|syntax highlighting and programming
   languages|syntax-highlighting.en.tm>.
 

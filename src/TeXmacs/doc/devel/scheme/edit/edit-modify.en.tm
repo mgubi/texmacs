@@ -46,7 +46,7 @@
     the macro <scm|tree-set!> in order to update the value of <scm-arg|which>
     if <scm-arg|which> is a <scheme> variable and <scm-arg|accessors> is
     the empty list. These routines are defined in
-    <verbatim|progs/utils/library/tree.scm>.
+    <source-link|progs/utils/library/tree.scm|TeXmacs/progs/utils/library/tree.scm>.
   </explain>
 
   <\explain>
@@ -145,9 +145,9 @@
   </explain>
 
   These routines are mostly defined in
-  <verbatim|progs/utils/library/cpp-wrap.scm> as wrappers of <c++>
+  <source-link|progs/utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm> as wrappers of <c++>
   routines, or glued directly from <c++> (see
-  <verbatim|src/Scheme/Glue/build-glue-editor.scm>).
+  <source-link|src/Scheme/Glue/build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>).
 
   <tmdoc-copyright|2005|Joris van der Hoeven>
 

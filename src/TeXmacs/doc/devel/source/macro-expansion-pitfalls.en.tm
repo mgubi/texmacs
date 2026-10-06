@@ -69,7 +69,7 @@
     adding a primitive, also consider <cpp|exec_until> (otherwise the
     environment at the cursor is wrong inside it), <cpp|depends> (otherwise
     edits of macro arguments may not invalidate it) and the DRD in
-    <verbatim|drd_std.cpp>.
+    <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>.
 
     <item*|Restore the argument stacks>Every push of <cpp|macro_arg> must
     be matched by a push of <cpp|macro_src>, and every temporary pop (as in
@@ -113,7 +113,7 @@
     <item*|Global state>Several pieces of state are global:
     <cpp|the_drd>, the <cpp|current_rewrite_env> used by
     <scm|texmacs-exec>, the static <cpp|quote_substitute> flag, the style
-    caches in <verbatim|new_style.cpp> and <cpp|default_env>. On a cache
+    caches in <source-link|new_style.cpp|src/Data/Document/new_style.cpp> and <cpp|default_env>. On a cache
     miss, <cpp|typeset_style_use_cache> stores in the editor the
     <cpp|drd_info> object which is also kept in the style cache
     (<cpp|drd_cached>); since <cpp|drd_info> has reference semantics, the
@@ -131,7 +131,7 @@
   <section|Debugging hints>
 
   <\itemize>
-    <item>Most functions in <verbatim|env_exec.cpp> and in the bridges
+    <item>Most functions in <source-link|env_exec.cpp|src/Typeset/Env/env_exec.cpp> and in the bridges
     contain commented-out trace statements (for instance
     <cpp|// cout \<less\>\<less\> "Execute: " \<less\>\<less\> t \<less\>\<less\> "\\n";> at the start of
     <cpp|exec>, or the traces in <cpp|notify_macro>). Uncommenting them is

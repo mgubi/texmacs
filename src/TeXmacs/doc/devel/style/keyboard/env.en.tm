@@ -6,7 +6,7 @@
   <tmdoc-title|Macros and environment variables>
 
   The main key-combinations that you should know to write style files are the
-  following (see <verbatim|progs/source/source-kbd.scm> for the complete
+  following (see <source-link|progs/source/source-kbd.scm|TeXmacs/progs/source/source-kbd.scm> for the complete
   list):
 
   <\description>

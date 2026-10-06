@@ -8,8 +8,8 @@
   <section|The <src-var|font-effects> environment variable>
 
   The environment variable <src-var|font-effects> (C++ name
-  <cpp|FONT_EFFECTS>, declared in <verbatim|Data/Drd/vars.cpp>, default
-  value the empty string in <verbatim|Typeset/Env/env_default.cpp>)
+  <cpp|FONT_EFFECTS>, declared in <source-link|Data/Drd/vars.cpp|src/Data/Drd/vars.cpp>, default
+  value the empty string in <source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>)
   contains a comma separated list of effects of the form
   <verbatim|<em|effect>=<em|value>>. It belongs to the font variables
   (<cpp|Env_Font>), so changing it triggers
@@ -28,7 +28,7 @@
   variables|../format/environment/env-font.en.tm>.
 
   At the markup level, the effects are used by the macros of
-  <verbatim|packages/standard/std-markup.ts>, which append an effect to the
+  <source-link|packages/standard/std-markup.ts|TeXmacs/packages/standard/std-markup.ts>, which append an effect to the
   current list with <markup|add-font-effect>:
 
   <\verbatim-code>
@@ -45,7 +45,7 @@
   <src-var|embold-strength> (2), <src-var|slanted-slope> (0.25) or
   <src-var|condensed-factor> (0.8). Most of them are available from the
   <menu|Font effects> submenus of the text properties menus
-  (<scm|text-font-effects-menu> in <verbatim|progs/generic/format-menu.scm>).
+  (<scm|text-font-effects-menu> in <source-link|progs/generic/format-menu.scm|TeXmacs/progs/generic/format-menu.scm>).
 
   <section|<cpp|apply_effects>>
 
@@ -60,7 +60,7 @@
   </explain>
 
   The recognized effects, with the clamping of their values, are
-  (<verbatim|Graphics/Fonts/smart_font.cpp>):
+  (<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>):
 
   <\description>
     <item*|<verbatim|bold=<em|e>>><math|e\<in\>[1,5]>.
@@ -144,23 +144,23 @@
     <item>Implement the glyph transformation, typically as a function on
     <cpp|glyph> and on <cpp|font_glyphs> (and on <cpp|font_metric> if the
     metrics change) in <verbatim|Graphics/Bitmap_fonts/>, and declare it in
-    <verbatim|bitmap_font.hpp>.
+    <source-link|bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp>.
 
     <item>Either add a new kind to an existing wrapper
     (<cpp|poor_distorted_font_rep> and <cpp|poor_effected_font_rep> take a
     <cpp|tree> describing the effect, so adding a new tuple there is the
     least intrusive way), or write a new <verbatim|poor_<em|name>.cpp> by
-    copying the simplest existing wrapper (<verbatim|poor_distorted.cpp>):
+    copying the simplest existing wrapper (<source-link|poor_distorted.cpp|src/Graphics/Fonts/poor_distorted.cpp>):
     delegate everything to <cpp|base>, transform the tables in
     <cpp|index_glyph> and <cpp|get_glyph>, and draw with
     <cpp|ren-\<gtr\>draw (c, fng, x, y)>. Give the font a unique resource
     name which includes all parameters, and implement <cpp|magnify>.
-    Declare the constructor in <verbatim|Graphics/Fonts/font.hpp>.
+    Declare the constructor in <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>.
 
     <item>Add a branch to <cpp|apply_effects>, with clamping of the
     parameters.
 
-    <item>Optionally add a macro in <verbatim|std-markup.ts> based on
+    <item>Optionally add a macro in <source-link|std-markup.ts|TeXmacs/packages/standard/std-markup.ts> based on
     <markup|add-font-effect>, an entry in <scm|text-font-effects-menu>, and
     document the effect in <verbatim|doc/devel/format/environment/env-font.en.tm>.
   </enumerate>

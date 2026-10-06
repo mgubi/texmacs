@@ -29,7 +29,7 @@
     <item><with|font-series|bold|<name|CMake> ignores the port
     choice.> <verbatim|TEXMACS_GUI> accepts <verbatim|Aqua> and
     <verbatim|X11> but always compiles <verbatim|Plugins/Qt>, without
-    defining any port macro for those values (<verbatim|CMakeLists.txt>,
+    defining any port macro for those values (<source-link|CMakeLists.txt|src/CMakeLists.txt>,
     section \PGUI & Qt Selection\Q).
 
     <item><with|font-series|bold|Stale generated files.> An in-tree
@@ -37,12 +37,12 @@
     <verbatim|Plugins/Qt> (they are ignored by <verbatim|src/.gitignore>).
     The <name|CMake> source list is a glob on
     <verbatim|Plugins/Qt/*.cpp> while <name|CMake> also runs its own
-    <verbatim|AUTOMOC> (<verbatim|src/CMakeLists.txt>), so a <name|CMake>
+    <verbatim|AUTOMOC> (<source-link|src/CMakeLists.txt|src/CMakeLists.txt>), so a <name|CMake>
     build in the same tree compiles both sets of meta object files.
 
     <item><with|font-series|bold|The <name|Cocoa> port does not link.>
-    <cpp|gui_version> is declared in <verbatim|gui.hpp> and called
-    unconditionally (<verbatim|Texmacs/Texmacs/texmacs.cpp:537>, the glue
+    <cpp|gui_version> is declared in <source-link|gui.hpp|src/Graphics/Gui/gui.hpp> and called
+    unconditionally (<source-link|Texmacs/Texmacs/texmacs.cpp:537|src/Texmacs/Texmacs/texmacs.cpp:537>, the glue
     of <scm|gui-version>), but <verbatim|Plugins/Cocoa> does not define it.
 
     <item><with|font-series|bold|Print dialog options.> The
@@ -51,7 +51,7 @@
     <cpp|CupsQTMPrinterSettings::toSystemCommand> never turns it into a
     printing option. The unused helpers <cpp|getFromQPrinter> and
     <cpp|setToQPrinter> invert its meaning
-    (<verbatim|QTMPrinterSettings.cpp:71> and <verbatim|98>). The page
+    (<source-link|QTMPrinterSettings.cpp:71|src/Plugins/Qt/QTMPrinterSettings.cpp:71> and <verbatim|98>). The page
     range for several pages per sheet is computed with integer division,
     so the <cpp|ceil> around <verbatim|lastPage / pagesPerSide> has no
     effect and the last sheet may be left out
@@ -72,11 +72,11 @@
 
     <item><with|font-series|bold|<name|X11> selections are
     <name|Latin-1>.> The <name|X11> port only offers and requests the
-    target <verbatim|STRING> (<verbatim|x_loop.cpp>,
-    <verbatim|x_gui.cpp>), never <verbatim|UTF8_STRING>, so non
+    target <verbatim|STRING> (<source-link|x_loop.cpp|src/Plugins/X11/x_loop.cpp>,
+    <source-link|x_gui.cpp|src/Plugins/X11/x_gui.cpp>), never <verbatim|UTF8_STRING>, so non
     <name|Latin-1> text is not exchanged correctly with other programs.
     Pasting also busy-polls up to a million times for the answer of the
-    selection owner (<verbatim|x_gui.cpp>), using the processor meanwhile
+    selection owner (<source-link|x_gui.cpp|src/Plugins/X11/x_gui.cpp>), using the processor meanwhile
     and failing with slow owners.
 
     <item><with|font-series|bold|Markup on the system clipboard.> Outside

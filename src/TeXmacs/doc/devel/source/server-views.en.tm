@@ -27,8 +27,8 @@
   <\explain>
     <cpp|class tm_view_rep><explain-synopsis|an editor on a buffer>
   <|explain>
-    Declared in <verbatim|Texmacs/tm_window.hpp> (its constructor is in
-    <verbatim|Texmacs/Data/new_view.cpp>); <cpp|tm_view> is a plain pointer
+    Declared in <source-link|Texmacs/tm_window.hpp|src/Texmacs/tm_window.hpp> (its constructor is in
+    <source-link|Texmacs/Data/new_view.cpp|src/Texmacs/Data/new_view.cpp>); <cpp|tm_view> is a plain pointer
     to it. Its fields are:
 
     <\description>
@@ -63,7 +63,7 @@
   </verbatim-code>
 
   which is computed by <cpp|abstract_view> and decoded by
-  <cpp|concrete_view> in <verbatim|new_view.cpp>. The buffer name is
+  <cpp|concrete_view> in <source-link|new_view.cpp|src/Texmacs/Data/new_view.cpp>. The buffer name is
   encoded by the static function <cpp|encode_url>: a relative name becomes
   <verbatim|here/...>, a local absolute name <verbatim|default/...> (for
   instance <verbatim|tmfs://view/1/default/home/joris/a.tm>), and another
@@ -99,7 +99,7 @@
     <verbatim|$TEXMACS_PATH/progs/init-buffer.scm> (or the file given with
     the <verbatim|-b> option) and
     <verbatim|$TEXMACS_HOME_PATH/progs/my-init-buffer.scm>; the default
-    <verbatim|init-buffer.scm> sets the default style of unnamed buffers.
+    <source-link|init-buffer.scm|TeXmacs/progs/init-buffer.scm> sets the default style of unnamed buffers.
   </enumerate>
 
   A new view is passive and is not in the view history (see below). Other
@@ -204,7 +204,7 @@
   <section|The current view>
 
   The current view is stored in the global pointer <cpp|the_view> of
-  <verbatim|new_view.cpp> (no other file uses it directly) and manipulated
+  <source-link|new_view.cpp|src/Texmacs/Data/new_view.cpp> (no other file uses it directly) and manipulated
   by
 
   <\description>
@@ -233,7 +233,7 @@
     <cpp|concrete_window ()> refer to the window of the current view, if it
     is attached; there is no separately stored current window;
 
-    <item>all routines of <verbatim|build-glue-editor.scm> are exported as
+    <item>all routines of <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm> are exported as
     <cpp|get_current_editor()-\<gtr\>...>, so that every <scheme> editing
     command acts on the current view;
 
@@ -293,7 +293,7 @@
   <paragraph|In <c++>.>The routines of the server act on the current
   window. An editor which needs such a routine for its <em|own> window
   (for instance to install its menus or to show a message in its footer)
-  uses the <cpp|SERVER> macro of <verbatim|Edit/editor.hpp>, which makes
+  uses the <cpp|SERVER> macro of <source-link|Edit/editor.hpp|src/Edit/editor.hpp>, which makes
   the editor current for the duration of the call:
 
   <\cpp-code>
@@ -315,7 +315,7 @@
   the restoration is not protected against exceptions.
 
   <paragraph|In <scheme>.>The macros <scm|with-buffer> and
-  <scm|with-window> of <verbatim|utils/library/cursor.scm> execute a body
+  <scm|with-window> of <source-link|utils/library/cursor.scm|TeXmacs/progs/utils/library/cursor.scm> execute a body
   in the context of another buffer:
 
   <\scm-code>
@@ -334,7 +334,7 @@
     <item>If the buffer does not exist or has no view, <scm|buffer-focus>
     fails and the body is <em|not executed>; the macro returns <scm|#f>.
     This is why, for instance, <scm|buffer-copy> in
-    <verbatim|tm-files.scm> calls <scm|view-new> on the new buffer before
+    <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> calls <scm|view-new> on the new buffer before
     using <scm|with-buffer>.
 
     <item>The previous context is restored by <em|buffer>, not by view: if

@@ -15,13 +15,13 @@
   design of <name|Widkit> is described in <hlink|the graphical user
   interface (historical Widkit toolkit)|gui.en.tm>, and the mapping of the
   abstract constructors to it is in
-  <verbatim|Widkit/Basic/widkit_wrapper.cpp>. The port is still updated
+  <source-link|Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>. The port is still updated
   when the abstract interface changes, but lacks the most recent
   constructors (responsive tabs and setting widgets) and all features which
   the <scheme> code only offers when <scm|qt-gui?> holds.
 
   <paragraph|The event loop.><cpp|x_gui_rep::event_loop>
-  (<verbatim|X11/x_loop.cpp>) is a polling loop which runs while there are
+  (<source-link|X11/x_loop.cpp|src/Plugins/X11/x_loop.cpp>) is a polling loop which runs while there are
   windows or remote clients. In each iteration it processes at most one
   pending <name|X> event (after <cpp|XFilterEvent>, for input methods);
   when no event arrived, it sleeps with <cpp|select> for a delay which
@@ -36,19 +36,19 @@
   <paragraph|Keyboard and input methods.>When an input method could be
   opened at startup, each window gets an input context created with the
   style <verbatim|XIMPreeditNothing \| XIMStatusNothing>
-  (<verbatim|x_window.cpp>), that is, without on-the-spot or over-the-spot
+  (<source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>), that is, without on-the-spot or over-the-spot
   preedit. Key presses are decoded with <cpp|Xutf8LookupString>
-  (<verbatim|x_loop.cpp>); a decoded Unicode character is converted to Cork
+  (<source-link|x_loop.cpp|src/Plugins/X11/x_loop.cpp>); a decoded Unicode character is converted to Cork
   and used directly, and otherwise the key symbol is looked up in the
   tables <cpp|lower_key> and <cpp|upper_key> built in
-  <verbatim|x_init.cpp>. Without an input method, <cpp|XLookupString> is
+  <source-link|x_init.cpp|src/Plugins/X11/x_init.cpp>. Without an input method, <cpp|XLookupString> is
   used.
 
   <paragraph|Selections.>The clipboard <verbatim|"primary"> is the
   <name|X> selection <verbatim|CLIPBOARD> and <verbatim|"mouse"> is
   <verbatim|PRIMARY>. When <TeXmacs> owns a selection, it answers requests
   for <verbatim|TARGETS> and <verbatim|STRING> only
-  (<verbatim|SelectionRequest> in <verbatim|x_loop.cpp>), with the
+  (<verbatim|SelectionRequest> in <source-link|x_loop.cpp|src/Plugins/X11/x_loop.cpp>), with the
   serialized string stored by <cpp|set_selection>. To paste from another
   program, <cpp|x_gui_rep::get_selection> requests <verbatim|STRING> and
   polls for the <verbatim|SelectionNotify> event, giving up after a fixed
@@ -57,7 +57,7 @@
 
   <paragraph|Printing and dialogs.><name|Widkit> has no print dialog:
   <cpp|printer_widget> is a bare \PCancel\Q button
-  (<verbatim|widkit_wrapper.cpp>), and since <scm|use-print-dialog?> is
+  (<source-link|widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>), and since <scm|use-print-dialog?> is
   false outside <name|Qt>, printing always goes through the printing
   command. File choosers and other dialogs are <name|Widkit> widgets.
 
@@ -74,7 +74,7 @@
   mouse events).
 
   <paragraph|The event loop.><cpp|aqua_gui_rep::event_loop>
-  (<verbatim|aqua_gui.mm>) does not call <verbatim|[NSApp run]> (that
+  (<source-link|aqua_gui.mm|src/Plugins/Cocoa/aqua_gui.mm>) does not call <verbatim|[NSApp run]> (that
   variant is disabled with <verbatim|#if 0>) but calls
   <verbatim|finishLaunching> and then loops itself: it waits up to half a
   second for an event with <verbatim|nextEventMatchingMask>, dispatches it
@@ -83,7 +83,7 @@
   condition: the program ends through <cpp|quit>.
 
   <paragraph|Keyboard and input methods.><verbatim|TMView>
-  (<verbatim|TMView.mm>) passes key events through
+  (<source-link|TMView.mm|src/Plugins/Cocoa/TMView.mm>) passes key events through
   <verbatim|interpretKeyEvents:> and implements the <verbatim|NSTextInput>
   protocol (<verbatim|insertText:>, <verbatim|setMarkedText:>,
   <verbatim|doCommandBySelector:>), so that the input methods of
@@ -95,9 +95,9 @@
   internal. As in <name|X11>, the <cpp|format> argument is ignored.
 
   <paragraph|Printing and dialogs.><cpp|printer_widget> is a \PCancel\Q
-  button as in <name|Widkit> (<verbatim|aqua_dialogues.mm>), and
+  button as in <name|Widkit> (<source-link|aqua_dialogues.mm|src/Plugins/Cocoa/aqua_dialogues.mm>), and
   <cpp|gui_refresh> is empty. File choosers and simple dialogs use
-  <verbatim|NSSavePanel> and friends in <verbatim|aqua_dialogues.mm>.
+  <verbatim|NSSavePanel> and friends in <source-link|aqua_dialogues.mm|src/Plugins/Cocoa/aqua_dialogues.mm>.
 
   <section|Common limitations>
 
@@ -105,7 +105,7 @@
   For an ordinary copy this is the <TeXmacs> snippet, since the verbatim
   version <cpp|sv> is only computed when <cpp|QTTEXMACS> is defined
   (<cpp|edit_select_rep::selection_set> in
-  <verbatim|Edit/Replace/edit_select.cpp>); other programs therefore
+  <source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>); other programs therefore
   receive <TeXmacs> markup rather than plain text. Neither port implements
   the recent constructors listed in <hlink|the overview|guiports.en.tm>
   (five for <name|Widkit>, six for <name|Cocoa>), and both lack the features of the user interface which <scheme> reserves to
