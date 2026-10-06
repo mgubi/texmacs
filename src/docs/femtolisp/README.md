@@ -42,8 +42,9 @@ how it works, what differs from Guile, how it performs, and what is left.
   code runs, so code written for Guile keeps working.
 - **Tests:** 40 of the 43 regression suites pass; the 4 failing checks are
   listed in [06](06-open-issues.md).
-- **Performance** (see [07](07-performance.md)): running Scheme code,
-  femtolisp is as fast as s7 or faster (8 warm LaTeX exports: 1.8 s, s7
-  1.9–3.1 s, Guile 6.7 s), but loading code is slower, since every loaded
-  form is compiled (boot 1.6 s, s7 0.9 s, Guile 1.7 s). Its memory use is
-  close to Guile's, well below s7's.
+- **Performance** (see [07](07-performance.md)): femtolisp is faster than
+  Guile on what was measured and between Guile and s7 overall. It is the
+  fastest on the warm LaTeX export (1.8 s, s7 1.9–3.1 s, Guile 6.7 s),
+  about 1.5× slower than s7 on the regression suites, and slower to load
+  code, since every loaded form is compiled (boot 1.6 s, s7 0.9 s,
+  Guile 1.7 s). Its memory use is close to Guile's, well below s7's.
