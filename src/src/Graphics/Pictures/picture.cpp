@@ -18,6 +18,7 @@
 #include "iterator.hpp"
 #include "file.hpp"
 #include "effect.hpp"
+#include "boot.hpp" // get_user_preference (the icon set)
 
 /******************************************************************************
 * Unique id for pictures
@@ -312,6 +313,8 @@ load_xpm (url file_name) {
 #ifdef MUPDF_RENDERER
   name= name * "#" * mupdf_get_icon_theme ();
 #endif
+  // and the icon set, which may change while TeXmacs runs (apply_icon_set)
+  name= name * "#" * get_user_preference ("icon set", "neo-classical");
   if (cache->contains (name)) return cache[name];
 
 #if defined (QTTEXMACS) || defined (AQUATEXMACS)

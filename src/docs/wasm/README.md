@@ -242,6 +242,14 @@ bars** in the General tab of the preferences, in the Vue interface only) is
 read at each layout, so that a change shows at once;
 `TEXMACS_VUE_BARS=top` or `left` (`?bars=top` in the browser) overrides it.
 
+The icon set of the preferences (classical, monochrome, neo-classical) is
+followed at once in the Vue interface, without a restart: the loop
+compares the preference with the set in use at each iteration (a lookup),
+puts the new set on the path of the icons (`apply_icon_set`, as at the
+start) and the widgets load their icons again (`vue_follow_icon_set`, the
+generation of the icons); `load_xpm` keeps the icons per set, so that a
+change back costs nothing (6 changes, 2 frames each, in 87 ms).
+
 The tabs of the windows may also be above the page, as before the column:
 the preference "window tabs" (`left`, the default, or `top`: **Tabs of the
 windows** in the General tab of the preferences, in the browser only),

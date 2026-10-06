@@ -1164,6 +1164,23 @@ decode_length (string width, vue_window win, int style) {
   else return ex;
 }
 
+// The icon set of the preferences, followed at once rather than at the next
+// start of TeXmacs: when it changes, it is put on the path of the icons
+// (apply_icon_set) and the widgets load their icons again (icon_picture);
+// the icons loaded are kept per set (load_xpm), a change back costs nothing.
+// The loop calls it at each iteration: a lookup in the preferences
+void
+vue_follow_icon_set () {
+  static string current;
+  string now= get_user_preference ("icon set", "neo-classical");
+  if (N(current) == 0) { current= now; return; }
+  if (now == current) return;
+  current= now;
+  apply_icon_set ();
+  icon_generation++;
+  gui_needs_relayout= true;
+}
+
 // additional widgets for caching and drawing
 // file_name is the icon the picture was loaded from (none for a picture
 // which has no file), and stamp the icon theme and the resolution it was

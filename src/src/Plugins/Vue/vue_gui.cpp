@@ -3827,6 +3827,7 @@ loop_iteration_body () {
   int& delay= loop_delay;
   time_t t1= 0, t2= 0;
   if (dismiss_finished_wait ()) gui_needs_update= true;
+  vue_follow_icon_set (); // a change of the icon set shows at once
 #ifdef __EMSCRIPTEN__
   // The browser calls this once per frame (60 or 120 times a second), where
   // the desktop sleeps until an event comes or the pause ends (loop_wait,

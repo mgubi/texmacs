@@ -48,6 +48,11 @@
   (set-message "Restart in order to let the new theme take effect"
                "graphical interface theme"))
 
+(define (notify-icon-set var val)
+  ;; the Vue interface follows the icon set at once (vue_follow_icon_set);
+  ;; the others at their next start
+  (when (not (vue-gui?)) (notify-restart var val)))
+
 (define (notify-window-tabs var val)
   ;; the tabs of the windows of the browser (misc/wasm/frame.js): in a
   ;; column at the left of the page, or above it
@@ -122,7 +127,7 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
-  ("icon set" "neo-classical" notify-restart)
+  ("icon set" "neo-classical" notify-icon-set)
   ("icon bars" "left" noop) ; the Vue interface reads it at each layout
   ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
