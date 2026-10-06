@@ -2147,7 +2147,8 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
     .layout= {
       .layoutDirection= (vert || column) ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= s,
-      .childGap= ui_px (gap), // a 2x value, as the numbers of this file
+      // a 2x value, as the numbers of this file; tighter in the tool bars
+      .childGap= ui_px ((in_tool_bar && !vert) ? tool_button_gap : gap),
       // a horizontal menu fills the height of its bar: its items (icons of
       // several sizes, texts, separators) are centered in it
       .childAlignment= column ? (Clay_ChildAlignment) { .x= CLAY_ALIGN_X_CENTER, .y= CLAY_ALIGN_Y_TOP }
@@ -2968,7 +2969,8 @@ vue_ui_rep::do_layout () {
         // a button of a tool bar: roomier, with a rounder highlight (flatter
         // in the footer, which is lower than the tool bars)
         padding= in_footer ? (Clay_Padding) { ui_px (10), ui_px (10), ui_px (3), ui_px (3) }
-                           : CLAY_PADDING_ALL(ui_px (7));
+                 : in_tool_bar ? CLAY_PADDING_ALL(ui_px (tool_button_pad))
+                 : CLAY_PADDING_ALL(ui_px (7));
         radius= ui_corners (menu_round); // as the menus
       }
       if (down || pressed) bg= color_pressed;
@@ -5667,9 +5669,9 @@ layout_tool_panel (Clay_ElementId id, vue_widget tools, bool side, float win_w, 
 // (2x values, scaled to the density: ui_px)
 #define bar_hpad     ui_px (24)   // contents clear of the window edges
 #define bar_menu_h   ui_pxf (62)
-#define bar_main_h   ui_pxf (88)
-#define bar_mode_h   ui_pxf (72)
-#define bar_focus_h  ui_pxf (64)
+#define bar_main_h   ui_pxf (72)
+#define bar_mode_h   ui_pxf (62)
+#define bar_focus_h  ui_pxf (56)
 #define bar_footer_h ui_pxf (56)
 
 static void
@@ -5811,8 +5813,11 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= color_background,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
-      if (!is_nil (main_icons))
+      if (!is_nil (main_icons)) {
+        in_tool_bar= true;
         layout_bar_content (8*id + 1, main_icons, color_background);
+        in_tool_bar= false;
+      }
     }
     if (visibility[0] && visibility[2] && !side) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
       .layout= {
@@ -5824,8 +5829,11 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= the_theme.bar_mode,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
-      if (!is_nil (mode_icons))
+      if (!is_nil (mode_icons)) {
+        in_tool_bar= true;
         layout_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
+        in_tool_bar= false;
+      }
     }
     // the main and mode bars as two columns at the left, side by side (see
     // in_side_bar), from the menu bar down to the footer; the focus bar,
