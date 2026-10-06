@@ -17,7 +17,8 @@ you download it.
   (`?gpu=0` in the address, or a browser without WebGL2, draws it with MuPDF).
 * **What works**: editing and typesetting, the menus and dialogs (drawn in
   the page, moved by their title and resized by their frame), a tab per document (in a
-  column at the left), your files kept in the browser (upload, drag
+  column at the left, or above: the "window tabs" preference), the main and
+  mode icon bars at the left or above (the "icon bars" preference), your files kept in the browser (upload, drag
   and drop, zip projects, downloads), printing (the PDF opens in a tab of the
   browser), the clipboard of the system, spell checking (Hunspell), Scheme
   sessions, the Remote menu (a TeXmacs server over WebSocket, `wss` from the
