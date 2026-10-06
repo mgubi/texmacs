@@ -266,6 +266,7 @@
 
 (define (bib-retrieve-entries-from-one names db)
   (cond ((== db :local) (bib-retrieve-attached names #t))
+        ((== db :zotero) (zotero-db-entries names))
 	((== db :attached) (bib-retrieve-attached names #f))
 	(else (with-database db
 		(bib-retrieve-several names)))))
@@ -279,6 +280,7 @@
 
 (define (bib-get-db bib-file names)
   (cond ((== bib-file :default) (bib-database))
+        ((== bib-file :zotero) :zotero)
         ((== bib-file :local) :local)
         ((== bib-file :attached) :attached)
         ((== (url-suffix bib-file) "tmdb") (url->url bib-file))
@@ -307,6 +309,17 @@
 (define (bib-file? f)
   (and (url? f) (== (url-suffix f) "bib")))
 
+(define (bib-sources bib-files)
+  ;; The sources of references, in their order of precedence: the entries
+  ;; of the document, the BibTeX files of the user, the database, the files
+  ;; managed by Zotero, Zotero itself and the attached entries
+  ;; (see doc/zotero-design.md)
+  (receive (managed own)
+      (list-partition bib-files
+                      (lambda (f) (and (bib-file? f) (url-exists? f)
+                                       (zotero-managed-file? f))))
+    `(:local ,@own :default ,@managed :zotero :attached)))
+
 (define (bib-warning msg)
   (debug-message "bibtex-warning" msg))
 
@@ -321,13 +334,12 @@
       (bib-warning "  switching to tm-plain style\n")
       (set! style "tm-plain")))      
   (if (in? style (bib-standard-styles))
-      (let* ((all-files `(:local ,@bib-files :default :attached))
+      (let* ((all-files (bib-sources bib-files))
              (l (apply bib-retrieve-entries (cons names all-files)))
              (bl (map db->bib (map cdr l)))
              (doc `(document ,@bl)))
         (bib-generate prefix (string-drop style 3) doc))
-      (receive (b1 b2) (list-partition `(:local ,@bib-files :default :attached)
-                                       bib-file?)
+      (receive (b1 b2) (list-partition (bib-sources bib-files) bib-file?)
         (let* ((l1 (apply bib-retrieve-entries (cons names b1)))
                (names2 (list-difference names (map car l1)))
                (l2 (apply bib-retrieve-entries (cons names2 b2)))
@@ -402,7 +414,7 @@
       (set! names (tm-children (tm->stree names))))
     (when (and (list? names) (list-and (map string? names)))
       (set! names (list-remove-duplicates names))
-      (let* ((all-files `(:local ,@bib-files :default :attached))
+      (let* ((all-files (bib-sources bib-files))
              (l (apply bib-retrieve-entries (cons names all-files)))
              (doc `(document ,@(map cdr l))))
         (set-attachment (string-append prefix "-bibliography") doc)))))
@@ -475,4 +487,12 @@
   (bib-import-current-buffer))
 
 (tm-define (open-bib-chooser cb)
-  (open-db-chooser (bib-database) "bib" "Search bibliographic reference" cb))
+  ;; the key of zotero.org is asked if the window needs it
+  (zotero-search-opened)
+  (with buf (current-buffer)
+    (open-db-chooser (bib-database) "bib" "Search bibliographic reference"
+                     ;; the item of a reference of Zotero is remembered
+                     ;; with the document
+                     (lambda (key)
+                       (cb key)
+                       (when (string? key) (zotero-cited key buf))))))

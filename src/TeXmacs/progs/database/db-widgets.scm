@@ -97,7 +97,35 @@
           (ahash-set! db-result-cache id r)
           r))))
 
+;; The search shown in the search window: the answers of Zotero, which
+;; come later in a web browser, show it again (see bibtex/zotero.scm)
+(define db-search-shown #f)
+
+(define (db-search-show db kind query)
+  (with doc `(document ,@(db-search-results db kind query))
+    (buffer-set-body "tmfs://aux/db-search-results" doc)))
+
+(tm-define (db-search-refresh)
+  (:synopsis "Show the search of the search window again, and its sources")
+  (when db-search-shown (apply db-search-show db-search-shown))
+  (refresh-now "db-search-sources"))
+
+(define (db-search-again db kind query)
+  (lambda ()
+    (when (== db-search-shown (list db kind query))
+      (db-search-show db kind query))
+    (refresh-now "db-search-sources")))
+
 (define (db-search-results db kind query)
+  (set! db-search-shown (list db kind query))
+  (if (== db :bib-file)
+      ;; without the database tool: the BibTeX file of the document, and
+      ;; Zotero (see bibtex/zotero-db.scm)
+      (zotero-with-retry (db-search-again db kind query)
+                         (lambda () (zotero-file-search-results query)))
+      (db-search-results-in db kind query)))
+
+(define (db-search-results-in db kind query)
   (with-database db
     (with-limit 20
       ;; TODO: filter on user permissions
@@ -106,10 +134,26 @@
 		      (cons "type" types)))
 	     (ids (db-search-cached q))
 	     (l (map db-get-result-cached ids))
-	     (r (db-pretty-cached l kind :pretty)))
-	(cond ((null? r) (list "No matching items"))
-	      ((>= (length r) 20) (rcons r "More items follow"))
-	      (else r))))))
+	     (r (db-pretty-cached l kind :pretty))
+             ;; the references of Zotero, after those of the database, when
+             ;; the preference asks for them; each one says its source
+             ;; (with a line while they are awaited)
+             (zs (if (and (== kind "bib") (zotero-in-database-search?))
+                     (zotero-with-retry
+                      (db-search-again db kind query)
+                      (lambda ()
+                        (with l (zotero-search-entries query (map get-name r))
+                          (cons l (zotero-searching-results)))))
+                     (cons '() '())))
+             (zl (car zs))
+             (z (if (null? zl) '() (db-pretty zl kind :pretty)))
+             (r* (if (== kind "bib") (zotero-mark-results r l #f) r))
+             (z* (zotero-mark-results z zl #t))
+             (s* (cdr zs)))
+	(cond ((and (null? r) (null? z) (nnull? s*)) s*)
+              ((and (null? r) (null? z)) (list "No matching items"))
+	      ((>= (length r) 20) (append (rcons r* "More items follow") z* s*))
+	      (else (append r* z* s*)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search the database
@@ -130,8 +174,7 @@
           (delayed
             (:pause 200)
             (when (== db-search-keypress-serial serial)
-              (with doc `(document ,@(db-search-results db kind new-query))
-                (buffer-set-body "tmfs://aux/db-search-results" doc))
+              (db-search-show db kind new-query)
               ;;(refresh-now "db-search-results")
               ))))
       new-query)))
@@ -145,13 +188,19 @@
   (padded
     (let* ((dummy (set! db-quit-search quit))
 	   (query ""))
+      (assuming (== kind "bib")
+        ;; the sources of the references (see bibtex/zotero-db.scm)
+        ;; NOTE: a promise, so that the line is made again when refreshed
+        (refreshable "db-search-sources"
+          (promise (list 'text (zotero-search-sources-text db))))
+        ===)
       (hlist
 	(text "Search:") // //
 	(input (set! query (db-search-keypress db kind answer query))
 	       "search-database" (list "") "650px"))
       === ===
       (refreshable "db-search-results"
-	(resize "750px" "500px"
+	(resize '("400px" "750px" "9999px") '("200px" "500px" "9999px")
 	  (texmacs-input `(document ,@(db-search-results db kind query))
 			 `(style (tuple ,(db-get-style kind)))
 			 (db-search-results-buffer)))))))
@@ -165,13 +214,19 @@
                     (tool-close :any 'db-search-tool noop win)))
            (dummy (set! db-quit-search quit*))
 	   (query ""))
+      (assuming (== kind "bib")
+        ;; the sources of the references (see bibtex/zotero-db.scm)
+        ;; NOTE: a promise, so that the line is made again when refreshed
+        (refreshable "db-search-sources"
+          (promise (list 'text (zotero-search-sources-text db))))
+        ===)
       (hlist
 	(text "Search:") // //
 	(input (set! query (db-search-keypress db kind answer query))
 	       "search-database" (list "") "300px"))
       === ===
       (refreshable "db-search-results"
-	(resize "400px" "600px"
+	(resize '("300px" "400px" "9999px") '("200px" "600px" "9999px")
 	  (texmacs-input `(document ,@(db-search-results db kind query))
 			 `(style (tuple ,(db-get-style kind) "side-tools"))
 			 (db-search-results-buffer)))))))
