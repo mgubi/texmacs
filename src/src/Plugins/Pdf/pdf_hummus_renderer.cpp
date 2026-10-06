@@ -104,6 +104,7 @@ class pdf_hummus_renderer_rep : public renderer_rep {
   hashmap<string,PDFUsedFont*> native_fonts;
   hashset<string> not_native_fonts;
   hashset<string> EuropeanComputerModern_fonts;
+  hashset<string> T2A_fonts;
   hashmap<string,pdf_raw_image> pdf_glyphs;
   hashmap<tree,pdf_image> image_pool;
   hashmap<tree,pdf_image> pattern_image_pool;
@@ -1351,6 +1352,50 @@ no_font_issues (url u) {
   return !pdf_font_issues ()->contains (h);
 }
 
+// The Unicode character of the glyph at position ch of a TeX font in the
+// Cork encoding (the EC fonts) or the T2A encoding (the Cyrillic fonts),
+// for the text layer: the positions are not Unicode code points, and
+// differ from Latin-1 for some letters (oe at 0xF7, sharp s at 0xFF)
+static int
+tex_glyph_unicode (int ch, bool t2a) {
+  static int cork_table[256], t2a_table[256];
+  static bool done= false;
+  if (!done) {
+    for (int c=0; c<256; c++) {
+      string s (1);
+      s[0]= (char) c;
+      for (int k=0; k<2; k++) {
+        string u= (k == 0? cork_to_utf8 (s): t2a_to_utf8 (s));
+        int i= 0;
+        unsigned int code= (N(u) == 0? c: decode_from_utf8 (u, i));
+        // a position without a single character keeps its number
+        if (N(u) == 0 || i != N(u)) code= c;
+        (k == 0? cork_table: t2a_table)[c]= (int) code;
+      }
+    }
+    done= true;
+  }
+  if (ch < 0 || ch > 255) return ch;
+  return t2a? t2a_table[ch]: cork_table[ch];
+}
+
+// Whether the font file u is a Cyrillic TeX font in the T2A encoding: the LH
+// fonts of TeXmacs (fonts/type1/la) and the T2A fonts of cm-super are named
+// la + two letters for the shape + the size in hundredths of a point
+// (larm1000, larm700, labx1728, larm0500). Other TeX fonts begin with la
+// too: lasy10 and lasyb10 (the LaTeX symbols), which are not in T2A.
+static bool
+is_t2a_font_file (url u) {
+  if (suffix (u) != "pfb") return false;
+  string s= basename (u);
+  int n= N(s);
+  if (n < 7 || n > 8 || !starts (s, "la")) return false;
+  if (!is_alpha (s[2]) || !is_alpha (s[3])) return false;
+  for (int i= 4; i < n; i++)
+    if (!is_digit (s[i])) return false;
+  return true;
+}
+
 void
 pdf_hummus_renderer_rep::make_pdf_font (string fontname)
 {
@@ -1381,6 +1426,8 @@ pdf_hummus_renderer_rep::make_pdf_font (string fontname)
       string ps_name (_ps_name.c_str ());
       if (starts (ps_name, "EuropeanComputerModern"))
 	EuropeanComputerModern_fonts->insert (fontname);
+      if (is_t2a_font_file (u))
+	T2A_fonts->insert (fontname);
       return;
     }
     else {
@@ -1570,7 +1617,12 @@ pdf_hummus_renderer_rep::draw (int ch, font_glyphs fn, SI x, SI y) {
   }
   else {
     if (cfid != NULL) {
-      glyphs.push_back (GlyphUnicodeMapping (gl_index, ch));
+      int uc= ch;
+      if (EuropeanComputerModern_fonts->contains (cfn))
+        uc= tex_glyph_unicode (ch, false);
+      else if (T2A_fonts->contains (cfn))
+        uc= tex_glyph_unicode (ch, true);
+      glyphs.push_back (GlyphUnicodeMapping (gl_index, uc));
       contentContext->Tj(glyphs);
     }
     else {
@@ -1773,7 +1825,7 @@ pdf_image_rep::flush (PDFWriter& pdfw)
 #endif
     // other formats we generate a either pdf or png that we'll embbed
     temp= url_temp (".pdf");
-    image_to_pdf (name, temp, w, h, 300);
+    image_to_pdf (name, temp, w, h, 300, false);
     // the 300 dpi setting is the maximum dpi of raster images that will be generated:
     // images that are to dense will de downsampled to keep file small
     // (other are not up-sampled) 
@@ -1781,10 +1833,18 @@ pdf_image_rep::flush (PDFWriter& pdfw)
     // 
     // TODO: make the max dpi setting smarter (printer resolution, preference ...)
     if (! exists(temp)) {
+#ifndef PDFHUMMUS_NO_PNG
         // nothing worked for pdf, then embed png (if we could display the image, we can use png)
-        temp= url_temp (".png");
-        image_to_png (name, temp, w, h);
-        if (flush_png(pdfw, temp)) return;
+        url temp_png= url_temp (".png");
+        image_to_png (name, temp_png, w, h);
+        bool done= flush_png (pdfw, temp_png);
+        remove (temp_png);
+        if (done) return;
+#endif
+        // the png route failed too: include the placeholder
+        convert_error << "pdf_hummus, failed converting " << name << LF;
+        copy ("$TEXMACS_PATH/misc/pixmaps/unknown.pdf", temp);
+        inform_about_dependencies ();
     }
 
   }

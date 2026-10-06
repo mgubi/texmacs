@@ -970,4 +970,4 @@
       (let* ((getter (prefixed-get-init prefix))
              (setter (prefixed-init-multi prefix)))
         (open-font-tool "Font selector" getter setter #t))
-      (open-document-other-font-selector prefix-window)))
+      (open-document-other-font-selector-window prefix)))

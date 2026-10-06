@@ -2606,7 +2606,7 @@
 ((TeXmacs\ Computer\ Modern Bold\ Oblique\ SmallCaps) ((ecoc10.tfm 0 3060)))
 ((TeXmacs\ Computer\ Modern Bold\ SmallCaps) ((ecxc10.tfm 0 2852)))
 ((TeXmacs\ Computer\ Modern Italic) ((ecti10.tfm 0 2840)))
-((TeXmacs\ Computer\ Modern ItalicUpright) ((ecui10.tfm 3072)))
+((TeXmacs\ Computer\ Modern ItalicUpright) ((ecui10.tfm 0 3072)))
 ((TeXmacs\ Computer\ Modern Long) ((ecdh10.tfm 0 3152)))
 ((TeXmacs\ Computer\ Modern Oblique) ((ecsl10.tfm 0 3372)))
 ((TeXmacs\ Computer\ Modern Regular) ((ecrm10.tfm 0 3148)))

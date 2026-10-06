@@ -38,7 +38,6 @@ CMakeLists.txt.user
 misc/benchmark/gbench
 
 TeXmacs/progs/ice-9
-src/Plugins/Qt/moc_*.cpp
 src/Deps
 src/Objects
 TeXmacs/plugins/
@@ -73,3 +72,6 @@ config.status
 /build-wasm/
 # the makefile of the browser build is a source, not a generated file
 !/misc/wasm/Makefile
+
+# moc output of the autotools build
+src/Plugins/Qt*/moc_*.cpp

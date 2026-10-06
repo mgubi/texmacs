@@ -29,9 +29,9 @@
     <branch|Resumo das principais etiquetas do
     <TeXmacs>|styles/std-dtds/dtds.pt.tm>
 
-    <branch|Compatibilidade com outros formatos|convert/man-convert.pt.tm>
+    <branch|Compatibilidade com outros formatos|convert/man-convert.en.tm>
 
-    <extra-branch|Configurando o <TeXmacs>|scheme/man-scheme.pt.tm>
+    <extra-branch|Configurando o <TeXmacs>|scheme/man-scheme.en.tm>
   </traverse>
 
   <tmdoc-copyright|1998--2003|Joris van der Hoeven|Ramiro Brito Willmersdorf>

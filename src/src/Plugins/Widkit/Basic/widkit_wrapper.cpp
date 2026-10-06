@@ -124,6 +124,17 @@ responsive_icon_tabs_widget (array<url> us, array<widget> tabs,
 }
 
 widget
+responsive_tabs_widget (array<widget> tabs, array<widget> bodies) {
+  return tabs_widget (tabs, bodies);
+}
+
+widget
+responsive_icon_tabs_widget (array<url> us, array<widget> tabs,
+                             array<widget> bodies) {
+  return icon_tabs_widget (us, tabs, bodies);
+}
+
+widget
 horizontal_menu (array<widget> a) {
   return abstract (horizontal_list (concrete (a)));
   //return abstract (horizontal_array (concrete (a), -1));
@@ -288,6 +299,14 @@ setting_group_widget (string text, array<widget> vals, int style) {
 }
 
 widget
+setting_toggle_widget (command cmd, string text, bool on, int style) {
+  array<widget> a;
+  a << toggle_widget (cmd, on, style);
+  a << text_widget (text, style, black, true);
+  return horizontal_list (a);
+}
+
+widget
 popup_widget (widget w) {
   return abstract (popup_widget (concrete (w), center));
 }
@@ -333,6 +352,23 @@ inputs_list_widget (command call_back, array<string> prompts) {
 widget
 enum_widget (command cb, array<string> vals, string v, int style, string w) {
   return abstract (enum_wk_widget (cb, vals, v, style, w));
+}
+
+widget
+setting_enum_widget (command cb, string text, array<string> vals, string v,
+                     int style, string w) {
+  array<widget> a;
+  a << text_widget (text, style, black, true);
+  a << enum_widget (cb, vals, v, style, w);
+  return horizontal_list (a);
+}
+
+widget
+setting_group_widget (string text, array<widget> vals, int style) {
+  array<widget> a;
+  a << text_widget (text, style, black, true);
+  a << vals;
+  return vertical_list (a);
 }
 
 widget

@@ -288,9 +288,12 @@
 ;;   - teardown-expr runs after each test (even on failure)
 ;;   - all tests run regardless of earlier failures
 ;;   - returns the number of tests run
-;;   - signals error at the end if any test failed
+;;   - adds the number of failed tests to integration-failure-total, which
+;;     the test runner of check-master.scm reads
 ;;
 ;; Use (begin ...) for multiple setup/teardown expressions.
+(define-public integration-failure-total 0)
+
 (define-public-macro (integration-test-group group-desc group-id
                                              setup-expr teardown-expr . body)
   (let ((tests
@@ -324,6 +327,7 @@
               (failed (- total passed)))
          (display* "  " (number->string passed) "/" (number->string total)
                    " passed\n")
+         (set! integration-failure-total (+ integration-failure-total failed))
          total))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

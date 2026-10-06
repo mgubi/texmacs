@@ -169,7 +169,7 @@
     ganze Dokument fest eingestellt. Üblicherweise ist die Basisgröÿe
     <verbatim|9pt>, <verbatim|10pt>, <verbatim|11pt> oder <verbatim|12pt>.
     Andere Gröÿen werden normalerweise durch Festlegung des
-    <hyper-link|<src-var|Vergröÿerungsfaktor>|env-general.de.tm#Vergröÿerung>
+    <hyper-link|<src-var|Vergröÿerungsfaktor>|env-general.de.tm#magnification>
     oder des Gröÿenverhältnisses <hyper-link|font-size|#font-size> erzeugt.
 
     <\tm-fragment>

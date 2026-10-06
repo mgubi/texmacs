@@ -144,7 +144,8 @@ eval_request (tree t, int& status,
     status= 0; outbuf= ""; errbuf= t[0]->label; kill= false;
     return false;
   }
-  io_error << "request_link, unexpected request: " << t << LF;
+  io_error << "request_link, unexpected request: "
+           << http_mask_request (t) << LF;
   return true;
 }
 
@@ -160,7 +161,7 @@ request_link_rep::write (string s, int channel) {
     return;
   }
   tree t= scheme_to_tree (cmd);
-  if (DEBUG_IO) debug_io << "Requesting '" << t << "'\n";
+  if (DEBUG_IO) debug_io << "Requesting '" << http_mask_request (t) << "'\n";
 #ifdef __EMSCRIPTEN__
   web_async_cancel (&outbuf); // an answer still awaited is no longer wanted
 #else

@@ -157,6 +157,7 @@ include (CheckFunctionExists)
 include (CheckLibraryExists)
 include (CheckIncludeFile)
 include (CheckTypeSize)
+include (CheckSymbolExists)
 include (FindPkgConfig)
 
 ### --------------------------------------------------------------------
@@ -217,6 +218,15 @@ check_include_file (pty.h HAVE_PTY_H)
 check_include_file (util.h HAVE_UTIL_H)
 check_function_exists (gettimeofday HAVE_GETTIMEOFDAY)
 check_function_exists (snprintf HAVE_SNPRINTF)
+
+if (NOT WIN32)
+  set (CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+  check_symbol_exists (dlopen dlfcn.h HAVE_DLOPEN)
+  unset (CMAKE_REQUIRED_LIBRARIES)
+  if (HAVE_DLOPEN)
+    set (TM_DYNAMIC_LINKING dlopen)
+  endif ()
+endif ()
 
 set (STDC_HEADERS 1)
 set (DEBUG_ASSERT 1)
@@ -663,6 +673,9 @@ if (WIN32)
 elseif (APPLE)
   # the Unix sources, and the Objective-C of the macOS plugin (as
   # configure)
+  enable_language (OBJC OBJCXX)
+  set (CMAKE_OBJCXX_STANDARD 17)
+  set (CMAKE_OBJCXX_STANDARD_REQUIRED ON)
   file (GLOB TeXmacs_OS_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/Unix/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Plugins/MacOS/*.m"
@@ -820,6 +833,10 @@ set (TeXmacs_Libraries
   ${GNUTLS_EXTRA_LIBS}
 )
 
+if (TM_DYNAMIC_LINKING)
+  list (APPEND TeXmacs_Libraries ${CMAKE_DL_LIBS})
+endif ()
+
 if (USE_RESVG)
   list (APPEND TeXmacs_Libraries ${RESVG_LIBRARIES})
 endif ()
@@ -876,10 +893,21 @@ endif ()
 ### Subdirectories
 ### --------------------------------------------------------------------
 
+# Install location of texmacs.bin, relative to CMAKE_INSTALL_PREFIX
+# (the texmacs script configured in misc/ expects it in libexec/TeXmacs/bin)
+set (tmbin "libexec/TeXmacs")
+
 add_subdirectory (src)
 add_subdirectory (plugins)
 add_subdirectory (misc)
 add_subdirectory (TeXmacs)
+
+# C++ unit tests (Qt Test based, see tests/README.md); run them with ctest
+option (TEXMACS_BUILD_TESTS "Build the C++ unit tests in tests/" OFF)
+if (TEXMACS_BUILD_TESTS)
+  enable_testing ()
+  add_subdirectory (tests)
+endif ()
 
 ### --------------------------------------------------------------------
 ### Installation

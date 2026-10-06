@@ -55,6 +55,7 @@
   ("ollama-text-input" "on" noop)
   ("chatgpt-text-input" "on" noop)
   ("gemini-text-input" "on" noop)
+  ("gemini model" "gemini-2.0-flash" noop)
   ("open-mistral-7b-text-input" "on" noop)
   ("claude-text-input" "on" noop)
   ("openrouter-text-input" "on" noop)
@@ -73,8 +74,9 @@
   ("albert ai-agents translator" "default" noop)
   ("albert model" "openweight-large" noop))
 
-(with key (getenv "ALBERT_API_KEY")
-  (when key (set-preference "albert api key" key)))
+(tm-define (albert-env-key?)
+  (with key (getenv "ALBERT_API_KEY")
+    (and key (!= key ""))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; API keys: in the wallet when it is on, else a preference, else the

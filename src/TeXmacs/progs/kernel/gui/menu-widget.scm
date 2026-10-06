@@ -379,7 +379,7 @@
              (and-with prop (property (car source) :synopsis)
                (and (pair? prop) (string? (car prop))
                     (with txt (synopsis-substitute (car prop) source)
-                      (and (string? txt) txt))))))))
+                      (and (string? txt) (translate txt)))))))))
 
 (define (add-menu-entry-balloon but style action label)
   (with txt (if (tuple? label 'balloon 2)

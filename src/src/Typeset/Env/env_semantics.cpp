@@ -228,7 +228,7 @@ edit_env_rep::update_page_pars () {
     }
     else if (height_flag == "true") {
       page_user_height  = get_length (PAGE_USER_HEIGHT);
-      page_top_margin   = (page_height - page_user_width) >> 1;
+      page_top_margin   = (page_height - page_user_height) >> 1;
       page_bottom_margin= page_top_margin;
     }
     else {
@@ -895,12 +895,6 @@ edit_env_rep::decode_arrow (tree t, string l, string h) {
                          tree (_POINT, "0" * lun, "0" * hun),
                          tree (_POINT, as_string (-lx) * lun,
                                as_string (-hx) * hun)));
-    if (s == "<gtr>")
-      return tree (LINE,
-                   tree (_POINT, as_string (-lx) * lun, h),
-                   tree (_POINT, "0" * lun, "0" * hun),
-                   tree (_POINT, as_string (-lx) * lun,
-                                 as_string (-hx) * hun));
     if (s == "<less><less>")
       return tree (GR_GROUP,
                    tree (LINE,

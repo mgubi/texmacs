@@ -816,6 +816,7 @@
     (server-log-write `notice
       (format #f
           "user ~A: ~A failed logins, ~A last failure, suspended: ~A\n"
+          ;; NOTE: strftime and localtime are not available with S7
           uid n (pretty-date t "iso8601") (server-user-suspended? uid)))
     (and (not (server-user-deleted? uid))
          (not (server-user-suspended? uid))

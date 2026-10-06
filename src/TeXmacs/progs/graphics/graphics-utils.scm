@@ -703,7 +703,7 @@
     new))
 
 (tm-define (graphical-get-selected-attributes t filter-list)
-  (with tab (graphical-get-selected-attributes t filter-list)
+  (with tab (graphical-get-selected-attributes* t filter-list)
     (for (var filter-list)
       (if (and (not (ahash-ref tab var)) (graphics-attribute-default var))
           (ahash-set! tab var (graphics-attribute-default var))))

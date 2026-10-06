@@ -1,0 +1,39 @@
+pages: 1
+--- page 1
+1 Program code
+
+Code is set in a typewriter font, with the colors of the syntax of its language.
+
+#include <iostream>
+
+int main () {
+
+for (int i= 0; i < 10; i++)
+
+std::cout << i << "\n";
+return 0;
+}
+
+def fib (n):
+
+a, b = 0, 1
+for _ in range (n):
+
+a, b = b, a + b
+return a
+
+(define (square x) (* x x))
+(map square '(1 2 3))
+
+Inline code: std::vector<int>, (car l) and plain verbatim text.
+
+A verbatim block keeps
+
+its spaces and
+
+its line breaks.
+
+Program code
+1
+
+

@@ -136,6 +136,11 @@
 ;; Automatic correction
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (ai-empty? t)
+  (or (tm-equal? t "")
+      (and (tm-func? t 'document)
+           (list-and (map (lambda (x) (tm-equal? x "")) (tm-children t))))))
+
 (define (open-comments c)
   (let* ((doc
 	  `(document
@@ -148,11 +153,6 @@
     (aux-set-document aux doc)
     (if (not (buffer->window name))
 	(load-buffer-main name :new-window))))
-
-(define (ai-empty? t)
-  (or (tm-equal? t "")
-      (and (tm-func? t 'document)
-           (list-and (map (lambda (x) (tm-equal? x "")) (tm-children t))))))
 
 ;; The correction and the translation of the selection: the selection is
 ;; replaced by the answer only when one came; without a key the key is asked

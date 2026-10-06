@@ -157,7 +157,7 @@
                      (begin
                        (system-wait "Initializing wallet" "please wait")
                        (when (and (wallet-initialize (first (form-values)))
-                                  (== (second (form-values)) "yes"))
+                                  (> n 1) (== (second (form-values)) "yes"))
                          (wallet-save-passphrase (first (form-values))))
                        (cmd "Ok")))))
              (set! wallet-widget-weak-passphrase? #t)
@@ -203,7 +203,7 @@
                      (begin
                        (system-wait "Reinitializing wallet" "please wait")
                        (when (wallet-reinitialize "" (first (form-values)))
-                         (when (== (second (form-values)) "yes")
+                         (when (and (> n 1) (== (second (form-values)) "yes"))
                            (wallet-save-passphrase (first (form-values)))))
                        (cmd "Ok")))))
              (set! wallet-widget-weak-passphrase? #t)

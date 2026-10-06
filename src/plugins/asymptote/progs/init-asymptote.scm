@@ -39,7 +39,7 @@
 
 (plugin-configure asymptote
   (:require (or (asymptote-in-browser?)
-                (and (url-exists-in-path? "asy") (python-command))))
+                (and (url-exists-in-path? "asy") (!= (python-command) ""))))
   ,@(asymptote-engine)
   (:serializer ,asy-serialize)
   (:session "Asymptote")

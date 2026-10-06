@@ -298,10 +298,21 @@ tree_active (tree t) {
   return is_nil (ip) || last_item (ip) != DETACHED;
 }
 
+// The children of a compound tree; an atomic tree has none, and A would
+// read its string as an array of trees
+array<tree>
+tree_children (tree t) {
+  TMSCM_ASSERT (is_compound (t), tree_to_tmscm (t), TMSCM_ARG1,
+                "tree-children");
+  return A (t);
+}
+
 tree
 tree_child_insert (tree t, int pos, tree x) {
   //cout << "t= " << t << "\n";
   //cout << "x= " << x << "\n";
+  TMSCM_ASSERT (is_compound (t) && pos >= 0 && pos <= N(t),
+                tree_to_tmscm (t), TMSCM_ARG1, "tree-child-insert");
   int i, n= N(t);
   tree r (t, n+1);
   for (i=0; i<pos; i++) r[i]= t[i];
@@ -315,6 +326,12 @@ tree_child_insert (tree t, int pos, tree x) {
 ******************************************************************************/
 
 extern tree the_et;
+
+// The edits below raise an error when they do not apply to the tree, as
+// modification-applicable? would say; without the check, an edit at a
+// wrong position or of the wrong kind of tree crashes TeXmacs
+#define TREE_EDIT_ASSERT(ok, r, name) \
+  TMSCM_ASSERT (ok, tree_to_tmscm (r), TMSCM_ARG1, name)
 
 tree
 tree_assign (tree r, tree t) {
@@ -331,6 +348,8 @@ tree_assign (tree r, tree t) {
 
 tree
 tree_insert (tree r, int pos, tree t) {
+  TREE_EDIT_ASSERT (is_applicable (r, mod_insert (path (), pos, t)), r,
+                    "tree-var-insert");
   path ip= copy (obtain_ip (r));
   if (ip_attached (ip)) {
     insert (reverse (path (pos, ip)), copy (t));
@@ -344,6 +363,8 @@ tree_insert (tree r, int pos, tree t) {
 
 tree
 tree_remove (tree r, int pos, int nr) {
+  TREE_EDIT_ASSERT (is_applicable (r, mod_remove (path (), pos, nr)), r,
+                    "tree-remove");
   path ip= copy (obtain_ip (r));
   if (ip_attached (ip)) {
     remove (reverse (path (pos, ip)), nr);
@@ -357,6 +378,8 @@ tree_remove (tree r, int pos, int nr) {
 
 tree
 tree_split (tree r, int pos, int at) {
+  TREE_EDIT_ASSERT (is_applicable (r, mod_split (path (), pos, at)), r,
+                    "tree-split");
   path ip= copy (obtain_ip (r));
   if (ip_attached (ip)) {
     split (reverse (path (at, pos, ip)));
@@ -370,6 +393,9 @@ tree_split (tree r, int pos, int at) {
 
 tree
 tree_join (tree r, int pos) {
+  TREE_EDIT_ASSERT (is_compound (r) &&
+                    is_applicable (r, mod_join (path (), pos)), r,
+                    "tree-join");
   path ip= copy (obtain_ip (r));
   if (ip_attached (ip)) {
     join (reverse (path (pos, ip)));
@@ -433,6 +459,7 @@ scheme_tree_to_tmscm (scheme_tree t) {
     if (s == "#t") return tmscm_true ();
     if (s == "#f") return tmscm_false ();
     if (is_int (s)) return int_to_tmscm (as_int (s));
+    if (is_double (s)) return double_to_tmscm (as_double (s));
     if (is_quoted (s))
       return string_to_tmscm (scm_unquote (s));
     //if ((N(s)>=2) && (s[0]=='\42') && (s[N(s)-1]=='\42'))
@@ -463,6 +490,7 @@ tmscm_to_scheme_tree (tmscm p) {
   if (tmscm_is_string (p)) return scm_quote (tmscm_to_string (p));
   //if (tmscm_is_string (p)) return "\"" * tmscm_to_string (p) * "\"";
   if (tmscm_is_int (p)) return as_string ((int) tmscm_to_int (p));
+  if (tmscm_is_double (p)) return as_string (tmscm_to_double (p));
   if (tmscm_is_bool (p)) return (tmscm_to_bool (p)? string ("#t"): string ("#f"));
   if (tmscm_is_tree (p)) return tree_to_scheme_tree (tmscm_to_tree (p));
   return "?";
@@ -518,7 +546,9 @@ contentP (tmscm t) {
 bool
 tmscm_is_path (tmscm p) {
   if (tmscm_is_null (p)) return true;
-  else return tmscm_is_int (tmscm_car (p)) && tmscm_is_path (tmscm_cdr (p));
+  else return tmscm_is_pair (p) &&
+    tmscm_is_int (tmscm_car (p)) &&
+    tmscm_is_path (tmscm_cdr (p));
 }
 
 #define TMSCM_ASSERT_PATH(p,arg,rout) \
@@ -712,12 +742,16 @@ modificationP (tmscm t) {
 
 tree
 var_apply (tree& t, modification m) {
+  TMSCM_ASSERT (is_applicable (t, m), modification_to_tmscm (m), TMSCM_ARG2,
+                "modification-inplace-apply");
   apply (t, copy (m));
   return t;
 }
 
 tree
 var_clean_apply (tree& t, modification m) {
+  TMSCM_ASSERT (is_applicable (t, m), modification_to_tmscm (m), TMSCM_ARG2,
+                "modification-apply");
   return clean_apply (t, copy (m));
 }
 
@@ -755,11 +789,15 @@ branch_patch (array<patch> a) {
 
 tree
 var_clean_apply (tree t, patch p) {
+  TMSCM_ASSERT (is_applicable (p, t), patch_to_tmscm (p), TMSCM_ARG2,
+                "patch-apply");
   return clean_apply (copy (p), t);
 }
 
 tree
 var_apply (tree& t, patch p) {
+  TMSCM_ASSERT (is_applicable (p, t), patch_to_tmscm (p), TMSCM_ARG2,
+                "patch-inplace-apply");
   apply (copy (p), t);
   return t;
 }

@@ -13,6 +13,8 @@
 #include "convert.hpp"
 #include "qt_utilities.hpp"
 
+array<string> http_mask_headers (array<string> headers_attr);
+
 #if QT_VERSION >= 0x060000
 
 #include <QNetworkAccessManager>
@@ -71,7 +73,7 @@ qt_http_post (string& ret, string url, array<string> headers_attr,
 	      const char* data, long long n) {
   if (DEBUG_IO)
     debug_io << "qt_http_post" << LF
-	     << headers_attr << LF
+	     << http_mask_headers (headers_attr) << LF
 	     << string (data, n) << LF;
   ret= "";
   QUrl qurl (utf8_to_qstring (url));
@@ -331,7 +333,7 @@ qt_async_http_post (string url, array<string> headers_attr,
 		    int& status, string& outbuf, string& errbuf, bool& kill) {
   if (DEBUG_IO)
     debug_io << "qt_async_http_post" << LF
-	     << headers_attr << LF
+	     << http_mask_headers (headers_attr) << LF
 	     << string (data, n) << LF;
   QUrl qurl (utf8_to_qstring (url));
   if (!qurl.isValid ()) {
@@ -366,7 +368,7 @@ qt_async_http_post (string url, array<string> headers_attr,
 		    const char* data, long long n, object callback) {
   if (DEBUG_IO)
     debug_io << "qt_async_http_post" << LF
-	     << headers_attr << LF
+	     << http_mask_headers (headers_attr) << LF
 	     << string (data, n) << LF;
   QUrl qurl (utf8_to_qstring (url));
   if (!qurl.isValid ()) {

@@ -107,7 +107,8 @@
       (list (cork->html s))))
 
 (define (tmhtml-text s)
-  (if (or (ahash-ref tmhtml-env :math) (ahash-ref tmhtml-env :preformatted))
+  (if (or (ahash-ref tmhtml-env :math) (ahash-ref tmhtml-env :preformatted)
+          (ahash-ref tmhtml-env :verbatim))
       (tmhtml-string s)
       (tmhtml-string (make-ligatures s))))
 
@@ -282,8 +283,9 @@
         (set! body (tmhtml-css-post body)))
     `(h:html
       (h:head
+       (h:meta (@ (charset "utf-8")))
        (h:title ,@(tmhtml title))
-       (h:meta (@ (charset "utf-8") (name "generator") 
+       (h:meta (@ (name "generator")
 		  (content ,(string-append "TeXmacs " (texmacs-version)))))
        ,css
        ,@xhead)
@@ -380,7 +382,7 @@
       x))
 
 (define (xhtml-block? x)
-  (tm-in? x '(h:p h:div h:pre h:h1 h:h2 h:h3 h:h4 h:h5 h:h6
+  (tm-in? x '(h:p h:div h:center h:pre h:h1 h:h2 h:h3 h:h4 h:h5 h:h6
               h:ol h:ul h:dl h:table)))
 
 (define (mixed-block l)
@@ -404,7 +406,7 @@
         (else x)))
 
 (define (force-block? x)
-  (or (and (tm-in? x '(h:p h:div h:pre h:h1 h:h2 h:h3 h:h4
+  (or (and (tm-in? x '(h:p h:div h:center h:pre h:h1 h:h2 h:h3 h:h4
                        h:ol h:ul h:dl h:table))
            (not (and-with style (sxml-attr x 'style)
                   (string-contains? style "display: inline")))
@@ -1290,6 +1292,11 @@
 	((and (func? x 'label 1) (string? (cadr x))) `((id ,(cadr x))))
 	(else (append-map tmhtml-collect-labels (cdr x)))))
 
+(define (tmhtml-math-labels x)
+  ;; labels inside formulas are lost by the MathML and MathJax conversions
+  (map (lambda (id) `(h:a (@ (id ,(cork->html (cadr id))))))
+       (tmhtml-collect-labels x)))
+
 (define (tmhtml-image-names ext)
   (set! tmhtml-image-serial (+ tmhtml-image-serial 1))
   (let* ((postfix (string-append
@@ -1543,11 +1550,17 @@
       (when (func? body 'action)
         (set! body (cadr body))
         (set! pre? (string? body)))
-      (if (or (stm-block-structure? body) pre?)
-          (verbatim-pre
-           (ahash-with tmhtml-env :preformatted #t
-             (tmhtml body)))
-          (verbatim-tt (tmhtml body))))))
+      (ahash-with tmhtml-env :verbatim #t
+        (if (or (stm-block-structure? body) pre?)
+            (verbatim-pre
+             (ahash-with tmhtml-env :preformatted #t
+               (tmhtml body)))
+            (verbatim-tt (tmhtml body)))))))
+
+(define (tmhtml-code* l)
+  ;; Inline code: no ligatures (e.g. "--" must not become an en-dash)
+  (ahash-with tmhtml-env :verbatim #t
+    (tmhtml-post-simplify-element (cons 'h:code (tmhtml-list l)))))
 
 (define (verbatim-tt content)
   `((h:tt (@ (class "verbatim")) ,@content)))
@@ -1860,18 +1873,21 @@
     (ahash-with tmhtml-env :math #f
       (ahash-with tmhtml-env :math-display #f
         (ahash-with tmhtml-env :preformatted #f
-          (ahash-with tmhtml-env :left-margin 0
-            (ahash-with tmhtml-env :right-margin 0
-              (tmhtml x))))))))
+          (ahash-with tmhtml-env :verbatim #f
+            (ahash-with tmhtml-env :left-margin 0
+              (ahash-with tmhtml-env :right-margin 0
+                (tmhtml x)))))))))
 
 (define (tmhtml x)
   ;; Main conversion function.
   ;; Takes a TeXmacs tree in Scheme notation and produce a SXML node-set.
   ;; All handler functions have a similar prototype.
   (cond ((and tmhtml-mathjax? (ahash-ref tmhtml-env :math))
-         (tmhtml-mathjax-formula x))
+         (append (tmhtml-math-labels x)
+                 (tmhtml-mathjax-formula x)))
         ((and tmhtml-mathml? (ahash-ref tmhtml-env :math))
-	 `((m:math (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
+	 `(,@(tmhtml-math-labels x)
+           (m:math (@ (xmlns "http://www.w3.org/1998/Math/MathML"))
 		   ,(texmacs->mathml x tmhtml-env))))
 	((and tmhtml-images? (ahash-ref tmhtml-env :math)
               (!= tmhtml-image-root-string "image"))
@@ -1924,7 +1940,7 @@
   (new-line tmhtml-new-line)
   (line-sep tmhtml-noop)
   (next-line tmhtml-next-line)
-  (no_break tmhtml-noop)
+  (no-break tmhtml-noop)
   (no-indent tmhtml-noop)
   (yes-indent tmhtml-noop)
   (no-indent* tmhtml-noop)
@@ -2051,7 +2067,7 @@
   (strong (h:strong))
   (em (h:em))
   (dfn (h:dfn))
-  (code* (h:code))
+  (code* ,tmhtml-code*)
   (samp (h:samp)) ; WARNING: semantic documentation does not match HTML4
   (kbd (h:kbd))
   (var (h:var))

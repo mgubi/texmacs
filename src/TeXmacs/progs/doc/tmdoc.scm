@@ -79,6 +79,15 @@
          (cons (car x) (tmdoc-substitute-sub (cdr x) root cur)))
 	(else x)))
 
+(define (tmdoc-page-label rel)
+  ;; label for the page at rel (relative to the root of the book),
+  ;; with the .tm and language suffixes removed and "/" replaced by "-"
+  (let* ((s (if (string-ends? rel ".tm") (string-drop-right rel 3) rel))
+         (i (string-search-backwards "." (string-length s) s))
+         (j (string-search-backwards "/" (string-length s) s)))
+    (string-append "sec-" (string-replace (if (> i j) (substring s 0 i) s)
+                                          "/" "-"))))
+
 (define (tmdoc-rewrite-one x root cur the-level done)
   (let* ((omit? (list? the-level))
 	 (level (if omit? (car the-level) the-level)))
@@ -86,8 +95,8 @@
 	   (cond (omit? '(document))
                  ((== level 'title) (cons level (cdr x)))
                  (else
-                   (let* ((name (url-basename (url-basename cur)))
-                          (lab  (string-append "sec-" (url->string name))))
+                   (let* ((rel (url->unix (url-delta root cur)))
+                          (lab (tmdoc-page-label rel)))
                      `(concat ,(cons level (cdr x)) (label ,lab))))))
           ((and (func? x 'concat)
                 (or (func? (tm-ref x 0) 'tmdoc-title)
@@ -147,8 +156,7 @@
        (with pos (string-search-backwards "#" (string-length dest) dest)
          (if (>= pos 0)
              (substring dest (+ pos 1) (string-length dest))
-             (with name (url-basename (url-basename dest))
-               (string-append "sec-" (url->string name)))))))
+             (tmdoc-page-label dest)))))
 
 (define (tmdoc-internal-link dest t)
   (and-with lab (tmdoc-internal-label dest)
@@ -222,10 +230,28 @@
 (define-preferences
   ("manual style" "tmmanual" (lambda args (noop))))
 
+(define (help-english-file file)
+  ;; "dir/name.<lan>.tm" -> "dir/name.en.tm", or #f
+  (and (string-ends? file ".tm")
+       (let* ((s (string-drop-right file 3))
+              (i (string-search-backwards "." (string-length s) s))
+              (lan (if (< i 0) "" (substring s (+ i 1) (string-length s)))))
+         (and (>= i 0) (in? (string-length lan) '(2 3)) (!= lan "en")
+              (not (string-index lan #\/))
+              (string-append (substring s 0 (+ i 1)) "en.tm")))))
+
+(define (help-file->url file)
+  ;; fall back on the English version of untranslated pages
+  (let* ((root (tmfs-string->url file))
+         (efile (and (!= file "") (not (url-exists? root))
+                     (help-english-file file)))
+         (eroot (and efile (tmfs-string->url efile))))
+    (if (and eroot (url-exists? eroot)) eroot root)))
+
 (tmfs-permission-handler (help name type)
   (and (== type "read")
        (let* ((file (or (tmfs-cdr name) ""))
-              (root (tmfs-string->url file)))
+              (root (help-file->url file)))
          (if (or (== file "") (not (url-exists? root)))
              (in? (url-suffix root) (list "html" "tm" "tmml"))
              #t))))
@@ -233,7 +259,7 @@
 (tmfs-load-handler (help name)
   (let* ((type (or (tmfs-car name) "normal"))
          (file (or (tmfs-cdr name) ""))
-         (root (tmfs-string->url file)))
+         (root (help-file->url file)))
     (cond ((or (== file "") (not (url-exists? root)))
            `(document
               (TeXmacs ,(texmacs-version))

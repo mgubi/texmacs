@@ -100,6 +100,8 @@
         (switch-to-buffer buf)
         (set-drd cur)
         (dynamic-make-slides)
+        ;; typeset the new buffer, so that its links get registered
+        (update-forced)
         (print-to-file fname)
         (switch-to-buffer cur)
         (buffer-close buf))
@@ -159,6 +161,8 @@
         (switch-to-buffer buf)
         (set-drd cur)
         (dynamic-make-slides)
+        ;; typeset the new buffer, so that its links get registered
+        (update-forced)
         (print-to-file fname)
         (unless (attach-doc-to-exported-pdf fname)
           (notify-now "Fail to attach tm to pdf"))

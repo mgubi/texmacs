@@ -65,7 +65,7 @@
   (:winpath "python*" ".")
   (:winpath "Python*" ".")
   (:winpath "Python/Python*" ".")
-  (:require (or (python-in-browser?) (python-command)))
+  (:require (or (python-in-browser?) (!= (python-command) "")))
   ,@(python-engine)
   (:preferences (and (not (python-in-browser?)) (supports-jupyter?)))
   (:serializer ,python-serialize)

@@ -11,6 +11,7 @@
 
 #include "convert.hpp"
 #include "analyze.hpp"
+#include "converter.hpp"
 
 #define JSON_SHORT_ARRAY    8
 #define JSON_SHORT_OBJECT  16
@@ -64,7 +65,7 @@ void
 json_skip (string s, int& pos) {
   while (pos < N(s)) {
     switch (s[pos]) {
-    case '\"': case ',':
+    case '\"': case ',': case '-':
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
     case ':': case '[': case '\\': case ']':
@@ -76,30 +77,18 @@ json_skip (string s, int& pos) {
   }
 }
 
-static unsigned int
-json_hex4 (string s, int pos) {
-  unsigned int c= 0;
-  for (int i= 0; i < 4; i++) {
-    char x= s[pos + i];
-    c <<= 4;
-    if (x >= '0' && x <= '9') c += x - '0';
-    else if (x >= 'a' && x <= 'f') c += x - 'a' + 10;
-    else if (x >= 'A' && x <= 'F') c += x - 'A' + 10;
+static int
+json_parse_hex4 (string s, int pos) {
+  if (pos + 4 > N(s)) return -1;
+  int code= 0;
+  for (int i= pos; i < pos + 4; i++) {
+    char c= s[i];
+    if (c >= '0' && c <= '9') code= 16 * code + (c - '0');
+    else if (c >= 'a' && c <= 'f') code= 16 * code + (c - 'a' + 10);
+    else if (c >= 'A' && c <= 'F') code= 16 * code + (c - 'A' + 10);
+    else return -1;
   }
-  return c;
-}
-
-static void
-json_utf8 (string& r, unsigned int c) {
-  if (c < 0x80) r << (char) c;
-  else if (c < 0x800) {
-    r << (char) (0xC0 | (c >> 6)) << (char) (0x80 | (c & 0x3F)); }
-  else if (c < 0x10000) {
-    r << (char) (0xE0 | (c >> 12)) << (char) (0x80 | ((c >> 6) & 0x3F))
-      << (char) (0x80 | (c & 0x3F)); }
-  else {
-    r << (char) (0xF0 | (c >> 18)) << (char) (0x80 | ((c >> 12) & 0x3F))
-      << (char) (0x80 | ((c >> 6) & 0x3F)) << (char) (0x80 | (c & 0x3F)); }
+  return code;
 }
 
 tree
@@ -116,22 +105,21 @@ json_parse_string (string s, int& pos, int mode) {
       else if (s[pos] == 'n') { pos++; r << '\n'; }
       else if (s[pos] == 'r') { pos++; r << '\r'; }
       else if (s[pos] == 't') { pos++; r << '\t'; }
-      else if (s[pos] == 'u' && pos + 4 < N(s)) {
-        // a code point in UTF-16 (a pair of surrogates beyond U+FFFF), in
-        // UTF-8 as the rest of the string
-        unsigned int c= json_hex4 (s, pos + 1);
+      else if (s[pos] == '/') { pos++; r << '/'; }
+      else if (s[pos] == 'u' && json_parse_hex4 (s, pos+1) >= 0) {
+        unsigned int code= json_parse_hex4 (s, pos+1);
         pos += 5;
-        if (c >= 0xD800 && c < 0xDC00 && pos + 5 < N(s) &&
-            s[pos] == '\\' && s[pos+1] == 'u') {
-          unsigned int d= json_hex4 (s, pos + 2);
-          if (d >= 0xDC00 && d < 0xE000) {
-            c= 0x10000 + ((c - 0xD800) << 10) + (d - 0xDC00);
-            pos += 6;
-          }
+        if (code >= 0xd800 && code < 0xdc00 &&
+            test (s, pos, "\\u") && json_parse_hex4 (s, pos+2) >= 0xdc00 &&
+            json_parse_hex4 (s, pos+2) < 0xe000) {
+          unsigned int low= json_parse_hex4 (s, pos+2);
+          code= 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+          pos += 6;
         }
-        json_utf8 (r, c);
+        else if (code >= 0xd800 && code < 0xe000)
+          code= 0xfffd; // unpaired surrogate
+        r << encode_as_utf8 (code);
       }
-      else r << s[pos++];
     }
     else r << s[pos++];
   return r;
@@ -140,9 +128,12 @@ json_parse_string (string s, int& pos, int mode) {
 tree
 json_parse_number (string s, int& pos, int mode) {
   int start= pos;
+  if (pos < N(s) && s[pos] == '-') pos++;
   while (pos < N(s) &&
          ((s[pos] >= '0' && s[pos] <= '9') ||
-          s[pos] == '.'))
+          s[pos] == '.' || s[pos] == 'e' || s[pos] == 'E' ||
+          ((s[pos] == '+' || s[pos] == '-') &&
+           (s[pos-1] == 'e' || s[pos-1] == 'E'))))
     pos++;
   return json_number (s (start, pos), mode);
 }
@@ -198,6 +189,7 @@ json_parse (string s, int& pos, int mode) {
       return json_parse_string (s, pos, mode);
     case ',':
       break;
+    case '-':
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
       return json_parse_number (s, pos, mode);

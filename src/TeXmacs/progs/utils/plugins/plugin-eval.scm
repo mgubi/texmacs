@@ -21,7 +21,7 @@
 
 (tm-define (plugin-output-std-simplify name t)
   ;;(display* "Simplify " t "\n")
-  (cond ((or (func? t 'document 0) (func? 'concat 0)) "")
+  (cond ((or (func? t 'document 0) (func? t 'concat 0)) "")
         ((or (func? t 'document 1) (func? t 'concat 1))
          (plugin-output-simplify name (cadr t)))
         ((and (or (func? t 'document) (func? t 'concat))
@@ -109,8 +109,14 @@
       ;; a program which cannot be started (in a browser there are no
       ;; processes): its error, and the evaluations waiting are cancelled
       (when (and (string? r) (string-starts? r "Error:"))
+        (ahash-remove! plugin-connected (list lan ses))
+        (ahash-remove! plugin-started (list lan ses))
+        (ahash-remove! plugin-prompts (list lan ses))
+        (pending-set lan ses (cdr (pending-ref lan ses)))
         (connection-notify lan ses "error" (stree->tree `(document ,r)))
-        (connection-notify-status lan ses 0)))))
+        (connection-notify-status lan ses 0)
+        (plugin-cancel lan ses #t))
+      r)))
 
 (tm-define (plugin-write lan ses t mode)
   (ahash-set! plugin-started (list lan ses) (texmacs-time))

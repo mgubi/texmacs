@@ -163,37 +163,37 @@
 ;; Collected keys
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define gpg-collected-public-keys-url
+(define (gpg-collected-public-keys-url)
   (url-append (gpg-homedir) "collected-public-keys.scm"))
 
 (tm-define (gpg-collected-public-keys)
   (when (supports-gpg?)
     (with t (make-ahash-table)
-      (when (url-exists? gpg-collected-public-keys-url)
+      (when (url-exists? (gpg-collected-public-keys-url))
 	(set! t (list->ahash-table
-		 (load-object gpg-collected-public-keys-url))))
+		 (load-object (gpg-collected-public-keys-url)))))
       t)))
 
 (tm-define (gpg-add-collected-public-keys ckeys)
   (when (supports-gpg?)
     (with t (make-ahash-table)
-      (when (url-exists? gpg-collected-public-keys-url)
+      (when (url-exists? (gpg-collected-public-keys-url))
 	(set! t (list->ahash-table
-		 (load-object gpg-collected-public-keys-url))))
+		 (load-object (gpg-collected-public-keys-url)))))
       (for (f (ahash-entries ckeys))
 	(ahash-set! t f (ahash-ref ckeys f)))
-      (save-object gpg-collected-public-keys-url
+      (save-object (gpg-collected-public-keys-url)
 		   (ahash-table->list t)))))
 
 (tm-define (gpg-delete-collected-public-keys fingerprints)
   (when (supports-gpg?)
     (with t (make-ahash-table)
-      (when (url-exists? gpg-collected-public-keys-url)
+      (when (url-exists? (gpg-collected-public-keys-url))
 	(set! t (list->ahash-table
-		 (load-object gpg-collected-public-keys-url))))
+		 (load-object (gpg-collected-public-keys-url)))))
       (for (f fingerprints)
 	(ahash-remove! t f))
-      (save-object gpg-collected-public-keys-url
+      (save-object (gpg-collected-public-keys-url)
 		   (ahash-table->list t)))))
 
 (tm-define (gpg-import-public-key-from-collected fingerprint)
@@ -223,7 +223,6 @@
   (ahash-entries t)))
 
 (tm-define (tm-gpg-collect-public-keys-from-buffer)
-  (:secure #t)
   (:synopsis "Collect public keys from buffer")
   (let* ((fingerprints (get-new-key-fingerprints-from-buffer))
 	 (ckeys (gpg-get-ahash-table-attachment "gpg"))
@@ -421,12 +420,12 @@
 
 (define (gpg-executable-delete-public-key fingerprint homedir)
   (append (gpg-executable-default homedir)
-          (list "--quiet" "--yes" "--delete-public-key" fingerprint)))
+          (list "--quiet" "--yes" "--delete-keys" fingerprint)))
 
 (tm-define (gpg-delete-public-key fingerprint . homedir)
   (:synopsis "Delete GnuPG public key of fingerprint @fingerprint")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (cmd (gpg-executable-delete-secret-and-public-key fingerprint dir))
+         (cmd (gpg-executable-delete-public-key fingerprint dir))
          (ret (evaluate-system cmd '() '() '(1 2))))
     (or (== (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret)))))
