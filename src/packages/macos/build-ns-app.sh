@@ -93,7 +93,9 @@ fi
 
 if [ $configure = yes ]; then
   if [ $scheme = s7 ]; then args="--with-scheme=s7"
-  else args="--with-scheme=guile --with-guile=$guile_config"; fi
+  else args="--with-guile=$guile_config"
+       # (where the Scheme is chosen, S7 is the default)
+       grep -q with-scheme configure && args="--with-scheme=guile $args"; fi
   args="$args --with-gui=$gui"
   if [ $gui = vue ]; then
     [ -z "$mupdf" ] && mupdf=$(brew --prefix 2> /dev/null || echo /opt/homebrew)

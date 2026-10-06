@@ -295,6 +295,7 @@ struct gpu_state {
   int sx1= 0, sy1= 0, sx2= 0, sy2= 0; // the clip (device pixels)
   // the atlas of the glyphs, with a white corner for the fills
   GLuint atlas= 0;
+  GLuint blank= 0;  // 1x1, at the unit of u_tex when a draw has no texture
   int ax= 4, ay= 0, arow= 4;
   std::unordered_map<glyph_key, glyph_slot, glyph_key_hash> glyphs;
   std::unordered_map<glyph_key, slug_glyph, glyph_key_hash> slugs;
@@ -566,6 +567,17 @@ init_gl () {
   G.u_ptile= glGetUniformLocation (G.prog, "u_ptile");
   glGenVertexArrays (1, &G.vao);
   glGenBuffers (1, &G.vbo);
+  // a texture of 1x1 for the units which a draw does not use: the samplers
+  // of the program must always have a complete texture (macOS warns of the
+  // texture 0, "unloadable", otherwise)
+  glGenTextures (1, &G.blank);
+  glBindTexture (GL_TEXTURE_2D, G.blank);
+  {
+    unsigned char white[4]= { 255, 255, 255, 255 };
+    glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  }
   // the atlas, with a white 4x4 corner (the fills)
   glGenTextures (1, &G.atlas);
   glBindTexture (GL_TEXTURE_2D, G.atlas);
@@ -702,7 +714,7 @@ flush_quads () {
   glUniform2f (G.u_porig, G.porig_x, G.porig_y);
   glUniform2f (G.u_ptile, G.ptile_w, G.ptile_h);
   glActiveTexture (GL_TEXTURE0);
-  glBindTexture (GL_TEXTURE_2D, G.mode != 2 ? G.tex : 0);
+  glBindTexture (GL_TEXTURE_2D, (G.mode != 2 && G.tex != 0) ? G.tex : G.blank);
   glUniform1i (G.u_tex, 0);
   glActiveTexture (GL_TEXTURE1);
   glBindTexture (GL_TEXTURE_2D, G.atlas);

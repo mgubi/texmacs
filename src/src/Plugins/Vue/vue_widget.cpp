@@ -2410,6 +2410,24 @@ vue_ui_rep::do_layout () {
         concrete (d.w)->do_layout ();
       }
     }
+    else if (d.name == "wait-panel") {
+      // the wait indicator (show_wait_indicator in vue_gui.cpp): a framed
+      // panel, its content centred vertically. Rounded when the windows are
+      // drawn in one; a window of its own is square, framed by the popup
+      bool round= vue_single_window ();
+      Clay_BorderElementConfig frame= {};
+      if (round) frame= { .width= { 1, 1, 1, 1 }, .color= color_border };
+      CLAY(div_id, {
+        .backgroundColor= color_field,
+        .cornerRadius= round ? ui_corners (menu_round) : CLAY_CORNER_RADIUS (0),
+        .layout= {
+          .padding= { ui_px (18), ui_px (24), ui_px (14), ui_px (14) },
+          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+        .border= frame })
+      {
+        concrete (d.w)->do_layout ();
+      }
+    }
     else if (d.name == "discrete") {
       context_style |= WIDGET_STYLE_GREY;
       CLAY(div_id, { .layout= { .padding= { ui_px (4), ui_px (4), ui_px (2), ui_px (2) } }})
@@ -4962,7 +4980,10 @@ vue_plain_window_widget_rep::write (slot s, blackbox index, widget w)  {
 void
 vue_plain_window_widget_rep::do_layout () {
   Clay_BorderElementConfig border= {};
-  if (popup) border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
+  // (not around the wait indicator drawn in a window with the others, a
+  // panel with its own rounded frame: the square line showed at its corners)
+  if (popup && !(name == "Wait" && vue_single_window ()))
+    border= { .width= { 1, 1, 1, 1 }, .color= { 150, 150, 150, 255 } };
   // no background: process_redraw clears the window with the same colour
   // before replaying the commands, and painting it again here cost a fill
   // of the whole window per frame (see "Rendering details" in

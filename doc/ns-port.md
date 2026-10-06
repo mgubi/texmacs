@@ -240,7 +240,12 @@ fade).
   filled by Core Graphics with its antialiasing into images cached as the
   bitmaps were (one per glyph, size and color), at the place of the bitmaps
   to the pixel; the other glyphs (TeX's bitmap fonts, patterns) keep the
-  bitmaps made by `shrink`, which are a little bolder.
+  bitmaps made by `shrink`, which are a little bolder. Checked against the
+  bitmaps (`TEXMACS_NS_GLYPHS=bitmap`) on a help page and on
+  `examples/texts/{bracket,root,greek,bigtable,roman-sup}-test.tm` (big
+  delimiters made of pieces, roots, Greek, a big table, STIX and Termes):
+  the glyphs are at the same place to the pixel, at most 1% of the pixels
+  differ by more than a quarter, with 1-12% less ink.
 * **Generic code**: `AQUATEXMACS` is treated as Qt where the generic code
   has Qt specific parts (delayed commands, native pictures, drops, bitmap
   exports, texmacs output widgets, the repainting and the mouse of the

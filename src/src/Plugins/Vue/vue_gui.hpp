@@ -60,6 +60,7 @@ struct vue_theme {
 extern vue_theme the_theme;       // the one in use
 color theme_color (Clay_Color c); // its TeXmacs equivalent
 void  set_vue_theme (string name);
+bool  vue_single_window (); // the windows drawn in one (the browser)
 
 
 // drag state of a scroll bar
