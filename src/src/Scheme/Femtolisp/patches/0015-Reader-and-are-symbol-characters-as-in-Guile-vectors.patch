@@ -1,7 +1,7 @@
 From 47aed47d76616861a469d548114a161a4647a016 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:34:20 +0100
-Subject: [PATCH 15/20] Reader: [ and ] are symbol characters, as in Guile
+Subject: [PATCH 15/21] Reader: [ and ] are symbol characters, as in Guile
  (vectors are #(...)); boot image regenerated
 
 ---

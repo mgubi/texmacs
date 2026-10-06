@@ -1,7 +1,7 @@
 From 56db7dcaa63ac8f8949e75da1ffb81acc16ead20 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:17:23 +0100
-Subject: [PATCH 13/20] *defer-macro-errors*: a macro call whose expansion
+Subject: [PATCH 13/21] *defer-macro-errors*: a macro call whose expansion
  fails compiles to the code raising the error; boot image regenerated
 
 ---

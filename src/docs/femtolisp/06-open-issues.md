@@ -38,8 +38,10 @@ With `tests/scheme/check.sh all`, 40 of 43 suites pass. The 4 failing checks:
 
 ## 6.4 Next steps
 
-- Faster boot: compile function bodies at their first call instead of when
-  the file is loaded (see [07](07-performance.md)).
+- The cache of compiled files: its format number (`%cache-format` in
+  `boot-femtolisp.scm`) must be increased when the code which compiles
+  (`boot-femtolisp.scm`, the late calls...) changes in a way the key does
+  not see.
 - Test CMake, Linux, Windows and the WebAssembly build (llt builds on any
   architecture, but this was only tested on macOS arm64).
 - Try plugins and user code written for Guile.

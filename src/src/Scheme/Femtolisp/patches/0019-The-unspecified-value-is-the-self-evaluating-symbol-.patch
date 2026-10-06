@@ -1,7 +1,7 @@
 From 3495065fa0cb36da2d4564b46d91657fac582c46 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 20:40:50 +0100
-Subject: [PATCH 19/20] The unspecified value is the self-evaluating symbol
+Subject: [PATCH 19/21] The unspecified value is the self-evaluating symbol
  #<unspecified>, distinct from #t; boot image regenerated
 
 ---

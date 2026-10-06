@@ -1,7 +1,7 @@
 From e4e4b168708162ee87c5d3647569b283babe4740 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:52:30 +0100
-Subject: [PATCH 16/20] Special forms are not shadowed by local variables at
+Subject: [PATCH 16/21] Special forms are not shadowed by local variables at
  the head of a form (the expansions of the macros use them); boot image
  regenerated
 

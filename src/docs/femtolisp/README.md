@@ -11,7 +11,7 @@ how it works, what differs from Guile, how it performs, and what is left.
 | [02-boot-and-modules.md](02-boot-and-modules.md) | The boot sequence, modules as renamed global names, late calls for macros defined later, `tm-define` |
 | [03-compat-layer.md](03-compat-layer.md) | `r5rs-femtolisp.scm` and `compat-femtolisp.scm`: R5RS and Guile on femtolisp, byte strings, errors, complex numbers |
 | [04-progs-changes.md](04-progs-changes.md) | The changes to the Scheme code shared by all the interpreters, and the tests |
-| [05-build-and-vendored-femtolisp.md](05-build-and-vendored-femtolisp.md) | Choosing the interpreter, the vendored femtolisp, its 20 patches, rebuilding the boot image |
+| [05-build-and-vendored-femtolisp.md](05-build-and-vendored-femtolisp.md) | Choosing the interpreter, the vendored femtolisp, its 21 patches, rebuilding the boot image |
 | [06-open-issues.md](06-open-issues.md) | Known differences with Guile, failing checks, fragile spots, what to do next |
 | [07-performance.md](07-performance.md) | femtolisp, s7 and Guile on boot, tests, conversions, LaTeX export, the manual and the C++ boundary |
 | [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds |
@@ -21,7 +21,7 @@ how it works, what differs from Guile, how it performs, and what is left.
 - **The interpreter is a build option:** `./configure --with-scheme=femtolisp`
   (CMake: `-DSCHEME_IMPL=femtolisp`). The choices `s7` (default) and `guile`
   are unchanged. A femtolisp build needs nothing outside the source tree.
-- **femtolisp is vendored with 20 local patches** in
+- **femtolisp is vendored with 21 local patches** in
   `src/Scheme/Femtolisp/patches`, each one small and described in
   [05](05-build-and-vendored-femtolisp.md). Most make femtolisp read, print
   and evaluate as Guile does; a few are hooks for the embedding.
@@ -42,9 +42,10 @@ how it works, what differs from Guile, how it performs, and what is left.
   code runs, so code written for Guile keeps working.
 - **Tests:** 40 of the 43 regression suites pass; the 4 failing checks are
   listed in [06](06-open-issues.md).
-- **Performance** (see [07](07-performance.md)): femtolisp is faster than
-  Guile on what was measured and between Guile and s7 overall. It is the
-  fastest on the warm LaTeX export (1.8 s, s7 1.9–3.1 s, Guile 6.7 s),
-  about 1.5× slower than s7 on the regression suites, and slower to load
-  code, since every loaded form is compiled (boot 1.6 s, s7 0.9 s,
-  Guile 1.7 s). Its memory use is close to Guile's, well below s7's.
+- **Performance** (see [07](07-performance.md)): femtolisp and s7 are close,
+  and much faster than Guile. femtolisp is the fastest on Scheme-heavy work
+  (8 warm LaTeX exports: 1.8 s, s7 2.3 s, Guile 6.9–8.4 s; the regression
+  suites: 0.20 s, s7 0.23 s, Guile 0.35–0.40 s); s7 boots a little faster
+  (0.9 s, femtolisp 0.95–1.05 s, Guile 1.5 s). The boot relies on a cache
+  of the compiled files in `$TEXMACS_HOME_PATH/system/cache/femtolisp`.
+  Memory use is close to Guile's, below s7's.

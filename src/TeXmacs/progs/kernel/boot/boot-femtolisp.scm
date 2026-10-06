@@ -149,6 +149,13 @@
     (filter (lambda (n) (not (memq n public-here))) private)))
 
 (define (%read-forms file)
+  (if %profile?
+      (let* ((t0 (time.now)) (r (%read-forms-sub file)))
+        (set! %profile-read (+ %profile-read (- (time.now) t0)))
+        r)
+      (%read-forms-sub file)))
+
+(define (%read-forms-sub file)
   (call-with-input-file file
     (lambda (p)
       (let loop ((acc '()))
@@ -170,9 +177,18 @@
 
 (define (primitive-eval x) (eval x))
 
-(define (%eval-forms forms)
-  (let loop ((l forms) (r #t))
-    (if (null? l) r (loop (cdr l) (%fl-eval (car l))))))
+;; TEXMACS_FL_PROFILE: the time spent reading, expanding and compiling (or
+;; finding in the cache) the forms of the loaded files, (%profile-report)
+(define %profile? (os.getenv "TEXMACS_FL_PROFILE"))
+(define %profile-read 0.0)
+(define %profile-expand 0.0)
+(define %profile-compile 0.0)
+(define %profile-forms 0)
+(define (%profile-report)
+  (display* "PROFILE forms " %profile-forms
+            " read " (round (* 1000 %profile-read)) " ms"
+            " expand " (round (* 1000 %profile-expand)) " ms"
+            " compile or cache " (round (* 1000 %profile-compile)) " ms\n"))
 
 ;; Femtolisp expands the macros when it compiles a form, and Guile when it
 ;; first evaluates it: TeXmacs code may use a macro which is defined after the
@@ -202,7 +218,9 @@
   (let ((f (aref site 3)))
     (if (not f)
         (begin
-          (set! f (with-bindings ((*current-module* (aref site 2))
+          (set! f (with-bindings ((*current-module*
+                                   (and (aref site 2)
+                                        (get *modules* (aref site 2) #f)))
                                   (*compiling-late-site* #t))
                     (%fl-eval (list 'lambda (aref site 1) (aref site 0)))))
           (aset! site 3 f)))
@@ -214,12 +232,140 @@
                 (and *file-definitions* (has? *file-definitions* (car x))))
             #f
             (let* ((vars (%env-variables env))
-                   (site (vector x vars *current-module* #f)))
+                   ;; the name of the module (the site can be written in the
+                   ;; cache of compiled files)
+                   (site (vector x vars (and *current-module*
+                                             (module-name *current-module*))
+                                 #f)))
               (if %trace-errors? (set! %late-sites (cons site %late-sites)))
               (list '%late-call (list 'quote site) (cons 'list vars))))))
 
 (define (%late-calls)
   (map (lambda (site) (car (aref site 0))) %late-sites))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The cache of the compiled files
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Compiling the forms of the loaded files is half of the boot. The cache,
+;; $TEXMACS_HOME_PATH/system/cache/femtolisp/, keeps for each file the
+;; expanded forms and their compiled code. The forms are still expanded at
+;; each load (the expansions may have side effects), and the compiled code
+;; of a form is reused when its expansion is equal to the one in the cache.
+;; A cache file starts with a key (the compiler, the TeXmacs version and
+;; the format of the cache) and the private names of the module, which the
+;; compiled code depends on. The forms whose expansion or code holds values
+;; which cannot be written and read back (uninterned symbols, tables,
+;; procedures with an environment, TeXmacs objects...) are compiled at each
+;; load. TEXMACS_FL_NO_CACHE disables the cache.
+
+(define %cache-format 1)
+(define %cache? (not (os.getenv "TEXMACS_FL_NO_CACHE")))
+(define %cache-dir #f)
+(define %cache-key #f)
+
+(define (%cache-file file)
+  (and %cache?
+       (begin
+         (if (not %cache-dir)
+             (let ((dir (url-concretize
+                         "$TEXMACS_HOME_PATH/system/cache/femtolisp")))
+               (if (not (url-exists? dir)) (system-mkdir dir))
+               (set! %cache-dir dir)
+               (set! %cache-key
+                     (list *fl-boot-id* (texmacs-version) %cache-format))))
+         (string-append %cache-dir "/"
+                        (list->string
+                         (map (lambda (c)
+                                (if (memv c '(#\/ #\\ #\: #\space)) #\% c))
+                              (string->list file)))
+                        ".flc"))))
+
+;; can x be written and read back as an equal value?
+(define (%cache-writable? x)
+  (let ((seen (table)))
+    (let walk ((x x))
+      (cond ((or (%fl-symbol? x) (number? x) (string? x) (char? x)
+                 (null? x) (boolean? x) (builtin? x))
+             (not (gensym? x)))
+            ((pair? x)
+             (or (has? seen x)
+                 (begin (put! seen x #t) (and (walk (car x)) (walk (cdr x))))))
+            ((vector? x)
+             (or (has? seen x)
+                 (begin (put! seen x #t) (every walk (vector->list x)))))
+            ((function? x)
+             (or (%builtin-name x)
+                 (and (null? (function:env x))
+                      (walk (function:vals x)))))
+            (else #f)))))
+
+(define (%cache-read-entry in)
+  (trycatch (read in) (lambda (e) (eof-object))))
+
+;; the entries of the cache of file, or #f
+(define (%cache-open cf privates)
+  (and cf (file-exists? cf)
+       (trycatch
+        (let* ((in (open-input-file cf))
+               (key (read in))
+               (privs (read in)))
+          (if (and (equal? key %cache-key) (equal? privs privates))
+              in
+              (begin (close-port in) #f)))
+        (lambda (e) #f))))
+
+(define (%cache-write cf privates entries)
+  (trycatch
+   ;; (written aside, then moved: another TeXmacs may read or write it)
+   (let ((tmp (string-append cf "." (number->string (getpid)) ".tmp")))
+     (call-with-output-file tmp
+       (lambda (out)
+         (with-bindings ((*print-readably* #t) (*print-closures* #t)
+                         (*print-shared* #t) (*print-pretty* #f)
+                         (*print-length* #f) (*print-level* #f))
+           (%fl-write %cache-key out) (newline out)
+           (%fl-write privates out) (newline out)
+           (for-each (lambda (e) (%fl-write e out) (newline out))
+                     entries))))
+     (system-move tmp cf))
+   (lambda (e) #f)))
+
+;; evaluates the forms of file, with the cache
+(define (%eval-forms-cached file forms privates)
+  (let* ((cf (%cache-file file))
+         (in (%cache-open cf privates))
+         (dirty (not in))
+         (entries '()))
+    (let loop ((l forms))
+      (if (pair? l)
+          (let* ((t0 (and %profile? (time.now)))
+                 (e (expand (car l)))
+                 (t1 (and %profile? (time.now)))
+                 (old (if in (%cache-read-entry in) (eof-object)))
+                 (hit (and (pair? old) (cdr old) (equal? (car old) e)))
+                 (thunk (if hit
+                            (cdr old)
+                            (begin (set! dirty #t) (compile-thunk e)))))
+            (if %profile?
+                (begin
+                  (set! %profile-expand (+ %profile-expand (- t1 t0)))
+                  (set! %profile-compile (+ %profile-compile
+                                            (- (time.now) t1)))
+                  (set! %profile-forms (+ %profile-forms 1))))
+            ;; (an entry read from the cache can be written back)
+            (if cf
+                (set! entries
+                      (cons (cond (hit old)
+                                  ((and (%cache-writable? e)
+                                        (%cache-writable? thunk))
+                                   (cons e thunk))
+                                  (else (list #f)))
+                            entries)))
+            (thunk)
+            (loop (cdr l)))))
+    (if in (close-port in))
+    (if (and cf dirty) (%cache-write cf privates (reverse! entries)))))
 
 ;; loads a file; when its first form is (texmacs-module name ...), it is the
 ;; file of the module name
@@ -229,9 +375,9 @@
 
 (define (%load-file-sub file)
   (with-bindings ((*file-definitions* (table)))
-    (%load-forms (%read-forms file))))
+    (%load-forms (%read-forms file) file)))
 
-(define (%load-forms forms)
+(define (%load-forms forms file)
   (begin
     (if (and (pair? forms) (pair? (car forms))
              (eq? (caar forms) 'texmacs-module) (pair? (cdar forms)))
@@ -240,14 +386,15 @@
                       (let ((m (%make-module name)))
                         (put! *modules* name m)
                         m))))
-          (for-each (lambda (s) (%module-declare-private! m s))
-                    (%scan-definitions forms))
-          (with-bindings ((*current-module* m)
-                          (*module-name* name))
-            (%eval-forms forms)))
+          (let ((privates (%scan-definitions forms)))
+            (for-each (lambda (s) (%module-declare-private! m s)) privates)
+            (with-bindings ((*current-module* m)
+                            (*module-name* name))
+              (%eval-forms-cached file forms (cons name privates)))))
         (begin
           (%scan-definitions forms)
-          (%eval-forms forms)))))
+          (%eval-forms-cached file forms
+                              (list (module-name *current-module*)))))))
 
 (define-override (load file . env)
   (if (null? env)

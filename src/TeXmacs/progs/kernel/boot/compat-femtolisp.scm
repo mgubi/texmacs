@@ -24,7 +24,7 @@
 (define-public (make-hash-table . size) (table))
 (define-public (hash-table? x) (table? x))
 (define-public (hash-ref h key . default)
-  (get h key (if (pair? default) (car default) #f)))
+  (if (null? default) (%table-ref h key) (get h key (car default))))
 (define-public (hash-set! h key value) (put! h key value) value)
 (define-public (hash-get-handle h key)
   (and (has? h key) (cons key (get h key))))

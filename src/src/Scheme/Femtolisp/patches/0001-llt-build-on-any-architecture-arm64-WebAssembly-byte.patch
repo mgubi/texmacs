@@ -1,7 +1,7 @@
 From 2c0903374e4d5e3daff582e4227d2818ce34875c Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 16:25:10 +0100
-Subject: [PATCH 01/20] llt: build on any architecture (arm64, WebAssembly):
+Subject: [PATCH 01/21] llt: build on any architecture (arm64, WebAssembly):
  byte swaps with compiler builtins
 
 ---

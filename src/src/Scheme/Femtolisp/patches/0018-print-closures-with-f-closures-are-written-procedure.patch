@@ -1,7 +1,7 @@
 From b3e1e92ba518d3cfcd42101d017c82ecd7df9cc0 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 20:31:48 +0100
-Subject: [PATCH 18/20] *print-closures*: with #f, closures are written
+Subject: [PATCH 18/21] *print-closures*: with #f, closures are written
  #<procedure name>, as Guile
 
 ---

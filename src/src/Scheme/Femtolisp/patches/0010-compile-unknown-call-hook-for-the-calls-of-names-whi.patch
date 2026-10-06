@@ -1,7 +1,7 @@
 From 0719a43e685cb8f5b053bd37109398dcbb043990 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:03:56 +0100
-Subject: [PATCH 10/20] compile-unknown-call: hook for the calls of names which
+Subject: [PATCH 10/21] compile-unknown-call: hook for the calls of names which
  are not defined at compile time; boot image regenerated
 
 ---

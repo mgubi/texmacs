@@ -428,6 +428,29 @@ static value_t read_vector(value_t label, u_int32_t closer)
 {
     value_t v=the_empty_vector, elt;
     u_int32_t i=0;
+    if (label == UNBOUND) {
+        // TeXmacs: without a label, nothing refers to the vector while it is
+        // read: its elements are kept on the stack and the vector made at
+        // the end (growing it calls the garbage collector, which is slow
+        // with a large heap)
+        uint32_t base = SP;
+        while (peek() != closer) {
+            if (ios_eof(F))
+                lerror(ParseError, "read: unexpected end of input");
+            elt = do_read_sexpr(UNBOUND);
+            if (SP >= N_STACK)
+                grow_stack();
+            PUSH(elt);
+            i++;
+        }
+        take();
+        if (i == 0)
+            return the_empty_vector;
+        v = alloc_vector(i, 0);
+        memcpy(&vector_elt(v,0), &Stack[base], i*sizeof(value_t));
+        POPN(i);
+        return v;
+    }
     PUSH(v);
     if (label != UNBOUND)
         ptrhash_put(&readstate->backrefs, (void*)label, (void*)v);

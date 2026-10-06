@@ -1,7 +1,7 @@
 From 98ce521c1502556b1185d8442bcc3382d1cb5612 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 16:25:30 +0100
-Subject: [PATCH 02/20] Hooks for embedding: extra GC roots, equality and hash
+Subject: [PATCH 02/21] Hooks for embedding: extra GC roots, equality and hash
  of opaque values
 
 ---
