@@ -1265,6 +1265,7 @@ string
 replace (string s, string what, string by) {
   int i, n= N(s);
   string r;
+  if (N(what) == 0) return s;
   for (i=0; i<n; )
     if (test (s, i, what)) {
       r << by;
@@ -1313,6 +1314,7 @@ array<string>
 tokenize (string s, string sep) {
   int start=0;
   array<string> a;
+  if (N(sep) == 0) { a << s; return a; }
   for (int i=0; i<N(s); )
     if (test (s, i, sep)) {
       a << s (start, i);
