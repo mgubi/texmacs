@@ -13,7 +13,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (kernel boot abbrevs-test)
+  (:use (convert latex tmtex-pdflatex)
+        (kernel boot abbrevs-test)
         (kernel logic logic-engine-test)
         (kernel texmacs tm-define-test)
         (kernel texmacs tm-dialogue-test)
@@ -72,23 +73,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (run-pdflatex tex-file)
-  (and (url-exists? tex-file)
-       (let* ((tex-dir  (url-head tex-file))
-              (pdf-file (url-glue (url-unglue tex-file 4) ".pdf"))
-              (log-file (url-glue (url-unglue tex-file 4) ".log"))
-              (cmd1 (string-append "cd " (system-url->string tex-dir)))
-              (cmd2 (string-append "pdflatex -interaction=batchmode "
-                                   (url->string (url-tail tex-file))))
-              (cmd  (string-append cmd1 "; " cmd2 " > /dev/null")))
-         (system-remove pdf-file)
-         (system-remove log-file)
-         (system cmd)
-         (and (url-exists? log-file)
-              (list (url-exists? pdf-file)
-                    (number-latex-errors log-file)
-                    (number-latex-pages log-file))))))
 
 (define (check-latex-export-one tm-file)
   (display* "Checking LaTeX export of " (url->string tm-file) "...\n")
