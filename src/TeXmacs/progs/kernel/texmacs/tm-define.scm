@@ -267,30 +267,42 @@
             ,(begin* body)
             ,(apply* 'former head)))))
 
+(define (tm-global-ref var)
+  ;; expression for the value of the tm-defined var: on femtolisp, the global
+  ;; one, also in a module which defines var privately
+  (if (femtolisp-scheme?) `(top-level-value ',var) var))
+
 (define (tm-defining-module-name)
   ;; expression for the name of the module in which a tm-define is expanded
-  (if (s7-scheme?) '*module-name* '(module-name temp-module)))
+  (if (or (s7-scheme?) (femtolisp-scheme?))
+      '*module-name*
+      '(module-name temp-module)))
 
 (define-public-macro (tm-define-overloaded head . body)
   (let* ((var (ca*r head))
          (nbody (tm-add-condition var head body))
          (nval (lambda* head nbody)))
     (if (ahash-ref tm-defined-table var)
-        `(let ((former ,var))
+        `(let ((former ,(tm-global-ref var)))
            ;;(if (== (length (ahash-ref tm-defined-table ',var)) 1)
            ;;    (display* "Overloaded " ',var "\n"))
            ;;(display* "Overloaded " ',var "\n")
            ;;(display* "   " ',nval "\n")
-           ,@(if (s7-scheme?)
-                 `((set! ,var ,nval))
+           ,@(cond ((s7-scheme?)
+                    `((set! ,var ,nval)))
+                   ((femtolisp-scheme?)
+                    ;; a global definition, even when the module which
+                    ;; overloads var has a private var
+                    `((define-global! ',var ,nval)))
+                   (else
                  `((set! temp-module ,(current-module))
                    (set! temp-value ,nval)
                    (set-current-module texmacs-user)
                    (set! ,var temp-value)
-                   (set-current-module temp-module)))
+                   (set-current-module temp-module))))
            (ahash-set! tm-defined-table ',var
                        (cons ',nval (ahash-ref tm-defined-table ',var)))
-           (ahash-set! tm-defined-name ,var ',var)
+           (ahash-set! tm-defined-name ,(tm-global-ref var) ',var)
 	   (ahash-set! tm-defined-module ',var
 		       (cons ,(tm-defining-module-name)
 			     (ahash-ref tm-defined-module ',var)))
@@ -304,19 +316,24 @@
                  '())
            ;;(display* "Defined " ',var "\n")
            ;;(if (nnull? cur-conds) (display* "   " ',nval "\n"))
-           ,@(if (s7-scheme?)
+           ,@(cond ((s7-scheme?)
                  `((varlet (rootlet) ',var
                      ,(if (null? cur-conds) nval
-                          (list 'let '((former (lambda args (noop)))) nval))))
+                          (list 'let '((former (lambda args (noop)))) nval)))))
+                   ((femtolisp-scheme?)
+                 `((define-global! ',var
+                     ,(if (null? cur-conds) nval
+                          (list 'let '((former (lambda args (noop)))) nval)))))
+                   (else
                  `((set! temp-module ,(current-module))
                    (set! temp-value
                          ,(if (null? cur-conds) nval
                               (list 'let '((former (lambda args (noop)))) nval)))
                    (set-current-module texmacs-user)
                    (define-public ,var temp-value)
-                   (set-current-module temp-module)))
+                   (set-current-module temp-module))))
            (ahash-set! tm-defined-table ',var (list ',nval))
-           (ahash-set! tm-defined-name ,var ',var)
+           (ahash-set! tm-defined-name ,(tm-global-ref var) ',var)
 	   (ahash-set! tm-defined-module ',var
                        (list ,(tm-defining-module-name)))
            ,@(map property-rewrite cur-props)))))
@@ -353,19 +370,25 @@
     ;; with-module: with-let would renumber the user module, which then
     ;; looks newer than the modules loaded before, and every lookup of a
     ;; kernel symbol from those modules would scan their whole environment
-    (if (s7-scheme?)
+    (cond ((s7-scheme?)
         `(begin
            (tm-define ,macro-head ,@body)
            (eval '(define-public-macro ,head
                     ,(apply* (ca*r macro-head) head))
-                 *texmacs-user-module*))
+                 *texmacs-user-module*)))
+          ((femtolisp-scheme?)
+        `(begin
+           (tm-define ,macro-head ,@body)
+           (define-public-macro ,head
+             ,(apply* (ca*r macro-head) head))))
+          (else
         `(begin
            (tm-define ,macro-head ,@body)
            (set! temp-module ,(current-module))
            (set-current-module texmacs-user)
            (define-public-macro ,head
              ,(apply* (ca*r macro-head) head))
-           (set-current-module temp-module)))))
+           (set-current-module temp-module))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Associating extra properties to existing function symbols
@@ -404,11 +427,14 @@
        (tm-define (,name . args)
          ,@opts
          (let* ((m (resolve-module ',module))
-                (r ,(if (s7-scheme?)
-                        `(m ',name)
+                (r ,(cond ((s7-scheme?)
+                        `(m ',name))
+                          ((femtolisp-scheme?)
+                        `(module-ref m ',name #f))
+                          (else
                         `(module-ref (module-ref texmacs-user
                                                  '%module-public-interface)
-                                     ',name #f))))
+                                     ',name #f)))))
            (if (not r)
                (texmacs-error "lazy-define"
                               ,(string-append "Could not retrieve "
