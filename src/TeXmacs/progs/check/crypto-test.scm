@@ -65,6 +65,16 @@
 
 (define (tmp name) (url-append crypto-dir name))
 
+;; the sockets of gpg-agent are made in its home directory, and the name of
+;; a Unix socket has at most 104 bytes on macOS (108 on Linux, where gpg puts
+;; them in /run/user instead): the GnuPG homes of the checks are in /tmp
+(define gpg-socket-max 80)
+
+(define (gpg-tmp name)
+  (if (or (os-mingw?) (os-win32?)) (tmp name)
+      (system->url (string-append "/tmp/tm-" name "-"
+                                  (url->string (url-tail (url-temp-dir)))))))
+
 (define (skip what why)
   (display* "  SKIP " what ": " why "\n")
   (force-output))
@@ -184,13 +194,13 @@
                        '(concat "" "ab") '(document "x") '(document "x" "")
                        '(frac "a" "b") '(frac "b" "a")))
     (check= (length (list-remove-duplicates l)) (length l)))
-  ;; FIXME: tree-hash does not separate a label from the hashes of the
-  ;; children (src/Data/Tree/tree_cache.cpp:317-324): the hash of a tree is
-  ;; the hash of a string, so that (tree-hash (stree->tree '(frac))) equals
-  ;; (tree-hash (stree->tree "frac")), and the hash of (em "x") equals that
-  ;; of the string "em" followed by the hash of "x"; a document can thus
-  ;; contain a string with the cache name of another tree.
-  )
+  ;; the hash of a tree is not the one of a string, and its label is
+  ;; separated from its children (#176)
+  (check-false (== (h '(frac)) (h "frac")))
+  (check-false (== (h '(em "x")) (h (string-append "em" (h "x")))))
+  (check-false (== (h '(em "x")) (h (string-append "1:em" (h "x")))))
+  (check-false (== (h (list (string->symbol (string-append "em" (h "x")))))
+                   (h '(em "x")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Random numbers and salts
@@ -349,10 +359,19 @@
           (check-false (== (server-password-encode "pw-X1!" s "pbkdf2")
                            (server-password-encode "pw-X1!" test-salt
                                                    "pbkdf2"))))))
-  ;; FIXME: password-correct-sha512? prints the password and its hash on
-  ;; the standard output (server/server-authentication.scm:375, :384),
-  ;; which is the log of a headless server.
-  )
+  ;; checking a password does not print it, since the output of a server
+  ;; without a window is its log (#176); other lines may be printed (on
+  ;; Windows, every process started is reported there)
+  (for (type '("clear" "sha256" "sha512" "pbkdf2"))
+    (check-false (contains? (begin
+                              (cout-buffer)
+                              (check-run
+                               (lambda ()
+                                 (server-password-correct?
+                                  "Logged-pw-7!"
+                                  `(password ,type ,test-salt "x"))))
+                              (cout-unbuffer))
+                            "Logged-pw-7!"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format of encrypted blocks and documents
@@ -448,12 +467,11 @@
     (gpg-delete-buffer-passphrase w)
     (check-false (gpg-get-buffer-passphrase u))
     (check-false (gpg-get-buffer-passphrase w))
-    ;; FIXME: gpg-delete-buffer-passphrase (security/gpg/gpg-edit.scm:449)
-    ;; forgets the passphrase of the document but not the one which
-    ;; gpg-set-buffer-passphrase (:440) stored for its autosave file, which
-    ;; stays in memory and in the wallet: after the deletion,
-    ;; (gpg-get-buffer-passphrase (url-autosave u "~")) is still "pass-two".
-    ))
+    ;; the passphrases of the autosave files are deleted too (#176)
+    (check-false (gpg-get-buffer-passphrase (url-autosave u "~")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave u "#")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave w "~")))
+    (check-false (gpg-get-buffer-passphrase (url-autosave w "#")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Untrusted documents
@@ -505,14 +523,22 @@
     (check-false (tree-export (stree->tree doc) u "texmacs"))
     (check-true (contains? (string-load u) "PLAINTEXT"))
     (check-false (contains? (string-load u) "gpg-passphrase-encrypted")))
-  ;; FIXME (#66, item 3): a document whose initial environment has
-  ;; encryption gpg-passphrase is saved in clear when it has no passphrase
-  ;; or when gpg fails: tree-export-encrypted returns the plain tree
-  ;; (security/gpg/gpg-edit.scm:506-524), which export_tree writes
-  ;; (src/Texmacs/Data/new_buffer.cpp:535-545); (tree-export doc u
-  ;; "texmacs") then returns #f (success) and the file contains the
-  ;; secret text, with or without (gpg-set-buffer-passphrase u "pw").
-  )
+  ;; a document to be encrypted which cannot be is not saved: without a
+  ;; passphrase, or when gpg fails (#66, item 3)
+  (let ((u (tmp "secret.tm"))
+        (doc '(document (TeXmacs "2.1") (style (tuple "generic"))
+                        (initial (collection
+                                  (associate "encryption" "gpg-passphrase")))
+                        (body (document "SECRETTEXT")))))
+    (when (url-exists? u) (system-remove u))
+    (check-true (tree-export (stree->tree doc) u "texmacs"))
+    (check-false (and (url-exists? u) (contains? (string-load u) "SECRETTEXT")))
+    ;; with a passphrase, gpg is missing here
+    (gpg-set-buffer-passphrase u "pw")
+    (check-true (tree-export (stree->tree doc) u "texmacs"))
+    (check-false (and (url-exists? u)
+                      (contains? (string-load u) "SECRETTEXT")))
+    (gpg-delete-buffer-passphrase u)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GnuPG setup
@@ -585,8 +611,9 @@
   (check= (gpg-secret-key-fingerprints other) '())
   (with key (gpg-search-key-by-fingerprint fpr (gpg-public-keys dir))
     (check-true key)
+    ;; (the keys are listed as Cork strings, for the widgets: < is <less>)
     (check= (and key (gpg-get-key-user-id key))
-            "TeXmacs Test <texmacs-test@example.invalid>"))
+            (utf8->cork "TeXmacs Test <texmacs-test@example.invalid>")))
   (check-true (armored? (gpg-export-public-keys (list fpr) dir)
                         "PUBLIC KEY BLOCK"))
   (check-group "gpg encryption")
@@ -659,30 +686,34 @@
 ;; block of a buffer is encrypted and decrypted in place; a key block is
 ;; encrypted for its recipients (the decryption asks the passphrase of the
 ;; key in a dialog, so the message is decrypted with gpg-decrypt). A
-;; document with a passphrase is saved encrypted and read back.
+;; document with a passphrase is saved encrypted and read back. The commands
+;; replace the block by a new tree (tree-set! of another label), so the
+;; block is looked up again in the buffer after each of them.
+(define (first-block) (tree-ref (buffer-tree) 0))
+
 (define (test-gpg-documents dir fpr)
   (check-group "gpg blocks")
   (in-buffer '(document (gpg-passphrase-decrypted-block
                          (document "hidden text")))
     (lambda ()
-      (with t (tree-ref (buffer-tree) 0)
-        (tm-gpg-passphrase-encrypt t "block-pass")
+      (tm-gpg-passphrase-encrypt (first-block) "block-pass")
+      (with t (first-block)
         (check= (tree-label t) 'gpg-passphrase-encrypted-block)
         (check= (tree-arity t) 1)
         (check-true (armored? (tree->string (tree-ref t 0)) "MESSAGE"))
-        (check-false (contains? (tree->string (tree-ref t 0)) "hidden"))
-        (with enc (tree->stree t)
-          (tm-gpg-passphrase-decrypt t "wrong-pass")
-          (check= (tree->stree t) enc))
-        (tm-gpg-passphrase-decrypt t "block-pass")
-        (check= (tree->stree t)
-                '(gpg-passphrase-decrypted-block (document "hidden text"))))))
+        (check-false (contains? (tree->string (tree-ref t 0)) "hidden")))
+      (with enc (tree->stree (first-block))
+        (tm-gpg-passphrase-decrypt (first-block) "wrong-pass")
+        (check= (tree->stree (first-block)) enc))
+      (tm-gpg-passphrase-decrypt (first-block) "block-pass")
+      (check= (tree->stree (first-block))
+              '(gpg-passphrase-decrypted-block (document "hidden text")))))
   ;; the public key goes to the GnuPG home of TeXmacs
   (check-true (gpg-import-public-keys (gpg-export-public-keys (list fpr) dir)))
   (in-buffer `(document (gpg-decrypted-block (document "for the key") ,fpr))
     (lambda ()
-      (with t (tree-ref (buffer-tree) 0)
-        (tm-gpg-encrypt t)
+      (tm-gpg-encrypt (first-block))
+      (with t (first-block)
         (check= (tree-label t) 'gpg-encrypted-block)
         (check= (tree->string (tree-ref t 1)) fpr)
         (with enc (tree->string (tree-ref t 0))
@@ -727,8 +758,8 @@
           (check-group "gpg")
           (skip "GnuPG" ok)
           (test-without-gpg))
-        (let ((dir (tmp "gnupg"))
-              (other (tmp "gnupg-other")))
+        (let ((dir (gpg-tmp "gnupg"))
+              (other (gpg-tmp "gnupg-other")))
           (dynamic-wind
             (lambda ()
               (gpg-make-test-home dir)
@@ -744,9 +775,18 @@
                                (lambda () (test-gpg-keys dir other fpr)))
                       (guarded "gpg passphrase"
                                (lambda () (test-gpg-passphrase dir)))
-                      (if (not (scratch-home?))
-                          (skip "GnuPG in documents"
-                                "TeXmacs runs with the home of the user")
+                      (cond
+                        ((not (scratch-home?))
+                         (skip "GnuPG in documents"
+                               "TeXmacs runs with the home of the user"))
+                        ((> (string-length (url->system (gpg-homedir)))
+                            gpg-socket-max)
+                         (skip "GnuPG in documents"
+                               (string-append "the GnuPG home of TeXmacs "
+                                 "is too long for the sockets of gpg-agent "
+                                 "(use a shorter TM_TEST_HOME): "
+                                 (url->system (gpg-homedir)))))
+                        (else
                           (let* ((home (gpg-homedir))
                                  (made? (not (url-exists? home))))
                             (when made?
@@ -757,7 +797,7 @@
                                      (lambda ()
                                        (test-gpg-documents dir fpr)))
                             (gpg-kill-agent home)
-                            (when made? (system-rmdir-recursive home))))))))
+                            (when made? (system-rmdir-recursive home)))))))))
             (lambda ()
               (gpg-kill-agent dir)
               (gpg-kill-agent other)

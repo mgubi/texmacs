@@ -842,6 +842,10 @@
     ("    s = 'a\\nb' + \"x\""
      `(("s" ,black) ("=" ,c-operator) ("'a" ,c-string) ("\\n" ,c-char)
        ("b'" ,c-string) ("+" ,c-operator) ("\"x\"" ,c-string)))
+    ;; a comment marker in a string begins no comment (#46)
+    ("s = \"#\" + x  # c"
+     `(("s" ,black) ("=" ,c-operator) ("\"#\"" ,c-string) ("+" ,c-operator)
+       ("x" ,black) ("#" ,c-comment) ("c" ,c-comment)))
     ("    return [a for a in xs]"
      `(("return" ,c-keyword) ("[" ,c-openclose) ("a" ,black) ("for" ,c-keyword)
        ("a" ,black) ("in" ,c-keyword) ("xs" ,black) ("]" ,c-openclose)))
@@ -877,7 +881,12 @@
        ("a" ,black) ("." ,c-field) ("b" ,black)))
     ("  x /* c */ y"
      `(("x" ,black) ("/*" ,c-comment) ("c" ,c-comment) ("*/" ,c-comment)
-       ("y" ,black)))))
+       ("y" ,black)))
+    ;; a comment marker in a string begins no comment (#46)
+    ("  u = \"http://x\" + y; // c"
+     `(("u" ,black) ("=" ,c-operator) ("\"http://x\"" ,c-string)
+       ("+" ,c-operator) ("y" ,black) (";" ,c-operator) ("//" ,c-comment)
+       ("c" ,c-comment)))))
 
 (define (test-scala)
   (check-lines "scala"

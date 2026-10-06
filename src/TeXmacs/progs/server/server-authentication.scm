@@ -371,7 +371,7 @@
       (if (or (!= ret "0") (!= err ""))
 	  #f
           (with l (password-parse-crypt-style out)
-	    (and (>= (length l) 4) (== (fourth l) enc)))))))
+	    (and l (>= (length l) 4) (== (fourth l) enc)))))))
 
 (define (password-supports-sha256?)
   (and (not (os-mingw?)) (password-encode-sha256 "foo")))
@@ -384,7 +384,6 @@
     (if (or (!= ret "0") (!= err "")) #f (password-parse-crypt-style out))))
 
 (define (password-correct-sha512? p hidden)
-  (display* "verifying " p ", hidden: " hidden "\n")
   (let* ((salt (third hidden))
          (enc (fourth hidden)))
     (with  (ret out err)
@@ -393,8 +392,7 @@
       (if (or (!= ret "0") (!= err ""))
 	  #f
           (with l (password-parse-crypt-style out)
-                (display* l "\n")
-                (and (>= (length l) 4) (== (fourth l) enc)))))))
+                (and l (>= (length l) 4) (== (fourth l) enc)))))))
 
 (define (password-supports-sha512?)
   (and (not (os-mingw?)) (password-encode-sha512 "foo")))
