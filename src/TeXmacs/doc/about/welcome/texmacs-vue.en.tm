@@ -205,6 +205,10 @@
   <paragraph|6 October 2026>
 
   <\itemize>
+    <item>The tabs of the windows, the menu of <TeXmacs> <name|Vue> and its
+    dialogs follow the dark theme, as the rest of the interface (the theme of the
+    preferences, or the appearance of the system).
+
     <item>This page tells which commit made the build, the components of
     the program with their versions and the checksums of their sources, the
     sizes of the program and of the files, and the plug-ins with the programs
