@@ -793,10 +793,11 @@
   (check= (sh "plugins-test-sh1" "printf x") '(document "x"))
   (check= (sh "plugins-test-sh1" "echo '<x>' '{y}' '$z'")
           '(document "<x> {y} $z" ""))
-  ;; a failing command: its error message is output, as is its status
+  ;; a failing command: its error message is output, as is its status (1
+  ;; for the ls of BSD and macOS, 2 for the ls of GNU)
   (with r (sh "plugins-test-sh1" "ls /tm-plugins-test-nothing; echo status=$?")
     (check-true (contains? r "tm-plugins-test-nothing"))
-    (check-true (contains? r "status=1"))
+    (check-true (contains? r "status="))
     (check-false (contains? r "status=0")))
   (check= (sh "plugins-test-sh1" "false; echo $?") '(document "1" ""))
   (check= (sh "plugins-test-sh1" "tm-plugins-test-nothing >/dev/null 2>&1; echo $?")

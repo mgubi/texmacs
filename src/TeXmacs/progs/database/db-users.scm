@@ -131,8 +131,12 @@
      (safe-getpwnam user))))
 
 (define (create-default-user)
+  ;; (getlogin gives #f without a terminal, as in CI, and Guile may be
+  ;; built without getuid, as the embedded Guile 1.8)
   (let* ((pseudo (or (if (os-macos?) (getenv "USER") (getlogin))
-		     (safe-getpwuid (getuid))))
+                     (getenv "USER") (getenv "LOGNAME")
+		     (and (defined? 'getuid) (safe-getpwuid (getuid)))
+                     ""))
          (name (get-full-name pseudo)))
     ;;(display* "pseudo= " pseudo "\n")
     ;;(display* "name= " name "\n")
