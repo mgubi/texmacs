@@ -85,7 +85,11 @@ jobs:
         # (gnupg: the gpg command, for the checks of the crypto suite;
         # imagemagick and ghostscript: the converters of images, which the
         # convert-more suite checks, as on Linux)
-        run: brew install qt freetype libpng jpeg gnutls sqlite gmp libtool gnupg imagemagick ghostscript
+        # (texinfo: makeinfo, for the documentation of Guile when make
+        # thinks it out of date; keg-only, so its bin is added to the PATH)
+        run: |
+          brew install qt freetype libpng jpeg gnutls sqlite gmp libtool gnupg imagemagick ghostscript texinfo
+          echo "$(brew --prefix texinfo)/bin" >> "$GITHUB_PATH"
 
       - name: Configure
         run: |
