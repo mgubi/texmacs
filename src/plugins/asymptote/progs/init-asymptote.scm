@@ -38,7 +38,9 @@
         (:launch ,(asy-launcher)))))
 
 (plugin-configure asymptote
-  (:require (or (asymptote-in-browser?)
+  ;; (the test of asymptote-in-browser? written out: the requirements are also
+  ;; evaluated outside of this file, e.g. by the plugins suite)
+  (:require (or (defined? 'web-files)
                 (and (url-exists-in-path? "asy") (!= (python-command) ""))))
   ,@(asymptote-engine)
   (:serializer ,asy-serialize)

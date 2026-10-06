@@ -203,6 +203,10 @@
   <paragraph|6 October 2026>
 
   <\itemize>
+    <item>The plots of the example session of <name|R> and the figure of the
+    page layout (<menu|Help|Developer's guide>) are shown: they were
+    <name|PostScript>, which the browser cannot draw, and are now <name|PDF>.
+
     <item>The help of the <name|Python> and <name|R> plug-ins is there
     (<menu|Help|Plug-ins>), with how they run in the browser: it was left out
     of the files of the page.

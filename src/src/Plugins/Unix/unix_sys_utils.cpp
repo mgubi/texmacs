@@ -17,6 +17,7 @@
 #include <spawn.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <pthread.h>
 #include <pwd.h>
@@ -124,18 +125,27 @@ struct _ts_string {
 };
 
 // pipe
+// the ends which are still open are closed when the pipe is destroyed: an
+// end closed before, or given to a thread which closes it, is set to -1, so
+// that a descriptor is never closed twice (its number may have been given
+// to another file in between)
 struct _pipe_t {
   int rep[2];
   int st;
   inline _pipe_t () {
     st= pipe (rep);
+    if (st != 0) { rep[0]= rep[1]= -1; return; }
     int fl= fcntl (rep[0], F_GETFL);
     fl = fl & (~(int) O_NONBLOCK);
     fcntl (rep[0], F_SETFL, fl);
     fl= fcntl (rep[1], F_GETFL);
     fl= fl & (~(int) O_NONBLOCK);
     fcntl (rep[1], F_SETFL, fl); }
-  inline ~_pipe_t () { close (rep[0]); close (rep[1]); }
+  inline ~_pipe_t () { close_in (); close_out (); }
+  inline void close_in () { if (rep[0] >= 0) close (rep[0]); rep[0]= -1; }
+  inline void close_out () { if (rep[1] >= 0) close (rep[1]); rep[1]= -1; }
+  inline void release_in () { rep[0]= -1; }
+  inline void release_out () { rep[1]= -1; }
   inline int in () const { return rep[0]; }
   inline int out () const { return rep[1]; }
   inline int status () const { return st; }
@@ -159,42 +169,42 @@ struct _channel {
     buffer= array<char> (buffer_size2); }
 };
 
-// data read from spawn process
+// data read from spawn process, until its end; the descriptor is closed
 static void*
 _background_read_task (void* channel_as_void_ptr) {
   _channel* c= (_channel*) channel_as_void_ptr;
   int fd= c->fd;
   int n= c->buffer_size;
   char* b= A (c->buffer);
-  int m;
-  do {
-    m= read (fd, b, n);
-    // cout << "read " << m << " bytes from " << fd << "\n";
+  while (true) {
+    int m= read (fd, b, n);
     if (m > 0) c->data.append (b, m);
-    if (m == 0) { if (close (fd) != 0) c->status= -1; }
-  } while (m > 0);
+    else if (m < 0 && errno == EINTR) continue;
+    else { if (m < 0) c->status= -1; break; }
+  }
+  if (close (fd) != 0) c->status= -1;
   return (void*) NULL;
 }
 
-// data written to spawn process
+// data written to spawn process; the descriptor is always closed, also when
+// there is nothing to write or the writing fails, since a process which
+// reads its input to the end waits for that, and unix_system for it
 static void*
 _background_write_task (void* channel_as_void_ptr) {
   _channel* c= (_channel*) channel_as_void_ptr;
   int fd= c->fd;
   const char* d= c->data.a;
   int n= c->buffer_size;
-  int t= (c->data).n, k= 0, o= 0;
-  if (t == 0) return (void*) NULL;
-  if (n == 0) { c->status= -1; return (void*) NULL; }
-  do {
-    int m= min (n, t - k);
-    // cout << "writting " << m << " bytes / " << t-k << "\n";
-    o= write (fd, (void*) (d + k), m);
-    // cout << "written " << o << " bytes to " << fd << "\n";
-    if (o > 0) k += o;
-    if (o < 0) { close (fd); c->status= -1; }
-    if (k == t) { if (close (fd) != 0) c->status= -1; }
-  } while (o > 0 && k < t);
+  int t= (c->data).n, k= 0;
+  if (n <= 0 && t > 0) c->status= -1;
+  else
+    while (k < t) {
+      int o= write (fd, (void*) (d + k), min (n, t - k));
+      if (o > 0) k += o;
+      else if (o < 0 && errno == EINTR) continue;
+      else { c->status= -1; break; }
+    }
+  if (close (fd) != 0) c->status= -1;
   return (void*) NULL;
 }
 
@@ -232,6 +242,10 @@ unix_system (array<string> arg,
   ASSERT(N(str_in)  == n_in, "size mismatch");
   ASSERT(N(str_out) == n_out, "size mismatch");
   array<_pipe_t> pp_in (n_in), pp_out (n_out);
+  for (int i= 0; i < n_in; i++)
+    if (pp_in[i].status () != 0) return -1;
+  for (int i= 0; i < n_out; i++)
+    if (pp_out[i].status () != 0) return -1;
   _file_actions_t file_actions;
   for (int i= 0; i < n_in; i++) {
     if (posix_spawn_file_actions_addclose
@@ -279,18 +293,30 @@ unix_system (array<string> arg,
 	     << pid << "\n";
 
   // close useless ports
-  for (int i= 0; i < n_in ; i++) close (pp_in[i].in ());
-  for (int i= 0; i < n_out; i++) close (pp_out[i].out ());
+  for (int i= 0; i < n_in ; i++) pp_in[i].close_in ();
+  for (int i= 0; i < n_out; i++) pp_out[i].close_out ();
 
   // write to spawn process
+  // (if a thread cannot be made, the ends without a thread are closed, so
+  // that the process sees the end of its inputs and outputs and stops; it
+  // is waited for, and the threads made are joined, before returning -1:
+  // they use the channels of this function)
+  bool failed= false;
+  int n_write= 0, n_read= 0;
   array<_channel> channels_in (n_in);
   array<pthread_t> threads_write (n_in);
   for (int i= 0; i < n_in; i++) {
     channels_in[i]._init_in (pp_in[i].out (), str_in[i], 1 << 12);
-    if (pthread_create (&threads_write[i], NULL /* &attr */,
-			_background_write_task,
-			(void *) &(channels_in[i])))
-      return -1;
+    if (failed || pthread_create (&threads_write[i], NULL /* &attr */,
+                                  _background_write_task,
+                                  (void *) &(channels_in[i]))) {
+      failed= true;
+      pp_in[i].close_out ();
+    }
+    else {
+      pp_in[i].release_out ();  // (closed by the thread)
+      n_write++;
+    }
   }
 
   // read from spawn process
@@ -298,10 +324,16 @@ unix_system (array<string> arg,
   array<pthread_t> threads_read (n_out);
   for (int i= 0; i < n_out; i++) {
     channels_out[i]._init_out (pp_out[i].in (), 1 << 12); 
-    if (pthread_create (&threads_read[i], NULL /* &attr */,
-			_background_read_task,
-			(void *) &(channels_out[i])))
-      return -1;
+    if (failed || pthread_create (&threads_read[i], NULL /* &attr */,
+                                  _background_read_task,
+                                  (void *) &(channels_out[i]))) {
+      failed= true;
+      pp_out[i].close_in ();
+    }
+    else {
+      pp_out[i].release_in ();  // (closed by the thread)
+      n_read++;
+    }
   }
 
   int wret;
@@ -319,17 +351,18 @@ unix_system (array<string> arg,
   // wait for terminating threads
   void* exit_status;
   int thread_status= 0;
-  for (int i= 0; i < n_in; i++) {
+  for (int i= 0; i < n_write; i++) {
     pthread_join (threads_write[i], &exit_status);
     if (channels_in[i].status < 0) thread_status= -1;
   }
-  for (int i= 0; i < n_out; i++) {
+  for (int i= 0; i < n_read; i++) {
     pthread_join (threads_read[i], &exit_status);
     *(str_out[i])= string (channels_out[i].data.a,
                            channels_out[i].data.n);
     if (channels_out[i].status < 0) thread_status= -1;
   }
 
+  if (failed) return -1;
   if (thread_status < 0) return thread_status;
   if (wret < 0 || WIFEXITED(status) == 0) return -1;
   return WEXITSTATUS(status);

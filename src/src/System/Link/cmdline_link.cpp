@@ -189,9 +189,9 @@ cmdline_link_rep::write (string s, int channel) {
 #else
   if (alive || (channel != LINK_IN)) return;
   string cmd= as_string (call ("connection-cmdline", name, "default", s));
+  if (cmd == "") return;
   cmd= cmd * " 2> /dev/null";
   //cout << "Command[" << name << "," << s << "] = " << cmd << "\n";
-  if (cmd == "") return;
   if (DEBUG_IO) debug_io << "Launching '" << cmd << "'\n";
   int e1= pipe (pp_in ); (void) e1;
   int e2= pipe (pp_out); (void) e2;
@@ -349,7 +349,7 @@ cmdline_link_rep::stop () {
   alive= false;    
   //cout << "Alive = false, stop\n";
   close (in);
-  wait (NULL);
+  waitpid (pid, NULL, 0);  // (its own child, not one of a pipe plugin)
 
   remove_notifier (snout);
   remove_notifier (snerr);

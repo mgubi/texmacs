@@ -37,7 +37,9 @@
       `((:launch ,(tikz-launcher)))))
 
 (plugin-configure tikz
-  (:require (or (tikz-in-browser?)
+  ;; (the test of tikz-in-browser? written out: the requirements are also
+  ;; evaluated outside of this file, e.g. by the plugins suite)
+  (:require (or (defined? 'web-files)
                 (and (python-command) (!= (python-command) "")
                      (url-exists-in-path? "latex"))))
   ,@(tikz-engine)

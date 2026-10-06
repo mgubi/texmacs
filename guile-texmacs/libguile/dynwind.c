@@ -378,6 +378,12 @@ scm_init_dynwind ()
   scm_set_smob_mark (tc16_winder, winder_mark);
 
  scm_c_define_gsubr (s_scm_dynamic_wind, 3, 0, 0, (SCM (*)()) scm_dynamic_wind); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_wind_chain, 0, 0, 0, (SCM (*)()) scm_wind_chain); ;
+#endif
 
 }
 

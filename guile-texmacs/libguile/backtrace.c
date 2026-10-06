@@ -828,6 +828,12 @@ scm_init_backtrace ()
  scm_c_define_gsubr (s_scm_display_backtrace_with_highlights, 2, 3, 0, (SCM (*)()) scm_display_backtrace_with_highlights); ;
  scm_has_shown_backtrace_hint_p_var = scm_permanent_object (scm_c_define ("has-shown-backtrace-hint?", ((SCM) ((((0)) << 8) + scm_tc8_flag)))); ;
  scm_c_define_gsubr (s_scm_backtrace_with_highlights, 0, 1, 0, (SCM (*)()) scm_backtrace_with_highlights); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if defined(GUILE_DEBUG)
+  scm_c_define_gsubr (s_scm_set_print_params_x, 1, 0, 0, (SCM (*)()) scm_set_print_params_x); ;
+#endif
 
 }
 
