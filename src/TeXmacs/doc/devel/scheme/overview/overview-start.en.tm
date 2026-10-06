@@ -22,7 +22,12 @@
   </verbatim>
 
   The file <verbatim|my-init-texmacs.scm> is loaded when booting <TeXmacs>
-  and <verbatim|my-init-buffer.scm> is booted each time you open a file.
+  and <verbatim|my-init-buffer.scm> is executed each time a view of a
+  document is created, after the system file
+  <verbatim|$TEXMACS_PATH/progs/init-buffer.scm>. Both files can be opened
+  with <menu|Developer|Open my-init-texmacs.scm> <abbr|resp.>
+  <menu|Developer|Open my-init-buffer.scm> (the <menu|Developer> menu is
+  shown when the developer tool is enabled in <menu|Tools>).
 
   Usually, the file <verbatim|my-init-texmacs.scm> contains personal keyboard
   bindings and menus. For instance, when putting the following piece of code
@@ -42,10 +47,12 @@
     \ \ ("T h ." (make 'theorem)))
   </scm-code>
 
-  Similarly, the following command extends the standard <menu|Insert> menu
+  Similarly, the following commands extend the standard <menu|Insert> menu
   with a special section for the insertion of greetings:
 
   <\scm-code>
+    (import-from (generic insert-menu))
+
     (menu-bind insert-menu
 
     \ \ (former)
@@ -64,6 +71,13 @@
 
     \ \ \ \ \ \ ("Greetings" (insert "Greetings,"))))
   </scm-code>
+
+  The <scm|import-from> line is needed because the standard menu is defined
+  lazily: at boot time, <scm|insert-menu> is only a stub, and the module
+  <verbatim|(generic insert-menu)>, loaded later when the editor is idle,
+  would define it again and replace your version. Loading the module first
+  makes <scm|(former)> refer to the standard menu, and your definition comes
+  after it.
 
   The customization of the <hlink|keyboard|../utils/utils-keyboard.en.tm> and
   <hlink|menus|../utils/utils-menus.en.tm> is described in more detail in the
@@ -228,7 +242,28 @@
     <item*|<with|font-series|medium|<verbatim|-c <em|in> <em|out>>>>This
     options may be used to convert the input file <verbatim|<em|in>> into the
     output file <verbatim|<em|out>>. The suffixes of <verbatim|<em|in>> and
-    <verbatim|<em|out>> determine their file formats.
+    <verbatim|<em|out>> determine their file formats. It runs the commands
+    <scm|load-buffer> and <scm|export-buffer>, and is usually followed by
+    <verbatim|-q>.
+
+    <item*|<with|font-series|medium|<verbatim|-headless>>>Runs <TeXmacs>
+    without opening a window (also <verbatim|-H>), for instance for
+    conversions with <verbatim|-c> or commands with <verbatim|-x>.
+
+    <item*|<with|font-series|medium|<verbatim|-i <em|file>>>>Uses
+    <verbatim|<em|file>> instead of the standard initialization file of
+    <scheme> (also <verbatim|-initialize>).
+
+    <item*|<with|font-series|medium|<verbatim|-b <em|file>>>>Uses
+    <verbatim|<em|file>> instead of the system file
+    <verbatim|$TEXMACS_PATH/progs/init-buffer.scm>, which is executed for
+    each new view (also <verbatim|-initialize-buffer>).
+
+    <item*|<with|font-series|medium|<verbatim|-test-suite
+    <em|dir>>>>Typesets the documents of the directory
+    <verbatim|<em|dir>> into <verbatim|<em|dir>-check>, compares them with
+    the reference results in <verbatim|<em|dir>-ref> (made with
+    <verbatim|-reference-suite <em|dir>>) and quits.
   </description-long>
 
   <paragraph*|Invoking <scheme> scripts from <TeXmacs> markup>

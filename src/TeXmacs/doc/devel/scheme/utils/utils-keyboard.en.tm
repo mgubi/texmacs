@@ -48,7 +48,9 @@
     <\description>
       <item*|<scm|(:mode <scm-arg|mode?>)>>The bindings are only valid in
       the given mode, such as <scm|in-math?> (see <hlink|contextual
-      overloading|utils-overload.en.tm>).
+      overloading|utils-overload.en.tm>). The mode may also be given alone,
+      as in <scm|(kbd-map in-math? ...)>. As for functions, the most recent
+      binding of a key whose conditions hold is used.
 
       <item*|<scm|(:require <scm-arg|cond>)>>The bindings are only valid
       when the expression <scm-arg|cond> evaluates to true.

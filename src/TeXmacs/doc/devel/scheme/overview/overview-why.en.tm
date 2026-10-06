@@ -37,9 +37,9 @@
   <\scheme-fragment>
     (menu-bind file-menu
 
-    \ \ ("New" (new-buffer))
+    \ \ ("New" (new-document))
 
-    \ \ ("Load" (choose-file load-buffer "Load file" ""))
+    \ \ ("Load" (open-document))
 
     \ \ ("Save" (save-buffer))
 

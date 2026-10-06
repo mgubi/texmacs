@@ -26,8 +26,10 @@
   A handler is only available once its module has been loaded. For the
   classes registered in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> with
   <scm|lazy-tmfs-handler> (<verbatim|automate>, <verbatim|grep>,
-  <verbatim|help>, <verbatim|apidoc>, <verbatim|part>, <verbatim|db> and
-  <verbatim|remote-file>) this happens automatically; the other modules are
+  <verbatim|help>, <verbatim|apidoc>, <verbatim|part>, <verbatim|db>,
+  <verbatim|remote-file>, <verbatim|history>, <verbatim|revision>,
+  <verbatim|git>, <verbatim|commit> and <verbatim|blame>) this happens
+  automatically; the other modules are
   loaded at startup or as a side effect of using the corresponding
   features.
 
@@ -79,7 +81,8 @@
     Files with suffix <verbatim|html> and <verbatim|tmml> are converted; a
     missing file yields a <verbatim|Broken link.> page. Operations:
     <verbatim|load>, <verbatim|title> (<verbatim|Help - > followed by the
-    title found in the document), <verbatim|permission> (read only). The
+    title found in the document), <verbatim|permission> (read only). When
+    a translated page does not exist, the English page is shown instead. The
     help menus generate such <abbr|URL>s with <scm|tmdoc-expand-help>; for
     instance the <c++> startup code (<source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>)
     opens <verbatim|tmfs://help/plain/tm/doc/about/changes/changes-recent.en.tm>
@@ -114,10 +117,14 @@
 
   <section|Version control>
 
-  These handlers are defined in <source-link|version/version-tmfs.scm|TeXmacs/progs/version/version-tmfs.scm>, except
-  for <verbatim|git> which is defined in <source-link|version/version-git.scm|TeXmacs/progs/version/version-git.scm>.
-  They are not registered lazily; the modules are loaded by the versioning
-  menus and commands.
+  The handlers <verbatim|history> and <verbatim|revision> are defined in
+  <source-link|version/version-tmfs.scm|TeXmacs/progs/version/version-tmfs.scm>,
+  <verbatim|git> and <verbatim|commit> in
+  <source-link|version/version-git.scm|TeXmacs/progs/version/version-git.scm>
+  and <verbatim|blame> in
+  <source-link|version/git-blame.scm|TeXmacs/progs/version/git-blame.scm>.
+  All of them are registered lazily in
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>.
 
   <\description>
     <item*|<verbatim|tmfs://history/<em|file>>>The list of revisions of
@@ -138,13 +145,24 @@
     <item*|<verbatim|tmfs://commit/<em|rev>/<em|root>>>The description of a
     <name|Git> commit in the repository at <em|root>: message, parents and
     changed files. Built by <scm|tmfs-url-commit>. Operations:
-    <verbatim|load>, <verbatim|format>.
+    <verbatim|load>, <verbatim|title> (<verbatim|Commit> followed by the
+    short hash and the name of the directory), <verbatim|format>
+    (<verbatim|texmacs>).
 
-    <item*|<verbatim|tmfs://git/<em|which>/<em|root>>>The output of
-    <verbatim|git status> (<em|which> is <verbatim|status>) or
-    <verbatim|git log> (<em|which> is <verbatim|log>) for the repository at
-    <em|root>. Built by <scm|tmfs-url-git>. Operations: <verbatim|load>,
-    <verbatim|title>.
+    <item*|<verbatim|tmfs://git/<em|which>/<em|root>>>A page about the
+    repository at <em|root>, according to <em|which>: <verbatim|status>
+    (the output of <verbatim|git status>), <verbatim|log> or
+    <verbatim|log.<em|n>> (the history, starting after the first <em|n>
+    commits, for the next pages), <verbatim|branches>, <verbatim|graph>
+    (the graph of the commits) or <verbatim|output> (the output of the last
+    <name|Git> command). Built by <scm|tmfs-url-git>. Operations:
+    <verbatim|load>, <verbatim|title>.
+
+    <item*|<verbatim|tmfs://blame/<em|file>>>The lines of <em|file> with
+    the commit and the author which last changed them, opened by
+    <scm|git-show-blame> (<menu|Version|Who changed what>). Operations:
+    <verbatim|load>, <verbatim|title> (the name of the file followed by
+    <verbatim|- Blame>), <verbatim|format> (<verbatim|texmacs>).
   </description>
 
   <section|Documents and data>
@@ -197,6 +215,14 @@
     loaded at startup only if <verbatim|mmail> is found in the path). The
     special names <verbatim|mailbox> and <verbatim|inbox> list the messages.
     Operations: <verbatim|load>, <verbatim|title>.
+
+    <item*|<verbatim|tmfs://fontdbg/<em|file>>>A report on the fonts used
+    by the characters of <em|file> and on the characters which no font has
+    (<source-link|fonts/font-debug.scm|TeXmacs/progs/fonts/font-debug.scm>,
+    opened by <scm|open-font-report>). Operations: <verbatim|load>,
+    <verbatim|master> (<em|file>), <verbatim|title> (the name of the file
+    followed by <verbatim|- Font report>), <verbatim|permission> (read
+    only).
   </description>
 
   <section|Remote file systems and collaboration>

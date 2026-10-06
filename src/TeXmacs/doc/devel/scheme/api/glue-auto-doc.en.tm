@@ -1,4 +1,4 @@
-<TeXmacs|1.99.4>
+<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -504,6 +504,14 @@ source code.
   <|explain>
     Calls the <c++> function <cpp|async_evaluate_cancel> which returns
     <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(http-get <scm-arg|string> <scm-arg|array_string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|http_get> which returns
+    <scm|string>.
   </explain>
 
   <\explain>
@@ -1630,7 +1638,7 @@ source code.
     <scm|(tree-children <scm-arg|tree>)>
 <explain-synopsis|no synopsis>
   <|explain>
-    Calls the <c++> function <cpp|A> which returns
+    Calls the <c++> function <cpp|tree_children> which returns
     <scm|array_tree>.
   </explain>
 

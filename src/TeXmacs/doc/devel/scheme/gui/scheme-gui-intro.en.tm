@@ -131,7 +131,8 @@
   choose a <tt|monospaced font>, set the color to <with|color|grey|grey>,
   deactivate the widget (meaning it is rendered, but greyed out and
   inactive), choose a bold face, do not translate the labels and render
-  entries as explicit buttons. (The layout helper <scm|centered> is not a
+  entries as explicit buttons. There is also <scm|plain-style>, meant to
+  reset the style, which currently changes nothing. (The layout helper <scm|centered> is not a
   style, but it can be used in a similar way.) Here is an example:
 
   <\session|scheme|default>

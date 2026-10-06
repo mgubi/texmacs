@@ -6,7 +6,8 @@
   <tmdoc-title|Overview of the <scheme> extension language>
 
   One major characteristic of <TeXmacs> is the possibility to extend the
-  editor using the <name|Guile>-<scheme> <em|extension language>. Such
+  editor using the <scheme> <em|extension language>, which is provided by
+  <name|S7> or by <name|Guile> 1.8, depending on the build. Such
   extensions can be simple, like a personal boot file containing frequently
   used keyboard shortcuts, or more complex, like a plug-in with special
   editing routines for a particular type of documents. The <scheme> language
@@ -24,14 +25,18 @@
 
   More complete documentation about the <scheme> modules provided by
   <TeXmacs> is available from the <menu|Help|Scheme extensions> menu. We also
-  recommend the following on-line manuals about <scheme> and its <name|Guile>
-  implementation:
+  recommend the following on-line manuals about <scheme> and its
+  <name|S7> and <name|Guile> implementations:
 
   <\itemize-minus>
     <item><hlink|The <scheme> programming
     language|https://www.scheme.com/tspl4/>.
 
-    <item><hlink|Guile reference manual|https://www.gnu.org/software/guile/manual/>.
+    <item><hlink|S7 reference
+    manual|https://ccrma.stanford.edu/software/snd/snd/s7.html>.
+
+    <item><hlink|Guile reference manual|https://www.gnu.org/software/guile/manual/>
+    (<TeXmacs> uses the old version 1.8 of <name|Guile>).
   </itemize-minus>
 
   For further information about <scheme>, we refer to

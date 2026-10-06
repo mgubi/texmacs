@@ -114,10 +114,12 @@
     <scm-arg|mode>. Here <scm-arg|mode> is a mode predicate such as
     <scm|in-math?> or <scm|in-prog-scheme?>. Contrary to conditions
     specified using <scm|:require>, mode conditions do not depend on the
-    arguments of the function, and definitions for more specific modes
-    automatically take precedence over definitions for more general
-    modes. New modes are defined using <scm|texmacs-modes> and modes
-    can inherit from other modes.
+    arguments of the function. As with <scm|:require>, the most recent
+    definition whose conditions hold is used: definitions for more specific
+    modes do <em|not> take precedence over definitions for more general
+    modes, so that a general definition made later overrides them. New modes
+    are defined using <scm|texmacs-modes> and modes can inherit from other
+    modes; inheritance only affects whether the mode predicate holds.
   </explain>
 
   <\explain>
@@ -179,8 +181,9 @@
     </scm-code>
 
     The synopsis of a function is used for instance in order to provide a
-    short help string for the function. In the future, we might also use it
-    for help balloons describing menu items.
+    short help string for the function; it is also the help balloon of the
+    menu items which call the function, when they have no
+    <scm|:balloon>.
   </explain>
 
   <\explain>

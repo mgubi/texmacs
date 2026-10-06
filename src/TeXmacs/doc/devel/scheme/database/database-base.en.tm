@@ -248,6 +248,73 @@
     values.
   </explain>
 
+  <\explain>
+    <scm|(global-database)>
+
+    <scm|(db-get-time)><explain-synopsis|context>
+  <|explain>
+    The URL of the database <verbatim|$TEXMACS_HOME_PATH/server/global.tmdb>,
+    <abbr|resp.> the time used by the queries (see <scm|with-time>), as a
+    floating point number.
+  </explain>
+
+  <\explain>
+    <scm|(db-inspect-history name)><explain-synopsis|debugging>
+  <|explain>
+    Print on the standard output the identifiers of the entries whose
+    <scm|name> field has, or had, the value <scm|name>, with the creation
+    and expiration dates of these fields.
+  </explain>
+
+  <paragraph|Glued routines>
+
+  The routines above call the following glued routines, which take the URL
+  <scm|db> of the database and, for most of them, the time <scm|t> of the
+  query explicitly: <scm|(tmdb-set-field db id attr vals t)>,
+  <scm|(tmdb-get-field db id attr t)>, <scm|(tmdb-remove-field db id attr
+  t)>, <scm|(tmdb-get-attributes db id t)>, <scm|(tmdb-set-entry db id l
+  t)>, <scm|(tmdb-get-entry db id t)>, <scm|(tmdb-remove-entry db id t)>,
+  <scm|(tmdb-query db q t limit offset)>, <scm|(tmdb-keep-history db
+  flag)>, <scm|(tmdb-inspect-history db name)>, <scm|(tmdb-get-completions
+  db prefix)> and <scm|(tmdb-get-name-completions db prefix)>.
+
+  <paragraph|Other modules>
+
+  The other files of the <verbatim|database/> directory build on this API:
+
+  <\description>
+    <item*|<source-link|db-users.scm|TeXmacs/progs/database/db-users.scm>>Users
+    and permissions (see <hlink|users, groups and
+    permissions|database-permissions.en.tm>), and the database of each
+    user and each kind of data: <scm|(user-database kind)> returns the
+    database of the current user for <scm|kind> (such as <scm|"bib">),
+    which is stored with <scm|(set-preferred-database uid kind db)> and
+    retrieved with <scm|(get-preferred-database uid kind)>;
+    <scm|(use-database db)> makes <scm|db> the database of the current kind
+    and <scm|(add-user pseudo name)> registers a user.
+
+    <item*|<source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm>>Conversion
+    between the entries of the database and <TeXmacs> markup:
+    <scm|(db-load-entry id)> returns an entry as a <markup|db-entry> tree,
+    <scm|(db-load)> all the entries of the current database as a document,
+    and <scm|(db-save doc)> stores the entries of a document. The predicate
+    <scm|(db-url? u)> tests whether <scm|u> is a database
+    (<verbatim|.tmdb> file or <verbatim|tmfs://db/> url).
+
+    <item*|<source-link|db-tmfs.scm|TeXmacs/progs/database/db-tmfs.scm>>The
+    buffers <verbatim|tmfs://db/<em|kind>/<em|file>>, which show the
+    entries of a database, with the search, order and limit of the query
+    kept in preferences (<scm|db-get-query-preference> and
+    <scm|db-set-query-preference>).
+
+    <item*|<source-link|bib-db.scm|TeXmacs/progs/database/bib-db.scm>>The
+    bibliographic database <scm|(bib-database)>, that is
+    <scm|(user-database "bib")>, and the conversions <scm|(db-\<gtr\>bib
+    t)> and <scm|(bib-\<gtr\>db t)> between database entries and
+    <BibTeX> entries (see <hlink|bibliography
+    styles|../bibliography/bibliography.en.tm>).
+  </description>
+
   <tmdoc-copyright|2015|Joris van der Hoeven>
 
   <tmdoc-license|Permission is granted to copy, distribute and/or modify this

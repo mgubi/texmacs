@@ -150,8 +150,16 @@
   the control points of nearby objects), and then calls one of the
   <scheme> routines <scm|graphics-move>, <scm|graphics-release-left>,
   <scm|graphics-start-drag-left>, <scm|graphics-dragging-left>,
-  <scm|graphics-end-drag-left>, <scm|graphics-release-right>, <abbr|etc.>
-  with the resulting coordinates as strings. These routines are defined in
+  <scm|graphics-end-drag-left>, <scm|graphics-release-middle>,
+  <scm|graphics-release-right>, <scm|graphics-start-drag-right>,
+  <scm|graphics-dragging-right>, <scm|graphics-end-drag-right> and
+  <scm|graphics-drop-object>, with the resulting coordinates as strings
+  (the left button routines also receive the time and the pressure of the
+  pen). The mouse wheel calls <scm|(graphics-wheel <scm-arg|dx>
+  <scm-arg|dy>)> instead, with the motion as fractions of the width and the
+  height of the graphics, which moves the origin (see
+  <source-link|graphics/graphics-kbd.scm|TeXmacs/progs/graphics/graphics-kbd.scm>).
+  The other routines are defined in
   <source-link|progs/graphics/graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm> and dispatch on the current
   graphical mode. The main glued routines which may be used by these
   handlers are:
@@ -186,6 +194,15 @@
     Set <abbr|resp.> get the markup (typically the object under
     construction together with its control points) which is displayed on
     top of the graphics without being part of the document.
+  </explain>
+
+  <\explain>
+    <scm|(invalidate-graphical-object)><explain-synopsis|redraw the
+    temporary object>
+  <|explain>
+    Ask for the region of the temporary object to be drawn again, after it
+    was changed. The predicate <scm|(in-graphics?)> tests whether the cursor
+    is inside a graphics.
   </explain>
 
   <tmdoc-copyright|2005|Joris van der Hoeven>

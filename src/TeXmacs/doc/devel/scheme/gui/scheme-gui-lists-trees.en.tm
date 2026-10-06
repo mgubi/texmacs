@@ -14,8 +14,10 @@
   <|explain>
     Builds a combo box which will execute <scm-arg|cmd> whenever the user
     makes a choice; the chosen string is available in <scm-arg|cmd> as the
-    variable <scm|answer>. The <scm-arg|width> may be given in any <TeXmacs>
-    length unit. If the last element of <scm-arg|items> is the empty string
+    variable <scm|answer>. The <scm-arg|width> is a length in the units
+    <verbatim|px>, <verbatim|em>, <verbatim|w> or <verbatim|h> (see
+    <scm|input> in <hlink|the reference|scheme-gui-reference.en.tm>), such
+    as <scm|"10em">. If the last element of <scm-arg|items> is the empty string
     <scm|"">, the user may also type in an arbitrary value.
 
     <\session|scheme|default>
@@ -111,8 +113,9 @@
     <scm|(tree-view <scm-arg|cmd> <scm-arg|data>
     <scm-arg|data-roles>)><explain-synopsis|a tree view>
   <|explain>
-    The <scm|tree-view> widget (currently only implemented for <name|Qt>)
-    provides a graphical representation of a <TeXmacs>
+    The <scm|tree-view> widget (implemented in the <name|Qt>, <name|Cocoa>
+    and <name|Vue> ports, not in <name|X11>/<name|Widkit>; the data roles
+    for icons and tooltips are only honoured by <name|Qt>) provides a graphical representation of a <TeXmacs>
     tree <scm-arg|data> (not a <scheme> tree!). This may be part of a
     document or any other tree. The first node in <scm-arg|data> won't be
     displayed. All other nodes may have attributes called <em|data roles>
@@ -302,11 +305,12 @@
   example we use the default data role specification.
 
   <\warning>
-    As of this writing (31 Dec. 2013) the <name|Qt> implementation is sloppy
-    and forces a full reloading of the data model for each <cpp|modification>
-    of the <cpp|tree>. The slowdown is already noticeable with documents of a
-    few pages like this one. Additionally, the current selection in the
-    widget is lost after each modification to the buffer (fixing this
+    When this was written (31 Dec. 2013) the <name|Qt> implementation was
+    sloppy
+    and forced a full reloading of the data model for each
+    <cpp|modification> of the <cpp|tree>. The slowdown was already noticeable
+    with documents of a few pages like this one. Additionally, the current
+    selection in the widget was lost after each modification to the buffer (fixing this
     requires writing a fully fledged <cpp|observer> and probably an
     intermediate copy of the data).
   </warning>

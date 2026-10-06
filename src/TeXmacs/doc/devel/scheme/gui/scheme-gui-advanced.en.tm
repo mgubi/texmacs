@@ -7,8 +7,9 @@
 
   <subsection|Attribute widgets>
 
-  In what follows <scm-arg|widget> can be anything defined using
-  <scm|tm-widget>.
+  In what follows <scm-arg|widget> stands for menu items, as in the body of
+  a <scm|tm-widget>; a widget defined with <scm|tm-widget> is included with
+  <scm|(dynamic (<scm-arg|name>))> or <scm|(link <scm-arg|name>)>.
 
   <\explain>
     <scm|(centered <scm-arg|widget>)><explain-synopsis|centers
@@ -26,7 +27,7 @@
 
         \ \ (centered (text "I'm centered.")))
       <|unfolded-io>
-        ((guile-user) (guile-user))
+        \;
       </unfolded-io>
 
       <\folded-io|Scheme] >
@@ -46,7 +47,7 @@
 
         \ \ \ \ (glue #f #f 0 10)))
       <|folded-io>
-        ((guile-user) (guile-user))
+        \;
       </folded-io>
 
       <\input|Scheme] >
@@ -106,9 +107,8 @@
   <subsection|Container or layout widgets>
 
   You can arrange widgets horizontally or vertically, or in two column mode
-  as in forms. When running the QT version the latter will default to the OS
-  standard for arranging labels and their associated input widgets in
-  dialogs. Other possibilities are splitters and tabbed widgets. A very
+  as in forms (labels aligned at the right of their column, as the ports
+  draw them). Other possibilities are splitters and tabbed widgets. A very
   useful macro is <scm|dynamic>, which allows you to embed one widget into
   another.
 
@@ -220,7 +220,7 @@
 
         \ \ (vlist
 
-        \ \ \ \ ===
+        \ \ \ \ (glue #f #f 0 10)
 
         \ \ \ \ (hlist
 
@@ -304,8 +304,19 @@
   <subsection|Refresh widgets>
 
   Widgets are normally built once, when they are displayed. <em|Refresh
-  widgets> are rebuilt on demand, by re-evaluating the code which defines
-  their contents, so that they can reflect new values of your variables.
+  widgets> are rebuilt on demand, so that they can reflect new values of
+  your variables. Only part of their contents is evaluated again, though:
+  the items of a <scm|refreshable> are computed when the enclosing widget is
+  built, and a refresh makes the widgets again from them. What is evaluated
+  again at a refresh are the conditions of <scm|if> and <scm|when>, the
+  lists of <scm|for>, <scm|promise>s, <scm|link> and <scm|refresh>, the
+  sizes of <scm|resize>, and the values and lists of the fields
+  (<scm|input>, <scm|enum>, <scm|choice>, <scm|toggle>). Texts and labels,
+  <scm|dynamic>, <scm|assuming>, <scm|loop>, <scm|eval> and the values of
+  <scm|let> and <scm|with> keep the value which they had when the widget
+  was built: an item which must change, such as <scm|(text <scm-arg|expr>)>,
+  is written as <scm|(promise (list 'text <scm-arg|expr>))>, or chosen with
+  <scm|if> as in the example below.
 
   <\explain>
     <scm|(refreshable <scm-arg|kind> <scm-arg|widgets>)><explain-synopsis|a

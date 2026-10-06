@@ -47,7 +47,8 @@
   <|explain>
     Display the buffer <scm-arg|buf> in the window <scm-arg|win>, using a
     view on <scm-arg|buf> which is not yet displayed in another window (a new
-    view is created if necessary).
+    view is created if necessary). Nothing happens if the window has no
+    view, or already displays <scm-arg|buf>.
   </explain>
 
   <\explain>

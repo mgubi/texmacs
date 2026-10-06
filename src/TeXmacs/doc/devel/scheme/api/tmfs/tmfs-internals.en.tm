@@ -137,7 +137,7 @@
   path with a pseudo protocol:
 
   <\description>
-    <item*|<source-link|tm/|plugins/octave/octave/tm>>A file under <verbatim|$TEXMACS_PATH>, given
+    <item*|<verbatim|tm/>>A file under <verbatim|$TEXMACS_PATH>, given
     relatively to it. For instance
     <verbatim|tm/doc/main/man-manual.en.tm>.
 
@@ -149,7 +149,7 @@
     <item*|<verbatim|here/>>A relative file name.
 
     <item*|<verbatim|http/>, <verbatim|https/>, <verbatim|ftp/>,
-    <source-link|tmfs/|TeXmacs/doc/devel/scheme/api/tmfs>>A web <abbr|URL> or another <verbatim|tmfs> <abbr|URL>,
+    <verbatim|tmfs/>>A web <abbr|URL> or another <verbatim|tmfs> <abbr|URL>,
     without the <verbatim|://>. For instance the <verbatim|tmfs> string of
     <verbatim|tmfs://help/normal/x.tm> is
     <verbatim|tmfs/help/normal/x.tm>.
@@ -184,8 +184,8 @@
     <item><verbatim|r> calls <scm|(tmfs-permission? name "read")> and
     <verbatim|w> calls <scm|(tmfs-permission? name "write")>.
 
-    <item>All other letters, in particular <verbatim|f> (regular file) and
-    <verbatim|c> (can be created), succeed.
+    <item>All other letters, in particular <verbatim|f> (regular file),
+    are ignored and therefore succeed.
   </itemize>
 
   Since <cpp|exists> is implemented as a resolution with the filter
@@ -272,7 +272,8 @@
   <abbr|URL> and the string to <scm|tmfs-save>. <cpp|save_to_server> always
   reports success, so errors must be signalled by the save handler itself
   (for instance with <scm|set-message>). <cpp|append_string> is not
-  supported and fails.
+  supported: it stops <TeXmacs> with the fatal error <verbatim|file not
+  appendable>.
 
   <subsection|Summary of the calls from <c++> to <scheme>>
 
@@ -316,9 +317,11 @@
     <cpp|get_from_server> and therefore <scm|tmfs-load>.
 
     <item><scm|tmfs-load> finds the load handler of the class and calls it
-    on the name. If the handler returns a <scheme> tree rather than a string,
-    it is serialized with <scm|object-\<gtr\>tmstring>, which yields the
-    <verbatim|stm> format (<scheme> representation of <TeXmacs> trees).
+    on the name. If the handler returns a <scm|(document ...)> tree rather
+    than a string, it is converted with <scm|texmacs-\<gtr\>stm> into the
+    <verbatim|stm> format (<scheme> representation of <TeXmacs> trees); any
+    other result which is not a string is serialized with
+    <scm|object-\<gtr\>tmstring>.
 
     <item><cpp|import_loaded_tree> parses the string according to the format
     and the buffer is filled with <cpp|set_buffer_tree>. The buffer title is
@@ -415,8 +418,9 @@
   <\description>
     <item*|<scm|tmfs-load>>Calls the <scm|load> handler of the class, or the
     default one, which returns a document saying <verbatim|Invalid tmfs
-    document.> A string result is returned as is; any other result is
-    serialized with <scm|object-\<gtr\>tmstring>.
+    document.> A string result is returned as is, a <scm|(document ...)>
+    tree is converted with <scm|texmacs-\<gtr\>stm>, and any other result
+    is serialized with <scm|object-\<gtr\>tmstring>.
 
     <item*|<scm|tmfs-save>>Calls the <scm|save> handler with the name and the
     document as a <scheme> tree. The default handler does nothing.
@@ -654,8 +658,8 @@
     <item>Errors during saving are not propagated to the <c++> layer.
 
     <item><scm|lazy-tmfs-handler> only registers the listed classes. The
-    handlers <verbatim|remote-dir>, <verbatim|history> or <verbatim|git>,
-    for example, are not registered lazily and are only available once
+    handlers <verbatim|remote-dir>, <verbatim|chat>, <verbatim|live> or
+    <verbatim|fontdbg>, for example, are not registered lazily and are only available once
     their modules have been loaded for another reason.
   </itemize>
 

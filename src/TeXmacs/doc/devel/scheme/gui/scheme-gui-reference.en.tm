@@ -162,8 +162,13 @@
     <scm|"string">, <scm|"password">, <scm|"file">, <scm|"directory">,
     <scm|"search"> or <scm|"replace-what">, <scm-arg|proposals> a list of
     strings whose first element is the initial value, and <scm-arg|width>
-    a length such as <scm|"20em"> or <scm|"1w"> (use all available
-    width). <scm-arg|cmd> is executed with <scm|answer> set to the entered
+    a length such as <scm|"20em"> or <scm|"1w">. The widths of the widgets
+    are given in four units only: <verbatim|px>, <verbatim|em> (14 pixels),
+    and <verbatim|w> or <verbatim|h>, a multiple of the default width or
+    height of the widget in <name|Qt> and <name|Cocoa>, but of the extents
+    of the window in <name|Vue> and <name|Widkit> (a field of
+    <scm|"2w"> is then wider than its window: prefer <verbatim|em> in
+    dialogs). <scm-arg|cmd> is executed with <scm|answer> set to the entered
     string when the user confirms the input (or to <scm|#f> when the input
     is cancelled).
   </explain>
@@ -207,7 +212,8 @@
 
   <\explain>
     <scm|(tree-view <scm-arg|cmd> <scm-arg|data>
-    <scm-arg|roles>)><explain-synopsis|a tree view (<name|Qt> only)>
+    <scm-arg|roles>)><explain-synopsis|a tree view (not in the
+    <name|X11>/<name|Widkit> port)>
   <|explain>
     Displays the <TeXmacs> tree <scm-arg|data>; see \P<hlink|Displaying
     lists and trees|scheme-gui-lists-trees.en.tm>\Q. Contrary to the other
@@ -230,7 +236,11 @@
   <|explain>
     Tiles of buttons for standard colors, <abbr|resp.> colors and
     background patterns; <scm-arg|cmd> is executed with <scm|answer> set to
-    the selected color or pattern.
+    the selected color or pattern. In <name|Vue>, the color menu also offers
+    a <with|font-series|bold|Palette> enumeration: typographic palettes,
+    defined with <scm|define-typographic-palette> or
+    <scm|define-typographic-palette-from-colors>, replace the standard
+    colors (preference <verbatim|typographic palette set>).
   </explain>
 
   <\explain>
@@ -261,7 +271,7 @@
     <scm-arg|vals> <scm-arg|val> <scm-arg|width>)>
 
     <scm|(setting-group <scm-arg|title> <scm-arg|items>)><explain-synopsis|preference
-    panel controls (<name|Qt> only, experimental)>
+    panel controls>
   <|explain>
     Variants of <scm|toggle> and <scm|enum> which display an additional
     description text, and a titled group of such controls, intended for
@@ -294,7 +304,8 @@
     menu>
   <|explain>
     Arranges <scm-arg|items> in a table with <scm-arg|columns> columns, as in
-    the palettes for mathematical symbols.
+    the palettes for mathematical symbols; <scm-arg|columns> must be an
+    integer written in the menu (not an expression).
   </explain>
 
   <\explain>
@@ -384,8 +395,10 @@
     Sets the size of <scm-arg|items>. Each of <scm-arg|w> and <scm-arg|h>
     is evaluated and is either a length string, like <scm|"200px">, or a
     list of three strings (minimal, default and maximal size), optionally
-    followed by an alignment (by default <scm|"left"> <abbr|resp.>
-    <scm|"top">; ignored by the <name|Qt> implementation). Lists must be
+    followed by the initial position of the scrolled contents
+    (<scm|"left">, <scm|"center"> or <scm|"right">, <abbr|resp.>
+    <scm|"top">, <scm|"center"> or <scm|"bottom">; only honoured by
+    <name|Vue>). Lists must be
     quoted, as in <scm|(resize '("100px" "200px" "400px") "50px" ...)>.
   </explain>
 
@@ -420,7 +433,7 @@
   <|explain>
     Extends the size of <scm-arg|widget> to the maximum of the sizes of the
     <scm-arg|items> (the <scm-arg|items> themselves are not displayed).
-    This is ignored by the <name|Qt> implementation.
+    This is ignored by the <name|Qt> and <name|Cocoa> ports.
   </explain>
 
   <section|Styles>
@@ -433,8 +446,9 @@
   <|explain>
     Render the entries of <scm-arg|items> as explicit buttons, as inactive
     (greyed out) widgets, in bold face, in grey, in a monospaced font,
-    without translation of the labels, <abbr|resp.> reset the style to the
-    default one.
+    without translation of the labels; <scm|plain-style> keeps the style
+    as it is (it is meant to reset it, but its implementation, a style of
+    <scm|0> in <scm|make-menu-style>, changes nothing).
   </explain>
 
   <section|Control structures>
@@ -527,6 +541,8 @@
 
     <scm|(refresh <scm-arg|widget> <scm-arg|kind>)>
 
+    <scm|(refresh <scm-arg|widget>)>
+
     <scm|(cached <scm-arg|kind> <scm-arg|valid?>
     <scm-arg|items>)><explain-synopsis|widgets which can be rebuilt>
   <|explain>
@@ -536,11 +552,16 @@
     or widget <scm-arg|widget> (the name of a <scm|menu-bind> or of a
     <scm|tm-widget> without arguments, not evaluated) in the same way; here
     <scm-arg|kind> is written as a symbol, as in <scm|(refresh my-widget
-    auto)>. Widgets of kind <verbatim|"auto"> are also refreshed
+    auto)>; without <scm-arg|kind>, the kind is the name of the widget.
+    Widgets of kind <verbatim|"auto"> are also refreshed
     automatically after each user command, and widgets of kind
     <verbatim|"any"> by any call of <scm|refresh-now>. A <scm|cached> group
-    is only rebuilt if <scm-arg|valid?> does not hold or after
-    <scm|(invalidate-now <scm-arg|kind>)>. See \P<hlink|Containers,
+    is rebuilt at a <scm|refresh-now> of its kind only if <scm-arg|valid?>
+    does not hold or after <scm|(invalidate-now <scm-arg|kind>)>. A refresh
+    makes the widgets again from the items computed when the enclosing
+    widget was built: texts, labels and <scm|dynamic> keep their value,
+    while conditions, <scm|for> lists and <scm|promise>s are evaluated
+    again. See \P<hlink|Containers,
     glue, refresh and co.|scheme-gui-advanced.en.tm>\Q.
   </explain>
 

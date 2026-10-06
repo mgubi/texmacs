@@ -88,7 +88,7 @@
 
 
 (begin
-  (output "<TeXmacs|1.99.4>
+  (output "<TeXmacs|2.1.4>
 
 <style|<tuple|tmdoc|english>>
 
@@ -101,7 +101,7 @@ the <c++> code and which, consequently, are neither defined nor documented in th
 elsewhere in the documentation.
 
 This document was generated automatically from the glue code definitions by
-the script <verbatim|src/src/Scheme/Glue/make-apidoc-doc.scm> in <TeXmacs>
+the script <source-link|src/src/Scheme/Glue/make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm> in <TeXmacs>
 source code.
 
 \\;

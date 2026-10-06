@@ -23,6 +23,18 @@
   <scheme> widget language and its
   interpreter|../../source/widgets-scheme.en.tm>\Q.
 
+  The same widgets are drawn by each graphical port of <TeXmacs>:
+  <name|Qt>, <name|Cocoa> (the native port for <name|macOS>), <name|Vue>
+  (drawn with <name|SDL3>) and the older
+  <name|X11>/<name|Widkit> port; the differences between the ports are
+  noted where they matter, and the ports themselves are described in
+  \P<hlink|Adding new widgets and porting to other toolkits|../../source/widgets-port.en.tm>\Q. When
+  <scm|(has-markup-gui?)> holds, the dialogs are instead rendered as
+  <TeXmacs> documents, see \P<hlink|The graphical user interface through
+  markup|../../source/gui-markup.en.tm>\Q. Keyboard shortcuts are defined
+  as explained in \P<hlink|Keyboard
+  bindings|../utils/utils-keyboard.en.tm>\Q.
+
   <\traverse>
     <branch|An introduction to widgets.|scheme-gui-intro.en.tm>
 
