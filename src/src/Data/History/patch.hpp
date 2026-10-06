@@ -127,7 +127,7 @@ bool can_pull (patch p1, patch p2);
 patch pull (patch p1, patch p2);
 patch co_pull (patch p1, patch p2);
 bool join (patch& p1, patch p2, tree t);
-patch remove_set_cursor (patch p);
+patch remove_set_cursor (patch p, bool copy_flag= true);
 bool does_modify (patch p);
 
 #endif // defined PATCH_H
