@@ -280,9 +280,14 @@
 (define (test-glue-processes)
   (if (not (url-exists-in-path? "cat"))
       (display "  no cat command, skipped\n")
-      (let ((cat (lambda (in) (evaluate-system '("cat") '(0) (list in)
-                                               '(1 2))))
-            (long (make-string 100000 #\a)))
+      ;; (on Unix, cat is stopped after 20 s when perl is at hand: the check
+      ;; then fails, instead of TeXmacs waiting for cat forever)
+      (let* ((guard (if (and (not (or (os-mingw?) (os-win32?)))
+                             (url-exists-in-path? "perl"))
+                        '("perl" "-e" "alarm 20; exec @ARGV") '()))
+             (cat (lambda (in) (evaluate-system (append guard '("cat"))
+                                                '(0) (list in) '(1 2))))
+             (long (make-string 100000 #\a)))
         (glue-check-equal "processes" "an input"
                           (lambda () (cat "abc")) '("0" "abc" ""))
         (glue-check-equal "processes" "an empty input"

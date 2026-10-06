@@ -124,18 +124,27 @@ struct _ts_string {
 };
 
 // pipe
+// the ends which are still open are closed when the pipe is destroyed: an
+// end closed before, or given to a thread which closes it, is set to -1, so
+// that a descriptor is never closed twice (its number may have been given
+// to another file in between)
 struct _pipe_t {
   int rep[2];
   int st;
   inline _pipe_t () {
     st= pipe (rep);
+    if (st != 0) { rep[0]= rep[1]= -1; return; }
     int fl= fcntl (rep[0], F_GETFL);
     fl = fl & (~(int) O_NONBLOCK);
     fcntl (rep[0], F_SETFL, fl);
     fl= fcntl (rep[1], F_GETFL);
     fl= fl & (~(int) O_NONBLOCK);
     fcntl (rep[1], F_SETFL, fl); }
-  inline ~_pipe_t () { close (rep[0]); close (rep[1]); }
+  inline ~_pipe_t () { close_in (); close_out (); }
+  inline void close_in () { if (rep[0] >= 0) close (rep[0]); rep[0]= -1; }
+  inline void close_out () { if (rep[1] >= 0) close (rep[1]); rep[1]= -1; }
+  inline void release_in () { rep[0]= -1; }
+  inline void release_out () { rep[1]= -1; }
   inline int in () const { return rep[0]; }
   inline int out () const { return rep[1]; }
   inline int status () const { return st; }
@@ -232,6 +241,10 @@ unix_system (array<string> arg,
   ASSERT(N(str_in)  == n_in, "size mismatch");
   ASSERT(N(str_out) == n_out, "size mismatch");
   array<_pipe_t> pp_in (n_in), pp_out (n_out);
+  for (int i= 0; i < n_in; i++)
+    if (pp_in[i].status () != 0) return -1;
+  for (int i= 0; i < n_out; i++)
+    if (pp_out[i].status () != 0) return -1;
   _file_actions_t file_actions;
   for (int i= 0; i < n_in; i++) {
     if (posix_spawn_file_actions_addclose
@@ -274,8 +287,8 @@ unix_system (array<string> arg,
 	     << pid << "\n";
 
   // close useless ports
-  for (int i= 0; i < n_in ; i++) close (pp_in[i].in ());
-  for (int i= 0; i < n_out; i++) close (pp_out[i].out ());
+  for (int i= 0; i < n_in ; i++) pp_in[i].close_in ();
+  for (int i= 0; i < n_out; i++) pp_out[i].close_out ();
 
   // write to spawn process
   array<_channel> channels_in (n_in);
@@ -286,6 +299,7 @@ unix_system (array<string> arg,
 			_background_write_task,
 			(void *) &(channels_in[i])))
       return -1;
+    pp_in[i].release_out ();  // (closed by the thread)
   }
 
   // read from spawn process
@@ -297,6 +311,7 @@ unix_system (array<string> arg,
 			_background_read_task,
 			(void *) &(channels_out[i])))
       return -1;
+    pp_out[i].release_in ();  // (closed by the thread)
   }
 
   int wret;
