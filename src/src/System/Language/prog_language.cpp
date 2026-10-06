@@ -18,7 +18,7 @@
 #include "iterator.hpp"
 
 prog_language_rep::prog_language_rep (string name):
-  abstract_language_rep (name)
+  abstract_language_rep (name), multi_line_comments (false)
 {
   if (DEBUG_PARSER)
     debug_packrat << "Building the " * name * " language parser" << LF;
@@ -135,6 +135,10 @@ prog_language_rep::customize_comment (tree config) {
       }
       inline_comment_parser.set_starts (inline_comment_starts);
     }
+    // in_comment only knows the C comments /* ... */
+    else if (label == "multi_line" && N(feature) == 2 &&
+             get_label (feature[0]) == "/*" && get_label (feature[1]) == "*/")
+      multi_line_comments= true;
   }
 }
 
@@ -238,7 +242,7 @@ prog_language_rep::get_color (tree t, int start, int end) {
 
 
   // Coloring as multi-line comment
-  if (in_comment (start, t))
+  if (multi_line_comments && in_comment (start, t))
     return decode_color (lan_name, encode_color ("comment"));
 
   string type= none;

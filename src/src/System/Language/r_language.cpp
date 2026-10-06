@@ -36,6 +36,10 @@ r_language_rep::r_language_rep (string name):
   extra_chars << '.' << '_';
   identifier_parser.set_start_chars (start_chars);
   identifier_parser.set_extra_chars (extra_chars);
+
+  array<string> starts;
+  starts << string ("#");
+  inline_comment_parser.set_starts (starts);
 }
 
 text_property
