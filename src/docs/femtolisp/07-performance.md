@@ -32,9 +32,10 @@
 | Peak memory: manual | 419–434 MB | 647–649 MB | 402–409 MB |
 
 What this shows:
-- **Running Scheme code, femtolisp is fast:** its bytecode is the fastest of
-  the three on the LaTeX export (a Scheme-heavy conversion), about as fast as
-  s7 on the other conversions, and faster than Guile everywhere.
+- **Running Scheme code, femtolisp is between s7 and Guile:** the fastest of
+  the three on the LaTeX export (a Scheme-heavy conversion), close to s7 on
+  the other conversions, about 1.5× slower than s7 on the regression suites,
+  and faster than Guile on all of them.
 - **Loading Scheme code is slow:** femtolisp compiles every form it loads, so
   boot and the first use of a module cost about twice as much as with s7
   (about the same as Guile).
