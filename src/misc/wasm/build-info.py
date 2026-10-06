@@ -162,12 +162,24 @@ for f in lazy:
 # --- the document
 L = []
 def line (s=''): L.append (s)
+# a centered table, its first row the heads (in bold, with a rule below)
 def table (rows):
-  line ('  <\\big-table|<tabular|<tformat|<table|' + '|'.join (
-        '<row|' + '|'.join ('<cell|' + c + '>' for c in r) + '>' for r in rows) + '>>>>')
-  line ('    ')
-  line ('  </big-table>')
+  rows[0] = ['<strong|' + c + '>' for c in rows[0]]
+  line ('  <\\center>')
+  line ('    <tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<table|' + '|'.join (
+        '<row|' + '|'.join ('<cell|' + c + '>' for c in r) + '>' for r in rows) + '>>>')
+  line ('  </center>')
   line ()
+def items (xs):
+  line ('  <\\itemize>')
+  for x in xs: line ('    <item>' + x); line ()
+  L.pop ()
+  line ('  </itemize>')
+  line ()
+# (a sha512 in two lines of 64 digits)
+def checksum (kind, h):
+  if not h: return 'no checksum (not found)'
+  return kind + ' ' + ' '.join ('<verbatim|' + tm (h[i:i+64]) + '>' for i in range (0, len (h), 64))
 
 line ('<TeXmacs|%s>' % (version or '2.1.5'))
 line ()
@@ -184,68 +196,87 @@ line ('  This page was made by the build of the commit ' +
 line ()
 line ('  <subsection|The components of the program>')
 line ()
-line ('  All of them are compiled into ' + verb ('texmacs.wasm') + ' by ' + name ('Emscripten') +
-      ' ' + tm (ems_version) + ' but the libraries of the plug-ins, below.')
+line ('  They are compiled into ' + verb ('texmacs.wasm') + ' by ' + name ('Emscripten') + ' ' +
+      tm (ems_version) + ' (the programs of the plug-ins are apart, see below):')
 line ()
-rows = [['<strong|Component>', '<strong|Version>', '<strong|What it does>', '<strong|Source>']]
-rows.append ([name ('TeXmacs'), tm (version), 'the editor and the typesetter',
-              verb (short (commit)) + ' of ' + tm (repo)])
-rows.append ([name ('S7') + ' Scheme', tm (s7_version) + ' (' + tm (s7_date) + ')',
-              'the extension language, in place of ' + name ('Guile'),
-              'in the sources of <TeXmacs> (' + tm (len (s7_patches)) + ' patches)'])
-rows.append ([name ('MuPDF'), tm (mupdf_version), 'the pictures, the PDF, the pixels (without the GPU)',
-              tm ('mupdf.com, sha256 ') + verb (short (mupdf_sha, 16)) if mupdf_sha else tm ('mupdf.com')])
-for n, v, w in (('FreeType', freetype, 'the glyphs of the fonts'), ('zlib', zlib, 'compression'),
-                ('libjpeg', libjpeg, 'JPEG pictures'), ('OpenJPEG', openjpeg, 'JPEG 2000 pictures'),
-                ('Little CMS', lcms, 'colour management'), ('jbig2dec', jbig2, 'JBIG2 pictures')):
-  if v: rows.append ([name (n), tm (v), w, 'with ' + name ('MuPDF')])
-rows.append ([name ('SDL'), tm (sdl_version), 'the window, the events, the keyboard',
-              tm ('github.com/libsdl-org/SDL (Emscripten port), sha512 ') + verb (short (sdl_sha512, 16))])
+rows = [['Component', 'Version', 'What it does']]
+rows.append (['<TeXmacs>', tm (version), 'the editor and the typesetter'])
+rows.append ([name ('S7') + ' Scheme', tm (s7_version), 'the extension language, in place of ' + name ('Guile')])
+rows.append ([name ('MuPDF'), tm (mupdf_version), 'the pictures, PDF, the pixels without the GPU'])
+bundled = [(n, v, w) for n, v, w in (
+  ('FreeType', freetype, 'the glyphs of the fonts'), ('zlib', zlib, 'compression'),
+  ('libjpeg', libjpeg, 'JPEG pictures'), ('OpenJPEG', openjpeg, 'JPEG 2000 pictures'),
+  ('Little CMS', lcms, 'colour management'), ('jbig2dec', jbig2, 'JBIG2 pictures')) if v]
+for n, v, w in bundled: rows.append (['  ' + name (n), tm (v), w + ' (in ' + name ('MuPDF') + ')'])
+rows.append ([name ('SDL'), tm (sdl_version), 'the window, the events, the keyboard'])
 if thorvg_version:
-  rows.append ([name ('ThorVG'), tm (thorvg_version), 'the drawing with the GPU (WebGL2)',
-                tm ('github.com/thorvg/thorvg, commit ') + verb (short (thorvg_commit))])
-rows.append ([name ('Clay'), tm (clay_version), 'the layout of the interface (Vue)',
-              'in the sources of <TeXmacs>'])
-rows.append ([name ('Hunspell'), tm (hunspell_version), 'the spell checker',
-              tm ('github.com/hunspell/hunspell, sha256 ') + verb (short (hunspell_sha, 16))])
+  rows.append ([name ('ThorVG'), tm (thorvg_version), 'the drawing with the GPU (WebGL2)'])
+rows.append ([name ('Clay'), tm (clay_version), 'the layout of the interface'])
+rows.append ([name ('Hunspell'), tm (hunspell_version), 'the spell checker'])
 table (rows)
+line ('  Their sources:')
+line ()
+src_items = [
+  '<TeXmacs>: the commit ' + verb (commit) + ' of <hlink|' + tm (repo) + '|' + tm (repo) + '>.',
+  name ('S7') + ' ' + tm (s7_version) + ' (' + tm (s7_date) + ') of <hlink|ccrma.stanford.edu/software/snd|https://ccrma.stanford.edu/software/snd/snd/s7.html>, ' +
+  'in the sources of <TeXmacs> (' + verb ('src/Scheme/S7') + '), with ' + tm (len (s7_patches)) + ' patches.',
+  name ('MuPDF') + ': ' + verb ('mupdf-%s-source.tar.gz' % mupdf_version) + ' of <hlink|mupdf.com|https://mupdf.com/releases>, ' +
+  checksum ('sha256', mupdf_sha) + '; the libraries it bundles come with it.',
+  name ('SDL') + ': ' + verb ('release-%s.zip' % sdl_version) + ' of <hlink|github.com/libsdl-org/SDL|https://github.com/libsdl-org/SDL>, ' +
+  'as the port of ' + name ('Emscripten') + ', ' + checksum ('sha512', sdl_sha512) + '.']
+if thorvg_version:
+  src_items.append (name ('ThorVG') + ': the commit ' + verb (thorvg_commit) +
+                    ' of <hlink|github.com/thorvg/thorvg|https://github.com/thorvg/thorvg>.')
+src_items += [
+  name ('Clay') + ': ' + verb ('clay.h') + ' of <hlink|github.com/nicbarker/clay|https://github.com/nicbarker/clay>, in the sources of <TeXmacs> (' + verb ('src/Plugins/Vue') + ').',
+  name ('Hunspell') + ': ' + verb ('hunspell-%s.tar.gz' % hunspell_version) + ' of <hlink|github.com/hunspell/hunspell|https://github.com/hunspell/hunspell>, ' +
+  checksum ('sha256', hunspell_sha) + '.']
+items (src_items)
 line ('  <subsection|The sizes>')
 line ()
 line ('  The program is ' + verb ('texmacs.wasm') + ', ' + tm (mb (wasm[0])) + ' (' + tm (mb (wasm[1])) +
       ' downloaded, compressed with brotli), with ' + verb ('texmacs.js') + ', ' + tm (mb (js[0])) +
-      ' (' + tm (mb (js[1])) + '). The files of <TeXmacs> come in packages, which the browser keeps' +
-      ' (the boot package before the start, the others in the background), and the fonts one by one,' +
-      ' when a document first uses them:')
+      ' (' + tm (mb (js[1])) + '). The files of <TeXmacs>, by kind:')
 line ()
-rows = [['<strong|Files>', '<strong|Number>', '<strong|Size>']]
+rows = [['Files', 'Number', 'Size']]
 for k, what in kinds:
-  if by_kind[k][1]: rows.append ([tm (what) + ' (' + verb (k) + ')', tm (by_kind[k][1]), tm (mb (by_kind[k][0]))])
+  if by_kind[k][1]: rows.append ([what + ' (' + verb (k) + ')', tm (by_kind[k][1]), tm (mb (by_kind[k][0]))])
 if other[1]: rows.append (['the others', tm (other[1]), tm (mb (other[0]))])
 table (rows)
-rows = [['<strong|Package>', '<strong|Files>', '<strong|Size>', '<strong|Downloaded>']]
+line ('  They come in packages, which the browser keeps: the boot package before ' +
+      '<TeXmacs> starts, the others in the background; and the fonts one by one, ' +
+      'when a document first uses them:')
+line ()
+rows = [['Package', 'Files', 'Size', 'Downloaded']]
 for n, s, br, nf, boot in packs:
-  rows.append ([verb (n) + (' (before the start)' if boot else ''), tm (nf), tm (mb (s)), tm (mb (br)) if br else '--'])
+  rows.append ([verb (n), tm (nf), tm (mb (s)), tm (mb (br)) if br else '--'])
 if lazy_n:
-  rows.append (['the fonts, one by one', tm (lazy_n), tm (mb (lazy_bytes)), tm (mb (lazy_br)) if lazy_br else '--'])
+  rows.append (['the fonts', tm (lazy_n), tm (mb (lazy_bytes)), tm (mb (lazy_br)) if lazy_br else '--'])
 table (rows)
 line ('  <subsection|The plug-ins>')
 line ()
 line ('  The plug-ins which work in the page (<menu|Help|Plug-ins>), and the programs they run:')
 line ()
-rows = [['<strong|Plug-in>', '<strong|Runs>', '<strong|Origin>', '<strong|Size>']]
-rows.append ([name ('Python'), name ('Pyodide') + ' ' + tm (pyodide_version) + ' (' + name ('Python') + ' 3.14)',
-              tm ('cdn.jsdelivr.net/pyodide, at the first input'), 'about 10 MB, kept by the browser'])
-rows.append ([name ('R'), name ('webR') + ' ' + tm (webr_version),
-              tm ('webr.r-wasm.org, at the first input'), 'kept by the browser'])
-rows.append ([name ('TikZ'), name ('TikZJax') + ' ' + tm (tikzjax_version) + ' (' + name ('TeX') + ' in WebAssembly)',
-              tm ('npm @rod2ik/tikzjax, sha256 ') + verb (short (tikzjax_sha, 16)) + ', served with the page',
-              tm (mb (dir_size (os.path.join (web, 'tikzjax')))) ])
-rows.append ([name ('Asymptote'), name ('Asymptote-web') + ' ' + tm (asymptote_version),
-              tm ('npm asymptote-web, sha256 ') + verb (short (asymptote_sha, 16)) + ', served with the page',
-              tm (mb (dir_size (os.path.join (web, 'asymptote')))) ])
-rows.append ([name ('JavaScript'), 'the engine of the browser', '--', '--'])
-rows.append (['AI', 'the services of the providers (your keys)', 'the network', '--'])
+rows = [['Plug-in', 'Runs', 'Size']]
+rows.append ([name ('Python'), name ('Pyodide') + ' ' + tm (pyodide_version) + ' (' + name ('Python') + ' 3.14)', 'about 10 MB'])
+rows.append ([name ('R'), name ('webR') + ' ' + tm (webr_version) + ' (' + name ('R') + ')', '--'])
+rows.append ([name ('TikZ'), name ('TikZJax') + ' ' + tm (tikzjax_version) + ' (<TeX>)', tm (mb (dir_size (os.path.join (web, 'tikzjax'))))])
+rows.append ([name ('Asymptote'), name ('Asymptote-web') + ' ' + tm (asymptote_version), tm (mb (dir_size (os.path.join (web, 'asymptote'))))])
+rows.append ([name ('JavaScript'), 'the engine of the browser', '--'])
+rows.append (['AI', 'the services of the providers', '--'])
 table (rows)
+line ('  Where the programs come from:')
+line ()
+items ([
+  name ('Pyodide') + ': <hlink|cdn.jsdelivr.net/pyodide/v' + tm (pyodide_version) + '|https://cdn.jsdelivr.net/pyodide/v' +
+  tm (pyodide_version) + '/full/>, loaded at the first input of a session (then kept by the browser).',
+  name ('webR') + ': <hlink|webr.r-wasm.org/v' + tm (webr_version) + '|https://webr.r-wasm.org/v' + tm (webr_version) +
+  '/>, loaded at the first input of a session (then kept by the browser).',
+  name ('TikZJax') + ': the package ' + verb ('@rod2ik/tikzjax') + ' of npm, ' + checksum ('sha256', tikzjax_sha) +
+  ', served with the page (' + verb ('tikzjax/') + ').',
+  name ('Asymptote-web') + ': the package ' + verb ('asymptote-web') + ' of npm, ' + checksum ('sha256', asymptote_sha) +
+  ', served with the page (' + verb ('asymptote/') + ').',
+  'AI: the services chosen in the preferences, with your keys, through the network.'])
 line ('</body>')
 line ()
 line ('<initial|<\\collection>')
