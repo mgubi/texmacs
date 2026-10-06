@@ -72,7 +72,7 @@
      (logic-query (child% 'x Joris))
      '())))
 
-(tm-define (regtest-logic)
+(tm-define (regtest-logic-queries)
   (let ((n (regtest-logic-query)))
     (display* "Total: " (object->string n) " tests.\n")
-    (display "Test suite of logic: ok\n")))
+    (display "Test suite of logic-query: ok\n")))

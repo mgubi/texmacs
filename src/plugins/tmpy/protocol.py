@@ -33,6 +33,8 @@ def data_end():
 
 
 def texmacs_escape (data):
+    if isinstance(data, str):
+        data = data.encode()
     return data.replace(DATA_BEGIN.encode(), (DATA_ESCAPE + DATA_BEGIN).encode()) \
                .replace(DATA_END.encode(), (DATA_ESCAPE + DATA_END).encode())
 

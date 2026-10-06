@@ -20,15 +20,41 @@
         (convert tools environment-test)
         (convert mathml mathtm-test)
         (convert tmml tmmltm-test)
-        (kernel texmacs tm-convert-test)
-        (kernel regexp regexp-test)
-        (kernel logic logic-test)
         (prog prog-format-test)
         (server server-cache-test)
         (server server-backup-test)
         (server server-notifications-test)
         (server server-tmfs-test)
-        (utils cite cite-sort-test)))
+        (utils cite cite-sort-test)
+        (kernel texmacs tm-convert-test)
+        (kernel regexp regexp-test)
+        (kernel logic logic-test)
+        (check glue-test)
+        (check lists-test)
+        (check base-test)
+        (check trees-test)
+        (check define-test)
+        (check latex-test)
+        (check formats-test)
+        (check editing-test)
+        (check typeset-test)
+        (check bibtex-test)
+        (check database-test)
+        (check math-edit-test)
+        (check table-test)
+        (check text-structure-test)
+        (check graphics-edit-test)
+        (check version-test)
+        (check links-test)
+        (check misc-modules-test)
+        (check remote-test)
+        (check kbd-menu-test)
+        (check structures-test)
+        (check convert-more-test)
+        (check parse-test)
+        (check macro-drd-test)
+        (check crypto-test)
+        (check plugins-test)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
@@ -87,35 +113,116 @@
 (tm-define (run-checks)
   (check-latex-export "$TEXMACS_CHECKS/latex-export"))
 
+;; The suites: a name, the function which runs it, and how it reports its
+;; failures: count (it returns their number), error (it raises an error at
+;; the first one) or integration (integration-test-group adds them to
+;; integration-failure-total).
+(define regression-suites
+  '(("htmltm" regtest-htmltm error)
+    ("xmltm" regtest-xmltm error)
+    ("tmlength" regtest-tmlength error)
+    ("environment" regtest-environment error)
+    ("mathtm" regtest-mathtm error)
+    ("tmhtml" regtest-tmhtml error)
+    ("tmmltm" regtest-tmmltm error)
+    ("prog-format" regtest-prog-format error)
+    ("cite-sort" regtest-cite-sort error)
+    ("tm-convert" regtest-tm-convert error)
+    ("regexp" regtest-regexp error)
+    ("logic-query" regtest-logic-queries error)
+    ("glue" glue-test-failures count)
+    ("lists" lists-test-failures count)
+    ("base" base-test-failures count)
+    ("trees" trees-test-failures count)
+    ("latex" latex-test-failures count)
+    ("formats" formats-test-failures count)
+    ;; opens buffers and edits them
+    ("editing" editing-test-failures count)
+    ("typeset" typeset-test-failures count)
+    ;; after editing: generating a bibliography or the auxiliary data of a
+    ;; document processes the pending GUI events, among which those of the
+    ;; views which editing closed (#174)
+    ("bibtex" bibtex-test-failures count)
+    ;; generates the auxiliary data of documents in the temporary directory
+    ("links" links-test-failures count)
+    ("structures" structures-test-failures count)
+    ("convert-more" convert-more-test-failures count)
+    ("math-edit" math-edit-test-failures count)
+    ("table" table-test-failures count)
+    ("text-structure" text-structure-test-failures count)
+    ("graphics-edit" graphics-edit-test-failures count)
+    ;; makes a throwaway git repository in the temporary directory
+    ("version" version-test-failures count)
+    ("misc-modules" misc-modules-test-failures count)
+    ;; loads the keyword tables of the program languages
+    ("parse" parse-test-failures count)
+    ("database" database-test-failures count)
+    ("crypto" crypto-test-failures count)
+    ;; server and clients in this process, with databases in the temporary
+    ;; directory and the server files of the (scratch) home, which it cleans
+    ("remote" remote-test-failures count)
+    ;; starts plugin processes (shell, python when present) and stops them
+    ("plugins" plugins-test-failures count)
+    ;; loads every lazy menu, and maps and unmaps test keys
+    ("kbd-menu" kbd-menu-test-failures count)
+    ;; loads every style package, and with them the Scheme modules they use
+    ("macro-drd" macro-drd-test-failures count)
+    ;; last, since it defines modes and functions in the running TeXmacs
+    ("tm-define" define-test-failures count)))
+
+(define integration-suites
+  '(("deletion-plan" regtest-deletion-plan integration)
+    ("server-notifications" regtest-server-notifications integration)
+    ("server-backup" regtest-server-backup integration)
+    ("server-cache" regtest-server-cache integration)))
+
+;; the number of failures of a suite; an error which escapes the suite
+;; counts as one, and does not stop the suites after it
+(define (suite-failures suite)
+  (let ((f (eval (cadr suite)))
+        (kind (caddr suite)))
+    (set! integration-failure-total 0)
+    (catch #t
+      (lambda ()
+        (with r (f)
+          (cond ((== kind 'count) r)
+                ((== kind 'integration) integration-failure-total)
+                (else 0))))
+      (lambda (key . args)
+        (display* "  error in suite " (car suite) ": "
+                  (object->string (cons key args)) "\n")
+        (+ integration-failure-total 1)))))
+
+(define (run-suites suites)
+  (let ((failed '()))
+    (for (suite suites)
+      (with n (suite-failures suite)
+        (when (> n 0) (set! failed (cons (car suite) failed)))))
+    (display* "Suites: " (number->string (length suites)) ", failed: "
+              (if (null? failed) "none"
+                  (string-recompose (reverse failed) ", "))
+              "\n")
+    (length failed)))
+
+(tm-define (test-suite-names)
+  (:synopsis "The names of the test suites")
+  (map car (append regression-suites integration-suites)))
+
+(tm-define (run-regression-suite name)
+  (:synopsis "Run the test suite @name and return its number of failures")
+  (with suite (or (assoc name regression-suites)
+                  (assoc name integration-suites))
+    (if suite (suite-failures suite)
+        (begin (display* "no test suite " name "\n") 1))))
+
 (tm-define (run-all-tests)
-  (regtest-htmltm)
-  (regtest-xmltm)
-  (regtest-tmlength)
-  (regtest-environment)
-  (regtest-mathtm)
-  (regtest-tmhtml)
-  (regtest-tmmltm)
-  (regtest-prog-format)
-  (regtest-cite-sort)
-  (regtest-tm-convert)
-  (regtest-regexp)
-  (regtest-logic)
-)
+  (:synopsis "Run the regression tests; the number of failed suites")
+  (run-suites regression-suites))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Integration tests (side-effecting, with setup/teardown)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (run-integration-tests)
-  ;; run all groups and return the number of failing groups;
-  ;; no error is raised, so that a -x session can still quit afterwards
-  (with failed (integration-test-run-all
-                (list regtest-deletion-plan
-                      regtest-server-notifications
-                      regtest-server-backup
-                      regtest-server-cache))
-    (if (null? failed)
-        (display* "All integration test groups passed\n")
-        (display* "Integration test failure: " (length failed)
-                  " groups failed: " failed "\n"))
-    (length failed)))
+  (:synopsis "Run the integration tests; the number of failed suites")
+  (run-suites integration-suites))

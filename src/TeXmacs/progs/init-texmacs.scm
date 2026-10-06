@@ -320,7 +320,7 @@
 
 ;(display "Booting graphics mode\n")
 (lazy-keyboard (graphics graphics-kbd) in-active-graphics? graphics-wheel)
-(lazy-menu (graphics graphics-menu) graphics-menu graphics-icons
+(lazy-menu (graphics graphics-menu) graphics-icons
            graphics-focus-icons)
 (lazy-define (graphics graphics-object)
              graphics-reset-state graphics-decorations-update)
@@ -548,7 +548,7 @@
 
 ;(display "Booting regression testing\n")
 (lazy-define (check check-master) check-all run-checks run-all-tests
-             run-integration-tests)
+             run-integration-tests run-regression-suite test-suite-names)
 (lazy-define (utils test test-latex-export) run-latex-export-suite)
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
 ;(display* "memory: " (texmacs-memory) " bytes\n")

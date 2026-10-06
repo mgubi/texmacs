@@ -96,14 +96,17 @@
 		(bibtex-latex von)
 		(output-verbatim " ")))
 	  (bibtex-latex last)
-	  (if (not (equal? first ""))
-	      (begin
-		(output-verbatim ", ")
-		(bibtex-latex first)))
+	  ;; "von Last, First" or "von Last, Jr, First"
 	  (if (not (equal? jr ""))
 	      (begin
 		(output-verbatim ", ")
-		(bibtex-latex jr)))))))
+		(bibtex-latex jr)
+		(output-verbatim ", ")
+		(bibtex-latex first))
+	      (if (not (equal? first ""))
+		  (begin
+		    (output-verbatim ", ")
+		    (bibtex-latex first))))))))
 
 (define (bibtex-names x)
   ;; (display* "BIBTEX NAMES: " x "\n")

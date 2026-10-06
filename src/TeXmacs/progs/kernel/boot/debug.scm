@@ -264,10 +264,12 @@
 ;;   - teardown-expr runs after each test (even on failure)
 ;;   - all tests run regardless of earlier failures
 ;;   - returns the number of tests run
-;;   - signals error at the end if any test failed
-;;     (inside integration-test-run-all, the failure is recorded instead)
+;;   - adds the number of failed tests to integration-failure-total, which
+;;     the test runner of check-master.scm reads
 ;;
 ;; Use (begin ...) for multiple setup/teardown expressions.
+(define-public integration-failure-total 0)
+
 (define-public-macro (integration-test-group group-desc group-id
                                              setup-expr teardown-expr . body)
   (let ((tests
@@ -301,36 +303,8 @@
               (failed (- total passed)))
          (display* "  " (number->string passed) "/" (number->string total)
                    " passed\n")
-         (when (> failed 0)
-           (integration-test-failure ,group-id failed))
+         (set! integration-failure-total (+ integration-failure-total failed))
          total))))
-
-(define integration-failures #f)
-
-(define-public (integration-test-failure group-id failed)
-  ;; signal an error, unless failures are being collected
-  ;; by integration-test-run-all
-  (if (list? integration-failures)
-      (begin
-        (display* "  FAILED group " group-id ": " failed " tests failed\n")
-        (set! integration-failures (cons group-id integration-failures)))
-      (error "Integration test failure:" group-id failed)))
-
-(define-public (integration-test-run-all groups)
-  ;; run all thunks in groups, collecting the ids of the failing
-  ;; integration test groups instead of stopping at the first one
-  (let ((old integration-failures))
-    (set! integration-failures '())
-    (for-each (lambda (group)
-                (catch #t group
-                  (lambda args
-                    (display* "  ERROR " (object->string args) "\n")
-                    (set! integration-failures
-                          (cons "error" integration-failures)))))
-              groups)
-    (let ((r (reverse integration-failures)))
-      (set! integration-failures old)
-      r)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Test suite library
