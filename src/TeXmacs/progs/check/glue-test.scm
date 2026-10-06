@@ -275,19 +275,20 @@
 ;; processes: evaluate-system sends its inputs to the file descriptors of
 ;; the process and reads its outputs. An empty input used to be left open,
 ;; so that a process which reads it to its end never stopped, nor TeXmacs,
-;; which waits for it (openssl passwd -stdin of an empty password)
+;; which waits for it (openssl passwd -stdin of an empty password). A long
+;; input is sent in pieces of 4096 bytes on Unix.
 (define (test-glue-processes)
-  (if (or (os-mingw?) (os-win32?) (not (url-exists-in-path? "cat")))
+  (if (not (url-exists-in-path? "cat"))
       (display "  no cat command, skipped\n")
-      (begin
+      (let ((cat (lambda (in) (evaluate-system '("cat") '(0) (list in)
+                                               '(1 2))))
+            (long (make-string 100000 #\a)))
         (glue-check-equal "processes" "an input"
-                          (lambda () (evaluate-system '("cat") '(0) '("abc")
-                                                      '(1 2)))
-                          '("0" "abc" ""))
+                          (lambda () (cat "abc")) '("0" "abc" ""))
         (glue-check-equal "processes" "an empty input"
-                          (lambda () (evaluate-system '("cat") '(0) '("")
-                                                      '(1 2)))
-                          '("0" "" "")))))
+                          (lambda () (cat "")) '("0" "" ""))
+        (glue-check-equal "processes" "a long input"
+                          (lambda () (cat long)) (list "0" long "")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite

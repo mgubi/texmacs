@@ -729,8 +729,13 @@ mingw_system (::array< ::string> arg,
           debug_io << "unix_system, pid " << process.getpid ()
                << ", warning: write error on fd " 
                << ch[i].getPipe () << "\n";
+          pos_in[i]= N(str_in[i]);
+          ch[i].close ();
         } 
       }
+      // an empty input is closed too (close does nothing the second time):
+      // a process which reads its input to the end waits for that
+      else ch[i].close ();
     }
   } while (busy);
 

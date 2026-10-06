@@ -17,6 +17,7 @@
 #include <spawn.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <pthread.h>
 
@@ -158,45 +159,42 @@ struct _channel {
     buffer= array<char> (buffer_size2); }
 };
 
-// data read from spawn process
+// data read from spawn process, until its end; the descriptor is closed
 static void*
 _background_read_task (void* channel_as_void_ptr) {
   _channel* c= (_channel*) channel_as_void_ptr;
   int fd= c->fd;
   int n= c->buffer_size;
   char* b= A (c->buffer);
-  int m;
-  do {
-    m= read (fd, b, n);
-    // cout << "read " << m << " bytes from " << fd << "\n";
+  while (true) {
+    int m= read (fd, b, n);
     if (m > 0) c->data.append (b, m);
-    if (m == 0) { if (close (fd) != 0) c->status= -1; }
-  } while (m > 0);
+    else if (m < 0 && errno == EINTR) continue;
+    else { if (m < 0) c->status= -1; break; }
+  }
+  if (close (fd) != 0) c->status= -1;
   return (void*) NULL;
 }
 
-// data written to spawn process
+// data written to spawn process; the descriptor is always closed, also when
+// there is nothing to write or the writing fails, since a process which
+// reads its input to the end waits for that, and unix_system for it
 static void*
 _background_write_task (void* channel_as_void_ptr) {
   _channel* c= (_channel*) channel_as_void_ptr;
   int fd= c->fd;
   const char* d= c->data.a;
   int n= c->buffer_size;
-  int t= (c->data).n, k= 0, o= 0;
-  // an empty input is closed at once: the process reads its end
-  if (t == 0) {
-    if (close (fd) != 0) c->status= -1;
-    return (void*) NULL; }
-  if (n == 0) { close (fd); c->status= -1; return (void*) NULL; }
-  do {
-    int m= min (n, t - k);
-    // cout << "writting " << m << " bytes / " << t-k << "\n";
-    o= write (fd, (void*) (d + k), m);
-    // cout << "written " << o << " bytes to " << fd << "\n";
-    if (o > 0) k += o;
-    if (o < 0) { close (fd); c->status= -1; }
-    if (k == t) { if (close (fd) != 0) c->status= -1; }
-  } while (o > 0 && k < t);
+  int t= (c->data).n, k= 0;
+  if (n <= 0 && t > 0) c->status= -1;
+  else
+    while (k < t) {
+      int o= write (fd, (void*) (d + k), min (n, t - k));
+      if (o > 0) k += o;
+      else if (o < 0 && errno == EINTR) continue;
+      else { c->status= -1; break; }
+    }
+  if (close (fd) != 0) c->status= -1;
   return (void*) NULL;
 }
 
