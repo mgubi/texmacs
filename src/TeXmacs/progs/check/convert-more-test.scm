@@ -723,6 +723,10 @@
                 (l (string-tokenize-by-char (substring ps start end) #\space)))
            (map string->number (list-filter l (lambda (x) (!= x ""))))))))
 
+;; a check left out for a missing tool
+(define (images-skip what why)
+  (display* "  SKIP [" what "] " why "\n"))
+
 ;; The size of an image, in points (a pixel is a point when the file gives
 ;; no resolution), is the bounding box of its PostScript form (image->psdoc,
 ;; which goes through the convert of ImageMagick for the bitmaps and SVG:
@@ -756,8 +760,13 @@
     (check= (file-format (string->url "a.tiff")) "tif-file")
     (check-true (file-of-format? png "image"))
     (check-false (file-of-format? (string->url "a.tm") "image"))
-    (if (not (url-exists-in-path? "convert"))
-        (display "  SKIP sizes of images: no convert of ImageMagick\n")
+    ;; (Qt 6 cannot write PostScript: the bitmaps go to PostScript with the
+    ;; convert of ImageMagick, which TeXmacs does not use on Windows, where
+    ;; convert is another command; without it image->psdoc gives the
+    ;; picture of an unknown image)
+    (if (not (has-convert?))
+        (images-skip "the PostScript of bitmaps and svg"
+                     "no convert of ImageMagick (never used on Windows)")
         (begin
           (check= (bounding-box (image->psdoc png)) '(0 0 30 20))
           (check= (bounding-box (image->psdoc gif)) '(0 0 40 10))
@@ -801,21 +810,35 @@
           '(tuple "au" "cdr" "cvs" "dat" "gsm" "ogg" "snd" "voc" "wav"))
   (check= (format-get-suffixes* "animation") '(tuple "gif"))
   (check= (format-default-suffix "image") "png")
-  (with l (cdr (format-get-suffixes* "image"))
-    (for-each (lambda (s) (check-true (in? s l)))
-              '("png" "jpg" "jpeg" "gif" "pnm" "ps" "eps" "pdf" "svg" "tif"
-                "ppm")))
-  (with l (image-formats)
-    (for-each (lambda (f) (check-true (in? f l)))
-              '("gif" "jpeg" "pdf" "png" "pnm" "postscript" "ppm" "svg" "tif")))
+  ;; the image formats are those which a converter takes to PostScript:
+  ;; pdf needs Ghostscript (except on Windows), svg inkscape or
+  ;; rsvg-convert, ppm the convert of ImageMagick
+  (let* ((pdf? (or (os-mingw?) (url-exists-in-path? "gs")))
+         (svg? (or (url-exists-in-path? "inkscape")
+                   (url-exists-in-path? "rsvg-convert")))
+         (ppm? (has-convert?))
+         (opt (lambda (ok? l) (if ok? l '()))))
+    (with l (cdr (format-get-suffixes* "image"))
+      (for-each (lambda (s) (check-true (in? s l)))
+                (append '("png" "jpg" "jpeg" "gif" "pnm" "ps" "eps" "tif")
+                        (opt pdf? '("pdf")) (opt svg? '("svg"))
+                        (opt ppm? '("ppm")))))
+    (with l (image-formats)
+      (for-each (lambda (f) (check-true (in? f l)))
+                (append '("gif" "jpeg" "png" "pnm" "postscript" "tif")
+                        (opt pdf? '("pdf")) (opt svg? '("svg"))
+                        (opt ppm? '("ppm"))))))
   ;; the bitmaps go to PostScript by image->psdoc, without external tool
   (for-each (lambda (fm)
               (check= (converter-search (string-append fm "-file")
                                         "postscript-document")
                       (list (string-append fm "-file") "postscript-document")))
             '("png" "jpeg" "gif" "tif" "pnm"))
-  (check= (converter-search "xfig-file" "postscript-file")
-          '("xfig-file" "postscript-file")))
+  ;; (fig2ps is a shell script of TeXmacs, which Windows does not run)
+  (if (url-exists-in-path? "fig2ps")
+      (check= (converter-search "xfig-file" "postscript-file")
+              '("xfig-file" "postscript-file"))
+      (images-skip "xfig to PostScript" "no fig2ps command")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Source code formats and the registry
