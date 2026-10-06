@@ -1,0 +1,226 @@
+From b47caf1d9c12bd922cc6cb5bb9c38728e5c72269 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 16:40:09 +0100
+Subject: [PATCH 04/20] Reader and printer as Guile's: '|' and '\\' in symbols,
+ #{...}#, long tokens, large integers inexact, shortest floats; boot image
+ regenerated
+
+---
+ print.c  | 70 ++++++++++++++++++++++++++++++++++++++++++--------------
+ read.c   | 55 +++++++++++++++++++++++++++++++-------------
+ string.c | 10 ++++++++
+ 3 files changed, 102 insertions(+), 33 deletions(-)
+
+diff --git a/print.c b/print.c
+index 993aafa..863219b 100644
+--- a/print.c
++++ b/print.c
+@@ -132,22 +132,12 @@ static void print_symbol_name(ios_t *f, char *name)
+         i++;
+     }
+     if (escape) {
+-        if (charescape) {
+-            outc('|', f);
+-            i=0;
+-            while (name[i]) {
+-                if (name[i]=='|' || name[i]=='\\')
+-                    outc('\\', f);
+-                outc(name[i], f);
+-                i++;
+-            }
+-            outc('|', f);
+-        }
+-        else {
+-            outc('|', f);
+-            outs(name, f);
+-            outc('|', f);
+-        }
++        // TeXmacs: as Guile, #{...}# (charescape is never set, since '|'
++        // and '\\' are ordinary symbol characters)
++        (void)charescape;
++        outsn("#{", f, 2);
++        outs(name, f);
++        outsn("}#", f, 2);
+     }
+     else {
+         outs(name, f);
+@@ -534,6 +524,49 @@ int double_exponent(double d)
+     return dl.ieee.exponent - IEEE754_DOUBLE_BIAS;
+ }
+ 
++// TeXmacs: the shortest decimal representation of d which reads back as d,
++// written as Guile does: 0.001, 100.0, 1.0e21, 1.0e-4 (d finite, nonzero)
++void fl_print_double_guile(char *s, size_t cnt, double d)
++{
++    char tmp[64], digits[32];
++    int p, e, nd = 0, i, k = 0;
++    for (p = 1; p <= 17; p++) {
++        snprintf(tmp, sizeof(tmp), "%.*e", p-1, d);
++        if (strtod(tmp, NULL) == d) break;
++    }
++    // tmp is [-]D[.DDD]e[+-]XX
++    i = 0;
++    if (tmp[i] == '-') { if (k < (int)cnt-1) s[k++] = '-'; i++; }
++    for (; tmp[i] != 'e'; i++)
++        if (tmp[i] != '.') digits[nd++] = tmp[i];
++    while (nd > 1 && digits[nd-1] == '0') nd--;
++    digits[nd] = '\0';
++    e = atoi(&tmp[i+1]);
++#define PUTC(c) do { if (k < (int)cnt-1) s[k++] = (c); } while (0)
++    if (e >= -3 && e < 21) {
++        if (e >= 0) {
++            for (i = 0; i <= e; i++) PUTC(i < nd ? digits[i] : '0');
++            PUTC('.');
++            if (nd > e+1) for (i = e+1; i < nd; i++) PUTC(digits[i]);
++            else PUTC('0');
++        }
++        else {
++            PUTC('0'); PUTC('.');
++            for (i = 0; i < -e-1; i++) PUTC('0');
++            for (i = 0; i < nd; i++) PUTC(digits[i]);
++        }
++    }
++    else {
++        PUTC(digits[0]); PUTC('.');
++        if (nd > 1) for (i = 1; i < nd; i++) PUTC(digits[i]);
++        else PUTC('0');
++        snprintf(tmp, sizeof(tmp), "e%d", e);
++        for (i = 0; tmp[i]; i++) PUTC(tmp[i]);
++    }
++#undef PUTC
++    s[k] = '\0';
++}
++
+ void snprint_real(char *s, size_t cnt, double r,
+                   int width,    // printf field width, or 0
+                   int dec,      // # decimal digits desired, recommend 16
+@@ -687,7 +720,10 @@ static void cvalue_printdata(ios_t *f, void *data, size_t len, value_t type,
+                 outc('f', f);
+         }
+         else {
+-            snprint_real(buf, sizeof(buf), d, 0, ndec, 3, 10);
++            if (type == doublesym)
++                fl_print_double_guile(buf, sizeof(buf), d);
++            else
++                snprint_real(buf, sizeof(buf), d, 0, ndec, 3, 10);
+             int hasdec = (strpbrk(buf, ".eE") != NULL);
+             outs(buf, f);
+             if (!hasdec) outsn(".0", f, 2);
+diff --git a/read.c b/read.c
+index e262c40..eacb2cc 100644
+--- a/read.c
++++ b/read.c
+@@ -11,9 +11,11 @@ enum {
+ // exceptions are '.', which is an ordinary symbol character
+ // unless it's the only character in the symbol, and '#', which is
+ // an ordinary symbol character unless it's the first character.
++// TeXmacs: as in Guile, '|' and '\\' are ordinary symbol characters (symbols
++// with special characters are written #{...}#)
+ static inline int symchar(char c)
+ {
+-    static char *special = "()[]'\";`,\\| \f\n\r\t\v";
++    static char *special = "()[]'\";`, \f\n\r\t\v";
+     return !strchr(special, c);
+ }
+ 
+@@ -85,14 +87,24 @@ static int read_numtok(char *tok, value_t *pval, int base)
+     int result;
+     errno = 0;
+     result = isnumtok_base(tok, pval, base);
+-    if (errno == ERANGE)
+-        lerrorf(ParseError, "read: overflow in numeric constant %s", tok);
++    if (errno == ERANGE) {
++        // TeXmacs: an integer too large for 64 bits is read as an inexact
++        // number (there are no bignums)
++        char *end;
++        double d;
++        errno = 0;
++        d = (base == 0 || base == 10) ? strtod(tok, &end) : 0;
++        if (base != 0 && base != 10 || *end != '\0' || errno)
++            lerrorf(ParseError, "read: overflow in numeric constant %s", tok);
++        if (pval) *pval = mk_double(d);
++        return 1;
++    }
+     return result;
+ }
+ 
+ static u_int32_t toktype = TOK_NONE;
+ static value_t tokval;
+-static char buf[256];
++static char buf[16384];
+ 
+ static char nextchar(void)
+ {
+@@ -148,18 +160,7 @@ static int read_token(char c, int digits)
+             c = (char)ch;
+         }
+         first = 0;
+-        if (c == '|') {
+-            issym = 1;
+-            escaped = !escaped;
+-        }
+-        else if (c == '\\') {
+-            issym = 1;
+-            ch = ios_getc(F);
+-            if (ch == IOS_EOF)
+-                goto terminate;
+-            accumchar((char)ch, &i);
+-        }
+-        else if (!escaped && !(symchar(c) && (!digits || isdigit(c)))) {
++        if (!escaped && !(symchar(c) && (!digits || isdigit(c)))) {
+             break;
+         }
+         else {
+@@ -254,6 +255,28 @@ static u_int32_t peek(void)
+         else if (c == '(') {
+             toktype = TOK_SHARPOPEN;
+         }
++        else if (c == '{') {
++            // TeXmacs: Guile's symbols with special characters, #{...}#
++            int i = 0;
++            while (1) {
++                ch = ios_getc(F);
++                if (ch == IOS_EOF)
++                    lerror(ParseError, "read: end of input in #{...}#");
++                if ((char)ch == '}') {
++                    ch = ios_getc(F);
++                    if ((char)ch == '#') break;
++                    accumchar('}', &i);
++                    if (ch == IOS_EOF)
++                        lerror(ParseError, "read: end of input in #{...}#");
++                    ios_ungetc((char)ch, F);
++                    continue;
++                }
++                accumchar((char)ch, &i);
++            }
++            buf[i] = '\0';
++            toktype = TOK_SYM;
++            tokval = symbol(buf);
++        }
+         else if (c == '<') {
+             lerror(ParseError, "read: unreadable object");
+         }
+diff --git a/string.c b/string.c
+index 387cf14..37c9a7d 100644
+--- a/string.c
++++ b/string.c
+@@ -363,6 +363,16 @@ value_t fl_numbertostring(value_t *args, u_int32_t nargs)
+     value_t n = args[0];
+     int neg = 0;
+     uint64_t num;
++    if (iscprim(n) && (cp_numtype((cprim_t*)ptr(n)) == T_DOUBLE ||
++                       cp_numtype((cprim_t*)ptr(n)) == T_FLOAT)) {
++        // TeXmacs: inexact numbers are written as print writes them
++        value_t buf = fl_buffer(NULL, 0);
++        fl_gc_handle(&buf);
++        fl_print(value2c(ios_t*,buf), args[0]);
++        value_t outp = stream_to_string(&buf);
++        fl_free_gc_handles(1);
++        return outp;
++    }
+     if (isfixnum(n))      num = numval(n);
+     else if (!iscprim(n)) type_error("number->string", "integer", n);
+     else num = conv_to_uint64(cp_data((cprim_t*)ptr(n)),
+-- 
+2.50.1 (Apple Git-155)
+

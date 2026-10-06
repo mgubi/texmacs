@@ -1,0 +1,54 @@
+From bca2ef6b66564741ef0997af15ada9c5199d76b5 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 17:16:18 +0100
+Subject: [PATCH 12/20] Heap limited to 1 Gb (heapsize has 32 bits): an out of
+ memory error, after fl_out_of_memory_hook, instead of an overflow
+
+---
+ flisp.c | 8 ++++++++
+ flisp.h | 3 +++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/flisp.c b/flisp.c
+index 7874c00..3c79107 100644
+--- a/flisp.c
++++ b/flisp.c
+@@ -523,6 +523,7 @@ static void trace_globals(symbol_t *root)
+ static value_t memory_exception_value;
+ 
+ void (*fl_gc_extra_roots)(value_t (*reloc)(value_t)) = NULL;
++void (*fl_out_of_memory_hook)(void) = NULL;
+ 
+ void gc(int mustgrow)
+ {
+@@ -592,6 +593,13 @@ void gc(int mustgrow)
+     // more space to fill next time. if we grew tospace last time,
+     // grow the other half of the heap this time to catch up.
+     if (grew || ((lim-curheap) < (int)(heapsize/5)) || mustgrow) {
++        // TeXmacs: heapsize has 32 bits; an out of memory error rather than
++        // a new growth past 512 Mb (the heap then becomes 1 Gb), which would
++        // overflow
++        if (!grew && heapsize >= (1U << 29)) {
++            if (fl_out_of_memory_hook) fl_out_of_memory_hook();
++            fl_raise(memory_exception_value);
++        }
+         temp = LLT_REALLOC(tospace, heapsize*2);
+         if (temp == NULL)
+             fl_raise(memory_exception_value);
+diff --git a/flisp.h b/flisp.h
+index 7837656..8821a36 100644
+--- a/flisp.h
++++ b/flisp.h
+@@ -218,6 +218,9 @@ typedef struct {
+ // function, to update the values that C or C++ code holds outside the Lisp
+ // stack and the GC handles
+ extern void (*fl_gc_extra_roots)(value_t (*reloc)(value_t));
++// optional: called before the out of memory error which stops the growth of
++// the heap (TeXmacs)
++extern void (*fl_out_of_memory_hook)(void);
+ 
+ /* functions needed to implement the value interface (cvtable_t) */
+ typedef enum { T_INT8, T_UINT8, T_INT16, T_UINT16, T_INT32, T_UINT32,
+-- 
+2.50.1 (Apple Git-155)
+

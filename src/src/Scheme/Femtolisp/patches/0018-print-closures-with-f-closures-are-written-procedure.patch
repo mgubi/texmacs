@@ -1,0 +1,84 @@
+From b3e1e92ba518d3cfcd42101d017c82ecd7df9cc0 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 20:31:48 +0100
+Subject: [PATCH 18/20] *print-closures*: with #f, closures are written
+ #<procedure name>, as Guile
+
+---
+ flisp.c |  4 +++-
+ print.c | 16 ++++++++++++++--
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/flisp.c b/flisp.c
+index 3c79107..6d61f3f 100644
+--- a/flisp.c
++++ b/flisp.c
+@@ -94,7 +94,7 @@ value_t FL_NIL, FL_T, FL_F, FL_EOF, QUOTE;
+ value_t IOError, ParseError, TypeError, ArgError, UnboundError, MemoryError;
+ value_t DivideError, BoundsError, Error, KeyError, EnumerationError;
+ value_t printwidthsym, printreadablysym, printprettysym, printlengthsym;
+-value_t printlevelsym, builtins_table_sym, printsharedsym;
++value_t printlevelsym, builtins_table_sym, printsharedsym, printclosuressym;
+ 
+ static value_t NIL, LAMBDA, IF, TRYCATCH;
+ static value_t BACKQUOTE, COMMA, COMMAAT, COMMADOT, FUNCTION;
+@@ -2313,6 +2313,8 @@ static void lisp_init(size_t initial_heapsize)
+     set(printlengthsym=symbol("*print-length*"), FL_F);
+     set(printlevelsym=symbol("*print-level*"), FL_F);
+     set(printsharedsym=symbol("*print-shared*"), FL_T);
++    // TeXmacs: with #f, closures are written #<procedure name>
++    set(printclosuressym=symbol("*print-closures*"), FL_T);
+     builtins_table_sym = symbol("*builtins*");
+     fl_lasterror = NIL;
+     i = 0;
+diff --git a/print.c b/print.c
+index dae8b3f..41a52ed 100644
+--- a/print.c
++++ b/print.c
+@@ -66,6 +66,7 @@ void fl_print_str(char *s, ios_t *f)
+ static htable_t printvisiting;
+ static int printvisiting_init = 0;
+ static int print_shared = 1;
++static int print_closures = 1;
+ 
+ static void print_label(value_t v)
+ {
+@@ -440,7 +441,7 @@ void fl_print_child(ios_t *f, value_t v)
+         }
+         else {
+             assert(isclosure(v));
+-            if (!print_princ) {
++            if (!print_princ && print_closures) {
+                 if (print_circle_prefix(f, v)) break;
+                 function_t *fn = (function_t*)ptr(v);
+                 outs("#fn(", f);
+@@ -462,7 +463,17 @@ void fl_print_child(ios_t *f, value_t v)
+                 outc(')', f);
+             }
+             else {
+-                outs("#<function>", f);
++                // TeXmacs: with *print-closures* #f, as Guile: #<procedure f>
++                function_t *fn = (function_t*)ptr(v);
++                if (print_closures)
++                    outs("#<function>", f);
++                else if (issymbol(fn->name) && fn->name != LAMBDA) {
++                    outs("#<procedure ", f);
++                    outs(symbol_name(fn->name), f);
++                    outc('>', f);
++                }
++                else
++                    outs("#<procedure>", f);
+             }
+         }
+         break;
+@@ -939,6 +950,7 @@ void fl_print(ios_t *f, value_t v)
+ 
+     printlabel = 0;
+     print_shared = (symbol_value(printsharedsym) != FL_F);
++    print_closures = (symbol_value(printclosuressym) != FL_F);
+     if (!print_princ) print_traverse(v);
+     HPOS = VPOS = 0;
+ 
+-- 
+2.50.1 (Apple Git-155)
+

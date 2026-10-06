@@ -1,0 +1,141 @@
+From 47aed47d76616861a469d548114a161a4647a016 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 17:34:20 +0100
+Subject: [PATCH 15/20] Reader: [ and ] are symbol characters, as in Guile
+ (vectors are #(...)); boot image regenerated
+
+---
+ compiler.lsp       | 10 +++++-----
+ read.c             | 12 +++---------
+ tests/unittest.lsp | 24 ++++++++++++------------
+ 3 files changed, 20 insertions(+), 26 deletions(-)
+
+diff --git a/compiler.lsp b/compiler.lsp
+index 6a6c73a..375ee13 100644
+--- a/compiler.lsp
++++ b/compiler.lsp
+@@ -3,7 +3,7 @@
+ (define Instructions
+   (let ((e (table))
+ 	(keys 
+-	 [nop dup pop call tcall jmp brf brt jmp.l brf.l brt.l ret
++	 #(nop dup pop call tcall jmp brf brt jmp.l brf.l brt.l ret
+ 	  
+ 	  eq? eqv? equal? atom? not null? boolean? symbol?
+ 	  number? bound? pair? builtin? vector? fixnum? function?
+@@ -28,7 +28,7 @@
+ 	  brne brne.l cadr brnn brnn.l brn brn.l
+ 	  optargs brbound keyargs
+ 	  
+-	  dummy_t dummy_f dummy_nil]))
++	  dummy_t dummy_f dummy_nil)))
+     (for 0 (1- (length keys))
+ 	 (lambda (i)
+ 	   (put! e (aref keys i) i)))))
+@@ -394,7 +394,7 @@
+ 		(argc-error b 1)
+ 		(emit g b nargs)))
+       (vector   (if (= nargs 0)
+-		    (emit g 'loadv [])
++		    (emit g 'loadv #())
+ 		    (emit g b nargs)))
+       (apply    (if (< nargs 2)
+ 		    (argc-error b 2)
+@@ -476,7 +476,7 @@
+     (define (compile-unknown-call x env) #f))
+ 
+ (define (compile-in g env tail? x)
+-  (cond ((symbol? x) (compile-sym g env x [loada loadc loadg]))
++  (cond ((symbol? x) (compile-sym g env x #(loada loadc loadg)))
+ 	((atom? x)
+ 	 (cond ((eq? x 0)   (emit g 'load0))
+ 	       ((eq? x 1)   (emit g 'load1))
+@@ -517,7 +517,7 @@
+ 	   (set!     (compile-in g env #f (caddr x))
+ 		     (or (symbol? (cadr x))
+ 			 (error "set!: second argument must be a symbol"))
+-		     (compile-sym g env (cadr x) [seta setc setg]))
++		     (compile-sym g env (cadr x) #(seta setc setg)))
+ 	   (define   (compile-in g env tail?
+ 				 (expand-define x)))
+ 	   (trycatch (compile-in g env #f `(lambda () ,(cadr x)))
+diff --git a/read.c b/read.c
+index e881f76..ad68535 100644
+--- a/read.c
++++ b/read.c
+@@ -11,11 +11,11 @@ enum {
+ // exceptions are '.', which is an ordinary symbol character
+ // unless it's the only character in the symbol, and '#', which is
+ // an ordinary symbol character unless it's the first character.
+-// TeXmacs: as in Guile, '|' and '\\' are ordinary symbol characters (symbols
+-// with special characters are written #{...}#)
++// TeXmacs: as in Guile, '|', '\\', '[' and ']' are ordinary symbol characters
++// (symbols with special characters are written #{...}#, vectors #(...))
+ static inline int symchar(char c)
+ {
+-    static char *special = "()[]'\";`, \f\n\r\t\v";
++    static char *special = "()'\";`, \f\n\r\t\v";
+     return !strchr(special, c);
+ }
+ 
+@@ -200,12 +200,6 @@ static u_int32_t peek(void)
+     else if (c == ')') {
+         toktype = TOK_CLOSE;
+     }
+-    else if (c == '[') {
+-        toktype = TOK_OPENB;
+-    }
+-    else if (c == ']') {
+-        toktype = TOK_CLOSEB;
+-    }
+     else if (c == '\'') {
+         toktype = TOK_QUOTE;
+     }
+diff --git a/tests/unittest.lsp b/tests/unittest.lsp
+index c864d2d..fbe40a2 100644
+--- a/tests/unittest.lsp
++++ b/tests/unittest.lsp
+@@ -249,28 +249,28 @@
+ 	      (hash '(#1=(((((#1#))))) 1)))))
+ 
+ (assert (equal?
+-	 (hash #0=[1 [2 [#0#]] 3])
+-	 (hash #1=[1 [2 [[1 [2 [#1#]] 3]]] 3])))
++	 (hash #0=#(1 #(2 #(#0#)) 3))
++	 (hash #1=#(1 #(2 #(#(1 #(2 #(#1#)) 3))) 3))))
+ 
+ (assert (not (equal?
+-	      (hash #0=[1 [2 [#0#]] 3])
+-	      (hash #1=[1 [2 [[5 [2 [#1#]] 3]]] 3]))))
++	      (hash #0=#(1 #(2 #(#0#)) 3))
++	      (hash #1=#(1 #(2 #(#(5 #(2 #(#1#)) 3))) 3)))))
+ 
+ (assert (equal?
+-	 (hash #0=[1 #0# [2 [#0#]] 3])
+-	 (hash #1=[1 #1# [2 [[1 #1# [2 [#1#]] 3]]] 3])))
++	 (hash #0=#(1 #0# #(2 #(#0#)) 3))
++	 (hash #1=#(1 #1# #(2 #(#(1 #1# #(2 #(#1#)) 3))) 3))))
+ 
+ (assert (not (equal?
+-	      (hash #0=[1 #0# [2 [#0#]] 3])
+-	      (hash #1=[6 #1# [2 [[1 #1# [2 [#1#]] 3]]] 3]))))
++	      (hash #0=#(1 #0# #(2 #(#0#)) 3))
++	      (hash #1=#(6 #1# #(2 #(#(1 #1# #(2 #(#1#)) 3))) 3)))))
+ 
+ (assert (equal?
+-	 (hash [1 [2 [[1 1 [2 [1]] 3]]] 3])
+-	 (hash [1 [2 [[1 1 [2 [1]] 3]]] 3])))
++	 (hash #(1 #(2 #(#(1 1 #(2 #(1)) 3))) 3))
++	 (hash #(1 #(2 #(#(1 1 #(2 #(1)) 3))) 3))))
+ 
+ (assert (not (equal?
+-	      (hash [6 1 [2 [[3 1 [2 [1]] 3]]] 3])
+-	      (hash [6 1 [2 [[1 1 [2 [1]] 3]]] 3]))))
++	      (hash #(6 1 #(2 #(#(3 1 #(2 #(1)) 3))) 3))
++	      (hash #(6 1 #(2 #(#(1 1 #(2 #(1)) 3))) 3)))))
+ 
+ (assert (equal? (hash '#0=(1 . #0#))
+ 		(hash '#1=(1 1 . #1#))))
+-- 
+2.50.1 (Apple Git-155)
+
