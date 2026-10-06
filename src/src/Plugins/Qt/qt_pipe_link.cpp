@@ -112,6 +112,15 @@ qt_pipe_link_rep::watch (int channel) {
 string
 qt_pipe_link_rep::read (int channel) {
   listen (0);
+  if (alive && PipeLink.state () == QProcess::NotRunning) {
+    // the process has exited: what it wrote is read, and the link is dead
+    // once the other channel has been read too
+    PipeLink.feedBuf (QProcess::StandardOutput);
+    PipeLink.feedBuf (QProcess::StandardError);
+    string& other= (channel == LINK_OUT? PipeLink.getErrbuf ():
+                                         PipeLink.getOutbuf ());
+    if (other == "") alive= false;
+  }
   if (channel == LINK_OUT) {
     string r= PipeLink.getOutbuf ();
     PipeLink.setOutbuf ("");
