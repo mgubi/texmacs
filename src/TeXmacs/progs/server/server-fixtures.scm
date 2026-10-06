@@ -106,6 +106,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (fixture-delete-user pseudo)
+  ;; remove everything of the user, so that the tests which create the
+  ;; account again start afresh
   (with-database (server-database)
     (let* ((uid (server-find-user pseudo))
            (children (db-search `(("owner" ,uid)))))
@@ -115,7 +117,12 @@
              (cond
                ((== rtype "dir") (server-dir-remove-recursive rid))
                ((== rtype "file") (server-file-remove-complete rid))
+               ((== rtype "chat-room") (server-chat-room-remove rid))
                ((== rtype "live") (db-remove-entry rid)))))
+      ;; the home directory, which server-scrub-participations leaves
+      ;; without an owner (the account is then recreated without access)
+      (for (rid (db-search `(("type" "dir") ("name" ,(string-append "~" pseudo)))))
+           (server-dir-remove-recursive rid))
       (server-mark-user-deleted uid))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

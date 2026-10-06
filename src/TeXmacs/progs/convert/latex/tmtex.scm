@@ -1856,6 +1856,16 @@
           ((in? unit '("w" "h")) (or val 0))
           (else #f))))
 
+(define (tmtex-image-sized fig hor ver)
+  ;; size the image with the width and height options of includegraphics
+  ;; rather than with resizebox, which TeXmacs does not import back
+  (let* ((w (if (== hor "!") '() (list (string-append "width=" hor))))
+         (h (if (== ver "!") '() (list (string-append "height=" ver))))
+         (opts (string-recompose (append w h) ",")))
+    (if (and (func? fig 'includegraphics 1) (!= opts ""))
+        (list 'includegraphics (list '!option opts) (cadr fig))
+        (list 'resizebox hor ver fig))))
+
 (define (tmtex-image l)
   (if (nstring? (car l))
       (tmtex-eps (cons 'image l))
@@ -1864,7 +1874,7 @@
              (ver (tmtex-image-length (caddr l)))
              (mhor (tmtex-image-mag (cadr l)))
              (mver (tmtex-image-mag (caddr l))))
-        (cond ((or (not mhor) (not mver)) (list 'resizebox hor ver fig))
+        (cond ((or (not mhor) (not mver)) (tmtex-image-sized fig hor ver))
               ((and (== mhor 0.0) (== mver 0.0)) fig)
               ((or (== mhor 1.0) (== mver 1.0)) fig)
               ((== mhor 0.0) (list 'scalebox (number->string mver) fig))

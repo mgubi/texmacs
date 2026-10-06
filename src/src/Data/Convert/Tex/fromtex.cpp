@@ -1335,7 +1335,7 @@ latex_concat_to_tree (tree t, bool& new_flag) {
       else if (s == "\\end-verbatim") command_type ("!verbatim") = "false";
     }
     if (is_atomic (t[i]) && (command_type["!verbatim"] == "true")) {
-      r << tm_encode (t[i]->label);
+      r << t[i];
       continue;
     }
 
@@ -2434,7 +2434,7 @@ latex_command_to_tree (tree t) {
   if (is_tuple (t, "\\raisebox", 2))
     return tree (MOVE, l2e (t[2]), "0pt", t2e (t[1]));
   if (is_tuple (t, "\\verbatim", 1))
-    return compound ("verbatim", tm_encode (t[1]));
+    return compound ("verbatim", t[1]);
   if (is_tuple (t, "\\tmcodeinline", 1) || is_tuple (t, "\\tmverbatim", 1))
     return compound ("verbatim", v2e (t[1]));
   if (is_tuple (t, "\\tmcodeinline*", 2))
@@ -2568,10 +2568,13 @@ latex_command_to_tree (tree t) {
     return tree (ABOVE, l2e (t[2]), l2e (t[1]));
   if (is_tuple (t, "\\underset", 2))
     return tree (BELOW, l2e (t[2]), l2e (t[1]));
+  // (its text is text, also in a formula, as that of \text)
   if (is_tuple (t, "\\parbox", 2))
-    return compound ("mini-paragraph", v2e (t[1]), l2e (t[2]));
+    return compound ("mini-paragraph", v2e (t[1]),
+                     var_m2e (tuple ("\\text", t[2]), MODE, "text"));
   if (is_tuple (t, "\\parbox*", 3))
-    return compound ("mini-paragraph", v2e (t[2]), l2e (t[3]));
+    return compound ("mini-paragraph", v2e (t[2]),
+                     var_m2e (tuple ("\\text", t[3]), MODE, "text"));
 
   int dtype= 0;
   if (is_large_delimiter (t, dtype)) {

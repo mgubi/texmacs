@@ -184,14 +184,15 @@
 
 (define-public (list-fold-right kons knil clist1 . rest)
   "Fundamental list recursion operator."
+  ;; Folds the reversed lists from the left, so that long lists do not
+  ;; overflow the stack; @kons is applied to the same arguments and in the
+  ;; same order, from the last elements to the first ones.
   (if (null? rest)
-      (let f ((list1 clist1))
-	(if (null? list1) knil
-	    (kons (car list1) (f (cdr list1)))))
-      (let f ((lists (cons clist1 rest)))
-	(if (list-any null? lists) knil
-	    (apply kons (append! (map-in-order car lists)
-				 (list (f (map-in-order cdr lists)))))))))
+      (list-fold kons knil (reverse clist1))
+      (let* ((lists (cons clist1 rest))
+	     (n (apply min (map length lists))))
+	(apply list-fold kons knil
+	       (map (lambda (l) (reverse (list-head l n))) lists)))))
 
 (provide-public (pair-fold kons knil clist1 . rest)
   "Analogous to @fold but applies @kons to pairs of @clist1..."

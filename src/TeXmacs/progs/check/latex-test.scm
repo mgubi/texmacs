@@ -428,7 +428,13 @@
   (check= (lt "{\\bf x}") '(with "font-series" "bold" "x"))
   (check= (lt "\\textit{x}") '(with "font-shape" "italic" "x"))
   (check= (lt "\\texttt{x}") '(with "font-family" "tt" "x"))
-  (check= (lt "\\textsuperscript{a}") '(rsup "a")))
+  (check= (lt "\\textsuperscript{a}") '(rsup "a"))
+  ;; a space which begins the argument of a command of text is typeset
+  (check= (lt "a\\textbf{ b}") '(concat "a" (with "font-series" "bold" " b")))
+  (check= (lt "a\\emph{ b}") '(concat "a" (em " b")))
+  (check= (lt "a\\mbox{ b }c") "a b c")
+  (check= (lt "$a,\\text{ if }b$") '(math (concat "a," (text " if ") "b")))
+  (check= (lt "\\section{ Intro}") '(section "Intro")))
 
 (define (test-import-sections)
   (check-group "import: sections, paragraphs, spaces")
@@ -455,7 +461,17 @@
   (check= (lt "\\begin{description}\\item[x] a\\end{description}")
           '(document (description (document (concat (item* "x") "a")))))
   (check= (lt "\\begin{itemize}\\item[*] a\\end{itemize}")
-          '(document (itemize (document (concat (item* "*") "a"))))))
+          '(document (itemize (document (concat (item* "*") "a")))))
+  ;; the options of enumitem are dropped, the lists kept
+  (check= (lt "\\begin{itemize}[nosep]\n\\item a\n\\item b\n\\end{itemize}")
+          '(document (itemize (document (concat (item) "a")
+                                        (concat (item) "b")))))
+  (check= (lt "\\begin{description}[style=nextline]\\item[x] a\\end{description}")
+          '(document (description (document (concat (item* "x") "a")))))
+  (check= (lt "\\begin{compactitem}[nosep]\\item a\\end{compactitem}")
+          '(document (itemize (document (concat (item) "a")))))
+  (check= (lt "\\begin{enumerate}[label=(\\alph*)]\\item \\href{http://x.org}{x}\\end{enumerate}")
+          '(document (enumerate (document (concat (item) (hlink "x" "http://x.org")))))))
 
 (define (test-import-references)
   (check-group "import: labels, references, notes")
@@ -487,6 +503,12 @@
   (check= (lt "$\\mathbf{x}$") '(math "<b-up-x>"))
   (check= (lt "$\\operatorname{rank} A$")
           '(math (concat (math-up "rank") "A")))
+  ;; a text separates the factors around it: no multiplication across it
+  (check= (lt "$a\\text{if}b$") '(math (concat "a" (text "if") "b")))
+  ;; (the space which begins the argument of \text is kept, as in LaTeX)
+  (check= (lt "$x\\text{ for all }y$")
+          '(math (concat "x" (text " for all ") "y")))
+  (check= (lt "$ab$") '(math "a*b"))
   (check= (lt "$\\frac{a}{b}$") '(math (frac "a" "b")))
   (check= (lt "$a\\over b$") '(math (frac "a" "b")))
   (check= (lt "$\\sqrt{x}$") '(math (sqrt "x")))
@@ -522,8 +544,9 @@
   (check= (lt "\\makebox{mb}") "mb")
   (check= (lt "\\makebox[2cm]{mb}") "mb")
   (check= (lt "\\makebox[3cm][r]{right}") "right")
+  ;; (a text ends the implicit product: no * before it, #271)
   (check= (lt "$a \\makebox[1cm][l]{t u} b$")
-          '(math (concat "a*" (text "t u") "b")))
+          '(math (concat "a" (text "t u") "b")))
   (check= (lt "\\fcolorbox{red}{yellow}{warn}")
           '(fcolorbox "red" "yellow" "warn"))
   (check= (lt "\\colorbox{yellow}{hi}") '(colored-frame "yellow" "hi")))
@@ -597,7 +620,20 @@
   ;; block) gives (code (document "" "x" "")): unlike alltt, the line
   ;; breaks after \begin and before \end become empty lines
   ;; an unknown environment becomes a tag of the same name
-  (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x")))
+  (check= (lt "\\begin{unknownenv}x\\end{unknownenv}") '(unknownenv "x"))
+  ;; the text of a \parbox is text, also in a formula
+  (check= (lt "\\parbox{3cm}{a $x$}")
+          '(mini-paragraph "3cm" (concat "a " (math "x"))))
+  (check= (lt "$\\parbox{3cm}{a b}$") '(math (mini-paragraph "3cm" (text "a b"))))
+  (check= (lt "\\[\\parbox{3cm}{Given $x$, \\[a=b\\] for all $s$.}\\]")
+          '(document
+             (equation*
+               (document
+                 (mini-paragraph "3cm"
+                   (document
+                     (text (document (concat "Given " (math "x") ",")
+                                     (equation* (document "a=b"))
+                                     (concat "for all " (math "s") "."))))))))))
 
 ;; definitions become assign/macro and their uses macro applications
 (define (test-import-macros)
@@ -633,7 +669,15 @@
   (check= (tree->stree (latex->texmacs (parse-latex "\\emph{x} $a_1$")))
           '(concat (em "x") " " (math (concat "a" (rsub "1")))))
   (check= (tree->stree (parse-latex "\\emph{x}")) '(concat (tuple "\\emph" "x")))
-  (check= (tree->stree (parse-latex-document "x")) '(!file (concat "x"))))
+  (check= (tree->stree (parse-latex-document "x")) '(!file (concat "x")))
+  ;; \parbox[pos][height][inner]{width}{text}: the options after the first
+  ;; are dropped, not read as text
+  (check= (lt "\\parbox[t][3cm][c]{2cm}{a b} c")
+          '(concat (mini-paragraph "2cm" "a b") " c"))
+  (check= (lt "\\parbox[t][3cm]{2cm}{a b} c")
+          '(concat (mini-paragraph "2cm" "a b") " c"))
+  (check= (lt "\\parbox{2cm}{a b} [x] c")
+          '(concat (mini-paragraph "2cm" "a b") " [x] c")))
 
 ;; \begin{document}: in a snippet, the class and the body; in a document,
 ;; the style, the preamble definitions (hidden) and the title
@@ -715,6 +759,7 @@
     (math (concat (big "sum") (rsub "i") "x"))
     (math (concat (big "int") (rsub "0") (rsup "1") "f"))
     (math (binom "n" "k")) (math (op "lim"))
+    (math (concat "a" (text "if") "b"))
     (math (wide "x" "^")) (math (wide "x" "~")) (math (wide "x" "<bar>"))
     (math (wide "x" "<vect>")) (math (wide* "x" "<bar>"))
     (math "<bbb-R>") (math "<cal-A>")
@@ -741,7 +786,6 @@
 ;;     atom;
 ;;   - text underline and math under-bar are both \underline;
 ;;   - math bold is \tmmathbf, read back as a bold letter;
-;;   - a text in a formula ends an implicit product;
 ;;   - a frame in a formula is \boxed, read back as boxed, and \boxed is
 ;;     only allowed in formulas.
 (define round-trip-lossy
@@ -751,7 +795,6 @@
     ((math (concat "a" (lsub "b"))) (math (concat "a" (rsub "b"))))
     ((underline "u") (wide* "u" "<bar>"))
     ((math (with "math-font-series" "bold" "x")) (math "<b-x>"))
-    ((math (concat "a" (text "if") "b")) (math (concat "a*" (text "if") "b")))
     ((math (frame "x")) (math (boxed "x")))
     ((boxed "x") (math (boxed "x")))
     ((verbatim (document "a" "b")) (verbatim-code (document "a" "b")))
@@ -792,6 +835,23 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; a whole document converted from Scheme has no view, whose editor would
+;; expand its macros; it is converted without that expansion (it used to
+;; crash TeXmacs in latex_expand)
+(define (test-export-without-view)
+  (check-group "export: documents without a view")
+  (with s (convert '(document (TeXmacs "2.1.5") (style (tuple "article"))
+                              (body (document (section "A") "text")))
+                   "texmacs-stree" "latex-document")
+    ;; NOTE: string-contains is Guile only
+    (with pos (lambda (x) (string-search-forwards x 0 s))
+      (check-true (string? s))
+      (check-true (>= (pos "\\documentclass{article}") 0))
+      (check-true (>= (pos "\\section{A}") 0))
+      (check-true (>= (pos "text") 0))
+      (check-true (< -1 (pos "\\begin{document}") (pos "\\section{A}")
+                     (pos "\\end{document}"))))))
+
 (tm-define (latex-test-failures)
   (check-suite "latex")
   (test-export-special)
@@ -827,7 +887,5 @@
   (test-import-parse)
   (test-import-documents)
   (test-round-trips)
-  ;; FIXME: (convert doc "texmacs-stree" "latex-document") crashes TeXmacs
-  ;; (segmentation fault in latex_expand, new_buffer.cpp) when doc has no
-  ;; view attribute, as outside an export from a buffer
+  (test-export-without-view)
   (check-end))

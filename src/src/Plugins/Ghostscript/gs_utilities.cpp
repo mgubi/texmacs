@@ -401,7 +401,7 @@ gs_to_eps (url image, url eps) {
 	<< " -dDEVICEHEIGHTPOINTS=" << as_string (by2-by1)<<" ";
     //don't use -dEPSCrop which works incorrectly if (bx1 != 0 || by1 != 0)
     cmd << "-c \" "<< as_string (-bx1) << " " << as_string (-by1) 
-	<< " translate gsave \" "
+	<< " translate gsave \" -f "
 	<< sys_concretize (resolve (image))
 	<< " -c \" grestore \"";     
   }

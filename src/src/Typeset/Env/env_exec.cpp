@@ -622,7 +622,7 @@ edit_env_rep::exec_provide (tree t) {
   if (N(t)!=2) return tree (_ERROR, "bad provide");
   tree r= exec (t[0]);
   if (is_compound (r)) return tree (_ERROR, "bad provide");
-  if (provides (t->label)) return "";
+  if (provides (r->label)) return "";
   assign (r->label, copy (t[1]));
   tree v= read (r->label);
   if (is_atomic (v) || is_func (v, MACRO));
@@ -750,7 +750,7 @@ edit_env_rep::exec_drd_props (tree t) {
 	if (val == "yes") drd->set_border (l, BORDER_YES);
 	if (val == "inner") drd->set_border (l, BORDER_INNER);
 	if (val == "outer") drd->set_border (l, BORDER_OUTER);
-	if (val == "no") drd->set_border (l, BORDER_INNER);
+	if (val == "no") drd->set_border (l, BORDER_NO);
 	drd->freeze_border (l);
       }
       else if (prop == "with-like") {
@@ -1054,6 +1054,7 @@ edit_env_rep::exec_apply_theme_sub (string var) {
   while (is_compound (val, 1) && !is_func (val, WITH)) {
     string lab= as_string (L(val));
     r << exec_apply_theme_sub (lab);
+    val= val[N(val)-1];
   }
   if (is_func (val, WITH))
     for (int i=0; i+2<N(val); i+=2)
@@ -1094,7 +1095,7 @@ edit_env_rep::exec_select_theme_sub (string theme, string from) {
 tree
 edit_env_rep::exec_select_theme (tree t) {
   if (N(t)<1 || !is_atomic (t[0]))
-    return tree (_ERROR, "bad copy-theme");
+    return tree (_ERROR, "bad select-theme");
   string theme= t[0]->label;
   tree r (CONCAT);
   for (int k=1; k<N(t); k++) {
@@ -1901,7 +1902,7 @@ edit_env_rep::exec_rgb_color (tree t) {
   tree t1= exec (t[0]);
   tree t2= exec (t[1]);
   tree t3= exec (t[2]);
-  tree t4= (N(t)==4? tree ("255"): exec (t[3]));
+  tree t4= (N(t)==4? exec (t[3]): tree ("255"));
   if (!(is_int (t1) && is_int (t2) && is_int (t3) && is_int (t4)))
     return tree (_ERROR, "bad rgb-color");
   color c= rgb_color (as_int (t1), as_int (t2), as_int (t3), as_int (t4));

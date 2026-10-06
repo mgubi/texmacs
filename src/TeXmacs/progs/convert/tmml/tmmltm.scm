@@ -67,7 +67,12 @@
 		       ,(cadr r)
 		       (TeXmacs ,(cadr (caddr r))
 				(!stacked ,@(cddr (caddr r)))))
-		     (xmlin-regular tag attrs args))))
+		     ;; a snippet of paragraphs or arguments, as below
+		     (if (list-or (map (lambda (x) (or (func? x 'tm-par)
+						       (func? x 'tm-arg)))
+				       args))
+			 r
+			 (xmlin-regular tag attrs args)))))
 	      ((== tag '*PI*) x)
 	      ((== tag 'TeXmacs)
 	       (xmlin-special tag attrs args))

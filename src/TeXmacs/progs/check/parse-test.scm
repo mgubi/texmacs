@@ -85,11 +85,9 @@
   (define Frac (:<frac :any :/ :any :>))
   (define AnyTag (:< :args :>))
   (define Leaf :leaf)
-  ;; FIXME: a rule without alternatives cannot be defined
-  ;; (tm-language.scm:57 passes the list '(or) where packrat-define wants a
-  ;; tree): (define-language l (define Never)) raises wrong-type-arg in
-  ;; packrat-define, expected a rule which never matches, as (or) gives.
-  (define Never (or))
+  ;; a rule without alternatives never matches, as (or)
+  (define Never)
+  (define Never-or (or))
   (define Cur ("a" :cursor "b")))
 
 ;; Inheritance: parse-test-derived takes the rules of parse-test-base and
@@ -260,6 +258,8 @@
   (check-false (peg? "Never" ""))
   (check-false (peg? "Never" "a"))
   (check= (peg-end "Never" "a") '(-1))
+  (check-false (peg? "Never-or" ""))
+  (check= (peg-end "Never-or" "a") '(-1))
   (check-false (peg? "Undefined" ""))
   (check= (peg-end "Undefined" "a") '(-1))
   ;; there is no cursor in the input of packrat-correct?
@@ -308,13 +308,11 @@
 ;; packrat-context lists the selectable structures around a position, from
 ;; the innermost one, as (rule start end) with paths in the input. A
 ;; structure is kept when it is the only one with its extent, or the
-;; innermost one. Only the right recursive grammar is used here:
-;; FIXME: a context inside a left recursive rule has a garbage name
-;; (packrat_parser.cpp:792 takes the label of the compound (symbol "Sum")
-;; inside (partial (symbol "Sum"))): (packrat-context "std-math" "Main"
-;; (stree->tree "a+b*c") '(2)) gives a first entry named by random bytes,
-;; expected Sum (or a name for the partial sum), with (1) (5).
+;; innermost one. Inside a left recursive rule, as Sum of std-math, the
+;; structure is a part of the rule, named by the rule.
 (define (test-context)
+  (check= (packrat-context "std-math" "Main" (stree->tree "a+b*c") '(2))
+          '((Sum (1) (5)) (Sum (0) (5))))
   (check= (context "a+b*c" '(0)) '())
   (check= (context "a+b*c" '(1)) '((Sum (0) (5))))
   (check= (context "a+b*c" '(2)) '((Sum (0) (5))))
@@ -933,6 +931,13 @@
      `(("a" ,black) ("," ,c-operator) ("b" ,black) ("," ,c-operator)
        ("\"c,d\"" ,c-string) ("," ,c-operator) ("1" ,c-number)))))
 
+;; packrat grammars: the :highlight properties of the rules (Lhs-radical has
+;; :highlight declare in language/minimal.scm) color the code
+(define (test-packrat-highlighting)
+  (check-lines "minimal"
+    ("x == 1;"
+     `(("x" ,c-declare) ("==" ,black) ("1" ,c-number) (";" ,black)))))
+
 ;; Languages without a highlighter keep the color of the text.
 ;; FIXME: javascript, dot and octave have complete tables
 ;; (javascript-lang.scm, dot-lang.scm, octave-lang.scm) and code
@@ -941,13 +946,6 @@
 ;; only builds a prog_language_rep for a language with a format: their code
 ;; is not highlighted at all, "let a = null;" in javascript is all in the
 ;; color of the text, expected let #0000c0, = #8b008b, null #4040c0.
-;; FIXME: packrat highlighting does not reach the document: the
-;; highlighting of a verb_language (minimal, or any define-language with
-;; :highlight properties) is attached to the copy of the input that
-;; make_packrat_parser keeps (packrat_parser.cpp:46, last_in= copy (in)),
-;; not to the typeset trees: the minimal line "x == 1;" is all in the color
-;; of the text, expected x in the color of declarations (Lhs-radical has
-;; :highlight declare in language/minimal.scm).
 (define (test-no-highlighting)
   (check-lines "verbatim"
     ("int x = 1; // c"
@@ -1121,6 +1119,7 @@
   (run-group "highlight scala" test-scala)
   (run-group "highlight julia" test-julia)
   (run-group "highlight json csv" test-json-csv)
+  (run-group "highlight packrat" test-packrat-highlighting)
   (run-group "no highlighting" test-no-highlighting)
   (run-group "language tables" test-tables)
   (run-group "classes" test-classes)
