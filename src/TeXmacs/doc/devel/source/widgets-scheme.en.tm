@@ -517,7 +517,8 @@
   <scm|eval-nullary-mangled> and <scm|eval-unary-mangled>. This path is
   taken by <scm|make-menu-widget*> when <scm|(has-markup-gui?)> holds,
   that is when both preferences <verbatim|markup gui> and
-  <verbatim|developer tool> are on; it is experimental.
+  <verbatim|developer tool> are on; it is experimental, and described in
+  <hlink|the graphical user interface through markup|gui-markup.en.tm>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

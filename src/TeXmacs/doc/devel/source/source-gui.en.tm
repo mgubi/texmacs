@@ -23,6 +23,9 @@
   <\traverse>
     <branch|The abstract widget system|widgets.en.tm>
 
+    <branch|The graphical user interface through markup
+    (experimental)|gui-markup.en.tm>
+
     <branch|The graphical user interface ports|guiports.en.tm>
 
     <branch|Handwriting recognition (experimental)|handwriting.en.tm>
