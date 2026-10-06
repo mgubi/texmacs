@@ -100,7 +100,7 @@ connection_rep::start (bool again) {
       // within 100 ms of the previous one, for at most 1 s, are read with
       // the banner, and a block which comes later is still taken for the
       // next answer. The error stream does not extend the wait: what the
-      // plugin writes there is read with the next answer.
+      // plugin writes there is not part of the banner.
       for (int i= 0; i < 10 && ln->alive; i++) {
         ln->listen (100);
         if (ln->watch (LINK_OUT) == "") break;
