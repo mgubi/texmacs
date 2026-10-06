@@ -544,7 +544,9 @@ image_to_pdf (url image, url pdf, int w_pt, int h_pt, int dpi,
 #endif
   //converters below will yield only raster images.
 #ifdef QTTEXMACS
-  if (qt_supports (image) && qt_supports (pdf)) {
+  // not qt_supports (pdf), which is always false: Qt writes PDF files;
+  // not svg either, which qt_image_to_pdf would only read as a raster QImage
+  if (qt_supports (image) && s != "svg") {
     if (DEBUG_CONVERT)
       debug_convert << "image_to_pdf, using qt_image_to_pdf"<< LF;
     qt_image_to_pdf (image, pdf, w_pt, h_pt, dpi);
