@@ -272,11 +272,14 @@ tree_hash_set_limit (int n) {
   hash_limit= (n <= 0) ? 0 : (uint64_t) n;
 }
 
+// golden ratio arbitrary seed
+static const uint64_t hash_seed= 0x9E3779B97F4A7C15;
+
 // hash to be used for Content addressed storage (filenames on disk)
-uint64_t hash64 (string s) {
+static uint64_t
+hash64 (string s, uint64_t seed) {
   int n=N(s);
-  // golden ratio arbitrary seed
-  uint64_t h = 0x9E3779B97F4A7C15;
+  uint64_t h = seed;
 
   for (int i = 0; i < n; i++) {
     h ^= s[i];
@@ -294,6 +297,10 @@ uint64_t hash64 (string s) {
 
   if (hash_limit != 0) h %= hash_limit;
   return h;
+}
+
+uint64_t hash64 (string s) {
+  return hash64 (s, hash_seed);
 }
 
 static string
@@ -317,10 +324,13 @@ string
 tree_hash (tree t) {
   if (is_atomic (t))
     return hash_hex (t->label);
-  string data= copy (as_string (L (t)));
+  // the arity, the label and the hashes of the children, which have a
+  // fixed length, determine the tree; a compound tree is hashed with
+  // another seed, so that its hash is not the one of a string
+  string data= as_string (N (t)) * ":" * as_string (L (t));
   for (int i= 0; i < N (t); i++)
     data << tree_hash (t[i]);
-  return hash_hex (data);
+  return hash_as_hex (hash64 (data, ~hash_seed));
 }
 
 void
