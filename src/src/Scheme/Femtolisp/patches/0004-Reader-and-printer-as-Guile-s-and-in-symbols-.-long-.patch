@@ -1,7 +1,7 @@
 From b47caf1d9c12bd922cc6cb5bb9c38728e5c72269 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 16:40:09 +0100
-Subject: [PATCH 04/20] Reader and printer as Guile's: '|' and '\\' in symbols,
+Subject: [PATCH 04/21] Reader and printer as Guile's: '|' and '\\' in symbols,
  #{...}#, long tokens, large integers inexact, shortest floats; boot image
  regenerated
 

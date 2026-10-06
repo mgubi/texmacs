@@ -1,7 +1,7 @@
 From 14b94ac12a498a52a21cc6c72263f1642fc90009 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:29:42 +0100
-Subject: [PATCH 14/20] Reader: a datum at the very end of the input is read
+Subject: [PATCH 14/21] Reader: a datum at the very end of the input is read
  (the eof object only when nothing is left)
 
 ---

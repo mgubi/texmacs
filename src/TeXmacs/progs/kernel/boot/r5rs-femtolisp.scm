@@ -25,7 +25,7 @@
 
 ;; the compiled functions keep their source (procedure-source), which TeXmacs
 ;; inspects (the actions of the menus, for instance)
-(set! *keep-source* #t)
+(set! *keep-source* (not (os.getenv "TM_NOSRC")))
 
 ;; the errors of the macro expansions are raised when the code runs, as with
 ;; Guile, which expands the macros when it first evaluates them
@@ -64,14 +64,10 @@
 
 ;; as in Guile with (read-set! keywords 'prefix), :foo is a keyword and not a
 ;; symbol (femtolisp also takes foo: for a keyword)
-(define-override (keyword? x)
-  (and (%fl-symbol? x)
-       (let ((s (%fl-string x)))
-         (and (> (length s) 1) (eqv? (aref s 0) 58)))))
+(define-override keyword? %keyword?) ;; in C: no allocation
 
 ;; (the unspecified value of femtolisp is the symbol #<unspecified>)
-(define-override (symbol? x)
-  (and (%fl-symbol? x) (not (keyword? x)) (not (eq? x (if #f #f)))))
+(define-override symbol? %symbol?) ;; in C
 (define (unspecified? x) (eq? x (if #f #f)))
 
 (define (symbol->string s) (%fl-string s))
@@ -245,7 +241,11 @@
     (let loop ((a a) (b b) (rest rest))
       (and (cmp (fixnum a) (fixnum b))
            (or (null? rest) (loop b (car rest) (cdr rest)))))))
-(define char=? (%char-compare =))
+;; (the usual case, two characters, without the loop)
+(define (char=? a b . rest)
+  (if (null? rest)
+      (eqv? a b)
+      (and (eqv? a b) (apply char=? b rest))))
 (define char<? (%char-compare <))
 (define char>? (%char-compare >))
 (define char<=? (%char-compare <=))
@@ -280,8 +280,6 @@
 ;; substring string->list, and (%string char ...)
 (define-override (string . chars) (apply %string chars))
 
-(define (string-length s)
-  (if (string? s) (length s) (error "string-length: not a string" s)))
 (define (string-append . l) (%string-copy (apply %fl-string l)))
 (define (string-copy s . range)
   (if (null? range) (%string-copy s) (apply substring s range)))
@@ -292,7 +290,10 @@
     (let loop ((a a) (b b) (rest rest))
       (and (test (%string-compare a b))
            (or (null? rest) (loop b (car rest) (cdr rest)))))))
-(define string=? (%string-cmp (lambda (c) (= c 0))))
+(define (string=? a b . rest)
+  (if (null? rest)
+      (= (%string-compare a b) 0)
+      (and (= (%string-compare a b) 0) (apply string=? b rest))))
 (define string<? (%string-cmp (lambda (c) (< c 0))))
 (define string>? (%string-cmp (lambda (c) (> c 0))))
 (define string<=? (%string-cmp (lambda (c) (<= c 0))))

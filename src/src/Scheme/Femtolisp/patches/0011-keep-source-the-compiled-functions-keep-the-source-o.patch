@@ -1,7 +1,7 @@
 From 84af807e72dd77fd8473bac67b9eda22d234d97f Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:07:54 +0100
-Subject: [PATCH 11/20] *keep-source*: the compiled functions keep the source
+Subject: [PATCH 11/21] *keep-source*: the compiled functions keep the source
  of their lambda expression (function-source); boot image regenerated
 
 ---

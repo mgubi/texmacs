@@ -283,7 +283,46 @@ fltm_builtin_name (value_t* args, uint32_t nargs) {
   return FL_F;
 }
 
+/* (%keyword? x): a symbol :name (without allocating its name) */
+static value_t
+fltm_keywordp (value_t* args, uint32_t nargs) {
+  argcount ("%keyword?", nargs, 1);
+  if (!issymbol (args[0])) return FL_F;
+  const char* n= symbol_name (args[0]);
+  return (n[0] == ':' && n[1] != '\0')? FL_T: FL_F;
+}
+
+/* (%symbol? x): a symbol of Guile: neither a keyword nor #<unspecified> */
+static value_t
+fltm_symbolp (value_t* args, uint32_t nargs) {
+  argcount ("%symbol?", nargs, 1);
+  value_t x= args[0];
+  if (!issymbol (x) || x == FL_UNSPECIFIED) return FL_F;
+  const char* n= symbol_name (x);
+  return (n[0] == ':' && n[1] != '\0')? FL_F: FL_T;
+}
+
+/* (%table-ref table key): the value of key, or #f (ahash-ref, hash-ref) */
+static value_t
+fltm_table_ref (value_t* args, uint32_t nargs) {
+  argcount ("%table-ref", nargs, 2);
+  value_t a[3]= { args[0], args[1], FL_F };
+  return fl_table_get (a, 3);
+}
+
+/* (string-length s): the number of bytes */
+static value_t
+fltm_string_length_builtin (value_t* args, uint32_t nargs) {
+  argcount ("string-length", nargs, 1);
+  if (!fl_isstring (args[0])) type_error ("string-length", "string", args[0]);
+  return fixnum (cvalue_len (args[0]));
+}
+
 static builtinspec_t fltm_builtin_info[]= {
+  { "string-length", fltm_string_length_builtin },
+  { "%keyword?", fltm_keywordp },
+  { "%symbol?", fltm_symbolp },
+  { "%table-ref", fltm_table_ref },
   { "%builtin-name", fltm_builtin_name },
   { "system", fltm_system },
   { "%read-byte", fltm_read_byte },

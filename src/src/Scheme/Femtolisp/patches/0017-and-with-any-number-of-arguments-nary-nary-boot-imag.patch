@@ -1,7 +1,7 @@
 From f843282d9f713fc4783b269ea5e3f438d91b7295 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 20:21:59 +0100
-Subject: [PATCH 17/20] < and = with any number of arguments (nary<, nary=);
+Subject: [PATCH 17/21] < and = with any number of arguments (nary<, nary=);
  boot image regenerated
 
 ---

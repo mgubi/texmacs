@@ -1,7 +1,7 @@
 From 21d439a8cbaa8ba10ce44b992037f9227b47f664 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 16:43:48 +0100
-Subject: [PATCH 05/20] Printer: vectors as #(...); with *print-shared* #f,
+Subject: [PATCH 05/21] Printer: vectors as #(...); with *print-shared* #f,
  labels only for cycles, as Guile; boot image regenerated
 
 ---

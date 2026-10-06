@@ -1,7 +1,7 @@
 From d24a4446ee5155c5fd25a4e9df152c593296ab3a Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:01:25 +0100
-Subject: [PATCH 09/20] Boot image: the functions of system.lsp and
+Subject: [PATCH 09/21] Boot image: the functions of system.lsp and
  compiler.lsp call each other through private names (%fl:name), so that
  programs may redefine the public names; boot image regenerated
 

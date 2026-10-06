@@ -40,6 +40,11 @@ restrict what a module sees (as with s7, every public name is visible).
 `resolve-module`, `module-ref`, `module-defined?`, `with-module` and
 `eval ... module` work on module records.
 
+Each module file goes through the cache of compiled files: its forms are
+expanded, and their compiled code is taken from
+`$TEXMACS_HOME_PATH/system/cache/femtolisp/` when the expansion has not
+changed (see [07](07-performance.md#76-what-made-it-faster)).
+
 ## 2.3 Macros used before their definition
 
 femtolisp expands macros when a form is compiled, Guile when it first

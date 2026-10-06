@@ -1,7 +1,7 @@
 From bca2ef6b66564741ef0997af15ada9c5199d76b5 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 17:16:18 +0100
-Subject: [PATCH 12/20] Heap limited to 1 Gb (heapsize has 32 bits): an out of
+Subject: [PATCH 12/21] Heap limited to 1 Gb (heapsize has 32 bits): an out of
  memory error, after fl_out_of_memory_hook, instead of an overflow
 
 ---

@@ -38,7 +38,7 @@
       ((femtolisp-scheme?)
        (begin ;; the tables of femtolisp
          (define-public (make-ahash-table . size) (table))
-         (define-public (ahash-ref h key) (get h key #f))
+         (define-public ahash-ref %table-ref) ;; in C
          (define-public (ahash-get-handle h key)
            (and (has? h key) (cons key (get h key))))
          (define-public (ahash-set! h key value) (put! h key value) value)

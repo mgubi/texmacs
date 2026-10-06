@@ -77,6 +77,8 @@ The patches
 0020  *arith-fallback*: + - * / = call it when an operand is not a number
       (TeXmacs implements the complex numbers with it, r5rs-femtolisp.scm);
       (- 0) is the fixnum 0
+0021  the reader makes a vector without a label once its elements are read
+      (growing it called the garbage collector at each step)
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 
@@ -112,3 +114,7 @@ TEXMACS_FL_TRACE=1        reports the errors with the femtolisp error and
                           its stack, and (%late-calls) lists the calls which
                           were compiled at their first evaluation
 TEXMACS_FL_CHECK_ROOTS=1  checks the C++ roots at each garbage collection
+TEXMACS_FL_PROFILE=1      times the reading, expansion and compilation of the
+                          loaded files, (%profile-report) prints it
+TEXMACS_FL_NO_CACHE=1     disables the cache of compiled files
+                          ($TEXMACS_HOME_PATH/system/cache/femtolisp)

@@ -13,6 +13,7 @@
 #include "file.hpp"
 #include "../Scheme/glue.hpp"
 #include "convert.hpp" // tree_to_texmacs (should not belong here)
+#include "analyze.hpp"
 #include "fl_boot.h"
 
 #include <stdlib.h>
@@ -32,8 +33,11 @@ tmscm_node tmscm_roots= { 0, &tmscm_roots, &tmscm_roots };
 
 static bool tmscm_check_roots= (getenv ("TEXMACS_FL_CHECK_ROOTS") != NULL);
 
+static int64_t tmscm_gc_count= 0;
+
 static void
 tmscm_relocate_roots (fltm_value (*reloc) (fltm_value)) {
+  tmscm_gc_count++;
   if (tmscm_check_roots) {
     int i= 0;
     for (tmscm_node* n= tmscm_roots.next; n != &tmscm_roots; n= n->next, i++)
@@ -322,8 +326,16 @@ g_getpid (fltm_value* args, uint32_t nargs) {
   return fltm_integer ((int64_t) getpid ());
 }
 
+// (%gc-count): the number of garbage collections so far
+static fltm_value
+g_gc_count (fltm_value* args, uint32_t nargs) {
+  (void) args; (void) nargs;
+  return fltm_integer (tmscm_gc_count);
+}
+
 static void
 initialize_compat () {
+  tmscm_define_builtin ("%gc-count", g_gc_count);
   tmscm_define_builtin ("current-time", g_current_time);
   tmscm_define_builtin ("getpid", g_getpid);
 }
@@ -347,6 +359,14 @@ initialize_scheme () {
   initialize_compat ();
   initialize_smobs ();
   initialize_glue ();
+  // the identity of the compiler (the boot image), for the cache of the
+  // compiled files (boot-femtolisp.scm)
+  unsigned long sum= 5381;
+  for (unsigned long i=0; i<fl_boot_image_length; i++)
+    sum= (sum * 33) ^ fl_boot_image[i];
+  string id= "fl-" * as_string ((int) fl_boot_image_length) * "-" *
+             as_hexadecimal ((int) (sum & 0x7fffffff));
+  fltm_define ("*fl-boot-id*", string_to_tmscm (id).v);
   tmscm r;
   fltm_eval_string (init_prg, strlen (init_prg), &r.v);
 }

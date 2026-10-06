@@ -1,7 +1,7 @@
 From e9f1c0f0bd2279daff8eff4b0def38e49e0b7e68 Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 16:48:14 +0100
-Subject: [PATCH 06/20] Strings written as strings of bytes (Cork in TeXmacs):
+Subject: [PATCH 06/21] Strings written as strings of bytes (Cork in TeXmacs):
  bytes from 128 raw, control characters escaped; boot image regenerated
 
 ---

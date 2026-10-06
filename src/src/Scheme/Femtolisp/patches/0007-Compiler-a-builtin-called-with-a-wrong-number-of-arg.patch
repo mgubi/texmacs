@@ -1,7 +1,7 @@
 From 7e218a948c4590e2299ed3d2ac48b04265ded73a Mon Sep 17 00:00:00 2001
 From: tm <tm@x>
 Date: Tue, 6 Oct 2026 16:55:21 +0100
-Subject: [PATCH 07/20] Compiler: a builtin called with a wrong number of
+Subject: [PATCH 07/21] Compiler: a builtin called with a wrong number of
  arguments is a plain call, the error is raised at run time; boot image
  regenerated
 
