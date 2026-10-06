@@ -61,8 +61,9 @@ var tmFrame = (function () {
     #tm-frame .tm-tab.active { background:#f6f6f6; box-shadow:inset 0 0 0 1px #b4b4b4 }
     #tm-frame .tm-tab .tm-title { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis }
     #tm-frame .tm-tab .tm-close { flex:none; margin-left:4px; width:18px; height:18px;
-      line-height:18px; text-align:center; border-radius:3px; color:#555; visibility:hidden }
-    #tm-frame .tm-tab:hover .tm-close, #tm-frame .tm-tab.active .tm-close { visibility:visible }
+      line-height:18px; text-align:center; border-radius:3px; color:#9a9a9a }
+    /* the close box of every tab, lighter on the tabs which are not shown */
+    #tm-frame .tm-tab:hover .tm-close, #tm-frame .tm-tab.active .tm-close { color:#555 }
     #tm-frame .tm-tab .tm-close:hover { background:#bbb; color:#000 }
     #tm-frame .tm-tab .tm-short { display:none; font-size:11.5px; font-weight:600; letter-spacing:.2px }
     #tm-frame .tm-tab .tm-dot { display:none; position:absolute; top:4px; right:4px; width:6px;
