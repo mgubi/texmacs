@@ -18,10 +18,14 @@
   <section|Windows, tabs and dialogs>
 
   A web page has a single window. The windows of <TeXmacs> are therefore the
-  <em|tabs> above the page: one per document, with its name, a dot when it
-  has unsaved changes, a cross to close it, and a <verbatim|+> for a new
-  document. The dialogs of <TeXmacs> float over the page, and can be moved
-  by their title bar and resized by their edges.
+  <em|tabs> in the column at the left of the page: one per document, with
+  its name, a dot when it has unsaved changes, a cross to close it, and
+  <with|font-series|bold|New window> for a new document. The chevron at the
+  bottom of the column folds it, to leave more room to the document: the
+  column then keeps the logo and small tabs with the initials of the
+  windows, whose names show when the mouse is over them; the browser
+  remembers it. The dialogs of <TeXmacs> float over the page, and can be
+  moved by their title bar and resized by their edges.
 
   The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
@@ -189,6 +193,15 @@
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|6 October 2026>
+
+  <\itemize>
+    <item>The tabs of the windows are in a column at the left of the page,
+    which leaves the whole height to the document; the column folds to
+    small tabs with the initials of the windows, whose names show when the
+    mouse is over them.
+  </itemize>
 
   <paragraph|5 October 2026>
 

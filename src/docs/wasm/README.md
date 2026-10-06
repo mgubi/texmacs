@@ -71,11 +71,16 @@ and scrolls (`vue_plain_window_widget_rep::do_layout`): at their own size
 at least, larger when the dialog is, with scroll bars and the wheel when
 it is smaller (after a resize, or on a page smaller than the dialog, which
 is then made to fit). In
-the browser the page has a frame above the canvas (`misc/wasm/frame.js`):
-the tabs, labelled with the names of the windows (the title of a window on
-the desktop, and the title of the page for the active one), with a marker
-for unsaved changes, a close box (not on the last tab: TeXmacs asks as for
-a window whether to save), a `+` for a new window, and a TeXmacs menu: what
+the browser the page has a frame, a column at the left of the canvas
+(`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
+one under the other, labelled with the names of the windows (the title of a
+window on the desktop, and the title of the page for the active one), with
+a marker for unsaved changes, a close box (not on the last tab: TeXmacs
+asks as for a window whether to save), a "New window", a chevron which
+folds the column to 44 pixels (the logo, and small tabs with the initials
+of the windows, or their numbers, "N2" for "No name [2]", whose names show
+in a balloon; the browser remembers it, and a page narrower than 900
+pixels starts folded), and a TeXmacs menu: what
 this TeXmacs is (version, S7, MuPDF, build date), where its files are, how
 many of its packages have come, the storage used, a popup with more info
 and the limitations of the port (the keyboard, the files, what is
