@@ -78,7 +78,6 @@ var tmFrame = (function () {
     #tm-frame.collapsed .tm-new, #tm-frame.collapsed .tm-fold { padding:0; justify-content:center }
     #tm-frame.collapsed .tm-new .tm-plus { margin:0 }
     #tm-frame.collapsed .tm-new .tm-label { display:none }
-    #tm-frame.collapsed .tm-tab { transition:transform .16s ease-out; transform-origin:left center }
     #tm-flyout { position:fixed; z-index:36; display:none; align-items:center; overflow:hidden;
       white-space:nowrap; box-sizing:border-box; border-radius:6px; background:#ececec;
       box-shadow:0 3px 14px rgba(0,0,0,.28), inset 0 0 0 1px #b4b4b4; color:#222;
@@ -351,9 +350,9 @@ var tmFrame = (function () {
 
   // In the folded column a tab under the mouse grows to the right, over the
   // document, into a whole tab: its initials, its name and its close box
-  // (a click on it shows the window). Its neighbours swell a little, more
-  // the nearer they are, as the icons of a dock. The tab is drawn by an
-  // element of its own (#tm-flyout), which the column does not clip.
+  // (a click on it shows the window); the other tabs stay as they are. The
+  // tab is drawn by an element of its own (#tm-flyout), which the column
+  // does not clip.
   var flyout = null, flyTimer = null;
   function flyOut (tab, t, name) {
     if (!bar.classList.contains ('collapsed')) return;
@@ -368,8 +367,8 @@ var tmFrame = (function () {
       });
       document.body.appendChild (flyout);
     }
-    // its place without the swelling (offsets, in the column, which is
-    // positioned, minus the scroll of the tabs)
+    // its place (offsets, in the column, which is positioned, minus the
+    // scroll of the tabs)
     var b = bar.getBoundingClientRect ();
     var r = { left: b.left + tab.offsetLeft, top: b.top + tab.offsetTop - strip.scrollTop,
               width: tab.offsetWidth, height: tab.offsetHeight };
@@ -406,12 +405,10 @@ var tmFrame = (function () {
     flyout.style.transition = '';
     flyout.style.width = Math.min (wide, most) + 'px';
     flyout.classList.add ('open');
-    magnify (tab);
   }
   // the tab back into the column (at once when the tabs change)
   function flyIn (now) {
     if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
-    magnify (null);
     if (!flyout || flyout.style.display === 'none') return;
     if (now) { flyout.style.display = 'none'; return; }
     flyout.classList.remove ('open');
@@ -419,17 +416,6 @@ var tmFrame = (function () {
     var f = flyout;
     setTimeout (function () { if (!f.classList.contains ('open')) f.style.display = 'none'; }, 200);
   }
-  // the neighbours of the tab under the mouse a little larger
-  function magnify (tab) {
-    if (!strip) return;
-    var all = Array.prototype.slice.call (strip.querySelectorAll ('.tm-tab'));
-    var i = tab ? all.indexOf (tab) : -1;
-    all.forEach (function (e, k) {
-      var d = Math.abs (k - i), s = (i < 0 || d === 0) ? 1 : d === 1 ? 1.14 : d === 2 ? 1.06 : 1;
-      e.style.transform = s === 1 ? '' : 'scale(' + s + ')';
-    });
-  }
-
   function render () {
     build ();
     if (!strip) return;
