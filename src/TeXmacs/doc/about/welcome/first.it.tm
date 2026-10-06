@@ -9,7 +9,7 @@
   prima volta che lo utilizzi, troverai qui sotto alcuni utili commenti e
   suggerimenti. Questo testo appare solamente la prima volta che viene
   avviato <TeXmacs>. Se hai bisogno di leggerlo nuovamente lo puoi in ogni
-  caso trovare nel menu <menu|Help|Apropos|First start>.
+  caso trovare nel menu <menu|Help|About|First start>.
 
   <\description>
     <item*|Aiuto>

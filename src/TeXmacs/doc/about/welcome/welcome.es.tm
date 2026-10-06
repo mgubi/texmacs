@@ -32,7 +32,7 @@
     los diferentes estilos de documentos <TeXmacs> son documentados. También
     está explicado como crear sus propios estios y preambulos.
 
-    <item>El menu <hlink|<menu|Help|Apropos>|../../about/about.en.tm>
+    <item>El menu <hlink|<menu|Help|About>|../../about/about.en.tm>
     contiene más información acerca de <TeXmacs>, como información sobre sus
     <hlink|autores|../../about/authors/authors.es.tm>, como
     <hlink|contactarnos|../../about/authors/contact.es.tm>, y
@@ -60,7 +60,7 @@
   Si usted quiere contribir a <TeXmacs>, o si quiere adaptar el programa para
   algún propósito particular, entonces usted encotrará información más útil
   en el menú <menu|Help>. El submenú <hlink|<menu|Help|Document
-  format>|../../devel/format/format.en.tm> contiene información acerca del
+  format>|../../devel/format/basics/basics.en.tm> contiene información acerca del
   formato de documento <TeXmacs> y en <hlink|<menu|Help|Interfacing>|../../devel/plugin/plugin.en.tm>
   está explicado como hacer una interface de <TeXmacs> con otros sistemas.
   Una parte del código fuente ha sido documentada en <hlink|<menu|Help|Source

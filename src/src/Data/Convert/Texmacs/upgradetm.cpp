@@ -483,8 +483,9 @@ upgrade_apply_expand_value (tree t, hashset<string> H) {
     tree r (t, n);
     if (is_func (t, APPLY))
       if ((n >= 1) && is_atomic (t[0]) && H->contains (t[0]->label)) {
-        if (n == 1) r= tree (VALUE, n);
-        else r= tree (EXPAND, n);
+        // in LaTeX imports, user macros such as \tm are not variables
+        if (n > 1) r= tree (EXPAND, n);
+        else if (!upgrade_tex_flag) r= tree (VALUE, n);
       }
     for (i=0; i<n; i++)
       r[i]= upgrade_apply_expand_value (t[i], H);
@@ -4020,9 +4021,12 @@ bool
 is_equation_env (tree t) {
   if (is_atomic (t) || N(t) != 1) return false;
   static hashset<tree_label> H;
+  // make_tree_label, not as_tree_label: the set is made once, maybe before
+  // the styles which define these tags have been loaded (a new home, with
+  // no style caches), and as_tree_label does not know the labels yet
   if (N(H) == 0)
     for (int i=0; equation_tags[i][0] != '\0'; i++)
-      H->insert (as_tree_label (equation_tags[i]));
+      H->insert (make_tree_label (equation_tags[i]));
   return H->contains (L(t));
 }
 

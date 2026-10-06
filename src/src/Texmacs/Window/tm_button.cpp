@@ -263,7 +263,13 @@ box_widget (scheme_tree p, string s, color col, bool trans, bool ink) {
   if ((n >= 4) && is_atomic (p[3])) shape   = as_string (p[3]);
   if ((n >= 5) && is_atomic (p[4])) sz      = as_int (p[4]);
   if ((n >= 6) && is_atomic (p[5])) dpi     = as_int (p[5]);
-  font fn= find_font (family, fn_class, series, shape, sz, dpi);
+  // NOTE: use smart fonts as in the editor, so that any Unicode character
+  // (and not only the symbols of the classic TeX fonts) can be rendered
+  font fn;
+  if (fn_class == "mr" || fn_class == "ms" || fn_class == "mt")
+    fn= smart_font (family, fn_class, series, shape,
+                    family, "rm", series, "mathitalic", sz, dpi);
+  else fn= smart_font (family, fn_class, series, shape, sz, dpi);
   box  b = text_box (decorate (), 0, s, fn, col);
   if (ink) b= resize_box (decorate (), b, b->x3, b->y3, b->x4, b->y4, true);
   return box_widget (b, trans);

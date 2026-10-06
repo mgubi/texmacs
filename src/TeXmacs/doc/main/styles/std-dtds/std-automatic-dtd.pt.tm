@@ -92,8 +92,7 @@
 
   <\explain|<markup|index-complex>>
     Uma função com quatro argumentos, <var|key>, <var|how>, <var|range>,
-    <var|entry>, que é documentada na sessão sobre <hlink|geração de índices|
-    ../../links/man-index.pt.tm>.
+    <var|entry>, que é documentada na sessão sobre <hlink|geração de índices|../../links/man-index.pt.tm>.
   </explain>
 
   <\explain|<markup|index-line>>

@@ -13,6 +13,7 @@
 #include "hashset.hpp"
 #include "converter.hpp"
 #include "parse_string.hpp"
+#include "analyze.hpp"
 
 static int mathjax_serial= 1;
 static hashmap<int,string> mathjax_strings;
@@ -24,14 +25,16 @@ static hashmap<int,tree> mathjax_trees;
 
 bool
 contains_mathjax (string s) {
-  int pos= search_forwards ("<head>", 0, s);
+  // detect a MathJax script (version 2 'MathJax.js' or version 3
+  // 'mathjax@3/es5/tex-mml-chtml.js' and the like) in the head
+  int start= search_forwards ("<head", 0, s);
+  if (start < 0) return false;
+  int end= search_forwards ("</head>", start, s);
+  if (end < 0) return false;
+  string h= locase_all (s (start, end));
+  int pos= search_forwards ("<script", 0, h);
   if (pos < 0) return false;
-  pos= search_forwards ("<script", pos, s);
-  if (pos < 0) return false;
-  pos= search_forwards ("MathJax.js", pos, s);
-  if (pos < 0) return false;
-  pos= search_forwards ("</head>", pos, s);
-  return pos >= 0;
+  return search_forwards ("mathjax", pos, h) >= 0;
 }
 
 bool

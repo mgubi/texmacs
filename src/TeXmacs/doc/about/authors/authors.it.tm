@@ -22,7 +22,7 @@
 
     <apply|branch|Porting di <TeXmacs> su altre piattaforme|about-porting.it.tm>
 
-    <apply|branch|Mantenimento pacchetti di <TeXmacs>|maintainers.it.tm>
+    <apply|branch|Mantenimento pacchetti di <TeXmacs>|maintainers.en.tm>
 
     <apply|branch|Internazionalizzazione di <TeXmacs>|translators.it.tm>
 

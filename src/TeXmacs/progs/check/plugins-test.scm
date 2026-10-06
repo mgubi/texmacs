@@ -945,6 +945,41 @@
 ;; External commands
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (file-forms u)
+  ;; the forms of the Scheme file @u
+  (with-input-from-file (url-concretize u)
+    (lambda ()
+      (let loop ((acc '()))
+        (with x (read)
+          (if (eof-object? x) (reverse acc) (loop (cons x acc))))))))
+
+(define (python-requirements)
+  ;; the :require clauses of the installed plugins which use python-command
+  (append-map
+   (lambda (dir)
+     (with u (url-append dir (string-append "progs/init-"
+                                            (url->string (url-tail dir))
+                                            ".scm"))
+       (if (not (url-exists? u)) '()
+           (append-map
+            (lambda (form)
+              (if (not (func? form 'plugin-configure)) '()
+                  (map cadr
+                       (list-filter (cddr form)
+                                    (lambda (x)
+                                      (and (func? x :require 1)
+                                           (contains? x "python-command")))))))
+            (file-forms u)))))
+   (url->list (url-expand (url-complete "$TEXMACS_PATH/plugins/*" "d")))))
+
+(define (without-python thunk)
+  ;; the value of @thunk when no python interpreter is found
+  (let ((saved python-command))
+    (set! python-command (lambda () ""))
+    (with r (check-run thunk)
+      (set! python-command saved)
+      r)))
+
 ;; The availability of plugins rests on looking for programs in the path,
 ;; and the plugins which are not sessions run external commands.
 (define (test-external)
@@ -959,11 +994,14 @@
   (check= (first-in-path "tm-plugins-test-no-such-program" "sh") "sh")
   ;; none found: the empty string, which is a true value
   (check= (first-in-path "tm-plugins-test-no-such-program") "")
-  ;; FIXME: so (:require (python-command)), as in init-python.scm,
-  ;; init-sympy.scm, init-plantuml.scm and init-asymptote.scm, holds
-  ;; without python: a plugin configured with
-  ;; (:require (first-in-path "tm-plugins-test-no-such-program")) is
-  ;; supported. The check that it is not is left out.
+  ;; so the plugins which need python check that python-command is not
+  ;; empty: without python, none of their requirements holds (#12)
+  (check-true (>= (length (python-requirements)) 10))
+  (check= (without-python
+           (lambda ()
+             (list-filter (python-requirements)
+                          (lambda (r) (eval r (current-module))))))
+          '())
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -37,10 +37,7 @@
 #include <QGuiApplication>
 #endif
 
-
-#ifdef USE_QTSVG
 #include <QSvgRenderer>
-#endif
 
 #include "colors.hpp"
 
@@ -342,8 +339,7 @@ utf8_to_qstring (const string& s) {
 string
 from_qstring_utf8 (const QString &s) {
   QByteArray arr= s.toUtf8 ();
-  const char* cstr= arr.constData ();
-  return string ((char*) cstr);
+  return string (arr.constData (), arr.size ());
 }
 
 // This should provide better lookup times
@@ -416,10 +412,8 @@ qt_supports (url u) {
   // http://forum.texmacs.cn/t/how-are-graphics-supposed-to-look-like/963/12
   if (suf == "pdf" || suf == "ps" || suf == "eps")
     return false; 
-#ifdef USE_QTSVG
   if (suf == "svg")
     return true;
-#endif
   bool ans= (bool) formats.contains((QByteArray) as_charp(suf));
   if (DEBUG_CONVERT) {
     if (ans)
@@ -434,7 +428,6 @@ bool
 qt_image_size (url image, int& w, int& h) {// w, h in points
   if (DEBUG_CONVERT)
     debug_convert << "qt_image_size, handling " << image << LF;
-#ifdef USE_QTSVG
   if (suffix (image) == "svg") {
     QSvgRenderer r (utf8_to_qstring (materialize (image)));
     if (r.isValid ()) {
@@ -445,13 +438,6 @@ qt_image_size (url image, int& w, int& h) {// w, h in points
         debug_convert << "qtsvg image_size: " << w << " x " << h << LF;
       return true;
     }
-  }
-#endif
-  if (suffix (image) == "svg") {
-    convert_error << "Cannot read SVG image file '" << image << "'"
-                  << " in qt_image_size" << LF;
-    w = 35; h = 35;
-    return false;
   }
   QImage im= QImage (utf8_to_qstring (materialize (image)));
   if (im.isNull ()) {
@@ -473,7 +459,6 @@ bool
 qt_native_image_size (url image, int& w, int& h) {
   if (DEBUG_CONVERT)
     debug_convert << "qt_native_image_size, handling " << image << LF;
-#ifdef USE_QTSVG
   if (suffix (image) == "svg") {
     QSvgRenderer r (utf8_to_qstring (materialize (image)));
     if (r.isValid ()) {
@@ -482,10 +467,6 @@ qt_native_image_size (url image, int& w, int& h) {
       h = (int) ceil (sz.height ());
       return true;
     }
-  }
-#endif
-  if (suffix (image) == "svg") {
-    return false;
   }
   QImage im= QImage (utf8_to_qstring (materialize (image)));
   if (im.isNull ()) return false;
@@ -530,7 +511,6 @@ qt_convert_image (url image, url dest, int w, int h) {// w, h in pixels
   if (DEBUG_CONVERT)
     debug_convert << "qt_convert_image, converting " << image
 		  << " into " << dest << LF;
-#ifdef USE_QTSVG
   if (suffix (image) == "svg") {
     QSvgRenderer renderer (utf8_to_qstring (materialize (image)));
     if (renderer.isValid ()) {
@@ -546,14 +526,13 @@ qt_convert_image (url image, url dest, int w, int h) {// w, h in pixels
       return;
     }
   }
-#endif
   QImage im (utf8_to_qstring (materialize (image)));
   if (im.isNull ())
     convert_error << "qt_convert_image, failed reading " << image << LF;
   else {
     if (w > 0 && h > 0)
       im= im.scaled (w, h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-    im.scaled (w, h).save (utf8_to_qstring (materialize (dest, "")));
+    im.save (utf8_to_qstring (materialize (dest, "")));
   }
 }
 

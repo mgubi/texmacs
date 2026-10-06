@@ -10,9 +10,9 @@
 
     <branch|Die Blätter des <TeXmacs>-Baums|leaves.de.tm>
 
-    <branch|Die <TeXmacs>-Konstrukte|primitives.en.tm>
+    <branch|Die <TeXmacs>-Konstrukte|regular/regular.de.tm>
 
-    <branch|Systemumgebungs-Variablen|env-vars.en.tm>
+    <branch|Systemumgebungs-Variablen|env-vars.de.tm>
 
     <branch|Geplante Änderungen|planned-changes.en.tm>
   </traverse>

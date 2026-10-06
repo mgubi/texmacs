@@ -295,7 +295,10 @@ memorizer::memorizer (memorizer_rep* ptr) {
   else {
     if (old_rep != NULL) {
       old_rep->ref_count--;
-      if (old_rep->ref_count == 0) tm_delete (old_rep);
+      if (old_rep->ref_count == 0) {
+        bigmem_remove (old_rep);
+        tm_delete (old_rep);
+      }
     }
     old_rep= rep;
     rep->ref_count += 2;

@@ -500,6 +500,7 @@ translate_list (string s) {
   if (s == "compactenum") return "enumerate";
   if (s == "itemize*") return "itemize";
   if (s == "enumerate*") return "enumerate";
+  if (s == "description*") return "description";
   if (s == "asparaitem*") return "itemize";
   if (s == "inparaitem*") return "itemize";
   if (s == "compactitem*") return "itemize";
@@ -588,14 +589,19 @@ finalize_layout (tree t) {
         continue;
       }
 
+      // the line breaks after \begin{tmcode} and before \end{tmcode} only
+      // separate the code from the environment, as for alltt
       if (is_func (v, BEGIN) && (v[0] == "tmcode" || v[0] == "tmcode*")) {
         if (is_func (v, BEGIN, 2)) lang= string_arg (v[1]) * "-code";
         else lang= "code";
         r << tree (BEGIN, lang);
+        if (i+1 < n && u[i+1] == tree (FORMAT, "new line")) i++;
         continue;
       }
 
       if (is_func (v, END) && v[0] == "tmcode") {
+        if (N(r) > 0 && r[N(r)-1] == tree (FORMAT, "new line"))
+          r= r (0, N(r)-1);
         r << tree (END, lang);
         continue;
       }
@@ -1677,12 +1683,24 @@ is_hyper_link (string s) {
   return starts (s, "http://") || starts (s, "https://") || starts (s, "ftp://");
 }
 
+// the lists, which may have an option (of enumitem: [nosep],
+// [label=(\alph*)]...) before their items
+static bool
+is_list_tag (tree t) {
+  if (!is_compound (t) || N(t) != 2) return false;
+  string s= as_string (L(t));
+  return s == "itemize" || s == "enumerate" || s == "description" ||
+         starts (s, "itemize-") || starts (s, "enumerate-") ||
+         starts (s, "description-");
+}
+
 tree
 finalize_misc (tree t) {
   if (is_atomic (t)) return t;
   // Fixme: to be improved when TeXmacs will allow easy personalisation
-  else if (is_compound (t, "enumerate", 2))
-    return compound ("enumerate", t[1]);
+  // (the option of a list is dropped; without it, the items were lost)
+  else if (is_list_tag (t))
+    return compound (as_string (L(t)), finalize_misc (t[1]));
   else if (is_compound (t, "verbatim", 1) &&
            is_atomic (t[0]) && is_hyper_link (t[0]->label)) {
     return compound ("slink", finalize_misc (t[0]));
@@ -2394,7 +2412,10 @@ latex_to_tree (tree t0) {
   // cout << "\n\nt3= " << t3 << "\n\n";
   tree t4= finalize_document (t3);
   // cout << "\n\nt4= " << t4 << "\n\n";
-  tree t5= is_document? finalize_preamble (t4, style): t4;
+  // the first paragraph of a document starts with \begin{document} and
+  // the preamble until finalize_preamble removes them, so a section which
+  // starts the body is only split from what follows it after that
+  tree t5= is_document? finalize_sections (finalize_preamble (t4, style)): t4;
   // cout << "\n\nt5= " << t5 << "\n\n";
   tree t6= handle_matches (t5);
   // cout << "\n\nt6= " << t6 << "\n\n";

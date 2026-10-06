@@ -102,8 +102,10 @@
 (define (cursor) (rel (cursor-path)))
 
 (define (with-buffer-body doc thunk)
-  ;; run @thunk in a new buffer holding @doc, then close the buffer
+  ;; run @thunk in a new buffer holding @doc, then close the buffers it
+  ;; opened, also when it renamed the new buffer (save-buffer-as)
   (let* ((old (current-buffer))
+         (before (buffer-list))
          (u (new-buffer)))
     ;; new-buffer shows the buffer in the current window; switching to it
     ;; again would make a second view (see test-buffers)
@@ -114,7 +116,8 @@
     (with r (check-run thunk)
       (when (and (pair? r) (== (car r) 'error))
         (check-report #f "the group" (object->string r)))
-      (buffer-close u)
+      (for (b (buffer-list))
+        (when (nin? b before) (buffer-close b)))
       (when (buffer-exists? old) (switch-to-buffer old)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -637,7 +640,9 @@
         (with doc (tree->stree (tree-import f "texmacs"))
           (check= (doc-part doc 'body) `(body ,saved-doc))
           ;; the style, followed by the language package of the locale
-          (check= (cadr (cadr (doc-part doc 'style))) "generic")
+          ;; (none for English: the style is then "generic" alone)
+          (with st (cadr (doc-part doc 'style))
+            (check= (if (pair? st) (cadr st) st) "generic"))
           (check-true (string-contains? (object->string (doc-part doc 'initial))
                                         "font-base-size")))
         ;; save-buffer after a change
@@ -695,6 +700,21 @@
         (check-false (buffer-modified? (current-buffer)))
         (check= (body) saved-doc)))))
 
+;; The text which a copy gives to the other programs (verbatim-snippet, as
+;; selection_set makes it): in code (a verbatim-code, the font tt), ... and
+;; the backquote are kept as they are, in UTF-8 where the conversion makes
+;; an ellipsis and a quote of them in text.
+(define (test-copy-as-text)
+  (check-group "copy as text")
+  (with-buffer-body '(document (verbatim-code (document "x in {0,...,5} `a`")))
+    (lambda ()
+      (tree-go-to (tree-ref (buffer-tree) 0 0 0) 3)
+      (check= (get-env "font-family") "tt")
+      (with r (convert (stree->tree "x in {0,...,5} `a`")
+                       "texmacs-tree" "verbatim-snippet"
+                       (cons "texmacs->verbatim:encoding" "utf-8"))
+        (check= r "x in {0,...,5} `a`")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -715,5 +735,6 @@
   (test-undo-save)
   (test-save)
   (test-export)
+  (test-copy-as-text)
   (remove-tmp-files)
   (check-end))

@@ -196,6 +196,7 @@ bool
 can_join (tree t, path p, int pos) {
   if (!has_subtree (t, p)) return false;
   tree st= subtree (t, p);
+  if (is_atomic (st)) return false;  // a string has no children to join
   if (pos < 0 || pos+1 >= N(st)) return false;
   if (is_atomic (st[pos]) && is_atomic (st[pos+1])) return true;
   if (is_compound (st[pos]) && is_compound (st[pos+1])) return true;
