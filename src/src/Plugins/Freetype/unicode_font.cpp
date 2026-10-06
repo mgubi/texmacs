@@ -286,6 +286,13 @@ unicode_font_rep::unicode_font_rep (string name,
   get_extents ("i", ex);
   SI ei= ex->x2 - ex->x1;
   bool mono= (em == ei);
+  // the space of a monospaced font takes one cell, also when the font
+  // gives it another width (KpMono has a space of 333 for cells of 530)
+  if (mono && em > 0 && em != (spc->def)) {
+    spc  = space ((3*em)>>2, em, (3*em)>>1);
+    extra= spc/2;
+    mspc = spc;
+  }
 
   // available standard ligatures
   if (!mono) {
