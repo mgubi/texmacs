@@ -1626,6 +1626,11 @@ single_window_mode () {
 #endif
 }
 
+bool
+vue_single_window () {
+  return single_window_mode ();
+}
+
 class vue_virtual_window_rep;
 static vue_sdl_base_window_rep* the_host= NULL;       // holds the others
 static bool host_is_bare= false; // the host outlived its own window, see forget_host
@@ -2259,6 +2264,26 @@ fill_rounded (renderer ren, int x1, int y1, int x2, int y2, float r) {
   ren->polygon (xs, ys);
 }
 
+// A popup without frame whose contents are a box with rounded corners which
+// covers it (the wait indicator): it paints its own background, and the
+// background of the window would show at the corners, outside the curve
+static bool
+rounded_popup (vue_virtual_window_rep* v, int W, int H) {
+  if (!v->popup || v->decorated ()) return false;
+  Clay_RenderCommandArray& a= v->render_commands;
+  for (int32_t i= 0; i < a.length; i++) {
+    Clay_RenderCommand* c= Clay_RenderCommandArray_Get (&a, i);
+    if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START) continue;
+    if (c->commandType != CLAY_RENDER_COMMAND_TYPE_RECTANGLE) return false;
+    Clay_RectangleRenderData* d= &c->renderData.rectangle;
+    Clay_BoundingBox bb= c->boundingBox;
+    return d->backgroundColor.a >= 255 && d->cornerRadius.topLeft > 0 &&
+           bb.x <= 0.5f && bb.y <= 0.5f &&
+           bb.x + bb.width >= W - 0.5f && bb.y + bb.height >= H - 0.5f;
+  }
+  return false;
+}
+
 // draw the visible virtual windows over the host, back to front
 static void
 composite_virtual_windows (vue_window host, renderer ren) {
@@ -2305,8 +2330,10 @@ composite_virtual_windows (vue_window host, renderer ren) {
     }
     ren->set_origin (X*px, -Y*px);
     ren->clip (0, -H*px, W*px, 0);
-    ren->set_pencil (theme_color (the_theme.background));
-    ren->fill (0, -H*px, W*px, 0);
+    if (!rounded_popup (v, W, H)) {
+      ren->set_pencil (theme_color (the_theme.background));
+      ren->fill (0, -H*px, W*px, 0);
+    }
     {
       with_window frame (v);
       render_clay_commands (ren, &v->render_commands);
@@ -2652,6 +2679,7 @@ static string print_key_info ( SDL_KeyboardEvent *key );
 void process_event (SDL_Event *event);
 void close_help_balloon ();
 void dismiss_wait_indicator ();
+bool dismiss_finished_wait (); // below: the operation which waited is over
 
 // The payloads of the drops, read back by call_drop_event (edit_mouse.cpp)
 // through the ticket carried by the "drop" mouse action.
@@ -3179,6 +3207,7 @@ static void
 loop_iteration () {
   int& delay= loop_delay;
   time_t t1= 0, t2= 0;
+  if (dismiss_finished_wait ()) gui_needs_update= true;
   uint64_t t_frame= vue_now (); // the whole iteration, wait included
   static time_t last_frame= 0; // the last full frame (see frame_wanted)
   bool active= false; // an event, or something moving by itself
@@ -4950,6 +4979,21 @@ dismiss_wait_indicator () {
   close_wait_window ();
 }
 
+// The loop runs again, so the operation which asked for the wait indicator
+// is over, though it did not take its message back (Update -> All pushes
+// "Updating current buffer" and never pops it: the panel stayed until a
+// key). An operation made of several steps shows it again at each step,
+// which comes before this delay
+static time_t wait_shown_at= 0;
+
+bool
+dismiss_finished_wait () {
+  if (is_nil (wait_messages) || texmacs_time () - wait_shown_at < 500)
+    return false;
+  dismiss_wait_indicator ();
+  return true;
+}
+
 void show_wait_indicator (widget base, string message, string argument) {
   // Display a wait indicator with a message and an optional argument, at
   // the centre of the window which triggered the lengthy operation; an
@@ -4968,6 +5012,7 @@ void show_wait_indicator (widget base, string message, string argument) {
 
   close_wait_window ();
   if (is_nil (wait_messages) || !has_current_window ()) return;
+  wait_shown_at= texmacs_time ();
 
   string outer= wait_messages->item, inner;
   for (list<string> l= wait_messages; !is_nil (l); l= l->next) outer= l->item;
