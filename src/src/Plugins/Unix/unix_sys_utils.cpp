@@ -183,8 +183,11 @@ _background_write_task (void* channel_as_void_ptr) {
   const char* d= c->data.a;
   int n= c->buffer_size;
   int t= (c->data).n, k= 0, o= 0;
-  if (t == 0) return (void*) NULL;
-  if (n == 0) { c->status= -1; return (void*) NULL; }
+  // an empty input is closed at once: the process reads its end
+  if (t == 0) {
+    if (close (fd) != 0) c->status= -1;
+    return (void*) NULL; }
+  if (n == 0) { close (fd); c->status= -1; return (void*) NULL; }
   do {
     int m= min (n, t - k);
     // cout << "writting " << m << " bytes / " << t-k << "\n";

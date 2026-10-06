@@ -272,6 +272,23 @@
                     (lambda () (run-test-suite "no-such-test-suite-dir"))
                     'texmacs-error))
 
+;; processes: evaluate-system sends its inputs to the file descriptors of
+;; the process and reads its outputs. An empty input used to be left open,
+;; so that a process which reads it to its end never stopped, nor TeXmacs,
+;; which waits for it (openssl passwd -stdin of an empty password)
+(define (test-glue-processes)
+  (if (or (os-mingw?) (os-win32?) (not (url-exists-in-path? "cat")))
+      (display "  no cat command, skipped\n")
+      (begin
+        (glue-check-equal "processes" "an input"
+                          (lambda () (evaluate-system '("cat") '(0) '("abc")
+                                                      '(1 2)))
+                          '("0" "abc" ""))
+        (glue-check-equal "processes" "an empty input"
+                          (lambda () (evaluate-system '("cat") '(0) '("")
+                                                      '(1 2)))
+                          '("0" "" "")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -299,6 +316,8 @@
   (test-glue-booleans-doubles)
   (glue-group "paths and urls")
   (test-glue-paths-urls)
+  (glue-group "processes")
+  (test-glue-processes)
   (when (nnull? glue-redefined)
     (display* "  redefined in Scheme, not checked: "
               (object->string (reverse glue-redefined)) "\n"))
