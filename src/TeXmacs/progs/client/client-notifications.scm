@@ -25,8 +25,8 @@
 (tm-define (notif-count-label server kind label)
   (with c (notification-count server kind)
     (cond
-      ((> c 0)  (string-append label " (" (number->string c) ")"))
       ((> c 99) (string-append label " (99+)"))
+      ((> c 0)  (string-append label " (" (number->string c) ")"))
       (else label))))
 
 (tm-define (notifiable-entry server kind label action)
