@@ -269,7 +269,7 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   bool owns = (format != "temp" && format != "wrapbuf" && key != "primary") &&
   !(key == "mouse" && cb->supportsSelection ());
   
-  if (!owns && md->hasFormat ("application/x-texmacs-pid")) {
+  if (!owns && md && md->hasFormat ("application/x-texmacs-pid")) {
     buf = md->data ("application/x-texmacs-pid");
     if (!(buf.isEmpty())) {
       owns = string (buf.constData(), buf.size())
@@ -283,6 +283,7 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
     s = copy (selection_s [key]);
     return true;
   }
+  if (!md) return false;
   
   if (DEBUG_QT)
     debug_qt << "get_selection format: ["  << format << "] mime-types: [" 
@@ -327,7 +328,7 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
                get_preference ("verbatim->texmacs:encoding") == "auto"  ))
     buf = md->text().toUtf8 ();
   else {
-    if (md->hasFormat ("plain/text")) buf = md->data ("plain/text").data();
+    if (md->hasFormat ("text/plain")) buf = md->data ("text/plain").data();
     else buf = md->text().toUtf8 ();
   }
   if (!(buf.isEmpty())) s << string (buf.constData(), buf.size());

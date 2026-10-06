@@ -295,7 +295,9 @@ x_gui_rep::clear_selection (string key) {
 bool
 set_selection (string key, tree t,
                string s, string sv, string sh, string format) {
-  (void) format;
+  (void) sh;
+  // foreign clients get the plain text version, not TeXmacs markup
+  if (format == "default") s= sv;
   return the_gui->set_selection (key, t, s);
 }
 
