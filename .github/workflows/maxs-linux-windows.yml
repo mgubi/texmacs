@@ -44,7 +44,10 @@ jobs:
             qt6-base-dev qt6-base-dev-tools qt6-svg-dev libgl-dev \
             libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
             libgnutls28-dev libsqlite3-dev \
-            ghostscript imagemagick fig2dev librsvg2-bin
+            ghostscript imagemagick fig2dev librsvg2-bin \
+            gnupg
+          # (gnupg: the gpg command, which the encryption of TeXmacs runs
+          # and the crypto suite checks; without it these checks are skipped)
           # ImageMagick of Ubuntu does not write PostScript, EPS or PDF
           # (its policy), which TeXmacs asks of it (image_to_eps)
           sudo sed -i -E 's/rights="none" pattern="(PS|PS2|PS3|EPS|PDF|XPS)"/rights="read|write" pattern="\1"/' \
@@ -99,6 +102,7 @@ jobs:
             mingw-w64-x86_64-libjpeg-turbo
             mingw-w64-x86_64-gnutls
             mingw-w64-x86_64-sqlite3
+            mingw-w64-x86_64-gnupg
 
       - name: Configure
         run: |
