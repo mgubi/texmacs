@@ -253,6 +253,8 @@ bib_change_first (tree& t, string (*change_fun) (string)) {
     return false;
   else if (is_compound (t, "math"))
     return false;
+  else if (is_compound (t, "keepcase"))
+    return false;
   else {
     int pos= 0;
     if (L(t) == WITH) pos= N(t)-1;
@@ -690,11 +692,17 @@ bib_text_length (string s) {
 
 static int
 bib_tree_length (tree t) {
-  if (is_atomic (t)) return N(t->label);
+  if (is_atomic (t)) {
+    string s= t->label;
+    int pos= 0, n= 0;
+    while (pos < N(s)) { tm_char_forwards (s, pos); n++; }
+    return n;
+  }
   else if (L(t) == WITH) return bib_tree_length (t[N(t)-1]);
   else if (L(t) == CONCAT || L(t) == DOCUMENT) {
-    int s= 0; (void) s;
+    int s= 0;
     for (int i= 0; i<N(t); i++) s += bib_tree_length (t[i]);
+    return s;
   }
   return 0;
 }
@@ -716,17 +724,18 @@ bib_get_prefix (tree t, string& pre, int& i) {
       string s= t->label;
       int beg= 0;
       while ((beg < N(s)) && (i > 0)) {
-        pre << s[beg];
-        beg++;
+        int end= beg;
+        tm_char_forwards (s, end);
+        pre << s (beg, end);
+        beg= end;
         i--;
       }
       return;
     }
     else {
-      int pos= 0;
-      if (L(t) == WITH) pos= N(t)-1;
+      if (L(t) == WITH) bib_get_prefix (t[N(t)-1], pre, i);
       else if (L(t) == CONCAT || L(t) == DOCUMENT)
-        for (int j= pos; j<N(t); j++) bib_get_prefix (t[j], pre, i);
+        for (int j= 0; j<N(t); j++) bib_get_prefix (t[j], pre, i);
     }
   }
 }
@@ -832,7 +841,19 @@ bib_field_pages (string p) {
       res << as_string (p2);
     return res;
   }
-  res << "0";
+  p= trim_spaces (p);
+  if (N(p) == 0) {
+    res << "0";
+    return res;
+  }
+  int i= search_forwards ("-", p);
+  if (i <= 0) res << p;
+  else {
+    int j= i;
+    while (j < N(p) && p[j] == '-') j++;
+    res << trim_spaces (p (0, i));
+    if (j < N(p)) res << trim_spaces (p (j, N(p)));
+  }
   return res;
 }
 
@@ -936,8 +957,8 @@ is_hyper_link (string s) {
   return starts (s, "http://") || starts (s, "https://") || starts (s, "ftp://");
 }
 
-void
-bib_parse_fields (tree& t) {
+static bool
+bib_parse_fields_all (tree& t) {
   string fields;
   int nb= bib_get_fields (t, fields);
   array<tree> latex= bib_latex_array (
@@ -955,7 +976,36 @@ bib_parse_fields (tree& t) {
     if (is_atomic (latex[k]) && is_hyper_link (latex[k]->label))
       latex[k]= compound ("slink", latex[k]);
   int i= 0;
-  if (nb == N(latex)) bib_set_fields (t, latex, i);
+  if (nb != N(latex)) return false;
+  bib_set_fields (t, latex, i);
+  return true;
+}
+
+static void
+bib_parse_fields_split (tree& t) {
+  // fall back to converting entry by entry, and then field by field,
+  // so that one problematic value does not prevent the other conversions
+  for (int i= 0; i<N(t); i++) {
+    tree u (DOCUMENT, t[i]);
+    if (bib_parse_fields_all (u)) continue;
+    if (bib_is_entry (t[i]))
+      for (int j= 0; j<N(t[i][2]); j++) {
+        tree e= compound ("bib-entry", t[i][0], t[i][1],
+                          tree (DOCUMENT, t[i][2][j]));
+        tree v (DOCUMENT, e);
+        if (!bib_parse_fields_all (v) && bib_is_field (t[i][2][j]))
+          bibtex_warning << "Could not convert field '"
+                         << t[i][2][j][0]->label << "' of entry '"
+                         << t[i][1]->label << "'\n";
+      }
+    else if (bib_is_comment (t[i]))
+      bib_parse_fields_split (t[i]);
+  }
+}
+
+void
+bib_parse_fields (tree& t) {
+  if (!bib_parse_fields_all (t)) bib_parse_fields_split (t);
 }
 
 /******************************************************************************
@@ -1043,7 +1093,11 @@ bib_strings_dict (tree t) {
           string sval;
           for (int j= 0; j<N(val); j++) {
             if (is_atomic (val[j])) sval << val[j]->label;
-            else if (bib_is_var (val[j])) sval << dict[val[j][0]->label];
+            else if (bib_is_var (val[j])) {
+              string vkey= locase_all (val[j][0]->label);
+              if (dict->contains (vkey)) sval << dict[vkey];
+              else sval << val[j][0]->label;
+            }
           }
           dict(key)= sval;
         }
@@ -1061,7 +1115,11 @@ bib_subst_str (tree t, hashmap<string,string> dict) {
   else if (L(t) == CONCAT) {
     string s;
     for (int i= 0; i<N(t); i++) {
-      if (bib_is_var (t[i])) s << dict[locase_all (t[i][0]->label)];
+      if (bib_is_var (t[i])) {
+        string key= locase_all (t[i][0]->label);
+        if (dict->contains (key)) s << dict[key];
+        else s << t[i][0]->label;
+      }
       else if (is_atomic (t[i])) s << t[i]->label;
       else s << bib_subst_str (t[i], dict);
     }
