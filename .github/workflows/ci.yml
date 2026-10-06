@@ -82,8 +82,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        # (gnupg: the gpg command, for the checks of the crypto suite)
-        run: brew install qt freetype libpng jpeg gnutls sqlite gmp libtool gnupg
+        # (gnupg: the gpg command, for the checks of the crypto suite;
+        # imagemagick and ghostscript: the converters of images, which the
+        # convert-more suite checks, as on Linux)
+        run: brew install qt freetype libpng jpeg gnutls sqlite gmp libtool gnupg imagemagick ghostscript
 
       - name: Configure
         run: |
