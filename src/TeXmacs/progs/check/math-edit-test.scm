@@ -192,16 +192,11 @@
     (edit (variant-formula (bt 1)))
     (check= (body) '(document (concat "Let " (math "x+y") " then")))
     (check= (cursor) '(0 1 0 1)))
-  ;; FIXME: displaying a formula inside a paragraph leaves concats with a
-  ;; single child (concat-isolate! with tree-split, math-edit.scm:171 and
-  ;; 176): with the cursor in the formula of
-  ;; (document (concat "Let " (math "x+y") ", so")), (variant-equation t)
-  ;; gives (document (concat "Let") (equation* (document "x+y,"))
-  ;; (concat "so")), expected (document "Let" (equation* (document "x+y,"))
-  ;; "so"). The equation itself and the way back are checked.
+  ;; a formula inside a paragraph: the paragraph is split around it,
+  ;; without leaving concats of a single child
   (in-buffer '(document (concat "Let " (math "x+y") ", so"))
     (edit (go-to (at 0 1 0 1)) (variant-equation (bt 0 1)))
-    (check= (tree->stree (bt 1)) '(equation* (document "x+y,")))
+    (check= (body) '(document "Let" (equation* (document "x+y,")) "so"))
     (check= (cursor) '(1 0 0 1))
     (edit (variant-formula (bt 1)))
     (check= (body) '(document (concat "Let " (math "x+y") ", so")))
@@ -555,11 +550,13 @@
     (check= (body) '(document (math "x|")))
     (edit (math-separator "|" #t))
     (check= (body) '(document (math (concat "x|" (mid "|"))))))
-  ;; FIXME: a small separator given as a symbol loses its brackets
-  ;; (math-separator, math-edit.scm:673, also used by the shortcut
-  ;; math:small | | var): in (math "x"), (math-separator "<||>" #f) gives
-  ;; (math "x||"), two bars, expected (math "x<||>").
-  )
+  ;; a separator given as a symbol keeps its brackets when small; a large
+  ;; one takes the name without them, as tree-downgrade-brackets writes it
+  (in-buffer '(document (math "x"))
+    (edit (go-to (at 0 0 1)) (math-separator "<||>" #f))
+    (check= (body) '(document (math "x<||>")))
+    (edit (math-separator "<||>" #t))
+    (check= (body) '(document (math (concat "x<||>" (mid "||")))))))
 
 ;; The shape and size of brackets: variant-circulate goes through the
 ;; brackets of the same kind, geometry-vertical makes them larger or
@@ -596,12 +593,16 @@
   (in-buffer '(document (math (around "<langle>" "b" "<rangle>")))
     (edit (variant-circulate (bt 0 0) #t))
     (check= (body) '(document (math (around "|" "b" "|")))))
-  ;; FIXME: variant-circulate does nothing on a left, mid or right bracket
-  ;; without a size (bracket-circulate, math-edit.scm:452-456, asks for an
-  ;; arity > 1): in (math (concat (left "(") "b" (right ")"))),
-  ;; (variant-circulate (left "(") #t) leaves (left "("), expected
-  ;; (left "["); likewise for (mid "|") in an around*. With a size the
-  ;; bracket changes:
+  ;; left, mid and right brackets, without a size or with one
+  (in-buffer '(document (math (concat (left "(") "b" (right ")"))))
+    (edit (variant-circulate (bt 0 0 0) #t))
+    (check= (body) '(document (math (concat (left "[") "b" (right ")")))))
+    (edit (variant-circulate (bt 0 0 2) #f))
+    (check= (body) '(document (math (concat (left "[") "b" (right "<rrbracket>"))))))
+  (in-buffer '(document (math (around* "(" (concat "a" (mid "|") "b") ")")))
+    (edit (variant-circulate (bt 0 0 1 1) #t))
+    (check= (body) '(document (math (around* "(" (concat "a" (mid "<||>") "b")
+                                              ")")))))
   (in-buffer '(document (math (concat (left "(" "1") "b" (right ")" "1"))))
     (edit (variant-circulate (bt 0 0 0) #t))
     (check= (body) '(document (math (concat (left "[" "1") "b" (right ")" "1")))))

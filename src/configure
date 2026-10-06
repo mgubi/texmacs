@@ -6178,12 +6178,17 @@ fi
   CONFIG_HOST_VENDOR="$host_vendor"
   CONFIG_HOST_CPU="$host_cpu"
   CONFIG_USER="$USER"
-  CONFIG_DATE="`date`"
+  DATE_FMT="+%Y-%m-%dT%H:%M:%SZ"
+  CONFIG_DATE="`SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(date +%s)}"; date -u -d "@$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH" "$DATE_FMT" 2>/dev/null || date -u "$DATE_FMT"`"
   CONFIG_QTPIPES="no"
   CONFIG_FASTALLOC="yes"
   type rsync && CONFIG_CP="rsync -a --exclude='.*'" || CONFIG_CP="cp -f -R -p"
   # tweak for XCode project
   CONFIG_ARCHS='$(NATIVE_ARCH)'
+
+  if test -z "$CONFIG_USER"
+  then CONFIG_USER=`lsb_release -is 2> /dev/null` || CONFIG_USER=`dpkg-vendor --query vendor 2> /dev/null` || CONFIG_USER="UNKNOWN"
+  fi
 
   X11_CFLAGS="$X_CFLAGS"
   X11_LDFLAGS="$X_LIBS -lXext -lX11"
@@ -22511,8 +22516,8 @@ fi
       { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: disabling imlib2 support" >&5
 printf '%s\n' "disabling imlib2 support" >&6; }
   else
-      CPPFLAGS=`imlib2-config --cflags`
-      LIBS=`imlib2-config --libs`
+      CPPFLAGS=`pkg-config --cflags imlib2`
+      LIBS=`pkg-config --libs imlib2`
       ac_fn_cxx_check_header_compile "$LINENO" "Imlib2.h" "ac_cv_header_Imlib2_h" "$ac_includes_default"
 if test "x$ac_cv_header_Imlib2_h" = xyes
 then :

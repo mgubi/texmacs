@@ -22,10 +22,33 @@ keyword_parser_rep::keyword_parser_rep () {
 
 bool
 keyword_parser_rep::can_parse (string s, int pos) {
-  string word;
-  bool hit= read_word (s, pos, word) && keyword_group->contains (word);
+  // the keywords of several words first ("mutable struct" in julia)
+  if (can_parse_phrase (s, pos)) return true;
+  // Read the whole identifier, so that keywords are not matched on prefixes
+  // (as "for" in "for_each") and keywords with '_' or digits can match
+  int i= pos;
+  while (i<N(s) && (is_alpha (s[i]) || is_digit (s[i]) || s[i] == '_')) i++;
+  string word= s (pos, i);
+  bool hit= i>pos && keyword_group->contains (word);
   if (hit) current_keyword= word;
   return hit;
+}
+
+bool
+keyword_parser_rep::can_parse_phrase (string s, int pos) {
+  // keywords of several words, as "mutable struct" in julia, separated by
+  // a single space and followed by the end of a word
+  for (int i=0; i<N(phrases); i++) {
+    string phrase= phrases[i];
+    int end= pos + N(phrase);
+    if (test (s, pos, phrase) &&
+        (end >= N(s) || !(is_alpha (s[end]) || is_digit (s[end]) ||
+                          s[end] == '_'))) {
+      current_keyword= phrase;
+      return true;
+    }
+  }
+  return false;
 }
 
 void

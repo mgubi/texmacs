@@ -19,4 +19,5 @@
 (tm-define (parser-feature lan key)
   (:require (== key "comment"))
   `(,(string->symbol key)
-    (inline "//")))
+    (inline "//")
+    (multi_line "/*" "*/")))

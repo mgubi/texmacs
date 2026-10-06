@@ -77,6 +77,7 @@ struct verb_language_rep: language_rep {
 };
 
 struct prog_language_rep: abstract_language_rep {
+  bool multi_line_comments; // the comment table has (multi_line "/*" "*/")
   prog_language_rep (string name);
   text_property advance (tree t, int& pos);
   array<int> get_hyphens (string s);

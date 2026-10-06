@@ -256,7 +256,7 @@
         (let* ((sufl (string-length suffix))
               (surl (url->string myurl))
               (sl (string-length surl)))
-          (set! myurl (string->url (string-append (substring surl (- sl sufl) sl) "pdf"))))))
+          (set! myurl (string->url (string-append (substring surl 0 (- sl sufl)) "pdf"))))))
 
 ; TODO Handle when output file already exists (presently we overwritte without warning)
 

@@ -16,8 +16,7 @@
   <\traverse>
     <apply|branch|Examinando um exemplo|example.pt.tm>
 
-    <apply|branch|Atalhos do teclado para escrita de arquivos de estilo|
-    ../keyboard/style-kbd.pt.tm>
+    <apply|branch|Atalhos do teclado para escrita de arquivos de estilo|../keyboard/style-kbd.pt.tm>
 
     <apply|branch|Diretórios importantes|paths.pt.tm>
   </traverse>

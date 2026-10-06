@@ -88,7 +88,7 @@ escaped_char_parser_rep::can_parse_octal_upto_3_digits (string s, int pos) {
   int remaining= N(s)-pos;
   return octal_upto_3_digits()
     && remaining >= 1
-    && is_octal_digit (s[pos+1]);
+    && is_octal_digit (s[pos]);
 }
 
 bool
@@ -100,6 +100,7 @@ escaped_char_parser_rep::can_parse (string s, int pos) {
   if (can_parse_hex_with_8_bits (s, pos+1)) return true;
   if (can_parse_hex_with_16_bits (s, pos+1)) return true;
   if (can_parse_hex_with_32_bits (s, pos+1)) return true;
+  if (can_parse_octal_upto_3_digits (s, pos+1)) return true;
 
   for (int i=0; i<N(m_strings); i++) {
     string m_string= m_strings[i];
@@ -152,7 +153,7 @@ escaped_char_parser_rep::do_parse (string s, int& pos) {
   for (int i=0; i<N(m_strings); i++) {
     string m_string= m_strings[i];
     if (test (s, pos+1, m_string)) {
-      pos= pos+N(m_string);
+      pos= pos+1+N(m_string);
       return;
     }
   }

@@ -166,8 +166,17 @@
   ;; escape-shell protects the characters special to a POSIX shell
   (check= (escape-shell "abc") "abc")
   (check= (escape-shell "a b(c)$d") "a\\ b\\(c\\)\\$d")
-  (check= (escape-shell "x\ny") "x\\ny")
+  (check= (escape-shell "x\ny") "x'\n'y")
   (check= (escape-shell "a&b<c>d?") "a\\&b\\<c\\>d\\?")
+  (check= (escape-shell "a;b|c'd*e~f#g") "a\\;b\\|c\\'d\\*e\\~f\\#g")
+  (check= (escape-shell "/usr/bin/x-y_z.1,2:3+4@5%6=7")
+          "/usr/bin/x-y_z.1,2:3+4@5%6=7")
+  ;; the shell reads the escaped string back unchanged
+  (when (not (or (os-win32?) (os-mingw?)))
+    (for (s (list "a b" "a;echo INJECTED" "it's" "x|y" "a*" "~/f" "#c"
+                  "$(echo no)" "`echo no`" "x\ny" "t\tu" "[ab]" "{a,b}"))
+      (check= (eval-system (string-append "printf %s " (escape-shell s)))
+              s)))
   ;; escape-to-ascii writes the bytes above 127 as \xhh, which
   ;; unescape-guile reads back
   (check= (escape-to-ascii "abc") "abc")
@@ -248,11 +257,11 @@
   (check= (string-distance "abc" "abc") 0)
   (check= (string-distance "abc" "abXc") 1)
   (check= (string-distance "abcdef" "abXYZef") 3)
-  ;; FIXME: a replacement which keeps the length is no difference
-  ;; (differences in Data/String/analyze.cpp:1598 tests i1 == i2 && j1 == j2
-  ;; where it means that both ranges are empty, i1 == j1 && i2 == j2):
-  ;; (string-differences "abcdef" "abXdef") gives (), expected (2 3 2 3);
-  ;; (string-distance "abcdef" "abXYef") gives 0, expected 2.
+  ;; a replacement which keeps the length
+  (check= (string-differences "abcdef" "abXdef") '(2 3 2 3))
+  (check= (string-differences "abc" "abc") '())
+  (check= (string-distance "abcdef" "abXYef") 2)
+  (check= (string-distance "a" "b") 1)
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -468,6 +477,17 @@
     (check= (us (url-resolve (url-append both "a.txt") "r"))
             (us (tmp-file "a.txt")))
     (check= (url-none? (url-resolve (url-append both "zz.txt") "r")) #t))
+  ;; any number of directories followed by a file name
+  (let ((any (url-append (tmp-dir) (url-any))))
+    (check= (map us (url->list (url-expand
+                                (url-complete (url-append any "d.txt") "fr"))))
+            (list (us (tmp-file "sub/d.txt"))))
+    (check= (map us (url->list (url-expand
+                                (url-complete (url-append any "a.txt") "fr"))))
+            (list (us (tmp-file "a.txt"))))
+    (check= (us (url-resolve (url-append any "d.txt") "r"))
+            (us (tmp-file "sub/d.txt")))
+    (check= (url-none? (url-resolve (url-append any "zz.txt") "r")) #t))
   (check= (us (url-grep "def" (url-append (tmp-dir) (url-wildcard "*.txt"))))
           (us (tmp-file "a.txt")))
   (check= (url-none? (url-grep "zzz" (url-append (tmp-dir)
@@ -847,12 +867,10 @@
   (check= (logic-unify '(f a) '(f a)) '(()))
   (check= (logic-unify '(f a) '(f b)) #f)
   (check= (logic-unify '(f 'x) '(g 'x)) #f)
-  ;; FIXME: a variable which occurs twice cannot be unified: bind-unify
-  ;; calls unify, which kernel/logic/logic-bind.scm:52 does not import
-  ;; (it is defined in logic-unify.scm, which uses logic-bind):
-  ;; (logic-unify '(f 'x 'x) '(f a a)) raises "Unbound variable: unify",
-  ;; expected (((x . a))); so does (logic-query (structures-test-son% 'x 'x)),
-  ;; expected ().
+  ;; a variable which occurs twice
+  (check= (logic-unify '(f 'x 'x) '(f a a)) '(((x . a))))
+  (check= (logic-unify '(f 'x 'x) '(f a b)) #f)
+  (check= (logic-query (structures-test-son% 'x 'x)) '())
   ;; queries
   (check= (logic-query (structures-test-son% joris piet)) '(()))
   (check= (logic-query (structures-test-son% piet joris)) '())
@@ -891,13 +909,9 @@
   (check= (logic-ref structures-test-op% 'plus) +)
   (check= (logic-dispatch structures-test-op% 'plus 1 2) 3)
   (check= (logic-dispatch structures-test-op% 'plus 1 2 3) 6)
-  ;; FIXME: the form with one object, which dispatches on its car, is taken
-  ;; when one argument follows the key instead of none (kernel/logic/
-  ;; logic-data.scm:160 tests (= (length args) 1) where it means
-  ;; (null? args)): (logic-dispatch structures-test-op% '(first 2 3))
-  ;; raises "Wrong type to apply: #f", expected first, and
-  ;; (logic-dispatch structures-test-op% 'first '(5 6)) raises an error
-  ;; (car of the symbol first), expected 5.
+  ;; the form with one object dispatches on its car
+  (check= (logic-dispatch structures-test-op% '(first 2 3)) 'first)
+  (check= (logic-dispatch structures-test-op% 'first '(5 6)) 5)
   )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

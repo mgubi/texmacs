@@ -315,10 +315,11 @@
                            ("pseudo" ,pseudo)))
       (when (nnull? ids)
         (db-remove-entry (car ids))))
-    (when (== port "6561") ; backward compatibility
-      (with ids (db-search `(("type" "account")
-			     ("server" ,server-name)
-			     ("pseudo" ,pseudo)))
+    (when (== port "6561") ; backward compatibility, accounts without port
+      (with ids (list-filter (db-search `(("type" "account")
+                                          ("server" ,server-name)
+                                          ("pseudo" ,pseudo)))
+                             (lambda (id) (null? (db-get-field id "port"))))
 	(when (nnull? ids)
 	  (db-remove-entry (car ids)))))))
 

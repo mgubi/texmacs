@@ -80,6 +80,6 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
+    <associate|language|italian>
   </collection>
 </initial>

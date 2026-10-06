@@ -82,7 +82,7 @@
   Dans les cas où les raccourcis clavier <TeXmacs> sont remplacés par les
   raccourcis clavier du système d'exploitation, nous remarquons que les
   <hlink|équivalents pour les modificateurs
-  clavier|../config/man-config-keyboard.fr.tm#kbd-escape-table> peuvent être
+  clavier|../config/man-config-keyboard.en.tm#kbd-escape-table> peuvent être
   obtenus en utilisant la touche <key*|escape>. Par exemple, <key*|escape>
   est équivalente à <key*|M-> et <key*|escape><key*|escape> est équivalente à
   <key*|A->.

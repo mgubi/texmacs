@@ -84,12 +84,12 @@ def ps_out (out):
             data = out
         else:
             ext_list = ['', '.eps', '.ps']
-        for ext in ext_list:
-            if os.path.exists(out+ext):
-                fd = open(out+ext, 'rb')
-                data = fd.read()
-                fd.close()
-                break
+            for ext in ext_list:
+                if os.path.exists(out+ext):
+                    fd = open(out+ext, 'rb')
+                    data = fd.read()
+                    fd.close()
+                    break
             else:
                 raise IOError('File "%s%s" not found.' % (out, str(ext_list)))
     elif 'read' in dir(out):
