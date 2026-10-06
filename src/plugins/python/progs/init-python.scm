@@ -65,7 +65,9 @@
   (:winpath "python*" ".")
   (:winpath "Python*" ".")
   (:winpath "Python/Python*" ".")
-  (:require (or (python-in-browser?) (!= (python-command) "")))
+  ;; (the test of python-in-browser? written out: the requirements are also
+  ;; evaluated outside of this file, e.g. by the plugins suite)
+  (:require (or (defined? 'web-files) (!= (python-command) "")))
   ,@(python-engine)
   (:preferences (and (not (python-in-browser?)) (supports-jupyter?)))
   (:serializer ,python-serialize)
