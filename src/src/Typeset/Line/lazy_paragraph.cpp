@@ -887,10 +887,10 @@ lazy_paragraph_rep::query (lazy_type request, format fm) {
     if (N (qvw->after ) != 0) li= join (li, qvw->after);
 
     // determine the first indentation
-    SI first= env->as_length (style [PAR_FIRST]);
     bool no_first= (style [PAR_NO_FIRST] == "true");
     style (PAR_NO_FIRST)= "false";
     if (no_first) style (PAR_FIRST)= "0cm";
+    SI first= env->as_length (style [PAR_FIRST]);
     for (int j=0; j<N(a); j++)
       if (a[j]->type == CONTROL_ITEM)
         if (is_tuple (a[j]->t, "env_par")) {

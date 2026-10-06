@@ -125,9 +125,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; for each type whose argument is checked, a value which the check refuses
-;; FIXME: a number or an improper list as a path crashes TeXmacs
-;; (tmscm_is_path takes the car of a non-pair), so a list holding a string
-;; is used; a uint is not checked for its sign (TMSCM_ASSERT_UINT, #72)
+;; FIXME: a uint is not checked for its sign (TMSCM_ASSERT_UINT, #72)
 (define glue-wrong-values
   '((string . 42)
     (int . "x")
@@ -135,7 +133,7 @@
     (double . "x")
     (bool . "x")
     (url . 42)
-    (path . ("x"))
+    (path . 42)
     (tree . "x")
     (content . 42)
     (tree_label . "x")
@@ -212,9 +210,7 @@
 
 ;; integers up to the limits of a C int, and an error beyond them
 (define (test-glue-integers)
-  ;; FIXME: as_hexadecimal (int) recurses forever on -2^31, whose negation
-  ;; overflows, and crashes TeXmacs, so -2^31+1 is the lowest checked
-  (for (n (list 0 1 -1 255 65536 2147483647 -2147483647))
+  (for (n (list 0 1 -1 255 65536 2147483647 -2147483647 -2147483648))
     (glue-check-equal "integers" (number->string n)
                       (lambda () (hexadecimal->integer
                                   (integer->hexadecimal n)))
@@ -251,6 +247,13 @@
   (glue-check-equal "paths" "empty" (lambda () (path-strip '() '())) '())
   (glue-check-error "paths" "a list of strings for a path"
                     (lambda () (path-strip '("a") '())) 'wrong-type-arg)
+  ;; a number and an improper list used to crash TeXmacs
+  (glue-check-error "paths" "a number for a path"
+                    (lambda () (path-strip 5 '())) 'wrong-type-arg)
+  (glue-check-error "paths" "an improper list for a path"
+                    (lambda () (path-strip '(1 . 2) '())) 'wrong-type-arg)
+  (glue-check-error "paths" "a string for a path"
+                    (lambda () (path-strip "x" '())) 'wrong-type-arg)
   (for (s (list "a.tm" "a/b/c.tm" "/abs/path.tm" "a b.tm" ""))
     (glue-check-equal "urls" s (lambda () (url->string (string->url s))) s))
   (glue-check-equal "urls" "a string for an url"

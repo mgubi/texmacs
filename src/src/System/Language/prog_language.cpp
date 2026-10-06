@@ -167,7 +167,9 @@ prog_language_rep::advance (tree t, int& pos) {
   if (pos>=N(s)) return &tp_normal_rep;
 
   if (string_parser.unfinished ()) {
-    if (string_parser.escaped () && string_parser.parse_escaped (s, pos)) {
+    // Also try when the previous token was an escape sequence itself,
+    // so that consecutive escape sequences (as in "\n\t") are recognized
+    if (string_parser.parse_escaped (s, pos)) {
       current_parser= escaped_char_parser.get_parser_name ();
       return &tp_normal_rep;
     }

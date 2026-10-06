@@ -475,7 +475,7 @@ static bool end_preprocessing(string s) {
   int pos= N(s)-1;
   if (N(s) == 0) return false;
   while (s[pos] == ' ' && pos > 0) --pos;
-  if (s[pos] == '/') return true;
+  if (s[pos] == '\\') return true;
   return false;
 }
 

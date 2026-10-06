@@ -54,7 +54,7 @@
     </explain>
   </macro>>
 
-  <drd-props|doc-module-header-body|arity|2|accesible|all>
+  <drd-props|doc-module-header-body|arity|2|accessible|all>
 
   \;
 

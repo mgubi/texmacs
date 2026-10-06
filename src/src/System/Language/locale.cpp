@@ -10,6 +10,7 @@
 ******************************************************************************/
 
 #include "locale.hpp"
+#include <time.h>
 
 #ifndef OS_MINGW
 #include <langinfo.h>
@@ -291,58 +292,183 @@ invalid_format (string s) {
 }
 
 static string
-simplify_date (string s) {
-  int i, n=N(s);
-  string r;
-  for (i=0; i<n; i++)
-    if ((s[i]!='0') || ((N(r)>0) && is_digit(r[N(r)-1]))) r << s[i];
-  return r;
-}
-
-string
-get_date (string lan, string fm) {
-//#ifdef OS_MINGW
-//  return win32::get_date(lan, fm);
-  if (invalid_format (fm)) {
-    if ((lan == "british") || (lan == "english") || (lan == "american"))
-      fm= "%B %d, %Y";
-    else if (lan == "german")
-      fm= "%d. %B %Y";
-    else if (lan == "chinese" || lan == "japanese" ||
-	     lan == "korean" || lan == "taiwanese")
-      {
-        string y= simplify_date (var_eval_system ("date +\"%Y\""));
-        string m= simplify_date (var_eval_system ("date +\"%m\""));
-        string d= simplify_date (var_eval_system ("date +\"%d\""));
-        if (lan == "korean")
-          return y * "<#b144> " * m * "<#c6d4> " * d * "<#c77c>";
-	      return y * "<#5e74>" * m * "<#6708>" * d * "<#65e5>";
-      }
-    else fm= "%d %B %Y";
-  }
+system_date (string lan, string fm) {
+  // the output of the date command for the format fm, in the language lan
   lan= language_to_locale (lan);
   string lvar= "LC_TIME";
   if (get_env (lvar) == "") lvar= "LC_ALL";
   if (get_env (lvar) == "") lvar= "LANG";
   string old= get_env (lvar);
   set_env (lvar, lan);
-  string date= simplify_date (var_eval_system ("date +\"" * fm * "\""));
+  // the errors and warnings (of the shell, of a missing locale) apart: with
+  // system (cmd, out), which appends 2>&1, they were taken for the date
+  string date, errors;
+  int status= system ("date +\"" * fm * "\"", date, errors);
+  while (N(date) > 0 && (date[N(date)-1] == '\n' || date[N(date)-1] == '\r'))
+    date= date (0, N(date) - 1);
   if ((lan == "cz_CZ") || (lan == "hu_HU") || (lan == "pl_PL"))
     date= il2_to_cork (date);
   // if (lan == "ru_RU") date= iso_to_koi8 (date);
   set_env (lvar, old);
+  if ((status != 0 || N(date) == 0) && N(fm) > 0) {
+    // no date command (a browser has no processes, a system may lack
+    // it): the C library, in its own locale, so the names are in English
+    char buf[256];
+    time_t ti;
+    time (&ti);
+    c_string _fm (fm);
+    size_t len= strftime (buf, sizeof (buf), _fm, localtime (&ti));
+    date= string (buf, (int) len);
+  }
   return date;
 }
 
+static string
+two_digits (int n) {
+  return (n < 10? string ("0"): string ("")) * as_string (n);
+}
+
+static bool
+has_am_pm (string fm) {
+  // whether fm contains an AM/PM marker (a or A) outside quoted text
+  bool quoted= false;
+  for (int i=0; i<N(fm); i++)
+    if (fm[i] == '\'') quoted= !quoted;
+    else if (!quoted && (fm[i] == 'a' || fm[i] == 'A')) return true;
+  return false;
+}
+
+static string
+c_date (struct tm* tm, string fm) {
+  // the date tm in the strftime format fm, by the C library, in its own
+  // locale (the names are in English)
+  char buf[256];
+  c_string _fm (fm);
+  size_t len= strftime (buf, sizeof (buf), _fm, tm);
+  return string (buf, (int) len);
+}
+
+static string
+pattern_date (string lan, string fm, time_t ti, bool now) {
+  // the current date in the format fm, with the patterns of Qt (which
+  // the Qt version of get_date uses): d dd ddd dddd for the day, M MM MMM
+  // MMMM for the month, yy yyyy for the year, h hh H HH m mm s ss for the
+  // time (h and hh on 12 hours when there is an AM/PM marker AP A ap a),
+  // and 'text' quoted. The date is the one of ti, the current one when
+  // now holds: its names of the months and days then come from date, in the
+  // language lan (otherwise from the C library, in English); the format
+  // itself is never passed to the shell.
+  struct tm tm= *localtime (&ti);
+  bool am_pm= has_am_pm (fm);
+  string r;
+  int i= 0, n= N(fm);
+  while (i < n) {
+    char c= fm[i];
+    if (c == '\'') {
+      // quoted text; two quotes are a quote, inside quoted text too
+      i++;
+      if (i < n && fm[i] == '\'') { r << '\''; i++; continue; }
+      while (i < n) {
+        if (fm[i] != '\'') r << fm[i++];
+        else if (i+1 < n && fm[i+1] == '\'') { r << '\''; i += 2; }
+        else break;
+      }
+      if (i < n) i++;
+      continue;
+    }
+    int k= i;
+    while (k < n && fm[k] == c) k++;
+    int count= k - i;
+    if (c == 'd') {
+      if (count == 1) r << as_string (tm.tm_mday);
+      else if (count == 2) r << two_digits (tm.tm_mday);
+      else if (count == 3) r << (now? system_date (lan, "%a"): c_date (&tm, "%a"));
+      else r << (now? system_date (lan, "%A"): c_date (&tm, "%A"));
+    }
+    else if (c == 'M') {
+      if (count == 1) r << as_string (tm.tm_mon + 1);
+      else if (count == 2) r << two_digits (tm.tm_mon + 1);
+      else if (count == 3) r << (now? system_date (lan, "%b"): c_date (&tm, "%b"));
+      else r << (now? system_date (lan, "%B"): c_date (&tm, "%B"));
+    }
+    else if (c == 'y' && count == 2) r << two_digits ((tm.tm_year + 1900) % 100);
+    else if (c == 'y' && count == 4) r << as_string (tm.tm_year + 1900);
+    else if ((c == 'h' || c == 'H' || c == 'm' || c == 's') && count <= 2) {
+      int v= (c == 'm'? tm.tm_min: c == 's'? tm.tm_sec: tm.tm_hour);
+      if (c == 'h' && am_pm) v= (v % 12 == 0? 12: v % 12);
+      r << (count == 1? as_string (v): two_digits (v));
+    }
+    else if (c == 'A' || c == 'a') {
+      // AP, A, ap or a
+      bool up= (c == 'A');
+      r << (tm.tm_hour < 12? (up? "AM": "am"): (up? "PM": "pm"));
+      k= i + 1;
+      if (k < n && fm[k] == (up? 'P': 'p')) k++;
+    }
+    else r << fm (i, k);
+    i= k;
+  }
+  return r;
+}
+
+static string
+long_date (string lan, time_t ti, bool now) {
+  // the date ti in the long format of the language lan
+  if (lan == "chinese" || lan == "japanese" ||
+      lan == "korean" || lan == "taiwanese") {
+    // numbers only: no date command is needed
+    struct tm tm= *localtime (&ti);
+    string y= as_string (tm.tm_year + 1900);
+    string m= as_string (tm.tm_mon + 1);
+    string d= as_string (tm.tm_mday);
+    if (lan == "korean")
+      return y * "<#b144> " * m * "<#c6d4> " * d * "<#c77c>";
+    return y * "<#5e74>" * m * "<#6708>" * d * "<#65e5>";
+  }
+  string fm= "d MMMM yyyy";
+  if ((lan == "british") || (lan == "english") || (lan == "american"))
+    fm= "MMMM d, yyyy";
+  else if (lan == "german")
+    fm= "d. MMMM yyyy";
+  return pattern_date (lan, fm, ti, now);
+}
+
+string
+get_date (string lan, string fm) {
+//#ifdef OS_MINGW
+//  return win32::get_date(lan, fm);
+  // as the Qt version: a strftime format if fm starts with %, the default
+  // of the language if fm is empty, and Qt patterns otherwise
+  if (N(fm) > 0 && fm[0] == '%' && !invalid_format (fm))
+    return system_date (lan, fm);
+  time_t ti;
+  time (&ti);
+  if (N(fm) == 0 || fm[0] == '%') return long_date (lan, ti, true);
+  return pattern_date (lan, fm, ti, true);
+}
+
+// The date and time of t, as the Qt versions give them. They used to run
+// "date -r t", which only BSD date reads as seconds: GNU date takes -r for
+// a reference file, and gave an error message.
+
 string
 pretty_time (int t) {
-  return var_eval_system ("date -r " * as_string (t));
+  // as QDateTime::toString: Mon Oct 6 14:05:09 2026
+  time_t ti= (time_t) t;
+  return pattern_date ("english", "ddd MMM d HH:mm:ss yyyy", ti, false);
 }
 
 string
 pretty_date (int t, string fm) {
-  (void) fm;
-  return var_eval_system ("date -r " * as_string (t));
+  // as the Qt version: the short or the long date of the language (here
+  // English, as the names), or the date in the Qt pattern fm
+  time_t ti= (time_t) t;
+  if (fm == "short") {
+    struct tm tm= *localtime (&ti);
+    return c_date (&tm, "%x");
+  }
+  if (fm == "") return long_date ("english", ti, false);
+  return pattern_date ("english", fm, ti, false);
 }
 #endif
 
