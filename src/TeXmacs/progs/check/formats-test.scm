@@ -573,10 +573,10 @@
   (check= (export "<alpha><less><gtr>\xe9" "verbatim-snippet"
                   (cons "texmacs->verbatim:encoding" "cork"))
           "<alpha><less><gtr>\xe9")
-  ;; Latin-1 has no alpha, which is left out
+  ;; Latin-1 has no alpha, which becomes a ? (#90; it was left out)
   (check= (export "<alpha><less><gtr>\xe9" "verbatim-snippet"
                   (cons "texmacs->verbatim:encoding" "iso-8859-1"))
-          "<>\xe9")
+          "?<>\xe9")
   ;; a document of TeXmacs gives its body
   (check= (export (tmfile '(document "x" "y")) "verbatim-document") "x\ny"))
 
