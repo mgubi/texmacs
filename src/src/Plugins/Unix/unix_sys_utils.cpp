@@ -291,15 +291,26 @@ unix_system (array<string> arg,
   for (int i= 0; i < n_out; i++) pp_out[i].close_out ();
 
   // write to spawn process
+  // (if a thread cannot be made, the ends without a thread are closed, so
+  // that the process sees the end of its inputs and outputs and stops; it
+  // is waited for, and the threads made are joined, before returning -1:
+  // they use the channels of this function)
+  bool failed= false;
+  int n_write= 0, n_read= 0;
   array<_channel> channels_in (n_in);
   array<pthread_t> threads_write (n_in);
   for (int i= 0; i < n_in; i++) {
     channels_in[i]._init_in (pp_in[i].out (), str_in[i], 1 << 12);
-    if (pthread_create (&threads_write[i], NULL /* &attr */,
-			_background_write_task,
-			(void *) &(channels_in[i])))
-      return -1;
-    pp_in[i].release_out ();  // (closed by the thread)
+    if (failed || pthread_create (&threads_write[i], NULL /* &attr */,
+                                  _background_write_task,
+                                  (void *) &(channels_in[i]))) {
+      failed= true;
+      pp_in[i].close_out ();
+    }
+    else {
+      pp_in[i].release_out ();  // (closed by the thread)
+      n_write++;
+    }
   }
 
   // read from spawn process
@@ -307,11 +318,16 @@ unix_system (array<string> arg,
   array<pthread_t> threads_read (n_out);
   for (int i= 0; i < n_out; i++) {
     channels_out[i]._init_out (pp_out[i].in (), 1 << 12); 
-    if (pthread_create (&threads_read[i], NULL /* &attr */,
-			_background_read_task,
-			(void *) &(channels_out[i])))
-      return -1;
-    pp_out[i].release_in ();  // (closed by the thread)
+    if (failed || pthread_create (&threads_read[i], NULL /* &attr */,
+                                  _background_read_task,
+                                  (void *) &(channels_out[i]))) {
+      failed= true;
+      pp_out[i].close_in ();
+    }
+    else {
+      pp_out[i].release_in ();  // (closed by the thread)
+      n_read++;
+    }
   }
 
   int wret;
@@ -329,17 +345,18 @@ unix_system (array<string> arg,
   // wait for terminating threads
   void* exit_status;
   int thread_status= 0;
-  for (int i= 0; i < n_in; i++) {
+  for (int i= 0; i < n_write; i++) {
     pthread_join (threads_write[i], &exit_status);
     if (channels_in[i].status < 0) thread_status= -1;
   }
-  for (int i= 0; i < n_out; i++) {
+  for (int i= 0; i < n_read; i++) {
     pthread_join (threads_read[i], &exit_status);
     *(str_out[i])= string (channels_out[i].data.a,
                            channels_out[i].data.n);
     if (channels_out[i].status < 0) thread_status= -1;
   }
 
+  if (failed) return -1;
   if (thread_status < 0) return thread_status;
   if (wret < 0 || WIFEXITED(status) == 0) return -1;
   return WEXITSTATUS(status);
