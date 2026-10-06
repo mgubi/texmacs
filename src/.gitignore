@@ -75,3 +75,6 @@ config.status
 
 # moc output of the autotools build
 src/Plugins/Qt*/moc_*.cpp
+
+# written by misc/wasm/build-info.py at each build of the browser version
+TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm
