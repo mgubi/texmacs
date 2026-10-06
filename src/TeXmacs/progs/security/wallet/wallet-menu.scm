@@ -135,14 +135,18 @@
               (cmd "Ok"))
             (wrong "Wrong passphrase")))))
 
+;; The windows of the wallet take the size of their contents, and the
+;; passphrase fields a width in em: a width in w is a fraction of the window
+;; in Vue (of the default width of a field in Qt), so that a fixed window
+;; of 500px with a field of 2w or 10w cut off the buttons Ok and Cancel
 (tm-widget (wallet-widget-initialize cmd)
   (with wallet-widget-weak-passphrase? #f
-    (resize "500px" "200px"
+    (vertical
       (padded
         (form "Ask passphrase"
           (hlist
             (text "Wallet passphrase:") // //
-            (form-input "passphrase" "password" '() "10w") >>)
+            (form-input "passphrase" "password" '() "20em") >>)
           (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             ===
             (hlist
@@ -183,12 +187,12 @@
 
 (tm-widget (wallet-widget-reinitialize cmd)
   (with wallet-widget-weak-passphrase? #f
-    (resize "500px" "200px"
+    (vertical
       (padded
         (form "Ask new passphrase"
           (hlist
             (text "New wallet passphrase:") // //
-            (form-input "passphrase" "password" '() "10w") >>)
+            (form-input "passphrase" "password" '() "20em") >>)
           (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             ===
             (hlist
@@ -233,8 +237,7 @@
 
 (tm-widget (wallet-widget-turn-on cmd)
   (with wallet-widget-wrong-passphrase? #f
-    ;; (the question of the login takes a line on the desktop)
-    (resize "500px" (if (wallet-can-remember-passphrase?) "200px" "150px")
+    (vertical
       (padded
         ;; NOTE: a promise, so that the warning is made when refreshed
         (refreshable "wallet-widget-reask-passphrase"
@@ -247,7 +250,7 @@
                     (lambda (msg)
                       (set! wallet-widget-wrong-passphrase? #t)
                       (refresh-now "wallet-widget-reask-passphrase")))
-                   "passphrase#form-wallet-1:password" (list "") "2w") >>)
+                   "passphrase#form-wallet-1:password" (list "") "20em") >>)
           ===
           (if (not (web-wallet?)) (when (wallet-can-remember-passphrase?)
             (hlist
