@@ -1710,14 +1710,16 @@ ai_raw_fold (string raw, string model= "") {
   return compound ("with", "ai-raw", "true", fold);
 }
 
-// the reasoning of a model (Markdown, in UTF-8), folded before its answer
+// the reasoning of a model (Markdown, in UTF-8), folded before its answer;
+// it is in grey and smaller, as the usage line
 static tree
 ai_reasoning_fold (string reasoning) {
   tree doc= verbatim_to_tree (trim_spaces (reasoning), false, "utf-8");
   if (!is_func (doc, DOCUMENT)) doc= tree (DOCUMENT, doc);
   tree fold= compound ("folded",
                        compound ("with", "font-shape", "italic", "The reasoning"),
-                       compound ("with", "color", "dark grey", doc));
+                       compound ("with", "color", "dark grey",
+                                 "font-size", "0.84", doc));
   return compound ("with", "ai-reasoning", "true", fold);
 }
 
@@ -1736,8 +1738,9 @@ ai_reasoning_partial (string reasoning) {
   tree doc (DOCUMENT);
   doc << compound ("with", "font-shape", "italic", "Thinking...");
   tree body= verbatim_to_tree (r, false, "utf-8");
-  if (is_func (body, DOCUMENT)) doc << A(body);
-  else if (body != "") doc << body;
+  if (!is_func (body, DOCUMENT)) body= tree (DOCUMENT, body);
+  if (N(body) > 0 && body != tree (DOCUMENT, ""))
+    doc << compound ("with", "font-size", "0.84", body);
   return compound ("with", "color", "dark grey", doc);
 }
 

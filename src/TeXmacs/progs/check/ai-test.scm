@@ -98,7 +98,8 @@
 (define (reasoning-fold text)
   `(with "ai-reasoning" "true"
      (folded (with "font-shape" "italic" "The reasoning")
-             (with "color" "dark grey" (document ,text)))))
+             (with "color" "dark grey" "font-size" "0.84"
+               (document ,text)))))
 
 (define (usage-line data text)
   `(with "ai-usage" ,data (with "color" "dark grey" "font-size" "0.84" ,text)))
