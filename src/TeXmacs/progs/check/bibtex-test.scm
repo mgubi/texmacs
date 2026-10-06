@@ -655,7 +655,14 @@
             "  <cite|knuth>\n\n  <\\bibliography|bib|plain|only>\n  </bibliography>\n")
     (check= (bib-items b) '(("1" "knuth") ("Lam86" "lamport")))
     (check= (flat (first-of 'concat (first-of 'bib-list b)))
-            "D. Knuth. The art.")))
+            "D. Knuth. The art."))
+  ;; without bibtex, a style of BibTeX is replaced by its tm- version, as
+  ;; abstract by tm-abstract, whose labels are the keys
+  (set-bibtex-command "tm-no-such-bibtex")
+  (with b (generated-bibliography "abstract.tm"
+            "  <cite|knuth>\n\n  <\\bibliography|bib|abstract|refs>\n  </bibliography>\n")
+    (check= (bib-items b) '(("knuth" "knuth"))))
+  (set-bibtex-command (get-preference "bibtex command")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
