@@ -70,12 +70,57 @@ dialog has its size, its contents are laid out in a container which clips
 and scrolls (`vue_plain_window_widget_rep::do_layout`): at their own size
 at least, larger when the dialog is, with scroll bars and the wheel when
 it is smaller (after a resize, or on a page smaller than the dialog, which
-is then made to fit). In
-the browser the page has a frame above the canvas (`misc/wasm/frame.js`):
-the tabs, labelled with the names of the windows (the title of a window on
-the desktop, and the title of the page for the active one), with a marker
-for unsaved changes, a close box (not on the last tab: TeXmacs asks as for
-a window whether to save), a `+` for a new window, and a TeXmacs menu: what
+is then made to fit). In the browser, where the loop never waits, a
+resize which comes from an event of the page (the page resized, the column
+of the tabs dragged) is handled at once by `event_filter` too, outside an
+iteration of the loop: a change of the size of the canvas clears it, and
+left to the next frame it showed an empty canvas during a drag (the frames
+with events waiting do not repaint the editors).
+The page sends a resize only when the place of the canvas changed: SDL
+sets the size of the canvas at each resize event, which clears it even
+when the size stays, but tells TeXmacs only of a new size (a move of the
+mouse which left the width as it was, at a limit or finer than a pixel at
+density 2, emptied the canvas until the next change).
+`misc/wasm/test/resize-flicker.mjs` counts such frames, and the frames
+whose canvas is stretched (0 in Firefox and Chrome, at density 1 and 2,
+and in Safari; 116 of 270 before). In single-window mode (the browser) the
+editors are in the virtual windows of the host: the frame drawn at once
+lays them all out and repaints their editors (it laid out and repainted
+those of the host, which are none), with a repaint of its own (the flag of
+an interrupted repaint of the loop cut it short), so that it shows the page
+where it goes; it showed it where it was, and the next frame where it
+goes, so that the page jumped at each step of a drag.
+`misc/wasm/test/resize-jitter.mjs` checks that a width of the canvas
+always comes with the same place of the page (21 of 22 widths came with two
+or three places before). In
+the browser the page has a frame, a column at the left of the canvas
+(`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
+one under the other, in the order of TeXmacs (a tab dragged to another
+place reorders them, here and in TeXmacs by `vue_web_move_tab`, whose
+order also decides which tab follows a closed one), chevrons above and
+below them when they do not fit (they scroll them, the one at an end
+dimmed; so does the wheel over the column or over a grown tab, which the
+page does not do itself: SDL takes the wheel events of the page; a tab
+which the list shows only in part does not grow, it would cover the
+chevrons), "New window" after the last tab; a press in the column starts no
+selection of the page (a drag carried it over the canvas, selected whole);
+the tabs are labelled with the names of the windows (the title of a
+window on the desktop, and the title of the page for the active one), with
+a marker for unsaved changes, a close box (not on the last tab: TeXmacs
+asks as for a window whether to save), a "New window", a right edge which
+changes its width (100 to 480 pixels and half the page at most, remembered
+by the browser; a double click gives the 200 pixels back; TeXmacs follows
+the width once per frame during the drag; a drag below 80 pixels folds the
+column, keeping the width it had before the drag, and a drag of the folded
+column beyond 100 pixels opens it again; the resize is sent from the move
+of the mouse, and TeXmacs draws it at once, see below), a chevron which
+folds the column to 44 pixels (the logo, and small tabs with the initials
+of the windows, or their numbers, "N2" for "No name [2]"; the tab under
+the mouse grows to the right, over the document, into a whole tab with the
+name and a close box (`#tm-flyout`, an element of its own, which the column
+does not clip; the other tabs stay as they are); the browser
+remembers it, and a page narrower than 900
+pixels starts folded), and a TeXmacs menu: what
 this TeXmacs is (version, S7, MuPDF, build date), where its files are, how
 many of its packages have come, the storage used, a popup with more info
 and the limitations of the port (the keyboard, the files, what is

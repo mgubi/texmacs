@@ -18,10 +18,20 @@
   <section|Windows, tabs and dialogs>
 
   A web page has a single window. The windows of <TeXmacs> are therefore the
-  <em|tabs> above the page: one per document, with its name, a dot when it
-  has unsaved changes, a cross to close it, and a <verbatim|+> for a new
-  document. The dialogs of <TeXmacs> float over the page, and can be moved
-  by their title bar and resized by their edges.
+  <em|tabs> in the column at the left of the page: one per document, with
+  its name, a dot when it has unsaved changes, a cross to close it, and
+  <with|font-series|bold|New window> after the last one, for a new
+  document. A tab is moved to another place by dragging it; when the tabs
+  do not fit, chevrons above and below them scroll them. Its right edge
+  changes its width (a double click gives the usual width back); dragged
+  far enough to the left, it folds the column, and dragged back, it opens
+  it again. The chevron at the
+  bottom of the column folds it, to leave more room to the document: the
+  column then keeps the logo and small tabs with the initials of the
+  windows; under the mouse, a small tab grows into a whole one, with the
+  name of its window and a cross to close it; the browser
+  remembers it. The dialogs of <TeXmacs> float over the page, and can be
+  moved by their title bar and resized by their edges.
 
   The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
@@ -189,6 +199,23 @@
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|6 October 2026>
+
+  <\itemize>
+    <item>The tabs of the windows are in a column at the left of the page,
+    which leaves the whole height to the document; the column folds to
+    small tabs with the initials of the windows, which grow into whole
+    tabs (the name and a cross to close the window) under the mouse.
+
+    <item>The tabs of the windows can be dragged to another place; when
+    they do not fit in the column, chevrons above and below them scroll
+    them; <with|font-series|bold|New window> comes after the last tab. Its right edge changes its width, and folds the
+    column when it is dragged far enough to the left.
+
+    <item>The document no longer flickers or jumps while the page or the
+    column is resized.
+  </itemize>
 
   <paragraph|5 October 2026>
 

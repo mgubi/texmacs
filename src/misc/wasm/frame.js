@@ -1,5 +1,8 @@
-// The frame of the page (a --pre-js of the browser build): a bar above the
-// canvas with the tabs of the windows of TeXmacs and a TeXmacs menu.
+// The frame of the page (a --pre-js of the browser build): a column at the
+// left of the canvas with a TeXmacs menu and the tabs of the windows of
+// TeXmacs. The column folds down to the logo and small tabs (the initials
+// of the windows, which grow into whole tabs under the mouse), which the
+// browser remembers (localStorage).
 //
 // In the browser every window of an editor is a tab (see "Single-window
 // mode" in src/Plugins/Vue/vue_gui.cpp): the plugin tells the frame of the
@@ -30,26 +33,92 @@ var tmFrame = (function () {
   }
 
   var style = `
-    #tm-frame { display:flex; align-items:stretch; height:32px; background:#d8d8d8;
-      border-bottom:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
-      color:#222; user-select:none; flex:none }
-    #tm-frame .tm-app { display:flex; align-items:center; padding:0 12px; font-weight:bold;
-      cursor:pointer; color:#fff; background:#5b7fa8; border-right:1px solid #4a6b91 }
+    #tm-frame { position:relative; display:flex; flex-direction:column; width:200px; flex:none; background:#d8d8d8;
+      border-right:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
+      color:#222; user-select:none; overflow:hidden }
+    #tm-frame.collapsed { width:44px !important }
+    #tm-frame .tm-resize { position:absolute; top:0; right:0; width:5px; height:100%;
+      cursor:col-resize; z-index:5 }
+    #tm-frame .tm-resize:hover, #tm-frame .tm-resize.dragging { background:rgba(91,127,168,.45) }
+    body.tm-resizing, body.tm-resizing * { cursor:col-resize !important; user-select:none;
+      -webkit-user-select:none }
+    body.tm-reordering, body.tm-reordering * { cursor:grabbing !important; user-select:none;
+      -webkit-user-select:none }
+    #tm-frame .tm-app { display:flex; align-items:center; height:36px; flex:none; padding:0 12px;
+      font-weight:bold; cursor:pointer; color:#fff; background:#5b7fa8;
+      border-bottom:1px solid #4a6b91; white-space:nowrap }
     #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#6a8db5 }
     #tm-frame .tm-app .tm-logo { width:20px; height:20px; margin-right:7px; flex:none }
-    #tm-frame .tm-tabs { display:flex; flex:1; overflow:hidden; scrollbar-width:none }
+    #tm-frame.collapsed .tm-app { padding:0; justify-content:center }
+    #tm-frame.collapsed .tm-app .tm-logo { width:24px; height:24px; margin:0 }
+    #tm-frame.collapsed .tm-app .tm-name { display:none }
+    #tm-frame .tm-tabs { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
+      scrollbar-width:none; padding:5px 0 }
     #tm-frame .tm-tabs::-webkit-scrollbar { display:none }
-    #tm-frame .tm-tabs.dragging { cursor:grabbing }
-    #tm-frame .tm-tab { display:flex; align-items:center; max-width:240px; min-width:90px;
-      padding:0 6px 0 12px; border-right:1px solid #b8b8b8; cursor:default; background:#d0d0d0 }
-    #tm-frame .tm-tab.active { background:#f0f0f0 }
+    #tm-frame .tm-tab { position:relative; display:flex; align-items:center; height:28px;
+      margin:1px 5px; padding:0 3px 0 9px; border-radius:5px; cursor:default }
+    #tm-frame .tm-tab:hover { background:#cacaca }
+    #tm-frame .tm-tab.active { background:#f6f6f6; box-shadow:inset 0 0 0 1px #b4b4b4 }
     #tm-frame .tm-tab .tm-title { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis }
-    #tm-frame .tm-tab .tm-close { margin-left:6px; width:18px; height:18px; line-height:18px;
-      text-align:center; border-radius:3px; color:#555 }
+    #tm-frame .tm-tab .tm-close { flex:none; margin-left:4px; width:18px; height:18px;
+      line-height:18px; text-align:center; border-radius:3px; color:#555; visibility:hidden }
+    #tm-frame .tm-tab:hover .tm-close, #tm-frame .tm-tab.active .tm-close { visibility:visible }
     #tm-frame .tm-tab .tm-close:hover { background:#bbb; color:#000 }
-    #tm-frame .tm-new { display:flex; align-items:center; padding:0 12px; cursor:pointer; font-size:17px }
-    #tm-frame .tm-new:hover { background:#c8c8c8 }
-    #tm-menu { position:fixed; left:4px; top:34px; width:340px; background:#f6f6f6;
+    #tm-frame .tm-tab .tm-short { display:none; font-size:11.5px; font-weight:600; letter-spacing:.2px }
+    #tm-frame .tm-tab .tm-dot { display:none; position:absolute; top:4px; right:4px; width:6px;
+      height:6px; border-radius:3px; background:#5b7fa8 }
+    #tm-frame.collapsed .tm-tab { justify-content:center; padding:0; margin:2px 6px; height:30px }
+    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-close { display:none }
+    #tm-frame.collapsed .tm-tab .tm-short { display:block }
+    #tm-frame.collapsed .tm-tab.modified .tm-dot { display:block }
+    #tm-frame .tm-new, #tm-frame .tm-fold { display:flex; align-items:center; flex:none; height:30px;
+      padding:0 14px; cursor:pointer; color:#333; white-space:nowrap }
+    #tm-frame .tm-new:hover, #tm-frame .tm-fold:hover { background:#c8c8c8 }
+    #tm-frame .tm-new .tm-plus { font-size:17px; width:16px; text-align:center; margin-right:8px }
+    #tm-frame .tm-fold { border-top:1px solid #c0c0c0; color:#555; justify-content:flex-end }
+    #tm-frame .tm-fold svg, #tm-frame .tm-new svg { width:16px; height:16px; fill:none;
+      stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round }
+    #tm-frame.collapsed .tm-new, #tm-frame.collapsed .tm-fold { padding:0; justify-content:center }
+    #tm-frame.collapsed .tm-new .tm-plus { margin:0 }
+    #tm-frame.collapsed .tm-new .tm-label { display:none }
+    /* New window: the item after the last tab */
+    #tm-frame .tm-tabs .tm-new { height:28px; margin:1px 5px; padding:0 9px; border-radius:5px; color:#444 }
+    #tm-frame.collapsed .tm-tabs .tm-new { height:30px; margin:2px 6px; padding:0 }
+    /* the chevrons which scroll the tabs when they do not fit */
+    #tm-frame .tm-scroll { flex:none; height:18px; display:none; align-items:center;
+      justify-content:center; cursor:pointer; color:#555 }
+    #tm-frame .tm-scroll.shown { display:flex }
+    #tm-frame .tm-scroll.off { opacity:.25; cursor:default }
+    #tm-frame .tm-scroll:not(.off):hover { background:#c8c8c8 }
+    #tm-frame .tm-scroll svg { width:14px; height:14px; fill:none; stroke:currentColor;
+      stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round }
+    /* a tab dragged to another place, and the others making room */
+    #tm-frame .tm-tab.dragging { z-index:3; background:#f6f6f6;
+      box-shadow:0 3px 10px rgba(0,0,0,.25), inset 0 0 0 1px #b4b4b4 }
+    #tm-frame .tm-tabs.reordering .tm-tab:not(.dragging) { transition:transform .15s ease-out }
+    #tm-frame .tm-tabs.reordering { cursor:grabbing }
+    #tm-flyout { position:fixed; z-index:36; display:none; align-items:center; overflow:hidden;
+      white-space:nowrap; box-sizing:border-box; border-radius:6px; background:#ececec;
+      box-shadow:0 3px 14px rgba(0,0,0,.28), inset 0 0 0 1px #b4b4b4; color:#222;
+      font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; cursor:default; user-select:none;
+      transition:width .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s }
+    #tm-flyout.active { background:#f8f8f8 }
+    #tm-flyout .tm-short { flex:none; text-align:center; font-size:11.5px; font-weight:600;
+      letter-spacing:.2px; position:relative }
+    #tm-flyout .tm-dot { position:absolute; top:-6px; right:2px; width:6px; height:6px;
+      border-radius:3px; background:#5b7fa8 }
+    #tm-flyout .tm-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+      padding:0 4px 0 2px; opacity:0; transition:opacity .15s .05s }
+    #tm-flyout.open .tm-title { opacity:1 }
+    #tm-flyout .tm-close { flex:none; width:20px; height:20px; line-height:20px; margin-right:4px;
+      text-align:center; border-radius:4px; color:#555 }
+    #tm-flyout .tm-close:hover { background:#c4c4c4; color:#000 }
+    #tm-balloon { position:fixed; z-index:35; padding:4px 9px; border-radius:5px; background:#333;
+      color:#fff; font:12.5px -apple-system,"Fira Sans",Helvetica,sans-serif; white-space:nowrap;
+      pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.25); max-width:60vw; overflow:hidden;
+      text-overflow:ellipsis }
+    #tm-menu { position:fixed; left:4px; top:4px; width:340px; max-height:calc(100vh - 8px);
+      overflow:auto; box-sizing:border-box; background:#f6f6f6;
       border:1px solid #999; border-radius:6px; box-shadow:0 6px 24px rgba(0,0,0,.3);
       font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; color:#222; z-index:30; padding:6px 0 }
     #tm-menu .tm-head { padding:8px 14px 4px; font-weight:bold; font-size:14px;
@@ -111,6 +180,203 @@ var tmFrame = (function () {
     #tm-about .tm-format select { margin-left:4px; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif }
   `;
 
+  // folded (only the logo and small tabs) or not, as the browser remembers
+  // it; a narrow page starts folded
+  var FOLD = 'texmacs-sidebar';
+  function folded () {
+    var v = null;
+    try { v = localStorage.getItem (FOLD); } catch (e) {}
+    if (v === 'collapsed') return true;
+    if (v === 'expanded') return false;
+    return typeof window !== 'undefined' && window.innerWidth < 900;
+  }
+
+  // the width of the column when it is open, which its right edge changes
+  // (a drag; a double click gives the default back), as the browser
+  // remembers it. A drag below FOLD_AT folds the column, and a drag of the
+  // folded column beyond MIN_WIDTH opens it again
+  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 200, MIN_WIDTH = 100, FOLD_AT = 80;
+  function clampWidth (w) {
+    var most = Math.max (MIN_WIDTH, Math.min (480, Math.floor (window.innerWidth / 2)));
+    return Math.max (MIN_WIDTH, Math.min (most, Math.round (w)));
+  }
+  function savedWidth () {
+    var v = null;
+    try { v = Number (localStorage.getItem (WIDTH)); } catch (e) {}
+    return clampWidth (v > 0 ? v : DEFAULT_WIDTH);
+  }
+  var width = DEFAULT_WIDTH;
+  function setWidth (w, remember) {
+    width = clampWidth (w);
+    if (bar) bar.style.width = width + 'px';
+    if (remember) try { localStorage.setItem (WIDTH, String (width)); } catch (e) {}
+    resized ();
+  }
+  // TeXmacs follows the width it is left. At once, from the event which
+  // changed it (a move of the mouse comes before the frame, at most one per
+  // frame): a change of the size of the canvas clears it, and TeXmacs draws
+  // in the callbacks of the frame (emscripten_set_main_loop), so that a
+  // resize sent from a callback of its own came after the drawing, and the
+  // frame showed an empty canvas (the page flickered during a drag)
+  // Only when the place of the canvas changed: SDL sets the size of the
+  // canvas at each resize event, which clears it even when the size stays,
+  // but tells TeXmacs only of a new size, so that the canvas stayed empty
+  // (a move of the mouse which leaves the width as it is, at a limit, or
+  // finer than a pixel on a screen of density 2)
+  var lastBox = '';
+  function boxSize () {
+    var box = document.getElementById ('tm-canvas-box');
+    if (!box) return '';
+    var r = box.getBoundingClientRect ();
+    return r.width + 'x' + r.height;
+  }
+  function resized () {
+    if (menu) placeMenu ();
+    var now = boxSize ();
+    if (now === lastBox) return;
+    lastBox = now;
+    window.dispatchEvent (new Event ('resize'));
+  }
+  if (typeof window !== 'undefined')
+    window.addEventListener ('resize', function () { lastBox = boxSize (); });
+  function edge (handle) {
+    var startX = 0, startW = 0, openW = 0, dragging = false;
+    handle.addEventListener ('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      e.preventDefault ();
+      hideBalloon ();
+      dragging = true; startX = e.clientX; startW = bar.getBoundingClientRect ().width;
+      openW = width; // the width given back when the drag folds the column
+      handle.setPointerCapture (e.pointerId);
+      handle.classList.add ('dragging');
+      document.body.classList.add ('tm-resizing');
+    });
+    handle.addEventListener ('pointermove', function (e) {
+      if (!dragging) return;
+      var w = startW + e.clientX - startX, folded = bar.classList.contains ('collapsed');
+      if (!folded && w < FOLD_AT) {
+        width = openW; bar.style.width = width + 'px';
+        setFolded (true, false);
+      }
+      else if (folded && w >= MIN_WIDTH) { setFolded (false, false); setWidth (w, false); }
+      else if (!folded) setWidth (w, false);
+    });
+    function end (e) {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove ('dragging');
+      document.body.classList.remove ('tm-resizing');
+      var folded = bar.classList.contains ('collapsed');
+      setFolded (folded, true);
+      if (!folded) setWidth (width, true);
+    }
+    handle.addEventListener ('pointerup', end);
+    handle.addEventListener ('pointercancel', end);
+    handle.addEventListener ('dblclick', function () {
+      if (bar.classList.contains ('collapsed')) setFolded (false, true);
+      setWidth (DEFAULT_WIDTH, true);
+    });
+  }
+
+  function svg (d) {
+    return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
+  }
+  var FOLD_ICON = 'M10 3.5 5.5 8 10 12.5', UNFOLD_ICON = 'M6 3.5 10.5 8 6 12.5';
+  var UP_ICON = 'M3.5 10 8 5.5 12.5 10', DOWN_ICON = 'M3.5 6 8 10.5 12.5 6';
+
+  var fold = null, newButton = null, balloon = null, scrollUp = null, scrollDown = null;
+
+  // the chevrons above and below the tabs, when they do not all fit: they
+  // scroll them (as the wheel does), the one at an end dimmed
+  function chevrons () {
+    if (!strip) return;
+    var over = strip.scrollHeight > strip.clientHeight + 1;
+    scrollUp.classList.toggle ('shown', over);
+    scrollDown.classList.toggle ('shown', over);
+    scrollUp.classList.toggle ('off', strip.scrollTop <= 0);
+    scrollDown.classList.toggle ('off', strip.scrollTop + strip.clientHeight >= strip.scrollHeight - 1);
+  }
+  // the wheel over the column (or over the tab grown from the folded
+  // column, which is not in it) scrolls the tabs: the page itself does not
+  // (SDL takes the wheel events of the page for TeXmacs)
+  function wheelTabs (e) {
+    if (!strip) return;
+    var d = Math.abs (e.deltaY) >= Math.abs (e.deltaX) ? e.deltaY : e.deltaX;
+    if (e.deltaMode === 1) d *= 16;
+    else if (e.deltaMode === 2) d *= strip.clientHeight;
+    e.preventDefault ();
+    e.stopPropagation ();
+    if (d === 0) return;
+    flyIn (true); hideBalloon ();
+    strip.scrollTop += d;
+  }
+  function scrollTabs (dir) {
+    var by = Math.max (30, strip.clientHeight - 40) * dir;
+    if (strip.scrollBy) strip.scrollBy ({ top: by, behavior: 'smooth' });
+    else strip.scrollTop += by;
+  }
+
+  // A tab pressed and moved goes to another place: it follows the mouse,
+  // the others make room, the list scrolls when the mouse is at its top or
+  // bottom; at the release the tabs are reordered here and in TeXmacs
+  // (vue_web_move_tab), whose order decides which tab follows a closed one.
+  // The click which ends a drag shows no window.
+  var dragDone = false;
+  function pressTab (e, tab, t) {
+    if (e.button !== 0 || (e.target.classList && e.target.classList.contains ('tm-close'))) return;
+    var startY = e.clientY, startScroll = strip.scrollTop, dragging = false;
+    var all = [], from = -1, slot = 0, to = -1;
+    function move (ev) {
+      var dy = ev.clientY - startY;
+      if (!dragging) {
+        if (Math.abs (dy) < 5) return;
+        dragging = true;
+        flyIn (true); hideBalloon ();
+        all = Array.prototype.slice.call (strip.querySelectorAll ('.tm-tab'));
+        from = all.indexOf (tab); to = from;
+        if (from < 0) { dragging = false; return; }
+        slot = all.length > 1 ? Math.abs (all[1].offsetTop - all[0].offsetTop) : tab.offsetHeight + 2;
+        strip.classList.add ('reordering');
+        tab.classList.add ('dragging');
+        document.body.classList.add ('tm-reordering');
+        try { window.getSelection ().removeAllRanges (); } catch (err) {}
+      }
+      // the list scrolls when the mouse is near its ends
+      var r = strip.getBoundingClientRect ();
+      if (ev.clientY < r.top + 16) strip.scrollTop -= 6;
+      else if (ev.clientY > r.bottom - 16) strip.scrollTop += 6;
+      dy += strip.scrollTop - startScroll;
+      var lo = -all[from].offsetTop + all[0].offsetTop, hi = all[all.length - 1].offsetTop - all[from].offsetTop;
+      dy = Math.max (lo, Math.min (hi, dy));
+      tab.style.transform = 'translateY(' + dy + 'px)';
+      to = Math.max (0, Math.min (all.length - 1, from + Math.round (dy / slot)));
+      all.forEach (function (o, k) {
+        if (o === tab) return;
+        var shift = (from < to && k > from && k <= to) ? -slot : (to < from && k >= to && k < from) ? slot : 0;
+        o.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    }
+    function up () {
+      window.removeEventListener ('pointermove', move);
+      window.removeEventListener ('pointerup', up);
+      window.removeEventListener ('pointercancel', up);
+      if (!dragging) return;
+      dragDone = true;
+      setTimeout (function () { dragDone = false; }, 0);
+      strip.classList.remove ('reordering');
+      document.body.classList.remove ('tm-reordering');
+      all.forEach (function (o) { o.style.transform = ''; o.classList.remove ('dragging'); });
+      if (to !== from && to >= 0) {
+        var moved = tabs.splice (from, 1)[0];
+        tabs.splice (to, 0, moved);
+        render ();
+        _vue_web_move_tab (t.id, to);
+      }
+    }
+    window.addEventListener ('pointermove', move);
+    window.addEventListener ('pointerup', up);
+    window.addEventListener ('pointercancel', up);
+  }
   function build () {
     if (bar || typeof document === 'undefined') return;
     var st = el ('style'); st.textContent = style; document.head.appendChild (st);
@@ -118,17 +384,47 @@ var tmFrame = (function () {
     if (!bar) return;
     var appButton = el ('div', 'tm-app');
     appButton.appendChild (logo ('tm-logo', 'texmacs-vue-32.png 1x, texmacs-vue-48.png 2x'));
-    appButton.appendChild (document.createTextNode ('TeXmacs Vue'));
+    appButton.appendChild (el ('span', 'tm-name', 'TeXmacs Vue'));
     appButton.title = 'About TeXmacs Vue, an experimental port of GNU TeXmacs';
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
-    ribbon (strip);
-    var plus = el ('div', 'tm-new', '+');
-    plus.title = 'New window';
-    plus.onclick = function () { _vue_web_new_tab (); };
+    newButton = el ('div', 'tm-new');
+    newButton.appendChild (el ('span', 'tm-plus', '+'));
+    newButton.appendChild (el ('span', 'tm-label', 'New window'));
+    newButton.onclick = function () { hideBalloon (); _vue_web_new_tab (); };
+    hover (newButton, function () { return bar.classList.contains ('collapsed') ? 'New window' : ''; });
+    fold = el ('div', 'tm-fold');
+    fold.onclick = function () { hideBalloon (); setFolded (!bar.classList.contains ('collapsed'), true); };
+    hover (fold, function () { return bar.classList.contains ('collapsed') ? 'Show the names of the windows'
+                                                                            : 'Fold the column'; });
+    var handle = el ('div', 'tm-resize');
+    handle.title = 'Drag to change the width; double-click for the default';
+    edge (handle);
+    scrollUp = el ('div', 'tm-scroll');
+    scrollUp.innerHTML = svg (UP_ICON);
+    scrollDown = el ('div', 'tm-scroll');
+    scrollDown.innerHTML = svg (DOWN_ICON);
+    scrollUp.onclick = function () { scrollTabs (-1); };
+    scrollDown.onclick = function () { scrollTabs (1); };
+    strip.addEventListener ('scroll', chevrons);
+    window.addEventListener ('resize', chevrons);
+    bar.addEventListener ('wheel', wheelTabs, { passive: false });
+    // a press in the column starts no selection of the page (which a drag
+    // of a tab or of the edge carried over the canvas, selecting it whole)
+    bar.addEventListener ('mousedown', function (e) { if (e.button === 0) e.preventDefault (); });
     bar.appendChild (appButton);
+    bar.appendChild (scrollUp);
     bar.appendChild (strip);
-    bar.appendChild (plus);
+    bar.appendChild (scrollDown);
+    bar.appendChild (fold);
+    bar.appendChild (handle);
+    width = savedWidth ();
+    bar.style.width = width + 'px';
+    setFolded (folded (), false);
+    // a smaller page may leave the column too wide
+    window.addEventListener ('resize', function () {
+      if (clampWidth (width) !== width) setWidth (width, false);
+    });
     // a press outside the menu closes it; not one on the TeXmacs button,
     // whose click toggles it (else the press closed it and the click
     // opened it again)
@@ -137,49 +433,145 @@ var tmFrame = (function () {
     });
   }
 
-  // the ribbon of the tabs has no scroll bar: the wheel (either way) and a
-  // drag of the ribbon move it, and the active tab is brought into view
-  var dragged = false;
-  function ribbon (r) {
-    r.addEventListener ('wheel', function (e) {
-      var d = Math.abs (e.deltaX) > Math.abs (e.deltaY) ? e.deltaX : e.deltaY;
-      if (e.deltaMode === 1) d *= 16;
-      r.scrollLeft += d;
-      e.preventDefault ();
-    }, { passive: false });
-    var startX = 0, startScroll = 0, down = false;
-    r.addEventListener ('pointerdown', function (e) {
-      if (e.button !== 0 || e.target.classList.contains ('tm-close')) return;
-      down = true; dragged = false;
-      startX = e.clientX; startScroll = r.scrollLeft;
-    });
-    window.addEventListener ('pointermove', function (e) {
-      if (!down) return;
-      var dx = e.clientX - startX;
-      if (!dragged && Math.abs (dx) > 4) { dragged = true; r.classList.add ('dragging'); }
-      if (dragged) r.scrollLeft = startScroll - dx;
-    });
-    window.addEventListener ('pointerup', function () {
-      if (!down) return;
-      down = false;
-      r.classList.remove ('dragging');
-      // the click which follows the release sees whether it was a drag
-      setTimeout (function () { dragged = false; }, 0);
-    });
+  // the column folded or not; TeXmacs takes the width it leaves (SDL
+  // follows the size of the canvas when the window is resized)
+  function setFolded (on, remember) {
+    if (!bar) return;
+    flyIn (true);
+    bar.classList.toggle ('collapsed', on);
+    if (scrollUp) chevrons ();
+    fold.innerHTML = svg (on ? UNFOLD_ICON : FOLD_ICON);
+    if (remember) try { localStorage.setItem (FOLD, on ? 'collapsed' : 'expanded'); } catch (e) {}
+    resized ();
   }
 
+  // the balloon of an element of the column, at its right (text () gives
+  // it, or nothing): the buttons of the folded column, the names which do
+  // not fit in the open one
+  function hover (e, text) {
+    e.addEventListener ('mouseenter', function () {
+      var t = text ();
+      if (!t) return;
+      if (!balloon) { balloon = el ('div'); balloon.id = 'tm-balloon'; document.body.appendChild (balloon); }
+      balloon.textContent = t;
+      balloon.style.display = 'block';
+      var r = e.getBoundingClientRect ();
+      balloon.style.left = (r.right + 8) + 'px';
+      balloon.style.top = Math.max (4, r.top + r.height / 2 - balloon.offsetHeight / 2) + 'px';
+    });
+    e.addEventListener ('mouseleave', hideBalloon);
+  }
+  function hideBalloon () { if (balloon) balloon.style.display = 'none'; }
+
+  // the short name of a window in the folded column: the initials of its
+  // first two words ("Help - Welcome..." gives HW, "paper.tm" gives P), or
+  // its first initial and its number ("No name [2]" gives N2)
+  function initials (title) {
+    title = String (title);
+    var words = title.replace (/\.[a-z0-9]+$/i, '').match (/[\p{L}\p{N}]+/gu) || ['?'];
+    var n = /\[(\d+)\]\s*$/.exec (title);
+    if (n) return (words[0].charAt (0).toUpperCase () + n[1]).slice (0, 3);
+    return words.slice (0, 2).map (function (w) { return w.charAt (0).toUpperCase (); }).join ('');
+  }
+
+  // In the folded column a tab under the mouse grows to the right, over the
+  // document, into a whole tab: its initials, its name and its close box
+  // (a click on it shows the window); the other tabs stay as they are. The
+  // tab is drawn by an element of its own (#tm-flyout), which the column
+  // does not clip.
+  var flyout = null, flyTimer = null;
+  function flyOut (tab, t, name) {
+    if (!bar.classList.contains ('collapsed')) return;
+    if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
+    if (!flyout) {
+      flyout = el ('div'); flyout.id = 'tm-flyout';
+      flyout.addEventListener ('mousedown', function (e) { if (e.button === 0) e.preventDefault (); });
+      flyout.addEventListener ('wheel', wheelTabs, { passive: false });
+      flyout.addEventListener ('mouseenter', function () {
+        if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; } });
+      flyout.addEventListener ('mouseleave', function () {
+        if (flyTimer) clearTimeout (flyTimer);
+        flyTimer = setTimeout (function () { flyTimer = null; flyIn (false); }, 120);
+      });
+      document.body.appendChild (flyout);
+    }
+    // its place (offsets, in the column, which is positioned, minus the
+    // scroll of the tabs)
+    var b = bar.getBoundingClientRect ();
+    var r = { left: b.left + tab.offsetLeft, top: b.top + tab.offsetTop - strip.scrollTop,
+              width: tab.offsetWidth, height: tab.offsetHeight };
+    // not a tab which the list shows only in part: the grown tab would
+    // cover the chevrons, which bring it into view
+    var sr = strip.getBoundingClientRect ();
+    if (r.top < sr.top - 0.5 || r.top + r.height > sr.bottom + 0.5) { flyIn (true); return; }
+    flyout.textContent = '';
+    flyout.className = t.active ? 'active' : '';
+    var short = el ('span', 'tm-short', initials (t.title));
+    short.style.width = r.width + 'px';
+    if (t.modified) short.appendChild (el ('span', 'tm-dot'));
+    flyout.appendChild (short);
+    flyout.appendChild (el ('span', 'tm-title', name));
+    if (tabs.length > 1) {
+      var x = el ('span', 'tm-close', '×');
+      x.title = 'Close';
+      x.onmousedown = function (e) { e.stopPropagation (); };
+      x.onclick = function (e) { e.stopPropagation (); flyIn (true); _vue_web_close_tab (t.id); };
+      flyout.appendChild (x);
+    }
+    flyout.onclick = function () { if (dragDone) return; flyIn (true); _vue_web_activate_tab (t.id); };
+    flyout.onpointerdown = function (e) { pressTab (e, tab, t); };
+    flyout.onmousedown = function (e) {
+      if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) { flyIn (true); _vue_web_close_tab (t.id); } }
+    };
+    flyout.style.transition = 'none';
+    flyout.style.left = r.left + 'px';
+    flyout.style.top = r.top + 'px';
+    flyout.style.height = r.height + 'px';
+    flyout.style.width = r.width + 'px';
+    flyout.style.display = 'flex';
+    // the width of its contents (the name may shrink: its own scroll width
+    // is the whole of it), then the tab grows to it
+    var title = flyout.querySelector ('.tm-title'), close = flyout.querySelector ('.tm-close');
+    var wide = r.width + title.scrollWidth + 6 + (close ? close.offsetWidth + 6 : 10);
+    var most = Math.max (r.width, Math.min (340, window.innerWidth - r.left - 8));
+    flyout.getBoundingClientRect ();
+    flyout.style.transition = '';
+    flyout.style.width = Math.min (wide, most) + 'px';
+    flyout.classList.add ('open');
+  }
+  // the tab back into the column (at once when the tabs change)
+  function flyIn (now) {
+    if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
+    if (!flyout || flyout.style.display === 'none') return;
+    if (now) { flyout.style.display = 'none'; return; }
+    flyout.classList.remove ('open');
+    flyout.style.width = flyout.querySelector ('.tm-short').style.width;
+    var f = flyout;
+    setTimeout (function () { if (!f.classList.contains ('open')) f.style.display = 'none'; }, 200);
+  }
   function render () {
     build ();
     if (!strip) return;
+    hideBalloon ();
+    flyIn (true);
     strip.textContent = '';
     tabs.forEach (function (t) {
-      var tab = el ('div', 'tm-tab' + (t.active ? ' active' : ''));
+      var tab = el ('div', 'tm-tab' + (t.active ? ' active' : '') + (t.modified ? ' modified' : ''));
       tab.dataset.id = t.id;
-      tab.title = t.title;
-      var title = el ('span', 'tm-title', (t.modified ? '• ' : '') + t.title);
-      tab.appendChild (title);
-      // a click shows the tab, unless the ribbon was dragged (see ribbon)
-      tab.onclick = function (e) { if (!dragged) _vue_web_activate_tab (t.id); };
+      var name = (t.modified ? '• ' : '') + t.title;
+      tab.appendChild (el ('span', 'tm-title', name));
+      tab.appendChild (el ('span', 'tm-short', initials (t.title)));
+      tab.appendChild (el ('span', 'tm-dot'));
+      // the name in a balloon when it does not fit in the open column; in
+      // the folded column the tab grows into a whole one (see flyOut)
+      hover (tab, function () {
+        var title = tab.querySelector ('.tm-title');
+        return (!bar.classList.contains ('collapsed') &&
+                title.scrollWidth > title.clientWidth) ? name : '';
+      });
+      tab.addEventListener ('mouseenter', function () { flyOut (tab, t, name); });
+      tab.onclick = function () { if (!dragDone) _vue_web_activate_tab (t.id); };
+      tab.addEventListener ('pointerdown', function (e) { pressTab (e, tab, t); });
       tab.onmousedown = function (e) {
         if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) _vue_web_close_tab (t.id); }
       };
@@ -187,20 +579,24 @@ var tmFrame = (function () {
         var x = el ('span', 'tm-close', '×');
         x.title = 'Close';
         x.onmousedown = function (e) { e.stopPropagation (); };
-        x.onclick = function (e) { e.stopPropagation (); _vue_web_close_tab (t.id); };
+        x.onclick = function (e) { e.stopPropagation (); hideBalloon (); _vue_web_close_tab (t.id); };
         tab.appendChild (x);
       }
       strip.appendChild (tab);
     });
+    strip.appendChild (newButton); // just after the last tab
     var active = tabs.filter (function (t) { return t.active; })[0];
+    // the chevrons first: they take room from the tabs when they appear
+    chevrons ();
     var at = strip.querySelector ('.tm-tab.active');
     if (at) {
-      var l = at.offsetLeft - strip.offsetLeft, r = l + at.offsetWidth;
-      if (l < strip.scrollLeft) strip.scrollLeft = l;
-      else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth;
+      var top = at.offsetTop - strip.offsetTop, bottom = top + at.offsetHeight;
+      if (top < strip.scrollTop) strip.scrollTop = top;
+      else if (bottom > strip.scrollTop + strip.clientHeight) strip.scrollTop = bottom - strip.clientHeight;
     }
     document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs Vue'
                             : 'TeXmacs Vue';
+    chevrons ();
   }
 
   /****************************************************************************
@@ -299,7 +695,8 @@ var tmFrame = (function () {
   // more about the port and its limitations, from the text of the menu
   var about = [
     ['In the browser', [
-      'The windows of TeXmacs are the tabs above the page; the dialogs float over it.',
+      'The windows of TeXmacs are the tabs in the column at the left of the page (its ' +
+      'chevron folds it to small tabs); the dialogs float over the page.',
       'TeXmacs uses its usual shortcuts, but the browser keeps some of them for itself ' +
       '(new window, new tab, close tab, reload...): use the menus of TeXmacs, or the + ' +
       'of the tabs, for those.',
@@ -540,8 +937,15 @@ var tmFrame = (function () {
     });
   }
 
+  // the menu beside the column, at the top
+  function placeMenu () {
+    if (!menu || !bar) return;
+    menu.style.left = (bar.getBoundingClientRect ().right + 4) + 'px';
+  }
+
   function toggleMenu (button) {
     if (menu) { closeMenu (); return; }
+    hideBalloon ();
     button.classList.add ('open');
     menu = el ('div');
     menu.id = 'tm-menu';
@@ -647,6 +1051,7 @@ var tmFrame = (function () {
       removeAll ();
     });
     document.body.appendChild (menu);
+    placeMenu ();
   }
 
   if (typeof document !== 'undefined') {

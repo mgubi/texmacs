@@ -2722,6 +2722,31 @@ vue_web_new_tab () {
   exec_delayed (scheme_cmd ("(open-window)"));
   gui_needs_update= true;
 }
+
+// a tab dragged to another place among the tabs shown (frame.js): the
+// order of the tabs is the one of the page, and the one in which a closed
+// tab gives its place to its neighbour (destroy_event)
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_move_tab (int id, int to) {
+  vue_virtual_window_rep* t= find_tab (id);
+  if (t == NULL) return;
+  array<vue_virtual_window_rep*> shown, hidden, r;
+  for (int i= 0; i < N(tabs); i++)
+    if (tabs[i] != t) {
+      if (tabs[i]->shown) shown << tabs[i];
+      else hidden << tabs[i];
+    }
+  to= max (0, min (to, N(shown)));
+  for (int i= 0; i < N(shown); i++) {
+    if (i == to) r << t;
+    r << shown[i];
+  }
+  if (to == N(shown)) r << t;
+  r << hidden;
+  tabs= r;
+  frame_dirty= true;
+  gui_needs_update= true;
+}
 #else
 static void frame_sync () {}
 #endif
@@ -3523,6 +3548,18 @@ vue_profile_frame () {
 // TeXmacs stopped at once ("no window attached to view").
 static bool watch_may_run= false;
 
+#ifdef __EMSCRIPTEN__
+// In the browser the loop never waits: the frames are callbacks of the page
+// (see gui_start_loop). A resize comes from an event of the page (the page
+// resized, or the column of the tabs at its left dragged: frame.js), which
+// clears the canvas at once; left to the next frame, it showed an empty
+// canvas, for as long as the drag lasted, since the frames which have
+// events waiting do not repaint the editors. It is therefore handled at
+// once too, as the desktop does while it waits, when it comes from outside
+// an iteration of the loop, once the loop runs.
+static bool web_in_iteration= false, web_loop_started= false;
+#endif
+
 // The focus a window was given when first laid out (default_focus), set
 // just before the interpose handler, so that it applies the change of the
 // editor before anything is repainted (see vue_texmacs_widget_rep). A window
@@ -3757,6 +3794,10 @@ static void loop_iteration_body ();
 // on with a redraw.
 static void
 loop_iteration () {
+#ifdef __EMSCRIPTEN__
+  web_in_iteration= true;
+  web_loop_started= true;
+#endif
   try {
     loop_iteration_body ();
   }
@@ -3767,6 +3808,9 @@ loop_iteration () {
     gui_wait= false;
     request_partial_redraw= true;
   }
+#ifdef __EMSCRIPTEN__
+  web_in_iteration= false;
+#endif
 }
 
 static void
@@ -5052,6 +5096,18 @@ process_event (SDL_Event *event) {
   } // switch (event->type)
 }
 
+// the editors drawn in a window: in single-window mode (always so in the
+// browser) the editors are in the virtual windows which the host holds
+// (their tabs), not in the host itself, so that those of the host were
+// none, and a resize of the host showed the old picture of the editor (at
+// its old place: the page jumped at each step of a drag of the edge)
+static void
+repaint_editors_of (vue_window win) {
+  if (single_window_mode () && win == (vue_window) the_host)
+    vue_simple_widget_rep::repaint_all ();
+  else vue_simple_widget_rep::repaint_all_in_window (win);
+}
+
 bool event_filter (void *userdata, SDL_Event *event) {
   if (event->type == SDL_EVENT_WINDOW_RESIZED) {
     // A resize is handled here, inside SDL's event pump, so that the window
@@ -5065,7 +5121,11 @@ bool event_filter (void *userdata, SDL_Event *event) {
     // only while the main loop waits for events (see watch_may_run): the
     // event stays in the queue, and the next frame lays the window out at
     // its new size
-    if (!watch_may_run) return true;
+    bool may_run= watch_may_run;
+#ifdef __EMSCRIPTEN__
+    if (web_loop_started && !web_in_iteration) may_run= true;
+#endif
+    if (!may_run) return true;
     vue_window win= get_window_from_ID (event->window.windowID);
     if (win) {
       busy= true;
@@ -5082,11 +5142,22 @@ bool event_filter (void *userdata, SDL_Event *event) {
       Uint32 sid= event->window.windowID;
       auto alive= [vid, sid, win] () {
         return id_to_window->contains (vid) && get_window_from_ID (sid) == win; };
-      win->process_layout();
+      // in single-window mode (always so in the browser) the editors are in
+      // the virtual windows the host holds, fitted to it by their own
+      // layout: the host alone left them at their old size, and the frame
+      // drawn here showed them as they were. All the windows are laid out
+      // (and the host draws them all), so the pools may be released
+      if (single_window_mode () && win == (vue_window) the_host) process_layout ();
+      else win->process_layout();
       vue_simple_widget_rep::notify_resizes ();
       if (the_interpose_handler != NULL) the_interpose_handler ();
       if (gui_needs_relayout) process_layout ();
-      if (alive ()) vue_simple_widget_rep::repaint_all_in_window (win);
+      // a repaint of its own, as the loop starts one (else the flag of a
+      // repaint of the loop which was interrupted cut this one short, and
+      // the frame showed the editor as it was)
+      interrupted= false;
+      interrupt_time= texmacs_time () + 100;
+      if (alive ()) repaint_editors_of (win);
       // the repaint may have replaced widgets, see gui_start_loop
       for (int pass= 0; gui_needs_relayout && pass < 4; pass++) process_layout ();
       if (alive ()) win->process_redraw();
