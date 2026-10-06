@@ -642,7 +642,12 @@
     (check= (gpg-string-load-decrypt f "" dir) secret-text)
     (check-false (gpg-string-load-decrypt f "" other))
     (gpg-encrypt-save-object g o fpr dir)
-    (check= (gpg-load-decrypt-object g "" dir) o))
+    (check= (gpg-load-decrypt-object g "" dir) o)
+    ;; a long object comes back whole (with S7, write prints only the first
+    ;; 40 elements of a list: the GnuPG wallet saves its table this way)
+    (with long (map (lambda (i) (list i (number->string i))) (iota 100))
+      (gpg-encrypt-save-object g long fpr dir)
+      (check= (gpg-load-decrypt-object g "" dir) long)))
   ;; FIXME (#66, item 4): gpg-delete-public-key runs
   ;; --delete-secret-and-public-key (security/gpg/gpg-base.scm:429), so
   ;; that deleting a public key also deletes the secret key.
