@@ -823,14 +823,10 @@
 ;; FIXME: syntax:python:operator_field is "#88888" (python-lang.scm:119,
 ;; five digits), which is no color: in "a.b", the dot has the color of the
 ;; text, expected #888888 as in java and scala.
-;; FIXME: the keyword parser reads a word of letters only (read_word,
-;; analyze.cpp:1056, used by keyword_parser.cpp:25): in python, __debug__,
-;; __import__ and raw_input have the color of the text, expected the color
-;; of constants; and if_x shows if as a keyword.
-;; FIXME: the operators which are words ("and" "not" "or" of python) are
-;; parsed before the keywords and identifiers, also inside a word
-;; (prog_language.cpp:211): in python, ord is or (operator) then d,
-;; expected ord as a constant.
+;; (Fixed by #97: the keyword parser reads whole identifiers, so that
+;; __debug__, __import__ and raw_input of python have the color of
+;; constants and if_x is no keyword; the operators which are words, as "or",
+;; end at the end of a word, so that ord is a constant, not or then d.)
 (define (test-python)
   (check-lines "python"
     ("import os"
@@ -1090,10 +1086,9 @@
   (list-filter l (lambda (x) (nin? (car x) classes))))
 
 (define (test-classes)
-  ;; python: see the FIXMEs before test-python
-  (check= (misclassified "python" "keyword")
-          '((constant ("__debug__" . "constant") ("__import__" . "constant")
-                      ("ord" . "constant") ("raw_input" . "constant"))))
+  ;; python: see the FIXMEs before test-python (the words of the tables
+  ;; have their colors since #97)
+  (check= (misclassified "python" "keyword") '())
   (check= (without (misclassified "python" "operator")
                    'operator_decoration 'operator_field)
           '())
