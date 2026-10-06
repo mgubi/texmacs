@@ -430,32 +430,54 @@ quote_argument (const std::wstring& a) {
   return r;
 }
 
+static HANDLE
+std_handle (int fd) {
+  intptr_t h= _get_osfhandle (fd);
+  return (h == -1 || h == -2)? INVALID_HANDLE_VALUE: (HANDLE) h;
+}
+
+// The process gets as standard input, output and error the descriptors 0, 1
+// and 2 of TeXmacs, which spawn_system has redirected to its pipes. They are
+// given as the standard handles of the process (STARTF_USESTDHANDLES):
+// _wspawnvp passed them only in the descriptors of the C runtime, which
+// TeXmacs, a program without console, does not make standard handles, so
+// a program which reads its standard handle (gpg, the programs of MSYS2)
+// read that of TeXmacs and never saw the end of its input. The handles of
+// the pipes are inherited (a pipe may also be given by its number, as
+// gpg --passphrase-fd), and no console window is opened.
+// Returns the handle of the process (for _cwait) or -1; with _P_WAIT, the
+// exit code of the process.
 intptr_t texmacs_spawnvp(int mode, string name, array<string> args) {
-  // convert the arguments to a wide string
-  std::vector<wchar_t*> wide_args;
+  (void) name;  // (the program is the first argument, searched in the path)
+  std::wstring cmd;
   for (int i = 0; i < N(args); i++) {
-    std::wstring wide_arg = quote_argument (texmacs_utf8_to_wide(args[i]));
-    wchar_t *c_wide_arg = (wchar_t*)malloc((wide_arg.size() + 1) * sizeof(wchar_t));
-    memcpy(c_wide_arg, &wide_arg[0], wide_arg.size() * sizeof(wchar_t));
-    c_wide_arg[wide_arg.size()] = 0;
-    wide_args.push_back(c_wide_arg);
+    if (i > 0) cmd += L' ';
+    cmd += quote_argument (texmacs_utf8_to_wide (args[i]));
   }
+  std::vector<wchar_t> cmd_buffer (cmd.begin (), cmd.end ());
+  cmd_buffer.push_back (0);
 
-  wide_args.push_back(nullptr);
-
-  // convert the name to a wide string
-  std::wstring wide_name = texmacs_utf8_to_wide(name);
-
-  // spawn the process
-  intptr_t res = _wspawnvp(mode, wide_name.c_str(), 
-                           (wchar_t* const*)wide_args.data());
-
-  // free the memory
-  for (size_t i = 0; i < wide_args.size(); i++) {
-    free(wide_args[i]);
+  STARTUPINFOW si;
+  PROCESS_INFORMATION pi;
+  ZeroMemory (&si, sizeof (si));
+  ZeroMemory (&pi, sizeof (pi));
+  si.cb= sizeof (si);
+  si.dwFlags= STARTF_USESTDHANDLES;
+  si.hStdInput = std_handle (0);
+  si.hStdOutput= std_handle (1);
+  si.hStdError = std_handle (2);
+  if (!CreateProcessW (NULL, cmd_buffer.data (), NULL, NULL, TRUE,
+                       CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+    return -1;
+  CloseHandle (pi.hThread);
+  if (mode == _P_WAIT) {
+    DWORD code= 0;
+    WaitForSingleObject (pi.hProcess, INFINITE);
+    GetExitCodeProcess (pi.hProcess, &code);
+    CloseHandle (pi.hProcess);
+    return (intptr_t) code;
   }
-
-  return res;
+  return (intptr_t) pi.hProcess;
 }
 
 bool IsWindowsDarkMode() {
