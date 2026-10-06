@@ -1,0 +1,110 @@
+From c25a2c9749b2ba6580c80d882c85715cf05121c3 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 16:57:11 +0100
+Subject: [PATCH 08/20] Curried definitions, (define ((f a) b) body), as in
+ Guile; boot image regenerated
+
+---
+ compiler.lsp |  4 ++--
+ flisp.boot   | 13 ++++++++-----
+ system.lsp   | 10 ++++++++++
+ 3 files changed, 20 insertions(+), 7 deletions(-)
+
+diff --git a/compiler.lsp b/compiler.lsp
+index 29fba26..04fecbb 100644
+--- a/compiler.lsp
++++ b/compiler.lsp
+@@ -513,8 +513,8 @@
+ 		     (or (and (symbol? (cadr expr))
+ 			      (list (cadr expr)))
+ 			 (and (pair? (cadr expr))
+-			      (symbol? (caadr expr))
+-			      (list (caadr expr)))
++			      (symbol? (define-head-name (cadr expr)))
++			      (list (define-head-name (cadr expr))))
+ 			 ()))
+ 		    ((eq? (car expr) 'begin)
+ 		     (apply nconc (map get-defined-vars- (cdr expr))))
+diff --git a/flisp.boot b/flisp.boot
+index d9d3d10..79e9956 100644
+--- a/flisp.boot
++++ b/flisp.boot
+@@ -158,7 +158,7 @@
+   largc lvargc vargc argc compile-in ret values #fn(function) encode-byte-code
+   bcode:code const-to-idx-vec)) filter keyword-arg?))
+   #fn(length))) #fn(length))) make-code-emitter lastcdr lambda-vars filter #.pair?
+-  lambda))) #0=#(#:g731 ()))
++  lambda))) #0=#(#:g737 ()))
+ 	  compile-for #fn(":000r5e0g4316X0e1|}^g2342e1|}^g3342e1|}^g4342e2|c342;e4c541;" #(1arg-lambda?
+   compile-in emit for error "for: third form must be a 1-argument lambda") compile-for)
+ 	  compile-if #fn("<000r4c0qe1|31e1|31g3„e2g331e3g331F6;0e4g331560e53045;" #(#fn(";000r5g2]‚>0e0~\x7fi02g344;g2^‚>0e0~\x7fi02g444;e0~\x7f^g2342e1~c2|332e0~\x7fi02g3342i026<0e1~c3325:0e1~c4}332e5~|322e0~\x7fi02g4342e5~}42;" #(compile-in
+@@ -193,6 +193,7 @@
+   #fn("8000r2~}|\\;" #()) bcode:ctable)) #fn(vector.alloc) bcode:nconst) const-to-idx-vec)
+ 	  copy-tree #fn("8000r1|?640|;e0|M31e0|N31K;" #(copy-tree) copy-tree)
+ 	  count #fn("7000r2c0q]41;" #(#fn("9000r1c0qm02|~\x7f`43;" #(#fn(":000r3}…50g2;~|}N|}M31690g2aw540g243;" #() count-)))) count)
++	  define-head-name #fn("7000r1|F690e0|M41;|;" #(define-head-name) define-head-name)
+ 	  delete-duplicates #fn("8000r1e0|bD326<0c1qc23041;|?640|;c3|M|N42;" #(length>
+   #fn("8000r1c0q]31~_42;" #(#fn("6000r1c0qm02|;" #(#fn("9000r2|?680e0}41;c1i10|M32690~|N}42;c2i10|M]332~|N|M}K42;" #(reverse!
+   #fn(has?) #fn(put!))))))) #fn(table) #fn("8000r2e0|}32680e1}41;|e1}31K;" #(member
+@@ -249,8 +250,8 @@
+   cadar) expand-lambda-list) #fn("8000r1|?660|L1;|MF6@0e0|31i05|N31K;|Mi05|N31K;" #(caar) l-vars)
+   #fn(";000r2c0q|„e1|31e2|31i05|„3144;" #(#fn(":000r4c0qc1c2c3g332\x7f3241;" #(#fn(";000r1c0c1L1i24~|32L1i23i02|32\x7f44;" #(#fn(nconc)
+   lambda)) #fn(nconc) #fn(map) #.list)) lastcdr cddr) expand-lambda)
+-  #fn("<000r2|NA17602|„?6N0e0|31…40|;c1|„i0:e2|31}32L3;c3qe4|31e5|31e0|31i05e4|313144;" #(cddr
+-  define caddr #fn(":000r4c0qc1c2c3g332\x7f3241;" #(#fn(";000r1c0c1L1\x7fi24~|32KL1i23i02|3243;" #(#fn(nconc)
++  #fn("<000r2e0|31m02|NA17602|„?6N0e1|31…40|;c2|„i0:e3|31}32L3;c4qe5|31e6|31e1|31i05e5|313144;" #(uncurry-define
++  cddr define caddr #fn(":000r4c0qc1c2c3g332\x7f3241;" #(#fn(";000r1c0c1L1\x7fi24~|32KL1i23i02|3243;" #(#fn(nconc)
+   define)) #fn(nconc) #fn(map) #.list)) cdadr caadr) expand-define)
+   #fn("7000r2c0q|„41;" #(#fn("<000r1c0i13e1~31c2c3c4q|32\x7f3232K;" #(begin
+   cddr #fn(nconc) #fn(map) #fn(":000r1|Me0i2:|„i11323130i11L3;" #(compile-thunk))))) expand-let-syntax)
+@@ -268,8 +269,8 @@
+ 	  foldl #fn(":000r3g2…40};e0||g2M}32g2N43;" #(foldl) foldl) foldr
+ 	  #fn(";000r3g2…40};|g2Me0|}g2N3342;" #(foldr) foldr) for-each #fn(";000s2c0q]41;" #(#fn(":000r1c0qm02i02…J0]\x7fF6A02~\x7fM312\x7fNo015\x1e/5;0|~\x7fi02K322];" #(#fn(":000r2}MF6I0|c0c1}32Q22~|c0c2}3242;];" #(#fn(map)
+   #.car #.cdr) for-each-n)))) for-each)
+-	  get-defined-vars #fn("8000r1e0~|3141;" #(delete-duplicates) #1=#(#fn("9000r1|?640_;|Mc0<16602|NF6d0|„C16702|„L117S02|„F16E02e1|31C16:02e1|31L117402_;|Mc2‚>0c3c4~|N32v2;_;" #(define
+-  caadr begin #fn(nconc) #fn(map)) #1#) ()))
++	  get-defined-vars #fn("8000r1e0~|3141;" #(delete-duplicates) #1=#(#fn("9000r1|?640_;|Mc0<16602|NF6f0|„C16702|„L117U02|„F16G02e1|„31C16;02e1|„31L117402_;|Mc2‚>0c3c4~|N32v2;_;" #(define
++  define-head-name begin #fn(nconc) #fn(map)) #1#) ()))
+ 	  hex5 #fn("9000r1e0c1|b@32b5c243;" #(string.lpad #fn(number->string)
+ 					      #\0) hex5)
+ 	  identity #fn("6000r1|;" #() identity) in-env?
+@@ -459,6 +460,8 @@
+   #fn(gensym))) #fn(top-level-value) ok) trace)
+ 	  traced? #fn("8000r1e0|3116>02c1|31c1~31>;" #(closure? #fn(function:code)) #(#fn(":000s0c0c1|K312e2302c3|v2;" #(#fn(write)
+   x newline #.apply)) ()))
++	  uncurry-define #fn("=000r1|NF16A02|„F16902e0|31F6P0e1|Me0|31c2c3e4|31e5|3133L341;|;" #(caadr
++  uncurry-define #fn(list*) lambda cdadr cddr) uncurry-define)
+ 	  untrace #fn("8000r1c0qc1|3141;" #(#fn("9000r1e0|316@0c1~c2|31b2[42;];" #(traced?
+   #fn(set-top-level-value!) #fn(function:vals)))
+ 					    #fn(top-level-value)) untrace)
+diff --git a/system.lsp b/system.lsp
+index edd63dd..40e2b33 100644
+--- a/system.lsp
++++ b/system.lsp
+@@ -773,6 +773,15 @@
+ 	(if f (apply f (cdr e))
+ 	    e))))
+ 
++;; curried definitions, as in Guile (TeXmacs): (define ((f a) b) body) is
++;; (define (f a) (lambda (b) body))
++(define (define-head-name h) (if (pair? h) (define-head-name (car h)) h))
++(define (uncurry-define e)
++  (if (and (pair? (cdr e)) (pair? (cadr e)) (pair? (caadr e)))
++      (uncurry-define
++       (list (car e) (caadr e) (list* 'lambda (cdadr e) (cddr e))))
++      e))
++
+ (define (expand e)
+   ; symbol resolves to toplevel; i.e. has no shadowing definition
+   (define (top? s env) (not (or (bound? (resolve-global s)) (assq s env))))
+@@ -844,6 +853,7 @@
+ 	   . ,name))))
+   
+   (define (expand-define e env)
++    (set! e (uncurry-define e))
+     (if (or (null? (cdr e)) (atom? (cadr e)))
+ 	(if (null? (cddr e))
+ 	    e
+-- 
+2.50.1 (Apple Git-155)
+

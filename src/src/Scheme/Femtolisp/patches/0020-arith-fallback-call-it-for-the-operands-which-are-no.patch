@@ -1,0 +1,160 @@
+From 43cf2bd605c5a76dd0baf5d017cee1605e11b56d Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 20:46:35 +0100
+Subject: [PATCH 20/20] *arith-fallback*: + - * / = call it for the operands
+ which are not numbers (complex numbers of TeXmacs); (- 0) is the fixnum 0
+
+---
+ cvalues.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++------
+ flisp.c   |  2 +-
+ 2 files changed, 67 insertions(+), 9 deletions(-)
+
+diff --git a/cvalues.c b/cvalues.c
+index df402de..573ebf8 100644
+--- a/cvalues.c
++++ b/cvalues.c
+@@ -1043,6 +1043,32 @@ value_t return_from_int64(int64_t Saccum)
+     RETURN_NUM_AS(Saccum, int32);
+ }
+ 
++// TeXmacs: when an operand of + - * / = is not a number, and the variable
++// *arith-fallback* holds a function, (*arith-fallback* op operands) gives the
++// result instead of a type error (TeXmacs implements the complex numbers so)
++static value_t arith_fallback(void)
++{
++    value_t h = symbol_value(symbol("*arith-fallback*"));
++    return (h == UNBOUND || h == FL_F) ? UNBOUND : h;
++}
++
++// (h op carry args...), args on the stack of femtolisp (which collections
++// update in place; fl_cons does not grow the stack)
++static value_t arith_fallback_args(value_t h, char *op, int64_t carry,
++                                   value_t *args, uint32_t nargs)
++{
++    uint32_t base = args - Stack, i;
++    value_t lst = NIL;
++    PUSH(h);
++    fl_gc_handle(&lst);
++    for (i = nargs; i > 0; i--)
++        lst = fl_cons(Stack[base+i-1], lst);
++    lst = fl_cons(return_from_int64(carry), lst);
++    fl_free_gc_handles(1);
++    h = POP();
++    return fl_applyn(2, h, symbol(op), lst);
++}
++
+ static value_t fl_add_any(value_t *args, u_int32_t nargs, fixnum_t carryIn)
+ {
+     uint64_t Uaccum=0;
+@@ -1084,6 +1110,11 @@ static value_t fl_add_any(value_t *args, u_int32_t nargs, fixnum_t carryIn)
+             continue;
+         }
+     add_type_error:
++        {
++            value_t h = arith_fallback();
++            if (h != UNBOUND)
++                return arith_fallback_args(h, "+", carryIn, args, nargs);
++        }
+         type_error("+", "number", arg);
+     }
+     if (inexact) {
+@@ -1117,7 +1148,7 @@ static value_t fl_neg(value_t n)
+ {
+     if (isfixnum(n)) {
+         fixnum_t s = fixnum(-numval(n));
+-        if (__unlikely(s == n))
++        if (__unlikely(s == n && s != fixnum(0)))
+             return mk_long(-numval(n)); // negate overflows
+         else
+             return s;
+@@ -1153,11 +1184,21 @@ static value_t fl_neg(value_t n)
+             break;
+         }
+     }
++    {
++        value_t h = arith_fallback();
++        if (h != UNBOUND) {
++            PUSH(h);
++            value_t l = fl_cons(n, NIL);
++            h = POP();
++            return fl_applyn(2, h, symbol("-"), l);
++        }
++    }
+     type_error("-", "number", n);
+ }
+ 
+ static value_t fl_mul_any(value_t *args, u_int32_t nargs, int64_t Saccum)
+ {
++    int64_t carryIn = Saccum;
+     uint64_t Uaccum=1;
+     double Faccum=1;
+     int32_t inexact = 0;
+@@ -1196,6 +1237,11 @@ static value_t fl_mul_any(value_t *args, u_int32_t nargs, int64_t Saccum)
+             continue;
+         }
+     mul_type_error:
++        {
++            value_t h = arith_fallback();
++            if (h != UNBOUND)
++                return arith_fallback_args(h, "*", carryIn, args, nargs);
++        }
+         type_error("*", "number", arg);
+     }
+     if (inexact) {
+@@ -1257,10 +1303,14 @@ int numeric_compare(value_t a, value_t b, int eq, int eqnans, char *fname)
+         if (numval(a) < numval(b)) return -1;
+         return 1;
+     }
+-    if (!num_to_ptr(a, &ai, &ta, &aptr)) {
+-        if (fname) type_error(fname, "number", a); else return 2;
+-    }
+-    if (!num_to_ptr(b, &bi, &tb, &bptr)) {
++    if (!num_to_ptr(a, &ai, &ta, &aptr) || !num_to_ptr(b, &bi, &tb, &bptr)) {
++        if (fname && eq && arith_fallback() != UNBOUND) {
++            value_t l = fl_list2(a, b);
++            return (fl_applyn(2, arith_fallback(), symbol("="), l) != FL_F) ? 0 : 1;
++        }
++        if (!num_to_ptr(a, &ai, &ta, &aptr)) {
++            if (fname) type_error(fname, "number", a); else return 2;
++        }
+         if (fname) type_error(fname, "number", b); else return 2;
+     }
+     if (eq && eqnans && ((ta >= T_FLOAT) != (tb >= T_FLOAT)))
+@@ -1286,10 +1336,18 @@ static value_t fl_div2(value_t a, value_t b)
+     numerictype_t ta, tb;
+     void *aptr, *bptr;
+ 
+-    if (!num_to_ptr(a, &ai, &ta, &aptr))
+-        type_error("/", "number", a);
+-    if (!num_to_ptr(b, &bi, &tb, &bptr))
++    if (!num_to_ptr(a, &ai, &ta, &aptr) || !num_to_ptr(b, &bi, &tb, &bptr)) {
++        value_t h = arith_fallback();
++        if (h != UNBOUND) {
++            PUSH(h);
++            value_t l = fl_list2(a, b);
++            h = POP();
++            return fl_applyn(2, h, symbol("/"), l);
++        }
++        if (!num_to_ptr(a, &ai, &ta, &aptr))
++            type_error("/", "number", a);
+         type_error("/", "number", b);
++    }
+ 
+     da = conv_to_double(aptr, ta);
+     db = conv_to_double(bptr, tb);
+diff --git a/flisp.c b/flisp.c
+index 42c3ce8..230a6b0 100644
+--- a/flisp.c
++++ b/flisp.c
+@@ -1410,7 +1410,7 @@ static value_t apply_cl(uint32_t nargs)
+         do_neg:
+             if (isfixnum(Stack[SP-1])) {
+                 s = fixnum(-numval(Stack[SP-1]));
+-                if (__unlikely(s == Stack[SP-1]))
++                if (__unlikely(s == Stack[SP-1] && s != fixnum(0)))
+                   Stack[SP-1] = mk_long(-numval(Stack[SP-1])); // negate overflows
+                 else
+                   Stack[SP-1] = s;
+-- 
+2.50.1 (Apple Git-155)
+

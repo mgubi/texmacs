@@ -1,0 +1,123 @@
+From 0719a43e685cb8f5b053bd37109398dcbb043990 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 17:03:56 +0100
+Subject: [PATCH 10/20] compile-unknown-call: hook for the calls of names which
+ are not defined at compile time; boot image regenerated
+
+---
+ compiler.lsp | 13 +++++++++++++
+ flisp.boot   | 29 +++++++++++++++++------------
+ mkboot1.lsp  |  2 +-
+ 3 files changed, 31 insertions(+), 13 deletions(-)
+
+diff --git a/compiler.lsp b/compiler.lsp
+index 65dd3ca..ee37a61 100644
+--- a/compiler.lsp
++++ b/compiler.lsp
+@@ -452,6 +452,14 @@
+ 
+ (define (fits-i8 x) (and (fixnum? x) (>= x -128) (<= x 127)))
+ 
++(define special-forms
++  '(quote if begin prog1 lambda and or while for return set! define trycatch))
++
++; the hook for the calls (f ...) where f is not bound at compile time: a form
++; to compile instead, or #f; an embedding redefines it (as resolve-global)
++(if (not (bound? 'compile-unknown-call))
++    (define (compile-unknown-call x env) #f))
++
+ (define (compile-in g env tail? x)
+   (cond ((symbol? x) (compile-sym g env x [loada loadc loadg]))
+ 	((atom? x)
+@@ -467,6 +475,11 @@
+ 	((or (not (symbol? (car x))) (bound? (resolve-global (car x)))
+ 	     (in-env? (car x) env))
+ 	 (compile-app g env tail? x))
++	; TeXmacs: a call of a function which is not defined yet (or of a
++	; macro defined later): the hook may give another form to compile
++	((and (not (memq (car x) special-forms))
++	      (compile-unknown-call x env))
++	 => (lambda (y) (compile-in g env tail? y)))
+ 	(else
+ 	 (case (car x)
+ 	   (quote    (if (self-evaluating? (cadr x))
+diff --git a/flisp.boot b/flisp.boot
+index 083103a..50a6d14 100644
+--- a/flisp.boot
++++ b/flisp.boot
+@@ -114,21 +114,22 @@
+ 	%fl:compile-if #68=#fn("<000r4c0qe1|31e1|31e2g331e3g331e4g331F6;0e5g331560e63045;" #(#fn(";000r5g2]‚>0e0~\x7fi02g344;g2^‚>0e0~\x7fi02g444;e0~\x7f^g2342e1~c2|332e0~\x7fi02g3342i026<0e1~c3325:0e1~c4}332e5~|322e0~\x7fi02g4342e5~}42;" #(%fl:compile-in
+   %fl:emit brf ret jmp %fl:mark-label)) %fl:make-label %fl:cadr %fl:caddr
+   %fl:cdddr %fl:cadddr %fl:void) compile-if)
+-	%fl:compile-in #69=#fn(";000r4g3C6=0e0|}g3c144;g3?6¯0g3`‚:0e2|c342;g3a‚:0e2|c442;g3]‚:0e2|c542;g3^‚:0e2|c642;g3_‚:0e2|c742;e8g3316<0e2|c9g343;c:g3316C0e;|}g2c<c=31L144;e2|c>g343;g3MC@17H02e?g3M31E17;02e@g3M}326=0eA|}g2g344;cBqg3M41;" #(%fl:compile-sym
++	%fl:compile-in #69=#fn(";000r4g3C6=0e0|}g3c144;g3?6¯0g3`‚:0e2|c342;g3a‚:0e2|c442;g3]‚:0e2|c542;g3^‚:0e2|c642;g3_‚:0e2|c742;e8g3316<0e2|c9g343;c:g3316C0e;|}g2c<c=31L144;e2|c>g343;g3MC@17H02e?g3M31E17;02e@g3M}326=0eA|}g2g344;cBqcCg3MeD32@16:02eEg3}3241;" #(%fl:compile-sym
+   #(loada loadc loadg) %fl:emit load0 load1 loadt loadf loadnil %fl:fits-i8
+   loadi8 #fn(eof-object?) %fl:compile-in #fn(top-level-value) eof-object loadv
+-  resolve-global %fl:in-env? %fl:compile-app #fn("=000r1|c0‚`0e1e2i0331316C0e3~\x7fi02e2i033144;e4~c5e2i033143;|c6‚?0e7~\x7fi02i0344;|c8‚@0e9~\x7fi02i03N44;|c:‚<0e;~\x7fi0343;|c<‚=0e=c>qc?q42;|c@‚@0eA~\x7fi02i03N44;|cB‚@0eC~\x7fi02i03N44;|cD‚J0eE~\x7fe2i0331c8eFi0331K44;|cG‚N0eH~\x7fe2i0331eIi0331eJi033145;|cK‚I0e3~\x7f]e2i0331342e4~cL42;|cM‚e0e3~\x7f^eIi0331342e2i0331C17902eNcO312eP~\x7fe2i0331cQ44;|cR‚C0e3~\x7fi02eSi033144;|cT‚v0e3~\x7f^c<_e2i0331L3342eUeIi033131660^580eNcV312e3~\x7f^eIi0331342e4~cT42;eW~\x7fi02i0344;" #(quote
++  resolve-global %fl:in-env? %fl:compile-app #fn(":000r1|6=0e0~\x7fi02|44;c1qi03M41;" #(%fl:compile-in
++  #fn("=000r1|c0‚f0e1e2i1331316G0e3i10i11i12e2i133144;e4i10c5e2i133143;|c6‚C0e7i10i11i12i1344;|c8‚D0e9i10i11i12i13N44;|c:‚@0e;i10i11i1343;|c<‚=0e=c>qc?q42;|c@‚D0eAi10i11i12i13N44;|cB‚D0eCi10i11i12i13N44;|cD‚N0eEi10i11e2i1331c8eFi1331K44;|cG‚R0eHi10i11e2i1331eIi1331eJi133145;|cK‚O0e3i10i11]e2i1331342e4i10cL42;|cM‚m0e3i10i11^eIi1331342e2i1331C17902eNcO312ePi10i11e2i1331cQ44;|cR‚G0e3i10i11i12eSi133144;|cT‚€0e3i10i11^c<_e2i1331L3342eUeIi133131660^580eNcV312e3i10i11^eIi1331342e4i10cT42;eWi10i11i12i1344;" #(quote
+   %fl:self-evaluating? %fl:cadr %fl:compile-in %fl:emit loadv if %fl:compile-if
+   begin %fl:compile-begin prog1 %fl:compile-prog1 lambda %fl:call-with-values
+-  #fn("8000r0e0i11i1342;" #(%fl:compile-f-))
+-  #fn("9000r2e0i10c1|332e2i10}322}e3i1131X6<0e0i10c442;];" #(%fl:emit loadv
++  #fn("8000r0e0i21i2342;" #(%fl:compile-f-))
++  #fn("9000r2e0i20c1|332e2i20}322}e3i2131X6<0e0i20c442;];" #(%fl:emit loadv
+ 							     %fl:bcode:cdepth
+ 							     %fl:nnn closure))
+   and %fl:compile-and or %fl:compile-or while %fl:compile-while %fl:cddr for
+   %fl:compile-for %fl:caddr %fl:cadddr return ret set! %fl:error "set!: second argument must be a symbol"
+   %fl:compile-sym #(seta setc setg) define %fl:expand-define trycatch
+   %fl:1arg-lambda? "trycatch: second form must be a 1-argument lambda"
+-  %fl:compile-app))) compile-in)
++  %fl:compile-app)))) #fn(memq) special-forms compile-unknown-call) compile-in)
+ 	%fl:compile-or #70=#fn("<000r4e0|}g2g3^c146;" #(%fl:compile-short-circuit
+ 							brt) compile-or)
+ 	%fl:compile-prog1 #71=#fn(";000r3e0|}^e1g231342e2g231F6H0e3|}^e2g231342e4|c542;];" #(%fl:compile-in
+@@ -568,12 +569,14 @@
+ 	#67# compile-if #68# compile-in
+ 	#69# compile-or #70# compile-prog1
+ 	#71# compile-short-circuit #72# compile-sym
+-	#73# compile-thunk #74# compile-while
+-	#75# const-to-idx-vec #76# copy-tree
+-	#77# count #78# define-head-name
+-	#79# delete-duplicates #80# disassemble
+-	#81# div #82# emit
+-	#83# emit-optional-arg-inits #84# encode-byte-code
++	#73# compile-thunk #74#
++	compile-unknown-call #fn("6000r2^;" #() compile-unknown-call)
++	compile-while #75# const-to-idx-vec
++	#76# copy-tree #77# count
++	#78# define-head-name #79# delete-duplicates
++	#80# disassemble #81# div
++	#82# emit #83#
++	emit-optional-arg-inits #84# encode-byte-code
+ 	#85# error #86# eval
+ 	#87# even? #88# every
+ 	#89# expand #90# expand-define
+@@ -615,7 +618,9 @@
+ 	#160# reverse!- #161# reverse-
+ 	#162# self-evaluating? #163# separate
+ 	#164# set-syntax! #165# simple-sort
+-	#166# splice-form? #167# string.join
++	#166# special-forms (quote if begin prog1 lambda and or while for
++			     return set! define trycatch)
++	splice-form? #167# string.join
+ 	#168# string.lpad #169# string.map
+ 	#170# string.rep #171# string.rpad
+ 	#172# string.tail #173# string.trim
+diff --git a/mkboot1.lsp b/mkboot1.lsp
+index 8a34297..7b52f38 100644
+--- a/mkboot1.lsp
++++ b/mkboot1.lsp
+@@ -13,7 +13,7 @@
+   (for-each (lambda (s)
+ 	      (if (and (bound? s) (not (constant? s))
+ 		       (function? (top-level-value s))
+-		       (not (eq? s 'resolve-global))
++		       (not (memq s '(resolve-global compile-unknown-call)))
+ 		       (not (string.find (string s) "%fl:")))
+ 		  (put! private s (symbol (string "%fl:" s)))))
+ 	    (environment))
+-- 
+2.50.1 (Apple Git-155)
+

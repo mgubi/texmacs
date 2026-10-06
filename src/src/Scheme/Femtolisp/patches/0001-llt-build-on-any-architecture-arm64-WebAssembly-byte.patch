@@ -1,0 +1,75 @@
+From 2c0903374e4d5e3daff582e4227d2818ce34875c Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 16:25:10 +0100
+Subject: [PATCH 01/20] llt: build on any architecture (arm64, WebAssembly):
+ byte swaps with compiler builtins
+
+---
+ llt/dtypes.h |  2 +-
+ llt/utils.h  | 27 +++++++--------------------
+ 2 files changed, 8 insertions(+), 21 deletions(-)
+
+diff --git a/llt/dtypes.h b/llt/dtypes.h
+index 1bab667..a9d1fd2 100644
+--- a/llt/dtypes.h
++++ b/llt/dtypes.h
+@@ -17,7 +17,7 @@
+ */
+ 
+ 
+-#if defined(__gnu_linux__)
++#if defined(__gnu_linux__) || defined(__EMSCRIPTEN__)
+ #  define LINUX
+ #elif defined(__APPLE__) && defined(__MACH__)
+ #  define MACOSX
+diff --git a/llt/utils.h b/llt/utils.h
+index 9f2c5ad..9256bf3 100644
+--- a/llt/utils.h
++++ b/llt/utils.h
+@@ -5,28 +5,11 @@
+ #if defined( __amd64__ ) || defined( _M_AMD64 )
+ #  define ARCH_X86_64
+ #  define __CPU__ 686
+-#elif defined( _M_IX86 )//msvs, intel, digital mars, watcom
+-#  if ! defined( __386__ )
+-#    error "unsupported target: 16-bit x86"
+-#  endif
+-#  define ARCH_X86
+-#  define __CPU__  ( _M_IX86 + 86 )
+-#elif defined( __i686__ )//gnu c
++#elif defined( __i686__ ) || defined( __i386__ ) || defined( _M_IX86 )
+ #  define ARCH_X86
+ #  define __CPU__ 686
+-#elif defined( __i586__ )//gnu c
+-#  define ARCH_X86
+-#  define __CPU__ 586
+-#elif defined( __i486__ )//gnu c
+-#  define ARCH_X86
+-#  define __CPU__ 486
+-#elif defined( __i386__ )//gnu c
+-#  define ARCH_X86
+-#  define __CPU__ 386
+-#else
+-#  error "unknown architecture"
+ #endif
+-
++// other architectures (arm64, WebAssembly...) use the portable code below
+ 
+ char *uint2str(char *dest, size_t len, uint64_t num, uint32_t base);
+ int str2int(char *str, size_t len, int64_t *res, uint32_t base);
+@@ -38,7 +21,11 @@ int isdigit_base(char c, int base);
+ #  define LEGACY_REGS "=q"
+ #endif
+ 
+-#if !defined(__INTEL_COMPILER) && (defined(ARCH_X86) || defined(ARCH_X86_64))
++#if defined(__GNUC__) || defined(__clang__)
++#define bswap_16(x) __builtin_bswap16(x)
++#define bswap_32(x) __builtin_bswap32(x)
++#define bswap_64(x) __builtin_bswap64(x)
++#elif !defined(__INTEL_COMPILER) && (defined(ARCH_X86) || defined(ARCH_X86_64))
+ STATIC_INLINE u_int16_t ByteSwap16(u_int16_t x)
+ {
+   __asm("xchgb %b0,%h0" :
+-- 
+2.50.1 (Apple Git-155)
+

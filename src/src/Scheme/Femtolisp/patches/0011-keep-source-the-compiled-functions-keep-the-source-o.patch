@@ -1,0 +1,511 @@
+From 84af807e72dd77fd8473bac67b9eda22d234d97f Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 17:07:54 +0100
+Subject: [PATCH 11/20] *keep-source*: the compiled functions keep the source
+ of their lambda expression (function-source); boot image regenerated
+
+---
+ compiler.lsp |  21 ++++
+ flisp.boot   | 310 ++++++++++++++++++++++++++-------------------------
+ 2 files changed, 179 insertions(+), 152 deletions(-)
+
+diff --git a/compiler.lsp b/compiler.lsp
+index ee37a61..6a6c73a 100644
+--- a/compiler.lsp
++++ b/compiler.lsp
+@@ -452,6 +452,21 @@
+ 
+ (define (fits-i8 x) (and (fixnum? x) (>= x -128) (<= x 127)))
+ 
++; when true, a compiled function keeps the source of its lambda expression
++; (function-source); an embedding sets it (TeXmacs)
++(if (not (bound? '*keep-source*))
++    (define *keep-source* #f))
++
++(define (proper-part l)  ; l without its dotted tail (the name of a lambda)
++  (if (pair? l) (cons (car l) (proper-part (cdr l))) ()))
++
++(define (function-source f)
++  (and (function? f) (not (builtin? f))
++       (let ((v (function:vals f)))
++	 (and (> (length v) 0)
++	      (let ((c (aref v (- (length v) 1))))
++		(and (pair? c) (eq? (car c) '%source) (cdr c)))))))
++
+ (define special-forms
+   '(quote if begin prog1 lambda and or while for return set! define trycatch))
+ 
+@@ -659,6 +674,12 @@
+ 	  ; compile body and return
+ 	  (compile-in g (cons vars env) #t (lam:body f))
+ 	  (emit g 'ret)
++	  ; TeXmacs: the source of the lambda, as the last constant
++	  (if (and *keep-source*
++		   (not (eq? (lastcdr f) *defines-processed-token*)))
++	      (bcode:indexfor g (cons '%source
++				      (list* 'lambda (cadr f)
++					     (proper-part (cddr f))))))
+ 	  (values (function (encode-byte-code (bcode:code g))
+ 			    (const-to-idx-vec g) name)
+ 		  (aref g 3)))))))
+diff --git a/flisp.boot b/flisp.boot
+index 50a6d14..0c1406c 100644
+--- a/flisp.boot
++++ b/flisp.boot
+@@ -99,14 +99,14 @@
+   lambda #fn(map) #fn("6000r1e040;" #(%fl:void))))
+   %fl:get-defined-vars)) %fl:cddr %fl:cdddr begin %fl:caddr %fl:void) lambda-body)
+   #fn("7000r1e0|31i20‚80e1|41;~|41;" #(%fl:lastcdr %fl:caddr) lam:body)
+-  #fn("9000r6c0q}?660`570c1}3141;" #(#fn("9000r1c0q|c1i0431x41;" #(#fn("9000r1c0qe1e2i143241;" #(#fn("C000r1i24‡©0|…O0e0i20c1~i22…80i10560i10y345s0e2i20e3c4c5c4c6|32e7c8|31313331322e0i20c9~c8|31i22…80i10560i10y352e:i20i40i24i23~35530]2e;i10c<326L0e0i20i22…70c=540c>i10335]0i22‡A0e0i20c?i10335H0i24…A0e0i20c@i1033530^2eAi20i23i40K]i31i4131342e0i20cB322eCcDeEeFi203131eGi2031i2533i20b3[42;" #(%fl:emit
++  #fn("9000r6c0q}?660`570c1}3141;" #(#fn("9000r1c0q|c1i0431x41;" #(#fn("9000r1c0qe1e2i143241;" #(#fn("F000r1i24‡©0|…O0e0i20c1~i22…80i10560i10y345s0e2i20e3c4c5c4c6|32e7c8|31313331322e0i20c9~c8|31i22…80i10560i10y352e:i20i40i24i23~35530]2e;i10c<326L0e0i20i22…70c=540c>i10335]0i22‡A0e0i20c?i10335H0i24…A0e0i20c@i1033530^2eAi20i23i40K]i31i4131342e0i20cB322eC16?02eDi4131i50<@6W0e2i20cEcFcGeHi4131eIeJi41313133K32530]2eKcLeMeNi203131eOi2031i2533i20b3[42;" #(%fl:emit
+   optargs %fl:bcode:indexfor %fl:make-perfect-hash-table
+   #fn(map) #.cons #.car %fl:iota #fn(length) keyargs
+   %fl:emit-optional-arg-inits %fl:> 255 largc lvargc vargc argc %fl:compile-in
+-  ret %fl:values #fn(function) %fl:encode-byte-code %fl:bcode:code
+-  %fl:const-to-idx-vec)) %fl:filter %fl:keyword-arg?))
+-								   #fn(length)))
+-				     #fn(length)))
++  ret *keep-source* %fl:lastcdr %source #fn(list*) lambda %fl:cadr
++  %fl:proper-part %fl:cddr %fl:values #fn(function)
++  %fl:encode-byte-code %fl:bcode:code %fl:const-to-idx-vec)) %fl:filter
++  %fl:keyword-arg?)) #fn(length))) #fn(length)))
+   %fl:make-code-emitter %fl:cadr %fl:lastcdr %fl:lambda-vars %fl:filter #.pair?
+   lambda))) #0=#(%defines-processed% ()))
+ 	%fl:compile-for #67=#fn(":000r5e0g4316X0e1|}^g2342e1|}^g3342e1|}^g4342e2|c342;e4c541;" #(%fl:1arg-lambda?
+@@ -239,69 +239,72 @@
+ 	#95=#fn(";000r3g2…40};|g2Me0|}g2N3342;" #(%fl:foldr) foldr)
+ 	%fl:for-each #96=#fn(";000s2c0q]41;" #(#fn(":000r1c0qm02i02…J0]\x7fF6A02~\x7fM312\x7fNo015\x1e/5;0|~\x7fi02K322];" #(#fn(":000r2}MF6I0|c0c1}32Q22~|c0c2}3242;];" #(#fn(map)
+   #.car #.cdr) for-each-n)))) for-each)
+-	%fl:get-defined-vars #97=#fn("8000r1e0~|3141;" #(%fl:delete-duplicates) #1=#(#fn("9000r1|?640_;|Mc0<16602|NF6u0e1|31C16:02e1|31L117^02e1|31F16M02e2e1|3131C16>02e2e1|3131L117402_;|Mc3‚>0c4c5~|N32v2;_;" #(define
++	%fl:function-source #97=#fn("8000r1|J16D02|G@16<02c0c1|3141;" #(#fn("9000r1e0c1|31`3216@02c2|c1|31ax[41;" #(%fl:>
++  #fn(length) #fn("7000r1|F16?02|Mc0<16502|N;" #(%source))))
++  #fn(function:vals)) function-source)
++	%fl:get-defined-vars #98=#fn("8000r1e0~|3141;" #(%fl:delete-duplicates) #1=#(#fn("9000r1|?640_;|Mc0<16602|NF6u0e1|31C16:02e1|31L117^02e1|31F16M02e2e1|3131C16>02e2e1|3131L117402_;|Mc3‚>0c4c5~|N32v2;_;" #(define
+   %fl:cadr %fl:define-head-name begin #fn(nconc)
+   #fn(map)) #1#) ()))
+-	%fl:hex5 #98=#fn("9000r1e0c1|b@32b5c243;" #(%fl:string.lpad #fn(number->string)
++	%fl:hex5 #99=#fn("9000r1e0c1|b@32b5c243;" #(%fl:string.lpad #fn(number->string)
+ 						    #\0) hex5)
+-	%fl:identity #99=#fn("6000r1|;" #() identity) %fl:in-env?
+-	#100=#fn("8000r2}F16F02c0|}M3217:02e1|}N42;" #(#fn(memq) %fl:in-env?) in-env?)
+-	%fl:index-of #101=#fn(":000r3}…40^;|}M‚50g2;e0|}Ng2aw43;" #(%fl:index-of) index-of)
++	%fl:identity #100=#fn("6000r1|;" #() identity) %fl:in-env?
++	#101=#fn("8000r2}F16F02c0|}M3217:02e1|}N42;" #(#fn(memq) %fl:in-env?) in-env?)
++	%fl:index-of #102=#fn(":000r3}…40^;|}M‚50g2;e0|}Ng2aw43;" #(%fl:index-of) index-of)
+ 	%fl:int16 #fn(int16) %fl:int32
+ 	#fn(int32) %fl:int64 #fn(int64) %fl:int8
+-	#fn(int8) %fl:io.readall #102=#fn("7000r1c0qc13041;" #(#fn("8000r1c0|~322c1qc2|3141;" #(#fn(io.copy)
++	#fn(int8) %fl:io.readall #103=#fn("7000r1c0qc13041;" #(#fn("8000r1c0|~322c1qc2|3141;" #(#fn(io.copy)
+   #fn("7000r1|c0>16:02c1i1031670c240;|;" #("" #fn(io.eof?)
+ 					   #fn(eof-object)))
+   #fn(io.tostring!))) #fn(buffer)) io.readall)
+-	%fl:io.readline #103=#fn("8000r1c0|c142;" #(#fn(io.readuntil) #\newline) io.readline)
+-	%fl:io.readlines #104=#fn("8000r1e0e1|42;" #(%fl:read-all-of
++	%fl:io.readline #104=#fn("8000r1c0|c142;" #(#fn(io.readuntil) #\newline) io.readline)
++	%fl:io.readlines #105=#fn("8000r1e0e1|42;" #(%fl:read-all-of
+ 						     %fl:io.readline) io.readlines)
+-	%fl:iota #105=#fn("8000r1e0e1|42;" #(%fl:map-int %fl:identity) iota)
+-	%fl:keyword->symbol #106=#fn("9000r1c0|316@0c1c2c3|313141;|;" #(#fn(keyword?)
++	%fl:iota #106=#fn("8000r1e0e1|42;" #(%fl:map-int %fl:identity) iota)
++	%fl:keyword->symbol #107=#fn("9000r1c0|316@0c1c2c3|313141;|;" #(#fn(keyword?)
+   #fn(symbol) #fn("<000r1c0|`c1|c2|313243;" #(#fn(string.sub)
+ 					      #fn(string.dec)
+ 					      #fn(length)))
+   #fn(string)) keyword->symbol)
+-	%fl:keyword-arg? #107=#fn("7000r1|F16902c0|M41;" #(#fn(keyword?)) keyword-arg?)
+-	%fl:lambda-arg-names #108=#fn("9000r1e0c1e2|3142;" #(%fl:map! #fn("7000r1|F690e0|M41;|;" #(%fl:keyword->symbol))
++	%fl:keyword-arg? #108=#fn("7000r1|F16902c0|M41;" #(#fn(keyword?)) keyword-arg?)
++	%fl:lambda-arg-names #109=#fn("9000r1e0c1e2|3142;" #(%fl:map! #fn("7000r1|F690e0|M41;|;" #(%fl:keyword->symbol))
+ 							     %fl:to-proper) lambda-arg-names)
+-	%fl:lambda-vars #109=#fn("7000r1c0q]41;" #(#fn(":000r1c0qm02|~~^^342e1~41;" #(#fn(";000r4|A17502|C640];|F16602|MC6S0g217502g36<0e0c1}c243;~|N}g2g344;|F16602|MF6‡0e3|Mb23216902e4|31C660^5=0e0c5|Mc6}342c7e4|31316<0~|N}g2]44;g36<0e0c1}c843;~|N}]g344;|F6>0e0c9|Mc6}44;|}‚:0e0c1}42;e0c9|c6}44;" #(%fl:error
++	%fl:lambda-vars #110=#fn("7000r1c0q]41;" #(#fn(":000r1c0qm02|~~^^342e1~41;" #(#fn(";000r4|A17502|C640];|F16602|MC6S0g217502g36<0e0c1}c243;~|N}g2g344;|F16602|MF6‡0e3|Mb23216902e4|31C660^5=0e0c5|Mc6}342c7e4|31316<0~|N}g2]44;g36<0e0c1}c843;~|N}]g344;|F6>0e0c9|Mc6}44;|}‚:0e0c1}42;e0c9|c6}44;" #(%fl:error
+   "compile error: invalid argument list "
+   ". optional arguments must come after required." %fl:length= %fl:caar "compile error: invalid optional argument "
+   " in list " #fn(keyword?) ". keyword arguments must come last."
+   "compile error: invalid formal argument ") check-formals)
+   %fl:lambda-arg-names))) lambda-vars)
+-	%fl:last-pair #110=#fn("7000r1|N?640|;e0|N41;" #(%fl:last-pair) last-pair)
+-	%fl:lastcdr #111=#fn("7000r1|?640|;e0|31N;" #(%fl:last-pair) lastcdr)
+-	%fl:length= #112=#fn("9000r2}`X640^;}`W650|?;|?660}`W;e0|N}ax42;" #(%fl:length=) length=)
+-	%fl:length> #113=#fn("9000r2}`X640|;}`W6;0|F16402|;|?660}`X;e0|N}ax42;" #(%fl:length>) length>)
+-	%fl:list->vector #114=#fn("7000r1c0|v2;" #(#.vector) list->vector)
+-	%fl:list-head #115=#fn(":000r2e0}`32640_;|Me1|N}ax32K;" #(%fl:<=
++	%fl:last-pair #111=#fn("7000r1|N?640|;e0|N41;" #(%fl:last-pair) last-pair)
++	%fl:lastcdr #112=#fn("7000r1|?640|;e0|31N;" #(%fl:last-pair) lastcdr)
++	%fl:length= #113=#fn("9000r2}`X640^;}`W650|?;|?660}`W;e0|N}ax42;" #(%fl:length=) length=)
++	%fl:length> #114=#fn("9000r2}`X640|;}`W6;0|F16402|;|?660}`X;e0|N}ax42;" #(%fl:length>) length>)
++	%fl:list->vector #115=#fn("7000r1c0|v2;" #(#.vector) list->vector)
++	%fl:list-head #116=#fn(":000r2e0}`32640_;|Me1|N}ax32K;" #(%fl:<=
+ 								  %fl:list-head) list-head)
+-	%fl:list-ref #116=#fn("8000r2e0|}32M;" #(%fl:list-tail) list-ref)
+-	%fl:list-tail #117=#fn("9000r2e0}`32640|;e1|N}ax42;" #(%fl:<=
++	%fl:list-ref #117=#fn("8000r2e0|}32M;" #(%fl:list-tail) list-ref)
++	%fl:list-tail #118=#fn("9000r2e0}`32640|;e1|N}ax42;" #(%fl:<=
+ 							       %fl:list-tail) list-tail)
+-	%fl:list? #118=#fn("7000r1|A17@02|F16902e0|N41;" #(%fl:list?) list?)
+-	%fl:load #119=#fn("9000r1c0qc1|c23241;" #(#fn("7000r1c0qc1qt;" #(#fn("9000r0c0q]31]]]43;" #(#fn("6000r1c0qm02|;" #(#fn(":000r3c0i10317C0~c1i1031|e2}3143;c3i10312e2}41;" #(#fn(io.eof?)
++	%fl:list? #119=#fn("7000r1|A17@02|F16902e0|N41;" #(%fl:list?) list?)
++	%fl:load #120=#fn("9000r1c0qc1|c23241;" #(#fn("7000r1c0qc1qt;" #(#fn("9000r0c0q]31]]]43;" #(#fn("6000r1c0qm02|;" #(#fn(":000r3c0i10317C0~c1i1031|e2}3143;c3i10312e2}41;" #(#fn(io.eof?)
+   #fn(read) %fl:load-process #fn(io.close)))))))
+   #fn("9000r1c0~312c1c2i10|L341;" #(#fn(io.close)
+ 				    #fn(raise) load-error))))
+ 						  #fn(file) :read) load)
+-	%fl:load-process #120=#fn("7000r1e0|41;" #(%fl:eval) load-process)
++	%fl:load-process #121=#fn("7000r1e0|41;" #(%fl:eval) load-process)
+ 	%fl:long #fn(long) %fl:lookup-sym
+-	#121=#fn("7000r4}…50c0;c1q}M41;" #((global)
++	#122=#fn("7000r4}…50c0;c1q}M41;" #((global)
+ 					   #fn(":000r1c0qe1~|`3341;" #(#fn(";000r1|6@0i13640|;i12|K;e0i10i11Ni1317502~A680i12570i12aw^44;" #(%fl:lookup-sym))
+   %fl:index-of))) lookup-sym)
+-	%fl:macrocall? #122=#fn("8000r1|MC16=02e0e1|M3141;" #(%fl:symbol-syntax
++	%fl:macrocall? #123=#fn("8000r1|MC16=02e0e1|M3141;" #(%fl:symbol-syntax
+ 							      resolve-global) macrocall?)
+-	%fl:macroexpand-1 #123=#fn("8000r1|?640|;c0qe1|3141;" #(#fn("7000r1|680|~Nv2;~;" #())
++	%fl:macroexpand-1 #124=#fn("8000r1|?640|;c0qe1|3141;" #(#fn("7000r1|680|~Nv2;~;" #())
+ 								%fl:macrocall?) macroexpand-1)
+-	%fl:make-code-emitter #124=#fn("9000r0_c030`c1Z4;" #(#fn(table) +inf.0) make-code-emitter)
+-	%fl:make-label #125=#fn("6000r1c040;" #(#fn(gensym)) make-label)
+-	%fl:make-perfect-hash-table #126=#fn("7000r1c0q]41;" #(#fn("8000r1c0m02c1q]31c2~3141;" #(#fn("9000r2e0e1c2|3131}42;" #(%fl:mod0
++	%fl:make-code-emitter #125=#fn("9000r0_c030`c1Z4;" #(#fn(table) +inf.0) make-code-emitter)
++	%fl:make-label #126=#fn("6000r1c040;" #(#fn(gensym)) make-label)
++	%fl:make-perfect-hash-table #127=#fn("7000r1c0q]41;" #(#fn("8000r1c0m02c1q]31c2~3141;" #(#fn("9000r2e0e1c2|3131}42;" #(%fl:mod0
+   %fl:abs #fn(hash)) $hash-keyword) #fn("6000r1c0qm02|;" #(#fn("9000r1c0qc1b2|T2^3241;" #(#fn("7000r1c0q]31i3041;" #(#fn("6000r1c0qm02|;" #(#fn("8000r1|F6=0c0qe1|3141;i10;" #(#fn(":000r1c0qb2i50|i3032T241;" #(#fn("9000r1i30|[6=0i50i40aw41;i30|~\\2i30|awe0i1031\\2i20i10N41;" #(%fl:cdar))))
+   %fl:caar)))))) #fn(vector.alloc))))) #fn(length)))) make-perfect-hash-table)
+-	%fl:make-system-image #127=#fn(";000r1c0c1|c2c3c434c542;" #(#fn("8000r2c0qe1e242;" #(#fn("7000r2]k02]k12c2qc3q41;" #(*print-pretty*
++	%fl:make-system-image #128=#fn(";000r1c0c1|c2c3c434c542;" #(#fn("8000r2c0qe1e242;" #(#fn("7000r2]k02]k12c2qc3q41;" #(*print-pretty*
+   *print-readably* #fn("7000r1c0qc1qt|302;" #(#fn(":000r0c0qe1c2qe3c4303132312c5i2041;" #(#fn("=000r1c0c1c2c3|c2c4|3233Q2i20322c5i20e642;" #(#fn(write)
+   #fn(nconc) #fn(map) #.list #fn(top-level-value)
+   #fn(io.write) *linefeed*)) %fl:filter #fn("9000r1|E16w02c0|31@16l02c1|31G@17C02c2|31c2c1|3131>@16K02c3|i2132@16=02c4c1|3131@;" #(#fn(constant?)
+@@ -318,35 +321,35 @@
+ 							 *print-level*
+ 							 *print-length*
+ 							 *os-name*)) make-system-image)
+-	%fl:map! #128=#fn("9000r2}]}F6B02}|}M31O2}Nm15\x1d/2;" #() map!)
+-	%fl:map-int #129=#fn("8000r2e0}`32640_;c1q|`31_K_42;" #(%fl:<= #fn(":000r2|m12a\x7faxc0qu2|;" #(#fn("8000r1\x7fi10|31_KP2\x7fNo01;" #())))) map-int)
+-	%fl:mark-label #130=#fn("9000r2e0|c1}43;" #(%fl:emit label) mark-label)
+-	%fl:max #131=#fn("<000s1}…40|;e0c1|}43;" #(%fl:foldl #fn("7000r2|}X640};|;" #())) max)
+-	%fl:member #132=#fn("8000r2}?640^;}M|>640};e0|}N42;" #(%fl:member) member)
+-	%fl:memv #133=#fn("8000r2}?640^;}M|=640};e0|}N42;" #(%fl:memv) memv)
+-	%fl:min #134=#fn("<000s1}…40|;e0c1|}43;" #(%fl:foldl #fn("7000r2|}X640|;};" #())) min)
+-	%fl:mod #135=#fn("9000r2|e0|}32}T2x;" #(%fl:div) mod) %fl:mod0
+-	#136=#fn("8000r2||}V}T2x;" #() mod0) %fl:nan? #137=#fn("7000r1|c0>17702|c1>;" #(+nan.0
++	%fl:map! #129=#fn("9000r2}]}F6B02}|}M31O2}Nm15\x1d/2;" #() map!)
++	%fl:map-int #130=#fn("8000r2e0}`32640_;c1q|`31_K_42;" #(%fl:<= #fn(":000r2|m12a\x7faxc0qu2|;" #(#fn("8000r1\x7fi10|31_KP2\x7fNo01;" #())))) map-int)
++	%fl:mark-label #131=#fn("9000r2e0|c1}43;" #(%fl:emit label) mark-label)
++	%fl:max #132=#fn("<000s1}…40|;e0c1|}43;" #(%fl:foldl #fn("7000r2|}X640};|;" #())) max)
++	%fl:member #133=#fn("8000r2}?640^;}M|>640};e0|}N42;" #(%fl:member) member)
++	%fl:memv #134=#fn("8000r2}?640^;}M|=640};e0|}N42;" #(%fl:memv) memv)
++	%fl:min #135=#fn("<000s1}…40|;e0c1|}43;" #(%fl:foldl #fn("7000r2|}X640|;};" #())) min)
++	%fl:mod #136=#fn("9000r2|e0|}32}T2x;" #(%fl:div) mod) %fl:mod0
++	#137=#fn("8000r2||}V}T2x;" #() mod0) %fl:nan? #138=#fn("7000r1|c0>17702|c1>;" #(+nan.0
+   -nan.0) nan?)
+-	%fl:negative? #138=#fn("7000r1|`X;" #() negative?) %fl:nestlist
+-	#139=#fn(";000r3e0g2`32640_;}e1||}31g2ax33K;" #(%fl:<= %fl:nestlist) nestlist)
+-	%fl:newline #140=#fn("9000‰00001000Š0000770e0m02c1|e2322];" #(*output-stream*
++	%fl:negative? #139=#fn("7000r1|`X;" #() negative?) %fl:nestlist
++	#140=#fn(";000r3e0g2`32640_;}e1||}31g2ax33K;" #(%fl:<= %fl:nestlist) nestlist)
++	%fl:newline #141=#fn("9000‰00001000Š0000770e0m02c1|e2322];" #(*output-stream*
+   #fn(io.write) *linefeed*) newline)
+-	%fl:nnn #141=#fn("8000r1e0c1|42;" #(%fl:count #fn("6000r1|A@;" #())) nnn)
+-	%fl:nreconc #142=#fn("8000r2e0}|42;" #(%fl:reverse!-) nreconc) %fl:odd?
+-	#143=#fn("7000r1e0|31@;" #(%fl:even?) odd?) %fl:positive? #144=#fn("8000r1e0|`42;" #(%fl:>) positive?)
+-	%fl:princ #145=#fn("9000s0c0qe141;" #(#fn("7000r1^k02c1qc2q41;" #(*print-readably*
++	%fl:nnn #142=#fn("8000r1e0c1|42;" #(%fl:count #fn("6000r1|A@;" #())) nnn)
++	%fl:nreconc #143=#fn("8000r2e0}|42;" #(%fl:reverse!-) nreconc) %fl:odd?
++	#144=#fn("7000r1e0|31@;" #(%fl:even?) odd?) %fl:positive? #145=#fn("8000r1e0|`42;" #(%fl:>) positive?)
++	%fl:princ #146=#fn("9000s0c0qe141;" #(#fn("7000r1^k02c1qc2q41;" #(*print-readably*
+   #fn("7000r1c0qc1qt|302;" #(#fn("8000r0e0c1i2042;" #(%fl:for-each #fn(write)))
+ 			     #fn("7000r1~302c0|41;" #(#fn(raise)))))
+   #fn("6000r0~k0;" #(*print-readably*)))) *print-readably*) princ)
+-	%fl:print #146=#fn(":000s0e0c1|42;" #(%fl:for-each #fn(write)) print)
+-	%fl:print-exception #147=#fn("=000r1|F16D02|Mc0<16:02e1|b4326S0e2c3e4|31c5e6|31c7352e8e9|31315\x130|F16D02|Mc:<16:02e1|b4326Q0e2e4|31c;e9|31c<342e8e6|31315Ù0|F16@02|Mc=<16602|NF6B0e2c>e4|31c?335²0|F16802|Mc@<6B0e2cA312e2|NQ25“0|F16802|McB<6J0eCe6|31312e2cDe4|31325l0eE|3116:02e1|b2326L0e8|M312e2cF312cGe4|31315>0e2cH312e8|312e2eI41;" #(type-error
++	%fl:print #147=#fn(":000s0e0c1|42;" #(%fl:for-each #fn(write)) print)
++	%fl:print-exception #148=#fn("=000r1|F16D02|Mc0<16:02e1|b4326S0e2c3e4|31c5e6|31c7352e8e9|31315\x130|F16D02|Mc:<16:02e1|b4326Q0e2e4|31c;e9|31c<342e8e6|31315Ù0|F16@02|Mc=<16602|NF6B0e2c>e4|31c?335²0|F16802|Mc@<6B0e2cA312e2|NQ25“0|F16802|McB<6J0eCe6|31312e2cDe4|31325l0eE|3116:02e1|b2326L0e8|M312e2cF312cGe4|31315>0e2cH312e8|312e2eI41;" #(type-error
+   %fl:length= %fl:princ "type error: " %fl:cadr ": expected " %fl:caddr ", got "
+   %fl:print %fl:cadddr bounds-error ": index " " out of bounds for "
+   unbound-error "eval: variable " " has no value" error "error: " load-error
+   %fl:print-exception "in file " %fl:list? ": " #fn("8000r1c0|3117502|C670e1540e2|41;" #(#fn(string?)
+   %fl:princ %fl:print)) "*** Unhandled exception: " *linefeed*) print-exception)
+-	%fl:print-stack-trace #148=#fn("8000r1c0q]]42;" #(#fn("=000r2c0qm02c1qm12c2qe3e4~e5670b5540b43231e6e7c8c9c:303232`43;" #(#fn("8000r3c0qc1|31g2K41;" #(#fn("9000r1c0~31c0\x7f31‚>0c1c2c3|L341;c4qc5~3141;" #(#fn(function:code)
++	%fl:print-stack-trace #149=#fn("8000r1c0q]]42;" #(#fn("=000r2c0qm02c1qm12c2qe3e4~e5670b5540b43231e6e7c8c9c:303232`43;" #(#fn("8000r3c0qc1|31g2K41;" #(#fn("9000r1c0~31c0\x7f31‚>0c1c2c3|L341;c4qc5~3141;" #(#fn(function:code)
+   #fn(raise) thrown-value ffound #fn(":000r1`e0c1|3131c2qu;" #(%fl:1- #fn(length)
+ 							       #fn("9000r1e0~|[316A0i30~|[i21i1043;];" #(%fl:closure?))))
+   #fn(function:vals))) #fn(function:name)) find-in-f)
+@@ -360,23 +363,24 @@
+   *interactive* %fl:filter %fl:closure? #fn(map)
+   #fn("7000r1|E16802c0|41;" #(#fn(top-level-value)))
+   #fn(environment)))) print-stack-trace)
+-	%fl:print-to-string #149=#fn("7000r1c0qc13041;" #(#fn("8000r1c0~|322c1|41;" #(#fn(write)
++	%fl:print-to-string #150=#fn("7000r1c0qc13041;" #(#fn("8000r1c0~|322c1|41;" #(#fn(write)
+   #fn(io.tostring!))) #fn(buffer)) print-to-string)
+-	%fl:printable? #150=#fn("7000r1c0|3117802c1|31@;" #(#fn(iostream?)
++	%fl:printable? #151=#fn("7000r1c0|3117802c1|31@;" #(#fn(iostream?)
+ 							    #fn(eof-object?)) printable?)
+-	%fl:quote-value #151=#fn("7000r1e0|31640|;c1|L2;" #(%fl:self-evaluating?
++	%fl:proper-part #152=#fn("8000r1|F6<0|Me0|N31K;_;" #(%fl:proper-part) proper-part)
++	%fl:quote-value #153=#fn("7000r1e0|31640|;c1|L2;" #(%fl:self-evaluating?
+ 							    quote) quote-value)
+-	%fl:random #152=#fn("8000r1c0|316<0e1c230|42;c330|T2;" #(#fn(integer?)
++	%fl:random #154=#fn("8000r1c0|316<0e1c230|42;c330|T2;" #(#fn(integer?)
+ 								 %fl:mod #fn(rand)
+ 								 #fn(rand.double)) random)
+-	%fl:read-all #153=#fn("8000r1e0c1|42;" #(%fl:read-all-of #fn(read)) read-all)
+-	%fl:read-all-of #154=#fn("9000r2c0q]31_|}3142;" #(#fn("6000r1c0qm02|;" #(#fn("9000r2c0i1131680e1|41;~}|Ki10i113142;" #(#fn(io.eof?)
++	%fl:read-all #155=#fn("8000r1e0c1|42;" #(%fl:read-all-of #fn(read)) read-all)
++	%fl:read-all-of #156=#fn("9000r2c0q]31_|}3142;" #(#fn("6000r1c0qm02|;" #(#fn("9000r2c0i1131680e1|41;~}|Ki10i113142;" #(#fn(io.eof?)
+   %fl:reverse!))))) read-all-of)
+-	%fl:ref-int16-LE #155=#fn(";000r2e0c1|}`w[`32c1|}aw[b832w41;" #(%fl:int16
++	%fl:ref-int16-LE #157=#fn(";000r2e0c1|}`w[`32c1|}aw[b832w41;" #(%fl:int16
+   #fn(ash)) ref-int16-LE)
+-	%fl:ref-int32-LE #156=#fn("=000r2e0c1|}`w[`32c1|}aw[b832c1|}b2w[b@32c1|}b3w[bH32R441;" #(%fl:int32
++	%fl:ref-int32-LE #158=#fn("=000r2e0c1|}`w[`32c1|}aw[b832c1|}b2w[b@32c1|}b3w[bH32R441;" #(%fl:int32
+   #fn(ash)) ref-int32-LE)
+-	%fl:repl #157=#fn("8000r0c0]]42;" #(#fn("6000r2c0m02c1qm12}302e240;" #(#fn("8000r0e0c1312c2e3312c4c5c6t41;" #(%fl:princ
++	%fl:repl #159=#fn("8000r0c0]]42;" #(#fn("6000r2c0m02c1qm12}302e240;" #(#fn("8000r0e0c1312c2e3312c4c5c6t41;" #(%fl:princ
+   "> " #fn(io.flush) *output-stream* #fn("8000r1c0e131@16<02c2e3|3141;" #(#fn(io.eof?)
+   *input-stream* #fn("7000r1e0|312|k12];" #(%fl:print that)) %fl:load-process))
+   #fn("6000r0c040;" #(#fn(read))) #fn("7000r1c0e1312c2|41;" #(#fn(io.discardbuffer)
+@@ -384,86 +388,86 @@
+   #fn("7000r0c0qc1t6;0e2302\x7f40;^;" #(#fn("7000r0~3016702e040;" #(%fl:newline))
+ 					#fn("7000r1e0|312];" #(%fl:top-level-exception-handler))
+ 					%fl:newline) reploop) %fl:newline))) repl)
+-	%fl:revappend #158=#fn("8000r2e0}|42;" #(%fl:reverse-) revappend)
+-	%fl:reverse #159=#fn("8000r1e0_|42;" #(%fl:reverse-) reverse)
+-	%fl:reverse! #160=#fn("8000r1e0_|42;" #(%fl:reverse!-) reverse!)
+-	%fl:reverse!- #161=#fn("9000r2]}F6B02}N}|}m02P2m15\x1d/2|;" #() reverse!-)
+-	%fl:reverse- #162=#fn("8000r2}…40|;e0}M|K}N42;" #(%fl:reverse-) reverse-)
+-	%fl:self-evaluating? #163=#fn("8000r1|?16602|C@17K02c0|3116A02|C16:02|c1|31<;" #(#fn(constant?)
++	%fl:revappend #160=#fn("8000r2e0}|42;" #(%fl:reverse-) revappend)
++	%fl:reverse #161=#fn("8000r1e0_|42;" #(%fl:reverse-) reverse)
++	%fl:reverse! #162=#fn("8000r1e0_|42;" #(%fl:reverse!-) reverse!)
++	%fl:reverse!- #163=#fn("9000r2]}F6B02}N}|}m02P2m15\x1d/2|;" #() reverse!-)
++	%fl:reverse- #164=#fn("8000r2}…40|;e0}M|K}N42;" #(%fl:reverse-) reverse-)
++	%fl:self-evaluating? #165=#fn("8000r1|?16602|C@17K02c0|3116A02|C16:02|c1|31<;" #(#fn(constant?)
+   #fn(top-level-value)) self-evaluating?)
+-	%fl:separate #164=#fn("7000r2c0q]41;" #(#fn(":000r1c0m02|~\x7f_L1_L144;" #(#fn(";000r4c0g2g3K]}F6Z02|}M316?0g2}M_KPNm25<0g3}M_KPNm32}Nm15\x05/241;" #(#fn("8000r1e0|MN|NN42;" #(%fl:values))) separate-)))) separate)
+-	%fl:set-syntax! #165=#fn("9000r2c0e1e2|31}43;" #(#fn(put!)
++	%fl:separate #166=#fn("7000r2c0q]41;" #(#fn(":000r1c0m02|~\x7f_L1_L144;" #(#fn(";000r4c0g2g3K]}F6Z02|}M316?0g2}M_KPNm25<0g3}M_KPNm32}Nm15\x05/241;" #(#fn("8000r1e0|MN|NN42;" #(%fl:values))) separate-)))) separate)
++	%fl:set-syntax! #167=#fn("9000r2c0e1e2|31}43;" #(#fn(put!)
+ 							 *syntax-environment*
+ 							 resolve-global) set-syntax!)
+-	%fl:simple-sort #166=#fn("7000r1|A17602|NA640|;c0q|M41;" #(#fn("8000r1e0c1qc2q42;" #(%fl:call-with-values
++	%fl:simple-sort #168=#fn("7000r1|A17602|NA640|;c0q|M41;" #(#fn("8000r1e0c1qc2q42;" #(%fl:call-with-values
+   #fn("8000r0e0c1qi10N42;" #(%fl:separate #fn("7000r1|~X;" #())))
+   #fn(":000r2c0e1|31~L1e1}3143;" #(#fn(nconc) %fl:simple-sort))))) simple-sort)
+-	%fl:splice-form? #167=#fn("8000r1|F16X02|Mc0<17N02|Mc1<17D02|Mc2<16:02e3|b23217702|c2<;" #(unquote-splicing
++	%fl:splice-form? #169=#fn("8000r1|F16X02|Mc0<17N02|Mc1<17D02|Mc2<16:02e3|b23217702|c2<;" #(unquote-splicing
+   unquote-nsplicing unquote %fl:length>) splice-form?)
+-	%fl:string.join #168=#fn("7000r2|…50c0;c1qc23041;" #("" #fn("8000r1c0|~M322e1c2q~N322c3|41;" #(#fn(io.write)
++	%fl:string.join #170=#fn("7000r2|…50c0;c1qc23041;" #("" #fn("8000r1c0|~M322e1c2q~N322c3|41;" #(#fn(io.write)
+   %fl:for-each #fn("8000r1c0~i11322c0~|42;" #(#fn(io.write)))
+   #fn(io.tostring!))) #fn(buffer)) string.join)
+-	%fl:string.lpad #169=#fn(";000r3c0e1g2}c2|31x32|42;" #(#fn(string)
++	%fl:string.lpad #171=#fn(";000r3c0e1g2}c2|31x32|42;" #(#fn(string)
+ 							       %fl:string.rep
+ 							       #fn(string.count)) string.lpad)
+-	%fl:string.map #170=#fn("9000r2c0qc130c2}3142;" #(#fn("7000r2c0q`312c1|41;" #(#fn(";000r1]|\x7fX6S02c0~i10c1i11|3231322c2i11|32m05\x0b/;" #(#fn(io.putc)
++	%fl:string.map #172=#fn("9000r2c0qc130c2}3142;" #(#fn("7000r2c0q`312c1|41;" #(#fn(";000r1]|\x7fX6S02c0~i10c1i11|3231322c2i11|32m05\x0b/;" #(#fn(io.putc)
+   #fn(string.char) #fn(string.inc))) #fn(io.tostring!)))
+ 							  #fn(buffer)
+ 							  #fn(length)) string.map)
+-	%fl:string.rep #171=#fn(";000r2}b4X6`0e0}`32650c1;}aW680c2|41;}b2W690c2||42;c2|||43;e3}316@0c2|e4|}ax3242;e4c2||32}b2U242;" #(%fl:<=
++	%fl:string.rep #173=#fn(";000r2}b4X6`0e0}`32650c1;}aW680c2|41;}b2W690c2||42;c2|||43;e3}316@0c2|e4|}ax3242;e4c2||32}b2U242;" #(%fl:<=
+   "" #fn(string) %fl:odd? %fl:string.rep) string.rep)
+-	%fl:string.rpad #172=#fn("<000r3c0|e1g2}c2|31x3242;" #(#fn(string)
++	%fl:string.rpad #174=#fn("<000r3c0|e1g2}c2|31x3242;" #(#fn(string)
+ 							       %fl:string.rep
+ 							       #fn(string.count)) string.rpad)
+-	%fl:string.tail #173=#fn(";000r2c0|c1|`}3342;" #(#fn(string.sub)
++	%fl:string.tail #175=#fn(";000r2c0|c1|`}3342;" #(#fn(string.sub)
+ 							 #fn(string.inc)) string.tail)
+-	%fl:string.trim #174=#fn("8000r3c0q]]42;" #(#fn("8000r2c0qm02c1qm12c2qc3~3141;" #(#fn(";000r4g2g3X16?02c0}c1|g232326A0~|}c2|g232g344;g2;" #(#fn(string.find)
++	%fl:string.trim #176=#fn("8000r3c0q]]42;" #(#fn("8000r2c0qm02c1qm12c2qc3~3141;" #(#fn(";000r4g2g3X16?02c0}c1|g232326A0~|}c2|g232g344;g2;" #(#fn(string.find)
+   #fn(string.char) #fn(string.inc)) trim-start)
+   #fn("<000r3e0g2`3216D02c1}c2|c3|g23232326?0\x7f|}c3|g23243;g2;" #(%fl:> #fn(string.find)
+ 								    #fn(string.char)
+ 								    #fn(string.dec)) trim-end)
+   #fn("<000r1c0i10~i10i11`|34\x7fi10i12|3343;" #(#fn(string.sub)))
+   #fn(length)))) string.trim)
+-	%fl:symbol-syntax #175=#fn("9000r1c0e1|^43;" #(#fn(get)
++	%fl:symbol-syntax #177=#fn("9000r1c0e1|^43;" #(#fn(get)
+ 						       *syntax-environment*) symbol-syntax)
+-	%fl:table.clone #176=#fn("7000r1c0qc13041;" #(#fn("9000r1c0c1q_~332|;" #(#fn(table.foldl)
++	%fl:table.clone #178=#fn("7000r1c0qc13041;" #(#fn("9000r1c0c1q_~332|;" #(#fn(table.foldl)
+   #fn("9000r3c0~|}43;" #(#fn(put!))))) #fn(table)) table.clone)
+-	%fl:table.foreach #177=#fn("9000r2c0c1q_}43;" #(#fn(table.foldl)
++	%fl:table.foreach #179=#fn("9000r2c0c1q_}43;" #(#fn(table.foldl)
+ 							#fn("8000r3~|}322];" #())) table.foreach)
+-	%fl:table.invert #178=#fn("7000r1c0qc13041;" #(#fn("9000r1c0c1q_~332|;" #(#fn(table.foldl)
++	%fl:table.invert #180=#fn("7000r1c0qc13041;" #(#fn("9000r1c0c1q_~332|;" #(#fn(table.foldl)
+   #fn("9000r3c0~}|43;" #(#fn(put!))))) #fn(table)) table.invert)
+-	%fl:table.keys #179=#fn("9000r1c0c1_|43;" #(#fn(table.foldl)
++	%fl:table.keys #181=#fn("9000r1c0c1_|43;" #(#fn(table.foldl)
+ 						    #fn("7000r3|g2K;" #())) table.keys)
+-	%fl:table.pairs #180=#fn("9000r1c0c1_|43;" #(#fn(table.foldl)
++	%fl:table.pairs #182=#fn("9000r1c0c1_|43;" #(#fn(table.foldl)
+ 						     #fn("7000r3|}Kg2K;" #())) table.pairs)
+-	%fl:table.values #181=#fn("9000r1c0c1_|43;" #(#fn(table.foldl)
++	%fl:table.values #183=#fn("9000r1c0c1_|43;" #(#fn(table.foldl)
+ 						      #fn("7000r3}g2K;" #())) table.values)
+-	%fl:to-proper #182=#fn("8000r1|…40|;|?660|L1;|Me0|N31K;" #(%fl:to-proper) to-proper)
+-	%fl:top-level-exception-handler #183=#fn("7000r1c0qe141;" #(#fn("7000r1e0k12c2qc3q41;" #(*stderr*
++	%fl:to-proper #184=#fn("8000r1|…40|;|?660|L1;|Me0|N31K;" #(%fl:to-proper) to-proper)
++	%fl:top-level-exception-handler #185=#fn("7000r1c0qe141;" #(#fn("7000r1e0k12c2qc3q41;" #(*stderr*
+   *output-stream* #fn("7000r1c0qc1qt|302;" #(#fn("7000r0e0i20312e1c23041;" #(%fl:print-exception
+   %fl:print-stack-trace #fn(stacktrace)))
+ 					     #fn("7000r1~302c0|41;" #(#fn(raise)))))
+   #fn("6000r0~k0;" #(*output-stream*)))) *output-stream*) top-level-exception-handler)
+-	%fl:trace #184=#fn("8000r1c0qc1|31312c2;" #(#fn("7000r1c0qc13041;" #(#fn("@000r1e0~317e0c1i10e2c3|c4c5c6c7i10L2|L3L2c8L1c9c7~L2|L3L4L33142;];" #(%fl:traced?
++	%fl:trace #186=#fn("8000r1c0qc1|31312c2;" #(#fn("7000r1c0qc13041;" #(#fn("@000r1e0~317e0c1i10e2c3|c4c5c6c7i10L2|L3L2c8L1c9c7~L2|L3L4L33142;];" #(%fl:traced?
+   #fn(set-top-level-value!) %fl:eval lambda begin write cons quote newline
+   apply)) #fn(gensym))) #fn(top-level-value) ok) trace)
+-	%fl:traced? #185=#fn("8000r1e0|3116>02c1|31c1~31>;" #(%fl:closure? #fn(function:code)) #(#fn(":000s0c0c1|K312e2302c3|v2;" #(#fn(write)
++	%fl:traced? #187=#fn("8000r1e0|3116>02c1|31c1~31>;" #(%fl:closure? #fn(function:code)) #(#fn(":000s0c0c1|K312e2302c3|v2;" #(#fn(write)
+   x %fl:newline #.apply)) ()))
+ 	%fl:uint16 #fn(uint16) %fl:uint32
+ 	#fn(uint32) %fl:uint64 #fn(uint64) %fl:uint8
+ 	#fn(uint8) %fl:ulong #fn(ulong) %fl:uncurry-define
+-	#186=#fn("=000r1|NF16D02e0|31F16902e1|31F6P0e2|Me1|31c3c4e5|31e6|3133L341;|;" #(%fl:cadr
++	#188=#fn("=000r1|NF16D02e0|31F16902e1|31F6P0e2|Me1|31c3c4e5|31e6|3133L341;|;" #(%fl:cadr
+   %fl:caadr %fl:uncurry-define #fn(list*) lambda %fl:cdadr %fl:cddr) uncurry-define)
+-	%fl:untrace #187=#fn("8000r1c0qc1|3141;" #(#fn("9000r1e0|316@0c1~c2|31b2[42;];" #(%fl:traced?
++	%fl:untrace #189=#fn("8000r1c0qc1|3141;" #(#fn("9000r1e0|316@0c1~c2|31b2[42;];" #(%fl:traced?
+   #fn(set-top-level-value!) #fn(function:vals)))
+ 						   #fn(top-level-value)) untrace)
+-	%fl:values #188=#fn("9000s0|F16602|NA650|M;~|K;" #() #2#)
+-	%fl:vector->list #189=#fn("8000r1c0qc1|31_42;" #(#fn(":000r2a|c0qu2};" #(#fn("8000r1i10~|x[\x7fKo01;" #())))
++	%fl:values #190=#fn("9000s0|F16602|NA650|M;~|K;" #() #2#)
++	%fl:vector->list #191=#fn("8000r1c0qc1|31_42;" #(#fn(":000r2a|c0qu2};" #(#fn("8000r1i10~|x[\x7fKo01;" #())))
+ 							 #fn(length)) vector->list)
+-	%fl:vector.map #190=#fn("8000r2c0qc1}3141;" #(#fn("8000r1c0qc1|3141;" #(#fn(":000r1`~axc0qu2|;" #(#fn(":000r1~|i20i21|[31\\;" #())))
++	%fl:vector.map #192=#fn("8000r2c0qc1}3141;" #(#fn("8000r1c0qc1|3141;" #(#fn(":000r1`~axc0qu2|;" #(#fn(":000r1~|i20i21|[31\\;" #())))
+   #fn(vector.alloc))) #fn(length)) vector.map)
+-	%fl:void #191=#fn("6000r0];" #() void) %fl:wchar
+-	#fn(wchar) %fl:zero? #192=#fn("7000r1|`W;" #() zero?) *banner*
++	%fl:void #193=#fn("6000r0];" #() void) %fl:wchar
++	#fn(wchar) %fl:zero? #194=#fn("7000r1|`W;" #() zero?) *banner*
+ 	";  _\n; |_ _ _ |_ _ |  . _ _\n; | (-||||_(_)|__|_)|_)\n;-------------------|----------------------------------------------------------\n\n"
+ 	*builtins* #(0 0 0 0 0 0 0 0 0 0 0 0 #fn("7000r2|}<;" #())
+ 		     #fn("7000r2|}=;" #())
+@@ -497,7 +501,7 @@
+ 		     #fn("9000s0c0|v2;" #(#.vector))
+ 		     #fn("7000r2|}[;" #())
+ 		     #fn("8000r3|}g2\\;" #()))
+-	*interactive* #f *print-shared* #t
++	*interactive* #f *keep-source* #f *print-shared* #t
+ 	*syntax-environment* #table(letrec #fn("?000s1c0c0c1L1c2c3|32L1c2c4|32c5}3134L1c2c6|3242;" #(#fn(nconc)
+   lambda #fn(map) #.car #fn("9000r1c0c1L1c2|3142;" #(#fn(nconc) set! #fn(copy-list)))
+   #fn(copy-list) #fn("6000r1e040;" #(%fl:void))))  quasiquote #fn("8000r1e0|`42;" #(%fl:bq-process))  when #fn("<000s1c0|c1}K^L4;" #(if
+@@ -582,55 +586,57 @@
+ 	#89# expand #90# expand-define
+ 	#91# filter #92# fits-i8
+ 	#93# foldl #94# foldr
+-	#95# for-each #96# get-defined-vars
+-	#97# hex5 #98# identity
+-	#99# in-env? #100# index-of
+-	#101# io.readall #102# io.readline
+-	#103# io.readlines #104# iota
+-	#105# keyword->symbol #106# keyword-arg?
+-	#107# lambda-arg-names #108# lambda-vars
+-	#109# last-pair #110# lastcdr
+-	#111# length= #112# length>
+-	#113# list->vector #114# list-head
+-	#115# list-ref #116# list-tail
+-	#117# list? #118# load
+-	#119# load-process #120# lookup-sym
+-	#121# macrocall? #122# macroexpand-1
+-	#123# make-code-emitter #124# make-label
+-	#125# make-perfect-hash-table #126# make-system-image
+-	#127# map! #128# map-int
+-	#129# mark-label #130# max
+-	#131# member #132# memv
+-	#133# min #134# mod
+-	#135# mod0 #136# nan?
+-	#137# negative? #138# nestlist
+-	#139# newline #140# nnn
+-	#141# nreconc #142# odd?
+-	#143# positive? #144# princ
+-	#145# print #146# print-exception
+-	#147# print-stack-trace #148# print-to-string
+-	#149# printable? #150# quote-value
+-	#151# random #152# read-all
+-	#153# read-all-of #154# ref-int16-LE
+-	#155# ref-int32-LE #156# repl
+-	#157# resolve-global #fn("6000r1|;" #()) revappend
+-	#158# reverse #159# reverse!
+-	#160# reverse!- #161# reverse-
+-	#162# self-evaluating? #163# separate
+-	#164# set-syntax! #165# simple-sort
+-	#166# special-forms (quote if begin prog1 lambda and or while for
+-			     return set! define trycatch)
+-	splice-form? #167# string.join
+-	#168# string.lpad #169# string.map
+-	#170# string.rep #171# string.rpad
+-	#172# string.tail #173# string.trim
+-	#174# symbol-syntax #175# table.clone
+-	#176# table.foreach #177# table.invert
+-	#178# table.keys #179# table.pairs
+-	#180# table.values #181# to-proper
+-	#182# top-level-exception-handler
+-	#183# trace #184# traced?
+-	#185# uncurry-define #186# untrace
+-	#187# values #188# vector->list
+-	#189# vector.map #190# void
+-	#191# zero? #192#)
++	#95# for-each #96# function-source
++	#97# get-defined-vars #98# hex5
++	#99# identity #100# in-env?
++	#101# index-of #102# io.readall
++	#103# io.readline #104# io.readlines
++	#105# iota #106# keyword->symbol
++	#107# keyword-arg? #108# lambda-arg-names
++	#109# lambda-vars #110# last-pair
++	#111# lastcdr #112# length=
++	#113# length> #114# list->vector
++	#115# list-head #116# list-ref
++	#117# list-tail #118# list?
++	#119# load #120# load-process
++	#121# lookup-sym #122# macrocall?
++	#123# macroexpand-1 #124# make-code-emitter
++	#125# make-label #126#
++	make-perfect-hash-table #127# make-system-image
++	#128# map! #129# map-int
++	#130# mark-label #131# max
++	#132# member #133# memv
++	#134# min #135# mod
++	#136# mod0 #137# nan?
++	#138# negative? #139# nestlist
++	#140# newline #141# nnn
++	#142# nreconc #143# odd?
++	#144# positive? #145# princ
++	#146# print #147# print-exception
++	#148# print-stack-trace #149# print-to-string
++	#150# printable? #151# proper-part
++	#152# quote-value #153# random
++	#154# read-all #155# read-all-of
++	#156# ref-int16-LE #157# ref-int32-LE
++	#158# repl #159# resolve-global
++	#fn("6000r1|;" #()) revappend #160# reverse
++	#161# reverse! #162# reverse!-
++	#163# reverse- #164# self-evaluating?
++	#165# separate #166# set-syntax!
++	#167# simple-sort #168# special-forms
++	(quote if begin prog1 lambda and or while for return set! define
++	 trycatch)
++	splice-form? #169# string.join
++	#170# string.lpad #171# string.map
++	#172# string.rep #173# string.rpad
++	#174# string.tail #175# string.trim
++	#176# symbol-syntax #177# table.clone
++	#178# table.foreach #179# table.invert
++	#180# table.keys #181# table.pairs
++	#182# table.values #183# to-proper
++	#184# top-level-exception-handler
++	#185# trace #186# traced?
++	#187# uncurry-define #188# untrace
++	#189# values #190# vector->list
++	#191# vector.map #192# void
++	#193# zero? #194#)
+-- 
+2.50.1 (Apple Git-155)
+

@@ -1,0 +1,92 @@
+From 14b94ac12a498a52a21cc6c72263f1642fc90009 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 17:29:42 +0100
+Subject: [PATCH 14/20] Reader: a datum at the very end of the input is read
+ (the eof object only when nothing is left)
+
+---
+ iostream.c |  4 ++--
+ read.c     | 18 +++++++++++++++---
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/iostream.c b/iostream.c
+index 9f0d3f8..e82cba2 100644
+--- a/iostream.c
++++ b/iostream.c
+@@ -121,8 +121,8 @@ value_t fl_read(value_t *args, u_int32_t nargs)
+     fl_gc_handle(&arg);
+     value_t v = fl_read_sexpr(arg);
+     fl_free_gc_handles(1);
+-    if (ios_eof(value2c(ios_t*,arg)))
+-        return FL_EOF;
++    // TeXmacs: the reader gives the eof object when nothing is left to read
++    // (a datum at the very end of the stream is not the end)
+     return v;
+ }
+ 
+diff --git a/read.c b/read.c
+index eacb2cc..e881f76 100644
+--- a/read.c
++++ b/read.c
+@@ -106,28 +106,37 @@ static u_int32_t toktype = TOK_NONE;
+ static value_t tokval;
+ static char buf[16384];
+ 
++// TeXmacs: set when nextchar reaches the end of the input (the end of the
++// stream after the last character which was read is not the end of input)
++static int nextchar_eof = 0;
++
+ static char nextchar(void)
+ {
+     int ch;
+     char c;
+     ios_t *f = F;
+ 
++    nextchar_eof = 0;
+     do {
+         if (f->bpos < f->size) {
+             ch = f->buf[f->bpos++];
+         }
+         else {
+             ch = ios_getc(f);
+-            if (ch == IOS_EOF)
++            if (ch == IOS_EOF) {
++                nextchar_eof = 1;
+                 return 0;
++            }
+         }
+         c = (char)ch;
+         if (c == ';') {
+             // single-line comment
+             do {
+                 ch = ios_getc(f);
+-                if (ch == IOS_EOF)
++                if (ch == IOS_EOF) {
++                    nextchar_eof = 1;
+                     return 0;
++                }
+             } while ((char)ch != '\n');
+             c = (char)ch;
+         }
+@@ -184,7 +193,7 @@ static u_int32_t peek(void)
+     if (toktype != TOK_NONE)
+         return toktype;
+     c = nextchar();
+-    if (ios_eof(F)) return TOK_NONE;
++    if (nextchar_eof) return TOK_NONE;
+     if (c == '(') {
+         toktype = TOK_OPEN;
+     }
+@@ -583,6 +592,9 @@ static value_t do_read_sexpr(value_t label)
+     t = peek();
+     take();
+     switch (t) {
++    case TOK_NONE:
++        // TeXmacs: nothing left to read
++        return FL_EOF;
+     case TOK_CLOSE:
+         lerror(ParseError, "read: unexpected ')'");
+     case TOK_CLOSEB:
+-- 
+2.50.1 (Apple Git-155)
+

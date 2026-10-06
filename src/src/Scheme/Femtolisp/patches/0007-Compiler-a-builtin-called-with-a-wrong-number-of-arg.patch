@@ -1,0 +1,79 @@
+From 7e218a948c4590e2299ed3d2ac48b04265ded73a Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 16:55:21 +0100
+Subject: [PATCH 07/20] Compiler: a builtin called with a wrong number of
+ arguments is a plain call, the error is raised at run time; boot image
+ regenerated
+
+---
+ compiler.lsp | 9 +++++++++
+ flisp.boot   | 9 ++++++---
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/compiler.lsp b/compiler.lsp
+index a0fa203..29fba26 100644
+--- a/compiler.lsp
++++ b/compiler.lsp
+@@ -366,6 +366,14 @@
+     (lambda (b)
+       (get b2i b #f))))
+ 
++; a call of a builtin with a wrong number of arguments is compiled as a
++; plain call: the error is raised when it is evaluated (TeXmacs: as Guile)
++(define (builtin-argc-ok? head nargs)
++  (let ((count (get arg-counts head #f)))
++    (and (or (not count) (= nargs count))
++	 (not (and (= nargs 0) (or (eq? head -) (eq? head /))))
++	 (not (and (< nargs 2) (eq? head apply))))))
++
+ (define (compile-builtin-call g env tail? x head b nargs)
+   (let ((count (get arg-counts head #f)))
+     (if (and count
+@@ -412,6 +420,7 @@
+ 		 (let ((nargs (compile-arglist g env (cdr x))))
+ 		   (emit g (if tail? 'tcall.l 'call.l) nargs)))
+ 	  (let ((b (and (builtin? head)
++			(builtin-argc-ok? head (length (cdr x)))
+ 			(builtin->instruction head))))
+ 	    (if (and (eq? head 'cadr)
+ 		     (eq? ghead 'cadr)
+diff --git a/flisp.boot b/flisp.boot
+index b24ed6d..d9d3d10 100644
+--- a/flisp.boot
++++ b/flisp.boot
+@@ -107,6 +107,8 @@
+   reverse! unquote nreconc #.list 'unquote bq-process bq-bracket))))) bq-process)
+ 	  builtin->instruction #fn("9000r1c0~|^43;" #(#fn(get)) #(#table(#.equal? equal?  #.* *  #.car car  #.apply apply  #.aref aref  #.- -  #.boolean? boolean?  #.builtin? builtin?  #.null? null?  #.eqv? eqv?  #.function? function?  #.bound? bound?  #.cdr cdr  #.list list  #.set-car! set-car!  #.cons cons  #.atom? atom?  #.set-cdr! set-cdr!  #.symbol? symbol?  #.eq? eq?  #.vector vector  #.not not  #.pair? pair?  #.number? number?  #.div0 div0  #.aset! aset!  #.+ +  #.= =  #.compare compare  #.vector? vector?  #./ /  #.< <  #.fixnum? fixnum?)
+ 								  ()))
++	  builtin-argc-ok? #fn(":000r2c0qc1e2|^3341;" #(#fn("7000r1|@17602\x7f|W16\\02\x7f`W16@02~c0<17702~c1<@16A02\x7fb2X16702~c2<@;" #(#.-
++  #./ #.apply)) #fn(get) arg-counts) builtin-argc-ok?)
+ 	  caaaar #fn("6000r1|MMMM;" #() caaaar) caaadr
+ 	  #fn("6000r1|„MM;" #() caaadr) caaar #fn("6000r1|MMM;" #() caaar)
+ 	  caadar #fn("6000r1|M„M;" #() caadar) caaddr
+@@ -130,11 +132,12 @@
+ 	  #fn("7000r1c0|31c1<;" #(#fn(typeof) wchar) char?) closure? #fn("7000r1|J16602|G@;" #() closure?)
+ 	  compile #fn("8000r1e0_|42;" #(compile-f) compile) compile-and
+ 	  #fn("<000r4e0|}g2g3]c146;" #(compile-short-circuit brf) compile-and)
+-	  compile-app #fn("7000r4c0qg3M41;" #(#fn("9000r1c0q|C16:02e1|\x7f32@6:0e2|31530|41;" #(#fn("9000r1c0q~C16X02e1~i1132@16J02|E16C02c2|3116902c3|31G6:0c3|31530~41;" #(#fn(":000r1e0i23Nc1326S0e2i20i21^|342c3qe4i20i21i23N3341;c5q|G16802e6|3141;" #(length>
++	  compile-app #fn("7000r4c0qg3M41;" #(#fn("9000r1c0q|C16:02e1|\x7f32@6:0e2|31530|41;" #(#fn("9000r1c0q~C16X02e1~i1132@16J02|E16C02c2|3116902c3|31G6:0c3|31530~41;" #(#fn(":000r1e0i23Nc1326S0e2i20i21^|342c3qe4i20i21i23N3341;c5q|G16J02e6|c7i23N313216802e8|3141;" #(length>
+   255 compile-in #fn(":000r1e0i30i32670c1540c2|43;" #(emit tcall.l call.l))
+   compile-arglist #fn(";000r1~c0<16c02i10c0<16X02e1~i3132@16J02c2c031e0>16<02e3i33b2326L0e4i30i31^i33„342e5i30c042;|7A0e4i30i31^~34530]2c6qe7i30i31i33N3341;" #(cadr
+   in-env? #fn(top-level-value) length= compile-in emit #fn("=000r1~6H0e0i40i41i42i43i10~|47;e1i40i42670c2540c3|43;" #(compile-builtin-call
+-  emit tcall call)) compile-arglist)) builtin->instruction)) in-env? #fn(constant?)
++  emit tcall call)) compile-arglist)) builtin-argc-ok? #fn(length)
++  builtin->instruction)) in-env? #fn(constant?)
+   #fn(top-level-value))) in-env? resolve-global))) compile-app)
+ 	  compile-arglist #fn("8000r3e0c1qg2322c2g241;" #(for-each #fn(":000r1e0~\x7f^|44;" #(compile-in))
+ 							  #fn(length)) compile-arglist)
+@@ -155,7 +158,7 @@
+   largc lvargc vargc argc compile-in ret values #fn(function) encode-byte-code
+   bcode:code const-to-idx-vec)) filter keyword-arg?))
+   #fn(length))) #fn(length))) make-code-emitter lastcdr lambda-vars filter #.pair?
+-  lambda))) #0=#(#:g724 ()))
++  lambda))) #0=#(#:g731 ()))
+ 	  compile-for #fn(":000r5e0g4316X0e1|}^g2342e1|}^g3342e1|}^g4342e2|c342;e4c541;" #(1arg-lambda?
+   compile-in emit for error "for: third form must be a 1-argument lambda") compile-for)
+ 	  compile-if #fn("<000r4c0qe1|31e1|31g3„e2g331e3g331F6;0e4g331560e53045;" #(#fn(";000r5g2]‚>0e0~\x7fi02g344;g2^‚>0e0~\x7fi02g444;e0~\x7f^g2342e1~c2|332e0~\x7fi02g3342i026<0e1~c3325:0e1~c4}332e5~|322e0~\x7fi02g4342e5~}42;" #(compile-in
+-- 
+2.50.1 (Apple Git-155)
+

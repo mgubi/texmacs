@@ -1,0 +1,84 @@
+From 98ce521c1502556b1185d8442bcc3382d1cb5612 Mon Sep 17 00:00:00 2001
+From: tm <tm@x>
+Date: Tue, 6 Oct 2026 16:25:30 +0100
+Subject: [PATCH 02/20] Hooks for embedding: extra GC roots, equality and hash
+ of opaque values
+
+---
+ equal.c | 7 +++++++
+ flisp.c | 4 ++++
+ flisp.h | 9 +++++++++
+ 3 files changed, 20 insertions(+)
+
+diff --git a/equal.c b/equal.c
+index 4184a55..8ad78b5 100644
+--- a/equal.c
++++ b/equal.c
+@@ -94,6 +94,11 @@ static value_t bounded_compare(value_t a, value_t b, int bound, int eq)
+         if (iscvalue(b)) {
+             if (cv_isPOD((cvalue_t*)ptr(a)) && cv_isPOD((cvalue_t*)ptr(b)))
+                 return cvalue_compare(a, b);
++            if (cv_class((cvalue_t*)ptr(a)) == cv_class((cvalue_t*)ptr(b))) {
++                cvtable_t *vt = cv_class((cvalue_t*)ptr(a))->vtable;
++                if (vt != NULL && vt->equal != NULL)
++                    return fixnum(vt->equal(a, b) ? 0 : 1);
++            }
+             return fixnum(1);
+         }
+         break;
+@@ -322,6 +327,8 @@ static uptrint_t bounded_hash(value_t a, int bound, int *oob)
+         return doublehash(u.i64);
+     case TAG_CVALUE:
+         cv = (cvalue_t*)ptr(a);
++        if (cv_class(cv)->vtable != NULL && cv_class(cv)->vtable->hash != NULL)
++            return cv_class(cv)->vtable->hash(a);
+         data = cv_data(cv);
+         return memhash(data, cv_len(cv));
+ 
+diff --git a/flisp.c b/flisp.c
+index 08f5c4b..b7b6b95 100644
+--- a/flisp.c
++++ b/flisp.c
+@@ -522,6 +522,8 @@ static void trace_globals(symbol_t *root)
+ 
+ static value_t memory_exception_value;
+ 
++void (*fl_gc_extra_roots)(value_t (*reloc)(value_t)) = NULL;
++
+ void gc(int mustgrow)
+ {
+     static int grew = 0;
+@@ -552,6 +554,8 @@ void gc(int mustgrow)
+     }
+     for (i=0; i < N_GCHND; i++)
+         *GCHandleStack[i] = relocate(*GCHandleStack[i]);
++    if (fl_gc_extra_roots)
++        fl_gc_extra_roots(relocate);
+     trace_globals(symtab);
+     relocate_typetable();
+     rs = readstate;
+diff --git a/flisp.h b/flisp.h
+index 8c069b3..7837656 100644
+--- a/flisp.h
++++ b/flisp.h
+@@ -208,8 +208,17 @@ typedef struct {
+     void (*relocate)(value_t oldv, value_t newv);
+     void (*finalize)(value_t self);
+     void (*print_traverse)(value_t self);
++    // optional (TeXmacs): equality and hash of opaque values, for equal?
++    // and the equal hash tables; nonzero when a and b are equal
++    int (*equal)(value_t a, value_t b);
++    uptrint_t (*hash)(value_t self);
+ } cvtable_t;
+ 
++// optional (TeXmacs): called by the garbage collector with the relocation
++// function, to update the values that C or C++ code holds outside the Lisp
++// stack and the GC handles
++extern void (*fl_gc_extra_roots)(value_t (*reloc)(value_t));
++
+ /* functions needed to implement the value interface (cvtable_t) */
+ typedef enum { T_INT8, T_UINT8, T_INT16, T_UINT16, T_INT32, T_UINT32,
+                T_INT64, T_UINT64, T_FLOAT, T_DOUBLE } numerictype_t;
+-- 
+2.50.1 (Apple Git-155)
+
