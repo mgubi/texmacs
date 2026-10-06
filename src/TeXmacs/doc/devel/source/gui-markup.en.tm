@@ -215,6 +215,9 @@
 
   <section|A small example>
 
+  More examples, which can be tried, are in <hlink|examples of the
+  graphical user interface through markup|gui-markup-examples.en.tm>.
+
   A document with the style <verbatim|gui-button> (or <verbatim|gui-dark>,
   <verbatim|gui-bright>) shows such a widget; the commands are written as
   strings, and may use <scm|answer> and <scm|name>:
