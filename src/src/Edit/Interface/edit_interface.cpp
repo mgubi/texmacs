@@ -540,16 +540,18 @@ edit_interface_rep::compute_env_rects (path p, rectangles& rs, bool recurse) {
       if (is_func (st[i], ROW))
         for (int j=0; j<N(st[i]); j++) {
           selection sel= eb->find_check_selection (p*i*j*0, p*i*j*1);
+          // NOTE: cells covered by a joined cell are not typeset
+          if (!sel->valid) continue;
           rectangles rsel= copy (thicken (sel->rs, 0, 2 * pixel));
           if (i > 0 && is_func (st[i-1], ROW) && j < N(st[i-1])) {
             selection bis= eb->find_check_selection (p*(i-1)*j*0, p*(i-1)*j*1);
             rectangles rbis= copy (thicken (bis->rs, 0, 2 * pixel));
-            correct_adjacent (rbis, rsel);
+            if (bis->valid) correct_adjacent (rbis, rsel);
           }
           if (i+1 < N(st) && is_func (st[i+1], ROW) && j < N(st[i+1])) {
             selection bis= eb->find_check_selection (p*(i+1)*j*0, p*(i+1)*j*1);
             rectangles rbis= copy (thicken (bis->rs, 0, 2 * pixel));
-            correct_adjacent (rsel, rbis);
+            if (bis->valid) correct_adjacent (rsel, rbis);
           }
           rectangles selp= thicken (rsel,  pixel/2,  pixel/2);
           rectangles selm= thicken (rsel, -pixel/2, -pixel/2);
@@ -1213,6 +1215,10 @@ edit_interface_rep::is_editor_widget () {
 bool
 edit_interface_rep::is_embedded_widget () {
   if (!has_subtree (et, rp) || subtree (et, rp) == tree (UNINIT)) return false;
+  // the view was closed (delete_view), but its widget may still receive
+  // events, such as the focus event posted when it was created: like an
+  // embedded widget, it should not take the focus
+  if (buf == NULL) return true;
   string name= as_string (buf->buf->name);
   return starts (name, "tmfs://aux/");
   // FIXME: could be made more robust: test should not be based on file name

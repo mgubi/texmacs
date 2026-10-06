@@ -49,6 +49,7 @@
   ("ollama-text-input" "on" noop)
   ("chatgpt-text-input" "on" noop)
   ("gemini-text-input" "on" noop)
+  ("gemini model" "gemini-2.0-flash" noop)
   ("open-mistral-7b-text-input" "on" noop)
   ("albert api key" "" noop)
   ("albert-text-input" "on" noop)
@@ -57,8 +58,9 @@
   ("albert ai-agents translator" "default" noop)
   ("albert model" "openweight-large" noop))
 
-(with key (getenv "ALBERT_API_KEY")
-  (when key (set-preference "albert api key" key)))
+(tm-define (albert-env-key?)
+  (with key (getenv "ALBERT_API_KEY")
+    (and key (!= key ""))))
 
 (tm-define (ai-models)
   (list "chatgpt" "gemini" "open-mistral-7b" "albert" "ollama"))
@@ -83,11 +85,14 @@
   (assuming (== name "albert")
     (with model (string-append name " model")
       (aligned
-	(item (text "API key")
-          (enum (set-preference "albert api key" answer)
-                (list (get-preference "albert api key")
-		      (or (getenv "ALBERT_API_KEY") ""))
-		(get-preference "albert api key") "11em"))
+        (assuming (albert-env-key?)
+          (item (text "API key")
+            (text "from ALBERT_API_KEY")))
+        (assuming (not (albert-env-key?))
+          (item (text "API key")
+            (input (when answer (set-preference "albert api key" answer))
+                   "password" (list (get-preference "albert api key"))
+                   "11em")))
         (item (text model)
           (enum (set-preference model answer)
 		(albert-variants)
@@ -201,7 +206,8 @@
         (dynamic (focus-ai-agents-interlocutor (focus-session-language*))))))
 
 (tm-define (has-albert?)
-  (!= (get-preference "albert api key") ""))
+  (or (albert-env-key?)
+      (!= (get-preference "albert api key") "")))
 
 (plugin-configure albert
   (:require (has-albert?))

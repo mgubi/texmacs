@@ -717,8 +717,23 @@
 (tm-define (titled-named? t)
   (tree-in? t (render-titled-tag-list)))
 
+(define (figure-type t)
+  ;; the type of a figure-like environment, "table" for small-table*
+  (let* ((s (symbol->string (tree-label t)))
+         (s* (if (string-ends? s "*") (string-drop-right s 1) s)))
+    (cond ((string-starts? s* "small-") (string-drop s* 6))
+          ((string-starts? s* "big-") (string-drop s* 4))
+          (else "figure"))))
+
+(define (figure-tag prefix type l)
+  ;; the environment of the list @l for the @type of a named figure
+  (let* ((s (if (tree-atomic? type) (tree->string type) ""))
+         (tag (string->symbol (string-append prefix s))))
+    (if (in? tag l) tag (string->symbol (string-append prefix "figure")))))
+
 (tm-define (titled-toggle-name t)
-  (cond ((tree-in? t (numbered-unnumbered-append (theorem-tag-list)))
+  (cond ((tree-in? t (numbered-unnumbered-append
+                      (append (theorem-tag-list) (definition-tag-list))))
          (tree-set! t `(render-theorem "" ,(tree-ref t 0))))
         ((tree-in? t (numbered-unnumbered-append (remark-tag-list)))
          (tree-set! t `(render-remark "" ,(tree-ref t 0))))
@@ -731,11 +746,11 @@
         ((tree-in? t '(proof))
          (tree-set! t `(render-proof "" ,(tree-ref t 0))))
         ((tree-in? t (numbered-unnumbered-append (small-figure-tag-list)))
-         (tree-set! t `(render-small-figure "" "" ,(tree-ref t 0)
-                                                  ,(tree-ref t 1))))
+         (tree-set! t `(render-small-figure ,(figure-type t) ""
+                                            ,(tree-ref t 0) ,(tree-ref t 1))))
         ((tree-in? t (numbered-unnumbered-append (big-figure-tag-list)))
-         (tree-set! t `(render-big-figure "" "" ,(tree-ref t 0)
-                                                ,(tree-ref t 1))))
+         (tree-set! t `(render-big-figure ,(figure-type t) ""
+                                          ,(tree-ref t 0) ,(tree-ref t 1))))
         ((tree-is? t 'render-theorem)
          (tree-set! t `(theorem ,(tree-ref t 1))))
         ((tree-is? t 'render-remark)
@@ -747,9 +762,13 @@
         ((tree-is? t 'render-proof)
          (tree-set! t `(proof ,(tree-ref t 1))))
         ((tree-is? t 'render-small-figure)
-         (tree-set! t `(small-figure ,(tree-ref t 2) ,(tree-ref t 3))))
+         (tree-set! t `(,(figure-tag "small-" (tree-ref t 0)
+                                     (small-figure-tag-list))
+                        ,(tree-ref t 2) ,(tree-ref t 3))))
         ((tree-is? t 'render-big-figure)
-         (tree-set! t `(big-figure ,(tree-ref t 2) ,(tree-ref t 3))))))
+         (tree-set! t `(,(figure-tag "big-" (tree-ref t 0)
+                                     (big-figure-tag-list))
+                        ,(tree-ref t 2) ,(tree-ref t 3))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Framed environments

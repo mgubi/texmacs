@@ -103,6 +103,6 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
+    <associate|language|spanish>
   </collection>
 </initial>

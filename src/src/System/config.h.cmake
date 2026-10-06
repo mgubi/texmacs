@@ -180,7 +180,7 @@
 
 #cmakedefine TEXMACS_FIX_1_GNUTLS 1
 #cmakedefine TEXMACS_REVISION "@TEXMACS_REVISION@"
-#cmakedefine TM_DYNAMIC_LINKING 1
+#cmakedefine TM_DYNAMIC_LINKING @TM_DYNAMIC_LINKING@
 
 /* Optional features and libraries */
 #cmakedefine USE_ASPELL 1

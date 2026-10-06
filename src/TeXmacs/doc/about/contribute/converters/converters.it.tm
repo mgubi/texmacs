@@ -16,7 +16,7 @@
   maggiori di implementazione e forse richiedere una più stretta
   collaborazione con gli autori principali di <TeXmacs>. In
   <apply|hyper-link|<apply|menu|Help|Source code|Data
-  format>|../../../devel/format/format.en.tm> sono disponibili dettagli sul
+  format>|../../../devel/format/basics/basics.en.tm> sono disponibili dettagli sul
   formato dati di <apply|TeXmacs> e in <apply|hyper-link|<apply|menu|Help|Source
   code|Data conversion>|../../../devel/source/conversions.en.tm> vengono
   forniti suggerimenti utili per questo genere di progetti.

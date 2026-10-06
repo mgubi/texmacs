@@ -63,7 +63,7 @@
     <em|export-struct> <em|options>)>>>questa opzione è simile a
     <verbatim|:launch>, salvo che ora l'applicazione esterna viene collegata
     dinamicamente. Per ulteriori informazioni si rimanda alla sezione
-    relativa ai <apply|hyper-link|link dinamici|../interface/interface-dynlibs.it.tm>;
+    relativa ai <apply|hyper-link|link dinamici|../interface/interface-dynlibs.en.tm>;
 
     <expand|item*|<verbatim|<with|font series|medium|(:session
     <em|menu-nome>)>>>questa opzione indica che il plugin supporta una

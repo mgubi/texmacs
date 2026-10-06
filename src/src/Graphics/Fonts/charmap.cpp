@@ -164,7 +164,7 @@ struct join_charmap_rep: public charmap_rep {
     int i, sum= 0;
     for (i=0; i<jn; i++) {
       int p= ja[i] -> arity ();
-      if (ch >= sum && ch < sum+p) return ja[i] -> child (i-sum);
+      if (ch >= sum && ch < sum+p) return ja[i] -> child (ch-sum);
       sum += p;
     }
     FAILED ("bad child");

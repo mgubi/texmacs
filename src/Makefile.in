@@ -56,36 +56,30 @@ SIGN = misc/admin/sign_update
 ###############################################################################
 
 TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS @MKGUILE@
-	if test "$(TEXMACS_DEPS)" != "no"; then \
-		cd src; $(MAKE) -f makefile deps; \
-	fi
 	cd src; $(MAKE) -r -f makefile
 	$(MAKE) -f Makefile PLUGINS
 	$(MAKE) -f Makefile EX_PLUGINS
 	$(CP) misc/scripts/fig2ps $(tmdir)/bin
 	$(CP) misc/scripts/texmacs $(tmdir)/bin
 	$(CP) misc/scripts/tm_gs $(tmdir)/bin
-	$(CHMOD) 755 $(tmdir)/bin/*
-	$(CHMOD) 755 plugins/*/bin/*
 	$(RM) -r $(tmdir)/plugins
 	$(CP) plugins $(tmdir)/
+	$(CHMOD) 755 $(tmdir)/bin/*
+	$(CHMOD) 755 $(tmdir)/plugins/*/bin/*
 	@echo ----------------------------------------------------
 	@echo dynamic TeXmacs has been successfully compiled
 
 STATIC_TEXMACS: SAFE_TEXMACS_REV EMPTY_DIRS 
-	if test "$(TEXMACS_DEPS)" != "no"; then \
-		cd src; $(MAKE) -f makefile deps; \
-	fi
 	cd src; $(MAKE) -r -f makefile link=static CFLAGS=-D__TMSTATIC__
 	$(MAKE) -f Makefile PLUGINS
 	$(MAKE) -f Makefile EX_PLUGINS
 	$(CP) misc/scripts/fig2ps $(tmdir)/bin
 	$(CP) misc/scripts/texmacs $(tmdir)/bin
 	$(CP) misc/scripts/tm_gs $(tmdir)/bin
-	$(CHMOD) 755 $(tmdir)/bin/*
-	$(CHMOD) 755 plugins/*/bin/*
 	$(RM) -r $(tmdir)/plugins
 	$(CP) plugins $(tmdir)/plugins
+	$(CHMOD) 755 $(tmdir)/bin/*
+	$(CHMOD) 755 $(tmdir)/plugins/*/bin/*
 	@echo ----------------------------------------------------
 	@echo static TeXmacs has been successfully compiled
 
@@ -527,7 +521,7 @@ MACOS_PACKAGE: MACOS_BUNDLE
 
 MACOS_RELEASE: MACOS_BUNDLE
 	$(RM) $(MACOS_PACKAGE_ZIP)
-	(cd ../distr; zip -r9Tq $(tm_devel).zip $MACOS_PACKAGE_APP)
+	(cd ../distr; zip -r9Tq $(tm_devel).zip $(notdir $(MACOS_PACKAGE_APP)))
 	$(SIGN) $(MACOS_PACKAGE_ZIP) @SVNREV@ $(tm_devel_version)
 
 .PHONY: MACOS_BUNDLE MACOS_PACKAGE MACOS_RELEASE
@@ -612,9 +606,6 @@ ANDROID_PACKAGE_DIR = ../distr/android
 ANDROID_BUILD_DIR = ../distr/TeXmacs-Android
 
 ANDROID_LIBTEXMACS: @MKGUILE@ EMPTY_DIRS
-	if test "$(TEXMACS_DEPS)" != "no"; then \
-		cd src; $(MAKE) -f makefile deps; \
-	fi
 	cd src; $(MAKE) -r -f makefile link=static Objects/libtexmacs.a
 	$(CP) plugins $(tmdir)
 	$(RM) $(tmdir)/plugins/*/Makefile
