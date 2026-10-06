@@ -237,10 +237,15 @@ set (DEBUG_ASSERT 1)
 ### --------------------------------------------------------------------
 
 set (SCHEME_IMPL "s7" CACHE STRING
-  "Implementation of Scheme to compile for: s7, embedded18 (tm-guile188) or guile")
-set_property (CACHE SCHEME_IMPL PROPERTY STRINGS s7 embedded18 guile)
+  "Implementation of Scheme to compile for: s7, femtolisp, embedded18 (tm-guile188) or guile")
+set_property (CACHE SCHEME_IMPL PROPERTY STRINGS s7 femtolisp embedded18 guile)
 
-if (SCHEME_IMPL STREQUAL "s7")
+if (SCHEME_IMPL STREQUAL "femtolisp")
+  message (STATUS "Using the femtolisp interpreter")
+  set (SCHEME_DIR "Femtolisp")
+  set (USE_FEMTOLISP 1)
+  set (guile_str_size_t "size_t")
+elseif (SCHEME_IMPL STREQUAL "s7")
   message (STATUS "Using the S7 Scheme interpreter")
   set (SCHEME_DIR "S7")
   set (USE_S7 1)
@@ -579,6 +584,15 @@ file (GLOB_RECURSE TeXmacs_Scheme_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}/*.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/${SCHEME_DIR}/*.c"
 )
+if (USE_FEMTOLISP)
+  # the vendored femtolisp finds the headers of its library llt by their
+  # names alone (only for its own sources: llt has headers like utils.h)
+  set_source_files_properties (
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Femtolisp/fl_core.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Femtolisp/fl_llt.c"
+    PROPERTIES COMPILE_OPTIONS
+    "-I${CMAKE_CURRENT_SOURCE_DIR}/src/Scheme/Femtolisp/femtolisp/llt;-w")
+endif ()
 option (ENABLE_EXPERIMENTAL "Enable experimental style rewriting code" OFF)
 if (ENABLE_EXPERIMENTAL)
   file (GLOB_RECURSE TeXmacs_Style_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/Style/*.cpp")
