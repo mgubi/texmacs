@@ -370,6 +370,17 @@ mix_colors (Clay_Color a, Clay_Color b, float t) {
 // icon of an older generation loads it again (see icon_picture).
 static int icon_generation= 0;
 
+#ifdef __EMSCRIPTEN__
+// the class tm-dark of the page: the dark colours of its frame (the tabs,
+// the menu of TeXmacs Vue, its dialogs); tm-theme-set tells the frame that
+// TeXmacs chose (before, the frame follows the system)
+EM_JS (void, vue_web_frame_theme, (int dark), {
+  var c = document.documentElement.classList;
+  c.add ('tm-theme-set');
+  if (dark) c.add ('tm-dark'); else c.remove ('tm-dark');
+});
+#endif
+
 // "light", "dark", or anything else (the "default" of the preference) to
 // follow the appearance of the system
 void
@@ -395,6 +406,10 @@ set_vue_theme (string name) {
     mupdf_set_icon_theme (icons);
     icon_generation++;
   }
+#ifdef __EMSCRIPTEN__
+  // the frame of the page (misc/wasm/frame.js) in the same theme
+  vue_web_frame_theme (dark ? 1 : 0);
+#endif
   // the surround of the pages is a colour of TeXmacs, not of the widgets
   tm_background= rgb_color (the_theme.canvas.r, the_theme.canvas.g,
                             the_theme.canvas.b);

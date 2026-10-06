@@ -199,6 +199,57 @@ var tmFrame = (function () {
     #tm-about .tm-note { font-size:12.5px; color:#666 }
     #tm-about .tm-format { display:block; margin:10px 0 0; font-size:13px }
     #tm-about .tm-format select { margin-left:4px; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif }
+    /* the dark theme of TeXmacs (the class tm-dark of the page, set by
+       set_vue_theme in vue_widget.cpp, and by the system before it runs):
+       the greys of vue_theme_dark */
+    .tm-dark #tm-frame { background:#2a2a2c; border-right-color:#1c1c1e; color:#e4e4e6 }
+    .tm-dark #tm-frame .tm-app { background:#3d5a7c; border-bottom-color:#2f4865 }
+    .tm-dark #tm-frame .tm-app:hover, .tm-dark #tm-frame .tm-app.open { background:#4a6a90 }
+    .tm-dark #tm-frame .tm-tab:hover { background:#3a3a3d }
+    .tm-dark #tm-frame .tm-tab.active { background:#4a4a4f; box-shadow:inset 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-frame .tm-tab .tm-close { color:#7c7c82 }
+    .tm-dark #tm-frame .tm-tab:hover .tm-close, .tm-dark #tm-frame .tm-tab.active .tm-close { color:#c8c8cc }
+    .tm-dark #tm-frame .tm-tab .tm-close:hover { background:#5e5e64; color:#fff }
+    .tm-dark #tm-frame .tm-tab .tm-dot, .tm-dark #tm-flyout .tm-dot { background:#7a9cc6 }
+    .tm-dark #tm-frame .tm-new, .tm-dark #tm-frame .tm-tabs .tm-new, .tm-dark #tm-frame .tm-fold,
+    .tm-dark #tm-frame .tm-scroll { color:#c8c8cc }
+    .tm-dark #tm-frame .tm-new:hover, .tm-dark #tm-frame .tm-fold:hover,
+    .tm-dark #tm-frame .tm-scroll:not(.off):hover { background:#3a3a3d }
+    .tm-dark #tm-frame .tm-fold { border-top-color:#3c3c40 }
+    .tm-dark #tm-frame .tm-tab.dragging { background:#4a4a4f;
+      box-shadow:0 3px 10px rgba(0,0,0,.5), inset 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-flyout { background:#3a3a3d; color:#e4e4e6;
+      box-shadow:0 3px 14px rgba(0,0,0,.55), inset 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-flyout.active { background:#4a4a4f }
+    .tm-dark #tm-flyout .tm-close { color:#c8c8cc }
+    .tm-dark #tm-flyout .tm-close:hover { background:#5e5e64; color:#fff }
+    .tm-dark #tm-frame.top { border-bottom-color:#1c1c1e }
+    .tm-dark #tm-frame.top .tm-app { border-right-color:#2f4865 }
+    .tm-dark #tm-frame.top .tm-tab { background:#303033; border-right-color:#1c1c1e }
+    .tm-dark #tm-frame.top .tm-tab:hover { background:#3a3a3d }
+    .tm-dark #tm-frame.top .tm-tab.active { background:#4a4a4f }
+    .tm-dark #tm-balloon { background:#56565c; box-shadow:0 2px 8px rgba(0,0,0,.5) }
+    .tm-dark #tm-menu, .tm-dark #tm-about .tm-box { background:#343437; border-color:#5c5c62;
+      color:#e4e4e6; box-shadow:0 6px 24px rgba(0,0,0,.6) }
+    .tm-dark #tm-menu .tm-text, .tm-dark #tm-menu .tm-soft, .tm-dark #tm-about li,
+    .tm-dark #tm-about p { color:#c8c8cc }
+    .tm-dark #tm-menu .tm-soft .tm-ver, .tm-dark #tm-about .tm-note { color:#9a9aa0 }
+    .tm-dark #tm-menu .tm-sep { background:#4a4a4f }
+    .tm-dark #tm-menu .tm-item:hover { background:#3f4f66 }
+    .tm-dark #tm-menu a, .tm-dark #tm-about a { color:#8fb4e8 }
+    .tm-dark #tm-menu .tm-badge { color:#b8d0f4; background:#2c3c56; border-color:#4a6488 }
+    .tm-dark #tm-about b { color:#f2f2f4 }
+    .tm-dark #tm-about code { background:#262628 }
+    .tm-dark #tm-about .tm-x { color:#c8c8cc }
+    .tm-dark #tm-about .tm-x:hover { background:#4a4a4f; color:#fff }
+    .tm-dark #tm-about .tm-button, .tm-dark #tm-about input,
+    .tm-dark #tm-about select { background:#46464a; color:#e4e4e6; border-color:#6a6a70 }
+    .tm-dark #tm-about .tm-button:hover { background:#55555a }
+    .tm-dark #tm-about .tm-default { background:#3d5a7c; border-color:#2f4865; color:#fff }
+    .tm-dark #tm-about .tm-default:hover { background:#4a6a90 }
+    .tm-dark #tm-about .tm-icon { color:#9a9aa0 }
+    .tm-dark #tm-about .tm-icon:hover { background:#4a4a4f; color:#e4e4e6 }
+    .tm-dark #tm-about .tm-icon.done { color:#6fbf7a }
   `;
 
   // folded (only the logo and small tabs) or not, as the browser remembers
@@ -455,6 +506,12 @@ var tmFrame = (function () {
   function build () {
     if (bar || typeof document === 'undefined') return;
     var st = el ('style'); st.textContent = style; document.head.appendChild (st);
+    // dark as the system until TeXmacs sets its theme (set_vue_theme)
+    try {
+      if (!document.documentElement.classList.contains ('tm-theme-set') && window.matchMedia &&
+          window.matchMedia ('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.add ('tm-dark');
+    } catch (e) {}
     bar = document.getElementById ('tm-frame');
     if (!bar) return;
     var appButton = el ('div', 'tm-app');
