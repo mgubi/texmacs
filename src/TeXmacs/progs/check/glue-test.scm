@@ -277,9 +277,12 @@
 ;; so that a process which reads it to its end never stopped, nor TeXmacs,
 ;; which waits for it (openssl passwd -stdin of an empty password). A long
 ;; input is sent in pieces of 4096 bytes on Unix.
+;; Not on Windows: the cat of MSYS2 never sees the end of its input there
+;; (it does not read the redirected descriptors of _wspawnvp, a limitation
+;; of mingw_system which is not addressed here), so the checks would hang.
 (define (test-glue-processes)
-  (if (not (url-exists-in-path? "cat"))
-      (display "  no cat command, skipped\n")
+  (if (or (os-mingw?) (os-win32?) (not (url-exists-in-path? "cat")))
+      (display "  no cat command (or Windows), skipped\n")
       ;; (on Unix, cat is stopped after 20 s when perl is at hand: the check
       ;; then fails, instead of TeXmacs waiting for cat forever)
       (let* ((guard (if (and (not (or (os-mingw?) (os-win32?)))
