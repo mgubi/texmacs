@@ -18,7 +18,8 @@
 ;; menu label. Family names are those of the TeXmacs font database. See
 ;; doc/opentype-math-fonts-survey.md.
 ;;
-;; Keys: text, sans, mono (companion families), file (file name of the
+;; Keys: text, sans, mono (companion families; a list of alternatives
+;; separated by commas, the first installed one is used), file (file name of the
 ;; math font without suffix, to test for its presence), letters (math or
 ;; text), bold-math (family of a bold math font), text-file (a file of the
 ;; text companion, for a companion which the font database may not know:
@@ -57,22 +58,22 @@
 
 (define-math-font-profile "TeX Gyre Pagella Math"
   (file "texgyrepagella-math") (text "TeX Gyre Pagella")
-  (sans "TeX Gyre Heros") (mono "TeX Gyre Cursor")
+  (sans "TeX Gyre Heros") (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "text") (menu "Palatino") (group "Serif"))
 
 (define-math-font-profile "TeX Gyre Termes Math"
   (file "texgyretermes-math") (text "TeX Gyre Termes")
-  (sans "TeX Gyre Heros") (mono "TeX Gyre Cursor")
+  (sans "TeX Gyre Heros") (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "text") (menu "Times") (group "Serif"))
 
 (define-math-font-profile "TeX Gyre Bonum Math"
   (file "texgyrebonum-math") (text "TeX Gyre Bonum")
-  (sans "TeX Gyre Adventor") (mono "TeX Gyre Cursor")
+  (sans "TeX Gyre Adventor") (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "text") (menu "Bookman") (group "Serif"))
 
 (define-math-font-profile "TeX Gyre Schola Math"
   (file "texgyreschola-math") (text "TeX Gyre Schola")
-  (sans "TeX Gyre Heros") (mono "TeX Gyre Cursor")
+  (sans "TeX Gyre Heros") (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "text") (menu "Schoolbook") (group "Serif"))
 
 (define-math-font-profile "TeX Gyre DejaVu Math"
@@ -105,7 +106,7 @@
 
 (define-math-font-profile "Euler Math"
   (file "Euler-Math") (text "TeX Gyre Pagella")
-  (sans "TeX Gyre Heros") (mono "TeX Gyre Cursor")
+  (sans "TeX Gyre Heros") (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (menu "Euler") (group "Serif"))
 
 (define-math-font-profile "Concrete Math"
@@ -271,3 +272,10 @@
     (link opentype-sans-font-menu))
   (assuming (nnull? (opentype-math-font-group-list "Other"))
     (-> "Other OpenType math fonts" (link opentype-other-font-menu))))
+
+;; Text fonts without mathematics: a profile with companions only (no file,
+;; so that it is not offered in the menus of math fonts), for the typewriter
+;; text of a font which has no monospaced face of its own; otherwise the
+;; closest monospaced font is taken, Linux Libertine Mono for Palatino
+(define-math-font-profile "Palatino"
+  (mono "Inconsolatazi4, TeX Gyre Cursor"))
