@@ -81,8 +81,8 @@
   outline items from this flat list of levels: an entry with a higher
   level than the previous one becomes its child. Each item has a
   <verbatim|/Title> written as a <name|UTF-16> hex string, links to its
-  parent and siblings, the number of its descendants (negative, so that
-  the items are closed), and a destination on its page.
+  parent and siblings, the number of its children (negative, so that the
+  items are closed), and a destination on its page.
 
   <section|Metadata>
 

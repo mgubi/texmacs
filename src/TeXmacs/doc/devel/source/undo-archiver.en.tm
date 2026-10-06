@@ -91,7 +91,8 @@
   <cpp|start_editing> sets the global author to the author of the editor.
   <cpp|end_editing> calls <cpp|global_confirm>, which confirms and
   simplifies every pending archiver, so an action which modifies several
-  buffers adds one step to each of them. If the action throws an error,
+  buffers adds one step to each of them. If the action throws an error
+  (the handlers catch it since <cpp|USE_EXCEPTIONS> is defined),
   <cpp|cancel_editing> calls <cpp|global_cancel>, which applies
   <cpp|current> and so restores the documents.
 
@@ -121,8 +122,8 @@
   <section|Undo and redo>
 
   <cpp|undo_one> (<source-link|archiver.cpp:429|src/Data/History/archiver.cpp:429>)
-  applies the step of the undo part, computes its inverse on the new tree
-  and makes it a new future, then moves to the history below the step.
+  computes the inverse of the step of the undo part on the current tree,
+  applies the step, and makes the inverse a new future, then moves to the history below the step.
   <cpp|redo_one (i)> (<source-link|archiver.cpp:451|src/Data/History/archiver.cpp:451>)
   applies future number <cpp|i>; the remaining futures become futures of
   the history below. Both refuse to act while <cpp|current> is not empty,
@@ -145,10 +146,11 @@
   two changes commute. Undoing the step which sent the input removes the
   output as well: a patch is never moved past the birth of its author.
   <cpp|redo> redoes future <cpp|i> and then continues as long as there is
-  a single future which does not belong to the editor's author. Once a step
-  of the editor's author has been redone, it also stops before steps of
-  other editors (the authors in <cpp|genuine_authors>), so that only the
-  steps of slave authors such as plug-ins are redone together with it.
+  a single future which does not belong to the editor's author. Right
+  after a step of the editor's author, it also stops if the next step
+  belongs to another editor (the authors in <cpp|genuine_authors>), so that
+  the steps of slave authors such as plug-ins are redone together with
+  it.
 
   <section|Markers>
 

@@ -46,16 +46,19 @@
 
   <\description-paragraphs>
     <item*|<scm|:global>>The definition replaces the existing
-    <markup|assign> of the document, or is added to its preamble, which is
-    created if needed (<scm|macro-set-value>). When the edited buffer has a
-    master (a project), the definition is added to the master as well. The
+    <markup|assign> of the document wherever it is, or, if there is none, is
+    added to its preamble, which is created if needed
+    (<scm|macro-set-value>); in the latter case, when the edited buffer has
+    a master (a project), the definition is added to the master as well. The
     style files are never modified; a macro defined in a style file is
     overridden by a definition in the preamble.
 
     <item*|<scm|(:local <em|name>)>>The definition only applies to the tag
     under focus: it is stored in a <markup|with> around that tag
-    (<scm|tree-with-set>). This is <menu|Focus|Preferences|Customize macro>,
-    and it is also used for the macro-valued parameters of a tag.
+    (<scm|tree-with-set>). This is <menu|Focus|Rendering|Customize macro>.
+    The macro-valued parameters of a tag are edited in either mode,
+    depending on the menu: <scm|:global> from <menu|Focus|Preferences>,
+    <scm|:local> from <menu|Focus|Rendering>.
   </description-paragraphs>
 
   Variants of the editor:
@@ -73,7 +76,8 @@
     the current table;
 
     <item><menu|Source|Edit macros> (<scm|open-macros-editor>) shows the
-    list of all macros of the document in one editor; there,
+    list of all names defined in the environment (macros of the style and
+    of the document, and other variables) in one editor; there,
     <scm|edit-focus-macro> moves to the macro under the cursor and
     <scm|edit-previous-macro> goes back.
   </itemize>
@@ -95,8 +99,8 @@
   <source-link|shortcut-edit.scm|TeXmacs/progs/source/shortcut-edit.scm>
   keeps a list of pairs (<em|key sequence>, <em|command>), where the
   command is <scheme> code in a string, in
-  <verbatim|$TEXMACS_HOME_PATH/system/shortcuts.scm>. At start-up, when the
-  file exists, <scm|init-user-shortcuts> reads it and defines each pair with
+  <verbatim|$TEXMACS_HOME_PATH/system/shortcuts.scm>. Shortly after
+  start-up (when the editor is first idle), if the file exists, <scm|init-user-shortcuts> reads it and defines each pair with
   <scm|kbd-map> (<source-link|init-texmacs.scm:306|TeXmacs/progs/init-texmacs.scm:306>);
   <scm|set-user-shortcut> and <scm|remove-user-shortcut> update the list,
   save the file and apply the change with <scm|kbd-map> or

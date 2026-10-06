@@ -47,10 +47,13 @@
   (<cpp|reverse (ip) * mod>) and performed by <cpp|raw_apply> on
   <cpp|the_et>. Modifications made by observers while one is being
   performed are queued in <cpp|upcoming> and performed afterwards, unless
-  they touch a path which is already busy. Each <cpp|raw_*> routine calls
+  they touch a path which is already busy, in which case they are silently
+  dropped. Each <cpp|raw_*> routine calls
   <cpp|announce> on the observers of the subtree before the change and
-  <cpp|done> after it; the undo observer only uses <cpp|announce>, since
-  the inverse must be computed on the tree before the change.
+  <cpp|done> after it; the undo observer records modifications in
+  <cpp|announce>, since the inverse must be computed on the tree before the
+  change (its <cpp|notify_*> methods only keep it attached to the right
+  tree).
 
   The functions of <source-link|commute.cpp|src/Data/History/commute.cpp>
   work on single modifications:
@@ -98,14 +101,16 @@
 
     <item*|<cpp|PATCH_BIRTH>>A patch without effect, built by
     <cpp|patch (author, create)>, which marks the moment an author (or a
-    marker) appears. The archiver uses birth patches with <cpp|create =
-    false> as markers.
+    marker) appears. The archiver always records births with <cpp|create
+    = false>, for slave authors and for markers alike; markers are told
+    apart by their numbers (<cpp|is_marker>).
   </description-paragraphs>
 
   The functions on patches (<source-link|patch.cpp|src/Data/History/patch.cpp>)
   extend those on modifications: <cpp|invert (p, t)> reverses a compound
   and inverts its parts; <cpp|apply (p, t)> applies a patch to the edit
-  tree; <cpp|is_applicable> checks it first; <cpp|swap>
+  tree; <cpp|is_applicable> tests whether it can be applied (the archiver
+  asserts this before replaying a step); <cpp|swap>
   (<source-link|patch.cpp:429|src/Data/History/patch.cpp:429>) commutes
   patches recursively, refusing branches, and refusing to move a patch past
   the birth of its own author; <cpp|join>
@@ -124,12 +129,13 @@
     A step which only contains such modifications is not stored in the
     history.
 
-    <item*|<cpp|cursor_hint (p, t)>>The position where the cursor should be
-    put after applying <cpp|p>, for instance after the last inserted
-    character. After an undo or a redo the editor moves the cursor to the
-    hint of the inverse of the replayed step, computed on the new tree, so
-    that the cursor ends up at the place of the change (the first
-    modification which is not a cursor modification decides).
+    <item*|<cpp|cursor_hint (p, t)>>A cursor position for the first
+    modification of <cpp|p> which is not a cursor modification, computed on
+    the tree <cpp|t> before <cpp|p> is applied: for an insertion, the place
+    where the text goes. After an undo or a redo the editor moves the
+    cursor to the hint of the inverse of the replayed step, computed on the
+    tree after the replay, so that the cursor ends up at the place of the
+    change.
   </description-paragraphs>
 
   Patches are printed by <cpp|operator \<less\>\<less\>>; <scm|show-history>

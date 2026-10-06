@@ -26,7 +26,7 @@
     <item><em|Symbol codes above 255> (checked, issue #305 of
     <verbatim|mgubi/texmacs>). <cpp|activate_symbol>
     converts a numeric name with a cast to <cpp|char>
-    (<source-link|edit_dynamic.cpp:617|src/Edit/Modify/edit_dynamic.cpp:617>):
+    (<source-link|edit_dynamic.cpp:625|src/Edit/Modify/edit_dynamic.cpp:625>):
     <verbatim|\<less\>symbol\|233\<gtr\>> gives the Cork character 233
     (e with an acute accent), but <verbatim|\<less\>symbol\|300\<gtr\>> gives
     <verbatim|,> (300 modulo 256). Unicode code points are not
@@ -38,9 +38,10 @@
     <verbatim|src-close> keeps the previous setting without a warning
     (<source-link|env_semantics.cpp:729|src/Typeset/Env/env_semantics.cpp:729>).
 
-    <item><em|The macro editor writes to the document.> <em|Apply> stores
-    the definition in the preamble of the edited document (and of its
-    master), never in a style file, so editing a macro of a style package
+    <item><em|The macro editor writes to the document.> In the global mode,
+    <em|Apply> rewrites the existing <markup|assign> or adds one to the
+    preamble (and then also to the master); in the local mode it adds a
+    <markup|with> around the tag. It never writes to a style file, so editing a macro of a style package
     creates a local override. Use <menu|Focus|Preferences|Edit source> to
     change the package itself.
 

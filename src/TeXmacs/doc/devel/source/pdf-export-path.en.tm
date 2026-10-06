@@ -10,14 +10,16 @@
   There are two ways from <scheme> to <abbr|PDF>:
 
   <\itemize>
-    <item><menu|File|Export|Pdf> and <menu|File|Print|Print to file> call
-    <scm|wrapped-print-to-file> (<source-link|tm-print.scm:94|TeXmacs/progs/texmacs/texmacs/tm-print.scm:94>).
+    <item><menu|File|Export|Pdf>, <menu|File|Export|Postscript> and the
+    <em|Export as Pdf> entries call <scm|wrapped-print-to-file> (<source-link|tm-print.scm:94|TeXmacs/progs/texmacs/texmacs/tm-print.scm:94>).
     For a document with <markup|screens> (slides), it first copies the
     buffer and expands the slides into pages (<scm|dynamic-make-slides>);
     then it calls <scm|print-to-file>, the glue of
     <cpp|edit_main_rep::print_to_file>. <scm|wrapped-print-to-pdf-embeded-with-tm>
     does the same and attaches the <TeXmacs> source to the result (see
-    <hlink|PDF attachments|images-pdf.en.tm>).
+    <hlink|PDF attachments|images-pdf.en.tm>). The <em|Print to file>
+    entries of the <menu|File> menu call <scm|print-to-file> directly and
+    do not expand slides.
 
     <item><scm|export-buffer> with a <verbatim|.pdf> or <verbatim|.ps>
     target, which the command line option <verbatim|-c> uses, ends in
@@ -41,7 +43,7 @@
     happens in the other direction for PostScript.
 
     <item>It sets the printing environment: <verbatim|dpi> to the printing
-    resolution (600 by default), headers and footers on, no screen margins
+    resolution (the preference <verbatim|printer dpi>, 1200 by default), headers and footers on, no screen margins
     and no page border, and <verbatim|page-medium> to <verbatim|paper>
     (except for <em|conform> printing, used by <cpp|export_ps>
     (<scm|export-postscript>), which keeps the paging of the screen and
@@ -61,7 +63,8 @@
     <cpp|set_metadata>. Each comes from the <verbatim|global-title>, ...
     environment variable, from the <markup|doc-data> of the document
     (<cpp|search_metadata>), or, failing that, from the file name for the
-    title and from <verbatim|finger `whoami`> for the author
+    title and, outside <name|Windows> and when the commands are available,
+    from <verbatim|finger `whoami`> for the author
     (<source-link|edit_main.cpp:180|src/Edit/Editor/edit_main.cpp:180>).
 
     <item>Each page box is redrawn on the renderer, after clearing the page
@@ -81,8 +84,11 @@
   <section|The renderer>
 
   <cpp|pdf_hummus_renderer_rep> (<source-link|pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>)
-  derives from <cpp|renderer_rep>; it is a printer (<cpp|is_printer> is
-  true), so boxes draw their links and table of contents entries on it.
+  derives from <cpp|renderer_rep>. Boxes call <cpp|href>, <cpp|anchor>
+  and <cpp|toc_entry> on every renderer, and <cpp|display_links> on every
+  renderer which is not a screen; only the printers implement them (the
+  base class ignores them). <cpp|is_printer> is true, which only affects
+  some decorations.
 
   <paragraph|Construction.>The constructor
   (<source-link|pdf_hummus_renderer.cpp:287|src/Plugins/Pdf/pdf_hummus_renderer.cpp:287>)
@@ -134,19 +140,26 @@
   attachments). It relies on <name|FreeType> for the fonts, which is why
   the renderer is only built with <name|FreeType> 2.4.8 or later.
 
-  The renderer is enabled by <verbatim|--enable-pdf-renderer> in the
-  autotools build (<source-link|misc/m4/hummus.m4|misc/m4/hummus.m4>), and
-  always in the <name|CMake> build, both with <cpp|PDFHUMMUS_NO_TIFF> and
+  The renderer is enabled by default in the autotools build
+  (<source-link|misc/m4/hummus.m4|misc/m4/hummus.m4>; off with
+  <verbatim|--disable-pdf-renderer>), provided that the <abbr|GUI> is
+  <name|Qt> and that <name|zlib>, <name|libpng> and <name|FreeType>
+  2.4.8 or later are found. The <name|CMake> build always enables it.
+  Both define <cpp|PDFHUMMUS_NO_TIFF> and
   <cpp|PDFHUMMUS_NO_DCT> (no <name|TIFF> images, no <name|JPEG> decoding;
   <name|JPEG> files are embedded as they are).
 
   A few local changes are marked in the sources: <cpp|UsedFontsRepository::GetFontForFile>
   returns <cpp|NULL> for a corrupted font file instead of stopping the
-  output, so that <TeXmacs> can fall back to a Type 3 font; a fix in
-  <cpp|CharStringType2Flattener::Type2Cntrmask> (2021); and the font
-  descriptor flags of <verbatim|HelveticaNeue.0.ttf> on <name|macOS>
-  (<cpp|FontDescriptorWriter::CalculateFlags>, savannah bug #66761). When
-  the library is updated, these changes have to be carried over.
+  output, so that <TeXmacs> can fall back to a Type 3 font; and two fixes
+  of 2021 in <cpp|CharStringType2Flattener::Type2Cntrmask> and in
+  <cpp|CharStringType2Interpreter> (which no longer checks
+  <cpp|mCheckedWidth>). One change is not marked: the font descriptor
+  flags of <verbatim|HelveticaNeue.0.ttf> on <name|macOS>
+  (<cpp|FontDescriptorWriter::CalculateFlags>, savannah bug #66761); the
+  same commit listed this font in <source-link|pdf-font-issues.scm|TeXmacs/fonts/pdf-font-issues.scm>, so it is
+  written as a Type 3 font and the flags are not used. When the library is
+  updated, these changes have to be carried over.
 
   <section|Preferences>
 
@@ -164,8 +177,10 @@
     <item*|<verbatim|texmacs-\<gtr\>pdf:version>>The <abbr|PDF> version:
     <verbatim|default> (1.4), 1.5, 1.6 or 1.7.
 
-    <item*|<verbatim|texmacs-\<gtr\>pdf:expand slides>>Export the slides of
-    a presentation as separate pages.
+    <item*|<verbatim|texmacs-\<gtr\>pdf:expand slides>>Each screen of a
+    presentation becomes a page in any case; with this preference, the
+    overlays and alternatives of each slide are also expanded into
+    separate pages.
 
     <item*|<verbatim|texmacs-\<gtr\>pdf:distill inclusion>>Run included
     <abbr|PDF> images through <name|Ghostscript> first.

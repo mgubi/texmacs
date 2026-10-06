@@ -12,12 +12,13 @@
   <cpp|ch> and a <cpp|font_glyphs> object <cpp|fn>, the low-level glyph
   set of a font at a given size and resolution (see <hlink|fonts|fonts.en.tm>).
   The name of that glyph set, <cpp|fn-\<gtr\>res_name>, identifies the
-  font in the <abbr|PDF> file: <verbatim|<em|family>:<em|size>.<em|dpi>>
+  font in the <abbr|PDF> file: <verbatim|<em|family>:<em|size>.<em|dpi>tt>
   for glyphs read with <name|FreeType> (<cpp|tt_font_glyphs>,
   <source-link|tt_face.cpp:241|src/Plugins/Freetype/tt_face.cpp:241>) and
   <verbatim|<em|family><em|size>.<em|dpi>pk> for <name|Metafont> bitmaps
   (<source-link|load_tex.cpp:215|src/Plugins/Metafont/load_tex.cpp:215>).
-  The size in points is read back from the name (<cpp|font_size>).
+  <cpp|font_size> reads back the size from the name, scaled to the
+  printing resolution.
 
   <cpp|draw> (<source-link|pdf_hummus_renderer.cpp:1468|src/Plugins/Pdf/pdf_hummus_renderer.cpp:1468>)
   proceeds as follows:
@@ -66,9 +67,9 @@
 
     <item>For the <name|European Computer Modern> fonts (recognized by
     their PostScript name, <cpp|EuropeanComputerModern_fonts>) the code is a
-    Cork code. The ligature glyphs at positions 27 to 31 are mapped to
-    U+FB00 to U+FB04, and from <abbr|PDF> 1.5 on each ligature is also
-    wrapped in a <verbatim|/Span> with an <verbatim|/ActualText> such as
+    Cork code. The ligature glyphs (glyph indices 27 to 31) are mapped to
+    U+FB00 to U+FB04. From <abbr|PDF> 1.5 on, every character from U+FB00 to
+    U+FB04, in any font, is also wrapped in a <verbatim|/Span> with an <verbatim|/ActualText> such as
     <verbatim|(ffi)> (<source-link|pdf_hummus_renderer.cpp:1544|src/Plugins/Pdf/pdf_hummus_renderer.cpp:1544>).
     The other Cork codes are passed as they are, which is wrong for the
     ligature oe, the sharp s, the inverted question and exclamation marks
@@ -86,8 +87,8 @@
   Two workarounds remain from older <abbr|PDF> viewers: character 0 of the
   Computer Modern fonts is drawn as character 161
   (<cpp|requires_hack_notdef_for_tex_font>), and <verbatim|HelveticaNeue.0.ttf>
-  gets fixed font descriptor flags in the library (see <hlink|the
-  PDFHummus library|pdf-export-path.en.tm>).
+  is listed in <source-link|pdf-font-issues.scm|TeXmacs/fonts/pdf-font-issues.scm>, so it is written as a Type 3
+  font (see <hlink|the PDFHummus library|pdf-export-path.en.tm>).
 
   <section|Type 3 fonts>
 
@@ -96,7 +97,8 @@
   one bit per pixel (<cpp|t3font_rep::write_char>,
   <source-link|pdf_hummus_renderer.cpp:1113|src/Plugins/Pdf/pdf_hummus_renderer.cpp:1113>).
   A Type 3 font has at most 256 codes, so a glyph set is split into
-  <em|chunks> of 255 characters, each a separate font named
+  <em|chunks> (codes 0 to 255 in the first one, 254 codes in each of the
+  others), each a separate font named
   <verbatim|<em|res_name>-chunk<em|n>> (<cpp|t3font_font_chunk>,
   <cpp|t3font_get_local_glyph>). The glyphs are bitmaps at the printing
   resolution; the font matrix scales them by 1/100, and the font is

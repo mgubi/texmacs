@@ -16,12 +16,14 @@
 
   The buffers grow by doubling: <cpp|round_length> gives the allocated size
   for a length <var|n>, which is <var|n> itself for short arrays (fewer than
-  6 elements) and short strings (rounded to 4 bytes below 24), and the next
-  power of two above (from 8 elements, <abbr|resp.> 32 bytes). Appending
+  6 elements) and short strings (rounded to 4 bytes below 24), and
+  otherwise the smallest power of two at least <var|n> (at least 8
+  elements, <abbr|resp.> 32 bytes). Appending
   with <cpp|\<less\>\<less\>> is therefore cheap on average, while
   <cpp|s1 * s2>, <cpp|append> and <cpp|s (i, j)> always build a new
-  object. The buffer is reallocated when it grows past its allocated size,
-  and shrinks when the length falls far enough below it (<cpp|resize>).
+  object. <cpp|resize> reallocates the buffer whenever the rounded size
+  changes, in either direction, so a length which keeps crossing a power
+  of two, or any change of a very short array, reallocates every time.
 
   The hash function of strings (<source-link|string.cpp:203|src/Kernel/Types/string.cpp:203>)
   rotates and adds the bytes; hashing a string costs its length.
@@ -31,9 +33,11 @@
   A <cpp|list\<less\>T\<gtr\>> (<source-link|list.hpp|src/Kernel/Containers/list.hpp>)
   is a nil handle or a cell with <cpp|item> and <cpp|next>. Only the
   operations at the front are cheap. <cpp|N (l)>, <cpp|last_item>,
-  <cpp|l * x> (append at the end), <cpp|l1 * l2> and <cpp|copy> walk the
-  whole list <em|recursively>, and the appending functions copy every cell
-  (<source-link|list.cpp:140|src/Kernel/Containers/list.cpp:140>). Lists
+  <cpp|l * x> (append at the end), <cpp|l1 * l2>, <cpp|copy> and
+  <cpp|==> walk the whole list <em|recursively>, the appending functions
+  copy every cell (<source-link|list.cpp:151|src/Kernel/Containers/list.cpp:151>),
+  and the in-place <cpp|l \<less\>\<less\> x> also walks the whole
+  list. Lists
   are fine for short sequences such as paths and the chains of hash tables;
   a loop which appends with <cpp|l= l * x> is quadratic, and a very long
   list can exhaust the stack in these functions. <cpp|path> is
@@ -85,7 +89,8 @@
   of <cpp|n> buckets, a power of two, each a list of entries holding the
   hash value, the key and the value; a key goes in bucket
   <cpp|hash (key) & (n-1)>. The table also stores a default value
-  <cpp|init>, given to the constructor.
+  <cpp|init>, given to the constructor (or the default value of the type
+  for the default constructor).
 
   <\itemize>
     <item><cpp|H[x]> (<cpp|bracket_ro>) returns the value, or <cpp|init> if
@@ -100,10 +105,13 @@
     default), the table doubles (<cpp|resize>, <source-link|hashmap.cpp:49|src/Kernel/Containers/hashmap.cpp:49>),
     rebuilding every bucket with new list cells. <cpp|reset (x)> removes an
     entry and halves the table when it becomes less than half full;
-    <cpp|clear> empties the buckets but keeps their number.
+    <cpp|clear> empties the buckets but keeps their number, and also, by
+    mistake, the count of entries, so that <cpp|N (H)> and <cpp|empty>
+    are wrong after it (see <hlink|the pitfalls|kernel-pitfalls.en.tm>).
   </itemize>
 
-  <cpp|hashset\<less\>T\<gtr\>> is the same without values.
+  <cpp|hashset\<less\>T\<gtr\>> is similar, without values; it grows
+  but never shrinks.
   <cpp|iterate (H)> (<source-link|iterator.cpp|src/Kernel/Containers/iterator.cpp>)
   returns an iterator which keeps the table and walks its buckets lazily, so
   the order of the keys is that of the buckets, which depends on the hash
@@ -111,7 +119,7 @@
   Code which needs a stable order sorts the keys.
 
   The hash functions are defined next to the types: integers hash to
-  themselves, pointers to their address, strings and trees as above. For
+  themselves, pointers to a value computed from their address, strings and trees as above. For
   a type used as a key, <cpp|hash> and <cpp|==> must agree.
 
   Relatives of <cpp|hashmap>:

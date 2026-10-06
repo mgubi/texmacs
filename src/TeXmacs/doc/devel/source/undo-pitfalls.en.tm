@@ -12,20 +12,25 @@
   <\itemize>
     <item><em|Clearing the history acts on all buffers and marks them as
     modified> (checked, issue #301 of <verbatim|mgubi/texmacs>).
-    <menu|Tools|Clear undo history> calls
+    <menu|Tools|Miscellaneous|Clear undo history> calls
     <scm|clear-undo-history>, which calls <cpp|global_clear_history>
     (<source-link|archiver.cpp:85|src/Data/History/archiver.cpp:85>) instead
     of clearing the archiver of the current editor. <cpp|clear> also sets
     <cpp|last_save> to -1, so every open buffer, including saved ones,
     loses its history and is then reported as modified.
 
-    <item><em|An unknown marker empties the history> (checked, issue
-    #301). If
-    <cpp|mark_end> or <cpp|mark_cancel> does not find its marker, or finds
-    it below a future, <cpp|remove_marker> prints <verbatim|warning, marker
-    not found> or <verbatim|warning, cannot remove marker> on the console
-    and replaces the whole history by an empty one
-    (<source-link|archiver.cpp:587|src/Data/History/archiver.cpp:587>). This
+    <item><em|An unknown marker loses the history, or the document>
+    (checked, issue #301). If <cpp|mark_end> does not find its marker,
+    <cpp|remove_marker> prints <verbatim|warning, marker not found> and
+    replaces the whole history by an empty one
+    (<source-link|archiver.cpp:587|src/Data/History/archiver.cpp:587>); if
+    the marker lies below a future, it prints <verbatim|warning, cannot
+    remove marker> and drops the marker and everything below it.
+    <cpp|mark_cancel> is worse: looking for the marker, it undoes and forgets
+    the editor's own steps one by one, so with an unknown marker it reverts
+    the document through all of the user's changes down to a step of
+    another author or to the beginning; a document with three steps typed
+    by the user became empty, without any warning, and lost its history. This
     replaced a fatal error (bug #60743 of the old tracker); it happens when
     a <scm|mark-start> and its <scm|mark-end> are executed in different
     editors, or when the history was changed in between. With
@@ -47,7 +52,8 @@
     <source-link|edit_modify.cpp:145|src/Edit/Modify/edit_modify.cpp:145>).
 
     <item><em|Undo is silent while changes are pending.> <cpp|undo> and
-    <cpp|redo> of the archiver do nothing while <cpp|current> is not empty.
+    <cpp|redo> of the archiver do nothing while <cpp|current> is not empty
+    (the editor first drops the pending cursor modifications).
     A <scheme> function which modifies the document and then calls
     <scm|(undo 0)> in the same action first has to close the step with
     <scm|(add-undo-mark)>.
@@ -61,6 +67,10 @@
     (<cpp|expose>, <cpp|normalize>) or forget them set <cpp|last_save> to
     -1, so after undoing one's own change past the output of a plug-in the
     document counts as modified even if it is back in its saved state.
+    Conversely, <cpp|mark_end> merges the steps after a marker into one
+    (<cpp|compress>) but decreases <cpp|depth> only by one, so after a
+    group of several steps the depth is too high and undoing back to the
+    saved state is not recognized.
 
     <item><em|Swapped patches may be paired with the wrong inverse> (issue
     #144 of <verbatim|mgubi/texmacs>). <cpp|swap> on two modification

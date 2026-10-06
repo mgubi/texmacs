@@ -20,11 +20,14 @@
     source tree> toggles <verbatim|preamble> as an initial value of the
     document (<scm|toggle-source-mode> in <source-link|document-edit.scm|TeXmacs/progs/generic/document-edit.scm>).
     When <verbatim|preamble> is true, <cpp|typeset_exec_until> also sets
-    the mode to <verbatim|src> (<source-link|edit_typeset.cpp:498|src/Edit/Editor/edit_typeset.cpp:498>).
+    the mode to <verbatim|src> when it computes the environment at the
+    cursor (<source-link|edit_typeset.cpp:498|src/Edit/Editor/edit_typeset.cpp:498>).
 
     <item*|The preamble>The preamble of a document is its first paragraph,
     <markup|hide-preamble> or <markup|show-preamble>, which holds the local
-    macro definitions. <menu|Document|Part|Show preamble> or
+    macro definitions. <menu|Document|Part|Show preamble> (<em|Create
+    preamble> when there is none; the <menu|Part> menu is hidden in
+    projects) or
     <menu|Source|Edit preamble> (<scm|toggle-preamble-mode>,
     <source-link|document-part.scm|TeXmacs/progs/generic/document-part.scm>)
     changes it into <markup|show-preamble> and hides the rest of the
@@ -36,8 +39,9 @@
     <item*|A single tag>A subtree wrapped in <markup|inactive> is shown as
     source with its children typeset normally; <markup|inactive*> shows
     the children as source too. Inside source, <markup|active> and
-    <markup|active*> do the converse, and <markup|style-only> and
-    <markup|style-only*> apply the macro of a tag to its source arguments.
+    <markup|style-only> apply the tag to its arguments shown as source,
+    while <markup|active*> and <markup|style-only*> typeset the whole
+    subtree normally (<source-link|env_inactive.cpp:452|src/Typeset/Env/env_inactive.cpp:452>).
     Outside source, the <markup|active> and <markup|style-only> tags are
     the identity (<source-link|env_default.cpp:425|src/Typeset/Env/env_default.cpp:425>).
   </description-paragraphs>
@@ -49,8 +53,9 @@
   <abbr|resp.> <verbatim|recurse>; erroneous markup uses <verbatim|error>.
   <cpp|edit_env_rep::rewrite_inactive> (<source-link|env_inactive.cpp|src/Typeset/Env/env_inactive.cpp>)
   turns the tree into ordinary markup made of the style macros
-  <markup|src-regular>, <markup|src-macro>, <markup|src-var>,
-  <markup|src-arg>, <markup|src-unknown>, <markup|src-error>, ... and of
+  <markup|src-regular>, <markup|src-var>, <markup|src-arg>,
+  <markup|src-textual>, <markup|src-numeric>, <markup|src-unknown>,
+  <markup|src-error>, ... and of
   the four primitives <markup|inline-tag>, <markup|open-tag>,
   <markup|middle-tag> and <markup|close-tag>, whose children are
   <markup|arg> references back to the original tree. Typesetting these
@@ -95,10 +100,13 @@
     <verbatim|compact> (the default) or <verbatim|minimal>.
   </description-paragraphs>
 
-  They are set for a document in <menu|Document|Source|Preferences>
-  (<scm|document-source-preferences-menu> in <source-link|document-menu.scm|TeXmacs/progs/generic/document-menu.scm>),
-  or locally with <menu|Source|Presentation>, which inserts a
-  <markup|style-with>. The user documentation of these settings is
+  They are set for a document in the <em|Preferences> group of
+  <menu|Document|Source> (<scm|document-source-preferences-menu> in
+  <source-link|document-menu.scm|TeXmacs/progs/generic/document-menu.scm>;
+  a dialog in the compressed menus). Locally, <menu|Source|Presentation|Compact>
+  and <menu|Source|Presentation|Stretched> insert a <markup|style-with>
+  for <verbatim|src-compact>; the other variables need a
+  <markup|style-with> written by hand. The user documentation of these settings is
   <hlink|global presentation|../style/presentation/src-present-global.en.tm>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

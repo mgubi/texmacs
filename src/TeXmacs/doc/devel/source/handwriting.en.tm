@@ -13,8 +13,12 @@
   a drawing with the learned examples. It is not connected to the editor:
   the result of a recognition is only printed on the console, and the
   dialog is opened by calling <scm|(learn-glyphs)> by hand. The drawing
-  widget only exists in the X11 (<name|Widkit>) port; the <name|Qt> ports
-  return an empty widget (<cpp|ink_widget> in <source-link|qt_widget.cpp:643|src/Plugins/Qt/qt_widget.cpp:643>).
+  widget only exists in the X11 (<name|Widkit>) port; the <name|Qt> and
+  <name|Cocoa> ports return an empty widget (<cpp|ink_widget> in
+  <source-link|qt_widget.cpp:643|src/Plugins/Qt/qt_widget.cpp:643> and
+  <source-link|aqua_widget.mm|src/Plugins/Cocoa/aqua_widget.mm>), and
+  <name|Qt> only says so on the debug output when <verbatim|qt> debugging
+  is on.
 
   <section|Source files>
 
@@ -29,7 +33,8 @@
     table of learned glyphs and the matcher.
 
     <item*|<source-link|smoothen.cpp|src/Graphics/Handwriting/smoothen.cpp>><cpp|simplify>,
-    which removes superfluous points of a stroke.
+    which removes superfluous points of a stroke; it is not called
+    anywhere.
 
     <item*|<source-link|Plugins/Widkit/Misc/ink_widget.cpp|src/Plugins/Widkit/Misc/ink_widget.cpp>>The
     drawing widget of the X11 port.
@@ -43,32 +48,39 @@
   A <em|point> is an <cpp|array\<less\>double\<gtr\>>, a stroke
   (<cpp|poly_line>) an array of points and a glyph (<cpp|contours>) an
   array of strokes. The <markup|ink> widget of <scm|tm-widget> records one
-  stroke per press and drag of the mouse, and, when the pointer leaves the
-  widget or a stroke ends, passes the strokes to its <scheme> callback as a
-  list of lists of coordinate pairs (<cpp|ink_widget_rep::commit>).
+  stroke per press and drag of the left button; the right button erases
+  the strokes within a few pixels of the pointer
+  (<source-link|ink_widget.cpp|src/Plugins/Widkit/Misc/ink_widget.cpp>).
+  When a stroke ends, and after an erasure, <cpp|commit> passes all the
+  strokes to the <scheme> callback as a list of lists of coordinate pairs.
+  Leaving the widget to the left clears the drawing and passes an empty
+  list; leaving it to the right passes <verbatim|#t> and clears the
+  drawing.
 
   To compare glyphs, <cpp|invariants> (<source-link|poly_line.cpp|src/Graphics/Handwriting/poly_line.cpp>)
   first normalizes a glyph into the unit square and then describes it by:
 
   <\itemize>
-    <item>a <em|discrete> part: the number of strokes and, at level 1, the
-    number of vertices (sharp turns) of each stroke, found by
-    <cpp|vertices>;
+    <item>a <em|discrete> part: the number of strokes and, at level 1, for
+    each stroke the number of entries returned by <cpp|vertices>, that is
+    its sharp turns plus its two endpoints;
 
     <item>a <em|continuous> part: 21 points sampled at equal distances
-    along each stroke and, at level 1, the positions of the vertices along
-    the stroke.
+    along each stroke and, at level 1, the positions of these vertices
+    along the stroke (as fractions of its length, weighted by 2.5).
   </itemize>
 
   <cpp|register_glyph> stores both levels of invariants of an example with
   its name. <cpp|recognize_glyph> splits a drawing into characters, taking
-  each stroke together with the following ones until a stroke starts to the
-  right of the previous one without lying above it (<cpp|attached>), and for each character looks for the
+  each stroke together with the following ones until a stroke lies entirely
+  to the right of the bounding box of the previous one, unless it lies
+  entirely above it (<cpp|attached>), and for each character looks for the
   learned examples with the same number of strokes and the same discrete
   invariants at level 1. Among these, the example with the smallest
   Euclidean distance between the continuous invariants wins. If there is
   none at level 1, level 2 (without vertices) is tried. The names of the
-  winners are concatenated.
+  winners are concatenated; a character without any match contributes
+  nothing.
 
   The matcher can be tried without the widget, from <scheme>, with
   <scm|glyph-register> and <scm|glyph-recognize>, which take glyphs as lists
@@ -80,8 +92,11 @@
   <section|The learning dialog>
 
   <scm|learn-glyphs> (<source-link|handwriting.scm|TeXmacs/progs/utils/handwriting/handwriting.scm>)
-  shows a widget with the drawing area, buttons to learn the drawing as a
-  Latin letter, a digit or a Greek letter, and a button to recognize it.
+  shows a widget with the drawing area, a <em|Learn> menu which learns the
+  last drawing as a lowercase or uppercase Latin letter, a digit or a
+  lowercase Greek letter, and a button to recognize it. Both act on the
+  last list of strokes passed by the widget (<scm|last-glyph>) and do
+  nothing when it is empty or <verbatim|#t>.
   The examples are kept in a hash table from names to lists of glyphs and
   saved with <scm|save-object> in <verbatim|~/.TeXmacs/system/glyphs.scm>;
   they are loaded and registered with <scm|glyph-register> before the first

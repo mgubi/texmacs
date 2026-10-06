@@ -19,12 +19,15 @@
     64-bit systems), and <cpp|fast_new> adds one word in front of the
     object in which it stores the size, so that <cpp|fast_delete> knows it.
 
-    <item>Blocks smaller than <cpp|MAX_FAST> (264 bytes on 64-bit systems,
-    set by the build) are taken from a free list for their size,
+    <item>Blocks smaller than <cpp|MAX_FAST> bytes, header included (264
+    on 64-bit systems, set by the build, so objects of up to 248 bytes),
+    are taken from a free list for their size,
     <cpp|alloc_table[size]>; the first word of a free block points to the
     next one. When the list is empty, the block is cut from the current
-    64<nbsp>KB chunk (<cpp|enlarge_malloc>), and a new chunk is obtained
-    with <cpp|malloc> when the current one is used up.
+    64<nbsp>KB chunk (<cpp|enlarge_malloc>). When the block does not fit
+    in what remains of the chunk, a new chunk is obtained with
+    <cpp|malloc>, and the rest of the old one is lost (<cpp|mem_used>
+    counts it as used).
 
     <item>Freed small blocks go back to their free list. Chunks are never
     returned to the system, and a block freed with one size is never reused
@@ -43,7 +46,7 @@
   <cpp|delete>; this is the configuration to use with <name|AddressSanitizer>
   or <name|Valgrind>, which cannot see inside the free lists. The X11 port
   instead replaces the global <cpp|new> and <cpp|delete> by the fast
-  allocator.
+  allocator, and <cpp|tm_new> is plain <cpp|new> there too.
 
   <cpp|mem_used> (<scm|texmacs-memory> in <scheme>) adds the large blocks
   and the used part of the chunks; <cpp|mem_info> prints these numbers.
@@ -71,7 +74,8 @@
 
     <item*|<cpp|ABSTRACT (T)>, <cpp|ABSTRACT_CODE (T)>>The representation
     is an abstract base class whose subclasses implement the behaviour
-    (widgets, commands, boxes, renderers through their own macros, ...).
+    (widgets, commands, boxes, observers, ...; renderers, on the other
+    hand, are plain pointers to <cpp|renderer_rep>).
     The handle has a constructor <cpp|T (T_rep*)> which increments the
     count; an <cpp|abstract_struct> therefore starts with a count of 0,
     and functions return <cpp|tm_new\<less\>sub_rep\<gtr\> (...)> as a

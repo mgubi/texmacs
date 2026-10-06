@@ -60,7 +60,8 @@
     <item*|Authors and markers>Authors and markers are numbers of type
     <cpp|double>: <cpp|new_author> returns the integers 1, 2, 3, ...,
     <cpp|new_marker> the half-integers 1.5, 2.5, ... Every editor has its own
-    author; plug-in sessions get a fresh author for each evaluation.
+    author; plug-in sessions (except <scheme> sessions) get a fresh author
+    for each evaluation.
   </description>
 
   The data flow for one key press is:

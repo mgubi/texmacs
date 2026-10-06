@@ -32,7 +32,10 @@
     The same holds for <cpp|a[i]> and <cpp|t[i]> after the array or tree
     grows (<cpp|\<less\>\<less\>>), and for references obtained through
     <cpp|subtree> after the tree is modified. Keep handles, not references,
-    across such operations; <cpp|H(x)= y> on its own is safe.
+    across such operations. A single assignment <cpp|H(x)= y> is safe, even
+    <cpp|H(x)= H(z)> when both insert (checked): <TeXmacs> is compiled as
+    C++17, where the right-hand side of an assignment is evaluated before
+    the left-hand side.
 
     <item><em|Reading with <cpp|H(x)> inserts> (checked). Use <cpp|H[x]>
     or <cpp|H-\<gtr\>contains (x)> to read; <cpp|H(x)> creates the entry
@@ -45,7 +48,16 @@
     over 8 gave 53 visits for 48 keys. Collect the keys first (for instance
     in an <cpp|array>) and then modify.
 
-    <item><em|Shared representations.> <cpp|a= b> shares; an in-place change
+    <item><em|<cpp|clear> keeps the count of entries> (issue #306 of
+    <verbatim|mgubi/texmacs>).
+    <cpp|hashmap_rep::clear> (<source-link|hashmap.cpp:127|src/Kernel/Containers/hashmap.cpp:127>)
+    empties the buckets but does not reset <cpp|size>, so after
+    <cpp|H-\<gtr\>clear ()>, <cpp|N (H)> still gives the old number of
+    entries, <cpp|empty> is false, and the table grows earlier than
+    needed. Assign a new table (<cpp|H= hashmap\<less\>T,U\<gtr\> (init)>)
+    instead.
+
+        <item><em|Shared representations.> <cpp|a= b> shares; an in-place change
     through one handle (<cpp|\<less\>\<less\>>, <cpp|b[i]= ...>,
     <cpp|H(x)= ...>) is visible through all.
     This is the most common source of \Pimpossible\Q changes, for instance

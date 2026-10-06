@@ -21,8 +21,9 @@
     <verbatim|/Producer (GPL Ghostscript ...)> and the file name as its
     title.
     <verbatim|mutool info <em|file>.pdf> shows the producer. The
-    <name|CMake> build always enables the renderer; in the autotools build
-    it needs <verbatim|--enable-pdf-renderer> and <name|FreeType>.
+    <name|CMake> build always enables the renderer; the autotools build
+    enables it by default, but only with <name|Qt>, <name|zlib>,
+    <name|libpng> and <name|FreeType>.
 
     <item><em|<verbatim|texmacs -c> loses the <markup|hlink>s> (checked).
     The conversion from the command line exports the buffer right after
@@ -62,8 +63,9 @@
     resolve against the location of the <abbr|PDF> file, if at all.
 
     <item><em|The author may be the user's name.> When the document has no
-    author, <cpp|get_metadata> runs <verbatim|finger `whoami`> and puts the
-    full name of the user in the <abbr|PDF> file.
+    author, <cpp|get_metadata> runs <verbatim|finger `whoami`> (outside
+    <name|Windows>, when the commands exist) and puts the full name of the
+    user in the <abbr|PDF> file.
 
     <item><em|Empty bitmap glyphs> (issue #146, item 3). A Type 3 glyph
     without ink is written as an inline image of width 0, which is not

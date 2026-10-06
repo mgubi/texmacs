@@ -12,9 +12,10 @@
   an explicit arity it takes the smallest arity which the DRD accepts. It
   wraps the selection into the tag when appropriate, starts block macros
   with a <markup|document>, and puts the cursor in the first accessible
-  argument. If some argument of the tag is not accessible, and the cursor is
-  neither in source mode nor in a <markup|show-preamble>, the tag is
-  inserted <em|inactive>, so that its arguments can be filled in, and the
+  argument. If some argument of the tag is not accessible, the tag is
+  inserted <em|inactive>, unless the document is in source mode (its
+  initial <verbatim|mode> is <verbatim|src>) or the cursor is in a
+  <markup|show-preamble>, so that its arguments can be filled in, and the
   footer says that <key|return> activates it.
 
   <cpp|activate> (<source-link|edit_dynamic.cpp:166|src/Edit/Modify/edit_dynamic.cpp:166>)
@@ -29,7 +30,8 @@
 
   <key|\\> calls <cpp|make_hybrid> (<source-link|edit_dynamic.cpp:521|src/Edit/Modify/edit_dynamic.cpp:521>),
   which inserts a <markup|hybrid> tag (inactive outside source mode) and
-  waits for a name; the selection, if any, becomes its second argument.
+  waits for a name; a small selection becomes its second argument, or its
+  name if it is the name of a known tag.
   <key|return> calls <cpp|activate_hybrid> (<source-link|edit_dynamic.cpp:559|src/Edit/Modify/edit_dynamic.cpp:559>),
   which tries in turn:
 

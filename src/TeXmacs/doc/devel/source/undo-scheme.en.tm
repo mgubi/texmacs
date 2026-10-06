@@ -15,8 +15,9 @@
     <item*|<scm|(undo 0)>, <scm|(redo <em|i>)>>Undo the last step of the
     current editor's author (see <hlink|the archiver|undo-archiver.en.tm>
     for the steps of other authors), or redo future number <em|i>. The
-    argument of <scm|undo> must be 0. They do nothing while modifications
-    of the current action are pending, and the C++ <cpp|undo> also resets
+    argument of <scm|undo> must be 0. They first drop the pending cursor
+    modifications, and do nothing while other modifications of the current
+    action are pending, and the C++ <cpp|undo> also resets
     the graphics editor and refuses to undo inside a graphics while
     <scm|graphics-undo-enabled> is false.
 
@@ -24,8 +25,9 @@
     of possible undos (0 or 1) and of futures. The <menu|Edit> menu uses
     them.
 
-    <item*|<scm|(unredoable-undo)>>Undo the last step and forget it, without
-    creating a future.
+    <item*|<scm|(unredoable-undo)>>Cancel the pending modifications of the
+    current action, then undo the last step and forget it, without creating
+    a future.
 
     <item*|<scm|(start-editing)>, <scm|(end-editing)>,
     <scm|(cancel-editing)>>Delimit a user action. The event handlers already
