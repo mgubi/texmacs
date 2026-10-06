@@ -445,6 +445,7 @@
 (lazy-define (database ai-agents-menu) open-ai-agents in-ai-agents?)
 (lazy-menu (database db-menu) db-menu db-toolbar)
 (lazy-tmfs-handler (database db-tmfs) db)
+(lazy-tmfs-handler (database bib-local) biblio)
 (lazy-keyboard (database bib-kbd) in-bib?)
 (tm-property (open-biblio) (:interactive #t))
 ;(display* "time: " (- (texmacs-time) boot-start) "\n")
