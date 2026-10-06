@@ -44,13 +44,25 @@
 
     <item*|<verbatim|TEXMACS_GUI>>One of <verbatim|Qt> (the default, which
     uses <name|Qt> 6 if it is found and <name|Qt> 5 otherwise),
-    <verbatim|Qt6>, <verbatim|Qt5> or <verbatim|Qt4>. The help string also
-    mentions <verbatim|Aqua> and <verbatim|X11>, but only the <name|Qt>
-    values are implemented (see the pitfalls below). Note that
-    <verbatim|Qt6> is treated like <verbatim|Qt>: there is no branch which
-    insists on <name|Qt> 6. All variants compile the sources of
-    <source-link|src/Plugins/Qt/|src/Plugins/Qt>; the directory <source-link|src/Plugins/Qt6/|src/Plugins/Qt6> is
-    not used by <name|CMake>.
+    <verbatim|Qt6>, <verbatim|Qt5>, <verbatim|Qt4>, <verbatim|Vue>,
+    <verbatim|SDL> or <verbatim|X11>, as <verbatim|./configure
+    --with-gui> (any other value is an error). <verbatim|Qt6> is treated
+    like <verbatim|Qt>: there is no branch which insists on <name|Qt> 6.
+    All <name|Qt> variants compile the sources of
+    <source-link|src/Plugins/Qt/|src/Plugins/Qt> and define
+    <verbatim|QTTEXMACS>; <verbatim|Vue> compiles
+    <source-link|src/Plugins/Vue/|src/Plugins/Vue> (in <c++>20, with
+    <name|Clay>), <verbatim|SDL> and <verbatim|X11> their directory and
+    <source-link|src/Plugins/Widkit/|src/Plugins/Widkit>. The <name|Qtwk>
+    and <name|Cocoa> ports, the fork <source-link|src/Plugins/Qt6/|src/Plugins/Qt6>
+    and the GPU renderer of <name|Vue> (<name|ThorVG>) are only available
+    with <verbatim|configure>.
+
+    <item*|<verbatim|USE_MUPDF>>(on for <verbatim|Vue> and <verbatim|SDL>,
+    which require it, off otherwise, and forced off for <verbatim|X11>)
+    Compile <source-link|Plugins/MuPDF|src/Plugins/MuPDF> and define
+    <verbatim|MUPDF_RENDERER>; the library is looked for in
+    <verbatim|MUPDF_DIR>.
 
     <item*|<verbatim|QTPIPES>>(on) Use <name|Qt> classes instead of
     <name|Unix> pipes for plug-in connections.
@@ -80,7 +92,8 @@
   Several settings are not options but fixed: <verbatim|DEBUG_ASSERT> is
   always 1 (so <cpp|ASSERT> and <cpp|FAILED> are active in all builds),
   <name|PNG> and <name|zlib> are required, <name|iconv> is used if found,
-  the native <abbr|PDF> renderer (<name|Hummus>) is always compiled, and
+  the native <abbr|PDF> renderer (<name|Hummus>) is compiled for <name|Qt>
+  without <name|MuPDF> (<name|MuPDF> writes the <abbr|PDF> otherwise), and
   the path of <name|Ghostscript> is hard-wired
   (<verbatim|/usr/bin/gs>, or <verbatim|bin/gs.exe> on <name|Windows>).
   If <name|ccache> is installed, it is used automatically.
@@ -98,21 +111,21 @@
   <verbatim|Edit>, <verbatim|Graphics>, <verbatim|Kernel>,
   <source-link|Scheme/Scheme|src/Scheme/Scheme> and <source-link|Scheme/Guile|src/Scheme/Guile>, <verbatim|System>,
   <verbatim|Typeset>, part of <verbatim|Texmacs>, the <em|standard
-  plug-ins> (<verbatim|Bibtex>, <verbatim|Database>, <verbatim|Freetype>,
-  <verbatim|Gnutls>, <verbatim|Pdf>, <verbatim|Ghostscript>,
+  plug-ins> (<verbatim|Bibtex>, <verbatim|Cairo>, <verbatim|Imlib2>,
+  <verbatim|Database>, <verbatim|Freetype>, <verbatim|Gnutls>,
+  <verbatim|Ghostscript>,
   <verbatim|Ispell>, <verbatim|Metafont>, <verbatim|LaTeX_Preview>,
   <verbatim|Openssl>, <verbatim|Updater>, and optionally
-  <verbatim|Resvg> and <verbatim|Sqlite3>), the <name|Qt> port, and the
-  operating system layer (<source-link|Plugins/Unix|src/Plugins/Unix> on <name|Linux>,
+  <verbatim|Pdf>, <verbatim|MuPDF>, <verbatim|Resvg> and <verbatim|Sqlite3>), the directories of the chosen
+  port (see <verbatim|TEXMACS_GUI> above), and the operating system layer (<source-link|Plugins/Unix|src/Plugins/Unix> on <name|Linux>,
   <source-link|Plugins/Windows|src/Plugins/Windows> or <source-link|Plugins/Windows64|src/Plugins/Windows64> on
-  <name|Windows>). Since the lists are globbed, a new <verbatim|.cpp> file
+  <name|Windows>, <source-link|Plugins/Unix|src/Plugins/Unix> and
+  <source-link|Plugins/MacOS|src/Plugins/MacOS> on <name|macOS>). Since the lists are globbed, a new <verbatim|.cpp> file
   is picked up automatically, but only after <name|CMake> is run again; a
   file in a directory which is not listed (for instance a new plug-in
   directory) must be added to <source-link|CMakeLists.txt|src/CMakeLists.txt>. The
-  <source-link|Scheme/Tiny|src/Scheme/Tiny>, <source-link|Plugins/X11|src/Plugins/X11>, <source-link|Plugins/Widkit|src/Plugins/Widkit>,
-  <verbatim|Plugins/Cocoa>, <verbatim|Plugins/MacOS>,
-  <source-link|Plugins/Cairo|src/Plugins/Cairo>, <source-link|Plugins/Imlib2|src/Plugins/Imlib2> and
-  <source-link|Plugins/Qt6|src/Plugins/Qt6> directories are never compiled by <name|CMake>.
+  <source-link|Plugins/Qt6|src/Plugins/Qt6>, <source-link|Plugins/Qtwk|src/Plugins/Qtwk> and
+  <source-link|Plugins/NS|src/Plugins/NS> directories are never compiled by <name|CMake>.
 
   <paragraph|Targets.>All sources are compiled once into the object
   library <verbatim|texmacs_body> (<source-link|src/CMakeLists.txt|src/CMakeLists.txt>), with
@@ -133,8 +146,9 @@
     <verbatim|TeXmacs/bin/> as <verbatim|*.bin> and also to the top of the
     build directory;
 
-    <item>on <name|macOS>, a <verbatim|MACOSX_BUNDLE> named
-    <verbatim|TeXmacs> with <source-link|packages/macos/Info.plist.in|packages/macos/Info.plist.in>.
+    <item>on <name|macOS> with <name|Qt>, a <verbatim|MACOSX_BUNDLE> named
+    <verbatim|TeXmacs> with <source-link|packages/macos/Info.plist.in|packages/macos/Info.plist.in>;
+    with the other ports, <verbatim|texmacs.bin> as on <name|Unix>.
   </itemize>
 
   The <c++> unit tests of <source-link|tests/|tests> link against the same object
@@ -178,22 +192,10 @@
   <section|Pitfalls>
 
   <\itemize>
-    <item><verbatim|TEXMACS_GUI=X11> or <verbatim|Aqua> configures without
-    error but does not select any graphical port: only the
-    <verbatim|Qt.*> values are handled (<verbatim|CMakeLists.txt:259-293>),
-    so neither <verbatim|QTTEXMACS> nor <verbatim|X11TEXMACS> is defined
-    and no toolkit sources are compiled.
-
-    <item>The <name|macOS> target is built from <verbatim|texmacs_body>
-    alone (<verbatim|src/CMakeLists.txt:124-142>): no entry point is
-    added (the <name|Unix> one is only used in the <verbatim|else> branch),
-    and the list of operating system sources is left empty for
-    <name|Apple> (<source-link|CMakeLists.txt|src/CMakeLists.txt>, \PApple/Cocoa\Q), so the
-    <verbatim|.mm> files of <verbatim|Plugins/MacOS> and the
-    <source-link|Plugins/Unix|src/Plugins/Unix> files are not compiled although
-    <verbatim|MACOSX_EXTENSIONS> is defined. As far as can be seen from the
-    files, a <name|CMake> build on <name|macOS> cannot link; the autotools
-    build is the one used on that platform.
+    <item>There is no <verbatim|TEXMACS_GUI> value for the <name|Cocoa>
+    port: on <name|macOS>, <name|CMake> builds <name|Qt>, <name|Vue>,
+    <name|SDL> or <name|X11>, and the native port needs
+    <verbatim|./configure --with-gui=cocoa>.
 
     <item>On <name|Unix>, the executable is installed to
     <verbatim|${tmbin}/bin> (<source-link|src/CMakeLists.txt:157|src/CMakeLists.txt:157>), but

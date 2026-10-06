@@ -25,8 +25,12 @@
     interruption checks).
 
     <item*|<source-link|window.hpp|src/Graphics/Gui/window.hpp>>An abstract class <cpp|window_rep> for
-    toolkit windows. It is only used by ports which build on
-    <name|Widkit>; the <name|Qt> port does not implement it.
+    toolkit windows. It is only used by the ports which build on
+    <name|Widkit>, which implement it with <cpp|x_window_rep>
+    (<name|X11>), <cpp|sdl_window_rep> (<name|SDL>) and
+    <cpp|qtwk_window_rep> (<name|Qtwk>). The <name|Qt>, <name|Cocoa> and
+    <name|Vue> ports do not implement it (<name|Vue> has an unrelated
+    class <cpp|vue_window_rep> of its own).
 
     <item*|<source-link|widget.cpp|src/Graphics/Gui/widget.cpp>>The few port-independent parts: connection
     management, the default message handlers, <cpp|slot_name> and
@@ -129,7 +133,14 @@
   slots it understands. Ports usually derive from a common base class which
   provides lenient defaults (the <name|Qt> base class
   <cpp|qt_widget_rep> for instance ignores unknown messages sent to it and
-  returns neutral values for common queries).
+  returns neutral values for common queries). The base classes of the
+  other ports are <cpp|ns_widget_rep> (<name|Cocoa>,
+  <source-link|ns_widget.h|src/Plugins/NS/ns_widget.h>), <cpp|vue_widget_rep>
+  (<name|Vue>, <source-link|vue_widget.hpp|src/Plugins/Vue/vue_widget.hpp>) and, for the ports
+  built on <name|Widkit>, <cpp|wk_widget_rep>
+  (<source-link|wk_widget.hpp|src/Plugins/Widkit/wk_widget.hpp>), whose <cpp|send> and
+  <cpp|query> translate the messages into <name|Widkit> events
+  (<source-link|widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>).
 
   The connection mechanism (<cpp|connect>, <cpp|deconnect> and the lists
   <cpp|in> and <cpp|out> of <cpp|widget_connection>s) is a remnant of a more
@@ -143,7 +154,9 @@
   <cpp|derived_this> to find the start of the most derived object before
   freeing it. Ports with their own base class do the same (see
   <cpp|tm_delete\<less\>qt_widget_rep\<gtr\>> in
-  <source-link|Plugins/Qt/qt_widget.cpp|src/Plugins/Qt/qt_widget.cpp>).
+  <source-link|Plugins/Qt/qt_widget.cpp|src/Plugins/Qt/qt_widget.cpp> and
+  <cpp|tm_delete\<less\>vue_widget_rep\<gtr\>> in
+  <source-link|Plugins/Vue/vue_widget.cpp|src/Plugins/Vue/vue_widget.cpp>).
 
   <section|Blackboxes and typed messages>
 
@@ -204,7 +217,9 @@
   type. The <name|Qt> port provides <cpp|check_type\<less\>T\<gtr\> (val,
   s)>, <cpp|check_type_id\<less\>T\<gtr\> (type_id, s)> and
   <cpp|check_type_void (index, s)> in <source-link|Plugins/Qt/qt_utilities.hpp|src/Plugins/Qt/qt_utilities.hpp>
-  to catch mismatches early, and uses the abbreviations
+  to catch mismatches early (the <name|Cocoa> and <name|Vue> ports have
+  their own copies, in <source-link|ns_utilities.h|src/Plugins/NS/ns_utilities.h> and
+  <source-link|vue_widget.cpp|src/Plugins/Vue/vue_widget.cpp>), and uses the abbreviations
   <cpp|coord2>=<cpp|pair\<less\>SI,SI\<gtr\>> and
   <cpp|coord4>=<cpp|quartet\<less\>SI,SI,SI,SI\<gtr\>>.
 
@@ -219,7 +234,7 @@
   <source-link|widget.cpp|src/Graphics/Gui/widget.cpp> returns a printable name for debugging. The
   enumeration ends with <cpp|slot_id__LAST>, which is used by some ports to
   size tables indexed by slots (for instance <cpp|sent_slots> in
-  <cpp|qt_simple_widget_rep>).
+  <cpp|qt_simple_widget_rep> and <cpp|ns_simple_widget_rep>).
 
   <\warning>
     The array of names in <cpp|slot_name> must be kept in the same order as
@@ -369,7 +384,7 @@
   (<source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>), created by <cpp|as_command (object)>
   and exported to <scheme> as <scm|object-\<gtr\>command>; their
   <cpp|apply (object args)> calls the closure with the elements of the list
-  <cpp|args>. This is how input widgets pass their result: the <name|Qt> port
+  <cpp|args>. This is how input widgets pass their result: every port
   calls <cpp|cmd (list_object (...))> with the text, the state of a toggle
   or the selected items. From <scheme>, <scm|command-eval> and
   <scm|command-apply> invoke a command.
@@ -576,11 +591,17 @@
 
   Which header defines <cpp|simple_widget_rep> is chosen at compile time:
   <source-link|Edit/editor.hpp|src/Edit/editor.hpp> and <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>
-  include <source-link|Qt/qt_simple_widget.hpp|src/Plugins/Qt/qt_simple_widget.hpp> when <cpp|QTTEXMACS> is
-  defined, <verbatim|Cocoa/aqua_simple_widget.h> when <cpp|AQUATEXMACS> is
-  defined, and <source-link|Widkit/simple_wk_widget.hpp|src/Plugins/Widkit/simple_wk_widget.hpp> otherwise. The
-  <name|Qt> header simply ends with <cpp|typedef qt_simple_widget_rep
-  simple_widget_rep>.
+  include
+
+  <descriptive-table|<tformat|<table|<row|<cell|Macro>|<cell|Header>|<cell|Class>>|<row|<cell|<cpp|AQUATEXMACS>>|<cell|<source-link|NS/ns_simple_widget.h|src/Plugins/NS/ns_simple_widget.h>>|<cell|<cpp|ns_simple_widget_rep>>>|<row|<cell|<cpp|QTTEXMACS>
+  without <cpp|QTWKTEXMACS>>|<cell|<source-link|Qt/qt_simple_widget.hpp|src/Plugins/Qt/qt_simple_widget.hpp>>|<cell|<cpp|qt_simple_widget_rep>>>|<row|<cell|<cpp|VUETEXMACS>>|<cell|<source-link|Vue/vue_widget.hpp|src/Plugins/Vue/vue_widget.hpp>>|<cell|<cpp|vue_simple_widget_rep>>>|<row|<cell|otherwise
+  (<name|X11>, <name|SDL>, <name|Qtwk>)>|<cell|<source-link|Widkit/simple_wk_widget.hpp|src/Plugins/Widkit/simple_wk_widget.hpp>>|<cell|<cpp|simple_widget_rep>
+  itself>>>>>
+
+  The other headers end with a <cpp|typedef> such as <cpp|typedef
+  qt_simple_widget_rep simple_widget_rep>. Note that the <name|Qtwk> port
+  defines <cpp|QTTEXMACS> as well, so that tests of <cpp|QTTEXMACS> alone
+  also select it.
 
   <section|System-wide routines>
 

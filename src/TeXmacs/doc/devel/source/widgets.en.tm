@@ -12,16 +12,22 @@
   windows) is built from <em|widgets>. <TeXmacs> does not talk directly to
   a particular toolkit: the kernel only knows an <em|abstract> widget class,
   a fixed set of widget constructors and a message protocol. Each graphical
-  port (today essentially the <name|Qt> port) implements these constructors
-  and messages in terms of its own toolkit. On top of this, almost the
+  port implements these constructors and messages in terms of its own
+  toolkit: the native <name|Qt> widgets (<name|Qt> port, the default), the
+  native <name|AppKit> controls of <name|macOS> (<name|Cocoa> port),
+  elements drawn every frame by the immediate mode layout library
+  <name|Clay> (<name|Vue> port), or the <TeXmacs> own toolkit
+  <name|Widkit> on top of <name|X11>, <name|SDL> or <name|Qt> (the
+  <name|X11>, <name|SDL> and <name|Qtwk> ports). On top of this, almost the
   entire user interface is described in <scheme> by a small declarative
   language, which is interpreted at run time into calls to the <c++>
   constructors.
 
   This part of the developer documentation describes the internals of this
   machinery: the <c++> interface, the way the main window is organized, the
-  <scheme> language and its interpreter, the <name|Qt> implementation and
-  what has to be done to add a new kind of widget or to port <TeXmacs> to
+  <scheme> language and its interpreter, the <name|Qt> implementation (the
+  reference port), how the other ports map the same interface, and what
+  has to be done to add a new kind of widget or to port <TeXmacs> to
   another toolkit. The <em|use> of the <scheme> widget language (how to
   write a menu or a dialog) is explained in the user-level tutorial
   \P<hlink|Extending the graphical user
@@ -63,10 +69,30 @@
     <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>) only uses this interface.
 
     <item><em|The port.> The constructors and the message handlers are
-    implemented by a plug-in, typically <verbatim|Plugins/Qt>. In the
-    <name|Qt> port most widgets are first stored as passive descriptions
-    (<cpp|qt_ui_element_rep>) and only materialized into <cpp|QWidget>s,
-    <cpp|QAction>s or <cpp|QLayoutItem>s when the toolkit needs them.
+    implemented by a plug-in in <source-link|src/src/Plugins|src/Plugins>, selected at
+    configuration time. The ports differ in when the toolkit objects are
+    made:
+
+    <\itemize>
+      <item>in the <name|Qt> port most widgets are first stored as passive
+      descriptions (<cpp|qt_ui_element_rep>) and only materialized into
+      <cpp|QWidget>s, <cpp|QAction>s or <cpp|QLayoutItem>s when the toolkit
+      needs them;
+
+      <item>the <name|Cocoa> port follows the same design
+      (<cpp|ns_ui_element_rep>, materialized into <cpp|NSView>s or
+      <cpp|NSMenuItem>s);
+
+      <item>the <name|Vue> port also stores descriptions
+      (<cpp|vue_ui_rep>), but never builds persistent toolkit objects: at
+      every frame the widget tree of a window is walked again and emits
+      <name|Clay> elements, which are laid out and drawn;
+
+      <item>the <name|Widkit> based ports build <name|Widkit> widgets at
+      once (<source-link|widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>), which
+      draw themselves with the <TeXmacs> renderer in windows provided by
+      <name|X11>, <name|SDL> or <name|Qt>.
+    </itemize>
   </enumerate>
 
   Schematically, for the menu entry \PNew\Q of the \PFile\Q menu:
@@ -86,11 +112,15 @@
 
     pulldown_button (text_widget ("File"), promise) \ \ \ \ \ \ abstract C++ widget
 
-    \ \ \ \ \ \ \ \ \| Plugins/Qt
+    \ \ \ \ \ \ \ \ \| Plugins/Qt, Plugins/NS, Plugins/Vue
 
     \ \ \ \ \ \ \ \ v
 
     QAction + QTMLazyMenu, filled on aboutToShow () \ \ \ \ \ Qt objects
+
+    NSMenuItem + TMLazyMenu, filled on menuNeedsUpdate: \ Cocoa objects
+
+    Clay elements, promise evaluated when opened \ \ \ \ \ \ \ \ Vue (each frame)
   </verbatim-code>
 
   <section|Where to find the code>
@@ -122,11 +152,30 @@
     <item*|<source-link|src/src/Plugins/Qt/|src/Plugins/Qt>>The <name|Qt> port (with a variant
     in <source-link|Plugins/Qt6|src/Plugins/Qt6>).
 
-    <item*|<source-link|src/src/Plugins/Widkit/|src/Plugins/Widkit>, <source-link|Plugins/X11/|src/Plugins/X11>,
-    <verbatim|Plugins/Cocoa/>>The older <name|X11> port, built on the
-    <TeXmacs> own widget kit <name|Widkit>, and an experimental <name|Cocoa>
-    port.
+    <item*|<source-link|src/src/Plugins/NS/|src/Plugins/NS>>The native <name|Cocoa> port of
+    <name|macOS> (<verbatim|--with-gui=cocoa>, macro <cpp|AQUATEXMACS>),
+    modelled on the <name|Qt> port; it uses the <name|Objective-C> helpers
+    of <source-link|Plugins/MacOS|src/Plugins/MacOS>, which the <name|Qt> port also uses on
+    <name|macOS>.
+
+    <item*|<source-link|src/src/Plugins/Vue/|src/Plugins/Vue>>The <name|Vue> port
+    (<verbatim|--with-gui=vue>, macro <cpp|VUETEXMACS>): <name|SDL> 3
+    windows and events, widgets laid out in immediate mode by <name|Clay>
+    (<source-link|clay.h|src/Plugins/Vue/clay.h>), drawing with <name|MuPDF> or on the
+    GPU.
+
+    <item*|<source-link|src/src/Plugins/Widkit/|src/Plugins/Widkit>>The <TeXmacs> own widget
+    kit, used by three ports which only provide windows, events and
+    drawing: <source-link|Plugins/X11|src/Plugins/X11> (<verbatim|--with-gui=x11>),
+    <source-link|Plugins/SDL|src/Plugins/SDL> (<verbatim|--with-gui=sdl>) and
+    <source-link|Plugins/Qtwk|src/Plugins/Qtwk> (<verbatim|--with-gui=qtwk>, <name|Qt> as a
+    platform layer only).
   </description-paragraphs>
+
+  How a port is selected and built, and the details of each port, are
+  described in the chapter on \P<hlink|graphical ports|guiports.en.tm>\Q,
+  in particular \P<hlink|The <name|Vue> port|guiports-vue.en.tm>\Q and
+  \P<hlink|The <name|Cocoa> port|guiports-cocoa.en.tm>\Q.
 
   <section|Contents>
 
@@ -157,9 +206,10 @@
   The older document \P<hlink|The graphical user interface|gui.en.tm>\Q
   describes the original <name|X11> toolkit of <TeXmacs> (the widget,
   event and attribute classes that now live in
-  <source-link|Plugins/Widkit|src/Plugins/Widkit>). It is of historical interest only: the
-  <name|Qt> port does not use that event model, and the abstract interface
-  described here replaced direct use of <name|Widkit> in the kernel.
+  <source-link|Plugins/Widkit|src/Plugins/Widkit>). The abstract interface described here
+  replaced direct use of <name|Widkit> in the kernel: the <name|Qt>,
+  <name|Cocoa> and <name|Vue> ports do not use that event model, which
+  survives only inside the <name|X11>, <name|SDL> and <name|Qtwk> ports.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

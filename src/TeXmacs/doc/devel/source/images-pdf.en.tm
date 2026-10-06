@@ -227,8 +227,11 @@
     renderer. It also calls <cpp|ps_load>, and thus a conversion, each time
     an image is drawn, with no cache.
 
-    <item>Pictures and pattern images can only be exported with <name|Qt>,
-    because the temporary <name|PNG> files are written with <cpp|QImage>.
+    <item>The <name|PDFHummus> renderer writes pictures and pattern images
+    as temporary <name|PNG> files, with <cpp|QImage> under <name|Qt> and
+    with <cpp|save_picture> under <name|Cocoa> (the two ports for which it
+    is compiled); the <name|MuPDF> writer (<cpp|mupdf_pdf_renderer_rep>, the
+    one of <name|Vue> and <name|SDL>) embeds them itself.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

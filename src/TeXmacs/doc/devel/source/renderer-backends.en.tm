@@ -9,27 +9,25 @@
 
   <subsection|Overview>
 
-  <tabular|<tformat|<cwith|1|1|1|-1|font-series|bold>|<table|<row|<cell|Class>|<cell|Files>|<cell|Device>>|<row|<cell|<cpp|basic_renderer_rep>>|<cell|<verbatim|Graphics/Renderer/basic_renderer.*>>|<cell|common
-  base of screen renderers>>|<row|<cell|<cpp|qt_renderer_rep>>|<cell|<verbatim|Plugins/Qt/qt_renderer.*>>|<cell|<cpp|QPainter>>>|<row|<cell|<cpp|qt_proxy_renderer_rep>,
-  <cpp|qt_shadow_renderer_rep>>|<cell|<verbatim|Plugins/Qt/qt_renderer.*>>|<cell|shadows>>|<row|<cell|<cpp|qt_image_renderer_rep>>|<cell|<verbatim|Plugins/Qt/qt_picture.*>>|<cell|<cpp|QImage>
-  of a picture>>|<row|<cell|<cpp|printer_rep>>|<cell|<verbatim|Graphics/Renderer/printer.*>>|<cell|PostScript
-  file>>|<row|<cell|<cpp|pdf_hummus_renderer_rep>>|<cell|<verbatim|Plugins/Pdf/pdf_hummus_renderer.*>>|<cell|<abbr|PDF>
-  file>>|<row|<cell|<cpp|x_drawable_rep>>|<cell|<verbatim|Plugins/X11/x_drawable.*>,
-  <source-link|x_shadow.cpp|src/Plugins/X11/x_shadow.cpp>, <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>>|<cell|<name|X11>
-  window or pixmap>>|<row|<cell|<cpp|cairo_renderer_rep>>|<cell|<verbatim|Plugins/Cairo/cairo_renderer.*>>|<cell|<name|Cairo>
-  context>>|<row|<cell|<cpp|aqua_renderer_rep>>|<cell|<verbatim|Plugins/Cocoa/aqua_renderer.*>>|<cell|<name|Cocoa>
-  view>>|<row|<cell|<cpp|cg_renderer_rep>>|<cell|<verbatim|Plugins/MacOS/cg_renderer.*>>|<cell|<name|CoreGraphics>
-  context>>>>>
+  <tabular|<tformat|<twith|table-width|1par>|<twith|table-hmode|exact>|<cwith|1|-1|1|-1|cell-hyphen|t>|<cwith|1|-1|1|1|cell-hpart|2>|<cwith|1|-1|2|2|cell-hpart|1>|<cwith|1|-1|3|3|cell-hpart|1>|<cwith|1|-1|1|-1|cell-bsep|0.5spc>|<cwith|1|1|1|-1|font-series|bold>|<table|<row|<cell|<with|par-mode|left|Class and files>>|<cell|<with|par-mode|left|Device>>|<cell|<with|par-mode|left|Used by>>>|<row|<cell|<with|par-mode|left|<cpp|basic_renderer_rep> (<verbatim|Graphics/Renderer/basic_renderer.*>)>>|<cell|<with|par-mode|left|common base of screen renderers>>|<cell|<with|par-mode|left|all but <name|X11>>>>|<row|<cell|<with|par-mode|left|<cpp|qt_renderer_rep> (<verbatim|Plugins/Qt/qt_renderer.*>)>>|<cell|<with|par-mode|left|<cpp|QPainter>>>|<cell|<with|par-mode|left|<name|Qt>, <name|Qtwk>>>>|<row|<cell|<with|par-mode|left|<cpp|qt_proxy_renderer_rep>, <cpp|qt_shadow_renderer_rep> (<verbatim|Plugins/Qt/qt_renderer.*>)>>|<cell|<with|par-mode|left|shadows>>|<cell|<with|par-mode|left|<name|Qt>>>>|<row|<cell|<with|par-mode|left|<cpp|qt_image_renderer_rep> (<verbatim|Plugins/Qt/qt_picture.*>)>>|<cell|<with|par-mode|left|<cpp|QImage> of a picture>>|<cell|<with|par-mode|left|<name|Qt>, <name|Qtwk> (without <name|MuPDF>)>>>|<row|<cell|<with|par-mode|left|<cpp|mupdf_renderer_rep> (<verbatim|Plugins/MuPDF/mupdf_renderer.*>)>>|<cell|<with|par-mode|left|<name|MuPDF> pixmap>>|<cell|<with|par-mode|left|<name|SDL>, <name|Vue>; pictures of <name|Qt>>>>|<row|<cell|<with|par-mode|left|<cpp|gpu_renderer_rep> (<source-link|Plugins/Vue/vue_gpu.cpp|src/Plugins/Vue/vue_gpu.cpp>)>>|<cell|<with|par-mode|left|<name|OpenGL> texture or window, <name|ThorVG>>>|<cell|<with|par-mode|left|<name|Vue>>>>|<row|<cell|<with|par-mode|left|<cpp|ns_renderer_rep> (<verbatim|Plugins/NS/ns_renderer.*>)>>|<cell|<with|par-mode|left|<cpp|NSGraphicsContext> (<name|CoreGraphics>)>>|<cell|<with|par-mode|left|<name|Cocoa>>>>|<row|<cell|<with|par-mode|left|<cpp|x_drawable_rep> (<verbatim|Plugins/X11/x_drawable.*>, <source-link|x_shadow.cpp|src/Plugins/X11/x_shadow.cpp>, <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>)>>|<cell|<with|par-mode|left|<name|X11> window or pixmap>>|<cell|<with|par-mode|left|<name|X11>>>>|<row|<cell|<with|par-mode|left|<cpp|cairo_renderer_rep> (<verbatim|Plugins/Cairo/cairo_renderer.*>)>>|<cell|<with|par-mode|left|<name|Cairo> context>>|<cell|<with|par-mode|left|<name|Qt> with <cpp|USE_CAIRO>>>>|<row|<cell|<with|par-mode|left|<cpp|printer_rep> (<verbatim|Graphics/Renderer/printer.*>)>>|<cell|<with|par-mode|left|PostScript file>>|<cell|<with|par-mode|left|all>>>|<row|<cell|<with|par-mode|left|<cpp|pdf_hummus_renderer_rep> (<verbatim|Plugins/Pdf/pdf_hummus_renderer.*>)>>|<cell|<with|par-mode|left|<abbr|PDF> file>>|<cell|<with|par-mode|left|<name|Qt>, <name|Cocoa>>>>|<row|<cell|<with|par-mode|left|<cpp|mupdf_pdf_renderer_rep> (<verbatim|Plugins/MuPDF/mupdf_pdf_renderer.*>)>>|<cell|<with|par-mode|left|<abbr|PDF> file>>|<cell|<with|par-mode|left|with <name|MuPDF>, on demand>>>>>>
 
-  The <name|CMake> build compiles <verbatim|Plugins/Qt> and
-  <source-link|Plugins/Pdf|src/Plugins/Pdf> (with <cpp|PDF_RENDERER> set), and nothing of the
-  other back-ends; the <verbatim|configure> based build chooses the
-  <abbr|GUI> directory (<verbatim|Qt>, <verbatim|Qt6>, <verbatim|X11>,
-  <verbatim|Cocoa>) at configuration time (<verbatim|Qt6> is used for <name|Qt> 6), and always
-  compiles <source-link|Plugins/Cairo|src/Plugins/Cairo>, whose code is guarded by
-  <cpp|USE_CAIRO>. At the time of
-  writing, <verbatim|Plugins/Qt/qt_renderer.*> and
-  <verbatim|Plugins/Qt6/qt_renderer.*> are identical.
+  The <abbr|GUI> directory is chosen at configuration time:
+  <verbatim|./configure --with-gui=...> takes <verbatim|Qt> (or
+  <verbatim|Qt6> with <verbatim|--enable-qt-new>), <verbatim|Qtwk> (with
+  the renderer and the pictures of <source-link|Plugins/Qt|src/Plugins/Qt>), <verbatim|X11>,
+  <verbatim|SDL>, <verbatim|Vue> or <verbatim|NS>; the <name|CMake> build
+  (<verbatim|TEXMACS_GUI>) knows <verbatim|Qt>, <verbatim|Vue>,
+  <verbatim|SDL> and <verbatim|X11>. <source-link|Plugins/Cairo|src/Plugins/Cairo>
+  is always compiled, its code guarded by <cpp|USE_CAIRO>.
+  <source-link|Plugins/MuPDF|src/Plugins/MuPDF> is compiled with
+  <cpp|MUPDF_RENDERER> for <name|Qt>, <name|SDL> and <name|Vue> when
+  <name|MuPDF> is found (it is required by the last two), never for
+  <name|X11> and <name|Cocoa>, whose pictures would clash with it;
+  <source-link|Plugins/Pdf|src/Plugins/Pdf> (<cpp|PDF_RENDERER>,
+  <name|PDFHummus>) only with <name|Qt> and <name|Cocoa> (with <name|CMake>,
+  only for <name|Qt> without <name|MuPDF>). The renderers of
+  <source-link|Plugins/Qt|src/Plugins/Qt> and <source-link|Plugins/Qt6|src/Plugins/Qt6> have diverged a little
+  (only the former has <cpp|rounded_rectangle>, for instance).
 
   <subsection|<cpp|basic_renderer_rep>>
 
@@ -40,8 +38,10 @@
   bracket a drawing session on a native device, color helpers <cpp|rgb> and
   <cpp|get_rgb>, and no-op shadow operations. The file also defines
   <cpp|basic_character>, the key of glyph caches, and
-  <cpp|gui_interrupted>. Note that <source-link|basic_renderer.cpp|src/Graphics/Renderer/basic_renderer.cpp> is only
-  compiled when <cpp|QTTEXMACS> or <cpp|AQUATEXMACS> is defined.
+  <cpp|gui_interrupted>. Note that <source-link|basic_renderer.cpp|src/Graphics/Renderer/basic_renderer.cpp> is
+  compiled for all ports but <name|X11> (it is guarded by
+  <cpp|!defined(X11TEXMACS)>): the <name|X11> port has its own
+  <cpp|gui_interrupted>.
 
   <subsection|The <name|Qt> renderer>
 
@@ -135,7 +135,8 @@
     (<cpp|select_alpha>), and pattern brushes through <abbr|PDF> patterns.
 
     <item>Pictures are saved as temporary <verbatim|png> files (with
-    <name|Qt>) and embedded, cached by <cpp|get_unique_id>; image files are
+    <cpp|QImage> under <name|Qt>, <cpp|save_picture> under <name|Cocoa>)
+    and embedded, cached by <cpp|get_unique_id>; image files are
     embedded directly by <cpp|draw_scalable>.
 
     <item>Hyperlinks, destinations, outlines and metadata are written when
@@ -154,16 +155,79 @@
   strokes are not anti-aliased, and <cpp|draw_picture> ignores its
   <cpp|alpha> argument.
 
-  <subsection|Older renderers>
+  <subsection|The <name|MuPDF> renderers>
+
+  <cpp|mupdf_renderer_rep>
+  (<source-link|mupdf_renderer.cpp|src/Plugins/MuPDF/mupdf_renderer.cpp>)
+  draws with the <name|Fitz> library of <name|MuPDF> into an
+  <cpp|fz_pixmap>, which is the picture <cpp|mupdf_picture_rep>
+  (<source-link|mupdf_picture.cpp|src/Plugins/MuPDF/mupdf_picture.cpp>).
+  Strokes and fills are anti-aliased; glyphs are drawn from the bitmaps of
+  <TeXmacs>; shadows are pixmaps. It is the screen renderer of the
+  <name|SDL> port (one backing pixmap per window, see
+  <source-link|sdl_window.cpp|src/Plugins/SDL/sdl_window.cpp>) and of the
+  <name|Vue> port without the GPU, and it draws the pictures (icons,
+  images) of <name|Qt> and <name|Qtwk> builds with <name|MuPDF>, in place
+  of the <cpp|QImage>s of <source-link|qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>.
+
+  <cpp|mupdf_pdf_renderer_rep>
+  (<source-link|mupdf_pdf_renderer.cpp|src/Plugins/MuPDF/mupdf_pdf_renderer.cpp>)
+  is a printer which writes <abbr|PDF> with <name|MuPDF>, a prototype
+  alternative to <name|PDFHummus>: <cpp|printer> in
+  <source-link|printer.cpp|src/Graphics/Renderer/printer.cpp> takes it when
+  <cpp|use_mupdf_pdf ()> holds, that is with the preference
+  <verbatim|native pdf renderer> set to <verbatim|mupdf>, with
+  <verbatim|TEXMACS_PDF_MUPDF=1>, or always in the browser.
+
+  <subsection|The renderers of the <name|Vue> port>
+
+  The <name|Vue> port draws its widgets in immediate mode with <name|Clay>
+  and its documents with one of two renderers, chosen once at start-up
+  (<cpp|vue_gpu_enabled>):
+
+  <\itemize>
+    <item>Without the GPU, every window has an <name|MuPDF> pixmap as
+    backing store, drawn by <cpp|mupdf_renderer_rep>
+    (<cpp|vue_sdl_mupdf_window_rep> in
+    <source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>).
+
+    <item>With the GPU (<verbatim|./configure --with-thorvg=...>, which
+    defines <cpp|USE_THORVG>; on unless <verbatim|TEXMACS_VUE_GPU=0>, and
+    abandoned when no <name|OpenGL> context can be made),
+    <cpp|gpu_renderer_rep>
+    (<source-link|vue_gpu.cpp|src/Plugins/Vue/vue_gpu.cpp>) draws into
+    <name|OpenGL> textures (<name|WebGL> 2 in the browser): glyphs from an
+    atlas of the bitmaps of <TeXmacs>, plain fills from the same atlas,
+    pictures as textures, and lines, polygons, arcs and rounded rectangles
+    with the <name|OpenGL> engine of <name|ThorVG>. The backing store of an
+    editor is a texture (<cpp|gpu_picture_rep>), repainted incrementally as
+    the pixmap was.
+  </itemize>
+
+  A third path, through <name|SDL>'s own renderer and the example
+  renderer of <name|Clay> (<cpp|vue_sdl_window_rep>), is unused. The
+  <name|CMake> build has no <name|ThorVG>, hence no GPU path.
+
+  <subsection|The <name|Cocoa> renderer>
+
+  <cpp|ns_renderer_rep>
+  (<source-link|ns_renderer.mm|src/Plugins/NS/ns_renderer.mm>) derives
+  from <cpp|basic_renderer_rep> and draws with <name|CoreGraphics> in the
+  <cpp|NSGraphicsContext> given to <cpp|begin>, that of the view
+  (<cpp|TMView>) or that of a bitmap for the pictures
+  (<source-link|ns_picture.mm|src/Plugins/NS/ns_picture.mm>). It keeps
+  a stack of clippings per context (<cpp|clip_pushed>) and reapplies its
+  state after a context is saved and restored.
+
+  <subsection|The <name|Cairo> renderer>
 
   <cpp|cairo_renderer_rep> (used by
   <cpp|qt_simple_widget_rep::get_renderer> when <cpp|USE_CAIRO> is
-  defined), <cpp|aqua_renderer_rep> and <cpp|cg_renderer_rep> all derive
-  from <cpp|basic_renderer_rep>. They have not followed the recent
-  evolution of the interface: for instance, their constructors still call
-  <cpp|basic_renderer_rep (true, w2, h2)>, although the second argument of
-  that constructor is now the pixel ratio. Treat them as starting points
-  rather than as working code.
+  defined) derives from <cpp|basic_renderer_rep>. It has not followed the
+  recent evolution of the interface (shadows, transformations, pictures);
+  treat it as a starting point rather than as working code. The former
+  <cpp|aqua_renderer_rep> and <cpp|cg_renderer_rep> are gone: the
+  <name|Cocoa> port now draws with <cpp|ns_renderer_rep>.
 
   <section|Writing a new renderer>
 
@@ -213,7 +277,9 @@
   must be hooked into the factory <cpp|printer> in <source-link|printer.cpp|src/Graphics/Renderer/printer.cpp>.
 
   A useful way to proceed is to start from the <name|Qt> renderer, which
-  shows how to map each primitive to a modern 2D graphics <abbr|API>, and
+  shows how to map each primitive to a modern 2D graphics <abbr|API> (the
+  <name|MuPDF> and <name|Cocoa> renderers do the same with <name|Fitz> and
+  <name|CoreGraphics>), and
   from the <abbr|PDF> renderer for the printer-specific parts.
 
   <section|Pitfalls>

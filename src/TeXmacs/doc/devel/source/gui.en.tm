@@ -9,10 +9,18 @@
     This chapter describes the original graphical toolkit of <TeXmacs>,
     called <em|Widkit>, together with its <name|X11> backend. This toolkit
     still lives in the directories <source-link|src/src/Plugins/Widkit|src/Plugins/Widkit> and
-    <source-link|src/src/Plugins/X11|src/Plugins/X11>, but it is only used when <TeXmacs> is
-    configured with the <name|X11> interface (<verbatim|./configure
-    --disable-qt>). The default user interface is based on <name|Qt>
-    (<verbatim|Plugins/Qt>), and all user interfaces implement the abstract
+    <source-link|src/src/Plugins/X11|src/Plugins/X11>. The widgets of Widkit
+    are used by three of the current ports, which only differ by the
+    implementation of the window interface (<cpp|window_rep>):
+    <name|X11> (<verbatim|./configure --with-gui=x11>, <cpp|x_window_rep>),
+    <name|SDL> (<verbatim|--with-gui=sdl>, <cpp|sdl_window_rep> in
+    <source-link|Plugins/SDL|src/Plugins/SDL>, drawing with <name|MuPDF>)
+    and <name|Qtwk> (<verbatim|--with-gui=qtwk>, <cpp|qtwk_window_rep> in
+    <source-link|Plugins/Qtwk|src/Plugins/Qtwk>, <name|Qt> as a mere
+    platform layer). The default user interface is based on the native
+    widgets of <name|Qt> (<source-link|Plugins/Qt|src/Plugins/Qt>), and the <name|Vue>
+    (<source-link|Plugins/Vue|src/Plugins/Vue>) and <name|Cocoa> (<source-link|Plugins/NS|src/Plugins/NS>) ports
+    have widgets of their own; all user interfaces implement the abstract
     widget interface from <source-link|src/src/Graphics/Gui|src/Graphics/Gui>. For an up-to-date
     description of the abstract widget system, of the main <TeXmacs> window
     and of the <scheme> widget language, we refer to the chapter on the
@@ -29,7 +37,8 @@
 
   The Widkit toolkit has two main components: an abstract window interface,
   which is very similar to X Window, and the actual toolkit. The abstract
-  window interface has been implemented for X Window.
+  window interface was first implemented for X Window, and later for
+  <name|SDL> and for <name|Qt> (the <name|Qtwk> port).
 
   The <name|X11> implementation of the window interface consists of three
   main classes (see <source-link|Plugins/X11|src/Plugins/X11>): <cpp|x_gui_rep>,

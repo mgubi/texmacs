@@ -81,6 +81,18 @@
     <item*|<name|X11>><cpp|Xutf8LookupString> is followed by
     <cpp|utf8_to_cork> (<source-link|Plugins/X11/x_loop.cpp|src/Plugins/X11/x_loop.cpp>).
 
+    <item*|<name|SDL>, <name|Vue>>The text of an <name|SDL> text event is
+    converted with <cpp|utf8_to_cork> and named as in <name|Qt> by
+    <cpp|cork_key>
+    (<source-link|sdl_gui.cpp|src/Plugins/SDL/sdl_gui.cpp>,
+    <source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>).
+
+    <item*|<name|Cocoa>>The text given to <cpp|insertText:> by the input
+    system is named character by character by <cpp|ns_key_name>
+    (<source-link|TMView.mm|src/Plugins/NS/TMView.mm>), as
+    <cpp|computeUnicodeToCork> does, through <cpp|from_nsstring> and
+    <cpp|utf8_to_cork>.
+
     <item*|Editor>When it shows keyboard shortcuts or handles pre-edit
     text, the editor converts back with <cpp|cork_to_utf8>
     (<source-link|Edit/Interface/edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp>).

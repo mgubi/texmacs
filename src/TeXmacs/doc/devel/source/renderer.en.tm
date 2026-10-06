@@ -61,7 +61,8 @@
     <item*|<verbatim|Plugins/Qt/>>The <name|Qt> screen renderer
     (<source-link|qt_renderer.hpp|src/Plugins/Qt/qt_renderer.hpp>, <source-link|qt_renderer.cpp|src/Plugins/Qt/qt_renderer.cpp>) and <name|Qt>
     native pictures (<source-link|qt_picture.hpp|src/Plugins/Qt/qt_picture.hpp>, <source-link|qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>).
-    The directory <source-link|Plugins/Qt6/|src/Plugins/Qt6> contains a copy of these files.
+    The directory <source-link|Plugins/Qt6/|src/Plugins/Qt6> contains a
+    slightly different copy of these files.
 
     <item*|<source-link|Plugins/Pdf/|src/Plugins/Pdf>>The <abbr|PDF> renderer based on the
     <name|PDFHummus> library (<source-link|pdf_hummus_renderer.hpp|src/Plugins/Pdf/pdf_hummus_renderer.hpp>,
@@ -69,9 +70,15 @@
 
     <item*|Other back-ends>The <name|X11> renderer
     (<source-link|Plugins/X11/x_drawable.hpp|src/Plugins/X11/x_drawable.hpp>, <source-link|x_shadow.cpp|src/Plugins/X11/x_shadow.cpp>,
-    <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>), and the older <name|Cairo>
-    (<source-link|Plugins/Cairo/|src/Plugins/Cairo>), <name|Cocoa> (<verbatim|Plugins/Cocoa/>)
-    and <name|CoreGraphics> (<verbatim|Plugins/MacOS/>) renderers.
+    <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>), the
+    <name|MuPDF> renderers of the <name|SDL> and <name|Vue> ports and of
+    <abbr|PDF> export (<source-link|Plugins/MuPDF/|src/Plugins/MuPDF>), the
+    GPU renderer of <name|Vue>
+    (<source-link|vue_gpu.cpp|src/Plugins/Vue/vue_gpu.cpp>), the
+    <name|Cocoa> renderer
+    (<source-link|ns_renderer.mm|src/Plugins/NS/ns_renderer.mm>), and the
+    older <name|Cairo> renderer
+    (<source-link|Plugins/Cairo/|src/Plugins/Cairo>).
   </description>
 
   <\traverse>

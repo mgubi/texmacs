@@ -28,9 +28,19 @@
   then builds markup instead of native widgets for <scm|top-window> and
   <scm|dialogue-window>.
 
+  The path does not depend on the port: the test is a preference, not
+  <scm|(gui-version)>, and the markup is shown in an editor embedded in a
+  dialog (<cpp|texmacs_input_widget>, <cpp|texmacs_output_widget> in
+  <source-link|tm_window.cpp|src/Texmacs/Window/tm_window.cpp> and
+  <source-link|tm_button.cpp|src/Texmacs/Window/tm_button.cpp>), which all
+  the ports provide through their <TeXmacs> widget: <name|Qt>,
+  <name|Vue>, <name|Cocoa>, and <name|X11>, <name|SDL> and <name|Qtwk>
+  with <name|Widkit>. Only the menus, bars and side tools around it are
+  those of the port.
+
   <section|Two generations>
 
-  The style packages of <verbatim|packages/gui>
+  The style packages of <source-link|packages/gui|TeXmacs/packages/gui>
   (<verbatim|gui>, <verbatim|gui-widget>, <verbatim|gui-form>,
   <verbatim|gui-layout> and the themes <verbatim|gui-metal>,
   <verbatim|gui-brushed>, <verbatim|gui-granite>, from 2007) are a first
@@ -42,7 +52,7 @@
   <scm|widget-set!>), which show them in an auxiliary buffer; this
   generation is legacy.
 
-  The current generation is in <verbatim|packages/new-gui> (from 2022):
+  The current generation is in <source-link|packages/new-gui|TeXmacs/packages/new-gui> (from 2022):
   its elements react to the mouse by themselves, through two primitives of
   the typesetter, and the interpreter of <scm|tm-widget> descriptions
   produces it. The rest of this chapter is about it.
@@ -95,7 +105,7 @@
     <item*|<source-link|gui-keyboard.ts|TeXmacs/packages/new-gui/gui-keyboard.ts>>Virtual
     keyboards: <markup|keyboard>, <markup|std-key>, <markup|extended-key>,
     <markup|simple-key>, <markup|mod-key>; with the style
-    <verbatim|new-gui> (<verbatim|styles/test/new-gui.ts>).
+    <verbatim|new-gui> (<source-link|styles/test/new-gui.ts|TeXmacs/styles/test/new-gui.ts>).
   </description>
 
   <section|How the elements react>
@@ -205,11 +215,12 @@
     <item>The dialogs and top windows, with <menu|View|GUI through markup>.
 
     <item>The custom keyboard (<menu|Developer|Custom keyboard>), shown in
-    a <scm|texmacs-output> widget with the style <verbatim|new-gui>, or as
-    native buttons (<name|Qt>) built from the same markup.
+    a <scm|texmacs-output> widget with the style <verbatim|new-gui> (all
+    ports), or as native buttons built from the same markup
+    (<cpp|QTMOnscreenKeyboard>, <name|Qt> only).
 
     <item>The preferences of a server, a form
-    (<verbatim|progs/forms/server-preferences.tm>) with
+    (<source-link|progs/forms/server-preferences.tm|TeXmacs/progs/forms/server-preferences.tm>) with
     <markup|form-input-text> and <markup|form-checkbox>.
   </itemize>
 

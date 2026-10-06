@@ -230,7 +230,8 @@
   its neighbour after shrinking (<cpp|adjust_top>, <cpp|adjust_bot>) and the
   vertical offset is reset, so that the pieces of a large delimiter join
   without visible seams; note that this adjustment is compiled out in
-  <name|Qt> builds (<verbatim|#ifndef QTTEXMACS>). The renderers cache the
+  <name|Qt> and <name|Qtwk> builds (<verbatim|#ifndef QTTEXMACS>), and
+  kept with the other ports. The renderers cache the
   shrunk glyph as an image per character, font, shrinking factor and color
   (for instance the <cpp|character_image> table of the <name|Qt>
   renderer).

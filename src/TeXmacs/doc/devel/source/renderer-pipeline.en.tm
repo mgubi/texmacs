@@ -157,6 +157,18 @@
   reset zoom, so that the <cpp|SI> coordinates are those of the window,
   <abbr|i.e.> document coordinates multiplied by <cpp|magf>.
 
+  The other ports follow the same scheme with their own backing store:
+  <cpp|ns_simple_widget_rep::repaint_invalid_regions> in <name|Cocoa>
+  (<source-link|ns_simple_widget.mm|src/Plugins/NS/ns_simple_widget.mm>),
+  <cpp|vue_simple_widget_rep::repaint_invalid_regions> in <name|Vue>
+  (<source-link|vue_widget.cpp|src/Plugins/Vue/vue_widget.cpp>, on an
+  <name|MuPDF> pixmap or a GPU texture), and, for the <name|Widkit> ports
+  (<name|X11>, <name|SDL>, <name|Qtwk>), the window
+  (<cpp|x_window_rep::repaint_invalid_regions> and its counterparts), which
+  sends repaint events to the widgets; <cpp|simple_widget_rep::handle_repaint>
+  (<source-link|simple_wk_widget.cpp|src/Plugins/Widkit/Basic/simple_wk_widget.cpp>)
+  then reaches the editor.
+
   <subsection|Repainting a document>
 
   <cpp|edit_interface_rep::handle_repaint> (in
@@ -258,7 +270,8 @@
   <cpp|edit_main_rep::print_snippet>, which calls either
   <cpp|make_eps (url name, box b, int dpi)> (a one page printer renderer of
   page type <verbatim|user> fitted to the ink extents of the box) or, for
-  bitmap formats with <name|Qt>, <cpp|make_raster_image (url name, box b,
+  bitmap formats with <name|Qt>, <name|Vue> or <name|Cocoa> (not with
+  <name|X11> and <name|SDL>), <cpp|make_raster_image (url name, box b,
   double zoomf)>, which creates a <cpp|native_picture>, draws on it with a
   <cpp|picture_renderer> and saves it with <cpp|save_picture>. Both are
   defined in <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>.

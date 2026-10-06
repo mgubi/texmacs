@@ -236,7 +236,9 @@
   <section|Saving pictures>
 
   <cpp|save_picture (dest, p)> writes a picture to a file in the format
-  given by the suffix (with <name|Qt>; the <name|X11> version does nothing).
+  given by the suffix (with <name|Qt> and <name|Cocoa>; the <name|MuPDF>
+  version of <name|SDL> and <name|Vue> only writes <name|PNG>, and the
+  <name|X11> version fails).
   <cpp|picture_as_eps (p, dpi)> encodes a picture as an <abbr|EPS> image
   with an <verbatim|ASCIIHexDecode> data stream and, if the picture has
   transparent pixels, a one bit mask (pixels with an opacity of at most 32

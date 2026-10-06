@@ -46,14 +46,45 @@
     compiling, it must be given in the variable <verbatim|GUILE_VERSION>.
 
     <item*|Graphical port>(<source-link|tm_gui.m4|misc/m4/tm_gui.m4>, <source-link|qt.m4|misc/m4/qt.m4>)
-    <name|Qt> is the default; <verbatim|--disable-qt> builds the
-    historical <name|X11> port and <verbatim|--enable-cocoa> the
-    experimental <name|Cocoa> port. <verbatim|--enable-qtpipes> replaces
-    <name|Unix> pipes by <name|Qt> pipes. The <name|Qt> installation is
-    found through <verbatim|qmake> (variables <verbatim|QMAKE>,
-    <verbatim|QT_PATH>, <verbatim|MOC>, ...). On <name|macOS> with
-    <name|Qt>, the <name|Objective-C> code of <source-link|src/Plugins/MacOS|src/Plugins/MacOS>
-    is added.
+    <verbatim|--with-gui=<em|port>> chooses the port, which defines one
+    macro:
+
+    <\description>
+      <item*|<verbatim|qt>>(the default) native <name|Qt> 5 or 6 widgets,
+      <verbatim|QTTEXMACS>. <verbatim|--enable-qt-new> (the default on
+      <name|Android>) compiles <source-link|Plugins/Qt6|src/Plugins/Qt6> instead of
+      <source-link|Plugins/Qt|src/Plugins/Qt>, and requires <name|Qt> 6.10 or later.
+
+      <item*|<verbatim|qtwk>><name|Qt> as a platform layer with the
+      <name|Widkit> widgets, <verbatim|QTWKTEXMACS> together with
+      <verbatim|QTTEXMACS>.
+
+      <item*|<verbatim|x11>>The historical <name|X11> port with
+      <name|Widkit>, <verbatim|X11TEXMACS>.
+
+      <item*|<verbatim|sdl>><name|Widkit> on <name|SDL> 3
+      (<verbatim|--with-sdl3>), drawn with <name|MuPDF>,
+      <verbatim|SDLTEXMACS>.
+
+      <item*|<verbatim|vue>><name|SDL> 3 windows and widgets drawn by
+      <name|Clay>, <verbatim|VUETEXMACS>; with <verbatim|--with-thorvg=<em|dir>>
+      the GPU renderer (<name|OpenGL> and <name|ThorVG>).
+
+      <item*|<verbatim|cocoa>, <verbatim|aqua>>The native <name|macOS>
+      port of <source-link|Plugins/NS|src/Plugins/NS>, <verbatim|AQUATEXMACS>; it needs the
+      <name|macOS> extensions.
+    </description>
+
+    <name|SDL> and <name|Vue> require <name|MuPDF>
+    (<verbatim|--with-mupdf=<em|dir>>, <source-link|mupdf.m4|misc/m4/mupdf.m4>);
+    <name|Qt> uses it when it is found, <name|X11> and <name|Cocoa> refuse
+    it. <verbatim|--enable-qtpipes> (on by default with <name|Qt> and
+    <name|Qtwk>, refused with the other ports) replaces <name|Unix> pipes by
+    <name|Qt> pipes. The <name|Qt> installation is found through
+    <verbatim|qmake> (variables <verbatim|QMAKE>, <verbatim|QT_PATH>,
+    <verbatim|MOC>, ...). On <name|macOS>, the <name|Objective-C> code of
+    <source-link|src/Plugins/MacOS|src/Plugins/MacOS> is added unless
+    <verbatim|--disable-macosx-extensions> is given.
 
     <item*|Libraries><verbatim|--with-freetype>, <verbatim|--with-iconv>,
     <verbatim|--with-gnutls>, <verbatim|--with-aspell>,

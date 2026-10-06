@@ -3,22 +3,37 @@
 <style|<tuple|tmdoc|english>>
 
 <\body>
-  <tmdoc-title|The <name|X11>/<name|Widkit> and <name|Cocoa> ports>
+  <tmdoc-title|The <name|Widkit> ports: <name|X11>, <name|SDL> and
+  <name|Qtwk>>
+
+  <section|<name|Widkit>>
+
+  Three ports draw all their widgets with <source-link|Plugins/Widkit|src/Plugins/Widkit>, a
+  complete widget toolkit whose widgets are drawn with the <TeXmacs>
+  renderer and communicate by <cpp|event>s. They only differ by the layer
+  below, which provides the windows, the events, the clipboards and the
+  renderer: <name|X11> (<source-link|Plugins/X11|src/Plugins/X11>), <name|SDL3>
+  (<source-link|Plugins/SDL|src/Plugins/SDL>) or <name|Qt> (<source-link|Plugins/Qtwk|src/Plugins/Qtwk>). The design of
+  <name|Widkit> is described in <hlink|the graphical user interface
+  (historical Widkit toolkit)|gui.en.tm>, and the mapping of the abstract
+  constructors to it is in <source-link|Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>.
+
+  The wrapper defines all constructors of the abstract interface, but some
+  are placeholders (see <hlink|the overview|guiports.en.tm>):
+  <cpp|printer_widget> is a bare \PCancel\Q button, <cpp|tree_view_widget>
+  shows \PNot implemented\Q, the responsive tabs are plain tabs and the
+  tooltip windows are popup windows. File choosers, color pickers and the
+  other dialogs are <name|Widkit> widgets. The main window
+  (<source-link|Widkit/Misc/texmacs_widget.cpp|src/Plugins/Widkit/Misc/texmacs_widget.cpp>) has side panels for the tools,
+  300 points wide and hidden until tools are shown on that side. After a
+  window is shown or resized the whole window must be invalidated, as the
+  <verbatim|Expose> events of <name|X11> do: <name|Widkit> relies on them.
 
   <section|The <name|X11> port>
 
-  The <name|X11> port is the original port of <TeXmacs>. It consists of two
-  parts: <source-link|Plugins/X11|src/Plugins/X11> talks to the <name|X> server (display,
-  windows, events, fonts, pictures, selections), and
-  <source-link|Plugins/Widkit|src/Plugins/Widkit> is a complete widget toolkit whose widgets are
-  drawn with the <TeXmacs> renderer and communicate by <cpp|event>s. The
-  design of <name|Widkit> is described in <hlink|the graphical user
-  interface (historical Widkit toolkit)|gui.en.tm>, and the mapping of the
-  abstract constructors to it is in
-  <source-link|Widkit/Basic/widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>. The port is still updated
-  when the abstract interface changes, but lacks the most recent
-  constructors (responsive tabs and setting widgets) and all features which
-  the <scheme> code only offers when <scm|qt-gui?> holds.
+  The <name|X11> port is the original port of <TeXmacs>. It is still
+  updated when the abstract interface changes, but lacks the features which
+  the <scheme> code only offers when <scm|qt-gui?> or <scm|vue-gui?> holds.
 
   <paragraph|The event loop.><cpp|x_gui_rep::event_loop>
   (<source-link|X11/x_loop.cpp|src/Plugins/X11/x_loop.cpp>) is a polling loop which runs while there are
@@ -46,70 +61,109 @@
 
   <paragraph|Selections.>The clipboard <verbatim|"primary"> is the
   <name|X> selection <verbatim|CLIPBOARD> and <verbatim|"mouse"> is
-  <verbatim|PRIMARY>. When <TeXmacs> owns a selection, it answers requests
-  for <verbatim|TARGETS> and <verbatim|STRING> only
-  (<verbatim|SelectionRequest> in <source-link|x_loop.cpp|src/Plugins/X11/x_loop.cpp>), with the
-  serialized string stored by <cpp|set_selection>. To paste from another
-  program, <cpp|x_gui_rep::get_selection> requests <verbatim|STRING> and
-  polls for the <verbatim|SelectionNotify> event, giving up after a fixed
-  number of polls. The <cpp|format> argument of <cpp|get_selection> and
-  <cpp|set_selection> is ignored.
+  <verbatim|PRIMARY>. For the format <verbatim|default>, the global
+  <cpp|set_selection> (<source-link|x_gui.cpp|src/Plugins/X11/x_gui.cpp>) publishes the verbatim version
+  <cpp|sv> of the selection, so that other programs receive plain text;
+  since the port offers a single string, another <TeXmacs> instance
+  receives that plain text too, and a copy between two instances loses its
+  structure. When <TeXmacs> owns a selection, it answers requests for
+  <verbatim|TARGETS> and <verbatim|STRING> only (<verbatim|SelectionRequest>
+  in <source-link|x_loop.cpp|src/Plugins/X11/x_loop.cpp>). To paste from another program,
+  <cpp|x_gui_rep::get_selection> requests <verbatim|STRING> and polls for
+  the <verbatim|SelectionNotify> event, giving up after a fixed number of
+  polls.
 
-  <paragraph|Printing and dialogs.><name|Widkit> has no print dialog:
-  <cpp|printer_widget> is a bare \PCancel\Q button
-  (<source-link|widkit_wrapper.cpp|src/Plugins/Widkit/Basic/widkit_wrapper.cpp>), and since <scm|use-print-dialog?> is
-  false outside <name|Qt>, printing always goes through the printing
-  command. File choosers and other dialogs are <name|Widkit> widgets.
+  <paragraph|Printing.>Since <scm|use-print-dialog?> is false,
+  printing always goes through the printing command.
 
-  <section|The <name|Cocoa> port>
+  <section|The <name|SDL> port>
 
-  <verbatim|Plugins/Cocoa> is an experimental native port for
-  <name|macOS>, written in <name|Objective-C++> with manual reference
-  counting (<cpp|NSAutoreleasePool>). It is built with
-  <verbatim|configure --enable-cocoa> (<cpp|AQUATEXMACS>), and is
-  independent of <verbatim|Plugins/MacOS>, which holds the
-  <name|Objective-C> helpers of the <name|Qt> port on <name|macOS>. Most
-  files were last changed for real in 2013; later commits only adapted it
-  to changes of the abstract interface (styled widgets, extra arguments of
-  mouse events).
+  <source-link|Plugins/SDL|src/Plugins/SDL> is an experimental port which uses <name|SDL3> for
+  the windows and the events, <name|Widkit> for the widgets, and the
+  <name|MuPDF> renderer for the drawing (<verbatim|configure
+  --with-gui=sdl --with-mupdf=... --with-sdl3>, or <name|CMake>
+  <verbatim|TEXMACS_GUI=SDL>). Its <source-link|README.md|src/Plugins/SDL/README.md> describes it.
 
-  <paragraph|The event loop.><cpp|aqua_gui_rep::event_loop>
-  (<verbatim|aqua_gui.mm>) does not call <verbatim|[NSApp run]> (that
-  variant is disabled with <verbatim|#if 0>) but calls
-  <verbatim|finishLaunching> and then loops itself: it waits up to half a
-  second for an event with <verbatim|nextEventMatchingMask>, dispatches it
-  and all further pending events, and, when no event is left, calls
-  <cpp|update>, which runs the interpose handler. The loop has no exit
-  condition: the program ends through <cpp|quit>.
+  <paragraph|Windows and drawing.>Each window has a backing store, an
+  opaque <name|MuPDF> pixmap of the size of the window in device pixels, in
+  which the widgets draw with <cpp|mupdf_renderer_rep>. A repaint records
+  the rectangles it changed, and only these are copied to the surface of
+  the window (<cpp|SDL_ConvertPixels>, then
+  <cpp|SDL_UpdateWindowSurfaceRects>); a scroll shifts the pixels of the
+  backing store in place. There is no <cpp|SDL_Renderer>. The renderers
+  draw at <cpp|retina_factor> pixels per point, the pixel density of the
+  primary display (<verbatim|TEXMACS_SDL_DENSITY> overrides it).
 
-  <paragraph|Keyboard and input methods.><verbatim|TMView>
-  (<verbatim|TMView.mm>) passes key events through
-  <verbatim|interpretKeyEvents:> and implements the <verbatim|NSTextInput>
-  protocol (<verbatim|insertText:>, <verbatim|setMarkedText:>,
-  <verbatim|doCommandBySelector:>), so that the input methods of
-  <name|macOS> can be used.
+  <paragraph|The event loop.><cpp|sdl_gui_rep::event_loop>
+  (<source-link|sdl_gui.cpp|src/Plugins/SDL/sdl_gui.cpp>) runs while there are windows or servers. It sleeps
+  in <cpp|SDL_WaitEventTimeout>, handles the waiting events in a burst (a
+  mouse motion superseded by the next one is dropped), lets the editors
+  apply their changes, and repaints when the queue is empty, or at least
+  every 50<nbsp>ms. While a window is resized by its border, an event watch
+  lays it out and repaints it from inside the event pump of <name|SDL>, but
+  only while the loop is waiting.
 
-  <paragraph|Clipboards.>Only the clipboard <verbatim|"primary"> is
-  connected to the system, through the general <verbatim|NSPasteboard>
-  and the plain string type <verbatim|NSStringPboardType>; other names are
-  internal. As in <name|X11>, the <cpp|format> argument is ignored.
+  <paragraph|Keyboard and input methods.>Each window calls
+  <cpp|SDL_StartTextInput> (<source-link|sdl_window.cpp|src/Plugins/SDL/sdl_window.cpp>). A keystroke which
+  types text is delivered by its text event, which carries what the input
+  method or a dead key composed; the others are delivered as keys
+  (<verbatim|C-x>, <verbatim|M-s>, <verbatim|return>, ...). The composition
+  of an input method is sent as <verbatim|pre-edit:<em|cursor>:<em|text>>,
+  as in <name|Qt>.
 
-  <paragraph|Printing and dialogs.><cpp|printer_widget> is a \PCancel\Q
-  button as in <name|Widkit> (<verbatim|aqua_dialogues.mm>), and
-  <cpp|gui_refresh> is empty. File choosers and simple dialogs use
-  <verbatim|NSSavePanel> and friends in <verbatim|aqua_dialogues.mm>.
+  <paragraph|Clipboards.>The system clipboard holds the selection
+  <verbatim|"primary">, under the types
+  <verbatim|application/x-texmacs-clipboard>, <verbatim|text/html> (when
+  there is an <name|HTML> version) and plain text, the latter being
+  <cpp|sv> for the format <verbatim|default>. The other selections are
+  kept internally; <name|SDL> has no <name|X11> <verbatim|PRIMARY>
+  selection.
 
-  <section|Common limitations>
+  <paragraph|Testing.><verbatim|TEXMACS_SDL_SCRIPT=<em|file>> replays the
+  commands of the file (<verbatim|wait>, <verbatim|window>,
+  <verbatim|click>, <verbatim|key>, <verbatim|text>, <verbatim|snapshot>,
+  ..., see the comment in <source-link|sdl_gui.cpp|src/Plugins/SDL/sdl_gui.cpp>); <verbatim|snapshot
+  <em|name>> saves the backing store of the target window in the directory
+  <verbatim|TEXMACS_SDL_SNAPSHOT>.
 
-  Both ports publish only the string <cpp|s> passed to <cpp|set_selection>.
-  For an ordinary copy this is the <TeXmacs> snippet, since the verbatim
-  version <cpp|sv> is only computed when <cpp|QTTEXMACS> is defined
-  (<cpp|edit_select_rep::selection_set> in
-  <source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>); other programs therefore
-  receive <TeXmacs> markup rather than plain text. Neither port implements
-  the recent constructors listed in <hlink|the overview|guiports.en.tm>
-  (five for <name|Widkit>, six for <name|Cocoa>), and both lack the features of the user interface which <scheme> reserves to
-  <scm|qt-gui?>.
+  <paragraph|Limits.>No file dialogs of the system and no drag and drop,
+  no custom cursors (except the invisible one), and the positions of
+  popups may be off on a display whose density differs from
+  <cpp|retina_factor>. Printing goes through the printing command, as in
+  <name|X11>.
+
+  <section|The <name|Qtwk> port>
+
+  <source-link|Plugins/Qtwk|src/Plugins/Qtwk> (<verbatim|configure --with-gui=qtwk>, macros
+  <cpp|QTWKTEXMACS> and <cpp|QTTEXMACS>) uses <name|Qt> as a platform layer
+  under <name|Widkit>: a <cpp|QTWKApplication> (a <cpp|QApplication>, or a
+  <cpp|QTWKCoreApplication> in headless mode), one <cpp|QTWKWindow> (a
+  <cpp|QWidget>) per <TeXmacs> window, painted with the <name|Qt> renderer
+  <cpp|qt_renderer_rep> of <verbatim|Plugins/Qt>, and fonts, pictures,
+  pipes, sockets and <abbr|HTTP> taken from <verbatim|Plugins/Qt> (see
+  <hlink|selecting and building a port|guiports-build.en.tm>).
+
+  <paragraph|The event loop.>As in the <name|Qt> port, <name|Qt> runs the
+  loop (<verbatim|qApp-\<gtr\>exec ()> in <source-link|qtwk_gui.cpp|src/Plugins/Qtwk/qtwk_gui.cpp>), and the
+  events of the windows (key presses, mouse, resizes, socket
+  notifications, commands) are queued as <cpp|qp_type> events and handled
+  by the update cycle of <cpp|qtwk_gui_rep>.
+
+  <paragraph|Keyboard and input methods.><cpp|QTWKWindow::keyPressEvent>
+  and <cpp|QTWKWindow::inputMethodEvent> (<source-link|QTWKWindow.cpp|src/Plugins/Qtwk/QTWKWindow.cpp>) follow
+  the <name|Qt> port; committed text is replayed as one synthetic key
+  press per <cpp|QChar>.
+
+  <paragraph|Clipboards.><cpp|qtwk_gui_rep::set_selection> and
+  <cpp|get_selection> are those of the <name|Qt> port: the same
+  <cpp|QMimeData> with <verbatim|application/x-texmacs-clipboard> and
+  <verbatim|application/x-texmacs-pid>, <verbatim|"primary"> on the system
+  clipboard and <verbatim|"mouse"> on the <name|X11> selection.
+
+  <paragraph|Scheme.>Since <cpp|QTTEXMACS> is defined, <scm|qt-gui?> holds
+  and <scm|gui-version> is <verbatim|"qt5"> or <verbatim|"qt6">: the
+  <scheme> code offers the <name|Qt> features, which the <name|Widkit>
+  widgets do not all have (see <hlink|pitfalls|guiports-pitfalls.en.tm>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

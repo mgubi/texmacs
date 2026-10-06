@@ -47,7 +47,10 @@
     <item*|Environment><cpp|texmacs_getenv>, <cpp|texmacs_setenv>.
 
     <item*|Miscellaneous><cpp|get_default_theme> (light or dark, following
-    the system with <name|Qt> 6.5 and later),
+    the system with <name|Qt> 6.5 and later, and light with the other
+    ports, whose own themes come from the preference <verbatim|gui theme>
+    in <name|Vue> and from the appearance of the application in
+    <name|Cocoa>),
     <cpp|texmacs_get_application_directory>,
     <cpp|texmacs_init_guile_hooks>.
   </description>
@@ -77,7 +80,9 @@
   <name|Linux> and <verbatim|os_log> on <name|macOS>.
 
   <verbatim|Plugins/MacOS/> adds services which only exist on
-  <name|macOS>:
+  <name|macOS>; it is compiled with every port on <name|macOS>
+  (<cpp|MACOSX_EXTENSIONS>), unless <verbatim|--disable-macosx-extensions>
+  is given, which the <name|Cocoa> port refuses:
 
   <\description>
     <item*|<source-link|mac_utilities.mm|src/Plugins/MacOS/mac_utilities.mm>><cpp|mac_alternate_startup> (is
@@ -95,8 +100,10 @@
     <item*|<source-link|mac_images.mm|src/Plugins/MacOS/mac_images.mm>>Image sizes and conversions with
     <name|Cocoa>.
 
-    <item*|<source-link|mac_app.mm|src/Plugins/MacOS/mac_app.mm>, <verbatim|cg_renderer.cpp>>Support for
-    the older <name|Cocoa> and <name|X11> front ends.
+    <item*|<source-link|mac_app.mm|src/Plugins/MacOS/mac_app.mm>>The
+    <cpp|NSApplication> delegate of the <name|X11> front end on
+    <name|macOS> (<cpp|MACOSX_EXTENSIONS>). The native <name|Cocoa> port
+    has its own, in <source-link|Plugins/NS|src/Plugins/NS>.
   </description>
 
   <section|Windows>
@@ -155,8 +162,8 @@
     also does not reset the variable after releasing it.
 
     <item><cpp|mac_fix_paths> is declared in
-    <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> but only defined for the old
-    <name|Cocoa> front end and never called.
+    <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> but only defined for the
+    <name|Cocoa> port (<cpp|AQUATEXMACS>), and never called.
 
     <item>The behaviour of locks differs: advisory <cpp|flock> locks on
     <name|Unix>, mandatory <cpp|LockFileEx> locks on <name|Windows> (which

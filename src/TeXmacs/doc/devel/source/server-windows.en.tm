@@ -17,7 +17,9 @@
   <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp> and <source-link|message.hpp|src/Graphics/Gui/message.hpp>, so it is
   independent of the toolkit; how the <name|Qt> port implements the
   corresponding widgets is described in <hlink|the <name|Qt>
-  implementation|widgets-qt.en.tm>, and the <scheme> side of menus and
+  implementation|widgets-qt.en.tm>, the other ports (<name|Vue>,
+  <name|Cocoa>, and <name|X11>, <name|SDL> and <name|Qtwk> with
+  <name|Widkit>) in <hlink|the ports|guiports.en.tm>, and the <scheme> side of menus and
   dialogs in <hlink|widgets from <scheme>|widgets-scheme.en.tm>.
 
   The <TeXmacs> widget built by <cpp|texmacs_widget (mask, quit)> has the
@@ -143,9 +145,16 @@
     (<scm|windows-number>) is something else: the number of top level
     windows as counted by the GUI back-end (<cpp|nr_windows>). Under
     <name|Qt> it is maintained by <cpp|qt_window_widget_rep> for all its
-    non \Pfake\Q windows, which includes dialogs and alternative windows;
-    under X11 by <source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>; in the <name|Cocoa> port it stays
-    0. In no case is it the length of <cpp|windows_list>.
+    non \Pfake\Q windows, which includes dialogs and alternative windows,
+    and likewise by <cpp|ns_window_widget_rep> in the <name|Cocoa> port
+    (<source-link|ns_widget.mm|src/Plugins/NS/ns_widget.mm>); the
+    <name|Widkit> ports count their <cpp|window_rep>s
+    (<source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>,
+    <source-link|sdl_window.cpp|src/Plugins/SDL/sdl_window.cpp>,
+    <source-link|qtwk_window.cpp|src/Plugins/Qtwk/qtwk_window.cpp>), and
+    <name|Vue> its <name|SDL> and virtual windows
+    (<source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>), popups
+    included. In no case is it the length of <cpp|windows_list>.
 
     <item*|Current window><cpp|has_current_window>,
     <cpp|get_current_window> (returns the empty <abbr|URL> if there is
@@ -283,7 +292,8 @@
     <cpp|geometry_x>, <cpp|geometry_y>; by default 800<math|\<times\>>600
     at the origin; a size of exactly 800<math|\<times\>>600 is
     multiplied by <cpp|retina_zoom> on high resolution screens, and
-    toolkits other than <name|Qt> add room for the side tools). Negative
+    the ports which do not define <cpp|QTTEXMACS>, that is all but
+    <name|Qt> and <name|Qtwk>, add room for the side tools). Negative
     coordinates count from the right or bottom edge of the screen.
 
     <item>An explicit geometry <cpp|geom> (a tuple of width and height,
@@ -302,7 +312,7 @@
   <cpp|notify_window_resize>, which store the new values in the user
   preferences <verbatim|abscissa <em|name>>, <verbatim|ordinate
   <em|name>>, <verbatim|width <em|name>> and <verbatim|height <em|name>>
-  (in pixels; under <name|Qt>, a resize which keeps the width and changes
+  (in pixels; under <name|Qt> and <name|Qtwk>, a resize which keeps the width and changes
   the height by at most 80 pixels is ignored, presumably to absorb
   toolbars appearing and disappearing). Popup windows are never recorded. Since the names are
   per session numbers, the second window of a session gets the geometry

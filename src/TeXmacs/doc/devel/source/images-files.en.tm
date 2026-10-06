@@ -10,7 +10,7 @@
   conversion into the three formats which the rest of <TeXmacs> needs
   (<name|PNG> for the screen, <abbr|PDF> and <abbr|EPS> for printing). Each
   function tries the available tools in a fixed order, depending on the
-  build options <cpp|QTTEXMACS>, <cpp|USE_RESVG>, <cpp|USE_GS>,
+  build options <cpp|QTTEXMACS>, <cpp|MUPDF_RENDERER>, <cpp|USE_RESVG>, <cpp|USE_GS>,
   <cpp|PDF_RENDERER>, <cpp|USE_IMLIB2> and <cpp|MACOSX_EXTENSIONS>, and
   on the external programs found at run time.
 

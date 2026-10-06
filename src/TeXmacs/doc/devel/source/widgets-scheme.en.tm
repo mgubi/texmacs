@@ -479,9 +479,13 @@
   <scm-arg|field>)>, <scm|(form-fields)> and <scm|(form-values)> give access
   to the collected values. A <scm|form-input> passes an input type of the
   form <verbatim|<em|field>#form-<em|name>-<em|n>:<em|type>> to
-  <cpp|input_text_widget>; the <name|Qt> port parses it
-  (<cpp|QTMLineEdit::set_type>) and commits the text of such fields
-  continuously, so that <scm|form-last> is always up to date.
+  <cpp|input_text_widget>; every port parses it (in <name|Qt>
+  <cpp|QTMLineEdit::set_type>, in <name|Cocoa>
+  <source-link|ns_dialogues.mm|src/Plugins/NS/ns_dialogues.mm>, in <name|Vue>
+  <cpp|vue_input_text_widget_rep>, in <name|Widkit>
+  <source-link|input_widget.cpp|src/Plugins/Widkit/Input/input_widget.cpp>) and commits the text of
+  fields whose serial starts with <verbatim|form-> continuously, so that
+  <scm|form-last> is always up to date.
 
   <section|Side tools>
 

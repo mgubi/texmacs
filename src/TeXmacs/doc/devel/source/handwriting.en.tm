@@ -13,10 +13,14 @@
   a drawing with the learned examples. It is not connected to the editor:
   the result of a recognition is only printed on the console, and the
   dialog is opened by calling <scm|(learn-glyphs)> by hand. The drawing
-  widget only exists in the X11 (<name|Widkit>) port; the <name|Qt> and
-  <name|Cocoa> ports return an empty widget (<cpp|ink_widget> in
+  widget exists in the <name|Widkit> ports (<name|X11>, <name|SDL> and
+  <name|Qtwk>, with <cpp|ink_wk_widget>) and in <name|Vue>
+  (<cpp|vue_ink_widget_rep> in
+  <source-link|vue_widget.cpp|src/Plugins/Vue/vue_widget.cpp>, which passes
+  the strokes as the <name|X11> one does); the <name|Qt> and <name|Cocoa>
+  ports return an empty widget (<cpp|ink_widget> in
   <source-link|qt_widget.cpp:643|src/Plugins/Qt/qt_widget.cpp:643> and
-  <verbatim|aqua_widget.mm>), and
+  <source-link|ns_widget.mm|src/Plugins/NS/ns_widget.mm>), and
   <name|Qt> only says so on the debug output when <verbatim|qt> debugging
   is on.
 
@@ -37,7 +41,7 @@
     anywhere.
 
     <item*|<source-link|Plugins/Widkit/Misc/ink_widget.cpp|src/Plugins/Widkit/Misc/ink_widget.cpp>>The
-    drawing widget of the X11 port.
+    drawing widget of the <name|Widkit> ports.
 
     <item*|<source-link|utils/handwriting/handwriting.scm|TeXmacs/progs/utils/handwriting/handwriting.scm>>The
     <scheme> side: storage of the examples and the learning dialog.

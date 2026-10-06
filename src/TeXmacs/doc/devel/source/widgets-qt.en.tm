@@ -17,6 +17,20 @@
   in both directories. The description below refers to
   <verbatim|Plugins/Qt>.
 
+  Two other ports depend on this one. The <name|Qtwk> port
+  (<verbatim|--with-gui=qtwk>) compiles only the platform files of
+  <verbatim|Plugins/Qt> (renderer, fonts, pictures, pipes, sockets) and
+  uses the <name|Widkit> widgets instead of the classes described here;
+  since it also defines <cpp|QTTEXMACS>, code which must only apply to
+  native <name|Qt> widgets tests <cpp|QTWKTEXMACS> as well. The
+  <name|Cocoa> port (<source-link|Plugins/NS|src/Plugins/NS>) shares no code with this one,
+  but copies its structure class by class (<cpp|ns_widget_rep>,
+  <cpp|ns_ui_element_rep> with <cpp|as_nsview> and <cpp|as_menuitem>,
+  <cpp|ns_tm_widget_rep>, <cpp|ns_simple_widget_rep>, <cpp|ns_gui_rep>),
+  so that what follows mostly applies to it too. How the other ports
+  differ is summarized in \P<hlink|Adding new widgets and porting to other
+  toolkits|widgets-port.en.tm>\Q.
+
   The files relevant for widgets are:
 
   <\description-paragraphs>
@@ -159,7 +173,9 @@
   When <TeXmacs> runs without a display (<cpp|headless_mode>), every
   constructor returns a <cpp|headless_widget ()>, an instance of
   <cpp|qt_headless_widget_rep> which accepts all messages and never creates
-  <name|Qt> objects.
+  <name|Qt> objects. (The <name|Vue> port does it differently: it builds
+  and lays out the real widgets in virtual windows, so that dialogs can be
+  tested without a display.)
 
   <section|UI elements: widgets as descriptions>
 
@@ -475,7 +491,10 @@
   <cpp|QTMGuiHelper::emitTmSlotRefresh>, which is called when a
   <cpp|qt_window_widget_rep> receives <cpp|SLOT_REFRESH>. Consequently a
   refresh sent to <em|any> window reaches <em|all> refresh widgets; the
-  <em|kind> argument is what limits the work.
+  <em|kind> argument is what limits the work. (<name|Cocoa> does the same
+  with the notification <verbatim|TMRefresh>; <name|Vue> obtains the same
+  effect lazily, see \P<hlink|Windows, the main <TeXmacs> widget and the
+  flow of events|widgets-window.en.tm>\Q.)
 
   When the interface language changes, <cpp|gui_refresh> calls
   <cpp|qt_gui_rep::refresh_language>, which makes <cpp|QTMGuiHelper> emit

@@ -52,7 +52,11 @@
   </itemize>
 
   <cpp|gui_version ()> returns <verbatim|"qt4">, <verbatim|"qt5"> or
-  <verbatim|"qt6"> accordingly (<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>).
+  <verbatim|"qt6"> accordingly (<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>). The same code is in
+  <source-link|Plugins/Qt6|src/Plugins/Qt6> and in <name|Qtwk> (<source-link|qtwk_gui.cpp|src/Plugins/Qtwk/qtwk_gui.cpp>), so
+  <scm|gui-version> does not tell <name|Qtwk> from <name|Qt>; the predicate
+  <scm|qt-gui?> holds in all three, and in the <name|Cocoa> port too, see
+  <hlink|the overview|guiports.en.tm>.
 
   <section|The <source-link|Plugins/Qt6|src/Plugins/Qt6> fork>
 
@@ -136,8 +140,9 @@
   <verbatim|texmacs-\<gtr\>verbatim:encoding>). For the formats
   <verbatim|html> and <verbatim|latex> the converted text is published as
   <name|HTML> or plain text. The caller, <cpp|edit_select_rep::selection_set>
-  (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>), computes <cpp|sv> only in the
-  <name|Qt> port.
+  (<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>), computes <cpp|sv> for the format
+  <verbatim|default> in every port; <name|Qtwk> publishes the same
+  <cpp|QMimeData> (<cpp|qtwk_gui_rep::set_selection>).
 
   <paragraph|Pasting.><cpp|qt_gui_rep::get_selection> first decides
   whether <TeXmacs> owns the clipboard, by comparing the
@@ -156,9 +161,9 @@
   <section|Printing>
 
   <scm|print-buffer> (<source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>) uses a
-  dialog only if <scm|use-print-dialog?> holds, that is, in the <name|Qt>
-  port with the preference <verbatim|gui:print dialogue> set to
-  <verbatim|on>. Otherwise it calls <scm|print>, which typesets the
+  dialog only if <scm|use-print-dialog?> holds, that is, when
+  <scm|qt-gui?> or <scm|vue-gui?> holds and the preference
+  <verbatim|gui:print dialogue> is <verbatim|on>. Otherwise it calls <scm|print>, which typesets the
   document to PostScript or <abbr|PDF> and sends the file to the printing
   command (<scm|set-printing-command>).
 
@@ -178,6 +183,14 @@
   <name|CUPS> options (<verbatim|-o orientation-requested>, <verbatim|-o
   sides>, <verbatim|-o number-up>, <verbatim|-o page-ranges>, ...); on
   <name|Windows> it is <cpp|WinQTMPrinterSettings>.
+
+  The other ports with a print dialog have their own <cpp|printer_widget>:
+  <name|Vue> a dialog of <name|Clay> widgets which also queries
+  <verbatim|lpoptions> and prints with <verbatim|lpr> (<hlink|the <name|Vue>
+  port|guiports-vue.en.tm>), and <name|Cocoa> the print panel of
+  <name|macOS> (<hlink|the <name|Cocoa> port|guiports-cocoa.en.tm>). In
+  <name|Qtwk>, where <scm|qt-gui?> also holds, the widget is the
+  <name|Widkit> placeholder, see <hlink|pitfalls|guiports-pitfalls.en.tm>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

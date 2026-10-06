@@ -39,8 +39,7 @@
   <verbatim|MACOS_BUNDLE> builds <verbatim|../distr/TeXmacs.app>: it copies
   <verbatim|Info.plist>, <verbatim|PkgInfo>, the icons and
   <verbatim|Assets.car> from <source-link|packages/macos/|packages/macos>, the binary as
-  <verbatim|Contents/MacOS/TeXmacs>, the localized resources of
-  <verbatim|src/Plugins/Cocoa/English.lproj>, and the runtime tree into
+  <verbatim|Contents/MacOS/TeXmacs>, and the runtime tree into
   <verbatim|Contents/Resources/share/TeXmacs>. The script
   <source-link|packages/macos/bundle-libs.sh|packages/macos/bundle-libs.sh> then copies the <name|Qt>
   frameworks and plug-ins and the other dynamic libraries into the bundle
@@ -50,9 +49,15 @@
   <verbatim|hdiutil>, and <verbatim|MACOS_RELEASE> makes a signed
   <verbatim|zip> archive for the updater.
 
-  The directory also contains an <name|Xcode> project
+  The script <source-link|build-ns-app.sh|packages/macos/build-ns-app.sh>
+  builds the application of the native <name|Cocoa> port (the default) or
+  of the <name|Vue> port (<verbatim|--gui vue>, with <name|MuPDF> and
+  optionally <name|ThorVG>), with its libraries, in
+  <verbatim|../distr/TeXmacs.app>, and optionally its disk image. The
+  directory also contains an <name|Xcode> project
   (<verbatim|TeXmacs.xcodeproj>) with configuration files for the
-  <name|Qt>, <name|Cocoa> and <name|X11> ports.
+  <name|Qt>, <name|Cocoa>, <name|Vue>, <name|SDL> and <name|X11> ports
+  (<verbatim|TeXmacsQt.xcconfig>, ...).
 
   <section|<name|Windows>>
 

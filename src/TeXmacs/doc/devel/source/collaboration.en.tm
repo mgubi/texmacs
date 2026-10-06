@@ -59,9 +59,13 @@
     <verbatim|src/src/Plugins/Qt/QTMSockets.*> and
     <source-link|src/src/Plugins/Gnutls/|src/Plugins/Gnutls>) implements the sockets, the optional
     <abbr|TLS> layer, the legacy encryption layer and the framing of
-    messages into packets. Only raw strings cross this layer. The socket code
-    is only compiled in the <name|Qt> build (<verbatim|QTTEXMACS>); other
-    builds contain stubs which report that sockets are not implemented.
+    messages into packets. Only raw strings cross this layer. The
+    <name|Qt> and <name|Qtwk> builds (<verbatim|QTTEXMACS>) use
+    <verbatim|QTMSockets> (on <cpp|QSocketNotifier>); the other ports
+    (<name|Vue>, <name|SDL>, <name|X11>, <name|Cocoa>) use the
+    <abbr|GUI> independent
+    <source-link|tm_sockets.cpp|src/System/Link/tm_sockets.cpp>, so that the
+    sockets exist in every build.
 
     <item><scheme> implements everything else: serialization of messages as
     S-expressions, dispatching of requests to services, continuations for

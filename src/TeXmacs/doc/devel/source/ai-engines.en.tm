@@ -136,10 +136,14 @@
     (<scm|ai-preferences-widget> in <source-link|preferences-widgets.scm|TeXmacs/progs/texmacs/menus/preferences-widgets.scm>). <cpp|http_from_json> uses
     <cpp|QJsonDocument>;
 
-    <item>otherwise (<name|Qt> 5, <name|X11>), <source-link|web_files.cpp|src/System/Files/web_files.cpp>
-    builds a <verbatim|curl> command line with the headers and the data and
-    runs it with <cpp|system> or <cpp|async_eval_system>, without any
-    timeout; <cpp|http_from_json> is the <cpp|json_to_tree> of
+    <item>otherwise (<name|Qt> 5, and the ports without <name|Qt>:
+    <name|Vue>, <name|SDL>, <name|X11>, <name|Cocoa>),
+    <source-link|web_files.cpp|src/System/Files/web_files.cpp> makes the
+    request with <name|libcurl> when it was found (<cpp|USE_LIBCURL>; the
+    asynchronous requests are driven by <cpp|http_async_pending> from the
+    main loop), and else builds a <verbatim|curl> command line with the
+    headers and the data and runs it with <cpp|system> or
+    <cpp|async_eval_system>, without any timeout; <cpp|http_from_json> is the <cpp|json_to_tree> of
     <source-link|json.cpp|src/Data/Convert/AI/json.cpp>.
   </itemize>
 

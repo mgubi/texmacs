@@ -347,7 +347,7 @@
   signals fill the buffers, polled>|<cell|polled, <cpp|listen (1)>>|<cell|polled>>|<row|<cell|<name|Qt>
   without <cpp|QTPIPES>>|<cell|<cpp|perform_select>, <cpp|process_all_pipes>>|<cell|socket
   notifiers, also polled>|<cell|notifiers, polled>|<cell|polled>>|<row|<cell|Other
-  ports (<name|X11>)>|<cell|<cpp|perform_select>>|<cell|socket
+  ports (<name|Vue>, <name|SDL>, <name|X11>, <name|Cocoa>)>|<cell|<cpp|perform_select>>|<cell|socket
   notifiers>|<cell|socket notifiers>|<cell|not polled>>>>>
 
   In all cases <cpp|async_eval_pending> is called by the interpose handler

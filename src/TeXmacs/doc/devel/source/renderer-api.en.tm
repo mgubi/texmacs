@@ -507,9 +507,12 @@
     <cpp|draw_rectangles> fills each rectangle of the list.
     <cpp|draw_selection> draws a selection: the interior of the region is
     filled with the pencil color at roughly <math|1/16> of its opacity and
-    the one-pixel wide border with the opaque color. The editor uses
-    <cpp|draw_selection> only when compiled with <name|Qt>
-    (<cpp|QTTEXMACS>), and <cpp|draw_rectangles> otherwise.
+    the one-pixel wide border with the opaque color. The editor
+    (<source-link|edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>)
+    uses <cpp|draw_selection> for the selections with <name|Qt>,
+    <name|Qtwk>, <name|SDL>, <name|Vue> and <name|Cocoa>, and for the
+    spelling errors with <name|Qt>, <name|Qtwk> and <name|Cocoa> only;
+    <cpp|draw_rectangles> otherwise (always with <name|X11>).
   </explain>
 
   <\explain>
@@ -594,7 +597,10 @@
   counted rectangular array of pixels with an origin. Its kind is
   <cpp|picture_native> (a picture of the <abbr|GUI> toolkit: a
   <cpp|qt_picture_rep> wrapping a <cpp|QImage>, an <cpp|x_picture_rep>
-  wrapping an <name|X11> <cpp|Pixmap>), <cpp|picture_raster> (a portable
+  wrapping an <name|X11> <cpp|Pixmap>, an <cpp|ns_picture_rep> wrapping an
+  <cpp|NSBitmapImageRep>, a <cpp|mupdf_picture_rep> wrapping an
+  <name|MuPDF> pixmap, or the texture <cpp|gpu_picture_rep> of the
+  <name|Vue> GPU path), <cpp|picture_raster> (a portable
   <cpp|raster_picture_rep\<less\>C\<gtr\>> wrapping a
   <cpp|raster\<less\>C\<gtr\>>, by default with <cpp|true_color> pixels) or
   <cpp|picture_lazy>. Pixels are accessed with <cpp|get_pixel> and
@@ -673,10 +679,15 @@
     <cpp|delete_renderer> or <cpp|tm_delete> when drawing is finished. This
     function, as well as <cpp|native_picture>, <cpp|load_picture>,
     <cpp|as_native_picture> and <cpp|save_picture>, is provided by the
-    <abbr|GUI> back-end (<source-link|Plugins/Qt/qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp> or
-    <source-link|Plugins/X11/x_picture.cpp|src/Plugins/X11/x_picture.cpp>); <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp> only
-    contains failing stubs for builds without <cpp|QTTEXMACS> and
-    <cpp|X11TEXMACS>. For <name|Qt> the returned renderer is a
+    <abbr|GUI> back-end (<source-link|Plugins/Qt/qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>,
+    <source-link|Plugins/X11/x_picture.cpp|src/Plugins/X11/x_picture.cpp>,
+    <source-link|Plugins/NS/ns_picture.mm|src/Plugins/NS/ns_picture.mm>, or
+    <source-link|Plugins/MuPDF/mupdf_picture.cpp|src/Plugins/MuPDF/mupdf_picture.cpp>
+    for <name|SDL>, <name|Vue> and the <name|Qt> builds with
+    <name|MuPDF>); <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp> only
+    contains failing stubs for builds without any of <cpp|QTTEXMACS>,
+    <cpp|X11TEXMACS>, <cpp|SDLTEXMACS>, <cpp|VUETEXMACS> and
+    <cpp|AQUATEXMACS>. For <name|Qt> without <name|MuPDF> the returned renderer is a
     <cpp|qt_image_renderer_rep>, which opens a <cpp|QPainter> on the
     <cpp|QImage> of the picture after clearing it to transparent.
   </explain>
@@ -785,8 +796,10 @@
     SI y) = 0><explain-synopsis|copy a region between renderers>
   <|explain>
     Copy a rectangle of <cpp|ren> to position <cpp|(x, y)> of the current
-    renderer. Only the <name|X11> renderer implements it (with
-    <cpp|XCopyArea>); the other renderers leave it empty.
+    renderer. The <name|X11> renderer implements it (with
+    <cpp|XCopyArea>), as do the <name|MuPDF> renderer (between pixmaps) and
+    the <name|Vue> GPU renderer (between textures); the other renderers
+    leave it empty.
   </explain>
 
   <subsection|Shadows with <name|Qt>>

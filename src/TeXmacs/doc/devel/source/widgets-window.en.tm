@@ -35,8 +35,19 @@
   The abstract class <cpp|window_rep> of <source-link|window.hpp|src/Graphics/Gui/window.hpp>, with its
   constructors <cpp|plain_window> and <cpp|popup_window>, is a lower level
   interface used only by ports which build on <name|Widkit> (it is
-  implemented in <source-link|Plugins/X11/x_window.cpp|src/Plugins/X11/x_window.cpp>). Kernel code never
+  implemented in <source-link|Plugins/X11/x_window.cpp|src/Plugins/X11/x_window.cpp>,
+  <source-link|Plugins/SDL/sdl_window.cpp|src/Plugins/SDL/sdl_window.cpp> and
+  <source-link|Plugins/Qtwk/qtwk_window.cpp|src/Plugins/Qtwk/qtwk_window.cpp>). Kernel code never
   uses it directly.
+
+  The window widgets of the other ports are <cpp|qt_window_widget_rep>
+  (<name|Qt>), <cpp|ns_window_widget_rep> (<name|Cocoa>, an
+  <cpp|NSWindow>) and <cpp|vue_plain_window_widget_rep> (<name|Vue>, an
+  <name|SDL> window, or a virtual window drawn inside a host window in the
+  single window mode of <verbatim|TEXMACS_VUE_SINGLE_WINDOW> and when
+  running headless). In <name|Vue>, <cpp|plain_window_widget> does not
+  wrap the file chooser and the forms of <cpp|inputs_list_widget>: these
+  open their own (system or <TeXmacs>) dialog.
 
   <section|The <TeXmacs> windows>
 
@@ -49,8 +60,12 @@
     widget texmacs_widget (int mask, command quit);
   </cpp-code>
 
-  The main widget is implemented by each port (in <name|Qt> by
-  <cpp|qt_tm_widget_rep>) and contains the menu bar, the four icon bars,
+  The main widget is implemented by each port (by <cpp|qt_tm_widget_rep>
+  in <name|Qt>, <cpp|ns_tm_widget_rep> in <name|Cocoa>,
+  <cpp|vue_texmacs_widget_rep> in <name|Vue> and the <name|Widkit> class
+  <cpp|texmacs_widget_rep> of
+  <source-link|Widkit/Misc/texmacs_widget.cpp|src/Plugins/Widkit/Misc/texmacs_widget.cpp> in the other ports) and
+  contains the menu bar, the four icon bars,
   the left and right side tools, the canvas, the bottom and extra tools
   and the footer. The bits of <cpp|mask> say which parts are initially
   visible:
@@ -69,7 +84,9 @@
 
   A mask of zero, used for embedded editors, asks the port for a
   stripped-down main widget without any bars (in <name|Qt> a
-  <cpp|qt_tm_embedded_widget_rep>).
+  <cpp|qt_tm_embedded_widget_rep>, in <name|Cocoa> an
+  <cpp|ns_tm_embedded_widget_rep>; <name|Vue> uses the same class with
+  all bars hidden).
 
   The main widget understands a large set of slots, sent by the methods of
   <cpp|tm_window_rep>: <cpp|SLOT_SCROLLABLE> (the canvas, whose contents
@@ -169,7 +186,14 @@
   </cpp-code>
 
   In the <name|Qt> port, <cpp|popup_widget> applied to a
-  <cpp|vertical_menu> yields a native <cpp|QMenu>.
+  <cpp|vertical_menu> yields a native <cpp|QMenu>, and in the <name|Cocoa>
+  port a native <cpp|NSMenu> shown by <cpp|popUpMenuPositioningItem>
+  when the mouse grab is sent (<cpp|ns_menu_rep>). Other contents become
+  an undecorated window which disappears when the pointer leaves it
+  (<cpp|TMPopupPanel> in <name|Cocoa>). The <name|Vue> port has no native
+  menus: the popup is an undecorated <name|SDL> window, laid out by
+  <name|Clay> and dismissed when the pointer leaves it, and the grab is
+  implicit.
 
   <subsection|Embedded <TeXmacs> widgets>
 
@@ -247,7 +271,22 @@
     only if at least one auxiliary window is open (see \P<hlink|The <name|Qt>
     implementation|widgets-qt.en.tm>\Q). A port which dispatches
     <cpp|SLOT_REFRESH> only to the subwidgets of the receiving window must
-    keep this in mind.
+    keep this in mind. The ports handle it as follows:
+
+    <\itemize>
+      <item><name|Cocoa> imitates <name|Qt>: the window posts the
+      notification <verbatim|TMRefresh>, observed by all refresh views;
+
+      <item><name|Vue> numbers the messages: each kind remembers the number
+      of its last message, and a refresh widget compares it with the number
+      of its own last refresh when it is laid out. The window receiving the
+      message, and for kinds other than <verbatim|"auto"> all windows, are
+      laid out again, so that refresh widgets anywhere (also in closed menus
+      or hidden tools, when they are next shown) see the message;
+
+      <item>the <name|Widkit> ports pass the message down the widget tree of
+      the receiving window only (<cpp|send_refresh>).
+    </itemize>
   </remark>
 
   <section|The flow of events and commands>
@@ -269,6 +308,18 @@
   typeset and update the menus), and finally the invalid regions of all
   canvases are repainted through <cpp|handle_repaint>.
 
+  The <name|Cocoa> port copies this design (<cpp|event_queue> and
+  <cpp|command_queue> in <source-link|ns_gui.h|src/Plugins/NS/ns_gui.h>, an update cycle driven by
+  an <cpp|NSTimer>). The <name|Vue> port has no callbacks at all: its main
+  loop (<source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>) collects the <name|SDL> events into
+  the input state of each window, then lays the windows out; during the
+  layout, the canvas consumes the pending key and mouse event and calls
+  its <cpp|handle_*> methods, while buttons only push their command onto
+  a list. The commands are run after the layout, followed by the interpose
+  handler and the repainting of the canvases. The <name|Widkit> ports
+  translate the events of their window system into <name|Widkit> events,
+  which travel down the widget tree to the canvas.
+
   <subsection|Commands>
 
   Commands attached to menu entries and other widgets follow a similar
@@ -282,7 +333,9 @@
 
     <item>when the user activates the entry, the port calls the command
     (in <name|Qt>, <cpp|QTMCommand::apply> queues it with
-    <cpp|the_gui-\<gtr\>process_command>);
+    <cpp|the_gui-\<gtr\>process_command>; <name|Cocoa> does the same, and
+    <name|Vue> appends it to <cpp|cmd_list>, run after the layout of the
+    frame);
 
     <item>the command, run from the main loop, only schedules the action
     with <cpp|exec_delayed>;

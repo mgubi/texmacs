@@ -29,9 +29,11 @@
   displays: colors are then mapped to a palette of <cpp|CFACTOR>
   <math|\<times\>> <cpp|CFACTOR> <math|\<times\>> <cpp|CFACTOR> colors and
   <cpp|GREYS> grey levels (<cpp|set_color_attrs>, <cpp|get_color_attrs>),
-  and the low 24 bits contain a palette index. Only the <name|X11> port
-  calls <cpp|initialize_colors> and could use it; with <name|Qt> the basic
-  colors are initialized statically and true colors are always used.
+  and the low 24 bits contain a palette index. Only the <name|X11>,
+  <name|SDL> and <name|Vue> ports call <cpp|initialize_colors>, and only
+  <name|X11> could use the indexed mode (it tries <cpp|set_true_colors
+  (false)> first); with <name|Qt> and <name|Cocoa> the basic colors are
+  initialized statically and true colors are always used.
 
   The file also defines global colors <cpp|black>, <cpp|white>,
   <cpp|red>, ..., <cpp|light_grey>, <cpp|grey>, <cpp|dark_grey> and

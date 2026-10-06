@@ -21,9 +21,12 @@
     <verbatim|/Producer (GPL Ghostscript ...)> and the file name as its
     title.
     <verbatim|mutool info <em|file>.pdf> shows the producer. The
-    <name|CMake> build always enables the renderer; the autotools build
-    enables it by default, but only with <name|Qt>, <name|zlib>,
-    <name|libpng> and <name|FreeType>.
+    <name|CMake> build enables the renderer for <name|Qt> without
+    <name|MuPDF>; the autotools build enables it by default, but only with
+    <name|Qt> or <name|Cocoa>, <name|zlib>, <name|libpng> and
+    <name|FreeType>. The other ports (<name|Vue>, <name|SDL>, <name|Qtwk>,
+    <name|X11>) write <abbr|PDF> with <name|MuPDF> when they have it, and
+    through <name|Ghostscript> otherwise.
 
     <item><em|<verbatim|texmacs -c> loses the <markup|hlink>s> (checked).
     The conversion from the command line exports the buffer right after

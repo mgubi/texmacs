@@ -118,15 +118,24 @@
 
     <item*|<verbatim|Plugins>>Implementations of the abstract interfaces for
     specific libraries or platforms. For instance, <verbatim|Plugins/Qt>
-    contains the default graphical user interface based on <name|Qt>,
+    contains the default graphical user interface based on <name|Qt>
+    (the other ports are in <source-link|Plugins/Vue|src/Plugins/Vue>,
+    <source-link|Plugins/NS|src/Plugins/NS> for <name|Cocoa>,
+    <source-link|Plugins/SDL|src/Plugins/SDL>,
+    <source-link|Plugins/Qtwk|src/Plugins/Qtwk> and
+    <source-link|Plugins/Qt6|src/Plugins/Qt6>; see <hlink|the graphical
+    user interface|source-gui.en.tm>),
+    <source-link|Plugins/MuPDF|src/Plugins/MuPDF> drawing and pictures with
+    <name|MuPDF>,
     <source-link|Plugins/Freetype|src/Plugins/Freetype> the support for <name|TrueType> and
     <name|OpenType> fonts, <source-link|Plugins/Metafont|src/Plugins/Metafont> the support for
     <TeX> fonts, <source-link|Plugins/Pdf|src/Plugins/Pdf> the <name|PDF> renderer,
     <source-link|Plugins/Unix|src/Plugins/Unix>, <verbatim|Plugins/MacOS> and
     <source-link|Plugins/Windows|src/Plugins/Windows> system specific code,
     <source-link|Plugins/Database|src/Plugins/Database> the database engine, and
-    <source-link|Plugins/Widkit|src/Plugins/Widkit> with <source-link|Plugins/X11|src/Plugins/X11> the historical
-    <hlink|<name|X11> interface|gui.en.tm>.
+    <source-link|Plugins/Widkit|src/Plugins/Widkit> the historical
+    <hlink|<name|Widkit> toolkit|gui.en.tm>, used on <source-link|Plugins/X11|src/Plugins/X11>,
+    <name|SDL> and <name|Qtwk>.
   </description>
 
   Roughly speaking, <verbatim|Kernel> does not depend on anything else;
