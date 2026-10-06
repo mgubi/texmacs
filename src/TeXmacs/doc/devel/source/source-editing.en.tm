@@ -23,6 +23,8 @@
 
     <branch|Structured editing, search and automatic content|editing.en.tm>
 
+    <branch|Undo, redo and the modification history|undo.en.tm>
+
     <branch|Editing modes on the <scheme> side|modes.en.tm>
 
     <branch|The graphics editor|graphics-editor.en.tm>

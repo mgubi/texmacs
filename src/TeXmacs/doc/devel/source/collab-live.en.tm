@@ -269,7 +269,7 @@
 
   <section|Interaction with undo and redo>
 
-  Each buffer has an <cpp|archiver> (<source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>)
+  Each view of a buffer has an <cpp|archiver> (<source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>)
   which records modifications as patches labeled with their author. Changes
   coming from other participants are applied to the views under the author
   <scm|live-author>, so they are recorded as changes of another author.
@@ -281,7 +281,8 @@
   undone as well. The resulting modifications of the view are ordinary edits
   (<scm|live-updating?> is not set), so <scm|live-notify> propagates the
   undo to the live document and hence to the server like any other local
-  change. There is no global, collaborative undo.
+  change. There is no global, collaborative undo. The history itself is
+  described in <hlink|undo, redo and the modification history|undo.en.tm>.
 
   <section|Extending live documents>
 
