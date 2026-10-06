@@ -70,7 +70,14 @@ dialog has its size, its contents are laid out in a container which clips
 and scrolls (`vue_plain_window_widget_rep::do_layout`): at their own size
 at least, larger when the dialog is, with scroll bars and the wheel when
 it is smaller (after a resize, or on a page smaller than the dialog, which
-is then made to fit). In
+is then made to fit). In the browser, where the loop never waits, a
+resize which comes from an event of the page (the page resized, the column
+of the tabs dragged) is handled at once by `event_filter` too, outside an
+iteration of the loop: a change of the size of the canvas clears it, and
+left to the next frame it showed an empty canvas during a drag (the frames
+with events waiting do not repaint the editors).
+`misc/wasm/test/resize-flicker.mjs` counts such frames (0 in Firefox and
+Chrome; 116 of 270 before). In
 the browser the page has a frame, a column at the left of the canvas
 (`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
 one under the other, labelled with the names of the windows (the title of a
@@ -81,7 +88,8 @@ changes its width (100 to 480 pixels and half the page at most, remembered
 by the browser; a double click gives the 200 pixels back; TeXmacs follows
 the width once per frame during the drag; a drag below 80 pixels folds the
 column, keeping the width it had before the drag, and a drag of the folded
-column beyond 100 pixels opens it again), a chevron which
+column beyond 100 pixels opens it again; the resize is sent from the move
+of the mouse, and TeXmacs draws it at once, see below), a chevron which
 folds the column to 44 pixels (the logo, and small tabs with the initials
 of the windows, or their numbers, "N2" for "No name [2]", whose names show
 in a balloon; the browser remembers it, and a page narrower than 900

@@ -177,16 +177,15 @@ var tmFrame = (function () {
     if (remember) try { localStorage.setItem (WIDTH, String (width)); } catch (e) {}
     resized ();
   }
-  // TeXmacs follows the width it is left (once per frame while dragging)
-  var resizePending = false;
+  // TeXmacs follows the width it is left. At once, from the event which
+  // changed it (a move of the mouse comes before the frame, at most one per
+  // frame): a change of the size of the canvas clears it, and TeXmacs draws
+  // in the callbacks of the frame (emscripten_set_main_loop), so that a
+  // resize sent from a callback of its own came after the drawing, and the
+  // frame showed an empty canvas (the page flickered during a drag)
   function resized () {
-    if (resizePending) return;
-    resizePending = true;
-    requestAnimationFrame (function () {
-      resizePending = false;
-      if (menu) placeMenu ();
-      window.dispatchEvent (new Event ('resize'));
-    });
+    if (menu) placeMenu ();
+    window.dispatchEvent (new Event ('resize'));
   }
   function edge (handle) {
     var startX = 0, startW = 0, openW = 0, dragging = false;

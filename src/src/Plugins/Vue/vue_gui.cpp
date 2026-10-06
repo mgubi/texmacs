@@ -3523,6 +3523,18 @@ vue_profile_frame () {
 // TeXmacs stopped at once ("no window attached to view").
 static bool watch_may_run= false;
 
+#ifdef __EMSCRIPTEN__
+// In the browser the loop never waits: the frames are callbacks of the page
+// (see gui_start_loop). A resize comes from an event of the page (the page
+// resized, or the column of the tabs at its left dragged: frame.js), which
+// clears the canvas at once; left to the next frame, it showed an empty
+// canvas, for as long as the drag lasted, since the frames which have
+// events waiting do not repaint the editors. It is therefore handled at
+// once too, as the desktop does while it waits, when it comes from outside
+// an iteration of the loop, once the loop runs.
+static bool web_in_iteration= false, web_loop_started= false;
+#endif
+
 // The focus a window was given when first laid out (default_focus), set
 // just before the interpose handler, so that it applies the change of the
 // editor before anything is repainted (see vue_texmacs_widget_rep). A window
@@ -3757,6 +3769,10 @@ static void loop_iteration_body ();
 // on with a redraw.
 static void
 loop_iteration () {
+#ifdef __EMSCRIPTEN__
+  web_in_iteration= true;
+  web_loop_started= true;
+#endif
   try {
     loop_iteration_body ();
   }
@@ -3767,6 +3783,9 @@ loop_iteration () {
     gui_wait= false;
     request_partial_redraw= true;
   }
+#ifdef __EMSCRIPTEN__
+  web_in_iteration= false;
+#endif
 }
 
 static void
@@ -5065,7 +5084,11 @@ bool event_filter (void *userdata, SDL_Event *event) {
     // only while the main loop waits for events (see watch_may_run): the
     // event stays in the queue, and the next frame lays the window out at
     // its new size
-    if (!watch_may_run) return true;
+    bool may_run= watch_may_run;
+#ifdef __EMSCRIPTEN__
+    if (web_loop_started && !web_in_iteration) may_run= true;
+#endif
+    if (!may_run) return true;
     vue_window win= get_window_from_ID (event->window.windowID);
     if (win) {
       busy= true;
