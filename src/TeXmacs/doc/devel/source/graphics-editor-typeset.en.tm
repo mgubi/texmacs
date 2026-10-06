@@ -11,9 +11,9 @@
 
   A picture is a <markup|graphics> tag. Its children are drawn in order, so
   that later children cover earlier ones (as in <abbr|SVG>; see the comment
-  at the top of <verbatim|Typeset/Concat/concat_graphics.cpp>). A freshly
+  at the top of <source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>). A freshly
   inserted picture, as created by <scm|make-graphics> in
-  <verbatim|graphics/graphics-utils.scm>, looks like this:
+  <source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>, looks like this:
 
   <\scm-code>
     (with "gr-mode" "point"
@@ -43,14 +43,14 @@
 
   The children of a <markup|graphics> are the following kinds of trees.
   Their <abbr|DRD> properties are declared in
-  <verbatim|Data/Drd/drd_std.cpp>, their semantics is described in
+  <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp>, their semantics is described in
   <hlink|graphics primitives|../format/regular/prim-graphics.en.tm>.
 
   <\description>
     <item*|Points>A <markup|point> with two (or three) coordinates. The
     coordinates are numbers in the units of the current frame, but lengths
     such as <verbatim|1cm> are also accepted: in that case
-    <cpp|edit_env_rep::as_point> (<verbatim|Typeset/Env/env_length.cpp>)
+    <cpp|edit_env_rep::as_point> (<source-link|Typeset/Env/env_length.cpp|src/Typeset/Env/env_length.cpp>)
     converts them through the inverse frame.
 
     <item*|Curves><markup|line>, <markup|cline>, <markup|spline>,
@@ -83,7 +83,7 @@
 
     <item*|Macros>Any user macro which expands to graphics, for instance
     <markup|rectangle>, <markup|circle> or <markup|arrow-with-text> from
-    <verbatim|packages/standard/std-graphics.ts>.
+    <source-link|packages/standard/std-graphics.ts|TeXmacs/packages/standard/std-graphics.ts>.
   </description>
 
   An empty string child (the <scm|""> in the examples above) is ignored by
@@ -101,7 +101,7 @@
     <src-var|text-at-halign>, are read by the typesetter when it draws an
     object. They are set on individual objects by <markup|with> tags. Their
     built-in defaults are in <cpp|initialize_default_env>
-    (<verbatim|Typeset/Env/env_default.cpp>).
+    (<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>).
 
     <item>The <verbatim|gr-> prefixed variables, like <src-var|gr-color>,
     <src-var|gr-line-width> or <src-var|gr-point-style>, are <em|not>
@@ -125,7 +125,7 @@
 
   On the <scheme> side, the list of per-object attributes, their defaults
   and the attributes which make sense for each tag are in
-  <verbatim|graphics/graphics-drd.scm>:
+  <source-link|graphics/graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm>:
 
   <\explain>
     <scm|(graphics-all-attributes)><explain-synopsis|all attribute names>
@@ -174,9 +174,9 @@
   <subsection|Frames>
 
   A <cpp|point> is just an <cpp|array\<less\>double\<gtr\>>
-  (<verbatim|Graphics/Types/point.hpp>); the empty array is used as an
+  (<source-link|Graphics/Types/point.hpp|src/Graphics/Types/point.hpp>); the empty array is used as an
   invalid point, so many routines test <cpp|N(p) == 0>. A <cpp|frame>
-  (<verbatim|Graphics/Types/frame.hpp>) is an abstract invertible map
+  (<source-link|Graphics/Types/frame.hpp|src/Graphics/Types/frame.hpp>) is an abstract invertible map
   between two coordinate systems. Its operators are
 
   <\cpp-code>
@@ -198,7 +198,7 @@
   coordinates> (the numbers stored in <markup|point> tags) to typesetter
   coordinates (<cpp|SI> units relative to the origin of the box being
   built). It is recomputed by <cpp|edit_env_rep::update_frame>
-  (<verbatim|Typeset/Env/env_semantics.cpp>) whenever <src-var|gr-frame> or
+  (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>) whenever <src-var|gr-frame> or
   <src-var|gr-geometry> changes:
 
   <\itemize>
@@ -222,7 +222,7 @@
   </itemize>
 
   Because the unit and the origin are lengths, zooming a picture
-  (<scm|graphics-zoom> in <verbatim|graphics/graphics-main.scm>) is
+  (<scm|graphics-zoom> in <source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>) is
   implemented by rewriting <src-var|gr-frame> and the
   <src-var|magnify> property of the picture, and scrolling
   (<scm|graphics-move-origin>) by rewriting the origin. The objects
@@ -231,15 +231,15 @@
   The environment exposes the frame to markup through the primitives
   <markup|frame-direct> and <markup|frame-inverse>
   (<cpp|exec_frame_direct> and <cpp|exec_frame_inverse> in
-  <verbatim|Typeset/Env/env_exec.cpp>); the <scheme> functions
+  <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>); the <scheme> functions
   <scm|frame-direct> and <scm|frame-inverse> in
-  <verbatim|graphics/graphics-utils.scm> evaluate these primitives at the
+  <source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm> evaluate these primitives at the
   cursor, and are used by the editor to compute distances in physical
   units, for instance in <scm|points-dist\<less\>>.
 
   <subsection|Grids>
 
-  A <cpp|grid> (<verbatim|Graphics/Types/grid.hpp>) is an abstract
+  A <cpp|grid> (<source-link|Graphics/Types/grid.hpp|src/Graphics/Types/grid.hpp>) is an abstract
   object which produces the lines to be drawn
   (<cpp|grid_rep::get_curves>) and which can find the nearest grid point
   (<cpp|find_point_around>) and nearby grid lines
@@ -256,15 +256,15 @@
   stored in the <cpp|graphics_box>; it is the grid used for snapping. By
   default the <scheme> code keeps the edit grid synchronized with the visual
   one (<scm|egrid-as-vgrid?>, <scm|update-edit-grid> and
-  <scm|graphics-set-edit-grid> in <verbatim|graphics/graphics-main.scm>).
+  <scm|graphics-set-edit-grid> in <source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>).
 
   <section|Typesetting>
 
   <subsection|The <markup|graphics> tag>
 
   The concater dispatches each graphical tag to a method in
-  <verbatim|Typeset/Concat/concat_graphics.cpp> (see the big switch in
-  <verbatim|concater.cpp>). For <markup|graphics> this is
+  <source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp> (see the big switch in
+  <source-link|concater.cpp|src/Typeset/Concat/concater.cpp>). For <markup|graphics> this is
 
   <\cpp-code>
     void
@@ -320,7 +320,7 @@
   object or on a group scales line widths, point sizes and text.
   <cpp|notify_graphics_extents> calls the <scheme> hook
   <scm|graphics-notify-extents> (defined in
-  <verbatim|dynamic/scripts-edit.scm>) for identified pictures, which is
+  <source-link|dynamic/scripts-edit.scm|TeXmacs/progs/dynamic/scripts-edit.scm>) for identified pictures, which is
   used by some plug-ins.
 
   <cpp|typeset_graphical> typesets the children:
@@ -352,7 +352,7 @@
     <item*|<cpp|typeset_line>, <cpp|typeset_spline>, <cpp|typeset_arc>,
     <cpp|typeset_bezier>>Evaluate the points, build a <cpp|curve> with
     <cpp|poly_segment>, <cpp|spline>, <cpp|arc> or <cpp|poly_bezier>
-    (<verbatim|Graphics/Types/curve.cpp>), transform it with
+    (<source-link|Graphics/Types/curve.cpp|src/Graphics/Types/curve.cpp>), transform it with
     <cpp|env-\<gtr\>fr> and produce a <cpp|curve_box>. Each curve is built
     with the array of inverse paths of its points (<cpp|cip>), which allows
     the curve box to report which source point corresponds to which control
@@ -377,7 +377,7 @@
     <markup|calligraphy>. The samples are first adapted to the possibly
     modified end points, then smoothed according to <src-var|pen-enhance>
     (<cpp|refine> and <cpp|smoothen>, or <cpp|bezier_fit> and
-    <cpp|rectify_bezier>, in <verbatim|Graphics/Types/curve_extras.cpp>).
+    <cpp|rectify_bezier>, in <source-link|Graphics/Types/curve_extras.cpp|src/Graphics/Types/curve_extras.cpp>).
     For <markup|calligraphy>, the curve is replaced by the outline of an
     oval pen (<cpp|oval_profile>, <cpp|calligraphy>), which is filled.
 
@@ -392,7 +392,7 @@
     <item*|<cpp|typeset_graphics_3d>>Used for the experimental tags
     <markup|object-3d>, <markup|triangle-3d>, <markup|transform-3d> and
     <markup|light-3d>. The tree is converted into a <cpp|spacial>
-    (<verbatim|Graphics/Spacial/spacial.hpp>), transformed by the
+    (<source-link|Graphics/Spacial/spacial.hpp|src/Graphics/Spacial/spacial.hpp>), transformed by the
     composition of the current frame and the 4<math|\<times\>>4 matrix in
     <src-var|gr-transformation>, and drawn by a <cpp|spacial_box>. The
     keyboard shortcuts <key|C-left>, <key|C-right>, <key|C-up> and
@@ -416,7 +416,7 @@
   it calls <cpp|graphics_require_update> and still returns the <em|old>
   point. After the editor has committed an object, the <scheme> function
   <scm|graphics-update-constraints> (in
-  <verbatim|graphics/graphics-single.scm>) asks
+  <source-link|graphics/graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm>) asks
   <scm|graphics-needs-update?>, and rewrites the outdated points in the
   document using <scm|graphics-ref> and <scm|graphics-notify-update>. The
   corresponding glue functions are <scm|graphics-set>, <scm|graphics-has?>,
@@ -467,7 +467,7 @@
   The editor needs the frame of the picture which contains the cursor.
   Since boxes are positioned relative to their parent, the frame is
   obtained by walking down the box tree and composing the translations
-  with the innermost frame found (<verbatim|Typeset/Boxes/Basic/boxes.cpp>):
+  with the innermost frame found (<source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>):
 
   <\cpp-code>
     frame
@@ -530,7 +530,7 @@
 
   returns all the parts of a box within distance <cpp|dist> of
   <verbatim|(x, y)>, and the variant with a rectangle returns the parts
-  inside the rectangle. A <cpp|gr_selection> (<verbatim|Typeset/boxes.hpp>)
+  inside the rectangle. A <cpp|gr_selection> (<source-link|Typeset/boxes.hpp|src/Typeset/boxes.hpp>)
   has the fields
 
   <\description>

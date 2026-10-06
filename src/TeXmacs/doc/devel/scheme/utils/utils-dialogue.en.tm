@@ -7,8 +7,8 @@
 
   The routines on this page allow <scheme> programs to ask simple questions
   to the user and to display messages. They are defined in
-  <verbatim|kernel/texmacs/tm-dialogue.scm> and
-  <verbatim|kernel/gui/menu-widget.scm>. Since the graphical user interface
+  <source-link|kernel/texmacs/tm-dialogue.scm|TeXmacs/progs/kernel/texmacs/tm-dialogue.scm> and
+  <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>. Since the graphical user interface
   is event driven, the answers are passed to continuations rather than
   returned. More complex dialogues can be built using widgets, as explained
   in <hlink|dialogs and composite
@@ -50,7 +50,7 @@
     Open a file chooser with title <scm-arg|prompt> and call
     <scm-arg|cont> with the chosen <abbr|URL>. The <scm-arg|type> can for
     instance be <scm|"texmacs">, <scm|"image"> or <scm|"directory">; see
-    <scm|choose-file> in <verbatim|kernel/boot/abbrevs.scm>.
+    <scm|choose-file> in <source-link|kernel/boot/abbrevs.scm|TeXmacs/progs/kernel/boot/abbrevs.scm>.
   </explain>
 
   <\explain>
@@ -148,7 +148,7 @@
 
     For instance, <scm|(delayed (:idle 1000) (set-message "Hi" ""))>
     displays a message after one second of inactivity. The macro is defined
-    in <verbatim|kernel/texmacs/tm-dialogue.scm>. Notice that <scm|:idle>
+    in <source-link|kernel/texmacs/tm-dialogue.scm|TeXmacs/progs/kernel/texmacs/tm-dialogue.scm>. Notice that <scm|:idle>
     does not work in headless mode.
   </explain>
 

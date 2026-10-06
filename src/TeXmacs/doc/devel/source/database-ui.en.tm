@@ -31,15 +31,15 @@
   All the database <abbr|UI> is only reachable when the preference
   <verbatim|"database tool"> is on: the <menu|Data> menu (both in the menu
   bar and in the compact main menu) is guarded by
-  <scm|with-database-tool?> in <verbatim|texmacs/menus/main-menu.scm>, and
+  <scm|with-database-tool?> in <source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>, and
   many actions test <scm|supports-db?>. The modules are loaded lazily from
-  <verbatim|init-texmacs.scm> (<scm|lazy-menu>, <scm|lazy-define>,
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> (<scm|lazy-menu>, <scm|lazy-define>,
   <scm|lazy-tmfs-handler> and <scm|lazy-keyboard>).
 
   <section|Styles and modes>
 
   The package <verbatim|database> (file
-  <verbatim|styles/test/database.ts>) defines the rendering of
+  <source-link|styles/test/database.ts|TeXmacs/styles/test/database.ts>) defines the rendering of
   <markup|db-entry>, <markup|db-folded-entry>, <markup|db-pretty-entry>,
   <markup|db-field>, <markup|db-field-optional>, <markup|db-field-alternative>,
   <markup|db-pretty> and <markup|db-result>, and the variable
@@ -53,7 +53,7 @@
   <em|kind>, <scm|db-get-style> returns the style name
   <verbatim|database-<em|kind>>.
 
-  The modes are defined in <verbatim|kernel/texmacs/tm-modes.scm> and in the
+  The modes are defined in <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm> and in the
   kind modules:
 
   <\description>
@@ -64,20 +64,20 @@
     <item*|<scm|in-bib?>>the style is <verbatim|database-bib>;
 
     <item*|<scm|in-bib-names?>>moreover inside an <verbatim|author> or
-    <verbatim|editor> field (<verbatim|bib-menu.scm>);
+    <verbatim|editor> field (<source-link|bib-menu.scm|TeXmacs/progs/database/bib-menu.scm>);
 
     <item*|<scm|in-ai-agents?>>the style is <verbatim|database-ai-agents>
-    (<verbatim|ai-agents-menu.scm>).
+    (<source-link|ai-agents-menu.scm|TeXmacs/progs/database/ai-agents-menu.scm>).
   </description>
 
-  In these modes <verbatim|db-menu.scm> replaces the <menu|Insert> menu and
+  In these modes <source-link|db-menu.scm|TeXmacs/progs/database/db-menu.scm> replaces the <menu|Insert> menu and
   the mode icons by database specific ones (new entry of each type of the
   kind, import or confirmation of entries), and adds <menu|Focus> menus to
   insert and remove fields.
 
   <section|The <verbatim|tmfs://db> handler>
 
-  <verbatim|db-tmfs.scm> registers the handlers for the <verbatim|db> class
+  <source-link|db-tmfs.scm|TeXmacs/progs/database/db-tmfs.scm> registers the handlers for the <verbatim|db> class
   of <verbatim|tmfs> <abbr|URL>s. The name part of the <abbr|URL> is parsed
   by <scm|name-\<gtr\>query>: leading components of the form
   <verbatim|<em|var>=<em|val>> are query parameters, the next component is
@@ -110,7 +110,7 @@
     complete entries (see below).
   </explain>
 
-  The toolbar of <verbatim|db-menu.scm> (<scm|db-toolbar>, shown at the
+  The toolbar of <source-link|db-menu.scm|TeXmacs/progs/database/db-menu.scm> (<scm|db-toolbar>, shown at the
   bottom of the window by <scm|db-show-toolbar> for <verbatim|tmfs://db>
   buffers) edits the query preferences and reverts the buffer. Hence
   changing the search string or the order simply reloads the virtual
@@ -130,7 +130,7 @@
   optional fields (<markup|db-field-optional>). The cursor is
   placed in the name of the entry.
 
-  The keyboard handlers of <verbatim|db-edit.scm> implement a \Pfill out
+  The keyboard handlers of <source-link|db-edit.scm|TeXmacs/progs/database/db-edit.scm> implement a \Pfill out
   the form\Q interaction through <scm|kbd-enter>:
 
   <\itemize>
@@ -152,7 +152,7 @@
   </itemize>
 
   In author and editor fields of bibliographic entries,
-  <verbatim|bib-kbd.scm> adds shortcuts: a comma or \P<verbatim|and>\Q
+  <source-link|bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm> adds shortcuts: a comma or \P<verbatim|and>\Q
   starts a new name (<markup|name-sep>), <key|return> converts a plain list
   <verbatim|A. Einstein and N. Bohr> into structured names with
   <markup|name> markup for the last names, and <menu|Insert|Particle> or
@@ -188,7 +188,7 @@
 
   <section|Searching and choosing entries>
 
-  <verbatim|db-widgets.scm> implements a search dialogue:
+  <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm> implements a search dialogue:
 
   <\explain>
     <scm|(open-db-chooser <scm-arg|db> <scm-arg|kind> <scm-arg|name>
@@ -207,11 +207,11 @@
 
   For bibliographies, <scm|open-bib-chooser> opens this dialogue on
   <scm|(bib-database)>. It is used by the focus search tool inside
-  citations (<scm|focus-open-search-tool> in <verbatim|bib-menu.scm>,
+  citations (<scm|focus-open-search-tool> in <source-link|bib-menu.scm|TeXmacs/progs/database/bib-menu.scm>,
   <menu|Focus|Search references>) and by the alternate tab key
   (<scm|kbd-alternate-tab>, which calls <scm|kbd-alternate-variant>) in a
   citation, while <key|tab> (<scm|kbd-variant> in
-  <verbatim|bib-kbd.scm>) completes the citation key with
+  <source-link|bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm>) completes the citation key with
   <scm|index-get-name-completions>. For the kind <verbatim|"bib">, the
   dialogue also lists the matching references of Zotero after those of the
   database, puts the source of each reference before it, and names its
@@ -220,11 +220,11 @@
 
   When the database tool is off, <key|tab> in a citation completes keys
   from the <verbatim|.bib> file of the document (<scm|citekey-completions>
-  in <verbatim|bibtex/bib-complete.scm>) and from Zotero, and the same
+  in <source-link|bibtex/bib-complete.scm|TeXmacs/progs/bibtex/bib-complete.scm>) and from Zotero, and the same
   dialogue is opened on the marker <scm|:bib-file> instead of a database
   (<scm|zotero-open-search-tool>, through the definitions of
   <scm|focus-can-search?> and <scm|focus-open-search-tool> for citations
-  in <verbatim|generic-edit.scm>): <scm|db-search-results> then lists the
+  in <source-link|generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>): <scm|db-search-results> then lists the
   entries of the <verbatim|.bib> file of the bibliography, and those of
   Zotero.
 
@@ -233,12 +233,12 @@
   The <verbatim|"Pretty"> presentation and the search results use the
   function <scm|(db-pretty <scm-arg|l> <scm-arg|kind> <scm-arg|fm>)>,
   which is the identity by default. For bibliographies
-  (<verbatim|bib-manage.scm>) it converts the entries to <BibTeX> entries
+  (<source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>) it converts the entries to <BibTeX> entries
   and formats them with the internal <verbatim|siam> style, turning each
   item into <verbatim|(db-result <em|name> <em|text>)>. In a database view,
   <markup|db-pretty-entry> calls the secure <scheme> function
   <scm|ext-db-pretty-entry> through <markup|extern>, which caches the
-  result per kind (<verbatim|db-markup.scm>); clicking the key of a pretty
+  result per kind (<source-link|db-markup.scm|TeXmacs/progs/database/db-markup.scm>); clicking the key of a pretty
   entry (<scm|db-pretty-notify>) turns it back into an editable
   <markup|db-entry>.
 
@@ -259,8 +259,8 @@
     <item*|Import and export>(<menu|Data|Import>, <menu|Data|Export>) are
     dispatched through <scm|db-import-select>, <scm|db-export-select>,
     <scm|db-import-file> and <scm|db-export-file>, which do nothing by
-    default in <verbatim|db-convert.scm> and are redefined in the mode
-    <scm|in-bib?> by <verbatim|bib-manage.scm>. Recently used files are
+    default in <source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm> and are redefined in the mode
+    <scm|in-bib?> by <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>. Recently used files are
     remembered with <scm|learn-interactive> (<scm|db-recent-imports>,
     <scm|db-recent-exports>).
   </description>
@@ -280,15 +280,15 @@
     set per <verbatim|tmfs://db> <abbr|URL>.
 
     <item>The lazy declaration <verbatim|(lazy-define (database db-widget)
-    open-db-chooser)> in <verbatim|init-texmacs.scm> names a module
+    open-db-chooser)> in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> names a module
     <verbatim|db-widget> which does not exist (the file is
-    <verbatim|db-widgets.scm>). In practice <verbatim|db-widgets.scm> is
-    loaded through <verbatim|db-menu.scm> before the chooser is needed,
-    and, without the database tool, by <verbatim|bibtex/zotero-db.scm>.
+    <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm>). In practice <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm> is
+    loaded through <source-link|db-menu.scm|TeXmacs/progs/database/db-menu.scm> before the chooser is needed,
+    and, without the database tool, by <source-link|bibtex/zotero-db.scm|TeXmacs/progs/bibtex/zotero-db.scm>.
 
     <item>No lazy <verbatim|tmfs> handler is declared for
     <verbatim|biblio>: <verbatim|tmfs://biblio/...> <abbr|URL>s only work
-    once <verbatim|bib-local.scm> has been loaded, normally through
+    once <source-link|bib-local.scm|TeXmacs/progs/database/bib-local.scm> has been loaded, normally through
     <scm|open-biblio>.
   </itemize>
 

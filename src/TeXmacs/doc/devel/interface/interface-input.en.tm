@@ -25,7 +25,7 @@
   be sent, including the final newline. This method allows you for
   instance to treat multi-line input in a particular way or to perform
   transformations on the <TeXmacs> tree. The default serializer is
-  <scm|verbatim-serialize> (in <verbatim|utils/plugins/plugin-cmd.scm>);
+  <scm|verbatim-serialize> (in <source-link|utils/plugins/plugin-cmd.scm|TeXmacs/progs/utils/plugins/plugin-cmd.scm>);
   custom serializers usually start by calling <scm|(pre-serialize
   <em|plugin-name> <em|tree>)>, which converts mathematical content using
   the rules described below.
@@ -92,7 +92,7 @@
     \ \ \ \ <example-plugin-link|input/src/input.cpp>
   </verbatim>
 
-  The <scheme> configuration code in <verbatim|init-input.scm> is given by
+  The <scheme> configuration code in <source-link|init-input.scm|TeXmacs/examples/plugins/input/progs/init-input.scm> is given by
 
   <\scm-code>
     (plugin-configure input
@@ -113,9 +113,9 @@
   The predicate <scm|supports-input?> tests whether the plug-in is
   indeed operational (that is, whether <verbatim|input.bin> exists in the
   path). The conversion rules in the module <verbatim|(input-input)> are
-  added in a lazy manner. In other words, the file <verbatim|input-input.scm>
+  added in a lazy manner. In other words, the file <source-link|input-input.scm|TeXmacs/examples/plugins/input/progs/input-input.scm>
   will only be loaded when we explicitly request to make a conversion. The
-  conversion rules in <verbatim|input-input.scm> are given by
+  conversion rules in <source-link|input-input.scm|TeXmacs/examples/plugins/input/progs/input-input.scm> are given by
 
   <\scm-code>
     (plugin-input-converters input
@@ -147,7 +147,7 @@
     \ \ (display "))"))
   </scm-code>
 
-  In the additional style file <verbatim|input.ts> we also defined some
+  In the additional style file <source-link|input.ts|TeXmacs/examples/plugins/input/packages/session/input.ts> we also defined some
   additional markup <markup|special>:
 
   <\tm-fragment>
@@ -167,7 +167,7 @@
     \ \ (display "]]]"))
   </scm-code>
 
-  As to the <c++> code in <verbatim|input.cpp>, the startup banner
+  As to the <c++> code in <source-link|input.cpp|src/Data/Convert/Generic/input.cpp>, the startup banner
   attempts to put the shell session in mathematical input mode:
 
   <\cpp-code>

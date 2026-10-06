@@ -10,11 +10,11 @@
   At startup, <verbatim|TEXMACS_DOC_PATH> is set to its value from the
   environment (if any), followed by <verbatim|$TEXMACS_HOME_PATH/doc>,
   <verbatim|$TEXMACS_PATH/doc> and the <verbatim|doc> directories of all
-  plug-ins (<verbatim|src/src/System/Boot/init_texmacs.cpp>, see <hlink|boot
+  plug-ins (<source-link|src/src/System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>, see <hlink|boot
   paths|system-boot.en.tm>). Users can therefore add or override pages in
   their home directory, and plug-ins ship their own documentation.
 
-  The routines of <verbatim|progs/doc/help-funcs.scm> work with names
+  The routines of <source-link|progs/doc/help-funcs.scm|TeXmacs/progs/doc/help-funcs.scm> work with names
   relative to this path:
 
   <\description>
@@ -66,7 +66,7 @@
   <section|Expansion>
 
   For all types except <verbatim|normal>, the handler calls
-  <scm|tmdoc-expand> (<verbatim|progs/doc/tmdoc.scm>), which loads the file
+  <scm|tmdoc-expand> (<source-link|progs/doc/tmdoc.scm|TeXmacs/progs/doc/tmdoc.scm>), which loads the file
   and rewrites its body:
 
   <\description>
@@ -116,8 +116,8 @@
     chapters: if the initial environment of its root file sets
     <verbatim|tmdoc-book-parts> to <verbatim|true>, the root level is
     <verbatim|title*>, whose branches become parts. The developer guide
-    (<verbatim|devel/source/source.en.tm>) and the whole developer
-    documentation (<verbatim|devel/devel.en.tm>) use this.
+    (<source-link|devel/source/source.en.tm|TeXmacs/doc/devel/source/source.en.tm>) and the whole developer
+    documentation (<source-link|devel/devel.en.tm|TeXmacs/doc/devel/devel.en.tm>) use this.
 
     <item*|<markup|continue>>expands the target at the <em|same> level and
     drops its title, so that a long page can be split into several files.
@@ -179,7 +179,7 @@
   <section|Building the PDF manuals>
 
   The command line option <verbatim|-build-manual <em|file>> calls
-  <scm|build-manual> (<verbatim|progs/utils/test/test-convert.scm>). The
+  <scm|build-manual> (<source-link|progs/utils/test/test-convert.scm|TeXmacs/progs/utils/test/test-convert.scm>). The
   file name has the form
   <verbatim|<em|dir>/<em|name>.<em|xx>.pdf>; <verbatim|<em|name>> must be
   one of <verbatim|texmacs-user-manual>, <verbatim|texmacs-reference-manual>

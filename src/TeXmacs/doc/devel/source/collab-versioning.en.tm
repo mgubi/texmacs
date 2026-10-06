@@ -12,7 +12,7 @@
 
   <\enumerate>
     <item>The undo/redo history of a buffer, maintained in <c++> by the
-    <cpp|archiver> class (<verbatim|Data/History/archiver.hpp>). It lives
+    <cpp|archiver> class (<source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>). It lives
     in memory only and is described together with patches in <hlink|Live
     documents and shared editing|collab-live.en.tm>.
 
@@ -28,13 +28,13 @@
   </enumerate>
 
   This page covers the last two points. All code lives in
-  <verbatim|progs/version/>.
+  <source-link|progs/version/|TeXmacs/progs/version>.
 
   <section|The generic versioning interface>
 
   <subsection|Dispatch>
 
-  <verbatim|version/version-tmfs.scm> defines a set of generic functions
+  <source-link|version/version-tmfs.scm|TeXmacs/progs/version/version-tmfs.scm> defines a set of generic functions
   which are overloaded, using <scm|tm-define> with a <scm|:require>
   clause, by each back-end:
 
@@ -86,7 +86,7 @@
   functions and display the result; <scm|version-interactive-update> and
   <scm|version-interactive-commit> first save the buffer
   (<scm|save-buffer> with the options <scm|:update> and <scm|:commit>).
-  The menus are in <verbatim|version/version-menu.scm> (<scm|version-menu>,
+  The menus are in <source-link|version/version-menu.scm|TeXmacs/progs/version/version-menu.scm> (<scm|version-menu>,
   <scm|version-compare-menu>).
 
   <subsection|<verbatim|tmfs> classes for histories and revisions>
@@ -108,7 +108,7 @@
     and log of a <name|Git> repository.
   </description-paragraphs>
 
-  For remote files, <verbatim|client/client-tmfs.scm> overloads the
+  For remote files, <source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm> overloads the
   generic functions so that the history is the server side version list
   and revisions are <verbatim|time=> <abbr|URL>s.
 
@@ -118,13 +118,13 @@
   <scm|eval-system> and parse their output.
 
   <\itemize>
-    <item><verbatim|version-svn.scm> uses <verbatim|svn status>,
+    <item><source-link|version-svn.scm|TeXmacs/progs/version/version-svn.scm> uses <verbatim|svn status>,
     <verbatim|svn log>, <verbatim|svn cat -r>, <verbatim|svn up --accept
     theirs-full>, <verbatim|svn add>, <verbatim|svn remove --force> and
     <verbatim|svn commit -m>. Note that updating accepts the repository
     version in case of conflicts.
 
-    <item><verbatim|version-git.scm> uses <verbatim|git status
+    <item><source-link|version-git.scm|TeXmacs/progs/version/version-git.scm> uses <verbatim|git status
     --porcelain>, <verbatim|git log --follow> (at most 1000 entries) for
     histories, <verbatim|git show <em|rev>:<em|path>> for revisions,
     <verbatim|git add> and <verbatim|git reset HEAD> for registration,
@@ -147,7 +147,7 @@
 
   The result of a comparison is an ordinary document in which each
   difference is represented by one of the tags of the group
-  <scm|version-tag> (<verbatim|version/version-drd.scm>):
+  <scm|version-tag> (<source-link|version/version-drd.scm|TeXmacs/progs/version/version-drd.scm>):
 
   <\description>
     <item*|<markup|version-both>>Two arguments, the old and the new
@@ -163,7 +163,7 @@
     (inserted or deleted material), rendered as a cross.
   </description>
 
-  The macros are defined in <verbatim|packages/standard/std-fold.ts>, and
+  The macros are defined in <source-link|packages/standard/std-fold.ts|TeXmacs/packages/standard/std-fold.ts>, and
   the colors are given by the environment variables
   <verbatim|old-version-color> and <verbatim|new-version-color>. Since the
   three tags form a variant group, the user can cycle between them.
@@ -171,7 +171,7 @@
   <subsection|The comparison algorithm>
 
   <scm|(compare-versions <scm-arg|t1> <scm-arg|t2>)> in
-  <verbatim|version/version-compare.scm> takes two <scheme> trees and
+  <source-link|version/version-compare.scm|TeXmacs/progs/version/version-compare.scm> takes two <scheme> trees and
   returns a merged tree. It works recursively:
 
   <\itemize>
@@ -257,7 +257,7 @@
   <scm|reactualize-differences> recomputes the comparison inside the
   current difference or selection, for instance after the user edited one
   of the versions or changed the grain. The keyboard shortcuts are defined
-  in <verbatim|version/version-kbd.scm>.
+  in <source-link|version/version-kbd.scm|TeXmacs/progs/version/version-kbd.scm>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

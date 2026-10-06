@@ -6,14 +6,14 @@
   <tmdoc-title|Creating and following links from <scheme>>
 
   The <scheme> side of the linking system lives in
-  <verbatim|progs/link/>. Most of it is loaded lazily
-  (<verbatim|init-texmacs.scm> declares <scm|link-follow-ids>,
+  <source-link|progs/link/|TeXmacs/progs/link>. Most of it is loaded lazily
+  (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> declares <scm|link-follow-ids>,
   <scm|link-active-ids>, <scm|link-mouse-ids>, <scm|link-active-upwards>,
   <scm|get-link-locations>, <scm|register-link-locations> and a few others
   with <scm|lazy-define>), so the first event over an active locus loads
   the navigation code.
 
-  <section|Loci and identifiers (<verbatim|locus-edit.scm>)>
+  <section|Loci and identifiers (<source-link|locus-edit.scm|TeXmacs/progs/link/locus-edit.scm>)>
 
   <\description-paragraphs>
     <item*|<scm|(create-unique-id)>>Returns a new identifier
@@ -40,10 +40,10 @@
     (just before the body) or remove it.
   </description-paragraphs>
 
-  <section|Making links interactively (<verbatim|link-edit.scm>)>
+  <section|Making links interactively (<source-link|link-edit.scm|TeXmacs/progs/link/link-edit.scm>)>
 
-  Links are built in two steps, through the <menu|Link> menu (<verbatim|link-menu.scm>) and the
-  keyboard shortcuts (<verbatim|link-kbd.scm>) of the linking tool, which
+  Links are built in two steps, through the <menu|Link> menu (<source-link|link-menu.scm|TeXmacs/progs/link/link-menu.scm>) and the
+  keyboard shortcuts (<source-link|link-kbd.scm|TeXmacs/progs/link/link-kbd.scm>) of the linking tool, which
   are only present when <scm|with-linking-tool?> holds. First the participants are
   collected in the table <scm|link-participants>, indexed by their
   position: <scm|(link-set-locus <em|nr>)> stores a tree pointer to the
@@ -72,7 +72,7 @@
   <scm|link-vertices>, <scm|vertex-\<gtr\>id>, <scm|vertex-\<gtr\>url> and
   <scm|vertex-\<gtr\>script> take links apart.
 
-  <section|Link lists and navigation lists (<verbatim|link-navigate.scm>)>
+  <section|Link lists and navigation lists (<source-link|link-navigate.scm|TeXmacs/progs/link/link-navigate.scm>)>
 
   Following a link goes through two intermediate representations.
 
@@ -165,7 +165,7 @@
   <scm|locus-link-follow> (<verbatim|link return> in the linking tool) follows
   the links of the loci around the cursor as a click would.
 
-  <section|Links between files (<verbatim|link-extern.scm>)>
+  <section|Links between files (<source-link|link-extern.scm|TeXmacs/progs/link/link-extern.scm>)>
 
   A link may point to a locus in another file, which is not necessarily
   loaded. To find it, <TeXmacs> keeps a <em|registry> in
@@ -176,7 +176,7 @@
 
   <\itemize>
     <item>When a buffer is saved, <cpp|buffer_export>
-    (<verbatim|Texmacs/Data/new_buffer.cpp>) calls <scm|(get-link-locations
+    (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>) calls <scm|(get-link-locations
     <em|name> <em|body>)> and stores the result as a <markup|links>
     attribute of the document. For every link in the body whose vertices
     are loci located in <em|other> files (found among the open buffers or
@@ -195,7 +195,7 @@
   </itemize>
 
   <scm|get-constellation> lists all registered files;
-  <verbatim|link-extract.scm> builds auxiliary pages listing the linked
+  <source-link|link-extract.scm|TeXmacs/progs/link/link-extract.scm> builds auxiliary pages listing the linked
   files (<scm|build-constellation-page>), the loci of the current buffer
   (<scm|build-locus-page>), or all environments of a given type, after
   turning them into loci if necessary (<scm|build-environment-page>).

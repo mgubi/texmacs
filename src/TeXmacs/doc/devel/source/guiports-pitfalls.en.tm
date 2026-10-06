@@ -10,8 +10,8 @@
   Further ports are developed outside the branch described here. In the
   repository, the branches <verbatim|wip_other_guis> and
   <verbatim|wip_wasm_vue> contain the plug-in directories
-  <verbatim|Plugins/NS>, <verbatim|Plugins/Qtwk>, <verbatim|Plugins/SDL>,
-  <verbatim|Plugins/Vue> and <verbatim|Plugins/MuPDF>, which do not exist
+  <source-link|Plugins/NS|src/Plugins/NS>, <source-link|Plugins/Qtwk|src/Plugins/Qtwk>, <source-link|Plugins/SDL|src/Plugins/SDL>,
+  <source-link|Plugins/Vue|src/Plugins/Vue> and <source-link|Plugins/MuPDF|src/Plugins/MuPDF>, which do not exist
   in this tree, and the remote branches <verbatim|ns_ci> and
   <verbatim|vue_ci> exist as well. These ports are documented on their own
   branches; nothing in this chapter applies to them.
@@ -20,7 +20,7 @@
 
   <\itemize>
     <item><with|font-series|bold|Two copies of the <name|Qt> port.>
-    <verbatim|Plugins/Qt> and <verbatim|Plugins/Qt6> are maintained in
+    <verbatim|Plugins/Qt> and <source-link|Plugins/Qt6|src/Plugins/Qt6> are maintained in
     parallel and synchronized by hand. A fix applied to one directory must
     be applied to the other; <name|CMake> builds only the first, and
     <verbatim|configure --enable-qt-new> (the default on <name|Android>)
@@ -29,20 +29,20 @@
     <item><with|font-series|bold|<name|CMake> ignores the port
     choice.> <verbatim|TEXMACS_GUI> accepts <verbatim|Aqua> and
     <verbatim|X11> but always compiles <verbatim|Plugins/Qt>, without
-    defining any port macro for those values (<verbatim|CMakeLists.txt>,
+    defining any port macro for those values (<source-link|CMakeLists.txt|src/CMakeLists.txt>,
     section \PGUI & Qt Selection\Q).
 
     <item><with|font-series|bold|Stale generated files.> An in-tree
     <verbatim|make> build leaves <verbatim|moc_*.cpp> files in
-    <verbatim|Plugins/Qt> (they are ignored by <verbatim|src/.gitignore>).
+    <verbatim|Plugins/Qt> (they are ignored by <source-link|src/.gitignore|.gitignore>).
     The <name|CMake> source list is a glob on
     <verbatim|Plugins/Qt/*.cpp> while <name|CMake> also runs its own
-    <verbatim|AUTOMOC> (<verbatim|src/CMakeLists.txt>), so a <name|CMake>
+    <verbatim|AUTOMOC> (<source-link|src/CMakeLists.txt|src/CMakeLists.txt>), so a <name|CMake>
     build in the same tree compiles both sets of meta object files.
 
     <item><with|font-series|bold|The <name|Cocoa> port does not link.>
-    <cpp|gui_version> is declared in <verbatim|gui.hpp> and called
-    unconditionally (<verbatim|Texmacs/Texmacs/texmacs.cpp:537>, the glue
+    <cpp|gui_version> is declared in <source-link|gui.hpp|src/Graphics/Gui/gui.hpp> and called
+    unconditionally (<source-link|Texmacs/Texmacs/texmacs.cpp:537|src/Texmacs/Texmacs/texmacs.cpp:537>, the glue
     of <scm|gui-version>), but <verbatim|Plugins/Cocoa> does not define it.
 
     <item><with|font-series|bold|Print dialog options.> The
@@ -51,7 +51,7 @@
     <cpp|CupsQTMPrinterSettings::toSystemCommand> never turns it into a
     printing option. The unused helpers <cpp|getFromQPrinter> and
     <cpp|setToQPrinter> invert its meaning
-    (<verbatim|QTMPrinterSettings.cpp:71> and <verbatim|98>). The page
+    (<source-link|QTMPrinterSettings.cpp:71|src/Plugins/Qt/QTMPrinterSettings.cpp:71> and <verbatim|98>). The page
     range for several pages per sheet is computed with integer division,
     so the <cpp|ceil> around <verbatim|lastPage / pagesPerSide> has no
     effect and the last sheet may be left out
@@ -72,11 +72,11 @@
 
     <item><with|font-series|bold|<name|X11> selections are
     <name|Latin-1>.> The <name|X11> port only offers and requests the
-    target <verbatim|STRING> (<verbatim|x_loop.cpp>,
-    <verbatim|x_gui.cpp>), never <verbatim|UTF8_STRING>, so non
+    target <verbatim|STRING> (<source-link|x_loop.cpp|src/Plugins/X11/x_loop.cpp>,
+    <source-link|x_gui.cpp|src/Plugins/X11/x_gui.cpp>), never <verbatim|UTF8_STRING>, so non
     <name|Latin-1> text is not exchanged correctly with other programs.
     Pasting also busy-polls up to a million times for the answer of the
-    selection owner (<verbatim|x_gui.cpp>), using the processor meanwhile
+    selection owner (<source-link|x_gui.cpp|src/Plugins/X11/x_gui.cpp>), using the processor meanwhile
     and failing with slow owners.
 
     <item><with|font-series|bold|Markup on the system clipboard.> Outside

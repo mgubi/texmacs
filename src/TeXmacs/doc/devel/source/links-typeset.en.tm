@@ -8,11 +8,11 @@
   <section|Registering loci: <cpp|build_locus>>
 
   Loci are registered when they are typeset, by <cpp|build_locus (env, t,
-  ids, col, ref, anchor)> in <verbatim|Typeset/Concat/concat_active.cpp>.
+  ids, col, ref, anchor)> in <source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>.
   It is called for inline loci (<cpp|concater_rep::typeset_locus>), for
-  loci typeset as atomic boxes (<verbatim|concater.cpp>), for block loci
+  loci typeset as atomic boxes (<source-link|concater.cpp|src/Typeset/Concat/concater.cpp>), for block loci
   (<cpp|bridge_locus_rep::my_typeset>) and for loci in the lazy
-  typesetter (<cpp|make_lazy_locus>, <verbatim|Typeset/Line/lazy_typeset.cpp>).
+  typesetter (<cpp|make_lazy_locus>, <source-link|Typeset/Line/lazy_typeset.cpp|src/Typeset/Line/lazy_typeset.cpp>).
   It expands the body (the last argument) and evaluates the other
   arguments one by one:
 
@@ -70,7 +70,7 @@
 
   For an inline locus whose body is not accessible,
   <cpp|typeset_locus> wraps the typeset material, in pieces, in
-  <em|locus boxes> (<cpp|locus_box>, <verbatim|change_boxes.cpp>). A locus
+  <em|locus boxes> (<cpp|locus_box>, <source-link|change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>). A locus
   box remembers the identifiers, the <cpp|ref> and the <cpp|anchor>:
 
   <\itemize>
@@ -85,18 +85,18 @@
   </itemize>
 
   For accessible loci, links are printed by <cpp|box_rep::display_links>
-  (<verbatim|boxes.cpp>), which is called for non-screen renderers only:
+  (<source-link|boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>), which is called for non-screen renderers only:
   it walks up from the source of a box, looks up the identifiers of each
   subtree with <cpp|get_ids>, and emits an <cpp|href> for every
   <verbatim|hyperlink> whose target is a <verbatim|url>.
 
   <section|Active loci in the editor>
 
-  The editor keeps two lists of identifiers (<verbatim|edit_interface.hpp>):
+  The editor keeps two lists of identifiers (<source-link|edit_interface.hpp|src/Edit/Interface/edit_interface.hpp>):
 
   <\description>
     <item*|<cpp|mouse_ids>>Computed by <cpp|update_mouse_loci>
-    (<verbatim|edit_mouse.cpp>) when the mouse moves: the identifiers of
+    (<source-link|edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>) when the mouse moves: the identifiers of
     the locus boxes under the mouse (<cpp|eb-\<gtr\>loci>) and of the
     subtree under the mouse and its ancestors (<cpp|get_ids>), filtered by
     the <scheme> functions <scm|link-mouse-ids> (which drops identifiers

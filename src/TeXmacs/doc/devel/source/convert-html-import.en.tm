@@ -12,8 +12,8 @@
   <math|\<rightarrow\>> <verbatim|texmacs-stree> of the converter graph:
 
   <\enumerate>
-    <item><scm|parse-html-document> (<verbatim|convert/html/htmltm.scm>)
-    calls <scm|htmltm-parse> (<verbatim|convert/tools/xmltm.scm>), which
+    <item><scm|parse-html-document> (<source-link|convert/html/htmltm.scm|TeXmacs/progs/convert/html/htmltm.scm>)
+    calls <scm|htmltm-parse> (<source-link|convert/tools/xmltm.scm|TeXmacs/progs/convert/tools/xmltm.scm>), which
     parses the string with the <c++> parser <cpp|parse_html> and normalizes
     the namespaces of the resulting sxml. The result is wrapped into
     <scm|(!file ...)>; <scm|parse-html-snippet> does the same without the
@@ -21,7 +21,7 @@
 
     <item><scm|html-\<gtr\>texmacs> converts the sxml into a <TeXmacs>
     stree with the dispatch table <scm|htmltm-methods%>, delegating
-    <name|MathML> to <verbatim|convert/mathml/mathtm.scm>, and post-processes
+    <name|MathML> to <source-link|convert/mathml/mathtm.scm|TeXmacs/progs/convert/mathml/mathtm.scm>, and post-processes
     the result in <c++> with <scm|clean-html> (<cpp|clean_html>).
   </enumerate>
 
@@ -33,7 +33,7 @@
   <subsection|The <name|XML>/<name|HTML> parser>
 
   <cpp|parse_xml> and <cpp|parse_plain_html> in
-  <verbatim|Data/Convert/Xml/parsexml.cpp> are two modes of the same parser,
+  <source-link|Data/Convert/Xml/parsexml.cpp|src/Data/Convert/Xml/parsexml.cpp> are two modes of the same parser,
   <cpp|xml_html_parser>, which aims to accept a superset of the valid
   documents and never reports errors. It proceeds in three passes:
 
@@ -42,9 +42,9 @@
     opening and closing tags, text, comments, processing instructions,
     <verbatim|CDATA> sections and the <verbatim|DOCTYPE>. Entities are
     expanded on the fly (<cpp|expand_entities>), using the entities declared
-    in the doctype and the tables <verbatim|HTMLlat1.scm>,
-    <verbatim|HTMLspecial.scm>, <verbatim|HTMLsymbol.scm> and
-    <verbatim|XML.scm> in <verbatim|$TEXMACS_PATH/langs/encoding>.
+    in the doctype and the tables <source-link|HTMLlat1.scm|TeXmacs/langs/encoding/HTMLlat1.scm>,
+    <source-link|HTMLspecial.scm|TeXmacs/langs/encoding/HTMLspecial.scm>, <source-link|HTMLsymbol.scm|TeXmacs/langs/encoding/HTMLsymbol.scm> and
+    <source-link|XML.scm|TeXmacs/langs/encoding/XML.scm> in <verbatim|$TEXMACS_PATH/langs/encoding>.
     For <name|HTML>, the input is first transcoded to UTF-8
     (<cpp|transcode>), using the encoding of the <name|XML> prolog if
     present.
@@ -63,11 +63,11 @@
 
   The result is a tree of the form <verbatim|(*TOP* (html (@ ...) ...))>,
   which is converted into a <scheme> expression by the glue. Unit tests for
-  this parser are in <verbatim|src/tests/Data/Convert/Xml>.
+  this parser are in <source-link|src/tests/Data/Convert/Xml|tests/Data/Convert/Xml>.
 
   <subsection|<name|MathJax>>
 
-  <cpp|parse_html> (<verbatim|Data/Convert/Xml/parsehtml.cpp>) is a wrapper
+  <cpp|parse_html> (<source-link|Data/Convert/Xml/parsehtml.cpp|src/Data/Convert/Xml/parsehtml.cpp>) is a wrapper
   around <cpp|parse_plain_html>. If the page loads <verbatim|MathJax.js> in
   its head (<cpp|contains_mathjax>), the formulas written in <TeX> syntax
   (<verbatim|$...$>, <verbatim|\\(...\\)>, <verbatim|equation>
@@ -95,7 +95,7 @@
 
   <subsection|Dispatch>
 
-  The generic dispatcher <scm|sxml-dispatch> (<verbatim|xmltm.scm>) splits
+  The generic dispatcher <scm|sxml-dispatch> (<source-link|xmltm.scm|TeXmacs/progs/convert/tools/xmltm.scm>) splits
   the name of an element into prefix and local name and looks up the local
   name in the table of the namespace: <scm|htmltm-methods%> for
   <verbatim|h>, <scm|mathtm-methods%> for <verbatim|m>. Elements without
@@ -114,7 +114,7 @@
     <scm-arg|args-\<gtr\>serial>)><explain-synopsis|make an entry for
     <scm|htmltm-methods%>>
   <|explain>
-    Defined in <verbatim|xmltm.scm>; within <verbatim|htmltm.scm> it is
+    Defined in <source-link|xmltm.scm|TeXmacs/progs/convert/tools/xmltm.scm>; within <source-link|htmltm.scm|TeXmacs/progs/convert/html/htmltm.scm> it is
     abbreviated as <scm|handler>. <scm-arg|model> describes the treatment of
     white space in the content: <scm|:empty> (empty element),
     <scm|:element> (text nodes are ignored), <scm|:mixed> (leading and
@@ -146,7 +146,7 @@
   <verbatim|script>, <verbatim|style>, forms, frames, ...) are dropped with
   <scm|htmltm-drop>. The specific handlers deal with tables
   (<scm|htmltm-table>, which computes borders, widths, alignments and cell
-  spans with the helpers of <verbatim|convert/tools/old-tmtable.scm>), list
+  spans with the helpers of <source-link|convert/tools/old-tmtable.scm|TeXmacs/progs/convert/tools/old-tmtable.scm>), list
   items, anchors and links (<scm|htmltm-anchor>), images
   (<scm|htmltm-image>), the deprecated <verbatim|font> element, line
   breaks, and a few special cases: <name|TeX> formulas given as images with
@@ -158,7 +158,7 @@
   <subsection|Building the <TeXmacs> tree>
 
   The converted children are assembled into <em|serials> with
-  <scm|htmltm-serial> and the constructors of <verbatim|convert/tools/stm.scm>
+  <scm|htmltm-serial> and the constructors of <source-link|convert/tools/stm.scm|TeXmacs/progs/convert/tools/stm.scm>
   (<scm|stm-serial>, <scm|stm-concat>): inline material becomes
   <markup|concat> nodes, and block material is collected into a
   <markup|document> whose paragraphs are the blocks and lines. An invariant
@@ -167,14 +167,14 @@
   with the kind <scm|:block>. After the conversion,
   <scm|html-postproc> replaces non-breaking spaces and straight double
   quotes, the tree is simplified, and <cpp|clean_html>
-  (<verbatim|Data/Convert/Xml/cleanhtml.cpp>) removes superfluous
+  (<source-link|Data/Convert/Xml/cleanhtml.cpp|src/Data/Convert/Xml/cleanhtml.cpp>) removes superfluous
   documents and white space, compresses list items and converts
   <markup|above>/<markup|below> constructs produced by <name|MathML> into
   big operators with scripts.
 
   <section|<name|MathML>>
 
-  <name|MathML> elements are converted by <verbatim|convert/mathml/mathtm.scm>
+  <name|MathML> elements are converted by <source-link|convert/mathml/mathtm.scm|TeXmacs/progs/convert/mathml/mathtm.scm>
   with the dispatch table <scm|mathtm-methods%> (entries made by
   <scm|mathtm-handler>): <verbatim|mi>, <verbatim|mn>, <verbatim|mo> and
   <verbatim|mtext> become strings or <TeXmacs> symbols, <verbatim|mfrac>,
@@ -182,7 +182,7 @@
   <verbatim|munder>/<verbatim|mover> become the corresponding primitives,
   <verbatim|mtable> becomes a <markup|tabular>, and so on. Operators,
   symbols and accents are translated with the tables of
-  <verbatim|convert/mathml/mathml-drd.scm> (<scm|mathml-operator-\<gtr\>tm%>,
+  <source-link|convert/mathml/mathml-drd.scm|TeXmacs/progs/convert/mathml/mathml-drd.scm> (<scm|mathml-operator-\<gtr\>tm%>,
   <scm|mathml-symbol-\<gtr\>tm%>, <scm|mathml-above-\<gtr\>tm%>,
   <abbr|etc.>). The function <scm|mathml-\<gtr\>tree> imports a
   standalone <name|MathML> string.
@@ -201,27 +201,27 @@
 
   <\enumerate>
     <item>Add an entry to <scm|htmltm-methods%> in
-    <verbatim|htmltm.scm>, using <scm|handler> with the appropriate white
+    <source-link|htmltm.scm|TeXmacs/progs/convert/html/htmltm.scm>, using <scm|handler> with the appropriate white
     space model and kind. If the element maps to a unary macro, a string is
     enough; otherwise write a method <scm|(define (htmltm-my-element env a
     c) ...)> which uses <scm|htmltm-args-serial> to convert the content and
     <scm|shtml-attr-non-null> to read attributes.
 
     <item>For <name|MathML>, add an entry to <scm|mathtm-methods%> in
-    <verbatim|mathtm.scm>, or a symbol to the tables of
-    <verbatim|mathml-drd.scm>.
+    <source-link|mathtm.scm|TeXmacs/progs/convert/mathml/mathtm.scm>, or a symbol to the tables of
+    <source-link|mathml-drd.scm|TeXmacs/progs/convert/mathml/mathml-drd.scm>.
 
-    <item>Add a regression test to <verbatim|convert/html/htmltm-test.scm>
-    (or <verbatim|convert/mathml/mathtm-test.scm>).
+    <item>Add a regression test to <source-link|convert/html/htmltm-test.scm|TeXmacs/progs/convert/html/htmltm-test.scm>
+    (or <source-link|convert/mathml/mathtm-test.scm|TeXmacs/progs/convert/mathml/mathtm-test.scm>).
   </enumerate>
 
   <section|Testing>
 
   <scm|(regtest-htmltm)>, <scm|(regtest-xmltm)> and <scm|(regtest-mathtm)>
   run the regression tests of the importer
-  (<verbatim|convert/html/htmltm-test.scm>,
-  <verbatim|convert/tools/xmltm-test.scm>,
-  <verbatim|convert/mathml/mathtm-test.scm>); they are part of
+  (<source-link|convert/html/htmltm-test.scm|TeXmacs/progs/convert/html/htmltm-test.scm>,
+  <source-link|convert/tools/xmltm-test.scm|TeXmacs/progs/convert/tools/xmltm-test.scm>,
+  <source-link|convert/mathml/mathtm-test.scm|TeXmacs/progs/convert/mathml/mathtm-test.scm>); they are part of
   <scm|(run-all-tests)>. In a <scheme> session,
   <scm|(parse-html-snippet <scm-arg|s>)> shows the normalized sxml and
   <scm|(html-\<gtr\>texmacs (parse-html-snippet <scm-arg|s>))> the

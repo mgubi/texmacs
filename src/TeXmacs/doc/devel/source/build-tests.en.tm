@@ -14,10 +14,10 @@
 
   <section|<c++> unit tests>
 
-  The directory <verbatim|tests/> mirrors the source tree and contains
+  The directory <source-link|tests/|tests> mirrors the source tree and contains
   one test program per file, for instance
-  <verbatim|tests/Data/String/analyze_test.cpp> or
-  <verbatim|tests/Kernel/Containers/hashmap_test.cpp> (about twenty files:
+  <source-link|tests/Data/String/analyze_test.cpp|tests/Data/String/analyze_test.cpp> or
+  <source-link|tests/Kernel/Containers/hashmap_test.cpp|tests/Kernel/Containers/hashmap_test.cpp> (about twenty files:
   strings, trees, containers, <abbr|URL>s, <name|XML> parsing, image files,
   fonts, lengths, keyword parsing, the <name|Qt> and <name|macOS>
   utilities). Each file is a <name|QtTest> test class:
@@ -42,19 +42,19 @@
     };
   </cpp-code>
 
-  <verbatim|tests/CMakeLists.txt> globs all <verbatim|*.cpp> files and
+  <source-link|tests/CMakeLists.txt|tests/CMakeLists.txt> globs all <verbatim|*.cpp> files and
   makes one executable per file, linked against the object library
   <verbatim|texmacs_body> of the main build, with a <name|CTest> test of the
   same name, a time limit of 5 seconds, and <verbatim|TEXMACS_PATH> set to
-  the <verbatim|TeXmacs/> directory of the sources (needed for instance by
+  the <source-link|TeXmacs/|packages/macos/TeXmacs> directory of the sources (needed for instance by
   the tests of <cpp|utf8_to_cork>, which load dictionaries).
-  <verbatim|tests/README.md> explains how to run them with
+  <source-link|tests/README.md|tests/README.md> explains how to run them with
   <verbatim|ctest> or directly.
 
   <section|<scheme> regression tests>
 
   <paragraph|Writing tests.>The macro <scm|regression-test-group>
-  (<verbatim|TeXmacs/progs/kernel/boot/debug.scm>) groups tests of a
+  (<source-link|TeXmacs/progs/kernel/boot/debug.scm|TeXmacs/progs/kernel/boot/debug.scm>) groups tests of a
   function:
 
   <\scm-code>
@@ -71,7 +71,7 @@
     \ \ \ (test "span" '(span "a") "a")))
   </scm-code>
 
-  (from <verbatim|convert/html/htmltm-test.scm>).
+  (from <source-link|convert/html/htmltm-test.scm|TeXmacs/progs/convert/html/htmltm-test.scm>).
 
   The third and fourth arguments are functions applied to the input and to
   the expected value of each test (<scm|:none> for the identity). Each
@@ -91,7 +91,7 @@
   <paragraph|Test modules.>By convention, the tests of a module
   <verbatim|<em|name>.scm> are in <verbatim|<em|name>-test.scm> next to it,
   which defines a function <scm|regtest-<em|name>>. The master file
-  <verbatim|TeXmacs/progs/check/check-master.scm> loads the test modules
+  <source-link|TeXmacs/progs/check/check-master.scm|TeXmacs/progs/check/check-master.scm> loads the test modules
   and defines
 
   <\description>
@@ -110,7 +110,7 @@
     <verbatim|$TEXMACS_CHECKS/latex-export>.
   </description>
 
-  These functions are declared lazily in <verbatim|init-texmacs.scm>, so
+  These functions are declared lazily in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>, so
   that they can be called from the command line, for instance
 
   <\verbatim-code>
@@ -121,7 +121,7 @@
 
   <section|Document test suites>
 
-  The module <verbatim|TeXmacs/progs/utils/test/test-convert.scm> runs
+  The module <source-link|TeXmacs/progs/utils/test/test-convert.scm|TeXmacs/progs/utils/test/test-convert.scm> runs
   collections of documents through <TeXmacs>. A test suite is a
   directory whose subdirectories are named after the kind of their
   contents:
@@ -167,43 +167,43 @@
   (<scm|should-update?>), so a second run is fast. The functions take
   continuations, and the command line options pass <scm|delayed-quit> so
   that <TeXmacs> exits when the run is complete. A separate module,
-  <verbatim|utils/test/test-latex-export.scm>, defines
+  <source-link|utils/test/test-latex-export.scm|TeXmacs/progs/utils/test/test-latex-export.scm>, defines
   <scm|run-latex-export-suite>, which exports the documents of a directory
   to <LaTeX> with several styles.
 
   <section|Other hooks>
 
-  <verbatim|texmacs.cpp> contains a compile time hook for ad hoc <c++>
+  <source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> contains a compile time hook for ad hoc <c++>
   tests: if <verbatim|ENABLE_TESTS> is defined (the <verbatim|#define> is
   commented out), <cpp|texmacs_entrypoint> calls <cpp|test_routines> before
   starting <scheme>, which currently runs <cpp|test_math>
-  (<verbatim|src/Graphics/Mathematics/test_math.cpp>), a demonstration
+  (<source-link|src/Graphics/Mathematics/test_math.cpp|src/Graphics/Mathematics/test_math.cpp>), a demonstration
   which prints computations with vectors, matrices, polynomials and balls.
 
   <section|Pitfalls>
 
   <\itemize>
     <item>The <c++> unit tests are not part of the <name|CMake> build:
-    neither <verbatim|CMakeLists.txt> nor <verbatim|src/CMakeLists.txt>
+    neither <source-link|CMakeLists.txt|src/CMakeLists.txt> nor <source-link|src/CMakeLists.txt|src/CMakeLists.txt>
     contains <verbatim|add_subdirectory (tests)> or
     <verbatim|enable_testing ()>, so the instructions of
-    <verbatim|tests/README.md> do not work as written.
+    <source-link|tests/README.md|tests/README.md> do not work as written.
 
-    <item>Even when <verbatim|tests/> is added, its
-    <verbatim|CMakeLists.txt> links <verbatim|Qt5::Test> unconditionally,
+    <item>Even when <source-link|tests/|tests> is added, its
+    <source-link|CMakeLists.txt|src/CMakeLists.txt> links <verbatim|Qt5::Test> unconditionally,
     whereas the default build uses <name|Qt> 6 when it is available.
 
     <item><scm|integration-test-group> is documented (in a comment in
-    <verbatim|debug.scm>) to signal an error at the end if any test failed,
+    <source-link|debug.scm|TeXmacs/progs/kernel/boot/debug.scm>) to signal an error at the end if any test failed,
     but its expansion only prints the summary and returns the number of
     tests (<verbatim|kernel/boot/debug.scm:296-303>), so a failing
     integration run is not detectable from its result.
 
     <item>Some test modules are not run by <scm|run-all-tests>: for
-    instance <verbatim|kernel/texmacs/tm-convert-test.scm> (whose
+    instance <source-link|kernel/texmacs/tm-convert-test.scm|TeXmacs/progs/kernel/texmacs/tm-convert-test.scm> (whose
     <scm|regtest-format> is a private <scm|define>),
-    <verbatim|kernel/regexp/regexp-test.scm> and
-    <verbatim|kernel/logic/logic-test.scm>.
+    <source-link|kernel/regexp/regexp-test.scm|TeXmacs/progs/kernel/regexp/regexp-test.scm> and
+    <source-link|kernel/logic/logic-test.scm|TeXmacs/progs/kernel/logic/logic-test.scm>.
 
     <item><scm|run-latex-export-suite> is not declared lazily and is not
     loaded by any other module, so it is only available after loading

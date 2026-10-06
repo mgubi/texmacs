@@ -14,7 +14,7 @@
   which the server manages: dialogs, embedded <TeXmacs> editors and the
   \Palternative\Q windows which <scheme> builds from widgets. All of it is
   written against the abstract widget interface of
-  <verbatim|Graphics/Gui/widget.hpp> and <verbatim|message.hpp>, so it is
+  <source-link|Graphics/Gui/widget.hpp|src/Graphics/Gui/widget.hpp> and <source-link|message.hpp|src/Graphics/Gui/message.hpp>, so it is
   independent of the toolkit; how the <name|Qt> port implements the
   corresponding widgets is described in <hlink|the <name|Qt>
   implementation|widgets-qt.en.tm>, and the <scheme> side of menus and
@@ -74,8 +74,8 @@
   <\explain>
     <cpp|class tm_window_rep><explain-synopsis|a <TeXmacs> window>
   <|explain>
-    Declared in <verbatim|Texmacs/tm_window.hpp>, implemented in
-    <verbatim|Texmacs/Window/tm_window.cpp>. Its public fields are:
+    Declared in <source-link|Texmacs/tm_window.hpp|src/Texmacs/tm_window.hpp>, implemented in
+    <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>. Its public fields are:
 
     <\description>
       <item*|<cpp|widget win>>The top level window widget.
@@ -126,7 +126,7 @@
   <section|Window identifiers and the window table>
 
   Windows are owned by the static table <cpp|tm_window_table> of
-  <verbatim|Texmacs/Data/new_window.cpp>, which maps window identifiers to
+  <source-link|Texmacs/Data/new_window.cpp|src/Texmacs/Data/new_window.cpp>, which maps window identifiers to
   <cpp|tm_window_rep> pointers. The identifiers are <abbr|URL>s
   <verbatim|tmfs://window/<em|n>>, allocated by <cpp|create_window_id>
   (from the constructor of <cpp|tm_window_rep>) and released by
@@ -144,7 +144,7 @@
     windows as counted by the GUI back-end (<cpp|nr_windows>). Under
     <name|Qt> it is maintained by <cpp|qt_window_widget_rep> for all its
     non \Pfake\Q windows, which includes dialogs and alternative windows;
-    under X11 by <verbatim|x_window.cpp>; in the <name|Cocoa> port it stays
+    under X11 by <source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>; in the <name|Cocoa> port it stays
     0. In no case is it the length of <cpp|windows_list>.
 
     <item*|Current window><cpp|has_current_window>,
@@ -214,7 +214,7 @@
   <verbatim|buffer management> preference: with the value
   <verbatim|separate> (the default on <name|macOS> and <name|Windows>,
   tested by the mode predicate <scm|window-per-buffer?> of
-  <verbatim|kernel/texmacs/tm-modes.scm>) each document gets its own
+  <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>) each document gets its own
   window; with <verbatim|shared> (the default elsewhere) documents replace
   each other in the same window.
 
@@ -240,7 +240,7 @@
   </description>
 
   The user command is <scm|safely-kill-window> in
-  <verbatim|texmacs/texmacs/tm-server.scm>, called from the close box (with
+  <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>, called from the close box (with
   the window as argument) and, through <scm|close-document>, from the
   <menu|File> menu (without argument):
 
@@ -273,7 +273,7 @@
 
   <section|Geometry of top level windows><label|geometry>
 
-  <cpp|texmacs_window_widget (wid, geom)> (<verbatim|tm_window.cpp>) wraps
+  <cpp|texmacs_window_widget (wid, geom)> (<source-link|tm_window.cpp|src/Texmacs/Window/tm_window.cpp>) wraps
   the <TeXmacs> widget in a top level window and decides its size and
   position:
 
@@ -309,8 +309,8 @@
   that the second window of the previous session had. Under <name|Qt>,
   <cpp|plain_window_widget> and <cpp|QTMPlainWindow> also save and restore
   the geometry of every other non-popup top level window (dialogs,
-  alternative windows) under its title (<verbatim|Plugins/Qt/qt_widget.cpp>,
-  <verbatim|Plugins/Qt/QTMWindow.cpp>).
+  alternative windows) under its title (<source-link|Plugins/Qt/qt_widget.cpp|src/Plugins/Qt/qt_widget.cpp>,
+  <source-link|Plugins/Qt/QTMWindow.cpp|src/Plugins/Qt/QTMWindow.cpp>).
 
   <section|Menus and toolbars><label|menus>
 
@@ -406,7 +406,7 @@
   <cpp|set_left_footer>, <cpp|set_right_footer>.
 
   The contents of the footer are decided by the editor
-  (<verbatim|Edit/Interface/edit_footer.cpp>). <cpp|set_message (left,
+  (<source-link|Edit/Interface/edit_footer.cpp|src/Edit/Interface/edit_footer.cpp>). <cpp|set_message (left,
   right, temp)> stores a message and calls <cpp|notify_change
   (THE_DECORATIONS)>; <cpp|set_footer>, called from <cpp|update_menus>,
   displays the message if there is one, and otherwise computes a
@@ -435,7 +435,7 @@
   <section|Dialogs and interactive commands><label|dialogs>
 
   <paragraph|Dialog windows.><cpp|tm_frame_rep::dialogue_start (name,
-  wid)> (<verbatim|tm_dialogue.cpp>) opens <cpp|wid> in a plain window
+  wid)> (<source-link|tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp>) opens <cpp|wid> in a plain window
   with the translated title <cpp|name>, centered on the current window.
   There is a single dialog slot in the server (<cpp|dialogue_win>,
   <cpp|dialogue_wid>); while it is occupied, further calls are ignored.
@@ -488,7 +488,7 @@
 
   Note that the <scheme> function <scm|interactive> does not always reach
   this code: it calls <scm|tm-interactive-hook>, which is set to
-  <scm|tm-interactive-new> in <verbatim|generic/generic-menu.scm>. When
+  <scm|tm-interactive-new> in <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>. When
   the side tools are enabled (<scm|side-tools?>, that is, the
   <verbatim|side tools> and <verbatim|developer tool> preferences are both
   on), that function shows an <scm|interactive-tool> in the bottom tool
@@ -538,8 +538,8 @@
 
   Embedded widgets are placed either in an \Palternative\Q window (see
   below), for instance in dialogs, or in the side tools of a main window,
-  for instance the search and replace tools (<verbatim|generic/search-widgets.scm>)
-  and the format tools (<verbatim|generic/format-tools.scm>). To be able to
+  for instance the search and replace tools (<source-link|generic/search-widgets.scm|TeXmacs/progs/generic/search-widgets.scm>)
+  and the format tools (<source-link|generic/format-tools.scm|TeXmacs/progs/generic/format-tools.scm>). To be able to
   close the alternative windows when their buffer is closed,
   the constructor of the close command records the handle of the most
   recently allocated alternative window (<cpp|last_window_handle>) under
@@ -547,8 +547,8 @@
   returns the handles which still exist, <cpp|is_embedded_buffer> tests
   whether there is one (<scm|buffer-embedded?>), and
   <scm|safely-kill-buffer> and <scm|safely-kill-window> in
-  <verbatim|tm-server.scm> use <scm|alt-window-search> to delete them.
-  This relies on the order of calls in <verbatim|menu-widget.scm>, where
+  <source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm> use <scm|alt-window-search> to delete them.
+  This relies on the order of calls in <source-link|menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>, where
   the handle is allocated before the widget is built.
 
   <\warning>
@@ -568,7 +568,7 @@
 
   <section|Output widgets and box widgets>
 
-  <verbatim|Texmacs/Window/tm_button.cpp> contains the widgets which only
+  <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp> contains the widgets which only
   <em|display> typeset material:
 
   <\description-paragraphs>
@@ -599,7 +599,7 @@
     similar way (but without <cpp|enrich_embedded_document> and without
     project data), in units of 5 pixels rounded up; exported as
     <scm|tree-extents>, which is only used by the old GUI code in
-    <verbatim|kernel/old-gui/>.
+    <source-link|kernel/old-gui/|TeXmacs/progs/kernel/old-gui>.
 
     <item*|<cpp|get_texmacs_widget_size (wid)>>The size hint of such a
     widget.
@@ -607,12 +607,12 @@
 
   <section|Alternative windows><label|alt-windows>
 
-  The end of <verbatim|tm_window.cpp> implements a second, simpler family
+  The end of <source-link|tm_window.cpp|src/Texmacs/Window/tm_window.cpp> implements a second, simpler family
   of top level windows, identified by small integers rather than by
   <abbr|URL>s. They are used for the top level windows which <scheme> builds from
   widgets (dialogs and tool windows made with <scm|top-window>,
   <scm|dialogue-window> and similar functions of
-  <verbatim|kernel/gui/menu-widget.scm>, and tooltips) through the
+  <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>, and tooltips) through the
   <scm|alt-window-...> glue, which the code describes as
   \Ptransitional\Q. Editor windows (<scm|open-window>) are
   <cpp|tm_window_rep>s, and the dialogs of <cpp|tm_frame_rep> (file

@@ -15,8 +15,8 @@
   layout, while additional variables mostly serve computational purposes. In
   the next sections of this chapter, we will describe the built-in
   environment variables. Their names are declared in
-  <verbatim|Data/Drd/vars.cpp> and their built-in default values are set in
-  <verbatim|Typeset/Env/env_default.cpp> in the <c++> sources; style files
+  <source-link|Data/Drd/vars.cpp|src/Data/Drd/vars.cpp> and their built-in default values are set in
+  <source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp> in the <c++> sources; style files
   frequently override these defaults.
 
   A typical built-in environment variable is <src-var|color>. The value of an

@@ -119,6 +119,10 @@
 
   <drd-props|help-link|arity|2|accessible|0|url|1>
 
+  <assign|source-link|<macro|shown|path|<verbatim|<action|<arg|shown>|open-source-link|<arg|path>>>>>
+
+  <drd-props|source-link|arity|2|accessible|0>
+
   <assign|simple-link|<macro|destination|<hlink|<with|font-family|tt|<arg|destination>>|<arg|destination>>>>
 
   <assign|hyper-link*|<macro|body|destination|<hlink|<arg|body>|<arg|destination>>>>

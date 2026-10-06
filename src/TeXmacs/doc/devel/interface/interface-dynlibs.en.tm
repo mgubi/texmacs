@@ -14,7 +14,7 @@
     Dynamic linking is only available if <TeXmacs> was compiled with the
     macro <cpp|TM_DYNAMIC_LINKING> defined (the <name|autotools>
     configuration script defines it as <cpp|dlopen> when this function is
-    available, see <verbatim|misc/m4/dlopen.m4>). It is not supported under
+    available, see <source-link|misc/m4/dlopen.m4|misc/m4/dlopen.m4>). It is not supported under
     <name|Windows>. Otherwise, starting a session fails with the message
     <verbatim|Dynamic linking not implemented>.
   </warning>
@@ -137,7 +137,7 @@
     \ \ \ \ <example-plugin-link|dynlink/src/dynlink.cpp>
   </verbatim>
 
-  The <verbatim|Makefile> is generated from <verbatim|Makefile.in> by the
+  The <verbatim|Makefile> is generated from <source-link|Makefile.in|Makefile.in> by the
   <name|autotools> configuration script, which substitutes the path of the
   <TeXmacs> sources for <verbatim|@tmsrc@>. It contains
 
@@ -165,11 +165,11 @@
   </quotation>
 
   so that running it will create a dynamic library
-  <verbatim|dynlink/lib/libtmdynlink.so> from <verbatim|dynlink.cpp> (the
+  <verbatim|dynlink/lib/libtmdynlink.so> from <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp> (the
   <verbatim|lib> directory must exist). The <verbatim|tmsrc> variable
   should contain <verbatim|$TEXMACS_PATH>, so as to find the include file
-  <verbatim|TeXmacs.h>. The configuration file
-  <verbatim|init-dynlink.scm> simply contains
+  <source-link|TeXmacs.h|TeXmacs/include/TeXmacs.h>. The configuration file
+  <source-link|init-dynlink.scm|TeXmacs/examples/plugins/dynlink/progs/init-dynlink.scm> simply contains
 
   <\scm-code>
     (plugin-configure dynlink
@@ -183,7 +183,7 @@
     \ \ (:session "Dynlink"))
   </scm-code>
 
-  As to the <c++> file <verbatim|dynlink.cpp>, it contains a string
+  As to the <c++> file <source-link|dynlink.cpp|TeXmacs/examples/plugins/dynlink/src/dynlink.cpp>, it contains a string
 
   <\cpp-code>
     static char* output= NULL;

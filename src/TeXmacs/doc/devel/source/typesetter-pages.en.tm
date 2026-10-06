@@ -10,7 +10,7 @@
   At the end of each typesetting pass, the typesetter owns the array
   <cpp|l> of page items of the whole document (see <hlink|incremental
   typesetting|typesetter-bridges.en.tm>). It hands this array to a
-  <cpp|pager_rep> (<verbatim|Typeset/Page/pager.hpp>), whose job is to cut
+  <cpp|pager_rep> (<source-link|Typeset/Page/pager.hpp|src/Typeset/Page/pager.hpp>), whose job is to cut
   it into pages and to produce the final document box:
 
   <\cpp-code>
@@ -19,7 +19,7 @@
     box rb= ppp-\<gtr\>make_pages ();
   </cpp-code>
 
-  The constructor of <cpp|pager_rep> (<verbatim|Typeset/Page/pager.cpp>)
+  The constructor of <cpp|pager_rep> (<source-link|Typeset/Page/pager.cpp|src/Typeset/Page/pager.cpp>)
   reads the page geometry with <cpp|env-\<gtr\>get_page_pars>
   (<cpp|text_width>, <cpp|text_height>, <cpp|width>, <cpp|height>, the
   margins <cpp|odd>, <cpp|even>, <cpp|top>, <cpp|bot>) and the page
@@ -56,7 +56,7 @@
   <section|Skeletons, pagelets and insertions>
 
   The result of page breaking is a <cpp|skeleton>, <abbr|i.e.> an
-  <cpp|array\<less\>pagelet\<gtr\>> (<verbatim|Typeset/Page/skeleton.hpp>).
+  <cpp|array\<less\>pagelet\<gtr\>> (<source-link|Typeset/Page/skeleton.hpp|src/Typeset/Page/skeleton.hpp>).
   A <cpp|pagelet> describes the contents of one page (or one column) as a
   list of <cpp|insertion>s, together with its total height <cpp|ht> (a
   <cpp|space>), its penalty <cpp|pen> and the stretch factor chosen for it.
@@ -100,10 +100,10 @@
   Floats and footnotes are addressed by longer paths
   <cpp|(i, j, k)>: item <cpp|k> of the <cpp|j>-th float attached to page
   item <cpp|i> (see the functions <cpp|access> and <cpp|sub> in
-  <verbatim|Typeset/Page/page_breaker.cpp>). Multi-column insertions carry
+  <source-link|Typeset/Page/page_breaker.cpp|src/Typeset/Page/page_breaker.cpp>). Multi-column insertions carry
   one sub-pagelet per column in <cpp|sk>.
 
-  Costs are measured by a <cpp|vpenalty> (<verbatim|Typeset/Page/vpenalty.hpp>),
+  Costs are measured by a <cpp|vpenalty> (<source-link|Typeset/Page/vpenalty.hpp|src/Typeset/Page/vpenalty.hpp>),
   a pair of integers compared lexicographically: the main penalty
   <cpp|pen> and the <em|excentricity> <cpp|exc>, a squared deviation from
   the ideal page height computed by <cpp|as_vpenalty>. The main penalty is
@@ -174,11 +174,11 @@
     qual, space fn_sep, space fnote_sep, space float_sep, font fn, int
     first_page)><explain-synopsis|break a document into pages>
   <|explain>
-    Defined in <verbatim|Typeset/Page/page_breaker.cpp>. If the user
+    Defined in <source-link|Typeset/Page/page_breaker.cpp|src/Typeset/Page/page_breaker.cpp>. If the user
     preference <verbatim|"new style page breaking"> is not
     <verbatim|"off"> (it is <verbatim|"on"> by default, see
-    <verbatim|texmacs/texmacs/tm-server.scm>), the call is delegated to
-    <cpp|new_break_pages> in <verbatim|Typeset/Page/new_breaker.cpp>.
+    <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>), the call is delegated to
+    <cpp|new_break_pages> in <source-link|Typeset/Page/new_breaker.cpp|src/Typeset/Page/new_breaker.cpp>.
     Otherwise the older <cpp|page_breaker_rep> is used.
   </explain>
 
@@ -296,7 +296,7 @@
 
   Multi-column material (page items with <cpp|nr_cols \<gtr\> 1>, produced
   by paragraphs with <verbatim|par-columns> larger than one) is handled in
-  <verbatim|Typeset/Page/columns_breaker.cpp>. <cpp|break_uniform> splits
+  <source-link|Typeset/Page/columns_breaker.cpp|src/Typeset/Page/columns_breaker.cpp>. <cpp|break_uniform> splits
   a page into portions with a uniform number of columns, and
   <cpp|break_columns> finds column breaks which balance the columns of
   each portion (searching around the fractions <math|k/n> of the total
@@ -307,7 +307,7 @@
   <subsection|The older page breaker>
 
   The class <cpp|page_breaker_rep> in
-  <verbatim|Typeset/Page/page_breaker.cpp> implements the previous
+  <source-link|Typeset/Page/page_breaker.cpp|src/Typeset/Page/page_breaker.cpp> implements the previous
   algorithm, still available by switching off the preference. It organizes
   the page items into three <em|flows> (<cpp|MAIN_FLOW>,
   <cpp|FNOTE_FLOW>, <cpp|FLOAT_FLOW>), represents break points as vectors
@@ -319,7 +319,7 @@
   <section|Building the page boxes>
 
   The skeleton is turned into boxes by the methods in
-  <verbatim|Typeset/Page/make_pages.cpp>:
+  <source-link|Typeset/Page/make_pages.cpp|src/Typeset/Page/make_pages.cpp>:
 
   <\description-paragraphs>
     <item*|<cpp|pages_format (array\<less\>page_item\<gtr\> l, SI ht, SI

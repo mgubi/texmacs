@@ -11,11 +11,11 @@
 
   All coordinates passed to a renderer are integers of type <cpp|SI>, the
   basic length unit of the typesetter. The constant <cpp|PIXEL> (defined as
-  <cpp|256> in <verbatim|renderer.hpp> and <verbatim|pencil.hpp>) is the
+  <cpp|256> in <source-link|renderer.hpp|src/Graphics/Renderer/renderer.hpp> and <source-link|pencil.hpp|src/Graphics/Renderer/pencil.hpp>) is the
   number of <cpp|SI> units in one dot of the typesetting resolution: when a
   document is typeset at <verbatim|dpi> dots per inch, one inch corresponds to
   <cpp|dpi*PIXEL> units (see for instance <cpp|make_eps> in
-  <verbatim|Typeset/Boxes/Basic/boxes.cpp>, which computes
+  <source-link|Typeset/Boxes/Basic/boxes.cpp|src/Typeset/Boxes/Basic/boxes.cpp>, which computes
   <cpp|inch= dpi * PIXEL>).
 
   The logical <math|y>-axis points <em|upwards>, as in <TeX> and
@@ -80,7 +80,7 @@
     check for interruptions only on the screen).
   </description>
 
-  The global variable <cpp|std_shrinkf> (defined in <verbatim|renderer.cpp>
+  The global variable <cpp|std_shrinkf> (defined in <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp>
   and equal to <cpp|5>) is the standard shrinking factor: at a zoom of
   <math|100%>, one screen pixel corresponds to five dots of the typesetting
   resolution. The editor keeps its own zoom factor in
@@ -93,7 +93,7 @@
   </cpp-code>
 
   (see <cpp|edit_interface_rep::set_zoom_factor> in
-  <verbatim|Edit/Interface/edit_interface.cpp>).
+  <source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>).
 
   <\explain>
     <cpp|virtual void set_zoom_factor (double zoom, bool safe= true)><explain-synopsis|change
@@ -132,7 +132,7 @@
 
   <subsection|High density displays>
 
-  <verbatim|renderer.hpp> declares a few global parameters for high density
+  <source-link|renderer.hpp|src/Graphics/Renderer/renderer.hpp> declares a few global parameters for high density
   screens: <cpp|retina_factor> (the <name|MacOS> style integer factor),
   <cpp|retina_zoom> (the <name|GNU>/<name|Linux> and <name|Windows> style
   zoom), <cpp|retina_icons>, <cpp|retina_scale> and the flags
@@ -237,7 +237,7 @@
   <|explain>
     Intersect the current clipping rectangle with the given one. The typical
     usage, from <cpp|clip_box_rep> in
-    <verbatim|Typeset/Boxes/Modifier/change_boxes.cpp>, is
+    <source-link|Typeset/Boxes/Modifier/change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>, is
 
     <\cpp-code>
       void
@@ -294,7 +294,7 @@
     transformations>
   <|explain>
     Install a linear transformation (a <cpp|frame>, see
-    <verbatim|Graphics/Types/frame.hpp>) for subsequent drawing, and remove it
+    <source-link|Graphics/Types/frame.hpp|src/Graphics/Types/frame.hpp>) for subsequent drawing, and remove it
     again. This is used by <cpp|transformed_box_rep::pre_display> and
     <cpp|post_display> for rotated and scaled boxes. The default
     implementation does nothing. The <name|Qt> and <abbr|PDF> renderers
@@ -310,7 +310,7 @@
   <subsection|Colors>
 
   Colors are values of type <cpp|color> (a packed <abbr|RGBA> value, see
-  <verbatim|Graphics/Colors/colors.hpp>), built with <cpp|rgb_color> and
+  <source-link|Graphics/Colors/colors.hpp|src/Graphics/Colors/colors.hpp>), built with <cpp|rgb_color> and
   decomposed with <cpp|get_rgb_color>. The alpha component is honored by the
   screen renderers; the PostScript renderer blends it with the current
   background color since PostScript has no transparency. The global
@@ -319,7 +319,7 @@
 
   <subsection|Pencils>
 
-  A <cpp|pencil> (<verbatim|Graphics/Renderer/pencil.hpp>) is a reference
+  A <cpp|pencil> (<source-link|Graphics/Renderer/pencil.hpp|src/Graphics/Renderer/pencil.hpp>) is a reference
   counted, immutable description of how lines and glyphs are drawn: a color
   or a brush, a width in <cpp|SI>, a cap style (<cpp|cap_square>,
   <cpp|cap_flat>, <cpp|cap_round>), a join style (<cpp|join_bevel>,
@@ -335,7 +335,7 @@
 
   <subsection|Brushes>
 
-  A <cpp|brush> (<verbatim|Graphics/Renderer/brush.hpp>) describes how areas
+  A <cpp|brush> (<source-link|Graphics/Renderer/brush.hpp|src/Graphics/Renderer/brush.hpp>) describes how areas
   are filled. Its kind is <cpp|brush_none>, <cpp|brush_color> or
   <cpp|brush_pattern>. A pattern brush is built from a
   <markup|pattern> tree <verbatim|(pattern url width height [color])> and an
@@ -457,7 +457,7 @@
     <name|Qt> 6 the <name|Qt> renderer paints a checkerboard pattern (the
     image <verbatim|neutral-pattern.png> if it can be found), which shows
     through transparent page backgrounds. Although declared pure virtual,
-    <verbatim|renderer.cpp> also provides an empty body.
+    <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp> also provides an empty body.
   </explain>
 
   <\explain>
@@ -472,7 +472,7 @@
     spanning <cpp|delta>. As in <name|X11>, angles are expressed in
     <math|1/64> of a degree, counterclockwise; callers typically write
     <cpp|90\<less\>\<less\>6> for a right angle (see
-    <verbatim|Typeset/Boxes/Basic/rubber_boxes.cpp>). The <name|Qt> renderer
+    <source-link|Typeset/Boxes/Basic/rubber_boxes.cpp|src/Typeset/Boxes/Basic/rubber_boxes.cpp>). The <name|Qt> renderer
     converts them to the <math|1/16> degrees of <cpp|QPainter::drawArc>
     and to degrees for <cpp|QPainterPath::arcTo>.
   </explain>
@@ -495,7 +495,7 @@
     Fill a triangle. The default calls <cpp|polygon>; the <name|Qt> version
     rounds the vertices to integer pixels and disables anti-aliasing, which
     gives crisp joins for the beveled borders drawn by
-    <verbatim|Typeset/Boxes/Modifier/highlight_boxes.cpp>.
+    <source-link|Typeset/Boxes/Modifier/highlight_boxes.cpp|src/Typeset/Boxes/Modifier/highlight_boxes.cpp>.
   </explain>
 
   <\explain>
@@ -516,7 +516,7 @@
     <cpp|virtual void draw_spacial (spacial obj)><explain-synopsis|three
     dimensional objects>
   <|explain>
-    Draw a <cpp|spacial> object (<verbatim|Graphics/Spacial/spacial.hpp>)
+    Draw a <cpp|spacial> object (<source-link|Graphics/Spacial/spacial.hpp|src/Graphics/Spacial/spacial.hpp>)
     by calling <cpp|obj-\<gtr\>draw (this)>.
   </explain>
 
@@ -532,7 +532,7 @@
   <|explain>
     Draw the glyph with index <cpp|char_code> of the bitmap font
     <cpp|fn> with its origin at <cpp|(x, y)>, using the current pencil.
-    <cpp|font_glyphs> (<verbatim|Graphics/Bitmap_fonts/bitmap_font.hpp>)
+    <cpp|font_glyphs> (<source-link|Graphics/Bitmap_fonts/bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp>)
     gives access to the rasterized glyphs through
     <cpp|glyph& get (int char_code)>; its <cpp|res_name> identifies the font
     and its size, which the printers use to build font resources.
@@ -543,11 +543,11 @@
 
   <\enumerate>
     <item><cpp|text_box_rep::display> (in
-    <verbatim|Typeset/Boxes/Basic/text_boxes.cpp>) sets the pencil and calls
+    <source-link|Typeset/Boxes/Basic/text_boxes.cpp|src/Typeset/Boxes/Basic/text_boxes.cpp>) sets the pencil and calls
     <cpp|fn-\<gtr\>draw (ren, str, 0, 0)> on its <cpp|font>.
 
     <item><cpp|font_rep::draw (renderer ren, string s, SI x, SI y, SI xk,
-    bool ext)> (in <verbatim|Graphics/Fonts/font.cpp>) decides at which
+    bool ext)> (in <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>) decides at which
     resolution to render. If <cpp|ren-\<gtr\>zoomf == 1.0> or the renderer
     is a printer, it calls <cpp|draw_fixed> directly. Otherwise it uses a
     magnified font <cpp|zoomed_fn= magnify (ren-\<gtr\>zoomf)> (cached as
@@ -561,9 +561,9 @@
     cache anything derived from these fields across calls to <cpp|draw>.
 
     <item><cpp|draw_fixed> of the concrete font (for instance
-    <verbatim|Plugins/Freetype/tt_font.cpp>,
-    <verbatim|Plugins/Freetype/unicode_font.cpp>,
-    <verbatim|Graphics/Fonts/virtual_font.cpp> or the <verbatim|poor_*.cpp>
+    <source-link|Plugins/Freetype/tt_font.cpp|src/Plugins/Freetype/tt_font.cpp>,
+    <source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>,
+    <source-link|Graphics/Fonts/virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp> or the <verbatim|poor_*.cpp>
     fonts) computes glyph positions and calls
     <cpp|ren-\<gtr\>draw (c, fng, x, y)> for each glyph.
 
@@ -581,7 +581,7 @@
   </enumerate>
 
   One font bypasses the glyph interface: <cpp|qt_font_rep::draw_fixed>
-  (<verbatim|Plugins/Qt/qt_font.cpp>) recovers the <name|Qt> renderer with
+  (<source-link|Plugins/Qt/qt_font.cpp|src/Plugins/Qt/qt_font.cpp>) recovers the <name|Qt> renderer with
   <cpp|ren-\<gtr\>get_handle ()> and calls the extra method
   <cpp|qt_renderer_rep::draw (const QFont& qfn, const QString& s, SI x, SI y,
   double zoom)>, which renders the string with <cpp|QPainter::drawText>.
@@ -590,7 +590,7 @@
 
   <subsection|Pictures>
 
-  A <cpp|picture> (<verbatim|Graphics/Pictures/picture.hpp>) is a reference
+  A <cpp|picture> (<source-link|Graphics/Pictures/picture.hpp|src/Graphics/Pictures/picture.hpp>) is a reference
   counted rectangular array of pixels with an origin. Its kind is
   <cpp|picture_native> (a picture of the <abbr|GUI> toolkit: a
   <cpp|qt_picture_rep> wrapping a <cpp|QImage>, an <cpp|x_picture_rep>
@@ -610,7 +610,7 @@
   <cpp|magnify>, <cpp|crop>), pens and morphological operations
   (<cpp|gaussian_pen_picture>, <cpp|blur>, <cpp|outlines>, <cpp|thicken>,
   <cpp|erode>), noise and distortions, and color operations. The class
-  <cpp|effect_rep> (<verbatim|Graphics/Pictures/effect.hpp>) combines them:
+  <cpp|effect_rep> (<source-link|Graphics/Pictures/effect.hpp|src/Graphics/Pictures/effect.hpp>) combines them:
   <cpp|effect build_effect (tree description)> parses an effect and
   <cpp|picture apply (array\<less\>picture\<gtr\> pics, SI pixel)> computes
   the resulting picture from pictures of its arguments.
@@ -638,7 +638,7 @@
 
   <subsection|Scalable images>
 
-  A <cpp|scalable> (<verbatim|Graphics/Pictures/scalable.hpp>) is an image
+  A <cpp|scalable> (<source-link|Graphics/Pictures/scalable.hpp|src/Graphics/Pictures/scalable.hpp>) is an image
   that is independent of the resolution, with logical and physical extents
   and a method <cpp|draw (renderer ren, SI x, SI y, int alpha)>. The only
   implementation is <cpp|scalable_image_rep>, created by
@@ -673,8 +673,8 @@
     <cpp|delete_renderer> or <cpp|tm_delete> when drawing is finished. This
     function, as well as <cpp|native_picture>, <cpp|load_picture>,
     <cpp|as_native_picture> and <cpp|save_picture>, is provided by the
-    <abbr|GUI> back-end (<verbatim|Plugins/Qt/qt_picture.cpp> or
-    <verbatim|Plugins/X11/x_picture.cpp>); <verbatim|renderer.cpp> only
+    <abbr|GUI> back-end (<source-link|Plugins/Qt/qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp> or
+    <source-link|Plugins/X11/x_picture.cpp|src/Plugins/X11/x_picture.cpp>); <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp> only
     contains failing stubs for builds without <cpp|QTTEXMACS> and
     <cpp|X11TEXMACS>. For <name|Qt> the returned renderer is a
     <cpp|qt_image_renderer_rep>, which opens a <cpp|QPainter> on the
@@ -796,7 +796,7 @@
   own backing store: each <cpp|qt_simple_widget_rep> owns a
   <cpp|backingPixmap>, the <name|TeXmacs> side only ever paints on this
   pixmap, and the <cpp|QWidget> copies it to the screen in its paint event.
-  On top of this, the comment in <verbatim|qt_renderer.cpp> explains that
+  On top of this, the comment in <source-link|qt_renderer.cpp|src/Plugins/Qt/qt_renderer.cpp> explains that
   two helper classes emulate the shadow protocol:
 
   <\itemize>
@@ -828,9 +828,9 @@
     <cpp|virtual bool is_printer ()><explain-synopsis|is this a printer?>
   <|explain>
     Returns <cpp|false> by default. Boxes test it to suppress screen-only
-    decorations (for instance in <verbatim|highlight_boxes.cpp> and in the
+    decorations (for instance in <source-link|highlight_boxes.cpp|src/Typeset/Boxes/Modifier/highlight_boxes.cpp> and in the
     <markup|screen>/<markup|printer> filters of
-    <verbatim|decoration_boxes.cpp>), and <cpp|font_rep::draw> uses it to
+    <source-link|decoration_boxes.cpp|src/Typeset/Boxes/Composite/decoration_boxes.cpp>), and <cpp|font_rep::draw> uses it to
     bypass zooming.
   </explain>
 
@@ -880,8 +880,8 @@
     outline and a metadata field (<verbatim|title>, <verbatim|author>,
     <verbatim|subject>). Boxes call the first three unconditionally, the
     screen renderers simply ignoring them: <cpp|locus_box_rep::post_display>
-    (in <verbatim|change_boxes.cpp>) emits <cpp|href> and <cpp|anchor>, the
-    table of contents boxes of <verbatim|decoration_boxes.cpp> emit
+    (in <source-link|change_boxes.cpp|src/Typeset/Boxes/Modifier/change_boxes.cpp>) emits <cpp|href> and <cpp|anchor>, the
+    table of contents boxes of <source-link|decoration_boxes.cpp|src/Typeset/Boxes/Composite/decoration_boxes.cpp> emit
     <cpp|toc_entry>, and <cpp|box_rep::display_links>, which
     <cpp|box_rep::redraw> only calls for non-screen renderers, emits
     <cpp|href> for hyperlinks attached to the source of the box.

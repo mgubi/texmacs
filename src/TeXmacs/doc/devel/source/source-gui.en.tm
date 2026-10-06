@@ -25,6 +25,8 @@
 
     <branch|The graphical user interface ports|guiports.en.tm>
 
+    <branch|Handwriting recognition (experimental)|handwriting.en.tm>
+
     <branch|The graphical user interface (historical Widkit
     toolkit)|gui.en.tm>
   </traverse>

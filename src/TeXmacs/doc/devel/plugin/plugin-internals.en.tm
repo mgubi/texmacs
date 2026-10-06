@@ -15,47 +15,47 @@
   programs|../interface/interface.en.tm>.
 
   The implementation is spread over the following files (<scheme> files are
-  given relative to <verbatim|src/TeXmacs/progs>, <c++> files relative to
-  <verbatim|src/src>):
+  given relative to <source-link|src/TeXmacs/progs|TeXmacs/progs>, <c++> files relative to
+  <source-link|src/src|src>):
 
   <\description>
-    <item*|<verbatim|System/Boot/init_texmacs.cpp>>Discovery of the plug-in
+    <item*|<source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>>Discovery of the plug-in
     directories (<cpp|plugin_list>) and extension of the search paths with
     the subdirectories of all plug-ins (<cpp|plugin_path>).
 
-    <item*|<verbatim|kernel/texmacs/tm-plugins.scm>>The
+    <item*|<source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>>The
     <scm|plugin-configure> macro, the plug-in cache, lazy initialization,
     the tables of connections, sessions and scripting languages, and remote
     plug-ins.
 
-    <item*|<verbatim|utils/plugins/plugin-eval.scm>>Queues of pending
+    <item*|<source-link|utils/plugins/plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm>>Queues of pending
     evaluations, the notification call-backs from the <c++> side, silent
     (background) evaluations and <scm|plugin-eval>.
 
-    <item*|<verbatim|utils/plugins/plugin-cmd.scm>>Serialization of the
+    <item*|<source-link|utils/plugins/plugin-cmd.scm|TeXmacs/progs/utils/plugins/plugin-cmd.scm>>Serialization of the
     input, formatting of special commands, and the tables for
     tab-completion, input completeness tests and numeric evaluation.
 
-    <item*|<verbatim|utils/plugins/plugin-convert.scm>>Conversion of
+    <item*|<source-link|utils/plugins/plugin-convert.scm|TeXmacs/progs/utils/plugins/plugin-convert.scm>>Conversion of
     mathematical input into strings (<scm|plugin-input-converters>).
 
-    <item*|<verbatim|dynamic/session-edit.scm>,
-    <verbatim|dynamic/session-menu.scm>>Shell sessions.
+    <item*|<source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm>,
+    <source-link|dynamic/session-menu.scm|TeXmacs/progs/dynamic/session-menu.scm>>Shell sessions.
 
-    <item*|<verbatim|dynamic/scripts-edit.scm>>Evaluation of scripts inside
+    <item*|<source-link|dynamic/scripts-edit.scm|TeXmacs/progs/dynamic/scripts-edit.scm>>Evaluation of scripts inside
     documents.
 
-    <item*|<verbatim|System/Link/>>The <c++> side of connections:
-    <verbatim|connection.cpp> (the <cpp|connection> resource),
-    <verbatim|tm_link.hpp> (the abstract <cpp|tm_link_rep> class and the
-    control characters), <verbatim|pipe_link.cpp>,
-    <verbatim|dyn_link.cpp>, <verbatim|cmdline_link.cpp> and
-    <verbatim|request_link.cpp>. Under <name|Windows> (and for <name|Qt>
+    <item*|<source-link|System/Link/|src/System/Link>>The <c++> side of connections:
+    <source-link|connection.cpp|src/System/Link/connection.cpp> (the <cpp|connection> resource),
+    <source-link|tm_link.hpp|src/System/Link/tm_link.hpp> (the abstract <cpp|tm_link_rep> class and the
+    control characters), <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>,
+    <source-link|dyn_link.cpp|src/System/Link/dyn_link.cpp>, <source-link|cmdline_link.cpp|src/System/Link/cmdline_link.cpp> and
+    <source-link|request_link.cpp|src/System/Link/request_link.cpp>. Under <name|Windows> (and for <name|Qt>
     builds with <cpp|QTPIPES>), pipes are implemented by
-    <verbatim|Plugins/Qt/qt_pipe_link.cpp> instead of
-    <verbatim|pipe_link.cpp>.
+    <source-link|Plugins/Qt/qt_pipe_link.cpp|src/Plugins/Qt/qt_pipe_link.cpp> instead of
+    <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp>.
 
-    <item*|<verbatim|Data/Convert/Generic/input.cpp>>The parser for the
+    <item*|<source-link|Data/Convert/Generic/input.cpp|src/Data/Convert/Generic/input.cpp>>The parser for the
     output of plug-ins (<cpp|texmacs_input_rep>).
   </description>
 
@@ -64,7 +64,7 @@
   <subsection|The list of plug-ins>
 
   The <scheme> function <scm|(plugin-list)> is implemented by the <c++>
-  function <cpp|plugin_list> in <verbatim|System/Boot/init_texmacs.cpp>. It
+  function <cpp|plugin_list> in <source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>. It
   returns the sorted list of the names of all subdirectories of
 
   <\verbatim-code>
@@ -85,7 +85,7 @@
   order to redirect the launchers of other plug-ins.
 
   In the source tree, the plug-ins which are shipped with <TeXmacs> live in
-  <verbatim|src/plugins>; the build system copies them into
+  <source-link|src/plugins|plugins>; the build system copies them into
   <verbatim|TeXmacs/plugins> (which is not under version control), and the
   installation procedure installs them into <verbatim|$TEXMACS_PATH/plugins>.
   The small example plug-ins of the chapter about interfaces live in
@@ -122,8 +122,8 @@
     libraries for <scm|:link>>>|<row|<cell|<verbatim|styles>>|<cell|<verbatim|TEXMACS_STYLE_ROOT>>|<cell|style
     files>>|<row|<cell|<verbatim|packages>>|<cell|<verbatim|TEXMACS_PACKAGE_ROOT>>|<cell|style
     packages>>|<row|<cell|<verbatim|texts>>|<cell|<verbatim|TEXMACS_TEXT_ROOT>>|<cell|text
-    files>>|<row|<cell|<verbatim|doc>>|<cell|<verbatim|TEXMACS_DOC_PATH>>|<cell|documentation>>|<row|<cell|<verbatim|misc/patterns>>|<cell|<verbatim|TEXMACS_PATTERN_PATH>>|<cell|background
-    patterns>>|<row|<cell|<verbatim|misc/pixmaps>>|<cell|<verbatim|TEXMACS_PIXMAP_PATH>>|<cell|icons>>|<row|<cell|<verbatim|misc/themes>>|<cell|<verbatim|TEXMACS_THEME_PATH>>|<cell|themes>>|<row|<cell|<verbatim|langs/natural/dic>>|<cell|<verbatim|TEXMACS_DIC_PATH>>|<cell|dictionaries>>>>>
+    files>>|<row|<cell|<verbatim|doc>>|<cell|<verbatim|TEXMACS_DOC_PATH>>|<cell|documentation>>|<row|<cell|<source-link|misc/patterns|TeXmacs/misc/patterns>>|<cell|<verbatim|TEXMACS_PATTERN_PATH>>|<cell|background
+    patterns>>|<row|<cell|<source-link|misc/pixmaps|TeXmacs/misc/pixmaps>>|<cell|<verbatim|TEXMACS_PIXMAP_PATH>>|<cell|icons>>|<row|<cell|<source-link|misc/themes|TeXmacs/misc/themes>>|<cell|<verbatim|TEXMACS_THEME_PATH>>|<cell|themes>>|<row|<cell|<source-link|langs/natural/dic|TeXmacs/langs/natural/dic>>|<cell|<verbatim|TEXMACS_DIC_PATH>>|<cell|dictionaries>>>>>
 
   The style and package roots are searched recursively (through
   <cpp|search_sub_dirs>), so that a package
@@ -136,7 +136,7 @@
   Since the <verbatim|progs> directories of all plug-ins are in the load
   path, <scheme> modules of plug-ins are simply named after their file
   names. For instance, the module in
-  <verbatim|plugins/python/progs/python-menus.scm> is declared as
+  <source-link|plugins/python/progs/python-menus.scm|plugins/python/progs/python-menus.scm> is declared as
   <scm|(texmacs-module (python-menus) ...)> and loaded using
   <scm|(import-from (python-menus))>.
 
@@ -144,7 +144,7 @@
 
   <subsection|Initialization at boot time>
 
-  Near the end of <verbatim|init-texmacs.scm>, all plug-ins are scheduled
+  Near the end of <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>, all plug-ins are scheduled
   for initialization:
 
   <\scm-code>
@@ -152,7 +152,7 @@
   </scm-code>
 
   The function <scm|lazy-plugin-initialize> (in
-  <verbatim|kernel/texmacs/tm-plugins.scm>) marks the plug-in in the table
+  <source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>) marks the plug-in in the table
   <scm|plugin-initialize-todo> and postpones the actual initialization using
   <scm|(delayed (:idle 1000) (plugin-initialize name))>, that is, until
   <TeXmacs> has been idle for one second. This keeps the startup time low,
@@ -251,7 +251,7 @@
   <section|Connection tables and predicates>
 
   Processing the options of <scm|plugin-configure> fills a number of hash
-  tables in <verbatim|tm-plugins.scm>: <scm|connection-variant> maps pairs
+  tables in <source-link|tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>: <scm|connection-variant> maps pairs
   <scm|(<em|name> <em|variant>)> to a description of the launcher, such as
   <scm|(tuple "pipe" <em|shell-cmd>)>, <scm|(tuple "dynlink" <em|lib>
   <em|symbol> <em|init>)>, <scm|(tuple "cmdline" <em|cmd-fun>
@@ -308,19 +308,19 @@
 
   <\description>
     <item*|<scm|plugin-supports-completions?>>The plug-in was configured
-    with <scm|(:tab-completion #t)> (<verbatim|plugin-cmd.scm>).
+    with <scm|(:tab-completion #t)> (<source-link|plugin-cmd.scm|TeXmacs/progs/utils/plugins/plugin-cmd.scm>).
 
     <item*|<scm|plugin-supports-input-done?>>The plug-in was configured
-    with <scm|(:test-input-done #t)> (<verbatim|plugin-cmd.scm>).
+    with <scm|(:test-input-done #t)> (<source-link|plugin-cmd.scm|TeXmacs/progs/utils/plugins/plugin-cmd.scm>).
 
     <item*|<scm|plugin-supports-math-input-ref>>The plug-in declared
     mathematical input converters using <scm|plugin-input-converters>
-    (<verbatim|plugin-convert.scm>).
+    (<source-link|plugin-convert.scm|TeXmacs/progs/utils/plugins/plugin-convert.scm>).
   </description>
 
   Inside a session, the predicates <scm|(session-supports-completions?)>
   and <scm|(session-supports-input-done?)> (in
-  <verbatim|dynamic/session-edit.scm>) combine these tests with the current
+  <source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm>) combine these tests with the current
   value of <verbatim|prog-language> and the status of the connection. The
   function <scm|(plugin-approx-command-ref <scm-arg|name>)> returns the
   name of the function which should be used for numeric evaluation in
@@ -333,8 +333,8 @@
 
   When the user evaluates an input field in a session, the following
   sequence of calls takes place (all <scheme> functions are defined in
-  <verbatim|dynamic/session-edit.scm> or
-  <verbatim|utils/plugins/plugin-eval.scm>):
+  <source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm> or
+  <source-link|utils/plugins/plugin-eval.scm|TeXmacs/progs/utils/plugins/plugin-eval.scm>):
 
   <\enumerate>
     <item><scm|session-feed> preprocesses the input (conversion of
@@ -354,7 +354,7 @@
 
     <item><scm|plugin-write> calls <scm|connection-write>, which is
     implemented by <cpp|connection_write> in
-    <verbatim|System/Link/connection.cpp>. This function serializes the tree
+    <source-link|System/Link/connection.cpp|src/System/Link/connection.cpp>. This function serializes the tree
     by calling back the <scheme> function <scm|plugin-serialize> and writes
     the resulting string to the link.
   </enumerate>
@@ -394,7 +394,7 @@
 
   (<verbatim|"cmdline"> and <verbatim|"request"> tuples are handled in a
   similar way.) The status of a connection is one of the constants defined
-  in <verbatim|System/Link/tm_link.hpp>:
+  in <source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>:
 
   <\cpp-code>
     #define CONNECTION_DEAD \ \ \ 0
@@ -452,7 +452,7 @@
   <subsection|Control characters>
 
   The following control characters are defined in
-  <verbatim|System/Link/tm_link.hpp>:
+  <source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>:
 
   <descriptive-table|<tformat|<cwith|1|1|1|-1|cell-font-series|bold>|<table|<row|<cell|Name>|<cell|Code>|<cell|Meaning>>|<row|<cell|<verbatim|DATA_ABORT>>|<cell|1>|<cell|discard
     the verbatim text of the current block>>|<row|<cell|<verbatim|DATA_BEGIN>>|<cell|2>|<cell|start
@@ -480,7 +480,7 @@
 
   The format of a block determines how its message is converted into a
   <TeXmacs> tree (see <cpp|texmacs_input_rep::get_mode> and the various
-  <cpp|*_flush> methods in <verbatim|Data/Convert/Generic/input.cpp>):
+  <cpp|*_flush> methods in <source-link|Data/Convert/Generic/input.cpp|src/Data/Convert/Generic/input.cpp>):
 
   <\description>
     <item*|<verbatim|verbatim>>Plain text, converted with
@@ -507,7 +507,7 @@
 
     <item*|<verbatim|math>>A mathematical expression in prefix <scheme>
     notation, such as <verbatim|(+ (* 2 x) 1)>, which is converted into
-    presentation markup by <scm|cas-\<gtr\>stree> (<verbatim|utils/cas/cas-out.scm>)
+    presentation markup by <scm|cas-\<gtr\>stree> (<source-link|utils/cas/cas-out.scm|TeXmacs/progs/utils/cas/cas-out.scm>)
     and inserted in math mode.
 
     <item*|<verbatim|ps>>Encapsulated <name|PostScript>, inserted as an
@@ -556,7 +556,7 @@
   application goes to the <verbatim|error> channel and is displayed as
   error output (in an <markup|errput> tag); it may again be structured
   using <verbatim|DATA_BEGIN>-<verbatim|DATA_END> blocks, as done by
-  <verbatim|flush_err> in <verbatim|tmpy/protocol.py>. Blocks on other
+  <verbatim|flush_err> in <source-link|tmpy/protocol.py|plugins/tmpy/protocol.py>. Blocks on other
   channels are only delivered if a handler has been declared with the
   <scm|:handler> option; notice that the <verbatim|error> channel of the
   <em|standard output> is not displayed unless a handler is declared.
@@ -567,7 +567,7 @@
 
   Before being sent to the application, the input tree is converted to a
   string by <scm|(plugin-serialize <scm-arg|lan> <scm-arg|t>)> (in
-  <verbatim|plugin-cmd.scm>), which calls the serializer declared with
+  <source-link|plugin-cmd.scm|TeXmacs/progs/utils/plugins/plugin-cmd.scm>), which calls the serializer declared with
   <scm|:serializer>, or <scm|verbatim-serialize> by default. The following
   building blocks are available for custom serializers:
 
@@ -618,7 +618,7 @@
     <em|cursor-position>)>>Sent by <scm|kbd-variant> (the <key|tab> key)
     in a session of a plug-in with <scm|:tab-completion>. The string is
     computed by <cpp|edit_interface_rep::session_complete_command> in
-    <verbatim|Edit/Interface/edit_complete.cpp>, using
+    <source-link|Edit/Interface/edit_complete.cpp|src/Edit/Interface/edit_complete.cpp>, using
     <scm|verbatim-serialize> (not the custom serializer of the plug-in).
     The answer should be a tuple <verbatim|(tuple <em|root>
     <em|completion-1> ...)>, which is passed to <scm|custom-complete>. See
@@ -658,7 +658,7 @@
 
   Rules which are not defined by the plug-in fall back to the rules of the
   <verbatim|generic> converter at the end of
-  <verbatim|utils/plugins/plugin-convert.scm>, which for instance rewrites
+  <source-link|utils/plugins/plugin-convert.scm|TeXmacs/progs/utils/plugins/plugin-convert.scm>, which for instance rewrites
   fractions as <verbatim|(a/b)>, <verbatim|\<less\>alpha\<gtr\>> as
   <verbatim|alpha> and matrices as <verbatim|[a, b; c, d]>.
 
@@ -707,7 +707,7 @@
   turned into executable fields (<markup|script-input>). All these
   operations end up in <scm|(script-eval-at <scm-arg|where> <scm-arg|lan>
   <scm-arg|session> <scm-arg|in> . <scm-arg|opts>)> and <scm|script-feed>
-  in <verbatim|dynamic/scripts-edit.scm>, which use <scm|silent-feed*> and
+  in <source-link|dynamic/scripts-edit.scm|TeXmacs/progs/dynamic/scripts-edit.scm>, which use <scm|silent-feed*> and
   replace the tree <scm-arg|where> by the result. The rendering of
   <markup|script-input> fields can be customized per language through a
   macro <markup|<em|lan>-script-input>.
@@ -729,7 +729,7 @@
 
   <\description>
     <item*|<scm|plugin-menu>>This menu is declared empty in
-    <verbatim|texmacs/menus/main-menu.scm> and linked into the main menu
+    <source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm> and linked into the main menu
     bar. A plug-in adds a top-level menu using a conditional binding, as
     done by the <verbatim|maxima> plug-in:
 
@@ -744,10 +744,10 @@
 
     <item*|<scm|session-help-icons>>Icons which are displayed in the help
     part of the toolbar inside sessions (see
-    <verbatim|plugins/python/progs/python-menus.scm>).
+    <source-link|plugins/python/progs/python-menus.scm|plugins/python/progs/python-menus.scm>).
 
     <item*|<scm|plugin-icons>>This menu is also declared in
-    <verbatim|main-menu.scm>, but it is not linked into any toolbar in the
+    <source-link|main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>, but it is not linked into any toolbar in the
     current version.
 
     <item*|<scm|plugin-preferences-widget>>The contents of the preferences
@@ -765,7 +765,7 @@
   <verbatim|<em|lan>.ts> is automatically added to the document, provided
   that it can be found in <verbatim|$TEXMACS_STYLE_PATH> (for instance in
   <verbatim|<em|lan>/packages/session/<em|lan>.ts>). The generic session
-  markup in <verbatim|packages/compute/session.ts> dispatches on the
+  markup in <source-link|packages/compute/session.ts|TeXmacs/packages/compute/session.ts> dispatches on the
   current programming language: if the macros
   <markup|<em|lan>-session>, <markup|<em|lan>-input>,
   <markup|<em|lan>-output>, <markup|<em|lan>-errput> or
@@ -781,8 +781,8 @@
   A plug-in may also extend the set of file formats of <TeXmacs>, for
   instance in order to import and export source files of its language. A
   format is declared with <scm|define-format> and the conversions with
-  <scm|converter> (see <verbatim|kernel/texmacs/tm-convert.scm>). For
-  example, <verbatim|plugins/python/progs/python-format.scm> contains
+  <scm|converter> (see <source-link|kernel/texmacs/tm-convert.scm|TeXmacs/progs/kernel/texmacs/tm-convert.scm>). For
+  example, <source-link|plugins/python/progs/python-format.scm|plugins/python/progs/python-format.scm> contains
 
   <\scm-code>
     (texmacs-module (python-format))
@@ -814,7 +814,7 @@
   <em|format> ...)>, which imports the module after two seconds of idle time
   or as soon as the list of formats is needed. For the plug-ins which are
   shipped with <TeXmacs>, these declarations are made in
-  <verbatim|init-texmacs.scm>; a third-party plug-in can put the
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>; a third-party plug-in can put the
   <scm|lazy-format> declaration in its own initialization file. Once a
   format <verbatim|<em|fm>> with a converter from
   <verbatim|<em|fm>-snippet> to <verbatim|texmacs-tree> is defined, the
@@ -900,7 +900,7 @@
 
     <item>Dynamic linking requires <cpp|TM_DYNAMIC_LINKING> to be defined at
     compile time. The <name|autotools> configuration defines it (as
-    <cpp|dlopen>) through <verbatim|misc/m4/dlopen.m4>; otherwise
+    <cpp|dlopen>) through <source-link|misc/m4/dlopen.m4|misc/m4/dlopen.m4>; otherwise
     <cpp|symbol_install> returns <verbatim|"Dynamic linking not
     implemented">.
 

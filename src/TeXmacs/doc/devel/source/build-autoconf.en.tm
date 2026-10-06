@@ -18,8 +18,8 @@
     make install
   </verbatim-code>
 
-  run from <verbatim|src/>. When <verbatim|configure.in> or one of the
-  macros in <verbatim|misc/m4/> has changed, <verbatim|configure> must be
+  run from <source-link|src/|src>. When <source-link|configure.in|configure.in> or one of the
+  macros in <source-link|misc/m4/|misc/m4> has changed, <verbatim|configure> must be
   regenerated first with <verbatim|autoreconf -fi> (as in the
   <verbatim|Dockerfile>). The build is done in the source tree: objects go
   to <verbatim|src/Objects/>, dependency files to <verbatim|src/Deps/>,
@@ -27,13 +27,13 @@
 
   <section|Configuration>
 
-  <verbatim|configure.in> checks the compilers (preferring
+  <source-link|configure.in|configure.in> checks the compilers (preferring
   <verbatim|clang> and <verbatim|clang++>, with <name|Objective-C> for
   <name|macOS>), the sizes of the basic types and a few headers, and then
   calls one macro per subject. The options which matter most are:
 
   <\description>
-    <item*|<name|Guile>>(<verbatim|guile.m4>) <verbatim|--with-guile=<em|path>>
+    <item*|<name|Guile>>(<source-link|guile.m4|misc/m4/guile.m4>) <verbatim|--with-guile=<em|path>>
     gives the <verbatim|guile-config> program to use;
     <verbatim|--with-guile=embedded18> uses the embedded <name|Guile> 1.8
     in <verbatim|tm-guile188/>, which is also chosen automatically when
@@ -45,14 +45,14 @@
     dialect macro <verbatim|GUILE_A> to <verbatim|GUILE_D>; when cross
     compiling, it must be given in the variable <verbatim|GUILE_VERSION>.
 
-    <item*|Graphical port>(<verbatim|tm_gui.m4>, <verbatim|qt.m4>)
+    <item*|Graphical port>(<source-link|tm_gui.m4|misc/m4/tm_gui.m4>, <source-link|qt.m4|misc/m4/qt.m4>)
     <name|Qt> is the default; <verbatim|--disable-qt> builds the
     historical <name|X11> port and <verbatim|--enable-cocoa> the
     experimental <name|Cocoa> port. <verbatim|--enable-qtpipes> replaces
     <name|Unix> pipes by <name|Qt> pipes. The <name|Qt> installation is
     found through <verbatim|qmake> (variables <verbatim|QMAKE>,
     <verbatim|QT_PATH>, <verbatim|MOC>, ...). On <name|macOS> with
-    <name|Qt>, the <name|Objective-C> code of <verbatim|src/Plugins/MacOS>
+    <name|Qt>, the <name|Objective-C> code of <source-link|src/Plugins/MacOS|src/Plugins/MacOS>
     is added.
 
     <item*|Libraries><verbatim|--with-freetype>, <verbatim|--with-iconv>,
@@ -62,33 +62,33 @@
     on <name|macOS> and <name|Windows>, with <verbatim|--with-appcast>),
     <verbatim|--with-axel>, <verbatim|--disable-gs>,
     <verbatim|--disable-pdf-renderer>, and the <name|SQLite> check of
-    <verbatim|sql.m4>.
+    <source-link|sql.m4|misc/m4/sql.m4>.
 
-    <item*|Debugging and optimization>(<verbatim|tm_debug.m4>,
-    <verbatim|tm_optimize.m4>) <verbatim|--enable-debug>,
+    <item*|Debugging and optimization>(<source-link|tm_debug.m4|misc/m4/tm_debug.m4>,
+    <source-link|tm_optimize.m4|misc/m4/tm_optimize.m4>) <verbatim|--enable-debug>,
     <verbatim|--enable-assert>, <verbatim|--enable-warnings>,
     <verbatim|--enable-checks>, <verbatim|--enable-profile>,
     <verbatim|--enable-sanitizers>, <verbatim|--enable-optimize>,
     <verbatim|--disable-fastalloc> (use the system allocator instead of
     the fast allocator for small objects, useful with memory checkers) and
     <verbatim|--enable-experimental> (the style rewriting code in
-    <verbatim|src/Style/>).
+    <source-link|src/Style/|src/Style>).
 
-    <item*|Developer kit><verbatim|--with-tmrepo=<em|dir>> (<verbatim|tm_repo.m4>)
+    <item*|Developer kit><verbatim|--with-tmrepo=<em|dir>> (<source-link|tm_repo.m4|misc/m4/tm_repo.m4>)
     uses a <TeXmacs> <abbr|SDK> directory: its <verbatim|bin>,
     <verbatim|include>, <verbatim|lib> and <verbatim|pkgconfig>
     directories are put first in the search paths. It is also required for
     some packaging targets (see <hlink|packages|build-packaging.en.tm>).
   </description>
 
-  The platform macro (<verbatim|tm_platform.m4>) chooses the operating
-  system layer, the static or dynamic link mode (<verbatim|tm_static.m4>)
+  The platform macro (<source-link|tm_platform.m4|misc/m4/tm_platform.m4>) chooses the operating
+  system layer, the static or dynamic link mode (<source-link|tm_static.m4|misc/m4/tm_static.m4>)
   and the default packaging targets.
 
   <section|Generated files>
 
   <verbatim|configure> writes
-  <verbatim|src/System/config.h> (from <verbatim|src/System/config.in>, as
+  <verbatim|src/System/config.h> (from <source-link|src/System/config.in|src/System/config.in>, as
   declared by <verbatim|AC_CONFIG_HEADERS>) and the files listed in
   <verbatim|AC_CONFIG_FILES>, among which:
 
@@ -97,7 +97,7 @@
     <verbatim|misc/admin/admin.makefile>;
 
     <item><verbatim|src/System/tm_configure.hpp> (from
-    <verbatim|tm_configure.in>), with the version and the build
+    <source-link|tm_configure.in|src/System/tm_configure.in>), with the version and the build
     description;
 
     <item>the scripts <verbatim|misc/scripts/texmacs> and
@@ -111,7 +111,7 @@
     <name|MSIX> manifests and the <name|Android> manifest;
 
     <item>the makefile of the example dynamic link plug-in
-    <verbatim|TeXmacs/examples/plugins/dynlink/>.
+    <source-link|TeXmacs/examples/plugins/dynlink/|TeXmacs/examples/plugins/dynlink>.
   </itemize>
 
   None of these generated files is under version control; only their
@@ -119,7 +119,7 @@
 
   <section|Makefile targets>
 
-  The top level <verbatim|Makefile> (from <verbatim|Makefile.in>) has the
+  The top level <verbatim|Makefile> (from <source-link|Makefile.in|Makefile.in>) has the
   following main targets:
 
   <\description>
@@ -139,7 +139,7 @@
     up to date.
 
     <item*|<verbatim|PLUGINS>, <verbatim|EX_PLUGINS>>The binaries of the
-    plug-ins in <verbatim|plugins/> and of the example plug-ins.
+    plug-ins in <source-link|plugins/|plugins> and of the example plug-ins.
 
     <item*|<verbatim|install>, <verbatim|uninstall>>Installation into the
     prefix: executables, data, plug-ins, icons, desktop files, include
@@ -152,7 +152,7 @@
     <item*|<verbatim|clean>, <verbatim|distclean>>Remove the objects; <verbatim|distclean> also removes the embedded
     <name|Guile> build, the makefiles, the configuration headers, the
     scripts and the manual page (but not the generated package
-    descriptions in <verbatim|packages/>).
+    descriptions in <source-link|packages/|packages>).
   </description>
 
   <section|Pitfalls>
@@ -169,7 +169,7 @@
     <name|CMake>|build-cmake.en.tm>).
 
     <item>The configuration is cached in <verbatim|config.status>; after
-    switching branches with different <verbatim|configure.in> files, run
+    switching branches with different <source-link|configure.in|configure.in> files, run
     <verbatim|autoreconf -fi> and <verbatim|./configure> again rather than
     relying on <verbatim|config.status --recheck>.
   </itemize>

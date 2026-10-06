@@ -9,7 +9,7 @@
   test whether a given tree matches a given pattern. <TeXmacs> implements the
   primitives <scm|match?> and <scm|match> for this purpose, which also
   provide support for wildcards, user-defined grammars and more. They are
-  implemented in <verbatim|kernel/regexp/regexp-match.scm>.
+  implemented in <source-link|kernel/regexp/regexp-match.scm|TeXmacs/progs/kernel/regexp/regexp-match.scm>.
 
   <\explain>
     <scm|(match? <scm-arg|expr> <scm-arg|pattern>)><explain-synopsis|check

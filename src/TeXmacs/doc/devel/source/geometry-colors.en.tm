@@ -8,7 +8,7 @@
   <section|The color word>
 
   A <cpp|color> is a plain <cpp|unsigned int>
-  (<verbatim|Kernel/Abstractions/basic.hpp>). In the normal <em|true color>
+  (<source-link|Kernel/Abstractions/basic.hpp|src/Kernel/Abstractions/basic.hpp>). In the normal <em|true color>
   mode (the global <cpp|true_colors>, which is <cpp|true> by default) it
   holds the four components in the order alpha, red, green, blue, from the
   most to the least significant byte:
@@ -57,9 +57,9 @@
     <verbatim|#rrggbb> and <verbatim|#rrggbbaa>;
 
     <item>names from five dictionaries, looked up in this order: the
-    <TeXmacs> colors (<verbatim|tm_colors.hpp>: <verbatim|red>,
+    <TeXmacs> colors (<source-link|tm_colors.hpp|src/Graphics/Colors/tm_colors.hpp>: <verbatim|red>,
     <verbatim|dark red>, <verbatim|pastel blue>, <verbatim|broken white>,
-    ...), the <name|X11> colors (<verbatim|x11_colors.hpp>, including
+    ...), the <name|X11> colors (<source-link|x11_colors.hpp|src/Graphics/Colors/x11_colors.hpp>, including
     <verbatim|gray0> to <verbatim|gray100> and spellings with and without
     spaces), the <name|SVG>/<name|HTML> colors, the <LaTeX> <name|xcolor>
     base colors and the <name|dvips> colors (given in <abbr|CMYK> and
@@ -76,10 +76,10 @@
 
   The second argument multiplies the alpha of the color: the typesetter
   passes the current opacity, <cpp|edit_env_rep::alpha>, which is decoded
-  from <src-var|opacity> (<verbatim|Typeset/Env/env_semantics.cpp>), so
+  from <src-var|opacity> (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>), so
   <cpp|edit_env_rep::get_color (var)> returns a color already combined with
-  the opacity. Pencils and brushes (<verbatim|Graphics/Renderer/pencil.cpp>,
-  <verbatim|brush.cpp>) call <cpp|named_color> for atomic color values and
+  the opacity. Pencils and brushes (<source-link|Graphics/Renderer/pencil.cpp|src/Graphics/Renderer/pencil.cpp>,
+  <source-link|brush.cpp|src/Graphics/Renderer/brush.cpp>) call <cpp|named_color> for atomic color values and
   build pattern brushes for compound ones.
 
   The converse operations are <cpp|get_hex_color> (which drops the alpha
@@ -88,16 +88,16 @@
   <name|xcolor> option (<verbatim|"xcolor">, <verbatim|"x11names">,
   <verbatim|"svgnames">, <verbatim|"dvipsnames"> or <verbatim|"texmacs">)
   which defines a color name; the <LaTeX> converter uses it to declare the
-  right color model (<verbatim|convert/latex/tmtex.scm>). <cpp|xpm_color>
+  right color model (<source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>). <cpp|xpm_color>
   is a separate parser for the colors of <name|XPM> images (only
   <verbatim|#rgb>, <verbatim|#rrggbb>, <verbatim|#rrrrggggbbbb>,
   <verbatim|none> and <name|X11> names), used when loading <name|XPM> icons
-  (<verbatim|Graphics/Pictures/picture.cpp>).
+  (<source-link|Graphics/Pictures/picture.cpp|src/Graphics/Pictures/picture.cpp>).
 
   <section|Color primitives and <scheme> access>
 
   Three primitives compute colors in documents
-  (<verbatim|Typeset/Env/env_exec.cpp>); all of them return hexadecimal
+  (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>); all of them return hexadecimal
   strings:
 
   <\description>
@@ -113,9 +113,9 @@
   </description>
 
   Animations interpolate colors componentwise in <cpp|morph_color>
-  (<verbatim|Typeset/Env/env_animate.cpp>).
+  (<source-link|Typeset/Env/env_animate.cpp|src/Typeset/Env/env_animate.cpp>).
 
-  From <scheme>, the glue (<verbatim|Scheme/Glue/build-glue-basic.scm>)
+  From <scheme>, the glue (<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>)
   exports <scm|(color <scm-arg|name>)> (<cpp|named_color>, returning the
   color word as an integer), <scm|get-hex-color>,
   <scm|named-color-\<gtr\>xcolormap>, <scm|rgba-\<gtr\>named-color> and
@@ -141,8 +141,8 @@
     the program are (approximately) the logical ones.
 
     <item>The <name|Qt> conversions <cpp|to_qcolor> and <cpp|to_color>
-    (<verbatim|Plugins/Qt/qt_utilities.cpp>) and the glyph and picture
-    drawing code (<verbatim|qt_renderer.cpp>, <verbatim|qt_picture.cpp>)
+    (<source-link|Plugins/Qt/qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>) and the glyph and picture
+    drawing code (<source-link|qt_renderer.cpp|src/Plugins/Qt/qt_renderer.cpp>, <source-link|qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>)
     reverse the logical components once more before handing them to
     <name|Qt>.
   </enumerate>
@@ -154,7 +154,7 @@
 
   <section|Floating point colors>
 
-  <cpp|true_color> (<verbatim|Graphics/Colors/true_color.hpp>) stores the
+  <cpp|true_color> (<source-link|Graphics/Colors/true_color.hpp|src/Graphics/Colors/true_color.hpp>) stores the
   four components as <cpp|double>s between 0 and 1, in the fields
   <cpp|r>, <cpp|g>, <cpp|b> and <cpp|a>. It converts implicitly from and to
   <cpp|color> (with rounding), and is the pixel type of the raster pictures
@@ -175,7 +175,7 @@
     the composition effects;
 
     <item>weighted mixtures <cpp|mix> of two or four colors, in
-    premultiplied form (<verbatim|true_color.cpp>);
+    premultiplied form (<source-link|true_color.cpp|src/Graphics/Colors/true_color.cpp>);
 
     <item>color transformations returned as
     <cpp|unary_function\<less\>true_color,true_color\<gtr\>>:
@@ -194,7 +194,7 @@
     <item><markup|rgb-color> with three arguments makes <TeXmacs> abort,
     and with four arguments ignores the alpha component. The test in
     <cpp|exec_rgb_color> is inverted
-    (<verbatim|Typeset/Env/env_exec.cpp:1904>):
+    (<source-link|Typeset/Env/env_exec.cpp:1904|src/Typeset/Env/env_exec.cpp:1904>):
 
     <\cpp-code>
       tree t4= (N(t)==4? tree ("255"): exec (t[3]));
@@ -208,7 +208,7 @@
     <item><cpp|blend_colors> computes the resulting alpha as
     <math|(b<rsub|A>(255-f<rsub|A>)+f<rsub|A><rsup|2>)/255> instead of
     <math|(b<rsub|A>(255-f<rsub|A>)+255f<rsub|A>)/255>
-    (<verbatim|Graphics/Colors/colors.cpp:159>), so blending a translucent
+    (<source-link|Graphics/Colors/colors.cpp:159|src/Graphics/Colors/colors.cpp:159>), so blending a translucent
     color over an opaque one gives a translucent result. Verified at run
     time: <verbatim|(blend "#ff000080" "#0000ff")> gives
     <verbatim|#80007FBF> instead of an opaque <verbatim|#80007F>.
@@ -224,7 +224,7 @@
 
     <item><cpp|operator *= (true_color&, const true_color&)> prints both
     operands on the standard output each time it is called
-    (<verbatim|true_color.hpp:96>).
+    (<source-link|true_color.hpp:96|src/Graphics/Colors/true_color.hpp:96>).
 
     <item>Unknown color names silently become black, which also makes
     <cpp|is_color_name> the only reliable way to validate user input.
@@ -232,15 +232,15 @@
     <item>The special syntax <verbatim|gray<em|n>> in <cpp|color_from_name>
     is dead code: the test <verbatim|s (1,4) == "gray"> compares a three
     character substring with a four character string
-    (<verbatim|colors.cpp:353>). The names still work because the
+    (<source-link|colors.cpp:353|src/Graphics/Colors/colors.cpp:353>). The names still work because the
     <name|X11> dictionary defines <verbatim|gray0> to <verbatim|gray100>.
 
-    <item><verbatim|colors.hpp> declares <cpp|get_xpm_color>,
+    <item><source-link|colors.hpp|src/Graphics/Colors/colors.hpp> declares <cpp|get_xpm_color>,
     <cpp|get_cmyk_color> and the variable <cpp|reverse_color>, none of
     which is defined, and defines the five dictionary hash tables as
     <cpp|static>, so that every file including the header gets its own
     empty copies; the accessors <cpp|x11_color>, <cpp|svg_color>, ...
-    only work inside <verbatim|colors.cpp>. <verbatim|named_colors.hpp>
+    only work inside <source-link|colors.cpp|src/Graphics/Colors/colors.cpp>. <source-link|named_colors.hpp|src/Graphics/Colors/named_colors.hpp>
     contains conflicting stub definitions returning black and is not
     included anywhere.
   </itemize>

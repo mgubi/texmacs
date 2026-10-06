@@ -24,7 +24,7 @@
     <item>the classes for <em|pictures> (arrays of pixels), <em|scalable
     images> and <em|effects>, and the caches built on them;
 
-    <item>the central module <verbatim|System/Files/image_files.cpp>, which
+    <item>the central module <source-link|System/Files/image_files.cpp|src/System/Files/image_files.cpp>, which
     determines the size of image files and converts them between formats,
     using <name|Qt>, <name|Ghostscript>, <name|resvg>, <name|ImageMagick> and
     the converters declared in <scheme>;
@@ -47,7 +47,7 @@
   <markup|gr-effect> in <hlink|the graphics editor: typesetting
   pictures|graphics-editor-typeset.en.tm>.
 
-  All file names below are relative to <verbatim|src/src/> unless stated
+  All file names below are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -103,11 +103,11 @@
   <\description>
     <item*|Sizes in points>The <em|original size> of an image file is
     always expressed in points (1/72 inch) and is cached per file in a
-    table of <verbatim|image_files.cpp>, because the typesetter asks for it
+    table of <source-link|image_files.cpp|src/System/Files/image_files.cpp>, because the typesetter asks for it
     very often.
 
     <item*|One place for conversions>All conversions go through the
-    functions of <verbatim|image_files.cpp>, which try the available tools
+    functions of <source-link|image_files.cpp|src/System/Files/image_files.cpp>, which try the available tools
     in a fixed order of preference and fall back on placeholder images
     (<verbatim|$TEXMACS_PATH/misc/pixmaps/unknown.*>) when everything fails.
     The comment at the top of that file asks other modules not to call
@@ -122,77 +122,77 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Pictures/picture.hpp>,
-    <verbatim|picture.cpp>>The abstract class <cpp|picture_rep>, the
+    <item*|<source-link|Graphics/Pictures/picture.hpp|src/Graphics/Pictures/picture.hpp>,
+    <source-link|picture.cpp|src/Graphics/Pictures/picture.cpp>>The abstract class <cpp|picture_rep>, the
     composition modes, the list of picture operations, the cache of loaded
     pictures (<cpp|cached_load_picture> and friends), <cpp|load_xpm> for
     builds without <name|Qt>, and <cpp|picture_as_eps>.
 
-    <item*|<verbatim|Graphics/Pictures/raster.hpp>,
-    <verbatim|raster_operators.hpp>, <verbatim|raster_picture.hpp>,
-    <verbatim|raster_picture.cpp>, <verbatim|raster_random.cpp>>Portable
+    <item*|<source-link|Graphics/Pictures/raster.hpp|src/Graphics/Pictures/raster.hpp>,
+    <source-link|raster_operators.hpp|src/Graphics/Pictures/raster_operators.hpp>, <source-link|raster_picture.hpp|src/Graphics/Pictures/raster_picture.hpp>,
+    <source-link|raster_picture.cpp|src/Graphics/Pictures/raster_picture.cpp>, <source-link|raster_random.cpp|src/Graphics/Pictures/raster_random.cpp>>Portable
     pixel arrays (<cpp|raster\<less\>C\<gtr\>>), the pixel operators used to
     compose them, the picture class which wraps them, and the
     implementation of all picture operations (including random noise).
 
-    <item*|<verbatim|Graphics/Pictures/effect.hpp>,
-    <verbatim|effect.cpp>>Effects and <cpp|build_effect>, the parser of
+    <item*|<source-link|Graphics/Pictures/effect.hpp|src/Graphics/Pictures/effect.hpp>,
+    <source-link|effect.cpp|src/Graphics/Pictures/effect.cpp>>Effects and <cpp|build_effect>, the parser of
     effect trees.
 
-    <item*|<verbatim|Graphics/Pictures/scalable.hpp>,
-    <verbatim|scalable.cpp>>Scalable images and <cpp|scalable_image_rep>.
+    <item*|<source-link|Graphics/Pictures/scalable.hpp|src/Graphics/Pictures/scalable.hpp>,
+    <source-link|scalable.cpp|src/Graphics/Pictures/scalable.cpp>>Scalable images and <cpp|scalable_image_rep>.
 
-    <item*|<verbatim|System/Files/image_files.hpp>,
-    <verbatim|image_files.cpp>>Image sizes, the size cache, the
+    <item*|<source-link|System/Files/image_files.hpp|src/System/Files/image_files.hpp>,
+    <source-link|image_files.cpp|src/System/Files/image_files.cpp>>Image sizes, the size cache, the
     conversions <cpp|image_to_png>, <cpp|image_to_eps>, <cpp|image_to_pdf>,
     <cpp|image_to_psdoc>, the calls to <scheme> converters and to
     <name|ImageMagick>, <cpp|xpm_load> and <cpp|ps_load>.
 
-    <item*|<verbatim|Plugins/Qt/qt_picture.cpp>,
-    <verbatim|qt_utilities.cpp>>The <name|Qt> pictures, the loading of image
+    <item*|<source-link|Plugins/Qt/qt_picture.cpp|src/Plugins/Qt/qt_picture.cpp>,
+    <source-link|qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>>The <name|Qt> pictures, the loading of image
     files into <cpp|QImage>s with their own cache, icons, effects applied to
     files, and the <name|Qt> based size determination and conversions
     (<cpp|qt_supports>, <cpp|qt_image_size>, <cpp|qt_convert_image>,
-    <cpp|qt_image_to_pdf>). <verbatim|Plugins/Qt6/> contains a copy of these
+    <cpp|qt_image_to_pdf>). <source-link|Plugins/Qt6/|src/Plugins/Qt6> contains a copy of these
     files for <name|Qt> 6.
 
-    <item*|<verbatim|Plugins/Resvg/resvg.cpp>>Size determination and
+    <item*|<source-link|Plugins/Resvg/resvg.cpp|src/Plugins/Resvg/resvg.cpp>>Size determination and
     rendering of <abbr|SVG> files with the <name|resvg> library
     (<cpp|USE_RESVG>).
 
-    <item*|<verbatim|Plugins/Ghostscript/gs_utilities.cpp>,
-    <verbatim|ghostscript.cpp>>Calls to the <name|Ghostscript> executable
+    <item*|<source-link|Plugins/Ghostscript/gs_utilities.cpp|src/Plugins/Ghostscript/gs_utilities.cpp>,
+    <source-link|ghostscript.cpp|src/Plugins/Ghostscript/ghostscript.cpp>>Calls to the <name|Ghostscript> executable
     for PostScript and <abbr|PDF> files (<cpp|USE_GS>), and, for the
     <name|X11> port, the rendering of PostScript into pixmaps.
 
-    <item*|<verbatim|Plugins/Imlib2/imlib2.cpp>>Optional dynamically loaded
+    <item*|<source-link|Plugins/Imlib2/imlib2.cpp|src/Plugins/Imlib2/imlib2.cpp>>Optional dynamically loaded
     <name|Imlib2> support for the <name|X11> port.
 
-    <item*|<verbatim|Plugins/MacOS/mac_images.mm>>Image sizes and
+    <item*|<source-link|Plugins/MacOS/mac_images.mm|src/Plugins/MacOS/mac_images.mm>>Image sizes and
     conversion to <name|PNG> with the <name|macOS> frameworks, used only
     when <TeXmacs> is not built with <name|Qt> 6.
 
-    <item*|<verbatim|Plugins/Pdf/pdf_hummus_renderer.cpp>>The image related
+    <item*|<source-link|Plugins/Pdf/pdf_hummus_renderer.cpp|src/Plugins/Pdf/pdf_hummus_renderer.cpp>>The image related
     parts of the <abbr|PDF> renderer: <cpp|pdf_image_rep>, image and pattern
     pools, <cpp|hummus_pdf_image_size>.
 
-    <item*|<verbatim|Plugins/Pdf/pdf_hummus_make_attachment.cpp>,
-    <verbatim|pdf_hummus_extract_attachment.cpp>>Embedding files into
+    <item*|<source-link|Plugins/Pdf/pdf_hummus_make_attachment.cpp|src/Plugins/Pdf/pdf_hummus_make_attachment.cpp>,
+    <source-link|pdf_hummus_extract_attachment.cpp|src/Plugins/Pdf/pdf_hummus_extract_attachment.cpp>>Embedding files into
     <abbr|PDF> files and extracting them again.
 
-    <item*|<verbatim|Plugins/Cairo/>>A <name|Cairo> renderer, only compiled
+    <item*|<source-link|Plugins/Cairo/|src/Plugins/Cairo>>A <name|Cairo> renderer, only compiled
     with <cpp|USE_CAIRO>, which the <name|CMake> build does not set.
 
-    <item*|<verbatim|Typeset/Concat/concat_active.cpp>,
-    <verbatim|Typeset/Boxes/Basic/basic_boxes.cpp>>The typesetting of the
+    <item*|<source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>,
+    <source-link|Typeset/Boxes/Basic/basic_boxes.cpp|src/Typeset/Boxes/Basic/basic_boxes.cpp>>The typesetting of the
     <markup|image> primitive and the image box.
 
-    <item*|<verbatim|Graphics/Renderer/renderer.cpp>,
-    <verbatim|printer.cpp>>Background patterns
+    <item*|<source-link|Graphics/Renderer/renderer.cpp|src/Graphics/Renderer/renderer.cpp>,
+    <source-link|printer.cpp|src/Graphics/Renderer/printer.cpp>>Background patterns
     (<cpp|renderer_rep::clear_pattern>) and the PostScript inclusion of
     images.
 
-    <item*|<verbatim|Edit/Modify/edit_text.cpp>>The insertion of images
+    <item*|<source-link|Edit/Modify/edit_text.cpp|src/Edit/Modify/edit_text.cpp>>The insertion of images
     (<cpp|edit_text_rep::make_image>).
 
     <item*|<verbatim|$TEXMACS_PATH/progs/convert/images/init-images.scm>>The

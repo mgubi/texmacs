@@ -118,7 +118,7 @@
   <|explain>
     The <src-arg|content> is only displayed if a page break occurs at this
     point, in which case it is typeset at the top of the new page. For
-    instance, the index macros of <verbatim|std-automatic.ts> use an
+    instance, the index macros of <source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts> use an
     <markup|if-page-break> tag with <src-arg|where> equal to
     <verbatim|t> in order to repeat the main index entry at the top of a
     page when its subentries are split across pages. The evaluated <src-arg|where> argument is passed to the page

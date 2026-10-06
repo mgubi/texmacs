@@ -42,7 +42,7 @@
     children, and which is computed to a large extent from the macro
     definitions;
 
-    <item>the experimental memoizing evaluator in <verbatim|Style/>.
+    <item>the experimental memoizing evaluator in <source-link|Style/|src/Style>.
   </itemize>
 
   The semantics of the individual primitives from the point of view of a
@@ -56,8 +56,8 @@
   general organization of the typesetter in bridges and concaters, are
   described in the chapter on the <hlink|typesetter|typesetter.en.tm>.
 
-  All C++ file names below are relative to <verbatim|src/src/>, and all
-  <scheme> file names are relative to <verbatim|src/TeXmacs/progs/>.
+  All C++ file names below are relative to <source-link|src/src/|src>, and all
+  <scheme> file names are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Two ways of evaluating a tree>
 
@@ -68,7 +68,7 @@
   <\description>
     <item*|Evaluation (<cpp|exec>)>The method
     <cpp|tree edit_env_rep::exec (tree t)> in
-    <verbatim|Typeset/Env/env_exec.cpp> computes the <em|value> of
+    <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp> computes the <em|value> of
     <cpp|t> in the current environment: macros are expanded, arguments are
     substituted, arithmetic and string primitives are computed,
     <markup|if>-conditions are decided, and the result is a new tree. For
@@ -89,15 +89,15 @@
     while the <markup|arg> primitive typesets the original subtree with its
     own inverse path, so that the cursor can be moved into
     <verbatim|world> and the user can edit it. The code for this lives in
-    <verbatim|Typeset/Concat/concat_macro.cpp> (inline material) and in the
-    bridges <verbatim|Typeset/Bridge/bridge_compound.cpp>,
-    <verbatim|bridge_argument.cpp> etc. (paragraph-level material).
+    <source-link|Typeset/Concat/concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp> (inline material) and in the
+    bridges <source-link|Typeset/Bridge/bridge_compound.cpp|src/Typeset/Bridge/bridge_compound.cpp>,
+    <source-link|bridge_argument.cpp|src/Typeset/Bridge/bridge_argument.cpp> etc. (paragraph-level material).
   </description>
 
   Both mechanisms share the same environment object and the same stacks of
   macro arguments (<cpp|edit_env_rep::macro_arg> and
   <cpp|edit_env_rep::macro_src>). They must be kept consistent: several
-  functions in <verbatim|env_exec.cpp> carry comments such as <em|this case
+  functions in <source-link|env_exec.cpp|src/Typeset/Env/env_exec.cpp> carry comments such as <em|this case
   must be kept consistent with <cpp|concater_rep::typeset_if>>.
 
   There is a third, related, mechanism: <em|rewriting>
@@ -107,10 +107,10 @@
   is then typeset (or evaluated). Rewriting is designed so that parts of the
   result which come from the document keep their source location.
 
-  Finally, the directory <verbatim|Style/> contains an experimental,
+  Finally, the directory <source-link|Style/|src/Style> contains an experimental,
   memoizing re-implementation of the evaluator which works on persistent
   environments. It is only compiled when <TeXmacs> is configured with the
-  <verbatim|ENABLE_EXPERIMENTAL> option of <verbatim|CMakeLists.txt> (which
+  <verbatim|ENABLE_EXPERIMENTAL> option of <source-link|CMakeLists.txt|src/CMakeLists.txt> (which
   defines the preprocessor symbol <verbatim|EXPERIMENTAL>) and it is not used
   for the actual typesetting; see <hlink|the experimental
   evaluator|macro-expansion-style.en.tm>.
@@ -118,66 +118,66 @@
   <section|Source map>
 
   <\description-paragraphs>
-    <item*|<verbatim|Typeset/env.hpp>>Declaration of the class
+    <item*|<source-link|Typeset/env.hpp|src/Typeset/env.hpp>>Declaration of the class
     <cpp|edit_env_rep>, the <verbatim|Env_*> categories of environment
     variables and various constants.
 
-    <item*|<verbatim|Typeset/Env/env.cpp>>Construction of the environment,
+    <item*|<source-link|Typeset/Env/env.cpp|src/Typeset/Env/env.cpp>>Construction of the environment,
     global manipulations (<cpp|write_env>, <cpp|patch_env>,
     <cpp|read_env>) and the bookkeeping which allows bridges to cache their
     effect on the environment (<cpp|local_start>, <cpp|local_update>,
     <cpp|local_end>).
 
-    <item*|<verbatim|Typeset/Env/env_exec.cpp>>The evaluator:
+    <item*|<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>>The evaluator:
     <cpp|exec>, <cpp|rewrite>, the partial evaluator <cpp|exec_until>,
     <cpp|expand> and <cpp|depends>, and the implementation of all
     computational primitives.
 
-    <item*|<verbatim|Typeset/Env/env_semantics.cpp>>The categories of the
+    <item*|<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>>The categories of the
     built-in environment variables (<cpp|initialize_default_var_type>) and
     the <cpp|update> methods which recompute cached C++ fields (fonts,
     colors, page parameters, ...) when a variable changes.
 
-    <item*|<verbatim|Typeset/Env/env_default.cpp>>The default environment
+    <item*|<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>>The default environment
     <cpp|default_env>, built by <cpp|initialize_default_env>.
 
-    <item*|<verbatim|Typeset/Env/env_length.cpp>>Length arithmetic and
+    <item*|<source-link|Typeset/Env/env_length.cpp|src/Typeset/Env/env_length.cpp>>Length arithmetic and
     length units.
 
-    <item*|<verbatim|Typeset/Env/env_inactive.cpp>>Rewriting of inactive
+    <item*|<source-link|Typeset/Env/env_inactive.cpp|src/Typeset/Env/env_inactive.cpp>>Rewriting of inactive
     markup (source code display of macros).
 
-    <item*|<verbatim|Typeset/Env/env_animate.cpp>>Evaluation of animations.
+    <item*|<source-link|Typeset/Env/env_animate.cpp|src/Typeset/Env/env_animate.cpp>>Evaluation of animations.
 
-    <item*|<verbatim|Typeset/Concat/concat_macro.cpp>>Inline typesetting of
+    <item*|<source-link|Typeset/Concat/concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>>Inline typesetting of
     <markup|with>, <markup|assign>, macro applications, <markup|arg>,
     <markup|mark>, <markup|expand-as>, <markup|eval>, rewritable and
     executable primitives.
 
-    <item*|<verbatim|Typeset/Bridge/bridge_compound.cpp>,
-    <verbatim|bridge_argument.cpp>, <verbatim|bridge_with.cpp>,
-    <verbatim|bridge_rewrite.cpp>, <verbatim|bridge_eval.cpp>,
-    <verbatim|bridge_expand_as.cpp>>The corresponding paragraph-level
+    <item*|<source-link|Typeset/Bridge/bridge_compound.cpp|src/Typeset/Bridge/bridge_compound.cpp>,
+    <source-link|bridge_argument.cpp|src/Typeset/Bridge/bridge_argument.cpp>, <source-link|bridge_with.cpp|src/Typeset/Bridge/bridge_with.cpp>,
+    <source-link|bridge_rewrite.cpp|src/Typeset/Bridge/bridge_rewrite.cpp>, <source-link|bridge_eval.cpp|src/Typeset/Bridge/bridge_eval.cpp>,
+    <source-link|bridge_expand_as.cpp|src/Typeset/Bridge/bridge_expand_as.cpp>>The corresponding paragraph-level
     (incremental) typesetting.
 
-    <item*|<verbatim|Data/Drd/>>The data relation descriptor:
-    <cpp|drd_info> (<verbatim|drd_info.hpp>), <cpp|tag_info>
-    (<verbatim|tag_info.hpp>), the standard <abbr|DRD> for built-in tags
-    (<verbatim|drd_std.cpp>), the global access modes
-    (<verbatim|drd_mode.hpp>) and the names of built-in environment
-    variables (<verbatim|vars.hpp>).
+    <item*|<source-link|Data/Drd/|src/Data/Drd>>The data relation descriptor:
+    <cpp|drd_info> (<source-link|drd_info.hpp|src/Data/Drd/drd_info.hpp>), <cpp|tag_info>
+    (<source-link|tag_info.hpp|src/Data/Drd/tag_info.hpp>), the standard <abbr|DRD> for built-in tags
+    (<source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>), the global access modes
+    (<source-link|drd_mode.hpp|src/Data/Drd/drd_mode.hpp>) and the names of built-in environment
+    variables (<source-link|vars.hpp|src/Data/Drd/vars.hpp>).
 
-    <item*|<verbatim|Data/Document/new_style.cpp>>Computation and caching of
+    <item*|<source-link|Data/Document/new_style.cpp|src/Data/Document/new_style.cpp>>Computation and caching of
     the environment and the <abbr|DRD> of a style.
 
-    <item*|<verbatim|Edit/Editor/edit_typeset.cpp>>Initialization of the
+    <item*|<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>>Initialization of the
     environment of a buffer (<cpp|typeset_preamble>,
     <cpp|typeset_prepare>) and computation of the environment at the cursor
     (<cpp|typeset_exec_until>).
 
-    <item*|<verbatim|Style/>>The experimental memoizing evaluator.
+    <item*|<source-link|Style/|src/Style>>The experimental memoizing evaluator.
 
-    <item*|<verbatim|kernel/texmacs/tm-secure.scm>>The <scheme> side of the
+    <item*|<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>>The <scheme> side of the
     security check for <markup|extern>.
   </description-paragraphs>
 
@@ -193,7 +193,7 @@
     <branch|The data relation descriptor|macro-expansion-drd.en.tm>
 
     <branch|The experimental evaluator in
-    <verbatim|Style/>|macro-expansion-style.en.tm>
+    <source-link|Style/|src/Style>|macro-expansion-style.en.tm>
 
     <branch|Pitfalls and debugging hints|macro-expansion-pitfalls.en.tm>
   </traverse>

@@ -37,7 +37,7 @@
     \ \ \ \ make
   </verbatim>
 
-  will compile the program <verbatim|minimal.cpp> and create a binary
+  will compile the program <source-link|minimal.cpp|TeXmacs/examples/plugins/minimal/src/minimal.cpp> and create a binary
 
   <\verbatim>
     \ \ \ \ minimal/bin/minimal.bin
@@ -56,10 +56,10 @@
   <paragraph*|How it works>
 
   The <verbatim|minimal> plug-in demonstrates a minimal interface between
-  <TeXmacs> and an extern program; the program <verbatim|minimal.cpp> is
+  <TeXmacs> and an extern program; the program <source-link|minimal.cpp|TeXmacs/examples/plugins/minimal/src/minimal.cpp> is
   <hlink|explained|../interface/interface-pipes.en.tm> in more detail in
   the chapter about writing interfaces. The initialization file
-  <verbatim|init-minimal.scm> essentially contains the following code:
+  <source-link|init-minimal.scm|TeXmacs/examples/plugins/minimal/progs/init-minimal.scm> essentially contains the following code:
 
   <\scm-code>
     (plugin-configure minimal

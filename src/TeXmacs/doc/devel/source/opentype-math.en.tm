@@ -24,7 +24,7 @@
   per-font corrections long before it read <verbatim|MATH> tables: the
   <verbatim|adjust_*.cpp> tables and the <name|STIX>, <name|TeX Gyre>,
   <name|Linux Libertine>, <name|Linux Biolinum>, <name|Fira Sans> and
-  <name|Papyrus> branches of <verbatim|unicode_font.cpp>, tuned against the
+  <name|Papyrus> branches of <source-link|unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>, tuned against the
   layout of <TeXmacs> itself. The table is layered <em|under> them: it
   fills what they leave open, and they keep precedence wherever they say
   something.
@@ -32,29 +32,29 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Fonts/font.hpp>,
-    <verbatim|font.cpp>>The parameters of <cpp|font_rep>, the virtual hooks
+    <item*|<source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>,
+    <source-link|font.cpp|src/Graphics/Fonts/font.cpp>>The parameters of <cpp|font_rep>, the virtual hooks
     with their neutral defaults, <cpp|copy_math_pars>, and the switch
     <cpp|hand_tuned_math_fonts>.
 
-    <item*|<verbatim|Plugins/Freetype/unicode_font.cpp>>Activation
+    <item*|<source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>>Activation
     (<cpp|init_ot_math>), the conversion from design units, and the
     implementations of the hooks for fonts with a table.
 
-    <item*|<verbatim|Typeset/Boxes/Composite/script_boxes.cpp>>Scripts and
+    <item*|<source-link|Typeset/Boxes/Composite/script_boxes.cpp|src/Typeset/Boxes/Composite/script_boxes.cpp>>Scripts and
     limits.
 
-    <item*|<verbatim|Typeset/Boxes/Composite/math_boxes.cpp>>Fractions,
+    <item*|<source-link|Typeset/Boxes/Composite/math_boxes.cpp|src/Typeset/Boxes/Composite/math_boxes.cpp>>Fractions,
     radicals, wide accents, over- and underlines.
 
-    <item*|<verbatim|Typeset/Concat/concat_math.cpp>>Radicals and
+    <item*|<source-link|Typeset/Concat/concat_math.cpp|src/Typeset/Concat/concat_math.cpp>>Radicals and
     fractions at the level of the concatenator, long arrows with labels,
     accents over dotless letters, negated relations.
 
-    <item*|<verbatim|Typeset/Env/env_semantics.cpp>>Script sizes and
+    <item*|<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>>Script sizes and
     script alternates.
 
-    <item*|<verbatim|Typeset/Boxes/Basic/text_boxes.cpp>, the composite and
+    <item*|<source-link|Typeset/Boxes/Basic/text_boxes.cpp|src/Typeset/Boxes/Basic/text_boxes.cpp>, the composite and
     modifier boxes>The box side of the hooks.
   </description-paragraphs>
 
@@ -97,16 +97,16 @@
     <cpp|MATH_TYPE_TEX_GYRE> or <cpp|MATH_TYPE_NORMAL>.
   </description>
 
-  The switch <cpp|hand_tuned_math_fonts> (<verbatim|font.cpp>, default
+  The switch <cpp|hand_tuned_math_fonts> (<source-link|font.cpp|src/Graphics/Fonts/font.cpp>, default
   true) turns the tuned branches off for fonts which have a table, so that
   the table-only result can be compared with the tuned one. It is set from
   the preference <verbatim|hand tuned math fonts> (<scm|notify-hand-tuned-math-fonts>
-  in <verbatim|tm-server.scm>, which calls
+  in <source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>, which calls
   <scm|set-hand-tuned-math-fonts>), and the sample scripts of
-  <verbatim|tests/opentype> turn it off with <verbatim|TM_HAND_TUNED=off>.
+  <source-link|tests/opentype|tests/opentype> turn it off with <verbatim|TM_HAND_TUNED=off>.
   The same switch also decides whether the <name|STIX> rubber font is used
   (<cpp|font_rep::make_rubber_font>) and the <name|STIX> special cases of
-  <verbatim|concat_math.cpp>. Fonts are cached, so the switch only affects
+  <source-link|concat_math.cpp|src/Typeset/Concat/concat_math.cpp>. Fonts are cached, so the switch only affects
   fonts made after it was changed.
 
   <section|The parameters>
@@ -137,7 +137,7 @@
   </description-paragraphs>
 
   <paragraph|New fields.>About forty fields added to <cpp|font_rep> for
-  this purpose (<verbatim|font.hpp>), all zero for a font without table:
+  this purpose (<source-link|font.hpp|src/Graphics/Fonts/font.hpp>), all zero for a font without table:
 
   <\description-paragraphs>
     <item*|Fractions><cpp|frac_rule_thickness>, <cpp|frac_num_shift_up>,
@@ -170,7 +170,7 @@
     <cpp|underbar_extra_descender>.
   </description-paragraphs>
 
-  The comments in <verbatim|font.hpp> name the constant each field comes
+  The comments in <source-link|font.hpp|src/Graphics/Fonts/font.hpp> name the constant each field comes
   from. <cpp|copy_math_pars> copies all of them, and <cpp|ot_math>, so that
   a font made from another one (a smart font from its main font, a
   magnified or emulated font from its base) inherits them. The typesetter
@@ -181,7 +181,7 @@
   <section|Glyph-level data and the box hooks>
 
   The data which belong to one glyph are reached through virtual hooks of
-  <cpp|font_rep>, whose defaults in <verbatim|font.cpp> answer
+  <cpp|font_rep>, whose defaults in <source-link|font.cpp|src/Graphics/Fonts/font.cpp> answer
   \Punknown\Q, and are relayed by virtual methods of the boxes, so that a
   composite box answers for the glyph that represents it.
 
@@ -218,7 +218,7 @@
     <hlink|OpenType features in text and formulas|opentype-features.en.tm>.
   </description-paragraphs>
 
-  On the box side, <verbatim|boxes.hpp> adds <cpp|lsub_correction_at>,
+  On the box side, <source-link|boxes.hpp|src/Typeset/boxes.hpp> adds <cpp|lsub_correction_at>,
   <cpp|lsup_correction_at>, <cpp|rsub_correction_at>,
   <cpp|rsup_correction_at>, <cpp|extended_shape> and <cpp|top_accent>.
   A text box forwards them to its font, but only a text box of exactly one
@@ -237,7 +237,7 @@
 
   <subsection|Scripts and limits>
 
-  <cpp|script_box_rep> (<verbatim|script_boxes.cpp>) places scripts with
+  <cpp|script_box_rep> (<source-link|script_boxes.cpp|src/Typeset/Boxes/Composite/script_boxes.cpp>) places scripts with
   <cpp|ot_script_shifts> when <cpp|fn-\<gtr\>ot_math> and
   <cpp|sub_sup_gap_min \<gtr\> 0>. A superscript starts at
   <cpp|sup_lo_base> of the base; over an extended shape (or a composite
@@ -259,7 +259,7 @@
   their baselines. A <em|stretched> base, flagged by the new argument of
   <cpp|limit_box>, takes the stretch stack constants instead, which keep a
   label closer to a long arrow or a wide brace than a limit to an operator;
-  <cpp|typeset_long_arrow> in <verbatim|concat_math.cpp> passes it, and
+  <cpp|typeset_long_arrow> in <source-link|concat_math.cpp|src/Typeset/Concat/concat_math.cpp> passes it, and
   uses <cpp|wide_box_covering>, which keeps trying the next horizontal
   variant until the arrow is at least as wide as its labels.
 
@@ -287,7 +287,7 @@
 
   <subsection|Accents, over- and underlines>
 
-  In <cpp|wide_box_rep> (<verbatim|math_boxes.cpp>), fonts with
+  In <cpp|wide_box_rep> (<source-link|math_boxes.cpp|src/Typeset/Boxes/Composite/math_boxes.cpp>), fonts with
   <cpp|ot_math> which are neither <name|TeX Gyre> nor <name|STIX> by math
   type get three new paths:
 
@@ -309,7 +309,7 @@
 
   The base of an accent which is a single <verbatim|i> or <verbatim|j> is
   replaced by its <verbatim|dtls> substitute when the font has one
-  (<verbatim|concat_math.cpp>).
+  (<source-link|concat_math.cpp|src/Typeset/Concat/concat_math.cpp>).
 
   <subsection|Delimiters, big operators and negations>
 
@@ -319,7 +319,7 @@
   <cpp|get_wide_variant> are asked first by the generic code which picks
   a size. A display operator is the smallest variant at least
   <verbatim|displayOperatorMinHeight> tall, capped at two em
-  (<cpp|DISPLAY_OPERATOR_MAX_EM> in <verbatim|rubber_unicode_font.cpp>)
+  (<cpp|DISPLAY_OPERATOR_MAX_EM> in <source-link|rubber_unicode_font.cpp|src/Plugins/Freetype/rubber_unicode_font.cpp>)
   because some fonts declare much larger values. The details are in
   <hlink|stretchable glyphs: variants and
   assemblies|opentype-stretch.en.tm>.
@@ -329,11 +329,11 @@
   <verbatim|\<less\>subseteq\<gtr\>> and about forty others) is set as the
   precomposed Unicode symbol when the font has it, instead of a stroke drawn
   through the relation (<cpp|negated_symbols> in
-  <verbatim|concat_math.cpp>).
+  <source-link|concat_math.cpp|src/Typeset/Concat/concat_math.cpp>).
 
   <subsection|Script sizes and script alternates>
 
-  <cpp|edit_env_rep::update_font> (<verbatim|env_semantics.cpp>) builds
+  <cpp|edit_env_rep::update_font> (<source-link|env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>) builds
   the font of the current mode with the new <cpp|make_current_font>. At
   script levels, when the font has <cpp|ot_math> and
   <src-var|math-font-sizes> is <verbatim|default>, the size is taken from
@@ -385,7 +385,7 @@
     exclude the tuned math types explicitly as <cpp|wide_box_rep> does.
 
     <item><cpp|smart_font_rep> has a member of its own named
-    <cpp|ot_math> (<verbatim|smart_font.cpp>), which means \Pthe main font
+    <cpp|ot_math> (<source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>), which means \Pthe main font
     is an untuned <name|OpenType> math font whose letters come from its own
     alphabets\Q. It hides the field of <cpp|font_rep> inside the methods of
     the smart font, while the typesetter, which holds a <cpp|font> handle,

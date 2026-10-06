@@ -97,7 +97,7 @@
   is built, each field is initialized with its default value (the first
   proposal, <abbr|resp.> the selected value), except for toggles, whose
   value is only set when they are clicked. These macros are defined
-  in <hlink|<verbatim|gui-markup.scm>|$TEXMACS_PATH/progs/kernel/gui/gui-markup.scm>.
+  in <hlink|<source-link|gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>|$TEXMACS_PATH/progs/kernel/gui/gui-markup.scm>.
 
   <tmdoc-copyright|2012|the <TeXmacs> team.>
 

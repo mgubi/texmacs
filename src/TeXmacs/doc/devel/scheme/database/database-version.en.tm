@@ -8,7 +8,7 @@
   Sometimes, a new or better version for a database entry becomes available.
   This happens for instance, when the value of some field needs to be
   corrected, or when a paper in a bibliographic database gets published. In
-  <verbatim|database/db-version.scm>, we introduce a few additional attributes and routines
+  <source-link|database/db-version.scm|TeXmacs/progs/database/db-version.scm>, we introduce a few additional attributes and routines
   for version management of database entries.
 
   This is particularly important when entries are attached to files and

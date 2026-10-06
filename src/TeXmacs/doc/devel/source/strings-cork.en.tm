@@ -44,7 +44,7 @@
   The Cork encoding (also called <name|T1>) is the 8-bit font encoding of
   <LaTeX>'s <verbatim|fontenc>. <TeXmacs> uses it for single byte
   characters. Its correspondence with Unicode is given by
-  <verbatim|langs/encoding/corktounicode.scm>; in summary:
+  <source-link|langs/encoding/corktounicode.scm|TeXmacs/langs/encoding/corktounicode.scm>; in summary:
 
   <\description>
     <item*|<verbatim|0x00>--<verbatim|0x0C>>Accents used for composing
@@ -95,7 +95,7 @@
 
   <section|Iterating over universal strings>
 
-  The routines of <verbatim|Data/String/analyze.cpp> whose name starts with
+  The routines of <source-link|Data/String/analyze.cpp|src/Data/String/analyze.cpp> whose name starts with
   <cpp|tm_> treat a symbol as one character:
 
   <\description-paragraphs>
@@ -157,13 +157,13 @@
   <section|Case, accents and letters>
 
   Two families of routines change the case of letters. The routines of
-  <verbatim|analyze.cpp> (<cpp|upcase>, <cpp|locase>, <cpp|upcase_first>,
+  <source-link|analyze.cpp|src/Data/String/analyze.cpp> (<cpp|upcase>, <cpp|locase>, <cpp|upcase_first>,
   <cpp|locase_all>, ...; <scheme>: <scm|upcase-all>, <scm|locase-all>, ...)
   work on bytes and only know <abbr|ASCII> and the Cork letters, which they
   recognize with <cpp|is_iso_locase> and <cpp|is_iso_upcase> and shift by
   <verbatim|0x20>.
 
-  The routines of <verbatim|universal.cpp> (<cpp|uni_locase_char>,
+  The routines of <source-link|universal.cpp|src/Data/String/universal.cpp> (<cpp|uni_locase_char>,
   <cpp|uni_upcase_char>, <cpp|uni_locase_first>, <cpp|uni_upcase_first>,
   <cpp|uni_locase_all>, <cpp|uni_Locase_all> (all but the first
   character), <cpp|uni_upcase_all>; <scheme>: <scm|tmstring-upcase-all> and
@@ -174,13 +174,13 @@
   <verbatim|\<less\>varepsilon\<gtr\>> and similar variants are mapped to
   the upper case letter).
 
-  The remaining routines of <verbatim|universal.cpp> are mainly used for
+  The remaining routines of <source-link|universal.cpp|src/Data/String/universal.cpp> are mainly used for
   sorting, indexing and bibliographies:
 
   <\description-paragraphs>
     <item*|<cpp|uni_translit (s)>>Transliteration to <abbr|ASCII>: Cork
     accented letters lose their accents (using the table
-    <cpp|Cork_unaccented> of <verbatim|Data/Convert/Tex/parsetex.cpp>), and
+    <cpp|Cork_unaccented> of <source-link|Data/Convert/Tex/parsetex.cpp|src/Data/Convert/Tex/parsetex.cpp>), and
     Cyrillic escapes are transliterated following the <name|ICAO> scheme
     (<scm|tmstring-translit>).
 

@@ -41,14 +41,14 @@
     <item*|<cpp|aux>>Maps the name of a list (<verbatim|toc>,
     <verbatim|idx>, <verbatim|gly>, <verbatim|bib>, ...;
     the names are given by variables like <verbatim|toc-prefix> or
-    <verbatim|index-prefix> of <verbatim|std-automatic.ts>) to a
+    <verbatim|index-prefix> of <source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>) to a
     <markup|document> of entries. It is filled by
-    <cpp|concater_rep::typeset_write> (<verbatim|Typeset/Concat/concat_active.cpp>),
+    <cpp|concater_rep::typeset_write> (<source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>),
     which evaluates the second argument of <markup|write>, removes its
     labels and appends it to the list named by the first argument, but only
     when the typesetting is <em|complete>, that is, when the whole document
     is being typeset. At the start of such a pass, the typesetter replaces
-    the table by a fresh one (<verbatim|Typeset/Bridge/typesetter.cpp>), so
+    the table by a fresh one (<source-link|Typeset/Bridge/typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>), so
     that it always reflects the current document.
 
     <item*|<cpp|ref>>Maps labels to their value and page number; it is
@@ -67,13 +67,13 @@
   From <scheme>, the tables are accessed with <scm|get-auxiliary>,
   <scm|set-auxiliary>, <scm|list-auxiliaries>, <scm|get-reference>,
   <scm|set-reference>, <scm|list-references> and <scm|find-references>
-  (<verbatim|build-glue-editor.scm>); the variants with a star take a flag
+  (<source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>); the variants with a star take a flag
   which selects the tables of the project.
 
   <section|Regeneration>
 
   <paragraph|The traversal.><cpp|edit_process_rep::generate_aux (which)>
-  (<verbatim|Edit/Process/edit_process.cpp>) is exported as
+  (<source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp>) is exported as
   <scm|generate-all-aux> (without argument) and <scm|generate-aux>. It calls
   <cpp|generate_aux_recursively> on the body of the buffer, which looks for
   the automatic tags recognized by <cpp|is_aux>:
@@ -91,7 +91,7 @@
 
   <paragraph|Driver.>The menu entries <menu|Document|Update|...> call
   <scm|(update-document <scm-arg|what>)> in
-  <verbatim|generic/document-edit.scm>. This schedules, as many times as
+  <source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>. This schedules, as many times as
   the preference <verbatim|document update times> says (at most 5), a
   delayed command which for <verbatim|"all"> regenerates all automatic
   content, empties the caches of included documents and pictures and
@@ -117,7 +117,7 @@
   <cpp|generate_glossary>.
 
   <paragraph|Index.>An index entry is recorded as a tuple. The forms used
-  by <verbatim|std-automatic.ts> are <verbatim|(<em|key> <em|ref>)> for an
+  by <source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts> are <verbatim|(<em|key> <em|ref>)> for an
   ordinary entry with a page reference, <verbatim|(<em|key> "" <em|text>)>
   for an entry with a fixed text instead of a page, and <verbatim|(<em|key>
   <em|how> <em|range> <em|entry> <em|ref>)> for the complex form, where
@@ -178,7 +178,7 @@
     emptied and none is regenerated.
 
     <item><cpp|generate_aux_recursively> empties <em|every> automatic
-    section (<verbatim|edit_process.cpp:594>) before testing whether it
+    section (<source-link|edit_process.cpp:594|src/Edit/Process/edit_process.cpp:594>) before testing whether it
     matches <cpp|which>. A restricted update such as
     <menu|Document|Update|Table of contents> (or <scm|(generate-aux
     "bibliography")>) therefore regenerates the requested section but leaves

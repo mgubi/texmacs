@@ -8,22 +8,22 @@
   <section|Modules>
 
   The <scheme> part of the graphics editor consists of the modules in
-  <verbatim|src/TeXmacs/progs/graphics/>. At the bottom,
-  <verbatim|graphics-drd.scm> is used by <verbatim|graphics-utils.scm> and
-  <verbatim|graphics-markup.scm>; <verbatim|graphics-utils.scm> is used by
-  <verbatim|graphics-env.scm>, <verbatim|graphics-object.scm> and
-  <verbatim|graphics-main.scm>; these three are used by
-  <verbatim|graphics-single.scm>, which is used by
-  <verbatim|graphics-group.scm>, itself used by
-  <verbatim|graphics-animate.scm>. The module
-  <verbatim|graphics-edit.scm> combines the single, group and animation
-  modules, and <verbatim|graphics-kbd.scm> and
-  <verbatim|graphics-menu.scm> are on top.
+  <source-link|src/TeXmacs/progs/graphics/|TeXmacs/progs/graphics>. At the bottom,
+  <source-link|graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm> is used by <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm> and
+  <source-link|graphics-markup.scm|TeXmacs/progs/graphics/graphics-markup.scm>; <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm> is used by
+  <source-link|graphics-env.scm|TeXmacs/progs/graphics/graphics-env.scm>, <source-link|graphics-object.scm|TeXmacs/progs/graphics/graphics-object.scm> and
+  <source-link|graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>; these three are used by
+  <source-link|graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm>, which is used by
+  <source-link|graphics-group.scm|TeXmacs/progs/graphics/graphics-group.scm>, itself used by
+  <source-link|graphics-animate.scm|TeXmacs/progs/graphics/graphics-animate.scm>. The module
+  <source-link|graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm> combines the single, group and animation
+  modules, and <source-link|graphics-kbd.scm|TeXmacs/progs/graphics/graphics-kbd.scm> and
+  <source-link|graphics-menu.scm|TeXmacs/progs/graphics/graphics-menu.scm> are on top.
 
-  None of them is loaded at start-up. <verbatim|init-texmacs.scm> declares
+  None of them is loaded at start-up. <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> declares
   the entry points with <scm|lazy-define> (for instance
   <scm|graphics-reset-context>, <scm|graphics-busy?>, the mouse handlers
-  of <verbatim|graphics-edit.scm>, <scm|make-graphics>), the keyboard map
+  of <source-link|graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm>, <scm|make-graphics>), the keyboard map
   with <scm|lazy-keyboard> (activated by the predicate
   <scm|in-active-graphics?>) and the menus with <scm|lazy-menu>. The first
   call of any of these loads the corresponding module and its dependencies.
@@ -32,7 +32,7 @@
 
   The current mode is stored in the property <src-var|gr-mode> of the
   picture and read by <scm|(graphics-mode)>
-  (<verbatim|graphics/graphics-main.scm>), which always returns a list of
+  (<source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>), which always returns a list of
   two symbols:
 
   <\description>
@@ -60,7 +60,7 @@
   point mode and group mode, and finally stores the new mode.
   <scm|graphics-group-mode?> tests for group mode. The menu entries of the
   <menu|Insert> and <menu|Focus> menus and the toolbar icons
-  (<verbatim|graphics/graphics-menu.scm>) are mostly calls to
+  (<source-link|graphics/graphics-menu.scm|TeXmacs/progs/graphics/graphics-menu.scm>) are mostly calls to
   <scm|graphics-set-mode> with the appropriate argument.
 
   <section|The editor state>
@@ -68,8 +68,8 @@
   <subsection|The state object>
 
   The state of the editor is declared in
-  <verbatim|graphics/graphics-env.scm> with <scm|define-state>
-  (<verbatim|kernel/texmacs/tm-states.scm>):
+  <source-link|graphics/graphics-env.scm|TeXmacs/progs/graphics/graphics-env.scm> with <scm|define-state>
+  (<source-link|kernel/texmacs/tm-states.scm|TeXmacs/progs/kernel/texmacs/tm-states.scm>):
 
   <\scm-code>
     (define-state graphics-state
@@ -181,7 +181,7 @@
   closest to the mouse (<scm|object-closest-point-pos>). The source code
   calls this a hack.
 
-  <scm|(graphics-path <scm-arg|p>)> (<verbatim|graphics/graphics-utils.scm>)
+  <scm|(graphics-path <scm-arg|p>)> (<source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>)
   goes up from a path until it reaches a tree whose ancestors include a
   <markup|graphics> without crossing a graphical text tag, and returns the
   path of the object, or <scm|#f>. Hence for a path to the second point of
@@ -197,7 +197,7 @@
 
   <subsection|Event dispatch>
 
-  The handlers called by C++ (<verbatim|graphics/graphics-edit.scm>) just
+  The handlers called by C++ (<source-link|graphics/graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm>) just
   dispatch on the first component of the mode, unless the cursor is inside
   a label (<scm|inside-graphical-text?>), in which case the events are
   ignored, or a click in a label moves the cursor within the label:
@@ -216,7 +216,7 @@
   <scm|edit_tab-key> are defined with <scm|tm-define> and overloaded with
   <scm|:require> clauses on the mode (<scm|'edit>, <scm|'hand-edit>,
   <scm|'group-edit>) and on the current object. The default versions in
-  <verbatim|graphics/graphics-single.scm> print a message; the default
+  <source-link|graphics/graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm> print a message; the default
   drag handlers fall back to the button and move handlers. Note that
   <scm|graphics-start-drag-right> and <scm|graphics-end-drag-right> are
   mapped to a right click, and <scm|graphics-dragging-right> to a move.
@@ -226,7 +226,7 @@
   <subsection|The sketch>
 
   The <em|sketch>, stored in the slot <scm|the-sketch>, is the list of
-  objects the editor is working on (<verbatim|graphics/graphics-object.scm>):
+  objects the editor is working on (<source-link|graphics/graphics-object.scm|TeXmacs/progs/graphics/graphics-object.scm>):
 
   <\itemize>
     <item>In selecting state, its elements are <em|trees> of the document:
@@ -293,7 +293,7 @@
   <section|Point mode>
 
   The functions which implement point mode are in
-  <verbatim|graphics/graphics-single.scm>. They fall into two layers: the
+  <source-link|graphics/graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm>. They fall into two layers: the
   <em|basic operations> (<scm|object_create>, <scm|object_set-point>,
   <scm|object_add-point>, <scm|object_remove-point>, <scm|object_checkout>,
   <scm|object_commit>), which act on the sketch, and the <em|edit
@@ -398,7 +398,7 @@
 
   <section|Group mode>
 
-  Group mode is implemented in <verbatim|graphics/graphics-group.scm>.
+  Group mode is implemented in <source-link|graphics/graphics-group.scm|TeXmacs/progs/graphics/graphics-group.scm>.
 
   <\description>
     <item*|Selecting>A right click calls <scm|toggle-select>, which toggles
@@ -446,8 +446,8 @@
   </description>
 
   Animation editing (<scm|(group-edit animate)>,
-  <verbatim|graphics/graphics-animate.scm>) builds on group mode and on the
-  animation editor in <verbatim|dynamic/animate-edit.scm>.
+  <source-link|graphics/graphics-animate.scm|TeXmacs/progs/graphics/graphics-animate.scm>) builds on group mode and on the
+  animation editor in <source-link|dynamic/animate-edit.scm|TeXmacs/progs/dynamic/animate-edit.scm>.
 
   <section|Undo and the state stack>
 
@@ -485,7 +485,7 @@
   <section|Properties of new objects>
 
   The default properties of new objects are the <verbatim|gr->
-  variables of the picture (<verbatim|graphics/graphics-utils.scm>):
+  variables of the picture (<source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>):
 
   <\explain>
     <scm|(graphics-get-property <scm-arg|var>)><explain-synopsis|read a
@@ -507,7 +507,7 @@
     <scm|graphics-set-color>, <scm|graphics-set-line-width>,
     <scm|graphics-set-arrow-end>, <scm|graphics-set-unit>,
     <scm|graphics-set-extents> or <scm|graphics-set-snap> are implemented
-    this way (<verbatim|graphics/graphics-main.scm>).
+    this way (<source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm>).
   </explain>
 
   <\explain>
@@ -527,16 +527,16 @@
   cursor, the functions <scm|object-set-property> and the
   commands like <scm|object-set-fill-color> and
   <scm|object-set-text-at-halign> at the end of
-  <verbatim|graphics/graphics-main.scm> modify the attributes of the label
+  <source-link|graphics/graphics-main.scm|TeXmacs/progs/graphics/graphics-main.scm> modify the attributes of the label
   itself instead.
 
   <section|Keyboard, menus and toolbars>
 
-  <verbatim|graphics/graphics-kbd.scm> defines a keymap active in
+  <source-link|graphics/graphics-kbd.scm|TeXmacs/progs/graphics/graphics-kbd.scm> defines a keymap active in
   <scm|in-active-graphics?>: zooming (<key|+>, <key|->, digits), moving
   the origin (arrow keys), changing the size (<key|A-left>, ...), z-order
   (<key|home>, <key|end>, <key|pageup>, <key|pagedown>, implemented by
-  <scm|graphics-zmove> in <verbatim|graphics/graphics-edit.scm>), grids
+  <scm|graphics-zmove> in <source-link|graphics/graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm>), grids
   (<key|#>, <key|C-g>), deletion (<key|backspace>, <key|delete> through
   <scm|graphics-kbd-remove>) and 3D rotations. It overrides
   <scm|keyboard-press> so that only these keys are interpreted in a picture
@@ -545,11 +545,11 @@
   <scm|kbd-horizontal>, <scm|geometry-vertical>, ...) for pictures and
   labels. Pinch gestures and the mouse wheel zoom and scroll the picture.
 
-  <verbatim|graphics/graphics-menu.scm> defines the <menu|Insert> and
+  <source-link|graphics/graphics-menu.scm|TeXmacs/progs/graphics/graphics-menu.scm> defines the <menu|Insert> and
   <menu|Focus> menus of graphics mode (<scm|graphics-insert-menu>,
   <scm|graphics-focus-menu>) and the toolbars (<scm|graphics-icons>,
   <scm|graphics-focus-icons>), which are linked from
-  <verbatim|texmacs/menus/main-menu.scm> when <scm|in-graphics?> holds. The
+  <source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm> when <scm|in-graphics?> holds. The
   focus menu only shows the property submenus which make sense for the
   current mode (<scm|graphics-mode-attribute?>). The check marks are
   obtained with the <scm|:check-mark> option of the setters, together with

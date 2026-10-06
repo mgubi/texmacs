@@ -8,7 +8,7 @@
   <section|Declaring glue routines>
 
   The <c++> routines which are visible from <scheme> are listed in three
-  declaration files in <verbatim|Scheme/Glue/>. Each of them is a single
+  declaration files in <source-link|Scheme/Glue/|src/Scheme/Glue>. Each of them is a single
   call of the macro <scm|build>:
 
   <\scm-code>
@@ -30,17 +30,17 @@
   their prefix:
 
   <\description>
-    <item*|<verbatim|build-glue-basic.scm>>No prefix: free functions. This
+    <item*|<source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>No prefix: free functions. This
     is the largest file (about 820 routines): trees, paths, <abbr|URL>s,
     files, buffers, views and windows, widgets, conversions, fonts,
     databases, and so on.
 
-    <item*|<verbatim|build-glue-editor.scm>>Prefix
+    <item*|<source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>>Prefix
     <verbatim|get_current_editor()-\<gtr\>>: methods of the current editor
     (about 310 routines), which must be declared in the abstract class
-    <cpp|editor_rep> (<verbatim|Edit/editor.hpp>).
+    <cpp|editor_rep> (<source-link|Edit/editor.hpp|src/Edit/editor.hpp>).
 
-    <item*|<verbatim|build-glue-server.scm>>Prefix
+    <item*|<source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm>>Prefix
     <verbatim|get_server()-\<gtr\>>: methods of the server (about 40
     routines), declared in <cpp|server_rep> (see <hlink|the server
     classes|server-classes.en.tm>).
@@ -48,7 +48,7 @@
 
   <section|The generator>
 
-  <verbatim|Scheme/Glue/build-glue.scm> defines <scm|build> as a macro
+  <source-link|Scheme/Glue/build-glue.scm|src/Scheme/Glue/build-glue.scm> defines <scm|build> as a macro
   which, when the declaration file is loaded, prints <c++> code on the
   standard output. For each entry it produces a function named after the
   <scheme> name: <verbatim|tmg_> followed by the name in which
@@ -74,7 +74,7 @@
   </enumerate>
 
   For example, the entry <verbatim|(kbd-pre-rewrite kbd_pre_rewrite
-  (string string))> of <verbatim|build-glue-server.scm> yields
+  (string string))> of <source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm> yields
 
   <\cpp-code>
     tmscm
@@ -106,17 +106,17 @@
   declaration file, which installs every routine with
   <cpp|tmscm_install_procedure> (all arguments are required; there are no
   optional or rest arguments). <cpp|initialize_glue>
-  (<verbatim|Scheme/Scheme/glue.cpp>) calls the three initialization
+  (<source-link|Scheme/Scheme/glue.cpp|src/Scheme/Scheme/glue.cpp>) calls the three initialization
   functions, after installing by hand the predicates <scm|tree?>,
   <scm|tm?>, <scm|observer?>, <scm|url?>, <scm|modification?>,
   <scm|patch?> and <scm|blackbox?>. The generated files are not compiled
-  separately: <verbatim|glue.cpp> includes them after all the headers that
+  separately: <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp> includes them after all the headers that
   the glued routines need.
 
   <section|Types>
 
   A type name <em|t> can be used in a declaration as soon as
-  <verbatim|glue.cpp> (or <verbatim|guile_tm.hpp>) provides
+  <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp> (or <source-link|guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp>) provides
   <verbatim|TMSCM_ASSERT_<em|T>>, <verbatim|tmscm_to_<em|t>> (for
   arguments) and <verbatim|<em|t>_to_tmscm> (for results). The types
   currently used are:
@@ -156,7 +156,7 @@
   tree; results of type <verbatim|content> are trees.
 
   To add a new type, define the three items above in
-  <verbatim|glue.cpp> (and usually a <verbatim|tmscm_is_<em|t>>
+  <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp> (and usually a <verbatim|tmscm_is_<em|t>>
   predicate). For a <c++> class which only needs to be passed around, the
   easiest is to box it, as is done for <cpp|command>:
 
@@ -173,15 +173,15 @@
   together with a <verbatim|tmscm_is_<em|t>> test on <cpp|type_box> and
   the <verbatim|TMSCM_ASSERT_<em|T>> macro. If values of the new type
   should print nicely, add a case to <cpp|print_blackbox> in
-  <verbatim|guile_tm.cpp>.
+  <source-link|guile_tm.cpp|src/Scheme/Guile/guile_tm.cpp>.
 
   <section|Regenerating the glue>
 
-  The generated files <verbatim|glue_basic.cpp>, <verbatim|glue_editor.cpp>
-  and <verbatim|glue_server.cpp> are part of the repository, and the
+  The generated files <source-link|glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp>, <source-link|glue_editor.cpp|src/Scheme/Glue/glue_editor.cpp>
+  and <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp> are part of the repository, and the
   <name|CMake> build compiles them as they are: it has no rule to
   regenerate them. After changing a declaration file, regenerate the
-  corresponding file by hand, in the directory <verbatim|Scheme/Glue/>:
+  corresponding file by hand, in the directory <source-link|Scheme/Glue/|src/Scheme/Glue>:
 
   <\verbatim-code>
     ./build-glue build-glue-basic.scm glue_basic.cpp [<em|guile-binary>]
@@ -189,7 +189,7 @@
 
   This needs a <name|Guile> interpreter (<verbatim|guile> by default, or
   the binary given as third argument or in <verbatim|GUILE_BIN>). In the
-  traditional build, <verbatim|make GLUE> in <verbatim|src/src/>
+  traditional build, <verbatim|make GLUE> in <source-link|src/src/|src>
   regenerates all three files with the <verbatim|GUILE_BIN> found by
   <verbatim|configure>.
 
@@ -197,19 +197,19 @@
   regenerates two files from the three declaration files:
 
   <\itemize>
-    <item><verbatim|TeXmacs/progs/prog/glue-symbols.scm>
-    (<verbatim|make-apidoc-module.scm>), the list of all glued symbols
+    <item><source-link|TeXmacs/progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>
+    (<source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>), the list of all glued symbols
     returned by <scm|all-glued-symbols>, used for the completion of
-    <scheme> code (<verbatim|prog/scheme-autocomplete.scm>);
+    <scheme> code (<source-link|prog/scheme-autocomplete.scm|TeXmacs/progs/prog/scheme-autocomplete.scm>);
 
-    <item><verbatim|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>
-    (<verbatim|make-apidoc-doc.scm>), <hlink|the reference of all glue
+    <item><source-link|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>
+    (<source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm>), <hlink|the reference of all glue
     routines|../scheme/api/glue-auto-doc.en.tm>.
   </itemize>
 
   These two files, too, are committed, and should be regenerated together
   with the glue so that they stay in sync. At the time of writing, all
-  three generated <c++> files and <verbatim|glue-symbols.scm> agree with
+  three generated <c++> files and <source-link|glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm> agree with
   the declarations (1181 routines in total).
 
   <section|Adding a glue routine, step by step>
@@ -217,9 +217,9 @@
   <\enumerate>
     <item>Write the <c++> routine. For a free function, declare it in a
     header and make sure that this header is included in the
-    \PGluing\Q section near the end of <verbatim|Scheme/Scheme/glue.cpp>
+    \PGluing\Q section near the end of <source-link|Scheme/Scheme/glue.cpp|src/Scheme/Scheme/glue.cpp>
     (many headers are already there). For an editor method, add a pure
-    virtual declaration to <cpp|editor_rep> in <verbatim|Edit/editor.hpp>
+    virtual declaration to <cpp|editor_rep> in <source-link|Edit/editor.hpp|src/Edit/editor.hpp>
     and implement it in the appropriate <verbatim|edit_*_rep> class; for a
     server method, likewise in <cpp|server_rep> and the classes of
     <verbatim|Texmacs/>. Use only argument and return types from the list
@@ -237,14 +237,14 @@
     <verbatim|cpp-> for low level routines that are meant to be wrapped by
     a <scheme> function of the same name without the prefix (there are
     about 50 of these, such as <scm|cpp-buffer-close>, which is wrapped by
-    <scm|buffer-close> in <verbatim|texmacs/texmacs/tm-server.scm>).
+    <scm|buffer-close> in <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>).
 
     <item>Regenerate the glue as explained above and check the diff: the
-    generated files, <verbatim|glue-symbols.scm> and
+    generated files, <source-link|glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm> and
     <verbatim|glue-auto-doc.en.tm> should all have changed.
 
     <item>Rebuild <TeXmacs>. The new procedure is defined when the
-    interpreter starts, before <verbatim|init-texmacs.scm> is loaded, and
+    interpreter starts, before <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> is loaded, and
     can be called from any module.
 
     <item>If the routine is part of the user level <abbr|API>, wrap it
@@ -259,7 +259,7 @@
   definitions|../scheme/overview/overview-lazyness.en.tm>). Within a
   module, <scm|define> creates a private definition and
   <scm|define-public> an exported one. <scm|tm-define>
-  (<verbatim|kernel/texmacs/tm-define.scm>) is different:
+  (<source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>) is different:
 
   <\itemize>
     <item>it always defines the function in the global module

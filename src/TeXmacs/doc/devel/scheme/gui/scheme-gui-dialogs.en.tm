@@ -18,7 +18,7 @@
   <scm|dynamic>: it allows you to embed one widget into another.
 
   Let's see how you create a dialog. To get started here is one little
-  example taken from <hlink|<verbatim|menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>:
+  example taken from <hlink|<source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm>|$TEXMACS_PATH/progs/kernel/gui/menu-test.scm>:
 
   <\session|scheme|default>
     <\unfolded-io|Scheme] >

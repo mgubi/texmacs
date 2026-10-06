@@ -31,7 +31,7 @@
     \ \ \ \ <example-plugin-link|menus/src/menus.cpp>
   </verbatim>
 
-  The body of the main loop of <verbatim|menus.cpp> simply contains
+  The body of the main loop of <source-link|menus.cpp|TeXmacs/examples/plugins/menus/src/menus.cpp> simply contains
 
   <\cpp-code>
     char buffer[100];
@@ -55,7 +55,7 @@
   </cpp-code>
 
   The <scheme> function <scm|menus-add> is defined in
-  <verbatim|init-menus.scm>, which contains
+  <source-link|init-menus.scm|TeXmacs/examples/plugins/menus/progs/init-menus.scm>, which contains
 
   <\scm-code>
     (plugin-configure menus

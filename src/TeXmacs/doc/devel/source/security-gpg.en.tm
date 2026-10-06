@@ -6,15 +6,15 @@
   <tmdoc-title|<name|GnuPG> encryption of documents>
 
   All encryption in <TeXmacs> is delegated to the external program
-  <verbatim|gpg>. The <scheme> code in <verbatim|progs/security/gpg/>
+  <verbatim|gpg>. The <scheme> code in <source-link|progs/security/gpg/|TeXmacs/progs/security/gpg>
   builds the command lines, sends the data and the passphrases to the
   program, and stores the results in documents. Unless stated otherwise,
-  file names below are relative to <verbatim|src/TeXmacs/progs/>.
+  file names below are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|Enabling encryption>
 
   Encryption is an experimental feature. <scm|supports-gpg?>
-  (<verbatim|security/gpg/gpg-base.scm>) is true only if
+  (<source-link|security/gpg/gpg-base.scm|TeXmacs/progs/security/gpg/gpg-base.scm>) is true only if
 
   <\itemize>
     <item>the preference <verbatim|experimental encryption> is
@@ -30,11 +30,11 @@
 
   The menus only show the encryption entries when encryption is enabled:
   the <menu|Insert|Fold|Encrypt> submenu
-  (<scm|gpg-menu>, <verbatim|dynamic/fold-menu.scm>) and the
+  (<scm|gpg-menu>, <source-link|dynamic/fold-menu.scm|TeXmacs/progs/dynamic/fold-menu.scm>) and the
   <menu|Encryption> submenu of <menu|Document>
-  (<scm|document-encryption-menu>, <verbatim|generic/document-menu.scm>).
+  (<scm|document-encryption-menu>, <source-link|generic/document-menu.scm|TeXmacs/progs/generic/document-menu.scm>).
   The key manager and the preferences are in
-  <verbatim|security/gpg/gpg-widgets.scm>.
+  <source-link|security/gpg/gpg-widgets.scm|TeXmacs/progs/security/gpg/gpg-widgets.scm>.
 
   <section|Keys and the key directory>
 
@@ -75,7 +75,7 @@
     <item*|Default identity>The preference <verbatim|gpg default key
     fingerprint> (<scm|gpg-get-default-key-fingerprint>,
     <scm|gpg-set-default-key-fingerprint> in
-    <verbatim|security/gpg/gpg-widgets.scm>), which is also stored as the
+    <source-link|security/gpg/gpg-widgets.scm|TeXmacs/progs/security/gpg/gpg-widgets.scm>), which is also stored as the
     user information <verbatim|gpg-key-fingerprint>. It is proposed as a
     recipient when a region is encrypted.
 
@@ -90,9 +90,9 @@
   <section|Running <verbatim|gpg>>
 
   All calls go through <scm|evaluate-system>, the glue for
-  <cpp|evaluate_system> (<verbatim|src/src/System/Misc/sys_utils.cpp>). On
+  <cpp|evaluate_system> (<source-link|src/src/System/Misc/sys_utils.cpp|src/System/Misc/sys_utils.cpp>). On
   <name|Unix> it starts the program with <cpp|posix_spawn>, without a
-  shell (<cpp|unix_system>, <verbatim|src/src/Plugins/Unix/unix_sys_utils.cpp>),
+  shell (<cpp|unix_system>, <source-link|src/src/Plugins/Unix/unix_sys_utils.cpp|src/Plugins/Unix/unix_sys_utils.cpp>),
   writes given strings to given file descriptors of the child and
   collects given output descriptors. An input whose descriptor is
   <math|-1> gets a fresh pipe, and the string <verbatim|$$<em|i>> in the
@@ -135,7 +135,7 @@
   <section|Encrypted regions>
 
   A document may contain encrypted regions. The markup is defined in
-  <verbatim|src/TeXmacs/packages/standard/std-security.ts>, which is part
+  <source-link|src/TeXmacs/packages/standard/std-security.ts|TeXmacs/packages/standard/std-security.ts>, which is part
   of <verbatim|std>:
 
   <\description-paragraphs>
@@ -155,11 +155,11 @@
   </description-paragraphs>
 
   The packages <verbatim|gpg-info-level-none>, <verbatim|-short> and
-  <verbatim|-detailed> (<verbatim|packages/customize/encryption/>) set
+  <verbatim|-detailed> (<source-link|packages/customize/encryption/|TeXmacs/packages/customize/encryption>) set
   <verbatim|gpg-info-level>, which determines how much information on the
   recipients is shown around decrypted blocks.
 
-  The operations are in <verbatim|security/gpg/gpg-edit.scm>:
+  The operations are in <source-link|security/gpg/gpg-edit.scm|TeXmacs/progs/security/gpg/gpg-edit.scm>:
 
   <\description>
     <item*|Insertion><scm|tm-gpg-dialogue-insert-decrypted> and the block
@@ -182,7 +182,7 @@
     passphrase encrypted region.
 
     <item*|Toggling><scm|alternate-toggle> and the focus menus and icons of
-    <verbatim|security/gpg/gpg-menu.scm> switch between the two forms;
+    <source-link|security/gpg/gpg-menu.scm|TeXmacs/progs/security/gpg/gpg-menu.scm> switch between the two forms;
     <verbatim|Recipients> changes the recipients of a decrypted region.
     Structured insertion and removal of children are disabled for all these
     tags.
@@ -206,14 +206,14 @@
   <verbatim|encryption> to <verbatim|gpg-passphrase> and saves the buffer.
 
   <paragraph|Passphrases of buffers.>They are kept in memory in the table
-  <scm|gpg-buffer-passphrase-table> of <verbatim|gpg-edit.scm>, under the
+  <scm|gpg-buffer-passphrase-table> of <source-link|gpg-edit.scm|TeXmacs/progs/security/gpg/gpg-edit.scm>, under the
   concrete file name of the buffer <em|and> under the name of its autosave
   file (suffix <verbatim|~>), and also in the wallet if it is on
   (<scm|gpg-set-buffer-passphrase>). <scm|save-buffer-as-main> is overloaded
   for encrypted buffers to copy the passphrase to the new name.
 
   <paragraph|Saving.><cpp|export_tree>
-  (<verbatim|src/src/Texmacs/Data/new_buffer.cpp>) checks whether a
+  (<source-link|src/src/Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>) checks whether a
   document in <TeXmacs> format has an initial variable
   <verbatim|encryption>; if so, it replaces the document by the result of
   the <scheme> function <scm|tree-export-encrypted> before writing it. This
@@ -225,7 +225,7 @@
   <scm|buffer-export>.
 
   <paragraph|Loading.>The file then loads like any other document;
-  <scm|load-buffer-open> (<verbatim|texmacs/texmacs/tm-files.scm>) notices
+  <scm|load-buffer-open> (<source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>) notices
   the <markup|gpg-passphrase-encrypted-buffer> tag and calls
   <scm|tm-gpg-dialogue-passphrase-decrypt-buffer>. If encryption is not
   enabled, a dialog explains how to enable it. Otherwise the passphrase is

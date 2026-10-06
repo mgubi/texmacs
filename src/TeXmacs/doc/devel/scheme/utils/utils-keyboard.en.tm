@@ -6,10 +6,10 @@
   <tmdoc-title|Keyboard bindings>
 
   Keyboard shortcuts are defined using the <scm|kbd-map> macro, which is
-  implemented in <verbatim|kernel/gui/kbd-define.scm>. The standard
+  implemented in <source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>. The standard
   bindings can be found in the files <verbatim|*-kbd.scm>, such as
-  <verbatim|generic/generic-kbd.scm>, <verbatim|math/math-kbd.scm> or
-  <verbatim|text/text-kbd.scm> (relative to <verbatim|src/TeXmacs/progs/>).
+  <source-link|generic/generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>, <source-link|math/math-kbd.scm|TeXmacs/progs/math/math-kbd.scm> or
+  <source-link|text/text-kbd.scm|TeXmacs/progs/text/text-kbd.scm> (relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>).
   See also the user manual section on <hlink|creating your own keyboard
   shortcuts|../../../main/scheme/man-custom-keyboard.en.tm>. The way
   keyboard events reach the editor is described in <hlink|the
@@ -39,7 +39,7 @@
     <verbatim|std>, <verbatim|cmd>, <verbatim|altcmd>, <verbatim|special>
     or <verbatim|structured:move> are rewritten into physical modifiers
     according to the current look and feel (see
-    <verbatim|texmacs/keyboard/prefix-kbd.scm>); they should be preferred in
+    <source-link|texmacs/keyboard/prefix-kbd.scm|TeXmacs/progs/texmacs/keyboard/prefix-kbd.scm>); they should be preferred in
     portable key bindings. The key <verbatim|var> (usually the tab key) is
     used to cycle through variants.
 
@@ -105,7 +105,7 @@
 
   Besides key bindings, many keys call overloadable routines, such as
   <scm|kbd-enter>, <scm|kbd-tab>, <scm|kbd-remove>, <scm|kbd-horizontal> or
-  <scm|kbd-vertical> (see <verbatim|generic/generic-edit.scm>). The
+  <scm|kbd-vertical> (see <source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>). The
   behaviour of these keys inside specific tags can be customized by
   redefining these routines using <scm|tm-define> with a <scm|:require>
   option.

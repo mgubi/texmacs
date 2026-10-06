@@ -9,7 +9,7 @@
 
   Before smart fonts were introduced (2013), the combination of several
   physical fonts was described explicitly by the rule based font selection
-  (<cpp|find_font> in <verbatim|Graphics/Fonts/find_font.cpp> and the
+  (<cpp|find_font> in <source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp> and the
   <scm|set-font-rules> declarations in <verbatim|progs/fonts/*.scm>, see
   the <hlink|overview|fonts.en.tm>). Three kinds of composite fonts are
   used there: <em|compound fonts>, <em|math fonts> and <em|Unicode math
@@ -22,7 +22,7 @@
 
   <section|Charmaps>
 
-  A <cpp|charmap> (<verbatim|Graphics/Fonts/charmap.hpp>) decides which of
+  A <cpp|charmap> (<source-link|Graphics/Fonts/charmap.hpp|src/Graphics/Fonts/charmap.hpp>) decides which of
   several fonts renders a symbol, and how the symbol is called in that
   font:
 
@@ -54,7 +54,7 @@
   are not translated. <cpp|advance> extracts the longest run of characters
   with the same font number, concatenating the translated symbols, exactly
   like <cpp|smart_font_rep::advance>. The concrete charmaps
-  (<verbatim|Graphics/Fonts/charmap.cpp>) are:
+  (<source-link|Graphics/Fonts/charmap.cpp|src/Graphics/Fonts/charmap.cpp>) are:
 
   <\description>
     <item*|<verbatim|any>>Every symbol, unchanged.
@@ -82,7 +82,7 @@
 
   A compound font is described by the macro
   <verbatim|(compound (<em|cm<rsub|1>> <em|font<rsub|1>>) ...)>, as in
-  <verbatim|progs/fonts/fonts-composite.scm>:
+  <source-link|progs/fonts/fonts-composite.scm|TeXmacs/progs/fonts/fonts-composite.scm>:
 
   <\scm-code>
     ((modern $v $a $b $s $d)
@@ -113,10 +113,10 @@
   <section|Math fonts>
 
   <cpp|math_font (t, base_fn, error_fn, hzf, vzf)>
-  (<verbatim|Graphics/Fonts/math_font.cpp>) implements the
+  (<source-link|Graphics/Fonts/math_font.cpp|src/Graphics/Fonts/math_font.cpp>) implements the
   <verbatim|(math (math <em|enc> <em|fonts>...) (rubber <em|enc>
   <em|fonts>...) <em|base> <em|error>)> macro (see
-  <verbatim|progs/fonts/fonts-math.scm>). It holds two translators,
+  <source-link|progs/fonts/fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>). It holds two translators,
   <cpp|math> and <cpp|rubber>, loaded from the encodings named by the
   first elements, and the lists of fonts. A translator code <math|c>
   designates the font number <math|c/256> and the character
@@ -147,10 +147,10 @@
   <section|Unicode math fonts>
 
   <cpp|unicode_math_font (up, it, bup, bit, fb)>
-  (<verbatim|Plugins/Freetype/unicode_math_font.cpp>) implements the
+  (<source-link|Plugins/Freetype/unicode_math_font.cpp|src/Plugins/Freetype/unicode_math_font.cpp>) implements the
   <verbatim|unimath> macro, which combines an upright, an italic, a bold
   upright and a bold italic <name|Unicode> font with a fallback font
-  (<verbatim|progs/fonts/fonts-math.scm>, rules
+  (<source-link|progs/fonts/fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>, rules
   <verbatim|unicode-math>). <cpp|search_font_sub> classifies each symbol
   once (cached in <cpp|mapper>): single letters go to the italic font,
   <verbatim|\<less\>b-...\<gtr\>> symbols to the bold fonts,

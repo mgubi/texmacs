@@ -7,7 +7,7 @@
 
   From an internal point of view, all modifications to the <TeXmacs> edit
   tree are decomposed into atomic modifications of eight different types
-  (see <verbatim|src/Kernel/Types/modification.hpp>; a ninth type,
+  (see <source-link|src/Kernel/Types/modification.hpp|src/Kernel/Types/modification.hpp>; a ninth type,
   <cpp|MOD_SET_CURSOR>, only records cursor positions). In this section, we describe the <scheme> interface to these fundamental
   modification routines. Even though it is usually more convenient to use
   higher level modification routines, as described in the <hlink|next
@@ -179,9 +179,9 @@
     these functions. Only <scm|tree-assign!>, <scm|tree-insert-node!> and
     <scm|tree-remove-node!> are macros which update the variable. The
     functional versions are glued from <c++> (see
-    <verbatim|src/Scheme/Glue/build-glue-basic.scm>, where
+    <source-link|src/Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>, where
     <scm|tree-insert> is called <scm|tree-var-insert>), and the other
-    routines are defined in <verbatim|progs/utils/library/tree.scm>, which
+    routines are defined in <source-link|progs/utils/library/tree.scm|TeXmacs/progs/utils/library/tree.scm>, which
     must be imported with <scm|(use-modules (utils library tree))> in
     modules which use them.
   </remark>

@@ -5,9 +5,9 @@
 <\body>
   <tmdoc-title|The evaluator of the style rewriter and its coverage>
 
-  This page describes <verbatim|src/src/Style/Evaluate/> and compares it
+  This page describes <source-link|src/src/Style/Evaluate/|src/Style/Evaluate> and compares it
   with the real evaluator <cpp|edit_env_rep::exec>
-  (<verbatim|Typeset/Env/env_exec.cpp>), whose semantics are documented in
+  (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>), whose semantics are documented in
   <hlink|evaluation of primitives|macro-expansion-exec.en.tm>.
 
   <section|Entry points>
@@ -38,15 +38,15 @@
     on the console.
   </explain>
 
-  <cpp|rewrite (tree)> (<verbatim|evaluate_rewrite.cpp>) and the evaluation
-  of inactive markup (<verbatim|evaluate_inactive.cpp>) are memoized in the
+  <cpp|rewrite (tree)> (<source-link|evaluate_rewrite.cpp|src/Style/Evaluate/evaluate_rewrite.cpp>) and the evaluation
+  of inactive markup (<source-link|evaluate_inactive.cpp|src/Style/Evaluate/evaluate_inactive.cpp>) are memoized in the
   same way, with memorizer types <verbatim|MEMORIZE_REWRITE> and
   <verbatim|MEMORIZE_INACTIVE>, and print similar traces. Helper functions
   such as <cpp|evaluate_string> evaluate and then extract an atomic result.
 
   <section|Dispatching>
 
-  <cpp|evaluate_impl> (<verbatim|evaluate_main.cpp>) is a large
+  <cpp|evaluate_impl> (<source-link|evaluate_main.cpp|src/Style/Evaluate/evaluate_main.cpp>) is a large
   <cpp|switch> on the label of the tree, with the same grouping as
   <cpp|edit_env_rep::exec>: typesetting primitives with side effects,
   macro expansion, control flow, boolean, arithmetic, textual and length
@@ -59,7 +59,7 @@
     <cpp|transfer_ip> copies the inverse path;
 
     <item>user-defined labels go to <cpp|evaluate_compound>
-    (<verbatim|evaluate_macro.cpp>), which looks the macro up in the
+    (<source-link|evaluate_macro.cpp|src/Style/Evaluate/evaluate_macro.cpp>), which looks the macro up in the
     environment and applies it.
   </itemize>
 
@@ -90,7 +90,7 @@
     <verbatim|RESIZE>, <verbatim|CLIPPED>, and <verbatim|BOX_INFO>,
     <verbatim|FRAME_DIRECT>, <verbatim|FRAME_INVERSE> (whose cases and
     implementations are present but commented out, in
-    <verbatim|evaluate_main.cpp> and <verbatim|evaluate_misc.cpp>).
+    <source-link|evaluate_main.cpp|src/Style/Evaluate/evaluate_main.cpp> and <source-link|evaluate_misc.cpp|src/Style/Evaluate/evaluate_misc.cpp>).
 
     <item*|Graphical effects>All <verbatim|EFF_*> labels
     (<verbatim|EFF_MOVE>, <verbatim|EFF_GAUSSIAN>, <verbatim|EFF_OVAL>,
@@ -116,7 +116,7 @@
   <\description>
     <item*|<markup|provide>, <markup|or-value>>Treated as <markup|assign>
     and <markup|value> respectively (marked \Pprovisory\Q in
-    <verbatim|evaluate_main.cpp:112>, <verbatim|122>).
+    <source-link|evaluate_main.cpp:112|src/Style/Evaluate/evaluate_main.cpp:112>, <verbatim|122>).
 
     <item*|<markup|drd-props>><cpp|evaluate_drd_props> returns the empty
     string without doing anything (<verbatim|evaluate_macro.cpp:82-85>).
@@ -125,12 +125,12 @@
     <cpp|evaluate_paw_length> and <cpp|evaluate_pag_length> return fixed
     values (15cm, 18cm and 23cm), <cpp|evaluate_gw_length> and
     <cpp|evaluate_gh_length> return 10cm and 6cm, and
-    <cpp|evaluate_gu_length> returns 1cm (<verbatim|evaluate_length.cpp>);
+    <cpp|evaluate_gu_length> returns 1cm (<source-link|evaluate_length.cpp|src/Style/Evaluate/evaluate_length.cpp>);
     the real computations are left in comments.
 
     <item*|Bindings><cpp|evaluate_set_binding> and
     <cpp|evaluate_get_binding> work on two static hash tables
-    <cpp|local_ref> and <cpp|global_ref> of <verbatim|evaluate_misc.cpp>,
+    <cpp|local_ref> and <cpp|global_ref> of <source-link|evaluate_misc.cpp|src/Style/Evaluate/evaluate_misc.cpp>,
     which are never connected to the references of the buffer, and
     <markup|set-binding> evaluates to the empty string (the comment says the
     work of <cpp|concater_rep::typeset_set_binding> should be done instead).

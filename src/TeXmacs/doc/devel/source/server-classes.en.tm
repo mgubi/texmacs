@@ -14,7 +14,7 @@
   constructed and connected to <scheme> and to the editors. The buffers,
   views and windows which the server manages are described in the
   following pages; they are not members of the server but global tables
-  of <verbatim|Texmacs/Data/>.
+  of <source-link|Texmacs/Data/|src/Texmacs/Data>.
 
   <section|The class hierarchy>
 
@@ -43,7 +43,7 @@
   <\explain>
     <cpp|class server_rep><explain-synopsis|the abstract server interface>
   <|explain>
-    Declared in <verbatim|Texmacs/server.hpp>. Apart from the
+    Declared in <source-link|Texmacs/server.hpp|src/Texmacs/server.hpp>. Apart from the
     constructor and destructor, all its methods are pure virtual. This
     includes <cpp|get_server ()>, which <cpp|tm_server_rep> implements by
     returning <cpp|this>, and which is used by code holding a
@@ -75,7 +75,7 @@
     A hand written reference counted handle around <cpp|server_rep*> (it
     does not use the <cpp|ABSTRACT> macros because the destruction must go
     through a <cpp|dynamic_cast> to <cpp|tm_server_rep>, see
-    <cpp|server_dec_count> in <verbatim|tm_server.cpp>). The default
+    <cpp|server_dec_count> in <source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>). The default
     constructor <cpp|server ()> creates a new <cpp|tm_server_rep>; the
     constructor from a <cpp|server_rep*> wraps an existing one.
   </explain>
@@ -83,7 +83,7 @@
   <section|The singleton and its construction>
 
   There is exactly one server. It is created as the local variable
-  <cpp|server sv> in <cpp|TeXmacs_main> (<verbatim|texmacs.cpp>) and lives
+  <cpp|server sv> in <cpp|TeXmacs_main> (<source-link|texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>) and lives
   until the GUI event loop terminates. The constructor of
   <cpp|tm_server_rep> stores a second handle in the global pointer
 
@@ -115,11 +115,11 @@
     <item>It registers itself in <cpp|the_server>, so that everything that
     follows may call <cpp|get_server ()>.
 
-    <item><cpp|initialize_scheme ()> (in <verbatim|Scheme/Guile/guile_tm.cpp>
+    <item><cpp|initialize_scheme ()> (in <source-link|Scheme/Guile/guile_tm.cpp|src/Scheme/Guile/guile_tm.cpp>
     or the corresponding file of the other <scheme> back-ends) evaluates a
     small bootstrap program, installs the <scheme> types for trees,
     <abbr|URL>s, observers, widgets, ... and calls <cpp|initialize_glue ()>
-    (<verbatim|Scheme/Scheme/glue.cpp>), which in turn calls
+    (<source-link|Scheme/Scheme/glue.cpp|src/Scheme/Scheme/glue.cpp>), which in turn calls
     <cpp|initialize_glue_basic>, <cpp|initialize_glue_editor> and
     <cpp|initialize_glue_server>.
 
@@ -132,7 +132,7 @@
     <verbatim|$TEXMACS_PATH/progs/init-texmacs.scm>, overridden by the
     <verbatim|-i> option) and the user file <cpp|my_init_file>
     (<verbatim|$TEXMACS_HOME_PATH/progs/my-init-texmacs.scm>). Loading
-    <verbatim|init-texmacs.scm> defines all modules, menus, keyboard
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> defines all modules, menus, keyboard
     bindings and so on; this is the bulk of the startup time.
 
     <item>If command line options produced <scheme> commands
@@ -147,7 +147,7 @@
 
   <paragraph|From <scheme> to the server.>The routines of
   <cpp|server_rep> are exported to <scheme> by the glue generator. The file
-  <verbatim|Scheme/Glue/build-glue-server.scm> begins with
+  <source-link|Scheme/Glue/build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm> begins with
 
   <\scm-code>
     (build
@@ -175,18 +175,18 @@
   each routine, so that <scm|(show-header #f)> becomes
   <cpp|get_server()-\<gtr\>show_header (false)>; the second string is the
   name of the generated initialization function. The generated code is in
-  <verbatim|Scheme/Glue/glue_server.cpp>, which is included by
-  <verbatim|glue.cpp>. In the same way, <verbatim|build-glue-editor.scm>
+  <source-link|Scheme/Glue/glue_server.cpp|src/Scheme/Glue/glue_server.cpp>, which is included by
+  <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp>. In the same way, <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>
   uses the prefix <verbatim|get_current_editor()-\<gtr\>>, and
-  <verbatim|build-glue-basic.scm> exports free functions without a prefix;
+  <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm> exports free functions without a prefix;
   among those are all buffer, view, window and project routines of
-  <verbatim|Texmacs/Data/> (the block starting with the comment
+  <source-link|Texmacs/Data/|src/Texmacs/Data> (the block starting with the comment
   <verbatim|;; buffers> in that file). The correspondence between the <scheme>
   names and the <c++> routines is listed in <hlink|the <scheme>
   interface|server-scheme.en.tm>.
 
   <paragraph|From the server to <scheme>.>The server calls into <scheme>
-  with the functions of <verbatim|Scheme/scheme.hpp>:
+  with the functions of <source-link|Scheme/scheme.hpp|src/Scheme/scheme.hpp>:
 
   <\description>
     <item*|<cpp|call (string fun, args...)>>Synchronous call of a <scheme>
@@ -206,7 +206,7 @@
     unsafe to run arbitrary <scheme> code, for instance in
     <cpp|kill_window_command_rep::apply> (the close box of a window
     schedules <scm|(safely-kill-window <scm-arg|id>)>), in the dialog
-    callbacks of <verbatim|tm_dialogue.cpp> and for the startup
+    callbacks of <source-link|tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp> and for the startup
     commands.
 
     <item*|<cpp|eval (string)> and <cpp|exec_file (url)>>Evaluation of a
@@ -243,7 +243,7 @@
     editor new_editor (server_rep* sv, tm_buffer buf);
   </cpp-code>
 
-  (<verbatim|Edit/editor.hpp>). <cpp|get_new_view> creates the editor with
+  (<source-link|Edit/editor.hpp|src/Edit/editor.hpp>). <cpp|get_new_view> creates the editor with
   <cpp|new_editor (get_server () -\<gtr\> get_server (), buf)>, that is,
   with the raw <cpp|server_rep*> of the singleton. Through <cpp|sv>, the
   editor accesses the keyboard configuration (<cpp|sv-\<gtr\>get_keycomb>,
@@ -257,9 +257,9 @@
   Conversely, the server reaches the editors only through the views:
 
   <\itemize>
-    <item><cpp|get_current_editor ()> (<verbatim|new_view.cpp>) returns
+    <item><cpp|get_current_editor ()> (<source-link|new_view.cpp|src/Texmacs/Data/new_view.cpp>) returns
     the editor of the current view; it is the receiver of all routines of
-    <verbatim|build-glue-editor.scm>.
+    <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>.
 
     <item><cpp|view_to_editor (url)> returns the editor of a given view.
 
@@ -283,8 +283,8 @@
   <\explain>
     <cpp|class tm_config_rep><explain-synopsis|fonts and keyboard>
   <|explain>
-    Declared in <verbatim|Texmacs/tm_config.hpp>, implemented in
-    <verbatim|Texmacs/Server/tm_config.cpp>. Its fields are
+    Declared in <source-link|Texmacs/tm_config.hpp|src/Texmacs/tm_config.hpp>, implemented in
+    <source-link|Texmacs/Server/tm_config.cpp|src/Texmacs/Server/tm_config.cpp>. Its fields are
 
     <\description>
       <item*|<cpp|var_suffix>, <cpp|unvar_suffix>>The variant and
@@ -329,8 +329,8 @@
   <\explain>
     <cpp|class tm_frame_rep><explain-synopsis|the current window>
   <|explain>
-    Declared in <verbatim|Texmacs/tm_frame.hpp>, implemented in
-    <verbatim|Texmacs/Window/tm_frame.cpp> and <verbatim|Texmacs/Window/tm_dialogue.cpp>.
+    Declared in <source-link|Texmacs/tm_frame.hpp|src/Texmacs/tm_frame.hpp>, implemented in
+    <source-link|Texmacs/Window/tm_frame.cpp|src/Texmacs/Window/tm_frame.cpp> and <source-link|Texmacs/Window/tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp>.
     Almost every method forwards to the <cpp|tm_window_rep> of the current
     view, obtained with <cpp|concrete_window ()>, after checking
     <cpp|has_current_window ()>; the check is there so that <scheme> code
@@ -350,7 +350,7 @@
       widget and <cpp|full_screen_mode> on the current editor (which
       sets a flag of the editor and invalidates the display). The state is stored in
       the server, not in the window, so it is global to the program.
-      <cpp|in_presentation_mode ()> (<verbatim|tm_server.cpp>) is a
+      <cpp|in_presentation_mode ()> (<source-link|tm_server.cpp|src/Texmacs/Server/tm_server.cpp>) is a
       shortcut for <cpp|in_full_screen_mode ()>.
 
       <item*|<cpp|dialogue_win>, <cpp|dialogue_wid>>The single dialog
@@ -371,7 +371,7 @@
       variants. Properties are an arbitrary <cpp|tree> to <cpp|tree> table
       in the window. The serial number is used by <scheme> to keep per
       window data, for instance the cursor history in
-      <verbatim|utils/library/cursor.scm>.
+      <source-link|utils/library/cursor.scm|TeXmacs/progs/utils/library/cursor.scm>.
 
       <item*|Menus and bars><cpp|menu_main>, <cpp|menu_icons>,
       <cpp|side_tools>, <cpp|bottom_tools> install a menu given by the
@@ -400,8 +400,8 @@
   <\explain>
     <cpp|class tm_server_rep><explain-synopsis|the server>
   <|explain>
-    Declared in <verbatim|Texmacs/tm_server.hpp>, implemented in
-    <verbatim|Texmacs/Server/tm_server.cpp>. Its own fields are the default zoom
+    Declared in <source-link|Texmacs/tm_server.hpp|src/Texmacs/tm_server.hpp>, implemented in
+    <source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp>. Its own fields are the default zoom
     factor <cpp|def_zoomf> and three fields of the idle monitor. The
     methods are:
 
@@ -459,7 +459,7 @@
       <item*|<cpp|quit ()>>Closes all pipes to plug-ins, calls the
       <scheme> hook <scm|quit-TeXmacs-scheme> (which runs all the code
       registered with the <scm|on-exit> macro of
-      <verbatim|kernel/boot/boot.scm>), clears the pending commands, destroys
+      <source-link|kernel/boot/boot.scm|TeXmacs/progs/kernel/boot/boot.scm>), clears the pending commands, destroys
       the <name|Qt> renderer objects and terminates the process with
       <cpp|_exit> (or <cpp|exit> in <verbatim|ADVANCED_DEVELOPER_MODE>).
       A comment in the code explains that <cpp|_exit> is used because

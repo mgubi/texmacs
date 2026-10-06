@@ -11,7 +11,7 @@
   <TeXmacs> format. In order to save or load a file in the XML format (using
   the <verbatim|.tmml> extension), you may use <menu|File|Export|Xml>
   <abbr|resp.> <menu|File|Import|Xml>. The conversion is implemented in
-  <scheme> in the directory <verbatim|convert/tmml/> of
+  <scheme> in the directory <source-link|convert/tmml/|TeXmacs/progs/convert/tmml> of
   <verbatim|$TEXMACS_PATH/progs>.
 
   It should be noticed that <TeXmacs> documents do not match a predefined

@@ -64,7 +64,7 @@
 
   <\description>
     <item*|The engine (<c++>)>The class <cpp|database> in
-    <verbatim|Plugins/Database/> holds an in-memory table of <em|lines>
+    <source-link|Plugins/Database/|src/Plugins/Database> holds an in-memory table of <em|lines>
     (<cpp|db_line>), each line associating a value to an attribute of an
     identifier during a time interval. All strings are interned as integer
     <em|atoms>. The engine maintains indices from identifiers and values to
@@ -76,7 +76,7 @@
     <scheme> as <scm|tmdb-set-field>, <scm|tmdb-get-entry>, <scm|tmdb-query>,
     <abbr|etc.>
 
-    <item*|The basic <scheme> <abbr|API>>The module <verbatim|database/db-base.scm>
+    <item*|The basic <scheme> <abbr|API>>The module <source-link|database/db-base.scm|TeXmacs/progs/database/db-base.scm>
     wraps the glue into the functions <scm|db-set-field>, <scm|db-get-entry>,
     <scm|db-search>, <abbr|etc.>, whose implicit arguments (the current
     database, the current time, a limit on the number of results, extra
@@ -85,47 +85,47 @@
     <scm|with-extra-fields> and <scm|with-time-stamp>.
 
     <item*|Customization layers (<scheme>)>The modules
-    <verbatim|db-format.scm> (encoding of values, entry formats and
-    <em|kinds> of databases), <verbatim|db-users.scm> (users, groups and
-    permissions) and <verbatim|db-version.scm> (versions of entries and
+    <source-link|db-format.scm|TeXmacs/progs/database/db-format.scm> (encoding of values, entry formats and
+    <em|kinds> of databases), <source-link|db-users.scm|TeXmacs/progs/database/db-users.scm> (users, groups and
+    permissions) and <source-link|db-version.scm|TeXmacs/progs/database/db-version.scm> (versions of entries and
     importation) redefine the basic functions using <scm|tm-define> and
     <scm|former>. Each layer adds one context variable
     (<scm|with-encoding>, <scm|with-user>) while keeping the semantics of the
     basic routines.
 
-    <item*|Databases as documents>The module <verbatim|db-convert.scm>
+    <item*|Databases as documents>The module <source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm>
     converts between database entries and the markup
-    <markup|db-entry>/<markup|db-field>; <verbatim|db-edit.scm> implements
-    the structured editing of this markup; <verbatim|db-tmfs.scm> presents a
+    <markup|db-entry>/<markup|db-field>; <source-link|db-edit.scm|TeXmacs/progs/database/db-edit.scm> implements
+    the structured editing of this markup; <source-link|db-tmfs.scm|TeXmacs/progs/database/db-tmfs.scm> presents a
     database as a virtual document with <abbr|URL>
-    <verbatim|tmfs://db/<em|kind>/<em|file>>; <verbatim|db-menu.scm> and
-    <verbatim|db-widgets.scm> implement the <menu|Data> menu, the search
+    <verbatim|tmfs://db/<em|kind>/<em|file>>; <source-link|db-menu.scm|TeXmacs/progs/database/db-menu.scm> and
+    <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm> implement the <menu|Data> menu, the search
     toolbar, the search dialogue and the identities dialogue.
 
     <item*|Database kinds>The bibliographic kind (<verbatim|"bib">) is
-    implemented by <verbatim|bib-db.scm> (entry formats and conversions
-    between <BibTeX> and database entries), <verbatim|bib-manage.scm>
+    implemented by <source-link|bib-db.scm|TeXmacs/progs/database/bib-db.scm> (entry formats and conversions
+    between <BibTeX> and database entries), <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>
     (caching of <verbatim|.bib> files as databases, importation,
     exportation, retrieval of entries and compilation of bibliographies),
-    <verbatim|bib-local.scm>, <verbatim|bib-menu.scm> and
-    <verbatim|bib-kbd.scm>. A second, much smaller kind,
-    <verbatim|"ai-agents">, is implemented by <verbatim|ai-agents-db.scm>
-    and <verbatim|ai-agents-menu.scm>.
+    <source-link|bib-local.scm|TeXmacs/progs/database/bib-local.scm>, <source-link|bib-menu.scm|TeXmacs/progs/database/bib-menu.scm> and
+    <source-link|bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm>. A second, much smaller kind,
+    <verbatim|"ai-agents">, is implemented by <source-link|ai-agents-db.scm|TeXmacs/progs/database/ai-agents-db.scm>
+    and <source-link|ai-agents-menu.scm|TeXmacs/progs/database/ai-agents-menu.scm>.
 
     <item*|<BibTeX> support>Independently of the database, the <c++> files
-    <verbatim|Data/Convert/BibTeX/parsebib.cpp> (parser) and
-    <verbatim|conservative_bib.cpp> (conservative import and export),
-    <verbatim|Plugins/Bibtex/bibtex.cpp> (running the external program and
-    reading <verbatim|.bbl> files) and <verbatim|bibtex_functions.cpp>
+    <source-link|Data/Convert/BibTeX/parsebib.cpp|src/Data/Convert/BibTeX/parsebib.cpp> (parser) and
+    <source-link|conservative_bib.cpp|src/Data/Convert/BibTeX/conservative_bib.cpp> (conservative import and export),
+    <source-link|Plugins/Bibtex/bibtex.cpp|src/Plugins/Bibtex/bibtex.cpp> (running the external program and
+    reading <verbatim|.bbl> files) and <source-link|bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>
     (<c++> versions of the <BibTeX> built-in functions such as
     <verbatim|purify$> or <verbatim|format.name$>), and the <scheme> style
-    engine in <verbatim|progs/bibtex/> (<verbatim|bib-utils.scm> and one
+    engine in <source-link|progs/bibtex/|TeXmacs/progs/bibtex> (<source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> and one
     file per style) implement the <BibTeX> side.
 
     <item*|The bibliography pipeline>The typesetter collects the keys of
     citations into the auxiliary data of the buffer; the <c++> editor
     routine <cpp|edit_process_rep::generate_bibliography> in
-    <verbatim|Edit/Process/edit_process.cpp> selects one of the strategies
+    <source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp> selects one of the strategies
     described in <hlink|Bibliographies|database-bibliography.en.tm> and
     inserts the resulting <markup|bib-list> into the body of the
     <markup|bibliography> tag.
@@ -134,53 +134,53 @@
   <subsection|Map of the source files>
 
   <\description-paragraphs>
-    <item*|Engine (<c++>, <verbatim|src/src/>)><verbatim|Plugins/Database/database.hpp>
-    (data structures and public functions), <verbatim|database.cpp> (atoms,
-    basic operations, table of open databases), <verbatim|db_disk.cpp>
+    <item*|Engine (<c++>, <source-link|src/src/|src>)><source-link|Plugins/Database/database.hpp|src/Plugins/Database/database.hpp>
+    (data structures and public functions), <source-link|database.cpp|src/Plugins/Database/database.cpp> (atoms,
+    basic operations, table of open databases), <source-link|db_disk.cpp|src/Plugins/Database/db_disk.cpp>
     (journal, persistence, compression, concurrent access),
-    <verbatim|db_index.cpp> (keywords and completions),
-    <verbatim|db_query.cpp> (queries) and <verbatim|db_sort.cpp> (sorting
+    <source-link|db_index.cpp|src/Plugins/Database/db_index.cpp> (keywords and completions),
+    <source-link|db_query.cpp|src/Plugins/Database/db_query.cpp> (queries) and <source-link|db_sort.cpp|src/Plugins/Database/db_sort.cpp> (sorting
     of results). The glue is declared in
-    <verbatim|Scheme/Glue/build-glue-basic.scm> (section <verbatim|;; native
-    TeXmacs databases>). <verbatim|Plugins/Sqlite3/> contains an unrelated
+    <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm> (section <verbatim|;; native
+    TeXmacs databases>). <source-link|Plugins/Sqlite3/|src/Plugins/Sqlite3> contains an unrelated
     and currently unused interface to <name|SQLite>.
 
-    <item*|<scheme> database modules (<verbatim|src/TeXmacs/progs/database/>)><verbatim|db-base.scm>,
-    <verbatim|db-format.scm>, <verbatim|db-users.scm>,
-    <verbatim|db-version.scm>, <verbatim|db-edit.scm>,
-    <verbatim|db-convert.scm>, <verbatim|db-markup.scm>,
-    <verbatim|db-tmfs.scm>, <verbatim|db-widgets.scm>, <verbatim|db-menu.scm>,
-    <verbatim|bib-db.scm>, <verbatim|bib-manage.scm>, <verbatim|bib-local.scm>,
-    <verbatim|bib-menu.scm>, <verbatim|bib-kbd.scm>,
-    <verbatim|ai-agents-db.scm>, <verbatim|ai-agents-menu.scm>. The same
-    directory also contains <verbatim|title-markup.scm> and
-    <verbatim|title-transform.scm>, which have nothing to do with databases
+    <item*|<scheme> database modules (<source-link|src/TeXmacs/progs/database/|TeXmacs/progs/database>)><source-link|db-base.scm|TeXmacs/progs/database/db-base.scm>,
+    <source-link|db-format.scm|TeXmacs/progs/database/db-format.scm>, <source-link|db-users.scm|TeXmacs/progs/database/db-users.scm>,
+    <source-link|db-version.scm|TeXmacs/progs/database/db-version.scm>, <source-link|db-edit.scm|TeXmacs/progs/database/db-edit.scm>,
+    <source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm>, <source-link|db-markup.scm|TeXmacs/progs/database/db-markup.scm>,
+    <source-link|db-tmfs.scm|TeXmacs/progs/database/db-tmfs.scm>, <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm>, <source-link|db-menu.scm|TeXmacs/progs/database/db-menu.scm>,
+    <source-link|bib-db.scm|TeXmacs/progs/database/bib-db.scm>, <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>, <source-link|bib-local.scm|TeXmacs/progs/database/bib-local.scm>,
+    <source-link|bib-menu.scm|TeXmacs/progs/database/bib-menu.scm>, <source-link|bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm>,
+    <source-link|ai-agents-db.scm|TeXmacs/progs/database/ai-agents-db.scm>, <source-link|ai-agents-menu.scm|TeXmacs/progs/database/ai-agents-menu.scm>. The same
+    directory also contains <source-link|title-markup.scm|TeXmacs/progs/database/title-markup.scm> and
+    <source-link|title-transform.scm|TeXmacs/progs/database/title-transform.scm>, which have nothing to do with databases
     (they implement the rendering of document titles and author data).
 
-    <item*|Styles>The editing styles <verbatim|database.ts>,
-    <verbatim|database-bib.ts>, <verbatim|database-ai-agents.ts> and the
-    <BibTeX> presentation style <verbatim|bibliography.ts> live in
-    <verbatim|src/TeXmacs/styles/test/>. The citation and bibliography
-    markup is defined in <verbatim|packages/standard/std-automatic.ts> and
-    <verbatim|packages/section/section-base.ts>.
+    <item*|Styles>The editing styles <source-link|database.ts|TeXmacs/styles/test/database.ts>,
+    <source-link|database-bib.ts|TeXmacs/styles/test/database-bib.ts>, <source-link|database-ai-agents.ts|TeXmacs/styles/test/database-ai-agents.ts> and the
+    <BibTeX> presentation style <source-link|bibliography.ts|TeXmacs/styles/test/bibliography.ts> live in
+    <source-link|src/TeXmacs/styles/test/|TeXmacs/styles/test>. The citation and bibliography
+    markup is defined in <source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts> and
+    <source-link|packages/section/section-base.ts|TeXmacs/packages/section/section-base.ts>.
 
-    <item*|<BibTeX> (<c++>)><verbatim|Data/Convert/BibTeX/parsebib.cpp>,
-    <verbatim|Data/Convert/BibTeX/conservative_bib.cpp>,
-    <verbatim|Plugins/Bibtex/bibtex.cpp>,
-    <verbatim|Plugins/Bibtex/bibtex_functions.cpp>, and
-    <verbatim|Edit/Process/edit_process.cpp> (generation of the
+    <item*|<BibTeX> (<c++>)><source-link|Data/Convert/BibTeX/parsebib.cpp|src/Data/Convert/BibTeX/parsebib.cpp>,
+    <source-link|Data/Convert/BibTeX/conservative_bib.cpp|src/Data/Convert/BibTeX/conservative_bib.cpp>,
+    <source-link|Plugins/Bibtex/bibtex.cpp|src/Plugins/Bibtex/bibtex.cpp>,
+    <source-link|Plugins/Bibtex/bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>, and
+    <source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp> (generation of the
     bibliography).
 
-    <item*|<BibTeX> (<scheme>)><verbatim|progs/convert/bibtex/> (the
+    <item*|<BibTeX> (<scheme>)><source-link|progs/convert/bibtex/|TeXmacs/progs/convert/bibtex> (the
     <verbatim|bibtex> and <verbatim|tmbib> formats and their converters),
-    <verbatim|progs/bibtex/bib-utils.scm> (style engine),
-    <verbatim|plain.scm>, <verbatim|abbrv.scm>, <verbatim|abstract.scm>,
-    <verbatim|acm.scm>, <verbatim|alpha.scm>, <verbatim|elsart-num.scm>,
-    <verbatim|ieeetr.scm>, <verbatim|siam.scm>, <verbatim|unsrt.scm>
-    (styles), <verbatim|bib-complete.scm> (completion of citation keys
-    without the database) and <verbatim|bib-widgets.scm> (the
+    <source-link|progs/bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> (style engine),
+    <source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm>, <source-link|abbrv.scm|TeXmacs/progs/bibtex/abbrv.scm>, <source-link|abstract.scm|TeXmacs/progs/bibtex/abstract.scm>,
+    <source-link|acm.scm|TeXmacs/progs/bibtex/acm.scm>, <source-link|alpha.scm|TeXmacs/progs/bibtex/alpha.scm>, <source-link|elsart-num.scm|TeXmacs/progs/bibtex/elsart-num.scm>,
+    <source-link|ieeetr.scm|TeXmacs/progs/bibtex/ieeetr.scm>, <source-link|siam.scm|TeXmacs/progs/bibtex/siam.scm>, <source-link|unsrt.scm|TeXmacs/progs/bibtex/unsrt.scm>
+    (styles), <source-link|bib-complete.scm|TeXmacs/progs/bibtex/bib-complete.scm> (completion of citation keys
+    without the database) and <source-link|bib-widgets.scm|TeXmacs/progs/bibtex/bib-widgets.scm> (the
     bibliography insertion dialogue). The file
-    <verbatim|src/TeXmacs/misc/bib/texmacs.bib> contains the entries with
+    <source-link|src/TeXmacs/misc/bib/texmacs.bib|TeXmacs/misc/bib/texmacs.bib> contains the entries with
     keys <verbatim|TeXmacs:...> used by <markup|cite-TeXmacs>.
   </description-paragraphs>
 
@@ -193,7 +193,7 @@
   <\description-paragraphs>
     <item*|<verbatim|users/users-master.tmdb>>User identities, the default
     user and, for each user and each database kind, the preferred database
-    file (<verbatim|db-users.scm>).
+    file (<source-link|db-users.scm|TeXmacs/progs/database/db-users.scm>).
 
     <item*|<verbatim|users/<em|uid>/<em|pseudo>-<em|kind>.tmdb>>The default
     per-user database of a given kind, for instance
@@ -205,10 +205,10 @@
     files: for each cached file, a copy <verbatim|<em|id>.bib> of the source,
     its conversion <verbatim|<em|id>.tm> into a <TeXmacs> document, and a
     database <verbatim|<em|id>.tmdb> containing the entries that were
-    actually cited (<verbatim|bib-manage.scm>).
+    actually cited (<source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>).
 
     <item*|<verbatim|system/database/lp-master.tmdb>>Time stamps used by
-    the literate programming tools (<verbatim|utils/literate/lp-build.scm>).
+    the literate programming tools (<source-link|utils/literate/lp-build.scm|TeXmacs/progs/utils/literate/lp-build.scm>).
 
     <item*|<verbatim|server/global.tmdb>>The state of a <TeXmacs> server
     (<scm|global-database>).
@@ -240,10 +240,10 @@
     interface, the caching of <verbatim|.bib> files, the attachment of
     bibliographies to documents and the automatic importation of attached
     entries. The preference <verbatim|"database tool"> is
-    <verbatim|"off"> by default (<verbatim|texmacs/texmacs/tm-server.scm>).
+    <verbatim|"off"> by default (<source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>).
     The engine itself is always compiled in and is used unconditionally by
     the server, the client synchronization code, the identities dialogue and
-    <verbatim|lp-build.scm>.
+    <source-link|lp-build.scm|TeXmacs/progs/utils/literate/lp-build.scm>.
 
     <item><em|Experimental or recent>: the <verbatim|"ai-agents"> kind, the
     local bibliography editor (<verbatim|tmfs://biblio/...>,

@@ -6,7 +6,7 @@
   <tmdoc-title|URLs, resolution and concretization>
 
   This page describes the <c++> class <cpp|url> of
-  <verbatim|System/Classes/url.hpp> and <verbatim|url.cpp>. The user level
+  <source-link|System/Classes/url.hpp|src/System/Classes/url.hpp> and <source-link|url.cpp|src/System/Classes/url.cpp>. The user level
   view and the <scheme> routines are documented in <hlink|the URL
   system|../scheme/api/url.en.tm>; the treatment of <verbatim|tmfs>
   <abbr|URL>s in <hlink|internals of the <TeXmacs> file
@@ -63,7 +63,7 @@
     <verbatim|(concat (root https) (concat www.texmacs.org x))>.
   </explain>
 
-  The predicates of <verbatim|url.hpp> test these forms
+  The predicates of <source-link|url.hpp|src/System/Classes/url.hpp> test these forms
   (<cpp|is_none>, <cpp|is_atomic>, <cpp|is_concat>, <cpp|is_or>,
   <cpp|is_root>, <cpp|is_wildcard>, ...) and the root of a name
   (<cpp|is_rooted>, <cpp|is_rooted_web>, <cpp|is_rooted_tmfs>,
@@ -170,7 +170,7 @@
     settings|system-boot.en.tm>). In documents from secure locations,
     the typesetter executes scripts (such as <markup|extern>) without
     first asking the <scheme> predicate <scm|secure?>
-    (<verbatim|Typeset/Env/env_exec.cpp>); the environment computes this
+    (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>); the environment computes this
     flag from the file name of the document (<cpp|edit_env_rep::secure>).
     <cpp|new_buffer_rep::secure> is initialized in the same way but not
     read anywhere.
@@ -245,7 +245,7 @@
     <item*|<cpp|materialize (u, filter)>>Resolution followed by
     concretization.
 
-    <item*|<cpp|sys_concretize (u)>>(<verbatim|file.hpp>) The concretized
+    <item*|<cpp|sys_concretize (u)>>(<source-link|file.hpp|src/System/Files/file.hpp>) The concretized
     name quoted for the shell, used by the <cpp|system (cmd, u, ...)>
     helpers.
   </description>
@@ -253,7 +253,7 @@
   For remote resources the result is a temporary file in the session's
   temporary directory, so concretized names must be used at once and not
   stored. The three fetch functions live in
-  <verbatim|System/Files/web_files.cpp>:
+  <source-link|System/Files/web_files.cpp|src/System/Files/web_files.cpp>:
 
   <\description>
     <item*|<cpp|get_from_web (u)>><verbatim|doi:> names are first

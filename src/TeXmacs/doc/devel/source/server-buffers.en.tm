@@ -10,7 +10,7 @@
   all (help pages loaded in the background, the project file of a book,
   the auxiliary documents built by <scheme>). This page describes how a
   buffer is represented, how it is named, which routines of
-  <verbatim|Texmacs/Data/new_buffer.cpp> manipulate it, and how buffers are
+  <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp> manipulate it, and how buffers are
   created, loaded, saved, renamed and closed, both at the <c++> level and
   by the user level commands written in <scheme>.
 
@@ -40,9 +40,9 @@
   <section|The global edit tree>
 
   All document bodies are children of the global tree <cpp|the_et>
-  (<verbatim|Data/Document/new_document.cpp>), a <markup|tuple> created at
+  (<source-link|Data/Document/new_document.cpp|src/Data/Document/new_document.cpp>), a <markup|tuple> created at
   startup in <cpp|texmacs_entrypoint>. The three functions of
-  <verbatim|new_document.hpp> manage its slots:
+  <source-link|new_document.hpp|src/Data/Document/new_document.hpp> manage its slots:
 
   <\description>
     <item*|<cpp|path new_document ()>>Returns the path of a free slot,
@@ -104,9 +104,9 @@
   pages opened from a document, the documents behind embedded widgets.
   Auxiliary buffers cannot be saved under their own name, but behave as if
   they were located at their master. The <scheme> routine
-  <scm|open-auxiliary> in <verbatim|texmacs/texmacs/tm-files.scm> creates
+  <scm|open-auxiliary> in <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> creates
   such a buffer from a tree and a master (via <scm|aux-set-document> and
-  <scm|aux-set-master> of <verbatim|kernel/texmacs/tm-file-system.scm>),
+  <scm|aux-set-master> of <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>),
   and <scm|load-buffer-open> sets the master of a <verbatim|tmfs://> buffer
   to the one proposed by its handler (<scm|tmfs-master>).
 
@@ -128,7 +128,7 @@
   <\explain>
     <cpp|class new_buffer_rep><explain-synopsis|file related information>
   <|explain>
-    Declared in <verbatim|Texmacs/Data/new_buffer.hpp>; a
+    Declared in <source-link|Texmacs/Data/new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>; a
     <cpp|concrete_struct> with the handle <cpp|new_buffer>. Its fields
     are:
 
@@ -169,7 +169,7 @@
   <\explain>
     <cpp|class new_data_rep><explain-synopsis|everything but the body>
   <|explain>
-    Declared in <verbatim|Data/Document/new_data.hpp>; a
+    Declared in <source-link|Data/Document/new_data.hpp|src/Data/Document/new_data.hpp>; a
     <cpp|concrete_struct> with the handle <cpp|new_data>. It holds the
     parts of a <TeXmacs> document other than the body:
 
@@ -219,7 +219,7 @@
   <\explain>
     <cpp|class tm_buffer_rep><explain-synopsis|an open document>
   <|explain>
-    Declared in <verbatim|Texmacs/tm_buffer.hpp>; <cpp|tm_buffer> is a
+    Declared in <source-link|Texmacs/tm_buffer.hpp|src/Texmacs/tm_buffer.hpp>; <cpp|tm_buffer> is a
     plain pointer to it, and <cpp|nil_buffer ()> and <cpp|is_nil> test for
     <cpp|NULL>. Its fields are:
 
@@ -247,7 +247,7 @@
 
     <\description-paragraphs>
       <item*|<cpp|attach_notifier ()>>Calls the <scheme> function
-      <scm|buffer-initialize> (defined in <verbatim|part/part-shared.scm>)
+      <scm|buffer-initialize> (defined in <source-link|part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>)
       with the buffer name and its body, and registers the body as a locus
       with the link type <verbatim|"buffer-notify">, so that every
       modification of the buffer is reported to the <scheme> function
@@ -268,7 +268,7 @@
 
   <section|Reference of the buffer routines>
 
-  Most routines of <verbatim|new_buffer.cpp> take a buffer name and do
+  Most routines of <source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp> take a buffer name and do
   nothing (or return a neutral value) if there is no such buffer. The
   exceptions are <cpp|buffer_export> and <cpp|buffer_save>, which go
   through <cpp|get_recent_view> and therefore <em|create> an empty buffer
@@ -359,15 +359,15 @@
   <cpp|with_package_definitions (package, body)> wraps a body in a
   <markup|with> which sets all the variables assigned by the package; it
   implements the <markup|with-package> primitive
-  (<verbatim|Style/Evaluate/evaluate_rewrite.cpp>,
-  <verbatim|Typeset/Env/env_exec.cpp>).
+  (<source-link|Style/Evaluate/evaluate_rewrite.cpp|src/Style/Evaluate/evaluate_rewrite.cpp>,
+  <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>).
 
   <section|Life cycle of a buffer>
 
   The <c++> routines above are deliberately simple; the policy (which
   questions are asked, what happens to autosave files, where the buffer is
-  shown) lives in <scheme>, in <verbatim|texmacs/texmacs/tm-files.scm>
-  (loading and saving) and <verbatim|texmacs/texmacs/tm-server.scm>
+  shown) lives in <scheme>, in <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>
+  (loading and saving) and <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>
   (closing). The following subsections follow a buffer through its life.
 
   <subsection|Creation>
@@ -519,7 +519,7 @@
   A <em|project> is a master document (typically a book) whose chapters
   are separate files. The chapters share the references and the auxiliary
   data of the master. Projects are implemented in
-  <verbatim|Texmacs/Data/new_project.cpp>:
+  <source-link|Texmacs/Data/new_project.cpp|src/Texmacs/Data/new_project.cpp>:
 
   <\description>
     <item*|<cpp|project_attach (prj_name)>>Sets the <cpp|project> field of

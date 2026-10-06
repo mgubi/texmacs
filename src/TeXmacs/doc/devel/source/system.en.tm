@@ -29,9 +29,9 @@
     <item>the utilities for running external programs, fetching web files,
     sending <abbr|HTTP> requests, printing messages and measuring time;
 
-    <item>the platform layers in <verbatim|Plugins/Unix>,
-    <verbatim|Plugins/MacOS>, <verbatim|Plugins/Windows>,
-    <verbatim|Plugins/Windows64> and <verbatim|Plugins/Android>.
+    <item>the platform layers in <source-link|Plugins/Unix|src/Plugins/Unix>,
+    <verbatim|Plugins/MacOS>, <source-link|Plugins/Windows|src/Plugins/Windows>,
+    <source-link|Plugins/Windows64|src/Plugins/Windows64> and <source-link|Plugins/Android|src/Plugins/Android>.
   </itemize>
 
   Several neighbouring subjects are described elsewhere. The <scheme>
@@ -48,7 +48,7 @@
   libraries used by plug-ins are in <hlink|the plug-in
   machinery|plugin-machinery.en.tm>.
 
-  All file names below are relative to <verbatim|src/src/> unless stated
+  All file names below are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -90,59 +90,59 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|System/Classes/url.hpp>, <verbatim|url.cpp>>The class
+    <item*|<source-link|System/Classes/url.hpp|src/System/Classes/url.hpp>, <source-link|url.cpp|src/System/Classes/url.cpp>>The class
     <cpp|url>: constructors and parsing, printing, operations, resolution
     (<cpp|complete>, <cpp|resolve>) and concretization.
 
-    <item*|<verbatim|System/Files/file.hpp>, <verbatim|file.cpp>>Loading and
+    <item*|<source-link|System/Files/file.hpp|src/System/Files/file.hpp>, <source-link|file.cpp|src/System/Files/file.cpp>>Loading and
     saving strings, file tests and attributes, directories, temporary,
     scratch and backup names, file operations, file searches.
 
-    <item*|<verbatim|System/Files/web_files.hpp>,
-    <verbatim|web_files.cpp>>Local copies of web, <verbatim|tmfs> and
+    <item*|<source-link|System/Files/web_files.hpp|src/System/Files/web_files.hpp>,
+    <source-link|web_files.cpp|src/System/Files/web_files.cpp>>Local copies of web, <verbatim|tmfs> and
     <em|ramdisc> resources; <abbr|HTTP> <verbatim|POST> requests.
 
-    <item*|<verbatim|System/Files/make_file.cpp>>Generated files in
+    <item*|<source-link|System/Files/make_file.cpp|src/System/Files/make_file.cpp>>Generated files in
     <verbatim|$TEXMACS_HOME_PATH/system/make> (downloaded images, images
     with effects).
 
-    <item*|<verbatim|System/Files/tm_ostream.hpp>,
-    <verbatim|tm_ostream.cpp>>Output streams: <cpp|cout>, <cpp|cerr>, the
+    <item*|<source-link|System/Files/tm_ostream.hpp|src/System/Files/tm_ostream.hpp>,
+    <source-link|tm_ostream.cpp|src/System/Files/tm_ostream.cpp>>Output streams: <cpp|cout>, <cpp|cerr>, the
     error, warning and debug channels.
 
-    <item*|<verbatim|System/Files/image_files.cpp>>Image sizes and image
+    <item*|<source-link|System/Files/image_files.cpp|src/System/Files/image_files.cpp>>Image sizes and image
     conversion; described with the graphics output, not here.
 
-    <item*|<verbatim|System/Classes/tm_timer.hpp>,
-    <verbatim|tm_timer.cpp>>Time in milliseconds, <abbr|CPU> time and the
+    <item*|<source-link|System/Classes/tm_timer.hpp|src/System/Classes/tm_timer.hpp>,
+    <source-link|tm_timer.cpp|src/System/Classes/tm_timer.cpp>>Time in milliseconds, <abbr|CPU> time and the
     benchmarking routines.
 
-    <item*|<verbatim|System/Misc/data_cache.hpp>,
-    <verbatim|data_cache.cpp>>The caches of directory contents, file
+    <item*|<source-link|System/Misc/data_cache.hpp|src/System/Misc/data_cache.hpp>,
+    <source-link|data_cache.cpp|src/System/Misc/data_cache.cpp>>The caches of directory contents, file
     attributes and file contents.
 
-    <item*|<verbatim|System/Misc/persistent.hpp>,
-    <verbatim|persistent.cpp>>A persistent key-value store on disk.
+    <item*|<source-link|System/Misc/persistent.hpp|src/System/Misc/persistent.hpp>,
+    <source-link|persistent.cpp|src/System/Misc/persistent.cpp>>A persistent key-value store on disk.
 
-    <item*|<verbatim|System/Misc/sys_utils.hpp>,
-    <verbatim|sys_utils.cpp>>Running programs synchronously and
+    <item*|<source-link|System/Misc/sys_utils.hpp|src/System/Misc/sys_utils.hpp>,
+    <source-link|sys_utils.cpp|src/System/Misc/sys_utils.cpp>>Running programs synchronously and
     asynchronously, environment variables, printing command, portable
     <cpp|poll>.
 
-    <item*|<verbatim|System/Misc/server_log.hpp>>Log levels and macros for
+    <item*|<source-link|System/Misc/server_log.hpp|src/System/Misc/server_log.hpp>>Log levels and macros for
     the <TeXmacs> server; implemented in the platform layers.
 
-    <item*|<verbatim|System/Misc/fast_alloc.hpp>,
-    <verbatim|fast_alloc.cpp>>Memory allocation (see <hlink|basic data
+    <item*|<source-link|System/Misc/fast_alloc.hpp|src/System/Misc/fast_alloc.hpp>,
+    <source-link|fast_alloc.cpp|src/System/Misc/fast_alloc.cpp>>Memory allocation (see <hlink|basic data
     types|types.en.tm>).
 
-    <item*|<verbatim|System/Boot/init_texmacs.cpp>,
-    <verbatim|init_upgrade.cpp>, <verbatim|preferences.cpp>,
-    <verbatim|boot.hpp>>Paths, environment variables, user and temporary
+    <item*|<source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>,
+    <source-link|init_upgrade.cpp|src/System/Boot/init_upgrade.cpp>, <source-link|preferences.cpp|src/System/Boot/preferences.cpp>,
+    <source-link|boot.hpp|src/System/Boot/boot.hpp>>Paths, environment variables, user and temporary
     directories, the boot lock, the settings file, upgrades and the
     <c++> store of user preferences.
 
-    <item*|<verbatim|Plugins/Unix/>>Entry point, file and directory
+    <item*|<source-link|Plugins/Unix/|src/Plugins/Unix>>Entry point, file and directory
     primitives, <cpp|system>, logging and stack traces for <name|Linux>,
     <name|macOS> and the other <name|Unix> systems.
 
@@ -150,10 +150,10 @@
     (startup modifiers, remote controls, <name|Cocoa> spell checking and
     image conversion, App Nap).
 
-    <item*|<verbatim|Plugins/Windows/>, <verbatim|Plugins/Windows64/>>The
+    <item*|<source-link|Plugins/Windows/|src/Plugins/Windows>, <source-link|Plugins/Windows64/|src/Plugins/Windows64>>The
     32-bit and 64-bit <name|Windows> layers.
 
-    <item*|<verbatim|Plugins/Android/>>The <name|Android> layer.
+    <item*|<source-link|Plugins/Android/|src/Plugins/Android>>The <name|Android> layer.
   </description-paragraphs>
 
   <section|Contents of this chapter>

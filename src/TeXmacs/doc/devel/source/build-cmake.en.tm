@@ -15,7 +15,7 @@
     cmake --build build
   </verbatim-code>
 
-  run from <verbatim|src/>. With the default <verbatim|SCHEME_IMPL>
+  run from <source-link|src/|src>. With the default <verbatim|SCHEME_IMPL>
   (<verbatim|embedded18>), the sources of the embedded <name|Guile> must
   first be made available as <verbatim|src/tm-guile188/> (from the
   <verbatim|guile-texmacs> repository); <verbatim|-DSCHEME_IMPL=system>
@@ -26,7 +26,7 @@
 
   <section|Options>
 
-  The cache variables and options defined in <verbatim|CMakeLists.txt>
+  The cache variables and options defined in <source-link|CMakeLists.txt|src/CMakeLists.txt>
   are:
 
   <\description>
@@ -49,7 +49,7 @@
     values are implemented (see the pitfalls below). Note that
     <verbatim|Qt6> is treated like <verbatim|Qt>: there is no branch which
     insists on <name|Qt> 6. All variants compile the sources of
-    <verbatim|src/Plugins/Qt/>; the directory <verbatim|src/Plugins/Qt6/> is
+    <source-link|src/Plugins/Qt/|src/Plugins/Qt>; the directory <source-link|src/Plugins/Qt6/|src/Plugins/Qt6> is
     not used by <name|CMake>.
 
     <item*|<verbatim|QTPIPES>>(on) Use <name|Qt> classes instead of
@@ -70,10 +70,10 @@
     remote servers and versioning|collaboration.en.tm>).
 
     <item*|<verbatim|USE_SQLITE3>>(on) Link <name|SQLite> if found, which
-    enables the <verbatim|Plugins/Sqlite3> back-end of the database.
+    enables the <source-link|Plugins/Sqlite3|src/Plugins/Sqlite3> back-end of the database.
 
     <item*|<verbatim|ENABLE_EXPERIMENTAL>>(off) Compile the experimental
-    style rewriting code in <verbatim|src/Style/> and define
+    style rewriting code in <source-link|src/Style/|src/Style> and define
     <verbatim|EXPERIMENTAL>.
   </description>
 
@@ -96,26 +96,26 @@
   <paragraph|Source lists.>The sources are collected with
   <verbatim|file (GLOB_RECURSE ...)> from the directories <verbatim|Data>,
   <verbatim|Edit>, <verbatim|Graphics>, <verbatim|Kernel>,
-  <verbatim|Scheme/Scheme> and <verbatim|Scheme/Guile>, <verbatim|System>,
+  <source-link|Scheme/Scheme|src/Scheme/Scheme> and <source-link|Scheme/Guile|src/Scheme/Guile>, <verbatim|System>,
   <verbatim|Typeset>, part of <verbatim|Texmacs>, the <em|standard
   plug-ins> (<verbatim|Bibtex>, <verbatim|Database>, <verbatim|Freetype>,
   <verbatim|Gnutls>, <verbatim|Pdf>, <verbatim|Ghostscript>,
   <verbatim|Ispell>, <verbatim|Metafont>, <verbatim|LaTeX_Preview>,
   <verbatim|Openssl>, <verbatim|Updater>, and optionally
   <verbatim|Resvg> and <verbatim|Sqlite3>), the <name|Qt> port, and the
-  operating system layer (<verbatim|Plugins/Unix> on <name|Linux>,
-  <verbatim|Plugins/Windows> or <verbatim|Plugins/Windows64> on
+  operating system layer (<source-link|Plugins/Unix|src/Plugins/Unix> on <name|Linux>,
+  <source-link|Plugins/Windows|src/Plugins/Windows> or <source-link|Plugins/Windows64|src/Plugins/Windows64> on
   <name|Windows>). Since the lists are globbed, a new <verbatim|.cpp> file
   is picked up automatically, but only after <name|CMake> is run again; a
   file in a directory which is not listed (for instance a new plug-in
-  directory) must be added to <verbatim|CMakeLists.txt>. The
-  <verbatim|Scheme/Tiny>, <verbatim|Plugins/X11>, <verbatim|Plugins/Widkit>,
+  directory) must be added to <source-link|CMakeLists.txt|src/CMakeLists.txt>. The
+  <source-link|Scheme/Tiny|src/Scheme/Tiny>, <source-link|Plugins/X11|src/Plugins/X11>, <source-link|Plugins/Widkit|src/Plugins/Widkit>,
   <verbatim|Plugins/Cocoa>, <verbatim|Plugins/MacOS>,
-  <verbatim|Plugins/Cairo>, <verbatim|Plugins/Imlib2> and
-  <verbatim|Plugins/Qt6> directories are never compiled by <name|CMake>.
+  <source-link|Plugins/Cairo|src/Plugins/Cairo>, <source-link|Plugins/Imlib2|src/Plugins/Imlib2> and
+  <source-link|Plugins/Qt6|src/Plugins/Qt6> directories are never compiled by <name|CMake>.
 
   <paragraph|Targets.>All sources are compiled once into the object
-  library <verbatim|texmacs_body> (<verbatim|src/CMakeLists.txt>), with
+  library <verbatim|texmacs_body> (<source-link|src/CMakeLists.txt|src/CMakeLists.txt>), with
   <verbatim|AUTOMOC> for the <name|Qt> classes and with the generated
   <verbatim|config.h> force-included in every file
   (<verbatim|-include .../src/System/config.h>). The executables are then
@@ -123,44 +123,44 @@
 
   <\itemize>
     <item>on <name|Linux> and other <name|Unix> systems,
-    <verbatim|texmacs.bin> with <verbatim|Plugins/Unix/unix_entrypoint.cpp>,
+    <verbatim|texmacs.bin> with <source-link|Plugins/Unix/unix_entrypoint.cpp|src/Plugins/Unix/unix_entrypoint.cpp>,
     written to <verbatim|TeXmacs/bin/> of the build directory;
 
     <item>on <name|Windows>, <verbatim|texmacs.exe> with the 32 or 64 bit
     entry point and the resource file <verbatim|packages/windows/resource.rc>,
     and <verbatim|texmacs-open.exe> from
-    <verbatim|src/Launcher/texmacs_open_main.cpp>; both are copied to
+    <source-link|src/Launcher/texmacs_open_main.cpp|src/Launcher/texmacs_open_main.cpp>; both are copied to
     <verbatim|TeXmacs/bin/> as <verbatim|*.bin> and also to the top of the
     build directory;
 
     <item>on <name|macOS>, a <verbatim|MACOSX_BUNDLE> named
-    <verbatim|TeXmacs> with <verbatim|packages/macos/Info.plist.in>.
+    <verbatim|TeXmacs> with <source-link|packages/macos/Info.plist.in|packages/macos/Info.plist.in>.
   </itemize>
 
-  The <c++> unit tests of <verbatim|tests/> link against the same object
+  The <c++> unit tests of <source-link|tests/|tests> link against the same object
   library; see <hlink|automatic tests|build-tests.en.tm>.
 
   <paragraph|The runtime tree.>In an out-of-source build, the whole
-  <verbatim|TeXmacs/> directory is copied into the build directory when
+  <source-link|TeXmacs/|packages/macos/TeXmacs> directory is copied into the build directory when
   <name|CMake> runs, and the target <verbatim|deploy_texmacs_to_build>
   (part of <verbatim|ALL>) copies it again at every build, so that changes
   to <scheme> files, styles or documentation reach the build tree. The copy
   only adds and overwrites files: a file deleted in the source tree stays
   in the build tree until the build directory is cleaned. An in-source
-  build (with a warning) uses <verbatim|TeXmacs/> directly and writes the
+  build (with a warning) uses <source-link|TeXmacs/|packages/macos/TeXmacs> directly and writes the
   generated files into the source tree. In both cases the version string
   is written to <verbatim|TeXmacs/SVNREV>.
 
   <paragraph|Generated headers.><verbatim|config.h> and
   <verbatim|tm_configure.hpp> are generated with <verbatim|configure_file>
-  from <verbatim|src/System/config.h.cmake> and
-  <verbatim|src/System/tm_configure.hpp.cmake> into
+  from <source-link|src/System/config.h.cmake|src/System/config.h.cmake> and
+  <source-link|src/System/tm_configure.hpp.cmake|src/System/tm_configure.hpp.cmake> into
   <verbatim|<em|build>/src/System/>. The first one holds the feature macros
   (<verbatim|QTTEXMACS>, <verbatim|USE_FREETYPE>, <verbatim|GUILE_C>, ...),
   the second the version, the build user and date, and the host
   description reported by <verbatim|-version> and in crash reports. The
   scripts <verbatim|texmacs> and <verbatim|fig2ps> and the manual page are
-  generated by <verbatim|misc/CMakeLists.txt>.
+  generated by <source-link|misc/CMakeLists.txt|misc/CMakeLists.txt>.
 
   <paragraph|The glue.>The <name|CMake> build compiles the generated glue
   files <verbatim|src/Scheme/Glue/glue_*.cpp> as they are in the
@@ -170,7 +170,7 @@
   glue|scheme-bridge-glue.en.tm>.
 
   <paragraph|Installation.><verbatim|cmake --install> installs the
-  executable, the <verbatim|TeXmacs/> tree into
+  executable, the <source-link|TeXmacs/|packages/macos/TeXmacs> tree into
   <verbatim|share/TeXmacs> (or the installation prefix itself on
   <name|Windows>), the plug-ins, and the desktop file, icons and
   <name|MIME> description for <name|Linux> desktops.
@@ -188,34 +188,34 @@
     alone (<verbatim|src/CMakeLists.txt:124-142>): no entry point is
     added (the <name|Unix> one is only used in the <verbatim|else> branch),
     and the list of operating system sources is left empty for
-    <name|Apple> (<verbatim|CMakeLists.txt>, \PApple/Cocoa\Q), so the
+    <name|Apple> (<source-link|CMakeLists.txt|src/CMakeLists.txt>, \PApple/Cocoa\Q), so the
     <verbatim|.mm> files of <verbatim|Plugins/MacOS> and the
-    <verbatim|Plugins/Unix> files are not compiled although
+    <source-link|Plugins/Unix|src/Plugins/Unix> files are not compiled although
     <verbatim|MACOSX_EXTENSIONS> is defined. As far as can be seen from the
     files, a <name|CMake> build on <name|macOS> cannot link; the autotools
     build is the one used on that platform.
 
     <item>On <name|Unix>, the executable is installed to
-    <verbatim|${tmbin}/bin> (<verbatim|src/CMakeLists.txt:157>), but
-    <verbatim|tmbin> is only defined in <verbatim|misc/CMakeLists.txt>,
+    <verbatim|${tmbin}/bin> (<source-link|src/CMakeLists.txt:157|src/CMakeLists.txt:157>), but
+    <verbatim|tmbin> is only defined in <source-link|misc/CMakeLists.txt|misc/CMakeLists.txt>,
     which is a sibling directory processed later; in
-    <verbatim|src/> the variable is empty and the binary is installed to
+    <source-link|src/|src> the variable is empty and the binary is installed to
     <verbatim|/bin> under the installation root rather than
     <verbatim|libexec/TeXmacs/bin> where the <verbatim|texmacs> script
     looks for it.
 
-    <item>The include path lists <verbatim|src/System> of the source tree
-    before <verbatim|src/System> of the build tree. If an autotools build
+    <item>The include path lists <source-link|src/System|src/System> of the source tree
+    before <source-link|src/System|src/System> of the build tree. If an autotools build
     has been run in the same source tree, its <verbatim|config.h> and
     <verbatim|tm_configure.hpp> (which are not version controlled) are
     found first by <verbatim|#include "tm_configure.hpp"> and by the files
     which include <verbatim|config.h> explicitly, while the force-included
     <verbatim|config.h> is the <name|CMake> one. Remove the generated files
-    from <verbatim|src/System> (or use a separate checkout) before
+    from <source-link|src/System|src/System> (or use a separate checkout) before
     switching build systems.
 
-    <item>The helper files <verbatim|cmake/CreateBundle.sh.in> and
-    <verbatim|cmake/CompleteBundle.cmake.in> are not referenced by any
+    <item>The helper files <source-link|cmake/CreateBundle.sh.in|cmake/CreateBundle.sh.in> and
+    <source-link|cmake/CompleteBundle.cmake.in|cmake/CompleteBundle.cmake.in> are not referenced by any
     <name|CMake> file; they are leftovers of an older bundle procedure.
   </itemize>
 

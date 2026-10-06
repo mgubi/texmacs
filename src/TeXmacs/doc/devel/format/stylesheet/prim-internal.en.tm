@@ -72,7 +72,7 @@
     <explain-macro|tag|id|body><explain-synopsis|attach a label to some
     content>
   <|explain>
-    This built-in macro (defined in <verbatim|Typeset/Env/env_default.cpp>)
+    This built-in macro (defined in <source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>)
     adds the label <src-arg|id> to the <src-var|the-tags> environment
     variable while typesetting <src-arg|body>. The next
     <explain-macro|set-binding|value> inside <src-arg|body> (typically

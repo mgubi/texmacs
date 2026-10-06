@@ -12,7 +12,7 @@
   the serialization in <scheme>.
 
   <\enumerate>
-    <item><cpp|buffer_export> (<verbatim|Texmacs/Data/new_buffer.cpp>)
+    <item><cpp|buffer_export> (<source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>)
     attaches the current view to the document (attribute
     <verbatim|view>) and calls <cpp|export_tree>, which calls
     <cpp|tree_to_generic> with the format <verbatim|latex-document>. The
@@ -22,13 +22,13 @@
     <cpp|conservative_texmacs_to_latex>.
 
     <item><cpp|conservative_texmacs_to_latex>
-    (<verbatim|Data/Convert/Tex/conservative_totex.cpp>) checks whether the
+    (<source-link|Data/Convert/Tex/conservative_totex.cpp|src/Data/Convert/Tex/conservative_totex.cpp>) checks whether the
     document was itself imported from <LaTeX> with source tracking; if so,
     unchanged parts of the original <LaTeX> source are reused (see
     <hlink|source tracking and conservative
     conversion|convert-latex-tracking.en.tm>). Otherwise, or after this
     preparation, it calls <cpp|tracked_texmacs_to_latex>
-    (<verbatim|tracked_totex.cpp>).
+    (<source-link|tracked_totex.cpp|src/Data/Convert/Tex/tracked_totex.cpp>).
 
     <item><cpp|tracked_texmacs_to_latex> first calls <cpp|latex_expand>,
     which retrieves the view from the <verbatim|view> attribute and calls
@@ -36,14 +36,14 @@
     <TeXmacs> macros which have no <LaTeX> counterpart (see below). Then it
     calls <cpp|tree_to_latex_document>, which calls the <scheme> function
     <scm|texmacs-\<gtr\>latex-document> from
-    <verbatim|convert/latex/init-latex.scm>, possibly several times when
+    <source-link|convert/latex/init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm>, possibly several times when
     source tracking is enabled.
 
     <item><scm|texmacs-\<gtr\>latex-document> converts the tree into an
     stree, calls <scm|texmacs-\<gtr\>latex>
-    (<verbatim|convert/latex/tmtex.scm>) to obtain a <LaTeX> stree, and
+    (<source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>) to obtain a <LaTeX> stree, and
     serializes it with <scm|serialize-latex>
-    (<verbatim|convert/latex/texout.scm>).
+    (<source-link|convert/latex/texout.scm|TeXmacs/progs/convert/latex/texout.scm>).
   </enumerate>
 
   Snippets (copying a selection as <LaTeX>) skip the <c++> stages and go
@@ -62,7 +62,7 @@
     <cpp|tree edit_typeset_rep::exec_latex (tree t, path p)><explain-synopsis|expand
     macros unknown to the <LaTeX> converter>
   <|explain>
-    Implemented in <verbatim|Edit/Editor/edit_typeset.cpp> and accessible
+    Implemented in <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp> and accessible
     from <scheme> as <scm|latex-expand>. Nothing is done unless one of the
     preferences <verbatim|"texmacs-\<gtr\>latex:expand-macros"> or
     <verbatim|"texmacs-\<gtr\>latex:expand-user-macros"> is
@@ -78,7 +78,7 @@
     separately so that the user's definitions survive.
   </explain>
 
-  The patch returned by <scm|tmtex-env-patch> (end of <verbatim|tmtex.scm>)
+  The patch returned by <scm|tmtex-env-patch> (end of <source-link|tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>)
   is a collection of <em|identity macros> <scm|(xmacro "x" (eval-args
   "x"))>, which protect a tag from expansion while still evaluating its
   arguments. Protected are:
@@ -115,7 +115,7 @@
   the <LaTeX> command <verbatim|\\<em|cmd>{<em|arg1>}...{<em|argn>}>,
   strings stand for <LaTeX> text, and a number of special labels starting
   with <verbatim|!> stand for other constructs. The serializer
-  <scm|texout> in <verbatim|convert/latex/texout.scm> recognizes the
+  <scm|texout> in <source-link|convert/latex/texout.scm|TeXmacs/progs/convert/latex/texout.scm> recognizes the
   following labels:
 
   <\description-paragraphs>
@@ -171,7 +171,7 @@
 
   Any other list is serialized as a command application by
   <scm|texout-apply>. The serializer writes into the output buffer of
-  <verbatim|convert/tools/output.scm> (<scm|output-text>,
+  <source-link|convert/tools/output.scm|TeXmacs/progs/convert/tools/output.scm> (<scm|output-text>,
   <scm|output-verbatim>, <scm|output-lf>, <abbr|etc.>), which takes care of
   indentation and line breaking; <scm|serialize-latex> returns the
   accumulated string via <scm|output-produce>.
@@ -196,7 +196,7 @@
     (<scm|tmtm-eqnumber-\<gtr\>nonumber>), brackets are matched
     (<scm|tmtm-match-brackets>), the options are decoded
     (<scm|tmtex-initialize>), the tree is pre-processed by
-    <scm|tmpre-produce> (<verbatim|convert/tools/tmpre.scm>) and converted by
+    <scm|tmpre-produce> (<source-link|convert/tools/tmpre.scm|TeXmacs/progs/convert/tools/tmpre.scm>) and converted by
     <scm|tmtex>. Finally, if the option
     <verbatim|"texmacs-\<gtr\>latex:use-macros"> is off, the <LaTeX> macros
     introduced by <TeXmacs> are expanded in place by
@@ -325,15 +325,15 @@
 
   The behavior of the converter depends on the <TeXmacs> style of the
   document. The modes declared by <scm|texmacs-modes> at the top of
-  <verbatim|tmtex.scm> (<scm|elsevier-style%>, <scm|acm-style%>,
+  <source-link|tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm> (<scm|elsevier-style%>, <scm|acm-style%>,
   <scm|ams-style%>, <scm|revtex-style%>, <scm|springer-style%>,
   <scm|ieee-style%>, <scm|beamer-style%>, <scm|natbib-package%>, ...)
   test <scm|tmtex-style> and <scm|tmtex-packages>. The modules
-  <verbatim|tmtex-acm.scm>, <verbatim|tmtex-ams.scm>, <abbr|etc.> are
+  <source-link|tmtex-acm.scm|TeXmacs/progs/convert/latex/tmtex-acm.scm>, <source-link|tmtex-ams.scm|TeXmacs/progs/convert/latex/tmtex-ams.scm>, <abbr|etc.> are
   imported by <scm|import-tmtex-styles> and redefine some functions with
   <scm|tm-define> and the <scm|:mode> option (see <hlink|function
   definition and contextual overloading|../scheme/utils/utils-overload.en.tm>).
-  For instance <verbatim|tmtex-ams.scm> contains
+  For instance <source-link|tmtex-ams.scm|TeXmacs/progs/convert/latex/tmtex-ams.scm> contains
 
   <\scm-code>
     (tm-define (tmtex-transform-style x)
@@ -366,8 +366,8 @@
   Many <TeXmacs> tags are exported to <LaTeX> commands which do not exist in
   standard <LaTeX>, such as <verbatim|\\tmstrong>, <verbatim|\\tmop>,
   <verbatim|\\tmtextbf>, or environments such as <verbatim|tmindent>. Their
-  definitions are kept in <em|smart tables> (<verbatim|utils/library/smart-table.scm>)
-  in <verbatim|convert/latex/latex-define.scm>:
+  definitions are kept in <em|smart tables> (<source-link|utils/library/smart-table.scm|TeXmacs/progs/utils/library/smart-table.scm>)
+  in <source-link|convert/latex/latex-define.scm|TeXmacs/progs/convert/latex/latex-define.scm>:
 
   <\description-paragraphs>
     <item*|<scm|latex-texmacs-macro>>Macro bodies, written as <LaTeX>
@@ -384,10 +384,10 @@
   </description-paragraphs>
 
   The arity of these macros is declared in
-  <verbatim|latex-texmacs-drd.scm> (groups <scm|latex-texmacs-0%>,
+  <source-link|latex-texmacs-drd.scm|TeXmacs/progs/convert/latex/latex-texmacs-drd.scm> (groups <scm|latex-texmacs-0%>,
   <scm|latex-texmacs-1%>, ..., <scm|latex-texmacs-environment-0%>,
   <abbr|etc.>, which feed <scm|latex-texmacs-arity%>). Entries of a smart
-  table may be conditional; <verbatim|latex-overload.scm> uses this to
+  table may be conditional; <source-link|latex-overload.scm|TeXmacs/progs/convert/latex/latex-overload.scm> uses this to
   change definitions according to the <LaTeX> document class or packages,
   for instance
 
@@ -400,7 +400,7 @@
   </scm-code>
 
   The preamble is computed by <scm|latex-preamble> in
-  <verbatim|latex-tools.scm>, called from <scm|texout-file>. It returns the
+  <source-link|latex-tools.scm|TeXmacs/progs/convert/latex/latex-tools.scm>, called from <scm|texout-file>. It returns the
   document class options, the <verbatim|\\usepackage> lines, the page size
   settings and the macro definitions:
 
@@ -416,7 +416,7 @@
 
     <item><scm|latex-use-package-command> collects the packages needed by
     the commands of the document from the table <scm|latex-needs%> in
-    <verbatim|latex-drd.scm> (<abbr|e.g.> <scm|(includegraphics "graphicx")>),
+    <source-link|latex-drd.scm|TeXmacs/progs/convert/latex/latex-drd.scm> (<abbr|e.g.> <scm|(includegraphics "graphicx")>),
     removes the ones implied by others (<scm|latex-depends%>) or provided by
     the class, and sorts them with <scm|latex-package-priority%>.
 
@@ -467,8 +467,8 @@
   <verbatim|\\tmmathbf>, Unicode characters <verbatim|\<less\>#XXXX\<gtr\>>
   become <scm|!widechar>, and other symbols become the <LaTeX> command with
   the same name (hyphens removed) provided that it occurs in the symbol table
-  <scm|latex-symbol%> (<verbatim|latex-symbol-drd.scm> and
-  <verbatim|latex-texmacs-drd.scm>). Unknown symbols are reported on the
+  <scm|latex-symbol%> (<source-link|latex-symbol-drd.scm|TeXmacs/progs/convert/latex/latex-symbol-drd.scm> and
+  <source-link|latex-texmacs-drd.scm|TeXmacs/progs/convert/latex/latex-texmacs-drd.scm>). Unknown symbols are reported on the
   console (<verbatim|non converted symbol>) and exported as
   <verbatim|\\nonconverted{...}>.
 
@@ -515,7 +515,7 @@
   <verbatim|\\mathord>, <verbatim|\\mathrel>, <abbr|etc.>
 
   Tables are converted by <scm|tmtex-table-apply> with the help of the table
-  parser of <verbatim|convert/tools/old-tmtable.scm>. The table
+  parser of <source-link|convert/tools/old-tmtable.scm|TeXmacs/progs/convert/tools/old-tmtable.scm>. The table
   <scm|tmtex-table-props%> gives, for each tabular macro
   (<markup|tabular>, <markup|matrix>, <markup|choice>, ...), the material
   to put before and after, the default alignment and whether borders are
@@ -565,7 +565,7 @@
 
   The options of the converters from <verbatim|texmacs-stree> to
   <verbatim|latex-stree> and to <verbatim|latex-document> are declared in
-  <verbatim|init-latex.scm> and appear in the menu
+  <source-link|init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm> and appear in the menu
   tab <menu|Convert> (sub-tab <menu|LaTeX>) of the preferences dialog. Some are passed in the option list
   of the converter, some are read directly as preferences.
 
@@ -595,7 +595,7 @@
   <scm|tmtex-initialize>. The preference
   <verbatim|"texmacs-\<gtr\>latex:attach-tracking-info"> appears in the
   preferences dialog, but is not read anywhere in the conversion code of
-  this version; likewise <verbatim|init-latex.scm> declares a preference
+  this version; likewise <source-link|init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm> declares a preference
   <verbatim|"texmacs-\<gtr\>latex:transparent-tracking"> which is not used.
 
   <section|How to add support for a new tag>
@@ -611,14 +611,14 @@
     the generated file does not define <verbatim|\\mynote>.
 
     <item>To provide a definition, add an entry to the smart table
-    <scm|latex-texmacs-macro> in <verbatim|latex-define.scm>, <abbr|e.g.>
+    <scm|latex-texmacs-macro> in <source-link|latex-define.scm|TeXmacs/progs/convert/latex/latex-define.scm>, <abbr|e.g.>
     <scm|(mynote (footnote 1))>, and declare its arity by adding
-    <scm|mynote> to <scm|latex-texmacs-1%> in <verbatim|latex-texmacs-drd.scm>.
+    <scm|mynote> to <scm|latex-texmacs-1%> in <source-link|latex-texmacs-drd.scm|TeXmacs/progs/convert/latex/latex-texmacs-drd.scm>.
     If the definition requires a package, add an entry to
-    <scm|latex-needs%> in <verbatim|latex-drd.scm>.
+    <scm|latex-needs%> in <source-link|latex-drd.scm|TeXmacs/progs/convert/latex/latex-drd.scm>.
 
     <item>If the conversion is not a plain renaming, add an entry to
-    <scm|tmtex-tmstyle%> in <verbatim|tmtex.scm>, for instance
+    <scm|tmtex-tmstyle%> in <source-link|tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>, for instance
     <scm|(my-note (,tmtex-my-note 1))>, with a handler <scm|(define
     (tmtex-my-note s l) ...)> which receives the tag name and the list of
     unconverted arguments and returns a <LaTeX> stree; use <scm|tmtex> to
@@ -642,18 +642,18 @@
 
   <\itemize>
     <item>The menu <menu|Tools|LaTeX> (shown with detailed menus when <verbatim|pdflatex> is in
-    the path, see <verbatim|convert/latex/tmtex-widgets.scm>) exports the
+    the path, see <source-link|convert/latex/tmtex-widgets.scm|TeXmacs/progs/convert/latex/tmtex-widgets.scm>) exports the
     current buffer, runs <verbatim|pdflatex> through <scm|try-latex-export>
-    (<cpp|try_latex_export> in <verbatim|Data/Convert/Tex/latex_recover.cpp>)
+    (<cpp|try_latex_export> in <source-link|Data/Convert/Tex/latex_recover.cpp|src/Data/Convert/Tex/latex_recover.cpp>)
     and displays the <LaTeX> errors together with the corresponding
     locations in the <TeXmacs> document (which are found with the source
     tracking markers).
 
     <item><scm|(check-latex-export <scm-arg|dir>)> and <scm|(run-checks)>
-    in <verbatim|check/check-master.scm> export all <verbatim|.tm> files of
+    in <source-link|check/check-master.scm|TeXmacs/progs/check/check-master.scm> export all <verbatim|.tm> files of
     a directory, run <verbatim|pdflatex> on them and report errors.
 
-    <item><scm|(test-tmtex)> in <verbatim|convert/latex/test-tmtex.scm>
+    <item><scm|(test-tmtex)> in <source-link|convert/latex/test-tmtex.scm|TeXmacs/progs/convert/latex/test-tmtex.scm>
     returns a document testing the idempotence of the round trips
     <TeXmacs> <math|\<rightarrow\>> <LaTeX> <math|\<rightarrow\>>
     <TeXmacs> and <LaTeX> <math|\<rightarrow\>> <TeXmacs>
@@ -682,7 +682,7 @@
 
     <item>When the export is requested on a document without the
     <verbatim|view> attribute (that is, not through <cpp|buffer_export>),
-    <cpp|latex_expand> in <verbatim|Texmacs/Data/new_buffer.cpp> uses the
+    <cpp|latex_expand> in <source-link|Texmacs/Data/new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp> uses the
     view returned by <cpp|concrete_view> without checking it; scripts which
     want to export trees should use the converters to
     <verbatim|latex-stree> or <verbatim|latex-snippet>.

@@ -7,14 +7,14 @@
 
   This page describes how <TeXmacs> locates the files of a <TeX> font and how
   it generates missing ones with the tools of a <TeX> distribution. The code
-  is in <verbatim|Plugins/Metafont/tex_init.cpp>,
-  <verbatim|Plugins/Metafont/tex_files.cpp> and, for the error cache,
-  <verbatim|Plugins/Metafont/load_tex.cpp>.
+  is in <source-link|Plugins/Metafont/tex_init.cpp|src/Plugins/Metafont/tex_init.cpp>,
+  <source-link|Plugins/Metafont/tex_files.cpp|src/Plugins/Metafont/tex_files.cpp> and, for the error cache,
+  <source-link|Plugins/Metafont/load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>.
 
   <section|Settings detected at the first run>
 
   When <TeXmacs> sets up a new home directory (<cpp|setup_texmacs> in
-  <verbatim|System/Boot/init_texmacs.cpp>, run when
+  <source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>, run when
   <verbatim|$TEXMACS_HOME_PATH/system/settings.scm> does not exist, and
   after <verbatim|-setup>), it calls <cpp|setup_tex>, which removes
   <verbatim|$TEXMACS_HOME_PATH/fonts/font-index.scm> and records the
@@ -57,7 +57,7 @@
 
   At every start, after the settings have been loaded, <cpp|init_tex> calls
   <cpp|reset_tfm_path>, <cpp|reset_pk_path> and <cpp|reset_pfb_path>, which
-  build the three static search paths of <verbatim|tex_files.cpp>. For the
+  build the three static search paths of <source-link|tex_files.cpp|src/Plugins/Metafont/tex_files.cpp>. For the
   metrics, the path is, in this order,
 
   <\enumerate>
@@ -82,7 +82,7 @@
   The <name|PK> path is built in the same way from
   <verbatim|fonts/pk>, <verbatim|$TEX_PK_PATH>, the <verbatim|PK> setting and
   <verbatim|kpsepath pk>. The <name|Type 1> path uses
-  <verbatim|fonts/type1>, <verbatim|$TEX_PFB_PATH> and the <verbatim|PFB>
+  <source-link|fonts/type1|TeXmacs/fonts/type1>, <verbatim|$TEX_PFB_PATH> and the <verbatim|PFB>
   setting, without <verbatim|kpsepath>.
 
   <section|Looking up a file>
@@ -113,7 +113,7 @@
 
   <cpp|exists_in_tex (u)> is <cpp|!is_none (resolve_tex (u))>. The
   <name|Type 1> files are usually not located through <cpp|resolve_tex>
-  directly, but through <cpp|tt_font_find> (<verbatim|Plugins/Freetype/tt_file.cpp>),
+  directly, but through <cpp|tt_font_find> (<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>),
   which tries <verbatim|<em|name>.pfb> first (with <cpp|resolve_tex>) and then
   the <name|TrueType> and <name|OpenType> suffixes; see
   <hlink|Type 1 substitution|texfonts-formats.en.tm>. Unlike
@@ -159,7 +159,7 @@
   <section|The error cache>
 
   Generating a font is slow and, when the font does not exist at all,
-  pointless. <verbatim|load_tex.cpp> therefore records failures as empty
+  pointless. <source-link|load_tex.cpp|src/Plugins/Metafont/load_tex.cpp> therefore records failures as empty
   marker files <verbatim|$TEXMACS_HOME_PATH/fonts/error/<em|file-name>>:
 
   <\itemize>
@@ -180,9 +180,9 @@
   startup (the boot lock), by an upgrade to a new version
   (<cpp|init_upgrade>), on <name|macOS> when <TeXmacs> is started with the
   <key|Alt> key pressed, and automatically when the directories
-  <verbatim|fonts/type1> or <verbatim|fonts/truetype> of
+  <source-link|fonts/type1|TeXmacs/fonts/type1> or <source-link|fonts/truetype|TeXmacs/fonts/truetype> of
   <verbatim|$TEXMACS_PATH> or <verbatim|$TEXMACS_HOME_PATH> have changed
-  (<verbatim|System/Misc/data_cache.cpp>).
+  (<source-link|System/Misc/data_cache.cpp|src/System/Misc/data_cache.cpp>).
 
   <section|What the cache remembers>
 

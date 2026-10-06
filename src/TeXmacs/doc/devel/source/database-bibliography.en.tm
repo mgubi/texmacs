@@ -24,7 +24,7 @@
   <subsection|Citations>
 
   The citation macros are defined in
-  <verbatim|packages/standard/std-automatic.ts>. The central one is
+  <source-link|packages/standard/std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>. The central one is
 
   <\tm-fragment>
     <verbatim|\<less\>assign\|cite-arg\|\<less\>macro\|key\|\<less\>write\|\<less\>value\|bib-prefix\<gtr\>\|\<less\>arg\|key\<gtr\>\<gtr\>\<less\>reference\|\<less\>merge\|\<less\>value\|bib-prefix\<gtr\>\|-\|\<less\>arg\|key\<gtr\>\<gtr\>\<gtr\>\<gtr\>\<gtr\>>
@@ -39,13 +39,13 @@
   the special key <verbatim|*> stands for all entries of the bibliography
   file. <markup|with-bib> changes <verbatim|bib-prefix> locally, which is
   how a document can contain several independent bibliographies.
-  <markup|cite-TeXmacs> (in <verbatim|packages/header/title-base.ts> and
-  <verbatim|header-article.ts>) cites keys of the form
+  <markup|cite-TeXmacs> (in <source-link|packages/header/title-base.ts|TeXmacs/packages/header/title-base.ts> and
+  <source-link|header-article.ts|TeXmacs/packages/header/header-article.ts>) cites keys of the form
   <verbatim|TeXmacs:...>, which are provided by
   <verbatim|$TEXMACS_PATH/misc/bib/texmacs.bib>.
 
   The typesetter implements <markup|write> in
-  <cpp|concater_rep::typeset_write> (<verbatim|Typeset/Concat/concat_active.cpp>):
+  <cpp|concater_rep::typeset_write> (<source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>):
   during a complete typesetting pass it appends the evaluated second
   argument to <cpp|env-\<gtr\>local_aux[<em|name>]>, a <markup|document>
   which is stored in the buffer as <cpp|buf-\<gtr\>data-\<gtr\>aux> and
@@ -59,13 +59,13 @@
   The bibliography itself is the tag
   <verbatim|(bibliography <em|aux> <em|style> <em|file> <em|body>)> (or
   <markup|bibliography*> with an extra title argument), defined in
-  <verbatim|packages/section/section-base.ts>: <em|aux> is the prefix
+  <source-link|packages/section/section-base.ts|TeXmacs/packages/section/section-base.ts>: <em|aux> is the prefix
   (<verbatim|"bib">), <em|style> the name of a <BibTeX> style
   (<verbatim|plain>) or of an internal style (<verbatim|tm-plain>),
   <em|file> the <verbatim|.bib> file (possibly empty) and <em|body> the
   generated content. It is inserted by <scm|make-bib>,
-  <scm|make-database-bib> (<verbatim|text/text-edit.scm>) or the dialogue
-  <scm|open-bibliography-inserter> (<verbatim|bibtex/bib-widgets.scm>, used
+  <scm|make-database-bib> (<source-link|text/text-edit.scm|TeXmacs/progs/text/text-edit.scm>) or the dialogue
+  <scm|open-bibliography-inserter> (<source-link|bibtex/bib-widgets.scm|TeXmacs/progs/bibtex/bib-widgets.scm>, used
   when the preference <verbatim|"gui:new bibliography dialogue"> is set).
 
   The generated body is a <markup|bib-list>:
@@ -83,7 +83,7 @@
   <subsection|Triggering the generation>
 
   <menu|Document|Update|Bibliography> calls <scm|(update-document
-  "bibliography")> (<verbatim|generic/document-edit.scm>). It first calls
+  "bibliography")> (<source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>). It first calls
   <scm|zotero-before-update>, which refreshes a <verbatim|.bib> file
   written from Zotero and syncs the entries of the database which come
   from Zotero (see <hlink|Citations from Zotero|zotero.en.tm>), then runs
@@ -96,7 +96,7 @@
   <cpp|generate_aux_recursively> clears each automatic body before testing
   which kind was requested; see <hlink|automatic content|editing-auxiliary.en.tm>.
 
-  <cpp|edit_process_rep::generate_aux> (<verbatim|Edit/Process/edit_process.cpp>)
+  <cpp|edit_process_rep::generate_aux> (<source-link|Edit/Process/edit_process.cpp|src/Edit/Process/edit_process.cpp>)
   walks through the document. For each automatic tag (<cpp|is_aux>) it
   replaces the body by an empty document, puts the cursor there and calls
   <cpp|generate_bibliography (<em|aux>, <em|style>, <em|file>)>, which
@@ -177,7 +177,7 @@
     <cpp|tree bibtex_run (string bib, string style, url bib_file, tree
     bib_t)><explain-synopsis|run <verbatim|bibtex>>
   <|explain>
-    Defined in <verbatim|Plugins/Bibtex/bibtex.cpp> (the variant taking an
+    Defined in <source-link|Plugins/Bibtex/bibtex.cpp|src/Plugins/Bibtex/bibtex.cpp> (the variant taking an
     <cpp|array\<less\>string\<gtr\>> of keys is exported as
     <scm|bibtex-run>). It checks that the program (by default
     <verbatim|bibtex>, see the preference <verbatim|"bibtex command"> and
@@ -211,14 +211,14 @@
   <subsection|The internal style engine>
 
   The internal styles are ordinary <scheme> modules
-  <verbatim|(bibtex <em|name>)> in <verbatim|progs/bibtex/>, and are
+  <verbatim|(bibtex <em|name>)> in <source-link|progs/bibtex/|TeXmacs/progs/bibtex>, and are
   selected by the style name <verbatim|tm-<em|name>>. The entry point is:
 
   <\explain>
     <scm|(bib-process <scm-arg|prefix> <scm-arg|style>
     <scm-arg|doc>)><explain-synopsis|format a list of entries>
   <|explain>
-    Defined in <verbatim|bibtex/bib-utils.scm>. <scm-arg|doc> is a
+    Defined in <source-link|bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm>. <scm-arg|doc> is a
     <scm|(document (bib-entry <scm-arg|type> <scm-arg|key> (document
     (bib-field <scm-arg|name> <scm-arg|value>) ...)) ...)>, as produced by
     <cpp|parse_bib> or <scm|db-\<gtr\>bib>. The function sets the globals
@@ -234,7 +234,7 @@
   A style is declared with <scm|(bib-define-style <scm-arg|name>
   <scm-arg|fallback>)>, which defines a <scheme> mode
   <scm|bib-<scm-arg|name>?> that implies the mode of the fallback style.
-  <verbatim|plain.scm> defines the generic formatting functions
+  <source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm> defines the generic formatting functions
   (<scm|bib-format-entry>, <scm|bib-format-article>, ...,
   <scm|bib-format-names>, <scm|bib-sort-key>) without mode, and every other
   style overrides some of them with <scm|(:mode bib-<scm-arg|name>?)>. The
@@ -246,7 +246,7 @@
   structured as <verbatim|(bib-names (bib-name <em|first> <em|von>
   <em|last> <em|jr>) ...)> and pages as <verbatim|(bib-pages <em|from>
   <em|to>)>. The <BibTeX> built-in string functions are implemented in
-  <c++> (<verbatim|Plugins/Bibtex/bibtex_functions.cpp>) and exported to
+  <c++> (<source-link|Plugins/Bibtex/bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>) and exported to
   <scheme>:
 
   <\description-paragraphs>
@@ -268,7 +268,7 @@
     <item*|<scm|bib-abbreviate>>abbreviation of first names.
   </description-paragraphs>
 
-  The <scheme> side (<verbatim|bib-utils.scm>) adds helpers for building
+  The <scheme> side (<source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm>) adds helpers for building
   the output (<scm|bib-new-block>, <scm|bib-new-sentence>,
   <scm|bib-new-list>, <scm|bib-emphasize>, <scm|bib-translate>, ...) and for
   temporarily switching style (<scm|bib-with-style>).
@@ -276,7 +276,7 @@
   <subsection|Compilation with the database tool>
 
   When the database tool is enabled, <cpp|generate_bibliography> delegates
-  to <verbatim|database/bib-manage.scm>:
+  to <source-link|database/bib-manage.scm|TeXmacs/progs/database/bib-manage.scm>:
 
   <\explain>
     <scm|(bib-compile <scm-arg|prefix> <scm-arg|style> <scm-arg|names> .
@@ -336,12 +336,12 @@
     carries the entries it cites, and its bibliography can be recompiled
     elsewhere without the original <verbatim|.bib> file. When the preference
     <verbatim|"auto bib import"> is on (the default), the redefinition of
-    <scm|notify-set-attachment> in <verbatim|bib-manage.scm> imports the
+    <scm|notify-set-attachment> in <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm> imports the
     entries of such attachments into the user's database. This hook is
     called by <cpp|edit_typeset_rep::set_data> for every attachment when the
     data of a document are installed, typically when it is opened; since
-    its default definition in <verbatim|init-texmacs.scm> does nothing, the
-    importation only happens once <verbatim|bib-manage.scm> has been
+    its default definition in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> does nothing, the
+    importation only happens once <source-link|bib-manage.scm|TeXmacs/progs/database/bib-manage.scm> has been
     loaded.
   </explain>
 
@@ -360,7 +360,7 @@
   which the entries are looked up.
 
   <paragraph|Local bibliographies.><scm|open-biblio>
-  (<verbatim|database/bib-local.scm>) opens
+  (<source-link|database/bib-local.scm|TeXmacs/progs/database/bib-local.scm>) opens
   <verbatim|tmfs://biblio/<em|prefix>/<em|document>>, a virtual document
   showing the union of the attached and of the local entries. When it is
   saved (<scm|biblio-confirm>), the entries which differ from the attached
@@ -373,12 +373,12 @@
 
   <subsection|Parsing>
 
-  <cpp|parse_bib> (<verbatim|Data/Convert/BibTeX/parsebib.cpp>, exported as
+  <cpp|parse_bib> (<source-link|Data/Convert/BibTeX/parsebib.cpp|src/Data/Convert/BibTeX/parsebib.cpp>, exported as
   <scm|parse-bib>) parses a <verbatim|.bib> file into a <markup|document>
   containing <markup|bib-entry>, <markup|bib-comment>,
   <markup|bib-preamble> and <markup|bib-string> tags. It substitutes the
   <verbatim|@string> abbreviations (and a few predefined journal names, see
-  <cpp|bib_strings_dict> in <verbatim|bibtex_functions.cpp>), and
+  <cpp|bib_strings_dict> in <source-link|bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp>), and
   <cpp|bib_parse_fields> converts all field values at once from <LaTeX> to
   <TeXmacs> (by concatenating them with separators into a single <LaTeX>
   string, which is much faster than converting each field separately).
@@ -388,13 +388,13 @@
 
   <subsection|The <verbatim|tmbib> format>
 
-  <verbatim|progs/convert/bibtex/init-bibtex.scm> defines two formats. The
+  <source-link|progs/convert/bibtex/init-bibtex.scm|TeXmacs/progs/convert/bibtex/init-bibtex.scm> defines two formats. The
   hidden format <verbatim|bibtex> (suffix <verbatim|rawbib>) converts
   between <verbatim|.bib> text and the parsed markup above, with the style
   <verbatim|bibliography>. The format <verbatim|tmbib> (name
   \P<BibTeX>\Q, suffix <verbatim|bib>) is the one used when opening or
   saving a <verbatim|.bib> file. Its converters are in
-  <verbatim|database/bib-db.scm>:
+  <source-link|database/bib-db.scm|TeXmacs/progs/database/bib-db.scm>:
 
   <\itemize>
     <item><scm|tmbib-document-\<gtr\>texmacs> parses the file and converts
@@ -426,7 +426,7 @@
 
   <subsection|Conservative conversions>
 
-  <verbatim|Data/Convert/BibTeX/conservative_bib.cpp> implements the
+  <source-link|Data/Convert/BibTeX/conservative_bib.cpp|src/Data/Convert/BibTeX/conservative_bib.cpp> implements the
   incremental conversions. Both split a <verbatim|.bib> text into an
   alternation of inter-entry text and entries (<cpp|bib_break>) and index
   the entries by key.
@@ -493,7 +493,7 @@
     Here the label of each item is its key.
 
     <item>Add <verbatim|"tm-mystyle"> to <scm|bib-standard-styles> in
-    <verbatim|bib-utils.scm>. This list is used by the bibliography dialogue
+    <source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm>. This list is used by the bibliography dialogue
     and, more importantly, by <scm|bib-compile>: with the database tool
     enabled, a style which is not in this list is passed to the external
     <verbatim|bibtex> program. Without the database tool, any style whose
@@ -509,8 +509,8 @@
 
   The admissible types and fields of bibliographic entries used by the
   editor are declared in <scm|db-format-table> in
-  <verbatim|database/bib-db.scm>; the internal styles format each type in
-  <scm|bib-format-entry> (<verbatim|plain.scm>), falling back to
+  <source-link|database/bib-db.scm|TeXmacs/progs/database/bib-db.scm>; the internal styles format each type in
+  <scm|bib-format-entry> (<source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm>), falling back to
   <scm|bib-format-misc> for unknown types. Fields which need special
   treatment when converting between <BibTeX> and database entries are
   handled in <scm|db-bib-sub-sub> and <scm|bib-db-sub-sub>.

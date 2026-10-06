@@ -135,7 +135,7 @@
     Finally, <markup|apply-theme> assigns the values of a <src-arg|theme>
     to the corresponding environment variables, in a non-scoped way. The
     names of the themes are literal strings. These primitives are
-    implemented in <verbatim|Typeset/Env/env_exec.cpp>
+    implemented in <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>
     (<cpp|edit_env_rep::exec_new_theme> and following).
   </explain>
 

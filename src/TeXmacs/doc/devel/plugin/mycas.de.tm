@@ -14,7 +14,7 @@
   eine neue Schnittstelle von <TeXmacs> zu einem Fremd-Programm installiert.
   In dem Unterverzeichnis Ihres <TeXmacs>-Verzeichnisses, plugins/mycas,
   finden Sie ein Beispiel für ein simples \RComputer Algebra System'' mit dem
-  Namen <verbatim|mycas>. Dort finden sie auch die Datei <verbatim|mycas.cpp>
+  Namen <verbatim|mycas>. Dort finden sie auch die Datei <source-link|mycas.cpp|plugins/mycas/src/mycas.cpp>
   mit diesem wirklich einfachen Programm. Das Programm finden Sie auÿerdem am
   Ende dieses Abschnitts. Um es zu testen, müssen Sie es mit dem Befehl
 

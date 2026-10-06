@@ -13,7 +13,7 @@
   (points, curves, text, <abbr|etc.>), and variables with a <verbatim|gr->
   prefix which are used by the graphics editor for newly created objects.
   The built-in default values are defined in
-  <verbatim|src/Typeset/Env/env_default.cpp>.
+  <source-link|src/Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>.
 
   <section|Global layout of graphics>
 
@@ -308,7 +308,7 @@
     text. The <src-var|doc-at-valign> has the same possible values as
     <src-var|text-at-valign>, but defaults to <verbatim|top>. The body is
     typeset inside a one-cell table (see the <markup|paragraph-box> macro in
-    <verbatim|std-graphics.ts>), whose width and width mode
+    <source-link|std-graphics.ts|TeXmacs/packages/standard/std-graphics.ts>), whose width and width mode
     (<src-var|table-width> and <src-var|table-hmode>) are given by
     <src-var|doc-at-width> and <src-var|doc-at-hmode>, whose borders and
     paddings are given by <src-var|doc-at-border> and

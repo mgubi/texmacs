@@ -22,7 +22,7 @@
   developer guide|../scheme/scheme.en.tm>, and the list of all exported
   routines in <hlink|the glue auto-documentation|../scheme/api/glue-auto-doc.en.tm>.
 
-  All file names below are relative to <verbatim|src/src/> unless stated
+  All file names below are relative to <source-link|src/src/|src> unless stated
   otherwise.
 
   <section|Overview>
@@ -31,14 +31,14 @@
 
   <\description>
     <item*|The interpreter>The only back-end which is compiled is
-    <name|Guile> (<verbatim|Scheme/Guile/>). Everything which depends on
+    <name|Guile> (<source-link|Scheme/Guile/|src/Scheme/Guile>). Everything which depends on
     the <name|Guile> version is hidden behind a thin abstraction, the
     <verbatim|tmscm> layer: the type <cpp|tmscm> (a <name|Guile>
     <cpp|SCM>) and functions such as <cpp|tmscm_cons>,
     <cpp|tmscm_is_string> or <cpp|string_to_tmscm>.
 
-    <item*|<c++> objects>The class <cpp|object> (<verbatim|Scheme/scheme.hpp>,
-    <verbatim|Scheme/Scheme/object.cpp>) is a reference counted handle on a
+    <item*|<c++> objects>The class <cpp|object> (<source-link|Scheme/scheme.hpp|src/Scheme/scheme.hpp>,
+    <source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>) is a reference counted handle on a
     <scheme> value which protects it from the garbage collector. It comes
     with constructors from the usual <TeXmacs> types, predicates,
     conversions (<cpp|as_int>, <cpp|as_tree>, ...) and the functions
@@ -51,11 +51,11 @@
     <cpp|blackbox>, that is, a type tagged copy of the <c++> value.
 
     <item*|The glue>About 1200 <c++> routines are exported to <scheme>.
-    They are declared in three tables (<verbatim|Scheme/Glue/build-glue-basic.scm>,
-    <verbatim|build-glue-editor.scm>, <verbatim|build-glue-server.scm>),
+    They are declared in three tables (<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>,
+    <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>, <source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm>),
     from which a generator written in <scheme> produces <c++> wrapper
-    functions (<verbatim|glue_basic.cpp>, <verbatim|glue_editor.cpp>,
-    <verbatim|glue_server.cpp>) that check and convert the arguments, call
+    functions (<source-link|glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp>, <source-link|glue_editor.cpp|src/Scheme/Glue/glue_editor.cpp>,
+    <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp>) that check and convert the arguments, call
     the routine and convert the result.
   </description>
 
@@ -86,51 +86,51 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Scheme/scheme.hpp>>The interface seen by the rest of
+    <item*|<source-link|Scheme/scheme.hpp|src/Scheme/scheme.hpp>>The interface seen by the rest of
     <TeXmacs>: the class <cpp|object>, its predicates and conversions,
     <cpp|eval>, <cpp|call>, <cpp|exec_delayed>, <cpp|protected_call>,
     <cpp|scheme_cmd> and the preference routines.
 
-    <item*|<verbatim|Scheme/Scheme/object.hpp>, <verbatim|object.cpp>>The
+    <item*|<source-link|Scheme/Scheme/object.hpp|src/Scheme/Scheme/object.hpp>, <source-link|object.cpp|src/Scheme/Scheme/object.cpp>>The
     representation <cpp|tmscm_object_rep> of objects and the
     implementation of the interface above.
 
-    <item*|<verbatim|Scheme/Scheme/glue.hpp>, <verbatim|glue.cpp>>The
+    <item*|<source-link|Scheme/Scheme/glue.hpp|src/Scheme/Scheme/glue.hpp>, <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp>>The
     conversions between <cpp|tmscm> and all <TeXmacs> types used by the
     glue, the corresponding argument checks
     (<verbatim|TMSCM_ASSERT_<em|TYPE>>), a few helper routines which only
     exist to be exported, and <cpp|initialize_glue>, which installs all
     glue routines. The generated files are compiled as part of
-    <verbatim|glue.cpp>, which includes them.
+    <source-link|glue.cpp|src/Scheme/Scheme/glue.cpp>, which includes them.
 
-    <item*|<verbatim|Scheme/Guile/guile_tm.hpp>, <verbatim|guile_tm.cpp>>The
+    <item*|<source-link|Scheme/Guile/guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp>, <source-link|guile_tm.cpp|src/Scheme/Guile/guile_tm.cpp>>The
     <name|Guile> back-end: the <verbatim|tmscm> layer, the selection of the
     <name|Guile> <abbr|API> generation (<verbatim|GUILE_A> to
     <verbatim|GUILE_D>), <cpp|start_scheme>, <cpp|initialize_scheme>,
     evaluation with error catching, and the black box smob.
 
-    <item*|<verbatim|Scheme/Tiny/>>An experimental <name|TinyScheme>
+    <item*|<source-link|Scheme/Tiny/|src/Scheme/Tiny>>An experimental <name|TinyScheme>
     back-end, not compiled by any of the build systems.
 
-    <item*|<verbatim|Scheme/Glue/build-glue.scm>>The glue generator.
+    <item*|<source-link|Scheme/Glue/build-glue.scm|src/Scheme/Glue/build-glue.scm>>The glue generator.
 
-    <item*|<verbatim|Scheme/Glue/build-glue-basic.scm>,
-    <verbatim|build-glue-editor.scm>, <verbatim|build-glue-server.scm>>The
+    <item*|<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>,
+    <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>, <source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm>>The
     declarations of the exported routines.
 
-    <item*|<verbatim|Scheme/Glue/glue_basic.cpp>, <verbatim|glue_editor.cpp>,
-    <verbatim|glue_server.cpp>>The generated wrappers (do not edit).
+    <item*|<source-link|Scheme/Glue/glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp>, <source-link|glue_editor.cpp|src/Scheme/Glue/glue_editor.cpp>,
+    <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp>>The generated wrappers (do not edit).
 
-    <item*|<verbatim|Scheme/Glue/build-glue>, <verbatim|build-auto-doc>,
-    <verbatim|make-apidoc-module.scm>, <verbatim|make-apidoc-doc.scm>>Shell
+    <item*|<source-link|Scheme/Glue/build-glue|src/Scheme/Glue/build-glue>, <verbatim|build-auto-doc>,
+    <source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>, <source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm>>Shell
     scripts which run the generator, and generators for the list of glue
-    symbols (<verbatim|TeXmacs/progs/prog/glue-symbols.scm>) and for the
-    glue documentation (<verbatim|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>).
+    symbols (<source-link|TeXmacs/progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm>) and for the
+    glue documentation (<source-link|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm|TeXmacs/doc/devel/scheme/api/glue-auto-doc.en.tm>).
 
-    <item*|<verbatim|Kernel/Abstractions/blackbox.hpp>>The type tagged
+    <item*|<source-link|Kernel/Abstractions/blackbox.hpp|src/Kernel/Abstractions/blackbox.hpp>>The type tagged
     containers <cpp|blackbox> and <cpp|whitebox_rep\<less\>T\<gtr\>>.
 
-    <item*|<verbatim|TeXmacs/progs/kernel/texmacs/tm-define.scm>>The macros
+    <item*|<source-link|TeXmacs/progs/kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>>The macros
     <scm|tm-define>, <scm|tm-property> and <scm|lazy-define>.
   </description-paragraphs>
 

@@ -7,10 +7,10 @@
 
   This section briefly describes the primitives for images, graphics and
   animations. Most of them are typeset by the routines in
-  <verbatim|Typeset/Concat/concat_graphics.cpp>,
-  <verbatim|Typeset/Concat/concat_animate.cpp> and
-  <verbatim|Typeset/Concat/concat_gui.cpp>; their arities are declared in
-  <verbatim|Data/Drd/drd_std.cpp>. The rendering of graphical objects is
+  <source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>,
+  <source-link|Typeset/Concat/concat_animate.cpp|src/Typeset/Concat/concat_animate.cpp> and
+  <source-link|Typeset/Concat/concat_gui.cpp|src/Typeset/Concat/concat_gui.cpp>; their arities are declared in
+  <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp>. The rendering of graphical objects is
   controlled by many environment variables, such as <src-var|color>,
   <src-var|fill-color>, <src-var|line-width>, <src-var|dash-style>,
   <src-var|arrow-begin>, <src-var|arrow-end>, <src-var|point-style>,
@@ -284,7 +284,7 @@
   <paragraph|Animations>
 
   Animations are typeset as boxes which change over time; they are driven by
-  <em|players> (<verbatim|Typeset/Concat/concat_animate.cpp>). Durations
+  <em|players> (<source-link|Typeset/Concat/concat_animate.cpp|src/Typeset/Concat/concat_animate.cpp>). Durations
   are specified as lengths with the units <verbatim|ms>, <verbatim|s>,
   <verbatim|msec>, <verbatim|sec>, <verbatim|min> and <verbatim|hr>.
 
@@ -361,7 +361,7 @@
     <src-arg|t-i> (numbers between <verbatim|0> and <verbatim|1>) surround
     the current animation portion. Numbers, lengths, colors,
     <markup|with> attributes, tables and graphics are interpolated
-    recursively (<verbatim|Typeset/Env/env_animate.cpp>); other content is
+    recursively (<source-link|Typeset/Env/env_animate.cpp|src/Typeset/Env/env_animate.cpp>); other content is
     switched abruptly. A <src-arg|content-i> which is not a tuple is taken
     to be the content at time <verbatim|0> (first occurrence) or
     <verbatim|1> (second occurrence).

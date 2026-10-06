@@ -22,8 +22,8 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Plugins/Freetype/tt_tools.hpp>,
-    <verbatim|tt_tools.cpp>>The table readers. The file is older than the
+    <item*|<source-link|Plugins/Freetype/tt_tools.hpp|src/Plugins/Freetype/tt_tools.hpp>,
+    <source-link|tt_tools.cpp|src/Plugins/Freetype/tt_tools.cpp>>The table readers. The file is older than the
     <name|OpenType> work: it also holds the low level access to the tables
     of a font file (<cpp|tt_table>), the reading of the name table and the
     glyph analysis used by the <hlink|font database|font-database.en.tm>.
@@ -31,13 +31,13 @@
     <TeXmacs> in 2021 and extended for <name|Mogan>; the <verbatim|GSUB> and
     <verbatim|GPOS> readers are new.
 
-    <item*|<verbatim|Plugins/Freetype/tt_face.hpp>,
-    <verbatim|tt_face.cpp>>The face of a font file (<cpp|tt_face_rep>),
+    <item*|<source-link|Plugins/Freetype/tt_face.hpp|src/Plugins/Freetype/tt_face.hpp>,
+    <source-link|tt_face.cpp|src/Plugins/Freetype/tt_face.cpp>>The face of a font file (<cpp|tt_face_rep>),
     which holds the <name|FreeType> face, the bytes of the file, and the
     parsed tables; the metrics of a face (<cpp|tt_font_metric_rep>), whose
     <cpp|kerning> method answers from <verbatim|GPOS> first.
 
-    <item*|<verbatim|Plugins/Freetype/unicode_font.cpp>>The users of the
+    <item*|<source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>>The users of the
     tables: <cpp|init_ot_math>, the correction hooks, and
     <cpp|get_feature_variant> and <cpp|ot_font_features> for the features;
     see <hlink|mathematics from the MATH table|opentype-math.en.tm>.
@@ -186,7 +186,7 @@
 
   <cpp|parse_gsub_tags> lists the feature tags of the table, without
   repetitions; it is what lets a menu offer only the features a font has
-  (<cpp|ot_font_features> in <verbatim|unicode_font.cpp>).
+  (<cpp|ot_font_features> in <source-link|unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>).
 
   Two simplifications are worth knowing. The reader ignores the script and
   language system lists: a feature counts if any feature record with its tag
@@ -311,7 +311,7 @@
     the table string.
 
     <item>A glyph index of 0 is the missing glyph. <cpp|get_glyphID> in
-    <verbatim|unicode_font.cpp> returns 0 for a character the font does not
+    <source-link|unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp> returns 0 for a character the font does not
     have, and the lookups then find nothing, which is the intended answer.
 
     <item>Substituted glyphs have no character code. They are named

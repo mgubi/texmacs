@@ -128,7 +128,7 @@
   <verbatim|"\<less\>big-sum-2\<gtr\>"> (display version). The typesetter
   determines the appropriate size of a delimiter as a function of the height
   of the delimited expression (see <cpp|get_delimiter> in
-  <verbatim|Typeset/Boxes/Basic/text_boxes.cpp>). A font which knows the
+  <source-link|Typeset/Boxes/Basic/text_boxes.cpp|src/Typeset/Boxes/Basic/text_boxes.cpp>). A font which knows the
   size variants of its glyphs, as an <name|OpenType> math font does, is
   first asked directly with <cpp|get_rubber_variant> (for heights) and
   <cpp|get_wide_variant> (for the widths of wide accents and arrows,
@@ -138,7 +138,7 @@
   <section|The abstract font class>
 
   The main abstract <cpp|font> class is defined in
-  <verbatim|Graphics/Fonts/font.hpp>. Here follows an abridged version of
+  <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>. Here follows an abridged version of
   its representation class:
 
   <\cpp-code>
@@ -285,64 +285,64 @@
   Several types of concrete fonts have been implemented in <TeXmacs>:
 
   <\description>
-    <item*|<TeX> text fonts>See <verbatim|Plugins/Metafont/tex_font.cpp>.
+    <item*|<TeX> text fonts>See <source-link|Plugins/Metafont/tex_font.cpp|src/Plugins/Metafont/tex_font.cpp>.
     These fonts use <verbatim|.tfm> metrics and <verbatim|.pk> or
-    <name|Type 1> glyphs (see also <verbatim|load_tex.cpp>,
-    <verbatim|load_tfm.cpp> and <verbatim|load_pk.cpp> in the same
+    <name|Type 1> glyphs (see also <source-link|load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>,
+    <source-link|load_tfm.cpp|src/Plugins/Metafont/load_tfm.cpp> and <source-link|load_pk.cpp|src/Plugins/Metafont/load_pk.cpp> in the same
     directory).
 
     <item*|<TeX> rubber fonts>See
-    <verbatim|Plugins/Metafont/tex_rubber_font.cpp>. These fonts provide
+    <source-link|Plugins/Metafont/tex_rubber_font.cpp|src/Plugins/Metafont/tex_rubber_font.cpp>. These fonts provide
     large delimiters and big operators of variable size.
 
     <item*|<name|TrueType> and <name|OpenType> fonts>See
-    <verbatim|Plugins/Freetype>: <verbatim|tt_font.cpp> implements fonts with
-    a fixed encoding, <verbatim|unicode_font.cpp> <name|Unicode> fonts, and
-    <verbatim|unicode_math_font.cpp>, <verbatim|rubber_unicode_font.cpp>,
-    <verbatim|rubber_stix_font.cpp> and <verbatim|rubber_assemble_font.cpp>
+    <verbatim|Plugins/Freetype>: <source-link|tt_font.cpp|src/Plugins/Freetype/tt_font.cpp> implements fonts with
+    a fixed encoding, <source-link|unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp> <name|Unicode> fonts, and
+    <source-link|unicode_math_font.cpp|src/Plugins/Freetype/unicode_math_font.cpp>, <source-link|rubber_unicode_font.cpp|src/Plugins/Freetype/rubber_unicode_font.cpp>,
+    <source-link|rubber_stix_font.cpp|src/Plugins/Freetype/rubber_stix_font.cpp> and <source-link|rubber_assemble_font.cpp|src/Plugins/Freetype/rubber_assemble_font.cpp>
     mathematical fonts and their rubber (extensible) variants. The files
     <verbatim|adjust_*.cpp> contain font specific adjustments, which take
     precedence over the data of an <name|OpenType> <verbatim|MATH> table.
-    <verbatim|tt_tools.cpp> reads the <verbatim|MATH>, <verbatim|GSUB> and
-    <verbatim|GPOS> tables of such fonts and <verbatim|tt_face.cpp> caches
+    <source-link|tt_tools.cpp|src/Plugins/Freetype/tt_tools.cpp> reads the <verbatim|MATH>, <verbatim|GSUB> and
+    <verbatim|GPOS> tables of such fonts and <source-link|tt_face.cpp|src/Plugins/Freetype/tt_face.cpp> caches
     them per face; see <hlink|the <name|OpenType> layout
     tables|opentype-tables.en.tm>.
 
-    <item*|System fonts>See <verbatim|Plugins/Qt/qt_font.cpp> and
-    <verbatim|Plugins/X11/x_font.cpp>.
+    <item*|System fonts>See <source-link|Plugins/Qt/qt_font.cpp|src/Plugins/Qt/qt_font.cpp> and
+    <source-link|Plugins/X11/x_font.cpp|src/Plugins/X11/x_font.cpp>.
 
-    <item*|Mathematical fonts>See <verbatim|Graphics/Fonts/math_font.cpp>.
+    <item*|Mathematical fonts>See <source-link|Graphics/Fonts/math_font.cpp|src/Graphics/Fonts/math_font.cpp>.
     These fonts combine several <TeX> fonts according to an encoding.
 
-    <item*|Virtual fonts>See <verbatim|Graphics/Fonts/virtual_font.cpp>.
+    <item*|Virtual fonts>See <source-link|Graphics/Fonts/virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>.
     Virtual fonts build new symbols out of existing ones, using the
     definitions in <verbatim|$TEXMACS_PATH/fonts/virtual/*.vfn>.
 
-    <item*|Compound fonts>See <verbatim|Graphics/Fonts/compound_font.cpp>.
+    <item*|Compound fonts>See <source-link|Graphics/Fonts/compound_font.cpp|src/Graphics/Fonts/compound_font.cpp>.
 
-    <item*|Smart fonts>See <verbatim|Graphics/Fonts/smart_font.cpp>. A smart
+    <item*|Smart fonts>See <source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>. A smart
     font merges several fonts: symbols which are not supported by the main
     font are looked up in other fonts, depending on their <name|Unicode>
     range and on the font database, and symbols which are not available at
     all are rendered using an error font. The profiles of the named
     <name|OpenType> math fonts, which give their text, sans serif and
-    typewriter companions, are in <verbatim|math_font_profiles.cpp>; see
+    typewriter companions, are in <source-link|math_font_profiles.cpp|src/Graphics/Fonts/math_font_profiles.cpp>; see
     <hlink|math font profiles|opentype-profiles.en.tm>.
 
     <item*|Synthetic fonts>The files <verbatim|poor_*.cpp> in
     <verbatim|Graphics/Fonts> implement \Ppoor man's\Q fonts, which
     synthesize bold, italic, small capitals, blackboard bold, extended,
     monospaced or distorted variants of existing fonts. Similarly,
-    <verbatim|superposed_font.cpp> and <verbatim|recolored_font.cpp>
+    <source-link|superposed_font.cpp|src/Graphics/Fonts/superposed_font.cpp> and <source-link|recolored_font.cpp|src/Graphics/Fonts/recolored_font.cpp>
     implement superposed and recolored fonts, and
-    <verbatim|feature_font.cpp> shows a font through one of its
+    <source-link|feature_font.cpp|src/Graphics/Fonts/feature_font.cpp> shows a font through one of its
     <name|OpenType> substitution features (<cpp|feature_font>,
     <cpp|apply_features>; see <hlink|<name|OpenType>
     features|opentype-features.en.tm>).
   </description>
 
   In most cases, the lowest layer of the implementation consists of a
-  collection of glyphs (see <verbatim|Graphics/Bitmap_fonts>) or of outline
+  collection of glyphs (see <source-link|Graphics/Bitmap_fonts|src/Graphics/Bitmap_fonts>) or of outline
   fonts, together with some font metric information. The font is
   responsible for putting these glyphs together using some appropriate
   spacing. The renderers take care of displaying glyphs in a nice,
@@ -358,7 +358,7 @@
   <src-var|font-family>, <src-var|font-series>, <src-var|font-shape>,
   <src-var|font-base-size> and <src-var|font-size> (and similar variables
   for mathematics and programs); the font is recomputed by
-  <cpp|edit_env_rep::update_font> in <verbatim|Typeset/Env/env_semantics.cpp>
+  <cpp|edit_env_rep::update_font> in <source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>
   whenever one of them changes. <TeXmacs> currently provides two font
   selection mechanisms.
 
@@ -370,16 +370,16 @@
   each font family and style the corresponding font files and a list of
   <em|characteristics> (such as the supported scripts, whether the font is
   monospaced, sans serif or italic, its slant, its x-height, <abbr|etc.>). The global database
-  consists of the files <verbatim|font-database.scm>,
-  <verbatim|font-features.scm>, <verbatim|font-characteristics.scm> and
-  <verbatim|font-substitutions.scm> in <verbatim|$TEXMACS_PATH/fonts>; a
+  consists of the files <source-link|font-database.scm|TeXmacs/fonts/font-database.scm>,
+  <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm>, <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm> and
+  <source-link|font-substitutions.scm|TeXmacs/fonts/font-substitutions.scm> in <verbatim|$TEXMACS_PATH/fonts>; a
   local database of the fonts which are installed on the user's system is
   maintained in <verbatim|$TEXMACS_HOME_PATH/fonts>. It can be rebuilt using
   the <scheme> command <scm|scan-disk-for-fonts>, and the entries of a newer
   shipped database are merged into it automatically (see <hlink|the font
   database|font-database.en.tm>). The implementation can be
-  found in <verbatim|Graphics/Fonts/font_database.cpp> and
-  <verbatim|Graphics/Fonts/font_select.cpp>: requested fonts are translated
+  found in <source-link|Graphics/Fonts/font_database.cpp|src/Graphics/Fonts/font_database.cpp> and
+  <source-link|Graphics/Fonts/font_select.cpp|src/Graphics/Fonts/font_select.cpp>: requested fonts are translated
   into lists of \Plogical\Q features, which are matched against the
   characteristics of the available fonts in order to find the closest
   match. This makes it possible to use arbitrary fonts installed on the
@@ -392,7 +392,7 @@
   when the new style fonts are disabled. At the lowest level, we provide a
   fixed number of macros which directly correspond to the above types of
   concrete fonts (see <cpp|find_font> in
-  <verbatim|Graphics/Fonts/find_font.cpp>). For instance, the macro
+  <source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>). For instance, the macro
 
   <\scm-code>
     (tex $name $size $dpi)
@@ -419,7 +419,7 @@
   </scm-code>
 
   When a left hand pattern is matched, it is recursively substituted by the
-  right hand side. The files in the directory <verbatim|progs/fonts> contain
+  right hand side. The files in the directory <source-link|progs/fonts|TeXmacs/progs/fonts> contain
   a large number of rewriting rules, which are declared using
   <scm|set-font-rules>.
 

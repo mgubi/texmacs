@@ -11,7 +11,7 @@
     <cpp|struct dictionary_rep: rep\<less\>dictionary\<gtr\>><explain-synopsis|a
     translation table>
   <|explain>
-    Declared in <verbatim|System/Language/dictionary.hpp>. A dictionary
+    Declared in <source-link|System/Language/dictionary.hpp|src/System/Language/dictionary.hpp>. A dictionary
     translates strings from one language <cpp|from> into another
     <cpp|to>; it is a resource named <verbatim|<em|from>-<em|to>>, created
     by <cpp|load_dictionary (from, to)> and kept for the session. Its
@@ -23,8 +23,8 @@
   <verbatim|$TEXMACS_DIC_PATH>, which consists of
   <verbatim|$TEXMACS_HOME_PATH/langs/natural/dic>,
   <verbatim|$TEXMACS_PATH/langs/natural/dic> and the
-  <verbatim|langs/natural/dic> directories of the plug-ins
-  (<verbatim|System/Boot/init_texmacs.cpp>). All matching files are
+  <source-link|langs/natural/dic|TeXmacs/langs/natural/dic> directories of the plug-ins
+  (<source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>). All matching files are
   loaded, so a plug-in or the user can add entries. Each file is a sequence
   of pairs
 
@@ -65,13 +65,13 @@
 
   <section|The translation interface>
 
-  The output language is a global variable of <verbatim|dictionary.cpp>,
+  The output language is a global variable of <source-link|dictionary.cpp|src/System/Language/dictionary.cpp>,
   set with <cpp|set_output_language> and read with
   <cpp|get_output_language>. At the <scheme> level,
   <scm|set-output-language> is bound to <cpp|gui_set_output_language>
-  (<verbatim|Texmacs/Server/tm_server.cpp>), which also refreshes all menus
+  (<source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp>), which also refreshes all menus
   and widgets. It is called when the <verbatim|language> preference
-  changes (<scm|notify-language> in <verbatim|texmacs/texmacs/tm-server.scm>),
+  changes (<scm|notify-language> in <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>),
   whose default is the language of the user's locale
   (<scm|get-locale-language>).
 
@@ -95,7 +95,7 @@
     and <verbatim|(replace <em|pattern> <em|arg1> ...)> translates the
     pattern without guessing and substitutes the translated arguments for
     <verbatim|%1>, <verbatim|%2>, .... The <scheme> function <scm|replace>
-    (<verbatim|language/natural.scm>) builds and translates such a tree.
+    (<source-link|language/natural.scm|TeXmacs/progs/language/natural.scm>) builds and translates such a tree.
 
     <item*|<cpp|translate (t)> for a tree>Translate the tree and serialize
     it as a string, as needed for window titles and native menus; keyboard
@@ -108,8 +108,8 @@
 
   Documents use the same dictionaries through the typesetting primitive
   <markup|translate> (<cpp|edit_env_rep::exec_translate>,
-  <verbatim|Typeset/Env/env_exec.cpp>). The macro <markup|localize> of
-  <verbatim|std-utils.ts> is defined as <verbatim|\<less\>translate\|<em|text>\|english\|\<less\>value\|language\<gtr\>\<gtr\>>,
+  <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>). The macro <markup|localize> of
+  <source-link|std-utils.ts|TeXmacs/packages/standard/std-utils.ts> is defined as <verbatim|\<less\>translate\|<em|text>\|english\|\<less\>value\|language\<gtr\>\<gtr\>>,
   so that the automatically generated texts of a document (\PChapter\Q,
   \PTheorem\Q, ...) follow the <em|document> language rather than the
   language of the interface.
@@ -119,17 +119,17 @@
   Two <scheme> modules help translators:
 
   <\description>
-    <item*|<verbatim|language/natural.scm>>In developer mode, the menu and
-    widget macros of <verbatim|kernel/gui/gui-markup.scm> record every label
+    <item*|<source-link|language/natural.scm|TeXmacs/progs/language/natural.scm>>In developer mode, the menu and
+    widget macros of <source-link|kernel/gui/gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm> record every label
     in the table <scm|all-translations>. <scm|tr-missing> lists the labels
     seen so far that have no translation, and <scm|tr-rebuild> rewrites the
     dictionary file with the missing entries added. The commands are in the
     translations submenu of the developer menu.
 
-    <item*|<verbatim|utils/misc/translation-list.scm>>A more systematic
+    <item*|<source-link|utils/misc/translation-list.scm|TeXmacs/progs/utils/misc/translation-list.scm>>A more systematic
     approach: <scm|update-translatable> collects all translatable strings
-    from the <scheme> sources into <verbatim|english-new.scm> (minus those
-    in <verbatim|english-ignore.scm>), <scm|update-missing> computes, for
+    from the <scheme> sources into <source-link|english-new.scm|TeXmacs/langs/natural/dic/english-new.scm> (minus those
+    in <source-link|english-ignore.scm|TeXmacs/langs/natural/dic/english-ignore.scm>), <scm|update-missing> computes, for
     each language, the list of missing translations in
     <verbatim|src/TeXmacs/langs/natural/miss/english-<em|lan>-miss.scm>,
     and <scm|translate-begin> / <scm|translate-end> export these lists for
@@ -138,7 +138,7 @@
 
   <section|Locales and dates>
 
-  <verbatim|System/Language/locale.cpp> converts between <TeXmacs> language
+  <source-link|System/Language/locale.cpp|src/System/Language/locale.cpp> converts between <TeXmacs> language
   names and system locales:
 
   <\description-paragraphs>
@@ -163,7 +163,7 @@
 
     <item*|<cpp|get_date (lan, fm)>, <cpp|pretty_time>,
     <cpp|pretty_date>>Dates in a given language and format. With <name|Qt>
-    they are computed by <name|Qt> (<verbatim|Plugins/Qt/qt_utilities.cpp>);
+    they are computed by <name|Qt> (<source-link|Plugins/Qt/qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>);
     otherwise <verbatim|date> is run with the locale of the language.
   </description-paragraphs>
 
@@ -173,13 +173,13 @@
     <item>The dictionary loader converts from <name|UTF-8> only for a fixed
     list of target languages (<verbatim|dictionary.cpp:51-55>), which does
     not match the actual encodings of the files: for instance
-    <verbatim|english-italian.scm> is in <name|UTF-8> but Italian is not in
+    <source-link|english-italian.scm|TeXmacs/langs/natural/dic/english-italian.scm> is in <name|UTF-8> but Italian is not in
     the list, so accented Italian translations are garbled (the translation
     of \Pcell properties\Q comes out with the two <name|UTF-8> bytes of the
     accented letter instead of one Cork character). A new dictionary must be
     written in the encoding the loader expects for its language.
 
-    <item>Some locale codes in <verbatim|locale.cpp> are not valid
+    <item>Some locale codes in <source-link|locale.cpp|src/System/Language/locale.cpp> are not valid
     <name|ISO> codes: Greek is mapped from <verbatim|gr> and to
     <verbatim|gr_GR> (lines 118 and 150; the language code is
     <verbatim|el>), Swedish to <verbatim|sv_SV> (line 162; the country is
@@ -190,12 +190,12 @@
 
     <item>Without <name|Qt>, <cpp|get_date> converts dates for Czech,
     Hungarian and Polish only if the locale is <verbatim|cz_CZ>,
-    <verbatim|hu_HU> or <verbatim|pl_PL> (<verbatim|locale.cpp:330>), but
+    <verbatim|hu_HU> or <verbatim|pl_PL> (<source-link|locale.cpp:330|src/System/Language/locale.cpp:330>), but
     Czech is mapped to <verbatim|cs_CZ>, so Czech dates are not converted.
 
     <item>The language lists are duplicated: <cpp|text_language> and
     <cpp|get_supported_languages> (<c++>), <scm|supported-languages>
-    (<verbatim|kernel/texmacs/tm-modes.scm>), the locale tables, the
+    (<source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>), the locale tables, the
     hyphenation files, the dictionaries and the style packages must be kept
     consistent by hand. For instance <verbatim|american> is a text language
     but not one of the <scheme> <scm|supported-languages>.

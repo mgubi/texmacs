@@ -8,7 +8,7 @@
   <section|Defining modes>
 
   Modes are declared with the macro <scm|texmacs-modes> of
-  <verbatim|kernel/texmacs/tm-modes.scm>. Each entry has the form
+  <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>. Each entry has the form
 
   <\scm-code>
     (<scm-arg|name>% <scm-arg|test> <scm-arg|parent>% ...)
@@ -58,7 +58,7 @@
   </itemize>
 
   The predicates are defined in the module <verbatim|texmacs-user>, so they
-  are visible everywhere. <verbatim|tm-modes.scm> defines the modes for the
+  are visible everywhere. <source-link|tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm> defines the modes for the
   editing context (<scm|in-source?>, <scm|in-text?>, <scm|in-math?>,
   <scm|in-prog?>, <scm|in-hybrid?>, <scm|in-table?>, <scm|in-session?>,
   ...), for the document style (<scm|in-std?>, <scm|in-beamer?>,
@@ -88,7 +88,7 @@
     \ \ (if shift? (make-return-after) (make-item)))
   </scm-code>
 
-  The implementation in <verbatim|kernel/texmacs/tm-define.scm> is simple:
+  The implementation in <source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm> is simple:
   a conditional redefinition replaces the global binding by a function of
   the form
 
@@ -114,7 +114,7 @@
 
     <item>the body of a definition may call <scm|former> explicitly to
     extend rather than replace the previous behaviour; this is how
-    <verbatim|math/math-sem-edit.scm> wraps <scm|kbd-insert>,
+    <source-link|math/math-sem-edit.scm|TeXmacs/progs/math/math-sem-edit.scm> wraps <scm|kbd-insert>,
     <scm|kbd-backspace> and <scm|make>;
 
     <item>a first definition with a condition gets an empty
@@ -131,7 +131,7 @@
   <subsection|Keyboard shortcuts>
 
   Keyboard shortcuts are declared with <scm|kbd-map>
-  (<verbatim|kernel/gui/kbd-define.scm>):
+  (<source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>):
 
   <\scm-code>
     (kbd-map
@@ -163,7 +163,7 @@
   symbolic prefixes such as <verbatim|math:small>, <verbatim|structured:cmd>
   or <verbatim|table> are turned into concrete modifier combinations; the
   prefixes are declared with <scm|kbd-wildcards> in
-  <verbatim|texmacs/keyboard/prefix-kbd.scm> and depend on the look and
+  <source-link|texmacs/keyboard/prefix-kbd.scm|TeXmacs/progs/texmacs/keyboard/prefix-kbd.scm> and depend on the look and
   feel. The suffix <verbatim|var> stands for the variant key (by default
   <key|tab>): <verbatim|"a var"> is the binding for <key|a> followed by
   <key|tab>.
@@ -173,10 +173,10 @@
   <\enumerate>
     <item>the toolkit calls <cpp|edit_interface_rep::handle_keypress>,
     which calls the <scheme> function <scm|keyboard-press>
-    (<verbatim|kernel/gui/kbd-handlers.scm>), which by default calls back
+    (<source-link|kernel/gui/kbd-handlers.scm|TeXmacs/progs/kernel/gui/kbd-handlers.scm>), which by default calls back
     the editor with <scm|key-press>;
 
-    <item>the editor (<verbatim|Edit/Interface/edit_keyboard.cpp>) appends
+    <item>the editor (<source-link|Edit/Interface/edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp>) appends
     the key to the pending shortcut and asks the server for a binding
     (<cpp|get_keycomb>), which ends in <scm|kbd-find-key-binding>;
 
@@ -188,7 +188,7 @@
   </enumerate>
 
   <scm|kbd-insert> is itself overloaded: in math mode
-  (<verbatim|math/math-edit.scm>) it removes a space typed before an infix
+  (<source-link|math/math-edit.scm|TeXmacs/progs/math/math-edit.scm>) it removes a space typed before an infix
   operator, and in semantic math mode it checks the syntactic correctness
   of the result. The details of the <c++> side are in <hlink|keyboard
   events|server-events.en.tm>.
@@ -217,16 +217,16 @@
 
   <\description>
     <item*|<scm|texmacs-mode-icons>>The mode dependent icon bar
-    (<verbatim|texmacs/menus/main-menu.scm>), which links to
+    (<source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>), which links to
     <scm|text-icons>, <scm|math-icons>, <scm|prog-icons>, ... according
     to the mode.
 
     <item*|<scm|format-menu>>The <menu|Format> menu
-    (<verbatim|generic/format-menu.scm>), which links to
+    (<source-link|generic/format-menu.scm|TeXmacs/progs/generic/format-menu.scm>), which links to
     <scm|text-format-menu> or <scm|math-format-menu>.
 
     <item*|<scm|texmacs-focus-icons> and <scm|focus-menu>>The focus icon
-    bar and the <menu|Focus> menu (<verbatim|generic/generic-menu.scm>),
+    bar and the <menu|Focus> menu (<source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>),
     which are built from the focus tree, see <hlink|the generic structured
     editing hooks|modes-structured.en.tm>.
 
@@ -241,7 +241,7 @@
 
   <section|Lazy loading>
 
-  Most mode modules are not loaded at startup. <verbatim|init-texmacs.scm>
+  Most mode modules are not loaded at startup. <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>
   only declares when they are needed, with the macros of
   <hlink|lazy definitions|../scheme/overview/overview-lazyness.en.tm>:
 
@@ -278,11 +278,11 @@
   Lazy loading interacts with conditional definitions: since the most
   recently loaded definition is tried first, a module which is loaded late
   takes precedence over modules loaded earlier, whatever the order of the
-  declarations in <verbatim|init-texmacs.scm>. A module therefore declares
+  declarations in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>. A module therefore declares
   the modules it extends in its <scm|:use> clause, which forces them to be
-  loaded first; for example <verbatim|math/math-kbd.scm> uses
-  <verbatim|generic/generic-kbd.scm>, <verbatim|math/math-edit.scm> and
-  <verbatim|table/table-edit.scm>.
+  loaded first; for example <source-link|math/math-kbd.scm|TeXmacs/progs/math/math-kbd.scm> uses
+  <source-link|generic/generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>, <source-link|math/math-edit.scm|TeXmacs/progs/math/math-edit.scm> and
+  <source-link|table/table-edit.scm|TeXmacs/progs/table/table-edit.scm>.
 
   <section|Organization of a mode>
 
@@ -311,8 +311,8 @@
     <item*|<verbatim|<em|mode>-markup.scm>><scheme> functions which are
     called while tags of the mode are typeset, through the <markup|extern>
     primitive of the style files (for instance <scm|screens-index> in
-    <verbatim|dynamic/fold-markup.scm>, or the callbacks of spreadsheets in
-    <verbatim|dynamic/calc-markup.scm>).
+    <source-link|dynamic/fold-markup.scm|TeXmacs/progs/dynamic/fold-markup.scm>, or the callbacks of spreadsheets in
+    <source-link|dynamic/calc-markup.scm|TeXmacs/progs/dynamic/calc-markup.scm>).
 
     <item*|<verbatim|<em|mode>-doc.scm>>Documentation hooks, such as the
     help about tags shown by the focus menu.
@@ -321,12 +321,12 @@
     and side tools.
 
     <item*|<verbatim|<em|mode>-speech*.scm>>Speech input for the mode
-    (<verbatim|kernel/gui/speech-define.scm>), loaded together with the
+    (<source-link|kernel/gui/speech-define.scm|TeXmacs/progs/kernel/gui/speech-define.scm>), loaded together with the
     keyboard.
   </description>
 
   Not every mode has every file, and some files mix several roles (tag
-  groups for tables are declared in <verbatim|table/table-edit.scm>, for
+  groups for tables are declared in <source-link|table/table-edit.scm|TeXmacs/progs/table/table-edit.scm>, for
   instance).
 
   <section|Pitfalls>
@@ -336,8 +336,8 @@
     an earlier one completely hides it; this happens for instance with the
     <scm|standard-parameters> of the <markup|input>, <markup|output>,
     <markup|errput> and <markup|textput> tags, which are defined both in
-    <verbatim|dynamic/session-edit.scm> and in
-    <verbatim|dynamic/program-edit.scm> (the bodies currently compute the
+    <source-link|dynamic/session-edit.scm|TeXmacs/progs/dynamic/session-edit.scm> and in
+    <source-link|dynamic/program-edit.scm|TeXmacs/progs/dynamic/program-edit.scm> (the bodies currently compute the
     same result).
 
     <item>Because the order of loading determines the precedence, the same
@@ -346,11 +346,11 @@
     from a lazily loaded module should <scm|:use> that module.
 
     <item>A definition such as <scm|(tm-define (make . l) ...)> in
-    <verbatim|math/math-sem-edit.scm> has no condition: once the module is
+    <source-link|math/math-sem-edit.scm|TeXmacs/progs/math/math-sem-edit.scm> has no condition: once the module is
     loaded, it wraps every call of <scm|make> in the whole program. It
     tests the <verbatim|semantic correctness> preference on each call.
 
-    <item><verbatim|kernel/gui/kbd-define.scm> accepts a bare symbol at the
+    <item><source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm> accepts a bare symbol at the
     start of a <scm|kbd-map> block (<scm|kbd-map-body>), but turns it into
     the condition list <scm|(0 <scm-arg|symbol>)>, whose first element is
     not a procedure; no keymap uses this form, and it would fail at the

@@ -52,7 +52,7 @@
     \ \ (:interactive #t))
   </scm-code>
 
-  in the source code of <TeXmacs> (see <verbatim|init-texmacs.scm>) states
+  in the source code of <TeXmacs> (see <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>) states
   that <scm|open-document-page-format> is an interactive command. As a
   consequence, the <menu|Document|Page> entry, which is defined by
 
@@ -88,7 +88,7 @@
   \P<math|<op|\<circ\>>>\Q before the folded text so as to unfold the tag.
   When doing this, the scheme script <scm|mouse-unfold> is launched. However,
   for this to work, the <scm|mouse-unfold> function needs to be secure (see
-  <verbatim|utils/edit/variants.scm>):
+  <source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>):
 
   <\scm-code>
     (tm-define (mouse-unfold t)
@@ -113,7 +113,7 @@
   markup|overview-start.en.tm#markup-scripts>\Q.\ 
 
   The complete list of options currently understood by <scm|tm-define> and
-  <scm|tm-property> (see <verbatim|kernel/texmacs/tm-define.scm>) is:
+  <scm|tm-property> (see <source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>) is:
   <scm|:mode> and <scm|:require> (for <hlink|contextual
   overloading|overview-overloading.en.tm>), <scm|:applicable> (a condition
   under which a menu entry for the command is active, rather than greyed

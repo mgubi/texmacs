@@ -23,14 +23,14 @@
     <item*|<verbatim|doc>>For documentation. This directory is added to
     <verbatim|TEXMACS_DOC_PATH>.
 
-    <item*|<verbatim|langs/natural/dic>>For dictionaries. This directory is
+    <item*|<source-link|langs/natural/dic|TeXmacs/langs/natural/dic>>For dictionaries. This directory is
     added to <verbatim|TEXMACS_DIC_PATH>.
 
     <item*|<verbatim|lib>>For shared libraries. This directory is added to
     <verbatim|LD_LIBRARY_PATH>.
 
-    <item*|<verbatim|misc/patterns>, <verbatim|misc/pixmaps>,
-    <verbatim|misc/themes>>For background patterns, icons and themes.
+    <item*|<source-link|misc/patterns|TeXmacs/misc/patterns>, <source-link|misc/pixmaps|TeXmacs/misc/pixmaps>,
+    <source-link|misc/themes|TeXmacs/misc/themes>>For background patterns, icons and themes.
 
     <item*|<verbatim|packages>>For style packages.
 
@@ -128,7 +128,7 @@
   </verbatim>
 
   In the source code of <TeXmacs>, the second directory corresponds to
-  <verbatim|src/plugins>. Some of these plug-ins are
+  <source-link|src/plugins|plugins>. Some of these plug-ins are
   <hlink|described|../interface/interface.en.tm> in more detail in the
   chapter about writing new interfaces.
 

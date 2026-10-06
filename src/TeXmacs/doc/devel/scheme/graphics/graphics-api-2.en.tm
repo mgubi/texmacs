@@ -126,7 +126,7 @@
     string of letters which specify the requested coordinates, like
     <scm|"lbrt"> (left, bottom, right and top of the logical box) or
     <scm|"LBRT"> (the same for the ink box). The routine is implemented in
-    <verbatim|graphics-utils.scm> by typesetting the markup <markup|box-info>
+    <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm> by typesetting the markup <markup|box-info>
     with <scm|texmacs-exec*>; the analogous routines <scm|frame-direct> and
     <scm|frame-inverse> transform points between the coordinates of the
     graphics and the coordinates of the typeset document.
@@ -144,7 +144,7 @@
   <paragraph*|The current interface>
 
   In the current implementation, the <c++> editor
-  (<verbatim|src/Edit/Interface/edit_graphics.cpp>) handles mouse events
+  (<source-link|src/Edit/Interface/edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>) handles mouse events
   inside graphics as follows: it transforms the mouse position into
   graphics coordinates, projects it on the current grid (taking into account
   the control points of nearby objects), and then calls one of the
@@ -152,7 +152,7 @@
   <scm|graphics-start-drag-left>, <scm|graphics-dragging-left>,
   <scm|graphics-end-drag-left>, <scm|graphics-release-right>, <abbr|etc.>
   with the resulting coordinates as strings. These routines are defined in
-  <verbatim|progs/graphics/graphics-edit.scm> and dispatch on the current
+  <source-link|progs/graphics/graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm> and dispatch on the current
   graphical mode. The main glued routines which may be used by these
   handlers are:
 

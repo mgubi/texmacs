@@ -9,8 +9,8 @@
   take a look at the sample \Pcomputer algebra system\Q <verbatim|mycas>,
   which is shipped as a plug-in in the directory
   <verbatim|$TEXMACS_PATH/plugins/mycas> (in the source code of <TeXmacs>,
-  this is <verbatim|src/plugins/mycas>). The file
-  <verbatim|src/mycas.cpp> of this plug-in, which is listed at the end of
+  this is <source-link|src/plugins/mycas|plugins/mycas>). The file
+  <source-link|src/mycas.cpp|plugins/mycas/src/mycas.cpp> of this plug-in, which is listed at the end of
   this section, contains a very simple program which can be interfaced
   with <TeXmacs>. In order to test the program, you should compile it
   using
@@ -20,7 +20,7 @@
   </shell-code>
 
   and move the binary <verbatim|mycas> to some location in your path. The
-  configuration file <verbatim|progs/init-mycas.scm> of the plug-in
+  configuration file <source-link|progs/init-mycas.scm|plugins/mycas/progs/init-mycas.scm> of the plug-in
   contains
 
   <\scm-code>
@@ -39,7 +39,7 @@
   <menu|Insert|Session> menu.
 
   <\remark>
-    The file <verbatim|mycas.cpp> dates from 2001 and includes the
+    The file <source-link|mycas.cpp|plugins/mycas/src/mycas.cpp> dates from 2001 and includes the
     pre-standard header <verbatim|\<less\>iostream.h\<gtr\>>, which is
     rejected by modern <c++> compilers. In order to compile it, replace
     this line by <verbatim|#include \<less\>iostream\<gtr\>> followed by
@@ -176,7 +176,7 @@
   then they should be enclosed in one main block.
 
   A special \Pchannel\Q is used in order to send the input prompt. In
-  <verbatim|mycas.cpp>, the channel is selected using a special
+  <source-link|mycas.cpp|plugins/mycas/src/mycas.cpp>, the channel is selected using a special
   <verbatim|DATA_BEGIN>-<verbatim|DATA_END> block in the
   <verbatim|channel> format, which redirects the remainder of the enclosing
   block to the <verbatim|prompt> channel:
@@ -252,7 +252,7 @@
 
   <section|The complete listing>
 
-  Here follows the complete listing of <verbatim|mycas.cpp>, with the
+  Here follows the complete listing of <source-link|mycas.cpp|plugins/mycas/src/mycas.cpp>, with the
   include lines adapted to modern <c++> compilers:
 
   <\cpp-code>

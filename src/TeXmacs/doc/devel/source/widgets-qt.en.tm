@@ -7,8 +7,8 @@
 
   <section|Overview>
 
-  The <name|Qt> port lives in <verbatim|src/src/Plugins/Qt>. A second copy
-  with the same structure, <verbatim|Plugins/Qt6>, is used by the
+  The <name|Qt> port lives in <source-link|src/src/Plugins/Qt|src/Plugins/Qt>. A second copy
+  with the same structure, <source-link|Plugins/Qt6|src/Plugins/Qt6>, is used by the
   <verbatim|configure> build when the option <verbatim|--enable-qt-new> is
   given (it is the default on Android); it adds for instance
   <cpp|QTMMainTabWindow>. The <name|CMake> build always uses
@@ -22,7 +22,7 @@
   <\description-paragraphs>
     <item*|<verbatim|qt_widget.hpp/cpp>>the base class
     <cpp|qt_widget_rep> and the implementation of all the constructors of
-    <verbatim|widget.hpp>;
+    <source-link|widget.hpp|src/Graphics/Gui/widget.hpp>;
 
     <item*|<verbatim|qt_ui_element.hpp/cpp>>the class
     <cpp|qt_ui_element_rep>, which implements most constructors;
@@ -53,7 +53,7 @@
 
     <item*|<verbatim|qt_gui.hpp/cpp>, <verbatim|QTMGuiHelper.*>>the
     <cpp|qt_gui_rep> singleton <cpp|the_gui>, the event queue and the
-    functions of <verbatim|gui.hpp>.
+    functions of <source-link|gui.hpp|src/Graphics/Gui/gui.hpp>.
   </description-paragraphs>
 
   <section|The base class <cpp|qt_widget_rep>>

@@ -15,18 +15,18 @@
   of a picture>>|<row|<cell|<cpp|printer_rep>>|<cell|<verbatim|Graphics/Renderer/printer.*>>|<cell|PostScript
   file>>|<row|<cell|<cpp|pdf_hummus_renderer_rep>>|<cell|<verbatim|Plugins/Pdf/pdf_hummus_renderer.*>>|<cell|<abbr|PDF>
   file>>|<row|<cell|<cpp|x_drawable_rep>>|<cell|<verbatim|Plugins/X11/x_drawable.*>,
-  <verbatim|x_shadow.cpp>, <verbatim|x_picture.cpp>>|<cell|<name|X11>
+  <source-link|x_shadow.cpp|src/Plugins/X11/x_shadow.cpp>, <source-link|x_picture.cpp|src/Plugins/X11/x_picture.cpp>>|<cell|<name|X11>
   window or pixmap>>|<row|<cell|<cpp|cairo_renderer_rep>>|<cell|<verbatim|Plugins/Cairo/cairo_renderer.*>>|<cell|<name|Cairo>
   context>>|<row|<cell|<cpp|aqua_renderer_rep>>|<cell|<verbatim|Plugins/Cocoa/aqua_renderer.*>>|<cell|<name|Cocoa>
   view>>|<row|<cell|<cpp|cg_renderer_rep>>|<cell|<verbatim|Plugins/MacOS/cg_renderer.*>>|<cell|<name|CoreGraphics>
   context>>>>>
 
   The <name|CMake> build compiles <verbatim|Plugins/Qt> and
-  <verbatim|Plugins/Pdf> (with <cpp|PDF_RENDERER> set), and nothing of the
+  <source-link|Plugins/Pdf|src/Plugins/Pdf> (with <cpp|PDF_RENDERER> set), and nothing of the
   other back-ends; the <verbatim|configure> based build chooses the
   <abbr|GUI> directory (<verbatim|Qt>, <verbatim|Qt6>, <verbatim|X11>,
   <verbatim|Cocoa>) at configuration time (<verbatim|Qt6> is used for <name|Qt> 6), and always
-  compiles <verbatim|Plugins/Cairo>, whose code is guarded by
+  compiles <source-link|Plugins/Cairo|src/Plugins/Cairo>, whose code is guarded by
   <cpp|USE_CAIRO>. At the time of
   writing, <verbatim|Plugins/Qt/qt_renderer.*> and
   <verbatim|Plugins/Qt6/qt_renderer.*> are identical.
@@ -40,7 +40,7 @@
   bracket a drawing session on a native device, color helpers <cpp|rgb> and
   <cpp|get_rgb>, and no-op shadow operations. The file also defines
   <cpp|basic_character>, the key of glyph caches, and
-  <cpp|gui_interrupted>. Note that <verbatim|basic_renderer.cpp> is only
+  <cpp|gui_interrupted>. Note that <source-link|basic_renderer.cpp|src/Graphics/Renderer/basic_renderer.cpp> is only
   compiled when <cpp|QTTEXMACS> or <cpp|AQUATEXMACS> is defined.
 
   <subsection|The <name|Qt> renderer>
@@ -107,6 +107,10 @@
   their PostScript code.
 
   <subsection|The <abbr|PDF> renderer>
+
+  The whole export path, the fonts and the text layer, links, bookmarks
+  and metadata are described in more detail in <hlink|PDF
+  export|pdf-export.en.tm>.
 
   <cpp|pdf_hummus_renderer_rep> writes <abbr|PDF> through the
   <name|PDFHummus> library (a <cpp|PDFWriter>, the current <cpp|PDFPage> and
@@ -205,8 +209,8 @@
   also provide the free functions <cpp|native_picture>,
   <cpp|picture_renderer>, <cpp|load_picture>, <cpp|as_native_picture> and
   <cpp|save_picture>, and adapt the conditional stubs at the end of
-  <verbatim|renderer.cpp>. A printer that should be selectable for export
-  must be hooked into the factory <cpp|printer> in <verbatim|printer.cpp>.
+  <source-link|renderer.cpp|src/Graphics/Renderer/renderer.cpp>. A printer that should be selectable for export
+  must be hooked into the factory <cpp|printer> in <source-link|printer.cpp|src/Graphics/Renderer/printer.cpp>.
 
   A useful way to proceed is to start from the <name|Qt> renderer, which
   shows how to map each primitive to a modern 2D graphics <abbr|API>, and

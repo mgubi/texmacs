@@ -10,9 +10,9 @@
     was planned in 2005. Only part of it has been implemented, sometimes
     under different names; the entries below indicate the current status.
     The actual implementation of the graphical editor can be found in
-    <verbatim|progs/graphics/>, mainly in <verbatim|graphics-utils.scm>
-    (enhanced trees), <verbatim|graphics-object.scm> (the sketch and the
-    current object) and <verbatim|graphics-edit.scm> (mouse handlers).
+    <source-link|progs/graphics/|TeXmacs/progs/graphics>, mainly in <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>
+    (enhanced trees), <source-link|graphics-object.scm|TeXmacs/progs/graphics/graphics-object.scm> (the sketch and the
+    current object) and <source-link|graphics-edit.scm|TeXmacs/progs/graphics/graphics-edit.scm> (mouse handlers).
   </warning>
 
   <paragraph*|Rationale>
@@ -100,7 +100,7 @@
     \ Given an enhanced tree <scm-arg|t>, return its radical. In the current
     implementation, the enhancements are <markup|with> and
     <markup|anim-edit> tags (see <scm|enhanced-tree?> in
-    <verbatim|graphics-utils.scm>); <scm|stree-radical> does the same for
+    <source-link|graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>); <scm|stree-radical> does the same for
     <scheme> trees.
   </explain>
 

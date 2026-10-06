@@ -30,12 +30,12 @@
   Calling <verbatim|make MACOS_RELEASE> will compile and bundle <TeXmacs>,
   then zip and finally digitally sign the resulting
   <verbatim|.zip> archive of the bundle with the script
-  <verbatim|misc/admin/sign_update>. In order for this to work, one has to
+  <source-link|misc/admin/sign_update|misc/admin/sign_update>. In order for this to work, one has to
   set the environment variable <verbatim|TEXMACS_PRIVATE_DSA> to point to the
   location of the private <name|DSA> key used to sign releases. At the end of
   the build process a chunk of <name|XML> is printed that can be pasted in
   the <verbatim|appcast.xml> file. This rule is only provided by the
-  <name|autotools> build (<verbatim|Makefile.in>), not by the <name|CMake>
+  <name|autotools> build (<source-link|Makefile.in|Makefile.in>), not by the <name|CMake>
   build.
 
   Under <name|Windows> digital signatures are not yet supported by
@@ -47,13 +47,13 @@
 
   <subsection|Client side interface>
 
-  The <c++> side of the updater lives in <verbatim|src/src/Plugins/Updater/>:
-  the abstract class <cpp|tm_updater> (<verbatim|tm_updater.hpp>) has the
+  The <c++> side of the updater lives in <source-link|src/src/Plugins/Updater/|src/Plugins/Updater>:
+  the abstract class <cpp|tm_updater> (<source-link|tm_updater.hpp|src/Plugins/Updater/tm_updater.hpp>) has the
   implementations <cpp|tm_sparkle> (<name|MacOS>) and <cpp|tm_winsparkle>
   (<name|Windows>). Support is only compiled in when <TeXmacs> is configured
   with <verbatim|--with-sparkle>; the <abbr|URL> of the appcast is fixed at
   configuration time using <verbatim|--with-appcast=<em|url>> (see
-  <verbatim|misc/m4/sparkle.m4>), and is stored as <verbatim|SUFeedURL> in
+  <source-link|misc/m4/sparkle.m4|misc/m4/sparkle.m4>), and is stored as <verbatim|SUFeedURL> in
   the <name|MacOS> bundle's <verbatim|Info.plist>, <abbr|resp.> in the
   <name|Windows> resource file. The following glued routines are available
   from <scheme>:
@@ -106,8 +106,8 @@
     no check yet).
   </explain>
 
-  At startup, <verbatim|init-texmacs.scm> loads the module
-  <verbatim|utils/misc/updater.scm> if <scm|(updater-supported?)> holds, and
+  At startup, <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> loads the module
+  <source-link|utils/misc/updater.scm|TeXmacs/progs/utils/misc/updater.scm> if <scm|(updater-supported?)> holds, and
   calls <scm|(updater-initialize)> after a short delay. This routine reads
   the following preference:
 

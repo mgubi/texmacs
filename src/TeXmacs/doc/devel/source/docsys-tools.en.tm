@@ -8,7 +8,7 @@
   <section|The web site generator>
 
   The <TeXmacs> web site is built from a directory tree of <TeXmacs>
-  documents by <verbatim|progs/doc/tmweb.scm>. The entry points are
+  documents by <source-link|progs/doc/tmweb.scm|TeXmacs/progs/doc/tmweb.scm>. The entry points are
 
   <\description-paragraphs>
     <item*|<scm|tmweb-convert-dir>, <scm|tmweb-update-dir>>Convert, or
@@ -26,7 +26,7 @@
     directories; the last one opens a dialog and remembers the directories
     in the preferences <verbatim|website:src-dir> and
     <verbatim|website:dest-dir>. They are declared lazily in
-    <verbatim|init-texmacs.scm> but no menu calls them.
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> but no menu calls them.
   </description-paragraphs>
 
   <scm|tmweb-convert-directory> enumerates all files below the source
@@ -51,7 +51,7 @@
 
   <menu|Help|Search|Documentation> and the neighbouring entries call
   <scm|docgrep-in-doc>, <scm|docgrep-in-src> and <scm|docgrep-in-recent>
-  (<verbatim|progs/doc/docgrep.scm>). They open
+  (<source-link|progs/doc/docgrep.scm|TeXmacs/progs/doc/docgrep.scm>). They open
   <verbatim|tmfs://grep/type=<em|type>&what=<em|words>>, whose handler
   collects the candidate files and ranks them:
 
@@ -69,7 +69,7 @@
   </description>
 
   Each file is scored by the <c++> routine <cpp|search_score>
-  (<verbatim|src/src/System/Files/file.cpp>, glue <scm|system-search-score>):
+  (<source-link|src/src/System/Files/file.cpp|src/System/Files/file.cpp>, glue <scm|system-search-score>):
   the scores of the individual words are multiplied, a word counts ten
   times more when it is a whole word, and in <verbatim|.tm> files
   occurrences inside tag names do not count while occurrences in
@@ -82,7 +82,7 @@
 
   <section|Finding the documentation of an item>
 
-  <verbatim|progs/doc/tmdoc-search.scm> finds the <markup|explain> block
+  <source-link|progs/doc/tmdoc-search.scm|TeXmacs/progs/doc/tmdoc-search.scm> finds the <markup|explain> block
   which documents a given item, that is, whose header contains the item
   in the corresponding markup: <scm|tmdoc-search-tag> for a tag
   (<markup|explain-macro> or <markup|markup>), <scm|tmdoc-search-style>
@@ -93,8 +93,8 @@
   path which contain the corresponding markup as a string (<scm|url-grep>)
   and then searches their trees; if nothing is found for the output
   language, English files are searched. These routines are used by the
-  contextual help of the focus toolbar (<verbatim|generic/generic-doc.scm>)
-  and by the macro editor (<verbatim|source/macro-widgets.scm>).
+  contextual help of the focus toolbar (<source-link|generic/generic-doc.scm|TeXmacs/progs/generic/generic-doc.scm>)
+  and by the macro editor (<source-link|source/macro-widgets.scm|TeXmacs/progs/source/macro-widgets.scm>).
 
   <section|The API documentation>
 
@@ -103,7 +103,7 @@
   module and symbol browsers of the developer menu) show, for <scheme>
   functions and macros, their documentation together with their source
   code and module. The documentation comes from a cache of
-  <markup|explain> blocks (<verbatim|progs/doc/apidoc-collect.scm>):
+  <markup|explain> blocks (<source-link|progs/doc/apidoc-collect.scm|TeXmacs/progs/doc/apidoc-collect.scm>):
 
   <\itemize>
     <item>The cache is built the first time documentation is requested in
@@ -129,10 +129,10 @@
 
   The <c++> routines exported to <scheme> are documented separately in
   <hlink|the glue auto-documentation|../scheme/api/glue-auto-doc.en.tm>.
-  That file and <verbatim|progs/prog/glue-symbols.scm> are generated from
-  the glue declarations by <verbatim|src/src/Scheme/Glue/build-auto-doc>
-  (with <verbatim|make-apidoc-doc.scm> and
-  <verbatim|make-apidoc-module.scm>); see <hlink|the glue
+  That file and <source-link|progs/prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm> are generated from
+  the glue declarations by <source-link|src/src/Scheme/Glue/build-auto-doc|src/Scheme/Glue/build-auto-doc>
+  (with <source-link|make-apidoc-doc.scm|src/Scheme/Glue/make-apidoc-doc.scm> and
+  <source-link|make-apidoc-module.scm|src/Scheme/Glue/make-apidoc-module.scm>); see <hlink|the glue
   generator|scheme-bridge-glue.en.tm>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

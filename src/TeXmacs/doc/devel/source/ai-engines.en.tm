@@ -5,8 +5,8 @@
 <\body>
   <tmdoc-title|Engines, requests and transport>
 
-  This page describes <verbatim|Data/Convert/AI/ai.cpp> and
-  <verbatim|json.cpp>: how a request for a given engine is built, how it is
+  This page describes <source-link|Data/Convert/AI/ai.cpp|src/Data/Convert/AI/ai.cpp> and
+  <source-link|json.cpp|src/Data/Convert/AI/json.cpp>: how a request for a given engine is built, how it is
   sent, and how the answer is extracted from the reply.
 
   <section|Engines and models>
@@ -120,27 +120,27 @@
   <section|Transport>
 
   <cpp|eval_system> and <cpp|async_eval_system>
-  (<verbatim|System/Misc/sys_utils.cpp>) run a command through the shell
+  (<source-link|System/Misc/sys_utils.cpp|src/System/Misc/sys_utils.cpp>) run a command through the shell
   (<verbatim|popen> in a detached thread for the asynchronous variant,
   with <verbatim|2\<gtr\> /dev/null> appended). The <abbr|HTTP> routines
-  of <verbatim|System/Files/web_files.hpp> have two implementations:
+  of <source-link|System/Files/web_files.hpp|src/System/Files/web_files.hpp> have two implementations:
 
   <\itemize>
-    <item>in <name|Qt> 6 builds, <verbatim|Plugins/Qt/qt_http.cpp> uses a
+    <item>in <name|Qt> 6 builds, <source-link|Plugins/Qt/qt_http.cpp|src/Plugins/Qt/qt_http.cpp> uses a
     shared <cpp|QNetworkAccessManager>; the synchronous
     <cpp|qt_http_post> runs a nested event loop until the reply has
     arrived, the asynchronous variant connects a <cpp|QTMHTTPHandler> to
     the <verbatim|finished> signal. The transfer timeout is the preference
     <verbatim|http request timeout> (in seconds, default 10), set in the
     <verbatim|AI> tab of the <verbatim|Convert> page of the preferences
-    (<scm|ai-preferences-widget> in <verbatim|preferences-widgets.scm>). <cpp|http_from_json> uses
+    (<scm|ai-preferences-widget> in <source-link|preferences-widgets.scm|TeXmacs/progs/texmacs/menus/preferences-widgets.scm>). <cpp|http_from_json> uses
     <cpp|QJsonDocument>;
 
-    <item>otherwise (<name|Qt> 5, <name|X11>), <verbatim|web_files.cpp>
+    <item>otherwise (<name|Qt> 5, <name|X11>), <source-link|web_files.cpp|src/System/Files/web_files.cpp>
     builds a <verbatim|curl> command line with the headers and the data and
     runs it with <cpp|system> or <cpp|async_eval_system>, without any
     timeout; <cpp|http_from_json> is the <cpp|json_to_tree> of
-    <verbatim|json.cpp>.
+    <source-link|json.cpp|src/Data/Convert/AI/json.cpp>.
   </itemize>
 
   <section|Extracting the answer>
@@ -180,7 +180,7 @@
   <cpp|ai_latex_command> do), the request includes the last prompts and
   answers of the conversation <verbatim|<em|model>-<em|chat>>, at most
   the value of the preference <verbatim|albert chat history size> (default
-  3) of each. They are stored in static tables of <verbatim|ai.cpp>, so the
+  3) of each. They are stored in static tables of <source-link|ai.cpp|src/Data/Convert/AI/ai.cpp>, so the
   history lives as long as the program and is not saved. A second
   mechanism, <cpp|ai_get_continuation> and <cpp|ai_set_continuation>,
   remembers the <verbatim|"id"> of the last answer and asks the model to
@@ -189,7 +189,7 @@
 
   <section|<name|JSON>>
 
-  <verbatim|json.cpp> represents <name|JSON> values as trees: objects are
+  <source-link|json.cpp|src/Data/Convert/AI/json.cpp> represents <name|JSON> values as trees: objects are
   <markup|attr> trees with alternating keys and values, arrays are
   <markup|tuple> trees and strings are atomic trees. Depending on the
   <cpp|mode> bits <verbatim|JSON_NULL>, <verbatim|JSON_BOOLEAN> and

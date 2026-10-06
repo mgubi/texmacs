@@ -6,7 +6,7 @@
   <tmdoc-title|TFM metrics, PK glyphs and Type 1 substitution>
 
   This page describes how a <TeX> font of a given family, size and resolution
-  is loaded (<cpp|load_tex> in <verbatim|Plugins/Metafont/load_tex.cpp>),
+  is loaded (<cpp|load_tex> in <source-link|Plugins/Metafont/load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>),
   how its metrics and glyphs are decoded, and how the glyphs are represented
   and prepared for display.
 
@@ -82,7 +82,7 @@
     <cpp|struct tex_font_metric_rep><explain-synopsis|a decoded
     <verbatim|.tfm> file>
   <|explain>
-    Declared in <verbatim|Plugins/Metafont/load_tfm.hpp>; a resource
+    Declared in <source-link|Plugins/Metafont/load_tfm.hpp|src/Plugins/Metafont/load_tfm.hpp>; a resource
     (<cpp|RESOURCE(tex_font_metric)>), so that each file is decoded only
     once per session and shared by all fonts which use it. Its fields are
     those of the <verbatim|.tfm> format: the lengths <cpp|lf>, <cpp|lh>,
@@ -142,7 +142,7 @@
     <cpp|struct pk_loader><explain-synopsis|decoding of <verbatim|.pk>
     files>
   <|explain>
-    Declared in <verbatim|Plugins/Metafont/load_pk.hpp>. It is created with
+    Declared in <source-link|Plugins/Metafont/load_pk.hpp|src/Plugins/Metafont/load_pk.hpp>. It is created with
     the file, the metric and the resolution, and reads the whole file into
     memory. <cpp|load_pk ()> checks the preamble (command 247, format 89),
     then scans all character packets. For each character of the metric's
@@ -156,7 +156,7 @@
   </explain>
 
   The bitmaps are decoded lazily: the glyphs of a <name|PK> font are a
-  <cpp|pk_font_glyphs_rep> (in <verbatim|load_tex.cpp>), whose <cpp|get (c)>
+  <cpp|pk_font_glyphs_rep> (in <source-link|load_tex.cpp|src/Plugins/Metafont/load_tex.cpp>), whose <cpp|get (c)>
   unpacks the bitmap of character <cpp|c> the first time it is requested
   (<cpp|pk_loader::unpack>, which implements the run-length and
   <verbatim|dyn_f> nybble packing of the format, and the raw bitmap
@@ -166,7 +166,7 @@
 
   If <TeXmacs> is built with <name|FreeType> (<verbatim|USE_FREETYPE>),
   <cpp|try_pk> first asks <cpp|tt_find_name (family, size)>
-  (<verbatim|Plugins/Freetype/tt_file.cpp>) for an outline font with the
+  (<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>) for an outline font with the
   same name. <cpp|tt_find_name_sub> tries
   <verbatim|<em|family><em|size>>, the size divided by 100 for the
   <math|\<times\>100> convention, and then a list of usual design sizes
@@ -182,7 +182,7 @@
   <name|FreeType> rasterizes each glyph into a <cpp|glyph> on request. The
   face is opened with the <name|Adobe> custom character map
   (<cpp|ft_select_charmap (face, ft_encoding_adobe_custom)> in
-  <verbatim|tt_face.cpp>), so that character codes are those of the
+  <source-link|tt_face.cpp|src/Plugins/Freetype/tt_face.cpp>), so that character codes are those of the
   <verbatim|.tfm> file. Only the glyphs come from the outline font: the
   metrics, the ligatures and the kerning still come from the
   <verbatim|.tfm> file.
@@ -192,7 +192,7 @@
   <\explain>
     <cpp|struct glyph_rep><explain-synopsis|a bitmap character>
   <|explain>
-    Declared in <verbatim|Graphics/Bitmap_fonts/bitmap_font.hpp>; the handle
+    Declared in <source-link|Graphics/Bitmap_fonts/bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp>; the handle
     <cpp|glyph> is reference counted and may be nil. The fields are the
     pixel <cpp|width> and <cpp|height>, the offsets <cpp|xoff> and
     <cpp|yoff> of the reference point (from the left edge and from the top
@@ -210,14 +210,14 @@
   metrics and glyphs indexed by character code, which renderers and the
   <cpp|index_glyph> mechanism of fonts use (see <hlink|<TeXmacs>
   fonts|fonts.en.tm>). For <TeX> fonts, the metric table is a
-  <cpp|tfm_font_metric_rep> (<verbatim|tex_font.cpp>), which combines the
+  <cpp|tfm_font_metric_rep> (<source-link|tex_font.cpp|src/Plugins/Metafont/tex_font.cpp>), which combines the
   logical box of the <verbatim|.tfm> file with the ink box of the glyph.
 
   <paragraph|Shrinking for display.>Glyphs are rasterized at the resolution
   of the font (600 dpi at the default zoom), and the screen renderers reduce
   them by the shrinking factor (see <hlink|the renderer
   interface|renderer-api.en.tm>) with <cpp|shrink (gl, xf, yf, xo, yo)>
-  (<verbatim|Graphics/Bitmap_fonts/glyph_shrink.cpp>). Every black input
+  (<source-link|Graphics/Bitmap_fonts/glyph_shrink.cpp|src/Graphics/Bitmap_fonts/glyph_shrink.cpp>). Every black input
   pixel is first thickened into a small block, whose size grows with the
   shrinking factor and with the <cpp|pixel_ratio> of high resolution screens
   (no thickening for glyphs produced by artistic effects); each output pixel

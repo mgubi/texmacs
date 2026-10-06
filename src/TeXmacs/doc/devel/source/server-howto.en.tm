@@ -26,14 +26,14 @@
     <cpp|extra_init_cmd>; further files get <scm|:new-window>.
 
     <item>The server is constructed; its constructor loads
-    <verbatim|init-texmacs.scm>, which defines all menus, keyboard
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>, which defines all menus, keyboard
     bindings and user commands.
 
     <item>Since no buffer exists yet, <cpp|open_window> creates the scratch
     buffer <verbatim|no_name_1.tm> with <cpp|make_new_buffer>, a window
     with <cpp|new_window>, and a first view with <cpp|get_passive_view>
     (which calls <cpp|get_new_view>, which creates the editor and runs
-    <verbatim|init-buffer.scm>); <cpp|window_set_view> attaches the view
+    <source-link|init-buffer.scm|TeXmacs/progs/init-buffer.scm>); <cpp|window_set_view> attaches the view
     to the window (<cpp|attach_view>, <cpp|resume>, which installs the
     menus) and makes it current.
 
@@ -83,7 +83,7 @@
     eventually calls <cpp|insert (path, tree)> on the global edit tree.
 
     <item>The modification goes through <cpp|apply> in
-    <verbatim|observer.cpp> and is announced to the observers of the
+    <source-link|observer.cpp|src/Kernel/Abstractions/observer.cpp> and is announced to the observers of the
     modified node: the <cpp|ip_observer>s propagate it up to the root of
     the buffer, where the <cpp|edit_observer> of every editor on the buffer
     and the <cpp|undo_observer> of every archiver receive it. Each editor
@@ -196,7 +196,7 @@
     occurs.
 
     <item>Modify documents only through the functions of
-    <verbatim|observer.cpp> (<cpp|assign>, <cpp|insert>, ...) or the
+    <source-link|observer.cpp|src/Kernel/Abstractions/observer.cpp> (<cpp|assign>, <cpp|insert>, ...) or the
     editing routines built on top of them. Direct assignments to subtrees
     of <cpp|the_et> bypass the observers, so neither the typesetter, nor
     the other views, nor the undo system would notice them.

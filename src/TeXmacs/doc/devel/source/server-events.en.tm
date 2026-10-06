@@ -47,8 +47,8 @@
 
   <section|The GUI loop and the interpose handler>
 
-  With the <name|Qt> back-end (<verbatim|Plugins/Qt/qt_gui.cpp>, and its
-  counterpart in <verbatim|Plugins/Qt6/>), events delivered by <name|Qt> to
+  With the <name|Qt> back-end (<source-link|Plugins/Qt/qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>, and its
+  counterpart in <source-link|Plugins/Qt6/|src/Plugins/Qt6>), events delivered by <name|Qt> to
   <TeXmacs> widgets are not processed immediately. The widgets call
   <cpp|qt_gui_rep::process_keypress>, <cpp|process_mouse>,
   <cpp|process_keyboard_focus>, <cpp|process_resize> or
@@ -132,17 +132,17 @@
 
   <\enumerate>
     <item><cpp|edit_interface_rep::handle_keypress (key, t)>
-    (<verbatim|Edit/Interface/edit_keyboard.cpp>) records the key for the
+    (<source-link|Edit/Interface/edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp>) records the key for the
     optional display of typed keys, forces a first typesetting if needed,
     calls <cpp|start_editing ()>, and passes the key to the <scheme>
     function <scm|keyboard-press> (or <scm|delayed-keyboard-press> for
     pre-edit strings of input methods).
 
     <item><scm|keyboard-press> is defined with <scm|tm-define> in
-    <verbatim|kernel/gui/kbd-handlers.scm>; its default implementation calls
+    <source-link|kernel/gui/kbd-handlers.scm|TeXmacs/progs/kernel/gui/kbd-handlers.scm>; its default implementation calls
     <scm|(key-press <scm-arg|key>)>. It is overloaded in several contexts,
     for instance inside input fields of widgets
-    (<verbatim|utils/misc/gui-utils.scm>), during interactive spell checking
+    (<source-link|utils/misc/gui-utils.scm|TeXmacs/progs/utils/misc/gui-utils.scm>), during interactive spell checking
     or in the shortcut editor.
 
     <item><scm|key-press> is the glue for <cpp|edit_interface_rep::key_press>.
@@ -175,12 +175,12 @@
   <section|Mouse events>
 
   <cpp|edit_interface_rep::handle_mouse (kind, x, y, mods, t, data)>
-  (<verbatim|Edit/Interface/edit_mouse.cpp>) first makes sure that the
+  (<source-link|Edit/Interface/edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>) first makes sure that the
   document is typeset (the box tree is needed to interpret the coordinates),
   calls <cpp|start_editing>, converts the coordinates according to the
   magnification, detects the start of left and right drags, and passes the
   event to the <scheme> function <scm|mouse-event>. Its default definition
-  in <verbatim|kbd-handlers.scm> calls the glue routine <scm|mouse-any>,
+  in <source-link|kbd-handlers.scm|TeXmacs/progs/kernel/gui/kbd-handlers.scm> calls the glue routine <scm|mouse-any>,
   that is, <cpp|edit_interface_rep::mouse_any>. The latter updates the loci
   under the mouse (hyperlinks, tooltips), dispatches to the graphics editor
   when the pointer is inside a <markup|graphics>, and otherwise calls
@@ -195,7 +195,7 @@
   Editing routines never redraw the screen directly. Instead, they call
   <cpp|notify_change (int flags)>, which adds the flags to
   <cpp|env_change> and asks the GUI for an update (<cpp|needs_update>).
-  The flags are defined in <verbatim|editor.hpp>:
+  The flags are defined in <source-link|editor.hpp|src/Edit/editor.hpp>:
 
   <\description>
     <item*|<cpp|THE_TREE>>The document tree changed; the document has to be
@@ -224,7 +224,7 @@
     highlighted spelling errors.
   </description>
 
-  <cpp|apply_changes> (<verbatim|Edit/Interface/edit_interface.cpp>),
+  <cpp|apply_changes> (<source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>),
   called by the interpose handler, processes the accumulated flags:
 
   <\enumerate>
@@ -261,7 +261,7 @@
 
   All drawing is done by invalidating rectangles (<cpp|invalidate>). The
   GUI then calls <cpp|handle_repaint (renderer, x1, y1, x2, y2)>
-  (<verbatim|Edit/Interface/edit_repaint.cpp>), which draws the background,
+  (<source-link|Edit/Interface/edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>), which draws the background,
   the typeset boxes, the selections, the cursor and the other decorations
   into the renderer, using a \Pstored\Q or \Pshadow\Q renderer as a
   cache. <cpp|handle_repaint> expects <cpp|env_change> to be zero: all
@@ -277,7 +277,7 @@
   <section|Keyboard configuration><label|sec-config>
 
   Key bindings are defined in <scheme> with the <scm|kbd-map> macro of
-  <verbatim|kernel/gui/kbd-define.scm>, possibly conditioned on modes and
+  <source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>, possibly conditioned on modes and
   contexts, and looked up with <scm|kbd-find-key-binding>. The
   <cpp|tm_config_rep> part of the server implements the lookup of a key
   sequence entered by the user in <cpp|get_keycomb (which, status, cmd,
@@ -321,17 +321,17 @@
   <verbatim|$TEXMACS_HOME_PATH/system/preferences.scm>. At the <c++> level,
   <cpp|load_user_preferences>, <cpp|save_user_preferences>,
   <cpp|get_user_preference> and <cpp|set_user_preference>
-  (<verbatim|System/Boot/preferences.cpp>) access this file directly; they
+  (<source-link|System/Boot/preferences.cpp|src/System/Boot/preferences.cpp>) access this file directly; they
   are used during startup, before <scheme> is available. Afterwards, code
   should use <cpp|get_preference (var, def)> and <cpp|set_preference (var,
-  val)> (<verbatim|Scheme/Scheme/object.cpp>), which call the <scheme>
+  val)> (<source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>), which call the <scheme>
   functions <scm|get-preference> and <scm|set-preference> once the
   preferences have been booted. On the <scheme> side
-  (<verbatim|kernel/texmacs/tm-preferences.scm>), preferences are declared
+  (<source-link|kernel/texmacs/tm-preferences.scm|TeXmacs/progs/kernel/texmacs/tm-preferences.scm>), preferences are declared
   with default values and call-back functions using
   <scm|define-preferences>; the call-back is invoked when the preference
   changes (<scm|notify-preference>). Examples can be found in
-  <verbatim|texmacs/texmacs/tm-server.scm>. Modified preferences are written
+  <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>. Modified preferences are written
   back to disk by <cpp|save_user_preferences>, which is called from
   <cpp|update_menus>.
 

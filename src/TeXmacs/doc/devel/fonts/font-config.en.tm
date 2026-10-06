@@ -11,13 +11,13 @@
   under <verbatim|$TEXMACS_HOME_PATH/fonts>, which is
   <verbatim|~/.TeXmacs/fonts> on <name|Unix>. For the database files the
   local copy is the one in use, and the shipped one is its starting point
-  and its safety net; <verbatim|font-substitutions.scm> is only read from
+  and its safety net; <source-link|font-substitutions.scm|TeXmacs/fonts/font-substitutions.scm> is only read from
   the installation.
 
   <paragraph*|The database>
 
   <\description>
-    <item*|<verbatim|font-database.scm>>Which file holds which face. Each
+    <item*|<source-link|font-database.scm|TeXmacs/fonts/font-database.scm>>Which file holds which face. Each
     entry names a family and a style and gives the file, the index inside
     it, and its size in bytes:
 
@@ -28,20 +28,20 @@
     The size is what lets <TeXmacs> notice that a file has been replaced by
     another version of itself.
 
-    <item*|<verbatim|font-features.scm>>Which <em|master> a family belongs
+    <item*|<source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm>>Which <em|master> a family belongs
     to and which features it carries. The master is the name a document
     uses: the families <verbatim|Fira Sans> and <verbatim|Fira Mono> both
     belong to the master <verbatim|Fira>, and the variant asked for by
     <verbatim|font-family> picks one of them.
 
-    <item*|<verbatim|font-characteristics.scm>>What a face looks like,
+    <item*|<source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>>What a face looks like,
     measured on its glyphs: whether it is monospaced or sans serif, its
     slant, its x-height, the vertical and horizontal stroke widths, the
     fill rate, and so on. These numbers are what the font browser filters
     on and what the distance between a request and a face is computed
     from.
 
-    <item*|<verbatim|font-substitutions.scm>>Which family to use when a
+    <item*|<source-link|font-substitutions.scm|TeXmacs/fonts/font-substitutions.scm>>Which family to use when a
     style is missing, for the families where the obvious answer is wrong:
     the sans serif companion of <verbatim|FandolSong> is
     <verbatim|FandolHei> and not a slanted <verbatim|FandolSong>.
@@ -113,8 +113,8 @@
 
   <paragraph*|The fonts themselves>
 
-  The directories <verbatim|fonts/truetype>, <verbatim|fonts/type1> and
-  <verbatim|fonts/tfm> hold the fonts shipped with <TeXmacs>, and
+  The directories <source-link|fonts/truetype|TeXmacs/fonts/truetype>, <source-link|fonts/type1|TeXmacs/fonts/type1> and
+  <source-link|fonts/tfm|TeXmacs/fonts/tfm> hold the fonts shipped with <TeXmacs>, and
   <verbatim|fonts/pk> in your home directory holds the bitmaps generated
   from <name|Metafont> sources. Fonts installed on your system are found in
   the usual places of the operating system and in the <TeX>

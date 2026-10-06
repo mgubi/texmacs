@@ -79,11 +79,11 @@
   been implemented so far.
 
   When a session is started, <TeXmacs> (see
-  <verbatim|System/Link/dyn_link.cpp>) opens the library, looks up the
+  <source-link|System/Link/dyn_link.cpp|src/System/Link/dyn_link.cpp>) opens the library, looks up the
   symbol given in the <scm|:link> option using <cpp|dlsym>, and
   interprets it as a pointer to a structure of type
   <cpp|package_exports_1>. Notice that the comments at the beginning of
-  <verbatim|TeXmacs.h>, which mention a function <cpp|get_my_package> and
+  <source-link|TeXmacs.h|TeXmacs/include/TeXmacs.h>, which mention a function <cpp|get_my_package> and
   a <scheme> command <verbatim|package_declare>, describe an older
   mechanism which is not used anymore.
 
@@ -139,11 +139,11 @@
   <\remark>
     <TeXmacs> copies the strings returned by the routines
     <verbatim|install> and <verbatim|evaluate> and the error messages, but
-    it does not free them (see <verbatim|System/Link/dyn_link.cpp>). The
+    it does not free them (see <source-link|System/Link/dyn_link.cpp|src/System/Link/dyn_link.cpp>). The
     package is therefore responsible for the memory management of these
     strings, for instance by reusing a static buffer, as in the
     <verbatim|dynlink> example plug-in. The comments in
-    <verbatim|TeXmacs.h> which state that these strings are freed by
+    <source-link|TeXmacs.h|TeXmacs/include/TeXmacs.h> which state that these strings are freed by
     <TeXmacs> are not accurate.
   </remark>
 

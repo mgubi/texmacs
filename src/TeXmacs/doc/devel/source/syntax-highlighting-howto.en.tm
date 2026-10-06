@@ -119,7 +119,7 @@
 
   <cpp|prog_language> only builds a <cpp|prog_language_rep> if the format
   exists. Declare it next to the other formats of the plugin in
-  <verbatim|src/plugins/code/progs/code-format.scm>:
+  <source-link|src/plugins/code/progs/code-format.scm|plugins/code/progs/code-format.scm>:
 
   <\scm-code>
     (define-format lua
@@ -158,7 +158,7 @@
   </scm-code>
 
   and add <verbatim|lua> to the corresponding line of
-  <verbatim|init-texmacs.scm>:
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>:
 
   <\scm-code>
     (lazy-format (code-format) cpp julia scala java json csv lua)
@@ -172,7 +172,7 @@
   <subsection|Step 3: markup>
 
   Add an inline and a block macro to
-  <verbatim|src/TeXmacs/packages/environment/env-program.ts>:
+  <source-link|src/TeXmacs/packages/environment/env-program.ts|TeXmacs/packages/environment/env-program.ts>:
 
   <\tm-fragment>
     <inactive*|<assign|lua-lang|<macro|body|<with|mode|prog|prog-language|lua|font-family|rm|<arg|body>>>>>
@@ -182,14 +182,14 @@
 
   (in the existing file, the block macros are written in block form). Then
   register the tags in the groups <scm|inline-code-tag> and
-  <scm|block-code-tag> of <verbatim|text/text-drd.scm>, so that generic
+  <scm|block-code-tag> of <source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm>, so that generic
   editing functions recognize them as code, and add entries
   <scm|("Lua" (make 'lua-lang))> and <scm|("Lua" (make 'lua-code))> to
-  <scm|code-menu> in <verbatim|text/text-menu.scm>.
+  <scm|code-menu> in <source-link|text/text-menu.scm|TeXmacs/progs/text/text-menu.scm>.
 
   <subsection|Step 4: editing support (optional)>
 
-  Add mode predicates to <verbatim|kernel/texmacs/tm-modes.scm>:
+  Add mode predicates to <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>:
 
   <\scm-code>
     (in-lua% (== (get-env "prog-language") "lua"))
@@ -198,7 +198,7 @@
   </scm-code>
 
   Create <verbatim|prog/lua-edit.scm> and add <verbatim|(prog lua-edit)> to
-  the <scm|:use> list of <verbatim|prog/prog-kbd.scm>:
+  the <scm|:use> list of <source-link|prog/prog-kbd.scm|TeXmacs/progs/prog/prog-kbd.scm>:
 
   <\scm-code>
     (texmacs-module (prog lua-edit)
@@ -273,12 +273,12 @@
   If the generic highlighter is not expressive enough (other string
   delimiters, nested comments, context dependent coloring, colors that
   follow themes), write a C++ class derived from
-  <cpp|abstract_language_rep> as for <verbatim|cpp_language.cpp>: declare it
-  in <verbatim|System/Language/impl_language.hpp>, implement
+  <cpp|abstract_language_rep> as for <source-link|cpp_language.cpp|src/System/Language/cpp_language.cpp>: declare it
+  in <source-link|System/Language/impl_language.hpp|src/System/Language/impl_language.hpp>, implement
   <cpp|advance>, <cpp|get_hyphens>, <cpp|hyphenate> and <cpp|get_color>, and
   add a test for its name to <cpp|prog_language> before the generic case.
-  The sources of <verbatim|System/Language/> are collected by a glob in
-  <verbatim|src/CMakeLists.txt>, so it suffices to re-run <name|CMake>.
+  The sources of <source-link|System/Language/|src/System/Language> are collected by a glob in
+  <source-link|src/CMakeLists.txt|src/CMakeLists.txt>, so it suffices to re-run <name|CMake>.
   Return names of environment variables from <cpp|get_color> to obtain
   theme-aware colors.
 
@@ -330,7 +330,7 @@
     <item><em|Two different language mechanisms coexist.> A language name
     may be handled by a hard-wired C++ class, by the generic
     <cpp|prog_language_rep>, or by the fallback. In particular
-    <verbatim|cpp-lang.scm> does not influence the highlighting of C++, and
+    <source-link|cpp-lang.scm|plugins/code/progs/cpp-lang.scm> does not influence the highlighting of C++, and
     languages with a <verbatim|-lang.scm> file but without a format
     (currently <verbatim|javascript>, <verbatim|dot>, <verbatim|octave>) are
     not highlighted.
@@ -348,7 +348,7 @@
 
     <item><em|Word operators.> Operators are tried before keywords and
     identifiers and without checking word boundaries. With
-    <verbatim|python-lang.scm>, which lists <verbatim|and>, <verbatim|or>
+    <source-link|python-lang.scm|plugins/python/progs/python-lang.scm>, which lists <verbatim|and>, <verbatim|or>
     and <verbatim|not> as operators, the beginning of identifiers like
     <verbatim|order> or <verbatim|notify> is colored as an operator.
 
@@ -379,31 +379,31 @@
 
     <item><em|Escape sequences.> In <cpp|escaped_char_parser_rep>, escape
     sequences of more than one character (such as <verbatim|newline> in
-    <verbatim|python-lang.scm> and <verbatim|julia-lang.scm>) advance one
+    <source-link|python-lang.scm|plugins/python/progs/python-lang.scm> and <source-link|julia-lang.scm|plugins/code/progs/julia-lang.scm>) advance one
     character too little, and octal escapes are never recognized because
     <cpp|can_parse> does not test for them.
 
     <item><em|Variable names versus macros.> The names returned by
     <cpp|get_color> are looked up with <cpp|env-\<gtr\>provides>. If a
     package defines a macro with the same name, its value is not a color.
-    For example, <verbatim|utilities/comment.ts> defines a macro
+    For example, <source-link|utilities/comment.ts|TeXmacs/packages/utilities/comment.ts> defines a macro
     <markup|comment-color>, which shadows the variable used for comments in
     <scheme> and C++ code.
 
-    <item><em|Markup names.> <verbatim|environment/env-program.ts> first
+    <item><em|Markup names.> <source-link|environment/env-program.ts|TeXmacs/packages/environment/env-program.ts> first
     defines <markup|java>, <markup|python>, <markup|julia>,
     <markup|scala>, <markup|r>, <markup|scilab> and <markup|fortran> as
     names of languages, and then redefines them as inline code macros with
     one argument; only the second definitions are effective. In
     documentation, use <markup|scheme> and <markup|c++> for the names, which
-    are not overridden. The groups in <verbatim|text/text-drd.scm> mention
+    are not overridden. The groups in <source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm> mention
     inline tags <markup|octave>, <markup|javascript> and <markup|json>,
     whereas the macros are called <markup|octave-lang>,
     <markup|javascript-lang> and <markup|json-lang>.
 
     <item><em|Editing is separate from highlighting.> Bracket matching and
     indentation work on raw characters and know nothing about strings and
-    comments (see the <verbatim|FIXME> in <verbatim|prog/python-edit.scm>).
+    comments (see the <verbatim|FIXME> in <source-link|prog/python-edit.scm|TeXmacs/progs/prog/python-edit.scm>).
     For languages without an overload of
     <scm|program-compute-indentation>, such as C++, pressing return
     resets the indentation of the new line to zero.

@@ -11,7 +11,7 @@
 
   Whenever one of the font related environment variables changes, the
   typesetter recomputes the current font in
-  <cpp|edit_env_rep::update_font> (<verbatim|Typeset/Env/env_semantics.cpp>).
+  <cpp|edit_env_rep::update_font> (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>).
   In text mode it calls the six argument version of <cpp|smart_font> with
   the values of <src-var|font>, <src-var|font-family>,
   <src-var|font-series> and <src-var|font-shape>; in mathematical mode and
@@ -120,12 +120,12 @@
 
     <\enumerate>
       <item>handles a few special cases: families starting with
-      <verbatim|tc> (legacy symbols of <verbatim|std-symbol.ts>) go directly
+      <verbatim|tc> (legacy symbols of <source-link|std-symbol.ts|TeXmacs/packages/standard/std-symbol.ts>) go directly
       to <cpp|find_font>, and the families <verbatim|sys-chinese>,
       <verbatim|sys-japanese> and <verbatim|sys-korean> are replaced by
       <verbatim|cjk=<em|name>,roman> where <em|name> is the system default
       (<cpp|default_chinese_font_name> and friends in
-      <verbatim|Graphics/Fonts/font.cpp>);
+      <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>);
 
       <item>normalizes the family list with <cpp|tex_gyre_fix>,
       <cpp|kepler_fix>, <cpp|math_fix> and <cpp|profile_fix> (see below);
@@ -142,7 +142,7 @@
 
       <item>constructs a <cpp|smart_font_rep>.
     </enumerate>
-    All other routines in <verbatim|smart_font.cpp> which need a font with a
+    All other routines in <source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp> which need a font with a
     different family, variant, series or shape call <cpp|smart_font_bis>
     again, so subfonts are often smart fonts themselves.
   </explain>
@@ -152,7 +152,7 @@
   The <em|family> argument of a smart font is a comma separated list. Each
   entry is either a plain family name or a <em|conditional entry> of the
   form <verbatim|<em|conditions>=<em|family>>. Examples from the style
-  packages in <verbatim|packages/customize/fonts/> and from the code are:
+  packages in <source-link|packages/customize/fonts/|TeXmacs/packages/customize/fonts> and from the code are:
 
   <\verbatim-code>
     mathlarge=TeX Gyre Pagella,Linux Libertine
@@ -224,7 +224,7 @@
   math fonts are used in formulas and the text fonts elsewhere.
 
   The last fix, <cpp|profile_fix>, generalizes this to the profiled
-  <name|OpenType> math fonts (<verbatim|math_font_profiles.cpp>). For each
+  <name|OpenType> math fonts (<source-link|math_font_profiles.cpp|src/Graphics/Fonts/math_font_profiles.cpp>). For each
   unconditional entry, in a mathematical shape a text family is replaced by
   the math font of its profile when that font is installed, and in a text
   shape a math family by its text companion; the variants <verbatim|ss>
@@ -511,7 +511,7 @@
 
   The drawing itself is not done by the smart font but by the leaf fonts.
   Note that <cpp|draw_fixed> draws at the font's own resolution; the
-  public <cpp|font_rep::draw> (<verbatim|Graphics/Fonts/font.cpp>) takes
+  public <cpp|font_rep::draw> (<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>) takes
   care of zooming. When the renderer has a zoom factor different from one
   and is not a printer, <cpp|draw> creates (and caches in
   <cpp|zoomed_fn>) a magnified version of the font and draws with it. For

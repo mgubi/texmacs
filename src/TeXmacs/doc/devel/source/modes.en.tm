@@ -57,7 +57,7 @@
   <\description>
     <item*|Modes>A mode is a named predicate, such as <scm|in-math?>,
     declared with <scm|texmacs-modes> in
-    <verbatim|kernel/texmacs/tm-modes.scm>. Modes form a hierarchy:
+    <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>. Modes form a hierarchy:
     <scm|in-math-in-session?> is a sub-mode of both <scm|in-math?> and
     <scm|in-session?>.
 
@@ -77,13 +77,13 @@
 
   For instance, when the user presses <key|return> inside an
   <markup|itemize> list, the key is bound (in
-  <verbatim|generic/generic-kbd.scm>) to <scm|(kbd-return)>, which calls
+  <source-link|generic/generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>) to <scm|(kbd-return)>, which calls
   <scm|(kbd-enter (focus-tree) #f)>. The focus tree is the innermost tag
   around the cursor, here the <markup|itemize> tag. Among all definitions
-  of <scm|kbd-enter>, the one in <verbatim|text/text-edit.scm> with the
+  of <scm|kbd-enter>, the one in <source-link|text/text-edit.scm|TeXmacs/progs/text/text-edit.scm> with the
   condition <scm|(list-context? t)> applies, and inserts a new item. Inside
   a table which is itself inside the list, the table definition in
-  <verbatim|table/table-edit.scm> applies first, because the focus tree is
+  <source-link|table/table-edit.scm|TeXmacs/progs/table/table-edit.scm> applies first, because the focus tree is
   then the table.
 
   <section|Source files>
@@ -92,49 +92,49 @@
   are:
 
   <\description>
-    <item*|<verbatim|kernel/texmacs/tm-modes.scm>>The macro
+    <item*|<source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>>The macro
     <scm|texmacs-modes>, the standard modes, the sub-mode test and
     <scm|lazy-initialize>.
 
-    <item*|<verbatim|kernel/texmacs/tm-define.scm>>Conditional definitions:
+    <item*|<source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>>Conditional definitions:
     <scm|tm-define>, <scm|tm-property> and their options.
 
-    <item*|<verbatim|kernel/gui/kbd-define.scm>>The keyboard tables,
+    <item*|<source-link|kernel/gui/kbd-define.scm|TeXmacs/progs/kernel/gui/kbd-define.scm>>The keyboard tables,
     <scm|kbd-map>, <scm|kbd-wildcards> and <scm|lazy-keyboard>.
 
-    <item*|<verbatim|kernel/gui/menu-define.scm>>Menus: <scm|menu-bind>,
+    <item*|<source-link|kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>>Menus: <scm|menu-bind>,
     <scm|tm-menu>, <scm|lazy-menu>.
 
-    <item*|<verbatim|generic/>>Behaviour common to all modes: the generic
-    hooks (<verbatim|generic-edit.scm>), the basic keyboard
-    (<verbatim|generic-kbd.scm>), the focus menus and focus icon bar
-    (<verbatim|generic-menu.scm>) and the format, insert and document
+    <item*|<source-link|generic/|TeXmacs/progs/generic>>Behaviour common to all modes: the generic
+    hooks (<source-link|generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>), the basic keyboard
+    (<source-link|generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>), the focus menus and focus icon bar
+    (<source-link|generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>) and the format, insert and document
     menus.
 
     <item*|<verbatim|text/>>Text mode: document titles, sections, lists,
     enunciations, floats and the language specific keyboards
-    (<verbatim|text/chinese/>, <verbatim|text/cyrillic/>, ...).
+    (<source-link|text/chinese/|TeXmacs/progs/text/chinese>, <source-link|text/cyrillic/|TeXmacs/progs/text/cyrillic>, ...).
 
     <item*|<verbatim|math/>>Mathematics: the large mathematical keyboard,
     brackets, scripts, equations and the semantic editing mode.
 
     <item*|<verbatim|table/>>Tables and cells.
 
-    <item*|<verbatim|dynamic/>>Folding, switches, overlays and slides;
+    <item*|<source-link|dynamic/|TeXmacs/progs/dynamic>>Folding, switches, overlays and slides;
     sessions and programs; scripts, plots and converters; spreadsheets;
     animations.
 
-    <item*|<verbatim|texmacs/keyboard/>>Keyboard prefixes and wildcards
-    common to all modes (<verbatim|prefix-kbd.scm>) and the
-    <LaTeX> style shortcuts (<verbatim|latex-kbd.scm>).
+    <item*|<source-link|texmacs/keyboard/|TeXmacs/progs/texmacs/keyboard>>Keyboard prefixes and wildcards
+    common to all modes (<source-link|prefix-kbd.scm|TeXmacs/progs/texmacs/keyboard/prefix-kbd.scm>) and the
+    <LaTeX> style shortcuts (<source-link|latex-kbd.scm|TeXmacs/progs/texmacs/keyboard/latex-kbd.scm>).
 
-    <item*|<verbatim|init-texmacs.scm>>The lazy declarations which tell
+    <item*|<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>>The lazy declarations which tell
     when each mode module is loaded.
   </description>
 
   Other modes follow the same pattern and are not described here, notably
   the source mode (<verbatim|source/>), the programming languages
-  (<verbatim|prog/>, see <hlink|syntax highlighting and programming
+  (<source-link|prog/|TeXmacs/progs/prog>, see <hlink|syntax highlighting and programming
   languages|syntax-highlighting.en.tm>), graphics (<verbatim|graphics/>,
   see <hlink|the graphics editor|graphics-editor.en.tm>) and the
   bibliographic database (<verbatim|database/>, see <hlink|the database and

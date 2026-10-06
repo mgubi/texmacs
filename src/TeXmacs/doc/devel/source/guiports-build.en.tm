@@ -12,17 +12,17 @@
   <\description>
     <item*|<cpp|QTTEXMACS>><name|Qt> port (<verbatim|Plugins/Qt>).
 
-    <item*|<cpp|X11TEXMACS>><name|X11> port (<verbatim|Plugins/X11> and
-    <verbatim|Plugins/Widkit>).
+    <item*|<cpp|X11TEXMACS>><name|X11> port (<source-link|Plugins/X11|src/Plugins/X11> and
+    <source-link|Plugins/Widkit|src/Plugins/Widkit>).
 
     <item*|<cpp|AQUATEXMACS>><name|Cocoa> port (<verbatim|Plugins/Cocoa>).
   </description>
 
   Outside the port directories, many files test these macros, typically to
   include the header which defines <cpp|simple_widget_rep> (for instance
-  <verbatim|Texmacs/Window/tm_button.cpp>, which chooses between
-  <verbatim|Cocoa/aqua_simple_widget.h>, <verbatim|Qt/qt_simple_widget.hpp>
-  and <verbatim|Widkit/simple_wk_widget.hpp>) or to enable features which
+  <source-link|Texmacs/Window/tm_button.cpp|src/Texmacs/Window/tm_button.cpp>, which chooses between
+  <verbatim|Cocoa/aqua_simple_widget.h>, <source-link|Qt/qt_simple_widget.hpp|src/Plugins/Qt/qt_simple_widget.hpp>
+  and <source-link|Widkit/simple_wk_widget.hpp|src/Plugins/Widkit/simple_wk_widget.hpp>) or to enable features which
   only exist in one port. In most of these places the <verbatim|#else>
   branch is the <name|X11>/<name|Widkit> code, so a new port must add its
   own branches. Code which depends on the <name|Qt> version tests
@@ -31,7 +31,7 @@
 
   <section|<name|CMake>>
 
-  The top level <verbatim|CMakeLists.txt> declares
+  The top level <source-link|CMakeLists.txt|src/CMakeLists.txt> declares
 
   <\verbatim-code>
     set (TEXMACS_GUI "Qt" CACHE STRING "TeXmacs Gui (Qt, Qt6, Qt5, Qt4, Aqua, X11)")
@@ -55,7 +55,7 @@
 
   <section|<verbatim|configure> and <verbatim|make>>
 
-  The autoconf macro <verbatim|TM_GUI> (<verbatim|misc/m4/tm_gui.m4>) is
+  The autoconf macro <verbatim|TM_GUI> (<source-link|misc/m4/tm_gui.m4|misc/m4/tm_gui.m4>) is
   more complete:
 
   <\description>
@@ -75,8 +75,8 @@
     with <verbatim|-framework Cocoa>. Since this test comes after the
     <name|Qt> test, it overrides the default <name|Qt> choice.
 
-    <item*|<verbatim|--enable-qt-new>>Compile <verbatim|Plugins/Qt6>
-    instead of <verbatim|Plugins/Qt> (<verbatim|misc/m4/qt.m4>): the
+    <item*|<verbatim|--enable-qt-new>>Compile <source-link|Plugins/Qt6|src/Plugins/Qt6>
+    instead of <verbatim|Plugins/Qt> (<source-link|misc/m4/qt.m4|misc/m4/qt.m4>): the
     variable <verbatim|QT_PLUGIN_DIR> becomes <verbatim|Qt6>, which selects
     both the sources and the include path <verbatim|-IPlugins/Qt6>. The
     option is on by default when <verbatim|CONFIG_OS> is
@@ -89,7 +89,7 @@
     <name|Qt> port.
   </description>
 
-  <verbatim|src/makefile.in> then compiles the port directories through
+  <source-link|src/makefile.in|src/makefile.in> then compiles the port directories through
   the substituted variables: <verbatim|@CONFIG_X11@> for the <name|C++>
   sources of <name|X11>, <verbatim|@CONFIG_COCOA@ @CONFIG_MACOS@> for the
   <name|Objective-C> sources, and, for <name|Qt>, the directory
@@ -98,12 +98,12 @@
 
   <section|Android>
 
-  The <name|Android> launcher in <verbatim|src/packages/android/launcher>
+  The <name|Android> launcher in <source-link|src/packages/android/launcher|packages/android/launcher>
   is a separate <name|CMake> project which links a prebuilt
   <verbatim|libtexmacs.a> with <name|Qt> 6 or 5 (<verbatim|find_package
   (QT NAMES Qt6 Qt5 ...)>). The library itself is configured with
   <verbatim|configure>, where <verbatim|--enable-qt-new> is the default for
-  <name|Android>, so a library configured for <name|Android> uses <verbatim|Plugins/Qt6>
+  <name|Android>, so a library configured for <name|Android> uses <source-link|Plugins/Qt6|src/Plugins/Qt6>
   unless <verbatim|--disable-qt-new> is given. The operating system side of
   <name|Android> is described in <hlink|platform
   support|system-platforms.en.tm>.

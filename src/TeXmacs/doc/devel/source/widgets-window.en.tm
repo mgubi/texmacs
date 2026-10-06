@@ -29,19 +29,19 @@
   under which the geometry of the window is remembered between sessions
   (see <cpp|notify_window_move>, <cpp|notify_window_resize>,
   <cpp|get_preferred_position> and <cpp|get_preferred_size> in
-  <verbatim|Texmacs/Window/tm_window.cpp>). The command <cpp|quit> is
+  <source-link|Texmacs/Window/tm_window.cpp|src/Texmacs/Window/tm_window.cpp>). The command <cpp|quit> is
   executed when the user closes the window.
 
-  The abstract class <cpp|window_rep> of <verbatim|window.hpp>, with its
+  The abstract class <cpp|window_rep> of <source-link|window.hpp|src/Graphics/Gui/window.hpp>, with its
   constructors <cpp|plain_window> and <cpp|popup_window>, is a lower level
   interface used only by ports which build on <name|Widkit> (it is
-  implemented in <verbatim|Plugins/X11/x_window.cpp>). Kernel code never
+  implemented in <source-link|Plugins/X11/x_window.cpp|src/Plugins/X11/x_window.cpp>). Kernel code never
   uses it directly.
 
   <section|The <TeXmacs> windows>
 
   A <TeXmacs> editing window is an instance of <cpp|tm_window_rep>
-  (<verbatim|Texmacs/tm_window.hpp>), which holds two widgets: the window
+  (<source-link|Texmacs/tm_window.hpp|src/Texmacs/tm_window.hpp>), which holds two widgets: the window
   widget <cpp|win> (the result of <cpp|plain_window_widget>) and, inside
   it, the <em|main <TeXmacs> widget> <cpp|wid>, created by
 
@@ -95,7 +95,7 @@
 
   <subsection|Dialogs built by the kernel>
 
-  <verbatim|Texmacs/Window/tm_dialogue.cpp> builds two kinds of dialogs
+  <source-link|Texmacs/Window/tm_dialogue.cpp|src/Texmacs/Window/tm_dialogue.cpp> builds two kinds of dialogs
   directly in <c++>: file choosers (<cpp|tm_frame_rep::choose_file>, glue
   <scm|cpp-choose-file>), from a <cpp|file_chooser_widget> initialized with
   <cpp|set_directory> and <cpp|set_file>, and the forms which ask for the
@@ -111,7 +111,7 @@
   <subsection|Windows created from <scheme>>
 
   Most dialogs are nowadays written in <scheme> and displayed in auxiliary
-  windows managed by a few functions of <verbatim|tm_window.cpp> (the glue
+  windows managed by a few functions of <source-link|tm_window.cpp|src/Texmacs/Window/tm_window.cpp> (the glue
   names are in parentheses):
 
   <\explain>
@@ -148,7 +148,7 @@
 
   The contextual menu of the editor shows how a menu can be displayed
   outside the menu bar. In <cpp|edit_interface_rep::mouse_adjust>
-  (<verbatim|Edit/Interface/edit_mouse.cpp>):
+  (<source-link|Edit/Interface/edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>):
 
   <\cpp-code>
     SERVER (menu_widget ("(vertical (link " * menu * "))", wid));
@@ -180,7 +180,7 @@
   an ordinary window, and returns the main widget wrapped by
   <cpp|wrapped_widget>, whose command (<cpp|close_embedded_command>) is
   executed on <cpp|SLOT_DESTROY> and closes the auxiliary buffer.
-  <cpp|texmacs_output_widget> (<verbatim|tm_button.cpp>) is much lighter:
+  <cpp|texmacs_output_widget> (<source-link|tm_button.cpp|src/Texmacs/Window/tm_button.cpp>) is much lighter:
   it typesets the document once into a box and returns a
   <cpp|box_widget_rep>, a read-only <cpp|simple_widget_rep> which paints
   the box. Both are described in more detail in <hlink|embedded <TeXmacs>
@@ -278,7 +278,7 @@
     <item>the <scheme> interpreter wraps the action into a <cpp|command>
     whose closure calls <scm|exec-delayed> on
     <scm|(protected-call (lambda () (new-document)))> (see <scm|make-menu-command>
-    in <verbatim|kernel/gui/menu-widget.scm>);
+    in <source-link|kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>);
 
     <item>when the user activates the entry, the port calls the command
     (in <name|Qt>, <cpp|QTMCommand::apply> queues it with
@@ -288,7 +288,7 @@
     with <cpp|exec_delayed>;
 
     <item>the delayed action is executed by <cpp|protected_call>
-    (<verbatim|Scheme/Scheme/object.cpp>), which surrounds it with
+    (<source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>), which surrounds it with
     <cpp|before_menu_action> and <cpp|after_menu_action> of the current
     editor (or <cpp|cancel_menu_action> if an exception occurs): the
     editor state is archived for undo, and afterwards

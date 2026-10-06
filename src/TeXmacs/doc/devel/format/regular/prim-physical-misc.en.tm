@@ -67,7 +67,7 @@
     horizontal and vertical offsets <src-arg|x> and <src-arg|y> (evaluated
     lengths) with respect to the origin of that line. It is used for
     instance for marginal notes (see the <markup|marginal-left-note> and
-    related macros in <verbatim|std-markup.ts>). The <markup|page-note>
+    related macros in <source-link|std-markup.ts|TeXmacs/packages/standard/std-markup.ts>). The <markup|page-note>
     primitive has the same syntax and is intended to attach notes to pages;
     it is not yet handled by the page breaker.
   </explain>

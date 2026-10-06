@@ -9,7 +9,7 @@
 
   The directory <verbatim|Data/Parser/> contains a handful of small lexical
   recognizers, written in 2020 for the generic highlighter. They all derive
-  from <cpp|parser_rep> (<verbatim|Data/Parser/parser.hpp>):
+  from <cpp|parser_rep> (<source-link|Data/Parser/parser.hpp|src/Data/Parser/parser.hpp>):
 
   <\cpp-code>
     class parser_rep {
@@ -48,7 +48,7 @@
   position, and succeeds only if the position actually moved. When debugging
   is enabled for parsers (<scm|(debug-set "parser" #t)>, which sets
   <cpp|DEBUG_FLAG_PARSER>; see <cpp|DEBUG_PARSER> in
-  <verbatim|Kernel/Abstractions/basic.hpp>), a parser which accepted in
+  <source-link|Kernel/Abstractions/basic.hpp|src/Kernel/Abstractions/basic.hpp>), a parser which accepted in
   <cpp|can_parse> but did not advance is reported on the
   <cpp|debug_packrat> stream. Most subclasses redeclare <cpp|can_parse> and
   <cpp|get_parser_name> as public; the names returned by
@@ -58,10 +58,10 @@
   are not reference counted.
 
   <\description>
-    <item*|<cpp|blanks_parser_rep>>(<verbatim|blanks_parser.hpp>) Consumes
+    <item*|<cpp|blanks_parser_rep>>(<source-link|blanks_parser.hpp|src/Data/Parser/blanks_parser.hpp>) Consumes
     exactly one space or tab.
 
-    <item*|<cpp|identifier_parser_rep>>(<verbatim|identifier_parser.cpp>) An
+    <item*|<cpp|identifier_parser_rep>>(<source-link|identifier_parser.cpp|src/Data/Parser/identifier_parser.cpp>) An
     identifier starts with a letter or one of the <em|start characters>
     (default <verbatim|_>) and continues with letters, digits and the
     <em|extra characters> (default <verbatim|_>). Configured with
@@ -69,22 +69,22 @@
     <name|Mathemagix> and <name|R> highlighters, but there is no
     <scheme> interface for it.
 
-    <item*|<cpp|keyword_parser_rep>>(<verbatim|keyword_parser.cpp>) Holds a
+    <item*|<cpp|keyword_parser_rep>>(<source-link|keyword_parser.cpp|src/Data/Parser/keyword_parser.cpp>) Holds a
     map from keywords to <em|groups> (<cpp|put (keyword, group)>,
     <cpp|get (keyword)>). <cpp|can_parse> reads the maximal run of ASCII
     letters at the position with <cpp|read_word>
-    (<verbatim|Data/String/analyze.cpp>) and succeeds if this word is a key
+    (<source-link|Data/String/analyze.cpp|src/Data/String/analyze.cpp>) and succeeds if this word is a key
     of the map. The method <cpp|use_keywords_of_lang> is a leftover which
     is not called anywhere.
 
-    <item*|<cpp|operator_parser_rep>>(<verbatim|operator_parser.cpp>) Holds
+    <item*|<cpp|operator_parser_rep>>(<source-link|operator_parser.cpp|src/Data/Parser/operator_parser.cpp>) Holds
     a map from operator strings to groups. <cpp|can_parse> iterates over all
     operators and succeeds if one of them occurs at the position;
     <cpp|do_parse> then extends the match to the longest operator which
     starts with the one found, so that <verbatim|\<less\>\<less\>=> wins over
     <verbatim|\<less\>\<less\>> and <verbatim|\<less\>>.
 
-    <item*|<cpp|number_parser_rep>>(<verbatim|number_parser.cpp>) Recognizes
+    <item*|<cpp|number_parser_rep>>(<source-link|number_parser.cpp|src/Data/Parser/number_parser.cpp>) Recognizes
     decimal numbers (digits and dots, possibly starting with a dot followed by
     a digit) and, depending on its <em|boolean features>, the prefixes
     <verbatim|0b>, <verbatim|0o>, <verbatim|0x> (<verbatim|"prefix_0b">,
@@ -97,7 +97,7 @@
     returned by <cpp|get_suffix_parser>, recognizes suffixes like
     <verbatim|L> or <verbatim|j>.
 
-    <item*|<cpp|escaped_char_parser_rep>>(<verbatim|escaped_char_parser.cpp>)
+    <item*|<cpp|escaped_char_parser_rep>>(<source-link|escaped_char_parser.cpp|src/Data/Parser/escaped_char_parser.cpp>)
     Recognizes an escape character (default <verbatim|\\>) followed by one of
     a configurable set of characters or strings (<cpp|set_sequences>; strings
     of length one go to the character set, longer ones to the string list)
@@ -107,7 +107,7 @@
     (<verbatim|"hex_with_32_bits">), and up to three octal digits
     (<verbatim|"octal_upto_3_digits">).
 
-    <item*|<cpp|string_parser_rep>>(<verbatim|string_parser.cpp>) Holds a
+    <item*|<cpp|string_parser_rep>>(<source-link|string_parser.cpp|src/Data/Parser/string_parser.cpp>) Holds a
     map from opening to closing delimiters (<cpp|set_pairs>) and optionally
     an escaped character parser (<cpp|set_escaped_char_parser>). It is the
     only <em|stateful> parser: if a line ends before the closing delimiter,
@@ -118,11 +118,11 @@
     <cpp|parse_escaped>. (With <cpp|skip_escaped (true)>, escape sequences
     are swallowed instead; no language uses this.)
 
-    <item*|<cpp|inline_comment_parser_rep>>(<verbatim|inline_comment_parser.cpp>)
+    <item*|<cpp|inline_comment_parser_rep>>(<source-link|inline_comment_parser.cpp|src/Data/Parser/inline_comment_parser.cpp>)
     Succeeds if one of the configured comment starts (<cpp|set_starts>)
     occurs at the position, and then consumes the rest of the string.
 
-    <item*|<cpp|preprocessor_parser_rep>>(<verbatim|preprocessor_parser.cpp>)
+    <item*|<cpp|preprocessor_parser_rep>>(<source-link|preprocessor_parser.cpp|src/Data/Parser/preprocessor_parser.cpp>)
     Succeeds on a start character (default <verbatim|#>) which is the first
     non-blank character of the line, followed by one of the configured
     directives (<cpp|set_directives>) and then a space or the end of the
@@ -131,7 +131,7 @@
 
   <section|The class <cpp|abstract_language_rep>>
 
-  <verbatim|System/Language/impl_language.hpp> declares the common base of
+  <source-link|System/Language/impl_language.hpp|src/System/Language/impl_language.hpp> declares the common base of
   all parser based highlighters:
 
   <\cpp-code>
@@ -177,7 +177,7 @@
 
   <subsection|Construction>
 
-  The constructor (<verbatim|System/Language/prog_language.cpp>) loads the
+  The constructor (<source-link|System/Language/prog_language.cpp|src/System/Language/prog_language.cpp>) loads the
   <scheme> module of the language and then queries six <em|features>:
 
   <\cpp-code>
@@ -207,7 +207,7 @@
   The module must therefore be called <verbatim|(<em|name>-lang)> and be
   found on the load path; the <verbatim|progs> directory of every plugin is
   on that path (see <cpp|plugin_path> in
-  <verbatim|System/Boot/init_texmacs.cpp>). <cpp|get_parser_config>
+  <source-link|System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>). <cpp|get_parser_config>
   evaluates <scm|(tm-\<gtr\>tree (parser-feature <scm-arg|lan>
   <scm-arg|key>))>, and the <cpp|customize_*> methods walk through the
   resulting tree and call the configuration methods of the parsers. The
@@ -280,8 +280,8 @@
   <subsection|Multi-line comments>
 
   The function <cpp|in_comment> and its helpers in
-  <verbatim|System/Language/impl_language.cpp> (and a private copy,
-  <cpp|in_cpp_comment>, in <verbatim|cpp_language.cpp>) implement C-style
+  <source-link|System/Language/impl_language.cpp|src/System/Language/impl_language.cpp> (and a private copy,
+  <cpp|in_cpp_comment>, in <source-link|cpp_language.cpp|src/System/Language/cpp_language.cpp>) implement C-style
   <verbatim|/* ... */> comments spanning several lines. They need the
   neighbouring lines, which is why <cpp|advance> and <cpp|get_color> take a
   tree:
@@ -317,7 +317,7 @@
   A language for <cpp|prog_language_rep> is described by overloading the
   function <scm|parser-feature> with <scm|tm-define> and a
   <scm|:require> clause. The fallback definitions are in
-  <verbatim|prog/default-lang.scm>:
+  <source-link|prog/default-lang.scm|TeXmacs/progs/prog/default-lang.scm>:
 
   <\scm-code>
     (texmacs-module (prog default-lang))
@@ -341,7 +341,7 @@
 
   So by default a feature is empty, except that <verbatim|//> starts an
   inline comment. A language module overrides the features it needs; for
-  example (abridged from <verbatim|src/plugins/python/progs/python-lang.scm>):
+  example (abridged from <source-link|src/plugins/python/progs/python-lang.scm|plugins/python/progs/python-lang.scm>):
 
   <\scm-code>
     (texmacs-module (python-lang)
@@ -466,7 +466,7 @@
     The element <scm|(directives <scm-arg|d> ...)> lists the directive names
     which may follow a <verbatim|#> at the beginning of a line. Such
     directives get the color class <verbatim|preprocessor_directive>. In
-    the current sources only <verbatim|cpp-lang.scm> defines directives, and
+    the current sources only <source-link|cpp-lang.scm|plugins/code/progs/cpp-lang.scm> defines directives, and
     it is not used by the C++ highlighter, so this feature is effectively
     unused.
   </explain>
@@ -481,7 +481,7 @@
   packrat grammar. It is used for the semantic analysis of mathematics, and
   can also be used in programming mode through <cpp|verb_language_rep>.
   Grammars are defined with the macro <scm|define-language>
-  (<verbatim|kernel/texmacs/tm-language.scm>):
+  (<source-link|kernel/texmacs/tm-language.scm|TeXmacs/progs/kernel/texmacs/tm-language.scm>):
 
   <\scm-code>
     (define-language minimal-grammar
@@ -542,9 +542,9 @@
   <scm|:limits>, <scm|:operator>, <scm|:focus>, <scm|:selectable>,
   <scm|:atomic>) are used for mathematics. A grammar can be loaded lazily
   with <scm|(lazy-language <scm-arg|module> <scm-arg|lan> ...)>; this is
-  how <verbatim|init-texmacs.scm> declares <verbatim|minimal> and
+  how <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> declares <verbatim|minimal> and
   <verbatim|std-math>, and <cpp|find_packrat_grammar>
-  (<verbatim|System/Language/packrat_grammar.cpp>) forces the promise with
+  (<source-link|System/Language/packrat_grammar.cpp|src/System/Language/packrat_grammar.cpp>) forces the promise with
   <scm|lazy-language-force>.
 
   At run time, <cpp|packrat_abbreviation (lan, "Main")> returns a small
@@ -564,7 +564,7 @@
 
     <item>The colors are stored per string as an <cpp|array\<less\>int\<gtr\>>
     in a <em|highlight observer> attached to the tree
-    (<verbatim|Data/Observers/highlight_observer.cpp>,
+    (<source-link|Data/Observers/highlight_observer.cpp|src/Data/Observers/highlight_observer.cpp>,
     <cpp|attach_highlight>, <cpp|obtain_highlight>, <cpp|has_highlight>,
     <cpp|detach_highlight>). Any modification of the tree removes the
     observer (<cpp|highlight_observer_rep::announce>), which invalidates the

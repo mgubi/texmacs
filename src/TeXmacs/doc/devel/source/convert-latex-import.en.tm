@@ -8,12 +8,12 @@
   <section|Overview>
 
   The import of <LaTeX> is almost entirely written in <c++>, in the
-  directory <verbatim|Data/Convert/Tex>. The <scheme> side only declares the
-  converters (<verbatim|convert/latex/init-latex.scm>) and provides the
+  directory <source-link|Data/Convert/Tex|src/Data/Convert/Tex>. The <scheme> side only declares the
+  converters (<source-link|convert/latex/init-latex.scm|TeXmacs/progs/convert/latex/init-latex.scm>) and provides the
   tables which describe the <LaTeX> commands
-  (<verbatim|convert/latex/latex-command-drd.scm>,
-  <verbatim|latex-symbol-drd.scm>, <verbatim|latex-texmacs-drd.scm>,
-  <verbatim|latex-drd.scm>). A complete <LaTeX> document is imported by
+  (<source-link|convert/latex/latex-command-drd.scm|TeXmacs/progs/convert/latex/latex-command-drd.scm>,
+  <source-link|latex-symbol-drd.scm|TeXmacs/progs/convert/latex/latex-symbol-drd.scm>, <source-link|latex-texmacs-drd.scm|TeXmacs/progs/convert/latex/latex-texmacs-drd.scm>,
+  <source-link|latex-drd.scm|TeXmacs/progs/convert/latex/latex-drd.scm>). A complete <LaTeX> document is imported by
 
   <\scm-code>
     (tm-define (latex-document-\<gtr\>texmacs x . opts)
@@ -35,7 +35,7 @@
     <cpp|tree latex_document_to_tree (string s, bool as_pic)><explain-synopsis|import
     a complete <LaTeX> document>
   <|explain>
-    Defined in <verbatim|fromtex_post.cpp>. Opens a new layer of the
+    Defined in <source-link|fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>. Opens a new layer of the
     command tables (see below), parses the document with
     <cpp|parse_latex_document (s, true, as_pic)>, renders the parts which
     must be imported as pictures (<cpp|latex_fallback_on_pictures>, only if
@@ -60,15 +60,15 @@
     int \ \ \ latex_arity (string cmd);
   </cpp-code>
 
-  declared in <verbatim|Tex/convert_tex.hpp> and implemented in
-  <verbatim|inittex.cpp>. The argument is the command with its backslash,
+  declared in <source-link|Tex/convert_tex.hpp|src/Data/Convert/Tex/convert_tex.hpp> and implemented in
+  <source-link|inittex.cpp|src/Data/Convert/Tex/inittex.cpp>. The argument is the command with its backslash,
   and environments are represented as <verbatim|\\begin-<em|name>> and
   <verbatim|\\end-<em|name>>. These functions first look into the
   hash maps <cpp|command_type> and <cpp|command_arity> (and
   <cpp|command_def> for the definitions), which contain the commands
   defined by the document being parsed, and otherwise call the <scheme>
   functions <scm|latex-type> and <scm|latex-arity> of
-  <verbatim|latex-drd.scm> (the results are cached by <cpp|hashfunc>
+  <source-link|latex-drd.scm|TeXmacs/progs/convert/latex/latex-drd.scm> (the results are cached by <cpp|hashfunc>
   objects). The three maps are <cpp|rel_hashmap> objects: they are
   <cpp|extend>ed at the beginning of a parse and <cpp|merge>d or
   <cpp|shorten>ed at the end, so that definitions do not leak from one
@@ -84,7 +84,7 @@
     <abbr|etc.> contain commands with an optional argument).
 
     <item*|<verbatim|"symbol">, <verbatim|"big-symbol">>Symbols
-    (<verbatim|latex-symbol-drd.scm>, including the symbols of
+    (<source-link|latex-symbol-drd.scm|TeXmacs/progs/convert/latex/latex-symbol-drd.scm>, including the symbols of
     <verbatim|amssymb>, <verbatim|stmaryrd>, <verbatim|wasysym>,
     <verbatim|upgreek>, ...), converted into the <TeXmacs> symbol with the
     same name.
@@ -137,7 +137,7 @@
     <cpp|tree parse_latex (string s, bool change, bool as_pic)><explain-synopsis|parse
     a <LaTeX> string>
   <|explain>
-    Defined at the end of <verbatim|parsetex.cpp>. Converts line endings
+    Defined at the end of <source-link|parsetex.cpp|src/Data/Convert/Tex/parsetex.cpp>. Converts line endings
     (<cpp|dos_to_better>), detects the language from the
     <verbatim|babel> options (<cpp|get_latex_language>) and the input
     encoding from <verbatim|inputenc> (<cpp|get_latex_encoding>,
@@ -220,9 +220,9 @@
   If the preference <verbatim|"latex-\<gtr\>texmacs:fallback-on-pictures">
   is on, commands and environments of type <verbatim|"as-picture"> are
   stored as <verbatim|(tuple "\\latex_preview" <em|name> <em|source>)>.
-  After parsing, <cpp|latex_fallback_on_pictures> (<verbatim|fromtex.cpp>)
+  After parsing, <cpp|latex_fallback_on_pictures> (<source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp>)
   merges the beginning and end of environments, calls <cpp|latex_preview>
-  (<verbatim|Plugins/LaTeX_Preview/latex_preview.cpp>), which runs <LaTeX>
+  (<source-link|Plugins/LaTeX_Preview/latex_preview.cpp|src/Plugins/LaTeX_Preview/latex_preview.cpp>), which runs <LaTeX>
   on the fragments together with the preamble of the document, and replaces
   them by <markup|picture-mixed> trees containing both the picture and the
   original source.
@@ -231,7 +231,7 @@
 
   <subsection|The stages>
 
-  The driver is <cpp|latex_to_tree (tree t)> in <verbatim|fromtex_post.cpp>.
+  The driver is <cpp|latex_to_tree (tree t)> in <source-link|fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>.
   Abridged, it reads
 
   <\cpp-code>
@@ -274,15 +274,15 @@
 
   <\description-paragraphs>
     <item*|<cpp|kill_space_invaders>>Removes spaces and newlines which
-    <TeX> would ignore (<verbatim|fromtex.cpp>).
+    <TeX> would ignore (<source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp>).
 
     <item*|<cpp|filter_preamble>>Moves the preamble into a
     <markup|hide-preamble> environment, keeps the document class, and
     collects the title, authors and abstract with <cpp|collect_metadata>
-    (<verbatim|metadata.cpp>), which has variants for the classes of various
-    publishers (<verbatim|metadata-acm.cpp>, <verbatim|metadata-ams.cpp>,
-    <verbatim|metadata-elsevier.cpp>, <verbatim|metadata-ieee.cpp>,
-    <verbatim|metadata-revtex.cpp>, <verbatim|metadata-springer.cpp>).
+    (<source-link|metadata.cpp|src/Data/Convert/Tex/metadata.cpp>), which has variants for the classes of various
+    publishers (<source-link|metadata-acm.cpp|src/Data/Convert/Tex/metadata-acm.cpp>, <source-link|metadata-ams.cpp|src/Data/Convert/Tex/metadata-ams.cpp>,
+    <source-link|metadata-elsevier.cpp|src/Data/Convert/Tex/metadata-elsevier.cpp>, <source-link|metadata-ieee.cpp|src/Data/Convert/Tex/metadata-ieee.cpp>,
+    <source-link|metadata-revtex.cpp|src/Data/Convert/Tex/metadata-revtex.cpp>, <source-link|metadata-springer.cpp|src/Data/Convert/Tex/metadata-springer.cpp>).
 
     <item*|<cpp|parsed_latex_to_tree>>The main translation, see below.
 
@@ -303,7 +303,7 @@
     reopening environments which are improperly nested.
 
     <item*|<cpp|upgrade_tex>>A selection of the upgrade routines of
-    <verbatim|Data/Convert/Texmacs/upgradetm.cpp> which turn the
+    <source-link|Data/Convert/Texmacs/upgradetm.cpp|src/Data/Convert/Texmacs/upgradetm.cpp> which turn the
     old-style markup (<markup|apply>, <markup|begin>, <markup|set>/<markup|reset>,
     ...) produced so far into modern <TeXmacs> markup.
 
@@ -317,7 +317,7 @@
 
     <item*|<cpp|guess_missing>, <cpp|postprocess_metadata>>Adds missing
     definitions and structures the metadata (<markup|doc-data>,
-    <markup|doc-author>, ...) with <verbatim|metadata_post.cpp>.
+    <markup|doc-author>, ...) with <source-link|metadata_post.cpp|src/Data/Convert/Tex/metadata_post.cpp>.
   </description-paragraphs>
 
   For a complete document, the result is assembled into a <TeXmacs> file
@@ -331,7 +331,7 @@
   <subsection|The translation of commands>
 
   <cpp|parsed_latex_to_tree> (abbreviated <cpp|l2e> in
-  <verbatim|fromtex.cpp>) dispatches on the shape of the tree: strings are
+  <source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp>) dispatches on the shape of the tree: strings are
   passed to <cpp|latex_symbol_to_tree>, <markup|concat> nodes to
   <cpp|latex_concat_to_tree> (which also deals with font declarations
   whose scope extends to the end of the group) and tuples to
@@ -374,7 +374,7 @@
 
   The format <verbatim|latex-class> (suffixes <verbatim|ltx>,
   <verbatim|sty>, <verbatim|cls>) is imported by
-  <cpp|latex_class_document_to_tree> (<verbatim|fromcls.cpp>). It sets the
+  <cpp|latex_class_document_to_tree> (<source-link|fromcls.cpp|src/Data/Convert/Tex/fromcls.cpp>). It sets the
   flag <cpp|textm_class_flag> (which makes the parser accept length
   assignments in <TeX> syntax), imports the file as a document and filters
   the result with <cpp|latex_class_filter> into a <TeXmacs> style file.
@@ -403,15 +403,15 @@
   <\enumerate>
     <item>Declare the command in the tables, so that the parser reads the
     right number of arguments: add it to the appropriate group of
-    <verbatim|latex-command-drd.scm> (<abbr|e.g.> <scm|latex-command-2%>
+    <source-link|latex-command-drd.scm|TeXmacs/progs/convert/latex/latex-command-drd.scm> (<abbr|e.g.> <scm|latex-command-2%>
     for a command with two arguments, <scm|latex-command-1*%> for one
     argument plus an optional one, <scm|latex-environment-0%> for an
-    environment), or to <verbatim|latex-symbol-drd.scm> for a symbol. If
+    environment), or to <source-link|latex-symbol-drd.scm|TeXmacs/progs/convert/latex/latex-symbol-drd.scm> for a symbol. If
     the corresponding <TeXmacs> symbol has the same name, nothing else is
     needed for symbols.
 
     <item>Add a rule to <cpp|latex_command_to_tree> in
-    <verbatim|fromtex.cpp> which builds the <TeXmacs> tree, <abbr|e.g.>
+    <source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp> which builds the <TeXmacs> tree, <abbr|e.g.>
 
     <\cpp-code>
       if (is_tuple (t, "\\\\mycmd", 2))
@@ -425,11 +425,11 @@
 
     <item>If the command introduces a block structure (an environment
     which should be a separate paragraph), check the lists of block
-    environments in <verbatim|fromtex.cpp> and <verbatim|fromtex_post.cpp>
+    environments in <source-link|fromtex.cpp|src/Data/Convert/Tex/fromtex.cpp> and <source-link|fromtex_post.cpp|src/Data/Convert/Tex/fromtex_post.cpp>
     (<cpp|is_block_environnement>, <cpp|finalize_layout>).
 
     <item>For commands which the <TeXmacs> exporter itself produces, add
-    them to <verbatim|latex-texmacs-drd.scm> and convert them back in the
+    them to <source-link|latex-texmacs-drd.scm|TeXmacs/progs/convert/latex/latex-texmacs-drd.scm> and convert them back in the
     section <verbatim|Start TeXmacs specific markup> of
     <cpp|latex_command_to_tree>.
   </enumerate>
@@ -448,7 +448,7 @@
     <item>The commented <cpp|cout> statements in <cpp|latex_to_tree> print
     the tree after each stage.
 
-    <item>The idempotence tests of <verbatim|convert/latex/test-tmtex.scm>
+    <item>The idempotence tests of <source-link|convert/latex/test-tmtex.scm|TeXmacs/progs/convert/latex/test-tmtex.scm>
     (<scm|(test-tmtex)>) also exercise the import.
   </itemize>
 

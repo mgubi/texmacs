@@ -7,12 +7,12 @@
 
   <section|Introduction>
 
-  Several low level libraries in <verbatim|src/src/Graphics/> are shared by
+  Several low level libraries in <source-link|src/src/Graphics/|src/Graphics> are shared by
   the typesetter, the renderers, the picture effects and the graphics
   editor:
 
   <\itemize>
-    <item>the <em|color> library (<verbatim|Graphics/Colors/>), which packs
+    <item>the <em|color> library (<source-link|Graphics/Colors/|src/Graphics/Colors>), which packs
     colors into 32 bit words, resolves color names from several
     dictionaries, implements the reverse (dark) display mode and provides
     floating point colors for image processing;
@@ -22,11 +22,11 @@
     the numerical routines for splines, closest points and intersections;
 
     <item>a small generic <em|algebra> library
-    (<verbatim|Graphics/Mathematics/>) with matrices, vectors, polynomials
+    (<source-link|Graphics/Mathematics/|src/Graphics/Mathematics>) with matrices, vectors, polynomials
     and a few experimental classes;
 
     <item>the experimental <em|three dimensional> objects
-    (<verbatim|Graphics/Spacial/>) behind the <markup|object-3d> family of
+    (<source-link|Graphics/Spacial/|src/Graphics/Spacial>) behind the <markup|object-3d> family of
     tags.
   </itemize>
 
@@ -70,52 +70,52 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Colors/colors.hpp>, <verbatim|colors.cpp>>The
+    <item*|<source-link|Graphics/Colors/colors.hpp|src/Graphics/Colors/colors.hpp>, <source-link|colors.cpp|src/Graphics/Colors/colors.cpp>>The
     <cpp|color> word: <cpp|rgb_color>, <cpp|get_rgb_color>,
     <cpp|cmyk_color>, <cpp|xpm_color>, <cpp|named_color>,
     <cpp|get_hex_color>, <cpp|blend_colors>, <cpp|reverse>, the global
     flags <cpp|true_colors> and <cpp|reverse_colors>.
 
-    <item*|<verbatim|tm_colors.hpp>, <verbatim|x11_colors.hpp>,
-    <verbatim|svg_colors.hpp>, <verbatim|xc_colors.hpp>,
-    <verbatim|dvips_colors.hpp>>The five color dictionaries, as static
-    tables included only by <verbatim|colors.cpp>.
+    <item*|<source-link|tm_colors.hpp|src/Graphics/Colors/tm_colors.hpp>, <source-link|x11_colors.hpp|src/Graphics/Colors/x11_colors.hpp>,
+    <source-link|svg_colors.hpp|src/Graphics/Colors/svg_colors.hpp>, <source-link|xc_colors.hpp|src/Graphics/Colors/xc_colors.hpp>,
+    <source-link|dvips_colors.hpp|src/Graphics/Colors/dvips_colors.hpp>>The five color dictionaries, as static
+    tables included only by <source-link|colors.cpp|src/Graphics/Colors/colors.cpp>.
 
-    <item*|<verbatim|Graphics/Colors/true_color.hpp>,
-    <verbatim|true_color.cpp>>Floating point <abbr|RGBA> colors with
+    <item*|<source-link|Graphics/Colors/true_color.hpp|src/Graphics/Colors/true_color.hpp>,
+    <source-link|true_color.cpp|src/Graphics/Colors/true_color.cpp>>Floating point <abbr|RGBA> colors with
     arithmetic, alpha composition and color transformations.
 
-    <item*|<verbatim|Graphics/Types/point.hpp>, <verbatim|point.cpp>>Points,
+    <item*|<source-link|Graphics/Types/point.hpp|src/Graphics/Types/point.hpp>, <source-link|point.cpp|src/Graphics/Types/point.cpp>>Points,
     axes and elementary plane geometry.
 
-    <item*|<verbatim|Graphics/Types/frame.hpp>,
-    <verbatim|frame.cpp>>Frames: invertible coordinate transformations.
+    <item*|<source-link|Graphics/Types/frame.hpp|src/Graphics/Types/frame.hpp>,
+    <source-link|frame.cpp|src/Graphics/Types/frame.cpp>>Frames: invertible coordinate transformations.
 
-    <item*|<verbatim|Graphics/Types/curve.hpp>, <verbatim|curve.cpp>,
-    <verbatim|curve_extras.cpp>>Parameterized curves, rectification,
+    <item*|<source-link|Graphics/Types/curve.hpp|src/Graphics/Types/curve.hpp>, <source-link|curve.cpp|src/Graphics/Types/curve.cpp>,
+    <source-link|curve_extras.cpp|src/Graphics/Types/curve_extras.cpp>>Parameterized curves, rectification,
     closest points and intersections; polyline simplification, Bezier
     fitting and calligraphic strokes.
 
-    <item*|<verbatim|Graphics/Types/equations.hpp>,
-    <verbatim|equations.cpp>>Tridiagonal solvers used for interpolating
+    <item*|<source-link|Graphics/Types/equations.hpp|src/Graphics/Types/equations.hpp>,
+    <source-link|equations.cpp|src/Graphics/Types/equations.cpp>>Tridiagonal solvers used for interpolating
     splines.
 
-    <item*|<verbatim|Graphics/Types/grid.hpp>, <verbatim|grid.cpp>>Grids
+    <item*|<source-link|Graphics/Types/grid.hpp|src/Graphics/Types/grid.hpp>, <source-link|grid.cpp|src/Graphics/Types/grid.cpp>>Grids
     (cartesian, polar, logarithmic).
 
-    <item*|<verbatim|Graphics/Types/math_util.hpp>>Numerical constants and
+    <item*|<source-link|Graphics/Types/math_util.hpp|src/Graphics/Types/math_util.hpp>>Numerical constants and
     helpers (<cpp|tm_infinity>, <cpp|tm_PI>, <cpp|square>, <cpp|fnull>,
     ...).
 
-    <item*|<verbatim|Graphics/Mathematics/>>Generic templates:
-    <verbatim|matrix.hpp>, <verbatim|vector.hpp>,
-    <verbatim|polynomial.hpp>, <verbatim|ball.hpp>,
-    <verbatim|function.hpp>, <verbatim|function_extra.hpp>, the operator
-    and property traits <verbatim|operators.hpp> and
-    <verbatim|properties.hpp>, symbolic trees <verbatim|math_tree.hpp>,
-    and the self test <verbatim|test_math.cpp>.
+    <item*|<source-link|Graphics/Mathematics/|src/Graphics/Mathematics>>Generic templates:
+    <source-link|matrix.hpp|src/Graphics/Mathematics/matrix.hpp>, <source-link|vector.hpp|src/Graphics/Mathematics/vector.hpp>,
+    <source-link|polynomial.hpp|src/Graphics/Mathematics/polynomial.hpp>, <source-link|ball.hpp|src/Graphics/Mathematics/ball.hpp>,
+    <source-link|function.hpp|src/Graphics/Mathematics/function.hpp>, <source-link|function_extra.hpp|src/Graphics/Mathematics/function_extra.hpp>, the operator
+    and property traits <source-link|operators.hpp|src/Graphics/Mathematics/operators.hpp> and
+    <source-link|properties.hpp|src/Graphics/Mathematics/properties.hpp>, symbolic trees <source-link|math_tree.hpp|src/Graphics/Mathematics/math_tree.hpp>,
+    and the self test <source-link|test_math.cpp|src/Graphics/Mathematics/test_math.cpp>.
 
-    <item*|<verbatim|Graphics/Spacial/>>Triangulated three dimensional
+    <item*|<source-link|Graphics/Spacial/|src/Graphics/Spacial>>Triangulated three dimensional
     objects, their transformations and lighting.
   </description-paragraphs>
 

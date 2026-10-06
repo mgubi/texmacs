@@ -114,7 +114,7 @@
 
   The second is by a font rule. A compound font may list a virtual font
   among its members, as the traditional mathematics font does in
-  <verbatim|fonts-math.scm>:
+  <source-link|fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>:
 
   <\scm-code>
     (virtual tradi-misc $s $d)
@@ -139,7 +139,7 @@
     <item>add a definition to it, using the glyphs the text fonts do have;
 
     <item>make sure the symbol has a name in
-    <verbatim|langs/encoding/tmuniversaltounicode.scm>, or it will be
+    <source-link|langs/encoding/tmuniversaltounicode.scm|TeXmacs/langs/encoding/tmuniversaltounicode.scm>, or it will be
     typed as <verbatim|\<less\>#XXXX\<gtr\>> and no palette will propose
     it;
 

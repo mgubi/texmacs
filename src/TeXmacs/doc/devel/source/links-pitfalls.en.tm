@@ -46,11 +46,11 @@
 
   <\itemize>
     <item><em|<scm|link-vertices> is shadowed inside
-    <verbatim|link-edit.scm>.> The module defines the public
+    <source-link|link-edit.scm|TeXmacs/progs/link/link-edit.scm>.> The module defines the public
     <scm|(link-vertices ln)> at line 58 and later a private
     <scm|(link-vertices nr)> at line 146, which replaces it <em|inside the
     module>. Other modules see the right function, but within
-    <verbatim|link-edit.scm>:
+    <source-link|link-edit.scm|TeXmacs/progs/link/link-edit.scm>:
 
     <\itemize>
       <item><scm|link-source> and <scm|link-target> (lines 62-66) fail with

@@ -113,7 +113,7 @@
 
   <section|The abstract font class>
 
-  The main abstract <verbatim|font> class is defined in <verbatim|font.hpp>:\ 
+  The main abstract <verbatim|font> class is defined in <source-link|font.hpp|src/Graphics/Fonts/font.hpp>:\ 
 
   <\verbatim>
     \ \ \ \ struct font_rep: rep\<less\>font\<gtr\> {<format|next line>
@@ -236,7 +236,7 @@
   </verbatim>
 
   When a left hand pattern is matched, it is recursively substituted by the
-  right hand side. The files in the directory <verbatim|progs/fonts> contain
+  right hand side. The files in the directory <source-link|progs/fonts|TeXmacs/progs/fonts> contain
   a large number of rewriting rules.
 
   At the top level, <apply|TeXmacs> calls a macro of the form\ 

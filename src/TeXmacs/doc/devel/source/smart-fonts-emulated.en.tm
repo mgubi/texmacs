@@ -11,7 +11,7 @@
   appearance of its glyphs: it makes them bolder, slanted, wider, smaller,
   hollow, irregular or blurred. The implementations are the files
   <verbatim|Graphics/Fonts/poor_*.cpp>; the constructors are declared in
-  <verbatim|Graphics/Fonts/font.hpp>:
+  <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>:
 
   <\cpp-code>
     font poor_rubber_font (font base);
@@ -77,7 +77,7 @@
 
     <item><cpp|index_glyph> obtains the glyph and metric tables of the base
     font and returns transformed tables, using the operations of
-    <verbatim|Graphics/Bitmap_fonts/bitmap_font.hpp> on whole tables:
+    <source-link|Graphics/Bitmap_fonts/bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp> on whole tables:
     <cpp|slanted>, <cpp|stretched>, <cpp|extended>, <cpp|bolden>,
     <cpp|make_bbb>, <cpp|mono>, <cpp|distorted>, <cpp|effected>.
     <cpp|get_glyph> does the same for a single glyph.
@@ -137,7 +137,7 @@
     <cpp|slanted>. The automatic emulation uses the slant
     <cpp|0.25001> on a font compressed horizontally by <math|5/6>; this
     precise value is recognized by <cpp|concat_math>
-    (<verbatim|Typeset/Concat/concat_math.cpp>) when positioning scripts.
+    (<source-link|Typeset/Concat/concat_math.cpp|src/Typeset/Concat/concat_math.cpp>) when positioning scripts.
 
     <item*|<cpp|poor_smallcaps_font (base)>>Not a bitmap transformation but a
     small dispatcher, similar to a smart font: runs of lower case
@@ -171,13 +171,13 @@
 
     <item*|<cpp|poor_distorted_font (base, kind)>>Random distortions of the
     glyphs (<cpp|distorted> in
-    <verbatim|Graphics/Bitmap_fonts/glyph_distorted.cpp>); <src-arg|kind> is
+    <source-link|Graphics/Bitmap_fonts/glyph_distorted.cpp|src/Graphics/Bitmap_fonts/glyph_distorted.cpp>); <src-arg|kind> is
     a tuple <verbatim|(degraded <em|threshold> <em|frequency>)>,
     <verbatim|(distorted <em|strength> <em|frequency>)> or
     <verbatim|(gnawed <em|strength> <em|frequency>)>.
 
     <item*|<cpp|poor_effected_font (base, kind)>>Graphical effects applied to
-    the glyphs (<verbatim|glyph_effected.cpp>). Currently only
+    the glyphs (<source-link|glyph_effected.cpp|src/Graphics/Bitmap_fonts/glyph_effected.cpp>). Currently only
     <verbatim|(blurred <em|radius> [<em|dx> <em|dy>])> is recognized: it is
     translated into a Gaussian blur effect (<cpp|EFF_BLUR>,
     <cpp|EFF_GAUSSIAN>), optionally moved (<cpp|EFF_MOVE>).
@@ -196,7 +196,7 @@
   <section|Emulation of missing series and shapes>
 
   The automatic emulation is decided during the font selection, in
-  <cpp|find_closest> (<verbatim|Graphics/Fonts/font_translate.cpp>, see
+  <cpp|find_closest> (<source-link|Graphics/Fonts/font_translate.cpp|src/Graphics/Fonts/font_translate.cpp>, see
   also the chapter on <hlink|font selection|font-database-selection.en.tm>). After
   finding the closest physical font, it compares the requested logical
   features with the features of the font which was found (both those
@@ -219,7 +219,7 @@
   </description>
 
   <cpp|closest_font> then calls <cpp|find_font (family, variant, series,
-  shape, sz, dpi)> (<verbatim|Graphics/Fonts/find_font.cpp>), which
+  shape, sz, dpi)> (<source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp>), which
   recognizes these suffixes, recursively finds the font without the
   suffix, and wraps it:
 
@@ -334,15 +334,15 @@
     <cpp|ot_math>) or from <verbatim|emu-large>.
   </itemize>
 
-  The global <cpp|has_poor_rubber> (in <verbatim|Graphics/Fonts/font.cpp>,
+  The global <cpp|has_poor_rubber> (in <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>,
   <cpp|true> by default) enables this mechanism; <cpp|use_poor_rubber
   (fn)> is consulted by the typesetter
-  (<verbatim|Typeset/Concat/concat_post.cpp>), which always creates a
+  (<source-link|Typeset/Concat/concat_post.cpp|src/Typeset/Concat/concat_post.cpp>), which always creates a
   delimiter box for such fonts, even for small delimiters.
 
   <section|The error font>
 
-  <cpp|error_font (fn)> (<verbatim|Graphics/Fonts/font.cpp>) is the last
+  <cpp|error_font (fn)> (<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>) is the last
   resort of every smart font. It claims to support every string, measures
   it with <src-arg|fn> and draws it in red with <src-arg|fn>. The error
   font of a smart font is based on the sans serif variant of the

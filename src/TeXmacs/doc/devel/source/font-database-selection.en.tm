@@ -8,7 +8,7 @@
   <section|From the environment to a font>
 
   The typesetter recomputes its current font in
-  <cpp|edit_env_rep::update_font> (<verbatim|Typeset/Env/env_semantics.cpp>)
+  <cpp|edit_env_rep::update_font> (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>)
   whenever an environment variable of type <cpp|Env_Font> or
   <cpp|Env_Font_Size> changes, as well as on changes of the mode, the
   magnification or the script level. The size is
@@ -66,7 +66,7 @@
     <cpp|find_font (family, variant, series, shape, sz, dpi)>;
 
     <item>families starting with <verbatim|tc> are also handled by
-    <cpp|find_font> (symbols of <verbatim|std-symbol.ts>);
+    <cpp|find_font> (symbols of <source-link|std-symbol.ts|TeXmacs/packages/standard/std-symbol.ts>);
 
     <item>the families <verbatim|sys-chinese>, <verbatim|sys-japanese> and
     <verbatim|sys-korean> are rewritten into <verbatim|cjk=Name,roman>,
@@ -103,7 +103,7 @@
   <subsection|Kinds of features>
 
   A <em|feature> is a lower case word. The predicates in
-  <verbatim|Graphics/Fonts/font_select.cpp> classify features into the
+  <source-link|Graphics/Fonts/font_select.cpp|src/Graphics/Fonts/font_select.cpp> classify features into the
   following kinds; two features are of the <em|same kind> (<cpp|same_kind>)
   if they belong to the same row. The last column gives the default value,
   which is assumed when a font does not mention any feature of that kind.
@@ -251,7 +251,7 @@
   <subsection|Translation from and to the internal naming scheme>
 
   The four argument variant of <cpp|logical_font> in
-  <verbatim|Graphics/Fonts/font_translate.cpp> translates an internal font
+  <source-link|Graphics/Fonts/font_translate.cpp|src/Graphics/Fonts/font_translate.cpp> translates an internal font
   description into a logical font:
 
   <\enumerate>
@@ -330,7 +330,7 @@
   range mismatch>>|<row|<cell|<cpp|D_HUGE>>|<cell|30000000>|<cell|features
   of different kinds>>|<row|<cell|<cpp|D_INFINITY>>|<cell|1000000000>|<cell|no
   candidate>>>>>>
-    Distances between features (<verbatim|Graphics/Fonts/font_select.cpp>).
+    Distances between features (<source-link|Graphics/Fonts/font_select.cpp|src/Graphics/Fonts/font_select.cpp>).
   </big-table>
 
   Some distances are asymmetric: when <cpp|asym> is true, a requested
@@ -388,7 +388,7 @@
   <subsection|Guessed distances>
 
   Ties are broken using the characteristics. The function
-  <cpp|characteristic_distance> in <verbatim|Plugins/Freetype/tt_analyze.cpp>
+  <cpp|characteristic_distance> in <source-link|Plugins/Freetype/tt_analyze.cpp|src/Plugins/Freetype/tt_analyze.cpp>
   sums: twice the discrete distances (0 or 1) for <verbatim|mono>,
   <verbatim|sans>, <verbatim|italic> and <verbatim|case>; relative
   (logarithmic) distances for <verbatim|ex>, <verbatim|em>,
@@ -398,7 +398,7 @@
   for <verbatim|slant>. A missing characteristic counts as a maximal
   difference.
 
-  In <verbatim|Graphics/Fonts/font_guess.cpp>, <cpp|guessed_distance (fam1,
+  In <source-link|Graphics/Fonts/font_guess.cpp|src/Graphics/Fonts/font_guess.cpp>, <cpp|guessed_distance (fam1,
   sty1, fam2, sty2)> adds to this a <cpp|category_distance> between the
   categories of both fonts. <cpp|guessed_distance_families> takes the
   minimum over all pairs of styles (using the styles of the global database
@@ -495,7 +495,7 @@
   <subsection|Substitutions>
 
   Before searching, <cpp|find_closest> applies the rules of
-  <verbatim|font-substitutions.scm> with <cpp|apply_substitutions>. A rule
+  <source-link|font-substitutions.scm|TeXmacs/fonts/font-substitutions.scm> with <cpp|apply_substitutions>. A rule
   <verbatim|((F p1 ... pn) (G q1 ... qm))> applies to a logical font
   <cpp|v> with <cpp|v[0]> equal to <verbatim|F> if <cpp|v> contains all the
   words <verbatim|F>, <verbatim|p1>, ..., <verbatim|pn>; these words are
@@ -560,7 +560,7 @@
   <subsection|From an internal description>
 
   The function <cpp|find_font (family, variant, series, shape, sz, dpi)> in
-  <verbatim|Graphics/Fonts/find_font.cpp> first checks
+  <source-link|Graphics/Fonts/find_font.cpp|src/Graphics/Fonts/find_font.cpp> first checks
   <cpp|font::instances> for the name
   <verbatim|family-variant-series-shape-sz-dpi>. Then:
 
@@ -618,7 +618,7 @@
   atoms starting with <verbatim|$> are variables. The first matching rule
   wins and its right hand side, after substitution, is looked up
   recursively. Here is a typical excerpt of
-  <verbatim|progs/fonts/fonts-truetype.scm>:
+  <source-link|progs/fonts/fonts-truetype.scm|TeXmacs/progs/fonts/fonts-truetype.scm>:
 
   <\scm-code>
     (set-font-rules
@@ -630,11 +630,11 @@
     \ \ \ \ ((pagella $v $a $b $s $d) (unicode texgyrepagella-regular $s $d))))
   </scm-code>
 
-  The rule files <verbatim|fonts-ec.scm>, <verbatim|fonts-adobe.scm>,
-  <verbatim|fonts-x.scm>, <verbatim|fonts-math.scm>,
-  <verbatim|fonts-foreign.scm>, <verbatim|fonts-misc.scm>,
-  <verbatim|fonts-composite.scm> and <verbatim|fonts-truetype.scm> are
-  loaded at boot time by <verbatim|progs/init-texmacs.scm>.
+  The rule files <source-link|fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm>, <source-link|fonts-adobe.scm|TeXmacs/progs/fonts/fonts-adobe.scm>,
+  <source-link|fonts-x.scm|TeXmacs/progs/fonts/fonts-x.scm>, <source-link|fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>,
+  <source-link|fonts-foreign.scm|TeXmacs/progs/fonts/fonts-foreign.scm>, <source-link|fonts-misc.scm|TeXmacs/progs/fonts/fonts-misc.scm>,
+  <source-link|fonts-composite.scm|TeXmacs/progs/fonts/fonts-composite.scm> and <source-link|fonts-truetype.scm|TeXmacs/progs/fonts/fonts-truetype.scm> are
+  loaded at boot time by <source-link|progs/init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>.
 
   <subsection|The database fallback>
 
@@ -651,7 +651,7 @@
   This is how the old and new mechanisms coexist. The families returned by
   <cpp|find_closest> are masters. For the master <verbatim|roman> of
   <verbatim|TeXmacs Computer Modern>, rules exist in
-  <verbatim|fonts-ec.scm>, so that <TeX> fonts are built through the rules.
+  <source-link|fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm>, so that <TeX> fonts are built through the rules.
   For a master such as <verbatim|TeX Gyre Pagella> or <verbatim|DejaVu>
   (with capitals; the rules use the old lower case names), there are no
   rules, and the files are found through the database. Rule heads are
@@ -673,7 +673,7 @@
 
     <item>At attempt <math|k\<gtr\>1>, the <name|Unicode> range of the
     character is computed by <cpp|get_unicode_range> (in
-    <verbatim|smart_font.cpp>): <verbatim|ascii>, <verbatim|latin>,
+    <source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>): <verbatim|ascii>, <verbatim|latin>,
     <verbatim|greek>, <verbatim|cyrillic>, <verbatim|cjk>,
     <verbatim|hiragana>, <verbatim|hangul>, <verbatim|mathsymbols>,
     <verbatim|mathextra>, <verbatim|mathletters>, or empty. The range is
@@ -708,12 +708,12 @@
   emulation which a <name|PDF> export can only hold as a bitmap, the smart
   font takes the symbol from <name|STIX Two Math>, shipped with <TeXmacs>,
   instead of asking the database (<cpp|resolve_shipped_math> in
-  <verbatim|smart_font.cpp>), so that the result is the same on every
+  <source-link|smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>), so that the result is the same on every
   system.
 
   The default <name|CJK> fonts are determined by
   <cpp|default_chinese_font_name>, <cpp|default_japanese_font_name> and
-  <cpp|default_korean_font_name> in <verbatim|Graphics/Fonts/font.cpp>:
+  <cpp|default_korean_font_name> in <source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>:
   the user preferences <verbatim|"default chinese font name">,
   <verbatim|"default japanese font name"> and <verbatim|"default korean
   font name"> take precedence; otherwise a platform specific list of

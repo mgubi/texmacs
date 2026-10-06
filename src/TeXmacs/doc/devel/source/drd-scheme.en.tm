@@ -11,8 +11,8 @@
   function to set a property. Properties are declared in markup, with
   <markup|drd-props> in a style file, a package or the preamble of a
   document. The query functions are declared in
-  <verbatim|Scheme/Glue/build-glue-basic.scm> and implemented, for most of
-  them, by the small wrappers of <verbatim|Data/Tree/tree_traverse.cpp>.
+  <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm> and implemented, for most of
+  them, by the small wrappers of <source-link|Data/Tree/tree_traverse.cpp|src/Data/Tree/tree_traverse.cpp>.
   They all consult <cpp|the_drd>, <abbr|i.e.> the <abbr|DRD> of the
   <em|current view>; when working on a tree which belongs to another
   buffer, call <scm|(set-drd <scm-arg|buffer-url>)> first.
@@ -73,7 +73,7 @@
     The same for the label of <scm-arg|t>; <scm|tree-insert_point>
     (note the underscore) tests whether children may be inserted at
     position <scm-arg|i>, and <scm|tree-is-dynamic?> whether the arity is
-    variable. <scm|focus-can-insert?> (<verbatim|generic/generic-edit.scm>)
+    variable. <scm|focus-can-insert?> (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>)
     compares <scm|tree-arity> with <scm|tree-maximal-arity>.
   </explain>
 
@@ -88,7 +88,7 @@
   <|explain>
     Accessibility in the current access mode (see <scm|get-access-mode>).
     The library function <scm|tree-map-accessible-children>
-    (<verbatim|kernel/library/tree.scm>) applies a function to the
+    (<source-link|kernel/library/tree.scm|TeXmacs/progs/kernel/library/tree.scm>) applies a function to the
     accessible children only.
   </explain>
 
@@ -154,7 +154,7 @@
   <|explain>
     Sets <cpp|the_drd> to the <abbr|DRD> of the editor of a view of
     <scm-arg|buffer> (<cpp|set_current_drd>). It is not restored
-    automatically; <verbatim|texmacs/texmacs/tm-print.scm> resets it
+    automatically; <source-link|texmacs/texmacs/tm-print.scm|TeXmacs/progs/texmacs/texmacs/tm-print.scm> resets it
     explicitly after printing auxiliary buffers.
   </explain>
 
@@ -183,7 +183,7 @@
   <\description>
     <item*|Focus bar>The focus toolbar shows an input field for each
     \Phidden\Q child of the focus tag (<scm|hidden-child?> in
-    <verbatim|generic/generic-menu.scm>): a child which is not accessible,
+    <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>): a child which is not accessible,
     is not the name of a variable in a <markup|with>-like tag, and whose
     type has an input format (<scm|type-\<gtr\>format> maps
     <verbatim|"color"> to a color chooser, <verbatim|"url"> to a file
@@ -197,14 +197,14 @@
     child became inaccessible.
 
     <item*|Documentation>The automatic documentation of tags
-    (<verbatim|generic/generic-doc.scm>) describes the arguments by their
+    (<source-link|generic/generic-doc.scm|TeXmacs/progs/generic/generic-doc.scm>) describes the arguments by their
     types and accessibility, and the parameters by
     <scm|tree-label-type>.
 
     <item*|Converters>The <LaTeX> exporter computes math/text statistics
-    following <scm|tree-child-env> (<verbatim|convert/latex/tmtex.scm>);
+    following <scm|tree-child-env> (<source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>);
     the semantic math editor does the same in
-    <verbatim|math/math-sem-edit.scm>.
+    <source-link|math/math-sem-edit.scm|TeXmacs/progs/math/math-sem-edit.scm>.
   </description>
 
   <section|Tag groups>
@@ -222,7 +222,7 @@
     <scm|(define-group <scm-arg|group> <scm-arg|member> ...)><explain-synopsis|declare
     or extend a tag group>
   <|explain>
-    Defined in <verbatim|utils/edit/variants.scm>. Each <scm-arg|member> is
+    Defined in <source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>. Each <scm-arg|member> is
     either a tag name (a symbol) or a list <scm|(<scm-arg|subgroup>)>
     naming another group whose members are included. The first declaration
     of a group also defines three functions:
@@ -253,7 +253,7 @@
     <scm|#f>: this is how the variants of a tag are found.
   </explain>
 
-  For example, <verbatim|text/text-drd.scm> declares
+  For example, <source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm> declares
 
   <\scm-code>
     (define-group variant-tag
@@ -283,7 +283,7 @@
     <scm|(variants-of <scm-arg|label>)> returns the subgroup of
     <scm|variant-tag> containing the label (taking numbered and
     unnumbered versions into account); it feeds the variant menu of the
-    focus bar (<scm|focus-variants-of> in <verbatim|generic/generic-menu.scm>)
+    focus bar (<scm|focus-variants-of> in <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>)
     and <scm|variant-circulate> (keyboard shortcuts for cycling through
     variants). Modes overload <scm|focus-variants-of> and
     <scm|variant-circulate> for special cases (mathematics, switches,
@@ -292,7 +292,7 @@
     <item*|<scm|similar-tag>>Groups of tags which are \Psimilar\Q for
     structured navigation: <scm|(similar-to <scm-arg|label>)> is used by
     <scm|traverse-incremental> and <scm|traverse-extremal>
-    (<verbatim|generic/generic-edit.scm>) to jump to the previous or next
+    (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>) to jump to the previous or next
     tag of the same kind (for instance from a theorem to the next
     proposition).
 
@@ -307,10 +307,10 @@
     one object, declared with <scm|(define-alternate <scm-arg|first>
     <scm-arg|second>)>, which also fills <scm|alternate-table>. They drive
     <scm|alternate-toggle>, <scm|fold>, <scm|unfold> and the folding
-    icons; <verbatim|math/math-drd.scm> uses them for
+    icons; <source-link|math/math-drd.scm|TeXmacs/progs/math/math-drd.scm> uses them for
     <markup|wide>/<markup|wide*> and <markup|around>/<markup|around*>.
 
-    <item*|Toggles><verbatim|dynamic/dynamic-drd.scm> defines the macros
+    <item*|Toggles><source-link|dynamic/dynamic-drd.scm|TeXmacs/progs/dynamic/dynamic-drd.scm> defines the macros
     <scm|define-toggle>, <scm|define-fold> and <scm|define-summarize>, which
     put a pair of tags into <scm|toggle-first-tag>/<scm|toggle-second-tag>,
     <scm|folded-tag>/<scm|unfolded-tag> or
@@ -321,48 +321,48 @@
     <item*|Others><scm|hidden-tag> (tags with hidden content, for
     <scm|tree-show-hidden>), <scm|mini-flow-tag>, <scm|make-inline-tag>,
     <scm|make-wrapped-tag>, the many specific groups of
-    <verbatim|text/text-drd.scm> (<scm|theorem-tag>, <scm|list-tag>,
+    <source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm> (<scm|theorem-tag>, <scm|list-tag>,
     <scm|titled-tag>, <scm|doc-title-tag>, ...) used by the structure and
     title routines, <scm|spell-tag> (used with <scm|group-resolve> by
-    <verbatim|tools/spell/spell-edit.scm>), and the graphical groups of
-    <verbatim|graphics/graphics-drd.scm>.
+    <source-link|tools/spell/spell-edit.scm|TeXmacs/progs/tools/spell/spell-edit.scm>), and the graphical groups of
+    <source-link|graphics/graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm>.
   </description-paragraphs>
 
   <subsection|Where groups are declared>
 
   <\description-paragraphs>
-    <item*|<verbatim|utils/edit/variants.scm>>The macro, the standard
+    <item*|<source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>>The macro, the standard
     groups for source-like tags (<scm|argument-tag>, <scm|value-tag>,
     <scm|binary-operation-tag>, <scm|reference-tag>, <scm|citation-tag>,
     ...).
 
-    <item*|<verbatim|text/text-drd.scm>>Sections, lists, enunciations,
+    <item*|<source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm>>Sections, lists, enunciations,
     figures, frames, titles, ...
 
-    <item*|<verbatim|math/math-drd.scm>>Fractions, vertical scripts,
+    <item*|<source-link|math/math-drd.scm|TeXmacs/progs/math/math-drd.scm>>Fractions, vertical scripts,
     textual operators, mathematical annotations.
 
-    <item*|<verbatim|dynamic/dynamic-drd.scm>>Folds, switches, overlays,
+    <item*|<source-link|dynamic/dynamic-drd.scm|TeXmacs/progs/dynamic/dynamic-drd.scm>>Folds, switches, overlays,
     animations; and the session, program, script and spreadsheet
-    variants in <verbatim|dynamic/session-drd.scm>,
-    <verbatim|program-drd.scm>, <verbatim|scripts-drd.scm>,
-    <verbatim|calc-drd.scm>.
+    variants in <source-link|dynamic/session-drd.scm|TeXmacs/progs/dynamic/session-drd.scm>,
+    <source-link|program-drd.scm|TeXmacs/progs/dynamic/program-drd.scm>, <source-link|scripts-drd.scm|TeXmacs/progs/dynamic/scripts-drd.scm>,
+    <source-link|calc-drd.scm|TeXmacs/progs/dynamic/calc-drd.scm>.
 
-    <item*|<verbatim|generic/format-drd.scm>,
-    <verbatim|source/source-drd.scm>, <verbatim|version/version-drd.scm>,
-    <verbatim|doc/tmdoc-drd.scm>, <verbatim|education/edu-drd.scm>,
-    <verbatim|tools/comment/comment-drd.scm>,
-    <verbatim|tools/poster/poster-drd.scm>,
-    <verbatim|graphics/graphics-drd.scm>>Groups of the corresponding
+    <item*|<source-link|generic/format-drd.scm|TeXmacs/progs/generic/format-drd.scm>,
+    <source-link|source/source-drd.scm|TeXmacs/progs/source/source-drd.scm>, <source-link|version/version-drd.scm|TeXmacs/progs/version/version-drd.scm>,
+    <source-link|doc/tmdoc-drd.scm|TeXmacs/progs/doc/tmdoc-drd.scm>, <source-link|education/edu-drd.scm|TeXmacs/progs/education/edu-drd.scm>,
+    <source-link|tools/comment/comment-drd.scm|TeXmacs/progs/tools/comment/comment-drd.scm>,
+    <source-link|tools/poster/poster-drd.scm|TeXmacs/progs/tools/poster/poster-drd.scm>,
+    <source-link|graphics/graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm>>Groups of the corresponding
     modes and packages. Some editing modules also declare groups directly
-    (<verbatim|database/db-edit.scm>, <verbatim|table/table-edit.scm>,
-    <verbatim|math/math-edit.scm>, ...).
+    (<source-link|database/db-edit.scm|TeXmacs/progs/database/db-edit.scm>, <source-link|table/table-edit.scm|TeXmacs/progs/table/table-edit.scm>,
+    <source-link|math/math-edit.scm|TeXmacs/progs/math/math-edit.scm>, ...).
   </description-paragraphs>
 
   These modules are not loaded at start-up: they are pulled in through the
   <scm|:use> clauses of the corresponding editing modules
-  (<verbatim|text/text-edit.scm>, <verbatim|math/math-edit.scm>,
-  <verbatim|dynamic/fold-edit.scm>, ...), which are themselves loaded
+  (<source-link|text/text-edit.scm|TeXmacs/progs/text/text-edit.scm>, <source-link|math/math-edit.scm|TeXmacs/progs/math/math-edit.scm>,
+  <source-link|dynamic/fold-edit.scm|TeXmacs/progs/dynamic/fold-edit.scm>, ...), which are themselves loaded
   lazily. The contents of a group may therefore grow during a session.
 
   <subsection|Adding tags to groups>
@@ -399,7 +399,7 @@
 
   A group can also be extended at run time: since <scm|define-group> is a
   macro, this requires <scm|eval>, as in <scm|tm-register-new-list-tag>
-  (<verbatim|text/text-drd.scm>), which is called from the
+  (<source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm>), which is called from the
   <verbatim|std-list> package (through <markup|extern>) to register new
   list environments defined by the user:
 
@@ -410,8 +410,8 @@
   <section|The logic programming layer>
 
   The <scheme> kernel also contains a small <name|Prolog>-like engine
-  (<verbatim|kernel/logic/>), loaded at start-up by
-  <verbatim|init-texmacs.scm> and documented in <hlink|logical programming
+  (<source-link|kernel/logic/|TeXmacs/progs/kernel/logic>), loaded at start-up by
+  <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> and documented in <hlink|logical programming
   extensions|../scheme/utils/utils-logic.en.tm>. In the code base it is
   the other half of the \P<abbr|DRD>\Q terminology: declarative
   descriptions of tags used by the converters. By convention predicate
@@ -421,23 +421,23 @@
     <item*|<scm|(logic-group <scm-arg|name> <scm-arg|tag> ...)>>Membership
     facts, tested with <scm|(logic-in? <scm-arg|x> <scm-arg|name>)>. Used
     for instance for the <LaTeX> command classes in
-    <verbatim|convert/latex/latex-command-drd.scm>
+    <source-link|convert/latex/latex-command-drd.scm|TeXmacs/progs/convert/latex/latex-command-drd.scm>
     (<scm|latex-command-1%>, <scm|latex-modifier-1%>, ...) and the symbol
-    classes in <verbatim|latex-symbol-drd.scm>.
+    classes in <source-link|latex-symbol-drd.scm|TeXmacs/progs/convert/latex/latex-symbol-drd.scm>.
 
     <item*|<scm|(logic-table <scm-arg|name> (<scm-arg|key> <scm-arg|value>)
     ...)>>Tables, read with <scm|logic-ref> and <scm|logic-ref-list>; a
     key <scm|(:or <scm-arg|k1> <scm-arg|k2> ...)> covers several keys.
     Examples: <scm|latex-needs%> and <scm|latex-package-priority%> in
-    <verbatim|convert/latex/latex-drd.scm>, the operator tables of
-    <verbatim|convert/mathml/mathml-drd.scm>.
+    <source-link|convert/latex/latex-drd.scm|TeXmacs/progs/convert/latex/latex-drd.scm>, the operator tables of
+    <source-link|convert/mathml/mathml-drd.scm|TeXmacs/progs/convert/mathml/mathml-drd.scm>.
 
     <item*|<scm|(logic-dispatcher <scm-arg|name> (<scm-arg|tag>
     <scm-arg|function>) ...)>>Tables whose values are evaluated
     functions. Every structured converter maps tags to conversion
     routines this way: <scm|tmtex-primitives%> and
-    <scm|tmtex-extra-methods%> (<verbatim|convert/latex/tmtex.scm>),
-    <scm|tmhtml-primitives%> (<verbatim|convert/html/tmhtml.scm>),
+    <scm|tmtex-extra-methods%> (<source-link|convert/latex/tmtex.scm|TeXmacs/progs/convert/latex/tmtex.scm>),
+    <scm|tmhtml-primitives%> (<source-link|convert/html/tmhtml.scm|TeXmacs/progs/convert/html/tmhtml.scm>),
     <scm|htmltm-methods%>, <scm|tmmath-primitives%>, <scm|mathtm-methods%>.
 
     <item*|<scm|(logic-rules ...)>>General rules, used for instance to

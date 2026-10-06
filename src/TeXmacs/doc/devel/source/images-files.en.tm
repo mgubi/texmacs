@@ -5,7 +5,7 @@
 <\body>
   <tmdoc-title|Image files: sizes and conversions>
 
-  <verbatim|System/Files/image_files.cpp> is the single entry point for
+  <source-link|System/Files/image_files.cpp|src/System/Files/image_files.cpp> is the single entry point for
   everything that concerns image <em|files>: their original size and their
   conversion into the three formats which the rest of <TeXmacs> needs
   (<name|PNG> for the screen, <abbr|PDF> and <abbr|EPS> for printing). Each
@@ -67,7 +67,7 @@
   returns the natural size of a raster or <abbr|SVG> image (with
   <name|resvg> or <name|Qt>), and otherwise the size in points scaled to 300
   pixels per inch. <cpp|qt_pretty_image_size> (in
-  <verbatim|Plugins/Qt/qt_utilities.cpp>) proposes a width and height for a
+  <source-link|Plugins/Qt/qt_utilities.cpp|src/Plugins/Qt/qt_utilities.cpp>) proposes a width and height for a
   newly inserted image: its size in points, or <verbatim|1par> if it is
   wider than the paragraph.
 
@@ -113,7 +113,7 @@
   <cpp|image_to_psdoc> for other formats. <cpp|image_to_psdoc> is also
   exported to <scheme> as <scm|image-\<gtr\>psdoc>, and serves as the
   converter from bitmap formats to <verbatim|postscript-document> in
-  <verbatim|init-images.scm>.
+  <source-link|init-images.scm|TeXmacs/progs/convert/images/init-images.scm>.
 
   <section|<scheme> converters>
 
@@ -161,7 +161,7 @@
 
   <section|<name|Ghostscript>>
 
-  <verbatim|Plugins/Ghostscript/gs_utilities.cpp> (compiled with
+  <source-link|Plugins/Ghostscript/gs_utilities.cpp|src/Plugins/Ghostscript/gs_utilities.cpp> (compiled with
   <cpp|USE_GS>, which the <name|CMake> build always sets) runs the
   <name|Ghostscript> executable; nothing is linked. The executable is
   <verbatim|gs> (on <name|Windows>, the first <verbatim|gswin*c.exe>
@@ -205,7 +205,7 @@
     (1.4 by default).
   </description-paragraphs>
 
-  <verbatim|Plugins/Ghostscript/ghostscript.cpp> is only used by the
+  <source-link|Plugins/Ghostscript/ghostscript.cpp|src/Plugins/Ghostscript/ghostscript.cpp> is only used by the
   <name|X11> port: <cpp|ghostscript_run> renders a PostScript image into an
   <name|X11> pixmap through the <verbatim|GHOSTVIEW> protocol.
 
@@ -223,7 +223,7 @@
   <section|Pitfalls>
 
   <\itemize>
-    <item>The <name|Inkscape> converters of <verbatim|init-images.scm>
+    <item>The <name|Inkscape> converters of <source-link|init-images.scm|TeXmacs/progs/convert/images/init-images.scm>
     (lines 152-160) use the command line options <verbatim|-z>,
     <verbatim|-f>, <verbatim|-P>, <verbatim|-A> and
     <verbatim|--export-png>, which were removed in <name|Inkscape> 1.0.
@@ -245,7 +245,7 @@
     <abbr|EPS> inputs fails. <cpp|gs_to_png> and <cpp|gs_to_pdf> use
     <verbatim|-f> correctly.
 
-    <item><cpp|qt_convert_image> (<verbatim|Plugins/Qt/qt_utilities.cpp:556>)
+    <item><cpp|qt_convert_image> (<source-link|Plugins/Qt/qt_utilities.cpp:556|src/Plugins/Qt/qt_utilities.cpp:556>)
     saves <cpp|im.scaled (w, h)> even when <cpp|w> or <cpp|h> is zero, the
     default of <cpp|image_to_png>; <cpp|QImage::scaled> then returns a
     null image and nothing is written. All current callers pass a positive

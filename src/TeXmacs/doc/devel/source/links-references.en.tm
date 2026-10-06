@@ -13,7 +13,7 @@
 
   The macros <markup|label>, <markup|reference>, <markup|pageref>,
   <markup|hlink> and <markup|action> are defined in <c++>
-  (<verbatim|Typeset/Env/env_default.cpp>), so they exist in every style:
+  (<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>), so they exist in every style:
 
   <\description>
     <item*|<explain-macro|label|Id>>A locus with identifier
@@ -41,14 +41,14 @@
   it is not accessible). Such identifiers are stable while a document is
   open but not across sessions, which is fine for these loci: they are
   only used to make the reference clickable. The style package
-  <verbatim|preview-ref> (<verbatim|packages/utilities/preview-ref.ts>)
+  <verbatim|preview-ref> (<source-link|packages/utilities/preview-ref.ts|TeXmacs/packages/utilities/preview-ref.ts>)
   redefines <markup|reference> and <markup|pageref> with an additional
   <verbatim|mouse-over> link to the script <scm|preview-reference>, which
   shows the labelled content in a tooltip.
 
   <section|The reference table>
 
-  <cpp|exec_set_binding> (<verbatim|Typeset/Env/env_exec.cpp>) stores the
+  <cpp|exec_set_binding> (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>) stores the
   value of a label in the table <cpp|env-\<gtr\>local_ref> as a tuple
   <verbatim|(<em|value> <em|page>)>, keeping the previous page number, and
   appends a third component when the label comes from an included file or
@@ -102,7 +102,7 @@
   showing the right part of a project if needed. This is what the
   <verbatim|#<em|Id>> targets of references lead to.
 
-  <section|Tools for references (<verbatim|ref-edit.scm>)>
+  <section|Tools for references (<source-link|ref-edit.scm|TeXmacs/progs/link/ref-edit.scm>)>
 
   <\itemize>
     <item>Searching: <scm|search-labels>, <scm|search-references>,
@@ -124,7 +124,7 @@
     while a reference is being typed.
   </itemize>
 
-  <verbatim|ref-markup.scm> implements the \Psmart\Q references of the
+  <source-link|ref-markup.scm|TeXmacs/progs/link/ref-markup.scm> implements the \Psmart\Q references of the
   style packages (<scm|ext-smart-ref>, <scm|ext-typed-ref>), which group
   several keys by type and render them as, for instance, \PTheorems 1 and
   2\Q.

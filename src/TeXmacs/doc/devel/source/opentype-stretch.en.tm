@@ -40,10 +40,10 @@
 
   Traditionally the typesetter found the size it needed by probing:
   <cpp|get_delimiter> and <cpp|get_wide> in
-  <verbatim|Typeset/Boxes/Basic/text_boxes.cpp> ask the font for the
+  <source-link|Typeset/Boxes/Basic/text_boxes.cpp|src/Typeset/Boxes/Basic/text_boxes.cpp> ask the font for the
   extents of size 0, 1, 2, ... until one is tall or wide enough. Fonts
   which know their sizes now short-circuit this search through two virtual
-  methods of <cpp|font_rep> (<verbatim|Graphics/Fonts/font.hpp>), which
+  methods of <cpp|font_rep> (<source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp>), which
   return <cpp|false> by default:
 
   <\explain>
@@ -67,7 +67,7 @@
   <section|Which rubber font a font gets>
 
   Every font has a <em|rubber font>, obtained with <cpp|rubber_font (base)>
-  (<verbatim|Graphics/Fonts/font.cpp>), which caches the result of the
+  (<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>), which caches the result of the
   virtual method <cpp|base-\<gtr\>make_rubber_font (base)>. The method
   decides how the stretched characters of that font are drawn:
 
@@ -98,7 +98,7 @@
   <section|The rubber font of an OpenType math font>
 
   <cpp|rubber_unicode_font_rep>
-  (<verbatim|Plugins/Freetype/rubber_unicode_font.cpp>) keeps the
+  (<source-link|Plugins/Freetype/rubber_unicode_font.cpp|src/Plugins/Freetype/rubber_unicode_font.cpp>) keeps the
   <cpp|tt_face> of the font (<cpp|math_face>, whose <cpp|math_table> is the
   parsed <verbatim|MATH> table) and seven subfonts, created on first use by
   <cpp|get_font>:
@@ -236,7 +236,7 @@
   same glyph from it.
 
   <paragraph|Virtual font primitives.>Two additions to
-  <verbatim|Graphics/Fonts/virtual_font.cpp> came with this work:
+  <source-link|Graphics/Fonts/virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp> came with this work:
   <verbatim|hor-take>, the horizontal mirror of <verbatim|ver-take>, which
   repeats a column of a glyph over a given length, in both the bitmap
   compiler (<cpp|compile_bis>) and the vector path (<cpp|draw_tree>), and an
@@ -245,7 +245,7 @@
   <section|The emulation behind the table>
 
   Fonts without a table, and the characters a table does not cover, still
-  go through the emulation of <verbatim|Graphics/Fonts/poor_rubber.cpp> and
+  go through the emulation of <source-link|Graphics/Fonts/poor_rubber.cpp|src/Graphics/Fonts/poor_rubber.cpp> and
   the <verbatim|emu-*> virtual fonts, described in <hlink|emulated
   fonts|smart-fonts-emulated.en.tm>. Two changes concern the
   <name|OpenType> path. First, <cpp|poor_rubber_font_rep> now treats a font
@@ -288,27 +288,27 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Plugins/Freetype/rubber_unicode_font.cpp>>The rubber
+    <item*|<source-link|Plugins/Freetype/rubber_unicode_font.cpp|src/Plugins/Freetype/rubber_unicode_font.cpp>>The rubber
     font of <name|Unicode> fonts, and its <name|OpenType> path: variants,
     assemblies, made to measure sizes.
 
-    <item*|<verbatim|Graphics/Fonts/font.cpp>,
-    <verbatim|font.hpp>><cpp|rubber_font>, the default
+    <item*|<source-link|Graphics/Fonts/font.cpp|src/Graphics/Fonts/font.cpp>,
+    <source-link|font.hpp|src/Graphics/Fonts/font.hpp>><cpp|rubber_font>, the default
     <cpp|make_rubber_font> and the hooks <cpp|get_rubber_variant>,
     <cpp|get_wide_variant>.
 
-    <item*|<verbatim|Graphics/Fonts/smart_font.cpp>><cpp|make_rubber_font>
+    <item*|<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>><cpp|make_rubber_font>
     and the forwarding hooks of the smart font, <cpp|resolve_rubber>, and
     the fallback to <name|STIX Two Math> (<cpp|resolve_shipped_math>).
 
-    <item*|<verbatim|Graphics/Fonts/virtual_font.cpp>>The glyph algebra
+    <item*|<source-link|Graphics/Fonts/virtual_font.cpp|src/Graphics/Fonts/virtual_font.cpp>>The glyph algebra
     which draws the assemblies, <verbatim|hor-take>,
     <cpp|virtual_font_draws_vectors>.
 
-    <item*|<verbatim|Graphics/Fonts/poor_rubber.cpp>>The emulation of
+    <item*|<source-link|Graphics/Fonts/poor_rubber.cpp|src/Graphics/Fonts/poor_rubber.cpp>>The emulation of
     stretched characters for fonts without a table.
 
-    <item*|<verbatim|Typeset/Boxes/Basic/text_boxes.cpp>><cpp|get_delimiter>
+    <item*|<source-link|Typeset/Boxes/Basic/text_boxes.cpp|src/Typeset/Boxes/Basic/text_boxes.cpp>><cpp|get_delimiter>
     and <cpp|get_wide>, the size searches of the typesetter.
   </description-paragraphs>
 
@@ -326,7 +326,7 @@
 
     <item>Six symbols which only <TeXmacs> defines (<verbatim|triangleup>,
     <verbatim|blacktriangleup> and four negated black triangles) are listed
-    in <verbatim|src/src/OPENTYPEMATH.md> as still exporting as small
+    in <source-link|src/src/OPENTYPEMATH.md|src/OPENTYPEMATH.md> as still exporting as small
     bitmaps when the math font lacks them.
 
     <item>Delimiters for which the table has variants but no assembly stop

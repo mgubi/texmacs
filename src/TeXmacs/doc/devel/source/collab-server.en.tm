@@ -11,7 +11,7 @@
 
   A server is an ordinary <TeXmacs> process with server mode enabled. The
   relevant command line options are parsed in
-  <verbatim|Texmacs/Texmacs/texmacs.cpp>:
+  <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp>:
 
   <\description-paragraphs>
     <item*|<verbatim|-server>>Enable server mode (<cpp|set_server>). At the
@@ -59,10 +59,10 @@
 
   In a graphical session, the server is started from the menu
   <menu|Remote|Start server>, which calls <scm|server-safe-start>
-  (<verbatim|server/server-menu.scm>). If <abbr|TLS> is supported and on
+  (<source-link|server/server-menu.scm|TeXmacs/progs/server/server-menu.scm>). If <abbr|TLS> is supported and on
   but no certificate exists, the user is first offered to create a
   self-signed certificate (<scm|open-certificate-warning> in
-  <verbatim|server-widgets.scm>, which ends up in the glue function
+  <source-link|server-widgets.scm|TeXmacs/progs/server/server-widgets.scm>, which ends up in the glue function
   <scm|generate-self-signed-certificate>). The server menu also allows to
   stop and restart the server and to reset the administrator password or
   the preferences. See also the user documentation <hlink|Starting and
@@ -83,7 +83,7 @@
 
   <\description-paragraphs>
     <item*|<verbatim|global.tmdb>>The server database, returned by
-    <scm|(global-database)> (<verbatim|database/db-base.scm>) and
+    <scm|(global-database)> (<source-link|database/db-base.scm|TeXmacs/progs/database/db-base.scm>) and
     installed by <scm|tm-service> as the current database of each service
     (<scm|server-database>). It contains one entry per user, file,
     directory, file version list, live document, chat room, chat message,
@@ -112,11 +112,11 @@
   </description-paragraphs>
 
   The database layer is described in the <scheme> modules of
-  <verbatim|progs/database/>. The points which matter for the server are:
+  <source-link|progs/database/|TeXmacs/progs/database>. The points which matter for the server are:
 
   <\itemize>
     <item>The <c++> class <cpp|database_rep>
-    (<verbatim|Plugins/Database/database.hpp>) stores lines
+    (<source-link|Plugins/Database/database.hpp|src/Plugins/Database/database.hpp>) stores lines
     <cpp|(id, attr, val, created, expires)> and never forgets anything
     unless history is disabled: removing a field or an entry only sets an
     expiration time. Queries take a time argument, so the state of the
@@ -130,7 +130,7 @@
     <verbatim|"readable"> and <verbatim|"writable"> contain lists of user
     identifiers, where the special value <verbatim|"all"> denotes everybody.
     <scm|(db-allow? <scm-arg|id> <scm-arg|uid> <scm-arg|attr>)>
-    (<verbatim|database/db-users.scm>) checks whether <scm-arg|uid> (or a
+    (<source-link|database/db-users.scm|TeXmacs/progs/database/db-users.scm>) checks whether <scm-arg|uid> (or a
     group it belongs to, see <scm|db-expand-user>) appears in the field, and
     owners are allowed everything. <scm|(with-user <scm-arg|uid> ...)> sets
     <scm|db-current-user>, which the wrappers of <scm|db-get-field>,
@@ -154,7 +154,7 @@
   <scm|(password <scm-arg|encoding> <scm-arg|salt> <scm-arg|hash>
   ...)>, produced by <scm|server-hide-credentials> and checked by
   <scm|server-password-correct?> in
-  <verbatim|server/server-authentication.scm>. The supported encodings are
+  <source-link|server/server-authentication.scm|TeXmacs/progs/server/server-authentication.scm>. The supported encodings are
   listed by <scm|server-supported-password-encodings>:
 
   <\description>
@@ -182,7 +182,7 @@
 
   <subsection|Login>
 
-  The service <scm|remote-login> (<verbatim|server/server-base.scm>) finds
+  The service <scm|remote-login> (<source-link|server/server-base.scm|TeXmacs/progs/server/server-base.scm>) finds
   the user with <scm|server-find-user>, verifies the password with
   <scm|server-password-authentified?> and, on success, calls
   <scm|server-login-uid>, which records the login time and address, resets
@@ -199,7 +199,7 @@
   3600) have elapsed since the last failure. Accounts can also be suspended
   (<scm|server-suspend-user>) or marked as deleted.
 
-  On the client, <scm|client-login-home> (<verbatim|client-widgets.scm>)
+  On the client, <scm|client-login-home> (<source-link|client-widgets.scm|TeXmacs/progs/client/client-widgets.scm>)
   performs the complete sequence: connect and log in
   (<scm|client-login-then>), register the connection with
   <scm|add-active-connection>, send the protocol version, fetch the
@@ -249,7 +249,7 @@
   Users with the admin flag may read and modify the server preferences
   remotely (<scm|remote-admin-preferences>, <scm|remote-set-preferences>,
   <scm|remote-admin-preferences-form>; see
-  <verbatim|client/client-remote-config.scm>), list the accounts
+  <source-link|client/client-remote-config.scm|TeXmacs/progs/client/client-remote-config.scm>), list the accounts
   (<scm|remote-get-accounts>) and evaluate arbitrary <scheme> expressions
   on the server with <scm|remote-eval>. The latter is equivalent to shell
   access to the server account and should be kept in mind when granting
@@ -268,7 +268,7 @@
   syslog levels <scm|emergency>, <scm|alert>, <scm|critical>, <scm|error>,
   <scm|warning>, <scm|notice>, <scm|info> and <scm|debug>. In headless mode
   it calls the glue function <scm|server-log-write-int>, which uses
-  <verbatim|syslog> on <name|Unix> (<verbatim|Plugins/Unix/unix_server_log.cpp>),
+  <verbatim|syslog> on <name|Unix> (<source-link|Plugins/Unix/unix_server_log.cpp|src/Plugins/Unix/unix_server_log.cpp>),
   <verbatim|os_log> on <name|macOS> (subsystem
   <verbatim|org.texmacs.logging>), and the corresponding modules for
   <name|Windows>; when standard output is a terminal the messages are
@@ -278,7 +278,7 @@
 
   <section|Chat rooms, mail boxes and notifications>
 
-  Chat rooms (<verbatim|server/server-chat.scm>) are database entries of
+  Chat rooms (<source-link|server/server-chat.scm|TeXmacs/progs/server/server-chat.scm>) are database entries of
   type <verbatim|"chat-room">; messages are entries of type
   <verbatim|"chat-message"> with fields <verbatim|"action">,
   <verbatim|"from">, <verbatim|"to"> (the room), <verbatim|"message"> and
@@ -337,7 +337,7 @@
     the <scm|:on-cpu-idle> keyword).
 
     <item>The client (<scm|fetch-missing-cache-refs> in
-    <verbatim|client/client-tmfs.scm>) uses its own cache with the server
+    <source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm>) uses its own cache with the server
     name as host, requests the missing hashes one by one and substitutes
     the <markup|cache-ref> trees in the buffer as they arrive, without
     marking the buffer as modified.
@@ -345,7 +345,7 @@
 
   <section|Backups>
 
-  <verbatim|server/server-backup.scm> implements optional periodic
+  <source-link|server/server-backup.scm|TeXmacs/progs/server/server-backup.scm> implements optional periodic
   snapshots of <verbatim|$TEXMACS_HOME_PATH/server> with <verbatim|rsync>.
   When <verbatim|"server service backup"> is on and <verbatim|"server
   backup destination"> is set, <scm|server-backup-register> schedules
@@ -374,7 +374,7 @@
     anonymous Diffie\UHellman by default (<verbatim|"tls-server
     authentication anonymous">), and the client does not check that the
     certificate matches the host name (see the comment near
-    <cpp|gnutls_session_set_verify_cert> in <verbatim|gnutls.cpp>); when
+    <cpp|gnutls_session_set_verify_cert> in <source-link|gnutls.cpp|src/Plugins/Gnutls/gnutls.cpp>); when
     the certificate cannot be verified, the user is asked whether to trust
     it (<scm|trust-certificate-interactive>). Disabling anonymous
     authentication on the server and distributing the server certificate to
@@ -394,7 +394,7 @@
     documents and chat rooms are created readable and writable by
     <verbatim|"all">. The client side permission handler for remote files
     always answers <scm|#t> (a <verbatim|FIXME> in
-    <verbatim|client-tmfs.scm>); the server is the only line of defence.
+    <source-link|client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm>); the server is the only line of defence.
 
     <item><em|Secrets.> Account confirmation and reset codes are six digit
     numbers produced by the <scheme> <scm|random> function. The helper

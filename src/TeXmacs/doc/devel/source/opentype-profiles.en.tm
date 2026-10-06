@@ -28,7 +28,7 @@
   <section|Profiles>
 
   A profile is declared in <scheme>, in
-  <verbatim|TeXmacs/progs/fonts/fonts-opentype.scm>, with the macro
+  <source-link|TeXmacs/progs/fonts/fonts-opentype.scm|TeXmacs/progs/fonts/fonts-opentype.scm>, with the macro
   <scm|define-math-font-profile>, which expands into a call of the glue
   routine <scm|math-font-profile-set>:
 
@@ -44,23 +44,23 @@
 
   The name is the family of the math font as the font database names it.
   The module is loaded at boot with the other font modules
-  (<verbatim|init-texmacs.scm>), so the twenty-four profiles are in place
+  (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>), so the twenty-four profiles are in place
   before the first document is typeset.
 
-  On the <c++> side (<verbatim|Graphics/Fonts/math_font_profiles.cpp>) a
+  On the <c++> side (<source-link|Graphics/Fonts/math_font_profiles.cpp|src/Graphics/Fonts/math_font_profiles.cpp>) a
   profile is stored as a <cpp|tree>, a tuple of <verbatim|(key value)>
   pairs, in a table keyed by the family. Both tables of the file are
   function-local statics, since they are filled during the <scheme> boot,
   before the global statics of other units are guaranteed to be
   initialized. The routines, all exported to <scheme> by
-  <verbatim|build-glue-basic.scm>, are
+  <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>, are
 
   <\description-paragraphs>
     <item*|<cpp|math_font_profile_set (family, profile)>>Stores a profile
     and, when it names a <verbatim|text> companion which no earlier profile
     claimed, records the reverse association text <math|\<rightarrow\>>
     math. The first claimant wins, so the order of the declarations in
-    <verbatim|fonts-opentype.scm> decides which math font a shared text
+    <source-link|fonts-opentype.scm|TeXmacs/progs/fonts/fonts-opentype.scm> decides which math font a shared text
     family pulls in: <name|TeX Gyre Pagella Math> is declared before
     <name|Euler Math> and <name|Asana Math>, which name the same text font.
 
@@ -92,7 +92,7 @@
     it when the database does not know it (<cpp|register_profiled_font>).
 
     <item*|<verbatim|text>>The text companion, named by its <em|master>,
-    the second field of an entry of <verbatim|TeXmacs/fonts/font-features.scm>,
+    the second field of an entry of <source-link|TeXmacs/fonts/font-features.scm|TeXmacs/fonts/font-features.scm>,
     since that is what the <src-var|font> variable holds. Naming a family
     instead (<verbatim|Fira Sans> rather than <verbatim|Fira>) makes the
     font selection fall back on the feature distance.
@@ -130,7 +130,7 @@
   <section|How a profile steers the choice of fonts>
 
   The family string of a smart font goes through a chain of rewritings in
-  <cpp|smart_font_bis> (<verbatim|Graphics/Fonts/smart_font.cpp>) before a
+  <cpp|smart_font_bis> (<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>) before a
   base font is looked for: <cpp|tex_gyre_fix>, <cpp|kepler_fix>,
   <cpp|math_fix> and, last, <cpp|profile_fix>, which is where the profiles
   come in. For each item of the font sequence which carries no condition
@@ -200,7 +200,7 @@
   then. <scm|opentype-math-font-menu> appends the installed math fonts to
   <menu|Document|Font|Mathematical font>. The text fonts which bring no
   mathematics are listed apart, in
-  <verbatim|TeXmacs/progs/fonts/font-short-menu.scm>, declared with
+  <source-link|TeXmacs/progs/fonts/font-short-menu.scm|TeXmacs/progs/fonts/font-short-menu.scm>, declared with
   <scm|define-text-font> by master.
 
   The entries call
@@ -217,7 +217,7 @@
     <verbatim|rm>.
   </explain>
 
-  <scm|init-font> (<verbatim|generic/document-edit.scm>) sends the four
+  <scm|init-font> (<source-link|generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>) sends the four
   <name|TeX Gyre> text fonts to the style packages of their hand-tuned
   mathematics (<verbatim|pagella-font> and the others), unless another math
   font is asked for (<scm|tex-gyre-font?>): <name|Euler Math> and
@@ -232,7 +232,7 @@
 
   <section|The shipped fonts>
 
-  The directory <verbatim|TeXmacs/fonts/truetype> holds, besides the fonts
+  The directory <source-link|TeXmacs/fonts/truetype|TeXmacs/fonts/truetype> holds, besides the fonts
   shipped before (the first <name|STIX> fonts, the <name|TeX Gyre> math
   fonts, <name|Linux Libertine>, <name|OpenDyslexic>), one subdirectory per
   family with the math font, its text faces, a <verbatim|README.md> and the
@@ -245,8 +245,8 @@
   Concrete faces) and <verbatim|euler>.
 
   All their faces are entered in the shipped database
-  (<verbatim|TeXmacs/fonts/font-database.scm>,
-  <verbatim|font-features.scm> and <verbatim|font-characteristics.scm>), so
+  (<source-link|TeXmacs/fonts/font-database.scm|TeXmacs/fonts/font-database.scm>,
+  <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm> and <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>), so
   they work in a fresh installation without a scan. A few entries are
   arranged by hand: <name|KpMath Sans>, whose name table calls its family
   <verbatim|KpMath> with the style <verbatim|Sans>, is also listed as a
@@ -257,7 +257,7 @@
   <verbatim|Bold> style of <verbatim|Erewhon Math>, and the families
   <verbatim|XCharter-Math-Bold> and <verbatim|Concrete> (the bold
   <name|Concrete Math>) are given the masters <verbatim|XCharter Math> and
-  <verbatim|Concrete Math> in <verbatim|font-features.scm>.
+  <verbatim|Concrete Math> in <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm>.
 
   The smart font also uses one shipped file directly: when the main font
   has a <verbatim|MATH> table and a symbol it lacks could only be emulated
@@ -267,7 +267,7 @@
 
   <section|Finding the font files>
 
-  <cpp|tt_font_find_sub> (<verbatim|Plugins/Freetype/tt_file.cpp>) now
+  <cpp|tt_font_find_sub> (<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>) now
   looks for <verbatim|.otf>, <verbatim|.ttf> and <verbatim|.ttc> before
   <verbatim|.pfb>, and <verbatim|.dfont> last. A <TeX> distribution ships
   many families in both forms, and the <name|Type 1> file carries the
@@ -296,7 +296,7 @@
   derived from the shipped one only when it was empty, so a home directory
   written by an older version never saw the fonts a newer version
   registers, and a character only those fonts draw came out as its name in
-  red. <cpp|font_database_load> (<verbatim|Graphics/Fonts/font_database.cpp>)
+  red. <cpp|font_database_load> (<source-link|Graphics/Fonts/font_database.cpp|src/Graphics/Fonts/font_database.cpp>)
   now keeps a stamp in <verbatim|$TEXMACS_HOME_PATH/fonts/shipped-stamp.scm>
   of two lines:
 
@@ -336,31 +336,31 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Fonts/math_font_profiles.cpp>>The profile
+    <item*|<source-link|Graphics/Fonts/math_font_profiles.cpp|src/Graphics/Fonts/math_font_profiles.cpp>>The profile
     tables and their accessors.
 
-    <item*|<verbatim|Graphics/Fonts/smart_font.cpp>><cpp|profile_fix>,
+    <item*|<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>><cpp|profile_fix>,
     <cpp|profile_variant_fix>, <cpp|register_profiled_font>, the
     <cpp|ot_math> flag and the math italic subfont,
     <cpp|resolve_shipped_math>.
 
-    <item*|<verbatim|Graphics/Fonts/font_database.cpp>>The shipped stamp,
+    <item*|<source-link|Graphics/Fonts/font_database.cpp|src/Graphics/Fonts/font_database.cpp>>The shipped stamp,
     the merge and the index of scanned files.
 
-    <item*|<verbatim|Plugins/Freetype/tt_file.cpp>>The order of the
+    <item*|<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>>The order of the
     suffixes, the cache key, the <TeX> Live directories.
 
-    <item*|<verbatim|TeXmacs/progs/fonts/fonts-opentype.scm>>The profiles,
+    <item*|<source-link|TeXmacs/progs/fonts/fonts-opentype.scm|TeXmacs/progs/fonts/fonts-opentype.scm>>The profiles,
     the menus, <scm|init-opentype-font>.
 
-    <item*|<verbatim|TeXmacs/progs/fonts/font-short-menu.scm>>The text fonts
+    <item*|<source-link|TeXmacs/progs/fonts/font-short-menu.scm|TeXmacs/progs/fonts/font-short-menu.scm>>The text fonts
     of the focus toolbar.
 
-    <item*|<verbatim|TeXmacs/progs/generic/document-edit.scm>,
-    <verbatim|document-menu.scm>><scm|init-font> and the
+    <item*|<source-link|TeXmacs/progs/generic/document-edit.scm|TeXmacs/progs/generic/document-edit.scm>,
+    <source-link|document-menu.scm|TeXmacs/progs/generic/document-menu.scm>><scm|init-font> and the
     <menu|Document|Font> menus.
 
-    <item*|<verbatim|TeXmacs/fonts/truetype/>, <verbatim|TeXmacs/fonts/*.scm>>The
+    <item*|<source-link|TeXmacs/fonts/truetype/|TeXmacs/fonts/truetype>, <verbatim|TeXmacs/fonts/*.scm>>The
     shipped fonts and database.
   </description-paragraphs>
 

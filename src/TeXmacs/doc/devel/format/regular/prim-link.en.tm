@@ -8,7 +8,7 @@
   The most common linking tags, <markup|label>, <markup|reference>,
   <markup|pageref>, <markup|hlink>, <markup|action> and <markup|include>,
   are actually built-in macros defined in the default environment
-  (<verbatim|Typeset/Env/env_default.cpp>) in terms of the lower level
+  (<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>) in terms of the lower level
   primitives <markup|locus>, <markup|id>, <markup|link>, <markup|url>,
   <markup|script>, <markup|set-binding>, <markup|get-binding> and
   <markup|include*>, which are described at the end of this section. For
@@ -107,7 +107,7 @@
     The <markup|include> tag is a built-in macro which expands to
     <explain-macro|include*|url>; the <markup|include*> primitive loads the
     file (<cpp|edit_env_rep::rewrite> in
-    <verbatim|Typeset/Env/env_exec.cpp>) and refuses to include the current
+    <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>) and refuses to include the current
     document itself.
   </explain>
 
@@ -153,7 +153,7 @@
     and links are registered in the linking environment of the editor, and
     the <src-arg|body> is rendered as an active hyperlink region
     (<verbatim|concater_rep::typeset_locus> in
-    <verbatim|Typeset/Concat/concat_active.cpp>).
+    <source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>).
   </explain>
 
   <\explain>

@@ -32,7 +32,7 @@
   and <scm|(former)> may be used inside a redefinition in order to include
   the previous definition. For instance, the following code adds an entry
   to the <menu|Insert> menu in the mode <scm|in-database?> only (similar
-  code can be found in <verbatim|progs/database/db-menu.scm>):
+  code can be found in <source-link|progs/database/db-menu.scm|TeXmacs/progs/database/db-menu.scm>):
 
   <\scm-code>
     (menu-bind insert-menu
@@ -108,7 +108,7 @@
   <paragraph*|The main menus and toolbars>
 
   The <c++> part of <TeXmacs> asks the <scheme> code for the menus of each
-  window (see <verbatim|src/Edit/Interface/edit_interface.cpp>). The menu
+  window (see <source-link|src/Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>). The menu
   bar is <scm|(horizontal (link texmacs-menu))> and the four toolbars are
   built from <scm|texmacs-main-icons>, <scm|texmacs-mode-icons>,
   <scm|texmacs-focus-icons> and <scm|texmacs-extra-icons>. The context menu
@@ -118,7 +118,7 @@
   side and bottom panels are made of the widgets <scm|texmacs-side-tools>,
   <scm|texmacs-left-tools> and <scm|texmacs-bottom-tools>, which display
   the <em|tools> defined with <scm|tm-tool>. Most of these menus are
-  defined in <verbatim|progs/texmacs/menus/main-menu.scm>.
+  defined in <source-link|progs/texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>.
 
   The menus <scm|texmacs-extra-menu> (inserted in the menu bar before
   <menu|Focus>), <scm|texmacs-extra-icons>, <scm|plugin-menu> and

@@ -12,7 +12,7 @@
 
   <section|Memory allocation and data structures in TeXmacs>
 
-  The file <verbatim|fast_alloc.hpp> declares the <apply|TeXmacs> memory
+  The file <source-link|fast_alloc.hpp|src/System/Misc/fast_alloc.hpp> declares the <apply|TeXmacs> memory
   allocation routines. These routines are very fast for small sizes, since
   for each such size, <apply|TeXmacs> maintains a linked list of freed
   objects of that size. No garbage collection has been implemented yet.

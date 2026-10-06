@@ -27,7 +27,7 @@
 
   <paragraph*|Wie es funktioniert.>
 
-  Die Datei <verbatim|init-world.scm> enthält den folgenden Code:
+  Die Datei <source-link|init-world.scm|TeXmacs/examples/plugins/world/progs/init-world.scm> enthält den folgenden Code:
 
   <\scheme-fragment>
     (define (world-initialize)

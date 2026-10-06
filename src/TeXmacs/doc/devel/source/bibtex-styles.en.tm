@@ -13,7 +13,7 @@
   (bibtex <em|name>))> and calls <scm|(bib-process <scm-arg|prefix>
   <scm-arg|name> <scm-arg|entries>)>; with the database tool,
   <scm|bib-compile> does the same. The flow inside <scm|bib-process>
-  (<verbatim|bibtex/bib-utils.scm>) is described in <hlink|the database
+  (<source-link|bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm>) is described in <hlink|the database
   chapter|database-bibliography.en.tm>: set the globals
   <scm|bib-current-prefix> and <scm|bib-style>, run
   <scm|bib-preprocessing>, sort with <scm|bib-sorted-entries>, format each
@@ -31,13 +31,13 @@
   <scm|bib-default-style>. The macro also sets <scm|bib-default-style> to
   <scm-arg|fallback>, as a side effect of loading the module.
 
-  A style file then redefines functions of <verbatim|plain.scm> with a
+  A style file then redefines functions of <source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm> with a
   <scm|(:mode bib-<scm-arg|name>?)> clause. Since <scm|bib-style> is set
   by <scm|bib-process>, several style modules can be loaded at the same
   time: each override only applies while its style is active, and the most
   specific mode wins as for all <scheme> overloading (see <hlink|editing
   modes on the Scheme side|modes.en.tm>). The functions of
-  <verbatim|plain.scm> themselves are defined without a mode, so they are
+  <source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm> themselves are defined without a mode, so they are
   the defaults of every style.
 
   <scm|(bib-with-style <scm-arg|style> <scm-arg|f> <scm-arg|args>
@@ -48,7 +48,7 @@
   <subsection|The protocol of a style>
 
   The functions which a style may override, all defined in
-  <verbatim|plain.scm>, are:
+  <source-link|plain.scm|TeXmacs/progs/bibtex/plain.scm>, are:
 
   <\description>
     <item*|<scm|(bib-preprocessing <scm-arg|entries>)>>Called once with
@@ -86,7 +86,7 @@
     <scm|bib-format-in-ed-booktitle>.
   </description>
 
-  The output helpers of <verbatim|bib-utils.scm> (<scm|bib-new-block>,
+  The output helpers of <source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> (<scm|bib-new-block>,
   <scm|bib-new-sentence>, <scm|bib-new-list>, <scm|bib-format-field> and
   its variants, <scm|bib-emphasize>, <scm|bib-translate>) are documented in
   <hlink|writing <TeXmacs> bibliography
@@ -126,7 +126,7 @@
     formatting functions to follow the corresponding <verbatim|.bst>
     files. <verbatim|ieeetr> and <verbatim|elsart-num> also keep the
     citation order, and <verbatim|ieeetr> replaces the helper
-    <scm|new-list-rec> of <verbatim|bib-utils.scm> (the comment there says
+    <scm|new-list-rec> of <source-link|bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> (the comment there says
     so) to change the separators.
   </description>
 
@@ -170,7 +170,7 @@
 
   <subsection|Inserting a bibliography>
 
-  <scm|open-bibliography-inserter> (<verbatim|bibtex/bib-widgets.scm>)
+  <scm|open-bibliography-inserter> (<source-link|bibtex/bib-widgets.scm|TeXmacs/progs/bibtex/bib-widgets.scm>)
   opens a dialog which inserts a new <markup|bibliography> tag, or modifies
   the first one of the document (style and file). The file may be stored
   relative to the document or as an absolute path. The dialog shows a
@@ -182,13 +182,13 @@
 
   <subsection|Completion of citation keys>
 
-  <verbatim|bibtex/bib-complete.scm> provides the completions offered when
+  <source-link|bibtex/bib-complete.scm|TeXmacs/progs/bibtex/bib-complete.scm> provides the completions offered when
   typing the key of a citation. <scm|current-bib-file> finds the first
   <markup|bibliography> tag of the buffer and resolves its file name
   relative to the buffer (the result is cached per buffer);
   <scm|citekey-list> parses that file (again only when its modification
   time has changed), stores the keys in a prefix tree
-  (<verbatim|utils/library/ptrees.scm>) and returns the keys which start
+  (<source-link|utils/library/ptrees.scm|TeXmacs/progs/utils/library/ptrees.scm>) and returns the keys which start
   with the typed text. <scm|citekey-completions> formats them for the
   completion mechanism.
 

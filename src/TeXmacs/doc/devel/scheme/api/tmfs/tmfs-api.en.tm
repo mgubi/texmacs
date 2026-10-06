@@ -10,7 +10,7 @@
   This page documents the <scheme> interface of the <TeXmacs> file system.
   Unless stated otherwise, the functions and macros are defined in the module
   <scm|(kernel texmacs tm-file-system)>, file
-  <verbatim|src/TeXmacs/progs/kernel/texmacs/tm-file-system.scm>, and are
+  <source-link|src/TeXmacs/progs/kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>, and are
   available everywhere. In the descriptions, <scm-arg|class> is the first
   component of a <verbatim|tmfs> <abbr|URL> and <scm-arg|name> the rest of
   the <abbr|URL> after <verbatim|tmfs://<scm-arg|class>/>. See the <hlink|primer|tmfs-basics.en.tm>
@@ -230,7 +230,7 @@
     <scm|(tmfs-wrap <scm-arg|u>)><explain-synopsis|underlying file>
   <|explain>
     Return the file wrapped by <scm-arg|u>, or <scm|#f>. The generic
-    function <scm|url-wrap> in <verbatim|texmacs/texmacs/tm-files.scm>
+    function <scm|url-wrap> in <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>
     calls it for <verbatim|tmfs> <abbr|URL>s and returns <scm|#f> for other
     <abbr|URL>s.
   </explain>
@@ -241,7 +241,7 @@
   <|explain>
     Return the date of last modification of <scm-arg|u>, or <scm|#f>. Used
     by <scm|url-last-modified> and <scm|url-newer?>, which are redefined in
-    <verbatim|tm-files.scm> for <verbatim|tmfs> <abbr|URL>s.
+    <source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> for <verbatim|tmfs> <abbr|URL>s.
   </explain>
 
   <\explain>
@@ -314,7 +314,7 @@
     <scm|(list-\<gtr\>query <scm-arg|l>)><explain-synopsis|build a query>
   <|explain>
     Build a query string from an association list of strings, replacing
-    colons by <verbatim|%3A>. For instance, <verbatim|doc/docgrep.scm> opens
+    colons by <verbatim|%3A>. For instance, <source-link|doc/docgrep.scm|TeXmacs/progs/doc/docgrep.scm> opens
     search results with
 
     <\scm-code>
@@ -463,7 +463,7 @@
     <scm|(open-auxiliary <scm-arg|aux> <scm-arg|body>
     [<scm-arg|master>])><explain-synopsis|open an auxiliary buffer>
   <|explain>
-    Defined in <verbatim|texmacs/texmacs/tm-files.scm>. Set the contents and
+    Defined in <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>. Set the contents and
     the master (by default the master of the current buffer) of the
     auxiliary buffer <scm-arg|aux> and switch to it.
   </explain>

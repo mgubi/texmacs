@@ -8,7 +8,7 @@
   <section|Organization>
 
   The <scheme> interface to databases lives in
-  <verbatim|src/TeXmacs/progs/database/>. It is organized as a chain of
+  <source-link|src/TeXmacs/progs/database/|TeXmacs/progs/database>. It is organized as a chain of
   modules, each of which uses the previous one and redefines some of the
   basic routines with <scm|tm-define>, calling the previous definition
   through <scm|former>:
@@ -41,7 +41,7 @@
   database engine|database-core.en.tm>). Below we concentrate on the
   implementation and on what the reference does not say.
 
-  <section|The basic layer (<verbatim|db-base.scm>)>
+  <section|The basic layer (<source-link|db-base.scm|TeXmacs/progs/database/db-base.scm>)>
 
   <subsection|Context>
 
@@ -113,7 +113,7 @@
     <item><scm|(index-get-completions <scm-arg|prefix>)> and
     <scm|(index-get-name-completions <scm-arg|prefix>)> give access to the
     keyword and name indices; the latter is used to complete citation keys
-    (<verbatim|bib-kbd.scm>).
+    (<source-link|bib-kbd.scm|TeXmacs/progs/database/bib-kbd.scm>).
 
     <item><scm|(global-database)> returns
     <verbatim|$TEXMACS_HOME_PATH/server/global.tmdb>, the database of a
@@ -144,7 +144,7 @@
   full layer stack is loaded, the values are moreover encoded as <TeXmacs>
   snippets, as explained in the next section.
 
-  <section|Formats and encodings (<verbatim|db-format.scm>)>
+  <section|Formats and encodings (<source-link|db-format.scm|TeXmacs/progs/database/db-format.scm>)>
 
   <subsection|Kinds, types and formats>
 
@@ -154,9 +154,9 @@
   <\description>
     <item*|<scm|db-kind-table>>maps a kind to its list of entry types, for
     instance <verbatim|"bib"> to <verbatim|("article" "book" ...)> in
-    <verbatim|bib-db.scm> and <verbatim|"ai-agents"> to
+    <source-link|bib-db.scm|TeXmacs/progs/database/bib-db.scm> and <verbatim|"ai-agents"> to
     <verbatim|("corrector" "interlocutor" "translator")> in
-    <verbatim|ai-agents-db.scm>.
+    <source-link|ai-agents-db.scm|TeXmacs/progs/database/ai-agents-db.scm>.
 
     <item*|<scm|db-format-table>>maps an entry type to a <em|format>: a
     string (a mandatory field), <scm|(and <scm-arg|f1> ...)>, <scm|(or
@@ -198,7 +198,7 @@
   permission attributes (<verbatim|owner>, <verbatim|readable>, ...) are
   converted between user identifiers in the database and user pseudos in
   <scheme> (<scm|:users> encoder and decoder); the server uses the same
-  mechanism for <verbatim|version-by> in <verbatim|server/server-tmfs.scm>.
+  mechanism for <verbatim|version-by> in <source-link|server/server-tmfs.scm|TeXmacs/progs/server/server-tmfs.scm>.
 
   <scm|db-search> encodes the values of its constraints using the type
   found in a <verbatim|"type"> constraint, if any. Keyword searches work on
@@ -206,7 +206,7 @@
   snippets (<hlink|see|database-core.en.tm>), they are not affected by the
   serialization.
 
-  <section|Users and permissions (<verbatim|db-users.scm>)>
+  <section|Users and permissions (<source-link|db-users.scm|TeXmacs/progs/database/db-users.scm>)>
 
   <subsection|Users and user databases>
 
@@ -222,7 +222,7 @@
     account (<scm|create-default-user>). <scm|add-user> uses the pseudo as
     identifier, so that identifiers of local users usually coincide with
     their pseudos. The dialogue <menu|Data|Open identities>
-    (<scm|open-identities> in <verbatim|db-widgets.scm>) allows the user to
+    (<scm|open-identities> in <source-link|db-widgets.scm|TeXmacs/progs/database/db-widgets.scm>) allows the user to
     create, rename and delete identities (<scm|add-user>,
     <scm|remove-user>, <scm|set-default-user>, <scm|set-user-info>).
   </explain>
@@ -278,7 +278,7 @@
   the server, which wraps requests of remote users in <scm|with-user>
   (see <hlink|The remote file system|collab-remote-fs.en.tm>).
 
-  <section|Versions and importation (<verbatim|db-version.scm>)>
+  <section|Versions and importation (<source-link|db-version.scm|TeXmacs/progs/database/db-version.scm>)>
 
   An entry is never modified in place by the editor: saving a modified
   entry creates a <em|new entry> which supersedes the old one. This is
@@ -329,7 +329,7 @@
     <scm|db-warning>, and can be silenced with <scm|db-duplicate-warning?>.
   </explain>
 
-  <section|Entries as documents (<verbatim|db-convert.scm>)>
+  <section|Entries as documents (<source-link|db-convert.scm|TeXmacs/progs/database/db-convert.scm>)>
 
   <subsection|The markup>
 
@@ -348,7 +348,7 @@
   presentation; <scm|db-entry-any?> recognizes all three (<scm|db-entry?>
   only the first). While editing, <markup|db-field-optional> and
   <markup|db-field-alternative> mark empty optional and alternative fields.
-  Utilities in <verbatim|db-edit.scm> such as <scm|db-entry-ref>,
+  Utilities in <source-link|db-edit.scm|TeXmacs/progs/database/db-edit.scm> such as <scm|db-entry-ref>,
   <scm|db-entry-set>, <scm|db-entry-remove> and <scm|db-entry-rename>
   manipulate this markup as <scheme> trees, the pseudo attributes
   <verbatim|"id">, <verbatim|"type"> and <verbatim|"name"> referring to the
@@ -398,7 +398,7 @@
   these attributes are used for the first three children of
   <markup|db-entry> (for instance, the <BibTeX> field <verbatim|type> of a
   <verbatim|techreport> is stored under the attribute <verbatim|type*>).
-  <verbatim|bib-db.scm> additionally converts <markup|bib-entry> markup with
+  <source-link|bib-db.scm|TeXmacs/progs/database/bib-db.scm> additionally converts <markup|bib-entry> markup with
   <scm|bib-\<gtr\>db> in <scm|db-save-pre>.
 
   <scm|(db-change-list <scm-arg|uid> <scm-arg|kind> <scm-arg|t>)> returns the
@@ -422,7 +422,7 @@
     synchronization records in <scm|(user-database "sync")>, see
     <hlink|Synchronization of files and databases|collab-sync.en.tm>;
 
-    <item><verbatim|utils/literate/lp-build.scm> calls the glue
+    <item><source-link|utils/literate/lp-build.scm|TeXmacs/progs/utils/literate/lp-build.scm> calls the glue
     (<scm|tmdb-set-field>, <scm|tmdb-get-field>) directly on
     <verbatim|system/database/lp-master.tmdb> to remember build times.
   </itemize>
@@ -471,7 +471,7 @@
 
     <item>Write an editing style <verbatim|database-<em|kind>.ts> which
     uses the package <verbatim|database> and sets <verbatim|db-kind> (see
-    <verbatim|styles/test/database-ai-agents.ts>), and a mode which detects
+    <source-link|styles/test/database-ai-agents.ts|TeXmacs/styles/test/database-ai-agents.ts>), and a mode which detects
     it, redefining <scm|db-get-kind> in this mode so that
     <scm|user-database> and the <menu|Insert> menu select the right kind:
 
@@ -491,8 +491,8 @@
 
     <item>Open the database as a document with <scm|(load-db-buffer
     "tmfs://db/ai-agents/global")>, register the new modules with
-    <scm|lazy-define> in <verbatim|init-texmacs.scm>, and add a menu entry
-    (see <scm|db-menu> in <verbatim|db-menu.scm>).
+    <scm|lazy-define> in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>, and add a menu entry
+    (see <scm|db-menu> in <source-link|db-menu.scm|TeXmacs/progs/database/db-menu.scm>).
 
     <item>Optionally, redefine <scm|db-pretty> for the kind (used by the
     <verbatim|"Pretty"> presentation and by the search dialogue), and

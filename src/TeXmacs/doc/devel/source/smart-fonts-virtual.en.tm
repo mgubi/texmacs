@@ -32,7 +32,7 @@
     (logical and ink bounding boxes). This is
     <cpp|virtual_font_rep::compile>; it is used for the metrics in all
     cases and for drawing on the screen. Glyph operations are those of
-    <verbatim|Graphics/Bitmap_fonts/bitmap_font.hpp> (<cpp|join>,
+    <source-link|Graphics/Bitmap_fonts/bitmap_font.hpp|src/Graphics/Bitmap_fonts/bitmap_font.hpp> (<cpp|join>,
     <cpp|move>, <cpp|hor_flip>, <cpp|stretched>, <cpp|clip>, ...).
 
     <item><em|Draw> it directly on a renderer, using the vector drawing of
@@ -94,9 +94,9 @@
 
   <subsection|Translators>
 
-  Files are loaded by <cpp|load_virtual> (<verbatim|Graphics/Fonts/translator.cpp>),
+  Files are loaded by <cpp|load_virtual> (<source-link|Graphics/Fonts/translator.cpp|src/Graphics/Fonts/translator.cpp>),
   usually through <cpp|load_translator>, which first looks for an encoding
-  file <verbatim|<em|name>.enc> in <verbatim|fonts/enc> and otherwise
+  file <verbatim|<em|name>.enc> in <source-link|fonts/enc|TeXmacs/fonts/enc> and otherwise
   loads the virtual font. Both produce a <cpp|translator>:
 
   <\cpp-code>
@@ -559,7 +559,7 @@
   <section|Enhancing a font>
 
   <cpp|virtual_enhance_font (font base, string virt)>
-  (<verbatim|Graphics/Fonts/virtual_enhance.cpp>) wraps <src-arg|base> and
+  (<source-link|Graphics/Fonts/virtual_enhance.cpp|src/Graphics/Fonts/virtual_enhance.cpp>) wraps <src-arg|base> and
   an extend mode virtual font <src-arg|virt> built on it. All symbols
   supported by the base font are rendered by the base font; universal
   symbols <verbatim|\<less\>...\<gtr\>> which it lacks are taken from the

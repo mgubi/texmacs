@@ -100,7 +100,7 @@
 
   Several font parameters are crucial for the correct positioning of the
   different components. They are stored as fields of the class
-  <cpp|font_rep> (see <verbatim|Graphics/Fonts/font.hpp> and the chapter on
+  <cpp|font_rep> (see <source-link|Graphics/Fonts/font.hpp|src/Graphics/Fonts/font.hpp> and the chapter on
   <hlink|fonts|fonts.en.tm>). The following are often needed:
 
   <\description>
@@ -218,7 +218,7 @@
     <item>The root itself is typeset like a large delimiter. The positioning
     of a potential script (the index of the root) depends on the font, with
     special cases for some math fonts (see <cpp|sqrt_box_rep> in
-    <verbatim|math_boxes.cpp>).
+    <source-link|math_boxes.cpp|src/Typeset/Boxes/Composite/math_boxes.cpp>).
 
     <item>The upper bar has a overhang of <verbatim|sep/2> at the right and
     the logical right limit of the root is situated another <verbatim|sep/2>
@@ -361,7 +361,7 @@
   fraction bars), by extending them at the top or at the bottom, but the
   corresponding shift of the middle may not exceed <verbatim|2 sep>. This
   algorithm is implemented in <cpp|concater_rep::handle_matching> in
-  <verbatim|Typeset/Concat/concat_post.cpp>.
+  <source-link|Typeset/Concat/concat_post.cpp|src/Typeset/Concat/concat_post.cpp>.
 
   From a horizontal point of view, we finally have to notice that we adapted
   the metrics of the big delimiters in a way that potential scripts are
@@ -380,19 +380,19 @@
   <section|Implementation>
 
   The mathematical constructs are typeset by the routines in
-  <verbatim|Typeset/Concat/concat_math.cpp> (fractions, roots, scripts,
+  <source-link|Typeset/Concat/concat_math.cpp|src/Typeset/Concat/concat_math.cpp> (fractions, roots, scripts,
   big operators, delimiters, wide accents, <abbr|etc.>), which produce the
-  boxes implemented in <verbatim|Typeset/Boxes/Composite/math_boxes.cpp>
+  boxes implemented in <source-link|Typeset/Boxes/Composite/math_boxes.cpp|src/Typeset/Boxes/Composite/math_boxes.cpp>
   (fractions, roots, negations, wide accents) and
-  <verbatim|Typeset/Boxes/Composite/script_boxes.cpp> (scripts and limits).
+  <source-link|Typeset/Boxes/Composite/script_boxes.cpp|src/Typeset/Boxes/Composite/script_boxes.cpp> (scripts and limits).
   Brackets are resized in a post-processing step, in
-  <verbatim|Typeset/Concat/concat_post.cpp>, once the entire line is known.
+  <source-link|Typeset/Concat/concat_post.cpp|src/Typeset/Concat/concat_post.cpp>, once the entire line is known.
   The spacing between symbols depends on their types (operators,
   relations, <abbr|etc.>), as provided by the mathematical language (see
-  <verbatim|System/Language/math_language.cpp> and the grammar
-  <verbatim|progs/language/std-math.scm>), and on spacing tables provided
+  <source-link|System/Language/math_language.cpp|src/System/Language/math_language.cpp> and the grammar
+  <source-link|progs/language/std-math.scm|TeXmacs/progs/language/std-math.scm>), and on spacing tables provided
   by the font. Notice that the directory
-  <verbatim|Graphics/Mathematics> is unrelated to mathematical typesetting:
+  <source-link|Graphics/Mathematics|src/Graphics/Mathematics> is unrelated to mathematical typesetting:
   it contains generic templates for polynomials, vectors, matrices and
   formal expressions.
 

@@ -27,7 +27,7 @@
 
   The routine which re-establishes the <markup|concat> invariants is
   <cpp|edit_text_rep::correct_concat (p, done)>
-  (<verbatim|Edit/Modify/edit_text.cpp>). Starting from the child
+  (<source-link|Edit/Modify/edit_text.cpp|src/Edit/Modify/edit_text.cpp>). Starting from the child
   <cpp|done>, it removes empty strings, joins adjacent strings, flattens
   nested <markup|concat> nodes, splits off multi-paragraph children into
   separate paragraphs, and replaces a <markup|concat> of arity 0 or 1 by
@@ -41,7 +41,7 @@
 
   <paragraph|<cpp|insert_tree (t, p_in_t)>.>This is the workhorse of all
   insertions (<scm|cpp-insert-go-to>, <scm|insert-raw-go-to>, and via
-  <scm|insert> in <verbatim|utils/library/cpp-wrap.scm>). It inserts the
+  <scm|insert> in <source-link|utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm>). It inserts the
   tree <cpp|t> at the cursor and puts the cursor at the position
   <cpp|p_in_t> inside the inserted copy. Unless the look and feel is
   <name|Emacs>, it first deletes the selection (<cpp|selection_cut
@@ -83,7 +83,7 @@
   the next one.
 
   The two routines <cpp|make_return_before> and <cpp|make_return_after> of
-  <verbatim|edit_dynamic.cpp> (<scm|make-return-before>,
+  <source-link|edit_dynamic.cpp|src/Edit/Modify/edit_dynamic.cpp> (<scm|make-return-before>,
   <scm|make-return-after>) move the cursor to the start or the end of the
   enclosing paragraph and insert a paragraph break there; they are used to
   put block content in a paragraph of its own.
@@ -102,7 +102,7 @@
 
   <paragraph|<cpp|make_compound (l, n)>.>This is the generic constructor
   behind <scm|make> (<scm|cpp-make>, <scm|cpp-make-arity>), in
-  <verbatim|edit_dynamic.cpp>. Given a tag and an optional arity it
+  <source-link|edit_dynamic.cpp|src/Edit/Modify/edit_dynamic.cpp>. Given a tag and an optional arity it
 
   <\enumerate>
     <item>determines the smallest correct arity from the <abbr|DRD> if none
@@ -135,7 +135,7 @@
 
   It also sets a footer message which explains how to insert arguments or
   activate the tag. On the <scheme> side, <scm|make> has several
-  overloads in <verbatim|utils/library/cpp-wrap.scm>: <markup|with>-like
+  overloads in <source-link|utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm>: <markup|with>-like
   tags and inline tags wrap the selection themselves, and tags listed by
   <scm|make-wrapped-tag-list> cut the selection to a temporary clipboard
   and paste it inside.
@@ -168,7 +168,7 @@
   instead when a table selection is active.
 
   <paragraph|Hybrid commands.>Typing a backslash inserts a
-  <markup|hybrid> tag (<verbatim|generic/generic-kbd.scm>) (<cpp|make_hybrid>, <scm|cpp-make-hybrid>) in which
+  <markup|hybrid> tag (<source-link|generic/generic-kbd.scm|TeXmacs/progs/generic/generic-kbd.scm>) (<cpp|make_hybrid>, <scm|cpp-make-hybrid>) in which
   the user types a name. <cpp|activate_hybrid> (<scm|activate-hybrid>)
   then decides what it means: a <LaTeX> command known to the keyboard
   tables (<cpp|activate_latex>, which looks the name up with
@@ -178,7 +178,7 @@
   (inserted as <markup|value>). <cpp|activate_symbol> does the same for
   <markup|symbol> tags.
 
-  <paragraph|Mathematics.>The constructors of <verbatim|edit_math.cpp>
+  <paragraph|Mathematics.>The constructors of <source-link|edit_math.cpp|src/Edit/Modify/edit_math.cpp>
   (<cpp|make_fraction>, <cpp|make_sqrt>, <cpp|make_var_sqrt>,
   <cpp|make_script>, <cpp|make_lprime>, <cpp|make_rprime>,
   <cpp|make_below>, <cpp|make_above>, <cpp|make_wide>,
@@ -190,17 +190,17 @@
   accumulated: typing a prime right after a prime extends the existing
   <markup|rprime>. <cpp|make_script> does nothing in an empty script and
   moves to the end of an existing script of the same kind. The <scheme>
-  wrappers are in <verbatim|utils/library/cpp-wrap.scm> and are called by
-  the math keyboard and menus (<verbatim|math/math-kbd.scm>,
-  <verbatim|math/math-menu.scm>); the semantic math editor in
-  <verbatim|math/math-sem-edit.scm> overrides some of them.
+  wrappers are in <source-link|utils/library/cpp-wrap.scm|TeXmacs/progs/utils/library/cpp-wrap.scm> and are called by
+  the math keyboard and menus (<source-link|math/math-kbd.scm|TeXmacs/progs/math/math-kbd.scm>,
+  <source-link|math/math-menu.scm|TeXmacs/progs/math/math-menu.scm>); the semantic math editor in
+  <source-link|math/math-sem-edit.scm|TeXmacs/progs/math/math-sem-edit.scm> overrides some of them.
 
   <section|Deleting>
 
   <subsection|The deletion point>
 
   <cpp|remove_text (forward)> (<scm|remove-text>) is the default action of
-  backspace and delete. It is implemented in <verbatim|edit_delete.cpp> as
+  backspace and delete. It is implemented in <source-link|edit_delete.cpp|src/Edit/Modify/edit_delete.cpp> as
   <cpp|remove_text_sub>, followed by <cpp|empty_document_fix>, which
   inserts an empty paragraph if the document no longer contains any
   accessible position.
@@ -269,7 +269,7 @@
 
   <cpp|remove_structure_upwards> (<scm|remove-structure-upwards>, the
   <em|Delete> entry of the focus tag menu in
-  <verbatim|generic/generic-menu.scm>, and the action of several
+  <source-link|generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>, and the action of several
   <scm|kbd-remove> overloads) removes the innermost non formatting tag
   around the cursor while keeping the argument that contains the cursor:
   the other arguments are deleted, the tag node is removed with
@@ -296,7 +296,7 @@
 
     <item>Merging spaces ignores the unit of the new space. In
     <cpp|edit_text_rep::make_space (tree u)>
-    (<verbatim|Edit/Modify/edit_text.cpp:293>) the unit of each argument of
+    (<source-link|Edit/Modify/edit_text.cpp:293|src/Edit/Modify/edit_text.cpp:293>) the unit of each argument of
     the existing space is compared with the unit of its <em|own> first
     argument (<cpp|get_unit (t[0])>) instead of with the unit of the new
     space <cpp|u[i]>, so the test always succeeds for spaces of the same
@@ -306,20 +306,20 @@
 
     <item><cpp|remove_structure> reads an uninitialized variable in the
     backward direction: the inner declaration <cpp|int pos= max (start-1,
-    0)> (<verbatim|Edit/Modify/edit_delete.cpp:329>) shadows the outer
+    0)> (<source-link|Edit/Modify/edit_delete.cpp:329|src/Edit/Modify/edit_delete.cpp:329>) shadows the outer
     <cpp|pos>, and the following <cpp|end= pos> uses the outer, never
     assigned one. The routine is only reachable through the glue
     (<scm|remove-structure>).
 
     <item><cpp|make_return_before> compares the number of paragraphs with
-    <cpp|q-\<gtr\>item+1> (<verbatim|Edit/Modify/edit_dynamic.cpp:646>),
+    <cpp|q-\<gtr\>item+1> (<source-link|Edit/Modify/edit_dynamic.cpp:646|src/Edit/Modify/edit_dynamic.cpp:646>),
     that is, with the <em|first> item of the path (the index of the buffer
     in the global tree) instead of the index of the paragraph
     (<cpp|last_item (q)>). The test whether the cursor is in the last
     paragraph is therefore wrong in general.
 
     <item>The <scheme> wrapper <scm|(make-script r? sup?)>
-    (<verbatim|utils/library/cpp-wrap.scm:93>) names its parameters in the
+    (<source-link|utils/library/cpp-wrap.scm:93|TeXmacs/progs/utils/library/cpp-wrap.scm:93>) names its parameters in the
     wrong order: they are passed unchanged to <cpp|make_script (sup,
     right)>, and all callers indeed use the order <em|superscript?,
     right?>.

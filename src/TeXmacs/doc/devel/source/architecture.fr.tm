@@ -28,9 +28,9 @@
     <verbatim|Prg>.
 
     <item>La partie typographique de l'éditeur dans le répertoire
-    <verbatim|src/Typeset>.
+    <source-link|src/Typeset|src/Typeset>.
 
-    <item>L'éditeur dans le répertoire <verbatim|src/Edit>.
+    <item>L'éditeur dans le répertoire <source-link|src/Edit|src/Edit>.
 
     <item>Le serveur <apply|TeXmacs> dans le répertoire
     <verbatim|src/Server>.
@@ -131,7 +131,7 @@
 
   <section|Modification du texte>
 
-  Vous trouverez dans le répertoire <verbatim|Edit/Modify> différentes
+  Vous trouverez dans le répertoire <source-link|Edit/Modify|src/Edit/Modify> différentes
   routines de modification de l'arbre d'édition. Les modifications se
   déroulent en plusieurs étapes :
 

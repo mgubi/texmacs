@@ -9,7 +9,7 @@
 
   A link moves bytes between <TeXmacs> and an extern program; it knows
   nothing about trees, formats or sessions. The abstract class is declared in
-  <verbatim|System/Link/tm_link.hpp>:
+  <source-link|System/Link/tm_link.hpp|src/System/Link/tm_link.hpp>:
 
   <\cpp-code>
     struct tm_link_rep: abstract_struct {
@@ -61,7 +61,7 @@
   channels are numbers: <cpp|LINK_IN> and <cpp|LINK_OUT> are both 0 (input
   to the program and its standard output), <cpp|LINK_ERR> is 1 (its standard
   error). The contract of the virtual methods, as relied upon by
-  <verbatim|connection.cpp>, is the following:
+  <source-link|connection.cpp|src/System/Link/connection.cpp>, is the following:
 
   <\explain>
     <cpp|string start ()><explain-synopsis|launch>
@@ -124,7 +124,7 @@
 
   <subsection|<name|POSIX> pipes>
 
-  <cpp|pipe_link_rep> in <verbatim|System/Link/pipe_link.cpp> holds the
+  <cpp|pipe_link_rep> in <source-link|System/Link/pipe_link.cpp|src/System/Link/pipe_link.cpp> holds the
   launch command, the process identifier, three pairs of pipe descriptors,
   the buffers <cpp|outbuf> and <cpp|errbuf>, and two socket notifiers. Its
   <cpp|start> method forks:
@@ -187,8 +187,8 @@
   <cpp|process_all_pipes> applies the command of every live pipe link (and
   of every live command line and request link), and <cpp|close_all_pipes>
   kills all processes; the latter is called by
-  <cpp|quit_texmacs_internal> in <verbatim|Texmacs/Server/tm_server.cpp> and
-  by the emergency handler in <verbatim|Texmacs/Server/tm_debug.cpp>.
+  <cpp|quit_texmacs_internal> in <source-link|Texmacs/Server/tm_server.cpp|src/Texmacs/Server/tm_server.cpp> and
+  by the emergency handler in <source-link|Texmacs/Server/tm_debug.cpp|src/Texmacs/Server/tm_debug.cpp>.
 
   On <name|Windows> (<cpp|OS_MINGW>) without <name|Qt>, all methods of
   <cpp|pipe_link_rep> are empty and <cpp|start> returns
@@ -197,11 +197,11 @@
   <subsection|<name|Qt> pipes>
 
   When <cpp|QTTEXMACS> is defined together with <cpp|OS_MINGW> or
-  <cpp|QTPIPES>, <verbatim|pipe_link.cpp> compiles to nothing and
+  <cpp|QTPIPES>, <source-link|pipe_link.cpp|src/System/Link/pipe_link.cpp> compiles to nothing and
   <cpp|make_pipe_link> is provided by
-  <verbatim|Plugins/Qt/qt_pipe_link.cpp> instead. The class
+  <source-link|Plugins/Qt/qt_pipe_link.cpp|src/Plugins/Qt/qt_pipe_link.cpp> instead. The class
   <cpp|qt_pipe_link_rep> delegates to a <cpp|QTMPipeLink>, a subclass of
-  <cpp|QProcess> declared in <verbatim|Plugins/Qt/QTMPipeLink.hpp> which
+  <cpp|QProcess> declared in <source-link|Plugins/Qt/QTMPipeLink.hpp|src/Plugins/Qt/QTMPipeLink.hpp> which
   holds the command and the two buffers. The differences with the
   <name|POSIX> implementation are significant:
 
@@ -249,9 +249,9 @@
   <section|Dynamic libraries>
 
   A plug-in configured with <scm|(:link <em|lib> <em|symbol> <em|init>)>
-  uses a <cpp|dyn_link_rep> (<verbatim|System/Link/dyn_link.cpp>). The
+  uses a <cpp|dyn_link_rep> (<source-link|System/Link/dyn_link.cpp|src/System/Link/dyn_link.cpp>). The
   interface between <TeXmacs> and the library is declared in
-  <verbatim|src/TeXmacs/include/TeXmacs.h> and documented from the point of
+  <source-link|src/TeXmacs/include/TeXmacs.h|TeXmacs/include/TeXmacs.h> and documented from the point of
   view of the library in <hlink|dynamic libraries|../interface/interface-dynlibs.en.tm>
   and <hlink|dynamic linking|../plugin/dynlibs.en.tm>.
 
@@ -288,7 +288,7 @@
 
   <section|Command lines and requests>
 
-  <cpp|cmdline_link_rep> (<verbatim|System/Link/cmdline_link.cpp>) starts a
+  <cpp|cmdline_link_rep> (<source-link|System/Link/cmdline_link.cpp|src/System/Link/cmdline_link.cpp>) starts a
   new process for every request. Its <cpp|start> method only clears the
   buffers and returns <verbatim|"cmdline">. Its <cpp|write> method replaces
   newlines in the input by spaces, asks <scheme> for the command line with
@@ -305,7 +305,7 @@
   <cpp|listen (1)> on these links, which waits at most one millisecond for
   data.
 
-  <cpp|request_link_rep> (<verbatim|System/Link/request_link.cpp>) is
+  <cpp|request_link_rep> (<source-link|System/Link/request_link.cpp|src/System/Link/request_link.cpp>) is
   similar, but the request is a <scheme> expression returned by
   <scm|connection-request>. The only request which is understood is
 
@@ -314,7 +314,7 @@
   </scm-code>
 
   which is passed to <cpp|async_http_post_json>
-  (<verbatim|System/Files/web_files.cpp>). The latter builds a shell command
+  (<source-link|System/Files/web_files.cpp|src/System/Files/web_files.cpp>). The latter builds a shell command
   (with <cpp|to_shell_command>) and runs it with <cpp|async_eval_system>,
   which starts it with <cpp|popen> and reads its output in a detached
   thread. When the thread has finished, <cpp|async_eval_pending>, called from
@@ -329,7 +329,7 @@
 
   <subsection|Socket notifiers>
 
-  <verbatim|System/Link/socket_notifier.cpp> maintains a set of
+  <source-link|System/Link/socket_notifier.cpp|src/System/Link/socket_notifier.cpp> maintains a set of
   <cpp|socket_notifier> objects, each consisting of a file descriptor and a
   <cpp|command>. <cpp|add_notifier> and <cpp|remove_notifier> manage the
   set, and <cpp|perform_select> repeatedly calls <cpp|select> with a zero
@@ -360,7 +360,7 @@
 
   <section|Sockets>
 
-  The header <verbatim|tm_link.hpp> declares the functions
+  The header <source-link|tm_link.hpp|src/System/Link/tm_link.hpp> declares the functions
   <cpp|make_socket_link>, <cpp|make_socket_server>,
   <cpp|find_socket_link>, <cpp|close_all_sockets> and
   <cpp|close_all_servers>, but none of them is defined anywhere in the
@@ -373,7 +373,7 @@
 
   The client/server code of the collaboration tools does have a working
   socket link: the class <cpp|socket_link_rep> in
-  <verbatim|Plugins/Qt/QTMSockets.hpp>, which derives from both
+  <source-link|Plugins/Qt/QTMSockets.hpp|src/Plugins/Qt/QTMSockets.hpp>, which derives from both
   <cpp|QObject> and <cpp|tm_link_rep>, uses <cpp|QSocketNotifier> objects and
   applies <cpp|feed_cmd> when data arrives. It is only available in
   <name|Qt> builds and is used through the packet interface (see
@@ -391,7 +391,7 @@
     <verbatim|"ok">, <cpp|read> must return and clear the buffered data
     without blocking, and the link must set <cpp|alive> to <cpp|false> when
     the peer disappears. Provide a factory function, declared in
-    <verbatim|tm_link.hpp>.
+    <source-link|tm_link.hpp|src/System/Link/tm_link.hpp>.
 
     <item><em|Delivery of the output.> Make sure that
     <cpp|apply_command> is called when data has been buffered. The simplest
@@ -409,11 +409,11 @@
     closed when <TeXmacs> exits.
 
     <item><em|The connection.> Add a branch to <cpp|connection_start> in
-    <verbatim|System/Link/connection.cpp> which recognizes the launcher
+    <source-link|System/Link/connection.cpp|src/System/Link/connection.cpp> which recognizes the launcher
     description and creates the link.
 
     <item><em|The configuration.> Add a clause to
-    <scm|plugin-configure-cmd> in <verbatim|kernel/texmacs/tm-plugins.scm>
+    <scm|plugin-configure-cmd> in <source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>
     which turns the new option into a launcher description with
     <scm|connection-setup>, and document the option in <hlink|the summary
     of configuration options|../plugin/plugin-config.en.tm>. If the option

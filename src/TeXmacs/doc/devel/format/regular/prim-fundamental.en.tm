@@ -51,7 +51,7 @@
 
     This primitive is not yet fully implemented: the current typesetter
     (<verbatim|concater_rep::typeset_paragraph> in
-    <verbatim|Typeset/Concat/concat_text.cpp>) only formats the first unit
+    <source-link|Typeset/Concat/concat_text.cpp|src/Typeset/Concat/concat_text.cpp>) only formats the first unit
     <src-arg|unit-1> as a paragraph and ignores the others.
   </explain>
 

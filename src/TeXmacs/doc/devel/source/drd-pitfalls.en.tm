@@ -18,7 +18,7 @@
 
     <item*|Physical indices>All low-level setters (<cpp|set_type (l, nr,
     tp)>, <cpp|set_accessible>, ...), the declaration methods of
-    <verbatim|drd_std.cpp> and the numeric arguments of
+    <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp> and the numeric arguments of
     <markup|drd-props> designate <em|records>, not children. With
     <verbatim|CHILD_BIFORM> there are only two records; with
     <verbatim|ARITY_VAR_REPEAT>, record <math|0> is the repeated group.
@@ -69,7 +69,7 @@
     leaves the editor in the wrong mode.
 
     <item*|Memoized logic queries><scm|logic-holds?>, <scm|logic-apply> and
-    <scm|logic-apply-list> (<verbatim|kernel/logic/logic-data.scm>) cache
+    <scm|logic-apply-list> (<source-link|kernel/logic/logic-data.scm|TeXmacs/progs/kernel/logic/logic-data.scm>) cache
     their results in hash tables which are never cleared. Rules added after
     a query (for instance by a lazily loaded module) are invisible for
     queries already answered; declare logic tables before they are first
@@ -93,7 +93,7 @@
 
   <\description-paragraphs>
     <item*|<verbatim|drd-props> border <verbatim|no>
-    (<verbatim|Typeset/Env/env_exec.cpp:753>)>The value <verbatim|no> sets
+    (<source-link|Typeset/Env/env_exec.cpp:753|src/Typeset/Env/env_exec.cpp:753>)>The value <verbatim|no> sets
     <verbatim|BORDER_INNER> instead of <verbatim|BORDER_NO>, so the 64 or
     so declarations <verbatim|border\|no> in the standard packages behave
     like <verbatim|border\|inner>. (Reported.)
@@ -102,12 +102,12 @@
     (<verbatim|Data/Drd/drd_std.cpp:380-383>)><markup|minimum> is declared
     with <cpp|repeat (2, 1)> and <markup|maximum> with <cpp|repeat (1,
     1)>. Since both are in the group <scm|binary-operation-tag>
-    (<verbatim|utils/edit/variants.scm>), turning a one-argument
+    (<source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>), turning a one-argument
     <markup|maximum> into a <markup|minimum> with the variant menu yields a
     tree of invalid arity. (Reported.)
 
     <item*|Variable type uses the with-like freeze bit
-    (<verbatim|Data/Drd/drd_info.cpp:314>, <verbatim|:329>)><cpp|set_var_type>
+    (<source-link|Data/Drd/drd_info.cpp:314|src/Data/Drd/drd_info.cpp:314>, <verbatim|:329>)><cpp|set_var_type>
     tests <cpp|freeze_with> and <cpp|freeze_var_type> sets
     <cpp|freeze_with> instead of <cpp|freeze_var_type>. Declaring
     <verbatim|parameter> or <verbatim|macro-parameter> therefore freezes
@@ -126,7 +126,7 @@
     <cpp|frozen> argument suggests.
 
     <item*|Wrong child in two declarations
-    (<verbatim|Data/Drd/drd_std.cpp:539>, <verbatim|:972>)>For
+    (<source-link|Data/Drd/drd_std.cpp:539|src/Data/Drd/drd_std.cpp:539>, <verbatim|:972>)>For
     <markup|script>, <cpp|name (0, "arguments")> overwrites the name
     <verbatim|function> of child <math|0> (child <math|1> was probably
     meant). For <markup|set>, <cpp|variable (0) -\<gtr\> regular (0)>
@@ -134,7 +134,7 @@
     was meant).
 
     <item*|Type of <src-var|no-patterns>
-    (<verbatim|Data/Drd/drd_std.cpp:1047>)>Declared as a color although
+    (<source-link|Data/Drd/drd_std.cpp:1047|src/Data/Drd/drd_std.cpp:1047>)>Declared as a color although
     its value is a boolean.
 
     <item*|Type names are not symmetric
@@ -144,7 +144,7 @@
     encoded, so it cannot be used in <markup|drd-props>.
 
     <item*|Queries modify the DRD
-    (<verbatim|Data/Drd/drd_info.cpp:476>, <verbatim|540>,
+    (<source-link|Data/Drd/drd_info.cpp:476|src/Data/Drd/drd_info.cpp:476>, <verbatim|540>,
     <verbatim|604>, <verbatim|641>, <verbatim|654>)>For an
     <markup|extern> tree whose function has no record, the getters
     execute <cpp|ti= info(EXTERN); info(lab)= ti;>. This writes into the
@@ -159,7 +159,7 @@
     itself.
 
     <item*|Sharing of the cached style DRD
-    (<verbatim|Edit/Editor/edit_typeset.cpp:284>)>When a style is not
+    (<source-link|Edit/Editor/edit_typeset.cpp:284|src/Edit/Editor/edit_typeset.cpp:284>)>When a style is not
     found in the cache, <cpp|typeset_style_use_cache> replaces the editor
     <abbr|DRD> by the object returned by <cpp|get_style_drd>, which is
     also stored in <cpp|drd_cached>. The subsequent
@@ -168,18 +168,18 @@
     <abbr|DRD>, which is later returned by <cpp|get_style_drd> to other
     users (<cpp|get_document_drd>, widgets). The serialized cache is
     written before these modifications, so editors which hit the cache
-    are not affected. The code at <verbatim|Texmacs/Window/tm_button.cpp:58>
+    are not affected. The code at <source-link|Texmacs/Window/tm_button.cpp:58|src/Texmacs/Window/tm_button.cpp:58>
     has the same structure.
 
     <item*|Unused or unimplemented declarations>The parent and child
     <cpp|block> fields are never set nor read; the methods
     <cpp|set_block>, <cpp|get_block> and <cpp|freeze_block> (both
     overloads) and <cpp|drd_info::operator tree> are declared in
-    <verbatim|drd_info.hpp> but not defined. The macro <cpp|macro (i)> of
-    <verbatim|drd_std.cpp:25> refers to a non-existent
+    <source-link|drd_info.hpp|src/Data/Drd/drd_info.hpp> but not defined. The macro <cpp|macro (i)> of
+    <source-link|drd_std.cpp:25|src/Data/Drd/drd_std.cpp:25> refers to a non-existent
     <verbatim|TYPE_MACRO>.
 
-    <item*|Outdated comments (<verbatim|Data/Drd/tag_info.hpp:62>,
+    <item*|Outdated comments (<source-link|Data/Drd/tag_info.hpp:62|src/Data/Drd/tag_info.hpp:62>,
     <verbatim|:150>)>The comment on <verbatim|ARITY_OPTIONS> gives a strict
     upper bound whereas <cpp|correct_arity> uses
     <math|base\<leqslant\>n\<leqslant\>base+extra>; the comment on
@@ -187,14 +187,14 @@
     <verbatim|MODE_PARENT>, which has been replaced by <cpp|env>.
 
     <item*|Mode stored in a <cpp|bool>
-    (<verbatim|Data/Tree/tree_traverse.cpp:284>)><cpp|move_valid_bis>
+    (<source-link|Data/Tree/tree_traverse.cpp:284|src/Data/Tree/tree_traverse.cpp:284>)><cpp|move_valid_bis>
     saves the result of <cpp|set_access_mode> in a <cpp|bool>, which
     would restore <verbatim|DRD_ACCESS_SOURCE> as
     <verbatim|DRD_ACCESS_HIDDEN>. It is harmless in practice because the
     branch is not reached in source mode.
 
     <item*|Suspicious return value
-    (<verbatim|Data/Drd/drd_info.cpp:412>)>For an <markup|or-value> tree,
+    (<source-link|Data/Drd/drd_info.cpp:412|src/Data/Drd/drd_info.cpp:412>)>For an <markup|or-value> tree,
     <cpp|get_syntax (tree, path)> returns the tree itself instead of the
     syntax <verbatim|r> which it has just found. This may be intentional.
 
@@ -205,7 +205,7 @@
   <subsection|In style packages>
 
   <\description-paragraphs>
-    <item*|<verbatim|packages/customize/math/math-check.ts>>The declaration
+    <item*|<source-link|packages/customize/math/math-check.ts|TeXmacs/packages/customize/math/math-check.ts>>The declaration
     <verbatim|\<less\>drd-props\|extern:math-check\|with-like\|true\|arity\|1\|accessible\|all\|regular\|all\<gtr\>>
     uses <verbatim|true>, which is not a recognized value (only
     <verbatim|yes> and <verbatim|no> are), and declares an arity of
@@ -215,7 +215,7 @@
     accessible, which is probably the opposite of what was intended. The
     same holds for <verbatim|extern:math-check-table>.
 
-    <item*|<verbatim|packages/documentation/standard/scheme-api.ts>>The
+    <item*|<source-link|packages/documentation/standard/scheme-api.ts|TeXmacs/packages/documentation/standard/scheme-api.ts>>The
     property <verbatim|accesible> (sic) in the declaration of
     <markup|doc-module-header-body> is ignored.
   </description-paragraphs>

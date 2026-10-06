@@ -7,13 +7,13 @@
 
   <TeXmacs> hyphenates words with Liang's algorithm, the one used by <TeX>,
   and with the same pattern files. The implementation is in
-  <verbatim|System/Language/hyphenate.cpp>; the text languages of
-  <verbatim|text_language.cpp> load the patterns in their constructors and
+  <source-link|System/Language/hyphenate.cpp|src/System/Language/hyphenate.cpp>; the text languages of
+  <source-link|text_language.cpp|src/System/Language/text_language.cpp> load the patterns in their constructors and
   call the algorithm from <cpp|get_hyphens> and <cpp|hyphenate>.
 
   <section|Pattern files>
 
-  The patterns live in <verbatim|src/TeXmacs/langs/natural/hyphen/> as
+  The patterns live in <source-link|src/TeXmacs/langs/natural/hyphen/|TeXmacs/langs/natural/hyphen> as
   files <verbatim|hyphen.<em|name>>, where <em|name> is the second argument
   given to the language constructor in <cpp|text_language> (for instance
   <verbatim|us> for English and <verbatim|ukenglish> for British English).
@@ -102,7 +102,7 @@
   <section|Use by the line breaker>
 
   The concatenation typesetter stores the language in every string line
-  item. When the line breaker (<verbatim|Typeset/Line/line_breaker.cpp>)
+  item. When the line breaker (<source-link|Typeset/Line/line_breaker.cpp|src/Typeset/Line/line_breaker.cpp>)
   looks for break points inside a word that does not fit, it calls
   <cpp|item-\<gtr\>lan-\<gtr\>get_hyphens (s)> and tries the positions
   with a penalty below <verbatim|HYPH_INVALID>, splitting the item with
@@ -119,7 +119,7 @@
     <verbatim|hyphen.ukenglish> the exception list ends with
     <verbatim|some-thing}>, so the exception is stored under the key
     <verbatim|something}> and never matches; the comment in
-    <verbatim|hyphenate.cpp> (\Pbug: shows the hyphenation something}
+    <source-link|hyphenate.cpp|src/System/Language/hyphenate.cpp> (\Pbug: shows the hyphenation something}
     --\<gtr\> some-thing}\Q) refers to this. Exceptions and patterns
     which come after such a token would also be misclassified.
 

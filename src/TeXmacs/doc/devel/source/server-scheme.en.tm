@@ -11,20 +11,20 @@
   programmed there. This page relates the three levels:
 
   <\enumerate>
-    <item>the <c++> routines of <verbatim|Texmacs/Data/>, of the server and
+    <item>the <c++> routines of <source-link|Texmacs/Data/|src/Texmacs/Data>, of the server and
     of the editor;
 
     <item>the <em|glue> routines, which export them under <scheme> names
-    and are generated from the files <verbatim|build-glue-basic.scm>,
-    <verbatim|build-glue-server.scm> and <verbatim|build-glue-editor.scm>
-    of <verbatim|src/src/Scheme/Glue/> (see <hlink|the <scheme>
+    and are generated from the files <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>,
+    <source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm> and <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>
+    of <source-link|src/src/Scheme/Glue/|src/Scheme/Glue> (see <hlink|the <scheme>
     interpreter and the glue|scheme-bridge.en.tm>);
 
     <item>the <scheme> library and the user level commands, in
-    <verbatim|kernel/library/base.scm>,
-    <verbatim|texmacs/texmacs/tm-files.scm> and
-    <verbatim|texmacs/texmacs/tm-server.scm> (relative to
-    <verbatim|src/TeXmacs/progs/>).
+    <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>,
+    <source-link|texmacs/texmacs/tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm> and
+    <source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm> (relative to
+    <source-link|src/TeXmacs/progs/|TeXmacs/progs>).
   </enumerate>
 
   The user level documentation of the <scheme> functions is in
@@ -39,18 +39,18 @@
   are called:
 
   <\description>
-    <item*|<verbatim|build-glue-basic.scm>>Free functions, without a
+    <item*|<source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>Free functions, without a
     receiver. Among those are all buffer, view, window and project routines
-    of <verbatim|Texmacs/Data/> (the block starting with the comment
+    of <source-link|Texmacs/Data/|src/Texmacs/Data> (the block starting with the comment
     <verbatim|;; buffers> in that file). They take buffer names, view
     and window <abbr|URL>s as arguments and therefore work on any buffer.
 
-    <item*|<verbatim|build-glue-server.scm>>Routines called as
+    <item*|<source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm>>Routines called as
     <cpp|get_server()-\<gtr\>...>. Those which concern windows (properties,
     bars, zoom, footer, dialogs) act on the window of the <em|current
     view>.
 
-    <item*|<verbatim|build-glue-editor.scm>>Routines called as
+    <item*|<source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>>Routines called as
     <cpp|get_current_editor()-\<gtr\>...>: all editing commands, the
     cursor, the selection, the undo history and the environment at the
     cursor. They always act on the <em|current view>.
@@ -117,11 +117,11 @@
     <scm|alt-window-get-size>, <scm|alt-window-set-size>,
     <scm|alt-window-get-position>, <scm|alt-window-set-position> and
     <scm|alt-window-search>, which wraps the functions at the end of
-    <verbatim|tm_window.hpp>; these use integer handles, except
+    <source-link|tm_window.hpp|src/Texmacs/tm_window.hpp>; these use integer handles, except
     <scm|alt-window-search>, which maps a buffer name to the list of handles
     of its windows; see <hlink|alternative windows|server-windows.en.tm>.
 
-    <item*|Server and current window>(<verbatim|build-glue-server.scm>)
+    <item*|Server and current window>(<source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm>)
     <scm|window-get-serial>, <scm|window-set-property>,
     <scm|window-get-property>, <scm|show-header>, <scm|show-icon-bar>,
     <scm|show-side-tools>, <scm|show-bottom-tools>, <scm|show-footer>,
@@ -131,7 +131,7 @@
     <scm|set-variant-keys>, <scm|kbd-system-rewrite>,
     <scm|update-all-buffers>, <scm|quit-TeXmacs>, ...
 
-    <item*|Current editor>(<verbatim|build-glue-editor.scm>)
+    <item*|Current editor>(<source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>)
     <scm|root-tree>, <scm|buffer-path>, <scm|buffer-tree>,
     <scm|cursor-path>, <scm|key-press>, <scm|mouse-any>,
     <scm|get-input-mode>, <scm|get-env>, <scm|go-to-path>, the selection
@@ -145,7 +145,7 @@
   <section|Convenience wrappers>
 
   Several glue routines return <cpp|url_none ()> or the empty <abbr|URL>
-  when there is no answer. The library <verbatim|kernel/library/base.scm>
+  when there is no answer. The library <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>
   defines wrappers which return <scm|#f> in that case, and which most
   <scheme> code uses: <scm|current-buffer>, <scm|current-view>,
   <scm|window-\<gtr\>buffer>, <scm|view-\<gtr\>window>,
@@ -163,50 +163,50 @@
   <\description>
     <item*|Loading><scm|load-buffer>, <scm|load-buffer-in-new-window>,
     <scm|load-browse-buffer>, <scm|open-buffer> (with a file chooser),
-    <scm|revert-buffer>, <scm|open-auxiliary> (<verbatim|tm-files.scm>);
+    <scm|revert-buffer>, <scm|open-auxiliary> (<source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>);
     see <hlink|loading|server-buffers.en.tm>.
 
     <item*|Saving><scm|save-buffer>, <scm|save-buffer-as>,
     <scm|export-buffer>, <scm|autosave-buffer>, <scm|autosave-all>
-    (<verbatim|tm-files.scm>); see <hlink|saving and
+    (<source-link|tm-files.scm|TeXmacs/progs/texmacs/texmacs/tm-files.scm>); see <hlink|saving and
     exporting|server-buffers.en.tm>.
 
     <item*|Closing><scm|safely-kill-buffer>, <scm|safely-kill-window>,
     <scm|safely-quit-TeXmacs>, <scm|buffer-close>
-    (<verbatim|tm-server.scm>); see <hlink|closing a
+    (<source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>); see <hlink|closing a
     buffer|server-buffers.en.tm> and <hlink|closing
     windows|server-windows.en.tm>.
 
     <item*|Policy><scm|new-document>, <scm|new-document*>,
-    <scm|close-document>, <scm|close-document*> (<verbatim|tm-server.scm>)
+    <scm|close-document>, <scm|close-document*> (<source-link|tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>)
     choose between the buffer and the window versions of these commands
     according to the <verbatim|buffer management> preference
     (<scm|window-per-buffer?>).
   </description>
 
   New code should normally call the user level commands when it acts on
-  behalf of the user, and the glue routines (or the <verbatim|base.scm>
+  behalf of the user, and the glue routines (or the <source-link|base.scm|TeXmacs/progs/kernel/library/base.scm>
   wrappers) when it manipulates buffers programmatically, for instance to
   build an auxiliary document in the background without showing it.
 
   <section|Exporting a new routine>
 
-  A new routine of <verbatim|Texmacs/Data/> is exported by declaring it in
-  the corresponding header (<verbatim|new_buffer.hpp>,
-  <verbatim|new_view.hpp>, <verbatim|new_window.hpp>) and adding a line
+  A new routine of <source-link|Texmacs/Data/|src/Texmacs/Data> is exported by declaring it in
+  the corresponding header (<source-link|new_buffer.hpp|src/Texmacs/Data/new_buffer.hpp>,
+  <source-link|new_view.hpp|src/Texmacs/Data/new_view.hpp>, <source-link|new_window.hpp|src/Texmacs/Data/new_window.hpp>) and adding a line
   such as
 
   <\scm-code>
     (buffer-has-name? buffer_has_name (bool url))
   </scm-code>
 
-  to the buffer block of <verbatim|build-glue-basic.scm>. A new editing
+  to the buffer block of <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>. A new editing
   command is declared as a pure virtual method of <cpp|editor_rep>,
   implemented in the appropriate <verbatim|edit_*_rep> class (see
   <hlink|the editor classes|server-editor.en.tm>) and added to
-  <verbatim|build-glue-editor.scm>; a new routine of the server is added
+  <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm>; a new routine of the server is added
   to <cpp|server_rep>, implemented in one of the three server classes
-  and added to <verbatim|build-glue-server.scm>. In all cases the glue
+  and added to <source-link|build-glue-server.scm|src/Scheme/Glue/build-glue-server.scm>. In all cases the glue
   has to be regenerated (see <hlink|the <c++>/<scheme>
   glue|scheme-bridge.en.tm>).
 

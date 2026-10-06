@@ -35,7 +35,7 @@
   </explain>
 
   <cpp|unicode_font_rep::get_feature_variant>
-  (<verbatim|Plugins/Freetype/unicode_font.cpp>) implements it: it looks
+  (<source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>) implements it: it looks
   up the glyph id of <var|s>, asks the face for the map of the feature
   (<cpp|tt_face_rep::gsub_feature>, which parses it on first use and caches
   it per tag) and returns the requested alternate if there is one. A single
@@ -52,7 +52,7 @@
 
   Most callers do not want one glyph but a whole font in which every glyph
   is replaced by its substitute. This is the decorator
-  <cpp|feature_font_rep> of <verbatim|Graphics/Fonts/feature_font.cpp>:
+  <cpp|feature_font_rep> of <source-link|Graphics/Fonts/feature_font.cpp|src/Graphics/Fonts/feature_font.cpp>:
 
   <\explain>
     <cpp|font feature_font (font base, string feature, int alt)><explain-synopsis|a
@@ -77,10 +77,10 @@
   <section|The variable font-features>
 
   The value of <src-var|font-features> (default empty,
-  <verbatim|Typeset/Env/env_default.cpp>) is a comma separated list of
+  <source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>) is a comma separated list of
   feature tags, each optionally followed by <verbatim|=<var|n>> to select
   the <var|n>-th alternate. <cpp|edit_env_rep::update_font>
-  (<verbatim|Typeset/Env/env_semantics.cpp>) applies it with
+  (<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>) applies it with
 
   <\explain>
     <cpp|font apply_features (font fn, string features)><explain-synopsis|the
@@ -99,7 +99,7 @@
   below), then the features of <src-var|font-features>, then the effects of
   <src-var|font-effects>.
 
-  On the <scheme> side, <verbatim|progs/fonts/font-features.scm> holds the
+  On the <scheme> side, <source-link|progs/fonts/font-features.scm|TeXmacs/progs/fonts/font-features.scm> holds the
   table of the features which the menus propose
   (<scm|font-feature-table>: the figure styles, <verbatim|zero>, the
   capital forms, <verbatim|hist>, <verbatim|swsh>, <verbatim|salt>,
@@ -114,7 +114,7 @@
   environment; turning on one figure style or spacing turns off its
   opposite (<verbatim|onum> and <verbatim|lnum>, <verbatim|tnum> and
   <verbatim|pnum>). The font browser
-  (<verbatim|progs/fonts/font-new-widgets.scm>) has a column and a tab of
+  (<source-link|progs/fonts/font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>) has a column and a tab of
   toggles, <scm|font-features-selector>, which lists the features of the
   font the dialog has selected (<scm|selector-font-features-available>,
   through the logical font of the sample text) and keeps the choice in the
@@ -141,7 +141,7 @@
 
     <item*|<verbatim|dtls>, dotless letters>An accent over <math|i> or
     <math|j> should sit on a dotless letter. <cpp|concater_rep::typeset_wide>
-    (<verbatim|Typeset/Concat/concat_math.cpp>) replaces an atomic body
+    (<source-link|Typeset/Concat/concat_math.cpp|src/Typeset/Concat/concat_math.cpp>) replaces an atomic body
     <verbatim|i> or <verbatim|j> of an accent above by its <verbatim|dtls>
     substitute when the font has a table and offers one.
 
@@ -149,7 +149,7 @@
     <verbatim|FlattenedAccentBaseHeight>, a narrow accent (one which the
     font does not stretch) is replaced by its <verbatim|flac> substitute,
     in the <name|OpenType> branch of the accent construction of
-    <verbatim|Typeset/Boxes/Composite/math_boxes.cpp>.
+    <source-link|Typeset/Boxes/Composite/math_boxes.cpp|src/Typeset/Boxes/Composite/math_boxes.cpp>.
   </description>
 
   The letters of a formula are another substitution, but not a
@@ -161,7 +161,7 @@
   <section|Pair kerning>
 
   The kerning of text is computed by the font metric of the face,
-  <cpp|tt_font_metric_rep::kerning> (<verbatim|Plugins/Freetype/tt_face.cpp>),
+  <cpp|tt_font_metric_rep::kerning> (<source-link|Plugins/Freetype/tt_face.cpp|src/Plugins/Freetype/tt_face.cpp>),
   which <cpp|unicode_font_rep::get_xpositions> and the drawing routines add
   between consecutive glyphs. <name|FreeType> only exposes the legacy
   <verbatim|kern> table, which no <name|OpenType> math font and few recent
@@ -179,25 +179,25 @@
   <section|Source files>
 
   <\description-paragraphs>
-    <item*|<verbatim|Graphics/Fonts/feature_font.cpp>><cpp|feature_font>
+    <item*|<source-link|Graphics/Fonts/feature_font.cpp|src/Graphics/Fonts/feature_font.cpp>><cpp|feature_font>
     and <cpp|apply_features>.
 
-    <item*|<verbatim|Plugins/Freetype/unicode_font.cpp>><cpp|get_feature_variant>
+    <item*|<source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>><cpp|get_feature_variant>
     and <cpp|ot_font_features>.
 
-    <item*|<verbatim|Plugins/Freetype/tt_face.cpp>, <verbatim|tt_tools.cpp>>The
+    <item*|<source-link|Plugins/Freetype/tt_face.cpp|src/Plugins/Freetype/tt_face.cpp>, <source-link|tt_tools.cpp|src/Plugins/Freetype/tt_tools.cpp>>The
     cached feature maps and the kerning, and the <verbatim|GSUB> and
     <verbatim|GPOS> readers.
 
-    <item*|<verbatim|Typeset/Env/env_semantics.cpp>><cpp|update_font>:
+    <item*|<source-link|Typeset/Env/env_semantics.cpp|src/Typeset/Env/env_semantics.cpp>><cpp|update_font>:
     script sizes, <verbatim|ssty>, <src-var|font-features>.
 
-    <item*|<verbatim|Typeset/Concat/concat_math.cpp>,
-    <verbatim|Typeset/Boxes/Composite/math_boxes.cpp>><verbatim|dtls> and
+    <item*|<source-link|Typeset/Concat/concat_math.cpp|src/Typeset/Concat/concat_math.cpp>,
+    <source-link|Typeset/Boxes/Composite/math_boxes.cpp|src/Typeset/Boxes/Composite/math_boxes.cpp>><verbatim|dtls> and
     <verbatim|flac>.
 
-    <item*|<verbatim|progs/fonts/font-features.scm>,
-    <verbatim|progs/fonts/font-new-widgets.scm>>The menus and the font
+    <item*|<source-link|progs/fonts/font-features.scm|TeXmacs/progs/fonts/font-features.scm>,
+    <source-link|progs/fonts/font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>>The menus and the font
     browser.
   </description-paragraphs>
 

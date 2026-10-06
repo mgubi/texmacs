@@ -18,7 +18,7 @@
   </scm-code>
 
   The macro <scm|plugin-configure> is defined in
-  <verbatim|kernel/texmacs/tm-plugins.scm>. Each option is a list whose
+  <source-link|kernel/texmacs/tm-plugins.scm|TeXmacs/progs/kernel/texmacs/tm-plugins.scm>. Each option is a list whose
   first element is a keyword; the options are processed <em|in order> by
   <scm|plugin-configure-cmd>. After each option, the processing stops as
   soon as the plug-in is known to be unsupported (that is, as soon as the
@@ -241,7 +241,7 @@
     the <TeXmacs> tree to be inserted as output. This connection type is
     used by the <name|AI> plug-ins (<verbatim|chatgpt>, <verbatim|gemini>,
     <verbatim|ollama>, <abbr|etc.>), which are all declared in
-    <verbatim|plugins/ai/progs/init-ai.scm>.
+    <source-link|plugins/ai/progs/init-ai.scm|plugins/ai/progs/init-ai.scm>.
   </explain>
 
   <\explain>
@@ -252,7 +252,7 @@
     This is similar to <scm|:cmdline>, but <scm-arg|request-fun> returns a
     string with a <scheme> expression describing a network request instead
     of a shell command. The only request which is currently understood by
-    <verbatim|System/Link/request_link.cpp> is of the form
+    <source-link|System/Link/request_link.cpp|src/System/Link/request_link.cpp> is of the form
     <verbatim|(http_post <em|url> (tuple <em|header-1> ...) <em|data>)>,
     which performs an asynchronous <abbr|HTTP> <verbatim|POST> of <abbr|JSON>
     data. The answer is again passed to <scm-arg|result-fun>. This
@@ -267,7 +267,7 @@
   <|explain>
     This option is accepted by <scm|plugin-configure> and registers a
     connection of type <verbatim|"socket">. However, the function
-    <cpp|connection_start> in <verbatim|System/Link/connection.cpp> only
+    <cpp|connection_start> in <source-link|System/Link/connection.cpp|src/System/Link/connection.cpp> only
     knows how to start connections of the types <verbatim|"pipe">,
     <verbatim|"dynlink">, <verbatim|"cmdline"> and <verbatim|"request">, so
     this option cannot be used in practice.
@@ -381,7 +381,7 @@
 
   A single initialization file may contain several <scm|plugin-configure>
   instructions for different names. For instance, the file
-  <verbatim|plugins/ai/progs/init-ai.scm> declares the connections
+  <source-link|plugins/ai/progs/init-ai.scm|plugins/ai/progs/init-ai.scm> declares the connections
   <verbatim|chatgpt>, <verbatim|gemini>, <verbatim|ollama>,
   <verbatim|open-mistral-7b> and <verbatim|albert>, and the
   <verbatim|jupyter> plug-in generates one <scm|plugin-configure>

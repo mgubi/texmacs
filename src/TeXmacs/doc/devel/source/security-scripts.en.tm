@@ -13,29 +13,29 @@
   <\description>
     <item*|<markup|extern>>The primitive <markup|extern> calls a <scheme>
     function with the evaluated arguments during typesetting
-    (<cpp|edit_env_rep::rewrite>, <verbatim|Typeset/Env/env_exec.cpp>; the
+    (<cpp|edit_env_rep::rewrite>, <source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>; the
     experimental style evaluator has the same code in
-    <verbatim|Style/Evaluate/evaluate_rewrite.cpp>).
+    <source-link|Style/Evaluate/evaluate_rewrite.cpp|src/Style/Evaluate/evaluate_rewrite.cpp>).
 
     <item*|Links to scripts>A link whose target vertex is a
     <verbatim|(script ...)> is executed when the user follows it. This is
     how <markup|action> works: its default definition
-    (<verbatim|Typeset/Env/env_default.cpp>) creates a locus with a link of
+    (<source-link|Typeset/Env/env_default.cpp|src/Typeset/Env/env_default.cpp>) creates a locus with a link of
     type <verbatim|action> to a script. Following the link ends up in
     <scm|go-to-vertex> and <scm|execute-script>
-    (<verbatim|link/link-navigate.scm>).
+    (<source-link|link/link-navigate.scm|TeXmacs/progs/link/link-navigate.scm>).
 
     <item*|Observers>A locus may carry an <verbatim|(observer
     <em|id> <em|callback>)> attribute, whose callback is called when the
     locus is modified (<cpp|build_locus>, called when a <markup|locus> is typeset,
-    <verbatim|Typeset/Concat/concat_active.cpp>).
+    <source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>).
 
     <item*|Widgets and exercises>Commands attached to the buttons of
     widgets rendered inside documents are evaluated by <scm|gui-on-select>
-    (<verbatim|utils/misc/gui-utils.scm>); scripts attached to the input
+    (<source-link|utils/misc/gui-utils.scm|TeXmacs/progs/utils/misc/gui-utils.scm>); scripts attached to the input
     fields of exercises by <scm|edu-exec>
-    (<verbatim|education/edu-edit.scm>); <scheme> fragments of automatic
-    documents by <scm|build-scheme*> (<verbatim|utils/automate/auto-build.scm>).
+    (<source-link|education/edu-edit.scm|TeXmacs/progs/education/edu-edit.scm>); <scheme> fragments of automatic
+    documents by <scm|build-scheme*> (<source-link|utils/automate/auto-build.scm|TeXmacs/progs/utils/automate/auto-build.scm>).
   </description>
 
   Plug-in sessions are not in this list: evaluating a session input is an
@@ -56,8 +56,8 @@
     }
   </cpp-code>
 
-  (<verbatim|System/Classes/url.cpp>, exported to <scheme> as
-  <scm|url-secure?>). At startup, <verbatim|init_texmacs.cpp> appends
+  (<source-link|System/Classes/url.cpp|src/System/Classes/url.cpp>, exported to <scheme> as
+  <scm|url-secure?>). At startup, <source-link|init_texmacs.cpp|src/System/Boot/init_texmacs.cpp> appends
   <verbatim|$TEXMACS_PATH:$TEXMACS_HOME_PATH> to whatever the user put in
   this environment variable. So the documentation and the style files of
   <TeXmacs>, and everything below the user's <TeXmacs> directory, are
@@ -68,15 +68,15 @@
   <\itemize>
     <item>the constructor of <cpp|edit_env_rep> sets <cpp|secure> to
     <cpp|is_secure (base_file_name)>, where the base file name is the
-    <em|master> of the buffer (<verbatim|Typeset/Env/env.cpp>,
-    <verbatim|Edit/Editor/edit_typeset.cpp>);
+    <em|master> of the buffer (<source-link|Typeset/Env/env.cpp|src/Typeset/Env/env.cpp>,
+    <source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>);
 
     <item>while an included file is typeset (<markup|include> in
-    <verbatim|concat_macro.cpp>, <markup|var-include> in
-    <verbatim|bridge_rewrite.cpp>), <cpp|secure> is set from the name of
+    <source-link|concat_macro.cpp|src/Typeset/Concat/concat_macro.cpp>, <markup|var-include> in
+    <source-link|bridge_rewrite.cpp|src/Typeset/Bridge/bridge_rewrite.cpp>), <cpp|secure> is set from the name of
     the included file and restored afterwards; the experimental style
     evaluator does the same with the environment variable
-    <verbatim|secure> (<verbatim|Style/Evaluate/evaluate_control.cpp>).
+    <verbatim|secure> (<source-link|Style/Evaluate/evaluate_control.cpp|src/Style/Evaluate/evaluate_control.cpp>).
   </itemize>
 
   The field <cpp|secure> of <cpp|new_buffer_rep>, also initialized with
@@ -86,8 +86,8 @@
 
   The user chooses a policy with the preference <verbatim|security>
   (the <verbatim|Security> item of the preferences menu, also in the preferences dialog). Its handler <scm|notify-security>
-  (<verbatim|texmacs/texmacs/tm-server.scm>) translates it into the
-  global <cpp|script_status> (<verbatim|System/Misc/sys_utils.cpp>) with
+  (<source-link|texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm>) translates it into the
+  global <cpp|script_status> (<source-link|System/Misc/sys_utils.cpp|src/System/Misc/sys_utils.cpp>) with
   <scm|set-script-status>:
 
   <\description>
@@ -130,7 +130,7 @@
 
   <section|The checker <scm|secure?>>
 
-  <scm|secure?> (<verbatim|kernel/texmacs/tm-secure.scm>) is a static
+  <scm|secure?> (<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>) is a static
   analysis of the expression: nothing is evaluated. An expression is
   accepted by <scm|secure-expr?> if
 
@@ -157,7 +157,7 @@
 
   <\itemize>
     <item>by the option <scm|(:secure #t)> of <scm|tm-define>
-    (<verbatim|kernel/texmacs/tm-define.scm>), which many editing routines
+    (<source-link|kernel/texmacs/tm-define.scm|TeXmacs/progs/kernel/texmacs/tm-define.scm>), which many editing routines
     use, among which most entry points of the encryption code;
 
     <item>by <scm|define-secure-symbols> for a list of primitive functions

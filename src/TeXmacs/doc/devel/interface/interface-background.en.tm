@@ -44,7 +44,7 @@
     \ \ \ \ <example-plugin-link|substitute/src/substitute.cpp>
   </verbatim>
 
-  The main evaluation loop of <verbatim|substitute.cpp> simply consists of
+  The main evaluation loop of <source-link|substitute.cpp|TeXmacs/examples/plugins/substitute/src/substitute.cpp> simply consists of
 
   <\cpp-code>
     char buffer[100];
@@ -61,7 +61,7 @@
     cout.flush ();
   </cpp-code>
 
-  Moreover, the configuration file <verbatim|init-substitute.scm> contains
+  Moreover, the configuration file <source-link|init-substitute.scm|TeXmacs/examples/plugins/substitute/progs/init-substitute.scm> contains
   the following code for replacing a selected region by its evaluation, as
   well as the keyboard shortcut <key|C-F12> for this operation:
 
@@ -107,10 +107,10 @@
     \ \ \ \ <example-plugin-link|secure/src/secure.cpp>
   </verbatim>
 
-  Just as <verbatim|substitute.cpp> above, the main program
-  <verbatim|secure.cpp> just converts mathematical <LaTeX> expressions to
-  <TeXmacs>. The <verbatim|secure-secure.scm> module (which is loaded by
-  <verbatim|init-secure.scm> using <scm|(import-from (secure-secure))>)
+  Just as <source-link|substitute.cpp|TeXmacs/examples/plugins/substitute/src/substitute.cpp> above, the main program
+  <source-link|secure.cpp|TeXmacs/examples/plugins/secure/src/secure.cpp> just converts mathematical <LaTeX> expressions to
+  <TeXmacs>. The <source-link|secure-secure.scm|TeXmacs/examples/plugins/secure/progs/secure-secure.scm> module (which is loaded by
+  <source-link|init-secure.scm|TeXmacs/examples/plugins/secure/progs/init-secure.scm> using <scm|(import-from (secure-secure))>)
   contains the <em|secure>
   <scheme> routine <verbatim|latexer>:
 
@@ -128,7 +128,7 @@
 
   It is important to define <verbatim|latexer> as being secure, so that it
   can be used in order to define additional markup using the <markup|extern>
-  primitive. This is done in the style file <verbatim|secure.ts>:
+  primitive. This is done in the style file <source-link|secure.ts|TeXmacs/examples/plugins/secure/packages/secure.ts>:
 
   <\tm-fragment>
     <\inactive*>

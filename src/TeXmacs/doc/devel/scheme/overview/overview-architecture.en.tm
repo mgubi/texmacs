@@ -40,8 +40,8 @@
   \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-editor.scm<new-line>
   \ \ \ <em|source-dir>/src/Scheme/Glue/build-glue-server.scm>
 
-  (from which the <c++> files <verbatim|glue_basic.cpp>,
-  <verbatim|glue_editor.cpp> and <verbatim|glue_server.cpp> in the same
+  (from which the <c++> files <source-link|glue_basic.cpp|src/Scheme/Glue/glue_basic.cpp>,
+  <source-link|glue_editor.cpp|src/Scheme/Glue/glue_editor.cpp> and <source-link|glue_server.cpp|src/Scheme/Glue/glue_server.cpp> in the same
   directory are generated).
 
   <paragraph*|Extensions to <value|scheme> and further utilities>

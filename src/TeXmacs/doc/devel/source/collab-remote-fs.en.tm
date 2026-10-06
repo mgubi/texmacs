@@ -34,19 +34,19 @@
 
     <item*|<verbatim|tmfs://live/<em|server>/<em|name>>,
     <verbatim|tmfs://live-list/<em|server>>>A live document and the list of
-    live documents of the user (<verbatim|client/client-live.scm>).
+    live documents of the user (<source-link|client/client-live.scm|TeXmacs/progs/client/client-live.scm>).
 
     <item*|<verbatim|tmfs://chat/<em|server>/<em|room>>,
     <verbatim|tmfs://chat-rooms/<em|server>>>A chat room (or the mail box
     when the room name starts with <verbatim|mail->) and the list of chat
-    rooms (<verbatim|client/client-chat.scm>).
+    rooms (<source-link|client/client-chat.scm|TeXmacs/progs/client/client-chat.scm>).
 
     <item*|<verbatim|tmfs://shared/<em|server>>>The list of resources shared
     with the user.
   </description-paragraphs>
 
   The <verbatim|tmfs> handlers of the client are registered lazily: the
-  boot file <verbatim|init-texmacs.scm> contains
+  boot file <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> contains
   <scm|(lazy-tmfs-handler (client client-tmfs) remote-file)>, so that the
   client modules are loaded when a remote <abbr|URL> is first opened. See
   <hlink|Connecting to a <TeXmacs>
@@ -61,7 +61,7 @@
   The remote file system is a \Pdatabase file system\Q. Each file or
   directory is a <em|resource>, i.e. an entry of the server database whose
   identifier is called a <em|resource identifier> (<scm|rid>). The fields
-  used by <verbatim|server/server-tmfs.scm> are:
+  used by <source-link|server/server-tmfs.scm|TeXmacs/progs/server/server-tmfs.scm> are:
 
   <\description-paragraphs>
     <item*|<verbatim|type>><verbatim|"file">, <verbatim|"dir">,
@@ -160,7 +160,7 @@
   <scm|remote-dir-remove> (recursive), <scm|remote-identifier> (map a name
   to its resource identifier, or to <scm|(<scm-arg|rid> <scm-arg|time>)>
   for past versions, or <scm|#f>) and <scm|remote-get-versions>. The
-  generic database services of <verbatim|server/server-db.scm>
+  generic database services of <source-link|server/server-db.scm|TeXmacs/progs/server/server-db.scm>
   (<scm|remote-get-field>, <scm|remote-set-field>, <scm|remote-get-entry>,
   <scm|remote-search>, ...) give access to the properties of resources;
   they accept an identifier of the form returned by
@@ -196,7 +196,7 @@
   <scm-arg|by> <scm-arg|msg>)>, and the client builds the page
   <verbatim|tmfs://history/...> from it (<scm|compute-remote-versions>).
   The generic versioning menu works for remote files because
-  <verbatim|client-tmfs.scm> overloads <scm|versioned?>,
+  <source-link|client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm> overloads <scm|versioned?>,
   <scm|version-status>, <scm|version-history>, <scm|commit-buffer-message>,
   <scm|version-revision?>, <scm|version-head>, etc. with <scm|:require
   (remote-file? ...)>; committing with a message simply saves the buffer
@@ -213,7 +213,7 @@
 
   <section|Client side>
 
-  <verbatim|client/client-tmfs.scm> implements:
+  <source-link|client/client-tmfs.scm|TeXmacs/progs/client/client-tmfs.scm> implements:
 
   <\itemize>
     <item>The load handler of <verbatim|remote-file>: if there is no active

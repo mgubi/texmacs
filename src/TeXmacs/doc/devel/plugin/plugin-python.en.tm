@@ -37,7 +37,7 @@
 
   The <verbatim|pyminimal> plug-in demonstrates a minimal interface between
   <TeXmacs> and an extern program in python. The initialization file
-  <verbatim|init-pyminimal.scm> essentially contains the following code:
+  <source-link|init-pyminimal.scm|TeXmacs/examples/plugins/pyminimal/progs/init-pyminimal.scm> essentially contains the following code:
 
   <\scm-code>
     (define (python-launcher)
@@ -169,11 +169,11 @@
   test and in its launcher. On systems where only <shell|python3> is
   installed, the plug-in will therefore not be detected. The plug-ins which
   are shipped with <TeXmacs> rather use the function
-  <scm|(python-command)> (defined in <verbatim|kernel/library/base.scm>),
+  <scm|(python-command)> (defined in <source-link|kernel/library/base.scm|TeXmacs/progs/kernel/library/base.scm>),
   which returns the first of <shell|python3>, <shell|python> and
   <shell|python2> which can be found in the path (or the empty string if
   there is none). For instance, the configuration of the
-  <verbatim|python> plug-in (in <verbatim|plugins/python/progs/init-python.scm>)
+  <verbatim|python> plug-in (in <source-link|plugins/python/progs/init-python.scm|plugins/python/progs/init-python.scm>)
   reads
 
   <\scm-code>
@@ -201,7 +201,7 @@
   </scm-code>
 
   where <scm|python-launcher> starts the script
-  <verbatim|plugins/tmpy/session/tm_python.py> with the interpreter
+  <source-link|plugins/tmpy/session/tm_python.py|plugins/tmpy/session/tm_python.py> with the interpreter
   returned by <scm|(python-command)> and the option <verbatim|-X utf8>.
   Notice that the empty string returned by <scm|(python-command)> when no
   interpreter is found is a true value in <scheme>, so this particular

@@ -193,7 +193,7 @@
     (for instance a query to be parsed with <scm|query-ref>) and must return
     a complete <TeXmacs> document, either in <scheme> form or as a string.
     Consider the following example, which is actually defined in
-    <verbatim|kernel/texmacs/tm-file-system.scm>:
+    <source-link|kernel/texmacs/tm-file-system.scm|TeXmacs/progs/kernel/texmacs/tm-file-system.scm>:
 
     <\scm-code>
       (tmfs-load-handler (id what)
@@ -286,7 +286,7 @@
   loaded. In order to make it available from any menu item or document upon
   startup without loading your code at startup, register it in
   <verbatim|my-init-texmacs.scm> (or, for handlers which are part of
-  <TeXmacs>, in <verbatim|init-texmacs.scm>) using the macro
+  <TeXmacs>, in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>) using the macro
   <scm|lazy-tmfs-handler>. The module is then loaded the first time that a
   <abbr|URL> of one of the registered classes is accessed.
 
@@ -299,7 +299,7 @@
     <scm-arg|classn> are defined in the module <scm-arg|module>. The
     arguments are not evaluated: <scm-arg|module> is a list of symbols (like
     <scm|(doc tmdoc)>) naming the <scheme> module, and the classes are
-    symbols. For instance, <verbatim|init-texmacs.scm> contains
+    symbols. For instance, <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> contains
 
     <\scm-code>
       (lazy-tmfs-handler (doc tmdoc) help)

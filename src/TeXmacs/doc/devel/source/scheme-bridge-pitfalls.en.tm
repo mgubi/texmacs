@@ -11,7 +11,7 @@
     <item><strong|Errors are swallowed.> A <scheme> error
     during <cpp|eval>, <cpp|call> or <cpp|exec_file> is printed on the
     console and the call returns the pair <verbatim|(<em|key> .
-    <em|args>)> (<verbatim|Scheme/Guile/guile_tm.cpp>,
+    <em|args>)> (<source-link|Scheme/Guile/guile_tm.cpp|src/Scheme/Guile/guile_tm.cpp>,
     <cpp|TeXmacs_catcher>). Most <cpp|as_<em|type>> conversions then
     return a neutral value (0, <verbatim|"">, an empty tree, ...), so
     <cpp|as_int (call ("f"))> yields 0 when <scm|f> fails. Check the type
@@ -29,14 +29,14 @@
     <item><strong|<cpp|exec_file> always returns
     <cpp|true>.> It compares the result of loading the file with the
     <em|string> <verbatim|"#\<less\>unspecified\<gtr\>">, which never
-    matches, not even after an error (<verbatim|Scheme/Scheme/object.cpp>,
+    matches, not even after an error (<source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>,
     <cpp|exec_file>). No caller uses the result.
 
     <item><strong|<cpp|eval_secure> is broken.> It
     evaluates <verbatim|(wrap-eval-secure <em|expr>)>, but
     <scm|wrap-eval-secure> is not defined anywhere in
-    <verbatim|TeXmacs/progs>. The function has no callers; secure
-    evaluation is implemented in <scheme> (<verbatim|kernel/texmacs/tm-secure.scm>).
+    <source-link|TeXmacs/progs|TeXmacs/progs>. The function has no callers; secure
+    evaluation is implemented in <scheme> (<source-link|kernel/texmacs/tm-secure.scm|TeXmacs/progs/kernel/texmacs/tm-secure.scm>).
 
     <item><strong|Delayed commands and pauses.> Only
     commands scheduled with <cpp|exec_delayed_pause> (and hence the
@@ -49,19 +49,19 @@
 
   <\itemize>
     <item><strong|Editor routines need a current view.>
-    All routines of <verbatim|build-glue-editor.scm> call
+    All routines of <source-link|build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm> call
     <cpp|get_current_editor ()>, which asserts that there is a current
     view. <scheme> code which may run without a buffer (very early during
     startup, or in some background tasks) must not call them.
 
     <item><strong|At most ten arguments.> The generator
     refers to <verbatim|TMSCM_ARG<em|n>>, which is only defined up to 10
-    in <verbatim|guile_tm.hpp>. Routines with more arguments should take a
+    in <source-link|guile_tm.hpp|src/Scheme/Guile/guile_tm.hpp>. Routines with more arguments should take a
     list or an <verbatim|object>.
 
     <item><strong|The <verbatim|uint> check does not
     reject negative numbers.> <verbatim|TMSCM_ASSERT_UINT>
-    (<verbatim|Scheme/Scheme/glue.cpp>) tests <verbatim|tmscm_is_int (i)
+    (<source-link|Scheme/Scheme/glue.cpp|src/Scheme/Scheme/glue.cpp>) tests <verbatim|tmscm_is_int (i)
     && scm_positive_p (i)>, but <cpp|scm_positive_p> returns a
     <scheme> boolean, and <verbatim|#f> is not a null value in <c++>. A
     negative argument therefore passes the check, and is only rejected

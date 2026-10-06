@@ -8,11 +8,11 @@
   This is a reference list of all the keywords which may be used inside
   <scm|menu-bind>, <scm|tm-menu> and <scm|tm-widget> definitions. The
   authoritative list is the table <scm|gui-make-table> in
-  <verbatim|progs/kernel/gui/menu-define.scm>: each keyword is translated
+  <source-link|progs/kernel/gui/menu-define.scm|TeXmacs/progs/kernel/gui/menu-define.scm>: each keyword is translated
   by <scm|gui-make> into one of the <scm|$>-macros of
-  <verbatim|progs/kernel/gui/gui-markup.scm>, and the resulting menu items
+  <source-link|progs/kernel/gui/gui-markup.scm|TeXmacs/progs/kernel/gui/gui-markup.scm>, and the resulting menu items
   are turned into actual widgets by <scm|make-menu-widget> in
-  <verbatim|progs/kernel/gui/menu-widget.scm>. How this works is explained
+  <source-link|progs/kernel/gui/menu-widget.scm|TeXmacs/progs/kernel/gui/menu-widget.scm>. How this works is explained
   in \P<hlink|The <scheme> widget language and its
   interpreter|../../source/widgets-scheme.en.tm>\Q.
 

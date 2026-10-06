@@ -7,13 +7,13 @@
 
   New data formats and converters between them are declared using the
   macros <scm|define-format> and <scm|converter>, which are defined in
-  <verbatim|kernel/texmacs/tm-convert.scm>. <TeXmacs> maintains a graph of
+  <source-link|kernel/texmacs/tm-convert.scm|TeXmacs/progs/kernel/texmacs/tm-convert.scm>. <TeXmacs> maintains a graph of
   all declared converters and automatically combines them when no direct
   converter exists between two formats. Formats which can be converted from
   or into <TeXmacs> automatically appear in the <menu|File|Import> and
   <menu|File|Export> menus. Typical examples of declarations can be found in
   the files <verbatim|convert/*/init-*.scm>, such as
-  <verbatim|convert/html/init-html.scm>. The internals of the <LaTeX>
+  <source-link|convert/html/init-html.scm|TeXmacs/progs/convert/html/init-html.scm>. The internals of the <LaTeX>
   converters are described in <hlink|the section on
   conversions|../../source/conversions.en.tm>.
 

@@ -5,15 +5,15 @@
 <\body>
   <tmdoc-title|The wallet, system keychains and passwords>
 
-  File names below are relative to <verbatim|src/TeXmacs/progs/>.
+  File names below are relative to <source-link|src/TeXmacs/progs/|TeXmacs/progs>.
 
   <section|The wallet>
 
   The wallet is an encrypted table from keys to passphrases, so that the
   user does not have to retype the passphrases of keys and documents. It is
   built on <name|GnuPG> and only available when <scm|supports-gpg?> holds.
-  The interface is <verbatim|security/wallet/wallet-base.scm>; the
-  implementation is <verbatim|security/gpg/gpg-wallet.scm>.
+  The interface is <source-link|security/wallet/wallet-base.scm|TeXmacs/progs/security/wallet/wallet-base.scm>; the
+  implementation is <source-link|security/gpg/gpg-wallet.scm|TeXmacs/progs/security/gpg/gpg-wallet.scm>.
 
   <paragraph|Storage.>The wallet lives in the directory
   <verbatim|$TEXMACS_HOME_PATH/system/gnupg/wallet>, which is a separate
@@ -35,9 +35,9 @@
   user wants the wallet to be on in later sessions.
 
   <paragraph|Use.>Code which wants a stored passphrase wraps the access in
-  the macro <scm|with-wallet> (defined in <verbatim|init-texmacs.scm>,
+  the macro <scm|with-wallet> (defined in <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>,
   expanded by <scm|expand-with-wallet> in
-  <verbatim|security/wallet/wallet-menu.scm>): if the wallet is
+  <source-link|security/wallet/wallet-menu.scm|TeXmacs/progs/security/wallet/wallet-menu.scm>): if the wallet is
   initialized, should be on persistently, but is off, the body is run after
   the dialog which turns the wallet on; otherwise it is run at once. Then
   <scm|wallet-get>, <scm|wallet-set> and <scm|wallet-delete> do nothing
@@ -57,7 +57,7 @@
   directory aside, creates a new one with the new passphrase, copies the
   table over and removes the old directory (or moves it back on failure).
   <scm|wallet-destroy> removes the wallet directory. The dialogs and the
-  preferences are in <verbatim|security/wallet/wallet-menu.scm>; they warn
+  preferences are in <source-link|security/wallet/wallet-menu.scm|TeXmacs/progs/security/wallet/wallet-menu.scm>; they warn
   about passphrases with fewer than 8 characters or without upper case
   letters, lower case letters, digits and symbols, but accept them after a
   second confirmation.
@@ -72,14 +72,14 @@
   passphrase from the keychain and only asks if it is missing or wrong.
 
   <\description>
-    <item*|<name|macOS>><verbatim|security/keychain/macos-security.scm>
+    <item*|<name|macOS>><source-link|security/keychain/macos-security.scm|TeXmacs/progs/security/keychain/macos-security.scm>
     runs the system command <verbatim|security -i> and sends it
     <verbatim|add-generic-password>, <verbatim|find-generic-password> or
     <verbatim|delete-generic-password> requests on standard input, so that
     the password is not visible on the command line; error reports show
     <verbatim|********> instead of the password.
 
-    <item*|<name|Windows>><verbatim|security/keychain/win-security.scm> runs
+    <item*|<name|Windows>><source-link|security/keychain/win-security.scm|TeXmacs/progs/security/keychain/win-security.scm> runs
     the helper <verbatim|$TEXMACS_PATH/bin/winwallet> with the arguments
     <verbatim|ADD>, <verbatim|GET> or <verbatim|RM>, the account and the
     service, and sends the password on standard input.
@@ -90,11 +90,11 @@
   <scm|system-security-find-generic-password>,
   <scm|system-security-quiet-find-generic-password>,
   <scm|system-security-delete-generic-password>); the right one is loaded
-  by <verbatim|wallet-menu.scm> according to the operating system.
+  by <source-link|wallet-menu.scm|TeXmacs/progs/security/wallet/wallet-menu.scm> according to the operating system.
 
   <section|Passwords and salts>
 
-  <verbatim|security/password.scm> provides <scm|generate-password n>,
+  <source-link|security/password.scm|TeXmacs/progs/security/password.scm> provides <scm|generate-password n>,
   which returns a random password of <math|n> characters containing at
   least one lower case letter, one upper case letter, one digit and one
   symbol, and <scm|generate-salt>. The characters are drawn with
@@ -102,7 +102,7 @@
   (<scm|supports-gnutls?>), and with the ordinary <scm|random> otherwise;
   salts always come from <scm|gnutls-generate-salt>. The <TeXmacs> server
   uses these functions for the administrator password and for password
-  hashes (<verbatim|server/server-base.scm>, see <hlink|the
+  hashes (<source-link|server/server-base.scm|TeXmacs/progs/server/server-base.scm>, see <hlink|the
   server|collab-server.en.tm>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

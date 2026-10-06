@@ -16,7 +16,7 @@
   (see <hlink|graphics primitives|../format/regular/prim-graphics.en.tm>
   for the user level description). It is typeset by
   <cpp|concater_rep::typeset_image> in
-  <verbatim|Typeset/Concat/concat_active.cpp>, which requires exactly five
+  <source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>, which requires exactly five
   arguments and proceeds as follows.
 
   <paragraph|The file.>If the first argument evaluates to a string, it is
@@ -30,7 +30,7 @@
   If the first argument is a tuple
   <verbatim|(tuple (raw-data <em|bytes>) <em|name>)>, the image is
   <em|embedded> in the document. It is then designated by a <em|ramdisc>
-  <abbr|URL> (<cpp|url_ramdisc>, <verbatim|System/Classes/url.cpp>) whose
+  <abbr|URL> (<cpp|url_ramdisc>, <source-link|System/Classes/url.cpp|src/System/Classes/url.cpp>) whose
   root holds the bytes themselves, followed by the file name
   <verbatim|image.<em|name>>, so that the suffix of the original file
   determines the format. The file functions (<cpp|load_string>,
@@ -54,13 +54,13 @@
   the image box is shifted accordingly with <cpp|move_box>.
 
   <paragraph|The box.><cpp|image_box (ip, u, w, h, alpha, pixel)>
-  (<verbatim|Typeset/Boxes/Basic/basic_boxes.cpp>) creates an
+  (<source-link|Typeset/Boxes/Basic/basic_boxes.cpp|src/Typeset/Boxes/Basic/basic_boxes.cpp>) creates an
   <cpp|image_box_rep>, which holds a <cpp|scalable> obtained from
   <cpp|load_scalable_image (u, w, h, "", pixel)> and the current opacity.
   Its extents are those of the scalable image, and its <cpp|display>
   method calls <cpp|ren-\<gtr\>draw_scalable>. Nothing is loaded or
   rasterized at typesetting time: only the size of the file is needed. The
-  animation boxes (<verbatim|Typeset/Boxes/Animate/animate_boxes.cpp>) use
+  animation boxes (<source-link|Typeset/Boxes/Animate/animate_boxes.cpp|src/Typeset/Boxes/Animate/animate_boxes.cpp>) use
   <cpp|image_box> too.
 
   Other ways of including images in a document, which are not covered
@@ -73,7 +73,7 @@
   The background of a box, a page or a table cell may be a <em|pattern>, a
   tree <verbatim|(pattern <em|url> <em|width> <em|height>
   [<em|effect>])> stored in a pattern brush. Patterns are drawn by
-  <cpp|renderer_rep::clear_pattern> (<verbatim|Graphics/Renderer/renderer.cpp>):
+  <cpp|renderer_rep::clear_pattern> (<source-link|Graphics/Renderer/renderer.cpp|src/Graphics/Renderer/renderer.cpp>):
 
   <\enumerate>
     <item>the original size of the image is computed with
@@ -91,19 +91,19 @@
   </enumerate>
 
   The <scheme> side of patterns (the pattern and gradient selectors of the
-  format menus) is in <verbatim|generic/pattern-selector.scm> and
-  <verbatim|generic/pattern-tools.scm>. The <abbr|PDF> renderer does not use
+  format menus) is in <source-link|generic/pattern-selector.scm|TeXmacs/progs/generic/pattern-selector.scm> and
+  <source-link|generic/pattern-tools.scm|TeXmacs/progs/generic/pattern-tools.scm>. The <abbr|PDF> renderer does not use
   <cpp|clear_pattern>: it turns patterns into <abbr|PDF> tiling patterns
   (see <hlink|images in <abbr|PDF> output|images-pdf.en.tm>).
 
   <section|Inserting images>
 
-  The <menu|Insert|Image> menu (<verbatim|generic/insert-menu.scm>) offers
+  The <menu|Insert|Image> menu (<source-link|generic/insert-menu.scm|TeXmacs/progs/generic/insert-menu.scm>) offers
   <menu|Link image> and <menu|Insert image>, which call
   <scm|make-link-image> and <scm|make-inline-image>
-  (<verbatim|generic/generic-edit.scm>) through the file chooser. Both call
+  (<source-link|generic/generic-edit.scm|TeXmacs/progs/generic/generic-edit.scm>) through the file chooser. Both call
   the editor routine <cpp|edit_text_rep::make_image (file, link, w, h, x,
-  y)> (<verbatim|Edit/Modify/edit_text.cpp>), with the name made relative to
+  y)> (<source-link|Edit/Modify/edit_text.cpp|src/Edit/Modify/edit_text.cpp>), with the name made relative to
   the current buffer:
 
   <\description>
@@ -120,7 +120,7 @@
   The width and height proposed by the file chooser come from
   <cpp|qt_pretty_image_size>. When files are dropped on a document, the
   image names of the dropped content are made relative to the document if
-  possible (<cpp|relativize> in <verbatim|Edit/Interface/edit_mouse.cpp>).
+  possible (<cpp|relativize> in <source-link|Edit/Interface/edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>).
 
   <section|Exporting selections as images>
 
@@ -157,7 +157,7 @@
 
   <\itemize>
     <item>In <cpp|renderer_rep::clear_pattern>
-    (<verbatim|Graphics/Renderer/renderer.cpp:408>), the height of a tile is
+    (<source-link|Graphics/Renderer/renderer.cpp:408|src/Graphics/Renderer/renderer.cpp:408>), the height of a tile is
     set to the image height when <verbatim|pattern[1]> (the <em|width>) is
     empty, instead of testing <verbatim|pattern[2]>. A pattern with an empty
     height and an explicit width gets the height of the whole area, and a
@@ -167,12 +167,12 @@
     has no converter, the code falls back on <abbr|PDF> by rebuilding the
     file name from <verbatim|(substring surl (- sl sufl) sl)>, which is the
     <em|suffix> of the name rather than the part before it
-    (<verbatim|tmimage.scm:259>). Exporting <verbatim|a/b.png> without a
+    (<source-link|tmimage.scm:259|TeXmacs/progs/convert/images/tmimage.scm:259>). Exporting <verbatim|a/b.png> without a
     <abbr|PDF> to <name|PNG> converter therefore writes a file called
     <verbatim|pngpdf> in the current directory.
 
     <item><cpp|typeset_gr_effect> and <cpp|typeset_gr_transform>
-    (<verbatim|Typeset/Concat/concat_graphics.cpp:199>, <verbatim|211>)
+    (<source-link|Typeset/Concat/concat_graphics.cpp:199|src/Typeset/Concat/concat_graphics.cpp:199>, <verbatim|211>)
     call <cpp|typeset_error> on a wrong number of arguments but do not
     return, and then read the missing arguments.
 

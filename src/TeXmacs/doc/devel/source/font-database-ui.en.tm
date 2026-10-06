@@ -13,13 +13,13 @@
   <\description-paragraphs>
     <item*|<verbatim|"new style fonts">>Default <verbatim|"on">. When it
     changes, <scm|notify-new-fonts> in
-    <verbatim|progs/texmacs/texmacs/tm-server.scm> calls
+    <source-link|progs/texmacs/texmacs/tm-server.scm|TeXmacs/progs/texmacs/texmacs/tm-server.scm> calls
     <scm|set-new-fonts>, which sets the <c++> flag <cpp|new_fonts>. When
     the flag is off, <cpp|smart_font> reduces to <cpp|find_font> and only
     the <scheme> rewriting rules are used. Menus test the flag with
     <scm|new-fonts?>: when it is on, <menu|Format|Font> and
     <menu|Document|Font> open the font selector instead of the old font
-    menus of <verbatim|progs/fonts/font-old-menu.scm>. The preference can be
+    menus of <source-link|progs/fonts/font-old-menu.scm|TeXmacs/progs/fonts/font-old-menu.scm>. The preference can be
     toggled in the experimental section of the preferences dialog.
 
     <item*|<verbatim|"advanced font customization">>When on, the font
@@ -41,40 +41,40 @@
 
   <section|<scheme> modules>
 
-  The directory <verbatim|progs/fonts> contains:
+  The directory <source-link|progs/fonts|TeXmacs/progs/fonts> contains:
 
   <\description-paragraphs>
-    <item*|<verbatim|fonts-ec.scm>, <verbatim|fonts-adobe.scm>,
-    <verbatim|fonts-x.scm>, <verbatim|fonts-math.scm>,
-    <verbatim|fonts-foreign.scm>, <verbatim|fonts-misc.scm>,
-    <verbatim|fonts-composite.scm>, <verbatim|fonts-truetype.scm>>The
+    <item*|<source-link|fonts-ec.scm|TeXmacs/progs/fonts/fonts-ec.scm>, <source-link|fonts-adobe.scm|TeXmacs/progs/fonts/fonts-adobe.scm>,
+    <source-link|fonts-x.scm|TeXmacs/progs/fonts/fonts-x.scm>, <source-link|fonts-math.scm|TeXmacs/progs/fonts/fonts-math.scm>,
+    <source-link|fonts-foreign.scm|TeXmacs/progs/fonts/fonts-foreign.scm>, <source-link|fonts-misc.scm|TeXmacs/progs/fonts/fonts-misc.scm>,
+    <source-link|fonts-composite.scm|TeXmacs/progs/fonts/fonts-composite.scm>, <source-link|fonts-truetype.scm|TeXmacs/progs/fonts/fonts-truetype.scm>>The
     rewriting rules of the old mechanism (<scm|set-font-rules>), loaded at
     boot time. They remain in use for <TeX> fonts (the master
     <verbatim|roman>) and for all fonts when the new style fonts are
     disabled.
 
-    <item*|<verbatim|font-old-menu.scm>>The menus <scm|text-font-menu>,
+    <item*|<source-link|font-old-menu.scm|TeXmacs/progs/fonts/font-old-menu.scm>>The menus <scm|text-font-menu>,
     <scm|math-font-menu> and <scm|prog-font-menu>, which list fonts by their
     old names. Loaded lazily.
 
-    <item*|<verbatim|font-new-widgets.scm>>The font selector (dialog and side
+    <item*|<source-link|font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>>The font selector (dialog and side
     tool). Loaded lazily through <scm|open-font-selector>,
     <scm|open-document-font-selector> and
     <scm|open-document-other-font-selector>.
 
-    <item*|<verbatim|font-sample.scm>>Utilities which build tables of
+    <item*|<source-link|font-sample.scm|TeXmacs/progs/fonts/font-sample.scm>>Utilities which build tables of
     characters and font samples, used by the font selector and by
     maintainers for comparing fonts.
   </description-paragraphs>
 
   The commands <scm|scan-disk-for-fonts> and <scm|clear-font-cache>, bound
   to <menu|Tools|Fonts|Scan disk for fonts> and <menu|Tools|Fonts|Clear font
-  cache>, are defined in <verbatim|progs/texmacs/texmacs/tm-tools.scm>.
+  cache>, are defined in <source-link|progs/texmacs/texmacs/tm-tools.scm|TeXmacs/progs/texmacs/texmacs/tm-tools.scm>.
 
   <section|The glue <abbr|API>>
 
   The routines below are exported in
-  <verbatim|Scheme/Glue/build-glue-basic.scm>. Arrays of strings are passed
+  <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>. Arrays of strings are passed
   as lists of strings, and logical fonts as lists whose first element is the
   family or master.
 
@@ -285,7 +285,7 @@
   <scm|font-logical-search> (the four argument <cpp|font_database_search>,
   from a family, variant, series and shape),
   <scm|font-available-features> (the <verbatim|GSUB> features of a font,
-  <cpp|ot_font_features>, used by the feature menus of <verbatim|progs/fonts/font-features.scm>), the profile
+  <cpp|ot_font_features>, used by the feature menus of <source-link|progs/fonts/font-features.scm|TeXmacs/progs/fonts/font-features.scm>), the profile
   routines <scm|math-font-profile-set>, <scm|math-font-profile>,
   <scm|math-font-profile-families>, <scm|math-font-profile-attr>,
   <scm|math-family-for-text> and <scm|text-family-for-math>,
@@ -303,7 +303,7 @@
   <subsection|Entry points>
 
   The font selector is implemented in
-  <verbatim|progs/fonts/font-new-widgets.scm>. It exists in two forms: a
+  <source-link|progs/fonts/font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>. It exists in two forms: a
   dialog (<scm|font-selector>) and a side tool (<scm|font-tool>), the
   latter being used when side tools are enabled (<scm|side-tools?>). The
   public entry points are:
@@ -324,7 +324,7 @@
     <scm-arg|prefix> (for instance <verbatim|font-series> becomes
     <scm-arg|prefix> followed by <verbatim|font-series>). It is called from
     the <menu|Other> entry of the parameter menus in
-    <verbatim|progs/generic/generic-menu.scm>.
+    <source-link|progs/generic/generic-menu.scm|TeXmacs/progs/generic/generic-menu.scm>.
   </description-paragraphs>
 
   <subsection|State>
@@ -456,7 +456,7 @@
     <item>Install the fonts and scan the disk.
 
     <item>Run <scm|(font-database-save-local-delta)>, then
-    <scm|(font-test)> from <verbatim|font-sample.scm> in a <scheme>
+    <scm|(font-test)> from <source-link|font-sample.scm|TeXmacs/progs/fonts/font-sample.scm> in a <scheme>
     session: it returns a table showing, for each new font, its name, the
     weights, slants, stretches and other properties that the selection
     algorithm associates to it, and some sample text. This makes it easy to
@@ -466,13 +466,13 @@
     development tree (the files in <verbatim|$TEXMACS_PATH/fonts> are
     overwritten), review the guessed features in
     <verbatim|font-features.bis.scm>, merge them by hand into
-    <verbatim|font-features.scm> (fixing masters and adding categories such
+    <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm> (fixing masters and adding categories such
     as <verbatim|Calligraphic> or <verbatim|Handwritten>, which cannot be
     guessed), and restart <TeXmacs>.
 
     <item>If appropriate, add substitution rules to
-    <verbatim|font-substitutions.scm>, and a short alias to
-    <cpp|upgrade_family_name> in <verbatim|Graphics/Fonts/font_translate.cpp>
+    <source-link|font-substitutions.scm|TeXmacs/fonts/font-substitutions.scm>, and a short alias to
+    <cpp|upgrade_family_name> in <source-link|Graphics/Fonts/font_translate.cpp|src/Graphics/Fonts/font_translate.cpp>
     (as for <verbatim|pagella> or <verbatim|dejavu>).
   </enumerate>
 
@@ -483,7 +483,7 @@
   <hlink|mathematical typesetting|maths.en.tm>. An <name|OpenType> math
   font needs neither: its <verbatim|MATH> table provides the layout, and a
   profile declared with <scm|define-math-font-profile> in
-  <verbatim|progs/fonts/fonts-opentype.scm> gives its text, sans serif and
+  <source-link|progs/fonts/fonts-opentype.scm|TeXmacs/progs/fonts/fonts-opentype.scm> gives its text, sans serif and
   typewriter companions and its place in the menus; see <hlink|math font
   profiles, shipped fonts and the database|opentype-profiles.en.tm>.
 
@@ -495,7 +495,7 @@
 
   <\itemize>
     <item><cpp|font_database_build> and <cpp|font_database_collect> (in
-    <verbatim|font_database.cpp>) decide by extension which files are
+    <source-link|font_database.cpp|src/Graphics/Fonts/font_database.cpp>) decide by extension which files are
     scanned, respectively kept when filtering the global database;
 
     <item><cpp|tt_font_name> must be able to extract the family and style
@@ -506,7 +506,7 @@
     <cpp|font_database_search> map locations to font names by removing
     known extensions;
 
-    <item><cpp|tt_font_find_sub> (in <verbatim|tt_file.cpp>) decides which
+    <item><cpp|tt_font_find_sub> (in <source-link|tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>) decides which
     extensions are tried when a font name is looked up, and in which order;
     currently <verbatim|.otf>, <verbatim|.ttf>, <verbatim|.ttc>,
     <verbatim|.pfb> and <verbatim|.dfont>, so that <verbatim|.pfb> and
@@ -545,7 +545,7 @@
     (show-closest-fonts '("TeX Gyre Pagella" "Regular"))
   </scm-code>
 
-  The module <verbatim|font-sample.scm> is only loaded together with the
+  The module <source-link|font-sample.scm|TeXmacs/progs/fonts/font-sample.scm> is only loaded together with the
   font selector, hence the first line. The last function returns a table of
   the 25 installed fonts which are closest to the given one according to
   the guessed distance, together with their characteristics and samples.
@@ -658,7 +658,7 @@
 
     <item>The guessed features and distances depend on the rendering of a
     few glyphs. Decorative or symbol fonts may be misclassified; the
-    features in <verbatim|font-features.scm> always take precedence over
+    features in <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm> always take precedence over
     guesses.
   </itemize>
 
@@ -667,13 +667,13 @@
   The following problems were noticed while writing this documentation:
 
   <\itemize>
-    <item>In <verbatim|progs/fonts/font-new-widgets.scm>,
+    <item>In <source-link|progs/fonts/font-new-widgets.scm|TeXmacs/progs/fonts/font-new-widgets.scm>,
     <scm|open-document-other-font-selector> calls
     <scm|(open-document-other-font-selector prefix-window)> when side tools
     are disabled; the intended call is
     <scm|(open-document-other-font-selector-window prefix)>.
 
-    <item>In <verbatim|Graphics/Fonts/smart_font.cpp>, at attempts
+    <item>In <source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>, at attempts
     <math|\<gtr\>1> of <cpp|smart_font_rep::resolve>, the test <cpp|v ==
     "rm"> is made on an empty string, where <cpp|variant == "rm"> was
     probably meant; this is harmless, since <verbatim|rm> is dropped by
@@ -681,14 +681,14 @@
     <cpp|in_unicode_range>, which returns a <cpp|bool>, returns
     <cpp|""> (that is, <cpp|true>) for strings that cannot be decoded.
 
-    <item>In <verbatim|Plugins/Freetype/tt_analyze.cpp>, the fallback
+    <item>In <source-link|Plugins/Freetype/tt_analyze.cpp|src/Plugins/Freetype/tt_analyze.cpp>, the fallback
     definition of <cpp|characteristic_distance> used without
     <name|FreeType> returns an <cpp|int>, whereas the header declares a
     <cpp|double>.
 
-    <item>The save functions of <verbatim|font_database.cpp> remove
+    <item>The save functions of <source-link|font_database.cpp|src/Graphics/Fonts/font_database.cpp> remove
     <verbatim|$TEXMACS_PATH/system/cache/file_cache>, whereas the caches
-    of <verbatim|data_cache.cpp> live in
+    of <source-link|data_cache.cpp|src/System/Misc/data_cache.cpp> live in
     <verbatim|$TEXMACS_HOME_PATH/system/cache>.
   </itemize>
 

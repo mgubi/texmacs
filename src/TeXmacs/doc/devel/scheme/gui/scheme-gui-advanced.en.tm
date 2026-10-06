@@ -313,7 +313,7 @@
   <|explain>
     The <scm-arg|widgets> are rebuilt whenever <scm|(refresh-now
     <scm-arg|kind>)> is executed, where <scm-arg|kind> is a string. For
-    instance, the following widget from <verbatim|menu-test.scm> changes
+    instance, the following widget from <source-link|menu-test.scm|TeXmacs/progs/kernel/gui/menu-test.scm> changes
     its text when the toggle is clicked:
 
     <\session|scheme|default>

@@ -8,35 +8,35 @@
   <section|Overview>
 
   The editing behaviour inside code is implemented entirely in <scheme>, in
-  the directory <verbatim|prog/>. It does not use the C++ language objects
+  the directory <source-link|prog/|TeXmacs/progs/prog>. It does not use the C++ language objects
   of the previous chapters: there is no shared tokenizer between highlighting
   and editing. The main files are:
 
   <\description-paragraphs>
-    <item*|<verbatim|prog/prog-edit.scm>>Generic routines: access to the
+    <item*|<source-link|prog/prog-edit.scm|TeXmacs/progs/prog/prog-edit.scm>>Generic routines: access to the
     lines of a program, preferences for brackets, bracket insertion,
     highlighting and selection, tab stops, the indentation framework, and
     copy and paste.
 
-    <item*|<verbatim|prog/prog-kbd.scm>>Keyboard bindings in programming
+    <item*|<source-link|prog/prog-kbd.scm|TeXmacs/progs/prog/prog-kbd.scm>>Keyboard bindings in programming
     mode and per language. This module is loaded lazily the first time the
     cursor is in programming mode
     (<scm|(lazy-keyboard (prog prog-kbd) in-prog?)> in
-    <verbatim|init-texmacs.scm>), and it loads all the language specific
+    <source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>), and it loads all the language specific
     edit modules.
 
-    <item*|<verbatim|prog/scheme-edit.scm>, <verbatim|cpp-edit.scm>,
-    <verbatim|python-edit.scm>, <verbatim|fortran-edit.scm>,
-    <verbatim|java-edit.scm>, <verbatim|scala-edit.scm>,
-    <verbatim|dot-edit.scm>>Language specific indentation and bracket
+    <item*|<source-link|prog/scheme-edit.scm|TeXmacs/progs/prog/scheme-edit.scm>, <source-link|cpp-edit.scm|TeXmacs/progs/prog/cpp-edit.scm>,
+    <source-link|python-edit.scm|TeXmacs/progs/prog/python-edit.scm>, <source-link|fortran-edit.scm|TeXmacs/progs/prog/fortran-edit.scm>,
+    <source-link|java-edit.scm|TeXmacs/progs/prog/java-edit.scm>, <source-link|scala-edit.scm|TeXmacs/progs/prog/scala-edit.scm>,
+    <source-link|dot-edit.scm|TeXmacs/progs/prog/dot-edit.scm>>Language specific indentation and bracket
     handling.
 
-    <item*|<verbatim|prog/scheme-tools.scm>,
-    <verbatim|scheme-autocomplete.scm>, <verbatim|scheme-menu.scm>>Extra
+    <item*|<source-link|prog/scheme-tools.scm|TeXmacs/progs/prog/scheme-tools.scm>,
+    <source-link|scheme-autocomplete.scm|TeXmacs/progs/prog/scheme-autocomplete.scm>, <source-link|scheme-menu.scm|TeXmacs/progs/prog/scheme-menu.scm>>Extra
     developer tools for <scheme> code: help on symbols, jump to definition,
     completion, running a <scheme> file.
 
-    <item*|<verbatim|prog/prog-menu.scm>>The <menu|Format> menu and the icon
+    <item*|<source-link|prog/prog-menu.scm|TeXmacs/progs/prog/prog-menu.scm>>The <menu|Format> menu and the icon
     bar in programming mode (loaded lazily as well).
   </description-paragraphs>
 
@@ -45,7 +45,7 @@
   Language specific behaviour is selected with the <scm|:mode> or
   <scm|:require> clauses of <scm|tm-define> and <scm|kbd-map>, using
   predicates defined with <scm|texmacs-modes> in
-  <verbatim|kernel/texmacs/tm-modes.scm>:
+  <source-link|kernel/texmacs/tm-modes.scm|TeXmacs/progs/kernel/texmacs/tm-modes.scm>:
 
   <\scm-code>
     (in-prog% (and (== (get-env "mode") "prog") (not (in-graphics?))))
@@ -64,7 +64,7 @@
   <verbatim|scheme>, <verbatim|python> and <verbatim|julia>. The predicate
   <scm|in-code?> is defined by <scm|(in-code% (style-has?
   "code-style"))>; it is used for the focus bar in
-  <verbatim|prog/prog-menu.scm>.
+  <source-link|prog/prog-menu.scm|TeXmacs/progs/prog/prog-menu.scm>.
 
   <section|Programs as documents of lines>
 
@@ -115,7 +115,7 @@
   </description>
 
   These preferences can be set in the preferences dialog
-  (<verbatim|texmacs/menus/preferences-widgets.scm>). The core routines are:
+  (<source-link|texmacs/menus/preferences-widgets.scm|TeXmacs/progs/texmacs/menus/preferences-widgets.scm>). The core routines are:
 
   <\explain>
     <scm|(bracket-open <scm-arg|lb> <scm-arg|rb>
@@ -142,7 +142,7 @@
     The first function finds the innermost pair of brackets around
     <scm-arg|path> with the C++ routines <scm|find-left-bracket> and
     <scm|find-right-bracket> (<cpp|find_left_bracket> and
-    <cpp|find_right_bracket> in <verbatim|Data/String/analyze.cpp>, which
+    <cpp|find_right_bracket> in <source-link|Data/String/analyze.cpp|src/Data/String/analyze.cpp>, which
     count nesting levels and may cross line boundaries within the same
     <markup|document>), and sets the alternative selection
     <verbatim|"brackets">. The second is called from language specific
@@ -193,18 +193,18 @@
     current overloads are:
 
     <\itemize>
-      <item><scheme> (<verbatim|prog/scheme-edit.scm>): looks back for the
+      <item><scheme> (<source-link|prog/scheme-edit.scm|TeXmacs/progs/prog/scheme-edit.scm>): looks back for the
       previous arguments of the enclosing form and uses the indentation arity
       of the head symbol (<scm|indent-get-arity>, from the lists
       <verbatim|nullary-indent>, <verbatim|unary-indent>, ... in
-      <verbatim|tm-mode.el>) to decide between aligning with the previous
+      <source-link|tm-mode.el|TeXmacs/progs/tm-mode.el>) to decide between aligning with the previous
       argument and indenting by a fixed amount;
 
-      <item><name|Python> (<verbatim|prog/python-edit.scm>): the
+      <item><name|Python> (<source-link|prog/python-edit.scm|TeXmacs/progs/prog/python-edit.scm>): the
       indentation of the previous line, plus one tab stop if that line ends
       with <verbatim|:> (after a naive removal of <verbatim|#> comments);
 
-      <item><name|Fortran> (<verbatim|prog/fortran-edit.scm>): the
+      <item><name|Fortran> (<source-link|prog/fortran-edit.scm|TeXmacs/progs/prog/fortran-edit.scm>): the
       indentation of the previous line, plus one tab stop if that line starts
       with a keyword like <verbatim|function>, <verbatim|program>,
       <verbatim|subroutine>, <verbatim|do> or <verbatim|module>;
@@ -232,7 +232,7 @@
 
   In programming mode, <scm|insert-return> is redefined to insert a raw line
   break and to re-indent the new line with <scm|(program-indent #f)>. In
-  <verbatim|prog/prog-kbd.scm> the following keys are bound for all
+  <source-link|prog/prog-kbd.scm|TeXmacs/progs/prog/prog-kbd.scm> the following keys are bound for all
   languages: <key|cmd i> and <key|cmd tab> re-indent the
   current line, <key|cmd A-tab> re-indents the whole program, and
   <key|space var> inserts a tab stop. Several text mode shortcuts are
@@ -241,28 +241,28 @@
 
   <section|Copy and paste>
 
-  In <verbatim|prog/prog-edit.scm>, <scm|kbd-cut> and <scm|kbd-paste> are
+  In <source-link|prog/prog-edit.scm|TeXmacs/progs/prog/prog-edit.scm>, <scm|kbd-cut> and <scm|kbd-paste> are
   overloaded in programming mode when the selection (or clipboard) is purely
   textual. They export and import through the converters
   <verbatim|<em|lan>-snippet> if they exist, where <em|lan> is the value of
   <src-var|prog-language>, and through <verbatim|verbatim> otherwise. For
   <scheme>, <scm|kbd-copy> exports to the <verbatim|scheme> format
-  (<verbatim|prog/scheme-edit.scm>). The converters for the languages of the
+  (<source-link|prog/scheme-edit.scm|TeXmacs/progs/prog/scheme-edit.scm>). The converters for the languages of the
   <verbatim|code> plugin are defined in
-  <verbatim|src/plugins/code/progs/code-format.scm>; they use
+  <source-link|src/plugins/code/progs/code-format.scm|plugins/code/progs/code-format.scm>; they use
   <scm|texmacs-\<gtr\>verbatim> with the <verbatim|SourceCode> encoding and
   <scm|code-\<gtr\>texmacs>.
 
   <section|<scheme> specific tools>
 
-  When <scm|developer-mode?> is on, <verbatim|prog/prog-kbd.scm> binds
+  When <scm|developer-mode?> is on, <source-link|prog/prog-kbd.scm|TeXmacs/progs/prog/prog-kbd.scm> binds
   <key|A-F1> to <scm|scheme-popup-help>, <key|cmd A-F1> to
   <scm|scheme-inbuffer-help> and <key|std F1> to
   <scm|scheme-go-to-definition>, all applied to the word at the cursor; in a
   <scheme> file, <key|std R> runs the file. Completion (<scm|kbd-variant>, normally
   bound to <key|tab>) uses <scm|scheme-completions> from
-  <verbatim|prog/scheme-autocomplete.scm>, which collects the glued symbols listed in
-  <verbatim|prog/glue-symbols.scm> (<scm|all-glued-symbols>) and the symbols
+  <source-link|prog/scheme-autocomplete.scm|TeXmacs/progs/prog/scheme-autocomplete.scm>, which collects the glued symbols listed in
+  <source-link|prog/glue-symbols.scm|TeXmacs/progs/prog/glue-symbols.scm> (<scm|all-glued-symbols>) and the symbols
   used in <scheme> code (<scm|all-used-symbols>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

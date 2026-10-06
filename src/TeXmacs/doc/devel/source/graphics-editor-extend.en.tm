@@ -17,7 +17,7 @@
 
   The macro must be defined in a style file or package. It can be written
   in pure markup, as <markup|rectangle> in
-  <verbatim|packages/standard/std-graphics.ts>:
+  <source-link|packages/standard/std-graphics.ts|TeXmacs/packages/standard/std-graphics.ts>:
 
   <\tm-fragment>
     <inactive*|<assign|rectangle|<macro|p1|p2|<cline|<arg|p1>|<point|<look-up|<arg|p1>|0>|<look-up|<arg|p2>|1>>|<arg|p2>|<point|<look-up|<arg|p2>|0>|<look-up|<arg|p1>|1>>>>>>
@@ -34,14 +34,14 @@
 
   The <markup|drd-props> declaration makes only the text argument
   accessible, so that the cursor can enter the label but not the points.
-  The package <verbatim|packages/experimental/graphical-macros.ts> contains
+  The package <source-link|packages/experimental/graphical-macros.ts|TeXmacs/packages/experimental/graphical-macros.ts> contains
   more examples which use <markup|extern> for all their computations.
 
   <subsection|Registering the tag with the editor>
 
   The editor only offers tags which are listed in <scm|gr-tags-user>
-  (<verbatim|graphics/graphics-drd.scm>). This list is extended by the
-  macro <scm|define-graphics> of <verbatim|graphics/graphics-markup.scm>,
+  (<source-link|graphics/graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm>). This list is extended by the
+  macro <scm|define-graphics> of <source-link|graphics/graphics-markup.scm|TeXmacs/progs/graphics/graphics-markup.scm>,
   which also defines the <scheme> function used by <markup|extern> and
   declares it secure:
 
@@ -106,8 +106,8 @@
   <subsection|Loading>
 
   <scm|gr-tags-user> is only filled when the module containing the
-  <scm|define-graphics> forms is loaded. <verbatim|graphics-markup.scm> is
-  loaded lazily (<verbatim|init-texmacs.scm> declares
+  <scm|define-graphics> forms is loaded. <source-link|graphics-markup.scm|TeXmacs/progs/graphics/graphics-markup.scm> is
+  loaded lazily (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm> declares
   <scm|arrow-with-text> and <scm|arrow-with-text*> with <scm|lazy-define>
   and <scm|define-secure-symbols>), and the menu entries call
   <scm|(import-from (graphics graphics-markup))>. A new module of graphical
@@ -123,15 +123,15 @@
 
   <\enumerate>
     <item><em|Tree label.> Add the label to the enumeration in
-    <verbatim|Kernel/Types/tree_label.hpp> (next to <cpp|CSPLINE>) and
-    declare it in <verbatim|Data/Drd/drd_std.cpp> with
+    <source-link|Kernel/Types/tree_label.hpp|src/Kernel/Types/tree_label.hpp> (next to <cpp|CSPLINE>) and
+    declare it in <source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp> with
     <cpp|returns_graphical ()> and <cpp|point_type> for the point arguments,
     and an arity (<cpp|repeat>, <cpp|fixed>) which the editor will use to
     decide when the object is complete.
 
     <item><em|Typesetting.> Add a <cpp|case> to the dispatch in
-    <verbatim|Typeset/Concat/concater.cpp> and a method in
-    <verbatim|concat_graphics.cpp>. Follow <cpp|typeset_line>: evaluate the
+    <source-link|Typeset/Concat/concater.cpp|src/Typeset/Concat/concater.cpp> and a method in
+    <source-link|concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>. Follow <cpp|typeset_line>: evaluate the
     points with <cpp|env-\<gtr\>as_point (env-\<gtr\>exec (t[i]))>, keep the
     paths <cpp|descend (ip, i)> of the points in a <cpp|cip> array, build a
     <cpp|curve> in graphical coordinates, map it with <cpp|env-\<gtr\>fr>,
@@ -143,19 +143,19 @@
 
     <item><em|Other C++ code.> Some functions enumerate the graphical tags
     explicitly: <cpp|is_graphical> in
-    <verbatim|Edit/Interface/edit_interface.cpp>, <cpp|complete> in
-    <verbatim|Typeset/Env/env_animate.cpp> (closed curves in animations), and
-    the upgrader in <verbatim|Data/Convert/Texmacs/upgradetm.cpp>.
+    <source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>, <cpp|complete> in
+    <source-link|Typeset/Env/env_animate.cpp|src/Typeset/Env/env_animate.cpp> (closed curves in animations), and
+    the upgrader in <source-link|Data/Convert/Texmacs/upgradetm.cpp|src/Data/Convert/Texmacs/upgradetm.cpp>.
 
     <item><em|Tag groups.> Add the tag to the appropriate group in
-    <verbatim|graphics/graphics-drd.scm>, for instance
+    <source-link|graphics/graphics-drd.scm|TeXmacs/progs/graphics/graphics-drd.scm>, for instance
     <scm|graphical-closed-curve-tag>. This automatically puts it into
     <scm|gr-tags-all> and <scm|gr-tags-curves>, gives it the curve
     attributes, and makes <scm|object_create> treat it as a curve.
 
     <item><em|Interface.> Add entries to <scm|graphics-mode-menu> and to
     <scm|graphics-insert-icons>, and a name in <scm|gr-mode-\<gtr\>string>
-    (<verbatim|graphics/graphics-menu.scm>).
+    (<source-link|graphics/graphics-menu.scm|TeXmacs/progs/graphics/graphics-menu.scm>).
 
     <item><em|Documentation.> Describe the tag in <hlink|graphics
     primitives|../format/regular/prim-graphics.en.tm>.
@@ -166,7 +166,7 @@
   <scm|edit_right-button>, <scm|edit_middle-button>,
   <scm|edit_start-drag>, <scm|edit_drag> and <scm|edit_end-drag> with a
   <scm|:require> clause on the mode symbol and the option
-  <scm|(:state graphics-state)>, as <verbatim|graphics/graphics-single.scm>
+  <scm|(:state graphics-state)>, as <source-link|graphics/graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm>
   does for <scm|'hand-edit>, and by making <scm|graphics-mode-attributes>,
   <scm|graphics-finish> and <scm|gr-mode-\<gtr\>string> aware of it.
 
@@ -181,7 +181,7 @@
 
     <item*|Strings for numbers>All coordinates exchanged between C++ and
     <scheme> are strings. The abbreviations <scm|f2s> and <scm|s2f>
-    (<verbatim|graphics/graphics-utils.scm>) are used everywhere for the
+    (<source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>) are used everywhere for the
     conversions.
 
     <item*|Recomputed props>The variables <scm|current-x>,
@@ -252,18 +252,18 @@
 
   <\itemize>
     <item><scm|graphical-get-selected-attributes>
-    (<verbatim|graphics/graphics-utils.scm>) calls itself instead of
+    (<source-link|graphics/graphics-utils.scm|TeXmacs/progs/graphics/graphics-utils.scm>) calls itself instead of
     <scm|graphical-get-selected-attributes*>, and would loop forever; it is
     currently not used.
 
     <item>In hand drawing mode, a simple click
     (<scm|edit_left-button> for <scm|'hand-edit> in
-    <verbatim|graphics/graphics-single.scm>) creates a point inside
+    <source-link|graphics/graphics-single.scm|TeXmacs/progs/graphics/graphics-single.scm>) creates a point inside
     <scm|(with "point style" "disk" ...)>: the variable name contains a
     space instead of a hyphen, so the style is not applied.
 
     <item><cpp|typeset_gr_transform> and <cpp|typeset_gr_effect>
-    (<verbatim|Typeset/Concat/concat_graphics.cpp>) call
+    (<source-link|Typeset/Concat/concat_graphics.cpp|src/Typeset/Concat/concat_graphics.cpp>) call
     <cpp|typeset_error> on a wrong arity but then continue, accessing
     children which may not exist.
 

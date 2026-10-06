@@ -15,7 +15,7 @@
   values are arbitrary strings; an identifier together with all its lines
   is called an <em|entry>, and the lines of an entry which share an
   attribute form a <em|field>, which may therefore have several values. The
-  class <cpp|db_line> of <verbatim|Plugins/Database/database.hpp> is:
+  class <cpp|db_line> of <source-link|Plugins/Database/database.hpp|src/Plugins/Database/database.hpp> is:
 
   <\cpp-code>
     typedef int db_atom;
@@ -158,7 +158,7 @@
   <subsection|The functional interface and the <scheme> glue>
 
   The rest of <TeXmacs> never manipulates <cpp|database> objects directly.
-  Databases are designated by their <abbr|URL>, and <verbatim|database.cpp>
+  Databases are designated by their <abbr|URL>, and <source-link|database.cpp|src/Plugins/Database/database.cpp>
   keeps a global table of all databases which have been opened in this
   process:
 
@@ -190,9 +190,9 @@
 
   A database is loaded the first time it is used and stays in memory until
   the end of the session. The following functions, declared at the end of
-  <verbatim|database.hpp>, convert their string arguments to atoms and
+  <source-link|database.hpp|src/Plugins/Database/database.hpp>, convert their string arguments to atoms and
   call the corresponding method. They are exported to <scheme> by
-  <verbatim|build-glue-basic.scm>; the time argument is a double and
+  <source-link|build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>; the time argument is a double and
   <scheme> code normally obtains it from <scm|(db-get-time)>.
 
   <\explain>
@@ -274,8 +274,8 @@
   constraints at the query time. At the <c++> level a query is a
   <cpp|tree> built from a <scheme> list, in which strings are quoted and
   symbols are not. The following constraints are recognized by
-  <cpp|database_rep::encode_constraint> (<verbatim|db_query.cpp>) and
-  <cpp|normalize_query> (<verbatim|db_index.cpp>):
+  <cpp|database_rep::encode_constraint> (<source-link|db_query.cpp|src/Plugins/Database/db_query.cpp>) and
+  <cpp|normalize_query> (<source-link|db_index.cpp|src/Plugins/Database/db_index.cpp>):
 
   <\description>
     <item*|<scm|(<scm-arg|attr> <scm-arg|val1> ... <scm-arg|valn>)>>where
@@ -316,7 +316,7 @@
   <scm-arg|text>)> and <scm|(:contains <scm-arg|text>)> (both mapped to
   <scm|contains>), and <scm|(:prefix <scm-arg|text>)> and
   <scm|(:completes <scm-arg|text>)> (both mapped to <scm|completes>); see
-  <scm|rewrite-query> in <verbatim|db-base.scm>.
+  <scm|rewrite-query> in <source-link|db-base.scm|TeXmacs/progs/database/db-base.scm>.
 
   <subsection|Evaluation of a query>
 
@@ -341,7 +341,7 @@
 
     <item><scm|modified> constraints are applied by <cpp|filter_modified>.
 
-    <item><cpp|sort_results> (<verbatim|db_sort.cpp>) sorts the results
+    <item><cpp|sort_results> (<source-link|db_sort.cpp|src/Plugins/Database/db_sort.cpp>) sorts the results
     lexicographically on the values of the <scm|order> attributes
     (the last alive value of each attribute is used, and the identifier
     breaks ties). Only the direction of the first <scm|order> constraint is
@@ -388,7 +388,7 @@
   A <verbatim|.tmdb> file is a binary journal of the modifications of the
   database, which is replayed when the database is loaded
   (<cpp|database_rep::initialize> and <cpp|replay> in
-  <verbatim|db_disk.cpp>). It is a sequence of commands, each starting with
+  <source-link|db_disk.cpp|src/Plugins/Database/db_disk.cpp>). It is a sequence of commands, each starting with
   one byte:
 
   <\description>
@@ -484,7 +484,7 @@
     get their creation date as expiration date.
 
     <item><em|No <name|SQLite>.> The functions <scm|sql-exec>,
-    <scm|sql-quote> and <scm|supports-sql?> (<verbatim|Plugins/Sqlite3/>)
+    <scm|sql-quote> and <scm|supports-sql?> (<source-link|Plugins/Sqlite3/|src/Plugins/Sqlite3>)
     are an older experiment which is not used by the database engine nor by
     any <scheme> module.
   </itemize>

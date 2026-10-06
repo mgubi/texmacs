@@ -33,11 +33,11 @@
   alternative time for database queries, which make it possible to easily
   recover any past state of the database.
 
-  The basic <scheme> API is implemented in <verbatim|database/db-base.scm>
+  The basic <scheme> API is implemented in <source-link|database/db-base.scm|TeXmacs/progs/database/db-base.scm>
   on top of a few glued <c++> routines (<scm|tmdb-set-field>,
   <scm|tmdb-get-field>, <scm|tmdb-set-entry>, <scm|tmdb-query>,
   <abbr|etc.>) whose implementation can be found in
-  <verbatim|src/src/Plugins/Database/>. The extensions described in the
+  <source-link|src/src/Plugins/Database/|src/Plugins/Database>. The extensions described in the
   next sections are implemented in further files of the
   <verbatim|database/> directory by overloading the basic routines with
   <scm|tm-define>. The internals of the database engine (storage on disk,

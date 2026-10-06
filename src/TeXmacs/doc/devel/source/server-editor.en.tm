@@ -25,8 +25,8 @@
 
   An editor is an instance of <cpp|edit_main_rep>, created by
   <cpp|new_editor (server_rep* sv, tm_buffer buf)> in
-  <verbatim|Edit/Editor/edit_main.cpp>. Its abstract base class
-  <cpp|editor_rep> (<verbatim|Edit/editor.hpp>) derives from
+  <source-link|Edit/Editor/edit_main.cpp|src/Edit/Editor/edit_main.cpp>. Its abstract base class
+  <cpp|editor_rep> (<source-link|Edit/editor.hpp|src/Edit/editor.hpp>) derives from
   <cpp|simple_widget_rep>, the widget class for canvases of the GUI back-end
   (<name|Qt>, Cocoa or Widkit), so that an editor <em|is> the widget which
   the GUI displays inside the scrollable canvas of a window. The handle
@@ -70,38 +70,38 @@
   inheritance; all of them derive virtually from <cpp|editor_rep>:
 
   <\description-paragraphs>
-    <item*|<cpp|edit_interface_rep>>(<verbatim|Edit/Interface/edit_interface.cpp>,
-    <verbatim|edit_keyboard.cpp>, <verbatim|edit_mouse.cpp>,
-    <verbatim|edit_repaint.cpp>, <verbatim|edit_footer.cpp>,
-    <verbatim|edit_complete.cpp>) Event handlers, change notification and
+    <item*|<cpp|edit_interface_rep>>(<source-link|Edit/Interface/edit_interface.cpp|src/Edit/Interface/edit_interface.cpp>,
+    <source-link|edit_keyboard.cpp|src/Edit/Interface/edit_keyboard.cpp>, <source-link|edit_mouse.cpp|src/Edit/Interface/edit_mouse.cpp>,
+    <source-link|edit_repaint.cpp|src/Edit/Interface/edit_repaint.cpp>, <source-link|edit_footer.cpp|src/Edit/Interface/edit_footer.cpp>,
+    <source-link|edit_complete.cpp|src/Edit/Interface/edit_complete.cpp>) Event handlers, change notification and
     <cpp|apply_changes>, repainting, the footer, keyboard shortcuts, input
     modes and completion.
 
-    <item*|<cpp|edit_cursor_rep>>(<verbatim|Edit/Interface/edit_cursor.cpp>)
+    <item*|<cpp|edit_cursor_rep>>(<source-link|Edit/Interface/edit_cursor.cpp|src/Edit/Interface/edit_cursor.cpp>)
     The cursor and cursor movements.
 
-    <item*|<cpp|edit_graphics_rep>>(<verbatim|Edit/Interface/edit_graphics.cpp>)
+    <item*|<cpp|edit_graphics_rep>>(<source-link|Edit/Interface/edit_graphics.cpp|src/Edit/Interface/edit_graphics.cpp>)
     Interaction with graphics.
 
-    <item*|<cpp|edit_typeset_rep>>(<verbatim|Edit/Editor/edit_typeset.cpp>)
+    <item*|<cpp|edit_typeset_rep>>(<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>)
     The link with the typesetter: document data, environment queries and
     invalidation; see <hlink|the typesetting algorithm|typesetter.en.tm>.
 
-    <item*|<cpp|edit_modify_rep>>(<verbatim|Edit/Modify/edit_modify.cpp>)
+    <item*|<cpp|edit_modify_rep>>(<source-link|Edit/Modify/edit_modify.cpp|src/Edit/Modify/edit_modify.cpp>)
     Reception of modifications, undo and redo.
 
     <item*|<cpp|edit_text_rep>, <cpp|edit_math_rep>, <cpp|edit_table_rep>,
-    <cpp|edit_dynamic_rep>>(<verbatim|Edit/Modify/>) Structured editing
+    <cpp|edit_dynamic_rep>>(<source-link|Edit/Modify/|src/Edit/Modify>) Structured editing
     operations on text, mathematics, tables and markup.
 
-    <item*|<cpp|edit_process_rep>>(<verbatim|Edit/Process/>) Generation of
+    <item*|<cpp|edit_process_rep>>(<source-link|Edit/Process/|src/Edit/Process>) Generation of
     bibliographies, tables of contents, indexes and glossaries.
 
-    <item*|<cpp|edit_select_rep>>(<verbatim|Edit/Replace/edit_select.cpp>)
+    <item*|<cpp|edit_select_rep>>(<source-link|Edit/Replace/edit_select.cpp|src/Edit/Replace/edit_select.cpp>)
     Selections and the clipboard.
 
-    <item*|<cpp|edit_replace_rep>>(<verbatim|Edit/Replace/edit_search.cpp>,
-    <verbatim|edit_spell.cpp>) Searching upwards in the tree, interactive
+    <item*|<cpp|edit_replace_rep>>(<source-link|Edit/Replace/edit_search.cpp|src/Edit/Replace/edit_search.cpp>,
+    <source-link|edit_spell.cpp|src/Edit/Replace/edit_spell.cpp>) Searching upwards in the tree, interactive
     search and replace, spell checking.
   </description-paragraphs>
 
@@ -135,7 +135,7 @@
   To add a new editing command which is callable from <scheme>, one
   typically declares it as a pure virtual function in <cpp|editor_rep>,
   implements it in the appropriate <verbatim|edit_*_rep> class, and adds
-  an entry to <verbatim|Scheme/Glue/build-glue-editor.scm> (after which the
+  an entry to <source-link|Scheme/Glue/build-glue-editor.scm|src/Scheme/Glue/build-glue-editor.scm> (after which the
   glue has to be regenerated). Since the glue calls it on
   <cpp|get_current_editor ()>, the command always acts on the current view.
 
@@ -233,13 +233,13 @@
   <section|Modifications and observers><label|sec-modifications>
 
   The document is only modified through a small set of elementary
-  <em|modifications> (<verbatim|Kernel/Types/modification.hpp>):
+  <em|modifications> (<source-link|Kernel/Types/modification.hpp|src/Kernel/Types/modification.hpp>):
   <cpp|MOD_ASSIGN>, <cpp|MOD_INSERT>, <cpp|MOD_REMOVE>, <cpp|MOD_SPLIT>,
   <cpp|MOD_JOIN>, <cpp|MOD_ASSIGN_NODE>, <cpp|MOD_INSERT_NODE>,
   <cpp|MOD_REMOVE_NODE> and <cpp|MOD_SET_CURSOR>. A modification consists of
   its kind <cpp|k>, a path <cpp|p> and possibly a tree <cpp|t>. The function
   <cpp|apply (tree& ref, modification mod)> in
-  <verbatim|Kernel/Abstractions/observer.cpp> is the single entry point;
+  <source-link|Kernel/Abstractions/observer.cpp|src/Kernel/Abstractions/observer.cpp> is the single entry point;
   wrappers like <cpp|assign (path p, tree t)>, <cpp|insert>, <cpp|remove>,
   <cpp|split>, <cpp|join>, <cpp|assign_node>, <cpp|insert_node>,
   <cpp|remove_node> and <cpp|set_cursor> build the modification and call
@@ -270,33 +270,33 @@
   <cpp|list_observer>). The following observers matter for this document:
 
   <\description>
-    <item*|<cpp|ip_observer>>(<verbatim|Data/Observers/ip_observer.cpp>)
+    <item*|<cpp|ip_observer>>(<source-link|Data/Observers/ip_observer.cpp|src/Data/Observers/ip_observer.cpp>)
     Every node of <cpp|the_et> carries an ip observer which knows its
     inverse path. Announcements are propagated upwards to the observers of
     the ancestors, with the path of the modification extended accordingly.
     Hence an observer attached to the root of a buffer is notified of all
     changes inside the buffer.
 
-    <item*|<cpp|edit_observer>>(<verbatim|Data/Observers/edit_observer.cpp>)
+    <item*|<cpp|edit_observer>>(<source-link|Data/Observers/edit_observer.cpp|src/Data/Observers/edit_observer.cpp>)
     Attached to the buffer root by each editor. It forwards announcements to
     <cpp|edit_announce>, completions to <cpp|edit_done> and
     <cpp|touch>-notifications to <cpp|edit_touch> (in
-    <verbatim|Edit/Modify/edit_modify.cpp>).
+    <source-link|Edit/Modify/edit_modify.cpp|src/Edit/Modify/edit_modify.cpp>).
 
-    <item*|<cpp|undo_observer>>(<verbatim|Data/Observers/undo_observer.cpp>)
+    <item*|<cpp|undo_observer>>(<source-link|Data/Observers/undo_observer.cpp|src/Data/Observers/undo_observer.cpp>)
     Attached to the buffer root by each archiver; records every modification
     in the undo history through <cpp|archive_announce>.
 
     <item*|Scheme observers>The <scheme> hooks attached through a link
     repository with a callback (<cpp|scheme_observer>, in
-    <verbatim|Data/Observers/tree_pointer.cpp>) are called as
+    <source-link|Data/Observers/tree_pointer.cpp|src/Data/Observers/tree_pointer.cpp>) are called as
     <scm|(<scm-arg|callback> 'announce <scm-arg|tree>
     <scm-arg|modification>)>, and similarly with <scm|'done> and
     <scm|'touched>. <cpp|tm_buffer_rep::attach_notifier> (<scheme>:
     <scm|buffer-attach-notifier>) uses this to call <scm|buffer-notify> on
     all changes of a buffer, after an initial call of
     <scm|buffer-initialize>; this is used for shared buffers and mirrored
-    parts (<verbatim|part/part-shared.scm>).
+    parts (<source-link|part/part-shared.scm|TeXmacs/progs/part/part-shared.scm>).
 
     <item*|Positions and pointers><cpp|tree_position> (for cursor positions,
     see above), <cpp|tree_pointer>, tree addenda (<cpp|tree_addendum_new>,
@@ -353,9 +353,9 @@
   modification carries the author of the editor, in which case it moves the
   cursor or restores the selection.
 
-  <section|Undo, redo and the \Pmodified\Q status><label|sec-undo>
+  <section|Undo, redo and the \Pmodified\Q status><label|sec-editor-undo>
 
-  Each editor owns an <cpp|archiver> (<verbatim|Data/History/archiver.hpp>),
+  Each editor owns an <cpp|archiver> (<source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>),
   created with the author identifier of the editor and the root path of the
   buffer. The archiver stores a <cpp|patch> <cpp|archive> of past changes and
   a patch <cpp|current> for the changes of the ongoing user action. Each
@@ -398,6 +398,9 @@
   <cpp|archiver_rep::undo> keeps undoing steps until it has undone one of its
   own author. The whole history of all archivers is cleared with
   <cpp|clear_undo_history> (<cpp|global_clear_history>).
+
+  The history, authors, markers and the modified state are described in
+  detail in <hlink|undo, redo and the modification history|undo.en.tm>.
 
   The archiver also implements the \Pmodified\Q status of a buffer. It
   remembers the depth of the archive at the last save and autosave; after

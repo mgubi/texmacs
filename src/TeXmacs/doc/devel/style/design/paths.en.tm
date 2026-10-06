@@ -7,7 +7,7 @@
 
   Before writing your own style file, it is useful to know the following
   important <TeXmacs> paths (see also <verbatim|init_env_vars> in
-  <verbatim|src/System/Boot/init_texmacs.cpp>). Each of them may be overridden
+  <source-link|src/System/Boot/init_texmacs.cpp|src/System/Boot/init_texmacs.cpp>). Each of them may be overridden
   by setting the corresponding environment variable before launching
   <TeXmacs>.
 

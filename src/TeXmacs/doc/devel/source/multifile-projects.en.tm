@@ -20,12 +20,12 @@
     its file name ends in <verbatim|.tp>, or if the initial variable
     <verbatim|project-flag> is <verbatim|true>. The latter is toggled by
     <menu|Tools|Project|Use as master> (<scm|buffer-toggle-master> in
-    <verbatim|generic/document-part.scm>, which calls <scm|init-env>).
+    <source-link|generic/document-part.scm|TeXmacs/progs/generic/document-part.scm>, which calls <scm|init-env>).
 
     <item*|A chapter><menu|Tools|Project|Attach master> asks for a file and
     calls <scm|project-attach> with its name relative to the current buffer
     (<scm|project-attach*>). The <c++> routine <cpp|project_attach>
-    (<verbatim|Texmacs/Data/new_project.cpp>) stores the name in the
+    (<source-link|Texmacs/Data/new_project.cpp|src/Texmacs/Data/new_project.cpp>) stores the name in the
     <cpp|project> field of the buffer data, re-initializes the editors
     (<cpp|init_update>, <cpp|notify_change (THE_DECORATIONS)>), marks the
     buffer as modified and loads the master buffer into <cpp|buf-\<gtr\>prj>
@@ -35,7 +35,7 @@
   </description>
 
   When a chapter is loaded later, <cpp|set_buffer_tree>
-  (<verbatim|new_buffer.cpp>) sees the <verbatim|project> attribute and loads
+  (<source-link|new_buffer.cpp|src/Texmacs/Data/new_buffer.cpp>) sees the <verbatim|project> attribute and loads
   the master in the background, without any view. The master therefore must
   exist on disk; unless it is already open, its references are those of its
   last save.
@@ -44,7 +44,7 @@
 
   The typesetting environment of an editor holds <em|two> tables of each
   kind: a local one and a global one. They are bound in the constructor of
-  <cpp|edit_typeset_rep> (<verbatim|Edit/Editor/edit_typeset.cpp>):
+  <cpp|edit_typeset_rep> (<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>):
 
   <\description>
     <item*|References>local: <cpp|buf-\<gtr\>data-\<gtr\>ref>; global: the
@@ -61,14 +61,14 @@
 
   <\itemize>
     <item><em|Writes always go to the local table>: labels
-    (<verbatim|Typeset/Env/env_exec.cpp>), page numbers of labels
-    (<verbatim|Typeset/Bridge/typesetter.cpp>) and <markup|write> entries
-    (<verbatim|Typeset/Concat/concat_active.cpp>).
+    (<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>), page numbers of labels
+    (<source-link|Typeset/Bridge/typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>) and <markup|write> entries
+    (<source-link|Typeset/Concat/concat_active.cpp|src/Typeset/Concat/concat_active.cpp>).
 
     <item><em|Reads try the local table first, then the global one>:
     <cpp|exec_get_binding> and <cpp|exec_has_binding> (the primitives
     behind references) for labels, and the lookup of attachments
-    (<verbatim|env_exec.cpp>). The global auxiliary table is only read by
+    (<source-link|env_exec.cpp|src/Typeset/Env/env_exec.cpp>). The global auxiliary table is only read by
     <cpp|init_update>, for the <verbatim|parts> entry described below;
     automatic content such as the table of contents of a chapter is
     always taken from the chapter itself.
@@ -93,7 +93,7 @@
 
   The <markup|include> macro of the standard style calls
   <markup|part-info> with the name of the included file, which does two
-  things while the master is typeset (<verbatim|std-automatic.ts>):
+  things while the master is typeset (<source-link|std-automatic.ts|TeXmacs/packages/standard/std-automatic.ts>):
 
   <\itemize>
     <item>it sets the label <verbatim|part:<em|name>>, whose page number
@@ -114,7 +114,7 @@
   numbered as in the book.
 
   Conversely, when a chapter is included, <cpp|extract_document>
-  (<verbatim|Data/Convert/Texmacs/fromtm.cpp>) keeps its initial
+  (<source-link|Data/Convert/Texmacs/fromtm.cpp|src/Data/Convert/Texmacs/fromtm.cpp>) keeps its initial
   environment as a <markup|with> around the body, but drops the page layout
   variables and, if the included file belongs to a project, its
   <verbatim|page-first> and chapter and section counters, so that the copies
@@ -124,8 +124,8 @@
 
   <\description>
     <item*|<menu|Document|Project>>Shown when a project is attached
-    (<verbatim|texmacs/menus/main-menu.scm>). <scm|project-menu>
-    (<verbatim|generic/document-menu.scm>) offers the master and the list
+    (<source-link|texmacs/menus/main-menu.scm|TeXmacs/progs/texmacs/menus/main-menu.scm>). <scm|project-menu>
+    (<source-link|generic/document-menu.scm|TeXmacs/progs/generic/document-menu.scm>) offers the master and the list
     of files included by the master (<scm|project-file-list>, computed by
     <scm|include-list> from the master's tree).
 
@@ -164,7 +164,7 @@
     looks at <markup|include> tags directly in the master's top level
     <markup|document>; inclusions inside a <markup|with> or another tag are
     not listed in <menu|Document|Project>. (The similar <scm|tm-get-includes>
-    of <verbatim|document-part.scm> does descend into <markup|with>.)
+    of <source-link|document-part.scm|TeXmacs/progs/generic/document-part.scm> does descend into <markup|with>.)
 
     <item><em|Chapters write to the buffer data during initialization.>
     <cpp|init_update> stores the counters in

@@ -9,8 +9,8 @@
   <LaTeX> strings. The <TeXmacs> styles need the same operations on
   <TeXmacs> trees, since the field values have already been converted (see
   <hlink|parsing|bibtex-parsing.en.tm>). They are implemented in <c++> in
-  <verbatim|Plugins/Bibtex/bibtex_functions.cpp> and exported to <scheme>
-  by <verbatim|Scheme/Glue/build-glue-basic.scm>. All of them take
+  <source-link|Plugins/Bibtex/bibtex_functions.cpp|src/Plugins/Bibtex/bibtex_functions.cpp> and exported to <scheme>
+  by <source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>. All of them take
   <scheme> trees, convert them to <TeXmacs> trees and simplify them with
   <cpp|simplify_correct> before working, and most return a <scheme> tree.
   The descriptions below are meant for style writers who need to know the
@@ -37,7 +37,7 @@
     True if <scm|bib-field> returns <verbatim|"">. A field whose value is a
     non-atomic tree without text (for instance an empty
     <markup|concat>) is not considered empty; use <scm|bib-null?> from
-    <verbatim|bibtex/bib-utils.scm> for such tests.
+    <source-link|bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> for such tests.
   </explain>
 
   <section|Text functions>
@@ -141,7 +141,7 @@
   The analogue of <verbatim|change.case$> with <verbatim|"t"> (title case
   conversion: lower case except the first letter) is obtained in the
   styles by combining these functions, for instance
-  <scm|bib-format-field-Locase> in <verbatim|bibtex/bib-utils.scm> is
+  <scm|bib-format-field-Locase> in <source-link|bibtex/bib-utils.scm|TeXmacs/progs/bibtex/bib-utils.scm> is
   <scm|(bib-upcase-first (bib-locase <scm-arg|field>))>.
 
   <section|Functions which are not exported>

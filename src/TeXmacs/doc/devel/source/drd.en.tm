@@ -46,19 +46,19 @@
   <section|Overview>
 
   On the <c++> side, a <abbr|DRD> is an object of class <cpp|drd_info>
-  (<verbatim|Data/Drd/drd_info.hpp>) which maps tree labels to
-  <cpp|tag_info> records (<verbatim|Data/Drd/tag_info.hpp>). There are
+  (<source-link|Data/Drd/drd_info.hpp|src/Data/Drd/drd_info.hpp>) which maps tree labels to
+  <cpp|tag_info> records (<source-link|Data/Drd/tag_info.hpp|src/Data/Drd/tag_info.hpp>). There are
   several <abbr|DRD>s at any time:
 
   <\itemize>
     <item>The <em|standard <abbr|DRD>> <cpp|std_drd>, filled once at
-    start-up by <cpp|init_std_drd> (<verbatim|Data/Drd/drd_std.cpp>). It
+    start-up by <cpp|init_std_drd> (<source-link|Data/Drd/drd_std.cpp|src/Data/Drd/drd_std.cpp>). It
     describes all built-in primitives and environment variables and also
     registers the string names of the built-in tree labels.
 
     <item>One <abbr|DRD> per style (more precisely, per style tuple such as
     <verbatim|(article number-europe)>), computed by
-    <cpp|compute_env_and_drd> (<verbatim|Data/Document/new_style.cpp>) on
+    <cpp|compute_env_and_drd> (<source-link|Data/Document/new_style.cpp|src/Data/Document/new_style.cpp>) on
     top of <cpp|std_drd>, partly by <em|heuristic inference> from the macro
     definitions and partly from explicit <markup|drd-props> declarations,
     and cached in memory and on disk.
@@ -97,57 +97,57 @@
   <section|Source files>
 
   <\description>
-    <item*|<verbatim|Data/Drd/tag_info.hpp>,
-    <verbatim|tag_info.cpp>>The records <cpp|parent_info>,
+    <item*|<source-link|Data/Drd/tag_info.hpp|src/Data/Drd/tag_info.hpp>,
+    <source-link|tag_info.cpp|src/Data/Drd/tag_info.cpp>>The records <cpp|parent_info>,
     <cpp|child_info> and <cpp|tag_info>, the type constants
     <verbatim|TYPE_*>, the compact environment table (<cpp|drd_encode>,
     <cpp|drd_decode>) and the conversion of type names
     (<cpp|drd_encode_type>, <cpp|drd_decode_type>).
 
-    <item*|<verbatim|Data/Drd/drd_info.hpp>,
-    <verbatim|drd_info.cpp>>The class <cpp|drd_info>: getters, setters and
+    <item*|<source-link|Data/Drd/drd_info.hpp|src/Data/Drd/drd_info.hpp>,
+    <source-link|drd_info.cpp|src/Data/Drd/drd_info.cpp>>The class <cpp|drd_info>: getters, setters and
     freezing of all properties, the high-level queries
     (<cpp|is_accessible_child>, <cpp|get_env_child>, ...) and the heuristic
     inference from macros.
 
-    <item*|<verbatim|Data/Drd/drd_std.hpp>,
-    <verbatim|drd_std.cpp>>The standard <abbr|DRD> <cpp|std_drd>, the
+    <item*|<source-link|Data/Drd/drd_std.hpp|src/Data/Drd/drd_std.hpp>,
+    <source-link|drd_std.cpp|src/Data/Drd/drd_std.cpp>>The standard <abbr|DRD> <cpp|std_drd>, the
     current <abbr|DRD> <cpp|the_drd>, the table <cpp|STD_CODE> of built-in
     tag names and the helper <cpp|with_drd>.
 
-    <item*|<verbatim|Data/Drd/drd_mode.hpp>,
-    <verbatim|drd_mode.cpp>>The global access mode and writability mode.
+    <item*|<source-link|Data/Drd/drd_mode.hpp|src/Data/Drd/drd_mode.hpp>,
+    <source-link|drd_mode.cpp|src/Data/Drd/drd_mode.cpp>>The global access mode and writability mode.
 
-    <item*|<verbatim|Data/Drd/vars.hpp>, <verbatim|vars.cpp>>String
+    <item*|<source-link|Data/Drd/vars.hpp|src/Data/Drd/vars.hpp>, <source-link|vars.cpp|src/Data/Drd/vars.cpp>>String
     constants for the names of the built-in environment variables
     (<cpp|MODE>, <cpp|FONT_SIZE>, ...), several hundred of which get a type
     in <cpp|std_drd>.
 
-    <item*|<verbatim|Data/Document/new_style.cpp>>Computation and caching
+    <item*|<source-link|Data/Document/new_style.cpp|src/Data/Document/new_style.cpp>>Computation and caching
     of style <abbr|DRD>s (<cpp|compute_env_and_drd>,
     <cpp|get_style_drd>, <cpp|get_document_drd>, <cpp|style_get_cache>,
     <cpp|style_set_cache>).
 
-    <item*|<verbatim|Edit/Editor/edit_typeset.cpp>>Initialization and
+    <item*|<source-link|Edit/Editor/edit_typeset.cpp|src/Edit/Editor/edit_typeset.cpp>>Initialization and
     update of the <abbr|DRD> of an editor (<cpp|typeset_style_use_cache>,
     <cpp|typeset_preamble>, <cpp|drd_update>).
 
-    <item*|<verbatim|Typeset/Env/env_exec.cpp>>The evaluation of
+    <item*|<source-link|Typeset/Env/env_exec.cpp|src/Typeset/Env/env_exec.cpp>>The evaluation of
     <markup|drd-props> (<cpp|edit_env_rep::exec_drd_props>).
 
-    <item*|<verbatim|Data/Tree/tree_traverse.cpp>>Free functions wrapping
+    <item*|<source-link|Data/Tree/tree_traverse.cpp|src/Data/Tree/tree_traverse.cpp>>Free functions wrapping
     <cpp|the_drd> (<cpp|is_accessible_child>, <cpp|minimal_arity>,
     <cpp|get_child_type>, ...), most of which are exported to <scheme>.
 
-    <item*|<verbatim|Scheme/Glue/build-glue-basic.scm>>The declarations of
+    <item*|<source-link|Scheme/Glue/build-glue-basic.scm|src/Scheme/Glue/build-glue-basic.scm>>The declarations of
     the <scheme> glue.
 
-    <item*|<verbatim|utils/edit/variants.scm>>The <scheme> macro
+    <item*|<source-link|utils/edit/variants.scm|TeXmacs/progs/utils/edit/variants.scm>>The <scheme> macro
     <scm|define-group> and the standard tag groups.
 
     <item*|<verbatim|*/*-drd.scm>>Tag groups and tables of the various
-    editing modes and converters (<verbatim|text/text-drd.scm>,
-    <verbatim|math/math-drd.scm>, <verbatim|dynamic/dynamic-drd.scm>, ...).
+    editing modes and converters (<source-link|text/text-drd.scm|TeXmacs/progs/text/text-drd.scm>,
+    <source-link|math/math-drd.scm|TeXmacs/progs/math/math-drd.scm>, <source-link|dynamic/dynamic-drd.scm|TeXmacs/progs/dynamic/dynamic-drd.scm>, ...).
 
     <item*|<verbatim|kernel/logic/logic-*.scm>>The logic programming
     engine.

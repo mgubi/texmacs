@@ -87,7 +87,7 @@
 
   Steps 2 and 6 need to know which Unicode character a name stands for. The
   tables of <verbatim|$TEXMACS_PATH/langs/encoding> answer that question:
-  <verbatim|tmuniversaltounicode.scm> and its companions map
+  <source-link|tmuniversaltounicode.scm|TeXmacs/langs/encoding/tmuniversaltounicode.scm> and its companions map
   <verbatim|\<less\>alpha\<gtr\>> to <verbatim|U+03B1> and back. The same
   tables serve the converters, which is why a symbol without an entry there
   can be typed and printed but not exported.
@@ -179,8 +179,8 @@
     <item*|A font looks like an older version of itself>The file found for a
     font name is cached; <menu|Tools|Fonts|Clear font cache> removes that
     cache (<verbatim|system/cache/font_cache.scm>) and the local database
-    files (<verbatim|font-database.scm>, <verbatim|font-features.scm>,
-    <verbatim|font-characteristics.scm> and <verbatim|shipped-stamp.scm>
+    files (<source-link|font-database.scm|TeXmacs/fonts/font-database.scm>, <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm>,
+    <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm> and <verbatim|shipped-stamp.scm>
     under <verbatim|fonts>), which are rebuilt at the next start.
 
     <item*|The document looks different on another machine>The fonts it

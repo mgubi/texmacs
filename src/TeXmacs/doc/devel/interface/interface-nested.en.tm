@@ -38,7 +38,7 @@
     \ \ \ \ <example-plugin-link|formula/src/formula.cpp>
   </verbatim>
 
-  The body of the main loop of <verbatim|formula.cpp> is given by
+  The body of the main loop of <source-link|formula.cpp|TeXmacs/examples/plugins/formula/src/formula.cpp> is given by
 
   <\cpp-code>
     int i, nr;
@@ -129,7 +129,7 @@
   </tm-fragment>
 
   The <markup|foo> tag is used in the following way in the body of the main
-  loop of <verbatim|markup.cpp>:
+  loop of <source-link|markup.cpp|TeXmacs/examples/plugins/markup/src/markup.cpp>:
 
   <\cpp-code>
     char buffer[100];
