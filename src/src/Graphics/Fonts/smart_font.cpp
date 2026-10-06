@@ -725,8 +725,11 @@ profile_variant_fix (string math_family, string variant, string item) {
   if (key == "") return item;
   string prof= profile_family (math_family);
   if (prof == "") return item;
-  string comp= math_font_profile_attr (prof, key);
-  if (comp != "" && N (font_database_styles (comp)) > 0) return comp;
+  // the companion may be a list of alternatives, the first installed wins
+  array<string> comps= trimmed_tokenize (math_font_profile_attr (prof, key), ",");
+  for (int i= 0; i < N(comps); i++)
+    if (comps[i] != "" && N (font_database_styles (comps[i])) > 0)
+      return comps[i];
   return item;
 }
 
@@ -760,6 +763,9 @@ profile_fix (string family, string variant, string series, string shape) {
           item= profile_variant_fix (item, variant, t);
         }
         else if (has_math) item= profile_variant_fix (m, variant, item);
+        // a text font without mathematics may have a profile with its
+        // companions only, as the Palatino of macOS
+        else item= profile_variant_fix (item, variant, item);
         string mst= font_database_master (item);
         if (mst != "") item= mst;
       }
