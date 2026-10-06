@@ -39,6 +39,9 @@
 /* Use the Guile Scheme interpreter */
 #undef USE_GUILE
 
+/* Use the femtolisp interpreter */
+#undef USE_FEMTOLISP
+
 /* Use the S7 Scheme interpreter */
 #undef USE_S7
 

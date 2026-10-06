@@ -1632,7 +1632,7 @@ Optional Packages:
   --with-tmrepo[=no]      absolute texmacs sdk path
   --with-texmacs-builder[=no]
                           absolute texmacs builder path
-  --with-scheme[=s7|guile]
+  --with-scheme[=s7|guile|femtolisp]
                           Scheme interpreter to use [default=s7]
   --with-guile[=system]   path to to find guile-config or [embedded] if any
                           tm-guile package included
@@ -13347,8 +13347,16 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
   esac
 
       ;;
+    (femtolisp | Femtolisp)
+      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: using the femtolisp interpreter (vendored in src/Scheme/Femtolisp)" >&5
+printf '%s\n' "$as_me: using the femtolisp interpreter (vendored in src/Scheme/Femtolisp)" >&6;}
+
+printf '%s\n' "#define USE_FEMTOLISP 1" >>confdefs.h
+
+      SCHEME_DIR=Femtolisp
+      ;;
     (*)
-      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7 or guile" "$LINENO" 5
+      as_fn_error $? "unknown Scheme interpreter '$with_scheme', use s7, guile or femtolisp" "$LINENO" 5
       ;;
   esac
 

@@ -1,0 +1,114 @@
+The femtolisp Scheme backend of TeXmacs
+=======================================
+
+Configure with --with-scheme=femtolisp (CMake: -DSCHEME_IMPL=femtolisp).
+
+Files
+-----
+
+femtolisp/        femtolisp (https://github.com/JeffBezanson/femtolisp, commit
+                  ec76010, BSD license), with the patches below applied; only
+                  the sources, the boot files and the tests are kept
+patches/          the local patches, made with git format-patch, in order
+fl_core.c         femtolisp compiled as one unit, and its C interface for
+                  TeXmacs (fl_tm.h): errors, opaque values, byte strings...
+fl_llt.c          the library llt of femtolisp, compiled as one unit
+fl_boot.h         the boot image femtolisp/flisp.boot, as a C array
+                  (make-boot-header.sh regenerates it)
+femtolisp_tm.*    the tmscm interface of TeXmacs (as S7/s7_tm.* and
+                  Guile/guile_tm.*)
+
+The Scheme side is in TeXmacs/progs: init-femtolisp.scm, then
+kernel/boot/r5rs-femtolisp.scm (R5RS and Guile 1.8 on femtolisp),
+kernel/boot/boot-femtolisp.scm (the module system) and
+kernel/boot/compat-femtolisp.scm (the Guile library functions).
+
+Design notes
+------------
+
+* Garbage collection. Femtolisp has a copying collector, which moves the
+  objects. The C++ class tmscm is a root by itself (a node of a list which
+  the collector updates), so that C++ code can hold Scheme values across
+  allocations. The errors of femtolisp are longjmps: they never cross C++
+  frames (fltm_apply and fltm_eval_string catch them; the glue raises them
+  after its C++ objects are gone).
+
+* Strings are strings of bytes, in the Cork encoding of TeXmacs, as in
+  Guile 1.8: a character is a byte, the indices count bytes, and write gives
+  the bytes from 128 as they are.
+
+* Modules. Femtolisp has one global environment. The private definitions of
+  a TeXmacs module (its plain define and define-macro) are renamed name@module
+  when the module is compiled (the hook resolve-global, patch 0003); the
+  public definitions (define-public, tm-define...) are global.
+
+* Macros are expanded when a form is compiled, Guile expands them when it
+  first evaluates them. To keep the Guile behavior: a call of a name which is
+  not defined yet is compiled when it is first evaluated (compile-unknown-call,
+  patch 0010, used by boot-femtolisp.scm), and a macro expansion which fails
+  raises its error when the code runs (*defer-macro-errors*, patch 0013).
+
+The patches
+-----------
+
+0001  llt builds on any architecture (arm64, WebAssembly)
+0002  hooks: extra GC roots, equality and hash of opaque values
+0003  resolve-global: the global names of the expanded and compiled code
+0004  reader and printer as Guile's: | and \ in symbols, #{...}#, long tokens,
+      large integers read as inexact, floats written shortest, as Guile
+0005  vectors written #(...); with *print-shared* #f, labels only for cycles
+0006  strings written as strings of bytes
+0007  a builtin called with a wrong number of arguments: a run time error
+0008  curried definitions, (define ((f a) b) ...)
+0009  the functions of system.lsp and compiler.lsp call each other through
+      private names (%fl:name), so that programs may redefine the public ones
+      (mkboot1.lsp compiles them twice)
+0010  compile-unknown-call: hook for the calls of names not yet defined
+0011  *keep-source*: compiled functions keep their source (procedure-source)
+0012  the heap stops growing at 1 Gb, with an out of memory error
+0013  *defer-macro-errors*
+0014  a datum at the very end of the input is read (eof only when nothing is left)
+0015  [ and ] are symbol characters, as in Guile (vectors are #(...))
+0016  local variables do not shadow the special forms at the head of a form
+      (cond expands to begin, which a parameter named begin captured)
+0017  < and = with any number of arguments
+0018  *print-closures*: with #f, closures are written #<procedure name>
+0019  the unspecified value is the self-evaluating symbol #<unspecified>
+0020  *arith-fallback*: + - * / = call it when an operand is not a number
+      (TeXmacs implements the complex numbers with it, r5rs-femtolisp.scm);
+      (- 0) is the fixnum 0
+
+The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
+
+Known differences with Guile
+----------------------------
+
+* No exact rationals (1/2 is 0.5). The complex numbers are implemented in
+  Scheme (+ - * / = make-rectangular real-part angle...), but number? is
+  false for them and the other numeric functions do not take them.
+* The hash tables iterate in another order.
+* A macro whose expansion contains itself loops (math-edit.scm was changed),
+  and a macro with side effects when it is expanded has them even in code
+  which never runs (lazy-format was changed).
+
+Upgrading femtolisp, or changing system.lsp / compiler.lsp
+-----------------------------------------------------------
+
+Apply the patches in order (git am patches/*.patch in a clone of femtolisp),
+copy the sources here, then rebuild the boot image with a standalone flisp
+until it no longer changes, and regenerate fl_boot.h:
+
+  cd femtolisp-clone && make -C llt && make release
+  ./flisp mkboot0.lsp system.lsp compiler.lsp > flisp.boot.new
+  mv flisp.boot.new flisp.boot
+  ./flisp mkboot1.lsp && ./flisp mkboot1.lsp   # twice: a fixed point
+  make test
+  cp flisp.boot <here>/femtolisp/ && <here>/make-boot-header.sh
+
+Debugging
+---------
+
+TEXMACS_FL_TRACE=1        reports the errors with the femtolisp error and
+                          its stack, and (%late-calls) lists the calls which
+                          were compiled at their first evaluation
+TEXMACS_FL_CHECK_ROOTS=1  checks the C++ roots at each garbage collection
