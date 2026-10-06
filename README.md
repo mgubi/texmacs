@@ -10,25 +10,34 @@ you download it.
 ![TeXmacs Vue in the browser: the tabs of the documents in a column, the main and mode icon bars at the left, a formula](src/docs/wasm/texmacs-in-the-browser.png)
 
 * **What it is**: stock TeXmacs compiled to WebAssembly, on **Vue**, a new
-  interface for TeXmacs (Clay, SDL3 and MuPDF, below), with the
+  interface for TeXmacs (Clay, SDL3, MuPDF and ThorVG, below), with the
   [S7](https://ccrma.stanford.edu/software/snd/snd/s7.html) Scheme in place of
-  Guile and **OpenType fonts**, OpenType mathematics included.
+  Guile and **OpenType fonts**, OpenType mathematics included. The page is
+  drawn by the GPU, with WebGL2 through [ThorVG](https://github.com/thorvg/thorvg)
+  (`?gpu=0` in the address, or a browser without WebGL2, draws it with MuPDF).
 * **What works**: editing and typesetting, the menus and dialogs (drawn in
-  the page), a tab per document, your files kept in the browser (upload,
-  drag and drop, zip projects, downloads), printing (the PDF opens in a tab
-  of the browser), the clipboard of the system, Scheme sessions, and the
-  Remote menu (a TeXmacs server over WebSocket).
-* **Not yet**: plugins which run programs (a page has no processes), `wss`
-  for TeXmacs servers on other machines, resizing the dialogs. Tested in
-  Firefox and Safari.
+  the page, moved by their title and resized by their frame), a tab per document (in a
+  column at the left), your files kept in the browser (upload, drag
+  and drop, zip projects, downloads), printing (the PDF opens in a tab of the
+  browser), the clipboard of the system, spell checking (Hunspell), Scheme
+  sessions, the Remote menu (a TeXmacs server over WebSocket, `wss` from the
+  https page), and the plug-ins whose programs run in the browser too:
+  Python (Pyodide), R (webR), TikZ (TikZJax), Asymptote (Asymptote-web),
+  JavaScript and AI.
+* **Not yet**: the plug-ins which run a program of the computer (Maxima,
+  Octave...) and the external converters: a page has no processes. Tested in
+  Firefox, Safari and Chrome.
 * **Issues**: a problem of this port which does not happen in the official
   TeXmacs distribution is to be reported on the
   [issue page of this repository](https://github.com/mgubi/texmacs/issues),
   not to the TeXmacs project; the others go to
   [TeXmacs](https://www.texmacs.org/tmweb/contact/bugs.en.html) as usual.
-* **First visit**: some 9 MB before it starts (the program, and the files
-  it needs to boot), 8.5 MB more in the background, and each font the first
-  time a document uses it; a second visit loads nothing.
+* **First visit**: some 10 MB before it starts (the program, 5.8 MB, and
+  the files it needs to boot), 8.5 MB more in the background, each font the
+  first time a document uses it, and the program of a plug-in the first time
+  it runs (Pyodide, webR and Asymptote-web are the largest); a second visit
+  loads nothing. Help > TeXmacs in the browser tells which commit made the
+  page, the versions of its components and the sizes of its parts.
 * **Published** by the CI, which runs on the branch `vue_ci` only: the work
   goes on in `wip_wasm_vue` without triggering it, and a state is built,
   tested and published with `git push origin wip_wasm_vue:vue_ci`. Each run
@@ -111,8 +120,11 @@ known gaps and testing aids: [doc/ns-port.md](doc/ns-port.md).
 Every pixel of the window is drawn by TeXmacs: Clay lays the widgets out
 anew at each frame (immediate mode), MuPDF renders them and the documents
 into one backing store, and SDL3 only brings the windows, the events, the
-clipboard and the input methods. The widgets follow those of Qt (menus as
-on the Mac, combo boxes which can be typed in, tabs, lists, side tools),
+clipboard and the input methods. Built with ThorVG (`--with-thorvg`), the
+windows can be drawn by the GPU instead, with OpenGL (`TEXMACS_VUE_GPU=1`),
+or WebGL2 in the browser, where it is the default. The widgets follow
+those of Qt (menus as on the Mac, combo boxes which can be typed in, tabs,
+lists, side tools),
 at the density of each window, with animated highlights and rounded
 corners. Nothing in it depends on a platform: the same code runs in a
 browser (branch `wip_wasm_vue`). A single-window mode
