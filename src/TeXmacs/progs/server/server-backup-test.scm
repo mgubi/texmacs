@@ -54,6 +54,16 @@
    (test "non-numeric start"
      "backup-2025-01-15T08" #f)))
 
+(define (regtest-snapshot-name)
+  (regression-test-group
+   "snapshot names of times (UTC)" "snapshot-time"
+   snapshot-name :none
+   (test "the epoch" 0 "1970-01-01T00-00-00")
+   (test "a leap day" 951782400 "2000-02-29T00-00-00")
+   (test "the end of a leap day" 951868799 "2000-02-29T23-59-59")
+   (test "no leap day in 2100" 4107542399 "2100-02-28T23-59-59")
+   (test "an afternoon" 1791152285 "2026-10-04T22-18-05")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test: list-snapshots ordering
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -79,6 +89,26 @@
      '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The tests set the backup preferences: they give them back afterwards
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define backup-preferences
+  '("server service backup" "server backup destination"
+    "server backup keep hourly" "server backup keep daily"
+    "server backup keep monthly" "server backup keep yearly"))
+
+(define saved-backup-preferences '())
+
+(define (save-backup-preferences!)
+  (set! saved-backup-preferences
+        (map (lambda (p) (and (cpp-has-preference? p) (get-preference p)))
+             backup-preferences)))
+
+(define (restore-backup-preferences!)
+  (for-each (lambda (p v) (if v (set-preference p v) (reset-preference p)))
+            backup-preferences saved-backup-preferences))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test: server-backup-prune retention
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -87,11 +117,14 @@
    "backup prune retention" "backup-prune"
    (begin
      (create-test-snapshots!)
+     (save-backup-preferences!)
      (set-preference "server backup keep hourly"  "3")
      (set-preference "server backup keep daily"   "2")
      (set-preference "server backup keep monthly" "1")
      (set-preference "server backup keep yearly"  "0"))
-   (cleanup-test-snapshots!)
+   (begin
+     (cleanup-test-snapshots!)
+     (restore-backup-preferences!))
 
    ;; Newest-first processing:
    ;;   13h -> hourly 1, daily 1 (17th), monthly 1
@@ -112,11 +145,14 @@
    "backup prune safety net" "backup-prune-safety"
    (begin
      (create-test-snapshots!)
+     (save-backup-preferences!)
      (set-preference "server backup keep hourly"  "0")
      (set-preference "server backup keep daily"   "0")
      (set-preference "server backup keep monthly" "0")
      (set-preference "server backup keep yearly"  "0"))
-   (cleanup-test-snapshots!)
+   (begin
+     (cleanup-test-snapshots!)
+     (restore-backup-preferences!))
 
    (test "newest snapshot always preserved as safety net"
      (begin
@@ -158,12 +194,17 @@
    (begin
      (create-test-server-data!)
      (system-mkdir test-backup-dest)
+     (save-backup-preferences!)
+     ;; server-backup-run does nothing while the service is off (the default)
+     (set-preference "server service backup" "on")
      (set-preference "server backup destination" test-backup-dest)
      (set-preference "server backup keep hourly" "24")
      (set-preference "server backup keep daily" "0")
      (set-preference "server backup keep monthly" "0")
      (set-preference "server backup keep yearly" "0"))
-   (cleanup-backup-dest!)
+   (begin
+     (cleanup-backup-dest!)
+     (restore-backup-preferences!))
 
    (test "snapshot is created and matches source"
      (begin
@@ -182,6 +223,7 @@
 
 (tm-define (regtest-server-backup)
   (let ((n (+ (regtest-snapshot-name?)
+              (regtest-snapshot-name)
               (regtest-list-snapshots)
               (regtest-list-snapshots-empty)
               (regtest-backup-prune)

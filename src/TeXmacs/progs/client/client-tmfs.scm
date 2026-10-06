@@ -273,7 +273,7 @@
     (cond ((not name) (url-head fname))
           ((remote-root-directory? fname) fname)
           (else
-            (with h (url->string (url-head name))
+            (with h (url->unix (url-head name))
               (string->url (string-append "tmfs://remote-dir/" h)))))))
 
 (tm-define (remote-home-directory? fname)
@@ -487,7 +487,7 @@
     (list "Name" "string")))
 
 (tm-define (tmfs-type u)
-  (with head (tmfs-car (url->string (url-unroot u)))
+  (with head (tmfs-car (url->unix (url-unroot u)))
     (if (string-starts? head "remote-") (string-drop head 7) head)))
 
 (tm-define (tmfs-icon type)

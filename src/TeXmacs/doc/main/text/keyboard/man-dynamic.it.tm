@@ -10,7 +10,7 @@
   etichette e i riferimenti, perché l'aspetto di un riferimetno dipende da un
   numero determinato dinamicamente. Molti altri esempi di marcatori dinamici
   si trovano nella documentazione relativa allo <apply|hyper-link|scrivere
-  file di stile|../../../devel/style/keyboard/style-kbd.it.tm>.
+  file di stile|../../../devel/style/keyboard/style-kbd.en.tm>.
 
   Quando si inserisce un oggetto dinamico come un'etichetta usando
   <shortcut|(make-label)>, lo stato predefinito è <em|inattivo>. Questo stato

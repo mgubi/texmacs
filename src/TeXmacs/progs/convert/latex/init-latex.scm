@@ -41,9 +41,6 @@
   (:name "LaTeX class")
   (:suffix "ltx" "sty" "cls"))
 
-(define-preferences
-  ("texmacs->latex:transparent-tracking" "on" noop))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; TeXmacs->LaTeX
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

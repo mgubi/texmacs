@@ -8,7 +8,7 @@
   Oltre al genere di contributi che è stato descritto dettagliatamente in
   precedenza, ci sono molti altri aspetti in cui un aiuto sarebbe gradito.
   Per ulteriori dettagli potete dare un'occhiata ai nostri
-  <apply|hyper-link|progetti futuri|../../projects/projects.it.tm>.
+  <apply|hyper-link|progetti futuri|../../projects/projects.en.tm>.
   Naturalmente sentitevi liberi di proporre idee nuove e di condividerle con
   noi nella mailing list <verbatim|texmacs-dev@gnu.org>!
 

@@ -78,7 +78,7 @@ static hashmap<string,aqua_image> images;
  ******************************************************************************/
 
 aqua_renderer_rep::aqua_renderer_rep (int w2, int h2) :
-  basic_renderer_rep (true, w2, h2), context(nil), view(nil)
+  basic_renderer_rep (true, 1.0, w2, h2), context(nil), view(nil)
 {
 }
 

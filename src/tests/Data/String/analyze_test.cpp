@@ -30,6 +30,7 @@ private slots:
   void test_starts ();
   void test_ends ();
   void test_read_word ();
+  void test_as_hexadecimal ();
 };
 
 void
@@ -142,6 +143,20 @@ TestAnalyze::test_read_word () {
   QVERIFY (!read_word ("123", i, word));
   QVERIFY (is_empty (word));
   QCOMPARE (i, 0);
+}
+
+void
+TestAnalyze::test_as_hexadecimal () {
+  QCOMPARE (as_charp (as_hexadecimal (0)), "0");
+  QCOMPARE (as_charp (as_hexadecimal (255)), "FF");
+  QCOMPARE (as_charp (as_hexadecimal (-255)), "-FF");
+  QCOMPARE (as_charp (as_hexadecimal (2147483647)), "7FFFFFFF");
+  // the negation of the smallest int overflows, which used to make the
+  // conversion recurse forever
+  QCOMPARE (as_charp (as_hexadecimal ((int) -2147483647 - 1)), "-80000000");
+  QCOMPARE (from_hexadecimal (as_hexadecimal ((int) -2147483647 - 1)),
+            (int) -2147483647 - 1);
+  QCOMPARE (as_charp (as_hexadecimal (0x1234, 6)), "001234");
 }
 
 QTEST_MAIN(TestAnalyze)

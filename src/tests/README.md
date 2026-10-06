@@ -100,10 +100,9 @@ references, theorems), mathematics, tables, a drawing, program code,
 languages with accented letters, and a book (table of contents, chapters,
 page breaks, appendix). They use only the fonts which come with TeXmacs.
 Like every `.tm` file they are Cork-encoded: accented letters are Cork
-bytes, not UTF-8. The references record the current output, not the ideal
-one: the text layer of the PDF currently maps the Cork glyphs of oe, sharp
-s and the Spanish inverted marks to the wrong characters, and the
-reference of `languages` holds those characters until the writer is fixed.
+bytes, and Cyrillic letters `<#4xx>` code points, not UTF-8. The text of
+the references is the text layer of the PDF, which for the TeX fonts is
+translated from their Cork and T2A positions to Unicode.
 
 When a change is intended, run `check.sh -u` and commit the new references
 together with the change, so that the diff of the references documents what
@@ -162,6 +161,33 @@ and mode, `former`, properties, modes and sub-modes, `lazy-define` and the
 module macros). What needs a buffer, the cursor or the GUI is left out;
 checks which fail because of a bug in the sources are left out with a
 `FIXME` at their place.
+
+Three more test the document level. `latex-test.scm` converts to and from
+LaTeX (special characters, accents, structure, formulas, tables, theorems,
+macros, whole documents) and checks round trips, including the ones which
+lose information on purpose. `formats-test.scm` does the same for the .tm,
+Scheme, TMML, HTML and plain text formats, round-trips a common table of
+samples through the TeXmacs formats, and checks the format registry.
+`editing-test.scm` opens buffers and edits them through the commands a user
+or a plugin uses (inserting, the cursor, selections and the clipboard,
+structured editing, the environment, undo and redo, saving and exporting),
+each action wrapped like a key press of the event loop so that it reaches
+the undo history. Moving the cursor by characters and lines needs a window
+and is left out.
+
+Five more reach further into the system. `typeset-test.scm` checks the
+typesetter as Scheme sees it: evaluation of the style language, lengths,
+the environment and the numbering at paths, the extents of boxes (text,
+mathematics, tables), line breaking, hyphenation, paragraphs and pages.
+`bibtex-test.scm` checks the .bib parser, the BibTeX engine and its styles,
+the export to .bib and the bibliography of a document. `database-test.scm`
+checks the TeXmacs database (fields, history, queries, persistence and the
+Scheme layer) on databases of its own in the temporary directory.
+`crypto-test.scm` checks base64, tree hashes, passwords, the encrypted
+blocks and documents, and GnuPG and GnuTLS, which it skips when they are
+missing (it never touches `~/.gnupg`). `plugins-test.scm` checks plugin
+configuration, the protocol of plugin answers, and live shell and Python
+sessions when they are installed, stopping every process it starts.
 
 `TeXmacs/progs/check/glue-test.scm` tests the glue between C++ and Scheme
 (`src/Scheme/Glue`). It reads the declarations of `build-glue-*.scm` from
