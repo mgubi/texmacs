@@ -128,18 +128,28 @@
         ((string-starts? path "items/top?limit=1&format=keys")
          "AAAA1111\n")
         ((string-starts? path "items/top?format=json")
-         ;; the search matches the citation keys, titles and creators
-         (let ((q (locase-all (or (query-ref path "q") "")))
-               (all? (string-contains? path "qmode=everything")))
+         ;; each word is in the title, the creators or the date; the
+         ;; application also matches the citation keys (and with
+         ;; qmode=everything the field extra), zotero.org does not
+         (let* ((q (locase-all (or (query-ref path "q") "")))
+                (words (list-filter (string-tokenize-by-char q #\space)
+                                    (lambda (w) (!= w ""))))
+                (all? (string-contains? path "qmode=everything"))
+                (fields (lambda (x)
+                          (append (list (caddr x) (cadddr x) (list-ref x 4))
+                                  (if (zotero-web?) '()
+                                      (list (cadr x)
+                                            (if all? (fake-extra x) "")))))))
            (json-items
             (list-filter fake-current
                          (lambda (x)
-                           (or (string-contains? (locase-all (cadr x)) q)
-                               (and all? (string-contains?
-                                          (locase-all (fake-extra x)) q))
-                               (string-contains? (locase-all (caddr x)) q)
-                               (string-contains? (locase-all (cadddr x))
-                                                 q)))))))
+                           (list-and
+                            (map (lambda (w)
+                                   (list-or
+                                    (map (lambda (f)
+                                           (string-contains? (locase-all f) w))
+                                         (fields x))))
+                                 words)))))))
         ((string-starts? path "items?format=json")
          (json-items (list-filter (map fake-item (item-keys path)) identity)))
         ((string-starts? path "items?format=versions")
@@ -425,6 +435,37 @@
                          "EEEE5555"))
             (set-status! 200)
             (system-remove f))))
+      ;; a bibliography without file gets one exported from Zotero, when
+      ;; Zotero has references of the citations
+      (with-document "nofile.tm"
+          (doc-tm "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+        (lambda ()
+          (with f (tmp "nofile-zotero.bib")
+            (zotero-before-update "all")
+            (check= (zotero-master-bibliography-file) f)
+            (check-true (zotero-managed-file? f))
+            (check-true (string-contains? (string-load f)
+                                          "@article{smith2020,"))
+            (system-remove f))))
+      ;; nor a bibliography whose file does not exist yet
+      (with-document "nofile2.tm"
+          (doc-tm "  <\\bibliography|bib|tm-plain|refs>\n  </bibliography>\n")
+        (lambda ()
+          (with f (tmp "refs.bib")
+            (zotero-before-update "all")
+            (check-true (zotero-managed-file? f))
+            (check-true (string-contains? (string-load f)
+                                          "@article{smith2020,"))
+            (system-remove f))))
+      ;; not when it has none
+      (with-document "nozotero.tm"
+          (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                         "  See <cite|nowhere2000>.\n\n"
+                         "  <\\bibliography|bib|tm-plain|>\n"
+                         "  </bibliography>\n</body>\n")
+        (lambda ()
+          (zotero-before-update "all")
+          (check-false (zotero-master-bibliography-file))))
       ;; a file of the user is never replaced: the references of Zotero
       ;; which it lacks are added at its end, after a comment naming their
       ;; item
@@ -935,11 +976,22 @@
       (with-preferences '(("zotero source" . "web")
                           ("zotero user" . "12345 alice"))
         (lambda ()
-          ;; a search of keys searches all the fields on zotero.org
+          ;; zotero.org does not search the citation keys: a key is
+          ;; searched by the name of the author and the year
+          (zotero-forget-keys)
           (set! fake-requests '())
-          (zotero-find-key "smith2020a")
+          (check-true (zotero-find-key "smith2020a"))
           (check-true (list-find fake-requests
-                                 (cut string-contains? <> "qmode=everything")))
+                                 (cut string-contains? <> "q=smith%202020")))
+          (check= ((zotero-private 'key-author-year)
+                   "barashkovF43MeasureGirsanovs2020")
+                  "barashkov 2020")
+          (check= ((zotero-private 'key-author-year) "hairer$$Phi_3^4$$Measure")
+                  "hairer")
+          (check= ((zotero-private 'key-author-year) "smith2020b")
+                  "smith 2020")
+          (check-false ((zotero-private 'key-author-year) "Smith2020"))
+          (check-false ((zotero-private 'key-author-year) "knuth"))
           (set! fake-requests '())
           (zotero-search "gravity")
           (check-false (list-find fake-requests
@@ -997,6 +1049,22 @@
     (set! sim-requests (list-filter sim-requests (lambda (x) (not (eq? x r)))))
     (zotero-async-answer (car r) status version (encode-base64 body))))
 
+(define (sim-answer-all!)
+  ;; answer all the recorded requests from the fake library
+  (with l sim-requests
+    (set! sim-requests '())
+    (for (r l)
+      (let* ((url (cadr r))
+             (pos (string-search-forwards "/users/123/" 0 url))
+             (path (if (>= pos 0) (substring url (+ pos 11) (string-length url))
+                       "")))
+        (set! fake-current fake-library)
+        (zotero-async-answer (car r) 200 7
+                             (encode-base64 ((eval 'fake-library-answer
+                                                   (resolve-module
+                                                    '(check zotero-test)))
+                                             path)))))))
+
 (define (with-sim-browser thunk)
   (with-preferences '(("zotero source" . "web")
                       ("zotero api key" . "secret")
@@ -1029,15 +1097,40 @@
         ;; the key goes in a header
         (check-true (in? "Zotero-API-Key: secret" (caddr (car sim-requests))))
         (check= (zotero-status-message 'pending) "Asking zotero.org...")
+        ;; the footer says what is asked
+        (check= (zotero-progress-message)
+                "Asking zotero.org: checking the library...")
         ;; the operation which waited runs again once answered
+        ;; the results of the search window wait for the state too
+        (check= (zotero-with-retry again
+                                   (lambda () (zotero-file-search-results "")))
+                '("Searching zotero.org..."))
         (sim-answer! "format=keys" 200 7 "AAAA1111\n")
         (check= runs 1)
         (check-false (zotero-pending?))
+        (check-false (zotero-progress-message))
         (check= (zotero-with-retry again zotero-status) 'ready)
         ;; a search: nothing at first, the items once answered
         (check= (zotero-with-retry again (lambda () (zotero-search "gravity")))
                 '())
         (check= (length sim-requests) 1)
+        (check= (zotero-progress-message)
+                "Asking zotero.org: searching ``gravity''...")
+        ;; the search window says so, for the results which wait (and run
+        ;; again), not for others
+        (check= (zotero-searching-results) '())
+        (check= (zotero-with-retry (lambda () (noop)) zotero-searching-results)
+                '())
+        (check= (zotero-with-retry again
+                                   (lambda ()
+                                     (zotero-file-search-results "gravity")))
+                '("Searching zotero.org..."))
+        ;; (its own request, with fewer items)
+        (sim-answer! "limit=10" 200 7 "[]")
+        ;; its sources line says what is asked
+        (check= (zotero-search-sources-text :bib-file)
+                (string-append "Sources: no BibTeX file in the bibliography; "
+                               "Asking zotero.org: searching ``gravity''..."))
         ;; the same request is not asked twice while it is awaited
         (zotero-with-retry again (lambda () (zotero-search "gravity")))
         (check= (length sim-requests) 1)
@@ -1070,9 +1163,44 @@
         (zotero-with-retry again zotero-status)
         (sim-answer! "format=keys" 0 0 "")
         (check= (zotero-with-retry again zotero-status) 'not-running)
+        ;; which is said once all is answered
+        (check= (zotero-answered-message) "zotero.org cannot be reached")
         (check= sim-requests '())
         ;; without retry, the request is synchronous (not recorded here)
         (check-false (zotero-pending?)))))
+  (check-group "async messages")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items/top?format=json&limit=50&q=caf%C3%A9%20au")
+          (string-append "searching ``caf" (string (integer->char 233))
+                         " au''"))
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items/top?format=json&limit=9&qmode=everything&q=smith")
+          "searching ``smith''")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items?format=bibtex&itemKey=A,B,C")
+          "exporting 3 references")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items?format=json&itemKey=A")
+          "fetching 1 reference")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/items?format=versions&itemKey=A,B")
+          "looking for changes of 2 references")
+  (check= (zotero-request-label "https://api.zotero.org/keys/current")
+          "checking the API key")
+  (check= (zotero-request-label
+           "https://api.zotero.org/users/1/groups?format=json&limit=100")
+          "listing your groups")
+  (with-sim-browser
+    (lambda ()
+      (let* ((again (lambda () (noop))))
+        (zotero-with-retry again zotero-status)
+        (sim-answer! "format=keys" 200 7 "AAAA1111\n")
+        (zotero-with-retry again (lambda () (zotero-search "gravity")))
+        (zotero-with-retry again (lambda () (zotero-search "smith")))
+        (check= (zotero-progress-message)
+                "Asking zotero.org: searching ``smith'', and 1 more...")
+        (set! sim-requests '())
+        (zotero-forget-keys))))
   (check-group "async update")
   (with-sim-browser
     (lambda ()
@@ -1087,23 +1215,155 @@
           (lambda ()
             ;; an update waits for the answers, and is made again then
             (check= (zotero-before-update "bibliography") 'wait)
-            (sim-answer! "format=keys" 200 7 "AAAA1111\n")
-            (check= (zotero-before-update "bibliography") 'wait)
-            (set! fake-current fake-library)
-            (sim-answer! "q=smith2020" 200 7
-                         ((eval 'fake-library-answer
-                                (resolve-module '(check zotero-test)))
-                          "items/top?format=json&q=smith2020"))
-            (check= (zotero-before-update "bibliography") 'wait)
-            (sim-answer! "format=bibtex" 200 7
-                         ((eval 'fake-library-answer
-                                (resolve-module '(check zotero-test)))
-                          "items?format=bibtex&itemKey=AAAA1111"))
+            (let loop ((i 0))
+              (when (and (< i 10) (nnull? sim-requests))
+                (sim-answer-all!)
+                (zotero-before-update "bibliography")
+                (loop (+ i 1))))
             ;; all is known: the reference is added to the file
             (check= (zotero-before-update "bibliography") 'done)
             (check= (map car (zotero-bib-chunks-of (string-load f)))
                     '("other" "smith2020"))))
         (system-remove f)))))
+
+
+(define (test-by-item)
+  (check-group "by item")
+  ;; a citation is found by its item, the identifier of Zotero, when it
+  ;; is known: on zotero.org, which does not search the citation keys, a
+  ;; key which is not "author...year" is found that way only
+  (with-fake
+    (lambda ()
+      (set! fake-library
+            (append (default-library)
+                    (list '("FFFF6666" "Weird2021" "Strange title" "Nobody"
+                            "2021" 1 "journalArticle"))))
+      (with-preferences '(("zotero source" . "web")
+                          ("zotero api key" . "secret")
+                          ("zotero user" . "12345 alice"))
+        (lambda ()
+          (with-document "item.tm"
+              (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                             "  See <cite|Weird2021>.\n</body>\n")
+            (lambda ()
+              (check-false (zotero-find-key "Weird2021"))
+              ;; an item which Zotero gave (the search window) is known
+              (zotero-forget-keys)
+              (check= (map zotero-entry-key (zotero-search "strange"))
+                      '("Weird2021"))
+              (check= (zotero-item-of "Weird2021") '("FFFF6666" "users/0"))
+              ;; the citation made from it remembers it with the document
+              (zotero-cited "Weird2021" (current-buffer))
+              (check= (zotero-recorded-items)
+                      '(("Weird2021" "FFFF6666" "users/0")))
+              ;; which is enough, later: it is asked for by its item
+              (zotero-forget-keys)
+              (set! fake-requests '())
+              (check= (map car (zotero-resolve '("Weird2021" "smith2020")))
+                      '("Weird2021" "smith2020"))
+              (check-true (list-find fake-requests
+                                     (cut string-contains? <>
+                                          "items?format=json&itemKey=FFFF6666")))
+              ;; a renamed item is no longer found under the old key, and
+              ;; is reported as renamed
+              (set! fake-library
+                    (map (lambda (x)
+                           (if (== (car x) "FFFF6666")
+                               '("FFFF6666" "Weird2021b" "Strange title"
+                                 "Nobody" "2021" 2 "journalArticle")
+                               x))
+                         fake-library))
+              (zotero-forget-keys)
+              (check-false (zotero-find-key "Weird2021"))
+              (check= (map car (car (zotero-check-missing '("Weird2021"))))
+                      '("Weird2021")))))))))
+
+(define (test-cited)
+  (check-group "cited")
+  ;; a reference of Zotero chosen in the search window is copied at once
+  ;; where the bibliography reads it
+  (with-fake
+    (lambda ()
+      (set! fake-library
+            (append (default-library)
+                    (list '("FFFF6666" "Weird2021" "Strange title" "Nobody"
+                            "2021" 1 "journalArticle"))))
+      (with-preferences '(("zotero source" . "web")
+                          ("zotero api key" . "secret")
+                          ("zotero user" . "12345 alice"))
+        (lambda ()
+          (eval-system (string-append "mkdir -p '" zotero-dir "'"))
+          (with cite-doc (lambda (bib)
+                           (string-append
+                            "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n"
+                            "  See <cite|Weird2021>.\n\n" bib "</body>\n"))
+            ;; at the end of the BibTeX file of the user
+            (with f (tmp "mine.bib")
+              (string-save "@article{other, title={Other}}\n" f)
+              (with-document "c1.tm"
+                  (cite-doc "  <\\bibliography|bib|tm-plain|mine>\n  </bibliography>\n")
+                (lambda ()
+                  (zotero-search "strange")
+                  (zotero-cited "Weird2021" (current-buffer))
+                  (check= (map car (zotero-bib-chunks-of (string-load f)))
+                          '("other" "Weird2021"))
+                  (check= (zotero-bib-file-items f)
+                          '(("Weird2021" "FFFF6666" "users/0")))
+                  (check= (zotero-recorded-items)
+                          '(("Weird2021" "FFFF6666" "users/0")))))
+              (system-remove f))
+            ;; into a file of Zotero, for a bibliography without file
+            (with-document "c2.tm"
+                (cite-doc "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+              (lambda ()
+                (with f (tmp "c2-zotero.bib")
+                  (zotero-search "strange")
+                  (zotero-cited "Weird2021" (current-buffer))
+                  (check-true (zotero-managed-file? f))
+                  (check= (map car (zotero-bib-chunks-of (string-load f)))
+                          '("Weird2021"))
+                  (system-remove f))))
+            ;; not a reference which Zotero did not give
+            (with-document "c3.tm"
+                (cite-doc "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+              (lambda ()
+                (zotero-forget-keys)
+                (zotero-cited "Weird2021" (current-buffer))
+                (check= (zotero-recorded-items) '())
+                (check-false (url-exists? (tmp "c3-zotero.bib")))))
+            ;; into the database, with the database
+            (with-test-database
+              (lambda ()
+                (with-document "c4.tm" (cite-doc "")
+                  (lambda ()
+                    (zotero-search "strange")
+                    (check-false (zotero-in-database? "Weird2021"))
+                    (zotero-cited "Weird2021" (current-buffer))
+                    (check-true (zotero-in-database? "Weird2021"))))))))))))
+
+(define (test-async-database)
+  (check-group "async database")
+  ;; with the database, Update -> All in a web browser: the references of
+  ;; Zotero are asked first, and the bibliography made once they are known
+  ;; (zotero.org does not search the citation keys: they are found by the
+  ;; name of the author and the year)
+  (with-sim-browser
+    (lambda ()
+      (with-test-database
+        (lambda ()
+          (with-document "adb.tm"
+              (doc-tm "  <\\bibliography|bib|tm-plain|>\n  </bibliography>\n")
+            (lambda ()
+              (let loop ((i 0))
+                (when (and (< i 10) (== (zotero-before-update "all") 'wait))
+                  (sim-answer-all!)
+                  (loop (+ i 1))))
+              (check= (zotero-before-update "all") 'done)
+              ;; the generation of the bibliography then finds them (a
+              ;; request now would fail: no web-javascript)
+              (check= (map car (zotero-db-entries
+                                '("smith2020" "zotero:EEEE5555")))
+                      '("smith2020" "zotero:EEEE5555")))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The key of zotero.org, asked when it is needed
@@ -1579,6 +1839,9 @@
   (test-summaries)
   (test-web)
   (test-async)
+  (test-async-database)
+  (test-by-item)
+  (test-cited)
   (test-key)
   (test-renamed)
   (test-database-search)

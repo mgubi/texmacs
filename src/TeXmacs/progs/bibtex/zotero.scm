@@ -323,6 +323,12 @@
   (:synopsis "Does an operation wait for answers of zotero.org?")
   (and (zotero-in-browser?) (zotero-pending?)))
 
+(tm-define (zotero-waiting?)
+  (:synopsis "Does the operation being run wait for answers of zotero.org?")
+  ;; NOTE: it runs again once they have come (zotero-with-retry)
+  (and current-retry (zotero-pending?)
+       (memq current-retry waiting-retries) #t))
+
 (tm-define (zotero-command again thunk)
   (:synopsis "Run the command @thunk, which runs @again when answered")
   ;; a command which waits for zotero.org says so; it runs again when the
@@ -332,7 +338,7 @@
       (zotero-ask-key again)
       (begin
         (zotero-with-retry again thunk)
-        (when (zotero-asking?) (set-message "Asking zotero.org..." "Zotero")))))
+        (when (zotero-asking?) (show-progress)))))
 
 (define (answer-delay url)
   ;; how long an answer is used again: the requests of the state, briefly
@@ -347,7 +353,121 @@
   (set! answers (make-ahash-table))
   (set! pending (make-ahash-table))
   (set! pending-ids (make-ahash-table))
-  (set! waiting-retries '()))
+  (set! waiting-retries '())
+  (set! asked-since #f)
+  (set! asked-failures '()))
+
+;; While answers are awaited, the footer says what is asked, and for how
+;; long; once they have all come, how long it took, or what failed
+
+(define asked-since #f)      ; when the requests awaited began, or #f
+(define asked-failures '())  ; the statuses of the failed answers meanwhile
+
+(define (url-decode s)
+  ;; the (utf8) string percent-encoded in @s
+  (let loop ((l (string->list s)) (acc '()))
+    (cond ((null? l) (list->string (reverse acc)))
+          ((and (== (car l) #\%) (pair? (cdr l)) (pair? (cddr l))
+                (string->number (string (cadr l) (caddr l)) 16))
+           (loop (cdddr l)
+                 (cons (integer->char (string->number
+                                       (string (cadr l) (caddr l)) 16))
+                       acc)))
+          ((== (car l) #\+) (loop (cdr l) (cons #\space acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
+
+(define (url-parameter url name)
+  ;; the value of the parameter @name of @url, decoded, or #f
+  (let* ((key (string-append name "="))
+         (at (lambda (sep)
+               (with pos (string-search-forwards (string-append sep key) 0 url)
+                 (and (>= pos 0) pos))))
+         (pos (or (at "?") (at "&"))))
+    (and pos
+         (let* ((start (+ pos 1 (string-length key)))
+                (end (string-search-forwards "&" start url)))
+           (url-decode (substring url start (if (>= end 0) end
+                                                (string-length url))))))))
+
+(tm-define (zotero-request-label url)
+  (:synopsis "What the request @url asks of Zotero, for the messages")
+  (let* ((items (url-parameter url "itemKey"))
+         (n (if items (length (string-tokenize-by-char items #\,)) 1))
+         (refs (lambda (one several)
+                 (if (== n 1) (zotero-tr one)
+                     (zotero-tr several (number->string n))))))
+    (cond ((string-contains? url "keys/current")
+           (zotero-tr "checking the API key"))
+          ((string-contains? url "groups?")
+           (zotero-tr "listing your groups"))
+          ((string-contains? url "limit=1&format=keys")
+           (zotero-tr "checking the library"))
+          ((url-parameter url "q")
+           => (lambda (q)
+                (zotero-tr "searching %1"
+                           (string-append "``" (utf8->cork q) "''"))))
+          ((string-contains? url "format=versions")
+           (refs "looking for changes of 1 reference"
+                 "looking for changes of %1 references"))
+          ((or (string-contains? url "format=bibtex")
+               (string-contains? url "format=biblatex"))
+           (refs "exporting 1 reference" "exporting %1 references"))
+          (else (refs "fetching 1 reference" "fetching %1 references")))))
+
+(define (seconds ms)
+  ;; @ms milliseconds, in seconds with one decimal
+  (with d (quotient (+ ms 50) 100)
+    (string-append (number->string (quotient d 10)) "."
+                   (number->string (remainder d 10)))))
+
+(tm-define (zotero-progress-message)
+  (:synopsis "What is asked of zotero.org, while answers are awaited")
+  ;; NOTE: the newest request first, which is what was asked last (as the
+  ;; search being typed)
+  (let* ((urls (map cdr (sort (ahash-table->list pending-ids)
+                              (lambda (a b) (> (car a) (car b))))))
+         (what (cond ((null? urls) #f)
+                     ((null? (cdr urls)) (zotero-request-label (car urls)))
+                     (else (zotero-tr "%1, and %2 more"
+                                      (zotero-request-label (car urls))
+                                      (number->string (- (length urls) 1))))))
+         (t (if asked-since (- (texmacs-time) asked-since) 0)))
+    (cond ((not what) #f)
+          ((< t 2000) (zotero-tr "Asking zotero.org: %1..." what))
+          ((< t 10000)
+           (zotero-tr "Asking zotero.org: %1 (%2 s)..." what
+                      (number->string (quotient t 1000))))
+          (else
+           (zotero-tr "zotero.org is slow to answer: %1 (%2 s)..." what
+                      (number->string (quotient t 1000)))))))
+
+(define last-answered #f)
+
+(tm-define (zotero-answered-message)
+  (:synopsis "What came back from zotero.org, when all was last answered")
+  last-answered)
+
+(define (answered-message)
+  (let* ((t (if asked-since (- (texmacs-time) asked-since) 0))
+         (failed (list-filter asked-failures (lambda (st) (!= st 200)))))
+    (if (null? failed)
+        (zotero-tr "zotero.org answered in %1 s" (seconds t))
+        (zotero-status-message (status->state (car failed))))))
+
+(define ticking? #f)
+
+(define (show-progress)
+  ;; the footer says what is awaited, again each second while it is
+  (and-with msg (zotero-progress-message)
+    (set-message msg "Zotero")
+    (when (not ticking?)
+      (set! ticking? #t)
+      (delayed
+        (:pause 1000)
+        (set! ticking? #f)
+        ;; (and the sources line of the search window)
+        (refresh-now "db-search-sources")
+        (when (zotero-pending?) (show-progress))))))
 
 (tm-define (zotero-start-request id url headers)
   (:synopsis "Ask for @url asynchronously; zotero-async-answer gets the answer")
@@ -374,15 +494,24 @@
 
 (tm-define (zotero-async-answer id status version body64)
   (:synopsis "The answer of the asynchronous request @id")
+  ;; NOTE: the operations which waited may set their own message, or ask
+  ;; for more (then the time counts from the first request)
   (and-with url (ahash-ref pending-ids id)
     (ahash-remove! pending-ids id)
     (ahash-remove! pending url)
     (ahash-set! answers url (list (texmacs-time) status (decode-base64 body64)
                                   (and (> version 0) version)))
-    (when (not (zotero-pending?))
-      (with l (reverse waiting-retries)
-        (set! waiting-retries '())
-        (for (r l) (r))))))
+    (when (!= status 200)
+      (set! asked-failures (cons status asked-failures)))
+    (if (zotero-pending?) (show-progress)
+        (with l (reverse waiting-retries)
+          (set! last-answered (answered-message))
+          (set-message last-answered "Zotero")
+          (set! waiting-retries '())
+          (for (r l) (r))
+          (when (not (zotero-pending?))
+            (set! asked-since #f)
+            (set! asked-failures '()))))))
 
 (define (async-get url headers)
   (or (known-answer url)
@@ -390,10 +519,13 @@
         (when (not (memq current-retry waiting-retries))
           (set! waiting-retries (cons current-retry waiting-retries)))
         (when (not (ahash-ref pending url))
+          (when (not (zotero-pending?))
+            (set! asked-since (or asked-since (texmacs-time))))
           (ahash-set! pending url #t)
           (set! async-serial (+ async-serial 1))
           (ahash-set! pending-ids async-serial url)
-          (zotero-start-request async-serial url headers))
+          (zotero-start-request async-serial url headers)
+          (show-progress))
         (list 'pending "" #f))))
 
 (define (http-get url headers interactive?)
@@ -719,7 +851,19 @@
 
 (define (items-entries lib s)
   ;; The entries of the items in the answer @s for the library @lib
-  (list-filter (map (cut item-entry <> lib) (json-items s)) identity))
+  (with l (list-filter (map (cut item-entry <> lib) (json-items s)) identity)
+    (for (e l) (note-item! e))
+    l))
+
+;; The items which Zotero gave (searches, completions...), by their
+;; citation key: a citation made from them is then found by its item, the
+;; identifier of Zotero, which does not change (see zotero-item-of)
+(define seen-items (make-ahash-table)) ; key -> (item library)
+
+(define (note-item! e)
+  (when (!= (zotero-entry-key e) "")
+    (ahash-set! seen-items (zotero-entry-key e)
+                (list (zotero-entry-item e) (zotero-entry-library e)))))
 
 (tm-define (zotero-entry-key e) (first e))
 (tm-define (zotero-entry-item e) (second e))
@@ -978,14 +1122,46 @@
 (tm-define (zotero-forget-keys)
   (:synopsis "Forget the citation keys found in Zotero")
   (forget-answers)
+  (set! seen-items (make-ahash-table))
   (set! resolved (make-ahash-table))
   (set! completions (make-ahash-table))
   (set! library-versions (make-ahash-table)))
 
+(define (key-author-year key)
+  ;; The words "author year" of a citation key made by Better BibTeX (or
+  ;; Zotero), as barashkovF43MeasureGirsanovs2020: the name of the first
+  ;; author in lower case, words of the title, the year; #f otherwise
+  (let* ((l (string->list key))
+         (author (let loop ((l l) (acc '()))
+                   (if (and (pair? l) (char-lower-case? (car l)))
+                       (loop (cdr l) (cons (car l) acc))
+                       (list->string (reverse acc)))))
+         ;; (a letter may follow the year: smith2020a, smith2020b)
+         (r (with r (reverse l)
+              (if (and (pair? r) (pair? (cdr r)) (char-lower-case? (car r))
+                       (char-numeric? (cadr r)))
+                  (cdr r) r)))
+         (year (let loop ((l r) (acc '()))
+                 (if (and (pair? l) (char-numeric? (car l)))
+                     (loop (cdr l) (cons (car l) acc))
+                     (list->string acc)))))
+    (and (>= (string-length author) 2)
+         (< (string-length author) (string-length key))
+         (if (== (string-length year) 4)
+             (string-append author " " year)
+             author))))
+
 (define (find-in-library lib key)
-  ;; NOTE: the search also finds longer keys containing key
-  (list-find (search-library lib key 100 #f #t)
-             (lambda (e) (== (zotero-entry-key e) key))))
+  ;; NOTE: the search also finds longer keys containing key. zotero.org
+  ;; only searches the titles, the creators and the years (also with
+  ;; qmode=everything), not the citation keys: there the items of the
+  ;; author of the year are searched first
+  (let ((match (lambda (l)
+                 (list-find l (lambda (e) (== (zotero-entry-key e) key))))))
+    (or (and (zotero-web?)
+             (and-with q (key-author-year key)
+               (match (search-library lib q 100 #f))))
+        (match (search-library lib key 100 #f #t)))))
 
 (tm-define (zotero-find-key key)
   (:synopsis "The entry of the item with the citation key @key, or #f")
@@ -1003,8 +1179,9 @@
                                                    "?format=json"))
                         (and-with e (list-find (items-entries lib s) identity)
                           (and (== (zotero-entry-key e) key) e))))
-                    (list-or (map (cut find-in-library <> key)
-                                  (zotero-libraries))))
+                    (or (find-by-item key)
+                        (list-or (map (cut find-in-library <> key)
+                                      (zotero-libraries)))))
           ;; NOTE: not while an answer is awaited, which is no answer
           (when (and (zotero-ready?) (not (zotero-asking?)))
             (ahash-set! resolved key (or e 'none)))
@@ -1050,11 +1227,63 @@
                                            (string-recompose l ",")))))
      (if (null? items) '() (chunks items 50)))))
 
+(tm-define (zotero-item-of key)
+  (:synopsis "The (item library) of the citation @key, when it is known")
+  ;; as remembered with the document, in the comments of the BibTeX file
+  ;; of the user, or given by Zotero during this session
+  (or (assoc-ref (zotero-recorded-items) key)
+      (with f (zotero-own-bib-file)
+        (and f (assoc-ref (zotero-bib-file-items f) key)))
+      (ahash-ref seen-items key)))
+
+(define (find-by-item key)
+  ;; the entry of @key, asked for by its item; #f when that item has
+  ;; another key now (renamed: see zotero-check-missing) or is gone
+  (and-with x (zotero-item-of key)
+    (and (in? (cadr x) (zotero-libraries))
+         (and-with s (zotero-get (cadr x) (string-append
+                                           "items/" (car x) "?format=json"))
+           (list-find (items-entries (cadr x) s)
+                      (lambda (e) (== (zotero-entry-key e) key)))))))
+
+(define (resolve-by-items! keys)
+  ;; ask for the items of the @keys, by library and at once, and remember
+  ;; those which still have their key
+  (let* ((l (list-filter (map (lambda (k)
+                                (and (not (zotero-derived-key? k))
+                                     (not (ahash-ref resolved k))
+                                     (and-with x (zotero-item-of k)
+                                       (cons k x))))
+                              keys)
+                         identity))
+         (libs (list-remove-duplicates (map caddr l))))
+    (for (lib libs)
+      (when (in? lib (zotero-libraries))
+        (let* ((mine (list-filter l (lambda (x) (== (caddr x) lib))))
+               (es (zotero-items-entries (map cadr mine) lib)))
+          (for (x mine)
+            (and-with e (list-find es (lambda (e)
+                                        (and (== (zotero-entry-item e) (cadr x))
+                                             (== (zotero-entry-key e)
+                                                 (car x)))))
+              (ahash-set! resolved (car x) e))))))))
+
 (tm-define (zotero-resolve keys)
   (:synopsis "The (key . entry) for the @keys which Zotero has")
-  (list-filter (map (lambda (k) (and-with e (zotero-find-key k) (cons k e)))
-                    keys)
-               identity))
+  ;; the keys whose item is known are asked for by their items first; the
+  ;; others are searched (while the items are awaited, nothing is searched)
+  (if (not (zotero-ready?)) '()
+      (begin
+        (resolve-by-items! keys)
+        (if (zotero-waiting?) '()
+            (list-filter (map (lambda (k)
+                                (and-with e (zotero-find-key k) (cons k e)))
+                              keys)
+                         identity)))))
+
+(tm-define (zotero-seen? key)
+  (:synopsis "Did Zotero give the item of @key during this session?")
+  (and (ahash-ref seen-items key) #t))
 
 (define (chunks l n)
   (if (<= (length l) n) (list l)
@@ -1617,13 +1846,23 @@
   (:synopsis "Remember with the document the Zotero items of its citations")
   ;; The (key item library) are kept in an attachment of the document, so
   ;; that a key renamed in Zotero can be found again
-  (when (nnull? entries)
+  (record-items (map (lambda (e)
+                       (list (zotero-entry-key e) (zotero-entry-item e)
+                             (zotero-entry-library e)))
+                     entries)))
+
+(define (record-items l)
+  ;; remember the (key item library) of @l with the document
+  (when (and (nnull? l)
+             (list-or (map (lambda (x) (!= (assoc-ref (zotero-recorded-items)
+                                                      (car x))
+                                           (cdr x)))
+                           l)))
     (let* ((h (make-ahash-table)))
       (for (x (zotero-recorded-items))
         (ahash-set! h (car x) (cdr x)))
-      (for (e entries)
-        (ahash-set! h (zotero-entry-key e)
-                    (list (zotero-entry-item e) (zotero-entry-library e))))
+      (for (x l)
+        (ahash-set! h (car x) (cdr x)))
       (set-attachment "zotero-items"
                       (stree->tree
                        `(tuple ,@(map (lambda (x) `(tuple ,(car x) ,@(cdr x)))
@@ -1841,9 +2080,66 @@
   (zotero-key-wanted (lambda () (update-document what)))
   (if (zotero-asking?)
       (begin
-        (set-message "Asking zotero.org..." "Zotero")
+        (show-progress)
         'wait)
       'done))
+
+;; Without the database, a bibliography without file, or whose file does
+;; not exist yet, has no references: when Zotero has references which the
+;; document cites, its file is exported from Zotero, as with Update from
+;; Zotero; a bibliography without file is given one named after the
+;; document (Zotero is not asked about when its key is missing)
+
+(define (empty-bibliography t)
+  ;; the bibliography tag without file in the tree @t, or #f
+  (cond ((and (tree-is? t 'bibliography) (== (tree-arity t) 4))
+         (and (tree-atomic? (tree-ref t 2))
+              (== (tree->string (tree-ref t 2)) "")
+              t))
+        ((tree-compound? t)
+         (list-or (map empty-bibliography (tree-children t))))
+        (else #f)))
+
+(define (zotero-has-citations?)
+  (with keys (zotero-project-citations)
+    (and (nnull? keys) (zotero-ready?) (nnull? (zotero-resolve keys)))))
+
+(define (fill-missing-bibliography)
+  ;; #t when the bibliography is to be exported from Zotero
+  (let* ((u (current-buffer))
+         (ok? (and u (not (url-rooted-tmfs? u)) (not (supports-db?))
+                   (not (zotero-key-missing?))))
+         (t (and ok? (== (zotero-master) u)
+                 (empty-bibliography (buffer-get-body u))))
+         (f (and ok? (not t) (zotero-master-bibliography-file))))
+    (cond ((and t (zotero-has-citations?))
+           (with name (string-append (url-basename u) "-zotero")
+             (tree-set! t 2 name)
+             (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
+                                     (string-append name ".bib"))
+                          "Zotero")
+             #t))
+          ((and f (not (url-rooted-tmfs? f)) (not (url-exists? f))
+                (zotero-has-citations?))
+           (set-message (zotero-tr "The bibliography takes the references of Zotero, in %1"
+                                   (url->system (url-tail f)))
+                        "Zotero")
+           #t)
+          (else #f))))
+
+(tm-define (zotero-file-citations keys)
+  (:synopsis "Put the references of Zotero of @keys in the BibTeX file")
+  ;; the file of the bibliography, without the database: added at the end
+  ;; of a file of the user, or exported into a file of Zotero (also when
+  ;; it does not exist yet, or the bibliography has no file)
+  (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))
+               (zotero-master-bibliography-file))
+    (cond ((add-to-own-file? f)
+           (with (added missing) (zotero-add-to-bib-file f keys)
+             (when (and (nnull? added) (not (zotero-asking?)))
+               (set-message (zotero-add-message added '() f) "Zotero"))))
+          ((or (fill-missing-bibliography) (with-zotero-bibliography?))
+           (zotero-refresh-bibliography #t)))))
 
 (define (before-update what)
   (when (in? what '("all" "bibliography"))
@@ -1857,7 +2153,7 @@
                               (negate zotero-in-database?))
         (when (and (nnull? keys) (zotero-ready?) (zotero-in-browser?))
           (zotero-db-entries keys))))
-    (when (with-zotero-bibliography?)
+    (when (or (fill-missing-bibliography) (with-zotero-bibliography?))
       (zotero-refresh-bibliography #t))
     ;; the references of Zotero which the file of the user lacks
     (with f (and (current-buffer) (not (url-rooted-tmfs? (current-buffer)))

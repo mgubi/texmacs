@@ -37,7 +37,8 @@
         (database db-convert)
         (database bib-db)
         (database bib-manage)
-        (database db-widgets)))
+        (database db-widgets)
+        (utils library cursor)))
 
 (tm-define (zotero-in-database? key)
   (:synopsis "Does the database of the user have the reference @key?")
@@ -155,6 +156,26 @@
                                           "zotero-key" (car x))))
                         (convert-entries (list (cdr p)))))
                  renamed)))))
+
+(tm-define (zotero-cited key buf)
+  (:synopsis "Take from Zotero the reference of @key, cited in @buf")
+  ;; A citation chosen in the search window, among the references which
+  ;; Zotero gave: its item is remembered with the document, and its
+  ;; reference is copied where the bibliography reads it, into the database
+  ;; or into the BibTeX file of the bibliography; Update then finds it
+  ;; there, without asking Zotero
+  (when (and (string? key) (zotero-seen? key)
+             buf (buffer-exists? buf))
+    (with-buffer buf
+      (zotero-command (lambda () (zotero-cited key buf))
+                      (lambda () (take-cited key))))))
+
+(define (take-cited key)
+  (and-with e (zotero-find-key key)
+    (zotero-record-items (list e))
+    (if (supports-db?)
+        (when (zotero-can-import? e) (import-entry e))
+        (zotero-file-citations (list key)))))
 
 (tm-define (zotero-import-items zs)
   (:synopsis "Import the Zotero entries @zs into the database")
@@ -291,7 +312,10 @@
   ;; At most 20 references of the BibTeX file of the bibliography (unless
   ;; it is managed by Zotero: its items are those of Zotero), then those of
   ;; Zotero, each with its source
-  (let* ((f (zotero-own-bib-file))
+  ;; NOTE: the state of Zotero is asked first, so that the results are
+  ;; shown again when it comes, in a web browser
+  (let* ((ready? (zotero-ready?))
+         (f (zotero-own-bib-file))
          (fl (if (not f) '()
                  (list-filter (bib-file-entries f)
                               (lambda (e)
@@ -308,23 +332,39 @@
                 (zotero-mark-results (db-pretty zl "bib" :pretty) zl #t))))
     (cond ((nnull? (append r z))
            (append r (if (> (length fl) 20) (list "More items follow") '())
-                   z))
-          ((and (not f) (not (zotero-ready?)))
+                   z (zotero-searching-results)))
+          ((zotero-waiting?) (zotero-searching-results))
+          ((and (not f) (not ready?))
            (list (zotero-tr "No bibliography file, and Zotero is not available")))
           (else (list (zotero-tr "No matching items"))))))
 
+(tm-define (zotero-searching-results)
+  (:synopsis "A line of the search results, while zotero.org is asked")
+  ;; NOTE: only for the answers which these results wait for
+  (if (and (zotero-in-database-search?) (zotero-waiting?))
+      (list (zotero-tr "Searching zotero.org..."))
+      '()))
+
 (define (zotero-source-state)
-  ;; Zotero, as a source of the search window
+  ;; Zotero, as a source of the search window; while answers of zotero.org
+  ;; are awaited, what is asked (the footer of the document is not shown
+  ;; again while the search window has the focus)
   (let ((where (if (zotero-web?) "zotero.org" "Zotero")))
     (cond ((not (zotero-in-database-search?))
            (zotero-tr "Zotero is left out (see the Zotero settings)"))
+          ;; (the state is asked first: the line is shown again when it
+          ;; comes)
+          ((begin (zotero-ready?) (zotero-asking?))
+           (zotero-progress-message))
           ((zotero-ready?)
-           (if (== (get-preference "zotero libraries") "all")
-               (with n (length (zotero-groups))
-                 (zotero-tr (if (== n 1) "%1 (My Library and %2 group)"
-                                "%1 (My Library and %2 groups)")
-                            where (number->string n)))
-               (zotero-tr "%1 (My Library)" where)))
+           (with libs (if (== (get-preference "zotero libraries") "all")
+                          (with n (length (zotero-groups))
+                            (zotero-tr (if (== n 1)
+                                           "%1 (My Library and %2 group)"
+                                           "%1 (My Library and %2 groups)")
+                                       where (number->string n)))
+                          (zotero-tr "%1 (My Library)" where))
+             libs))
           ((== (zotero-status) 'disabled)
            (zotero-tr "Zotero refuses the requests (enable its local API)"))
           ((and (== (zotero-status) 'not-running) (not (zotero-web?)))
@@ -357,14 +397,17 @@
   (zotero-forget-state)
   (zotero-search-opened)
   (and-with u (if (tree-func? t 'cite-detail) (tree-ref t 0) (tree-down t))
-    (open-db-chooser
-     :bib-file "bib" "Search bibliographic reference"
-     (lambda (key)
-       (when (and key
-                  (tree->path u)
-                  (tree-in? (tree-up u)
-                            '(cite nocite cite-detail cite-TeXmacs)))
-         (tree-set! u key))))))
+    (with buf (current-buffer)
+      (open-db-chooser
+       :bib-file "bib" "Search bibliographic reference"
+       (lambda (key)
+         (when (and key
+                    (tree->path u)
+                    (tree-in? (tree-up u)
+                              '(cite nocite cite-detail cite-TeXmacs)))
+           (tree-set! u key)
+           ;; its item is remembered with the document
+           (zotero-cited key buf)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Summaries of the entries of the database
