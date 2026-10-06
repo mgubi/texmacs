@@ -26,7 +26,7 @@
                      "/plugins/tmpy/session/tm_tikz.py\"")))
 
 (plugin-configure tikz
-  (:require (python-command))
+  (:require (!= (python-command) ""))
   (:require (url-exists-in-path? "latex"))
   (:launch ,(tikz-launcher))
   (:serializer ,tikz-serialize)

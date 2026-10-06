@@ -31,7 +31,8 @@
   (:winpath "gnuplot" "bin") ;; the first winpath has the highest priority
   (:winpath "GNU Octave/Octave*/mingw64" "bin")
   (:require (url-exists-in-path? "gnuplot"))
-  (:require (url-exists-in-path? (python-command)))
+  (:require (and (!= (python-command) "")
+                 (url-exists-in-path? (python-command))))
   ,@(gnuplot-launcher)
   (:serializer ,gnuplot-serialize)
   (:session "Gnuplot")

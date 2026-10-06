@@ -43,9 +43,12 @@
 (define-public connection-session (make-ahash-table))
 (define-public connection-scripts (make-ahash-table))
 
-(ahash-set! connection-defined "scheme" "Scheme")
-(ahash-set! connection-session "scheme" "Scheme")
-(ahash-set! connection-scripts "scheme" "Scheme")
+(define (register-scheme-connection)
+  (ahash-set! connection-defined "scheme" "Scheme")
+  (ahash-set! connection-session "scheme" "Scheme")
+  (ahash-set! connection-scripts "scheme" "Scheme"))
+
+(register-scheme-connection)
 
 (define (connection-setup name val . opt)
   (ahash-set! connection-defined name #t)
@@ -358,7 +361,8 @@
   (set! connection-varlist (make-ahash-table))
   (set! connection-handler (make-ahash-table))
   (set! connection-session (make-ahash-table))
-  (set! connection-scripts (make-ahash-table)))
+  (set! connection-scripts (make-ahash-table))
+  (register-scheme-connection))
 
 (define-public (reinit-plugin-cache)
   (reinit-connection)
@@ -656,8 +660,10 @@
 
 (define-public (lazy-plugin-initialize name)
   "Initialize the plug-in @name in a lazy way"
+  (plugin-load-setup)
   (ahash-set! plugin-initialize-todo name #t)
-  (if (eval (ahash-ref plugin-data-table (list name :prioritary)))
+  (if (eval (ahash-ref plugin-data-table
+                       (list (symbol->string name) :prioritary)))
       (plugin-initialize name)
       (delayed
         (:idle 1000)

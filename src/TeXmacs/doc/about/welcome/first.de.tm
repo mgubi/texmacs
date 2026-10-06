@@ -9,7 +9,7 @@
   that you are using it, you will find a few useful comments and suggestions
   below. This text only appears at the first time when you start <TeXmacs>.
   If you want to read it again, you can find it in the menu
-  <menu|Help|Apropos|First start>.
+  <menu|Help|About|First start>.
 
   <\description>
     <item*|Help>

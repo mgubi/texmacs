@@ -130,7 +130,7 @@ protected:
   virtual void apply_changes () = 0;
   virtual void animate () = 0;
   virtual path search_format () = 0;
-  virtual path search_format (int& row, int& col) = 0;
+  virtual path search_format (int& row, int& col, bool create= true) = 0;
   virtual void table_get_extents (path fp, int& nr_rows, int& nr_cols) = 0;
   virtual void table_bound (path fp, int& i1, int& j1, int& i2, int& j2) = 0;
   virtual tree table_get_subtable (path p, int i1, int j1, int i2, int j2) = 0;

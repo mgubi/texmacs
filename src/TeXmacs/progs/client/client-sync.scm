@@ -155,8 +155,9 @@
 (define (conflicting-remote-delete? line ref)
   (and (!= (car line) "remote-delete")
        (fifth line)
-       (url-descends? (system->url (fifth line))
-                      (system->url (fifth ref)))))
+       ;; compare tmfs://remote-file/... with tmfs://remote-dir/... names
+       (url-descends? (file-dir-correct #f (system->url (fifth line)))
+                      (file-dir-correct #f (system->url (fifth ref))))))
 
 (define (requalify-deleted line l)
   (with (cmd dir? local-name local-id remote-name remote-id*) line
