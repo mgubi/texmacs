@@ -70,7 +70,7 @@
 		 (load-help-article "main/math/fonts/man-math-font-others"))
 		---
 		("Fonts, from selection to glyph"
-		 (load-help-article "devel/fonts/font-guide")))
+		 (load-help-buffer "devel/fonts/font-guide")))
 	    ("Tabular material"
 	     (load-help-article "main/table/man-table"))
 	    ("Automatic content generation"
@@ -108,7 +108,7 @@
 	    ("Stylesheet language"
 	     (load-help-article "devel/format/stylesheet/stylesheet"))
 	    ("Fonts, from selection to glyph"
-	     (load-help-article "devel/fonts/font-guide"))
+	     (load-help-buffer "devel/fonts/font-guide"))
 	    ("Standard TeXmacs styles"
 	     (load-help-article "main/styles/styles"))
 	    ("Compatibility with other formats"
@@ -118,19 +118,19 @@
 	    ("Browse" (load-help-buffer "devel/devel"))
 	    ---
 	    ("The TeXmacs document format"
-	     (load-help-article "devel/format/format"))
+	     (load-help-buffer "devel/format/format"))
 	    ("Writing TeXmacs style files"
 	     (load-help-article "devel/style/style"))
 	    ("The TeXmacs Scheme developer guide"
-	     (load-help-article "devel/scheme/scheme"))
+	     (load-help-buffer "devel/scheme/scheme"))
 	    ("The TeXmacs plug-in system"
 	     (load-help-article "devel/plugin/plugins"))
 	    ("Interfacing TeXmacs with other programs"
-	     (load-help-article "devel/interface/interface"))
+	     (load-help-buffer "devel/interface/interface"))
 	    ("Fonts, from selection to glyph"
-	     (load-help-article "devel/fonts/font-guide"))
+	     (load-help-buffer "devel/fonts/font-guide"))
 	    ("About the source code of TeXmacs"
-	     (load-help-article "devel/source/source"))))
+	     (load-help-buffer "devel/source/source"))))
   (-> "Plug-ins"
       (link help-plugins-menu))
   (when (url-exists-in-help? "about/about.en.tm")
