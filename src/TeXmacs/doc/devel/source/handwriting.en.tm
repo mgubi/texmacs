@@ -88,7 +88,8 @@
   learning or recognition. The path is written literally, so it ignores
   <verbatim|$TEXMACS_HOME_PATH>: a private home set for tests, or the
   home directory of <TeXmacs> on <name|Windows>, which is not
-  <verbatim|~/.TeXmacs>, are not used.
+  <verbatim|~/.TeXmacs>, are not used (issue #305 of
+  <verbatim|mgubi/texmacs>).
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

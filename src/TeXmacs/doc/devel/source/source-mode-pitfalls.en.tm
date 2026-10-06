@@ -23,7 +23,8 @@
     inactive <markup|hybrid> tag in the document with an error message;
     only source mode creates new tags from unknown names.
 
-    <item><em|Symbol codes above 255> (checked). <cpp|activate_symbol>
+    <item><em|Symbol codes above 255> (checked, issue #305 of
+    <verbatim|mgubi/texmacs>). <cpp|activate_symbol>
     converts a numeric name with a cast to <cpp|char>
     (<source-link|edit_dynamic.cpp:617|src/Edit/Modify/edit_dynamic.cpp:617>):
     <verbatim|\<less\>symbol\|233\<gtr\>> gives the Cork character 233
