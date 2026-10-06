@@ -153,7 +153,7 @@ has_current_window () {
 tm_window
 concrete_window () {
   tm_view vw= concrete_view (get_current_view_safe ());
-  ASSERT (vw->win != NULL, "no window attached to view");
+  ASSERT (vw != NULL && vw->win != NULL, "no window attached to view");
   return vw->win;
 }
 
