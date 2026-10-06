@@ -148,6 +148,19 @@ static bool in_tool_bar= false;
 #define tool_button_pad 4
 #define tool_button_gap 4
 
+// The main and mode icon bars in a column at the left of the editor, rather
+// than in rows above it (a prototype: TEXMACS_VUE_BARS=top, or ?bars=top in
+// the browser, puts them back). While they are laid out, the rows of a bar
+// (its horizontal menus and lists) go from top to bottom, its separators
+// are horizontal and its pull-down menus open to the right
+static bool in_side_bar= false;
+static bool
+bars_on_side () {
+  static int on= -1;
+  if (on < 0) on= (get_env ("TEXMACS_VUE_BARS") == "top") ? 0 : 1;
+  return on == 1;
+}
+
 // The context menu of the editor (texmacs-popup-menu, the Focus menu) at a
 // point of the screen (SI, y upwards as for set_position): a right click
 // on a tag of the interactive footer, once the tag is selected (the
@@ -1906,6 +1919,9 @@ void
 layout_pull_button (vue_ui_rep *w) {
   vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
   bool down= w->type == "pulldown_button";
+  // where the menu opens: below the button, or at its right in the column
+  // of the bars at the left of the editor
+  bool opens_down= down && !in_side_bar;
   Clay_ElementId button_id= CLAY_SIDI(CLAY_TM_STRING(w->type), w->id);
   Clay_ElementId float_id=  CLAY_IDI("pull_button_float", w->id);
   Clay_Sizing s= layoutExpand;
@@ -2044,7 +2060,7 @@ layout_pull_button (vue_ui_rep *w) {
         d.shift_x= d.shift_y= 0;
         float over_x= f.x + f.width  - dims.width;
         float over_y= f.y + f.height - dims.height;
-        if (down) {
+        if (opens_down) {
           if (over_y > 0) {
             if (b.y > dims.height - (b.y + b.height)) d.flip= true;
             else d.shift_y= -min (over_y, f.y);
@@ -2059,7 +2075,7 @@ layout_pull_button (vue_ui_rep *w) {
         }
       }
       Clay_FloatingAttachPoints attach;
-      if (down) attach= d.flip
+      if (opens_down) attach= d.flip
         ? (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_BOTTOM, .parent= CLAY_ATTACH_POINT_LEFT_TOP }
         : (Clay_FloatingAttachPoints) { .element= CLAY_ATTACH_POINT_LEFT_TOP, .parent= CLAY_ATTACH_POINT_LEFT_BOTTOM };
       else attach= d.flip
@@ -2137,7 +2153,11 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
     grows_cross= grows_cross || widget_grows (a[i], vert);
   }
   Clay_Sizing s= layoutFit;
-  if (vert) {
+  // a row of a bar in the column at the left of the editor: top to bottom,
+  // its items centered in the width of the column
+  bool column= in_side_bar && !vert;
+  if (column) s.width= CLAY_SIZING_GROW(0);
+  else if (vert) {
     if (grows_cross) s.width=  CLAY_SIZING_GROW(0);
     if (grows_main)  s.height= CLAY_SIZING_GROW(0);
   } else {
@@ -2146,13 +2166,14 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
   }
   CLAY(vert ? CLAY_IDI("vertical_menu", id) : CLAY_IDI("horizontal_menu", id), {
     .layout= {
-      .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
+      .layoutDirection= (vert || column) ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
       .sizing= s,
       // a 2x value, as the numbers of this file; tighter in the tool bars
       .childGap= ui_px ((in_tool_bar && !vert) ? tool_button_gap : gap),
       // a horizontal menu fills the height of its bar: its items (icons of
       // several sizes, texts, separators) are centered in it
-      .childAlignment= { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
+      .childAlignment= column ? (Clay_ChildAlignment) { .x= CLAY_ALIGN_X_CENTER, .y= CLAY_ALIGN_Y_TOP }
+                              : (Clay_ChildAlignment) { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
   {
     bool save_grow= button_grow;
     uint32_t save_bar= current_bar, save_menu= current_menu;
@@ -2252,11 +2273,14 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
     if (grows_main)  s.width=  CLAY_SIZING_GROW(0);
     if (grows_cross) s.height= CLAY_SIZING_GROW(0);
   }
+  bool column= in_side_bar && !vert; // see layout_menu
+  if (column) s= { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) };
   CLAY(vert ? CLAY_IDI("vertical_list", id) : CLAY_IDI("horizontal_list", id), {
      .layout= {
-       .layoutDirection= vert ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
+       .layoutDirection= (vert || column) ? CLAY_TOP_TO_BOTTOM : CLAY_LEFT_TO_RIGHT,
        .sizing= s,
-       .childAlignment= { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
+       .childAlignment= column ? (Clay_ChildAlignment) { .x= CLAY_ALIGN_X_CENTER, .y= CLAY_ALIGN_Y_TOP }
+                               : (Clay_ChildAlignment) { .y= vert ? CLAY_ALIGN_Y_TOP : CLAY_ALIGN_Y_CENTER } }})
   {
     // the buttons of a row keep their size (the >>> glue of a row of
     // buttons pushes them to one side), even in a dialog, which is a
@@ -3059,7 +3083,17 @@ vue_ui_rep::do_layout () {
   if (type == "menu_separator") {
     //VUE_WIDGET(menu_separator, bool, vertical);
     vue_menu_separator d= open_box<vue_menu_separator> (data);
-    if (d.vertical) {
+    if (d.vertical && in_side_bar) {
+      // the separator of the groups of a bar in the column: a rule across
+      CLAY(CLAY_IDI("menu_separator (v)", id), {
+        .layout= {
+          .sizing= { .width= CLAY_SIZING_GROW(0) },
+          .padding= { ui_px (5), ui_px (5), ui_px (5), ui_px (5) } },
+        .border= {
+          .width= { .top= ui_px (2) },
+          .color= color_border } });
+    }
+    else if (d.vertical) {
       CLAY(CLAY_IDI("menu_separator (v)", id), {
         .layout= {
           .sizing= { .height= CLAY_SIZING_GROW(0) },
@@ -5726,6 +5760,29 @@ layout_bar_content (int key, vue_widget content, Clay_Color bg) {
   if (sd.found) scroll_markers (clip_id, sd, bg, true, 2);
 }
 
+// a bar as a column at the left of the editor (see in_side_bar): the
+// height of the editor, which it scrolls when its icons do not fit
+static void
+layout_side_bar_content (int key, vue_widget content, Clay_Color bg) {
+  Clay_ElementId clip_id= CLAY_IDI ("side_bar_clip", key);
+  CLAY(clip_id, {
+    .layout= {
+      .padding= { ui_px (4), ui_px (4), ui_px (6), ui_px (6) },
+      .sizing= { CLAY_SIZING_FIT(0), CLAY_SIZING_GROW(0) },
+      .childAlignment= { .x= CLAY_ALIGN_X_CENTER }},
+    .backgroundColor= bg,
+    .border= { .width= { .right= 2 }, .color= the_theme.bar_line },
+    .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () }})
+  {
+    with_behind b (bg);
+    in_tool_bar= true; in_side_bar= true;
+    content->do_layout ();
+    in_tool_bar= false; in_side_bar= false;
+  }
+  Clay_ScrollContainerData sd= Clay_GetScrollContainerData (clip_id);
+  if (sd.found) scroll_markers (clip_id, sd, bg, false, 2);
+}
+
 static void
 texmacs_widget_set_window (vue_widget w, vue_window win) {
   vue_texmacs_widget_rep* tw= dynamic_cast<vue_texmacs_widget_rep*> (w.rep);
@@ -5788,7 +5845,8 @@ void vue_texmacs_widget_rep::do_layout () {
       if (!is_nil (main_menu))
         layout_bar_content (8*id + 0, main_menu, color_background);
     }
-    if (visibility[0] && visibility[1]) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
+    bool side= bars_on_side ();
+    if (visibility[0] && visibility[1] && !side) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
       .layout= {
          .padding= { bar_hpad, bar_hpad, 0, 0 },
          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
@@ -5804,7 +5862,7 @@ void vue_texmacs_widget_rep::do_layout () {
         in_tool_bar= false;
       }
     }
-    if (visibility[0] && visibility[2]) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
+    if (visibility[0] && visibility[2] && !side) CLAY(CLAY_ID_LOCAL("ModeToolbar"), {
       .layout= {
          .padding= { bar_hpad, bar_hpad, 0, 0 },
          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
@@ -5859,6 +5917,12 @@ void vue_texmacs_widget_rep::do_layout () {
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
         .sizing= layoutExpand }})
     {
+      // the main and mode bars as two columns at the left, side by side,
+      // each of the height of the editor (see in_side_bar)
+      bool main_side= side && visibility[0] && visibility[1] && !is_nil (main_icons);
+      bool mode_side= side && visibility[0] && visibility[2] && !is_nil (mode_icons);
+      if (main_side) layout_side_bar_content (8*id + 1, main_icons, color_background);
+      if (mode_side) layout_side_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
       if (visibility[7] && !is_nil (left_tools))
         layout_tool_panel (CLAY_ID_LOCAL("LeftTools"), left_tools, true,
                            win->layout_w, win->layout_h, 1);

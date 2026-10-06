@@ -228,6 +228,17 @@ Locally:
   program had been compiled: the two downloads followed each other. `serve.mjs [dir] [port] [KB/s]` and
   `browser-run.mjs --slow <KB/s>` load the page as over a slow network.
 
+## The icon bars at the left (prototype, branch `wip_wasm_vertical_bars`)
+
+The main and mode icon bars are two columns at the left of the editor,
+side by side, each of the height of the editor (it scrolls, with the wheel
+or its markers, when its icons do not fit), rather than rows above it; the
+menu bar and the focus bar stay above. While these bars are laid out
+(`in_side_bar` in `vue_widget.cpp`) their rows go from top to bottom, the
+separators of their groups are horizontal and their pull-down menus open
+to the right. `TEXMACS_VUE_BARS=top` (`?bars=top` in the browser) puts them
+back above the editor.
+
 ## Drawing with the GPU (the default; `texmacs.html?gpu=0` for MuPDF)
 
 A build with ThorVG draws the windows with WebGL2 instead of MuPDF (see

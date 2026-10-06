@@ -73,6 +73,10 @@ Module['preRun'].push(function () {
     if (webgl2) ENV['TEXMACS_VUE_GPU'] = '1';
     else console.warn ('TeXmacs: no WebGL2, drawing with MuPDF');
   }
+  // ?bars=top: the main and mode icon bars above the document, rather than
+  // in a column at its left (TEXMACS_VUE_BARS, see in_side_bar in
+  // vue_widget.cpp)
+  if (tmAddress.get ('bars') === 'top') ENV['TEXMACS_VUE_BARS'] = 'top';
   // ?slug=1: the glyphs drawn from their outlines (vue_gpu.cpp, Slug)
   if (tmAddress.get ('slug') === '1') ENV['TEXMACS_VUE_SLUG'] = '1';
   // ?gpusync=1: the profile waits for the GPU (vue_gpu.cpp, gpu_finish)
