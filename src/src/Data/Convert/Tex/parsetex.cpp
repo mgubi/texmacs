@@ -69,6 +69,7 @@ struct latex_parser {
   tree parse_length      (string s, int& i);
   tree parse_length      (string s, int& i, int e);
   tree parse_length_name (string s, int& i);
+  string verbatim_encode (string s, bool escape);
   tree parse_verbatim    (string s, int& i, string end, string env);
   tree parse_alltt       (string s, int& i, string end, string env,
                           tree opt= tree (CONCAT));
@@ -1483,19 +1484,40 @@ verbatim_escape (string s) {
   return r;
 }
 
+string
+latex_parser::verbatim_encode (string s, bool escape) {
+  // verbatim text to TeXmacs encoding: non ASCII characters are UTF-8
+  // in unicode mode; '<' and '>' are escaped if requested
+  int i= 0, n= N(s);
+  string r;
+  while (i<n) {
+    if (escape && s[i] == '<') { r << "<less>"; i++; }
+    else if (escape && s[i] == '>') { r << "<gtr>"; i++; }
+    else if (unicode && ((unsigned char) s[i]) >= 128) {
+      unsigned int code= decode_from_utf8 (s, i);
+      r << utf8_to_cork (encode_as_utf8 (code));
+    }
+    else r << s[i++];
+  }
+  return r;
+}
+
 tree
 latex_parser::parse_verbatim (string s, int& i, string end, string env) {
   int start=i, n= N(s), e= N(end);
   while ((i<(n-e)) && (s(i,i+e)!=end)) i++;
   i+=e;
-  if (N(env) > 0 && env[0] == '\\') {
+  if (env == "\\url") {
     return tree (TUPLE, env, s(start,i-e));
+  }
+  else if (N(env) > 0 && env[0] == '\\') {
+    return tree (TUPLE, env, verbatim_encode (s(start,i-e), true));
   }
   else if (N(env) > 0) {
     string begin= "\\begin-" * env, endenv= "\\end-" * env;
     return tree (CONCAT,
         tree (TUPLE, begin),
-        s(start,i-e),
+        verbatim_encode (s(start,i-e), true),
         tree (TUPLE, endenv));
   }
   else return "";
@@ -1513,19 +1535,19 @@ latex_parser::parse_alltt (string s, int& i, string end, string env, tree opt)
   tree r= tree (CONCAT, b);
   while ((i<(n-e)) && (s(i,i+e)!=end)) {
     if (s[i] == '\\') {
-      r << s(start, i);
+      r << verbatim_encode (s(start, i), false);
       r << parse_backslash (s, i);
       start= i;
     }
     if (s[i] == '<' || s[i] == '>') {
-      r << s(start, i);
+      r << verbatim_encode (s(start, i), false);
       if (s[i] == '<') r << "<less>";
       if (s[i] == '>') r << "<gtr>";
       start= i+1;
     }
     i++;
   }
-  r << s(start, i);
+  r << verbatim_encode (s(start, i), false);
   r << tree (TUPLE, endenv);
   r << "\n";
   i+=e;
