@@ -25,6 +25,6 @@
 
 <\initial>
   <\collection>
-    <associate|language|english>
+    <associate|language|german>
   </collection>
 </initial>

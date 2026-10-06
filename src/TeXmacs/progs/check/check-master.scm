@@ -13,7 +13,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (check check-master)
-  (:use (convert html htmltm-test)
+  (:use (convert latex tmtex-pdflatex)
+        (convert html htmltm-test)
         (convert html tmhtml-test)
         (convert tools xmltm-test)
         (convert tools tmlength-test)
@@ -27,6 +28,8 @@
         (server server-tmfs-test)
         (utils cite cite-sort-test)
         (kernel texmacs tm-convert-test)
+        (kernel regexp regexp-test)
+        (kernel logic logic-test)
         (check glue-test)
         (check lists-test)
         (check base-test)
@@ -57,23 +60,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Test LaTeX export
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(tm-define (run-pdflatex tex-file)
-  (and (url-exists? tex-file)
-       (let* ((tex-dir  (url-head tex-file))
-              (pdf-file (url-glue (url-unglue tex-file 4) ".pdf"))
-              (log-file (url-glue (url-unglue tex-file 4) ".log"))
-              (cmd1 (string-append "cd " (system-url->string tex-dir)))
-              (cmd2 (string-append "pdflatex -interaction=batchmode "
-                                   (url->string (url-tail tex-file))))
-              (cmd  (string-append cmd1 "; " cmd2 " > /dev/null")))
-         (system-remove pdf-file)
-         (system-remove log-file)
-         (system cmd)
-         (and (url-exists? log-file)
-              (list (url-exists? pdf-file)
-                    (number-latex-errors log-file)
-                    (number-latex-pages log-file))))))
 
 (define (check-latex-export-one tm-file)
   (display* "Checking LaTeX export of " (url->string tm-file) "...\n")
@@ -126,25 +112,25 @@
     ("prog-format" regtest-prog-format error)
     ("cite-sort" regtest-cite-sort error)
     ("tm-convert" regtest-tm-convert error)
+    ("regexp" regtest-regexp error)
+    ("logic-query" regtest-logic-queries error)
     ("glue" glue-test-failures count)
     ("lists" lists-test-failures count)
     ("base" base-test-failures count)
     ("trees" trees-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
-    ;; FIXME: bibtex before editing: generating a bibliography processes
-    ;; the pending GUI events (system_wait), and a focus event for the
-    ;; widget of a view which editing closed reaches is_embedded_widget,
-    ;; which reads the buffer of the editor, NULL since delete_view
-    ("bibtex" bibtex-test-failures count)
-    ;; generates the auxiliary data of documents in the temporary directory;
-    ;; FIXME: before editing too, for the same reason as bibtex
-    ("links" links-test-failures count)
-    ("structures" structures-test-failures count)
-    ("convert-more" convert-more-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ("typeset" typeset-test-failures count)
+    ;; after editing: generating a bibliography or the auxiliary data of a
+    ;; document processes the pending GUI events, among which those of the
+    ;; views which editing closed (#174)
+    ("bibtex" bibtex-test-failures count)
+    ;; generates the auxiliary data of documents in the temporary directory
+    ("links" links-test-failures count)
+    ("structures" structures-test-failures count)
+    ("convert-more" convert-more-test-failures count)
     ("math-edit" math-edit-test-failures count)
     ("table" table-test-failures count)
     ("text-structure" text-structure-test-failures count)

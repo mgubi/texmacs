@@ -247,7 +247,7 @@
 (define (kbd-map-body conds l)
   (cond ((null? l) '())
 	((symbol? (car l))
-	 (kbd-map-body (list 0 (car l)) (cdr l)))
+	 (kbd-map-body (ctx-add-condition conds 0 (car l)) (cdr l)))
 	((and (pair? (car l)) (== (caar l) :profile))
 	 (if (not (has-look-and-feel? (cdar l))) '((noop))
 	     (kbd-map-body conds (cdr l))))

@@ -85,11 +85,9 @@
   (define Frac (:<frac :any :/ :any :>))
   (define AnyTag (:< :args :>))
   (define Leaf :leaf)
-  ;; FIXME: a rule without alternatives cannot be defined
-  ;; (tm-language.scm:57 passes the list '(or) where packrat-define wants a
-  ;; tree): (define-language l (define Never)) raises wrong-type-arg in
-  ;; packrat-define, expected a rule which never matches, as (or) gives.
-  (define Never (or))
+  ;; a rule without alternatives never matches, as (or)
+  (define Never)
+  (define Never-or (or))
   (define Cur ("a" :cursor "b")))
 
 ;; Inheritance: parse-test-derived takes the rules of parse-test-base and
@@ -260,6 +258,8 @@
   (check-false (peg? "Never" ""))
   (check-false (peg? "Never" "a"))
   (check= (peg-end "Never" "a") '(-1))
+  (check-false (peg? "Never-or" ""))
+  (check= (peg-end "Never-or" "a") '(-1))
   (check-false (peg? "Undefined" ""))
   (check= (peg-end "Undefined" "a") '(-1))
   ;; there is no cursor in the input of packrat-correct?
@@ -308,13 +308,11 @@
 ;; packrat-context lists the selectable structures around a position, from
 ;; the innermost one, as (rule start end) with paths in the input. A
 ;; structure is kept when it is the only one with its extent, or the
-;; innermost one. Only the right recursive grammar is used here:
-;; FIXME: a context inside a left recursive rule has a garbage name
-;; (packrat_parser.cpp:792 takes the label of the compound (symbol "Sum")
-;; inside (partial (symbol "Sum"))): (packrat-context "std-math" "Main"
-;; (stree->tree "a+b*c") '(2)) gives a first entry named by random bytes,
-;; expected Sum (or a name for the partial sum), with (1) (5).
+;; innermost one. Inside a left recursive rule, as Sum of std-math, the
+;; structure is a part of the rule, named by the rule.
 (define (test-context)
+  (check= (packrat-context "std-math" "Main" (stree->tree "a+b*c") '(2))
+          '((Sum (1) (5)) (Sum (0) (5))))
   (check= (context "a+b*c" '(0)) '())
   (check= (context "a+b*c" '(1)) '((Sum (0) (5))))
   (check= (context "a+b*c" '(2)) '((Sum (0) (5))))
@@ -618,7 +616,11 @@
                (when (url-exists? eps-file) (system-remove eps-file))
                (print-snippet eps-file (tree-ref (buffer-tree) 0) #f)
                (let loop ((ls lines)
-                          (gs (eps-glyphs (string-load eps-file)))
+                          ;; a token with a space (as "abstract type"
+                          ;; in julia) has a glyph for it
+                          (gs (list-filter
+                               (eps-glyphs (string-load eps-file))
+                               (lambda (g) (!= (car g) #\space))))
                           (acc '()))
                  (if (null? ls) (reverse acc)
                      (with p (line-runs (car ls) gs)
@@ -674,16 +676,22 @@
 
 ;; cpp_language.cpp: keywords, constants, basic types, numbers, strings,
 ;; comments and preprocessor lines; operators and identifiers keep the
-;; color of the text.
-;; FIXME: the end of a multi-line comment ends the comment for the whole
-;; line (in_cpp_comment, cpp_language.cpp:385, and in_comment,
-;; impl_language.cpp:163, look for the end of the comment from the column of
-;; the current line in the first line): in the cpp lines "/* a" and
-;; "b */ x", x has the comment color, expected the color of the text.
-;; FIXME: after a comment closed on a line, a later comment of the document
-;; makes the rest of the line a comment: in "a /* b */ c", "d", "/* e */",
-;; c has the comment color, expected the color of the text.
+;; color of the text. A multi-line comment ends where it is closed, and a
+;; later comment of the document does not reach back into the line.
 (define (test-cpp)
+  (check-lines "cpp"
+    ("/* a"
+     `(("/*" ,env-comment) ("a" ,env-comment)))
+    ("b */ x"
+     `(("b" ,env-comment) ("*/" ,env-comment) ("x" ,black))))
+  (check-lines "cpp"
+    ("a /* b */ c"
+     `(("a" ,black) ("/*" ,env-comment) ("b" ,env-comment)
+       ("*/" ,env-comment) ("c" ,black)))
+    ("d"
+     `(("d" ,black)))
+    ("/* e */"
+     `(("/*" ,env-comment) ("e" ,env-comment) ("*/" ,env-comment))))
   (check-lines "cpp"
     ("#include <stdio.h>"
      `(("#include" ,env-preprocessor) ("<stdio.h>" ,env-preprocessor)))
@@ -763,13 +771,7 @@
 
 ;; r_language.cpp: keywords, constants, numbers and strings in the colors
 ;; of the environment, operators in red, assignments in dark green, index
-;; brackets in dark blue.
-;; FIXME: comments are not highlighted, the inline comment parser of r is
-;; never given its start "#" (r_language.cpp:22, the constructor): in the r
-;; line "x = 1 # c", # and c have the color of the text, expected brown.
-;; FIXME: the assignment <- is not one token (r_language.cpp:116 declares
-;; "<less>-" as an assignment): in "x <- 1", < has the color of the text
-;; and - is red, expected <- in dark green as =.
+;; brackets in dark blue, comments in brown.
 (define (test-r)
   (check-lines "r"
     ("f = function(x) { if (x > 1) TRUE else NULL }"
@@ -780,7 +782,15 @@
        ("NULL" ,env-constant) ("}" ,black)))
     ("x[1] == \"s\""
      `(("x" ,black) ("[" "#000080") ("1" ,env-constant) ("]" "#000080")
-       ("==" "#ff0000") ("\"s\"" ,env-string)))))
+       ("==" "#ff0000") ("\"s\"" ,env-string)))
+    ("x = 1 # c"
+     `(("x" ,black) ("=" ,env-type) ("1" ,env-constant) ("#" "#802000")
+       ("c" "#802000")))
+    ("x <- 1"
+     `(("x" ,black) ("<-" ,env-type) ("1" ,env-constant)))
+    ("y <- \"#\" -> z"
+     `(("y" ,black) ("<-" ,env-type) ("\"#\"" ,env-string) ("->" ,env-type)
+       ("z" ,black)))))
 
 ;; scilab_language.cpp
 (define (test-scilab)
@@ -803,10 +813,8 @@
 ;; Highlighting configured by the *-lang.scm tables
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; FIXME: every prog_language_rep colors /* ... */ as a comment
-;; (prog_language.cpp:241 calls in_comment for all languages): in the
-;; python line "a /* b */ c", /* b */ has the comment color, expected the
-;; color of the text (python has no such comments).
+;; Only the languages whose comment feature has multi_line, as java, color
+;; /* ... */ as a comment (python has no such comments).
 ;; FIXME: the class operator_decoration of the tables (@ in python, java,
 ;; scala, julia, $ in julia) has no color (language.cpp:221, the encoding
 ;; of the classes, has no operator_decoration), so that it gets the color
@@ -815,14 +823,10 @@
 ;; FIXME: syntax:python:operator_field is "#88888" (python-lang.scm:119,
 ;; five digits), which is no color: in "a.b", the dot has the color of the
 ;; text, expected #888888 as in java and scala.
-;; FIXME: the keyword parser reads a word of letters only (read_word,
-;; analyze.cpp:1056, used by keyword_parser.cpp:25): in python, __debug__,
-;; __import__ and raw_input have the color of the text, expected the color
-;; of constants; and if_x shows if as a keyword.
-;; FIXME: the operators which are words ("and" "not" "or" of python) are
-;; parsed before the keywords and identifiers, also inside a word
-;; (prog_language.cpp:211): in python, ord is or (operator) then d,
-;; expected ord as a constant.
+;; (Fixed by #97: the keyword parser reads whole identifiers, so that
+;; __debug__, __import__ and raw_input of python have the color of
+;; constants and if_x is no keyword; the operators which are words, as "or",
+;; end at the end of a word, so that ord is a constant, not or then d.)
 (define (test-python)
   (check-lines "python"
     ("import os"
@@ -838,6 +842,10 @@
     ("    s = 'a\\nb' + \"x\""
      `(("s" ,black) ("=" ,c-operator) ("'a" ,c-string) ("\\n" ,c-char)
        ("b'" ,c-string) ("+" ,c-operator) ("\"x\"" ,c-string)))
+    ;; a comment marker in a string begins no comment (#46)
+    ("s = \"#\" + x  # c"
+     `(("s" ,black) ("=" ,c-operator) ("\"#\"" ,c-string) ("+" ,c-operator)
+       ("x" ,black) ("#" ,c-comment) ("c" ,c-comment)))
     ("    return [a for a in xs]"
      `(("return" ,c-keyword) ("[" ,c-openclose) ("a" ,black) ("for" ,c-keyword)
        ("a" ,black) ("in" ,c-keyword) ("xs" ,black) ("]" ,c-openclose)))
@@ -845,7 +853,10 @@
      `(("n" ,black) ("=" ,c-operator) ("1_000" ,c-constant) ("+" ,c-operator)
        ("0b101" ,c-constant) ("+" ,c-operator) ("1e-3" ,c-constant)))
     ("\"\"\"doc\"\"\""
-     `(("\"\"\"doc\"\"\"" ,c-string)))))
+     `(("\"\"\"doc\"\"\"" ,c-string)))
+    ("a /* b */ c"
+     `(("a" ,black) ("/*" ,c-operator) ("b" ,black) ("*/" ,c-operator)
+       ("c" ,black)))))
 
 (define (test-java)
   (check-lines "java"
@@ -867,7 +878,15 @@
      `(("if" ,c-keyword) ("(" ,c-openclose) ("x" ,black) ("!=" ,c-operator)
        ("null" ,c-constant) (")" ,c-openclose) ("throw" ,c-control)
        ("new" ,c-keyword) ("E" ,black) ("()" ,c-openclose) (";" ,c-operator)
-       ("a" ,black) ("." ,c-field) ("b" ,black)))))
+       ("a" ,black) ("." ,c-field) ("b" ,black)))
+    ("  x /* c */ y"
+     `(("x" ,black) ("/*" ,c-comment) ("c" ,c-comment) ("*/" ,c-comment)
+       ("y" ,black)))
+    ;; a comment marker in a string begins no comment (#46)
+    ("  u = \"http://x\" + y; // c"
+     `(("u" ,black) ("=" ,c-operator) ("\"http://x\"" ,c-string)
+       ("+" ,c-operator) ("y" ,black) (";" ,c-operator) ("//" ,c-comment)
+       ("c" ,c-comment)))))
 
 (define (test-scala)
   (check-lines "scala"
@@ -893,10 +912,6 @@
 ;; FIXME: syntax:julia:declare_module and declare_type are "0000c0"
 ;; (julia-lang.scm:131-132, without #), which is no color: in julia,
 ;; import and struct have the color of the text, expected #0000c0.
-;; FIXME: the declarations of several words of julia ("abstract type",
-;; "mutable struct", "primitive type", julia-lang.scm:17) can never match,
-;; the keyword parser reads a single word: "abstract type T end" shows
-;; abstract and type in the color of the text, expected #0000c0.
 (define (test-julia)
   (check-lines "julia"
     ("function f(x)"
@@ -911,6 +926,20 @@
        ("true" ,c-constant)))
     ("end"
      `(("end" ,c-keyword)))))
+
+;; The declarations of several words of julia ("abstract type", "mutable
+;; struct", "primitive type") are keywords, but not their words alone. They
+;; have the color of declare_type, that of struct (see the FIXME above).
+(define (test-julia-declarations)
+  (let* ((r (highlight "julia" '("struct" "abstract type T end"
+                                 "mutable  struct S; mutable = 1; types")))
+         (line (lambda (i) (and (list? r) (> (length r) i) (list-ref r i))))
+         (c (and (pair? (line 0)) (cadr (car (line 0))))))
+    (check= (line 1)
+            `(("abstract" ,c) ("type" ,c) ("T" ,black) ("end" ,c-keyword)))
+    (check= (line 2)
+            `(("mutable" ,black) ("struct" ,c) ("S;" ,black) ("mutable" ,black)
+              ("=" ,black) ("1" ,c-constant) (";" ,black) ("types" ,black)))))
 
 ;; FIXME: the number format of json is defined for javascript
 ;; (json-lang.scm:29 requires (== lan "javascript")): json numbers have no
@@ -933,6 +962,13 @@
      `(("a" ,black) ("," ,c-operator) ("b" ,black) ("," ,c-operator)
        ("\"c,d\"" ,c-string) ("," ,c-operator) ("1" ,c-number)))))
 
+;; packrat grammars: the :highlight properties of the rules (Lhs-radical has
+;; :highlight declare in language/minimal.scm) color the code
+(define (test-packrat-highlighting)
+  (check-lines "minimal"
+    ("x == 1;"
+     `(("x" ,c-declare) ("==" ,black) ("1" ,c-number) (";" ,black)))))
+
 ;; Languages without a highlighter keep the color of the text.
 ;; FIXME: javascript, dot and octave have complete tables
 ;; (javascript-lang.scm, dot-lang.scm, octave-lang.scm) and code
@@ -941,13 +977,6 @@
 ;; only builds a prog_language_rep for a language with a format: their code
 ;; is not highlighted at all, "let a = null;" in javascript is all in the
 ;; color of the text, expected let #0000c0, = #8b008b, null #4040c0.
-;; FIXME: packrat highlighting does not reach the document: the
-;; highlighting of a verb_language (minimal, or any define-language with
-;; :highlight properties) is attached to the copy of the input that
-;; make_packrat_parser keeps (packrat_parser.cpp:46, last_in= copy (in)),
-;; not to the typeset trees: the minimal line "x == 1;" is all in the color
-;; of the text, expected x in the color of declarations (Lhs-radical has
-;; :highlight declare in language/minimal.scm).
 (define (test-no-highlighting)
   (check-lines "verbatim"
     ("int x = 1; // c"
@@ -977,8 +1006,10 @@
               "javascript" "octave"))
     (for (key '("keyword" "operator" "number" "string" "comment"))
       (check= (car (feature lan key)) (string->symbol key))))
-  ;; the default comment is //, python and julia use #, octave # and %
-  (check= (feature "java" "comment") '(comment (inline "//")))
+  ;; the default comments are // and /* */, python and julia use #,
+  ;; octave # and %
+  (check= (feature "java" "comment")
+          '(comment (inline "//") (multi_line "/*" "*/")))
   (check= (feature "python" "comment") '(comment (inline "#")))
   (check= (feature "julia" "comment") '(comment (inline "#")))
   (check= (feature "octave" "comment") '(comment (inline "#" "%")))
@@ -1005,7 +1036,8 @@
                    (separator "_")))
   ;; a language without a table has the empty features of default-lang
   (check= (feature "parse-test-nolang" "keyword") '(keyword))
-  (check= (feature "parse-test-nolang" "comment") '(comment (inline "//"))))
+  (check= (feature "parse-test-nolang" "comment")
+          '(comment (inline "//") (multi_line "/*" "*/"))))
 
 ;; Each word of the tables of a prog_language_rep has the color of its
 ;; class: all the words of a language are typeset, one per line, and the
@@ -1063,10 +1095,9 @@
   (list-filter l (lambda (x) (nin? (car x) classes))))
 
 (define (test-classes)
-  ;; python: see the FIXMEs before test-python
-  (check= (misclassified "python" "keyword")
-          '((constant ("__debug__" . "constant") ("__import__" . "constant")
-                      ("ord" . "constant") ("raw_input" . "constant"))))
+  ;; python: see the FIXMEs before test-python (the words of the tables
+  ;; have their colors since #97)
+  (check= (misclassified "python" "keyword") '())
   (check= (without (misclassified "python" "operator")
                    'operator_decoration 'operator_field)
           '())
@@ -1120,7 +1151,9 @@
   (run-group "highlight java" test-java)
   (run-group "highlight scala" test-scala)
   (run-group "highlight julia" test-julia)
+  (run-group "highlight julia declarations" test-julia-declarations)
   (run-group "highlight json csv" test-json-csv)
+  (run-group "highlight packrat" test-packrat-highlighting)
   (run-group "no highlighting" test-no-highlighting)
   (run-group "language tables" test-tables)
   (run-group "classes" test-classes)

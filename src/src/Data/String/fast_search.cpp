@@ -84,6 +84,8 @@ string_searcher_rep::search_sub (string what) {
     for (int i=0; i<=N(s); i++) r << i;
     return r;
   }
+  // a pattern longer than the text has no hash level of its own in a
+  if (N(what) > N(s)) return array<int> ();
   int k=1, l=0;
   while ((k<<1) <= N(what)) { k <<= 1; l++; }
   int code= fast_hash (what (0, k));

@@ -27,7 +27,6 @@ bool may_transform (url file_name, const QImage& pm);
 
 static bool
 load_svg (url file_name, QIcon& icon) {
-  (void) icon;
   url sub= QTMIconManager::is_dark_mode () ?
     url ("dark") : url ("light");
   url res= file_name;
@@ -61,26 +60,26 @@ load_svg (url file_name, QIcon& icon) {
     resvg_destroy_tree (tree);
     if (!icon.isNull ()) return true;
   }
-#ifdef USE_QTSVG
   std_warning << "SVG fallback: resvg failed for icon '" << res
               << "', falling back to QtSvg" << LF;
 #endif
-#endif
-#ifdef USE_QTSVG
   icon= QIcon (to_qstring (concretize (res)));
   if (QTMIconManager::is_dark_mode () &&
       tail (head (res)) != url (sub)) {
-    QImage image= icon.pixmap (512).toImage ();
-    if (may_transform (file_name, image)) {
-      invert_colors (image);
-      saturate (image);
-      QPixmap pixmap= QPixmap::fromImage (image);
-      icon= QIcon (pixmap);
+    int sizes[] = { 16, 24, 32, 48, 64, 128, 256, 512 };
+    QIcon dark_icon;
+    for (int i = 0; i < 8; i++) {
+      int s = sizes[i];
+      QImage image = icon.pixmap (s).toImage ();
+      if (may_transform (file_name, image)) {
+        invert_colors (image);
+        saturate (image);
+      }
+      dark_icon.addPixmap (QPixmap::fromImage (image));
     }
+    icon = dark_icon;
   }
   return !icon.isNull ();
-#endif
-  return false;
 }
 
 static bool

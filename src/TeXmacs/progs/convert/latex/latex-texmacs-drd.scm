@@ -76,6 +76,9 @@
   dotminus dotpm dotmp dotamalg dottimes dotoplus dototimes dotast
   into longminus longequal
   longhookrightarrow longhookleftarrow
+  longtwoheadrightarrow longtwoheadleftarrow
+  longrightharpoonup longrightharpoondown
+  longleftharpoonup longleftharpoondown
   triangleup tmprecdot preceqdot
   llangle rrangle join um upl upm ump pplus
   assign plusassign minusassign timesassign overassign backassign

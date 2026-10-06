@@ -11,6 +11,7 @@
 
 #include "convert.hpp"
 #include "analyze.hpp"
+#include "converter.hpp"
 
 #define JSON_SHORT_ARRAY    8
 #define JSON_SHORT_OBJECT  16
@@ -64,7 +65,7 @@ void
 json_skip (string s, int& pos) {
   while (pos < N(s)) {
     switch (s[pos]) {
-    case '\"': case ',':
+    case '\"': case ',': case '-':
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
     case ':': case '[': case '\\': case ']':
@@ -74,6 +75,20 @@ json_skip (string s, int& pos) {
     }
     pos++;
   }
+}
+
+static int
+json_parse_hex4 (string s, int pos) {
+  if (pos + 4 > N(s)) return -1;
+  int code= 0;
+  for (int i= pos; i < pos + 4; i++) {
+    char c= s[i];
+    if (c >= '0' && c <= '9') code= 16 * code + (c - '0');
+    else if (c >= 'a' && c <= 'f') code= 16 * code + (c - 'a' + 10);
+    else if (c >= 'A' && c <= 'F') code= 16 * code + (c - 'A' + 10);
+    else return -1;
+  }
+  return code;
 }
 
 tree
@@ -86,10 +101,25 @@ json_parse_string (string s, int& pos, int mode) {
       pos++;
       if (s[pos] == '\"' || s[pos] == '\\') r << s[pos++];
       else if (s[pos] == 'b') { pos++; r << '\b'; }
-      else if (s[pos] == 'f') { pos++; r << '\b'; }
+      else if (s[pos] == 'f') { pos++; r << '\f'; }
       else if (s[pos] == 'n') { pos++; r << '\n'; }
       else if (s[pos] == 'r') { pos++; r << '\r'; }
       else if (s[pos] == 't') { pos++; r << '\t'; }
+      else if (s[pos] == '/') { pos++; r << '/'; }
+      else if (s[pos] == 'u' && json_parse_hex4 (s, pos+1) >= 0) {
+        unsigned int code= json_parse_hex4 (s, pos+1);
+        pos += 5;
+        if (code >= 0xd800 && code < 0xdc00 &&
+            test (s, pos, "\\u") && json_parse_hex4 (s, pos+2) >= 0xdc00 &&
+            json_parse_hex4 (s, pos+2) < 0xe000) {
+          unsigned int low= json_parse_hex4 (s, pos+2);
+          code= 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
+          pos += 6;
+        }
+        else if (code >= 0xd800 && code < 0xe000)
+          code= 0xfffd; // unpaired surrogate
+        r << encode_as_utf8 (code);
+      }
     }
     else r << s[pos++];
   return r;
@@ -98,9 +128,12 @@ json_parse_string (string s, int& pos, int mode) {
 tree
 json_parse_number (string s, int& pos, int mode) {
   int start= pos;
+  if (pos < N(s) && s[pos] == '-') pos++;
   while (pos < N(s) &&
          ((s[pos] >= '0' && s[pos] <= '9') ||
-          s[pos] == '.'))
+          s[pos] == '.' || s[pos] == 'e' || s[pos] == 'E' ||
+          ((s[pos] == '+' || s[pos] == '-') &&
+           (s[pos-1] == 'e' || s[pos-1] == 'E'))))
     pos++;
   return json_number (s (start, pos), mode);
 }
@@ -156,6 +189,7 @@ json_parse (string s, int& pos, int mode) {
       return json_parse_string (s, pos, mode);
     case ',':
       break;
+    case '-':
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
       return json_parse_number (s, pos, mode);
@@ -321,9 +355,9 @@ void
 json_print (string& r, tree t, int mode, int indent) {
   if (is_atomic (t))
     json_print_string (r, t->label, mode);
-  else if (is_func (t, TUPLE))
+  else if (L(t) == TUPLE)
     json_print_array (r, t, mode, indent);
-  else if (is_func (t, ATTR))
+  else if (L(t) == ATTR)
     json_print_object (r, t, mode, indent);
   else if (is_compound (t, "json-null")) {
     json_space (r); r << "null"; }

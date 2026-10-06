@@ -20,7 +20,7 @@
   <apply|menu|Ayuda> usted puede encontrar documentación acerca del
   <apply|hyper-link|código fuente|../../../devel/source/source.en.tm> de
   <apply|TeXmacs>, su <apply|hyper-link|formato de
-  documento|../../../devel/format/format.en.tm>, como escribir
+  documento|../../../devel/format/basics/basics.en.tm>, como escribir
   <apply|hyper-link|interfaces|../../../devel/plugin/plugin.en.tm> con otros
   formatos, y así.
 
