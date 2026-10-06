@@ -324,13 +324,17 @@ qt_gui_rep::get_selection (string key, tree& t, string& s, string format) {
     }
   }
   else if (format == "verbatim"
-           && (get_preference ("verbatim->texmacs:encoding") == "utf-8" ||
-               get_preference ("verbatim->texmacs:encoding") == "auto"  ))
+           && get_preference ("verbatim->texmacs:encoding") != "utf-8"
+           && get_preference ("verbatim->texmacs:encoding") != "auto"
+           && md->hasFormat ("text/plain"))
+    // verbatim in another encoding: the bytes as they are, which the
+    // converter decodes (they differ from the UTF-8 text only where the
+    // clipboard keeps a legacy encoding, as on X11)
+    buf = md->data ("text/plain").data();
+  else
+    // the other formats (latex, html...) read UTF-8, as before the
+    // "plain/text" typo was fixed (#109)
     buf = md->text().toUtf8 ();
-  else {
-    if (md->hasFormat ("text/plain")) buf = md->data ("text/plain").data();
-    else buf = md->text().toUtf8 ();
-  }
   if (!(buf.isEmpty())) s << string (buf.constData(), buf.size());
   if (input_format == "html-snippet" && seems_buggy_html_paste (s))
     s = correct_buggy_html_paste (s);
