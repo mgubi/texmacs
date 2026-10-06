@@ -251,6 +251,11 @@ tm_poll (struct tm_pollfd* fds, int nfds, int timeout_ms) {
 #include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
+#if defined (OS_MINGW) || defined (OS_WIN)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 #include "scheme.hpp"
 
 struct async_handle {
@@ -259,6 +264,7 @@ struct async_handle {
   char*  buf;
   int    len;
   int    cap;
+  pthread_mutex_t lock; // buf and len, which the reading thread changes
   // either
   object call_back;
   // or
@@ -270,12 +276,15 @@ struct async_handle {
     fp (fp2), done (false),
     buf ((char*) malloc (4096)), len (0), cap (4096),
     call_back (call_back2),
-    status (NULL), outbuf (NULL), errbuf (NULL), kill (NULL) {}
+    status (NULL), outbuf (NULL), errbuf (NULL), kill (NULL) {
+      pthread_mutex_init (&lock, NULL); }
   async_handle (FILE* fp2, int& st, string& out,
 		string& err, bool& k):
     fp (fp2), done (false),
     buf ((char*) malloc (4096)), len (0), cap (4096),
-    status (&st), outbuf (&out), errbuf (&err), kill (&k) {}
+    status (&st), outbuf (&out), errbuf (&err), kill (&k) {
+      pthread_mutex_init (&lock, NULL); }
+  ~async_handle () { pthread_mutex_destroy (&lock); }
 };
 
 array<async_handle*> async_busy;
@@ -296,12 +305,18 @@ async_read_output (void* arg) {
     done= true;
     return NULL;
   }
+  // what is there is read as it comes (read, not fread, which waits for
+  // a whole buffer): a request link shows the output so far (a streamed
+  // answer, see async_eval_pending); a handle which is no longer wanted
+  // stops reading
   while (true) {
     char buffer[4096];
     int bytes_read;
-    bytes_read= fread (buffer, 1, sizeof (buffer), fp);
+    bytes_read= read (fileno (fp), buffer, sizeof (buffer));
     if (bytes_read <= 0) break;
-    if (bytes_read + len > cap) {
+    if (handle->kill != NULL && *(handle->kill)) break;
+    pthread_mutex_lock (&handle->lock);
+    while (bytes_read + len > cap) {
       char* buf2= (char*) malloc (2 * cap);
       for (int i=0; i<len; i++) buf2[i]= buf[i];
       free ((void*) buf);
@@ -311,6 +326,7 @@ async_read_output (void* arg) {
     for (int i=0; i<bytes_read; i++)
       buf[len+i]= buffer[i];
     len += bytes_read;
+    pthread_mutex_unlock (&handle->lock);
   }
 
   pclose (fp);
@@ -475,7 +491,18 @@ async_eval_pending () {
       async_busy= append (range (async_busy, 0, i),
                           range (async_busy, i + 1, N(async_busy)));
     }
-    else i++;
+    else {
+      // the output so far, for a request link (its partial answer)
+      async_handle* handle= async_busy[i];
+      if (handle->outbuf != NULL &&
+          (handle->kill == NULL || !*(handle->kill))) {
+        pthread_mutex_lock (&handle->lock);
+        if (handle->len > N(*(handle->outbuf)))
+          *(handle->outbuf)= string (handle->buf, handle->len);
+        pthread_mutex_unlock (&handle->lock);
+      }
+      i++;
+    }
 }
 
 /******************************************************************************

@@ -498,6 +498,18 @@ if (USE_SQLITE3)
   endif ()
 endif ()
 
+# libcurl: the HTTP requests of the builds without Qt (else the curl program)
+option (USE_LIBCURL "make the HTTP requests with libcurl" ON)
+if (USE_LIBCURL)
+  find_package (CURL)
+  if (CURL_FOUND)
+    set (USE_LIBCURL 1)
+  else ()
+    set (USE_LIBCURL 0)
+    message (STATUS "libcurl not found, the curl program makes the HTTP requests")
+  endif ()
+endif ()
+
 # Ghostscript
 set (USE_GS 1)
 if (WIN32)
@@ -752,6 +764,7 @@ set (TeXmacs_Include_Dirs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/Typeset/Page
   ${CMAKE_CURRENT_SOURCE_DIR}/TeXmacs/include
   ${Guile_INCLUDE_DIRS}
+  ${CURL_INCLUDE_DIRS}
   ${FREETYPE_INCLUDE_DIRS}
   ${PNG_INCLUDE_DIRS}
   ${GNUTLS_INCLUDE_DIRS}
@@ -831,6 +844,13 @@ if (USE_ICONV)
     list (APPEND TeXmacs_Libraries ${Iconv_LIBRARIES})
   elseif (ICONV_LIBRARIES)
     list (APPEND TeXmacs_Libraries ${ICONV_LIBRARIES})
+  endif ()
+endif ()
+if (USE_LIBCURL)
+  list (APPEND TeXmacs_Libraries ${CURL_LIBRARIES})
+  if (APPLE)
+    # (the proxies of the settings of macOS)
+    list (APPEND TeXmacs_Libraries "-framework CFNetwork" "-framework CoreFoundation")
   endif ()
 endif ()
 if (USE_SQLITE3)

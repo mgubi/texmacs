@@ -44,6 +44,7 @@ CXXCAIRO = @CAIRO_CXX@
 CXXIMLIB2 = @IMLIB2_CXX@
 CXXSQLITE3 = @SQLITE3_CXX@
 CXXGNUTLS = @GNUTLS_CFLAGS@
+CXXLIBCURL = @LIBCURL_CFLAGS@
 CXXFREETYPE = @FREETYPE_CFLAGS@
 CXXICONV = @ICONV_CXX@
 CXXGUILE = @GUILE_CFLAGS@
@@ -68,6 +69,7 @@ LDVUE = @VUE_LDFLAGS@
 LDQTWK = $(LDQT)
 LDGUI = $(LD@CONFIG_GUI@)
 LDGNUTLS= @GNUTLS_LDFLAGS@
+LDLIBCURL= @LIBCURL_LDFLAGS@
 LDRESVG = @RESVG_LDFLAGS@ @RESVG_LIBS@
 
 AR = ar
@@ -347,7 +349,7 @@ objc_incl  = $(call objc_flags,$(1) \
   $(CPPFLAGS) $(CXXFLAGS))
 
 $(system_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(system_incl) -I$(tmsrc)/include $(CXXGNUTLS) $(CXXGUI))
+	$(call cxx_incl,$(system_incl) -I$(tmsrc)/include $(CXXGNUTLS) $(CXXLIBCURL) $(CXXGUI))
 $(kernel_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(kernel_incl))
 $(data_obj): Objects/%.o: %.cpp
@@ -488,7 +490,7 @@ TEXMACS_OPEN_objects := $(texmacs_open_obj) Objects/tm_ostream.o Objects/fast_al
 # NOTE: not $(LDPATH) (-Wl,-rpath, on Linux) alone, which took the first
 # option of $(LDGUI) for its path (-L<the SDL3 of the Vue port>)
 link_options:=-L$(tmsrc)/lib -lm $(LDGUI) $(LDICONV) $(CXXFLAGS)\
-   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) $(LDRESVG) @SPARKLE_LDFLAGS@
+   $(LDAXEL) $(LDCAIRO) $(LDSQLITE3) $(LDGNUTLS) $(LDLIBCURL) $(LDRESVG) @SPARKLE_LDFLAGS@
 
 
 $(tmsrc)/bin/texmacs.bin: Objects/texmacs.bin

@@ -679,6 +679,21 @@ tmg_async_evaluate_cancel (tmscm arg1) {
 }
 
 tmscm
+tmg_http_get (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-get");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-get");
+
+  string in1= tmscm_to_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= http_get (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_http_post (tmscm arg1, tmscm arg2, tmscm arg3) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-post");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-post");
@@ -11672,6 +11687,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
   tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
   tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
+  tmscm_install_procedure ("http-get",  tmg_http_get, 2, 0, 0);
   tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
   tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);
   tmscm_install_procedure ("async-http-post",  tmg_async_http_post, 4, 0, 0);

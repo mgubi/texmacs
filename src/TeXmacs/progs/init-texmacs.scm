@@ -372,7 +372,8 @@
 (tm-define-macro (with-wallet . body) (expand-with-wallet body))
 (lazy-define (security wallet wallet-base)
 	     supports-wallet? wallet-initialized?
-	     wallet-on? wallet-off? wallet-get)
+	     wallet-on? wallet-off? wallet-get wallet-set wallet-delete
+	     wallet-add-on-hook)
 (lazy-menu (security wallet wallet-menu) wallet-preferences-widget)
 (lazy-define (security gpg gpg-edit) tree-export-encrypted
 	     tm-gpg-dialogue-passphrase-decrypt-buffer)

@@ -134,6 +134,8 @@
 (define-public (has-llama?) #f)
 (define-public (has-mistral-7b?) #f)
 (define-public (has-albert?) #f)
+(define-public (has-claude?) #f)
+(define-public (has-openrouter?) #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mode related

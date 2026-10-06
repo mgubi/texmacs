@@ -80,6 +80,7 @@
   (async-evaluate-system async_evaluate_system
     (int array_string string object))
   (async-evaluate-cancel async_evaluate_cancel (void int))
+  (http-get http_get (string string array_string))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
   (async-http-post async_http_post (bool string array_string string object))

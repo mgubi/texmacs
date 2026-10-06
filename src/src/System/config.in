@@ -308,6 +308,9 @@
 /* Use MuPDF library */
 #undef USE_MUPDF
 
+/* Make the HTTP requests with libcurl */
+#undef USE_LIBCURL
+
 /* Use resvg library for SVG rendering */
 #undef USE_RESVG
 
