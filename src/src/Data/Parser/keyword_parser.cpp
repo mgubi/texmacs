@@ -22,8 +22,12 @@ keyword_parser_rep::keyword_parser_rep () {
 
 bool
 keyword_parser_rep::can_parse (string s, int pos) {
-  string word;
-  bool hit= read_word (s, pos, word) && keyword_group->contains (word);
+  // Read the whole identifier, so that keywords are not matched on prefixes
+  // (as "for" in "for_each") and keywords with '_' or digits can match
+  int i= pos;
+  while (i<N(s) && (is_alpha (s[i]) || is_digit (s[i]) || s[i] == '_')) i++;
+  string word= s (pos, i);
+  bool hit= i>pos && keyword_group->contains (word);
   if (hit) current_keyword= word;
   return hit;
 }
