@@ -326,11 +326,8 @@ is_of_type (url name, string filter) {
     }
   }
 #endif
-  bool preserve_links= false;
-  for (i=0; i<n; i++)
-    preserve_links= preserve_links || (filter[i] == 'l');
   struct_stat buf;
-  bool err= get_attributes (name, &buf, preserve_links);
+  bool err= get_attributes (name, &buf);
   for (i=0; i<n; i++)
     switch (filter[i]) {
       // FIXME: should check user id and group id for r, w and x
@@ -342,8 +339,18 @@ is_of_type (url name, string filter) {
       break;
 #ifndef OS_MINGW
     case 'l':
-      if (err || !S_ISLNK (buf.st_mode)) return false;
+      {
+        // buf follows symbolic links (and may come from the stat cache)
+        struct_stat lbuf;
+        if (texmacs_lstat (concretize (name), &lbuf) != 0 ||
+            !S_ISLNK (lbuf.st_mode)) return false;
+      }
       break;
+#else
+    case 'l':
+      // stat does not tell the links of Windows: none (otherwise every
+      // file, even a missing one, was a symbolic link)
+      return false;
 #endif
     case 'r':
       if (err) return false;
@@ -393,12 +400,9 @@ bool
 is_newer (url which, url than) {
   struct_stat which_stat;
   struct_stat than_stat;
-  // FIXME: why was this? 
-  if (is_cached ("stat_cache.scm", concretize (which))) return false;
-  if (is_cached ("stat_cache.scm", concretize (than))) return false;
-  // end FIXME
-  if (get_attributes (which, &which_stat, true)) return false;
-  if (get_attributes (than , &than_stat , true)) return false;
+  // not from the stat cache: a file edited in place may not show up there
+  if (get_attributes (which, &which_stat, true, false)) return false;
+  if (get_attributes (than , &than_stat , true, false)) return false;
   return which_stat.st_mtime > than_stat.st_mtime;
 }
 
