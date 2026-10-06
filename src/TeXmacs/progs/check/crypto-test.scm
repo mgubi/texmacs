@@ -65,6 +65,16 @@
 
 (define (tmp name) (url-append crypto-dir name))
 
+;; the sockets of gpg-agent are made in its home directory, and the name of
+;; a Unix socket has at most 104 bytes on macOS (108 on Linux, where gpg puts
+;; them in /run/user instead): the GnuPG homes of the checks are in /tmp
+(define gpg-socket-max 80)
+
+(define (gpg-tmp name)
+  (if (or (os-mingw?) (os-win32?)) (tmp name)
+      (system->url (string-append "/tmp/tm-" name "-"
+                                  (url->string (url-tail (url-temp-dir)))))))
+
 (define (skip what why)
   (display* "  SKIP " what ": " why "\n")
   (force-output))
@@ -599,8 +609,9 @@
   (check= (gpg-secret-key-fingerprints other) '())
   (with key (gpg-search-key-by-fingerprint fpr (gpg-public-keys dir))
     (check-true key)
+    ;; (the keys are listed as Cork strings, for the widgets: < is <less>)
     (check= (and key (gpg-get-key-user-id key))
-            "TeXmacs Test <texmacs-test@example.invalid>"))
+            (utf8->cork "TeXmacs Test <texmacs-test@example.invalid>")))
   (check-true (armored? (gpg-export-public-keys (list fpr) dir)
                         "PUBLIC KEY BLOCK"))
   (check-group "gpg encryption")
@@ -673,30 +684,34 @@
 ;; block of a buffer is encrypted and decrypted in place; a key block is
 ;; encrypted for its recipients (the decryption asks the passphrase of the
 ;; key in a dialog, so the message is decrypted with gpg-decrypt). A
-;; document with a passphrase is saved encrypted and read back.
+;; document with a passphrase is saved encrypted and read back. The commands
+;; replace the block by a new tree (tree-set! of another label), so the
+;; block is looked up again in the buffer after each of them.
+(define (first-block) (tree-ref (buffer-tree) 0))
+
 (define (test-gpg-documents dir fpr)
   (check-group "gpg blocks")
   (in-buffer '(document (gpg-passphrase-decrypted-block
                          (document "hidden text")))
     (lambda ()
-      (with t (tree-ref (buffer-tree) 0)
-        (tm-gpg-passphrase-encrypt t "block-pass")
+      (tm-gpg-passphrase-encrypt (first-block) "block-pass")
+      (with t (first-block)
         (check= (tree-label t) 'gpg-passphrase-encrypted-block)
         (check= (tree-arity t) 1)
         (check-true (armored? (tree->string (tree-ref t 0)) "MESSAGE"))
-        (check-false (contains? (tree->string (tree-ref t 0)) "hidden"))
-        (with enc (tree->stree t)
-          (tm-gpg-passphrase-decrypt t "wrong-pass")
-          (check= (tree->stree t) enc))
-        (tm-gpg-passphrase-decrypt t "block-pass")
-        (check= (tree->stree t)
-                '(gpg-passphrase-decrypted-block (document "hidden text"))))))
+        (check-false (contains? (tree->string (tree-ref t 0)) "hidden")))
+      (with enc (tree->stree (first-block))
+        (tm-gpg-passphrase-decrypt (first-block) "wrong-pass")
+        (check= (tree->stree (first-block)) enc))
+      (tm-gpg-passphrase-decrypt (first-block) "block-pass")
+      (check= (tree->stree (first-block))
+              '(gpg-passphrase-decrypted-block (document "hidden text")))))
   ;; the public key goes to the GnuPG home of TeXmacs
   (check-true (gpg-import-public-keys (gpg-export-public-keys (list fpr) dir)))
   (in-buffer `(document (gpg-decrypted-block (document "for the key") ,fpr))
     (lambda ()
-      (with t (tree-ref (buffer-tree) 0)
-        (tm-gpg-encrypt t)
+      (tm-gpg-encrypt (first-block))
+      (with t (first-block)
         (check= (tree-label t) 'gpg-encrypted-block)
         (check= (tree->string (tree-ref t 1)) fpr)
         (with enc (tree->string (tree-ref t 0))
@@ -741,8 +756,8 @@
           (check-group "gpg")
           (skip "GnuPG" ok)
           (test-without-gpg))
-        (let ((dir (tmp "gnupg"))
-              (other (tmp "gnupg-other")))
+        (let ((dir (gpg-tmp "gnupg"))
+              (other (gpg-tmp "gnupg-other")))
           (dynamic-wind
             (lambda ()
               (gpg-make-test-home dir)
@@ -758,9 +773,18 @@
                                (lambda () (test-gpg-keys dir other fpr)))
                       (guarded "gpg passphrase"
                                (lambda () (test-gpg-passphrase dir)))
-                      (if (not (scratch-home?))
-                          (skip "GnuPG in documents"
-                                "TeXmacs runs with the home of the user")
+                      (cond
+                        ((not (scratch-home?))
+                         (skip "GnuPG in documents"
+                               "TeXmacs runs with the home of the user"))
+                        ((> (string-length (url->system (gpg-homedir)))
+                            gpg-socket-max)
+                         (skip "GnuPG in documents"
+                               (string-append "the GnuPG home of TeXmacs "
+                                 "is too long for the sockets of gpg-agent "
+                                 "(use a shorter TM_TEST_HOME): "
+                                 (url->system (gpg-homedir)))))
+                        (else
                           (let* ((home (gpg-homedir))
                                  (made? (not (url-exists? home))))
                             (when made?
@@ -771,7 +795,7 @@
                                      (lambda ()
                                        (test-gpg-documents dir fpr)))
                             (gpg-kill-agent home)
-                            (when made? (system-rmdir-recursive home))))))))
+                            (when made? (system-rmdir-recursive home)))))))))
             (lambda ()
               (gpg-kill-agent dir)
               (gpg-kill-agent other)
