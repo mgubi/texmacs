@@ -243,6 +243,38 @@
 ;; Common arguments for batch mode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; GnuPG 2.1 and later ask the passphrase through their agent and its
+;; pinentry, which do not read --passphrase-fd in batch mode ("Inappropriate
+;; ioctl for device": even the right passphrase was refused) unless the
+;; pinentry mode is loopback; GnuPG 1 has no such option
+(define gpg-loopback-table (make-ahash-table)) ; executable -> yes or no
+
+(define (gpg-version-numbers exe)
+  ;; (major minor) of "gpg (GnuPG) 2.5.24", or #f
+  (let* ((ret (evaluate-system (list exe "--version") '() '() '(1 2)))
+         (out (if (and (pair? ret) (pair? (cdr ret))) (cadr ret) ""))
+         (pos (string-search-forwards "(GnuPG) " 0 out)))
+    (and (>= pos 0)
+         (let* ((rest (substring out (+ pos 8) (string-length out)))
+                (word (car (string-tokenize-by-char
+                            (string-append rest " ") #\space)))
+                (l (map string->number (string-tokenize-by-char word #\.))))
+           (and (>= (length l) 2) (car l) (cadr l)
+                (list (car l) (cadr l)))))))
+
+(define (gpg-loopback?)
+  (let* ((exe (gpg-get-executable))
+         (known (ahash-ref gpg-loopback-table exe)))
+    (if known (== known 'yes)
+        (with v (gpg-version-numbers exe)
+          (with ok? (and v (or (> (car v) 2)
+                               (and (= (car v) 2) (>= (cadr v) 1))))
+            (ahash-set! gpg-loopback-table exe (if ok? 'yes 'no))
+            ok?)))))
+
+(define (gpg-passphrase-options)
+  (if (gpg-loopback?) (list "--pinentry-mode" "loopback") '()))
+
 (define (gpg-executable-default homedir)
   (if (url-none? homedir)
       (list (gpg-get-executable) "--homedir" (url->system (gpg-homedir))
@@ -473,6 +505,7 @@
 
 (define (gpg-executable-decrypt homedir)
   (append (gpg-executable-default homedir)
+          (gpg-passphrase-options)
           (if (or (os-mingw?) (os-win32?))
               (list "--decrypt" "--passphrase-fd" "$%1" "--armor")
               (list "--decrypt" "--passphrase-fd" "$$1" "--armor"))))
@@ -607,6 +640,7 @@
 (define (gpg-executable-passphrase-encrypt homedir)
   (append (gpg-executable-default homedir)
 	  (list "--cipher-algo" gpg-cipher-algorithm "--symmetric" "-c")
+          (gpg-passphrase-options)
           (if (or (os-mingw?) (os-win32?))
               (list "--passphrase-fd" "$%1")
               (list "--passphrase-fd" "$$1"))
