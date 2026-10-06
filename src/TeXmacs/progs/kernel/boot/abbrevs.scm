@@ -69,21 +69,17 @@
 (define-public (number->keyword x)
   (symbol->keyword (string->symbol (string-append "%" (number->string x)))))
 
-;; (the files are closed once written or read: an open file cannot be
-;; removed on Windows)
 (if (guile-c?)
     (define-public (save-object file value)
-      (call-with-output-file (url-materialize file "")
-        (lambda (port) (pretty-print value port))))
+      (pretty-print value (open-file (url-materialize file "") OPEN_WRITE))
+      (flush-all-ports))
     (define-public (save-object file value)
-      (call-with-output-file (url-materialize file "")
-        (lambda (port) (write value port)))))
+      (write value (open-file (url-materialize file "") OPEN_WRITE))
+      (flush-all-ports)))
 
 (define-public (load-object file)
   (let ((r (catch #t
-    (lambda ()
-      (call-with-input-file (url-materialize file "r")
-        (lambda (port) (read port))))
+    (lambda () (read (open-file (url-materialize file "r") OPEN_READ)))
     (lambda (key msg . err-msg)
       (let* ((msg (car err-msg))
 	     (args (cadr err-msg))
