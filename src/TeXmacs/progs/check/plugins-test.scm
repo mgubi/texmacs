@@ -1008,6 +1008,105 @@
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The processes of pipe plugins
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; How the processes of the plugins are started and stopped (the pipes
+;; without Qt: pipe_link.cpp; the Qt pipes start the program themselves).
+;; A wrapper script which runs its program as a child (without exec) dies
+;; at once on SIGTERM: the program, which needs 0.2 s to clean up (it then
+;; writes a file), is given the time to do so. A command may start with a
+;; word of the shell. When PATH is not set, sh looks for programs in its
+;; default path. A plugin which closes its standard error goes on.
+
+(define pipes-dir (url-append (url-temp-dir) "plugins-test-pipes"))
+(define (pipes-file name) (url->system (url-append pipes-dir name)))
+
+(define (write-pipes-scripts)
+  (when (not (url-exists? pipes-dir)) (system-mkdir pipes-dir))
+  (string-save (string-append
+                "trap 'sleep 0.2; echo done > \"" (pipes-file "cleaned") "\";"
+                " exit 0' TERM\n"
+                "printf '\\002verbatim:ready\\005'\n"
+                "while :; do sleep 0.05; done\n")
+               (url-append pipes-dir "program.sh"))
+  (string-save (string-append "sh '" (pipes-file "program.sh") "'\n"
+                              "echo after\n")
+               (url-append pipes-dir "wrapper.sh")))
+
+(define saved-reconfigure-flag* reconfigure-flag?)
+(set! reconfigure-flag? #t)
+
+(plugin-configure tmtestwrapper
+  (:launch ,(string-append "sh '" (pipes-file "wrapper.sh") "'"))
+  (:serializer ,raw-serialize))
+
+(plugin-configure tmtestshellword
+  (:launch "if true; then exec cat; fi")
+  (:serializer ,raw-serialize))
+
+(plugin-configure tmtestbashword
+  (:launch "readarray x < /dev/null 2> /dev/null; exec cat")
+  (:serializer ,raw-serialize))
+
+;; answers each line of input with the descriptors open in a program which
+;; it starts (ls)
+(plugin-configure tmtestfds
+  (:launch "sh -c \"printf '\\002verbatim:ready\\005'; while read x; do printf '\\002verbatim:'; ls /dev/fd | tr '\\n' ' '; printf '\\005'; done\"")
+  (:serializer ,raw-serialize))
+
+(plugin-configure tmtestnoerr
+  (:launch "sh -c \"exec 2>/dev/null; printf '\\002verbatim:ready\\005'; exec cat\"")
+  (:serializer ,raw-serialize))
+
+(set! reconfigure-flag? saved-reconfigure-flag*)
+
+(define (test-pipes)
+  (check-group "pipes: processes")
+  ;; a plugin does not inherit the pipes of the plugins started before it:
+  ;; it has the same descriptors with another plugin running as without
+  (let* ((fds1 (eval* "tmtestfds" "plugins-test-fds1" "go\n"))
+         (dummy (connection-stop "tmtestfds" "plugins-test-fds1"))
+         (other (start* "tmtestecho" "plugins-test-fds-other"))
+         (fds2 (eval* "tmtestfds" "plugins-test-fds2" "go\n")))
+    (check= other "ok")
+    (check= fds2 fds1)
+    (connection-stop "tmtestfds" "plugins-test-fds2")
+    (connection-stop "tmtestecho" "plugins-test-fds-other"))
+  (write-pipes-scripts)
+  (with mark (url-append pipes-dir "cleaned")
+    (when (url-exists? mark) (system-remove mark))
+    (check= (start* "tmtestwrapper" "plugins-test-wrapper") "ok")
+    (pause "0.5")  ; (the program runs, its trap is set)
+    (connection-stop "tmtestwrapper" "plugins-test-wrapper")
+    ;; the program cleaned up before connection-stop returned
+    (check-true (url-exists? mark)))
+  ;; a command starting with a reserved word of the shell
+  (check= (start* "tmtestshellword" "plugins-test-word") "ok")
+  (check= (eval* "tmtestshellword" "plugins-test-word" (blk "verbatim:" "w"))
+          '(document "w"))
+  ;; a command starting with a builtin of bash (which dash has not: it then
+  ;; reports an error, and goes on)
+  (check= (start* "tmtestbashword" "plugins-test-bashword") "ok")
+  (check= (eval* "tmtestbashword" "plugins-test-bashword" (blk "verbatim:" "b"))
+          '(document "b"))
+  ;; PATH not set
+  (when (defined? 'unsetenv)
+    (with path (getenv "PATH")
+      (unsetenv "PATH")
+      (with r (start* "tmtestecho" "plugins-test-nopath")
+        (setenv "PATH" path)
+        (check= r "ok"))
+      (check= (echo* "plugins-test-nopath" "np") '(document "np"))))
+  ;; a plugin without a standard error
+  (check= (eval* "tmtestnoerr" "plugins-test-noerr" (blk "verbatim:" "n1"))
+          '(document "n1"))
+  (check= (eval* "tmtestnoerr" "plugins-test-noerr" (blk "verbatim:" "n2"))
+          '(document "n2"))
+  (check= (connection-status "tmtestnoerr" "plugins-test-noerr") 2)
+  (system-rmdir-recursive pipes-dir))
+
 (tm-define (plugins-test-failures)
   (check-suite "plugins")
   (run-group test-installed)
@@ -1023,6 +1122,9 @@
       (run-group test-python)
       (skip "python" "python3 or tmpy is missing"))
   (stop-all)
+  (if (url-exists-in-path? "sh")
+      (run-group test-pipes)
+      (skip "pipes" "sh is not in the path"))
   (run-group test-scheme-session)
   (run-group test-external)
   (check-end))
