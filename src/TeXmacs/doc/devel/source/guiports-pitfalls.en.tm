@@ -93,12 +93,16 @@
     internal to <TeXmacs> in these two ports.
   </itemize>
 
-  <section|Ports on other branches>
+  <section|The browser>
 
-  The <name|WebAssembly> build of <name|Vue> for the browser is developed
-  on the branch <verbatim|wip_wasm_vue>: this tree only contains the parts
-  of the port compiled under <cpp|__EMSCRIPTEN__>, see <hlink|the
-  <name|Vue> port|guiports-vue.en.tm>.
+  The <name|WebAssembly> build of <name|Vue> for the browser is in this
+  tree (<source-link|misc/wasm|misc/wasm>), see <hlink|the <name|Vue>
+  port|guiports-vue.en.tm>. Its pitfalls are those of a page: no processes
+  (plug-ins run as Web Workers), one canvas for all the windows, a loop
+  which cannot block, a clipboard which the browser hands over only on a
+  paste event or a gesture of the user, and files in a virtual file system
+  kept in <name|IndexedDB>; see
+  <source-link|docs/wasm/README.md|docs/wasm/README.md>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

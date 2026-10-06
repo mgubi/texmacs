@@ -45,8 +45,14 @@
   <source-link|merge-universal.sh|packages/macos/merge-universal.sh> merges two applications into a
   universal one, and <source-link|check-app.sh|packages/macos/check-app.sh> checks the signature and
   that only system libraries and those of the bundle are used. The
-  continuous integration workflow <verbatim|.github/workflows/macos-ns.yml>
-  does all this on the branch <verbatim|ns_ci>.
+  continuous integration workflow <verbatim|.github/workflows/macos-maxs.yml>
+  does all this on the branch <verbatim|maxs_ci>, for the <name|Cocoa> and
+  the <name|Vue> ports and both architectures, and publishes the two disk
+  images as the pre-release <verbatim|maxs-latest>; a state of
+  <verbatim|maxs_texmacs> is built by moving <verbatim|maxs_ci> to it
+  (<verbatim|git push -f origin maxs_texmacs:maxs_ci>). The older workflow
+  <verbatim|macos-ns.yml> still names the branch <verbatim|ns_ci>, which no
+  longer exists.
 
   <section|Structure>
 

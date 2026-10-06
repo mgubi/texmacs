@@ -226,15 +226,181 @@
 
   <section|The browser>
 
-  A <name|WebAssembly> build of the port (<name|Emscripten>) is developed
-  on the branch <verbatim|wip_wasm_vue>; this tree has neither its build
-  files nor its documentation, only the code of the port which is compiled
-  under <cpp|__EMSCRIPTEN__>: single window mode always on, one window
-  which fills the page (<verbatim|SDL_WINDOW_FILL_DOCUMENT>), the loop
-  driven by <cpp|emscripten_set_main_loop>, file dialogs through the page,
-  the <name|Fira> fonts for the interface, <name|WebGL2> in the GPU
-  renderer, and no <name|SDL3_ttf>. Headless mode, which opens no display,
-  makes the build testable under <name|node>.
+  <TeXmacs> also runs in a web page: a <name|WebAssembly> build of this port
+  with <name|Emscripten>, on <scheme> <name|S7> (the collector of
+  <name|Guile> scans the C stack, which <name|WebAssembly> does not expose).
+  It lives in this tree (it was developed on the branch
+  <verbatim|wip_wasm_vue> until it was merged into
+  <verbatim|maxs_texmacs>). The design notes, measurements and the state of
+  the port are in <source-link|docs/wasm/README.md|docs/wasm/README.md>
+  (with <source-link|tikzjax.md|docs/wasm/tikzjax.md> and
+  <source-link|asymptote.md|docs/wasm/asymptote.md> for two of the plug-ins);
+  what the user sees is described in the help page
+  <source-link|texmacs-vue.en.tm|TeXmacs/doc/about/welcome/texmacs-vue.en.tm>
+  (<menu|Help|TeXmacs in the browser>, in the browser only), whose recent changes list every
+  feature and fix of the browser version.
+
+  <subsection|Building>
+
+  The build uses neither <verbatim|configure> nor <name|CMake>: everything is
+  in <source-link|misc/wasm|misc/wasm>, run from <verbatim|src>:
+
+  <\verbatim>
+    . misc/wasm/emenv.sh build-wasm \ \ \ \ \ # the Emscripten environment
+
+    sh misc/wasm/build-mupdf.sh \ \ \ \ \ \ \ \ \ # the slim MuPDF, once
+
+    make -C build-wasm -f ../misc/wasm/Makefile -j8 web \ # the page
+
+    make -C build-wasm -f ../misc/wasm/Makefile -j8 node # node, headless
+
+    node misc/wasm/serve.mjs \ \ \ \ \ \ \ \ \ \ \ \ # http://localhost:8080/texmacs.html
+  </verbatim>
+
+  <source-link|Makefile|misc/wasm/Makefile> compiles the sources listed in
+  <source-link|sources.txt|misc/wasm/sources.txt> (those of a desktop
+  <name|Vue>+<name|S7> build without the <name|Objective-C>; written again by
+  <source-link|list-sources.sh|misc/wasm/list-sources.sh>) with
+  <source-link|config.h|misc/wasm/config.h> and
+  <source-link|tm_configure.hpp|misc/wasm/tm_configure.hpp> in place of what
+  <verbatim|configure> writes. <name|SDL3> is the port of <name|Emscripten>
+  (<verbatim|-sUSE_SDL=3>); <name|MuPDF> is a slim build without fonts of its
+  own, patched (<source-link|build-mupdf.sh|misc/wasm/build-mupdf.sh>,
+  <source-link|mupdf-subset-cff.patch|misc/wasm/mupdf-subset-cff.patch>);
+  <name|SDL3_ttf> is not linked; <name|Hunspell> is compiled in for the
+  spelling (<source-link|get-hunspell.sh|misc/wasm/get-hunspell.sh>). The
+  exceptions and <cpp|setjmp>/<cpp|longjmp> are those of <name|WebAssembly>
+  (<verbatim|-fwasm-exceptions>), as in <name|MuPDF>, which rules out
+  <verbatim|ASYNCIFY>: the loop cannot block, and gives control back to the
+  browser every frame. The files of the directory <verbatim|TeXmacs> are written as
+  packages with a manifest by <source-link|package.py|misc/wasm/package.py>,
+  the files read at startup (<source-link|boot-files.txt|misc/wasm/boot-files.txt>)
+  in the boot package.
+
+  <subsection|In the code of the port>
+
+  What the code of the port compiles under <cpp|__EMSCRIPTEN__> (mostly in
+  <source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>) does: single window
+  mode always on, the windows of the editors being tabs of the page; the
+  loop driven by <cpp|emscripten_set_main_loop>, one
+  <cpp|loop_iteration> per frame, the keys queued in a frame all handled in
+  it (<cpp|web_more_events>); file dialogs through the page; the
+  <name|Fira> fonts for the interface; <name|WebGL2> in the GPU renderer;
+  the tabs sent to the frame of the page (<cpp|frame_sync>,
+  <cpp|vue_web_move_tab>), the input methods (<cpp|vue_web_compose>), the
+  clipboard and printing through the page. Headless mode, which opens no
+  display, makes the build testable under <name|node>.
+
+  <subsection|The page>
+
+  The page is <source-link|shell.html|misc/wasm/shell.html> and a series of
+  scripts given to <name|Emscripten> as <verbatim|--pre-js>, each with a
+  header which explains it:
+
+  <\description>
+    <item*|<source-link|progress.js|misc/wasm/progress.js>>The progress of
+    the loading, until <TeXmacs> runs.
+
+    <item*|<source-link|packages.js|misc/wasm/packages.js>>The tree
+    <verbatim|/texmacs>: every file a placeholder, filled by the boot
+    package before the start, by the other packages in the background, or
+    by a range of its package when it is read first; the fonts fetched one
+    by one; all kept in the Cache Storage of the browser.
+
+    <item*|<source-link|web-pre.js|misc/wasm/web-pre.js>>The home directory
+    <verbatim|/home/web>, kept in <name|IndexedDB> and written back a moment
+    after each change, by the one tab which holds a Web Lock.
+
+    <item*|<source-link|files.js|misc/wasm/files.js>>The Files panel:
+    uploads, downloads, folders and zips, the files of <TeXmacs>.
+
+    <item*|<source-link|frame.js|misc/wasm/frame.js>>The frame: a column at
+    the left of the canvas with a <TeXmacs> menu and the tabs of the
+    windows.
+
+    <item*|<source-link|clipboard.js|misc/wasm/clipboard.js>>The clipboard:
+    <TeXmacs> reads it synchronously, the browser gives it to a paste event
+    only, so the page keeps what it knows of it.
+
+    <item*|<source-link|ime.js|misc/wasm/ime.js>>Dead keys and input
+    methods, which <name|SDL> does not have on the web.
+
+    <item*|<source-link|print.js|misc/wasm/print.js>>Print and preview: the
+    PDF of <name|MuPDF> opens in a tab of the browser.
+
+    <item*|<source-link|javascript.js|misc/wasm/javascript.js>>The global
+    <verbatim|TeXmacs> of the page (<scheme> from <name|JavaScript>).
+
+    <item*|<source-link|wallet.js|misc/wasm/wallet.js>>The wallet, encrypted
+    by <name|WebCrypto> instead of <name|GnuPG>.
+
+    <item*|<source-link|workers.js|misc/wasm/workers.js>>The plug-ins which
+    are Web Workers (below).
+  </description>
+
+  The node build has <source-link|node-pre.js|misc/wasm/node-pre.js>
+  instead, which passes the environment of <name|node> to <TeXmacs>.
+
+  <subsection|Plug-ins as Web Workers>
+
+  A page has no processes: <cpp|posix_spawnp> fails and the plug-ins which
+  run a program are not offered. A plug-in may instead say
+  <scm|(:worker "url")> in its <scm|plugin-configure>, the url being its
+  script relative to the page: the link
+  (<source-link|worker_link.cpp|src/System/Link/worker_link.cpp>) sends the
+  input of a session to that worker and reads back what it posts, in the
+  usual protocol of the plug-ins, as through pipes;
+  <source-link|workers.js|misc/wasm/workers.js> describes the messages. The
+  scripts are in the <verbatim|web> directory of their plug-ins:
+  <name|Python> on <name|Pyodide>
+  (<source-link|tm-python.mjs|plugins/python/web/tm-python.mjs>), <name|R> on
+  <name|webR> (<source-link|tm-r.mjs|plugins/r/web/tm-r.mjs>), <name|TikZ> on
+  <name|TikZJax> (<source-link|tm-tikz.js|plugins/tikz/web/tm-tikz.js>),
+  <name|Asymptote> on <name|Asymptote-web>
+  (<source-link|tm-asy.mjs|plugins/asymptote/web/tm-asy.mjs>), and
+  <name|JavaScript>, which runs in the page itself
+  (<scm|(:worker "page:<em|file>")>,
+  <source-link|tm-javascript.js|plugins/javascript/web/tm-javascript.js>).
+  The <verbatim|web> target of the makefile copies them and their engines
+  into the page.
+
+  <subsection|Testing>
+
+  Under <name|node>, which sees the files of the host, the node build
+  converts documents as the desktop does:
+
+  <\verbatim>
+    TEXMACS_PATH=$PWD/TeXmacs TEXMACS_HOME_PATH=/tmp/tmhome HOME=/tmp/tmhome
+    \\
+
+    \ \ node build-wasm/out/node/texmacs.js -headless -c in.tm out.pdf -q
+  </verbatim>
+
+  In a browser, <source-link|browser-run.mjs|misc/wasm/browser-run.mjs>
+  loads the page in a headless <name|Firefox> (with <verbatim|puppeteer-core>
+  in <verbatim|build-wasm/tools>), prints the console and replays a script of
+  clicks, keys and screenshots; <source-link|serve.mjs|misc/wasm/serve.mjs>
+  serves the page, possibly as over a slow network. The tests of
+  <source-link|misc/wasm/test|misc/wasm/test> check the home directory with
+  several tabs (<verbatim|home-tabs.mjs>, also in <name|Safari> and
+  <name|Chrome>) and the frames drawn while the page is resized
+  (<verbatim|resize-flicker.mjs>, <verbatim|resize-jitter.mjs>).
+
+  <subsection|Publishing>
+
+  The workflow <verbatim|.github/workflows/wasm.yml> runs on the branch
+  <verbatim|wasm_ci> only: work on <verbatim|maxs_texmacs> triggers
+  nothing, and a state is built, tested (the node build turns the Welcome
+  document into a PDF) and published on <name|GitHub Pages> by moving
+  <verbatim|wasm_ci> to it,
+
+  <\verbatim>
+    git push origin maxs_texmacs:wasm_ci
+  </verbatim>
+
+  The page of the run is also kept as an artifact
+  (<verbatim|texmacs-wasm-web>), to be served with <verbatim|node
+  misc/wasm/serve.mjs <em|dir>>.
 
   <section|What is missing>
 
