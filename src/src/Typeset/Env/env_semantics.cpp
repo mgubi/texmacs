@@ -875,12 +875,6 @@ edit_env_rep::decode_arrow (tree t, string l, string h) {
                          tree (_POINT, "0" * lun, "0" * hun),
                          tree (_POINT, as_string (-lx) * lun,
                                as_string (-hx) * hun)));
-    if (s == "<gtr>")
-      return tree (LINE,
-                   tree (_POINT, as_string (-lx) * lun, h),
-                   tree (_POINT, "0" * lun, "0" * hun),
-                   tree (_POINT, as_string (-lx) * lun,
-                                 as_string (-hx) * hun));
     if (s == "<less><less>")
       return tree (GR_GROUP,
                    tree (LINE,

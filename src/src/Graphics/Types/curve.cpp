@@ -389,6 +389,7 @@ spline_rep::spline_rep (
   U = array<double> (n+6);
   if (close) {
     int i;
+    a= copy (a);
     a->resize(N(a)+2);
     for (i=0;i<=1;i++)
       a[n+1+i]=a[i];
@@ -689,6 +690,7 @@ struct bezier_rep: public curve_rep {
 };
 
 bezier_rep::bezier_rep (array<point> a2): a (a2) {
+  ASSERT (N(a) == 4, "cubic bezier curve needs four points");
   P << a[0];
   P << (-3.0*a[0] + 3.0*a[1]);
   P << (3.0*a[0] - 6.0*a[1] + 3.0*a[2]);
