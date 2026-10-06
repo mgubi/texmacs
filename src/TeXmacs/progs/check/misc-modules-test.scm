@@ -395,7 +395,9 @@
     (check= (down 'subsubsection) 'paragraph)
     (check= (down 'paragraph) 'subparagraph)
     (check= (lab "foo/bar.en.tm#here") "here")
-    (check= (lab "foo/bar.en.tm") "sec-bar")
+    ;; the label is built from the whole path (pages of the same name in
+    ;; different directories got the same label, #108)
+    (check= (lab "foo/bar.en.tm") "sec-foo-bar")
     (check= (lab 3) #f)
     (check= (internalize '(document (label "sec-x") (hlink "a" "x.en.tm")
                                     (hlink "b" "y.en.tm")))
