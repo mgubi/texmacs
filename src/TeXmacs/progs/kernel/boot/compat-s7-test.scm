@@ -90,6 +90,23 @@
   (regression-test-group
    "compat-s7, miscellaneous builtins" "misc"
    :none :none
+   (test "pretty-print, short on one line"
+         (call-with-output-string (lambda (p) (pretty-print '(a "b" 1) p)))
+         "(a \"b\" 1)\n")
+   (test "pretty-print, long on several lines read back"
+         (let* ((x (map (lambda (i) (cons (list "ai" "claude" "api key")
+                                          (make-string 30 #\x)))
+                        (iota 3)))
+                (s (call-with-output-string (lambda (p) (pretty-print x p)))))
+           (list (> (length (string-split s #\newline)) 2)
+                 (equal? (read (open-input-string s)) x)))
+         '(#t #t))
+   (test "pretty-print, dotted and vector read back"
+         (let* ((x (vector (cons (make-string 50 #\a) (make-string 50 #\b))
+                           "c" 'd))
+                (s (call-with-output-string (lambda (p) (pretty-print x p)))))
+           (equal? (read (open-input-string s)) x))
+         #t)
    (test "1+" (1+ 41) 42)
    (test "1-" (1- 43) 42)
    (test "noop without arguments" (noop) #f)
