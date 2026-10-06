@@ -463,7 +463,11 @@ bool
 set_selection (string key, tree t,
                string s, string sv, string sh, string format) {
   (void) sh;
-  // foreign clients get the plain text version, not TeXmacs markup
+  // foreign clients get the plain text version, not TeXmacs markup. This
+  // port offers a single string, so another TeXmacs gets the plain text
+  // too: a copy between two TeXmacs instances loses its structure (within
+  // one instance, the tree t is pasted). Keeping it would need a second
+  // target for the markup, as the Qt port offers with its MIME types.
   if (format == "default") s= sv;
   return the_gui->set_selection (key, t, s);
 }
