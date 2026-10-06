@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeXmacs Vue</title>
+<!-- the logo of TeXmacs Vue (TeXmacs/misc/images, made by
+     misc/icons/vue-logo/make-vue-logo.py, copied by misc/wasm/Makefile); Safari
+     takes the .ico -->
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="16x16" href="texmacs-vue-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="texmacs-vue-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="texmacs-vue-192.png">
+<link rel="apple-touch-icon" href="texmacs-vue-192.png">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #a0a0a0; }
+  body { display: flex; flex-direction: row; }
+  /* the frame (misc/wasm/frame.js) at the left, the canvas of TeXmacs at
+     its right: SDL takes the size the page gives the canvas, and follows it */
+  #tm-canvas-box { flex: 1; position: relative; min-width: 0; min-height: 0; }
+  canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+           display: block; outline: none; }
+  /* until the panel of misc/wasm/progress.js replaces it */
+  #status { position: fixed; left: 0; right: 0; top: 40%; text-align: center;
+            font: 16px -apple-system, "Helvetica Neue", sans-serif; color: #222; }
+</style>
+</head>
+<body>
+<div id="tm-frame"></div>
+<div id="tm-canvas-box"><canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas></div>
+<div id="status">Loading TeXmacs Vue…</div>
+<script>
+  var statusElement = document.getElementById('status');
+  var Module = {
+    canvas: document.getElementById('canvas'),
+    // the size of texmacs.wasm, written by the build (misc/wasm/Makefile)
+    // for the progress of its download (misc/wasm/progress.js)
+    tmWasmSize: Number('@TM_WASM_SIZE@') || 0,
+    // the version of TeXmacs, for the panel of the loading
+    tmVersion: '@TM_VERSION@',
+    print: function (text) { console.log(text); },
+    printErr: function (text) { console.error(text); },
+    setStatus: function (text) {
+      statusElement.textContent = text || '';
+      statusElement.style.display = text ? 'block' : 'none';
+    },
+    monitorRunDependencies: function (left) {
+      if (left) Module.setStatus('Loading TeXmacs… (' + left + ')');
+    }
+  };
+  window.onerror = function (msg) { Module.setStatus('Error: ' + msg); };
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

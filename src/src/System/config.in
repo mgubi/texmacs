@@ -296,6 +296,9 @@
 /* Use ghostscript */
 #undef USE_GS
 
+/* Use the Guile Scheme interpreter */
+#undef USE_GUILE
+
 /* Use iconv library */
 #undef USE_ICONV
 
@@ -313,6 +316,9 @@
 
 /* Use resvg library for SVG rendering */
 #undef USE_RESVG
+
+/* Use the S7 Scheme interpreter */
+#undef USE_S7
 
 /* Use SDL3 library */
 #undef USE_SDL3

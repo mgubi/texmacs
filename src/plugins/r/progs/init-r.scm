@@ -32,14 +32,30 @@
       (toggle (run-via-jupyter "r" answer)
               (run-via-jupyter? "r")))))
 
+;; In a browser, the plugin is a Web Worker which runs R in WebAssembly
+;; (webR: web/tm-r.mjs, copied to r/ next to the page), whose inputs end
+;; with a line <EOF>; elsewhere the R program of the computer
+(define (r-in-browser?)
+  (defined? 'web-files))
+
+(define (r-serialize-web lan t)
+  (with u (pre-serialize lan t)
+    (string-append (texmacs->code u) "\n<EOF>\n")))
+
+(define (r-engine)
+  (if (r-in-browser?)
+      `((:worker "r/tm-r.mjs")
+        (:serializer ,r-serialize-web))
+      `((:serializer ,r-serialize)
+        (:launch ,(r-launcher))
+        (:tab-completion #t))))
+
 (plugin-configure r
   (:winpath "R-*" "bin")
   (:winpath "R/R*" "bin")
-  (:require (url-exists-in-path? "R"))
-  (:serializer ,r-serialize)
-  (:launch ,(r-launcher))
-  (:preferences (supports-jupyter?))
-  (:tab-completion #t)
+  (:require (or (r-in-browser?) (url-exists-in-path? "R")))
+  ,@(r-engine)
+  (:preferences (and (not (r-in-browser?)) (supports-jupyter?)))
   (:session "R")
   (:scripts "R"))
 
@@ -56,6 +72,7 @@
     ("update menu" (insert "t.update.menus(max.len=30)"))
     ("R help in TeXmacs" (insert "t.start.help()")))
 
+  ;; (not in a browser: its commands are those of the program tm_r)
   (menu-bind plugin-menu
-    (:require (in-r?))
+    (:require (and (in-r?) (not (r-in-browser?))))
     (=> "R" (link r-menu))))

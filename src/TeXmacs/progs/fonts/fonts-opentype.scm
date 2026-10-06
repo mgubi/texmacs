@@ -205,6 +205,17 @@
     (if (== (math-family-for-text text) math) text
         (string-append "math=" math "," text))))
 
+;; the variables which set a part of a document in the text and the
+;; mathematics of @math, as a list (var val ...), for make-multi-with (the
+;; footer of the window, footer-menu.scm, sets the font at the cursor)
+(tm-define (opentype-font-local-vars math)
+  (with fam (opentype-font-family math)
+    (append (list "font" (opentype-font-value math))
+            (if (== fam "rm") (list) (list "font-family" fam)))))
+
+(tm-define (opentype-font-local? math)
+  (== (get-env "font") (opentype-font-value math)))
+
 (define (tex-gyre-package math)
   (with text (math-font-profile-attr math "text")
     (and (string-starts? text "TeX Gyre ")

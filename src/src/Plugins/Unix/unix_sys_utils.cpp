@@ -609,14 +609,20 @@ unix_system_kill (unix_process_rep* rep) {
 
 #endif
 
+// getpwuid finds no entry for the user where there is no user database (a
+// container, or the browser): the login then comes from USER, if any
 string unix_get_login () {
   uid_t uid= getuid ();
   struct passwd* pwd= getpwuid (uid);
-  return string(pwd->pw_name);
+  if (pwd != NULL && pwd->pw_name != NULL) return string (pwd->pw_name);
+  const char* user= getenv ("USER");
+  return user != NULL ? string (user) : string ("");
 }
 
 string unix_get_username () {
   uid_t uid= getuid ();
   struct passwd* pwd= getpwuid (uid);
-  return tokenize (string (pwd->pw_gecos), string(","))[0];
+  if (pwd == NULL || pwd->pw_gecos == NULL) return unix_get_login ();
+  array<string> a= tokenize (string (pwd->pw_gecos), string (","));
+  return N(a) > 0 ? a[0] : string ("");
 }

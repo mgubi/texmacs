@@ -232,8 +232,9 @@ typedef vue_window_rep* vue_window;
 extern hashmap<int, pointer> id_to_window;
 void draw_picture (void *data, picture pic);
 void get_viewport_size (void *data, int& w, int& h);
-// document: the window of an editor, brought to the front when it is shown
-// again (switch_to_window, to switch to its buffer)
+// document: the window of an editor (vue_texmacs_widget_rep), which is a
+// tab in single-window mode (see vue_gui.cpp), brought to the front when it
+// is shown again (switch_to_window, to switch to its buffer)
 vue_window plain_window (vue_widget wwid, string name, bool popup= false,
                          bool document= false);
 
@@ -267,6 +268,11 @@ extern void* vue_render_widget;
 extern void* vue_render_text;
 
 void layout_text (string s, int style, color c);
+void layout_keys (string s, int style, color c); // a keyboard shortcut
+
+// the SDL window which shows win (its host for a virtual window), and where
+// the top left corner of win is in it (points)
+void* vue_shown_in (vue_window win, float& dx, float& dy);
 
 extern vue_window current_window;
 class with_window {

@@ -33,6 +33,10 @@
   (when (url-exists-in-help? "about/welcome/new-welcome.en.tm")
 	("Welcome" (load-help-article "about/welcome/new-welcome"))
 	("Getting started" (load-help-article "about/welcome/start"))
+	;; the browser build (web-files is defined by the Vue plugin there)
+	(if (defined? 'web-files)
+	    ("TeXmacs in the browser"
+	     (load-help-article "about/welcome/texmacs-vue")))
 	---)
   (if (detailed-menus?)
       (when (url-exists-in-help? "main/config/man-configuration.en.tm")

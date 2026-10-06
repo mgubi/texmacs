@@ -217,6 +217,7 @@ bool os_mingw64 ();
 bool os_macos ();
 bool os_android ();
 bool use_macos_fonts ();
+bool use_macos_keys ();
 const char* default_look_and_feel ();
 void gui_set_next_window_as_popup ();
 bool support_functionality (string);

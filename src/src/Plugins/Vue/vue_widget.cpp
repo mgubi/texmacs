@@ -56,6 +56,9 @@ extern bool menu_caching;
 // Clay
 
 #include <SDL3/SDL.h> // SDL_GetSystemTheme (the themes)
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h> // EM_ASM (the input area of the page)
+#endif
 #include "clay.h"
 #include "clay_grid.h"
 
@@ -372,6 +375,18 @@ mix_colors (Clay_Color a, Clay_Color b, float t) {
 // icon of an older generation loads it again (see icon_picture).
 static int icon_generation= 0;
 
+#ifdef __EMSCRIPTEN__
+// the class tm-dark of the page: the dark colours of its frame (the tabs,
+// the menu of TeXmacs Vue, its dialogs); tm-theme-set tells the frame that
+// TeXmacs chose (before, the frame follows the system)
+EM_JS (void, vue_web_frame_theme, (int dark), {
+  if (typeof document === 'undefined') return; // the node build: no page
+  var c = document.documentElement.classList;
+  c.add ('tm-theme-set');
+  if (dark) c.add ('tm-dark'); else c.remove ('tm-dark');
+});
+#endif
+
 // "light", "dark", or anything else (the "default" of the preference) to
 // follow the appearance of the system
 void
@@ -397,6 +412,10 @@ set_vue_theme (string name) {
     mupdf_set_icon_theme (icons);
     icon_generation++;
   }
+#ifdef __EMSCRIPTEN__
+  // the frame of the page (misc/wasm/frame.js) in the same theme
+  vue_web_frame_theme (dark ? 1 : 0);
+#endif
   // the surround of the pages is a colour of TeXmacs, not of the widgets
   tm_background= rgb_color (the_theme.canvas.r, the_theme.canvas.g,
                             the_theme.canvas.b);
@@ -418,6 +437,7 @@ int mouse_y;
 int mouse_ticket= 0; // the payload of a "drop" action
 int mouse_clicks= 1; // the count of the clicks of a press (2: double click)
 unsigned int mouse_state= 0;
+unsigned int mouse_presses= 0; // the presses of a button so far
 array<double> mouse_data;
 
 bool current_popup; // is there an active popup?
@@ -477,6 +497,7 @@ bool fill_parent= false;
 
 uint32_t current_balloon;
 time_t balloon_time;
+static unsigned int balloon_presses= 0; // mouse_presses when it was hovered
 
 // list of commands
 list<command> cmd_list;
@@ -1164,6 +1185,23 @@ decode_length (string width, vue_window win, int style) {
   else return ex;
 }
 
+// The icon set of the preferences, followed at once rather than at the next
+// start of TeXmacs: when it changes, it is put on the path of the icons
+// (apply_icon_set) and the widgets load their icons again (icon_picture);
+// the icons loaded are kept per set (load_xpm), a change back costs nothing.
+// The loop calls it at each iteration: a lookup in the preferences
+void
+vue_follow_icon_set () {
+  static string current;
+  string now= get_user_preference ("icon set", "neo-classical");
+  if (N(current) == 0) { current= now; return; }
+  if (now == current) return;
+  current= now;
+  apply_icon_set ();
+  icon_generation++;
+  gui_needs_relayout= true;
+}
+
 // additional widgets for caching and drawing
 // file_name is the icon the picture was loaded from (none for a picture
 // which has no file), and stamp the icon theme and the resolution it was
@@ -1299,18 +1337,43 @@ render_marker_fn (renderer ren, void* data, rectangle r) {
   }
 }
 
+// a solid triangle, as the characters U+25B8, U+25BE... of the arrows of the
+// widgets: data is dir as for render_marker_fn, plus 4 when it is grey
+static void
+render_triangle_fn (renderer ren, void* data, rectangle r) {
+  int code= (int) (intptr_t) data, dir= code & 3;
+  SI cx= (r->x1 + r->x2) / 2, cy= (r->y1 + r->y2) / 2;
+  SI a= (min (r->x2 - r->x1, r->y2 - r->y1) * 5) / 16; // half the long side
+  SI b= (a * 7) / 8;                             // half the height
+  array<SI> x (3), y (3);
+  switch (dir) {
+    case 0:  x[0]= cx + b; y[0]= cy + a; x[1]= cx + b; y[1]= cy - a;
+             x[2]= cx - b; y[2]= cy; break;
+    case 1:  x[0]= cx - b; y[0]= cy + a; x[1]= cx - b; y[1]= cy - a;
+             x[2]= cx + b; y[2]= cy; break;
+    case 2:  x[0]= cx - a; y[0]= cy - b; x[1]= cx + a; y[1]= cy - b;
+             x[2]= cx; y[2]= cy + b; break;
+    default: x[0]= cx - a; y[0]= cy + b; x[1]= cx + a; y[1]= cy + b;
+             x[2]= cx; y[2]= cy - b; break;
+  }
+  Clay_Color c= (code & 4) ? the_theme.text_grey : the_theme.text;
+  ren->set_brush (theme_color (c));
+  ren->polygon (x, y, true);
+}
+
 // An arrow of the widgets (dir as for render_marker_fn): the character of
-// the interface font when it has one, the drawn chevron otherwise (Fira, the
-// font of the browser, has no U+25B8 and no U+25BE)
+// the interface font when it has one, a drawn solid triangle otherwise
+// (Fira, the font of the browser, has no U+25B8 and no U+25BE)
 static void
 layout_arrow (string glyph, int dir, color c) {
   font fn= get_default_styled_font (0);
   if (fn->supports (glyph)) { layout_text (glyph, 0, c); return; }
   float s= (float) retina_factor * ((fn->y2 - fn->y1) / 3) / PIXEL;
+  int grey= (c == black) ? 0 : 4;
   CLAY_AUTO_ID({
     .layout= { .sizing= { CLAY_SIZING_FIXED(s), CLAY_SIZING_FIXED(s) }},
-    .custom= { .customData= (void*) &render_marker_fn },
-    .userData= (void*) (intptr_t) dir }) {}
+    .custom= { .customData= (void*) &render_triangle_fn },
+    .userData= (void*) (intptr_t) (dir + grey) }) {}
 }
 
 static void
@@ -3008,7 +3071,7 @@ vue_ui_rep::do_layout () {
       if (N(d.ks) > 0) {
         // add shortcut, well apart from the label
         CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_GROW(ui_pxf (32)), CLAY_SIZING_GROW(0) }}}) {}
-        layout_text (d.ks, d.style, black);
+        layout_keys (d.ks, d.style, black);
       }
       if (tab_strip && bd.found) {
         // cover the bottom line of the bar under the active tab (the border
@@ -3115,7 +3178,21 @@ vue_ui_rep::do_layout () {
         // hovered and not active, then become active and start counting time
         current_balloon= id;
         balloon_time= texmacs_time ();
+        balloon_presses= mouse_presses;
       }
+      // a click puts it away (or keeps it from coming) until the pointer
+      // leaves the widget, as a tooltip does; the press and its release
+      // may both come between two layouts, hence the count
+      if (mouse_presses != balloon_presses) {
+        balloon_presses= mouse_presses;
+        balloon_time= texmacs_time () - 5000;
+      }
+      // nor does it come while a menu is open (a menu of a bar, a submenu):
+      // it would hide the menu; its delay starts when the menus close
+      else if ((current_window != NULL &&
+                N(current_window->input.menu_zones) > 0) ||
+               N(menu_zones_now) > 0)
+        balloon_time= texmacs_time ();
       time_t elapsed= texmacs_time () - balloon_time;
       if ((elapsed > 1000) && (elapsed < 5000)) {
         // The balloon sits near the pointer and floats over the whole
@@ -4698,6 +4775,18 @@ vue_input_text_widget_rep::do_layout () {
   if (!greyed) sig= button_logic (cid);
   Clay_ElementData ed= Clay_GetElementData (cid);
   Clay_SizingAxis sw= input_fill ? CLAY_SIZING_GROW (0) : CLAY_SIZING_FIXED (w_px);
+  // a width in "w" is a multiple of the default width of an input, as in
+  // Qt (qt_decode_length: of its size hint), not of the window: "10w", as
+  // the passphrase of the wallet asks, was ten windows wide and pushed the
+  // buttons of its dialog out of sight. It fills the room it is given, up
+  // to that width.
+  if (!input_fill) {
+    double w_len; string w_unit;
+    parse_length (width, w_len, w_unit);
+    if (w_unit == "w")
+      sw= CLAY_SIZING_GROW (.min= ui_pxf (60),
+                            .max= (float) (w_len * ui_pxf (150)));
+  }
   CLAY(cid, {
     .layout= { .sizing= { sw, CLAY_SIZING_FIXED (h_px) } },
     .custom= { .customData= vue_render_widget },
@@ -6756,23 +6845,31 @@ vue_simple_widget_rep::repaint_invalid_regions () {
 // which has the keyboard: SDL is told where it is (SDL_SetTextInputArea, in
 // points of the window), as Qt answers ImCursorRectangle from the position
 // of SLOT_CURSOR. Done after the scroll, which moves the cursor in the
-// window, and only when it changed.
+// window, and only when it changed. A virtual window (a tab, a dialog of
+// single-window mode) is shown in its host, the area is set there. In the
+// browser, where SDL has no input method, the hidden text area of the page
+// in which they compose goes there (tmIme.caret, misc/wasm/ime.js).
 void
 vue_simple_widget_rep::update_text_input_area () {
   if (win == NULL || win->kbd_focus != this) return;
-  SDL_Window* sw= (SDL_Window*) win->platform_window ();
-  if (sw == NULL) return; // a virtual window (single-window mode)
+  float dx, dy;
+  SDL_Window* sw= (SDL_Window*) vue_shown_in (win, dx, dy);
+  if (sw == NULL) return;
   SI x= cursor_pos.x1, y= cursor_pos.x2;
   ren->set_origin (-backing_pos.x1, -backing_pos.x2);
   ren->decode (x, y); // pixels of the backing store, from its top left
   float d= (win->density > 0.0f) ? win->density : 1.0f;
-  int px= (int) ((origin.x1 + x) / d), py= (int) ((origin.x2 + y) / d);
+  int px= (int) (dx + (origin.x1 + x) / d), py= (int) (dy + (origin.x2 + y) / d);
   if (!cursor_moved && px == ime_x && py == ime_y) return;
   cursor_moved= false;
   ime_x= px; ime_y= py;
   // a thin box on the baseline, the candidates go below it
   SDL_Rect r= { px, py - 12, 2, 16 };
   SDL_SetTextInputArea (sw, &r, 0);
+#ifdef __EMSCRIPTEN__
+  EM_ASM ({ if (typeof tmIme !== 'undefined' && tmIme) tmIme.caret ($0, $1, $2); },
+          r.x, r.y, r.h);
+#endif
 }
 
 void

@@ -24,7 +24,9 @@
 #include "boot.hpp"
 #include "server_log.hpp"
 #include "gnutls.hpp"
+#include "websocket_contact.hpp"
 #include "tm_timer.hpp"
+#include "hashset.hpp"
 #include <cctype>
 #include <string.h> // memset, memcpy (without Qt, which included it)
 
@@ -205,6 +207,43 @@ socket_present () {
 
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+// In the browser a socket is a WebSocket (Emscripten), to ws://host:port/
+// or wss://host:port/. A page served over https may open wss only (a ws
+// from it is blocked as mixed content), save to this machine, which the
+// browser trusts: wss to the other hosts then, ws otherwise (a page over
+// http, a server on this machine). ?websocket=wss (or ws) in the address of
+// the page says which, whatever the page (the tests serve it over http)
+EM_JS (int, web_socket_scheme, (const char* host), {
+  var h = UTF8ToString (host);
+  var page = typeof location !== 'undefined' ? location : null;
+  var q = page ? new URLSearchParams (page.search).get ('websocket') : null;
+  var local = /^(localhost|127\.[0-9.]+|::1|\[::1\])$/i.test (h);
+  var scheme = (q === 'wss' || q === 'ws') ? q :
+               (page && page.protocol === 'https:' && !local ? 'wss' : 'ws');
+  if (typeof SOCKFS !== 'undefined') SOCKFS.websocketArgs['url'] = scheme + '://';
+  return scheme === 'wss' ? 1 : 0;
+});
+
+// The browser does not tell a page why a WebSocket failed (security): a
+// connection which fails before any data says where it went, and what may
+// be wrong
+static hashmap<int,string> web_socket_url ("");
+static hashset<int> web_socket_got;
+
+static string
+web_socket_failure (int s) {
+  if (web_socket_got->contains (s) || web_socket_url[s] == "") return "";
+  return " (" * web_socket_url[s] * " could not be opened: no TeXmacs "
+    "server there, one which does not serve WebSocket clients (its "
+    "preference \"server websocket\"), or, for wss, a certificate which "
+    "the browser does not trust)";
+}
+#else
+static string web_socket_failure (int s) { (void) s; return ""; }
+#endif
+
 int try_connect (const char* host, const char* port, int timeout,
                  char* errbuf, size_t errlen) {
 #define MAX_SOCKS 16
@@ -219,6 +258,9 @@ int try_connect (const char* host, const char* port, int timeout,
   hints.ai_next= NULL;
 
   if (errbuf && errlen > 0) errbuf[0]= '\0';
+#ifdef __EMSCRIPTEN__
+  bool wss= web_socket_scheme (host) != 0;
+#endif
 
   int x= GETADDRINFO (host, port, &hints, &result);
   if (x != 0) {
@@ -239,6 +281,11 @@ int try_connect (const char* host, const char* port, int timeout,
       continue;
     }
 
+#ifdef __EMSCRIPTEN__
+    web_socket_url (s)= string (wss ? "wss://" : "ws://") * string (host) *
+                        ":" * string (port) * "/";
+    web_socket_got->remove (s);
+#endif
     int ret= CONNECT (s, rp->ai_addr, rp->ai_addrlen);
     if (ret == 0) {
       // immediate success
@@ -258,6 +305,14 @@ int try_connect (const char* host, const char* port, int timeout,
       CLOSE (s);
       continue;
     }
+#endif
+#ifdef __EMSCRIPTEN__
+    // in the browser a socket is a WebSocket, which opens once the page
+    // has the hand again: no waiting here (it would never open). What is
+    // written before is queued, and the link waits for the socket to be
+    // writable, which it is once open
+    FREEADDRINFO (result);
+    return s;
 #endif
     socks[n]= s;
     pfds[n].fd= s;
@@ -562,6 +617,10 @@ socket_link_rep::resume_start (int s) {
   if (is_active (contact)) {
     connect_data_notifiers();
     enable_write (N(output_buffer) > 0);
+    // what the contact read while it started (the first request of a
+    // client over TLS, read to know what it is) does not make the socket
+    // readable again
+    data_set_ready (s);
   }
 }
 
@@ -576,6 +635,11 @@ socket_link_rep::data_set_ready (int s) {
   }
   DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
     << socket_id << ", s= " << s);
+  // a contact may hold data of its own (decoded from WebSocket frames, or
+  // TLS records) beyond what one call gives: read until it has no more,
+  // since the socket will not say it is readable for those
+  bool got= false;
+  for (int round= 0; round < 256; round++) {
   char data[16384];
   int n= receive (contact, (void*) data, 16384);
   DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
@@ -584,7 +648,8 @@ socket_link_rep::data_set_ready (int s) {
     DEBUG_SOCKET("'socket_link_rep::data_set_ready', socket "
       << socket_id << " hung up");
     if (!used_by_server ())
-      io_error << "connection to server '" << host << "' hung up" << LF;
+      io_error << "connection to server '" << host << "' hung up"
+               << web_socket_failure (socket_id) << LF;
     stop ();
   }
   else if (n < 0) {
@@ -595,12 +660,16 @@ socket_link_rep::data_set_ready (int s) {
       if (used_by_server ())
 	io_error << "connection to client " << s << " aborted" << LF;
       else
-        io_error << "connection to server '" << host << "' aborted" << LF;
+        io_error << "connection to server '" << host << "' aborted"
+                 << web_socket_failure (socket_id) << LF;
       stop ();
     }
   }
   else {
     input_buffer << string (data, n);
+#ifdef __EMSCRIPTEN__
+    web_socket_got->insert (socket_id);
+#endif
     if (DEBUG_IO) {
       string s (data, n);
       bool ok= true;
@@ -618,9 +687,13 @@ socket_link_rep::data_set_ready (int s) {
           << N(s));
       }
     }
-    if (!is_nil (feed_cmd))
-      feed_cmd->apply ();
+    got= true;
+    continue;
   }
+  break; // nothing more (or the end, or an error)
+  }
+  if (got && !is_nil (feed_cmd))
+    feed_cmd->apply ();
 }
 
 void
@@ -668,7 +741,8 @@ socket_link_rep::ready_to_send (int s) {
             << as_string (s) << " aborted: " << last_error (contact);
         else
           io_error << "connection to server '"
-            << host << "' aborted: " << last_error (contact);
+            << host << "' aborted: " << last_error (contact)
+            << web_socket_failure (socket_id);
         stop ();
       }
     }
@@ -884,9 +958,19 @@ socket_server_rep::connection (int s) {
     authentications << _anonymous;
 
   bool is_tls_server = get_preference ("tls-server") == string ("on");
-  tm_contact contact= is_tls_server ?
+  tm_contact inner= is_tls_server ?
     make_tls_server_contact (authentications) :
     make_socket_server_contact (authentications);
+  // the clients in a browser come as WebSockets (websocket_contact.cpp),
+  // the others through the inner contact
+  string ws_mode= get_preference ("server websocket", "local");
+  if (ws_mode == "default") ws_mode= "local";
+  bool local= starts (address, "127.") || address == "[::1]" ||
+              starts (address, "[::ffff:127.");
+  tm_contact contact= inner;
+  if (ws_mode != "off")
+    contact= make_websocket_server_contact (inner, is_tls_server,
+                                            authentications, ws_mode, local);
 
   if (!contact.rep) {
     SLOGE ("contact creation failed from " * string_from_socket_address (&cltadd)

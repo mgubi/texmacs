@@ -57,6 +57,27 @@ get_env_path (string which, url def) {
   return val;
 }
 
+// the path of the icons without the set of the preferences (empty when
+// TEXMACS_PIXMAP_PATH was given, which is left alone)
+static string base_pixmap_path;
+
+// the icon set of the preferences, in front of the path of the icons: at
+// the start, and again when the preference changes (the Vue interface
+// follows it at once, see vue_follow_icon_set)
+void
+apply_icon_set () {
+  if (N(base_pixmap_path) == 0) return;
+  string icon_set= get_user_preference ("icon set", "neo-classical");
+  string icon_dir= "";
+  if (icon_set == "monochrome") icon_dir= "monochrome";
+  if (icon_set == "neo-classical") icon_dir= "neoclassical";
+  if (icon_dir != "")
+    set_env_path ("TEXMACS_PIXMAP_PATH",
+                  url ("$TEXMACS_PATH/misc/pixmaps") * url (icon_dir) |
+                  url_system (base_pixmap_path));
+  else set_env ("TEXMACS_PIXMAP_PATH", base_pixmap_path);
+}
+
 static url
 plugin_path (string which) {
   url base= "$TEXMACS_HOME_PATH:/etc/TeXmacs:$TEXMACS_PATH:/usr/share/TeXmacs";
@@ -380,16 +401,10 @@ init_env_vars () {
                        plugin_path ("misc/pixmaps"));
   // The icon set: the original icons ("classical") are those of the path
   // above; another set, chosen in the preferences (by default the
-  // neo-classical one), is looked up first
+  // neo-classical one), is looked up first (see apply_icon_set)
   if (!pixmap_path_given) {
-    string icon_set= get_user_preference ("icon set", "neo-classical");
-    string icon_dir= "";
-    if (icon_set == "monochrome") icon_dir= "monochrome";
-    if (icon_set == "neo-classical") icon_dir= "neoclassical";
-    if (icon_dir != "")
-      set_env_path ("TEXMACS_PIXMAP_PATH",
-                    url ("$TEXMACS_PATH/misc/pixmaps") * url (icon_dir) |
-                    url_system (get_env ("TEXMACS_PIXMAP_PATH")));
+    base_pixmap_path= get_env ("TEXMACS_PIXMAP_PATH");
+    apply_icon_set ();
   }
   (void) get_env_path ("TEXMACS_DIC_PATH",
                        "$TEXMACS_HOME_PATH/langs/natural/dic" |

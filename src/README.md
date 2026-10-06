@@ -1,3 +1,78 @@
+> ## <img src="TeXmacs/misc/images/texmacs-vue-256.png" alt="The logo of TeXmacs Vue" width="36" align="top"> Branch `wip_wasm_vue` — TeXmacs in the browser (TeXmacs Vue)
+>
+> **Try it: <https://mgubi.github.io/texmacs/>** (experimental). Issues
+> of this port which cannot be reproduced in the official TeXmacs
+> distribution go to the [issue page](https://github.com/mgubi/texmacs/issues)
+> of this repository, not to the TeXmacs project.
+>
+> Work in progress: TeXmacs compiled to WebAssembly and running in a web
+> page, an experimental port called TeXmacs Vue, with OpenType fonts
+> (OpenType mathematics included). The CI runs on the branch `vue_ci` only,
+> which is moved to this one when a state is worth building and publishing:
+> `git push origin wip_wasm_vue:vue_ci`. Nothing is installed and
+> nothing leaves the browser unless it is downloaded.
+>
+> ![TeXmacs Vue in the browser: tabs for the documents, the tool bars, a formula](docs/wasm/texmacs-in-the-browser.png)
+>
+> It is stock TeXmacs on
+>
+> * the Vue GUI (below) and SDL3, with Emscripten's SDL3 port;
+> * the [S7](https://ccrma.stanford.edu/software/snd/snd/s7.html) Scheme
+>   interpreter in place of Guile, merged from `wip_s7` of texmacs/texmacs
+>   (notes in [`docs/s7/`](docs/s7/README.md)); S7 is also the default of the
+>   desktop build on this branch (`--with-scheme=s7|guile`);
+> * a slim MuPDF 1.28.5 for the pixels and the PDF output (no fonts of its
+>   own but the standard 14, no document formats but PDF, SVG and images).
+>
+> What the page does:
+>
+> * **One canvas, many windows.** The browser gives one window, so the
+>   windows of TeXmacs become virtual ones: each document is a tab of the
+>   frame above the canvas (its name, a dot when modified, × to close, + for
+>   a new one, a ribbon which scrolls with the wheel or a drag), and the
+>   dialogs float over it with a title bar and a frame which resizes them
+  (their contents scroll when they do not fit). The same mode runs on the desktop
+>   with `TEXMACS_VUE_SINGLE_WINDOW=1`, which is how it is tested.
+> * **The TeXmacs menu** of the page: the version, the state of the files,
+>   the storage used, the Files panel, reload and reset.
+> * **Files.** *Files in this browser…* (also in the File menu) shows the
+>   files kept in the browser, on the user's computer (nothing is sent
+>   anywhere); files and whole projects (folders, zip archives, with their
+>   images) are added from the computer or dropped on the page, and a copy
+>   of one is saved back on the computer (a folder as a zip). The open and save dialogs of
+>   TeXmacs are this panel. The home directory, with the preferences and the
+>   documents, is kept in IndexedDB.
+> * **Loading in pieces.** The program is 5.2 MB (brotli) and the files of
+>   TeXmacs are packages: 4 MB are needed to start, 8.5 MB more come in
+>   the background once TeXmacs runs; a file needed before its package is
+>   fetched alone (a byte range). The fonts (28 MB) come one by one, the
+>   first time a document uses them. Everything is kept in the cache of the
+>   browser: a second visit loads nothing.
+>
+> * **The clipboard of the system**: copy, cut and paste with the other
+>   programs (text, and HTML when TeXmacs has it); TeXmacs' own format is
+>   kept when a copy is pasted back. On a Mac the shortcuts are Cmd+..., as
+>   the browser's.
+>
+> * **The TeXmacs server**: the Remote menu logs in to a TeXmacs server over
+>   WebSocket (the servers of this branch serve WebSocket clients on their
+>   usual port), for remote files and shared documents.
+>
+> Not there yet: plugins and external converters (no processes in a page),
+> `wss` for servers elsewhere than on the same machine.
+>
+> Build and try it (Emscripten, tested with 6.0; Python ≥ 3.10; Node):
+>
+>     . misc/wasm/emenv.sh build-wasm     # the Emscripten environment
+>     sh misc/wasm/build-mupdf.sh         # the slim MuPDF, once
+>     make -C build-wasm -f ../misc/wasm/Makefile -j8 web
+>     node misc/wasm/serve.mjs            # http://localhost:8080/texmacs.html
+>
+> (`make ... node` builds a headless TeXmacs for node, which converts
+> documents to PDF.) Any web server does, but the page loads faster from one
+> which sends the brotli copies and answers range requests, as `serve.mjs`
+> does. Details, the design and the plan: [`docs/wasm/`](docs/wasm/README.md).
+>
 > ## Branch `wip_vue` — the Vue GUI
 >
 > Work in progress: a graphical back end for TeXmacs which owes nothing to a

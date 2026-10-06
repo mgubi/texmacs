@@ -472,8 +472,15 @@ async_evaluate_pending () {
   }
 }
 
+#ifdef __EMSCRIPTEN__
+void web_async_pending (); // the requests of the browser (web_files.cpp)
+#endif
+
 void
 async_eval_pending () {
+#ifdef __EMSCRIPTEN__
+  web_async_pending ();
+#endif
   if (N(async_processes) > 0) async_evaluate_pending ();
   for (int i=0; i<N(async_busy); )
     if (async_busy[i]->done) {

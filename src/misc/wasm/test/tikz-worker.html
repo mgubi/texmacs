@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>TikZ worker</title>
+<!-- the worker of the TikZ plugin alone, for its tests: served from the
+     directory of the page (out/web), run by browser-run.mjs; its input is
+     window.tikz (source) and its output, as TeXmacs would get it, is in
+     window.tikzOut, window.tikzErr -->
+<pre id="log"></pre>
+<script>
+window.tikzOut = ''; window.tikzErr = '';
+var w = new Worker ('tikzjax/tm-tikz.js');
+w.onmessage = function (e) {
+  if (e.data.out !== undefined) window.tikzOut += e.data.out;
+  if (e.data.err !== undefined) window.tikzErr += e.data.err;
+};
+window.tikz = function (source) {
+  w.postMessage ({ input: new TextEncoder ().encode (source + '\n<EOF>\n') });
+};
+</script>

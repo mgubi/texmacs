@@ -1,0 +1,215 @@
+--- a/source/fitz/subset-cff.c	2026-09-27 02:06:04
++++ b/source/fitz/subset-cff.c	2026-09-27 02:06:20
+@@ -943,25 +943,87 @@
+ #define PUSH(n) \
+ do { if (sp + n > (int)(sizeof(stack)/sizeof(*stack))) fz_throw(ctx, FZ_ERROR_FORMAT, "Stack overflow"); sp += n; } while (0)
+ 
+-static void
+-execute_charstring(fz_context *ctx, cff_t *cff, const uint8_t *pc, const uint8_t *end, uint16_t subr_bias, usage_list_t *local_usage)
+-{
+-	double trans[32] = { 0 };
++/* The state of the execution of a charstring, which goes on into the
++ * subroutines it calls: a subroutine may declare stem hints, or hold a
++ * hintmask whose length depends on the stems declared before it, so that it
++ * cannot be scanned apart from the glyph which calls it (the length of its
++ * hintmasks would be wrong, and the scan would read their bytes as
++ * operators: "Reserved charstring byte"). Such subroutines are common in
++ * fonts whose charstrings were subroutinized (the Fira fonts). */
++typedef struct
++{
++	double trans[32];
+ 	double stack[513];
+-	int sp = 0;
+-	int stem_hints = 0;
+-	uint8_t c;
++	int sp;
++	int stem_hints;
++	int start; /* 0 => starting, 1 => had hstem, 2 => anything else */
++	int done; /* endchar */
++	int depth; /* of the subroutine calls */
++} cs_state_t;
+ 
+-	/* 0 => starting, 1 => had hstem, 2 => anything else */
+-	int start = 0;
++static void
++run_charstring(fz_context *ctx, cff_t *cff, cs_state_t *st, const uint8_t *pc, const uint8_t *end, uint16_t subr_bias, usage_list_t *local_usage);
++
++/* The index of the local subroutines which go with a usage list. */
++static index_t *
++local_index_of(cff_t *cff, usage_list_t *local_usage)
++{
++	int font;
++	if (local_usage == &cff->local_usage)
++		return &cff->local_index;
++	for (font = 0; font < (int)cff->fdarray_index.count; font++)
++		if (local_usage == &cff->fdarray[font].local_usage)
++			return &cff->fdarray[font].local_index;
++	return NULL;
++}
++
++/* Execute a subroutine within the charstring which calls it. */
++static void
++call_subr(fz_context *ctx, cff_t *cff, cs_state_t *st, int subr, int global, uint16_t subr_bias, usage_list_t *local_usage)
++{
++	index_t *index = global ? &cff->global_index : local_index_of(cff, local_usage);
++	uint32_t offset, end;
++
++	subr += global ? cff->gsubr_bias : subr_bias;
++	if (index == NULL || subr < 0 || subr >= (int)index->count)
++		return;
++	if (st->depth >= 10)
++		fz_throw(ctx, FZ_ERROR_FORMAT, "Subroutines nested too deeply in charstring");
++	offset = index_get(ctx, index, subr);
++	end = index_get(ctx, index, subr+1);
++	st->depth++;
++	run_charstring(ctx, cff, st, &cff->base[offset], &cff->base[end], subr_bias, local_usage);
++	st->depth--;
++}
++
++static void
++execute_charstring(fz_context *ctx, cff_t *cff, const uint8_t *pc, const uint8_t *end, uint16_t subr_bias, usage_list_t *local_usage)
++{
++	cs_state_t st = { { 0 } };
++	run_charstring(ctx, cff, &st, pc, end, subr_bias, local_usage);
++}
++
++#define trans (st->trans)
++#define stack (st->stack)
++#define sp (st->sp)
++#define stem_hints (st->stem_hints)
++#define start (st->start)
+ 
+-	while (pc < end)
++static void
++run_charstring(fz_context *ctx, cff_t *cff, cs_state_t *st, const uint8_t *pc, const uint8_t *end, uint16_t subr_bias, usage_list_t *local_usage)
++{
++	uint8_t c;
++
++	while (pc < end && !st->done)
+ 	{
+ 		c = *pc++;
+ 
+ 		/* An operator other than one of the hint ones immediately
+-		 * disqualifies us from being in the hint extension state. */
+-		if (c < 32 && (c != 1 && c != 18 && c != 19 && c != 20))
++		 * disqualifies us from being in the hint extension state
++		 * (the calls of subroutines and their returns do not: the
++		 * hints may be declared in them). */
++		if (c < 32 && (c != 1 && c != 18 && c != 19 && c != 20 && c != 3 && c != 23 &&
++				c != 10 && c != 29 && c != 11))
+ 			start = 2;
+ 
+ 		switch (c)
+@@ -985,8 +1047,8 @@
+ 
+ 		case 19: /* hintmask */
+ 		case 20: /* cntrmask */
+-			if (start == 1)
+-				stem_hints += (sp/2);
++			/* operands before it are an implicit vstem */
++			stem_hints += (sp/2);
+ 			pc += fz_bytes_from_bits(stem_hints);
+ 			if (pc > end)
+ 				goto overflow;
+@@ -1015,13 +1077,17 @@
+ 
+ 
+ 		case 10: /* callsubr */
++		{
++			int subr;
+ 			ATLEAST(1);
+-			mark_subr_used(ctx, cff, stack[sp-1], 0, subr_bias, local_usage);
++			subr = (int)stack[sp-1];
++			mark_subr_used(ctx, cff, subr, 0, subr_bias, local_usage);
+ 			sp--;
++			call_subr(ctx, cff, st, subr, 0, subr_bias, local_usage);
+ 			break;
+-		case 11: /* return */
++		}
++		case 11: /* return: the stack goes on in the caller */
+ 			pc = end;
+-			sp = 0;
+ 			break;
+ 		case 12: /* escape */
+ 		{
+@@ -1204,6 +1270,7 @@
+ 				use_sub_char(ctx, cff, stack[sp-2]);
+ 			}
+ 			sp = 0;
++			st->done = 1;
+ 			break;
+ 		case 16: /* blend */
+ 		{
+@@ -1227,10 +1294,15 @@
+ 			break;
+ 		}
+ 		case 29: /* callgsubr */
++		{
++			int subr;
+ 			ATLEAST(1);
+-			mark_subr_used(ctx, cff, stack[sp-1], 1, subr_bias, local_usage);
++			subr = (int)stack[sp-1];
++			mark_subr_used(ctx, cff, subr, 1, subr_bias, local_usage);
+ 			sp--;
++			call_subr(ctx, cff, st, subr, 1, subr_bias, local_usage);
+ 			break;
++		}
+ 		case 28: /* shortint */
+ 			if (pc + 2 >= end)
+ 			{
+@@ -1277,7 +1349,13 @@
+ 	fz_throw(ctx, FZ_ERROR_FORMAT, "Insufficient operators on the stack: op=%d", c);
+ }
+ 
++#undef trans
++#undef stack
++#undef sp
++#undef stem_hints
++#undef start
+ 
++
+ static usage_list_t *
+ get_font_locals(fz_context *ctx, cff_t *cff, int gid, int is_pdf_cidfont, uint16_t *subr_bias)
+ {
+@@ -1368,12 +1446,7 @@
+ 			if (cff->local_usage.list[i].scanned)
+ 				continue;
+ 			cff->local_usage.list[i].scanned = 1;
+-			gid = cff->local_usage.list[i].num;
+-			offset = index_get(ctx, &cff->local_index, gid);
+-			end = index_get(ctx, &cff->local_index, gid+1);
+-
+-			local_usage = get_font_locals(ctx, cff, gid, is_pdf_cidfont, &subr_bias);
+-			execute_charstring(ctx, cff, &cff->base[offset], &cff->base[end], subr_bias, local_usage);
++			/* executed within the charstrings which call it */
+ 			changed = 1;
+ 		}
+ 
+@@ -1387,12 +1460,7 @@
+ 				if (cff->fdarray[font].local_usage.list[i].scanned)
+ 					continue;
+ 				cff->fdarray[font].local_usage.list[i].scanned = 1;
+-				gid = cff->fdarray[font].local_usage.list[i].num;
+-				offset = index_get(ctx, &cff->fdarray[font].local_index, gid);
+-				end = index_get(ctx, &cff->fdarray[font].local_index, gid+1);
+-
+-				local_usage = get_font_locals(ctx, cff, gid, is_pdf_cidfont, &subr_bias);
+-				execute_charstring(ctx, cff, &cff->base[offset], &cff->base[end], subr_bias, local_usage);
++				/* executed within the charstrings which call it */
+ 				changed = 1;
+ 			}
+ 		}
+@@ -1403,12 +1471,7 @@
+ 			if (cff->global_usage.list[i].scanned)
+ 				continue;
+ 			cff->global_usage.list[i].scanned = 1;
+-			gid = cff->global_usage.list[i].num;
+-			offset = index_get(ctx, &cff->global_index, gid);
+-			end = index_get(ctx, &cff->global_index, gid+1);
+-
+-			local_usage = get_font_locals(ctx, cff, gid, is_pdf_cidfont, &subr_bias);
+-			execute_charstring(ctx, cff, &cff->base[offset], &cff->base[end], subr_bias, local_usage);
++			/* executed within the charstrings which call it */
+ 			changed = 1;
+ 		}
+ 	}

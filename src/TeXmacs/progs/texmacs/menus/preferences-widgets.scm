@@ -117,6 +117,10 @@
   ("top" "Above the document")
   ("left" "At the left of the document"))
 
+(define-preference-names-and-validate "window tabs"
+  ("left" "In a column at the left")
+  ("top" "Above the page"))
+
 (define-preference-names-and-validate "gui density"
   ("compact" "Compact")
   ("normal" "Normal")
@@ -182,6 +186,12 @@
         (enum (set-pretty-preference "icon bars" answer)
               '("Above the document" "At the left of the document")
               (get-pretty-preference "icon bars")
+              "18em")))
+    (assuming (defined? 'web-javascript)
+      (item (text "Tabs of the windows:")
+        (enum (set-pretty-preference "window tabs" answer)
+              '("In a column at the left" "Above the page")
+              (get-pretty-preference "window tabs")
               "18em")))
     (assuming (support-functionality? "density")
       (item (text "Interface density:")

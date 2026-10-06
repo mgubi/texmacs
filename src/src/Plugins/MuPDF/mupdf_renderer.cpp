@@ -48,6 +48,16 @@ mupdf_context () {
     ctx= fz_new_context (NULL, NULL, FZ_STORE_UNLIMITED);
     fz_set_error_callback (ctx, mupdf_error_callback, NULL);
     fz_set_warning_callback (ctx, mupdf_warning_callback, NULL);
+    // the readers of documents (PDF, SVG), for the pictures which are
+    // opened as documents (mupdf_picture.cpp: their size, their pixels)
+    // and the SVG converted to PDF (mupdf_pdf_renderer.cpp). They were
+    // registered by the latter only: a PDF or SVG picture failed ("No
+    // document handlers registered") until an SVG had been converted
+    fz_try (ctx) { fz_register_document_handlers (ctx); }
+    fz_catch (ctx) {
+      cout << "TeXmacs] MuPDF cannot register its document handlers: "
+           << fz_caught_message (ctx) << LF;
+    }
   }
   return ctx;
 }

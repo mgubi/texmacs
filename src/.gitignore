@@ -71,6 +71,12 @@ packages/macos/TeXmacs.xcodeproj/xcuserdata
 config.status
 packages/msix/AppxManifest.xml
 packages/msix/AppxManifestStore.xml
+/build-wasm/
+# the makefile of the browser build is a source, not a generated file
+!/misc/wasm/Makefile
 
 # moc output of the autotools build
 src/Plugins/Qt*/moc_*.cpp
+
+# written by misc/wasm/build-info.py at each build of the browser version
+TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm

@@ -269,7 +269,10 @@
 
 (tm-define (preview-file u)
   (with s (url-sys-concretize u)
-    (cond ((!= preview-command "default")
+    (cond ((defined? 'web-open-pdf)
+           ;; in the browser: a tab of its own (misc/wasm/print.js)
+           (web-open-pdf s (url->string (url-tail u))))
+          ((!= preview-command "default")
            (shell (string-append preview-command " " s " &")))
           ((or (os-mingw?) (os-win32?))
            (shell s))
@@ -287,8 +290,17 @@
                  "Error: ghostview does not seem to be installed on your system"
                  "preview")))))
 
+(define (web-print-name)
+  (with name (url->string (url-tail (current-buffer)))
+    (string-append (if (string-ends? name ".tm") (string-drop-right name 3) name)
+                   ".pdf")))
+
 (tm-define (preview-buffer)
-  (with file (cond ((os-mingw?)
+  (with file (cond ((defined? 'web-open-pdf)
+                    ;; in the browser: the PDF, in the files of the page
+                    ;; which are not kept (not in the home directory)
+                    (system->url "/tmp/texmacs-print.pdf"))
+                   ((os-mingw?)
                     (let* ((p (getenv "TEXMACS_HOME_PATH"))
                            (f (string-append p "\\system\\tmp\\preview.pdf")))
                       (system->url f)))
@@ -296,7 +308,9 @@
                     "$TEXMACS_HOME_PATH/system/tmp/preview.pdf")
                    (else "$TEXMACS_HOME_PATH/system/tmp/preview.ps"))
     (print-to-file file)
-    (preview-file file)))
+    (if (defined? 'web-open-pdf)
+        (web-open-pdf (url-sys-concretize file) (web-print-name))
+        (preview-file file))))
 
 (tm-define (choose-file-and-print-page-selection start end)
   (:argument  start "First page")

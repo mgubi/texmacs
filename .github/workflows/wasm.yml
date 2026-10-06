@@ -1,0 +1,130 @@
+# TeXmacs in the browser (TeXmacs Vue): the WebAssembly build (src/misc/wasm,
+# src/docs/wasm/README.md). Builds the slim MuPDF (cached), the page and the
+# node build, checks that the node build turns a document into a PDF, and
+# keeps the page (src/build-wasm/out/web) as an artifact of the run: unzip
+# it and serve it (node src/misc/wasm/serve.mjs <dir>), and publishes it on
+# GitHub Pages (the job pages).
+#
+# It runs on the branch vue_ci only: the work goes on in wip_wasm_vue, which
+# triggers nothing, and a state is built, tested and published by moving
+# vue_ci to it,
+#   git push origin wip_wasm_vue:vue_ci
+# (or by hand, from the Actions tab, on the branch vue_ci)
+
+name: WebAssembly
+
+on:
+  push:
+    branches: [vue_ci]
+  workflow_dispatch:
+
+env:
+  EMSCRIPTEN_VERSION: 6.0.10
+  MUPDF_VERSION: 1.28.5
+
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSCRIPTEN_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      - name: Tools
+        run: sudo apt-get update && sudo apt-get install -y brotli
+
+      # the slim MuPDF, with the patches of TeXmacs: again only when its
+      # script, its patches, its version or Emscripten change
+      - name: Cache of MuPDF
+        uses: actions/cache@v4
+        with:
+          path: src/build-wasm/mupdf-${{ env.MUPDF_VERSION }}-source
+          key: mupdf-${{ env.MUPDF_VERSION }}-emscripten-${{ env.EMSCRIPTEN_VERSION }}-${{ hashFiles('src/misc/wasm/build-mupdf.sh', 'src/misc/wasm/mupdf-*.patch') }}
+
+      - name: MuPDF
+        run: |
+          mkdir -p build-wasm
+          sh misc/wasm/build-mupdf.sh ${{ env.MUPDF_VERSION }}
+
+      # ThorVG, for the GPU renderer (the default of the page): again only
+      # when its script or Emscripten change
+      - name: Cache of ThorVG
+        uses: actions/cache@v4
+        with:
+          path: src/build-wasm/thorvg/wasm
+          key: thorvg-emscripten-${{ env.EMSCRIPTEN_VERSION }}-${{ hashFiles('src/misc/thorvg/build-thorvg.sh') }}
+
+      - name: ThorVG
+        run: test -f build-wasm/thorvg/wasm/lib/libthorvg-1.a || sh misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm
+
+      - name: TeXmacs (the page and the node build)
+        run: make -C build-wasm -f ../misc/wasm/Makefile -j"$(nproc)" web node
+
+      - name: Smoke test (node, the Welcome document to PDF)
+        run: |
+          home=$(mktemp -d)
+          # a hang must not take the whole run (it takes seconds)
+          TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$home/.TeXmacs" HOME="$home" \
+            timeout 300 node build-wasm/out/node/texmacs.js -headless \
+              -c TeXmacs/doc/about/welcome/new-welcome.en.tm "$home/welcome.pdf" -q
+          test -s "$home/welcome.pdf"
+          head -c 5 "$home/welcome.pdf" | grep -q '%PDF'
+          ls -l "$home/welcome.pdf"
+
+      - name: Sizes
+        run: |
+          ls -l build-wasm/out/web
+          du -sh build-wasm/out/web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-wasm-web
+          path: src/build-wasm/out/web
+          if-no-files-found: error
+
+  # the page on GitHub Pages (https://<owner>.github.io/<repository>/), from
+  # the branch vue_ci only (see above): the brotli copies are left out
+  # (Pages does not send them; the page takes the gzip copies, which it
+  # decompresses itself)
+  pages:
+    needs: wasm
+    if: github.ref == 'refs/heads/vue_ci'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: texmacs-wasm-web
+          path: web
+
+      - name: The site
+        run: |
+          find web -name '*.br' -delete
+          du -sh web
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

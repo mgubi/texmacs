@@ -462,6 +462,13 @@
                               (url-append (string->url "www.doi.org")
                                           (url-unroot u)))
            (load-external u*)))
+        ((defined? 'web-open-external)
+         ;; in the browser (TeXmacs Vue): a page of the web or a mail
+         ;; address in the browser, a file of the page in its viewer
+         (if (or (url-rooted-web? u) (url-rooted-protocol? u "mailto"))
+             (web-open-external (url->string u) #f "")
+             (web-open-external (url->system u) #t
+                                (url->string (url-tail u)))))
         ((url-rooted-protocol? u "mailto")
          (system (string-append (default-open) " " (url->string u))))
         ((not (url-rooted-web? u))
@@ -710,9 +717,12 @@
 (tm-define (print-buffer)
   (:synopsis "Print the current buffer")
   (:interactive (use-print-dialog?))
-  (if (use-print-dialog?)
-      (interactive-print-buffer)
-      (direct-print-buffer)))
+  (cond ((defined? 'web-open-pdf)
+         ;; in the browser: the PDF in a tab, whose viewer prints it
+         (preview-buffer))
+        ((use-print-dialog?)
+         (interactive-print-buffer))
+        (else (direct-print-buffer))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Important files to which the buffer is linked (e.g. bibliographies)

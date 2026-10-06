@@ -25,11 +25,24 @@
                      (getenv "TEXMACS_PATH")
                      "/plugins/tmpy/session/tm_asy.py\"")))
 
+;; In a browser, the plugin is a Web Worker which runs Asymptote compiled to
+;; WebAssembly (web/tm-asy.mjs, copied to asymptote/ next to the page; see
+;; docs/wasm/asymptote.md); elsewhere a Python program which runs asy
+(define (asymptote-in-browser?)
+  (defined? 'web-files))
+
+(define (asymptote-engine)
+  (if (asymptote-in-browser?)
+      `((:worker "asymptote/tm-asy.mjs"))
+      `((:winpath "Asymptote" ".")
+        (:launch ,(asy-launcher)))))
+
 (plugin-configure asymptote
-  (:winpath "Asymptote" ".")
-  (:require (url-exists-in-path? "asy"))
-  (:require (!= (python-command) ""))
-  (:launch ,(asy-launcher))
+  ;; (the test of asymptote-in-browser? written out: the requirements are also
+  ;; evaluated outside of this file, e.g. by the plugins suite)
+  (:require (or (defined? 'web-files)
+                (and (url-exists-in-path? "asy") (!= (python-command) ""))))
+  ,@(asymptote-engine)
   (:serializer ,asy-serialize)
   (:session "Asymptote")
   (:scripts "Asymptote"))
@@ -37,3 +50,9 @@
 (when (supports-asymptote?)
   (import-from (asymptote-menus))
   (import-from (utils plugins plugin-convert)))
+
+;; the labels of the pictures made in a browser: set by TeXmacs from their
+;; LaTeX, editable, and put back into the source of an executable fold
+;; (asymptote-edit.scm)
+(when (and (asymptote-in-browser?) (supports-asymptote?))
+  (import-from (asymptote-edit)))

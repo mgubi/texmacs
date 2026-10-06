@@ -71,6 +71,27 @@
     (clipboard-paste which)
     (clipboard-set-import temp)))
 
+(define (clipboard-paste-browser-command format which)
+  (if (== format "default")
+      (string-append "(clipboard-paste " (string-quote which) ")")
+      (string-append "(clipboard-paste-import " (string-quote format)
+                     " " (string-quote which) ")")))
+
+(tm-define (clipboard-paste-browser format which)
+  (:synopsis "Paste the clipboard of the browser (TeXmacs in a web page)")
+  ;; the dialog of the page offers the formats of Paste from, the default
+  ;; one first, and starts on format
+  (let* ((fms (cons "default"
+                    (converters-to-special "texmacs-snippet" "-snippet" #t)))
+         (name (lambda (fm)
+                 (cork->utf8 (translate (if (== fm "default") "Default"
+                                            (format-get-name fm))))))
+         (line (lambda (fm)
+                 (string-append (name fm) "\t"
+                                (clipboard-paste-browser-command fm which))))
+         (chosen (or (list-find-index fms (lambda (fm) (== fm format))) 0)))
+    (web-paste-dialog (string-join (map line fms) "\n") chosen)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Structured selections
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
