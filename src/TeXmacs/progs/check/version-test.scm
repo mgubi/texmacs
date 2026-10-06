@@ -748,10 +748,13 @@
 ;; The revisions of a file are tmfs urls tmfs://revision/<rev>/<file>.
 (define (test-revision-urls)
   (check-group "revision urls")
-  (let* ((f (system->url "/no-such-dir-version-test/file.tm"))
+  (let* ((f (system->url (check-abs "no-such-dir-version-test/file.tm")))
          (s (version-revision-url f "abc"))
          (r (string->url s)))
-    (check= s "tmfs://revision/abc/file/no-such-dir-version-test/file.tm")
+    ;; (the drive is a part of the name on Windows)
+    (check= s (if (or (os-mingw?) (os-win32?))
+                  "tmfs://revision/abc/file/c/no-such-dir-version-test/file.tm"
+                  "tmfs://revision/abc/file/no-such-dir-version-test/file.tm"))
     ;; a revision with a colon names the file itself
     (check= (version-revision-url f "abc:file/x/y.tm")
             "tmfs://revision/abc/file/x/y.tm")

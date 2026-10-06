@@ -1112,6 +1112,18 @@ scm_init_strings ()
  scm_c_define_gsubr (s_scm_substring_copy, 2, 1, 0, (SCM (*)()) scm_substring_copy); ;
  scm_c_define_gsubr (s_scm_substring_shared, 2, 1, 0, (SCM (*)()) scm_substring_shared); ;
  scm_c_define_gsubr (s_scm_string_append, 0, 0, 1, (SCM (*)()) scm_string_append); ;
+  /* registrations which the snarfing of a Windows build left out
+     (the .x files of guile-snarf, pasted in this file), under the
+     conditions of their definitions */
+#if (SCM_DEBUG)
+  scm_c_define_gsubr (s_scm_sys_string_dump, 1, 0, 0, (SCM (*)()) scm_sys_string_dump); ;
+#endif
+#if (SCM_DEBUG)
+  scm_c_define_gsubr (s_scm_sys_symbol_dump, 1, 0, 0, (SCM (*)()) scm_sys_symbol_dump); ;
+#endif
+#if (SCM_DEBUG)
+  scm_c_define_gsubr (s_scm_sys_stringbuf_hist, 0, 0, 0, (SCM (*)()) scm_sys_stringbuf_hist); ;
+#endif
 
 }
 

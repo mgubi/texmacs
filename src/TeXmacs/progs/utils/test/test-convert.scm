@@ -310,6 +310,8 @@
         (for-each (lambda (x) (test-file x dir type)) u5)))))
 
 (define (test-suite* orig-dir suffix next)
+  (when (url-none? (url-complete orig-dir "dr"))
+    (texmacs-error "test-suite" "~S is not a directory" orig-dir))
   (let* ((dir (url-expand (url-complete orig-dir "dr")))
          (head (url-head dir))
          (tail (url->string (url-tail dir)))

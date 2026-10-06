@@ -95,8 +95,14 @@ mingw_system (::array< ::string> arg,
         if (o >= 0) { 
           pos_in[i] += o;
           if (N(str_in[i]) == pos_in[i]) ch[i].close (); else busy= true;
-        } 
+        } else {
+          pos_in[i]= N(str_in[i]);
+          ch[i].close ();
+        }
       }
+      // an empty input is closed too (close does nothing the second time):
+      // a process which reads its input to the end waits for that
+      else ch[i].close ();
     }
   } while (busy);
 
