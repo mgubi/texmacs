@@ -263,7 +263,14 @@
                       (lambda () (check-unix (url->string (string->url (car p)))))
                       (cdr p)))
   (glue-check-equal "urls" "a string for an url"
-                    (lambda () (check-unix (url->string "x/y.tm"))) "x/y.tm"))
+                    (lambda () (check-unix (url->string "x/y.tm"))) "x/y.tm")
+  ;; system-mkdir of no url, and so run-test-suite with a name which is not
+  ;; a directory, used to crash TeXmacs (#163)
+  (glue-check-equal "urls" "system-mkdir of no url"
+                    (lambda () (system-mkdir (url-none)) #t) #t)
+  (glue-check-error "urls" "run-test-suite of a name which is not a directory"
+                    (lambda () (run-test-suite "no-such-test-suite-dir"))
+                    'texmacs-error))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The test suite
