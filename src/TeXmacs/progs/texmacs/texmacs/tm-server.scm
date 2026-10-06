@@ -22,7 +22,10 @@
   (if (or (like-gnome?) (like-macos?) (like-windows?)) "popup" "footer"))
 
 (define (get-default-buffer-management)
-  (if (or (like-macos?) (like-windows?)) "separate" "shared"))
+  ;; in the browser (where the Vue plugin defines web-files) the windows are
+  ;; the tabs of the page: a document per tab
+  (if (or (like-macos?) (like-windows?) (defined? 'web-files))
+      "separate" "shared"))
 
 (define (notify-buffer-management var val)
   (when (== val (get-default-buffer-management))
@@ -44,6 +47,18 @@
 (define (notify-gui-theme var val)
   (set-message "Restart in order to let the new theme take effect"
                "graphical interface theme"))
+
+(define (notify-icon-set var val)
+  ;; the Vue interface follows the icon set at once (vue_follow_icon_set);
+  ;; the others at their next start
+  (when (not (vue-gui?)) (notify-restart var val)))
+
+(define (notify-window-tabs var val)
+  ;; the tabs of the windows of the browser (misc/wasm/frame.js): in a
+  ;; column at the left of the page, or above it
+  (when (defined? 'web-javascript)
+    (web-javascript (string-append "tmFrame.setTabsPosition ('"
+                                   (if (== val "top") "top" "left") "')"))))
 
 (define (notify-language var val)
   (set-output-language val)
@@ -112,10 +127,11 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
-  ("icon set" "neo-classical" notify-restart)
+  ("icon set" "neo-classical" notify-icon-set)
   ;; the Vue interface reads it at each layout; at the left by default in
   ;; a web browser
   ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
+  ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-restart)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
@@ -203,6 +219,7 @@
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
 (validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical"))
 (validate-enum-preference "icon bars" '("top" "left"))
+(validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
 (validate-enum-preference "gui:responsive tab mode" '("top" "side" "mobile" "grid"))
 

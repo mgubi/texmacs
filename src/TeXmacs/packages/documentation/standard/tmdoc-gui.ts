@@ -54,7 +54,7 @@
     </src-comment>
   </active*>
 
-  <assign|menu-item|<macro|body|<with|font-family|ss|<localize|<arg|body>>>>>
+  <assign|menu-item|<macro|body|<with|font-family|ss|<extern|tmdoc-menu-font|<localize|<arg|body>>>>>>
 
   <assign|menu-extra|<macro|body|<active*|<with|mode|math|\<rightarrow\>>><menu-item|<arg|body>>>>
 

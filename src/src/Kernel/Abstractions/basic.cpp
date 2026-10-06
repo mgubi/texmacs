@@ -351,8 +351,31 @@ use_macos_fonts () {
 #endif
 }
 
+// The keyboard shortcuts written with the symbols of a Mac (the command
+// sign...) rather than as M-x: where the fonts of the Mac are (above), and in
+// the browser of a Mac (the Vue port draws the symbols from a font of
+// TeXmacs, see layout_keys in vue_gui.cpp)
+bool
+use_macos_keys () {
+#ifdef __EMSCRIPTEN__
+  string s= get_preference ("look and feel");
+  if (s == "default") s= default_look_and_feel ();
+  return s == "macos";
+#else
+  return use_macos_fonts ();
+#endif
+}
+
 static const char*
 default_look_and_feel_impl () {
+#ifdef __EMSCRIPTEN__
+  // in the browser, that of the platform of the browser (web-pre.js), so
+  // that the shortcuts of TeXmacs and of the browser agree (Cmd+V on a Mac)
+  string web= get_env ("TEXMACS_WEB_PLATFORM");
+  if (web == "macos") return "macos";
+  if (web == "windows") return "windows";
+  return "gnome";
+#endif
   if (os_mingw () || os_win32 ()) return "windows";
   if (os_macos ()) return "macos";
   string session= get_env ("DESKTOP_SESSION");

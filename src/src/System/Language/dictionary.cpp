@@ -281,7 +281,7 @@ serialize (tree t) {
       while (is_concat (u) && N(u) > 0) u= u[0];
       if (i > 0 && is_compound (u, "render-key"))
 	if (!is_atomic (t[i-1]) || !ends (t[i-1]->label, " ")) {
-	  if (use_macos_fonts () || gui_is_qt ()) s << "  ";
+	  if (use_macos_keys () || gui_is_qt ()) s << "  ";
 	  else s << " ";
 	}
       s << serialize (t[i]);

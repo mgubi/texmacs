@@ -43,7 +43,21 @@ public:
 
   inline list_rep (T item2, list<T> next2): item(item2), next(next2) {
     TM_DEBUG(list_count++); }
-  inline ~list_rep () { TM_DEBUG(list_count--); }
+  // the tail which only this cell holds goes one cell at a time: the
+  // destructor of next released the next cell, whose destructor released
+  // the next one, and so on, one frame of the stack per cell, so that a
+  // long list overflowed the stack (the browser has a small one: the
+  // rectangles of a whole manual). Each cell is unlinked from its tail
+  // (held by rest) before it goes, so its own destructor stops at once.
+  // The test reads the pointer: is_nil takes a copy of the list, which
+  // counts as a reference until the end of the test
+  inline ~list_rep () {
+    TM_DEBUG(list_count--);
+    while (next.operator-> () != NULL && next->ref_count == 1) {
+      list<T> rest= next->next;
+      next= rest;
+    }
+  }
   friend class list<T>;
 };
 

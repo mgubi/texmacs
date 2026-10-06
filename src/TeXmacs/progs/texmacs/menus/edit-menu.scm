@@ -31,6 +31,8 @@
   (clipboard-extern-menu converters-from-special clipboard-cut-export))
 (tm-define (clipboard-paste-import-menu)
   (clipboard-extern-menu converters-to-special clipboard-paste-import))
+(tm-define (clipboard-paste-browser-menu)
+  (clipboard-extern-menu converters-to-special clipboard-paste-browser))
 
 (tm-menu (redo-menu)
   (for (i (.. 0 (redo-possibilities)))
@@ -58,6 +60,10 @@
 	("Copy" (kbd-copy))
 	("Cut" (kbd-cut)))
   ("Paste" (kbd-paste))
+  ;; in the browser, the menus have no access to its clipboard: a dialog
+  ;; of the page gets it (misc/wasm/clipboard.js)
+  (if (defined? 'web-paste-dialog)
+      ("Paste from browser..." (clipboard-paste-browser "default" "primary")))
   (if (detailed-menus?)
       ("Clear" (kbd-cancel)))
   ---
@@ -100,7 +106,10 @@
           ("Secondary" (clipboard-paste "secondary"))
           ("Ternary" (clipboard-paste "ternary"))
           ---
-          ("Other" (interactive clipboard-paste))))
+          ("Other" (interactive clipboard-paste)))
+      (if (defined? 'web-paste-dialog)
+          (-> "Paste from browser as"
+              (link clipboard-paste-browser-menu))))
   ---
   (if (use-menus?)
       (-> "Preferences"

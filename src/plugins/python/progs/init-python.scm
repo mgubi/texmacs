@@ -49,14 +49,27 @@
       (toggle (run-via-jupyter "python" answer)
               (run-via-jupyter? "python")))))
 
+;; In a browser, the plugin is a Web Worker which runs Python in WebAssembly
+;; (Pyodide: web/tm-python.mjs, copied to python/ next to the page); elsewhere
+;; the Python program of the computer, with tmpy
+(define (python-in-browser?)
+  (defined? 'web-files))
+
+(define (python-engine)
+  (if (python-in-browser?)
+      `((:worker "python/tm-python.mjs"))
+      `((:launch ,(python-launcher))
+        (:tab-completion #t))))
+
 (plugin-configure python
   (:winpath "python*" ".")
   (:winpath "Python*" ".")
   (:winpath "Python/Python*" ".")
-  (:require (!= (python-command) ""))
-  (:launch ,(python-launcher))
-  (:preferences (supports-jupyter?))
-  (:tab-completion #t)
+  ;; (the test of python-in-browser? written out: the requirements are also
+  ;; evaluated outside of this file, e.g. by the plugins suite)
+  (:require (or (defined? 'web-files) (!= (python-command) "")))
+  ,@(python-engine)
+  (:preferences (and (not (python-in-browser?)) (supports-jupyter?)))
   (:serializer ,python-serialize)
   (:session "Python")
   (:scripts "Python"))

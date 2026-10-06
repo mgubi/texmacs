@@ -16,6 +16,7 @@ in:
 | `wip_s7` | **TeXmacs on [s7](https://ccrma.stanford.edu/software/snd/snd/s7.html)** instead of Guile 1.8: the interpreter is a build option (`./configure --with-scheme=s7\|guile`), s7 (vendored, 11.9) is the default and needs no Guile at all; one Scheme code base serves both, and with s7 the first window is ready in about 0.7 s instead of 1.9 s — see [src/docs/s7/](src/docs/s7/README.md) |
 | `wip-git-versioning` | **Git support**: Version ▸ Git with a side panel, a commit dialog, clickable status, log and branch pages, branches, tags and stashes, fetch, pull, push and clone in the background, comparison with any revision, a simple mode of snapshots, and **structured three-way merges of TeXmacs documents** (also as a git merge driver), with Git never run in a folder until it is trusted — see the manual chapter *Working with Git* and [doc/git-features.md](doc/git-features.md) |
 | `wip_zotero` | **Citations from [Zotero](https://www.zotero.org)**, read from the Zotero desktop application (its local API): the search window of citations lists the references of Zotero after those of the `.bib` file or of the database, with their sources; keys completed from Zotero; a bibliography file written from Zotero, or Zotero as a source of the database, whose copies of Zotero items follow Zotero (with a field-by-field choice when both sides changed); keys renamed in Zotero followed in the citations; group libraries — see the manual page *Citations from Zotero* and [doc/zotero-design.md](doc/zotero-design.md) |
+| `wip_wasm_vue` | **TeXmacs in the browser**: the same TeXmacs compiled to WebAssembly with Emscripten, on the Vue interface and s7, drawn by the GPU (WebGL2, through ThorVG) or by MuPDF; the files kept in the browser, and plug-ins whose programs run in the page too (Python by Pyodide, R by webR, TikZ by TikZJax, Asymptote, JavaScript, AI) — see [TeXmacs in the browser](#texmacs-in-the-browser) below |
 | `wip_dev_docs` | **Extensive developer documentation**, inside TeXmacs (Help ▸ Developer documentation): some 365 pages, about 200 of them on the internals of the source code — the data types, the typesetter, fonts and OpenType, the server, buffers, views and windows, the editor, the GUI ports, converters, plug-ins, collaboration — which compile into a book of more than a thousand pages ([`src/TeXmacs/doc/devel/`](src/TeXmacs/doc/devel/)) |
 | (tests, with `wip_fixes`) | **More tests**: unit tests of the kernel in C++, Scheme test suites for editing, conversions, the typesetter, menus, links and more, regression tests on documents, a headless typesetting of the whole documentation, and the OpenType renders — see [src/tests/README.md](src/tests/README.md) |
 
@@ -28,6 +29,31 @@ Scheme interpreter is s7 by default, which needs nothing installed;
 `./configure --with-scheme=guile --with-guile=<path to guile-config of
 Guile 1.8>` builds with Guile instead. The interface is chosen when
 configuring, see below.
+
+## TeXmacs in the browser
+
+![TeXmacs Vue in the browser: the tabs of the documents in a column, the main and mode icon bars at the left, a formula](src/docs/wasm/texmacs-in-the-browser.png)
+
+The same tree builds TeXmacs for a web page (it was the branch
+`wip_wasm_vue`, merged here and retired: the browser version is developed
+in `maxs_texmacs` now): the Vue interface draws everything in a canvas, s7 runs the Scheme
+code, and the files of TeXmacs come in packages which the browser keeps.
+Editing and typesetting, the menus and dialogs, a tab per document, the
+files of the user (upload, drag and drop, zip projects, downloads), the PDF
+of a document, the clipboard of the system, spell checking (Hunspell), the
+Remote menu (a TeXmacs server over WebSocket) and the plug-ins above work
+in the page; the plug-ins which run a program of the computer and the
+external converters do not (a page has no processes), and Git versioning
+hides itself there for the same reason. Help ▸ TeXmacs in the browser
+tells which commit made a build, the versions of its components and the
+sizes of its parts.
+
+It is built apart from `configure`, with Emscripten, by
+[`src/misc/wasm/Makefile`](src/misc/wasm/Makefile) (the sources are those of
+`misc/wasm/sources.txt`): see [`src/docs/wasm/`](src/docs/wasm/README.md)
+for the build, the design and the tests. The browser version is
+published at <https://mgubi.github.io/texmacs/> by the CI of the branch
+`wasm_ci` (`git push origin maxs_texmacs:wasm_ci`).
 
 ## The graphical interfaces
 
@@ -102,7 +128,7 @@ clipboard and the input methods. The widgets follow those of Qt (menus as
 on the Mac, combo boxes which can be typed in, tabs, lists, side tools),
 at the density of each window, with animated highlights and rounded
 corners. Nothing in it depends on a platform: the same code runs in a
-browser (branch `wip_wasm_vue`). A single-window mode
+browser (see [TeXmacs in the browser](#texmacs-in-the-browser)). A single-window mode
 (`TEXMACS_VUE_SINGLE_WINDOW=1`) keeps the dialogs and the tools inside the
 main window, as in the browser.
 

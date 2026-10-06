@@ -16,6 +16,7 @@
 #include "effect.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
+#include "Freetype/tt_file.hpp"
 
 /******************************************************************************
 * Protected MuPDF calls (see mupdf_picture.hpp)
@@ -426,6 +427,235 @@ svg_flatten_gradients (string s) {
   return s;
 }
 
+/******************************************************************************
+* The text of TeX fonts in an SVG
+*
+* MuPDF draws the text of an SVG in one of its standard fonts, whatever its
+* family (svg-run.c), and the browser has those 14 fonts only. The pictures
+* of the TikZ plugin in the browser (plugins/tikz/web/tm-tikz.js) have their
+* text set by TeXmacs over them; what it cannot set (cmex, a rotated run...)
+* stays in their SVG, marked data-tm-tex, its characters being U+F000 plus
+* their position in the TeX font of the element. Such text becomes the
+* outlines of its glyphs, from the Type 1 fonts of TeXmacs (the Blue Sky
+* Computer Modern), whose built-in encodings give the glyph of a position.
+******************************************************************************/
+
+struct tex_svg_font {
+  fz_font* font;
+  array<string> names; // the glyph of each position, "" if none
+};
+static hashmap<string,pointer> tex_svg_fonts (NULL);
+
+// the Type 1 font of TeXmacs of that name (cmr10...), NULL if none
+static tex_svg_font*
+tex_svg_font_get (string name) {
+  if (tex_svg_fonts->contains (name)) return (tex_svg_font*) tex_svg_fonts[name];
+  tex_svg_font* r= NULL;
+  url u= tt_font_find (name);
+  string data;
+  if (!is_none (u) && suffix (u) == "pfb" && !load_string (u, data, false) &&
+      N(data) > 6 && (unsigned char) data[0] == 0x80 && data[1] == 1) {
+    // the encoding, in the clear text of the first segment of the file
+    int n= ((unsigned char) data[2]) | ((unsigned char) data[3] << 8) |
+           ((unsigned char) data[4] << 16) | ((unsigned char) data[5] << 24);
+    string head= data (6, min (N(data), 6 + n));
+    array<string> names (256);
+    for (int i= 0; i < 256; i++) names[i]= "";
+    int k= 0;
+    while ((k= search_forwards ("dup ", k, head)) >= 0) {
+      k += 4;
+      int j= k, pos= 0;
+      while (j < N(head) && is_digit (head[j])) pos= 10 * pos + (head[j++] - '0');
+      if (j == k || j >= N(head) || head[j] != ' ' || j + 1 >= N(head) ||
+          head[j+1] != '/') continue;
+      int e= j + 2;
+      while (e < N(head) && head[e] != ' ') e++;
+      if (pos < 256) names[pos]= head (j + 2, e);
+    }
+    fz_context* ctx= mupdf_context ();
+    fz_font* f= NULL;
+    fz_buffer* buf= NULL;
+    fz_var (f);
+    fz_var (buf);
+    fz_try (ctx) {
+      c_string cd (data);
+      buf= fz_new_buffer_from_copied_data (ctx, (const unsigned char*) (char*) cd, N(data));
+      c_string cn (name);
+      f= fz_new_font_from_buffer (ctx, cn, buf, 0, 0);
+    }
+    fz_always (ctx) fz_drop_buffer (ctx, buf);
+    fz_catch (ctx) f= NULL;
+    if (f != NULL) r= new tex_svg_font { f, names };
+  }
+  tex_svg_fonts (name)= (pointer) r;
+  return r;
+}
+
+// a path of MuPDF as SVG path data
+static void
+tex_svg_moveto (fz_context*, void* a, float x, float y) {
+  *((string*) a) << "M" << as_string (x) << " " << as_string (y); }
+static void
+tex_svg_lineto (fz_context*, void* a, float x, float y) {
+  *((string*) a) << "L" << as_string (x) << " " << as_string (y); }
+static void
+tex_svg_curveto (fz_context*, void* a, float x1, float y1, float x2, float y2,
+                 float x3, float y3) {
+  *((string*) a) << "C" << as_string (x1) << " " << as_string (y1) << " "
+                 << as_string (x2) << " " << as_string (y2) << " "
+                 << as_string (x3) << " " << as_string (y3); }
+static void
+tex_svg_closepath (fz_context*, void* a) { *((string*) a) << "Z"; }
+
+// the characters of a <text>: its character references (&#xF00B;), as
+// tm-tikz.js writes them
+static array<int>
+tex_svg_codes (string s) {
+  array<int> r;
+  int i= 0;
+  while (i < N(s)) {
+    if (s[i] == '&' && i + 2 < N(s) && s[i+1] == '#') {
+      int j= i + 2, c= 0;
+      bool hex= j < N(s) && (s[j] == 'x' || s[j] == 'X');
+      if (hex) j++;
+      while (j < N(s) && s[j] != ';') {
+        char d= s[j++];
+        if (hex) c= 16 * c + (is_digit (d)? d - '0': (d | 32) - 'a' + 10);
+        else c= 10 * c + (d - '0');
+      }
+      r << c;
+      i= j + 1;
+    }
+    else r << (int) (unsigned char) s[i++];
+  }
+  return r;
+}
+
+// one <text> as <path>s, or "" if it cannot be
+static string
+tex_svg_text_to_paths (string tag, string body) {
+  tex_svg_font* tf= tex_svg_font_get (svg_attribute (tag, "font-family"));
+  if (tf == NULL) return "";
+  fz_context* ctx= mupdf_context ();
+  double x = as_double (svg_attribute (tag, "x"));
+  double y = as_double (svg_attribute (tag, "y"));
+  double sz= as_double (svg_attribute (tag, "font-size"));
+  if (sz <= 0) sz= 10;
+  string d;
+  array<int> codes= tex_svg_codes (body);
+  for (int i= 0; i < N(codes); i++) {
+    int pos= codes[i] - 0xF000;
+    if (pos < 0 || pos > 255 || tf->names[pos] == "") return "";
+    c_string gn (tf->names[pos]);
+    int gid= fz_encode_character_by_glyph_name (ctx, tf->font, gn);
+    if (gid <= 0) return "";
+    fz_path* p= NULL;
+    fz_var (p);
+    fz_try (ctx) {
+      // the glyph at (x, y), the y axis of the SVG going down
+      fz_matrix m= fz_make_matrix ((float) sz, 0, 0, (float) -sz, (float) x, (float) y);
+      p= fz_outline_glyph (ctx, tf->font, gid, m);
+      if (p != NULL) {
+        fz_path_walker w= { tex_svg_moveto, tex_svg_lineto, tex_svg_curveto,
+                            tex_svg_closepath, NULL, NULL, NULL, NULL };
+        fz_walk_path (ctx, p, &w, &d);
+      }
+    }
+    fz_always (ctx) fz_drop_path (ctx, p);
+    fz_catch (ctx) return "";
+    x += sz * fz_advance_glyph (ctx, tf->font, gid, 0);
+  }
+  string r= "<path d=\"" * d * "\"";
+  string fill= svg_attribute (tag, "fill");
+  if (fill != "") r << " fill=\"" << fill << "\"";
+  string tr= svg_attribute (tag, "transform");
+  if (tr != "") r << " transform=\"" << tr << "\"";
+  return r * "/>";
+}
+
+// the SVG with its text of TeX fonts as outlines; s itself if it has none
+static string
+svg_outline_tex_text (string s) {
+  if (search_forwards ("data-tm-tex", 0, s) < 0) return s;
+  string r;
+  int i= 0;
+  while (true) {
+    int a= search_forwards ("<text", i, s);
+    if (a < 0) break;
+    int b= search_forwards (">", a, s);
+    int c= b < 0 ? -1 : search_forwards ("</text>", b, s);
+    if (c < 0) break;
+    string tag= s (a, b + 1);
+    string paths;
+    if (search_forwards ("data-tm-tex", 0, tag) >= 0)
+      paths= tex_svg_text_to_paths (tag, s (b + 1, c));
+    r << s (i, a);
+    if (paths != "") r << paths;
+    else r << s (a, c + 7);
+    i= c + 7;
+  }
+  r << s (i, N(s));
+  return r;
+}
+
+// The first page of the PDF u drawn in a box of w x h points, at scale
+// device pixels per point, as mupdf_render_svg below (a side given as zero
+// taken from the page, the proportions kept, centered, on a transparent
+// ground). The renderer of MuPDF draws a PDF picture itself (draw_scalable,
+// as vectors); the others ask for its pixels (scalable_image_rep::draw),
+// which came from an external converter (image_to_png), and there is none
+// in the browser: the picture was a question mark with the GPU renderer.
+// NULL when the file cannot be read.
+fz_pixmap*
+mupdf_render_pdf (url u, int w, int h, int scale) {
+  fz_context* ctx= mupdf_context ();
+  c_string path (concretize (u));
+  fz_document* doc= NULL;
+  fz_page* page= NULL;
+  fz_device* dev= NULL;
+  fz_pixmap* pix= NULL;
+  if (scale < 1) scale= 1;
+  fz_var (doc);
+  fz_var (page);
+  fz_var (dev);
+  fz_var (pix);
+  fz_try (ctx) {
+    doc= fz_open_document (ctx, path);
+    page= fz_load_page (ctx, doc, 0);
+    fz_rect b= fz_bound_page (ctx, page);
+    float dw= b.x1 - b.x0, dh= b.y1 - b.y0;
+    if (dw <= 0.0f || dh <= 0.0f) fz_throw (ctx, FZ_ERROR_GENERIC, "empty page");
+    if (w <= 0 && h <= 0) { w= (int) (dw + 0.5f); h= (int) (dh + 0.5f); }
+    else if (w <= 0) w= (int) ((dw * h) / dh + 0.5f);
+    else if (h <= 0) h= (int) ((dh * w) / dw + 0.5f);
+    if (w < 1) w= 1;
+    if (h < 1) h= 1;
+    float f= ((float) w) / dw;
+    if (((float) h) / dh < f) f= ((float) h) / dh;
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), w * scale, h * scale, NULL, 1);
+    fz_clear_pixmap (ctx, pix); // transparent
+    fz_matrix m= fz_concat (fz_translate (-b.x0, -b.y0),
+                            fz_concat (fz_scale (f * scale, f * scale),
+                                       fz_translate (0.5f * (w - f * dw) * scale,
+                                                     0.5f * (h - f * dh) * scale)));
+    dev= fz_new_draw_device (ctx, m, pix);
+    fz_run_page (ctx, page, dev, fz_identity, NULL);
+    fz_close_device (ctx, dev);
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_page (ctx, page);
+    fz_drop_document (ctx, doc);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    pix= NULL;
+    cout << "TeXmacs] MuPDF cannot draw " << concretize (u) << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return pix;
+}
+
 // Draw u in a box of w x h points, at scale device pixels per point. A side
 // given as zero is taken from the size the file declares; the drawing keeps
 // its proportions and is centered in the box. NULL when the file cannot be
@@ -451,7 +681,7 @@ mupdf_render_svg (url u, int w, int h, int scale) {
       unsigned char* data= NULL;
       size_t len= fz_buffer_storage (ctx, buf, &data);
       string text ((char*) data, (int) len);
-      string flat= svg_flatten_gradients (text);
+      string flat= svg_outline_tex_text (svg_flatten_gradients (text));
       if (N(flat) != N(text) || flat != text) {
         fz_drop_buffer (ctx, buf);
         buf= NULL;
@@ -554,6 +784,8 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
   fz_pixmap* drawn= NULL;
   if (suffix (vec) == "svg" && w > 0 && h > 0)
     drawn= mupdf_render_svg (vec, w, h, 1);
+  else if (locase_all (suffix (u)) == "pdf")
+    drawn= mupdf_render_pdf (u, w, h, 1);
   if (drawn != NULL) return mupdf_apply_effect (drawn, eff, pixel);
 
   fz_image *im = mupdf_load_image (u);

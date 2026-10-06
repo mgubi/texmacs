@@ -114,6 +114,12 @@ legacy_client_start (string host, int port) {
 
 int
 tls_client_start (string host, int port, scheme_tree args) {
+#ifdef __EMSCRIPTEN__
+  // in the browser the sockets are WebSockets, which the server serves
+  // without TLS of their own (websocket_contact.cpp): wss encrypts them
+  (void) args;
+  return _client_start (host, port, make_socket_client_contact ());
+#endif
   if (!gnutls_present ())
     return TM_NET_NO_GNUTLS;
   if (!is_tuple_tuple_string (args)) {

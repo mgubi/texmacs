@@ -1414,6 +1414,55 @@ mupdf_pdf_renderer_rep::merge_layers (pdf_document* src, pdf_graft_map* map) {
   }
 }
 
+// An SVG as a PDF, by MuPDF itself, which reads SVG (the screen draws them
+// so): the converters of TeXmacs run programs (rsvg-convert, inkscape)
+// which a web browser does not have, and a picture of TikZ or of an AI
+// answer came out as the "unknown image" sign. Its contents are read with
+// load_string, so that a picture of the ramdisc is read too.
+static bool
+mupdf_svg_to_pdf (fz_context* ctx, url svg, url pdf) {
+  string data;
+  if (load_string (svg, data, false) || N(data) == 0) {
+    cout << "TeXmacs] SVG to PDF: cannot read " << svg << LF;
+    return false;
+  }
+  // made before fz_try: a throw is a longjmp, which skips destructors
+  c_string out (concretize (pdf));
+  const unsigned char* bytes= (const unsigned char*) &(data[0]);
+  size_t len= N(data);
+  bool ok= false;
+  fz_buffer* buf= NULL;
+  fz_document* d= NULL;
+  fz_page* page= NULL;
+  fz_document_writer* w= NULL;
+  fz_var (buf); fz_var (d); fz_var (page); fz_var (w); fz_var (ok);
+  // (the handlers of the documents are registered with the context, see
+  // mupdf_context)
+  fz_try (ctx) {
+    buf= fz_new_buffer_from_copied_data (ctx, bytes, len);
+    d= fz_open_document_with_buffer (ctx, "image/svg+xml", buf);
+    page= fz_load_page (ctx, d, 0);
+    fz_rect box= fz_bound_page (ctx, page);
+    w= fz_new_pdf_writer (ctx, out, NULL);
+    fz_device* dev= fz_begin_page (ctx, w, box);
+    fz_run_page (ctx, page, dev, fz_identity, NULL);
+    fz_end_page (ctx, w);
+    fz_close_document_writer (ctx, w);
+    ok= true;
+  }
+  fz_always (ctx) {
+    fz_drop_document_writer (ctx, w);
+    fz_drop_page (ctx, page);
+    fz_drop_document (ctx, d);
+    fz_drop_buffer (ctx, buf);
+  }
+  fz_catch (ctx) {
+    cout << "TeXmacs] SVG to PDF: " << fz_caught_message (ctx) << LF;
+    ok= false;
+  }
+  return ok;
+}
+
 // The XObject for a file, added once and used as often as it occurs.
 // A PDF goes in as a form -- its own drawing, kept as drawing -- and a
 // raster image as an image; anything else (EPS, PostScript, SVG) is
@@ -1444,9 +1493,11 @@ mupdf_pdf_renderer_rep::embed_image (url u) {
     if (s != "pdf") {
       // let the converters of TeXmacs make a PDF of it
       tmp= url_temp (".pdf");
-      int w= 0, h= 0;
-      image_size (name, w, h);
-      image_to_pdf (name, tmp, w, h, 300);
+      if (s != "svg" || !mupdf_svg_to_pdf (ctx, name, tmp)) {
+        int w= 0, h= 0;
+        image_size (name, w, h);
+        image_to_pdf (name, tmp, w, h, 300);
+      }
       pdf= tmp;
     }
     pdf_document* src= NULL;

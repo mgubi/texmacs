@@ -58,7 +58,11 @@
          (list #\" (integer->char 127) #\a #\"))
    (test "object->tmstring, escape followed by a semicolon"
          (string->list (object->tmstring (string (integer->char 1) #\; #\x)))
-         (list #\" (integer->char 1) #\; #\x #\"))))
+         (list #\" (integer->char 1) #\; #\x #\"))
+   ;; and a backslash of the string followed by "x41" stays as it is
+   (test "object->tmstring, backslash followed by x and hex digits"
+         (string->list (object->tmstring "\\x41"))
+         (list #\" #\\ #\\ #\x #\4 #\1 #\"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Trees

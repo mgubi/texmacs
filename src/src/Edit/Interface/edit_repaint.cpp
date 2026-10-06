@@ -164,7 +164,7 @@ edit_interface_rep::draw_selection (renderer ren, rectangle r) {
   for (int i=0; i<N(spell_error_rects); i++) {
     color col= get_env_color (SPELL_ERROR_COLOR);
     ren->set_pencil (pencil (col, ren->pixel));
-#if defined (QTTEXMACS) || defined (AQUATEXMACS)
+#if defined (QTTEXMACS) || defined (SDLTEXMACS) || defined (VUETEXMACS) || defined (AQUATEXMACS)
     ren->draw_selection (spell_error_rects[i] & visible);
 #else
     ren->draw_rectangles (spell_error_rects[i] & visible);

@@ -1,0 +1,308 @@
+// The home directory of the browser build in IndexedDB, with several tabs
+// (tmHome in misc/wasm/web-pre.js), in a headless Firefox, or in Safari:
+//
+//   node misc/wasm/test/home-tabs.mjs [--safari | --chrome | --browser <path>]
+//                                     [src directory] [profile directory]
+//
+// from src/, after the "web" target of misc/wasm/Makefile (the defaults:
+// the current directory, and build-wasm/home-profile, which is emptied
+// first). puppeteer-core is looked for in build-wasm/tools, as by
+// misc/wasm/browser-run.mjs. --browser gives another browser for
+// puppeteer: a Chrome or a Chromium (Chrome for Testing) is driven as such,
+// headless; --chrome is the Chrome for Testing installed in build-wasm/tools
+// (cd build-wasm/tools && ./node_modules/.bin/browsers install chrome@stable
+// --path $PWD/chrome). With --safari, Safari is driven by its
+// WebDriver (safaridriver, started here; "Allow Remote Automation" in the
+// Develop menu of Safari, or safaridriver --enable once): its window is on
+// the screen, its storage is that of an automation session (empty at the
+// start), and the console of the page is not shown. Each check prints PASS
+// or FAIL.
+import path from 'node:path';
+import fs from 'node:fs';
+import { createRequire } from 'node:module';
+
+const SAFARI = process.argv.includes ('--safari');
+const bi = process.argv.indexOf ('--browser');
+let BROWSER = bi > 0 ? process.argv[bi + 1] : '/Applications/Firefox.app/Contents/MacOS/firefox';
+if (process.argv.includes ('--chrome')) {
+  // the newest Chrome for Testing of build-wasm/tools/chrome
+  const top = path.join (path.resolve (positionalSrc ()), 'build-wasm/tools/chrome/chrome');
+  const v = fs.existsSync (top) ? fs.readdirSync (top).filter (d => /^mac/.test (d)).sort ().pop () : null;
+  const app = v && fs.readdirSync (path.join (top, v)).map (d => path.join (top, v, d,
+    'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing')).find (f => fs.existsSync (f));
+  if (!app) { console.error ('no Chrome for Testing in ' + top); process.exit (2); }
+  BROWSER = app;
+}
+function positionalSrc () {
+  return process.argv.slice (2).filter ((a, i, l) => !a.startsWith ('--') && l[i - 1] !== '--browser')[0] || '.';
+}
+const CHROME = /chrom/i.test (path.basename (BROWSER));
+const positional = process.argv.slice (2).filter ((a, i, l) => !a.startsWith ('--') && l[i - 1] !== '--browser');
+const SRC = path.resolve (positional[0] || '.');
+const PROFILE = path.resolve (positional[1] || path.join (SRC, 'build-wasm/home-profile'));
+fs.rmSync (PROFILE, { recursive: true, force: true });
+fs.mkdirSync (PROFILE, { recursive: true });
+const { serve } = await import (path.join (SRC, 'misc/wasm/serve.mjs'));
+const server = await serve (path.join (SRC, 'build-wasm/out/web'), 0, '127.0.0.1', () => {}, 0);
+const url = `http://127.0.0.1:${server.address ().port}/texmacs.html`;
+
+let failures = 0;
+function check (ok, what) {
+  console.log ((ok ? 'PASS ' : 'FAIL ') + what);
+  if (!ok) failures++;
+}
+const sleep = ms => new Promise (ok => setTimeout (ok, ms));
+
+// Safari through its WebDriver: a session has one current window, so that
+// each command of a tab first switches to it; the commands go one at a time
+async function safari () {
+  const { spawn } = await import ('node:child_process');
+  const port = 4400 + Math.floor (Math.random () * 500);
+  const driver = spawn ('safaridriver', ['-p', String (port)], { stdio: 'ignore' });
+  const base = `http://127.0.0.1:${port}`;
+  let queue = Promise.resolve (), current = null, sid = null;
+  async function call (method, p, body) {
+    const r = await fetch (base + p, { method, headers: { 'Content-Type': 'application/json' },
+                                       body: body ? JSON.stringify (body) : undefined });
+    const j = await r.json ();
+    if (j.value && j.value.error) throw new Error (j.value.error + ': ' + j.value.message);
+    return j.value;
+  }
+  const serial = f => { const r = queue.then (f); queue = r.catch (() => {}); return r; };
+  for (let i = 0; ; i++) {
+    try { sid = (await call ('POST', '/session', { capabilities: { alwaysMatch: { browserName: 'safari' } } })).sessionId; break; }
+    catch (e) { if (i > 20) throw e; await sleep (500); }
+  }
+  const S = '/session/' + sid;
+  await call ('POST', S + '/timeouts', { script: 120000, pageLoad: 120000 });
+  await call ('POST', S + '/window/rect', { width: 1280, height: 860 });
+  let first = await call ('GET', S + '/window');
+  const go = h => current === h ? null : call ('POST', S + '/window', { handle: h }).then (() => { current = h; });
+  class Page {
+    constructor (h) { this.h = h; }
+    run (f) { return serial (async () => { await go (this.h); return f (); }); }
+    evaluate (fn) {
+      const script = 'const done = arguments[arguments.length - 1];' +
+        'try { Promise.resolve ((' + fn.toString () + ') ()).then (' +
+        'v => done ({ v: v === undefined ? null : v }), e => done ({ e: String (e) })); }' +
+        'catch (e) { done ({ e: String (e) }); }';
+      return this.run (async () => {
+        const r = await call ('POST', S + '/execute/async', { script, args: [] });
+        if (r && r.e) throw new Error (r.e);
+        return r ? r.v : null;
+      });
+    }
+    async waitForFunction (fn, opts) {
+      const t0 = Date.now ();
+      for (;;) {
+        try { if (await this.evaluate (fn)) return; } catch (e) {}
+        if (Date.now () - t0 > opts.timeout) throw new Error ('timeout');
+        await sleep (opts.polling || 500);
+      }
+    }
+    bringToFront () { return this.run (() => null); }
+    waitForNavigation () {
+      const mark = this.evaluate (() => { window.tmNavigated = 1; });
+      return (async () => {
+        await mark;
+        const t0 = Date.now ();
+        for (;;) {
+          await sleep (500);
+          try {
+            if (await this.evaluate (() => typeof window.tmNavigated === 'undefined' &&
+                                           document.readyState === 'complete')) return;
+          } catch (e) {}
+          if (Date.now () - t0 > 120000) throw new Error ('no navigation');
+        }
+      }) ();
+    }
+    close () { return this.run (async () => { await call ('DELETE', S + '/window'); current = null; }); }
+  }
+  let used = false;
+  return {
+    async newPage () {
+      let h = first;
+      if (used) h = (await serial (() => call ('POST', S + '/window/new', { type: 'tab' }))).handle;
+      used = true;
+      const page = new Page (h);
+      await page.run (() => call ('POST', S + '/url', { url }));
+      return page;
+    },
+    async close () {
+      try { await call ('DELETE', S); } catch (e) {}
+      driver.kill ();
+    }
+  };
+}
+
+async function puppet () {
+  const require = createRequire (path.join (SRC, 'build-wasm/tools/package.json'));
+  const puppeteer = require ('puppeteer-core');
+  const b = await puppeteer.launch ({
+    browser: CHROME ? 'chrome' : 'firefox', executablePath: BROWSER,
+    headless: true, userDataDir: PROFILE,
+    args: CHROME ? ['--window-size=1280,800'] : ['--width=1280', '--height=800']
+  });
+  return {
+    async newPage () {
+      const page = await b.newPage ();
+      page.on ('console', m => { const t = m.text (); if (/home|TeXmacs:/.test (t)) console.log ('page:', t); });
+      page.on ('pageerror', e => console.log ('page error:', e.message));
+      await page.goto (url, { waitUntil: 'load', timeout: 120000 });
+      return page;
+    },
+    close: () => b.close ()
+  };
+}
+
+const browser = SAFARI ? await safari () : await puppet ();
+console.log ('browser: ' + (SAFARI ? 'Safari' : CHROME ? 'Chrome' : 'Firefox'));
+
+async function open (name) {
+  const page = await browser.newPage ();
+  await ready (page);
+  return page;
+}
+
+async function ready (page) {
+  await page.waitForFunction (() => typeof runtimeInitialized !== 'undefined' && runtimeInitialized &&
+                                    typeof tmFrame !== 'undefined' && tmFrame.tabs ().length > 0,
+                              { timeout: 120000, polling: 500 });
+  await sleep (3000);
+}
+
+// the keys and sizes of the database, and the tree in memory
+const idb = page => page.evaluate (() => new Promise ((ok, ko) => {
+  const r = indexedDB.open ('/home/web');
+  r.onerror = () => ko (r.error);
+  r.onsuccess = () => {
+    const db = r.result, st = db.transaction (['FILE_DATA']).objectStore ('FILE_DATA');
+    const out = {};
+    const q = st.openCursor ();
+    q.onsuccess = () => {
+      const c = q.result;
+      if (!c) { db.close (); ok (out); return; }
+      out[c.key] = c.value.contents ? c.value.contents.length : -1;
+      c.continue ();
+    };
+  };
+}));
+const mem = page => page.evaluate (() => {
+  const out = {};
+  (function walk (p) {
+    FS.readdir (p).forEach (x => {
+      if (x === '.' || x === '..') return;
+      const q = p + '/' + x, st = FS.lstat (q);
+      if (FS.isDir (st.mode)) { out[q] = -1; walk (q); }
+      else if (FS.isLink (st.mode)) out[q] = -1;
+      else out[q] = st.size;
+    });
+  }) ('/home/web');
+  return out;
+});
+// the changes not yet written (a timer of 300 ms) are written first
+const flushed = page => page.evaluate (() => new Promise (ok => tmHome.flush (ok)));
+function same (a, b) {
+  const diff = [];
+  for (const k of Object.keys (a)) if (!(k in b) || a[k] !== b[k]) diff.push ('mem ' + k + ' ' + a[k] + ' / db ' + b[k]);
+  for (const k of Object.keys (b)) if (!(k in a) && k !== '/home/web') diff.push ('db only ' + k);
+  return diff;
+}
+
+// 1. one tab: its changes reach the database
+const A = await open ('A');
+check (await A.evaluate (() => !tmHome.readOnly ()), 'A writes the home directory');
+await sleep (2000);
+await flushed (A);
+let d = same (await mem (A), await idb (A));
+check (d.length === 0, 'after the start, memory and database agree' + (d.length ? ': ' + d.slice (0, 8).join ('; ') : ''));
+await A.evaluate (() => {
+  FS.mkdirTree ('/home/web/t1/sub');
+  FS.writeFile ('/home/web/t1/sub/a.txt', 'hello');
+  FS.writeFile ('/home/web/gone.txt', 'x');
+});
+await sleep (800);
+let db = await idb (A);
+check (db['/home/web/t1/sub/a.txt'] === 5 && db['/home/web/gone.txt'] === 1, 'new files are written');
+await A.evaluate (() => { FS.rename ('/home/web/t1', '/home/web/t2'); FS.unlink ('/home/web/gone.txt'); });
+await sleep (800);
+db = await idb (A);
+check (db['/home/web/t2/sub/a.txt'] === 5 && !('/home/web/t1' in db) && !('/home/web/t1/sub/a.txt' in db),
+       'a renamed folder moves in the database');
+check (!('/home/web/gone.txt' in db), 'a deleted file leaves the database');
+await A.evaluate (() => { const s = FS.open ('/home/web/t2/sub/a.txt', 'r+'); FS.write (s, new Uint8Array ([65, 66, 67, 68, 69, 70, 71]), 0, 7, 0); FS.close (s); });
+await sleep (800);
+db = await idb (A);
+check (db['/home/web/t2/sub/a.txt'] === 7, 'a file written through a stream is updated');
+await flushed (A);
+d = same (await mem (A), await idb (A));
+check (d.length === 0, 'memory and database agree' + (d.length ? ': ' + d.slice (0, 8).join ('; ') : ''));
+
+// 2. a second tab: read only
+const B = await open ('B');
+check (await B.evaluate (() => tmHome.readOnly ()), 'B is read only');
+const noticeB = await B.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
+check (/already open in another tab/.test (noticeB), 'B says why: ' + noticeB.slice (0, 80));
+check (await B.evaluate (() => FS.readFile ('/home/web/t2/sub/a.txt', { encoding: 'utf8' })) === 'ABCDEFG',
+       'B reads what A wrote');
+await B.evaluate (() => FS.writeFile ('/home/web/fromB.txt', 'b'));
+await sleep (800);
+check (!('/home/web/fromB.txt' in await idb (A)), 'B keeps none of its changes');
+check (await A.evaluate (() => !tmHome.readOnly ()), 'A still writes');
+
+// a third tab, read only too
+const C = await open ('C');
+check (await C.evaluate (() => tmHome.readOnly ()), 'C is read only');
+// 3. B takes over: A writes its last change first
+await A.evaluate (() => FS.writeFile ('/home/web/last.txt', 'last'));
+// the button is clicked in the tab which is shown (a tab in the background
+// has no frames, so that TeXmacs would not start there)
+await B.bringToFront ();
+const reload = B.waitForNavigation ({ waitUntil: 'load', timeout: 120000 });
+await B.evaluate (() => { setTimeout (() => document.querySelector ('#tm-home-notice button').click (), 100); });
+await reload;
+await ready (B);
+check (await B.evaluate (() => !tmHome.readOnly ()), 'B writes after "Use TeXmacs here"');
+check (await A.evaluate (() => tmHome.readOnly ()), 'A is read only then');
+await sleep (7000);
+const noticeA = await A.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
+check (/now used in another tab/.test (noticeA), 'A says why, still after 7 s: ' + noticeA.slice (0, 80));
+const noticeC = await C.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
+check (/already open in another tab/.test (noticeC), 'C says nothing new during the takeover: ' + noticeC.slice (0, 80));
+check (await B.evaluate (() => { try { return FS.readFile ('/home/web/last.txt', { encoding: 'utf8' }); } catch (e) { return null; } }) === 'last',
+       'the last change of A reached B');
+await B.bringToFront ();
+await B.evaluate (() => FS.writeFile ('/home/web/fromB2.txt', 'bb'));
+await sleep (800);
+check ((await idb (B))['/home/web/fromB2.txt'] === 2, 'B keeps its changes now');
+
+// 4. B is closed: A says that a reload brings TeXmacs back
+await B.close ();
+await sleep (8000);
+const noticeC2 = await C.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
+check (/no longer open in another tab/.test (noticeC2), 'C offers to reload: ' + noticeC2.slice (0, 80));
+await C.close ();
+const noticeA2 = await A.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
+check (/no longer open in another tab/.test (noticeA2), 'A offers to reload: ' + noticeA2.slice (0, 80));
+await A.bringToFront ();
+try { await A.evaluate (() => { setTimeout (() => location.reload (), 100); }); } catch (e) {}
+await sleep (1000);
+await ready (A);
+check (await A.evaluate (() => !tmHome.readOnly ()), 'A writes again after the reload');
+check (await A.evaluate (() => { try { return FS.readFile ('/home/web/fromB2.txt', { encoding: 'utf8' }); } catch (e) { return null; } }) === 'bb',
+       'A has what B wrote');
+
+// 5. TeXmacs itself saves a document (save-buffer-as through its own code)
+await A.bringToFront ();
+await A.evaluate (() => withStackSave (() => _vue_web_scheme (stringToUTF8OnStack (
+  '(begin (new-document) (insert "saved by TeXmacs") (save-buffer-as (string->url "$HOME/saved-by-tm.tm") (lambda x (noop))))'))));
+await sleep (3000);
+db = await idb (A);
+check ((db['/home/web/saved-by-tm.tm'] || 0) > 100, 'a document saved by TeXmacs is in the database (' + db['/home/web/saved-by-tm.tm'] + ' bytes)');
+await flushed (A);
+d = same (await mem (A), await idb (A));
+check (d.length === 0, 'at the end, memory and database agree' + (d.length ? ': ' + d.slice (0, 8).join ('; ') : ''));
+await browser.close ();
+server.close ();
+console.log (failures ? `${failures} FAILED` : 'all passed');
+process.exit (failures ? 1 : 0);

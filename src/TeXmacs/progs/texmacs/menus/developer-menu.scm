@@ -29,6 +29,23 @@
 ;; save empty file & reload so that it is recognized as scheme code, not plain tm doc  
       (begin (buffer-save u) (revert-buffer-revert))))
 
+;; in the browser: the JavaScript run when TeXmacs starts (tm_server.cpp,
+;; plugins/javascript), begun with a few lines on what it may do
+(define javascript-init-template
+  (string-append
+   "// my-init-javascript.js: run by TeXmacs in the browser when it starts,\n"
+   "// after my-init-texmacs.scm, in the global scope of the page.\n"
+   "// TeXmacs.scheme (expr) evaluates Scheme and gives its value as text,\n"
+   "// TeXmacs.later (expr) runs it after the current event, for instance:\n"
+   "//   TeXmacs.later ('(set-message \"Hello from JavaScript\" \"\")');\n"
+   "// Try it first in a JavaScript session (Insert > Session > JavaScript).\n"))
+
+(define (javascript-init-open)
+  (with u (url-concretize "$TEXMACS_HOME_PATH/progs/my-init-javascript.js")
+    (when (not (url-exists? u))
+      (string-save javascript-init-template u))
+    (load-document u)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Customized keyboards
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -225,6 +242,9 @@
   ((replace "Open %1" (verbatim "my-init-buffer.scm"))
    (scm-load-buffer
     (url-concretize "$TEXMACS_HOME_PATH/progs/my-init-buffer.scm")))
+  (if (defined? 'web-files)
+      ((replace "Open %1" (verbatim "my-init-javascript.js"))
+       (javascript-init-open)))
   ((replace "Open %1" (verbatim "preferences.scm"))
    (scm-load-buffer
     (url-concretize "$TEXMACS_HOME_PATH/system/preferences.scm")))

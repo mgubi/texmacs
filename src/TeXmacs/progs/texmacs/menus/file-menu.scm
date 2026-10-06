@@ -169,6 +169,10 @@
 (menu-bind load-menu
   ("Load" (open-document))
   ("Revert" (revert-buffer))
+  ;; the browser build: the files kept in the page (web-files is defined
+  ;; by the Vue plugin there)
+  (if (defined? 'web-files)
+      ("Files in this browser..." (web-files)))
   (if (not (window-per-buffer?))
       ("Load in new window" (open-document*)))
   ---
@@ -209,6 +213,10 @@
 
 (menu-bind print-menu
   ("Preview" (preview-buffer))
+  (if (defined? 'web-open-pdf)
+      ;; in the browser: the PDF in a tab, whose viewer prints it (as
+      ;; Preview, but named for what it is for; print-buffer is interactive)
+      ("Print" (preview-buffer)))
   (if (use-print-dialog?)
       (if (has-printing-cmd?) ("Print" (print-buffer)))
       ("Print to file"
@@ -223,6 +231,10 @@
 
 (menu-bind print-menu-inline
   ("Preview" (preview-buffer))
+  (if (defined? 'web-open-pdf)
+      ;; in the browser: the PDF in a tab, whose viewer prints it (as
+      ;; Preview, but named for what it is for; print-buffer is interactive)
+      ("Print" (preview-buffer)))
   (if (use-print-dialog?)
       (if (has-printing-cmd?) ("Print" (print-buffer)))
       ("Print to file"

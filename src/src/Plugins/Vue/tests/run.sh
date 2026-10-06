@@ -26,6 +26,7 @@ OUT=${OUT:-/tmp/vue-tests/$test}
 SCM=${SCM:-$test.scm}
 SCRIPT=${SCRIPT:-$test.script}
 BIN=${BIN:-TeXmacs/bin/texmacs.bin} # BIN=<path>: another build (CMake)
+# TM_ARGS: options of TeXmacs (e.g. -tls-no-verify)
 [ -x "$BIN" ] || { echo "run me from the top of the source tree"; exit 2; }
 
 rm -rf "${OUT:?}"; mkdir -p "$OUT"
@@ -45,7 +46,7 @@ script=""
 
 TEXMACS_PATH="$PWD/TeXmacs" TEXMACS_HOME_PATH="$HOMEDIR" \
 TEXMACS_VUE_SNAPSHOT="$OUT" TEXMACS_VUE_SCRIPT="$script" \
-  "$BIN" ${load:+-x "$load"} > "$OUT/run.log" 2>&1 &
+  "$BIN" ${TM_ARGS:-} ${load:+-x "$load"} > "$OUT/run.log" 2>&1 &
 p=$!
 sleep "$secs"
 kill -9 $p 2>/dev/null

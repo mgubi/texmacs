@@ -369,7 +369,7 @@ $(plugins_c_obj): Objects/%.o: %.c
 $(x11_obj): Objects/%.o: %.cpp
 	$(call cxx_incl,$(x11_incl) $(CXXX11) $(CXXGUILE))
 $(os_obj): Objects/%.o: %.cpp
-	$(call cxx_incl,$(os_incl) $(CXXQT) $(CXXGUILE))
+	$(call cxx_incl,$(os_incl) $(CXXGNUTLS) $(CXXQT) $(CXXGUILE))
 $(qt_obj): Objects/%.o: ./Plugins/$(QT_SRC_DIR)/%.cpp
 	$(call cxx_incl,$(qt_incl) $(CXXQT) $(CXXGUILE) $(CXXRESVG))
 $(qtwk_obj): Objects/%.o: %.cpp
