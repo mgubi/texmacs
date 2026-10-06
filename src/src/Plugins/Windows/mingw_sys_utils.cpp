@@ -91,7 +91,10 @@ mingw_system (::array< ::string> arg,
     _arg << as_charp (quote_argument (arg_[j]));
   _arg << (char*) NULL;
 
-  spawn_system process (ch, _arg[0], A(_arg));
+  // (the program is looked for by its name as given, not quoted)
+  char* _name= as_charp (arg_[0]);
+  spawn_system process (ch, _name, A(_arg));
+  tm_delete_array (_name);
   for (int j= 0; j < N(arg_); j++)
     tm_delete_array (_arg[j]);
   if (!process.isRunning ()) {
