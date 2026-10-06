@@ -965,7 +965,8 @@ latex_parser::parse_command (string s, int& i, string cmd, int change) {
     u = tree(TUPLE, copy (cmd)); // unparsed arguments
     // Should be in a drd.
 
-    bool option2= (cmd == "\\def" || cmd == "\\newenvironment");
+    bool option2= (cmd == "\\def" || cmd == "\\newenvironment" ||
+                   cmd == "\\makebox" || cmd == "\\framebox");
     // \parbox[pos][height][inner]{width}{text}: the options after the
     // first one, which TeXmacs does not use, are read and dropped
     int extra_options= (cmd == "\\parbox")? 2: 0;

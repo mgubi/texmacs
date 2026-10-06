@@ -218,6 +218,25 @@
   (check= (tl '(math (binom "n" "k"))) "$\\binom{n}{k}$")
   (check= (tl '(math (concat "a" (text "if") "b"))) "$a \\text{if} b$"))
 
+;; LaTeX's \boxed is the boxed macro; a frame is \fbox in text, but \fbox
+;; typesets its argument as text, so a frame in a formula is \boxed
+(define (test-export-boxes)
+  (check-group "export: boxes")
+  (check= (tl '(math (boxed (concat "x" (rsup "2") "+" (frac "1" "2")))))
+          "$\\boxed{x^2 + \\frac{1}{2}}$")
+  (check= (tl '(equation* (document (boxed (concat "y=" (frac "1" "3"))))))
+          "\\[ \\boxed{y = \\frac{1}{3}} \\]")
+  (check= (tl '(boxed "x")) "$\\boxed{x}$")
+  (check= (tl '(frame (concat "text " (math "a")))) "\\fbox{text $a$}")
+  (check= (tl '(frame (concat "x" (rsup "2")))) "\\fbox{x\\tmrsup{2}}")
+  (check= (tl '(math (frame (concat "x" (rsup "2"))))) "$\\boxed{x^2}$")
+  (check= (tl '(fcolorbox "red" "yellow" "warn"))
+          "\\fcolorbox{red}{yellow}{warn}")
+  (check= (tl '(colored-frame "yellow" "hi")) "\\colorbox{yellow}{hi}")
+  (check-true (string-contains?
+               (td '("generic") '(document (concat "a " (math (boxed "x")))))
+               "\\usepackage{amsmath}")))
+
 (define (test-export-big)
   (check-group "export: big operators and delimiters")
   (check= (tl '(math (concat (big "sum") (rsub "i") "x"))) "$\\sum_i x$")
@@ -507,6 +526,31 @@
           '(math (concat (wide "x" "<dot>") (wide "y" "<ddot>"))))
   (check= (lt "$\\underline{u}$") '(math (wide* "u" "<bar>"))))
 
+;; the optional width and position of \framebox and \makebox are dropped
+(define (test-import-boxes)
+  (check-group "import: boxes")
+  (check= (lt "$\\boxed{x^2+\\frac{1}{2}}$")
+          '(math (boxed (concat "x" (rsup "2") "+" (frac "1" "2")))))
+  (check= (lt "\\[\\boxed{y=\\frac13}\\]")
+          '(document (equation* (document (boxed (concat "y=" (frac "1" "3")))))))
+  (check= (lt "\\begin{equation*}\\boxed{a=b}\\end{equation*}")
+          '(document (equation* (document (boxed "a=b")))))
+  (check= (lt "\\fbox{text $a$}") '(frame (concat "text " (math "a"))))
+  (check= (lt "\\framebox{plain}") '(frame "plain"))
+  (check= (lt "\\framebox[3cm]{w}") '(frame "w"))
+  (check= (lt "\\framebox[3cm][c]{centered}") '(frame "centered"))
+  (check= (lt "a \\framebox[2cm][r]{$x$} b")
+          '(concat "a " (frame (math "x")) " b"))
+  (check= (lt "\\makebox{mb}") "mb")
+  (check= (lt "\\makebox[2cm]{mb}") "mb")
+  (check= (lt "\\makebox[3cm][r]{right}") "right")
+  ;; (a text ends the implicit product: no * before it, #271)
+  (check= (lt "$a \\makebox[1cm][l]{t u} b$")
+          '(math (concat "a" (text "t u") "b")))
+  (check= (lt "\\fcolorbox{red}{yellow}{warn}")
+          '(fcolorbox "red" "yellow" "warn"))
+  (check= (lt "\\colorbox{yellow}{hi}") '(colored-frame "yellow" "hi")))
+
 (define (test-import-matrices)
   (check-group "import: matrices")
   (check= (lt "$\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}$")
@@ -719,6 +763,10 @@
     (math (wide "x" "^")) (math (wide "x" "~")) (math (wide "x" "<bar>"))
     (math (wide "x" "<vect>")) (math (wide* "x" "<bar>"))
     (math "<bbb-R>") (math "<cal-A>")
+    (math (boxed (concat "x" (rsup "2") "+" (frac "1" "2"))))
+    (equation* (document (boxed (concat "y=" (frac "1" "3")))))
+    (frame (concat "text " (math "a"))) (frame "x")
+    (fcolorbox "red" "yellow" "warn") (colored-frame "yellow" "hi")
     (equation* (document "x=1")) (equation (document "x=1"))
     (equation (document (concat "x=1" (label "e"))))
     (eqnarray* (document (tformat (table (row (cell "a") (cell "=") (cell "b"))
@@ -737,7 +785,9 @@
 ;;   - a left subscript is written {}_b, which is read back on the left
 ;;     atom;
 ;;   - text underline and math under-bar are both \underline;
-;;   - math bold is \tmmathbf, read back as a bold letter.
+;;   - math bold is \tmmathbf, read back as a bold letter;
+;;   - a frame in a formula is \boxed, read back as boxed, and \boxed is
+;;     only allowed in formulas.
 (define round-trip-lossy
   '(((math (around* "(" "x" ")")) (math (around "(" "x" ")")))
     ((math (concat (left "(") "x" (right ")"))) (math (around "(" "x" ")")))
@@ -745,6 +795,8 @@
     ((math (concat "a" (lsub "b"))) (math (concat "a" (rsub "b"))))
     ((underline "u") (wide* "u" "<bar>"))
     ((math (with "math-font-series" "bold" "x")) (math "<b-x>"))
+    ((math (frame "x")) (math (boxed "x")))
+    ((boxed "x") (math (boxed "x")))
     ((verbatim (document "a" "b")) (verbatim-code (document "a" "b")))
     ((math (det (tformat (table (row (cell "a") (cell "b"))))))
      (math (around* "|" (tabular* (tformat
@@ -775,7 +827,9 @@
               (check-equal s (lambda () (tl (lt s))) s))
             '("\\section{A}\n\ntext" "$\\frac{a}{b}$" "$x_i^2$" "a\\footnote{f}"
               "\\begin{theorem}\n  T\n\\end{theorem}"
-              "\\begin{equation}\n  x = 1\n\\end{equation}")))
+              "\\begin{equation}\n  x = 1\n\\end{equation}"
+              "$\\boxed{x^2 + \\frac{1}{2}}$" "\\[ \\boxed{y = \\frac{1}{3}} \\]"
+              "\\fbox{text $a$}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
@@ -807,6 +861,7 @@
   (test-export-lists)
   (test-export-references)
   (test-export-math)
+  (test-export-boxes)
   (test-export-big)
   (test-export-accents-math)
   (test-export-matrices)
@@ -822,6 +877,7 @@
   (test-import-lists)
   (test-import-references)
   (test-import-math)
+  (test-import-boxes)
   (test-import-matrices)
   (test-import-equations)
   (test-import-tables)
