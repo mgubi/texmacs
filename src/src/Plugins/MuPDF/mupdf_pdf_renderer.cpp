@@ -1435,11 +1435,9 @@ mupdf_svg_to_pdf (fz_context* ctx, url svg, url pdf) {
   fz_page* page= NULL;
   fz_document_writer* w= NULL;
   fz_var (buf); fz_var (d); fz_var (page); fz_var (w); fz_var (ok);
-  // (the handlers of the documents, which nothing else of TeXmacs opens
-  // through fz_open_document, are registered once)
-  static bool handlers= false;
+  // (the handlers of the documents are registered with the context, see
+  // mupdf_context)
   fz_try (ctx) {
-    if (!handlers) { fz_register_document_handlers (ctx); handlers= true; }
     buf= fz_new_buffer_from_copied_data (ctx, bytes, len);
     d= fz_open_document_with_buffer (ctx, "image/svg+xml", buf);
     page= fz_load_page (ctx, d, 0);
