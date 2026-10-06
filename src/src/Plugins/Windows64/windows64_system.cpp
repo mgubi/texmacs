@@ -478,6 +478,8 @@ find_program (const std::wstring& name) {
       size_t end= p.find (L';', start);
       if (end == std::wstring::npos) end= p.size ();
       std::wstring d= p.substr (start, end - start);
+      if (d.size () >= 2 && d.front () == L'"' && d.back () == L'"')
+        d= d.substr (1, d.size () - 2);
       if (!d.empty ()) {
         if (d.back () != L'\\' && d.back () != L'/') d += L'\\';
         dirs.push_back (d);
@@ -485,8 +487,16 @@ find_program (const std::wstring& name) {
       start= end + 1;
     }
   }
+  // (the name as it is only if it has a suffix: else a script of the
+  // same name without suffix, as fig2ps or those of MSYS2, would be taken
+  // before the program, and could not be started)
+  size_t sep= name.find_last_of (L"\\/");
+  size_t dot= name.find_last_of (L'.');
+  bool has_suffix= dot != std::wstring::npos &&
+                   (sep == std::wstring::npos || dot > sep);
   for (const std::wstring& d: dirs)
     for (const wchar_t* suf: sufs) {
+      if (*suf == 0 && !has_suffix) continue;
       std::wstring f= d + name + suf;
       if (is_file (f)) return f;
     }
