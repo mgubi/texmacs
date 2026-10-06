@@ -302,7 +302,17 @@ edit_env_rep::exec (tree t) {
   case EXTERN:
     return exec_rewrite (t);
   case VAR_INCLUDE:
-    return exec_rewrite (t);
+    {
+      // as in bridge_rewrite_rep::my_typeset
+      if (N(t) == 0) return exec_rewrite (t);
+      url save_name= cur_file_name;
+      cur_file_name= relative (base_file_name, url_unix (exec_string (t[0])));
+      secure= is_secure (cur_file_name);
+      tree r= exec_rewrite (t);
+      cur_file_name= save_name;
+      secure= is_secure (cur_file_name);
+      return r;
+    }
   case WITH_PACKAGE:
     return exec_rewrite (t);
   case USE_PACKAGE:
