@@ -604,13 +604,15 @@ rmdir_recursive (url u) {
 void
 mkdir (url u) {
   // if the directory already exists, we do nothing
-  if (exists (u)) {
+  // (nor for no url: its head is itself, see issue #163)
+  if (is_none (u) || exists (u)) {
     return;
   }
   
   // if the parent directory does not exist, we create it
   if (!is_atomic (u) && !is_root (u)) {
-    mkdir (head (u));
+    url h= head (u);
+    if (h != u) mkdir (h);
   }
   
   // call the system mkdir

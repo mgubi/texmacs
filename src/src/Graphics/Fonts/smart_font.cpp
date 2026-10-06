@@ -45,6 +45,7 @@ RESOURCE(smart_map);
 #define REWRITE_ITALIC         10
 #define REWRITE_IGNORE         11
 #define REWRITE_MATH_ITALIC    12
+#define REWRITE_CORK           13
 
 static string substitute_math_italic (string s);
 
@@ -1016,6 +1017,8 @@ rewrite (string s, int kind) {
     return "";
   case REWRITE_MATH_ITALIC:
     return substitute_math_italic (s);
+  case REWRITE_CORK:
+    return utf8_to_cork (strict_cork_to_utf8 (s));
   default:
     return s;
   }
@@ -1450,6 +1453,27 @@ smart_font_rep::resolve (string c) {
   //     << "; " << fn[SUBFONT_MAIN]->res_name << "; " << math_kind << "\n";
   array<string> a= trimmed_tokenize (family, ",");
 
+  if (starts (c, "<#") && ends (c, ">")) {
+    // a code point with a Cork equivalent in the upper half of the Cork
+    // encoding (e.g. <#E9>, the byte for e acute) is drawn with the font
+    // and glyph of the typed character; not below 128, where Unicode fonts
+    // read the bytes as ASCII (the Cork quotes ` and ' are curly in TeX
+    // fonts, grave and straight in Unicode fonts)
+    string cc= rewrite (c, REWRITE_CORK);
+    if (N(cc) == 1 && ((unsigned char) cc[0]) >= 128 &&
+        strict_cork_to_utf8 (cc) == strict_cork_to_utf8 (c)) {
+      int cnr= sm->chv[(int) (unsigned char) cc[0]];
+      if (cnr == -1) cnr= resolve (cc);
+      if (cnr >= 0 && cnr != SUBFONT_ERROR &&
+          sm->fn_rewr[cnr] == REWRITE_NONE) {
+        tree key= tuple ("cork", as_string (cnr));
+        int nr= sm->add_font (key, REWRITE_CORK);
+        initialize_font (nr);
+        return sm->add_char (key, c);
+      }
+    }
+  }
+
   if (math_kind != 0) {
     string upc= substitute_upright (c);
     if (upc != "" && fn[SUBFONT_MAIN]->supports (upc)) {
@@ -1579,6 +1603,11 @@ smart_font_rep::initialize_font (int nr) {
     fn[nr]= adjust_subfont (get_math_font (a[1], a[2], a[3], a[4]));
   else if (a[0] == "cyrillic")
     fn[nr]= adjust_subfont (get_cyrillic_font (a[1], a[2], a[3], a[4]));
+  else if (a[0] == "cork") {
+    int cnr= as_int (a[1]);
+    initialize_font (cnr);
+    fn[nr]= fn[cnr];
+  }
   else if (a[0] == "greek")
     fn[nr]= adjust_subfont (get_greek_font (a[1], a[2], a[3], a[4]));
   else if (a[0] == "subfont")
