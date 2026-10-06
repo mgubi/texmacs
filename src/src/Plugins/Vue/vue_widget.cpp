@@ -375,6 +375,7 @@ static int icon_generation= 0;
 // the menu of TeXmacs Vue, its dialogs); tm-theme-set tells the frame that
 // TeXmacs chose (before, the frame follows the system)
 EM_JS (void, vue_web_frame_theme, (int dark), {
+  if (typeof document === 'undefined') return; // the node build: no page
   var c = document.documentElement.classList;
   c.add ('tm-theme-set');
   if (dark) c.add ('tm-dark'); else c.remove ('tm-dark');
