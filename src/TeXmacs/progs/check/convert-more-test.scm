@@ -960,6 +960,28 @@
 
 ;; JSON: objects are attr, arrays tuple, the other values strings (null
 ;; the empty string); the printer writes the trees back.
+;; the answers of the chatbots, as LaTeX documents (ai.cpp): ChatGPT gives
+;; its text as it is, Gemini in JSON; the commands of LaTeX which begin
+;; with \n are not newlines
+(define ai-answer-doc
+  (string-append "\\documentclass{article}\n\\begin{document}\n"
+                 "$\\nu \\ni x$, $a\\nonumber$ \\noindent b\n"
+                 "\\end{document}"))
+
+(define (gemini-answer latex)
+  (string-append "{\"candidates\": [{\"content\": {\"parts\": [{\"text\": "
+                 (tree->json latex) "\n}]}}]}"))
+
+(define (test-ai-answers)
+  (check-group "ai answers")
+  (with r '(with "mode" "text"
+             (concat (math "<nu><ni>x") ", " (math (concat "a" (no-number)))
+                     (no-indent) "b "))
+    (check= (st (cpp-ai-latex-output ai-answer-doc "chatgpt" "check")) r)
+    (check= (st (cpp-ai-latex-output (gemini-answer ai-answer-doc)
+                                     "gemini" "check"))
+            r)))
+
 (define (test-json)
   (check-group "json")
   (check= (st (json->tree "{\"a\": [1, 2.5, \"x\"], \"b\": null, \"c\": true}"))
@@ -970,6 +992,9 @@
   (check= (st (json->tree "{}")) '(attr))
   (check= (tree->json "x\"y") "\"x\\\"y\"")
   (check= (tree->json "a\nb\tc\\") "\"a\\nb\\tc\\\\\"")
+  ;; the other control characters as \u00XX (JSON does not allow them raw)
+  (check= (tree->json (string #\a (integer->char 1) #\b (integer->char 27)))
+          "\"a\\u0001b\\u001b\"")
   (check= (tree->json (stree->tree '(tuple "a"))) "[ \"a\" ]")
   (check= (tree->json (stree->tree '(attr "a" "b"))) "{ \"a\": \"b\" }")
   (check= (tree->json (stree->tree '(attr "a" (tuple "1" "2") "b" (attr "c" "d"))))
@@ -1154,7 +1179,8 @@
                   test-tmml-special test-cork-table test-cork-symbols
                   test-cork-bytes test-cork-unicode test-other-encodings
                   test-images test-image-formats test-code-formats
-                  test-format-registry test-vernac test-json test-compress
+                  test-format-registry test-vernac test-json test-ai-answers
+                  test-compress
                   test-serialize-special test-big-document))
   (when (url-exists? (temp-dir)) (system-rmdir-recursive (temp-dir)))
   (check-end))
