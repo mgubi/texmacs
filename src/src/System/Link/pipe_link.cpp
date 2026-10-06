@@ -22,6 +22,7 @@
 #include "analyze.hpp"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #ifndef OS_MINGW
 #include <unistd.h>
 #include <signal.h>
@@ -80,6 +81,8 @@ public:
 
   void    feed (int channel);
   void    close_fds ();
+  void    close_pipes ();
+  void    close_err ();
 };
 
 pipe_link_rep::pipe_link_rep (string cmd2): cmd (cmd2) {
@@ -109,20 +112,25 @@ terminate_child (int pid) {
   // no process (fork failed, or none was made): killpg (-1, ...) fails, and
   // kill (-1, SIGKILL) below would kill every process of the user
   if (pid <= 0) return;
-  // Ask the process group of the child to terminate, give it a short
-  // time to do so, kill it otherwise, and reap the child
+  // Ask the process group of the child to terminate, give it up to 2 s to
+  // do so, kill what is left of it otherwise, and reap the child. The whole
+  // group is waited for, not only the child: a wrapper script often runs
+  // the program as a child of its own (without exec), and stops at once on
+  // SIGTERM while the program still cleans up
   if (-1 != killpg (pid, SIGTERM)) {
-    for (int i=0; i<50; i++) {
-      if (waitpid (pid, NULL, WNOHANG) != 0) {
-        killpg (pid, SIGKILL);
-        return;
-      }
+    bool reaped= false;
+    for (int i=0; i<200; i++) {
+      if (!reaped && waitpid (pid, NULL, WNOHANG) != 0) reaped= true;
+      if (reaped && killpg (pid, 0) == -1) return;  // the group is gone
       usleep (10000);
     }
     killpg (pid, SIGKILL);
+    if (!reaped) waitpid (pid, NULL, 0);
   }
-  else kill (pid, SIGKILL);
-  waitpid (pid, NULL, 0);
+  else {
+    kill (pid, SIGKILL);
+    waitpid (pid, NULL, 0);
+  }
 }
 #endif
 
@@ -131,6 +139,27 @@ pipe_link_rep::close_fds () {
 #ifndef OS_MINGW
   if (in  != -1) { close (in ); in = -1; }
   if (out != -1) { close (out); out= -1; }
+  if (err != -1) { close (err); err= -1; }
+#endif
+}
+
+void
+pipe_link_rep::close_pipes () {
+  // the descriptors of the pipes which start has not handed over yet
+#ifndef OS_MINGW
+  int* fds[3]= { pp_in, pp_out, pp_err };
+  for (int i= 0; i < 3; i++)
+    for (int j= 0; j < 2; j++)
+      if (fds[i][j] >= 0) { close (fds[i][j]); fds[i][j]= -1; }
+#endif
+}
+
+void
+pipe_link_rep::close_err () {
+  // the end of the errors of a live child, which may close its stderr and
+  // go on (exec 2>/dev/null): only that pipe is closed
+#ifndef OS_MINGW
+  remove_notifier (snerr);
   if (err != -1) { close (err); err= -1; }
 #endif
 }
@@ -169,21 +198,22 @@ process_all_pipes () {
 * Routines for pipe_links
 ******************************************************************************/
 
-#ifndef OS_MINGW
-// NOTE: the same as in cmdline_link.cpp, which is compiled with it without Qt
-static void
-execute_shell (string s) {
-  c_string _s (s);
-  char *argv[4];
-  argv[0] = const_cast<char*> ("sh");
-  argv[1] = const_cast<char*> ("-c");
-  argv[2] = _s;
-  argv[3] = NULL;
-  execve ("/bin/sh", argv, environ);
-}
-#endif
+#if !defined (OS_MINGW) && !defined (__EMSCRIPTEN__)
+// the first words of commands which the shell runs itself
+static const char* shell_words[]= {
+  // reserved words
+  "!", "{", "}", "[[", "]]", "case", "do", "done", "elif", "else", "esac",
+  "fi", "for", "function", "if", "in", "select", "then", "time", "until",
+  "while",
+  // builtins
+  ".", ":", "[", "alias", "bg", "bind", "break", "builtin", "cd", "command",
+  "continue", "declare", "echo", "eval", "exec", "exit", "export", "false",
+  "fc", "fg", "getopts", "hash", "jobs", "kill", "let", "local", "printf",
+  "pwd", "read", "readonly", "return", "set", "shift", "source", "test",
+  "times", "trap", "true", "type", "typeset", "ulimit", "umask", "unalias",
+  "unset", "wait",
+  NULL };
 
-#ifndef OS_MINGW
 static bool
 program_found (string cmd) {
   // Can the program which @cmd runs be started? As for Qt pipes, which
@@ -200,15 +230,16 @@ program_found (string cmd) {
         prog[j] != '.' && prog[j] != '_' && prog[j] != '-' &&
         prog[j] != '+' && prog[j] != '/')
       return true;
-  if (prog == "exec" || prog == "cd" || prog == "eval" || prog == "." ||
-      prog == "command" || prog == "set" || prog == "export" ||
-      prog == "trap" || prog == "ulimit" || prog == "umask")
-    return true;
+  for (int j= 0; shell_words[j] != NULL; j++)
+    if (prog == shell_words[j]) return true;
   if (search_forwards ("/", prog) >= 0) {
     c_string p (prog);
     return access (p, X_OK) == 0;
   }
-  string path= get_env ("PATH");
+  // (when PATH is not set, sh looks in its default path; an empty PATH is
+  // the current directory)
+  const char* env_path= getenv ("PATH");
+  string path= env_path == NULL? string ("/usr/bin:/bin"): string (env_path);
   int k= 0;
   while (k <= N(path)) {
     int e= search_forwards (":", k, path);
@@ -231,21 +262,30 @@ pipe_link_rep::start () {
   // a page has no processes: fork fails, and the pipes, taken for those of
   // a live program, were read again and again (the page froze)
   return "Error: the programs of the plugins do not run in the browser";
-#endif
+#else
   if (!program_found (cmd)) {
     if (DEBUG_IO) debug_io << "Error: cannot start '" << cmd << "'\n";
     return "Error: cannot start application";
   }
 
-  int e1= pipe (pp_in ); (void) e1;
-  int e2= pipe (pp_out); (void) e2;
-  int e3= pipe (pp_err); (void) e3;
+  int* fds[3]= { pp_in, pp_out, pp_err };
+  for (int i= 0; i < 3; i++)
+    if (pipe (fds[i]) != 0) {
+      fds[i][0]= fds[i][1]= -1;
+      close_pipes ();
+      return "Error: cannot start '" * cmd * "' (no pipes)";
+    }
+  // the command for sh, made before fork: the child of a process with
+  // threads may only call async-signal-safe functions (no allocation)
+  c_string _cmd (cmd);
+  char* argv[4];
+  argv[0]= const_cast<char*> ("sh");
+  argv[1]= const_cast<char*> ("-c");
+  argv[2]= _cmd;
+  argv[3]= NULL;
   pid= fork ();
   if (pid < 0) { // no process: not a live program
-    int* fds[3]= { pp_in, pp_out, pp_err };
-    for (int i= 0; i < 3; i++)
-      for (int j= 0; j < 2; j++)
-        if (fds[i][j] >= 0) { close (fds[i][j]); fds[i][j]= -1; }
+    close_pipes ();
     return "Error: cannot start '" * cmd * "'";
   }
   if (pid==0) { // the child
@@ -259,10 +299,8 @@ pipe_link_rep::start () {
     close (pp_out [OUT]);
     dup2  (pp_err [OUT], STDERR);
     close (pp_err [OUT]);
-
-    execute_shell (cmd);
-    exit (127);
-    // exit (system (cmd) != 0);
+    execve ("/bin/sh", argv, environ);
+    _exit (127);
   }
   else { // the main process
     in = pp_in  [OUT];
@@ -271,6 +309,8 @@ pipe_link_rep::start () {
     close (pp_out [OUT]);
     err= pp_err [IN ];
     close (pp_err [OUT]);
+    // (handed over: the numbers are not kept, so never closed again)
+    pp_in[0]= pp_in[1]= pp_out[0]= pp_out[1]= pp_err[0]= pp_err[1]= -1;
 
     alive= true;
     snout = socket_notifier (out, &pipe_callback, this, NULL);
@@ -294,6 +334,7 @@ pipe_link_rep::start () {
         return "Error: the application did not send its usual startup banner";
     }
   }
+#endif
 #else
   return "Error: pipes not implemented";
 #endif
@@ -334,6 +375,7 @@ pipe_link_rep::feed (int channel) {
   if ((!alive) || ((channel != LINK_OUT) && (channel != LINK_ERR))) return;
   int r;
   char tempout[1024];
+  if (channel == LINK_ERR && err == -1) return;
   if (channel == LINK_OUT) r = ::read (out, tempout, 1024);
   else r = ::read (err, tempout, 1024);
   // NOTE: an interrupted read is tried again later; after any other
@@ -341,14 +383,16 @@ pipe_link_rep::feed (int channel) {
   // be reported readable again and again
   if (r == -1 && (errno == EINTR || errno == EAGAIN)) return;
   if (r == -1) io_error << "Read failed for '" << cmd << "'\n";
-  if (r <= 0) {
+  // the end of stderr alone: the child goes on as long as its output
+  if (r <= 0 && channel == LINK_ERR) close_err ();
+  else if (r <= 0) {
     terminate_child (pid);
     alive= false;
     remove_notifier (snout);      
     remove_notifier (snerr);      
     close_fds ();
   }
-  else {
+  else if (r > 0) {
     if (DEBUG_IO) debug_io << debug_io_string (string (tempout, r));
     if (channel == LINK_OUT) outbuf << string (tempout, r);
     else errbuf << string (tempout, r);
@@ -395,7 +439,7 @@ pipe_link_rep::listen (int msecs) {
     fd_set rfds;
     FD_ZERO (&rfds);
     FD_SET (out, &rfds);
-    FD_SET (err, &rfds);
+    if (err != -1) FD_SET (err, &rfds);
     // NOTE: only the time which is left is waited for, and listen (0)
     // checks the pipes once (it is called by each read)
     time_t left= max ((time_t) 0, wait_until - texmacs_time ());
@@ -404,7 +448,8 @@ pipe_link_rep::listen (int msecs) {
     tv.tv_usec = 1000 * (left % 1000);
     int nr= select (max (out, err) + 1, &rfds, NULL, NULL, &tv);
     if (nr > 0 && FD_ISSET (out, &rfds)) feed (LINK_OUT);
-    if (alive && nr > 0 && FD_ISSET (err, &rfds)) feed (LINK_ERR);
+    if (alive && nr > 0 && err != -1 && FD_ISSET (err, &rfds))
+      feed (LINK_ERR);
     if (msecs == 0 || texmacs_time () - wait_until >= 0) break;
   }
 #endif
@@ -446,7 +491,7 @@ void pipe_callback (void *obj, void *info) {
     FD_ZERO (&rfds);
     int max_fd= max (con->err, con->out) + 1;
     FD_SET (con->out, &rfds);
-    FD_SET (con->err, &rfds);
+    if (con->err != -1) FD_SET (con->err, &rfds);
   
     struct timeval tv;
     tv.tv_sec  = 0;
@@ -459,7 +504,7 @@ void pipe_callback (void *obj, void *info) {
       con->feed (LINK_OUT);
       busy= news= true;
     }
-    if (con->alive && FD_ISSET (con->err, &rfds)) {
+    if (con->alive && con->err != -1 && FD_ISSET (con->err, &rfds)) {
       //cout << "pipe_callback ERR" << LF;
       con->feed (LINK_ERR);
       busy= news= true;
