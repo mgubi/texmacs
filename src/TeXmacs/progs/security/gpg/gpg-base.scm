@@ -586,7 +586,7 @@
   (:synopsis "Encrypt and save object @o to @url for @fingerprint")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
          (port (open-output-string)))
-    (pretty-print o port)
+    (write o port)  ; (not pretty-print, which only Guile has)
     (with ret (gpg-string-encrypt-save (get-output-string port)
                                        url fingerprint dir)
       (close-output-port port)
