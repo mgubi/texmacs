@@ -296,6 +296,20 @@ var tmFrame = (function () {
     scrollUp.classList.toggle ('off', strip.scrollTop <= 0);
     scrollDown.classList.toggle ('off', strip.scrollTop + strip.clientHeight >= strip.scrollHeight - 1);
   }
+  // the wheel over the column (or over the tab grown from the folded
+  // column, which is not in it) scrolls the tabs: the page itself does not
+  // (SDL takes the wheel events of the page for TeXmacs)
+  function wheelTabs (e) {
+    if (!strip) return;
+    var d = Math.abs (e.deltaY) >= Math.abs (e.deltaX) ? e.deltaY : e.deltaX;
+    if (e.deltaMode === 1) d *= 16;
+    else if (e.deltaMode === 2) d *= strip.clientHeight;
+    e.preventDefault ();
+    e.stopPropagation ();
+    if (d === 0) return;
+    flyIn (true); hideBalloon ();
+    strip.scrollTop += d;
+  }
   function scrollTabs (dir) {
     var by = Math.max (30, strip.clientHeight - 40) * dir;
     if (strip.scrollBy) strip.scrollBy ({ top: by, behavior: 'smooth' });
@@ -394,6 +408,7 @@ var tmFrame = (function () {
     scrollDown.onclick = function () { scrollTabs (1); };
     strip.addEventListener ('scroll', chevrons);
     window.addEventListener ('resize', chevrons);
+    bar.addEventListener ('wheel', wheelTabs, { passive: false });
     // a press in the column starts no selection of the page (which a drag
     // of a tab or of the edge carried over the canvas, selecting it whole)
     bar.addEventListener ('mousedown', function (e) { if (e.button === 0) e.preventDefault (); });
@@ -471,6 +486,7 @@ var tmFrame = (function () {
     if (!flyout) {
       flyout = el ('div'); flyout.id = 'tm-flyout';
       flyout.addEventListener ('mousedown', function (e) { if (e.button === 0) e.preventDefault (); });
+      flyout.addEventListener ('wheel', wheelTabs, { passive: false });
       flyout.addEventListener ('mouseenter', function () {
         if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; } });
       flyout.addEventListener ('mouseleave', function () {
@@ -484,6 +500,10 @@ var tmFrame = (function () {
     var b = bar.getBoundingClientRect ();
     var r = { left: b.left + tab.offsetLeft, top: b.top + tab.offsetTop - strip.scrollTop,
               width: tab.offsetWidth, height: tab.offsetHeight };
+    // not a tab which the list shows only in part: the grown tab would
+    // cover the chevrons, which bring it into view
+    var sr = strip.getBoundingClientRect ();
+    if (r.top < sr.top - 0.5 || r.top + r.height > sr.bottom + 0.5) { flyIn (true); return; }
     flyout.textContent = '';
     flyout.className = t.active ? 'active' : '';
     var short = el ('span', 'tm-short', initials (t.title));

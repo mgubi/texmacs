@@ -99,7 +99,10 @@ one under the other, in the order of TeXmacs (a tab dragged to another
 place reorders them, here and in TeXmacs by `vue_web_move_tab`, whose
 order also decides which tab follows a closed one), chevrons above and
 below them when they do not fit (they scroll them, the one at an end
-dimmed), "New window" after the last tab; a press in the column starts no
+dimmed; so does the wheel over the column or over a grown tab, which the
+page does not do itself: SDL takes the wheel events of the page; a tab
+which the list shows only in part does not grow, it would cover the
+chevrons), "New window" after the last tab; a press in the column starts no
 selection of the page (a drag carried it over the canvas, selected whole);
 the tabs are labelled with the names of the windows (the title of a
 window on the desktop, and the title of the page for the active one), with
