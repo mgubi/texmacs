@@ -728,6 +728,8 @@ modificationP (tmscm t) {
 
 tree
 var_apply (tree& t, modification m) {
+  TMSCM_ASSERT (is_applicable (t, m), modification_to_tmscm (m), TMSCM_ARG2,
+                "modification-inplace-apply");
   apply (t, copy (m));
   return t;
 }
@@ -773,11 +775,15 @@ branch_patch (array<patch> a) {
 
 tree
 var_clean_apply (tree t, patch p) {
+  TMSCM_ASSERT (is_applicable (p, t), patch_to_tmscm (p), TMSCM_ARG2,
+                "patch-apply");
   return clean_apply (copy (p), t);
 }
 
 tree
 var_apply (tree& t, patch p) {
+  TMSCM_ASSERT (is_applicable (p, t), patch_to_tmscm (p), TMSCM_ARG2,
+                "patch-inplace-apply");
   apply (copy (p), t);
   return t;
 }
