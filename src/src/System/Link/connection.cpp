@@ -97,14 +97,28 @@ connection_rep::start (bool again) {
     if (again && (message == "ok")) {
       beep ();
       (void) connection_retrieve (name, session);
+      // NOTE: a banner may consist of several blocks (e.g. a warning, then
+      // the banner itself); those which follow at once are part of it, and
+      // would otherwise be taken for the answer of the next evaluation.
+      // This is a best effort, on time: the blocks of the output which come
+      // within 100 ms of the previous one, for at most 1 s, are read with
+      // the banner, and a block which comes later is still taken for the
+      // next answer. The error stream does not extend the wait: what the
+      // plugin writes there is not part of the banner.
+      for (int i= 0; i < 10 && ln->alive; i++) {
+        ln->listen (100);
+        if (ln->watch (LINK_OUT) == "") break;
+        (void) connection_retrieve (name, session);
+      }
     }
   }
   tm_out->bof ();
   tm_err->bof ();
   ln->set_command (command (connection_callback, this));
-  if (name == "dynlink") {
-    this->listen ();
+  if (is_tuple (info, "dynlink")) {
+    // NOTE: listen notifies the status once the banner has been read
     status = WAITING_FOR_OUTPUT;
+    this->listen ();
   }
   if (message == "cmdline") {
     tm_out->format= "cmdline-" * name;
@@ -124,10 +138,10 @@ connection_rep::start (bool again) {
 void
 connection_rep::write (string s) {
   shown_partial= "";
-  ln->write (s, LINK_IN);
   tm_out->bof ();
   tm_err->bof ();
   status= WAITING_FOR_OUTPUT;
+  ln->write (s, LINK_IN);
 }
 
 void
@@ -288,6 +302,8 @@ connection_start (string name, string session, bool again) {
         make_dynamic_link (t[1]->label, t[2]->label, t[3]->label, session);
       con= tm_new<connection_rep> (name, session, ln);
     }
+    else if (!is_tuple (t, "cmdline") && !is_tuple (t, "request"))
+      return "Error: unsupported link type for connection " * name;
     con->info= t;
   }
 
@@ -367,23 +383,46 @@ connection_get (string name, string session) {
   return con;
 }
 
+static void
+connection_append (tree& doc, tree next, bool join) {
+  // the answer may come in several reads: the first line of a read
+  // continues the last line of the previous one, with the rule used within
+  // a read (document_append), when both come from the same stream (output
+  // or error); a piece of the other stream in between is not joined
+  if (!is_document (next)) next= tree (DOCUMENT, next);
+  if (join && N(doc) != 0) document_append (doc, next);
+  else doc << A (next);
+}
+
 static tree
 connection_retrieve (string name, string session) {
   // cout << "Retrieve " << name << ", " << session << "\n";
   connection con= connection (name * "-" * session);
   if (is_nil (con)) return "";
   tree doc (DOCUMENT);
+  int last= -1;
   while (true) {
     con->forced_eval= true;
-#ifndef QTTEXMACS
+#if !(defined (QTTEXMACS) && (defined (OS_MINGW) || defined (QTPIPES)))
     perform_select ();
 #endif
     con->forced_eval= false;
-    tree next= connection_read (name, session);
-    if (next == "");
-    else if (is_document (next)) doc << A (next);
-    else doc << next;
+    // as connection_read, but keeping track of the stream which was read
+    con->read (LINK_ERR);
+    tree next= con->tm_err->get ("output");
+    int channel= LINK_ERR;
+    if (next == "") {
+      con->read (LINK_OUT);
+      next= con->tm_out->get ("output");
+      channel= LINK_OUT;
+    }
+    if (next != "") {
+      connection_append (doc, next, channel == last);
+      last= channel;
+    }
     if (con->status == WAITING_FOR_INPUT) break;
+    // a dead connection never completes its answer
+    if (con->status == CONNECTION_DEAD) break;
   }
   if (N(doc) == 0) return "";
   // cout << "Retrieved " << doc << "\n";
@@ -395,7 +434,9 @@ connection_eval (string name, string session, tree t) {
   // cout << "Evaluating " << name << ", " << session << ", " << t << LF;
   connection con= connection_get (name, session);
   if (is_nil (con)) return "";
+  con->forced_eval= true;
   connection_write (name, session, t);
+  con->forced_eval= false;
   return connection_retrieve (name, session);
 }
 
@@ -404,7 +445,9 @@ connection_eval (string name, string session, string s) {
   // cout << "Evaluating " << name << ", " << session << ", " << s << LF;
   connection con= connection_get (name, session);
   if (is_nil (con)) return "";
+  con->forced_eval= true;
   connection_write (name, session, s);
+  con->forced_eval= false;
   return connection_retrieve (name, session);
 }
 
