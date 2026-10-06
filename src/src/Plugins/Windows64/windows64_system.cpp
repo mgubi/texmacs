@@ -401,11 +401,40 @@ void texmacs_init_guile_hooks() {
 #endif
 }
 
+// _wspawnvp joins its arguments with spaces into the command line of the
+// process, which splits it again (CommandLineToArgvW, the C runtime): an
+// argument with a space or a quote must be quoted, else it comes in pieces
+static std::wstring
+quote_argument (const std::wstring& a) {
+  if (!a.empty () && a.find_first_of (L" \t\n\v\"") == std::wstring::npos)
+    return a;
+  std::wstring r= L"\"";
+  size_t i= 0;
+  while (true) {
+    size_t backslashes= 0;
+    while (i < a.size () && a[i] == L'\\') { i++; backslashes++; }
+    if (i == a.size ()) {
+      // before the closing quote, each backslash is doubled
+      r.append (2 * backslashes, L'\\');
+      break;
+    }
+    if (a[i] == L'"')
+      // before a quote, each backslash is doubled and the quote escaped
+      r.append (2 * backslashes + 1, L'\\');
+    else
+      r.append (backslashes, L'\\');
+    r.push_back (a[i]);
+    i++;
+  }
+  r.push_back (L'"');
+  return r;
+}
+
 intptr_t texmacs_spawnvp(int mode, string name, array<string> args) {
   // convert the arguments to a wide string
   std::vector<wchar_t*> wide_args;
   for (int i = 0; i < N(args); i++) {
-    std::wstring wide_arg = texmacs_utf8_to_wide(args[i]);
+    std::wstring wide_arg = quote_argument (texmacs_utf8_to_wide(args[i]));
     wchar_t *c_wide_arg = (wchar_t*)malloc((wide_arg.size() + 1) * sizeof(wchar_t));
     memcpy(c_wide_arg, &wide_arg[0], wide_arg.size() * sizeof(wchar_t));
     c_wide_arg[wide_arg.size()] = 0;
