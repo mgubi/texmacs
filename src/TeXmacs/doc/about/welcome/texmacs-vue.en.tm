@@ -203,6 +203,9 @@
   <paragraph|6 October 2026>
 
   <\itemize>
+    <item>PDF pictures are shown again (they were a question mark since the
+    windows are drawn by the GPU).
+
     <item>The menu <with|font-series|bold|TeXmacs <name|Vue>> says how the
     page draws: with the GPU (<name|WebGL2> and <name|ThorVG>, whose version
     is given with the other libraries) or with <name|MuPDF>, and why.

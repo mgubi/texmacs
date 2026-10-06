@@ -598,6 +598,64 @@ svg_outline_tex_text (string s) {
   return r;
 }
 
+// The first page of the PDF u drawn in a box of w x h points, at scale
+// device pixels per point, as mupdf_render_svg below (a side given as zero
+// taken from the page, the proportions kept, centered, on a transparent
+// ground). The renderer of MuPDF draws a PDF picture itself (draw_scalable,
+// as vectors); the others ask for its pixels (scalable_image_rep::draw),
+// which came from an external converter (image_to_png), and there is none
+// in the browser: the picture was a question mark with the GPU renderer.
+// NULL when the file cannot be read.
+fz_pixmap*
+mupdf_render_pdf (url u, int w, int h, int scale) {
+  fz_context* ctx= mupdf_context ();
+  c_string path (concretize (u));
+  fz_document* doc= NULL;
+  fz_page* page= NULL;
+  fz_device* dev= NULL;
+  fz_pixmap* pix= NULL;
+  if (scale < 1) scale= 1;
+  fz_var (doc);
+  fz_var (page);
+  fz_var (dev);
+  fz_var (pix);
+  fz_try (ctx) {
+    doc= fz_open_document (ctx, path);
+    page= fz_load_page (ctx, doc, 0);
+    fz_rect b= fz_bound_page (ctx, page);
+    float dw= b.x1 - b.x0, dh= b.y1 - b.y0;
+    if (dw <= 0.0f || dh <= 0.0f) fz_throw (ctx, FZ_ERROR_GENERIC, "empty page");
+    if (w <= 0 && h <= 0) { w= (int) (dw + 0.5f); h= (int) (dh + 0.5f); }
+    else if (w <= 0) w= (int) ((dw * h) / dh + 0.5f);
+    else if (h <= 0) h= (int) ((dh * w) / dw + 0.5f);
+    if (w < 1) w= 1;
+    if (h < 1) h= 1;
+    float f= ((float) w) / dw;
+    if (((float) h) / dh < f) f= ((float) h) / dh;
+    pix= fz_new_pixmap (ctx, fz_device_rgb (ctx), w * scale, h * scale, NULL, 1);
+    fz_clear_pixmap (ctx, pix); // transparent
+    fz_matrix m= fz_concat (fz_translate (-b.x0, -b.y0),
+                            fz_concat (fz_scale (f * scale, f * scale),
+                                       fz_translate (0.5f * (w - f * dw) * scale,
+                                                     0.5f * (h - f * dh) * scale)));
+    dev= fz_new_draw_device (ctx, m, pix);
+    fz_run_page (ctx, page, dev, fz_identity, NULL);
+    fz_close_device (ctx, dev);
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_page (ctx, page);
+    fz_drop_document (ctx, doc);
+  }
+  fz_catch (ctx) {
+    fz_drop_pixmap (ctx, pix);
+    pix= NULL;
+    cout << "TeXmacs] MuPDF cannot draw " << concretize (u) << ": "
+         << fz_caught_message (ctx) << LF;
+  }
+  return pix;
+}
+
 // Draw u in a box of w x h points, at scale device pixels per point. A side
 // given as zero is taken from the size the file declares; the drawing keeps
 // its proportions and is centered in the box. NULL when the file cannot be
@@ -726,6 +784,8 @@ mupdf_load_pixmap (url u, int w, int h, tree eff, SI pixel) {
   fz_pixmap* drawn= NULL;
   if (suffix (vec) == "svg" && w > 0 && h > 0)
     drawn= mupdf_render_svg (vec, w, h, 1);
+  else if (locase_all (suffix (u)) == "pdf")
+    drawn= mupdf_render_pdf (u, w, h, 1);
   if (drawn != NULL) return mupdf_apply_effect (drawn, eff, pixel);
 
   fz_image *im = mupdf_load_image (u);
