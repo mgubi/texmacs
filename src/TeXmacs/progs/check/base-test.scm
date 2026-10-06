@@ -73,7 +73,7 @@
   (check= (char->string #\space) " ")
   (check= (char->string e-acute) "\xe9")
   (check= (tm-char-whitespace? #\space) #t)
-  (check= (tm-char-whitespace? #\ht) #t)
+  (check= (tm-char-whitespace? (integer->char 9)) #t)
   (check= (tm-char-whitespace? #\newline) #t)
   (check= (tm-char-whitespace? #\return) #t)
   (check= (tm-char-whitespace? #\a) #f)
@@ -113,7 +113,7 @@
   (check= (string-contains? "" "a") #f)
   (check= (string-contains? "abc" "ac") #f)
   (check= (string-contains? "abc" "abcd") #f)
-  (check= (string-contains? "a\xe9b" "\xe9") #t))
+  (check= (string-contains? "a\xe9z" "\xe9") #t))
 
 ;; string-take and friends count characters; out of range is an error
 (define (test-substrings)
@@ -185,13 +185,13 @@
   (check= (string-join '("" "") ",") ",")
   (check= (string-map char-upcase "abc") "ABC")
   (check= (string-map char-upcase "") "")
-  (check= (string-map (lambda (c) (if (== c #\a) e-acute c)) "aba")
-          "\xe9b\xe9")
+  (check= (string-map (lambda (c) (if (== c #\a) e-acute c)) "aza")
+          "\xe9z\xe9")
   (check= (string-fold cons '() "abc") '(#\c #\b #\a))
   (check= (string-fold cons '() "") '())
   (check= (string-fold-right cons '() "abc") '(#\a #\b #\c))
   (check= (string-fold-right cons '() "") '())
-  (check= (string-fold (lambda (c n) (+ n 1)) 0 "a\xe9b") 3))
+  (check= (string-fold (lambda (c n) (+ n 1)) 0 "a\xe9z") 3))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Splitting and joining
@@ -212,7 +212,7 @@
   (check= (string-tokenize-by-char "" #\,) '(""))
   (check= (string-tokenize-by-char "," #\,) '("" ""))
   (check= (string-tokenize-by-char ",a,,b," #\,) '("" "a" "" "b" ""))
-  (check= (string-tokenize-by-char "a\xe9b\xe9" e-acute) '("a" "b" ""))
+  (check= (string-tokenize-by-char "a\xe9z\xe9" e-acute) '("a" "z" ""))
   (check= (string-tokenize-by-char-n "a:b:c:d" #\: 2) '("a" "b" "c:d"))
   (check= (string-tokenize-by-char-n "a:b:c:d" #\: 1) '("a" "b:c:d"))
   (check= (string-tokenize-by-char-n "a:b" #\: 0) '("a:b"))
@@ -289,7 +289,9 @@
   (check= (symbol-drop 'abc 1) 'bc)
   (check= (symbol-drop 'abc 0) 'abc)
   (check= (symbol-drop-right 'abc 1) 'ab)
-  (check= (symbol-drop-right 'abc 3) (string->symbol ""))
+  ;; s7 has no empty symbol (see docs/s7/04-progs-changes.md)
+  (when (not (s7-scheme?))
+    (check= (symbol-drop-right 'abc 3) (string->symbol "")))
   (check-error (symbol-drop 'abc 4) #t))
 
 (define (test-functions)
@@ -302,6 +304,26 @@
   (check= ((non <) 1 2) #f)
   (check= ((non <) 2 1) #t)
   (check= ((non (lambda () #f))) #t))
+
+;; Guile's curried define, which the TeXmacs code uses (the vendored s7 is
+;; patched for it)
+(define ((base-test-adder a) b) (+ a b))
+(define (((base-test-adder3 a) b) . l) (apply + a b l))
+
+(define (base-test-curried-twice k l)
+  (define ((scale k) x) (* k x))
+  (define (walk l) (if (null? l) '() (cons ((scale k) (car l)) (walk (cdr l)))))
+  (walk (cdr l)))
+
+(define (test-curried-define)
+  (check-group "curried define")
+  (check= ((base-test-adder 1) 2) 3)
+  (check= (map (base-test-adder 10) '(1 2)) '(11 12))
+  (check= (((base-test-adder3 1) 2) 3 4) 10)
+  (check= (((base-test-adder3 1) 2)) 3)
+  (check= (let () (define ((mul a) b) (* a b)) ((mul 6) 7)) 42)
+  (check= (base-test-curried-twice 2 '(0 1 2)) '(2 4))
+  (check= (base-test-curried-twice 3 '(0 1 2)) '(3 6)))
 
 ;; object->string* writes the kinds of data it knows and #f for others
 (define (test-objects)
@@ -428,8 +450,15 @@
     (check= (ahash-size h) 5)
     (ahash-set! h 'f #f)
     (check= (ahash-ref h 'f) #f)
-    (check= (ahash-get-handle h 'f) '(f . #f))
-    (check= (ahash-size h) 6))
+    ;; storing #f in an s7 hash table removes the key, or does not add it
+    ;; (see docs/s7/03-compat-layer.md)
+    (if (s7-scheme?)
+        (begin
+          (check= (ahash-get-handle h 'f) #f)
+          (check= (ahash-size h) 5))
+        (begin
+          (check= (ahash-get-handle h 'f) '(f . #f))
+          (check= (ahash-size h) 6))))
   (let ((h (make-abc)))
     (check-true (ahash-remove! h 'b))
     (check= (ahash-ref h 'b) #f)
@@ -572,6 +601,7 @@
   (test-alists)
   (test-symbols)
   (test-functions)
+  (test-curried-define)
   (test-objects)
   (test-urls)
   (test-output)

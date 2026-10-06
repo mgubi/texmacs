@@ -393,9 +393,12 @@
          (off (export doc "html-document" (cons "texmacs->html:css" "off"))))
     (check-true (string-starts? on "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"))
     (check-true (contains? on "<!DOCTYPE html"))
-    (check-true (contains? on "<html xmlns=\"http://www.w3.org/1999/xhtml\""))
+    ;; the order of the attributes depends on the interpreter
+    (check-true (contains? on "<html "))
+    (check-true (contains? on " xmlns=\"http://www.w3.org/1999/xhtml\""))
     (check-true (contains? on "<title>No title</title>"))
-    (check-true (contains? on "<meta charset=\"utf-8\""))
+    (check-true (contains? on "<meta "))
+    (check-true (contains? on " charset=\"utf-8\""))
     (check-true (contains? (squash on) "<body><p>Caf&eacute;</p><p><i>i</i></p></body>"))
     (check-true (contains? on "</html>"))
     ;; the style sheet is written with and without css
