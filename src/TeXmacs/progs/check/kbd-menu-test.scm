@@ -527,6 +527,7 @@
 ;; The bindings of the suite are on A-F12, which TeXmacs does not use;
 ;; the last ones apply only while kbd-test-on? holds.
 (define kbd-test-on? #f)
+(define (kbd-test-condition?) kbd-test-on?)
 
 (define (test-kbd-map)
   (check-group "kbd-map")
@@ -610,6 +611,11 @@
   (kbd-unmap (:require kbd-test-on?) "A-F12 j var" "A-F12 j")
   (check-false (text-binding "A-F12 j"))
   (check-false (text-binding "A-F12 j var"))
+  ;; a bare predicate is a condition, for kbd-unmap as for kbd-map
+  (kbd-map kbd-test-condition? ("A-F12 m" "m1"))
+  (check= (text-binding "A-F12 m") "m1")
+  (kbd-unmap kbd-test-condition? "A-F12 m")
+  (check-false (text-binding "A-F12 m"))
   (set! kbd-test-on? #f))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

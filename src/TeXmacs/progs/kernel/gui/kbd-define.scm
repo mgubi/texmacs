@@ -265,7 +265,7 @@
 (define (kbd-remove-body conds l)
   (cond ((null? l) '())
 	((symbol? (car l))
-	 (kbd-remove-body (list 0 (car l)) (cdr l)))
+	 (kbd-remove-body (ctx-add-condition conds 0 (car l)) (cdr l)))
 	((and (pair? (car l)) (keyword? (caar l)))
 	 (kbd-remove-body (kbd-add-condition conds (car l)) (cdr l)))
 	(else (map (lambda (x) (kbd-remove-one conds x)) l))))
