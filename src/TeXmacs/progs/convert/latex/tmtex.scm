@@ -528,6 +528,16 @@
          (cons (list (string->symbol " ")) (tmtex-text-list-space (cdr l))))
         (else (tmtex-text-list l))))
 
+;; the UTF-8 characters of the Cork character c. Cork and UTF-8 coincide on the
+;; printable ASCII characters, except the backquote (a left quote in Cork):
+;; they need no conversion, which the text and math exports did for every
+;; character (a call of string-convert per character)
+(define (tmtex-cork-char->utf8 c)
+  (let ((i (char->integer c)))
+    (if (and (>= i 32) (< i 127) (!= i 96))
+        (list c)
+        (string->list (string-convert (char->string c) "Cork" "UTF-8")))))
+
 (define (tmtex-text-list l)
   (if (null? l) l
       (let ((c (car l)))
@@ -565,8 +575,7 @@
               (else
                 (append
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (tmtex-text-list (cdr l))))))))
 
@@ -601,8 +610,7 @@
               (else
                 (with c
                   (if (or tmtex-use-unicode? tmtex-use-ascii?)
-                      (string->list (string-convert (char->string c)
-                                                    "Cork" "UTF-8"))
+                      (tmtex-cork-char->utf8 c)
                       (list c))
                   (append c (tmtex-math-list (cdr l)))))))))
 
