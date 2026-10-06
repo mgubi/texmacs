@@ -26,7 +26,8 @@
   it again. The chevron at the
   bottom of the column folds it, to leave more room to the document: the
   column then keeps the logo and small tabs with the initials of the
-  windows, whose names show when the mouse is over them; the browser
+  windows; under the mouse, a small tab grows into a whole one, with the
+  name of its window and a cross to close it; the browser
   remembers it. The dialogs of <TeXmacs> float over the page, and can be
   moved by their title bar and resized by their edges.
 
@@ -202,8 +203,8 @@
   <\itemize>
     <item>The tabs of the windows are in a column at the left of the page,
     which leaves the whole height to the document; the column folds to
-    small tabs with the initials of the windows, whose names show when the
-    mouse is over them. Its right edge changes its width, and folds the
+    small tabs with the initials of the windows, which grow into whole
+    tabs (the name and a cross to close the window) under the mouse. Its right edge changes its width, and folds the
     column when it is dragged far enough to the left.
 
     <item>The document no longer flickers or jumps while the page or the

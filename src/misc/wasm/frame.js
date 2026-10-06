@@ -1,8 +1,8 @@
 // The frame of the page (a --pre-js of the browser build): a column at the
 // left of the canvas with a TeXmacs menu and the tabs of the windows of
 // TeXmacs. The column folds down to the logo and small tabs (the initials
-// of the windows, their names in a balloon over them), which the browser
-// remembers (localStorage).
+// of the windows, which grow into whole tabs under the mouse), which the
+// browser remembers (localStorage).
 //
 // In the browser every window of an editor is a tab (see "Single-window
 // mode" in src/Plugins/Vue/vue_gui.cpp): the plugin tells the frame of the
@@ -78,6 +78,23 @@ var tmFrame = (function () {
     #tm-frame.collapsed .tm-new, #tm-frame.collapsed .tm-fold { padding:0; justify-content:center }
     #tm-frame.collapsed .tm-new .tm-plus { margin:0 }
     #tm-frame.collapsed .tm-new .tm-label { display:none }
+    #tm-frame.collapsed .tm-tab { transition:transform .16s ease-out; transform-origin:left center }
+    #tm-flyout { position:fixed; z-index:36; display:none; align-items:center; overflow:hidden;
+      white-space:nowrap; box-sizing:border-box; border-radius:6px; background:#ececec;
+      box-shadow:0 3px 14px rgba(0,0,0,.28), inset 0 0 0 1px #b4b4b4; color:#222;
+      font:13px -apple-system,"Fira Sans",Helvetica,sans-serif; cursor:default; user-select:none;
+      transition:width .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s }
+    #tm-flyout.active { background:#f8f8f8 }
+    #tm-flyout .tm-short { flex:none; text-align:center; font-size:11.5px; font-weight:600;
+      letter-spacing:.2px; position:relative }
+    #tm-flyout .tm-dot { position:absolute; top:-6px; right:2px; width:6px; height:6px;
+      border-radius:3px; background:#5b7fa8 }
+    #tm-flyout .tm-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+      padding:0 4px 0 2px; opacity:0; transition:opacity .15s .05s }
+    #tm-flyout.open .tm-title { opacity:1 }
+    #tm-flyout .tm-close { flex:none; width:20px; height:20px; line-height:20px; margin-right:4px;
+      text-align:center; border-radius:4px; color:#555 }
+    #tm-flyout .tm-close:hover { background:#c4c4c4; color:#000 }
     #tm-balloon { position:fixed; z-index:35; padding:4px 9px; border-radius:5px; background:#333;
       color:#fff; font:12.5px -apple-system,"Fira Sans",Helvetica,sans-serif; white-space:nowrap;
       pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.25); max-width:60vw; overflow:hidden;
@@ -296,14 +313,16 @@ var tmFrame = (function () {
   // follows the size of the canvas when the window is resized)
   function setFolded (on, remember) {
     if (!bar) return;
+    flyIn (true);
     bar.classList.toggle ('collapsed', on);
     fold.innerHTML = svg (on ? UNFOLD_ICON : FOLD_ICON);
     if (remember) try { localStorage.setItem (FOLD, on ? 'collapsed' : 'expanded'); } catch (e) {}
     resized ();
   }
 
-  // the balloon of an element of the column, at its right: the names of the
-  // windows when the column is folded (text () gives it, or nothing)
+  // the balloon of an element of the column, at its right (text () gives
+  // it, or nothing): the buttons of the folded column, the names which do
+  // not fit in the open one
   function hover (e, text) {
     e.addEventListener ('mouseenter', function () {
       var t = text ();
@@ -330,10 +349,92 @@ var tmFrame = (function () {
     return words.slice (0, 2).map (function (w) { return w.charAt (0).toUpperCase (); }).join ('');
   }
 
+  // In the folded column a tab under the mouse grows to the right, over the
+  // document, into a whole tab: its initials, its name and its close box
+  // (a click on it shows the window). Its neighbours swell a little, more
+  // the nearer they are, as the icons of a dock. The tab is drawn by an
+  // element of its own (#tm-flyout), which the column does not clip.
+  var flyout = null, flyTimer = null;
+  function flyOut (tab, t, name) {
+    if (!bar.classList.contains ('collapsed')) return;
+    if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
+    if (!flyout) {
+      flyout = el ('div'); flyout.id = 'tm-flyout';
+      flyout.addEventListener ('mouseenter', function () {
+        if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; } });
+      flyout.addEventListener ('mouseleave', function () {
+        if (flyTimer) clearTimeout (flyTimer);
+        flyTimer = setTimeout (function () { flyTimer = null; flyIn (false); }, 120);
+      });
+      document.body.appendChild (flyout);
+    }
+    // its place without the swelling (offsets, in the column, which is
+    // positioned, minus the scroll of the tabs)
+    var b = bar.getBoundingClientRect ();
+    var r = { left: b.left + tab.offsetLeft, top: b.top + tab.offsetTop - strip.scrollTop,
+              width: tab.offsetWidth, height: tab.offsetHeight };
+    flyout.textContent = '';
+    flyout.className = t.active ? 'active' : '';
+    var short = el ('span', 'tm-short', initials (t.title));
+    short.style.width = r.width + 'px';
+    if (t.modified) short.appendChild (el ('span', 'tm-dot'));
+    flyout.appendChild (short);
+    flyout.appendChild (el ('span', 'tm-title', name));
+    if (tabs.length > 1) {
+      var x = el ('span', 'tm-close', '×');
+      x.title = 'Close';
+      x.onmousedown = function (e) { e.stopPropagation (); };
+      x.onclick = function (e) { e.stopPropagation (); flyIn (true); _vue_web_close_tab (t.id); };
+      flyout.appendChild (x);
+    }
+    flyout.onclick = function () { flyIn (true); _vue_web_activate_tab (t.id); };
+    flyout.onmousedown = function (e) {
+      if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) { flyIn (true); _vue_web_close_tab (t.id); } }
+    };
+    flyout.style.transition = 'none';
+    flyout.style.left = r.left + 'px';
+    flyout.style.top = r.top + 'px';
+    flyout.style.height = r.height + 'px';
+    flyout.style.width = r.width + 'px';
+    flyout.style.display = 'flex';
+    // the width of its contents (the name may shrink: its own scroll width
+    // is the whole of it), then the tab grows to it
+    var title = flyout.querySelector ('.tm-title'), close = flyout.querySelector ('.tm-close');
+    var wide = r.width + title.scrollWidth + 6 + (close ? close.offsetWidth + 6 : 10);
+    var most = Math.max (r.width, Math.min (340, window.innerWidth - r.left - 8));
+    flyout.getBoundingClientRect ();
+    flyout.style.transition = '';
+    flyout.style.width = Math.min (wide, most) + 'px';
+    flyout.classList.add ('open');
+    magnify (tab);
+  }
+  // the tab back into the column (at once when the tabs change)
+  function flyIn (now) {
+    if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
+    magnify (null);
+    if (!flyout || flyout.style.display === 'none') return;
+    if (now) { flyout.style.display = 'none'; return; }
+    flyout.classList.remove ('open');
+    flyout.style.width = flyout.querySelector ('.tm-short').style.width;
+    var f = flyout;
+    setTimeout (function () { if (!f.classList.contains ('open')) f.style.display = 'none'; }, 200);
+  }
+  // the neighbours of the tab under the mouse a little larger
+  function magnify (tab) {
+    if (!strip) return;
+    var all = Array.prototype.slice.call (strip.querySelectorAll ('.tm-tab'));
+    var i = tab ? all.indexOf (tab) : -1;
+    all.forEach (function (e, k) {
+      var d = Math.abs (k - i), s = (i < 0 || d === 0) ? 1 : d === 1 ? 1.14 : d === 2 ? 1.06 : 1;
+      e.style.transform = s === 1 ? '' : 'scale(' + s + ')';
+    });
+  }
+
   function render () {
     build ();
     if (!strip) return;
     hideBalloon ();
+    flyIn (true);
     strip.textContent = '';
     tabs.forEach (function (t) {
       var tab = el ('div', 'tm-tab' + (t.active ? ' active' : '') + (t.modified ? ' modified' : ''));
@@ -342,13 +443,14 @@ var tmFrame = (function () {
       tab.appendChild (el ('span', 'tm-title', name));
       tab.appendChild (el ('span', 'tm-short', initials (t.title)));
       tab.appendChild (el ('span', 'tm-dot'));
-      // the name in a balloon when the column is folded, or when it does
-      // not fit in the tab
+      // the name in a balloon when it does not fit in the open column; in
+      // the folded column the tab grows into a whole one (see flyOut)
       hover (tab, function () {
         var title = tab.querySelector ('.tm-title');
-        return (bar.classList.contains ('collapsed') ||
+        return (!bar.classList.contains ('collapsed') &&
                 title.scrollWidth > title.clientWidth) ? name : '';
       });
+      tab.addEventListener ('mouseenter', function () { flyOut (tab, t, name); });
       tab.onclick = function () { _vue_web_activate_tab (t.id); };
       tab.onmousedown = function (e) {
         if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) _vue_web_close_tab (t.id); }
