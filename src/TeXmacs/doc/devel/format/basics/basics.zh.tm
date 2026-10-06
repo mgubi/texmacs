@@ -12,15 +12,15 @@
 
     <branch|\<#9ED8\>\<#8BA4\>\<#5E8F\>\<#5217\>\<#5316\>|tm-tm.zh.tm>
 
-    <branch|XML \<#5E8F\>\<#5217\>\<#5316\>|tm-tmml.zh.tm>
+    <branch|XML \<#5E8F\>\<#5217\>\<#5316\>|tm-tmml.en.tm>
 
-    <branch|<scheme> \<#5E8F\>\<#5217\>\<#5316\>|tm-scm.zh.tm>
+    <branch|<scheme> \<#5E8F\>\<#5217\>\<#5316\>|tm-scm.en.tm>
 
     <branch|\<#6392\>\<#7248\>\<#8FC7\>\<#7A0B\>|typesetting.zh.tm>
 
-    <branch|\<#6570\>\<#636E\>\<#5173\>\<#7CFB\>\<#63CF\>\<#8FF0\>|tm-drd.zh.tm>
+    <branch|\<#6570\>\<#636E\>\<#5173\>\<#7CFB\>\<#63CF\>\<#8FF0\>|tm-drd.en.tm>
 
-    <branch|\<#6807\>\<#51C6\>\<#957F\>\<#5EA6\>\<#5355\>\<#4F4D\>|lengths.zh.tm>
+    <branch|\<#6807\>\<#51C6\>\<#957F\>\<#5EA6\>\<#5355\>\<#4F4D\>|lengths.en.tm>
   </traverse>
 
   <tmdoc-copyright|2004|Joris van der Hoeven>

@@ -228,11 +228,17 @@ tex_rubber_font_rep::get_extents (string s, metric& ex) {
 
 void
 tex_rubber_font_rep::draw_raw (renderer ren, int c, SI x, SI& y, SI& real_y) {
-  ren->draw (c, pk, x, y);
-  SI delta  = conv (tfm->h (c)+ tfm->d (c));
+  // y is the top of the piece; its baseline lies tfm->h (c) below
+  // (consistent with get_partial_extents and with TeX's own assembly)
   SI pixel  = ren->pixel;
-  y        -= pixel * (delta/pixel);
-  real_y   -= delta;
+  SI height = conv (tfm->h (c));
+  y        -= pixel * (height/pixel);
+  real_y   -= height;
+  while (y >= real_y + pixel) y -= pixel;
+  ren->draw (c, pk, x, y);
+  SI depth  = conv (tfm->d (c));
+  y        -= pixel * (depth/pixel);
+  real_y   -= depth;
   while (y >= real_y + pixel) y -= pixel;
 }
 

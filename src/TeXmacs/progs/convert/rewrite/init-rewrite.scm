@@ -118,9 +118,12 @@
          (enc (or (assoc-ref opts "texmacs->verbatim:encoding") "auto")))
     (if (or (== (get-env "mode") "prog") (== (get-env "font-family") "tt"))
         ;; FIXME: dirty hacks for "copy to verbatim" of code snippets
+        ;; (the backquote, and ... which is not an ellipsis in code, as
+        ;; \foreach \x in {0,...,5} of TikZ)
         (let ((conv (cpp-texmacs->verbatim x #f enc))
-              (tick (cpp-texmacs->verbatim (tm->tree "`") #f enc)))
-          (string-replace conv tick "`"))
+              (tick (cpp-texmacs->verbatim (tm->tree "`") #f enc))
+              (dots (cpp-texmacs->verbatim (tm->tree "...") #f enc)))
+          (string-replace (string-replace conv tick "`") dots "..."))
         (cpp-texmacs->verbatim x wrap? enc))))
 
 (tm-define (verbatim->texmacs x . opts)

@@ -6,9 +6,9 @@
   <expand|tmdoc-title|Headers and footers>
 
   <\traverse>
-    <apply|branch|Running headers and footers|header-dtd.en.tm>
+    <apply|branch|Running headers and footers|header-dtd.pt.tm>
 
-    <apply|branch|Titles|header-title-dtd.en.tm>
+    <apply|branch|Titles|header-title-dtd.pt.tm>
   </traverse>
 
   <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>

@@ -284,7 +284,11 @@
         (check= (env-at "math-display" 4 0 0) "true")
         (check= (env-at "equation-nr" 4 0 0) "1")
         (check= (env-at "equation-nr" 6 0) "2")))
-     (check= (get-style-list) '("generic" "british"))
+     ;; the language package of the locale (buffer-set-default-style), none
+     ;; for English
+     (with lan (get-preference "language")
+       (check= (get-style-list)
+               (if (== lan "english") '("generic") (list "generic" lan))))
      (check= (get-init "font-base-size") "10")
      (check= (env-at "mode" 2 1) "text")
      (check= (env-at "par-mode" 3 4 0 1) "center")

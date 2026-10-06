@@ -41,6 +41,7 @@ RESOURCE(smart_map);
 #define REWRITE_UPRIGHT         9
 #define REWRITE_ITALIC         10
 #define REWRITE_IGNORE         11
+#define REWRITE_CORK           12
 
 struct smart_map_rep: rep<smart_map> {
   int chv[256];
@@ -486,7 +487,7 @@ get_unicode_range (string c) {
 bool
 in_unicode_range (string c, string range) {
   string uc= strict_cork_to_utf8 (c);
-  if (N(uc) == 0) return "";
+  if (N(uc) == 0) return false;
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
   string got= get_unicode_range (code);
@@ -887,6 +888,8 @@ rewrite (string s, int kind) {
     return substitute_italic (s);
   case REWRITE_IGNORE:
     return "";
+  case REWRITE_CORK:
+    return utf8_to_cork (strict_cork_to_utf8 (s));
   default:
     return s;
   }
@@ -970,7 +973,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
         else if (N(wanted) > 0 && wanted[0] == '!' &&
-                 !in_collection (c, wanted)) ok= true;
+                 !in_collection (c, wanted (1, N(wanted)))) ok= true;
         else {
           array<string> w= tokenize (v[j], ":");
           if (N(w) == 1) w << w[0];
@@ -1098,7 +1101,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
     int a= attempt - 1;
     string v;
     if (range == "") v= variant;
-    else if (v == "rm") v= range;
+    else if (variant == "rm") v= range;
     else v= variant * "-" * range;
     font cfn= closest_font (fam, v, series, rshape, sz, dpi, a);
     //cout << "Trying " << c << " in " << cfn->res_name << "\n";
@@ -1189,6 +1192,27 @@ smart_font_rep::resolve (string c) {
   //     << ", " << series << ", " << shape << ", " << rshape
   //     << "; " << fn[SUBFONT_MAIN]->res_name << "; " << math_kind << "\n";
   array<string> a= trimmed_tokenize (family, ",");
+
+  if (starts (c, "<#") && ends (c, ">")) {
+    // a code point with a Cork equivalent in the upper half of the Cork
+    // encoding (e.g. <#E9>, the byte for e acute) is drawn with the font
+    // and glyph of the typed character; not below 128, where Unicode fonts
+    // read the bytes as ASCII (the Cork quotes ` and ' are curly in TeX
+    // fonts, grave and straight in Unicode fonts)
+    string cc= rewrite (c, REWRITE_CORK);
+    if (N(cc) == 1 && ((unsigned char) cc[0]) >= 128 &&
+        strict_cork_to_utf8 (cc) == strict_cork_to_utf8 (c)) {
+      int cnr= sm->chv[(int) (unsigned char) cc[0]];
+      if (cnr == -1) cnr= resolve (cc);
+      if (cnr >= 0 && cnr != SUBFONT_ERROR &&
+          sm->fn_rewr[cnr] == REWRITE_NONE) {
+        tree key= tuple ("cork", as_string (cnr));
+        int nr= sm->add_font (key, REWRITE_CORK);
+        initialize_font (nr);
+        return sm->add_char (key, c);
+      }
+    }
+  }
 
   if (math_kind != 0) {
     string upc= substitute_upright (c);
@@ -1311,6 +1335,11 @@ smart_font_rep::initialize_font (int nr) {
     fn[nr]= adjust_subfont (get_math_font (a[1], a[2], a[3], a[4]));
   else if (a[0] == "cyrillic")
     fn[nr]= adjust_subfont (get_cyrillic_font (a[1], a[2], a[3], a[4]));
+  else if (a[0] == "cork") {
+    int cnr= as_int (a[1]);
+    initialize_font (cnr);
+    fn[nr]= fn[cnr];
+  }
   else if (a[0] == "greek")
     fn[nr]= adjust_subfont (get_greek_font (a[1], a[2], a[3], a[4]));
   else if (a[0] == "subfont")

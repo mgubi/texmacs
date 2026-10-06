@@ -238,13 +238,32 @@ var_cork_to_sourcecode (string s) {
   return r;
 }
 
+static string
+cork_to_latin1 (string s) {
+  string u= var_cork_to_utf8 (s), r;
+  for (int i=0; i<N(u); ) {
+    unsigned int code= decode_from_utf8 (u, i);
+    if (code < 256) r << ((char) code);
+    else r << '?';
+  }
+  return r;
+}
+
+static string
+latin1_to_cork (string s) {
+  string u;
+  for (int i=0; i<N(s); i++)
+    u << encode_as_utf8 ((unsigned int) (unsigned char) s[i]);
+  return utf8_to_cork (u);
+}
+
 string
 tree_to_verbatim (tree t, bool wrap, string enc) {
   if (enc == "default") enc= "auto";
   string buf= as_verbatim (t, wrap);
   if (enc == "auto")
     enc= get_locale_charset ();
-  if (enc == "iso-8859-1" || enc == "ISO-8859-1") buf= tm_decode (buf);
+  if (enc == "iso-8859-1" || enc == "ISO-8859-1") buf= cork_to_latin1 (buf);
   else if (enc == "SourceCode") buf= var_cork_to_sourcecode (buf);
   else if (enc != "cork" && enc != "Cork") buf= var_cork_to_utf8 (buf);
 #ifdef OS_WIN32
@@ -279,7 +298,8 @@ static string
 encode (string s, string enc) {
   if (enc == "auto") return western_to_cork (s);
   else if (enc == "utf-8") return utf8_to_cork (s);
-  else if (enc == "iso-8859-1") return tm_encode (s);
+  else if (enc == "iso-8859-1" || enc == "ISO-8859-1")
+    return latin1_to_cork (s);
   else if (enc == "SourceCode") return sourcecode_to_cork(s);
   else return tm_encode (s);
 }

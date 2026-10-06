@@ -223,7 +223,6 @@
   (ahash-entries t)))
 
 (tm-define (tm-gpg-collect-public-keys-from-buffer)
-  (:secure #t)
   (:synopsis "Collect public keys from buffer")
   (let* ((fingerprints (get-new-key-fingerprints-from-buffer))
 	 (ckeys (gpg-get-ahash-table-attachment "gpg"))
@@ -421,12 +420,12 @@
 
 (define (gpg-executable-delete-public-key fingerprint homedir)
   (append (gpg-executable-default homedir)
-          (list "--quiet" "--yes" "--delete-public-key" fingerprint)))
+          (list "--quiet" "--yes" "--delete-keys" fingerprint)))
 
 (tm-define (gpg-delete-public-key fingerprint . homedir)
   (:synopsis "Delete GnuPG public key of fingerprint @fingerprint")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (cmd (gpg-executable-delete-secret-and-public-key fingerprint dir))
+         (cmd (gpg-executable-delete-public-key fingerprint dir))
          (ret (evaluate-system cmd '() '() '(1 2))))
     (or (== (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret)))))
@@ -461,7 +460,10 @@
 (tm-define (gpg-encrypt data rcps . homedir)
   (:synopsis "GnuPG encrypt string @data for recipient fingerprint list @rcps") 
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (rcps-args (map (lambda (x) (string-append "-r " x)) rcps))
+         ;; (each word an argument of its own: with "-r fpr" or " fpr" the
+         ;; argument is not the fingerprint; gpg of Unix takes them, that of
+         ;; Windows not)
+         (rcps-args (append-map (lambda (x) (list "-r" x)) rcps))
          (cmd (gpg-executable-encrypt rcps-args dir))
          (ret (evaluate-system cmd '(0) (list data) '(1 2))))
     (if (!= (car ret) "0")
@@ -515,9 +517,7 @@
 (tm-define (gpg-export-public-keys fingerprints . homedir)
   (:synopsis "Export GnuPG public keys of fingerprint in the given list")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (fingerprints-args
-          (map (lambda (x) (string-append " " x)) fingerprints))
-         (cmd (gpg-executable-export-public-keys fingerprints-args dir))
+         (cmd (gpg-executable-export-public-keys fingerprints dir))
          (ret (evaluate-system cmd '() '() '(1 2))))
     (if (!= (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret))
@@ -534,9 +534,7 @@
 (tm-define (gpg-export-secret-keys fingerprints . homedir)
   (:synopsis "Export GnuPG secret keys of fingerprint in the given list")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (fingerprints-args
-          (map (lambda (x) (string-append " " x)) fingerprints))
-         (cmd (gpg-executable-export-secret-keys fingerprints-args dir))
+         (cmd (gpg-executable-export-secret-keys fingerprints dir))
          (ret (evaluate-system cmd '() '() '(1 2))))
     (if (!= (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret))

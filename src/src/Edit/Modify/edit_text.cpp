@@ -290,7 +290,7 @@ edit_text_rep::make_space (tree u) {
   for (i=0; i<n; i++) {
     if (!flag) break;
     string u1= get_unit (t[i]);
-    string u2= get_unit (t[0]);
+    string u2= get_unit (u[i]);
     double x1= as_double (get_quantity (t[i]));
     double x2= as_double (get_quantity (u[i]));
     flag= flag && (u1==u2) && ((x1*x2)>0);

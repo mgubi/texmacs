@@ -78,8 +78,6 @@ tm_link make_cmdline_link (string name);
 tm_link make_request_link (string name);
 tm_link make_pipe_link (string cmd);
 tm_link make_dynamic_link (string lib, string symb, string init, string ses);
-tm_link make_socket_link (string h, int p, int t,
-			  int fd, tm_contact contact);
 tm_link make_socket_server (int port);
 tm_link find_socket_link (int fd);
 
