@@ -1072,8 +1072,8 @@
                               "echo after\n")
                (url-append pipes-dir "wrapper.sh")))
 
-(define saved-reconfigure-flag* reconfigure-flag?)
-(set! reconfigure-flag? #t)
+(define saved-reconfigure-flag* (plugin-reconfigure?))
+(plugin-reconfigure-set! #t)  ; (not set!, which S7 does not pass on)
 
 (plugin-configure tmtestwrapper
   (:launch ,(string-append "sh '" (pipes-file "wrapper.sh") "'"))
@@ -1097,7 +1097,7 @@
   (:launch "sh -c \"exec 2>/dev/null; printf '\\002verbatim:ready\\005'; exec cat\"")
   (:serializer ,raw-serialize))
 
-(set! reconfigure-flag? saved-reconfigure-flag*)
+(plugin-reconfigure-set! saved-reconfigure-flag*)
 
 (define (test-pipes)
   (check-group "pipes: processes")
