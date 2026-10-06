@@ -39,6 +39,8 @@
 
     <branch|Images, pictures and PDF output|images.en.tm>
 
+    <branch|PDF export|pdf-export.en.tm>
+
     <branch|Languages, hyphenation and spell checking|language.en.tm>
   </traverse>
 

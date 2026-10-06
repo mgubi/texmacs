@@ -9,7 +9,8 @@
   How the printers are created and how pages are drawn is explained in
   <hlink|renderers at work|renderer-pipeline.en.tm>, and the general
   structure of the <abbr|PDF> renderer in <hlink|implementations, new
-  renderers and pitfalls|renderer-backends.en.tm>. This page describes how
+  renderers and pitfalls|renderer-backends.en.tm> and in <hlink|PDF
+  export|pdf-export.en.tm>. This page describes how
   images end up in the output files, and how <TeXmacs> documents are
   embedded in, and recovered from, <abbr|PDF> files.
 

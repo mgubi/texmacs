@@ -353,7 +353,7 @@
   modification carries the author of the editor, in which case it moves the
   cursor or restores the selection.
 
-  <section|Undo, redo and the \Pmodified\Q status><label|sec-undo>
+  <section|Undo, redo and the \Pmodified\Q status><label|sec-editor-undo>
 
   Each editor owns an <cpp|archiver> (<source-link|Data/History/archiver.hpp|src/Data/History/archiver.hpp>),
   created with the author identifier of the editor and the root path of the
@@ -398,6 +398,9 @@
   <cpp|archiver_rep::undo> keeps undoing steps until it has undone one of its
   own author. The whole history of all archivers is cleared with
   <cpp|clear_undo_history> (<cpp|global_clear_history>).
+
+  The history, authors, markers and the modified state are described in
+  detail in <hlink|undo, redo and the modification history|undo.en.tm>.
 
   The archiver also implements the \Pmodified\Q status of a buffer. It
   remembers the depth of the archive at the last save and autosave; after

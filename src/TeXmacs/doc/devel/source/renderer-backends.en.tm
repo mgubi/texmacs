@@ -108,6 +108,10 @@
 
   <subsection|The <abbr|PDF> renderer>
 
+  The whole export path, the fonts and the text layer, links, bookmarks
+  and metadata are described in more detail in <hlink|PDF
+  export|pdf-export.en.tm>.
+
   <cpp|pdf_hummus_renderer_rep> writes <abbr|PDF> through the
   <name|PDFHummus> library (a <cpp|PDFWriter>, the current <cpp|PDFPage> and
   <cpp|PageContentContext>). Unlike the screen renderers it keeps the
