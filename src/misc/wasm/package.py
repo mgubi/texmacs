@@ -38,7 +38,7 @@ EXCLUDE = ['bin', 'plugins/*/bin', 'plugins/*/doc', 'misc/images/windows',
 # the documentation of the plugins which work in the browser, kept although
 # that of the others is not (in the package doc)
 PLUGIN_DOCS = ['plugins/tikz/doc', 'plugins/javascript/doc', 'plugins/asymptote/doc',
-               'plugins/ai/doc']
+               'plugins/ai/doc', 'plugins/python/doc', 'plugins/r/doc']
 
 BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/',
                'langs/encoding/', 'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/',

@@ -766,7 +766,9 @@ port of the server which does the TLS.
 ## The files of TeXmacs in the page
 
 `misc/wasm/package.py` writes the files of `TeXmacs/` (without `bin/` and
-the programs and documentation of the plugins: 62.6 MB) as packages with a
+the programs and documentation of the plugins, but the documentation of
+those which work in the page, `PLUGIN_DOCS`: AI, Asymptote, JavaScript,
+Python, R, TikZ, which Help > Plug-ins lists: 62.6 MB) as packages with a
 manifest, `texmacs-files.json` (each file: its package, offset, size).
 `misc/wasm/packages.js` makes the whole tree at `/texmacs` before TeXmacs
 starts, every file a placeholder of its size, and loads the boot package;

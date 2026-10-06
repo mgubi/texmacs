@@ -203,6 +203,10 @@
   <paragraph|6 October 2026>
 
   <\itemize>
+    <item>The help of the <name|Python> and <name|R> plug-ins is there
+    (<menu|Help|Plug-ins>), with how they run in the browser: it was left out
+    of the files of the page.
+
     <item>PDF pictures are shown again (they were a question mark since the
     windows are drawn by the GPU).
 
