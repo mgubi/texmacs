@@ -486,7 +486,7 @@ get_unicode_range (string c) {
 bool
 in_unicode_range (string c, string range) {
   string uc= strict_cork_to_utf8 (c);
-  if (N(uc) == 0) return "";
+  if (N(uc) == 0) return false;
   int pos= 0;
   int code= decode_from_utf8 (uc, pos);
   string got= get_unicode_range (code);
@@ -970,7 +970,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
         else if (wanted == c) ok= true;
         else if (in_collection (c, wanted)) ok= true;
         else if (N(wanted) > 0 && wanted[0] == '!' &&
-                 !in_collection (c, wanted)) ok= true;
+                 !in_collection (c, wanted (1, N(wanted)))) ok= true;
         else {
           array<string> w= tokenize (v[j], ":");
           if (N(w) == 1) w << w[0];
@@ -1098,7 +1098,7 @@ smart_font_rep::resolve (string c, string fam, int attempt) {
     int a= attempt - 1;
     string v;
     if (range == "") v= variant;
-    else if (v == "rm") v= range;
+    else if (variant == "rm") v= range;
     else v= variant * "-" * range;
     font cfn= closest_font (fam, v, series, rshape, sz, dpi, a);
     //cout << "Trying " << c << " in " << cfn->res_name << "\n";
