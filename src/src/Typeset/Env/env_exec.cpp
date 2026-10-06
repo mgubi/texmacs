@@ -750,7 +750,10 @@ edit_env_rep::exec_drd_props (tree t) {
 	if (val == "yes") drd->set_border (l, BORDER_YES);
 	if (val == "inner") drd->set_border (l, BORDER_INNER);
 	if (val == "outer") drd->set_border (l, BORDER_OUTER);
-	if (val == "no") drd->set_border (l, BORDER_NO);
+	// "no" is BORDER_INNER on purpose: it is the "no border" of the
+	// boolean property which these modes replaced (2010, 8d78112a0c), and
+	// the style files rely on it (show-part, doc-title, abstract, slide...)
+	if (val == "no") drd->set_border (l, BORDER_INNER);
 	drd->freeze_border (l);
       }
       else if (prop == "with-like") {
