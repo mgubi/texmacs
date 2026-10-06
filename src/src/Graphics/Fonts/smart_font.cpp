@@ -699,13 +699,34 @@ register_profiled_font (string math_family) {
   }
 }
 
-// The companion a profile declares for a sans serif or typewriter variant
+// The profile of a math family, also when it is named by its master: in
+// prog mode the shape is mathupright, and kepler_fix has then turned Kepler
+// into Kepler Math, the master of the profile KpMath
+static string
+profile_family (string math_family) {
+  if (N (math_font_profile (math_family)) > 0) return math_family;
+  static hashmap<string,string> cache ("?");
+  if (cache->contains (math_family)) return cache [math_family];
+  string r= "";
+  array<string> a= math_font_profile_families ();
+  for (int i= 0; i < N(a) && r == ""; i++)
+    if (font_database_master (a[i]) == math_family) r= a[i];
+  cache (math_family)= r;
+  return r;
+}
+
+// The companion a profile declares for a sans serif or typewriter variant;
+// as in variant_features, the parts of a variant count separately, so that
+// the variant rm-tt of prog mode (session inputs) is a typewriter one
 static string
 profile_variant_fix (string math_family, string variant, string item) {
-  string key= (variant == "ss"? string ("sans"):
-               (variant == "tt"? string ("mono"): string ("")));
+  array<string> v= tokenize (variant, "-");
+  string key= (contains (string ("tt"), v)? string ("mono"):
+               (contains (string ("ss"), v)? string ("sans"): string ("")));
   if (key == "") return item;
-  string comp= math_font_profile_attr (math_family, key);
+  string prof= profile_family (math_family);
+  if (prof == "") return item;
+  string comp= math_font_profile_attr (prof, key);
   if (comp != "" && N (font_database_styles (comp)) > 0) return comp;
   return item;
 }
