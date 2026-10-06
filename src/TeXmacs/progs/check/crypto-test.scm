@@ -359,17 +359,19 @@
           (check-false (== (server-password-encode "pw-X1!" s "pbkdf2")
                            (server-password-encode "pw-X1!" test-salt
                                                    "pbkdf2"))))))
-  ;; checking a password prints nothing, since the output of a server
-  ;; without a window is its log (#176)
+  ;; checking a password does not print it, since the output of a server
+  ;; without a window is its log (#176); other lines may be printed (on
+  ;; Windows, every process started is reported there)
   (for (type '("clear" "sha256" "sha512" "pbkdf2"))
-    (check= (begin
-              (cout-buffer)
-              (check-run
-               (lambda ()
-                 (server-password-correct? "Logged-pw-7!"
-                                           `(password ,type ,test-salt "x"))))
-              (cout-unbuffer))
-            "")))
+    (check-false (contains? (begin
+                              (cout-buffer)
+                              (check-run
+                               (lambda ()
+                                 (server-password-correct?
+                                  "Logged-pw-7!"
+                                  `(password ,type ,test-salt "x"))))
+                              (cout-unbuffer))
+                            "Logged-pw-7!"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format of encrypted blocks and documents
