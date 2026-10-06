@@ -1083,6 +1083,16 @@
   (:launch "if true; then exec cat; fi")
   (:serializer ,raw-serialize))
 
+(plugin-configure tmtestbashword
+  (:launch "readarray x < /dev/null 2> /dev/null; exec cat")
+  (:serializer ,raw-serialize))
+
+;; answers each line of input with the descriptors open in a program which
+;; it starts (ls)
+(plugin-configure tmtestfds
+  (:launch "sh -c \"printf '\\002verbatim:ready\\005'; while read x; do printf '\\002verbatim:'; ls /dev/fd | tr '\\n' ' '; printf '\\005'; done\"")
+  (:serializer ,raw-serialize))
+
 (plugin-configure tmtestnoerr
   (:launch "sh -c \"exec 2>/dev/null; printf '\\002verbatim:ready\\005'; exec cat\"")
   (:serializer ,raw-serialize))
@@ -1091,6 +1101,16 @@
 
 (define (test-pipes)
   (check-group "pipes: processes")
+  ;; a plugin does not inherit the pipes of the plugins started before it:
+  ;; it has the same descriptors with another plugin running as without
+  (let* ((fds1 (eval* "tmtestfds" "plugins-test-fds1" "go\n"))
+         (dummy (connection-stop "tmtestfds" "plugins-test-fds1"))
+         (other (start* "tmtestecho" "plugins-test-fds-other"))
+         (fds2 (eval* "tmtestfds" "plugins-test-fds2" "go\n")))
+    (check= other "ok")
+    (check= fds2 fds1)
+    (connection-stop "tmtestfds" "plugins-test-fds2")
+    (connection-stop "tmtestecho" "plugins-test-fds-other"))
   (write-pipes-scripts)
   (with mark (url-append pipes-dir "cleaned")
     (when (url-exists? mark) (system-remove mark))
@@ -1103,6 +1123,11 @@
   (check= (start* "tmtestshellword" "plugins-test-word") "ok")
   (check= (eval* "tmtestshellword" "plugins-test-word" (blk "verbatim:" "w"))
           '(document "w"))
+  ;; a command starting with a builtin of bash (which dash has not: it then
+  ;; reports an error, and goes on)
+  (check= (start* "tmtestbashword" "plugins-test-bashword") "ok")
+  (check= (eval* "tmtestbashword" "plugins-test-bashword" (blk "verbatim:" "b"))
+          '(document "b"))
   ;; PATH not set
   (when (defined? 'unsetenv)
     (with path (getenv "PATH")

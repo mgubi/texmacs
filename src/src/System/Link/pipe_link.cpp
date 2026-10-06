@@ -28,6 +28,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <fcntl.h>
 #endif
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
 #include <malloc.h>
@@ -124,7 +125,9 @@ terminate_child (int pid) {
       if (reaped && killpg (pid, 0) == -1) return;  // the group is gone
       usleep (10000);
     }
-    killpg (pid, SIGKILL);
+    // (the group may have ended during the last pause: its number may then
+    // be another group's; EPERM: a member which we may not signal)
+    if (killpg (pid, 0) == 0 || errno == EPERM) killpg (pid, SIGKILL);
     if (!reaped) waitpid (pid, NULL, 0);
   }
   else {
@@ -205,13 +208,16 @@ static const char* shell_words[]= {
   "!", "{", "}", "[[", "]]", "case", "do", "done", "elif", "else", "esac",
   "fi", "for", "function", "if", "in", "select", "then", "time", "until",
   "while",
-  // builtins
-  ".", ":", "[", "alias", "bg", "bind", "break", "builtin", "cd", "command",
-  "continue", "declare", "echo", "eval", "exec", "exit", "export", "false",
-  "fc", "fg", "getopts", "hash", "jobs", "kill", "let", "local", "printf",
-  "pwd", "read", "readonly", "return", "set", "shift", "source", "test",
-  "times", "trap", "true", "type", "typeset", "ulimit", "umask", "unalias",
-  "unset", "wait",
+  "coproc",
+  // builtins (of POSIX sh, bash, dash and zsh)
+  ".", ":", "[", "alias", "bg", "bind", "break", "builtin", "caller", "cd",
+  "command", "compgen", "complete", "compopt", "continue", "declare", "dirs",
+  "disown", "echo", "enable", "eval", "exec", "exit", "export", "false",
+  "fc", "fg", "getopts", "hash", "help", "history", "jobs", "kill", "let",
+  "local", "logout", "mapfile", "popd", "printf", "pushd", "pwd", "read",
+  "readarray", "readonly", "return", "set", "setopt", "shift", "shopt",
+  "source", "suspend", "test", "times", "trap", "true", "type", "typeset",
+  "ulimit", "umask", "unalias", "unset", "unsetopt", "wait",
   NULL };
 
 static bool
@@ -236,10 +242,16 @@ program_found (string cmd) {
     c_string p (prog);
     return access (p, X_OK) == 0;
   }
-  // (when PATH is not set, sh looks in its default path; an empty PATH is
-  // the current directory)
+  // (when PATH is not set, sh looks in the default path of the system; an
+  // empty PATH is the current directory)
   const char* env_path= getenv ("PATH");
-  string path= env_path == NULL? string ("/usr/bin:/bin"): string (env_path);
+  string path;
+  if (env_path != NULL) path= string (env_path);
+  else {
+    char buf[1024];
+    size_t l= confstr (_CS_PATH, buf, sizeof (buf));
+    path= (l > 0 && l <= sizeof (buf))? string (buf): string ("/usr/bin:/bin");
+  }
   int k= 0;
   while (k <= N(path)) {
     int e= search_forwards (":", k, path);
@@ -275,6 +287,11 @@ pipe_link_rep::start () {
       close_pipes ();
       return "Error: cannot start '" * cmd * "' (no pipes)";
     }
+  // the ends of TeXmacs are closed in the programs which it starts later
+  // (other plugins, which would otherwise keep these pipes open)
+  fcntl (pp_in [OUT], F_SETFD, FD_CLOEXEC);
+  fcntl (pp_out[IN ], F_SETFD, FD_CLOEXEC);
+  fcntl (pp_err[IN ], F_SETFD, FD_CLOEXEC);
   // the command for sh, made before fork: the child of a process with
   // threads may only call async-signal-safe functions (no allocation)
   c_string _cmd (cmd);
@@ -494,7 +511,10 @@ void pipe_callback (void *obj, void *info) {
     struct timeval tv;
     tv.tv_sec  = 0;
     tv.tv_usec = 0;
-    select (max_fd, &rfds, NULL, NULL, &tv);
+    int nr= select (max_fd, &rfds, NULL, NULL, &tv);
+    if (nr < 0 && errno == EINTR) continue;
+    // (after an error, the set is unspecified: nothing is read)
+    if (nr <= 0) break;
 
     busy= false;
     if (con->alive && FD_ISSET (con->out, &rfds)) {
