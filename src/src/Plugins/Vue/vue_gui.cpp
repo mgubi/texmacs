@@ -2722,6 +2722,31 @@ vue_web_new_tab () {
   exec_delayed (scheme_cmd ("(open-window)"));
   gui_needs_update= true;
 }
+
+// a tab dragged to another place among the tabs shown (frame.js): the
+// order of the tabs is the one of the page, and the one in which a closed
+// tab gives its place to its neighbour (destroy_event)
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_move_tab (int id, int to) {
+  vue_virtual_window_rep* t= find_tab (id);
+  if (t == NULL) return;
+  array<vue_virtual_window_rep*> shown, hidden, r;
+  for (int i= 0; i < N(tabs); i++)
+    if (tabs[i] != t) {
+      if (tabs[i]->shown) shown << tabs[i];
+      else hidden << tabs[i];
+    }
+  to= max (0, min (to, N(shown)));
+  for (int i= 0; i < N(shown); i++) {
+    if (i == to) r << t;
+    r << shown[i];
+  }
+  if (to == N(shown)) r << t;
+  r << hidden;
+  tabs= r;
+  frame_dirty= true;
+  gui_needs_update= true;
+}
 #else
 static void frame_sync () {}
 #endif

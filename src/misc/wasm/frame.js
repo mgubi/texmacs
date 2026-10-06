@@ -40,7 +40,10 @@ var tmFrame = (function () {
     #tm-frame .tm-resize { position:absolute; top:0; right:0; width:5px; height:100%;
       cursor:col-resize; z-index:5 }
     #tm-frame .tm-resize:hover, #tm-frame .tm-resize.dragging { background:rgba(91,127,168,.45) }
-    body.tm-resizing, body.tm-resizing * { cursor:col-resize !important; user-select:none }
+    body.tm-resizing, body.tm-resizing * { cursor:col-resize !important; user-select:none;
+      -webkit-user-select:none }
+    body.tm-reordering, body.tm-reordering * { cursor:grabbing !important; user-select:none;
+      -webkit-user-select:none }
     #tm-frame .tm-app { display:flex; align-items:center; height:36px; flex:none; padding:0 12px;
       font-weight:bold; cursor:pointer; color:#fff; background:#5b7fa8;
       border-bottom:1px solid #4a6b91; white-space:nowrap }
@@ -78,6 +81,22 @@ var tmFrame = (function () {
     #tm-frame.collapsed .tm-new, #tm-frame.collapsed .tm-fold { padding:0; justify-content:center }
     #tm-frame.collapsed .tm-new .tm-plus { margin:0 }
     #tm-frame.collapsed .tm-new .tm-label { display:none }
+    /* New window: the item after the last tab */
+    #tm-frame .tm-tabs .tm-new { height:28px; margin:1px 5px; padding:0 9px; border-radius:5px; color:#444 }
+    #tm-frame.collapsed .tm-tabs .tm-new { height:30px; margin:2px 6px; padding:0 }
+    /* the chevrons which scroll the tabs when they do not fit */
+    #tm-frame .tm-scroll { flex:none; height:18px; display:none; align-items:center;
+      justify-content:center; cursor:pointer; color:#555 }
+    #tm-frame .tm-scroll.shown { display:flex }
+    #tm-frame .tm-scroll.off { opacity:.25; cursor:default }
+    #tm-frame .tm-scroll:not(.off):hover { background:#c8c8c8 }
+    #tm-frame .tm-scroll svg { width:14px; height:14px; fill:none; stroke:currentColor;
+      stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round }
+    /* a tab dragged to another place, and the others making room */
+    #tm-frame .tm-tab.dragging { z-index:3; background:#f6f6f6;
+      box-shadow:0 3px 10px rgba(0,0,0,.25), inset 0 0 0 1px #b4b4b4 }
+    #tm-frame .tm-tabs.reordering .tm-tab:not(.dragging) { transition:transform .15s ease-out }
+    #tm-frame .tm-tabs.reordering { cursor:grabbing }
     #tm-flyout { position:fixed; z-index:36; display:none; align-items:center; overflow:hidden;
       white-space:nowrap; box-sizing:border-box; border-radius:6px; background:#ececec;
       box-shadow:0 3px 14px rgba(0,0,0,.28), inset 0 0 0 1px #b4b4b4; color:#222;
@@ -263,8 +282,87 @@ var tmFrame = (function () {
     return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
   }
   var FOLD_ICON = 'M10 3.5 5.5 8 10 12.5', UNFOLD_ICON = 'M6 3.5 10.5 8 6 12.5';
+  var UP_ICON = 'M3.5 10 8 5.5 12.5 10', DOWN_ICON = 'M3.5 6 8 10.5 12.5 6';
 
-  var fold = null, newButton = null, balloon = null;
+  var fold = null, newButton = null, balloon = null, scrollUp = null, scrollDown = null;
+
+  // the chevrons above and below the tabs, when they do not all fit: they
+  // scroll them (as the wheel does), the one at an end dimmed
+  function chevrons () {
+    if (!strip) return;
+    var over = strip.scrollHeight > strip.clientHeight + 1;
+    scrollUp.classList.toggle ('shown', over);
+    scrollDown.classList.toggle ('shown', over);
+    scrollUp.classList.toggle ('off', strip.scrollTop <= 0);
+    scrollDown.classList.toggle ('off', strip.scrollTop + strip.clientHeight >= strip.scrollHeight - 1);
+  }
+  function scrollTabs (dir) {
+    var by = Math.max (30, strip.clientHeight - 40) * dir;
+    if (strip.scrollBy) strip.scrollBy ({ top: by, behavior: 'smooth' });
+    else strip.scrollTop += by;
+  }
+
+  // A tab pressed and moved goes to another place: it follows the mouse,
+  // the others make room, the list scrolls when the mouse is at its top or
+  // bottom; at the release the tabs are reordered here and in TeXmacs
+  // (vue_web_move_tab), whose order decides which tab follows a closed one.
+  // The click which ends a drag shows no window.
+  var dragDone = false;
+  function pressTab (e, tab, t) {
+    if (e.button !== 0 || (e.target.classList && e.target.classList.contains ('tm-close'))) return;
+    var startY = e.clientY, startScroll = strip.scrollTop, dragging = false;
+    var all = [], from = -1, slot = 0, to = -1;
+    function move (ev) {
+      var dy = ev.clientY - startY;
+      if (!dragging) {
+        if (Math.abs (dy) < 5) return;
+        dragging = true;
+        flyIn (true); hideBalloon ();
+        all = Array.prototype.slice.call (strip.querySelectorAll ('.tm-tab'));
+        from = all.indexOf (tab); to = from;
+        if (from < 0) { dragging = false; return; }
+        slot = all.length > 1 ? Math.abs (all[1].offsetTop - all[0].offsetTop) : tab.offsetHeight + 2;
+        strip.classList.add ('reordering');
+        tab.classList.add ('dragging');
+        document.body.classList.add ('tm-reordering');
+        try { window.getSelection ().removeAllRanges (); } catch (err) {}
+      }
+      // the list scrolls when the mouse is near its ends
+      var r = strip.getBoundingClientRect ();
+      if (ev.clientY < r.top + 16) strip.scrollTop -= 6;
+      else if (ev.clientY > r.bottom - 16) strip.scrollTop += 6;
+      dy += strip.scrollTop - startScroll;
+      var lo = -all[from].offsetTop + all[0].offsetTop, hi = all[all.length - 1].offsetTop - all[from].offsetTop;
+      dy = Math.max (lo, Math.min (hi, dy));
+      tab.style.transform = 'translateY(' + dy + 'px)';
+      to = Math.max (0, Math.min (all.length - 1, from + Math.round (dy / slot)));
+      all.forEach (function (o, k) {
+        if (o === tab) return;
+        var shift = (from < to && k > from && k <= to) ? -slot : (to < from && k >= to && k < from) ? slot : 0;
+        o.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+      });
+    }
+    function up () {
+      window.removeEventListener ('pointermove', move);
+      window.removeEventListener ('pointerup', up);
+      window.removeEventListener ('pointercancel', up);
+      if (!dragging) return;
+      dragDone = true;
+      setTimeout (function () { dragDone = false; }, 0);
+      strip.classList.remove ('reordering');
+      document.body.classList.remove ('tm-reordering');
+      all.forEach (function (o) { o.style.transform = ''; o.classList.remove ('dragging'); });
+      if (to !== from && to >= 0) {
+        var moved = tabs.splice (from, 1)[0];
+        tabs.splice (to, 0, moved);
+        render ();
+        _vue_web_move_tab (t.id, to);
+      }
+    }
+    window.addEventListener ('pointermove', move);
+    window.addEventListener ('pointerup', up);
+    window.addEventListener ('pointercancel', up);
+  }
   function build () {
     if (bar || typeof document === 'undefined') return;
     var st = el ('style'); st.textContent = style; document.head.appendChild (st);
@@ -280,7 +378,7 @@ var tmFrame = (function () {
     newButton.appendChild (el ('span', 'tm-plus', '+'));
     newButton.appendChild (el ('span', 'tm-label', 'New window'));
     newButton.onclick = function () { hideBalloon (); _vue_web_new_tab (); };
-    hover (newButton, function () { return 'New window'; });
+    hover (newButton, function () { return bar.classList.contains ('collapsed') ? 'New window' : ''; });
     fold = el ('div', 'tm-fold');
     fold.onclick = function () { hideBalloon (); setFolded (!bar.classList.contains ('collapsed'), true); };
     hover (fold, function () { return bar.classList.contains ('collapsed') ? 'Show the names of the windows'
@@ -288,9 +386,21 @@ var tmFrame = (function () {
     var handle = el ('div', 'tm-resize');
     handle.title = 'Drag to change the width; double-click for the default';
     edge (handle);
+    scrollUp = el ('div', 'tm-scroll');
+    scrollUp.innerHTML = svg (UP_ICON);
+    scrollDown = el ('div', 'tm-scroll');
+    scrollDown.innerHTML = svg (DOWN_ICON);
+    scrollUp.onclick = function () { scrollTabs (-1); };
+    scrollDown.onclick = function () { scrollTabs (1); };
+    strip.addEventListener ('scroll', chevrons);
+    window.addEventListener ('resize', chevrons);
+    // a press in the column starts no selection of the page (which a drag
+    // of a tab or of the edge carried over the canvas, selecting it whole)
+    bar.addEventListener ('mousedown', function (e) { if (e.button === 0) e.preventDefault (); });
     bar.appendChild (appButton);
+    bar.appendChild (scrollUp);
     bar.appendChild (strip);
-    bar.appendChild (newButton);
+    bar.appendChild (scrollDown);
     bar.appendChild (fold);
     bar.appendChild (handle);
     width = savedWidth ();
@@ -314,6 +424,7 @@ var tmFrame = (function () {
     if (!bar) return;
     flyIn (true);
     bar.classList.toggle ('collapsed', on);
+    if (scrollUp) chevrons ();
     fold.innerHTML = svg (on ? UNFOLD_ICON : FOLD_ICON);
     if (remember) try { localStorage.setItem (FOLD, on ? 'collapsed' : 'expanded'); } catch (e) {}
     resized ();
@@ -359,6 +470,7 @@ var tmFrame = (function () {
     if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
     if (!flyout) {
       flyout = el ('div'); flyout.id = 'tm-flyout';
+      flyout.addEventListener ('mousedown', function (e) { if (e.button === 0) e.preventDefault (); });
       flyout.addEventListener ('mouseenter', function () {
         if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; } });
       flyout.addEventListener ('mouseleave', function () {
@@ -386,7 +498,8 @@ var tmFrame = (function () {
       x.onclick = function (e) { e.stopPropagation (); flyIn (true); _vue_web_close_tab (t.id); };
       flyout.appendChild (x);
     }
-    flyout.onclick = function () { flyIn (true); _vue_web_activate_tab (t.id); };
+    flyout.onclick = function () { if (dragDone) return; flyIn (true); _vue_web_activate_tab (t.id); };
+    flyout.onpointerdown = function (e) { pressTab (e, tab, t); };
     flyout.onmousedown = function (e) {
       if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) { flyIn (true); _vue_web_close_tab (t.id); } }
     };
@@ -437,7 +550,8 @@ var tmFrame = (function () {
                 title.scrollWidth > title.clientWidth) ? name : '';
       });
       tab.addEventListener ('mouseenter', function () { flyOut (tab, t, name); });
-      tab.onclick = function () { _vue_web_activate_tab (t.id); };
+      tab.onclick = function () { if (!dragDone) _vue_web_activate_tab (t.id); };
+      tab.addEventListener ('pointerdown', function (e) { pressTab (e, tab, t); });
       tab.onmousedown = function (e) {
         if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) _vue_web_close_tab (t.id); }
       };
@@ -450,7 +564,10 @@ var tmFrame = (function () {
       }
       strip.appendChild (tab);
     });
+    strip.appendChild (newButton); // just after the last tab
     var active = tabs.filter (function (t) { return t.active; })[0];
+    // the chevrons first: they take room from the tabs when they appear
+    chevrons ();
     var at = strip.querySelector ('.tm-tab.active');
     if (at) {
       var top = at.offsetTop - strip.offsetTop, bottom = top + at.offsetHeight;
@@ -459,6 +576,7 @@ var tmFrame = (function () {
     }
     document.title = active ? (active.modified ? '• ' : '') + active.title + ' — TeXmacs Vue'
                             : 'TeXmacs Vue';
+    chevrons ();
   }
 
   /****************************************************************************

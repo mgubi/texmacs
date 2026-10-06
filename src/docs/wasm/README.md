@@ -95,7 +95,13 @@ always comes with the same place of the page (21 of 22 widths came with two
 or three places before). In
 the browser the page has a frame, a column at the left of the canvas
 (`misc/wasm/frame.js`), which leaves the whole height to TeXmacs: the tabs,
-one under the other, labelled with the names of the windows (the title of a
+one under the other, in the order of TeXmacs (a tab dragged to another
+place reorders them, here and in TeXmacs by `vue_web_move_tab`, whose
+order also decides which tab follows a closed one), chevrons above and
+below them when they do not fit (they scroll them, the one at an end
+dimmed), "New window" after the last tab; a press in the column starts no
+selection of the page (a drag carried it over the canvas, selected whole);
+the tabs are labelled with the names of the windows (the title of a
 window on the desktop, and the title of the page for the active one), with
 a marker for unsaved changes, a close box (not on the last tab: TeXmacs
 asks as for a window whether to save), a "New window", a right edge which
