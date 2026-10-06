@@ -41,7 +41,10 @@ jobs:
             libfreetype-dev libpng-dev zlib1g-dev libjpeg-dev \
             libgnutls28-dev libsqlite3-dev \
             libgmp-dev libltdl-dev \
-            ghostscript imagemagick fig2dev librsvg2-bin
+            ghostscript imagemagick fig2dev librsvg2-bin \
+            gnupg
+          # (gnupg: the gpg command, which the encryption of TeXmacs runs
+          # and the crypto suite checks; without it these checks are skipped)
           # ImageMagick of Ubuntu does not write PostScript, EPS or PDF
           # (its policy), which TeXmacs asks of it (image_to_eps)
           sudo sed -i -E 's/rights="none" pattern="(PS|PS2|PS3|EPS|PDF|XPS)"/rights="read|write" pattern="\1"/' \
@@ -79,7 +82,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: brew install qt freetype libpng jpeg gnutls sqlite gmp libtool
+        # (gnupg: the gpg command, for the checks of the crypto suite)
+        run: brew install qt freetype libpng jpeg gnutls sqlite gmp libtool gnupg
 
       - name: Configure
         run: |
@@ -143,6 +147,7 @@ jobs:
             mingw-w64-x86_64-sqlite3
             mingw-w64-x86_64-gmp
             mingw-w64-x86_64-libtool
+            mingw-w64-x86_64-gnupg
             texinfo
 
       - name: Configure
