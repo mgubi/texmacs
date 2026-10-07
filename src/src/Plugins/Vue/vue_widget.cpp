@@ -417,12 +417,17 @@ menu_veil (Clay_ElementId parent, Clay_Color bg, Clay_CornerRadius r, int16_t z)
 // shadows and the renderers no blur: a few translucent rounded boxes behind
 // the element, each larger than the one before and all a little lower, add
 // up to a soft one. They take the size the element had in the
-// last pass (none in its first frame), lie one level under it and let the
-// pointer through.
+// last pass (for a new element, a second pass is asked for), lie one level
+// under it and let the pointer through.
 static void
 menu_shadow (Clay_ElementId parent, float radius, int16_t z) {
   Clay_ElementData pd= Clay_GetElementData (parent);
-  if (!pd.found) return;
+  // the element is new, its size not known yet: another pass, in the same
+  // frame, draws the shadow (else it came with the next frame, which for a
+  // balloon, which does not move, was the next event: a visible delay)
+  // (Clay knows an element from the pass which makes it, with no size yet)
+  if (!pd.found || pd.boundingBox.width <= 0 || pd.boundingBox.height <= 0) {
+    gui_needs_relayout= true; return; }
   // a light theme has dark text: the shadow is stronger on a dark theme
   bool dark= the_theme.text.r > 128;
   // (eight layers, 2 px apart, of the same very faint black: where n of
