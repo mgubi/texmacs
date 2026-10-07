@@ -11,21 +11,22 @@ went); add what you find. Paths are relative to the repository root.
   graphics menus, a bare predicate in `kbd-unmap`); #311 makes
   `delayed (:refresh ms)` run its body and maps the BibTeX style `abstract`
   to `tm-abstract` when `bibtex` is not installed. Then merge `wip_fixes`
-  into `maxs_texmacs` and update
+  into `maxs_texmacs` again (it was merged on 2026-10-07, before these
+  PRs) and update
   `src/TeXmacs/doc/devel/scheme/utils/utils-dialogue.en.tm`, which says
   that `:refresh` does not work.
 
 ## Bugs found, not fixed
 
-None left from the list of 2026-10-07; the fixes are in the commit "Fix the
-bugs of doc/TODO.md" of 2026-10-07 (Widkit duplicates, `x-gui?` and
-`qt-gui?` for Cocoa and Qtwk, Qtwk clipboard and input methods, headless
-X11/SDL/Cocoa, `rounded_rectangle` in Qt6, `mac_fix_paths`, CMake
-`THORVG_DIR`, `macos-ns.yml`, CMake and TikZJax docs, typewriter companions,
-Medium faces in the font database). Not tested beyond compiling: the X11,
-SDL, Qtwk and Qt6 changes (no such build here; compiled with
-`-fsyntax-only` against their configuration), and headless mode of those
-ports. The Widkit duplicates are also on `wip_other_guis`.
+None left from the list of 2026-10-07. The fixes are in e6c092506c (ports,
+build, docs, fonts), in the commit "Qt pipes: commands run by sh, in a
+process group stopped as a whole" and in the merge of `wip_fixes`
+b6cd741771 (Windows). The CI of `maxs_ci` passes on b6cd741771: macOS
+(Cocoa and Vue, arm64 and x86_64), Linux and Windows (Qt 6 and Vue, with
+the 48 regression suites on Qt). Still only compiled, never run: the X11,
+SDL and Qtwk changes, the Qt 5 branch of the Qt pipes
+(`setupChildProcess`), and headless mode of X11, SDL and Cocoa. Qtwk has
+no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
 ## Kept on purpose
 
