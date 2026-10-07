@@ -289,10 +289,11 @@
 (define %lazy-forced 0)
 (define %lazy-time 0.0)
 
-(define (%make-lazy src name module)
-  ;; src is (lambda formals . body), compiled with the name of the function
+(define (%make-lazy src name module file)
+  ;; src is (lambda formals . body), compiled with the name of the function;
+  ;; file: the name of the cache of the file which defines it (or #f)
   (let* ((named (if name (append src name) src))
-         (rec (vector named module #f #f))
+         (rec (vector named module #f #f file))
          (tvals (function:vals %lazy-template))
          (n (length tvals))
          (vals (make-vector n #f)))
@@ -320,7 +321,7 @@
                (m (and name (get *modules* name #f)))
                (real (with-bindings ((*current-module* m)
                                      (*module-name* (or name '(texmacs-user))))
-                       (%lazy-compile (aref rec 0) name))))
+                       (%lazy-compile (aref rec 0) name (aref rec 4)))))
           ;; (a call of the stub during this compilation, from a macro, uses
           ;; this compilation's result, and the outer one becomes the stub)
           (if (not (aref rec 3))
@@ -348,72 +349,85 @@
     (aset! w (if has (- n 1) n) src)
     (function (function:code f) w (function:name f) (function:env f))))
 
-;; The compiled bodies are kept in the cache of compiled files, in the file
-;; %lazy.flc, under the fingerprint of their expansion, their module and its
-;; private names: the bodies are still expanded at their first call (their
-;; macros run, as in Guile), not compiled. The file starts with the key of
-;; the cache; each compilation appends an entry, and the file is read at the
-;; first call of a stub.
-(define %lazy-table #f)
+;; The compiled bodies are kept in the cache of compiled files, a file
+;; <name>.lazy next to the cache <name>.flc of the file which defines them,
+;; under the fingerprint of their expansion, their module and its private
+;; names: the bodies are still expanded at their first call (their macros
+;; run, as in Guile), not compiled. A .lazy file starts with the key of the
+;; cache; each compilation appends an entry; it is read (the shipped one,
+;; then the one of the home) at the first call of a function of the file,
+;; and emptied when the forms of the file change (%lazy-file-changed!).
+(define %lazy-tables (table))           ; name of the file -> its table
 (define %module-privates-fp (table))
 (define %lazy-hits 0)
 
-(define (%lazy-cache-file) (%cache-file "%lazy"))
+;; the entries of the file cf into the table t, if its key is the one of
+;; the cache; #f when it is not a cache of this TeXmacs
+(define (%lazy-table-read t cf)
+  (and cf (file-exists? cf)
+       (trycatch
+        (let* ((in (open-input-file cf))
+               (ok (equal? (%cache-read-entry in) %cache-key)))
+          (if ok
+              (let loop ()
+                (let ((e (%cache-read-entry in)))
+                  (if (pair? e)
+                      (begin (put! t (car e) (cdr e))
+                             (loop))))))
+          (close-port in)
+          ok)
+        (lambda (e) #f))))
 
-(define (%lazy-table-load)
-  (set! %lazy-table (table))
-  (let ((cf (%lazy-cache-file)))
-    (if cf
-        (trycatch
-         (if (and (file-exists? cf)
-                  (let ((in (open-input-file cf)))
-                    (let ((ok (equal? (%cache-read-entry in) %cache-key)))
-                      (if ok
-                          (let loop ()
-                            (let ((e (%cache-read-entry in)))
-                              (if (pair? e)
-                                  (begin (put! %lazy-table (car e) (cdr e))
-                                         (loop))))))
-                      (close-port in)
-                      ok)))
-             #t
-             ;; a new file (or another version of TeXmacs): the key
-             (let ((out (file cf :write :create :truncate)))
-               (%fl-write %cache-key out) (newline out)
-               (io.close out)))
-         (lambda (e) #f)))))
+(define (%lazy-file-start cf)
+  ;; a new .lazy file (or one of another version of TeXmacs): the key
+  (trycatch
+   (let ((out (file cf :write :create :truncate)))
+     (%fl-write %cache-key out) (newline out)
+     (io.close out))
+   (lambda (e) #f)))
 
-(define (%lazy-cache-add! fp f)
-  (put! %lazy-table fp f)
-  (let ((cf (%lazy-cache-file)))
-    (if cf
-        (trycatch
-         (let ((out (file cf :write :create :append)))
-           (with-bindings ((*print-readably* #t) (*print-closures* #t)
-                           (*print-shared* #t) (*print-pretty* #f)
-                           (*print-length* #f) (*print-level* #f))
-             (%fl-write (cons fp f) out) (newline out))
-           (io.close out))
-         (lambda (e) #f)))))
+;; the table of the compiled bodies of a file: the shipped ones, then those
+;; of the home
+(define (%lazy-file-table name)
+  (or (get %lazy-tables name #f)
+      (let ((t (table))
+            (cf (%cache-file-named name ".lazy")))
+        (%lazy-table-read t (%cache-shipped-file-named name ".lazy"))
+        (if (not (%lazy-table-read t cf)) (%lazy-file-start cf))
+        (put! %lazy-tables name t)
+        t)))
 
-(define (%lazy-compile src name)
+;; the forms of the file changed: its compiled bodies are compiled again
+(define (%lazy-file-changed! name)
+  (put! %lazy-tables name (table))
+  (%lazy-file-start (%cache-file-named name ".lazy")))
+
+(define (%lazy-cache-add! name fp f)
+  (put! (%lazy-file-table name) fp f)
+  (trycatch
+   (let ((out (file (%cache-file-named name ".lazy") :write :create :append)))
+     (with-bindings ((*print-readably* #t) (*print-closures* #t)
+                     (*print-shared* #t) (*print-pretty* #f)
+                     (*print-length* #f) (*print-level* #f))
+       (%fl-write (cons fp f) out) (newline out))
+     (io.close out))
+   (lambda (e) #f)))
+
+(define (%lazy-compile src name file)
   (let* ((e (expand src))
-         (fp (and %cache?
+         (fp (and %cache? file
                   (%fingerprint (list name (get %module-privates-fp name #f)
                                       e))))
-         (hit (and fp
-                   (begin
-                     (if (not %lazy-table) (%lazy-table-load))
-                     (get %lazy-table fp #f)))))
+         (hit (and fp (get (%lazy-file-table file) fp #f))))
     (if hit
         (begin (set! %lazy-hits (+ %lazy-hits 1)) hit)
         (let ((f ((compile-thunk e))))
-          (if (and fp (%cache-writable? f)) (%lazy-cache-add! fp f))
+          (if (and fp (%cache-writable? f)) (%lazy-cache-add! file fp f))
           f))))
 
 ;; the code of the stubs, compiled after %lazy-force! (a direct call): a
-;; record #(lambda module-name stub forced?) takes the place of the constant
-;; %lazy-record
+;; record #(lambda module-name stub forced? file) takes the place of the
+;; constant %lazy-record
 (define %lazy-template
   (%fl-eval '(lambda args (apply (%lazy-force! '%lazy-record) args))))
 
@@ -423,9 +437,12 @@
             (round (* 1000 %lazy-time)) " ms\n"))
 
 ;; the lambda e (with a name or #f) as a stub
+(define *lazy-file* #f)   ; the name of the cache of the file being loaded
+
 (define (%lazy-lambda e name)
   (list '%make-lazy (list 'quote e) (list 'quote name)
-        (list 'quote (and *current-module* (module-name *current-module*)))))
+        (list 'quote (and *current-module* (module-name *current-module*)))
+        *lazy-file*))
 
 ;; expands the top level of the form e, keeping the lambdas in stubs
 (define (%expand-top e)
@@ -478,29 +495,60 @@
 ;; the compiled code depends on. The forms whose expansion or code holds
 ;; values which cannot be written and read back (uninterned symbols, tables,
 ;; procedures with an environment, TeXmacs objects...) are compiled at each
-;; load. TEXMACS_FL_NO_CACHE disables the cache.
+;; load. A file of TeXmacs is named by its path in $TEXMACS_PATH, and when the
+;; home has no valid cache of it, the cache shipped with TeXmacs is read
+;; ($TEXMACS_PATH/cache/femtolisp: the page in the browser has one, made by
+;; its build). TEXMACS_FL_NO_CACHE disables the cache.
 
-(define %cache-format (if %lazy? 4 2))  ; (lazy bodies: another cache)
+(define %cache-format (if %lazy? 5 2))  ; (lazy bodies: another cache)
 (define %cache? (not (os.getenv "TEXMACS_FL_NO_CACHE")))
 (define %cache-dir #f)
 (define %cache-key #f)
 
+(define %cache-tm-path #f)
+
+(define (%cache-init!)
+  (if (not %cache-dir)
+      (let ((dir (url-concretize "$TEXMACS_HOME_PATH/system/cache/femtolisp")))
+        (if (not (url-exists? dir)) (system-mkdir dir))
+        (set! %cache-dir dir)
+        (set! %cache-tm-path (string-append (url-concretize "$TEXMACS_PATH") "/"))
+        (set! %cache-key (list *fl-boot-id* (texmacs-version) %cache-format)))))
+
+;; the name of the cache of file (without its extension, .flc for the
+;; forms, .lazy for the function bodies): a file of TeXmacs by its path in
+;; $TEXMACS_PATH (TM%progs%...), so that a cache made with another
+;; $TEXMACS_PATH (the one shipped with the page in the browser) fits
+(define (%cache-name file)
+  (let* ((n (string-length %cache-tm-path))
+         (rel (if (and (> (string-length file) n)
+                       (string=? (substring file 0 n) %cache-tm-path))
+                  (string-append "TM/" (substring file n (string-length file)))
+                  file)))
+    (list->string
+     (map (lambda (c) (if (memv c '(#\/ #\\ #\: #\space)) #\% c))
+          (string->list rel)))))
+
+(define (%cache-file-named name ext)
+  (string-append %cache-dir "/" name ext))
+
 (define (%cache-file file)
   (and %cache?
        (begin
-         (if (not %cache-dir)
-             (let ((dir (url-concretize
-                         "$TEXMACS_HOME_PATH/system/cache/femtolisp")))
-               (if (not (url-exists? dir)) (system-mkdir dir))
-               (set! %cache-dir dir)
-               (set! %cache-key
-                     (list *fl-boot-id* (texmacs-version) %cache-format))))
-         (string-append %cache-dir "/"
-                        (list->string
-                         (map (lambda (c)
-                                (if (memv c '(#\/ #\\ #\: #\space)) #\% c))
-                              (string->list file)))
-                        ".flc"))))
+         (%cache-init!)
+         (%cache-file-named (%cache-name file) ".flc"))))
+
+;; the cache shipped with TeXmacs ($TEXMACS_PATH/cache/femtolisp, made with
+;; the program: the page in the browser has one), read when the cache of the
+;; home directory has no valid file
+(define (%cache-shipped-file-named name ext)
+  (string-append %cache-tm-path "cache/femtolisp/" name ext))
+
+(define (%cache-shipped-file file)
+  (and %cache?
+       (begin
+         (%cache-init!)
+         (%cache-shipped-file-named (%cache-name file) ".flc"))))
 
 ;; can x be written and read back as an equal value?
 (define (%cache-writable? x)
@@ -555,9 +603,13 @@
 ;; evaluates the forms of file, with the cache
 (define (%eval-forms-cached file forms privates)
   (let* ((cf (%cache-file file))
-         (in (%cache-open cf privates))
+         (name (and cf (%cache-name file)))
+         (in (or (%cache-open cf privates)
+                 (%cache-open (%cache-shipped-file file) privates)))
          (dirty (not in))
+         (changed #f)
          (entries '()))
+   (with-bindings ((*lazy-file* name))
     (let loop ((l forms))
       (if (pair? l)
           (let* ((t0 (and %profile? (time.now)))
@@ -582,14 +634,18 @@
                   (set! %profile-forms (+ %profile-forms 1))))
             ;; (an entry read from the cache can be written back)
             (if cf
-                (set! entries
-                      (cons (cond (hit old)
-                                  ((and fp (%cache-writable? thunk))
-                                   (cons fp thunk))
-                                  (else (list #f)))
-                            entries)))
+                (let ((entry (cond (hit old)
+                                   ((and fp (%cache-writable? thunk))
+                                    (cons fp thunk))
+                                   (else (list #f)))))
+                  ;; a form which can be cached and was not: the file
+                  ;; changed, and so may have its function bodies
+                  (if (and (not hit) (car entry) (not changed))
+                      (begin (set! changed #t)
+                             (if %lazy? (%lazy-file-changed! name))))
+                  (set! entries (cons entry entries))))
             (thunk)
-            (loop (cdr l)))))
+            (loop (cdr l))))))
     (if in (close-port in))
     (if (and cf dirty) (%cache-write cf privates (reverse! entries)))))
 

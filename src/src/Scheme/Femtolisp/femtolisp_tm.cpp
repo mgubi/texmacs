@@ -65,10 +65,12 @@ void
 start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   tm_femtolisp_argc= argc;
   tm_femtolisp_argv= argv;
-  // a heap of 32 Mb, about what TeXmacs uses once booted (it grows
-  // anyway): with 8 Mb, a boot collected the garbage 23 times instead of 5
-  // (60 ms more); TEXMACS_FL_HEAP sets it (in Mb)
-  size_t heap_mb= 32;
+  // a heap of 48 Mb at start (it grows anyway), each of the two halves of
+  // the copying collector: about the heap of S7 in TeXmacs (1M cells of 48
+  // bytes); with 8 Mb, a boot collected the garbage 23 times instead of 6,
+  // and 8 exports to LaTeX take 13% less time than with 32 Mb (38 Mb more
+  // at the peak); TEXMACS_FL_HEAP sets it (in Mb)
+  size_t heap_mb= 48;
   if (getenv ("TEXMACS_FL_HEAP")) heap_mb= atoi (getenv ("TEXMACS_FL_HEAP"));
   if (fltm_init (heap_mb * 1024 * 1024, (const char*) fl_boot_image,
                  fl_boot_image_length)) {

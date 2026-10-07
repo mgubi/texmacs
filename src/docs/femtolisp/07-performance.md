@@ -106,9 +106,13 @@ regression suites than s7. A profile of the boot (`TEXMACS_FL_PROFILE=1`,
   references to the old one; with the heap of TeXmacs this made reading the
   cache 100 times slower than in a standalone femtolisp. A vector without a
   label is now made once its elements are read.
-- **A heap of 32 MB at start** (`femtolisp_tm.cpp`, `TEXMACS_FL_HEAP` in
-  MB): with 8 MB, a boot collected the garbage 23 times instead of 6, about
-  60 ms more; the resident memory at boot is 8 MB larger.
+- **A heap of 48 MB at start** (`femtolisp_tm.cpp`, `TEXMACS_FL_HEAP` in
+  MB), each of the two halves of the copying collector, about the heap of
+  S7 in TeXmacs (1,024,000 cells of 48 bytes, 49 MB, and 16 MB of pointers
+  to them; S7 takes about 91 MB once booted). With 8 MB, a boot collected
+  the garbage 23 times instead of 6 (60 ms more); 8 exports of the change
+  log to LaTeX take 1.77 s with 32 MB, 1.52 s with 48 MB, 1.48 s with 64 MB,
+  for a peak of 162, 201 and 233 MB.
 - **Primitives in C:** `symbol?` and `keyword?` (they built the name of the
   symbol at each call), `ahash-ref`/`hash-ref`, `string-length`; `char=?`
   and `string=?` without their n-ary loop for two arguments.
