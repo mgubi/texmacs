@@ -54,8 +54,10 @@
   <cpp|gui_version ()> returns <verbatim|"qt4">, <verbatim|"qt5"> or
   <verbatim|"qt6"> accordingly (<source-link|qt_gui.cpp|src/Plugins/Qt/qt_gui.cpp>). The same code is in
   <source-link|Plugins/Qt6|src/Plugins/Qt6> and in <name|Qtwk> (<source-link|qtwk_gui.cpp|src/Plugins/Qtwk/qtwk_gui.cpp>), so
-  <scm|gui-version> does not tell <name|Qtwk> from <name|Qt>; the predicate
-  <scm|qt-gui?> holds in all three, and in the <name|Cocoa> port too, see
+  <scm|gui-version> does not tell <name|Qtwk> from <name|Qt>. The predicate
+  <scm|qt-gui?> holds in the two <name|Qt> directories and in the
+  <name|Cocoa> port, but not in <name|Qtwk>, whose widgets are those of
+  <name|Widkit> (there <scm|x-gui?> holds, as in <name|X11>), see
   <hlink|the overview|guiports.en.tm>.
 
   <section|The <source-link|Plugins/Qt6|src/Plugins/Qt6> fork>
@@ -189,8 +191,9 @@
   <verbatim|lpoptions> and prints with <verbatim|lpr> (<hlink|the <name|Vue>
   port|guiports-vue.en.tm>), and <name|Cocoa> the print panel of
   <name|macOS> (<hlink|the <name|Cocoa> port|guiports-cocoa.en.tm>). In
-  <name|Qtwk>, where <scm|qt-gui?> also holds, the widget is the
-  <name|Widkit> placeholder, see <hlink|pitfalls|guiports-pitfalls.en.tm>.
+  <name|Qtwk>, <scm|qt-gui?> does not hold, so <scm|use-print-dialog?> is
+  false and the <name|Widkit> placeholder <cpp|printer_widget> is never
+  opened: printing goes through the printing command, as in <name|X11>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

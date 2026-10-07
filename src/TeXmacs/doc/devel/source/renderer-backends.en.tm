@@ -26,8 +26,9 @@
   <source-link|Plugins/Pdf|src/Plugins/Pdf> (<cpp|PDF_RENDERER>,
   <name|PDFHummus>) only with <name|Qt> and <name|Cocoa> (with <name|CMake>,
   only for <name|Qt> without <name|MuPDF>). The renderers of
-  <source-link|Plugins/Qt|src/Plugins/Qt> and <source-link|Plugins/Qt6|src/Plugins/Qt6> have diverged a little
-  (only the former has <cpp|rounded_rectangle>, for instance).
+  <source-link|Plugins/Qt|src/Plugins/Qt> and <source-link|Plugins/Qt6|src/Plugins/Qt6> are kept identical
+  (<cpp|rounded_rectangle> included); like the rest of the two directories,
+  they are synchronized by hand.
 
   <subsection|<cpp|basic_renderer_rep>>
 
@@ -191,8 +192,9 @@
     (<cpp|vue_sdl_mupdf_window_rep> in
     <source-link|vue_gui.cpp|src/Plugins/Vue/vue_gui.cpp>).
 
-    <item>With the GPU (<verbatim|./configure --with-thorvg=...>, which
-    defines <cpp|USE_THORVG>; on unless <verbatim|TEXMACS_VUE_GPU=0>, and
+    <item>With the GPU (<verbatim|./configure --with-thorvg=...>, or
+    <verbatim|THORVG_DIR> with <name|CMake>, which define
+    <cpp|USE_THORVG>; on unless <verbatim|TEXMACS_VUE_GPU=0>, and
     abandoned when no <name|OpenGL> context can be made),
     <cpp|gpu_renderer_rep>
     (<source-link|vue_gpu.cpp|src/Plugins/Vue/vue_gpu.cpp>) draws into
@@ -205,8 +207,9 @@
   </itemize>
 
   A third path, through <name|SDL>'s own renderer and the example
-  renderer of <name|Clay> (<cpp|vue_sdl_window_rep>), is unused. The
-  <name|CMake> build has no <name|ThorVG>, hence no GPU path.
+  renderer of <name|Clay> (<cpp|vue_sdl_window_rep>), is unused. A
+  <name|CMake> build without <verbatim|THORVG_DIR> has no <name|ThorVG>,
+  hence no GPU path.
 
   <subsection|The <name|Cocoa> renderer>
 

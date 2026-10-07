@@ -76,6 +76,14 @@
   <paragraph|Printing.>Since <scm|use-print-dialog?> is false,
   printing always goes through the printing command.
 
+  <paragraph|Headless mode.>With <verbatim|-headless> the windows are made
+  but never mapped (<cpp|x_window_rep::set_visibility> in
+  <source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>). The port still
+  needs a display: without one, <cpp|x_gui_rep>
+  (<source-link|x_init.cpp|src/Plugins/X11/x_init.cpp>) stops with a
+  message which suggests <verbatim|xvfb-run> or a virtual
+  <verbatim|DISPLAY>.
+
   <section|The <name|SDL> port>
 
   <source-link|Plugins/SDL|src/Plugins/SDL> is an experimental port which uses <name|SDL3> for
@@ -126,6 +134,13 @@
   <em|name>> saves the backing store of the target window in the directory
   <verbatim|TEXMACS_SDL_SNAPSHOT>.
 
+  <paragraph|Headless mode.>With <verbatim|-headless>, the constructor of
+  <cpp|sdl_gui_rep> (<source-link|sdl_gui.cpp|src/Plugins/SDL/sdl_gui.cpp>)
+  selects the <verbatim|dummy> video driver of <name|SDL>, which opens no
+  display, and <cpp|sdl_window_rep::set_visibility>
+  (<source-link|sdl_window.cpp|src/Plugins/SDL/sdl_window.cpp>) shows no
+  window; the windows are still drawn in their backing stores.
+
   <paragraph|Limits.>No file dialogs of the system and no drag and drop,
   no custom cursors (except the invisible one), and the positions of
   popups may be off on a display whose density differs from
@@ -152,18 +167,29 @@
   <paragraph|Keyboard and input methods.><cpp|QTWKWindow::keyPressEvent>
   and <cpp|QTWKWindow::inputMethodEvent> (<source-link|QTWKWindow.cpp|src/Plugins/Qtwk/QTWKWindow.cpp>) follow
   the <name|Qt> port; committed text is replayed as one synthetic key
-  press per <cpp|QChar>.
+  press per character, a surrogate pair (a character outside the basic
+  multilingual plane) being kept together, as in <name|Qt>.
 
   <paragraph|Clipboards.><cpp|qtwk_gui_rep::set_selection> and
   <cpp|get_selection> are those of the <name|Qt> port: the same
   <cpp|QMimeData> with <verbatim|application/x-texmacs-clipboard> and
   <verbatim|application/x-texmacs-pid>, <verbatim|"primary"> on the system
-  clipboard and <verbatim|"mouse"> on the <name|X11> selection.
+  clipboard and <verbatim|"mouse"> on the <name|X11> selection. As in
+  <name|Qt>, a null <cpp|QClipboard::mimeData> (an empty clipboard on some
+  platforms) is checked for.
 
-  <paragraph|Scheme.>Since <cpp|QTTEXMACS> is defined, <scm|qt-gui?> holds
-  and <scm|gui-version> is <verbatim|"qt5"> or <verbatim|"qt6">: the
-  <scheme> code offers the <name|Qt> features, which the <name|Widkit>
-  widgets do not all have (see <hlink|pitfalls|guiports-pitfalls.en.tm>).
+  <paragraph|Scheme.><scm|gui-version> is <verbatim|"qt5"> or
+  <verbatim|"qt6">, but <scm|qt-gui?> does not hold and <scm|x-gui?> does
+  (<source-link|Kernel/Abstractions/basic.cpp|src/Kernel/Abstractions/basic.cpp>),
+  although <cpp|QTTEXMACS> is defined: the widgets are those of
+  <name|Widkit>, so the <scheme> code treats the port as <name|X11>. In
+  particular <scm|use-print-dialog?> is false and printing goes through
+  the printing command. In <name|C++>, on the other hand, code which tests
+  <cpp|QTTEXMACS> applies to <name|Qtwk> too (see
+  <hlink|pitfalls|guiports-pitfalls.en.tm>).
+
+  <paragraph|Headless mode.>A <cpp|QTWKCoreApplication> replaces the
+  application, but the windows do not test <cpp|is_headless>.
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

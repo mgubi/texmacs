@@ -102,9 +102,12 @@
     serif and typewriter text and mathematics (<cpp|profile_variant_fix>).
     A value may list alternatives separated by commas, such as
     <verbatim|"Inconsolatazi4, TeX Gyre Cursor"> for the <name|TeX Gyre>
-    profiles, <name|Euler Math>, <name|Garamond-Math>,
-    <name|OldStandard-Math> and <name|GFS Neohellenic Math>: the first one
-    of which the database knows a style (<cpp|font_database_styles>) is
+    profiles (except <name|TeX Gyre DejaVu Math>), <name|STIX Two Math>,
+    <name|Erewhon Math>, <name|XCharter Math>, <name|Euler Math>,
+    <name|Lete Sans Math>, <name|XITS Math>, <name|Asana Math>,
+    <name|Garamond-Math>, <name|OldStandard-Math> and <name|GFS Neohellenic
+    Math> (<name|Concrete Math> takes <name|Latin Modern Mono>): the first
+    one of which the database knows a style (<cpp|font_database_styles>) is
     used, and the item is kept when none is.
 
     <item*|<verbatim|letters>><verbatim|math> or <verbatim|text>: whether
@@ -141,11 +144,22 @@
   <verbatim|file> is never offered in the menus
   (<scm|opentype-math-font-installed?> requires the file) and pulls in no
   mathematics, but its <verbatim|sans> and <verbatim|mono> keys still apply
-  to the text font it is named after. The one such profile is
-  <verbatim|Palatino>, the Palatino of <name|macOS>, which has no
-  typewriter face: without it the typewriter text would be the closest
-  monospaced font of the database, <name|Linux Libertine Mono>; with it,
-  it is <name|Inconsolata>.
+  to the text font it is named after. Such profiles, made with
+  <scm|math-font-profile-set> at the end of
+  <source-link|fonts/fonts-opentype.scm|TeXmacs/progs/fonts/fonts-opentype.scm>,
+  give the typewriter companion <verbatim|"Inconsolatazi4, TeX Gyre
+  Cursor"> to the text fonts of the menu of text fonts which have no
+  monospaced face of their own, fonts of <name|macOS> and of <TeX>
+  distributions: Palatino, Baskerville, Charter, Cochin, Didot, Garamond,
+  Georgia, Hoefler Text, Iowan Old Style, Times New Roman, Alegreya,
+  Cardo, Crimson, Essays1743, Junicode, Merriweather, Arial, Avenir,
+  Futura, Gill, Helvetica, Lucida Grande, Optima, Verdana, Inter, Lato and
+  Cuprum. Without them the typewriter text would be the closest
+  monospaced font of the database, <name|Linux Libertine Mono> for
+  Palatino; with them, it is <name|Inconsolata>. The families with a
+  monospaced face of their own (<name|DejaVu>, <name|IBM Plex>,
+  <name|Noto>, <name|Fira>, <name|Libertinus>, ...) need no such
+  profile.
 
   <section|How a profile steers the choice of fonts>
 
@@ -323,9 +337,15 @@
   <name|Concrete Math>) are given the masters <verbatim|XCharter Math> and
   <verbatim|Concrete Math> in <source-link|font-features.scm|TeXmacs/fonts/font-features.scm>.
   <name|Noto Sans Math> is a master of its own, as <name|Fira Math> is,
-  rather than a family of the master <verbatim|Noto>, and the <name|IBM
-  Plex> entries list the regular file before the medium one, which a scan
-  files as the regular style too.
+  rather than a family of the master <verbatim|Noto>. A scan files a
+  family <verbatim|X Medium> under the style of <verbatim|X>, so that the
+  <name|IBM Plex> entries of the <verbatim|Regular> style also list the
+  medium files (<verbatim|IBMPlexSans-Medium.otf> next to
+  <verbatim|IBMPlexSans-Regular.otf>); since the first file of an entry is
+  the one used, the database puts the files named <verbatim|Medium> after
+  the others, both when it scans and when it loads a database file
+  (<cpp|medium_last> in
+  <source-link|font_database.cpp|src/Graphics/Fonts/font_database.cpp>).
 
   The smart font also uses one shipped file directly: when the main font
   has a <verbatim|MATH> table and a symbol it lacks could only be emulated
@@ -444,8 +464,9 @@
     family name and its <verbatim|MATH> table, not the companions.
 
     <item>The order of the profiles matters when two of them name the same
-    text font. The companion-only <verbatim|Palatino> profile is declared
-    last, after the menus.
+    text font. The companion-only profiles (<verbatim|Palatino> and the
+    other text fonts without a monospaced face) are declared last, after
+    the menus.
 
     <item>The <verbatim|bold-math> key has no effect.
 

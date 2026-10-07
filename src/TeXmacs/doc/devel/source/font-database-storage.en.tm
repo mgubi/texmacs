@@ -277,7 +277,12 @@
   <cpp|font_database_init_scanned> before each scan. For each new file, it
   calls <cpp|tt_font_name> to obtain one pair <verbatim|(family style)> per
   subfont, and registers the location <verbatim|(file index size)> for this
-  pair; the names of the processed files are only printed in verbose debug
+  pair. Since <cpp|tt_font_name> drops <verbatim|Medium> from the family
+  names, a medium face may be filed under the same style as the regular
+  one, and the first location of a pair is the one used: <cpp|medium_last>
+  therefore puts the files whose name contains <verbatim|Medium> after the
+  others, after each insertion and also when a database file is loaded
+  (<cpp|font_database_load_database>). The names of the processed files are only printed in verbose debug
   mode, and a scan ends with a count of the new and skipped files.
 
   The scanning functions available to the rest of <TeXmacs> are:

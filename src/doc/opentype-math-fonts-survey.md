@@ -176,14 +176,16 @@ with "STIX" to "Stix", so inside TeXmacs the family is "Stix Two Math" and
 documents must use that spelling (the sample document had to be fixed).
 Its `displayOperatorMinHeight` is 1800, so display operators come out
 large; `minConnectorOverlap` 100. *Now: shipped (`stix2`) with four STIX
-Two Text faces; STIX Two has no sans serif or typewriter companion.*
+Two Text faces; STIX Two has no sans serif companion, and Inconsolata
+(TeX Gyre Cursor as the fallback) is its typewriter companion.*
 
 **XITS Math** (OFL, a fork of STIX v1 by Khaled Hosny). Regular and Bold
 math, `XITS-{Regular, Italic, Bold, BoldItalic}` text. Coverage like STIX
 v1 but with italic corrections, `ssty` and kerning. The Bold math font is
 partial (40 vertical variants, one assembly). Good fallback for users who
 prefer Times; less compelling now that STIX Two exists. *Now: profiled,
-not shipped; in the "Other" submenu when installed.*
+not shipped; in the "Other" submenu when installed, with Inconsolata for
+typewriter text.*
 
 **Libertinus Math** (OFL). Companion of Libertinus Serif and Sans, the
 maintained successor of Linux Libertine, which TeXmacs already knows
@@ -209,8 +211,8 @@ family); Light and Semibold are not shipped.*
 **Asana Math** (OFL). Derived from Palatino-like pxfonts; wide coverage
 (94%), MathKernInfo, but no companion text fonts of its own. Pair it with
 TeX Gyre Pagella or with the pxfonts text faces. TeXmacs already lists it
-(`math-asana`). *Now: profiled with Pagella text, not shipped; in the
-"Other" submenu when installed.*
+(`math-asana`). *Now: profiled with Pagella text and Inconsolata for
+typewriter text, not shipped; in the "Other" submenu when installed.*
 
 **Fira Math** (OFL). Sans serif math for Fira Sans, which TeXmacs supports
 (`adjust_fira.cpp`, `fira-font` package). Coverage is limited (43% of the
@@ -231,7 +233,8 @@ options through Metafont; these are their OpenType replacements. *Now: all
 four are shipped and in the serif section of the menu as Utopia, Charter,
 Concrete and Euler: Concrete Math with the Concrete faces of CM Unicode
 (CMU Concrete), Euler Math with TeX Gyre Pagella text, as with `eulervm`,
-and Heros and Inconsolata as companions.
+and Heros and Inconsolata as companions. Erewhon and XCharter also take
+Inconsolata for typewriter text, and Concrete takes Latin Modern Mono.
 XCharter, Concrete and Erewhon use their bold math faces; the bold Erewhon
 math file names its family like the text face, and the shipped database
 lists it as the Bold style of Erewhon Math.*
@@ -245,7 +248,8 @@ table. Text companions are EB Garamond from Google Fonts or TeX Live.
 **Lete Sans Math** (OFL). Sans math for Lato; 95% coverage, kerning.
 Companions: Lato. *Now: shipped (`letesans`), regular and bold, with the
 math font itself as its text companion rather than Lato, which is not
-shipped; menu entry "Lete Sans" in the sans serif section.*
+shipped, and Inconsolata for typewriter text; menu entry "Lete Sans" in
+the sans serif section.*
 
 **IBM Plex Math** (OFL). Complete coverage, kerning, `mark` positioning,
 and the large Plex Sans, Serif and Mono families. `displayOperatorMinHeight`
@@ -333,8 +337,12 @@ Alphabets, rubber policy and quirks are still to come; the display cap is a
 constant for all fonts. `sans` and `mono` may list alternatives separated
 by commas, the first one the database knows being used (`"Inconsolatazi4,
 TeX Gyre Cursor"`), and a profile without `file` only gives companions to a
-text font without mathematics: the Palatino of macOS takes Inconsolata for
-its typewriter text instead of the closest monospaced font.*
+text font without mathematics: the text fonts of the menu without a
+monospaced face of their own, from macOS and TeX Live (Palatino,
+Baskerville, Charter, Georgia, Helvetica, Optima, Alegreya, Crimson,
+Junicode, Lato, ..., the list is at the end of `fonts-opentype.scm`), take
+Inconsolata for their typewriter text instead of the closest monospaced
+font.*
 
 Introduce one data structure, filled by hand, consulted by all the places
 above. In C++ it can be a static table in a new
@@ -507,14 +515,19 @@ has changed or the local one has lost entries (see section 4.1 of
 
 Only one weight and one optical size of each text family is shipped. A
 document typeset with the whole upstream family available can therefore
-differ slightly, as the extra optical sizes of Latin Modern and the Medium
-and SemiBold weights of STIX Two Text are then used instead. Upstream has
+differ slightly, as the extra optical sizes of Latin Modern and the
+SemiBold weight of STIX Two Text are then used instead. (A Medium face is
+filed by a scan under the style of the regular one, but the database puts
+the files named Medium after the others, when scanning and when loading,
+so that the regular file stays the one used: `medium_last` in
+`font_database.cpp`.) Upstream has
 released only the regular weight of Fira Math, so bold Fira mathematics is
 emulated. Erewhon-Math-Bold names its family like the Erewhon text face;
 the shipped database lists it as the Bold style of Erewhon Math, which a
 scan of the disk alone would not. Likewise by hand: Noto Sans Math is a
-master of its own, as Fira Math is, and the IBM Plex entries list the
-regular file before the medium one, which a scan files as regular too.
+master of its own, as Fira Math is. The IBM Plex entries list the
+medium files after the regular ones, which a scan files as regular too;
+the database also enforces this order (`medium_last`).
 A text font which a shipped math font sets as roman text (EB Garamond, Old
 Standard, ...) is left out of the menu of text fonts, which offers it with
 its mathematics instead; a sans serif text (Noto Sans, IBM Plex Sans) does

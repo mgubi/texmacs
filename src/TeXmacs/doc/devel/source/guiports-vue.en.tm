@@ -31,9 +31,9 @@
   <source-link|misc/thorvg/build-thorvg.sh|misc/thorvg/build-thorvg.sh>) the GPU renderer is compiled in
   (<cpp|USE_THORVG>). <name|CMake> builds the port with
   <verbatim|TEXMACS_GUI=Vue> (<name|SDL3>, <name|SDL3_ttf> and <name|MuPDF>
-  required) but has no <name|ThorVG> option, so its build draws with
-  <name|MuPDF> only, see <hlink|selecting and building a
-  port|guiports-build.en.tm>. <source-link|clay.h|src/Plugins/Vue/clay.h> is upstream <name|Clay>,
+  required), with the GPU renderer when <verbatim|THORVG_DIR> names the
+  prefix of a <name|ThorVG> build and with <name|MuPDF> only otherwise,
+  see <hlink|selecting and building a port|guiports-build.en.tm>. <source-link|clay.h|src/Plugins/Vue/clay.h> is upstream <name|Clay>,
   taken verbatim; <source-link|clay_renderer_SDL3.c|src/Plugins/Vue/clay_renderer_SDL3.c> is the example renderer of
   the library and is not compiled.
 

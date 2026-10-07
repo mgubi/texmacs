@@ -66,8 +66,10 @@
   (or <verbatim|aqua>)>|<cell|none>|<cell|<cpp|AQUATEXMACS>>>>>>
 
   Headless mode (option <verbatim|-headless>) is not a port but a run-time
-  mode, implemented by <name|Qt> (both directories) and <name|Vue>, see
-  <hlink|selecting and building a port|guiports-build.en.tm>.
+  mode, implemented by <name|Qt> (both directories) and <name|Vue>, which
+  make no windows, and by <name|SDL>, <name|X11> and <name|Cocoa>, which
+  make their windows but never show them, see <hlink|selecting and building
+  a port|guiports-build.en.tm>.
 
   <paragraph|Run time.>The port can be recognized with <cpp|gui_version ()>
   (exported as <scm|gui-version>) and with the predicates of
@@ -82,12 +84,12 @@
   which hold>|<cell|Screen renderer>|<cell|Lines>>|<row|<cell|<name|Qt>>|<cell|<verbatim|"qt5">,
   <verbatim|"qt6"> (<verbatim|"qt4">)>|<cell|<scm|qt-gui?>>|<cell|<cpp|qt_renderer_rep>>|<cell|25500>>|<row|<cell|<name|Qt6>
   fork>|<cell|<verbatim|"qt6">>|<cell|<scm|qt-gui?>>|<cell|<cpp|qt_renderer_rep>>|<cell|26800>>|<row|<cell|<name|Qtwk>>|<cell|<verbatim|"qt5">,
-  <verbatim|"qt6">>|<cell|<scm|qt-gui?>>|<cell|<cpp|qt_renderer_rep>>|<cell|3700
+  <verbatim|"qt6">>|<cell|<scm|x-gui?>>|<cell|<cpp|qt_renderer_rep>>|<cell|3700
   + <name|Widkit>>>|<row|<cell|<name|X11>>|<cell|<verbatim|"x11">>|<cell|<scm|x-gui?>>|<cell|<cpp|x_drawable_rep>>|<cell|4100
   + <name|Widkit>>>|<row|<cell|<name|SDL>>|<cell|<verbatim|"sdl">>|<cell|<scm|x-gui?>>|<cell|<cpp|mupdf_renderer_rep>>|<cell|2500
   + <name|Widkit>>>|<row|<cell|<name|Vue>>|<cell|<verbatim|"vue">>|<cell|<scm|vue-gui?>>|<cell|<cpp|mupdf_renderer_rep>,
   <cpp|gpu_renderer_rep>>|<cell|16600 + <name|Clay>>>|<row|<cell|<name|Cocoa>>|<cell|<verbatim|"ns">>|<cell|<scm|qt-gui?>,
-  <scm|x-gui?>, <scm|ns-gui?>>|<cell|<cpp|ns_renderer_rep>>|<cell|12700>>>>>
+  <scm|ns-gui?>>|<cell|<cpp|ns_renderer_rep>>|<cell|12700>>>>>
 
   The line counts are those of the <name|C++> and <name|Objective-C> sources
   of the port directories, rounded. <name|Widkit> adds 10500 lines,

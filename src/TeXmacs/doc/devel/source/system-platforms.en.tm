@@ -153,18 +153,6 @@
   <section|Pitfalls>
 
   <\itemize>
-    <item><cpp|mac_begin_server> declares a <em|local> variable
-    <cpp|background_activity> which hides the static one
-    (<source-link|Plugins/MacOS/mac_utilities.mm:547|src/Plugins/MacOS/mac_utilities.mm:547>). The static variable
-    stays <cpp|nil>, so <cpp|mac_end_server> never ends the activity, each
-    start of the server creates and retains a new one, and App Nap
-    remains disabled after the server is stopped. <cpp|mac_end_server>
-    also does not reset the variable after releasing it.
-
-    <item><cpp|mac_fix_paths> is declared in
-    <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> but only defined for the
-    <name|Cocoa> port (<cpp|AQUATEXMACS>), and never called.
-
     <item>The behaviour of locks differs: advisory <cpp|flock> locks on
     <name|Unix>, mandatory <cpp|LockFileEx> locks on <name|Windows> (which
     block other programs as long as <TeXmacs> holds the file), none on

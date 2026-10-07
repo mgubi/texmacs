@@ -150,8 +150,13 @@
     <verbatim|MUPDF_DIR> as a hint), without which the configuration stops.
     The <name|Vue> sources are compiled as <name|C++20> in an object library
     of their own (<verbatim|texmacs_cxx20> in
-    <source-link|src/CMakeLists.txt|src/CMakeLists.txt>). There is no <name|ThorVG> option, so a
-    <name|CMake> build of <name|Vue> has no GPU renderer.
+    <source-link|src/CMakeLists.txt|src/CMakeLists.txt>). For <name|Vue>,
+    <verbatim|THORVG_DIR> (empty by default) names the prefix of a
+    <name|ThorVG> build made by
+    <source-link|misc/thorvg/build-thorvg.sh|misc/thorvg/build-thorvg.sh>: it
+    defines <cpp|USE_THORVG> and links <name|OpenGL>, for the GPU renderer,
+    as <verbatim|--with-thorvg> does; without it the <name|CMake> build of
+    <name|Vue> draws with <name|MuPDF> only.
 
     <item*|<verbatim|X11>><verbatim|find_package (X11)>, <name|X11> and
     <name|Widkit> sources, <name|MuPDF> off.
@@ -178,7 +183,7 @@
   <verbatim|-headless> (and implied by the conversion and web site options,
   see <hlink|the main program|server-startup.en.tm>); <cpp|is_headless ()>
   in <source-link|Texmacs/Texmacs/texmacs.cpp|src/Texmacs/Texmacs/texmacs.cpp> tells whether it is on. Two
-  ports implement it:
+  ports make no windows at all in this mode:
 
   <\description>
     <item*|<name|Qt>>A <cpp|QTMCoreApplication> replaces the
@@ -197,9 +202,31 @@
     <verbatim|TEXMACS_VUE_GPU=0> as a precaution).
   </description>
 
-  <name|X11>, <name|SDL> and <name|Cocoa> do not test <cpp|is_headless>:
-  with <verbatim|-headless> they still connect to the display (from
-  reading the code).
+  <name|SDL>, <name|X11> and <name|Cocoa> make their windows as usual, but
+  never show them:
+
+  <\description>
+    <item*|<name|SDL>>The constructor of <cpp|sdl_gui_rep>
+    (<source-link|sdl_gui.cpp|src/Plugins/SDL/sdl_gui.cpp>) selects the
+    <verbatim|dummy> video driver, which opens no display, and
+    <cpp|sdl_window_rep::set_visibility>
+    (<source-link|sdl_window.cpp|src/Plugins/SDL/sdl_window.cpp>) shows no
+    window.
+
+    <item*|<name|X11>>The windows are never mapped
+    (<cpp|x_window_rep::set_visibility> in
+    <source-link|x_window.cpp|src/Plugins/X11/x_window.cpp>), but a display
+    is still needed: without one, <cpp|x_gui_rep>
+    (<source-link|x_init.cpp|src/Plugins/X11/x_init.cpp>) fails with a
+    message which suggests <verbatim|xvfb-run> or a virtual
+    <verbatim|DISPLAY>.
+
+    <item*|<name|Cocoa>>The application gets no icon in the Dock and no
+    menu bar (activation policy <verbatim|Prohibited> in <cpp|gui_open>,
+    <source-link|ns_gui.mm|src/Plugins/NS/ns_gui.mm>), no window is ordered
+    front (<source-link|ns_widget.mm|src/Plugins/NS/ns_widget.mm>) and the
+    wait window is not shown.
+  </description>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
 

@@ -332,7 +332,7 @@
   for <cpp|exec_delayed> in <source-link|Scheme/Scheme/object.cpp|src/Scheme/Scheme/object.cpp>), while
   <name|Vue> adds branches of its own (<cpp|VUETEXMACS>). Remember that
   <cpp|QTTEXMACS> alone also holds for <name|Qtwk>, whose widgets are those
-  of <name|Widkit>.
+  of <name|Widkit> (the run-time predicates below exclude it).
 
   At run time, <cpp|gui_version ()> and the functions <cpp|gui_is_qt ()>,
   <cpp|gui_is_vue ()> and <cpp|gui_is_x ()> of
@@ -343,11 +343,15 @@
 
   <descriptive-table|<tformat|<table|<row|<cell|Port>|<cell|<scm|gui-version>>|<cell|<scm|qt-gui?>>|<cell|<scm|x-gui?>>|<cell|<scm|vue-gui?>>>|<row|<cell|<name|Qt>>|<cell|<verbatim|"qt5">,
   <verbatim|"qt6">>|<cell|yes>|<cell|no>|<cell|no>>|<row|<cell|<name|Qtwk>>|<cell|<verbatim|"qt5">,
-  <verbatim|"qt6">>|<cell|yes>|<cell|no>|<cell|no>>|<row|<cell|<name|Cocoa>>|<cell|<verbatim|"ns">>|<cell|yes>|<cell|yes>|<cell|no>>|<row|<cell|<name|Vue>>|<cell|<verbatim|"vue">>|<cell|no>|<cell|no>|<cell|yes>>|<row|<cell|<name|SDL>>|<cell|<verbatim|"sdl">>|<cell|no>|<cell|yes>|<cell|no>>|<row|<cell|<name|X11>>|<cell|<verbatim|"x11">>|<cell|no>|<cell|yes>|<cell|no>>>>>
+  <verbatim|"qt6">>|<cell|no>|<cell|yes>|<cell|no>>|<row|<cell|<name|Cocoa>>|<cell|<verbatim|"ns">>|<cell|yes>|<cell|no>|<cell|no>>|<row|<cell|<name|Vue>>|<cell|<verbatim|"vue">>|<cell|no>|<cell|no>|<cell|yes>>|<row|<cell|<name|SDL>>|<cell|<verbatim|"sdl">>|<cell|no>|<cell|yes>|<cell|no>>|<row|<cell|<name|X11>>|<cell|<verbatim|"x11">>|<cell|no>|<cell|yes>|<cell|no>>>>>
 
   <scm|qt-gui?> means \Pimplements the widgets and dialogs of the
   <name|Qt> port\Q: the <scheme> code uses it to choose native dialogs,
-  shortcuts and menus, which is why it holds for <name|Cocoa>. A new port
+  shortcuts and menus, which is why it holds for <name|Cocoa> and not for
+  <name|Qtwk>, whose <scm|gui-version> is nevertheless that of <name|Qt>.
+  <scm|x-gui?> means \Phas the historical <name|X11> look and feel\Q (the
+  <name|Widkit> ports): <scheme> then asks itself before overwriting a
+  file, which the native save panels of the other ports do. A new port
   should decide which of these predicates it satisfies, and look for the
   places in <source-link|TeXmacs/progs|TeXmacs/progs> which test them: a feature hidden
   behind <scm|(qt-gui?)> is silently missing elsewhere (in <name|Vue>, the

@@ -15,7 +15,9 @@
   trackpad gestures and input methods. The macro is <cpp|AQUATEXMACS>,
   <cpp|gui_version ()> returns <verbatim|"ns"> (<scm|ns-gui?> in
   <scheme>), and <scm|qt-gui?> holds, so that the <scheme> code uses the
-  same native dialogs and shortcuts as with <name|Qt>. It replaces the
+  same native dialogs and shortcuts as with <name|Qt>; <scm|x-gui?> does
+  not hold, so that, as with <name|Qt>, the save panel of <name|macOS>
+  asks before overwriting a file instead of <scheme>. It replaces the
   older <verbatim|Plugins/Cocoa> port (with its nib files), which has been
   removed.
 
@@ -51,8 +53,8 @@
   images as the pre-release <verbatim|maxs-latest>; a state of
   <verbatim|maxs_texmacs> is built by moving <verbatim|maxs_ci> to it
   (<verbatim|git push -f origin maxs_texmacs:maxs_ci>). The older workflow
-  <verbatim|macos-ns.yml> still names the branch <verbatim|ns_ci>, which no
-  longer exists.
+  <verbatim|macos-ns.yml>, for the branch <verbatim|ns_ci>, has been
+  removed from this branch (it is kept on <verbatim|wip_other_guis>).
 
   <section|Structure>
 
@@ -149,6 +151,12 @@
   <name|Ghostscript>; PostScript is only printed through
   <name|Ghostscript>.
 
+  <paragraph|Headless mode.>With <verbatim|-headless>, the application has
+  no icon in the Dock and no menu bar (activation policy
+  <verbatim|Prohibited> in <cpp|gui_open>, <source-link|ns_gui.mm|src/Plugins/NS/ns_gui.mm>), the
+  windows are made but never ordered front
+  (<source-link|ns_widget.mm|src/Plugins/NS/ns_widget.mm>), and the wait window is not shown.
+
   <section|The renderer>
 
   <cpp|ns_renderer_rep> draws with <name|Core Graphics>. Its clipping
@@ -199,15 +207,10 @@
 
     <item>The bottom and extra tools have no handle and a fixed height.
 
-    <item>No headless mode: <cpp|is_headless> is not tested.
-
     <item>Not tested with real hardware: printing on a printer, a real
     input method, gestures other than scrolling, help balloons triggered by
     hovering.
 
-    <item>Since neither <cpp|QTTEXMACS> nor <cpp|VUETEXMACS> is defined,
-    <scm|x-gui?> holds as well as <scm|qt-gui?>, see
-    <hlink|pitfalls|guiports-pitfalls.en.tm>.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
