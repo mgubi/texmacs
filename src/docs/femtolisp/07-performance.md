@@ -106,6 +106,9 @@ regression suites than s7. A profile of the boot (`TEXMACS_FL_PROFILE=1`,
   references to the old one; with the heap of TeXmacs this made reading the
   cache 100 times slower than in a standalone femtolisp. A vector without a
   label is now made once its elements are read.
+- **A heap of 32 MB at start** (`femtolisp_tm.cpp`, `TEXMACS_FL_HEAP` in
+  MB): with 8 MB, a boot collected the garbage 23 times instead of 6, about
+  60 ms more; the resident memory at boot is 8 MB larger.
 - **Primitives in C:** `symbol?` and `keyword?` (they built the name of the
   symbol at each call), `ahash-ref`/`hash-ref`, `string-length`; `char=?`
   and `string=?` without their n-ary loop for two arguments.
