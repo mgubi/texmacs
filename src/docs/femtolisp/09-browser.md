@@ -45,11 +45,13 @@ package, as `/texmacs/cache/femtolisp`:
   build, a few seconds): the program for node (the same compiler, in
   WebAssembly) runs `misc/wasm/femtolisp-cache.scm`, which loads what
   TeXmacs loads at its start and when all the menus are opened, in text and
-  in math; its cache (7.8 MB, 293 files) goes to `build-wasm/femtolisp-cache`,
+  in math; its cache (8.9 MB: 292 `.flc` and 292 `.lazy` files) goes to
+  `build-wasm/femtolisp-cache`,
   which `package.py` adds to the files of the page (its argument
   `<dir>:<prefix>`).
-- It makes the boot package 0.9 MB larger with brotli (5.16 MB instead of
-  4.26), 1.3 MB with gzip.
+- It makes the boot package 0.9 MB larger with brotli (5.40 MB instead of
+  4.46), 1.3 MB with gzip (as measured with the first version of the
+  cache).
 
 ## 9.3 Results (2026-10-07, headless Firefox, `misc/wasm/browser-run.mjs`)
 

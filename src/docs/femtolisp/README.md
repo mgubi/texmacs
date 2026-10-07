@@ -19,6 +19,12 @@ how it works, what differs from Guile, how it performs, and what is left.
 | [10-benchmarks.md](10-benchmarks.md) | the benchmarks of 2026-10-07: where the time goes, the heap, the caches, what was kept; the size of the code against S7 |
 | [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds |
 
+The documentation for the developers who maintain the interpreter is with
+the developer documentation of TeXmacs:
+`TeXmacs/doc/devel/source/femtolisp.en.tm` and the pages it links, among the
+foundations of "About the source code". These notes keep the measurements
+and the history of the decisions.
+
 ## Summary
 
 - **The interpreter is a build option:** `./configure --with-scheme=femtolisp`

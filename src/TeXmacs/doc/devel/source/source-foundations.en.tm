@@ -24,6 +24,8 @@
     <branch|The <scheme> interpreter and the <c++>/<scheme>
     glue|scheme-bridge.en.tm>
 
+    <branch|The femtolisp <scheme> interpreter|femtolisp.en.tm>
+
     <branch|The system layer: files, URLs, caches and platform
     support|system.en.tm>
   </traverse>
