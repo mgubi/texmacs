@@ -22,22 +22,30 @@ const HERE = path.dirname (new URL (import.meta.url).pathname);
 const PIXMAPS = path.resolve (HERE, '../../../TeXmacs/misc/pixmaps');
 const OUT = path.join (PIXMAPS, 'lucide');
 
-// the lines, and the pastel insides: soft tints on the light theme, deep
-// muted ones on the dark theme (the lines are light there)
+// the lines, and the pastel insides: soft tints on the light theme; on the
+// dark theme, where the lines are light, brighter pastels (the 300 tints of
+// Tailwind) blended with the background of the theme (DARK_MIX of the
+// pastel), dusty but still pastel, and the lines still show over them
 const INK = { light: '#3F3F46', dark: '#E4E4E7' };
+const DARK_BG = [32, 32, 35], DARK_MIX = 0.6;
 const FILLS = {
-  //         light      dark
-  blue:   ['#BFDBFE', '#2B4466'], // documents and files
-  amber:  ['#FDE68A', '#5A4718'], // the clipboard, editing
-  violet: ['#DDD6FE', '#43386E'], // searching, checking
-  green:  ['#BBF7D0', '#24543A'], // inserting things, running
-  rose:   ['#FECDD3', '#63303D'], // the look of the text
-  teal:   ['#99F6E4', '#1D5650'], // the structure of the document
-  orange: ['#FED7AA', '#66401E'], // statements, ideas
-  sky:    ['#BAE6FD', '#1F4A60'], // help, moving around, viewing
-  slate:  ['#D4D4D8', '#3F3F46'], // settings and tools
-  red:    ['#FECACA', '#6B2727'], // closing, deleting, stopping
+  //         light      dark (before the blend)
+  blue:   ['#BFDBFE', '#93C5FD'], // documents and files
+  amber:  ['#FDE68A', '#FDE68A'], // the clipboard, editing
+  violet: ['#DDD6FE', '#C4B5FD'], // searching, checking
+  green:  ['#BBF7D0', '#86EFAC'], // inserting things, running
+  rose:   ['#FECDD3', '#FDA4AF'], // the look of the text
+  teal:   ['#99F6E4', '#5EEAD4'], // the structure of the document
+  orange: ['#FED7AA', '#FDBA74'], // statements, ideas
+  sky:    ['#BAE6FD', '#7DD3FC'], // help, moving around, viewing
+  slate:  ['#D4D4D8', '#A1A1AA'], // settings and tools
+  red:    ['#FECACA', '#FCA5A5'], // closing, deleting, stopping
 };
+function darkFill (hex) {
+  const c = [1, 3, 5].map (i => parseInt (hex.slice (i, i + 2), 16));
+  return '#' + c.map ((v, i) => Math.round (DARK_MIX * v + (1 - DARK_MIX) * DARK_BG[i])
+                                  .toString (16).padStart (2, '0')).join ('').toUpperCase ();
+}
 
 // the margin around the drawing (in the units of the 24 x 24 drawing): the
 // icons are a little smaller than their box, as those of the Hugeicons set
@@ -188,7 +196,9 @@ function main () {
       const dir = path.join (OUT, theme);
       fs.mkdirSync (dir, { recursive: true });
       fs.writeFileSync (path.join (dir, `tm_${name}.svg`),
-                        svg (nodes[lucide], INK[theme], FILLS[colour][k], stroke, lucide));
+                        svg (nodes[lucide], INK[theme],
+                            k ? darkFill (FILLS[colour][1]) : FILLS[colour][0],
+                            stroke, lucide));
     });
     n++;
   }
