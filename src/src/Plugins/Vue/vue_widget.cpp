@@ -138,6 +138,17 @@ ui_corners (float k= 1.0f) {
 
 // the pull-down menus are rounder than the fields
 static const float menu_round= 1.5f;
+// the room between the border of a menu and its items (2x)
+static const float menu_inset= 10;
+
+// The corners of an element which lies inset (2x) in a container rounded
+// as ui_corners (k): concentric with those of the container, their radius
+// is the container's less the inset
+static inline Clay_CornerRadius
+ui_inner_corners (float k, float inset) {
+  float r= ui_pxf (the_theme.radius * k) - (float) ui_px (inset);
+  return CLAY_CORNER_RADIUS (r > 0 ? r : 0);
+}
 
 // the footer is being laid out: its buttons are flatter (menu_button,
 // layout_pull_button)
@@ -2022,6 +2033,7 @@ layout_pull_button (vue_ui_rep *w) {
   if (!down && button_grow) {
     padding= menu_item_padding ();
     padding.right= 0;
+    rad= ui_inner_corners (menu_round, menu_inset).topLeft; // in a menu
   }
   CLAY(button_id, {
     .layout= {
@@ -2174,7 +2186,7 @@ layout_pull_button (vue_ui_rep *w) {
           .attachTo= CLAY_ATTACH_TO_PARENT,
           .attachPoints= attach },
         .layout= {
-          .padding= { ui_px (10), ui_px (10), ui_px (12), ui_px (12) },
+          .padding= CLAY_PADDING_ALL (ui_px (menu_inset)),
           .sizing= { .width= CLAY_SIZING_FIT(.min= ui_pxf (120), .max= dims.width),
                      .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
@@ -3033,9 +3045,9 @@ vue_ui_rep::do_layout () {
     // a disabled item is an item all the same: the pointer resting on it
     // closes the submenu of another item (see layout_pull_button)
     note_menu_hover (button_id);
-    // the highlight of an item is rounded as the menu (and the titles of
-    // the menu bar, see layout_pull_button)
-    Clay_CornerRadius radius= item ? ui_corners (menu_round)
+    // the highlight of an item follows the corners of the menu (and of the
+    // items which open submenus, see layout_pull_button)
+    Clay_CornerRadius radius= item ? ui_inner_corners (menu_round, menu_inset)
                                    : CLAY_CORNER_RADIUS(ui_pxf (4));
     Clay_BorderElementConfig border= {};
     bool tab_strip= false;
@@ -3492,7 +3504,7 @@ vue_ui_rep::do_layout () {
               .layout= { .padding= { ui_px (8), ui_px (8), ui_px (4), ui_px (4) }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
               .backgroundColor= (hot_id == item_id.id) ? highlight_on (color_background)
                                 : (active ? palette[2] : color_background),
-              .cornerRadius= ui_corners (0.5f) })
+              .cornerRadius= ui_inner_corners (1, 4) })
             {
               layout_text (d.vals[i], d.st, black);
             }
@@ -3835,7 +3847,7 @@ vue_ui_rep::do_layout () {
           .layout= { .padding= { pad_x, pad_x, pad_y, pad_y },
                      .sizing= { .width= CLAY_SIZING_GROW(0) }},
           .backgroundColor= bg,
-          .cornerRadius= ui_corners (0.5f) })
+          .cornerRadius= the_theme.radius > 0 ? ui_inner_corners (1, 3) : ui_corners (0.5f) })
         {
           color col= active ? theme_color (the_theme.selection_text)
                             : theme_color (the_theme.text);
