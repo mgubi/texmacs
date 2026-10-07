@@ -2008,6 +2008,37 @@ menu_rested (uint32_t menu, uint32_t item) {
   return false;
 }
 
+// The buttons of the tool bars which show an icon are square, whatever
+// the proportions of the icon: the side is the larger one of the icon, and
+// in the column at the left of the editor that of the icons of the main bar
+// (24 points) at least, so that the buttons of its two bars match.
+// Returns false when the button shows something else (a text).
+static bool
+icon_size (widget w, float& iw, float& ih) {
+  vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (concrete (w).rep);
+  if (u == NULL) return false;
+  if (u->type == "picture_widget") {
+    picture p= icon_picture (u->data);
+    iw= (float) p->get_width (); ih= (float) p->get_height ();
+    return true;
+  }
+  if (u->type == "balloon_widget")
+    return icon_size (open_box<vue_balloon_widget> (u->data).w, iw, ih);
+  return false;
+}
+
+static bool
+square_tool_button (widget content, Clay_Sizing& s, Clay_Padding& padding) {
+  float iw, ih;
+  if (!in_tool_bar || !icon_size (content, iw, ih)) return false;
+  float side= max (iw, ih);
+  if (in_side_bar) side= max (side, ui_pxf (48));
+  uint16_t pad= ui_px (tool_button_pad);
+  padding= CLAY_PADDING_ALL (pad);
+  s= { CLAY_SIZING_FIXED (side + 2 * pad), CLAY_SIZING_FIXED (side + 2 * pad) };
+  return true;
+}
+
 void
 layout_pull_button (vue_ui_rep *w) {
   vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
@@ -2036,12 +2067,14 @@ layout_pull_button (vue_ui_rep *w) {
     padding= menu_item_padding ();
     padding.right= 0;
   }
+  bool square= down && !in_footer && square_tool_button (d.w, s, padding);
   CLAY(button_id, {
     .layout= {
       .padding= padding,
       .childGap= ui_px (4),
       .sizing= s,
-      .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+      .childAlignment= { .x= square ? CLAY_ALIGN_X_CENTER : CLAY_ALIGN_X_LEFT,
+                         .y= CLAY_ALIGN_Y_CENTER }},
     // flat: the bar or menu behind shows through unless hovered (the bars
     // of the main window have different greys, hence highlight_on)
     .backgroundColor= (hot_id == button_id.id || !is_nil (d.cw))
@@ -3133,6 +3166,9 @@ vue_ui_rep::do_layout () {
       if (down || pressed) bg= color_pressed;
       else if (hot) bg= hl;
     }
+    // an icon of a tool bar: a square button (see square_tool_button)
+    bool square= !item && !push && !swatch && section_bar == 0 && !in_footer &&
+                 square_tool_button (d.w, sz, padding);
     Clay_ElementData bd= Clay_GetElementData (button_id);
     CLAY(button_id, {
       .layout= {
@@ -3142,8 +3178,8 @@ vue_ui_rep::do_layout () {
         // the label of a menu item is aligned with the labels above and
         // below it, a push button and a colour cell are centered (the cells
         // of a tile are stretched to the width of the menu the tile is in)
-        .childAlignment= { .x= (push || swatch) ? CLAY_ALIGN_X_CENTER
-                                                : CLAY_ALIGN_X_LEFT,
+        .childAlignment= { .x= (push || swatch || square) ? CLAY_ALIGN_X_CENTER
+                                                          : CLAY_ALIGN_X_LEFT,
                            .y= CLAY_ALIGN_Y_CENTER }},
       .backgroundColor= bg,
       .cornerRadius= radius,
