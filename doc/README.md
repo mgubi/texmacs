@@ -29,5 +29,6 @@ which has the same version-control code as `svn_sync`.
 
 | Also here | |
 |-----------|---|
+| [TODO.md](TODO.md) | **Open work on maxs_texmacs**: PRs waiting, bugs found and not fixed (ports, build, docs, fonts), offers not taken up. |
 | [tests/](tests/) | `run-git-tests.sh` runs the headless suites `git` and `version` of the test harness (`src/TeXmacs/progs/check/git-test.scm`, `version-test.scm`), or with `--gui` the offscreen `git-gui-test.scm`. |
 | [git-implementation.md](git-implementation.md) | How the new git support is organised (modules, data formats, conventions). |
