@@ -112,7 +112,8 @@
   ("classical" "Classical")
   ("monochrome" "Monochrome")
   ("neo-classical" "Neo-classical")
-  ("hugeicons" "Hugeicons"))
+  ("hugeicons" "Hugeicons")
+  ("lucide" "Lucide"))
 
 (define-preference-names-and-validate "icon bars"
   ("top" "Above the document")
@@ -179,7 +180,7 @@
             "18em"))
     (item (text "Icon set:")
       (enum (set-pretty-preference "icon set" answer)
-            '("Classical" "Monochrome" "Neo-classical" "Hugeicons")
+            '("Classical" "Monochrome" "Neo-classical" "Hugeicons" "Lucide")
             (get-pretty-preference "icon set")
             "18em"))
     (assuming (vue-gui?)
