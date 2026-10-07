@@ -40,7 +40,6 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
 - Invalidate the style cache automatically when a style or package
   changes (it is now stale until cleared by hand).
-- Bring the wallet window variant of the desktop to the browser version.
 - Fix the toggle bugs found in `src/TeXmacs/progs/utils/misc/gui-utils.scm`
   and in the style package `src/TeXmacs/packages/new-gui/gui-button.ts`
   (GUI through markup).
