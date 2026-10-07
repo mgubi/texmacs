@@ -800,7 +800,11 @@ placeholders of the same font (two paths, one digest), and puts it in the
 Cache Storage; before TeXmacs starts, the fonts found there are put in place
 (`restoreFonts`). A font no document uses is never fetched, and a font is
 fetched once: a document in Libertinus fetches `LibertinusSerif-Regular.otf`
-(337 KB) the first time, and nothing the next visits.
+(337 KB) the first time, and nothing the next visits. With the math fonts
+shipped on 7 October 2026 (Garamond, Old Standard, IBM Plex, Noto Sans,
+Lete Sans, GFS Neohellenic, Computer Modern Sans, Inconsolata) the lazy
+fonts are 445 files, 58.6 MB; the boot package only grows by their
+entries in the font database (2 KB).
 
 The boot package is the files TeXmacs opens when it starts
 (`misc/wasm/boot-files.txt`, the list of `?trace-files`: boot, the welcome

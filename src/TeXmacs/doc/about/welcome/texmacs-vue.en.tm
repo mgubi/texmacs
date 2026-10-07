@@ -211,6 +211,18 @@
     <name|Zotero>, the icon sets) and the whole developer documentation
     (<menu|Help|Developer documentation>). Its sources are on
     <hlink|GitHub|https://github.com/mgubi/texmacs/tree/maxs_texmacs>.
+
+    <item>More fonts for text and mathematics come with the page: Garamond,
+    Old Standard, <name|IBM> Plex, Noto Sans, Lete Sans, <name|GFS>
+    Neohellenic and Computer Modern Sans (in the font menus of the footer and
+    of <menu|Document|Font>), with Inconsolata as the typewriter font of
+    Palatino, Times, Bookman, Schoolbook and Euler. As the other fonts, each
+    file is fetched the first time a document uses it, and kept by the
+    browser for the next visits.
+
+    <item>The typewriter font of sessions (and of the prompt of <name|AI>
+    sessions) is the one of the font of the document, as in the rest of the
+    text, and the spaces of a monospaced font take one cell.
   </itemize>
 
   <paragraph|6 October 2026>
