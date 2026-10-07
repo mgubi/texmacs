@@ -201,69 +201,6 @@ process_all_pipes () {
 * Routines for pipe_links
 ******************************************************************************/
 
-#if !defined (OS_MINGW) && !defined (__EMSCRIPTEN__)
-// the first words of commands which the shell runs itself
-static const char* shell_words[]= {
-  // reserved words
-  "!", "{", "}", "[[", "]]", "case", "do", "done", "elif", "else", "esac",
-  "fi", "for", "function", "if", "in", "select", "then", "time", "until",
-  "while",
-  "coproc",
-  // builtins (of POSIX sh, bash, dash and zsh)
-  ".", ":", "[", "alias", "bg", "bind", "break", "builtin", "caller", "cd",
-  "command", "compgen", "complete", "compopt", "continue", "declare", "dirs",
-  "disown", "echo", "enable", "eval", "exec", "exit", "export", "false",
-  "fc", "fg", "getopts", "hash", "help", "history", "jobs", "kill", "let",
-  "local", "logout", "mapfile", "popd", "printf", "pushd", "pwd", "read",
-  "readarray", "readonly", "return", "set", "setopt", "shift", "shopt",
-  "source", "suspend", "test", "times", "trap", "true", "type", "typeset",
-  "ulimit", "umask", "unalias", "unset", "unsetopt", "wait",
-  NULL };
-
-static bool
-program_found (string cmd) {
-  // Can the program which @cmd runs be started? As for Qt pipes, which
-  // start the program themselves, a program which is not found is an error;
-  // a command which is not a plain call of a program is left to the shell
-  int i= 0, n= N(cmd);
-  while (i < n && (cmd[i] == ' ' || cmd[i] == '\t')) i++;
-  int start= i;
-  while (i < n && cmd[i] != ' ' && cmd[i] != '\t') i++;
-  string prog= cmd (start, i);
-  if (prog == "") return true;
-  for (int j= 0; j < N(prog); j++)
-    if (!is_alpha (prog[j]) && !is_digit (prog[j]) &&
-        prog[j] != '.' && prog[j] != '_' && prog[j] != '-' &&
-        prog[j] != '+' && prog[j] != '/')
-      return true;
-  for (int j= 0; shell_words[j] != NULL; j++)
-    if (prog == shell_words[j]) return true;
-  if (search_forwards ("/", prog) >= 0) {
-    c_string p (prog);
-    return access (p, X_OK) == 0;
-  }
-  // (when PATH is not set, sh looks in the default path of the system; an
-  // empty PATH is the current directory)
-  const char* env_path= getenv ("PATH");
-  string path;
-  if (env_path != NULL) path= string (env_path);
-  else {
-    char buf[1024];
-    size_t l= confstr (_CS_PATH, buf, sizeof (buf));
-    path= (l > 0 && l <= sizeof (buf))? string (buf): string ("/usr/bin:/bin");
-  }
-  int k= 0;
-  while (k <= N(path)) {
-    int e= search_forwards (":", k, path);
-    if (e < 0) e= N(path);
-    string dir= path (k, e);
-    c_string p ((dir == ""? string ("."): dir) * "/" * prog);
-    if (access (p, X_OK) == 0) return true;
-    k= e + 1;
-  }
-  return false;
-}
-#endif
 
 string
 pipe_link_rep::start () {
@@ -275,7 +212,7 @@ pipe_link_rep::start () {
   // a live program, were read again and again (the page froze)
   return "Error: the programs of the plugins do not run in the browser";
 #else
-  if (!program_found (cmd)) {
+  if (!pipe_program_found (cmd)) {
     if (DEBUG_IO) debug_io << "Error: cannot start '" << cmd << "'\n";
     return "Error: cannot start application";
   }
@@ -541,3 +478,75 @@ void pipe_callback (void *obj, void *info) {
 }
 
 #endif // !(defined (QTTEXMACS) && defined (OS_MINGW))
+
+/******************************************************************************
+* Can the program of a command be started? (also used by the pipes of Qt)
+******************************************************************************/
+
+#if !defined (OS_MINGW) && !defined (__EMSCRIPTEN__)
+#include "analyze.hpp"
+#include <stdlib.h>
+#include <unistd.h>
+
+// the first words of commands which the shell runs itself
+static const char* shell_words[]= {
+  // reserved words
+  "!", "{", "}", "[[", "]]", "case", "do", "done", "elif", "else", "esac",
+  "fi", "for", "function", "if", "in", "select", "then", "time", "until",
+  "while",
+  "coproc",
+  // builtins (of POSIX sh, bash, dash and zsh)
+  ".", ":", "[", "alias", "bg", "bind", "break", "builtin", "caller", "cd",
+  "command", "compgen", "complete", "compopt", "continue", "declare", "dirs",
+  "disown", "echo", "enable", "eval", "exec", "exit", "export", "false",
+  "fc", "fg", "getopts", "hash", "help", "history", "jobs", "kill", "let",
+  "local", "logout", "mapfile", "popd", "printf", "pushd", "pwd", "read",
+  "readarray", "readonly", "return", "set", "setopt", "shift", "shopt",
+  "source", "suspend", "test", "times", "trap", "true", "type", "typeset",
+  "ulimit", "umask", "unalias", "unset", "unsetopt", "wait",
+  NULL };
+
+bool
+pipe_program_found (string cmd) {
+  // Can the program which @cmd runs be started? As for Qt pipes, which
+  // start the program themselves, a program which is not found is an error;
+  // a command which is not a plain call of a program is left to the shell
+  int i= 0, n= N(cmd);
+  while (i < n && (cmd[i] == ' ' || cmd[i] == '\t')) i++;
+  int start= i;
+  while (i < n && cmd[i] != ' ' && cmd[i] != '\t') i++;
+  string prog= cmd (start, i);
+  if (prog == "") return true;
+  for (int j= 0; j < N(prog); j++)
+    if (!is_alpha (prog[j]) && !is_digit (prog[j]) &&
+        prog[j] != '.' && prog[j] != '_' && prog[j] != '-' &&
+        prog[j] != '+' && prog[j] != '/')
+      return true;
+  for (int j= 0; shell_words[j] != NULL; j++)
+    if (prog == shell_words[j]) return true;
+  if (search_forwards ("/", prog) >= 0) {
+    c_string p (prog);
+    return access (p, X_OK) == 0;
+  }
+  // (when PATH is not set, sh looks in the default path of the system; an
+  // empty PATH is the current directory)
+  const char* env_path= getenv ("PATH");
+  string path;
+  if (env_path != NULL) path= string (env_path);
+  else {
+    char buf[1024];
+    size_t l= confstr (_CS_PATH, buf, sizeof (buf));
+    path= (l > 0 && l <= sizeof (buf))? string (buf): string ("/usr/bin:/bin");
+  }
+  int k= 0;
+  while (k <= N(path)) {
+    int e= search_forwards (":", k, path);
+    if (e < 0) e= N(path);
+    string dir= path (k, e);
+    c_string p ((dir == ""? string ("."): dir) * "/" * prog);
+    if (access (p, X_OK) == 0) return true;
+    k= e + 1;
+  }
+  return false;
+}
+#endif

@@ -18,7 +18,9 @@
 #ifdef OS_MINGW
 #include <windows.h>
 #elif !defined(OS_ANDROID)
-#include <wordexp.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
 #endif
 
 static string
@@ -76,23 +78,16 @@ QTMPipeLink::launchCmd () {
   LocalFree(argv);
 
 #elif !defined(OS_ANDROID)
-  wordexp_t exp;
-  memset(&exp, 0, sizeof(exp));
-
-  int status = wordexp(raw.toUtf8().constData(), &exp, 0);
-
-  if (status != 0) {
-    wordfree(&exp);
-    return false;
-  }
-
-  if (exp.we_wordc > 0) {
-    program = QString::fromUtf8(exp.we_wordv[0]);
-    for (size_t i = 1; i < exp.we_wordc; ++i)
-    args << QString::fromUtf8(exp.we_wordv[i]);
-  }
-
-  wordfree(&exp);
+  // as the pipes without Qt (System/Link/pipe_link.cpp): sh runs the
+  // command, so that it may start with a word of the shell (if, readarray),
+  // in a process group of its own, which stop terminates as a whole; a
+  // program which is not found is still an error at once
+  if (!pipe_program_found (cmd)) return false;
+  program = "/bin/sh";
+  args << "-c" << raw;
+#if QT_VERSION >= 0x060000
+  setChildProcessModifier ([] () { ::setsid (); });
+#endif
 #else
   QStringList list = QProcess::splitCommand(raw);
   if (!list.isEmpty()) {
@@ -147,9 +142,36 @@ QTMPipeLink::killProcess (int msecs) {
 #ifdef OS_MINGW
   (void) msecs;
   close ();
-#else
+#elif defined(OS_ANDROID)
   terminate ();
   if (! waitForFinished (msecs)) kill ();
+#else
+  // Ask the process group of the program to terminate and wait for all of
+  // it (up to 2 s, or msecs), as the pipes without Qt do: a wrapper script
+  // often runs the program as a child of its own, which still cleans up
+  // when the wrapper is gone; then kill what is left
+  int limit= (msecs > 0? msecs: 2000);
+  qint64 pid= processId ();
+  if (pid > 0 && ::killpg ((pid_t) pid, SIGTERM) == 0) {
+    waitForFinished (limit);
+    for (int waited= 0; waited < limit; waited += 10) {
+      if (::killpg ((pid_t) pid, 0) == -1 && errno != EPERM) break;
+      ::usleep (10000);
+    }
+    if (::killpg ((pid_t) pid, 0) == 0 || errno == EPERM)
+      ::killpg ((pid_t) pid, SIGKILL);
+  }
+  if (state () != QProcess::NotRunning) {
+    kill ();
+    waitForFinished (1000);
+  }
 #endif
 }
+
+#if !defined (OS_MINGW) && !defined (OS_ANDROID) && QT_VERSION < 0x060000
+void
+QTMPipeLink::setupChildProcess () {
+  ::setsid ();
+}
+#endif
 

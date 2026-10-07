@@ -80,6 +80,7 @@ inline bool tm_link::operator != (tm_link l) { return rep != l.rep; }
 tm_link make_cmdline_link (string name);
 tm_link make_request_link (string name);
 tm_link make_pipe_link (string cmd);
+bool    pipe_program_found (string cmd); // (not on Windows)
 tm_link make_dynamic_link (string lib, string symb, string init, string ses);
 tm_link make_worker_link (string url);
 void process_all_workers ();

@@ -181,7 +181,10 @@ qt_pipe_link_rep::interrupt () {
 #else
   uint64_t pid = PipeLink.processId ();
   if (pid == 0) return;
-  int ret =  ::kill (pid, SIGINT);
+  // the program has a process group of its own (QTMPipeLink::launchCmd):
+  // the interrupt goes to all of it, as with the pipes without Qt
+  int ret =  ::killpg ((pid_t) pid, SIGINT);
+  if (ret == -1) ret= ::kill (pid, SIGINT);
   if (ret == -1) {
     qt_error << "Interrupt not successful, pid: " << pid << " return code: " << errno << "\n";
   }

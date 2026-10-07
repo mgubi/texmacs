@@ -41,6 +41,12 @@ public:
   void feedBuf (ProcessChannel);
   bool listenChannel (ProcessChannel, int msecs);
   void killProcess (int msecs);
+
+#if !defined (OS_MINGW) && !defined (OS_ANDROID) && QT_VERSION < 0x060000
+protected:
+  // the program gets a process group of its own (Qt 6: a child modifier)
+  void setupChildProcess () override;
+#endif
 };
 
 #endif // QTM_PIPE_LINK
