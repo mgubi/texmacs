@@ -346,8 +346,10 @@ ns_gui_rep::show_wait_indicator (widget w, string message, string arg) {
     [wait_window setFrameOrigin:
        NSMakePoint (NSMidX (r) - f.size.width / 2,
                     NSMidY (r) - f.size.height / 2)];
-    [wait_window orderFront: nil];
-    [wait_window displayIfNeeded];
+    if (!is_headless ()) {
+      [wait_window orderFront: nil];
+      [wait_window displayIfNeeded];
+    }
   }
   else [wait_window orderOut: nil];
 }
@@ -1570,8 +1572,11 @@ void gui_open (int& argc, char** argv)
     // initialize app
     [NSApplication sharedApplication];
     // NOTE: the menu bar is made by make_main_menu
-    // NOTE: needed for a menu bar when TeXmacs is not in a bundle
-    [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
+    // NOTE: needed for a menu bar when TeXmacs is not in a bundle;
+    // headless (-headless): no icon in the Dock and no menu bar
+    [NSApp setActivationPolicy: is_headless ()
+             ? NSApplicationActivationPolicyProhibited
+             : NSApplicationActivationPolicyRegular];
     // NOTE: otherwise these items are added to the Edit menu each time the
     // menu bar is rebuilt
     NSUserDefaults* d= [NSUserDefaults standardUserDefaults];
@@ -1725,7 +1730,8 @@ bool check_event (int type)
 
 void image_gc (string name) {
   // Garbage collect images of a given name (may use wildcards)
-  // NOTE: not used by TeXmacs any more (nor implemented by Qt)
+  // NOTE: the kernel never calls it; SDL and Vue forward it to the image
+  // cache of MuPDF, and the pictures of Cocoa have no such cache
   (void) name;
 }
 

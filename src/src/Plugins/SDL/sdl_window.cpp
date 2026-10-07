@@ -243,6 +243,7 @@ sdl_window_rep::set_modified (bool flag) {
 
 void
 sdl_window_rep::set_visibility (bool flag) {
+  if (flag && is_headless ()) return; // nothing is shown in headless mode
   if (flag) {
     SDL_ShowWindow (sdl_win);
     // a popup is shown where the pointer is: bring it above the window

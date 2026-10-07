@@ -335,7 +335,8 @@ x_window_rep::set_modified (bool flag) {
 
 void
 x_window_rep::set_visibility (bool flag) {
-  if (flag) XMapRaised (dpy, win);
+  // headless (-headless): the windows are made, but never mapped
+  if (flag) { if (!is_headless ()) XMapRaised (dpy, win); }
   else XUnmapWindow (dpy, win);
 }
 

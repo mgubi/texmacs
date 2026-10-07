@@ -377,6 +377,35 @@ if (NOT USE_MUPDF AND (TEXMACS_GUI STREQUAL "Vue" OR TEXMACS_GUI STREQUAL "SDL")
 endif ()
 
 ### --------------------------------------------------------------------
+### ThorVG: the GPU renderer of the Vue port (as configure --with-thorvg;
+### misc/thorvg/build-thorvg.sh builds it); without it, the Vue port draws
+### with MuPDF only
+### --------------------------------------------------------------------
+
+set (THORVG_DIR "" CACHE PATH
+  "Prefix of ThorVG, for the GPU renderer of the Vue GUI (optional)")
+if (VUETEXMACS AND THORVG_DIR)
+  if (EXISTS "${THORVG_DIR}/include/thorvg-1/thorvg.h" AND
+      EXISTS "${THORVG_DIR}/lib/libthorvg-1.a")
+    set (USE_THORVG 1)
+    set (THORVG_INCLUDE_DIR "${THORVG_DIR}/include/thorvg-1")
+    set (THORVG_LIBRARIES "${THORVG_DIR}/lib/libthorvg-1.a")
+    if (APPLE)
+      list (APPEND THORVG_LIBRARIES "-framework OpenGL")
+    elseif (WIN32)
+      list (APPEND THORVG_LIBRARIES opengl32)
+    else ()
+      list (APPEND THORVG_LIBRARIES GL)
+    endif ()
+    add_compile_definitions (GL_SILENCE_DEPRECATION TVG_STATIC)
+    message (STATUS "Found ThorVG: ${THORVG_DIR} (GPU renderer of Vue)")
+  else ()
+    message (FATAL_ERROR "No ThorVG in ${THORVG_DIR} "
+      "(see misc/thorvg/build-thorvg.sh)")
+  endif ()
+endif ()
+
+### --------------------------------------------------------------------
 ### External Libraries
 ### --------------------------------------------------------------------
 
@@ -789,6 +818,9 @@ endif ()
 if (SDL3_FOUND)
   list (APPEND TeXmacs_Include_Dirs ${SDL3_INCLUDE_DIRS})
 endif ()
+if (USE_THORVG)
+  list (APPEND TeXmacs_Include_Dirs ${THORVG_INCLUDE_DIR})
+endif ()
 if (X11TEXMACS)
   list (APPEND TeXmacs_Include_Dirs ${X11_INCLUDE_DIR})
 endif ()
@@ -872,6 +904,9 @@ if (USE_MUPDF)
 endif ()
 if (SDL3_FOUND)
   list (APPEND TeXmacs_Libraries ${SDL3_LINK_LIBRARIES})
+endif ()
+if (USE_THORVG)
+  list (APPEND TeXmacs_Libraries ${THORVG_LIBRARIES})
 endif ()
 if (X11TEXMACS)
   list (APPEND TeXmacs_Libraries ${X11_LIBRARIES})

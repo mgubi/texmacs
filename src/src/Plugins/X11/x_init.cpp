@@ -19,6 +19,7 @@
 #include "sys_utils.hpp"
 #include "colors.hpp"
 #include "locale.hpp"
+#include "boot.hpp" // is_headless
 #include <locale.h>
 #if defined(MACOSX_EXTENSIONS)
 #include "MacOS/mac_app.h" // init_mac_application
@@ -635,8 +636,13 @@ x_gui_rep::x_gui_rep (int& argc2, char** argv2):
   selection_t ("none"), selection_s (""), selection_w ((Window) 0)
 {
   the_gui= this;
-  ASSERT ((dpy= XOpenDisplay (NULL)) != NULL,
-	  "failure to connect to Xserver");
+  dpy= XOpenDisplay (NULL);
+  // the X11 port needs a display even in headless mode, where it maps no
+  // window: a virtual one will do
+  if (dpy == NULL && is_headless ())
+    FAILED ("headless mode of the X11 port needs a display: "
+            "run TeXmacs with xvfb-run, or set DISPLAY to a virtual one");
+  ASSERT (dpy != NULL, "failure to connect to Xserver");
   // XSynchronize (dpy, true);
 
   XGCValues values;

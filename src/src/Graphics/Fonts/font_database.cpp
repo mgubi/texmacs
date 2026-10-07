@@ -97,6 +97,22 @@ tuple_insert (tree& t, tree x) {
   t << x;
 }
 
+// tt_font_name files a family "X Medium" under the style of X (a medium
+// weight is the normal one for TeXmacs), so that its Regular may get the
+// file of the medium face too (IBMPlexSans-Medium.otf next to
+// IBMPlexSans-Regular.otf): the first file is the one used, so the files
+// named Medium come after the others
+static tree
+medium_last (tree all) {
+  tree r (TUPLE), m (TUPLE);
+  for (int i=0; i<N(all); i++)
+    if (N(all[i]) > 0 && is_atomic (all[i][0]) &&
+        occurs ("Medium", all[i][0]->label)) m << all[i];
+    else r << all[i];
+  for (int i=0; i<N(m); i++) r << m[i];
+  return r;
+}
+
 void
 font_database_load_database (url u, hashmap<tree,tree>& ftab= font_table) {
   if (!exists (u)) return;
@@ -107,7 +123,7 @@ font_database_load_database (url u, hashmap<tree,tree>& ftab= font_table) {
       if (is_func (t[i], TUPLE, 2)) {
         //if (&ftab == &font_table)
         //  cout << t[i][0] << " ~> " << t[i][1] << "\n";
-        ftab (t[i][0])= t[i][1];
+        ftab (t[i][0])= medium_last (t[i][1]);
       }
   }
 }
@@ -412,7 +428,7 @@ font_database_build (url u) {
           if (font_table->contains (key))
             all= font_table [key];
           tuple_insert (all, im);
-          font_table (key)= all;
+          font_table (key)= medium_last (all);
         }
     scanned_files->insert (name * " " * as_string (sz));
   }

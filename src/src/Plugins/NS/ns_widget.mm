@@ -19,6 +19,7 @@
 #include "ns_menu.h"
 #include "ns_gui.h"
 #include "gui.hpp"
+#include "boot.hpp" // is_headless
 
 
 /******************************************************************************
@@ -278,7 +279,7 @@ ns_window_widget_rep::ns_window_widget_rep (ns_widget wid, string _name,
 ns_window_widget_rep::~ns_window_widget_rep()
 {
   if (DEBUG_QT)
-    debug_qt << "Deleting qt_window_widget " << id << "\n";
+    debug_qt << "Deleting ns_window_widget " << id << "\n";
   if (!fake) nr_windows--;
   // as the destruction of the QWidget in Qt: the window disappears
   NSWindow* win= [wc window];
@@ -340,7 +341,9 @@ ns_window_widget_rep::send (slot s, blackbox val) {
       bool flag = open_box<bool> (val);
       NSWindow *win = [wc window];
       if (win) {
-        if (flag)
+        // headless (-headless): the windows are made, but never shown
+        if (flag && is_headless ());
+        else if (flag)
           [win makeKeyAndOrderFront: nil];
         else
           [win orderOut:nil];

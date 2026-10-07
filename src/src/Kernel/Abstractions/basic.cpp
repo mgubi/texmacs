@@ -266,8 +266,11 @@ bool
 gui_is_x () {
   // "x" here means the historical X11 look and feel, which drives a few
   // choices in the Scheme layer (the confirmation before overwriting a
-  // file, for one). Vue is not it: it has native dialogs of its own.
-#if defined (QTTEXMACS) || defined (VUETEXMACS)
+  // file, for one). Vue is not it: it has native dialogs of its own, and
+  // neither is Cocoa, whose save panel asks before overwriting a file.
+  // Qtwk is: it uses Qt as a platform layer, but the widgets of Widkit.
+#if (defined (QTTEXMACS) && !defined (QTWKTEXMACS)) || \
+    defined (VUETEXMACS) || defined (AQUATEXMACS)
   return false;
 #else
   return true;
@@ -285,8 +288,10 @@ gui_is_vue () {
 
 bool
 gui_is_qt () {
-  // NOTE: the native interface of macOS implements the widgets of Qt
-#if defined (QTTEXMACS) || defined (AQUATEXMACS)
+  // NOTE: the native interface of macOS implements the widgets of Qt;
+  // Qtwk does not (it draws the widgets of Widkit), although it defines
+  // QTTEXMACS for its platform layer
+#if (defined (QTTEXMACS) && !defined (QTWKTEXMACS)) || defined (AQUATEXMACS)
   return true;
 #else
   return false;

@@ -1,6 +1,7 @@
 # TikZ in the browser: the TikZ plugin on TikZJax (design)
 
-Branch `wip_tikzjax` (from `wip_wasm_vue`). Status: steps 1 to 4 below
+Developed on the branch `wip_tikzjax`, merged into `wip_wasm_vue` and,
+with it, into `maxs_texmacs`. Status: steps 1 to 4 below
 done and tested in headless Firefox; step 5 to do. The text of a picture is typeset by TeXmacs, over an image
 of its drawing. Measurements and checks quoted below were made on
 2026-10-03 with `@rod2ik/tikzjax` 1.6.0.

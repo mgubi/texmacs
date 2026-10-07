@@ -369,7 +369,8 @@ qtwk_gui_rep::get_selection (string key, tree& t, string& s, string format) {
   bool owns = (format != "temp" && format != "wrapbuf" && key != "primary") &&
   !(key == "mouse" && cb->supportsSelection ());
   
-  if (!owns && md->hasFormat ("application/x-texmacs-pid")) {
+  // mimeData may be null (an empty clipboard on some platforms)
+  if (!owns && md && md->hasFormat ("application/x-texmacs-pid")) {
     buf = md->data ("application/x-texmacs-pid");
     if (!(buf.isEmpty())) {
       owns = string (buf.constData(), buf.size())
@@ -383,6 +384,7 @@ qtwk_gui_rep::get_selection (string key, tree& t, string& s, string format) {
     s = copy (selection_s [key]);
     return true;
   }
+  if (!md) return false;
   
   if (format == "default") {
     if (md->hasFormat ("application/x-texmacs-clipboard")) {

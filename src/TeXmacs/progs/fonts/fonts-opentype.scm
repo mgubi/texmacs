@@ -83,6 +83,7 @@
 
 (define-math-font-profile "Stix Two Math"
   (file "STIXTwoMath-Regular") (text "Stix Two Text")
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (menu "STIX Two") (group "Serif"))
 
 (define-math-font-profile "Libertinus Math"
@@ -98,10 +99,12 @@
 
 (define-math-font-profile "Erewhon Math"
   (file "Erewhon-Math") (text "Erewhon")
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (menu "Utopia") (group "Serif"))
 
 (define-math-font-profile "XCharter Math"
   (file "XCharter-Math") (text "XCharter")
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (menu "Charter") (group "Serif"))
 
 (define-math-font-profile "Euler Math"
@@ -111,6 +114,7 @@
 
 (define-math-font-profile "Concrete Math"
   (file "Concrete-Math") (text "CMU Concrete")
+  (mono "Latin Modern Mono")
   (letters "math") (menu "Concrete") (group "Serif"))
 
 (define-math-font-profile "Fira Math"
@@ -135,6 +139,7 @@
 
 (define-math-font-profile "Lete Sans Math"
   (file "LeteSansMath") (text "Lete Sans Math")
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (menu "Lete Sans") (group "Sans serif"))
 
 ;; Noto Sans Math is a master of its own, as Fira Math is; its text is the
@@ -146,11 +151,13 @@
 
 (define-math-font-profile "XITS Math"
   (file "XITSMath-Regular") (text "Xits")
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (bold-math "XITS Math")
   (menu "XITS") (group "Other"))
 
 (define-math-font-profile "Asana Math"
   (file "Asana-Math") (text "TeX Gyre Pagella")
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
   (letters "math") (menu "Asana") (group "Other"))
 
 (define-math-font-profile "IBM Plex Math"
@@ -290,6 +297,13 @@
 ;; Text fonts without mathematics: a profile with companions only (no file,
 ;; so that it is not offered in the menus of math fonts), for the typewriter
 ;; text of a font which has no monospaced face of its own; otherwise the
-;; closest monospaced font is taken, Linux Libertine Mono for Palatino
-(define-math-font-profile "Palatino"
-  (mono "Inconsolatazi4, TeX Gyre Cursor"))
+;; closest monospaced font is taken, Linux Libertine Mono for Palatino.
+;; The names are those of the menu of text fonts (font-short-menu.scm); the
+;; families with a monospaced face of their own (DejaVu, IBM Plex, Noto, PT,
+;; Liberation, Fira, Libertinus, Roboto, Source) find it without help
+(for (name '("Palatino" "Baskerville" "Charter" "Cochin" "Didot" "Garamond"
+             "Georgia" "Hoefler Text" "Iowan Old Style" "Times New Roman"
+             "Alegreya" "Cardo" "Crimson" "Essays1743" "Junicode"
+             "Merriweather" "Arial" "Avenir" "Futura" "Gill" "Helvetica"
+             "Lucida Grande" "Optima" "Verdana" "Inter" "Lato" "Cuprum"))
+  (math-font-profile-set name '((mono "Inconsolatazi4, TeX Gyre Cursor"))))

@@ -170,6 +170,7 @@
 /* MuPDF: its pictures and its PDF */
 #cmakedefine USE_MUPDF 1
 #cmakedefine MUPDF_RENDERER 1
+#cmakedefine USE_THORVG 1
 #cmakedefine QTPIPES 1
 
 /* Type sizes */

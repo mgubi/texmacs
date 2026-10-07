@@ -10,16 +10,18 @@
   An out-of-source build, which is the recommended way, looks like
 
   <\verbatim-code>
-    cmake -B build -G Ninja -DSCHEME_IMPL=system
+    cmake -B build -G Ninja
 
     cmake --build build
   </verbatim-code>
 
-  run from <source-link|src/|src>. With the default <verbatim|SCHEME_IMPL>
-  (<verbatim|embedded18>), the sources of the embedded <name|Guile> must
-  first be made available as <verbatim|src/tm-guile188/> (from the
-  <verbatim|guile-texmacs> repository); <verbatim|-DSCHEME_IMPL=system>
-  uses an installed <name|Guile> instead. The resulting binary is
+  run from <source-link|src/|src>. The default <verbatim|SCHEME_IMPL> is
+  <verbatim|s7>, the <name|S7> interpreter whose sources are in the tree;
+  <verbatim|-DSCHEME_IMPL=embedded18> builds the embedded <name|Guile>,
+  whose sources must first be made available as
+  <verbatim|src/tm-guile188/> (from the <verbatim|guile-texmacs>
+  repository), and <verbatim|-DSCHEME_IMPL=guile> uses an installed
+  <name|Guile>. The resulting binary is
   <verbatim|build/TeXmacs/bin/texmacs.bin> (<verbatim|texmacs.exe> on
   <name|Windows>, a <verbatim|TeXmacs.app> bundle on <name|macOS>), and
   the runtime tree is <verbatim|build/TeXmacs/>.
@@ -32,10 +34,13 @@
   <\description>
     <item*|<verbatim|CMAKE_BUILD_TYPE>>Defaults to <verbatim|Release>.
 
-    <item*|<verbatim|SCHEME_IMPL>>Either <verbatim|embedded18> (or its
-    synonym <verbatim|tm-guile188>), which builds <verbatim|tm-guile188/>
-    as a subproject and defines <verbatim|GUILE_C>, or anything else, in
-    which case <verbatim|pkg-config> looks for <verbatim|guile-1.8>,
+    <item*|<verbatim|SCHEME_IMPL>><verbatim|s7> (the default), which
+    compiles the <name|S7> interpreter of
+    <source-link|Scheme/S7|src/Scheme/S7> and defines
+    <verbatim|USE_S7>; <verbatim|embedded18> (or its synonym
+    <verbatim|tm-guile188>), which builds <verbatim|tm-guile188/> as a
+    subproject and defines <verbatim|GUILE_C>; or anything else, such as
+    <verbatim|guile>, in which case <verbatim|pkg-config> looks for <verbatim|guile-1.8>,
     <verbatim|guile-3.0>, <verbatim|guile-2.2> or <verbatim|guile-2.0>
     (in this order) and defines <verbatim|GUILE_C> for 1.8 and
     <verbatim|GUILE_D> for 2.0 and later. The meaning of these dialect
@@ -54,15 +59,22 @@
     <source-link|src/Plugins/Vue/|src/Plugins/Vue> (in <c++>20, with
     <name|Clay>), <verbatim|SDL> and <verbatim|X11> their directory and
     <source-link|src/Plugins/Widkit/|src/Plugins/Widkit>. The <name|Qtwk>
-    and <name|Cocoa> ports, the fork <source-link|src/Plugins/Qt6/|src/Plugins/Qt6>
-    and the GPU renderer of <name|Vue> (<name|ThorVG>) are only available
-    with <verbatim|configure>.
+    and <name|Cocoa> ports and the fork <source-link|src/Plugins/Qt6/|src/Plugins/Qt6>
+    are only available with <verbatim|configure>.
 
     <item*|<verbatim|USE_MUPDF>>(on for <verbatim|Vue> and <verbatim|SDL>,
     which require it, off otherwise, and forced off for <verbatim|X11>)
     Compile <source-link|Plugins/MuPDF|src/Plugins/MuPDF> and define
     <verbatim|MUPDF_RENDERER>; the library is looked for in
     <verbatim|MUPDF_DIR>.
+
+    <item*|<verbatim|THORVG_DIR>>(empty) For <verbatim|Vue>, the prefix of
+    a <name|ThorVG> build (<verbatim|include/thorvg-1/thorvg.h> and
+    <verbatim|lib/libthorvg-1.a>, as made by
+    <source-link|misc/thorvg/build-thorvg.sh|misc/thorvg/build-thorvg.sh>):
+    defines <verbatim|USE_THORVG> and links <name|OpenGL>, for the GPU
+    renderer of <name|Vue>, as <verbatim|configure --with-thorvg>. Without
+    it <name|Vue> draws with <name|MuPDF> only.
 
     <item*|<verbatim|QTPIPES>>(on) Use <name|Qt> classes instead of
     <name|Unix> pipes for plug-in connections.

@@ -155,8 +155,9 @@
     (list (or code -1) (cadr ret) (caddr ret))))
 
 (define (spawn-supported?)
-  ;; NOTE: evaluate-system is not available for the X11 version
-  (not (x-gui?)))
+  ;; evaluate-system (System/Misc/sys_utils.cpp) does not depend on the
+  ;; graphical port: it is there in all of them
+  #t)
 
 (tm-define (git-shell-quote s)
   (:synopsis "Quote @s for a POSIX shell")

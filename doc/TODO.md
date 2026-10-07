@@ -17,67 +17,23 @@ went); add what you find. Paths are relative to the repository root.
 
 ## Bugs found, not fixed
 
-### Graphical ports
+None left from the list of 2026-10-07; the fixes are in the commit "Fix the
+bugs of doc/TODO.md" of 2026-10-07 (Widkit duplicates, `x-gui?` and
+`qt-gui?` for Cocoa and Qtwk, Qtwk clipboard and input methods, headless
+X11/SDL/Cocoa, `rounded_rectangle` in Qt6, `mac_fix_paths`, CMake
+`THORVG_DIR`, `macos-ns.yml`, CMake and TikZJax docs, typewriter companions,
+Medium faces in the font database). Not tested beyond compiling: the X11,
+SDL, Qtwk and Qt6 changes (no such build here; compiled with
+`-fsyntax-only` against their configuration), and headless mode of those
+ports. The Widkit duplicates are also on `wip_other_guis`.
 
-- **The Widkit ports do not compile.**
-  `src/src/Plugins/Widkit/Basic/widkit_wrapper.cpp` defines
-  `responsive_tabs_widget`, `responsive_icon_tabs_widget`,
-  `setting_toggle_widget`, `setting_enum_widget` and `setting_group_widget`
-  twice (a leftover of the merge 02d69cf61f, after #15 and `wip_fixes`
-  both added them). This breaks X11, SDL and Qtwk, on `maxs_texmacs` and on
-  `wip_other_guis` (not on `wip_fixes`).
-- **Cocoa holds both `qt-gui?` and `x-gui?`.** `gui_is_x ()` in
-  `src/src/Kernel/Abstractions/basic.cpp` is true for every port that is
-  neither Qt nor Vue, and `gui_is_qt ()` is true for Cocoa. Scheme then
-  takes branches meant for other ports: its own overwrite confirmation, and
-  `spawn-supported?` in `version/git-base.scm` turns off `evaluate-system`
-  for Git.
-- **Qtwk passes for Qt.** It defines `QTTEXMACS`, so `qt-gui?` holds, and
-  `gui_version ()` returns `"qt5"`/`"qt6"`; `(qt5-gui?)` cannot tell it
-  from Qt. Its print dialog is the Widkit placeholder (a Cancel button)
-  although `use-print-dialog?` may be true.
-- **Qtwk lacks two fixes of Qt:** `qtwk_gui_rep::get_selection`
-  (`qtwk_gui.cpp`) dereferences `mimeData` without a null check, and
-  `QTWKWindow::inputMethodEvent` sends committed text one `QChar` at a time,
-  splitting the characters outside the BMP into surrogate halves.
-- **Headless mode only in Qt and Vue.** X11, SDL and Cocoa never test
-  `is_headless`, so `-headless` still opens a display.
-- `rounded_rectangle` is in `Plugins/Qt/qt_renderer.cpp` but not in
-  `Plugins/Qt6/qt_renderer.cpp`.
-- `mac_fix_paths` (`Plugins/MacOS/mac_utilities.mm`) is never called.
-- The debug messages of `ns_window_widget_rep` say `qt_window_widget`.
-- The comment of `image_gc` in `ns_gui.mm` says TeXmacs no longer uses it,
-  but Vue and SDL implement it (nothing calls it).
+## Kept on purpose
 
-### Build and CI
-
-- **No GPU renderer under CMake:** CMake has no ThorVG option, so a CMake
-  Vue build compiles the GPU path out.
-- `.github/workflows/macos-ns.yml` still triggers on the deleted branch
-  `ns_ci`; the macOS apps are built by `macos-maxs.yml` on `maxs_ci`.
-
-### Documentation
-
-- `src/TeXmacs/doc/devel/source/build-cmake.en.tm` says the default
-  `SCHEME_IMPL` is embedded18; `CMakeLists.txt` defaults to s7 (Quick start
-  and the `SCHEME_IMPL` item).
-- `src/docs/wasm/tikzjax.md` still says it is on the branch `wip_tikzjax`.
-
-### Fonts
-
-- The macOS text fonts other than Palatino (Times New Roman, Garamond,
-  Baskerville, Georgia...) have no typewriter companion: their typewriter
-  text is the closest monospaced font. A companion-only profile in
-  `src/TeXmacs/progs/fonts/fonts-opentype.scm` (one line each, as for
-  Palatino) fixes one.
-- The font scanner files Medium faces under the style Regular (IBM Plex
-  Sans, Serif, Mono), and lists the medium file first, so the text came out
-  semibold. The shipped `font-database.scm` is fixed by hand; a scan of the
-  user's own fonts (the home database) can still do it.
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`
-  keeps an old hack (`zoom *= 0.9` for TeX Gyre Cursor with Pagella,
-  "temporary hack for new manual"); Pagella now takes Inconsolata, so it
-  only matters where Inconsolata is missing.
+  keeps an old hack of upstream (`zoom *= 0.9` for TeX Gyre Cursor with
+  Pagella, "temporary hack for new manual"). No style uses Cursor with
+  Pagella any more (its typewriter is Inconsolata), so it only matters when
+  Cursor is chosen by hand.
 
 ## Offered, not asked for
 

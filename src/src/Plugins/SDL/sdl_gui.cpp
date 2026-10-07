@@ -25,6 +25,7 @@
 #include "tm_link.hpp"       // number_of_servers
 #include "sys_utils.hpp"     // get_env
 #include "file.hpp"          // load_string (scripted events)
+#include "boot.hpp"          // is_headless
 #include "socket_notifier.hpp" // notifiers_active (pause of the loop)
 #ifdef OS_MACOS
 #include "MacOS/mac_utilities.h" // mac_beep
@@ -58,6 +59,9 @@ sdl_gui_rep::sdl_gui_rep (int& argc2, char** argv2):
   // trackpads: macOS generates the momentum of a gesture itself (SDL drops
   // these events by default)
   SDL_SetHint (SDL_HINT_MAC_SCROLL_MOMENTUM, "1");
+  // headless (-headless): the dummy video driver opens no display, and
+  // the windows are drawn in memory
+  if (is_headless ()) SDL_SetHint (SDL_HINT_VIDEO_DRIVER, "dummy");
   if (!SDL_Init (SDL_INIT_VIDEO)) { // no audio backend is needed
     SDL_Log ("Unable to initialize SDL: %s", SDL_GetError ());
     exit (-1);

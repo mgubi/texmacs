@@ -68,35 +68,6 @@ mac_alternate_startup () {
 }
 
 
-#ifdef AQUATEXMACS
-void 
-mac_fix_paths () {
-  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-  /* add appropriate TEXMACS_PATH to the current environment */
-#if 0
-  setenv("TEXMACS_PATH",
-         [[[[NSBundle mainBundle] resourcePath] 
-           stringByAppendingPathComponent:@"share/TeXmacs"] 
-          cStringUsingEncoding:NSUTF8StringEncoding],
-         1);
-#endif
-  /* add TeX directory */
-  /* FIXME: make this user-defined */
-  // FIXME: encoding here is not quite correct!!!
-  setenv("PATH",
-         [[[NSString stringWithCString:getenv("PATH") encoding:NSASCIIStringEncoding] 
-           stringByAppendingString:@":/usr/texbin"]
-          cStringUsingEncoding:NSUTF8StringEncoding],
-         1); 
-  setenv("GUILE_LOAD_PATH","/opt/local/share/guile/1.8",1);
-  system("printenv");
-  [pool release];  
-}
-#endif
-
-
-
-
 #ifdef QTTEXMACS
 #if 1
 //HACK:

@@ -527,8 +527,14 @@ QTWKWindow::inputMethodEvent (QInputMethodEvent* event) {
     int key = 0;
 #if 1
     for (int i = 0; i < commit_string.size(); ++i) {
-      QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier, commit_string[i]);
+      // keep surrogate pairs (non-BMP characters) together, as in Qt
+      int n= (commit_string[i].isHighSurrogate () &&
+              i + 1 < commit_string.size () &&
+              commit_string[i+1].isLowSurrogate ())? 2: 1;
+      QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier,
+                    commit_string.mid (i, n));
       keyPressEvent (&ev);
+      i += n - 1;
     }
 #else
     QKeyEvent ev (QEvent::KeyPress, key, Qt::NoModifier, commit_string);
