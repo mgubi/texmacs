@@ -21,6 +21,8 @@
     <branch|Mathematical typesetting|mathematics|maths.en.tm>
 
     <branch|The boxes produced by the typesetter|typeset boxes|boxes.en.tm>
+
+    <branch|The femtolisp Scheme interpreter|femtolisp|femtolisp.en.tm>
   </traverse>
 
   <apply|tmdoc-copyright|1998--2002|Joris van der Hoeven>
