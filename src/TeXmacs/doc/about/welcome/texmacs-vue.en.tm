@@ -230,13 +230,6 @@
     <menu|Edit|Preferences|General|Icon set>. The buttons of the
     icons are square, and the two columns of icons at the left match.
 
-    <item>The focus bar is at the right of the menu bar, which leaves more
-    room to the document.
-
-    <item>Folding the column of tabs makes it disappear: a button at the left
-    of the footer brings it back, and the logo of <TeXmacs> <name|Vue> at the
-    left of the menu bar opens its menu.
-
     <item>The browser asks before closing or reloading the page while
     documents have unsaved changes.
 
