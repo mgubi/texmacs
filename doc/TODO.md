@@ -43,5 +43,3 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 - Fix the toggle bugs found in `src/TeXmacs/progs/utils/misc/gui-utils.scm`
   and in the style package `src/TeXmacs/packages/new-gui/gui-button.ts`
   (GUI through markup).
-- A page with the classification of all the fonts of TeX Live 2025
-  (232 OpenType/TrueType packages, 817 MB, by kind and size).
