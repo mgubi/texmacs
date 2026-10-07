@@ -273,6 +273,135 @@ var tmFrame = (function () {
     .tm-dark #tm-about .tm-icon { color:#9a9aa0 }
     .tm-dark #tm-about .tm-icon:hover { background:#4a4a4f; color:#e4e4e6 }
     .tm-dark #tm-about .tm-icon.done { color:#6fbf7a }
+    /* A modern look (the branch modern-ui-try): the neutral greys of zinc,
+       as vue_theme_light/dark of vue_widget.cpp, a blue accent, a quiet
+       header instead of the blue block, tabs as rounded pills, line icons
+       in the manner of Hugeicons. Overrides the rules above. */
+    #tm-frame { background:#efeff1; border-right:1px solid #e0e0e4; color:#27272a;
+      font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif;
+      -webkit-font-smoothing:antialiased }
+    #tm-frame .tm-app { height:34px; margin:8px 8px 4px; padding:0 8px; border-radius:9px;
+      background:transparent; border-bottom:none; color:#18181b; font-weight:600;
+      letter-spacing:-.1px; transition:background .12s }
+    #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#e4e4e7 }
+    #tm-frame .tm-app .tm-logo { width:22px; height:22px; margin-right:9px; border-radius:6px }
+    #tm-frame.collapsed .tm-app { margin:8px 6px 4px; padding:0 }
+    #tm-frame .tm-tabs { padding:4px 0 }
+    #tm-frame .tm-tab { height:32px; margin:2px 8px; padding:0 4px 0 11px; border-radius:9px;
+      color:#52525b; transition:background .12s, color .12s }
+    #tm-frame .tm-tab:hover { background:#e9e9ec; color:#18181b }
+    #tm-frame .tm-tab.active { background:#fff; color:#18181b; font-weight:500;
+      box-shadow:0 1px 2px rgba(24,24,27,.06), 0 0 0 1px #e4e4e7 }
+    #tm-frame .tm-tab .tm-close, #tm-frame .tm-tab .tm-more, #tm-flyout .tm-close, #tm-flyout .tm-more {
+      display:flex; align-items:center; justify-content:center; width:22px; height:22px;
+      line-height:normal; border-radius:6px; color:#a1a1aa; letter-spacing:0 }
+    #tm-frame .tm-tab:hover .tm-close, #tm-frame .tm-tab.active .tm-close { color:#71717a }
+    #tm-frame .tm-tab .tm-close:hover, #tm-frame .tm-tab .tm-more:hover, #tm-frame .tm-tab .tm-more.open,
+    #tm-flyout .tm-close:hover, #tm-flyout .tm-more:hover { background:#e4e4e7; color:#18181b }
+    #tm-frame .tm-tab .tm-more { color:#71717a }
+    #tm-frame .tm-icon16, #tm-flyout .tm-icon16 { width:14px; height:14px; fill:none; stroke:currentColor;
+      stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round }
+    #tm-frame .tm-more .tm-icon16, #tm-flyout .tm-more .tm-icon16 { stroke-width:2.4 }
+    #tm-frame .tm-tab .tm-dot, #tm-flyout .tm-dot { background:#2563eb }
+    #tm-frame.collapsed .tm-tab { height:32px; margin:2px 6px }
+    #tm-frame .tm-new, #tm-frame .tm-fold { color:#52525b; transition:background .12s }
+    #tm-frame .tm-new:hover, #tm-frame .tm-fold:hover { background:#e9e9ec; color:#18181b }
+    #tm-frame .tm-new .tm-plus { display:flex; align-items:center; justify-content:center }
+    #tm-frame .tm-new .tm-plus .tm-icon16 { width:16px; height:16px }
+    #tm-frame .tm-tabs .tm-new { height:32px; margin:2px 8px; padding:0 11px; border-radius:9px; color:#71717a }
+    #tm-frame.collapsed .tm-tabs .tm-new { height:32px; margin:2px 6px; padding:0 }
+    #tm-frame .tm-fold { height:36px; border-top:1px solid #e4e4e7; color:#71717a }
+    #tm-frame .tm-resize:hover, #tm-frame .tm-resize.dragging { background:rgba(37,99,235,.35) }
+    #tm-frame .tm-scroll:not(.off):hover { background:#e9e9ec }
+    #tm-frame .tm-tab.dragging { background:#fff;
+      box-shadow:0 10px 24px rgba(24,24,27,.14), 0 0 0 1px #e4e4e7 }
+    #tm-flyout { border-radius:9px; background:#f4f4f5; color:#18181b;
+      font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif;
+      box-shadow:0 10px 28px rgba(24,24,27,.14), 0 0 0 1px #e4e4e7 }
+    #tm-flyout.active { background:#fff }
+    #tm-frame.top { height:40px; border-bottom:1px solid #e4e4e7; align-items:center }
+    #tm-frame.top .tm-app { height:30px; margin:0 6px; border-right:none }
+    #tm-frame.top .tm-tabs { align-items:center; gap:4px; padding:0 4px }
+    #tm-frame.top .tm-tab { height:30px; margin:0; border-radius:9px; border-right:none;
+      background:transparent; padding:0 4px 0 12px }
+    #tm-frame.top .tm-tab:hover { background:#e9e9ec }
+    #tm-frame.top .tm-tab.active { background:#fff;
+      box-shadow:0 1px 2px rgba(24,24,27,.06), 0 0 0 1px #e4e4e7 }
+    #tm-frame.top .tm-tabs .tm-new { height:30px; border-radius:9px; padding:0 8px }
+    #tm-balloon { background:#18181b; border-radius:7px; padding:5px 10px; font-size:12px;
+      box-shadow:0 6px 16px rgba(24,24,27,.2) }
+    #tm-menu { background:#fff; border:1px solid #e4e4e7; border-radius:14px; padding:6px;
+      box-shadow:0 16px 40px rgba(24,24,27,.14), 0 2px 6px rgba(24,24,27,.06); color:#18181b }
+    #tm-menu .tm-head { padding:8px 10px 6px }
+    #tm-menu .tm-head .tm-logo { border-radius:10px }
+    #tm-menu .tm-text { padding:2px 10px; color:#52525b }
+    #tm-menu .tm-sep { background:#f0f0f2; margin:6px 4px }
+    #tm-menu .tm-item { padding:7px 10px; border-radius:8px }
+    #tm-menu .tm-item:hover { background:#f4f4f5 }
+    #tm-menu .tm-soft { padding:2px 10px 4px; color:#52525b }
+    #tm-menu .tm-soft .tm-ver { color:#71717a }
+    #tm-menu a { color:#2563eb }
+    #tm-menu .tm-badge, #tm-loading .tm-badge { color:#1d4ed8; background:#eff6ff; border-color:#bfdbfe;
+      border-radius:999px; padding:1px 8px }
+    #tm-about { background:rgba(24,24,27,.32); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px) }
+    #tm-about .tm-box { background:#fff; border:1px solid #e4e4e7; border-radius:16px; padding:22px 26px;
+      box-shadow:0 24px 60px rgba(24,24,27,.22); color:#18181b }
+    #tm-about li, #tm-about p { color:#3f3f46 }
+    #tm-about code { background:#f4f4f5; border-radius:6px }
+    #tm-about .tm-x { border-radius:8px; color:#71717a }
+    #tm-about .tm-x:hover { background:#f4f4f5; color:#18181b }
+    #tm-about .tm-button { border:1px solid #e4e4e7; border-radius:8px; padding:5px 12px; background:#fff }
+    #tm-about .tm-button:hover { background:#f4f4f5 }
+    #tm-about .tm-default { background:#2563eb; border-color:#2563eb; color:#fff }
+    #tm-about .tm-default:hover { background:#1d4ed8 }
+    #tm-about input { border:1px solid #e4e4e7; border-radius:8px; padding:6px 8px }
+    #tm-about input:focus { outline:2px solid rgba(37,99,235,.35); border-color:#2563eb }
+    #tm-about .tm-icon:hover { background:#f4f4f5; color:#18181b }
+
+    .tm-dark #tm-frame { background:#18181b; border-right-color:#27272a; color:#d4d4d8 }
+    .tm-dark #tm-frame .tm-app { background:transparent; color:#f4f4f5 }
+    .tm-dark #tm-frame .tm-app:hover, .tm-dark #tm-frame .tm-app.open { background:#27272a }
+    .tm-dark #tm-frame .tm-tab { color:#a1a1aa }
+    .tm-dark #tm-frame .tm-tab:hover { background:#232326; color:#f4f4f5 }
+    .tm-dark #tm-frame .tm-tab.active { background:#2c2c30; color:#f4f4f5;
+      box-shadow:0 1px 2px rgba(0,0,0,.4), 0 0 0 1px #3f3f46 }
+    .tm-dark #tm-frame .tm-tab .tm-close, .tm-dark #tm-flyout .tm-close { color:#71717a }
+    .tm-dark #tm-frame .tm-tab:hover .tm-close, .tm-dark #tm-frame .tm-tab.active .tm-close,
+    .tm-dark #tm-frame .tm-tab .tm-more, .tm-dark #tm-flyout .tm-more { color:#a1a1aa }
+    .tm-dark #tm-frame .tm-tab .tm-close:hover, .tm-dark #tm-frame .tm-tab .tm-more:hover,
+    .tm-dark #tm-frame .tm-tab .tm-more.open, .tm-dark #tm-flyout .tm-close:hover,
+    .tm-dark #tm-flyout .tm-more:hover { background:#3f3f46; color:#fff }
+    .tm-dark #tm-frame .tm-tab .tm-dot, .tm-dark #tm-flyout .tm-dot { background:#60a5fa }
+    .tm-dark #tm-frame .tm-new, .tm-dark #tm-frame .tm-tabs .tm-new, .tm-dark #tm-frame .tm-fold,
+    .tm-dark #tm-frame .tm-scroll { color:#a1a1aa }
+    .tm-dark #tm-frame .tm-new:hover, .tm-dark #tm-frame .tm-fold:hover,
+    .tm-dark #tm-frame .tm-scroll:not(.off):hover { background:#232326; color:#f4f4f5 }
+    .tm-dark #tm-frame .tm-fold { border-top-color:#27272a }
+    .tm-dark #tm-frame .tm-tab.dragging { background:#2c2c30;
+      box-shadow:0 10px 24px rgba(0,0,0,.5), 0 0 0 1px #3f3f46 }
+    .tm-dark #tm-flyout { background:#232326; color:#f4f4f5;
+      box-shadow:0 10px 28px rgba(0,0,0,.5), 0 0 0 1px #3f3f46 }
+    .tm-dark #tm-flyout.active { background:#2c2c30 }
+    .tm-dark #tm-frame.top { border-bottom-color:#27272a }
+    .tm-dark #tm-frame.top .tm-tab { background:transparent }
+    .tm-dark #tm-frame.top .tm-tab:hover { background:#232326 }
+    .tm-dark #tm-frame.top .tm-tab.active { background:#2c2c30 }
+    .tm-dark #tm-balloon { background:#3f3f46 }
+    .tm-dark #tm-menu, .tm-dark #tm-about .tm-box { background:#1f1f22; border-color:#3f3f46;
+      color:#f4f4f5; box-shadow:0 16px 40px rgba(0,0,0,.55) }
+    .tm-dark #tm-menu .tm-text, .tm-dark #tm-menu .tm-soft, .tm-dark #tm-about li,
+    .tm-dark #tm-about p { color:#d4d4d8 }
+    .tm-dark #tm-menu .tm-sep { background:#2d2d31 }
+    .tm-dark #tm-menu .tm-item:hover { background:#2c2c30 }
+    .tm-dark #tm-menu a, .tm-dark #tm-about a { color:#60a5fa }
+    .tm-dark #tm-menu .tm-badge { color:#bfdbfe; background:#1e3a8a; border-color:#1e40af }
+    .tm-dark #tm-about code { background:#27272a }
+    .tm-dark #tm-about .tm-x:hover, .tm-dark #tm-about .tm-icon:hover { background:#2c2c30; color:#fff }
+    .tm-dark #tm-about .tm-button, .tm-dark #tm-about input,
+    .tm-dark #tm-about select { background:#27272a; color:#f4f4f5; border-color:#3f3f46 }
+    .tm-dark #tm-about .tm-button:hover { background:#323236 }
+    .tm-dark #tm-about .tm-default { background:#2563eb; border-color:#2563eb; color:#fff }
+    .tm-dark #tm-about .tm-default:hover { background:#3b82f6 }
   `;
 
   // folded (only the logo and small tabs) or not, as the browser remembers
@@ -408,6 +537,16 @@ var tmFrame = (function () {
     return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
   }
   var FOLD_ICON = 'M10 3.5 5.5 8 10 12.5', UNFOLD_ICON = 'M6 3.5 10.5 8 6 12.5';
+  // the close box, the ellipsis and the plus, drawn as lines like the
+  // icons of TeXmacs (Hugeicons)
+  var CLOSE_ICON = 'M4.5 4.5l7 7M11.5 4.5l-7 7', MORE_ICON = 'M3.5 8h.01M8 8h.01M12.5 8h.01',
+      PLUS_ICON = 'M8 3v10M3 8h10';
+  function icon16 (cls, d, title) {
+    var e = el ('span', cls);
+    e.innerHTML = '<svg class="tm-icon16" viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
+    if (title) e.title = title;
+    return e;
+  }
   var UP_ICON = 'M3.5 10 8 5.5 12.5 10', DOWN_ICON = 'M3.5 6 8 10.5 12.5 6';
 
   var fold = null, newButton = null, balloon = null, scrollUp = null, scrollDown = null;
@@ -545,7 +684,7 @@ var tmFrame = (function () {
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
     newButton = el ('div', 'tm-new');
-    newButton.appendChild (el ('span', 'tm-plus', '+'));
+    newButton.appendChild (icon16 ('tm-plus', PLUS_ICON));
     newButton.appendChild (el ('span', 'tm-label', 'New window'));
     newButton.onclick = function () { hideBalloon (); _vue_web_new_tab (); };
     hover (newButton, function () { return bar.classList.contains ('collapsed') ? 'New window' : ''; });
@@ -677,8 +816,7 @@ var tmFrame = (function () {
     flyout.appendChild (el ('span', 'tm-title', name));
     flyout.appendChild (moreButton (t));
     if (tabs.length > 1) {
-      var x = el ('span', 'tm-close', '×');
-      x.title = 'Close';
+      var x = icon16 ('tm-close', CLOSE_ICON, 'Close');
       x.onmousedown = function (e) { e.stopPropagation (); };
       x.onclick = function (e) { e.stopPropagation (); flyIn (true); _vue_web_close_tab (t.id); };
       flyout.appendChild (x);
@@ -750,8 +888,7 @@ var tmFrame = (function () {
   // the ellipsis of a tab (in the column, or in the grown tab of the folded
   // column), and the right click on the tab
   function moreButton (t) {
-    var m = el ('span', 'tm-more', '\u22ef');
-    m.title = 'More';
+    var m = icon16 ('tm-more', MORE_ICON, 'More');
     m.onmousedown = function (e) { e.stopPropagation (); };
     m.onclick = function (e) { e.stopPropagation (); tabMenu (t, m); };
     return m;
@@ -848,8 +985,7 @@ var tmFrame = (function () {
       tab.oncontextmenu = function (e) { onContextMenu (e, t); };
       tab.appendChild (moreButton (t));
       if (tabs.length > 1) {
-        var x = el ('span', 'tm-close', '×');
-        x.title = 'Close';
+        var x = icon16 ('tm-close', CLOSE_ICON, 'Close');
         x.onmousedown = function (e) { e.stopPropagation (); };
         x.onclick = function (e) { e.stopPropagation (); hideBalloon (); _vue_web_close_tab (t.id); };
         tab.appendChild (x);

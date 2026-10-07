@@ -67,13 +67,20 @@ static string base_pixmap_path;
 void
 apply_icon_set () {
   if (N(base_pixmap_path) == 0) return;
-  string icon_set= get_user_preference ("icon set", "neo-classical");
+  string icon_set= get_user_preference ("icon set", "hugeicons");
+  url pixmaps ("$TEXMACS_PATH/misc/pixmaps");
   string icon_dir= "";
   if (icon_set == "monochrome") icon_dir= "monochrome";
   if (icon_set == "neo-classical") icon_dir= "neoclassical";
-  if (icon_dir != "")
+  // the Hugeicons set has only the icons with a counterpart in Hugeicons:
+  // the others (letters, symbols) come from the monochrome set, as flat
+  if (icon_set == "hugeicons")
     set_env_path ("TEXMACS_PIXMAP_PATH",
-                  url ("$TEXMACS_PATH/misc/pixmaps") * url (icon_dir) |
+                  pixmaps * url ("hugeicons") | pixmaps * url ("monochrome") |
+                  url_system (base_pixmap_path));
+  else if (icon_dir != "")
+    set_env_path ("TEXMACS_PIXMAP_PATH",
+                  pixmaps * url (icon_dir) |
                   url_system (base_pixmap_path));
   else set_env ("TEXMACS_PIXMAP_PATH", base_pixmap_path);
 }
@@ -403,7 +410,7 @@ init_env_vars () {
                        plugin_path ("misc/pixmaps"));
   // The icon set: the original icons ("classical") are those of the path
   // above; another set, chosen in the preferences (by default the
-  // neo-classical one), is looked up first (see apply_icon_set)
+  // Hugeicons one), is looked up first (see apply_icon_set)
   if (!pixmap_path_given) {
     base_pixmap_path= get_env ("TEXMACS_PIXMAP_PATH");
     apply_icon_set ();
