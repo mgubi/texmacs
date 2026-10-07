@@ -413,6 +413,41 @@ menu_veil (Clay_ElementId parent, Clay_Color bg, Clay_CornerRadius r, int16_t z)
                 .trigger= CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME }}}) {}
 }
 
+// The shadow of a floating element (a menu, a list, a balloon). Clay has no
+// shadows and the renderers no blur: a few translucent rounded boxes behind
+// the element, each larger than the one before and all a little lower, add
+// up to a soft one. They take the size the element had in the
+// last pass (none in its first frame), lie one level under it and let the
+// pointer through.
+static void
+menu_shadow (Clay_ElementId parent, float radius, int16_t z) {
+  Clay_ElementData pd= Clay_GetElementData (parent);
+  if (!pd.found) return;
+  // a light theme has dark text: the shadow is stronger on a dark theme
+  bool dark= the_theme.text.r > 128;
+  // (ten layers, 2 px apart, of the same faint black: where n of them
+  // overlap the shadow is n times as dark, a ramp from the edge outwards)
+  const int   layers= 10;
+  const float alpha= dark ? 16.0f : 9.0f;
+  float dy= ui_pxf (6);
+  for (int i= 0; i < layers; i++) {
+    float sp= ui_pxf (1 + 2 * i);
+    CLAY(CLAY_IDI ("menu_shadow", parent.id + 7919 * (i + 1)), {
+      .layout= { .sizing= {
+        CLAY_SIZING_FIXED (pd.boundingBox.width  + 2 * sp),
+        CLAY_SIZING_FIXED (pd.boundingBox.height + 2 * sp) }},
+      .backgroundColor= { 0, 0, 0, alpha },
+      .cornerRadius= CLAY_CORNER_RADIUS (radius + sp),
+      .floating= {
+        .offset= { -sp, -sp + dy },
+        .zIndex= (int16_t) (z - 1),
+        .attachPoints= { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                         .parent= CLAY_ATTACH_POINT_LEFT_TOP },
+        .attachTo= CLAY_ATTACH_TO_PARENT,
+        .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }}) {}
+  }
+}
+
 // a colour a fraction t of the way from a to b (a line between two colours
 // of the theme, a frame which is to be fainter than the border)
 static Clay_Color
@@ -2239,6 +2274,7 @@ layout_pull_button (vue_ui_rep *w) {
         current_menu= save_menu;
         current_bar= save_bar;
         menu_veil (float_id, color_background, ui_corners (menu_round), 5);
+        menu_shadow (float_id, ui_pxf (the_theme.radius * menu_round), 5);
         // a press outside the chain: its last menu closes first, then the
         // ones it hangs from, down to the one the press is in
         bool outside= menu_press && !Clay_PointerOver (float_id) &&
@@ -3322,6 +3358,7 @@ vue_ui_rep::do_layout () {
           // (no veil here, unlike the menus: the box of a balloon appears
           // at once, and its text a moment later read as a delay)
           concrete(d.help)->do_layout ();
+          menu_shadow (balloon_id, ui_pxf (8), 10);
         }
       }
     } else {
@@ -3533,6 +3570,7 @@ vue_ui_rep::do_layout () {
           .transition= drop_in_transition })
         {
           menu_veil (list_id, color_background, ui_corners (), 10);
+          menu_shadow (list_id, ui_pxf (the_theme.radius), 10);
           for (int i=0; i<N(d.vals); i++) {
             Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
             ui_signal isig= button_logic (item_id);
