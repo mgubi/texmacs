@@ -16,7 +16,7 @@ how it works, what differs from Guile, how it performs, and what is left.
 | [07-performance.md](07-performance.md) | femtolisp, s7 and Guile on boot, tests, conversions, LaTeX export, the manual and the C++ boundary |
 | [08-lazy-bodies.md](08-lazy-bodies.md) | function bodies expanded and compiled at their first call |
 | [09-browser.md](09-browser.md) | femtolisp in the browser build (`SCHEME=femtolisp`) |
-| [10-benchmarks.md](10-benchmarks.md) | the benchmarks of 2026-10-07: where the time goes, the heap, the caches, what was kept |
+| [10-benchmarks.md](10-benchmarks.md) | the benchmarks of 2026-10-07: where the time goes, the heap, the caches, what was kept; the size of the code against S7 |
 | [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds |
 
 ## Summary

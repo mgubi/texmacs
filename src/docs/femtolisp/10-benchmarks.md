@@ -153,3 +153,42 @@ function which ran `browser-run.mjs` passed `--query ?env=...` as one word
 rows of §10.5 come from a page built without the caching code. An option
 which changes what is measured should be checked in the page itself:
 `TeXmacs.scheme("%cache?")`.
+
+## 10.8 The size of the code, against S7
+
+In this tree (lines of source; the compiled objects of the browser build and
+of the native one, arm64):
+
+| | S7 | femtolisp |
+|---|---:|---:|
+| the interpreter | 106,173 lines (`s7.c`, `s7.h`: 4.2 MB) | 16,496 lines (0.47 MB) |
+| its interface with TeXmacs, C and C++ | 653 lines | 1,742 lines |
+| its Scheme layer in `TeXmacs/progs` | 734 lines | 2,146 lines |
+| **total** | **107,560 lines** | **20,384 lines** |
+| local patches of the interpreter | 6 | 22 |
+| objects of the interpreter, WebAssembly | 2,582 KB | 395 KB |
+| objects of the interpreter, native | 2,612 KB | 432 KB |
+| the program of the page (`texmacs.wasm`) | 23.10 MB | 22.39 MB |
+
+- The interpreter of femtolisp: its C core (`femtolisp/*.c`, `*.h`, 8,777
+  lines), its library `llt` (5,776 lines), and its compiler and standard
+  library in Lisp (`system.lsp`, `compiler.lsp`, 1,943 lines), with the boot
+  image made from them (`flisp.boot`, 49 KB; `fl_boot.h`, 167 KB of C).
+- The interface: `s7_tm.cpp`, `s7_tm.hpp` for S7; `femtolisp_tm.cpp`,
+  `femtolisp_tm.hpp`, `fl_core.c`, `fl_llt.c`, `fl_tm.h` for femtolisp (the
+  strings, the roots of the garbage collector, the errors, some primitives).
+- The Scheme layer: `init-s7.scm`, `boot-s7.scm`, `compat-s7.scm` for S7;
+  for femtolisp `init-femtolisp.scm` (30 lines), `r5rs-femtolisp.scm` (700:
+  R5RS), `compat-femtolisp.scm` (594: the functions of Guile) and
+  `boot-femtolisp.scm` (822: the modules, the lazy function bodies, the
+  caches).
+
+femtolisp is a sixth of S7 in source and a seventh once compiled. It needs
+three times as much code to fit TeXmacs: S7 has most of what the Scheme code
+of TeXmacs expects, femtolisp is a much smaller language, to which R5RS, the
+functions of Guile and the modules are added. The patches do not compare by
+their number: those of S7 fix a large interpreter which fits as it is, those
+of femtolisp also add what TeXmacs needs and the language had not (the
+reader and the printer of Guile, the hooks for the modules and for the roots
+of the collector, comparisons with any number of arguments). The page is
+0.7 MB smaller with femtolisp, 3% of it: most of it is TeXmacs.
