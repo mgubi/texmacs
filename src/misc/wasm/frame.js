@@ -33,7 +33,7 @@ var tmFrame = (function () {
   }
 
   var style = `
-    #tm-frame { position:relative; display:flex; flex-direction:column; width:200px; flex:none; background:#d8d8d8;
+    #tm-frame { position:relative; display:flex; flex-direction:column; width:236px; flex:none; background:#d8d8d8;
       border-right:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
       color:#222; user-select:none; overflow:hidden }
     #tm-frame.collapsed { width:44px !important }
@@ -450,7 +450,7 @@ var tmFrame = (function () {
   // (a drag; a double click gives the default back), as the browser
   // remembers it. A drag below FOLD_AT folds the column, and a drag of the
   // folded column beyond MIN_WIDTH opens it again
-  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 200, MIN_WIDTH = 100, FOLD_AT = 80;
+  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 236, MIN_WIDTH = 100, FOLD_AT = 80;
   function clampWidth (w) {
     var most = Math.max (MIN_WIDTH, Math.min (480, Math.floor (window.innerWidth / 2)));
     return Math.max (MIN_WIDTH, Math.min (most, Math.round (w)));
