@@ -6033,6 +6033,11 @@ void vue_texmacs_widget_rep::do_layout () {
       .padding= { 0, 0, 0, 0 },
       .childGap= 0 }})
   {
+    // with the main and mode bars in columns at the left, the focus bar is
+    // at the right of the menu bar, which has room for it, rather than a
+    // row of its own above the editor
+    bool focus_in_menu= bars_on_side () && visibility[0] && visibility[3] &&
+                        !is_nil (focus_icons);
 #ifdef __EMSCRIPTEN__
     uint16_t menu_left= vue_web_sidebar_hidden ? ui_px (8) : bar_hpad;
 #else
@@ -6079,6 +6084,18 @@ void vue_texmacs_widget_rep::do_layout () {
 #endif
       if (!is_nil (main_menu))
         layout_bar_content (8*id + 0, main_menu, color_background);
+      if (focus_in_menu)
+        CLAY(CLAY_IDI ("menu_bar_focus", id), {
+          .layout= {
+            .sizing= { CLAY_SIZING_FIT (0), CLAY_SIZING_FIT (0) },
+            .padding= { ui_px (24), 0, 0, 0 },
+            .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+        {
+          with_behind b (color_background);
+          in_tool_bar= true;
+          focus_icons->do_layout ();
+          in_tool_bar= false;
+        }
     }
     bool side= bars_on_side ();
     if (visibility[0] && visibility[1] && !side) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
@@ -6119,7 +6136,7 @@ void vue_texmacs_widget_rep::do_layout () {
     bool main_side= side && visibility[0] && visibility[1] && !is_nil (main_icons);
     bool mode_side= side && visibility[0] && visibility[2] && !is_nil (mode_icons);
     auto body= [&] () {
-      if (visibility[0] && visibility[3]) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
+      if (visibility[0] && visibility[3] && !focus_in_menu) CLAY(CLAY_ID_LOCAL("FocusToolbar"), {
         .layout= {
            .padding= { bar_hpad, bar_hpad, 0, 0 },
            .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
