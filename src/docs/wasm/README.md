@@ -131,8 +131,8 @@ of the windows, or their numbers, "N2" for "No name [2]"; the tab under
 the mouse grows to the right, over the document, into a whole tab with the
 name and a close box (`#tm-flyout`, an element of its own, which the column
 does not clip; the other tabs stay as they are); the browser
-remembers it, and the page starts folded; a folded column
-is gone, a chevron in the footer of TeXmacs brings it back), and a TeXmacs menu: what
+remembers it, and a page narrower than 900
+pixels starts folded), and a TeXmacs menu: what
 this TeXmacs is (version, S7, MuPDF, build date), where its files are, how
 many of its packages have come, the storage used, a popup with more info
 and the limitations of the port (the keyboard, the files, what is

@@ -418,17 +418,13 @@ var tmFrame = (function () {
     #tm-frame .tm-fold svg { transition:transform .2s cubic-bezier(.2,.8,.2,1) }
     #tm-frame .tm-fold:hover svg { transform:translateX(-2px) }
     #tm-frame.collapsed .tm-fold:hover svg { transform:translateX(2px) }
-    /* folded at the left, the column is gone (the footer of TeXmacs has a
-       button which opens it); its bottom strip is as tall as that footer */
-    body:not(.tm-tabs-top) #tm-frame.collapsed { display:none !important }
-    #tm-frame .tm-fold { box-sizing:border-box; height:var(--tm-footer-h, 36px) }
     @media (prefers-reduced-motion: reduce) {
       #tm-menu, #tm-about, #tm-about .tm-box, #tm-balloon { animation:none }
     }
   `;
 
-  // folded (the column gone: see setFolded) or not, as the browser
-  // remembers it; the page starts folded, the whole width to the document
+  // folded (only the logo and small tabs) or not, as the browser remembers
+  // it; a narrow page starts folded
   // the tabs in the column at the left, or above the page as before (the
   // preference "window tabs" of TeXmacs, which tells it at its start and
   // when it changes: setTabsPosition); the page remembers the last one, so
@@ -443,7 +439,6 @@ var tmFrame = (function () {
     if (!bar) return;
     applyTabsPosition ();
     render ();
-    tellHidden ();
     resized ();
   }
   function applyTabsPosition () {
@@ -467,7 +462,7 @@ var tmFrame = (function () {
     try { v = localStorage.getItem (FOLD); } catch (e) {}
     if (v === 'collapsed') return true;
     if (v === 'expanded') return false;
-    return true;
+    return typeof window !== 'undefined' && window.innerWidth < 900;
   }
 
   // the width of the column when it is open, which its right edge changes
@@ -750,41 +745,20 @@ var tmFrame = (function () {
     // closed it and the click opened it again)
     document.addEventListener ('mousedown', function (e) {
       if (menu && !menu.contains (e.target) && !appButton.contains (e.target) &&
-          !(menuAnchor && menuAnchor.contains (e.target))) { closeMenu (); closedAt = Date.now (); }
+          !(menuAnchor && menuAnchor.contains (e.target))) closeMenu ();
     });
-    appMenuButton = appButton;
   }
 
   // the column folded or not; TeXmacs takes the width it leaves (SDL
   // follows the size of the canvas when the window is resized)
   function setFolded (on, remember) {
     if (!bar) return;
-    flyIn (true); hideBalloon ();
+    flyIn (true);
     bar.classList.toggle ('collapsed', on);
     if (scrollUp) chevrons ();
     fold.innerHTML = svg (on ? UNFOLD_ICON : FOLD_ICON);
     if (remember) try { localStorage.setItem (FOLD, on ? 'collapsed' : 'expanded'); } catch (e) {}
-    tellHidden ();
     resized ();
-  }
-  // A folded column is gone (at the left; the tabs above the page do not
-  // fold): TeXmacs puts a button in the footer of its window which opens
-  // it again (vue_web_set_sidebar_hidden, vue_widget.cpp). TeXmacs may not
-  // run yet when the column is built: it is told again by update, which
-  // TeXmacs calls.
-  var toldHidden = null;
-  function tellHidden () {
-    var hidden = !!bar && !tabsTop && bar.classList.contains ('collapsed');
-    if (hidden === toldHidden || typeof _vue_web_set_sidebar_hidden !== 'function') return;
-    try { _vue_web_set_sidebar_hidden (hidden ? 1 : 0); toldHidden = hidden; } catch (e) {}
-  }
-  // the height of the footer of TeXmacs (in pixels of the canvas), which
-  // the bottom strip of the column takes
-  function setFooterHeight (h) {
-    var c = Module['canvas'], r = c && c.getBoundingClientRect ();
-    var k = (r && r.width > 0) ? c.width / r.width : (window.devicePixelRatio || 1);
-    if (h > 0 && k > 0)
-      document.documentElement.style.setProperty ('--tm-footer-h', (h / k) + 'px');
   }
 
   // the balloon of an element of the column, at its right (text () gives
@@ -1405,30 +1379,8 @@ var tmFrame = (function () {
   }
 
   // the menu beside the column, at the top
-  // The menu of TeXmacs Vue from the logo which TeXmacs draws at the left
-  // of its menu bar when the column is folded away (vue_widget.cpp); below
-  // is the bottom of the logo, in pixels of the canvas. The press on the
-  // canvas which closed the menu must not open it again.
-  // A click may reach here from more than one layout pass of TeXmacs: the
-  // ones which follow the first within a moment are the same click.
-  var appMenuButton = null, closedAt = 0, menuBelow = 0, toggledAt = 0;
-  function appMenuFromBar (below) {
-    if (Date.now () - toggledAt < 300) return;
-    toggledAt = Date.now ();
-    if (menu) { closeMenu (); return; }
-    if (Date.now () - closedAt < 400 || !appMenuButton) return;
-    var c = Module['canvas'], r = c.getBoundingClientRect ();
-    menuBelow = r.top + below / (r.width > 0 ? c.width / r.width : 1);
-    toggleMenu (appMenuButton);
-  }
   function placeMenu () {
     if (!menu || !bar || menu.classList.contains ('tm-tabmenu')) return;
-    if (!tabsTop && bar.classList.contains ('collapsed')) {
-      var cr = Module['canvas'].getBoundingClientRect ();
-      menu.style.left = (cr.left + 6) + 'px';
-      menu.style.top = (menuBelow + 4) + 'px';
-      return;
-    }
     var b = bar.getBoundingClientRect ();
     menu.style.left = (tabsTop ? 4 : b.right + 4) + 'px';
     menu.style.top = (tabsTop ? b.bottom + 2 : 4) + 'px';
@@ -1635,16 +1587,13 @@ var tmFrame = (function () {
     });
 
   return {
-    update: function (state) { tabs = state.tabs || []; render (); tellHidden (); },
+    update: function (state) { tabs = state.tabs || []; render (); },
     info: function (d) { app = d || {}; },
     tabs: function () { return tabs; },
     fullScreen: fullScreen,
     leave: function () { leaving = true; },
     ask: ask,
     dialog: dialog,
-    setTabsPosition: setTabsPosition,
-    unfold: function () { setFolded (false, true); },
-    appMenu: appMenuFromBar,
-    setFooterHeight: setFooterHeight
+    setTabsPosition: setTabsPosition
   };
 })();
