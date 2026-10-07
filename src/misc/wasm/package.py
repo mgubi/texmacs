@@ -21,7 +21,7 @@
 # list: see misc/wasm/boot-files.txt and docs/wasm/README.md) and some whole
 # groups which are small and read at unforeseeable times (the Scheme code,
 # the styles, the metrics of the fonts, the icons of the default set in the
-# light theme: hugeicons, completed by monochrome, see init_texmacs.cpp).
+# light theme: neoclassical, see init_texmacs.cpp).
 # The other packages, in the order of their loading, follow PACKAGES below.
 #
 # The fonts themselves (LAZY: the OpenType and Type 1 files, 59 MB, two
@@ -42,12 +42,12 @@ PLUGIN_DOCS = ['plugins/tikz/doc', 'plugins/javascript/doc', 'plugins/asymptote/
 
 BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/',
                'langs/encoding/', 'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/',
-               'misc/pixmaps/hugeicons/light/', 'misc/pixmaps/monochrome/light/']
+               'misc/pixmaps/neoclassical/light/']
 BOOT_FILES = ['fonts/font-database.scm', 'fonts/font-characteristics.scm',
               'fonts/font-features.scm', 'fonts/font-substitutions.scm',
               'fonts/pdf-font-issues.scm',
               'misc/pixmaps/light/TeXmacs.svg'] # the one icon of light/ which
-                                                # the default sets have not
+                                                # neoclassical/light has not
 
 # the other packages, in the order they are loaded: (name, prefixes); a
 # package larger than CHUNK is split

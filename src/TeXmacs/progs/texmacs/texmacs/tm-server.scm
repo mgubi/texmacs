@@ -127,7 +127,7 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
-  ("icon set" "hugeicons" notify-icon-set)
+  ("icon set" "neo-classical" notify-icon-set)
   ;; the Vue interface reads it at each layout; at the left by default in
   ;; a web browser
   ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
