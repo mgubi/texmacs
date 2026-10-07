@@ -418,12 +418,17 @@
 (define-public (not-define-option? item)
   (not (and (pair? item) (keyword? (car item)))))
 
-(define-public (lazy-define-one module opts name)
+(define-public (lazy-define-add! module name)
   (let* ((old (ahash-ref lazy-define-table name))
          (new (if old (cons module old) (list module))))
-    (ahash-set! lazy-define-table name new))
+    (ahash-set! lazy-define-table name new)))
+
+(define-public (lazy-define-one module opts name)
+  ;; the module is recorded when the form is evaluated, not when it is
+  ;; expanded (femtolisp expands (when #f (lazy-define ...)) when it
+  ;; compiles it)
   (with name-star (string->symbol (string-append (symbol->string name) "*"))
-    `(when (not (defined? ',name))
+    `(when (begin (lazy-define-add! ',module ',name) (not (defined? ',name)))
        (tm-define (,name . args)
          ,@opts
          (let* ((m (resolve-module ',module))

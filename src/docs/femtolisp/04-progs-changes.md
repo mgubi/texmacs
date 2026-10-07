@@ -25,6 +25,11 @@ as before.
   form is evaluated, through the public `lazy-format-add!`. It recorded it
   when expanded, so `(when (url-exists-in-path? "coqtop") (lazy-format ...))`
   declared the Coq formats without Coq.
+- `kernel/gui/kbd-define.scm` and `kernel/texmacs/tm-define.scm`: likewise,
+  `lazy-keyboard` and `lazy-define` record their modules when the form is
+  evaluated (`lazy-define-add!`). The keyboard of Coq was declared without
+  Coq, and typing loaded `coq-kbd.scm`, which failed (`in-coq-style?` is
+  only defined with Coq).
 
 ## 4.3 Tests
 
