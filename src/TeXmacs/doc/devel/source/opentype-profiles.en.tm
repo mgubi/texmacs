@@ -44,8 +44,9 @@
 
   The name is the family of the math font as the font database names it.
   The module is loaded at boot with the other font modules
-  (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>), so the twenty-four profiles are in place
-  before the first document is typeset.
+  (<source-link|init-texmacs.scm|TeXmacs/progs/init-texmacs.scm>), so the twenty-six profiles are in place
+  before the first document is typeset: twenty-five of math fonts and one
+  of a text font without mathematics (see below).
 
   On the <c++> side (<source-link|Graphics/Fonts/math_font_profiles.cpp|src/Graphics/Fonts/math_font_profiles.cpp>) a
   profile is stored as a <cpp|tree>, a tuple of <verbatim|(key value)>
@@ -99,6 +100,12 @@
 
     <item*|<verbatim|sans>, <verbatim|mono>>The companions used for sans
     serif and typewriter text and mathematics (<cpp|profile_variant_fix>).
+    A value may list alternatives separated by commas, such as
+    <verbatim|"Inconsolatazi4, TeX Gyre Cursor"> for the <name|TeX Gyre>
+    profiles, <name|Euler Math>, <name|Garamond-Math>,
+    <name|OldStandard-Math> and <name|GFS Neohellenic Math>: the first one
+    of which the database knows a style (<cpp|font_database_styles>) is
+    used, and the item is kept when none is.
 
     <item*|<verbatim|letters>><verbatim|math> or <verbatim|text>: whether
     the letters of formulas come from the math alphabets of the math font
@@ -112,8 +119,11 @@
 
     <item*|<verbatim|family>>The font family, <verbatim|rm> or
     <verbatim|ss>, in which the text is set (<verbatim|rm> when absent).
-    Read by <scm|init-opentype-font> only: <name|KpMath Sans> sets
-    <verbatim|font-family> to <verbatim|ss>.
+    Read on the <scheme> side only (<scm|opentype-font-family>), by
+    <scm|init-opentype-font>, the check marks of the menus and
+    <scm|opentype-math-companions>: <name|KpMath Sans>, <name|Noto Sans
+    Math> and <name|IBM Plex Math> set <verbatim|font-family> to
+    <verbatim|ss>.
 
     <item*|<verbatim|menu>, <verbatim|group>>The label of the font in the
     menus and its section: <verbatim|Serif>, <verbatim|Sans serif> or
@@ -126,6 +136,16 @@
     is the case for all four, so the key only documents that such a face
     exists.
   </description-paragraphs>
+
+  <paragraph|Profiles with companions only.>A profile without
+  <verbatim|file> is never offered in the menus
+  (<scm|opentype-math-font-installed?> requires the file) and pulls in no
+  mathematics, but its <verbatim|sans> and <verbatim|mono> keys still apply
+  to the text font it is named after. The one such profile is
+  <verbatim|Palatino>, the Palatino of <name|macOS>, which has no
+  typewriter face: without it the typewriter text would be the closest
+  monospaced font of the database, <name|Linux Libertine Mono>; with it,
+  it is <name|Inconsolata>.
 
   <section|How a profile steers the choice of fonts>
 
@@ -153,7 +173,9 @@
     companion keeps itself but takes the variant companions of that math
     font. A math font which has no text face of its own, such as
     <name|Concrete Math> or <name|Euler Math>, thus sets its text in the
-    family its profile declares.
+    family its profile declares. A text family with neither takes the
+    variant companions of a profile of its own name, if there is one (the
+    companion-only profiles above).
   </enumerate>
 
   This is why formulas follow the math companion of the text font and not
@@ -162,6 +184,29 @@
   one is written as a rule, <verbatim|math=Euler Math,TeX Gyre Pagella>,
   which <cpp|math_fix> resolves in math shapes; the condition makes the
   item invisible to <cpp|profile_fix>.
+
+  <cpp|profile_variant_fix> splits the variant on <verbatim|->, as
+  <cpp|variant_features> does, and looks for the key <verbatim|mono> when
+  one of the parts is <verbatim|tt>, for <verbatim|sans> when one is
+  <verbatim|ss>. This matters for prog mode (the inputs of sessions and
+  the prompt of AI sessions), which asks for the variant
+  <verbatim|rm-tt> in the shape <verbatim|mathupright>. In that math shape
+  <cpp|kepler_fix> has already turned <verbatim|Kepler> into
+  <verbatim|Kepler Math>, which names no profile, so the profile is looked
+  up by <cpp|profile_family>: the family itself when it has a profile, else
+  the first profiled family whose master (<cpp|font_database_master>) is
+  the given name, here <verbatim|KpMath>. The answers are cached in a
+  static <cpp|hashmap>. Without these two steps the inputs of sessions were
+  set in the closest monospaced font, <name|Libertinus Mono>, for <name|Kp
+  Fonts> and Palatino alike.
+
+  A monospaced font may also give its space another width than its
+  cells (the space of <name|KpMono> is 333 units for cells of 530): the
+  constructor of <cpp|unicode_font_rep>
+  (<source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>)
+  therefore gives the space the advance of <verbatim|m> (stretchable
+  between three quarters and one and a half of it) when <verbatim|m> and
+  <verbatim|i> have the same advance, so that verbatim text lines up.
 
   <paragraph|Letters.>The constructor of <cpp|smart_font_rep> sets the
   flag <cpp|ot_math> when the base font is an <name|OpenType> math font
@@ -201,7 +246,14 @@
   <menu|Document|Font|Mathematical font>. The text fonts which bring no
   mathematics are listed apart, in
   <source-link|TeXmacs/progs/fonts/font-short-menu.scm|TeXmacs/progs/fonts/font-short-menu.scm>, declared with
-  <scm|define-text-font> by master.
+  <scm|define-text-font> by master. <scm|text-font-list> leaves out the
+  text fonts returned by <scm|opentype-math-companions>, which the menu
+  offers with their mathematics: only the <verbatim|text> companions of
+  the installed profiles whose <verbatim|family> is <verbatim|rm>. A
+  profile set in sans serif names a master which also has a serif face,
+  <verbatim|Noto> for <name|Noto Sans Math> and <verbatim|IBM Plex> for
+  <name|IBM Plex Math>, and Noto Serif and IBM Plex Serif must stay in the
+  menu of text fonts.
 
   The entries call
 
@@ -237,16 +289,28 @@
   fonts, <name|Linux Libertine>, <name|OpenDyslexic>), one subdirectory per
   family with the math font, its text faces, a <verbatim|README.md> and the
   license: <verbatim|lm> (<name|Latin Modern>), <verbatim|newcm> (<name|New
-  Computer Modern>, regular and bold math, the <verbatim|NewCM10> faces),
-  <verbatim|stix2>, <verbatim|kp> (<name|KpMath>, <name|KpMath Sans> and
-  the <name|Kp> text faces), <verbatim|fira> (<name|Fira Math>),
-  <verbatim|libertinus>, <verbatim|erewhon>, <verbatim|xcharter>,
-  <verbatim|concrete> (<name|Concrete Math> with the <name|CM Unicode>
-  Concrete faces) and <verbatim|euler>.
+  Computer Modern>, regular and bold math, <name|New Computer Modern Sans
+  Math>, the <verbatim|NewCM10>, <verbatim|NewCMSans10> and
+  <verbatim|NewCMMono10> faces), <verbatim|stix2>, <verbatim|kp>
+  (<name|KpMath>, <name|KpMath Sans> and the <name|Kp> text faces),
+  <verbatim|fira> (<name|Fira Math>), <verbatim|libertinus>,
+  <verbatim|erewhon>, <verbatim|xcharter>, <verbatim|concrete>
+  (<name|Concrete Math> with the <name|CM Unicode> Concrete faces),
+  <verbatim|euler>, <verbatim|letesans> (<name|Lete Sans Math>, regular
+  and bold), <verbatim|garamond> (<name|Garamond-Math> and <name|EB
+  Garamond>), <verbatim|oldstandard>, <verbatim|gfsneohellenic>,
+  <verbatim|plex> (<name|IBM Plex Math> and the <name|Plex Sans>,
+  <name|Serif> and <name|Mono> faces) and <verbatim|noto> (<name|Noto Sans
+  Math>, <name|Noto Sans> and <name|Noto Sans Mono>). The directory
+  <verbatim|inconsolata> holds <name|Inconsolatazi4>, the typewriter
+  companion of several profiles. Of the profiled math fonts, only <name|TeX
+  Gyre DejaVu Math>, <name|XITS Math> and <name|Asana Math> are not
+  shipped; they are used when a <TeX> distribution or the system has
+  them.
 
   All their faces are entered in the shipped database
   (<source-link|TeXmacs/fonts/font-database.scm|TeXmacs/fonts/font-database.scm>,
-  <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm> and <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>), so
+  <source-link|font-features.scm|TeXmacs/fonts/font-features.scm> and <source-link|font-characteristics.scm|TeXmacs/fonts/font-characteristics.scm>), so
   they work in a fresh installation without a scan. A few entries are
   arranged by hand: <name|KpMath Sans>, whose name table calls its family
   <verbatim|KpMath> with the style <verbatim|Sans>, is also listed as a
@@ -257,7 +321,11 @@
   <verbatim|Bold> style of <verbatim|Erewhon Math>, and the families
   <verbatim|XCharter-Math-Bold> and <verbatim|Concrete> (the bold
   <name|Concrete Math>) are given the masters <verbatim|XCharter Math> and
-  <verbatim|Concrete Math> in <source-link|font-features.scm|TeXmacs/progs/fonts/font-features.scm>.
+  <verbatim|Concrete Math> in <source-link|font-features.scm|TeXmacs/fonts/font-features.scm>.
+  <name|Noto Sans Math> is a master of its own, as <name|Fira Math> is,
+  rather than a family of the master <verbatim|Noto>, and the <name|IBM
+  Plex> entries list the regular file before the medium one, which a scan
+  files as the regular style too.
 
   The smart font also uses one shipped file directly: when the main font
   has a <verbatim|MATH> table and a symbol it lacks could only be emulated
@@ -340,7 +408,7 @@
     tables and their accessors.
 
     <item*|<source-link|Graphics/Fonts/smart_font.cpp|src/Graphics/Fonts/smart_font.cpp>><cpp|profile_fix>,
-    <cpp|profile_variant_fix>, <cpp|register_profiled_font>, the
+    <cpp|profile_variant_fix>, <cpp|profile_family>, <cpp|register_profiled_font>, the
     <cpp|ot_math> flag and the math italic subfont,
     <cpp|resolve_shipped_math>.
 
@@ -349,6 +417,9 @@
 
     <item*|<source-link|Plugins/Freetype/tt_file.cpp|src/Plugins/Freetype/tt_file.cpp>>The order of the
     suffixes, the cache key, the <TeX> Live directories.
+
+    <item*|<source-link|Plugins/Freetype/unicode_font.cpp|src/Plugins/Freetype/unicode_font.cpp>>The
+    space of monospaced fonts.
 
     <item*|<source-link|TeXmacs/progs/fonts/fonts-opentype.scm|TeXmacs/progs/fonts/fonts-opentype.scm>>The profiles,
     the menus, <scm|init-opentype-font>.
@@ -373,7 +444,8 @@
     family name and its <verbatim|MATH> table, not the companions.
 
     <item>The order of the profiles matters when two of them name the same
-    text font.
+    text font. The companion-only <verbatim|Palatino> profile is declared
+    last, after the menus.
 
     <item>The <verbatim|bold-math> key has no effect.
 
