@@ -18,6 +18,7 @@
 # docs/wasm/README.md). The sources are those of misc/wasm/sources.txt (see
 # list-sources.sh), the configuration misc/wasm/config.h.
 
+SCHEME   ?= s7
 TM       := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 S        := $(TM)/src
 W        := $(TM)/misc/wasm
@@ -27,8 +28,19 @@ MUPDF    ?= $(CURDIR)/mupdf-1.28.5-source
 MUPDF_LIB ?= $(MUPDF)/build/wasm/slim
 OBJ      := obj
 OUT      := out
+ifeq ($(SCHEME),femtolisp)
+OBJ      := obj-femtolisp
+OUT      := out-femtolisp
+endif
 
 SOURCES  := $(shell cat $(W)/sources.txt)
+# the Scheme interpreter: S7 (the default) or femtolisp (SCHEME=femtolisp,
+# src/Scheme/Femtolisp, docs/femtolisp), whose objects go to obj-femtolisp
+ifeq ($(SCHEME),femtolisp)
+SOURCES  := $(filter-out Scheme/S7/%,$(SOURCES)) \
+  Scheme/Femtolisp/fl_core.c Scheme/Femtolisp/fl_llt.c \
+  Scheme/Femtolisp/femtolisp_tm.cpp
+endif
 # node, as the shell finds it: make looks the command up itself, and takes
 # the first "node" on the PATH even when it is a directory, as the one of
 # emsdk, which the CI puts on the PATH ("node: Permission denied")
@@ -63,6 +75,9 @@ CPPFLAGS := -I$(W) -include $(W)/config.h $(patsubst %,-I$(S)/%,$(INCLUDE_DIRS))
 OPT      ?= -O2
 CFLAGS   := $(OPT) $(EH) -w
 CXXFLAGS := $(OPT) $(EH) -w -std=c++17
+ifeq ($(SCHEME),femtolisp)
+CPPFLAGS += -DUSE_FEMTOLISP
+endif
 
 # the GPU renderer of the Vue port (src/Plugins/Vue/vue_gpu.cpp), which the
 # page uses unless ?gpu=0 or the browser has no WebGL2: ThorVG, by default
@@ -267,6 +282,11 @@ $(OBJ)/Plugins/Ispell/ispell_hunspell.o: $(HUNSPELL)/src/hunspell/hunspell.hxx
 $(OBJ)/%.o: $(S)/%.cpp
 	@mkdir -p $(dir $@)
 	em++ $(CPPFLAGS) $(DEPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+# the vendored femtolisp finds the headers of its library llt by their names
+$(OBJ)/Scheme/Femtolisp/%.o: $(S)/Scheme/Femtolisp/%.c
+	@mkdir -p $(dir $@)
+	emcc $(CPPFLAGS) -I$(S)/Scheme/Femtolisp/femtolisp/llt $(DEPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(OBJ)/%.o: $(S)/%.c
 	@mkdir -p $(dir $@)

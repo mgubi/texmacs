@@ -2826,16 +2826,16 @@ bool char_clip= true;
 void initialize_keyboard ();
 extern Uint32 vue_dialog_event; // the results of the file dialogs (below)
 
-#if defined(__EMSCRIPTEN__) && defined(USE_S7)
-#include "S7/s7.h"
-extern s7_scheme* tm_s7;
+#if defined(__EMSCRIPTEN__)
+// The functions of Scheme for the page (web-files, web-javascript...), on
+// the interface of the Scheme interpreters (tmscm), for S7 and femtolisp
+#include "Scheme/object.hpp"
 
 // (web-files): the panel of the files of the page (misc/wasm/files.js)
-static s7_pointer
-web_files_s7 (s7_scheme* sc, s7_pointer args) {
-  (void) args;
+static tmscm
+web_files_tm () {
   emscripten_run_script ("tmFiles.browse ()");
-  return s7_unspecified (sc);
+  return TMSCM_UNSPECIFIED;
 }
 
 EM_JS (void, vue_web_open_pdf, (const char* path, const char* name), {
@@ -2846,12 +2846,14 @@ EM_JS (void, vue_web_open_pdf, (const char* path, const char* name), {
 // (web-open-pdf path name): the PDF at path (in the file system of the
 // page) in a tab of the browser, for printing (misc/wasm/print.js); name
 // is that of its download
-static s7_pointer
-web_open_pdf_s7 (s7_scheme* sc, s7_pointer args) {
-  const char* path= s7_string (s7_car (args));
-  const char* name= s7_string (s7_cadr (args));
-  vue_web_open_pdf (path, name);
-  return s7_unspecified (sc);
+static tmscm
+web_open_pdf_tm (tmscm path, tmscm name) {
+  TMSCM_ASSERT (tmscm_is_string (path), path, TMSCM_ARG1, "web-open-pdf");
+  TMSCM_ASSERT (tmscm_is_string (name), name, TMSCM_ARG2, "web-open-pdf");
+  c_string p (tmscm_to_string (path));
+  c_string n (tmscm_to_string (name));
+  vue_web_open_pdf (p, n);
+  return TMSCM_UNSPECIFIED;
 }
 
 EM_JS (void, vue_web_open_external, (const char* target, int file, const char* name), {
@@ -2863,13 +2865,14 @@ EM_JS (void, vue_web_open_external, (const char* target, int file, const char* n
 // system (load-external in tm-files.scm), in the browser: a page of the web
 // or a mail address (file? false), or a file of the page, in the viewer of
 // the browser or downloaded under name (misc/wasm/print.js)
-static s7_pointer
-web_open_external_s7 (s7_scheme* sc, s7_pointer args) {
-  const char* target= s7_string (s7_car (args));
-  bool file= s7_boolean (sc, s7_cadr (args));
-  const char* name= s7_string (s7_caddr (args));
-  vue_web_open_external (target, file ? 1 : 0, name);
-  return s7_unspecified (sc);
+static tmscm
+web_open_external_tm (tmscm target, tmscm file, tmscm name) {
+  TMSCM_ASSERT (tmscm_is_string (target), target, TMSCM_ARG1, "web-open-external");
+  TMSCM_ASSERT (tmscm_is_string (name), name, TMSCM_ARG3, "web-open-external");
+  c_string t (tmscm_to_string (target));
+  c_string n (tmscm_to_string (name));
+  vue_web_open_external (t, tmscm_to_bool (file) ? 1 : 0, n);
+  return TMSCM_UNSPECIFIED;
 }
 
 EM_JS (void, vue_web_paste_dialog, (const char* choices, int chosen), {
@@ -2897,17 +2900,16 @@ EM_JS (char*, vue_web_javascript, (const char* code), {
   return stringToNewUTF8 (r);
 });
 
-static s7_pointer
-web_javascript_s7 (s7_scheme* sc, s7_pointer args) {
-  s7_pointer a= s7_car (args);
-  if (!s7_is_string (a)) return s7_wrong_type_arg_error (sc, "web-javascript", 1, a, "a string");
-  c_string code (cork_to_utf8 (string (s7_string (a))));
+static tmscm
+web_javascript_tm (tmscm a) {
+  TMSCM_ASSERT (tmscm_is_string (a), a, TMSCM_ARG1, "web-javascript");
+  c_string code (cork_to_utf8 (tmscm_to_string (a)));
   char* r= vue_web_javascript (code);
   string res= utf8_to_cork (string (r));
   free (r);
-  // (with its length: a backquote is the character 0 of Cork, which would
-  // end a C string, as in the descriptions of the models of OpenRouter)
-  return s7_make_string_with_length (sc, N(res) == 0? "": &res[0], N(res));
+  // (a string of TeXmacs, with its length: a backquote is the character 0
+  // of Cork, as in the descriptions of the models of OpenRouter)
+  return string_to_tmscm (res);
 }
 
 // (web-paste-dialog choices chosen): Edit > Paste from browser, the dialog
@@ -2916,35 +2918,23 @@ web_javascript_s7 (s7_scheme* sc, s7_pointer args) {
 // chosen there (misc/wasm/clipboard.js). choices: one format a line, its
 // name and its command separated by a tab, in UTF-8; chosen: the one
 // selected at first
-static s7_pointer
-web_paste_dialog_s7 (s7_scheme* sc, s7_pointer args) {
-  s7_pointer n= s7_cadr (args);
-  vue_web_paste_dialog (s7_string (s7_car (args)),
-                        s7_is_integer (n) ? (int) s7_integer (n) : 0);
-  return s7_unspecified (sc);
+static tmscm
+web_paste_dialog_tm (tmscm choices, tmscm n) {
+  TMSCM_ASSERT (tmscm_is_string (choices), choices, TMSCM_ARG1, "web-paste-dialog");
+  c_string c (tmscm_to_string (choices));
+  vue_web_paste_dialog (c, tmscm_is_int (n) ? tmscm_to_int (n) : 0);
+  return TMSCM_UNSPECIFIED;
 }
 #endif
 
 void gui_open (int& argc, char** argv) {
   // start the gui
-#if defined(__EMSCRIPTEN__) && defined(USE_S7)
-  if (tm_s7 != NULL)
-    s7_define_function (tm_s7, "web-files", web_files_s7, 0, 0, false,
-                        "(web-files): the files of the page");
-  if (tm_s7 != NULL)
-    s7_define_function (tm_s7, "web-open-pdf", web_open_pdf_s7, 2, 0, false,
-                        "(web-open-pdf path name): a PDF in a tab of the browser");
-  if (tm_s7 != NULL)
-    s7_define_function (tm_s7, "web-open-external", web_open_external_s7, 3, 0, false,
-                        "(web-open-external target file? name): a link left to the browser");
-  if (tm_s7 != NULL)
-    s7_define_function (tm_s7, "web-javascript", web_javascript_s7, 1, 0, false,
-                        "(web-javascript code): JavaScript evaluated in the page, "
-                        "its value as a string");
-  if (tm_s7 != NULL)
-    s7_define_function (tm_s7, "web-paste-dialog", web_paste_dialog_s7, 2, 0, false,
-                        "(web-paste-dialog choices chosen): the clipboard of the browser, "
-                        "pasted in a format chosen among choices");
+#if defined(__EMSCRIPTEN__)
+  tmscm_install_procedure ("web-files", web_files_tm, 0, 0, 0);
+  tmscm_install_procedure ("web-open-pdf", web_open_pdf_tm, 2, 0, 0);
+  tmscm_install_procedure ("web-open-external", web_open_external_tm, 3, 0, 0);
+  tmscm_install_procedure ("web-javascript", web_javascript_tm, 1, 0, 0);
+  tmscm_install_procedure ("web-paste-dialog", web_paste_dialog_tm, 2, 0, 0);
 #endif
 #ifdef __EMSCRIPTEN__
   {

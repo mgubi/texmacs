@@ -21,6 +21,8 @@
 //   --url <address>    the page served there (GitHub Pages), not --dir
 //   --headed           a window on the screen: the clipboard of the system
 //                      (a headless browser has one of its own)
+//   --timeout <s>      how long an action of the script (an eval) may take
+//                      (default 180 s)
 //   --insecure         certificates which are not trusted are accepted (the
 //                      self-signed one of the test server, for wss: see
 //                      misc/wasm/remote/)
@@ -98,6 +100,9 @@ const browser = await puppeteer.launch ({
   headless: !process.argv.includes ('--headed'),
   ...(chrome ? {} : { extraPrefsFirefox: prefs }),
   acceptInsecureCerts: process.argv.includes ('--insecure'),
+  // --timeout <s>: how long an eval of the script may take (default 180 s;
+  // the regression suites take longer)
+  protocolTimeout: 1000 * Number (opt ('--timeout', '180')),
   ...(profile ? { userDataDir: path.resolve (profile) } : {}),
   args: chrome ? [`--window-size=${W},${H}`] : [`--width=${W}`, `--height=${H}`]
 });

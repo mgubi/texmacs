@@ -51,6 +51,12 @@ Module['preRun'].push(function () {
   // the windows of TeXmacs are the tabs of the page (vue_gui.cpp, where
   // this is always so in the browser): for Scheme (tm-view.scm)
   ENV['TEXMACS_VUE_SINGLE_WINDOW'] = '1';
+  // ?env=NAME=VALUE (several may be given): a variable of the environment
+  // of TeXmacs, for debugging (TEXMACS_FL_TRACE=catch, say)
+  for (const e of tmAddress.getAll ('env')) {
+    const i = e.indexOf ('=');
+    if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
+  }
   // the look and feel of TeXmacs follows the platform of the browser, whose
   // shortcuts are Cmd+... on a Mac (src/Kernel/Abstractions/basic.cpp)
   var platform = (typeof navigator === 'undefined') ? '' :
