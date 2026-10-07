@@ -273,135 +273,48 @@ var tmFrame = (function () {
     .tm-dark #tm-about .tm-icon { color:#9a9aa0 }
     .tm-dark #tm-about .tm-icon:hover { background:#4a4a4f; color:#e4e4e6 }
     .tm-dark #tm-about .tm-icon.done { color:#6fbf7a }
-    /* A modern look (the branch modern-ui-try): the neutral greys of zinc,
-       as vue_theme_light/dark of vue_widget.cpp, a blue accent, a quiet
-       header instead of the blue block, tabs as rounded pills, line icons
-       in the manner of Lucide. Overrides the rules above. */
-    #tm-frame { background:#efeff1; border-right:1px solid #e0e0e4; color:#27272a;
-      font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif;
-      -webkit-font-smoothing:antialiased }
-    #tm-frame .tm-app { height:34px; margin:8px 8px 4px; padding:0 8px; border-radius:9px;
-      background:transparent; border-bottom:none; color:#18181b; font-weight:600;
-      letter-spacing:-.1px; transition:background .12s }
-    #tm-frame .tm-app:hover, #tm-frame .tm-app.open { background:#e4e4e7 }
+    /* A modern look (from the branch modern-ui-try), in the colours of
+       before: tabs as rounded pills, line icons in the manner of Lucide,
+       rounder menus and dialogs. Overrides the shapes of the rules above;
+       the colours, of the light and of the dark theme, are theirs. */
+    #tm-frame { font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif; -webkit-font-smoothing:antialiased }
+    #tm-frame .tm-app { height:34px; margin:8px 8px 4px; padding:0 8px; border-radius:9px; border-bottom:none; font-weight:600; letter-spacing:-.1px; transition:background .12s }
     #tm-frame .tm-app .tm-logo { width:22px; height:22px; margin-right:9px; border-radius:6px }
     #tm-frame.collapsed .tm-app { margin:8px 6px 4px; padding:0 }
     #tm-frame .tm-tabs { padding:4px 0 }
-    #tm-frame .tm-tab { height:32px; margin:2px 8px; padding:0 4px 0 11px; border-radius:9px;
-      color:#52525b; transition:background .12s, color .12s }
-    #tm-frame .tm-tab:hover { background:#e9e9ec; color:#18181b }
-    #tm-frame .tm-tab.active { background:#fff; color:#18181b; font-weight:500;
-      box-shadow:0 1px 2px rgba(24,24,27,.06), 0 0 0 1px #e4e4e7 }
-    #tm-frame .tm-tab .tm-close, #tm-frame .tm-tab .tm-more, #tm-flyout .tm-close, #tm-flyout .tm-more {
-      display:flex; align-items:center; justify-content:center; width:22px; height:22px;
-      line-height:normal; border-radius:6px; color:#a1a1aa; letter-spacing:0 }
-    #tm-frame .tm-tab:hover .tm-close, #tm-frame .tm-tab.active .tm-close { color:#71717a }
-    #tm-frame .tm-tab .tm-close:hover, #tm-frame .tm-tab .tm-more:hover, #tm-frame .tm-tab .tm-more.open,
-    #tm-flyout .tm-close:hover, #tm-flyout .tm-more:hover { background:#e4e4e7; color:#18181b }
-    #tm-frame .tm-tab .tm-more { color:#71717a }
-    #tm-frame .tm-icon16, #tm-flyout .tm-icon16 { width:14px; height:14px; fill:none; stroke:currentColor;
-      stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round }
+    #tm-frame .tm-tab { height:32px; margin:2px 8px; padding:0 4px 0 11px; border-radius:9px; transition:background .12s, color .12s }
+    #tm-frame .tm-tab.active { font-weight:500 }
+    #tm-frame .tm-tab .tm-close, #tm-frame .tm-tab .tm-more, #tm-flyout .tm-close, #tm-flyout .tm-more { display:flex; align-items:center; justify-content:center; width:22px; height:22px; line-height:normal; border-radius:6px; letter-spacing:0 }
+    #tm-frame .tm-icon16, #tm-flyout .tm-icon16 { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round }
     #tm-frame .tm-more .tm-icon16, #tm-flyout .tm-more .tm-icon16 { stroke-width:2.4 }
-    #tm-frame .tm-tab .tm-dot, #tm-flyout .tm-dot { background:#2563eb }
     #tm-frame.collapsed .tm-tab { height:32px; margin:2px 6px }
-    #tm-frame .tm-new, #tm-frame .tm-fold { color:#52525b; transition:background .12s }
-    #tm-frame .tm-new:hover, #tm-frame .tm-fold:hover { background:#e9e9ec; color:#18181b }
+    #tm-frame .tm-new, #tm-frame .tm-fold { transition:background .12s }
     #tm-frame .tm-new .tm-plus { display:flex; align-items:center; justify-content:center }
     #tm-frame .tm-new .tm-plus .tm-icon16 { width:16px; height:16px }
-    #tm-frame .tm-tabs .tm-new { height:32px; margin:2px 8px; padding:0 11px; border-radius:9px; color:#71717a }
+    #tm-frame .tm-tabs .tm-new { height:32px; margin:2px 8px; padding:0 11px; border-radius:9px }
     #tm-frame.collapsed .tm-tabs .tm-new { height:32px; margin:2px 6px; padding:0 }
-    #tm-frame .tm-fold { height:36px; border-top:1px solid #e4e4e7; color:#71717a }
-    #tm-frame .tm-resize:hover, #tm-frame .tm-resize.dragging { background:rgba(37,99,235,.35) }
-    #tm-frame .tm-scroll:not(.off):hover { background:#e9e9ec }
-    #tm-frame .tm-tab.dragging { background:#fff;
-      box-shadow:0 10px 24px rgba(24,24,27,.14), 0 0 0 1px #e4e4e7 }
-    #tm-flyout { border-radius:9px; background:#f4f4f5; color:#18181b;
-      font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif;
-      box-shadow:0 10px 28px rgba(24,24,27,.14), 0 0 0 1px #e4e4e7 }
-    #tm-flyout.active { background:#fff }
-    #tm-frame.top { height:40px; border-bottom:1px solid #e4e4e7; align-items:center }
+    #tm-frame .tm-fold { height:36px }
+    #tm-flyout { border-radius:9px; font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif }
+    #tm-frame.top { height:40px; align-items:center }
     #tm-frame.top .tm-app { height:30px; margin:0 6px; border-right:none }
     #tm-frame.top .tm-tabs { align-items:center; gap:4px; padding:0 4px }
-    #tm-frame.top .tm-tab { height:30px; margin:0; border-radius:9px; border-right:none;
-      background:transparent; padding:0 4px 0 12px }
-    #tm-frame.top .tm-tab:hover { background:#e9e9ec }
-    #tm-frame.top .tm-tab.active { background:#fff;
-      box-shadow:0 1px 2px rgba(24,24,27,.06), 0 0 0 1px #e4e4e7 }
+    #tm-frame.top .tm-tab { height:30px; margin:0; border-radius:9px; border-right:none; padding:0 4px 0 12px }
     #tm-frame.top .tm-tabs .tm-new { height:30px; border-radius:9px; padding:0 8px }
-    #tm-balloon { background:#18181b; border-radius:7px; padding:5px 10px; font-size:12px;
-      box-shadow:0 6px 16px rgba(24,24,27,.2) }
-    #tm-menu { background:#fff; border:1px solid #e4e4e7; border-radius:14px; padding:6px;
-      box-shadow:0 16px 40px rgba(24,24,27,.14), 0 2px 6px rgba(24,24,27,.06); color:#18181b }
+    #tm-balloon { border-radius:7px; padding:5px 10px; font-size:12px }
+    #tm-menu { border-radius:14px; padding:6px }
     #tm-menu .tm-head { padding:8px 10px 6px }
     #tm-menu .tm-head .tm-logo { border-radius:10px }
-    #tm-menu .tm-text { padding:2px 10px; color:#52525b }
-    #tm-menu .tm-sep { background:#f0f0f2; margin:6px 4px }
+    #tm-menu .tm-text { padding:2px 10px }
+    #tm-menu .tm-sep { margin:6px 4px }
     #tm-menu .tm-item { padding:7px 10px; border-radius:8px }
-    #tm-menu .tm-item:hover { background:#f4f4f5 }
-    #tm-menu .tm-soft { padding:2px 10px 4px; color:#52525b }
-    #tm-menu .tm-soft .tm-ver { color:#71717a }
-    #tm-menu a { color:#2563eb }
-    #tm-menu .tm-badge, #tm-loading .tm-badge { color:#1d4ed8; background:#eff6ff; border-color:#bfdbfe;
-      border-radius:999px; padding:1px 8px }
-    #tm-about { background:rgba(24,24,27,.32); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px) }
-    #tm-about .tm-box { background:#fff; border:1px solid #e4e4e7; border-radius:16px; padding:22px 26px;
-      box-shadow:0 24px 60px rgba(24,24,27,.22); color:#18181b }
-    #tm-about li, #tm-about p { color:#3f3f46 }
-    #tm-about code { background:#f4f4f5; border-radius:6px }
-    #tm-about .tm-x { border-radius:8px; color:#71717a }
-    #tm-about .tm-x:hover { background:#f4f4f5; color:#18181b }
-    #tm-about .tm-button { border:1px solid #e4e4e7; border-radius:8px; padding:5px 12px; background:#fff }
-    #tm-about .tm-button:hover { background:#f4f4f5 }
-    #tm-about .tm-default { background:#2563eb; border-color:#2563eb; color:#fff }
-    #tm-about .tm-default:hover { background:#1d4ed8 }
-    #tm-about input { border:1px solid #e4e4e7; border-radius:8px; padding:6px 8px }
-    #tm-about input:focus { outline:2px solid rgba(37,99,235,.35); border-color:#2563eb }
-    #tm-about .tm-icon:hover { background:#f4f4f5; color:#18181b }
-
-    .tm-dark #tm-frame { background:#18181b; border-right-color:#27272a; color:#d4d4d8 }
-    .tm-dark #tm-frame .tm-app { background:transparent; color:#f4f4f5 }
-    .tm-dark #tm-frame .tm-app:hover, .tm-dark #tm-frame .tm-app.open { background:#27272a }
-    .tm-dark #tm-frame .tm-tab { color:#a1a1aa }
-    .tm-dark #tm-frame .tm-tab:hover { background:#232326; color:#f4f4f5 }
-    .tm-dark #tm-frame .tm-tab.active { background:#2c2c30; color:#f4f4f5;
-      box-shadow:0 1px 2px rgba(0,0,0,.4), 0 0 0 1px #3f3f46 }
-    .tm-dark #tm-frame .tm-tab .tm-close, .tm-dark #tm-flyout .tm-close { color:#71717a }
-    .tm-dark #tm-frame .tm-tab:hover .tm-close, .tm-dark #tm-frame .tm-tab.active .tm-close,
-    .tm-dark #tm-frame .tm-tab .tm-more, .tm-dark #tm-flyout .tm-more { color:#a1a1aa }
-    .tm-dark #tm-frame .tm-tab .tm-close:hover, .tm-dark #tm-frame .tm-tab .tm-more:hover,
-    .tm-dark #tm-frame .tm-tab .tm-more.open, .tm-dark #tm-flyout .tm-close:hover,
-    .tm-dark #tm-flyout .tm-more:hover { background:#3f3f46; color:#fff }
-    .tm-dark #tm-frame .tm-tab .tm-dot, .tm-dark #tm-flyout .tm-dot { background:#60a5fa }
-    .tm-dark #tm-frame .tm-new, .tm-dark #tm-frame .tm-tabs .tm-new, .tm-dark #tm-frame .tm-fold,
-    .tm-dark #tm-frame .tm-scroll { color:#a1a1aa }
-    .tm-dark #tm-frame .tm-new:hover, .tm-dark #tm-frame .tm-fold:hover,
-    .tm-dark #tm-frame .tm-scroll:not(.off):hover { background:#232326; color:#f4f4f5 }
-    .tm-dark #tm-frame .tm-fold { border-top-color:#27272a }
-    .tm-dark #tm-frame .tm-tab.dragging { background:#2c2c30;
-      box-shadow:0 10px 24px rgba(0,0,0,.5), 0 0 0 1px #3f3f46 }
-    .tm-dark #tm-flyout { background:#232326; color:#f4f4f5;
-      box-shadow:0 10px 28px rgba(0,0,0,.5), 0 0 0 1px #3f3f46 }
-    .tm-dark #tm-flyout.active { background:#2c2c30 }
-    .tm-dark #tm-frame.top { border-bottom-color:#27272a }
-    .tm-dark #tm-frame.top .tm-tab { background:transparent }
-    .tm-dark #tm-frame.top .tm-tab:hover { background:#232326 }
-    .tm-dark #tm-frame.top .tm-tab.active { background:#2c2c30 }
-    .tm-dark #tm-balloon { background:#3f3f46 }
-    .tm-dark #tm-menu, .tm-dark #tm-about .tm-box { background:#1f1f22; border-color:#3f3f46;
-      color:#f4f4f5; box-shadow:0 16px 40px rgba(0,0,0,.55) }
-    .tm-dark #tm-menu .tm-text, .tm-dark #tm-menu .tm-soft, .tm-dark #tm-about li,
-    .tm-dark #tm-about p { color:#d4d4d8 }
-    .tm-dark #tm-menu .tm-sep { background:#2d2d31 }
-    .tm-dark #tm-menu .tm-item:hover { background:#2c2c30 }
-    .tm-dark #tm-menu a, .tm-dark #tm-about a { color:#60a5fa }
-    .tm-dark #tm-menu .tm-badge { color:#bfdbfe; background:#1e3a8a; border-color:#1e40af }
-    .tm-dark #tm-about code { background:#27272a }
-    .tm-dark #tm-about .tm-x:hover, .tm-dark #tm-about .tm-icon:hover { background:#2c2c30; color:#fff }
-    .tm-dark #tm-about .tm-button, .tm-dark #tm-about input,
-    .tm-dark #tm-about select { background:#27272a; color:#f4f4f5; border-color:#3f3f46 }
-    .tm-dark #tm-about .tm-button:hover { background:#323236 }
-    .tm-dark #tm-about .tm-default { background:#2563eb; border-color:#2563eb; color:#fff }
-    .tm-dark #tm-about .tm-default:hover { background:#3b82f6 }
+    #tm-menu .tm-soft { padding:2px 10px 4px }
+    #tm-menu .tm-badge, #tm-loading .tm-badge { border-radius:999px; padding:1px 8px }
+    #tm-about { backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px) }
+    #tm-about .tm-box { border-radius:16px; padding:22px 26px }
+    #tm-about code { border-radius:6px }
+    #tm-about .tm-x { border-radius:8px }
+    #tm-about .tm-button { border-radius:8px; padding:5px 12px }
+    #tm-about input { border-radius:8px; padding:6px 8px }
     /* small animations: the menus drop in, the dialogs and the balloons
        fade in, the hovers ease (none when the system asks for less motion) */
     @keyframes tm-drop { from { opacity:0; transform:translateY(-6px) scale(.98) }

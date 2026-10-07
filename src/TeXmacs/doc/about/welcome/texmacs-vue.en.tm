@@ -218,10 +218,9 @@
   <paragraph|7 October 2026>
 
   <\itemize>
-    <item>A new look: flat bars in neutral greys with a blue accent, in the
-    light and the dark theme, rounder menus whose items follow their corners,
-    a quieter column of tabs, and short animations when the menus, lists,
-    balloons and dialogs appear.
+    <item>A new look, in the colours of before: rounder menus whose items
+    follow their corners, rounded tabs in the column of tabs, and short
+    animations when the menus, lists, balloons and dialogs appear.
 
     <item>A new icon set, the default: <name|Lucide>, with thin lines and
     pastel colours inside which tell the kind of an action (documents in
