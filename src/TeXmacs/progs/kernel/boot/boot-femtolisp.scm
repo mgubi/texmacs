@@ -360,27 +360,36 @@
 
 (define (%lazy-cache-file) (%cache-file "%lazy"))
 
+(define (%lazy-cache-shipped-file) (%cache-shipped-file "%lazy"))
+
+;; the entries of the file cf into the table, if its key is the one of the
+;; cache; #f when it is not a cache of this TeXmacs
+(define (%lazy-table-read cf)
+  (and cf (file-exists? cf)
+       (trycatch
+        (let* ((in (open-input-file cf))
+               (ok (equal? (%cache-read-entry in) %cache-key)))
+          (if ok
+              (let loop ()
+                (let ((e (%cache-read-entry in)))
+                  (if (pair? e)
+                      (begin (put! %lazy-table (car e) (cdr e))
+                             (loop))))))
+          (close-port in)
+          ok)
+        (lambda (e) #f))))
+
+;; the shipped cache first, then the one of the home directory
 (define (%lazy-table-load)
   (set! %lazy-table (table))
+  (%lazy-table-read (%lazy-cache-shipped-file))
   (let ((cf (%lazy-cache-file)))
-    (if cf
+    (if (and cf (not (%lazy-table-read cf)))
+        ;; a new file (or another version of TeXmacs): the key
         (trycatch
-         (if (and (file-exists? cf)
-                  (let ((in (open-input-file cf)))
-                    (let ((ok (equal? (%cache-read-entry in) %cache-key)))
-                      (if ok
-                          (let loop ()
-                            (let ((e (%cache-read-entry in)))
-                              (if (pair? e)
-                                  (begin (put! %lazy-table (car e) (cdr e))
-                                         (loop))))))
-                      (close-port in)
-                      ok)))
-             #t
-             ;; a new file (or another version of TeXmacs): the key
-             (let ((out (file cf :write :create :truncate)))
-               (%fl-write %cache-key out) (newline out)
-               (io.close out)))
+         (let ((out (file cf :write :create :truncate)))
+           (%fl-write %cache-key out) (newline out)
+           (io.close out))
          (lambda (e) #f)))))
 
 (define (%lazy-cache-add! fp f)
@@ -478,29 +487,55 @@
 ;; the compiled code depends on. The forms whose expansion or code holds
 ;; values which cannot be written and read back (uninterned symbols, tables,
 ;; procedures with an environment, TeXmacs objects...) are compiled at each
-;; load. TEXMACS_FL_NO_CACHE disables the cache.
+;; load. A file of TeXmacs is named by its path in $TEXMACS_PATH, and when the
+;; home has no valid cache of it, the cache shipped with TeXmacs is read
+;; ($TEXMACS_PATH/cache/femtolisp: the page in the browser has one, made by
+;; its build). TEXMACS_FL_NO_CACHE disables the cache.
 
 (define %cache-format (if %lazy? 4 2))  ; (lazy bodies: another cache)
 (define %cache? (not (os.getenv "TEXMACS_FL_NO_CACHE")))
 (define %cache-dir #f)
 (define %cache-key #f)
 
+(define %cache-tm-path #f)
+
+(define (%cache-init!)
+  (if (not %cache-dir)
+      (let ((dir (url-concretize "$TEXMACS_HOME_PATH/system/cache/femtolisp")))
+        (if (not (url-exists? dir)) (system-mkdir dir))
+        (set! %cache-dir dir)
+        (set! %cache-tm-path (string-append (url-concretize "$TEXMACS_PATH") "/"))
+        (set! %cache-key (list *fl-boot-id* (texmacs-version) %cache-format)))))
+
+;; the name of the cache of file: a file of TeXmacs by its path in
+;; $TEXMACS_PATH (TM%progs%...), so that a cache made with another
+;; $TEXMACS_PATH (the one shipped with the page in the browser) fits
+(define (%cache-name file)
+  (let* ((n (string-length %cache-tm-path))
+         (rel (if (and (> (string-length file) n)
+                       (string=? (substring file 0 n) %cache-tm-path))
+                  (string-append "TM/" (substring file n (string-length file)))
+                  file)))
+    (string-append
+     (list->string
+      (map (lambda (c) (if (memv c '(#\/ #\\ #\: #\space)) #\% c))
+           (string->list rel)))
+     ".flc")))
+
 (define (%cache-file file)
   (and %cache?
        (begin
-         (if (not %cache-dir)
-             (let ((dir (url-concretize
-                         "$TEXMACS_HOME_PATH/system/cache/femtolisp")))
-               (if (not (url-exists? dir)) (system-mkdir dir))
-               (set! %cache-dir dir)
-               (set! %cache-key
-                     (list *fl-boot-id* (texmacs-version) %cache-format))))
-         (string-append %cache-dir "/"
-                        (list->string
-                         (map (lambda (c)
-                                (if (memv c '(#\/ #\\ #\: #\space)) #\% c))
-                              (string->list file)))
-                        ".flc"))))
+         (%cache-init!)
+         (string-append %cache-dir "/" (%cache-name file)))))
+
+;; the cache shipped with TeXmacs ($TEXMACS_PATH/cache/femtolisp, made with
+;; the program: the page in the browser has one), read when the cache of the
+;; home directory has no valid file
+(define (%cache-shipped-file file)
+  (and %cache?
+       (begin
+         (%cache-init!)
+         (string-append %cache-tm-path "cache/femtolisp/" (%cache-name file)))))
 
 ;; can x be written and read back as an equal value?
 (define (%cache-writable? x)
@@ -555,7 +590,8 @@
 ;; evaluates the forms of file, with the cache
 (define (%eval-forms-cached file forms privates)
   (let* ((cf (%cache-file file))
-         (in (%cache-open cf privates))
+         (in (or (%cache-open cf privates)
+                 (%cache-open (%cache-shipped-file file) privates)))
          (dirty (not in))
          (entries '()))
     (let loop ((l forms))

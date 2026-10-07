@@ -30,17 +30,40 @@ make -C build-wasm -f ../misc/wasm/Makefile -j8 SCHEME=femtolisp web
   `browser-run.mjs --timeout <s>` lets an `eval` of a script run longer (the
   regression suites).
 
-## 9.2 Results (2026-10-07, headless Firefox, `misc/wasm/browser-run.mjs`)
+## 9.2 The cache of compiled files, in the page
+
+The page ships the cache of compiled files of femtolisp, in the boot
+package, as `/texmacs/cache/femtolisp`:
+
+- `boot-femtolisp.scm` names the cache of a file of TeXmacs by its path in
+  `$TEXMACS_PATH` (`TM%progs%...flc`), and reads
+  `$TEXMACS_PATH/cache/femtolisp` when the home has no valid cache of the
+  file (also for the compiled function bodies, `%lazy.flc`). What is
+  compiled anyway (a form which changed, or which cannot be cached) goes to
+  the cache of the home.
+- The build makes it (`femtolisp-cache` in `misc/wasm/Makefile`, at every
+  build, a few seconds): the program for node (the same compiler, in
+  WebAssembly) runs `misc/wasm/femtolisp-cache.scm`, which loads what
+  TeXmacs loads at its start and when all the menus are opened, in text and
+  in math; its cache (7.8 MB, 293 files) goes to `build-wasm/femtolisp-cache`,
+  which `package.py` adds to the files of the page (its argument
+  `<dir>:<prefix>`).
+- It makes the boot package 0.9 MB larger with brotli (5.16 MB instead of
+  4.26), 1.3 MB with gzip.
+
+## 9.3 Results (2026-10-07, headless Firefox, `misc/wasm/browser-run.mjs`)
 
 | | femtolisp | S7 |
 |---|---:|---:|
 | `texmacs.wasm` | 23.5 MB | 24.2 MB |
-| start, first visit (no cache) | 4.4 s | 2.8 s |
-| start, next visits | 1.19–1.24 s | 1.04 s |
+| start, first visit, without the shipped cache | 4.21–4.26 s | |
+| start, first visit, with the shipped cache | 3.11–3.22 s | 2.81–2.85 s |
+| start, next visits | 1.20 s | 1.05 s |
 
-(the start is the time the page reports, "TeXmacs: running"; the first
-visit of femtolisp compiles the loaded forms and writes its cache: 9.5 MB in
-402 files of the home directory, in IndexedDB)
+(the start is the time the page reports, "TeXmacs: running"; three runs
+each, alternated, load average 3-4; without the shipped cache, the first
+visit compiles the loaded forms and writes the cache, 9.5 MB in 402 files of
+the home directory, in IndexedDB)
 
 - Menus, typing in text and in math, a Scheme session and an Asymptote
   session work as with S7.
@@ -52,8 +75,6 @@ visit of femtolisp compiles the loaded forms and writes its cache: 9.5 MB in
   `document`. Both come from the environment of the test buffer in the
   page, which is not the one of a typeset document (natively, both pass).
 
-## 9.3 Next
+## 9.4 Next
 
-- Ship the cache of compiled files in the page (built with the page): the
-  first visit would start as fast as the next ones.
 - Find why the test buffers of `math-edit` are not typeset in the page.

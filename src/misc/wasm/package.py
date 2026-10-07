@@ -9,7 +9,11 @@
 # in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ###############################################################################
 #
-#   package.py <TeXmacs dir> <output dir> <boot list>
+#   package.py <TeXmacs dir> <output dir> <boot list> [<dir>:<prefix>]
+#
+# The optional <dir>:<prefix> adds the files of <dir> to those of TeXmacs,
+# under <prefix> (the cache of compiled files of femtolisp, made by the
+# build: build-wasm/femtolisp-cache:cache/femtolisp, see misc/wasm/Makefile).
 #
 # Writes <output dir>/texmacs-files.json and the packages it names. A package
 # is the concatenation of its files; the manifest gives, for each file, its
@@ -40,7 +44,8 @@ EXCLUDE = ['bin', 'plugins/*/bin', 'plugins/*/doc', 'misc/images/windows',
 PLUGIN_DOCS = ['plugins/tikz/doc', 'plugins/javascript/doc', 'plugins/asymptote/doc',
                'plugins/ai/doc', 'plugins/python/doc', 'plugins/r/doc']
 
-BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/',
+# (cache/: the compiled code of femtolisp, read when the Scheme code loads)
+BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/', 'cache/',
                'langs/encoding/', 'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/',
                'misc/pixmaps/neoclassical/light/']
 BOOT_FILES = ['fonts/font-database.scm', 'fonts/font-characteristics.scm',
@@ -82,14 +87,20 @@ def build_version ():
     if m: return m.group (1)
   sys.exit ('package.py: no ALTERNATIVE_VERSION in ' + config)
 
+# the files added by <dir>:<prefix>: their name in the page -> their path
+EXTRA = {}
+
+def file_path (root, rel):
+  return EXTRA[rel] if rel in EXTRA else os.path.join (root, rel)
+
 def file_bytes (root, rel):
   if rel == 'SVNREV': return (build_version () + '\n').encode ()
-  return open (os.path.join (root, rel), 'rb').read ()
+  return open (file_path (root, rel), 'rb').read ()
 
 def main ():
-  if len (sys.argv) != 4:
-    sys.exit ('usage: package.py <TeXmacs dir> <output dir> <boot list>')
-  root, out, boot_list = sys.argv[1:]
+  if len (sys.argv) not in (4, 5):
+    sys.exit ('usage: package.py <TeXmacs dir> <output dir> <boot list> [<dir>:<prefix>]')
+  root, out, boot_list = sys.argv[1:4]
   files = []
   for d, ds, fs in os.walk (root):
     rd = os.path.relpath (d, root)
@@ -98,6 +109,14 @@ def main ():
     for f in sorted (fs):
       if not excluded (rd + f) and rd + f != 'SVNREV': files.append (rd + f)
   files.append ('SVNREV')
+  if len (sys.argv) == 5:
+    extra, prefix = sys.argv[4].rsplit (':', 1)
+    for d, ds, fs in os.walk (extra):
+      ds.sort ()
+      for f in sorted (fs):
+        rel = prefix.rstrip ('/') + '/' + os.path.relpath (os.path.join (d, f), extra)
+        EXTRA[rel] = os.path.join (d, f)
+        if rel not in files: files.append (rel)
   boot = set ()
   for line in open (boot_list):
     p = line.strip ()
@@ -122,7 +141,7 @@ def main ():
   for name, rels in groups:
     part, size, n = [], 0, 1
     for rel in rels:
-      s = len (file_bytes (root, rel)) if rel == 'SVNREV' else os.path.getsize (os.path.join (root, rel))
+      s = len (file_bytes (root, rel)) if rel == 'SVNREV' else os.path.getsize (file_path (root, rel))
       if part and size + s > CHUNK and name != 'boot':
         chunks.append ((name + '-' + str (n), part)); n += 1
         part, size = [], 0

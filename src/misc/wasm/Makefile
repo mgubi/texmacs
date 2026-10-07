@@ -211,17 +211,37 @@ $(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js
 	-command -v brotli > /dev/null && brotli -f -q 9 -k $(OUT)/web/texmacs.wasm $(OUT)/web/texmacs.js
 	gzip -9 -n -k -f $(OUT)/web/texmacs.wasm
 
+# with femtolisp, the cache of its compiled files, shipped in the page as
+# /texmacs/cache/femtolisp (boot-femtolisp.scm reads it when the home has
+# none): made by the program for node, which loads what TeXmacs loads at
+# its start and when the menus are opened (femtolisp-cache.scm), at every
+# build (a few seconds), so that it fits the Scheme code of the page
+ifeq ($(SCHEME),femtolisp)
+FL_CACHE      := $(CURDIR)/femtolisp-cache
+PACKAGE_EXTRA := $(FL_CACHE):cache/femtolisp
+PACKAGE_DEPS  := femtolisp-cache
+endif
+
+femtolisp-cache: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV plugins-sync
+	rm -rf $(FL_CACHE) $(FL_CACHE)-home
+	mkdir -p $(FL_CACHE) $(FL_CACHE)-home
+	HOME=$(FL_CACHE)-home TEXMACS_PATH=$(TM)/TeXmacs TEXMACS_HOME_PATH=$(FL_CACHE)-home \
+	  $(NODE) $(OUT)/node/texmacs.js -headless \
+	  -x '(begin (load "$(W)/femtolisp-cache.scm") (exit 0))' -q > $(FL_CACHE)-home/log 2>&1
+	cp $(FL_CACHE)-home/system/cache/femtolisp/TM%* $(FL_CACHE)-home/system/cache/femtolisp/%lazy.flc $(FL_CACHE)/
+	@echo "femtolisp cache: $$(ls $(FL_CACHE) | wc -l | tr -d ' ') files, $$(du -sh $(FL_CACHE) | cut -f1)"
+
 # made at every build (package.py only writes the packages which changed)
 # the help page of the browser version includes the facts of the build
 # (misc/wasm/build-info.py: the commit, the versions, the sizes), written
 # once the program and the files are there, then packaged again
 BUILD_INFO := $(TM)/TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm
-$(OUT)/web/texmacs-files.json: FORCE plugins-sync $(OUT)/web/texmacs.html tikzjax asymptote
+$(OUT)/web/texmacs-files.json: FORCE plugins-sync $(OUT)/web/texmacs.html tikzjax asymptote $(PACKAGE_DEPS)
 	@mkdir -p $(OUT)/web
-	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
+	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt $(PACKAGE_EXTRA)
 	$(BROTLI_PACKS)
 	python3 $(W)/build-info.py $(TM) $(CURDIR) $(MUPDF) "$(THORVG)" $(BUILD_INFO)
-	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt
+	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt $(PACKAGE_EXTRA)
 	$(BROTLI_PACKS)
 
 BROTLI_PACKS = -command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack $(OUT)/web/tm-font-*; do \
@@ -319,4 +339,4 @@ $(OBJECTS): $(FLAGS_FILE)
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all web node clean tikzjax asymptote python r plugins-sync
+.PHONY: all web node clean tikzjax asymptote python r plugins-sync femtolisp-cache
