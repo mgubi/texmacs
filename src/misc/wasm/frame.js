@@ -276,7 +276,7 @@ var tmFrame = (function () {
     /* A modern look (the branch modern-ui-try): the neutral greys of zinc,
        as vue_theme_light/dark of vue_widget.cpp, a blue accent, a quiet
        header instead of the blue block, tabs as rounded pills, line icons
-       in the manner of Hugeicons. Overrides the rules above. */
+       in the manner of Lucide. Overrides the rules above. */
     #tm-frame { background:#efeff1; border-right:1px solid #e0e0e4; color:#27272a;
       font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif;
       -webkit-font-smoothing:antialiased }
@@ -562,7 +562,7 @@ var tmFrame = (function () {
   }
   var FOLD_ICON = 'M10 3.5 5.5 8 10 12.5', UNFOLD_ICON = 'M6 3.5 10.5 8 6 12.5';
   // the close box, the ellipsis and the plus, drawn as lines like the
-  // icons of TeXmacs (Hugeicons)
+  // icons of TeXmacs (Lucide)
   var CLOSE_ICON = 'M4.5 4.5l7 7M11.5 4.5l-7 7', MORE_ICON = 'M3.5 8h.01M8 8h.01M12.5 8h.01',
       PLUS_ICON = 'M8 3v10M3 8h10';
   function icon16 (cls, d, title) {

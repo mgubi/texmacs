@@ -217,7 +217,7 @@
 (validate-enum-preference "document update times" '("1" "2" "3"))
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
-(validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "hugeicons" "lucide"))
+(validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "lucide"))
 (validate-enum-preference "icon bars" '("top" "left"))
 (validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))

@@ -72,15 +72,10 @@ apply_icon_set () {
   string icon_dir= "";
   if (icon_set == "monochrome") icon_dir= "monochrome";
   if (icon_set == "neo-classical") icon_dir= "neoclassical";
-  // the Hugeicons set has only the icons with a counterpart in Hugeicons:
-  // the others (letters, symbols) come from the monochrome set, as flat
-  if (icon_set == "hugeicons")
-    set_env_path ("TEXMACS_PIXMAP_PATH",
-                  pixmaps * url ("hugeicons") | pixmaps * url ("monochrome") |
-                  url_system (base_pixmap_path));
-  // the Lucide set likewise, completed by the neo-classical one, whose
-  // colours suit its pastel insides
-  else if (icon_set == "lucide")
+  // the Lucide set has only the icons with a counterpart in Lucide: the
+  // others (symbols, tags) come from the neo-classical set, whose colours
+  // suit its pastel insides
+  if (icon_set == "lucide")
     set_env_path ("TEXMACS_PIXMAP_PATH",
                   pixmaps * url ("lucide") | pixmaps * url ("neoclassical") |
                   url_system (base_pixmap_path));

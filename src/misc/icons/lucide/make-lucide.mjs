@@ -44,7 +44,8 @@ const FILLS = {
 };
 
 // the margin around the drawing (in the units of the 24 x 24 drawing): the
-// icons are a little smaller than their box, as those of the Hugeicons set
+// icons are a little smaller than their box, lighter than those of the
+// other sets, which fill it
 const MARGIN = 2;
 // The icons of the mode bar (shown at 20 points) are drawn as large as
 // those of the main bar (24 points, with the margin): the two columns of

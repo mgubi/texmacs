@@ -226,8 +226,8 @@
     <item>A new icon set, the default: <name|Lucide>, with thin lines and
     pastel colours inside which tell the kind of an action (documents in
     blue, editing in amber, searching in violet, inserting in green, the look
-    of the text in rose). <name|Hugeicons> is offered too; the other sets
-    are still in <menu|Edit|Preferences|General|Icon set>. The buttons of the
+    of the text in rose). The other sets are still in
+    <menu|Edit|Preferences|General|Icon set>. The buttons of the
     icons are square, and the two columns of icons at the left match.
 
     <item>The focus bar is at the right of the menu bar, which leaves more
