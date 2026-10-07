@@ -27,9 +27,11 @@
 ;; inspects (the actions of the menus, for instance)
 (set! *keep-source* (not (os.getenv "TM_NOSRC")))
 
-;; the errors of the macro expansions are raised when the code runs, as with
-;; Guile, which expands the macros when it first evaluates them
-(set! *defer-macro-errors* #t)
+;; with TEXMACS_FL_EAGER (function bodies expanded at load, see
+;; boot-femtolisp.scm), the errors of the macro expansions are raised when the
+;; code runs, as with Guile, which expands the macros when it first evaluates
+;; them; lazy function bodies are expanded at their first call anyway
+(set! *defer-macro-errors* (if (os.getenv "TEXMACS_FL_EAGER") #t #f))
 
 ;; femtolisp ignores set! of its builtins (constants): (define-override ...)
 ;; makes the name redefinable first, when it is expanded (the compiler

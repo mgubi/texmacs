@@ -39,12 +39,20 @@ have (§7.7).
   expansion, their module and its private names (bodies are still expanded at
   their first call, not compiled). The file starts with the key of the cache;
   each compilation appends an entry; it is read at the first call of a stub.
-  The cache of compiled files has the format 3 with lazy bodies, 2 without.
-- `TEXMACS_FL_EAGER=1` expands and compiles everything at load, as before;
+  The cache of compiled files has the format 4 with lazy bodies, 2 without.
+- **No late calls, no deferred macro errors.** A body is compiled at its
+  first call, when the macros it uses are defined, and a macro error in a
+  body is raised when it is first called, as in Guile: the late calls (§2.3)
+  and `*defer-macro-errors*` (§2.4) are only used with `TEXMACS_FL_EAGER`.
+  With lazy bodies and without them, the suites, the boot and the
+  interactive benchmark give the same results; eager without them does not
+  boot (`delayed` is used before its definition).
+- `TEXMACS_FL_EAGER=1` expands and compiles everything at load, as before
+  (with the late calls and the deferred macro errors);
   `(%lazy-report)` gives the number of stubs, of first calls, of cache hits
   and the time of the first calls (with `TEXMACS_FL_PROFILE`).
 
-Also on this branch: the heap starts with 32 MB instead of 8
+The heap starts with 32 MB instead of 8 (on wip_femto too)
 (`TEXMACS_FL_HEAP`, in MB): a boot collected the garbage 23 times instead of
 5, about 60 ms more; the resident memory at boot is 8 MB larger, the peak of
 the interactive benchmark is the same.
@@ -80,7 +88,11 @@ with a warm cache (40/43, the three known failures, §6.1).
   top-level lambda when it is called at load.
 - An error in the expansion of a body appears at the first call, not at load
   (as in Guile): tests which only load code no longer see it.
-- The late calls and the deferred macro errors (§2.3, §2.4) are kept; with
-  lazy bodies most of them may no longer be needed.
+- The stubs rely on their code: after `%lazy-force!` returns, only a tail
+  call (`loada0`, `tapply`), which does not read the replaced constants. A
+  new femtolisp compiler must be checked with `(disassemble
+  %lazy-template)`.
+- `%lazy.flc` only grows (an entry per compiled body which was not in it):
+  it should be rewritten when it holds too many entries no longer used.
 - What remains of the boot gap with s7 is not the front end: the
   interpreter, the top-level code of the loaded files, and the glue.

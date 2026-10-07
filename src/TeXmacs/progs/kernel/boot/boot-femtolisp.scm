@@ -215,7 +215,9 @@
 
 ;; Femtolisp expands the macros when it compiles a form, and Guile when it
 ;; first evaluates it: TeXmacs code may use a macro which is defined after the
-;; code (in a module loaded later). A call (f ...) of a name f which is
+;; code (in a module loaded later). With lazy function bodies (below), a body
+;; is compiled when it first runs, which is enough; with TEXMACS_FL_EAGER,
+;; late calls are needed. A call (f ...) of a name f which is
 ;; neither bound nor a macro when it is compiled, nor defined by the file
 ;; being loaded, is compiled when it is first evaluated, as the function of
 ;; the local variables in its scope (#(form variables module function)).
@@ -249,6 +251,7 @@
           (aset! site 3 f)))
     (apply f vals)))
 
+(if (os.getenv "TEXMACS_FL_EAGER")
 (set! compile-unknown-call
       (lambda (x env)
         (if (or *compiling-late-site*
@@ -261,7 +264,7 @@
                                              (module-name *current-module*))
                                  #f)))
               (if %trace-errors? (set! %late-sites (cons site %late-sites)))
-              (list '%late-call (list 'quote site) (cons 'list vars))))))
+              (list '%late-call (list 'quote site) (cons 'list vars)))))))
 
 (define (%late-calls)
   (map (lambda (site) (car (aref site 0))) %late-sites))
@@ -477,7 +480,7 @@
 ;; procedures with an environment, TeXmacs objects...) are compiled at each
 ;; load. TEXMACS_FL_NO_CACHE disables the cache.
 
-(define %cache-format (if %lazy? 3 2))  ; (lazy bodies: another cache)
+(define %cache-format (if %lazy? 4 2))  ; (lazy bodies: another cache)
 (define %cache? (not (os.getenv "TEXMACS_FL_NO_CACHE")))
 (define %cache-dir #f)
 (define %cache-key #f)
