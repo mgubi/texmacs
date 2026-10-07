@@ -365,6 +365,44 @@ highlight_on (Clay_Color bg) {
 static Clay_Color
 faded (Clay_Color c) { return (Clay_Color) { c.r, c.g, c.b, 0 }; }
 
+// The menus, lists and balloons appear with a short animation: they drop
+// into place from a few pixels above, and their contents fade in. The
+// renderers have no opacity for a group, so the fade is a veil: a box in
+// the colour of the menu, over its contents, which Clay takes from opaque
+// to transparent (menu_veil).
+static Clay_TransitionData
+drop_in (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.boundingBox.y -= ui_pxf (10); return target;
+}
+static Clay_TransitionData
+veil_opaque (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.backgroundColor.a= 255; return target;
+}
+static const Clay_TransitionElementConfig drop_in_transition= {
+  .handler= Clay_EaseOut, .duration= 0.14f,
+  .properties= CLAY_TRANSITION_PROPERTY_Y,
+  .enter= { .setInitialState= drop_in,
+            .trigger= CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME }};
+
+// the veil over the contents of a floating element which has just appeared
+// (it is new: Clay animates it from veil_opaque); it lets the pointer through
+static void
+menu_veil (Clay_ElementId parent, Clay_Color bg, Clay_CornerRadius r, int16_t z) {
+  CLAY(CLAY_IDI ("menu_veil", parent.id), {
+    .layout= { .sizing= { CLAY_SIZING_GROW (0), CLAY_SIZING_GROW (0) }},
+    .backgroundColor= { bg.r, bg.g, bg.b, 0 },
+    .cornerRadius= r,
+    .floating= {
+      .zIndex= z,
+      .attachTo= CLAY_ATTACH_TO_PARENT,
+      .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH },
+    .transition= {
+      .handler= Clay_EaseOut, .duration= 0.18f,
+      .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR,
+      .enter= { .setInitialState= veil_opaque,
+                .trigger= CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME }}}) {}
+}
+
 // a colour a fraction t of the way from a to b (a line between two colours
 // of the theme, a frame which is to be fainter than the border)
 static Clay_Color
@@ -2145,7 +2183,8 @@ layout_pull_button (vue_ui_rep *w) {
                  .childOffset= Clay_GetScrollOffset () },
         .border= {
           .width= { 1, 1, 1, 1 },
-          .color= color_border }})
+          .color= color_border },
+        .transition= drop_in_transition })
       {
         current_popup= false;
         uint32_t save_menu= current_menu, save_bar= current_bar;
@@ -2154,6 +2193,7 @@ layout_pull_button (vue_ui_rep *w) {
         concrete (d.cw)->do_layout ();
         current_menu= save_menu;
         current_bar= save_bar;
+        menu_veil (float_id, color_background, ui_corners (menu_round), 5);
         // a press outside the chain: its last menu closes first, then the
         // ones it hangs from, down to the one the press is in
         bool outside= menu_press && !Clay_PointerOver (float_id) &&
@@ -3218,7 +3258,7 @@ vue_ui_rep::do_layout () {
         CLAY(balloon_id, {
           .backgroundColor= the_theme.balloon,
           .layout= { .padding= { ui_px (10), ui_px (10), ui_px (10), ui_px (10) } },
-          .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (4)),
+          .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (8)),
           .border= {
             .width= { 1, 1, 1, 1 },
             .color= the_theme.balloon_border },
@@ -3232,6 +3272,7 @@ vue_ui_rep::do_layout () {
             .attachTo= CLAY_ATTACH_TO_ROOT }})
         {
           concrete(d.help)->do_layout ();
+          menu_veil (balloon_id, the_theme.balloon, CLAY_CORNER_RADIUS(ui_pxf (8)), 10);
         }
       }
     } else {
@@ -3439,8 +3480,10 @@ vue_ui_rep::do_layout () {
           .backgroundColor= color_background,
           .cornerRadius= ui_corners (),
           .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
-          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+          .border= { .width= { 1, 1, 1, 1 }, .color= color_border },
+          .transition= drop_in_transition })
         {
+          menu_veil (list_id, color_background, ui_corners (), 10);
           for (int i=0; i<N(d.vals); i++) {
             Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
             ui_signal isig= button_logic (item_id);

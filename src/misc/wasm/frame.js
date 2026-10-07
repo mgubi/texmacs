@@ -402,6 +402,25 @@ var tmFrame = (function () {
     .tm-dark #tm-about .tm-button:hover { background:#323236 }
     .tm-dark #tm-about .tm-default { background:#2563eb; border-color:#2563eb; color:#fff }
     .tm-dark #tm-about .tm-default:hover { background:#3b82f6 }
+    /* small animations: the menus drop in, the dialogs and the balloons
+       fade in, the hovers ease (none when the system asks for less motion) */
+    @keyframes tm-drop { from { opacity:0; transform:translateY(-6px) scale(.98) }
+                         to { opacity:1; transform:none } }
+    @keyframes tm-zoom { from { opacity:0; transform:translateY(8px) scale(.96) }
+                         to { opacity:1; transform:none } }
+    @keyframes tm-fade { from { opacity:0 } to { opacity:1 } }
+    #tm-menu { animation:tm-drop .16s cubic-bezier(.2,.8,.2,1); transform-origin:top left }
+    #tm-about { animation:tm-fade .18s ease-out }
+    #tm-about .tm-box { animation:tm-zoom .22s cubic-bezier(.2,.8,.2,1) }
+    #tm-balloon { animation:tm-fade .14s ease-out }
+    #tm-menu .tm-item, #tm-about .tm-button, #tm-about .tm-x, #tm-about .tm-icon,
+    #tm-frame .tm-tab .tm-close, #tm-frame .tm-tab .tm-more { transition:background .12s, color .12s }
+    #tm-frame .tm-fold svg { transition:transform .2s cubic-bezier(.2,.8,.2,1) }
+    #tm-frame .tm-fold:hover svg { transform:translateX(-2px) }
+    #tm-frame.collapsed .tm-fold:hover svg { transform:translateX(2px) }
+    @media (prefers-reduced-motion: reduce) {
+      #tm-menu, #tm-about, #tm-about .tm-box, #tm-balloon { animation:none }
+    }
   `;
 
   // folded (only the logo and small tabs) or not, as the browser remembers
