@@ -235,7 +235,8 @@
 
     <item>Folding the column of tabs makes it disappear: a button at the left
     of the footer brings it back, and the logo of <TeXmacs> <name|Vue> at the
-    left of the menu bar opens its menu.
+    left of the menu bar opens its menu. The page opens with the column
+    folded, the whole width to the document; it remembers when you open it.
 
     <item>The browser asks before closing or reloading the page while
     documents have unsaved changes.

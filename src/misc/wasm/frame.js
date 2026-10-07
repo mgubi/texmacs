@@ -427,8 +427,8 @@ var tmFrame = (function () {
     }
   `;
 
-  // folded (only the logo and small tabs) or not, as the browser remembers
-  // it; a narrow page starts folded
+  // folded (the column gone: see setFolded) or not, as the browser
+  // remembers it; the page starts folded, the whole width to the document
   // the tabs in the column at the left, or above the page as before (the
   // preference "window tabs" of TeXmacs, which tells it at its start and
   // when it changes: setTabsPosition); the page remembers the last one, so
@@ -467,7 +467,7 @@ var tmFrame = (function () {
     try { v = localStorage.getItem (FOLD); } catch (e) {}
     if (v === 'collapsed') return true;
     if (v === 'expanded') return false;
-    return typeof window !== 'undefined' && window.innerWidth < 900;
+    return true;
   }
 
   // the width of the column when it is open, which its right edge changes
