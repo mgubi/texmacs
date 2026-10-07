@@ -2029,11 +2029,12 @@ layout_pull_button (vue_ui_rep *w) {
   // baseline, so that the letters look centered in the highlight
   Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (8), ui_px (4) };
   if (in_footer) padding= { ui_px (10), ui_px (10), ui_px (4), ui_px (2) };
-  float rad= ui_corners (menu_round).topLeft; // as the menus
+  // the highlight is rounded as the items of the menus, in a menu and on
+  // the bars alike
+  float rad= ui_inner_corners (menu_round, menu_inset).topLeft;
   if (!down && button_grow) {
     padding= menu_item_padding ();
     padding.right= 0;
-    rad= ui_inner_corners (menu_round, menu_inset).topLeft; // in a menu
   }
   CLAY(button_id, {
     .layout= {
@@ -3127,7 +3128,7 @@ vue_ui_rep::do_layout () {
         padding= in_footer ? (Clay_Padding) { ui_px (10), ui_px (10), ui_px (3), ui_px (3) }
                  : in_tool_bar ? CLAY_PADDING_ALL(ui_px (tool_button_pad))
                  : CLAY_PADDING_ALL(ui_px (7));
-        radius= ui_corners (menu_round); // as the menus
+        radius= ui_inner_corners (menu_round, menu_inset); // as the menu items
       }
       if (down || pressed) bg= color_pressed;
       else if (hot) bg= hl;
