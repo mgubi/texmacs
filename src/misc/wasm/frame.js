@@ -571,6 +571,7 @@ var tmFrame = (function () {
         strip.classList.add ('reordering');
         tab.classList.add ('dragging');
         document.body.classList.add ('tm-reordering');
+        flyIn (true); // (again, now that flyOut is refused)
         try { window.getSelection ().removeAllRanges (); } catch (err) {}
       }
       // the tabs scroll when the mouse is near their ends
@@ -585,11 +586,14 @@ var tmFrame = (function () {
       var c = centers[from] + d;
       to = from;
       for (var k = 0; k < all.length; k++) {
-        if (k < from && c < centers[k]) { to = k; break; }
+        if (k < from && c <= centers[k]) { to = k; break; }
       }
       for (var k2 = all.length - 1; k2 > from; k2--) {
-        if (c > centers[k2]) { to = k2; break; }
+        if (c >= centers[k2]) { to = k2; break; }
       }
+      // (<= and >=: at the first or the last place the dragged tab stops
+      // exactly on the centre of the tab which was there, and with < and >
+      // it never took its place; two tabs could not be exchanged at all)
       all.forEach (function (o, k) {
         if (o === tab) return;
         var sh = (from < to && k > from && k <= to) ? -step : (to < from && k >= to && k < from) ? step : 0;
@@ -736,6 +740,9 @@ var tmFrame = (function () {
   var flyout = null, flyTimer = null;
   function flyOut (tab, t, name) {
     if (!bar.classList.contains ('collapsed')) return;
+    // not while a tab is dragged: the tab which moves under the mouse asked
+    // for it again, and it stayed where the drag began, beside the tab
+    if (document.body.classList.contains ('tm-reordering')) return;
     if (flyTimer) { clearTimeout (flyTimer); flyTimer = null; }
     if (!flyout) {
       flyout = el ('div'); flyout.id = 'tm-flyout';
