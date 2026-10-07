@@ -25,7 +25,7 @@
 
 ;; the compiled functions keep their source (procedure-source), which TeXmacs
 ;; inspects (the actions of the menus, for instance)
-(set! *keep-source* (not (os.getenv "TM_NOSRC")))
+(set! *keep-source* #t)
 
 ;; with TEXMACS_FL_EAGER (function bodies expanded at load, see
 ;; boot-femtolisp.scm), the errors of the macro expansions are raised when the
