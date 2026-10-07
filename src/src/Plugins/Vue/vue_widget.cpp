@@ -2100,9 +2100,11 @@ layout_pull_button (vue_ui_rep *w) {
   // baseline, so that the letters look centered in the highlight
   Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (8), ui_px (4) };
   if (in_footer) padding= { ui_px (10), ui_px (10), ui_px (4), ui_px (2) };
-  // the highlight is rounded as the items of the menus, in a menu and on
-  // the bars alike
-  float rad= ui_inner_corners (menu_round, menu_inset).topLeft;
+  // the highlight of an item which opens a submenu is rounded as the other
+  // items of its menu; the highlight of a title of a bar as the menu which
+  // it opens, whose corners it sits above (the footer is too low for that)
+  float rad= (down && !in_footer) ? ui_corners (menu_round).topLeft
+             : ui_inner_corners (menu_round, menu_inset).topLeft;
   if (!down && button_grow) {
     padding= menu_item_padding ();
     padding.right= 0;
