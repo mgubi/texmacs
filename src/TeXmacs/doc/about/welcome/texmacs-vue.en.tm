@@ -218,6 +218,25 @@
   <paragraph|7 October 2026>
 
   <\itemize>
+    <item>A new look: flat bars in neutral greys with a blue accent, in the
+    light and the dark theme, rounder menus whose items follow their corners,
+    a quieter column of tabs, and short animations when the menus, lists,
+    balloons and dialogs appear.
+
+    <item>A new icon set, the default: <name|Lucide>, with thin lines and
+    pastel colours inside which tell the kind of an action (documents in
+    blue, editing in amber, searching in violet, inserting in green, the look
+    of the text in rose). <name|Hugeicons> is offered too; the other sets
+    are still in <menu|Edit|Preferences|General|Icon set>. The buttons of the
+    icons are square, and the two columns of icons at the left match.
+
+    <item>The focus bar is at the right of the menu bar, which leaves more
+    room to the document.
+
+    <item>Folding the column of tabs makes it disappear: a button at the left
+    of the footer brings it back, and the logo of <TeXmacs> <name|Vue> at the
+    left of the menu bar opens its menu.
+
     <item>The browser asks before closing or reloading the page while
     documents have unsaved changes.
 
