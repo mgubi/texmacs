@@ -220,7 +220,7 @@
   <\itemize>
     <item>A new look, in the colours of before: rounder menus whose items
     follow their corners, rounded tabs in the column of tabs, and short
-    animations when the menus, lists, balloons and dialogs appear.
+    animations when the menus, lists and dialogs appear.
 
     <item>A new icon set, the default: <name|Lucide>, with thin lines and
     pastel colours inside which tell the kind of an action (documents in

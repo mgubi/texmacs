@@ -375,7 +375,7 @@ highlight_on (Clay_Color bg) {
 static Clay_Color
 faded (Clay_Color c) { return (Clay_Color) { c.r, c.g, c.b, 0 }; }
 
-// The menus, lists and balloons appear with a short animation: they drop
+// The menus and lists appear with a short animation: they drop
 // into place from a few pixels above, and their contents fade in. The
 // renderers have no opacity for a group, so the fade is a veil: a box in
 // the colour of the menu, over its contents, which Clay takes from opaque
@@ -3319,8 +3319,9 @@ vue_ui_rep::do_layout () {
             .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
             .attachTo= CLAY_ATTACH_TO_ROOT }})
         {
+          // (no veil here, unlike the menus: the box of a balloon appears
+          // at once, and its text a moment later read as a delay)
           concrete(d.help)->do_layout ();
-          menu_veil (balloon_id, the_theme.balloon, CLAY_CORNER_RADIUS(ui_pxf (8)), 10);
         }
       }
     } else {
