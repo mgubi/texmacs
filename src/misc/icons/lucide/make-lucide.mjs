@@ -22,14 +22,15 @@ const HERE = path.dirname (new URL (import.meta.url).pathname);
 const PIXMAPS = path.resolve (HERE, '../../../TeXmacs/misc/pixmaps');
 const OUT = path.join (PIXMAPS, 'lucide');
 
-// the lines, and the pastel insides: soft tints on the light theme; on the
-// dark theme, where the lines are light, brighter pastels (the 300 tints of
-// Tailwind) blended with the background of the theme (DARK_MIX of the
-// pastel), dusty but still pastel, and the lines still show over them
+// the lines, and the pastel insides, which are translucent (FILL_OPACITY):
+// the bar shows through them. Soft tints on the light theme; on the dark
+// theme, where the lines are light, brighter pastels (the 300 tints of
+// Tailwind), more transparent, dusty but still pastel over the dark bars,
+// and the lines still show over them
 const INK = { light: '#3F3F46', dark: '#E4E4E7' };
-const DARK_BG = [32, 32, 35], DARK_MIX = 0.6;
+const FILL_OPACITY = { light: 0.7, dark: 0.55 };
 const FILLS = {
-  //         light      dark (before the blend)
+  //         light      dark
   blue:   ['#BFDBFE', '#93C5FD'], // documents and files
   amber:  ['#FDE68A', '#FDE68A'], // the clipboard, editing
   violet: ['#DDD6FE', '#C4B5FD'], // searching, checking
@@ -41,11 +42,6 @@ const FILLS = {
   slate:  ['#D4D4D8', '#A1A1AA'], // settings and tools
   red:    ['#FECACA', '#FCA5A5'], // closing, deleting, stopping
 };
-function darkFill (hex) {
-  const c = [1, 3, 5].map (i => parseInt (hex.slice (i, i + 2), 16));
-  return '#' + c.map ((v, i) => Math.round (DARK_MIX * v + (1 - DARK_MIX) * DARK_BG[i])
-                                  .toString (16).padStart (2, '0')).join ('').toUpperCase ();
-}
 
 // the margin around the drawing (in the units of the 24 x 24 drawing): the
 // icons are a little smaller than their box, as those of the Hugeicons set
@@ -178,11 +174,12 @@ function attrs (a) {
     .map (([k, v]) => `${k}="${v}"`).join (' ');
 }
 
-function svg (nodes, ink, fill, stroke, lucide, size) {
+function svg (nodes, ink, fill, opacity, stroke, lucide, size) {
   // the dots are drawn solid, and large enough to be seen with thin lines
   const solid = ([tag, a]) => dot ([tag, a]) ? [tag, { ...a, r: '1.1' }] : [tag, a];
   const fills = nodes.filter (n => closed (n, lucide)).map (solid).map (([tag, a]) =>
-    `  <${tag} ${attrs (a)} fill="${dot ([tag, a]) ? ink : fill}" stroke="none"/>`);
+    dot ([tag, a]) ? `  <${tag} ${attrs (a)} fill="${ink}" stroke="none"/>`
+                   : `  <${tag} ${attrs (a)} fill="${fill}" fill-opacity="${opacity}" stroke="none"/>`);
   const lines = nodes.filter (n => !dot (n)).map (([tag, a]) =>
     `  <${tag} ${attrs (a)} fill="none" stroke="${ink}" stroke-width="${stroke}" ` +
     `stroke-linecap="round" stroke-linejoin="round"/>`);
@@ -211,9 +208,8 @@ function main () {
       const dir = path.join (OUT, theme);
       fs.mkdirSync (dir, { recursive: true });
       fs.writeFileSync (path.join (dir, `tm_${name}.svg`),
-                        svg (nodes[lucide], INK[theme],
-                            k ? darkFill (FILLS[colour][1]) : FILLS[colour][0],
-                            stroke, lucide, size));
+                        svg (nodes[lucide], INK[theme], FILLS[colour][k],
+                            FILL_OPACITY[theme], stroke, lucide, size));
     });
     n++;
   }
