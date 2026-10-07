@@ -404,7 +404,29 @@ fltm_fingerprint (value_t* args, uint32_t nargs) {
   return string_from_cstr (buf);
 }
 
+/* (%function-become! f g): f takes the code, the constants, the environment
+   and the name of g, so that every reference to f now calls g (the stub of
+   a function whose body is expanded and compiled when it is first called).
+   The code of f must not run after this, except a tail call: the
+   interpreter keeps a pointer into it (code is pinned: it does not move,
+   and the stubs share one code, which stays alive). */
+static value_t
+fltm_function_become (value_t* args, uint32_t nargs) {
+  argcount ("%function-become!", nargs, 2);
+  value_t f= args[0], g= args[1];
+  if (!isclosure (f)) type_error ("%function-become!", "function", f);
+  if (!isclosure (g)) type_error ("%function-become!", "function", g);
+  function_t* a= (function_t*) ptr (f);
+  function_t* b= (function_t*) ptr (g);
+  a->bcode= b->bcode;
+  a->vals = b->vals;
+  a->env  = b->env;
+  a->name = b->name;
+  return f;
+}
+
 static builtinspec_t fltm_builtin_info[]= {
+  { "%function-become!", fltm_function_become },
   { "%fingerprint", fltm_fingerprint },
   { "string-length", fltm_string_length_builtin },
   { "%keyword?", fltm_keywordp },

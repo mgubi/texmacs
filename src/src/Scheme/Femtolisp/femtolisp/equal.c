@@ -312,8 +312,22 @@ static uptrint_t bounded_hash(value_t a, int bound, int *oob)
         u.d = (double)numval(a);
         return doublehash(u.i64);
     case TAG_FUNCTION:
-        if (uintval(a) > N_BUILTINS)
+        if (uintval(a) > N_BUILTINS) {
+            // TeXmacs: a function with its source (*keep-source*) hashes as
+            // its source, which stays the same when the stub of a lazy
+            // function becomes the compiled function (their code differs)
+            static value_t source_sym = 0;  // symbols do not move
+            if (!source_sym) source_sym = symbol("%source");
+            value_t vals = ((function_t*)ptr(a))->vals;
+            size_t n = isvector(vals) ? vector_size(vals) : 0;
+            if (n > 0) {
+                value_t c = vector_elt(vals, n-1);
+                if (iscons(c) && car_(c) == source_sym)
+                    return bounded_hash(cdr_(c), bound < 256 ? bound : 256,
+                                        oob);
+            }
             return bounded_hash(((function_t*)ptr(a))->bcode, bound, oob);
+        }
         return inthash(a);
     case TAG_SYM:
         return ((symbol_t*)ptr(a))->hash;

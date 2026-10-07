@@ -17,7 +17,7 @@
 src/Scheme/Femtolisp/
   femtolisp/          upstream femtolisp ec76010 with the patches applied
                       (sources, llt, system.lsp, compiler.lsp, flisp.boot, tests)
-  patches/            0001-0021, made with git format-patch
+  patches/            0001-0022, made with git format-patch
   fl_core.c, fl_llt.c the two compilation units
   fl_tm.h             the C interface
   fl_boot.h           flisp.boot as a C array (make-boot-header.sh)
@@ -50,6 +50,7 @@ src/Scheme/Femtolisp/
 | 0019 | the unspecified value is the self-evaluating symbol `#<unspecified>` (it was `#t`) |
 | 0020 | `*arith-fallback*` for `+ - * / =` on non-numbers; `(- 0)` is the fixnum 0 |
 | 0021 | the reader makes a vector without a label once its elements are read (growing it called the garbage collector at each step) |
+| 0022 | a function with its source (`*keep-source*`) hashes as its source, which stays the same when the stub of a lazy function becomes the compiled function |
 
 The new behaviours are off by default (the flags and hooks), except where
 femtolisp was wrong or where its own boot needs them, so upstream's tests

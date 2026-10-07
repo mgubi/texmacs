@@ -267,6 +267,200 @@
   (map (lambda (site) (car (aref site 0))) %late-sites))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Lazy function bodies
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Guile and s7 expand the body of a function when it first runs, femtolisp
+;; when it compiles the function. A loaded form is therefore only expanded
+;; at its top level (%expand-top): its macros run, but each lambda which is
+;; not inside a binding form (a lambda whose free variables are global) is
+;; kept unexpanded in a stub. The first call of the stub expands and compiles
+;; the lambda, in the module where it was loaded, and the stub becomes the
+;; compiled function (%function-become!), so that the references kept to it
+;; (hooks, menus, former definitions...) call the compiled code. A stub has
+;; the name and the source of its function (procedure-name,
+;; procedure-source, procedure-arity). TEXMACS_FL_EAGER disables it.
+
+(define %lazy? (not (os.getenv "TEXMACS_FL_EAGER")))
+(define %lazy-made 0)
+(define %lazy-forced 0)
+(define %lazy-time 0.0)
+
+(define (%make-lazy src name module)
+  ;; src is (lambda formals . body), compiled with the name of the function
+  (let* ((named (if name (append src name) src))
+         (rec (vector named module #f #f))
+         (tvals (function:vals %lazy-template))
+         (n (length tvals))
+         (vals (make-vector n #f)))
+    (let loop ((i 0))
+      (if (< i n)
+          (let ((c (aref tvals i)))
+            (aset! vals i
+                   (cond ((eq? c '%lazy-record) rec)
+                         ((and (pair? c) (eq? (car c) '%source))
+                          (cons '%source src))
+                         (else c)))
+            (loop (+ i 1)))))
+    (let ((stub (function (function:code %lazy-template) vals
+                          (or name 'lambda))))
+      (aset! rec 2 stub)
+      (set! %lazy-made (+ %lazy-made 1))
+      stub)))
+
+(define (%lazy-force! rec)
+  (let ((stub (aref rec 2)))
+    (if (aref rec 3)
+        stub
+        (let* ((t0 (and %profile? (time.now)))
+               (name (aref rec 1))
+               (m (and name (get *modules* name #f)))
+               (real (with-bindings ((*current-module* m)
+                                     (*module-name* (or name '(texmacs-user))))
+                       (%lazy-compile (aref rec 0) name))))
+          ;; (a call of the stub during this compilation, from a macro, uses
+          ;; this compilation's result, and the outer one becomes the stub)
+          (if (not (aref rec 3))
+              (begin
+                (aset! rec 3 #t)
+                (%function-become! stub (%with-source-of real stub))
+                (set! %lazy-forced (+ %lazy-forced 1))
+                (if %profile?
+                    (set! %lazy-time (+ %lazy-time (- (time.now) t0))))))
+          stub))))
+
+;; f with the source of the stub g (the lambda before its expansion), as
+;; the last constant: procedure-source gives it, and a function hashes as
+;; its source (equal.c), so that the stub keeps its hash when it becomes f
+(define (%with-source-of f g)
+  (let* ((gv (function:vals g))
+         (src (aref gv (- (length gv) 1)))
+         (v (function:vals f))
+         (n (length v))
+         (has (and (> n 0) (pair? (aref v (- n 1)))
+                   (eq? (car (aref v (- n 1))) '%source)))
+         (w (make-vector (if has n (+ n 1)) #f)))
+    (let loop ((i 0))
+      (if (< i n) (begin (aset! w i (aref v i)) (loop (+ i 1)))))
+    (aset! w (if has (- n 1) n) src)
+    (function (function:code f) w (function:name f) (function:env f))))
+
+;; The compiled bodies are kept in the cache of compiled files, in the file
+;; %lazy.flc, under the fingerprint of their expansion, their module and its
+;; private names: the bodies are still expanded at their first call (their
+;; macros run, as in Guile), not compiled. The file starts with the key of
+;; the cache; each compilation appends an entry, and the file is read at the
+;; first call of a stub.
+(define %lazy-table #f)
+(define %module-privates-fp (table))
+(define %lazy-hits 0)
+
+(define (%lazy-cache-file) (%cache-file "%lazy"))
+
+(define (%lazy-table-load)
+  (set! %lazy-table (table))
+  (let ((cf (%lazy-cache-file)))
+    (if cf
+        (trycatch
+         (if (and (file-exists? cf)
+                  (let ((in (open-input-file cf)))
+                    (let ((ok (equal? (%cache-read-entry in) %cache-key)))
+                      (if ok
+                          (let loop ()
+                            (let ((e (%cache-read-entry in)))
+                              (if (pair? e)
+                                  (begin (put! %lazy-table (car e) (cdr e))
+                                         (loop))))))
+                      (close-port in)
+                      ok)))
+             #t
+             ;; a new file (or another version of TeXmacs): the key
+             (let ((out (file cf :write :create :truncate)))
+               (%fl-write %cache-key out) (newline out)
+               (io.close out)))
+         (lambda (e) #f)))))
+
+(define (%lazy-cache-add! fp f)
+  (put! %lazy-table fp f)
+  (let ((cf (%lazy-cache-file)))
+    (if cf
+        (trycatch
+         (let ((out (file cf :write :create :append)))
+           (with-bindings ((*print-readably* #t) (*print-closures* #t)
+                           (*print-shared* #t) (*print-pretty* #f)
+                           (*print-length* #f) (*print-level* #f))
+             (%fl-write (cons fp f) out) (newline out))
+           (io.close out))
+         (lambda (e) #f)))))
+
+(define (%lazy-compile src name)
+  (let* ((e (expand src))
+         (fp (and %cache?
+                  (%fingerprint (list name (get %module-privates-fp name #f)
+                                      e))))
+         (hit (and fp
+                   (begin
+                     (if (not %lazy-table) (%lazy-table-load))
+                     (get %lazy-table fp #f)))))
+    (if hit
+        (begin (set! %lazy-hits (+ %lazy-hits 1)) hit)
+        (let ((f ((compile-thunk e))))
+          (if (and fp (%cache-writable? f)) (%lazy-cache-add! fp f))
+          f))))
+
+;; the code of the stubs, compiled after %lazy-force! (a direct call): a
+;; record #(lambda module-name stub forced?) takes the place of the constant
+;; %lazy-record
+(define %lazy-template
+  (%fl-eval '(lambda args (apply (%lazy-force! '%lazy-record) args))))
+
+(define (%lazy-report)
+  (display* "LAZY stubs " %lazy-made " forced " %lazy-forced
+            " (cache hits " %lazy-hits ") compiling them "
+            (round (* 1000 %lazy-time)) " ms\n"))
+
+;; the lambda e (with a name or #f) as a stub
+(define (%lazy-lambda e name)
+  (list '%make-lazy (list 'quote e) (list 'quote name)
+        (list 'quote (and *current-module* (module-name *current-module*)))))
+
+;; expands the top level of the form e, keeping the lambdas in stubs
+(define (%expand-top e)
+  (if (atom? e) e
+      (let ((head (car e)))
+        (cond ((eq? head 'quote) e)
+              ((eq? head 'lambda)
+               (if (and (pair? (cdr e)) (pair? (cddr e)))
+                   (let ((n (lastcdr e)))
+                     (%lazy-lambda (list* 'lambda (cadr e)
+                                          (proper-part (cddr e)))
+                                   (and (symbol? n) n)))
+                   e))
+              ((eq? head 'define) (%expand-top-define e))
+              ((eq? head 'let-syntax) (expand e))
+              ((and (symbol? head) (not (bound? (resolve-global head)))
+                    (macrocall? e))
+               => (lambda (f) (%expand-top (expand-macro-call f e))))
+              (else (%expand-args e))))))
+
+(define (%expand-args e)
+  (let loop ((e e))
+    (if (atom? e) e
+        (cons (if (atom? (car e)) (car e) (%expand-top (car e)))
+              (loop (cdr e))))))
+
+(define (%expand-top-define e)
+  (let ((e (uncurry-define e)))
+    (cond ((or (null? (cdr e)) (null? (cddr e))) e)
+          ((atom? (cadr e))
+           (list 'define (cadr e) (%expand-top (caddr e))))
+          (else
+           (let ((name (caadr e)))
+             (list 'define name
+                   (%lazy-lambda (list* 'lambda (cdadr e) (cddr e))
+                                 name)))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The cache of the compiled files
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -283,7 +477,7 @@
 ;; procedures with an environment, TeXmacs objects...) are compiled at each
 ;; load. TEXMACS_FL_NO_CACHE disables the cache.
 
-(define %cache-format 2)
+(define %cache-format (if %lazy? 3 2))  ; (lazy bodies: another cache)
 (define %cache? (not (os.getenv "TEXMACS_FL_NO_CACHE")))
 (define %cache-dir #f)
 (define %cache-key #f)
@@ -364,7 +558,7 @@
     (let loop ((l forms))
       (if (pair? l)
           (let* ((t0 (and %profile? (time.now)))
-                 (e (expand (car l)))
+                 (e (if %lazy? (%expand-top (car l)) (expand (car l))))
                  (t1 (and %profile? (time.now)))
                  (old (if in (%cache-read-entry in) (eof-object)))
                  (t2 (and %profile? (time.now)))
@@ -417,6 +611,7 @@
                         m))))
           (let ((privates (%scan-definitions forms)))
             (for-each (lambda (s) (%module-declare-private! m s)) privates)
+            (put! %module-privates-fp name (%fingerprint privates))
             (with-bindings ((*current-module* m)
                             (*module-name* name))
               (%eval-forms-cached file forms (cons name privates)))))
