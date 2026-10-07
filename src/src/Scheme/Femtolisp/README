@@ -79,6 +79,9 @@ The patches
       (- 0) is the fixnum 0
 0021  the reader makes a vector without a label once its elements are read
       (growing it called the garbage collector at each step)
+0022  a function with its source (*keep-source*) hashes as its source, which
+      stays the same when the stub of a lazy function becomes the compiled
+      function (boot-femtolisp.scm)
 
 The patches which change system.lsp or compiler.lsp regenerate flisp.boot.
 
