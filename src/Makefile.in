@@ -562,6 +562,8 @@ WINDOWS_BUNDLE: TEXMACS WINDOWS_PDB
 	$(RM) $(WINDOWS_BUILD_BIN_DIR)/texmacs
 	$(MV) $(WINDOWS_BUILD_BIN_DIR)/texmacs.bin $(WINDOWS_BUILD_BIN_DIR)/texmacs.exe
 	if test -n "@SIGNID@"; then @SIGNID@ $(WINDOWS_BUILD_BIN_DIR)/texmacs.exe; fi
+# (the extra programs of the TeXmacs repository, when there is one:
+# XTRA_CMD is empty without it, and "/"* would copy the whole root)
 	if test -n "@XTRA_CMD@" && test -d "@XTRA_CMD@"; then $(CP) -u "@XTRA_CMD@/"* $(WINDOWS_BUILD_BIN_DIR)/; fi
 	if [ -d "$(TMREPO)" ]; then \
 		$(CP) -r $(TMREPO)/lib/aspell-* $(WINDOWS_BUILD_DIR); \

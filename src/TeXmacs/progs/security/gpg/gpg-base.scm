@@ -492,7 +492,10 @@
 (tm-define (gpg-encrypt data rcps . homedir)
   (:synopsis "GnuPG encrypt string @data for recipient fingerprint list @rcps") 
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (rcps-args (map (lambda (x) (string-append "-r " x)) rcps))
+         ;; (each word an argument of its own: with "-r fpr" or " fpr" the
+         ;; argument is not the fingerprint; gpg of Unix takes them, that of
+         ;; Windows not)
+         (rcps-args (append-map (lambda (x) (list "-r" x)) rcps))
          (cmd (gpg-executable-encrypt rcps-args dir))
          (ret (evaluate-system cmd '(0) (list data) '(1 2))))
     (if (!= (car ret) "0")
@@ -547,9 +550,7 @@
 (tm-define (gpg-export-public-keys fingerprints . homedir)
   (:synopsis "Export GnuPG public keys of fingerprint in the given list")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (fingerprints-args
-          (map (lambda (x) (string-append " " x)) fingerprints))
-         (cmd (gpg-executable-export-public-keys fingerprints-args dir))
+         (cmd (gpg-executable-export-public-keys fingerprints dir))
          (ret (evaluate-system cmd '() '() '(1 2))))
     (if (!= (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret))
@@ -566,9 +567,7 @@
 (tm-define (gpg-export-secret-keys fingerprints . homedir)
   (:synopsis "Export GnuPG secret keys of fingerprint in the given list")
   (let* ((dir (if (null? homedir) (url-none) (car homedir)))
-         (fingerprints-args
-          (map (lambda (x) (string-append " " x)) fingerprints))
-         (cmd (gpg-executable-export-secret-keys fingerprints-args dir))
+         (cmd (gpg-executable-export-secret-keys fingerprints dir))
          (ret (evaluate-system cmd '() '() '(1 2))))
     (if (!= (car ret) "0")
         (gpg-error cmd (cadr ret) (caddr ret))

@@ -102,8 +102,12 @@
   (:handler "mychan" plugins-test-handler))
 
 ;; echoes its input on its standard output and its standard error
+;; (it writes each block, which perl -0005 reads up to its DATA_END, on the
+;; descriptor 2 itself: on Windows the programs of MSYS2 do not open the
+;; pipe of TeXmacs again by the name /dev/stderr, as tee did; and the
+;; command has no $, which is expanded on Unix and not on Windows)
 (plugin-configure tmtesterr
-  (:launch "sh -c \"trap '' INT; printf '\\002verbatim:ready\\005'; exec tee /dev/stderr\"")
+  (:launch "sh -c \"trap '' INT; printf '\\002verbatim:ready\\005'; exec perl -0005 -MIO::Handle -ne 'BEGIN { STDOUT->autoflush (1); STDERR->autoflush (1) } print; print STDERR'\"")
   (:serializer ,raw-serialize))
 
 ;; answers in two pieces, a second apart: two reads of the pipe; it sends
@@ -502,8 +506,12 @@
   (check= (echo (blk "tm-no-such-format:" "bar")) '(document "bar"))
   (check= (echo (blk "ps:" "%!PS"))
           '(document (image (tuple (raw-data "%!PS") "ps") "0.7par" "" "" "")))
+  ;; (the message shows the url of the name, which differs on Windows)
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png"))
-          '(document "[/tm-plugins-test-nothing.png] does not exist"))
+          `(document ,(string-append
+                       "[" (url->string (system->url
+                                         "/tm-plugins-test-nothing.png"))
+                       "] does not exist")))
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png?width=3cm"))
           '(document "cm is not allowed, please pt, px or par!"))
   (check= (echo (blk "file:" "/tm-plugins-test-nothing.png?height=3par"))
@@ -947,11 +955,15 @@
   (with r (py "plugins-test-py2" '(document "import os" "os.getpid()"))
     (check-true (func? r 'document 1))
     (when (func? r 'document 1)
-      (with pid (cadr r)
-        (check-true (pid-alive? pid))
+      ;; (not on Windows: pid-alive? needs the ps of Unix)
+      (with pid (and (not (os-mingw?)) (cadr r))
+        (when pid (check-true (pid-alive? pid)))
         (connection-stop "python" "plugins-test-py2")
         (check= (connection-status "python" "plugins-test-py2") 0)
-        (check-true (wait-until (lambda () (not (pid-alive? pid))) 5000)))))
+        (if pid
+            (check-true (wait-until (lambda () (not (pid-alive? pid))) 5000))
+            (skip "python: two sessions and stop"
+                  "the end of the process is not checked on Windows")))))
   (check= (py "plugins-test-py1" "y") '(document "5")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1026,7 +1038,9 @@
   (check= (eval-system "true") "")
   (check= (var-eval-system "echo hello") "hello")
   (check-true (url-exists-in-path? "sh"))
-  (check-true (url-exists-in-path? "tm_shell"))
+  ;; (the shell plugin needs a pseudo terminal: not built on Windows)
+  (unless (os-mingw?)
+    (check-true (url-exists-in-path? "tm_shell")))
   (check-false (url-exists-in-path? "tm-plugins-test-no-such-program"))
   (check= (first-in-path "tm-plugins-test-no-such-program" "sh") "sh")
   ;; none found: the empty string, which is a true value
@@ -1111,23 +1125,27 @@
     (check= fds2 fds1)
     (connection-stop "tmtestfds" "plugins-test-fds2")
     (connection-stop "tmtestecho" "plugins-test-fds-other"))
-  (write-pipes-scripts)
-  (with mark (url-append pipes-dir "cleaned")
-    (when (url-exists? mark) (system-remove mark))
-    (check= (start* "tmtestwrapper" "plugins-test-wrapper") "ok")
-    (pause "0.5")  ; (the program runs, its trap is set)
-    (connection-stop "tmtestwrapper" "plugins-test-wrapper")
-    ;; the program cleaned up before connection-stop returned
-    (check-true (url-exists? mark)))
-  ;; a command starting with a reserved word of the shell
-  (check= (start* "tmtestshellword" "plugins-test-word") "ok")
-  (check= (eval* "tmtestshellword" "plugins-test-word" (blk "verbatim:" "w"))
-          '(document "w"))
-  ;; a command starting with a builtin of bash (which dash has not: it then
-  ;; reports an error, and goes on)
-  (check= (start* "tmtestbashword" "plugins-test-bashword") "ok")
-  (check= (eval* "tmtestbashword" "plugins-test-bashword" (blk "verbatim:" "b"))
-          '(document "b"))
+  ;; (Windows: the command is not run by a shell, and a stopped program is
+  ;; closed, not asked to terminate)
+  (unless (os-mingw?)
+    (write-pipes-scripts)
+    (with mark (url-append pipes-dir "cleaned")
+      (when (url-exists? mark) (system-remove mark))
+      (check= (start* "tmtestwrapper" "plugins-test-wrapper") "ok")
+      (pause "0.5")  ; (the program runs, its trap is set)
+      (connection-stop "tmtestwrapper" "plugins-test-wrapper")
+      ;; the program cleaned up before connection-stop returned
+      (check-true (url-exists? mark)))
+    ;; a command starting with a reserved word of the shell
+    (check= (start* "tmtestshellword" "plugins-test-word") "ok")
+    (check= (eval* "tmtestshellword" "plugins-test-word" (blk "verbatim:" "w"))
+            '(document "w"))
+    ;; a command starting with a builtin of bash (which dash has not: it
+    ;; then reports an error, and goes on)
+    (check= (start* "tmtestbashword" "plugins-test-bashword") "ok")
+    (check= (eval* "tmtestbashword" "plugins-test-bashword"
+                   (blk "verbatim:" "b"))
+            '(document "b")))
   ;; PATH not set
   (when (defined? 'unsetenv)
     (with path (getenv "PATH")

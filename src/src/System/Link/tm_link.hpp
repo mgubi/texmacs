@@ -84,8 +84,6 @@ bool    pipe_program_found (string cmd); // (not on Windows)
 tm_link make_dynamic_link (string lib, string symb, string init, string ses);
 tm_link make_worker_link (string url);
 void process_all_workers ();
-tm_link make_socket_link (string h, int p, int t,
-			  int fd, tm_contact contact);
 tm_link make_socket_server (int port);
 tm_link find_socket_link (int fd);
 

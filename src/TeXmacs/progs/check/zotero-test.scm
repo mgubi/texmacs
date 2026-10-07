@@ -336,6 +336,9 @@
   (string-append (url->system (url-temp-dir)) "/zotero-test"))
 
 (define (tmp name) (system->url (string-append zotero-dir "/" name)))
+;; the system name of a file of the test directory, as url->system gives it
+;; (with the separators of the system: on Windows not those of zotero-dir)
+(define (tmp-system name) (url->system (tmp name)))
 
 (define (test-document)
   (check-group "document")
@@ -349,11 +352,11 @@
     (check= (zotero-citations doc) '("smith2020" "muller2019" "smith2020a"))
     (check= (zotero-citations '(document "no citation")) '())
     (check= (url->system (zotero-bibliography-file u doc))
-            (string-append zotero-dir "/refs.bib"))
+            (tmp-system "refs.bib"))
     (check= (url->system (zotero-bibliography-file
                           u '(bibliography "bib" "tm-plain" "sub/x.bib"
                                            (document ""))))
-            (string-append zotero-dir "/sub/x.bib"))
+            (tmp-system "sub/x.bib"))
     (check-false (zotero-bibliography-file u '(document "x")))
     (with-fake
       (lambda ()
@@ -892,7 +895,7 @@
           (doc-tm "  <\\bibliography|bib|tm-plain|own>\n  </bibliography>\n")
         (lambda ()
           (check= (url->system (zotero-own-bib-file))
-                  (string-append zotero-dir "/own.bib")))))))
+                  (tmp-system "own.bib")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Keys renamed and items deleted in Zotero
@@ -1684,8 +1687,8 @@
       (with-document "m.tm" master-doc
         (lambda ()
           (check= (map url->system (zotero-project-files))
-                  (list (string-append zotero-dir "/m.tm")
-                        (string-append zotero-dir "/chap.tm")))
+                  (list (tmp-system "m.tm")
+                        (tmp-system "chap.tm")))
           (check= (zotero-project-citations)
                   '("smith2020" "smith2020a" "muller2019"))
           ;; the managed file of the master has the citations of the chapter
@@ -1701,10 +1704,10 @@
                    '(("smith2020a" . "smith2020again")))
             (check= (car r) 1)
             (check= (map url->system (cadr r))
-                    (list (string-append zotero-dir "/chap.tm")))
+                    (list (tmp-system "chap.tm")))
             ;; the chapter was not open: it is saved
             (check= (map url->system (caddr r))
-                    (list (string-append zotero-dir "/chap.tm"))))
+                    (list (tmp-system "chap.tm"))))
           (with u (tmp "chap.tm")
             (check-false (buffer-exists? u))
             (check= (zotero-citations (zotero-file-stree u))
