@@ -65,8 +65,12 @@ void
 start_scheme (int argc, char** argv, void (*call_back) (int, char**)) {
   tm_femtolisp_argc= argc;
   tm_femtolisp_argv= argv;
-  // a heap of 8 Mb, about what TeXmacs uses once booted (it grows anyway)
-  if (fltm_init (8 * 1024 * 1024, (const char*) fl_boot_image,
+  // a heap of 32 Mb, about what TeXmacs uses once booted (it grows
+  // anyway): with 8 Mb, a boot collected the garbage 23 times instead of 5
+  // (60 ms more); TEXMACS_FL_HEAP sets it (in Mb)
+  size_t heap_mb= 32;
+  if (getenv ("TEXMACS_FL_HEAP")) heap_mb= atoi (getenv ("TEXMACS_FL_HEAP"));
+  if (fltm_init (heap_mb * 1024 * 1024, (const char*) fl_boot_image,
                  fl_boot_image_length)) {
     cerr << "TeXmacs] femtolisp could not be initialized\n";
     exit (1);
