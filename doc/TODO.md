@@ -28,16 +28,6 @@ SDL and Qtwk changes, the Qt 5 branch of the Qt pipes
 (`setupChildProcess`), and headless mode of X11, SDL and Cocoa. Qtwk has
 no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
-### Browser (found 2026-10-08, fixed on the local branch `modern-ui-kept-bars`, a variant of PR #314, not here)
-
-- `src/misc/wasm/frame.js`, folded column of tabs: while a tab is dragged
-  its flyout comes back (the moving tab asks for it) and stays where the
-  drag began, as a copy of the tab. `flyOut` should do nothing while
-  `tm-reordering` is set.
-- `src/misc/wasm/frame.js`, `pressTab`: a dragged tab never takes the first
-  or the last place (`c < centers[k]`, `c > centers[k2]` at the clamp are
-  equalities), so two tabs cannot be exchanged. `<=` and `>=`.
-
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`
