@@ -178,17 +178,40 @@
 (define (primitive-eval x) (eval x))
 
 ;; TEXMACS_FL_PROFILE: the time spent reading, expanding and compiling (or
-;; finding in the cache) the forms of the loaded files, (%profile-report)
+;; finding in the cache, of which reading the cache) the forms of the loaded
+;; files, (%profile-report); the expansion time by head of the top-level
+;; forms, (%profile-heads-report)
 (define %profile? (os.getenv "TEXMACS_FL_PROFILE"))
 (define %profile-read 0.0)
 (define %profile-expand 0.0)
 (define %profile-compile 0.0)
+(define %profile-cache-read 0.0)
 (define %profile-forms 0)
+(define %profile-hits 0)
+(define %profile-heads (table))
+
 (define (%profile-report)
   (display* "PROFILE forms " %profile-forms
+            " cache hits " %profile-hits
             " read " (round (* 1000 %profile-read)) " ms"
             " expand " (round (* 1000 %profile-expand)) " ms"
-            " compile or cache " (round (* 1000 %profile-compile)) " ms\n"))
+            " compile or cache " (round (* 1000 %profile-compile)) " ms"
+            " (reading the cache " (round (* 1000 %profile-cache-read))
+            " ms)\n"))
+
+(define (%profile-head! form dt)
+  (let* ((h (if (pair? form) (car form) 'atom))
+         (old (get %profile-heads h (cons 0 0.0))))
+    (put! %profile-heads h (cons (+ (car old) 1) (+ (cdr old) dt)))))
+
+(define (%profile-heads-report)
+  (let ((l (table.foldl (lambda (k v acc) (cons (cons k v) acc))
+                        '() %profile-heads)))
+    (for-each (lambda (p)
+                (display* "HEAD " (car p) " forms " (cadr p)
+                          " expand " (round (* 1000 (cddr p))) " ms\n"))
+              (list-head (sort l (lambda (a b) (> (cddr a) (cddr b))))
+                         (min 25 (length l))))))
 
 ;; Femtolisp expands the macros when it compiles a form, and Guile when it
 ;; first evaluates it: TeXmacs code may use a macro which is defined after the
@@ -249,17 +272,18 @@
 
 ;; Compiling the forms of the loaded files is half of the boot. The cache,
 ;; $TEXMACS_HOME_PATH/system/cache/femtolisp/, keeps for each file the
-;; expanded forms and their compiled code. The forms are still expanded at
-;; each load (the expansions may have side effects), and the compiled code
-;; of a form is reused when its expansion is equal to the one in the cache.
-;; A cache file starts with a key (the compiler, the TeXmacs version and
-;; the format of the cache) and the private names of the module, which the
-;; compiled code depends on. The forms whose expansion or code holds values
-;; which cannot be written and read back (uninterned symbols, tables,
+;; fingerprints of the expanded forms (%fingerprint: 128 bits of hash of the
+;; structure) and their compiled code. The forms are still expanded at each
+;; load (the expansions may have side effects), and the compiled code of a
+;; form is reused when the fingerprint of its expansion is the one in the
+;; cache. A cache file starts with a key (the compiler, the TeXmacs version
+;; and the format of the cache) and the private names of the module, which
+;; the compiled code depends on. The forms whose expansion or code holds
+;; values which cannot be written and read back (uninterned symbols, tables,
 ;; procedures with an environment, TeXmacs objects...) are compiled at each
 ;; load. TEXMACS_FL_NO_CACHE disables the cache.
 
-(define %cache-format 1)
+(define %cache-format 2)
 (define %cache? (not (os.getenv "TEXMACS_FL_NO_CACHE")))
 (define %cache-dir #f)
 (define %cache-key #f)
@@ -343,23 +367,28 @@
                  (e (expand (car l)))
                  (t1 (and %profile? (time.now)))
                  (old (if in (%cache-read-entry in) (eof-object)))
-                 (hit (and (pair? old) (cdr old) (equal? (car old) e)))
+                 (t2 (and %profile? (time.now)))
+                 (fp (and cf (%fingerprint e)))
+                 (hit (and fp (pair? old) (cdr old) (equal? (car old) fp)))
                  (thunk (if hit
                             (cdr old)
                             (begin (set! dirty #t) (compile-thunk e)))))
             (if %profile?
                 (begin
                   (set! %profile-expand (+ %profile-expand (- t1 t0)))
+                  (%profile-head! (car l) (- t1 t0))
                   (set! %profile-compile (+ %profile-compile
                                             (- (time.now) t1)))
+                  (set! %profile-cache-read (+ %profile-cache-read
+                                               (- t2 t1)))
+                  (if hit (set! %profile-hits (+ %profile-hits 1)))
                   (set! %profile-forms (+ %profile-forms 1))))
             ;; (an entry read from the cache can be written back)
             (if cf
                 (set! entries
                       (cons (cond (hit old)
-                                  ((and (%cache-writable? e)
-                                        (%cache-writable? thunk))
-                                   (cons e thunk))
+                                  ((and fp (%cache-writable? thunk))
+                                   (cons fp thunk))
                                   (else (list #f)))
                             entries)))
             (thunk)

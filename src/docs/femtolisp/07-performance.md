@@ -84,20 +84,23 @@ each `tmscm` links itself into the list of GC roots.
 
 The first measurements gave femtolisp a boot of 1.6 s (s7 0.9 s) and slower
 regression suites than s7. A profile of the boot (`TEXMACS_FL_PROFILE=1`,
-§7.7) showed that half of it was the front end: 0.52 s compiling and
+§7.8) showed that half of it was the front end: 0.52 s compiling and
 0.17 s expanding the 5894 forms of the loaded files.
 
 - **Cache of the compiled files** (`boot-femtolisp.scm`). For each loaded
-  file, `$TEXMACS_HOME_PATH/system/cache/femtolisp/` keeps the expanded forms
-  and their compiled code. The forms are still expanded at each load, since
-  expansions may have side effects; the compiled code of a form is reused
-  when its expansion is equal to the cached one. The key of a cache file is
+  file, `$TEXMACS_HOME_PATH/system/cache/femtolisp/` keeps a fingerprint of
+  each expanded form (`%fingerprint` in `fl_core.c`, 128 bits of hash of its
+  structure) and its compiled code. The forms are still expanded at each
+  load, since expansions may have side effects; the compiled code of a form
+  is reused when the fingerprint of its expansion is the cached one (the
+  first version kept the expansions themselves: 55% of the cache, read only
+  to be compared). The key of a cache file is
   the compiler (a checksum of the boot image), the TeXmacs version, the
   format of the cache, the module and its private names. Forms holding
   values which cannot be written and read back (uninterned symbols, tables,
   TeXmacs objects...) are compiled at each load; there were 26 of them at
-  boot. Compilation then takes 0.1 s instead of 0.52 s. The cache takes
-  about 7 MB; `TEXMACS_FL_NO_CACHE=1` disables it.
+  boot. Compilation then takes 0.1 s instead of 0.52 s.
+  `TEXMACS_FL_NO_CACHE=1` disables the cache.
 - **The reader no longer collects garbage while reading vectors** (patch
   0021). Growing a vector called the collector at each step, to update the
   references to the old one; with the heap of TeXmacs this made reading the
@@ -107,12 +110,41 @@ regression suites than s7. A profile of the boot (`TEXMACS_FL_PROFILE=1`,
   symbol at each call), `ahash-ref`/`hash-ref`, `string-length`; `char=?`
   and `string=?` without their n-ary loop for two arguments.
 
-## 7.7 Measuring
+## 7.7 Interactive work
+
+`bench/ui.scm` (workload `ui` of `run.sh`): the expansion of all menus with
+their submenus (menu bar, toolbars, context menu), typing in text and in
+math (each key as the event loop handles it, then typesetting), and opening
+and typesetting the change log; once cold, then the median of three warm
+runs. 2026-10-07, load average about 4, three rounds alternated:
+
+| Task | femtolisp | s7 |
+|---|---:|---:|
+| boot to exit | 0.88–0.92 s | 0.65–0.70 s |
+| all menus, first time (loads their modules) | 2.2–2.5 s | 1.65–1.9 s |
+| all menus, warm | 76–86 ms | 85–121 ms |
+| 520 keys in text, warm | 775–825 ms | 723–826 ms |
+| 270 keys in math, warm | 882–978 ms | 834–855 ms |
+| open and typeset the change log, warm | 121–132 ms | 127–144 ms |
+
+Once the code is loaded, femtolisp and s7 are as fast. femtolisp is slower
+when code is loaded: it expands every loaded form (about 0.15 s at boot,
+0.39 s more for the modules of the menus), whereas s7 expands a function
+when it first runs. Two costs are common to all the Schemes: the first
+expansion of the menus runs `kpsewhich` for each font which is not found
+(about 0.86 s, `font-exists-in-tt?`), and `url-exists-in-path?` takes about
+5 ms (the `:require` of the converters, at boot).
+
+## 7.8 Measuring
 
 - `TEXMACS_FL_PROFILE=1` and `(%profile-report)`: the time spent reading,
-  expanding and compiling (or finding in the cache) the loaded files.
+  expanding and compiling (or finding in the cache) the loaded files, and the
+  cache hits; `(%profile-heads-report)`: the expansion time by head of the
+  top-level forms.
 - `(%gc-count)`: the number of garbage collections so far; `(%gc)`,
   `(%heap-size)`.
-- The remaining front-end cost is the expansion (about 0.18 s at boot).
+- The remaining front-end cost is the expansion (about 0.15 s at boot).
   Skipping it on a cache hit would need to know that a form's macros have no
-  side effects when they are expanded.
+  side effects when they are expanded (about 20 TeXmacs macros have some:
+  `tm-define`, the `$` markup of menus, preferences...); expanding function
+  bodies at their first call, as Guile and s7 do, would avoid most of it.

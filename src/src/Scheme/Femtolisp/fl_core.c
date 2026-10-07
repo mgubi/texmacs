@@ -318,7 +318,94 @@ fltm_string_length_builtin (value_t* args, uint32_t nargs) {
   return fixnum (cvalue_len (args[0]));
 }
 
+/* (%fingerprint x): 128 bits of hash of the structure of x, as a string of 32
+   hex digits, or #f when x holds a value which is not written and read back
+   as an equal one (gensym, function, other cvalue...) or is too large. The
+   cache of compiled files keeps it instead of the expansion of a form. */
+typedef struct { uint64_t a, b; long budget; } fltm_fp;
+
+static inline uint64_t
+fltm_mix64 (uint64_t x) {
+  x ^= x >> 30; x *= 0xbf58476d1ce4e5b9ULL;
+  x ^= x >> 27; x *= 0x94d049bb133111ebULL;
+  return x ^ (x >> 31);
+}
+
+static inline void
+fltm_fp_add (fltm_fp* fp, uint64_t x) {
+  fp->a= fltm_mix64 (fp->a ^ x) + 0x9e3779b97f4a7c15ULL;
+  fp->b= fltm_mix64 ((fp->b + x) * 0xff51afd7ed558ccdULL) ^ (fp->b >> 17);
+}
+
+static void
+fltm_fp_bytes (fltm_fp* fp, uint64_t tag, const char* s, size_t n) {
+  fltm_fp_add (fp, tag ^ ((uint64_t) n << 8));
+  while (n >= 8) {
+    uint64_t w; memcpy (&w, s, 8);
+    fltm_fp_add (fp, w); s += 8; n -= 8;
+  }
+  uint64_t w= 0;
+  memcpy (&w, s, n);
+  fltm_fp_add (fp, w);
+}
+
+static int
+fltm_fp_walk (fltm_fp* fp, value_t x, int depth) {
+  while (1) {
+    if (--fp->budget < 0 || depth > 2000) return 0;
+    if (iscons (x)) {
+      fltm_fp_add (fp, 'P');
+      if (!fltm_fp_walk (fp, car_ (x), depth + 1)) return 0;
+      x= cdr_ (x);
+      continue;
+    }
+    if (isfixnum (x)) { fltm_fp_add (fp, 'I' ^ ((uint64_t) numval (x) << 8)); return 1; }
+    if (x == FL_NIL || x == FL_T || x == FL_F || x == FL_EOF) {
+      fltm_fp_add (fp, 'K' ^ ((uint64_t) x << 8)); return 1; }
+    if (issymbol (x)) {
+      if (isgensym (x)) return 0;
+      const char* n= symbol_name (x);
+      fltm_fp_bytes (fp, 'S', n, strlen (n));
+      return 1;
+    }
+    if (isbuiltin (x)) { fltm_fp_add (fp, 'B' ^ ((uint64_t) uintval (x) << 8)); return 1; }
+    if (isvector (x)) {
+      size_t i, n= vector_size (x);
+      fltm_fp_add (fp, 'V' ^ ((uint64_t) n << 8));
+      for (i= 0; i < n; i++)
+        if (!fltm_fp_walk (fp, vector_elt (x, i), depth + 1)) return 0;
+      return 1;
+    }
+    if (fl_isstring (x)) {
+      fltm_fp_bytes (fp, 'T', (char*) cvalue_data (x), cvalue_len (x));
+      return 1;
+    }
+    if (iscprim (x)) {
+      cprim_t* cp= (cprim_t*) ptr (x);
+      numerictype_t nt= cp_numtype (cp);
+      fltm_fp_bytes (fp, 'C' ^ ((uint64_t) nt << 8) ^
+                         ((uint64_t) (cp_class (cp) == wchartype) << 16),
+                     (char*) cp_data (cp), cp_class (cp)->size);
+      return 1;
+    }
+    return 0;
+  }
+}
+
+static value_t
+fltm_fingerprint (value_t* args, uint32_t nargs) {
+  argcount ("%fingerprint", nargs, 1);
+  fltm_fp fp= { 0x6a09e667f3bcc908ULL, 0xbb67ae8584caa73bULL, 4000000 };
+  if (!fltm_fp_walk (&fp, args[0], 0)) return FL_F;
+  char buf[33];
+  snprintf (buf, sizeof (buf), "%016llx%016llx",
+            (unsigned long long) fltm_mix64 (fp.a),
+            (unsigned long long) fltm_mix64 (fp.b ^ fp.a));
+  return string_from_cstr (buf);
+}
+
 static builtinspec_t fltm_builtin_info[]= {
+  { "%fingerprint", fltm_fingerprint },
   { "string-length", fltm_string_length_builtin },
   { "%keyword?", fltm_keywordp },
   { "%symbol?", fltm_symbolp },

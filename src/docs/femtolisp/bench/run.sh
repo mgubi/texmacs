@@ -3,7 +3,7 @@
 # each workload, all on the same TeXmacs/ directory (each build gets its own
 # home, under $BENCH_OUT). Usage, from any directory:
 #   TEXMACS_TREE=<src>/TeXmacs BUILDS="femto:<dir1> s7:<dir2> guile:<dir3>" \
-#     sh docs/femtolisp/bench/run.sh boot suites latex conversions marshal manual
+#     sh docs/femtolisp/bench/run.sh boot suites latex conversions marshal manual ui
 # One line per run, RUN build workload round real=<s> rss=<MB>, followed by
 # the lines which the script prints with its own timings. The first run of a
 # build in a new home also builds the font caches: run each workload once to
@@ -11,6 +11,7 @@
 B=${BENCH_OUT:-/tmp/femto-bench}; mkdir -p $B
 TP=${TEXMACS_TREE:?set TEXMACS_TREE to the TeXmacs/ directory to run}
 BENCH=$(cd "$(dirname "$0")/../../s7/bench" && pwd)
+HERE=$(cd "$(dirname "$0")" && pwd)
 BUILDS=${BUILDS:?set BUILDS to "name:build-dir ..." (each with TeXmacs/bin/texmacs.bin)}
 
 run () { # build-name dir workload round expr
@@ -34,6 +35,7 @@ for w in "$@"; do
     conversions) rounds=1; expr="(load \"$BENCH/conversions.scm\")" ;;
     marshal)     rounds=1; expr="(load \"$BENCH/marshal.scm\")" ;;
     manual)      rounds=3; QUIT=; expr="(load \"$BENCH/manual.scm\")" ;;
+    ui)          rounds=3; QUIT=; expr="(load \"$HERE/ui.scm\")" ;;
   esac
   r=1
   while [ $r -le $rounds ]; do
