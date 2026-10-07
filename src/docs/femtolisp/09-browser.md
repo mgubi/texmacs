@@ -38,7 +38,7 @@ package, as `/texmacs/cache/femtolisp`:
 - `boot-femtolisp.scm` names the cache of a file of TeXmacs by its path in
   `$TEXMACS_PATH` (`TM%progs%...flc`), and reads
   `$TEXMACS_PATH/cache/femtolisp` when the home has no valid cache of the
-  file (also for the compiled function bodies, `%lazy.flc`). What is
+  file (also for the compiled function bodies, `.lazy`). What is
   compiled anyway (a form which changed, or which cannot be cached) goes to
   the cache of the home.
 - The build makes it (`femtolisp-cache` in `misc/wasm/Makefile`, at every

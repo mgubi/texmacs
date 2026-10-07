@@ -228,7 +228,7 @@ femtolisp-cache: $(OUT)/node/texmacs.js $(TM)/TeXmacs/SVNREV plugins-sync
 	HOME=$(FL_CACHE)-home TEXMACS_PATH=$(TM)/TeXmacs TEXMACS_HOME_PATH=$(FL_CACHE)-home \
 	  $(NODE) $(OUT)/node/texmacs.js -headless \
 	  -x '(begin (load "$(W)/femtolisp-cache.scm") (exit 0))' -q > $(FL_CACHE)-home/log 2>&1
-	cp $(FL_CACHE)-home/system/cache/femtolisp/TM%* $(FL_CACHE)-home/system/cache/femtolisp/%lazy.flc $(FL_CACHE)/
+	cp $(FL_CACHE)-home/system/cache/femtolisp/TM%* $(FL_CACHE)/
 	@echo "femtolisp cache: $$(ls $(FL_CACHE) | wc -l | tr -d ' ') files, $$(du -sh $(FL_CACHE) | cut -f1)"
 
 # made at every build (package.py only writes the packages which changed)

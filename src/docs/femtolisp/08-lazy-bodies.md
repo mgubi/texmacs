@@ -34,12 +34,18 @@ have (§7.7).
   lost the names of the tm-defined functions. A function with its source now
   hashes as its source; the compiled function gets the source of its stub
   (the lambda before its expansion, as Guile's `procedure-source`).
-- **Cache of compiled bodies.** The compiled bodies are kept in
-  `%lazy.flc` in the cache of compiled files, under the fingerprint of their
-  expansion, their module and its private names (bodies are still expanded at
-  their first call, not compiled). The file starts with the key of the cache;
-  each compilation appends an entry; it is read at the first call of a stub.
-  The cache of compiled files has the format 4 with lazy bodies, 2 without.
+- **Cache of compiled bodies.** The compiled bodies of a file are kept
+  next to the cache of its forms, `<name>.flc`, in `<name>.lazy`, under the
+  fingerprint of their expansion, their module and its private names
+  (bodies are still expanded at their first call, not compiled). A `.lazy`
+  file starts with the key of the cache; each compilation appends an entry;
+  it is read at the first call of a function of the file. When a form of the
+  file which can be cached is not in the cache (the file changed), its
+  `.lazy` file starts again, so that it holds only the bodies of the file as
+  it is. (A first version had one file for all the bodies, `%lazy.flc`: a
+  boot read all those compiled in the home, 3.1 MB, for 1500 which it calls:
+  41 ms; with a file each, the first calls take 44 ms instead of 73.) The
+  cache of compiled files has the format 5 with lazy bodies, 2 without.
 - **No late calls, no deferred macro errors.** A body is compiled at its
   first call, when the macros it uses are defined, and a macro error in a
   body is raised when it is first called, as in Guile: the late calls (§2.3)
@@ -92,7 +98,5 @@ with a warm cache (40/43, the three known failures, §6.1).
   call (`loada0`, `tapply`), which does not read the replaced constants. A
   new femtolisp compiler must be checked with `(disassemble
   %lazy-template)`.
-- `%lazy.flc` only grows (an entry per compiled body which was not in it):
-  it should be rewritten when it holds too many entries no longer used.
 - What remains of the boot gap with s7 is not the front end: the
   interpreter, the top-level code of the loaded files, and the glue.
