@@ -50,6 +50,15 @@ function darkFill (hex) {
 // the margin around the drawing (in the units of the 24 x 24 drawing): the
 // icons are a little smaller than their box, as those of the Hugeicons set
 const MARGIN = 2;
+// The icons of the mode bar (shown at 20 points) are drawn as large as
+// those of the main bar (24 points, with the margin): the two columns of
+// icons at the left of the editor match. Those of the focus bar (16) and
+// of the preferences (32) keep the margin.
+function margin (size) {
+  if (size !== 20) return MARGIN;
+  const drawn = 24 * 24 / (24 + 2 * MARGIN); // points, on the main bar
+  return (24 * size / drawn - 24) / 2;
+}
 
 // TeXmacs name (without tm_) -> [Lucide name, colour]
 const MAP = {
@@ -74,6 +83,12 @@ const MAP = {
   parindent: ['list-indent-increase', 'teal'], index: ['tag', 'teal'],
   macro: ['square-code', 'green'], anchor: ['anchor', 'green'], camera: ['camera', 'green'],
   explain: ['info', 'sky'],
+  block: ['notepad-text', 'teal'], prominent: ['text-quote', 'orange'],
+  var_prominent: ['highlighter', 'orange'], parstyle: ['pilcrow', 'teal'],
+  pageins: ['sticky-note', 'teal'], textual: ['type', 'rose'], math: ['radical', 'green'],
+  switch: ['layers', 'green'], animate: ['clapperboard', 'green'],
+  position_float: ['move', 'teal'], wide_float: ['move-horizontal', 'teal'],
+  like: ['thumbs-up', 'orange'], theme: ['swatch-book', 'rose'],
   align_left: ['text-align-start', 'teal'], align_center: ['text-align-center', 'teal'],
   align_right: ['text-align-end', 'teal'], align_justify: ['text-align-justify', 'teal'],
   // the focus toolbar
@@ -163,7 +178,7 @@ function attrs (a) {
     .map (([k, v]) => `${k}="${v}"`).join (' ');
 }
 
-function svg (nodes, ink, fill, stroke, lucide) {
+function svg (nodes, ink, fill, stroke, lucide, size) {
   // the dots are drawn solid, and large enough to be seen with thin lines
   const solid = ([tag, a]) => dot ([tag, a]) ? [tag, { ...a, r: '1.1' }] : [tag, a];
   const fills = nodes.filter (n => closed (n, lucide)).map (solid).map (([tag, a]) =>
@@ -171,9 +186,9 @@ function svg (nodes, ink, fill, stroke, lucide) {
   const lines = nodes.filter (n => !dot (n)).map (([tag, a]) =>
     `  <${tag} ${attrs (a)} fill="none" stroke="${ink}" stroke-width="${stroke}" ` +
     `stroke-linecap="round" stroke-linejoin="round"/>`);
-  const v = 24 + 2 * MARGIN;
+  const m = +margin (size).toFixed (3), v = +(24 + 2 * m).toFixed (3);
   return '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="${-MARGIN} ${-MARGIN} ${v} ${v}">\n` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="${-m} ${-m} ${v} ${v}">\n` +
     fills.concat (lines).join ('\n') + '\n</svg>\n';
 }
 
@@ -191,14 +206,14 @@ function main () {
     // one pixel on the screen: the drawing (24 + 2 MARGIN units) is shown
     // in a box of the size of the icon
     const size = shownSize (name);
-    const stroke = +((24 + 2 * MARGIN) / size).toFixed (3);
+    const stroke = +((24 + 2 * margin (size)) / size).toFixed (3);
     ['light', 'dark'].forEach ((theme, k) => {
       const dir = path.join (OUT, theme);
       fs.mkdirSync (dir, { recursive: true });
       fs.writeFileSync (path.join (dir, `tm_${name}.svg`),
                         svg (nodes[lucide], INK[theme],
                             k ? darkFill (FILLS[colour][1]) : FILLS[colour][0],
-                            stroke, lucide));
+                            stroke, lucide, size));
     });
     n++;
   }
