@@ -315,6 +315,25 @@ var tmFrame = (function () {
     #tm-about .tm-x { border-radius:8px }
     #tm-about .tm-button { border-radius:8px; padding:5px 12px }
     #tm-about input { border-radius:8px; padding:6px 8px }
+    /* the shadows of the modern look, for the colours of before: a wide soft
+       shadow and a tight one, in neutral black (stronger than over white,
+       the surfaces being grey), and a ring in the grey of the borders */
+    #tm-frame .tm-tab.active, #tm-frame.top .tm-tab.active {
+      box-shadow:0 1px 2px rgba(0,0,0,.14), 0 0 0 1px #b4b4b4 }
+    #tm-frame .tm-tab.dragging {
+      box-shadow:0 10px 24px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12), 0 0 0 1px #b4b4b4 }
+    #tm-flyout { box-shadow:0 10px 28px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.10), 0 0 0 1px #b4b4b4 }
+    #tm-balloon { box-shadow:0 6px 16px rgba(0,0,0,.28) }
+    #tm-menu { box-shadow:0 16px 40px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12) }
+    #tm-about .tm-box { box-shadow:0 24px 60px rgba(0,0,0,.30), 0 2px 8px rgba(0,0,0,.12) }
+    .tm-dark #tm-frame .tm-tab.active, .tm-dark #tm-frame.top .tm-tab.active {
+      box-shadow:0 1px 2px rgba(0,0,0,.45), 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-frame .tm-tab.dragging {
+      box-shadow:0 10px 24px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-flyout { box-shadow:0 10px 28px rgba(0,0,0,.60), 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-balloon { box-shadow:0 6px 16px rgba(0,0,0,.55) }
+    .tm-dark #tm-menu, .tm-dark #tm-about .tm-box {
+      box-shadow:0 16px 40px rgba(0,0,0,.60), 0 2px 6px rgba(0,0,0,.35) }
     /* small animations: the menus drop in, the dialogs and the balloons
        fade in, the hovers ease (none when the system asks for less motion) */
     @keyframes tm-drop { from { opacity:0; transform:translateY(-6px) scale(.98) }

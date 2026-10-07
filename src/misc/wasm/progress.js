@@ -73,6 +73,8 @@ var tmProgress = (function () {
     #tm-loading .tm-badge { border-radius:999px; padding:1px 8px }
     #tm-loading .tm-bar { height:6px; border-radius:999px }
     #tm-loading .tm-fill { border-radius:999px }
+    #tm-loading { box-shadow:0 24px 60px rgba(0,0,0,.26), 0 2px 6px rgba(0,0,0,.10) }
+    .tm-dark #tm-loading { box-shadow:0 24px 60px rgba(0,0,0,.60), 0 2px 6px rgba(0,0,0,.35) }
   `;
 
   function build () {
