@@ -750,7 +750,7 @@ var tmFrame = (function () {
   // the ellipsis of a tab (in the column, or in the grown tab of the folded
   // column), and the right click on the tab
   function moreButton (t) {
-    var m = el ('span', 'tm-more', '⋯');
+    var m = el ('span', 'tm-more', '\u22ef');
     m.title = 'More';
     m.onmousedown = function (e) { e.stopPropagation (); };
     m.onclick = function (e) { e.stopPropagation (); tabMenu (t, m); };
@@ -767,14 +767,27 @@ var tmFrame = (function () {
   // which that tab saves too (tmHome, web-pre.js), and is closed here,
   // unless it is the last tab (closing the last window quits TeXmacs). It
   // must be saved, among the files of the user (the TeXmacs folder,
-  // ~/.TeXmacs, is saved by one tab only) or be a file of TeXmacs.
+  // ~/.TeXmacs, is saved by one tab only, and keeps the documents with no
+  // name, texts/scratch), or be a file of TeXmacs or a page of its help.
   function tabDocument (t) {
     try { return UTF8ToString (_vue_web_tab_document (t.id)); } catch (e) { return ''; }
   }
+  // unsaved changes, as TeXmacs knows them (the marker of a tab may lag
+  // behind, after a Save as for instance)
+  function modified (t, path) {
+    if (!path) return t.modified;
+    try {
+      var q = '"' + path.replace (/\\/g, '\\\\').replace (/"/g, '\\"') + '"';
+      return TeXmacs.scheme ('(buffer-modified? (system->url ' + q + '))') === '#t';
+    }
+    catch (e) { return t.modified; }
+  }
   function unmovable (t, path) {
-    if (t.modified) return 'Save the document first';
+    if (modified (t, path) || /^\/home\/web\/\.TeXmacs\/texts\/scratch\//.test (path))
+      return 'Save the document first';
     if (/^\/home\/web\/\.TeXmacs\//.test (path)) return 'The files of the TeXmacs folder stay in this tab';
-    if (!/^\/(home\/web|texmacs)\//.test (path)) return 'Save the document among your files first';
+    if (!/^(\/home\/web\/|\/texmacs\/|tmfs:\/\/help\/)/.test (path))
+      return 'Save the document among your files first';
     return '';
   }
   function moveTab (t, path, last) {
@@ -1018,8 +1031,9 @@ var tmFrame = (function () {
      'refers to are not fetched with it. It is not kept in the storage of the ' +
      'browser: Save as keeps it.'],
     ['file', '<path>', 'file=' + encodeURIComponent ('/home/web/Documents/paper.tm'),
-     'Opens **<path>**, a document kept in this browser (under /home/web) or a file of ' +
-     'TeXmacs (under /texmacs), once TeXmacs runs. The menu of a tab (its ⋯) moves ' +
+     'Opens **<path>**, a document kept in this browser (under /home/web), a file of ' +
+     'TeXmacs (under /texmacs) or a page of its help (tmfs://help/...), once TeXmacs ' +
+     'runs. The menu of a tab (its \u22ef) moves ' +
      'a document to a new tab of the browser with it.'],
     ['x', '<command>', 'open=https://example.org/paper.tm&x=' +
        encodeURIComponent ('(change-zoom-factor 1.5)'),

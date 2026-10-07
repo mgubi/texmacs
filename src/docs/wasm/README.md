@@ -674,14 +674,15 @@ was closed), the other tabs offer a reload, after 5 seconds without a
 claim (a tab may be reloading to take TeXmacs over). Tested with three
 tabs in headless Firefox: the changes reach the database within a second
 (files, a renamed folder, a deleted file, a document saved by TeXmacs),
-memory and database agree, a read-only tab keeps nothing (before the
-documents of the other tabs were kept: to be checked again), and a takeover
+memory and database agree, a tab without the lock keeps the documents it
+saves but not its changes of `~/.TeXmacs`, each tab reads again what the
+others saved, and a takeover
 keeps the last change of the tab which had TeXmacs
 (`node misc/wasm/test/home-tabs.mjs`, after `make ... web`; with `--safari`,
 in Safari through its WebDriver; with `--chrome`, in the Chrome for Testing
 of `build-wasm/tools/chrome` (installed there by `./node_modules/.bin/browsers
 install chrome@stable --path $PWD/chrome`); with `--browser <path>`, in
-another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154).
+another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154; with the documents kept by the other tabs, in Chrome 155).
 
 - **Reset…** deletes the storage of the page and reloads it.
 - **Remove from this browser…** (with a confirmation) deletes it and stops

@@ -665,7 +665,8 @@ var tmFiles = (function () {
   }
 
   // A document kept in the browser: texmacs.html?file=<path>, a path under
-  // the home directory or a file of TeXmacs (the menu of a tab moves a
+  // the home directory, a file of TeXmacs or a page of its help
+  // (tmfs://help/..., which every tab has too; the menu of a tab moves a
   // document to a new tab of the browser so, frame.js). It is read from the
   // storage of the browser once TeXmacs runs; the address reaches nothing
   // else, and runs nothing: no question asked, unlike ?x.
@@ -673,7 +674,8 @@ var tmFiles = (function () {
     return new Promise (function (ok) {
       tmProgress.running (function () {
         // (a file of TeXmacs may not have come yet: TeXmacs fetches it)
-        if (p.indexOf ('/../') < 0 && ((p.indexOf (HOME + '/') === 0 && exists (p)) || inSys (p)))
+        if (p.indexOf ('/../') < 0 && ((p.indexOf (HOME + '/') === 0 && exists (p)) || inSys (p) ||
+                                       p.indexOf ('tmfs://help/') === 0))
           openDocument (p);
         else toast ('No document ' + p + ' in this browser');
         ok ();

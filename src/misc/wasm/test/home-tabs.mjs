@@ -238,16 +238,28 @@ await flushed (A);
 d = same (await mem (A), await idb (A));
 check (d.length === 0, 'memory and database agree' + (d.length ? ': ' + d.slice (0, 8).join ('; ') : ''));
 
-// 2. a second tab: read only
+// 2. a second tab: it keeps the documents it saves, not the TeXmacs folder
 const B = await open ('B');
-check (await B.evaluate (() => tmHome.readOnly ()), 'B is read only');
+check (await B.evaluate (() => tmHome.readOnly ()), 'B does not write the TeXmacs folder');
 const noticeB = await B.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
-check (/already open in another tab/.test (noticeB), 'B says why: ' + noticeB.slice (0, 80));
+check (/also open in another tab/.test (noticeB), 'B says why: ' + noticeB.slice (0, 80));
 check (await B.evaluate (() => FS.readFile ('/home/web/t2/sub/a.txt', { encoding: 'utf8' })) === 'ABCDEFG',
        'B reads what A wrote');
-await B.evaluate (() => FS.writeFile ('/home/web/fromB.txt', 'b'));
+await B.evaluate (() => {
+  FS.writeFile ('/home/web/fromB.txt', 'b');
+  FS.writeFile ('/home/web/.TeXmacs/fromB-prefs.scm', 'p');
+});
 await sleep (800);
-check (!('/home/web/fromB.txt' in await idb (A)), 'B keeps none of its changes');
+db = await idb (A);
+check (db['/home/web/fromB.txt'] === 1, 'B keeps the documents it saves');
+check (!('/home/web/.TeXmacs/fromB-prefs.scm' in db), 'B does not keep its changes of the TeXmacs folder');
+check (await A.evaluate (() => { try { return FS.readFile ('/home/web/fromB.txt', { encoding: 'utf8' }); } catch (e) { return null; } }) === 'b',
+       'A reads again the document B saved');
+// a document A saves after B has it: B reads the new version
+await A.evaluate (() => FS.writeFile ('/home/web/t2/sub/a.txt', 'from A'));
+await sleep (800);
+check (await B.evaluate (() => FS.readFile ('/home/web/t2/sub/a.txt', { encoding: 'utf8' })) === 'from A',
+       'B reads again the document A saved');
 check (await A.evaluate (() => !tmHome.readOnly ()), 'A still writes');
 
 // a third tab, read only too
@@ -268,7 +280,7 @@ await sleep (7000);
 const noticeA = await A.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
 check (/now used in another tab/.test (noticeA), 'A says why, still after 7 s: ' + noticeA.slice (0, 80));
 const noticeC = await C.evaluate (() => (document.getElementById ('tm-home-notice') || {}).textContent || '');
-check (/already open in another tab/.test (noticeC), 'C says nothing new during the takeover: ' + noticeC.slice (0, 80));
+check (/also open in another tab/.test (noticeC), 'C says nothing new during the takeover: ' + noticeC.slice (0, 80));
 check (await B.evaluate (() => { try { return FS.readFile ('/home/web/last.txt', { encoding: 'utf8' }); } catch (e) { return null; } }) === 'last',
        'the last change of A reached B');
 await B.bringToFront ();
