@@ -750,8 +750,9 @@ var tmFrame = (function () {
     // closed it and the click opened it again)
     document.addEventListener ('mousedown', function (e) {
       if (menu && !menu.contains (e.target) && !appButton.contains (e.target) &&
-          !(menuAnchor && menuAnchor.contains (e.target))) closeMenu ();
+          !(menuAnchor && menuAnchor.contains (e.target))) { closeMenu (); closedAt = Date.now (); }
     });
+    appMenuButton = appButton;
   }
 
   // the column folded or not; TeXmacs takes the width it leaves (SDL
@@ -1404,8 +1405,30 @@ var tmFrame = (function () {
   }
 
   // the menu beside the column, at the top
+  // The menu of TeXmacs Vue from the logo which TeXmacs draws at the left
+  // of its menu bar when the column is folded away (vue_widget.cpp); below
+  // is the bottom of the logo, in pixels of the canvas. The press on the
+  // canvas which closed the menu must not open it again.
+  // A click may reach here from more than one layout pass of TeXmacs: the
+  // ones which follow the first within a moment are the same click.
+  var appMenuButton = null, closedAt = 0, menuBelow = 0, toggledAt = 0;
+  function appMenuFromBar (below) {
+    if (Date.now () - toggledAt < 300) return;
+    toggledAt = Date.now ();
+    if (menu) { closeMenu (); return; }
+    if (Date.now () - closedAt < 400 || !appMenuButton) return;
+    var c = Module['canvas'], r = c.getBoundingClientRect ();
+    menuBelow = r.top + below / (r.width > 0 ? c.width / r.width : 1);
+    toggleMenu (appMenuButton);
+  }
   function placeMenu () {
     if (!menu || !bar || menu.classList.contains ('tm-tabmenu')) return;
+    if (!tabsTop && bar.classList.contains ('collapsed')) {
+      var cr = Module['canvas'].getBoundingClientRect ();
+      menu.style.left = (cr.left + 6) + 'px';
+      menu.style.top = (menuBelow + 4) + 'px';
+      return;
+    }
     var b = bar.getBoundingClientRect ();
     menu.style.left = (tabsTop ? 4 : b.right + 4) + 'px';
     menu.style.top = (tabsTop ? b.bottom + 2 : 4) + 'px';
@@ -1621,6 +1644,7 @@ var tmFrame = (function () {
     dialog: dialog,
     setTabsPosition: setTabsPosition,
     unfold: function () { setFolded (false, true); },
+    appMenu: appMenuFromBar,
     setFooterHeight: setFooterHeight
   };
 })();

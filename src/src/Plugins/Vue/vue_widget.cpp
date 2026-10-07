@@ -2551,6 +2551,28 @@ EM_JS (void, vue_web_show_sidebar, (), {
 EM_JS (void, vue_web_footer_height, (float h), {
   if (typeof tmFrame !== 'undefined' && tmFrame.setFooterHeight) tmFrame.setFooterHeight (h);
 });
+
+// the menu of TeXmacs Vue (the page's), below the logo of the menu bar
+EM_JS (void, vue_web_app_menu, (float below), {
+  if (typeof tmFrame !== 'undefined' && tmFrame.appMenu) tmFrame.appMenu (below);
+});
+
+// The logo of TeXmacs Vue, which the column had at its top, at the left of
+// the menu bar while the column is folded away: drawn from its SVG at the
+// size of the box and the current resolution (kept until either changes)
+static void
+render_logo_fn (renderer ren, void* data, rectangle r) {
+  (void) data;
+  static picture logo;
+  static int logo_w= 0, logo_res= 0;
+  int w= (r->x2 - r->x1) / ren->pixel; // device pixels
+  if (is_nil (logo) || w != logo_w || retina_factor != logo_res) {
+    logo= mupdf_load_svg (url_system ("$TEXMACS_PATH/misc/images/texmacs-vue-small.svg"),
+                          max (1, w / retina_factor), max (1, w / retina_factor));
+    logo_w= w; logo_res= retina_factor;
+  }
+  if (!is_nil (logo)) ren->draw_picture (logo, r->x1, r->y1);
+}
 #endif
 
 // the mark in front of a menu item, from the 'pre' of menu_button:
@@ -6011,9 +6033,14 @@ void vue_texmacs_widget_rep::do_layout () {
       .padding= { 0, 0, 0, 0 },
       .childGap= 0 }})
   {
+#ifdef __EMSCRIPTEN__
+    uint16_t menu_left= vue_web_sidebar_hidden ? ui_px (8) : bar_hpad;
+#else
+    uint16_t menu_left= bar_hpad;
+#endif
     if (visibility[0]) CLAY(CLAY_ID_LOCAL("MainMenuBar"), {
       .layout= {
-        .padding= { bar_hpad, bar_hpad, 0, 0 },
+        .padding= { menu_left, bar_hpad, 0, 0 },
         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
         .sizing= {
           .width=  CLAY_SIZING_GROW(0),
@@ -6021,6 +6048,35 @@ void vue_texmacs_widget_rep::do_layout () {
       .backgroundColor= color_background,
       .border= { .width= { .bottom= 2 }, .color= the_theme.bar_line }})
     {
+#ifdef __EMSCRIPTEN__
+      if (vue_web_sidebar_hidden) {
+        // the logo of TeXmacs Vue, a button for the menu of the page
+        Clay_ElementId logo_id= CLAY_IDI ("menu_bar_logo", id);
+        ui_signal ls= button_logic (logo_id);
+        Clay_Color hl= highlight_on (color_background);
+        float side= ui_pxf (40);
+        CLAY(logo_id, {
+          .layout= {
+            .sizing= { CLAY_SIZING_FIXED (side + ui_pxf (12)),
+                       CLAY_SIZING_FIXED (side + ui_pxf (12)) },
+            .childAlignment= { .x= CLAY_ALIGN_X_CENTER, .y= CLAY_ALIGN_Y_CENTER }},
+          .backgroundColor= (hot_id == logo_id.id) ? hl : faded (hl),
+          .cornerRadius= ui_inner_corners (menu_round, menu_inset),
+          .transition= { .handler= Clay_EaseOut, .duration= 0.12f,
+                         .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR }})
+        {
+          CLAY_AUTO_ID({
+            .layout= { .sizing= { CLAY_SIZING_FIXED (side), CLAY_SIZING_FIXED (side) }},
+            .custom= { .customData= (void*) &render_logo_fn },
+            .userData= NULL }) {}
+        }
+        if (ls.clicked == 1) {
+          Clay_ElementData ld= Clay_GetElementData (logo_id);
+          if (ld.found) vue_web_app_menu (ld.boundingBox.y + ld.boundingBox.height);
+        }
+        CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED (ui_pxf (6)) }}}) {}
+      }
+#endif
       if (!is_nil (main_menu))
         layout_bar_content (8*id + 0, main_menu, color_background);
     }
