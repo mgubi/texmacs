@@ -58,7 +58,7 @@ package, as `/texmacs/cache/femtolisp`:
 | `texmacs.wasm` | 23.5 MB | 24.2 MB |
 | start, first visit, without the shipped cache | 4.21–4.26 s | |
 | start, first visit, with the shipped cache | 3.11–3.22 s | 2.81–2.85 s |
-| start, next visits | 1.20 s | 1.05 s |
+| start, next visits | 1.16–1.19 s | 1.03–1.07 s |
 
 (the start is the time the page reports, "TeXmacs: running"; three runs
 each, alternated, load average 3-4; without the shipped cache, the first
