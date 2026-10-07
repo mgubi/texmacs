@@ -87,10 +87,12 @@ have `ssty` but no `dtls`, and STIX Math v1 has neither.
 | Lete Sans Math | 0.45 | 4373 | 432 | 95% | 95% | 100% | 33 | 603 | 872 | 87 (32) | 44 (38) | kern |
 | IBM Plex Math | 1.000 | 7092 | 730 | 99% | 100% | 100% | 392 | 358 | 2508 | 125 (49) | 51 (43) | kern, mark |
 | Old Standard Math | 1.0 | 8138 | 1042 | 100% | 100% | 100% | 0 | 1084 | 2598 | 160 (45) | 86 (71) | kern, mark |
+| Noto Sans Math | 3.000 | 5130 | 991 | 100% | 100% | 100% | 0 | 528 | 1761 | 215 (57) | 29 (22) | kern, mark |
 
 Not surveyed because unavailable here: Cambria Math (proprietary, Windows
 and Office), Minion Math (commercial), Lucida Bright Math OpenType
-(commercial), Noto Sans Math (no MATH table). The ConTeXt "companion" fonts
+(commercial). Noto Sans Math had no MATH table when the survey was first
+run; its release 3.000 has one and was measured afterwards. The ConTeXt "companion" fonts
 (`context-companion-fonts`) are patch fonts, not standalone.
 
 The variant conventions are mostly uniform, and the exceptions are the
@@ -139,10 +141,11 @@ for screens) and Bold math fonts, with matching `NewCM10-{Regular, Italic,
 Bold, BoldItalic, Book, BookItalic}` text faces, sans and mono, plus a Sans
 Math. Complete symbol coverage, kerning info, many stylistic sets, and a real
 **bold math font**, which XITS, KpMath, Concrete, Erewhon, XCharter and Lete
-Sans also have. *Now: shipped next to Latin Modern (`newcm`), regular and
-bold math with four NewCM10 faces; Book, Sans and Mono are not shipped, and
-New Computer Modern Sans Math has a profile of its own ("Computer Modern
-Sans") for when it is installed.*
+Sans also have. *Now: shipped next to Latin Modern (`newcm`): regular and
+bold math, four NewCM10 faces, and four faces each of NewCM Sans 10 and
+NewCM Mono 10, the sans serif and typewriter companions; Book is not
+shipped. New Computer Modern Sans Math is shipped too, with a profile of
+its own, "Computer Modern Sans" in the sans serif section of the menu.*
 
 **TeX Gyre Pagella, Termes, Bonum, Schola Math** (GUST FL). Already shipped
 with TeXmacs together with their text faces, and already special-cased
@@ -152,7 +155,10 @@ TeXmacs's own layout and are better than what the font declares. The MATH
 table only supplies what they do not cover (variants and assemblies for
 delimiters, constants for fractions, radicals and limits); the visual
 sample shows where the two disagree. *Now: the menu calls them Palatino,
-Times, Bookman and Schoolbook.*
+Times, Bookman and Schoolbook. Their typewriter companion is Inconsolata
+(`inconsolata`, shipped), with TeX Gyre Cursor, a thin Courier which came
+out larger than the text, as the fallback: the profiles say `(mono
+"Inconsolatazi4, TeX Gyre Cursor")`.*
 
 **TeX Gyre DejaVu Math** (Bitstream Vera / DejaVu license, free). Sans
 serif math for DejaVu Sans and DejaVu Serif; TeXmacs already knows the
@@ -224,7 +230,8 @@ TeX's Euler. TeXmacs already has "Concrete" and "Euler new roman" math
 options through Metafont; these are their OpenType replacements. *Now: all
 four are shipped and in the serif section of the menu as Utopia, Charter,
 Concrete and Euler: Concrete Math with the Concrete faces of CM Unicode
-(CMU Concrete), Euler Math with TeX Gyre Pagella text, as with `eulervm`.
+(CMU Concrete), Euler Math with TeX Gyre Pagella text, as with `eulervm`,
+and Heros and Inconsolata as companions.
 XCharter, Concrete and Erewhon use their bold math faces; the bold Erewhon
 math file names its family like the text face, and the shipped database
 lists it as the Bold style of Erewhon Math.*
@@ -232,32 +239,50 @@ lists it as the Bold style of Erewhon Math.*
 **Garamond Math** (OFL). For EB Garamond; huge MathKernInfo (2094 glyphs)
 but almost no italic corrections (44), so kerning must come from the kern
 table. Text companions are EB Garamond from Google Fonts or TeX Live.
-*Now: profiled, not shipped.*
+*Now: shipped (`garamond`) with four EB Garamond faces; menu entry
+"Garamond" in the serif section, Inconsolata for typewriter text.*
 
 **Lete Sans Math** (OFL). Sans math for Lato; 95% coverage, kerning.
-Companions: Lato. *Now: profiled, not shipped, with the math font itself as
-its text companion rather than Lato; in the sans serif section of the menu
-when installed.*
+Companions: Lato. *Now: shipped (`letesans`), regular and bold, with the
+math font itself as its text companion rather than Lato, which is not
+shipped; menu entry "Lete Sans" in the sans serif section.*
 
 **IBM Plex Math** (OFL). Complete coverage, kerning, `mark` positioning,
 and the large Plex Sans, Serif and Mono families. `displayOperatorMinHeight`
 is 2339, the largest of all, so display integrals will be very tall unless
-capped. *Now: profiled with IBM Plex text, not shipped; the display
-operators are capped at two em.*
+capped. *Now: shipped (`plex`) with four faces each of Plex Sans, Serif
+and Mono; menu entry "IBM Plex" in the sans serif section, with the text
+set in Plex Sans (family `ss`); the display operators are capped at two
+em.*
 
 **Old Standard Math** (OFL). Complete coverage, no kerning info; for Old
-Standard text (historical and slavistic typography). *Now: profiled, not
-shipped.*
+Standard text (historical and slavistic typography). *Now: shipped
+(`oldstandard`) with three Old Standard faces (there is no bold italic);
+menu entry "Old Standard" in the serif section, with TeX Gyre Heros and
+Inconsolata as sans serif and typewriter companions.*
 
 **GFS Neohellenic Math** (OFL). Greek sans; 41% of the alphanumerics
-block, 98% of the operators. Niche. *Now: profiled, not shipped.*
+block, 98% of the operators. Niche. *Now: shipped (`gfsneohellenic`) with
+four GFS Neohellenic faces; menu entry "GFS Neohellenic" in the sans serif
+section, Inconsolata for typewriter text.*
+
+**Noto Sans Math** (OFL). Release 3.000 (google/fonts) has a MATH table:
+all of the `unicode-math` list, the operators and alphanumerics blocks,
+no MathKernInfo, `kern` and `mark` positioning, and a
+`displayOperatorMinHeight` of 2300. Companions: Noto Sans and Noto Sans
+Mono (master `Noto`, which also has Noto Serif). *Now: shipped (`noto`)
+with four Noto Sans faces and Noto Sans Mono regular and bold; menu entry
+"Noto Sans" in the sans serif section, the text set in Noto Sans (family
+`ss`). Noto Sans Math is a master of its own in the database, as Fira Math
+is.*
 
 ### Tier 3: do not integrate
 
 **STIX Math v1** and the Neo Euler of 2010 in `tm-fonts` are superseded.
 **Cambria Math** cannot be redistributed and TeXmacs users on Windows may
 have it, so activation by name should work, but no special support beyond
-the generic path is warranted. **Noto Sans Math** has no MATH table.
+the generic path is warranted. (**Noto Sans Math** used to be listed here
+for want of a MATH table; it now has one, see Tier 2.)
 
 ## 4. What TeXmacs has for named fonts
 
@@ -305,7 +330,11 @@ with `define-math-font-profile`, in a reduced form of the proposal below: keys `
 routing and the menus. `bold-math` is recorded but not consulted: a bold
 math face is found through the master of the math font in the database.
 Alphabets, rubber policy and quirks are still to come; the display cap is a
-constant for all fonts.*
+constant for all fonts. `sans` and `mono` may list alternatives separated
+by commas, the first one the database knows being used (`"Inconsolatazi4,
+TeX Gyre Cursor"`), and a profile without `file` only gives companions to a
+text font without mathematics: the Palatino of macOS takes Inconsolata for
+its typewriter text instead of the closest monospaced font.*
 
 Introduce one data structure, filled by hand, consulted by all the places
 above. In C++ it can be a static table in a new
@@ -438,15 +467,18 @@ TeXmacs ships these math families, besides the TeX Gyre text and math
 fonts and STIX v1 which were already there. The choice follows the fonts LaTeX
 users know: one entry of the font menu for each of the usual pdfLaTeX
 pairings (`lmodern`, `newtx`, `newpx`, `libertine`, `kpfonts`,
-`erewhon`, `XCharter`, `eulervm`, `concmath`, `stix2`) and Fira and Kp
-Sans for slides; Computer Modern Sans, listed first of the sans serif
-entries (the menus are sorted by label), appears when New Computer Modern
-Sans is installed.
+`erewhon`, `XCharter`, `eulervm`, `concmath`, `stix2`), and Fira, Kp
+Sans and Computer Modern Sans for slides; then the Tier 2 fonts with their
+text faces: Garamond and Old Standard in the serif section of the menu,
+Lete Sans, Noto Sans, IBM Plex and GFS Neohellenic in the sans serif
+section (the menus are sorted by label). Inconsolata is shipped as the
+typewriter companion of the TeX Gyre profiles, Euler, Garamond, Old
+Standard and GFS Neohellenic.
 
 | Directory | Fonts | Size | License |
 |---|---|---|---|
 | `TeXmacs/fonts/truetype/lm` | Latin Modern Math, and the 10 pt Latin Modern Roman (four faces), Sans (four) and Mono (regular, italic) | 1.7 MB | GUST Font License |
-| `TeXmacs/fonts/truetype/newcm` | New Computer Modern Math regular and bold, and four NewCM10 text faces | 4.2 MB | GUST Font License |
+| `TeXmacs/fonts/truetype/newcm` | New Computer Modern Math regular and bold, New Computer Modern Sans Math, and four faces each of NewCM10, NewCM Sans 10 and NewCM Mono 10 | 8.6 MB | GUST Font License |
 | `TeXmacs/fonts/truetype/stix2` | STIX Two Math and four STIX Two Text faces | 2.0 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/kp` | KpMath regular and bold, KpMath-Sans and SansBold, and four faces each of KpRoman, KpSans and KpMono, all version 0.66 | 2.1 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/fira` | Fira Math 0.3.4, next to the Fira Sans and Fira Mono faces already shipped | 0.2 MB added | SIL OFL 1.1 |
@@ -455,6 +487,13 @@ Sans is installed.
 | `TeXmacs/fonts/truetype/xcharter` | XCharter Math regular and bold, and four XCharter faces | 1.0 MB | SIL OFL 1.1 (math), Bitstream Charter license (text) |
 | `TeXmacs/fonts/truetype/concrete` | Concrete Math regular (0.65) and bold (0.60), and the four Concrete faces of CM Unicode | 1.5 MB | SIL OFL 1.1 |
 | `TeXmacs/fonts/truetype/euler` | Euler Math, set with TeX Gyre Pagella text | 0.4 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/inconsolata` | Inconsolatazi4 regular and bold (1.015), the typewriter companion of the TeX Gyre profiles | 0.1 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/letesans` | Lete Sans Math regular and bold (0.45) | 0.6 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/garamond` | Garamond-Math and four EB Garamond faces | 2.3 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/oldstandard` | Old Standard Math and three Old Standard faces | 1.7 MB | GUST Font License (math), SIL OFL 1.1 (text) |
+| `TeXmacs/fonts/truetype/gfsneohellenic` | GFS Neohellenic Math and four GFS Neohellenic faces | 1.1 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/plex` | IBM Plex Math and four faces each of IBM Plex Sans, Serif and Mono | 2.2 MB | SIL OFL 1.1 |
+| `TeXmacs/fonts/truetype/noto` | Noto Sans Math 3.000, four Noto Sans faces, Noto Sans Mono regular and bold | 4.1 MB | SIL OFL 1.1 |
 
 Each directory carries the license text and a `README.md` with the upstream
 address, the version and the copyright of every file. The families are
@@ -473,14 +512,18 @@ and SemiBold weights of STIX Two Text are then used instead. Upstream has
 released only the regular weight of Fira Math, so bold Fira mathematics is
 emulated. Erewhon-Math-Bold names its family like the Erewhon text face;
 the shipped database lists it as the Bold style of Erewhon Math, which a
-scan of the disk alone would not.
+scan of the disk alone would not. Likewise by hand: Noto Sans Math is a
+master of its own, as Fira Math is, and the IBM Plex entries list the
+regular file before the medium one, which a scan files as regular too.
+A text font which a shipped math font sets as roman text (EB Garamond, Old
+Standard, ...) is left out of the menu of text fonts, which offers it with
+its mathematics instead; a sans serif text (Noto Sans, IBM Plex Sans) does
+not hide its master, so Noto Serif and IBM Plex Serif stay there.
 
 Everything else in the survey is picked up from the system or from TeX
 Live through `TEXMACS_FONT_PATH` and the font database; the profiles in
 `TeXmacs/progs/fonts/fonts-opentype.scm` activate when the files are
 found, and the font menus list exactly the profiled fonts that are
-installed. New Computer Modern Sans Math is profiled for that reason and
-not shipped (2.4 MB with its text faces). TeX Gyre DejaVu Math (serif
-section) and Lete Sans Math (sans serif section) are profiled and offered
-when installed, and XITS, Asana, IBM Plex, Garamond, Old Standard and GFS
-Neohellenic in the submenu of other fonts.
+installed. Three profiled fonts are not shipped: TeX Gyre DejaVu Math,
+offered in the serif section when installed, and XITS and Asana, in the
+submenu of other fonts.
