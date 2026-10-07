@@ -2480,6 +2480,45 @@ render_close_mark_fn (renderer ren, void* data, rectangle r) {
   ren->line (x1, y2, x2, y1);
 }
 
+// the chevron of the button which opens the column of the page again
+// (data: 1 under the pointer)
+static void
+render_unfold_mark_fn (renderer ren, void* data, rectangle r) {
+  SI px= ren->pixel;
+  SI w= r->x2 - r->x1, h= r->y2 - r->y1;
+  array<SI> xs (3), ys (3);
+  xs[0]= r->x1 + (SI) (0.43*w); ys[0]= r->y1 + (SI) (0.32*h);
+  xs[1]= r->x1 + (SI) (0.59*w); ys[1]= r->y1 + (SI) (0.50*h);
+  xs[2]= r->x1 + (SI) (0.43*w); ys[2]= r->y1 + (SI) (0.68*h);
+  color c= theme_color (data != NULL ? the_theme.text : the_theme.text_grey);
+  ren->set_pencil (pencil (c, 2*px, cap_round));
+  ren->line (xs[0], ys[0], xs[1], ys[1]);
+  ren->line (xs[1], ys[1], xs[2], ys[2]);
+}
+
+#ifdef __EMSCRIPTEN__
+// The column of the page at the left (misc/wasm/frame.js): when it is
+// folded it is gone, and the footer of the window has a button which opens
+// it again. The page tells whether it is folded, the footer tells the page
+// its height (the bottom strip of the column has the same).
+static bool vue_web_sidebar_hidden= false;
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_set_sidebar_hidden (int on) {
+  if (vue_web_sidebar_hidden == (on != 0)) return;
+  vue_web_sidebar_hidden= (on != 0);
+  gui_needs_relayout= true;
+}
+
+EM_JS (void, vue_web_show_sidebar, (), {
+  if (typeof tmFrame !== 'undefined' && tmFrame.unfold) tmFrame.unfold ();
+});
+
+EM_JS (void, vue_web_footer_height, (float h), {
+  if (typeof tmFrame !== 'undefined' && tmFrame.setFooterHeight) tmFrame.setFooterHeight (h);
+});
+#endif
+
 // the mark in front of a menu item, from the 'pre' of menu_button:
 // 1= check ("v"), 2= bullet ("*"), 3= circle ("o")
 static void
@@ -6058,15 +6097,51 @@ void vue_texmacs_widget_rep::do_layout () {
         }
       }
     else body ();
+#ifdef __EMSCRIPTEN__
+    bool unfold_button= visibility[5] && vue_web_sidebar_hidden;
+    if (visibility[5]) {
+      static float reported= -1;
+      if (reported != bar_footer_h) {
+        reported= bar_footer_h;
+        vue_web_footer_height (bar_footer_h);
+      }
+    }
+#else
+    bool unfold_button= false;
+#endif
     if (visibility[5]) CLAY(CLAY_ID_LOCAL("Footer"), {
       .layout= {
-        .padding= { bar_hpad, bar_hpad, 0, 0 },
+        .padding= { unfold_button ? ui_px (8) : bar_hpad, bar_hpad, 0, 0 },
         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
         .sizing= {
           .width=  CLAY_SIZING_GROW(0),
           .height= CLAY_SIZING_FIXED(bar_footer_h) }},
       .backgroundColor= color_background })
     {
+#ifdef __EMSCRIPTEN__
+      if (unfold_button) {
+        // the column of the page is folded away: this opens it again
+        Clay_ElementId unfold_id= CLAY_IDI ("footer_unfold", id);
+        ui_signal us= button_logic (unfold_id);
+        bool hot= (hot_id == unfold_id.id);
+        Clay_Color hl= highlight_on (color_background);
+        float side= bar_footer_h - ui_pxf (12);
+        CLAY(unfold_id, {
+          .layout= { .sizing= { CLAY_SIZING_FIXED (side), CLAY_SIZING_FIXED (side) }},
+          .backgroundColor= hot ? hl : faded (hl),
+          .cornerRadius= ui_corners (),
+          .transition= { .handler= Clay_EaseOut, .duration= 0.12f,
+                         .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR }})
+        {
+          CLAY_AUTO_ID({
+            .layout= { .sizing= layoutExpand },
+            .custom= { .customData= (void*) &render_unfold_mark_fn },
+            .userData= hot ? (void*) 1 : NULL }) {}
+        }
+        if (us.clicked == 1) vue_web_show_sidebar ();
+        CLAY_AUTO_ID({ .layout= { .sizing= { CLAY_SIZING_FIXED (ui_pxf (12)) }}}) {}
+      }
+#endif
       if (interactive_mode && !is_nil (interactive_input)) {
         // the query line: the footer becomes a prompt and a field, as it
         // does under Qt when "interactive questions" is set to "footer"

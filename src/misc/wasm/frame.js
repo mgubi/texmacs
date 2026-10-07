@@ -418,6 +418,10 @@ var tmFrame = (function () {
     #tm-frame .tm-fold svg { transition:transform .2s cubic-bezier(.2,.8,.2,1) }
     #tm-frame .tm-fold:hover svg { transform:translateX(-2px) }
     #tm-frame.collapsed .tm-fold:hover svg { transform:translateX(2px) }
+    /* folded at the left, the column is gone (the footer of TeXmacs has a
+       button which opens it); its bottom strip is as tall as that footer */
+    body:not(.tm-tabs-top) #tm-frame.collapsed { display:none !important }
+    #tm-frame .tm-fold { box-sizing:border-box; height:var(--tm-footer-h, 36px) }
     @media (prefers-reduced-motion: reduce) {
       #tm-menu, #tm-about, #tm-about .tm-box, #tm-balloon { animation:none }
     }
@@ -439,6 +443,7 @@ var tmFrame = (function () {
     if (!bar) return;
     applyTabsPosition ();
     render ();
+    tellHidden ();
     resized ();
   }
   function applyTabsPosition () {
@@ -753,12 +758,32 @@ var tmFrame = (function () {
   // follows the size of the canvas when the window is resized)
   function setFolded (on, remember) {
     if (!bar) return;
-    flyIn (true);
+    flyIn (true); hideBalloon ();
     bar.classList.toggle ('collapsed', on);
     if (scrollUp) chevrons ();
     fold.innerHTML = svg (on ? UNFOLD_ICON : FOLD_ICON);
     if (remember) try { localStorage.setItem (FOLD, on ? 'collapsed' : 'expanded'); } catch (e) {}
+    tellHidden ();
     resized ();
+  }
+  // A folded column is gone (at the left; the tabs above the page do not
+  // fold): TeXmacs puts a button in the footer of its window which opens
+  // it again (vue_web_set_sidebar_hidden, vue_widget.cpp). TeXmacs may not
+  // run yet when the column is built: it is told again by update, which
+  // TeXmacs calls.
+  var toldHidden = null;
+  function tellHidden () {
+    var hidden = !!bar && !tabsTop && bar.classList.contains ('collapsed');
+    if (hidden === toldHidden || typeof _vue_web_set_sidebar_hidden !== 'function') return;
+    try { _vue_web_set_sidebar_hidden (hidden ? 1 : 0); toldHidden = hidden; } catch (e) {}
+  }
+  // the height of the footer of TeXmacs (in pixels of the canvas), which
+  // the bottom strip of the column takes
+  function setFooterHeight (h) {
+    var c = Module['canvas'], r = c && c.getBoundingClientRect ();
+    var k = (r && r.width > 0) ? c.width / r.width : (window.devicePixelRatio || 1);
+    if (h > 0 && k > 0)
+      document.documentElement.style.setProperty ('--tm-footer-h', (h / k) + 'px');
   }
 
   // the balloon of an element of the column, at its right (text () gives
@@ -1587,13 +1612,15 @@ var tmFrame = (function () {
     });
 
   return {
-    update: function (state) { tabs = state.tabs || []; render (); },
+    update: function (state) { tabs = state.tabs || []; render (); tellHidden (); },
     info: function (d) { app = d || {}; },
     tabs: function () { return tabs; },
     fullScreen: fullScreen,
     leave: function () { leaving = true; },
     ask: ask,
     dialog: dialog,
-    setTabsPosition: setTabsPosition
+    setTabsPosition: setTabsPosition,
+    unfold: function () { setFolded (false, true); },
+    setFooterHeight: setFooterHeight
   };
 })();
