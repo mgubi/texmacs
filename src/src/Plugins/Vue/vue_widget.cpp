@@ -425,11 +425,12 @@ menu_shadow (Clay_ElementId parent, float radius, int16_t z) {
   if (!pd.found) return;
   // a light theme has dark text: the shadow is stronger on a dark theme
   bool dark= the_theme.text.r > 128;
-  // (ten layers, 2 px apart, of the same faint black: where n of them
-  // overlap the shadow is n times as dark, a ramp from the edge outwards)
-  const int   layers= 10;
-  const float alpha= dark ? 16.0f : 9.0f;
-  float dy= ui_pxf (6);
+  // (eight layers, 2 px apart, of the same very faint black: where n of
+  // them overlap the shadow is n times as dark, a ramp from the edge
+  // outwards; a discreet shadow, about a sixth of black at the edge)
+  const int   layers= 8;
+  const float alpha= dark ? 12.0f : 5.5f;
+  float dy= ui_pxf (5);
   for (int i= 0; i < layers; i++) {
     float sp= ui_pxf (1 + 2 * i);
     CLAY(CLAY_IDI ("menu_shadow", parent.id + 7919 * (i + 1)), {
