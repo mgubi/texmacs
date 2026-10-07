@@ -137,6 +137,13 @@
   (file "LeteSansMath") (text "Lete Sans Math")
   (letters "math") (menu "Lete Sans") (group "Sans serif"))
 
+;; Noto Sans Math is a master of its own, as Fira Math is; its text is the
+;; sans serif face of the master Noto, which also has Noto Serif
+(define-math-font-profile "Noto Sans Math"
+  (file "NotoSansMath-Regular") (text "Noto") (family "ss")
+  (sans "Noto") (mono "Noto")
+  (letters "math") (menu "Noto Sans") (group "Sans serif"))
+
 (define-math-font-profile "XITS Math"
   (file "XITSMath-Regular") (text "Xits")
   (letters "math") (bold-math "XITS Math")
@@ -147,21 +154,24 @@
   (letters "math") (menu "Asana") (group "Other"))
 
 (define-math-font-profile "IBM Plex Math"
-  (file "IBMPlexMath-Regular") (text "IBM Plex")
+  (file "IBMPlexMath-Regular") (text "IBM Plex") (family "ss")
   (sans "IBM Plex") (mono "IBM Plex")
-  (letters "math") (menu "IBM Plex") (group "Other"))
+  (letters "math") (menu "IBM Plex") (group "Sans serif"))
 
 (define-math-font-profile "Garamond-Math"
   (file "Garamond-Math") (text "EB Garamond")
-  (letters "math") (menu "Garamond") (group "Other"))
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
+  (letters "math") (menu "Garamond") (group "Serif"))
 
 (define-math-font-profile "OldStandard-Math"
   (file "OldStandard-Math") (text "Old Standard")
-  (letters "math") (menu "Old Standard") (group "Other"))
+  (sans "TeX Gyre Heros") (mono "Inconsolatazi4, TeX Gyre Cursor")
+  (letters "math") (menu "Old Standard") (group "Serif"))
 
 (define-math-font-profile "GFS Neohellenic Math"
   (file "GFSNeohellenicMath") (text "GFS Neohellenic")
-  (letters "math") (menu "GFS Neohellenic") (group "Other"))
+  (mono "Inconsolatazi4, TeX Gyre Cursor")
+  (letters "math") (menu "GFS Neohellenic") (group "Sans serif"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Menus: the profiled math fonts which are installed
@@ -191,7 +201,11 @@
 
 (tm-define (opentype-math-companions)
   (:synopsis "The text fonts which the installed math fonts bring along")
-  (map caddr (opentype-math-font-list)))
+  ;; only those set as roman text: Noto Sans Math sets its text in Noto
+  ;; Sans, and Noto Serif stays in the menu of text fonts
+  (map caddr (list-filter (opentype-math-font-list)
+                          (lambda (p) (== (opentype-font-family (cadr p))
+                                          "rm")))))
 
 (define (opentype-font-family math)
   (with fam (math-font-profile-attr math "family")
