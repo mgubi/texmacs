@@ -33,6 +33,17 @@
   remembers it. The dialogs of <TeXmacs> float over the page, and can be
   moved by their title bar and resized by their edges.
 
+  The <verbatim|...> of a tab (or a right click on it) opens its menu:
+  <menu|Move to a new browser tab> opens its document in a new tab of the
+  browser, with a <TeXmacs> of its own, and closes it here, so that the
+  documents can be spread over several tabs or windows of the browser. The
+  document must be saved first, among your files. On the last tab, the
+  item is <menu|Open in a new browser tab>, and the tab stays.
+
+  Closing or reloading the page while documents have unsaved changes: the
+  browser asks first (in its own words). Safari on the iPhone and the iPad
+  never asks.
+
   The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
   of its files and the storage they use, <menu|Files in this browser...>,
@@ -75,12 +86,14 @@
     documents you want to keep.
   </warning*>
 
-  Your files are kept by one tab of the browser at a time. When <TeXmacs>
-  <name|Vue> is already open in another tab, a new tab shows your files but
-  does not keep its changes, and says so; <with|font-series|bold|Use
-  TeXmacs here> moves <TeXmacs> to it (the other tab keeps its last changes
-  first). When the tab which has <TeXmacs> is closed, the others offer to
-  reload.
+  <TeXmacs> <name|Vue> may be open in several tabs of the browser: each of
+  them keeps the documents it saves, and the others see the new version.
+  Your preferences (the <verbatim|.TeXmacs> folder) are kept by one tab at a
+  time: when <TeXmacs> <name|Vue> is already open in another tab, a new tab
+  says so; <with|font-series|bold|Use TeXmacs here> moves the preferences to
+  it (the other tab keeps its last changes first). When the tab which has
+  them is closed, the others offer to reload. Two tabs which save the same
+  document overwrite each other: the last one saved stays.
 
   <section|Passwords and keys: the wallet>
 
@@ -205,6 +218,17 @@
   <paragraph|7 October 2026>
 
   <\itemize>
+    <item>The browser asks before closing or reloading the page while
+    documents have unsaved changes.
+
+    <item>Each tab of the column has a menu (its <verbatim|...>, or a right
+    click): <menu|Move to a new browser tab> moves its document to a new tab
+    of the browser.
+
+    <item>The other tabs of the browser in which <TeXmacs> <name|Vue> is open
+    keep the documents they save (only the preferences are kept by one tab),
+    and each tab sees the documents the others saved.
+
     <item>The page is built from the branch <verbatim|maxs_texmacs>, which
     gathers the other lines of work of the repository: it has their newest
     state (the <name|OpenType> mathematics, the citations from

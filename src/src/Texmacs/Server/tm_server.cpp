@@ -358,10 +358,12 @@ quit_texmacs_internal (int code) {
   // in a page there is nothing to go back to: TeXmacs starts again, once
   // the home directory (the preferences just saved) is written to the
   // storage of the browser (see misc/wasm/web-pre.js); headless (node), it
-  // ends as elsewhere
+  // ends as elsewhere. TeXmacs has asked about the unsaved documents: the
+  // page does not ask again (tmFrame.leave, misc/wasm/frame.js)
   if (!is_headless ()) {
     emscripten_cancel_main_loop ();
     EM_ASM ({
+      if (typeof tmFrame !== 'undefined') tmFrame.leave ();
       FS.syncfs (false, function () { location.reload (); });
     });
     return;

@@ -4790,6 +4790,30 @@ vue_web_open_document (const char* path) {
                             scm_quote (as_string (u)) * ")"));
   gui_needs_update= true;
 }
+
+// the document of a tab, for the page (the menu of a tab, frame.js, which
+// moves it to a new tab of the browser): its file in UTF-8, or "" (the text
+// stays until the next call)
+extern "C" EMSCRIPTEN_KEEPALIVE const char*
+vue_web_tab_document (int id) {
+  static char* last= NULL;
+  string r;
+  try {
+    vue_virtual_window_rep* t= find_tab (id);
+    array<url> ws= windows_list ();
+    for (int i= 0; t != NULL && i < N(ws); i++) {
+      tm_window tw= concrete_window (ws[i]);
+      if (tw != NULL && find_tab_of (tw->win) == t) {
+        r= as_string (window_to_buffer (ws[i]));
+        break;
+      }
+    }
+  }
+  catch (string msg) { handle_exceptions (); } // (see loop_iteration)
+  if (last != NULL) tm_delete_array (last);
+  last= as_charp (cork_to_utf8 (r));
+  return last;
+}
 #endif
 // The wheel with control (command on macOS) alone zooms the editor rather
 // than scrolling it, as in the Qt port (QTMWidget::wheelEvent): by the

@@ -5,8 +5,8 @@
 // IndexedDB of the page (IDBFS): it is read before TeXmacs starts, and each
 // file which changes is written back to it a moment later (tmHome below),
 // so that the preferences and the documents of the user survive a reload.
-// One tab of the browser writes it; the other tabs of the page show it
-// without keeping their changes, until the user moves TeXmacs to them.
+// Every tab of the page keeps the documents it saves; the preferences
+// (~/.TeXmacs) are kept by one tab, until the user moves TeXmacs to another.
 
 // The options of the address of the page (texmacs.html?a&b=...; the list is
 // in the dialog "Address of the page", frame.js) which are options of the
@@ -125,9 +125,13 @@ function tmRemoveTree (path, self) {
 // the last 5 seconds when the browser stopped.
 //
 // One tab: the tab which holds the lock "texmacs-home" (Web Locks) writes
-// the home directory. Another tab of the page reads it, but keeps none of
-// its changes (they would overwrite those of the first tab: each tab has
-// its own copy in memory), and says so; "Use TeXmacs here" asks the first
+// the whole home directory. Another tab of the page reads it, and keeps the
+// documents it saves (a document moved to a tab of its own, frame.js), but
+// not the changes of the TeXmacs folder, ~/.TeXmacs (preferences, history:
+// they would overwrite those of the first tab, as each tab has its own copy
+// in memory), and says so. A tab which wrote documents tells the others,
+// which read them again (refresh), so that no tab keeps an older copy of a
+// document which it would save over the newer one. "Use TeXmacs here" asks the first
 // tab (BroadcastChannel) to write its last changes and let go of the lock,
 // and reloads, so that the tab starts again from what was written, and
 // waits for the lock. When the first tab is closed, the others say that a
@@ -139,18 +143,23 @@ function tmRemoveTree (path, self) {
 var tmSaveHome, tmStorageRemoved = false;
 var tmHome = (function () {
   var HOME = '/home/web', LOCK = 'texmacs-home', TAKEOVER = 'texmacs-home-takeover';
+  var PREFS = HOME + '/.TeXmacs';
   var readOnly = false, release = null, channel = null, notice = null;
   var dirty = new Set (), tracking = false, timer = null, busy = false, again = false;
+  var applying = false; // the documents another tab wrote, read again (refresh)
   var hasLocks = typeof navigator !== 'undefined' && navigator.locks &&
                  typeof BroadcastChannel !== 'undefined';
 
   function inHome (p) { return p === HOME || p.startsWith (HOME + '/'); }
+  function inPrefs (p) { return p === PREFS || p.startsWith (PREFS + '/'); }
 
   function mark (p) {
-    if (!tracking || typeof p !== 'string') return;
+    if (!tracking || applying || typeof p !== 'string') return;
     if (p.charAt (0) === '/' && !p.startsWith (HOME)) return; // most of them
     try { p = PATH_FS.resolve (p); } catch (e) { return; }
     if (!inHome (p)) return;
+    // another tab keeps the TeXmacs folder
+    if (readOnly && inPrefs (p)) return;
     dirty.add (p);
     if (!timer) timer = setTimeout (function () { timer = null; flush (); }, 300);
   }
@@ -223,7 +232,8 @@ var tmHome = (function () {
   // the noted entries to the database, in one transaction
   function flush (done) {
     if (timer) { clearTimeout (timer); timer = null; }
-    if (readOnly || tmStorageRemoved || dirty.size === 0) { if (done) done (); return; }
+    if (readOnly) dirty.forEach (function (p) { if (inPrefs (p)) dirty.delete (p); });
+    if (tmStorageRemoved || dirty.size === 0) { if (done) done (); return; }
     if (busy) { again = true; if (done) setTimeout (function () { flush (done); }, 50); return; }
     var paths = Array.from (dirty).sort ();
     dirty.clear ();
@@ -244,6 +254,8 @@ var tmHome = (function () {
       catch (e) { return fail (e); }
       tx.oncomplete = function () {
         busy = false;
+        var docs = paths.filter (function (p) { return !inPrefs (p); });
+        if (channel && docs.length > 0) channel.postMessage ({ type: 'wrote', paths: docs });
         if (again) { again = false; flush (); }
         if (done) done ();
       };
@@ -259,6 +271,37 @@ var tmHome = (function () {
             store.put (entry, p);
           });
         } catch (e) { console.error ('TeXmacs: cannot save ' + p, e); }
+      });
+    });
+  }
+
+  // the documents which another tab wrote, read again from the database
+  // into the copy of this tab; not those this tab changed and has not
+  // written yet (its own save comes after)
+  function refresh (paths) {
+    if (tmStorageRemoved || !tracking) return;
+    paths = paths.filter (function (p) { return inHome (p) && !inPrefs (p) && !dirty.has (p); });
+    if (paths.length === 0) return;
+    IDBFS.getDB (HOME, function (err, db) {
+      if (err) return;
+      var tx;
+      try { tx = db.transaction ([IDBFS.DB_STORE_NAME], 'readonly'); } catch (e) { return; }
+      var store = tx.objectStore (IDBFS.DB_STORE_NAME);
+      paths.forEach (function (p) {
+        var req = store.get (p);
+        req.onsuccess = function () {
+          if (dirty.has (p)) return;
+          applying = true;
+          try {
+            if (req.result) {
+              try { FS.mkdirTree (p.slice (0, p.lastIndexOf ('/'))); } catch (e) {}
+              IDBFS.storeLocalEntry (p, req.result, function () {});
+            }
+            else IDBFS.removeLocalEntry (p, function () {});
+          }
+          catch (e) { console.error ('TeXmacs: cannot read ' + p + ' again', e); }
+          finally { applying = false; }
+        };
       });
     });
   }
@@ -331,8 +374,8 @@ var tmHome = (function () {
 
   function becomeReadOnly (why, handedOver) {
     readOnly = true;
-    if (typeof document !== 'undefined' && !/^\(read only\) /.test (document.title))
-      document.title = '(read only) ' + document.title;
+    if (typeof document !== 'undefined' && !/^\(other tab\) /.test (document.title))
+      document.title = '(other tab) ' + document.title;
     say (why, [['Use TeXmacs here', takeOver]]);
     if (handedOver) claimWait = setTimeout (watchOwner, 15000);
     else watchOwner ();
@@ -346,11 +389,12 @@ var tmHome = (function () {
     channel.onmessage = function (e) {
       if (!e.data) return;
       if (e.data.type === 'claimed') { claims++; if (readOnly && !watching) watchOwner (); return; }
+      if (e.data.type === 'wrote') { refresh (e.data.paths || []); return; }
       if (e.data.type !== 'takeover' || readOnly || !release) return;
       flush (function () {
         var r = release; release = null;
         becomeReadOnly ('TeXmacs Vue is now used in another tab of this browser: the ' +
-                        'changes made in this tab are no longer kept.', true);
+                        'documents you save here are kept, your preferences are not.', true);
         r ();
       });
     };
@@ -364,8 +408,8 @@ var tmHome = (function () {
     navigator.locks.request (LOCK, opts, function (lock) {
       decided = true;
       if (!lock) {
-        becomeReadOnly ('TeXmacs Vue is already open in another tab of this browser. ' +
-                        'This tab shows your files, but its changes are not kept.');
+        becomeReadOnly ('TeXmacs Vue is also open in another tab of this browser: the ' +
+                        'documents you save here are kept, your preferences are not.');
         cont ();
         return;
       }
@@ -375,8 +419,8 @@ var tmHome = (function () {
     }).catch (function (e) {
       // the tab which had TeXmacs did not let go in time
       if (decided) return;
-      becomeReadOnly ('TeXmacs Vue is still open in another tab of this browser. ' +
-                      'This tab shows your files, but its changes are not kept.');
+      becomeReadOnly ('TeXmacs Vue is still open in another tab of this browser: the ' +
+                      'documents you save here are kept, your preferences are not.');
       cont ();
     });
   }

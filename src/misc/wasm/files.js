@@ -16,7 +16,9 @@
 //   keeping their structure; the documents are opened, the images dropped
 //   on a document inserted where they fall, a folder shown in the panel;
 // - a document given in the address of the page (texmacs.html?open=<url>),
-//   opened once TeXmacs runs: the page as a viewer of documents on the web.
+//   opened once TeXmacs runs: the page as a viewer of documents on the web;
+//   or a document kept in the browser (?file=<path>): a document moved to
+//   a new tab of the browser (the menu of a tab, frame.js).
 //
 // Everything that opens a chooser of the system is a control the user
 // clicks: the browsers open one only for a click being handled.
@@ -662,6 +664,23 @@ var tmFiles = (function () {
     });
   }
 
+  // A document kept in the browser: texmacs.html?file=<path>, a path under
+  // the home directory or a file of TeXmacs (the menu of a tab moves a
+  // document to a new tab of the browser so, frame.js). It is read from the
+  // storage of the browser once TeXmacs runs; the address reaches nothing
+  // else, and runs nothing: no question asked, unlike ?x.
+  function openFromFile (p) {
+    return new Promise (function (ok) {
+      tmProgress.running (function () {
+        // (a file of TeXmacs may not have come yet: TeXmacs fetches it)
+        if (p.indexOf ('/../') < 0 && ((p.indexOf (HOME + '/') === 0 && exists (p)) || inSys (p)))
+          openDocument (p);
+        else toast ('No document ' + p + ' in this browser');
+        ok ();
+      });
+    });
+  }
+
   // ?x=<command>: Scheme commands, as TeXmacs -x <command>, run once
   // TeXmacs runs, after the document of ?open (as -x after the files of the
   // command line), in their order. A link is anyone's, and a command could
@@ -684,6 +703,10 @@ var tmFiles = (function () {
   if (typeof location !== 'undefined') {
     var address = new URLSearchParams (location.search);
     var opened = address.get ('open') ? openFromWeb (address.get ('open')) : Promise.resolve ();
+    if (address.get ('file')) {
+      var file = address.get ('file'), web = opened;
+      opened = web.then (function () { return openFromFile (file); });
+    }
     var cmds = address.getAll ('x').filter (function (c) { return c.trim () !== ''; });
     if (cmds.length > 0)
       tmProgress.running (function () { opened.then (function () { runCommands (cmds); }); });
