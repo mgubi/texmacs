@@ -37,3 +37,8 @@
 
 (converter office-stree texmacs-stree
   (:function office->texmacs))
+
+(lazy-define (convert office tmoffice) texmacs->office)
+
+(converter texmacs-stree office-stree
+  (:function-with-options texmacs->office))
