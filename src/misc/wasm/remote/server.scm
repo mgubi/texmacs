@@ -1,4 +1,4 @@
-;; a TeXmacs server for the tests of the WebSocket clients: admin/secret123
+;; a TeXmacs server for the tests of the clients: admin/secret123
 ;; TLS for the other clients, as by default (the home of the test is a copy),
 ;; with a self-signed certificate
 (let ((cert (string->url "$TEXMACS_SERVER_CERT_DIR/cert.pem"))
@@ -17,4 +17,10 @@
        (hiddens (server-hide-credentials credentials))
        (info (server-get-user-info "admin")))
   (server-set-user-info #f "admin" "admin" hiddens (fourth info) #t))
+;; a second user, for what takes two (sharing, messages, chat): bob/secret456
+(unless (server-find-user "bob")
+  (let* ((credentials (server-add-salt (list (list 'tls-password "secret456"))
+                                       (generate-salt)))
+         (hiddens (server-hide-credentials credentials)))
+    (server-set-user-info #f "bob" "Bob" hiddens "bob@localhost" #f)))
 (display* "test server ready, websocket: " (get-preference "server websocket") "\n")

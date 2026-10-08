@@ -187,11 +187,13 @@
   ("Clear cache"
    (tree-cache-clear-all)
    (server-open-success "Tree cache has been cleared."))
-  ---
-  (assuming (not (server-started?))
-    (link server-start-menu))
-  (assuming (server-started?)
-    (link server-menu)))
+  ;; a page of a browser cannot be a server (no listening sockets)
+  (assuming (not (defined? 'web-javascript))
+    ---
+    (assuming (not (server-started?))
+      (link server-start-menu))
+    (assuming (server-started?)
+      (link server-menu))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main remote icon menu

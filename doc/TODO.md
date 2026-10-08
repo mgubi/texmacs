@@ -28,6 +28,18 @@ SDL and Qtwk changes, the Qt 5 branch of the Qt pipes
 (`setupChildProcess`), and headless mode of X11, SDL and Cocoa. Qtwk has
 no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
+- **Remote tools: what the check of 2026-10-08 found** (issues of
+  mgubi/texmacs; the fixes for `wip_fixes` reach this branch with its next
+  merge). #316: a version of a remote file replaced within 5 s is missing
+  from its history (PR for `wip_fixes`). #317: remote directories and the
+  lists of chat rooms, shared resources and live documents are titled by
+  their address (PR for `wip_fixes`). #318: in Remote > Rename, "Ok"
+  ignores the name typed and a renamed file gets the name of a directory
+  (PR for `wip_fixes`). #319: the backups of the server are never
+  registered, `server-backup.scm` is not loaded (no fix: where to hook it
+  is to decide). #322: the page cannot fetch the artwork of texmacs.org
+  (CORS) and falls back to the thumbnails (no fix yet).
+
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`

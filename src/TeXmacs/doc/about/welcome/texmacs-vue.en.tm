@@ -236,6 +236,15 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>The remote tools (<menu|Tools|Remote tool>, then the
+    <menu|Remote> menu) were checked against a <TeXmacs> server, from the
+    browser and from the desktop version, alone and together in a chat room
+    and in a live document. Three corrections: the name asked by
+    <menu|Remote|Rename> has the width of its dialog (it showed a few
+    letters); the preferences of the server say whether the server has
+    <verbatim|rsync> (they showed an error); and the browser, which cannot
+    be a server, no longer offers <menu|Remote|Start server>.
+
     <item><menu|Download a backup> and <menu|Restore a backup...>, in the
     menu of <TeXmacs> <name|Vue>: all your files and your preferences in one
     zip archive, to keep them safe or to move them to another browser (see

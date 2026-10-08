@@ -782,6 +782,32 @@ of the page). Checked on 2026-09-27: all of them, a WebSocket client from
 another address refused with `local` and served with `on`, none with
 `off`; the desktop Vue and the Qt (compiled) ports.
 
+The remote tools as a whole (2026-10-08): `remote-check.scm`, loaded by a
+desktop client (`-tls-no-verify -x`) or by the page (written to its file
+system and loaded with `_vue_web_scheme`), runs the same checks in both
+against the test server, which has a second user (bob / secret456):
+`(remote-check "admin" "secret123" "bob" #f)` logs in and goes through the
+Remote menu -- the home directory, a new directory and file, a second
+version and the history, renaming, permissions, sharing, messages, upload,
+download, removal, synchronization, a chat room, a live document, the
+account, the informations and the preferences of the server, the users --
+with a line `remote-check: ok` or `FAIL` for each; `(rc-widget "<name>")`
+then opens a dialog of the menu, for a screenshot. `(remote-duet user pass
+tag first?)` is for two clients at once: the first makes a chat room and a
+live document open to all, the second joins, and each checks that what the
+other wrote arrived. Checked: all of it from the desktop Vue client and
+from the page (Firefox), as admin and as bob, each seeing what the other
+shared and sent; the duet with the desktop first and with the page first
+(the live document is the same on both sides at the end); in the page,
+with the mouse and the keyboard, the login dialog, the menu, the icons,
+a new remote file typed in and saved. Found and corrected: the input of
+"Rename as:" (a width of `1w` in a refreshable) was 30 points wide in Vue;
+the preferences form of the server asked the client for `has-rsync-ext?`
+("bad if"), now answered by the server when it sends the form; the page
+offered "Start server". A file saved less than 5 s after its previous
+version loses that version from its history (the server, `readable-by?`):
+the check waits.
+
 `wss` (2026-10-01): `wss-cert.sh <home of the server>` puts an ECDSA
 certificate for localhost in place of the Ed25519 one, and
 `browser-run.mjs --insecure --query '?websocket=wss'` runs the scripts
