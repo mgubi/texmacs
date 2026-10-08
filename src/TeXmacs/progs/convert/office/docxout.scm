@@ -46,6 +46,7 @@
   "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing")
 (define dx-ns-a "http://schemas.openxmlformats.org/drawingml/2006/main")
 (define dx-ns-pic "http://schemas.openxmlformats.org/drawingml/2006/picture")
+(define dx-ns-svg "http://schemas.microsoft.com/office/drawing/2016/SVG/main")
 (define dx-rel-type
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships/")
 
@@ -114,8 +115,13 @@
          (cx (dx-emu (ox-attr x 'width)))
          (cy (dx-emu (ox-attr x 'height))))
     (if (or (not data) dx-in-note?) '()
-        (with id (dx-relation "image" (string-append "media/" file) #f)
+        (let* ((id (dx-relation "image" (string-append "media/" file) #f))
+               (svg (ox-attr x 'svg))
+               (svg-file (string-append "image" (number->string n) ".svg"))
+               (svg-id (and svg (dx-relation "image"
+                                             (string-append "media/" svg-file) #f))))
           (set! dx-media (cons (list file data) dx-media))
+          (when svg (set! dx-media (cons (list svg-file svg) dx-media)))
           (list
             `(w:r
                (w:drawing
@@ -131,7 +137,18 @@
                            (pic:cNvPr (@ (id ,(number->string n)) (name ,file)))
                            (pic:cNvPicPr))
                          (pic:blipFill
-                           (a:blip (@ (r:embed ,id)))
+                           ;; with an SVG of the picture, for the programs
+                           ;; which show it in the place of the bitmap
+                           (a:blip
+                             (@ (r:embed ,id))
+                             ,@(if svg-id
+                                   `((a:extLst
+                                       (a:ext
+                                         (@ (uri "{96DAC541-7B7A-43D3-8B79-37D633B846F1}"))
+                                         (asvg:svgBlip
+                                           (@ (xmlns:asvg ,dx-ns-svg)
+                                              (r:embed ,svg-id))))))
+                                   '()))
                            (a:stretch (a:fillRect)))
                          (pic:spPr
                            (a:xfrm (a:off (@ (x "0") (y "0")))
@@ -652,6 +669,7 @@
        ,(default "jpg" "image/jpeg")
        ,(default "jpeg" "image/jpeg")
        ,(default "gif" "image/gif")
+       ,(default "svg" "image/svg+xml")
        ,(override "/word/document.xml" "document.main")
        ,(override "/word/styles.xml" "styles")
        ,(override "/word/numbering.xml" "numbering")

@@ -81,6 +81,7 @@
     (int array_string string object))
   (async-evaluate-cancel async_evaluate_cancel (void int))
   ;; zip archives
+  (pdf->svg-native native_pdf_to_svg (bool url url))
   (zip-archive? zip_is_archive (bool string))
   (zip-unpack zip_unpack (array_string string))
   (zip-pack zip_write (string array_string array_string))

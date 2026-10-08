@@ -465,6 +465,64 @@
         (and (url-exists? v) (string-load v))))
     (lambda args #f)))
 
+(define tmof-picture-nr 0)
+
+(define (tmof-picture x vector)
+  ;; The tree x as a picture: a drawing, or an image in a format which the
+  ;; office programs do not read. The editor typesets it and makes an
+  ;; image of it: a PNG, which all programs read, and an SVG beside it for
+  ;; those which show it. The SVG is made from the PDF of the picture when
+  ;; vector is #t (a drawing: what TeXmacs draws is drawn the same), is
+  ;; the text vector when it is one (an image which is an SVG), and is
+  ;; left out when vector is #f. Nothing when there is no editor, or no
+  ;; picture.
+  (catch #t
+    (lambda ()
+      (let* ((base (url-temp))
+             (png (url-glue base ".png"))
+             (pdf (url-glue base ".pdf"))
+             (svg (url-glue base ".svg"))
+             (ext (print-snippet png x #t)))
+        (if (not (and (url-exists? png) (list? ext) (>= (length ext) 10)))
+            '()
+            (let* ((data (string-load png))
+                   (dpi (max 1 (list-ref ext 9)))
+                   ;; the box of the ink, in 256th of a dot
+                   (cm (lambda (a b) (max 0.1 (* 2.54 (/ (- b a) (* 256.0 dpi))))))
+                   (w (cm (list-ref ext 0) (list-ref ext 2)))
+                   (h (cm (list-ref ext 1) (list-ref ext 3)))
+                   (vector (cond ((string? vector) vector)
+                                 ((not vector) #f)
+                                 (else
+                                   (and (begin (print-snippet pdf x #t)
+                                               (url-exists? pdf))
+                                        (pdf->svg-native pdf svg)
+                                        (url-exists? svg)
+                                        (string-load svg))))))
+              (for (u (list png pdf svg))
+                (when (url-exists? u) (system-remove u)))
+              (set! tmof-picture-nr (+ tmof-picture-nr 1))
+              (list (apply office-node
+                           (list 'image
+                                 `((name ,(string-append
+                                            "drawing" (number->string tmof-picture-nr)
+                                            ".png"))
+                                   (data ,data)
+                                   (width ,(tmof-cm-string w))
+                                   (height ,(tmof-cm-string h))
+                                   (svg ,vector)))))))))
+    (lambda args '())))
+
+(define (tmof-graphics l)
+  (tmof-picture (cons 'graphics l) #t))
+
+(define (tmof-drawing? x)
+  ;; a tree which is drawn: graphics, alone or over a text, with the
+  ;; variables around them
+  (and (pair? x)
+       (or (in? (car x) '(graphics draw-over draw-under))
+           (and (func? x 'with) (pair? (cdr x)) (tmof-drawing? (cAr x))))))
+
 (define (tmof-image l)
   ;; an image which is in the document, or a file which is read
   (let* ((inside? (and (nnull? l) (func? (car l) 'tuple 2)
@@ -483,8 +541,16 @@
                          (data ,data)
                          (width ,(tmof-cm-string (car size)))
                          (height ,(tmof-cm-string (cadr size))))))))
-          ;; an image which cannot go into the archive: its name
-          ((!= name "") (list (string-append "[" name "]")))
+          ;; another format (PDF, Postscript, SVG): the picture which the
+          ;; editor makes of it, or else its name
+          ((!= name "")
+           ;; (an SVG which is made of the picture of an image is not
+           ;; always shown well: only an image which is one has one)
+           (with r (tmof-picture (cons 'image l)
+                                 (and (== suffix "svg") (string? data)
+                                      (>= (string-search-forwards "<svg" 0 data) 0)
+                                      data))
+             (if (null? r) (list (string-append "[" name "]")) r)))
           (else '()))))
 
 (define (tmof-specific l)
@@ -1037,6 +1103,7 @@
         ((not (symbol? (car x))) '())
         ((in? (car x) '(page-break new-page page-break* new-page*))
          '((!pagebreak)))
+        ((tmof-drawing? x) (tmof-picture x #t))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
         ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
         ((in? (car x) '(tabular tabular* block block* wide-tabular wide-block

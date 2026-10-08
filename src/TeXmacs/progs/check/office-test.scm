@@ -840,6 +840,27 @@
             (p (@ (role "date")) "2026") (p (@ (role "abstract")) "Abs.")
             (p (@ (role "heading") (level "1")) "S") (p "x"))))
 
+;; A drawing is a picture which the editor makes: a PNG, with an SVG beside
+;; it where it can be made (the builds with MuPDF).
+(define (test-tmoffice-drawings)
+  (check-group "tmoffice drawings")
+  (let* ((drawing '(with "gr-geometry" (tuple "geometry" "4cm" "2cm" "center")
+                     (graphics "" (line (point "-1" "0") (point "1" "0")))))
+         (r (of `(document "a" ,drawing "b")))
+         (image (and (== (length r) 3) (func? (cadr r) 'p)
+                     (list-find (ox-children (cadr r)) (lambda (x) (func? x 'image))))))
+    (check= (car r) '(p "a"))
+    (check= (cAr r) '(p "b"))
+    (check-true (pair? image))
+    (when image
+      ;; a PNG of the size of the drawing
+      (check-true (string-starts? (ox-attr image 'data)
+                                  (string-append (bytes 137) "PNG")))
+      (check-true (< (abs (- (office-length->cm (ox-attr image 'width)) 4.0)) 0.1))
+      (check-true (< (abs (- (office-length->cm (ox-attr image 'height)) 2.0)) 0.1))
+      (when (ox-attr image 'svg)
+        (check-true (string-starts? (ox-attr image 'svg) "<svg"))))))
+
 (define (test-tmoffice-tables)
   (check-group "tmoffice tables")
   ;; a block has all its borders; the formats of rectangles of cells
@@ -939,6 +960,20 @@
             '((p "a " (em "b") (note (p "n")))
               (p (image (@ (name "image2.png") (data "PNGDATA") (width "2cm")
                            (height "1cm")))))))
+  ;; a picture with an SVG beside its bitmap: both are written, and the
+  ;; bitmap is read back
+  (let* ((tree '(office (p (image (@ (name "d.png") (data "PNGDATA") (width "2cm")
+                                     (height "1cm") (svg "<svg/>"))))))
+         (docx (serialize-docx-document tree))
+         (odt (serialize-odt-document tree)))
+    (check-true (in? "word/media/image1.svg" (archive-names docx)))
+    (check-true (in? "Pictures/image1.svg" (archive-names odt)))
+    (check= (cdr (parse-docx-document docx))
+            '((p (image (@ (name "image1.png") (data "PNGDATA") (width "2cm")
+                           (height "1cm"))))))
+    (check= (cdr (parse-odt-document odt))
+            '((p (image (@ (name "image1.png") (data "PNGDATA") (width "2cm")
+                           (height "1cm")))))))
   ;; the text of XML: its characters are escaped, the control ones removed
   (check= (ox-serialize-element '(a (@ (x "1 & \"2\"")) "t < u" (b)))
           "<a x=\"1 &amp; &quot;2&quot;\">t &lt; u<b/></a>")
@@ -1037,6 +1072,7 @@
   (test-tmoffice-text)
   (test-tmoffice-blocks)
   (test-tmoffice-tables)
+  (test-tmoffice-drawings)
   (test-mathml-omml)
   (test-writers)
   (test-round-trips)

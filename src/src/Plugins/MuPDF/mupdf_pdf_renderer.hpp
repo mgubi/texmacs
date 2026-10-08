@@ -28,4 +28,8 @@ renderer mupdf_pdf_renderer (url pdf_file_name, int dpi, int nr_pages= 1,
 bool mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
                                  url out_path);
 
+// The first page of a PDF as an SVG, by MuPDF itself; the text is written
+// as outlines, so that the picture needs no font. True if it worked.
+bool mupdf_pdf_to_svg (url pdf, url svg);
+
 #endif // MUPDF_PDF_RENDERER_H

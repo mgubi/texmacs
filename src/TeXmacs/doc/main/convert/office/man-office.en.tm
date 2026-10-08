@@ -53,6 +53,14 @@
     sizes. A paragraph of images followed by a caption is a figure, and so
     for a table.
 
+    <item*|Drawings>A drawing made with <TeXmacs> is exported as a
+    picture: an <name|Svg> image, which stays sharp at any size, with a
+    bitmap of it for the programs which do not show <name|Svg> (the
+    versions of <TeXmacs> without <name|MuPDF> write the bitmap only). An
+    image in a format which the office programs do not read (<name|Pdf>,
+    <name|Postscript>) is exported as a bitmap of what <TeXmacs>
+    displays, and an <name|Svg> image as itself with its bitmap.
+
     <item*|Notes>Footnotes and endnotes are footnotes.
 
     <item*|Quotations and code>From the styles <samp|Quote> and
@@ -86,10 +94,9 @@
     when the document changes there. In the other direction, a
     cross-reference is a link to its target, with the text it had.
 
-    <item>The drawings made with <TeXmacs> are not exported, and the
-    drawings, charts and text boxes of the office programs are not
-    imported. The images in a format which the office programs do not read
-    (<name|Pdf>, <name|Postscript>) are replaced by their names.
+    <item>A drawing which was exported is a picture: it cannot be edited
+    in the office programs, and it comes back as an image. The drawings,
+    charts and text boxes of the office programs are not imported.
 
     <item>Comments and the history of the changes are not imported: the
     text is the one with all the changes accepted.

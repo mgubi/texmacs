@@ -1414,6 +1414,60 @@ mupdf_pdf_renderer_rep::merge_layers (pdf_document* src, pdf_graft_map* map) {
   }
 }
 
+// The other way: the first page of a PDF as an SVG, for the pictures of a
+// document which is exported to a format which has SVG images. The PDF is
+// read with load_string, and the SVG is written to a buffer and saved with
+// save_string, so that the files of the ramdisc work too.
+bool
+mupdf_pdf_to_svg (url pdf, url svg) {
+  fz_context* ctx= mupdf_context ();
+  string data;
+  if (load_string (pdf, data, false) || N(data) == 0) return false;
+  const unsigned char* bytes= (const unsigned char*) &(data[0]);
+  size_t len= N(data);
+  bool ok= false;
+  string result;
+  fz_buffer* in= NULL;
+  fz_buffer* buf= NULL;
+  fz_document* d= NULL;
+  fz_page* page= NULL;
+  fz_output* out= NULL;
+  fz_device* dev= NULL;
+  fz_var (in); fz_var (buf); fz_var (d); fz_var (page); fz_var (out);
+  fz_var (dev); fz_var (ok);
+  fz_try (ctx) {
+    in= fz_new_buffer_from_copied_data (ctx, bytes, len);
+    d= fz_open_document_with_buffer (ctx, "application/pdf", in);
+    page= fz_load_page (ctx, d, 0);
+    fz_rect box= fz_bound_page (ctx, page);
+    buf= fz_new_buffer (ctx, 65536);
+    out= fz_new_output_with_buffer (ctx, buf);
+    dev= fz_new_svg_device (ctx, out, box.x1 - box.x0, box.y1 - box.y0,
+                            FZ_SVG_TEXT_AS_PATH, 1);
+    fz_run_page (ctx, page, dev, fz_translate (-box.x0, -box.y0), NULL);
+    fz_close_device (ctx, dev);
+    fz_close_output (ctx, out);
+    unsigned char* s= NULL;
+    size_t n= fz_buffer_storage (ctx, buf, &s);
+    result= string ((char*) s, (int) n);
+    ok= n > 0;
+  }
+  fz_always (ctx) {
+    fz_drop_device (ctx, dev);
+    fz_drop_output (ctx, out);
+    fz_drop_buffer (ctx, buf);
+    fz_drop_page (ctx, page);
+    fz_drop_document (ctx, d);
+    fz_drop_buffer (ctx, in);
+  }
+  fz_catch (ctx) {
+    cout << "TeXmacs] PDF to SVG: " << fz_caught_message (ctx) << LF;
+    ok= false;
+  }
+  if (ok) ok= !save_string (svg, result, false);
+  return ok;
+}
+
 // An SVG as a PDF, by MuPDF itself, which reads SVG (the screen draws them
 // so): the converters of TeXmacs run programs (rsvg-convert, inkscape)
 // which a web browser does not have, and a picture of TikZ or of an AI

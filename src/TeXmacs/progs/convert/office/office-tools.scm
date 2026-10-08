@@ -36,7 +36,8 @@
 ;;            (link ...)  with the attribute href (#name inside the document)
 ;;            (note block...)  (br)  (tab)
 ;;            (image)  with the attributes name, data (the bytes of the
-;;              file), width, height (lengths of TeXmacs) and alt
+;;              file), width, height (lengths of TeXmacs), alt, and svg
+;;              (the text of an SVG of the same picture, when there is one)
 ;;            (math "MathML")  with the attribute display
 ;;            (bookmark)  (ref ...)  with the attribute name
 ;;

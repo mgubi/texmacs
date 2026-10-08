@@ -188,6 +188,19 @@
   images with their bytes and their sizes (<scm|tmof-image>), the formats
   of the tables (<scm|tmof-table>), colors, notes in their place.
 
+  A drawing (<markup|graphics>, alone or over a text) and an image which
+  the office programs cannot read are made into a picture by the editor
+  (<scm|tmof-picture>): <scm|print-snippet> typesets the tree and writes a
+  PNG of it, and its PDF, of which <scm|pdf-\<gtr\>svg-native> makes an
+  <name|SVG> with <name|MuPDF> (<cpp|mupdf_pdf_to_svg> in
+  <source-link|Plugins/MuPDF/mupdf_pdf_renderer.cpp|src/Plugins/MuPDF/mupdf_pdf_renderer.cpp>; false in the builds without it).
+  The node <verbatim|image> then has the <name|SVG> as its attribute
+  <verbatim|svg>, and the writers put both in the archive: <name|Word>
+  shows the <name|SVG> named by the extension of the bitmap, and a frame
+  of <name|OpenDocument> has the two images, of which the first one that a
+  program can show is shown. The <name|SVG> is only made for drawings: the
+  one of the picture of an embedded image is not always shown well.
+
   <section|Writing>
 
   The writers build the <name|XML> files as trees and serialize them
@@ -224,8 +237,8 @@
     <item>The numbers and the references are text; bookmarks and labels
     are kept on import, but not written on export.
 
-    <item>Drawings, charts, text boxes, comments and tracked changes are
-    not converted.
+    <item>The drawings, charts and text boxes of the office programs,
+    comments and tracked changes are not imported.
 
     <item>The entries of an archive are written without compression.
   </itemize>

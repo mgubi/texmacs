@@ -88,6 +88,7 @@
 "async-eval-system"
 "async-evaluate-system"
 "async-evaluate-cancel"
+"pdf->svg-native"
 "zip-archive?"
 "zip-unpack"
 "zip-pack"

@@ -149,17 +149,27 @@
          (type (cond ((in? suffix '("jpg" "jpeg")) "image/jpeg")
                      ((== suffix "gif") "image/gif")
                      (else "image/png")))
+         (svg (ox-attr x 'svg))
+         (svg-file (string-append "Pictures/image" (number->string n) ".svg"))
          (w (or (office-length->cm (ox-attr x 'width)) 5.0))
          (h (or (office-length->cm (ox-attr x 'height)) 3.0)))
     (if (not data) '()
         (begin
           (set! ot-files (cons (list file type data) ot-files))
+          (when svg
+            (set! ot-files (cons (list svg-file "image/svg+xml" svg) ot-files)))
           (list `(draw:frame
                    (@ (draw:style-name "fr1")
                       (draw:name ,(string-append "Image" (number->string n)))
                       (text:anchor-type "as-char")
                       (svg:width ,(ot-cm w)) (svg:height ,(ot-cm h))
                       (draw:z-index "0"))
+                   ;; the images of a frame are the same picture: the
+                   ;; first one which a program can show is shown
+                   ,@(if svg
+                         `((draw:image (@ (xlink:href ,svg-file) (xlink:type "simple")
+                                          (xlink:show "embed") (xlink:actuate "onLoad"))))
+                         '())
                    (draw:image (@ (xlink:href ,file) (xlink:type "simple")
                                   (xlink:show "embed") (xlink:actuate "onLoad")))
                    ,@(if (ox-attr x 'alt) `((svg:title ,(ox-attr x 'alt))) '())))))))

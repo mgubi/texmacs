@@ -53,6 +53,7 @@
              verbatim code tt underline overline strike-through
              deleted marked
              hlink hlink* action hyper-link render-key
+             draw-over draw-under
              ;; environments, with their names and numbers
              render-theorem render-remark render-exercise render-proof
              render-solution render-enunciation

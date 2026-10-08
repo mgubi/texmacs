@@ -266,7 +266,15 @@
 
 (define (odt-frame x)
   ;; a frame: an image, a formula, or a box of text
-  (let* ((image (ox-child x 'draw:image))
+  (let* ((images (ox-childs x 'draw:image))
+         ;; several images are the same picture: a bitmap is the one which
+         ;; all the converters and renderers know
+         (image (or (list-find images
+                               (lambda (i)
+                                 (with h (locase-all (or (ox-attr i 'xlink:href) ""))
+                                   (list-or (map (lambda (s) (string-ends? h s))
+                                                 '(".png" ".jpg" ".jpeg" ".gif"))))))
+                    (and (pair? images) (car images))))
          (object (ox-child x 'draw:object))
          (box (ox-child x 'draw:text-box))
          (display? (!= (ox-attr x 'text:anchor-type) "as-char"))

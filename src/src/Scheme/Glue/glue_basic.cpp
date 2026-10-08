@@ -679,6 +679,21 @@ tmg_async_evaluate_cancel (tmscm arg1) {
 }
 
 tmscm
+tmg_pdf_2svg_native (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf->svg-native");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf->svg-native");
+
+  url in1= tmscm_to_url (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= native_pdf_to_svg (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
 tmg_zip_archiveP (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-archive?");
 
@@ -11728,6 +11743,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
   tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
   tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
+  tmscm_install_procedure ("pdf->svg-native",  tmg_pdf_2svg_native, 2, 0, 0);
   tmscm_install_procedure ("zip-archive?",  tmg_zip_archiveP, 1, 0, 0);
   tmscm_install_procedure ("zip-unpack",  tmg_zip_unpack, 1, 0, 0);
   tmscm_install_procedure ("zip-pack",  tmg_zip_pack, 2, 0, 0);
