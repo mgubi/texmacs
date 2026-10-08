@@ -138,6 +138,17 @@ ui_corners (float k= 1.0f) {
 
 // the pull-down menus are rounder than the fields
 static const float menu_round= 1.5f;
+// the room between the border of a menu and its items (2x)
+static const float menu_inset= 10;
+
+// The corners of an element which lies inset (2x) in a container rounded
+// as ui_corners (k): concentric with those of the container, their radius
+// is the container's less the inset
+static inline Clay_CornerRadius
+ui_inner_corners (float k, float inset) {
+  float r= ui_pxf (the_theme.radius * k) - (float) ui_px (inset);
+  return CLAY_CORNER_RADIUS (r > 0 ? r : 0);
+}
 
 // the footer is being laid out: its buttons are flatter (menu_button,
 // layout_pull_button)
@@ -215,6 +226,7 @@ public:
 * theme will not cover it.
 ******************************************************************************/
 
+// (the colours of before; rounder corners)
 static const vue_theme vue_theme_light= {
   .shade= { {160, 160, 160, 255}, {192, 192, 192, 255},
             {224, 224, 224, 255}, {240, 240, 240, 255} },
@@ -245,7 +257,7 @@ static const vue_theme vue_theme_light= {
   .pre_edit= {252, 250, 232, 255},
   .pre_edit_line= {120, 120, 180, 255},
   .cursor= {224, 0, 0, 255},
-  .radius= 8
+  .radius= 12
 };
 
 static const vue_theme vue_theme_dark= {
@@ -277,7 +289,7 @@ static const vue_theme vue_theme_dark= {
   .pre_edit= {62, 60, 44, 255},
   .pre_edit_line= {150, 150, 210, 255},
   .cursor= {255, 96, 96, 255},
-  .radius= 8
+  .radius= 12
 };
 
 vue_theme the_theme= vue_theme_light;
@@ -362,6 +374,85 @@ highlight_on (Clay_Color bg) {
 // the fade a plain blend from the highlight into the bar behind it.
 static Clay_Color
 faded (Clay_Color c) { return (Clay_Color) { c.r, c.g, c.b, 0 }; }
+
+// The menus and lists appear with a short animation: they drop
+// into place from a few pixels above, and their contents fade in. The
+// renderers have no opacity for a group, so the fade is a veil: a box in
+// the colour of the menu, over its contents, which Clay takes from opaque
+// to transparent (menu_veil).
+static Clay_TransitionData
+drop_in (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.boundingBox.y -= ui_pxf (10); return target;
+}
+static Clay_TransitionData
+veil_opaque (Clay_TransitionData target, Clay_TransitionProperty props) {
+  (void) props; target.backgroundColor.a= 255; return target;
+}
+static const Clay_TransitionElementConfig drop_in_transition= {
+  .handler= Clay_EaseOut, .duration= 0.14f,
+  .properties= CLAY_TRANSITION_PROPERTY_Y,
+  .enter= { .setInitialState= drop_in,
+            .trigger= CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME }};
+
+// the veil over the contents of a floating element which has just appeared
+// (it is new: Clay animates it from veil_opaque); it lets the pointer through
+static void
+menu_veil (Clay_ElementId parent, Clay_Color bg, Clay_CornerRadius r, int16_t z) {
+  CLAY(CLAY_IDI ("menu_veil", parent.id), {
+    .layout= { .sizing= { CLAY_SIZING_GROW (0), CLAY_SIZING_GROW (0) }},
+    .backgroundColor= { bg.r, bg.g, bg.b, 0 },
+    .cornerRadius= r,
+    .floating= {
+      .zIndex= z,
+      .attachTo= CLAY_ATTACH_TO_PARENT,
+      .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH },
+    .transition= {
+      .handler= Clay_EaseOut, .duration= 0.18f,
+      .properties= CLAY_TRANSITION_PROPERTY_BACKGROUND_COLOR,
+      .enter= { .setInitialState= veil_opaque,
+                .trigger= CLAY_TRANSITION_ENTER_TRIGGER_ON_FIRST_PARENT_FRAME }}}) {}
+}
+
+// The shadow of a floating element (a menu, a list, a balloon). Clay has no
+// shadows and the renderers no blur: a few translucent rounded boxes behind
+// the element, each larger than the one before and all a little lower, add
+// up to a soft one. They take the size the element had in the
+// last pass (for a new element, a second pass is asked for), lie one level
+// under it and let the pointer through.
+static void
+menu_shadow (Clay_ElementId parent, float radius, int16_t z) {
+  Clay_ElementData pd= Clay_GetElementData (parent);
+  // the element is new, its size not known yet: another pass, in the same
+  // frame, draws the shadow (else it came with the next frame, which for a
+  // balloon, which does not move, was the next event: a visible delay)
+  // (Clay knows an element from the pass which makes it, with no size yet)
+  if (!pd.found || pd.boundingBox.width <= 0 || pd.boundingBox.height <= 0) {
+    gui_needs_relayout= true; return; }
+  // a light theme has dark text: the shadow is stronger on a dark theme
+  bool dark= the_theme.text.r > 128;
+  // (eight layers, 2 px apart, of the same very faint black: where n of
+  // them overlap the shadow is n times as dark, a ramp from the edge
+  // outwards; a discreet shadow, about a sixth of black at the edge)
+  const int   layers= 8;
+  const float alpha= dark ? 12.0f : 5.5f;
+  float dy= ui_pxf (5);
+  for (int i= 0; i < layers; i++) {
+    float sp= ui_pxf (1 + 2 * i);
+    CLAY(CLAY_IDI ("menu_shadow", parent.id + 7919 * (i + 1)), {
+      .layout= { .sizing= {
+        CLAY_SIZING_FIXED (pd.boundingBox.width  + 2 * sp),
+        CLAY_SIZING_FIXED (pd.boundingBox.height + 2 * sp) }},
+      .backgroundColor= { 0, 0, 0, alpha },
+      .cornerRadius= CLAY_CORNER_RADIUS (radius + sp),
+      .floating= {
+        .offset= { -sp, -sp + dy },
+        .zIndex= (int16_t) (z - 1),
+        .attachPoints= { .element= CLAY_ATTACH_POINT_LEFT_TOP,
+                         .parent= CLAY_ATTACH_POINT_LEFT_TOP },
+        .attachTo= CLAY_ATTACH_TO_PARENT,
+        .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH }}) {}
+  }
+}
 
 // a colour a fraction t of the way from a to b (a line between two colours
 // of the theme, a frame which is to be fainter than the border)
@@ -1193,7 +1284,7 @@ decode_length (string width, vue_window win, int style) {
 void
 vue_follow_icon_set () {
   static string current;
-  string now= get_user_preference ("icon set", "neo-classical");
+  string now= get_user_preference ("icon set", "lucide");
   if (N(current) == 0) { current= now; return; }
   if (now == current) return;
   current= now;
@@ -1957,6 +2048,37 @@ menu_rested (uint32_t menu, uint32_t item) {
   return false;
 }
 
+// The buttons of the tool bars which show an icon are square, whatever
+// the proportions of the icon: the side is the larger one of the icon, and
+// in the column at the left of the editor that of the icons of the main bar
+// (24 points) at least, so that the buttons of its two bars match.
+// Returns false when the button shows something else (a text).
+static bool
+icon_size (widget w, float& iw, float& ih) {
+  vue_ui_rep* u= dynamic_cast<vue_ui_rep*> (concrete (w).rep);
+  if (u == NULL) return false;
+  if (u->type == "picture_widget") {
+    picture p= icon_picture (u->data);
+    iw= (float) p->get_width (); ih= (float) p->get_height ();
+    return true;
+  }
+  if (u->type == "balloon_widget")
+    return icon_size (open_box<vue_balloon_widget> (u->data).w, iw, ih);
+  return false;
+}
+
+static bool
+square_tool_button (widget content, Clay_Sizing& s, Clay_Padding& padding) {
+  float iw, ih;
+  if (!in_tool_bar || !icon_size (content, iw, ih)) return false;
+  float side= max (iw, ih);
+  if (in_side_bar) side= max (side, ui_pxf (48));
+  uint16_t pad= ui_px (tool_button_pad);
+  padding= CLAY_PADDING_ALL (pad);
+  s= { CLAY_SIZING_FIXED (side + 2 * pad), CLAY_SIZING_FIXED (side + 2 * pad) };
+  return true;
+}
+
 void
 layout_pull_button (vue_ui_rep *w) {
   vue_cached_pull_button d= open_box<vue_cached_pull_button> (w->data);
@@ -1978,17 +2100,21 @@ layout_pull_button (vue_ui_rep *w) {
   // baseline, so that the letters look centered in the highlight
   Clay_Padding padding= { ui_px (10), ui_px (10), ui_px (8), ui_px (4) };
   if (in_footer) padding= { ui_px (10), ui_px (10), ui_px (4), ui_px (2) };
-  float rad= ui_corners (menu_round).topLeft; // as the menus
+  // the highlight is rounded as the items of the menus, in a menu and on
+  // the bars alike
+  float rad= ui_inner_corners (menu_round, menu_inset).topLeft;
   if (!down && button_grow) {
     padding= menu_item_padding ();
     padding.right= 0;
   }
+  bool square= down && !in_footer && square_tool_button (d.w, s, padding);
   CLAY(button_id, {
     .layout= {
       .padding= padding,
       .childGap= ui_px (4),
       .sizing= s,
-      .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+      .childAlignment= { .x= square ? CLAY_ALIGN_X_CENTER : CLAY_ALIGN_X_LEFT,
+                         .y= CLAY_ALIGN_Y_CENTER }},
     // flat: the bar or menu behind shows through unless hovered (the bars
     // of the main window have different greys, hence highlight_on)
     .backgroundColor= (hot_id == button_id.id || !is_nil (d.cw))
@@ -2134,7 +2260,7 @@ layout_pull_button (vue_ui_rep *w) {
           .attachTo= CLAY_ATTACH_TO_PARENT,
           .attachPoints= attach },
         .layout= {
-          .padding= { ui_px (10), ui_px (10), ui_px (12), ui_px (12) },
+          .padding= CLAY_PADDING_ALL (ui_px (menu_inset)),
           .sizing= { .width= CLAY_SIZING_FIT(.min= ui_pxf (120), .max= dims.width),
                      .height= CLAY_SIZING_FIT(.max= dims.height) }},
         .backgroundColor= color_background,
@@ -2143,7 +2269,8 @@ layout_pull_button (vue_ui_rep *w) {
                  .childOffset= Clay_GetScrollOffset () },
         .border= {
           .width= { 1, 1, 1, 1 },
-          .color= color_border }})
+          .color= color_border },
+        .transition= drop_in_transition })
       {
         current_popup= false;
         uint32_t save_menu= current_menu, save_bar= current_bar;
@@ -2152,6 +2279,8 @@ layout_pull_button (vue_ui_rep *w) {
         concrete (d.cw)->do_layout ();
         current_menu= save_menu;
         current_bar= save_bar;
+        menu_veil (float_id, color_background, ui_corners (menu_round), 5);
+        menu_shadow (float_id, ui_pxf (the_theme.radius * menu_round), 5);
         // a press outside the chain: its last menu closes first, then the
         // ones it hangs from, down to the one the press is in
         bool outside= menu_press && !Clay_PointerOver (float_id) &&
@@ -2991,9 +3120,9 @@ vue_ui_rep::do_layout () {
     // a disabled item is an item all the same: the pointer resting on it
     // closes the submenu of another item (see layout_pull_button)
     note_menu_hover (button_id);
-    // the highlight of an item is rounded as the menu (and the titles of
-    // the menu bar, see layout_pull_button)
-    Clay_CornerRadius radius= item ? ui_corners (menu_round)
+    // the highlight of an item follows the corners of the menu (and of the
+    // items which open submenus, see layout_pull_button)
+    Clay_CornerRadius radius= item ? ui_inner_corners (menu_round, menu_inset)
                                    : CLAY_CORNER_RADIUS(ui_pxf (4));
     Clay_BorderElementConfig border= {};
     bool tab_strip= false;
@@ -3034,11 +3163,14 @@ vue_ui_rep::do_layout () {
         padding= in_footer ? (Clay_Padding) { ui_px (10), ui_px (10), ui_px (3), ui_px (3) }
                  : in_tool_bar ? CLAY_PADDING_ALL(ui_px (tool_button_pad))
                  : CLAY_PADDING_ALL(ui_px (7));
-        radius= ui_corners (menu_round); // as the menus
+        radius= ui_inner_corners (menu_round, menu_inset); // as the menu items
       }
       if (down || pressed) bg= color_pressed;
       else if (hot) bg= hl;
     }
+    // an icon of a tool bar: a square button (see square_tool_button)
+    bool square= !item && !push && !swatch && section_bar == 0 && !in_footer &&
+                 square_tool_button (d.w, sz, padding);
     Clay_ElementData bd= Clay_GetElementData (button_id);
     CLAY(button_id, {
       .layout= {
@@ -3048,8 +3180,8 @@ vue_ui_rep::do_layout () {
         // the label of a menu item is aligned with the labels above and
         // below it, a push button and a colour cell are centered (the cells
         // of a tile are stretched to the width of the menu the tile is in)
-        .childAlignment= { .x= (push || swatch) ? CLAY_ALIGN_X_CENTER
-                                                : CLAY_ALIGN_X_LEFT,
+        .childAlignment= { .x= (push || swatch || square) ? CLAY_ALIGN_X_CENTER
+                                                          : CLAY_ALIGN_X_LEFT,
                            .y= CLAY_ALIGN_Y_CENTER }},
       .backgroundColor= bg,
       .cornerRadius= radius,
@@ -3216,7 +3348,7 @@ vue_ui_rep::do_layout () {
         CLAY(balloon_id, {
           .backgroundColor= the_theme.balloon,
           .layout= { .padding= { ui_px (10), ui_px (10), ui_px (10), ui_px (10) } },
-          .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (4)),
+          .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (8)),
           .border= {
             .width= { 1, 1, 1, 1 },
             .color= the_theme.balloon_border },
@@ -3229,7 +3361,10 @@ vue_ui_rep::do_layout () {
             .pointerCaptureMode= CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
             .attachTo= CLAY_ATTACH_TO_ROOT }})
         {
+          // (no veil here, unlike the menus: the box of a balloon appears
+          // at once, and its text a moment later read as a delay)
           concrete(d.help)->do_layout ();
+          menu_shadow (balloon_id, ui_pxf (8), 10);
         }
       }
     } else {
@@ -3437,8 +3572,11 @@ vue_ui_rep::do_layout () {
           .backgroundColor= color_background,
           .cornerRadius= ui_corners (),
           .clip= { .vertical= true, .childOffset= Clay_GetScrollOffset () },
-          .border= { .width= { 1, 1, 1, 1 }, .color= color_border }})
+          .border= { .width= { 1, 1, 1, 1 }, .color= color_border },
+          .transition= drop_in_transition })
         {
+          menu_veil (list_id, color_background, ui_corners (), 10);
+          menu_shadow (list_id, ui_pxf (the_theme.radius), 10);
           for (int i=0; i<N(d.vals); i++) {
             Clay_ElementId item_id= CLAY_IDI_LOCAL ("item", i);
             ui_signal isig= button_logic (item_id);
@@ -3447,7 +3585,7 @@ vue_ui_rep::do_layout () {
               .layout= { .padding= { ui_px (8), ui_px (8), ui_px (4), ui_px (4) }, .sizing= { .width= CLAY_SIZING_GROW(0) }},
               .backgroundColor= (hot_id == item_id.id) ? highlight_on (color_background)
                                 : (active ? palette[2] : color_background),
-              .cornerRadius= ui_corners (0.5f) })
+              .cornerRadius= ui_inner_corners (1, 4) })
             {
               layout_text (d.vals[i], d.st, black);
             }
@@ -3790,7 +3928,7 @@ vue_ui_rep::do_layout () {
           .layout= { .padding= { pad_x, pad_x, pad_y, pad_y },
                      .sizing= { .width= CLAY_SIZING_GROW(0) }},
           .backgroundColor= bg,
-          .cornerRadius= ui_corners (0.5f) })
+          .cornerRadius= the_theme.radius > 0 ? ui_inner_corners (1, 3) : ui_corners (0.5f) })
         {
           color col= active ? theme_color (the_theme.selection_text)
                             : theme_color (the_theme.text);

@@ -66,6 +66,15 @@ var tmProgress = (function () {
     #tm-loading .tm-detail { margin-top:8px; font-size:13px; color:#444; min-height:1.3em;
       font-variant-numeric:tabular-nums }
     #tm-loading.failed .tm-detail { color:#a00; font-size:13px }
+    /* the shapes of the modern look (as misc/wasm/frame.js), the colours of before */
+    #tm-loading { border-radius:18px; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); font:14px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif; -webkit-font-smoothing:antialiased; padding:24px 26px 22px }
+    #tm-loading .tm-head img { border-radius:12px }
+    #tm-loading .tm-title { font-weight:600; letter-spacing:-.2px }
+    #tm-loading .tm-badge { border-radius:999px; padding:1px 8px }
+    #tm-loading .tm-bar { height:6px; border-radius:999px }
+    #tm-loading .tm-fill { border-radius:999px }
+    #tm-loading { box-shadow:0 24px 60px rgba(0,0,0,.26), 0 2px 6px rgba(0,0,0,.10) }
+    .tm-dark #tm-loading { box-shadow:0 24px 60px rgba(0,0,0,.60), 0 2px 6px rgba(0,0,0,.35) }
   `;
 
   function build () {

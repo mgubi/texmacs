@@ -33,7 +33,7 @@ var tmFrame = (function () {
   }
 
   var style = `
-    #tm-frame { position:relative; display:flex; flex-direction:column; width:200px; flex:none; background:#d8d8d8;
+    #tm-frame { position:relative; display:flex; flex-direction:column; width:236px; flex:none; background:#d8d8d8;
       border-right:1px solid #a8a8a8; font:13px -apple-system,"Fira Sans",Helvetica,sans-serif;
       color:#222; user-select:none; overflow:hidden }
     #tm-frame.collapsed { width:44px !important }
@@ -65,11 +65,20 @@ var tmFrame = (function () {
     /* the close box of every tab, lighter on the tabs which are not shown */
     #tm-frame .tm-tab:hover .tm-close, #tm-frame .tm-tab.active .tm-close { color:#555 }
     #tm-frame .tm-tab .tm-close:hover { background:#bbb; color:#000 }
+    /* the ellipsis of a tab, its menu (tabMenu): shown on the tab under the
+       mouse and on the active one */
+    #tm-frame .tm-tab .tm-more { flex:none; margin-left:2px; width:18px; height:18px;
+      line-height:16px; text-align:center; border-radius:3px; color:#555; visibility:hidden;
+      letter-spacing:-1px }
+    #tm-frame .tm-tab:hover .tm-more, #tm-frame .tm-tab.active .tm-more,
+    #tm-frame .tm-tab .tm-more.open { visibility:visible }
+    #tm-frame .tm-tab .tm-more:hover, #tm-frame .tm-tab .tm-more.open { background:#bbb; color:#000 }
     #tm-frame .tm-tab .tm-short { display:none; font-size:11.5px; font-weight:600; letter-spacing:.2px }
     #tm-frame .tm-tab .tm-dot { display:none; position:absolute; top:4px; right:4px; width:6px;
       height:6px; border-radius:3px; background:#5b7fa8 }
     #tm-frame.collapsed .tm-tab { justify-content:center; padding:0; margin:2px 6px; height:30px }
-    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-close { display:none }
+    #tm-frame.collapsed .tm-tab .tm-title, #tm-frame.collapsed .tm-tab .tm-close,
+    #tm-frame.collapsed .tm-tab .tm-more { display:none }
     #tm-frame.collapsed .tm-tab .tm-short { display:block }
     #tm-frame.collapsed .tm-tab.modified .tm-dot { display:block }
     #tm-frame .tm-new, #tm-frame .tm-fold { display:flex; align-items:center; flex:none; height:30px;
@@ -114,6 +123,9 @@ var tmFrame = (function () {
     #tm-flyout .tm-close { flex:none; width:20px; height:20px; line-height:20px; margin-right:4px;
       text-align:center; border-radius:4px; color:#555 }
     #tm-flyout .tm-close:hover { background:#c4c4c4; color:#000 }
+    #tm-flyout .tm-more { flex:none; width:20px; height:20px; line-height:18px; margin-right:2px;
+      text-align:center; border-radius:4px; color:#555; letter-spacing:-1px }
+    #tm-flyout .tm-more:hover { background:#c4c4c4; color:#000 }
     /* the tabs above the page, as before the column (the preference "window
        tabs" of TeXmacs: setTabsPosition) */
     body.tm-tabs-top { flex-direction:column !important }
@@ -127,7 +139,7 @@ var tmFrame = (function () {
       min-width:90px; max-width:240px; border-right:1px solid #b8b8b8; background:#d0d0d0; box-shadow:none }
     #tm-frame.top .tm-tab:hover { background:#c8c8c8 }
     #tm-frame.top .tm-tab.active { background:#f0f0f0 }
-    #tm-frame.top .tm-tab .tm-close { visibility:visible }
+    #tm-frame.top .tm-tab .tm-close, #tm-frame.top .tm-tab .tm-more { visibility:visible }
     #tm-frame.top .tm-tabs .tm-new { flex:none; height:auto; margin:0; padding:0 12px; border-radius:0 }
     #tm-frame.top .tm-tabs .tm-new .tm-plus { margin:0 }
     #tm-frame.top .tm-tabs .tm-new .tm-label { display:none }
@@ -153,6 +165,11 @@ var tmFrame = (function () {
     #tm-menu .tm-item { padding:5px 14px; cursor:pointer }
     #tm-menu .tm-item:hover { background:#dde6f0 }
     #tm-menu a { color:#036 }
+    /* the menu of a tab (tabMenu): next to its ellipsis */
+    #tm-menu.tm-tabmenu { width:auto; min-width:200px; max-width:320px }
+    #tm-menu .tm-item.off { color:#999; cursor:default }
+    #tm-menu .tm-item.off:hover { background:none }
+    #tm-menu .tm-item .tm-hint { display:block; font-size:11.5px; color:#888; margin-top:1px }
     #tm-menu .tm-soft { display:grid; grid-template-columns:auto 1fr; column-gap:10px;
       row-gap:2px; padding:2px 14px 4px; color:#444 }
     #tm-menu .tm-soft a { text-decoration:none }
@@ -210,6 +227,11 @@ var tmFrame = (function () {
     .tm-dark #tm-frame .tm-tab .tm-close { color:#7c7c82 }
     .tm-dark #tm-frame .tm-tab:hover .tm-close, .tm-dark #tm-frame .tm-tab.active .tm-close { color:#c8c8cc }
     .tm-dark #tm-frame .tm-tab .tm-close:hover { background:#5e5e64; color:#fff }
+    .tm-dark #tm-frame .tm-tab .tm-more { color:#c8c8cc }
+    .tm-dark #tm-frame .tm-tab .tm-more:hover, .tm-dark #tm-frame .tm-tab .tm-more.open,
+    .tm-dark #tm-flyout .tm-more:hover { background:#5e5e64; color:#fff }
+    .tm-dark #tm-flyout .tm-more { color:#c8c8cc }
+    .tm-dark #tm-menu .tm-item.off, .tm-dark #tm-menu .tm-item .tm-hint { color:#7c7c82 }
     .tm-dark #tm-frame .tm-tab .tm-dot, .tm-dark #tm-flyout .tm-dot { background:#7a9cc6 }
     .tm-dark #tm-frame .tm-new, .tm-dark #tm-frame .tm-tabs .tm-new, .tm-dark #tm-frame .tm-fold,
     .tm-dark #tm-frame .tm-scroll { color:#c8c8cc }
@@ -236,6 +258,7 @@ var tmFrame = (function () {
     .tm-dark #tm-menu .tm-soft .tm-ver, .tm-dark #tm-about .tm-note { color:#9a9aa0 }
     .tm-dark #tm-menu .tm-sep { background:#4a4a4f }
     .tm-dark #tm-menu .tm-item:hover { background:#3f4f66 }
+    .tm-dark #tm-menu .tm-item.off:hover { background:none }
     .tm-dark #tm-menu a, .tm-dark #tm-about a { color:#8fb4e8 }
     .tm-dark #tm-menu .tm-badge { color:#b8d0f4; background:#2c3c56; border-color:#4a6488 }
     .tm-dark #tm-about b { color:#f2f2f4 }
@@ -250,6 +273,86 @@ var tmFrame = (function () {
     .tm-dark #tm-about .tm-icon { color:#9a9aa0 }
     .tm-dark #tm-about .tm-icon:hover { background:#4a4a4f; color:#e4e4e6 }
     .tm-dark #tm-about .tm-icon.done { color:#6fbf7a }
+    /* A modern look (from the branch modern-ui-try), in the colours of
+       before: tabs as rounded pills, line icons in the manner of Lucide,
+       rounder menus and dialogs. Overrides the shapes of the rules above;
+       the colours, of the light and of the dark theme, are theirs. */
+    #tm-frame { font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif; -webkit-font-smoothing:antialiased }
+    #tm-frame .tm-app { height:34px; margin:8px 8px 4px; padding:0 8px; border-radius:9px; border-bottom:none; font-weight:600; letter-spacing:-.1px; transition:background .12s }
+    #tm-frame .tm-app .tm-logo { width:22px; height:22px; margin-right:9px; border-radius:6px }
+    #tm-frame.collapsed .tm-app { margin:8px 6px 4px; padding:0 }
+    #tm-frame .tm-tabs { padding:4px 0 }
+    #tm-frame .tm-tab { height:32px; margin:2px 8px; padding:0 4px 0 11px; border-radius:9px; transition:background .12s, color .12s }
+    #tm-frame .tm-tab.active { font-weight:500 }
+    #tm-frame .tm-tab .tm-close, #tm-frame .tm-tab .tm-more, #tm-flyout .tm-close, #tm-flyout .tm-more { display:flex; align-items:center; justify-content:center; width:22px; height:22px; line-height:normal; border-radius:6px; letter-spacing:0 }
+    #tm-frame .tm-icon16, #tm-flyout .tm-icon16 { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round }
+    #tm-frame .tm-more .tm-icon16, #tm-flyout .tm-more .tm-icon16 { stroke-width:2.4 }
+    #tm-frame.collapsed .tm-tab { height:32px; margin:2px 6px }
+    #tm-frame .tm-new, #tm-frame .tm-fold { transition:background .12s }
+    #tm-frame .tm-new .tm-plus { display:flex; align-items:center; justify-content:center }
+    #tm-frame .tm-new .tm-plus .tm-icon16 { width:16px; height:16px }
+    #tm-frame .tm-tabs .tm-new { height:32px; margin:2px 8px; padding:0 11px; border-radius:9px }
+    #tm-frame.collapsed .tm-tabs .tm-new { height:32px; margin:2px 6px; padding:0 }
+    #tm-frame .tm-fold { height:36px }
+    #tm-flyout { border-radius:9px; font:13px -apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Fira Sans",Helvetica,sans-serif }
+    #tm-frame.top { height:40px; align-items:center }
+    #tm-frame.top .tm-app { height:30px; margin:0 6px; border-right:none }
+    #tm-frame.top .tm-tabs { align-items:center; gap:4px; padding:0 4px }
+    #tm-frame.top .tm-tab { height:30px; margin:0; border-radius:9px; border-right:none; padding:0 4px 0 12px }
+    #tm-frame.top .tm-tabs .tm-new { height:30px; border-radius:9px; padding:0 8px }
+    #tm-balloon { border-radius:7px; padding:5px 10px; font-size:12px }
+    #tm-menu { border-radius:14px; padding:6px }
+    #tm-menu .tm-head { padding:8px 10px 6px }
+    #tm-menu .tm-head .tm-logo { border-radius:10px }
+    #tm-menu .tm-text { padding:2px 10px }
+    #tm-menu .tm-sep { margin:6px 4px }
+    #tm-menu .tm-item { padding:7px 10px; border-radius:8px }
+    #tm-menu .tm-soft { padding:2px 10px 4px }
+    #tm-menu .tm-badge, #tm-loading .tm-badge { border-radius:999px; padding:1px 8px }
+    #tm-about { backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px) }
+    #tm-about .tm-box { border-radius:16px; padding:22px 26px }
+    #tm-about code { border-radius:6px }
+    #tm-about .tm-x { border-radius:8px }
+    #tm-about .tm-button { border-radius:8px; padding:5px 12px }
+    #tm-about input { border-radius:8px; padding:6px 8px }
+    /* the shadows of the modern look, for the colours of before: a wide soft
+       shadow and a tight one, in neutral black (stronger than over white,
+       the surfaces being grey), and a ring in the grey of the borders */
+    #tm-frame .tm-tab.active, #tm-frame.top .tm-tab.active {
+      box-shadow:0 1px 2px rgba(0,0,0,.14), 0 0 0 1px #b4b4b4 }
+    #tm-frame .tm-tab.dragging {
+      box-shadow:0 10px 24px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12), 0 0 0 1px #b4b4b4 }
+    #tm-flyout { box-shadow:0 10px 28px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.10), 0 0 0 1px #b4b4b4 }
+    #tm-balloon { box-shadow:0 6px 16px rgba(0,0,0,.28) }
+    #tm-menu { box-shadow:0 16px 40px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12) }
+    #tm-about .tm-box { box-shadow:0 24px 60px rgba(0,0,0,.30), 0 2px 8px rgba(0,0,0,.12) }
+    .tm-dark #tm-frame .tm-tab.active, .tm-dark #tm-frame.top .tm-tab.active {
+      box-shadow:0 1px 2px rgba(0,0,0,.45), 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-frame .tm-tab.dragging {
+      box-shadow:0 10px 24px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-flyout { box-shadow:0 10px 28px rgba(0,0,0,.60), 0 2px 6px rgba(0,0,0,.35), 0 0 0 1px #5c5c62 }
+    .tm-dark #tm-balloon { box-shadow:0 6px 16px rgba(0,0,0,.55) }
+    .tm-dark #tm-menu, .tm-dark #tm-about .tm-box {
+      box-shadow:0 16px 40px rgba(0,0,0,.60), 0 2px 6px rgba(0,0,0,.35) }
+    /* small animations: the menus drop in, the dialogs and the balloons
+       fade in, the hovers ease (none when the system asks for less motion) */
+    @keyframes tm-drop { from { opacity:0; transform:translateY(-6px) scale(.98) }
+                         to { opacity:1; transform:none } }
+    @keyframes tm-zoom { from { opacity:0; transform:translateY(8px) scale(.96) }
+                         to { opacity:1; transform:none } }
+    @keyframes tm-fade { from { opacity:0 } to { opacity:1 } }
+    #tm-menu { animation:tm-drop .16s cubic-bezier(.2,.8,.2,1); transform-origin:top left }
+    #tm-about { animation:tm-fade .18s ease-out }
+    #tm-about .tm-box { animation:tm-zoom .22s cubic-bezier(.2,.8,.2,1) }
+    #tm-balloon { animation:tm-fade .14s ease-out }
+    #tm-menu .tm-item, #tm-about .tm-button, #tm-about .tm-x, #tm-about .tm-icon,
+    #tm-frame .tm-tab .tm-close, #tm-frame .tm-tab .tm-more { transition:background .12s, color .12s }
+    #tm-frame .tm-fold svg { transition:transform .2s cubic-bezier(.2,.8,.2,1) }
+    #tm-frame .tm-fold:hover svg { transform:translateX(-2px) }
+    #tm-frame.collapsed .tm-fold:hover svg { transform:translateX(2px) }
+    @media (prefers-reduced-motion: reduce) {
+      #tm-menu, #tm-about, #tm-about .tm-box, #tm-balloon { animation:none }
+    }
   `;
 
   // folded (only the logo and small tabs) or not, as the browser remembers
@@ -298,7 +401,7 @@ var tmFrame = (function () {
   // (a drag; a double click gives the default back), as the browser
   // remembers it. A drag below FOLD_AT folds the column, and a drag of the
   // folded column beyond MIN_WIDTH opens it again
-  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 200, MIN_WIDTH = 100, FOLD_AT = 80;
+  var WIDTH = 'texmacs-sidebar-width', DEFAULT_WIDTH = 236, MIN_WIDTH = 100, FOLD_AT = 80;
   function clampWidth (w) {
     var most = Math.max (MIN_WIDTH, Math.min (480, Math.floor (window.innerWidth / 2)));
     return Math.max (MIN_WIDTH, Math.min (most, Math.round (w)));
@@ -385,6 +488,16 @@ var tmFrame = (function () {
     return '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
   }
   var FOLD_ICON = 'M10 3.5 5.5 8 10 12.5', UNFOLD_ICON = 'M6 3.5 10.5 8 6 12.5';
+  // the close box, the ellipsis and the plus, drawn as lines like the
+  // icons of TeXmacs (Lucide)
+  var CLOSE_ICON = 'M4.5 4.5l7 7M11.5 4.5l-7 7', MORE_ICON = 'M3.5 8h.01M8 8h.01M12.5 8h.01',
+      PLUS_ICON = 'M8 3v10M3 8h10';
+  function icon16 (cls, d, title) {
+    var e = el ('span', cls);
+    e.innerHTML = '<svg class="tm-icon16" viewBox="0 0 16 16" aria-hidden="true"><path d="' + d + '"/></svg>';
+    if (title) e.title = title;
+    return e;
+  }
   var UP_ICON = 'M3.5 10 8 5.5 12.5 10', DOWN_ICON = 'M3.5 6 8 10.5 12.5 6';
 
   var fold = null, newButton = null, balloon = null, scrollUp = null, scrollDown = null;
@@ -430,7 +543,8 @@ var tmFrame = (function () {
   // The click which ends a drag shows no window.
   var dragDone = false;
   function pressTab (e, tab, t) {
-    if (e.button !== 0 || (e.target.classList && e.target.classList.contains ('tm-close'))) return;
+    if (e.button !== 0 || (e.target.classList && (e.target.classList.contains ('tm-close') ||
+                                                  e.target.classList.contains ('tm-more')))) return;
     // along the tabs: down the column, or across the bar above the page
     var H = tabsTop;
     var pos = function (ev) { return H ? ev.clientX : ev.clientY; };
@@ -525,7 +639,7 @@ var tmFrame = (function () {
     appButton.onclick = function (e) { e.stopPropagation (); toggleMenu (appButton); };
     strip = el ('div', 'tm-tabs');
     newButton = el ('div', 'tm-new');
-    newButton.appendChild (el ('span', 'tm-plus', '+'));
+    newButton.appendChild (icon16 ('tm-plus', PLUS_ICON));
     newButton.appendChild (el ('span', 'tm-label', 'New window'));
     newButton.onclick = function () { hideBalloon (); _vue_web_new_tab (); };
     hover (newButton, function () { return bar.classList.contains ('collapsed') ? 'New window' : ''; });
@@ -562,11 +676,12 @@ var tmFrame = (function () {
     window.addEventListener ('resize', function () {
       if (clampWidth (width) !== width) setWidth (width, false);
     });
-    // a press outside the menu closes it; not one on the TeXmacs button,
-    // whose click toggles it (else the press closed it and the click
-    // opened it again)
+    // a press outside the menu closes it; not one on the TeXmacs button or
+    // on the ellipsis of a tab, whose click toggles it (else the press
+    // closed it and the click opened it again)
     document.addEventListener ('mousedown', function (e) {
-      if (menu && !menu.contains (e.target) && !appButton.contains (e.target)) closeMenu ();
+      if (menu && !menu.contains (e.target) && !appButton.contains (e.target) &&
+          !(menuAnchor && menuAnchor.contains (e.target))) closeMenu ();
     });
   }
 
@@ -657,15 +772,16 @@ var tmFrame = (function () {
     if (t.modified) short.appendChild (el ('span', 'tm-dot'));
     flyout.appendChild (short);
     flyout.appendChild (el ('span', 'tm-title', name));
+    flyout.appendChild (moreButton (t));
     if (tabs.length > 1) {
-      var x = el ('span', 'tm-close', '×');
-      x.title = 'Close';
+      var x = icon16 ('tm-close', CLOSE_ICON, 'Close');
       x.onmousedown = function (e) { e.stopPropagation (); };
       x.onclick = function (e) { e.stopPropagation (); flyIn (true); _vue_web_close_tab (t.id); };
       flyout.appendChild (x);
     }
     flyout.onclick = function () { if (dragDone) return; flyIn (true); _vue_web_activate_tab (t.id); };
     flyout.onpointerdown = function (e) { pressTab (e, tab, t); };
+    flyout.oncontextmenu = function (e) { onContextMenu (e, t); };
     flyout.onmousedown = function (e) {
       if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) { flyIn (true); _vue_web_close_tab (t.id); } }
     };
@@ -678,7 +794,9 @@ var tmFrame = (function () {
     // the width of its contents (the name may shrink: its own scroll width
     // is the whole of it), then the tab grows to it
     var title = flyout.querySelector ('.tm-title'), close = flyout.querySelector ('.tm-close');
-    var wide = r.width + title.scrollWidth + 6 + (close ? close.offsetWidth + 6 : 10);
+    var more = flyout.querySelector ('.tm-more');
+    var wide = r.width + title.scrollWidth + 6 + more.offsetWidth + 2 +
+               (close ? close.offsetWidth + 6 : 10);
     var most = Math.max (r.width, Math.min (340, window.innerWidth - r.left - 8));
     flyout.getBoundingClientRect ();
     flyout.style.transition = '';
@@ -695,11 +813,112 @@ var tmFrame = (function () {
     var f = flyout;
     setTimeout (function () { if (!f.classList.contains ('open')) f.style.display = 'none'; }, 200);
   }
+
+  // The menu of a tab: its ellipsis, or a right click on it (also in the
+  // folded column). It is the menu of the page (#tm-menu, closed as it),
+  // beside the ellipsis or under the mouse.
+  var menuAnchor = null;
+  function tabMenu (t, anchor, x, y) {
+    var again = !!(menu && anchor && menuAnchor === anchor);
+    closeMenu ();
+    if (again) return;
+    hideBalloon ();
+    menu = el ('div', 'tm-tabmenu');
+    menu.id = 'tm-menu';
+    menuAnchor = anchor;
+    if (anchor) anchor.classList.add ('open');
+    function item (label, f, hint) {
+      var d = el ('div', 'tm-item' + (hint ? ' off' : ''), label);
+      if (hint) d.appendChild (el ('span', 'tm-hint', hint));
+      else d.onclick = function () { closeMenu (); f (); };
+      menu.appendChild (d);
+    }
+    var path = tabDocument (t), last = tabs.length <= 1;
+    item (last ? 'Open in a new browser tab' : 'Move to a new browser tab',
+          function () { moveTab (t, path, last); }, unmovable (t, path));
+    if (!last) item ('Close', function () { _vue_web_close_tab (t.id); });
+    document.body.appendChild (menu);
+    var r = anchor && x === undefined ? anchor.getBoundingClientRect () : null;
+    var left = r ? (tabsTop ? r.left : r.right + 4) : x, top = r ? (tabsTop ? r.bottom + 2 : r.top) : y;
+    menu.style.left = Math.max (4, Math.min (left, window.innerWidth - menu.offsetWidth - 4)) + 'px';
+    menu.style.top = Math.max (4, Math.min (top, window.innerHeight - menu.offsetHeight - 4)) + 'px';
+  }
+  // the ellipsis of a tab (in the column, or in the grown tab of the folded
+  // column), and the right click on the tab
+  function moreButton (t) {
+    var m = icon16 ('tm-more', MORE_ICON, 'More');
+    m.onmousedown = function (e) { e.stopPropagation (); };
+    m.onclick = function (e) { e.stopPropagation (); tabMenu (t, m); };
+    return m;
+  }
+  function onContextMenu (e, t) {
+    e.preventDefault ();
+    e.stopPropagation ();
+    tabMenu (t, null, e.clientX, e.clientY);
+  }
+
+  // The document of a tab in a new tab of the browser: it opens there from
+  // the files kept in the browser (texmacs.html?file=<path>, files.js),
+  // which that tab saves too (tmHome, web-pre.js), and is closed here,
+  // unless it is the last tab (closing the last window quits TeXmacs). It
+  // must be saved, among the files of the user (the TeXmacs folder,
+  // ~/.TeXmacs, is saved by one tab only, and keeps the documents with no
+  // name, texts/scratch), or be a file of TeXmacs or a page of its help.
+  function tabDocument (t) {
+    try { return UTF8ToString (_vue_web_tab_document (t.id)); } catch (e) { return ''; }
+  }
+  // unsaved changes, as TeXmacs knows them (the marker of a tab may lag
+  // behind, after a Save as for instance)
+  function modified (t, path) {
+    if (!path) return t.modified;
+    try {
+      var q = '"' + path.replace (/\\/g, '\\\\').replace (/"/g, '\\"') + '"';
+      return TeXmacs.scheme ('(buffer-modified? (system->url ' + q + '))') === '#t';
+    }
+    catch (e) { return t.modified; }
+  }
+  function unmovable (t, path) {
+    if (modified (t, path) || /^\/home\/web\/\.TeXmacs\/texts\/scratch\//.test (path))
+      return 'Save the document first';
+    if (/^\/home\/web\/\.TeXmacs\//.test (path)) return 'The files of the TeXmacs folder stay in this tab';
+    if (!/^(\/home\/web\/|\/texmacs\/|tmfs:\/\/help\/)/.test (path))
+      return 'Save the document among your files first';
+    return '';
+  }
+  function moveTab (t, path, last) {
+    if (typeof tmSaveHome !== 'undefined') tmSaveHome ();
+    // the options of the address stay (?gpu=0...), not the documents and
+    // commands of this tab
+    var a = new URLSearchParams (location.search);
+    ['open', 'x', 'file'].forEach (function (k) { a.delete (k); });
+    a.set ('file', path);
+    var w = null;
+    try { w = window.open (location.pathname + '?' + a.toString (), '_blank'); } catch (e) {}
+    if (!w) {
+      // the browser refused: a click of its own opens it
+      dialog ('Open a new browser tab', function (box, close) {
+        box.appendChild (el ('p', null, 'The browser did not let the page open a new tab for ' +
+                                        t.title + '.'));
+        var b = el ('div', 'tm-buttons');
+        var no = el ('button', 'tm-button', 'Cancel');
+        var yes = el ('button', 'tm-button tm-default', last ? 'Open' : 'Move');
+        no.onclick = function () { close (); };
+        yes.onclick = function () { close (); moveTab (t, path, last); };
+        b.appendChild (no); b.appendChild (yes);
+        box.appendChild (b);
+      });
+      return;
+    }
+    try { w.opener = null; } catch (e) {}
+    if (!last) _vue_web_close_tab (t.id);
+  }
   function render () {
     build ();
     if (!strip) return;
     hideBalloon ();
     flyIn (true);
+    // the menu of a tab is for the tabs as they were
+    if (menu && menu.classList.contains ('tm-tabmenu')) closeMenu ();
     strip.textContent = '';
     tabs.forEach (function (t) {
       var tab = el ('div', 'tm-tab' + (t.active ? ' active' : '') + (t.modified ? ' modified' : ''));
@@ -721,9 +940,10 @@ var tmFrame = (function () {
       tab.onmousedown = function (e) {
         if (e.button === 1) { e.preventDefault (); if (tabs.length > 1) _vue_web_close_tab (t.id); }
       };
+      tab.oncontextmenu = function (e) { onContextMenu (e, t); };
+      tab.appendChild (moreButton (t));
       if (tabs.length > 1) {
-        var x = el ('span', 'tm-close', '×');
-        x.title = 'Close';
+        var x = icon16 ('tm-close', CLOSE_ICON, 'Close');
         x.onmousedown = function (e) { e.stopPropagation (); };
         x.onclick = function (e) { e.stopPropagation (); hideBalloon (); _vue_web_close_tab (t.id); };
         tab.appendChild (x);
@@ -762,6 +982,7 @@ var tmFrame = (function () {
     menu = null;
     var b = bar && bar.querySelector ('.tm-app');
     if (b) b.classList.remove ('open');
+    if (menuAnchor) { menuAnchor.classList.remove ('open'); menuAnchor = null; }
   }
 
   // what the page keeps: the home directory (in IndexedDB) and the packages
@@ -797,6 +1018,7 @@ var tmFrame = (function () {
   // (a database which is open is not deleted); the page says so
   function removeAll () {
     tmStorageRemoved = true;
+    leaving = true;
     try { if (Module.pauseMainLoop) Module.pauseMainLoop (); } catch (e) {}
     try {
       if (typeof IDBFS !== 'undefined' && IDBFS.dbs)
@@ -889,7 +1111,7 @@ var tmFrame = (function () {
   }
 
   // The options of the address of the page (texmacs.html?...), as the
-  // scripts read them: files.js (open), web-pre.js (profile, trace-files),
+  // scripts read them: files.js (open, file), web-pre.js (profile, trace-files),
   // clipboard.js (trace-clipboard), packages.js (no-background)
   // [name, its value ('' for a flag), an example, what it does]; the
   // texts are in the markup of rich (): **...** in bold
@@ -902,6 +1124,11 @@ var tmFrame = (function () {
      'TeXmacs opens (.tm, .tex, .html, .md...); the images and files the document ' +
      'refers to are not fetched with it. It is not kept in the storage of the ' +
      'browser: Save as keeps it.'],
+    ['file', '<path>', 'file=' + encodeURIComponent ('/home/web/Documents/paper.tm'),
+     'Opens **<path>**, a document kept in this browser (under /home/web), a file of ' +
+     'TeXmacs (under /texmacs) or a page of its help (tmfs://help/...), once TeXmacs ' +
+     'runs. The menu of a tab (its \u22ef) moves ' +
+     'a document to a new tab of the browser with it.'],
     ['x', '<command>', 'open=https://example.org/paper.tm&x=' +
        encodeURIComponent ('(change-zoom-factor 1.5)'),
      'Runs the Scheme **<command>**, as texmacs -x <command>: once TeXmacs runs, after ' +
@@ -1092,7 +1319,7 @@ var tmFrame = (function () {
 
   // the menu beside the column, at the top
   function placeMenu () {
-    if (!menu || !bar) return;
+    if (!menu || !bar || menu.classList.contains ('tm-tabmenu')) return;
     var b = bar.getBoundingClientRect ();
     menu.style.left = (tabsTop ? 4 : b.right + 4) + 'px';
     menu.style.top = (tabsTop ? b.bottom + 2 : 4) + 'px';
@@ -1113,7 +1340,8 @@ var tmFrame = (function () {
   }
 
   function toggleMenu (button) {
-    if (menu) { closeMenu (); return; }
+    var tabbed = !!(menu && menu.classList.contains ('tm-tabmenu'));
+    if (menu) { closeMenu (); if (!tabbed) return; }
     hideBalloon ();
     button.classList.add ('open');
     menu = el ('div');
@@ -1201,6 +1429,7 @@ var tmFrame = (function () {
     item ('Reset…', function () {
       if (!window.confirm ('Delete your files and preferences kept in this browser, ' +
                            'and the files of TeXmacs it keeps, and reload?')) return;
+      leaving = true;
       var jobs = [];
       if (window.indexedDB && indexedDB.databases)
         jobs.push (indexedDB.databases ().then (function (dbs) {
@@ -1271,11 +1500,37 @@ var tmFrame = (function () {
     document.addEventListener ('webkitfullscreenchange', fullScreenChanged);
   }
 
+  // Closing or reloading the page with unsaved documents: the browser asks
+  // first (in its own words; it asks only once the user did something in
+  // the page, and iOS never does). The documents are those of the Quit of
+  // TeXmacs (safely-quit-TeXmacs, tm-server.scm), or, when TeXmacs cannot
+  // say (it is not running yet, or stopped), the tabs with a marker. Not
+  // when the page goes on purpose (leave): TeXmacs quits, having asked
+  // itself, or the files kept in the browser are deleted.
+  var leaving = false;
+  function unsaved () {
+    try {
+      return TeXmacs.scheme ('(list-or (map (lambda (b) (and (buffer-modified? b) ' +
+                             '(not (buffer-aux? b)))) (buffer-list)))') === '#t';
+    }
+    catch (e) {
+      return tabs.some (function (t) { return t.modified; });
+    }
+  }
+  if (typeof window !== 'undefined')
+    window.addEventListener ('beforeunload', function (e) {
+      if (leaving || !unsaved ()) return;
+      e.preventDefault ();
+      e.returnValue = '';
+      return '';
+    });
+
   return {
     update: function (state) { tabs = state.tabs || []; render (); },
     info: function (d) { app = d || {}; },
     tabs: function () { return tabs; },
     fullScreen: fullScreen,
+    leave: function () { leaving = true; },
     ask: ask,
     dialog: dialog,
     setTabsPosition: setTabsPosition

@@ -113,8 +113,13 @@ chevrons), "New window" after the last tab; a press in the column starts no
 selection of the page (a drag carried it over the canvas, selected whole);
 the tabs are labelled with the names of the windows (the title of a
 window on the desktop, and the title of the page for the active one), with
-a marker for unsaved changes, a close box (not on the last tab: TeXmacs
-asks as for a window whether to save), a "New window", a right edge which
+a marker for unsaved changes, an ellipsis (or a right click on the tab,
+also in the folded column) which opens the menu of the tab (`tabMenu`:
+"Move to a new browser tab", which opens its document, saved among the
+files of the user, in a new tab of the browser, `texmacs.html?file=<path>`
+read by `files.js`, the path given by `vue_web_tab_document`, and closes
+it here, not on the last tab; and "Close"), a close box (not on the last
+tab: TeXmacs asks as for a window whether to save), a "New window", a right edge which
 changes its width (100 to 480 pixels and half the page at most, remembered
 by the browser; a double click gives the 200 pixels back; TeXmacs follows
 the width once per frame during the drag; a drag below 80 pixels folds the
@@ -135,7 +140,10 @@ missing), the Files panel, reload, a reset (the files kept by the browser
 deleted) and a removal from the browser. The plugin tells the
 frame of the tabs once per frame when they changed (`frame_sync`); the
 frame asks it to show, close or open one. Quitting TeXmacs reloads the
-page (after the home directory is written to the storage of the browser). Presentation mode hides the frame and asks the browser for the full
+page (after the home directory is written to the storage of the browser). Closing or reloading the page with unsaved documents (those of the
+Quit of TeXmacs: modified, not auxiliary) makes the browser ask first
+(`beforeunload` in `frame.js`); not after a Quit of TeXmacs, which asked
+itself, nor after Reset or Remove (`tmFrame.leave`). Presentation mode hides the frame and asks the browser for the full
 screen (`tmFrame.fullScreen`, from `vue_virtual_window_rep::set_full_screen`):
 the browser grants it only shortly after an action of the user (the key or
 the menu), otherwise the slides take the whole page; leaving the full screen
@@ -645,12 +653,19 @@ Before, `FS.syncfs` compared the whole directory with the whole database
 every 5 seconds. A tab in the background has its timers slowed down to
 1 second; a tab which is hidden or closed writes its changes at once.
 
-One tab writes the home directory: the one which holds the lock
+One tab writes the whole home directory: the one which holds the lock
 `texmacs-home` (Web Locks). Each tab has its own copy of the directory in
-memory, so that two writers would overwrite each other. A tab which does
-not get the lock reads the directory but keeps none of its changes, and
-says so in a line at the bottom of the page (`#tm-home-notice`, which its
-cross hides) and with "(read only)" in its title. **Use TeXmacs here**
+memory, so that two writers of the TeXmacs folder would overwrite each
+other. A tab which does not get the lock reads the directory and keeps the
+documents it saves (every path of the home directory but `~/.TeXmacs`:
+`inPrefs` in `tmHome`), not its preferences, and says so in a line at the
+bottom of the page (`#tm-home-notice`, which its cross hides) and with
+"(other tab)" in its title. After each transaction a tab announces the
+documents it wrote (`wrote`, on the same `BroadcastChannel`), and the
+other tabs read them again from the database into their copy (`refresh`;
+not a path they changed and have not written yet), so that no tab keeps
+an older copy of a document which it would save over the newer one. Two
+tabs which save the same document: the last one stays. **Use TeXmacs here**
 asks the tab which has the lock, over a
 `BroadcastChannel`, to write its last changes and let the lock go, and
 reloads; the reloaded tab waits for the lock (10 s at most) and announces
@@ -659,13 +674,15 @@ was closed), the other tabs offer a reload, after 5 seconds without a
 claim (a tab may be reloading to take TeXmacs over). Tested with three
 tabs in headless Firefox: the changes reach the database within a second
 (files, a renamed folder, a deleted file, a document saved by TeXmacs),
-memory and database agree, a read-only tab keeps nothing, and a takeover
+memory and database agree, a tab without the lock keeps the documents it
+saves but not its changes of `~/.TeXmacs`, each tab reads again what the
+others saved, and a takeover
 keeps the last change of the tab which had TeXmacs
 (`node misc/wasm/test/home-tabs.mjs`, after `make ... web`; with `--safari`,
 in Safari through its WebDriver; with `--chrome`, in the Chrome for Testing
 of `build-wasm/tools/chrome` (installed there by `./node_modules/.bin/browsers
 install chrome@stable --path $PWD/chrome`); with `--browser <path>`, in
-another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154).
+another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154; with the documents kept by the other tabs, in Chrome 155).
 
 - **Reset…** deletes the storage of the page and reloads it.
 - **Remove from this browser…** (with a confirmation) deletes it and stops

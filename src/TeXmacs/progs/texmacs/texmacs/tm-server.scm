@@ -127,7 +127,7 @@
   ("interactive questions" (get-default-interactive-questions) noop)
   ("language" (get-locale-language) notify-language)
   ("gui theme" "default" notify-gui-theme)
-  ("icon set" "neo-classical" notify-icon-set)
+  ("icon set" "lucide" notify-icon-set)
   ;; the Vue interface reads it at each layout; at the left by default in
   ;; a web browser
   ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
@@ -217,7 +217,7 @@
 (validate-enum-preference "document update times" '("1" "2" "3"))
 (validate-enum-preference "updater:interval" '("0" "24" "168" "720"))
 (validate-enum-preference "gui theme" '("default" "light" "dark" ""))
-(validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical"))
+(validate-enum-preference "icon set" '("classical" "monochrome" "neo-classical" "lucide"))
 (validate-enum-preference "icon bars" '("top" "left"))
 (validate-enum-preference "window tabs" '("top" "left"))
 (validate-enum-preference "gui density" '("compact" "normal" "large"))
