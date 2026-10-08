@@ -6588,6 +6588,62 @@ tmg_parse_xml (tmscm arg1) {
 }
 
 tmscm
+tmg_pdf_2svg_native (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf->svg-native");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf->svg-native");
+
+  url in1= tmscm_to_url (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= native_pdf_to_svg (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_archiveP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-archive?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= zip_is_archive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_unpack (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-unpack");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= zip_unpack (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_pack (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "zip-pack");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "zip-pack");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= zip_write (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_parse_html (tmscm arg1) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "parse-html");
 
@@ -11765,6 +11821,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("get-column-number",  tmg_get_column_number, 2, 0, 0);
   tmscm_install_procedure ("try-latex-export",  tmg_try_latex_export, 4, 0, 0);
   tmscm_install_procedure ("parse-xml",  tmg_parse_xml, 1, 0, 0);
+  tmscm_install_procedure ("pdf->svg-native",  tmg_pdf_2svg_native, 2, 0, 0);
+  tmscm_install_procedure ("zip-archive?",  tmg_zip_archiveP, 1, 0, 0);
+  tmscm_install_procedure ("zip-unpack",  tmg_zip_unpack, 1, 0, 0);
+  tmscm_install_procedure ("zip-pack",  tmg_zip_pack, 2, 0, 0);
   tmscm_install_procedure ("parse-html",  tmg_parse_html, 1, 0, 0);
   tmscm_install_procedure ("parse-bib",  tmg_parse_bib, 1, 0, 0);
   tmscm_install_procedure ("conservative-bib-import",  tmg_conservative_bib_import, 3, 0, 0);

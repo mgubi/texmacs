@@ -406,6 +406,7 @@
 (lazy-format (convert latex init-latex) latex)
 (lazy-format (convert html init-html) html)
 (lazy-format (convert markdown init-markdown) markdown)
+(lazy-format (convert office init-office) docx odt)
 (lazy-format (convert bibtex init-bibtex) bibtex)
 (lazy-format (convert images init-images)
              postscript pdf xfig xmgrace svg xpm jpeg ppm gif png pnm)
@@ -416,6 +417,7 @@
 (define-secure-symbols ext-tmhtml-eqnarray*)
 (lazy-define (convert html tmhtml-expand) tmhtml-env-patch)
 (lazy-define (convert markdown tmmarkdown-expand) tmmarkdown-env-patch)
+(lazy-define (convert office tmoffice-expand) tmoffice-env-patch)
 (lazy-define (convert latex latex-drd) latex-arity latex-type)
 (lazy-define (convert latex tmtex) tmtex-env-patch)
 (lazy-define (convert latex latex-tools) latex-set-virtual-packages

@@ -550,6 +550,12 @@
   (get-column-number get_column_number (int string int))
   (try-latex-export try_latex_export (tree content object url url))
   (parse-xml parse_xml (scheme_tree string))
+
+  ;; zip archives
+  (pdf->svg-native native_pdf_to_svg (bool url url))
+  (zip-archive? zip_is_archive (bool string))
+  (zip-unpack zip_unpack (array_string string))
+  (zip-pack zip_write (string array_string array_string))
   (parse-html parse_html (scheme_tree string))
   (parse-bib parse_bib (tree string))
   (conservative-bib-import conservative_bib_import
