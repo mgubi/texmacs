@@ -305,5 +305,7 @@
              "Georgia" "Hoefler Text" "Iowan Old Style" "Times New Roman"
              "Alegreya" "Cardo" "Crimson" "Essays1743" "Junicode"
              "Merriweather" "Arial" "Avenir" "Futura" "Gill" "Helvetica"
-             "Lucida Grande" "Optima" "Verdana" "Inter" "Lato" "Cuprum"))
+             "Lucida Grande" "Optima" "Verdana" "Inter" "Lato" "Cuprum"
+             "Antykwa Poltawskiego" "Antykwa Torunska" "Gentium Plus"
+             "Iwona" "Kurier"))
   (math-font-profile-set name '((mono "Inconsolatazi4, TeX Gyre Cursor"))))
