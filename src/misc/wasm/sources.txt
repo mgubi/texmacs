@@ -275,6 +275,7 @@ System/Files/image_files.cpp
 System/Files/make_file.cpp
 System/Files/tm_ostream.cpp
 System/Files/web_files.cpp
+System/Files/zip_files.cpp
 System/Language/cpp_language.cpp
 System/Language/dictionary.cpp
 System/Language/fortran_language.cpp

@@ -229,6 +229,16 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>The documents of <name|Word> (<verbatim|.docx>) and of
+    <name|LibreOffice> (<verbatim|.odt>) are opened and written by
+    <TeXmacs> itself, in the browser too: add such a file to the files of
+    the browser and open it, or use <menu|File|Export|Word> and
+    <menu|File|Export|OpenDocument> and save the result on the computer.
+    Formulas, tables, images, footnotes, the numbers and the references
+    are kept in both directions; see <menu|Help|Manual|Compatibility with
+    other formats>. <name|Markdown> files (<verbatim|.md>) are read and
+    written in the same way.
+
     <item>The shadows of the chat rooms and of the remote directories are
     grey again: in the browser they were stripes of green and of noise. The
     browser uses the small copies of the pictures of the shadows which come
