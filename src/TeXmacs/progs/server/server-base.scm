@@ -629,6 +629,11 @@
         ((form-checkbox)
          (and-with pref (get-pref prefs (cadr l))
                    (list-set! l 2 (if (is-on? pref) "true" "false"))))
+        ((if)
+         ;; the rsync of the server, not of the client which shows the
+         ;; form (and which has no has-rsync-ext?: "bad if")
+         (when (and (pair? (cdr l)) (== (cadr l) '(extern "has-rsync-ext?")))
+           (list-set! l 1 (if (url-exists-in-path? "rsync") "true" "false"))))
         (else l)))
     stree))
 
