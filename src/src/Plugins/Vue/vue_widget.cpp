@@ -2193,11 +2193,17 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
 // Containers grow along an axis only when one of their children does,
 // so that lists of labels keep their size while lists with a resizable
 // widget follow the window.
+static bool input_text_widget_fills (widget w); // defined below
+
 static bool
 widget_grows (widget w, bool horizontal) {
   vue_widget_rep* r= concrete (w).rep;
   if (r == NULL) return false;
   string t= r->type;
+  // an input whose width is in "w" fills the room it is given: the
+  // containers around it give it that room (in a refreshable of a row
+  // without glue, "Rename as:" of the remote files, it kept its minimum)
+  if (t == "input_text_widget") return horizontal && input_text_widget_fills (w);
   if (t == "simple_widget" || t == "user_canvas_widget" ||
       t == "hsplit_widget" || t == "vsplit_widget" ||
       t == "tabs_widget" || t == "icon_tabs_widget" ||
@@ -4702,6 +4708,20 @@ vue_input_text_widget_rep::do_layout () {
   if (!greyed) sig= button_logic (cid);
   Clay_ElementData ed= Clay_GetElementData (cid);
   Clay_SizingAxis sw= input_fill ? CLAY_SIZING_GROW (0) : CLAY_SIZING_FIXED (w_px);
+  // a width in "w" is a multiple of the default width of an input, as in
+  // Qt (qt_decode_length: of its size hint), not of the window: "10w" was
+  // ten windows wide and pushed the buttons of its dialog out of sight.
+  // It fills the room it is given, up to that width; all of it when the
+  // width is "1w" or less (the name of a remote file, "Rename as:").
+  if (!input_fill) {
+    double w_len; string w_unit;
+    parse_length (width, w_len, w_unit);
+    if (w_unit == "w" && w_len <= 1.0)
+      sw= CLAY_SIZING_GROW (.min= ui_pxf (60));
+    else if (w_unit == "w")
+      sw= CLAY_SIZING_GROW (.min= ui_pxf (60),
+                            .max= (float) (w_len * ui_pxf (150)));
+  }
   CLAY(cid, {
     .layout= { .sizing= { sw, CLAY_SIZING_FIXED (h_px) } },
     .custom= { .customData= vue_render_widget },
@@ -4783,6 +4803,17 @@ string
 input_text_widget_string (widget w) {
   vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
   return (in != NULL) ? in->s : string ("");
+}
+
+// does this input_text_widget fill the room it is given (a width in "w",
+// see its do_layout)?
+static bool
+input_text_widget_fills (widget w) {
+  vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
+  if (in == NULL) return false;
+  double w_len; string w_unit;
+  parse_length (in->width, w_len, w_unit);
+  return w_unit == "w";
 }
 
 // the value currently selected in an enum_widget
