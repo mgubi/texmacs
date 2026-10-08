@@ -21,8 +21,7 @@
 //   on a document inserted where they fall, a folder shown in the panel;
 // - a document given in the address of the page (texmacs.html?open=<url>),
 //   opened once TeXmacs runs: the page as a viewer of documents on the web;
-//   or a document kept in the browser (?file=<path>): a document moved to
-//   a new tab of the browser (the menu of a tab, frame.js).
+//   or a document kept in the browser (?file=<path>).
 //
 // Everything that opens a chooser of the system is a control the user
 // clicks: the browsers open one only for a click being handled.
@@ -840,8 +839,7 @@ var tmFiles = (function () {
 
   // A document kept in the browser: texmacs.html?file=<path>, a path under
   // the home directory, a file of TeXmacs or a page of its help
-  // (tmfs://help/..., which every tab has too; the menu of a tab moves a
-  // document to a new tab of the browser so, frame.js). It is read from the
+  // (tmfs://help/..., which every tab has too). It is read from the
   // storage of the browser once TeXmacs runs; the address reaches nothing
   // else, and runs nothing: no question asked, unlike ?x.
   function openFromFile (p) {

@@ -113,12 +113,7 @@ chevrons), "New window" after the last tab; a press in the column starts no
 selection of the page (a drag carried it over the canvas, selected whole);
 the tabs are labelled with the names of the windows (the title of a
 window on the desktop, and the title of the page for the active one), with
-a marker for unsaved changes, an ellipsis (or a right click on the tab,
-also in the folded column) which opens the menu of the tab (`tabMenu`:
-"Move to a new browser tab", which opens its document, saved among the
-files of the user, in a new tab of the browser, `texmacs.html?file=<path>`
-read by `files.js`, the path given by `vue_web_tab_document`, and closes
-it here, not on the last tab; and "Close"), a close box (not on the last
+a marker for unsaved changes, a close box (not on the last
 tab: TeXmacs asks as for a window whether to save), a "New window", a right edge which
 changes its width (100 to 480 pixels and half the page at most, remembered
 by the browser; a double click gives the 200 pixels back; TeXmacs follows

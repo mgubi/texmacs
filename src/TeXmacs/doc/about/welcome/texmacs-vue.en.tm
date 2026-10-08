@@ -33,13 +33,6 @@
   remembers it. The dialogs of <TeXmacs> float over the page, and can be
   moved by their title bar and resized by their edges.
 
-  The <verbatim|...> of a tab (or a right click on it) opens its menu:
-  <menu|Move to a new browser tab> opens its document in a new tab of the
-  browser, with a <TeXmacs> of its own, and closes it here, so that the
-  documents can be spread over several tabs or windows of the browser. The
-  document must be saved first, among your files. On the last tab, the
-  item is <menu|Open in a new browser tab>, and the tab stays.
-
   Closing or reloading the page while documents have unsaved changes: the
   browser asks first (in its own words). Safari on the iPhone and the iPad
   never asks.
@@ -236,6 +229,9 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>The tabs of the windows have a cross to close them and nothing
+    else: their menu, with <menu|Move to a new browser tab>, is gone.
+
     <item><menu|Save a backup> (it was called <menu|Download a backup>) and
     <menu|Restore a backup...> are buttons of <menu|File|Files in this
     browser...> too, next to <with|font-series|bold|Close>.
