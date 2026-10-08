@@ -10,7 +10,6 @@
 ******************************************************************************/
 
 #include "zip_files.hpp"
-#include "file.hpp"
 
 /******************************************************************************
 * Inflate (RFC 1951): the three kinds of blocks, with canonical Huffman codes
@@ -420,56 +419,20 @@ zip_write (array<string> names, array<string> datas) {
 }
 
 /******************************************************************************
-* Archives in files. The last one which was read is kept: a converter reads
-* the entries of an archive one after the other.
+* All the entries of an archive
 ******************************************************************************/
 
-static string zip_cache_name;
-static int    zip_cache_date= 0;
-static string zip_cache_data;
-
-static bool
-zip_file_load (url u, string& zip) {
-  string name= as_string (u);
-  int date= last_modified (u, false);
-  if (name == zip_cache_name && date == zip_cache_date && N (zip_cache_data) > 0) {
-    zip= zip_cache_data;
-    return true;
-  }
-  if (load_string (u, zip, false)) return false;
-  zip_cache_name= name;
-  zip_cache_date= date;
-  zip_cache_data= zip;
-  return true;
-}
-
 array<string>
-zip_file_entries (url u) {
-  string zip;
-  if (!zip_file_load (u, zip)) return array<string> ();
-  return zip_entries (zip);
-}
-
-string
-zip_file_read (url u, string name) {
-  string zip, data;
-  if (!zip_file_load (u, zip)) return "";
-  if (!zip_read (zip, name, data)) return "";
-  return data;
-}
-
-bool
-zip_file_has (url u, string name) {
-  array<string> l= zip_file_entries (u);
-  for (int i= 0; i < N (l); i++)
-    if (l[i] == name) return true;
-  return false;
-}
-
-bool
-zip_file_write (url u, array<string> names, array<string> datas) {
-  // true when the archive was written
-  zip_cache_name= "";
-  zip_cache_data= "";
-  return !save_string (u, zip_write (names, datas), false);
+zip_unpack (string zip) {
+  // the names and the data of the entries which can be read, in their
+  // order; the directories (names which end with /) are left out
+  array<zip_entry> dir;
+  array<string> r;
+  if (!zip_directory (zip, dir)) return r;
+  for (int i= 0; i < N (dir); i++) {
+    string name= dir[i].name, data;
+    if (N (name) == 0 || name[N (name) - 1] == '/') continue;
+    if (zip_read (zip, name, data)) r << name << data;
+  }
+  return r;
 }

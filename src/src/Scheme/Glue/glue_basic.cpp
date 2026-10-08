@@ -679,63 +679,44 @@ tmg_async_evaluate_cancel (tmscm arg1) {
 }
 
 tmscm
-tmg_zip_entries (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "zip-entries");
+tmg_zip_archiveP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-archive?");
 
-  url in1= tmscm_to_url (arg1);
+  string in1= tmscm_to_string (arg1);
 
   // TMSCM_DEFER_INTS;
-  array_string out= zip_file_entries (in1);
+  bool out= zip_is_archive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_unpack (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-unpack");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= zip_unpack (in1);
   // TMSCM_ALLOW_INTS;
 
   return array_string_to_tmscm (out);
 }
 
 tmscm
-tmg_zip_ref (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "zip-ref");
-  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "zip-ref");
+tmg_zip_pack (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "zip-pack");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "zip-pack");
 
-  url in1= tmscm_to_url (arg1);
-  string in2= tmscm_to_string (arg2);
+  array_string in1= tmscm_to_array_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
 
   // TMSCM_DEFER_INTS;
-  string out= zip_file_read (in1, in2);
+  string out= zip_write (in1, in2);
   // TMSCM_ALLOW_INTS;
 
   return string_to_tmscm (out);
-}
-
-tmscm
-tmg_zip_hasP (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "zip-has?");
-  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "zip-has?");
-
-  url in1= tmscm_to_url (arg1);
-  string in2= tmscm_to_string (arg2);
-
-  // TMSCM_DEFER_INTS;
-  bool out= zip_file_has (in1, in2);
-  // TMSCM_ALLOW_INTS;
-
-  return bool_to_tmscm (out);
-}
-
-tmscm
-tmg_zip_pack (tmscm arg1, tmscm arg2, tmscm arg3) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "zip-pack");
-  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "zip-pack");
-  TMSCM_ASSERT_ARRAY_STRING (arg3, TMSCM_ARG3, "zip-pack");
-
-  url in1= tmscm_to_url (arg1);
-  array_string in2= tmscm_to_array_string (arg2);
-  array_string in3= tmscm_to_array_string (arg3);
-
-  // TMSCM_DEFER_INTS;
-  bool out= zip_file_write (in1, in2, in3);
-  // TMSCM_ALLOW_INTS;
-
-  return bool_to_tmscm (out);
 }
 
 tmscm
@@ -11747,10 +11728,9 @@ initialize_glue_basic () {
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
   tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
   tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
-  tmscm_install_procedure ("zip-entries",  tmg_zip_entries, 1, 0, 0);
-  tmscm_install_procedure ("zip-ref",  tmg_zip_ref, 2, 0, 0);
-  tmscm_install_procedure ("zip-has?",  tmg_zip_hasP, 2, 0, 0);
-  tmscm_install_procedure ("zip-pack",  tmg_zip_pack, 3, 0, 0);
+  tmscm_install_procedure ("zip-archive?",  tmg_zip_archiveP, 1, 0, 0);
+  tmscm_install_procedure ("zip-unpack",  tmg_zip_unpack, 1, 0, 0);
+  tmscm_install_procedure ("zip-pack",  tmg_zip_pack, 2, 0, 0);
   tmscm_install_procedure ("http-get",  tmg_http_get, 2, 0, 0);
   tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
   tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);

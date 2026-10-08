@@ -11,7 +11,7 @@
 
 #ifndef ZIP_FILES_H
 #define ZIP_FILES_H
-#include "url.hpp"
+#include "string.hpp"
 #include "array.hpp"
 
 // The archives of the office formats (.docx, .odt) are zip files of a few
@@ -25,11 +25,8 @@ array<string> zip_entries (string zip);
 bool          zip_read (string zip, string name, string& data);
 string        zip_write (array<string> names, array<string> datas);
 
-// the same for a file, for the glue: an entry which is missing is ""
-array<string> zip_file_entries (url u);
-string        zip_file_read (url u, string name);
-bool          zip_file_has (url u, string name);
-bool          zip_file_write (url u, array<string> names, array<string> datas);
+// all the entries at once, for the glue: name, data, name, data...
+array<string> zip_unpack (string zip);
 
 // the two halves on their own
 bool          inflate_string (string in, int start, int size, int out_size,

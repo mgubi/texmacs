@@ -81,10 +81,9 @@
     (int array_string string object))
   (async-evaluate-cancel async_evaluate_cancel (void int))
   ;; zip archives
-  (zip-entries zip_file_entries (array_string url))
-  (zip-ref zip_file_read (string url string))
-  (zip-has? zip_file_has (bool url string))
-  (zip-pack zip_file_write (bool url array_string array_string))
+  (zip-archive? zip_is_archive (bool string))
+  (zip-unpack zip_unpack (array_string string))
+  (zip-pack zip_write (string array_string array_string))
 
   (http-get http_get (string string array_string))
   (http-post http_post (string string array_string string))
