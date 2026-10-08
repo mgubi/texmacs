@@ -240,6 +240,11 @@
     menu of <TeXmacs> <name|Vue>: all your files and your preferences in one
     zip archive, to keep them safe or to move them to another browser (see
     <with|font-series|bold|Your files>).
+
+    <item><menu|Edit|Preferences|General|Interface scaling> is obeyed: the
+    whole interface, with the documents, is drawn twice or three times as
+    large (or at half the size on a display of high density), from the next
+    start of <TeXmacs>. It had no effect.
   </itemize>
 
   <paragraph|7 October 2026>

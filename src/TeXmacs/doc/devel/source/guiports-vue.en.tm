@@ -196,7 +196,10 @@
   a test script>>|<row|<cell|<verbatim|TEXMACS_VUE_SNAPSHOT>>|<cell|directory
   in which every redraw of a window is saved as <abbr|PNG>>>|<row|<cell|<verbatim|TEXMACS_VUE_THEME>>|<cell|<verbatim|light>
   or <verbatim|dark>, instead of the preference>>|<row|<cell|<verbatim|TEXMACS_VUE_DENSITY>>|<cell|pixel
-  density used instead of that of the display>>|<row|<cell|<verbatim|TEXMACS_VUE_TAB_MODE>>|<cell|presentation
+  density used instead of that of the display>>|<row|<cell|<verbatim|TEXMACS_VUE_SCALE>>|<cell|interface
+  scaling used instead of the preference <verbatim|gui scaling> (the
+  drawing factor of a window is its density times this scaling, rounded to
+  an integer of at least 1: <cpp|vue_drawing_factor>)>>|<row|<cell|<verbatim|TEXMACS_VUE_TAB_MODE>>|<cell|presentation
   of the responsive tabs: <verbatim|top>, <verbatim|side>,
   <verbatim|mobile> or <verbatim|grid>>>|<row|<cell|<verbatim|TEXMACS_VUE_BARS>>|<cell|icon
   bars at the <verbatim|top> or on the <verbatim|left>>>|<row|<cell|<verbatim|TEXMACS_VUE_RADIUS>>|<cell|rounding
