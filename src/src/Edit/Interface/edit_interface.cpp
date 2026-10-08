@@ -868,7 +868,7 @@ edit_interface_rep::apply_changes () {
     double prof_t= 0;
     if (edit_profile.on) {
       bool on= true;
-      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       prof_t= edit_profile_now ();
     }
     typeset (x1, y1, x2, y2);
@@ -886,7 +886,11 @@ edit_interface_rep::apply_changes () {
       double rw= max (0.0, (vis->x2 - vis->x1) * f), rh= max (0.0, (vis->y2 - vis->y1) * f);
       cout << "edit-profile typeset: " << total << " ms in " << edit_profile.passes
            << " pass(es): bridges " << edit_profile.bridges << " ms ("
-           << edit_profile.redone << " redone, " << edit_profile.cached << " reused), pages "
+           << edit_profile.redone << " redone, " << edit_profile.cached << " reused"
+           << (edit_profile.unread > 0
+               ? ", " * as_string (edit_profile.unread) * " of them with other variables changed"
+               : string (""))
+           << "), pages "
            << edit_profile.pages << " ms"
            << (edit_profile.breaks_reused > 0 ? " (breaks reused)" : "")
            << (edit_profile.starts > 0

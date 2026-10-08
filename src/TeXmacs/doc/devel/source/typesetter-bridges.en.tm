@@ -518,8 +518,48 @@
   the pages with their headers and footers (7 to 9), which are made again
   for every page at every pass. On papyrus there is no page to break: the
   whole typesetting of a character takes 11<nbsp>ms, of which 8 are the
-  visit of the bridges which are reused. A new section renumbers what
-  follows and re-executes 2600 bridges.
+  visit of the bridges which are reused.
+
+  A new section, or a new numbered equation, changes counters for the
+  rest of the document, and <cpp|old_patch> stays non-empty down to its
+  end: every bridge after the edit was typeset again, 2600 of them in
+  120<nbsp>ms, whether it used these counters or not. A bridge now
+  records the variables which its typesetting reads or writes
+  (<cpp|env_table> in <source-link|env.hpp|src/Typeset/env.hpp>, and
+  <cpp|bridge_rep::typeset>), and one whose subtree did not change is
+  used again when none of the variables of <cpp|old_patch> is among them.
+  The conditions are in the comment before <cpp|bridge_rep::typeset>: the
+  bridge must have got no line items from the bridges around it (the
+  number of an equation ends up in the lines of its body); its record
+  must be complete (the reads of the bridges below it are added to it,
+  up to a limit; a reference, an attachment or a <scheme> routine make
+  it unknown); and the variables which changed must be plain ones, from
+  which the environment derives no state when they are written. The
+  variables which a bridge writes count as read: its
+  <cpp|changes> only hold those whose value it changed. In the same way a
+  paragraph which is removed no longer has every bridge after it typeset
+  again: the bridge which follows keeps the changes of the removed one,
+  which the next pass compares with the environment.
+  <verbatim|TEXMACS_TYPESET_READS> may be <verbatim|off>, or
+  <verbatim|check> to typeset again all the same and report a bridge
+  whose lines, contents or changes differ.
+
+  <\big-table|<block|<tformat|<table|<row|<cell|>|<cell|bridges typeset
+  again>|<cell|before>|<cell|after>>|<row|<cell|a new section, 140
+  pages>|<cell|2625, then 676>|<cell|121>|<cell|25>>|<row|<cell|a new
+  equation, 140 pages>|<cell|2642, then 1890>|<cell|128>|<cell|39>>|<row|<cell|a
+  new section, 70 pages with floats>|<cell|1566, then
+  327>|<cell|88>|<cell|50>>|<row|<cell|a new equation, 70 pages with
+  floats>|<cell|1583, then 1067>|<cell|82>|<cell|46>>>>>>
+    The bridges after an edit which renumbers, in milliseconds.
+  </big-table>
+
+  What is still typeset again are the titles and the equations which
+  follow, with the bridges inside them (they read or write the counters
+  and the current label), and in the second document the paragraphs with
+  footnotes. The first typesetting of a document, where every read is
+  recorded, takes the same time within the precision of the measure (143
+  and 149<nbsp>ms).
 
   After an edit, once the input pauses, the editor updates its menus,
   icon bars and tools and then its <abbr|DRD>
