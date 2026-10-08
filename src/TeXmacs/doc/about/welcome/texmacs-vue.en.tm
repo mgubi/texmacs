@@ -226,6 +226,15 @@
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
 
+  <paragraph|9 October 2026>
+
+  <\itemize>
+    <item>The interface follows the zoom of the browser. Its size was
+    that of a whole number of pixels of the screen per point: on a
+    display of density 2, a zoom of 115% or 120% made it smaller, and one
+    of 125% larger than asked.
+  </itemize>
+
   <paragraph|8 October 2026>
 
   <\itemize>

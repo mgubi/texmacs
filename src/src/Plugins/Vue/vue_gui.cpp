@@ -429,9 +429,18 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
 // pixels per point, so the window is laid out and drawn at r, the integer
 // nearest to e, and presented scaled by e / r when the two differ (0.5 on
 // a display of density 1: drawn at 1x, presented at half its size).
+// In a browser the density is that of the display times the zoom of the
+// page, which the user sets in small steps and expects everything to
+// follow: it is taken as it is, not rounded (rounded, a zoom of 120% on a
+// display of density 2 made the interface smaller, 2 pixels per point of
+// 2.4, and one of 125% larger than asked, 3 of 2.5).
 static void
 vue_scaling (float d, int& r, float& present) {
+#ifdef __EMSCRIPTEN__
+  float n= max (0.25f, d);
+#else
   int n= max (1, (int) (d + 0.5f));
+#endif
   float e= n * vue_interface_scale ();
   r= max (1, (int) (e + 0.5f));
   present= e / r;
