@@ -307,10 +307,19 @@
 (define (mmlo-text x)
   (apply string-append (list-filter (ox-children x) string?)))
 
-(define (mmlo-run text . props)
+(define (mmlo-visible s)
+  ;; the text of a token without the operators which are not seen (the
+  ;; application of a function, a product): Word shows them as boxes
+  (apply string-append
+         (list-filter (omml-characters s)
+                      (lambda (c)
+                        (not (in? (omml-code c) '(#x2061 #x2062 #x2063 #x2064)))))))
+
+(define (mmlo-run text* . props)
+  (with text (mmlo-visible text*)
   (if (== text "") '()
       (list `(m:r ,@(if (null? props) '() `((m:rPr ,@props)))
-                  (m:t ,text)))))
+                  (m:t ,text))))))
 
 (define (mmlo-arg tag x)
   ;; the argument tag of a construction, with the formula x

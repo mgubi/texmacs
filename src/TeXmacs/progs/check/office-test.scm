@@ -861,6 +861,26 @@
       (when (ox-attr image 'svg)
         (check-true (string-starts? (ox-attr image 'svg) "<svg"))))))
 
+;; The pages of the documentation: the logo before the title and a rule
+;; under it, a rule above the copyright.
+(define (test-tmoffice-tmdoc)
+  (check-group "tmoffice tmdoc")
+  (let* ((r (of '(document (tmdoc-title "Creating tables") "text"
+                           (tmdoc-copyright "1998" "A" "B"))))
+         (title (car r)))
+    (check= (ox-attr title 'role) "title")
+    (check-true (func? (car (ox-children title)) 'image))
+    (check= (cdr (ox-children title)) '(" Creating tables"))
+    (check= (cadr r) '(rule))
+    (check= (caddr r) '(p "text"))
+    (check= (cdddr r)
+            (list '(rule)
+                  (list 'p (string-append (office-utf8 #xa9) " 1998 A, B")))))
+  ;; the operators which are not seen are not written in a formula of Word
+  (check= (mathml->omml `(m:math (m:mrow (m:mi "a") (m:mo ,(office-utf8 #x2062))
+                                         (m:mi "b"))))
+          '(m:oMath (m:r (m:t "a")) (m:r (m:t "b")))))
+
 (define (test-tmoffice-tables)
   (check-group "tmoffice tables")
   ;; a block has all its borders; the formats of rectangles of cells
@@ -1073,6 +1093,7 @@
   (test-tmoffice-blocks)
   (test-tmoffice-tables)
   (test-tmoffice-drawings)
+  (test-tmoffice-tmdoc)
   (test-mathml-omml)
   (test-writers)
   (test-round-trips)

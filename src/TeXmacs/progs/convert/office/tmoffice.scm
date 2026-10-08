@@ -458,7 +458,13 @@
   ;; document, or #f
   (catch #t
     (lambda ()
-      (let* ((u (unix->url name))
+      (let* ((name (if (string-starts? name "local:")
+                       (substring name 6 (string-length name))
+                       name))
+             ;; (a name may start with a variable: $TEXMACS_PATH/...)
+             (u (if (string-starts? name "$")
+                    (url-complete (unix->url name) "r")
+                    (unix->url name)))
              (base (if (url-none? (current-buffer-url)) (unix->url ".")
                        (current-buffer-url)))
              (v (if (url-rooted? u) u (url-relative base u))))
@@ -843,16 +849,14 @@
 (define (tmof-captioned body name caption)
   ;; a figure or a table, and its caption after the name with its number
   (append (map (lambda (b)
-                 ;; a paragraph of images is the figure, and is centered
-                 ;; as a table is
+                 ;; a paragraph in the float is the figure, and is
+                 ;; centered as a table is
                  (if (and (func? b 'table)
                           (not (assoc 'align (tmof-node-attrs b))))
                      `(table (@ ,@(tmof-node-attrs b) (align "center"))
                              ,@(tmof-node-children b))
-                 (if (and (func? b 'p) (nnull? (cdr b))
-                          (list-and (map (lambda (y)
-                                           (or (func? y 'image) (tmof-blank? y)))
-                                         (cdr b))))
+                 ;; (and so is whatever else is in the float: a formula)
+                 (if (and (func? b 'p) (nnull? (cdr b)))
                      `(!role "figure" ,@(cdr b))
                      b)))
                (tmof-blocks body))
@@ -1069,12 +1073,22 @@
 ;; The documentation of TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tmof-tmdoc-title l) (tmof-heading -1 l))
+(define (tmof-tmdoc-title l)
+  ;; the title of a page of the documentation: the logo of TeXmacs before
+  ;; it and a rule under it, as the style draws them
+  (let ((logo (tmof-image '("local:$TEXMACS_PATH/misc/images/texmacs-256.png"
+                            "3em" "3em" "" "")))
+        (h (tmof-heading -1 l)))
+    (if (and (list-1? h) (func? (car h) '!h) (list-1? logo)
+             (func? (car logo) 'image))
+        `((!h -1 ,(car logo) " " ,@(cddar h)) (hr))
+        (append h '((hr))))))
 
 (define (tmof-tmdoc-copyright l)
   (if (null? l) '()
-      `((p ,(string-append
-              "(c) " (tmof-plain (car l)) " "
+      `((hr)
+        (p ,(string-append
+              (cork->utf8 "<copyright>") " " (tmof-plain (car l)) " "
               (apply string-append
                      (list-intersperse (map tmof-plain (cdr l)) ", ")))))))
 
