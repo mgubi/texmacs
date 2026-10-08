@@ -61,7 +61,7 @@
 
 (define (tmof-block? x)
   (and (pair? x)
-       (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h !role p blockquote ul ol pre hr
+       (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h !role !para p blockquote ul ol pre hr
                       table footnote-def !display !pagebreak))))
 
 (define (tmof-blank? x)
@@ -1075,14 +1075,19 @@
 
 (define (tmof-tmdoc-title l)
   ;; the title of a page of the documentation: the logo of TeXmacs before
-  ;; it and a rule under it, as the style draws them
+  ;; it and a rule under it, at the left, as the style draws them
   (let ((logo (tmof-image '("local:$TEXMACS_PATH/misc/images/texmacs-256.png"
                             "3em" "3em" "" "")))
         (h (tmof-heading -1 l)))
     (if (and (list-1? h) (func? (car h) '!h) (list-1? logo)
              (func? (car logo) 'image))
-        `((!h -1 ,(car logo) " " ,@(cddar h)) (hr))
-        (append h '((hr))))))
+        `((!para ((role "title") (align "left")) ,(car logo) " " ,@(cddar h)) (hr))
+        (append (map (lambda (b)
+                       (if (func? b '!h)
+                           `(!para ((role "title") (align "left")) ,@(cddr b))
+                           b))
+                     h)
+                '((hr))))))
 
 (define (tmof-tmdoc-copyright l)
   (if (null? l) '()
@@ -1288,7 +1293,7 @@
             ((math image) (list x))
             ((html footnote img) '())
             ;; blocks inside a text: their text
-            ((p !role !h)
+            ((p !role !h !para)
              (tmof-final-inlines
                (if (func? x 'p) (cdr x) (cddr x))))
             (else '())))))
@@ -1323,6 +1328,8 @@
                                (max 1 (min 9 (+ (- (cadr x) tmof-top-level) 1))))))
                    (cddr x))))
             ((!role) (tmof-paragraph `((role ,(cadr x))) (cddr x)))
+            ;; a paragraph with its attributes
+            ((!para) (tmof-paragraph (cadr x) (cddr x)))
             ((!display)
              (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
                        ,@(if (and (pair? (cddr x)) (!= (caddr x) ""))

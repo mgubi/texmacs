@@ -869,6 +869,7 @@
                            (tmdoc-copyright "1998" "A" "B"))))
          (title (car r)))
     (check= (ox-attr title 'role) "title")
+    (check= (ox-attr title 'align) "left")
     (check-true (func? (car (ox-children title)) 'image))
     (check= (cdr (ox-children title)) '(" Creating tables"))
     (check= (cadr r) '(rule))

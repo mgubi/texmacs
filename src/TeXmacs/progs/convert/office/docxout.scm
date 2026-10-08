@@ -284,6 +284,7 @@
                    (else '()))
              (cond ((== align "center") (list (dx-val 'w:jc "center")))
                    ((== align "right") (list (dx-val 'w:jc "right")))
+                   ((== align "left") (list (dx-val 'w:jc "left")))
                    (else '())))))
     (set! dx-item #f)
     (list `(w:p ,@(if (null? props) '() (list (cons 'w:pPr props)))

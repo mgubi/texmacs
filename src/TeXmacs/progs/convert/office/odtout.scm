@@ -301,6 +301,7 @@
              (style:paragraph-properties
                (@ ,@(cond ((== align "center") '((fo:text-align "center")))
                           ((== align "right") '((fo:text-align "end")))
+                          ((== align "left") '((fo:text-align "start")))
                           (else '()))
                   ,@(if break? '((fo:break-before "page")) '())
                   ,@(if rule?
