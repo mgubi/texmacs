@@ -32,4 +32,9 @@ bool mupdf_pdf_make_attachments (url pdf_path, array<url> attachments,
 // as outlines, so that the picture needs no font. True if it worked.
 bool mupdf_pdf_to_svg (url pdf, url svg);
 
+// The data deflated (RFC 1951, without the header and the checksum of
+// zlib), by the zlib which MuPDF has: for the entries of zip archives.
+// False if it could not be done.
+bool mupdf_deflate (string in, string& out);
+
 #endif // MUPDF_PDF_RENDERER_H

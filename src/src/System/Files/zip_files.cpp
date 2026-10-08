@@ -349,8 +349,26 @@ zip_read (string zip, string name, string& data) {
 }
 
 /******************************************************************************
-* Writing an archive, with its entries stored
+* Writing an archive. An entry is deflated when a library which does it is
+* linked (the zlib inside MuPDF), and when this makes it smaller; else it
+* is stored.
 ******************************************************************************/
+
+#ifdef MUPDF_RENDERER
+// in Plugins/MuPDF/mupdf_pdf_renderer.cpp (declared here: this file is
+// compiled without the headers of MuPDF)
+bool mupdf_deflate (string in, string& out);
+#endif
+
+static bool
+deflate_string (string in, string& out) {
+#ifdef MUPDF_RENDERER
+  return mupdf_deflate (in, out);
+#else
+  (void) in; (void) out;
+  return false;
+#endif
+}
 
 static void
 zip_put16 (string& s, unsigned int x) {
@@ -374,27 +392,39 @@ zip_write (array<string> names, array<string> datas) {
     unsigned int crc= crc32_string (datas[i]);
     unsigned int size= (unsigned int) N (datas[i]);
     unsigned int offset= (unsigned int) N (r);
+    // The entry "mimetype" of an OpenDocument file must be stored, and
+    // small or already compressed data gains nothing.
+    string packed= datas[i];
+    unsigned int method= 0;
+    string deflated;
+    if (names[i] != "mimetype" && size > 64 &&
+        deflate_string (datas[i], deflated) && N (deflated) < (int) size) {
+      packed= deflated;
+      method= 8;
+    }
+    unsigned int csize= (unsigned int) N (packed);
+    unsigned int version= (method == 8? 20: 10);
     zip_put32 (r, 0x04034b50u);
-    zip_put16 (r, 10);            // version needed
+    zip_put16 (r, version);       // version needed
     zip_put16 (r, 0x0800);        // flags: the names are in UTF-8
-    zip_put16 (r, 0);             // stored
+    zip_put16 (r, method);        // stored or deflated
     zip_put16 (r, 0);             // time
     zip_put16 (r, 0x0021);        // date
     zip_put32 (r, crc);
-    zip_put32 (r, size);
+    zip_put32 (r, csize);
     zip_put32 (r, size);
     zip_put16 (r, (unsigned int) N (names[i]));
     zip_put16 (r, 0);             // no extra field
-    r << names[i] << datas[i];
+    r << names[i] << packed;
     zip_put32 (dir, 0x02014b50u);
     zip_put16 (dir, 20);          // version made by
-    zip_put16 (dir, 10);          // version needed
+    zip_put16 (dir, version);     // version needed
     zip_put16 (dir, 0x0800);
-    zip_put16 (dir, 0);
+    zip_put16 (dir, method);
     zip_put16 (dir, 0);
     zip_put16 (dir, 0x0021);
     zip_put32 (dir, crc);
-    zip_put32 (dir, size);
+    zip_put32 (dir, csize);
     zip_put32 (dir, size);
     zip_put16 (dir, (unsigned int) N (names[i]));
     zip_put16 (dir, 0);           // no extra field

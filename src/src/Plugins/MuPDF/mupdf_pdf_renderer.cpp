@@ -1414,6 +1414,33 @@ mupdf_pdf_renderer_rep::merge_layers (pdf_document* src, pdf_graft_map* map) {
   }
 }
 
+bool
+mupdf_deflate (string in, string& out) {
+  fz_context* ctx= mupdf_context ();
+  if (N(in) == 0) return false;
+  const unsigned char* bytes= (const unsigned char*) &(in[0]);
+  size_t len= N(in);
+  unsigned char* data= NULL;
+  size_t n= 0;
+  bool ok= false;
+  fz_var (data); fz_var (ok);
+  fz_try (ctx) {
+    data= fz_new_deflated_data (ctx, &n, bytes, len, FZ_DEFLATE_DEFAULT);
+    // a stream of zlib: two bytes, the deflated data, four bytes
+    if (data != NULL && n > 6) {
+      out= string ((char*) (data + 2), (int) (n - 6));
+      ok= true;
+    }
+  }
+  fz_always (ctx) {
+    fz_free (ctx, data);
+  }
+  fz_catch (ctx) {
+    ok= false;
+  }
+  return ok;
+}
+
 // The other way: the first page of a PDF as an SVG, for the pictures of a
 // document which is exported to a format which has SVG images. The PDF is
 // read with load_string, and the SVG is written to a buffer and saved with

@@ -16,8 +16,10 @@
 
 // The archives of the office formats (.docx, .odt) are zip files of a few
 // XML files and images. This is all the zip which they need, with no
-// library: the entries are read when they are stored or deflated, and they
-// are written stored. No encryption, no zip64, no archives in several parts.
+// library: the entries are read when they are stored or deflated. They are
+// written deflated where a library is linked which does it (MuPDF, with
+// its zlib), and stored otherwise. No encryption, no zip64, no archives in
+// several parts.
 
 // an archive as a string
 bool          zip_is_archive (string zip);
