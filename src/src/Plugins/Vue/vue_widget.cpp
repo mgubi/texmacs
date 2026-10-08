@@ -2336,10 +2336,22 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
 void
 scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t z) {
   // z: the bars are drawn above their container (which may itself float)
-  Clay_Vector2 ratio= (Clay_Vector2) {
-    scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
-    scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
-  };
+  // The thumb of a bar has the length of the part of the contents which is
+  // shown, but not less than min_thumb (30 points, or the whole bar when it
+  // is shorter): in a long document it became a few pixels, which the mouse
+  // could not pick. It moves along what is left of the bar (track) while
+  // the contents scroll by their hidden part (range): ratio is the scroll
+  // for a pixel of the thumb.
+  float min_thumb= ui_pxf (60);
+  Clay_Vector2 view= { scrollData.scrollContainerDimensions.width,
+                       scrollData.scrollContainerDimensions.height };
+  Clay_Vector2 range= { fmaxf (scrollData.contentDimensions.width - view.x, 0.0f),
+                        fmaxf (scrollData.contentDimensions.height - view.y, 0.0f) };
+  Clay_Vector2 thumb= {
+    fminf (view.x, fmaxf (min_thumb, view.x * view.x / fmaxf (scrollData.contentDimensions.width, 1.0f))),
+    fminf (view.y, fmaxf (min_thumb, view.y * view.y / fmaxf (scrollData.contentDimensions.height, 1.0f))) };
+  Clay_Vector2 track= { fmaxf (view.x - thumb.x, 1.0f), fmaxf (view.y - thumb.y, 1.0f) };
+  Clay_Vector2 ratio= { range.x / track.x, range.y / track.y };
   // the thumbs follow the common mouse protocol (button_logic): pressed
   // over a thumb, the pointer drags it until the button is released, even
   // outside the bar
@@ -2349,7 +2361,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
     CLAY(vsb_id, {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-        .offset= { .y= -(scrollData.scrollPosition->y / ratio.y) },
+        .offset= { .y= ratio.y > 0 ? -(scrollData.scrollPosition->y / ratio.y) : 0.0f },
         .zIndex= z,
         .parentId= my_id.id,
         .attachPoints= {
@@ -2358,7 +2370,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
         .layout= {
           .sizing= {
             CLAY_SIZING_FIXED(ui_pxf (24)),
-            CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.height / ratio.y) }},
+            CLAY_SIZING_FIXED(thumb.y) }},
         .backgroundColor= Clay_PointerOver (vsb_id)
           ? the_theme.scrollbar_hover : the_theme.scrollbar,
       .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (12)) }){};
@@ -2380,7 +2392,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
     CLAY(hsb_id, {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-        .offset= { .x= -(scrollData.scrollPosition->x / ratio.x) },
+        .offset= { .x= ratio.x > 0 ? -(scrollData.scrollPosition->x / ratio.x) : 0.0f },
         .zIndex= z,
         .parentId= my_id.id,
         .attachPoints= {
@@ -2388,7 +2400,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
           .parent=  CLAY_ATTACH_POINT_LEFT_BOTTOM }},
         .layout= {
           .sizing= {
-            CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.width / ratio.x),
+            CLAY_SIZING_FIXED(thumb.x),
             CLAY_SIZING_FIXED(ui_pxf (24)) }},
         .backgroundColor= Clay_PointerOver (hsb_id)
           ? the_theme.scrollbar_hover : the_theme.scrollbar,
