@@ -233,7 +233,9 @@
     grey again: in the browser they were stripes of green and of noise. The
     browser uses the small copies of the pictures of the shadows which come
     with <TeXmacs>, in grey with transparency, a format which was read as
-    if it were in colours.
+    if it were in colours. And the pieces of a shadow for which a box has
+    no room are left out: they were drawn whole, across the box and the
+    page.
 
     <item>The remote tools say what happens with the server. The footer
     says <verbatim|connecting to...>, then <verbatim|connected to ... as
