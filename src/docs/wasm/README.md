@@ -684,6 +684,24 @@ of `build-wasm/tools/chrome` (installed there by `./node_modules/.bin/browsers
 install chrome@stable --path $PWD/chrome`); with `--browser <path>`, in
 another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154; with the documents kept by the other tabs, in Chrome 155).
 
+- **Download a backup** (`backup` in `files.js`) saves a zip of the home
+  directory, under `home/`, with a note, `texmacs-backup.json` (format,
+  date, address of the page, number and size of the files): the documents
+  and `~/.TeXmacs`, the wallet included (it is encrypted), without
+  `.TeXmacs/system/tmp` and `.TeXmacs/system/cache`, which TeXmacs makes
+  again. The entries have the times of the files. What is not saved is
+  not a file, and not in the backup.
+- **Restore a backup…** (`restore`, `restoreBackup`) takes such a zip (one
+  without the note is refused; an entry whose path would leave the home
+  directory is skipped) and, after a confirmation which shows its date and
+  contents, stops the loop of TeXmacs (which would otherwise save its
+  preferences over the restored ones), writes the files over those of the
+  same name, with their times, writes them to the database (`tmHome.flush`)
+  and reloads the page. The other files stay: Reset first for an exact copy.
+  A tab which has not the lock of the home directory refuses (its changes
+  of `~/.TeXmacs` are not kept). Test: `misc/wasm/test/backup.script`
+  (the backup, a restore, a zip which is not a backup, a path which leaves
+  the home directory, a restore with its reload; passes in Firefox).
 - **Reset…** deletes the storage of the page and reloads it.
 - **Remove from this browser…** (with a confirmation) deletes it and stops
   TeXmacs: no more saves of the home directory (`tmStorageRemoved`), its

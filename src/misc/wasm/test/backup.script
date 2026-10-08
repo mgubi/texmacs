@@ -1,0 +1,22 @@
+# The backup of the home directory (misc/wasm/files.js: makeBackup,
+# restoreBackup), run in the page:
+#   node misc/wasm/browser-run.mjs --script misc/wasm/test/backup.script
+# Each eval prints its result; expected, in this order:
+#   1. the backup has the documents and ~/.TeXmacs, no temporary file
+#      ("tmp":0), and its note comes first;
+#   2. a restore gives back a changed and a deleted file, and keeps a file
+#      which the backup has not ("a":true, "b":"keep me", "newStays":true,
+#      "pending":0: all of it written to the database);
+#   3. a zip which is not a backup is refused;
+#   4. an entry which would leave the home directory is not written
+#      ("evil":false);
+#   5. and 6. a restore reloads the page, which then has the file of the
+#      backup ("afterReload":true).
+wait 22000
+eval (async()=>{FS.mkdirTree('/home/web/Documents/proj');FS.writeFile('/home/web/Documents/proj/a.tm','<TeXmacs|2.1.5>\n\n<\\body>\n  original\n</body>\n');FS.writeFile('/home/web/Documents/b.txt','keep me');const b=await tmFiles.makeBackup();window.bk=new Uint8Array(await b.blob.arrayBuffer());const es=await tmFiles.unzip(window.bk);return JSON.stringify({files:b.files,bytes:b.bytes,zip:b.blob.size,first:es.slice(0,3).map(e=>e.rel),tops:[...new Set(es.map(e=>e.rel.split('/').slice(0,3).join('/')))].slice(0,14),tmp:es.filter(e=>e.rel.includes('system/tmp')||e.rel.includes('system/cache')).length,wallet:es.filter(e=>e.rel.includes('wallet')).length,prefs:es.filter(e=>e.rel.endsWith('preferences.scm')).length})})()
+eval (async()=>{FS.writeFile('/home/web/Documents/proj/a.tm','CHANGED');FS.unlink('/home/web/Documents/b.txt');FS.writeFile('/home/web/Documents/new.txt','added after');const r=await tmFiles.restoreBackup(window.bk,{quiet:true,stay:true});const td=new TextDecoder();return JSON.stringify({r:r,a:td.decode(FS.readFile('/home/web/Documents/proj/a.tm')).includes('original'),b:td.decode(FS.readFile('/home/web/Documents/b.txt')),newStays:FS.analyzePath('/home/web/Documents/new.txt').exists,pending:tmHome.pending()})})()
+eval (async()=>{try{await tmFiles.restoreBackup(new Uint8Array(await (await tmFiles.zip([{rel:'x.txt',bytes:new Uint8Array([1,2,3])}])).arrayBuffer()),{quiet:true,stay:true});return 'ACCEPTED (bad)'}catch(e){return 'refused: '+e.message}})()
+eval (async()=>{const z=await tmFiles.zip([{rel:'texmacs-backup.json',bytes:new TextEncoder().encode('{"format":1}')},{rel:'home/../../etc/evil',bytes:new Uint8Array([1])},{rel:'home/Documents/ok.txt',bytes:new Uint8Array([111,107])}]);const r=await tmFiles.restoreBackup(new Uint8Array(await z.arrayBuffer()),{quiet:true,stay:true});return JSON.stringify({r:r,evil:FS.analyzePath('/etc/evil').exists,ok:FS.analyzePath('/home/web/Documents/ok.txt').exists})})()
+eval (async()=>{FS.writeFile('/home/web/Documents/proj/a.tm','CHANGED AGAIN');sessionStorage.setItem('bk',btoa(String.fromCharCode.apply(null,window.bk.subarray(0,10))));tmFiles.restoreBackup(window.bk,{quiet:true});return 'restoring with reload'})()
+wait 25000
+eval JSON.stringify({afterReload:new TextDecoder().decode(FS.readFile('/home/web/Documents/proj/a.tm')).includes('original'),bkVarGone:typeof window.bk==='undefined',marker:!!sessionStorage.getItem('bk')})

@@ -6,6 +6,8 @@
 // - a panel (tmFiles.browse) to see it and to bring files in and out:
 //   upload files, whole folders (a project with its images) or a zip, make
 //   folders, rename, delete, download a file, or a folder as a zip;
+//   back up the whole home directory in a zip and restore it (the menu of
+//   TeXmacs Vue), to keep it safe or to move it to another browser;
 // - in the same panel, the files of TeXmacs (/texmacs: its styles,
 //   packages, Scheme code, documentation), which are not changed: they are
 //   opened, downloaded, or copied into the TeXmacs folder of the user
@@ -92,6 +94,10 @@ var tmFiles = (function () {
     }
   }
   function save () { if (typeof tmSaveHome === 'function') tmSaveHome (); }
+  function mtime (p) { // ms (a Date, or a number in newer versions of Emscripten)
+    try { var m = FS.stat (p).mtime; return m instanceof Date ? m.getTime () : +m; }
+    catch (e) { return 0; }
+  }
 
   /****************************************************************************
   * Zip files (the compression streams of the browser, no library)
@@ -115,7 +121,20 @@ var tmFiles = (function () {
     var out = new Response (new Blob ([bytes]).stream ().pipeThrough (stream));
     return new Uint8Array (await out.arrayBuffer ());
   }
-  // files: [{ rel, bytes }] -> the bytes of a zip file
+  // the time of a file (ms) as the two 16-bit fields of a zip (local time,
+  // 2 s steps), and back
+  function dosTime (ms) {
+    var d = new Date (ms);
+    if (!(ms > 0) || d.getFullYear () < 1980) return [0, 0x21]; // 1980-01-01
+    return [(d.getHours () << 11) | (d.getMinutes () << 5) | (d.getSeconds () >> 1),
+            ((d.getFullYear () - 1980) << 9) | ((d.getMonth () + 1) << 5) | d.getDate ()];
+  }
+  function fromDosTime (t, d) {
+    if (!d) return 0;
+    return new Date (1980 + (d >> 9), ((d >> 5) & 15) - 1, d & 31,
+                     t >> 11, (t >> 5) & 63, (t & 31) * 2).getTime ();
+  }
+  // files: [{ rel, bytes, time? }] -> the bytes of a zip file
   async function zip (files) {
     var canDeflate = typeof CompressionStream !== 'undefined';
     var enc = new TextEncoder (), parts = [], central = [], offset = 0;
@@ -126,15 +145,18 @@ var tmFiles = (function () {
         var d = await transform (data, new CompressionStream ('deflate-raw'));
         if (d.length < data.length) { comp = d; method = 8; }
       }
+      var dt = dosTime (files[i].time);
       var h = new DataView (new ArrayBuffer (30));
       h.setUint32 (0, 0x04034b50, true); h.setUint16 (4, 20, true);
       h.setUint16 (6, 0x0800, true); h.setUint16 (8, method, true);
+      h.setUint16 (10, dt[0], true); h.setUint16 (12, dt[1], true);
       h.setUint32 (14, crc, true); h.setUint32 (18, comp.length, true);
       h.setUint32 (22, data.length, true); h.setUint16 (26, name.length, true);
       parts.push (new Uint8Array (h.buffer), name, comp);
       var c = new DataView (new ArrayBuffer (46));
       c.setUint32 (0, 0x02014b50, true); c.setUint16 (4, 20, true); c.setUint16 (6, 20, true);
       c.setUint16 (8, 0x0800, true); c.setUint16 (10, method, true);
+      c.setUint16 (12, dt[0], true); c.setUint16 (14, dt[1], true);
       c.setUint32 (16, crc, true); c.setUint32 (20, comp.length, true);
       c.setUint32 (24, data.length, true); c.setUint16 (28, name.length, true);
       c.setUint32 (42, offset, true);
@@ -148,7 +170,7 @@ var tmFiles = (function () {
     e.setUint32 (16, offset, true);
     return new Blob (parts.concat (central, [new Uint8Array (e.buffer)]));
   }
-  // the bytes of a zip file -> [{ rel, bytes }] (stored and deflated entries)
+  // the bytes of a zip file -> [{ rel, bytes, time }] (stored and deflated entries)
   async function unzip (bytes) {
     var v = new DataView (bytes.buffer, bytes.byteOffset, bytes.byteLength);
     var end = -1;
@@ -159,6 +181,7 @@ var tmFiles = (function () {
     var dec = new TextDecoder (), out = [];
     for (var k = 0; k < n; k++) {
       var method = v.getUint16 (p + 10, true), csize = v.getUint32 (p + 20, true);
+      var time = fromDosTime (v.getUint16 (p + 12, true), v.getUint16 (p + 14, true));
       var nlen = v.getUint16 (p + 28, true), xlen = v.getUint16 (p + 30, true);
       var clen = v.getUint16 (p + 32, true), local = v.getUint32 (p + 42, true);
       var name = dec.decode (bytes.subarray (p + 46, p + 46 + nlen));
@@ -168,7 +191,7 @@ var tmFiles = (function () {
       var data = bytes.subarray (start, start + csize);
       if (method === 8) data = await transform (data, new DecompressionStream ('deflate-raw'));
       else if (method !== 0) continue; // another compression: skipped
-      out.push ({ rel: name, bytes: new Uint8Array (data) });
+      out.push ({ rel: name, bytes: new Uint8Array (data), time: time });
     }
     return out;
   }
@@ -189,10 +212,133 @@ var tmFiles = (function () {
   function downloadPath (p) {
     if (!isDir (p)) { download (base (p), new Blob ([FS.readFile (p)])); return; }
     var files = walk (p, base (p), []).map (function (f) {
-      return { rel: f.rel, bytes: FS.readFile (f.path) };
+      return { rel: f.rel, bytes: FS.readFile (f.path), time: mtime (f.path) };
     });
     zip (files).then (function (blob) { download (base (p) + '.zip', blob); });
   }
+  /****************************************************************************
+  * Backup: the whole home directory in a zip, and back
+  ****************************************************************************/
+
+  // A backup is a zip of the home directory, /home/web: the documents of the
+  // user and ~/.TeXmacs (the preferences, the styles and fonts added, the
+  // wallet, which is encrypted), under home/, with a note, texmacs-backup.json.
+  // The temporary files and the caches of TeXmacs are left out: TeXmacs
+  // makes them again. What is not saved yet (a document being edited) is not
+  // a file, and not in the backup.
+  var BACKUP_NOTE = 'texmacs-backup.json', BACKUP_ROOT = 'home/';
+  var BACKUP_SKIP = ['.TeXmacs/system/tmp/', '.TeXmacs/system/cache/'];
+  function backedUp (rel) {
+    return !BACKUP_SKIP.some (function (s) { return rel.indexOf (s) === 0; });
+  }
+  function humanSize (n) {
+    return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed (0) + ' KB'
+                                              : (n / 1048576).toFixed (1) + ' MB';
+  }
+  function backupName () {
+    var d = new Date (), two = function (n) { return (n < 10 ? '0' : '') + n; };
+    return 'texmacs-vue-backup-' + d.getFullYear () + '-' + two (d.getMonth () + 1) + '-' +
+           two (d.getDate ()) + '.zip';
+  }
+  // -> { blob, files, bytes }
+  async function makeBackup () {
+    var files = walk (HOME, '', []).filter (function (f) { return backedUp (f.rel); })
+      .map (function (f) {
+        return { rel: BACKUP_ROOT + f.rel, bytes: FS.readFile (f.path), time: mtime (f.path) }; });
+    var bytes = files.reduce (function (n, f) { return n + f.bytes.length; }, 0);
+    var note = { format: 1, application: 'TeXmacs Vue', made: new Date ().toISOString (),
+                 address: (typeof location !== 'undefined' ? location.origin + location.pathname : ''),
+                 files: files.length, bytes: bytes };
+    files.unshift ({ rel: BACKUP_NOTE, time: Date.now (),
+                     bytes: new TextEncoder ().encode (JSON.stringify (note, null, 1)) });
+    return { blob: await zip (files), files: note.files, bytes: bytes };
+  }
+  function backup () {
+    return makeBackup ().then (function (b) {
+      download (backupName (), b.blob);
+      toast ('Backup: ' + b.files + ' files, ' + humanSize (b.blob.size) +
+             '. Documents which are not saved are not in it.');
+      return b;
+    }, function (err) { toast ('The backup could not be made: ' + err.message); });
+  }
+  // the bytes of a backup -> { note, entries: [{ rel (in the home), bytes }] };
+  // an error when they are not a backup
+  async function readBackup (bytes) {
+    var all = await unzip (bytes), note = null, entries = [];
+    all.forEach (function (e) {
+      if (e.rel === BACKUP_NOTE) {
+        try { note = JSON.parse (new TextDecoder ().decode (e.bytes)); } catch (err) {}
+      }
+      else if (e.rel.indexOf (BACKUP_ROOT) === 0) {
+        var rel = e.rel.slice (BACKUP_ROOT.length), parts = rel.split ('/');
+        // (no path which leaves the home directory)
+        if (rel === '' || parts.some (function (q) { return q === '' || q === '.' || q === '..'; })) return;
+        if (backedUp (rel)) entries.push ({ rel: rel, bytes: e.bytes, time: e.time });
+      }
+    });
+    if (!note || note.format !== 1) throw new Error ('this zip is not a backup of TeXmacs Vue');
+    return { note: note, entries: entries };
+  }
+  // The files of a backup are written over those of the home directory (a
+  // file which the backup has not stays), TeXmacs being stopped first: it
+  // would save its preferences over the restored ones. Then the page loads
+  // again, with them. opts (tests): { quiet: no question, stay: no reload }
+  async function restoreBackup (bytes, opts) {
+    opts = opts || {};
+    if (typeof tmHome !== 'undefined' && tmHome.readOnly ())
+      throw new Error ('another tab of this browser has TeXmacs: restore the backup there, ' +
+                       'or choose "Use TeXmacs here" first');
+    var b = await readBackup (bytes);
+    var docs = b.entries.filter (function (e) { return e.rel.indexOf ('.TeXmacs/') !== 0; }).length;
+    var size = b.entries.reduce (function (n, e) { return n + e.bytes.length; }, 0);
+    if (!opts.quiet) {
+      var when = String (b.note.made || '').replace ('T', ' ').slice (0, 16);
+      var yes = await tmFrame.ask ('Restore this backup?',
+        'Its files replace those of the same name kept in this browser, your preferences ' +
+        'included; the other files stay (Reset first for an exact copy). Documents which ' +
+        'are not saved are lost: TeXmacs then starts again.',
+        ['made ' + when + (b.note.address ? ' at ' + b.note.address : ''),
+         docs + ' of your files, ' + (b.entries.length - docs) + ' files of preferences and settings',
+         humanSize (size)], 'Restore');
+      if (!yes) return null;
+    }
+    if (!opts.stay) {
+      if (typeof tmFrame !== 'undefined' && tmFrame.leave) tmFrame.leave ();
+      try { if (Module.pauseMainLoop) Module.pauseMainLoop (); } catch (err) {}
+    }
+    b.entries.forEach (function (e) {
+      var p = join (HOME, e.rel);
+      write (p, e.bytes);
+      // (the time the file had: the lists of TeXmacs sort and compare by it)
+      if (e.time > 0) try { FS.utime (p, e.time, e.time); } catch (err) {}
+    });
+    await new Promise (function (done) {
+      if (typeof tmHome !== 'undefined') tmHome.flush (done); else done ();
+    });
+    if (!opts.stay) location.reload ();
+    return { files: b.entries.length, bytes: size };
+  }
+  // choose a zip and restore it
+  function restore () {
+    var old = document.getElementById ('tm-restore-input');
+    if (old) old.remove ();
+    var i = document.createElement ('input');
+    i.id = 'tm-restore-input';
+    // (off the page rather than display:none, which some browsers do not
+    // open a file chooser for)
+    i.type = 'file'; i.accept = '.zip,application/zip';
+    i.style.cssText = 'position:fixed;left:-1000px;top:0;opacity:0';
+    i.onchange = function () {
+      var f = i.files && i.files[0];
+      i.remove ();
+      if (!f) return;
+      f.arrayBuffer ().then (function (buf) { return restoreBackup (new Uint8Array (buf)); })
+        .catch (function (err) { toast ('Not restored: ' + err.message); });
+    };
+    document.body.appendChild (i);
+    i.click ();
+  }
+
   // File objects with their relative paths -> written under dir
   async function importFiles (dir, items) {
     var written = [];
@@ -718,6 +864,9 @@ var tmFiles = (function () {
     browse: function (dir) { panel ('browse', { dir: dir }, null); },
     open: function (accept, done) { panel ('open', { accept: accept }, done); },
     save: function (name, done) { panel ('save', { name: name }, done); },
-    zip: zip, unzip: unzip
+    zip: zip, unzip: unzip,
+    backup: backup, restore: restore,
+    // (for the tests: the backup without the download, a restore of bytes)
+    makeBackup: makeBackup, restoreBackup: restoreBackup
   };
 })();

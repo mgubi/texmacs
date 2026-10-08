@@ -47,6 +47,7 @@
   The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
   of its files and the storage they use, <menu|Files in this browser...>,
+  <menu|Download a backup> and <menu|Restore a backup...> (see below),
   <menu|Reload>, <menu|Reset...> (which deletes your files and preferences),
   and <menu|Remove from this browser...>. Its panel also has more
   information and the options of the address of the page (see below).
@@ -80,10 +81,27 @@
     <verbatim|.TeXmacs> folder, where <TeXmacs> looks first.
   </itemize>
 
+  <paragraph|Backups>
+
+  What the browser keeps is lost when its data for this site are cleared,
+  and it is not seen by another browser or another computer. In the menu of
+  <with|font-series|bold|TeXmacs <name|Vue>>, <menu|Download a backup> saves
+  on your computer a zip archive of all of it: your documents and your
+  <verbatim|.TeXmacs> folder, with your preferences, your own styles and
+  the wallet (which stays encrypted: its passphrase opens it). A document
+  which is not saved is not in it: save your documents first.
+
+  <menu|Restore a backup...>, in the same menu, takes such an archive, in
+  this browser or in another one: after a confirmation, its files replace
+  the files of the same name, the others stay (use <menu|Reset...> first for
+  an exact copy), and <TeXmacs> starts again with them. The passphrase of
+  the wallet opens it everywhere; a passkey added to it may not be there in
+  another browser.
+
   <\warning*>
     Clearing the data of the site deletes your files, and Safari deletes the
     data of a site which was not visited for seven days. Save a copy of the
-    documents you want to keep.
+    documents you want to keep, or download a backup now and then.
   </warning*>
 
   <TeXmacs> <name|Vue> may be open in several tabs of the browser: each of
@@ -214,6 +232,15 @@
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|8 October 2026>
+
+  <\itemize>
+    <item><menu|Download a backup> and <menu|Restore a backup...>, in the
+    menu of <TeXmacs> <name|Vue>: all your files and your preferences in one
+    zip archive, to keep them safe or to move them to another browser (see
+    <with|font-series|bold|Your files>).
+  </itemize>
 
   <paragraph|7 October 2026>
 
