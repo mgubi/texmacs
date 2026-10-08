@@ -208,6 +208,8 @@
     <branch|Exporting to <name|HTML>|convert-html-export.en.tm>
 
     <branch|Importing <name|HTML> and <name|MathML>|convert-html-import.en.tm>
+
+    <branch|The <name|Markdown> converters|convert-markdown.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>
