@@ -1963,6 +1963,20 @@
                        (form-checkbox "tls-server" "true")
                        (form-text-area "other" "a" "b" "c" "x")
                        "text")))
+  ;; whether there is an rsync is answered by the server, in the form it
+  ;; sends: the client which shows the form has no has-rsync-ext?
+  (with load-prefs (priv '(server server-base) 'load-preferences-in-stree)
+    (with form (load-prefs
+                (tree->stree
+                 (stree->tree
+                  '(document (freeze (if (extern "has-rsync-ext?") "yes" "no"))
+                             (if (extern "other") "a" "b"))))
+                '())
+      (check-true (in? (cadr (cadr (cadr form))) '("true" "false")))
+      (check= (caddr form) '(if (extern "other") "a" "b"))))
+  (with form ((priv '(server server-base) 'generate-preferences-form)
+              (server-admin-preferences))
+    (check-false (string-occurs? "has-rsync-ext?" (object->string form))))
   (check= ((priv '(server server-base) 'server-mailer-instantiate)
            "u" "User" "u@test" "123"
            "To: $USER_EMAIL\n$USER_NAME ($USER_PSEUDO), code $USER_CODE")
