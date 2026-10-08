@@ -252,44 +252,118 @@
           ((null? (cdr b)) (car b))
           (else (cons 'document b)))))
 
+(define (oftm-runs row)
+  ;; the runs (first last value) of the equal values of a list which are
+  ;; not #f, with the ranks from 1 on
+  (let loop ((l row) (j 1) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((not (car l)) (loop (cdr l) (+ j 1) acc))
+          ((and (pair? acc) (== (cadar acc) (- j 1)) (== (caddar acc) (car l)))
+           (loop (cdr l) (+ j 1)
+                 (cons (list (caar acc) j (car l)) (cdr acc))))
+          (else (loop (cdr l) (+ j 1) (cons (list j j (car l)) acc))))))
+
+(define (oftm-rectangles matrix)
+  ;; the rectangles (row1 row2 col1 col2 value) which cover the values of
+  ;; a matrix which are not #f: the runs of its rows, taken together when
+  ;; the rows which follow each other have the same ones
+  (let loop ((rows matrix) (i 1) (open '()) (acc '()))
+    ;; open: the runs of the row before, each with the row where it starts
+    (let* ((runs (if (null? rows) '() (oftm-runs (car rows))))
+           (closed (list-filter open (lambda (o) (not (in? (car o) runs)))))
+           (acc (append (map (lambda (o)
+                               (list (cadr o) (- i 1) (caar o) (cadar o) (caddar o)))
+                             closed)
+                        acc)))
+      (if (null? rows) (reverse acc)
+          (loop (cdr rows) (+ i 1)
+                (map (lambda (r)
+                       (with o (list-find open (lambda (o) (== (car o) r)))
+                         (list r (if o (cadr o) i))))
+                     runs)
+                acc)))))
+
+(define (oftm-cwiths matrix var value)
+  ;; the format var of the cells of the matrix whose value is not #f:
+  ;; with this value, or with their own when value is #f
+  (map (lambda (r)
+         `(cwith ,(number->string (car r)) ,(number->string (cadr r))
+                 ,(number->string (caddr r)) ,(number->string (cadddr r))
+                 ,var ,(or value (list-ref r 4))))
+       (oftm-rectangles matrix)))
+
+(define (oftm-part s)
+  ;; a part of the width of the paragraph as a number: "0.7par" is 0.7
+  (or (and s (string-ends? s "par")
+           (string->number (substring s 0 (- (string-length s) 3))))
+      1.0))
+
 (define (oftm-table x)
-  ;; a table with borders. The cells which a wider or a higher one covers
-  ;; are there, empty, as in the tables of TeXmacs.
+  ;; A table. The cells which a wider or a higher one covers are there,
+  ;; empty, as in the tables of TeXmacs. The borders and the backgrounds
+  ;; of the cells are kept, as few formats of rectangles of cells; a table
+  ;; which says nothing of its borders has all of them.
   (let* ((rows (list-filter (ox-children x) (lambda (r) (func? r 'row))))
          (ncols (apply max (cons 1 (map (lambda (r) (length (ox-children r)))
                                         rows))))
+         (grid (map (lambda (r)
+                      (with cells (ox-children r)
+                        (append cells
+                                (map (lambda (k) '(cell))
+                                     (iota (- ncols (length cells)))))))
+                    rows))
          (formats '())
          (wide? #f)
          (trows
-           (map (lambda (r i)
-                  (let* ((cells (ox-children r))
-                         (cells (append cells
-                                        (map (lambda (k) '(cell))
-                                             (iota (- ncols (length cells)))))))
-                    (cons 'row
-                          (map (lambda (c j)
-                                 (let ((is (number->string i))
-                                       (js (number->string j))
-                                       (body (oftm-cell-body c)))
-                                   (for (span '((colspan "cell-col-span")
-                                                (rowspan "cell-row-span")))
-                                     (with v (ox-attr c (car span))
-                                       (when v
-                                         (set! formats
-                                               (cons `(cwith ,is ,is ,js ,js
-                                                             ,(cadr span) ,v)
-                                                     formats)))))
-                                   (with a (oftm-cell-align c)
-                                     (when a
+           (map (lambda (cells i)
+                  (cons 'row
+                        (map (lambda (c j)
+                               (let ((is (number->string i))
+                                     (js (number->string j))
+                                     (body (oftm-cell-body c)))
+                                 (for (span '((colspan "cell-col-span")
+                                              (rowspan "cell-row-span")))
+                                   (with v (ox-attr c (car span))
+                                     (when v
                                        (set! formats
                                              (cons `(cwith ,is ,is ,js ,js
-                                                           "cell-halign" ,a)
-                                                   formats))))
-                                   (when (func? body 'document) (set! wide? #t))
-                                   (list 'cell body)))
-                               cells (map (lambda (j) (+ j 1))
-                                          (iota (length cells)))))))
-                rows (map (lambda (i) (+ i 1)) (iota (length rows)))))
+                                                           ,(cadr span) ,v)
+                                                   formats)))))
+                                 (when (func? body 'document) (set! wide? #t))
+                                 (list 'cell body)))
+                             cells (map (lambda (j) (+ j 1)) (iota (length cells))))))
+                grid (map (lambda (i) (+ i 1)) (iota (length grid)))))
+         (aligns (oftm-cwiths (map (lambda (cells) (map oftm-cell-align cells)) grid)
+                              "cell-halign" #f))
+         ;; the borders: a letter of the sides of each cell
+         (borders? (list-or (map (lambda (cells)
+                                   (list-or (map (lambda (c) (ox-attr c 'borders))
+                                                 cells)))
+                                 grid)))
+         (side (lambda (letter)
+                 (map (lambda (cells)
+                        (map (lambda (c)
+                               (with b (ox-attr c 'borders)
+                                 (and b (>= (string-search-forwards letter 0 b) 0))))
+                             cells))
+                      grid)))
+         (all? (lambda (m)
+                 (list-and (map (lambda (row cells)
+                                  (list-and (map (lambda (v c)
+                                                   (or v (ox-attr c 'covered)))
+                                                 row cells)))
+                                m grid))))
+         (sides (map side '("t" "b" "l" "r")))
+         (block? (or (not borders?) (list-and (map all? sides))))
+         (lines (if block? '()
+                    (append-map (lambda (m var) (oftm-cwiths m var "1ln"))
+                                sides
+                                '("cell-tborder" "cell-bborder" "cell-lborder"
+                                  "cell-rborder"))))
+         (fills (oftm-cwiths (map (lambda (cells)
+                                    (map (lambda (c) (ox-attr c 'background)) cells))
+                                  grid)
+                             "cell-background" #f))
          (width (let loop ((rows trows) (w '()))
                   ;; the sum of the widths of the columns, in characters
                   (if (null? rows) (apply + w)
@@ -299,12 +373,38 @@
                               ((null? w) (sub (cdr l) w (cons (car l) r)))
                               (else (sub (cdr l) (cdr w)
                                          (cons (max (car l) (car w)) r))))))))
-         (wide (if (or wide? (> width 72))
-                   `((twith "table-width" "1par")
+         ;; a table of the width of the text, or of a part of it: when it
+         ;; says so, or when its text would not fit otherwise
+         (twidth (ox-attr x 'width))
+         (wide? (or wide? (> width 72)))
+         (cols (with c (ox-attr x 'columns)
+                 (and c (map string->number (string-tokenize-by-char c #\space)))))
+         (cols (and cols (== (length cols) ncols) (list-and cols) cols))
+         (wide (if (or wide? twidth)
+                   `((twith "table-width" ,(or twidth "1par"))
                      (twith "table-hmode" "exact")
-                     (cwith "1" "-1" "1" "-1" "cell-hyphen" "t"))
-                   '())))
-    `(block (tformat ,@wide ,@(reverse formats) (table ,@trows)))))
+                     (cwith "1" "-1" "1" "-1" "cell-hyphen" "t")
+                     ,@(if (not cols) '()
+                           (append-map
+                             (lambda (part j)
+                               (with js (number->string j)
+                                 `((cwith "1" "-1" ,js ,js "cell-hmode" "exact")
+                                   (cwith "1" "-1" ,js ,js "cell-width"
+                                          ,(string-append
+                                             (number->string
+                                               (/ (round (* 1000.0 part
+                                                            (oftm-part twidth)))
+                                                  1000.0))
+                                             "par")))))
+                             cols (map (lambda (j) (+ j 1)) (iota ncols)))))
+                   '()))
+         (table `(,(if block? 'block 'tabular)
+                  (tformat ,@wide ,@(reverse formats) ,@aligns ,@lines ,@fills
+                           (table ,@trows))))
+         (align (ox-attr x 'align)))
+    (cond ((== align "center") `(with "par-mode" "center" ,table))
+          ((== align "right") `(with "par-mode" "right" ,table))
+          (else table))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Blocks

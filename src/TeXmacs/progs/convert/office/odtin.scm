@@ -87,6 +87,59 @@
         (with v (ox-attr x 'fo:break-before)
           (if (== v "page") '((page-break . #t)) '())))))
 
+(define (odt-border-on? x names)
+  ;; the first of the attributes names of x which is there: is it a border?
+  (cond ((null? names) '())
+        ((ox-attr x (car names))
+         => (lambda (v) (list (not (string-starts? v "none")))))
+        (else (odt-border-on? x (cdr names)))))
+
+(define (odt-cell-properties x)
+  ;; the properties of an element style:table-cell-properties
+  (if (not x) '()
+      (append
+        (append-map
+          (lambda (side)
+            (with on (odt-border-on? x (list (cadr side) 'fo:border))
+              (if (null? on) '() (list (cons (car side) (car on))))))
+          '((border-top fo:border-top) (border-bottom fo:border-bottom)
+            (border-left fo:border-left) (border-right fo:border-right)))
+        (with v (ox-attr x 'fo:background-color)
+          (if (and v (string-starts? v "#") (!= (locase-all v) "#ffffff"))
+              (list (cons 'fill (locase-all v)))
+              '())))))
+
+(define (odt-table-properties x)
+  ;; the properties of an element style:table-properties
+  (if (not x) '()
+      (append
+        (with v (ox-attr x 'table:align)
+          (if v (list (cons 'table-align v)) '()))
+        (with v (ox-attr x 'style:rel-width)
+          (if v (list (cons 'table-width v)) '())))))
+
+(define (odt-column-properties x)
+  ;; the width of a column, as a number: its unit does not matter, since
+  ;; only the parts of the columns in the table are kept
+  (let* ((v (and x (or (ox-attr x 'style:rel-column-width)
+                       (ox-attr x 'style:column-width))))
+         (n (and v (let loop ((i 0))
+                     (if (and (< i (string-length v))
+                              (or (char-numeric? (string-ref v i))
+                                  (char=? (string-ref v i) #\.)))
+                         (loop (+ i 1))
+                         (string->number (substring v 0 i))))))
+         (unit (and v n (let loop ((i 0))
+                          (if (and (< i (string-length v))
+                                   (or (char-numeric? (string-ref v i))
+                                       (char=? (string-ref v i) #\.)))
+                              (loop (+ i 1))
+                              (substring v i (string-length v))))))
+         (scale (assoc-ref '(("cm" . 1.0) ("mm" . 0.1) ("in" . 2.54)
+                             ("pt" . 0.03528) ("*" . 1.0))
+                           unit)))
+    (if (and n scale) (list (cons 'col-width (* n scale))) '())))
+
 (define (odt-plain-name s)
   ;; the name of a style as it is shown: "Heading_20_1" is "heading 1"
   (locase-all (string-replace s "_20_" " ")))
@@ -112,7 +165,12 @@
                       (list (cons 'outline (string->number v))) '()))
                 (odt-text-properties (ox-child x 'style:text-properties))
                 (odt-paragraph-properties
-                  (ox-child x 'style:paragraph-properties)))))))
+                  (ox-child x 'style:paragraph-properties))
+                (odt-cell-properties
+                  (ox-child x 'style:table-cell-properties))
+                (odt-table-properties (ox-child x 'style:table-properties))
+                (odt-column-properties
+                  (ox-child x 'style:table-column-properties)))))))
       ;; the lists: a style with a kind for each level
       (for (x (ox-childs group 'text:list-style))
         (for (lvl (ox-elements x))
@@ -468,11 +526,18 @@
   (let* ((n (or (and (ox-attr x 'table:number-columns-repeated)
                      (string->number (ox-attr x 'table:number-columns-repeated)))
                 1))
+         (props (odt-style "table-cell" (ox-attr x 'table:style-name)))
+         (letters (string-append (if (odt-get props 'border-top) "t" "")
+                                 (if (odt-get props 'border-bottom) "b" "")
+                                 (if (odt-get props 'border-left) "l" "")
+                                 (if (odt-get props 'border-right) "r" "")))
          (cell (if (func? x 'table:covered-table-cell)
                    `(cell (@ (covered "true")))
                    (apply office-node
                           (cons* 'cell
                                  `((header ,(and header? "true"))
+                                   (borders ,(if (== letters "") "none" letters))
+                                   (background ,(odt-get props 'fill))
                                    (colspan ,(with v (ox-attr x 'table:number-columns-spanned)
                                                (and v (!= v "1") v)))
                                    (rowspan ,(with v (ox-attr x 'table:number-rows-spanned)
@@ -499,6 +564,51 @@
             (else '())))
     l))
 
+(define (odt-table-columns x)
+  ;; the widths of the columns, as parts of their sum, or #f
+  (let* ((cols (append-map
+                 (lambda (c)
+                   (cond ((func? c 'table:table-column)
+                          (let ((n (or (and (ox-attr c 'table:number-columns-repeated)
+                                            (string->number
+                                              (ox-attr c 'table:number-columns-repeated)))
+                                       1))
+                                (w (odt-get (odt-style "table-column"
+                                                       (ox-attr c 'table:style-name))
+                                            'col-width)))
+                            (map (lambda (i) w) (iota (min n 64)))))
+                         ((func? c 'table:table-columns)
+                          (ox-childs c 'table:table-column))
+                         (else '())))
+                 (ox-children x)))
+         (ok? (and (pair? cols) (list-and (map number? cols))))
+         (sum (if ok? (apply + cols) 0)))
+    (and ok? (> sum 0)
+         (string-recompose
+           (map (lambda (w) (number->string (/ (round (* 1000.0 (/ w sum))) 1000.0)))
+                cols)
+           " "))))
+
+(define (odt-table x)
+  (let* ((rows (odt-rows (ox-children x) #f))
+         (props (odt-style "table" (ox-attr x 'table:style-name)))
+         (align (odt-get props 'table-align))
+         (width (odt-get props 'table-width))
+         (percent (and width (string-ends? width "%")
+                       (string->number (substring width 0 (- (string-length width) 1))))))
+    (if (null? rows) '()
+        (list (apply office-node
+                     (cons* 'table
+                            `((align ,(cond ((== align "center") "center")
+                                            ((== align "right") "right")
+                                            (else #f)))
+                              (width ,(and percent (< percent 100)
+                                           (string-append
+                                             (number->string (/ percent 100.0))
+                                             "par")))
+                              (columns ,(odt-table-columns x)))
+                            rows))))))
+
 (define (odt-block x)
   (cond ((not (pair? x)) '())
         (else
@@ -506,9 +616,7 @@
             ((text:h) (odt-paragraph x #t))
             ((text:p) (odt-paragraph x #f))
             ((text:list) (odt-list x))
-            ((table:table)
-             (with rows (odt-rows (ox-children x) #f)
-               (if (null? rows) '() (list (cons 'table rows)))))
+            ((table:table) (odt-table x))
             ((text:section text:index-body) (odt-blocks (ox-children x)))
             ((draw:frame)
              (with l (odt-frame x)

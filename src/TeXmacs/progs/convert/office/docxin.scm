@@ -115,9 +115,11 @@
                   (if b (list (cons 'based-on b)) '()))
                 ;; a style of paragraphs has properties of runs too, which
                 ;; are not those of a style of runs: they are told apart
-                (if (== (ox-attr x 'w:type) "paragraph")
-                    (docx-paragraph-properties (ox-child x 'w:pPr))
-                    (docx-run-properties (ox-child x 'w:rPr)))))))))))
+                (cond ((== (ox-attr x 'w:type) "paragraph")
+                       (docx-paragraph-properties (ox-child x 'w:pPr)))
+                      ((== (ox-attr x 'w:type) "table")
+                       (docx-table-style-properties x))
+                      (else (docx-run-properties (ox-child x 'w:rPr))))))))))))
 
 (define (docx-get props key)
   (with p (assoc key props) (and p (cdr p))))
@@ -537,7 +539,162 @@
                                 (list-kind ,(and item? (docx-list-kind id level))))
                               l)))))))
 
-(define (docx-cell x header?)
+;; The borders of a table are those of its style, of the table itself and
+;; of each cell, in this order. A style has borders for the whole table
+;; (around it, and inside between the rows and the columns) and others for
+;; some of its parts: the first row, the last one, the first column, the
+;; last one, the rows of odd and of even rank. Borders are association
+;; lists side -> #t or #f, with the sides top, bottom, left, right,
+;; insideH and insideV.
+
+(define docx-border-sides
+  '((w:top . top) (w:bottom . bottom) (w:left . left) (w:start . left)
+    (w:right . right) (w:end . right) (w:insideH . insideH)
+    (w:insideV . insideV)))
+
+(define (docx-borders x)
+  ;; the borders of an element w:tblBorders or w:tcBorders
+  (if (not x) '()
+      (append-map
+        (lambda (y)
+          (with side (assoc-ref docx-border-sides (car y))
+            (if side
+                (list (cons side (not (in? (docx-val y) '("nil" "none")))))
+                '())))
+        (ox-elements x))))
+
+(define (docx-fill x)
+  ;; the color of the background of an element w:tcPr, or #f
+  (let* ((shd (and x (ox-child x 'w:shd)))
+         (fill (and shd (ox-attr shd 'w:fill))))
+    (and fill (== (string-length fill) 6) (!= (locase-all fill) "ffffff")
+         (string-append "#" (locase-all fill)))))
+
+(define (docx-table-style-properties x)
+  ;; the properties of a style of tables
+  (let ((pr (ox-child x 'w:tblPr))
+        (tc (ox-child x 'w:tcPr)))
+    (append
+      (with b (and pr (ox-child pr 'w:tblBorders))
+        (if b (list (cons 'borders (docx-borders b))) '()))
+      (with f (docx-fill tc)
+        (if f (list (cons 'fill f)) '()))
+      ;; the parts of the table, each (borders fill)
+      (map (lambda (part)
+             (with ptc (ox-child part 'w:tcPr)
+               (cons (string->symbol (string-append "part-" (or (ox-attr part 'w:type) "")))
+                     (list (docx-borders (and ptc (ox-child ptc 'w:tcBorders)))
+                           (docx-fill ptc)))))
+           (ox-childs x 'w:tblStylePr)))))
+
+;; the parts of a table which a row or a cell says it is in, by the rank of
+;; their bit in w:cnfStyle
+(define docx-parts
+  '(part-firstRow part-lastRow part-firstCol part-lastCol part-band1Vert
+    part-band2Vert part-band1Horz part-band2Horz))
+
+(define (docx-cnf x)
+  ;; the parts of the element w:cnfStyle x, or #f without it
+  (let* ((v (and x (docx-val x))))
+    (and v (>= (string-length v) 8)
+         (list-filter
+           (map (lambda (part i) (and (char=? (string-ref v i) #\1) part))
+                docx-parts (iota 8))
+           identity))))
+
+(define (docx-look tblpr)
+  ;; the parts which the table uses: (first-row? last-row? first-col?
+  ;; last-col? bands?)
+  (let* ((look (and tblpr (ox-child tblpr 'w:tblLook)))
+         (on? (lambda (name) (in? (and look (ox-attr look name)) '("1" "true"))))
+         (v (and look (docx-val look)))
+         (n (or (and v (string->number v 16)) #x04a0)))
+    (if (and look (ox-attr look 'w:firstRow))
+        (list (on? 'w:firstRow) (on? 'w:lastRow) (on? 'w:firstColumn)
+              (on? 'w:lastColumn) (not (on? 'w:noHBand)))
+        (list (odd? (quotient n #x20)) (odd? (quotient n #x40))
+              (odd? (quotient n #x80)) (odd? (quotient n #x100))
+              (not (odd? (quotient n #x200)))))))
+
+(define (docx-side borders side)
+  ;; (#t) or (#f) when the borders say something of this side, else ()
+  (with p (assoc side borders)
+    (if p (list (cdr p)) '())))
+
+(define (docx-cell-format i j rows cols parts style tbl-borders own-pr)
+  ;; (borders fill) of the cell at row i and column j of a table of rows
+  ;; and cols: the borders as a string of the letters t, b, l and r
+  (let* ((first-row? (== i 0))
+         (last-row? (== i (- rows 1)))
+         (first-col? (== j 0))
+         (last-col? (== j (- cols 1)))
+         (part-info (lambda (part) (or (docx-get style part) (list '() #f))))
+         ;; what each source says of the four sides, the last one first
+         (own (docx-borders (and own-pr (ox-child own-pr 'w:tcBorders))))
+         (from-parts
+           (lambda (side)
+             (append-map
+               (lambda (part)
+                 (let* ((b (car (part-info part)))
+                        (row-part? (in? part '(part-firstRow part-lastRow
+                                               part-band1Horz part-band2Horz))))
+                   (cond ((== side 'top)
+                          (if (or row-part? first-row?) (docx-side b 'top)
+                              (docx-side b 'insideH)))
+                         ((== side 'bottom)
+                          (if (or row-part? last-row?) (docx-side b 'bottom)
+                              (docx-side b 'insideH)))
+                         ((== side 'left)
+                          (if (or (not row-part?) first-col?) (docx-side b 'left)
+                              (docx-side b 'insideV)))
+                         (else
+                          (if (or (not row-part?) last-col?) (docx-side b 'right)
+                              (docx-side b 'insideV))))))
+               (reverse parts))))
+         (from-table
+           (lambda (side)
+             (cond ((== side 'top)
+                    (docx-side tbl-borders (if first-row? 'top 'insideH)))
+                   ((== side 'bottom)
+                    (docx-side tbl-borders (if last-row? 'bottom 'insideH)))
+                   ((== side 'left)
+                    (docx-side tbl-borders (if first-col? 'left 'insideV)))
+                   (else
+                    (docx-side tbl-borders (if last-col? 'right 'insideV))))))
+         (on? (lambda (side)
+                (with l (append (docx-side own side) (from-parts side)
+                                (from-table side))
+                  (and (pair? l) (car l)))))
+         (letters (string-append (if (on? 'top) "t" "") (if (on? 'bottom) "b" "")
+                                 (if (on? 'left) "l" "") (if (on? 'right) "r" "")))
+         (fill (or (docx-fill own-pr)
+                   (list-find (map (lambda (part) (cadr (part-info part)))
+                                   (reverse parts))
+                              identity)
+                   (docx-get style 'fill))))
+    (list (if (== letters "") "none" letters) fill)))
+
+(define (docx-row-parts i rows row look)
+  ;; the parts of the table which the row i is in
+  (or (docx-cnf (with pr (ox-child row 'w:trPr) (and pr (ox-child pr 'w:cnfStyle))))
+      (let ((first? (and (car look) (== i 0)))
+            (last? (and (cadr look) (== i (- rows 1)) (> rows 1))))
+        (cond (first? '(part-firstRow))
+              (last? '(part-lastRow))
+              ((not (list-ref look 4)) '())
+              ;; the bands start after the first row
+              ((odd? (- i (if (car look) 1 0))) '(part-band2Horz))
+              (else '(part-band1Horz))))))
+
+(define (docx-cell-parts j cols cell row-parts look)
+  ;; the parts of the table which a cell of the column j is in
+  (or (docx-cnf (with pr (ox-child cell 'w:tcPr) (and pr (ox-child pr 'w:cnfStyle))))
+      (append row-parts
+              (if (and (caddr look) (== j 0)) '(part-firstCol) '())
+              (if (and (cadddr look) (== j (- cols 1)) (> cols 1))
+                  '(part-lastCol) '()))))
+
+(define (docx-cell x header? format)
   ;; the cells of a w:tc: the cell, and those which it covers on its right
   (let* ((pr (ox-child x 'w:tcPr))
          (span (or (and pr (string->number (or (docx-child-val pr 'w:gridSpan) "1")))
@@ -550,17 +707,47 @@
                      (cons* 'cell
                             `((header ,(and header? "true"))
                               (colspan ,(and (> span 1) (number->string span)))
-                              (vmerge ,(and merge "start")))
+                              (vmerge ,(and merge "start"))
+                              (borders ,(car format))
+                              (background ,(cadr format)))
                             (docx-blocks (ox-children x)))))
           (map (lambda (i) covered) (iota (- span 1))))))
 
-(define (docx-row x)
+(define (docx-cell-span x)
+  (let* ((pr (ox-child x 'w:tcPr)))
+    (or (and pr (string->number (or (docx-child-val pr 'w:gridSpan) "1"))) 1)))
+
+(define (docx-row x i rows cols look style tbl-borders)
   (let* ((pr (ox-child x 'w:trPr))
          (header? (and pr (ox-child pr 'w:tblHeader)
                        (not (in? (docx-child-val pr 'w:tblHeader)
-                                 '("0" "false"))))))
-    (cons 'row (append-map (lambda (c) (docx-cell c header?))
-                           (ox-childs x 'w:tc)))))
+                                 '("0" "false")))))
+         (row-parts (docx-row-parts i rows x look)))
+    (cons 'row
+          (let loop ((l (ox-childs x 'w:tc)) (j 0) (acc '()))
+            (if (null? l) (reverse acc)
+                (let* ((c (car l))
+                       (span (docx-cell-span c))
+                       ;; a wide cell has the right side of its last column
+                       (jr (+ j span -1))
+                       (parts (docx-cell-parts j cols c row-parts look))
+                       (f (docx-cell-format i j rows cols parts style tbl-borders
+                                            (ox-child c 'w:tcPr)))
+                       (fr (if (== span 1) f
+                               (docx-cell-format i jr rows cols parts style
+                                                 tbl-borders (ox-child c 'w:tcPr))))
+                       (letters (list->string
+                                  (append
+                                    (list-filter (string->list (car f))
+                                                 (lambda (ch) (in? ch '(#\t #\b #\l))))
+                                    (list-filter (string->list (car fr))
+                                                 (lambda (ch) (char=? ch #\r))))))
+                       (format (list (if (or (== (car f) "none") (== letters ""))
+                                         (if (== letters "") "none" letters)
+                                         letters)
+                                     (cadr f))))
+                  (loop (cdr l) (+ j span)
+                        (append (reverse (docx-cell c header? format)) acc))))))))
 
 (define (docx-row-spans rows)
   ;; a cell which starts a vertical merge gets the number of rows it
@@ -583,15 +770,62 @@
                                                 (cons* 'cell
                                                        `((header ,(ox-attr cell 'header))
                                                          (colspan ,(ox-attr cell 'colspan))
-                                                         (rowspan ,(and (> n 1) (number->string n))))
+                                                         (rowspan ,(and (> n 1) (number->string n)))
+                                                         (borders ,(ox-attr cell 'borders))
+                                                         (background ,(ox-attr cell 'background)))
                                                        (ox-children cell)))))))
                              (car rest) (iota (length (car rest)))))
                   acc))))))
 
+(define (docx-table-columns x)
+  ;; the widths of the columns of the grid, as parts of their sum
+  (let* ((grid (ox-child x 'w:tblGrid))
+         (l (map (lambda (c) (or (string->number (or (ox-attr c 'w:w) "0")) 0))
+                 (if grid (ox-childs grid 'w:gridCol) '())))
+         (sum (apply + l)))
+    (and (pair? l) (> sum 0)
+         (string-recompose
+           (map (lambda (w) (number->string (/ (round (* 1000.0 (/ w sum))) 1000.0)))
+                l)
+           " "))))
+
+(define (docx-table-width pr)
+  ;; the width of the table: a part of the width of the text, or #f
+  (let* ((w (and pr (ox-child pr 'w:tblW)))
+         (type (and w (ox-attr w 'w:type)))
+         (v (and w (ox-attr w 'w:w)))
+         (v (and v (if (string-ends? v "%")
+                       (with n (string->number (substring v 0 (- (string-length v) 1)))
+                         (and n (* n 50)))
+                       (string->number v)))))
+    (and v (== type "pct") (> v 0)
+         (string-append (number->string (/ (round (/ v 5.0)) 1000.0)) "par"))))
+
 (define (docx-table x)
-  (with rows (map docx-row (ox-childs x 'w:tr))
+  (let* ((pr (ox-child x 'w:tblPr))
+         (style (docx-style (and pr (docx-child-val pr 'w:tblStyle))))
+         (tbl-borders (append (docx-borders (and pr (ox-child pr 'w:tblBorders)))
+                              (or (docx-get style 'borders) '())))
+         (look (docx-look pr))
+         (trs (ox-childs x 'w:tr))
+         (nrows (length trs))
+         (ncols (apply max (cons 1 (map (lambda (r)
+                                          (apply + (map docx-cell-span
+                                                        (ox-childs r 'w:tc))))
+                                        trs))))
+         (rows (map (lambda (r i)
+                      (docx-row r i nrows ncols look style tbl-borders))
+                    trs (iota nrows)))
+         (align (and pr (docx-child-val pr 'w:jc))))
     (if (null? rows) '()
-        (list (cons 'table (docx-row-spans rows))))))
+        (list (apply office-node
+                     (cons* 'table
+                            `((align ,(cond ((== align "center") "center")
+                                            ((in? align '("right" "end")) "right")
+                                            (else #f)))
+                              (width ,(docx-table-width pr))
+                              (columns ,(docx-table-columns x)))
+                            (docx-row-spans rows)))))))
 
 (define (docx-block x)
   (cond ((func? x 'w:p) (docx-paragraph x))

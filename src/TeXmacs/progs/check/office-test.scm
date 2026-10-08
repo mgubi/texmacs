@@ -94,6 +94,11 @@
     "<w:style w:type='paragraph' w:styleId='Citation'><w:name w:val='Quote'/></w:style>"
     "<w:style w:type='paragraph' w:styleId='Code'><w:name w:val='Source Code'/></w:style>"
     "<w:style w:type='paragraph' w:styleId='Legende'><w:name w:val='caption'/></w:style>"
+    "<w:style w:type='table' w:styleId='Grille'><w:name w:val='My table'/>"
+    "<w:tblPr><w:tblBorders><w:bottom w:val='single'/></w:tblBorders></w:tblPr>"
+    "<w:tblStylePr w:type='firstRow'><w:tcPr><w:tcBorders><w:top w:val='single'/>"
+    "<w:bottom w:val='single'/></w:tcBorders><w:shd w:fill='DDDDDD'/></w:tcPr>"
+    "</w:tblStylePr></w:style>"
     "<w:style w:type='character' w:styleId='Accent'><w:name w:val='Emphasis'/>"
     "<w:rPr><w:i/></w:rPr></w:style>"
     "<w:style w:type='character' w:styleId='Lien'><w:name w:val='Hyperlink'/>"
@@ -283,9 +288,10 @@
     (check= (docx (string-append
                     "<w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr>" (tc "" "A") (tc "" "B")
                     "</w:tr><w:tr>" (tc "" "1") (tc "" "2") "</w:tr></w:tbl>"))
-            '((table (row (cell (@ (header "true")) (p "A"))
-                          (cell (@ (header "true")) (p "B")))
-                     (row (cell (p "1")) (cell (p "2"))))))
+            '((table (row (cell (@ (header "true") (borders "none")) (p "A"))
+                          (cell (@ (header "true") (borders "none")) (p "B")))
+                     (row (cell (@ (borders "none")) (p "1"))
+                          (cell (@ (borders "none")) (p "2"))))))
     ;; a cell over two columns, a cell over two rows: the cells which they
     ;; cover are there
     (check= (docx (string-append
@@ -293,10 +299,37 @@
                     "<w:tr>" (tc "<w:vMerge w:val='restart'/>" "tall") (tc "" "x") "</w:tr>"
                     "<w:tr><w:tc><w:tcPr><w:vMerge/></w:tcPr><w:p/></w:tc>" (tc "" "y")
                     "</w:tr></w:tbl>"))
-            '((table (row (cell (@ (colspan "2")) (p "wide"))
+            '((table (row (cell (@ (colspan "2") (borders "none")) (p "wide"))
                           (cell (@ (covered "true"))))
-                     (row (cell (@ (rowspan "2")) (p "tall")) (cell (p "x")))
-                     (row (cell (@ (covered "true"))) (cell (p "y"))))))))
+                     (row (cell (@ (rowspan "2") (borders "none")) (p "tall"))
+                          (cell (@ (borders "none")) (p "x")))
+                     (row (cell (@ (covered "true")))
+                          (cell (@ (borders "none")) (p "y"))))))
+    ;; The borders: those of the table (around it and inside), which a cell
+    ;; may change; the background of a cell; the place and the width of the
+    ;; table, and the parts of its columns.
+    (check= (docx (string-append
+                    "<w:tbl><w:tblPr><w:jc w:val='center'/><w:tblW w:w='2500' w:type='pct'/>"
+                    "<w:tblBorders><w:top w:val='single'/><w:bottom w:val='single'/>"
+                    "<w:insideH w:val='single'/></w:tblBorders></w:tblPr>"
+                    "<w:tblGrid><w:gridCol w:w='1000'/><w:gridCol w:w='3000'/></w:tblGrid>"
+                    "<w:tr>" (tc "" "a") (tc "<w:shd w:fill='FFCC00'/>" "b") "</w:tr>"
+                    "<w:tr>" (tc "<w:tcBorders><w:top w:val='nil'/><w:left w:val='single'/></w:tcBorders>" "c")
+                    (tc "" "d") "</w:tr></w:tbl>"))
+            '((table (@ (align "center") (width "0.5par") (columns "0.25 0.75"))
+                     (row (cell (@ (borders "tb")) (p "a"))
+                          (cell (@ (borders "tb") (background "#ffcc00")) (p "b")))
+                     (row (cell (@ (borders "bl")) (p "c"))
+                          (cell (@ (borders "tb")) (p "d"))))))
+    ;; the borders of the style of the table, and of its first row
+    (check= (docx (string-append
+                    "<w:tbl><w:tblPr><w:tblStyle w:val='Grille'/></w:tblPr>"
+                    "<w:tr>" (tc "" "a") (tc "" "b") "</w:tr>"
+                    "<w:tr>" (tc "" "c") (tc "" "d") "</w:tr></w:tbl>"))
+            '((table (row (cell (@ (borders "tb") (background "#dddddd")) (p "a"))
+                          (cell (@ (borders "tb") (background "#dddddd")) (p "b")))
+                     (row (cell (@ (borders "b")) (p "c"))
+                          (cell (@ (borders "b")) (p "d"))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formulas of Word
@@ -396,6 +429,17 @@
     "<style:text-properties style:text-position='super 58%'/></style:style>"
     "<style:style style:name='T3' style:family='text'>"
     "<style:text-properties style:font-name='Courier New'/></style:style>"
+    "<style:style style:name='Tab' style:family='table'>"
+    "<style:table-properties table:align='center' style:rel-width='50%'/></style:style>"
+    "<style:style style:name='ColA' style:family='table-column'>"
+    "<style:table-column-properties style:column-width='1cm'/></style:style>"
+    "<style:style style:name='ColB' style:family='table-column'>"
+    "<style:table-column-properties style:column-width='30mm'/></style:style>"
+    "<style:style style:name='CellA' style:family='table-cell'>"
+    "<style:table-cell-properties fo:border='0.5pt solid #000000'/></style:style>"
+    "<style:style style:name='CellB' style:family='table-cell'>"
+    "<style:table-cell-properties fo:border='none' fo:border-bottom='1pt solid #000000'"
+    " fo:background-color='#FFCC00'/></style:style>"
     "<style:style style:name='P1' style:family='paragraph' style:parent-style-name='Quotations'>"
     "<style:paragraph-properties fo:text-align='end'/></style:style>"
     "</office:automatic-styles>"))
@@ -504,9 +548,22 @@
                  "<table:table-cell>" (tp "1") "</table:table-cell>"
                  "<table:table-cell>" (tp "2") "</table:table-cell>"
                  "</table:table-row></table:table>"))
-          '((table (row (cell (@ (header "true") (colspan "2")) (p "H"))
+          '((table (row (cell (@ (header "true") (borders "none") (colspan "2")) (p "H"))
                         (cell (@ (covered "true"))))
-                   (row (cell (p "1")) (cell (p "2"))))))
+                   (row (cell (@ (borders "none")) (p "1"))
+                        (cell (@ (borders "none")) (p "2"))))))
+  ;; the borders and the background of a cell are in its style; the place
+  ;; of the table and the widths of its columns in theirs
+  (check= (odt (string-append
+                 "<table:table table:style-name='Tab'>"
+                 "<table:table-column table:style-name='ColA'/>"
+                 "<table:table-column table:style-name='ColB'/><table:table-row>"
+                 "<table:table-cell table:style-name='CellA'>" (tp "1") "</table:table-cell>"
+                 "<table:table-cell table:style-name='CellB'>" (tp "2") "</table:table-cell>"
+                 "</table:table-row></table:table>"))
+          '((table (@ (align "center") (width "0.5par") (columns "0.25 0.75"))
+                   (row (cell (@ (borders "tblr")) (p "1"))
+                        (cell (@ (borders "b") (background "#ffcc00")) (p "2"))))))
   ;; an image and a formula: files of the archive
   (check= (odt (tp "<draw:frame svg:width='2cm' svg:height='1cm'>"
                    "<draw:image xlink:href='Pictures/pic.png'/>"
@@ -615,6 +672,36 @@
                             (table (row (cell "w") (cell ""))
                                    (row (cell "t") (cell "x"))
                                    (row (cell "") (cell "y")))))))
+  ;; The borders of the cells: all of them are a block; else the lines are
+  ;; formats of rectangles of cells, and so are the backgrounds.
+  (check= (tm '(table (row (cell (@ (borders "tblr")) (p "a"))
+                           (cell (@ (borders "tblr")) (p "b")))))
+          '((block (tformat (table (row (cell "a") (cell "b")))))))
+  (check= (tm '(table (row (cell (@ (borders "none")) (p "a")))))
+          '((tabular (tformat (table (row (cell "a")))))))
+  (check= (tm '(table (row (cell (@ (borders "tb") (background "#dddddd")) (p "a"))
+                           (cell (@ (borders "tb") (background "#dddddd")) (p "b")))
+                      (row (cell (@ (borders "b")) (p "c"))
+                           (cell (@ (borders "b")) (p "d")))))
+          '((tabular (tformat (cwith "1" "1" "1" "2" "cell-tborder" "1ln")
+                              (cwith "1" "2" "1" "2" "cell-bborder" "1ln")
+                              (cwith "1" "1" "1" "2" "cell-background" "#dddddd")
+                              (table (row (cell "a") (cell "b"))
+                                     (row (cell "c") (cell "d")))))))
+  ;; a table which is centered, of half the width of the text, with
+  ;; columns of a quarter and three quarters of it
+  (check= (tm '(table (@ (align "center") (width "0.5par") (columns "0.25 0.75"))
+                      (row (cell (@ (borders "none")) (p "a"))
+                           (cell (@ (borders "none")) (p "b")))))
+          '((with "par-mode" "center"
+              (tabular (tformat (twith "table-width" "0.5par")
+                                (twith "table-hmode" "exact")
+                                (cwith "1" "-1" "1" "-1" "cell-hyphen" "t")
+                                (cwith "1" "-1" "1" "1" "cell-hmode" "exact")
+                                (cwith "1" "-1" "1" "1" "cell-width" "0.125par")
+                                (cwith "1" "-1" "2" "2" "cell-hmode" "exact")
+                                (cwith "1" "-1" "2" "2" "cell-width" "0.375par")
+                                (table (row (cell "a") (cell "b"))))))))
   ;; a cell of several paragraphs: the table has the width of the page
   (check= (tm '(table (row (cell (p "a") (p "b")))))
           '((block (tformat (twith "table-width" "1par")
