@@ -418,6 +418,18 @@
   (check= ((priv '(client client-chat) 'chat-room-name) "tmfs://chat/h/room")
           "room")
 
+  (check-group "titles of remote documents")
+  (check= (tmfs-title "tmfs://remote-dir/h/~u/d" '(document ""))
+          "Remote directory - d")
+  (check= (tmfs-title "tmfs://remote-dir/h/~u" '(document ""))
+          "Remote directory - ~u")
+  (check= (tmfs-title "tmfs://chat-rooms/h" '(document "")) "Chat rooms - h")
+  (check= (tmfs-title "tmfs://shared/h" '(document "")) "Shared resources - h")
+  (check= (tmfs-title "tmfs://live-list/h" '(document ""))
+          "Live documents - h")
+  (check= (tmfs-title "tmfs://chat/h/room" '(document "")) "Chat room - room")
+  (check= (tmfs-title "tmfs://live/h/doc" '(document "")) "Live - doc")
+
   (check-group "names of live documents")
   (check= (live-get-name "tmfs://live/h/doc") "doc")
   (check= (live-get-name "tmfs://live/h/live/doc") "doc")
