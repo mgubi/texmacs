@@ -37,8 +37,75 @@
 
 (define tmof-html? #f)          ; (no HTML in an office document)
 (define tmof-document? #f)      ; a whole document, and not a piece of one
+(define tmof-seqs (make-ahash-table)) ; a sequence -> its last number
+(define tmof-seq-nr 0)                ; the numbers which were made
+
 (define (tmof-initialize opts)
-  (set! tmof-flat? #f))
+  (set! tmof-flat? #f)
+  (set! tmof-seqs (make-ahash-table))
+  (set! tmof-seq-nr 0))
+
+;; The numbers of a document (of its theorems, figures, tables, equations,
+;; references) are written as members of sequences, which the office
+;; programs count themselves: Figure 1 is "Figure" and the next number of
+;; the sequence Figure. The number which TeXmacs shows is only taken for
+;; the next one of a sequence when it is: with another way of numbering
+;; (2.1, numbers by sections) it is written as it is.
+
+(define (tmof-seq candidates number)
+  ;; the node of the number, in the first of the sequences candidates of
+  ;; which it is the next number; else a number which stands for itself
+  (let* ((n (string->number number))
+         (name (and n (integer? n)
+                    (list-find candidates
+                               (lambda (c)
+                                 (== n (+ 1 (or (ahash-ref tmof-seqs c) 0))))))))
+    (set! tmof-seq-nr (+ tmof-seq-nr 1))
+    (when name (ahash-set! tmof-seqs name n))
+    `(seq (@ (name ,(or name ""))
+             (id ,(string-append (or name "Text") (number->string tmof-seq-nr))))
+          ,number)))
+
+(define (tmof-number? s)
+  ;; a number of a theorem or of a figure: 1, 2.3, A.1
+  (and (!= s "") (<= (string-length s) 12)
+       (list-or (map char-numeric? (string->list s)))
+       (list-and (map (lambda (c) (or (char-numeric? c) (char-alphabetic? c)
+                                      (in? c '(#\. #\-))))
+                      (string->list s)))))
+
+(define (tmof-numbered-name x candidates)
+  ;; the nodes of the name x of a theorem or of a figure, "Theorem 1": its
+  ;; number is a number of a sequence
+  (let* ((s (tmof-squeeze (tmof-plain x)))
+         (s (tmof-trim-lines s))
+         (i (let loop ((i (- (string-length s) 1)))
+              (cond ((< i 0) #f)
+                    ((char=? (string-ref s i) #\space) i)
+                    (else (loop (- i 1))))))
+         (word (and i (substring s 0 i)))
+         (number (and i (substring s (+ i 1) (string-length s)))))
+    (if (and number (tmof-number? number) (!= word ""))
+        (list (string-append (tmof-text-utf8 word) " ")
+              (tmof-seq (append candidates (list (tmof-text-utf8 word))) number))
+        (tmof (if (string? x) x x)))))
+
+(define (tmof-text-utf8 s)
+  ;; a text which tmof-plain made is in UTF-8 already
+  s)
+
+(define (tmof-labels x)
+  ;; the names of the labels inside the tree x
+  (cond ((not (pair? x)) '())
+        ((and (func? x 'label 1) (string? (cadr x)))
+         (if (string-starts? (cadr x) "auto-") '() (list (cork->utf8 (cadr x)))))
+        (else (append-map tmof-labels (cdr x)))))
+
+(define (tmof-label l)
+  ;; a label: a bookmark, which tmof-bind gives to what it numbers
+  (with name (if (and (pair? l) (string? (car l))) (cork->utf8 (car l)) "")
+    (if (or (== name "") (string-starts? name "auto-")) '()
+        `((bookmark (@ (name ,name)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Nodes: text and blocks
@@ -318,9 +385,17 @@
         (else (cons (car x) (map tmof-display-limits (cdr x))))))
 
 (define (tmof-display x . tag)
-  ;; a formula on its own lines, with the number which follows it if any
-  (with m (with r (tmof-mathml x) (and r (tmof-display-limits r)))
-    (if m `((!display ,m ,(if (nnull? tag) (car tag) ""))) '())))
+  ;; a formula on its own lines; the number which follows it, if any, is
+  ;; a number of the sequence of the equations, and the labels of the
+  ;; formula are after it
+  (let ((m (with r (tmof-mathml x) (and r (tmof-display-limits r))))
+        (number (if (and (nnull? tag) (!= (car tag) "")) (car tag) #f))
+        (labels (map (lambda (name) `(bookmark (@ (name ,name)))) (tmof-labels x))))
+    (if m
+        `((!display ,m
+                    ,@(if number `("(" ,(tmof-seq '("Equation") number) ")") '())
+                    ,@labels))
+        '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text markup
@@ -367,13 +442,16 @@
 (define tmof-LaTeX (tmof-name "LaTeX"))
 
 (define (tmof-hlink l)
-  ;; a link; a link inside the document is its text
+  ;; a link; a link inside the document is a reference to its label
   (if (< (length l) 2) (tmof-all l)
       (let ((body (tmof (car l)))
             (url (tmof-plain (cadr l))))
-        (if (or (== url "") (string-starts? url "#") (tmof-has-block? body))
-            body
-            `((a (@ (href ,url)) ,@(tmof-merge body)))))))
+        (cond ((or (== url "") (tmof-has-block? body)) body)
+              ((string-starts? url "#")
+               (if (null? (tmof-trim body)) '()
+                   `((ref (@ (name ,(substring url 1 (string-length url))))
+                          ,@(tmof-merge body)))))
+              (else `((a (@ (href ,url)) ,@(tmof-merge body))))))))
 
 (define (tmof-hlink* l)
   ;; a link with a title
@@ -687,12 +765,39 @@
 
 (define tmof-flat? #f)
 
+(define (tmof-numbered-title x)
+  ;; (number . title) when the tree x of a title is the layout which the
+  ;; styles make of a number and a title, a row of two cells; else #f
+  (cond ((not (pair? x)) #f)
+        ((and (func? x 'row 2) (func? (cadr x) 'cell 1) (func? (caddr x) 'cell 1))
+         (cons (cadr (cadr x)) (cadr (caddr x))))
+        (else (let loop ((l (cdr x)))
+                (cond ((null? l) #f)
+                      ((tmof-numbered-title (car l)) => identity)
+                      (else (loop (cdr l))))))))
+
 (define (tmof-heading level l)
-  (with old tmof-flat?
+  ;; a heading; its number, when it has one, is kept apart: the office
+  ;; programs number the headings themselves
+  (let* ((parts (and (list-1? l) (tmof-numbered-title (car l))))
+         ;; (the number is the text of its cell, without the space after it)
+         (number (and parts
+                      (with c (car parts)
+                        (tmof-trim-lines
+                          (tmof-squeeze
+                            (cond ((string? c) (tmof-plain c))
+                                  ((func? c 'concat)
+                                   (apply string-append
+                                          (map tmof-plain (list-filter (cdr c) string?))))
+                                  (else "")))))))
+         (number (and number (tmof-number? number) number))
+         (old tmof-flat?))
     (set! tmof-flat? #t)
-    (with t (tmof-trim (tmof-inline (tmof-all l)))
+    (with t (tmof-trim (tmof-inline (if number (tmof (cdr parts)) (tmof-all l))))
       (set! tmof-flat? old)
-      (if (null? t) '() `((!h ,level ,@t))))))
+      (cond ((null? t) '())
+            (number `((!h ,level (!number ,number) ,@t)))
+            (else `((!h ,level ,@t)))))))
 
 (define (tmof-part l) (tmof-heading 0 l))
 (define (tmof-chapter l) (tmof-heading 1 l))
@@ -750,6 +855,9 @@
     (append-map
       (lambda (par)
         (with start (tmof-item-start par)
+          (if (tmof-bibitem-start? par)
+              ;; an entry of the bibliography
+              (tmof-with-role "bibitem" (tmof-blocks (tmof par)))
           (if (and start (func? (car start) 'item*))
               (append
                 (list `(!role "term" ,@(tmof-inline (tmof-all (cdar start)))))
@@ -757,8 +865,22 @@
                                 (tmof-blocks (tmof `(concat ,@(cdr start))))))
               (tmof-with-role "definition"
                               (tmof-blocks
-                                (tmof (if start `(concat ,@(cdr start)) par)))))))
+                                (tmof (if start `(concat ,@(cdr start)) par))))))))
       pars)))
+
+(define (tmof-bibitem l)
+  ;; the label of an entry of the bibliography, "[1]": its number is one
+  ;; of the sequence of the references
+  (let* ((s (tmof-trim-lines (tmof-squeeze (tmof-plain (if (null? l) "" (car l))))))
+         (n (string-length s)))
+    (cond ((== s "") '())
+          ((and (> n 2) (string-starts? s "[") (string-ends? s "]"))
+           (list "[" (tmof-seq '("Reference") (substring s 1 (- n 1))) "] "))
+          (else (list s " ")))))
+
+(define (tmof-bibitem-start? par)
+  (or (func? par 'render-bibitem)
+      (and (func? par 'concat) (pair? (cdr par)) (func? (cadr par) 'render-bibitem))))
 
 (define (tmof-check item)
   ;; "true" or "false" for the box of an item of a task list, else #f
@@ -822,18 +944,27 @@
   ;; the body after a name in bold, as "Theorem 1."
   (let* ((n (tmof-trim (tmof-inline name)))
          (s (if (and (nnull? n) (string? (cAr n))) (cAr n) ""))
-         (dot? (and (!= s "") (not (in? (string-ref s (- (string-length s) 1))
-                                        '(#\. #\: #\! #\?)))))
+         (dot? (or (and (nnull? n) (func? (cAr n) 'seq))
+                   (and (!= s "") (not (in? (string-ref s (- (string-length s) 1))
+                                            '(#\. #\: #\! #\?))))))
          (n* (if (and dot? (nnull? n)) (append n (list ".")) n)))
     (if (null? n) (tmof-blocks body)
         (tmof-attach `((strong ,@n*) " ")
                      (with b (tmof-blocks body) (if (null? b) '((p)) b))
                      '()))))
 
-(define (tmof-render-enunciation l)
-  ;; the name with its number, and the body
+(define (tmof-enunciation-as role sequence l)
+  ;; the name with its number, and the body: paragraphs with a role
   (if (< (length l) 2) (tmof-all l)
-      (tmof-titled (tmof (car l)) (tmof (cadr l)))))
+      (tmof-with-role role
+                      (tmof-titled (tmof-numbered-name (car l) (list sequence))
+                                   (tmof (cadr l))))))
+
+(define (tmof-render-theorem l) (tmof-enunciation-as "theorem" "Theorem" l))
+(define (tmof-render-remark l) (tmof-enunciation-as "remark" "Theorem" l))
+(define (tmof-render-exercise l) (tmof-enunciation-as "remark" "Exercise" l))
+(define (tmof-render-proof l) (tmof-enunciation-as "proof" "Proof" l))
+(define (tmof-render-enunciation l) (tmof-enunciation-as "remark" "Theorem" l))
 
 (define tmof-enunciations
   '(theorem proposition lemma corollary conjecture axiom definition notation
@@ -843,8 +974,13 @@
 (define (tmof-enunciation tag l)
   ;; a theorem which was not expanded: its name without a number
   (let* ((s (symbol->string tag))
-         (s (if (string-ends? s "*") (substring s 0 (- (string-length s) 1)) s)))
-    (tmof-titled (list (upcase-first s)) (tmof-all l))))
+         (s (if (string-ends? s "*") (substring s 0 (- (string-length s) 1)) s))
+         (role (cond ((== s "proof") "proof")
+                     ((in? s '("theorem" "proposition" "lemma" "corollary"
+                               "conjecture" "axiom" "definition" "notation"))
+                      "theorem")
+                     (else "remark"))))
+    (tmof-with-role role (tmof-titled (list (upcase-first s)) (tmof-all l)))))
 
 (define (tmof-captioned body name caption)
   ;; a figure or a table, and its caption after the name with its number
@@ -865,7 +1001,11 @@
 (define (tmof-render-figure l)
   ;; the type, the name with its number, the figure and its caption
   (if (< (length l) 4) (tmof-all l)
-      (tmof-captioned (tmof (caddr l)) (tmof (cadr l)) (tmof (cadddr l)))))
+      (tmof-captioned (tmof (caddr l))
+                      (tmof-numbered-name
+                        (cadr l)
+                        (list (upcase-first (tmof-plain (car l)))))
+                      (tmof (cadddr l)))))
 
 (define (tmof-figure name l)
   ;; a figure which was not expanded: the figure and its caption
@@ -1155,7 +1295,7 @@
   (phantom tmof-noop)
 
   ;; what has no meaning in Markdown
-  ((:or assign provides label hidden hidden-binding set-binding write quote
+  ((:or assign provides hidden hidden-binding set-binding write quote
         quasiquote tuple attr tmlen macro xmacro arg value quote-value
         cwith twith tmarker
         vspace vspace* no-indent yes-indent no-indent* yes-indent*
@@ -1231,15 +1371,18 @@
   ((:or quotation quote-env verse) tmof-quotation)
 
   ;; environments
-  ((:or render-theorem render-remark render-exercise render-proof
-        render-solution render-enunciation)
-   tmof-render-enunciation)
+  (render-theorem tmof-render-theorem)
+  (render-remark tmof-render-remark)
+  ((:or render-exercise render-solution) tmof-render-exercise)
+  (render-proof tmof-render-proof)
+  (render-enunciation tmof-render-enunciation)
   ((:or render-big-figure render-small-figure render-big-algorithm
         render-small-algorithm)
    tmof-render-figure)
   ((:or big-figure small-figure) tmof-big-figure)
   ((:or big-table small-table) tmof-big-table)
-  (render-bibitem tmof-first)
+  (render-bibitem tmof-bibitem)
+  (label tmof-label)
   ((:or html-div-class html-div-style html-class html-style html-tag
         html-attr)
    tmof-last)
@@ -1290,8 +1433,11 @@
                      (else (list `(link (@ (href ,href)) ,@l))))))
             ((note) (list (cons 'note (tmof-final-blocks (cdr x)))))
             ((br) '((br)))
-            ((math image) (list x))
-            ((html footnote img) '())
+            ((math image bookmark seq) (list x))
+            ((ref)
+             (with l (tmof-final-inlines (tmof-node-children x))
+               (if (null? l) '() (list `(ref (@ ,@(tmof-node-attrs x)) ,@l)))))
+            ((html footnote img !number) '())
             ;; blocks inside a text: their text
             ((p !role !h !para)
              (tmof-final-inlines
@@ -1322,19 +1468,20 @@
             ((!h)
              (if (< (cadr x) 0)
                  (tmof-paragraph '((role "title")) (cddr x))
-                 (tmof-paragraph
-                   `((role "heading")
-                     (level ,(number->string
-                               (max 1 (min 9 (+ (- (cadr x) tmof-top-level) 1))))))
-                   (cddr x))))
+                 (let* ((numbered? (and (pair? (cddr x)) (func? (caddr x) '!number)))
+                        (number (and numbered? (cadr (caddr x)))))
+                   (tmof-paragraph
+                     `((role "heading")
+                       (level ,(number->string
+                                 (max 1 (min 9 (+ (- (cadr x) tmof-top-level) 1)))))
+                       (number ,number))
+                     (cddr x)))))
             ((!role) (tmof-paragraph `((role ,(cadr x))) (cddr x)))
             ;; a paragraph with its attributes
             ((!para) (tmof-paragraph (cadr x) (cddr x)))
             ((!display)
              (list `(p (math (@ (display "true") (form "sxml")) ,(cadr x))
-                       ,@(if (and (pair? (cddr x)) (!= (caddr x) ""))
-                             `((tab) ,(string-append "(" (caddr x) ")"))
-                             '()))))
+                       ,@(if (pair? (cddr x)) `((tab) ,@(cddr x)) '()))))
             ((blockquote)
              (map (lambda (b)
                     (if (and (func? b 'p) (not (ox-attr b 'role)))
@@ -1375,13 +1522,109 @@
 (define (tmof-final-blocks l)
   (append-map tmof-final-block l))
 
+;; A label of TeXmacs is the label of the last thing which has a number
+;; before it: a heading, a theorem, a figure, an equation. In an office
+;; file a reference shows the number of what it refers to when its target
+;; is this number. So the bookmarks of the labels are given to the numbers
+;; (the attribute labels of a node seq, or of a heading), and the
+;; references say what they refer to (kind and target).
+
+(define tmof-bound (make-ahash-table))    ; label -> (kind id)
+(define tmof-targets (make-ahash-table))  ; id -> labels, reversed
+(define tmof-target #f)                   ; the last thing with a number
+(define tmof-heading-nr 0)
+
+(define (tmof-bind-scan x)
+  ;; first pass: what each label is the label of
+  (cond ((not (pair? x)) (noop))
+        ((in? (car x) '(math image @)) (noop))
+        ((func? x 'seq)
+         (set! tmof-target (list "seq" (ox-attr x 'id))))
+        ((func? x 'bookmark)
+         (when tmof-target
+           (ahash-set! tmof-bound (ox-attr x 'name) tmof-target)
+           (ahash-set! tmof-targets (cadr tmof-target)
+                       (cons (ox-attr x 'name)
+                             (or (ahash-ref tmof-targets (cadr tmof-target)) '())))))
+        (else
+          (when (and (func? x 'p) (== (ox-attr x 'role) "heading") (ox-attr x 'number))
+            (set! tmof-target (list "heading" (ox-attr x 'id))))
+          (for-each tmof-bind-scan (ox-children x)))))
+
+(define (tmof-labels-attr id)
+  (with l (ahash-ref tmof-targets id)
+    (and l (string-recompose (reverse l) " "))))
+
+(define (tmof-bind-node x)
+  ;; second pass: the nodes for the node x
+  (cond ((not (pair? x)) (list x))
+        ((in? (car x) '(math image)) (list x))
+        ((func? x 'bookmark)
+         (if (ahash-ref tmof-bound (ox-attr x 'name)) '() (list x)))
+        ((func? x 'seq)
+         (list (apply office-node
+                      (cons* 'seq `((name ,(ox-attr x 'name)) (id ,(ox-attr x 'id))
+                                    (labels ,(tmof-labels-attr (ox-attr x 'id))))
+                             (ox-children x)))))
+        ((func? x 'ref)
+         (with target (ahash-ref tmof-bound (ox-attr x 'name))
+           (list (apply office-node
+                        (cons* 'ref `((name ,(ox-attr x 'name))
+                                      (kind ,(and target (car target)))
+                                      (target ,(and target (cadr target))))
+                               (append-map tmof-bind-node (ox-children x)))))))
+        (else
+          (let* ((children (append-map tmof-bind-node (ox-children x)))
+                 ;; (the texts around a label which went away are one)
+                 (children (if (in? (car x) '(list item table row cell note))
+                               children
+                               (office-merge children)))
+                 (attrs (ox-attrs x))
+                 (attrs (if (and (func? x 'p) (== (ox-attr x 'role) "heading")
+                                 (ox-attr x 'id))
+                            (append attrs
+                                    (with l (tmof-labels-attr (ox-attr x 'id))
+                                      (if l `((labels ,l)) '())))
+                            attrs)))
+            ;; a paragraph which only had a label is no paragraph
+            (if (and (func? x 'p) (null? children) (not (ox-attr x 'role))
+                     (pair? (ox-children x)))
+                '()
+                (list (if (null? attrs) (cons (car x) children)
+                          (cons* (car x) (cons '@ attrs) children))))))))
+
+(define (tmof-bind l)
+  ;; the blocks l with their labels bound
+  (set! tmof-bound (make-ahash-table))
+  (set! tmof-targets (make-ahash-table))
+  (set! tmof-target #f)
+  (set! tmof-heading-nr 0)
+  ;; the headings with a number get a name
+  (let* ((named (map (lambda (b)
+                       (if (and (func? b 'p) (== (ox-attr b 'role) "heading")
+                                (ox-attr b 'number))
+                           (begin
+                             (set! tmof-heading-nr (+ tmof-heading-nr 1))
+                             (cons* 'p (cons '@ (append (ox-attrs b)
+                                                        `((id ,(string-append
+                                                                 "heading"
+                                                                 (number->string tmof-heading-nr))))))
+                                    (ox-children b)))
+                           b))
+                     l)))
+    (for-each tmof-bind-scan named)
+    (with r (append-map tmof-bind-node named)
+      (set! tmof-bound (make-ahash-table))
+      (set! tmof-targets (make-ahash-table))
+      r)))
+
 (define (tmof-finalize l)
   ;; the blocks of the office tree: the first level of headings which is
   ;; used is the level 1
   (with levels (list-filter (append-map tmof-heading-levels l)
                             (lambda (n) (>= n 0)))
     (set! tmof-top-level (if (null? levels) 0 (apply min levels)))
-    (tmof-final-blocks l)))
+    (tmof-bind (tmof-final-blocks l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface

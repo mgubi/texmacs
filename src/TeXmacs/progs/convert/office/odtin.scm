@@ -232,6 +232,8 @@
     ("captioned figure" . "figure")
     ("definition term" . "term") ("definition definition" . "definition")
     ("definition" . "definition")
+    ("theorem" . "theorem") ("remark" . "remark") ("proof" . "proof")
+    ("bibliography" . "bibitem") ("bibliography 1" . "bibitem")
     ("list heading" . "term") ("list contents" . "definition")))
 
 (define (odt-heading-level name)
@@ -380,7 +382,7 @@
   (if (null? wrappers) l
       (append-map (lambda (x)
                     (if (and (pair? x) (in? (car x) '(note image math br tab
-                                                      bookmark pagebreak)))
+                                                      bookmark pagebreak seq)))
                         (list x)
                         (office-wrap (list x) wrappers)))
                   l)))
@@ -420,6 +422,11 @@
                (cond ((null? l) '())
                      (name (list `(ref (@ (name ,name)) ,@l)))
                      (else l))))
+            ;; a number of a sequence: of the figures, of the tables
+            ((text:sequence)
+             (with l (odt-inlines (ox-children x))
+               (if (null? l) '()
+                   (list `(seq (@ (name ,(or (ox-attr x 'text:name) ""))) ,@l)))))
             ((draw:frame) (odt-frame x))
             ((draw:a) (odt-inlines (ox-children x)))
             ((text:ruby)
@@ -503,6 +510,9 @@
           (list (apply office-node
                        (cons* 'p
                               `((role ,(car role)) (level ,(cadr role))
+                                (numbered ,(and heading?
+                                                (== (ox-attr x 'text:is-list-header) "true")
+                                                "no"))
                                 (align ,(cond ((== align "center") "center")
                                               ((in? align '("end" "right")) "right")
                                               (else #f))))

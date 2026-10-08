@@ -174,7 +174,9 @@
     ("source code" . "code") ("html preformatted" . "code")
     ("plain text" . "code") ("preformatted text" . "code")
     ("macro" . "code") ("code" . "code")
-    ("definition term" . "term") ("definition" . "definition")))
+    ("definition term" . "term") ("definition" . "definition")
+    ("theorem" . "theorem") ("remark" . "remark") ("proof" . "proof")
+    ("bibliography" . "bibitem")))
 
 (define (docx-toc-style? name)
   ;; the entries of a table of contents, and its heading
@@ -447,6 +449,9 @@
           ((and (or (string-starts? s "REF ") (string-starts? s "PAGEREF "))
                 (!= arg ""))
            (list `(ref (@ (name ,arg)) ,@l)))
+          ;; a number of a sequence: of the figures, of the tables
+          ((and (string-starts? s "SEQ ") (!= arg ""))
+           (list `(seq (@ (name ,arg)) ,@l)))
           (else l))))
 
 (define (docx-unwrap l)
@@ -554,6 +559,10 @@
                                 (align ,(cond ((== align "center") "center")
                                               ((in? align '("right" "end")) "right")
                                               (else #f)))
+                                ;; a heading which says that it has no
+                                ;; number, where the others have one
+                                (numbered ,(and (== (car role) "heading")
+                                                (== id "0") "no"))
                                 (dropcap ,(and (docx-get own 'dropcap) "true"))
                                 ;; a plain paragraph which is indented, as
                                 ;; one more paragraph of an item is

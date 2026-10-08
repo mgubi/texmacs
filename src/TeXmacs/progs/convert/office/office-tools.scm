@@ -18,8 +18,10 @@
 ;;   (office block...)
 ;;   blocks:  (meta (key "value")...)
 ;;            (p inline...)  with the attributes role (title, subtitle,
-;;              author, date, abstract, heading, quote, code, caption),
-;;              level (of a heading) and align (center, right, justify)
+;;              author, date, abstract, heading, quote, code, caption,
+;;              figure, term, definition, theorem, remark, proof, bibitem,
+;;              toc), level (of a heading), number (of a heading which
+;;              has one), labels (the bookmarks of a heading) and align
 ;;            (list (item block...)...)  with the attribute kind (bullet,
 ;;              number)
 ;;            (table (row (cell block...)...)...)  with the attributes
@@ -39,7 +41,12 @@
 ;;              file), width, height (lengths of TeXmacs), alt, and svg
 ;;              (the text of an SVG of the same picture, when there is one)
 ;;            (math "MathML")  with the attribute display
-;;            (bookmark)  (ref ...)  with the attribute name
+;;            (bookmark)  (ref ...)  with the attribute name; a ref also
+;;              has kind (seq, heading) and target when its bookmark is
+;;              the one of a number
+;;            (seq "1")  a number of a sequence, with the attributes name
+;;              (Figure; empty for a number which stands for itself), id
+;;              and labels (the names of the bookmarks of this number)
 ;;
 ;; The attributes are those of sxml, (tag (@ (name "value")...) ...).
 
@@ -306,6 +313,20 @@
             (if (string-ends? d "0")
                 (loop (substring d 0 (- (string-length d) 1)))
                 (string-append "." d)))))))
+
+(tm-define (office-labels x)
+  (:synopsis "The names of the bookmarks of the node @x, from its attribute labels")
+  (with s (ox-attr x 'labels)
+    (if (or (not s) (== s "")) '()
+        (list-filter (string-tokenize-by-char s #\space)
+                     (lambda (t) (!= t ""))))))
+
+(tm-define (office-numbered-headings? x)
+  (:synopsis "Whether a heading of the office tree @x has a number")
+  (cond ((not (pair? x)) #f)
+        ((in? (car x) '(math image @)) #f)
+        ((and (func? x 'p) (== (ox-attr x 'role) "heading") (ox-attr x 'number)) #t)
+        (else (list-or (map office-numbered-headings? (ox-children x))))))
 
 (tm-define (office-utf8 n)
   (:synopsis "The character of code @n, in UTF-8")

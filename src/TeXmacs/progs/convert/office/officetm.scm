@@ -172,6 +172,199 @@
 ;; Inline nodes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; The labels of what has a number: the bookmarks in a heading, in a
+;; caption, in a theorem, in an entry of the bibliography, or beside a
+;; number of a sequence.
+(define oftm-numbered-labels (make-ahash-table))
+
+(define (oftm-number? s)
+  ;; a number: 1, 2.3, A.1
+  (and (!= s "") (<= (string-length s) 12)
+       (list-or (map char-numeric? (string->list s)))
+       (list-and (map (lambda (c) (or (char-numeric? c) (char-alphabetic? c)
+                                      (in? c '(#\. #\-))))
+                      (string->list s)))))
+
+(define (oftm-has? x tag)
+  ;; whether a node tag is inside x
+  (cond ((not (pair? x)) #f)
+        ((in? (car x) '(math image @)) #f)
+        ((func? x tag) #t)
+        (else (list-or (map (lambda (y) (oftm-has? y tag)) (ox-children x))))))
+
+(define (oftm-bookmarks x)
+  ;; the names of the bookmarks inside x, but those of its notes
+  (cond ((not (pair? x)) '())
+        ((in? (car x) '(math image @ note)) '())
+        ((func? x 'bookmark) (if (ox-attr x 'name) (list (ox-attr x 'name)) '()))
+        (else (append-map oftm-bookmarks (ox-children x)))))
+
+(define (oftm-scan-labels x)
+  (cond ((not (pair? x)) (noop))
+        ((func? x 'p)
+         (when (or (in? (ox-attr x 'role)
+                        '("heading" "caption" "theorem" "remark" "proof" "bibitem"))
+                   (oftm-has? x 'seq))
+           (for (name (oftm-bookmarks x))
+             (ahash-set! oftm-numbered-labels name #t)))
+         (for-each oftm-scan-labels (ox-children x)))
+        ((in? (car x) '(math image @)) (noop))
+        (else (for-each oftm-scan-labels (ox-children x)))))
+
+;; The name and the number of a theorem or of a figure are the start of
+;; its paragraph: "Theorem 1." in bold, or "Figure 1:". TeXmacs writes
+;; them itself: they are taken away, and their labels are kept.
+
+(define (oftm-drop-start l n)
+  ;; the nodes l without the n first characters of their text
+  (cond ((or (null? l) (<= n 0)) l)
+        ((string? (car l))
+         (if (<= (string-length (car l)) n)
+             (oftm-drop-start (cdr l) (- n (string-length (car l))))
+             (cons (substring (car l) n (string-length (car l))) (cdr l))))
+        (else l)))
+
+(define (oftm-trim-start l)
+  ;; the nodes l without the spaces and the punctuation at their start
+  (if (and (pair? l) (string? (car l)))
+      (let loop ((i 0))
+        (if (and (< i (string-length (car l)))
+                 (in? (string-ref (car l) i) '(#\space #\. #\: #\-)))
+            (loop (+ i 1))
+            (with s (substring (car l) i (string-length (car l)))
+              (if (== s "") (oftm-trim-start (cdr l)) (cons s (cdr l))))))
+      l))
+
+(define (oftm-punctuation? s)
+  (list-and (map (lambda (c) (in? c '(#\space #\. #\: #\-))) (string->list s))))
+
+(define (oftm-named-start l)
+  ;; (word labels rest numbered?) when the nodes l of a paragraph start
+  ;; with a name, in bold or followed by a number of a sequence: "Theorem
+  ;; 1." or "Figure 1:", with the bookmarks of its labels; else #f
+  (let loop ((r l) (word "") (labels '()) (number? #f) (bold? #f))
+    (let ((done (lambda (rest)
+                  (let* ((w (string-trim-spaces word))
+                         (w (let trim ((w w))
+                              (if (and (!= w "")
+                                       (in? (string-ref w (- (string-length w) 1))
+                                            '(#\. #\: #\space)))
+                                  (trim (substring w 0 (- (string-length w) 1)))
+                                  w))))
+                    (and (!= w "") (or bold? number?)
+                         (not (string-index w #\space))
+                         (list w (reverse labels) (oftm-trim-start rest) number?))))))
+      (cond ((null? r) (done r))
+            ((func? (car r) 'bookmark)
+             (loop (cdr r) word
+                   (if (ox-attr (car r) 'name) (cons (ox-attr (car r) 'name) labels)
+                       labels)
+                   number? bold?))
+            ((and (func? (car r) 'seq) (not number?))
+             (loop (cdr r) word labels #t bold?))
+            ;; bold text: the name before the number, the dot after it
+            ((and (func? (car r) 'strong)
+                  (list-and (map (lambda (y) (or (string? y)
+                                                 (and (pair? y)
+                                                      (in? (car y) '(seq bookmark)))))
+                                 (ox-children (car r)))))
+             (let* ((c (ox-children (car r)))
+                    (text (apply string-append (list-filter c string?)))
+                    (inner-number? (list-or (map (lambda (y) (func? y 'seq)) c)))
+                    (inner-labels (append-map
+                                    (lambda (y)
+                                      (if (and (func? y 'bookmark) (ox-attr y 'name))
+                                          (list (ox-attr y 'name)) '()))
+                                    c)))
+               (cond ((and number? (oftm-punctuation? text) (not inner-number?))
+                      (loop (cdr r) word (append (reverse inner-labels) labels)
+                            number? #t))
+                     ((and (not number?) (== word ""))
+                      (loop (cdr r) text (append (reverse inner-labels) labels)
+                            inner-number? #t))
+                     (else (done r)))))
+            ;; plain text: the name before the number
+            ((and (string? (car r)) (not number?) (not bold?) (== word "")
+                  (pair? (cdr r))
+                  (or (func? (cadr r) 'seq) (func? (cadr r) 'bookmark)))
+             (loop (cdr r) (car r) labels number? bold?))
+            (else (done r))))))
+
+(define oftm-environments
+  '(("theorem" . theorem) ("proposition" . proposition) ("lemma" . lemma)
+    ("corollary" . corollary) ("conjecture" . conjecture) ("axiom" . axiom)
+    ("definition" . definition) ("notation" . notation) ("remark" . remark)
+    ("note" . note) ("example" . example) ("convention" . convention)
+    ("warning" . warning) ("exercise" . exercise) ("problem" . problem)
+    ("question" . question) ("solution" . solution) ("proof" . proof)))
+
+(define (oftm-labels names)
+  (map (lambda (name) `(label ,(oftm-text name))) names))
+
+(define (oftm-theorem l)
+  ;; (environment . rest) for the theorem which starts the blocks l: the
+  ;; paragraph with its name, and those of the same style after it which
+  ;; do not start another one; #f when the name is not one of TeXmacs
+  (let* ((x (car l))
+         (start (oftm-named-start (ox-children x)))
+         (env (and start (assoc-ref oftm-environments (locase-all (car start))))))
+    (and env
+         (let loop ((r (cdr l))
+                    (acc (list (oftm-concat
+                                 (append (oftm-labels (cadr start))
+                                         (append-map oftm-inline (caddr start)))))))
+           (if (and (pair? r) (func? (car r) 'p)
+                    (== (ox-attr (car r) 'role) (ox-attr x 'role))
+                    (not (oftm-named-start (ox-children (car r)))))
+               (loop (cdr r) (cons (oftm-inlines (ox-children (car r))) acc))
+               (cons `(,env ,(oftm-document (reverse acc))) r))))))
+
+(define (oftm-numbered-formula x)
+  ;; (formula labels) for a paragraph which is a formula on its own lines
+  ;; with its number after it; else #f
+  (let* ((l (list-filter (ox-children x)
+                         (lambda (y) (not (and (string? y)
+                                               (in? (string-trim-spaces y)
+                                                    '("" "(" ")" "()"))))))))
+    (and (pair? l) (func? (car l) 'math)
+         (list-and (map (lambda (y) (and (pair? y) (in? (car y) '(tab seq bookmark))))
+                        (cdr l)))
+         (list-or (map (lambda (y) (func? y 'seq)) (cdr l)))
+         (list (car l) (oftm-bookmarks (cons 'p (cdr l)))))))
+
+(define (oftm-bibliography l)
+  ;; (bibliography . rest) for the entries which start the blocks l
+  (let loop ((r l) (acc '()) (n 0))
+    (if (and (pair? r) (oftm-role? (car r) "bibitem"))
+        (let* ((c (ox-children (car r)))
+               ;; "[" the number "] " before the text of the entry
+               (c (if (and (pair? c) (string? (car c))
+                           (== (string-trim-spaces (car c)) "["))
+                      (cdr c) c))
+               (labels (oftm-bookmarks (cons 'p (list-filter c (lambda (y) (func? y 'bookmark))))))
+               (number (with s (list-find c (lambda (y) (func? y 'seq)))
+                         (if s (oftm-plain s) (number->string (+ n 1)))))
+               (rest (let skip ((c c))
+                       (if (and (pair? c) (pair? (car c))
+                                (in? (caar c) '(bookmark seq)))
+                           (skip (cdr c))
+                           c)))
+               (rest (if (and (pair? rest) (string? (car rest))
+                              (string-starts? (car rest) "]"))
+                         (oftm-trim-start (oftm-drop-start rest 1))
+                         rest)))
+          (loop (cdr r)
+                (cons (oftm-concat
+                        (append (list `(bibitem* ,number))
+                                (oftm-labels labels)
+                                (append-map oftm-inline rest)))
+                      acc)
+                (+ n 1)))
+        (cons `(bibliography "bib" "tm-plain" ""
+                             (document (bib-list ,(number->string (max 1 n))
+                                                 ,(oftm-document (reverse acc)))))
+              r))))
+
 (define (oftm-wrap tag l)
   (with t (oftm-inlines l)
     (if (== t "") '() (list (list tag t)))))
@@ -207,11 +400,17 @@
                        ((== href "") (list t))
                        (else (list `(hlink ,t ,href))))))
               ((ref)
-               ;; the text of the reference, as a link to its bookmark
+               ;; A reference to the label of something with a number,
+               ;; whose text is this number, is a reference of TeXmacs,
+               ;; which shows the number again; else the text of the
+               ;; reference is kept, as a link to its bookmark.
                (let ((t (oftm-inlines l))
                      (name (oftm-text (or (ox-attr x 'name) ""))))
                  (cond ((== t "") '())
                        ((== name "") (list t))
+                       ((and (ahash-ref oftm-numbered-labels (ox-attr x 'name))
+                             (string? t) (oftm-number? t))
+                        (list `(reference ,name)))
                        (else (list `(hlink ,t ,(string-append "#" name)))))))
               ((bookmark)
                (with name (ox-attr x 'name)
@@ -433,6 +632,10 @@
 (define (oftm-heading x)
   (let* ((n (or (string->number (or (ox-attr x 'level) "1")) 1))
          (tag (list-ref oftm-sections (max 0 (min (- n 1) 4))))
+         ;; a heading which says that it has no number
+         (tag (if (== (ox-attr x 'numbered) "no")
+                  (string->symbol (string-append (symbol->string tag) "*"))
+                  tag))
          (t (oftm-inlines (ox-children x))))
     (if (== t "") '() (list (list tag t)))))
 
@@ -508,7 +711,12 @@
           (else (cons `(description ,(oftm-document (reverse acc))) l)))))
 
 (define (oftm-caption x)
-  (oftm-inlines (ox-children x)))
+  ;; the text of a caption, without "Figure 1." at its start
+  (with start (oftm-named-start (ox-children x))
+    (if (and start (cadddr start))
+        (oftm-concat (append (oftm-labels (cadr start))
+                             (append-map oftm-inline (caddr start))))
+        (oftm-inlines (ox-children x)))))
 
 (define (oftm-blocks l)
   ;; the paragraphs of TeXmacs for a list of blocks. The blocks which
@@ -540,6 +748,19 @@
            (if (and (pair? r) (or (func? (car r) 'toc) (oftm-role? (car r) "toc")))
                (loop (cdr r))
                (cons '(table-of-contents "toc" (document "")) (oftm-blocks r)))))
+        ;; a theorem, a remark, a proof
+        ((and (func? (car l) 'p)
+              (in? (ox-attr (car l) 'role) '("theorem" "remark" "proof"))
+              (oftm-theorem l))
+         => (lambda (r) (cons (car r) (oftm-blocks (cdr r)))))
+        ;; the bibliography, without the heading which TeXmacs writes
+        ((oftm-role? (car l) "bibitem")
+         (with r (oftm-bibliography l)
+           (cons (car r) (oftm-blocks (cdr r)))))
+        ((and (oftm-role? (car l) "heading") (pair? (cdr l))
+              (oftm-role? (cadr l) "bibitem")
+              (in? (locase-all (oftm-plain (car l))) '("bibliography" "references")))
+         (oftm-blocks (cdr l)))
         ;; terms and their definitions
         ((oftm-role? (car l) "term")
          (with r (oftm-description l)
@@ -571,6 +792,17 @@
                 ((p)
                  (cond ((oftm-role? x "heading") (oftm-heading x))
                        ((oftm-role? x "skip") '())
+                       ;; a formula with its number: an equation
+                       ((oftm-numbered-formula x)
+                        => (lambda (r)
+                             (with f (oftm-formula (car r))
+                               (if (== f "") '()
+                                   (list `(equation
+                                            (document
+                                              ,(oftm-concat
+                                                 (append (if (func? f 'concat) (cdr f)
+                                                             (list f))
+                                                         (oftm-labels (cadr r)))))))))))
                        ;; a formula alone in its paragraph is displayed
                        ((oftm-only-formula x)
                         => (lambda (m)
@@ -639,4 +871,8 @@
   (:type (-> stree stree))
   (:synopsis "Convert the office tree @x into a TeXmacs document")
   (with l (if (func? x 'office) (cdr x) (list x))
-    `(document (body ,(oftm-body l)) (style "generic"))))
+    (set! oftm-numbered-labels (make-ahash-table))
+    (for-each oftm-scan-labels l)
+    (with r `(document (body ,(oftm-body l)) (style "generic"))
+      (set! oftm-numbered-labels (make-ahash-table))
+      r)))

@@ -201,6 +201,55 @@
   program can show is shown. The <name|SVG> is only made for drawings: the
   one of the picture of an embedded image is not always shown well.
 
+  <section|Numbers, labels and references>
+
+  The numbers of a document which is expanded are text: <samp|Theorem 1>,
+  a section title laid out as a table of its number and its text, a link
+  for each reference. <scm|texmacs-\<gtr\>office> makes of them what the
+  office programs count themselves.
+
+  <\itemize>
+    <item>A number is a node <scm|(seq "1")> of a sequence
+    (<scm|tmof-seq>): the first of its candidates of which it is the
+    next number (<samp|Theorem> for all the theorems, whose counter is
+    shared, or the name of the theorem; <samp|Figure>, <samp|Table>,
+    <samp|Equation>, <samp|Reference>). A number which is the next one
+    of no sequence has no sequence, and is written as it is.
+
+    <item>The number of a heading is apart from its title
+    (<scm|tmof-numbered-title>), in the attribute <verbatim|number>.
+
+    <item>A label is a bookmark, and a link inside the document a node
+    <verbatim|ref>. As in <TeXmacs>, a label is the label of the last
+    number before it: <scm|tmof-bind> gives the bookmarks to the numbers
+    (the attribute <verbatim|labels> of a <verbatim|seq> or of a heading)
+    and tells each <verbatim|ref> what it refers to (<verbatim|kind>).
+  </itemize>
+
+  The writers make fields of them. In <name|Word> a number is a field
+  <verbatim|SEQ> inside the bookmarks of its labels, and a reference a
+  field <verbatim|REF> to one of them, which shows what the bookmark
+  holds (<verbatim|\\r>, the number of its paragraph, for a heading);
+  the headings are numbered by a list which their styles refer to. The
+  fields are written in their long form (a run which begins the field,
+  its instruction, a separator, its result, its end): not all programs
+  read <verbatim|w:fldSimple>. In <name|OpenDocument> a number is a
+  <verbatim|text:sequence> inside bookmarks, a reference a
+  <verbatim|text:bookmark-ref> to the text of the bookmark or to the number
+  of the heading, and the headings are numbered by the outline style.
+
+  In the other direction the readers give the fields <verbatim|SEQ> and
+  the elements <verbatim|text:sequence> as nodes <verbatim|seq>, and
+  <scm|office-\<gtr\>texmacs> takes away the names and the numbers which
+  <TeXmacs> writes itself (<scm|oftm-named-start>): a paragraph of the
+  role <verbatim|theorem> which starts with <samp|Lemma 2.> is a
+  <markup|lemma>, a formula followed by its number an
+  <markup|equation>, the entries of a bibliography a
+  <markup|bibliography>. A reference is a <markup|reference> when its
+  target is the label of something with a number
+  (<scm|oftm-numbered-labels>) and its text is a number; else it stays a
+  link with its text.
+
   <section|Writing>
 
   The writers build the <name|XML> files as trees and serialize them
@@ -234,8 +283,9 @@
   <section|Known limitations>
 
   <\itemize>
-    <item>The numbers and the references are text; bookmarks and labels
-    are kept on import, but not written on export.
+    <item>A number which is not the next one of its sequence (numbers by
+    sections) is text. The names of the theorems are only known in
+    English on import.
 
     <item>The drawings, charts and text boxes of the office programs,
     comments and tracked changes are not imported.

@@ -687,6 +687,45 @@
   (check= (tm '(p (@ (role "caption")) "The table") '(table (row (cell (p "x")))))
           '((big-table (block (tformat (table (row (cell "x"))))) "The table"))))
 
+;; What has a number in an office file is what numbers itself in TeXmacs:
+;; the names and the numbers are taken away, the labels are kept, and the
+;; references to them are references.
+(define (test-officetm-numbers)
+  (check-group "officetm numbers")
+  (check= (tm '(p (@ (role "theorem")) (strong "Theorem ") (bookmark (@ (name "t")))
+                  (seq (@ (name "Theorem")) "1") (strong ".") " Body.")
+              '(p (@ (role "theorem")) "More.")
+              '(p (@ (role "proof")) (strong "Proof.") " Easy.")
+              '(p "see " (ref (@ (name "t")) "1") " and " (ref (@ (name "t")) "the theorem")))
+          '((theorem (document (concat (label "t") "Body.") "More."))
+            (proof (document "Easy."))
+            (concat "see " (reference "t") " and " (hlink "the theorem" "#t"))))
+  ;; a name which is not one of TeXmacs stays as it is
+  (check= (tm '(p (@ (role "theorem")) (strong "Satz 1.") " Text."))
+          '((concat (strong "Satz 1.") " Text.")))
+  ;; a formula with its number is an equation
+  (check= (tm '(p (math (@ (display "true")) "<math><mi>x</mi></math>") (tab) "("
+                  (bookmark (@ (name "e"))) (seq (@ (name "Equation")) "1") ")"))
+          '((equation (document (concat "x" (label "e"))))))
+  ;; a caption without the name of its figure
+  (check= (tm '(p (image (@ (name "f.png"))))
+              '(p (@ (role "caption")) "Figure " (seq (@ (name "Figure")) "1")
+                  ": The figure"))
+          '((big-figure (image "f.png" "" "" "" "") "The figure")))
+  ;; headings without a number
+  (check= (tm '(p (@ (role "heading") (level "1") (numbered "no")) "A")
+              '(p (@ (role "heading") (level "2")) (bookmark (@ (name "s"))) "B")
+              '(p (ref (@ (name "s")) "1.1")))
+          '((section* "A") (subsection (concat (label "s") "B")) (reference "s")))
+  ;; the entries of a bibliography, without the heading before them
+  (check= (tm '(p (@ (role "heading") (level "1")) "References")
+              '(p (@ (role "bibitem")) "[" (bookmark (@ (name "b")))
+                  (seq (@ (name "Reference")) "1") "] A. Author.")
+              '(p (@ (role "bibitem")) "Another one."))
+          '((bibliography "bib" "tm-plain" ""
+              (document (bib-list "2" (document (concat (bibitem* "1") (label "b") "A. Author.")
+                                                (concat (bibitem* "2") "Another one."))))))))
+
 (define (test-officetm-tables)
   (check-group "officetm tables")
   (check= (tm '(table (row (cell (@ (header "true")) (p "A"))
@@ -823,7 +862,12 @@
           '((p (@ (role "code")) "x" (br) "  y")))
   (check= (of '(document "a" (page-break) (hrule)))
           '((p "a") (pagebreak) (rule)))
-  (check= (of '(theorem (document "T"))) '((p (strong "Theorem.") " T")))
+  (check= (of '(theorem (document "T")))
+          '((p (@ (role "theorem")) (strong "Theorem.") " T")))
+  (check= (of '(remark (document "R")))
+          '((p (@ (role "remark")) (strong "Remark.") " R")))
+  (check= (of '(proof (document "P" "Q")))
+          '((p (@ (role "proof")) (strong "Proof.") " P") (p (@ (role "proof")) "Q")))
   ;; a figure or a table, and its caption
   (check= (of '(big-table (tabular (tformat (table (row (cell "a"))))) "cap"))
           '((table (@ (align "center")) (row (cell (@ (borders "none")) (p "a"))))
@@ -839,6 +883,60 @@
           '((p (@ (role "title")) "T") (p (@ (role "author")) "A")
             (p (@ (role "date")) "2026") (p (@ (role "abstract")) "Abs.")
             (p (@ (role "heading") (level "1")) "S") (p "x"))))
+
+;; The numbers and the labels. A name with its number, as the styles write
+;; it, is a number of a sequence when it is the next one; a label is given
+;; to the number before it, and a reference says what it refers to.
+(define (test-tmoffice-numbers)
+  (check-group "tmoffice numbers")
+  (check= (of '(document
+                 (render-theorem (concat "Theorem " (with "font-shape" "right" "1"))
+                                 (document (concat (label "thm:a") "T")))
+                 (render-theorem "Lemma 2" (document "L"))
+                 (concat "see " (hlink "1" "#thm:a") " and " (hlink "x" "#nowhere"))))
+          '((p (@ (role "theorem"))
+               (strong "Theorem " (seq (@ (name "Theorem") (id "Theorem1")
+                                          (labels "thm:a")) "1") ".")
+               " T")
+            (p (@ (role "theorem"))
+               (strong "Lemma " (seq (@ (name "Theorem") (id "Theorem2")) "2") ".")
+               " L")
+            (p "see " (ref (@ (name "thm:a") (kind "seq") (target "Theorem1")) "1")
+               " and " (ref (@ (name "nowhere")) "x"))))
+  ;; a number which is not the next one of its sequence stands for itself
+  (check= (of '(render-theorem "Theorem 2.1" (document "T")))
+          '((p (@ (role "theorem"))
+               (strong "Theorem " (seq (@ (id "Text1")) "2.1") ".") " T")))
+  ;; a figure, an equation, an entry of the bibliography
+  (check= (of '(render-big-figure "figure" "Figure 1" "body"
+                                  (concat (label "fig:a") "Cap.")))
+          '((p (@ (role "figure")) "body")
+            (p (@ (role "caption"))
+               (strong "Figure " (seq (@ (name "Figure") (id "Figure1")
+                                         (labels "fig:a")) "1") ".")
+               " Cap.")))
+  (check= (of '(equation-lab (document (concat "x" (label "eq:a"))) "1"))
+          '((p (math (@ (display "true") (form "sxml")) (m:math (m:mi "x")))
+               (tab) "(" (seq (@ (name "Equation") (id "Equation1") (labels "eq:a")) "1")
+               ")")))
+  (check= (of '(description (document (concat (render-bibitem (strong "[1]  "))
+                                              (label "bib-a") "A. Author."))))
+          '((p (@ (role "bibitem")) "["
+               (seq (@ (name "Reference") (id "Reference1") (labels "bib-a")) "1")
+               "] A. Author.")))
+  ;; a heading whose title is laid out with its number: the number is
+  ;; apart, and a label after the heading is the one of the heading
+  (check= (of '(document
+                 (section-title (tformat (table (row (cell (concat "2" (space "2spc")))
+                                                     (cell "Second")))))
+                 (label "sec:b")
+                 (concat "see " (hlink "2" "#sec:b"))
+                 (section-title "Plain")))
+          '((p (@ (role "heading") (level "1") (number "2") (id "heading1")
+                  (labels "sec:b"))
+               "Second")
+            (p "see " (ref (@ (name "sec:b") (kind "heading") (target "heading1")) "2"))
+            (p (@ (role "heading") (level "1")) "Plain"))))
 
 ;; A drawing is a picture which the editor makes: a PNG, with an SVG beside
 ;; it where it can be made (the builds with MuPDF).
@@ -1027,6 +1125,42 @@
     (document (description (document (concat (item* "T") "D"))) "x")
     (document "a" (page-break) "b")))
 
+;; A document with numbers, as the editor expands it, comes back from both
+;; formats with its theorems, its equations, its references. (The labels
+;; have other names in a Word file, which only allows some characters.)
+(define (test-numbered-round-trip)
+  (check-group "numbered round trip")
+  (let* ((expanded
+           '(document
+              (section-title (tformat (table (row (cell (concat "1" (space "2spc")))
+                                                  (cell "Intro")))))
+              (label "s")
+              (concat "see " (hlink "1" "#t") ", (" (hlink "1" "#e") ") and "
+                      (hlink "1" "#s"))
+              (render-theorem "Theorem 1" (document (concat (label "t") "Body.")))
+              (render-proof "Proof" (document "Easy."))
+              (equation-lab (document (concat "x" (label "e"))) "1")
+              (section-title "Plain")))
+         (back (lambda (fm)
+                 (cdr (cadr (cadr (convert (convert expanded "texmacs-stree" fm)
+                                           fm "texmacs-stree")))))))
+    (check= (back "odt-document")
+            '((section (concat (label "s") "Intro"))
+              (concat "see " (reference "t") ", (" (reference "e") ") and "
+                      (reference "s"))
+              (theorem (document (concat (label "t") "Body.")))
+              (proof (document "Easy."))
+              (equation (document (concat "x" (label "e"))))
+              (section* "Plain")))
+    (check= (back "docx-document")
+            '((section (concat (label "tm_s") "Intro"))
+              (concat "see " (reference "tm_t") ", (" (reference "tm_e") ") and "
+                      (reference "tm_s"))
+              (theorem (document (concat (label "tm_t") "Body.")))
+              (proof (document "Easy."))
+              (equation (document (concat "x" (label "tm_e"))))
+              (section* "Plain")))))
+
 (define (test-round-trips)
   (check-group "round trips")
   (for-each
@@ -1088,15 +1222,18 @@
   (test-officetm-text)
   (test-officetm-math)
   (test-officetm-blocks)
+  (test-officetm-numbers)
   (test-officetm-tables)
   (test-officetm-title)
   (test-tmoffice-text)
   (test-tmoffice-blocks)
   (test-tmoffice-tables)
+  (test-tmoffice-numbers)
   (test-tmoffice-drawings)
   (test-tmoffice-tmdoc)
   (test-mathml-omml)
   (test-writers)
   (test-round-trips)
+  (test-numbered-round-trip)
   (test-formats)
   (check-end))

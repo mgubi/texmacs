@@ -35,6 +35,9 @@
 (define dx-item #f)         ; (list level) for the next paragraph of an item
 (define dx-indent 0)        ; the depth of the lists around a paragraph
 (define dx-cell-align #f)   ; the alignment of the cell around a paragraph
+(define dx-numbered? #f)    ; the headings are numbered by Word
+(define dx-bookmarks (make-ahash-table)) ; a label -> its bookmark
+(define dx-bookmark-names (make-ahash-table)) ; the bookmarks which are used
 
 (define dx-text-width 9026) ; the width of the text, in twentieths of a point
 
@@ -204,6 +207,88 @@
           (list `(w:r (w:rPr ,(dx-val 'w:rStyle "FootnoteReference"))
                       (w:footnoteReference (@ (w:id ,(number->string n))))))))))
 
+(define (dx-bookmark-name name)
+  ;; The name of the bookmark of a label. Word wants letters, digits and
+  ;; _ only, a letter first, 40 characters at most: thm:main is tm_thm_main.
+  (or (ahash-ref dx-bookmarks name)
+      (let* ((safe (list->string
+                     (map (lambda (c)
+                            (if (and (< (char->integer c) 128)
+                                     (or (char-alphabetic? c) (char-numeric? c)))
+                                c #\_))
+                          (string->list name))))
+             (base (string-append
+                     "tm_" (substring safe 0 (min 30 (string-length safe)))))
+             (unique (let loop ((n 1) (s base))
+                       (if (ahash-ref dx-bookmark-names s)
+                           (loop (+ n 1) (string-append base "_" (number->string n)))
+                           s))))
+        (ahash-set! dx-bookmark-names unique #t)
+        (ahash-set! dx-bookmarks name unique)
+        unique)))
+
+(define (dx-bookmarked labels l)
+  ;; the elements l inside the bookmarks of these labels
+  (let* ((ids (map (lambda (name) (number->string (dx-next-id))) labels)))
+    (append (map (lambda (name id)
+                   `(w:bookmarkStart (@ (w:id ,id) (w:name ,(dx-bookmark-name name)))))
+                 labels ids)
+            l
+            (map (lambda (id) `(w:bookmarkEnd (@ (w:id ,id)))) (reverse ids)))))
+
+(define (dx-sequence-name s)
+  ;; the name of a sequence for Word: letters of ASCII
+  (with t (list->string
+            (list-filter (string->list s)
+                         (lambda (c) (and (< (char->integer c) 128)
+                                          (char-alphabetic? c)))))
+    (if (== t "") "Sequence" t)))
+
+(define (dx-field-runs instruction runs)
+  ;; A field in a paragraph: the runs which begin it, hold its instruction,
+  ;; separate it from its result, which is runs, and end it. (The short
+  ;; form w:fldSimple is not read by all programs.)
+  `((w:r (w:fldChar (@ (w:fldCharType "begin"))))
+    (w:r (w:instrText (@ (xml:space "preserve")) ,instruction))
+    (w:r (w:fldChar (@ (w:fldCharType "separate"))))
+    ,@runs
+    (w:r (w:fldChar (@ (w:fldCharType "end"))))))
+
+(define (dx-seq x props)
+  ;; A number of a sequence: a field SEQ, which Word counts, inside the
+  ;; bookmarks of its labels, so that a reference to one of them shows
+  ;; this number.
+  (let* ((name (ox-attr x 'name))
+         (runs (dx-inlines (ox-children x) props)))
+    (dx-bookmarked
+      (office-labels x)
+      (if (and name (!= name ""))
+          (dx-field-runs (string-append " SEQ " (dx-sequence-name name)
+                                        " \\* ARABIC ")
+                         runs)
+          runs))))
+
+(define (dx-ref x props)
+  ;; A reference: a field REF to the bookmark of a number, which shows
+  ;; this number (the one of the paragraph, for a heading); else a link.
+  (let* ((name (or (ox-attr x 'name) ""))
+         (kind (ox-attr x 'kind))
+         (l (ox-children x)))
+    (cond ((== name "") (dx-inlines l props))
+          ((in? kind '("seq" "heading"))
+           (with runs (dx-inlines l props)
+             (if (null? runs) '()
+                 (dx-field-runs (string-append
+                                  " REF " (dx-bookmark-name name)
+                                  (if (== kind "heading") " \\r" "")
+                                  " \\h ")
+                                runs))))
+          (else
+            (with runs (dx-inlines l (cons 'hyperlink props))
+              (if (null? runs) '()
+                  (list `(w:hyperlink (@ (w:anchor ,(dx-bookmark-name name)))
+                                      ,@runs))))))))
+
 (define (dx-inline x props)
   ;; the elements of a paragraph for an inline node inside the wrappers
   ;; props
@@ -219,15 +304,16 @@
                                  (cons (list 'color (office-color (ox-attr x 'value)))
                                        props)
                                  props)))
-              ((link ref)
-               (let* ((href (if (func? x 'ref)
-                                (string-append "#" (or (ox-attr x 'name) ""))
-                                (or (ox-attr x 'href) "")))
+              ((seq) (dx-seq x props))
+              ((ref) (dx-ref x props))
+              ((link)
+               (let* ((href (or (ox-attr x 'href) ""))
                       (runs (dx-inlines l (cons 'hyperlink props))))
                  (cond ((null? runs) '())
                        ((string-starts? href "#")
                         (list `(w:hyperlink
-                                 (@ (w:anchor ,(substring href 1 (string-length href))))
+                                 (@ (w:anchor ,(dx-bookmark-name
+                                                 (substring href 1 (string-length href)))))
                                  ,@runs)))
                        ((or dx-in-note? (== href "")) (dx-inlines l props))
                        (else
@@ -235,9 +321,7 @@
                                   (@ (r:id ,(dx-relation "hyperlink" href #t)))
                                   ,@runs))))))
               ((bookmark)
-               (with n (number->string (dx-next-id))
-                 (list `(w:bookmarkStart (@ (w:id ,n) (w:name ,(or (ox-attr x 'name) ""))))
-                       `(w:bookmarkEnd (@ (w:id ,n))))))
+               (dx-bookmarked (list (or (ox-attr x 'name) "")) '()))
               ((note) (dx-note x))
               ((br) (list (dx-run '() '(w:br))))
               ((tab) (list (dx-run '() '(w:tab))))
@@ -258,7 +342,9 @@
   '(("title" . "Title") ("subtitle" . "Subtitle") ("author" . "Author")
     ("date" . "Date") ("abstract" . "Abstract") ("quote" . "Quote")
     ("code" . "SourceCode") ("caption" . "Caption") ("figure" . "Figure")
-    ("term" . "DefinitionTerm") ("definition" . "Definition")))
+    ("term" . "DefinitionTerm") ("definition" . "Definition")
+    ("theorem" . "Theorem") ("remark" . "Remark") ("proof" . "Proof")
+    ("bibitem" . "Bibliography")))
 
 (define (dx-paragraph-style x)
   (with role (ox-attr x 'role)
@@ -279,6 +365,11 @@
              (cond (item
                     `((w:numPr ,(dx-val 'w:ilvl (number->string (cadr item)))
                                ,(dx-val 'w:numId (number->string (car item))))))
+                   ;; a heading without a number, where the headings have
+                   ;; one by their style
+                   ((and dx-numbered? (== (ox-attr x 'role) "heading")
+                         (not (ox-attr x 'number)))
+                    `((w:numPr ,(dx-val 'w:numId "0"))))
                    ((> dx-indent 0)
                     `((w:ind (@ (w:left ,(number->string (* 720 dx-indent)))))))
                    (else '()))
@@ -288,6 +379,8 @@
                    (else '())))))
     (set! dx-item #f)
     (list `(w:p ,@(if (null? props) '() (list (cons 'w:pPr props)))
+                ;; the bookmarks of the labels of a heading
+                ,@(dx-bookmarked (office-labels x) '())
                 ,@(dx-inlines (ox-children x) '())))))
 
 (define (dx-list x)
@@ -510,6 +603,11 @@
     (dx-style "paragraph" (string-append "Heading" s) (string-append "heading " s)
               (dx-val 'w:basedOn "Normal") (dx-val 'w:next "Normal") '(w:qFormat)
               `(w:pPr (w:keepNext)
+                      ;; the numbers of the headings, when they have some
+                      ,@(if dx-numbered?
+                            `((w:numPr ,(dx-val 'w:ilvl (number->string (- n 1)))
+                                       ,(dx-val 'w:numId "999")))
+                            '())
                       (w:spacing (@ (w:before ,(if (<= n 2) "360" "240"))
                                     (w:after "120")))
                       ,(dx-val 'w:outlineLvl (number->string (- n 1))))
@@ -568,6 +666,19 @@
      ,(dx-style "paragraph" "Definition" "Definition"
                 (dx-val 'w:basedOn "Normal")
                 `(w:pPr (w:ind (@ (w:left "720")))))
+     ,(dx-style "paragraph" "Theorem" "Theorem"
+                (dx-val 'w:basedOn "Normal")
+                `(w:pPr (w:spacing (@ (w:before "120") (w:after "120"))))
+                `(w:rPr (w:i)))
+     ,(dx-style "paragraph" "Remark" "Remark"
+                (dx-val 'w:basedOn "Normal")
+                `(w:pPr (w:spacing (@ (w:before "120") (w:after "120")))))
+     ,(dx-style "paragraph" "Proof" "Proof"
+                (dx-val 'w:basedOn "Normal")
+                `(w:pPr (w:spacing (@ (w:before "120") (w:after "120")))))
+     ,(dx-style "paragraph" "Bibliography" "Bibliography"
+                (dx-val 'w:basedOn "Normal")
+                `(w:pPr (w:ind (@ (w:left "567") (w:hanging "567")))))
      ,(dx-style "paragraph" "FootnoteText" "footnote text"
                 (dx-val 'w:basedOn "Normal")
                 `(w:pPr (w:spacing (@ (w:after "0"))))
@@ -615,6 +726,31 @@
                               ,(dx-val 'w:multiLevelType "hybridMultilevel")
                               ,@(map (lambda (i) (dx-level kind i)) (iota 9))))
             '("bullet" "number") '("1" "2"))
+     ;; the numbers of the headings: 1, 1.1, 1.1.1 by their styles
+     ,@(if dx-numbered?
+           `((w:abstractNum
+               (@ (w:abstractNumId "3"))
+               ,(dx-val 'w:multiLevelType "multilevel")
+               ,@(map (lambda (i)
+                        `(w:lvl (@ (w:ilvl ,(number->string i)))
+                                ,(dx-val 'w:start "1")
+                                ,(dx-val 'w:numFmt "decimal")
+                                ,(dx-val 'w:pStyle
+                                         (string-append "Heading" (number->string (+ i 1))))
+                                ,(dx-val 'w:suff "space")
+                                ,(dx-val 'w:lvlText
+                                         (string-recompose
+                                           (map (lambda (k)
+                                                  (string-append "%" (number->string (+ k 1))))
+                                                (iota (+ i 1)))
+                                           "."))
+                                ,(dx-val 'w:lvlJc "left")
+                                (w:pPr (w:ind (@ (w:left "0") (w:firstLine "0"))))))
+                      (iota 9))))
+           '())
+     ,@(if dx-numbered?
+           `((w:num (@ (w:numId "999")) ,(dx-val 'w:abstractNumId "3")))
+           '())
      ,@(map (lambda (l)
               `(w:num (@ (w:numId ,(number->string (car l))))
                       ,(dx-val 'w:abstractNumId (if (== (cadr l) "bullet") "1" "2"))
@@ -705,6 +841,9 @@
   (set! dx-item #f)
   (set! dx-indent 0)
   (set! dx-cell-align #f)
+  (set! dx-numbered? (office-numbered-headings? x))
+  (set! dx-bookmarks (make-ahash-table))
+  (set! dx-bookmark-names (make-ahash-table))
   ;; the relations of the files which are always there come first
   (dx-relation "styles" "styles.xml" #f)
   (dx-relation "numbering" "numbering.xml" #f)

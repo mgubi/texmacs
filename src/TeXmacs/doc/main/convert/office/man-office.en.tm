@@ -70,18 +70,54 @@
 
   <paragraph|Exporting>
 
-  A document is first expanded as for <name|Html>: the numbers of the
-  sections, of the theorems and of the equations, the references and the
-  citations are those which <TeXmacs> displays (update the document first,
-  with <menu|Document|Update|All>). The file which is written uses named
-  styles for its paragraphs (<samp|Heading 1>, <samp|Title>,
-  <samp|Caption>, <samp|Quote>...), so that its look can be changed at once
-  in <name|Word> or <name|LibreOffice> by changing these styles or by
-  applying a template.
+  The file which is written uses named styles for its paragraphs
+  (<samp|Heading 1>, <samp|Title>, <samp|Caption>, <samp|Quote>,
+  <samp|Theorem>, <samp|Proof>, <samp|Bibliography>...), so that its look
+  can be changed at once in <name|Word> or <name|LibreOffice> by changing
+  these styles or by applying a template.
 
-  Theorems, proofs and the like are written with their name and number in
-  bold before their body, and figures and tables with their caption after
-  them.
+  <paragraph|Numbers and references>
+
+  The numbers of a document stay numbers in the office programs, which
+  count them again when the document changes there (in <name|Word>, select
+  all and press <key|F9>; in <name|LibreOffice>, <samp|Tools>,
+  <samp|Update>, <samp|Fields>). Update the document in <TeXmacs> first,
+  with <menu|Document|Update|All>: the numbers which are written are those
+  which it displays.
+
+  <\description>
+    <item*|Headings>The sections are numbered by the office program, as
+    1, 1.1, 1.1.1; a section without a number has none.
+
+    <item*|Theorems, figures, tables, equations>Their numbers are fields
+    of a sequence (<samp|Theorem>, <samp|Figure>, <samp|Table>,
+    <samp|Equation>). Theorems, proofs and the like are paragraphs with
+    their name and number in bold, in the style <samp|Theorem>,
+    <samp|Remark> or <samp|Proof>; a figure or a table is followed by its
+    caption.
+
+    <item*|References>A reference is a field which shows the number of
+    its target, and follows it. The labels are bookmarks; in a
+    <name|Word> file their names only have letters, digits and
+    <verbatim|_> (<verbatim|thm:main> is <verbatim|tm_thm_main>).
+
+    <item*|Bibliography>The entries are paragraphs in the style
+    <samp|Bibliography> with numbers of the sequence <samp|Reference>,
+    and a citation is a reference to its entry.
+  </description>
+
+  A number is only written as a field when it is the next one of its
+  sequence: with another way of numbering (by sections, as 2.1) it is
+  written as it is, and the references to it show it as it is.
+
+  In the other direction, the paragraphs in the styles <samp|Theorem>,
+  <samp|Remark> and <samp|Proof> which start with an English name
+  (<samp|Theorem>, <samp|Lemma>, <samp|Definition>, <samp|Proof>...) are
+  the environments of <TeXmacs>, a formula with its number is a numbered
+  equation, the paragraphs in the style <samp|Bibliography> are a
+  bibliography, and a reference whose text is the number of its target is
+  a reference of <TeXmacs>. A document which was exported comes back with
+  its numbers and its references.
 
   <paragraph|Limitations>
 
@@ -89,10 +125,10 @@
     <item>Fonts, sizes, indentations and spacings of the text are not
     kept, in either direction.
 
-    <item>The numbers of the sections and the references are written as
-    text: they are not renumbered by <name|Word> or <name|LibreOffice>
-    when the document changes there. In the other direction, a
-    cross-reference is a link to its target, with the text it had.
+    <item>A reference of an office document whose text is more than a
+    number (\PTable 3\Q, the title of a section) is a link to its
+    target, with the text it had. The theorems of a document in another
+    language than English stay paragraphs.
 
     <item>A drawing which was exported is a picture: it cannot be edited
     in the office programs, and it comes back as an image. The drawings,
@@ -101,7 +137,9 @@
     <item>Comments and the history of the changes are not imported: the
     text is the one with all the changes accepted.
 
-    <item>The bibliography is text.
+    <item>The bibliography is its entries as they are displayed: the
+    data of the references (authors, years) and the citation fields of
+    the office programs or of <name|Zotero> are not exchanged.
   </itemize>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

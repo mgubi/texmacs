@@ -31,6 +31,8 @@
 (define ot-files '())                 ; (name type data) of the files, reversed
 (define ot-id 0)                      ; the last number given to a thing
 (define ot-cell-align #f)             ; the alignment of the cell around
+(define ot-numbered? #f)              ; the headings are numbered
+(define ot-sequences '())             ; the names of the sequences
 
 (define ot-text-width 16.0)           ; the width of the text, in centimeters
 
@@ -237,6 +239,44 @@
                                      '((text:p (@ (text:style-name "Footnote"))))
                                      blocks)))))))
 
+(define (ot-seq x props)
+  ;; A number of a sequence, which the program counts, inside the
+  ;; bookmarks of its labels, so that a reference to one of them shows
+  ;; this number.
+  (let* ((name (ox-attr x 'name))
+         (labels (office-labels x))
+         (inner (ot-inlines (ox-children x) props))
+         (number (if (and name (!= name ""))
+                     (begin
+                       (when (not (in? name ot-sequences))
+                         (set! ot-sequences (cons name ot-sequences)))
+                       (ot-span props
+                                (list `(text:sequence
+                                         (@ (text:name ,name)
+                                            (text:formula ,(string-append "ooow:" name "+1"))
+                                            (style:num-format "1"))
+                                         ,@(ox-children x)))))
+                     inner)))
+    (append (map (lambda (l) `(text:bookmark-start (@ (text:name ,l)))) labels)
+            number
+            (map (lambda (l) `(text:bookmark-end (@ (text:name ,l)))) (reverse labels)))))
+
+(define (ot-ref x props)
+  ;; a reference: to the text of the bookmark of a number, to the number
+  ;; of a heading, or else a link
+  (let* ((name (or (ox-attr x 'name) ""))
+         (kind (ox-attr x 'kind))
+         (inner (ot-inlines (ox-children x) props)))
+    (cond ((or (== name "") (null? inner)) inner)
+          ((in? kind '("seq" "heading"))
+           (list `(text:bookmark-ref
+                    (@ (text:reference-format ,(if (== kind "heading") "number" "text"))
+                       (text:ref-name ,name))
+                    ,@inner)))
+          (else (list `(text:a (@ (xlink:type "simple")
+                                  (xlink:href ,(string-append "#" name)))
+                               ,@inner))))))
+
 (define (ot-inline x props)
   ;; the nodes of a paragraph for an inline node inside the wrappers props
   (cond ((string? x) (if (== x "") '() (ot-span props (ot-text x))))
@@ -251,10 +291,10 @@
                                  (cons (list 'color (office-color (ox-attr x 'value)))
                                        props)
                                  props)))
-              ((link ref)
-               (let ((href (if (func? x 'ref)
-                               (string-append "#" (or (ox-attr x 'name) ""))
-                               (or (ox-attr x 'href) "")))
+              ((seq) (ot-seq x props))
+              ((ref) (ot-ref x props))
+              ((link)
+               (let ((href (or (ox-attr x 'href) ""))
                      (inner (ot-inlines l props)))
                  (cond ((null? inner) '())
                        ((in? href '("" "#")) inner)
@@ -286,7 +326,9 @@
     ("date" . "Date") ("abstract" . "Abstract") ("quote" . "Quotations")
     ("code" . "Preformatted_20_Text") ("caption" . "Caption")
     ("figure" . "Figure") ("term" . "Definition_20_Term")
-    ("definition" . "Definition_20_Definition")))
+    ("definition" . "Definition_20_Definition")
+    ("theorem" . "Theorem") ("remark" . "Remark") ("proof" . "Proof")
+    ("bibitem" . "Bibliography")))
 
 (define (ot-paragraph-style base align break? rule?)
   ;; the name of the style of a paragraph: the style base, or one which
@@ -324,10 +366,18 @@
                   base
                   (or (ox-attr x 'align) ot-cell-align (and formula? "center"))
                   #f #f))
-         (l (ot-inlines (ox-children x) '())))
+         (l (append
+              ;; the bookmarks of the labels of a heading
+              (map (lambda (name) `(text:bookmark (@ (text:name ,name))))
+                   (office-labels x))
+              (ot-inlines (ox-children x) '()))))
     (if level
         (list `(text:h (@ (text:style-name ,style)
-                          (text:outline-level ,(number->string level)))
+                          (text:outline-level ,(number->string level))
+                          ;; a heading without a number among numbered ones
+                          ,@(if (and ot-numbered? (not (ox-attr x 'number)))
+                                '((text:is-list-header "true"))
+                                '()))
                        ,@l))
         (list `(text:p (@ (text:style-name ,style)) ,@l)))))
 
@@ -660,6 +710,37 @@
            (@ (fo:color "#954f72") (style:text-underline-style "solid")
               (style:text-underline-width "auto")
               (style:text-underline-color "font-color"))))
+       ,(ot-paragraph-style-element
+          "Theorem" #f "Text_20_body"
+          '((fo:margin-top "0.2cm") (fo:margin-bottom "0.2cm"))
+          '((fo:font-style "italic")))
+       ,(ot-paragraph-style-element
+          "Remark" #f "Text_20_body"
+          '((fo:margin-top "0.2cm") (fo:margin-bottom "0.2cm")) '())
+       ,(ot-paragraph-style-element
+          "Proof" #f "Text_20_body"
+          '((fo:margin-top "0.2cm") (fo:margin-bottom "0.2cm")) '())
+       ,(ot-paragraph-style-element
+          "Bibliography" #f "Text_20_body"
+          '((fo:margin-left "1cm") (fo:text-indent "-1cm")) '())
+       ;; the numbers of the headings: 1, 1.1, 1.1.1
+       ,@(if ot-numbered?
+             `((text:outline-style
+                 (@ (style:name "Outline"))
+                 ,@(map (lambda (i)
+                          `(text:outline-level-style
+                             (@ (text:level ,(number->string (+ i 1)))
+                                (style:num-format "1")
+                                ,@(if (> i 0)
+                                      `((text:display-levels ,(number->string (+ i 1))))
+                                      '()))
+                             (style:list-level-properties
+                               (@ (text:list-level-position-and-space-mode
+                                    "label-alignment"))
+                               (style:list-level-label-alignment
+                                 (@ (text:label-followed-by "space"))))))
+                        (iota 9))))
+             '())
        (style:style (@ (style:name "Graphics") (style:family "graphic")))
        (style:style (@ (style:name "Formula") (style:family "graphic"))))))
 
@@ -681,7 +762,16 @@
            (@ (style:vertical-pos "middle") (style:vertical-rel "text")
               (fo:border "none") (fo:padding "0cm"))))
        ,@(reverse ot-style-list))
-     (office:body (office:text ,@blocks))))
+     (office:body
+       (office:text
+         ;; the sequences which the text counts
+         ,@(if (null? ot-sequences) '()
+               `((text:sequence-decls
+                   ,@(map (lambda (name)
+                            `(text:sequence-decl
+                               (@ (text:display-outline-level "0") (text:name ,name))))
+                          (reverse ot-sequences)))))
+         ,@blocks))))
 
 (define (ot-manifest files)
   `(manifest:manifest
@@ -711,6 +801,8 @@
   (set! ot-files '())
   (set! ot-id 0)
   (set! ot-cell-align #f)
+  (set! ot-numbered? (office-numbered-headings? x))
+  (set! ot-sequences '())
   (let* ((blocks (ot-blocks-with (if (func? x 'office) (cdr x) (list x))
                                  "Text_20_body"))
          (blocks (if (null? blocks)
