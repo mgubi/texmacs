@@ -47,7 +47,7 @@
   The <with|font-series|bold|TeXmacs <name|Vue>> button at the top left of the
   page opens a menu of the page itself: the version of <TeXmacs>, the state
   of its files and the storage they use, <menu|Files in this browser...>,
-  <menu|Download a backup> and <menu|Restore a backup...> (see below),
+  <menu|Save a backup> and <menu|Restore a backup...> (see below),
   <menu|Reload>, <menu|Reset...> (which deletes your files and preferences),
   and <menu|Remove from this browser...>. Its panel also has more
   information and the options of the address of the page (see below).
@@ -85,7 +85,7 @@
 
   What the browser keeps is lost when its data for this site are cleared,
   and it is not seen by another browser or another computer. In the menu of
-  <with|font-series|bold|TeXmacs <name|Vue>>, <menu|Download a backup> saves
+  <with|font-series|bold|TeXmacs <name|Vue>>, <menu|Save a backup> saves
   on your computer a zip archive of all of it: your documents and your
   <verbatim|.TeXmacs> folder, with your preferences, your own styles and
   the wallet (which stays encrypted: its passphrase opens it). A document
@@ -258,7 +258,7 @@
     their address; and the browser, which cannot be a server, no longer
     offers <menu|Remote|Start server>.
 
-    <item><menu|Download a backup> and <menu|Restore a backup...>, in the
+    <item><menu|Save a backup> and <menu|Restore a backup...>, in the
     menu of <TeXmacs> <name|Vue>: all your files and your preferences in one
     zip archive, to keep them safe or to move them to another browser (see
     <with|font-series|bold|Your files>).

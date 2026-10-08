@@ -1424,7 +1424,7 @@ var tmFrame = (function () {
     });
     sep ();
     item ('Files in this browser…', function () { tmFiles.browse (); });
-    item ('Download a backup', function () { tmFiles.backup (); });
+    item ('Save a backup', function () { tmFiles.backup (); });
     item ('Restore a backup…', function () { tmFiles.restore (); });
     sep ();
     item ('Reload', function () { location.reload (); });

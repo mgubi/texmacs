@@ -684,7 +684,7 @@ of `build-wasm/tools/chrome` (installed there by `./node_modules/.bin/browsers
 install chrome@stable --path $PWD/chrome`); with `--browser <path>`, in
 another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154; with the documents kept by the other tabs, in Chrome 155).
 
-- **Download a backup** (`backup` in `files.js`) saves a zip of the home
+- **Save a backup** (`backup` in `files.js`) saves a zip of the home
   directory, under `home/`, with a note, `texmacs-backup.json` (format,
   date, address of the page, number and size of the files): the documents
   and `~/.TeXmacs`, the wallet included (it is encrypted), without
