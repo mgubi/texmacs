@@ -323,6 +323,8 @@ public:
   virtual tree     exec_verbatim (tree t) = 0;
   virtual tree     exec_html (tree t, path p) = 0;
   virtual tree     exec_html (tree t) = 0;
+  virtual tree     exec_markdown (tree t, path p) = 0;
+  virtual tree     exec_markdown (tree t) = 0;
   virtual tree     exec_latex (tree t, path p) = 0;
   virtual tree     exec_latex (tree t) = 0;
   virtual tree     texmacs_exec (tree t) = 0;

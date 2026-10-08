@@ -815,6 +815,31 @@ edit_typeset_rep::exec_html (tree t) {
   return exec_html (t, rp * 0);
 }
 
+// The expansion of a document for its conversion to Markdown: as for Html,
+// the macros of its styles are expanded, except those of the list
+// tmmarkdown-env-patch (progs/convert/markdown/tmmarkdown-expand.scm), which
+// the converter understands: the structure of the document rather than its
+// layout. A style may define a macro tmmarkdown-foo, which is then foo for
+// this conversion.
+
+tree
+edit_typeset_rep::exec_markdown (tree t, path p) {
+  t= convert_OTS1_symbols_to_universal_encoding (t);
+  if (p == (rp * 0)) typeset_preamble ();
+  typeset_exec_until (p);
+  hashmap<string,tree> H= copy (cur[p]);
+  tree patch= as_tree (eval ("(stree->tree (tmmarkdown-env-patch))"));
+  hashmap<string,tree> P (UNINIT, patch);
+  H->join (P);
+  prefix_specific (H, "tmmarkdown-");
+  return exec (t, H);
+}
+
+tree
+edit_typeset_rep::exec_markdown (tree t) {
+  return exec_markdown (t, rp * 0);
+}
+
 static tree
 value_to_compound (tree t, hashmap<string,tree> h) {
   if (is_atomic (t)) return t;
