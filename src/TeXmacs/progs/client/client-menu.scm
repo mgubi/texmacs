@@ -131,6 +131,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-menu (remote-submenu server)
+  ;; the state of the connection: connected (and how fast the server
+  ;; answers), or no answer for some time
+  (group (eval (client-connection-status server)))
   (dynamic (remote-home-menu server #f))
   ---
   (if (and (remote-file-name (current-buffer))
@@ -169,6 +172,11 @@
 
 (menu-bind client-menu
   (invisible (client-active-servers))
+  ;; the connections which were lost, until the user logs in again
+  (for (x (client-lost-connections))
+    (group (eval (string-append "Connection lost: "
+                                (account->string (first x) (second x)
+                                                 (third x))))))
   (link client-start-menu)
   (with l (client-active-servers)
     ---
@@ -220,11 +228,13 @@
 (tm-menu (remote-subicons server)
   (invisible (client-active-servers))
   (assuming (not (server-connection-admin? server))
-    (=> (balloon (icon "tm_cloud.xpm") "Connection with server")
+    (=> (balloon (icon "tm_cloud.xpm")
+                 (eval (client-connection-status server)))
 	("Edit account" (open-account-editor server))
 	("Logout" (client-logout server))))
   (assuming (server-connection-admin? server)
-    (=> (balloon (icon "tm_cloud_admin.xpm") "Connection with server")
+    (=> (balloon (icon "tm_cloud_admin.xpm")
+                 (eval (client-connection-status server)))
 	("Edit Server Preferences" (load-remote-config-form server))
 	("User Management" (open-admin-accounts-editor server))
 	("Edit account" (open-account-editor server))

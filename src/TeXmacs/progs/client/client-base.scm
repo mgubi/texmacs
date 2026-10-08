@@ -110,6 +110,210 @@
       (client-return envelope ret))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The state of the connections, for the user
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; What is known of each connection (by its number, server):
+;;   client-started      when it was opened (texmacs-time, ms)
+;;   client-heard        when the server was last heard (any message)
+;;   client-ping-sent    when the ping which is not answered yet was sent
+;;   client-latency      how long the last ping took (ms)
+;;   client-silent       the user was told that the server does not answer
+;;   client-stop-reason  why we close the connection ourselves
+;; client-lost is the list of the connections which were lost, each
+;; (server-name port pseudo reason), until the user logs in again.
+
+(define client-started (make-ahash-table))
+(define client-heard (make-ahash-table))
+(define client-ping-sent (make-ahash-table))
+(define client-latency (make-ahash-table))
+(define client-silent (make-ahash-table))
+(define client-stop-reason (make-ahash-table))
+(define client-looking (make-ahash-table)) ;; an answer is looked for soon
+;; The numbers of the connections are those of their sockets, which the
+;; system gives again to later connections: what is scheduled for a
+;; connection (its heartbeat, the wait for its first answer) holds a token
+;; of its own, and stops when the token of the number is another one.
+(define client-token (make-ahash-table))
+(define client-token-serial 0)
+
+(define (client-new-token server)
+  (set! client-token-serial (+ client-token-serial 1))
+  (ahash-set! client-token server client-token-serial)
+  client-token-serial)
+(define client-lost (list))
+
+(define client-ping-interval 10000) ;; a ping every 10 s
+(define client-silent-after 25000)  ;; two pings missed: the server is silent
+
+(define (client-forget-state server)
+  (for (t (list client-started client-heard client-ping-sent client-latency
+                client-silent client-stop-reason client-looking
+                client-token))
+    (ahash-remove! t server)))
+
+(define (account-name server-name port pseudo)
+  (string-append pseudo "@" server-name (if (== port "6561") "" ":") 
+                 (if (== port "6561") "" port)))
+
+;; What tells the user of an event of a connection. event is one of
+;;   :connecting :connected :logged-out :silent :back :lost :failed
+;; and msg a sentence for it. A procedure, which a test (or another
+;; interface) may replace; this one writes in the footer, and opens a
+;; dialog for what the user has to know even when looking elsewhere.
+(tm-define client-notify-hook
+  (lambda (event msg)
+    (set-message msg "remote server")
+    (when (and (in? event (list :lost)) (not (headless?)))
+      (client-open-error msg))))
+
+(tm-define (client-notify event msg)
+  (when (debug-get "remote")
+    (display* "client-notify " event ", " msg "\n"))
+  (client-notify-hook event msg)
+  ;; the menus and the icons show the state of the connections
+  (set! remote-client-list (client-active-servers)))
+
+(define (client-notify-heard server)
+  (ahash-set! client-heard server (texmacs-time))
+  (when (ahash-ref client-silent server)
+    (ahash-remove! client-silent server)
+    (and-with name (client-find-server-name server)
+      (client-notify :back (string-append "the server " name
+                                          " answers again")))))
+
+(tm-define (client-connection-state server)
+  (:synopsis "The state of a connection: :connected, :silent or :closed")
+  (cond ((not (ahash-ref client-server-active? server)) :closed)
+        ((ahash-ref client-silent server) :silent)
+        (else :connected)))
+
+(tm-define (client-connection-latency server)
+  (:synopsis "How long the server took to answer the last ping (ms), or #f")
+  (ahash-ref client-latency server))
+
+(tm-define (client-connection-status server)
+  (:synopsis "A sentence on the state of a connection, for the menus")
+  (let* ((name (or (client-find-server-name server) "server"))
+         (pseudo (client-find-server-pseudo server))
+         (state (client-connection-state server))
+         (heard (ahash-ref client-heard server))
+         (ms (ahash-ref client-latency server)))
+    (cond ((== state :closed) (string-append "Not connected to " name))
+          ((== state :silent)
+           (string-append "No answer from " name " for "
+                          (number->string
+                            (quotient (- (texmacs-time) (or heard 0)) 1000))
+                          " s"))
+          (else
+            (string-append "Connected to " name
+                           (if pseudo (string-append " as " pseudo) "")
+                           (if ms (string-append " (" (number->string ms)
+                                                 " ms)") ""))))))
+
+(tm-define (client-lost-connections)
+  (:synopsis "The connections which were lost: (server-name port pseudo reason)")
+  client-lost)
+
+(tm-define (client-forget-lost server-name port)
+  (set! client-lost
+        (list-filter client-lost
+                     (lambda (x) (not (and (== (car x) server-name)
+                                           (== (cadr x) port)))))))
+
+(define (client-connection-lost server reason)
+  ;; a connection which was logged in ends, and not by a logout (which
+  ;; forgets the connection first)
+  (and-with con (ahash-ref client-active-connections server)
+    (with (server-name port pseudo) con
+      (remove-active-connection server server-name port pseudo)
+      (client-forget-lost server-name port)
+      (set! client-lost (cons (list server-name port pseudo reason)
+                              client-lost))
+      (client-notify
+        :lost
+        (string-append "Connection with " (account-name server-name port pseudo)
+                       " lost: " reason
+                       ". Its remote files, chat rooms and live documents"
+                       " are no longer synchronized; log in again"
+                       " to continue.")))))
+
+(define (client-fail-pending server reason)
+  ;; whoever waits for an answer of server gets reason as an error
+  (with l (list-filter (ahash-table->list client-error-handlers)
+                       (lambda (x) (== (cadr x) server)))
+    (for (x l)
+      (ahash-remove! client-continuations (car x))
+      (ahash-remove! client-error-handlers (car x)))
+    (for (x l)
+      (catch #t
+             (lambda () ((caddr x) reason))
+             (lambda args (noop))))))
+
+(tm-define (client-close server reason)
+  (:synopsis "Close a connection which does not work, and say why")
+  (ahash-set! client-stop-reason server reason)
+  (client-stop server))
+
+(tm-define (client-heartbeat server)
+  (:synopsis "Ask the server for a sign of life, and see whether it gave any")
+  ;; any message of the server is a sign of life, the answer to a ping too
+  ;; (an older server answers that it does not know the command)
+  (let* ((now (texmacs-time))
+         (heard (or (ahash-ref client-heard server)
+                    (ahash-ref client-started server) now))
+         (quiet (- now heard))
+         (name (or (client-find-server-name server) "server"))
+         (give-up (* 1000 (max 30 (or (client-get-connection-timeout) 100)))))
+    (cond ((> quiet give-up)
+           (client-close server
+                         (string-append "no answer for "
+                                        (number->string (quotient quiet 1000))
+                                        " s")))
+          ((> quiet client-silent-after)
+           (when (not (ahash-ref client-silent server))
+             (ahash-set! client-silent server #t)
+             (client-notify :silent (string-append
+                                      "the server " name
+                                      " does not answer; still trying")))))
+    (when (and (ahash-ref client-server-active? server)
+               (not (ahash-ref client-ping-sent server)))
+      (ahash-set! client-ping-sent server now)
+      (with answered (lambda (ret)
+                       (when (ahash-ref client-ping-sent server)
+                         (ahash-set! client-latency server
+                                     (- (texmacs-time)
+                                        (ahash-ref client-ping-sent server)))
+                         (ahash-remove! client-ping-sent server)))
+        (client-remote-eval server '(remote-ping) answered answered)))))
+
+(define (client-watch server)
+  ;; the heartbeat of a connection which is logged in
+  (with token (client-new-token server)
+    (delayed
+      (:while (and (== (ahash-ref client-token server) token)
+                   (ahash-ref client-server-active? server)
+                   (ahash-ref client-active-connections server)))
+      (:pause client-ping-interval)
+      (client-heartbeat server))))
+
+(tm-define (client-expect-answer server what)
+  (:synopsis "Close the connection unless the server says something in time")
+  ;; a server which is not there, or not a TeXmacs server, or behind a
+  ;; network which drops the packets, left the user waiting for ever
+  (let ((ms (max 1000 (or (client-get-contact-timeout) 10000)))
+        (token (client-new-token server)))
+    (delayed
+      (:pause ms)
+      (when (and (== (ahash-ref client-token server) token)
+                 (not (ahash-ref client-heard server)))
+        (client-close server
+                      (string-append "no answer from " what " within "
+                                     (number->string (quotient ms 1000))
+                                     " s (is a TeXmacs server running"
+                                     " there, and reachable?)"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Establishing and finishing connections with servers
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -121,23 +325,61 @@
 
 (tm-define (client-send server cmd)
   (client-write server (object->string* (list client-serial cmd)))
-  (set! client-serial (+ client-serial 1)))
+  (set! client-serial (+ client-serial 1))
+  ;; an answer is expected: look for it soon (the loop which reads the
+  ;; messages of a quiet server looks every 2.5 s only)
+  (when (not (ahash-ref client-looking server))
+    (ahash-set! client-looking server #t)
+    (client-look-soon server (list 5 10 20 40 80 160 320 640 1200))))
+
+(define (client-read-pending server)
+  ;; read a message of server, if there is one, and act on it
+  (with msg (client-read server)
+    (and (!= msg "")
+         (begin
+           (client-notify-heard server)
+           (with (msg-id msg-cmd) (string->object msg)
+             (client-eval (list server msg-id) msg-cmd))
+           #t))))
+
+(define (client-look-soon server pauses)
+  (if (or (null? pauses) (not (ahash-ref client-server-active? server)))
+      (ahash-remove! client-looking server)
+      (delayed
+        (:pause (car pauses))
+        (if (client-read-pending server)
+            (ahash-remove! client-looking server)
+            (client-look-soon server (cdr pauses))))))
 
 (tm-define (client-add server)
   (ahash-set! client-server-active? server #t)
+  (ahash-remove! client-heard server)
+  (ahash-set! client-started server (texmacs-time))
   (with wait 1
     (delayed
       (:while (ahash-ref client-server-active? server))
       (:pause ((lambda () (inexact->exact (round wait)))))
       (:do (set! wait (min (* 1.01 wait) 2500)))
-      (with msg (client-read server)
-        (when (!= msg "")
-          (with (msg-id msg-cmd) (string->object msg)
-            (client-eval (list server msg-id) msg-cmd)
-            (set! wait 1)))))))
+      (when (client-read-pending server)
+        (set! wait 1)))))
 
 (tm-define (client-remove server)
-  (ahash-remove! client-server-active? server))
+  ;; the connection with server is over: closed on our side (a logout,
+  ;; client-stop), by the server or by the network. Whoever waits for an
+  ;; answer of the server is told so; and a connection which was logged in
+  ;; and not closed by a logout was lost, which the user is told.
+  ;; (a connection which could not be made ends too, maybe before it was
+  ;; added: who waits for its answer is told as well)
+  (ahash-remove! client-server-active? server)
+  (with reason (or (ahash-ref client-stop-reason server)
+                   (if (ahash-ref client-heard server)
+                       "the connection with the server was lost"
+                       (string-append "no connection with the server could"
+                                      " be made (is a TeXmacs server"
+                                      " running there, and reachable?)")))
+    (client-forget-state server)
+    (client-connection-lost server reason)
+    (client-fail-pending server reason)))
 
 (tm-define (client-remove-notify server msg)
   (client-open-error msg)
@@ -225,11 +467,16 @@
 
 (tm-define (add-active-connection server server-name port pseudo)
   (ahash-set! client-active-connections server (list server-name port pseudo))
-  (ahash-set! client-active-connections (list server-name port) server))
+  (ahash-set! client-active-connections (list server-name port) server)
+  (client-forget-lost server-name port)
+  (client-watch server))
 
 (define (remove-active-connection server server-name port pseudo)
   (ahash-remove! client-active-connections server)
-  (ahash-remove! client-active-connections (list server-name port)))
+  ;; (unless a newer connection with the same server took its place)
+  (when (== (ahash-ref client-active-connections (list server-name port))
+            server)
+    (ahash-remove! client-active-connections (list server-name port))))
 
 (tm-define (client-find-server-by-name-and-port server-name port)
   ;(display* server-name " -> " (ahash-ref client-active-connections
@@ -422,6 +669,8 @@
   (with server (legacy-anonymous-client-start server-name port)
     (if (< server 0) (cb server (client-start-errno->string server))
         (begin
+          (client-expect-answer
+            server (string-append server-name ":" port))
 	  (client-remote-eval* server
 			       `(remote-login ,pseudo ,passwd)
                                (lambda (ret) (cb server ret)))))))
@@ -432,6 +681,8 @@
   (with server (tls-anonymous-client-start server-name port)
     (if (< server 0) (cb server (client-start-errno->string server))
         (begin
+          (client-expect-answer
+            server (string-append server-name ":" port))
 	  (client-remote-eval* server
 			       `(remote-login ,pseudo ,passwd)
                                (lambda (ret) (cb server ret)))))))
@@ -460,6 +711,8 @@
   (with server (legacy-anonymous-client-start server-name port)
     (if (< server 0) (cb server (client-start-errno->string server))
         (begin
+          (client-expect-answer
+            server (string-append server-name ":" port))
 	  (client-remote-eval* server
 			       `(remote-login-code ,pseudo ,code)
                                (lambda (ret) (cb server ret)))))))
@@ -470,6 +723,8 @@
   (with server (tls-anonymous-client-start server-name port)
     (if (< server 0) (cb server (client-start-errno->string server))
         (begin
+          (client-expect-answer
+            server (string-append server-name ":" port))
 	  (client-remote-eval* server
 			       `(remote-login-code ,pseudo ,code)
                                (lambda (ret) (cb server ret)))))))
@@ -497,6 +752,8 @@
 		 (if (!= ret "bye")
 		     (std-client-error "Logout failed"))
                  (remove-active-connection server server-name server-port server-pseudo)
-		 (set! remote-client-list (client-active-servers))
-		 (client-stop server))
+		 (client-stop server)
+                 (client-notify
+                   :logged-out
+                   (string-append "logged out from " server-name)))
 	(client-remote-eval* server `(remote-logout) cb)))))

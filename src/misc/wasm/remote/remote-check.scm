@@ -427,3 +427,32 @@
   (delayed
     (:pause 2000)
     (rc-report (null? (client-active-servers)) "logout")))
+
+;; What the user is told about a connection: (remote-feedback user pass)
+;; logs in, prints each event of the connections ("remote-check: event ...")
+;; and, every 5 s, the state shown in the menu. The script which runs it
+;; stops the server for a while (silent, then back), kills it (lost), and
+;; has a port which accepts connections and never answers (6599); a login
+;; is tried on the dead server after 85 s and on the mute port after 92 s.
+(tm-define (remote-feedback user pass)
+  (set! client-notify-hook
+        (lambda (event msg)
+          (display* "remote-check: event " event " " msg "\n")))
+  (with login (lambda (port)
+                (client-login-home "localhost" port user
+                                   (list 'tls-password pass)
+                                   (lambda args (noop))))
+    (login "6561")
+    (with n 0
+      (delayed
+        (:while (< n 16))
+        (:pause 5000)
+        (set! n (+ n 1))
+        (when (nnull? (client-active-servers))
+          (display* "remote-check: status "
+                    (client-connection-status (rc-server)) "\n"))))
+    (delayed (:pause 85000) (login "6561"))
+    (delayed (:pause 92000) (login "6599"))
+    (delayed (:pause 110000)
+      (display* "remote-check: lost " (client-lost-connections) "\n")
+      (display* "remote-check: feedback done\n"))))
