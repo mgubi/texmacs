@@ -546,6 +546,8 @@
   ;; the text is UTF-8, the tree is in the encoding of TeXmacs
   (check= (tm (list 'p (string-append "caf" (bytes 195 169) " <x>")))
           (list (string-append "caf" (bytes 233) " <less>x<gtr>")))
+  ;; the characters of no width are dropped
+  (check= (tm (list 'p (string-append "a" (bytes 226 128 139) "b"))) '("ab"))
   ;; an image is inside the document, with the name of its file
   (check= (tm '(p (image (@ (name "pic.png") (data "PNG") (width "2cm")))))
           '((image (tuple (raw-data "PNG") "pic.png") "2cm" "" "" ""))))

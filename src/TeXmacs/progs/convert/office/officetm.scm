@@ -25,7 +25,10 @@
 ;; Text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (oftm-text s) (utf8->cork s))
+(define (oftm-text s)
+  ;; the text in the encoding of TeXmacs, without the characters of no
+  ;; width which the programs put around formulas and fields
+  (string-replace (string-replace (utf8->cork s) "<#200B>" "") "<#FEFF>" ""))
 
 (define (oftm-concat l)
   ;; a list of TeXmacs trees as one tree
