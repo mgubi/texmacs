@@ -687,6 +687,11 @@ layout_window_passes (vue_window_rep* w) {
   do {
     with_window frame (w);
     layout_again= false;
+    // the first pass at a new drawing factor (another display, a change of
+    // the interface scaling) does not use the sizes measured at the old one
+    bool fresh= (w->laid_out_retina != w->retina);
+    layout_forget_sizes= fresh;
+    w->laid_out_retina= w->retina;
     // init the current GUI context
     int win_w, win_h;
     w->layout_size (win_w, win_h);
@@ -709,7 +714,8 @@ layout_window_passes (vue_window_rep* w) {
     gui_finalize_context ();
 
     // post layout tweaking
-    relayout= w->content->post_layout () || layout_again;
+    relayout= w->content->post_layout () || layout_again || fresh;
+    layout_forget_sizes= false;
   } while (relayout && ++passes < 5);
   {
     with_window frame (w);
@@ -1778,11 +1784,20 @@ public:
   void*  platform_window () { return NULL; }
   bool   fills () { return full || promoted; }
   bool   decorated () { return !popup && !fills (); }
-  // the interface scaling changed by this ratio: the window follows
-  void   rescale (float r) {
+  // the interface scaling changed by this ratio: the window follows. Its
+  // place too, from the corner (hx, hy) of a host which grows as well, or
+  // around its own centre on a host which keeps its size (the browser)
+  void   rescale (float r, float hx, float hy, bool host_grows) {
+    if (host_grows) {
+      saved_x= hx + (saved_x - hx) * r; saved_y= hy + (saved_y - hy) * r;
+      if (!fills ()) { x= hx + (x - hx) * r; y= hy + (y - hy) * r; }
+    }
+    else {
+      saved_x += saved_w * (1 - r) / 2; saved_y += saved_h * (1 - r) / 2;
+      if (!fills ()) { x += w * (1 - r) / 2; y += h * (1 - r) / 2; }
+    }
     saved_w *= r; saved_h *= r;
-    if (!fills ()) { w *= r; h *= r; }
-    clamp (); }
+    if (!fills ()) { w *= r; h *= r; } }
   float  top () { return decorated () ? y - title_bar_h : y; }
   int    layer () { return fills () ? 0 : popup ? 3 : on_top ? 2 : 1; }
   void   destroy_event ();
@@ -3343,11 +3358,23 @@ vue_follow_interface_scale () {
 #endif
     win->update_density ();
   }
+  int hx= 0, hy= 0;
+  bool host_grows= false;
+  if (the_host != NULL) {
+    SDL_GetWindowPosition (the_host->sdl_win, &hx, &hy);
+#ifndef __EMSCRIPTEN__
+    host_grows= !(SDL_GetWindowFlags (the_host->sdl_win) &
+                  (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED));
+#endif
+  }
   for (int i= 0; i < N(virtual_windows); i++) {
     vue_virtual_window_rep* v= virtual_windows[i];
     v->update_density ();
-    v->rescale (ratio);
+    v->rescale (ratio, (float) hx, (float) hy, host_grows);
   }
+  // (once all of them have their size: the first clamp notices the new
+  // size of the host and clamps every window, see host_changed)
+  for (int i= 0; i < N(virtual_windows); i++) virtual_windows[i]->clamp ();
   vue_simple_widget_rep::invalidate_all_editors ();
   gui_needs_relayout= true;
   gui_needs_update= true;

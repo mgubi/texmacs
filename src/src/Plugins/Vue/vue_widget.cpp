@@ -500,6 +500,7 @@ bool in_title_bar= false; // laying out the title bar of a tool (its "x" is a cl
 int  section_bar= 0;
 bool section_active= false;
 bool layout_again= false; // see vue_widget.hpp
+bool layout_forget_sizes= false; // see vue_widget.hpp
 bool gui_needs_relayout= false; // see vue_widget.hpp
 
 // signalling
@@ -2546,6 +2547,9 @@ vue_ui_rep::do_layout () {
       Clay_ElementData r= Clay_GetElementData (probe_id ("aligned_widget_cell", id, 2*i+1));
       row_h[i]= max (l.found ? l.boundingBox.height : 0.0f,
                      r.found ? r.boundingBox.height : 0.0f);
+      // (measured at another drawing factor: a minimum would keep the rows
+      // as high as they were at the larger one)
+      if (layout_forget_sizes) row_h[i]= 0.0f;
       // a new widget: this pass is not aligned yet, ask for another one
       if (!l.found || !r.found) layout_again= true;
     }
