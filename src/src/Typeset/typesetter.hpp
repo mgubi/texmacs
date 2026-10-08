@@ -46,6 +46,9 @@ struct edit_profile_data {
   int    lines, moved;             // lines (and remembered boxes) logged, changed
   int    rects;                    // rectangles in the change log
   int    breaks_reused;            // searches of page breaks avoided
+  int    breaks_common;            // items the search had in common with the last
+  double search;                   // ms: the search of the page breaks
+  int    starts, starts_kept;      // starts of pages tried, with kept candidates
 };
 extern edit_profile_data edit_profile;
 double edit_profile_now ();        // ms, from an arbitrary origin

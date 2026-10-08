@@ -459,6 +459,18 @@
   footer. An edit which changes the number of lines, or the height of
   one, changes the signature and is searched in full.
 
+  That search finds the same breaks as before, in the same order and with
+  the same arithmetic, but faster for the positions with no pending float
+  (<cpp|find_page_breaks_plain>): their best previous breaks and penalties
+  are in arrays instead of tables indexed by paths, no path is made for
+  each candidate page, and the height and the penalty of a candidate are
+  computed with integers. On the document of 140 pages it takes 7<nbsp>ms
+  instead of 43. <verbatim|TEXMACS_PAGE_BREAK_FAST> may be <verbatim|0>
+  for the search as it was, or <verbatim|check> to run both and report a
+  difference; <verbatim|4> also uses again the candidates of the previous
+  search for the starts whose items did not change, which gains little
+  (5<nbsp>ms) and is not in use by default.
+
   <subsection|Complete typesetting and references>
 
   References, tables of contents and page numbers need several passes. The

@@ -109,7 +109,7 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 
 // see typesetter.hpp
 edit_profile_data edit_profile=
-  { get_env ("TEXMACS_EDIT_PROFILE") != "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  { get_env ("TEXMACS_EDIT_PROFILE") != "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 double
 edit_profile_now () {
