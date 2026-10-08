@@ -176,7 +176,21 @@
   ;; 360000 EMU are a centimeter
   (with n (and (string? s) (string->number s))
     (if (and n (> n 0))
-        (string-append (number->string (/ (round (/ n 360.0)) 1000.0)) "cm")
+        ;; in thousandths of a centimeter, without a useless .0
+        (let* ((k (inexact->exact (round (/ n 360.0))))
+               (whole (quotient k 1000))
+               (part (modulo k 1000)))
+          (string-append
+            (number->string whole)
+            (if (== part 0) ""
+                (let* ((d (number->string (+ 1000 part)))
+                       (d (substring d 1 4)))
+                  (string-append
+                    "." (let loop ((d d))
+                          (if (string-ends? d "0")
+                              (loop (substring d 0 (- (string-length d) 1)))
+                              d)))))
+            "cm"))
         "")))
 
 (tm-define (office-monospace? font)
