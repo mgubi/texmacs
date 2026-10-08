@@ -605,6 +605,11 @@
     `(document
        (dir-list ,(directory-table sname server entries)))))
 
+;; a title for the tabs and the windows, which showed the address
+(tmfs-title-handler (remote-dir name doc)
+  (with fname (string-append "tmfs://remote-dir/" name)
+    (string-append "Remote directory - " (url->string (url-tail fname)))))
+
 (tmfs-load-handler (remote-dir name)
   ;;(display* "Loading remote dir " name "\n")
   (let* ((sname (car (tmfs->list name)))
