@@ -807,6 +807,38 @@ offered "Start server". A file saved less than 5 s after its previous
 version loses that version from its history (the server, `readable-by?`):
 the check waits.
 
+What the user is told of a connection (2026-10-08, `client-base.scm`): each
+connection has a state (`client-connection-state`: connected, silent,
+closed) and a sentence for the menu and the icon
+(`client-connection-status`). A heartbeat every 10 s (`client-heartbeat`,
+the service `remote-ping`; any answer is a sign of life, the error of an
+older server too) finds a server which is silent (25 s) and gives up after
+the connection timeout of the preferences (100 s). `client-remove`, which
+the sockets call when a connection ends, now tells who waits for an answer
+(`client-fail-pending`) and, when the connection was logged in and not
+closed by a logout, the user (`client-connection-lost`); the timers of a
+connection hold a token, since the system gives the number of a socket to
+later connections. `client-notify-hook` is what tells the user (the footer,
+a dialog for a lost connection); the tests replace it. `(remote-feedback
+user pass)` of `remote-check.scm` prints the events while the script
+around it stops the server (SIGSTOP: silent, then back), kills it (lost)
+and tries a login on the dead server and on a port which accepts and never
+answers: checked on the desktop and in the page (a WebSocket which cannot
+be opened ends its connection, which fails the login at once; the mute port
+after 10 s).
+
+The cursors of the others in a live document (2026-10-08): the client
+sends the position of its cursor in the document when it changes
+(`live-cursor-poll` in `client-live.scm`, every 300 ms; `#f` outside), the
+server relays it to the other clients of the document with the name of the
+user (`live-cursor` in `server-live.scm`; a newcomer is told where the
+others are, and a client which leaves is taken away), and the editor draws
+them (`set-user-cursor`, `edit_interface_rep::draw_user_cursors`: a bar
+and a flag with the name, looked up at each repaint). An older server or
+client answers that it does not know the command, and is not asked again.
+`remote-duet` checks that each side knows the cursor of the other; seen in
+the screenshots of both.
+
 `wss` (2026-10-01): `wss-cert.sh <home of the server>` puts an ECDSA
 certificate for localhost in place of the Ed25519 one, and
 `browser-run.mjs --insecure --query '?websocket=wss'` runs the scripts

@@ -570,6 +570,11 @@ public:
   virtual void cancel_alt_selection (string s) = 0;
   virtual void cancel_alt_selections () = 0;
 
+  /* the cursors of other users (live documents) */
+  virtual void set_user_cursor (string id, path p, string col, string name) = 0;
+  virtual void cancel_user_cursor (string id) = 0;
+  virtual void cancel_user_cursors () = 0;
+
   /* public routines from edit_replace */
   virtual bool inside (string what) = 0;
   virtual bool inside (tree_label l) = 0;

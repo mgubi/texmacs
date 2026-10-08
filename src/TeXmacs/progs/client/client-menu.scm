@@ -113,6 +113,9 @@
   ("Join chat room" (chat-room-join-interactive server)))
 
 (tm-menu (remote-live-menu server)
+  ;; who else is in the live document (their cursors are shown in it)
+  (for (name (live-participants (current-buffer)))
+    (group (eval (string-append "Also here: " name))))
   ("Permissions" (open-permissions-editor server (current-buffer)))
   ("Share" (open-share-document-widget server (current-buffer))))
 

@@ -61,6 +61,11 @@ protected:
   int           mouse_adjusting;  // mask with active key modifiers upon click
   rectangles    selection_rects;
   array<rectangles> alt_selection_rects;
+  // the cursors of other users, shown besides ours (live documents)
+  array<string>     user_cursor_ids;
+  array<path>       user_cursor_paths;
+  array<string>     user_cursor_colors;
+  array<string>     user_cursor_names;
   array<rectangles> spell_error_rects;
   rectangle     last_visible;
   rectangle     last_extents;
@@ -124,6 +129,10 @@ public:
   void draw_context (renderer ren, rectangle r);
   void draw_env (renderer ren);
   void draw_cursor (renderer ren);
+  void draw_user_cursors (renderer ren);
+  void set_user_cursor (string id, path p, string col, string name);
+  void cancel_user_cursor (string id);
+  void cancel_user_cursors ();
   void draw_selection (renderer ren, rectangle r);
   void draw_graphics (renderer ren);
   void draw_keys (renderer ren);

@@ -376,7 +376,9 @@
           (list "duet: second message and text" 25000
                 (lambda () (say "Second message of the first") (write "CCC "))
                 (lambda () (and (rc-buf-has? room-u "Second message of the first")
-                                (rc-buf-has? lid "CCC")))))
+                                (rc-buf-has? lid "CCC"))))
+          (list "duet: the cursor of the other is shown" 500 noop
+                (lambda () (nnull? (live-participants lid)))))
          (list
           login
           (list "duet: join the chat room" 4000
@@ -392,8 +394,17 @@
                 (lambda () (rc-buf-has? room-u "Second message of the first")))
           (list "duet: the later text of the other arrived" 500 noop
                 (lambda () (and (rc-buf-has? lid "AAA") (rc-buf-has? lid "BBB")
-                                (rc-buf-has? lid "CCC"))))))
+                                (rc-buf-has? lid "CCC"))))
+          (list "duet: the cursor of the other is shown" 500 noop
+                (lambda () (nnull? (live-participants lid))))))
      (lambda ()
+       (display* "remote-check: also in the live document: "
+                 (live-participants lid) "\n")
+       (display* "remote-check: their cursors: "
+                 (map cdr (ahash-table->list
+                            (module-ref (resolve-module '(client client-live))
+                                        'live-cursors)))
+                 ", ours: " (cursor-path) "\n")
        (display* "remote-check: live document: "
                  (tm->stree (buffer-get-body lid)) "\n")
        (display* "remote-check: duet done, " rc-fails " failures\n")))))

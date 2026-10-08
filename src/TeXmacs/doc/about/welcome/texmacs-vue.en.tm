@@ -229,6 +229,24 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>The remote tools say what happens with the server. The footer
+    says <verbatim|connecting to...>, then <verbatim|connected to ... as
+    ...>; the top of the <menu|Remote> menu and the cloud icon say
+    <verbatim|Connected to host as user (40 ms)>, the time being that of
+    the last answer of the server, which is asked for a sign of life every
+    ten seconds. A server which does not answer for 25 seconds is said so,
+    and when it answers again. A connection which ends otherwise than by
+    <menu|Remote|Logout> is said to be lost, in a dialog and in the menu
+    (<verbatim|Connection lost: user@host>), until you log in again; a
+    login to a server which is not there, or which never answers, fails
+    with a message after ten seconds. It all went unsaid before: the menus
+    stayed as they were and the requests waited for ever.
+
+    <item>In a live document you see where the others are: the cursor of
+    each other user is a bar of a colour of its own, with the name of the
+    user above it, which follows what that user does;
+    <menu|Remote|Live document> lists who else is in the document.
+
     <item>The input fields whose width is left to the interface (the
     passphrases of GnuPG and of the wallet, the names of the remote files)
     have the usual width of a field, and take the room of their dialog:

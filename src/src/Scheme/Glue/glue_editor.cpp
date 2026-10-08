@@ -2576,6 +2576,47 @@ tmg_cancel_alt_selections () {
 }
 
 tmscm
+tmg_set_user_cursor (tmscm arg1, tmscm arg2, tmscm arg3, tmscm arg4) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "set-user-cursor");
+  TMSCM_ASSERT_PATH (arg2, TMSCM_ARG2, "set-user-cursor");
+  TMSCM_ASSERT_STRING (arg3, TMSCM_ARG3, "set-user-cursor");
+  TMSCM_ASSERT_STRING (arg4, TMSCM_ARG4, "set-user-cursor");
+
+  string in1= tmscm_to_string (arg1);
+  path in2= tmscm_to_path (arg2);
+  string in3= tmscm_to_string (arg3);
+  string in4= tmscm_to_string (arg4);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->set_user_cursor (in1, in2, in3, in4);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cancel_user_cursor (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "cancel-user-cursor");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_user_cursor (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
+tmg_cancel_user_cursors () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->cancel_user_cursors ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_clear_undo_history () {
   // TMSCM_DEFER_INTS;
   get_current_editor()->clear_undo_history ();
@@ -3893,6 +3934,9 @@ initialize_glue_editor () {
   tmscm_install_procedure ("get-alt-selection",  tmg_get_alt_selection, 1, 0, 0);
   tmscm_install_procedure ("cancel-alt-selection",  tmg_cancel_alt_selection, 1, 0, 0);
   tmscm_install_procedure ("cancel-alt-selections",  tmg_cancel_alt_selections, 0, 0, 0);
+  tmscm_install_procedure ("set-user-cursor",  tmg_set_user_cursor, 4, 0, 0);
+  tmscm_install_procedure ("cancel-user-cursor",  tmg_cancel_user_cursor, 1, 0, 0);
+  tmscm_install_procedure ("cancel-user-cursors",  tmg_cancel_user_cursors, 0, 0, 0);
   tmscm_install_procedure ("clear-undo-history",  tmg_clear_undo_history, 0, 0, 0);
   tmscm_install_procedure ("commit-changes",  tmg_commit_changes, 0, 0, 0);
   tmscm_install_procedure ("start-slave",  tmg_start_slave, 1, 0, 0);

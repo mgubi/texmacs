@@ -522,6 +522,11 @@ void
 socket_link_rep::stop () {
   DEBUG_SOCKET("'socket_link_rep::stop' is closing socket " << socket_id);
   if (!alive) {
+    // a connection of a client which ends before it was made (the first
+    // write failed while it was started): the client is told as well, or
+    // whoever waits for its answer would wait until a timeout
+    if (!used_by_server () && socket_id >= 0)
+      call ("client-remove", object (socket_id));
     checkout (this);
     return;
   }
