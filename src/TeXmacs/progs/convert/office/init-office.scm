@@ -42,3 +42,8 @@
 
 (converter texmacs-stree office-stree
   (:function-with-options texmacs->office))
+
+(lazy-define (convert office docxout) serialize-docx-document)
+
+(converter office-stree docx-document
+  (:function serialize-docx-document))

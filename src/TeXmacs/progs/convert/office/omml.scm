@@ -287,3 +287,226 @@
 (tm-define (omml->mathml x)
   (:synopsis "The formula of Word @x, an element m:oMath, as a tree of MathML")
   `(m:math ,(omml-row (omml-list (ox-children x)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; MathML as a formula of Word
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The other way: the elements of MathML have the prefix m: (as the
+;; converter of MathML writes them), or another one, or none.
+
+(define (mmlo-name x)
+  ;; the name of an element of MathML without its prefix, as a symbol
+  (let* ((s (symbol->string (car x)))
+         (i (string-search-forwards ":" 0 s)))
+    (string->symbol (if (>= i 0) (substring s (+ i 1) (string-length s)) s))))
+
+(define (mmlo-is? x name)
+  (and (pair? x) (symbol? (car x)) (== (mmlo-name x) name)))
+
+(define (mmlo-text x)
+  (apply string-append (list-filter (ox-children x) string?)))
+
+(define (mmlo-run text . props)
+  (if (== text "") '()
+      (list `(m:r ,@(if (null? props) '() `((m:rPr ,@props)))
+                  (m:t ,text)))))
+
+(define (mmlo-arg tag x)
+  ;; the argument tag of a construction, with the formula x
+  (cons tag (mmlo-node x)))
+
+;; the big operators, by their codes
+(define mmlo-big-operators
+  '(#x2211 #x220f #x2210 #x222b #x222c #x222d #x222e #x22c0 #x22c1 #x22c2
+    #x22c3 #x2a00 #x2a01 #x2a02 #x2a04 #x2a05 #x2a06))
+
+(define (mmlo-big-operator x)
+  ;; the character of the element x when it is a big operator, or #f
+  (and (mmlo-is? x 'mo)
+       (with s (mmlo-text x)
+         (and (!= s "") (in? (omml-code s) mmlo-big-operators) s))))
+
+(define (mmlo-nary-head x)
+  ;; (character under-and-over? sub sup) when x is a big operator, with
+  ;; its limits or without, or #f
+  (let ((c (ox-elements x)))
+    (cond ((mmlo-big-operator x) (list (mmlo-big-operator x) #f #f #f))
+          ((null? c) #f)
+          ((not (mmlo-big-operator (car c))) #f)
+          ((and (mmlo-is? x 'munderover) (== (length c) 3))
+           (list (mmlo-big-operator (car c)) #t (cadr c) (caddr c)))
+          ((and (mmlo-is? x 'msubsup) (== (length c) 3))
+           (list (mmlo-big-operator (car c)) #f (cadr c) (caddr c)))
+          ((and (mmlo-is? x 'munder) (== (length c) 2))
+           (list (mmlo-big-operator (car c)) #t (cadr c) #f))
+          ((and (mmlo-is? x 'mover) (== (length c) 2))
+           (list (mmlo-big-operator (car c)) #t #f (cadr c)))
+          ((and (mmlo-is? x 'msub) (== (length c) 2))
+           (list (mmlo-big-operator (car c)) #f (cadr c) #f))
+          ((and (mmlo-is? x 'msup) (== (length c) 2))
+           (list (mmlo-big-operator (car c)) #f #f (cadr c)))
+          (else #f))))
+
+(define (mmlo-ends-operand? x)
+  ;; a relation or a separator: where what a big operator applies to ends
+  (and (mmlo-is? x 'mo)
+       (in? (mmlo-text x)
+            (list "=" "<" ">" "," ";" (omml-utf8 #x2264) (omml-utf8 #x2265)
+                  (omml-utf8 #x2260) (omml-utf8 #x2248) (omml-utf8 #x2261)
+                  (omml-utf8 #x2192) (omml-utf8 #x21d2)))))
+
+(define (mmlo-fence? x form)
+  ;; a bracket which opens (form "prefix") or closes (form "postfix")
+  (and (mmlo-is? x 'mo)
+       (or (== (ox-attr x 'form) form)
+           (and (== (ox-attr x 'fence) "true")
+                (in? (mmlo-text x)
+                     (if (== form "prefix") '("(" "[" "{") '(")" "]" "}")))))))
+
+(define (mmlo-row l)
+  ;; the nodes of OMML for the children l of a row. A big operator takes
+  ;; what follows it, up to a relation; brackets take what they enclose.
+  (let loop ((l (list-filter l pair?)) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((mmlo-nary-head (car l))
+           => (lambda (h)
+                (let sub ((r (cdr l)) (operand '()))
+                  (if (or (null? r) (mmlo-ends-operand? (car r)))
+                      (loop r
+                            (cons `(m:nary
+                                     (m:naryPr (m:chr (@ (m:val ,(car h))))
+                                               (m:limLoc (@ (m:val ,(if (cadr h) "undOvr" "subSup"))))
+                                               ,@(if (caddr h) '() '((m:subHide (@ (m:val "1")))))
+                                               ,@(if (cadddr h) '() '((m:supHide (@ (m:val "1"))))))
+                                     (m:sub ,@(if (caddr h) (mmlo-node (caddr h)) '()))
+                                     (m:sup ,@(if (cadddr h) (mmlo-node (cadddr h)) '()))
+                                     (m:e ,@(mmlo-row (reverse operand))))
+                                  acc))
+                      (sub (cdr r) (cons (car r) operand))))))
+          ((mmlo-fence? (car l) "prefix")
+           ;; up to the bracket which closes this one
+           (let sub ((r (cdr l)) (depth 0) (inner '()))
+             (cond ((null? r)
+                    ;; none: the bracket is a character
+                    (loop (cdr l) (append (reverse (mmlo-run (mmlo-text (car l)))) acc)))
+                   ((and (mmlo-fence? (car r) "postfix") (== depth 0))
+                    (loop (cdr r)
+                          (cons `(m:d (m:dPr (m:begChr (@ (m:val ,(mmlo-text (car l)))))
+                                             (m:endChr (@ (m:val ,(mmlo-text (car r))))))
+                                      (m:e ,@(mmlo-row (reverse inner))))
+                                acc)))
+                   (else
+                     (sub (cdr r)
+                          (cond ((mmlo-fence? (car r) "prefix") (+ depth 1))
+                                ((mmlo-fence? (car r) "postfix") (- depth 1))
+                                (else depth))
+                          (cons (car r) inner))))))
+          (else (loop (cdr l) (append (reverse (mmlo-node (car l))) acc))))))
+
+;; the accents by themselves, and their combining characters
+(define mmlo-accents
+  '((#x5e . #x302) (#x7e . #x303) (#xaf . #x304) (#x2d9 . #x307)
+    (#xa8 . #x308) (#x2c7 . #x30c) (#x2d8 . #x306) (#xb4 . #x301)
+    (#x60 . #x300) (#x2192 . #x20d7) (#x2190 . #x20d6) (#x203e . #x304)
+    (#x2c6 . #x302) (#x2dc . #x303)))
+
+(define (mmlo-accent x)
+  ;; the combining character of the element x when it is an accent, or #f
+  (and (mmlo-is? x 'mo)
+       (with s (mmlo-text x)
+         (and (!= s "")
+              (with n (assoc-ref mmlo-accents (omml-code s))
+                (and n (omml-utf8 n)))))))
+
+(define (mmlo-node x)
+  ;; the nodes of OMML for a node of MathML
+  (cond ((not (pair? x)) '())
+        ((not (symbol? (car x))) '())
+        (else
+          (let ((c (ox-elements x)))
+            (case (mmlo-name x)
+              ((math mrow mstyle semantics mpadded mphantom merror)
+               (mmlo-row (ox-children x)))
+              ((mi)
+               (with s (mmlo-text x)
+                 (if (or (> (length (omml-characters s)) 1)
+                         (== (ox-attr x 'mathvariant) "normal"))
+                     (mmlo-run s '(m:sty (@ (m:val "p"))))
+                     (cond ((== (ox-attr x 'mathvariant) "bold")
+                            (mmlo-run s '(m:sty (@ (m:val "b")))))
+                           ((== (ox-attr x 'mathvariant) "bold-italic")
+                            (mmlo-run s '(m:sty (@ (m:val "bi")))))
+                           (else (mmlo-run s))))))
+              ((mn mo) (mmlo-run (mmlo-text x)))
+              ((mtext ms) (mmlo-run (mmlo-text x) '(m:nor)))
+              ((mspace) '())
+              ((mfrac)
+               (if (!= (length c) 2) (mmlo-row c)
+                   (list `(m:f ,@(if (in? (ox-attr x 'linethickness) '("0" "0pt" "0px"))
+                                     '((m:fPr (m:type (@ (m:val "noBar")))))
+                                     '())
+                               ,(mmlo-arg 'm:num (car c))
+                               ,(mmlo-arg 'm:den (cadr c))))))
+              ((msup)
+               (if (!= (length c) 2) (mmlo-row c)
+                   (list `(m:sSup ,(mmlo-arg 'm:e (car c)) ,(mmlo-arg 'm:sup (cadr c))))))
+              ((msub)
+               (if (!= (length c) 2) (mmlo-row c)
+                   (list `(m:sSub ,(mmlo-arg 'm:e (car c)) ,(mmlo-arg 'm:sub (cadr c))))))
+              ((msubsup)
+               (if (!= (length c) 3) (mmlo-row c)
+                   (list `(m:sSubSup ,(mmlo-arg 'm:e (car c)) ,(mmlo-arg 'm:sub (cadr c))
+                                     ,(mmlo-arg 'm:sup (caddr c))))))
+              ((msqrt)
+               (list `(m:rad (m:radPr (m:degHide (@ (m:val "1")))) (m:deg)
+                             (m:e ,@(mmlo-row c)))))
+              ((mroot)
+               (if (!= (length c) 2) (mmlo-row c)
+                   (list `(m:rad ,(mmlo-arg 'm:deg (cadr c)) ,(mmlo-arg 'm:e (car c))))))
+              ((mover)
+               (cond ((!= (length c) 2) (mmlo-row c))
+                     ((mmlo-accent (cadr c))
+                      (list `(m:acc (m:accPr (m:chr (@ (m:val ,(mmlo-accent (cadr c))))))
+                                    ,(mmlo-arg 'm:e (car c)))))
+                     (else (list `(m:limUpp ,(mmlo-arg 'm:e (car c))
+                                            ,(mmlo-arg 'm:lim (cadr c)))))))
+              ((munder)
+               (if (!= (length c) 2) (mmlo-row c)
+                   (list `(m:limLow ,(mmlo-arg 'm:e (car c)) ,(mmlo-arg 'm:lim (cadr c))))))
+              ((munderover)
+               (if (!= (length c) 3) (mmlo-row c)
+                   (list `(m:limUpp (m:e (m:limLow ,(mmlo-arg 'm:e (car c))
+                                                   ,(mmlo-arg 'm:lim (cadr c))))
+                                    ,(mmlo-arg 'm:lim (caddr c))))))
+              ((mfenced)
+               (list `(m:d (m:dPr (m:begChr (@ (m:val ,(or (ox-attr x 'open) "("))))
+                                  (m:endChr (@ (m:val ,(or (ox-attr x 'close) ")")))))
+                           ,@(map (lambda (y) (mmlo-arg 'm:e y)) c))))
+              ((mtable)
+               (list `(m:m ,@(map (lambda (r)
+                                    `(m:mr ,@(map (lambda (d)
+                                                    `(m:e ,@(mmlo-row (ox-children d))))
+                                                  (list-filter (ox-elements r)
+                                                               (lambda (d) (mmlo-is? d 'mtd))))))
+                                  (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
+                                                                 (mmlo-is? r 'mlabeledtr))))))))
+              ((mmultiscripts)
+               ;; the scripts before the base, when there are some
+               (let* ((i (list-find-index c (lambda (y) (mmlo-is? y 'mprescripts)))))
+                 (cond ((and i (>= (length c) (+ i 3)))
+                        (list `(m:sPre ,(mmlo-arg 'm:sub (list-ref c (+ i 1)))
+                                       ,(mmlo-arg 'm:sup (list-ref c (+ i 2)))
+                                       ,(mmlo-arg 'm:e (car c)))))
+                       ((>= (length c) 3)
+                        (list `(m:sSubSup ,(mmlo-arg 'm:e (car c)) ,(mmlo-arg 'm:sub (cadr c))
+                                          ,(mmlo-arg 'm:sup (caddr c)))))
+                       (else (mmlo-row c)))))
+              ((menclose)
+               (list `(m:borderBox (m:e ,@(mmlo-row c)))))
+              ((none mprescripts annotation annotation-xml) '())
+              (else (mmlo-row (ox-children x))))))))
+
+(tm-define (mathml->omml x)
+  (:synopsis "The tree of MathML @x as a formula of Word, an element m:oMath")
+  (cons 'm:oMath (mmlo-node x)))

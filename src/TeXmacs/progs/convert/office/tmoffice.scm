@@ -211,11 +211,49 @@
 ;; A formula is converted to MathML, whose named characters (&alpha;) are
 ;; written as the characters themselves: an office file knows no names.
 
+
+;; the names which the converter of MathML writes for the big operators,
+;; the accents and what is not seen, with the codes of their characters
+(define tmof-entities
+  '(("&Sum;" . #x2211) ("&Product;" . #x220f) ("&Integral;" . #x222b)
+    ("&ContourIntegral;" . #x222e) ("&Coproduct;" . #x2210)
+    ("&Intersection;" . #x22c2) ("&Union;" . #x22c3) ("&Wedge;" . #x22c0)
+    ("&Vee;" . #x22c1) ("&CircleDot;" . #x2a00) ("&CirclePlus;" . #x2a01)
+    ("&CircleTimes;" . #x2a02) ("&SquareIntersection;" . #x2a05)
+    ("&SquareUnion;" . #x2a06) ("&UnionPlus;" . #x2a04)
+    ("&Hat;" . #x5e) ("&Tilde;" . #x7e) ("&OverBar;" . #xaf)
+    ("&UnderBar;" . #x5f) ("&RightVector;" . #x2192) ("&Hacek;" . #x2c7)
+    ("&Breve;" . #x2d8) ("&DiacriticalAcute;" . #xb4)
+    ("&DiacriticalGrave;" . #x60) ("&DiacriticalDot;" . #x2d9)
+    ("&DoubleDot;" . #xa8) ("&RightArrow;" . #x2192) ("&LeftArrow;" . #x2190)
+    ("&OverBrace;" . #x23de) ("&UnderBrace;" . #x23df)
+    ("&ApplyFunction;" . #x2061) ("&af;" . #x2061)
+    ("&InvisibleTimes;" . #x2062) ("&it;" . #x2062)
+    ("&InvisibleComma;" . #x2063) ("&ic;" . #x2063)
+    ("&amp;" . #x26) ("&lt;" . #x3c) ("&gt;" . #x3e) ("&nbsp;" . #xa0)))
+
 (define (tmof-entity name)
-  ;; the character of a name of MathML, in UTF-8
-  (with t (catch #t (lambda () (logic-ref mathml-symbol->tm% name))
-                 (lambda args #f))
-    (if (string? t) (cork->utf8 t) name)))
+  ;; the character of a name of MathML (&alpha;, &#x3b1;), in UTF-8
+  (let* ((n (string-length name))
+         (code (cond ((assoc-ref tmof-entities name) => identity)
+                     ((and (> n 4) (string-starts? name "&#x"))
+                      (string->number (substring name 3 (- n 1)) 16))
+                     ((and (> n 3) (string-starts? name "&#"))
+                      (string->number (substring name 2 (- n 1))))
+                     (else #f)))
+         (t (and (not code)
+                 (catch #t (lambda () (logic-ref mathml-symbol->tm% name))
+                        (lambda args #f)))))
+    (cond (code (office-utf8 code))
+          ((string? t) (cork->utf8 t))
+          (else name))))
+
+(define (tmof-plain-utf8 s)
+  ;; a piece of text of MathML in UTF-8: the converter writes some
+  ;; characters as such already, and others in the encoding of TeXmacs
+  (if (list-or (map (lambda (c) (>= (char->integer c) 128)) (string->list s)))
+      s
+      (cork->utf8 s)))
 
 (define (tmof-mathml-text s)
   ;; the text of a token of MathML, with characters for its names
@@ -224,10 +262,11 @@
            (b (if (>= a 0) (string-search-forwards ";" a s) -1)))
       (if (or (< a 0) (< b 0))
           (apply string-append
-                 (reverse (cons (cork->utf8 (substring s i (string-length s))) acc)))
+                 (reverse (cons (tmof-plain-utf8 (substring s i (string-length s)))
+                                acc)))
           (loop (+ b 1)
                 (cons* (tmof-entity (substring s a (+ b 1)))
-                       (cork->utf8 (substring s i a))
+                       (tmof-plain-utf8 (substring s i a))
                        acc))))))
 
 (define (tmof-mathml-clean x)
@@ -700,7 +739,15 @@
 
 (define (tmof-captioned body name caption)
   ;; a figure or a table, and its caption after the name with its number
-  (append (tmof-blocks body)
+  (append (map (lambda (b)
+                 ;; a paragraph of images is the figure
+                 (if (and (func? b 'p) (nnull? (cdr b))
+                          (list-and (map (lambda (y)
+                                           (or (func? y 'image) (tmof-blank? y)))
+                                         (cdr b))))
+                     `(!role "figure" ,@(cdr b))
+                     b))
+               (tmof-blocks body))
           (tmof-with-role "caption" (tmof-titled name caption))))
 
 (define (tmof-render-figure l)

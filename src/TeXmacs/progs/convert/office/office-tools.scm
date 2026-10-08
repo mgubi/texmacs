@@ -236,3 +236,88 @@
                        '("courier" "consolas" "mono" "menlo" "monaco"
                          "typewriter" "fixed" "source code" "lucida console"
                          "andale"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Writing XML
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (ox-escape s quote?)
+  ;; the text s with the characters of XML as entities
+  (let loop ((l (string->list s)) (acc '()))
+    (cond ((null? l) (apply string-append (reverse acc)))
+          ((char=? (car l) #\&) (loop (cdr l) (cons "&amp;" acc)))
+          ((char=? (car l) #\<) (loop (cdr l) (cons "&lt;" acc)))
+          ((char=? (car l) #\>) (loop (cdr l) (cons "&gt;" acc)))
+          ((and quote? (char=? (car l) #\")) (loop (cdr l) (cons "&quot;" acc)))
+          ;; the control characters are not allowed in XML
+          ((and (< (char->integer (car l)) 32)
+                (not (in? (car l) '(#\newline #\tab))))
+           (loop (cdr l) acc))
+          (else
+            ;; (runs of other characters at once)
+            (let sub ((r (cdr l)) (run (list (car l))))
+              (if (and (pair? r) (not (in? (car r) '(#\& #\< #\> #\")))
+                       (>= (char->integer (car r)) 32))
+                  (sub (cdr r) (cons (car r) run))
+                  (loop r (cons (list->string (reverse run)) acc))))))))
+
+(define (ox-serialize-sub x)
+  ;; the pieces of the text of the node x, in a list
+  (cond ((string? x) (list (ox-escape x #f)))
+        ((not (pair? x)) '())
+        (else
+          (let ((tag (symbol->string (car x)))
+                (attrs (ox-attrs x))
+                (children (ox-children x)))
+            (append
+              (list "<" tag)
+              (append-map (lambda (a)
+                            (if (and (pair? (cdr a)) (string? (cadr a)))
+                                (list " " (symbol->string (car a)) "=\""
+                                      (ox-escape (cadr a) #t) "\"")
+                                '()))
+                          attrs)
+              (if (null? children) (list "/>")
+                  (append (list ">")
+                          (append-map ox-serialize-sub children)
+                          (list "</" tag ">"))))))))
+
+(tm-define (ox-serialize x)
+  (:synopsis "The text of the XML document whose element is the tree @x")
+  (apply string-append
+         (cons "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+               (ox-serialize-sub x))))
+
+(tm-define (ox-serialize-element x)
+  (:synopsis "The text of the element @x of XML, without a declaration")
+  (apply string-append (ox-serialize-sub x)))
+
+(tm-define (office-utf8 n)
+  (:synopsis "The character of code @n, in UTF-8")
+  (list->string
+    (map integer->char
+         (cond ((< n #x80) (list n))
+               ((< n #x800) (list (+ #xc0 (quotient n 64)) (+ #x80 (modulo n 64))))
+               ((< n #x10000)
+                (list (+ #xe0 (quotient n 4096))
+                      (+ #x80 (modulo (quotient n 64) 64))
+                      (+ #x80 (modulo n 64))))
+               (else
+                 (list (+ #xf0 (quotient n 262144))
+                       (+ #x80 (modulo (quotient n 4096) 64))
+                       (+ #x80 (modulo (quotient n 64) 64))
+                       (+ #x80 (modulo n 64))))))))
+
+(tm-define (office-length->cm s)
+  (:synopsis "The length @s (2cm, 1in, 10mm, 12pt, 96px) in centimeters, or #f")
+  (and (string? s) (!= s "")
+       (let* ((n (string-length s))
+              (i (let loop ((i 0))
+                   (if (and (< i n) (or (char-numeric? (string-ref s i))
+                                        (char=? (string-ref s i) #\.)))
+                       (loop (+ i 1)) i)))
+              (v (string->number (substring s 0 i)))
+              (scale (assoc-ref '(("cm" . 1.0) ("mm" . 0.1) ("in" . 2.54)
+                                  ("pt" . 0.03528) ("px" . 0.02646))
+                                (substring s i n))))
+         (and v scale (> v 0) (* v scale)))))
