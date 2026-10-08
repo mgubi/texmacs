@@ -158,6 +158,17 @@
   (if (or (not s) (== s "")) ""
       (string-append " \"" (string-replace s "\"" "\\\"") "\"")))
 
+(define (mdout-html-attr x name)
+  ;; the attribute name of x as HTML writes it, if x has it
+  (with v (mdout-attr x name)
+    (if (or (not v) (and (== v "") (!= name 'alt))) ""
+        (string-append
+          " " (symbol->string name) "=\""
+          (string-replace
+            (string-replace (string-replace v "&" "&amp;") "\"" "&quot;")
+            "<" "&lt;")
+          "\""))))
+
 (define (mdout-spaced open close l cell?)
   ;; emphasis does not start or end with a space: the spaces go outside
   (let* ((s (mdout-inlines l cell?))
@@ -194,9 +205,17 @@
                      (string-append "[" (mdout-inlines l cell?) "]("
                                     (mdout-url url) (mdout-title title) ")"))))
               ((img)
-               (string-append "![" (mdout-escape (or (mdout-attr x 'alt) "") cell?)
-                              "](" (mdout-url (or (mdout-attr x 'src) ""))
-                              (mdout-title (mdout-attr x 'title)) ")"))
+               (if (or (mdout-attr x 'width) (mdout-attr x 'height))
+                   ;; Markdown has no sizes: the tag of HTML
+                   (string-append
+                     "<img"
+                     (mdout-html-attr x 'src) (mdout-html-attr x 'alt)
+                     (mdout-html-attr x 'title) (mdout-html-attr x 'width)
+                     (mdout-html-attr x 'height) ">")
+                   (string-append
+                     "![" (mdout-escape (or (mdout-attr x 'alt) "") cell?)
+                     "](" (mdout-url (or (mdout-attr x 'src) ""))
+                     (mdout-title (mdout-attr x 'title)) ")")))
               ((br) (if cell? "<br>" "\\\n"))
               ((math)
                (with s (mdout-join l "")

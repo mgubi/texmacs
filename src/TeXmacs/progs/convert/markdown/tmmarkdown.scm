@@ -276,10 +276,39 @@
 (define (tmmd-em l) (tmmd-wrap 'em (tmmd-all l)))
 (define (tmmd-strong l) (tmmd-wrap 'strong (tmmd-all l)))
 (define (tmmd-del l) (tmmd-wrap 'del (tmmd-all l)))
-(define (tmmd-underline l) (tmmd-html-wrap "u" (tmmd-all l)))
+;; Markdown has no underlining: in a plain text it is emphasis
+(define (tmmd-underline l) (tmmd-em l))
 (define (tmmd-marked l) (tmmd-html-wrap "mark" (tmmd-all l)))
-(define (tmmd-sub l) (tmmd-html-wrap "sub" (tmmd-all l)))
-(define (tmmd-sup l) (tmmd-html-wrap "sup" (tmmd-all l)))
+;; The digits and the signs which Unicode has as subscripts and as
+;; superscripts, with their codes: H2O and x2 are written with them, and need
+;; no markup. (It has a few letters too, which many fonts lack.)
+(define tmmd-subscripts
+  '((#\0 . "2080") (#\1 . "2081") (#\2 . "2082") (#\3 . "2083")
+    (#\4 . "2084") (#\5 . "2085") (#\6 . "2086") (#\7 . "2087")
+    (#\8 . "2088") (#\9 . "2089") (#\+ . "208A") (#\- . "208B")
+    (#\= . "208C") (#\( . "208D") (#\) . "208E")))
+
+(define tmmd-superscripts
+  '((#\0 . "2070") (#\1 . "00B9") (#\2 . "00B2") (#\3 . "00B3")
+    (#\4 . "2074") (#\5 . "2075") (#\6 . "2076") (#\7 . "2077")
+    (#\8 . "2078") (#\9 . "2079") (#\+ . "207A") (#\- . "207B")
+    (#\= . "207C") (#\( . "207D") (#\) . "207E")))
+
+(define (tmmd-script l table name)
+  ;; a subscript or a superscript: its characters when they are all in the
+  ;; table, and else the tag name of HTML
+  (let* ((s (and (list-1? l) (string? (car l)) (car l)))
+         (codes (and s (!= s "")
+                     (map (lambda (c) (assoc-ref table c)) (string->list s)))))
+    (if (and codes (list-and codes))
+        (list (apply string-append
+                     (map (lambda (code)
+                            (cork->utf8 (string-append "<#" code ">")))
+                          codes)))
+        (tmmd-html-wrap name (tmmd-all l)))))
+
+(define (tmmd-sub l) (tmmd-script l tmmd-subscripts "sub"))
+(define (tmmd-sup l) (tmmd-script l tmmd-superscripts "sup"))
 
 (define (tmmd-code l)
   ;; code in the text, or lines of code
@@ -289,11 +318,9 @@
         (if (== s "") '() `((code ,s))))))
 
 (define (tmmd-key l)
-  ;; a key of the keyboard
+  ;; a key of the keyboard, as code
   (with s (apply string-append (map tmmd-plain l))
-    (cond ((== s "") '())
-          (tmmd-html? `((html "<kbd>") ,s (html "</kbd>")))
-          (else `((code ,s))))))
+    (if (== s "") '() `((code ,s)))))
 
 (define (tmmd-next-line l) '((br)))
 
@@ -314,6 +341,54 @@
             body
             `((a (@ (href ,url)) ,@(tmmd-merge body)))))))
 
+(define (tmmd-hlink* l)
+  ;; a link with a title
+  (let ((r (tmmd-hlink l))
+        (title (if (< (length l) 3) "" (tmmd-plain (caddr l)))))
+    (if (and (list-1? r) (func? (car r) 'a) (!= title ""))
+        `((a (@ ,@(cdadar r) (title ,title)) ,@(cddar r)))
+        r)))
+
+(define (tmmd-alt-text l)
+  ;; an image with a text in its place; anything else is itself
+  (if (< (length l) 2) (tmmd-all l)
+      (let ((r (tmmd (car l)))
+            (alt (tmmd-plain (cadr l))))
+        (if (and (list-1? r) (func? (car r) 'img))
+            `((img (@ ,@(list-filter (cdadar r) (lambda (a) (!= (car a) 'alt)))
+                      (alt ,alt))))
+            r))))
+
+(define (tmmd-size x)
+  ;; the width or the height of an image as HTML has them: pixels, or a
+  ;; percentage for a part of the paragraph; #f for the other lengths
+  (and tmmd-html? (string? x) (!= x "")
+       (let* ((n (string-length x))
+              (i (let loop ((i 0))
+                   (if (and (< i n)
+                            (or (char-numeric? (string-ref x i))
+                                (in? (string-ref x i) '(#\. #\-))))
+                       (loop (+ i 1)) i)))
+              (v (string->number (substring x 0 i)))
+              (unit (substring x i n))
+              (px (assoc-ref '(("px" . 1) ("" . 1) ("pt" . 1.3333) ("in" . 96)
+                               ("cm" . 37.795) ("mm" . 3.7795))
+                             unit)))
+         (cond ((or (not v) (<= v 0)) #f)
+               ((== unit "par")
+                (string-append (number->string (inexact->exact (round (* v 100))))
+                               "%"))
+               (px (number->string (inexact->exact (round (* v px)))))
+               (else #f)))))
+
+(define (tmmd-image-node src l)
+  ;; the image src, with the sizes of the arguments l of the tag
+  (let ((w (and (>= (length l) 2) (tmmd-size (cadr l))))
+        (h (and (>= (length l) 3) (tmmd-size (caddr l)))))
+    `((img (@ (src ,src) (alt "")
+              ,@(if w `((width ,w)) '())
+              ,@(if h `((height ,h)) '()))))))
+
 (define (tmmd-href l)
   (with url (tmmd-plain (if (null? l) "" (car l)))
     (if (== url "") '() `((a (@ (href ,url)) ,url)))))
@@ -332,7 +407,7 @@
   ;; file when the document is, as for HTML, and is left out otherwise
   (cond ((null? l) '())
         ((and (string? (car l)) (!= (car l) ""))
-         `((img (@ (src ,(tmmd-text (car l))) (alt "")))))
+         (tmmd-image-node (tmmd-text (car l)) l))
         ((and (func? (car l) 'tuple 2) (func? (cadar l) 'raw-data 1)
               (string? (cadr (cadar l))) (string? (caddar l))
               (tmmd-image-root))
@@ -343,8 +418,8 @@
                 (post (string-append "-" (number->string nr)
                                      (if (== suffix "") "" ".") suffix)))
            (string-save (cadr (cadar l)) (url-glue root post))
-           `((img (@ (src ,(string-append (url->unix (url-tail root)) post))
-                     (alt ""))))))
+           (tmmd-image-node (string-append (url->unix (url-tail root)) post)
+                            l)))
         (else '())))
 
 (define (tmmd-specific l)
@@ -835,6 +910,8 @@
   (TeX tmmd-TeX)
   (LaTeX tmmd-LaTeX)
   ((:or hlink hyper-link) tmmd-hlink)
+  (hlink* tmmd-hlink*)
+  (alt-text tmmd-alt-text)
   (action tmmd-first)
   ((:or href slink) tmmd-href)
   (image tmmd-image)

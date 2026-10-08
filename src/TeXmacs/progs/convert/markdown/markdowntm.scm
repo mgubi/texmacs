@@ -150,16 +150,37 @@
                `((verbatim ,(mdtm-text (apply string-append
                                               (list-filter l string?))))))
               ((a)
-               `((hlink ,(mdtm-inlines l)
-                        ,(mdtm-text (or (mdtm-attr x 'href) "")))))
+               (let ((body (mdtm-inlines l))
+                     (url (mdtm-text (or (mdtm-attr x 'href) "")))
+                     (title (or (mdtm-attr x 'title) "")))
+                 (if (== title "") `((hlink ,body ,url))
+                     `((hlink* ,body ,url ,(mdtm-text title))))))
               ((img)
-               `((image ,(mdtm-text (or (mdtm-attr x 'src) "")) "" "" "" "")))
+               (let ((im `(image ,(mdtm-text (or (mdtm-attr x 'src) ""))
+                                 ,(mdtm-size (mdtm-attr x 'width))
+                                 ,(mdtm-size (mdtm-attr x 'height)) "" ""))
+                     (alt (or (mdtm-attr x 'alt) "")))
+                 (if (== alt "") (list im)
+                     `((alt-text ,im ,(mdtm-text alt))))))
               ((br) '((next-line)))
               ((math) (list (mdtm-math (apply string-append l))))
               ((displaymath) (list (mdtm-display-math (apply string-append l))))
               ((html) (list (mdtm-html (apply string-append l))))
               ((footnote) (list (mdtm-footnote (apply string-append l))))
               (else (append-map mdtm-inline l)))))))
+
+(define (mdtm-size s)
+  ;; a length of TeXmacs for the width or the height of an image: a number
+  ;; is in pixels and a percentage is a part of the width of the paragraph
+  (cond ((or (not s) (== s "")) "")
+        ((string->number s) (string-append s "px"))
+        ((and (string-ends? s "%")
+              (string->number (substring s 0 (- (string-length s) 1))))
+         (string-append
+           (number->string
+             (/ (string->number (substring s 0 (- (string-length s) 1))) 100.0))
+           "par"))
+        (else s)))
 
 (define (mdtm-inlines l)
   (mdtm-concat (append-map mdtm-inline l)))

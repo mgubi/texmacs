@@ -1121,6 +1121,24 @@
 	body ;; temporary fix for URLs like $TEXMACS_PATH/...
 	`((h:a (@ (href ,(tmhtml-suffix to))) ,@body)))))
 
+(define (tmhtml-hyperlink* l)
+  ;; a link with a title
+  (let ((r (tmhtml-hyperlink l))
+	(title (if (< (length l) 3) ""
+		   (cork->html (tmhtml-force-string (third l))))))
+    (if (and (list-1? r) (func? (car r) 'h:a) (!= title ""))
+	`((h:a (@ ,@(cdadar r) (title ,title)) ,@(cddar r)))
+	r)))
+
+(define (tmhtml-alt-text l)
+  ;; an image with a text in its place; anything else is itself
+  (if (< (length l) 2) (tmhtml (first l))
+      (let ((r (tmhtml (first l)))
+	    (alt (cork->html (tmhtml-force-string (second l)))))
+	(if (and (list-1? r) (func? (car r) 'h:img))
+	    `((h:img (@ ,@(cdadar r) (alt ,alt))))
+	    r))))
+
 (define (tmhtml-specific l)
   (cond ((== (car l) "html") (list (tmstring->string (force-string (cadr l)))))
 	((== (car l) "html*") (tmhtml (cadr l)))
@@ -2017,6 +2035,8 @@
   (reference tmhtml-noop)
   (pageref tmhtml-noop)
   (hlink tmhtml-hyperlink)
+  (hlink* tmhtml-hyperlink*)
+  (alt-text tmhtml-alt-text)
   (action tmhtml-action)
   (write tmhtml-noop)
   

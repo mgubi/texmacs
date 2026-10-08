@@ -60,6 +60,13 @@
     <item*|Text>Emphasized, strong and struck through text, code, links,
     images, line breaks, the entities of <name|Html>.
 
+    <item*|Links and images>A link with a title,
+    <verbatim|[text](address "title")>, is a <markup|hlink*>, which keeps
+    the title. The text of an image, <verbatim|![text](file.png)>, is kept
+    by an <markup|alt-text> around the image. An image may have a size, as
+    for <name|Pandoc>, <verbatim|![text](file.png){width=50%}>, or with the
+    tag of <name|Html>, <verbatim|\<less\>img src="file.png" width="300"\<gtr\>>.
+
     <item*|Lists>With bullets or numbers, nested, with several paragraphs in
     an item; the task lists (<verbatim|- [ ]> and <verbatim|- [x]>) get a
     box as their bullet.
@@ -104,17 +111,26 @@
     header. Their cells are single lines: the paragraphs of a cell are
     joined.
 
+    <item*|Links and images>The title of an <markup|hlink*> and the text of
+    an <markup|alt-text> around an image are written with them. An image
+    with a width or a height is written as the tag <verbatim|img> of
+    <name|Html>, since <name|Markdown> has no sizes: in pixels, or in
+    percents for a part of the width of the paragraph.
+
     <item*|Images>The images which are files keep their name. Those which
     are inside the document are saved beside the file which is written:
     with <verbatim|name.md>, the files <verbatim|name-1.png>,
     <verbatim|name-2.png> and so on.
 
-    <item*|What <name|Markdown> cannot say>Underlined text, subscripts and
-    superscripts outside formulas and keys of the keyboard are written
-    with the tags of <name|Html>, which most programs display
-    (<menu|Edit|Preferences|Convert|Markdown> turns this off: they are
-    then plain text). Colors, fonts, sizes and alignments are dropped, and
-    so are the drawings made with <TeXmacs>.
+    <item*|What <name|Markdown> cannot say>An underlined text is
+    emphasized and a key of the keyboard is code. A subscript or a
+    superscript made of digits and signs is written with the characters
+    which Unicode has for them (as in H<rsub|2>O or
+    <verbatim|x><rsup|2>). The other ones and the marked
+    text are written with the tags of <name|Html>, which most programs
+    display (<menu|Edit|Preferences|Convert|Markdown> turns this off: they
+    are then plain text). Colors, fonts, sizes and alignments are dropped,
+    and so are the drawings made with <TeXmacs>.
   </description>
 
   To write something only into the <name|Markdown> file,

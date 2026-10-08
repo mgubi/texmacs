@@ -178,7 +178,19 @@
   (check= (import "**a *b* c**") '(strong (concat "a " (em "b") " c")))
   (check= (import "[t](u)") '(hlink "t" "u"))
   (check= (import "<https://x.y>") '(hlink "https://x.y" "https://x.y"))
-  (check= (import "![alt](i.png)") '(image "i.png" "" "" "" ""))
+  (check= (import "![](i.png)") '(image "i.png" "" "" "" ""))
+  ;; the title of a link and the text of an image have their tags
+  (check= (import "[t](u \"The title\")") '(hlink* "t" "u" "The title"))
+  (check= (import "![alt text](i.png)")
+          '(alt-text (image "i.png" "" "" "" "") "alt text"))
+  ;; the sizes of an image: the attributes of Pandoc, or the tag of HTML
+  (check= (import "![a](i.png){width=50%}")
+          '(alt-text (image "i.png" "0.5par" "" "" "") "a"))
+  (check= (import "![](i.png){width=300px height=2cm}")
+          '(image "i.png" "300px" "2cm" "" ""))
+  (check= (import "<img src=\"i.png\" alt=\"The logo\" width=\"36\">")
+          '(alt-text (image "i.png" "36px" "" "" "") "The logo"))
+  (check= (import "<a href=\"u\" title=\"T\">t</a>") '(hlink* "t" "u" "T"))
   (check= (import "a  \nb") '(concat "a" (next-line) "b"))
   (check= (import "x[^n]\n\n[^n]: note") '(concat "x" (footnote "note")))
   ;; the formulas go through the LaTeX converter, HTML through the HTML one
@@ -276,6 +288,12 @@
   (check= (export '(hlink "a b" "u v(w)")) "[a b](<u v(w)>)")
   (check= (export '(href "http://a.b")) "<http://a.b>")
   (check= (export '(image "i.png" "" "" "" "")) "![](i.png)")
+  (check= (export '(alt-text (image "i.png" "" "" "" "") "alt text"))
+          "![alt text](i.png)")
+  (check= (export '(alt-text "text" "alt")) "text")
+  (check= (export '(hlink* "t" "u" "The \"title\""))
+          "[t](u \"The \\\"title\\\"\")")
+  (check= (export '(hlink* "t" "u" "")) "[t](u)")
   (check= (export '(concat "a" (next-line) "b")) "a\\\nb")
   (check= (export '(concat "a" (footnote "note") "b")) "a[^1]b\n\n[^1]: note\n")
   (check= (export '(with "color" "red" "r")) "r")
@@ -286,13 +304,45 @@
   (check= (export (string-append "caf" (bytes 233)))
           (string-append "caf" (bytes 195 169))))
 
-;; What Markdown cannot say is HTML, or plain text without the option.
+;; Markdown has neither underlining nor scripts: an underlined text is
+;; emphasized, a script of digits and signs is written with the characters
+;; of Unicode, another one with the tag of HTML (or as plain text without
+;; the option); a key is code.
 (define (test-export-html)
   (check-group "export html")
-  (let ((t '(concat (underline "u") "x" (rsub "1") (rsup "2")))
-        (off (cons "texmacs->markdown:html" "off")))
-    (check= (export t) "<u>u</u>x<sub>1</sub><sup>2</sup>")
-    (check= (export t off) "ux12")))
+  (let ((off (cons "texmacs->markdown:html" "off")))
+    (check= (export '(underline "u")) "*u*")
+    (check= (export '(concat "H" (rsub "2") "O")) (cork->utf8 "H<#2082>O"))
+    (check= (export '(concat "x" (rsup "2") " y" (rsup "-(1+2)")))
+            (cork->utf8 "x<#00B2> y<#207B><#207D><#00B9><#207A><#00B2><#207E>"))
+    (check= (export '(concat "x" (rsup "n+1"))) "x<sup>n+1</sup>")
+    (check= (export '(concat "x" (rsub "max"))) "x<sub>max</sub>")
+    (check= (export '(concat "x" (rsup (em "a")))) "x<sup>*a*</sup>")
+    (check= (export '(concat "x" (rsub "max")) off) "xmax")
+    (check= (export '(render-key "F9")) "`F9`")
+    (check= (export '(marked "m")) "<mark>m</mark>")
+    (check= (export '(marked "m") off) "m")))
+
+;; An image with a size is the tag of HTML: pixels, or percents for a part
+;; of the paragraph; the lengths which depend on the image are dropped.
+(define (test-export-image-sizes)
+  (check-group "export image sizes")
+  (check= (export '(image "i.png" "36px" "" "" ""))
+          "<img src=\"i.png\" alt=\"\" width=\"36\">")
+  (check= (export '(image "i.png" "0.5par" "2cm" "" ""))
+          "<img src=\"i.png\" alt=\"\" width=\"50%\" height=\"76\">")
+  (check= (export '(alt-text (image "i.png" "36px" "" "" "") "a \"b\" <c>"))
+          "<img src=\"i.png\" alt=\"a &quot;b&quot; &lt;c>\" width=\"36\">")
+  (check= (export '(image "i.png" "0.6383w" "" "" "")) "![](i.png)")
+  (check= (export '(alt-text (image "i.png" "36px" "" "" "") "alt")
+                  (cons "texmacs->markdown:html" "off"))
+          "![alt](i.png)")
+  ;; and through HTML
+  (check= (convert '(alt-text (image "i.png" "36px" "" "" "") "The logo")
+                   "texmacs-stree" "html-snippet")
+          "<img alt=\"The logo\" class=\"image\" src=\"i.png\" width=\"36\"></img>")
+  (check= (convert '(hlink* "t" "u" "T") "texmacs-stree" "html-snippet")
+          "<a href=\"u\" title=\"T\">t</a>"))
 
 (define (test-export-math)
   (check-group "export math")
@@ -387,6 +437,9 @@
   '("plain"
     "x *a* **b** ~~c~~ `d`"
     "[t](u) and <https://x.y>"
+    "[t](u \"The title\") and ![alt text](i.png)"
+    "<img src=\"i.png\" alt=\"The logo\" width=\"36\">"
+    "<img src=\"i.png\" alt=\"\" width=\"50%\" height=\"20\">"
     "a\\\nb"
     "$x^2$ and \\$5"
     "# A\n\ntext\n\n## B\n\nmore\n"
@@ -407,6 +460,10 @@
   '("plain"
     (concat "x " (em "a") " " (strong "b") " " (verbatim "c"))
     (hlink "t" "u")
+    (hlink* "t" "u" "The title")
+    (alt-text (image "i.png" "" "" "" "") "alt text")
+    (alt-text (image "i.png" "36px" "" "" "") "The logo")
+    (image "i.png" "0.5par" "20px" "" "")
     (math (concat "x" (rsup "2")))
     (document (section "S") "text" (subsection "T") "more")
     (itemize (document (concat (item) "a") (concat (item) "b")))
@@ -468,6 +525,7 @@
   (test-import-document)
   (test-export-inline)
   (test-export-html)
+  (test-export-image-sizes)
   (test-export-math)
   (test-export-blocks)
   (test-export-headings)

@@ -653,6 +653,10 @@
 
   <assign|slink|<macro|body|<hlink|<with|font-family|tt|language|verbatim|<arg|body>>|<arg|body>>>>
 
+  <assign|hlink*|<macro|body|dest|title|<hlink|<arg|body>|<arg|dest>>>>
+
+  <assign|alt-text|<macro|body|text|<arg|body>>>
+
   <assign|square|<macro|x|<times|<arg|x>|<arg|x>>>>
 
   <assign|text-dots-sep|0.3333spc>

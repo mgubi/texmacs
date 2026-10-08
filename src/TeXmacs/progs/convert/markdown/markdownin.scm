@@ -30,7 +30,8 @@
 ;;
 ;; A node may have attributes, (tag (@ (name "value")...) ...): start and
 ;; loose for the lists, checked for the items of task lists, lang for pre,
-;; align for th and td, href and title for a, src, alt and title for img.
+;; align for th and td, href and title for a, src, alt, title, width and
+;; height for img (the sizes as in HTML or CSS: 300, 50%, 2cm).
 ;;
 ;; The blocks are parsed first, the text of the paragraphs, headings and
 ;; cells afterwards: a link may refer to a definition which follows it.
@@ -891,8 +892,34 @@
       `(a (@ (href ,url) ,@(if (== title "") '() `((title ,title))))
           ,@(md-inlines inner))))
 
+(define (md-image-size x s i)
+  ;; the image x with the width and the height of the attributes which
+  ;; follow it at i, as for Pandoc: {width=50% height=2cm}; (node . end)
+  (let* ((e (and (md-starts? s i "{") (md-find s i #\})))
+         (l (if e (string-tokenize-by-char (substring s (+ i 1) e) #\space) '()))
+         (get (lambda (key)
+                (let loop ((l l))
+                  (cond ((null? l) #f)
+                        ((string-starts? (car l) key)
+                         (md-yaml-value (substring (car l) (string-length key)
+                                                   (string-length (car l)))))
+                        (else (loop (cdr l)))))))
+         (w (get "width="))
+         (h (get "height=")))
+    (if (not (or w h)) (cons x i)
+        (cons `(img (@ ,@(cdadr x)
+                       ,@(if w `((width ,w)) '())
+                       ,@(if h `((height ,h)) '())))
+              (+ e 1)))))
+
 (define (md-link s i image?)
   ;; (node . end) for the link or the image whose [ is at i, or #f
+  (with r (md-link-sub s i image?)
+    (if (and r image? (func? (car r) 'img))
+        (md-image-size (car r) s (cdr r))
+        r)))
+
+(define (md-link-sub s i image?)
   (let ((e (md-bracket-end s i)))
     (and e
          (let* ((inner (substring s (+ i 1) e))

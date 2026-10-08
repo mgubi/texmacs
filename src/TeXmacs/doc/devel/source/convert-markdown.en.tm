@@ -68,8 +68,10 @@
     "value") ...) ...)>: <verbatim|start> and <verbatim|loose> for the
     lists, <verbatim|checked> for the items of a task list,
     <verbatim|lang> for <verbatim|pre>, <verbatim|align> for the cells,
-    <verbatim|href> and <verbatim|title> for the links, <verbatim|src> and
-    <verbatim|alt> for the images.
+    <verbatim|href> and <verbatim|title> for the links, <verbatim|src>,
+    <verbatim|alt>, <verbatim|title>, <verbatim|width> and
+    <verbatim|height> for the images (the sizes as in <name|HTML>:
+    <verbatim|300>, <verbatim|50%>, or with a unit).
   </description>
 
   A snippet of a single paragraph is the list of its nodes, without the
@@ -112,7 +114,11 @@
   <scm|markdown-\<gtr\>texmacs> maps the blocks and the text to the tags of
   the standard styles: the sections, <markup|itemize> and
   <markup|enumerate>, <markup|quotation>, <markup|hrule>, <markup|block>
-  for the tables, <markup|hlink>, <markup|image>, <markup|footnote>. The
+  for the tables, <markup|hlink>, <markup|image>, <markup|footnote>. A link
+  with a title is <markup|hlink*> and an image with a text is inside an
+  <markup|alt-text>, two macros of <verbatim|std-markup> which are typeset
+  as their first argument and which the converters for <name|HTML> know
+  too; the sizes of an image are its width and height (<scm|mdtm-size>). The
   language of a fence selects a tag <markup|<em|lang>-code> by the table
   <scm|mdtm-languages>. Formulas are given to the converter of <LaTeX>
   (<verbatim|latex-snippet>) and <name|HTML> to the one of <name|HTML>
@@ -169,8 +175,17 @@
     <item>The tables are those of <name|GitHub> (<scm|tmmd-table>); inside
     a heading or a cell, the blocks are flattened (<scm|tmmd-flat?>).
 
-    <item>With the option <verbatim|html>, the tags without an equivalent
-    are wrapped in tags of <name|HTML>, as <scm|(html "text")> nodes.
+    <item><name|HTML> is the last resort. An underlined text is emphasized,
+    a key is code, and a subscript or a superscript of digits and signs is
+    written with the characters of Unicode (<scm|tmmd-script>). What
+    remains (the other scripts, the marked text, an image with a size) is
+    wrapped in tags of <name|HTML>, as <scm|(html "text")> nodes, with the
+    option <verbatim|html>, and is plain text without it.
+
+    <item>An image with a width or a height gets them as attributes
+    (<scm|tmmd-size>: pixels or percents), and the serializer then writes
+    the tag <verbatim|img> of <name|HTML>; without the option
+    <verbatim|html> the sizes are dropped.
 
     <item>An image inside the document is saved beside the file which is
     written (<scm|tmmd-image>, from <scm|current-save-target>), for a
@@ -215,8 +230,7 @@
   <section|Known limitations>
 
   <\itemize>
-    <item>The alternative text and the size of an image, and the title of
-    a link, are not kept by the import.
+    <item>The title of an image is not kept by the import.
 
     <item>The drawings of <TeXmacs> are not exported.
 
