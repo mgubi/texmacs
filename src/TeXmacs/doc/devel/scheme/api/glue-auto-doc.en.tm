@@ -507,6 +507,38 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(zip-entries <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_file_entries> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-ref <scm-arg|url> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_file_read> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-has? <scm-arg|url> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_file_has> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-pack <scm-arg|url> <scm-arg|array_string> <scm-arg|array_string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_file_write> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
     <scm|(http-get <scm-arg|string> <scm-arg|array_string>)>
 <explain-synopsis|no synopsis>
   <|explain>

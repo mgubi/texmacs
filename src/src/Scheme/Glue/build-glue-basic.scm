@@ -80,6 +80,12 @@
   (async-evaluate-system async_evaluate_system
     (int array_string string object))
   (async-evaluate-cancel async_evaluate_cancel (void int))
+  ;; zip archives
+  (zip-entries zip_file_entries (array_string url))
+  (zip-ref zip_file_read (string url string))
+  (zip-has? zip_file_has (bool url string))
+  (zip-pack zip_file_write (bool url array_string array_string))
+
   (http-get http_get (string string array_string))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))
