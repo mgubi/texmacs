@@ -124,6 +124,105 @@ edit_interface_rep::draw_cursor (renderer ren) {
   }
 }
 
+/******************************************************************************
+* The cursors of other users
+*
+* In a live document, which several users edit at once, each of them sees
+* where the others are: a bar of the colour of the user at the position of
+* the cursor of that user, with the name of the user in a flag above it.
+* The positions are paths in the document, given from Scheme
+* (set-user-cursor: client/client-live.scm, which gets them from the
+* server); they are looked up at each repaint, so that the bars follow the
+* typesetting.
+******************************************************************************/
+
+void
+edit_interface_rep::set_user_cursor (string id, path p, string col, string name) {
+  int i;
+  for (i=0; i<N(user_cursor_ids); i++)
+    if (user_cursor_ids[i] == id) break;
+  if (i == N(user_cursor_ids)) {
+    user_cursor_ids << id;
+    user_cursor_paths << p;
+    user_cursor_colors << col;
+    user_cursor_names << name;
+  }
+  else {
+    if (user_cursor_paths[i] == p && user_cursor_colors[i] == col &&
+        user_cursor_names[i] == name) return;
+    user_cursor_paths[i]= p;
+    user_cursor_colors[i]= col;
+    user_cursor_names[i]= name;
+  }
+  invalidate_all ();
+}
+
+void
+edit_interface_rep::cancel_user_cursor (string id) {
+  array<string> ids, cols, names;
+  array<path> paths;
+  for (int i=0; i<N(user_cursor_ids); i++)
+    if (user_cursor_ids[i] != id) {
+      ids << user_cursor_ids[i];
+      paths << user_cursor_paths[i];
+      cols << user_cursor_colors[i];
+      names << user_cursor_names[i];
+    }
+  if (N(ids) == N(user_cursor_ids)) return;
+  user_cursor_ids= ids;
+  user_cursor_paths= paths;
+  user_cursor_colors= cols;
+  user_cursor_names= names;
+  invalidate_all ();
+}
+
+void
+edit_interface_rep::cancel_user_cursors () {
+  if (N(user_cursor_ids) == 0) return;
+  user_cursor_ids= array<string> ();
+  user_cursor_paths= array<path> ();
+  user_cursor_colors= array<string> ();
+  user_cursor_names= array<string> ();
+  invalidate_all ();
+}
+
+void
+edit_interface_rep::draw_user_cursors (renderer ren) {
+  if (N(user_cursor_ids) == 0 || is_nil (eb)) return;
+  font fn;
+  for (int i=0; i<N(user_cursor_ids); i++) {
+    path p= user_cursor_paths[i];
+    // a position which the document no longer has (it changed since the
+    // position was given) is not shown
+    if (is_nil (p) || !(rp <= p) || !has_subtree (et, path_up (p))) continue;
+    cursor cu= eb->find_check_cursor (p);
+    if (!cu->valid) continue;
+    color col= named_color (user_cursor_colors[i]);
+    SI cy1= cu->y1 - 2*zpixel, cy2= cu->y2 + 2*zpixel;
+    SI x1= cu->ox + ((SI) (cy1 * cu->slope)), y1= cu->oy + cy1;
+    SI x2= cu->ox + ((SI) (cy2 * cu->slope)), y2= cu->oy + cy2;
+    ren->set_pencil (pencil (col, 2*zpixel));
+    ren->line (x1, y1, x2, y2);
+    string name= user_cursor_names[i];
+    if (N(name) == 0) continue;
+    // the name of the user, in a flag of the colour above the bar
+    if (is_nil (fn)) {
+      tree t= use_macos_fonts () ? tuple ("apple-lucida", "ss", "medium", "right")
+                                 : tuple ("pagella", "rm", "medium", "right");
+      t << tree ("7") << tree ("600");
+      fn= find_font (t);
+    }
+    metric ex;
+    fn->get_extents (name, ex);
+    SI pad= 2*zpixel;
+    SI fw= ex->x2 - ex->x1 + 2*pad, fh= fn->y2 - fn->y1 + pad;
+    ren->set_background (col);
+    ren->clear (x2 - zpixel, y2, x2 - zpixel + fw, y2 + fh);
+    ren->set_pencil (pencil (white));
+    fn->draw (ren, name, x2 - zpixel + pad - ex->x1, y2 + pad/2 - fn->y1);
+  }
+}
+
 void
 edit_interface_rep::draw_surround (renderer ren, rectangle r) {          
   ren->set_background (tm_background);
@@ -287,6 +386,7 @@ edit_interface_rep::draw_post (renderer win, renderer ren, rectangle r) {
   draw_selection (ren, r);
   draw_graphics (ren);
   draw_cursor (ren); // the text cursor must be drawn over the graphical object
+  draw_user_cursors (ren);
   draw_keys (ren);
   ren->reset_zoom_factor ();
   win->reset_zoom_factor ();

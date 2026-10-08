@@ -53,6 +53,10 @@
   (with t (ahash-ref live-views lid)
     (and t (!= (ahash-size t) 0))))
 
+(tm-define (live-view-ids lid)
+  (:synopsis "The identifiers of the views of the live document @lid")
+  (map car (ahash-table->list (live-view-table lid))))
+
 (tm-define (live-view-set-state lid vid state)
   (with t (live-view-table lid)
     (ahash-set! t vid state)))

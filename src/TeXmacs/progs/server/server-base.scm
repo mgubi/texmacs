@@ -132,6 +132,11 @@
 (tm-define (server-remote-eval* client cmd cont)
   (server-remote-eval client cmd cont cont))
 
+;; a sign of life, for the clients which watch their connection (any answer
+;; is one: an older server answers that it does not know the command)
+(tm-service (remote-ping)
+  (server-return envelope "pong"))
+
 (tm-service (server-remote-result msg-id ret)
   (with client (car envelope)
     (when (debug-get "remote")

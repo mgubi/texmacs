@@ -275,8 +275,15 @@
           (for (loc (db-get-field id "location"))
             (remove-repository-file loc)))))))
 
+(define notify-log '())
+(define saved-notify-hook #f)
+
 (define (remote-setup)
   (check-group "setup")
+  ;; what the user would be told of the connections is recorded
+  (set! saved-notify-hook client-notify-hook)
+  (set! client-notify-hook
+        (lambda (event msg) (set! notify-log (cons (list event msg) notify-log))))
   (when (url-exists? remote-dir) (system-rmdir-recursive remote-dir))
   (system-mkdir remote-dir)
   (for (name '("server" "user-remote" "user-sync" "user-bib" "user-general"))
@@ -329,7 +336,66 @@
   (check-false (== (url->system (server-database))
                    (url->system (tmp "server.tmdb"))))
   (system-rmdir-recursive remote-dir)
-  (check-false (url-exists? remote-dir)))
+  (check-false (url-exists? remote-dir))
+  (set! client-notify-hook saved-notify-hook))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The state of the connections, as the user is told
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-connection-state)
+  (check-group "state of the connections")
+  (let* ((heard (priv '(client client-base) 'client-heard))
+         (notify-heard (priv '(client client-base) 'client-notify-heard))
+         (events (lambda () (reverse (map car notify-log)))))
+    (set! notify-log '())
+    (check= (client-connection-state 9101) :connected)
+    (check= (client-connection-state 9999) :closed)
+    (check= (client-connection-status 9101) "Connected to loophost as rt-alice")
+    ;; a ping, and its answer
+    (check-false (client-connection-latency 9101))
+    (client-heartbeat 9101)
+    (loop-pump)
+    (check= (loop-received 'server 9101 'remote-ping) '((remote-ping)))
+    (check-true (number? (client-connection-latency 9101)))
+    (check-true (string-starts? (client-connection-status 9101)
+                                "Connected to loophost as rt-alice ("))
+    (check= (rcall 9101 '(remote-ping)) "pong")
+    (check= (events) '())
+    ;; a server which says nothing for a while, and then again
+    (ahash-set! heard 9101 (- (texmacs-time) 40000))
+    (client-heartbeat 9101)
+    (check= (client-connection-state 9101) :silent)
+    (check-true (string-starts? (client-connection-status 9101)
+                                "No answer from loophost for 4"))
+    (client-heartbeat 9101)
+    (check= (events) '(:silent))
+    (notify-heard 9101)
+    (check= (client-connection-state 9101) :connected)
+    (check= (events) '(:silent :back))
+    ;; a server which says nothing for too long: the connection is closed,
+    ;; who waits for an answer gets an error, the user is told
+    (let ((r '(:no-answer)))
+      (client-remote-eval 9102 '(remote-logged?)
+                          (lambda (x) (set! r x))
+                          (lambda (e) (set! r (list :error e))))
+      (ahash-set! heard 9102 (- (texmacs-time) 200000))
+      (check= (client-lost-connections) '())
+      (client-heartbeat 9102)
+      (check= r '(:error "no answer for 200 s"))
+      (check= (client-connection-state 9102) :closed)
+      (check-false (client-find-server-pseudo 9102))
+      (check-false (memv 9102 (client-active-servers)))
+      (check= (client-lost-connections)
+              '(("loophost" "6561" "rt-bob" "no answer for 200 s")))
+      (check= (events) '(:silent :back :lost))
+      (check-true (string-starts? (cadr (car notify-log))
+                                  "Connection with rt-bob@loophost lost: "))
+      (loop-pump)
+      (check= r '(:error "no answer for 200 s")))
+    ;; a new login forgets that the connection was lost
+    (client-forget-lost "loophost" "6561")
+    (check= (client-lost-connections) '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Names of remote resources
@@ -1291,6 +1357,42 @@
 
 (define (live-doc) (tm->stree (live-current-document lid)))
 
+(define (test-live-cursors)
+  (check-group "cursors of the users of a live document")
+  (let* ((clid "tmfs://live/loophost/rt-cursors")
+         (told (lambda (client)
+                 (with l (list-filter (loop-received 'client client 'live-cursor)
+                                      (lambda (c) (== (cadr c) clid)))
+                   (and (nnull? l) (cddr (cAr l)))))))
+    (set! loop-blocked '(live-modify))
+    (ralice `(live-open ,clid))
+    (rbob `(live-open ,clid))
+    (check= (live-participants clid) '())
+    ;; the position of alice goes to bob, with who she is, not back to her
+    (check= (ralice `(live-cursor ,clid (0 3))) #t)
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" (0 3)))
+    (check-false (told 9001))
+    (check= (live-participants clid) '("Alice A"))
+    (check= (live-participants (string->url clid)) '("Alice A"))
+    ;; who opens the document later is told where the others are
+    (check-false (told 9005))
+    (rcarol `(live-open ,clid))
+    (check= (told 9005) '(9001 "rt-alice" "Alice A" (0 3)))
+    ;; a new position, and none when she leaves the document
+    (check= (ralice `(live-cursor ,clid (0 7))) #t)
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" (0 7)))
+    (check= (ralice `(live-cursor ,clid #f)) #t)
+    (check= (told 9002) '(9001 "rt-alice" "Alice A" #f))
+    (check= (live-participants clid) '())
+    ;; not a position; not logged in; no such document
+    (check= (ralice `(live-cursor ,clid "x"))
+            '(:error "Error: read access denied"))
+    (check= (ranon `(live-cursor ,clid (0 1)))
+            '(:error "Error: read access denied"))
+    (check= (ralice `(live-cursor "tmfs://live/loophost/rt-none" (0 1)))
+            '(:error "Error: read access denied"))
+    (set! loop-blocked '())))
+
 (define (test-live)
   (check-group "opening live documents")
   (set! loop-blocked '(live-modify))
@@ -2021,6 +2123,8 @@
         (run-group test-client-connections)
         (run-group test-client-listings)
         (run-group test-server-preferences)
+        (run-group test-live-cursors)
+        (run-group test-connection-state)
         (run-group remote-cleanup)
         (loop-uninstall!)
         (set! remote-active? #f)))
