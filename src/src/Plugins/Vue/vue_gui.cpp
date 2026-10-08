@@ -72,6 +72,48 @@
 extern "C" bool vue_clay_transitions_active (void); // clay.c
 extern "C" int  vue_clay_capacity_report (char* buf, int n); // clay.c
 
+/******************************************************************************
+* The interface scaling
+******************************************************************************/
+
+// The preference "gui scaling" (Preferences > General > Interface scaling):
+// "default", or a factor by which the whole interface is larger or smaller.
+// It is read once, at the start, as the Qt interface does (QT_SCALE_FACTOR
+// in texmacs.cpp); TEXMACS_VUE_SCALE overrides it (tests).
+static float
+vue_interface_scale () {
+  static float scale= 0.0f;
+  if (scale <= 0.0f) {
+    string v= get_env ("TEXMACS_VUE_SCALE");
+    if (N(v) == 0) v= get_user_preference ("gui scaling", "default");
+    double x= is_double (v) ? as_double (v) : 1.0;
+    scale= (x > 0.0) ? (float) x : 1.0f;
+  }
+  return scale;
+}
+
+// As with Qt, where the scaling makes the logical pixels larger, the
+// positions and the sizes of the windows which TeXmacs sees (PIXEL per
+// point) are the points of the display divided by the scaling: a window
+// of 800 points is 1600 points wide at a scaling of 2, and still holds as
+// much. Every length which goes to or comes from SDL takes one of these.
+static inline float
+sdl_pointsf (SI v) {
+  return (float) ((double) v * vue_interface_scale () / PIXEL);
+}
+
+static inline int
+sdl_points (SI v) {
+  double x= floor ((double) v * vue_interface_scale () / PIXEL + 0.5);
+  return (int) max (-2.0e9, min (2.0e9, x)); // (the limits may be huge)
+}
+
+static inline SI
+tm_length (double points) {
+  double x= floor (points * PIXEL / vue_interface_scale () + 0.5);
+  return (SI) max (-2.0e9, min (2.0e9, x));
+}
+
 
 
 /*****************************************************************************/
@@ -368,37 +410,34 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   update_density ();
 }
 
-// The preference "gui scaling" (Preferences > General > Interface scaling):
-// "default", or a factor by which the whole interface is larger or smaller.
-// It is read once, at the start, as the Qt interface does (QT_SCALE_FACTOR
-// in texmacs.cpp); TEXMACS_VUE_SCALE overrides it (tests).
-static float
-vue_interface_scale () {
-  static float scale= 0.0f;
-  if (scale <= 0.0f) {
-    string v= get_env ("TEXMACS_VUE_SCALE");
-    if (N(v) == 0) v= get_user_preference ("gui scaling", "default");
-    double x= is_double (v) ? as_double (v) : 1.0;
-    scale= (x > 0.0) ? (float) x : 1.0f;
-  }
-  return scale;
+// The interface scaling of a window on a display of pixel density d, as Qt
+// does it. There the density of the display is rounded to an integer n
+// (the rounding policy "Round" set in texmacs.cpp) and QT_SCALE_FACTOR
+// multiplies it as it is: a point of TeXmacs takes e = n * scale device
+// pixels, whatever the scale. Here the renderers want an integer number of
+// pixels per point, so the window is laid out and drawn at r, the integer
+// nearest to e, and presented scaled by e / r when the two differ (0.5 on
+// a display of density 1: drawn at 1x, presented at half its size).
+static void
+vue_scaling (float d, int& r, float& present) {
+  int n= max (1, (int) (d + 0.5f));
+  float e= n * vue_interface_scale ();
+  r= max (1, (int) (e + 0.5f));
+  present= e / r;
+  if (fabsf (present - 1.0f) < 0.005f) present= 1.0f;
 }
 
-// The factor at which a window of pixel density d is laid out and drawn:
-// everything of the interface (the sizes of ui_px, the fonts and the icons
-// of the widgets, the documents) is proportional to it, so that the
-// interface scaling multiplies it. The renderers want an integer, at least
-// 1: a scaling which does not give one is rounded (0.5 has no effect on a
-// display of density 1, and halves the interface on one of density 2).
 static int
 vue_drawing_factor (float d) {
-  return max (1, (int) (d * vue_interface_scale () + 0.5f));
+  int r; float present;
+  vue_scaling (d, r, present);
+  return r;
 }
 
-// The pixel density of the display this window is on. The layout works in
-// device pixels and the pointer comes in points, so the two are related by
-// this factor; the renderers draw at 'retina' pixels per point (the density
-// times the interface scaling, see vue_drawing_factor).
+// The pixel density of the display this window is on gives the factor it
+// is drawn at ('retina' pixels of the layout per point of TeXmacs), the
+// scale it is presented at and the pixels of the layout per point of the
+// display, which relate the pointer to the layout (see vue_scaling).
 void
 vue_sdl_base_window_rep::update_density () {
   float d= SDL_GetWindowPixelDensity (sdl_win);
@@ -407,12 +446,16 @@ vue_sdl_base_window_rep::update_density () {
   // and to exercise the other path while testing
   static string forced= get_env ("TEXMACS_VUE_DENSITY");
   if (N(forced) > 0 && is_double (forced)) d= (float) as_double (forced);
-  int r= vue_drawing_factor (d);
-  if (d == density && r == retina) return;
+  int r; float p;
+  vue_scaling (d, r, p);
+  d /= p;
+  if (d == density && r == retina && p == present) return;
   density= d;
   retina= r;
+  present= p;
   if (DEBUG_VUE)
-    SDL_Log ("Window %d: pixel density %.2f, drawing at %dx", id, d, r);
+    SDL_Log ("Window %d: %.2f pixels per point, drawing at %dx, presented at %.2f",
+             id, d, r, p);
 }
 
 vue_sdl_base_window_rep::~vue_sdl_base_window_rep () {
@@ -447,16 +490,16 @@ void
 vue_sdl_base_window_rep::get_position (SI& x, SI& y) {
   int xx, yy;
   SDL_GetWindowPosition (sdl_win, &xx, &yy);
-  x=  xx * PIXEL;
-  y= -yy * PIXEL;
+  x= tm_length (xx);
+  y= tm_length (-yy);
 }
 
 void
 vue_sdl_base_window_rep::get_size (SI& ww, SI& hh) {
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
-  ww= win_w * PIXEL;
-  hh= win_h * PIXEL;
+  ww= tm_length (win_w);
+  hh= tm_length (win_h);
 }
 
 void
@@ -474,8 +517,8 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
   int win_w, win_h;
   SDL_GetWindowSize (sdl_win, &win_w, &win_h);
 
-  int win_x= x/PIXEL;
-  int win_y= -y/PIXEL;
+  int win_x= sdl_points (x);
+  int win_y= sdl_points (-y);
   SDL_Rect wr= { win_x, win_y, max (win_w, 1), max (win_h, 1) };
   SDL_DisplayID d= SDL_GetDisplayForRect (&wr);
   if (d == 0) d= SDL_GetPrimaryDisplay ();
@@ -493,8 +536,7 @@ vue_sdl_base_window_rep::set_position (SI x, SI y) {
 
 void
 vue_sdl_base_window_rep::set_size (SI w, SI h) {
-  w= w/PIXEL; h= h/PIXEL;
-  //h=-h; ren->decode (w, h);
+  w= sdl_points (w); h= sdl_points (h);
   SDL_SetWindowSize (sdl_win, w, h);
 }
 
@@ -504,8 +546,8 @@ vue_sdl_base_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h
     return;
   Min_w= min_w; Min_h= min_h; Max_w= max_w; Max_h= max_h;
   // a limit of 0 means no limit for SDL
-  SDL_SetWindowMinimumSize (sdl_win, max (min_w/PIXEL, 0), max (min_h/PIXEL, 0));
-  SDL_SetWindowMaximumSize (sdl_win, max (max_w/PIXEL, 0), max (max_h/PIXEL, 0));
+  SDL_SetWindowMinimumSize (sdl_win, max (sdl_points (min_w), 0), max (sdl_points (min_h), 0));
+  SDL_SetWindowMaximumSize (sdl_win, max (sdl_points (max_w), 0), max (sdl_points (max_h), 0));
 }
 
 // The title of a window is the name TeXmacs gives it plus, for a document
@@ -605,8 +647,8 @@ vue_sdl_base_window_rep::track_geometry () {
   // the first geometry is the one TeXmacs gave; popups are not remembered
   // (nor by the other ports), nor is the host which outlived its window
   if (first || popup || N(orig_name) == 0) return;
-  if (moved) notify_window_move (orig_name, x * PIXEL, -y * PIXEL);
-  if (resized) notify_window_resize (orig_name, w * PIXEL, h * PIXEL);
+  if (moved) notify_window_move (orig_name, tm_length (x), tm_length (-y));
+  if (resized) notify_window_resize (orig_name, tm_length (w), tm_length (h));
 }
 
 void
@@ -671,6 +713,11 @@ layout_window_passes (vue_window_rep* w) {
 void
 vue_sdl_base_window_rep::layout_size (int& w, int& h) {
   SDL_GetWindowSizeInPixels (sdl_win, &w, &h);
+  if (present != 1.0f) {
+    // presented scaled (see vue_scaling): the layout has its own pixels
+    w= max (1, (int) (w / present + 0.5f));
+    h= max (1, (int) (h / present + 0.5f));
+  }
 }
 
 void
@@ -860,12 +907,16 @@ class vue_sdl_mupdf_window_rep : public vue_sdl_base_window_rep {
 public:
   renderer ren;
   picture backing_store;
+  // what is drawn when the window is presented scaled (the interface
+  // scaling, see vue_scaling): it has the pixels of the layout
+  SDL_Surface* scaled;
 
   vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup= false,
                             SDL_Window* adopt= NULL);
   // (no renderer: a window which was never shown was never drawn)
   ~vue_sdl_mupdf_window_rep () {
-    forget_host (this); if (ren != NULL) delete_renderer (ren); }
+    forget_host (this); if (ren != NULL) delete_renderer (ren);
+    if (scaled != NULL) SDL_DestroySurface (scaled); }
   
   void process_redraw ();
   void process_layout ();
@@ -896,7 +947,7 @@ ren_measure_text (Clay_StringSlice text, Clay_TextElementConfig *config, void *u
 
 vue_sdl_mupdf_window_rep::vue_sdl_mupdf_window_rep (vue_widget w, string name, bool popup,
                                                     SDL_Window* adopt)
-  : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL)
+  : vue_sdl_base_window_rep (w, name, popup, adopt), ren (NULL), scaled (NULL)
 {
   with_window frame (this);
   Clay_SetMeasureTextFunction (ren_measure_text, this);
@@ -1067,6 +1118,18 @@ vue_sdl_mupdf_window_rep::process_redraw () {
       SDL_Log ("SDL_GetWindowSurface failed: %s", SDL_GetError ());
     return;
   }
+  SDL_Surface* window_surf= surf;
+  if (present != 1.0f) {
+    int lw, lh;
+    layout_size (lw, lh);
+    if (scaled != NULL && (scaled->w != lw || scaled->h != lh ||
+                           scaled->format != surf->format)) {
+      SDL_DestroySurface (scaled);
+      scaled= NULL;
+    }
+    if (scaled == NULL) scaled= SDL_CreateSurface (lw, lh, surf->format);
+    if (scaled != NULL) surf= scaled;
+  }
   backing_store= native_picture_from_SDL_Surface (surf);
   fz_pixmap *pix= ((mupdf_picture_rep*)backing_store->get_handle())->pix;
   fz_context *ctx= mupdf_context ();
@@ -1143,6 +1206,8 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   //SDL_SetRenderDrawColor (sdl_ren, 0, 0, 0, 255);
   //SDL_RenderClear (sdl_ren);
   t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
+  if (surf != window_surf)
+    SDL_BlitSurfaceScaled (surf, NULL, window_surf, NULL, SDL_SCALEMODE_LINEAR);
   if (!SDL_UpdateWindowSurface (sdl_win)) {
     static int reported= 0;
     if (reported++ < 3) SDL_Log ("SDL_UpdateWindowSurface failed: %s", SDL_GetError ());
@@ -1228,11 +1293,14 @@ vue_sdl_gpu_window_rep::process_redraw () {
 #endif
   with_window frame (this);
   if (!vue_gpu_attach (sdl_win)) return;
-  int win_w= 0, win_h= 0;
-  SDL_GetWindowSizeInPixels (sdl_win, &win_w, &win_h);
-  if (win_w <= 0 || win_h <= 0) return;
+  int win_w= 0, win_h= 0, dev_w= 0, dev_h= 0;
+  SDL_GetWindowSizeInPixels (sdl_win, &dev_w, &dev_h);
+  if (dev_w <= 0 || dev_h <= 0) return;
+  // the pixels of the layout, which the GPU scales to those of the window
+  // when the interface scaling asks for it (see vue_scaling)
+  layout_size (win_w, win_h);
   if (ren == NULL) ren= gpu_screen_renderer (std_shrinkf * retina_factor);
-  gpu_begin_screen (ren, win_w, win_h);
+  gpu_begin_screen (ren, win_w, win_h, dev_w, dev_h);
   // as the MuPDF window: no clip of its own, the elements clip
   ren->cx1= ren->ox - (1 << 28); ren->cx2= ren->ox + (1 << 28);
   ren->cy1= ren->oy - (1 << 28); ren->cy2= ren->oy + (1 << 28);
@@ -1270,7 +1338,7 @@ vue_sdl_gpu_window_rep::process_redraw () {
   bool same= (h == presented);
   static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
   if (N(snapshot_dir) > 0) {
-    picture shot= gpu_read_screen (win_w, win_h);
+    picture shot= gpu_read_screen (dev_w, dev_h);
     if (!is_nil (shot)) {
       fz_pixmap* pix= ((mupdf_picture_rep*) shot->get_handle ())->pix;
       save_pixmap_as_png (mupdf_context (), pix,
@@ -1664,8 +1732,9 @@ static vue_sdl_base_window_rep* the_host= NULL;       // holds the others
 static bool host_is_bare= false; // the host outlived its own window, see forget_host
 static array<vue_virtual_window_rep*> virtual_windows; // back to front
 static vue_virtual_window_rep* focused_virtual= NULL;  // gets the keys
-static const float title_bar_h= 24.0f;                 // points
-static const float frame_w= 4.0f;     // the frame around a dialog, points
+// (points of the display: larger with the interface scaling, as the rest)
+#define title_bar_h (24.0f * vue_interface_scale ())
+#define frame_w (4.0f * vue_interface_scale ()) // the frame around a dialog
 static const float frame_grab= 3.0f;  // and outside it, which also grabs it
 static const float dialog_min_w= 120.0f, dialog_min_h= 48.0f; // resized
 
@@ -1913,8 +1982,8 @@ vue_virtual_window_rep::resize_from (int e, float x0, float y0, float w0,
   float max_w= (e & 1) ? x0 + w0 - (hx + frame_w) : hx + hw - frame_w - x0;
   float max_h= (e & 4) ? y0 + h0 - (hy + title_bar_h + frame_w)
                        : hy + hh - frame_w - y0;
-  if (Max_w > 0) max_w= min (max_w, (float) Max_w / PIXEL);
-  if (Max_h > 0) max_h= min (max_h, (float) Max_h / PIXEL);
+  if (Max_w > 0) max_w= min (max_w, sdl_pointsf (Max_w));
+  if (Max_h > 0) max_h= min (max_h, sdl_pointsf (Max_h));
   float nw= w0, nh= h0;
   if (e & 1) nw= w0 - dx; else if (e & 2) nw= w0 + dx;
   if (e & 4) nh= h0 - dy; else if (e & 8) nh= h0 + dy;
@@ -2035,12 +2104,12 @@ vue_virtual_window_rep::set_visibility (bool flag) {
 
 void
 vue_virtual_window_rep::set_size (SI sw, SI sh) {
-  float nw= max (1.0f, (float) sw / PIXEL);
-  float nh= max (1.0f, (float) sh / PIXEL);
-  if (Min_w > 0) nw= max (nw, (float) Min_w / PIXEL);
-  if (Min_h > 0) nh= max (nh, (float) Min_h / PIXEL);
-  if (Max_w > 0) nw= min (nw, (float) Max_w / PIXEL);
-  if (Max_h > 0) nh= min (nh, (float) Max_h / PIXEL);
+  float nw= max (1.0f, sdl_pointsf (sw));
+  float nh= max (1.0f, sdl_pointsf (sh));
+  if (Min_w > 0) nw= max (nw, sdl_pointsf (Min_w));
+  if (Min_h > 0) nh= max (nh, sdl_pointsf (Min_h));
+  if (Max_w > 0) nw= min (nw, sdl_pointsf (Max_w));
+  if (Max_h > 0) nh= min (nh, sdl_pointsf (Max_h));
   // a window which fills the host gets that size when it floats again
   if (fills ()) { saved_w= nw; saved_h= nh; return; }
   w= nw; h= nh;
@@ -2054,8 +2123,8 @@ vue_virtual_window_rep::set_size_limits (SI min_w, SI min_h, SI max_w, SI max_h)
 
 void
 vue_virtual_window_rep::get_size (SI& sw, SI& sh) {
-  sw= (SI) (w * PIXEL);
-  sh= (SI) (h * PIXEL);
+  sw= tm_length (w);
+  sh= tm_length (h);
 }
 
 void
@@ -2068,20 +2137,20 @@ vue_virtual_window_rep::set_position (SI sx, SI sy) {
   host_changed (); // or a pending move of the host would move it too
   placed= true;
   if (fills ()) {
-    saved_x= (float) sx / PIXEL;
-    saved_y= (float) -sy / PIXEL;
+    saved_x= sdl_pointsf (sx);
+    saved_y= sdl_pointsf (-sy);
     return;
   }
-  x= (float) sx / PIXEL;
-  y= (float) -sy / PIXEL;
+  x= sdl_pointsf (sx);
+  y= sdl_pointsf (-sy);
   clamp ();
 }
 
 void
 vue_virtual_window_rep::get_position (SI& sx, SI& sy) {
   host_changed ();
-  sx= (SI) (x * PIXEL);
-  sy= (SI) (-y * PIXEL);
+  sx= tm_length (x);
+  sy= tm_length (-y);
 }
 
 void
@@ -2328,12 +2397,14 @@ composite_virtual_windows (vue_window host, renderer ren) {
     v->layout_size (W, H);
     ren->set_origin (0, 0);
     if (v->decorated ()) {
-      int T= (int) (title_bar_h * d), B= max (1, (int) d);
+      // (u: the pixels of a point of TeXmacs, with the interface scaling)
+      float u= d * vue_interface_scale ();
+      int T= (int) (title_bar_h * d), B= max (1, (int) u);
       int F= (int) (frame_w * d + 0.5f);
       // the corners are rounded as those of the menus (vue_widget.cpp: the
       // theme's radius by 1.5, in 2x pixels); the contents stay square,
       // the frame is wide enough to hold the curve
-      float R= the_theme.radius * 1.5f / 2.0f * d;
+      float R= the_theme.radius * 1.5f / 2.0f * u;
       // a shadow, then a frame around the title bar and the contents, with
       // a line on both of its sides
       for (int k= 3; k >= 1; k--) {
@@ -2349,10 +2420,10 @@ composite_virtual_windows (vue_window host, renderer ren) {
       ren->fill ((X-B)*px, -(Y+H+B)*px, (X+W+B)*px, -Y*px);
       color tc= theme_color (the_theme.text);
       draw_band_text (ren, v->mod_name, WIDGET_STYLE_BOLD, tc,
-                      (X + (int) (8*d))*px, -Y*px, -(Y-T)*px);
+                      (X + (int) (8*u))*px, -Y*px, -(Y-T)*px);
       // the close box: a cross, whatever the fonts have
-      int c= (int) (7*d), cx= X + W - T/2, cy= Y - T/2;
-      ren->set_pencil (pencil (tc, max (1, (int) d) * px));
+      int c= (int) (7*u), cx= X + W - T/2, cy= Y - T/2;
+      ren->set_pencil (pencil (tc, max (1, (int) u) * px));
       ren->line ((cx-c/2)*px, -(cy-c/2)*px, (cx+c/2)*px, -(cy+c/2)*px);
       ren->line ((cx-c/2)*px, -(cy+c/2)*px, (cx+c/2)*px, -(cy-c/2)*px);
     }
@@ -2591,15 +2662,15 @@ void gui_root_extents (SI& width, SI& height)
   if (single_window_mode () && the_host != NULL) {
     int w, h;
     SDL_GetWindowSize (the_host->sdl_win, &w, &h);
-    width= w * PIXEL;
-    height= h * PIXEL;
+    width= tm_length (w);
+    height= tm_length (h);
     return;
   }
   // get the screen size
   SDL_Rect r;
   if (SDL_GetDisplayBounds (SDL_GetPrimaryDisplay (), &r)) {
-    width= r.w * PIXEL;
-    height= r.h * PIXEL;
+    width= tm_length (r.w);
+    height= tm_length (r.h);
     //cout << "SCREEN:" << screen_width << "," << screen_height << LF;
   } else {
     // headless or SDL trouble: pretend a common screen instead of leaving

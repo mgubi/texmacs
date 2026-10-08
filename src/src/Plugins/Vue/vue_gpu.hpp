@@ -39,7 +39,8 @@ picture  gpu_copy_picture (picture p);
 
 // the renderer of the window being drawn (its default framebuffer)
 renderer gpu_screen_renderer (double zoom);
-void     gpu_begin_screen (renderer ren, int w, int h);
+// (w x h: the pixels of the layout, drawn over the dw x dh of the window)
+void     gpu_begin_screen (renderer ren, int w, int h, int dw, int dh);
 // draw what is queued (before presenting, or reading the pixels)
 void     gpu_flush ();
 // the same, and wait for the GPU (the profile: TEXMACS_VUE_PROFILE)
