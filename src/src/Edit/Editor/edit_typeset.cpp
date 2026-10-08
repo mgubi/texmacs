@@ -840,6 +840,29 @@ edit_typeset_rep::exec_markdown (tree t) {
   return exec_markdown (t, rp * 0);
 }
 
+/******************************************************************************
+* The same for the office formats (.docx, .odt): the macros which their
+* converter knows are those of (tmoffice-env-patch).
+******************************************************************************/
+
+tree
+edit_typeset_rep::exec_office (tree t, path p) {
+  t= convert_OTS1_symbols_to_universal_encoding (t);
+  if (p == (rp * 0)) typeset_preamble ();
+  typeset_exec_until (p);
+  hashmap<string,tree> H= copy (cur[p]);
+  tree patch= as_tree (eval ("(stree->tree (tmoffice-env-patch))"));
+  hashmap<string,tree> P (UNINIT, patch);
+  H->join (P);
+  prefix_specific (H, "tmoffice-");
+  return exec (t, H);
+}
+
+tree
+edit_typeset_rep::exec_office (tree t) {
+  return exec_office (t, rp * 0);
+}
+
 static tree
 value_to_compound (tree t, hashmap<string,tree> h) {
   if (is_atomic (t)) return t;
