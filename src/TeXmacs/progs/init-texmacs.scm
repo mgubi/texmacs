@@ -325,6 +325,7 @@
 (lazy-format (convert latex init-latex) latex)
 (lazy-format (convert html init-html) html)
 (lazy-format (convert markdown init-markdown) markdown)
+(lazy-format (convert office init-office) docx odt)
 (lazy-format (convert bibtex init-bibtex) bibtex)
 (lazy-format (convert images init-images)
              postscript pdf xfig xmgrace svg xpm jpeg ppm gif png pnm)
