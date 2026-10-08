@@ -48,15 +48,15 @@ as_space (tree t) {
 * Constructor
 ******************************************************************************/
 
-// TEXMACS_PAGE_BREAK_FAST: 0 for the search as it was, 1 to 4 for the
-// changes of the faster search (the first three by default: the fourth
-// gains little, see below), "check" to run both and report a difference
+// TEXMACS_PAGE_BREAK_FAST: 0 for the search as it was, 1 to 3 for the
+// changes of the faster search (all of them by default), "check" to run
+// both and report a difference
 static int
 breaker_fast_level () {
   static int level= -1;
   if (level < 0) {
     string s= get_env ("TEXMACS_PAGE_BREAK_FAST");
-    level= (is_int (s) && as_int (s) >= 0 && as_int (s) <= 4) ? as_int (s) : 3;
+    level= (is_int (s) && as_int (s) >= 0 && as_int (s) <= 3) ? as_int (s) : 3;
   }
   return level;
 }
@@ -74,8 +74,7 @@ new_breaker_rep::new_breaker_rep (
     todo_list (false), done_list (false),
     cache_uniform (array<path> ()),
     cache_colbreaks (array<path> ()),
-    fast_level (quality2 > 1 ? breaker_fast_level () : 0),
-    old (NULL), old_prefix (0), old_suffix (0)
+    fast_level (quality2 > 1 ? breaker_fast_level () : 0)
 {
   // HACK: migrate double column footnotes in single column text
   for (int i=0; i+1<N(l); i++)
@@ -179,8 +178,6 @@ new_breaker_rep::new_breaker_rep (
     for (int i=0; i<m; i++) {
       has_a[i]= done_a[i]= false; pen_a[i]= MAX_INT; exc_a[i]= 0; }
     has_a[0]= true; pen_a[0]= 0; prev_a[0]= path (-2);
-    cand_off.assign (m, 0);
-    cand_cnt.assign (m, 0);
   }
   //cout << HRULE;
 }
@@ -293,39 +290,30 @@ new_breaker_rep::last_break (path b) {
 * A faster search
 *
 * The search below is what it was, in the same order and with the same
-* arithmetic, so that it finds the same breaks; four changes make it
+* arithmetic, so that it finds the same breaks; three changes make it
 * faster for the plain positions (a number of items, with no pending
 * float), which are all of them in a document without floats:
 *   1. their best previous break and penalty are in arrays (has_a, pen_a,
 *      exc_a, prev_a, done_a) instead of tables indexed by paths;
 *   2. no path is made for each candidate end of a page;
 *   3. the height of a candidate page and its penalty are computed with
-*      integers, instead of spaces and penalties allocated one by one;
-*   4. the candidates of a start (what each adds to its penalty) depend
-*      on the items from the start to the candidate only: those of the
-*      previous search are used again for the starts whose items did not
-*      change (breaker_history). Not in use by default.
+*      integers, instead of spaces and penalties allocated one by one.
 * Measured on a document of 140 pages (6200 starts, 345000 candidates):
 * the search takes 43 ms as it was, 30 to 37 ms with the first change,
-* 17 to 25 ms with the second, 7 ms with the third and 5 ms with the
-* fourth; with footnotes, floats and forced breaks (70 pages), 21 ms as
-* it was, 3 ms with the third change and the same with the fourth.
+* 17 to 25 ms with the second and 7 ms with the third; with footnotes,
+* floats and forced breaks (70 pages), 21.5, 19, 14.5 and 3 ms. A fourth
+* change was tried and removed: the candidates of a start depend on the
+* items from the start to the candidate only, and those of the previous
+* search were used again for the starts whose items had not changed. It
+* brought the search to 4 or 5 ms on the first document and to nothing
+* less on the second, for more code than any of the three others (105
+* lines), 4 MB of candidates kept, and conditions which were easy to get
+* wrong.
 * todo_list and done_list stay tables: the order in which the starts are
 * tried is the order of their iteration, and the result may depend on it.
 * The positions with pending floats, the pages with several columns and
 * the lower qualities of page breaking use the search as it was.
 ******************************************************************************/
-
-struct breaker_history {
-  bool        used;
-  array<SI>   nums;        // the signature of the items (breaker_signature)
-  array<tree> trees;
-  std::vector<int> num_off, tree_off;  // where each item starts in them
-  int         n;           // number of items
-  std::vector<breaker_cand> cands;
-  std::vector<int>          cand_off, cand_cnt;
-  breaker_history (): used (false), n (0) {}
-};
 
 bool
 new_breaker_rep::has_best (path b) {
@@ -420,37 +408,17 @@ new_breaker_rep::find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen) {
   int ppen= prev_pen->pen, pexc= prev_pen->exc;
   SI hmin= height->min, hdef= height->def, hmax= height->max;
 
-  // the candidates of this start in the previous search, when all the
-  // items they depend on (from the start to the candidate) are the same
-  const breaker_cand* memo= NULL;
-  int memo_n= 0;
-  bool keep= (fast_level >= 4);
-  if (keep && old != NULL) {
-    int t= s - (n - old->n);
-    if (s <= old->n && s + old->cand_cnt[s] <= old_prefix - 1) {
-      memo_n= old->cand_cnt[s];
-      if (memo_n > 0) memo= &old->cands[old->cand_off[s]];
-    }
-    else if (t >= 0 && t <= old->n && s >= n - old_suffix) {
-      memo_n= old->cand_cnt[t];
-      if (memo_n > 0) memo= &old->cands[old->cand_off[t]];
-    }
-  }
-  int first= (int) cands.size ();
-  if (keep) cand_off[s]= first;
-  if (memo_n > 0 && edit_profile.on) edit_profile.starts_kept++;
-
-  int k= 0;
-  for (int i= s; ; i++, k++) {
+  for (int i= s; ; i++) {
     int j= i + 1;
-    breaker_cand c;
-    if (k < memo_n) c= memo[k];
-    else {
+    // what this candidate adds to the penalty of the start, and its flags
+    // (1: a break is allowed here; 2: the page is too long for any
+    // stretch; 4: a page break is asked for here)
+    struct { int dpen, dexc, flags; } c;
+    {
       if (i >= n) break;
       if (N(ins_list[i]) != 0 &&
           float_tot[i]->def > (i==0? 0: float_tot[i-1]->def)) {
-        // a float: as before from here (the candidates so far are kept)
-        if (keep) cand_cnt[s]= k;
+        // a float: as before from here
         find_page_breaks_from (b1, b1x, prev_pen, path (i), ok, found_one);
         return;
       }
@@ -475,7 +443,6 @@ new_breaker_rep::find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen) {
             vpenalty mcpen;
             spc= compute_space (b1x, b2, mcpen);
             c.dpen += mcpen->pen; c.dexc += mcpen->exc;
-            keep= false; // not known to depend on these items only
           }
           smin= spc->min; sdef= spc->def; smax= spc->max;
         }
@@ -504,7 +471,6 @@ new_breaker_rep::find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen) {
         if (smin > hmax) c.flags |= 2;
       }
     }
-    if (keep) cands.push_back (c);
 
     if (c.flags & 1) {
       ok= true;
@@ -517,13 +483,8 @@ new_breaker_rep::find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen) {
       if (has_a[j]) found_one= true;
     }
     if (!found_one) continue;
-    if (ok && (c.flags & 2)) { k++; break; }
-    if (c.flags & 4) { k++; break; }
-  }
-  if (keep) cand_cnt[s]= k;
-  else if (fast_level >= 4) {
-    cands.resize (first);
-    cand_cnt[s]= 0;
+    if (ok && (c.flags & 2)) break;
+    if (c.flags & 4) break;
   }
 }
 
@@ -1032,15 +993,10 @@ new_breaker_rep::assemble_skeleton (skeleton& sk, path end, int& offset) {
 ******************************************************************************/
 
 static void
-breaker_signature (array<page_item> l, array<SI>& nums, array<tree>& trees,
-                   std::vector<int>* num_off= NULL,
-                   std::vector<int>* tree_off= NULL) {
-  // num_off, tree_off: where each item starts (and where the last one ends)
+breaker_signature (array<page_item> l, array<SI>& nums, array<tree>& trees) {
   nums << (SI) N(l);
   for (int i=0; i<N(l); i++) {
     page_item_rep* it= l[i].operator -> ();
-    if (num_off != NULL) {
-      num_off->push_back (N(nums)); tree_off->push_back (N(trees)); }
     nums << (SI) it->type << (SI) it->b->h () << (SI) it->b->y1 << (SI) it->b->y2
          << (SI) it->spc->min << (SI) it->spc->def << (SI) it->spc->max
          << (SI) it->penalty << (SI) it->nr_cols << (SI) N(it->fl);
@@ -1051,28 +1007,6 @@ breaker_signature (array<page_item> l, array<SI>& nums, array<tree>& trees,
       breaker_signature (lvs->l, nums, trees);
     }
   }
-  if (num_off != NULL) {
-    num_off->push_back (N(nums)); tree_off->push_back (N(trees)); }
-}
-
-// the previous search (one is kept), and whether the item i of a new
-// signature is the item j of it
-static breaker_history breaker_last;
-#define BREAKER_PARAMS 16 // the parameters of the breaker, before the items
-
-static bool
-same_item (breaker_history& h, int j, array<SI>& nums, array<tree>& trees,
-           std::vector<int>& num_off, std::vector<int>& tree_off, int i) {
-  int a1= h.num_off[j], a2= h.num_off[j+1], b1= num_off[i], b2= num_off[i+1];
-  if (a2 - a1 != b2 - b1) return false;
-  for (int k=0; k<a2-a1; k++)
-    if (h.nums[a1+k] != nums[b1+k]) return false;
-  int c1= h.tree_off[j], c2= h.tree_off[j+1], d1= tree_off[i], d2= tree_off[i+1];
-  if (c2 - c1 != d2 - d1) return false;
-  for (int k=0; k<c2-c1; k++)
-    if (inside (h.trees[c1+k]) != inside (trees[d1+k]) &&
-        h.trees[c1+k] != trees[d1+k]) return false;
-  return true;
 }
 
 static bool
@@ -1100,30 +1034,12 @@ static int breaker_memo_next= 0;
 static skeleton
 search_page_breaks (array<page_item> l, space ph, int qual,
                     space fn_sep, space fnote_sep, space float_sep,
-                    font fn, int first_page, int level,
-                    array<SI> nums, array<tree> trees,
-                    std::vector<int>& num_off, std::vector<int>& tree_off)
+                    font fn, int first_page, bool as_it_was)
 {
   new_breaker_rep* H=
     tm_new<new_breaker_rep> (l, ph, qual, fn_sep, fnote_sep, float_sep,
                              fn, first_page);
-  if (level < H->fast_level) H->fast_level= level;
-  int n= N(l);
-  if (H->fast_level >= 4 && breaker_last.used && N(nums) > BREAKER_PARAMS) {
-    // the items in common with the previous search, at both ends, when
-    // the parameters of the breaker are the same
-    breaker_history& h= breaker_last;
-    bool same= true;
-    for (int i=0; i<BREAKER_PARAMS && same; i++) same= (h.nums[i] == nums[i]);
-    if (same) {
-      int m= min (n, h.n), p= 0, q= 0;
-      while (p < m && same_item (h, p, nums, trees, num_off, tree_off, p)) p++;
-      while (q < m - p &&
-             same_item (h, h.n-1-q, nums, trees, num_off, tree_off, n-1-q)) q++;
-      H->old= &h; H->old_prefix= p; H->old_suffix= q;
-      if (edit_profile.on) edit_profile.breaks_common= p + q;
-    }
-  }
+  if (as_it_was) H->fast_level= 0;
   //cout << HRULE << LF;
   double t0= edit_profile.on ? edit_profile_now () : 0;
   H->find_page_breaks ();
@@ -1135,18 +1051,8 @@ search_page_breaks (array<page_item> l, space ph, int qual,
   //cout << HRULE << LF;
   skeleton sk;
   int offset= first_page - 1;
-  H->assemble_skeleton (sk, path (n), offset);
+  H->assemble_skeleton (sk, path (N(l)), offset);
   //cout << HRULE << LF;
-  if (H->fast_level >= 4 && N(nums) > BREAKER_PARAMS) {
-    // (after the search: it reads the previous one)
-    breaker_history& h= breaker_last;
-    h.used= true; h.n= n;
-    h.nums= nums; h.trees= trees;
-    h.num_off= num_off; h.tree_off= tree_off;
-    h.cands.swap (H->cands);
-    h.cand_off.swap (H->cand_off);
-    h.cand_cnt.swap (H->cand_cnt);
-  }
   tm_delete (H);
   return sk;
 }
@@ -1160,14 +1066,13 @@ new_break_pages (array<page_item> l, space ph, int qual,
   static string fast= get_env ("TEXMACS_PAGE_BREAK_FAST");
   array<SI> nums;
   array<tree> trees;
-  std::vector<int> num_off, tree_off;
   breaker_memo* memo= NULL;
   nums << (SI) ph->min << (SI) ph->def << (SI) ph->max << (SI) qual
        << (SI) fn_sep->min << (SI) fn_sep->def << (SI) fn_sep->max
        << (SI) fnote_sep->min << (SI) fnote_sep->def << (SI) fnote_sep->max
        << (SI) float_sep->min << (SI) float_sep->def << (SI) float_sep->max
        << (SI) fn->y1 << (SI) fn->y2 << (SI) first_page;
-  breaker_signature (l, nums, trees, &num_off, &tree_off);
+  breaker_signature (l, nums, trees);
   if (mode != "off")
     for (int i=0; i<BREAKER_MEMOS && memo == NULL; i++)
       if (breaker_memos[i].used &&
@@ -1182,12 +1087,12 @@ new_break_pages (array<page_item> l, space ph, int qual,
 
   skeleton sk=
     search_page_breaks (l, ph, qual, fn_sep, fnote_sep, float_sep, fn,
-                        first_page, 4, nums, trees, num_off, tree_off);
+                        first_page, false);
   if (fast == "check") {
     // the search as it was against the faster one
     skeleton sk0=
       search_page_breaks (l, ph, qual, fn_sep, fnote_sep, float_sep, fn,
-                          first_page, 0, nums, trees, num_off, tree_off);
+                          first_page, true);
     if (sk0 != sk)
       failed_error << "The faster search of the page breaks differs "
                    << "from the search as it was (" << N(l) << " items)" << LF;

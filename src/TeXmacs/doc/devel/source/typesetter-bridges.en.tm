@@ -464,12 +464,72 @@
   (<cpp|find_page_breaks_plain>): their best previous breaks and penalties
   are in arrays instead of tables indexed by paths, no path is made for
   each candidate page, and the height and the penalty of a candidate are
-  computed with integers. On the document of 140 pages it takes 7<nbsp>ms
-  instead of 43. <verbatim|TEXMACS_PAGE_BREAK_FAST> may be <verbatim|0>
-  for the search as it was, or <verbatim|check> to run both and report a
-  difference; <verbatim|4> also uses again the candidates of the previous
-  search for the starts whose items did not change, which gains little
-  (5<nbsp>ms) and is not in use by default.
+  computed with integers. <verbatim|TEXMACS_PAGE_BREAK_FAST> may be
+  <verbatim|0> for the search as it was, <verbatim|1> or <verbatim|2> for
+  the first changes only, or <verbatim|check> to run both searches and
+  report a difference. The tables which hold the starts to try are kept
+  as they were: the starts are tried in the order of their iteration, on
+  which the result may depend.
+
+  <paragraph|Measurements>
+
+  The times below were measured in October 2026 on the <name|Vue> port
+  with the software renderer, in a view of 800 by 446 points, on two
+  documents made for the purpose: 140 pages of plain paragraphs, sections
+  and numbered equations (1680 paragraphs, 6400 lines; the search has
+  6200 starts and 345000 candidate pages), and 70 pages with footnotes,
+  floats and forced page breaks. They are in milliseconds, and vary by a
+  factor of up to two from one run to the next on the same machine: the
+  figures compared with each other come from the same runs.
+
+  The search of the page breaks, with the changes up to each one (the
+  skeletons not kept, so that every edit searches):
+
+  <\big-table|<block|<tformat|<table|<row|<cell|>|<cell|as it
+  was>|<cell|arrays>|<cell|and no paths>|<cell|and integers>|<cell|and
+  candidates kept>>|<row|<cell|lines of code>|<cell|>|<cell|70>|<cell|85>|<cell|45>|<cell|105>>|<row|<cell|140
+  pages>|<cell|43 to 44>|<cell|30 to 37>|<cell|17 to 25>|<cell|7>|<cell|4
+  to 5>>|<row|<cell|70 pages with floats>|<cell|21.5>|<cell|19>|<cell|14.5>|<cell|3>|<cell|3.5>>>>>>
+    The search of the page breaks, in milliseconds.
+  </big-table>
+
+  The last column is a fourth change which was tried and removed: the
+  candidates of a start depend on the items from the start to the
+  candidate only, and those of the previous search were used again for
+  the starts whose items had not changed. It gained little, for the most
+  code, four megabytes of candidates kept for the first document, and
+  conditions which were easy to get wrong.
+
+  The whole of an edit in the first document, on paper, before and after
+  these changes and the others of October 2026 (the invalid regions cut
+  to the view in the <name|Vue> widget, the skeletons kept, the faster
+  search):
+
+  <\big-table|<block|<tformat|<table|<row|<cell|>|<cell|bridges>|<cell|pager
+  before>|<cell|pager after>|<cell|repaint before>|<cell|repaint
+  after>>|<row|<cell|a character in a line>|<cell|2>|<cell|49>|<cell|9 to
+  16>|<cell|0.4>|<cell|0.4>>|<row|<cell|a new line>|<cell|3>|<cell|51>|<cell|18
+  to 22>|<cell|67>|<cell|0.7>>|<row|<cell|a new section>|<cell|120>|<cell|52>|<cell|20>|<cell|61>|<cell|0.8>>>>>>
+    One edit in a document of 140 pages, in milliseconds.
+  </big-table>
+
+  Of the 18 to 22<nbsp>ms of the pager for a new line, the search is 6;
+  the rest is the setup of the breaker (3 to 5), the signature (2) and
+  the pages with their headers and footers (7 to 9), which are made again
+  for every page at every pass. On papyrus there is no page to break: the
+  whole typesetting of a character takes 11<nbsp>ms, of which 8 are the
+  visit of the bridges which are reused. A new section renumbers what
+  follows and re-executes 2600 bridges.
+
+  After an edit, once the input pauses, the editor updates its menus,
+  icon bars and tools and then its <abbr|DRD>
+  (<cpp|edit_interface_rep::update_menus>): 29 to 35<nbsp>ms in a document
+  of one paragraph, of which 14 to 18 were the heuristics of the macros,
+  run on every variable of the environment. They are now skipped when the
+  environment at the cursor and the properties are what they were at
+  their last run (<cpp|drd_info_rep::heuristic_init>), and the update
+  takes 10 to 18<nbsp>ms, nearly all of it the expansion of the menus and
+  icon bars in <scheme>.
 
   <subsection|Complete typesetting and references>
 

@@ -868,7 +868,7 @@ edit_interface_rep::apply_changes () {
     double prof_t= 0;
     if (edit_profile.on) {
       bool on= true;
-      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       prof_t= edit_profile_now ();
     }
     typeset (x1, y1, x2, y2);
@@ -891,9 +891,7 @@ edit_interface_rep::apply_changes () {
            << (edit_profile.breaks_reused > 0 ? " (breaks reused)" : "")
            << (edit_profile.starts > 0
                ? " (search " * as_string (floor (edit_profile.search * 100 + 0.5) / 100)
-                 * " ms, " * as_string (edit_profile.starts) * " starts, "
-                 * as_string (edit_profile.starts_kept) * " kept, "
-                 * as_string (edit_profile.breaks_common) * " items as before)"
+                 * " ms, " * as_string (edit_profile.starts) * " starts)"
                : string (""))
            << ", changes " << edit_profile.changes << " ms ("
            << edit_profile.rects << " rectangles from " << edit_profile.lines
