@@ -229,6 +229,12 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>The input fields whose width is left to the interface (the
+    passphrases of GnuPG and of the wallet, the names of the remote files)
+    have the usual width of a field, and take the room of their dialog:
+    they were 30 points wide, three or four letters. The widths in
+    <verbatim|em> of the dialogs follow the font of the interface.
+
     <item>The thumbs of the scroll bars are never shorter than 30 points:
     in a long document they shrank to a few pixels, which the mouse could
     hardly pick.
