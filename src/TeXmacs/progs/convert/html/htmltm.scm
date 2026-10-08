@@ -303,8 +303,13 @@
 		   a 'name (htmltm-args-serial env c))))))
 
 (define (htmltm-href->hlink a body)
-  (let ((href (shtml-attr-non-null a 'href)))
-    (if href `(hlink ,body ,(xmltm-url-text href)) body)))
+  ;; a link with a title is hlink*
+  (let ((href (shtml-attr-non-null a 'href))
+        (title (shtml-attr-non-null a 'title)))
+    (cond ((not href) body)
+          ((and title (!= title ""))
+           `(hlink* ,body ,(xmltm-url-text href) ,(xmltm-url-text title)))
+          (else `(hlink ,body ,(xmltm-url-text href))))))
 
 (define (htmltm-dimension attrs name)
   (let ((s (shtml-attr-non-null attrs name)))
@@ -313,7 +318,8 @@
 	      ((string->number s) => (lambda (n) (tmlength n 'px)))
 	      ((and (string-ends? s "%")
 		    (string->number (string-drop-right s 1)))
-	       => (lambda (n) (tmlength (/ n 100) 'par)))
+	       ;; (not a fraction, which is not a length: 1/2par)
+	       => (lambda (n) (tmlength (exact->inexact (/ n 100)) 'par)))
 	      (else (tmlength))))))
 
 (define (htmltm-image env a c)

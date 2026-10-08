@@ -748,6 +748,20 @@
 	      (get-boolean-preference
 	       "ai-correct explain")))))
 
+;; Markdown ----------
+
+(tm-widget (markdown-preferences-widget)
+  ======
+  (bold (text "TeXmacs -> Markdown"))
+  ===
+  (aligned
+    (meti (hlist // (text "Use Html for what Markdown cannot express"))
+      (toggle (set-boolean-preference "texmacs->markdown:html" answer)
+              (get-boolean-preference "texmacs->markdown:html")))
+    (meti (hlist // (text "Export the title, the authors and the date as a YAML header"))
+      (toggle (set-boolean-preference "texmacs->markdown:front-matter" answer)
+              (get-boolean-preference "texmacs->markdown:front-matter")))))
+
 ;; All converters ----------
 
 (tm-widget (conversion-preferences-widget)
@@ -763,6 +777,9 @@
       (tab (text "BibTeX")
         (centered
           (dynamic (bibtex-preferences-widget))))
+      (tab (text "Markdown")
+        (centered
+          (dynamic (markdown-preferences-widget))))
       (tab (text "Verbatim")
         (centered
           (dynamic (verbatim-preferences-widget))))

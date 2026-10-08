@@ -37,6 +37,7 @@
         (check define-test)
         (check latex-test)
         (check formats-test)
+        (check markdown-test)
         (check editing-test)
         (check typeset-test)
         (check bibtex-test)
@@ -120,6 +121,7 @@
     ("trees" trees-test-failures count)
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
+    ("markdown" markdown-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ("typeset" typeset-test-failures count)
