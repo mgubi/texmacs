@@ -190,6 +190,13 @@
               ((sub) (oftm-wrap 'rsub l))
               ((sup) (oftm-wrap 'rsup l))
               ((code) (oftm-wrap 'verbatim l))
+              ((mark) (oftm-wrap 'marked l))
+              ((color)
+               (let ((t (oftm-inlines l))
+                     (v (ox-attr x 'value)))
+                 (cond ((== t "") '())
+                       (v (list `(with "color" ,v ,t)))
+                       (else (list t)))))
               ((smallcaps)
                (with t (oftm-inlines l)
                  (if (== t "") '() (list `(with "font-shape" "small-caps" ,t)))))
@@ -236,8 +243,17 @@
           ((== a "right") "r")
           (else #f))))
 
+(define oftm-in-cell? #f)
+
 (define (oftm-cell-body c)
   ;; the contents of a cell: text, or a document of several paragraphs
+  (with old oftm-in-cell?
+    (set! oftm-in-cell? #t)
+    (with r (oftm-cell-body-sub c)
+      (set! oftm-in-cell? old)
+      r)))
+
+(define (oftm-cell-body-sub c)
   (let* ((l (ox-children c))
          (b (if (and (list-1? l) (func? (car l) 'p))
                 ;; (its alignment is the one of the cell)
@@ -375,8 +391,9 @@
                                          (cons (max (car l) (car w)) r))))))))
          ;; a table of the width of the text, or of a part of it: when it
          ;; says so, or when its text would not fit otherwise
-         (twidth (ox-attr x 'width))
-         (wide? (or wide? (> width 72)))
+         ;; (a table inside a cell has the width of its text)
+         (twidth (and (not oftm-in-cell?) (ox-attr x 'width)))
+         (wide? (and (not oftm-in-cell?) (or wide? (> width 72))))
          (cols (with c (ox-attr x 'columns)
                  (and c (map string->number (string-tokenize-by-char c #\space)))))
          (cols (and cols (== (length cols) ncols) (list-and cols) cols))
@@ -517,6 +534,12 @@
                              acc))
                (cons `(verbatim-code ,(oftm-document (reverse acc)))
                      (oftm-blocks r)))))
+        ;; a table of contents: TeXmacs makes it again from the headings
+        ((or (func? (car l) 'toc) (oftm-role? (car l) "toc"))
+         (let loop ((r l))
+           (if (and (pair? r) (or (func? (car r) 'toc) (oftm-role? (car r) "toc")))
+               (loop (cdr r))
+               (cons '(table-of-contents "toc" (document "")) (oftm-blocks r)))))
         ;; terms and their definitions
         ((oftm-role? (car l) "term")
          (with r (oftm-description l)

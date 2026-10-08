@@ -93,6 +93,7 @@
     "<w:pPr><w:jc w:val='center'/></w:pPr></w:style>"
     "<w:style w:type='paragraph' w:styleId='Citation'><w:name w:val='Quote'/></w:style>"
     "<w:style w:type='paragraph' w:styleId='Code'><w:name w:val='Source Code'/></w:style>"
+    "<w:style w:type='paragraph' w:styleId='TM1'><w:name w:val='toc 1'/></w:style>"
     "<w:style w:type='paragraph' w:styleId='Legende'><w:name w:val='caption'/></w:style>"
     "<w:style w:type='table' w:styleId='Grille'><w:name w:val='My table'/>"
     "<w:tblPr><w:tblBorders><w:bottom w:val='single'/></w:tblBorders></w:tblPr>"
@@ -176,6 +177,10 @@
   (check= (docx (wp (wr "u" "<w:u w:val='single'/>") (wr "s" "<w:strike/>")
                     (wr "c" "<w:smallCaps/>")))
           '((p (underline "u") (strike "s") (smallcaps "c"))))
+  ;; a color (black is none), a highlight
+  (check= (docx (wp (wr "r" "<w:color w:val='FF0000'/>") (wr "s" "<w:color w:val='FF0000'/>")
+                    (wr "k" "<w:color w:val='000000'/>") (wr "h" "<w:highlight w:val='yellow'/>")))
+          '((p (color (@ (value "#ff0000")) "rs") "k" (mark "h"))))
   ;; line breaks, tabs; an empty paragraph is left out
   (check= (docx (wp "<w:r><w:t>a</w:t><w:br/><w:t>b</w:t><w:tab/><w:t>c</w:t></w:r>"))
           '((p "a" (br) "b" (tab) "c")))
@@ -233,6 +238,13 @@
   (check= (docx (wp (wstyle "Code") (wr "x=1"))) '((p (@ (role "code")) "x=1")))
   (check= (docx (wp "<w:pPr><w:jc w:val='right'/></w:pPr>" (wr "r")))
           '((p (@ (align "right")) "r")))
+  ;; a large first letter is the start of the next paragraph
+  (check= (docx (string-append (wp "<w:pPr><w:framePr w:dropCap='drop' w:lines='3'/></w:pPr>" (wr "D"))
+                               (wp (wr "rop caps"))))
+          '((p "Drop caps")))
+  ;; the entries of a table of contents
+  (check= (docx (wp "<w:pPr><w:pStyle w:val='TM1'/></w:pPr>" (wr "Intro 1")))
+          '((p (@ (role "toc")) "Intro 1")))
   (check= (docx (wp "<w:pPr><w:pageBreakBefore/></w:pPr>" (wr "x")))
           '((pagebreak) (p "x")))
   ;; an image: its file in the archive, its size (360000 units are 1 cm)
@@ -427,6 +439,8 @@
     "<style:text-properties fo:font-weight='bold'/></style:style>"
     "<style:style style:name='T2' style:family='text' style:parent-style-name='Emphasis'>"
     "<style:text-properties style:text-position='super 58%'/></style:style>"
+    "<style:style style:name='T4' style:family='text'>"
+    "<style:text-properties fo:color='#FF0000' fo:background-color='#ffff00'/></style:style>"
     "<style:style style:name='T3' style:family='text'>"
     "<style:text-properties style:font-name='Courier New'/></style:style>"
     "<style:style style:name='Tab' style:family='table'>"
@@ -474,6 +488,8 @@
   (check= (odt (tp (tspan "T3" "f()"))) '((p (code "f()"))))
   (check= (odt (tp (tspan "T1" (string-append "a" (tspan "Emphasis" "b")))))
           '((p (strong "a" (em "b")))))
+  (check= (odt (tp (tspan "T4" "red")))
+          '((p (mark (color (@ (value "#ff0000")) "red")))))
   ;; the spaces of the file are one space; those which count are elements
   (check= (odt (tp "  a\n   b  ")) '((p "a b")))
   (check= (odt (tp "a<text:s text:c='3'/>b<text:tab/>c<text:line-break/>d"))
@@ -509,6 +525,9 @@
   ;; text which is in no paragraph is one
   (check= (odt (string-append "loose " (tspan "Emphasis" "text") (tp "next")))
           '((p "loose " (em "text")) (p "next")))
+  (check= (odt (string-append "<text:table-of-content><text:index-body>" (tp "Intro 1")
+                              "</text:index-body></text:table-of-content>" (tp "x")))
+          '((toc) (p "x")))
   ;; lists: the kind of each level is in the style of the outer list
   (check= (odt (string-append
                  "<text:list text:style-name='L1'><text:list-item>" (tp "a")
@@ -594,6 +613,8 @@
           '((concat "a " (em "b") (strong "c") (underline "d") (strike-through "e")
                     (rsub "f") (rsup "g") (verbatim "h"))))
   (check= (tm '(p (strong (em "x")))) '((strong (em "x"))))
+  (check= (tm '(p (color (@ (value "#ff0000")) "r") (mark "m")))
+          '((concat (with "color" "#ff0000" "r") (marked "m"))))
   (check= (tm '(p (link (@ (href "u")) "t") (br) (ref (@ (name "b")) "2")))
           '((concat (hlink "t" "u") (next-line) (hlink "2" "#b"))))
   (check= (tm '(p (bookmark (@ (name "b"))) "x")) '((concat (label "b") "x")))
@@ -643,6 +664,10 @@
           '((enumerate (document (concat (item) "a")
                                  (itemize (document (concat (item) "n")))))))
   (check= (tm '(pagebreak)) '((page-break)))
+  ;; the entries of a table of contents are the table of TeXmacs
+  (check= (tm '(p (@ (role "toc")) "Intro 1") '(p (@ (role "toc")) "More 2") '(p "x"))
+          '((table-of-contents "toc" (document "")) "x"))
+  (check= (tm '(toc)) '((table-of-contents "toc" (document ""))))
   ;; terms and their definitions
   (check= (tm '(p (@ (role "term")) "T") '(p (@ (role "definition")) "D")
               '(p (@ (role "definition")) "E") '(p (@ (role "term")) "U") '(p "x"))
@@ -702,6 +727,11 @@
                                 (cwith "1" "-1" "2" "2" "cell-hmode" "exact")
                                 (cwith "1" "-1" "2" "2" "cell-width" "0.375par")
                                 (table (row (cell "a") (cell "b"))))))))
+  ;; a table inside a cell has no width of its own
+  (check= (tm '(table (row (cell (@ (borders "none"))
+                                 (table (@ (width "1par"))
+                                        (row (cell (@ (borders "none")) (p "in"))))))))
+          '((tabular (tformat (table (row (cell (tabular (tformat (table (row (cell "in"))))))))))))
   ;; a cell of several paragraphs: the table has the width of the page
   (check= (tm '(table (row (cell (p "a") (p "b")))))
           '((block (tformat (twith "table-width" "1par")

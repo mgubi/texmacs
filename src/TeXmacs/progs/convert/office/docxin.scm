@@ -71,6 +71,10 @@
                 ((== v "subscript") '((sub . #t) (sup . #f)))
                 ((== v "baseline") '((sub . #f) (sup . #f)))
                 (else '())))
+        (with c (office-color (docx-child-val x 'w:color))
+          (if (ox-child x 'w:color) (list (cons 'color c)) '()))
+        (with h (docx-child-val x 'w:highlight)
+          (if h (list (cons 'mark (!= h "none"))) '()))
         (with f (ox-child x 'w:rFonts)
           (if (and f (ox-attr f 'w:ascii))
               (list (cons 'code (office-monospace? (ox-attr f 'w:ascii))))
@@ -95,6 +99,10 @@
                 (with v (docx-child-val n 'w:ilvl)
                   (if v (list (cons 'list-level v)) '())))))
         (if (ox-child x 'w:pageBreakBefore) '((page-break . #t)) '())
+        ;; a large first letter, in a frame of its own
+        (with f (ox-child x 'w:framePr)
+          (if (and f (in? (ox-attr f 'w:dropCap) '("drop" "margin")))
+              '((dropcap . #t)) '()))
         (with s (docx-child-val x 'w:pStyle)
           (if s (list (cons 'style s)) '())))))
 
@@ -164,6 +172,11 @@
     ("macro" . "code") ("code" . "code")
     ("definition term" . "term") ("definition" . "definition")))
 
+(define (docx-toc-style? name)
+  ;; the entries of a table of contents, and its heading
+  (or (string-starts? name "toc ") (string-starts? name "contents ")
+      (== name "table of figures")))
+
 (define (docx-heading-level name)
   ;; "heading 2" is 2
   (and (string-starts? name "heading ")
@@ -176,7 +189,8 @@
          (role (list-find (map (lambda (n) (assoc-ref docx-roles n)) names)
                           identity))
          (outline (docx-get props 'outline)))
-    (cond (level (list "heading" (number->string level)))
+    (cond ((list-or (map docx-toc-style? names)) (list "toc" #f))
+          (level (list "heading" (number->string level)))
           (role (list role #f))
           ;; a level of the outline without a heading style
           ((and outline (>= outline 0) (< outline 9))
@@ -326,6 +340,8 @@
                                   names)))))
     (list-filter
       (list (and code? 'code)
+            (and (docx-get props 'color) (list 'color (docx-get props 'color)))
+            (and (docx-get props 'mark) 'mark)
             (and (docx-get props 'sub) 'sub)
             (and (docx-get props 'sup) 'sup)
             (and (docx-get props 'smallcaps) 'smallcaps)
@@ -534,6 +550,7 @@
                                 (align ,(cond ((== align "center") "center")
                                               ((in? align '("right" "end")) "right")
                                               (else #f)))
+                                (dropcap ,(and (docx-get own 'dropcap) "true"))
                                 (list-id ,(and item? (docx-list-group id)))
                                 (list-level ,(and item? level))
                                 (list-kind ,(and item? (docx-list-kind id level))))
@@ -905,8 +922,22 @@
            (cons (car r) (docx-group-lists (cdr r)))))
         (else (cons (car l) (docx-group-lists (cdr l))))))
 
+(define (docx-drop-caps l)
+  ;; a large first letter is a paragraph of its own: it is the start of
+  ;; the next one
+  (cond ((or (null? l) (null? (cdr l))) l)
+        ((and (func? (car l) 'p) (ox-attr (car l) 'dropcap)
+              (func? (cadr l) 'p))
+         (docx-drop-caps
+           (cons (apply office-node
+                        (cons* 'p (ox-attrs (cadr l))
+                               (office-merge (append (ox-children (car l))
+                                                     (ox-children (cadr l))))))
+                 (cddr l))))
+        (else (cons (car l) (docx-drop-caps (cdr l))))))
+
 (define (docx-blocks l)
-  (docx-group-lists (docx-blocks-sub l)))
+  (docx-group-lists (docx-drop-caps (docx-blocks-sub l))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface

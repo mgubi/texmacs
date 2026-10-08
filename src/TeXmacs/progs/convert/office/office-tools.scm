@@ -22,11 +22,17 @@
 ;;              level (of a heading) and align (center, right, justify)
 ;;            (list (item block...)...)  with the attribute kind (bullet,
 ;;              number)
-;;            (table (row (cell block...)...)...)  the cells with the
-;;              attributes header, colspan, rowspan
+;;            (table (row (cell block...)...)...)  with the attributes
+;;              align, width (a part of the paragraph: 0.5par) and columns
+;;              (the parts of the columns in the table: "0.25 0.75"); the
+;;              cells with the attributes header, colspan, rowspan,
+;;              covered (by a wider or a higher cell), borders (the sides
+;;              t, b, l, r which have one, or none) and background
+;;            (toc)  the table of contents
 ;;            (pagebreak)
 ;;   inlines: "text"  (em ...)  (strong ...)  (underline ...)  (strike ...)
-;;            (sub ...)  (sup ...)  (code ...)  (smallcaps ...)
+;;            (sub ...)  (sup ...)  (code ...)  (smallcaps ...)  (mark ...)
+;;            (color ...)  with the attribute value, #rrggbb
 ;;            (link ...)  with the attribute href (#name inside the document)
 ;;            (note block...)  (br)  (tab)
 ;;            (image)  with the attributes name, data (the bytes of the
@@ -145,7 +151,18 @@
     (if (null? l) (cons tag children)
         (cons* tag (cons '@ l) children))))
 
-(define office-wrappers '(em strong underline strike sub sup code smallcaps))
+(define office-wrappers
+  '(em strong underline strike sub sup code smallcaps mark color))
+
+(define (office-same-wrapper? x y)
+  ;; two nodes which wrap text in the same way
+  (and (pair? x) (pair? y) (== (car x) (car y)) (in? (car x) office-wrappers)
+       (== (ox-attrs x) (ox-attrs y))))
+
+(define (office-wrapper-node x l)
+  ;; the wrapper of the node x around the nodes l
+  (if (null? (ox-attrs x)) (cons (car x) l)
+      (cons* (car x) (cons '@ (ox-attrs x)) l)))
 
 (tm-define (office-merge l)
   (:synopsis "The inline nodes @l, with the neighbours of the same kind as one")
@@ -154,22 +171,40 @@
         ((== (car l) "") (office-merge (cdr l)))
         ((null? (cdr l))
          (if (and (pair? (car l)) (in? (caar l) office-wrappers))
-             (list (cons (caar l) (office-merge (cdar l))))
+             (list (office-wrapper-node (car l)
+                                        (office-merge (ox-children (car l)))))
              l))
         ((and (string? (car l)) (string? (cadr l)))
          (office-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        ((and (pair? (car l)) (in? (caar l) office-wrappers)
-              (func? (cadr l) (caar l)))
-         (office-merge (cons (cons (caar l) (append (cdar l) (cdadr l)))
+        ((office-same-wrapper? (car l) (cadr l))
+         (office-merge (cons (office-wrapper-node
+                               (car l)
+                               (append (ox-children (car l))
+                                       (ox-children (cadr l))))
                              (cddr l))))
         ((and (pair? (car l)) (in? (caar l) office-wrappers))
-         (cons (cons (caar l) (office-merge (cdar l))) (office-merge (cdr l))))
+         (cons (office-wrapper-node (car l) (office-merge (ox-children (car l))))
+               (office-merge (cdr l))))
         (else (cons (car l) (office-merge (cdr l))))))
 
 (tm-define (office-wrap l props)
   (:synopsis "The inline nodes @l inside the wrappers of the list @props")
-  (if (or (null? props) (null? l)) l
-      (office-wrap (list (cons (car props) l)) (cdr props))))
+  ;; a wrapper is a tag, or (color "#rrggbb")
+  (cond ((or (null? props) (null? l)) l)
+        ((pair? (car props))
+         (office-wrap (list `(,(caar props) (@ (value ,(cadar props))) ,@l))
+                      (cdr props)))
+        (else (office-wrap (list (cons (car props) l)) (cdr props)))))
+
+(tm-define (office-color s)
+  (:synopsis "The color @s of a text as #rrggbb, or #f for none or black")
+  (let* ((s (and (string? s) (locase-all s)))
+         (s (and s (if (string-starts? s "#") (substring s 1 (string-length s)) s))))
+    (and s (== (string-length s) 6) (!= s "000000")
+         (list-and (map (lambda (c) (or (char-numeric? c)
+                                        (in? c '(#\a #\b #\c #\d #\e #\f))))
+                        (string->list s)))
+         (string-append "#" s))))
 
 (tm-define (office-emu->length s)
   (:synopsis "The length of TeXmacs for @s English Metric Units")
