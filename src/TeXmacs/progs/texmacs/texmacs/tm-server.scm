@@ -45,6 +45,11 @@
   (set-message "Restart in order to let the new theme take effect"
                "graphical interface theme"))
 
+(define (notify-gui-scaling var val)
+  ;; the Vue interface follows the scaling at once
+  ;; (vue_follow_interface_scale); Qt reads it at its start
+  (when (not (vue-gui?)) (notify-restart var val)))
+
 (define (notify-language var val)
   (set-output-language val)
   (if (and (current-view) (== (buffer-tree) (stree->tree '(document ""))))
@@ -113,7 +118,7 @@
   ;; a web browser
   ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
   ("gui density" (get-default-gui-density) noop)
-  ("gui scaling" "default" notify-restart)
+  ("gui scaling" "default" notify-gui-scaling)
   ("gui:responsive tab mode" (get-default-responsive-tab-mode) noop)
   ("interactive footer" "off" noop)
   ("typographic palette set" "Classical" noop)
