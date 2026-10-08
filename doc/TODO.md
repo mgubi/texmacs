@@ -28,15 +28,6 @@ SDL and Qtwk changes, the Qt 5 branch of the Qt pipes
 (`setupChildProcess`), and headless mode of X11, SDL and Cocoa. Qtwk has
 no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 
-- **Vue, GPU, 2x: floating dialogs have no title.** In single-window mode
-  (the browser, `TEXMACS_VUE_SINGLE_WINDOW`) the title of a floating
-  dialog (File > Page setup...) is not drawn when the window is drawn at a
-  factor of 2 by the GPU; the close box and the frame are. Fine at 1x, and
-  at any factor with the software renderer. Seen on 2026-10-08 in the
-  browser at a device pixel ratio of 2 (`browser-run.mjs --scale 2`), also
-  in a build from before the interface scaling. The title is drawn by
-  `draw_band_text` in `composite_virtual_windows` (vue_gui.cpp).
-
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`

@@ -1319,8 +1319,13 @@ vue_sdl_gpu_window_rep::process_redraw () {
   if (ren == NULL) ren= gpu_screen_renderer (std_shrinkf * retina_factor);
   gpu_begin_screen (ren, win_w, win_h, dev_w, dev_h);
   // as the MuPDF window: no clip of its own, the elements clip
-  ren->cx1= ren->ox - (1 << 28); ren->cx2= ren->ox + (1 << 28);
-  ren->cy1= ren->oy - (1 << 28); ren->cy2= ren->oy + (1 << 28);
+  // (far, but not 1 << 28 as there: this clip is the scissor of what is
+  // drawn outside of any element, as the titles of the virtual windows,
+  // and a change of zoom multiplies it by the zoom factor, 5 times the
+  // drawing factor, before dividing it: at 2x that overflowed, and the
+  // text of the titles, drawn at another zoom, was clipped away)
+  ren->cx1= ren->ox - (1 << 24); ren->cx2= ren->ox + (1 << 24);
+  ren->cy1= ren->oy - (1 << 24); ren->cy2= ren->oy + (1 << 24);
   uint64_t t_ns= vue_profile_on ? SDL_GetTicksNS () : 0;
   // the background of the theme (red in the F1 debug mode): a clear of the
   // GPU, at no cost worth avoiding
