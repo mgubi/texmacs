@@ -242,9 +242,9 @@
     <with|font-series|bold|Your files>).
 
     <item><menu|Edit|Preferences|General|Interface scaling> is obeyed, as
-    in the Qt version: from the next start of <TeXmacs> the whole interface,
-    with the documents and the windows themselves, is larger or smaller by
-    that factor. It had no effect. In the browser it scales what <TeXmacs>
+    in the Qt version, and at once, without a new start of <TeXmacs>: the
+    whole interface, with the documents and the windows themselves, is
+    larger or smaller by that factor. It had no effect. In the browser it scales what <TeXmacs>
     draws, not the tabs and the menu of the page, which follow the zoom of
     the browser; the address <verbatim|?scale=1.5> sets it for one visit.
   </itemize>

@@ -201,7 +201,9 @@
   <verbatim|QT_SCALE_FACTOR>, a point of <TeXmacs> takes the density of the
   display, rounded, times this scaling in device pixels, and the windows
   grow with it. The window is drawn at the nearest integer factor and
-  presented scaled when the two differ: <cpp|vue_scaling>>>|<row|<cell|<verbatim|TEXMACS_VUE_TAB_MODE>>|<cell|presentation
+  presented scaled when the two differ: <cpp|vue_scaling>. A change of
+  the preference is followed while <TeXmacs> runs
+  (<cpp|vue_follow_interface_scale>)>>|<row|<cell|<verbatim|TEXMACS_VUE_TAB_MODE>>|<cell|presentation
   of the responsive tabs: <verbatim|top>, <verbatim|side>,
   <verbatim|mobile> or <verbatim|grid>>>|<row|<cell|<verbatim|TEXMACS_VUE_BARS>>|<cell|icon
   bars at the <verbatim|top> or on the <verbatim|left>>>|<row|<cell|<verbatim|TEXMACS_VUE_RADIUS>>|<cell|rounding

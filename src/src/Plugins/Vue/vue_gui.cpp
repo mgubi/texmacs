@@ -84,18 +84,25 @@ extern "C" int  vue_clay_capacity_report (char* buf, int n); // clay.c
 
 // The preference "gui scaling" (Preferences > General > Interface scaling):
 // "default", or a factor by which the whole interface is larger or smaller.
-// It is read once, at the start, as the Qt interface does (QT_SCALE_FACTOR
-// in texmacs.cpp); TEXMACS_VUE_SCALE overrides it (tests).
+// It does what QT_SCALE_FACTOR does for the Qt interface (texmacs.cpp),
+// which reads it at the start only; here a change is followed at once
+// (vue_follow_interface_scale). TEXMACS_VUE_SCALE overrides it (tests).
+static float interface_scale= 0.0f; // 0: not read yet
+static int   primary_factor= 1; // the rounded density of the primary display
+
+static float
+read_interface_scale () {
+  static string forced= get_env ("TEXMACS_VUE_SCALE");
+  string v= forced;
+  if (N(v) == 0) v= get_user_preference ("gui scaling", "default");
+  double x= is_double (v) ? as_double (v) : 1.0;
+  return (x > 0.0) ? (float) x : 1.0f;
+}
+
 static float
 vue_interface_scale () {
-  static float scale= 0.0f;
-  if (scale <= 0.0f) {
-    string v= get_env ("TEXMACS_VUE_SCALE");
-    if (N(v) == 0) v= get_user_preference ("gui scaling", "default");
-    double x= is_double (v) ? as_double (v) : 1.0;
-    scale= (x > 0.0) ? (float) x : 1.0f;
-  }
-  return scale;
+  if (interface_scale <= 0.0f) interface_scale= read_interface_scale ();
+  return interface_scale;
 }
 
 // As with Qt, where the scaling makes the logical pixels larger, the
@@ -1826,6 +1833,11 @@ public:
   void*  platform_window () { return NULL; }
   bool   fills () { return full || promoted || tab; }
   bool   decorated () { return !popup && !fills (); }
+  // the interface scaling changed by this ratio: the window follows
+  void   rescale (float r) {
+    saved_w *= r; saved_h *= r;
+    if (!fills ()) { w *= r; h *= r; }
+    clamp (); }
   float  top () { return decorated () ? y - title_bar_h : y; }
   int    layer () { return fills () ? 0 : popup ? 3 : on_top ? 2 : 1; }
   void   destroy_event ();
@@ -3118,6 +3130,7 @@ void gui_open (int& argc, char** argv) {
     if (N(forced) > 0 && is_double (forced)) density= (float) as_double (forced);
     int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
     if (density <= 0.0f) factor= 2; // unknown: the previous default
+    primary_factor= factor;
     factor= vue_drawing_factor ((float) factor); // the interface scaling
     set_retina_factor (factor);
     if (DEBUG_VUE || factor != 2)
@@ -3948,12 +3961,56 @@ loop_iteration () {
 #endif
 }
 
+// The interface scaling of the preferences, followed at once: the windows
+// take their new factors (update_density) and, as their contents, grow or
+// shrink by the ratio of the two scalings; everything is laid out and the
+// documents are drawn again. The loop calls it at each iteration: a lookup
+// in the preferences.
+static void
+vue_follow_interface_scale () {
+  float was= vue_interface_scale ();
+  float now= read_interface_scale ();
+  if (now == was) return;
+  interface_scale= now;
+  float ratio= now / was;
+  set_retina_factor (vue_drawing_factor ((float) primary_factor));
+  iterator<SDL_Window*> it= iterate (Window_to_window);
+  while (it->busy ()) {
+    SDL_Window* sw= it->next ();
+    vue_sdl_base_window_rep* win= (vue_sdl_base_window_rep*) Window_to_window [sw];
+    if (win == NULL) continue;
+#ifndef __EMSCRIPTEN__
+    // (in the browser the page gives the canvas its size)
+    if (!(SDL_GetWindowFlags (sw) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MAXIMIZED))) {
+      SI min_w, min_h, max_w, max_h;
+      win->get_size_limits (min_w, min_h, max_w, max_h);
+      SDL_SetWindowMinimumSize (sw, max (sdl_points (min_w), 0), max (sdl_points (min_h), 0));
+      SDL_SetWindowMaximumSize (sw, max (sdl_points (max_w), 0), max (sdl_points (max_h), 0));
+      int w= 0, h= 0;
+      SDL_GetWindowSize (sw, &w, &h);
+      SDL_SetWindowSize (sw, max (1, (int) (w * ratio + 0.5f)),
+                             max (1, (int) (h * ratio + 0.5f)));
+    }
+#endif
+    win->update_density ();
+  }
+  for (int i= 0; i < N(virtual_windows); i++) {
+    vue_virtual_window_rep* v= virtual_windows[i];
+    v->update_density ();
+    v->rescale (ratio);
+  }
+  vue_simple_widget_rep::invalidate_all_editors ();
+  gui_needs_relayout= true;
+  gui_needs_update= true;
+}
+
 static void
 loop_iteration_body () {
   int& delay= loop_delay;
   time_t t1= 0, t2= 0;
   if (dismiss_finished_wait ()) gui_needs_update= true;
   vue_follow_icon_set (); // a change of the icon set shows at once
+  vue_follow_interface_scale (); // and one of the interface scaling
 #ifdef __EMSCRIPTEN__
   // The browser calls this once per frame (60 or 120 times a second), where
   // the desktop sleeps until an event comes or the pause ends (loop_wait,
