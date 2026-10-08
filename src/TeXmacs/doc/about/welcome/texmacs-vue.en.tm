@@ -236,6 +236,14 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item><menu|File|Files in this browser...> has a third place,
+    <with|font-series|bold|Your TeXmacs folder>, between
+    <with|font-series|bold|Your files> and <with|font-series|bold|Files of
+    TeXmacs>: it shows <verbatim|.TeXmacs>, with the preferences and the
+    styles, packages, fonts and Scheme code you added, which can be
+    opened, renamed, deleted, saved as copies and added to as your other
+    files. It is there in the dialogs to open and to save too.
+
     <item>The remote tools (<menu|Tools|Remote tool>, then the
     <menu|Remote> menu) were checked against a <TeXmacs> server, from the
     browser and from the desktop version, alone and together in a chat room

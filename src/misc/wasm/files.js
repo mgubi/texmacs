@@ -8,6 +8,8 @@
 //   folders, rename, delete, download a file, or a folder as a zip;
 //   back up the whole home directory in a zip and restore it (the menu of
 //   TeXmacs Vue), to keep it safe or to move it to another browser;
+// - in the same panel, the TeXmacs folder of the user (~/.TeXmacs), as a
+//   place of its own;
 // - in the same panel, the files of TeXmacs (/texmacs: its styles,
 //   packages, Scheme code, documentation), which are not changed: they are
 //   opened, downloaded, or copied into the TeXmacs folder of the user
@@ -33,6 +35,7 @@ var tmFiles = (function () {
   // where TeXmacs looks first
   var SYS = '/texmacs', USER_TM = HOME + '/.TeXmacs';
   function inSys (p) { return p === SYS || p.indexOf (SYS + '/') === 0; }
+  function inUserTm (p) { return p === USER_TM || p.indexOf (USER_TM + '/') === 0; }
   var DOC_SUFFIXES = ['tm', 'tmml', 'ts', 'tex', 'html', 'htm', 'md', 'bib', 'scm', 'txt'];
   var IMAGE_SUFFIXES = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'pdf', 'eps', 'ps', 'tif', 'tiff', 'bmp'];
 
@@ -580,11 +583,20 @@ var tmFiles = (function () {
     }
 
     function render () {
-      var sys = inSys (dir), top = sys ? SYS : HOME;
+      // the three places: the documents of the user, the TeXmacs folder of
+      // the user (~/.TeXmacs: the preferences, the styles, packages, fonts
+      // and Scheme code added, where TeXmacs looks before its own files)
+      // and the files of TeXmacs, which are only shown
+      var sys = inSys (dir), userTm = !sys && inUserTm (dir);
+      var place = sys ? 'sys' : userTm ? 'tm' : 'files';
+      var top = sys ? SYS : userTm ? USER_TM : HOME;
       places.textContent = '';
-      [['Your files', DOCS, false], ['Files of TeXmacs', SYS, true]].forEach (function (pl) {
-        var a = el ('a', 'cursor:pointer;color:#036' + (pl[2] === sys ? ';font-weight:bold' : ''), pl[0]);
-        a.onclick = function () { dir = pl[1]; selected = null; mkdirs (DOCS); render (); };
+      [['Your files', DOCS, 'files'], ['Your TeXmacs folder', USER_TM, 'tm'],
+       ['Files of TeXmacs', SYS, 'sys']].forEach (function (pl) {
+        var a = el ('a', 'cursor:pointer;color:#036' + (pl[2] === place ? ';font-weight:bold' : ''), pl[0]);
+        a.dataset.place = pl[2];
+        a.onclick = function () {
+          dir = pl[1]; selected = null; mkdirs (DOCS); mkdirs (USER_TM); render (); };
         places.appendChild (a);
       });
       places.appendChild (stored);
@@ -592,10 +604,13 @@ var tmFiles = (function () {
       if (hint) hint.textContent = sys
         ? 'The files of TeXmacs cannot be changed here: "customize" copies one into your ' +
           'TeXmacs folder (.TeXmacs), where you can edit it.'
+        : userTm
+        ? 'Your TeXmacs folder (.TeXmacs): preferences, and the styles, packages, fonts and ' +
+          'Scheme code you add. TeXmacs looks here before its own files.'
         : 'Drop files or folders here to add them to this folder.';
       crumbs.textContent = '';
       var parts = dir.slice (top.length).split ('/').filter (Boolean), acc = top;
-      var home = el ('a', 'cursor:pointer;color:#036', sys ? 'TeXmacs' : 'Home');
+      var home = el ('a', 'cursor:pointer;color:#036', sys ? 'TeXmacs' : userTm ? '.TeXmacs' : 'Home');
       home.onclick = function () { dir = top; render (); };
       crumbs.appendChild (home);
       parts.forEach (function (p) {

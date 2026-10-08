@@ -708,6 +708,10 @@ another browser for puppeteer: passes in Firefox, Safari 26 and Chrome 154; with
   loop paused, its connection to the database closed (an open database is
   not deleted); the page says so, and a reload starts afresh.
 
+The Files panel has a place for the TeXmacs folder of the user (**Your
+TeXmacs folder**: `~/.TeXmacs`, the preferences and the styles, packages,
+fonts and Scheme code added), handled as the documents are.
+
 The Files panel shows the files of TeXmacs too (**Files of TeXmacs**:
 `/texmacs`, its styles, packages, Scheme code, documentation), which are
 not changed there: opened, downloaded, or copied into the TeXmacs folder
