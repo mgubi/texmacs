@@ -368,9 +368,37 @@ vue_sdl_base_window_rep::vue_sdl_base_window_rep (vue_widget _content, string _n
   update_density ();
 }
 
+// The preference "gui scaling" (Preferences > General > Interface scaling):
+// "default", or a factor by which the whole interface is larger or smaller.
+// It is read once, at the start, as the Qt interface does (QT_SCALE_FACTOR
+// in texmacs.cpp); TEXMACS_VUE_SCALE overrides it (tests).
+static float
+vue_interface_scale () {
+  static float scale= 0.0f;
+  if (scale <= 0.0f) {
+    string v= get_env ("TEXMACS_VUE_SCALE");
+    if (N(v) == 0) v= get_user_preference ("gui scaling", "default");
+    double x= is_double (v) ? as_double (v) : 1.0;
+    scale= (x > 0.0) ? (float) x : 1.0f;
+  }
+  return scale;
+}
+
+// The factor at which a window of pixel density d is laid out and drawn:
+// everything of the interface (the sizes of ui_px, the fonts and the icons
+// of the widgets, the documents) is proportional to it, so that the
+// interface scaling multiplies it. The renderers want an integer, at least
+// 1: a scaling which does not give one is rounded (0.5 has no effect on a
+// display of density 1, and halves the interface on one of density 2).
+static int
+vue_drawing_factor (float d) {
+  return max (1, (int) (d * vue_interface_scale () + 0.5f));
+}
+
 // The pixel density of the display this window is on. The layout works in
 // device pixels and the pointer comes in points, so the two are related by
-// this factor; the renderers draw at 'retina' pixels per point.
+// this factor; the renderers draw at 'retina' pixels per point (the density
+// times the interface scaling, see vue_drawing_factor).
 void
 vue_sdl_base_window_rep::update_density () {
   float d= SDL_GetWindowPixelDensity (sdl_win);
@@ -379,7 +407,7 @@ vue_sdl_base_window_rep::update_density () {
   // and to exercise the other path while testing
   static string forced= get_env ("TEXMACS_VUE_DENSITY");
   if (N(forced) > 0 && is_double (forced)) d= (float) as_double (forced);
-  int r= max (1, (int) (d + 0.5f));
+  int r= vue_drawing_factor (d);
   if (d == density && r == retina) return;
   density= d;
   retina= r;
@@ -2540,6 +2568,7 @@ void gui_open (int& argc, char** argv) {
     if (N(forced) > 0 && is_double (forced)) density= (float) as_double (forced);
     int factor= (density >= 1.5f) ? 2 : 1; // the renderer wants an integer
     if (density <= 0.0f) factor= 2; // unknown: the previous default
+    factor= vue_drawing_factor ((float) factor); // the interface scaling
     set_retina_factor (factor);
     if (DEBUG_VUE || factor != 2)
       SDL_Log ("display pixel density %.2f: drawing at %dx", density, factor);
