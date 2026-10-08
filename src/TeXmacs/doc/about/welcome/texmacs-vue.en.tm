@@ -229,6 +229,10 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>The thumbs of the scroll bars are never shorter than 30 points:
+    in a long document they shrank to a few pixels, which the mouse could
+    hardly pick.
+
     <item>The tabs of the windows have a cross to close them and nothing
     else: their menu, with <menu|Move to a new browser tab>, is gone.
 

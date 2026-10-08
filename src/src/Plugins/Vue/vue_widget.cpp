@@ -1256,6 +1256,51 @@ string debug_style (int style) {
 }
 
 
+// The em of the widths written in the Scheme code ("6em"): it follows the
+// font of the interface (measured at three times the resolution, as the
+// texts: layout_text_box), as in Widkit; it was 14 points whatever the
+// font. The widths of the dialogs are tuned for Qt, whose em is 14 pixels
+// for a font of 13: the em here is 14/13 of that of the font, which is 14
+// points, or close, for the default font. It is the em of the normal
+// font for the widgets of a mini style too (as it was: their widths are
+// not narrower).
+static SI
+ui_em () {
+  font fn= get_default_styled_font (0);
+  return (SI) ((fn->wquad / 3) * 14.0 / 13.0);
+}
+
+// The default width of an input field, in device pixels: about that of a
+// line edit of Qt (some 17 characters), of which a width in "w" is a
+// multiple (qt_decode_length).
+static float
+input_default_width () {
+  return (float) retina_factor * 10 * ui_em () / PIXEL;
+}
+
+// A width in "w" of an input or an enum: the widget is at least as wide as
+// the default width (times the factor, when it is less than one), so that
+// a dialog sized to its contents shows a field one can type in (it was 30
+// points wide), and it fills the room it is given, up to that many default
+// widths; all of the room for "1w" or less.
+static Clay_SizingAxis
+default_width_sizing (double w_len) {
+  float dw= input_default_width ();
+  if (w_len <= 1.0)
+    return CLAY_SIZING_GROW (.min= (float) (max (w_len, 0.25) * dw));
+  return CLAY_SIZING_GROW (.min= dw, .max= (float) (w_len * dw));
+}
+
+// is this width one in "w" (an empty width counts as "1w": it was the width
+// of the window), and which multiple?
+static bool
+width_in_w (string width, double& w_len) {
+  if (N(width) == 0) { w_len= 1.0; return true; }
+  string w_unit;
+  parse_length (width, w_len, w_unit);
+  return w_unit == "w";
+}
+
 SI
 decode_length (string width, vue_window win, int style) {
   SI ex, ey;
@@ -1268,12 +1313,7 @@ decode_length (string width, vue_window win, int style) {
   if (w_unit == "w") return (SI) (w_len * ex);
   else if (w_unit == "h") return (SI) (w_len * ey);
   else if (w_unit == "px") return (SI) (w_len * PIXEL);
-  // Absolute EM units (temporarily fixed to 14px)
-  else if (w_unit == "em") {
-    return (SI) (w_len * 14 * PIXEL);
-//    font fn= get_default_styled_font (style);
-//    return (SI) ((w_len * fn->wquad) / SHRINK);
-  }
+  else if (w_unit == "em") return (SI) (w_len * ui_em ());
   else return ex;
 }
 
@@ -2428,6 +2468,17 @@ widget_grows (widget w, bool horizontal) {
     children << open_box<vue_refreshable_widget_star> (u->data).current;
   else if (t == "refresh_widget")
     children << open_box<vue_refresh_widget_star> (u->data).current;
+  else if (t == "enum_widget") {
+    // an enum whose width is in "w" fills the room it is given, as an input
+    double w_len;
+    string w= open_box<vue_enum_widget_star> (u->data).w;
+    return horizontal && N(w) > 0 && width_in_w (w, w_len);
+  }
+  else if (t == "aligned_widget") {
+    // the column of the fields takes the room when one of them does
+    if (!horizontal) return false;
+    children= open_box<vue_aligned_widget> (u->data).rhs;
+  }
   else return false;
   for (int i=0; i<N(children); i++)
     if (!is_nil (children[i]) && widget_grows (children[i], horizontal)) return true;
@@ -2477,10 +2528,22 @@ layout_list (unsigned int id, array<widget> a, bool vert) {
 void
 scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t z) {
   // z: the bars are drawn above their container (which may itself float)
-  Clay_Vector2 ratio= (Clay_Vector2) {
-    scrollData.contentDimensions.width / scrollData.scrollContainerDimensions.width,
-    scrollData.contentDimensions.height / scrollData.scrollContainerDimensions.height,
-  };
+  // The thumb of a bar has the length of the part of the contents which is
+  // shown, but not less than min_thumb (30 points, or the whole bar when it
+  // is shorter): in a long document it became a few pixels, which the mouse
+  // could not pick. It moves along what is left of the bar (track) while
+  // the contents scroll by their hidden part (range): ratio is the scroll
+  // for a pixel of the thumb.
+  float min_thumb= ui_pxf (60);
+  Clay_Vector2 view= { scrollData.scrollContainerDimensions.width,
+                       scrollData.scrollContainerDimensions.height };
+  Clay_Vector2 range= { fmaxf (scrollData.contentDimensions.width - view.x, 0.0f),
+                        fmaxf (scrollData.contentDimensions.height - view.y, 0.0f) };
+  Clay_Vector2 thumb= {
+    fminf (view.x, fmaxf (min_thumb, view.x * view.x / fmaxf (scrollData.contentDimensions.width, 1.0f))),
+    fminf (view.y, fmaxf (min_thumb, view.y * view.y / fmaxf (scrollData.contentDimensions.height, 1.0f))) };
+  Clay_Vector2 track= { fmaxf (view.x - thumb.x, 1.0f), fmaxf (view.y - thumb.y, 1.0f) };
+  Clay_Vector2 ratio= { range.x / track.x, range.y / track.y };
   // the thumbs follow the common mouse protocol (button_logic): pressed
   // over a thumb, the pointer drags it until the button is released, even
   // outside the bar
@@ -2490,7 +2553,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
     CLAY(vsb_id, {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-        .offset= { .y= -(scrollData.scrollPosition->y / ratio.y) },
+        .offset= { .y= ratio.y > 0 ? -(scrollData.scrollPosition->y / ratio.y) : 0.0f },
         .zIndex= z,
         .parentId= my_id.id,
         .attachPoints= {
@@ -2499,7 +2562,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
         .layout= {
           .sizing= {
             CLAY_SIZING_FIXED(ui_pxf (24)),
-            CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.height / ratio.y) }},
+            CLAY_SIZING_FIXED(thumb.y) }},
         .backgroundColor= Clay_PointerOver (vsb_id)
           ? the_theme.scrollbar_hover : the_theme.scrollbar,
       .cornerRadius= CLAY_CORNER_RADIUS(ui_pxf (12)) }){};
@@ -2521,7 +2584,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
     CLAY(hsb_id, {
       .floating= {
         .attachTo= CLAY_ATTACH_TO_ELEMENT_WITH_ID,
-        .offset= { .x= -(scrollData.scrollPosition->x / ratio.x) },
+        .offset= { .x= ratio.x > 0 ? -(scrollData.scrollPosition->x / ratio.x) : 0.0f },
         .zIndex= z,
         .parentId= my_id.id,
         .attachPoints= {
@@ -2529,7 +2592,7 @@ scroll_bar (Clay_ElementId &my_id, Clay_ScrollContainerData &scrollData, int16_t
           .parent=  CLAY_ATTACH_POINT_LEFT_BOTTOM }},
         .layout= {
           .sizing= {
-            CLAY_SIZING_FIXED(scrollData.scrollContainerDimensions.width / ratio.x),
+            CLAY_SIZING_FIXED(thumb.x),
             CLAY_SIZING_FIXED(ui_pxf (24)) }},
         .backgroundColor= Clay_PointerOver (hsb_id)
           ? the_theme.scrollbar_hover : the_theme.scrollbar,
@@ -2751,25 +2814,38 @@ vue_ui_rep::do_layout () {
       // a new widget: this pass is not aligned yet, ask for another one
       if (!l.found || !r.found) layout_again= true;
     }
+    // a field which fills the room it is given (an input or an enum of a
+    // width in "w") gets the room of the form: the column of the fields,
+    // and the form with it, then take the width they are given (the fields
+    // of the passphrases, "10w", were 30 points wide in a wide dialog)
+    array<bool> cell_grows (n);
+    bool grows= false;
+    for (int i=0; i<n; i++) {
+      cell_grows[i]= widget_grows (d.rhs[i], true);
+      grows= grows || cell_grows[i];
+    }
+    Clay_SizingAxis fit_w= CLAY_SIZING_FIT (0), grow_w= CLAY_SIZING_GROW (0);
     CLAY(CLAY_IDI("aligned_widget", id), {
       .layout= {
         .padding= { (uint16_t) (retina_factor*d.lpad / PIXEL), (uint16_t) (retina_factor*d.rpad / PIXEL), 0, 0 },
         .layoutDirection= CLAY_LEFT_TO_RIGHT,
         .childGap= (uint16_t) (retina_factor*d.hsep / PIXEL),
-        .sizing= { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) }}})
+        .sizing= { grows ? grow_w : fit_w, CLAY_SIZING_FIT(0) }}})
     {
       for (int col=0; col<2; col++) {
         array<widget>& cells= (col == 0) ? d.lhs : d.rhs;
         CLAY_AUTO_ID({
           .layout= {
             .layoutDirection= CLAY_TOP_TO_BOTTOM,
+            .sizing= { (col == 1 && grows) ? grow_w : fit_w, CLAY_SIZING_FIT(0) },
             .childGap= (uint16_t) (retina_factor*d.vsep / PIXEL),
             .childAlignment= { .x= (col == 0) ? CLAY_ALIGN_X_RIGHT : CLAY_ALIGN_X_LEFT }}})
         {
           for (int i=0; i<n; i++) {
             CLAY(probe_id ("aligned_widget_cell", id, 2*i + col), {
               .layout= {
-                .sizing= { .height= CLAY_SIZING_FIT (.min= row_h[i]) },
+                .sizing= { .width= (col == 1 && cell_grows[i]) ? grow_w : fit_w,
+                           .height= CLAY_SIZING_FIT (.min= row_h[i]) },
                 .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
             {
               concrete (cells[i])->do_layout ();
@@ -3503,8 +3579,12 @@ vue_ui_rep::do_layout () {
                           CLAY_SIZING_FIT (0) };
     if (N(d.w) > 0) {
       SI w= decode_length (d.w, current_window, d.st);
-      // the width given is that of the whole enum, arrow included
-      sz.width= CLAY_SIZING_FIXED ((float) retina_factor*w/PIXEL);
+      // the width given is that of the whole enum, arrow included; one in
+      // "w" is a multiple of the default width, as for an input (it was a
+      // multiple of the width of the window)
+      double w_len;
+      if (width_in_w (d.w, w_len)) sz.width= default_width_sizing (w_len);
+      else sz.width= CLAY_SIZING_FIXED ((float) retina_factor*w/PIXEL);
       val_sz.width= CLAY_SIZING_GROW (0);
     }
     Clay_Color face= (!inert && hot_id == button_id.id)
@@ -4929,14 +5009,12 @@ vue_input_text_widget_rep::do_layout () {
   // buttons of its dialog out of sight. It fills the room it is given, up
   // to that width; all of it when the width is "1w" or less, the whole
   // width asked for (the name of a remote file was cut at 75 points).
+  // The minimum is the default width (default_width_sizing): the layout
+  // has no preferred size, and a dialog sized to its contents gave such a
+  // field its minimum, which was 30 points. No width at all is "1w".
   if (!input_fill) {
-    double w_len; string w_unit;
-    parse_length (width, w_len, w_unit);
-    if (w_unit == "w" && w_len <= 1.0)
-      sw= CLAY_SIZING_GROW (.min= ui_pxf (60));
-    else if (w_unit == "w")
-      sw= CLAY_SIZING_GROW (.min= ui_pxf (60),
-                            .max= (float) (w_len * ui_pxf (150)));
+    double w_len;
+    if (width_in_w (width, w_len)) sw= default_width_sizing (w_len);
   }
   CLAY(cid, {
     .layout= { .sizing= { sw, CLAY_SIZING_FIXED (h_px) } },
@@ -5027,9 +5105,8 @@ static bool
 input_text_widget_fills (widget w) {
   vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
   if (in == NULL) return false;
-  double w_len; string w_unit;
-  parse_length (in->width, w_len, w_unit);
-  return w_unit == "w";
+  double w_len;
+  return width_in_w (in->width, w_len);
 }
 
 // the value currently selected in an enum_widget
