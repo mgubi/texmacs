@@ -1284,7 +1284,7 @@ decode_length (string width, vue_window win, int style) {
 void
 vue_follow_icon_set () {
   static string current;
-  string now= get_user_preference ("icon set", "lucide");
+  string now= get_user_preference ("icon set", "neo-classical");
   if (N(current) == 0) { current= now; return; }
   if (now == current) return;
   current= now;

@@ -67,7 +67,7 @@ static string base_pixmap_path;
 void
 apply_icon_set () {
   if (N(base_pixmap_path) == 0) return;
-  string icon_set= get_user_preference ("icon set", "lucide");
+  string icon_set= get_user_preference ("icon set", "neo-classical");
   url pixmaps ("$TEXMACS_PATH/misc/pixmaps");
   string icon_dir= "";
   if (icon_set == "monochrome") icon_dir= "monochrome";
@@ -411,7 +411,7 @@ init_env_vars () {
                        plugin_path ("misc/pixmaps"));
   // The icon set: the original icons ("classical") are those of the path
   // above; another set, chosen in the preferences (by default the
-  // Lucide one), is looked up first (see apply_icon_set)
+  // neo-classical one), is looked up first (see apply_icon_set)
   if (!pixmap_path_given) {
     base_pixmap_path= get_env ("TEXMACS_PIXMAP_PATH");
     apply_icon_set ();

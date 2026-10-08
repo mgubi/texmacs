@@ -222,12 +222,12 @@
     follow their corners, rounded tabs in the column of tabs, and short
     animations when the menus, lists and dialogs appear.
 
-    <item>A new icon set, the default: <name|Lucide>, with thin lines and
-    pastel colours inside which tell the kind of an action (documents in
-    blue, editing in amber, searching in violet, inserting in green, the look
-    of the text in rose). The other sets are still in
-    <menu|Edit|Preferences|General|Icon set>. The buttons of the
-    icons are square, and the two columns of icons at the left match.
+    <item>A new icon set, <name|Lucide>, with thin lines and pastel colours
+    inside which tell the kind of an action (documents in blue, editing in
+    amber, searching in violet, inserting in green, the look of the text in
+    rose): choose it in <menu|Edit|Preferences|General|Icon set> (the
+    default is still the neo-classical set). The buttons of the icons are
+    square, and the two columns of icons at the left match.
 
     <item>The browser asks before closing or reloading the page while
     documents have unsaved changes.
