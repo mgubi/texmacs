@@ -343,7 +343,7 @@
 
 (define (oftm-only-images? x)
   ;; a paragraph of images and nothing else
-  (and (func? x 'p) (not (ox-attr x 'role))
+  (and (func? x 'p) (in? (ox-attr x 'role) '(#f "figure"))
        (with l (list-filter (ox-children x)
                             (lambda (y) (not (and (string? y)
                                                   (== (string-trim-spaces y) "")))))
@@ -356,6 +356,36 @@
                        (lambda (y) (not (and (string? y)
                                              (== (string-trim-spaces y) "")))))
     (and (list-1? l) (func? (car l) 'math) (car l))))
+
+(define (oftm-trim-right s)
+  (let loop ((i (string-length s)))
+    (if (and (> i 0) (char=? (string-ref s (- i 1)) #\space))
+        (loop (- i 1))
+        (substring s 0 i))))
+
+(define (oftm-description l)
+  ;; (description . rest) for the terms and their definitions at the
+  ;; start of the blocks l
+  (let loop ((l l) (acc '()))
+    (cond ((and (pair? l) (oftm-role? (car l) "term"))
+           (let* ((term (oftm-inlines (ox-children (car l))))
+                  (defs (let sub ((r (cdr l)) (d '()))
+                          (if (and (pair? r) (oftm-role? (car r) "definition"))
+                              (sub (cdr r)
+                                   (cons (oftm-inlines (ox-children (car r))) d))
+                              (cons (reverse d) r))))
+                  (body (car defs)))
+             (loop (cdr defs)
+                   (append (reverse
+                             (cons (oftm-concat
+                                     (cons `(item* ,term)
+                                           (cond ((null? body) '())
+                                                 ((func? (car body) 'concat)
+                                                  (cdar body))
+                                                 (else (list (car body))))))
+                                   (if (null? body) '() (cdr body))))
+                           acc))))
+          (else (cons `(description ,(oftm-document (reverse acc))) l)))))
 
 (define (oftm-caption x)
   (oftm-inlines (ox-children x)))
@@ -378,11 +408,16 @@
          (let loop ((r l) (acc '()))
            (if (and (pair? r) (oftm-role? (car r) "code"))
                (loop (cdr r)
-                     (append (reverse (string-tokenize-by-char
-                                        (oftm-plain (car r)) #\newline))
+                     (append (reverse (map oftm-trim-right
+                                           (string-tokenize-by-char
+                                             (oftm-plain (car r)) #\newline)))
                              acc))
                (cons `(verbatim-code ,(oftm-document (reverse acc)))
                      (oftm-blocks r)))))
+        ;; terms and their definitions
+        ((oftm-role? (car l) "term")
+         (with r (oftm-description l)
+           (cons (car r) (oftm-blocks (cdr r)))))
         ;; a figure and its caption, in this order or in the other
         ((and (oftm-only-images? (car l)) (pair? (cdr l))
               (oftm-role? (cadr l) "caption"))
@@ -429,7 +464,8 @@
 ;; The title of the document
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define oftm-title-roles '("title" "subtitle" "author" "date" "abstract"))
+(define oftm-title-roles
+  '("title" "subtitle" "author" "date" "abstract" "skip"))
 
 (define (oftm-title-block? x)
   (and (func? x 'p) (in? (ox-attr x 'role) oftm-title-roles)))

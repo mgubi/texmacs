@@ -163,15 +163,27 @@
     ("tablecaption" . "caption") ("image caption" . "caption")
     ("table caption" . "caption")
     ("preformatted text" . "code") ("source code" . "code")
-    ("code" . "code")))
+    ("code" . "code")
+    ("abstract title" . "skip") ("abstracttitle" . "skip")
+    ("figurewithcaption" . "figure") ("figure with caption" . "figure")
+    ("captioned figure" . "figure")
+    ("definition term" . "term") ("definition definition" . "definition")
+    ("definition" . "definition")
+    ("list heading" . "term") ("list contents" . "definition")))
 
 (define (odt-heading-level name)
   (and (string-starts? name "heading ")
        (string->number (substring name 8 (string-length name)))))
 
 (define (odt-role names)
-  ;; (role level) of a paragraph with the styles of these names
-  (let ((level (list-find (map odt-heading-level names) identity))
+  ;; (role level) of a paragraph with the styles of these names; the
+  ;; "tight" variants of a style, for the items of a list, are the style
+  (let* ((names (map (lambda (n)
+                      (if (string-ends? n " tight")
+                          (substring n 0 (- (string-length n) 6))
+                          n))
+                    names))
+        (level (list-find (map odt-heading-level names) identity))
         (role (list-find (map (lambda (n) (assoc-ref odt-roles n)) names)
                          identity)))
     (cond (level (list "heading" (number->string level)))
@@ -312,7 +324,8 @@
             ((text:s)
              (with n (or (and (ox-attr x 'text:c) (string->number (ox-attr x 'text:c)))
                          1)
-               (list (make-string n #\space))))
+               ;; (spaces which count: not those which odt-trim removes)
+               (list (make-string n odt-hard-space))))
             ((text:tab) '((tab)))
             ((text:line-break) '((br)))
             ((text:a)
@@ -353,8 +366,23 @@
 (define (odt-inlines l)
   (append-map odt-inline l))
 
+(define odt-hard-space (integer->char 1))
+
+(define (odt-soften x)
+  ;; the spaces which count as usual spaces again
+  (cond ((string? x)
+         (list->string (map (lambda (c) (if (char=? c odt-hard-space) #\space c))
+                            (string->list x))))
+        ((and (pair? x) (in? (car x) '(image math note)))
+         x)
+        ((pair? x) (cons (car x) (map odt-soften (cdr x))))
+        (else x)))
+
 (define (odt-trim l)
   ;; without spaces at the ends of the text of a paragraph
+  (map odt-soften (odt-trim-sub l)))
+
+(define (odt-trim-sub l)
   (let* ((l (office-merge l))
          (l (if (and (pair? l) (string? (car l)))
                 (with s (odt-trim-left (car l))
@@ -502,13 +530,36 @@
                 (first (car (ox-children b)))
                 (merged `(list (@ ,@(ox-attrs a))
                                ,@(cDr items)
-                               ,(append (cAr items) (cdr first))
+                               ;; (the same may happen again, one level deeper)
+                               ,(cons 'item
+                                      (odt-merge-lists
+                                        (append (cdr (cAr items)) (cdr first))))
                                ,@(cdr (ox-children b)))))
            (odt-merge-lists (cons merged (cddr l)))))
         (else (cons (car l) (odt-merge-lists (cdr l))))))
 
+(define (odt-inline-node? x)
+  ;; text where a paragraph should be: some programs write it
+  (or (and (string? x) (!= (string-trim-spaces x) ""))
+      (and (pair? x) (in? (car x) '(text:span text:a text:s text:line-break
+                                    text:note)))))
+
+(define (odt-blocks-sub l)
+  ;; the blocks of the children l; text which is in no paragraph is one
+  (let loop ((l l) (text '()) (acc '()))
+    (let ((flush (lambda ()
+                   (with t (odt-trim (odt-inlines (reverse text)))
+                     (if (null? t) acc (cons (cons 'p t) acc))))))
+      (cond ((null? l) (reverse (flush)))
+            ((or (odt-inline-node? (car l))
+                 (and (pair? text) (or (string? (car l)) (func? (car l) 'draw:frame))))
+             (loop (cdr l) (cons (car l) text) acc))
+            ((string? (car l)) (loop (cdr l) text acc))
+            (else (loop (cdr l) '()
+                        (append (reverse (odt-block (car l))) (flush))))))))
+
 (define (odt-blocks l)
-  (odt-merge-lists (append-map odt-block l)))
+  (odt-merge-lists (odt-blocks-sub l)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface

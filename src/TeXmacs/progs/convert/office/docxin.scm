@@ -159,7 +159,8 @@
     ("table caption" . "caption") ("captioned figure" . "figure")
     ("source code" . "code") ("html preformatted" . "code")
     ("plain text" . "code") ("preformatted text" . "code")
-    ("macro" . "code") ("code" . "code")))
+    ("macro" . "code") ("code" . "code")
+    ("definition term" . "term") ("definition" . "definition")))
 
 (define (docx-heading-level name)
   ;; "heading 2" is 2

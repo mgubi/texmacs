@@ -459,6 +459,12 @@
           '((p (@ (role "quote") (align "right")) "q")))
   (check= (odt "<text:p text:style-name='Preformatted_20_Text'>x=1</text:p>")
           '((p (@ (role "code")) "x=1")))
+  ;; the spaces at the start of a line of code count
+  (check= (odt "<text:p text:style-name='Preformatted_20_Text'><text:s text:c='4'/>return x </text:p>")
+          '((p (@ (role "code")) "    return x")))
+  ;; text which is in no paragraph is one
+  (check= (odt (string-append "loose " (tspan "Emphasis" "text") (tp "next")))
+          '((p "loose " (em "text")) (p "next")))
   ;; lists: the kind of each level is in the style of the outer list
   (check= (odt (string-append
                  "<text:list text:style-name='L1'><text:list-item>" (tp "a")
@@ -476,6 +482,19 @@
                  "</text:list-item></text:list>"))
           '((list (@ (kind "bullet"))
                   (item (p "a") (list (@ (kind "number")) (item (p "n")))))))
+  ;; and so one level deeper
+  (check= (odt (string-append
+                 "<text:list text:style-name='L1'><text:list-item>" (tp "a")
+                 "<text:list><text:list-item>" (tp "n") "</text:list-item></text:list>"
+                 "</text:list-item></text:list>"
+                 "<text:list text:style-name='L1'><text:list-item><text:list>"
+                 "<text:list-item><text:list><text:list-item>" (tp "d")
+                 "</text:list-item></text:list></text:list-item></text:list>"
+                 "</text:list-item></text:list>"))
+          '((list (@ (kind "bullet"))
+                  (item (p "a")
+                        (list (@ (kind "number"))
+                              (item (p "n") (list (@ (kind "bullet")) (item (p "d")))))))))
   ;; tables, with the cells which a wider one covers
   (check= (odt (string-append
                  "<table:table><table:table-header-rows><table:table-row>"
@@ -565,7 +584,14 @@
           '((enumerate (document (concat (item) "a")
                                  (itemize (document (concat (item) "n")))))))
   (check= (tm '(pagebreak)) '((page-break)))
+  ;; terms and their definitions
+  (check= (tm '(p (@ (role "term")) "T") '(p (@ (role "definition")) "D")
+              '(p (@ (role "definition")) "E") '(p (@ (role "term")) "U") '(p "x"))
+          '((description (document (concat (item* "T") "D") "E" (item* "U"))) "x"))
   ;; a figure or a table with its caption, before or after
+  (check= (tm '(p (@ (role "figure")) (image (@ (name "f.png"))))
+              '(p (@ (role "caption")) "The figure"))
+          '((big-figure (image "f.png" "" "" "" "") "The figure")))
   (check= (tm '(p (image (@ (name "f.png")))) '(p (@ (role "caption")) "The figure"))
           '((big-figure (image "f.png" "" "" "" "") "The figure")))
   (check= (tm '(p (@ (role "caption")) "The table") '(table (row (cell (p "x")))))
@@ -604,6 +630,12 @@
                       (doc-author (author-data (author-name "A")))
                       (doc-author (author-data (author-name "B")))
                       (doc-date "2026"))
+            (abstract-data (abstract (document "Short.")))
+            "x"))
+  ;; a heading "Abstract" before the abstract is left out
+  (check= (tm '(p (@ (role "title")) "T") '(p (@ (role "skip")) "Abstract")
+              '(p (@ (role "abstract")) "Short.") '(p "x"))
+          '((doc-data (doc-title "T"))
             (abstract-data (abstract (document "Short.")))
             "x"))
   ;; the title of the properties of the file, when the text has none
