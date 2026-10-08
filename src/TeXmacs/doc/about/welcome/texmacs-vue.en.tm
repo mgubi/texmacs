@@ -241,10 +241,12 @@
     zip archive, to keep them safe or to move them to another browser (see
     <with|font-series|bold|Your files>).
 
-    <item><menu|Edit|Preferences|General|Interface scaling> is obeyed: the
-    whole interface, with the documents, is drawn twice or three times as
-    large (or at half the size on a display of high density), from the next
-    start of <TeXmacs>. It had no effect.
+    <item><menu|Edit|Preferences|General|Interface scaling> is obeyed, as
+    in the Qt version: from the next start of <TeXmacs> the whole interface,
+    with the documents and the windows themselves, is larger or smaller by
+    that factor. It had no effect. In the browser it scales what <TeXmacs>
+    draws, not the tabs and the menu of the page, which follow the zoom of
+    the browser; the address <verbatim|?scale=1.5> sets it for one visit.
   </itemize>
 
   <paragraph|7 October 2026>

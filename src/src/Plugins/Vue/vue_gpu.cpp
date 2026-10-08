@@ -51,7 +51,8 @@ renderer gpu_picture_renderer (picture p, double z) { (void) p; (void) z; return
 void     gpu_translate_picture (picture p, int x, int y) { (void) p; (void) x; (void) y; }
 picture  gpu_copy_picture (picture p) { return p; }
 renderer gpu_screen_renderer (double z) { (void) z; return NULL; }
-void     gpu_begin_screen (renderer r, int w, int h) { (void) r; (void) w; (void) h; }
+void     gpu_begin_screen (renderer r, int w, int h, int dw, int dh) {
+  (void) r; (void) w; (void) h; (void) dw; (void) dh; }
 void     gpu_flush () {}
 unsigned long long gpu_frame_hash () { return 0; }
 void     gpu_finish () {}
@@ -215,6 +216,12 @@ struct gpu_target {
   GLuint fbo2, tex2;    // the other one of a scrolled backing store
   bool screen;
   bool made;            // the GL objects exist (made when first drawn)
+  // the window may be drawn scaled (the interface scaling, vue_scaling in
+  // vue_gui.cpp): w x h are then the pixels of its layout, dw x dh those
+  // of its framebuffer. Equal to w x h otherwise, and for every texture
+  int dw, dh;
+  int dev_w () const { return (screen && dw > 0) ? dw : w; }
+  int dev_h () const { return (screen && dh > 0) ? dh : h; }
   unsigned long long gen; // changes with what the texture shows
 };
 
@@ -319,7 +326,7 @@ struct gpu_state {
   unsigned long long tick= 0;
   size_t texture_bytes= 0;
   // the default framebuffer of the window being drawn
-  gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true, 0 };
+  gpu_target screen= { 0, 0, 0, 0, 0, 0, true, true, 0, 0, 0 };
   // glyphs drawn from their outlines (Slug, TEXMACS_VUE_SLUG=1)
   bool slug_on= false;
   GLuint slug_prog= 0, slug_vao= 0, slug_vbo= 0, curve_tex= 0, index_tex= 0;
@@ -680,7 +687,8 @@ ensure_target (gpu_target* t) {
 static void
 bind_target (gpu_target* t) {
   glBindFramebuffer (GL_FRAMEBUFFER, t->screen ? 0 : t->fbo);
-  glViewport (0, 0, t->w, t->h);
+  // (the shaders map w x h to the viewport: a scaled window is scaled here)
+  glViewport (0, 0, t->dev_w (), t->dev_h ());
 }
 
 static void
@@ -689,6 +697,14 @@ set_scissor (gpu_target* t, int x1, int y1, int x2, int y2) {
   if (x2 < x1) x2= x1;
   if (y2 < y1) y2= y1;
   glEnable (GL_SCISSOR_TEST);
+  if (t->dev_w () != t->w || t->dev_h () != t->h) {
+    // a scaled window: the pixels which the box touches
+    double fx= (double) t->dev_w () / t->w, fy= (double) t->dev_h () / t->h;
+    int a1= (int) floor (x1 * fx), a2= (int) ceil (x2 * fx);
+    int b1= (int) floor ((t->h - y2) * fy), b2= (int) ceil ((t->h - y1) * fy);
+    glScissor (a1, b1, a2 - a1, b2 - b1);
+    return;
+  }
   glScissor (x1, t->h - y2, x2 - x1, y2 - y1);
 }
 
@@ -1196,6 +1212,32 @@ blit (GLuint src_fbo, int src_h, int x1, int y1, int x2, int y2,
   glBlitFramebuffer (x1, src_h - y2, x2, src_h - y1,
                      dx, dst_h - (dy + h), dx + w, dst_h - dy,
                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  glBindFramebuffer (GL_READ_FRAMEBUFFER, 0);
+  glBindFramebuffer (GL_DRAW_FRAMEBUFFER, 0);
+}
+
+// the same between two targets, one of which may be a scaled window
+static void
+blit (gpu_target* src, int x1, int y1, int x2, int y2,
+      gpu_target* dst, int dx, int dy) {
+  GLuint src_fbo= src->screen ? 0 : src->fbo, dst_fbo= dst->screen ? 0 : dst->fbo;
+  if (src->dev_h () == src->h && src->dev_w () == src->w &&
+      dst->dev_h () == dst->h && dst->dev_w () == dst->w) {
+    blit (src_fbo, src->h, x1, y1, x2, y2, dst_fbo, dst->h, dx, dy);
+    return;
+  }
+  int w= x2 - x1, h= y2 - y1;
+  if (w <= 0 || h <= 0) return;
+  double sfx= (double) src->dev_w () / src->w, sfy= (double) src->dev_h () / src->h;
+  double dfx= (double) dst->dev_w () / dst->w, dfy= (double) dst->dev_h () / dst->h;
+  glBindFramebuffer (GL_READ_FRAMEBUFFER, src_fbo);
+  glBindFramebuffer (GL_DRAW_FRAMEBUFFER, dst_fbo);
+  glDisable (GL_SCISSOR_TEST);
+  glBlitFramebuffer ((int) floor (x1 * sfx + 0.5), (int) floor ((src->h - y2) * sfy + 0.5),
+                     (int) floor (x2 * sfx + 0.5), (int) floor ((src->h - y1) * sfy + 0.5),
+                     (int) floor (dx * dfx + 0.5), (int) floor ((dst->h - (dy + h)) * dfy + 0.5),
+                     (int) floor ((dx + w) * dfx + 0.5), (int) floor ((dst->h - dy) * dfy + 0.5),
+                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
   glBindFramebuffer (GL_READ_FRAMEBUFFER, 0);
   glBindFramebuffer (GL_DRAW_FRAMEBUFFER, 0);
 }
@@ -1903,8 +1945,7 @@ gpu_renderer_rep::get_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   // the store of the active graphics: a real copy
   decode (x1, y1); decode (x2, y2);
   gpu_flush_all ();
-  blit (t->screen ? 0 : t->fbo, t->h, x1, y2, x2, y1,
-        sh->t->fbo, sh->t->h, x1, y2);
+  blit (t, x1, y2, x2, y1, sh->t, x1, y2);
   sh->t->gen++;
 }
 
@@ -1917,8 +1958,7 @@ gpu_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
   x2= min (x2, cx2- ox); y2= min (y2, cy2- oy);
   decode (x1, y1); decode (x2, y2);
   gpu_flush_all ();
-  blit (sh->t->fbo, sh->t->h, x1, y2, x2, y1,
-        t->screen ? 0 : t->fbo, t->h, x1, y2);
+  blit (sh->t, x1, y2, x2, y1, t, x1, y2);
   t->gen++;
   if (on_screen (t)) { SI k[5]= { 7, x1, y1, x2, y2 }; feed (k); }
 }
@@ -1948,8 +1988,7 @@ gpu_renderer_rep::fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y) {
   if (x1 >= x2 || y2 >= y1) return;
   gpu_flush_all ();
   if (src->t == t) return; // within one target: see gpu_translate_picture
-  blit (src->t->screen ? 0 : src->t->fbo, src->t->h, x, y - (y1 - y2), x + (x2 - x1), y,
-        t->screen ? 0 : t->fbo, t->h, x1, y2);
+  blit (src->t, x, y - (y1 - y2), x + (x2 - x1), y, t, x1, y2);
   t->gen++;
   if (on_screen (t)) { SI k[6]= { 8, x1, y1, x2, y2, (SI) src->t->gen }; feed (k); }
 }
@@ -1971,9 +2010,10 @@ gpu_screen_renderer (double zoom) {
 }
 
 void
-gpu_begin_screen (renderer ren, int w, int h) {
+gpu_begin_screen (renderer ren, int w, int h, int dw, int dh) {
   gpu_flush_all ();
   G.screen.w= w; G.screen.h= h;
+  G.screen.dw= dw; G.screen.dh= dh;
   G.frame_hash= 14695981039346656037ULL;
   int sz[2]= { w, h };
   feed (sz);

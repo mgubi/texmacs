@@ -79,6 +79,9 @@ Module['preRun'].push(function () {
   if (tmAddress.get ('bars') === 'top') ENV['TEXMACS_VUE_BARS'] = 'top';
   // ?slug=1: the glyphs drawn from their outlines (vue_gpu.cpp, Slug)
   if (tmAddress.get ('slug') === '1') ENV['TEXMACS_VUE_SLUG'] = '1';
+  // ?scale=1.5: the interface scaling, whatever the preference (tests)
+  if (/^[0-9.]+$/.test (tmAddress.get ('scale') || ''))
+    ENV['TEXMACS_VUE_SCALE'] = tmAddress.get ('scale');
   // ?gpusync=1: the profile waits for the GPU (vue_gpu.cpp, gpu_finish)
   if (tmAddress.get ('gpusync') === '1') ENV['TEXMACS_VUE_GPU_SYNC'] = '1';
   FS.mkdirTree ('/home/web');

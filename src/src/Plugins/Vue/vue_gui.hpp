@@ -177,13 +177,18 @@ public:
   bool popup; // undecorated popup/tooltip window
   vue_input_state input; // pending events and interaction state
   float layout_w, layout_h; // size of the layout area (pixels)
-  // Device pixels per point on the display this window is on
-  // (SDL_GetWindowPixelDensity, refreshed when the window moves to another
-  // display). The layout works in device pixels while the pointer comes in
-  // points, and the renderers draw at retina_factor pixels per point: the
-  // factor of the window is made current by with_window.
+  // Pixels of the layout per point of the display this window is on
+  // (from SDL_GetWindowPixelDensity, refreshed when the window moves to
+  // another display). The layout works in pixels while the pointer comes
+  // in points, and the renderers draw at retina_factor pixels per point:
+  // the factor of the window is made current by with_window.
+  // The pixels of the layout are those of the device, unless the interface
+  // scaling asks for a factor which is not an integer: the window is then
+  // laid out and drawn at the nearest integer one and presented scaled, by
+  // 'present' device pixels per pixel of the layout (see update_density).
   float density;
-  int   retina;  // the density rounded, at least 1
+  int   retina;  // the factor the window is drawn at, at least 1
+  float present; // device pixels per pixel of the layout (usually 1)
   virtual void update_density () {} // the platform window knows it
   // windows are shown only once their size matches their contents, to avoid
   // flickering while a new window is sized (see set_visibility/process_layout)
@@ -197,7 +202,7 @@ public:
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
   : id (serial++), name (_name), modified (false), orig_name (_name), content (w),
     clay_debug (false), popup (_popup), layout_w (0), layout_h (0),
-    density (1.0f), retina (1),
+    density (1.0f), retina (1), present (1.0f),
     visible_requested (false), shown (false), ready_to_show (false),
     layout_passes (0), last_layout_time (0), transitions_active (false)
   { render_commands.length= 0; }
@@ -220,7 +225,7 @@ public:
   virtual void   set_position (SI x, SI y) = 0;
   virtual void   get_position (SI& x, SI& y) = 0;
   
-  virtual void layout_size (int& w, int& h) = 0; // of the layout, in device pixels
+  virtual void layout_size (int& w, int& h) = 0; // of the layout, in its pixels
   virtual void process_layout () = 0;
   virtual void process_redraw () = 0;
   virtual void draw_picture (void *data, picture pic) = 0;

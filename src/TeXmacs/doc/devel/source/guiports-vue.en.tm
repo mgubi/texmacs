@@ -197,9 +197,11 @@
   in which every redraw of a window is saved as <abbr|PNG>>>|<row|<cell|<verbatim|TEXMACS_VUE_THEME>>|<cell|<verbatim|light>
   or <verbatim|dark>, instead of the preference>>|<row|<cell|<verbatim|TEXMACS_VUE_DENSITY>>|<cell|pixel
   density used instead of that of the display>>|<row|<cell|<verbatim|TEXMACS_VUE_SCALE>>|<cell|interface
-  scaling used instead of the preference <verbatim|gui scaling> (the
-  drawing factor of a window is its density times this scaling, rounded to
-  an integer of at least 1: <cpp|vue_drawing_factor>)>>|<row|<cell|<verbatim|TEXMACS_VUE_TAB_MODE>>|<cell|presentation
+  scaling used instead of the preference <verbatim|gui scaling>. As with
+  <verbatim|QT_SCALE_FACTOR>, a point of <TeXmacs> takes the density of the
+  display, rounded, times this scaling in device pixels, and the windows
+  grow with it. The window is drawn at the nearest integer factor and
+  presented scaled when the two differ: <cpp|vue_scaling>>>|<row|<cell|<verbatim|TEXMACS_VUE_TAB_MODE>>|<cell|presentation
   of the responsive tabs: <verbatim|top>, <verbatim|side>,
   <verbatim|mobile> or <verbatim|grid>>>|<row|<cell|<verbatim|TEXMACS_VUE_BARS>>|<cell|icon
   bars at the <verbatim|top> or on the <verbatim|left>>>|<row|<cell|<verbatim|TEXMACS_VUE_RADIUS>>|<cell|rounding
