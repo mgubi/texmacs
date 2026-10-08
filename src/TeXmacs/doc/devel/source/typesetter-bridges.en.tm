@@ -428,6 +428,22 @@
   again. Finally, page breaking is done again for the whole list of page
   items.
 
+  The cost of these stages can be measured: with the environment variable
+  <verbatim|TEXMACS_EDIT_PROFILE> set, every typesetting which follows an
+  edit prints the time spent in the bridges (with the number of bridges
+  re-executed and reused), in the pager and in the change log, with the
+  part of the view which the editor invalidates, and every repaint prints
+  its area and its time (<cpp|edit_profile> in
+  <source-link|typesetter.cpp|src/Typeset/Bridge/typesetter.cpp>). In a
+  document of 140 pages (1680 paragraphs, 6400 lines, measured in October
+  2026 on the <name|Vue> port with the software renderer), a character
+  typed in a paragraph costs 2<nbsp>ms in the bridges and 1<nbsp>ms in
+  the change log, but 50<nbsp>ms in the pager on paper; on papyrus, with
+  no pages to break, the whole typesetting takes 11<nbsp>ms, of which
+  8<nbsp>ms go to the visit of the bridges which are reused. A new
+  section, which renumbers what follows, re-executes 2600 bridges in
+  120<nbsp>ms.
+
   <subsection|Complete typesetting and references>
 
   References, tables of contents and page numbers need several passes. The

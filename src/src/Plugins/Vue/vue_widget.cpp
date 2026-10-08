@@ -7052,6 +7052,21 @@ vue_simple_widget_rep::repaint_invalid_regions () {
   }
   
   // repaint invalid rectangles if needed
+  // Only what the backing store shows is repainted (as in Qt): the editor
+  // invalidates all that an edit moved, down to the end of the document
+  // when a line is added, and the repaint of such a region drew every box
+  // of the rest of the document, most of them outside of the pixmap (70 ms
+  // for a new line in the middle of 140 pages). What is dropped here is
+  // invalidated again when a scroll shows it (the strips above).
+  if (!is_nil (invalid_regions)) {
+    SI X1= 0, Y1= 0, X2= bs_w, Y2= bs_h;
+    ren->set_origin (-backing_pos.x1, -backing_pos.x2);
+    ren->encode (X1, Y1);
+    ren->encode (X2, Y2);
+    SI pad= 2 * ren->pixel;
+    invalid_regions= invalid_regions &
+      rectangles (rectangle (X1 - pad, Y2 - pad, X2 + pad, Y1 + pad));
+  }
   if (!is_nil (invalid_regions)) {
     rectangles new_regions;
     

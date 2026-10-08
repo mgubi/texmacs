@@ -306,12 +306,14 @@ bridge_rep::typeset (int desired_status) {
   //cout << "Typesetting " << st << ", " << desired_status << LF << INDENT;
   if ((status==desired_status) && (N(ttt->old_patch)==0)) {
     //cout << "cached" << LF;
+    if (edit_profile.on) edit_profile.cached++;
     env->monitored_patch_env (changes);
     // cout << "changes       = " << changes << LF;
   }
   else {
     // cout << "Typesetting " << st << ", " << desired_status << LF << INDENT;
     //cout << "recomputing" << LF;
+    if (edit_profile.on) edit_profile.redone++;
     hashmap<string,tree> prev_back (UNINIT);
     my_clean_links ();
     link_repository old_link_env= env->link_env;
