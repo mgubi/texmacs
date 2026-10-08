@@ -18,6 +18,12 @@
              (client client-notifications) (client client-menu)
              (utils relate live-document))
 
+;; the port of the server and the kind of login: (set! rc-port "6571") and
+;; (set! rc-auth 'legacy-password) for a server without TLS (a client built
+;; without GnuTLS)
+(define rc-port "6561")
+(define rc-auth 'tls-password)
+
 (define rc-fails 0)
 (define rc-val (make-ahash-table))
 (define rc-last #f) ;; the last answer, shown with a failure
@@ -102,7 +108,7 @@
      (list
       (list "login" 6000
             (lambda ()
-              (client-login-home host "6561" user (list 'tls-password pass)
+              (client-login-home host rc-port user (list rc-auth pass)
                                  (lambda args ((rc-set "login") #t))))
             (lambda () (and (rc-get "login") (nnull? (client-active-servers)))))
       (list "administrator or not" 500 noop
@@ -342,7 +348,7 @@
          (login
           (list "login" 6000
                 (lambda ()
-                  (client-login-home host "6561" user (list 'tls-password pass)
+                  (client-login-home host rc-port user (list rc-auth pass)
                                      (lambda args ((rc-set "login") #t))))
                 (lambda () (and (rc-get "login")
                                 (nnull? (client-active-servers)))))))
@@ -428,7 +434,7 @@
               ((== name "rename")
                (load-document rc-file)
                (remote-rename-interactive S (string->url rc-file)))
-              ((== name "login") (open-remote-login "" "6561" "" (list)))
+              ((== name "login") (open-remote-login "" rc-port "" (list)))
               ((== name "new-account") (open-remote-account-creator))
               (else (texmacs-error "rc-widget" "no such dialog")))
         (display* "remote-check: opened " name "\n")))))
@@ -451,9 +457,9 @@
           (display* "remote-check: event " event " " msg "\n")))
   (with login (lambda (port)
                 (client-login-home "localhost" port user
-                                   (list 'tls-password pass)
+                                   (list rc-auth pass)
                                    (lambda args (noop))))
-    (login "6561")
+    (login rc-port)
     (with n 0
       (delayed
         (:while (< n 16))
@@ -462,7 +468,7 @@
         (when (nnull? (client-active-servers))
           (display* "remote-check: status "
                     (client-connection-status (rc-server)) "\n"))))
-    (delayed (:pause 85000) (login "6561"))
+    (delayed (:pause 85000) (login rc-port))
     (delayed (:pause 92000) (login "6599"))
     (delayed (:pause 110000)
       (display* "remote-check: lost " (client-lost-connections) "\n")
