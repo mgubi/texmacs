@@ -239,11 +239,16 @@
     <item>The remote tools (<menu|Tools|Remote tool>, then the
     <menu|Remote> menu) were checked against a <TeXmacs> server, from the
     browser and from the desktop version, alone and together in a chat room
-    and in a live document. Three corrections: the name asked by
+    and in a live document. The corrections: the name asked by
     <menu|Remote|Rename> has the width of its dialog (it showed a few
-    letters); the preferences of the server say whether the server has
-    <verbatim|rsync> (they showed an error); and the browser, which cannot
-    be a server, no longer offers <menu|Remote|Start server>.
+    letters), and its button <menu|Ok> takes the name as typed (it renamed
+    nothing unless Return was pressed in the field); the preferences of
+    the server say whether the server has <verbatim|rsync> (they showed an
+    error); the history of a remote file keeps a version saved again
+    within five seconds; the tabs of remote directories and of the lists
+    of chat rooms, shared resources and live documents have a title, not
+    their address; and the browser, which cannot be a server, no longer
+    offers <menu|Remote|Start server>.
 
     <item><menu|Download a backup> and <menu|Restore a backup...>, in the
     menu of <TeXmacs> <name|Vue>: all your files and your preferences in one
