@@ -612,6 +612,7 @@ bool in_title_bar= false; // laying out the title bar of a tool (its "x" is a cl
 int  section_bar= 0;
 bool section_active= false;
 bool layout_again= false; // see vue_widget.hpp
+bool layout_forget_sizes= false; // see vue_widget.hpp
 bool gui_needs_relayout= false; // see vue_widget.hpp
 
 // signalling
@@ -2384,11 +2385,17 @@ layout_menu (unsigned int id, array<widget> a, bool vert, uint16_t gap= 10) {
 // Containers grow along an axis only when one of their children does,
 // so that lists of labels keep their size while lists with a resizable
 // widget follow the window.
+static bool input_text_widget_fills (widget w); // defined below
+
 static bool
 widget_grows (widget w, bool horizontal) {
   vue_widget_rep* r= concrete (w).rep;
   if (r == NULL) return false;
   string t= r->type;
+  // an input whose width is in "w" fills the room it is given: the
+  // containers around it give it that room (in a refreshable of a row
+  // without glue, "Rename as:" of the remote files, it kept its minimum)
+  if (t == "input_text_widget") return horizontal && input_text_widget_fills (w);
   if (t == "simple_widget" || t == "user_canvas_widget" ||
       t == "hsplit_widget" || t == "vsplit_widget" ||
       t == "tabs_widget" || t == "icon_tabs_widget" ||
@@ -2738,6 +2745,9 @@ vue_ui_rep::do_layout () {
       Clay_ElementData r= Clay_GetElementData (probe_id ("aligned_widget_cell", id, 2*i+1));
       row_h[i]= max (l.found ? l.boundingBox.height : 0.0f,
                      r.found ? r.boundingBox.height : 0.0f);
+      // (measured at another drawing factor: a minimum would keep the rows
+      // as high as they were at the larger one)
+      if (layout_forget_sizes) row_h[i]= 0.0f;
       // a new widget: this pass is not aligned yet, ask for another one
       if (!l.found || !r.found) layout_again= true;
     }
@@ -4917,11 +4927,14 @@ vue_input_text_widget_rep::do_layout () {
   // Qt (qt_decode_length: of its size hint), not of the window: "10w", as
   // the passphrase of the wallet asks, was ten windows wide and pushed the
   // buttons of its dialog out of sight. It fills the room it is given, up
-  // to that width.
+  // to that width; all of it when the width is "1w" or less, the whole
+  // width asked for (the name of a remote file was cut at 75 points).
   if (!input_fill) {
     double w_len; string w_unit;
     parse_length (width, w_len, w_unit);
-    if (w_unit == "w")
+    if (w_unit == "w" && w_len <= 1.0)
+      sw= CLAY_SIZING_GROW (.min= ui_pxf (60));
+    else if (w_unit == "w")
       sw= CLAY_SIZING_GROW (.min= ui_pxf (60),
                             .max= (float) (w_len * ui_pxf (150)));
   }
@@ -5006,6 +5019,17 @@ string
 input_text_widget_string (widget w) {
   vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
   return (in != NULL) ? in->s : string ("");
+}
+
+// does this input_text_widget fill the room it is given (a width in "w",
+// see its do_layout)?
+static bool
+input_text_widget_fills (widget w) {
+  vue_input_text_widget_rep* in= dynamic_cast<vue_input_text_widget_rep*> (w.rep);
+  if (in == NULL) return false;
+  double w_len; string w_unit;
+  parse_length (in->width, w_len, w_unit);
+  return w_unit == "w";
 }
 
 // the value currently selected in an enum_widget

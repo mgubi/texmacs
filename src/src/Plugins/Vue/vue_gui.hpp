@@ -189,6 +189,7 @@ public:
   float density;
   int   retina;  // the factor the window is drawn at, at least 1
   float present; // device pixels per pixel of the layout (usually 1)
+  int   laid_out_retina; // the factor of its last layout (0: none yet)
   virtual void update_density () {} // the platform window knows it
   // windows are shown only once their size matches their contents, to avoid
   // flickering while a new window is sized (see set_visibility/process_layout)
@@ -202,7 +203,7 @@ public:
   vue_window_rep (vue_widget w, string _name, bool _popup= false)
   : id (serial++), name (_name), modified (false), orig_name (_name), content (w),
     clay_debug (false), popup (_popup), layout_w (0), layout_h (0),
-    density (1.0f), retina (1), present (1.0f),
+    density (1.0f), retina (1), present (1.0f), laid_out_retina (0),
     visible_requested (false), shown (false), ready_to_show (false),
     layout_passes (0), last_layout_time (0), transitions_active (false)
   { render_commands.length= 0; }
