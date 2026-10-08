@@ -71,10 +71,10 @@
   (get-env "color"))
 
 ;; The fonts as in the menu of the font of the document in the focus bar
-;; (document-short-font-menu: the fonts of text and mathematics, those of
-;; text only by kind, the selector for the others), set at the cursor. A
-;; submenu is expanded when it is opened and loses the arguments of its
-;; menu: one menu without arguments for each list.
+;; (document-short-font-menu: the fonts by design, in each submenu those
+;; with mathematics and those of text only, the selector for the others),
+;; set at the cursor. A submenu is expanded when it is opened and loses the
+;; arguments of its menu: one menu without arguments for each list.
 (define (footer-local-font? f) (== (get-env "font") f))
 
 (tm-menu (footer-math-text-serif-menu)
@@ -112,34 +112,44 @@
     ((check (eval (car p)) "*" (footer-local-font? (cadr p)))
      (make-with "font" (cadr p)))))
 
-(tm-menu (footer-text-font-menu)
-  ((check "Default" "*" (footer-local-font? (get-init "font")))
-   (make-with "font" (get-init "font")))
-  ---
-  (group "Text and mathematics")
+(tm-menu (footer-serif-font-menu)
+  (group "With mathematics")
   ((check "Roman" "*" (footer-local-font? "roman"))
    (make-with "font" "roman"))
   (if (font-exists-in-tt? "STIX-Regular")
       ((check "Stix" "*" (footer-local-font? "stix"))
        (make-with "font" "stix")))
-  (assuming (nnull? (opentype-math-font-group-list "Serif"))
-    (group "Serif text and mathematics")
-    (link footer-math-text-serif-menu))
-  (assuming (nnull? (opentype-math-font-group-list "Sans serif"))
-    (group "Sans serif text and mathematics")
-    (link footer-math-text-sans-menu))
-  (assuming (nnull? (opentype-math-font-group-list "Other"))
-    (-> "Other OpenType math fonts" (link footer-math-text-other-menu)))
-  ---
-  (group "Text only")
+  (link footer-math-text-serif-menu)
   (assuming (nnull? (text-font-list 'serif))
-    (-> "Serif" (link footer-text-serif-menu)))
+    ---
+    (group "Text only")
+    (link footer-text-serif-menu)))
+
+(tm-menu (footer-sans-font-menu)
+  (assuming (nnull? (opentype-math-font-group-list "Sans serif"))
+    (group "With mathematics")
+    (link footer-math-text-sans-menu))
+  (assuming (and (nnull? (opentype-math-font-group-list "Sans serif"))
+                 (nnull? (text-font-list 'sans)))
+    ---)
   (assuming (nnull? (text-font-list 'sans))
-    (-> "Sans serif" (link footer-text-sans-menu)))
+    (group "Text only")
+    (link footer-text-sans-menu)))
+
+(tm-menu (footer-text-font-menu)
+  ((check "Default" "*" (footer-local-font? (get-init "font")))
+   (make-with "font" (get-init "font")))
+  ---
+  (-> "Serif" (link footer-serif-font-menu))
+  (assuming (or (nnull? (opentype-math-font-group-list "Sans serif"))
+                (nnull? (text-font-list 'sans)))
+    (-> "Sans serif" (link footer-sans-font-menu)))
   (assuming (nnull? (text-font-list 'mono))
     (-> "Typewriter" (link footer-text-mono-menu)))
   (assuming (nnull? (text-font-list 'other))
     (-> "Decorative" (link footer-text-other-menu)))
+  (assuming (nnull? (opentype-math-font-group-list "Other"))
+    (-> "Other OpenType math fonts" (link footer-math-text-other-menu)))
   ---
   ("Other" (open-font-selector)))
 

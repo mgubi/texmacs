@@ -120,6 +120,7 @@
 (define-text-font "Andale" (family "Andale Mono") (menu "Andale Mono")
   (kind mono))
 (define-text-font "Courier New" (kind mono))
+(define-text-font "Inconsolatazi4" (menu "Inconsolata") (kind mono))
 (define-text-font "Menlo" (kind mono))
 (define-text-font "Monaco" (kind mono))
 (define-text-font "TeX Gyre Cursor" (menu "Cursor") (kind mono))
@@ -181,12 +182,40 @@
     ((check (eval (car p)) "*" (test-init-font? (cadr p)))
      (init-font (cadr p)))))
 
-(tm-menu (document-short-text-font-menu)
+;; The fonts by design: in each submenu the fonts which bring their
+;; mathematics along (the profiles of fonts-opentype.scm, with the
+;; traditional Roman and Stix among the serif ones), then those which
+;; change the text only
+(tm-menu (document-serif-font-menu)
+  (group "With mathematics")
+  ("Roman" (init-font "roman" "roman"))
+  (if (font-exists-in-tt? "STIX-Regular")
+      ("Stix" (init-font "stix" "math-stix")))
+  (link opentype-serif-font-menu)
   (assuming (nnull? (text-font-list 'serif))
-    (-> "Serif" (link text-font-serif-menu)))
+    ---
+    (group "Text only")
+    (link text-font-serif-menu)))
+
+(tm-menu (document-sans-font-menu)
+  (assuming (nnull? (opentype-math-font-group-list "Sans serif"))
+    (group "With mathematics")
+    (link opentype-sans-font-menu))
+  (assuming (and (nnull? (opentype-math-font-group-list "Sans serif"))
+                 (nnull? (text-font-list 'sans)))
+    ---)
   (assuming (nnull? (text-font-list 'sans))
-    (-> "Sans serif" (link text-font-sans-menu)))
+    (group "Text only")
+    (link text-font-sans-menu)))
+
+(tm-menu (document-short-design-font-menu)
+  (-> "Serif" (link document-serif-font-menu))
+  (assuming (or (nnull? (opentype-math-font-group-list "Sans serif"))
+                (nnull? (text-font-list 'sans)))
+    (-> "Sans serif" (link document-sans-font-menu)))
   (assuming (nnull? (text-font-list 'mono))
     (-> "Typewriter" (link text-font-mono-menu)))
   (assuming (nnull? (text-font-list 'other))
-    (-> "Decorative" (link text-font-other-menu))))
+    (-> "Decorative" (link text-font-other-menu)))
+  (assuming (nnull? (opentype-math-font-group-list "Other"))
+    (-> "Other OpenType math fonts" (link opentype-other-font-menu))))

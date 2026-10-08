@@ -252,8 +252,11 @@
   the <verbatim|text-file> if there is one).
   <scm|opentype-math-font-list> returns triples <verbatim|(label math
   text)> sorted by label, and <scm|opentype-math-font-group-list> those of
-  one section. <scm|opentype-font-menu>, which the font button of the focus
-  toolbar shows, has one section per group, each a menu without arguments
+  one section. The menu of the font button of the focus toolbar
+  (<scm|document-short-design-font-menu>) has a submenu for each design,
+  <menu|Serif>, <menu|Sans serif>, <menu|Typewriter> and
+  <menu|Decorative>: the first two list the fonts with mathematics of
+  their group, then the text fonts. Each list is a menu without arguments
   (<scm|opentype-serif-font-menu> and the others), since a submenu is
   expanded after its parent and a menu with arguments has lost them by
   then. <scm|opentype-math-font-menu> appends the installed math fonts to
