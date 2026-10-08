@@ -19,6 +19,10 @@
 #     pre-release maxs-latest of the repository, replaced at each build
 #     (its tag moved to the commit built):
 #     https://github.com/<owner>/<repo>/releases/tag/maxs-latest
+#   * qt: the Qt 6 interface, with S7, for Apple silicon and the libraries
+#     of Homebrew (the job of ci.yml): built, the regression suites run,
+#     and TeXmacs.app (deployed with macdeployqt) kept as an artifact of
+#     the run. It is on its own: not in the disk images nor in the release.
 #
 # The applications are signed ad hoc and not notarized: Gatekeeper rejects
 # them on another machine until the quarantine is removed,
@@ -29,7 +33,7 @@
 #   git push -f origin maxs_texmacs:maxs_ci
 # (or by hand, from the Actions tab, on any branch)
 
-name: macOS (maxs_texmacs, Cocoa and Vue)
+name: macOS (maxs_texmacs, Cocoa, Vue and Qt)
 
 on:
   push:
@@ -206,6 +210,47 @@ jobs:
           name: snapshots-${{ matrix.gui }}
           path: distr/snapshots
           if-no-files-found: ignore
+
+  qt:
+    name: macOS (Apple silicon, Qt 6)
+    runs-on: macos-14
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install qt freetype libpng jpeg gnutls sqlite
+
+      - name: Configure
+        run: |
+          B=$(brew --prefix)
+          ./configure --with-scheme=s7 \
+            QMAKE="$(brew --prefix qt)/bin/qmake" \
+            CPPFLAGS="-I$(brew --prefix libpng)/include/libpng16 -I$B/include" \
+            LDFLAGS="-L$(brew --prefix libpng)/lib -L$B/lib"
+
+      - name: Build
+        run: make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Run the regression suites
+        run: ../.github/scripts/run-tests.sh TeXmacs/bin/texmacs.bin
+
+      - name: Bundle
+        run: |
+          # bundle-libs.sh does not handle Homebrew's /opt/homebrew, so the
+          # libraries, frameworks and plugins are deployed with macdeployqt
+          make MACOS_BUNDLE MACOS_DEPLOY=none
+          "$(brew --prefix qt)/bin/macdeployqt" ../distr/TeXmacs.app
+          ditto -c -k --keepParent ../distr/TeXmacs.app texmacs-qt-macos-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: texmacs-qt-macos-arm64
+          path: src/texmacs-qt-macos-arm64.zip
+          retention-days: 14
 
   release:
     needs: dmg
