@@ -54,7 +54,7 @@
           '(markdown (a (@ (href "u") (title "T")) "t") " "
                      (a (@ (href "http://a.b")) "http://a.b") " "
                      (a (@ (href "https://c.d/e")) "https://c.d/e") ". "
-                     (img (@ (src "i.png") (alt "alt")))))
+                     (img (@ (src "i.png") (alt "alt")) "alt")))
   (check= (parse "[a][r] [r]\n\n[r]: http://x.y")
           '(markdown (a (@ (href "http://x.y")) "a") " "
                      (a (@ (href "http://x.y")) "r")))
@@ -179,18 +179,16 @@
   (check= (import "[t](u)") '(hlink "t" "u"))
   (check= (import "<https://x.y>") '(hlink "https://x.y" "https://x.y"))
   (check= (import "![](i.png)") '(image "i.png" "" "" "" ""))
-  ;; the title of a link and the text of an image have their tags
-  (check= (import "[t](u \"The title\")") '(hlink* "t" "u" "The title"))
-  (check= (import "![alt text](i.png)")
-          '(alt-text (image "i.png" "" "" "" "") "alt text"))
-  ;; the sizes of an image: the attributes of Pandoc, or the tag of HTML
-  (check= (import "![a](i.png){width=50%}")
-          '(alt-text (image "i.png" "0.5par" "" "" "") "a"))
-  (check= (import "![](i.png){width=300px height=2cm}")
-          '(image "i.png" "300px" "2cm" "" ""))
-  (check= (import "<img src=\"i.png\" alt=\"The logo\" width=\"36\">")
-          '(alt-text (image "i.png" "36px" "" "" "") "The logo"))
-  (check= (import "<a href=\"u\" title=\"T\">t</a>") '(hlink* "t" "u" "T"))
+  ;; the title of a link has no tag: it is dropped
+  (check= (import "[t](u \"The title\")") '(hlink "t" "u"))
+  ;; an image in a text: its description is dropped, its sizes are kept
+  ;; (the attributes of Pandoc, or the tag of HTML)
+  (check= (import "x ![alt](i.png) y")
+          '(concat "x " (image "i.png" "" "" "" "") " y"))
+  (check= (import "x ![](i.png){width=300px height=2cm}")
+          '(concat "x " (image "i.png" "300px" "2cm" "" "")))
+  (check= (import "## <img src=\"i.png\" alt=\"The logo\" width=\"36\"> T")
+          '(subsection (concat (image "i.png" "36px" "" "" "") " T")))
   (check= (import "a  \nb") '(concat "a" (next-line) "b"))
   (check= (import "x[^n]\n\n[^n]: note") '(concat "x" (footnote "note")))
   ;; the formulas go through the LaTeX converter, HTML through the HTML one
@@ -201,6 +199,25 @@
   ;; the text is UTF-8, the tree is in the encoding of TeXmacs
   (check= (import (string-append "caf" (bytes 195 169) " \\<y\\> &copy;"))
           (string-append "caf" (bytes 233) " <less>y<gtr> <copyright>")))
+
+;; An image alone in its paragraph, with a description or a title, is a
+;; figure with this caption, as for Pandoc.
+(define (test-import-figures)
+  (check-group "import figures")
+  (check= (import "![alt text](i.png)")
+          '(big-figure (image "i.png" "" "" "" "") "alt text"))
+  (check= (import "![a](i.png \"The title\")")
+          '(big-figure (image "i.png" "" "" "" "") "The title"))
+  (check= (import "![a *b* $x^2$](i.png){width=50%}")
+          '(big-figure (image "i.png" "0.5par" "" "" "")
+                       (concat "a " (em "b") " "
+                               (math (concat "x" (rsup "2"))))))
+  (check= (import "<img src=\"i.png\" alt=\"The logo\" width=\"36\">")
+          '(big-figure (image "i.png" "36px" "" "" "") "The logo"))
+  (check= (import "para\n\n![cap](i.png)\n\nmore")
+          '(document "para" (big-figure (image "i.png" "" "" "" "") "cap")
+                     "more"))
+  (check= (import "![](i.png)") '(image "i.png" "" "" "" "")))
 
 ;; The first level of headings of a text is the sections.
 (define (test-import-blocks)
@@ -288,12 +305,6 @@
   (check= (export '(hlink "a b" "u v(w)")) "[a b](<u v(w)>)")
   (check= (export '(href "http://a.b")) "<http://a.b>")
   (check= (export '(image "i.png" "" "" "" "")) "![](i.png)")
-  (check= (export '(alt-text (image "i.png" "" "" "" "") "alt text"))
-          "![alt text](i.png)")
-  (check= (export '(alt-text "text" "alt")) "text")
-  (check= (export '(hlink* "t" "u" "The \"title\""))
-          "[t](u \"The \\\"title\\\"\")")
-  (check= (export '(hlink* "t" "u" "")) "[t](u)")
   (check= (export '(concat "a" (next-line) "b")) "a\\\nb")
   (check= (export '(concat "a" (footnote "note") "b")) "a[^1]b\n\n[^1]: note\n")
   (check= (export '(with "color" "red" "r")) "r")
@@ -323,6 +334,31 @@
     (check= (export '(marked "m")) "<mark>m</mark>")
     (check= (export '(marked "m") off) "m")))
 
+;; A figure which is a single image is this image, with the caption as its
+;; description; the other figures are followed by their caption.
+(define (test-export-figures)
+  (check-group "export figures")
+  (check= (export '(big-figure (image "i.png" "" "" "" "") "The caption"))
+          "![The caption](i.png)\n")
+  (check= (export '(small-figure (image "i.png" "" "" "" "")
+                                 (concat "A " (em "nice") " one")))
+          "![A *nice* one](i.png)\n")
+  (check= (export '(render-big-figure "figure" "Figure 1"
+                                      (image "i.png" "" "" "" "") "cap"))
+          "![cap](i.png)\n")
+  (check= (export '(big-figure (image "i.png" "" "" "" "")
+                               (document (concat (label "l") "cap"))))
+          "![cap](i.png)\n")
+  (check= (export '(big-figure (image "i.png" "" "" "" "") "")) "![](i.png)\n")
+  (check= (export '(big-figure (image "i.png" "" "" "" "") "see [1]"))
+          "![see [1]](i.png)\n")
+  (check= (export '(big-figure (image "i.png" "" "" "" "") "a ] b"))
+          "![a \\] b](i.png)\n")
+  (check= (export '(big-figure (concat (image "a.png" "" "" "" "")
+                                       (image "b.png" "" "" "" ""))
+                               "two"))
+          "![](a.png)![](b.png)\n\n**Figure.** two\n"))
+
 ;; An image with a size is the tag of HTML: pixels, or percents for a part
 ;; of the paragraph; the lengths which depend on the image are dropped.
 (define (test-export-image-sizes)
@@ -331,18 +367,13 @@
           "<img src=\"i.png\" alt=\"\" width=\"36\">")
   (check= (export '(image "i.png" "0.5par" "2cm" "" ""))
           "<img src=\"i.png\" alt=\"\" width=\"50%\" height=\"76\">")
-  (check= (export '(alt-text (image "i.png" "36px" "" "" "") "a \"b\" <c>"))
-          "<img src=\"i.png\" alt=\"a &quot;b&quot; &lt;c>\" width=\"36\">")
+  (check= (export '(big-figure (image "i.png" "36px" "" "" "")
+                               (concat "a \"b\" " (em "c"))))
+          "<img src=\"i.png\" alt=\"a &quot;b&quot; c\" width=\"36\">\n")
   (check= (export '(image "i.png" "0.6383w" "" "" "")) "![](i.png)")
-  (check= (export '(alt-text (image "i.png" "36px" "" "" "") "alt")
+  (check= (export '(big-figure (image "i.png" "36px" "" "" "") "alt")
                   (cons "texmacs->markdown:html" "off"))
-          "![alt](i.png)")
-  ;; and through HTML
-  (check= (convert '(alt-text (image "i.png" "36px" "" "" "") "The logo")
-                   "texmacs-stree" "html-snippet")
-          "<img alt=\"The logo\" class=\"image\" src=\"i.png\" width=\"36\"></img>")
-  (check= (convert '(hlink* "t" "u" "T") "texmacs-stree" "html-snippet")
-          "<a href=\"u\" title=\"T\">t</a>"))
+          "![alt](i.png)\n"))
 
 (define (test-export-math)
   (check-group "export math")
@@ -437,9 +468,8 @@
   '("plain"
     "x *a* **b** ~~c~~ `d`"
     "[t](u) and <https://x.y>"
-    "[t](u \"The title\") and ![alt text](i.png)"
-    "<img src=\"i.png\" alt=\"The logo\" width=\"36\">"
-    "<img src=\"i.png\" alt=\"\" width=\"50%\" height=\"20\">"
+    "a\n\n![cap](i.png)\n\nb\n"
+    "x <img src=\"i.png\" alt=\"\" width=\"50%\" height=\"20\"> y"
     "a\\\nb"
     "$x^2$ and \\$5"
     "# A\n\ntext\n\n## B\n\nmore\n"
@@ -460,10 +490,10 @@
   '("plain"
     (concat "x " (em "a") " " (strong "b") " " (verbatim "c"))
     (hlink "t" "u")
-    (hlink* "t" "u" "The title")
-    (alt-text (image "i.png" "" "" "" "") "alt text")
-    (alt-text (image "i.png" "36px" "" "" "") "The logo")
-    (image "i.png" "0.5par" "20px" "" "")
+    (big-figure (image "i.png" "" "" "" "") "alt text")
+    (big-figure (image "i.png" "" "" "" "") (concat "The " (em "logo")))
+    (big-figure (image "i.png" "36px" "" "" "") "The logo")
+    (concat "x " (image "i.png" "0.5par" "20px" "" "") " y")
     (math (concat "x" (rsup "2")))
     (document (section "S") "text" (subsection "T") "more")
     (itemize (document (concat (item) "a") (concat (item) "b")))
@@ -478,12 +508,17 @@
   (check-group "round trips")
   (for-each (lambda (s) (check= (export (import s)) s)) md-same)
   (for-each (lambda (t) (check= (import (export t)) t)) tm-same)
+  ;; a figure alone is a paragraph, which ends its line
+  (for-each (lambda (s) (check= (export (import s)) s))
+            '("![alt *text*](i.png)\n"
+              "<img src=\"i.png\" alt=\"The logo\" width=\"36\">\n"))
   ;; the parser and the serializer alone
   (for-each (lambda (s) (check= (write-md (parse s)) s)) md-same)
   (for-each (lambda (s) (check= (parse (write-md (parse s))) (parse s)))
             '("*a* **b** ***c***" "- a\n\n- b" "3. a\n4. b"
               "> q\n>\n> - l" "<div>\nhtml\n</div>" "    code\n    more"
-              "[t](u \"T\") ![alt](i.png)")))
+              "[t](u \"T\") ![alt](i.png)"
+              "<img src=\"i.png\" alt=\"a\" width=\"36\">")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format
@@ -521,10 +556,12 @@
   (test-serialize)
   (test-serialize-escapes)
   (test-import-inline)
+  (test-import-figures)
   (test-import-blocks)
   (test-import-document)
   (test-export-inline)
   (test-export-html)
+  (test-export-figures)
   (test-export-image-sizes)
   (test-export-math)
   (test-export-blocks)

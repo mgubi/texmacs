@@ -303,13 +303,8 @@
 		   a 'name (htmltm-args-serial env c))))))
 
 (define (htmltm-href->hlink a body)
-  ;; a link with a title is hlink*
-  (let ((href (shtml-attr-non-null a 'href))
-        (title (shtml-attr-non-null a 'title)))
-    (cond ((not href) body)
-          ((and title (!= title ""))
-           `(hlink* ,body ,(xmltm-url-text href) ,(xmltm-url-text title)))
-          (else `(hlink ,body ,(xmltm-url-text href))))))
+  (let ((href (shtml-attr-non-null a 'href)))
+    (if href `(hlink ,body ,(xmltm-url-text href)) body)))
 
 (define (htmltm-dimension attrs name)
   (let ((s (shtml-attr-non-null attrs name)))
@@ -326,16 +321,11 @@
   (let* ((s (xmltm-url-text (or (shtml-attr-non-null a 'src) "")))
 	 (w (tmlength->string (htmltm-dimension a 'width)))
 	     (h (tmlength->string (htmltm-dimension a 'height))))
-    (let ((im (if (not (and (string-null? w) (string-null? h)))
-		  `(image ,s ,w ,h "" "")
-		  `(image ,s "0.6383w" "" "" "")))
-	  (alt (shtml-attr-non-null a 'alt)))
-      ;; the text in the place of the image is kept around it
-      (list (xmltm-label-decorate
-	     a 'id
-	     (if (and alt (!= alt ""))
-		 `(alt-text ,im ,(xmltm-url-text alt))
-		 im))))))
+    (list (xmltm-label-decorate
+	   a 'id
+	   (if (not (and (string-null? w) (string-null? h)))
+	       `(image ,s ,w ,h "" "")
+	       `(image ,s "0.6383w" "" "" ""))))))
 
 (define (htmltm-font env a c)
   ;; WARNING: do as old filter, but is fragile and not conformant

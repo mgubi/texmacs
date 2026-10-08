@@ -341,24 +341,6 @@
             body
             `((a (@ (href ,url)) ,@(tmmd-merge body)))))))
 
-(define (tmmd-hlink* l)
-  ;; a link with a title
-  (let ((r (tmmd-hlink l))
-        (title (if (< (length l) 3) "" (tmmd-plain (caddr l)))))
-    (if (and (list-1? r) (func? (car r) 'a) (!= title ""))
-        `((a (@ ,@(cdadar r) (title ,title)) ,@(cddar r)))
-        r)))
-
-(define (tmmd-alt-text l)
-  ;; an image with a text in its place; anything else is itself
-  (if (< (length l) 2) (tmmd-all l)
-      (let ((r (tmmd (car l)))
-            (alt (tmmd-plain (cadr l))))
-        (if (and (list-1? r) (func? (car r) 'img))
-            `((img (@ ,@(list-filter (cdadar r) (lambda (a) (!= (car a) 'alt)))
-                      (alt ,alt))))
-            r))))
-
 (define (tmmd-size x)
   ;; the width or the height of an image as HTML has them: pixels, or a
   ;; percentage for a part of the paragraph; #f for the other lengths
@@ -665,17 +647,37 @@
          (s (if (string-ends? s "*") (substring s 0 (- (string-length s) 1)) s)))
     (tmmd-titled (list (upcase-first s)) (tmmd-all l))))
 
+(define (tmmd-image-figure body caption)
+  ;; a figure which is a single image is this image, with the caption as
+  ;; its description: ![caption](file); #f for the other figures
+  (let* ((inside (lambda (l)
+                   ;; the text of a single paragraph
+                   (with l (tmmd-trim l)
+                     (if (and (list-1? l) (func? (car l) 'p))
+                         (tmmd-trim (cdar l))
+                         l))))
+         (b (inside body))
+         (c (inside caption)))
+    (and (list-1? b) (func? (car b) 'img) (not (tmmd-has-block? c))
+         `((p (img ,(cadar b) ,@c))))))
+
 (define (tmmd-render-figure l)
   ;; the type, the name with its number, the figure and its caption
   (if (< (length l) 4) (tmmd-all l)
-      (append (tmmd-blocks (tmmd (caddr l)))
-              (tmmd-titled (tmmd (cadr l)) (tmmd (cadddr l))))))
+      (let ((body (tmmd (caddr l)))
+            (caption (tmmd (cadddr l))))
+        (or (tmmd-image-figure body caption)
+            (append (tmmd-blocks body)
+                    (tmmd-titled (tmmd (cadr l)) caption))))))
 
 (define (tmmd-figure name l)
   ;; a figure which was not expanded: the figure and its caption
   (if (< (length l) 2) (tmmd-all l)
-      (append (tmmd-blocks (tmmd (car l)))
-              (tmmd-titled (list name) (tmmd (cadr l))))))
+      (let ((body (tmmd (car l)))
+            (caption (tmmd (cadr l))))
+        (or (tmmd-image-figure body caption)
+            (append (tmmd-blocks body)
+                    (tmmd-titled (list name) caption))))))
 
 (define (tmmd-big-figure l) (tmmd-figure "Figure" l))
 (define (tmmd-big-table l) (tmmd-figure "Table" l))
@@ -910,8 +912,6 @@
   (TeX tmmd-TeX)
   (LaTeX tmmd-LaTeX)
   ((:or hlink hyper-link) tmmd-hlink)
-  (hlink* tmmd-hlink*)
-  (alt-text tmmd-alt-text)
   (action tmmd-first)
   ((:or href slink) tmmd-href)
   (image tmmd-image)

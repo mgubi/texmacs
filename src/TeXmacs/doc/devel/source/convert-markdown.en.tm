@@ -71,7 +71,10 @@
     <verbatim|href> and <verbatim|title> for the links, <verbatim|src>,
     <verbatim|alt>, <verbatim|title>, <verbatim|width> and
     <verbatim|height> for the images (the sizes as in <name|HTML>:
-    <verbatim|300>, <verbatim|50%>, or with a unit).
+    <verbatim|300>, <verbatim|50%>, or with a unit). The children of
+    <verbatim|img> are its description, of which <verbatim|alt> is the
+    plain text; the tag <verbatim|img> of <name|HTML> is read as this
+    node too (<scm|md-html-image>).
   </description>
 
   A snippet of a single paragraph is the list of its nodes, without the
@@ -114,11 +117,12 @@
   <scm|markdown-\<gtr\>texmacs> maps the blocks and the text to the tags of
   the standard styles: the sections, <markup|itemize> and
   <markup|enumerate>, <markup|quotation>, <markup|hrule>, <markup|block>
-  for the tables, <markup|hlink>, <markup|image>, <markup|footnote>. A link
-  with a title is <markup|hlink*> and an image with a text is inside an
-  <markup|alt-text>, two macros of <verbatim|std-markup> which are typeset
-  as their first argument and which the converters for <name|HTML> know
-  too; the sizes of an image are its width and height (<scm|mdtm-size>). The
+  for the tables, <markup|hlink>, <markup|image>, <markup|footnote>. An image
+  alone in its paragraph, with a description or a title, is a
+  <markup|big-figure> with this caption (<scm|mdtm-figure>), as
+  <name|Pandoc> does; the sizes of an image are its width and height
+  (<scm|mdtm-size>). The title of a link has no place in <markup|hlink>
+  and is dropped. The
   language of a fence selects a tag <markup|<em|lang>-code> by the table
   <scm|mdtm-languages>. Formulas are given to the converter of <LaTeX>
   (<verbatim|latex-snippet>) and <name|HTML> to the one of <name|HTML>
@@ -182,6 +186,10 @@
     wrapped in tags of <name|HTML>, as <scm|(html "text")> nodes, with the
     option <verbatim|html>, and is plain text without it.
 
+    <item>A figure which is a single image is this image with the caption
+    as its children (<scm|tmmd-image-figure>), written
+    <verbatim|![caption](file)>.
+
     <item>An image with a width or a height gets them as attributes
     (<scm|tmmd-size>: pixels or percents), and the serializer then writes
     the tag <verbatim|img> of <name|HTML>; without the option
@@ -230,7 +238,9 @@
   <section|Known limitations>
 
   <\itemize>
-    <item>The title of an image is not kept by the import.
+    <item>The title of a link and the description of an image inside a
+    text are not kept by the import; the number of a figure which is a
+    single image is not written.
 
     <item>The drawings of <TeXmacs> are not exported.
 

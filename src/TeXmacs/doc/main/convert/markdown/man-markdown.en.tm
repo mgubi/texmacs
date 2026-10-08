@@ -60,12 +60,15 @@
     <item*|Text>Emphasized, strong and struck through text, code, links,
     images, line breaks, the entities of <name|Html>.
 
-    <item*|Links and images>A link with a title,
-    <verbatim|[text](address "title")>, is a <markup|hlink*>, which keeps
-    the title. The text of an image, <verbatim|![text](file.png)>, is kept
-    by an <markup|alt-text> around the image. An image may have a size, as
-    for <name|Pandoc>, <verbatim|![text](file.png){width=50%}>, or with the
-    tag of <name|Html>, <verbatim|\<less\>img src="file.png" width="300"\<gtr\>>.
+    <item*|Images and figures>An image alone in its paragraph, with a
+    description, <verbatim|![description](file.png)>, is a figure whose
+    caption is this description (or its title,
+    <verbatim|![...](file.png "title")>, when it has one), as for
+    <name|Pandoc>. An image inside a text is the image alone. An image may
+    have a size, with the attributes of <name|Pandoc>,
+    <verbatim|![...](file.png){width=50%}>, or with the tag of
+    <name|Html>, <verbatim|\<less\>img src="file.png" width="300"\<gtr\>>.
+    The title of a link, <verbatim|[text](address "title")>, is dropped.
 
     <item*|Lists>With bullets or numbers, nested, with several paragraphs in
     an item; the task lists (<verbatim|- [ ]> and <verbatim|- [x]>) get a
@@ -101,8 +104,8 @@
     <menu|Edit|Preferences|Convert|Markdown> says otherwise; the abstract
     follows as a paragraph.
 
-    <item*|Theorems, proofs, figures>Their name and number in bold, then
-    their body; a figure or a table is followed by its caption.
+    <item*|Theorems, proofs, tables>Their name and number in bold, then
+    their body; a table is followed by its caption.
 
     <item*|Mathematics>Formulas in <LaTeX>, with <verbatim|\\tag> for the
     numbered equations.
@@ -111,11 +114,12 @@
     header. Their cells are single lines: the paragraphs of a cell are
     joined.
 
-    <item*|Links and images>The title of an <markup|hlink*> and the text of
-    an <markup|alt-text> around an image are written with them. An image
-    with a width or a height is written as the tag <verbatim|img> of
-    <name|Html>, since <name|Markdown> has no sizes: in pixels, or in
-    percents for a part of the width of the paragraph.
+    <item*|Figures>A figure which is a single image is written as this
+    image, with the caption as its description:
+    <verbatim|![caption](file.png)>. The other figures are followed by
+    their caption. An image with a width or a height is written as the tag
+    <verbatim|img> of <name|Html>, since <name|Markdown> has no sizes: in
+    pixels, or in percents for a part of the width of the paragraph.
 
     <item*|Images>The images which are files keep their name. Those which
     are inside the document are saved beside the file which is written:

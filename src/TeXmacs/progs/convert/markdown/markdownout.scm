@@ -169,6 +169,32 @@
             "<" "&lt;")
           "\""))))
 
+(define (mdout-plain l)
+  ;; the text of nodes, without their markup
+  (apply string-append
+         (map (lambda (x)
+                (cond ((string? x) x)
+                      ((func? x 'br) " ")
+                      ((pair? x) (mdout-plain (mdout-children x)))
+                      (else "")))
+              l)))
+
+(define (mdout-balanced s)
+  ;; the description of an image ends at the first ] which closes no [:
+  ;; a text whose brackets do not match gets all of them escaped
+  (let loop ((l (string->list s)) (depth 0) (esc? #f))
+    (cond ((null? l)
+           (if (== depth 0) s
+               (string-replace (string-replace s "[" "\\[") "]" "\\]")))
+          (esc? (loop (cdr l) depth #f))
+          ((char=? (car l) #\\) (loop (cdr l) depth #t))
+          ((char=? (car l) #\[) (loop (cdr l) (+ depth 1) #f))
+          ((char=? (car l) #\])
+           (if (== depth 0)
+               (string-replace (string-replace s "[" "\\[") "]" "\\]")
+               (loop (cdr l) (- depth 1) #f)))
+          (else (loop (cdr l) depth #f)))))
+
 (define (mdout-spaced open close l cell?)
   ;; emphasis does not start or end with a space: the spaces go outside
   (let* ((s (mdout-inlines l cell?))
@@ -209,11 +235,19 @@
                    ;; Markdown has no sizes: the tag of HTML
                    (string-append
                      "<img"
-                     (mdout-html-attr x 'src) (mdout-html-attr x 'alt)
+                     (mdout-html-attr x 'src)
+                     (mdout-html-attr
+                       `(img (@ (alt ,(if (null? l) (or (mdout-attr x 'alt) "")
+                                          (mdout-plain l)))))
+                       'alt)
                      (mdout-html-attr x 'title) (mdout-html-attr x 'width)
                      (mdout-html-attr x 'height) ">")
+                   ;; the description: the children, or else the text alt
                    (string-append
-                     "![" (mdout-escape (or (mdout-attr x 'alt) "") cell?)
+                     "![" (mdout-balanced
+                            (if (null? l)
+                                (mdout-escape (or (mdout-attr x 'alt) "") cell?)
+                                (mdout-inlines l cell?)))
                      "](" (mdout-url (or (mdout-attr x 'src) ""))
                      (mdout-title (mdout-attr x 'title)) ")")))
               ((br) (if cell? "<br>" "\\\n"))

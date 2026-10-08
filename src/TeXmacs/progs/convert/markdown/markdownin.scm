@@ -31,7 +31,8 @@
 ;; A node may have attributes, (tag (@ (name "value")...) ...): start and
 ;; loose for the lists, checked for the items of task lists, lang for pre,
 ;; align for th and td, href and title for a, src, alt, title, width and
-;; height for img (the sizes as in HTML or CSS: 300, 50%, 2cm).
+;; height for img (the sizes as in HTML or CSS: 300, 50%, 2cm). The
+;; children of img are its description, of which alt is the plain text.
 ;;
 ;; The blocks are parsed first, the text of the paragraphs, headings and
 ;; cells afterwards: a link may refer to a definition which follows it.
@@ -886,9 +887,12 @@
 
 (define (md-make-link image? inner url title)
   (if image?
-      `(img (@ (src ,url)
-               (alt ,(md-plain-text (md-inlines inner)))
-               ,@(if (== title "") '() `((title ,title)))))
+      ;; the description is kept as text too: it may be a caption
+      (with l (md-inlines inner)
+        `(img (@ (src ,url)
+                 (alt ,(md-plain-text l))
+                 ,@(if (== title "") '() `((title ,title))))
+              ,@l))
       `(a (@ (href ,url) ,@(if (== title "") '() `((title ,title))))
           ,@(md-inlines inner))))
 
@@ -909,7 +913,8 @@
     (if (not (or w h)) (cons x i)
         (cons `(img (@ ,@(cdadr x)
                        ,@(if w `((width ,w)) '())
-                       ,@(if h `((height ,h)) '())))
+                       ,@(if h `((height ,h)) '()))
+                    ,@(cddr x))
               (+ e 1)))))
 
 (define (md-link s i image?)
@@ -996,6 +1001,44 @@
   '("br" "hr" "img" "input" "meta" "link" "wbr" "area" "base" "col" "embed"
     "source" "track"))
 
+(define (md-html-attributes s)
+  ;; the attributes of a tag of HTML, from the text after its name
+  (let ((n (string-length s)))
+    (let loop ((i 0) (acc '()))
+      (let* ((i (let skip ((i i))
+                  (if (and (< i n) (or (md-space? (string-ref s i))
+                                       (in? (string-ref s i) '(#\newline #\/))))
+                      (skip (+ i 1)) i)))
+             (j (let name ((j i))
+                  (if (and (< j n) (not (md-space? (string-ref s j)))
+                           (not (in? (string-ref s j) '(#\= #\newline #\/))))
+                      (name (+ j 1)) j))))
+        (cond ((or (>= i n) (== j i)) (reverse acc))
+              ((and (< j n) (char=? (string-ref s j) #\=))
+               (let* ((q (and (< (+ j 1) n) (string-ref s (+ j 1))))
+                      (quoted? (and q (in? q '(#\" #\'))))
+                      (a (if quoted? (+ j 2) (+ j 1)))
+                      (b (if quoted?
+                             (or (md-find s a q) n)
+                             (let val ((b a))
+                               (if (and (< b n) (not (md-space? (string-ref s b))))
+                                   (val (+ b 1)) b)))))
+                 (loop (min n (if quoted? (+ b 1) b))
+                       (cons (list (string->symbol (locase-all (substring s i j)))
+                                   (md-unescape (substring s a b)))
+                             acc))))
+              (else (loop j acc)))))))
+
+(define (md-html-image s)
+  ;; the image of the tag img, from the text after its name
+  (let* ((l (md-html-attributes s))
+         (get (lambda (key) (with a (assoc key l) (if a (cadr a) ""))))
+         (opt (lambda (key)
+                (if (== (get key) "") '() `((,key ,(get key)))))))
+    `(img (@ (src ,(get 'src)) (alt ,(get 'alt))
+             ,@(opt 'title) ,@(opt 'width) ,@(opt 'height))
+          ,@(if (== (get 'alt) "") '() (list (get 'alt))))))
+
 (define (md-inline-html s i)
   ;; (node . end) for the tag which starts at i, with what it encloses when
   ;; it is closed further on, or #f
@@ -1026,10 +1069,15 @@
                          (c (and (not closing?) (not (in? name md-void-tags))
                                  (not (char=? (string-ref s (- e 1)) #\/))
                                  (md-search (locase-all s) (+ e 1) close))))
-                    (if c
+                    (cond
+                      ;; an image is the same as ![...](...), with its sizes
+                      ((and (== name "img") (not closing?))
+                       (cons (md-html-image (substring s j e)) (+ e 1)))
+                      (c
                         (cons `(html ,(substring s i (+ c (string-length close))))
-                              (+ c (string-length close)))
-                        (cons `(html ,(substring s i (+ e 1))) (+ e 1)))))))
+                              (+ c (string-length close))))
+                      (else
+                        (cons `(html ,(substring s i (+ e 1))) (+ e 1))))))))
           (else #f))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

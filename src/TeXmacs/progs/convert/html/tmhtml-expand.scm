@@ -48,7 +48,7 @@
              html-javascript html-javascript-src html-video
 	     web-title tmdoc-title tmdoc-flag tmdoc-license
 	     tmdoc-title* tmdoc-title** tmdoc-copyright
-	     hlink hlink* alt-text action hyper-link
+	     hlink action hyper-link
              mouse-over-balloon mouse-over-balloon*
              hover-balloon hover-balloon*
              popup-balloon popup-balloon*))
