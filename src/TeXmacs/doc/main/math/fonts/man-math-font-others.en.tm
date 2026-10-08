@@ -20,18 +20,6 @@
 
   <section|Fonts <TeXmacs> knows>
 
-  <paragraph*|DejaVu>
-
-  A mathematical companion of the DejaVu fonts, wide and very legible on the screen, in the style of the <name|TeX Gyre> fonts. Text: DejaVu Serif; mathematics: TeX Gyre DejaVu Math, with 67% of the symbols. Where to find it: <verbatim|tex-gyre-math> and <verbatim|dejavu> in <TeX> Live; the DejaVu fonts come with most <name|Linux> systems. Once installed, it appears in the section <menu|Serif text and mathematics> of the font menu.
-
-  <\with|font|DejaVu>
-    Text in <em|italic> and <strong|bold>: the quick brown fox, 0123456789.
-
-    <\equation*>
-      <big|int><rsub|0><rsup|\<infty\>>e<rsup|-x<rsup|2>>*\<mathd\>x=<frac|<sqrt|\<pi\>>|2>,<space|2em><big|sum><rsub|n=1><rsup|\<infty\>><frac|1|n<rsup|2>>=<frac|\<pi\><rsup|2>|6>,<space|2em>\<alpha\>\<beta\>\<gamma\>,<space|1em>\<bbb-R\><rsup|n>,<space|1em>\<cal-F\>
-    </equation*>
-  </with>
-
   <paragraph*|XITS>
 
   A Times design derived from the first STIX fonts, with a bold mathematical font and right to left mathematics; STIX Two, which comes with <TeXmacs>, has superseded it. Text: XITS; mathematics: XITS Math, with 99% of the symbols. Where to find it: <verbatim|xits> in <TeX> Live. Once installed, it appears in the submenu <menu|Other OpenType math fonts> of the font menu.

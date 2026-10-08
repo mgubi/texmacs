@@ -48,6 +48,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-text-font "Alegreya")
+(define-text-font "Antykwa Poltawskiego")
+(define-text-font "Antykwa Torunska")
 (define-text-font "Baskerville")
 (define-text-font "Cardo")
 (define-text-font "Charter")
@@ -59,6 +61,7 @@
 (define-text-font "Erewhon")
 (define-text-font "Essays1743" (file "Essays1743"))
 (define-text-font "Garamond")
+(define-text-font "Gentium Plus")
 (define-text-font "Georgia")
 (define-text-font "Hoefler Text")
 (define-text-font "IBM Plex" (family "IBM Plex Serif"))
@@ -96,6 +99,8 @@
 (define-text-font "Gill" (family "Gill Sans") (menu "Gill Sans") (kind sans))
 (define-text-font "Helvetica" (kind sans))
 (define-text-font "Inter" (kind sans))
+(define-text-font "Iwona" (kind sans))
+(define-text-font "Kurier" (kind sans))
 (define-text-font "Lato" (kind sans))
 (define-text-font "Linux Biolinum" (kind sans))
 (define-text-font "Lucida Grande" (kind sans))

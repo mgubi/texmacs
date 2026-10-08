@@ -279,6 +279,15 @@
 ;; Text fonts without mathematics: a profile with companions only (no file,
 ;; so that it is not offered in the menus of math fonts), for the typewriter
 ;; text of a font which has no monospaced face of its own; otherwise the
-;; closest monospaced font is taken, Linux Libertine Mono for Palatino
-(define-math-font-profile "Palatino"
-  (mono "Inconsolatazi4, TeX Gyre Cursor"))
+;; closest monospaced font is taken, Linux Libertine Mono for Palatino.
+;; The names are those of the menu of text fonts (font-short-menu.scm); the
+;; families with a monospaced face of their own (DejaVu, IBM Plex, Noto, PT,
+;; Liberation, Fira, Libertinus, Roboto, Source) find it without help
+(for (name '("Palatino" "Baskerville" "Charter" "Cochin" "Didot" "Garamond"
+             "Georgia" "Hoefler Text" "Iowan Old Style" "Times New Roman"
+             "Alegreya" "Cardo" "Crimson" "Essays1743" "Junicode"
+             "Merriweather" "Arial" "Avenir" "Futura" "Gill" "Helvetica"
+             "Lucida Grande" "Optima" "Verdana" "Inter" "Lato" "Cuprum"
+             "Antykwa Poltawskiego" "Antykwa Torunska" "Gentium Plus"
+             "Iwona" "Kurier"))
+  (math-font-profile-set name '((mono "Inconsolatazi4, TeX Gyre Cursor"))))
