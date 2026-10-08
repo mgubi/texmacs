@@ -341,6 +341,14 @@
             body
             `((a (@ (href ,url)) ,@(tmmd-merge body)))))))
 
+(define (tmmd-hlink* l)
+  ;; a link with a title
+  (let ((r (tmmd-hlink l))
+        (title (if (< (length l) 3) "" (tmmd-plain (caddr l)))))
+    (if (and (list-1? r) (func? (car r) 'a) (!= title ""))
+        `((a (@ ,@(cdadar r) (title ,title)) ,@(cddar r)))
+        r)))
+
 (define (tmmd-size x)
   ;; the width or the height of an image as HTML has them: pixels, or a
   ;; percentage for a part of the paragraph; #f for the other lengths
@@ -912,6 +920,7 @@
   (TeX tmmd-TeX)
   (LaTeX tmmd-LaTeX)
   ((:or hlink hyper-link) tmmd-hlink)
+  (hlink* tmmd-hlink*)
   (action tmmd-first)
   ((:or href slink) tmmd-href)
   (image tmmd-image)

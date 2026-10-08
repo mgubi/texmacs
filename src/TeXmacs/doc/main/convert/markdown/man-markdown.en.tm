@@ -68,7 +68,10 @@
     have a size, with the attributes of <name|Pandoc>,
     <verbatim|![...](file.png){width=50%}>, or with the tag of
     <name|Html>, <verbatim|\<less\>img src="file.png" width="300"\<gtr\>>.
-    The title of a link, <verbatim|[text](address "title")>, is dropped.
+
+    <item*|Links>A link with a title,
+    <verbatim|[text](address "title")>, is a <markup|hlink*>, which keeps
+    the title.
 
     <item*|Lists>With bullets or numbers, nested, with several paragraphs in
     an item; the task lists (<verbatim|- [ ]> and <verbatim|- [x]>) get a
@@ -113,6 +116,8 @@
     <item*|Tables>The tables of <name|GitHub>, whose first row is the
     header. Their cells are single lines: the paragraphs of a cell are
     joined.
+
+    <item*|Links>The title of an <markup|hlink*> is written with the link.
 
     <item*|Figures>A figure which is a single image is written as this
     image, with the caption as its description:

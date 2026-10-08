@@ -150,8 +150,12 @@
                `((verbatim ,(mdtm-text (apply string-append
                                               (list-filter l string?))))))
               ((a)
-               `((hlink ,(mdtm-inlines l)
-                        ,(mdtm-text (or (mdtm-attr x 'href) "")))))
+               ;; a link with a title is hlink*
+               (let ((body (mdtm-inlines l))
+                     (url (mdtm-text (or (mdtm-attr x 'href) "")))
+                     (title (or (mdtm-attr x 'title) "")))
+                 (if (== title "") `((hlink ,body ,url))
+                     `((hlink* ,body ,url ,(mdtm-text title))))))
               ((img) (list (mdtm-image x)))
               ((br) '((next-line)))
               ((math) (list (mdtm-math (apply string-append l))))

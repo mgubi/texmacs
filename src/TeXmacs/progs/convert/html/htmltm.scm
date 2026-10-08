@@ -303,8 +303,13 @@
 		   a 'name (htmltm-args-serial env c))))))
 
 (define (htmltm-href->hlink a body)
-  (let ((href (shtml-attr-non-null a 'href)))
-    (if href `(hlink ,body ,(xmltm-url-text href)) body)))
+  ;; a link with a title is hlink*
+  (let ((href (shtml-attr-non-null a 'href))
+        (title (shtml-attr-non-null a 'title)))
+    (cond ((not href) body)
+          ((and title (!= title ""))
+           `(hlink* ,body ,(xmltm-url-text href) ,(xmltm-url-text title)))
+          (else `(hlink ,body ,(xmltm-url-text href))))))
 
 (define (htmltm-dimension attrs name)
   (let ((s (shtml-attr-non-null attrs name)))

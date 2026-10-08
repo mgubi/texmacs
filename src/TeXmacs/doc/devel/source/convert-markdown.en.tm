@@ -121,8 +121,9 @@
   alone in its paragraph, with a description or a title, is a
   <markup|big-figure> with this caption (<scm|mdtm-figure>), as
   <name|Pandoc> does; the sizes of an image are its width and height
-  (<scm|mdtm-size>). The title of a link has no place in <markup|hlink>
-  and is dropped. The
+  (<scm|mdtm-size>). A link with a title is <markup|hlink*>, a macro of
+  <verbatim|std-markup> which is typeset as <markup|hlink> and which the
+  converters for <name|HTML> know too. The
   language of a fence selects a tag <markup|<em|lang>-code> by the table
   <scm|mdtm-languages>. Formulas are given to the converter of <LaTeX>
   (<verbatim|latex-snippet>) and <name|HTML> to the one of <name|HTML>
@@ -238,8 +239,8 @@
   <section|Known limitations>
 
   <\itemize>
-    <item>The title of a link and the description of an image inside a
-    text are not kept by the import; the number of a figure which is a
+    <item>The description of an image inside a text is not kept by the
+    import; the number of a figure which is a
     single image is not written.
 
     <item>The drawings of <TeXmacs> are not exported.

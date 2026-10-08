@@ -179,8 +179,9 @@
   (check= (import "[t](u)") '(hlink "t" "u"))
   (check= (import "<https://x.y>") '(hlink "https://x.y" "https://x.y"))
   (check= (import "![](i.png)") '(image "i.png" "" "" "" ""))
-  ;; the title of a link has no tag: it is dropped
-  (check= (import "[t](u \"The title\")") '(hlink "t" "u"))
+  ;; a link with a title, in Markdown or in HTML
+  (check= (import "[t](u \"The title\")") '(hlink* "t" "u" "The title"))
+  (check= (import "<a href=\"u\" title=\"T\">t</a>") '(hlink* "t" "u" "T"))
   ;; an image in a text: its description is dropped, its sizes are kept
   ;; (the attributes of Pandoc, or the tag of HTML)
   (check= (import "x ![alt](i.png) y")
@@ -303,6 +304,11 @@
   (check= (export '(strike-through "s")) "~~s~~")
   (check= (export '(hlink "t" "u")) "[t](u)")
   (check= (export '(hlink "a b" "u v(w)")) "[a b](<u v(w)>)")
+  (check= (export '(hlink* "t" "u" "The \"title\""))
+          "[t](u \"The \\\"title\\\"\")")
+  (check= (export '(hlink* "t" "u" "")) "[t](u)")
+  (check= (convert '(hlink* "t" "u" "T") "texmacs-stree" "html-snippet")
+          "<a href=\"u\" title=\"T\">t</a>")
   (check= (export '(href "http://a.b")) "<http://a.b>")
   (check= (export '(image "i.png" "" "" "" "")) "![](i.png)")
   (check= (export '(concat "a" (next-line) "b")) "a\\\nb")
@@ -468,6 +474,7 @@
   '("plain"
     "x *a* **b** ~~c~~ `d`"
     "[t](u) and <https://x.y>"
+    "[t](u \"The title\")"
     "a\n\n![cap](i.png)\n\nb\n"
     "x <img src=\"i.png\" alt=\"\" width=\"50%\" height=\"20\"> y"
     "a\\\nb"
@@ -490,6 +497,7 @@
   '("plain"
     (concat "x " (em "a") " " (strong "b") " " (verbatim "c"))
     (hlink "t" "u")
+    (hlink* "t" "u" "The title")
     (big-figure (image "i.png" "" "" "" "") "alt text")
     (big-figure (image "i.png" "" "" "" "") (concat "The " (em "logo")))
     (big-figure (image "i.png" "36px" "" "" "") "The logo")

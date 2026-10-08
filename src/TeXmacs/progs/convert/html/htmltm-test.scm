@@ -507,6 +507,8 @@
    (test "name" '(a (@ (name "foo")) "bar") '(concat (label "foo") "bar"))
    (test "id" '(a (@ (id "foo")) "bar") '(concat (label "foo") "bar"))
    (test "href" '(a (@ (href "foo")) "bar") '(hlink "bar" "foo"))
+   (test "href and title" '(a (@ (href "foo") (title "baz")) "bar")
+         '(hlink* "bar" "foo" "baz"))
    (test "name and href" '(a (@ (name "foo") (href "bar")) "baz")
          '(hlink (concat (label "foo") "baz") "bar"))
    (test "id and href" '(a (@ (id "foo") (href "bar")) "baz")
