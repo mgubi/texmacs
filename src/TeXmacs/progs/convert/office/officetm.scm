@@ -86,13 +86,49 @@
                                           '("annotation" "annotation-xml"))))))))))))
 
 (define (oftm-from-mathml x)
-  ;; the tree of TeXmacs for the element of MathML x, or ""
+  ;; the tree of TeXmacs for the element of MathML x; a formula which the
+  ;; converter cannot read is not lost: its text is kept
   (catch #t
     (lambda ()
       (let ((env (environment))
             (root (oftm-mathml x)))
         (initialize-xpath env root (cut mathtm-as-serial <> root))))
-    (lambda args "")))
+    (lambda args (oftm-text (ox-text (oftm-mathml x))))))
+
+;; The spaces of Unicode in a formula, as the converter of MathML leaves
+;; them, and what they are in TeXmacs: a space between a function and its
+;; argument, spaces of a width, or nothing.
+(define oftm-math-spaces
+  '(("<nospace>" " ") ("<#200B>") ("<#2060>") ("<#2063>") ("<#2064>")
+    ("<#2001>" (space "1em")) ("<#2003>" (space "1em"))
+    ("<#2000>" (space "0.5em")) ("<#2002>" (space "0.5em"))
+    ("<#2004>" (space "0.33em")) ("<#2005>" (space "0.25em"))
+    ("<#2006>" (space "0.17em")) ("<#2009>" (space "0.17em"))
+    ("<#200A>" (space "0.1em")) ("<#205F>" (space "0.22em"))
+    ("<#A0>" (space "0.33em")) ("<varspace>" (space "0.33em"))))
+
+(define (oftm-split-spaces s l)
+  ;; the pieces of the string s around the spaces of the list l
+  (if (null? l) (list s)
+      (let* ((what (caar l))
+             (i (string-search-forwards what 0 s)))
+        (if (< i 0) (oftm-split-spaces s (cdr l))
+            (append (oftm-split-spaces (substring s 0 i) (cdr l))
+                    (cdar l)
+                    (oftm-split-spaces
+                      (substring s (+ i (string-length what)) (string-length s))
+                      l))))))
+
+(define (oftm-clean-math t)
+  (cond ((string? t) (oftm-concat (oftm-split-spaces t oftm-math-spaces)))
+        ((and (pair? t) (func? t 'concat))
+         (oftm-concat
+           (append-map (lambda (x)
+                         (if (string? x) (oftm-split-spaces x oftm-math-spaces)
+                             (list (oftm-clean-math x))))
+                       (cdr t))))
+        ((pair? t) (cons (car t) (map oftm-clean-math (cdr t))))
+        (else t)))
 
 (define (oftm-formula x)
   ;; the formula of a node math, as a tree of TeXmacs in math mode
@@ -111,7 +147,7 @@
     (let loop ((r r))
       (if (or (func? r 'math 1) (func? r 'equation* 1) (func? r 'document 1))
           (loop (cadr r))
-          r))))
+          (oftm-clean-math r)))))
 
 (define (oftm-math x)
   (with f (oftm-formula x)

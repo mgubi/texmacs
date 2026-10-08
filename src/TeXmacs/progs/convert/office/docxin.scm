@@ -20,7 +20,8 @@
 ;; See office-tools.scm for the tree which is made of all this.
 
 (texmacs-module (convert office docxin)
-  (:use (convert office office-tools)))
+  (:use (convert office office-tools)
+        (convert office omml)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; State: the document which is read
@@ -287,12 +288,13 @@
                          (ox-attr data 'o:title)))))
 
 (define (docx-math x display?)
-  ;; FIXME: the formula as its text, until OMML is converted
-  (with s (ox-text x)
-    (if (== s "") '()
-        (list (office-node 'math `((display ,(and display? "true"))
-                                   (form "text"))
-                           s)))))
+  ;; the formulas of an element m:oMath, or m:oMathPara which holds
+  ;; several: each as MathML
+  (if (func? x 'm:oMathPara)
+      (append-map (lambda (y) (docx-math y #t)) (ox-childs x 'm:oMath))
+      (list (office-node 'math `((display ,(and display? "true"))
+                                 (form "sxml"))
+                         (omml->mathml x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Runs
