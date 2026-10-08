@@ -350,20 +350,45 @@ zip_read (string zip, string name, string& data) {
 
 /******************************************************************************
 * Writing an archive. An entry is deflated when a library which does it is
-* linked (the zlib inside MuPDF), and when this makes it smaller; else it
-* is stored.
+* linked (the zlib inside MuPDF, or the one of the PDF writer Hummus), and
+* when this makes it smaller; else it is stored.
 ******************************************************************************/
 
 #ifdef MUPDF_RENDERER
 // in Plugins/MuPDF/mupdf_pdf_renderer.cpp (declared here: this file is
 // compiled without the headers of MuPDF)
 bool mupdf_deflate (string in, string& out);
+#elif defined (PDF_RENDERER)
+// the zlib which the PDF writer (Hummus) is linked with
+#include <zlib.h>
 #endif
 
 static bool
 deflate_string (string in, string& out) {
 #ifdef MUPDF_RENDERER
   return mupdf_deflate (in, out);
+#elif defined (PDF_RENDERER)
+  int n= N (in);
+  if (n == 0) return false;
+  z_stream z;
+  z.zalloc= Z_NULL; z.zfree= Z_NULL; z.opaque= Z_NULL;
+  // a negative number of window bits: the deflated data alone, without
+  // the header and the checksum of zlib
+  if (deflateInit2 (&z, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8,
+                    Z_DEFAULT_STRATEGY) != Z_OK)
+    return false;
+  uLong bound= deflateBound (&z, (uLong) n);
+  string buf ((int) bound);
+  z.next_in  = (Bytef*) &(in[0]);
+  z.avail_in = (uInt) n;
+  z.next_out = (Bytef*) &(buf[0]);
+  z.avail_out= (uInt) bound;
+  int status= deflate (&z, Z_FINISH);
+  uLong size= z.total_out;
+  deflateEnd (&z);
+  if (status != Z_STREAM_END) return false;
+  out= buf (0, (int) size);
+  return true;
 #else
   (void) in; (void) out;
   return false;
