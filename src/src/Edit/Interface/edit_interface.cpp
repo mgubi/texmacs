@@ -637,8 +637,19 @@ edit_interface_rep::change_time () {
   return last_change;
 }
 
+// (the time of an update of the menus, the icon bars and the tools, which
+// follows every edit after a sixth of a second: TEXMACS_EDIT_PROFILE)
+struct menus_profile {
+  double t;
+  menus_profile (): t (edit_profile.on ? edit_profile_now () : 0) {}
+  ~menus_profile () {
+    if (edit_profile.on)
+      cout << "edit-profile menus: " << edit_profile_now () - t << " ms" << LF; }
+};
+
 void
 edit_interface_rep::update_menus () {
+  menus_profile prof;
   SERVER (menu_main ("(horizontal (link texmacs-menu))"));
   SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
   SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
