@@ -947,12 +947,18 @@
             '(:error "Error: cannot modify past")))
   (with l (ralice '(remote-get-versions "loophost/~rt-alice/s.tm"))
     (check-true (list? l))
+    ;; both versions, though the first one was replaced at once (a version
+    ;; replaced within 5 seconds was left out)
+    (check= (length l) 2)
+    (check= (map fifth l) '(#f "m"))
     (check-true (list-and (map (lambda (v) (== (third v) "~rt-alice/s.tm")) l)))
     (check-true (list-and (map (lambda (v) (== (fourth v) "rt-alice")) l))))
   (check= (ralice '(remote-get-versions "loophost/~rt-alice/none.tm"))
           '(:error "Error: file does not exist"))
   (check= (ranon '(remote-get-versions "loophost/~rt-alice/s.tm"))
           '(:error "Error: not logged in"))
+  ;; and none of them for who cannot read the file
+  (check= (rbob '(remote-get-versions "loophost/~rt-alice/s.tm")) '())
   (check= (ralice '(remote-file-remove "loophost/~rt-alice/s.tm")) "removed")
   (check= (ralice '(remote-file-load "loophost/~rt-alice/s.tm"))
           '(:error "Error: file does not exist"))
