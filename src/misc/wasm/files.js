@@ -556,7 +556,20 @@ var tmFiles = (function () {
         close (join (dir, n));
       }
     }
-    if (mode === 'browse') foot.appendChild (button ('Close', function () { close (null); }));
+    if (mode === 'browse') {
+      // the backup of all of it (the home directory), as in the menu of
+      // TeXmacs Vue: not in the dialogs to open and to save, which a
+      // restore, reloading the page, would not end well
+      var b1 = button ('Save a backup', function () { backup (); });
+      b1.id = 'tm-files-backup';
+      b1.title = 'Save a zip of all your files and of your TeXmacs folder on your computer';
+      var b2 = button ('Restore a backup…', function () { restore (); });
+      b2.id = 'tm-files-restore';
+      b2.title = 'Bring back the files of a backup, from this or another browser';
+      foot.appendChild (b1);
+      foot.appendChild (b2);
+      foot.appendChild (button ('Close', function () { close (null); }));
+    }
     else {
       foot.appendChild (button ('Cancel', function () { close (null); }));
       var ok = button (mode === 'open' ? 'Open' : 'Save', accept);

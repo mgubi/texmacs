@@ -236,6 +236,10 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item><menu|Save a backup> (it was called <menu|Download a backup>) and
+    <menu|Restore a backup...> are buttons of <menu|File|Files in this
+    browser...> too, next to <with|font-series|bold|Close>.
+
     <item><menu|File|Files in this browser...> has a third place,
     <with|font-series|bold|Your TeXmacs folder>, between
     <with|font-series|bold|Your files> and <with|font-series|bold|Files of
