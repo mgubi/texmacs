@@ -47,3 +47,8 @@
 
 (converter office-stree docx-document
   (:function serialize-docx-document))
+
+(lazy-define (convert office odtout) serialize-odt-document)
+
+(converter office-stree odt-document
+  (:function serialize-odt-document))

@@ -336,6 +336,7 @@
 (define-secure-symbols ext-tmhtml-eqnarray*)
 (lazy-define (convert html tmhtml-expand) tmhtml-env-patch)
 (lazy-define (convert markdown tmmarkdown-expand) tmmarkdown-env-patch)
+(lazy-define (convert office tmoffice-expand) tmoffice-env-patch)
 (lazy-define (convert latex latex-drd) latex-arity latex-type)
 (lazy-define (convert latex tmtex) tmtex-env-patch)
 (lazy-define (convert latex latex-tools) latex-set-virtual-packages

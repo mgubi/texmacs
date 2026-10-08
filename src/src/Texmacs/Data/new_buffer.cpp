@@ -570,6 +570,8 @@ buffer_export (url name, url dest, string fm) {
     body= vw->ed->exec_html (body);
   if (fm == "markdown")
     body= vw->ed->exec_markdown (body);
+  if (fm == "docx" || fm == "odt")
+    body= vw->ed->exec_office (body);
   //if (fm == "latex")
   //body= vw->ed->exec_latex (body);
 

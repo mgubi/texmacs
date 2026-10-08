@@ -9587,6 +9587,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(office-expand <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|exec_office> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
     <scm|(animate-checkout <scm-arg|content>)>
 <explain-synopsis|no synopsis>
   <|explain>

@@ -298,9 +298,28 @@
         (with m (tmof-mathml x)
           (if m `((math (@ (form "sxml")) ,m)) '())))))
 
+(define tmof-limit-operators
+  ;; the big operators whose limits are under and over them in a formula on
+  ;; its own lines: all but the integrals
+  (map office-utf8 '(#x2211 #x220f #x2210 #x22c0 #x22c1 #x22c2 #x22c3 #x2a00
+                     #x2a01 #x2a02 #x2a04 #x2a05 #x2a06)))
+
+(define (tmof-display-limits x)
+  ;; the MathML x with the limits of its big operators under and over them
+  (cond ((not (pair? x)) x)
+        ((func? x '@) x)
+        ((and (in? (car x) '(m:msubsup m:msub m:msup)) (pair? (cdr x))
+              (func? (cadr x) 'm:mo) (pair? (cdadr x))
+              (in? (cAr (cadr x)) tmof-limit-operators))
+         (cons (cond ((func? x 'm:msubsup) 'm:munderover)
+                     ((func? x 'm:msub) 'm:munder)
+                     (else 'm:mover))
+               (map tmof-display-limits (cdr x))))
+        (else (cons (car x) (map tmof-display-limits (cdr x))))))
+
 (define (tmof-display x . tag)
   ;; a formula on its own lines, with the number which follows it if any
-  (with m (tmof-mathml x)
+  (with m (with r (tmof-mathml x) (and r (tmof-display-limits r)))
     (if m `((!display ,m ,(if (nnull? tag) (car tag) ""))) '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -740,13 +759,18 @@
 (define (tmof-captioned body name caption)
   ;; a figure or a table, and its caption after the name with its number
   (append (map (lambda (b)
-                 ;; a paragraph of images is the figure
+                 ;; a paragraph of images is the figure, and is centered
+                 ;; as a table is
+                 (if (and (func? b 'table)
+                          (not (assoc 'align (tmof-node-attrs b))))
+                     `(table (@ ,@(tmof-node-attrs b) (align "center"))
+                             ,@(tmof-node-children b))
                  (if (and (func? b 'p) (nnull? (cdr b))
                           (list-and (map (lambda (y)
                                            (or (func? y 'image) (tmof-blank? y)))
                                          (cdr b))))
                      `(!role "figure" ,@(cdr b))
-                     b))
+                     b)))
                (tmof-blocks body))
           (tmof-with-role "caption" (tmof-titled name caption))))
 
@@ -829,7 +853,19 @@
                             (cons (cons var val)
                                   (or (ahash-ref cells (cons i j)) '())))))
          (width #f))
-    (if (== nrows 0) '()
+    (cond
+      ((== nrows 0) '())
+      ;; inside a heading, whose layout is a table: the text of the cells
+      (tmof-flat?
+       (append-map
+         (lambda (r)
+           (append-map (lambda (c)
+                         (if (func? c 'cell 1)
+                             (append (tmof-inline (tmof (cadr c))) (list " "))
+                             '()))
+                       (cdr r)))
+         rows))
+      (else
         (begin
           ;; a block has all the borders, before the formats which follow
           (when (caddr parts)
@@ -918,7 +954,7 @@
                                               (with-global tmof-flat? #f
                                                 (tmof-blocks (tmof body))))))))
                                   (iota ncols))))
-                     rows (iota nrows)))))))))
+                     rows (iota nrows))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Mathematics on its own lines
@@ -937,8 +973,13 @@
                 (if (< (length l) 2) "" (tmof-plain (cadr l)))))
 
 (define (tmof-equations tag l)
-  ;; several lines of formulas: the environment of LaTeX
-  (tmof-display (cons tag l)))
+  ;; several lines of formulas: the table of their parts, which the
+  ;; converter of MathML knows
+  (let loop ((x (if (null? l) "" (car l))))
+    (cond ((func? x 'document 1) (loop (cadr x)))
+          ((and (pair? x) (in? (car x) '(tformat table)))
+           (tmof-display `(tabular* ,x)))
+          (else (tmof-display x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The documentation of TeXmacs

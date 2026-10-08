@@ -1223,6 +1223,7 @@
 "latex-expand"
 "html-expand"
 "markdown-expand"
+"office-expand"
 "animate-checkout"
 "animate-commit"
 "idle-time"
