@@ -820,8 +820,9 @@ closed by a logout, the user (`client-connection-lost`); the timers of a
 connection hold a token, since the system gives the number of a socket to
 later connections. `client-notify-hook` is what tells the user (the footer,
 a dialog for a lost connection); the tests replace it. The icon of the
-connection is `tm_cloud_silent` (an amber badge) while the server is
-silent, and `tm_cloud_lost` (the cloud struck through) when no connection
+connection is `tm_cloud_active` or `tm_cloud_admin_active` (a green
+badge) while the server answers, `tm_cloud_silent` or
+`tm_cloud_admin_silent` (an amber badge) while it is silent, and `tm_cloud_lost` (the cloud struck through) when no connection
 is left and one was lost: both made from the `tm_cloud` of each of the
 nine icon sets (an overlay before `</svg>`; PNG and XPM for the modern
 set by `rsvg-convert` and ImageMagick), and `client-notify` updates the

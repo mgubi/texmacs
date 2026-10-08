@@ -210,12 +210,14 @@
 ;; Main remote icon menu
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The icon of a connection says how it is: the cloud of the connection, or
-;; one with an amber badge while the server does not answer; and, when no
-;; connection is left, a cloud struck through if one was lost.
-(define (connection-icon server normal)
-  `(icon ,(if (== (client-connection-state server) :silent)
-              "tm_cloud_silent.xpm" normal)))
+;; The icon of a connection says how it is: the cloud of the connection
+;; (the one of an administrator has a star) with a green badge while the
+;; server answers, an amber one while it does not; and, when no connection
+;; is left, the plain cloud, struck through if a connection was lost.
+(define (connection-icon server base)
+  `(icon ,(string-append base
+                         (if (== (client-connection-state server) :silent)
+                             "_silent.xpm" "_active.xpm"))))
 
 (define (connection-states)
   ;; what the icons depend on: the menus are made again when it changes
@@ -250,12 +252,12 @@
   (invisible (client-active-servers))
   (invisible (connection-states))
   (assuming (not (server-connection-admin? server))
-    (=> (balloon (eval (connection-icon server "tm_cloud.xpm"))
+    (=> (balloon (eval (connection-icon server "tm_cloud"))
                  (eval (client-connection-status server)))
 	("Edit account" (open-account-editor server))
 	("Logout" (client-logout server))))
   (assuming (server-connection-admin? server)
-    (=> (balloon (eval (connection-icon server "tm_cloud_admin.xpm"))
+    (=> (balloon (eval (connection-icon server "tm_cloud_admin"))
                  (eval (client-connection-status server)))
 	("Edit Server Preferences" (load-remote-config-form server))
 	("User Management" (open-admin-accounts-editor server))

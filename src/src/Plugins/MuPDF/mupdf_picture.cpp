@@ -71,6 +71,54 @@ mupdf_image_from_pixmap (fz_pixmap* pix) {
   return im;
 }
 
+// The pixmap of a picture has four bytes a pixel: red, green, blue and
+// alpha (mupdf_picture_rep reads and writes its pixels as such, and so do
+// the effects and the patterns made of it). An image is decoded as it is
+// stored: a PNG in grey with alpha has two bytes a pixel, a JPEG three, and
+// read as four they gave stripes of green (the thumbnails of the shadows,
+// which the page of a browser uses for the pictures it cannot fetch). The
+// pixmap is converted here, once; rgba_pixmap takes pix.
+static fz_pixmap*
+rgba_pixmap (fz_context* ctx, fz_pixmap* pix) {
+  if (pix == NULL) return NULL;
+  fz_colorspace* rgb= fz_device_rgb (ctx);
+  if (pix->n == 4 && pix->alpha && pix->s == 0 &&
+      fz_pixmap_colorspace (ctx, pix) == rgb) return pix;
+  fz_pixmap* conv= NULL;
+  fz_pixmap* out= NULL;
+  fz_var (conv);
+  fz_var (out);
+  fz_try (ctx) {
+    conv= fz_convert_pixmap (ctx, pix, rgb, NULL, NULL,
+                             fz_default_color_params, 1);
+    if (conv->n == 4 && conv->alpha) { out= conv; conv= NULL; }
+    else if (conv->n == 3 && !conv->alpha) {
+      // no alpha: opaque
+      int w= conv->w, h= conv->h;
+      out= fz_new_pixmap (ctx, rgb, w, h, NULL, 1);
+      out->x= conv->x; out->y= conv->y;
+      for (int y= 0; y < h; y++) {
+        const unsigned char* sp= conv->samples + (ptrdiff_t) y * conv->stride;
+        unsigned char* dp= out->samples + (ptrdiff_t) y * out->stride;
+        for (int x= 0; x < w; x++, sp += 3, dp += 4) {
+          dp[0]= sp[0]; dp[1]= sp[1]; dp[2]= sp[2]; dp[3]= 255;
+        }
+      }
+    }
+  }
+  fz_always (ctx) {
+    fz_drop_pixmap (ctx, conv);
+  }
+  fz_catch (ctx) {
+    out= NULL;
+    cout << "TeXmacs] MuPDF cannot convert an image: "
+         << fz_caught_message (ctx) << LF;
+  }
+  if (out == NULL) return pix; // as it was: nothing better
+  fz_drop_pixmap (ctx, pix);
+  return out;
+}
+
 fz_pixmap*
 mupdf_pixmap_from_image (fz_image* im) {
   if (im == NULL) return NULL;
@@ -85,7 +133,7 @@ mupdf_pixmap_from_image (fz_image* im) {
     cout << "TeXmacs] MuPDF cannot decode an image: "
          << fz_caught_message (ctx) << LF;
   }
-  return pix;
+  return rgba_pixmap (ctx, pix);
 }
 
 // The channel order of the window surfaces. SDL gives the format which
