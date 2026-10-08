@@ -171,8 +171,11 @@
   (when (debug-get "remote")
     (display* "client-notify " event ", " msg "\n"))
   (client-notify-hook event msg)
-  ;; the menus and the icons show the state of the connections
-  (set! remote-client-list (client-active-servers)))
+  ;; the menus and the icons show the state of the connections: at once,
+  ;; not at the next move of the user
+  (set! remote-client-list (client-active-servers))
+  (when (not (headless?))
+    (catch #t (lambda () (update-menus)) (lambda args (noop)))))
 
 (define (client-notify-heard server)
   (ahash-set! client-heard server (texmacs-time))

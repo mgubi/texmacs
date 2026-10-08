@@ -235,7 +235,8 @@
     <verbatim|Connected to host as user (40 ms)>, the time being that of
     the last answer of the server, which is asked for a sign of life every
     ten seconds. A server which does not answer for 25 seconds is said so,
-    and when it answers again. A connection which ends otherwise than by
+    and when it answers again; meanwhile its cloud has an amber badge. The
+    cloud is struck through after a connection was lost. A connection which ends otherwise than by
     <menu|Remote|Logout> is said to be lost, in a dialog and in the menu
     (<verbatim|Connection lost: user@host>), until you log in again; a
     login to a server which is not there, or which never answers, fails
