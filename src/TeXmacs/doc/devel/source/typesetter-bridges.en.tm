@@ -444,6 +444,21 @@
   section, which renumbers what follows, re-executes 2600 bridges in
   120<nbsp>ms.
 
+  Most of the time of the pager is the search of the page breaks, which
+  tries every line as the start of a page (40<nbsp>ms of the 50). Its
+  result, the skeleton, is a function of the heights, spaces, penalties,
+  columns and floating objects of the page items, not of their boxes, and
+  most edits do not change these numbers: the skeletons of the last few
+  such signatures are kept and returned without a search
+  (<cpp|new_break_pages> in
+  <source-link|new_breaker.cpp|src/Typeset/Page/new_breaker.cpp>; the
+  environment variable <verbatim|TEXMACS_PAGE_BREAK_CACHE> may be
+  <verbatim|off>, or <verbatim|check> to search anyway and report a
+  difference). A character typed in a line then costs a quarter of the
+  time in the pager, which still formats every page with its header and
+  footer. An edit which changes the number of lines, or the height of
+  one, changes the signature and is searched in full.
+
   <subsection|Complete typesetting and references>
 
   References, tables of contents and page numbers need several passes. The

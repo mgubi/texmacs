@@ -45,6 +45,7 @@ struct edit_profile_data {
   int    cached, redone;           // bridges whose result was reused or not
   int    lines, moved;             // lines (and remembered boxes) logged, changed
   int    rects;                    // rectangles in the change log
+  int    breaks_reused;            // searches of page breaks avoided
 };
 extern edit_profile_data edit_profile;
 double edit_profile_now ();        // ms, from an arbitrary origin
