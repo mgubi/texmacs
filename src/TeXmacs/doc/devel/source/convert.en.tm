@@ -210,6 +210,9 @@
     <branch|Importing <name|HTML> and <name|MathML>|convert-html-import.en.tm>
 
     <branch|The <name|Markdown> converters|convert-markdown.en.tm>
+
+    <branch|The <name|Word> and <name|OpenDocument>
+    converters|convert-office.en.tm>
   </traverse>
 
   <tmdoc-copyright|2026|the <TeXmacs> team>

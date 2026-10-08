@@ -44,6 +44,7 @@
         (check latex-test)
         (check formats-test)
         (check markdown-test)
+        (check office-test)
         (check editing-test)
         (check typeset-test)
         (check bibtex-test)
@@ -140,6 +141,7 @@
     ("latex" latex-test-failures count)
     ("formats" formats-test-failures count)
     ("markdown" markdown-test-failures count)
+    ("office" office-test-failures count)
     ;; opens buffers and edits them
     ("editing" editing-test-failures count)
     ("typeset" typeset-test-failures count)

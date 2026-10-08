@@ -42,7 +42,21 @@
 // in Plugins/MuPDF/mupdf_picture.cpp (declared here: this file is compiled
 // without the headers of MuPDF)
 bool mupdf_image_size (url u, int& w, int& h);
+// in Plugins/MuPDF/mupdf_pdf_renderer.cpp
+bool mupdf_pdf_to_svg (url pdf, url svg);
 #endif
+
+// The first page of a PDF as an SVG, without another program: true if it
+// was written. Only the builds with MuPDF can do it.
+bool
+native_pdf_to_svg (url pdf, url svg) {
+#ifdef MUPDF_RENDERER
+  return mupdf_pdf_to_svg (pdf, svg);
+#else
+  (void) pdf; (void) svg;
+  return false;
+#endif
+}
 
 #ifdef MACOSX_EXTENSIONS
 #include "MacOS/mac_images.h"

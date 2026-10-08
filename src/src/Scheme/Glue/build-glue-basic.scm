@@ -80,6 +80,12 @@
   (async-evaluate-system async_evaluate_system
     (int array_string string object))
   (async-evaluate-cancel async_evaluate_cancel (void int))
+  ;; zip archives
+  (pdf->svg-native native_pdf_to_svg (bool url url))
+  (zip-archive? zip_is_archive (bool string))
+  (zip-unpack zip_unpack (array_string string))
+  (zip-pack zip_write (string array_string array_string))
+
   (http-get http_get (string string array_string))
   (http-post http_post (string string array_string string))
   (http-post-query http_post_query (string string array_string array_string))

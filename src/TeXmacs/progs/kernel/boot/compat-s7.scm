@@ -157,6 +157,17 @@
         ((or (= end 0) (not (m (string-ref s (- end 1)))))
          (substring s 0 end)))))
 
+(define-public (string-trim s . opt)
+  ;; SRFI-13: without the characters at the start which match
+  (let ((m (if (pair? opt) (char-matcher (car opt)) char-whitespace?))
+        (n (string-length s)))
+    (do ((start 0 (+ start 1)))
+        ((or (= start n) (not (m (string-ref s start))))
+         (substring s start n)))))
+
+(define-public (string-trim-both s . opt)
+  (apply string-trim (cons (apply string-trim-right (cons s opt)) opt)))
+
 ;; Guile's stable-sort (a merge sort on lists, also accepting vectors)
 (define-public (stable-sort seq less?)
   (define (merge a b)

@@ -679,6 +679,62 @@ tmg_async_evaluate_cancel (tmscm arg1) {
 }
 
 tmscm
+tmg_pdf_2svg_native (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "pdf->svg-native");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "pdf->svg-native");
+
+  url in1= tmscm_to_url (arg1);
+  url in2= tmscm_to_url (arg2);
+
+  // TMSCM_DEFER_INTS;
+  bool out= native_pdf_to_svg (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_archiveP (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-archive?");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  bool out= zip_is_archive (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return bool_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_unpack (tmscm arg1) {
+  TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "zip-unpack");
+
+  string in1= tmscm_to_string (arg1);
+
+  // TMSCM_DEFER_INTS;
+  array_string out= zip_unpack (in1);
+  // TMSCM_ALLOW_INTS;
+
+  return array_string_to_tmscm (out);
+}
+
+tmscm
+tmg_zip_pack (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_ARRAY_STRING (arg1, TMSCM_ARG1, "zip-pack");
+  TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "zip-pack");
+
+  array_string in1= tmscm_to_array_string (arg1);
+  array_string in2= tmscm_to_array_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  string out= zip_write (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return string_to_tmscm (out);
+}
+
+tmscm
 tmg_http_get (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_STRING (arg1, TMSCM_ARG1, "http-get");
   TMSCM_ASSERT_ARRAY_STRING (arg2, TMSCM_ARG2, "http-get");
@@ -11687,6 +11743,10 @@ initialize_glue_basic () {
   tmscm_install_procedure ("async-eval-system",  tmg_async_eval_system, 2, 0, 0);
   tmscm_install_procedure ("async-evaluate-system",  tmg_async_evaluate_system, 3, 0, 0);
   tmscm_install_procedure ("async-evaluate-cancel",  tmg_async_evaluate_cancel, 1, 0, 0);
+  tmscm_install_procedure ("pdf->svg-native",  tmg_pdf_2svg_native, 2, 0, 0);
+  tmscm_install_procedure ("zip-archive?",  tmg_zip_archiveP, 1, 0, 0);
+  tmscm_install_procedure ("zip-unpack",  tmg_zip_unpack, 1, 0, 0);
+  tmscm_install_procedure ("zip-pack",  tmg_zip_pack, 2, 0, 0);
   tmscm_install_procedure ("http-get",  tmg_http_get, 2, 0, 0);
   tmscm_install_procedure ("http-post",  tmg_http_post, 3, 0, 0);
   tmscm_install_procedure ("http-post-query",  tmg_http_post_query, 3, 0, 0);

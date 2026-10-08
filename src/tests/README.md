@@ -202,6 +202,8 @@ Scheme, TMML, HTML and plain text formats, round-trips a common table of
 samples through the TeXmacs formats, and checks the format registry.
 `markdown-test.scm` checks the Markdown converters step by step (the parser,
 the serializer, the import and the export) and their round trips.
+`office-test.scm` does so for the Word and OpenDocument converters, on small
+archives which it makes from their XML, and for the zip archives.
 `editing-test.scm` opens buffers and edits them through the commands a user
 or a plugin uses (inserting, the cursor, selections and the clipboard,
 structured editing, the environment, undo and redo, saving and exporting),

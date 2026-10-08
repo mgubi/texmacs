@@ -1273,6 +1273,7 @@ tmscm_to_list_tree (tmscm p) {
 #include "file.hpp"
 #include "image_files.hpp"
 #include "web_files.hpp"
+#include "zip_files.hpp"
 #include "sys_utils.hpp"
 #include "client_server.hpp"
 #include "analyze.hpp"

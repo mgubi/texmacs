@@ -507,6 +507,38 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(pdf-\<gtr\>svg-native <scm-arg|url> <scm-arg|url>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|native_pdf_to_svg> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-archive? <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_is_archive> which returns
+    <scm|bool>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-unpack <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_unpack> which returns
+    <scm|array_string>.
+  </explain>
+
+  <\explain>
+    <scm|(zip-pack <scm-arg|array_string> <scm-arg|array_string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|zip_write> which returns
+    <scm|string>.
+  </explain>
+
+  <\explain>
     <scm|(http-get <scm-arg|string> <scm-arg|array_string>)>
 <explain-synopsis|no synopsis>
   <|explain>
@@ -9583,6 +9615,14 @@ source code.
 <explain-synopsis|no synopsis>
   <|explain>
     Calls the <c++> function <cpp|exec_markdown> which returns
+    <scm|tree>.
+  </explain>
+
+  <\explain>
+    <scm|(office-expand <scm-arg|content>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|exec_office> which returns
     <scm|tree>.
   </explain>
 
