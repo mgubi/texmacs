@@ -62,7 +62,7 @@
 (define (tmof-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h !role p blockquote ul ol pre hr
-                      table footnote-def !display))))
+                      table footnote-def !display !pagebreak))))
 
 (define (tmof-blank? x)
   (and (string? x) (== (string-trim-spaces x) "")))
@@ -436,7 +436,7 @@
          (and v scale (> v 0) (* v scale)))))
 
 (define (tmof-cm-string x)
-  (string-append (number->string (/ (round (* 1000.0 x)) 1000.0)) "cm"))
+  (string-append (office-decimal x) "cm"))
 
 (define (tmof-image-sizes l data)
   ;; (width height) in centimeters, for the arguments l of the tag image
@@ -669,6 +669,24 @@
               (or (func? (cadr x) 'item) (func? (cadr x) 'item*)))
          (cons (cadr x) (cddr x)))
         (else #f)))
+
+(define (tmof-description l)
+  ;; a description: its terms and their definitions, as paragraphs with
+  ;; these roles
+  (let* ((body (if (null? l) "" (cAr l)))
+         (pars (if (func? body 'document) (cdr body) (list body))))
+    (append-map
+      (lambda (par)
+        (with start (tmof-item-start par)
+          (if (and start (func? (car start) 'item*))
+              (append
+                (list `(!role "term" ,@(tmof-inline (tmof-all (cdar start)))))
+                (tmof-with-role "definition"
+                                (tmof-blocks (tmof `(concat ,@(cdr start))))))
+              (tmof-with-role "definition"
+                              (tmof-blocks
+                                (tmof (if start `(concat ,@(cdr start)) par)))))))
+      pars)))
 
 (define (tmof-check item)
   ;; "true" or "false" for the box of an item of a task list, else #f
@@ -1013,10 +1031,12 @@
       (tmof-all l)))
 
 (define (tmof x)
-  ;; the nodes of the Markdown tree for the TeXmacs tree x
+  ;; the nodes of the tree of the handlers for the TeXmacs tree x
   (cond ((string? x) (if (== x "") '() (list (tmof-text x))))
         ((not (pair? x)) '())
         ((not (symbol? (car x))) '())
+        ((in? (car x) '(page-break new-page page-break* new-page*))
+         '((!pagebreak)))
         ((tmof-dispatch 'tmoffice-methods% x) => identity)
         ((assoc (car x) tmof-languages) (tmof-code-block (car x) (cdr x)))
         ((in? (car x) '(tabular tabular* block block* wide-tabular wide-block
@@ -1117,7 +1137,7 @@
   ((:or itemize itemize-minus itemize-dot itemize-arrow) tmof-itemize)
   ((:or description description-compact description-dash description-aligned
         description-long description-paragraphs)
-   tmof-itemize)
+   tmof-description)
   ((:or enumerate enumerate-numeric enumerate-roman enumerate-Roman
         enumerate-alpha enumerate-Alpha)
    tmof-enumerate)
@@ -1249,6 +1269,7 @@
                             (list-filter (tmof-node-children x) string?))
                (list `(p (@ (role "code")) ,@(tmof-lines s)))))
             ((hr) '((rule)))
+            ((!pagebreak) '((pagebreak)))
             ((table)
              (list (apply office-node
                           (cons* 'table (tmof-node-attrs x)

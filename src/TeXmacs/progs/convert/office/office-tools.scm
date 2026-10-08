@@ -292,6 +292,20 @@
   (:synopsis "The text of the element @x of XML, without a declaration")
   (apply string-append (ox-serialize-sub x)))
 
+(tm-define (office-decimal x)
+  (:synopsis "The number @x with three decimals at most, and no useless ones")
+  (let* ((k (inexact->exact (round (* 1000.0 (abs x)))))
+         (whole (quotient k 1000))
+         (part (modulo k 1000)))
+    (string-append
+      (if (and (< x 0) (> k 0)) "-" "")
+      (number->string whole)
+      (if (== part 0) ""
+          (let loop ((d (substring (number->string (+ 1000 part)) 1 4)))
+            (if (string-ends? d "0")
+                (loop (substring d 0 (- (string-length d) 1)))
+                (string-append "." d)))))))
+
 (tm-define (office-utf8 n)
   (:synopsis "The character of code @n, in UTF-8")
   (list->string

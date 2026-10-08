@@ -19,6 +19,9 @@
 ;;     their XML, so that a test shows what it reads;
 ;;   - convert/office/omml.scm: the formulas of Word as MathML;
 ;;   - convert/office/officetm.scm: office trees as TeXmacs trees;
+;;   - convert/office/tmoffice.scm: TeXmacs trees as office trees;
+;;   - convert/office/docxout.scm and odtout.scm: the writers, by reading
+;;     back what they write, and the round trips through both formats;
 ;;   - the formats docx and odt.
 
 (texmacs-module (check office-test)
@@ -27,7 +30,10 @@
         (convert office docxin)
         (convert office odtin)
         (convert office omml)
-        (convert office officetm)))
+        (convert office officetm)
+        (convert office tmoffice)
+        (convert office docxout)
+        (convert office odtout)))
 
 (define (bytes . l) (list->string (map integer->char l)))
 
@@ -764,6 +770,220 @@
           '((doc-data (doc-title "T")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TeXmacs trees as office trees
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (of t)
+  ;; the blocks of the office tree of a TeXmacs tree
+  (cdr (texmacs->office t '())))
+
+(define (test-tmoffice-text)
+  (check-group "tmoffice text")
+  (check= (of "plain") '((p "plain")))
+  (check= (of '(concat "a " (em "b") (strong "c") (underline "u") (strike-through "s")
+                       (rsub "1") (rsup "2") (verbatim "v") (marked "m")))
+          '((p "a " (em "b") (strong "c") (underline "u") (strike "s") (sub "1")
+               (sup "2") (code "v") (mark "m"))))
+  ;; the colors by their names or their values; small capitals
+  (check= (of '(concat (with "color" "red" "r") (with "color" "#00f" "b")
+                       (with "color" "black" "k")
+                       (with "font-shape" "small-caps" "sc")))
+          '((p (color (@ (value "#ff0000")) "r") (color (@ (value "#0000ff")) "b")
+               "k" (smallcaps "sc"))))
+  (check= (of '(concat "a" (footnote "note") (hlink "t" "u") (next-line) "b"))
+          '((p "a" (note (p "note")) (link (@ (href "u")) "t") (br) "b")))
+  ;; formulas are MathML, with characters and not their names
+  (check= (of '(concat "x " (math (concat "a" (rsup "2") "+<alpha>"))))
+          `((p "x " (math (@ (form "sxml"))
+                          (m:math (m:mrow (m:msup (m:mi "a") (m:mn "2")) (m:mo "+")
+                                          (m:mi ,(office-utf8 #x3b1))))))))
+  ;; on its own lines, a sum has its limits under and over it
+  (check= (of '(equation* (document (concat (big "sum") (rsub "i") (rsup "n") "x"))))
+          `((p (math (@ (display "true") (form "sxml"))
+                     (m:math (m:mrow (m:munderover (m:mo ,(office-utf8 #x2211))
+                                                   (m:mi "i") (m:mi "n"))
+                                     (m:mi "x"))))))))
+
+(define (test-tmoffice-blocks)
+  (check-group "tmoffice blocks")
+  ;; the first level of headings which is used is the level 1
+  (check= (of '(document (subsection "S") "text" (subsubsection "T")))
+          '((p (@ (role "heading") (level "1")) "S") (p "text")
+            (p (@ (role "heading") (level "2")) "T")))
+  (check= (of '(itemize (document (concat (item) "a") (concat (item) "b")
+                                  (enumerate (document (concat (item) "n"))))))
+          '((list (@ (kind "bullet")) (item (p "a"))
+                  (item (p "b") (list (@ (kind "number")) (item (p "n")))))))
+  (check= (of '(description (document (concat (item* "T") "D") "E")))
+          '((p (@ (role "term")) "T") (p (@ (role "definition")) "D")
+            (p (@ (role "definition")) "E")))
+  (check= (of '(quotation (document "q" "r")))
+          '((p (@ (role "quote")) "q") (p (@ (role "quote")) "r")))
+  (check= (of '(verbatim-code (document "x" "  y")))
+          '((p (@ (role "code")) "x" (br) "  y")))
+  (check= (of '(document "a" (page-break) (hrule)))
+          '((p "a") (pagebreak) (rule)))
+  (check= (of '(theorem (document "T"))) '((p (strong "Theorem.") " T")))
+  ;; a figure or a table, and its caption
+  (check= (of '(big-table (tabular (tformat (table (row (cell "a"))))) "cap"))
+          '((table (@ (align "center")) (row (cell (@ (borders "none")) (p "a"))))
+            (p (@ (role "caption")) (strong "Table.") " cap")))
+  ;; the title of a document
+  (check= (of '(document (TeXmacs "2.1") (style "generic")
+                 (body (document
+                         (doc-data (doc-title "T")
+                                   (doc-author (author-data (author-name "A")))
+                                   (doc-date "2026"))
+                         (abstract-data (abstract (document "Abs.")))
+                         (section "S") "x"))))
+          '((p (@ (role "title")) "T") (p (@ (role "author")) "A")
+            (p (@ (role "date")) "2026") (p (@ (role "abstract")) "Abs.")
+            (p (@ (role "heading") (level "1")) "S") (p "x"))))
+
+(define (test-tmoffice-tables)
+  (check-group "tmoffice tables")
+  ;; a block has all its borders; the formats of rectangles of cells
+  (check= (of '(block (tformat (cwith "1" "1" "1" "-1" "cell-background" "pastel blue")
+                               (cwith "1" "-1" "2" "2" "cell-halign" "r")
+                               (table (row (cell "a") (cell "b"))
+                                      (row (cell "1") (cell "2"))))))
+          '((table (row (cell (@ (borders "tblr") (background "#dfdfff")) (p "a"))
+                        (cell (@ (borders "tblr") (background "#dfdfff")
+                                 (align "right")) (p "b")))
+                   (row (cell (@ (borders "tblr")) (p "1"))
+                        (cell (@ (borders "tblr") (align "right")) (p "2"))))))
+  ;; a line under the first row, a cell over two columns
+  (check= (of '(tabular (tformat (cwith "1" "1" "1" "-1" "cell-bborder" "1ln")
+                                 (cwith "1" "1" "1" "1" "cell-col-span" "2")
+                                 (table (row (cell "wide") (cell ""))
+                                        (row (cell "1") (cell "2"))))))
+          '((table (row (cell (@ (borders "b") (colspan "2")) (p "wide"))
+                        (cell (@ (covered "true"))))
+                   (row (cell (@ (borders "none")) (p "1"))
+                        (cell (@ (borders "none")) (p "2")))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; MathML as formulas of Word
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (test-mathml-omml)
+  (check-group "mathml to omml")
+  (check= (mathml->omml '(m:math (m:mrow (m:mi "a") (m:mo "+") (m:mn "12"))))
+          '(m:oMath (m:r (m:t "a")) (m:r (m:t "+")) (m:r (m:t "12"))))
+  (check= (mathml->omml '(m:math (m:mi "sin")))
+          '(m:oMath (m:r (m:rPr (m:sty (@ (m:val "p")))) (m:t "sin"))))
+  (check= (mathml->omml '(m:math (m:mfrac (m:mn "1") (m:mi "x"))))
+          '(m:oMath (m:f (m:num (m:r (m:t "1"))) (m:den (m:r (m:t "x"))))))
+  (check= (mathml->omml '(m:math (m:msup (m:mi "x") (m:mn "2"))))
+          '(m:oMath (m:sSup (m:e (m:r (m:t "x"))) (m:sup (m:r (m:t "2"))))))
+  (check= (mathml->omml '(m:math (m:msqrt (m:mi "x"))))
+          '(m:oMath (m:rad (m:radPr (m:degHide (@ (m:val "1")))) (m:deg)
+                           (m:e (m:r (m:t "x"))))))
+  ;; brackets take what they enclose
+  (check= (mathml->omml '(m:math (m:mrow (m:mo (@ (form "prefix")) "(") (m:mi "x")
+                                         (m:mo (@ (form "postfix")) ")"))))
+          '(m:oMath (m:d (m:dPr (m:begChr (@ (m:val "("))) (m:endChr (@ (m:val ")"))))
+                         (m:e (m:r (m:t "x"))))))
+  ;; a big operator takes what follows it, up to a relation
+  (check= (mathml->omml `(m:math (m:mrow (m:munderover (m:mo ,(office-utf8 #x2211))
+                                                       (m:mi "i") (m:mi "n"))
+                                         (m:mi "x") (m:mo "=") (m:mi "y"))))
+          `(m:oMath (m:nary (m:naryPr (m:chr (@ (m:val ,(office-utf8 #x2211))))
+                                      (m:limLoc (@ (m:val "undOvr"))))
+                            (m:sub (m:r (m:t "i"))) (m:sup (m:r (m:t "n")))
+                            (m:e (m:r (m:t "x"))))
+                    (m:r (m:t "=")) (m:r (m:t "y"))))
+  ;; there and back
+  (for-each
+    (lambda (m) (check= (omml->mathml (mathml->omml m)) m))
+    '((m:math (m:mfrac (m:mn "1") (m:mi "x")))
+      (m:math (m:msubsup (m:mi "x") (m:mi "i") (m:mn "2")))
+      (m:math (m:mroot (m:mi "x") (m:mn "3")))
+      (m:math (m:mtable (m:mtr (m:mtd (m:mi "a")) (m:mtd (m:mi "b"))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The writers and the round trips
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (archive-names z)
+  (let loop ((l (zip-unpack z)) (acc '()))
+    (if (or (null? l) (null? (cdr l))) (reverse acc)
+        (loop (cddr l) (cons (car l) acc)))))
+
+(define (test-writers)
+  (check-group "writers")
+  (let* ((tree '(office (p "a " (em "b") (note (p "n")))
+                        (p (image (@ (name "pic.png") (data "PNGDATA")
+                                     (width "2cm") (height "1cm"))))
+                        (p (math (@ (form "sxml")) (m:math (m:mi "x"))))))
+         (docx (serialize-docx-document tree))
+         (odt (serialize-odt-document tree)))
+    (check-true (zip-archive? docx))
+    (check= (archive-names docx)
+            '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
+              "word/_rels/document.xml.rels" "word/styles.xml"
+              "word/numbering.xml" "word/footnotes.xml" "word/settings.xml"
+              "word/media/image1.png"))
+    ;; the type of an OpenDocument text is the first file of its archive
+    (check= (archive-names odt)
+            '("mimetype" "content.xml" "styles.xml" "META-INF/manifest.xml"
+              "Pictures/image2.png" "Formula-3/content.xml"))
+    (check= (cadr (zip-unpack odt)) "application/vnd.oasis.opendocument.text")
+    ;; what is written is read back the same
+    (check= (cdr (parse-docx-document docx))
+            '((p "a " (em "b") (note (p "n")))
+              (p (image (@ (name "image1.png") (data "PNGDATA") (width "2cm")
+                           (height "1cm"))))
+              (p (math (@ (form "sxml")) (m:math (m:mi "x"))))))
+    (check= (list-head (cdr (parse-odt-document odt)) 2)
+            '((p "a " (em "b") (note (p "n")))
+              (p (image (@ (name "image2.png") (data "PNGDATA") (width "2cm")
+                           (height "1cm")))))))
+  ;; the text of XML: its characters are escaped, the control ones removed
+  (check= (ox-serialize-element '(a (@ (x "1 & \"2\"")) "t < u" (b)))
+          "<a x=\"1 &amp; &quot;2&quot;\">t &lt; u<b/></a>")
+  ;; an empty document is a document
+  (check= (convert (serialize-docx-document '(office)) "docx-document" "texmacs-stree")
+          '(document (body (document "")) (style "generic")))
+  (check= (convert (serialize-odt-document '(office)) "odt-document" "texmacs-stree")
+          '(document (body (document "")) (style "generic"))))
+
+;; These trees come back as they are from both formats.
+(define office-same
+  '("plain"
+    (concat "a " (em "b") " " (strong "c") " " (underline "u") " "
+            (strike-through "s") " H" (rsub "2") "O x" (rsup "2") " "
+            (verbatim "v") " " (with "color" "#ff0000" "r") " " (marked "m")
+            " " (with "font-shape" "small-caps" "sc"))
+    (document (section "S") "text" (subsection "T") "more" (subsubsection "U") "x")
+    (itemize (document (concat (item) "a") (concat (item) "b")
+                       (enumerate (document (concat (item) "n") (concat (item) "m")))
+                       (concat (item) "c")))
+    (enumerate (document (concat (item) "a") "second" (concat (item) "b")))
+    (concat "a" (footnote "note") " " (hlink "t" "https://x.y/") (next-line) "b")
+    (concat "x " (math (concat "a" (rsup "2") "+" (frac "1" "2"))) " y")
+    (document "a" (equation* (document (concat (sqrt "x") "=" (frac "1" "y")))) "b")
+    (quotation (document "q" "r"))
+    (verbatim-code (document "def f(x):" "    return x"))
+    (block (tformat (table (row (cell "a") (cell "b")) (row (cell "1") (cell "2")))))
+    (tabular (tformat (cwith "1" "1" "1" "2" "cell-bborder" "1ln")
+                      (table (row (cell "a") (cell "b")) (row (cell "1") (cell "2")))))
+    (document (description (document (concat (item* "T") "D"))) "x")
+    (document "a" (page-break) "b")))
+
+(define (test-round-trips)
+  (check-group "round trips")
+  (for-each
+    (lambda (fm)
+      (for-each
+        (lambda (t)
+          (check= (cdr (cadr (cadr (convert (convert t "texmacs-stree" fm)
+                                            fm "texmacs-stree"))))
+                  (if (func? t 'document) (cdr t) (list t))))
+        office-same))
+    '("docx-document" "odt-document")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -775,6 +995,8 @@
   (check= (format-from-suffix "odt") "odt")
   (check-true (in? "docx" (converters-to-special "texmacs-file" "-file" #f)))
   (check-true (in? "odt" (converters-to-special "texmacs-file" "-file" #f)))
+  (check-true (in? "docx" (converters-from-special "texmacs-file" "-file" #f)))
+  (check-true (in? "odt" (converters-from-special "texmacs-file" "-file" #f)))
   ;; the whole way, from the archive to the document
   (check= (convert (docx-archive (string-append (wp (wstyle "Titre1") (wr "Intro"))
                                                 (wp (wr "a ") (wr "b" "<w:i/>"))))
@@ -812,5 +1034,11 @@
   (test-officetm-blocks)
   (test-officetm-tables)
   (test-officetm-title)
+  (test-tmoffice-text)
+  (test-tmoffice-blocks)
+  (test-tmoffice-tables)
+  (test-mathml-omml)
+  (test-writers)
+  (test-round-trips)
   (test-formats)
   (check-end))

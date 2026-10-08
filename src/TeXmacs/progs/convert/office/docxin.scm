@@ -99,6 +99,10 @@
                 (with v (docx-child-val n 'w:ilvl)
                   (if v (list (cons 'list-level v)) '())))))
         (if (ox-child x 'w:pageBreakBefore) '((page-break . #t)) '())
+        (with ind (ox-child x 'w:ind)
+          (with v (and ind (or (ox-attr ind 'w:left) (ox-attr ind 'w:start)))
+            (if (and v (string->number v))
+                (list (cons 'indent (string->number v))) '())))
         ;; a large first letter, in a frame of its own
         (with f (ox-child x 'w:framePr)
           (if (and f (in? (ox-attr f 'w:dropCap) '("drop" "margin")))
@@ -551,6 +555,13 @@
                                               ((in? align '("right" "end")) "right")
                                               (else #f)))
                                 (dropcap ,(and (docx-get own 'dropcap) "true"))
+                                ;; a plain paragraph which is indented, as
+                                ;; one more paragraph of an item is
+                                (list-more ,(with ind (docx-get own 'indent)
+                                              (and ind (>= ind 600) (not item?)
+                                                   (not (car role))
+                                                   (number->string
+                                                     (quotient (+ ind 120) 720)))))
                                 (list-id ,(and item? (docx-list-group id)))
                                 (list-level ,(and item? level))
                                 (list-kind ,(and item? (docx-list-kind id level))))
@@ -884,7 +895,7 @@
          (cons* 'p
                 (list-filter (ox-attrs p)
                              (lambda (a) (not (in? (car a) '(list-id list-level
-                                                             list-kind)))))
+                                                             list-kind list-more)))))
                 (ox-children p))))
 
 (define (docx-item-level x)
@@ -898,7 +909,15 @@
          (kind (ox-attr (car l) 'list-kind)))
     (let loop ((l l) (items '()))
       (with n (and (pair? l) (docx-item-level (car l)))
-        (cond ((or (not n) (< n level)
+        (cond ((and (pair? l) (pair? items) (func? (car l) 'p)
+                    (ox-attr (car l) 'list-more)
+                    (> (or (string->number (ox-attr (car l) 'list-more)) 0) level))
+               ;; one more paragraph of the last item
+               (loop (cdr l)
+                     (cons (append (car items)
+                                   (list (docx-plain-paragraph (car l))))
+                           (cdr items))))
+              ((or (not n) (< n level)
                    (and (== n level)
                         (or (!= (ox-attr (car l) 'list-id) id)
                             (!= (ox-attr (car l) 'list-kind) kind))))
@@ -920,6 +939,8 @@
         ((docx-item-level (car l))
          (with r (docx-list l (docx-item-level (car l)))
            (cons (car r) (docx-group-lists (cdr r)))))
+        ((and (func? (car l) 'p) (ox-attr (car l) 'list-more))
+         (cons (docx-plain-paragraph (car l)) (docx-group-lists (cdr l))))
         (else (cons (car l) (docx-group-lists (cdr l))))))
 
 (define (docx-drop-caps l)

@@ -48,7 +48,7 @@
         name)))
 
 (define (ot-cm x)
-  (string-append (number->string (/ (round (* 1000.0 x)) 1000.0)) "cm"))
+  (string-append (office-decimal x) "cm"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text
