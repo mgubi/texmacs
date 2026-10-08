@@ -75,7 +75,8 @@
               (with (state doc) msg
                 (live-create lid doc state)
                 (live-connect lid server)
-                (live-terminate-retrieval lid)))
+                (live-terminate-retrieval lid)
+                (live-cursor-watch lid server)))
             (lambda (err)
               (display* "TeXmacs] " err "\n")
               (set-message err "retrieve remote live document")))
@@ -87,6 +88,128 @@
 (tm-define (live-retrieve t)
   (:require (live-remote-context? t))
   (live-remote-retrieve (live-id t) (live-view-id t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The cursors of the other users
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Each user of a live document sees where the others are. While a remote
+;; live document is open, the position of our cursor in it (a path in the
+;; document, or #f outside of it) is sent to the server when it changes
+;; (live-cursor-poll); the server tells the other clients, whose call back
+;; live-cursor keeps the positions (live-cursors) and has the editor show
+;; them (set-user-cursor), in a colour for each user and with the name.
+
+(define live-cursors (make-ahash-table))      ;; (lid who) -> (pseudo name pos)
+(define live-cursor-sent (make-ahash-table))  ;; lid -> the position sent last
+(define live-cursor-lids (make-ahash-table))  ;; lid -> server, while open
+(define live-cursor-refused (make-ahash-table)) ;; server -> #t: an old server
+(define live-cursor-polling? #f)
+
+(define live-cursor-palette
+  (list "dark red" "dark blue" "dark green" "dark magenta" "dark orange"
+        "dark cyan" "dark brown" "dark grey"))
+(define live-cursor-color-table (make-ahash-table))
+
+(define (live-cursor-color who)
+  (when (not (ahash-ref live-cursor-color-table who))
+    (ahash-set! live-cursor-color-table who
+                (list-ref live-cursor-palette
+                          (modulo (ahash-size live-cursor-color-table)
+                                  (length live-cursor-palette)))))
+  (ahash-ref live-cursor-color-table who))
+
+(define (path-starts? p q)
+  (or (null? q)
+      (and (pair? p) (== (car p) (car q)) (path-starts? (cdr p) (cdr q)))))
+
+(define (live-show-cursor lid who)
+  ;; show, or remove, the cursor of who in the views of lid
+  (with val (ahash-ref live-cursors (list lid who))
+    (for (vid (live-view-ids lid))
+      (for (vt (id->trees vid))
+        (and-let* ((vp (tree->path vt))
+                   (buf (path-to-buffer vp))
+                   (shown? (nnull? (buffer->views buf)))
+                   (id (string-append lid "#" (number->string who) "#" vid)))
+          (with-buffer buf
+            (if (and val (third val))
+                (set-user-cursor id (append vp (third val))
+                                 (live-cursor-color who) (second val))
+                (cancel-user-cursor id))))))))
+
+(tm-call-back (live-cursor lid who pseudo name pos)
+  (if pos
+      (ahash-set! live-cursors (list lid who) (list pseudo name pos))
+      (ahash-remove! live-cursors (list lid who)))
+  (live-show-cursor lid who)
+  (client-return envelope #t))
+
+(tm-define (live-participants lid)
+  (:synopsis "The names of the other users whose cursor is in @lid")
+  (with l (list-filter (ahash-table->list live-cursors)
+                       (lambda (x) (== (caar x) (url->string lid))))
+    (list-remove-duplicates (map (lambda (x) (third x)) l))))
+
+(define (live-cursor-current)
+  ;; (lid . position) when our cursor is in a view of a remote live document
+  (and-let* ((ok? (buffer-exists? (current-buffer)))
+             (vt (tree-innermost live-view-context?))
+             (lid (live-id vt))
+             (server (ahash-ref live-cursor-lids lid))
+             (vp (tree->path vt))
+             (cp (cursor-path))
+             (inside? (path-starts? cp vp)))
+    (cons lid (list-tail cp (length vp)))))
+
+(define (live-cursor-send lid pos)
+  (and-with server (ahash-ref live-cursor-lids lid)
+    (when (not (ahash-ref live-cursor-refused server))
+      (client-remote-eval server `(live-cursor ,lid ,pos) ignore
+        (lambda (err)
+          ;; a server which does not know of cursors is not asked again
+          (when (and (string? err) (string-occurs? "invalid command" err))
+            (ahash-set! live-cursor-refused server #t)))))))
+
+(tm-define (live-cursor-poll)
+  (:synopsis "Tell the servers of the live documents where our cursor is")
+  ;; (the cursors of the others are shown again: in a view which was not
+  ;; there, or not shown, when their position came; nothing is done for
+  ;; those which are shown already)
+  (for (x (ahash-table->list live-cursors))
+    (live-show-cursor (caar x) (cadar x)))
+  (with cur (catch #t live-cursor-current (lambda args #f))
+    (for (lid (map car (ahash-table->list live-cursor-lids)))
+      (with pos (and cur (== (car cur) lid) (cdr cur))
+        (when (!= pos (ahash-ref live-cursor-sent lid))
+          (ahash-set! live-cursor-sent lid pos)
+          (live-cursor-send lid pos))))))
+
+(define (live-cursor-watch lid server)
+  ;; a remote live document was opened: our cursor in it is followed
+  (ahash-set! live-cursor-lids lid server)
+  (ahash-remove! live-cursor-sent lid)
+  (when (not live-cursor-polling?)
+    (set! live-cursor-polling? #t)
+    (delayed
+      (:while (or (!= (ahash-size live-cursor-lids) 0)
+                  (begin (set! live-cursor-polling? #f) #f)))
+      (:pause 300)
+      (live-cursor-poll))))
+
+(tm-define (client-remove server)
+  ;; the live documents of a connection which ends: no cursors any more
+  (for (x (ahash-table->list live-cursor-lids))
+    (when (== (cdr x) server)
+      (with lid (car x)
+        (ahash-remove! live-cursor-lids lid)
+        (ahash-remove! live-cursor-sent lid)
+        (for (y (ahash-table->list live-cursors))
+          (when (== (caar y) lid)
+            (ahash-remove! live-cursors (car y))
+            (live-show-cursor lid (cadar y)))))))
+  (ahash-remove! live-cursor-refused server)
+  (former server))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Treating local modifications in live documents
@@ -189,6 +312,9 @@
   (remote-file-browser-document
     `(document
        (dir-list ,(live-table "Live documents" sname server entries)))))
+
+(tmfs-title-handler (live-list sname doc)
+  (string-append "Live documents - " sname))
 
 (tmfs-load-handler (live-list sname)
   (let* ((u (string-append "tmfs://live-list/" sname))

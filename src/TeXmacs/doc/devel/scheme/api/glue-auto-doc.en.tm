@@ -8675,6 +8675,30 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(set-user-cursor <scm-arg|string> <scm-arg|path> <scm-arg|string> <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|set_user_cursor> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(cancel-user-cursor <scm-arg|string>)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|cancel_user_cursor> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
+    <scm|(cancel-user-cursors)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|cancel_user_cursors> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(clear-undo-history)>
 <explain-synopsis|no synopsis>
   <|explain>

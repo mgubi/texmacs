@@ -397,11 +397,15 @@
                                  pseudo credential cb-done))))
 
 (tm-define (client-login-home server-name port pseudo credential cb-done)
+  (client-notify :connecting
+                 (string-append "connecting to " server-name "..."))
   (client-login-then server-name port pseudo credential
     (lambda (server ret)
       (cond ((== ret "ready")
              (add-active-connection server server-name port pseudo)
-             (set! remote-client-list (client-active-servers))
+             (client-notify :connected
+                            (string-append "connected to " server-name
+                                           " as " pseudo))
              (client-send-version server server-name port
                                   pseudo credential cb-done))
             ((== ret "pending")
@@ -410,9 +414,16 @@
              (open-remote-pending-login
                server server-name port pseudo credential))
             (else
-              (when server (client-logout server))
-              (client-open-error
-                (string-append "Remote login error, " ret)))))))
+              ;; the connection is of no use: closed, if it still is open
+              (when (and (integer? server) (>= server 0)
+                         (in? server (active-servers)))
+                (client-stop server))
+              (with msg (if (string? ret) ret "no connection")
+                (client-notify :failed
+                               (string-append "no connection with "
+                                              server-name ": " msg))
+                (client-open-error
+                  (string-append "Remote login error, " msg))))))))
 
 (tm-widget ((remote-login-widget server-name port pseudo authentication cb)
 	    quit)
@@ -958,6 +969,15 @@
           (lambda (e)
             (with (short-name full-name dir? props) e
               (if dir-flag? dir? #t))))
+         (save-as
+          ;; the file or the directory named name in dir (dir itself is
+          ;; always the name of a directory: a file renamed got one too,
+          ;; and its buffer was then read as a directory)
+          (lambda (name)
+            (with full (url-append dir name)
+              (if dir-flag? full
+                  (string->url (string-append "tmfs://remote-file/"
+                                              (remote-file-name full)))))))
          (dummy (select-dir dir)))
     (padded
       (refreshable "remote-file-browser"
@@ -973,14 +993,18 @@
                   ""))
         (assuming save-flag?
           ===
-          (hlist
-            (text (cadr type)) //
-            (refreshable "remote-save-as"
-              (input (when answer (quit (url-append dir answer)))
-                     "string" (list file) "1w"))
-            // // //
-            (explicit-buttons
-              ("Ok" (quit (url-append dir file)))))    )
+          ;; a form, so that "Ok" takes the name as typed (it took the
+          ;; name of the entry selected last, whatever was typed after)
+          (form "remote-save-as"
+            (hlist
+              (text (cadr type)) //
+              (refreshable "remote-save-as"
+                (form-input "name" "string" (list file) "1w"))
+              // // //
+              (explicit-buttons
+                ("Ok" (with name (form-ref "name")
+                        (when (and (string? name) (!= name ""))
+                          (quit (save-as name)))))))))
         (assuming (and dir-flag? (not save-flag?))
           (bottom-buttons
             >>
