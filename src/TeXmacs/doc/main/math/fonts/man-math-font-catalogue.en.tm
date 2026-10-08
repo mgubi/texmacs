@@ -23,7 +23,7 @@
   The typewriter companion of a font is also the font of the inputs of
   sessions.
 
-  <section|Serif text and mathematics>
+  <section|Serif fonts with mathematics>
 
   <paragraph*|Latin Modern>
 
@@ -281,7 +281,7 @@
     </equation*>
   </with>
 
-  <section|Sans serif text and mathematics>
+  <section|Sans serif fonts with mathematics>
 
   Sans serif fonts are mostly used for slides and posters, where they read
   better from a distance.
@@ -352,7 +352,7 @@
 
   <paragraph*|Noto Sans>
 
-  Google's Noto family, made to cover every script of <name|Unicode>, with a sans serif mathematical font which has all of the symbols. The text is set in Noto Sans; Noto Serif stays in the section <menu|Text only> of the font menu. Text: Noto Sans; mathematics: Noto Sans Math; in <LaTeX>: <verbatim|unicode-math> with Noto Sans Math.
+  Google's Noto family, made to cover every script of <name|Unicode>, with a sans serif mathematical font which has all of the symbols. The text is set in Noto Sans; Noto Serif stays in the section <menu|Text only> of the submenu <menu|Serif>. Text: Noto Sans; mathematics: Noto Sans Math; in <LaTeX>: <verbatim|unicode-math> with Noto Sans Math.
 
   <\with|font|Noto|font-family|ss>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
@@ -368,7 +368,7 @@
 
   <paragraph*|IBM Plex>
 
-  IBM's corporate family, with serif, sans serif and typewriter faces and a complete mathematical font of recent design. The text is set in IBM Plex Sans; IBM Plex Serif stays in the section <menu|Text only> of the font menu. Text: IBM Plex Sans; mathematics: IBM Plex Math; in <LaTeX>: <verbatim|plex-otf>, or <verbatim|unicode-math> with IBM Plex Math.
+  IBM's corporate family, with serif, sans serif and typewriter faces and a complete mathematical font of recent design. The text is set in IBM Plex Sans; IBM Plex Serif stays in the section <menu|Text only> of the submenu <menu|Serif>. Text: IBM Plex Sans; mathematics: IBM Plex Math; in <LaTeX>: <verbatim|plex-otf>, or <verbatim|unicode-math> with IBM Plex Math.
 
   <\with|font|IBM Plex|font-family|ss>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
@@ -400,7 +400,7 @@
 
   <section|The traditional fonts>
 
-  These are the fonts of the section <menu|Text and mathematics> of the font
+  These are the first fonts of the submenu <menu|Serif> of the font
   menu, which do not use the <name|OpenType> mathematical fonts above: Roman
   uses the fonts of <TeX>, and Stix the first STIX Math font, with its
   hand-tuned corrections.

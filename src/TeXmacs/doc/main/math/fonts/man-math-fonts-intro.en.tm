@@ -50,9 +50,11 @@
 
   The simplest way is the font button of the focus toolbar, which shows the
   name of the main font of the document (for instance <menu|Roman>) when the
-  cursor is not inside any particular tag. Its menu has a section <menu|Text
-  and mathematics> with Roman and the first STIX fonts, then a section <menu|Serif text and
-  mathematics> and a section <menu|Sans serif text and mathematics> with the
+  cursor is not inside any particular tag. Its menu sorts the fonts by
+  design, in the submenus <menu|Serif>, <menu|Sans serif>,
+  <menu|Typewriter> and <menu|Decorative>. The first two begin with a
+  section <menu|With mathematics>: Roman and the first STIX fonts among
+  the serif ones, and the
   <name|OpenType> pairs, under the names <LaTeX> users know: <menu|Times>
   for <name|TeX Gyre> Termes as with the <verbatim|newtx> package,
   <menu|Palatino> for <name|TeX Gyre> Pagella as with <verbatim|newpx>,
@@ -60,8 +62,8 @@
   knows but which are less common are in a submenu <menu|Other OpenType math
   fonts>. Every entry sets the text font, the mathematical font and, when
   the pair calls for it, the font family, and a menu lists only the fonts
-  which are installed. A last section, <menu|Text only>, changes the text
-  font alone.
+  which are installed. The second section of a submenu, <menu|Text only>,
+  changes the text font alone.
 
   <menu|Document|Font|Mathematical font> changes the mathematical font alone,
   and keeps the text font. Its entries are the traditional <TeXmacs> math
