@@ -512,17 +512,16 @@
 ;; Markdown
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TeXmacs has no Markdown converter, neither in convert/ nor in the
-;; plugins: the format is unknown and a .md file is of no known format.
+;; The Markdown converters have their own suite, markdown-test.scm: here,
+;; that the format is known and reached from and to the TeXmacs formats.
 (define (test-markdown)
   (check-group "markdown")
-  (check-false (format? "markdown"))
+  (check-true (format? "markdown"))
   (check-false (format? "md"))
-  (check= (format-from-suffix "md") "generic")
-  (check= (converter-search "texmacs-tree" "markdown-document") #f)
-  (check= (convert (stree->tree "x") "texmacs-tree" "markdown-snippet") #f)
-  (check= (texmacs->generic (stree->tree "x") "markdown-document")
-          "Error: bad format or data"))
+  (check= (format-from-suffix "md") "markdown")
+  (check-true (list? (converter-search "texmacs-tree" "markdown-document")))
+  (check= (convert (stree->tree "x") "texmacs-tree" "markdown-snippet") "x")
+  (check= (texmacs->generic (stree->tree "x") "markdown-snippet") "x"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Verbatim
@@ -779,13 +778,13 @@
   (let ((ex (converters-from-special "texmacs-file" "-file" #f))
         (im (converters-to-special "texmacs-file" "-file" #f)))
     (for-each (lambda (fm) (check-true (in? fm ex)))
-              '("html" "latex" "stm" "tmml" "verbatim" "code"))
+              '("html" "latex" "markdown" "stm" "tmml" "verbatim" "code"))
     (for-each (lambda (fm) (check-true (in? fm im)))
-              '("html" "latex" "stm" "tmml" "verbatim" "code"))
+              '("html" "latex" "markdown" "stm" "tmml" "verbatim" "code"))
     (for-each (lambda (fm) (check-false (in? fm ex)))
-              '("texmacs" "bibtex" "scheme" "python" "markdown"))
+              '("texmacs" "bibtex" "scheme" "python"))
     (for-each (lambda (fm) (check-false (in? fm im)))
-              '("texmacs" "bibtex" "scheme" "python" "markdown"))
+              '("texmacs" "bibtex" "scheme" "python"))
     (check-true (in? "texmacs" (converters-from-special "texmacs-file" "-file"
                                                         #t)))
     ;; every format of the menus can be reached from and to texmacs-file
