@@ -252,8 +252,11 @@
   the <verbatim|text-file> if there is one).
   <scm|opentype-math-font-list> returns triples <verbatim|(label math
   text)> sorted by label, and <scm|opentype-math-font-group-list> those of
-  one section. <scm|opentype-font-menu>, which the font button of the focus
-  toolbar shows, has one section per group, each a menu without arguments
+  one section. The menu of the font button of the focus toolbar
+  (<scm|document-short-design-font-menu>) has a submenu for each design,
+  <menu|Serif>, <menu|Sans serif>, <menu|Typewriter> and
+  <menu|Decorative>: the first two list the fonts with mathematics of
+  their group, then the text fonts. Each list is a menu without arguments
   (<scm|opentype-serif-font-menu> and the others), since a submenu is
   expanded after its parent and a menu with arguments has lost them by
   then. <scm|opentype-math-font-menu> appends the installed math fonts to
@@ -314,13 +317,34 @@
   and bold), <verbatim|garamond> (<name|Garamond-Math> and <name|EB
   Garamond>), <verbatim|oldstandard>, <verbatim|gfsneohellenic>,
   <verbatim|plex> (<name|IBM Plex Math> and the <name|Plex Sans>,
-  <name|Serif> and <name|Mono> faces) and <verbatim|noto> (<name|Noto Sans
-  Math>, <name|Noto Sans> and <name|Noto Sans Mono>). The directory
-  <verbatim|inconsolata> holds <name|Inconsolatazi4>, the typewriter
-  companion of several profiles. Of the profiled math fonts, only <name|TeX
-  Gyre DejaVu Math>, <name|XITS Math> and <name|Asana Math> are not
-  shipped; they are used when a <TeX> distribution or the system has
+  <name|Serif>, <name|Mono> and <name|Sans Condensed> faces in their eight
+  weights), <verbatim|noto> (<name|Noto Sans Math>, <name|Noto Sans> and
+  <name|Noto Sans Mono>) and <verbatim|dejavu> (<name|TeX Gyre DejaVu
+  Math> with the <name|DejaVu> Serif, Sans and Sans Mono faces and the
+  condensed ones). The directory <verbatim|inconsolata> holds
+  <name|Inconsolatazi4>, the typewriter companion of several profiles. Of
+  the profiled math fonts, only <name|XITS Math> and <name|Asana Math> are
+  not shipped; they are used when a <TeX> distribution or the system has
   them.
+
+  Four directories hold text fonts without mathematics, which are in the
+  menu of text fonts (<source-link|font-short-menu.scm|TeXmacs/progs/fonts/font-short-menu.scm>):
+  <verbatim|gentium> (<name|Gentium Plus>), <verbatim|antt> (<name|Antykwa
+  Torunska>), <verbatim|poltawski> (<name|Antykwa Poltawskiego>),
+  <verbatim|iwona> and <verbatim|kurier>. With <name|DejaVu>, the weights
+  of <name|IBM Plex> and the typewriter of variable width of <name|Latin
+  Modern> (<verbatim|lmmonoprop10>, the shape <verbatim|proportional> of
+  <name|Latin Modern Mono>), they complete the fonts of the
+  <name|ConTeXt> distribution. The files of <name|IBM Plex> are those of
+  <TeX> Live, which shorten the names of the families (<verbatim|IBM Plex
+  Sans Cond>, <verbatim|ExtLt>, <verbatim|Medm>, <verbatim|SmBld>): their
+  entries of <source-link|font-features.scm|TeXmacs/fonts/font-features.scm> are written by hand, in the
+  master <verbatim|IBM Plex> with the features <verbatim|Condensed>,
+  <verbatim|ExtraLight> and <verbatim|SemiBold>, and the medium weight in
+  a master of its own, <verbatim|IBM Plex Medium>, since a medium face
+  inside a master is taken for the regular one. For the same reason the
+  medium faces of <name|Antykwa Torunska>, <name|Iwona> and <name|Kurier>
+  are not shipped.
 
   All their faces are entered in the shipped database
   (<source-link|TeXmacs/fonts/font-database.scm|TeXmacs/fonts/font-database.scm>,

@@ -284,16 +284,6 @@
     ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
      (init-opentype-font (cadr p)))))
 
-(tm-menu (opentype-font-menu)
-  (assuming (nnull? (opentype-math-font-group-list "Serif"))
-    (group "Serif text and mathematics")
-    (link opentype-serif-font-menu))
-  (assuming (nnull? (opentype-math-font-group-list "Sans serif"))
-    (group "Sans serif text and mathematics")
-    (link opentype-sans-font-menu))
-  (assuming (nnull? (opentype-math-font-group-list "Other"))
-    (-> "Other OpenType math fonts" (link opentype-other-font-menu))))
-
 ;; Text fonts without mathematics: a profile with companions only (no file,
 ;; so that it is not offered in the menus of math fonts), for the typewriter
 ;; text of a font which has no monospaced face of its own; otherwise the
@@ -305,5 +295,7 @@
              "Georgia" "Hoefler Text" "Iowan Old Style" "Times New Roman"
              "Alegreya" "Cardo" "Crimson" "Essays1743" "Junicode"
              "Merriweather" "Arial" "Avenir" "Futura" "Gill" "Helvetica"
-             "Lucida Grande" "Optima" "Verdana" "Inter" "Lato" "Cuprum"))
+             "Lucida Grande" "Optima" "Verdana" "Inter" "Lato" "Cuprum"
+             "Antykwa Poltawskiego" "Antykwa Torunska" "Gentium Plus"
+             "Iwona" "Kurier"))
   (math-font-profile-set name '((mono "Inconsolatazi4, TeX Gyre Cursor"))))

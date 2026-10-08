@@ -365,15 +365,7 @@
 (menu-bind document-short-font-menu
   ("Default" (init-default-font))
   ---
-  (group "Text and mathematics")
-  ("Roman" (init-font "roman" "roman"))
-  (if (font-exists-in-tt? "STIX-Regular")
-      ("Stix" (init-font "stix" "math-stix")))
-  (if (nnull? (opentype-math-font-list))
-      (link opentype-font-menu))
-  ---
-  (group "Text only")
-  (link document-short-text-font-menu)
+  (link document-short-design-font-menu)
   (if (and (supports-chinese?) (== (get-init "language") "chinese"))
       ---
       (link document-short-chinese-font-menu))

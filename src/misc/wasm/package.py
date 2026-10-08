@@ -24,8 +24,8 @@
 # light theme: neoclassical, see init_texmacs.cpp).
 # The other packages, in the order of their loading, follow PACKAGES below.
 #
-# The fonts themselves (LAZY: the OpenType and Type 1 files, 59 MB, two
-# thirds of the whole) are not in a package: each is a file of its own
+# The fonts themselves (LAZY: the OpenType and Type 1 files, 90 MB, three
+# quarters of the whole) are not in a package: each is a file of its own
 # (tm-font-<digest>.<ext>), which the page fetches when TeXmacs first reads
 # it and keeps in the cache of the browser for the next visits; the manifest
 # lists them under "lazy". Those of the boot list stay in the boot package.

@@ -163,8 +163,9 @@ out larger than the text, as the fallback: the profiles say `(mono
 **TeX Gyre DejaVu Math** (Bitstream Vera / DejaVu license, free). Sans
 serif math for DejaVu Sans and DejaVu Serif; TeXmacs already knows the
 DejaVu text fonts (`math-dejavu`). Identical structure to the other TeX
-Gyre math fonts. Companions in the `dejavu` collection. *Now: profiled, not
-shipped; menu entry "DejaVu" when installed.*
+Gyre math fonts. Companions in the `dejavu` collection. *Now: shipped
+(`dejavu`) with the Serif, Sans and Sans Mono faces and the condensed
+ones; menu entry "DejaVu".*
 
 **STIX Two Math** (OFL). The most complete symbol set, MathKernInfo,
 stylistic sets for alternate glyph shapes (upright integrals, calligraphic
@@ -537,6 +538,5 @@ Everything else in the survey is picked up from the system or from TeX
 Live through `TEXMACS_FONT_PATH` and the font database; the profiles in
 `TeXmacs/progs/fonts/fonts-opentype.scm` activate when the files are
 found, and the font menus list exactly the profiled fonts that are
-installed. Three profiled fonts are not shipped: TeX Gyre DejaVu Math,
-offered in the serif section when installed, and XITS and Asana, in the
+installed. Two profiled fonts are not shipped: XITS and Asana, in the
 submenu of other fonts.

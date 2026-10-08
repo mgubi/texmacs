@@ -238,6 +238,24 @@
   <paragraph|8 October 2026>
 
   <\itemize>
+    <item>More fonts come with <TeXmacs>, those of the <name|ConTeXt>
+    distribution which were missing: <name|DejaVu> (serif, sans serif,
+    typewriter and condensed, with its mathematical font), <name|Gentium
+    Plus>, the
+    Polish families <name|Antykwa Torunska>, <name|Antykwa Poltawskiego>,
+    <name|Iwona> and <name|Kurier>, the light, semi bold and condensed
+    faces of <name|IBM Plex>, and the typewriter of variable width of
+    <name|Latin Modern>. As the other fonts, each is fetched when a
+    document first uses it.
+
+    <item>The menu of the fonts (the font button of the focus bar, and
+    the font in the footer) sorts them by design: <menu|Serif>, <menu|Sans
+    serif>, <menu|Typewriter> and <menu|Decorative>. A submenu lists first
+    the fonts which come with their mathematics, such as <menu|Palatino>,
+    <menu|DejaVu> or <menu|Fira>, then those which change the text only,
+    such as <menu|Gentium Plus> or <menu|Iwona>. Text with mathematics was
+    a long list in the menu itself, and the text fonts were apart.
+
     <item>The documents of <name|Word> (<verbatim|.docx>) and of
     <name|LibreOffice> (<verbatim|.odt>) are opened and written by
     <TeXmacs> itself, in the browser too: add such a file to the files of

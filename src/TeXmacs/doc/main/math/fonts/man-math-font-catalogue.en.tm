@@ -23,7 +23,7 @@
   The typewriter companion of a font is also the font of the inputs of
   sessions.
 
-  <section|Serif text and mathematics>
+  <section|Serif fonts with mathematics>
 
   <paragraph*|Latin Modern>
 
@@ -110,6 +110,22 @@
   A Century Schoolbook design, made for legibility. Hand tuned. Text: TeX Gyre Schola; mathematics: TeX Gyre Schola Math; in <LaTeX>: <verbatim|fouriernc, tgschola>.
 
   <\with|font|TeX Gyre Schola>
+    Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
+
+    <\equation*>
+      <big|int><rsub|0><rsup|\<infty\>>e<rsup|-x<rsup|2>>*\<mathd\>x=<frac|<sqrt|\<pi\>>|2>,<space|2em><big|sum><rsub|n=1><rsup|\<infty\>><frac|1|n<rsup|2>>=<frac|\<pi\><rsup|2>|6>,<space|2em><around*|(|<frac|\<partial\>f|\<partial\>x>|)><rsup|2>\<leqslant\><around*|\<\|\>|f|\<\|\>><rsub|\<infty\>><rsup|2>
+    </equation*>
+
+    <\equation*>
+      \<alpha\>\<beta\>\<gamma\>\<Gamma\>\<Omega\>,<space|1em>\<bbb-R\><rsup|n>,<space|1em>\<cal-F\>,<space|1em>\<frak-g\>,<space|1em><math-bf|v>+<math-ss|A>+<math-tt|x>,<space|1em><wide|x+y|^>,<space|1em><matrix|<tformat|<table|<row|<cell|a>|<cell|b>>|<row|<cell|c>|<cell|d>>>>>
+    </equation*>
+  </with>
+
+  <paragraph*|DejaVu>
+
+  The DejaVu fonts, wide and very legible on the screen, with a mathematical companion in the style of the <name|TeX Gyre> fonts; they have sans serif and typewriter faces of their own, and condensed ones. Text: DejaVu Serif; mathematics: TeX Gyre DejaVu Math; in <LaTeX>: <verbatim|dejavu-otf>.
+
+  <\with|font|DejaVu>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
 
     <\equation*>
@@ -265,7 +281,7 @@
     </equation*>
   </with>
 
-  <section|Sans serif text and mathematics>
+  <section|Sans serif fonts with mathematics>
 
   Sans serif fonts are mostly used for slides and posters, where they read
   better from a distance.
@@ -336,7 +352,7 @@
 
   <paragraph*|Noto Sans>
 
-  Google's Noto family, made to cover every script of <name|Unicode>, with a sans serif mathematical font which has all of the symbols. The text is set in Noto Sans; Noto Serif stays in the section <menu|Text only> of the font menu. Text: Noto Sans; mathematics: Noto Sans Math; in <LaTeX>: <verbatim|unicode-math> with Noto Sans Math.
+  Google's Noto family, made to cover every script of <name|Unicode>, with a sans serif mathematical font which has all of the symbols. The text is set in Noto Sans; Noto Serif stays in the section <menu|Text only> of the submenu <menu|Serif>. Text: Noto Sans; mathematics: Noto Sans Math; in <LaTeX>: <verbatim|unicode-math> with Noto Sans Math.
 
   <\with|font|Noto|font-family|ss>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
@@ -352,7 +368,7 @@
 
   <paragraph*|IBM Plex>
 
-  IBM's corporate family, with serif, sans serif and typewriter faces and a complete mathematical font of recent design. The text is set in IBM Plex Sans; IBM Plex Serif stays in the section <menu|Text only> of the font menu. Text: IBM Plex Sans; mathematics: IBM Plex Math; in <LaTeX>: <verbatim|plex-otf>, or <verbatim|unicode-math> with IBM Plex Math.
+  IBM's corporate family, with serif, sans serif and typewriter faces and a complete mathematical font of recent design. The text is set in IBM Plex Sans; IBM Plex Serif stays in the section <menu|Text only> of the submenu <menu|Serif>. Text: IBM Plex Sans; mathematics: IBM Plex Math; in <LaTeX>: <verbatim|plex-otf>, or <verbatim|unicode-math> with IBM Plex Math.
 
   <\with|font|IBM Plex|font-family|ss>
     Text in <em|italic>, <strong|bold>, <samp|sans serif> and <verbatim|typewriter>: the quick brown fox jumps over the lazy dog, 0123456789.
@@ -384,7 +400,7 @@
 
   <section|The traditional fonts>
 
-  These are the fonts of the section <menu|Text and mathematics> of the font
+  These are the first fonts of the submenu <menu|Serif> of the font
   menu, which do not use the <name|OpenType> mathematical fonts above: Roman
   uses the fonts of <TeX>, and Stix the first STIX Math font, with its
   hand-tuned corrections.
@@ -428,12 +444,12 @@
   another font or composes, and the result may not match the design
   perfectly. Every font below has all the symbols of everyday mathematics.
 
-  <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|symbols>>|<cell|<em|missing alphabets>>|<cell|<em|bold>>>|<row|<cell|Latin Modern>|<cell|65%>|<cell|lowercase script>|<cell|no>>|<row|<cell|New Computer Modern>|<cell|100%>|<cell|none>|<cell|yes>>|<row|<cell|Times>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Palatino>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Bookman>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Schoolbook>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|STIX Two>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Libertinus>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Kp Fonts>|<cell|65%>|<cell|lowercase script, blackboard>|<cell|yes>>|<row|<cell|Utopia>|<cell|68%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Charter>|<cell|67%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Euler>|<cell|66%>|<cell|lowercase script>|<cell|no>>|<row|<cell|Concrete>|<cell|67%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Garamond>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Old Standard>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Fira>|<cell|43%>|<cell|script, fraktur, sans serif>|<cell|no>>|<row|<cell|Kp Sans>|<cell|63%>|<cell|lowercase script, blackboard>|<cell|yes>>|<row|<cell|Computer Modern Sans>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Lete Sans>|<cell|95%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Noto Sans>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|IBM Plex>|<cell|99%>|<cell|none>|<cell|no>>|<row|<cell|GFS Neohellenic>|<cell|68%>|<cell|lowercase script, fraktur and blackboard, sans serif, typewriter>|<cell|no>>>>>>
+  <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|symbols>>|<cell|<em|missing alphabets>>|<cell|<em|bold>>>|<row|<cell|Latin Modern>|<cell|65%>|<cell|lowercase script>|<cell|no>>|<row|<cell|New Computer Modern>|<cell|100%>|<cell|none>|<cell|yes>>|<row|<cell|Times>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Palatino>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Bookman>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Schoolbook>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|DejaVu>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|STIX Two>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Libertinus>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Kp Fonts>|<cell|65%>|<cell|lowercase script, blackboard>|<cell|yes>>|<row|<cell|Utopia>|<cell|68%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Charter>|<cell|67%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Euler>|<cell|66%>|<cell|lowercase script>|<cell|no>>|<row|<cell|Concrete>|<cell|67%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Garamond>|<cell|67%>|<cell|none>|<cell|no>>|<row|<cell|Old Standard>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Fira>|<cell|43%>|<cell|script, fraktur, sans serif>|<cell|no>>|<row|<cell|Kp Sans>|<cell|63%>|<cell|lowercase script, blackboard>|<cell|yes>>|<row|<cell|Computer Modern Sans>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|Lete Sans>|<cell|95%>|<cell|lowercase script>|<cell|yes>>|<row|<cell|Noto Sans>|<cell|100%>|<cell|none>|<cell|no>>|<row|<cell|IBM Plex>|<cell|99%>|<cell|none>|<cell|no>>|<row|<cell|GFS Neohellenic>|<cell|68%>|<cell|lowercase script, fraktur and blackboard, sans serif, typewriter>|<cell|no>>>>>>
     How complete the mathematical fonts which come with <TeXmacs> are. <em|Symbols> is the part of the list of symbols of the <LaTeX> package <verbatim|unicode-math> which the font has; <em|missing alphabets> names the mathematical alphabets of <name|Unicode> (bold, italic, script, fraktur, blackboard bold, sans serif, typewriter) which are incomplete, and which <TeXmacs> emulates; <em|bold> says whether bold formulas use a real bold mathematical font.
   </big-table>
 
-  <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|sans serif, typewriter>>|<cell|<em|license>>>|<row|<cell|Latin Modern>|<cell|LM Sans, LM Mono>|<cell|GUST>>|<row|<cell|New Computer Modern>|<cell|NewCM Sans, NewCM Mono>|<cell|GUST>>|<row|<cell|Times>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Palatino>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Bookman>|<cell|Adventor, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Schoolbook>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|STIX Two>|<cell|none>|<cell|OFL>>|<row|<cell|Libertinus>|<cell|Libertinus Sans, Mono>|<cell|OFL>>|<row|<cell|Kp Fonts>|<cell|KpSans, KpMono>|<cell|OFL>>|<row|<cell|Utopia>|<cell|none>|<cell|OFL>>|<row|<cell|Charter>|<cell|none>|<cell|OFL, Bitstream>>|<row|<cell|Euler>|<cell|Heros, Inconsolata>|<cell|OFL, GUST>>|<row|<cell|Concrete>|<cell|none>|<cell|OFL>>|<row|<cell|Garamond>|<cell|Inconsolata (typewriter)>|<cell|OFL>>|<row|<cell|Old Standard>|<cell|Heros, Inconsolata>|<cell|OFL, GUST>>|<row|<cell|Fira>|<cell|Fira Mono>|<cell|OFL>>|<row|<cell|Kp Sans>|<cell|KpMono>|<cell|OFL>>|<row|<cell|Computer Modern Sans>|<cell|NewCM Sans, NewCM Mono>|<cell|GUST>>|<row|<cell|Lete Sans>|<cell|none>|<cell|OFL>>|<row|<cell|Noto Sans>|<cell|Noto Sans, Noto Sans Mono>|<cell|OFL>>|<row|<cell|IBM Plex>|<cell|Plex Sans, Plex Mono>|<cell|OFL>>|<row|<cell|GFS Neohellenic>|<cell|Inconsolata (typewriter)>|<cell|OFL>>>>>>
-    The sans serif and typewriter companions which come with <TeXmacs>, and the licenses of the fonts involved: the GUST Font License or the SIL Open Font License (OFL). Old Standard Math is under the GUST Font License, the Old Standard text faces under the OFL; Inconsolata is under the OFL.
+  <\big-table|<tabular|<tformat|<cwith|1|1|1|-1|cell-bborder|1ln>|<cwith|1|-1|1|-1|cell-lsep|0.5em>|<cwith|1|-1|1|-1|cell-rsep|0.5em>|<table|<row|<cell|<em|font>>|<cell|<em|sans serif, typewriter>>|<cell|<em|license>>>|<row|<cell|Latin Modern>|<cell|LM Sans, LM Mono>|<cell|GUST>>|<row|<cell|New Computer Modern>|<cell|NewCM Sans, NewCM Mono>|<cell|GUST>>|<row|<cell|Times>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Palatino>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Bookman>|<cell|Adventor, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|Schoolbook>|<cell|Heros, Inconsolata>|<cell|GUST, OFL>>|<row|<cell|DejaVu>|<cell|DejaVu Sans, DejaVu Sans Mono>|<cell|GUST, Bitstream Vera>>|<row|<cell|STIX Two>|<cell|none>|<cell|OFL>>|<row|<cell|Libertinus>|<cell|Libertinus Sans, Mono>|<cell|OFL>>|<row|<cell|Kp Fonts>|<cell|KpSans, KpMono>|<cell|OFL>>|<row|<cell|Utopia>|<cell|none>|<cell|OFL>>|<row|<cell|Charter>|<cell|none>|<cell|OFL, Bitstream>>|<row|<cell|Euler>|<cell|Heros, Inconsolata>|<cell|OFL, GUST>>|<row|<cell|Concrete>|<cell|none>|<cell|OFL>>|<row|<cell|Garamond>|<cell|Inconsolata (typewriter)>|<cell|OFL>>|<row|<cell|Old Standard>|<cell|Heros, Inconsolata>|<cell|OFL, GUST>>|<row|<cell|Fira>|<cell|Fira Mono>|<cell|OFL>>|<row|<cell|Kp Sans>|<cell|KpMono>|<cell|OFL>>|<row|<cell|Computer Modern Sans>|<cell|NewCM Sans, NewCM Mono>|<cell|GUST>>|<row|<cell|Lete Sans>|<cell|none>|<cell|OFL>>|<row|<cell|Noto Sans>|<cell|Noto Sans, Noto Sans Mono>|<cell|OFL>>|<row|<cell|IBM Plex>|<cell|Plex Sans, Plex Mono>|<cell|OFL>>|<row|<cell|GFS Neohellenic>|<cell|Inconsolata (typewriter)>|<cell|OFL>>>>>>
+    The sans serif and typewriter companions which come with <TeXmacs>, and the licenses of the fonts involved: the GUST Font License or the SIL Open Font License (OFL). Old Standard Math is under the GUST Font License, the Old Standard text faces under the OFL; Inconsolata is under the OFL. The DejaVu text faces are under the license of the Bitstream Vera fonts, with the changes of DejaVu in the public domain.
   </big-table>
 
   <tmdoc-copyright|2026|Massimiliano Gubinelli>

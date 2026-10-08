@@ -576,6 +576,46 @@
                   (font-database-search "Fira Mono" "Bold")))
   (check-true (in? "STIX-Bold.otf"
                   (font-database-search "Stix" "Bold")))
+  ;; the fonts of the ConTeXt distribution: DejaVu, Gentium Plus, the
+  ;; Polish families, the weights and the condensed width of IBM Plex, the
+  ;; Latin Modern typewriter of variable width
+  (for (x '(("DejaVu Serif" "Book" "DejaVuSerif.ttf")
+            ("DejaVu Sans" "Condensed Bold" "DejaVuSansCondensed-Bold.ttf")
+            ("DejaVu Sans Mono" "Oblique" "DejaVuSansMono-Oblique.ttf")
+            ("TeX Gyre DejaVu Math" "Regular" "texgyredejavu-math.otf")
+            ("Gentium Plus" "Bold Italic" "GentiumPlus-BoldItalic.ttf")
+            ("Antykwa Torunska" "Condensed Light"
+             "AntykwaTorunskaCondLight-Regular.otf")
+            ("Antykwa Poltawskiego" "Light Italic" "antpoltlt-italic.otf")
+            ("Iwona" "Heavy" "IwonaHeavy-Regular.otf")
+            ("Kurier Cond" "Bold" "KurierCond-Bold.otf")
+            ("IBM Plex Sans Cond" "Regular"
+             "IBMPlexSansCondensed-Regular.otf")
+            ("IBM Plex Serif SmBld" "Italic" "IBMPlexSerif-SemiBoldItalic.otf")
+            ("IBM Plex Mono ExtLt" "Regular" "IBMPlexMono-ExtraLight.otf")
+            ("Latin Modern Mono Prop" "10 Regular"
+             "lmmonoprop10-regular.otf")))
+    (check-true (in? (caddr x) (font-database-search (car x) (cadr x)))))
+  (check= (font-family->master "IBM Plex Sans Cond") "IBM Plex")
+  (check= (font-family->master "IBM Plex Sans Medm") "IBM Plex Medium")
+  (check= (font-family-features "IBM Plex Sans Cond")
+          '("sansserif" "condensed"))
+  (check= (font-family-features "IBM Plex Serif SmBld") '("semibold"))
+  (check= (font-family->master "Latin Modern Mono Prop") "Latin Modern Mono")
+  (check= (logical-font-search (logical-font-public "IBM Plex Sans" "Regular"))
+          '("IBM Plex Sans" "Regular"))
+  (check= (logical-font-search (logical-font-public "IBM Plex Sans" "Condensed"))
+          '("IBM Plex Sans Cond" "Regular"))
+  (check= (logical-font-search
+           (logical-font-private "IBM Plex" "ss" "bold" "condensed"))
+          '("IBM Plex Sans Cond" "Bold"))
+  (check= (logical-font-search
+           (logical-font-private "Latin Modern Mono" "tt" "medium"
+                                 "proportional"))
+          '("Latin Modern Mono Prop" "10 Regular"))
+  (check= (logical-font-search
+           (logical-font-private "Latin Modern Mono" "tt" "medium" "right"))
+          '("Latin Modern Mono" "10 Regular"))
   (check-true (tt-exists? "texgyrepagella-regular"))
   (check-true (tt-exists? "LinLibertine_R"))
   (check-true (font-exists-in-tt? "FiraSans-Regular"))
