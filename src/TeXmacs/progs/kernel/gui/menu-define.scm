@@ -790,7 +790,8 @@
 
 
 (tm-define (typographic-palette?)
-  (and (vue-gui?) (!= (typographic-palette-set) "Classical")))
+  ;; (Tau: the palettes of the Vue interface, in the menus of the page)
+  (!= (typographic-palette-set) "Classical"))
 
 (tm-menu (typographic-color-tiles cmd l)
   ;; eight colours a line (tile wants a number, not an expression): the
@@ -832,11 +833,8 @@
   ;; and the choice of it (an enum, which does not close the menu) changes
   ;; the grid in place: a promise in a refreshable, whose items are made
   ;; again when it is refreshed
-  (if (vue-gui?)
-      (refreshable "typographic-palette"
-        (promise (cons 'vertical (standard-color-grid cmd)))))
-  (if (not (vue-gui?))
-      (dynamic (standard-color-tiles cmd))))
+  (refreshable "typographic-palette"
+    (promise (cons 'vertical (standard-color-grid cmd)))))
 
 (define (gui-make-pick-color x)
   `(menu-dynamic

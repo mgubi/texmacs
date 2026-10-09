@@ -29,7 +29,7 @@
 ;; WebAssembly (web/tm-tikz.js, copied to tikzjax/ next to the page; see
 ;; src/docs/wasm/tikzjax.md); elsewhere a Python program which runs latex
 (define (tikz-in-browser?)
-  (defined? 'web-files))
+  (in-browser?))
 
 (define (tikz-engine)
   (if (tikz-in-browser?)
@@ -39,7 +39,7 @@
 (plugin-configure tikz
   ;; (the test of tikz-in-browser? written out: the requirements are also
   ;; evaluated outside of this file, e.g. by the plugins suite)
-  (:require (or (defined? 'web-files)
+  (:require (or (in-browser?)
                 (and (python-command) (!= (python-command) "")
                      (url-exists-in-path? "latex"))))
   ,@(tikz-engine)

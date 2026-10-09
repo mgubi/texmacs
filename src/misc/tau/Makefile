@@ -87,13 +87,61 @@ $(OUT)/node/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/node-pre.js $(W)/sourc
 # for the page: the core for a worker (tau.js, tau.wasm), the files of
 # TeXmacs in packages (misc/wasm/package.py and packages.js, as the browser
 # build of TeXmacs made them) and the page itself (misc/tau/web)
-WEB_FILES := index.html tau.mjs chrome.mjs keys.mjs tau-worker.js
+WEB_FILES := index.html tau.mjs chrome.mjs keys.mjs app.mjs tau-worker.js icon.svg icon-192.png
 # the plugins which are Web Workers (src/System/Link/worker_link.cpp, made
 # by misc/wasm/workers.js): their scripts, next to the page. Python and R
 # load their programs from the network when a session starts.
 WEB_PLUGINS := python/tm-python.mjs r/tm-r.mjs
 web: $(OUT)/web/tau.js web-packages $(patsubst %,$(OUT)/web/%,$(WEB_FILES)) \
-     $(patsubst %,$(OUT)/web/%,$(WEB_PLUGINS))
+     $(patsubst %,$(OUT)/web/%,$(WEB_PLUGINS)) tikzjax asymptote
+
+# The TikZ and the Asymptote plugins, as the browser build of TeXmacs has
+# them (misc/wasm/Makefile, docs/wasm/tikzjax.md and asymptote.md): their
+# programs in WebAssembly are fetched once, at pinned versions which are
+# checked (get-tikzjax.sh, get-asymptote.sh), and put next to the page
+# with the workers of the plugins. PLUGIN_PROGRAMS=no leaves them out.
+WW := $(TM)/misc/wasm
+TIKZJAX := tikzjax-1.6.0
+ASYMPTOTE := asymptote-web-0.3.3
+ASYMPTOTE_VERSION := 3.15
+ASY_FILES := asymptote.js asymptote.wasm asy.data asymptote-web.js utils.js
+ifeq ($(PLUGIN_PROGRAMS),no)
+tikzjax asymptote:
+else
+tikzjax: $(OUT)/web/tikzjax/tm-tikz.js $(OUT)/web/tikzjax/tables.js
+asymptote: $(OUT)/web/asymptote/asymptote.wasm $(OUT)/web/asymptote/tm-asy.mjs $(OUT)/web/asymptote/version.js
+endif
+
+$(OUT)/web/tikzjax/tables.js: $(WW)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(wildcard $(TM)/TeXmacs/fonts/enc/*.enc)
+	@mkdir -p $(OUT)/web/tikzjax
+	$(NODE) $(WW)/tikzjax-tables.mjs $(TIKZJAX)/dist/run-tex.js $(TM)/TeXmacs/fonts/enc $@ $(TIKZJAX:tikzjax-%=%)
+
+$(TIKZJAX)/dist/run-tex.js:
+	sh $(WW)/get-tikzjax.sh $(CURDIR)
+
+$(OUT)/web/tikzjax/tm-tikz.js: $(TM)/plugins/tikz/web/tm-tikz.js $(TIKZJAX)/dist/run-tex.js $(wildcard $(WW)/tikzjax-extra/*.tex)
+	@mkdir -p $(OUT)/web/tikzjax
+	cp $(TIKZJAX)/dist/run-tex.js $(TIKZJAX)/dist/tex.wasm.gz $(TIKZJAX)/dist/core.dump.gz $(TIKZJAX)/LICENSE $(OUT)/web/tikzjax/
+	rm -rf $(OUT)/web/tikzjax/tex_files; cp -R $(TIKZJAX)/dist/tex_files $(OUT)/web/tikzjax/
+	for f in $(WW)/tikzjax-extra/*.tex; do gzip -9 -n -c $$f > $(OUT)/web/tikzjax/tex_files/`basename $$f`.gz; done
+	cp $(TM)/plugins/tikz/web/tm-tikz.js $@
+
+$(ASYMPTOTE)/dist/asymptote.wasm:
+	sh $(WW)/get-asymptote.sh $(CURDIR)
+
+$(OUT)/web/asymptote/version.js: $(ASYMPTOTE)/dist/asymptote.wasm
+	@mkdir -p $(OUT)/web/asymptote
+	printf 'export const ASYMPTOTE_VERSION = "%s";\nexport const ASYMPTOTE_WEB_VERSION = "%s";\n' \
+	  $(ASYMPTOTE_VERSION) $(ASYMPTOTE:asymptote-web-%=%) > $@
+
+$(OUT)/web/asymptote/asymptote.wasm: $(ASYMPTOTE)/dist/asymptote.wasm
+	@mkdir -p $(OUT)/web/asymptote
+	cd $(ASYMPTOTE)/dist && cp $(ASY_FILES) $(CURDIR)/$(OUT)/web/asymptote/
+	touch $@
+
+$(OUT)/web/asymptote/tm-asy.mjs: $(TM)/plugins/asymptote/web/tm-asy.mjs
+	@mkdir -p $(OUT)/web/asymptote
+	cp $< $@
 
 $(OUT)/web/python/%: $(TM)/plugins/python/web/%
 	@mkdir -p $(OUT)/web/python
@@ -103,13 +151,14 @@ $(OUT)/web/r/%: $(TM)/plugins/r/web/%
 	@mkdir -p $(OUT)/web/r
 	cp $< $@
 
-$(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/wasm/workers.js $(W)/web/tau-pre.js $(W)/sources.txt
+$(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/wasm/workers.js $(TM)/misc/wasm/javascript.js $(W)/web/tau-pre.js $(W)/sources.txt $(W)/Makefile
 	@mkdir -p $(OUT)/web $(OUT)/stage
 	em++ $(LDFLAGS) -sMODULARIZE=1 -sEXPORT_NAME=tauCore -sENVIRONMENT=worker \
 	  --pre-js $(TM)/misc/wasm/packages.js --pre-js $(W)/web/tau-pre.js \
-	  --pre-js $(TM)/misc/wasm/workers.js \
-	  -sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPU8,FS,ENV \
+	  --pre-js $(TM)/misc/wasm/workers.js --pre-js $(TM)/misc/wasm/javascript.js \
+	  -sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPU8,FS,ENV,stringToUTF8OnStack \
 	  -sEXPORTED_FUNCTIONS=_main,_malloc,_free -lidbfs.js \
+	  '-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$$withStackSave,$$stringToUTF8OnStack' \
 	  $(OBJECTS) $(LIBS) -o $(OUT)/stage/tau.js
 	@# the program and its script go to the page together: a page which is
 	@# loaded while the link runs must not get one of each (it fails with

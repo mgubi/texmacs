@@ -183,6 +183,37 @@
         (ahash-set! icon-files name f)
         f)))
 
+(define (css-color col)
+  "The colour @col of TeXmacs (a name, #rrggbb) for a style sheet."
+  (with l (named-color->rgba col)
+    (if (and (list? l) (>= (length l) 3))
+        (string-append "rgba(" (number->string (first l)) ","
+                       (number->string (second l)) ","
+                       (number->string (third l)) ","
+                       (number->string (if (>= (length l) 4)
+                                           (/ (round (* 100 (/ (fourth l) 255.0))) 100.0)
+                                           1))
+                       ")")
+        "")))
+
+(define (pattern-file col)
+  "The file of the pattern @col, or the empty string."
+  (if (and (func? col 'pattern) (>= (length col) 2) (string? (cadr col)))
+      (let* ((name (unix->url (cadr col)))
+             (u (if (url-rooted? name) name
+                    (url-resolve (url-append (unix->url "$TEXMACS_PATTERN_PATH")
+                                             name) "r"))))
+        (if (and (not (url-none? u)) (url-exists? u)) (url-concretize u) ""))
+      ""))
+
+(define (serial-color col w h)
+  "The properties of a label which is a colour or a pattern, of a size."
+  `((color . ,(if (string? col) (css-color col) ""))
+    ,@(with f (if (string? col) "" (pattern-file col))
+        (if (== f "") '() `((file . ,f) (pattern . #t))))
+    (width . ,(if (number? w) w 24))
+    (height . ,(if (number? h) h 16))))
+
 (define (serial-label p style)
   "The properties of the label @p."
   (cond ((translatable? p)
@@ -201,7 +232,7 @@
         ((tuple? p 'icon 1)
          `((icon . ,(cadr p)) (file . ,(icon-file* (cadr p)))))
         ((tuple? p 'color 5)
-         `((color . ,(if (string? (second p)) (second p) ""))))
+         (serial-color (second p) (fifth p) (sixth p)))
         (else '())))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

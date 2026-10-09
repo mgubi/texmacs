@@ -6,6 +6,7 @@
 // what belongs to the browser: the clipboard and the files of the user.
 
 import * as chrome from "./chrome.mjs";
+import * as app from "./app.mjs";
 import { translate, makeLayout, learn, askLayout, browserKey, pasteKey } from "./keys.mjs";
 
 const panesElement = document.getElementById("tau-panes");
@@ -20,6 +21,19 @@ const send = message => worker.postMessage(message);
 const panes = new Map();  // number of a window of the core -> pane
 let active = null;        // the pane which has the keyboard, or had it last
 let buffers = [];         // the documents: { name, title, modified }
+
+let leaving = false;   // the page is left on purpose: nothing is asked
+
+// the icon of Tau at the top left, with its menu, and the panel of the
+// loading (app.mjs)
+let homeKept = false;
+app.initApp({
+	homeKept: () => homeKept,
+	nothingKept: params.has("nohome"),
+	reload: () => { leaving = true; location.reload(); },
+	forget: () => { leaving = true; send({ t: "forget-home" }); }
+});
+app.progress({ what: "" });
 
 // for tests and for the console
 const state = { started: false, paints: 0, get view() { return active ? active.view : 0; } };
@@ -640,15 +654,20 @@ worker.onmessage = event => {
 	case "status":
 		if (!state.started) setStatus(m.text);
 		break;
+	case "progress":
+		app.progress(m);
+		break;
 	case "log":
 		if (verbose) console.log(m.text);
 		break;
 	case "failed":
 		setStatus("Tau could not start: " + m.text);
+		app.failed("Tau could not start: " + m.text);
 		break;
 	case "ready":
 		if (!state.started) setStatus("Tau is ready, no view yet");
 		// another page of Tau keeps the documents and the preferences
+		homeKept = !!m.homeKept;
 		if (!m.homeKept && !params.has("nohome"))
 			notice("Tau is open in another page of this browser: what is saved here is not kept when this page is closed.");
 		break;
@@ -708,6 +727,7 @@ worker.onmessage = event => {
 		if (pane.showScroll) pane.showScroll();
 		if (pane === focused && !composing) placeArea();
 		state.paints++;
+		if (!state.started) app.started();
 		state.started = true;
 		if (params.has("debug"))
 			setStatus(`view ${m.view} · ${m.width}×${m.height} · document ${m.extents.width}×${m.extents.height}` +
@@ -738,7 +758,7 @@ function notice(text) {
 }
 
 // The program stopped: nothing which is typed reaches it any more
-let failed = false, leaving = false;
+let failed = false;
 function failure(text) {
 	if (failed) return;
 	failed = true;

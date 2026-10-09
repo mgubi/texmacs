@@ -10,13 +10,44 @@
 //                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
 //                { t: "dialog" | "close" | "refresh", part, ... },
 //                { t: "buffers" | "clipboard" | "paste-request" | "pick" | "download", ... },
-//                { t: "quit" }, { t: "stopped", text }
+//                { t: "quit" }, { t: "stopped", text }, { t: "progress", what, loaded, total }
 
 "use strict";
 
 // what the scripts of the worker complain of is told to the page too
 const consoleError = console.error.bind(console);
 console.error = (...args) => { consoleError(...args); postMessage({ t: "log", text: args.map(String).join(" ") }); };
+
+// The progress of the loading, for the panel of the page (app.mjs): the
+// bytes of the files of TeXmacs (misc/wasm/packages.js tells them to
+// tmProgress when there is one) and those of the program, counted below
+// as the browser compiles them.
+self.tmProgress = {
+	files: (loaded, total) => postMessage({ t: "progress", what: "files", loaded, total }),
+	error: text => postMessage({ t: "failed", text })
+};
+function instantiateWasm(imports, receive) {
+	const done = r => receive(r.instance, r.module);
+	const fail = error => postMessage({ t: "failed", text: "Cannot load the program of Tau: " + (error && error.message || error) });
+	fetch("tau.wasm", { credentials: "same-origin" }).then(response => {
+		if (!response.ok) throw new Error("tau.wasm: " + response.status);
+		// (a compressed answer does not say the size of what comes out of it)
+		let total = response.headers.get("content-encoding") ? 0 : Number(response.headers.get("content-length")) || 0;
+		if (!WebAssembly.instantiateStreaming || typeof TransformStream === "undefined")
+			return response.arrayBuffer().then(bytes => WebAssembly.instantiate(bytes, imports));
+		let loaded = 0, told = 0;
+		const counted = response.body.pipeThrough(new TransformStream({
+			transform(chunk, out) {
+				loaded += chunk.length;
+				if (loaded - told > 262144) { told = loaded; postMessage({ t: "progress", what: "program", loaded, total: Math.max(total, loaded) }); }
+				out.enqueue(chunk);
+			},
+			flush() { postMessage({ t: "progress", what: "program", loaded, total: loaded }); }
+		}));
+		return WebAssembly.instantiateStreaming(new Response(counted, { headers: { "Content-Type": "application/wasm" } }), imports);
+	}).then(done).catch(fail);
+	return {};
+}
 
 importScripts("tau.js");
 
@@ -41,6 +72,17 @@ function handle(m) {
 	case "close":
 		core._tau_closed(m.id);
 		break;
+	case "forget-home": {
+		// what is kept in the browser is deleted; the page starts again
+		const names = ["/home/tau"];
+		Promise.all(names.map(name => new Promise(resolve => {
+			try {
+				const r = indexedDB.deleteDatabase(name);
+				r.onsuccess = r.onerror = r.onblocked = () => resolve();
+			} catch (error) { resolve(); }
+		}))).then(() => postMessage({ t: "quit" }));
+		break;
+	}
 	case "fullscreen-left":
 		core._tau_fullscreen_left();
 		break;
@@ -164,12 +206,15 @@ function post(message, transfer) {
 tauCore({
 	arguments: args,
 	tauPost: post,
+	instantiateWasm,
 	preRun: [module => { tauModule = module; }],
 	// TeXmacs quits: what it wrote is kept first, then the page is told
 	tauQuit: () => tauModule.tauSaveHome(() => postMessage({ t: "quit" })),
 	print: text => postMessage({ t: "log", text }),
 	printErr: text => postMessage({ t: "log", text }),
-	setStatus: text => { if (text) postMessage({ t: "status", text }); }
+	setStatus: text => { if (text) postMessage({ t: "status", text }); },
+	// (the program and the files are there: TeXmacs starts)
+	onRuntimeInitialized: () => postMessage({ t: "progress", what: "starting" })
 }).then(module => {
 	core = module;
 	postMessage({ t: "ready", homeKept: !!module.tauHomeKept });

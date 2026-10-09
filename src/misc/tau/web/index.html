@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tau</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="alternate icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root {
 	--bar: #ececf0; --bar-border: #c4c4cf; --text: #1e1e28; --dim: #70707e;
@@ -37,7 +40,40 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 .tau-fit-column > .tau-chev-prev > .tau-chevron { top: 0; bottom: auto; box-shadow: 0 4px 4px -2px rgba(0,0,0,0.18); }
 .tau-fit-column > .tau-chev-next > .tau-chevron { top: auto; bottom: 0; box-shadow: 0 -4px 4px -2px rgba(0,0,0,0.18); }
 .tau-popup > .tau-chev > .tau-chevron { background: var(--popup); }
-#tau-menu { padding: 0 4px; }
+#tau-top { display: flex; align-items: stretch; background: var(--bar); border-bottom: 1px solid var(--bar-border); }
+#tau-top #tau-menu { flex: 1; min-width: 0; border-bottom: 0; padding: 0 4px; }
+.tau-no-header #tau-top { display: none; }
+/* the icon of Tau, which opens the menu about the page (app.mjs) */
+#tau-app { flex: none; display: flex; align-items: center; background: none; border: 0; border-radius: 6px;
+	padding: 2px 5px 2px 7px; margin: 1px 0; }
+#tau-app img { width: 22px; height: 22px; display: block; border-radius: 6px; }
+#tau-app:hover, #tau-app.tau-open { background: var(--hover); }
+.tau-app-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.tau-app-head img { width: 56px; height: 56px; flex: none; border-radius: 13px; }
+.tau-app-title { font-weight: 600; font-size: 18px; letter-spacing: -0.2px; }
+.tau-app-sub { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.tau-app-badge { display: inline-block; margin-left: 8px; padding: 1px 8px; font-size: 11px; font-weight: normal;
+	color: #1f4e8c; background: #e3eefc; border: 1px solid #9cbce8; border-radius: 999px; vertical-align: middle; }
+.tau-app-text { font-size: 13px; line-height: 1.45; color: #444; margin: 0 0 10px; user-select: text; -webkit-user-select: text; }
+.tau-app-text a { color: #1f4e8c; }
+.tau-app-menu { position: fixed; z-index: 100002; width: 360px; max-width: calc(100vw - 16px); box-sizing: border-box;
+	max-height: calc(100vh - 48px); overflow: auto; padding: 16px 18px 10px; background: var(--popup);
+	border: 1px solid var(--bar-border); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,0.28); display: flex;
+	flex-direction: column; }
+.tau-app-menu .tau-entry { justify-content: flex-start; padding: 5px 6px; text-align: left; }
+.tau-app-menu .tau-hsep { margin: 2px 0 10px; }
+/* the panel of the loading */
+.tau-loading { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 100003; width: 380px;
+	max-width: calc(100% - 32px); box-sizing: border-box; padding: 22px 24px 20px; background: #f4f4f6;
+	border: 1px solid #a8a8b4; border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.26), 0 2px 6px rgba(0,0,0,0.10);
+	font-size: 14px; color: #222; }
+.tau-loading.tau-gone { opacity: 0; transition: opacity 0.8s ease-in; pointer-events: none; }
+.tau-loading-bar { height: 6px; background: #d4d4da; border-radius: 999px; overflow: hidden; position: relative; margin-top: 6px; }
+.tau-loading-fill { height: 100%; width: 0; background: #4a63b8; border-radius: 999px; transition: width 0.15s linear; }
+.tau-loading-bar.tau-busy .tau-loading-fill { width: 30%; position: absolute; animation: tau-busy 1.2s ease-in-out infinite; }
+@keyframes tau-busy { from { left: -30%; } to { left: 100%; } }
+.tau-loading-detail { margin-top: 8px; font-size: 13px; color: #444; min-height: 1.3em; font-variant-numeric: tabular-nums; }
+.tau-loading.tau-failed .tau-loading-detail { color: #a00; }
 .tau-entry { font: inherit; color: inherit; background: none; border: 0; border-radius: 4px;
              padding: 3px 7px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .tau-entry:disabled { opacity: 0.4; }
@@ -53,12 +89,16 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 .tau-group { color: var(--dim); font-size: 11px; padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 .tau-text { padding: 3px 8px; }
 .tau-symbol { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; font-size: 15px; }
-.tau-color { display: inline-block; width: 16px; height: 16px; border: 1px solid var(--bar-border); }
+.tau-color { display: inline-block; width: 16px; height: 16px; border: 1px solid var(--bar-border); border-radius: 2px; }
+.tau-menu-row { gap: 6px; padding: 3px 6px; }
+.tau-popup .tau-enum { flex: 1; }
+.tau-tile .tau-entry:has(.tau-color) { padding: 2px; }
 .tau-popup { position: fixed; z-index: 100000; background: var(--popup); border: 1px solid var(--bar-border);
              border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 4px; overflow-y: auto; scrollbar-width: none;
              display: flex; flex-direction: column; min-width: 120px; }
-.tau-popup > .tau-entry { justify-content: flex-start; border-radius: 4px; padding: 4px 8px 4px 4px; text-align: left; }
-.tau-popup > .tau-entry:hover:not(:disabled), .tau-popup > .tau-entry.tau-open { background: var(--accent); color: #fff; }
+.tau-popup > .tau-entry, .tau-popup > .tau-refreshable > .tau-entry { justify-content: flex-start; border-radius: 4px; padding: 4px 8px 4px 4px; text-align: left; }
+.tau-popup > .tau-entry:hover:not(:disabled), .tau-popup > .tau-entry.tau-open,
+.tau-popup > .tau-refreshable > .tau-entry:hover:not(:disabled), .tau-popup > .tau-refreshable > .tau-entry.tau-open { background: var(--accent); color: #fff; }
 .tau-popup > .tau-entry:hover .tau-arrow, .tau-popup > .tau-entry:hover .tau-shortcut { color: #dde; }
 .tau-check { width: 14px; text-align: center; font-size: 11px; flex: none; }
 .tau-shortcut { margin-left: auto; padding-left: 24px; color: var(--dim); font-size: 12px; }
@@ -197,7 +237,7 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 </style>
 </head>
 <body class="tau-bars-left">
-<div id="tau-menu" class="tau-bar"></div>
+<div id="tau-top"><button id="tau-app" type="button" title="Tau"><img src="icon.svg" alt="Tau"></button><div id="tau-menu" class="tau-bar"></div></div>
 <div id="tau-body">
 <div id="tau-icons-0" class="tau-bar"></div>
 <div id="tau-icons-1" class="tau-bar"></div>
@@ -213,7 +253,7 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 <div id="tau-side-0" class="tau-tool tau-side" hidden></div>
 </div>
 </div>
-<div id="tau-footer"><span id="tau-footer-left"></span><span id="status">Loading Tau…</span><span id="tau-footer-right"></span></div>
+<div id="tau-footer"><span id="tau-footer-left"></span><span id="status"></span><span id="tau-footer-right"></span></div>
 <script type="module" src="tau.mjs"></script>
 </body>
 </html>

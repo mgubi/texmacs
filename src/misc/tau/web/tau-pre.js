@@ -27,6 +27,10 @@ Module['preRun'].push(function () {
   ENV['TEXMACS_WEB_PLATFORM'] = /mac|iphone|ipad/i.test (platform) ? 'macos' :
                                 /win/i.test (platform) ? 'windows' : 'other';
 
+  // the global TeXmacs of the JavaScript plugin (misc/wasm/javascript.js),
+  // for the code which a session evaluates in this worker
+  if (typeof TeXmacs !== 'undefined') self.TeXmacs = TeXmacs;
+
   FS.mkdirTree (TAU_HOME);
   Module.tauHomeKept = false;
   if (new URLSearchParams (self.location.search).has ('nohome')) {

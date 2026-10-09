@@ -193,6 +193,34 @@ test("start", async p => {
 	check("the title of the page", (await p.page.title()).endsWith("– Tau"), await p.page.title());
 	check("the keyboard is in the text area of the views", await p.page.evaluate(() => document.activeElement.classList.contains("tau-keyboard")));
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+	// the panel of the loading is gone, the icon of Tau is at the top left
+	await p.until("the panel of the loading goes", async () => (await p.count(".tau-loading")) === 0);
+	const icon = await p.box("#tau-app img");
+	check("the icon of Tau at the top left", icon.x < 20 && icon.y < 20 && icon.w > 15, icon);
+	await p.page.click("#tau-app");
+	await p.until("its menu", async () => (await p.count(".tau-app-menu")) === 1);
+	const text = await p.page.$eval(".tau-app-menu", e => e.textContent);
+	check("says what Tau is and how to start it again", text.includes("GNU TeXmacs") && text.includes("Start Tau again"), text.slice(0, 120));
+	await p.key("Escape");
+	await p.until("Escape closes it", async () => (await p.count(".tau-app-menu")) === 0);
+});
+
+test("loading", async p => {
+	// the panel while Tau loads: watched from the first moment of the page
+	await p.page.setViewport({ width: 1100, height: 760, deviceScaleFactor: 2 });
+	await p.page.evaluateOnNewDocument(() => {
+		window.seenLoading = [];
+		const watch = () => {
+			const d = document.querySelector(".tau-loading-detail");
+			if (d && window.seenLoading[window.seenLoading.length - 1] !== d.textContent) window.seenLoading.push(d.textContent);
+			if (!(window.tau && window.tau.state.started)) requestAnimationFrame(watch);
+		};
+		requestAnimationFrame(watch);
+	});
+	await p.open();
+	const seen = await p.page.evaluate(() => window.seenLoading);
+	check("the share which is downloaded was told", seen.some(t => /^Downloading: \d+%/.test(t)), seen);
+	check("then that TeXmacs starts", seen.includes("Starting TeXmacs…"), seen);
 });
 
 test("typing", async p => {
@@ -308,6 +336,40 @@ test("menus", async p => {
 	check("it is under the pointer", Math.abs(at.x - 700) < 30 && Math.abs(at.y - 420) < 30, at);
 	await p.key("Escape");
 	await p.until("Escape closes it", async () => (await p.count(".tau-popup")) === 0);
+});
+
+test("colours and palettes", async p => {
+	await p.open();
+	await p.newDocument();
+	await p.type("colour");
+	await p.key("ArrowLeft", "Shift"); await p.key("ArrowLeft", "Shift");
+	await p.menu("Format", "Color");
+	const swatches = () => p.page.$$eval(".tau-popup .tau-tile .tau-color", l => l.map(e => getComputedStyle(e).backgroundColor));
+	await p.until("the grid of colours", async () => (await swatches()).length >= 16);
+	const classical = await swatches();
+	check("the colours are drawn", new Set(classical).size > 8 && !classical.includes("rgba(0, 0, 0, 0)"), classical.slice(0, 6));
+	// the palette is chosen in the menu, which stays open and changes
+	const sets = await p.page.$$eval(".tau-popup select option", l => l.map(o => o.value));
+	check("the sets of colours to choose from", sets.includes("Classical") && sets.includes("Nordic"), sets);
+	await p.forget();
+	await p.page.evaluate(() => {
+		const select = document.querySelector(".tau-popup select");
+		select.value = "Nordic";
+		select.dispatchEvent(new Event("change", { bubbles: true }));
+	});
+	await p.until("the grid is described again", async () => (await p.got("refresh")).length >= 1);
+	await p.until("with the groups of the palette", () => p.page.$$eval(".tau-popup .tau-group", l => l.map(e => e.textContent).join(",").includes("Accents")));
+	const nordic = await swatches();
+	check("and other colours", nordic.length >= 16 && nordic.join() !== classical.join(), nordic.slice(0, 6));
+	check("the menu is still open", (await p.count(".tau-popup")) >= 2);
+	// a colour is chosen
+	await p.forget();
+	await (await p.page.$$(".tau-popup .tau-tile .tau-entry"))[10].click();
+	await p.until("the colour is applied", async () => (await p.sent("invoke")).length === 1 && (await p.count(".tau-popup")) === 0);
+	// (the next tests start from the standard grid)
+	await p.scheme('(set-typographic-palette-set "Classical")');
+	await sleep(300);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
 test("question", async p => {

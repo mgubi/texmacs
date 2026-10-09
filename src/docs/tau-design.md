@@ -891,6 +891,50 @@ Left: `tree-view`, `color-input` and `ink` in dialogs (one use each
 outside the tests: the tool of the patterns and the handwriting), and
 panes one above the other.
 
+**The other plugins, and the palettes of colours** (2026-10-09).
+
+- **JavaScript, TikZ and Asymptote** are there as in the browser build of
+  TeXmacs. The JavaScript of a session runs in the worker of the core:
+  `misc/wasm/javascript.js` (the global `TeXmacs`, with `TeXmacs.scheme`)
+  is linked in, and the two functions of the core which it calls have
+  their names of the Vue port in `tau_gui.cpp`; there is no `document`
+  in a worker. The programs of TikZ (TikZJax) and Asymptote are fetched
+  at their pinned versions by the scripts of `misc/wasm` and put next to
+  the page (`PLUGIN_PROGRAMS=no` leaves them out).
+- Tried in Firefox, each in a session: JavaScript (`TeXmacs.scheme
+  ("(+ 1 2)") + " and " + 6*7` gives "3 and 42"), R (`6*7`, webR from the
+  network), Asymptote (`write(6*7);`), TikZ (a circle, drawn), and Python
+  before.
+- **The colour menus have the palettes of the Vue interface**
+  (`docs/typographic-palettes.md`): the list "Palette" above the grid
+  chooses the standard grid or a typographic palette, and the grid
+  changes in the open menu. For this a menu of the page shows a colour
+  or a pattern as a swatch (the colour as the core resolves it, the
+  pattern as a picture of the core), a row, a list to choose from, and
+  keeps a part which the core describes again (`refresh`) as a dialog
+  does.
+
+Not gone through: the dialogs of the Remote menu.
+
+**The icon of Tau** (2026-10-09): `misc/tau/web/icon.svg`, a tau between
+angle brackets, bold and slanted as in a sans serif font for mathematics,
+drawn (no font is needed): the brackets in a cool hue and the tau in a
+warm one, each with a border in its hue, a side and a shadow, on a dark
+slate frame with rounded corners and the grid of technical paper. It is
+the icon of the page (with a PNG of 192 pixels beside it), and as in the
+page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
+
+- on **the panel of the loading** (`app.mjs`): the icon, the name, a few
+  words and a link to the sources, a bar and a line which tell the share
+  downloaded and the time left, then that TeXmacs starts. The worker
+  counts the bytes of the program as the browser compiles them and those
+  of the files of TeXmacs (`progress`). The panel fades when the first
+  view is drawn; an error stays on it;
+- at **the top left of the page**, before the menu bar: a button whose
+  menu says what Tau is, what is kept in the browser and how much, the
+  options of the address of the page, and has "Start Tau again" and
+  "Forget everything kept in this browser".
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:

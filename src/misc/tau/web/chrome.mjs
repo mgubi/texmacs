@@ -82,6 +82,9 @@ export function handle(m) {
 	case "refresh": {
 		const e = document.querySelector(`[data-refresh="${m.number}"]`);
 		if (e) e.replaceChildren(...renderItems(m.items, e.tauContext));
+		// (a menu which changed size stays in the window)
+		const popup = e && e.closest(".tau-popup");
+		if (popup) keepInWindow(popup);
 		return true;
 	}
 	case "file": {
@@ -149,8 +152,16 @@ function label(node, context) {
 	}
 	if (node.label !== undefined) parts.push(el("span", node.symbol ? "tau-symbol" : "tau-label", node.label));
 	if (node.color !== undefined) {
+		// a colour, or a pattern (a picture of the core, as an icon)
 		const c = el("span", "tau-color");
-		c.style.background = node.color;
+		if (node.color) c.style.background = node.color;
+		if (node.width) c.style.width = Math.round(node.width * 0.75) + "px";
+		if (node.height) c.style.height = Math.round(node.height * 0.75) + "px";
+		if (node.pattern && node.file) {
+			const known = waitingFiles.get(node.file);
+			const show = url => { if (url) c.style.background = `url("${url}") center / cover`; };
+			if (known && known.url) show(known.url); else iconUrl(node.file).then(show);
+		}
 		parts.push(c);
 	}
 	return parts;
@@ -172,8 +183,36 @@ function renderItems(items, context) {
 	for (const node of items || []) {
 		if (context.dialog && renderDialogItem(node, context, out)) continue;
 		switch (node.kind) {
-		case "horizontal": case "vertical": case "hlist": case "vlist":
-		case "minibar": case "refreshable":
+		case "refreshable":
+			// in a menu the part is kept, to be described again while the
+			// menu is open (the palette of the colour menus); a bar is
+			// described again whole
+			if (!context.bar) {
+				const e = el("div", "tau-refreshable");
+				e.dataset.refresh = node.number;
+				e.tauContext = context;
+				e.append(...renderItems(node.items, context));
+				out.push(e);
+				break;
+			}
+			out.push(...renderItems(node.items, context));
+			break;
+		case "hlist": case "horizontal":
+			// a row of a menu (a text and a list to choose from)
+			if (!context.bar && !context.tile) {
+				const e = el("div", "tau-h tau-menu-row");
+				e.append(...renderItems(node.items, { ...context, row: true }));
+				out.push(e);
+				break;
+			}
+			out.push(...renderItems(node.items, context));
+			break;
+		case "enum":
+			// a choice in a menu: it does not close the menu
+			out.push(labelled(node, renderEnum(node)));
+			break;
+		case "vertical": case "vlist":
+		case "minibar":
 			out.push(...renderItems(node.items, context));
 			break;
 		case "tile": {
@@ -288,6 +327,12 @@ function showContextMenu(items) {
 	const w = popup.offsetWidth, h = popup.offsetHeight;
 	popup.style.left = Math.max(4, Math.min(contextAt.x, window.innerWidth - 4 - w)) + "px";
 	popup.style.top = Math.max(4, Math.min(contextAt.y, window.innerHeight - 4 - h)) + "px";
+}
+
+function keepInWindow(popup) {
+	const r = popup.getBoundingClientRect();
+	if (r.right > window.innerWidth - 4) popup.style.left = Math.max(4, window.innerWidth - 4 - r.width) + "px";
+	if (r.bottom > window.innerHeight - 4) popup.style.top = Math.max(4, window.innerHeight - 4 - r.height) + "px";
 }
 
 // a menu under its button (in a bar) or at its right (in a menu), kept in

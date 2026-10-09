@@ -29,7 +29,7 @@
 ;; WebAssembly (web/tm-asy.mjs, copied to asymptote/ next to the page; see
 ;; docs/wasm/asymptote.md); elsewhere a Python program which runs asy
 (define (asymptote-in-browser?)
-  (defined? 'web-files))
+  (in-browser?))
 
 (define (asymptote-engine)
   (if (asymptote-in-browser?)
@@ -40,7 +40,7 @@
 (plugin-configure asymptote
   ;; (the test of asymptote-in-browser? written out: the requirements are also
   ;; evaluated outside of this file, e.g. by the plugins suite)
-  (:require (or (defined? 'web-files)
+  (:require (or (in-browser?)
                 (and (url-exists-in-path? "asy") (!= (python-command) ""))))
   ,@(asymptote-engine)
   (:serializer ,asy-serialize)

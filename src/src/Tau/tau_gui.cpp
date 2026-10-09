@@ -516,6 +516,56 @@ tau_fullscreen_left () {
   tau_turn ();
 }
 
+// Scheme for the JavaScript of the worker (misc/wasm/javascript.js, the
+// global TeXmacs of the JavaScript plugin), under the names which that
+// script calls in the browser build of TeXmacs. The text of a command is
+// in UTF-8: what is not ASCII goes to the encoding of TeXmacs, the rest
+// stays as it is (utf8_to_cork would make symbols of "<" and ">").
+static string
+scheme_text (string s) {
+  string r;
+  int i= 0, n= N(s);
+  while (i < n) {
+    if (((unsigned char) s[i]) < 128) { r << s[i]; i++; continue; }
+    int j= i + 1;
+    while (j < n && (((unsigned char) s[j]) & 0xC0) == 0x80) j++;
+    r << utf8_to_cork (s (i, j));
+    i= j;
+  }
+  return r;
+}
+
+// a command which the loop runs, as the delayed commands
+EMSCRIPTEN_KEEPALIVE
+void
+vue_web_scheme (const char* cmd) {
+  exec_delayed (scheme_cmd (scheme_text (string (cmd))));
+}
+
+// an expression evaluated now: its value as text (a string as it is, the
+// rest as object->string writes it, an error as (error ...)). Not from
+// code which TeXmacs runs. The text stays until the next call.
+EMSCRIPTEN_KEEPALIVE
+const char*
+vue_web_scheme_eval (const char* cmd) {
+  static char* last= NULL;
+  string expr= "(let ((r (catch #t (lambda () (begin " *
+               scheme_text (string (cmd)) *
+               "\n)) (lambda args (cons 'error args)))))"
+               " (if (string? r) r (object->string r)))";
+  string r;
+  try {
+    object o= eval (expr);
+    r= is_string (o) ? as_string (o) : string ("");
+  }
+  catch (string msg) {
+    r= "(error " * scm_quote (msg) * ")";
+  }
+  if (last != NULL) tm_delete_array (last);
+  last= as_charp (cork_to_utf8 (r));
+  return last;
+}
+
 // the user closed a dialog
 EMSCRIPTEN_KEEPALIVE
 void
