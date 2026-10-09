@@ -22,7 +22,7 @@
 
   <\active*>
     <\src-comment>
-      Buttons (inside action tags), status badges and muted text.
+      Buttons (inside action tags), muted text, the frame of a sample and the scrolling list of the fonts.
     </src-comment>
   </active*>
 
@@ -33,6 +33,22 @@
   <assign|font-design-muted|<macro|body|<with|color|#707070|<arg|body>>>>
 
   <assign|font-design-note|<macro|color|body|<small|<with|color|<arg|color>|<arg|body>>>>>
+
+  <assign|font-design-sample|<macro|body|<with|ornament-color|#f8f6ee|ornament-sunny-color|#d6d2c4|ornament-shadow-color|#d6d2c4|ornament-hpadding|1spc|ornament-vpadding|1spc|ornament-border|1ln|<ornament|<arg|body>>>>>
+
+  <assign|page-medium|automatic>
+
+  <assign|font|pagella>
+
+  <assign|math-font|math-pagella>
+
+  <assign|font-design-list-height|<macro|0.5pag>>
+
+  <assign|font-design-list|<macro|scroll|body|<with|canvas-type|e|canvas-color|white|canvas-hpadding|1spc|canvas-vpadding|1spc|ornament-border|1ln|ornament-sunny-color|#b8b8c0|ornament-shadow-color|#b8b8c0|<canvas||<merge|t-|<font-design-list-height>>|1par||0%|<arg|scroll>|<arg|body>>>>>
+
+  <drd-props|font-design-sample|arity|1>
+
+  <drd-props|font-design-list|arity|2|enable-writability|all>
 
   <drd-props|font-design-button|arity|1>
 

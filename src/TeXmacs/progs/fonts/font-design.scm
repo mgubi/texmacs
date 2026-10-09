@@ -490,13 +490,15 @@
     `(row (cell ,(part-name part))
           (cell ,(if val `(strong ,name) `(font-design-muted ,name)))
           (cell ,(if (and val (!= part "text"))
-                     (design-action "as the text font" "font-design-page-reset"
+                     (design-action "reset" "font-design-page-reset"
                                     (url->system doc) part)
                      "")))))
 
 ;; the choice, in its own fonts: the only fonts which the page loads
 (define (choice-preview c)
-  `(with "font" ,(font-design-font c)
+  ;; (the mathematical font of the page does not show through: formulas
+  ;; follow the text font unless it is roman)
+  `(with "font" ,(font-design-font c) "math-font" "roman"
        "font-family" ,(or (choice-ref c "family") "rm")
      (document
        ,@(sample-text-lines)
@@ -505,19 +507,32 @@
        (math ,sample-letters))))
 
 (define (choice-block doc c)
+  ;; the parts and the buttons on the left, the sample on the right
   (with d (url->system doc)
-    `(document
-       (tabular
-        (tformat (cwith "1" "-1" "1" "1" "cell-rsep" "1.5em")
-                 (cwith "1" "-1" "2" "2" "cell-rsep" "1.5em")
-                 (table ,@(map (cut choice-row doc c <>)
-                               '("text" "math" "sansserif" "typewriter"
-                                 "bbb" "cal" "frak")))))
-       (concat ,(design-action "Use for the document" "font-design-page-apply" d)
-               " "
-               ,(design-action "Start again from the document"
-                               "font-design-page-restart" d))
-       ,(choice-preview c))))
+    `(tabular
+      (tformat
+       (twith "table-width" "1par") (twith "table-hmode" "exact")
+       (cwith "1" "1" "1" "-1" "cell-hyphen" "t")
+       (cwith "1" "1" "1" "-1" "cell-valign" "t")
+       (cwith "1" "1" "1" "1" "cell-width" "0.42par")
+       (cwith "1" "1" "1" "1" "cell-hmode" "exact")
+       (cwith "1" "1" "1" "-1" "cell-lsep" "0spc")
+       (table
+        (row
+         (cell
+          (document
+            (tabular
+             (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0spc")
+                      (cwith "1" "-1" "1" "2" "cell-rsep" "1em")
+                      (table ,@(map (cut choice-row doc c <>)
+                                    '("text" "math" "sansserif" "typewriter"
+                                      "bbb" "cal" "frak")))))
+            (concat ,(design-action "Use for the document"
+                                    "font-design-page-apply" d)
+                    " "
+                    ,(design-action "Start again"
+                                    "font-design-page-restart" d))))
+         (cell ,(choice-preview c))))))))
 
 (define (entry-block doc e)
   (let* ((d (url->system doc))
@@ -531,7 +546,7 @@
     `((paragraph ,(entry-ref e 'name))
       ,@(if (== descr "") (list) (list descr))
       ,(if pic
-           `(image ,(url->system pic) "" "" "" "")
+           `(font-design-sample (image ,(url->system pic) "" "" "" ""))
            (design-action "Show a sample" "font-design-page-sample" d id))
       (concat (font-design-muted "Use for: ")
               ,@(list-intersperse acts " ")))))
@@ -547,13 +562,20 @@
        (style (tuple "generic" "font-design"))
        (body
         (document
-          (tmfs-title ,(string-append "Fonts of " (url->system (url-tail doc))))
-          (concat "Choose below the fonts of the parts of the document: each "
-                  "font has a sample and the parts it may be used for. The "
-                  "choice is shown here in its fonts; it changes the document "
-                  "only with " (em "Use for the document") ".")
+          (concat (strong ,(string-append "Fonts of "
+                                          (url->system (url-tail doc))))
+                  (space "1em")
+                  (font-design-muted
+                   (concat "Choose the fonts of the parts in the list; the "
+                           "document changes only with "
+                           (em "Use for the document") ".")))
           ,(choice-block doc c)
-          ,@(append-map (cut section-blocks doc <>) (font-design-sections)))))))
+          ;; the fonts scroll in a frame of their own, under the choice
+          (font-design-list
+           "100%"
+           (document
+             ,@(append-map (cut section-blocks doc <>)
+                           (font-design-sections)))))))))
 
 (tmfs-title-handler (font-design name doc)
   (string-append "Font design - "
@@ -562,13 +584,13 @@
 (tmfs-load-handler (font-design name)
   (font-design-content (page-document name)))
 
-;; The block of the choice is the third paragraph of the page: it is put
+;; The block of the choice is the second paragraph of the page: it is put
 ;; again in place, which keeps the page where the reader is; a page whose
 ;; pictures change is loaded again.
 (define (page-update doc)
   (with t (buffer-tree)
-    (if (and (tm-func? t 'document) (> (tm-arity t) 2))
-        (tree-set (tree-ref t 2)
+    (if (and (tm-func? t 'document) (> (tm-arity t) 1))
+        (tree-set (tree-ref t 1)
                   (stree->tree (choice-block doc (document-choice doc))))
         (revert-buffer-revert (tmfs-url-font-design doc)))))
 
@@ -580,6 +602,54 @@
     (when (not ok?)
       (set-message "This only works from the page of the fonts" "Font design"))
     ok?))
+
+;; The wheel scrolls the list of the fonts, wherever the pointer is: the
+;; page itself fits the window (font-design.ts) and has nothing to scroll.
+;; The ports hand the wheel to an editor which captures it (wheel-capture?,
+;; as the graphics do), with the displacement in points.
+(define (font-design-page?)
+  (string-starts? (url->system (current-buffer)) "tmfs://font-design/"))
+
+(define (page-list)
+  (with t (buffer-tree)
+    (and (tm-func? t 'document) (> (tm-arity t) 2)
+         (tree-is? (tree-ref t 2) 'font-design-list)
+         (tree-ref t 2))))
+
+;; The position of the list is a percentage (100% at the top), which the
+;; canvas turns into a displacement and keeps within the list. Points are
+;; turned into a percentage with an estimate of the height of the list: the
+;; extents of what a canvas holds are not known here, and an estimate
+;; which is off by a fifth only makes the wheel that much faster or slower.
+(define (list-height-estimate)
+  (with entry-height
+      (lambda (e)
+        (cond ((not (font-design-sample e)) 75)
+              ((== (entry-ref e 'kind) 'pair) 190)
+              ((== (entry-ref e 'kind) 'mono) 105)
+              (else 125)))
+    (apply + (map (lambda (s) (+ 45 (apply + (map entry-height (cdr s)))))
+                  (font-design-sections)))))
+
+(tm-define (font-design-scroll dy)
+  (:synopsis "Scroll the list of the fonts by @dy points")
+  (and-with l (page-list)
+    (let* ((h (max 400 (- (list-height-estimate) 300)))
+           (s (tree->string (tree-ref l 0)))
+           (old (or (and (string-ends? s "%")
+                         (string->number (string-drop-right s 1)))
+                    100))
+           (new (max 0 (min 100 (+ old (/ (* 100.0 dy) h))))))
+      (when (!= new old)
+        (tree-set (tree-ref l 0) (string-append (number->string new) "%"))))))
+
+(tm-define (wheel-capture?)
+  (:require (font-design-page?))
+  #t)
+
+(tm-define (wheel-event dx dy)
+  (:require (font-design-page?))
+  (font-design-scroll dy))
 
 (tm-define (font-design-page-choose d id part)
   (:secure #t)
