@@ -23,6 +23,8 @@
 #  else
 #    if defined(VUETEXMACS)
 #      include "Vue/vue_widget.hpp"
+#    elif defined(TAUTEXMACS)
+#      include "Tau/tau_widget.hpp"
 #    else
 #      include "Widkit/simple_wk_widget.hpp"
 #    endif
@@ -324,7 +326,7 @@ texmacs_output_widget (tree doc, tree style) {
       is_transparent (extract (doc, "body")))
 #if defined (QTTEXMACS) || defined (AQUATEXMACS)
     col= rgb_color (236, 236, 236);
-#elif defined(VUETEXMACS)
+#elif (defined(VUETEXMACS) || defined(TAUTEXMACS))
     col= rgb_color (250, 250, 250); // the "field" background of the Vue widgets
 #else
     col= light_grey;

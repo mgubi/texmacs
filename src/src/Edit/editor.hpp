@@ -21,6 +21,8 @@
 #  else
 #    if defined(VUETEXMACS)
 #      include "Vue/vue_widget.hpp"
+#    elif defined(TAUTEXMACS)
+#      include "Tau/tau_widget.hpp"
 #    else
 #      include "Widkit/simple_wk_widget.hpp"
 #    endif

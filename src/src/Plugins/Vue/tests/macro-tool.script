@@ -1,4 +1,0 @@
-# needs macro-tool.scm: the macro editor in the right side tool
-wait 9000
-window #2
-snapshot mt0

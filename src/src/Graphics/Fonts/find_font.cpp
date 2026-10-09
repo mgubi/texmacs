@@ -105,65 +105,13 @@ find_font_bis (tree t) {
   if (is_tuple (t, "qt", 3))
     return qt_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
 
-  if (is_tuple (t, "tex", 3))
-    return tex_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
-
-  if (is_tuple (t, "tex", 4))
-    return tex_font (as_string (t[1]), as_int (t[2]), as_int (t[3]),
-		     as_int (t[4]));
-
-  if (is_tuple (t, "cm", 3))
-    return tex_cm_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
-
-  if (is_tuple (t, "cm", 4))
-    return tex_cm_font (as_string (t[1]), as_int (t[2]), as_int (t[3]),
-			as_int (t[4]));
-
-  if (is_tuple (t, "ec", 3))
-    return tex_ec_font (as_string (t[1]), as_int (t[2]), as_int (t[3]));
-
-  if (is_tuple (t, "ec", 4))
-    return tex_ec_font (as_string (t[1]), as_int (t[2]), as_int (t[3]),
-			as_int (t[4]));
-  
-  if (is_tuple (t, "la", 3))
-    return tex_la_font (as_string (t[1]), as_int (t[2]) * 100,
-			as_int (t[3]), 1000);
-
-  if (is_tuple (t, "la", 4))
-    return tex_la_font (as_string (t[1]), as_int (t[2]) * 100,
-			as_int (t[3]), as_int (t[4]) * 100);
-  
-  if (is_tuple (t, "gr", 3))
-    return tex_gr_font (as_string (t[1]), as_int (t[2]) * 100,
-			as_int (t[3]), 1000);
-
-  if (is_tuple (t, "gr", 4))
-    return tex_gr_font (as_string (t[1]), as_int (t[2]) * 100,
-			as_int (t[3]), as_int (t[4]) * 100);
-
-  if (is_tuple (t, "adobe", 3))
-    return tex_adobe_font (as_string (t[1]), as_int (t[2]),
-			   as_int (t[3]));
-
-  if (is_tuple (t, "adobe", 4))
-    return tex_adobe_font (as_string (t[1]), as_int (t[2]),
-			   as_int (t[3]), as_int (t[4]));
-
-  if (is_tuple (t, "tex-rubber", 4))
-    return tex_rubber_font (as_string (t[1]), as_string (t[2]),
-			    as_int (t[3]), as_int (t[4]));
-
-  if (is_tuple (t, "tex-rubber", 5))
-    return tex_rubber_font (as_string (t[1]), as_string (t[2]),
-			    as_int (t[3]), as_int (t[4]), as_int (t[5]));
-
-  if (is_tuple (t, "tex-dummy-rubber", 1)) {
-    font fn= find_font (t[1]);
+  if (is_tuple (t, "alphabet", 4)) {
+    // the letters of an alphabet ("cal", "frak", "bbb") of a math font
+    font fn= unicode_font (as_string (t[2]), as_int (t[3]), as_int (t[4]));
     if (is_nil (fn)) return fn;
-    return tex_dummy_rubber_font (fn);
+    return alphabet_font (fn, as_string (t[1]));
   }
-  
+
   if (is_tuple (t, "error", 1)) {
     font fn= find_font (t[1]);
     if (is_nil (fn)) return fn;
@@ -316,7 +264,8 @@ find_font (string family, string variant,
     return fn;
   }
 
-  tree panic (TUPLE, "tex", "cmr", as_string (sz), as_string (dpi));
+  tree panic (TUPLE, "unicode", "lmroman10-regular",
+              as_string (sz), as_string (dpi));
   fn= find_font (panic);
   font::instances (s)= (pointer) fn.rep;
   return fn;

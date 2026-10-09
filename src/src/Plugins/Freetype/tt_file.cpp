@@ -15,7 +15,6 @@
 #include "boot.hpp"
 #include "analyze.hpp"
 #include "hashmap.hpp"
-#include "Metafont/tex_files.hpp"
 #include "tm_timer.hpp"
 #include "data_cache.hpp"
 #include "scheme.hpp"
@@ -121,9 +120,7 @@ tt_locate (string name) {
     if (starts (name, "rpzc")) name= "uzc" * name (4, N (name) - 4) * "8a.pfb";
     if (starts (name, "rpzd")) name= "uzd" * name (4, N (name));
     */
-    url u= resolve_tex (name);
-    //cout << "tt_locate: " << name << " -> " << u << "\n";
-    if (!is_none (u)) return u;
+    // (no fonts of a TeX distribution in Tau)
   }
   else if (use_locate &&
 	   // NOTE: avoiding unnecessary locates can greatly improve timings

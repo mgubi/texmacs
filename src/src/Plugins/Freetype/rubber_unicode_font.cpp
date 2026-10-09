@@ -117,6 +117,11 @@ rubber_unicode_font_rep::rubber_unicode_font_rep (string name, font base2,
   if (base->ot_math) {
     big_flag    = true;
     big_sums    = true;
+  }
+  // Tau: the assemblies are searched whenever the face has a MATH table
+  // (search_font_cached), also for a base which is not marked as an
+  // OpenType math font; they need the virtual font
+  if (base->ot_math || (!is_nil (face) && !is_nil (face->math_table))) {
     string vname= "opentype_virtual[" * base->res_name * "]";
     virt        = tm_new<translator_rep> (vname);
     // virt->virt_def= array<tree> ();

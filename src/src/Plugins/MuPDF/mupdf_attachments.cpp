@@ -25,7 +25,7 @@
 // which Hummus overwrote -- and the name an attachment has in the PDF is
 // reduced to a file name, so that a PDF cannot write elsewhere ("../x").
 
-#include "Pdf/pdf_hummus_extract_attachment.hpp"
+#include "MuPDF/pdf_extract_attachment.hpp"
 #include "mupdf_renderer.hpp"   // mupdf_context
 #include "analyze.hpp"
 #include "converter.hpp"

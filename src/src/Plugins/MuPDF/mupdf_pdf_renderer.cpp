@@ -48,7 +48,6 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 extern "C" {
-#include "mupdf_writet1.h"
 }
 
 extern url tt_font_find (string name); // font_select.cpp
@@ -231,7 +230,6 @@ class mupdf_pdf_renderer_rep : public renderer_rep {
   string glyph_name (pdf_font_item& it, int key, int fallback, int& gid);
   void write_type3 (pdf_font_item& it);
   void write_fonts ();
-  void subset_type1 (pdf_font_item& it, array<string> keep);
   void write_outline ();
   void write_dests ();
   void write_links (pdf_obj* pobj, array<string>& target, array<int>& local,
@@ -1040,11 +1038,9 @@ mupdf_pdf_renderer_rep::write_fonts () {
       convert_warning << "MuPDF could not write the encoding of "
                       << it.path << ": " << fz_caught_message (ctx) << LF;
     }
-    // The font program, cut down to the glyphs which are used. MuPDF
-    // subsets TrueType and CFF only, so a Type 1 would go in whole -- some
-    // eighty kilobytes for a handful of letters; mupdf_t1_subset is
-    // pdfTeX's writet1.c, which knows how to do it.
-    if (N(keep) > 0) subset_type1 (it, keep);
+    // (Tau has no Type 1 fonts: the subsetter of pdfTeX which cut them
+    // down is gone, and a simple font, if one comes, goes in whole)
+    (void) keep;
     // /Widths, in thousandths of the size
     fz_try (ctx) {
       pdf_dict_put_int (ctx, it.obj, PDF_NAME(FirstChar), first);
@@ -1063,61 +1059,6 @@ mupdf_pdf_renderer_rep::write_fonts () {
                       << it.path << ": " << fz_caught_message (ctx) << LF;
     }
   }
-}
-
-// Replace the font program of a simple font by a subset of itself which
-// has only the glyphs in `keep`, and rename the font as a subset is named.
-void
-mupdf_pdf_renderer_rep::subset_type1 (pdf_font_item& it, array<string> keep) {
-  pdf_obj* fdesc= NULL;
-  pdf_obj* ff= NULL;
-  fz_try (ctx) {
-    fdesc= pdf_dict_get (ctx, it.obj, PDF_NAME(FontDescriptor));
-    if (fdesc != NULL) ff= pdf_dict_get (ctx, fdesc, PDF_NAME(FontFile));
-  }
-  fz_catch (ctx) { ff= NULL; }
-  if (ff == NULL) return;   // not a Type 1 after all
-  // the subsetter is C, with an error handling of its own which unwinds
-  // only its own frames (mupdf_type1.c); it wants C strings
-  c_string path (it.path);
-  array<string> kz;
-  for (int i=0; i<N(keep); i++) kz << (keep[i] * string ((char) 0));
-  const char** names= tm_new_array<const char*> (N(kz));
-  for (int i=0; i<N(kz); i++) names[i]= &kz[i][0];
-  int size= 0, l1= 0, l2= 0, l3= 0;
-  char* psname= NULL;
-  const char* err= NULL;
-  unsigned char* sub= mupdf_t1_subset (path, names, N(kz), &size,
-                                       &l1, &l2, &l3, &psname, &err);
-  tm_delete_array (names);
-  if (sub == NULL) {
-    convert_warning << "the Type 1 font " << it.path
-                    << " could not be subsetted: "
-                    << string (err == NULL ? "?" : err) << LF;
-    return;
-  }
-  fz_buffer* buf= NULL;
-  fz_var (buf);
-  fz_try (ctx) {
-    buf= fz_new_buffer_from_copied_data (ctx, sub, (size_t) size);
-    pdf_update_stream (ctx, doc, ff, buf, 0);
-    pdf_dict_put_int (ctx, ff, PDF_NAME(Length1), l1);
-    pdf_dict_put_int (ctx, ff, PDF_NAME(Length2), l2);
-    pdf_dict_put_int (ctx, ff, PDF_NAME(Length3), l3);
-    if (psname != NULL) {
-      // the tag says the font is a subset, and the two names must agree
-      // with the /FontName the program itself now carries
-      pdf_dict_put_name (ctx, it.obj, PDF_NAME(BaseFont), psname);
-      pdf_dict_put_name (ctx, fdesc, PDF_NAME(FontName), psname);
-    }
-  }
-  fz_always (ctx) { fz_drop_buffer (ctx, buf); }
-  fz_catch (ctx) {
-    convert_warning << "MuPDF could not store the subsetted font: "
-                    << fz_caught_message (ctx) << LF;
-  }
-  free (sub);
-  if (psname != NULL) free (psname);
 }
 
 // A Type 3 font: the glyphs are little content streams which draw the

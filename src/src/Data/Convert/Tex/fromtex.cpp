@@ -9,7 +9,7 @@
 * in the root directory or <http://www.gnu.org/licenses/gpl-3.0.html>.
 ******************************************************************************/
 
-#include "LaTeX_Preview/latex_preview.hpp"
+#include "Tex/latex_preview.hpp"
 #include "Tex/convert_tex.hpp"
 #include "Bibtex/bibtex.hpp"
 #include "metadata.hpp"

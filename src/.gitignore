@@ -80,3 +80,4 @@ src/Plugins/Qt*/moc_*.cpp
 
 # written by misc/wasm/build-info.py at each build of the browser version
 TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm
+/build-tau/

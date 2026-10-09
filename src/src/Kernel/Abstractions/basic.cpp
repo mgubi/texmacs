@@ -270,7 +270,7 @@ gui_is_x () {
   // neither is Cocoa, whose save panel asks before overwriting a file.
   // Qtwk is: it uses Qt as a platform layer, but the widgets of Widkit.
 #if (defined (QTTEXMACS) && !defined (QTWKTEXMACS)) || \
-    defined (VUETEXMACS) || defined (AQUATEXMACS)
+    (defined(VUETEXMACS) || defined(TAUTEXMACS)) || defined (AQUATEXMACS)
   return false;
 #else
   return true;

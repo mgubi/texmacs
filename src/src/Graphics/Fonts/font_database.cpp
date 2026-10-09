@@ -18,7 +18,6 @@
 #include "merge_sort.hpp"
 #include "Freetype/tt_file.hpp"
 #include "Freetype/tt_tools.hpp"
-#include "Metafont/tex_files.hpp"
 #include "data_cache.hpp"
 
 void font_database_filter_features ();
@@ -652,7 +651,6 @@ font_database_filter () {
   back_font_table= hashmap<tree,tree> (UNINIT);
   build_back_table ();
   font_database_collect (tt_font_path ());
-  font_database_collect (tfm_font_path ());
   font_table= new_font_table;
   new_font_table = hashmap<tree,tree> (UNINIT);
   back_font_table= hashmap<tree,tree> (UNINIT);

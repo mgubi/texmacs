@@ -1289,9 +1289,11 @@ tmscm_to_list_tree (tmscm p) {
 #include "Concat/concater.hpp"
 #include "converter.hpp"
 #include "tm_timer.hpp"
-#include "Metafont/tex_files.hpp"
+// Tau: there are no fonts of a TeX distribution. The old font menus still
+// ask (url-exists-in-tex?), until they are reworked
+static bool exists_in_tex (url u) { (void) u; return false; }
 #include "Freetype/tt_file.hpp"
-#include "LaTeX_Preview/latex_preview.hpp"
+#include "Tex/latex_preview.hpp"
 #include "Bibtex/bibtex.hpp"
 #include "Bibtex/bibtex_functions.hpp"
 #include "link.hpp"
@@ -1301,8 +1303,8 @@ tmscm_to_list_tree (tmscm p) {
 #include "new_style.hpp"
 #include "persistent.hpp"
 
-#include "Pdf/pdf_hummus_extract_attachment.hpp"
-#include "Pdf/pdf_hummus_make_attachment.hpp"
+#include "MuPDF/pdf_extract_attachment.hpp"
+#include "MuPDF/pdf_make_attachment.hpp"
 
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"

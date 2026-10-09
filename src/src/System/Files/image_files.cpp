@@ -37,7 +37,6 @@
 #include "picture.hpp"
 #include "effect.hpp"
 #include "renderer.hpp" // PIXEL
-#include "Imlib2/imlib2.hpp"
 #ifdef MUPDF_RENDERER
 // in Plugins/MuPDF/mupdf_picture.cpp (declared here: this file is compiled
 // without the headers of MuPDF)

@@ -196,7 +196,7 @@ edit_interface_rep::mouse_adjust (SI x, SI y, int mods) {
     SERVER (menu_widget ("(vertical (link " * menu * "))", wid));
     widget popup_wid= ::popup_widget (wid);
     popup_win= ::popup_window_widget (popup_wid, "Popup menu");
-#if defined (QTTEXMACS) || defined(AQUATEXMACS) || defined(VUETEXMACS)
+#if defined (QTTEXMACS) || defined(AQUATEXMACS) || (defined(VUETEXMACS) || defined(TAUTEXMACS))
     SI ox, oy, sx, sy;
     get_position (this, ox, oy);
     get_scroll_position(this, sx, sy);
@@ -632,7 +632,7 @@ relativize (tree t, url base) {
 
 static void
 call_drop_event (string kind, SI x, SI y, SI ticket, time_t t, url base) {
-#if defined (QTTEXMACS) || defined (VUETEXMACS) || defined (AQUATEXMACS)
+#if defined (QTTEXMACS) || (defined(VUETEXMACS) || defined(TAUTEXMACS)) || defined (AQUATEXMACS)
   (void) kind; (void) x; (void) y; (void) t;
   extern hashmap<int, tree> payloads;
   tree doc = payloads [ticket];

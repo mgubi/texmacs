@@ -28,8 +28,6 @@ int  install_status   = 0;
 bool use_which        = false;
 bool use_locate       = false;
 
-extern void setup_tex (); // from Plugins/Metafont/tex_init.cpp
-extern void init_tex  (); // from Plugins/Metafont/tex_init.cpp
 
 /******************************************************************************
 * Subroutines for paths
@@ -509,7 +507,6 @@ setup_texmacs () {
   debug_boot << HRULE;
 
   set_setting ("VERSION", TEXMACS_VERSION);
-  setup_tex ();
   
   string s= scheme_tree_to_block (texmacs_settings);
   //cout << "settings_t= " << texmacs_settings << "\n";
@@ -583,7 +580,6 @@ init_plugins () {
     url ch ("$TEXMACS_HOME_PATH/doc/about/changes/changes-recent.en.tm");
     install_status= exists (ch)? 2: 0;
   }
-  init_tex ();
 }
 
 bool

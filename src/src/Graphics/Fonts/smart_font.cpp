@@ -172,11 +172,11 @@ static string rewrite_math (string s);
 
 static bool
 is_math_family (string f) {
-  return
-    f == "roman" ||
-    f == "concrete" ||
-    f == "Euler" ||
-    f == "ENR";
+  // Tau: the families which took their symbols from compounds of TeX fonts
+  // (find_font of a "math" tuple: roman, concrete, Euler, ENR). There are
+  // no TeX fonts, so there is none
+  (void) f;
+  return false;
 }
 
 static bool
@@ -1350,6 +1350,12 @@ smart_font_rep::resolve_rubber (string c, string fam, int attempt) {
   // long arrows whose long form the font lacks stretch the plain arrow
   if (bnr < 0 && starts (ss, "long") && N(ss) > 4)
     bnr= resolve ("<" * ss (4, N(ss)) * ">", main_family (fam), attempt);
+  // Tau: braces and the like have no character of their own in TeXmacs
+  // ("<underbrace>" is in no font), but the rubber font of an OpenType math
+  // font finds their stretchable glyphs by code point (wide_code_point)
+  if (bnr < 0 && ot_math && attempt == 1 &&
+      (starts (c, "<wide-") || starts (c, "<rubber-")))
+    bnr= SUBFONT_MAIN;
   if (bnr >= 0 && bnr < N(fn) && !is_nil (fn[bnr])) {
     tree key= tuple ("rubber", as_string (bnr));
     int nr= sm->add_font (key, REWRITE_NONE);
@@ -1648,6 +1654,9 @@ smart_font_rep::initialize_font (int nr) {
     int nhdpi= (hdpi * nvdpi + (dpi>>1)) / dpi;
     fn[nr]= smart_font_bis ("roman", variant, series, "mathitalic", sz,
                             nhdpi, nvdpi);
+    // Tau: when "roman" is this very font (see roman_fix) there is no other
+    // font to turn to
+    if (fn[nr]->res_name == res_name) fn[nr]= fn[SUBFONT_ERROR];
   }
   else if (a[0] == "bold-math")
     fn[nr]= smart_font_bis (family, variant, "bold", "right", sz, hdpi, dpi);
@@ -2240,6 +2249,32 @@ smart_font_rep::get_wide_correction (string s, int mode) {
 * User interface
 ******************************************************************************/
 
+// Tau: the family "roman", the default of TeXmacs, stood for the TeX fonts
+// (Computer Modern and its relatives, through the Metafont plugin). Tau has
+// no TeX fonts: "roman" is Latin Modern, their OpenType version, with Latin
+// Modern Math for the formulas (see fonts-opentype.scm), and Latin Modern
+// Sans and Mono for its sans serif and typewriter variants in the text.
+
+static string
+roman_fix (string family, string variant= "rm", string shape= "right") {
+  if (!occurs ("roman", family)) return family;
+  array<string> a= trimmed_tokenize (family, ","), r;
+  for (int i= 0; i < N(a); i++) {
+    string item= a[i];
+    int pos= search_forwards ("=", item);
+    string head= pos < 0? string (""): item (0, pos+1);
+    string tail= pos < 0? item: item (pos+1, N(item));
+    if (tail == "roman") {
+      if (starts (shape, "math")) tail= "Latin Modern Roman";
+      else if (variant == "ss") tail= "Latin Modern Sans";
+      else if (variant == "tt") tail= "Latin Modern Mono";
+      else tail= "Latin Modern Roman";
+    }
+    r << (head * tail);
+  }
+  return recompose (r, ",");
+}
+
 font
 smart_font_bis (string family, string variant, string series, string shape,
                 int sz, int hdpi, int vdpi) {
@@ -2258,6 +2293,20 @@ smart_font_bis (string family, string variant, string series, string shape,
       series * "-" * shape * "-" * as_string (sz) * "-" *
       as_string (hdpi) * "-" * as_string (vdpi) * "-smart";
   if (font::instances->contains (name)) return font (name);
+  if (family == "Euler" || starts (family, "cal") || starts (family, "Bbb")) {
+    // Tau: the families whose letters are those of another alphabet of
+    // Latin Modern Math (fonts/fonts-alphabets.scm). They are found by their
+    // rules, not in the database of the fonts, where "Euler" is the name
+    // of another font
+    if (family == "Euler" || family == "cal" || family == "Bbb" ||
+        ends (family, "*")) {
+      font fn= find_font (family, "rm", "medium", "right", sz, vdpi);
+      if (!is_nil (fn)) {
+        if (hdpi == vdpi) return fn;
+        return fn->magnify (((double) hdpi) / ((double) vdpi), 1.0);
+      }
+    }
+  }
   if (starts (family, "tc")) {
     // FIXME: temporary hack for symbols from std-symbol.ts
     font fn= find_font (family, variant, series, shape, sz, vdpi);
@@ -2278,6 +2327,7 @@ smart_font_bis (string family, string variant, string series, string shape,
       family= "cjk=" * name * ",roman";
     }
   }
+  family= roman_fix (family, variant, shape);
   family= tex_gyre_fix (family, series, shape);
   family= kepler_fix (family, series, shape);
   //family= stix_fix (family, series, shape);
@@ -2288,7 +2338,8 @@ smart_font_bis (string family, string variant, string series, string shape,
   string mfam= main_family (family);
   font base_fn= closest_font (mfam, variant, series, sh, sz, vdpi);
   if (is_nil (base_fn)) return font ();
-  font sec_fn= closest_font ("roman", "ss", "medium", "right", sz, vdpi);
+  font sec_fn= closest_font (roman_fix ("roman", "ss"), "ss", "medium",
+                             "right", sz, vdpi);
   font err_fn= error_font (sec_fn);
   return make (font, name,
                tm_new<smart_font_rep> (name, base_fn, err_fn, family, variant,

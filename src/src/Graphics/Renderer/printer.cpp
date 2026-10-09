@@ -10,7 +10,6 @@
 ******************************************************************************/
 
 #include "printer.hpp"
-#include "Metafont/tex_files.hpp"
 #include "Freetype/tt_file.hpp"
 #include "file.hpp"
 #include "image_files.hpp"

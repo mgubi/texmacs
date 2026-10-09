@@ -62,8 +62,9 @@ reduced `Texmacs/` (below). **The page** is new code.
   subsetter of the MuPDF plugin (`mupdf_type1.c`, `mupdf_writet1.c`), and
   the plugins of other platforms and toolkits.
 - `System/Link/texmacs_server.cpp` and the Scheme modules of `server/`.
-- `TeXmacs/fonts/tfm`, `TeXmacs/fonts/type1`, and the virtual fonts built
-  on TeX fonts.
+- `TeXmacs/fonts/tfm` and `TeXmacs/fonts/type1`. (The virtual fonts
+  `tradi-*.vfn` stay: they build long arrows, negations and the like over
+  any font, and the smart font uses them with OpenType fonts too.)
 
 ## Buffers, views and windows
 
@@ -357,6 +358,42 @@ interrupted. Proposed: measure typing in a long document at step 2 of the
 work; if interruption is needed, polling first. Shared memory is worth
 its constraints only with what else it allows (threads, a worker which
 draws and shares its data with the core).
+
+## State
+
+**Step 1 is done** (2026-10-09): the core builds without a GUI and runs
+under node.
+
+    . misc/wasm/emenv.sh build-tau
+    make -C build-tau -f ../misc/tau/Makefile -j8 MUPDF=<sources of MuPDF built for wasm>
+    make -C build-tau -f ../misc/tau/Makefile check
+
+- `misc/tau/` has the build: `Makefile`, `config.h` (`TAUTEXMACS`),
+  `sources.txt`. `out/node/tau.js` is the core for node; `check` typesets
+  a document of the examples and writes its PDF.
+- `src/Tau/` is what stands in the place of a GUI. `tau_widget.{hpp,cpp}`
+  is the class which the editor derives from: it keeps the state of the
+  place of a view and answers the questions of the editor from it (the
+  beginning of *What a view knows of its place*). `tau_gui.cpp` has the
+  services of `gui.hpp` (the loop, the clipboard) and the constructors of
+  widgets, which make nothing.
+- Without a GUI the core asked for 71 symbols: the services, and about
+  fifty constructors of widgets. These constructors, `Texmacs/Window` and
+  the windows of `Texmacs/Data` are still compiled: they go with their
+  callers, in steps 3 to 5. So does the server (`texmacs_server.cpp`,
+  `progs/server`), with the review of the glue.
+- Gone from the tree: the GUI plugins, those of other platforms, Metafont,
+  PDF Hummus, Ghostscript, Cairo, Imlib2, Resvg, the previews by LaTeX, the
+  TFM and Type 1 fonts and the Type 1 subsetter. The other builds of
+  TeXmacs (configure, CMake, `misc/wasm`) do not work any more.
+- Fonts: `roman` is Latin Modern (`roman_fix` in `smart_font.cpp`); the
+  families `cal`, `Euler` and `Bbb` are alphabets of Latin Modern Math
+  (`Graphics/Fonts/alphabet_font.cpp`, `fonts/fonts-alphabets.scm`, in the
+  place of the seven files of rules for TeX fonts); the marks of the
+  typesetter ask for Latin Modern by name. The old font menus
+  (`fonts/font-old-menu.scm`) still list TeX fonts, and ask whether they
+  are installed: the answer is no.
+- The test document of Vau (70 pages with the TeX fonts) has 73 pages.
 
 ## Order of the work
 
