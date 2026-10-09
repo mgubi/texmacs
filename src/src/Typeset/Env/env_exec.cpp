@@ -2086,6 +2086,14 @@ edit_env_rep::exec_has_binding (tree t) {
 * or updated has the names it was saved with. Outside of the bridges
 * (the header of a page...) the numbers are others, and not kept.
 *
+* The numbers are those of one typesetter, and the labels of a document go
+* to one table: two windows on the same document would name differently
+* the labels made since the last complete pass of each, and a name would
+* stand for two places. While a document has several views its labels
+* are numbered by the counter, which gives the same names in all of them
+* (auto_alone, set by edit_typeset_rep::typeset_sub, which has the
+* document typeset as a whole when this changes).
+*
 * With the environment variable TEXMACS_STABLE_LABELS set to "off" the
 * counter is used as before (inc-auto, auto-nr).
 ******************************************************************************/
@@ -2094,7 +2102,7 @@ tree
 edit_env_rep::exec_auto_id (tree t) {
   static bool stable= (get_env ("TEXMACS_STABLE_LABELS") != "off");
   bool fresh= (N(t) >= 1 && exec_string (t[0]) == "new");
-  if (!stable) {
+  if (!stable || !auto_alone) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }

@@ -41,7 +41,7 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   missing (UNINIT), redefined (), touched (false),
   read_unknown (false), rec_keys (NULL), rec_values (NULL),
   auto_ids (NULL), auto_used (0), auto_last (""), auto_given (0),
-  auto_count (0), auto_next (1), auto_loose (0)
+  auto_count (0), auto_next (1), auto_loose (0), auto_alone (true)
 {
   initialize_default_env ();
   initialize_default_var_type ();

@@ -514,6 +514,7 @@ public:
   int         auto_used;
   string      auto_last;
   int         auto_given, auto_count, auto_next, auto_loose;
+  bool        auto_alone; // no other view of the document (edit_typeset.cpp)
   inline void record_lookups (array<string>* keys, array<tree>* values) {
     rec_keys= keys; rec_values= values; }
   tree lookup_value (string name);

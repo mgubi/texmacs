@@ -634,10 +634,14 @@
   bridges typeset again. <verbatim|TEXMACS_STABLE_LABELS=off> uses the
   counter as before.
 
-  The numbers are those of a bridge, that is of one typesetter: two
-  windows on the same document, whose labels go to the same table, may
-  give different names to the labels made since the last complete pass
-  of each. This has not been looked at.
+  The numbers are those of a bridge, that is of one typesetter, while the
+  labels of a document go to one table: two windows on the same document
+  would give different names to the labels made since the last complete
+  pass of each, and a name would stand for two places. While a document
+  is shown by several views its labels are therefore numbered by the
+  counter, which gives the same names in all of them
+  (<cpp|edit_typeset_rep::typeset_sub> sets this, and has the document
+  typeset as a whole when it changes).
 
   The entries of the index itself, 1350 of them with their page numbers,
   and the paragraphs with references are used again since the references

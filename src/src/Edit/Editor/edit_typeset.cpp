@@ -12,6 +12,7 @@
 #include <climits>
 #include "edit_typeset.hpp"
 #include "tm_buffer.hpp"
+#include "tm_window.hpp" // tm_view_rep (the views which are shown)
 #include "convert.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
@@ -1021,6 +1022,17 @@ void
 edit_typeset_rep::typeset_sub (SI& x1, SI& y1, SI& x2, SI& y2) {
   //time_t t1= texmacs_time ();
   typeset_prepare ();
+  // The automatic labels keep their numbers as long as this is the only
+  // view of the document which is shown (exec_auto_id in env_exec.cpp);
+  // when that changes, they are all numbered again
+  int shown= 0;
+  for (int i=0; i<N(buf->vws); i++)
+    if (((tm_view) buf->vws[i])->win != NULL) shown++;
+  bool alone= (shown <= 1);
+  if (env->auto_alone != alone) {
+    env->auto_alone= alone;
+    ::notify_assign (ttt, path(), subtree (et, rp));
+  }
   eb= empty_box (reverse (rp));
   // saves memory, also necessary for change_log update
   bench_start ("typeset");
