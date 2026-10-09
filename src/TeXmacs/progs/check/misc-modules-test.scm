@@ -51,6 +51,7 @@
 
 (texmacs-module (check misc-modules-test)
   (:use (check check-lib)
+        (fonts font-design)
         (doc help-funcs)
         (doc tmdoc)
         (doc tmdoc-search)
@@ -652,6 +653,79 @@
   (check= (font-style-features "Bold Italic") '("bold" "italic"))
   (check= (font-style-features "Regular") '())
   (check= (font-style-features "Light Condensed") '("light" "condensed")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The page of the design of the fonts (fonts/font-design.scm)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (design-entry name kind)
+  (list-find (append-map cdr (font-design-sections))
+             (lambda (e) (and (== (cdr (assq 'name e)) name)
+                              (== (cdr (assq 'kind e)) kind)))))
+
+(define (test-font-design)
+  (check-group "font design")
+  ;; the catalogue: the fonts of the menus, by section
+  (with names (map car (font-design-sections))
+    (check-true (in? "Serif text with mathematics" names))
+    (check-true (in? "Sans serif text with mathematics" names))
+    (check-true (in? "Serif text" names))
+    (check-true (in? "Typewriter text" names)))
+  (for (x '(("Roman" pair) ("Palatino" pair) ("Euler" pair) ("DejaVu" pair)
+            ("Fira" pair) ("IBM Plex" pair) ("Gentium Plus" serif)
+            ("Antykwa Torunska" serif) ("Iwona" sans) ("Kurier" sans)
+            ("Inconsolata" mono) ("Chorus" other)))
+    (with e (design-entry (car x) (cadr x))
+      (check-true (pair? e))
+      ;; the fonts which come with TeXmacs have the picture of their sample
+      (when e (check-true (url? (font-design-sample e))))))
+  ;; the value of `font' and the choice of the parts, both ways
+  (with c (font-design-parse
+           "cal=TeX Gyre Termes,math=Stix Two Math,typewriter=Fira,Gentium Plus"
+           "rm")
+    (check= (assoc-ref c "text") "Gentium Plus")
+    (check= (assoc-ref c "math") "Stix Two Math")
+    (check= (assoc-ref c "cal") "TeX Gyre Termes")
+    (check= (assoc-ref c "typewriter") "Fira")
+    (check= (assoc-ref c "sansserif") #f)
+    (check= (font-design-font c)
+            "cal=TeX Gyre Termes,math=Stix Two Math,typewriter=Fira,Gentium Plus"))
+  (check= (font-design-font (font-design-parse "TeX Gyre Pagella" "rm"))
+          "TeX Gyre Pagella")
+  (check= (font-design-font (font-design-parse "roman" "rm")) "roman")
+  ;; the mathematics which the text font brings along is not named
+  (check= (font-design-font
+           (font-design-parse "math=TeX Gyre Pagella Math,TeX Gyre Pagella"
+                              "rm"))
+          "TeX Gyre Pagella")
+  (check= (font-design-font
+           (font-design-parse "math=Euler Math,TeX Gyre Pagella" "rm"))
+          "math=Euler Math,TeX Gyre Pagella")
+  ;; a part chosen from an entry
+  (let* ((c0 (font-design-parse "roman" "rm"))
+         (c1 (font-design-choose c0 (design-entry "Gentium Plus" 'serif) "text"))
+         (c2 (font-design-choose c1 (design-entry "STIX Two" 'pair) "math"))
+         (c3 (font-design-choose c2 (design-entry "Iwona" 'sans) "sansserif"))
+         (c4 (font-design-choose c3 (design-entry "Fira" 'pair) "typewriter"))
+         (c5 (font-design-choose c4 (design-entry "Times" 'pair) "cal"))
+         (c6 (font-design-choose c5 (design-entry "Euler" 'pair) "all"))
+         (c7 (font-design-choose c0 (design-entry "Fira" 'pair) "all"))
+         (c8 (font-design-choose c0 (design-entry "IBM Plex" 'pair) "all")))
+    (check= (font-design-font c1) "Gentium Plus")
+    (check= (font-design-font c2) "math=Stix Two Math,Gentium Plus")
+    (check= (font-design-font c5)
+            (string-append "cal=TeX Gyre Termes Math,math=Stix Two Math,"
+                           "typewriter=Fira,sansserif=Iwona,Gentium Plus"))
+    ;; a whole pair starts again
+    (check= (font-design-font c6) "math=Euler Math,TeX Gyre Pagella")
+    (check= (font-design-font c7) "Fira")
+    ;; the text of IBM Plex Math is Plex Sans, the sans serif of its master
+    (check= (font-design-font c8) "IBM Plex")
+    (check= (assoc-ref c8 "family") "ss"))
+  ;; the sample of an entry is set in its fonts
+  (with t (font-design-sample-tree (design-entry "Euler" 'pair))
+    (check= (car t) 'with)
+    (check= (caddr t) "math=Euler Math,TeX Gyre Pagella")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Logical fonts
@@ -1527,7 +1601,7 @@
   (for-each run-group
             (list test-help-files test-doc-parse test-tmdoc-expand
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
-                  test-font-database test-logical-fonts
+                  test-font-database test-font-design test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation
                   test-spelling

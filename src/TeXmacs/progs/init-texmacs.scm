@@ -543,6 +543,8 @@
 (lazy-define (fonts font-old-menu)
 	     text-font-menu math-font-menu prog-font-menu)
 (lazy-menu (fonts font-short-menu) document-short-design-font-menu)
+(lazy-define (fonts font-design) open-font-design)
+(lazy-tmfs-handler (fonts font-design) font-design)
 (lazy-menu (fonts font-features)
            text-font-features-menu document-font-features-menu)
 (lazy-define (fonts font-features)
