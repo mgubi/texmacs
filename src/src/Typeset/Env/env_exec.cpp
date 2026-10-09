@@ -64,6 +64,7 @@ edit_env_rep::rewrite (tree t) {
       }
       edit_env old_env= current_rewrite_env;
       current_rewrite_env= edit_env (this);
+      read_other ();
       object o= eval (expr);
       current_rewrite_env= old_env;
       return content_to_tree (o);
@@ -2036,6 +2037,7 @@ tree
 edit_env_rep::exec_get_binding (tree t) {
   if (N(t) != 1 && N(t) != 2) return tree (_ERROR, "bad get binding");
   string key= exec_string (t[0]);
+  read_other ();
   tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
@@ -2054,6 +2056,7 @@ tree
 edit_env_rep::exec_has_binding (tree t) {
   if (N(t) != 1 && N(t) != 2) return tree (_ERROR, "bad get binding");
   string key= exec_string (t[0]);
+  read_other ();
   tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
@@ -2067,6 +2070,7 @@ tree
 edit_env_rep::exec_get_attachment (tree t) {
   if (N(t) != 1) return tree (_ERROR, "bad get attachment");
   string key= exec_string (t[0]);
+  read_other ();
   tree value= local_att->contains (key)? local_att [key]: global_att [key];
   return value;
 }

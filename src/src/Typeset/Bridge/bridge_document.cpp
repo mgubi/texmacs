@@ -18,6 +18,8 @@ class bridge_document_rep: public bridge_rep {
 protected:
   array<bridge> brs;
   bridge acc; // binary splitting acceleration for long documents
+  hashmap<string,tree> removed_last; // as bridge_rep::removed, for the
+                                     // paragraphs removed at the end
 
 public:
   bridge_document_rep (typesetter ttt, tree st, path ip);
@@ -36,7 +38,7 @@ public:
 };
 
 bridge_document_rep::bridge_document_rep (typesetter ttt, tree st, path ip):
-  bridge_rep (ttt, st, ip)
+  bridge_rep (ttt, st, ip), removed_last (UNINIT)
 {
   initialize ();
 }
@@ -128,6 +130,26 @@ bridge_document_rep::notify_remove (path p, int nr) {
     bool change_flag= false;
     for (i=pos; i<pos+nr; i++)
       change_flag |= !brs[i]->changes->empty();
+    if (bridge_reads_on ()) {
+      // The changes of the removed paragraphs go to the bridge which
+      // follows (or to the document, at its end), which compares them
+      // with the environment at the next pass, instead of having every
+      // following bridge typeset again (see bridge_rep::typeset). In the
+      // order of the document: what each had kept from paragraphs
+      // removed before it, then its own changes
+      hashmap<string,tree> gone (UNINIT);
+      for (i=pos; i<pos+nr; i++) {
+        gone->join (brs[i]->removed);
+        gone->join (brs[i]->changes);
+      }
+      if (N(gone) != 0) {
+        hashmap<string,tree>& next=
+          (pos+nr < n) ? brs[pos+nr]->removed : removed_last;
+        gone->join (next);
+        next= gone;
+      }
+      change_flag= false;
+    }
     brs= brs2;
     n -= nr;
     st = st (0, pos) * st (pos+nr, N(st));
@@ -207,6 +229,10 @@ bridge_document_rep::my_typeset (int desired_status) {
       ttt->a= (i==0  ? a: array<line_item> ());
       ttt->b= (i==n-1? b: array<line_item> ());
       brs[i]->typeset (PROCESSED+ wanted);
+    }
+    if (N(removed_last) != 0) {
+      env->compare_changes (ttt->old_patch, removed_last);
+      removed_last= hashmap<string,tree> (UNINIT);
     }
   }
   else acc->my_typeset (desired_status);

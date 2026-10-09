@@ -42,6 +42,7 @@ struct edit_profile_data {
   double bridges, pages, changes;  // ms: the bridges, the pager, the change log
   int    passes;                   // typesetting passes of this edit
   int    cached, redone;           // bridges whose result was reused or not
+  int    unread;                   // of the reused: with other variables changed
   int    lines, moved;             // lines (and remembered boxes) logged, changed
   int    rects;                    // rectangles in the change log
   int    breaks_reused;            // searches of page breaks avoided
