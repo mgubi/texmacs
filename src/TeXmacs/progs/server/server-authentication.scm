@@ -78,6 +78,11 @@
     (server-log-write `info
       (string-append "Turning TLS " val))))
 
+(define (notify-server-websocket var val)
+  (when (server-started?)
+    (server-log-write `info
+      (string-append "WebSocket clients: " val))))
+
 (define (notify-tls-server-authentication-anonymous var val)
   (when (server-started?)
     (server-log-write `info
@@ -162,6 +167,12 @@
    notify-tls-server)
   ("tls-server authentication anonymous" "on"
    notify-tls-server-authentication-anonymous)
+  ;; the clients in a browser (their sockets are WebSockets, without TLS of
+  ;; their own: wss encrypts them): "local" serves those of this machine
+  ;; only, "on" any (behind a proxy which does the TLS of wss), "off" none
+  ;; (src/System/Link/websocket_contact.cpp)
+  ("server websocket" "local"
+   notify-server-websocket)
   ("server contact timeout" "10000" ;; 10s
    notify-server-contact-timeout)
   ("server connection timeout" "120" ;; 120s
