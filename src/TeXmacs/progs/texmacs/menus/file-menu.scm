@@ -48,17 +48,17 @@
 
 (tm-define (buffer-go-menu)
   (let* ((l1 (list-difference (buffer-menu-list 15) (linked-file-list)))
-         (l2 (map window->buffer (window-list)))
+         (l2 (map place->buffer (place-list)))
          (l3 (list-difference l2 (list (current-buffer)))))
     (buffer-list-menu (list-difference l1 l3))))
 
-(tm-define (buffer-windows-menu)
-  (let* ((l1 (map window->buffer (window-list))))
+(tm-define (buffer-places-menu)
+  (let* ((l1 (map place->buffer (place-list))))
     (buffer-list-menu l1)))
 
 (tm-define (buffer-invisible-list n)
   (let* ((l1 (list-difference (buffer-menu-list n) (linked-file-list)))
-         (l2 (map window->buffer (window-list))))
+         (l2 (map place->buffer (place-list))))
     (list-difference l1 l2)))
 
 (tm-define (buffer-invisible-menu)
@@ -156,14 +156,14 @@
      (begin
        (gui-set-next-window-as-popup)
        (new-document*))))
-  (if (and (not (support-functionality? "tab")) (window-per-buffer?))
+  (if (and (not (support-functionality? "tab")) (place-per-buffer?))
     ("New window" (new-document)))
   (if (and (not (support-functionality? "tab"))
-       (not (window-per-buffer?)))
+       (not (place-per-buffer?)))
     ("New document" (new-document))
     (if (not (support-functionality? "tab"))
       ("New window" (new-document*))))
-  ;;("Clone window" (clone-window))
+  ;;("Clone window" (clone-place))
   )
 
 (menu-bind load-menu
@@ -173,7 +173,7 @@
   ;; by the Vue plugin there)
   (if (defined? 'web-files)
       ("Files in this browser..." (web-files)))
-  (if (not (window-per-buffer?))
+  (if (not (place-per-buffer?))
       ("Load in new window" (open-document*)))
   ---
   (link import-top-menu)
@@ -190,6 +190,7 @@
 (menu-bind save-menu
   ("Save" (save-buffer))
   ("Save as" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
+  ("Download" (tau-download-buffer))
   ---
   (link export-top-menu)
   ---
@@ -250,9 +251,9 @@
       ("Page setup" (open-page-setup))))
 
 (menu-bind close-menu
-  (if (window-per-buffer?)
+  (if (place-per-buffer?)
       ("Close window" (close-document)))
-  (if (not (window-per-buffer?))
+  (if (not (place-per-buffer?))
       ("Close document" (close-document))
       ("Close window" (close-document*)))
   ("Close TeXmacs" (safely-quit-TeXmacs)))
@@ -297,6 +298,7 @@
   ---
   ("Save" (save-buffer))
   ("Save as" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
+  ("Download" (tau-download-buffer))
   ---
   (link print-menu)
   ---
@@ -317,9 +319,9 @@
         (=> "Export selection as image"
             (link export-as-image-menu))))
   ---
-  (if (window-per-buffer?)
+  (if (place-per-buffer?)
       ("Close window" (close-document)))
-  (if (not (window-per-buffer?))
+  (if (not (place-per-buffer?))
       ("Close document" (close-document)))
   ("Close TeXmacs" (safely-quit-TeXmacs)))
 
@@ -334,7 +336,7 @@
     ("Forward" (cursor-history-forward)))
   ("Save position" (cursor-history-add (cursor-path)))
   ---
-  (if (not (window-per-buffer?))
+  (if (not (place-per-buffer?))
       (link buffer-go-menu)
       (if (nnull? (linked-file-list))
           ---
@@ -345,9 +347,9 @@
       (if (nnull? (bookmarks-menu))
           ---
           (link bookmarks-menu)))
-  (if (window-per-buffer?)
+  (if (place-per-buffer?)
       (group "Windows")
-      (link buffer-windows-menu)
+      (link buffer-places-menu)
       ---
       (group "Buffer in this window")
       ("New" (new-document*))

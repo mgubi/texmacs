@@ -140,8 +140,8 @@
 
 (tm-define (switch-to-buffer* buf)
   (cond ((== buf (current-buffer)) (noop))
-        ((nnull? (buffer->windows buf))
-         (switch-to-window (car (buffer->windows buf))))
+        ((nnull? (buffer->places buf))
+         (switch-to-place (car (buffer->places buf))))
         (else (switch-to-buffer buf))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -489,8 +489,8 @@
 (define (load-buffer-open name opts)
   ;;(display* "load-buffer-open " name ", " opts "\n")
   (cond ((in? :background opts) (noop))
-        ((in? :new-window opts)
-         (open-buffer-in-window name (buffer-get name) ""))
+        ((in? :new-place opts)
+         (open-buffer-in-place name (buffer-get name) ""))
         (else
           (switch-to-buffer name)))
   (buffer-notify-recent name)
@@ -567,12 +567,12 @@
   ;;(display* "load-buffer " name ", " opts "\n")
   (apply load-buffer-main (cons name opts)))
 
-(tm-define (load-buffer-in-new-window name . opts)
+(tm-define (load-buffer-in-new-place name . opts)
   (:argument name smart-file "File name")
   (:default  name (propose-name-buffer))
-  (if (buffer->window name)
-      (noop) ;;(window-focus (buffer->window name))
-      (apply load-buffer-main (cons name (cons :new-window opts)))))
+  (if (buffer->place name)
+      (noop) ;;(place-focus (buffer->place name))
+      (apply load-buffer-main (cons name (cons :new-place opts)))))
 
 (tm-define (load-browse-buffer name)
   (:synopsis "Load a buffer or switch to it if already open")
@@ -642,8 +642,8 @@
   (import-buffer-check-permissions name fm opts))
 
 (tm-define (import-buffer name fm . opts)
-  (if (window-per-buffer?)
-      (import-buffer-main name fm (cons :new-window opts))
+  (if (place-per-buffer?)
+      (import-buffer-main name fm (cons :new-place opts))
       (import-buffer-main name fm opts)))
 
 (tm-define (buffer-importer fm)
@@ -653,35 +653,35 @@
 ;; System dependent conventions for buffer management
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (open-in-window)
-  (choose-file load-buffer-in-new-window "Load file" ""))
+(tm-define (open-in-place)
+  (choose-file load-buffer-in-new-place "Load file" ""))
 
 (tm-define (open-document)
-  (if (window-per-buffer?) (open-in-window) (open-buffer)))
+  (if (place-per-buffer?) (open-in-place) (open-buffer)))
 
 (tm-define (open-document*)
-  (if (window-per-buffer?) (open-buffer) (open-in-window)))
+  (if (place-per-buffer?) (open-buffer) (open-in-place)))
 
 (tm-define (load-document u)
   (:argument u smart-file "File name")
   (:default  u (propose-name-buffer))
   (when (not (url-none? u))
-    (if (window-per-buffer?) (load-buffer-in-new-window u) (load-buffer u))))
+    (if (place-per-buffer?) (load-buffer-in-new-place u) (load-buffer u))))
 
 (tm-define (load-document* u)
   (:argument u smart-file "File name")
   (:default  u (propose-name-buffer))
   (when (not (url-none? u))
-    (if (window-per-buffer?) (load-buffer u) (load-buffer-in-new-window u))))
+    (if (place-per-buffer?) (load-buffer u) (load-buffer-in-new-place u))))
 
 (tm-define (switch-document u)
   (:argument u smart-file "File name")
   (:default  u (propose-name-buffer))
   (when (not (url-none? u))
-    (if (window-per-buffer?)
-        (if (buffer->window u)
-            (noop) ;;(window-focus (buffer->window u))
-            (open-buffer-in-window u (buffer-get u) ""))
+    (if (place-per-buffer?)
+        (if (buffer->place u)
+            (noop) ;;(place-focus (buffer->place u))
+            (open-buffer-in-place u (buffer-get u) ""))
         (load-buffer u))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

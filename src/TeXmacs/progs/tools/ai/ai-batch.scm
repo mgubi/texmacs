@@ -151,8 +151,8 @@
 	 (aux "Comments from AI about corrections")
 	 (name (aux-name aux)))
     (aux-set-document aux doc)
-    (if (not (buffer->window name))
-	(load-buffer-main name :new-window))))
+    (if (not (buffer->place name))
+	(load-buffer-main name :new-place))))
 
 ;; The correction and the translation of the selection: the selection is
 ;; replaced by the answer only when one came; without a key the key is asked

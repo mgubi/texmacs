@@ -28,8 +28,8 @@
 (define selector-table (make-ahash-table))
 
 (define (selkey specs var)
-  (with win (if (list-4? specs) (cadddr specs) (current-window))
-    (list specs var (window->buffer win))))
+  (with win (if (list-4? specs) (cadddr specs) (current-place))
+    (list specs var (place->buffer win))))
 
 (tm-define (selector-set* specs var val)
   ;;(display* "Set " specs ", " var " <- " val "\n")
@@ -42,7 +42,7 @@
     (with changes (selector-get-changes specs getter)
       (when (nnull? changes)
         (setter changes)
-        ;;(with-window win (update-menus))
+        ;;(with-place win (update-menus))
         (keyboard-focus-on "canvas")
         ))))
 
@@ -946,7 +946,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (open-font-tool name getter setter global?)
-  (let* ((win (current-window))
+  (let* ((win (current-place))
          (specs (list getter setter global? win))
          (tool `(font-tool ,name ,getter ,setter ,global?)))
     (selector-clean specs)

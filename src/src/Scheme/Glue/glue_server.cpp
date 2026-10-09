@@ -112,8 +112,8 @@ tmg_window_get_serial () {
 
 tmscm
 tmg_window_set_property (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "window-set-property");
-  TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "window-set-property");
+  TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "place-set-property");
+  TMSCM_ASSERT_SCHEME_TREE (arg2, TMSCM_ARG2, "place-set-property");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
   scheme_tree in2= tmscm_to_scheme_tree (arg2);
@@ -127,7 +127,7 @@ tmg_window_set_property (tmscm arg1, tmscm arg2) {
 
 tmscm
 tmg_window_get_property (tmscm arg1) {
-  TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "window-get-property");
+  TMSCM_ASSERT_SCHEME_TREE (arg1, TMSCM_ARG1, "place-get-property");
 
   scheme_tree in1= tmscm_to_scheme_tree (arg1);
 
@@ -301,7 +301,7 @@ tmg_full_screen_editP () {
 
 tmscm
 tmg_set_window_zoom_factor (tmscm arg1) {
-  TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "set-window-zoom-factor");
+  TMSCM_ASSERT_DOUBLE (arg1, TMSCM_ARG1, "set-place-zoom-factor");
 
   double in1= tmscm_to_double (arg1);
 
@@ -573,9 +573,9 @@ initialize_glue_server () {
   tmscm_install_procedure ("kbd-post-rewrite",  tmg_kbd_post_rewrite, 2, 0, 0);
   tmscm_install_procedure ("kbd-system-rewrite",  tmg_kbd_system_rewrite, 1, 0, 0);
   tmscm_install_procedure ("set-font-rules",  tmg_set_font_rules, 1, 0, 0);
-  tmscm_install_procedure ("window-get-serial",  tmg_window_get_serial, 0, 0, 0);
-  tmscm_install_procedure ("window-set-property",  tmg_window_set_property, 2, 0, 0);
-  tmscm_install_procedure ("window-get-property",  tmg_window_get_property, 1, 0, 0);
+  tmscm_install_procedure ("place-get-serial",  tmg_window_get_serial, 0, 0, 0);
+  tmscm_install_procedure ("place-set-property",  tmg_window_set_property, 2, 0, 0);
+  tmscm_install_procedure ("place-get-property",  tmg_window_get_property, 1, 0, 0);
   tmscm_install_procedure ("show-header",  tmg_show_header, 1, 0, 0);
   tmscm_install_procedure ("show-icon-bar",  tmg_show_icon_bar, 2, 0, 0);
   tmscm_install_procedure ("show-side-tools",  tmg_show_side_tools, 2, 0, 0);
@@ -589,8 +589,8 @@ initialize_glue_server () {
   tmscm_install_procedure ("full-screen-mode",  tmg_full_screen_mode, 2, 0, 0);
   tmscm_install_procedure ("full-screen?",  tmg_full_screenP, 0, 0, 0);
   tmscm_install_procedure ("full-screen-edit?",  tmg_full_screen_editP, 0, 0, 0);
-  tmscm_install_procedure ("set-window-zoom-factor",  tmg_set_window_zoom_factor, 1, 0, 0);
-  tmscm_install_procedure ("get-window-zoom-factor",  tmg_get_window_zoom_factor, 0, 0, 0);
+  tmscm_install_procedure ("set-place-zoom-factor",  tmg_set_window_zoom_factor, 1, 0, 0);
+  tmscm_install_procedure ("get-place-zoom-factor",  tmg_get_window_zoom_factor, 0, 0, 0);
   tmscm_install_procedure ("shell",  tmg_shell, 1, 0, 0);
   tmscm_install_procedure ("dialogue-end",  tmg_dialogue_end, 0, 0, 0);
   tmscm_install_procedure ("cpp-choose-file",  tmg_cpp_choose_file, 5, 0, 0);

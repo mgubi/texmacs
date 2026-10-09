@@ -111,7 +111,7 @@
     (let* ((t (tree-innermost any-comment-context? #t))
            (id (comment-id t)))
       (when t (tree-select t))
-      (load-buffer-in-new-window cu)
+      (load-buffer-in-new-place cu)
       (buffer-set-master cu u)
       (delayed
         (:pause 50)
@@ -166,7 +166,7 @@
   (let* ((u (current-buffer))
          (cu (string-append "tmfs://comments/" (url->tmfs-string u))))
     (and (buffer-exists? cu)
-         (in? (string->url cu) (map window->buffer (window-list))))))
+         (in? (string->url cu) (map place->buffer (place-list))))))
 
 (define (sync-comments-cursor)
   (let* ((m (current-buffer))

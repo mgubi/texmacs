@@ -253,7 +253,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (tool-root win)
-  (git-buffer-root (window->buffer win)))
+  (git-buffer-root (place->buffer win)))
 
 (define (tool-status root)
   ;; NOTE: the panel is expanded after each change of the document, so that
@@ -457,7 +457,7 @@
 (define (tool-context win)
   ;; The working tree, the document and the mode for the panel of win
   (list (tool-root win)
-        (with b (window->buffer win)
+        (with b (place->buffer win)
           (and b (not (url-rooted-tmfs? b)) b))
         (git-simple-mode?)))
 
@@ -801,7 +801,7 @@
 (tm-define (git-with-mode cont)
   (:synopsis "Execute @cont, after asking for the mode the first time")
   (if (or (== (get-preference "git mode chosen") "on")
-          (headless?) (not (current-window)))
+          (headless?) (not (current-place)))
       (cont)
       (dialogue-window (git-mode-widget cont) noop "Git")))
 
@@ -864,7 +864,7 @@
       ("Close" (quit)))))
 
 (tm-define (git-show-failure ret what)
-  (:require (and (not (headless?)) (current-window)))
+  (:require (and (not (headless?)) (current-place)))
   (let* ((root (git-last-root))
          (x (explain-failure ret))
          (label (third x))
@@ -902,7 +902,7 @@
         'conflicted)))
 
 (tm-widget (version-review-contents win)
-  (let* ((u (window->buffer win))
+  (let* ((u (place->buffer win))
          (conflict? (review-conflict? u))
          (l (review-differences u))
          (n (length l))

@@ -300,7 +300,7 @@
 
 (tm-define (version-review-open)
   (:synopsis "Show the tool for reviewing the differences")
-  (when (and (not (headless?)) (current-window))
+  (when (and (not (headless?)) (current-place))
     (tool-select :transient-bottom 'version-review-tool)))
 
 (tm-define (compare-with-older old)

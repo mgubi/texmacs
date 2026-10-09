@@ -300,8 +300,8 @@
 
 (define (panorama-packets)
   (let* ((nr (nr-pages))
-         (ww (get-window-width))
-         (wh (get-window-height))
+         (ww (get-view-width))
+         (wh (get-view-height))
          (pw (get-page-width #f))
          (ph (get-page-height #f))
          (best-n 0)

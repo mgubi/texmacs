@@ -44,7 +44,7 @@
   (:synopsis "Draw each glyph in the colour of the font it comes from")
   (:check-mark "v" font-colours-by-origin?)
   (debug-set "fonts" (not (debug-get "fonts")))
-  (refresh-window))
+  (refresh-view))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The glyph inspector
@@ -374,9 +374,9 @@
 (define (open-font-report-of master)
   (when master
     (with u (font-report-url master)
-      (if (buffer->window u)
+      (if (buffer->place u)
           (with-buffer u (revert-buffer-revert))
-          (load-buffer-in-new-window u)))))
+          (load-buffer-in-new-place u)))))
 
 (tm-define (open-font-report)
   (:synopsis "Open a document which reports the route of every character")

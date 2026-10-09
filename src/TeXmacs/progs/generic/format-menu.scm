@@ -301,11 +301,11 @@
 
 (tm-define (notify-activated t)
   (:require (page-numbering-context? t))
-  (refresh-window))
+  (refresh-view))
 
 (tm-define (notify-disactivated t)
   (:require (page-numbering-context? t))
-  (refresh-window))
+  (refresh-view))
 
 (menu-bind page-header-menu
   (when (not (selection-active?))

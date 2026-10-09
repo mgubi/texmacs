@@ -63,15 +63,15 @@ is_place (int place) {
 url
 place_url (int place) {
   if (place == 0) return url_none ();
-  return url ("tmfs://window/" * as_string (place));
+  return url ("tmfs://place/" * as_string (place));
 }
 
 int
 url_place (url u) {
   if (is_none (u)) return 0;
   string s= as_string (u);
-  if (!starts (s, "tmfs://window/")) return 0;
-  s= s (14, N(s));
+  if (!starts (s, "tmfs://place/")) return 0;
+  s= s (13, N(s));
   if (!is_int (s)) return 0;
   int place= as_int (s);
   return is_place (place)? place: 0;
@@ -105,7 +105,7 @@ set_place_zoom (int place, double zoom) {
 }
 
 /******************************************************************************
-* The places as Scheme knows them: the "windows"
+* The places as Scheme knows them
 ******************************************************************************/
 
 array<url>

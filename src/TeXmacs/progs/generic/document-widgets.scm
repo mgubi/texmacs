@@ -467,7 +467,7 @@
       (delayed
         (:idle 10)
         (for (x l) (initial-set-tree u (car x) (cadr x)))
-        (refresh-window)))))
+        (refresh-view)))))
 
 (define (editing-headers?)
   (in? (current-buffer)

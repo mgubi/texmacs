@@ -176,10 +176,10 @@
 (define cursor-history (make-ahash-table))
 (define cursor-future (make-ahash-table))
 
-(define (history-get) (ahash-ref* cursor-history (window-get-serial) '()))
-(define (history-set l) (ahash-set! cursor-history (window-get-serial) l))
-(define (future-get) (ahash-ref* cursor-future (window-get-serial) '()))
-(define (future-set l) (ahash-set! cursor-future (window-get-serial) l))
+(define (history-get) (ahash-ref* cursor-history (place-get-serial) '()))
+(define (history-set l) (ahash-set! cursor-history (place-get-serial) l))
+(define (future-get) (ahash-ref* cursor-future (place-get-serial) '()))
+(define (future-set l) (ahash-set! cursor-future (place-get-serial) l))
 
 (define (cursor-same? l p)
   (and (nnull? l) (== (position-get (car l)) p)))
@@ -280,16 +280,16 @@
                   (buffer-focus ,old)
                   ,res))))))
 
-(define-public-macro (with-window name . body)
+(define-public-macro (with-place name . body)
   (with buf (gensym)
-    `(with ,buf (window-to-buffer ,name)
+    `(with ,buf (place-to-buffer ,name)
        (and (not (url-none? ,buf))
             (with-buffer ,buf ,@body)))))
 
 
 (tm-define (refresh-now* win what)
   (refresh-now what)
-  (with-window win (update-menus)))
+  (with-place win (update-menus)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Search and replace

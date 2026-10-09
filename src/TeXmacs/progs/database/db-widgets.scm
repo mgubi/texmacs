@@ -210,7 +210,7 @@
   (padded
     (let* ((quit* (lambda (x)
                     (quit x)
-                    (buffer-focus (window->buffer win))
+                    (buffer-focus (place->buffer win))
                     (tool-close :any 'db-search-tool noop win)))
            (dummy (set! db-quit-search quit*))
 	   (query ""))
@@ -250,7 +250,7 @@
   (when (and (in-database?) flag?)
     (revert-buffer-revert))
   (when win
-    (with-window win (update-menus))))
+    (with-place win (update-menus))))
 
 (define (set-identity win vars vals)
   (if adding-user?

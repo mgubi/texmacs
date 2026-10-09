@@ -429,7 +429,7 @@
       (with d "$TEXMACS_HOME_PATH/system/ai"
         (when (not (url-exists? d)) (system-mkdir d)))
       (string-save (ai-default-instructions name) u))
-    (load-buffer-in-new-window u)))
+    (load-buffer-in-new-place u)))
 
 (tm-define (ai-reset-instructions name)
   (with u (ai-instructions-file name)

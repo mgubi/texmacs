@@ -273,38 +273,38 @@
              (when answ (buffer-close (current-buffer))))))
         (else (buffer-close (current-buffer)))))
 
-(define (do-kill-window)
+(define (do-kill-place)
   (with buf (current-buffer)
-    (kill-window (current-window))
+    (kill-place (current-place))
     (delayed
       (:idle 100)
       (buffer-close buf))))
 
-(define (do-kill-window* u)
- (with buf (window->buffer u)
-   (kill-window u)
+(define (do-kill-place* u)
+ (with buf (place->buffer u)
+   (kill-place u)
    (delayed
      (:idle 100)
      (buffer-close buf))))
 
-(tm-define (safely-kill-window . opt-name)
+(tm-define (safely-kill-place . opt-name)
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
          (alt-windows-delete (alt-window-search (current-buffer))))
-        ((<= (windows-number) 1)
+        ((<= (places-number) 1)
          ;; Tau: the last place stays, the page has nothing else to show
          (noop))
         ((nnull? opt-name)
-         (if (buffer-modified? (window->buffer (car opt-name)))
+         (if (buffer-modified? (place->buffer (car opt-name)))
              (user-confirm
                  "The document has not been saved. Really close it?" #f
                (lambda (answ)
-                 (when answ (do-kill-window* (car opt-name)))))
-             (do-kill-window* (car opt-name))))
+                 (when answ (do-kill-place* (car opt-name)))))
+             (do-kill-place* (car opt-name))))
         ((buffer-modified? (current-buffer))
          (user-confirm "The document has not been saved. Really close it?" #f
            (lambda (answ)
-             (when answ (do-kill-window)))))
-        (else (do-kill-window))))
+             (when answ (do-kill-place)))))
+        (else (do-kill-place))))
 
 (tm-define (safely-quit-TeXmacs)
   (let* ((m (filter buffer-modified? (buffer-list)))
@@ -323,17 +323,17 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-define (new-document)
-  (if (window-per-buffer?) (open-window) (new-buffer)))
+  (if (place-per-buffer?) (open-place) (new-buffer)))
 
 (tm-define (new-document*)
-  (if (window-per-buffer?) (new-buffer) (open-window)))
+  (if (place-per-buffer?) (new-buffer) (open-place)))
 
 (tm-define (close-document)
   (delayed (:idle 1)
-    (if (window-per-buffer?) (safely-kill-window) (safely-kill-buffer))))
+    (if (place-per-buffer?) (safely-kill-place) (safely-kill-buffer))))
 
 (tm-define (close-document*)
-  (if (window-per-buffer?) (safely-kill-buffer) (safely-kill-window)))
+  (if (place-per-buffer?) (safely-kill-buffer) (safely-kill-place)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; When to show the versioning tool

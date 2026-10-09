@@ -147,10 +147,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind texmacs-main-icons
-  (if (window-per-buffer?)
+  (if (place-per-buffer?)
       ((balloon (icon "tm_new.xpm") "Create a new document")
        (new-document)))
-  (if (not (window-per-buffer?))
+  (if (not (place-per-buffer?))
       (=> (balloon (icon "tm_new.xpm") "Create a new document")
           (link new-file-menu)))
   (=> (balloon (icon "tm_open.xpm") "Load a file") (link load-menu))
@@ -210,23 +210,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-widget (texmacs-left-tools win)
-  (for (tool (window->tools win :transient-left :left))
+  (for (tool (place->tools win :transient-left :left))
     (dynamic (texmacs-side-tool win tool :title)))
   ===
   (glue #t #t 300 1)
-  (for (tool (window->tools win :bottom-left))
+  (for (tool (place->tools win :bottom-left))
     (dynamic (texmacs-side-tool win tool :title))))
 
 (tm-widget (texmacs-side-tools win)
-  (for (tool (window->tools win :transient-right :right))
+  (for (tool (place->tools win :transient-right :right))
     (dynamic (texmacs-side-tool win tool :title)))
   ===
   (glue #t #t 300 1)
-  (for (tool (window->tools win :bottom-right))
+  (for (tool (place->tools win :bottom-right))
     (dynamic (texmacs-side-tool win tool :title))))
 
 (tm-widget (texmacs-bottom-tools win)
-  (with tools (window->tools win :transient-bottom :bottom)
+  (with tools (place->tools win :transient-bottom :bottom)
     (if (not (qt-gui?)) (glue #f #f 0 2))
     (link texmacs-bottom-toolbars)
     (for (tool tools)

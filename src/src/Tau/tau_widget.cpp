@@ -203,6 +203,10 @@ simple_widget_rep::send (slot s, blackbox val) {
       coord2 p= open_box<coord2> (val);
       scroll_x= p.x1; scroll_y= p.x2;
       absolute_scroll= true;
+      if (getenv ("TAU_DEBUG_SCROLL") != NULL)
+        cout << "TAUDBG scroll_to " << id << " " << scroll_x/256 << "," << scroll_y/256
+             << " extents " << extents->y1/256 << ".." << extents->y2/256
+             << " place " << place_w/256 << "x" << place_h/256 << LF;
     }
     break;
   case SLOT_ZOOM_FACTOR:
@@ -249,7 +253,12 @@ simple_widget_rep::query (slot s, int type_id) {
   case SLOT_SIZE:
     return close_box<coord2> (coord2 (place_w, place_h));
   case SLOT_SCROLL_POSITION:
-    return close_box<coord2> (coord2 (backing_x, backing_y));
+    // as it is set: the point at the centre of the canvas. (Told as the
+    // top left corner, each position read and then set moved the view by
+    // half its size, down and to the right, to the end of a long document)
+    if (absolute_scroll) return close_box<coord2> (coord2 (scroll_x, scroll_y));
+    return close_box<coord2> (coord2 (scroll_x + place_w / 2,
+                                      scroll_y - place_h / 2));
   case SLOT_EXTENTS:
     return close_box<coord4> (coord4 (extents->x1, extents->y1,
                                       extents->x2, extents->y2));

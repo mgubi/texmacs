@@ -50,7 +50,7 @@
   (with z (string->number val)
     (set! z (max (min z 25.0) 0.04))
     (set-default-zoom-factor z)
-    (set-window-zoom-factor z)))
+    (set-place-zoom-factor z)))
 
 (define (notify-remote-control var val)
   (ahash-set! remote-control-remap val var))
@@ -90,14 +90,14 @@
   (with v (getenv "TEXMACS_VUE_SINGLE_WINDOW")
     (and (string? v) (!= v "") (!= v "0"))))
 
-(define (view-of-all-windows?)
-  (or (== (windows-number) 1) (single-window-gui?)))
+(define (view-of-all-places?)
+  (or (== (places-number) 1) (single-window-gui?)))
 
 (tm-define (toggle-visible-header)
   (:synopsis "Toggle the visibility of the window's header")
   (:check-mark "v" visible-header?)
   (with val (not (visible-header?))
-    (if (and (== (windows-number) 1) (os-macos?))
+    (if (and (== (places-number) 1) (os-macos?))
         (set-boolean-preference "header" val)
         (show-header val))))
 
@@ -105,7 +105,7 @@
   (:synopsis "Toggle the visibility of the window's footer")
   (:check-mark "v" visible-footer?)
   (with val (not (visible-footer?))
-    (if (view-of-all-windows?)
+    (if (view-of-all-places?)
         (set-boolean-preference "status bar" val)
         (show-footer val))))
 
@@ -114,7 +114,7 @@
   (:check-mark "v" has-side-tools?)
   (with val (not (has-side-tools? n))
     (with var (if (== n 0) "side tools" "left tools")
-      (if (and (view-of-all-windows?) (in? n (list 0 1)))
+      (if (and (view-of-all-places?) (in? n (list 0 1)))
           (set-boolean-preference var val)
           (show-side-tools n val)))))
 
@@ -123,7 +123,7 @@
   (:check-mark "v" visible-bottom-tools?)
   (with val (not (visible-bottom-tools? n))
     (with var (if (== n 0) "bottom tools" "extra tools")
-      (if (and (view-of-all-windows?) (in? n (list 0 1)))
+      (if (and (view-of-all-places?) (in? n (list 0 1)))
           (set-boolean-preference var val)
           (show-bottom-tools n val)))))
 
@@ -135,7 +135,7 @@
                     ((== n 1) "mode dependent icons")
                     ((== n 2) "focus dependent icons")
                     ((== n 3) "user provided icons"))))
-    (if (view-of-all-windows?)
+    (if (view-of-all-places?)
         (set-boolean-preference var val)
         (show-icon-bar n val))
     (when (and (os-macos?) (== n 0)
@@ -216,15 +216,15 @@
   (set! remote-control-flag? (not remote-control-flag?)))
 
 (define (test-zoom-factor? z)
-  (<= (abs (- (get-window-zoom-factor) (eval z))) 0.01))
+  (<= (abs (- (get-place-zoom-factor) (eval z))) 0.01))
 
 (tm-define (change-zoom-factor z)
   (:check-mark "*" test-zoom-factor?)
   (set! z (max (min z 25.0) 0.04))
-  (when (and (== (windows-number) 1)
+  (when (and (== (places-number) 1)
              (in? (get-init "page-packet") (list "1" "2")))
     (set-preference "zoom factor" (number->string z)))
-  (set-window-zoom-factor z)
+  (set-place-zoom-factor z)
   (notify-page-change)
   (notify-change 1))
 
@@ -239,12 +239,12 @@
 
 (tm-define (save-zoom mode)
   (with key (list (current-buffer) mode (full-screen?))
-    (ahash-set! zoom-table key (get-window-zoom-factor))))
+    (ahash-set! zoom-table key (get-place-zoom-factor))))
 
 (tm-define (restore-zoom mode)
   (with key (list (current-buffer) mode (full-screen?))
     (and-with zf (ahash-ref zoom-table key)
-      (when (!= zf (get-window-zoom-factor))
+      (when (!= zf (get-place-zoom-factor))
         (change-zoom-factor zf)))))
 
 (define (normalize-zoom-sub zoom l)
@@ -258,7 +258,7 @@
     (normalize-zoom-sub zoom std-zooms)))
 
 (tm-define (zoom-in x)
-  (let* ((old (get-window-zoom-factor))
+  (let* ((old (get-place-zoom-factor))
          (new (normalize-zoom (* x old))))
     (change-zoom-factor new)))
 
@@ -266,12 +266,12 @@
   (zoom-in (/ 1.0 x)))
 
 (tm-define (fit-all-to-screen)
-  (let* ((zf (get-window-zoom-factor))
-         (ww (get-window-width))
+  (let* ((zf (get-place-zoom-factor))
+         (ww (get-view-width))
          (tw (get-total-width #f))
          (dw (- (get-total-width #t) tw))
          (wf (/ (- ww (* zf dw)) tw))
-         (wh (get-window-height))
+         (wh (get-view-height))
          (th (get-total-height #f))
          (dh (- (get-total-height #t) th))
          (hf (/ (- wh (* zf dh)) th))
@@ -279,12 +279,12 @@
     (change-zoom-factor (- f 0.0001))))
 
 (tm-define (fit-to-screen)
-  (let* ((zf (get-window-zoom-factor))
-         (ww (get-window-width))
+  (let* ((zf (get-place-zoom-factor))
+         (ww (get-view-width))
          (pw (get-pages-width #f))
          (dw (- (get-pages-width #t) pw))
          (wf (/ (- ww (* zf dw)) pw))
-         (wh (get-window-height))
+         (wh (get-view-height))
          (ph (get-page-height #f))
          (dh (- (get-page-height #t) ph))
          (hf (/ (- wh (* zf dh)) ph))
@@ -292,16 +292,16 @@
     (change-zoom-factor (- f 0.0001))))
 
 (tm-define (fit-to-screen-width)
-  (let* ((zf (get-window-zoom-factor))
-         (ww (get-window-width))
+  (let* ((zf (get-place-zoom-factor))
+         (ww (get-view-width))
          (pw (get-pages-width #f))
          (dw (- (get-pages-width #t) pw))
          (f (/ (- ww (* zf dw)) pw)))
     (change-zoom-factor (- f 0.0001))))
 
 (tm-define (fit-to-screen-height)
-  (let* ((zf (get-window-zoom-factor))
-         (wh (get-window-height))
+  (let* ((zf (get-place-zoom-factor))
+         (wh (get-view-height))
          (ph (get-page-height #f))
          (dh (- (get-page-height #t) ph))
          (f (/ (- wh (* zf dh)) ph)))

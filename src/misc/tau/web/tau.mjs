@@ -505,6 +505,18 @@ worker.onmessage = event => {
 		break;
 	case "ready":
 		if (!state.started) setStatus("Tau is ready, no view yet");
+		// another page of Tau keeps the documents and the preferences
+		if (!m.homeKept && !params.has("nohome"))
+			notice("Tau is open in another page of this browser: what is saved here is not kept when this page is closed.");
+		break;
+	case "quit":
+		// TeXmacs was closed (it asked about what is not saved): it starts again
+		leaving = true;
+		location.reload();
+		break;
+	case "stopped":
+		failure("The program of Tau stopped on an error and cannot go on: " + m.text +
+			" Documents which were saved are kept; what was typed since is lost.");
 		break;
 	case "view": {
 		// the view which a window shows: tell it its place, and give it the
@@ -564,4 +576,38 @@ worker.onmessage = event => {
 	case "download": download(m); break;
 	}
 };
-worker.onerror = event => setStatus("The worker failed: " + (event.message || ""));
+worker.onerror = event => {
+	if (!state.started) setStatus("The worker failed: " + (event.message || ""));
+	else if (/RuntimeError|RangeError|call stack/i.test(event.message || "")) failure("The program of Tau stopped on an error and cannot go on: " + event.message);
+};
+
+// A line over the views which the user closes
+function notice(text) {
+	const bar = el("div", "tau-notice"), close = el("button", "tau-doc-close", "×");
+	close.type = "button";
+	close.addEventListener("click", () => bar.remove());
+	bar.append(el("span", "", text), close);
+	panesElement.parentElement.insertBefore(bar, panesElement);
+}
+
+// The program stopped: nothing which is typed reaches it any more
+let failed = false, leaving = false;
+function failure(text) {
+	if (failed) return;
+	failed = true;
+	const box = el("div", "tau-failure"), again = el("button", "tau-button", "Start Tau again");
+	again.type = "button";
+	again.addEventListener("click", () => { leaving = true; location.reload(); });
+	box.append(el("div", "tau-failure-title", "Tau stopped"), el("div", "", text), again);
+	const veil = el("div", "tau-veil");
+	veil.append(box);
+	document.body.append(veil);
+	again.focus();
+}
+
+// leaving the page with documents which are not saved asks first
+window.addEventListener("beforeunload", event => {
+	if (leaving || failed || !buffers.some(b => b.modified)) return;
+	event.preventDefault();
+	event.returnValue = "";
+});

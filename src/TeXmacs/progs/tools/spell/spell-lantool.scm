@@ -111,7 +111,7 @@
                    (tree-go-to (car l) 0 :start)
                    (delayed
                      (:idle 200)
-		     (recenter-window)
+		     (recenter-view)
 		     (if (get-boolean-preference
 			  "languagetool use widgets")
 			 (open-correct)			   

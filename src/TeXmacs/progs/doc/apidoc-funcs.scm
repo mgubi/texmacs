@@ -238,7 +238,7 @@
   (:secure #t)
   ;(display* file "\n" line " " col "\n" w "\n")
   ;FIXME column is zero (sometimes, at least): cannot use it
-  (load-buffer-in-new-window file) 
+  (load-buffer-in-new-place file) 
   (go-to-line line)
   (select-line)
   (select-word w (path->tree (selection-path)) col))
@@ -293,16 +293,16 @@
 ;; Retrieval and display of documentation from the cache
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (docgrep-new-window what)
+(define (docgrep-new-place what)
   (let* ((query (list->query (list (cons "type" "doc") (cons "what" what))))
          (name (string-append "tmfs://grep/" query)))
     (buffer-load name)
-    (open-buffer-in-window name (buffer-get name) "")))
+    (open-buffer-in-place name (buffer-get name) "")))
 
 (tm-define (docgrep-in-doc-secure what)
   (:synopsis "Search in documentation. Secure routine to use in 'action tags")
   (:secure #t)
-  (docgrep-new-window what))
+  (docgrep-new-place what))
 
 (define ($explain-scheme-not-found key)
   `(document

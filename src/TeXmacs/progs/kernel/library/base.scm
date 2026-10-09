@@ -388,20 +388,20 @@
       (string-starts? (url->unix u) "tmfs://remote-file/")
       (string-starts? (url->unix u) "tmfs://apidoc/")))
 
-(define-public (window->buffer win)
-  (with u (window-to-buffer win)
+(define-public (place->buffer win)
+  (with u (place-to-buffer win)
     (and (not (url-none? u)) u)))
 
-(define-public (buffer->window buf)
-  (with l (buffer->windows buf)
+(define-public (buffer->place buf)
+  (with l (buffer->places buf)
     (and (nnull? l) (car l))))
 
 (define-public (current-view)
   (with u (current-view-url)
     (and (not (url-none? u)) u)))
 
-(define-public (view->window vw)
-  (with win (view->window-url vw)
+(define-public (view->place vw)
+  (with win (view->place-url vw)
     (and (not (url-none? win)) win)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

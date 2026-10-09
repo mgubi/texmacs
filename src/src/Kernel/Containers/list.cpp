@@ -33,9 +33,15 @@ operator << (tm_ostream& out, list<T> l) {
 
 template<class T> T&
 list<T>::operator [] (int i) {
-  ASSERT (rep != NULL, "list too short");
-  if (i==0) return rep->item;
-  return rep->next[i-1];
+  // (the functions of this file do not call themselves: a long list is
+  // not a deep stack, which a browser gives little of to a worker)
+  list<T>* p= this;
+  for (; i>0; i--) {
+    ASSERT (p->rep != NULL, "list too short");
+    p= &(p->rep->next);
+  }
+  ASSERT (p->rep != NULL, "list too short");
+  return p->rep->item;
 }
 
 template<class T> list<T>::operator tree () {
@@ -53,15 +59,17 @@ template<class T> list<T>::operator tree () {
 
 template<class T> list<T>&
 operator << (list<T>& l, T item) {
-  if (is_nil (l)) l= list<T> (item, list<T> ());
-  else l->next << item;
+  list<T>* p= &l;
+  while (!is_nil (*p)) p= &((*p)->next);
+  *p= list<T> (item, list<T> ());
   return l;
 }
 
 template<class T> list<T>&
 operator << (list<T>& l1, list<T> l2) {
-  if (is_nil (l1)) l1= l2;
-  else l1->next << l2;
+  list<T>* p= &l1;
+  while (!is_nil (*p)) p= &((*p)->next);
+  *p= l2;
   return l1;
 }
 
@@ -80,22 +88,24 @@ operator << (T& item, list<T>& l) {
 template<class T> T
 last_item (list<T> l) {
   ASSERT (!is_nil (l), "empty path");
-  if (is_nil (l->next)) return l->item;
-  return last_item (l->next);
+  while (!is_nil (l->next)) l= l->next;
+  return l->item;
 }
 
 template<class T> T&
 access_last (list<T>& l) {
   ASSERT (!is_nil (l), "empty path");
-  if (is_nil (l->next)) return l->item;
-  return access_last (l->next);
+  list<T>* p= &l;
+  while (!is_nil ((*p)->next)) p= &((*p)->next);
+  return (*p)->item;
 }
 
 template<class T> list<T>&
 suppress_last (list<T>& l) {
   ASSERT (!is_nil (l), "empty path");
-  if (is_nil (l->next)) l= list<T> ();
-  else suppress_last (l->next);
+  list<T>* p= &l;
+  while (!is_nil ((*p)->next)) p= &((*p)->next);
+  *p= list<T> ();
   return l;
 }
 
@@ -110,26 +120,30 @@ strong_equal (list<T> l1, list<T> l2) {
 
 template<class T> bool
 operator == (list<T> l1, list<T> l2) {
-  if (is_nil (l1) || is_nil (l2)) return (is_nil (l1) == is_nil (l2));
-  return (l1->item==l2->item) && (l1->next==l2->next);
+  for (; !is_nil (l1) && !is_nil (l2); l1= l1->next, l2= l2->next)
+    if (!(l1->item == l2->item)) return false;
+  return is_nil (l1) == is_nil (l2);
 }
 
 template<class T> bool
 operator != (list<T> l1, list<T> l2) {
-  if (is_nil (l1) || is_nil (l2)) return (is_nil (l1) != is_nil (l2));
-  return (l1->item!=l2->item) || (l1->next!=l2->next);
+  for (; !is_nil (l1) && !is_nil (l2); l1= l1->next, l2= l2->next)
+    if (l1->item != l2->item) return true;
+  return is_nil (l1) != is_nil (l2);
 }
 
 template<class T> bool
 operator < (list<T> l1, list<T> l2) {
-  if (is_nil (l1) || is_nil (l2)) return !is_nil (l2);
-  return (l1->item==l2->item) && (l1->next<l2->next);
+  for (; !is_nil (l1) && !is_nil (l2); l1= l1->next, l2= l2->next)
+    if (!(l1->item == l2->item)) return false;
+  return !is_nil (l2);
 }
 
 template<class T> bool
 operator <= (list<T> l1, list<T> l2) {
-  if (is_nil (l1) || is_nil (l2)) return is_nil (l1);
-  return (l1->item==l2->item) && (l1->next<=l2->next);
+  for (; !is_nil (l1) && !is_nil (l2); l1= l1->next, l2= l2->next)
+    if (!(l1->item == l2->item)) return false;
+  return is_nil (l1);
 }
 
 /******************************************************************************
@@ -138,33 +152,41 @@ operator <= (list<T> l1, list<T> l2) {
 
 template<class T> int
 N (list<T> l) {
-  if (is_nil (l)) return 0;
-  else return N (l->next) + 1;
+  int n= 0;
+  for (; !is_nil (l); l= l->next) n++;
+  return n;
 }
 
 template<class T> list<T>
 copy (list<T> l) {
-  if (is_nil (l)) return list<T> ();
-  else return list<T> (l->item, copy (l->next));
+  return reverse (reverse (l));
 }
 
 template<class T> list<T>
 operator * (list<T> l1, T x) {
-  if (is_nil (l1)) return x;
-  else return list<T> (l1->item, l1->next * x);
+  list<T> r= x;
+  for (list<T> b= reverse (l1); !is_nil (b); b= b->next)
+    r= list<T> (b->item, r);
+  return r;
 }
 
 template<class T> list<T>
 operator * (list<T> l1, list<T> l2) {
-  if (is_nil (l1)) return copy (l2);
-  else return list<T> (l1->item, l1->next * l2);
+  list<T> r= copy (l2);
+  for (list<T> b= reverse (l1); !is_nil (b); b= b->next)
+    r= list<T> (b->item, r);
+  return r;
 }
 
 template<class T> list<T>
 head (list<T> l, int n) {
-  if (n==0) return list<T> ();
-  ASSERT (!is_nil (l), "list too short to get the head");
-  return list<T> (l->item, head (l->next, n-1));
+  list<T> b;
+  for (; n>0; n--) {
+    ASSERT (!is_nil (l), "list too short to get the head");
+    b= list<T> (l->item, b);
+    l= l->next;
+  }
+  return reverse (b);
 }
 
 template<class T> list<T>
@@ -188,14 +210,17 @@ reverse (list<T> l) {
 
 template<class T> list<T>
 remove (list<T> l, T what) {
-  if (is_nil (l)) return l;
-  else if (l->item == what) return remove<T> (l->next, what);
-  else return list<T> (l->item, remove<T> (l->next, what));
+  list<T> b;
+  for (; !is_nil (l); l= l->next)
+    if (!(l->item == what)) b= list<T> (l->item, b);
+  return reverse (b);
 }
 
 template<class T> bool
 contains (list<T> l, T what) {
-  return (!is_nil(l) && (l->item == what || contains(l->next, what)));
+  for (; !is_nil (l); l= l->next)
+    if (l->item == what) return true;
+  return false;
 }
 
 #endif // defined LIST_CC

@@ -105,7 +105,7 @@
   ;; a Refresh button), since this is done after each save
   (git-invalidate root)
   (for (u (buffer-list))
-    (when (and (git-page? u root) (nnull? (buffer->windows u)))
+    (when (and (git-page? u root) (nnull? (buffer->places u)))
       (git-reload-buffer u)))
   (git-update-tools))
 

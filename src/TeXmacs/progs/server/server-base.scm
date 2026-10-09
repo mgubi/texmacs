@@ -390,8 +390,8 @@
     (let* ((aux "Server messages")
 	   (name (aux-name aux)))
       (aux-set-document aux doc)
-      (if (not (buffer->window name))
-	  (load-buffer-main name :new-window)))))
+      (if (not (buffer->place name))
+	  (load-buffer-main name :new-place)))))
 
 (tm-define (server-reset-admin-password)
   (let* ((info (server-get-user-info "admin"))

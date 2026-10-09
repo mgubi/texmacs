@@ -115,6 +115,15 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 	border-radius: 4px; padding: 1px 5px; }
 .tau-doc-close:hover, .tau-doc-button:hover { background: var(--pressed); color: var(--text); }
 .tau-doc-button { align-self: center; font-size: 15px; }
+.tau-notice { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: #fff4c2; color: #4a3b00;
+	border-bottom: 1px solid #e0cf7a; font-size: 12px; }
+.tau-notice span { flex: 1; }
+.tau-veil { position: fixed; inset: 0; z-index: 200000; background: rgba(30, 30, 40, 0.45); display: flex;
+	align-items: center; justify-content: center; }
+.tau-failure { max-width: 460px; background: var(--popup); border: 1px solid var(--bar-border); border-radius: 8px;
+	box-shadow: 0 8px 30px rgba(0,0,0,0.35); padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.tau-failure-title { font-weight: 600; font-size: 15px; }
+.tau-failure .tau-button { align-self: flex-end; }
 .tau-ask { position: fixed; left: 50%; top: 90px; transform: translateX(-50%); z-index: 100001; display: flex;
 	align-items: center; gap: 8px; padding: 10px 14px; background: var(--popup); border: 1px solid var(--bar-border);
 	border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); }

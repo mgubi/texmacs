@@ -3992,10 +3992,10 @@ initialize_glue_editor () {
   tmscm_install_procedure ("broadcast-message",  tmg_broadcast_message, 1, 0, 0);
   tmscm_install_procedure ("view-set-property",  tmg_view_set_property, 2, 0, 0);
   tmscm_install_procedure ("view-get-property",  tmg_view_get_property, 1, 0, 0);
-  tmscm_install_procedure ("get-window-width",  tmg_get_window_width, 0, 0, 0);
-  tmscm_install_procedure ("get-window-height",  tmg_get_window_height, 0, 0, 0);
-  tmscm_install_procedure ("get-window-x",  tmg_get_window_x, 0, 0, 0);
-  tmscm_install_procedure ("get-window-y",  tmg_get_window_y, 0, 0, 0);
+  tmscm_install_procedure ("get-view-width",  tmg_get_window_width, 0, 0, 0);
+  tmscm_install_procedure ("get-view-height",  tmg_get_window_height, 0, 0, 0);
+  tmscm_install_procedure ("get-view-x",  tmg_get_window_x, 0, 0, 0);
+  tmscm_install_procedure ("get-view-y",  tmg_get_window_y, 0, 0, 0);
   tmscm_install_procedure ("get-canvas-x",  tmg_get_canvas_x, 0, 0, 0);
   tmscm_install_procedure ("get-canvas-y",  tmg_get_canvas_y, 0, 0, 0);
   tmscm_install_procedure ("get-scroll-x",  tmg_get_scroll_x, 0, 0, 0);
@@ -4006,7 +4006,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("clear-buffer",  tmg_clear_buffer, 0, 0, 0);
   tmscm_install_procedure ("tex-buffer",  tmg_tex_buffer, 0, 0, 0);
   tmscm_install_procedure ("clear-local-info",  tmg_clear_local_info, 0, 0, 0);
-  tmscm_install_procedure ("refresh-window",  tmg_refresh_window, 0, 0, 0);
+  tmscm_install_procedure ("refresh-view",  tmg_refresh_window, 0, 0, 0);
   tmscm_install_procedure ("update-forced",  tmg_update_forced, 0, 0, 0);
   tmscm_install_procedure ("update-path",  tmg_update_path, 1, 0, 0);
   tmscm_install_procedure ("update-current-buffer",  tmg_update_current_buffer, 0, 0, 0);

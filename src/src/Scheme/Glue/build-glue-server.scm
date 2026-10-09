@@ -24,9 +24,9 @@
   (kbd-system-rewrite kbd_system_rewrite (tree string))
   (set-font-rules set_font_rules (void scheme_tree))
 
-  (window-get-serial get_window_serial (int))
-  (window-set-property set_window_property (void scheme_tree scheme_tree))
-  (window-get-property get_window_property (scheme_tree scheme_tree))
+  (place-get-serial get_window_serial (int))
+  (place-set-property set_window_property (void scheme_tree scheme_tree))
+  (place-get-property get_window_property (scheme_tree scheme_tree))
   (show-header show_header (void bool))
   (show-icon-bar show_icon_bar (void int bool))
   (show-side-tools show_side_tools (void int bool))
@@ -40,8 +40,8 @@
   (full-screen-mode full_screen_mode (void bool bool))
   (full-screen? in_full_screen_mode (bool))
   (full-screen-edit? in_full_screen_edit_mode (bool))
-  (set-window-zoom-factor set_window_zoom_factor (void double))
-  (get-window-zoom-factor get_window_zoom_factor (double))
+  (set-place-zoom-factor set_window_zoom_factor (void double))
+  (get-place-zoom-factor get_window_zoom_factor (double))
 
   (shell shell (void string))
   (dialogue-end dialogue_end (void))

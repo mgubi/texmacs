@@ -104,13 +104,18 @@ $(OUT)/web/r/%: $(TM)/plugins/r/web/%
 	cp $< $@
 
 $(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/wasm/workers.js $(W)/web/tau-pre.js $(W)/sources.txt
-	@mkdir -p $(OUT)/web
+	@mkdir -p $(OUT)/web $(OUT)/stage
 	em++ $(LDFLAGS) -sMODULARIZE=1 -sEXPORT_NAME=tauCore -sENVIRONMENT=worker \
 	  --pre-js $(TM)/misc/wasm/packages.js --pre-js $(W)/web/tau-pre.js \
 	  --pre-js $(TM)/misc/wasm/workers.js \
 	  -sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPU8,FS,ENV \
-	  -sEXPORTED_FUNCTIONS=_main,_malloc,_free \
-	  $(OBJECTS) $(LIBS) -o $@
+	  -sEXPORTED_FUNCTIONS=_main,_malloc,_free -lidbfs.js \
+	  $(OBJECTS) $(LIBS) -o $(OUT)/stage/tau.js
+	@# the program and its script go to the page together: a page which is
+	@# loaded while the link runs must not get one of each (it fails with
+	@# calls to functions which are not there)
+	cp $(OUT)/stage/tau.wasm $(OUT)/web/tau.wasm.new && cp $(OUT)/stage/tau.js $(OUT)/web/tau.js.new
+	mv $(OUT)/web/tau.wasm.new $(OUT)/web/tau.wasm && mv $(OUT)/web/tau.js.new $(OUT)/web/tau.js
 
 web-packages: $(TM)/TeXmacs/SVNREV plugins-sync FORCE
 	@mkdir -p $(OUT)/web

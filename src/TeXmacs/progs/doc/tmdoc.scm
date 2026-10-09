@@ -438,8 +438,12 @@
 
 (tm-define (delayed-update nr cont)
   (system-wait "Generating automatic content" nr)
-  (generate-all-aux)
-  (update-current-buffer)
+  ;; (the cursor stays where it was: the table of contents and the index,
+  ;; which are written at the end, took it there, and a manual was opened
+  ;; at its last page)
+  (cursor-after
+    (generate-all-aux)
+    (update-current-buffer))
   (user-delayed cont))
 
 (tm-define (tmdoc-expand-help-manual* root next)

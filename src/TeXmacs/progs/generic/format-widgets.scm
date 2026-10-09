@@ -272,7 +272,7 @@
           (if (!= var "page-the-page")
               (insert `(assign ,var ,val))
               (insert `(assign ,var (macro ,(page-the-page-body val))))))
-        (refresh-window)))))
+        (refresh-view)))))
 
 (define (change-background settings what u)
   (let* ((var "page-this-bg-color")
@@ -330,7 +330,7 @@
       (and-with par (tree-down doc)
         (cut-tag par var)
         (insert `(,var ,val))
-        (refresh-window)))))
+        (refresh-view)))))
 
 (define (apply-page-settings u settings)
   (and-with val (get-field-contents (header-buffer))

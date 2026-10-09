@@ -50,38 +50,38 @@
 ;; Subroutines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(tm-define (window-inside-table? win)
-  (with-window win
+(tm-define (place-inside-table? win)
+  (with-place win
     (inside? 'table)))
 
-(tm-define (window-cell-get-format win var)
-  (with-window win
+(tm-define (place-cell-get-format win var)
+  (with-place win
     (cell-get-format var)))
 
-(tm-define (window-cell-set-format* win var val)
-  (with-window win
+(tm-define (place-cell-set-format* win var val)
+  (with-place win
     (cell-set-format* var val)
     (update-menus)))
 
-(tm-define (window-table-get-format win var)
-  (with-window win
+(tm-define (place-table-get-format win var)
+  (with-place win
     (table-get-format var)))
 
-(tm-define (window-table-set-format* win var val)
-  (with-window win
+(tm-define (place-table-set-format* win var val)
+  (with-place win
     (table-set-format* var val)
     (update-menus)))
 
-(tm-define (window-table-set-extents win r c) 
-  (with-window win
+(tm-define (place-table-set-extents win r c) 
+  (with-place win
     (table-set-extents r c)))
 
-(tm-define (window-table-nr-rows win) 
-  (with-window win
+(tm-define (place-table-nr-rows win) 
+  (with-place win
     (table-nr-rows)))
 
-(tm-define (window-table-nr-columns win) 
-  (with-window win
+(tm-define (place-table-nr-columns win) 
+  (with-place win
     (table-nr-columns)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -91,28 +91,28 @@
 (tm-widget (cell-basic-tool win)
   (aligned
     (item (text "Width:")
-      (with mode (decode-mode (window-cell-get-format win "cell-hmode"))
+      (with mode (decode-mode (place-cell-get-format win "cell-hmode"))
         (horizontal
-          (enum (window-cell-set-format* win "cell-hmode" (encode-mode answer))
+          (enum (place-cell-set-format* win "cell-hmode" (encode-mode answer))
                 '("Auto" "Exact" "Minimal" "Maximal") mode "6em")
           ///
           (when (!= mode "Auto")
-            (input (window-cell-set-format* win "cell-width" answer) "string"
-                   (list (window-cell-get-format win "cell-width"))
+            (input (place-cell-set-format* win "cell-width" answer) "string"
+                   (list (place-cell-get-format win "cell-width"))
                    "6em")))))
     (item (text "Height:")
-      (with mode (decode-mode (window-cell-get-format win "cell-vmode"))
+      (with mode (decode-mode (place-cell-get-format win "cell-vmode"))
         (horizontal
-          (enum (window-cell-set-format* win "cell-vmode" (encode-mode answer))
+          (enum (place-cell-set-format* win "cell-vmode" (encode-mode answer))
                 '("Auto" "Exact" "Minimal" "Maximal") mode "6em")
           ///
           (when (!= mode "Auto")
-            (input (window-cell-set-format* win "cell-height" answer) "string"
-                   (list (window-cell-get-format win "cell-height"))
+            (input (place-cell-set-format* win "cell-height" answer) "string"
+                   (list (place-cell-get-format win "cell-height"))
                    "6em")))))
     (item (text "Align:")
-      (let* ((ha (decode-halign (window-cell-get-format win "cell-halign")))
-             (va (decode-valign (window-cell-get-format win "cell-valign"))))
+      (let* ((ha (decode-halign (place-cell-get-format win "cell-halign")))
+             (va (decode-valign (place-cell-get-format win "cell-valign"))))
         (horizontal
           (enum (cell-set-format* "cell-halign" (encode-halign answer))
                 '("Left" "Center" "Right" "Decimal dot" "Decimal comma")
@@ -122,10 +122,10 @@
                 '("Top" "Center" "Bottom" "Baseline") va "6em"))))))
 
 (tm-widget (cell-border-tool win)
-  (let* ((set (lambda (v a) (window-cell-set-format* win v a)))
-         (get (lambda (v) (list (window-cell-get-format win v) "0ln" "1ln")))
-         (get* (lambda (v) (list (window-cell-get-format win v) "1spc")))
-         (get** (lambda (v) (list (window-cell-get-format win v) "1sep"))))
+  (let* ((set (lambda (v a) (place-cell-set-format* win v a)))
+         (get (lambda (v) (list (place-cell-get-format win v) "0ln" "1ln")))
+         (get* (lambda (v) (list (place-cell-get-format win v) "1spc")))
+         (get** (lambda (v) (list (place-cell-get-format win v) "1sep"))))
     (horizontal
       (glue #t #f 0 0)
       (tile 3
@@ -173,40 +173,40 @@
 (tm-widget (cell-special-tool win)
   (aligned
     (item (text "Line wrapping:")
-      (enum (window-cell-set-format* win "cell-hyphen" (encode-hyphen answer))
+      (enum (place-cell-set-format* win "cell-hyphen" (encode-hyphen answer))
             '("Off" "Top" "Center" "Bottom")
-            (decode-hyphen (window-cell-get-format win "cell-hyphen"))
+            (decode-hyphen (place-cell-get-format win "cell-hyphen"))
             "5em"))
     (item (text "Block content:")
-      (enum (window-cell-set-format* win "cell-block" (encode-block answer))
+      (enum (place-cell-set-format* win "cell-block" (encode-block answer))
             '("Never" "Auto" "Always")
-            (decode-block (window-cell-get-format win "cell-block"))
+            (decode-block (place-cell-get-format win "cell-block"))
             "5em"))
     (item (text "Horizontal stretch:")
-      (input (window-cell-set-format* win "cell-hpart" answer) "string"
-             (list (window-cell-get-format win "cell-hpart")) "5em"))
+      (input (place-cell-set-format* win "cell-hpart" answer) "string"
+             (list (place-cell-get-format win "cell-hpart")) "5em"))
     (item (text "Vertical stretch:")
-      (input (window-cell-set-format* win "cell-vpart" answer) "string"
-             (list (window-cell-get-format win "cell-vpart")) "5em"))
+      (input (place-cell-set-format* win "cell-vpart" answer) "string"
+             (list (place-cell-get-format win "cell-vpart")) "5em"))
     (item (text "Height correction:")
-      (enum (window-cell-set-format* win "cell-vcorrect"
+      (enum (place-cell-set-format* win "cell-vcorrect"
                                      (encode-vcorrect answer))
 	    '("Off" "Bottom" "Top" "Both")
-	    (decode-vcorrect (window-cell-get-format win "cell-vcorrect"))
+	    (decode-vcorrect (place-cell-get-format win "cell-vcorrect"))
 	    "5em"))))
 
 (tm-tool* (cell-properties-tool win)
   (:name "Cell properties")
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (cell-basic-tool win))))
   === ===
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (cell-border-tool win))))
   === ===
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (cell-special-tool win)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -214,8 +214,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (tm-widget (table-extents-tool win)
-  (let* ((set (lambda (v a) (window-table-set-format* win v a)))
-         (get (lambda (v) (list (window-table-get-format win v)
+  (let* ((set (lambda (v a) (place-table-set-format* win v a)))
+         (get (lambda (v) (list (place-table-get-format win v)
                                 "1" "2" "3" "4" "5" "6" "7" "8" ""))))
     (horizontal
       (glue #t #f 0 0)
@@ -230,11 +230,11 @@
                   (glue #f #f 0 6))
         (horizontal
 	  (enum (when answer
-                  (window-table-set-extents
-                   win (string->number answer) (window-table-nr-columns win)))
-                (list (number->string (window-table-nr-rows win))
+                  (place-table-set-extents
+                   win (string->number answer) (place-table-nr-columns win)))
+                (list (number->string (place-table-nr-rows win))
                       "1" "2" "3" "4" "5" "6" "7" "8" "")
-                (number->string (window-table-nr-rows win)) "4em") // // //)
+                (number->string (place-table-nr-rows win)) "4em") // // //)
         (horizontal
 	  (enum (set "table-min-rows" answer)
                 (get "table-min-rows")
@@ -248,11 +248,11 @@
                   (glue #f #f 0 6))
         (horizontal
 	  (enum (when answer
-                  (window-table-set-extents
-                   win (window-table-nr-rows win) (string->number answer)))
-                (list (number->string (window-table-nr-columns win))
+                  (place-table-set-extents
+                   win (place-table-nr-rows win) (string->number answer)))
+                (list (number->string (place-table-nr-columns win))
                       "1" "2" "3" "4" "5" "6" "7" "8" "")
-                (number->string (window-table-nr-columns win)) "4em") // // //)
+                (number->string (place-table-nr-columns win)) "4em") // // //)
         (horizontal
 	  (enum (set "table-min-cols" answer)
                 (get "table-min-cols")
@@ -265,30 +265,30 @@
 (tm-widget (table-basic-tool win)
   (aligned
     (item (text "Width:")
-      (with mode (decode-mode (window-table-get-format win "table-hmode"))
+      (with mode (decode-mode (place-table-get-format win "table-hmode"))
         (horizontal
-          (enum (window-table-set-format* win "table-hmode"
+          (enum (place-table-set-format* win "table-hmode"
                                           (encode-mode answer))
                 '("Auto" "Exact" "Minimal" "Maximal") mode "6em")
           ///
           (when (!= mode "Auto")
-            (input (window-table-set-format* win "table-width" answer) "string"
-                   (list (window-table-get-format win "table-width"))
+            (input (place-table-set-format* win "table-width" answer) "string"
+                   (list (place-table-get-format win "table-width"))
                    "6em")))))
     (item (text "Height:")
-      (with mode (decode-mode (window-table-get-format win "table-vmode"))
+      (with mode (decode-mode (place-table-get-format win "table-vmode"))
         (horizontal
-          (enum (window-table-set-format* win "table-vmode"
+          (enum (place-table-set-format* win "table-vmode"
                                           (encode-mode answer))
                 '("Auto" "Exact" "Minimal" "Maximal") mode "6em")
           ///
           (when (!= mode "Auto")
-            (input (window-table-set-format* win "table-height" answer) "string"
-                   (list (window-table-get-format win "table-height"))
+            (input (place-table-set-format* win "table-height" answer) "string"
+                   (list (place-table-get-format win "table-height"))
                    "6em")))))
     (item (text "Align:")
-      (let* ((ha (decode-halign (window-table-get-format win "table-halign")))
-             (va (decode-valign* (window-table-get-format win "table-valign"))))
+      (let* ((ha (decode-halign (place-table-get-format win "table-halign")))
+             (va (decode-valign* (place-table-get-format win "table-valign"))))
         (horizontal
           (enum (table-set-format* "table-halign" (encode-halign answer))
                 '("Left" "Center" "Right") ha "6em")
@@ -299,9 +299,9 @@
                 va "6em"))))))
 
 (tm-widget (table-border-tool win)
-  (let* ((set (lambda (v a) (window-table-set-format* win v a)))
-         (get (lambda (v) (list (window-table-get-format win v) "0ln" "1ln")))
-         (get* (lambda (v) (list (window-table-get-format win v) "0fn"))))
+  (let* ((set (lambda (v a) (place-table-set-format* win v a)))
+         (get (lambda (v) (list (place-table-get-format win v) "0ln" "1ln")))
+         (get* (lambda (v) (list (place-table-get-format win v) "0fn"))))
     (horizontal
       (glue #t #f 0 0)
       (tile 3
@@ -350,23 +350,23 @@
   (aligned
     (meti (horizontal // (text "Enable page breaking"))
       (toggle
-       (window-table-set-format* win "table-hyphen" (if answer "y" "n"))
-       (== (window-table-get-format win "table-hyphen") "y")))))
+       (place-table-set-format* win "table-hyphen" (if answer "y" "n"))
+       (== (place-table-get-format win "table-hyphen") "y")))))
 
 (tm-tool* (table-properties-tool win)
   (:name "Table properties")
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (table-extents-tool win))))
   === ===
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (table-basic-tool win))))
   === ===
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (table-border-tool win))))
   === ===
   (centered
-    (when (window-inside-table? win)
+    (when (place-inside-table? win)
       (dynamic (table-special-tool win)))))

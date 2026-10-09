@@ -11,15 +11,17 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The core has a file system of its own, in memory. A file of the user is
-;; asked of the page, which puts its bytes under /user and says so
-;; (tau-file-chosen); a file which is saved or exported is written under
-;; /user and given to the page, which hands it to the user (docs/tau-design.md)
+;; The documents of the user are kept in the browser: the home directory of
+;; the core is in its storage (misc/tau/web/tau-pre.js), and ~/Documents is
+;; where they are saved and looked for. A file of the computer is asked of
+;; the page, which puts it there and says so (tau-file-chosen); a file is
+;; given back to the computer when it is exported, or on demand
+;; (tau-download-buffer). See docs/tau-design.md.
 
 (texmacs-module (texmacs texmacs tau-files)
   (:use (kernel gui menu-serial)))
 
-(define user-dir "/user")
+(define user-dir "/home/tau/Documents")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Giving a file to the user
@@ -41,9 +43,17 @@
                   (name . ,(url->system (url-tail u))))))))
 
 (tm-define (tau-saved u)
-  (:synopsis "The buffer @u was saved: a file of the user goes to the user")
-  (when (string-starts? (url->system u) (string-append user-dir "/"))
-    (tau-download u)))
+  (:synopsis "The buffer @u was saved")
+  ;; (it is kept in the browser: nothing more to do)
+  (noop))
+
+(tm-define (tau-download-buffer)
+  (:synopsis "Give the file of the current document to the user")
+  (with u (current-buffer)
+    (cond ((buffer-modified? u)
+           (set-message "Save the document first" "Download"))
+          ((url-exists? u) (tau-download u))
+          (else (set-message "The document has no file yet" "Download")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Asking for a file
@@ -86,27 +96,86 @@
                                    (string-append "." new)))
             (url->system tail)))))
 
+(define (stored-files)
+  "The names of the documents which are kept, the last changed first."
+  (let* ((dir (system->url user-dir))
+         (l (list-filter (url-read-directory dir "*") url-regular?))
+         (l* (list-sort l (lambda (u v) (> (url-last-modified u)
+                                           (url-last-modified v))))))
+    (map (lambda (u) (url->system (url-tail u))) l*)))
+
+(define (stored-url name)
+  (url-append (system->url user-dir) (url-tail (system->url name))))
+
+(define (ask-computer fun title type)
+  "Ask the page for a file of the computer."
+  (with ticket file-next
+    (set! file-next (+ ticket 1))
+    (ahash-set! file-waiting ticket fun)
+    (tau-post "pick" ""
+              `((ticket . ,ticket)
+                (title . ,(cork->utf8 (translate title)))
+                (type . ,type)))))
+
+(define (ask-stored fun title type names)
+  "A dialog with the documents which are kept: one is opened or deleted,
+   or a file of the computer is asked for."
+  (let* ((id (tau-dialog-new))
+         (sel (car names))
+         (close (lambda () (tau-dialog-close id)))
+         (open (lambda () (close) (fun (stored-url sel))))
+         (computer (lambda () (close) (ask-computer fun title type)))
+         (delete (lambda ()
+                   (close)
+                   (user-confirm `(concat "Delete " (verbatim ,sel) "?") #f
+                     (lambda (answ)
+                       (when answ (url-remove (stored-url sel)))
+                       (tau-choose-file fun title type "" (url-none))))))
+         (menu `(vertical
+                  (glue #f #f 0 8)
+                  (hlist (glue #f #f 16 0)
+                         (vertical
+                           (text "Documents kept in this browser")
+                           (glue #f #f 0 4)
+                           (resize ,(lambda () "26em") ,(lambda () "16em")
+                             (choice ,(lambda (x) (when (string? x) (set! sel x)))
+                                     ,(lambda () names)
+                                     ,(lambda () sel))))
+                         (glue #f #f 16 0))
+                  (glue #f #f 0 12)
+                  (hlist (glue #f #f 16 0)
+                         (style ,widget-style-button
+                                ("From this computer" ,computer)
+                                ("Delete" ,delete))
+                         (glue #t #f 16 0)
+                         (style ,widget-style-button
+                                ("Cancel" ,close) ("Open" ,open))
+                         (glue #f #f 16 0))
+                  (glue #f #f 0 10))))
+    (tau-dialog-show id menu title close)))
+
 (tm-define (tau-choose-file fun title type prompt name)
   (:synopsis "Ask the user for a file and call @fun with it")
   (cond ((== type "directory")
          (set-message "Directories cannot be chosen in the browser" title))
         ((== prompt "")
-         (with ticket file-next
-           (set! file-next (+ ticket 1))
-           (ahash-set! file-waiting ticket fun)
-           (tau-post "pick" ""
-                     `((ticket . ,ticket)
-                       (title . ,(cork->utf8 (translate title)))
-                       (type . ,type)))))
+         ;; a document which is kept, or a file of the computer: of the
+         ;; computer at once when nothing is kept, or for an image
+         (with names (if (in? type '("" "texmacs" "generic")) (stored-files) '())
+           (if (null? names)
+               (ask-computer fun title type)
+               (ask-stored fun title type names))))
         (else
          (ask-name title "File name:" (propose-name name type)
                    (lambda (s)
-                     (with u (url-append (system->url user-dir)
-                                         (url-tail (system->url s)))
+                     (with u (stored-url s)
                        (fun u)
-                       (delayed
-                         (:idle 1)
-                         (tau-download u))))))))
+                       ;; what is exported is for the computer; a document
+                       ;; of TeXmacs stays in the browser
+                       (when (nin? type '("" "texmacs"))
+                         (delayed
+                           (:idle 1)
+                           (tau-download u)))))))))
 
 (tm-define (tau-file-chosen ticket u)
   (:synopsis "The page gave the file @u for the question @ticket")

@@ -21,8 +21,8 @@
 * of the page, or a field of a dialog. The core knows a place by its number
 * and nothing else (docs/tau-design.md): the windows of the other ports,
 * with their widgets, their bars and their menus, are of the page. A view
-* which is not shown has the place 0. Scheme names a place by the url which
-* named a window (tmfs://window/N).
+* which is not shown has the place 0. Scheme names a place by a url
+* (tmfs://place/N).
 ******************************************************************************/
 
 class tm_view_rep {

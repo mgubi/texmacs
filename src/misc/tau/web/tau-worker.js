@@ -9,7 +9,8 @@
 // To the page:   { t: "ready" | "view" | "paint" | "log" | "status" | "failed", ... },
 //                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
 //                { t: "dialog" | "close" | "refresh", part, ... },
-//                { t: "buffers" | "clipboard" | "pick" | "download", ... }
+//                { t: "buffers" | "clipboard" | "pick" | "download", ... },
+//                { t: "quit" }, { t: "stopped", text }
 
 "use strict";
 
@@ -100,8 +101,23 @@ onmessage = event => {
 	catch (error) {
 		postMessage({ t: "log", text: "error in " + event.data.t + ": " + (error && error.message || error) });
 		console.error(error);
+		stopped(error);
 	}
 };
+
+// The program stopped on an error which it cannot go on after (a trap of
+// WebAssembly, the stack of the browser which is too small...): the page
+// is told, so that the user does not go on typing into nothing
+let dead = false;
+function stopped(error) {
+	const fatal = error instanceof WebAssembly.RuntimeError || error instanceof RangeError ||
+		/RuntimeError|call stack|unreachable|out of bounds|null function|table entry/i.test(String(error && error.message || error));
+	if (!fatal || dead) return;
+	dead = true;
+	postMessage({ t: "stopped", text: String(error && error.message || error) });
+}
+self.addEventListener("error", event => stopped(event.error || event.message));
+self.addEventListener("unhandledrejection", event => stopped(event.reason));
 
 const args = new URLSearchParams(self.location.search).getAll("arg");
 
@@ -109,7 +125,7 @@ const args = new URLSearchParams(self.location.search).getAll("arg");
 // and which the page has not got yet are read here and added to the
 // message (files: path -> bytes), so that the bars come with their icons
 // and not before them.
-const USER = "/user";  // where the files of the user are, in the core
+const USER = "/home/tau/Documents";  // where the files of the user are, in the core
 
 const sentFiles = new Set();
 function collectFiles(node, files) {
@@ -145,13 +161,15 @@ function post(message, transfer) {
 tauCore({
 	arguments: args,
 	tauPost: post,
-	preRun: [module => { tauModule = module; module.FS.mkdirTree(USER); }],
+	preRun: [module => { tauModule = module; }],
+	// TeXmacs quits: what it wrote is kept first, then the page is told
+	tauQuit: () => tauModule.tauSaveHome(() => postMessage({ t: "quit" })),
 	print: text => postMessage({ t: "log", text }),
 	printErr: text => postMessage({ t: "log", text }),
 	setStatus: text => { if (text) postMessage({ t: "status", text }); }
 }).then(module => {
 	core = module;
-	postMessage({ t: "ready" });
+	postMessage({ t: "ready", homeKept: !!module.tauHomeKept });
 	for (const m of waiting.splice(0)) handle(m);
 }).catch(error => {
 	postMessage({ t: "failed", text: String(error && error.message || error) });

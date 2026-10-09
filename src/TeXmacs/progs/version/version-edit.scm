@@ -90,11 +90,11 @@
 
 (tm-define (version-previous-difference)
   (go-to-previous-tag (group-resolve 'version-tag))
-  (recenter-window))
+  (recenter-view))
 
 (tm-define (version-next-difference)
   (go-to-next-tag (group-resolve 'version-tag))
-  (recenter-window))
+  (recenter-view))
 
 (tm-define (version-last-difference)
   (go-end)

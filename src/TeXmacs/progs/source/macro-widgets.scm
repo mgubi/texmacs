@@ -374,7 +374,7 @@
 
 (tm-define (macros-editor-select* win u macro filter)
   (macros-editor-select u macro filter)
-  (with-window win (update-menus)))
+  (with-place win (update-menus)))
 
 (tm-define (macros-editor-has-help?)
   (tmdoc-search-tag (string->symbol macro-current-macro)))

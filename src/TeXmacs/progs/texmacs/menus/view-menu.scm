@@ -124,10 +124,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (menu-bind view-menu
-  (if (not (window-per-buffer?))
+  (if (not (place-per-buffer?))
       ("New window" (new-document*))
       ("Open in new window" (open-document*))
-      ;;("Clone window" (clone-window))
+      ;;("Clone window" (clone-place))
       ("Close window" (close-document*))
       ---)
   ("Full screen mode"  (toggle-full-screen-edit-mode))

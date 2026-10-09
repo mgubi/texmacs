@@ -280,7 +280,7 @@
   ("emacs g" (selection-cancel))
   ("emacs j" (insert-return))
   ("emacs k" (kill-paragraph))
-  ("emacs l" (recenter-window))
+  ("emacs l" (recenter-view))
   ("emacs m" (insert-return))
   ("emacs n" (kbd-down))
   ("emacs p" (kbd-up))
@@ -318,7 +318,7 @@
 
   ;; not implemented
   ;;("emacs h ..." (help ...))
-  ;;("emacs l" (recenter-window))
+  ;;("emacs l" (recenter-view))
   ;;("emacs o" (open-line))
   ;;("emacs t" (transpose-chars))
   ;;("emacs u" (universal-argument))
@@ -392,7 +392,7 @@
   ("C-F2" (revert-buffer))
   ("M-F2" (new-document))
   ("M-S-F2" (new-document*))
-  ;;("M-C-F2" (clone-window))
+  ;;("M-C-F2" (clone-place))
   ("F3" (save-buffer))
   ("S-F3" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("F4" (preview-buffer))
@@ -528,7 +528,7 @@
 
   ;; further shortcuts for Gnome look and feel
   ("gnome g" (selection-cancel))
-  ("gnome l" (recenter-window))
+  ("gnome l" (recenter-view))
   ("gnome F" (interactive-search))
 
   ("altcmd g" (kbd-cancel))
@@ -592,7 +592,7 @@
 
   ;; further shortcuts for KDE look and feel
   ("kde g" (selection-cancel))
-  ("kde l" (recenter-window))
+  ("kde l" (recenter-view))
   ("kde F" (interactive-search))
 
   ("altcmd g" (kbd-cancel))
@@ -684,7 +684,7 @@
   ;("C-e" (kbd-end-line))   ; conflict with ("text e" (make-tmlist 'enumerate))
   ("C-g" (selection-cancel))
   ("C-k" (kill-paragraph))
-  ("C-l" (recenter-window))
+  ("C-l" (recenter-view))
   ("C-y" (yank-paragraph))
   ("C-q" (make 'symbol))
   ("C-!" (make-label))
@@ -752,7 +752,7 @@
 
   ;; not yet implemented
   ;;("F4" (go-to-different-folder))
-  ;;("F5" (recenter-window))
+  ;;("F5" (recenter-view))
   ;;("F6" (switch-to-next-pane))
   ;;("F8" (kbd-select-enlarge))
   ;;("F9" (refresh-web-page))
@@ -816,7 +816,7 @@
 
   ;; further shortcuts for Windows look and feel
   ("windows g" (selection-cancel))
-  ("windows l" (recenter-window))
+  ("windows l" (recenter-view))
   ("windows =" (change-zoom-factor 1.0))
 
   ("altcmd g" (kbd-cancel))

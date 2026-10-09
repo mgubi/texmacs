@@ -735,11 +735,26 @@ replaces.
   per window, the prompt in the footer and the old dialogs of
   `tm_dialogue.cpp` (questions are asked by `tau-interactive`).
 
-Left as it was: the names in Scheme (the tools of `format-tools.scm` and
-`table-tools.scm` are still given a window, which is a place; `with-window`
-runs for the view shown there), and the functions of the glue which have
-nothing to do any more (`alt-window-*`, which do nothing, and those
-without callers). Renaming them is for later.
+**The names in Scheme** say what things are since (2026-10-09), about
+530 uses in 51 files, the glue with them:
+
+- a place: `current-place`, `place-list`, `places-number`,
+  `place->buffer`, `buffer->place`, `buffer->places`, `place->view`,
+  `place-focus`, `switch-to-place`, `open-place`, `clone-place`,
+  `kill-place`, `safely-kill-place`, `load-buffer-in-new-place`,
+  `with-place`, `place-per-buffer?`, the zoom factor and the properties
+  of a place; its url is `tmfs://place/N`;
+- what a tool is given to know for which document it is:
+  `place-get-init`, `place-set-init`, `place-get-env`,
+  `place-cell-get-format`, `place-table-set-format*`, `place->tools`...;
+- a view: `get-view-width`, `get-view-height`, `refresh-view`,
+  `recenter-view`.
+
+Kept: `dialogue-window`, `top-window` and the commands which open one
+(`open-preferences-window`...), which do open a window of the page, a
+dialog; the labels of the menus ("New window"); the names of preferences;
+`alt-window-*`, which do nothing and are still called by the tooltips and
+two tools; and in the messages of the page a place is still `window`.
 
 All the tests of the page pass as before: the keys, the dialogs, the
 tabs and the files, two panes made and closed, a view shown and a view
@@ -770,6 +785,60 @@ columns of icons; and `make check`.
   Not there: the clipboard of the system, a real dead key or input
   method, the file chooser, and what needs the network (Python, a
   server).
+
+**A long document in Safari** (2026-10-09): opening the user manual ended
+the core there, with "Maximum call stack size exceeded" and then calls to
+functions which are not there. Safari gives a worker a small stack, and
+`remove` on a list called itself once for each item (the links of a
+manual are thousands). The functions of `Kernel/Containers/list.cpp` do
+not call themselves any more (`N`, `copy`, `*`, `head`, `remove`,
+`contains`, `<<`, the comparisons...), as the destructor of a list
+already did not. Found with a build which keeps the names of the
+functions (`--profiling-funcs`) driven in Safari by `safaridriver`.
+
+Two things showed then, which were not of Safari:
+
+- the view told where it scrolls as its top left corner and was told as
+  its centre, so that reading the position and setting it again moved the
+  view by half its size;
+- the manual opened at its last page: the table of contents and the
+  index, written at the end, took the cursor there. `delayed-update`
+  (`doc/tmdoc.scm`) keeps the cursor where it was.
+
+The build of the page puts the program and its script in place together:
+a page loaded while the link ran could get one of each, which fails the
+same way. `?trace-scroll` logs where the editor asks its views to scroll.
+
+**What is kept, and what happens when Tau stops** (2026-10-09).
+
+- **The home directory is kept in the browser.** `/home/tau` is in
+  IndexedDB (IDBFS, `misc/tau/web/tau-pre.js`): read before TeXmacs
+  starts, written back a moment after each change. The preferences
+  (`~/.TeXmacs`) and the documents of the user (`~/Documents`) are there
+  when the page is loaded again. One page keeps it, the one which holds
+  the lock `tau-home`; another page of Tau in the same browser works in
+  memory and says so in a line above its views. `?nohome` keeps nothing
+  (the tests).
+- **Save keeps, Download gives.** A document is saved in `~/Documents`
+  and is not handed to the browser as a download any more; File →
+  Download gives the file of the current document, and what is exported
+  (PDF...) is still given at once. File → Load offers the documents which
+  are kept, the last changed first, with "From this computer" for the
+  file chooser of the browser and "Delete"; a file which is picked or
+  dropped is copied to `~/Documents`.
+- **Closing TeXmacs** (which asks about what is not saved) writes the
+  home directory and starts the page again, as the browser build of
+  `maxs_texmacs` does.
+- **Leaving the page** with documents which are not saved asks first
+  (`beforeunload`).
+- **When the program stops** on an error it cannot go on after (a trap of
+  WebAssembly, the stack of the browser), the worker tells the page
+  (`stopped`), which covers the views with what happened and a button to
+  start again, where it went on taking keys for nothing.
+
+Known: after "Save as" of a document which was saved before, its tab
+stays marked as changed though the file is written; it does not happen
+when `save-buffer-as` is called without the dialog, and was not found.
 
 ## Order of the work
 

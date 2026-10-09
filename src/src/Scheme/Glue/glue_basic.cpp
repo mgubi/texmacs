@@ -10784,7 +10784,7 @@ tmg_current_view_url () {
 
 tmscm
 tmg_window_2view (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window->view");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "place->view");
 
   url in1= tmscm_to_url (arg1);
 
@@ -10810,7 +10810,7 @@ tmg_view_2buffer (tmscm arg1) {
 
 tmscm
 tmg_view_2window_url (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view->window-url");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "view->place-url");
 
   url in1= tmscm_to_url (arg1);
 
@@ -10875,9 +10875,9 @@ tmg_view_delete (tmscm arg1) {
 
 tmscm
 tmg_window_set_view (tmscm arg1, tmscm arg2, tmscm arg3) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-set-view");
-  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "window-set-view");
-  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "window-set-view");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "place-set-view");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "place-set-view");
+  TMSCM_ASSERT_BOOL (arg3, TMSCM_ARG3, "place-set-view");
 
   url in1= tmscm_to_url (arg1);
   url in2= tmscm_to_url (arg2);
@@ -10945,7 +10945,7 @@ tmg_current_window () {
 
 tmscm
 tmg_buffer_2windows (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer->windows");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "buffer->places");
 
   url in1= tmscm_to_url (arg1);
 
@@ -10958,7 +10958,7 @@ tmg_buffer_2windows (tmscm arg1) {
 
 tmscm
 tmg_window_to_buffer (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-to-buffer");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "place-to-buffer");
 
   url in1= tmscm_to_url (arg1);
 
@@ -10971,8 +10971,8 @@ tmg_window_to_buffer (tmscm arg1) {
 
 tmscm
 tmg_window_set_buffer (tmscm arg1, tmscm arg2) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-set-buffer");
-  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "window-set-buffer");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "place-set-buffer");
+  TMSCM_ASSERT_URL (arg2, TMSCM_ARG2, "place-set-buffer");
 
   url in1= tmscm_to_url (arg1);
   url in2= tmscm_to_url (arg2);
@@ -10986,7 +10986,7 @@ tmg_window_set_buffer (tmscm arg1, tmscm arg2) {
 
 tmscm
 tmg_window_focus (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "window-focus");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "place-focus");
 
   url in1= tmscm_to_url (arg1);
 
@@ -10999,7 +10999,7 @@ tmg_window_focus (tmscm arg1) {
 
 tmscm
 tmg_switch_to_window (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "switch-to-window");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "switch-to-place");
 
   url in1= tmscm_to_url (arg1);
 
@@ -11021,9 +11021,9 @@ tmg_new_buffer () {
 
 tmscm
 tmg_open_buffer_in_window (tmscm arg1, tmscm arg2, tmscm arg3) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "open-buffer-in-window");
-  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "open-buffer-in-window");
-  TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "open-buffer-in-window");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "open-buffer-in-place");
+  TMSCM_ASSERT_CONTENT (arg2, TMSCM_ARG2, "open-buffer-in-place");
+  TMSCM_ASSERT_CONTENT (arg3, TMSCM_ARG3, "open-buffer-in-place");
 
   url in1= tmscm_to_url (arg1);
   content in2= tmscm_to_content (arg2);
@@ -11047,7 +11047,7 @@ tmg_open_window () {
 
 tmscm
 tmg_open_window_geometry (tmscm arg1) {
-  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "open-window-geometry");
+  TMSCM_ASSERT_CONTENT (arg1, TMSCM_ARG1, "open-place-geometry");
 
   content in1= tmscm_to_content (arg1);
 
@@ -11082,7 +11082,7 @@ tmg_cpp_buffer_close (tmscm arg1) {
 
 tmscm
 tmg_kill_window (tmscm arg1) {
-  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "kill-window");
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "kill-place");
 
   url in1= tmscm_to_url (arg1);
 
@@ -12467,32 +12467,32 @@ initialize_glue_basic () {
   tmscm_install_procedure ("view-list",  tmg_view_list, 0, 0, 0);
   tmscm_install_procedure ("buffer->views",  tmg_buffer_2views, 1, 0, 0);
   tmscm_install_procedure ("current-view-url",  tmg_current_view_url, 0, 0, 0);
-  tmscm_install_procedure ("window->view",  tmg_window_2view, 1, 0, 0);
+  tmscm_install_procedure ("place->view",  tmg_window_2view, 1, 0, 0);
   tmscm_install_procedure ("view->buffer",  tmg_view_2buffer, 1, 0, 0);
-  tmscm_install_procedure ("view->window-url",  tmg_view_2window_url, 1, 0, 0);
+  tmscm_install_procedure ("view->place-url",  tmg_view_2window_url, 1, 0, 0);
   tmscm_install_procedure ("view-new",  tmg_view_new, 1, 0, 0);
   tmscm_install_procedure ("view-passive",  tmg_view_passive, 1, 0, 0);
   tmscm_install_procedure ("view-recent",  tmg_view_recent, 1, 0, 0);
   tmscm_install_procedure ("view-delete",  tmg_view_delete, 1, 0, 0);
-  tmscm_install_procedure ("window-set-view",  tmg_window_set_view, 3, 0, 0);
+  tmscm_install_procedure ("place-set-view",  tmg_window_set_view, 3, 0, 0);
   tmscm_install_procedure ("switch-to-buffer",  tmg_switch_to_buffer, 1, 0, 0);
   tmscm_install_procedure ("set-drd",  tmg_set_drd, 1, 0, 0);
-  tmscm_install_procedure ("window-list",  tmg_window_list, 0, 0, 0);
-  tmscm_install_procedure ("windows-number",  tmg_windows_number, 0, 0, 0);
-  tmscm_install_procedure ("current-window",  tmg_current_window, 0, 0, 0);
-  tmscm_install_procedure ("buffer->windows",  tmg_buffer_2windows, 1, 0, 0);
-  tmscm_install_procedure ("window-to-buffer",  tmg_window_to_buffer, 1, 0, 0);
-  tmscm_install_procedure ("window-set-buffer",  tmg_window_set_buffer, 2, 0, 0);
-  tmscm_install_procedure ("window-focus",  tmg_window_focus, 1, 0, 0);
-  tmscm_install_procedure ("switch-to-window",  tmg_switch_to_window, 1, 0, 0);
+  tmscm_install_procedure ("place-list",  tmg_window_list, 0, 0, 0);
+  tmscm_install_procedure ("places-number",  tmg_windows_number, 0, 0, 0);
+  tmscm_install_procedure ("current-place",  tmg_current_window, 0, 0, 0);
+  tmscm_install_procedure ("buffer->places",  tmg_buffer_2windows, 1, 0, 0);
+  tmscm_install_procedure ("place-to-buffer",  tmg_window_to_buffer, 1, 0, 0);
+  tmscm_install_procedure ("place-set-buffer",  tmg_window_set_buffer, 2, 0, 0);
+  tmscm_install_procedure ("place-focus",  tmg_window_focus, 1, 0, 0);
+  tmscm_install_procedure ("switch-to-place",  tmg_switch_to_window, 1, 0, 0);
   tmscm_install_procedure ("new-buffer",  tmg_new_buffer, 0, 0, 0);
-  tmscm_install_procedure ("open-buffer-in-window",  tmg_open_buffer_in_window, 3, 0, 0);
-  tmscm_install_procedure ("open-window",  tmg_open_window, 0, 0, 0);
-  tmscm_install_procedure ("open-window-geometry",  tmg_open_window_geometry, 1, 0, 0);
-  tmscm_install_procedure ("clone-window",  tmg_clone_window, 0, 0, 0);
+  tmscm_install_procedure ("open-buffer-in-place",  tmg_open_buffer_in_window, 3, 0, 0);
+  tmscm_install_procedure ("open-place",  tmg_open_window, 0, 0, 0);
+  tmscm_install_procedure ("open-place-geometry",  tmg_open_window_geometry, 1, 0, 0);
+  tmscm_install_procedure ("clone-place",  tmg_clone_window, 0, 0, 0);
   tmscm_install_procedure ("cpp-buffer-close",  tmg_cpp_buffer_close, 1, 0, 0);
-  tmscm_install_procedure ("kill-window",  tmg_kill_window, 1, 0, 0);
-  tmscm_install_procedure ("kill-current-window-and-buffer",  tmg_kill_current_window_and_buffer, 0, 0, 0);
+  tmscm_install_procedure ("kill-place",  tmg_kill_window, 1, 0, 0);
+  tmscm_install_procedure ("kill-current-place-and-buffer",  tmg_kill_current_window_and_buffer, 0, 0, 0);
   tmscm_install_procedure ("project-attach",  tmg_project_attach, 1, 0, 0);
   tmscm_install_procedure ("project-detach",  tmg_project_detach, 0, 0, 0);
   tmscm_install_procedure ("project-attached?",  tmg_project_attachedP, 0, 0, 0);

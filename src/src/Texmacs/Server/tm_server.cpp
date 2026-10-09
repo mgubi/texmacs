@@ -358,11 +358,10 @@ quit_texmacs_internal (int code) {
   // ends as elsewhere. TeXmacs has asked about the unsaved documents: the
   // page does not ask again (tmFrame.leave, misc/wasm/frame.js)
   if (!is_headless ()) {
+    // Tau: the core stops, and the page starts it again once the home
+    // directory is written (tau-worker.js)
     emscripten_cancel_main_loop ();
-    EM_ASM ({
-      if (typeof tmFrame !== 'undefined') tmFrame.leave ();
-      FS.syncfs (false, function () { location.reload (); });
-    });
+    EM_ASM ({ if (Module.tauQuit) Module.tauQuit (); });
     return;
   }
 #endif

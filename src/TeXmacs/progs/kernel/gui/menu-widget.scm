@@ -1393,7 +1393,7 @@
 ;; Tau: the page has one set of tools, at its sides and under its views,
 ;; for the view which has the keyboard. They are kept for the page, and not
 ;; for the window (the place) which the functions below are given.
-(define window-tools-table (make-ahash-table))
+(define place-tools-table (make-ahash-table))
 (tm-define lazy-tool-table (make-ahash-table))
 
 (define-public-macro (lazy-tool module . tools)
@@ -1410,12 +1410,12 @@
       (eval `(use-modules ,module)))
     (ahash-remove! lazy-tool-table tool)))
 
-(tm-define (window->tools win . pos-l)
+(tm-define (place->tools win . pos-l)
   (if (null? pos-l) (list)
       (with (pos . pos-r) pos-l
-        (with tools (ahash-ref window-tools-table (list 'page pos))
+        (with tools (ahash-ref place-tools-table (list 'page pos))
           (or (and tools (nnull? tools) tools)
-              (apply window->tools (cons win pos-r)))))))
+              (apply place->tools (cons win pos-r)))))))
 
 (define (find-positions tool win l)
   (if (null? l) l
@@ -1428,7 +1428,7 @@
                   r)))))))
 
 (tm-define (tool->positions tool win)
-  (with l (ahash-table->list window-tools-table)
+  (with l (ahash-table->list place-tools-table)
     (find-positions tool 'page l)))
 
 (tm-define (tool-bottom? tool win)
@@ -1450,8 +1450,8 @@
 (tm-define (extra-bottom-tools?) #f)
 
 (tm-define (has-bottom-tools? . opt-win)
-  (with win (if (null? opt-win) (current-window) (car opt-win))
-    (with l (window->tools win :transient-bottom :bottom)
+  (with win (if (null? opt-win) (current-place) (car opt-win))
+    (with l (place->tools win :transient-bottom :bottom)
       (or (== (get-preference "keyboard tool") "on")
           (extra-bottom-tools?)
           (nnull? l)))))
@@ -1461,18 +1461,18 @@
   (when (not (extra-bottom-tools?))
     (keyboard-focus-on "canvas")))
 
-(tm-define (set-window-tools win pos l)
+(tm-define (set-place-tools win pos l)
   (apply lazy-tool-force l)
-  (ahash-set! window-tools-table (list 'page pos) l)
-  (let* ((l0 (window->tools win :transient-right :right :bottom-right))
-         (l1 (window->tools win :transient-left :left :bottom-left)))
+  (ahash-set! place-tools-table (list 'page pos) l)
+  (let* ((l0 (place->tools win :transient-right :right :bottom-right))
+         (l1 (place->tools win :transient-left :left :bottom-left)))
     (notify-side-tools 0 (nnull? l0))
     (notify-side-tools 1 (nnull? l1))
     (notify-bottom-tools 0 (has-bottom-tools? win))
     (keyboard-focus-on "canvas")))
 
-(tm-define (set-window-tool win pos tool)
-  (set-window-tools win pos (list tool)))
+(tm-define (set-place-tool win pos tool)
+  (set-place-tools win pos (list tool)))
 
 (tm-define (tool-active? pos tool . opt-win)
   (when (func? tool 'quote)
@@ -1481,8 +1481,8 @@
     (set! tool (string->symbol tool)))
   (when (symbol? tool)
     (set! tool (list tool)))
-  (with win (if (null? opt-win) (current-window) (car opt-win))
-    (and-with l (window->tools win pos)
+  (with win (if (null? opt-win) (current-place) (car opt-win))
+    (and-with l (place->tools win pos)
       (in? tool l))))
 
 (tm-define (tool-select pos tool . opt-win)
@@ -1491,8 +1491,8 @@
     (set! tool (string->symbol tool)))
   (when (symbol? tool)
     (set! tool (list tool)))
-  (with win (if (null? opt-win) (current-window) (car opt-win))
-    (set-window-tool win pos tool)))
+  (with win (if (null? opt-win) (current-place) (car opt-win))
+    (set-place-tool win pos tool)))
 
 (tm-define (tool-focus pos tool u)
   (:check-mark "v" tool-active?)
@@ -1510,11 +1510,11 @@
     (set! tool (string->symbol tool)))
   (when (symbol? tool)
     (set! tool (list tool)))
-  (with win (if (null? opt-win) (current-window) (car opt-win))
-    (with l (window->tools win pos)
+  (with win (if (null? opt-win) (current-place) (car opt-win))
+    (with l (place->tools win pos)
       (if (in? tool l)
-          (set-window-tools win pos (list-remove l tool))
-          (set-window-tools win pos (cons tool l))))))
+          (set-place-tools win pos (list-remove l tool))
+          (set-place-tools win pos (cons tool l))))))
 
 (tm-define (tool-close pos tool quit . opt-win)
   (if (== pos :any)
@@ -1522,26 +1522,26 @@
                        :transient-left :left :bottom-left
                        :transient-bottom :bottom))
         (apply tool-close (cons* pos* tool quit opt-win)))
-      (let* ((win (if (null? opt-win) (current-window) (car opt-win)))
-             (l (window->tools win pos))
+      (let* ((win (if (null? opt-win) (current-place) (car opt-win)))
+             (l (place->tools win pos))
              (f (list-filter l (lambda (t) (!= (car t) tool)))))
         (when (!= f l)
           (when quit (quit))
-          (buffer-focus (window->buffer win))
-          (set-window-tools win pos f)))))
+          (buffer-focus (place->buffer win))
+          (set-place-tools win pos f)))))
 
 (tm-define ((tool-quit tool quit . opt-win) . args)
   (apply tool-close (cons* :any tool quit opt-win)))
 
 (tm-define (no-active-tools? pos . opt-win)
-  (with win (if (null? opt-win) (current-window) (car opt-win))
-    (with l (window->tools win pos)
+  (with win (if (null? opt-win) (current-place) (car opt-win))
+    (with l (place->tools win pos)
       (null? l))))
 
 (tm-define (close-tools pos . opt-win)
   (:check-mark "v" no-active-tools?)
-  (with win (if (null? opt-win) (current-window) (car opt-win))
-    (set-window-tools win pos (list))))
+  (with win (if (null? opt-win) (current-place) (car opt-win))
+    (set-place-tools win pos (list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Defining side tools

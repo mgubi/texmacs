@@ -456,19 +456,19 @@
 (tm-tool (pattern-tool win name)
   (:name name)
   (let* ((key (list :pattern name win))
-         (u (window->buffer win)))
+         (u (place->buffer win)))
     (dynamic (pattern-selector-tool key u))))
 
 (tm-tool (gradient-tool win name)
   (:name name)
   (let* ((key (list :gradient name win))
-         (u (window->buffer win)))
+         (u (place->buffer win)))
     (dynamic (pattern-selector-tool key u))))
 
 (tm-tool (picture-tool win name)
   (:name name)
   (let* ((key (list :picture name win))
-         (u (window->buffer win)))
+         (u (place->buffer win)))
     (dynamic (pattern-selector-tool key u))))
 
 (display* "Alternative pattern selector\n")

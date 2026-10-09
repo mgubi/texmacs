@@ -927,7 +927,7 @@
     (lambda (m)
       (check-menu-expand context m))
     main-menus)
-  (with win (current-window)
+  (with win (current-place)
     (for-each
       (lambda (m)
         (check-menu (string-append (symbol->string m) " in " context)
@@ -1089,7 +1089,7 @@
       decls))
   ;; the walker sees a missing tool
   (check-true (string-occurs? "Missing '"
-                (object->string (texmacs-side-tool (current-window)
+                (object->string (texmacs-side-tool (current-place)
                                                    '(kbd-menu-no-such-tool)
                                                    :title))))
   ;; the side tools of lazy-tool: texmacs-side-tool knows them once their
@@ -1097,7 +1097,7 @@
   ;; expand without errors (in a table, for the table tools)
   (in-buffer table-doc '(0 0 0 0 0 0)
     (lambda ()
-      (with win (current-window)
+      (with win (current-place)
         (for-each
           (lambda (decl)
             (check-run (lambda () (module-provide (car decl))))

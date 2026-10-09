@@ -38,14 +38,14 @@
     (set! current-envelope envelope)
     (set! current-equ-url (system->url file))
       ;;(display* "remote-equ envelope = " current-envelope "\n")
-      (load-buffer-in-new-window current-equ-url)
-      (window-focus (buffer->window current-equ-url))
-      ;(display* (window-to-buffer (current-window)) "\n")
+      (load-buffer-in-new-place current-equ-url)
+      (place-focus (buffer->place current-equ-url))
+      ;(display* (place-to-buffer (current-place)) "\n")
       (equ-edit-start)
       ; sometimes, the buffer shown in the new window spuriously changes
       ; use this hack to be sure we show what we want
-      (delayed (:idle 300) (if (not (== (buffer->window current-equ-url) (current-window))) (begin (window-set-buffer (current-window) current-equ-url) 
-    (window-focus (buffer->window current-equ-url))))
+      (delayed (:idle 300) (if (not (== (buffer->place current-equ-url) (current-place))) (begin (place-set-buffer (current-place) current-equ-url) 
+    (place-focus (buffer->place current-equ-url))))
     (if (== (url-suffix current-equ-url) "html")
     ; converting a LO Math equation from its mathml code
             (buffer-set-default-style))
@@ -87,8 +87,8 @@
         (buffer-pretend-saved current-equ-url)
         (if (nnot current-envelope) (server-error current-envelope  "disconnect"))  ;;how to simply disconnect that client? 
         (if stay (begin   
-          (if (> (length (window-list)) 1)  
-              (begin (safely-kill-window) ))
+          (if (> (length (place-list)) 1)  
+              (begin (safely-kill-place) ))
           (if (== (length (buffer-list)) 1)  
               (begin (switch-to-buffer (buffer-new))))
           (buffer-close current-equ-url))

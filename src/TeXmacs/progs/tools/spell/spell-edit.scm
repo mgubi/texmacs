@@ -67,12 +67,12 @@
 (tm-define (spell-go-to-previous)
   (go-to-previous-tag-argument (group-resolve 'spell-tag) 0)
   (spell-run-hooks)
-  (recenter-window))
+  (recenter-view))
 
 (tm-define (spell-go-to-next)
   (go-to-next-tag-argument (group-resolve 'spell-tag) 0)
   (spell-run-hooks)
-  (recenter-window))
+  (recenter-view))
 
 (tm-define (spell-go-to-last)
   (go-end)
@@ -106,7 +106,7 @@
 	    (spell-retain i :recurse))
         (begin
 	  (spell-run-hooks)
-	  (recenter-window)
+	  (recenter-view)
 	  (when (and (list-1? cb) (procedure? (car cb))) ((car cb)))))))
 
 (tm-define (spell-retain i mode . cb)
@@ -242,5 +242,5 @@
          (spell-terminate* (car opt-t))))
   (delayed
     (:idle 100)
-    (recenter-window)
+    (recenter-view)
     (refresh-tooltips)))

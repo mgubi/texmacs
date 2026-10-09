@@ -514,7 +514,7 @@ tau_buffer (const char* what_c, int place, const char* name_c) {
   url name= url_system (utf8_to_cork (string (name_c)));
   if (!is_place (place) || place_view (place) == NULL) return;
   if (what == "close-window") {
-    object cmd= list_object (symbol_object ("safely-kill-window"),
+    object cmd= list_object (symbol_object ("safely-kill-place"),
                              object (win));
     exec_delayed (scheme_cmd (cmd));
   }
