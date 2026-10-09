@@ -596,7 +596,8 @@
   with the same boxes: only another way of naming these labels would
   avoid it. The entries of the index itself, 1350 of them with their page
   numbers, and the paragraphs with references are used again since the
-  references are recorded (the 1811<nbsp>ms were 1570 before that).
+  references are recorded (before that, the new section took
+  1570<nbsp>ms).
 
   After an edit, once the input pauses, the editor updates its menus,
   icon bars and tools and then its <abbr|DRD>
