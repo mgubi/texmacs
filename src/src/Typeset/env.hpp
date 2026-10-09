@@ -495,10 +495,20 @@ public:
   inline bool read_all () { return env.all; }
   inline void record_reads (hashmap<int,bool>* rec, bool all) {
     env.rec= rec; env.all= all; }
-  // something which is not a variable is read (a reference, an
-  // attachment, whatever a Scheme routine looks at): the record of the
-  // variables read does not tell what the result depends on
+  // something which is not a variable is read (whatever a Scheme routine
+  // looks at): the record of the variables read does not tell what the
+  // result depends on
   inline void read_other () { if (env.rec != NULL) env.all= true; }
+  // The references and the attachments which are looked up are recorded
+  // too, with the values found: a name ("0" or "1" for the two parts of
+  // a binding, "a" for an attachment, then the key) and a value, which
+  // lookup_value finds again
+  array<string>* rec_keys;
+  array<tree>*   rec_values;
+  inline void record_lookups (array<string>* keys, array<tree>* values) {
+    rec_keys= keys; rec_values= values; }
+  tree lookup_value (string name);
+  tree lookup (string name);
   // a variable whose value is all there is to it: no state of the
   // environment is derived from it when it is written (the types for
   // which update (string) does nothing)

@@ -532,9 +532,11 @@
   bridge must have got no line items from the bridges around it (the
   number of an equation ends up in the lines of its body); its record
   must be complete (the reads of the bridges below it are added to it,
-  up to a limit; a reference, an attachment or a <scheme> routine make
-  it unknown); and the variables which changed must be plain ones, from
-  which the environment derives no state when they are written. The
+  up to a limit; a <scheme> routine makes it unknown); the references and
+  attachments which it looked up, recorded with the values found, must
+  still have these values; and the variables which changed must be plain
+  ones, from which the environment derives no state when they are
+  written. The
   variables which a bridge writes count as read: its
   <cpp|changes> only hold those whose value it changed. In the same way a
   paragraph which is removed no longer has every bridge after it typeset
@@ -560,6 +562,41 @@
   footnotes. The first typesetting of a document, where every read is
   recorded, takes the same time within the precision of the measure (143
   and 149<nbsp>ms).
+
+  <paragraph|The user manual>
+
+  The same edits were made in the middle of the user manual, opened as
+  one book (<menu|Help|Manual|User manual>): 3000 paragraphs and
+  structures at its top level, 18000 bridges, 23000 starts for the pages.
+  The whole typesetting of an edit, in milliseconds, with the three
+  mechanisms off (<verbatim|TEXMACS_TYPESET_READS=off>,
+  <verbatim|TEXMACS_PAGE_BREAK_FAST=0>,
+  <verbatim|TEXMACS_PAGE_BREAK_CACHE=off>) and on:
+
+  <\big-table|<block|<tformat|<table|<row|<cell|>|<cell|before>|<cell|after>>|<row|<cell|a
+  character in a line>|<cell|416>|<cell|72>>|<row|<cell|a new
+  line>|<cell|419>|<cell|359>>|<row|<cell|two paragraphs
+  joined>|<cell|1134>|<cell|78>>|<row|<cell|a new
+  section>|<cell|1811>|<cell|1059>>|<row|<cell|a new numbered
+  equation>|<cell|1142>|<cell|396>>>>>>
+    One edit in the middle of the user manual, in milliseconds.
+  </big-table>
+
+  A real book gains less than the documents made for the measures, for
+  three reasons. The manual has floats and an index in two columns: most
+  of its page starts have pending floats, which the faster search leaves
+  to the search as it was (250 of the 340<nbsp>ms of the pager for a new
+  line). Its pages are made again at every pass, 50<nbsp>ms for 260 of
+  them. And a new section still has 10600 bridges typeset again in
+  700<nbsp>ms: every index entry and every section of <TeXmacs> gets a
+  label named from one counter (<verbatim|auto-1>,
+  <verbatim|auto-2>...), so that a new section renames the labels of all
+  the index entries after it, of which the manual has several in most of
+  its paragraphs on the macros. These bridges do make something else,
+  with the same boxes: only another way of naming these labels would
+  avoid it. The entries of the index itself, 1350 of them with their page
+  numbers, and the paragraphs with references are used again since the
+  references are recorded (the 1811<nbsp>ms were 1570 before that).
 
   After an edit, once the input pauses, the editor updates its menus,
   icon bars and tools and then its <abbr|DRD>

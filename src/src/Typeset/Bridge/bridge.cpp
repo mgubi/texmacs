@@ -316,11 +316,14 @@ extern tree the_et;
 *     record would hold more than READS_MAX variables: a document does not
 *     keep the reads of all its paragraphs (it is typeset again, which is
 *     cheap: it visits them), an equation or a title keeps its own. The
-*     table must not have been read as a whole, and nothing else must
-*     have been looked at which may change (read_other: a reference, an
-*     attachment, a Scheme routine): a paragraph with a reference is
-*     typeset again as it was before, which is also what brought its
-*     number up to date when it followed the change;
+*     table must not have been read as a whole, and no Scheme routine
+*     must have been called, which may look at anything (read_other);
+*   - the references and the attachments which it looked up, which are
+*     recorded with the values found (at most LOOKUPS_MAX of them, with
+*     those of the bridges below), still have these values: a paragraph
+*     which refers to an equation whose number changed before it is
+*     typeset again, one which refers to something which did not change
+*     is not (the entries of an index, with their page numbers);
 *   - the variables of old_patch are plain ones (plain_variable): the
 *     others (the font, the mode, the language, the colors...) are turned
 *     into a state of the environment when they are written, which is used
@@ -383,14 +386,29 @@ patch_unread (hashmap<string,tree> patch, array<int> reads, edit_env env) {
   return true;
 }
 
-// the reads of a bridge which was typeset or used again, for the record of
-// the bridge above it
+#define LOOKUPS_MAX 64
+
+// the reads and the lookups of a bridge which was typeset or used again,
+// for the record of the bridge above it
 static void
-add_reads (edit_env env, bool known, array<int> reads) {
+add_reads (edit_env env, bool known, array<int> reads,
+           array<string> keys, array<tree> values) {
   hashmap<int,bool>* rec= env->read_recorder ();
   if (rec == NULL || env->read_unknown) return;
-  if (!known || N(*rec) + N(reads) > READS_MAX) { env->read_unknown= true; return; }
+  if (!known || N(*rec) + N(reads) > READS_MAX ||
+      N(*env->rec_keys) + N(keys) > LOOKUPS_MAX) {
+    env->read_unknown= true; return; }
   for (int i=0; i<N(reads); i++) rec->operator () (reads[i])= true;
+  (*env->rec_keys) << keys;
+  (*env->rec_values) << values;
+}
+
+// do the references and attachments looked up still have the values found?
+static bool
+same_lookups (edit_env env, array<string> keys, array<tree> values) {
+  for (int i=0; i<N(keys); i++)
+    if (env->lookup_value (keys[i]) != values[i]) return false;
+  return true;
 }
 
 // what a bridge made, for the mode "check": the boxes as trees (with
@@ -441,7 +459,8 @@ bridge_rep::typeset (int desired_status) {
   bool alone= (N(ttt->a) == 0) && (N(ttt->b) == 0);
   bool unread= (status==desired_status) && (N(ttt->old_patch)!=0) &&
                reads_known && alone && reads_mode () != 0 &&
-               patch_unread (ttt->old_patch, reads, env);
+               patch_unread (ttt->old_patch, reads, env) &&
+               same_lookups (env, seen_keys, seen_values);
   bool check= unread && reads_mode () == 2;
   array<SI> old_lines;
   array<tree> old_contents;
@@ -454,14 +473,14 @@ bridge_rep::typeset (int desired_status) {
   if ((status==desired_status) && (N(ttt->old_patch)==0)) {
     //cout << "cached" << LF;
     if (edit_profile.on) edit_profile.cached++;
-    add_reads (env, reads_known, reads);
+    add_reads (env, reads_known, reads, seen_keys, seen_values);
     env->monitored_patch_env (changes);
     // cout << "changes       = " << changes << LF;
   }
   else if (unread && !check) {
     // as above; what the bridge writes is as in the previous pass
     if (edit_profile.on) { edit_profile.cached++; edit_profile.unread++; }
-    add_reads (env, reads_known, reads);
+    add_reads (env, reads_known, reads, seen_keys, seen_values);
     env->monitored_patch_env (changes);
     env->compare_changes (ttt->old_patch, changes);
   }
@@ -479,22 +498,32 @@ bridge_rep::typeset (int desired_status) {
     // the variables read by the typesetting of the subtree
     hashmap<int,bool>* outer_rec= env->read_recorder ();
     bool outer_all= env->read_all (), outer_unknown= env->read_unknown;
+    array<string>* outer_keys= env->rec_keys;
+    array<tree>* outer_values= env->rec_values;
     hashmap<int,bool> my_reads (false);
+    array<string> my_keys;
+    array<tree> my_values;
     env->record_reads (&my_reads, false);
+    env->record_lookups (&my_keys, &my_values);
     env->read_unknown= false;
     my_typeset (desired_status);
     bool recorded= !env->read_unknown && !env->read_all () &&
-                   N(my_reads) <= READS_MAX;
+                   N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
     reads_known= recorded && alone;
     reads= array<int> ();
+    seen_keys= array<string> ();
+    seen_values= array<tree> ();
     if (recorded) {
       for (iterator<int> it= iterate (my_reads); it->busy (); )
         reads << it->next ();
       merge_sort (reads);
+      seen_keys= my_keys;
+      seen_values= my_values;
     }
     env->record_reads (outer_rec, outer_all);
+    env->record_lookups (outer_keys, outer_values);
     env->read_unknown= outer_unknown;
-    add_reads (env, recorded, reads);
+    add_reads (env, recorded, reads, seen_keys, seen_values);
     env->local_update (ttt->old_patch, changes);
     env->local_end (prev_back);
     ttt->local_end (l, sb);

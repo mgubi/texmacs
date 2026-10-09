@@ -2037,12 +2037,9 @@ tree
 edit_env_rep::exec_get_binding (tree t) {
   if (N(t) != 1 && N(t) != 2) return tree (_ERROR, "bad get binding");
   string key= exec_string (t[0]);
-  read_other ();
-  tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
-  else if (type == 1) value= tree (UNINIT);
+  tree value= lookup ((type == 1 ? "1" : "0") * key);
   if (complete && value == tree (UNINIT))
     if (get_bool (WARN_MISSING)) {
       missing (key)= tree (GET_BINDING, key);
@@ -2056,12 +2053,9 @@ tree
 edit_env_rep::exec_has_binding (tree t) {
   if (N(t) != 1 && N(t) != 2) return tree (_ERROR, "bad get binding");
   string key= exec_string (t[0]);
-  read_other ();
-  tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
   int type= (N(t) == 1? 0: as_int (exec_string (t[1])));
   if (type != 0 && type != 1) type= 0;
-  if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
-  else if (type == 1) value= tree (UNINIT);
+  tree value= lookup ((type == 1 ? "1" : "0") * key);
   if (value == tree (UNINIT)) return "false";
   else return "true";
 }
@@ -2070,9 +2064,7 @@ tree
 edit_env_rep::exec_get_attachment (tree t) {
   if (N(t) != 1) return tree (_ERROR, "bad get attachment");
   string key= exec_string (t[0]);
-  read_other ();
-  tree value= local_att->contains (key)? local_att [key]: global_att [key];
-  return value;
+  return lookup ("a" * key);
 }
 
 tree
