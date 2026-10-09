@@ -40,6 +40,12 @@ public:
   path                 ip;       // source location of the paragraph
   int                  status;   // status among above values
   hashmap<string,tree> changes;  // changes in the environment
+  array<int>           reads;    // the variables read by the typesetting
+  bool                 reads_known; // (sorted env_var_id; when all recorded)
+  array<string>        seen_keys;   // the references and attachments it
+  array<tree>          seen_values; // looked up, with the values found
+  hashmap<string,tree> removed;  // changes of the bridges removed before
+                                 // this one since the last pass
 
   array<page_item>     l;        // the typesetted lines of st
   stack_border         sb;       // border properties of l
@@ -64,6 +70,8 @@ public:
   virtual void exec_until (path p, bool skip_flag= false);
   void typeset (int desired_status);
 };
+
+bool bridge_reads_on (); // see "What is typeset again" in bridge.cpp
 
 class bridge {
   ABSTRACT_NULL(bridge);

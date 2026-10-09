@@ -11,6 +11,8 @@
 
 #include "Bridge/impl_typesetter.hpp"
 #include "iterator.hpp"
+#include "sys_utils.hpp" // get_env
+#include <chrono>
 
 /******************************************************************************
 * Constructor and destructor
@@ -105,6 +107,16 @@ typesetter_rep::local_end (array<page_item>& prev_l, stack_border& prev_sb) {
 * Main typesetting routines
 ******************************************************************************/
 
+// see typesetter.hpp
+edit_profile_data edit_profile=
+  { get_env ("TEXMACS_EDIT_PROFILE") != "", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+double
+edit_profile_now () {
+  using namespace std::chrono;
+  return duration<double, std::milli> (steady_clock::now ().time_since_epoch ()).count ();
+}
+
 static rectangles
 requires_update (rectangles log) {
   rectangles rs;
@@ -158,17 +170,25 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
+  env->auto_seen= 0;
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
     env->missing  = hashmap<string,tree> (UNINIT);
     env->redefined= array<tree> ();
     env->touched  = hashmap<string,bool> (false);
   }
+  double t0= edit_profile.on ? edit_profile_now () : 0;
   br->typeset (PROCESSED+ WANTED_PARAGRAPH);
+  double t1= edit_profile.on ? edit_profile_now () : 0;
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
   box rb= ppp->make_pages ();
   if (env->complete && paper) determine_page_references (rb);
   tm_delete (ppp);
+  if (edit_profile.on) {
+    edit_profile.bridges += t1 - t0;
+    edit_profile.pages   += edit_profile_now () - t1;
+    edit_profile.passes++;
+  }
   // env->complete= false;  // moved to edit_typeset_rep::typeset
   return rb;
 }
@@ -178,8 +198,11 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   x1= x1b; y1= y1b; x2=x2b; y2= y2b;
   box b= typeset ();
   // cout << "-------------------------------------------------------------\n";
+  double t0= edit_profile.on ? edit_profile_now () : 0;
   b->position_at (0, 0, change_log);
+  if (edit_profile.on) edit_profile.lines += N(change_log) / 2;
   change_log= requires_update (change_log);
+  if (edit_profile.on) edit_profile.rects += N(change_log);
   rectangle r (0, 0, 0, 0);
   if (!is_nil (change_log)) r= least_upper_bound (change_log);
   array<brush> new_bgs;
@@ -189,6 +212,7 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
     if (new_bgs[i] != old_bgs[i])
       r= least_upper_bound (r, rs[i]);
   old_bgs= new_bgs;
+  if (edit_profile.on) edit_profile.changes += edit_profile_now () - t0;
   x1b= r->x1; y1b= r->y1; x2b= r->x2; y2b= r->y2;
   change_log= rectangles ();
   return b;

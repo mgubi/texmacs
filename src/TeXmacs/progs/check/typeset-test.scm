@@ -324,6 +324,86 @@
        (check-true (in? "e3" (list-references)))
        (check-false (in? "e4" (list-references)))))))
 
+;; A paragraph which is added changes the counters: what comes after it is
+;; numbered again, and what comes before is not.
+(define (test-renumbering)
+  (check-group "renumbering")
+  (with-typeset-body
+   '(document (section (concat "A" (label "s1")))
+              (equation (concat "x" (label "e1")))
+              (section (concat "B" (label "s2")))
+              (equation (concat "y" (label "e2")))
+              (concat "see " (reference "e2")))
+   (lambda ()
+     (let ((nr (lambda (l) (cadr (tree->stree (get-reference l))))))
+       (check= (nr "s2") "2")
+       (check= (nr "e2") "2")
+       (tree-insert (buffer-tree) 2
+                    '((equation (concat "n" (label "e0")))))
+       (update-forced)
+       (check= (nr "e1") "1")
+       (check= (nr "e0") "2")
+       (check= (nr "e2") "3")
+       (check= (nr "s2") "2")
+       (tree-insert (buffer-tree) 0 '((section (concat "N" (label "s0")))))
+       (update-forced)
+       (check= (nr "s0") "1")
+       (check= (nr "s1") "2")
+       (check= (nr "s2") "3")
+       (check= (nr "e2") "3")
+       (tree-remove (buffer-tree) 0 1)
+       (update-forced)
+       (check= (nr "s1") "1")
+       (check= (nr "s2") "2")))))
+
+;; The entries of the table of contents and of the index put a label where
+;; they stand, auto-n. The number is that of the tag which makes the label
+;; (Typeset/Env/env_exec.cpp, exec_auto_id): it follows the order of the
+;; document when this one is loaded or updated, and a tag which is added
+;; in between takes a new number, so that the other labels keep their
+;; names until the next update.
+(define (test-automatic-labels)
+  (check-group "automatic labels")
+  (with-typeset-body
+   '(document (section "A")
+              (concat "a" (index "first"))
+              (section "B")
+              (concat "b" (index "second"))
+              (section "C"))
+   (lambda ()
+     (let ((nr (lambda (l) (cadr (tree->stree (get-reference l)))))
+           (autos (lambda ()
+                    (list-filter (list-references)
+                                 (lambda (l) (string-starts? l "auto-"))))))
+       ;; in the order of the document
+       (check= (length (autos)) 5)
+       (check= (nr "auto-1") "1")
+       (check= (nr "auto-3") "2")
+       (check= (nr "auto-5") "3")
+       ;; a new section before B: B and C keep the names of their labels
+       (tree-insert (buffer-tree) 2 '((section "N")))
+       (update-forced)
+       (check= (nr "auto-1") "1")
+       (check= (nr "auto-6") "2")
+       (check= (nr "auto-3") "3")
+       (check= (nr "auto-5") "4")
+       ;; typing in a section does not change them either
+       (tree-set (tree-ref (buffer-tree) 3 0) "B again")
+       (update-forced)
+       (check= (nr "auto-3") "3")
+       ;; an update numbers them in the order of the document again
+       (renumber-auto-labels)
+       (update-forced)
+       (check= (nr "auto-1") "1")
+       (check= (nr "auto-3") "2")
+       (check= (nr "auto-4") "3")
+       (check= (nr "auto-6") "4")
+       ;; and so does a second update, which has nothing to do
+       (renumber-auto-labels)
+       (update-forced)
+       (check= (nr "auto-4") "3")
+       (check= (nr "auto-6") "4")))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Boxes
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -577,6 +657,8 @@
      (test-hyphenation)))
   (test-environment)
   (test-numbering)
+  (test-renumbering)
+  (test-automatic-labels)
   (test-tables)
   (test-paragraphs)
   (test-pages)

@@ -637,13 +637,38 @@ edit_interface_rep::change_time () {
   return last_change;
 }
 
+// (the times of an update of the menus, the icon bars and the tools, which
+// follows every edit after a sixth of a second: TEXMACS_EDIT_PROFILE)
+struct menus_profile {
+  double t0, t;
+  string parts;
+  menus_profile (): t0 (edit_profile.on ? edit_profile_now () : 0), t (t0) {}
+  void done (const char* what) {
+    if (!edit_profile.on) return;
+    double now= edit_profile_now ();
+    parts << (N(parts) == 0 ? "" : ", ") << what << " "
+          << as_string (floor ((now - t) * 100 + 0.5) / 100);
+    t= now;
+  }
+  ~menus_profile () {
+    if (edit_profile.on)
+      cout << "edit-profile menus: " << edit_profile_now () - t0 << " ms ("
+           << parts << ")" << LF; }
+};
+
 void
 edit_interface_rep::update_menus () {
+  menus_profile prof;
   SERVER (menu_main ("(horizontal (link texmacs-menu))"));
+  prof.done ("menu bar");
   SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
+  prof.done ("main icons");
   SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
+  prof.done ("mode icons");
   SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
+  prof.done ("focus icons");
   SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
+  prof.done ("extra icons");
   array<url> a= buffer_to_windows (buf->buf->name);
   if (N(a) > 0) {
     string win = "(string->url \"" * as_string (a[0]) * "\")";
@@ -656,7 +681,9 @@ edit_interface_rep::update_menus () {
     SERVER (bottom_tools (0, "(vertical " * bdyn * ")"));
     SERVER (bottom_tools (1, "(vertical " * xdyn * ")"));
   }
+  prof.done ("tools");
   set_footer ();
+  prof.done ("footer");
   if (has_current_window ()) {
     array<url> ws= buffer_to_windows (
                      window_to_buffer (
@@ -666,10 +693,14 @@ edit_interface_rep::update_menus () {
     for (int i=0; i<n; i++)
       concrete_window (ws[i])->set_modified (ns);
   }
+  prof.done ("modified");
   if (!gui_interrupted ()) drd_update ();
+  prof.done ("drd");
   cache_memorize ();
+  prof.done ("memorize");
   last_update= last_change;
   save_user_preferences ();
+  prof.done ("preferences");
 }
 
 int
@@ -834,7 +865,45 @@ edit_interface_rep::apply_changes () {
   if (env_change & (THE_TREE+THE_ENVIRONMENT)) {
     typeset_invalidate_env ();
     SI x1, y1, x2, y2;
+    double prof_t= 0;
+    if (edit_profile.on) {
+      bool on= true;
+      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      prof_t= edit_profile_now ();
+    }
     typeset (x1, y1, x2, y2);
+    if (edit_profile.on) {
+      // the rectangle which is invalidated, and the part of it in the view
+      // (points of the screen)
+      double total= edit_profile_now () - prof_t;
+      rectangle all (x1- 2*pixel, y1- 2*pixel, x2+ 2*pixel, y2+ 2*pixel);
+      rectangle vis= (x2 > x1 && y2 > y1)
+        ? rectangle (max (all->x1, vx1), max (all->y1, vy1),
+                     min (all->x2, vx2), min (all->y2, vy2))
+        : rectangle (0, 0, 0, 0);
+      double f= magf / PIXEL;
+      double vw= (vx2 - vx1) * f, vh= (vy2 - vy1) * f;
+      double rw= max (0.0, (vis->x2 - vis->x1) * f), rh= max (0.0, (vis->y2 - vis->y1) * f);
+      cout << "edit-profile typeset: " << total << " ms in " << edit_profile.passes
+           << " pass(es): bridges " << edit_profile.bridges << " ms ("
+           << edit_profile.redone << " redone, " << edit_profile.cached << " reused"
+           << (edit_profile.unread > 0
+               ? ", " * as_string (edit_profile.unread) * " of them with other variables changed"
+               : string (""))
+           << "), pages "
+           << edit_profile.pages << " ms"
+           << (edit_profile.breaks_reused > 0 ? " (breaks reused)" : "")
+           << (edit_profile.starts > 0
+               ? " (search " * as_string (floor (edit_profile.search * 100 + 0.5) / 100)
+                 * " ms, " * as_string (edit_profile.starts) * " starts, "
+                 * as_string (edit_profile.starts_kept) * " with candidates kept)"
+               : string (""))
+           << ", changes " << edit_profile.changes << " ms ("
+           << edit_profile.rects << " rectangles from " << edit_profile.lines
+           << " lines); invalid " << (int) rw << " x " << (int) rh << " of the view "
+           << (int) vw << " x " << (int) vh << " = "
+           << (vw * vh > 0 ? (int) (100.0 * rw * rh / (vw * vh) + 0.5) : 0) << "%" << LF;
+    }
     invalidate (x1- 2*pixel, y1- 2*pixel, x2+ 2*pixel, y2+ 2*pixel);
     // check_data_integrety ();
     the_ghost_cursor()= eb->find_check_cursor (tp);

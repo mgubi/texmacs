@@ -38,7 +38,9 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_ref (local_ref2), global_ref (global_ref2),
   local_aux (local_aux2), global_aux (global_aux2),
   local_att (local_att2), global_att (global_att2),
-  missing (UNINIT), redefined (), touched (false)
+  missing (UNINIT), redefined (), touched (false),
+  read_unknown (false), rec_keys (NULL), rec_values (NULL),
+  auto_seen (0)
 {
   initialize_default_env ();
   initialize_default_var_type ();
@@ -143,6 +145,37 @@ edit_env_rep::local_end_extents (tree t) {
 * Global manipulations of the environment
 ******************************************************************************/
 
+// The value of a binding or of an attachment (see rec_keys in env.hpp),
+// and the same with a record of it
+tree
+edit_env_rep::lookup_value (string name) {
+  if (N(name) == 0) return tree (UNINIT);
+  string key= name (1, N(name));
+  if (name[0] == 'a')
+    return local_att->contains (key)? local_att [key]: global_att [key];
+  int type= (name[0] == '1') ? 1 : 0;
+  tree value= local_ref->contains (key)? local_ref [key]: global_ref [key];
+  if (is_func (value, TUPLE) && (N(value) >= 2)) value= value[type];
+  else if (type == 1) value= tree (UNINIT);
+  return value;
+}
+
+tree
+edit_env_rep::lookup (string name) {
+  tree value= lookup_value (name);
+  if (rec_keys != NULL) { (*rec_keys) << name; (*rec_values) << value; }
+  return value;
+}
+
+// a number for each name of variable (see env_table)
+int
+env_var_id (string var) {
+  static hashmap<string,int> ids (-1);
+  int id= ids [var];
+  if (id < 0) { id= N(ids); ids (var)= id; }
+  return id;
+}
+
 void
 edit_env_rep::write_default_env () {
   env= copy (default_env);
@@ -177,7 +210,7 @@ edit_env_rep::patch_env (hashmap<string,tree> patch) {
 
 void
 edit_env_rep::read_env (hashmap<string,tree>& ret) {
-  ret= copy (env);
+  ret= copy ((hashmap<string,tree>) env); // (all of it: see env_table)
 }
 
 void
@@ -190,9 +223,9 @@ void
 edit_env_rep::local_update (hashmap<string,tree>& old_patch,
 			    hashmap<string,tree>& change)
 {
-  old_patch->pre_patch (back, env);
-  old_patch->post_patch (change, env);
-  change= invert (back, env);
+  old_patch->pre_patch (back, env.h);
+  old_patch->post_patch (change, env.h);
+  change= invert (back, env.h);
 }
 
 void
@@ -208,5 +241,5 @@ edit_env_rep::local_end (hashmap<string,tree>& prev_back) {
 
 tm_ostream&
 operator << (tm_ostream& out, edit_env env) {
-  return out << env->env;
+  return out << env->env.h;
 }

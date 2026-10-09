@@ -3212,6 +3212,15 @@ tmg_update_current_buffer () {
 }
 
 tmscm
+tmg_renumber_auto_labels () {
+  // TMSCM_DEFER_INTS;
+  get_current_editor()->typeset_renumber_labels ();
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_update_players (tmscm arg1, tmscm arg2) {
   TMSCM_ASSERT_PATH (arg1, TMSCM_ARG1, "update-players");
   TMSCM_ASSERT_BOOL (arg2, TMSCM_ARG2, "update-players");
@@ -3940,6 +3949,7 @@ initialize_glue_editor () {
   tmscm_install_procedure ("update-forced",  tmg_update_forced, 0, 0, 0);
   tmscm_install_procedure ("update-path",  tmg_update_path, 1, 0, 0);
   tmscm_install_procedure ("update-current-buffer",  tmg_update_current_buffer, 0, 0, 0);
+  tmscm_install_procedure ("renumber-auto-labels",  tmg_renumber_auto_labels, 0, 0, 0);
   tmscm_install_procedure ("update-players",  tmg_update_players, 2, 0, 0);
   tmscm_install_procedure ("generate-all-aux",  tmg_generate_all_aux, 0, 0, 0);
   tmscm_install_procedure ("generate-aux",  tmg_generate_aux, 1, 0, 0);

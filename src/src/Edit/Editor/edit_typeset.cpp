@@ -12,6 +12,7 @@
 #include <climits>
 #include "edit_typeset.hpp"
 #include "tm_buffer.hpp"
+#include "tm_window.hpp" // tm_view_rep (the other views of the buffer)
 #include "convert.hpp"
 #include "file.hpp"
 #include "analyze.hpp"
@@ -1078,6 +1079,27 @@ edit_typeset_rep::typeset_invalidate_all () {
   notify_change (THE_ENVIRONMENT);
   typeset_preamble ();
   ::notify_assign (ttt, path(), subtree (et, rp));
+}
+
+// The automatic labels are numbered again, in the order of the document
+// (exec_auto_id in env_exec.cpp), which is to be done before the tables
+// of contents and the indexes are made again: these hold the names of
+// the labels. All the views of the buffer have the same labels.
+void
+edit_typeset_rep::typeset_renumber_labels () {
+  tree root= subtree (et, rp);
+  if (!auto_labels_renumber (root)) return;
+  for (int i=0; i<N(buf->vws); i++)
+    ((tm_view) buf->vws[i])->ed->typeset_invalidate_all ();
+  // one pass, for the names: the references are not yet those of the
+  // tables to come, and the document is typeset again after them
+  SI x1, y1, x2, y2;
+  typeset_sub (x1, y1, x2, y2);
+  if (env->complete) {
+    env->complete= false;
+    clean_unused (env->local_ref, env->touched);
+  }
+  auto_labels_numbered (root);
 }
 
 void

@@ -123,6 +123,47 @@
 * The edit environment
 ******************************************************************************/
 
+// The variables of an environment, as a table which can record what is
+// read and written of it. A bridge records the variables which the
+// typesetting of its subtree reads or writes (bridge_rep::typeset): when
+// the environment it gets differs from the one of the previous pass in
+// other variables only, what it made then is still right. The variables
+// it writes count as well: the changes it keeps are the variables whose
+// value it changed, and one which it wrote with the value it had already
+// is not among them (an exercise which sets the current label to its
+// number, after a theorem with the same number). A read of the whole
+// table cannot be recorded variable by variable: it sets 'all'. The
+// variables are recorded by number (env_var_id): the sets of the bridges
+// are arrays of integers.
+int env_var_id (string var);
+class env_table {
+public:
+  hashmap<string,tree>  h;
+  hashmap<int,bool>*    rec;  // the variables read or written, if recording
+  bool                  all;  // the whole table was read, while recording
+  inline env_table (tree init): h (init), rec (NULL), all (false) {}
+  inline tree operator [] (string s) {
+    if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    return h [s]; }
+  inline tree& operator () (string s) {
+    if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    return h (s); }
+  inline bool contains (string s) {
+    if (rec != NULL) rec->operator () (env_var_id (s))= true;
+    return h->contains (s); }
+  inline env_table& operator = (hashmap<string,tree> h2) { h= h2; return *this; }
+  inline operator hashmap<string,tree> () {
+    if (rec != NULL) all= true;
+    return h; }
+};
+
+// The automatic labels of a document (exec_auto_id in env_exec.cpp): those
+// of 'root' get new numbers, in the order in which they are typeset, if
+// some were numbered out of the order of the document; this is then to
+// be followed by a complete typesetting and by auto_labels_numbered
+bool auto_labels_renumber (tree root);
+void auto_labels_numbered (tree root);
+
 class edit_env;
 class ornament_parameters;
 class art_box_parameters;
@@ -130,7 +171,7 @@ class edit_env_rep: public concrete_struct {
 public:
   drd_info&                    drd;
 private:
-  hashmap<string,tree>         env;
+  env_table                    env;
   hashmap<string,tree>         back;
 public:
   hashmap<string,path>         src;
@@ -379,6 +420,8 @@ private:
   tree exec_get_binding (tree t);
   tree exec_has_binding (tree t);
   tree exec_get_attachment (tree t);
+  tree exec_auto_id (tree t);
+  bool auto_label_tag (tree& tag, tree& root);
 
   tree exec_pattern (tree t);
 
@@ -452,10 +495,49 @@ public:
   tree   commit_animation (tree t);
   tree   expand_morph (tree t);
 
+  // The recording of the variables read (see env_table): by a bridge
+  // around the typesetting of its subtree. read_unknown tells a bridge
+  // that its record is not all it read (the reads of a bridge below it
+  // were not known, or too many to be added).
+  bool read_unknown;
+  inline hashmap<int,bool>* read_recorder () { return env.rec; }
+  inline bool read_all () { return env.all; }
+  inline void record_reads (hashmap<int,bool>* rec, bool all) {
+    env.rec= rec; env.all= all; }
+  // something which is not a variable is read (whatever a Scheme routine
+  // looks at): the record of the variables read does not tell what the
+  // result depends on
+  inline void read_other () { if (env.rec != NULL) env.all= true; }
+  // The references and the attachments which are looked up are recorded
+  // too, with the values found: a name ("0" or "1" for the two parts of
+  // a binding, "a" for an attachment, then the key) and a value, which
+  // lookup_value finds again
+  array<string>* rec_keys;
+  array<tree>*   rec_values;
+  // The tags which made an automatic label in this pass (exec_auto_id in
+  // env_exec.cpp)
+  int auto_seen;
+  inline void record_lookups (array<string>* keys, array<tree>* values) {
+    rec_keys= keys; rec_values= values; }
+  tree lookup_value (string name);
+  tree lookup (string name);
+  // a variable whose value is all there is to it: no state of the
+  // environment is derived from it when it is written (the types for
+  // which update (string) does nothing)
+  inline bool plain_variable (string s) {
+    int type= var_type [s];
+    return type == Env_User || type == Env_Fixed ||
+           type == Env_Paragraph || type == Env_Page; }
+  // the variables of 'change' had these values at this point of the
+  // previous pass: those which have another one now are in the patch
+  inline void compare_changes (hashmap<string,tree>& patch,
+                               hashmap<string,tree> change) {
+    patch->post_patch (change, env.h); }
+
   inline void monitored_write (string s, tree t) {
-    back->write_back (s, env); env (s)= t; }
+    back->write_back (s, env.h); env (s)= t; }
   inline void monitored_write_update (string s, tree t) {
-    back->write_back (s, env); env (s)= t; update (s); }
+    back->write_back (s, env.h); env (s)= t; update (s); }
   inline void write (string s, tree t) { env (s)= t; }
   inline void write_update (string s, tree t) { env (s)= t; update (s); }
   inline tree local_begin (string s, tree t) {
@@ -469,8 +551,8 @@ public:
     local_end (MATH_LEVEL, t); }
   inline void assign (string s, tree t) {
     tree& val= env (s); t= exec(t); if (val != t) {
-      back->write_back (s, env); val= t; update (s); } }
-  inline bool provides (string s) { return env->contains (s); }
+      back->write_back (s, env.h); val= t; update (s); } }
+  inline bool provides (string s) { return env.contains (s); }
   inline tree read (string s) { return env [s]; }
   tree local_begin_extents (box b);
   void local_end_extents (tree t);
