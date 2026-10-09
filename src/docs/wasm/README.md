@@ -858,6 +858,19 @@ same port: `wss`, `ws`, a TeXmacs client over TLS (handed on with
 with `local`. The headless desktop client (`tls-client.scm` with
 `-headless`) does not finish its TLS handshake: run it with a window.
 
+A server which does not speak WebSocket (the TeXmacs servers of the other
+branches: cloud.texmacs.org answers TCP with TLS on 6561, refuses `ws` and
+leaves `wss` without an answer, checked 2026-10-09) cannot be reached by
+the page; a login there fails after the contact timeout, with a message
+which says why. `misc/wasm/remote/ws-bridge.mjs [host [port [local port]]]`
+is a bridge to run on the machine of the browser: it accepts WebSocket
+connections on 127.0.0.1 and passes them to the server over TLS (it
+checks the certificate), so that the page logs in with the server
+`localhost` and the local port (6563). It sees the traffic in clear, the
+password included: for one's own machine only. Checked: through it
+cloud.texmacs.org answers a login (of a user which does not exist: "user
+not found").
+
 A server for the page served over https (GitHub Pages): `server
 websocket` on, and a real certificate in `$TEXMACS_SERVER_CERT_DIR`
 (`cert.pem`: the full chain, `key.pem`), or a proxy (Caddy, nginx) on the

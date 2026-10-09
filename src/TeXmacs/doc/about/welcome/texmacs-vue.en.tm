@@ -229,6 +229,15 @@
   <paragraph|9 October 2026>
 
   <\itemize>
+    <item>A login from the browser to a server of another version of
+    <TeXmacs>, such as <verbatim|cloud.texmacs.org>, fails: a page has only
+    WebSockets, which those servers do not answer. The message now says
+    so. Until they do, a bridge on your own machine passes the connection
+    on: run <verbatim|node misc/wasm/remote/ws-bridge.mjs> (from the
+    sources of <TeXmacs> <name|Vue>; <verbatim|cloud.texmacs.org> is its
+    default), and log in with the server <verbatim|localhost> and the port
+    6563.
+
     <item>The menus drop in without stopping halfway. On a display of 120
     Hz the page drew a frame every 8 ms, more than the graphics card
     follows with a large window: the browser then held the frames back for

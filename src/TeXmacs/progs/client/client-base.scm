@@ -146,6 +146,17 @@
 (define client-ping-interval 10000) ;; a ping every 10 s
 (define client-silent-after 25000)  ;; two pings missed: the server is silent
 
+;; why a server may not be reached. A page of a browser has WebSockets
+;; only, which the servers of the other versions of TeXmacs
+;; (cloud.texmacs.org) do not answer.
+(define (client-unreachable-hint)
+  (if (defined? 'web-javascript)
+      (string-append ". From a browser the server has to accept WebSocket"
+                     " connections: a server run by TeXmacs Vue does, the"
+                     " servers of other versions of TeXmacs do not (they"
+                     " need a bridge on your machine, see the help page)")
+      " (is a TeXmacs server running there, and reachable?)"))
+
 (define (client-forget-state server)
   (for (t (list client-started client-heard client-ping-sent client-latency
                 client-silent client-stop-reason client-looking
@@ -311,10 +322,13 @@
       (when (and (== (ahash-ref client-token server) token)
                  (not (ahash-ref client-heard server)))
         (client-close server
-                      (string-append "no answer from " what " within "
-                                     (number->string (quotient ms 1000))
-                                     " s (is a TeXmacs server running"
-                                     " there, and reachable?)"))))))
+                      (string-append
+                        "no answer from " what " within "
+                        (number->string (quotient ms 1000)) " s"
+                        ;; a page of a browser has WebSockets only, which
+                        ;; the servers of the other versions of TeXmacs
+                        ;; (cloud.texmacs.org) do not answer
+                        (client-unreachable-hint)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Establishing and finishing connections with servers
@@ -378,8 +392,8 @@
                    (if (ahash-ref client-heard server)
                        "the connection with the server was lost"
                        (string-append "no connection with the server could"
-                                      " be made (is a TeXmacs server"
-                                      " running there, and reachable?)")))
+                                      " be made"
+                                      (client-unreachable-hint))))
     (client-forget-state server)
     (client-connection-lost server reason)
     (client-fail-pending server reason)))
