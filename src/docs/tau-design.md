@@ -395,6 +395,47 @@ under node.
   are installed: the answer is no.
 - The test document of Vau (70 pages with the TeX fonts) has 73 pages.
 
+**Step 2 is done** (2026-10-09): one view of the editor in a bare canvas.
+
+    make -C build-tau -f ../misc/tau/Makefile -j8 MUPDF=... web
+    make -C build-tau -f ../misc/tau/Makefile serve    # http://localhost:8080/
+
+`index.html?arg=/texmacs/doc/...` opens a document of TeXmacs (the `arg`s
+are its arguments), `?log` sends its output to the console.
+
+- `out/web` has the core for a worker (`tau.js`, `tau.wasm`), the files of
+  TeXmacs in packages (`misc/wasm/package.py` and `packages.js`, unchanged)
+  and the page: `misc/tau/web/index.html`, `tau.mjs` (the canvas, the
+  keys, the pointer, the wheel) and `tau-worker.js` (the messages).
+- The core gives control back to the worker (`gui_start_loop` in
+  `tau_gui.cpp`). Each message of the page calls a function (`tau_place`,
+  `tau_scroll_by`, `tau_focus`, `tau_key`, `tau_mouse`), and ends with a
+  turn: the editors are told of new sizes, the pending commands run (the
+  interpose handler of the server), and the views which changed are drawn
+  and sent. A turn is also made twenty times a second without a message.
+- A view (`tau_widget.cpp`) has its pixels: a picture of MuPDF of the size
+  of the canvas, drawn by the editor through `handle_repaint` for the
+  invalid regions, in the coordinates of the document at the scroll
+  position, as the Vue port did.
+- Measured in a headless Firefox, a canvas of 2000 x 1354 pixels, a
+  document of twelve screens: 10 ms from a key to its pixels in the page,
+  and the same for a step of scrolling.
+
+What differs from the protocol above, for now:
+
+- **The whole canvas is sent** at each paint (11 MB for the canvas above),
+  not the rectangles which changed.
+- **The core has the scroll position.** The page sends steps (`scroll`,
+  from the wheel) and each `paint` tells the extents and the position; the
+  page keeps no tiles and does not scroll by itself.
+- **The cursor is drawn by the editor**, in the pixels. Its position comes
+  with each `paint` (`caret`), and is not used yet.
+- **`view`** only says which view is shown; the page shows the last one.
+- **No welcome message** over a document given as argument: the home
+  directory is new at each visit (in memory), so every start is a first
+  one.
+- The keys are those of `keydown`; no input methods, no dead keys.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:

@@ -581,6 +581,11 @@ TeXmacs_main (int argc, char** argv) {
 #endif
   
     // append commands to open standard welcome messages if needed
+#ifdef TAUTEXMACS
+    // Tau: the home directory is new at each visit, until the page keeps
+    // it: no welcome message over a document which was asked for
+    if (argc > 1) install_status= 0;
+#endif
     if (install_status == 1) {
       if (DEBUG_STD) debug_boot << "Loading welcome message...\n";
       string cmd= "(load-help-article \"about/welcome/new-welcome\")";

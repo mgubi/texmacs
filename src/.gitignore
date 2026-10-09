@@ -74,6 +74,8 @@ packages/msix/AppxManifestStore.xml
 /build-wasm/
 # the makefile of the browser build is a source, not a generated file
 !/misc/wasm/Makefile
+# and so is the one of Tau
+!/misc/tau/Makefile
 
 # moc output of the autotools build
 src/Plugins/Qt*/moc_*.cpp

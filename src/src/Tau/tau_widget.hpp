@@ -31,11 +31,23 @@ typedef pair<SI,SI> coord2;
 
 class simple_widget_rep: public widget_rep {
 public:
-  // the place, as the page told it (TeXmacs units, PIXEL per pixel)
-  SI     place_w, place_h;     // size of the canvas
-  SI     scroll_x, scroll_y;   // scroll position
+  int    id;                   // the number of the view, for the page
+  // the place, as the page told it
+  int    px_w, px_h;           // size of the canvas, in pixels of the screen
+  double density;              // pixels of the screen per pixel of TeXmacs
+  int    place_counter;        // the number of this place (see set_place)
+  SI     place_w, place_h;     // size of the canvas, in TeXmacs units
+  SI     scroll_x, scroll_y;   // scroll position asked for: the top left
+                               // corner of the canvas in the document (y up)
+  bool   absolute_scroll;      // ... or its centre, when the editor asked
   double zoom;                 // zoom factor
   bool   has_focus;            // the keyboard is here
+  bool   resize_pending;       // the editor is not told of the size yet
+  bool   shown;                // attached to a window of the core
+  // the pixels of the canvas
+  picture  backing;
+  renderer ren;
+  SI       backing_x, backing_y; // the scroll position they are drawn for
   // what the editor asked
   rectangle  extents;          // of the document
   rectangles invalid;          // regions to draw again
@@ -66,8 +78,20 @@ public:
   virtual void handle_clear (renderer ren, SI x1, SI y1, SI x2, SI y2);
   virtual void handle_repaint (renderer ren, SI x1, SI y1, SI x2, SI y2);
 
+  // the place of the view (docs/tau-design.md, "place")
+  void set_place (int w, int h, double density, int counter);
+  void scroll_by (int dx, int dy);       // in pixels of the screen, y down
+  void to_document (SI& x, SI& y);       // from pixels of the canvas
+  void notify_resize ();                 // tell the editor, if needed
+  bool repaint ();                       // draw what is invalid; true if
+                                         // the pixels changed
+  unsigned char* pixels ();              // RGBA, px_w * px_h * 4 bytes
+  void extents_in_pixels (int& w, int& h, int& sx, int& sy);
+  void cursor_in_pixels (int& x, int& y);
+
   // all the views
   static hashset<pointer> all_widgets;
+  static simple_widget_rep* find (int id);
 };
 
 #endif // defined TAU_WIDGET_H
