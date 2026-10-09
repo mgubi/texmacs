@@ -793,19 +793,19 @@ edit_interface_rep::apply_changes () {
       SI wx, wy;
       if (cvw == NULL) ::get_size (get_window (this), wx, wy);
       else ::get_size (widget (cvw), wx, wy);
-#ifdef VUETEXMACS
-      // In the Vue port the size of the widget of a window is that of the
-      // whole window, with its menu bar, tool bars and footer: a page which
+      // The size of the widget of a window is that of the whole window,
+      // with its menu bar, tool bars and footer (Qt and Vue): a page which
       // follows it is taller than what is seen by the height of those,
       // which differs from one configuration to the next and changes when
       // a tool bar is shown or hidden. The page follows the canvas, which
-      // is what is seen (the editor is told when its size changes).
+      // is what is seen (the editor is told when its size changes); a
+      // widget without a canvas of its own keeps its size.
       if (cvw != NULL) {
+        widget cv= ::get_canvas (widget (cvw));
         SI cw= 0, ch= 0;
-        ::get_size (::get_canvas (widget (cvw)), cw, ch);
+        if (!is_nil (cv)) ::get_size (cv, cw, ch);
         if (cw > 0 && ch > 0) { wx= cw; wy= ch; }
       }
-#endif
       if (get_init_string (SCROLL_BARS) == "false") sb= 0;
       if (get_server () -> in_full_screen_mode ()) sb= 0;
       if (sb) wx -= scrollbar_width();
