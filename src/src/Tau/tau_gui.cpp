@@ -46,7 +46,6 @@
 * Globals which the core reads
 ******************************************************************************/
 
-int  nr_windows= 0;             // the windows of the old organisation
 bool char_clip= true;
 hashmap<int,tree> payloads;     // what was dropped on a view, by ticket
 
@@ -91,131 +90,60 @@ no_widget_rep::read (slot s, blackbox index) {
   return no_widget ();
 }
 
-// The window of a view: the core still makes a window for each view
-// (Texmacs/Data/new_window.cpp), attaches the view to it and asks it for
-// the canvas, of which the editor wants the size and the scroll position.
-// The canvas is the view itself (tau_widget.hpp).
-
-static int next_window_id= 1;
-
-class view_window_rep: public no_widget_rep {
-public:
-  int     id;    // the number of the window for the page
-  widget  view;
-  command quit;
-  view_window_rep (command quit2): id (next_window_id++), quit (quit2) {
-    nr_windows++; }
-  ~view_window_rep () { nr_windows--; }
-  void send (slot s, blackbox val);
-  blackbox query (slot s, int type_id);
-  widget read (slot s, blackbox index);
-  void write (slot s, blackbox index, widget w);
-};
+// The core has no windows (Texmacs/tm_window.hpp): a view is shown at a
+// place, which is a number, and the bars around the views are of the page.
+// What the core says of them goes straight to the page.
 
 static void tau_post_json (const char* kind, string part, string json);
-static hashmap<int,bool> bar_visibility (true);
-
-// the bars of a window, for the page
-static string
-visibility_part (slot s) {
-  switch (s) {
-  case SLOT_HEADER_VISIBILITY: return "menu";
-  case SLOT_MAIN_ICONS_VISIBILITY: return "icons-0";
-  case SLOT_MODE_ICONS_VISIBILITY: return "icons-1";
-  case SLOT_FOCUS_ICONS_VISIBILITY: return "icons-2";
-  case SLOT_USER_ICONS_VISIBILITY: return "icons-3";
-  case SLOT_SIDE_TOOLS_VISIBILITY: return "side-0";
-  case SLOT_LEFT_TOOLS_VISIBILITY: return "side-1";
-  case SLOT_BOTTOM_TOOLS_VISIBILITY: return "bottom-0";
-  case SLOT_EXTRA_TOOLS_VISIBILITY: return "bottom-1";
-  case SLOT_FOOTER_VISIBILITY: return "footer";
-  default: return "";
-  }
-}
-
-// what the core says of the scrolling to the window is for the view
-static bool
-is_canvas_slot (slot s) {
-  return s == SLOT_EXTENTS || s == SLOT_SCROLL_POSITION ||
-         s == SLOT_VISIBLE_PART || s == SLOT_ZOOM_FACTOR;
-}
-
-void
-view_window_rep::send (slot s, blackbox val) {
-  if (is_canvas_slot (s) && !is_nil (view)) view->send (s, val);
-  else if (s == SLOT_LEFT_FOOTER || s == SLOT_RIGHT_FOOTER) {
-    string text= cork_to_utf8 (open_box<string> (val));
-    tau_post_json ("footer", s == SLOT_LEFT_FOOTER? "left": "right",
-                   "{\"text\":" * scm_quote (text) * "}");
-  }
-  else if (visibility_part (s) != "") {
-    bool flag= open_box<bool> (val);
-    bar_visibility ((int) s)= flag;
-    tau_post_json ("visible", visibility_part (s),
-                   flag? string ("{\"visible\":true}")
-                       : string ("{\"visible\":false}"));
-  }
-}
-
-blackbox
-view_window_rep::query (slot s, int type_id) {
-  // "attached to a window" is a non zero identifier (is_attached)
-  if (s == SLOT_IDENTIFIER) return close_box<int> (1);
-  if (is_canvas_slot (s) && !is_nil (view)) return view->query (s, type_id);
-  if (visibility_part (s) != "") {
-    // the bars are there until they are hidden, the tools once they are
-    // shown
-    bool tool= s == SLOT_SIDE_TOOLS_VISIBILITY ||
-               s == SLOT_LEFT_TOOLS_VISIBILITY ||
-               s == SLOT_BOTTOM_TOOLS_VISIBILITY ||
-               s == SLOT_EXTRA_TOOLS_VISIBILITY;
-    if (tool && !bar_visibility->contains ((int) s))
-      return close_box<bool> (false);
-    return close_box<bool> (bar_visibility [(int) s]);
-  }
-  return no_widget_rep::query (s, type_id);
-}
-
-widget
-view_window_rep::read (slot s, blackbox index) {
-  switch (s) {
-  case SLOT_CANVAS:
-  case SLOT_SCROLLABLE:
-    if (!is_nil (view)) return view;
-    return no_widget ();
-  case SLOT_WINDOW:
-    return widget (this);
-  default:
-    return no_widget_rep::read (s, index);
-  }
-}
-
 static void tau_post_view (int id, int window, const char* what);
+static hashmap<string,bool> part_visibility (true);
+
+// a bar or a tool is shown or hidden: the bars are there until they are
+// hidden, the tools once they are shown
+static bool
+is_tool_part (string part) {
+  return starts (part, "side-") || starts (part, "bottom-");
+}
+
+bool
+tau_get_visible (string part) {
+  if (!part_visibility->contains (part)) return !is_tool_part (part);
+  return part_visibility [part];
+}
 
 void
-view_window_rep::write (slot s, blackbox index, widget w) {
-  (void) index;
-  if (s == SLOT_SCROLLABLE || s == SLOT_CANVAS) {
-    // the view which was here is detached, and the page is told of the
-    // view which is shown now
-    simple_widget_rep* old= dynamic_cast<simple_widget_rep*> (view.rep);
-    if (old != NULL) old->shown= false;
-    view= w;
-    simple_widget_rep* v= dynamic_cast<simple_widget_rep*> (w.rep);
-    if (v != NULL) {
-      v->shown= true;
-      // (a view in a dialog is not the view of a pane: the description of
-      // the dialog says where it is)
-      if (v->is_editor_widget () && !v->is_embedded_widget ())
-        tau_post_view (v->id, id, "shown");
-    }
-  }
+tau_set_visible (string part, bool flag) {
+  part_visibility (part)= flag;
+  tau_post_json ("visible", part, flag? string ("{\"visible\":true}")
+                                      : string ("{\"visible\":false}"));
+}
+
+void
+tau_footer (string side, string text) {
+  tau_post_json ("footer", side,
+                 "{\"text\":" * scm_quote (cork_to_utf8 (text)) * "}");
+}
+
+// A view is shown at a place, or not any more (attach_view and detach_view
+// in Texmacs/Data/new_view.cpp). The page is told of the views of its
+// panes; where a view in a dialog is, the description of the dialog says.
+void
+tau_view_shown (editor_rep* ed, int place, bool shown) {
+  simple_widget_rep* v= (simple_widget_rep*) ed;
+  v->shown= shown;
+  if (shown && place > 0) tau_post_view (v->id, place, "shown");
+}
+
+void
+tau_place_deleted (int place) {
+  // (the page learns it from the state of the buffers and the places)
+  (void) place;
 }
 
 widget
 texmacs_widget (int mask, command quit) {
-  (void) mask;
-  return widget (tm_new<view_window_rep> (quit));
+  (void) mask; (void) quit;
+  return no_widget ();
 }
 
 void
@@ -352,26 +280,11 @@ json_quote (string s) {
   return r * "\"";
 }
 
-static view_window_rep*
-window_widget (url win) {
-  tm_window w= concrete_window (win);
-  if (w == NULL) return NULL;
-  return dynamic_cast<view_window_rep*> (w->wid.rep);
-}
-
-static url
-window_of_number (int id) {
-  array<url> l= windows_list ();
-  for (int i=0; i<N(l); i++) {
-    view_window_rep* w= window_widget (l[i]);
-    if (w != NULL && w->id == id) return l[i];
-  }
-  return url_none ();
-}
-
 static string
 tau_state () {
-  string r= "{\"buffers\":[";
+  // (and where the main and the mode icon bars are, which is of the page)
+  string r= "{\"bars\":" * json_quote (get_preference ("icon bars")) *
+            ",\"buffers\":[";
   array<url> bs= get_all_buffers ();
   bool first= true;
   for (int i=0; i<N(bs); i++) {
@@ -389,14 +302,15 @@ tau_state () {
   array<url> ws= windows_list ();
   first= true;
   for (int i=0; i<N(ws); i++) {
-    view_window_rep* w= window_widget (ws[i]);
-    if (w == NULL) continue;
-    simple_widget_rep* v= dynamic_cast<simple_widget_rep*> (w->view.rep);
+    int place= url_place (ws[i]);
+    tm_view vw= place_view (place);
+    if (vw == NULL) continue;
+    simple_widget_rep* v= (simple_widget_rep*) vw->ed.operator -> ();
     if (!first) r << ",";
     first= false;
-    r << "{\"window\":" << as_string (w->id)
-      << ",\"view\":" << as_string (v == NULL? 0: v->id)
-      << ",\"buffer\":" << json_quote (as_string (window_to_buffer (ws[i])))
+    r << "{\"window\":" << as_string (place)
+      << ",\"view\":" << as_string (v->id)
+      << ",\"buffer\":" << json_quote (as_string (vw->buf->buf->name))
       << "}";
   }
   r << "]}";
@@ -588,22 +502,27 @@ tau_expand (int n) {
   tau_post_json ("contents", as_string (n), json);
 }
 
-// What the tabs and the panes ask: to show a buffer in a window ("switch"),
-// to close a buffer ("close"), a new document in a window ("new"), to close
-// a window ("close-window"). The buffer is named as in the state.
+// What the tabs and the panes ask, for a place (which the page calls a
+// window): to show a buffer there ("switch"), to close a buffer ("close"),
+// a new document there ("new"), to give the place up ("close-window"). The
+// buffer is named as in the state.
 EMSCRIPTEN_KEEPALIVE
 void
-tau_buffer (const char* what_c, int window, const char* name_c) {
+tau_buffer (const char* what_c, int place, const char* name_c) {
   string what (what_c);
-  url win= window_of_number (window);
+  url win= place_url (place);
   url name= url_system (utf8_to_cork (string (name_c)));
-  if (is_none (win)) return;
+  if (!is_place (place) || place_view (place) == NULL) return;
   if (what == "close-window") {
-    view_window_rep* w= window_widget (win);
-    if (w != NULL && !is_nil (w->quit)) w->quit ();
+    object cmd= list_object (symbol_object ("safely-kill-window"),
+                             object (win));
+    exec_delayed (scheme_cmd (cmd));
   }
   else {
-    if (win != get_current_window ()) switch_to_window (win);
+    if (win != get_current_window ()) {
+      switch_to_window (win);
+      window_focus (win);
+    }
     if (what == "switch") switch_to_buffer (name);
     else if (what == "close") call ("tau-close-buffer", object (name));
     else if (what == "new") call ("new-document");
@@ -741,6 +660,8 @@ set_selection (string cb, tree t,
 bool
 get_selection (string cb, tree& t, string& s, string format) {
   (void) format;
+  // (nothing there is the tree "none", as in the other ports)
+  t= "none"; s= "";
   if (!selection_trees->contains (cb)) return false;
   t= copy (selection_trees [cb]);
   s= selection_strings [cb];
@@ -990,8 +911,6 @@ tau_widget_view (widget wid) {
   widget_rep* r= wid.rep;
   wrapped_widget_rep* ww= dynamic_cast<wrapped_widget_rep*> (r);
   if (ww != NULL) r= ww->w.rep;
-  view_window_rep* vw= dynamic_cast<view_window_rep*> (r);
-  if (vw != NULL) r= vw->view.rep;
   simple_widget_rep* v= dynamic_cast<simple_widget_rep*> (r);
   SI w= 0, h= 0;
   if (v != NULL && !v->is_editor_widget ()) v->handle_get_size_hint (w, h);

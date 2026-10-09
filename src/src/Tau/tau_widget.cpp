@@ -239,8 +239,9 @@ simple_widget_rep::query (slot s, int type_id) {
   (void) type_id;
   switch (s) {
   case SLOT_IDENTIFIER:
-    // "attached to a window" is a non zero identifier (is_attached)
-    return close_box<int> (1);
+    // "attached to a window" is a non zero identifier (is_attached): an
+    // editor which is shown at a place
+    return close_box<int> (is_editor_widget () && !shown? 0: 1);
   case SLOT_INVALID:
     return close_box<bool> (invalid_all || !is_nil (invalid));
   case SLOT_POSITION:
@@ -267,7 +268,10 @@ simple_widget_rep::read (slot s, blackbox index) {
   (void) index;
   switch (s) {
   case SLOT_WINDOW:
-    // a view is its own window, as far as the editor asks
+  case SLOT_CANVAS:
+  case SLOT_SCROLLABLE:
+    // a view is its own window and its own canvas, as far as the editor
+    // asks
     return widget (this);
   default:
     return widget ();

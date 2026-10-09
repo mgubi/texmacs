@@ -14,85 +14,39 @@
 #include "server.hpp"
 #include "tm_buffer.hpp"
 
-class tm_window_rep {
-public:
-  widget win;
-  widget wid;
-  url    id;
-
-public:
-  hashmap<tree,tree> props;
-  int                serial;
-  double             zoomf;       // the zoom factor
-
-protected:
-  hashmap<int,object>    menu_current;
-  hashmap<object,widget> menu_cache;
-  string*  text_ptr;  // where the interactive string is returned
-  command  call_back; // called when typing finished
-  string   cur_title; // current window title
-
-public:
-  tm_window_rep (widget wid2, tree geom);
-  tm_window_rep (tree doc, command quit);
-  ~tm_window_rep ();
-  void set_window_name (string s);
-  void set_modified (bool flag);
-  void set_window_url (url u);
-  void map ();
-  void unmap ();
-  void refresh ();
-  inline void set_property (scheme_tree what, scheme_tree val) {
-    props (what)= val; }
-  inline scheme_tree get_property (scheme_tree what) {
-    return props [what]; }
-
-  bool get_menu_widget (int which, string menu, widget& w);
-  void menu_main (string menu);
-  void menu_icons (int which, string menu);
-  void side_tools (int which, string tools);
-  void bottom_tools (int which, string tools);
-  void set_header_flag (bool flag);
-  void set_icon_bar_flag (int which, bool flag);
-  void set_side_tools_flag (int which, bool flag);
-  void set_bottom_tools_flag (int which, bool flag);
-  bool get_header_flag ();
-  bool get_icon_bar_flag (int which);
-  bool get_side_tools_flag (int which);
-  bool get_bottom_tools_flag (int which);
-
-  double get_window_zoom_factor ();
-  void set_window_zoom_factor (double zoom);
-  void get_visible (SI& x1, SI& y1, SI& x2, SI& y2);
-  void get_extents (SI& x1, SI& y1, SI& x2, SI& y2);
-  void set_extents (SI x1, SI y1, SI x2, SI y2);
-  void set_scrollbars (int i);
-  void get_scroll_pos (SI& x, SI& y);
-  void set_scroll_pos (SI x, SI y);
-
-  bool get_footer_flag ();
-  void set_footer_flag (bool on);
-  void set_left_footer (string s);
-  void set_right_footer (string s);
-  bool get_interactive_mode ();
-  void set_interactive_mode (bool on);
-  void interactive (string name, string type, array<string> def,
-		    string& s, command cmd);
-  void interactive_return ();
-};
+/******************************************************************************
+* Views and places
+*******************************************************************************
+* A view is an editor on a buffer. Where a view is shown is a place: a pane
+* of the page, or a field of a dialog. The core knows a place by its number
+* and nothing else (docs/tau-design.md): the windows of the other ports,
+* with their widgets, their bars and their menus, are of the page. A view
+* which is not shown has the place 0. Scheme names a place by the url which
+* named a window (tmfs://window/N).
+******************************************************************************/
 
 class tm_view_rep {
 public:
   tm_buffer buf;
   editor    ed;
-  tm_window win;
+  int       place;  // where the view is shown, or 0
   int       nr;
   tm_view_rep (tm_buffer buf2, editor ed2);
 };
 
 typedef tm_buffer_rep* tm_buffer;
 typedef tm_view_rep*   tm_view;
-typedef tm_window_rep* tm_window;
+
+int    new_place (bool embedded= false);  // a place for a pane or in a dialog
+void   delete_place (int place);
+bool   is_place (int place);
+url    place_url (int place);             // url_none for no place
+int    url_place (url u);                 // 0 when it is none
+int    current_place ();                  // of the current view, or 0
+tm_view place_view (int place);           // the view shown there, or NULL
+double get_place_zoom (int place);
+void   set_place_zoom (int place, double zoom);
+double get_doc_zoom_factor (tree doc);
 
 widget texmacs_output_widget (tree doc, tree style);
 widget texmacs_input_widget (tree doc, tree style, url wname);

@@ -233,7 +233,6 @@ public:
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2);
 
   friend class interactive_command_rep;
-  friend class tm_window_rep;
 };
 
 #endif // defined EDIT_INTERFACE_H

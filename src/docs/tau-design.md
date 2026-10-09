@@ -521,12 +521,8 @@ continuous inputs (a value at each key), the sizes in `w` and `h` of
 the core are panes, and the files and the clipboard are those of the
 browser.
 
-- **The window of the core stayed**, as the place of a view: a
-  `tm_window` has no widgets any more, only a number, the view which it
-  shows and the command which closes it. This is less than the design
-  asks (the core should know no window at all), and what it costs is
-  small: each window is a pane of the page, side by side. The menus and
-  the footer are those of the window which has the keyboard.
+- (The window of the core stayed at this step, as the place of a view;
+  it is gone since: see "The core without windows" below.)
 - At the end of a turn the core says which documents there are (name,
   title, modified) and which view and document each window shows
   (`buffers`), when that changed. The page makes and removes its panes
@@ -681,6 +677,99 @@ zoom keys, a click which keeps the keyboard, typing in the definition of
 the macro editor and in the search bar. Not checked: a real dead key and a
 real input method (the test sends their events), Safari and Chrome, a
 keyboard which is not US.
+
+**The icon bars at the left, the panes resized** (2026-10-09).
+
+- As in the prototype of the browser build (`docs/wasm/README.md`, "The
+  icon bars at the left"): the main and the mode icon bars are two columns
+  at the left, from the menu bar down to the footer; the focus bar and the
+  user bar stay above the views. It is a layout of the page (a grid,
+  `body.tau-bars-left`): in a column the separators lie flat and a menu
+  opens at the right of its button. The preference "icon bars" (`left`,
+  the default, or `top`; in the General tab of the preferences) goes to
+  the page with the state of the buffers; `?bars=top` or `left` in the
+  address says it whatever the preference.
+- The line between two panes is dragged to share the width otherwise; a
+  double click gives them the same width again. The shares are kept when
+  a pane comes or goes.
+- A bar, a column of icons, the tabs of a pane or a menu whose items do
+  not fit scrolls (the wheel too, sideways for a row), with a chevron at
+  each end where there is more (`fit` in `chrome.mjs`): a click moves by
+  most of what is seen, holding it goes on, and in a menu the pointer
+  over it is enough. The bars do not wrap any more.
+
+**The core without windows** (2026-10-09).
+
+What a window did in the core was surveyed first: 68 functions of the
+glue and 61 of Scheme have a window in their name, but most of their uses
+are dialogs (`dialogue-window`, 126), tools which only need to know for
+whom they are, the bars and the geometry of a view. What needed a window
+was "which view is shown where", and what a newly opened document
+replaces.
+
+- **A place is a number.** `tm_window_rep` is gone. A view has a place
+  (`tm_view_rep::place`, 0 when it is not shown): the place of a pane of
+  the page, or of a field of a dialog (a negative number, which is not
+  listed). The core keeps the list of the places of the panes and the
+  zoom factor of each, which stays when another buffer is shown there
+  (`Texmacs/Data/new_window.cpp`). Scheme names a place by the url which
+  named a window (`tmfs://window/N`), so that `current-window`,
+  `window-list`, `window->buffer`, `switch-to-buffer`, `open-window`,
+  `kill-window` and the others are what they were, over places.
+- **A new place is made by the core at once** (`open-window`, a buffer
+  opened in a new window), so that the commands which follow find their
+  buffer there; the page learns it with the view which is shown and makes
+  a pane. The last place stays.
+- **The view answers for itself.** It is its own canvas: its size, its
+  extents, where it scrolls and its zoom factor are asked of the editor,
+  not of a window which passed the question on.
+- **The bars are of the page.** The frame describes the menu, the icon
+  bars and the tools for the view which has the keyboard, each when it
+  changed and all of them when another place takes them
+  (`describe_part` in `tm_frame.cpp`); whether a bar is shown is a flag
+  of the Tau layer, and the footer goes straight to the page. The tools
+  are kept for the page and not for a place (`window-tools-table`).
+- **A view in a dialog** has a place and no window: its widget, for
+  Scheme, is the editor itself with what is done when the dialog goes.
+- What went with the window: its widgets, its title, the cache of menus
+  per window, the prompt in the footer and the old dialogs of
+  `tm_dialogue.cpp` (questions are asked by `tau-interactive`).
+
+Left as it was: the names in Scheme (the tools of `format-tools.scm` and
+`table-tools.scm` are still given a window, which is a place; `with-window`
+runs for the view shown there), and the functions of the glue which have
+nothing to do any more (`alt-window-*`, which do nothing, and those
+without callers). Renaming them is for later.
+
+All the tests of the page pass as before: the keys, the dialogs, the
+tabs and the files, two panes made and closed, a view shown and a view
+edited in a dialog, the search bar, a side tool, the zoom keys, the
+columns of icons; and `make check`.
+
+**The tests in the tree** (2026-10-09), in `misc/tau/test`.
+
+- `make check` (node, no browser): the table of the keys
+  (`keys-test.mjs`); a document converted to PDF; and the test suites of
+  TeXmacs (`TeXmacs/progs/check`, 50 of them) run by the core
+  (`suites-test.mjs`). Seven suites cannot pass in Tau and are listed
+  with their reason in `suites-expected.txt` (no processes: `glue`, `git`,
+  `plugins`; no Ghostscript: `convert-more`; Latin Modern for the TeX
+  fonts: `typeset`, `version`; and `parse`, two Julia declarations, not
+  looked into). The run fails when another suite fails, or when a listed
+  one passes. The suite of the editing, which goes through buffers, views
+  and windows, passes on the core without windows; it found that an
+  empty clipboard was not the tree "none".
+- `make browser-check` (a browser without a display, driven by
+  puppeteer-core, which is looked for in `build-tau/tools`:
+  `browser-test.mjs`): 14 tests, each on a page opened anew, which do
+  what a user does and check the page and the messages: the start, typing
+  and a composition, the zoom keys, the menus and the context menu, a
+  question, the preferences, a view shown and a view edited in a dialog,
+  the search bar, the tabs and the files, the panes, a side tool, the
+  bars above, and what does not fit. `ONLY=<name>` runs some of them.
+  Not there: the clipboard of the system, a real dead key or input
+  method, the file chooser, and what needs the network (Python, a
+  server).
 
 ## Order of the work
 

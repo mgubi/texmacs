@@ -229,14 +229,7 @@ set_title_buffer (url name, string title) {
   if (is_nil (buf)) return;
   if (buf->buf->title == title) return;
   buf->buf->title= title;
-  array<url> vs= buffer_to_views (name);
-  for (int i=0; i<N(vs); i++) {
-    tm_window win= concrete_window (view_to_window (vs[i]));
-    if (win != NULL) {
-      win->set_window_name (title);
-      win->set_window_url (name);
-    }
-  }
+  // (the page shows the titles of the buffers: Tau/tau_gui.cpp)
 }
 
 /******************************************************************************
@@ -617,9 +610,6 @@ buffer_save (url name) {
   bool r= buffer_export (name, name, fm);
   if (!r) {
     pretend_buffer_saved (name);
-    array<url> ws = buffer_to_windows (name);
-    for (int i=0; i<N(ws); i++)
-      concrete_window (ws[i])->set_modified (false);
   }
   return r;
 }

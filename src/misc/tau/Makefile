@@ -155,10 +155,18 @@ check: node
 	  if head -c 5 $$home/check.pdf 2> /dev/null | grep -q '%PDF'; then \
 	    echo "check: $(notdir $(CHECK_DOC)) -> PDF of $$(wc -c < $$home/check.pdf | tr -d ' ') bytes"; \
 	  else echo "check: FAILED, see $$home/check.log"; exit 1; fi
+	@$(NODE) $(W)/test/suites-test.mjs --core $(OUT)/node/tau.js --texmacs $(TM)/TeXmacs
+
+# the page in a browser without a display (misc/tau/test/browser-test.mjs):
+# needs puppeteer-core (npm install puppeteer-core in $(TOOLS)) and Firefox
+# or Chrome (BROWSER=<its program>)
+TOOLS ?= tools
+browser-check: web
+	$(NODE) $(W)/test/browser-test.mjs --dir $(OUT)/web --tools $(TOOLS) $(if $(BROWSER),--browser $(BROWSER)) $(if $(ONLY),--only $(ONLY))
 
 FORCE:
 
 clean:
 	rm -rf $(OBJ) $(OUT)
 
-.PHONY: all node web web-packages serve check clean plugins-sync
+.PHONY: browser-check all node web web-packages serve check clean plugins-sync

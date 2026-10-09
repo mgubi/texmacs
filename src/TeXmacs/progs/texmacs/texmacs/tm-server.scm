@@ -134,7 +134,7 @@
   ("icon set" "neo-classical" notify-icon-set)
   ;; the Vue interface reads it at each layout; at the left by default in
   ;; a web browser
-  ("icon bars" (if (defined? 'web-javascript) "left" "top") noop)
+  ("icon bars" "left" noop)
   ("window tabs" "left" notify-window-tabs)
   ("gui density" (get-default-gui-density) noop)
   ("gui scaling" "default" notify-gui-scaling)
@@ -291,7 +291,8 @@
   (cond ((and (buffer-embedded? (current-buffer)) (null? opt-name))
          (alt-windows-delete (alt-window-search (current-buffer))))
         ((<= (windows-number) 1)
-         (safely-quit-TeXmacs))
+         ;; Tau: the last place stays, the page has nothing else to show
+         (noop))
         ((nnull? opt-name)
          (if (buffer-modified? (window->buffer (car opt-name)))
              (user-confirm

@@ -54,6 +54,7 @@ export function handle(m) {
 		// the tools at the sides and under the views are laid out as dialogs
 		const tool = bar.classList.contains("tau-tool");
 		bar.replaceChildren(...renderItems(m.items, tool ? { dialog: true, row: false } : { bar: true }));
+		if (!tool) fit(bar);
 		return true;
 	}
 	case "visible": {
@@ -231,7 +232,10 @@ function renderSubmenu(node, context) {
 		b.append(el("span", "tau-check", ""), ...label(node, context), el("span", "tau-shortcut tau-arrow", "▸"));
 	}
 	const depth = context.bar ? 0 : context.depth || 0;
-	const open = () => openPopup(b, node, depth, context.bar || context.dialog);
+	// the menu of a bar opens under its button, or at its right when the bar
+	// is a column (the icon bars at the left)
+	const column = () => document.body.classList.contains("tau-bars-left") && !!b.closest("#tau-icons-0, #tau-icons-1");
+	const open = () => openPopup(b, node, depth, (context.bar || context.dialog) && !column());
 	b.addEventListener("click", () => {
 		if (b.classList.contains("tau-open")) closePopups(depth); else open();
 	});
@@ -264,6 +268,7 @@ async function openPopup(button, node, depth, below) {
 	const items = await expand(node.contents);
 	if (!popups.includes(entry)) return; // closed meanwhile
 	popup.replaceChildren(...renderItems(items, { bar: false, depth: depth + 1 }));
+	fit(popup);
 	place(popup, button, below);
 }
 
@@ -276,6 +281,7 @@ function showContextMenu(items) {
 	document.body.append(popup);
 	popups.push({ element: popup, button: el("span") });
 	popup.style.maxHeight = (window.innerHeight - 8) + "px";
+	fit(popup);
 	const w = popup.offsetWidth, h = popup.offsetHeight;
 	popup.style.left = Math.max(4, Math.min(contextAt.x, window.innerWidth - 4 - w)) + "px";
 	popup.style.top = Math.max(4, Math.min(contextAt.y, window.innerHeight - 4 - h)) + "px";
@@ -604,4 +610,83 @@ function drag(d, bar) {
 		bar.addEventListener("pointermove", move);
 		bar.addEventListener("pointerup", () => bar.removeEventListener("pointermove", move), { once: true });
 	});
+}
+
+// ---------------------------------------------------------------------------
+// What does not fit
+// ---------------------------------------------------------------------------
+
+// A bar or a menu whose items do not fit scrolls (with the wheel too), and
+// shows a chevron at each end where there is more: a click moves by most of
+// what is seen, holding it goes on, and in a menu the pointer over it is
+// enough. The chevrons are items of no size which stick to the ends; they
+// are put back when the items are replaced.
+const fitted = new WeakMap(); // container -> its two chevrons
+
+function chevron(c, end) {
+	const anchor = el("span", "tau-chev tau-chev-" + end), b = el("button", "tau-chevron");
+	b.type = "button";
+	b.tabIndex = -1;
+	anchor.append(b);
+	let timer = null;
+	const step = amount => {
+		const column = c.classList.contains("tau-fit-column"), sign = end === "prev" ? -1 : 1;
+		const d = sign * (amount || 0.7 * (column ? c.clientHeight : c.clientWidth));
+		c.scrollBy({ left: column ? 0 : d, top: column ? d : 0, behavior: amount ? "auto" : "smooth" });
+	};
+	const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+	b.addEventListener("pointerdown", event => {
+		event.preventDefault();
+		event.stopPropagation();
+		step();
+		stop();
+		timer = setInterval(() => step(12), 30);
+	});
+	b.addEventListener("pointerup", stop);
+	b.addEventListener("pointerleave", stop);
+	b.addEventListener("click", event => event.stopPropagation());
+	// in a menu the pointer over the chevron scrolls
+	b.addEventListener("pointerenter", () => {
+		if (!c.classList.contains("tau-popup")) return;
+		stop();
+		timer = setInterval(() => step(8), 30);
+	});
+	return anchor;
+}
+
+function updateFit(c) {
+	const f = fitted.get(c);
+	if (!f || !f.prev.isConnected) return;
+	const column = getComputedStyle(c).flexDirection === "column";
+	c.classList.toggle("tau-fit-column", column);
+	const at = column ? c.scrollTop : c.scrollLeft;
+	const most = column ? c.scrollHeight - c.clientHeight : c.scrollWidth - c.clientWidth;
+	f.prev.classList.toggle("tau-shown", at > 1);
+	f.next.classList.toggle("tau-shown", at < most - 1);
+	f.prev.firstChild.textContent = column ? "▴" : "‹";
+	f.next.firstChild.textContent = column ? "▾" : "›";
+}
+
+export function fit(c) {
+	let f = fitted.get(c);
+	if (!f) {
+		f = { prev: chevron(c, "prev"), next: chevron(c, "next") };
+		fitted.set(c, f);
+		c.addEventListener("scroll", () => updateFit(c), { passive: true });
+		new ResizeObserver(() => updateFit(c)).observe(c);
+		// the wheel moves a row sideways
+		c.addEventListener("wheel", event => {
+			if (c.classList.contains("tau-fit-column") || !event.deltaY || event.deltaX) return;
+			if (c.scrollWidth <= c.clientWidth) return;
+			c.scrollLeft += event.deltaY;
+			event.preventDefault();
+		}, { passive: false });
+	}
+	f.prev.remove();
+	f.next.remove();
+	// (a bar with nothing in it stays empty, and is not shown)
+	if (!c.firstElementChild) return;
+	c.prepend(f.prev);
+	c.append(f.next);
+	updateFit(c);
 }

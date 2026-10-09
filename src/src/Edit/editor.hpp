@@ -642,7 +642,6 @@ public:
   virtual void edit_special () = 0;
   virtual void edit_test () = 0;
 
-  friend class tm_window_rep;
   friend class tm_server_rep;
   friend class server_command_rep;
   friend void   edit_announce (editor_rep* ed, modification mod);
@@ -652,6 +651,7 @@ public:
   friend void   set_buffer_tree (url name, tree doc);
   friend void   set_current_view (url u);
   friend void   set_current_drd (url name);
+  friend drd_info use_current_drd ();
   friend void   focus_on_editor (editor ed);
   friend void   delete_view (url u);
 };

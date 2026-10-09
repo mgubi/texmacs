@@ -1390,6 +1390,9 @@
 ;; Attaching side tools to windows
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Tau: the page has one set of tools, at its sides and under its views,
+;; for the view which has the keyboard. They are kept for the page, and not
+;; for the window (the place) which the functions below are given.
 (define window-tools-table (make-ahash-table))
 (tm-define lazy-tool-table (make-ahash-table))
 
@@ -1410,7 +1413,7 @@
 (tm-define (window->tools win . pos-l)
   (if (null? pos-l) (list)
       (with (pos . pos-r) pos-l
-        (with tools (ahash-ref window-tools-table (list win pos))
+        (with tools (ahash-ref window-tools-table (list 'page pos))
           (or (and tools (nnull? tools) tools)
               (apply window->tools (cons win pos-r)))))))
 
@@ -1426,7 +1429,7 @@
 
 (tm-define (tool->positions tool win)
   (with l (ahash-table->list window-tools-table)
-    (find-positions tool win l)))
+    (find-positions tool 'page l)))
 
 (tm-define (tool-bottom? tool win)
   (with l (tool->positions tool win)
@@ -1460,7 +1463,7 @@
 
 (tm-define (set-window-tools win pos l)
   (apply lazy-tool-force l)
-  (ahash-set! window-tools-table (list win pos) l)
+  (ahash-set! window-tools-table (list 'page pos) l)
   (let* ((l0 (window->tools win :transient-right :right :bottom-right))
          (l1 (window->tools win :transient-left :left :bottom-left)))
     (notify-side-tools 0 (nnull? l0))

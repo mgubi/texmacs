@@ -144,11 +144,8 @@ edit_interface_rep::resume () {
 
 void
 edit_interface_rep::keyboard_focus_on (string field) {
-  array<url> a= buffer_to_windows (buf->buf->name);
-  if (N(a) >= 1) {
-    tm_window win= concrete_window (a[0]);
-    send_keyboard_focus_on (win->wid, field);
-  }
+  // (the fields are of the page)
+  (void) field;
 }
 
 void box_broadcast (string msg);
@@ -683,15 +680,6 @@ edit_interface_rep::update_menus () {
   prof.done ("tools");
   set_footer ();
   prof.done ("footer");
-  if (has_current_window ()) {
-    array<url> ws= buffer_to_windows (
-                     window_to_buffer (
-                       abstract_window (concrete_window ())));
-    int n= N(ws);
-    bool ns= need_save ();
-    for (int i=0; i<n; i++)
-      concrete_window (ws[i])->set_modified (ns);
-  }
   prof.done ("modified");
   if (!gui_interrupted ()) drd_update ();
   prof.done ("drd");
@@ -807,7 +795,7 @@ edit_interface_rep::apply_changes () {
   if (sb != cur_sb) {
     cur_sb= sb;
     if (has_current_window ())
-      concrete_window () -> set_scrollbars (sb);
+      get_server () -> set_scrollbars (sb);
   }
   init_env ("full-screen-mode", string (full_screen? "true": "false"));
 

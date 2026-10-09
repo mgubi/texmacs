@@ -12,9 +12,31 @@
 html, body { height: 100%; margin: 0; background: #6e6e91; overflow: hidden; }
 body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-serif; color: var(--text);
        user-select: none; -webkit-user-select: none; }
-.tau-bar { display: flex; flex-wrap: wrap; align-items: center; background: var(--bar);
+.tau-bar { display: flex; flex-wrap: nowrap; overflow: auto; scrollbar-width: none; align-items: center; background: var(--bar);
            border-bottom: 1px solid var(--bar-border); padding: 1px 4px; min-height: 0; }
 .tau-bar:empty, .tau-bar[hidden] { display: none; }
+.tau-bar::-webkit-scrollbar, .tau-popup::-webkit-scrollbar, .tau-doc-tabs::-webkit-scrollbar { display: none; }
+.tau-bar > .tau-entry, .tau-bar > .tau-vsep, .tau-bar > .tau-text, .tau-bar > .tau-group { flex: none; }
+/* what does not fit scrolls, with a chevron at each end where there is more
+   (fit, chrome.mjs): the chevrons hang on items of no size which stick to
+   the ends */
+.tau-chev { position: sticky; flex: none; width: 0; align-self: stretch; z-index: 3; pointer-events: none; }
+.tau-chev-prev { left: 0; }
+.tau-chev-next { right: 0; }
+.tau-chevron { position: absolute; top: 0; bottom: 0; width: 16px; display: none; align-items: center; justify-content: center;
+	pointer-events: auto; font: inherit; font-size: 13px; line-height: 1; color: var(--text); background: var(--bar);
+	border: 0; padding: 0; opacity: 0.94; }
+.tau-chevron:hover { background: var(--hover); }
+.tau-chev-prev > .tau-chevron { left: 0; box-shadow: 4px 0 4px -2px rgba(0,0,0,0.18); }
+.tau-chev-next > .tau-chevron { right: 0; box-shadow: -4px 0 4px -2px rgba(0,0,0,0.18); }
+.tau-chev.tau-shown > .tau-chevron { display: flex; }
+.tau-fit-column > .tau-chev { width: auto; height: 0; }
+.tau-fit-column > .tau-chev-prev { left: auto; top: 0; }
+.tau-fit-column > .tau-chev-next { right: auto; bottom: 0; }
+.tau-fit-column > .tau-chev > .tau-chevron { left: 0; right: 0; width: auto; height: 14px; font-size: 10px; }
+.tau-fit-column > .tau-chev-prev > .tau-chevron { top: 0; bottom: auto; box-shadow: 0 4px 4px -2px rgba(0,0,0,0.18); }
+.tau-fit-column > .tau-chev-next > .tau-chevron { top: auto; bottom: 0; box-shadow: 0 -4px 4px -2px rgba(0,0,0,0.18); }
+.tau-popup > .tau-chev > .tau-chevron { background: var(--popup); }
 #tau-menu { padding: 0 4px; }
 .tau-entry { font: inherit; color: inherit; background: none; border: 0; border-radius: 4px;
              padding: 3px 7px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -33,7 +55,7 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 .tau-symbol { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; font-size: 15px; }
 .tau-color { display: inline-block; width: 16px; height: 16px; border: 1px solid var(--bar-border); }
 .tau-popup { position: fixed; z-index: 100000; background: var(--popup); border: 1px solid var(--bar-border);
-             border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 4px; overflow-y: auto;
+             border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 4px; overflow-y: auto; scrollbar-width: none;
              display: flex; flex-direction: column; min-width: 120px; }
 .tau-popup > .tau-entry { justify-content: flex-start; border-radius: 4px; padding: 4px 8px 4px 4px; text-align: left; }
 .tau-popup > .tau-entry:hover:not(:disabled), .tau-popup > .tau-entry.tau-open { background: var(--accent); color: #fff; }
@@ -43,7 +65,28 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 .tau-hsep { height: 1px; margin: 4px 2px; background: var(--bar-border); flex: none; }
 .tau-tile { display: grid; gap: 1px; padding: 2px; }
 .tau-tile .tau-entry { justify-content: center; padding: 3px 4px; }
-#tau-middle { flex: 1; min-height: 0; display: flex; }
+/* Between the menu bar and the footer: the icon bars, then the views with
+   their tools. The main and the mode icon bars are rows above the views, or
+   (body.tau-bars-left, the preference "icon bars") two columns at their
+   left, from the menu bar down to the footer. */
+#tau-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr);
+	grid-template-rows: auto auto auto auto minmax(0, 1fr); }
+#tau-middle { min-height: 0; min-width: 0; display: flex; grid-row: 5; }
+.tau-bars-left #tau-body { grid-template-columns: auto auto minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+.tau-bars-left #tau-icons-0 { grid-column: 1; grid-row: 1 / 4; }
+.tau-bars-left #tau-icons-1 { grid-column: 2; grid-row: 1 / 4; }
+.tau-bars-left #tau-icons-2 { grid-column: 3; grid-row: 1; }
+.tau-bars-left #tau-icons-3 { grid-column: 3; grid-row: 2; }
+.tau-bars-left #tau-middle { grid-column: 3; grid-row: 3; }
+.tau-bars-left #tau-icons-0, .tau-bars-left #tau-icons-1 { flex-direction: column; flex-wrap: nowrap;
+	align-items: stretch; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 4px 2px;
+	border-bottom: 0; border-right: 1px solid var(--bar-border); }
+.tau-bars-left #tau-icons-0 .tau-entry, .tau-bars-left #tau-icons-1 .tau-entry { justify-content: center; flex: none; padding: 4px 4px; }
+.tau-bars-left #tau-icons-0 .tau-vsep, .tau-bars-left #tau-icons-1 .tau-vsep { width: auto; height: 1px; margin: 4px 3px; flex: none; }
+.tau-bars-left #tau-icons-1 .tau-icon { height: 17px; }
+.tau-bars-left #tau-icons-0 .tau-arrow, .tau-bars-left #tau-icons-1 .tau-arrow { display: none; }
+.tau-divider { flex: none; width: 5px; margin: 0 -2px; z-index: 2; cursor: col-resize; background: transparent; }
+.tau-divider:hover, .tau-divider.tau-dragging { background: var(--accent); opacity: 0.5; }
 #tau-center { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 #tau-panes { flex: 1; min-height: 0; display: flex; }
 .tau-tool { background: var(--popup); overflow: auto; display: flex; flex-direction: column; }
@@ -56,12 +99,12 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 .tau-embedded.tau-editable { border: 1px solid var(--bar-border); cursor: text; }
 .tau-keyboard { position: fixed; left: 0; top: 0; width: 2px; height: 18px; padding: 0; border: 0; margin: 0; opacity: 0;
 	resize: none; overflow: hidden; white-space: pre; font-size: 16px; line-height: 1; pointer-events: none; z-index: -1; }
-.tau-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tau-pane { flex: 1 1 0; min-width: 80px; display: flex; flex-direction: column; }
 .tau-pane + .tau-pane { border-left: 1px solid var(--bar-border); }
 .tau-view { flex: 1; min-height: 0; position: relative; }
 .tau-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: text; }
 .tau-doc-tabs { display: flex; align-items: stretch; background: var(--bar); border-bottom: 1px solid var(--bar-border);
-	padding: 3px 4px 0; gap: 2px; overflow: hidden; min-height: 24px; }
+	padding: 3px 4px 0; gap: 2px; overflow: auto; scrollbar-width: none; min-height: 24px; flex: none; }
 .tau-doc-tab { display: flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border: 1px solid transparent;
 	border-bottom: 0; border-radius: 5px 5px 0 0; color: var(--dim); min-width: 40px; max-width: 220px; cursor: default; }
 .tau-doc-tab:hover { background: var(--hover); }
@@ -127,8 +170,9 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 #status { color: var(--dim); }
 </style>
 </head>
-<body>
+<body class="tau-bars-left">
 <div id="tau-menu" class="tau-bar"></div>
+<div id="tau-body">
 <div id="tau-icons-0" class="tau-bar"></div>
 <div id="tau-icons-1" class="tau-bar"></div>
 <div id="tau-icons-2" class="tau-bar"></div>
@@ -141,6 +185,7 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 <div id="tau-bottom-1" class="tau-tool tau-bottom" hidden></div>
 </div>
 <div id="tau-side-0" class="tau-tool tau-side" hidden></div>
+</div>
 </div>
 <div id="tau-footer"><span id="tau-footer-left"></span><span id="status">Loading Tau…</span><span id="tau-footer-right"></span></div>
 <script type="module" src="tau.mjs"></script>

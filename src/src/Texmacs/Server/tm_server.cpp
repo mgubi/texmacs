@@ -41,7 +41,6 @@ string my_init_cmds= "";
 void reset_inclusions ();
 extern string printing_dpi;
 extern string printing_on;
-extern int nr_windows;
 
 #ifdef QTTEXMACS
 void del_obj_qt_renderer(void);
@@ -195,11 +194,9 @@ tm_server_rep::style_clear_cache () {
 
 void
 tm_server_rep::refresh () {
-  array<url> l= windows_list ();
-  for (int i=0; i<N(l); i++) {
-    url u= window_to_view (l[i]);
-    if (!is_none (u)) concrete_view (u)->win->refresh ();
-  }
+  // the bars and the tools are described again to the page
+  void forget_described_parts ();
+  forget_described_parts ();
 }
 
 static const long   IDLE_CPU_THRESHOLD_MS   = 500;
@@ -255,12 +252,12 @@ tm_server_rep::interpose_handler () {
 
       for (j=0; j<N(buf->vws); j++) {
 	tm_view vw= (tm_view) buf->vws[j];
-	if (vw->win != NULL) vw->ed->apply_changes ();
+	if (vw->place != 0) vw->ed->apply_changes ();
       }
 
       for (j=0; j<N(buf->vws); j++) {
 	tm_view vw= (tm_view) buf->vws[j];
-	if (vw->win != NULL) vw->ed->animate ();
+	if (vw->place != 0) vw->ed->animate ();
       }
     }
     windows_refresh ();
@@ -272,7 +269,7 @@ tm_server_rep::interpose_handler () {
 void
 tm_server_rep::wait_handler (string message, string arg) {
   if (has_current_window ())
-    show_wait_indicator (concrete_window () -> win, translate (message), arg);
+    show_wait_indicator (get_current_editor (), translate (message), arg);
   else
     cout << "TeXmacs] Please wait: " << message << " " << arg << "\n";
 }

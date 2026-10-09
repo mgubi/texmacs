@@ -182,7 +182,7 @@
             '("Classical" "Monochrome" "Neo-classical" "Lucide")
             (get-pretty-preference "icon set")
             "18em"))
-    (assuming (vue-gui?)
+    (assuming #t
       (item (text "Main and mode icon bars:")
         (enum (set-pretty-preference "icon bars" answer)
               '("Above the document" "At the left of the document")

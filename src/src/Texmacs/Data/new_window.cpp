@@ -17,151 +17,118 @@
 #include "message.hpp"
 #include "dictionary.hpp"
 #include "new_document.hpp"
+#include "hashmap.hpp"
 
 /******************************************************************************
-* Manage global list of windows
+* Places
+*******************************************************************************
+* The core has no windows: a view is shown at a place, which is a number
+* (tm_window.hpp). The places of the panes of the page are listed, for the
+* commands which go through them; those of the views in dialogs are not
+* (their numbers are negative). What is kept for a place is its zoom
+* factor, which stays when another buffer is shown there.
 ******************************************************************************/
 
-static int last_window= 1;
-static array<url> all_windows;
-extern int nr_windows;
+static int last_place= 1;
+static int last_embedded_place= -1;
+static array<int> all_places;
+static hashmap<int,double> place_zoom (1.0);
 
-/*
-static path
-reset (path p, int i) {
-  if (is_nil (p)) return p;
-  else if (p->item == i) return p->next;
-  else return path (p->item, reset (p->next, i));
-}
-*/
+void tau_place_made (int place);    // told to the page (Tau/tau_gui.cpp)
+void tau_place_deleted (int place);
 
-url
-create_window_id () {
-  url r= "tmfs://window/" * as_string (last_window);
-  all_windows << r;
-  last_window++;
-  return r;
+int
+new_place (bool embedded) {
+  int place= embedded? last_embedded_place--: last_place++;
+  if (!embedded) all_places << place;
+  place_zoom (place)= retina_zoom * get_server () -> get_default_zoom_factor ();
+  return place;
 }
 
 void
-destroy_window_id (url win) {
-  for (int i=0; i<N(all_windows); i++)
-    if (all_windows[i] == win) {
-      all_windows= append (range (all_windows, 0, i),
-                           range (all_windows, i+1, N(all_windows)));
-      return;
-    }
+delete_place (int place) {
+  array<int> r;
+  for (int i=0; i<N(all_places); i++)
+    if (all_places[i] != place) r << all_places[i];
+  all_places= r;
+  place_zoom->reset (place);
+  if (place > 0) tau_place_deleted (place);
+}
+
+bool
+is_place (int place) {
+  return place != 0 && place_zoom->contains (place);
 }
 
 url
-abstract_window (tm_window win) {
-  if (win == NULL) return url_none ();
-  return win->id;
+place_url (int place) {
+  if (place == 0) return url_none ();
+  return url ("tmfs://window/" * as_string (place));
 }
 
-/******************************************************************************
-* Low level creation and destruction of windows
-******************************************************************************/
-
-static hashmap<url,tm_window> tm_window_table (NULL);
-
-class kill_window_command_rep: public command_rep {
-  url* id;
-public:
-  inline kill_window_command_rep (url* id2): id (id2) {}
-  inline ~kill_window_command_rep () { tm_delete (id); }
-  inline void apply () {
-    object cmd= list_object (symbol_object ("safely-kill-window"),
-                             object (*id));
-    exec_delayed (scheme_cmd (cmd)); }
-  tm_ostream& print (tm_ostream& out) {
-    return out << "<command kill_window>"; }
-};
-
-url
-new_window (bool map_flag= true, tree geom= "") {
-  int mask= 0;
-  if (get_preference ("header") == "on") mask += 1;
-  if (get_preference ("main icon bar") == "on") mask += 2;
-  if (get_preference ("mode dependent icons") == "on") mask += 4;
-  if (get_preference ("focus dependent icons") == "on") mask += 8;
-  if (get_preference ("user provided icons") == "on") mask += 16;
-  if (get_preference ("status bar") == "on") mask += 32;
-  //if (get_preference ("side tools") == "on") mask += 64;
-  //if (get_preference ("left tools") == "on") mask += 128;
-  if (get_preference ("bottom tools") == "on") mask += 256;
-  if (get_preference ("extra tools") == "on") mask += 512;
-  url* id= tm_new<url> (url_none ());
-  command quit= tm_new<kill_window_command_rep> (id);
-  tm_window win= tm_new<tm_window_rep> (texmacs_widget (mask, quit), geom);
-  tm_window_table (win->id)= win;
-  if (map_flag) win->map ();
-  *id= abstract_window (win);
-  return abstract_window (win);
+int
+url_place (url u) {
+  if (is_none (u)) return 0;
+  string s= as_string (u);
+  if (!starts (s, "tmfs://window/")) return 0;
+  s= s (14, N(s));
+  if (!is_int (s)) return 0;
+  int place= as_int (s);
+  return is_place (place)? place: 0;
 }
 
-static bool
-delete_view_from_window (url win) {
+tm_view
+place_view (int place) {
+  if (place == 0) return NULL;
   array<url> vs= get_all_views ();
-  for (int i=0; i<N(vs); i++)
-    if (view_to_window (vs[i]) == win) {
-      detach_view (vs[i]);
-      // delete_view (vs[i]);
-      // Don't delete view alltogether, because at least one view is needed
-      // for making the 'buffer_modified' predicate function appropriately
-      return true;
-    }
-  return false;
+  for (int i=0; i<N(vs); i++) {
+    tm_view vw= concrete_view (vs[i]);
+    if (vw != NULL && vw->place == place) return vw;
+  }
+  return NULL;
+}
+
+int
+current_place () {
+  tm_view vw= concrete_view (get_current_view_safe ());
+  return vw == NULL? 0: vw->place;
+}
+
+double
+get_place_zoom (int place) {
+  return place_zoom [place];
 }
 
 void
-delete_window (url win_u) {
-  tm_window win= concrete_window (win_u);
-  if (win == NULL) return;
-  while (delete_view_from_window (win_u)) {}
-  win->unmap ();
-  tm_window_table->reset (win->id);
-  destroy_window_widget (win->win);
-  tm_delete (win);
-}
-
-tm_window
-concrete_window (url win) {
-  return tm_window_table [win];
+set_place_zoom (int place, double zoom) {
+  if (is_place (place)) place_zoom (place)= zoom;
 }
 
 /******************************************************************************
-* Manage global list of windows
+* The places as Scheme knows them: the "windows"
 ******************************************************************************/
 
 array<url>
 windows_list () {
-  return all_windows;
+  array<url> r;
+  for (int i=0; i<N(all_places); i++) r << place_url (all_places[i]);
+  return r;
 }
 
 int
 get_nr_windows () {
-  return nr_windows;
+  return N(all_places);
 }
 
 bool
 has_current_window () {
-  tm_view vw= concrete_view (get_current_view_safe ());
-  return vw != NULL && vw->win != NULL;
-}
-
-tm_window
-concrete_window () {
-  tm_view vw= concrete_view (get_current_view_safe ());
-  ASSERT (vw->win != NULL, "no window attached to view");
-  return vw->win;
+  return current_place () != 0;
 }
 
 url
 get_current_window () {
   if (!has_current_window ()) return url ("");
-  tm_window win= concrete_window ();
-  return abstract_window (win);
+  return place_url (current_place ());
 }
 
 array<url>
@@ -181,11 +148,9 @@ window_to_buffer (url win) {
 
 url
 window_to_view (url win) {
-  array<url> vs= get_all_views ();
-  for (int i=0; i<N(vs); i++)
-    if (view_to_window (vs[i]) == win)
-      return vs[i];
-  return url_none ();
+  tm_view vw= place_view (url_place (win));
+  if (vw == NULL) return url_none ();
+  return abstract_view (vw);
 }
 
 void
@@ -211,19 +176,11 @@ switch_to_window (url new_w) {
   url new_u= window_to_view (new_w);
   if (!is_none (old_u) && !is_none (new_u)) {
     tm_view old_vw = concrete_view (old_u);
-    if (old_vw != NULL) {
-      //old_vw->ed->end_editing ();
-      old_vw->ed->suspend ();
-    }
+    if (old_vw != NULL) old_vw->ed->suspend ();
   }
   if (!is_none (new_u)) {
     tm_view new_vw = concrete_view (new_u);
-    //attach_view (new_w, new_u);
-    //set_current_view (new_u);
-    tm_window win= concrete_window (new_w);
-    if (win != NULL) win->map ();
     if (new_vw != NULL) {
-      //new_vw->ed->start_editing ();
       new_vw->ed->resume ();
       send_keyboard_focus (new_vw->ed);
     }
@@ -249,9 +206,12 @@ new_buffer_in_this_window (url name, tree doc) {
 
 url
 new_buffer_in_new_window (url name, tree doc, tree geom) {
+  // a new place: the core makes it at once, so that the commands which
+  // follow find the buffer there, and the page shows it as it wants
+  (void) geom;
   if (is_nil (concrete_buffer (name)))
     create_buffer (name, doc);
-  url win= new_window (true, geom);
+  url win= place_url (new_place ());
   window_set_view (win, get_passive_view (name), true);
   return win;
 }
@@ -275,7 +235,7 @@ open_window (tree geom) {
 
 void
 clone_window () {
-  url win= new_window ();
+  url win= place_url (new_place ());
   window_set_view (win, get_passive_view (get_current_buffer ()), true);
 }
 
@@ -295,25 +255,33 @@ kill_buffer (url name) {
   remove_buffer (name);
 }
 
+static void
+delete_window (url win) {
+  int place= url_place (win);
+  if (place == 0) return;
+  // (the view is kept: at least one is needed for buffer_modified)
+  tm_view vw= place_view (place);
+  if (vw != NULL) detach_view (abstract_view (vw));
+  delete_place (place);
+}
+
 void
 kill_window (url wname) {
+  // the place is given up; another one takes the keyboard. The last place
+  // stays: the page has nothing else to show
   array<url> vs= get_all_views ();
   for (int i=0; i<N(vs); i++) {
     url win= view_to_window (vs[i]);
-    if (!is_none (win) && win != wname) {
+    if (!is_none (win) && win != wname && url_place (win) > 0) {
       set_current_view (vs[i]);
-      // FIXME: make sure that win obtains the focus of the GUI too
       delete_window (wname);
       return;
     }
   }
-  if (number_of_servers () == 0) get_server () -> quit ();
-  else delete_window (wname);
 }
 
 void
 kill_current_window_and_buffer () {
-  if (N(bufs) <= 1) get_server () -> quit();
   url name= get_current_buffer ();
   array<url> vs= buffer_to_views (get_current_buffer ());
   url win= get_current_window ();
@@ -321,6 +289,7 @@ kill_current_window_and_buffer () {
   for (int i=0; i<N(vs); i++)
     if (view_to_window (vs[i]) != win)
       kill= false;
+  if (get_nr_windows () <= 1) return;
   kill_window (win);
   if (kill) remove_buffer (name);
 }

@@ -1,7 +1,7 @@
 
 /******************************************************************************
 * MODULE     : tm_window.cpp
-* DESCRIPTION: Main TeXmacs windows
+* DESCRIPTION: The views in dialogs, and what is left of the windows
 * COPYRIGHT  : (C) 1999  Joris van der Hoeven
 *******************************************************************************
 * This software falls under the GNU general public license version 3 or later.
@@ -21,127 +21,10 @@
 int geometry_w= 800, geometry_h= 600;
 int geometry_x= 0  , geometry_y= 0;
 
-widget texmacs_window_widget (widget wid, tree geom);
-widget make_menu_widget (object menu);
-widget make_menu_widget (object menu, int w, int h);
-void refresh_size (widget wid, bool exact);
-
-static int last_window_handle= 0;
-static hashmap<int,widget> window_table (NULL);
-static hashmap<tree,path> window_by_name;
-static time_t refresh_time= 0;
-
-/******************************************************************************
-* User preference management concerning the geometry of windows
-******************************************************************************/
-
-hashmap<string,string> window_names ("");
-
-string
-unique_window_name (string name) {
-  for (int i=1; true; i++) {
-    string wname= name;
-    if (i > 1) wname= wname * ":" * as_string (i);
-    if (!window_names->contains (wname)) {
-      window_names (wname)= name;
-      return wname;
-    }
-  }
-}
-
-static bool
-move_accept (int old_x, int old_y, int x, int y) {
-  if (old_x == x && old_y == y) return false;
-  return true;
-}
-
-void
-notify_window_move (string name, SI xx, SI yy) {
-  int x=  xx / PIXEL;
-  int y= -yy / PIXEL;
-  if (name != "popup") {
-    //cout << "Move " << name << " to " << x << ", " << y << "\n";
-    string old_x= get_user_preference ("abscissa " * name, "");
-    string old_y= get_user_preference ("ordinate " * name, "");
-    //cout << "Move " << name << ": " << old_x << ", " << old_y
-    //<< " --> " << x << ", " << y << "\n";
-    if (old_x == "" || old_y == "" ||
-        move_accept (as_int (old_x), as_int (old_y), x, y)) {
-      set_user_preference ("abscissa " * name, as_string (x));
-      set_user_preference ("ordinate " * name, as_string (y));
-    }
-  }
-}
-
-static bool
-resize_accept (int old_w, int old_h, int w, int h) {
-  if (old_w == w && old_h == h) return false;
-#ifdef QTTEXMACS
-  if (old_w == w && old_h - 80 <= h && h <= old_h + 80) return false;
-#endif
-  return true;
-}
-
-void
-notify_window_resize (string name, SI ww, SI hh) {
-  int w= ww / PIXEL;
-  int h= hh / PIXEL;
-  if (name != "popup") {
-    //cout << "Resize " << name << " to " << ww << ", " << hh << "\n";
-    string old_w= get_user_preference ("width " * name, "");
-    string old_h= get_user_preference ("height " * name, "");
-    //cout << "Resize " << name << ": " << old_w << ", " << old_h
-    //<< " --> " << w << ", " << h << "\n";
-    if (old_w == "" || old_h == "" ||
-        resize_accept (as_int (old_w), as_int (old_h), w, h)) {
-      set_user_preference ("width " * name, as_string (w));
-      set_user_preference ("height " * name, as_string (h));
-    }
-  }
-}
-
-void
-notify_window_destroy (string name) {
-  window_names->reset (name);
-}
-
-void
-get_preferred_position (string name, SI& xx, SI& yy) {
-  if (has_user_preference ("abscissa " * name)) {
-    int x= as_int (get_user_preference ("abscissa " * name));
-    int y= as_int (get_user_preference ("ordinate " * name));
-    
-    xx=  x * PIXEL;
-    yy= -y * PIXEL;
-  }
-}
-
-void
-get_preferred_size (string name, SI& ww, SI& hh) {
-  if (has_user_preference ("width " * name)) {
-    int w= as_int (get_user_preference ("width " * name));
-    int h= as_int (get_user_preference ("height " * name));
-    ww= w * PIXEL;
-    hh= h * PIXEL;
-    //cout << "Size " << name << ": " << w << ", " << h << "\n";
-  }
-}
-
-/******************************************************************************
-* Meta editor constructor and destructor
-******************************************************************************/
-
-static int tm_window_serial= 1;
-
-tm_window_rep::tm_window_rep (widget wid2, tree geom):
-  win (texmacs_window_widget (wid2, geom)),
-  wid (wid2), id (create_window_id ()),
-  serial (tm_window_serial++),
-  menu_current (object ()), menu_cache (widget ()),
-  text_ptr (NULL)
-{
-  zoomf= retina_zoom * get_server () -> get_default_zoom_factor ();
-}
+// The core has no windows (tm_window.hpp): a view is shown at a place, and
+// the bars and the menus around it are of the page (tm_frame.cpp). What is
+// here is the view in a dialog, which has a place of its own, and the
+// functions of the windows which Scheme still calls.
 
 double
 get_doc_zoom_factor (tree doc) {
@@ -157,73 +40,24 @@ get_doc_zoom_factor (tree doc) {
   return -1.0;
 }
 
-tm_window_rep::tm_window_rep (tree doc, command quit):
-  win (texmacs_widget (0, quit)),
-  wid (win), id (url_none ()),
-  serial (tm_window_serial++),
-  menu_current (object ()), menu_cache (widget ()),
-  text_ptr (NULL)
-{
-  zoomf= retina_zoom * get_doc_zoom_factor (doc);
-  if (zoomf < 0.0)
-    zoomf= retina_zoom * get_server () -> get_default_zoom_factor ();
-}
-
-tm_window_rep::~tm_window_rep () {
-  if (!is_none (id)) destroy_window_id (id);
-}
-
 /******************************************************************************
-* Creation of TeXmacs window
+* A view in a dialog: a document which is edited there (texmacs-input)
 ******************************************************************************/
 
-widget
-texmacs_window_widget (widget wid, tree geom) {
-  SI W, H;
-  SI w= geometry_w, h= geometry_h;
-  SI x= geometry_x, y= geometry_y;
-  bool custom= is_tuple (geom) && N (geom) >= 2;
-#ifndef QTTEXMACS
-  if (use_side_tools) { w += 200; h += 100; }
-  if (use_left_tools) { w += 200; h += 100; }
-#endif
-  if (custom) {
-    w= as_int (geom[0]);
-    h= as_int (geom[1]);
-  }
-  if (w == 800 && h == 600) {
-    w *= retina_zoom;
-    h *= retina_zoom;
-  }
-  gui_root_extents (W, H); W /= PIXEL; H /= PIXEL;
-  if (x < 0) x= W + x + 1 - w;
-  if (y < 0) y= H + y + 1 - h;
-  string name= "TeXmacs";
-  name= unique_window_name (name);
-  widget win= plain_window_widget (wid, name);
-  SI xx= x * PIXEL, yy= -y * PIXEL;
-  SI ww= w * PIXEL, hh=  h * PIXEL;
-  if (!custom) {
-    get_preferred_position (name, xx, yy);
-    get_preferred_size (name, ww, hh);
-  }
-  set_size (win, ww, hh);
-  set_position (win, xx, yy);
-  return win;
+static hashmap<tree,int>&
+embedded_buffers_table () {
+  static hashmap<tree,int>* t= NULL;
+  if (t == NULL) t= tm_new<hashmap<tree,int> > (0);
+  return *t;
 }
-
-/******************************************************************************
-* Closing embedded TeXmacs widgets
-******************************************************************************/
+#define embedded_buffers (embedded_buffers_table ())
 
 class close_embedded_command_rep: public command_rep {
   tm_view vw;
   url name;
-  int win_id;
 public:
-  close_embedded_command_rep (tm_view vw2, url n2, int win2):
-    vw (vw2), name (n2), win_id (win2) {
-      window_by_name(name->t)= path (win_id, window_by_name[name->t]); }
+  close_embedded_command_rep (tm_view vw2, url n2): vw (vw2), name (n2) {
+    embedded_buffers (name->t)= embedded_buffers [name->t] + 1; }
   void apply ();
   tm_ostream& print (tm_ostream& out) {
     return out << "<command close_embedded>"; }
@@ -231,52 +65,35 @@ public:
 
 void
 close_embedded_command_rep::apply () {
-  //cout << "Destroy " << vw->buf->buf->name << "\n";
-  ASSERT (!is_nil(vw->ed), "embedded command acting on deleted editor");
-  url foc= abstract_window (vw->ed->mvw->win);
+  // the dialog is gone: the keyboard goes back to the view which opened
+  // it, or to any view which is shown, and the buffer is closed
+  ASSERT (!is_nil (vw->ed), "embedded command acting on deleted editor");
+  url foc= url_none ();
+  if (vw->ed->mvw != NULL) foc= place_url (vw->ed->mvw->place);
   if (is_none (foc)) {
     array<url> a= windows_list ();
-    ASSERT (N(a) != 0, "no remaining windows");
-    foc= a[0];
+    if (N(a) != 0) foc= a[0];
   }
-  window_focus (foc);
-  //cout << "Changed focus\n";
-  tm_window win= vw->win;
-  ASSERT (N (buffer_to_views (vw->buf->buf->name)) == 1,
-          "invalid cloned embedded TeXmacs widget");
-  window_by_name(name->t)= remove<int> (window_by_name[name->t], win_id);
+  if (!is_none (foc)) window_focus (foc);
+  int place= vw->place;
+  embedded_buffers (name->t)= embedded_buffers [name->t] - 1;
+  if (embedded_buffers [name->t] <= 0) embedded_buffers->reset (name->t);
+  detach_view (abstract_view (vw));
   remove_buffer (vw->buf->buf->name);
-  //cout << "Deleted buffer\n";
-  tm_delete (win);
-  //cout << "Deleted window\n";
-}
-
-command
-close_embedded_command (tm_view vw, url name, int win) {
-  return tm_new<close_embedded_command_rep> (vw, name, win);
-}
-
-static path
-filter_existing (path wins) {
-  if (is_nil (wins)) return wins;
-  if (window_table->contains (wins->item))
-    return path (wins->item, filter_existing (wins->next));
-  return filter_existing (wins->next);
+  delete_place (place);
 }
 
 path
 window_search (url name) {
-  return filter_existing (window_by_name[name->t]);
+  // (for Scheme: not nil when the buffer is edited in a dialog)
+  if (embedded_buffers->contains (name->t)) return path (1);
+  return path ();
 }
 
 bool
 is_embedded_buffer (url name) {
-  return !is_nil (window_search (name));
+  return embedded_buffers->contains (name->t);
 }
-
-/******************************************************************************
-* Embedded TeXmacs widgets
-******************************************************************************/
 
 url
 embedded_name (url name) {
@@ -322,460 +139,72 @@ enrich_embedded_document (tree body, tree style) {
 
 widget
 texmacs_input_widget (tree doc, tree style, url wname) {
+  // the widget is the editor itself, which is a view as that of a pane
+  // (Tau/tau_gui.cpp); what is done when the dialog goes is kept with it
   doc= enrich_embedded_document (doc, style);
   url       base = get_master_buffer (get_current_buffer ());
   tm_view   curvw= concrete_view (get_current_view ());
   url       name = embedded_name (wname);
   if (contains (name, get_all_buffers ())) set_buffer_tree (name, doc);
   else create_buffer (name, doc);
-  tm_view   vw   = concrete_view (get_passive_view (name));
-  tm_window win  = tm_new<tm_window_rep> (doc, command ());
+  url       u    = get_passive_view (name);
+  tm_view   vw   = concrete_view (u);
+  int       place= new_place (true);
+  double    zoom = retina_zoom * get_doc_zoom_factor (doc);
+  if (zoom > 0.0) set_place_zoom (place, zoom);
   set_master_buffer (name, base);
-  vw->win= win;
-  set_scrollable (win->wid, vw->ed);
-  vw->ed->cvw= win->wid.rep;
+  url temp= get_current_view_safe ();
+  attach_view (place_url (place), u);
+  set_current_view (temp);
   vw->ed->mvw= curvw;
-  command close_cmd= close_embedded_command (vw, name, last_window_handle);
-  return wrapped_widget (win->wid, close_cmd);
+  command close_cmd= tm_new<close_embedded_command_rep> (vw, name);
+  return wrapped_widget (vw->ed, close_cmd);
 }
 
 /******************************************************************************
-* Meta mathods
-******************************************************************************/
-
-void
-tm_window_rep::set_window_name (string s) {
-  if (cur_title != s) {
-    cur_title= s;
-    set_name (wid, s);
-  }
-}
-
-void
-tm_window_rep::set_modified (bool flag) {
-  ::set_modified (wid, flag);
-}
-
-void
-tm_window_rep::set_window_url (url u) {
-  if (!is_none (u)) set_file (wid, as_string (u));
-}
-
-void
-tm_window_rep::map () {
-  set_visibility (win, true);
-}
-
-void
-tm_window_rep::unmap () {
-  set_visibility (win, false);
-}
-
-void
-tm_window_rep::refresh () {
-  menu_cache= hashmap<object,widget> (widget ());
-}
-
-/******************************************************************************
-* Menus
-******************************************************************************/
-
-bool menu_caching= true;
-
-bool
-tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
-  drd_info old_drd= the_drd;
-  if (!is_none (window_to_view (id))) {
-    tm_view vw= concrete_view (window_to_view (id));
-    if (vw != NULL) the_drd= vw->ed->drd;
-  }
-  //cout << "expand " << menu << "\n";
-  object xmenu= call ("menu-expand", eval ("'" * menu));
-  the_drd= old_drd;
-  //if (which == 10) cout << "xmenu= " << xmenu << "\n";
-  //cout << "xmenu= " << xmenu << "\n";
-#ifdef TAUTEXMACS
-  // Tau: the page has one set of bars, for the window which has the
-  // keyboard. A part is described again when it changed, and all of them
-  // when another window takes the bars.
-  static url bars_owner= url_none ();
-  if (bars_owner != id) {
-    bars_owner= id;
-    menu_current= hashmap<int,object> (object ());
-  }
-  else if (menu_current->contains (which) && menu_current[which] == xmenu)
-    return false;
-#endif
-  if (menu_cache->contains (xmenu)) {
-    //if (menu_current[which] == xmenu) cout << "Same " << menu << "\n";
-    //if (which == 10) cout << which << " -> cached? " << (menu_current[which] == xmenu? "yes": "no") << LF;
-    //cout << which << " -> cached? " << (menu_current[which] == xmenu) << LF;
-    if (menu_current[which] == xmenu) return false;
-    if (which < 10) {
-      menu_current (which)= xmenu;
-      //cout << "Cached " << menu << "\n";
-      w= menu_cache [xmenu];
-      return true;
-    }
-  }
-  //if (which == 10) cout << which << " -> compute" << LF;
-  //cout << which << " -> compute" << LF;
-  menu_current (which)= xmenu;
-  //cout << "Compute " << menu << "\n";
-  object umenu= eval ("'" * menu);
-#ifdef TAUTEXMACS
-  // Tau: no widget is made, the menu is described to the page
-  // (kernel/gui/menu-serial.scm)
-  void tau_chrome (int which, object menu);
-  drd_info old_drd2= the_drd;
-  if (!is_none (window_to_view (id))) {
-    tm_view vw= concrete_view (window_to_view (id));
-    if (vw != NULL) the_drd= vw->ed->drd;
-  }
-  tau_chrome (which, umenu);
-  the_drd= old_drd2;
-  w= glue_widget ();
-  return true;
-#endif
-  if (which == 10 || which == 11) w= make_menu_widget (umenu, 400, 1000);
-  else w= make_menu_widget (umenu);
-  if (menu_caching)
-    if (which >= 10 || as_bool (call ("cache-menu?", xmenu))) {
-      //if (which == 10) cout << which << " -> cached" << LF;
-      //cout << which << " -> cached" << LF;
-      menu_cache (xmenu)= w;
-    }
-  return true;
-}
-
-void
-tm_window_rep::menu_main (string menu) {
-  eval ("(lazy-initialize-force)");
-  widget w;
-  if (get_menu_widget (-1, menu, w))
-    ::set_main_menu (wid, w);
-}
-
-void
-tm_window_rep::menu_icons (int which, string menu) {
-  eval ("(lazy-initialize-force)");
-  widget w;
-  if (get_menu_widget (which, menu, w)) {
-    if      (which == 0) set_main_icons (wid, w);
-    else if (which == 1) set_mode_icons (wid, w);
-    else if (which == 2) set_focus_icons (wid, w);
-    else if (which == 3) set_user_icons (wid, w);
-  }
-}
-
-void
-tm_window_rep::side_tools (int which, string tools) {
-  eval ("(lazy-initialize-force)");
-  widget w;
-  if (get_menu_widget (10 + which, tools, w)) {
-    if      (which == 0) set_side_tools (wid, w);
-    else if (which == 1) set_left_tools (wid, w);
-  }
-}
-
-void
-tm_window_rep::bottom_tools (int which, string tools) {
-  eval ("(lazy-initialize-force)");
-  widget w;
-  if (get_menu_widget (20 + which, tools, w)) {
-    if      (which == 0) set_bottom_tools (wid, w);
-    else if (which == 1) set_extra_tools (wid, w);
-  }
-}
-
-void
-tm_window_rep::set_header_flag (bool flag) {
-  set_header_visibility (wid, flag);
-}
-
-void
-tm_window_rep::set_icon_bar_flag (int which, bool flag) {
-  if      (which == 0) set_main_icons_visibility (wid, flag);
-  else if (which == 1) set_mode_icons_visibility (wid, flag);
-  else if (which == 2) set_focus_icons_visibility (wid, flag);
-  else if (which == 3) set_user_icons_visibility (wid, flag);
-}
-
-void
-tm_window_rep::set_side_tools_flag (int which, bool flag) {
-  if      (which == 0) set_side_tools_visibility (wid, flag);
-  else if (which == 1) set_left_tools_visibility (wid, flag);
-}
-
-void
-tm_window_rep::set_bottom_tools_flag (int which, bool flag) {
-  if      (which == 0) set_bottom_tools_visibility (wid, flag);
-  else if (which == 1) set_extra_tools_visibility (wid, flag);
-}
-
-bool
-tm_window_rep::get_header_flag () {
-  return get_header_visibility (wid);
-}
-
-bool
-tm_window_rep::get_icon_bar_flag (int which) {
-  if      (which == 0) return get_main_icons_visibility (wid);
-  else if (which == 1) return get_mode_icons_visibility (wid);
-  else if (which == 2) return get_focus_icons_visibility (wid);
-  else if (which == 3) return get_user_icons_visibility (wid);
-  else return false;
-}
-
-bool
-tm_window_rep::get_side_tools_flag (int which) {
-  if      (which == 0) return get_side_tools_visibility (wid);
-  else if (which == 1) return get_left_tools_visibility (wid);
-  else return false;
-}
-
-bool
-tm_window_rep::get_bottom_tools_flag (int which) {
-  if      (which == 0) return get_bottom_tools_visibility (wid);
-  else if (which == 1) return get_extra_tools_visibility (wid);
-  else return false;
-}
-
-/******************************************************************************
-* The canvas
-******************************************************************************/
-
-void
-tm_window_rep::set_window_zoom_factor (double zoom) {
-  zoomf= retina_zoom * zoom;
-  ::set_zoom_factor (wid, zoomf);
-}
-
-double
-tm_window_rep::get_window_zoom_factor () {
-  return zoomf / retina_zoom;
-}
-
-void
-tm_window_rep::get_visible (SI& x1, SI& y1, SI& x2, SI& y2) {
-  get_visible_part (wid, x1, y1, x2, y2);
-}
-
-void
-tm_window_rep::get_extents (SI& x1, SI& y1, SI& x2, SI& y2) {
-  ::get_extents (wid, x1, y1, x2, y2);
-}
-
-void
-tm_window_rep::set_extents (SI x1, SI y1, SI x2, SI y2) {
-  ::set_extents (wid, x1, y1, x2, y2);
-}
-
-void
-tm_window_rep::set_scrollbars (int i) {
-  ::set_scrollbars_visibility (wid, i);
-}
-
-void
-tm_window_rep::get_scroll_pos (SI& x, SI& y) {
-  get_scroll_position (wid, x, y);
-}
-
-void
-tm_window_rep::set_scroll_pos (SI x, SI y) {
-  set_scroll_position (wid, x, y);
-}
-
-/******************************************************************************
-* The footer as a status bar
-******************************************************************************/
-
-bool
-tm_window_rep::get_footer_flag () {
-  return get_footer_visibility (wid);
-}
-
-void
-tm_window_rep::set_footer_flag (bool flag) {
-  set_footer_visibility (wid, flag);
-}
-
-void
-tm_window_rep::set_left_footer (string s) {
-  ::set_left_footer (wid, s);
-}
-
-void
-tm_window_rep::set_right_footer (string s) {
-  ::set_right_footer (wid, s);
-}
-
-/******************************************************************************
-* Interactive commands on the footer
-******************************************************************************/
-
-class ia_command_rep: public command_rep {
-  tm_window_rep* win;
-public:
-  ia_command_rep (tm_window_rep* win2): win (win2) {}
-  void apply () { win->interactive_return (); }
-  tm_ostream& print (tm_ostream& out) { return out << "<command ia>"; }
-};
-
-bool
-tm_window_rep::get_interactive_mode () {
-  return ::get_interactive_mode (wid);
-}
-
-void
-tm_window_rep::set_interactive_mode (bool flag) {
-  ::set_interactive_mode (wid, flag);
-}
-
-void
-tm_window_rep::interactive (string name, string type, array<string> def,
-			    string& s, command cmd)
-{
-  if (get_interactive_mode ()) { s= "cancel"; return; }
-  text_ptr = &s;
-  call_back= cmd;
-  widget tw = text_widget (translate (name), 0, black, false);
-  widget inp= input_text_widget (tm_new<ia_command_rep> (this), type, def,
-                                 WIDGET_STYLE_MINI);
-  set_interactive_prompt (wid, tw);
-  set_interactive_input (wid, inp);
-  set_interactive_mode (true);
-}
-
-void
-tm_window_rep::interactive_return () {
-  if (text_ptr == NULL) return;
-  *text_ptr= get_interactive_input (wid);
-  text_ptr= NULL;
-  set_interactive_mode (false);
-  call_back ();
-}
-
-/******************************************************************************
-* Other top level windows
+* The windows of the other ports which Scheme may still ask for: the
+* dialogs are described to the page (kernel/gui/menu-serial.scm)
 ******************************************************************************/
 
 int
 window_handle () {
   static int window_next= 1;
-  last_window_handle= window_next;
   return window_next++;
 }
 
-void
-window_create (int win, widget wid, string name, command quit) {
-  widget pww;
-  pww= plain_window_widget (wid, name, quit);
-  window_table (win)= pww;
-}
-
-void
-window_create_plain (int win, widget wid, string name) {
-  widget pww;
-  pww= plain_window_widget (wid, name);
-  window_table (win)= pww;
-}
-
-void
-window_create_popup (int win, widget wid, string name) {
-  widget pww;
-  pww= popup_window_widget (wid, name);
-  window_table (win)= pww;
-}
-
-void
-window_create_tooltip (int win, widget wid, string name) {
-  widget pww;
-  pww= tooltip_window_widget (wid, name);
-  window_table (win)= pww;
-}
-
-/*
-FIXME: this old implementation does not work in the presence
-of texmacs_input widgets.  The current hack remedies this situation
-by explicitly signalling the widget destruction slot before
-the actual destruction of the widget.  This is still not sufficient
-in the case of Qt though and also might cause the desruction slot
-to be signalled twice.
-
-void
-window_delete (int win) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  window_table->reset (win);
-  destroy_window_widget (pww);
-}
-*/
-
-void
-window_delete (int win) {
-  static hashmap<int,bool> busy (false);
-  if (busy->contains (win)) return;
-  busy (win)= true;
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  window_table->reset (win);
-  send_destroy (pww);
-  destroy_window_widget (pww);
-  busy (win)= false;
-}
-
-void
-window_show (int win) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  set_visibility (pww, true);
-}
-
-void
-window_hide (int win) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  set_visibility (pww, false);
-}
-
-void
-window_set_on_top (int win, bool flag) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  set_on_top (window_table [win], flag);
-}
+void window_create (int win, widget wid, string name, command quit) {
+  (void) win; (void) wid; (void) name; (void) quit; }
+void window_create_plain (int win, widget wid, string name) {
+  (void) win; (void) wid; (void) name; }
+void window_create_popup (int win, widget wid, string name) {
+  (void) win; (void) wid; (void) name; }
+void window_create_tooltip (int win, widget wid, string name) {
+  (void) win; (void) wid; (void) name; }
+void window_delete (int win) { (void) win; }
+void window_show (int win) { (void) win; }
+void window_hide (int win) { (void) win; }
+void window_set_on_top (int win, bool flag) { (void) win; (void) flag; }
+void window_set_size (int win, int w, int h) { (void) win; (void) w; (void) h; }
+void window_set_position (int win, int x, int y) {
+  (void) win; (void) x; (void) y; }
 
 scheme_tree
 window_get_size (int win) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  SI w, h;
-  get_size (pww, w, h);
-  return tuple (as_string (w/PIXEL), as_string (h/PIXEL));
-}
-
-void
-window_set_size (int win, int w, int h) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  set_size (pww, w*PIXEL, h*PIXEL);
+  (void) win;
+  return tuple ("0", "0");
 }
 
 scheme_tree
 window_get_position (int win) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  SI x, y;
-  get_position (pww, x, y);
-  return tuple (as_string (x/PIXEL), as_string (y/PIXEL));
+  (void) win;
+  return tuple ("0", "0");
 }
 
-void
-window_set_position (int win, int x, int y) {
-  ASSERT (window_table->contains (win), "window does not exist");
-  widget pww= window_table [win];
-  set_position (pww, x*PIXEL, y*PIXEL);
-}
+/******************************************************************************
+* Refreshing
+******************************************************************************/
+
+static time_t refresh_time= 0;
 
 void
 windows_delayed_refresh (int ms) {
@@ -784,30 +213,13 @@ windows_delayed_refresh (int ms) {
 
 void
 windows_refresh (string kind) {
-  if (kind == "auto" && texmacs_time () < refresh_time) return;
-  iterator<int> it= iterate (window_table);
-  while (it->busy ()) {
-    int id= it->next ();
-    send_refresh (window_table[id], kind);
-#if defined(X11TEXMACS) || defined(QTWKTEXMACS) || defined(SDLTEXMACS)
-    if (kind == "auto") refresh_size (window_table[id], false);
-#endif
-  }
-  // a refresh asked for by name (refresh-now) reaches the windows of the
-  // editors too, which window_table does not hold: else it was lost while
-  // no other window was open (the widgets of that kind in the menus of an
-  // editor window, e.g. the typographic palette of the colour menus, which
-  // changes as it is chosen in the open menu)
-#ifdef TAUTEXMACS
+  // the parts of the interface of a given kind are described again
+  // (refresh-now); "auto" is the turn of the menus, which the editors
+  // look after themselves
   void tau_refresh (string kind);
-  if (kind != "auto") tau_refresh (kind);
-#endif
-  if (kind != "auto") {
-    array<url> l= windows_list ();
-    for (int i=0; i<N(l); i++) {
-      tm_window w= concrete_window (l[i]);
-      if (w != NULL) send_refresh (w->win, kind);
-    }
+  if (kind == "auto") {
+    if (texmacs_time () < refresh_time) return;
+    windows_delayed_refresh (1000000000);
   }
-  if (kind == "auto") windows_delayed_refresh (1000000000);
+  else tau_refresh (kind);
 }

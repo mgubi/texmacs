@@ -31,11 +31,4 @@ void kill_buffer (url name);
 void kill_window (url name);
 void kill_current_window_and_buffer ();
 
-// Low level types and routines
-class tm_window_rep;
-typedef tm_window_rep* tm_window;
-tm_window concrete_window ();
-tm_window concrete_window (url win);
-url       abstract_window (tm_window win);
-
 #endif // defined NEW_WINDOW_H

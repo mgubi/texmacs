@@ -37,7 +37,7 @@ new_view_number (url u) {
 }
 
 tm_view_rep::tm_view_rep (tm_buffer buf2, editor ed2):
-  buf (buf2), ed (ed2), win (NULL), nr (new_view_number (buf->buf->name)) {}
+  buf (buf2), ed (ed2), place (0), nr (new_view_number (buf->buf->name)) {}
 
 static string
 encode_url (url u) {
@@ -172,7 +172,7 @@ url
 view_to_window (url u) {
   tm_view vw= concrete_view (u);
   if (vw == NULL) return url_none ();
-  return abstract_window (vw->win);
+  return place_url (vw->place);
 }
 
 editor
@@ -234,8 +234,8 @@ get_recent_view (url name, bool same, bool other, bool active, bool passive) {
     if (vw != NULL) {
       if (same && vw->buf->buf->name != name) continue;
       if (other && vw->buf->buf->name == name) continue;
-      if (active && vw->win == NULL) continue;
-      if (passive && vw->win != NULL) continue;
+      if (active && vw->place == 0) continue;
+      if (passive && vw->place != 0) continue;
       return view_history[i];
     }
   }
@@ -382,39 +382,30 @@ notify_rename_after (url new_name) {
 * Attaching and detaching views
 ******************************************************************************/
 
+void tau_view_shown (editor_rep* ed, int place, bool shown); // Tau/tau_gui.cpp
+
 void
 attach_view (url win_u, url u) {
-  tm_window win= concrete_window (win_u);
-  tm_view   vw = concrete_view (u);
-  if (win == NULL || vw == NULL) return;
-  // cout << "Attach view " << vw->buf->buf->name << "\n";
-  vw->win= win;
-  widget wid= win->wid;
-  set_scrollable (wid, vw->ed);
-  vw->ed->cvw= wid.rep;
-  ASSERT (is_attached (wid), "widget should be attached");
+  int     place= url_place (win_u);
+  tm_view vw   = concrete_view (u);
+  if (place == 0 || vw == NULL) return;
+  vw->place= place;
+  // (the editor is its own canvas: it knows its size and where it scrolls)
+  editor_rep* ed= vw->ed.operator -> ();
+  ed->cvw= ed;
+  tau_view_shown (ed, place, true);
   vw->ed->resume ();
-  win->set_window_name (vw->buf->buf->title);
-  win->set_window_url (vw->buf->buf->name);
   notify_set_view (u);
-  // cout << "View attached\n";
 }
 
 void
 detach_view (url u) {
   tm_view vw = concrete_view (u);
-  if (vw == NULL) return;
-  tm_window win= vw->win;
-  if (win == NULL) return;
-  // cout << "Detach view " << vw->buf->buf->name << "\n";
-  vw->win= NULL;
-  widget wid= win->wid;
-  ASSERT (is_attached (wid), "widget should be attached");
+  if (vw == NULL || vw->place == 0) return;
+  int place= vw->place;
   vw->ed->suspend ();
-  set_scrollable (wid, glue_widget ());
-  win->set_window_name ("TeXmacs");
-  win->set_window_url (url_none ());
-  // cout << "View detached\n";
+  tau_view_shown (vw->ed.operator -> (), place, false);
+  vw->place= 0;
 }
 
 /******************************************************************************
@@ -423,14 +414,11 @@ detach_view (url u) {
 
 void
 window_set_view (url win_u, url new_u, bool focus) {
-  //cout << "set view " << win_u << ", " << new_u << ", " << focus << "\n";
-  tm_window win= concrete_window (win_u);
-  if (win == NULL) return;
-  //cout << "Found window\n";
+  int place= url_place (win_u);
+  if (place == 0) return;
   tm_view new_vw= concrete_view (new_u);
-  if (new_vw == NULL || new_vw->win == win) return;
-  //cout << "Found view\n";
-  ASSERT (new_vw->win == NULL, "view attached to other window");
+  if (new_vw == NULL || new_vw->place == place) return;
+  ASSERT (new_vw->place == 0, "view shown at another place");
   url old_u= window_to_view (win_u);
   if (!is_none (old_u)) detach_view (old_u);
   attach_view (win_u, new_u);
@@ -440,15 +428,23 @@ window_set_view (url win_u, url new_u, bool focus) {
 
 void
 switch_to_buffer (url name) {
-  //cout << "Switching to buffer " << name << "\n";
   url u= get_passive_view (name);
   tm_view vw= concrete_view (u);
   if (vw == NULL || !has_current_window ()) return;
   window_set_view (get_current_window (), u, true);
-  tm_window nwin= vw->win;
-  if (nwin != NULL)
-    nwin->set_window_zoom_factor (nwin->get_window_zoom_factor ());
-  //cout << "Switched to buffer " << vw->buf->buf->name << "\n";
+  // (the zoom factor is the one of the place)
+  if (vw->place != 0)
+    get_server () -> set_window_zoom_factor (get_place_zoom (vw->place) / retina_zoom);
+}
+
+// the drd of the current view, for what is computed for it; the one which
+// was there is returned
+drd_info
+use_current_drd () {
+  drd_info old= the_drd;
+  tm_view vw= concrete_view (get_current_view_safe ());
+  if (vw != NULL) the_drd= vw->ed->drd;
+  return old;
 }
 
 void

@@ -67,6 +67,7 @@ function makePane(windowNumber) {
 	pane.element.append(pane.tabs, holder);
 	panesElement.append(pane.element);
 	panes.set(windowNumber, pane);
+	layoutPanes();
 	attachView(pane);
 	// a file which is dropped on a pane is opened there
 	pane.canvas.addEventListener("dragover", event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
@@ -172,6 +173,42 @@ function attachView(target) {
 	}, { passive: false });
 }
 
+// The panes share the width; the line between two of them is dragged to
+// give more of it to one. Their shares are kept as they are when a pane
+// comes or goes.
+function layoutPanes() {
+	for (const d of panesElement.querySelectorAll(".tau-divider")) d.remove();
+	const list = Array.from(panesElement.querySelectorAll(".tau-pane"));
+	list.slice(1).forEach((right, i) => {
+		const left = list[i], divider = el("div", "tau-divider");
+		panesElement.insertBefore(divider, right);
+		divider.addEventListener("pointerdown", event => {
+			event.preventDefault();
+			divider.setPointerCapture(event.pointerId);
+			divider.classList.add("tau-dragging");
+			const x0 = event.clientX, w1 = left.offsetWidth, w2 = right.offsetWidth;
+			const g1 = Number(left.style.flexGrow || 1), g2 = Number(right.style.flexGrow || 1);
+			const move = e => {
+				const d = Math.max(80 - w1, Math.min(w2 - 80, e.clientX - x0));
+				left.style.flexGrow = (g1 + g2) * (w1 + d) / (w1 + w2);
+				right.style.flexGrow = (g1 + g2) * (w2 - d) / (w1 + w2);
+			};
+			const up = () => {
+				divider.classList.remove("tau-dragging");
+				divider.removeEventListener("pointermove", move);
+				divider.removeEventListener("pointerup", up);
+			};
+			divider.addEventListener("pointermove", move);
+			divider.addEventListener("pointerup", up);
+		});
+		// a double click gives them the same width again
+		divider.addEventListener("dblclick", () => {
+			const g = (Number(left.style.flexGrow || 1) + Number(right.style.flexGrow || 1)) / 2;
+			left.style.flexGrow = right.style.flexGrow = g;
+		});
+	});
+}
+
 function activate(pane) {
 	if (active === pane) return;
 	if (active) active.element.classList.remove("tau-active");
@@ -184,6 +221,7 @@ function removePane(pane) {
 	pane.observer.disconnect();
 	pane.element.remove();
 	panes.delete(pane.window);
+	layoutPanes();
 	if (active === pane) {
 		active = null;
 		const next = panes.values().next().value;
@@ -229,6 +267,7 @@ function showTabs(pane) {
 		close.addEventListener("click", () => ask("close-window"));
 		pane.tabs.append(el("span", "tau-glue"), close);
 	}
+	chrome.fit(pane.tabs);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,6 +519,9 @@ worker.onmessage = event => {
 		break;
 	}
 	case "buffers": {
+		// where the main and the mode icon bars are: the preference, or what
+		// the address says (?bars=top or left)
+		document.body.classList.toggle("tau-bars-left", (params.get("bars") || m.bars || "left") === "left");
 		// the tabs keep their places: the documents in the order in which
 		// the page came to know them
 		const known = buffers.map(b => b.name);

@@ -1,0 +1,10 @@
+# The test suites of TeXmacs which do not pass in Tau, and why
+# (misc/tau/test/suites-test.mjs). One per line: name: reason.
+
+glue: three checks run a program; there are no processes in WebAssembly
+git: runs git; there are no processes in WebAssembly
+plugins: starts the programs of plugins; in Tau a plugin is a Web Worker, which node does not start
+convert-more: converts EPS to PDF with Ghostscript, which Tau has not
+typeset: expects the line breaks of the TeX fonts; "roman" is Latin Modern in Tau
+version: one width expected of the TeX fonts (25755 for 25754)
+parse: the highlighting of two Julia declarations; not looked into
