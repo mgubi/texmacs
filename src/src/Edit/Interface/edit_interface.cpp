@@ -868,7 +868,7 @@ edit_interface_rep::apply_changes () {
     double prof_t= 0;
     if (edit_profile.on) {
       bool on= true;
-      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       prof_t= edit_profile_now ();
     }
     typeset (x1, y1, x2, y2);
@@ -888,7 +888,12 @@ edit_interface_rep::apply_changes () {
            << " pass(es): bridges " << edit_profile.bridges << " ms ("
            << edit_profile.redone << " redone, " << edit_profile.cached << " reused), pages "
            << edit_profile.pages << " ms"
-           << (edit_profile.breaks_reused > 0 ? " (breaks reused)" : "") << ", changes " << edit_profile.changes << " ms ("
+           << (edit_profile.breaks_reused > 0 ? " (breaks reused)" : "")
+           << (edit_profile.starts > 0
+               ? " (search " * as_string (floor (edit_profile.search * 100 + 0.5) / 100)
+                 * " ms, " * as_string (edit_profile.starts) * " starts)"
+               : string (""))
+           << ", changes " << edit_profile.changes << " ms ("
            << edit_profile.rects << " rectangles from " << edit_profile.lines
            << " lines); invalid " << (int) rw << " x " << (int) rh << " of the view "
            << (int) vw << " x " << (int) vh << " = "

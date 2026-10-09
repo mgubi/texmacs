@@ -53,6 +53,16 @@ struct new_breaker_rep {
  
   hashmap<path,array<path> > cache_uniform;
   hashmap<path,array<path> > cache_colbreaks;
+
+  // The faster search (see "A faster search" in new_breaker.cpp). The best
+  // previous break and penalty of the plain positions (a number of items,
+  // no pending float) are in arrays instead of the tables above
+  int          fast_level;  // 0: off, 1..3: the changes in use
+  array<bool>  has_a;       // a best previous break is known
+  array<bool>  done_a;      // the position is in done_list
+  array<int>   pen_a;       // its penalty
+  array<int>   exc_a;
+  array<path>  prev_a;      // the best previous break
  
   new_breaker_rep (array<page_item> l, space ph, int quality,
                    space fn_sep, space fnote_sep, space float_sep,
@@ -61,6 +71,16 @@ struct new_breaker_rep {
   insertion make_insertion (lazy_vstream lvs, path p);
   space compute_space (path b1, path b2, bool wide_part= false);
   bool last_break (path b);
+  inline bool is_plain (path b) { return fast_level > 0 && is_nil (b->next); }
+  bool     has_best (path b);
+  bool     is_done (path b);
+  vpenalty get_pen (path b);
+  void     set_best (path b, path prev, vpenalty pen);
+  void     export_tables ();
+  void     plain_space (int i1, int i2, SI& smin, SI& sdef, SI& smax);
+  void     find_page_breaks_plain (path b1, path b1x, vpenalty prev_pen);
+  void     find_page_breaks_from (path b1, path b1x, vpenalty prev_pen,
+                                  path b2, bool ok, bool found_one);
   void find_page_breaks (path i1);
   void find_page_breaks ();
   vpenalty format_insertion (insertion& ins, double stretch);
