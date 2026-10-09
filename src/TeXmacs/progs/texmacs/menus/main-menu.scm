@@ -177,7 +177,7 @@
   ((balloon (icon "tm_copy.xpm") "Copy text")
    (kbd-copy))
   ((balloon (icon "tm_paste.xpm") "Paste text")
-   (kbd-paste))
+   (tau-paste))
   ((balloon (icon "tm_find.xpm") "Find text")
    (interactive-search))
   ((balloon (icon "tm_replace.xpm") "Query replace")

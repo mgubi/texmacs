@@ -9,7 +9,7 @@
 // To the page:   { t: "ready" | "view" | "paint" | "log" | "status" | "failed", ... },
 //                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
 //                { t: "dialog" | "close" | "refresh", part, ... },
-//                { t: "buffers" | "clipboard" | "pick" | "download", ... },
+//                { t: "buffers" | "clipboard" | "paste-request" | "pick" | "download", ... },
 //                { t: "quit" }, { t: "stopped", text }
 
 "use strict";
@@ -40,6 +40,9 @@ function handle(m) {
 		break;
 	case "close":
 		core._tau_closed(m.id);
+		break;
+	case "fullscreen-left":
+		core._tau_fullscreen_left();
 		break;
 	case "scheme":
 		// for the tests: a Scheme command, when the page is opened with ?debug
@@ -148,7 +151,7 @@ function post(message, transfer) {
 		const buffers = Object.values(files);
 		if (buffers.length) { message.files = files; transfer = (transfer || []).concat(buffers); }
 	}
-	if (tauModule && message.t === "download") {
+	if (tauModule && (message.t === "download" || message.t === "open-pdf")) {
 		// a file for the user: its bytes go with the message
 		try {
 			message.bytes = tauModule.FS.readFile(message.path).buffer;

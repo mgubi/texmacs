@@ -69,6 +69,7 @@ function makePane(windowNumber) {
 	panes.set(windowNumber, pane);
 	layoutPanes();
 	attachView(pane);
+	addScrollbars(pane, holder);
 	// a file which is dropped on a pane is opened there
 	pane.canvas.addEventListener("dragover", event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
 	pane.canvas.addEventListener("drop", event => {
@@ -77,6 +78,74 @@ function makePane(windowNumber) {
 		for (const file of event.dataTransfer.files) openFile(file, 0);
 	});
 	return pane;
+}
+
+// The scroll bars of a pane: where the view is in its document, which the
+// core tells with what it draws. A thumb is dragged, a click beside it
+// moves by what is seen; the core scrolls, the bars follow.
+function addScrollbars(pane, holder) {
+	const bars = {};
+	for (const axis of ["y", "x"]) {
+		const track = el("div", "tau-scroll tau-scroll-" + axis), thumb = el("div", "tau-thumb");
+		track.append(thumb);
+		holder.append(track);
+		bars[axis] = { track, thumb };
+		const vertical = axis === "y";
+		const size = () => vertical ? pane.canvas.height : pane.canvas.width;       // what is seen
+		const whole = () => vertical ? pane.extents.height : pane.extents.width;   // the document
+		const length = () => vertical ? track.clientHeight : track.clientWidth;
+		const thumbLength = () => Math.max(24, length() * size() / Math.max(whole(), 1));
+		const by = d => {
+			d = Math.round(d);
+			if (d) send({ t: "scroll", view: pane.view, dx: vertical ? 0 : d, dy: vertical ? d : 0 });
+		};
+		thumb.addEventListener("pointerdown", event => {
+			event.preventDefault();
+			event.stopPropagation();
+			thumb.setPointerCapture(event.pointerId);
+			track.classList.add("tau-dragging");
+			const start = vertical ? event.clientY : event.clientX;
+			const from = pane.scroll[axis];
+			let asked = from;
+			const move = e => {
+				const room = length() - thumbLength();
+				if (room <= 0) return;
+				const d = ((vertical ? e.clientY : e.clientX) - start) / room * (whole() - size());
+				const to = Math.max(0, Math.min(whole() - size(), from + d));
+				by(to - asked);
+				asked += Math.round(to - asked);
+			};
+			const up = () => {
+				track.classList.remove("tau-dragging");
+				thumb.removeEventListener("pointermove", move);
+				thumb.removeEventListener("pointerup", up);
+			};
+			thumb.addEventListener("pointermove", move);
+			thumb.addEventListener("pointerup", up);
+		});
+		track.addEventListener("pointerdown", event => {
+			if (event.target !== track) return;
+			event.preventDefault();
+			const r = thumb.getBoundingClientRect();
+			const before = vertical ? event.clientY < r.top : event.clientX < r.left;
+			by((before ? -0.9 : 0.9) * size());
+		});
+	}
+	pane.showScroll = () => {
+		for (const axis of ["y", "x"]) {
+			const { track, thumb } = bars[axis], vertical = axis === "y";
+			const size = vertical ? pane.canvas.height : pane.canvas.width;
+			const whole = vertical ? pane.extents.height : pane.extents.width;
+			const needed = whole > size + 2;
+			track.hidden = !needed;
+			if (!needed) continue;
+			const length = vertical ? track.clientHeight : track.clientWidth;
+			const t = Math.max(24, length * size / whole);
+			const at = (length - t) * Math.max(0, Math.min(1, pane.scroll[axis] / (whole - size)));
+			thumb.style[vertical ? "height" : "width"] = t + "px";
+			thumb.style.transform = vertical ? `translateY(${at}px)` : `translateX(${at}px)`;
+		}
+	};
 }
 
 // A view in a dialog or in a tool (chrome.mjs): a canvas of the size which
@@ -171,6 +240,25 @@ function attachView(target) {
 		pendingScroll.dx += event.deltaX * unit * density;
 		pendingScroll.dy += event.deltaY * unit * density;
 	}, { passive: false });
+}
+
+// The tools at the sides of the views are made wider or narrower by their
+// edge towards the views
+for (const [id, sign] of [["tau-side-0", -1], ["tau-side-1", 1]]) {
+	const tool = document.getElementById(id), grip = el("div", "tau-tool-grip");
+	if (!tool) continue;
+	tool.parentElement.insertBefore(grip, sign < 0 ? tool : tool.nextSibling);
+	new MutationObserver(() => { grip.hidden = tool.hidden || !tool.firstElementChild; }).observe(tool, { attributes: true, childList: true });
+	grip.hidden = true;
+	grip.addEventListener("pointerdown", event => {
+		event.preventDefault();
+		grip.setPointerCapture(event.pointerId);
+		const x0 = event.clientX, w0 = tool.offsetWidth;
+		const move = e => { tool.style.width = Math.max(160, Math.min(window.innerWidth * 0.6, w0 + sign * (e.clientX - x0))) + "px"; };
+		const up = () => { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); };
+		grip.addEventListener("pointermove", move);
+		grip.addEventListener("pointerup", up);
+	});
 }
 
 // The panes share the width; the line between two of them is dragged to
@@ -468,6 +556,42 @@ function download(m) {
 	setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+// A PDF which TeXmacs made to be looked at or printed (Preview, Print): in
+// a tab of the browser, which has what it takes to read, print and save
+// it. The browser may refuse a tab which no click asked for (the document
+// took long to make): a line with a link then.
+function openPdf(m) {
+	if (!m.bytes) return;
+	const url = URL.createObjectURL(new Blob([m.bytes], { type: "application/pdf" }));
+	const tab = window.open(url, "_blank");
+	if (tab) return;
+	const bar = el("div", "tau-notice"), link = el("a", "", "Open " + m.name), close = el("button", "tau-doc-close", "×");
+	link.href = url;
+	link.target = "_blank";
+	link.addEventListener("click", () => bar.remove());
+	close.type = "button";
+	close.addEventListener("click", () => bar.remove());
+	bar.append(el("span", "", "The PDF is ready."), link, close);
+	panesElement.parentElement.insertBefore(bar, panesElement);
+}
+
+// The full screen mode of TeXmacs: the page takes the screen, if the
+// browser lets it (it wants a click or a key of the user just before), and
+// shows the views alone. When the user leaves it with the browser (Escape),
+// TeXmacs is told.
+let fullScreenAsked = false;
+function fullScreen(on) {
+	fullScreenAsked = on;
+	document.body.classList.toggle("tau-fullscreen", on);
+	const root = document.documentElement;
+	if (on && !document.fullscreenElement && root.requestFullscreen) root.requestFullscreen().catch(() => {});
+	if (!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+	if (active) focusView(active);
+}
+document.addEventListener("fullscreenchange", () => {
+	if (!document.fullscreenElement && fullScreenAsked) { fullScreenAsked = false; send({ t: "fullscreen-left" }); }
+});
+
 // what is pasted in a view: the text and the HTML of the clipboard, which
 // the browser gives to the text area of the keyboard
 area.addEventListener("paste", event => {
@@ -479,6 +603,25 @@ area.addEventListener("paste", event => {
 	const text = data.getData("text/plain"), html = data.getData("text/html");
 	if (text || html) send({ t: "paste", view: focused.view, text, html });
 });
+
+// Paste asked from a menu: the clipboard of the browser is read (the
+// browser may ask the user), and what TeXmacs kept is pasted when it
+// cannot be
+async function pasteFromBrowser() {
+	const target = focused || active;
+	if (!target || !target.view) return;
+	let text = "", html = "";
+	try {
+		if (navigator.clipboard.read) {
+			for (const item of await navigator.clipboard.read()) {
+				if (item.types.includes("text/html")) html = await (await item.getType("text/html")).text();
+				if (item.types.includes("text/plain")) text = await (await item.getType("text/plain")).text();
+			}
+		} else text = await navigator.clipboard.readText();
+	} catch (error) { if (verbose) console.log("clipboard: " + error.message); }
+	send({ t: "paste", view: target.view, text, html });
+	focusView(target);
+}
 
 function copy(text) {
 	const done = navigator.clipboard && navigator.clipboard.writeText
@@ -559,9 +702,10 @@ worker.onmessage = event => {
 		if (canvas.width !== m.width || canvas.height !== m.height) {
 			canvas.width = m.width; canvas.height = m.height;
 		}
-		pane.context.putImageData(
-			new ImageData(new Uint8ClampedArray(m.pixels), m.width, m.height), 0, 0);
+		// the rectangle of the canvas which changed
+		pane.context.putImageData(new ImageData(new Uint8ClampedArray(m.pixels), m.w, m.h), m.x, m.y);
 		pane.extents = m.extents; pane.scroll = m.scroll; pane.caret = m.caret;
+		if (pane.showScroll) pane.showScroll();
 		if (pane === focused && !composing) placeArea();
 		state.paints++;
 		state.started = true;
@@ -572,8 +716,11 @@ worker.onmessage = event => {
 		break;
 	}
 	case "clipboard": copy(m.text); break;
+	case "paste-request": pasteFromBrowser(); break;
 	case "pick": pickFile(m); break;
 	case "download": download(m); break;
+	case "open-pdf": openPdf(m); break;
+	case "fullscreen": fullScreen(m.on); break;
 	}
 };
 worker.onerror = event => {

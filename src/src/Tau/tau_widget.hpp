@@ -48,6 +48,8 @@ public:
   picture  backing;
   renderer ren;
   SI       backing_x, backing_y; // the scroll position they are drawn for
+  int      drawn_x1, drawn_y1, drawn_x2, drawn_y2; // the pixels which the
+                                   // last repaint changed
   // what the editor asked
   rectangle  extents;          // of the document
   rectangles invalid;          // regions to draw again

@@ -60,8 +60,11 @@ export function handle(m) {
 	case "visible": {
 		const bar = document.getElementById("tau-" + m.part);
 		if (bar) bar.hidden = !m.visible;
+		// "the header" of TeXmacs is the menu bar with the icon bars
+		if (m.part === "menu") document.body.classList.toggle("tau-no-header", !m.visible);
 		return true;
 	}
+	case "tooltip": showTooltip(m); return true;
 	case "footer": {
 		const side = document.getElementById("tau-footer-" + m.part);
 		if (side) side.textContent = m.text;
@@ -689,4 +692,30 @@ export function fit(c) {
 	c.prepend(f.prev);
 	c.append(f.next);
 	updateFit(c);
+}
+
+// ---------------------------------------------------------------------------
+// Tooltips
+// ---------------------------------------------------------------------------
+
+// A tooltip of a document (the text of a reference, a note...): a view
+// which the core draws, shown over the view which has the keyboard, at a
+// place counted from its top left corner. The core takes it away.
+const tooltips = new Map(); // id -> element
+
+function showTooltip(m) {
+	const old = tooltips.get(m.id);
+	if (old) { old.remove(); tooltips.delete(m.id); }
+	if (!m.view) return;
+	const canvas = makeView({ view: m.view, width: m.width, height: m.height, input: false });
+	if (!canvas) return;
+	const box = el("div", "tau-tooltip");
+	box.append(canvas);
+	document.body.append(box);
+	tooltips.set(m.id, box);
+	const pane = document.querySelector(".tau-pane.tau-active .tau-canvas") || document.querySelector(".tau-canvas");
+	const r = pane ? pane.getBoundingClientRect() : { left: 0, top: 0 };
+	const x = r.left + m.x, y = r.top + m.y;
+	box.style.left = Math.max(2, Math.min(x, window.innerWidth - m.width - 8)) + "px";
+	box.style.top = Math.max(2, Math.min(y, window.innerHeight - m.height - 8)) + "px";
 }

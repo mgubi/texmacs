@@ -338,6 +338,9 @@ tm_frame_rep::full_screen_mode (bool on, bool edit) {
     show_header (true);
     show_footer (true);
   }
+  // (the page takes the whole screen, if the browser lets it)
+  void tau_fullscreen (bool on);
+  tau_fullscreen (on);
   get_current_editor () -> full_screen_mode (on && !edit);
   full_screen = on;
   full_screen_edit = on && edit;

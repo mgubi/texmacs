@@ -300,7 +300,8 @@
 ;; menu bar was at the start; in Tau the menus are built when they open)
 (lazy-define (doc help-funcs) load-help-buffer load-help-article)
 (lazy-define (texmacs texmacs tau-files) tau-choose-file tau-file-chosen
-             tau-download tau-download-buffer tau-saved tau-close-buffer)
+             tau-download tau-download-buffer tau-saved tau-close-buffer
+             tau-paste web-open-pdf tau-tooltip-show tau-tooltip-hide)
 (lazy-define (doc tmdoc) tmdoc-expand-help tmdoc-expand-help-manual
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src

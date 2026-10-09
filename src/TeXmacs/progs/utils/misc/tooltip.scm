@@ -61,20 +61,19 @@
 
 (define (tooltip-unmap id)
   ;;(display* "Unmap " id " -> " (tooltip-win id) "\n")
+  ;; Tau: a tooltip is a view which the page shows over the document; what
+  ;; is kept as its window is its widget, which lives as long as it
   (and-with win (tooltip-win id)
-    (alt-window-hide win)
-    (alt-window-delete win)
+    (tau-tooltip-hide id)
     (tooltip-reset id)))
 
 (define (tooltip-map wid x y id settings)
   (set! x (quotient x 256))
   (set! y (quotient y 256))
   (if (tooltip-win id) (tooltip-unmap id))
-  (with win (alt-window-handle)
-    (alt-window-create-tooltip win wid (translate "Tooltip"))
-    (alt-window-set-position win x y)
-    (alt-window-show win)
-    (tooltip-set id win settings #f)
+  (begin
+    (tau-tooltip-show id wid x (- y))
+    (tooltip-set id wid settings #f)
     ;;(display* "Map " id " -> " win "\n")
     ))
 
@@ -243,7 +242,8 @@
                        (w (widget-texmacs-output
                            `(with ,@env "project" ,master ,doc)
                            `(style (tuple ,@packs))))
-                       (bsz (texmacs-widget-size w))
+                       ;; (in Tau the number of the view comes third)
+                       (bsz (sublist (texmacs-widget-size w) 0 2))
                        (ssz (get-screen-size))
                        (pos (tooltip-position x1 y1 x2 y2 wx wy
                                               bsz ssz mpos ha va type)))

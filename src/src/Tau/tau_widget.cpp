@@ -23,6 +23,7 @@ simple_widget_rep::simple_widget_rep ():
   absolute_scroll (false), zoom (1.0), has_focus (false),
   resize_pending (false), shown (false), backing (), ren (NULL),
   backing_x (0), backing_y (0),
+  drawn_x1 (0), drawn_y1 (0), drawn_x2 (0), drawn_y2 (0),
   extents (0, 0, 0, 0), invalid (), invalid_all (true),
   cursor_x (0), cursor_y (0), mouse_grab (false), pointer_name ("")
 {
@@ -63,7 +64,12 @@ simple_widget_rep::set_place (int w, int h, double density2, int counter) {
   if (w < 1) w= 1;
   if (h < 1) h= 1;
   if (density2 <= 0.0) density2= 1.0;
-  if (w == px_w && h == px_h && density2 == density && ren != NULL) return;
+  if (w == px_w && h == px_h && density2 == density && ren != NULL) {
+    // the same place told again: the page may have dropped what was drawn
+    // for the place before, so all of it is sent for this one
+    invalid_all= true;
+    return;
+  }
   px_w= w; px_h= h; density= density2;
   // the density of the screen, as the core knows it (a whole number)
   set_retina_factor (max (1, (int) (density + 0.5)));
@@ -140,6 +146,13 @@ simple_widget_rep::repaint () {
   invalid_all= false;
   if (is_nil (todo)) return false;
   rectangle lub= least_upper_bound (todo);
+  // the pixels which change: all that is sent to the page
+  drawn_x1= max (0, (int) ((lub->x1 - backing_x) / ren->pixel) - 2);
+  drawn_x2= min (px_w, (int) ((lub->x2 - backing_x) / ren->pixel) + 3);
+  drawn_y1= max (0, (int) ((backing_y - lub->y2) / ren->pixel) - 2);
+  drawn_y2= min (px_h, (int) ((backing_y - lub->y1) / ren->pixel) + 3);
+  if (drawn_x2 <= drawn_x1 || drawn_y2 <= drawn_y1) {
+    drawn_x1= 0; drawn_y1= 0; drawn_x2= px_w; drawn_y2= px_h; }
   if (area (lub) < 1.2 * area (todo)) todo= rectangles (lub);
   while (!is_nil (todo)) {
     rectangle r= thicken (copy (todo->item), 1, 1);

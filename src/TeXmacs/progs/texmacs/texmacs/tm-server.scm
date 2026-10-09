@@ -179,7 +179,9 @@
   ("bitmap effects" "on" notify-tool)
   ("new style page breaking" "on" notify-new-page-breaking)
   ("open console on errors" "on" noop)
-  ("open console on warnings" "on" noop)
+  ;; (Tau: the warnings of a document which is being typeset, hundreds for a
+  ;; manual, do not open a dialog; errors do)
+  ("open console on warnings" "off" noop)
   ("gui:line-input:autocommit" "on" noop)
   ("use native menubar" (get-default-native-menubar) noop))
 

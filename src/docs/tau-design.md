@@ -840,6 +840,57 @@ Known: after "Save as" of a document which was saved before, its tab
 stays marked as changed though the file is written; it does not happen
 when `save-buffer-as` is called without the dialog, and was not found.
 
+**Drawing, scrolling and pasting** (2026-10-09).
+
+- **A paint is the rectangle which changed.** The view notes the pixels
+  which a repaint touched (`drawn_x1`... in `tau_widget`), and those
+  alone are copied and sent, with their place in the canvas; the whole
+  canvas goes when the view scrolls or is resized. A key in a pane of
+  2074×1318 pixels sent 11 MB before, and sends the line which changed.
+- **Scroll bars** on the panes, drawn by the page from what the core
+  tells with each paint (the size of the document and where the view
+  is): the thumb is dragged, a click beside it moves by what is seen.
+  They ask the core to scroll, as the wheel does; the core is still the
+  one which scrolls.
+- **Paste from a menu** asks the page for the clipboard of the browser
+  (`paste-request`; the browser may ask the user), and pastes what
+  TeXmacs kept when the page cannot read it. The key which pastes still
+  goes through the `paste` event of the browser. Both end in
+  `kbd-paste`, so that what a mode does on a paste still holds.
+
+Not done here: the caret and the selection are still drawn by the core
+(with the rectangles, a caret which moves is a small paint); what is
+copied is text only, as in the other ports; and the keyboard has still
+not been tried on a real dead key, an input method, a keyboard which is
+not US, or in Chrome.
+
+**Preview, full screen, tooltips** (2026-10-09).
+
+- **Print and Preview** write a PDF and give it to the page
+  (`web-open-pdf`, the function which `tm-print.scm` already calls in the
+  browser build; `open-pdf`), which opens it in a tab of the browser:
+  read, printed and saved there. When the browser refuses the tab (the
+  document took long, no click is recent), a line above the views has a
+  link to it.
+- **The full screen and presentation modes** hide the bars, the tabs and
+  the scroll bars, and ask the browser for the screen (`fullscreen`);
+  when the user leaves the full screen of the browser, TeXmacs leaves its
+  mode. "The header" of TeXmacs is the menu bar with the icon bars: all
+  go when it is hidden.
+- **Tooltips of a document** (the text of a reference, of a note): the
+  widget of `tooltip.scm` is a view, which the page shows in a small box
+  over the document where TeXmacs places it (`tooltip`).
+- A view whose place is told again is drawn again whole: the page drops
+  what was drawn for the place before, and a small view which was placed
+  twice stayed empty.
+- The warnings of a document do not open the dialog of the messages any
+  more ("open console on warnings" is off; errors still do).
+- The tools at the sides are made wider or narrower by their edge.
+
+Left: `tree-view`, `color-input` and `ink` in dialogs (one use each
+outside the tests: the tool of the patterns and the handwriting), and
+panes one above the other.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:

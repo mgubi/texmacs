@@ -59,7 +59,7 @@
 		 (graphics-selection-active?)))
 	("Copy" (kbd-copy))
 	("Cut" (kbd-cut)))
-  ("Paste" (kbd-paste))
+  ("Paste" (tau-paste))
   ;; in the browser, the menus have no access to its clipboard: a dialog
   ;; of the page gets it (misc/wasm/clipboard.js)
   (if (defined? 'web-paste-dialog)

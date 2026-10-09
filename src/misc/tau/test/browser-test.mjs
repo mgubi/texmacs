@@ -73,7 +73,8 @@ class Page {
 			tau.worker.addEventListener("message", e => {
 				const m = e.data;
 				if (m.t === "log") { if (/[Ee]rror/.test(m.text)) window.got.push({ t: "error", text: m.text }); }
-				else if (m.t !== "paint") window.got.push({ t: m.t, part: m.part, view: m.view, visible: m.visible, name: m.name, text: m.text });
+				else if (m.t === "paint") window.got.push({ t: "paint", view: m.view, w: m.w, h: m.h, width: m.width, height: m.height });
+				else window.got.push({ t: m.t, part: m.part, view: m.view, visible: m.visible, name: m.name, text: m.text, width: m.width, height: m.height });
 			});
 			tau.worker.postMessage = new Proxy(tau.worker.postMessage, {
 				apply(target, self, a) { window.sent.push(a[0]); return Reflect.apply(target, self, a); }
@@ -227,6 +228,53 @@ test("typing", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("drawing and scrolling", async p => {
+	await p.open();
+	await p.newDocument();
+	await p.type("Some text.");
+	await sleep(500);
+	// a key draws the part of the view which changes, not all of it
+	await p.forget();
+	await p.type("x");
+	await p.until("the view is drawn again", async () => (await p.got("paint")).length >= 1);
+	const paint = (await p.got("paint"))[0];
+	check("only a part of the canvas is sent", paint.w * paint.h < 0.25 * paint.width * paint.height, paint);
+	// the document is taller than the pane: a bar at the right
+	check("a scroll bar at the right", !(await p.box(".tau-scroll-y")).hidden);
+	const scroll = () => p.page.evaluate(() => tau.active.scroll.y);
+	const thumb = await p.box(".tau-scroll-y .tau-thumb");
+	check("the view is at the top", (await scroll()) === 0, await scroll());
+	await p.page.mouse.move(thumb.x + thumb.w / 2, thumb.y + thumb.h / 2);
+	await p.page.mouse.down();
+	await p.page.mouse.move(thumb.x + thumb.w / 2, thumb.y + thumb.h / 2 + 120, { steps: 4 });
+	await p.page.mouse.up();
+	await p.until("dragging the thumb scrolls the view", async () => (await scroll()) > 200);
+	const moved = await p.box(".tau-scroll-y .tau-thumb");
+	check("and the thumb follows", moved.y > thumb.y + 60, [thumb, moved]);
+	// a click above the thumb goes back by what is seen
+	const track = await p.box(".tau-scroll-y");
+	const before = await scroll();
+	await p.click(track.x + track.w / 2, track.y + 3);
+	await p.until("a click above the thumb scrolls back", async () => (await scroll()) < before);
+});
+
+test("paste from the menu", async p => {
+	await p.open();
+	await p.newDocument();
+	await p.type("word");
+	await p.key("ArrowLeft", "Shift"); await p.key("ArrowLeft", "Shift");
+	await p.forget();
+	await p.key("c", MOD);
+	await p.until("what is copied is given to the page", async () => (await p.got("clipboard")).some(m => m.text === "rd"));
+	await p.key("End");
+	await p.forget();
+	await p.choose("Edit", "Paste");
+	await p.until("the page is asked for its clipboard", async () => (await p.got("paste-request")).length === 1);
+	await p.until("and answers", async () => (await p.sent("paste")).length === 1);
+	await p.until("the document changes", async () => (await p.got("paint")).length >= 1);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("zoom keys", async p => {
 	await p.open();
 	await p.click(600, 500);
@@ -311,7 +359,7 @@ test("view in a dialog", async p => {
 		if (!c || c.width < 100) return false;
 		const data = c.getContext("2d").getImageData(0, 0, c.width, Math.min(c.height, 200)).data;
 		let dark = 0;
-		for (let i = 0; i < data.length; i += 4) if (data[i] < 100) dark++;
+		for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200 && data[i] < 100) dark++;
 		return dark > 50;
 	}), 15000);
 	await p.forget();
@@ -450,6 +498,40 @@ test("kept in the browser", async p => {
 	await p.page.evaluate(() => { window.before = true; });
 	await p.scheme("(quit-TeXmacs)");
 	await p.until("the page starts again", () => p.page.evaluate(() => !window.before && !!(window.tau && tau.state.started)), 90000);
+});
+
+test("preview, full screen, tooltip", async p => {
+	await p.open();
+	await p.newDocument();
+	await p.type("A page to look at.");
+	// Preview: the PDF goes to the page, which opens it
+	await p.forget();
+	await p.choose("File", "Preview");
+	await p.until("the PDF is given to the page", async () => (await p.got("open-pdf")).length === 1, 30000);
+	check("under the name of the document", /\.pdf$/.test((await p.got("open-pdf"))[0].name), await p.got("open-pdf"));
+	check("no dialog of warnings", (await p.dialogs()).length === 0, await p.dialogs());
+	// the full screen mode of TeXmacs: the views alone
+	await p.scheme("(toggle-full-screen-mode)");
+	await p.until("the bars and the tabs go", () => p.page.evaluate(() =>
+		document.body.classList.contains("tau-fullscreen") && document.body.classList.contains("tau-no-header")));
+	check("the menu bar is not shown", (await p.box("#tau-menu")).h === 0);
+	await p.scheme("(toggle-full-screen-mode)");
+	await p.until("and come back", () => p.page.evaluate(() =>
+		!document.body.classList.contains("tau-fullscreen") && !document.body.classList.contains("tau-no-header")));
+	// a tooltip of the document: a small view over it
+	await p.scheme('(show-tooltip "test-tip" (cursor-tree) (quote (document "A tip.")) "auto" "auto" "keyboard" 0.8)');
+	await p.until("the tooltip is shown", async () => (await p.count(".tau-tooltip canvas")) === 1);
+	const tip = await p.box(".tau-tooltip"), view = await p.box(".tau-canvas");
+	check("over the view", tip.x >= view.x && tip.y >= view.y && tip.w > 20 && tip.h > 10, [tip, view]);
+	await p.until("and drawn", () => p.page.evaluate(() => {
+		const c = document.querySelector(".tau-tooltip canvas");
+		if (!c || c.width < 10) return false;
+		const data = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+		let dark = 0;
+		for (let i = 0; i < data.length; i += 4) if (data[i + 3] > 200 && data[i] < 100) dark++;
+		return dark > 20;
+	}));
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
 test("stopped", async p => {

@@ -42,6 +42,28 @@
                 `((path . ,path)
                   (name . ,(url->system (url-tail u))))))))
 
+(tm-define (web-open-pdf path name)
+  (:synopsis "Show the PDF file @path to the user, under the name @name")
+  ;; Print and Preview write a PDF and call this (tm-print.scm), as in the
+  ;; browser build of TeXmacs: the page opens it in a tab of the browser,
+  ;; where it is read, printed or saved
+  (tau-post "open-pdf" "" `((path . ,path) (name . ,name))))
+
+(tm-define (tau-tooltip-show id wid x y)
+  (:synopsis "Show the widget @wid as the tooltip @id of the current view")
+  ;; (x, y) from the top left corner of the view, y going down
+  (with l (texmacs-widget-size wid)
+    (tau-post "tooltip" ""
+              `((id . ,(object->string id))
+                (view . ,(caddr l))
+                (width . ,(quotient (car l) 256))
+                (height . ,(quotient (cadr l) 256))
+                (x . ,x) (y . ,y)))))
+
+(tm-define (tau-tooltip-hide id)
+  (:synopsis "Take the tooltip @id away")
+  (tau-post "tooltip" "" `((id . ,(object->string id)) (view . 0))))
+
 (tm-define (tau-saved u)
   (:synopsis "The buffer @u was saved")
   ;; (it is kept in the browser: nothing more to do)
@@ -185,6 +207,20 @@
       (lambda ()
         (protected-call
           (lambda () (if fun (fun u) (load-document u))))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The clipboard
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(tm-define (tau-paste)
+  (:synopsis "Paste what the clipboard of the browser has")
+  ;; The key which pastes is the browser's, which gives its clipboard with
+  ;; it. A command of a menu has to ask: the page reads the clipboard (the
+  ;; browser may ask the user) and pastes, or says that it could not, and
+  ;; what TeXmacs kept is pasted.
+  (if (in-browser?)
+      (tau-post "paste-request" "" '())
+      (kbd-paste)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The tabs

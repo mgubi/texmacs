@@ -119,6 +119,12 @@ tau_set_visible (string part, bool flag) {
 }
 
 void
+tau_fullscreen (bool on) {
+  tau_post_json ("fullscreen", "", on? string ("{\"on\":true}")
+                                     : string ("{\"on\":false}"));
+}
+
+void
 tau_footer (string side, string text) {
   tau_post_json ("footer", side,
                  "{\"text\":" * scm_quote (cork_to_utf8 (text)) * "}");
@@ -187,13 +193,24 @@ EM_JS (void, tau_js_view, (int view, int window, const char* what), {
 
 EM_JS (void, tau_js_paint, (int view, int counter, int w, int h,
                             const unsigned char* pixels,
+                            int x1, int y1, int x2, int y2,
                             int ew, int eh, int sx, int sy,
                             int cx, int cy), {
   if (!Module.tauPost) return;
-  // a copy of the pixels, which is transferred to the page
-  var data= HEAPU8.slice (pixels, pixels + 4 * w * h);
+  // a copy of the pixels which changed (a rectangle of the canvas), which
+  // is transferred to the page
+  var dw= x2 - x1, dh= y2 - y1, data;
+  if (dw == w && dh == h) data= HEAPU8.slice (pixels, pixels + 4 * w * h);
+  else {
+    data= new Uint8Array (4 * dw * dh);
+    for (var row= 0; row < dh; row++) {
+      var from= pixels + 4 * ((y1 + row) * w + x1);
+      data.set (HEAPU8.subarray (from, from + 4 * dw), 4 * row * dw);
+    }
+  }
   Module.tauPost ({ t: "paint", view: view, place: counter,
                     width: w, height: h, pixels: data.buffer,
+                    x: x1, y: y1, w: dw, h: dh,
                     extents: { width: ew, height: eh },
                     scroll: { x: sx, y: sy },
                     caret: { x: cx, y: cy } }, [data.buffer]);
@@ -203,8 +220,10 @@ static void tau_js_view (int view, int window, const char* what) {
   (void) view; (void) window; (void) what; }
 static void tau_js_paint (int view, int counter, int w, int h,
                           const unsigned char* pixels,
+                          int x1, int y1, int x2, int y2,
                           int ew, int eh, int sx, int sy, int cx, int cy) {
   (void) view; (void) counter; (void) w; (void) h; (void) pixels;
+  (void) x1; (void) y1; (void) x2; (void) y2;
   (void) ew; (void) eh; (void) sx; (void) sy; (void) cx; (void) cy; }
 #endif
 
@@ -344,6 +363,7 @@ tau_turn () {
     v->extents_in_pixels (ew, eh, sx, sy);
     v->cursor_in_pixels (cx, cy);
     tau_js_paint (v->id, v->place_counter, v->px_w, v->px_h, v->pixels (),
+                  v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
                   ew, eh, sx, sy, cx, cy);
   }
   // what Scheme has to say to the page (menu-serial.scm)
@@ -486,6 +506,16 @@ tau_scheme (const char* code) {
   tau_turn ();
 }
 
+// the browser left the full screen (the user pressed Escape): TeXmacs
+// leaves its full screen mode too
+EMSCRIPTEN_KEEPALIVE
+void
+tau_fullscreen_left () {
+  eval ("(cond ((full-screen-edit?) (toggle-full-screen-edit-mode))"
+        "      ((full-screen?) (toggle-full-screen-mode)))");
+  tau_turn ();
+}
+
 // the user closed a dialog
 EMSCRIPTEN_KEEPALIVE
 void
@@ -550,7 +580,7 @@ tau_paste (int view, const char* text, const char* html) {
   if (v == NULL) return;
   tau_paste_text (string (text), string (html));
   // (the view which pastes has the keyboard: it is the current one)
-  eval ("(clipboard-paste \"primary\")");
+  eval ("(kbd-paste)");
   tau_turn ();
 }
 
@@ -679,6 +709,8 @@ tau_paste_text (string text, string html) {
   // as the other interfaces read the clipboard of the system: HTML when
   // there is some, else text
   text= without_returns (text);
+  // (nothing from the page: what is kept here is pasted)
+  if (N(text) == 0 && N(html) == 0) return;
   if (text == copied_text && selection_trees->contains ("primary")) return;
   string s;
   if (N(html) != 0) {
