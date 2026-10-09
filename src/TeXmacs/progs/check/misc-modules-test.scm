@@ -669,10 +669,11 @@
   (check-group "font design")
   ;; the catalogue: a tab for each part, with the fonts the part may have
   (check= font-design-tabs
-          '("all" "text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
-  (for (x '(("all" "Roman") ("all" "Palatino") ("all" "Euler")
-            ("all" "DejaVu") ("all" "Fira") ("all" "IBM Plex")
-            ("text" "Roman") ("text" "Palatino") ("text" "Gentium Plus")
+          '("text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
+  ;; the pairs of the menus have no tab of their own
+  (for (name '("Roman" "Palatino" "Euler" "DejaVu" "Fira" "IBM Plex"))
+    (check-true (pair? (design-entry "all" name))))
+  (for (x '(("text" "Roman") ("text" "Palatino") ("text" "Gentium Plus")
             ("text" "Antykwa Torunska") ("text" "Iwona") ("text" "Fira")
             ("text" "Chorus")
             ("math" "Roman") ("math" "Euler") ("math" "STIX Two")
@@ -740,9 +741,9 @@
     (check= (assoc-ref c8 "family") "ss")
     (check= (assoc-ref c9 "family") "rm"))
   ;; the sample of an entry is set in its fonts, the rest in the default
-  (with t (font-design-sample-tree (design-entry "all" "Euler"))
+  (with t (font-design-sample-tree (design-entry "math" "Euler"))
     (check= (car t) 'with)
-    (check= (caddr t) "math=Euler Math,TeX Gyre Pagella"))
+    (check= (caddr t) "math=Euler Math,roman"))
   (check= (caddr (font-design-sample-tree (design-entry "cal" "Times")))
           "cal=TeX Gyre Termes Math,roman")
   (check= (caddr (font-design-sample-tree (design-entry "sansserif" "Iwona")))

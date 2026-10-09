@@ -133,9 +133,11 @@
 ;; The catalogue: for each part of a document, the fonts it may have
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The page has a tab for each part: "all" (text and mathematics together,
-;; the pairs of the menus), "text", "math", "sansserif", "typewriter",
-;; "bbb", "cal" and "frak". An entry of a tab is an association list with
+;; The page shows the fonts for one part at a time, its "tab": "text",
+;; "math", "sansserif", "typewriter", "bbb", "cal" or "frak". The pairs of
+;; the menus (text and mathematics together) are the catalogue "all",
+;; which has no tab: a pair is its text font with the mathematics "as the
+;; text font". An entry of a tab is an association list with
 ;;   tab     the part
 ;;   name    the name of the menus
 ;;   text    the master of the text font (the value of `font')
@@ -144,7 +146,7 @@
 ;;   id      the name of the picture of the sample, unique in the tab
 
 (tm-define font-design-tabs
-  '("all" "text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
+  '("text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
 
 (define tab-names
   '(("all" . "Text and mathematics") ("text" . "Text")
@@ -604,7 +606,7 @@
 (define font-design-page-tabs (make-ahash-table))
 
 (define (document-tab u)
-  (or (ahash-ref font-design-page-tabs (url->system u)) "all"))
+  (or (ahash-ref font-design-page-tabs (url->system u)) "text"))
 
 (define (design-action text cmd . args)
   `(action (font-design-button ,text)
@@ -616,12 +618,9 @@
 ;; the fonts for it in the list (pressed for the part which is shown)
 (define (choice-row doc c part)
   (let* ((d (url->system doc))
-         (val (if (== part "all")
-                  (and-with pair (choice-pair c) (entry-ref pair 'name))
-                  (and-with v (choice-ref c part)
-                    (font-design-value-name part v))))
-         (name (or val (if (== part "all") "a choice of your own"
-                           "as the text font"))))
+         (val (and-with v (choice-ref c part)
+                (font-design-value-name part v)))
+         (name (or val "as the text font")))
     `(row (cell ,(if (== part (document-tab doc))
                      `(font-design-tab-on ,(tab-name part))
                      `(action (font-design-tab-off ,(tab-name part))
@@ -726,7 +725,7 @@
     `(font-design-list
       ,scroll
       (document
-        ,@(if (in? tab '("all" "text")) (list)
+        ,@(if (== tab "text") (list)
               (append (default-block doc c tab) (list '(font-design-rule))))
         ,@(append-map (cut section-blocks doc c <>) ss)))))
 
