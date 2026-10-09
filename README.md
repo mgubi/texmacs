@@ -1,204 +1,111 @@
-# Max's TeXmacs — branch `maxs_texmacs`
+# Tau — branch `wip_tau`
 
-This is **Max's TeXmacs**, an integration branch of
-[GNU TeXmacs](https://texmacs.org): it gathers in one tree several lines
-of work which are not (yet) in the official TeXmacs, so that they can be
-built, used and tested together. It is stock TeXmacs (the `svn_sync`
-branch, the mirror of the SVN trunk) plus the following branches, merged
-in:
+<img src="src/misc/tau/web/icon.svg" width="96" align="right" alt="The icon of Tau">
 
-| Branch | What it brings |
-|---|---|
-| `wip_fixes` | **Fixes of TeXmacs which are not upstreamed**: bugs reported on Savannah and in the issues of this repository (the Scheme bridge, LaTeX export, the Qt list views, the editing modes, ...), header dependencies in the autotools build, and the test suites below |
-| `wip_opentype` | **OpenType mathematics**: formulas laid out from the `MATH` table of any OpenType math font, stretchable delimiters and accents from the font's own variants and assemblies, the OpenType features of text fonts, profiles which pair two dozen math fonts with their text companions (sixteen of the fonts are shipped), and a font inspector — see [OPENTYPEMATH.md](src/src/OPENTYPEMATH.md) |
-| `wip_other_guis` | **Other graphical interfaces and GUI improvements**: Vue (a toolkit of its own, on Clay, SDL3 and MuPDF), a native Cocoa interface for macOS, SDL and Qtwk, fixes to X11, and changes which serve every interface (the MuPDF renderer, windows which stay above the editor windows, ...) — see [the graphical interfaces](#the-graphical-interfaces) below |
-| `wip_icons` | **Icon sets**: besides the original icons (classical), a monochrome set in the manner of the macOS symbols and a neo-classical set, the classical compositions modernized, which is the default; chosen in Preferences ▸ General ▸ Icon set — see [src/doc/icons/README.md](src/doc/icons/README.md) |
-| `wip_s7` | **TeXmacs on [s7](https://ccrma.stanford.edu/software/snd/snd/s7.html)** instead of Guile 1.8: the interpreter is a build option (`./configure --with-scheme=s7\|guile`), s7 (vendored, 11.9) is the default and needs no Guile at all; one Scheme code base serves both, and with s7 the first window is ready in about 0.7 s instead of 1.9 s — see [src/docs/s7/](src/docs/s7/README.md) |
-| `wip-git-versioning` | **Git support**: Version ▸ Git with a side panel, a commit dialog, clickable status, log and branch pages, branches, tags and stashes, fetch, pull, push and clone in the background, comparison with any revision, a simple mode of snapshots, and **structured three-way merges of TeXmacs documents** (also as a git merge driver), with Git never run in a folder until it is trusted — see the manual chapter *Working with Git* and [doc/git-features.md](doc/git-features.md) |
-| `wip_zotero` | **Citations from [Zotero](https://www.zotero.org)**, read from the Zotero desktop application (its local API): the search window of citations lists the references of Zotero after those of the `.bib` file or of the database, with their sources; keys completed from Zotero; a bibliography file written from Zotero, or Zotero as a source of the database, whose copies of Zotero items follow Zotero (with a field-by-field choice when both sides changed); keys renamed in Zotero followed in the citations; group libraries — see the manual page *Citations from Zotero* and [doc/zotero-design.md](doc/zotero-design.md) |
-| `wip_wasm_vue` | **TeXmacs in the browser**: the same TeXmacs compiled to WebAssembly with Emscripten, on the Vue interface and s7, drawn by the GPU (WebGL2, through ThorVG) or by MuPDF; the files kept in the browser, and plug-ins whose programs run in the page too (Python by Pyodide, R by webR, TikZ by TikZJax, Asymptote, JavaScript, AI) — see [TeXmacs in the browser](#texmacs-in-the-browser) below |
-| `wip_dev_docs` | **Extensive developer documentation**, inside TeXmacs (Help ▸ Developer documentation): some 365 pages, about 200 of them on the internals of the source code — the data types, the typesetter, fonts and OpenType, the server, buffers, views and windows, the editor, the GUI ports, converters, plug-ins, collaboration — which compile into a book of more than a thousand pages ([`src/TeXmacs/doc/devel/`](src/TeXmacs/doc/devel/)) |
-| (tests, with `wip_fixes`) | **More tests**: unit tests of the kernel in C++, Scheme test suites for editing, conversions, the typesetter, menus, links and more, regression tests on documents, a headless typesetting of the whole documentation, and the OpenType renders — see [src/tests/README.md](src/tests/README.md) |
+**Tau** is an experiment with [GNU TeXmacs](https://texmacs.org) in the
+browser, organised differently from the other ports: the editor, the
+typesetter and the Scheme interpreter run in a **Web Worker**, without
+any widget or window, and the interface — the menus, the icon bars, the
+dialogs, the tabs and the panes — is **the page itself**, written in
+JavaScript and HTML. The two sides exchange messages; the documents are
+drawn by the worker (MuPDF) and shown in canvases.
 
-The branches are merged, not rebased, so each one can still be followed,
-updated and proposed upstream on its own; fixes found while integrating
-them go back to the branch they belong to.
+![Tau in a browser: the icon bars at the left, the documents as tabs, a document with formulas](src/docs/tau.png)
 
-Building is as for TeXmacs (from `src/`, `./configure && make`). The
-Scheme interpreter is s7 by default, which needs nothing installed;
-`./configure --with-scheme=guile --with-guile=<path to guile-config of
-Guile 1.8>` builds with Guile instead. The interface is chosen when
-configuring, see below.
+It branches from [`maxs_texmacs`](https://github.com/mgubi/texmacs/tree/maxs_texmacs)
+and is free to break with its organisation: it is not kept in sync with
+it. The design, the decisions taken and the state of the work are in
+[`src/docs/tau-design.md`](src/docs/tau-design.md).
 
-## TeXmacs in the browser
+## What is different
 
-![TeXmacs Vue in the browser: the tabs of the documents in a column, the main and mode icon bars at the left, a formula](src/docs/wasm/texmacs-in-the-browser.png)
-
-The same tree builds TeXmacs for a web page (it was the branch
-`wip_wasm_vue`, merged here and retired: the browser version is developed
-in `maxs_texmacs` now): the Vue interface draws everything in a canvas, s7 runs the Scheme
-code, and the files of TeXmacs come in packages which the browser keeps.
-Editing and typesetting, the menus and dialogs, a tab per document, the
-files of the user (upload, drag and drop, zip projects, downloads), the PDF
-of a document, the clipboard of the system, spell checking (Hunspell), the
-Remote menu (a TeXmacs server over WebSocket) and the plug-ins above work
-in the page; the plug-ins which run a program of the computer and the
-external converters do not (a page has no processes), and Git versioning
-hides itself there for the same reason. Help ▸ TeXmacs in the browser
-tells which commit made a build, the versions of its components and the
-sizes of its parts.
-
-It is built apart from `configure`, with Emscripten, by
-[`src/misc/wasm/Makefile`](src/misc/wasm/Makefile) (the sources are those of
-`misc/wasm/sources.txt`): see [`src/docs/wasm/`](src/docs/wasm/README.md)
-for the build, the design and the tests. The browser version is
-published at <https://mgubi.github.io/texmacs/> by the CI of the branch
-`wasm_ci` (`git push origin maxs_texmacs:wasm_ci`).
-
-## The graphical interfaces
-
-TeXmacs draws its documents itself and asks a GUI plugin only for windows,
-menus, bars, dialogs and events (see
-[how the core talks to a GUI plugin](src/docs/texmacs-gui-architecture.md)),
-so one editor can have several faces. The branch `wip_other_guis` brings
-back or adds:
-
-* **Vue**, an interface which owes nothing to a widget toolkit: it draws
-  the editor, the bars, the menus, the dialogs and the tools itself, on
-  [Clay](https://github.com/nicbarker/clay) for the layout, SDL3 for the
-  windows and the input, and MuPDF for the pixels;
-* **Cocoa**, a native macOS interface, the NS port of 2013/2018 brought
-  forward to the current TeXmacs;
-* **SDL**, the Widkit widgets of the X11 interface on SDL3 and MuPDF;
-* **Qtwk**, the Widkit widgets on Qt as a window system, and fixes to the
-  **X11** interface.
-
-The interface is chosen when configuring, from `src/`:
-
-| `./configure --with-gui=` | Interface | Code |
+| | The other ports | Tau |
 |---|---|---|
-| `qt` (default) | Qt 5/6 with native Qt widgets: the standard TeXmacs | `src/src/Plugins/Qt` |
-| `cocoa` (or `aqua`) | native macOS (NS) | `src/src/Plugins/NS` |
-| `vue` | SDL3 windows, widgets drawn by Clay, MuPDF rendering | `src/src/Plugins/Vue` |
-| `sdl` | SDL3 and MuPDF, Widkit widgets | `src/src/Plugins/SDL` |
-| `qtwk` | Qt as the window system, Widkit widgets | `src/src/Plugins/Qtwk` |
-| `x11` | plain X11, Widkit widgets | `src/src/Plugins/X11` |
+| Interface | widgets drawn by a toolkit (Qt, Vue...) in the program | HTML of the page; the program describes menus and dialogs as data |
+| Where the program runs | the thread of the interface | a worker: the page stays responsive |
+| Windows | objects of the program, with their bars and menus | none: a view is shown at a *place*, a number; panes and tabs are of the page |
+| Fonts | TeX fonts (Metafont, Type 1) and OpenType | OpenType only; Latin Modern in the place of the TeX fonts |
+| Graphical plugins | Qt, Cocoa, X11, SDL, Vue, Ghostscript... | removed; MuPDF draws and writes the PDF |
+| Scheme | Guile or S7 | S7 |
 
-`./configure --help` describes them too, and
-[build-and-debug.md](src/docs/build-and-debug.md) says what each needs
-(Guile 1.8, MuPDF for Vue and SDL, the X11 headers...).
+## What works
 
-### One document in each interface
+- Editing in one or several **panes** side by side, the documents as
+  **tabs**; the menus, the icon bars (as columns at the left, or above),
+  the context menu, the footer, the tools at the sides and under the
+  views, the search bar.
+- **Dialogs** made from the descriptions of TeXmacs (preferences, the
+  font selector, the macro editor...), with documents shown and edited
+  inside them; questions; tooltips over a document.
+- The **keyboard** as in the other ports: shortcuts from the place of
+  the keys, dead keys and input methods through a text area of the page.
+- **Documents kept in the browser** (IndexedDB), opened from and given
+  back to the computer; export to PDF; Print and Preview in a tab of the
+  browser; the clipboard of the browser.
+- **Plugins** as Web Workers: Python (Pyodide), R (webR), JavaScript,
+  Asymptote, TikZ; the client of a remote TeXmacs server over WebSocket.
+- The colour menus with **typographic palettes**; full screen and
+  presentation modes.
 
-The screenshots show one document, [sample.tm](src/docs/screenshots/sample.tm),
-in each interface, in the window each one opens with, taken on a Mac at 2x
-and reduced to 1x.
+What is missing or rough is listed, step by step, in the design note
+(*State*). In short: no tree views, colour pickers or handwriting in
+dialogs; panes only side by side; copy gives text only; the keyboard has
+been tried on a US keyboard in Firefox and Safari, not on others.
 
-#### Qt — the reference
+## Building
 
-![TeXmacs with the Qt interface](src/docs/screenshots/qt.png)
+Emscripten and a slim build of MuPDF for WebAssembly are needed (the
+scripts of `src/misc/wasm`, as for the browser build of `maxs_texmacs`:
+`emenv.sh`, `build-mupdf.sh`). From `src/`:
 
-The interface of the TeXmacs releases, shown as the reference the others
-are compared with: the menus, the three icon bars (main, mode and focus),
-the footer, the dialogs of Qt. The Scheme code of TeXmacs is written for
-it, and the other interfaces follow what it does. (A Qt 6 build of the
-same TeXmacs, 2.1.5.)
+```sh
+. misc/wasm/emenv.sh build-tau
+make -C build-tau -f ../misc/tau/Makefile -j8 MUPDF=<the MuPDF tree> web
+make -C build-tau -f ../misc/tau/Makefile MUPDF=<the MuPDF tree> serve   # http://localhost:8080/index.html
+```
 
-#### Cocoa — native macOS
+`web` makes the page in `build-tau/out/web`: the program (`tau.js`,
+`tau.wasm`), the files of TeXmacs in packages which are loaded lazily,
+the page (`misc/tau/web`) and the workers of the plugins. The programs of
+TikZ and Asymptote are fetched at pinned versions; `PLUGIN_PROGRAMS=no`
+leaves them out. The target `node` builds the core alone for node, which
+converts documents without a page.
 
-![TeXmacs with the Cocoa interface](src/docs/screenshots/cocoa.png)
+In the address of the page: `?bars=top` or `left` (the icon bars),
+`?nohome` (nothing is kept in the browser), `?trace-keys` (the keys in
+the console), `?arg=…` (an option of TeXmacs, a document to open).
 
-A native AppKit interface, in Objective-C++: the menus are those of the
-menu bar of the Mac, the icon bars, the side tools, the tabs, the dialogs
-and the file choosers are Cocoa views and panels, and the documents are
-drawn with Core Graphics. It follows the Qt interface feature by feature,
-with the Dock and the Finder (opening files, quitting). A universal
-application (arm64 and x86_64) for macOS 12 and later is built as a DMG by
-the CI (`.github/workflows/macos-ns.yml`, on the branch `ns_ci`). Status,
-known gaps and testing aids: [doc/ns-port.md](doc/ns-port.md).
+## Tests
 
-#### Vue — a toolkit of its own
+```sh
+make -C build-tau -f ../misc/tau/Makefile MUPDF=… check          # node
+make -C build-tau -f ../misc/tau/Makefile MUPDF=… browser-check  # a browser without a display
+```
 
-![TeXmacs with the Vue interface](src/docs/screenshots/vue.png)
+`check` runs the table of the keys, converts a document to PDF and runs
+the test suites of TeXmacs on the core (those which cannot pass in Tau
+are listed with their reason in `misc/tau/test/suites-expected.txt`).
+`browser-check` drives the page with puppeteer-core (`npm install
+puppeteer-core` in `build-tau/tools`) and Firefox or Chrome: the start,
+typing, the menus, the dialogs, the tabs and the files, the panes...
 
-Every pixel of the window is drawn by TeXmacs: Clay lays the widgets out
-anew at each frame (immediate mode), MuPDF renders them and the documents
-into one backing store, and SDL3 only brings the windows, the events, the
-clipboard and the input methods. The widgets follow those of Qt (menus as
-on the Mac, combo boxes which can be typed in, tabs, lists, side tools),
-at the density of each window, with animated highlights and rounded
-corners. Nothing in it depends on a platform: the same code runs in a
-browser (see [TeXmacs in the browser](#texmacs-in-the-browser)). A single-window mode
-(`TEXMACS_VUE_SINGLE_WINDOW=1`) keeps the dialogs and the tools inside the
-main window, as in the browser.
+## Where things are
 
-![The menus of the Vue interface](src/docs/screenshots/vue-menus.png)
-
-The menus and the submenus are drawn in the window too, with the column
-of the check marks, the shortcuts, and scroll markers when they do not
-fit.
-
-![The dark theme of the Vue interface](src/docs/screenshots/vue-dark.png)
-
-The colours come from a theme, light or dark, which follows the system
-(or the "gui theme" preference, or `TEXMACS_VUE_THEME`), with a dark set
-of the vector icons.
-
-Developer notes: [the graphics stack](src/docs/vue-graphics-stack.md),
-[the widgets](src/docs/vue-widgets.md), [the test harness](src/docs/vue-testing.md)
-(scripted events and snapshots, some fifty tests in
-`src/src/Plugins/Vue/tests/`).
-
-#### SDL — the Widkit widgets on SDL3
-
-![TeXmacs with the SDL interface](src/docs/screenshots/sdl.png)
-
-The widgets of the X11 interface (Widkit, drawn by TeXmacs itself) on
-SDL3 windows, with MuPDF as the renderer: the classic look of TeXmacs
-without X11. Its event loop, its text input and its clipboard are made as
-those of Vue.
-
-#### Qtwk and X11
-
-Not shown. Qtwk puts the same Widkit widgets on Qt windows. The X11
-interface is the historical one of TeXmacs, and needs an X server (XQuartz
-on a Mac), which was not available where the screenshots were taken. Both
-build on this branch, and have the changes made to Widkit for the other
-interfaces (side tools on both sides of the canvas, windows kept above the
-editor windows).
-
-## Documentation
-
-* [src/TeXmacs/doc/devel/](src/TeXmacs/doc/devel/): the developer
-  documentation, read in TeXmacs with Help ▸ Developer documentation, or
-  compiled into a book with Help ▸ Full manuals ▸ Developer documentation
-* [src/src/OPENTYPEMATH.md](src/src/OPENTYPEMATH.md) and
-  [src/doc/opentype-math-design.md](src/doc/opentype-math-design.md): the
-  OpenType mathematics, its status and its design
-* [src/tests/README.md](src/tests/README.md): the tests and how to run
-  them
-* [src/docs/](src/docs/README.md): the Vue plugin, how the core talks to a
-  GUI plugin, building and debugging, the PDF output with MuPDF, a design
-  for separating the editor from its front end
-* [doc/ns-port.md](doc/ns-port.md): the Cocoa interface
-* [src/docs/s7/](src/docs/s7/README.md): TeXmacs on s7, the differences
-  with Guile, the build, the open issues and the performance
-* [doc/README.md](doc/README.md): the Git support, its features, design,
-  implementation and audits; the user manual has a chapter *Working with
-  Git* (Help ▸ Manual, in the chapter *Editing tools*)
-* [doc/zotero-design.md](doc/zotero-design.md): the design of the Zotero
-  integration; the user manual page *Citations from Zotero* (in the
-  chapter on links and bibliographies) and the developer chapter
-  *Citations from Zotero* (with the database and bibliographies)
-
-## This repository
-
-The layout is the one of the TeXmacs SVN trunk, which this is a mirror of:
-
-| Directory | Contents |
+| | |
 |---|---|
-| [`src/`](src/README.md) | the editor: sources, Scheme, styles, documentation, packaging. **Its [`README.md`](src/README.md) is the README of the project** |
-| `doc/` | notes on the Cocoa interface, the Git support and the Zotero integration |
-| `misc/` | build scripts, plugins and other odds and ends |
-| `web/` | the sources of the web site |
-| `guile-texmacs/` | the vendored Guile 1.8 |
+| `src/docs/tau-design.md` | the design and the state of the work |
+| `src/src/Tau/` | the core seen from the page: views, the turn of the worker, the messages |
+| `src/TeXmacs/progs/kernel/gui/menu-serial.scm` | the menus and the dialogs of TeXmacs as data for the page |
+| `src/TeXmacs/progs/texmacs/texmacs/tau-files.scm` | the files of the user, the clipboard, tooltips |
+| `src/misc/tau/web/` | the page: `tau.mjs` (views, panes, keyboard), `chrome.mjs` (menus, dialogs), `keys.mjs`, `app.mjs`, the worker |
+| `src/misc/tau/test/` | the tests |
+| `src/misc/tau/Makefile` | the build |
+
+## Related
+
+- [`maxs_texmacs`](https://github.com/mgubi/texmacs/tree/maxs_texmacs),
+  from which Tau branches: TeXmacs with OpenType mathematics, S7, other
+  interfaces and a browser version on the Vue interface, where the whole
+  program runs in the page and draws its own widgets.
+- [Vau](https://github.com/mgubi/vau), the typesetting core of TeXmacs
+  as a viewer, from which the choice of fonts and the lazy packages come.
