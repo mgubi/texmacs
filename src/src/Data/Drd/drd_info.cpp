@@ -21,9 +21,13 @@
 ******************************************************************************/
 
 drd_info_rep::drd_info_rep (string name2):
-  name (name2), info (tag_info ()), env (UNINIT) {}
+  name (name2), info (tag_info ()), env (UNINIT),
+  version (0), heuristic_env (UNINIT), heuristic_version (0),
+  heuristic_valid (false) {}
 drd_info_rep::drd_info_rep (string name2, drd_info base):
-  name (name2), info (tag_info (), base->info), env (UNINIT) {}
+  name (name2), info (tag_info (), base->info), env (UNINIT),
+  version (0), heuristic_env (UNINIT), heuristic_version (0),
+  heuristic_valid (false) {}
 drd_info::drd_info (string name):
   rep (tm_new<drd_info_rep> (name)) {}
 drd_info::drd_info (string name, drd_info base):
@@ -46,6 +50,7 @@ drd_info_rep::set_locals (tree t) {
   if (!is_func (t, COLLECTION))
     return false;
   int i, n= N(t);
+  version++;
   for (i=0; i<n; i++)
     if (is_func (t[i], ASSOCIATE, 2) && is_atomic (t[i][0]))
       info (make_tree_label (t[i][0]->label))= tag_info (t[i][1]);
@@ -70,7 +75,7 @@ void
 drd_info_rep::set_type (tree_label l, int tp) {
   if (info[l]->pi.freeze_type) return;
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.type= tp;
 }
 
@@ -82,7 +87,7 @@ drd_info_rep::get_type (tree_label l) {
 void
 drd_info_rep::freeze_type (tree_label l) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.freeze_type= true;
 }
 
@@ -99,7 +104,7 @@ void
 drd_info_rep::set_arity (tree_label l, int arity, int extra, int am, int cm) {
   if (info[l]->pi.freeze_arity) return;
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.arity_mode= am;
   ti->pi.child_mode= cm;
   if (am != ARITY_VAR_REPEAT) {
@@ -146,7 +151,7 @@ drd_info_rep::get_nr_indices (tree_label l) {
 void
 drd_info_rep::freeze_arity (tree_label l) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.freeze_arity= true;
 }
 
@@ -240,7 +245,7 @@ void
 drd_info_rep::set_border (tree_label l, int mode) {
   if (info[l]->pi.freeze_border) return;
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.border_mode= mode;
 }
 
@@ -252,7 +257,7 @@ drd_info_rep::get_border (tree_label l) {
 void
 drd_info_rep::freeze_border (tree_label l) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.freeze_border= true;
 }
 
@@ -283,7 +288,7 @@ void
 drd_info_rep::set_with_like (tree_label l, bool is_with_like) {
   if (info[l]->pi.freeze_with) return;
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.with_like= is_with_like;
 }
 
@@ -295,7 +300,7 @@ drd_info_rep::get_with_like (tree_label l) {
 void
 drd_info_rep::freeze_with_like (tree_label l) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.freeze_with= true;
 }
 
@@ -313,7 +318,7 @@ void
 drd_info_rep::set_var_type (tree_label l, int vt) {
   if (info[l]->pi.freeze_var_type) return;
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.var_type= vt;
 }
 
@@ -325,7 +330,7 @@ drd_info_rep::get_var_type (tree_label l) {
 void
 drd_info_rep::freeze_var_type (tree_label l) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->pi.freeze_var_type= true;
 }
 
@@ -336,7 +341,7 @@ drd_info_rep::freeze_var_type (tree_label l) {
 void
 drd_info_rep::set_attribute (tree_label l, string which, tree val) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info& ti= info(l);
+  tag_info& ti= info(l); version++;
   ti->set_attribute (which, val);
 }
 
@@ -445,7 +450,7 @@ drd_info_rep::get_syntax (tree t, path p) {
 void
 drd_info_rep::set_type (tree_label l, int nr, int tp) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   if (ci.freeze_type) return;
@@ -461,7 +466,7 @@ drd_info_rep::get_type (tree_label l, int nr) {
 void
 drd_info_rep::freeze_type (tree_label l, int nr) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   ci.freeze_type= true;
@@ -490,7 +495,7 @@ drd_info_rep::get_type_child (tree t, int i) {
 void
 drd_info_rep::set_accessible (tree_label l, int nr, int is_accessible) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   if (ci.freeze_accessible) return;
@@ -506,7 +511,7 @@ drd_info_rep::get_accessible (tree_label l, int nr) {
 void
 drd_info_rep::freeze_accessible (tree_label l, int nr) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   ci.freeze_accessible= true;
@@ -573,7 +578,7 @@ drd_info_rep::is_accessible_path (tree t, path p) {
 void
 drd_info_rep::set_writability (tree_label l, int nr, int writability) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   if (ci.freeze_writability) return;
@@ -589,7 +594,7 @@ drd_info_rep::get_writability (tree_label l, int nr) {
 void
 drd_info_rep::freeze_writability (tree_label l, int nr) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   ci.freeze_writability= true;
@@ -704,7 +709,7 @@ drd_info_rep::set_env (tree_label l, int nr, tree env) {
   //if (as_string (l) == "session")
   //cout << as_string (l) << ", " << nr << " -> " << env << "\n";
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   if (ci.freeze_env) return;
@@ -720,7 +725,7 @@ drd_info_rep::get_env (tree_label l, int nr) {
 void
 drd_info_rep::freeze_env (tree_label l, int nr) {
   if (!info->contains (l)) info(l)= copy (info[l]);
-  tag_info  & ti= info(l);
+  tag_info  & ti= info(l); version++;
   if (nr >= N(ti->ci)) return;
   child_info& ci= ti->ci[nr];
   ci.freeze_env= true;
@@ -1012,9 +1017,37 @@ drd_info_rep::heuristic_init_parameter (string var, tree val) {
   return (old_ti != info[l]);
 }
 
+// the same variables with the same values (the values of an environment
+// made again are most often the very same trees)
+static bool
+same_environment (hashmap<string,tree> a, hashmap<string,tree> b) {
+  if (N(a) != N(b)) return false;
+  iterator<string> it= iterate (b);
+  while (it->busy ()) {
+    string var= it->next ();
+    if (!a->contains (var)) return false;
+    tree u= a[var], v= b[var];
+    if (inside (u) != inside (v) && u != v) return false;
+  }
+  return true;
+}
+
 void
 drd_info_rep::heuristic_init (hashmap<string,tree> env2) {
   // time_t tt= texmacs_time ();
+  // The heuristics end at a fixed point of the properties for an
+  // environment. Run again for the same environment, with no property
+  // changed in between (version), they would find that fixed point at
+  // once, after a visit of every variable (10 to 20 ms for the thousands
+  // of macros of a style): they are not run. The editor asks for them
+  // after every edit (edit_typeset_rep::drd_update), most often with the
+  // environment it had before.
+  if (heuristic_valid && version == heuristic_version &&
+      same_environment (heuristic_env, env2)) {
+    set_environment (env2);
+    heuristic_version= version;
+    return;
+  }
   set_environment (env2);
   bool flag= true;
   int round= 0;
@@ -1040,4 +1073,7 @@ drd_info_rep::heuristic_init (hashmap<string,tree> env2) {
     }
   }
   // cout << "--> " << (texmacs_time ()-tt) << "ms\n";
+  heuristic_env= env2;
+  heuristic_version= version;
+  heuristic_valid= true;
 }

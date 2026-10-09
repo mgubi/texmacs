@@ -637,24 +637,38 @@ edit_interface_rep::change_time () {
   return last_change;
 }
 
-// (the time of an update of the menus, the icon bars and the tools, which
+// (the times of an update of the menus, the icon bars and the tools, which
 // follows every edit after a sixth of a second: TEXMACS_EDIT_PROFILE)
 struct menus_profile {
-  double t;
-  menus_profile (): t (edit_profile.on ? edit_profile_now () : 0) {}
+  double t0, t;
+  string parts;
+  menus_profile (): t0 (edit_profile.on ? edit_profile_now () : 0), t (t0) {}
+  void done (const char* what) {
+    if (!edit_profile.on) return;
+    double now= edit_profile_now ();
+    parts << (N(parts) == 0 ? "" : ", ") << what << " "
+          << as_string (floor ((now - t) * 100 + 0.5) / 100);
+    t= now;
+  }
   ~menus_profile () {
     if (edit_profile.on)
-      cout << "edit-profile menus: " << edit_profile_now () - t << " ms" << LF; }
+      cout << "edit-profile menus: " << edit_profile_now () - t0 << " ms ("
+           << parts << ")" << LF; }
 };
 
 void
 edit_interface_rep::update_menus () {
   menus_profile prof;
   SERVER (menu_main ("(horizontal (link texmacs-menu))"));
+  prof.done ("menu bar");
   SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
+  prof.done ("main icons");
   SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
+  prof.done ("mode icons");
   SERVER (menu_icons (2, "(horizontal (link texmacs-focus-icons))"));
+  prof.done ("focus icons");
   SERVER (menu_icons (3, "(horizontal (link texmacs-extra-icons))"));
+  prof.done ("extra icons");
   array<url> a= buffer_to_windows (buf->buf->name);
   if (N(a) > 0) {
     string win = "(string->url \"" * as_string (a[0]) * "\")";
@@ -667,7 +681,9 @@ edit_interface_rep::update_menus () {
     SERVER (bottom_tools (0, "(vertical " * bdyn * ")"));
     SERVER (bottom_tools (1, "(vertical " * xdyn * ")"));
   }
+  prof.done ("tools");
   set_footer ();
+  prof.done ("footer");
   if (has_current_window ()) {
     array<url> ws= buffer_to_windows (
                      window_to_buffer (
@@ -677,10 +693,14 @@ edit_interface_rep::update_menus () {
     for (int i=0; i<n; i++)
       concrete_window (ws[i])->set_modified (ns);
   }
+  prof.done ("modified");
   if (!gui_interrupted ()) drd_update ();
+  prof.done ("drd");
   cache_memorize ();
+  prof.done ("memorize");
   last_update= last_change;
   save_user_preferences ();
+  prof.done ("preferences");
 }
 
 int
