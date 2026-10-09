@@ -552,8 +552,12 @@
               ,@(list-intersperse acts " ")))))
 
 (define (section-blocks doc s)
+  ;; a light rule between the fonts of a section
   (cons `(section ,(car s))
-        (append-map (cut entry-block doc <>) (cdr s))))
+        (append (entry-block doc (cadr s))
+                (append-map (lambda (e)
+                              (cons '(font-design-rule) (entry-block doc e)))
+                            (cddr s)))))
 
 (define (font-design-content doc)
   (with c (document-choice doc)

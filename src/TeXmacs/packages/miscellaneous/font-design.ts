@@ -25,7 +25,7 @@
   <\active*>
     <\src-comment>
       The page is a widget (gui-markup): it fits its window, with small
-      margins. Buttons (inside action tags), muted text, the frame of a sample and the scrolling list of the fonts.
+      margins. Buttons (inside action tags), muted text, the frame of a sample, the rule between two fonts and the scrolling list of the fonts.
     </src-comment>
   </active*>
 
@@ -51,7 +51,11 @@
 
   <assign|font-design-list|<macro|scroll|body|<with|canvas-type|e|canvas-color|white|canvas-hpadding|1spc|canvas-vpadding|1spc|ornament-border|1ln|ornament-sunny-color|#b8b8c0|ornament-shadow-color|#b8b8c0|<canvas||<merge|t-|<font-design-list-height>>|1par||0%|<arg|scroll>|<arg|body>>>>>
 
+  <assign|font-design-rule|<macro|<with|color|#d4d4dc|<hrule>>>>
+
   <drd-props|font-design-sample|arity|1>
+
+  <drd-props|font-design-rule|arity|0>
 
   <drd-props|font-design-list|arity|2|enable-writability|all>
 
