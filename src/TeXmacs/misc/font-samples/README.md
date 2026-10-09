@@ -2,8 +2,8 @@
 
 The pictures of the page of the design of the fonts (`Font design` in the
 menu of the fonts, `TeXmacs/progs/fonts/font-design.scm`): one for each
-font of that page which comes with TeXmacs, named by the kind and the name
-of its entry. They are pictures so that the page does not load the fonts.
+font of each tab of that page which comes with TeXmacs, named by the tab
+(the part of a document) and the name of its entry. They are pictures so that the page does not load the fonts.
 
 They are made by TeXmacs itself and have to be made again when a font
 is added, removed or updated, or when the sample changes:

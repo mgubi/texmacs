@@ -673,27 +673,42 @@
 ;; The page of the design of the fonts (fonts/font-design.scm)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (design-entry name kind)
-  (list-find (append-map cdr (font-design-sections))
-             (lambda (e) (and (== (cdr (assq 'name e)) name)
-                              (== (cdr (assq 'kind e)) kind)))))
+(define (design-entry tab name)
+  (list-find (font-design-entries tab)
+             (lambda (e) (== (cdr (assq 'name e)) name))))
+
+(define (design-names tab)
+  (map (lambda (e) (cdr (assq 'name e))) (font-design-entries tab)))
 
 (define (test-font-design)
   (check-group "font design")
-  ;; the catalogue: the fonts of the menus, by section
-  (with names (map car (font-design-sections))
-    (check-true (in? "Serif text with mathematics" names))
-    (check-true (in? "Sans serif text with mathematics" names))
-    (check-true (in? "Serif text" names))
-    (check-true (in? "Typewriter text" names)))
-  (for (x '(("Roman" pair) ("Palatino" pair) ("Euler" pair) ("DejaVu" pair)
-            ("Fira" pair) ("IBM Plex" pair) ("Gentium Plus" serif)
-            ("Antykwa Torunska" serif) ("Iwona" sans) ("Kurier" sans)
-            ("Inconsolata" mono) ("Chorus" other)))
+  ;; the catalogue: a tab for each part, with the fonts the part may have
+  (check= font-design-tabs
+          '("all" "text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
+  (for (x '(("all" "Roman") ("all" "Palatino") ("all" "Euler")
+            ("all" "DejaVu") ("all" "Fira") ("all" "IBM Plex")
+            ("text" "Roman") ("text" "Palatino") ("text" "Gentium Plus")
+            ("text" "Antykwa Torunska") ("text" "Iwona") ("text" "Fira")
+            ("text" "Chorus")
+            ("math" "Roman") ("math" "Euler") ("math" "STIX Two")
+            ("sansserif" "Iwona") ("sansserif" "Fira") ("sansserif" "DejaVu")
+            ("typewriter" "Inconsolata") ("typewriter" "Cursor")
+            ("typewriter" "Fira") ("typewriter" "IBM Plex")
+            ("bbb" "Fira") ("cal" "Times") ("frak" "Euler")))
     (with e (design-entry (car x) (cadr x))
+      (when (not e) (display* "no entry " x "\n"))
       (check-true (pair? e))
       ;; the fonts which come with TeXmacs have the picture of their sample
       (when e (check-true (url? (font-design-sample e))))))
+  ;; a text font which two pairs share is listed once; the default
+  ;; mathematics is no font for the letters of a formula
+  (check-false (in? "Euler" (design-names "text")))
+  (check-false (in? "Roman" (design-names "bbb")))
+  (check-false (in? "Chorus" (design-names "sansserif")))
+  ;; the names of the pictures are unique in a tab
+  (for (tab font-design-tabs)
+    (with ids (map (lambda (e) (cdr (assq 'id e))) (font-design-entries tab))
+      (check= (length ids) (length (list-remove-duplicates ids)))))
   ;; the value of `font' and the choice of the parts, both ways
   (with c (font-design-parse
            "cal=TeX Gyre Termes,math=Stix Two Math,typewriter=Fira,Gentium Plus"
@@ -716,16 +731,17 @@
   (check= (font-design-font
            (font-design-parse "math=Euler Math,TeX Gyre Pagella" "rm"))
           "math=Euler Math,TeX Gyre Pagella")
-  ;; a part chosen from an entry
+  ;; a font chosen in the tab of a part
   (let* ((c0 (font-design-parse "roman" "rm"))
-         (c1 (font-design-choose c0 (design-entry "Gentium Plus" 'serif) "text"))
-         (c2 (font-design-choose c1 (design-entry "STIX Two" 'pair) "math"))
-         (c3 (font-design-choose c2 (design-entry "Iwona" 'sans) "sansserif"))
-         (c4 (font-design-choose c3 (design-entry "Fira" 'pair) "typewriter"))
-         (c5 (font-design-choose c4 (design-entry "Times" 'pair) "cal"))
-         (c6 (font-design-choose c5 (design-entry "Euler" 'pair) "all"))
-         (c7 (font-design-choose c0 (design-entry "Fira" 'pair) "all"))
-         (c8 (font-design-choose c0 (design-entry "IBM Plex" 'pair) "all")))
+         (c1 (font-design-choose c0 (design-entry "text" "Gentium Plus")))
+         (c2 (font-design-choose c1 (design-entry "math" "STIX Two")))
+         (c3 (font-design-choose c2 (design-entry "sansserif" "Iwona")))
+         (c4 (font-design-choose c3 (design-entry "typewriter" "Fira")))
+         (c5 (font-design-choose c4 (design-entry "cal" "Times")))
+         (c6 (font-design-choose c5 (design-entry "all" "Euler")))
+         (c7 (font-design-choose c0 (design-entry "all" "Fira")))
+         (c8 (font-design-choose c0 (design-entry "all" "IBM Plex")))
+         (c9 (font-design-choose c0 (design-entry "text" "IBM Plex Serif"))))
     (check= (font-design-font c1) "Gentium Plus")
     (check= (font-design-font c2) "math=Stix Two Math,Gentium Plus")
     (check= (font-design-font c5)
@@ -736,11 +752,16 @@
     (check= (font-design-font c7) "Fira")
     ;; the text of IBM Plex Math is Plex Sans, the sans serif of its master
     (check= (font-design-font c8) "IBM Plex")
-    (check= (assoc-ref c8 "family") "ss"))
-  ;; the sample of an entry is set in its fonts
-  (with t (font-design-sample-tree (design-entry "Euler" 'pair))
+    (check= (assoc-ref c8 "family") "ss")
+    (check= (assoc-ref c9 "family") "rm"))
+  ;; the sample of an entry is set in its fonts, the rest in the default
+  (with t (font-design-sample-tree (design-entry "all" "Euler"))
     (check= (car t) 'with)
-    (check= (caddr t) "math=Euler Math,TeX Gyre Pagella")))
+    (check= (caddr t) "math=Euler Math,TeX Gyre Pagella"))
+  (check= (caddr (font-design-sample-tree (design-entry "cal" "Times")))
+          "cal=TeX Gyre Termes Math,roman")
+  (check= (caddr (font-design-sample-tree (design-entry "sansserif" "Iwona")))
+          "sansserif=Iwona,roman"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Logical fonts
