@@ -309,6 +309,12 @@ void mupdf_image_gc (string name) {
   form_cache_forget (name);
 }
 
+// The fonts of MuPDF made so far are forgotten (fonts_forget in font.hpp):
+// one whose file could not be read is kept as having none
+void mupdf_fonts_forget () {
+  native_fonts= hashmap<string, mupdf_font> ();
+}
+
 // flush caches
 void del_obj_mupdf_renderer (void)  {
   character_image= hashmap<basic_character, mupdf_image> ();

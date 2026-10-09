@@ -236,9 +236,10 @@
     with those files, under the progress bar: <TeXmacs> used to fetch each
     when it first drew with it, holding the page meanwhile, and a request
     which failed left that font out until the next visit (a question mark
-    for the command sign). A request which fails is now made again, and a
-    font which still does not come is fetched in the background for the
-    next visit, the page going on without it.
+    for the command sign). A request which fails is now made again. A
+    font which still does not come is asked for in the background, the
+    page going on without it, until it comes: the documents and the menus
+    are then drawn again with it.
 
     <item>A login from the browser to a server of another version of
     <TeXmacs>, such as <verbatim|cloud.texmacs.org>, fails: a page has only

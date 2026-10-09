@@ -332,6 +332,11 @@ bool get_new_fonts ();
 extern bool hand_tuned_math_fonts;
 void set_hand_tuned_math_fonts (bool val);
 bool get_hand_tuned_math_fonts ();
+// forget the fonts made so far, so that they are made again when next
+// asked for (a font whose file could not be read and can now)
+void fonts_forget ();
+void smart_fonts_forget ();
+void tt_faces_forget ();
 void font_database_build (url u);
 void font_database_build_local ();
 void font_database_extend_local (url u);
