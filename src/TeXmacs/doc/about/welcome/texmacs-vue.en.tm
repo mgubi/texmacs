@@ -229,6 +229,17 @@
   <paragraph|9 October 2026>
 
   <\itemize>
+    <item>A slow network no longer leaves signs out of the first screen.
+    The fonts of the first screen which are not among the files of the
+    start (those of the welcome page and, on a Mac, the one of the command
+    sign and of the other keys of the shortcuts in the menus) are fetched
+    with those files, under the progress bar: <TeXmacs> used to fetch each
+    when it first drew with it, holding the page meanwhile, and a request
+    which failed left that font out until the next visit (a question mark
+    for the command sign). A request which fails is now made again, and a
+    font which still does not come is fetched in the background for the
+    next visit, the page going on without it.
+
     <item>The menus drop in without stopping halfway. On a display of 120
     Hz the page drew a frame every 8 ms, more than the graphics card
     follows with a large window: the browser then held the frames back for
