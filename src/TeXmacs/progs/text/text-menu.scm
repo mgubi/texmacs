@@ -901,7 +901,8 @@
 
 (tm-define (child-proposals t i)
   (:require (and (tree-in? t '(bibliography bibliography*)) (<= i 1)))
-  (if (== i 0) (list "bib" :other) (rcons (bib-standard-styles) :other)))
+  (if (== i 0) (list "bib" :other)
+      (rcons (append (bib-standard-styles) (csl-available-styles)) :other)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Focus menu for lists

@@ -40,13 +40,17 @@
          (mini-paragraph "480guipx"
            (document (concat "Please choose a valid " (BibTeX) " file"))))
       `(with "bg-color" "#ffffff"
-         (mini-paragraph "480px" ,(bib-process "bib" style (tree->stree t))))))
+         (mini-paragraph "480px"
+           ,(if (csl-style-name? style)
+                (csl-bib-process "bib" style (tree->stree t))
+                (bib-process "bib" style (tree->stree t)))))))
 
 (define (bibwid-output)
   (with style (if (== "tm-" (string-take bibwid-style 3))
                   (string-drop bibwid-style 3)
                   bibwid-style)
-    (eval `(use-modules (bibtex ,(string->symbol style))))
+    (when (not (csl-style-name? style))
+      (eval `(use-modules (bibtex ,(string->symbol style)))))
     (with u (if (and bibwid-use-relative? (not (url-rooted? bibwid-url)))
                 (url-append (url-head bibwid-buffer) bibwid-url)
                 bibwid-url)
@@ -115,7 +119,8 @@
               bibwid-update-buffer?)
       ///
       (text "Style:") // //
-      (enum (bibwid-set-style answer) (bib-standard-styles)
+      (enum (bibwid-set-style answer)
+            (append (bib-standard-styles) (csl-available-styles))
             bibwid-style "10em"))
     === === ===
     (hlist // (dynamic (bibwid-preview)) //)
