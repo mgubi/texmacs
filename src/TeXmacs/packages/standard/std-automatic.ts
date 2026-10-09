@@ -24,7 +24,11 @@
 
   <\active*>
     <\src-comment>
-      Automatically generated labels.
+      Automatically generated labels. Their numbers come from the
+      primitive auto-id, with which the labels keep their names when
+      others are added before them; the macro auto-id below takes its
+      place in a version of TeXmacs which does not have the primitive,
+      and numbers them with the counter.
     </src-comment>
   </active*>
 
@@ -34,7 +38,9 @@
 
   <assign|set-part|<macro|Id|body|<with|current-part|<merge|<value|current-part>|.|<arg|Id>>|auto-nr|0|<arg|body>>>>
 
-  <assign|the-auto|<macro|<merge|auto|<value|current-part>|-|<auto-id>>>>
+  <assign|auto-id|<macro|what|<if|<equal|<arg|what>|new>|<inc-auto>|<value|auto-nr>>>>
+
+  <assign|the-auto|<macro|<merge|auto|<value|current-part>|-|<auto-id|last>>>>
 
   <assign|auto-label|<macro|<auto-id|new><label|<the-auto>>>>
 

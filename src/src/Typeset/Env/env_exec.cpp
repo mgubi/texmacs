@@ -2074,8 +2074,10 @@ edit_env_rep::exec_has_binding (tree t) {
 * were typeset again for that only, with the same boxes: nearly every
 * paragraph of the user manual after a new section.
 *
-* <auto-id|new> takes a number for a new label and <auto-id> gives the
-* last one taken. The numbers are kept by the bridge which is typeset
+* <auto-id|new> takes a number for a new label and <auto-id|last> gives
+* the last one taken (std-automatic.ts also has a macro auto-id, which
+* is what a TeXmacs without this primitive calls: it uses the counter).
+* The numbers are kept by the bridge which is typeset
 * (bridge_rep::typeset sets auto_ids): typeset again, it gives the same
 * numbers to its labels, in their order, and a label it did not have
 * gets a number which no label has (auto_next). In a complete pass, where

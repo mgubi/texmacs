@@ -614,8 +614,11 @@
   bridges did make something else, the same boxes with other names.
 
   The names are now made of numbers which stay: <markup|auto-id> with the
-  argument <verbatim|new> takes a number for a new label, and without
-  argument gives the last one taken (<cpp|edit_env_rep::exec_auto_id>).
+  argument <verbatim|new> takes a number for a new label, and with any
+  other one gives the last one taken (<cpp|edit_env_rep::exec_auto_id>).
+  The style file also defines a macro of that name, which a version of
+  <TeXmacs> without the primitive calls instead, and which numbers the
+  labels with the counter as before: the same package works in both.
   The numbers are kept by the bridge which is being typeset: typeset
   again, it gives the same numbers to its labels, in their order, and a
   label which it did not have gets a number which no label has. In a
