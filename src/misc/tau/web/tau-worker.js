@@ -3,10 +3,13 @@
 //
 // From the page: { t: "place" | "scroll" | "focus" | "key" | "mouse", view, ... },
 //                { t: "invoke" | "expand", number }, { t: "file", path },
-//                { t: "answer", number, args }, { t: "close", id }
+//                { t: "answer", number, args }, { t: "close", id },
+//                { t: "buffer", what, window, name }, { t: "paste", view, text, html },
+//                { t: "open", ticket, name, bytes }
 // To the page:   { t: "ready" | "view" | "paint" | "log" | "status" | "failed", ... },
 //                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
-//                { t: "dialog" | "close" | "refresh", part, ... }
+//                { t: "dialog" | "close" | "refresh", part, ... },
+//                { t: "buffers" | "clipboard" | "pick" | "download", ... }
 
 "use strict";
 
@@ -33,6 +36,20 @@ function handle(m) {
 	case "close":
 		core._tau_closed(m.id);
 		break;
+	case "buffer":
+		core.ccall("tau_buffer", null, ["string", "number", "string"], [m.what, m.window, m.name || ""]);
+		break;
+	case "paste":
+		core.ccall("tau_paste", null, ["number", "string", "string"], [m.view, m.text || "", m.html || ""]);
+		break;
+	case "open": {
+		// a file of the user: its bytes are put in the file system of the
+		// core, which is told where
+		const path = USER + "/" + m.name.replace(/[\/\\]/g, "_");
+		core.FS.writeFile(path, new Uint8Array(m.bytes));
+		core.ccall("tau_file", null, ["number", "string"], [m.ticket || 0, path]);
+		break;
+	}
 	case "place":
 		core._tau_place(m.view, m.width, m.height, m.density, m.place);
 		break;
@@ -80,6 +97,8 @@ const args = new URLSearchParams(self.location.search).getAll("arg");
 // and which the page has not got yet are read here and added to the
 // message (files: path -> bytes), so that the bars come with their icons
 // and not before them.
+const USER = "/user";  // where the files of the user are, in the core
+
 const sentFiles = new Set();
 function collectFiles(node, files) {
 	if (Array.isArray(node)) { for (const x of node) collectFiles(x, files); return; }
@@ -101,13 +120,20 @@ function post(message, transfer) {
 		const buffers = Object.values(files);
 		if (buffers.length) { message.files = files; transfer = (transfer || []).concat(buffers); }
 	}
+	if (tauModule && message.t === "download") {
+		// a file for the user: its bytes go with the message
+		try {
+			message.bytes = tauModule.FS.readFile(message.path).buffer;
+			transfer = [message.bytes];
+		} catch (error) { message.bytes = null; }
+	}
 	postMessage(message, transfer || []);
 }
 
 tauCore({
 	arguments: args,
 	tauPost: post,
-	preRun: [module => { tauModule = module; }],
+	preRun: [module => { tauModule = module; module.FS.mkdirTree(USER); }],
 	print: text => postMessage({ t: "log", text }),
 	printErr: text => postMessage({ t: "log", text }),
 	setStatus: text => { if (text) postMessage({ t: "status", text }); }

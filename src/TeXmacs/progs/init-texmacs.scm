@@ -299,6 +299,8 @@
 ;; (they were found only once the help menu had been built, which the whole
 ;; menu bar was at the start; in Tau the menus are built when they open)
 (lazy-define (doc help-funcs) load-help-buffer load-help-article)
+(lazy-define (texmacs texmacs tau-files) tau-choose-file tau-file-chosen
+             tau-download tau-saved tau-close-buffer)
 (lazy-define (doc tmdoc) tmdoc-expand-help tmdoc-expand-help-manual
              tmdoc-expand-this tmdoc-include)
 (lazy-define (doc docgrep) docgrep-in-doc docgrep-in-src

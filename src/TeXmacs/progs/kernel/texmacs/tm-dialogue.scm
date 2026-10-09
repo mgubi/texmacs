@@ -19,7 +19,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-public (user-ask prompt cont)
-  (tm-interactive cont
+  ;; (Tau: a dialog of the page, as for interactive)
+  (tm-interactive-hook cont
     (if (string? prompt)
         (list (build-interactive-arg prompt))
         (list prompt))))

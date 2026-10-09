@@ -129,6 +129,14 @@ gcd (int i, int j) {
 void
 tm_frame_rep::choose_file (object fun, string title, string type,
 			   string prompt, url name) {
+#ifdef TAUTEXMACS
+  // the files of the user are those of the page (tau-files.scm)
+  array<object> args;
+  args << fun << object (title) << object (type) << object (prompt)
+       << object (name);
+  call ("tau-choose-file", args);
+  return;
+#endif
   command  cb  = dialogue_command (get_server(), fun, 1);
   widget   wid = file_chooser_widget (cb, type, prompt);
   if (!is_scratch (name)) {

@@ -131,7 +131,7 @@
 
 (define outbox '())
 
-(define (tau-post kind part props)
+(define-public (tau-post kind part props)
   (set! outbox (cons `((t . ,kind) (part . ,part) ,@props) outbox)))
 
 (tm-define (tau-outbox)

@@ -181,6 +181,7 @@
           (autosave-remove name)
           (buffer-notify-recent name)
           (set-message `(concat "Saved " ,vname) "Save file")
+          (tau-saved name)
           (save-buffer-post name opts)))))
 
 (define (save-buffer-check-faithful name opts)

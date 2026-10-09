@@ -517,6 +517,57 @@ the toolkits), the tooltips and popups made with `alt-window-*`, the
 continuous inputs (a value at each key), the sizes in `w` and `h` of
 `resize`, the styles of the texts (bold, grey, monospaced).
 
+**Step 5 is done** (2026-10-09): the documents are tabs, the windows of
+the core are panes, and the files and the clipboard are those of the
+browser.
+
+- **The window of the core stayed**, as the place of a view: a
+  `tm_window` has no widgets any more, only a number, the view which it
+  shows and the command which closes it. This is less than the design
+  asks (the core should know no window at all), and what it costs is
+  small: each window is a pane of the page, side by side. The menus and
+  the footer are those of the window which has the keyboard.
+- At the end of a turn the core says which documents there are (name,
+  title, modified) and which view and document each window shows
+  (`buffers`), when that changed. The page makes and removes its panes
+  from it and draws the tabs, which keep their order. A tab asks
+  `buffer` with `switch`, `close` or `new`; the cross of a pane asks
+  `close-window`. Closing a modified document asks first, in a dialog
+  (`user-ask` goes through the dialogs of the page too now).
+- A new document is a tab ("buffer management" is `shared`); "New
+  window" makes a pane.
+- **The system of the user** is told to the core (`TEXMACS_WEB_PLATFORM`,
+  as in the browser build of `maxs_texmacs`), so that the shortcuts are
+  those of a Mac on a Mac.
+- **Files.** The file system of the core is in memory. `choose-file` asks
+  the page (`tau-choose-file` in `texmacs/texmacs/tau-files.scm`): to
+  load, the page opens the file chooser of the browser (`pick`) and
+  sends the bytes (`open`), which the worker writes under `/user`; a
+  file dropped on a pane is opened the same way. To save or export, a
+  name is asked in a dialog, the file is written under `/user` and given
+  to the user (`download`); saving again a document which lives under
+  `/user` gives it again.
+- **Clipboard.** What is copied stays in the core as a tree, and its
+  text goes to the clipboard of the browser (`clipboard`). The key which
+  pastes is left to the browser, whose `paste` event gives the text and
+  the HTML to the core (`paste`); they replace what the core kept unless
+  the text is the one it gave. Files in the clipboard are opened.
+
+Checked in Firefox: a new tab, typing in it, switching, a dropped file,
+Load through the file chooser, Save as and Export to PDF arriving as
+downloads, Copy reaching the page, the question on closing a modified
+tab, a second pane made and closed. The `paste` event of the browser
+could not be produced in the headless test: the message it sends was
+checked, not the event.
+
+Not there yet: the files of the user do not survive the page (nothing
+is kept in the browser); Edit → Paste and the paste keys of Emacs use
+what the core kept, not the clipboard of the browser; nothing but text
+is copied out (no HTML, no pictures in); "Close TeXmacs" ends the
+worker and leaves the page dead; the panes cannot be resized or split
+in the other direction; images are not picked in several formats, and
+directories not at all.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:
