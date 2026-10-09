@@ -232,8 +232,8 @@
     <item><menu|Font design>, in the menu of the fonts (the font button of
     the focus bar), opens a page to choose the fonts of the document by
     looking at them. Its top lists the parts of a document with the font
-    of each: the text and the mathematics together, the text, the
-    mathematics, the sans serif and the typewriter text, and the
+    of each: the text, the mathematics, the sans serif and the
+    typewriter text, and the
     blackboard bold, calligraphic and fraktur letters of the formulas. The
     name of a part is a button which shows the fonts for it, each with a
     few words, a sample of that part and a button to choose it. The
