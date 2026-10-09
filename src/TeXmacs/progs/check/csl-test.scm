@@ -28,7 +28,7 @@
   (:use (check check-lib)
         (convert bibtex init-bibtex)
         (csl csl-utils) (csl csl-style) (csl csl-data) (csl csl-names)
-        (csl csl-render) (csl csl-process) (csl csl-output) (csl csl-bib)))
+        (csl csl-render) (csl csl-process) (csl csl-cite) (csl csl-output) (csl csl-bib)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers
@@ -61,7 +61,7 @@
 (define (flat x)
   ;; the text of a TeXmacs tree
   (cond ((string? x) x)
-        ((or (func? x 'bibitem*) (func? x 'label)) "")
+        ((or (func? x 'bibitem*) (func? x 'label) (func? x 'set-binding)) "")
         ((func? x 'with) (flat (cAr x)))
         ((func? x 'TeX) "TeX")
         ((func? x 'rsup) (string-append "^" (flat (cadr x))))
@@ -289,6 +289,111 @@
     (check= (csl->texmacs '(cat "Inc." ".") locale) "Inc.")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Disambiguation and collapsing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (author-date-style options)
+  ;; a style "Doe 2000" with the attributes @options of cs:citation
+  (string-append
+   "<style xmlns=\"http://purl.org/net/xbiblio/csl\" class=\"in-text\""
+   " version=\"1.0\"><info><title>T</title><id>t</id></info>"
+   "<citation " options ">"
+   "<layout prefix=\"(\" suffix=\")\" delimiter=\"; \">"
+   "<group delimiter=\" \"><names variable=\"author\">"
+   "<name form=\"short\" and=\"symbol\" initialize-with=\". \"/></names>"
+   "<date variable=\"issued\"><date-part name=\"year\"/></date>"
+   "<text variable=\"locator\" prefix=\"p. \"/></group>"
+   "</layout></citation>"
+   "<bibliography><sort><key variable=\"title\"/></sort><layout>"
+   "<group delimiter=\" \"><names variable=\"author\"/>"
+   "<date variable=\"issued\"><date-part name=\"year\"/></date>"
+   "<text variable=\"title\"/></group></layout></bibliography></style>"))
+
+(define people-json
+  (string-append
+   "[{\"id\":\"a\",\"type\":\"book\",\"title\":\"A\",\"author\":"
+   "[{\"family\":\"Doe\",\"given\":\"John\"}],"
+   "\"issued\":{\"date-parts\":[[2000]]}},"
+   "{\"id\":\"b\",\"type\":\"book\",\"title\":\"B\",\"author\":"
+   "[{\"family\":\"Doe\",\"given\":\"John\"}],"
+   "\"issued\":{\"date-parts\":[[2000]]}},"
+   "{\"id\":\"c\",\"type\":\"book\",\"title\":\"C\",\"author\":"
+   "[{\"family\":\"Doe\",\"given\":\"John\"}],"
+   "\"issued\":{\"date-parts\":[[2001]]}},"
+   "{\"id\":\"d\",\"type\":\"book\",\"title\":\"D\",\"author\":"
+   "[{\"family\":\"Doe\",\"given\":\"Alice\"}],"
+   "\"issued\":{\"date-parts\":[[2002]]}},"
+   "{\"id\":\"e\",\"type\":\"book\",\"title\":\"E\",\"author\":"
+   "[{\"family\":\"Roe\",\"given\":\"R.\"},"
+   "{\"family\":\"Poe\",\"given\":\"P.\"},"
+   "{\"family\":\"Low\",\"given\":\"L.\"}],"
+   "\"issued\":{\"date-parts\":[[1990]]}},"
+   "{\"id\":\"f\",\"type\":\"book\",\"title\":\"F\",\"author\":"
+   "[{\"family\":\"Roe\",\"given\":\"R.\"},"
+   "{\"family\":\"Moe\",\"given\":\"M.\"},"
+   "{\"family\":\"Low\",\"given\":\"L.\"}],"
+   "\"issued\":{\"date-parts\":[[1990]]}}]"))
+
+(define (people-cite options . ids)
+  ;; the citation of the items @ids in the style with @options
+  (let* ((p (csl-make-processor
+             (csl-style-from-string "t" (author-date-style options))
+             "en-US" (csl-json->items people-json))))
+    (csl->html (csl-citation p (map (lambda (id) (list (cons 'id id))) ids))
+               (csl-processor-locale p))))
+
+(define (test-disambiguation)
+  (check-group "disambiguation")
+  ;; nothing asked: the cites stay ambiguous
+  (check= (people-cite "" "a" "b") "(Doe 2000; Doe 2000)")
+  ;; a suffix of the year, in the order of the bibliography
+  (check= (people-cite "disambiguate-add-year-suffix=\"true\"" "b" "a" "c")
+          "(Doe 2000b; Doe 2000a; Doe 2001)")
+  ;; one more name, only as far as needed
+  (check= (people-cite (string-append "et-al-min=\"3\" et-al-use-first=\"1\""
+                                      " disambiguate-add-names=\"true\"")
+                       "e" "f")
+          "(Roe, Poe, et al. 1990; Roe, Moe, et al. 1990)")
+  (check= (people-cite "et-al-min=\"3\" et-al-use-first=\"1\"" "e" "f")
+          "(Roe et al. 1990; Roe et al. 1990)")
+  ;; the initials of the persons with the same family name
+  (check= (people-cite (string-append
+                        "disambiguate-add-givenname=\"true\" "
+                        "givenname-disambiguation-rule=\"all-names\"")
+                       "c" "d")
+          "(J. Doe 2001; A. Doe 2002)")
+  (check-group "collapsing")
+  (check= (people-cite (string-append "disambiguate-add-year-suffix=\"true\""
+                                      " collapse=\"year\"")
+                       "a" "b" "c" "e")
+          "(Doe 2000a, 2000b, 2001; Roe, Poe, &#38; Low 1990)")
+  (check= (people-cite (string-append "disambiguate-add-year-suffix=\"true\""
+                                      " collapse=\"year-suffix\""
+                                      " year-suffix-delimiter=\",\"")
+                       "a" "b" "c")
+          "(Doe 2000a,b, 2001)")
+  ;; a cite with a locator is not merged
+  (with p (csl-make-processor
+           (csl-style-from-string
+            "t" (author-date-style "collapse=\"year\""))
+           "en-US" (csl-json->items people-json))
+    (check= (csl->html (csl-citation p '(((id . "c") (locator . "5"))
+                                         ((id . "d"))))
+                       (csl-processor-locale p))
+            "(Doe 2001 p. 5; 2002)")
+    (check-group "forms of a citation")
+    (check= (csl->html (csl-citation p '(((id . "c") (suppress-author . #t))))
+                       (csl-processor-locale p))
+            "(2001)")
+    (check= (csl->html (csl-citation p '(((id . "c") (author-only . #t))))
+                       (csl-processor-locale p))
+            "Doe")
+    (check= (csl->html (csl-textual-citation p '(((id . "c")) ((id . "d"))
+                                                 ((id . "e"))))
+                       (csl-processor-locale p))
+            "Doe (2001, 2002), Roe, Poe, &#38; Low (1990)")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The styles which come with TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -386,6 +491,8 @@
                  "</body>\n"))
 
 (define (generated-bibliography name text)
+  ;; the bibliography after two rounds of Document > Update > All: the
+  ;; citations are known to the bibliography from the second round on
   (let* ((f (tmp-file name))
          (old (current-buffer)))
     (string-save (doc-tm text) f)
@@ -393,12 +500,95 @@
     (switch-to-buffer* f)
     (update-forced)
     (generate-all-aux)
+    (update-current-buffer)
+    (update-forced)
+    (generate-all-aux)
+    (update-current-buffer)
     (update-forced)
     (with r (first-of 'bibliography (tree->stree (buffer-get-body f)))
       (buffer-pretend-saved f)
       (buffer-close f)
       (when (buffer-exists? old) (switch-to-buffer old))
       r)))
+
+(define (bindings b)
+  ;; the citations which a generated bibliography carries: (name . text)
+  (let loop ((x b))
+    (cond ((and (func? x 'set-binding 2) (func? (caddr x) 'quote 1))
+           (list (cons (cadr x) (flat* (cadr (caddr x))))))
+          ((func? x 'set-binding 2) (list (cons (cadr x) (flat* (caddr x)))))
+          ((pair? x) (append-map loop (cdr x)))
+          (else '()))))
+
+(define (flat* x)
+  ;; as flat, with the footnotes between braces
+  (cond ((or (func? x 'footnote 1) (func? x 'cite-note 1))
+         (string-append "{" (flat* (cadr x)) "}"))
+        ((string? x) x)
+        ((func? x 'with) (flat* (cAr x)))
+        ((func? x 'TeX) "TeX")
+        ((pair? x) (apply string-append (map flat* (cdr x))))
+        (else "")))
+
+(define (test-document-citations)
+  (check-group "document citations")
+  (string-save sample-bib (tmp-file "refs.bib"))
+  (with l (bindings
+           (generated-bibliography
+            "apa.tm"
+            (string-append
+             "  See <cite|knuth86b>, <cite|knuth84|knuth86>,"
+             " <cite-detail|knuth84|pp. 99-101>, <cite-textual|knuth86b>,"
+             " <cite-author|knuth84> in <cite-year|knuth84>"
+             " and <cite-detail|knuth86|for example>.\n\n"
+             "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n")))
+    (check= (assoc-ref l "bib-csl") "true")
+    (check= (assoc-ref l "bib-cite-p:knuth86b,")
+            "(Knuth & van der Hoeven, 1986)")
+    ;; the cites of one author are collapsed
+    (check= (assoc-ref l "bib-cite-p:knuth84,knuth86,") "(Knuth, 1984, 1986)")
+    (check= (assoc-ref l "bib-cite-p:knuth84@pp. 99-101,")
+            (u "(Knuth, 1984, pp. 99–101)"))
+    (check= (assoc-ref l "bib-cite-t:knuth86b,")
+            "Knuth & van der Hoeven (1986)")
+    (check= (assoc-ref l "bib-cite-a:knuth84,") "Knuth")
+    (check= (assoc-ref l "bib-cite-y:knuth84,") "1984")
+    ;; details which are no locator follow the cite
+    (check= (assoc-ref l "bib-cite-p:knuth86@for example,")
+            "(Knuth, 1986, for example)"))
+  (with l (bindings
+           (generated-bibliography
+            "ieee2.tm"
+            (string-append
+             "  See <cite|knuth86b>, <cite|knuth84|knuth86>"
+             " and <cite-textual|knuth86b>.\n\n"
+             "  <\\bibliography|bib|csl-ieee|refs>\n  </bibliography>\n")))
+    (check= (assoc-ref l "bib-cite-p:knuth86b,") "[1]")
+    (check= (assoc-ref l "bib-cite-p:knuth84,knuth86,") "[2], [3]")
+    ;; a numeric style has no names of its own
+    (check= (assoc-ref l "bib-cite-t:knuth86b,")
+            "Knuth and van der Hoeven [1]"))
+  (with l (bindings
+           (generated-bibliography
+            "notes.tm"
+            (string-append
+             "  One<cite|knuth86>, two<cite|knuth84>, three<cite|knuth86>"
+             " and <cite-textual|knuth84>.\n\n"
+             "  <\\bibliography|bib|csl-chicago-notes-bibliography|refs>\n"
+             "  </bibliography>\n")))
+    ;; a note style: the macros put the citation in a footnote
+    (check= (assoc-ref l "bib-csl") "note")
+    (check= (assoc-ref l "bib-cite-p:knuth86,")
+            "Donald E. Knuth, The TeXbook (Addison-Wesley, 1986).")
+    ;; the third citation is a later one of the same book
+    (check= (assoc-ref l "bib-cite-p:knuth86,#3") "Knuth, The TeXbook.")
+    (check= (assoc-ref l "bib-cite-p:knuth84,#2") #f)
+    ;; in the text, the names stay there and the rest goes to a footnote;
+    ;; the fourth citation is a later one of the article
+    (check= (assoc-ref l "bib-cite-t:knuth84,") "Donald E. Knuth")
+    (check= (assoc-ref l "bib-cite-t:knuth84,#4") "Knuth")
+    (check= (assoc-ref l "bib-cite-n:knuth84,#4")
+            (u "“Literate Programming.”"))))
 
 (define (test-document)
   (check-group "document bibliography")
@@ -434,11 +624,13 @@
   (test-utils)
   (test-items)
   (test-rendering)
+  (test-disambiguation)
   (test-styles)
   (remove-tmp-dir)
   (system-mkdir (system->url csl-dir))
-  (with r (check-run test-document)
-    (when (and (pair? r) (== (car r) 'error))
-      (check-report #f "the group" (object->string r))))
+  (for (test (list test-document test-document-citations))
+    (with r (check-run test)
+      (when (and (pair? r) (== (car r) 'error))
+        (check-report #f "the group" (object->string r)))))
   (remove-tmp-dir)
   (check-end))

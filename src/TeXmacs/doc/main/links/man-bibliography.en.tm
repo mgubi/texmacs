@@ -91,6 +91,43 @@
   produces citations by authors and years (<verbatim|natbib>), the package
   <tmpackage|cite-author-year> is added to the document.
 
+  <subsubsection*|Styles of the Citation Style Language>
+
+  A style whose name starts with <verbatim|csl-> is a style of the Citation
+  Style Language (CSL), the format of the styles of Zotero, Mendeley and
+  <name|Pandoc>: <verbatim|csl-apa> is formatted by the file
+  <verbatim|apa.csl>. <TeXmacs> processes these styles itself, from the same
+  references as the other styles. A few styles come with <TeXmacs>, among
+  which <verbatim|csl-apa>, <verbatim|csl-ieee>, <verbatim|csl-nature>,
+  <verbatim|csl-chicago-author-date>,
+  <verbatim|csl-chicago-notes-bibliography>,
+  <verbatim|csl-modern-language-association> and
+  <verbatim|csl-american-mathematical-society-label>; they are listed in the
+  dialogue of <menu|Insert|Automatic|Bibliography>. Several thousands of
+  other styles can be found at
+  <hlink|https://www.zotero.org/styles|https://www.zotero.org/styles>: put
+  the <verbatim|.csl> file next to your document or in the directory
+  <verbatim|~/.TeXmacs/csl/styles>, and use its name without the suffix
+  after <verbatim|csl->.
+
+  With such a style, the citations are also formatted by the style: as
+  numbers, as authors and years, or as footnotes. Since a citation may
+  depend on the other ones (two works of one author in the same year get the
+  years 2001a and 2001b, the citations of one author are grouped), the
+  citations are made together with the bibliography: after adding
+  citations, update the document again. A citation which is not known yet
+  shows its key or a provisional text. Besides <markup|cite> and
+  <markup|cite-detail>, whose second argument may be a locator such as
+  <verbatim|p. 12> or <verbatim|chap. 3>, the following tags are understood:
+  <markup|cite-textual> for a citation which is part of the sentence, as in
+  ``Knuth (1984) shows'', <markup|cite-author> for the authors alone and
+  <markup|cite-year> for the year alone. With a style which cites in
+  footnotes, a citation inside a footnote of yours stays in that footnote.
+
+  The terms (``and'', ``edited by'', the names of the months) are in the
+  language of the style when it has one, and else in the language of the
+  document.
+
   <subsubsection*|Editing files with bibliographic entries>
 
   <BibTeX> files can either be entered and edited using <TeXmacs> itself or
