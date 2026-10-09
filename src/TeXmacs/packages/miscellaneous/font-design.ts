@@ -43,7 +43,7 @@
 
   <assign|font-base-size|9>
 
-  <assign|font-design-top-height|28.4em>
+  <assign|font-design-top-height|17.6em>
 
   <assign|font-design-list-height|<macro|<merge|<look-up|<maximum|<minus|1pag|<value|font-design-top-height>>|10em>|0>|tmpt>>>
 
