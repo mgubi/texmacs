@@ -80,6 +80,15 @@
   page does not load any font but those of the choice; for a font of your
   system, <menu|Show a sample> makes the picture.
 
+  A document whose parts have fonts of their own has no font of the menus:
+  the font button then says <menu|Custom>, and so does an entry of its
+  menu, which opens the page again. <menu|Save these fonts> in the menu,
+  or <menu|Save as> on the page, keeps the choice under a name of yours:
+  the name is then on the button, and the section <menu|Saved fonts> at
+  the top of the menu offers it for every document, also the next time
+  <TeXmacs> runs. <menu|Forget saved fonts> removes a name; the documents
+  which use those fonts keep them.
+
   <menu|Document|Font|Mathematical font> changes the mathematical font alone,
   and keeps the text font. Its entries are the traditional <TeXmacs> math
   fonts and, at the end, the installed <name|OpenType> math fonts. Formulas
