@@ -619,29 +619,44 @@
   The style file also defines a macro of that name, which a version of
   <TeXmacs> without the primitive calls instead, and which numbers the
   labels with the counter as before: the same package works in both.
-  The numbers are kept by the bridge which is being typeset: typeset
-  again, it gives the same numbers to its labels, in their order, and a
-  label which it did not have gets a number which no label has. In a
-  complete pass, where every bridge is typeset in the order of the
-  document, the labels are numbered from 1 again, as the counter did: a
-  document which is opened or updated has the names it was saved with,
-  and the saved document is the same, byte for byte, as with the counter.
-  Between two updates the names differ, for the better: after a new
-  section, a line of the table of contents which was not made again
-  still refers to the label of its own section, where with the counter
-  it referred to the label of whatever had taken its number. The new
-  section in the manual takes 155<nbsp>ms instead of 839, with 570
-  bridges typeset again. <verbatim|TEXMACS_STABLE_LABELS=off> uses the
-  counter as before.
 
-  The numbers are those of a bridge, that is of one typesetter, while the
-  labels of a document go to one table: two windows on the same document
-  would give different names to the labels made since the last complete
-  pass of each, and a name would stand for two places. While a document
-  is shown by several views its labels are therefore numbered by the
-  counter, which gives the same names in all of them
-  (<cpp|edit_typeset_rep::typeset_sub> sets this, and has the document
-  typeset as a whole when it changes).
+  The number is that of the tag of the document which makes the label, the
+  section, the index entry or the figure, and it is kept with the tree of
+  that tag, in an addendum (<cpp|ADDENDUM_AUTO_ID>, an observer like the
+  one which holds the player of an animation). The tag is found from the
+  arguments of the macros which are being expanded
+  (<cpp|edit_env_rep::auto_label_tag>): the innermost argument which has
+  a place in the document is one of its arguments. The number is given
+  when the tag first makes a label and not before, so that nothing is
+  attached to the other trees, and it stays as long as the tree does. A
+  tag which is typeset again makes the same label, and it does so in every
+  window on the document, since the windows share the tree: the numbers do
+  not belong to a typesetter. A new tag gets the next number which no tag
+  had, which is kept in the same way with the tree of the buffer. A tag
+  which makes several labels names them <verbatim|auto-><math|n>,
+  <verbatim|auto-><math|n><verbatim|.2> and so on, and a label which no
+  tag of the document makes, in an included file for instance, is
+  <verbatim|auto-x><math|k>, numbered by the old counter. The variable
+  <src-var|auto-last> holds the last name which was given: the next tag
+  which makes a label after a new one reads another value and is typeset
+  again, once.
+
+  The numbers follow the order in which the tags first made a label. When
+  the document is updated they are given again, from 1 and in the order of
+  the document, as they are when it is loaded
+  (<scm|renumber-auto-labels>, which <scm|update-document> calls before it
+  makes the tables, since these hold the names): the buffer has an epoch,
+  the numbers of another epoch are not used, and all the views are typeset
+  again. This is one more pass, made only when a tag was numbered out of
+  order since the last time. A document which is opened or updated has
+  the names the counter gave, and the saved document is the same, byte for
+  byte. Between two updates the names differ, for the better: after a new
+  section, a line of the table of contents which was not made again still
+  refers to the label of its own section, where with the counter it
+  referred to the label of whatever had taken its number. The new section
+  in the manual takes 175<nbsp>ms instead of 815, with 600 bridges typeset
+  again instead of 10650. <verbatim|TEXMACS_STABLE_LABELS=off> uses the
+  counter as before.
 
   The entries of the index itself, 1350 of them with their page numbers,
   and the paragraphs with references are used again since the references

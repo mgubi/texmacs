@@ -19,8 +19,11 @@
 #include "typesetter.hpp"
 #include "drd_mode.hpp"
 #include "dictionary.hpp"
+#include "blackbox.hpp"
+#include "iterator.hpp"
 
 extern int script_status;
+extern tree the_et;
 extern tree with_package_definitions (string package, tree body);
 static tree filter_style (tree t);
 
@@ -2077,55 +2080,148 @@ edit_env_rep::exec_has_binding (tree t) {
 * <auto-id|new> takes a number for a new label and <auto-id|last> gives
 * the last one taken (std-automatic.ts also has a macro auto-id, which
 * is what a TeXmacs without this primitive calls: it uses the counter).
-* The numbers are kept by the bridge which is typeset
-* (bridge_rep::typeset sets auto_ids): typeset again, it gives the same
-* numbers to its labels, in their order, and a label it did not have
-* gets a number which no label has (auto_next). In a complete pass, where
-* every bridge is typeset in the order of the document, the labels are
-* numbered from 1 again, as the counter did: a document which is opened
-* or updated has the names it was saved with. Outside of the bridges
-* (the header of a page...) the numbers are others, and not kept.
+* The number is that of the tag of the document which makes the label:
+* the section, the index entry, the figure. The tag is found from the
+* arguments of the macros which are being expanded (auto_label_tag): the
+* innermost one which has a place in the document is an argument of it.
+* Its number is kept with its tree, in an addendum (ADDENDUM_AUTO_ID,
+* which holds an epoch and the number). It is given when the tag first
+* makes a label, not before, and stays as long as the tree does: a tag
+* which is typeset again makes the same label, in all the windows on the
+* document, which share the tree, and a new tag gets the next number
+* which no tag had. The numbers to come are kept in the same way with the
+* tree of the buffer (an epoch, the next number and whether some tag was
+* numbered out of the order of the document).
 *
-* The numbers are those of one typesetter, and the labels of a document go
-* to one table: two windows on the same document would name differently
-* the labels made since the last complete pass of each, and a name would
-* stand for two places. While a document has several views its labels
-* are numbered by the counter, which gives the same names in all of them
-* (auto_alone, set by edit_typeset_rep::typeset_sub, which has the
-* document typeset as a whole when this changes).
+* A tag may make several labels: the first is auto-n and the k-th one
+* auto-n.k. The variable auto-last holds the last name which was given,
+* so that the tag which makes a label is typeset again when the label
+* before it is another one (the next one after a new section is, once).
+* A label which no tag of the document makes (in an included file...) is
+* auto-xk, where k is the old counter, auto-nr.
+*
+* The numbers are those of the order in which the tags first made a label.
+* When the document is updated (typeset_renumber_labels in
+* edit_typeset.cpp) they are given again, from 1 and in the order of the
+* document, as they are when it is loaded: the epoch of the buffer changes,
+* the numbers of another epoch are not used and everything is typeset
+* again. A table of contents which is not updated after new sections
+* holds, as before, names which are others when the document is loaded.
 *
 * With the environment variable TEXMACS_STABLE_LABELS set to "off" the
 * counter is used as before (inc-auto, auto-nr).
 ******************************************************************************/
 
+static int auto_epoch= 0;
+
+static bool
+auto_label_data (tree t, array<int>& a) {
+  blackbox bb;
+  if (is_nil (t->obs) || !t->obs->get_contents (ADDENDUM_AUTO_ID, bb))
+    return false;
+  a= open_box<array<int> > (bb);
+  return true;
+}
+
+bool
+auto_labels_renumber (tree root) {
+  array<int> r;
+  if (!auto_label_data (root, r) || r[2] == 0) return false;
+  r[0]= ++auto_epoch;
+  r[1]= 1;
+  return true;
+}
+
+void
+auto_labels_numbered (tree root) {
+  array<int> r;
+  if (auto_label_data (root, r)) r[2]= 0;
+}
+
+bool
+edit_env_rep::auto_label_tag (tree& tag, tree& root) {
+  list<hashmap<string,path> > l= macro_src;
+  for (; !is_nil (l); l= l->next) {
+    iterator<string> it= iterate (l->item);
+    if (!it->busy ()) continue;
+    path p= l->item [it->next ()];
+    if (is_nil (p)) continue;
+    // the path of an argument, or the tag itself for a macro with any
+    // number of arguments; in the body of a macro, a mark and then the
+    // path of the tag; an argument which was computed has no path, and
+    // the tag is then looked for further out
+    bool whole= false;
+    if (p->item >= 0 && has_subtree (the_et, reverse (p))) {
+      tree u= subtree (the_et, reverse (p));
+      if (is_compound (u) && L(u) >= START_EXTENSIONS) {
+        string name= as_string (L(u));
+        whole= provides (name) && is_func (read (name), XMACRO);
+      }
+    }
+    if (!whole) p= p->next;
+    while (!is_nil (p) && p->item < 0) p= p->next;
+    if (is_nil (p) || is_nil (p->next)) continue;
+    path q= reverse (p);
+    if (!has_subtree (the_et, q)) continue;
+    tag = subtree (the_et, q);
+    root= the_et[q->item];
+    if (is_compound (tag)) return true;
+  }
+  return false;
+}
+
 tree
 edit_env_rep::exec_auto_id (tree t) {
   static bool stable= (get_env ("TEXMACS_STABLE_LABELS") != "off");
   bool fresh= (N(t) >= 1 && exec_string (t[0]) == "new");
-  if (!stable || !auto_alone) {
+  if (!stable) {
     if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
     return exec (tree (VALUE, "auto-nr"));
   }
+  string last= "";
+  if (provides ("auto-last")) last= as_string (read ("auto-last"));
   if (!fresh) {
-    if (N(auto_last) == 0) return exec (tree (VALUE, "auto-nr"));
-    return auto_last;
+    if (N(last) == 0) return exec (tree (VALUE, "auto-nr"));
+    return last;
   }
-  auto_given++;
-  if (auto_ids == NULL) {
-    auto_last= "x" * as_string (++auto_loose);
-    return "";
+  string name;
+  tree tag, root;
+  if (auto_label_tag (tag, root)) {
+    array<int> r, a;
+    if (!auto_label_data (root, r)) {
+      r= array<int> ();
+      r << (++auto_epoch) << 1 << 0;
+      (void) tree_addendum_new (root, ADDENDUM_AUTO_ID,
+                                close_box<array<int> > (r), false);
+    }
+    if (!auto_label_data (tag, a)) {
+      a= array<int> ();
+      a << 0 << 0;
+      (void) tree_addendum_new (tag, ADDENDUM_AUTO_ID,
+                                close_box<array<int> > (a), false);
+    }
+    bool given= (a[0] != r[0]);
+    if (given) { a[0]= r[0]; a[1]= r[1]++; }
+    string nr= as_string (a[1]);
+    int k= 1;
+    if (last == nr) k= 2;
+    else if (starts (last, nr * "."))
+      k= as_int (last (N(nr) + 1, N(last))) + 1;
+    if (k == 1) {
+      // numbered in the order of the document?
+      auto_seen++;
+      if (given && !(complete && a[1] == auto_seen)) r[2]= 1;
+      name= nr;
+    }
+    else name= nr * "." * as_string (k);
   }
-  int id;
-  if (complete) {
-    id= ++auto_count;
-    if (auto_used < N(*auto_ids)) (*auto_ids)[auto_used]= id;
-    else (*auto_ids) << id;
+  else {
+    int n= 1;
+    if (provides ("auto-nr")) n= as_int (read ("auto-nr")) + 1;
+    monitored_write ("auto-nr", as_string (n));
+    name= "x" * as_string (n);
   }
-  else if (auto_used < N(*auto_ids)) id= (*auto_ids)[auto_used];
-  else { id= auto_next; (*auto_ids) << id; }
-  auto_used++;
-  if (id >= auto_next) auto_next= id + 1;
-  auto_last= as_string (id);
+  if (name != last) monitored_write ("auto-last", name);
   return "";
 }
 

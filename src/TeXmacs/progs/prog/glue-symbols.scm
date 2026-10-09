@@ -1203,6 +1203,7 @@
 "update-forced"
 "update-path"
 "update-current-buffer"
+"renumber-auto-labels"
 "update-players"
 "generate-all-aux"
 "generate-aux"
