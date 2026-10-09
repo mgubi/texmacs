@@ -12,7 +12,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (texmacs-module (fonts font-design)
-  (:use (fonts fonts-opentype) (fonts font-short-menu)
+  (:use (fonts fonts-opentype) (fonts font-short-menu) (fonts font-custom)
         (generic document-edit)))
 
 ;; The fonts of a document are a design decision, and the menus only name
@@ -530,6 +530,8 @@
             (concat ,(design-action "Use for the document"
                                     "font-design-page-apply" d)
                     " "
+                    ,(design-action "Save as" "font-design-page-save" d)
+                    " "
                     ,(design-action "Start again"
                                     "font-design-page-restart" d))))
          (cell ,(choice-preview c))))))))
@@ -687,6 +689,20 @@
     (and-with e (font-design-find-entry id)
       (font-design-make-sample e (cached-samples))
       (revert-buffer-revert (tmfs-url-font-design (system->url d))))))
+
+(tm-define (font-design-page-save d)
+  (:secure #t)
+  ;; the choice under a name, for the menu of the fonts of every document
+  (when (page-context? d)
+    (with c (document-choice (system->url d))
+      (interactive
+          (lambda (name)
+            (when (!= name "")
+              (font-design-store name (font-design-font c)
+                                 (or (choice-ref c "family") "rm"))
+              (set-message (string-append "The fonts are saved as " name)
+                           "Font design")))
+        (list "Name of these fonts" "string" '())))))
 
 (tm-define (font-design-page-apply d)
   (:secure #t)

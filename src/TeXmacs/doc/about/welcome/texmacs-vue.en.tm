@@ -238,7 +238,10 @@
     letters of the formulas. The choice is listed at the top of the page
     with a sample, and <menu|Use for the document> gives it to the
     document. The samples are pictures: the page fetches no font but
-    those of the choice.
+    those of the choice. Such fonts show as <menu|Custom> on the font
+    button; <menu|Save as> on the page, or <menu|Save these fonts> in the
+    menu, keeps them under a name, which the menu then offers for every
+    document (<menu|Saved fonts>).
 
     <item>A slow network no longer leaves signs out of the first screen.
     The fonts of the first screen which are not among the files of the
