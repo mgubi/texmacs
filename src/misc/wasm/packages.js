@@ -214,7 +214,7 @@ var tmPackages = (function () {
 
   // a font which did not come when TeXmacs read it: without holding the
   // page, into its placeholders and into the cache
-  var later = {};
+  var later = {}, laterWait = 4000;
   function fetchFontLater (pkg) {
     var u = url (pkg.url);
     if (later[u]) return;
@@ -223,9 +223,16 @@ var tmPackages = (function () {
       if (bytes.length !== pkg.size) throw new Error (bytes.length + ' bytes');
       (lazyNodes[u] || []).forEach (function (n) { if (n.tmPackage) fill (n, bytes); });
       console.log ('TeXmacs: ' + pkg.name + ' came in the background');
+      // TeXmacs kept it as a font which cannot be read: its fonts are made
+      // again (vue_follow_fonts in vue_gui.cpp)
+      if (Module['_vue_web_font_arrived']) Module['_vue_web_font_arrived'] ();
     }).catch (function (e) {
       later[u] = false;
-      console.warn ('TeXmacs: ' + pkg.name + ' did not come in the background (' + e + ')');
+      console.warn ('TeXmacs: ' + pkg.name + ' did not come in the background (' + e + '), asked again in ' +
+                    Math.round (laterWait / 1000) + ' s');
+      // again later, the wait doubling up to a minute, while the page is open
+      setTimeout (function () { fetchFontLater (pkg); }, laterWait);
+      laterWait = Math.min (2 * laterWait, 60000);
     });
   }
 

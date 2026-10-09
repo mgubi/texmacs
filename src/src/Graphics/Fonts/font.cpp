@@ -585,6 +585,26 @@ qt_font (string family, int size, int dpi) {
 ******************************************************************************/
 
 static hashmap<string,font> larger_font_table;
+
+// Forget the fonts made so far: the fonts, their metrics and glyphs (which
+// are found by name, and never deleted), the faces of their files and what
+// the composite fonts decided from them (which font draws a character).
+// The fonts in use go on working; whoever asks again gets a new one. For a
+// font whose file could not be read when it was first asked for (in the
+// browser, a file which the network did not bring): the face was kept as
+// bad, and the fonts made on it drew nothing. The documents have to be
+// typeset again, and the widgets laid out, to get the new fonts.
+void
+fonts_forget () {
+  font::instances= hashmap<string,pointer> (NULL);
+  font_metric::instances= hashmap<string,pointer> (NULL);
+  font_glyphs::instances= hashmap<string,pointer> (NULL);
+  larger_font_table= hashmap<string,font> ();
+  smart_fonts_forget ();
+#ifdef USE_FREETYPE
+  tt_faces_forget ();
+#endif
+}
 bool has_poor_rubber= true;
 bool hand_tuned_math_fonts= true;
 

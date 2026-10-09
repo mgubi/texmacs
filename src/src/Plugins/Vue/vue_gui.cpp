@@ -1645,11 +1645,17 @@ struct text_extents {
   text_extents (): index (-1), last_use (-1) {}
 };
 
+static bool text_extents_stale= false; // the fonts were made again
+
 static text_extents&
 text_extents_of (font fn) {
   const int nr_fonts= 8;
   static text_extents tables[nr_fonts];
   static int use_clock= 0;
+  if (text_extents_stale) {
+    for (int i= 0; i < nr_fonts; i++) tables[i]= text_extents ();
+    text_extents_stale= false;
+  }
   int found= -1, oldest= 0;
   for (int i= 0; i < nr_fonts; i++) {
     if (tables[i].last_use >= 0 && tables[i].font_name == fn->res_name) {
@@ -3990,6 +3996,39 @@ loop_iteration () {
 #endif
 }
 
+// A font whose file could not be read when TeXmacs first asked for it (the
+// network did not bring it: see fetchFont in misc/wasm/packages.js) has
+// come. It was kept as a bad font, whose characters are drawn as missing
+// (a question mark in a box for the command sign of the shortcuts): the
+// fonts are forgotten, the documents typeset again and the widgets laid
+// out again, which makes them anew. The page calls vue_web_font_arrived
+// from outside the loop, which does the work at its next iteration.
+static bool fonts_arrived= false;
+
+#ifdef __EMSCRIPTEN__
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_font_arrived () {
+  fonts_arrived= true;
+  gui_needs_update= true;
+}
+#endif
+
+static void
+vue_follow_fonts () {
+  if (!fonts_arrived) return;
+  fonts_arrived= false;
+  fonts_forget ();
+  mupdf_fonts_forget ();
+  text_extents_stale= true;
+  array<url> vs= get_all_views ();
+  for (int i= 0; i < N(vs); i++) {
+    editor ed= view_to_editor (vs[i]);
+    if (!is_nil (ed)) ed->typeset_invalidate_all ();
+  }
+  gui_needs_relayout= true;
+  gui_needs_update= true;
+}
+
 // The interface scaling of the preferences, followed at once: the windows
 // take their new factors (update_density) and, as their contents, grow or
 // shrink by the ratio of the two scalings; everything is laid out and the
@@ -4056,6 +4095,7 @@ loop_iteration_body () {
   if (dismiss_finished_wait ()) gui_needs_update= true;
   vue_follow_icon_set (); // a change of the icon set shows at once
   vue_follow_interface_scale (); // and one of the interface scaling
+  vue_follow_fonts (); // and a font which came late
 #ifdef __EMSCRIPTEN__
   // The browser calls this once per frame (60 or 120 times a second), where
   // the desktop sleeps until an event comes or the pause ends (loop_wait,
