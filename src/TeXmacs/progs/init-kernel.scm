@@ -16,7 +16,7 @@
 ;; The initialization continues with init-texmacs.scm.
 
 (define remote-client-list (list))
-(define tm-interactive-hook tm-interactive)
+(define (tm-interactive-hook fun args) (tau-interactive fun args))
 
 (inherit-modules (kernel boot abbrevs)
                  (kernel boot debug) (kernel boot srfi)
@@ -46,4 +46,6 @@
 (lazy-define (kernel gui menu-convert) make-menu-widget**)
 ;; Tau: the interface as data, for the page
 (lazy-define (kernel gui menu-serial)
-             tau-serialize-part tau-expand tau-invoke)
+             tau-serialize-part tau-expand tau-invoke tau-answer tau-refresh
+  tau-outbox tau-dialog-new tau-dialog-show tau-dialog-close tau-dialog-closed
+  tau-interactive)

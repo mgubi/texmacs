@@ -4,6 +4,11 @@
 // TeXmacs: kernel/gui/menu-serial.scm). The contents of a submenu are asked
 // when it opens ("expand"), an entry sends the number of its action
 // ("invoke").
+//
+// The dialogs (step 4) are descriptions too ("dialog"), shown in windows of
+// the page: their inputs send their values ("answer"), their parts which
+// change come again ("refresh"), and the core takes them away ("close")
+// after the page said that the user closed them.
 
 let send = () => {};        // to the core
 let afterAction = () => {}; // gives the keyboard back to the view
@@ -21,6 +26,7 @@ export function init(options) {
 	document.addEventListener("keydown", event => {
 		if (event.key === "Escape" && popups.length) { closePopups(0); afterAction(); }
 	}, true);
+	initDialogs();
 }
 
 // The messages of the core which concern the interface
@@ -53,6 +59,13 @@ export function handle(m) {
 		const resolve = waitingContents.get(m.part);
 		waitingContents.delete(m.part);
 		if (resolve) resolve(m.items);
+		return true;
+	}
+	case "dialog": showDialog(m); return true;
+	case "close": removeDialog(m.id); return true;
+	case "refresh": {
+		const e = document.querySelector(`[data-refresh="${m.number}"]`);
+		if (e) e.replaceChildren(...renderItems(m.items, e.tauContext));
 		return true;
 	}
 	case "file": {
@@ -88,10 +101,11 @@ function expand(number) {
 	});
 }
 
-function invoke(node) {
+function invoke(node, context) {
 	closePopups(0);
 	send({ t: "invoke", number: node.action });
-	afterAction();
+	// (the keyboard stays in a dialog)
+	if (!context || !context.dialog) afterAction();
 }
 
 function el(tag, className, text) {
@@ -140,6 +154,7 @@ const CHECKS = { v: "✓", o: "●", "*": "●" };
 function renderItems(items, context) {
 	const out = [];
 	for (const node of items || []) {
+		if (context.dialog && renderDialogItem(node, context, out)) continue;
 		switch (node.kind) {
 		case "horizontal": case "vertical": case "hlist": case "vlist":
 		case "minibar": case "refreshable":
@@ -173,10 +188,10 @@ function renderItems(items, context) {
 }
 
 function renderEntry(node, context) {
-	const b = el("button", "tau-entry");
+	const b = el("button", node.button && context.dialog ? "tau-button" : "tau-entry");
 	b.type = "button";
 	b.disabled = !node.enabled;
-	if (context.bar || context.tile) {
+	if (context.bar || context.tile || context.dialog) {
 		b.append(...label(node, context));
 		if (node.check) b.classList.add("tau-pressed");
 		const tip = tooltip(node);
@@ -186,7 +201,7 @@ function renderEntry(node, context) {
 			el("span", "tau-shortcut", node.shortcut || ""));
 		if (node.help) b.title = node.help;
 	}
-	b.addEventListener("click", () => invoke(node));
+	b.addEventListener("click", () => invoke(node, context));
 	b.addEventListener("pointerenter", () => { if (!context.bar) closePopups(context.depth); });
 	return b;
 }
@@ -195,16 +210,16 @@ function renderSubmenu(node, context) {
 	const b = el("button", "tau-entry tau-submenu");
 	b.type = "button";
 	b.disabled = !node.enabled;
-	if (context.bar || context.tile) {
+	if (context.bar || context.tile || context.dialog) {
 		b.append(...label(node, context));
-		if (node.icon) b.append(el("span", "tau-arrow", "▾"));
+		if (node.icon || context.dialog) b.append(el("span", "tau-arrow", "▾"));
 		const tip = tooltip(node);
 		if (tip) b.title = tip;
 	} else {
 		b.append(el("span", "tau-check", ""), ...label(node, context), el("span", "tau-shortcut tau-arrow", "▸"));
 	}
-	const depth = context.bar ? 0 : context.depth;
-	const open = () => openPopup(b, node, depth, context.bar);
+	const depth = context.bar ? 0 : context.depth || 0;
+	const open = () => openPopup(b, node, depth, context.bar || context.dialog);
 	b.addEventListener("click", () => {
 		if (b.classList.contains("tau-open")) closePopups(depth); else open();
 	});
@@ -251,4 +266,301 @@ function place(popup, button, below) {
 	if (y + h > window.innerHeight - 4) y = Math.max(4, window.innerHeight - 4 - h);
 	popup.style.left = x + "px";
 	popup.style.top = y + "px";
+}
+
+// ---------------------------------------------------------------------------
+// Dialogs
+// ---------------------------------------------------------------------------
+
+const dialogs = new Map(); // number -> element
+let dialogTop = 20;        // z-index of the dialog in front
+let listCounter = 0;
+
+function initDialogs() {
+	document.addEventListener("keydown", event => {
+		const d = event.target.closest && event.target.closest(".tau-dialog");
+		if (!d) return;
+		if (event.key === "Escape" && !popups.length) {
+			event.preventDefault();
+			send({ t: "close", id: Number(d.dataset.id) });
+		}
+	});
+}
+
+// a length of TeXmacs ("120px", "30em", "1w") for the style sheet, or none
+function cssSize(s) {
+	const m = /^(-?\d+(?:\.\d+)?)(px|em|ex|w|h)?$/.exec(s || "");
+	if (!m) return null;
+	if (m[2] === "w" || m[2] === "h") return Math.round(100 * Number(m[1])) + "%";
+	return m[1] + (m[2] || "px");
+}
+
+function answer(node, ...args) {
+	send({ t: "answer", number: node.answer, args });
+}
+
+function box(className, items, context) {
+	const e = el("div", className);
+	e.append(...renderItems(items, context));
+	return e;
+}
+
+function labelled(node, control) {
+	if (!node.label) return control;
+	const row = el("label", "tau-setting");
+	row.append(el("span", "tau-setting-label", node.label), control);
+	return row;
+}
+
+// The element of the node of a dialog, added to out: the layouts are boxes
+// there, where a bar or a menu takes their items in a row
+function renderDialogItem(node, context, out) {
+	const row = { ...context, row: true }, column = { ...context, row: false };
+	switch (node.kind) {
+	case "horizontal": case "hlist": case "minibar": case "class":
+		out.push(box("tau-h", node.items, row));
+		break;
+	case "vertical": case "vlist": case "division":
+		out.push(box("tau-v", node.items, column));
+		break;
+	case "hsplit": out.push(box("tau-h tau-split", node.items, row)); break;
+	case "vsplit": out.push(box("tau-v tau-split", node.items, column)); break;
+	case "scrollable": out.push(box("tau-v tau-scrollable", node.items, column)); break;
+	case "resize": {
+		const e = box("tau-v tau-resize", node.items, column);
+		const w = cssSize(node.width), h = cssSize(node.height);
+		if (w && !w.endsWith("%")) e.style.width = w;
+		if (h && !h.endsWith("%")) e.style.height = h;
+		out.push(e);
+		break;
+	}
+	case "box": {
+		const e = el("fieldset", "tau-box");
+		if (node.label) e.append(el("legend", "", node.label));
+		e.append(...renderItems(node.items, column));
+		out.push(e);
+		break;
+	}
+	case "refreshable": {
+		const e = el("div", "tau-refreshable");
+		e.dataset.refresh = node.number;
+		e.tauContext = context;
+		e.append(...renderItems(node.items, context));
+		out.push(e);
+		break;
+	}
+	case "glue": {
+		const e = el("div", "tau-space");
+		if (context.row ? node.hext : node.vext) e.style.flex = "1";
+		if (node.width) e.style.minWidth = node.width + "px";
+		if (node.height) e.style.minHeight = node.height + "px";
+		out.push(e);
+		break;
+	}
+	case "separator":
+		out.push(el("div", node.vertical ? "tau-vline" : "tau-hsep"));
+		break;
+	case "text": out.push(el("span", "tau-dialog-text", node.label || "")); break;
+	case "group": out.push(el("div", "tau-dialog-group", node.label || "")); break;
+	case "aligned": {
+		const grid = el("div", "tau-aligned");
+		for (const r of node.rows) {
+			grid.append(box("tau-h tau-aligned-left", r.left, row), box("tau-h", r.right, row));
+		}
+		out.push(grid);
+		break;
+	}
+	case "tabs": out.push(renderTabs(node, context)); break;
+	case "input": out.push(renderInput(node)); break;
+	case "enum": out.push(labelled(node, renderEnum(node))); break;
+	case "choice": out.push(renderChoice(node)); break;
+	case "toggle": {
+		const c = el("input", "tau-toggle");
+		c.type = "checkbox";
+		c.checked = node.on;
+		c.disabled = !node.enabled;
+		c.addEventListener("change", () => answer(node, c.checked));
+		out.push(labelled(node, c));
+		break;
+	}
+	default:
+		if (!node.unsupported) return false;
+		out.push(el("span", "tau-unsupported", "[" + node.kind + "]"));
+	}
+	return true;
+}
+
+function proposals(input, values) {
+	if (!values || values.length < 2) return [];
+	const list = el("datalist");
+	list.id = "tau-list-" + (++listCounter);
+	for (const v of values) { const o = el("option"); o.value = v; list.append(o); }
+	input.setAttribute("list", list.id);
+	return [list];
+}
+
+function renderInput(node) {
+	const wrap = el("span", "tau-input-wrap");
+	const input = el("input", "tau-input");
+	input.type = node.type === "password" ? "password" : "text";
+	input.value = node.value;
+	input.disabled = !node.enabled;
+	input.spellcheck = false;
+	input.autocomplete = "off";
+	const w = cssSize(node.width);
+	if (w) { wrap.style.width = w; if (w.endsWith("%")) wrap.style.flex = "1"; }
+	// the value goes when it is validated or left, as in the other
+	// interfaces; return also validates a dialog which asks for values
+	let sent = node.value;
+	const commit = () => { if (input.value !== sent) { sent = input.value; answer(node, sent); } };
+	input.addEventListener("change", commit);
+	input.addEventListener("keydown", event => {
+		if (event.key !== "Enter") return;
+		sent = input.value;
+		answer(node, sent);
+		const d = input.closest(".tau-dialog");
+		const buttons = d && d.tauSubmit ? d.querySelectorAll(".tau-button") : [];
+		if (buttons.length) buttons[buttons.length - 1].click();
+	});
+	wrap.append(input, ...proposals(input, node.proposals));
+	return wrap;
+}
+
+function renderEnum(node) {
+	if (node.editable) {
+		const input = el("input", "tau-input");
+		input.value = node.value;
+		input.disabled = !node.enabled;
+		const wrap = el("span", "tau-input-wrap");
+		const w = cssSize(node.width);
+		if (w && !w.endsWith("%")) wrap.style.width = w;
+		input.addEventListener("change", () => answer(node, input.value));
+		wrap.append(input, ...proposals(input, node.values.concat([""])));
+		return wrap;
+	}
+	const select = el("select", "tau-enum");
+	select.disabled = !node.enabled;
+	for (const v of node.values) {
+		const o = el("option", "", v);
+		o.value = v;
+		o.selected = v === node.value;
+		select.append(o);
+	}
+	const w = cssSize(node.width);
+	if (w && !w.endsWith("%")) select.style.width = w;
+	select.addEventListener("change", () => answer(node, select.value));
+	return select;
+}
+
+// a list of which one or several are chosen, with a filter or without
+function renderChoice(node) {
+	const select = el("select", "tau-choice");
+	select.multiple = node.multiple;
+	select.disabled = !node.enabled;
+	const fill = filter => {
+		const shown = node.values.filter(v => !filter || v.toLowerCase().includes(filter.toLowerCase()));
+		select.size = Math.max(2, Math.min(shown.length, 12));
+		select.replaceChildren(...shown.map(v => {
+			const o = el("option", "", v);
+			o.value = v;
+			o.selected = node.chosen.includes(v);
+			return o;
+		}));
+	};
+	if (node.filter === undefined) {
+		fill("");
+		select.addEventListener("change", () => {
+			const chosen = Array.from(select.selectedOptions, o => o.value);
+			answer(node, node.multiple ? chosen : chosen[0] || "");
+		});
+		return select;
+	}
+	const e = el("div", "tau-v");
+	const input = el("input", "tau-input");
+	input.value = node.filter;
+	input.placeholder = "Filter";
+	fill(node.filter);
+	input.addEventListener("input", () => fill(input.value));
+	select.addEventListener("change", () => answer(node, select.value, input.value));
+	e.append(input, select);
+	return e;
+}
+
+function renderTabs(node, context) {
+	const e = el("div", "tau-tabs"), strip = el("div", "tau-tab-strip"), pages = [];
+	e.append(strip);
+	node.tabs.forEach((tab, i) => {
+		const b = el("button", "tau-tab");
+		b.type = "button";
+		if (tab.icon) b.append(...label({ icon: tab.icon, file: tab.file }, context));
+		b.append(...renderItems(tab.label, { ...context, row: true }));
+		const page = box("tau-v tau-tab-page", tab.items, { ...context, row: false });
+		page.hidden = i !== 0;
+		b.classList.toggle("tau-current", i === 0);
+		b.addEventListener("click", () => {
+			pages.forEach((p, j) => { p.hidden = j !== i; });
+			strip.querySelectorAll(".tau-tab").forEach((t, j) => t.classList.toggle("tau-current", j === i));
+		});
+		strip.append(b);
+		pages.push(page);
+		e.append(page);
+	});
+	return e;
+}
+
+function showDialog(m) {
+	let d = dialogs.get(m.id);
+	if (!d) {
+		d = el("div", "tau-dialog");
+		d.dataset.id = m.id;
+		const bar = el("div", "tau-dialog-title"), title = el("span", "tau-dialog-name");
+		const close = el("button", "tau-dialog-close", "×");
+		close.type = "button";
+		close.title = "Close";
+		close.addEventListener("click", () => send({ t: "close", id: m.id }));
+		bar.append(title, close);
+		d.append(bar, el("div", "tau-dialog-body tau-v"));
+		document.body.append(d);
+		dialogs.set(m.id, d);
+		// each new dialog a bit lower than the one before
+		const n = dialogs.size - 1;
+		d.style.left = `calc(50% + ${24 * n}px)`;
+		d.style.top = `${90 + 24 * n}px`;
+		d.addEventListener("pointerdown", () => { d.style.zIndex = ++dialogTop; }, true);
+		drag(d, bar);
+	}
+	d.tauSubmit = !!m.submit;
+	d.style.zIndex = ++dialogTop;
+	d.querySelector(".tau-dialog-name").textContent = m.title;
+	const body = d.querySelector(".tau-dialog-body");
+	body.replaceChildren(...renderItems(m.items, { dialog: true, row: false }));
+	const first = body.querySelector("input:not([type=checkbox]):not(:disabled)");
+	if (first) { first.focus(); first.select(); }
+	else { d.tabIndex = -1; d.focus(); }
+}
+
+function removeDialog(id) {
+	const d = dialogs.get(id);
+	if (!d) return;
+	const focused = d.contains(document.activeElement);
+	dialogs.delete(id);
+	d.remove();
+	if (focused || !dialogs.size) afterAction();
+}
+
+// a dialog is moved by its title
+function drag(d, bar) {
+	bar.addEventListener("pointerdown", event => {
+		if (event.target.closest("button")) return;
+		const r = d.getBoundingClientRect(), dx = event.clientX - r.left, dy = event.clientY - r.top;
+		d.style.transform = "none";
+		const move = e => {
+			d.style.left = Math.max(0, Math.min(window.innerWidth - 40, e.clientX - dx)) + "px";
+			d.style.top = Math.max(0, Math.min(window.innerHeight - 24, e.clientY - dy)) + "px";
+		};
+		move(event);
+		bar.setPointerCapture(event.pointerId);
+		bar.addEventListener("pointermove", move);
+		bar.addEventListener("pointerup", () => bar.removeEventListener("pointermove", move), { once: true });
+	});
 }

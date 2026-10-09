@@ -786,6 +786,10 @@ windows_refresh (string kind) {
   // no other window was open (the widgets of that kind in the menus of an
   // editor window, e.g. the typographic palette of the colour menus, which
   // changes as it is chosen in the open menu)
+#ifdef TAUTEXMACS
+  void tau_refresh (string kind);
+  if (kind != "auto") tau_refresh (kind);
+#endif
   if (kind != "auto") {
     array<url> l= windows_list ();
     for (int i=0; i<N(l); i++) {

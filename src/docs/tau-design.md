@@ -440,7 +440,7 @@ What differs from the protocol above, for now:
 footer are in the page.
 
 - `kernel/gui/menu-serial.scm` is the serialiser. It walks the markup as
-  `menu-widget.scm` does (which is still there, for the dialogs) and makes
+  `menu-widget.scm` does and makes
   nodes, written as JSON: `entry` (label, icon and its file, shortcut,
   check mark, enabled, help, the number of its action), `submenu` (label,
   the number of its contents), `separator`, `glue`, `group`, `text`, the
@@ -457,15 +457,65 @@ footer are in the page.
   passes on the texts of the footer (`footer`) and which bars are visible
   (`visible`). `tau_invoke` and `tau_expand` are called by the page.
 - In the page, `chrome.mjs` makes the bars and the menus from the nodes.
-  A menu asks for its contents when it opens. The icons are files of the
-  core, whose bytes the page asks of the worker once (`file`): they are in
-  the packages, not at addresses of their own.
+  A menu asks for its contents when it opens.
+- The icons are files of the core, in the packages and not at addresses of
+  their own. The serialiser finds the file as the core does when it draws
+  an icon (the SVG of that name in the `light` theme along
+  `TEXMACS_PIXMAP_PATH`, then next to it, then PNG files), and the worker
+  adds to a description the bytes of the files which the page has not got
+  yet (`files`), so that a bar comes with its icons and not before them.
 - `load-help-article` was only defined once the help menu had been built,
   which the menu bar was, whole, at the start: it is a lazy definition now.
 
 Not there yet: the side and bottom tools (described, not shown), the
 context menu of the editor, tooltips other than the titles of the buttons,
 keys in an open menu.
+
+**Step 4 is done** (2026-10-09): the dialogs and the questions are in
+the page.
+
+- The serialiser makes the nodes of the dialogs: `input` (type, value,
+  proposals, width), `enum` (values, value, editable; with a label for a
+  `setting-enum`), `choice` (values, chosen, multiple; with a filter for a
+  `filtered-choice`), `toggle`, `box` (a `setting-group`), `aligned` (rows
+  with a left and a right side), `tabs` (for each a label, maybe an icon,
+  and a page; the responsive tabs are tabs), and the layouts `scrollable`,
+  `hsplit`, `vsplit`, `resize`, `division`, `class`. An entry in the style
+  of a button says so (`button`). `texmacs-input`, `texmacs-output`,
+  `tree-view`, `color-input` and `ink` are still marked `unsupported`.
+- An input has a number as an action has; the page sends `answer` with the
+  number and the arguments of the command (strings, booleans, lists of
+  strings), which the worker writes in Scheme for `tau-answer`. The values
+  shown are translated; an `enum` maps the answer back.
+- A `refreshable` is a part inside its part (`dialog-3/274`), with its own
+  closures. `refresh-now` (`windows_refresh` in the core) reaches
+  `tau-refresh`, which describes again the parts of that kind and sends
+  `refresh` with the number of the node. Only the dialogs keep the node
+  in the page; a refreshable part of a bar is not replaced yet.
+- What Scheme has to say by itself (a dialog, a refresh) waits in an
+  outbox, which leaves at the end of the turn of the core (`tau-outbox`,
+  one message `batch` which the worker splits): no new glue.
+- `top-window` and `dialogue-window` make dialogs (`tau-dialog-new`,
+  `tau-dialog-show`, `tau-dialog-close`): `dialog` with a number, a title
+  and the nodes, `close` when the core takes it away. The cross and Escape
+  send `close` to the core (`tau-dialog-closed`), which runs the command
+  of the window; the page removes a dialog only when the core says so.
+- `interactive` asks in a dialog (`tau-interactive` is the
+  `tm-interactive-hook`): an aligned list of inputs with Cancel and Ok, or
+  the proposals as buttons for a question. Return in an input validates
+  it. The prompt in the footer is gone.
+- In the page the dialogs are floating boxes, not modal, moved by their
+  title (`chrome.mjs`).
+
+Checked in Firefox: Format → Whitespace → Rigid (question, value typed,
+the space is inserted), Edit → Preferences (tabs in tabs, 110 controls; a
+preference changed is there when the dialog is opened again), Format →
+Font (lists, and three parts refreshed when a family is chosen).
+
+Not there yet: `interactive-window` (the printer and colour pickers of
+the toolkits), the tooltips and popups made with `alt-window-*`, the
+continuous inputs (a value at each key), the sizes in `w` and `h` of
+`resize`, the styles of the texts (bold, grey, monospaced).
 
 ## Order of the work
 

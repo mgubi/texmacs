@@ -956,7 +956,7 @@
         (delayed
           (:pause 500)
           (keyboard-focus-on "interactive-0")))
-      (tm-interactive fun args)))
+      (tau-interactive fun args)))
 
 (set! tm-interactive-hook tm-interactive-new)
 

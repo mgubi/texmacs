@@ -2,9 +2,11 @@
 // messages between it and the page (docs/tau-design.md, "The protocol").
 //
 // From the page: { t: "place" | "scroll" | "focus" | "key" | "mouse", view, ... },
-//                { t: "invoke" | "expand", number }, { t: "file", path }
+//                { t: "invoke" | "expand", number }, { t: "file", path },
+//                { t: "answer", number, args }, { t: "close", id }
 // To the page:   { t: "ready" | "view" | "paint" | "log" | "status" | "failed", ... },
-//                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... }
+//                { t: "chrome" | "visible" | "footer" | "contents" | "file", part, ... },
+//                { t: "dialog" | "close" | "refresh", part, ... }
 
 "use strict";
 
@@ -13,8 +15,24 @@ importScripts("tau.js");
 let core = null;
 const waiting = [];   // the messages which came before the core was ready
 
+// A value of the page as Scheme reads it: the arguments of the command of
+// an input are strings, booleans and lists of them
+function scheme(value) {
+	if (typeof value === "string") return '"' + value.replace(/[\\"]/g, "\\$&") + '"';
+	if (typeof value === "number") return String(value);
+	if (Array.isArray(value)) return "(list " + value.map(scheme).join(" ") + ")";
+	return value ? "#t" : "#f";
+}
+
 function handle(m) {
 	switch (m.t) {
+	case "answer":
+		core.ccall("tau_answer", null, ["number", "string"],
+			[m.number, (m.args || []).map(scheme).join(" ")]);
+		break;
+	case "close":
+		core._tau_closed(m.id);
+		break;
 	case "place":
 		core._tau_place(m.view, m.width, m.height, m.density, m.place);
 		break;
@@ -63,20 +81,23 @@ const args = new URLSearchParams(self.location.search).getAll("arg");
 // message (files: path -> bytes), so that the bars come with their icons
 // and not before them.
 const sentFiles = new Set();
-function collectFiles(items, files) {
-	for (const node of items || []) {
-		if (node.file && !sentFiles.has(node.file)) {
-			sentFiles.add(node.file);
-			try { files[node.file] = tauModule.FS.readFile(node.file).buffer; } catch (error) {}
-		}
-		if (node.items) collectFiles(node.items, files);
+function collectFiles(node, files) {
+	if (Array.isArray(node)) { for (const x of node) collectFiles(x, files); return; }
+	if (!node || typeof node !== "object") return;
+	if (node.file && !sentFiles.has(node.file)) {
+		sentFiles.add(node.file);
+		try { files[node.file] = tauModule.FS.readFile(node.file).buffer; } catch (error) {}
 	}
+	for (const key in node) if (typeof node[key] === "object") collectFiles(node[key], files);
 }
+const DESCRIPTIONS = new Set(["chrome", "contents", "dialog", "refresh"]);
 let tauModule = null;
 function post(message, transfer) {
-	if (tauModule && (message.t === "chrome" || message.t === "contents")) {
+	// what Scheme says at the end of a turn comes together
+	if (message.t === "batch") { for (const m of message.msgs) post(m); return; }
+	if (tauModule && DESCRIPTIONS.has(message.t)) {
 		const files = {};
-		collectFiles(message.items, files);
+		collectFiles(message, files);
 		const buffers = Object.values(files);
 		if (buffers.length) { message.files = files; transfer = (transfer || []).concat(buffers); }
 	}

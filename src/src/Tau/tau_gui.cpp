@@ -324,6 +324,15 @@ tau_turn () {
     tau_js_paint (v->id, v->place_counter, v->px_w, v->px_h, v->pixels (),
                   ew, eh, sx, sy, cx, cy);
   }
+  // what Scheme has to say to the page (menu-serial.scm)
+  string out= as_string (call ("tau-outbox"));
+  if (N(out) != 0) tau_post_json ("batch", "", out);
+}
+
+// the parts of the interface of a given kind are described again
+void
+tau_refresh (string kind) {
+  call ("tau-refresh", object (kind));
 }
 
 void
@@ -398,6 +407,23 @@ void
 tau_invoke (int n) {
   // the action of an entry of a menu, by its number
   call ("tau-invoke", object (n));
+  tau_turn ();
+}
+
+// the value of an input: args are the arguments of its command, written
+// in Scheme by the worker
+EMSCRIPTEN_KEEPALIVE
+void
+tau_answer (int n, const char* args) {
+  eval ("(tau-answer " * as_string (n) * " " * string (args) * ")");
+  tau_turn ();
+}
+
+// the user closed a dialog
+EMSCRIPTEN_KEEPALIVE
+void
+tau_closed (int id) {
+  call ("tau-dialog-closed", object (id));
   tau_turn ();
 }
 
