@@ -229,6 +229,20 @@
   <paragraph|9 October 2026>
 
   <\itemize>
+    <item><menu|Font design>, in the menu of the fonts (the font button of
+    the focus bar), opens a page to choose the fonts of the document by
+    looking at them. It has a tab for each part: the text and the
+    mathematics together, the text, the mathematics, the sans serif and
+    the typewriter text, and the blackboard bold, calligraphic and fraktur
+    letters of the formulas. A tab lists the fonts for its part, each with
+    a few words, a sample of that part and a button to choose it. The
+    choice is listed at the top of the page with a sample, and <menu|Use
+    for the document> gives it to the document. The samples are pictures:
+    the page fetches no font but those of the choice. Such fonts show as <menu|Custom> on the font
+    button; <menu|Save as> on the page, or <menu|Save these fonts> in the
+    menu, keeps them under a name, which the menu then offers for every
+    document (<menu|Saved fonts>).
+
     <item>A slow network no longer leaves signs out of the first screen.
     The fonts of the first screen which are not among the files of the
     start (those of the welcome page and, on a Mac, the one of the command

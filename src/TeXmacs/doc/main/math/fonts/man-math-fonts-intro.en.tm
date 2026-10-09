@@ -65,6 +65,32 @@
   which are installed. The second section of a submenu, <menu|Text only>,
   changes the text font alone.
 
+  The menus only name the fonts. <menu|Font design>, at the end of the same
+  menu, opens a page which shows them. The page has a tab for each part of
+  a document: <menu|Text and mathematics> for the pairs of the menus, then
+  the text, the mathematics, the sans serif and the typewriter text, and
+  the blackboard bold, calligraphic and fraktur letters of the formulas. A
+  tab lists the fonts its part may have, each with a few words, a sample of
+  that part (the alphabet of a calligraphic font, the formulas of a
+  mathematical one) and a button <menu|Choose>, so that the text of one
+  font may go with the mathematics of another and the calligraphic letters
+  of a third; a part which has no font of its own follows the text font.
+  The top of the page lists the choice and shows a sample of it;
+  <menu|Use for the document> gives it to the document, which nothing
+  changes before. The samples of the fonts which come with <TeXmacs> are
+  pictures, so that the page does not load any font but those of the
+  choice; for a font of your system, <menu|Show a sample> makes the
+  picture.
+
+  A document whose parts have fonts of their own has no font of the menus:
+  the font button then says <menu|Custom>, and so does an entry of its
+  menu, which opens the page again. <menu|Save these fonts> in the menu,
+  or <menu|Save as> on the page, keeps the choice under a name of yours:
+  the name is then on the button, and the section <menu|Saved fonts> at
+  the top of the menu offers it for every document, also the next time
+  <TeXmacs> runs. <menu|Forget saved fonts> removes a name; the documents
+  which use those fonts keep them.
+
   <menu|Document|Font|Mathematical font> changes the mathematical font alone,
   and keeps the text font. Its entries are the traditional <TeXmacs> math
   fonts and, at the end, the installed <name|OpenType> math fonts. Formulas

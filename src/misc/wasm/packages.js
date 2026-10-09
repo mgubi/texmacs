@@ -203,6 +203,7 @@ var tmPackages = (function () {
     stats.fontBytes += pkg.size;
     console.log ('TeXmacs: ' + node.tmPath + ' loaded on demand (' + pkg.size + ' bytes)');
     (lazyNodes[u] || []).forEach (function (n) { if (n !== node && n.tmPackage) fill (n, bytes); });
+    if (pkg.name.indexOf (SAMPLES) === 0) fetchSamples ();
     if (typeof caches !== 'undefined')
       caches.open (CACHE).then (function (cache) {
         return cache.put (u, new Response (bytes, {
@@ -249,6 +250,38 @@ var tmPackages = (function () {
     .concat (MAC ? ['fonts/truetype/stix2/STIXTwoMath-Regular.otf'] : []);
   function earlyFonts (m) {
     return (m.lazy || []).filter (function (f) { return EARLY_FONTS.indexOf (f[0]) >= 0; });
+  }
+
+  // The pictures of the samples of the fonts (the page of the design of the
+  // fonts, fonts/font-design.scm) are files fetched on demand as the fonts
+  // are: only that page reads them. A tab of the page reads some thirty at
+  // once, each a request which holds the page: when the first one is read,
+  // all the others are fetched in the background, a few at a time, so that
+  // the next tabs find theirs in place.
+  var SAMPLES = 'misc/font-samples/';
+  var samplesAsked = false;
+  function fetchSamples () {
+    if (samplesAsked || !manifest.lazy) return;
+    samplesAsked = true;
+    var todo = manifest.lazy.filter (function (f) { return f[0].indexOf (SAMPLES) === 0; });
+    var came = 0;
+    async function worker () {
+      for (;;) {
+        var f = todo.shift ();
+        if (!f) return;
+        var u = url (f[1]), nodes = lazyNodes[u] || [];
+        if (!nodes.some (function (n) { return n.tmPackage; })) continue; // there already
+        try {
+          var bytes = await fetchPackage ({ url: f[1], size: f[2] });
+          if (bytes.length !== f[2]) continue;
+          nodes.forEach (function (n) { if (n.tmPackage) fill (n, bytes); });
+          came++;
+        } catch (e) {} // left to the read
+      }
+    }
+    Promise.all ([worker (), worker (), worker (), worker ()]).then (function () {
+      console.log ('TeXmacs: ' + came + ' samples of fonts fetched in the background');
+    });
   }
 
   // the fonts which an earlier visit fetched, from the cache, before TeXmacs
