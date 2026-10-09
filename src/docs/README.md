@@ -13,6 +13,7 @@ to look in the code.
 | [typographic-palettes.md](typographic-palettes.md) | The typographic palettes of the colour menus (Vue): the sets, and how to define your own |
 | [vue-testing.md](vue-testing.md) | Snapshot and scripted-event harness, how to run and write tests |
 | [texmacs-gui-architecture.md](texmacs-gui-architecture.md) | How the TeXmacs core talks to a GUI plugin: widget factories, slots, Scheme markup, tools, dialogs, the client/server sockets, the other entry points |
+| [tau-design.md](tau-design.md) | Design, not implemented: Tau, a browser port with the editor and Scheme in a worker and the interface in JavaScript and HTML in the page; buffers, views, the protocol, the vocabulary of the interface, fonts, order of the work |
 | [editor-frontend-separation.md](editor-frontend-separation.md) | Design, not implemented: how the editor depends on the GUI and the window layer, and how to separate them in stages; draft headers in [editor-frontend-separation/](editor-frontend-separation/) |
 | [pdf-output-with-mupdf.md](pdf-output-with-mupdf.md) | Writing the PDF with MuPDF instead of PDFHummus: what the Hummus renderer does, what MuPDF offers, the font subsetting which blocks it, and a working prototype |
 | [build-and-debug.md](build-and-debug.md) | Configuring, building, dependency tracking, crash reports, pitfalls met along the way |
