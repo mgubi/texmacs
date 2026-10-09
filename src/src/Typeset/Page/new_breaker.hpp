@@ -15,6 +15,15 @@
 #include "vpenalty.hpp"
 #include "skeleton.hpp"
 #include "iterator.hpp"
+#include <vector>
+
+// One candidate end of a page for a start, as find_page_breaks_plain keeps
+// it: what it adds to the penalty of the start, and what the loop does next
+struct breaker_cand {
+  int dpen, dexc;  // added to the main penalty and to the excentricity
+  int flags;       // 1: a break is allowed here; 2: the page is too long
+};                 // for any stretch; 4: a page break is asked for here
+struct breaker_history;
 
 struct new_breaker_rep {
   array<page_item> l;
@@ -57,12 +66,19 @@ struct new_breaker_rep {
   // The faster search (see "A faster search" in new_breaker.cpp). The best
   // previous break and penalty of the plain positions (a number of items,
   // no pending float) are in arrays instead of the tables above
-  int          fast_level;  // 0: off, 1..3: the changes in use
+  int          fast_level;  // 0: off, 1..4: the changes in use
   array<bool>  has_a;       // a best previous break is known
   array<bool>  done_a;      // the position is in done_list
   array<int>   pen_a;       // its penalty
   array<int>   exc_a;
   array<path>  prev_a;      // the best previous break
+  // the candidates of each start, kept for the next search
+  std::vector<breaker_cand> cands;
+  std::vector<int>          cand_off, cand_cnt;
+  breaker_history* old;        // those of the previous search, if any
+  // the item of the previous search which each item is (or -1), and how
+  // many items from it on are items of that search which follow each other
+  std::vector<int> old_pos, old_run;
  
   new_breaker_rep (array<page_item> l, space ph, int quality,
                    space fn_sep, space fnote_sep, space float_sep,

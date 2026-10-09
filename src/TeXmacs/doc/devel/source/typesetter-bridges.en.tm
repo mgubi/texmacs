@@ -465,7 +465,7 @@
   are in arrays instead of tables indexed by paths, no path is made for
   each candidate page, and the height and the penalty of a candidate are
   computed with integers. <verbatim|TEXMACS_PAGE_BREAK_FAST> may be
-  <verbatim|0> for the search as it was, <verbatim|1> or <verbatim|2> for
+  <verbatim|0> for the search as it was, <verbatim|1> to <verbatim|3> for
   the first changes only, or <verbatim|check> to run both searches and
   report a difference. The tables which hold the starts to try are kept
   as they were: the starts are tried in the order of their iteration, on
@@ -493,12 +493,12 @@
     The search of the page breaks, in milliseconds.
   </big-table>
 
-  The last column is a fourth change which was tried and removed: the
-  candidates of a start depend on the items from the start to the
-  candidate only, and those of the previous search were used again for
-  the starts whose items had not changed. It gained little, for the most
-  code, four megabytes of candidates kept for the first document, and
-  conditions which were easy to get wrong.
+  The last column is a fourth change: the candidates of a start depend on
+  the items from the start to the candidate only, and those of a previous
+  search are used again for the starts whose items did not change. It
+  gains little on these two documents, for the most code and four
+  megabytes of candidates kept for the first one, and was taken out for a
+  while. It is what counts in a book with an index, see below.
 
   The whole of an edit in the first document, on paper, before and after
   these changes and the others of October 2026 (the invalid regions cut
@@ -575,19 +575,30 @@
 
   <\big-table|<block|<tformat|<table|<row|<cell|>|<cell|before>|<cell|after>>|<row|<cell|a
   character in a line>|<cell|416>|<cell|72>>|<row|<cell|a new
-  line>|<cell|419>|<cell|359>>|<row|<cell|two paragraphs
+  line>|<cell|419>|<cell|93 to 117>>|<row|<cell|two paragraphs
   joined>|<cell|1134>|<cell|78>>|<row|<cell|a new
-  section>|<cell|1811>|<cell|1059>>|<row|<cell|a new numbered
-  equation>|<cell|1142>|<cell|396>>>>>>
+  section>|<cell|1811>|<cell|839>>|<row|<cell|a new numbered
+  equation>|<cell|1142>|<cell|139>>>>>>
     One edit in the middle of the user manual, in milliseconds.
   </big-table>
 
-  A real book gains less than the documents made for the measures, for
-  three reasons. The manual has floats and an index in two columns: most
-  of its page starts have pending floats, which the faster search leaves
-  to the search as it was (250 of the 340<nbsp>ms of the pager for a new
-  line). Its pages are made again at every pass, 50<nbsp>ms for 260 of
-  them. And a new section still has 10600 bridges typeset again in
+  A real book gains less than the documents made for the measures. The
+  manual has an index in two columns, and the height of a candidate page
+  with several columns means balancing them: 137000 such candidates took
+  210 of the 250<nbsp>ms of the search, at every change of the number of
+  lines anywhere in the book. These candidates are those of the previous
+  search as long as the index does not change, which is why the
+  candidates of each start are kept: the items of the new search are
+  matched with those of a previous one (lines added, removed or changed
+  in several places, since a pass after another one also changes the page
+  numbers of the table of contents and of the index; three searches are
+  kept, the documents which are open being searched in turn), and a start
+  whose items follow each other as before takes its candidates from it.
+  The search then takes 10 to 16<nbsp>ms, and a new line in the manual
+  93 to 117<nbsp>ms instead of 359; the first change of the number of
+  lines after the manual is opened still takes 370, the index itself
+  having changed with its page numbers. The pages are made again at every
+  pass, 50<nbsp>ms for 260 of them. And a new section still has 10600 bridges typeset again in
   700<nbsp>ms: every index entry and every section of <TeXmacs> gets a
   label named from one counter (<verbatim|auto-1>,
   <verbatim|auto-2>...), so that a new section renames the labels of all
