@@ -133,9 +133,11 @@
 ;; The catalogue: for each part of a document, the fonts it may have
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; The page has a tab for each part: "all" (text and mathematics together,
-;; the pairs of the menus), "text", "math", "sansserif", "typewriter",
-;; "bbb", "cal" and "frak". An entry of a tab is an association list with
+;; The page shows the fonts for one part at a time, its "tab": "text",
+;; "math", "sansserif", "typewriter", "bbb", "cal" or "frak". The pairs of
+;; the menus (text and mathematics together) are the catalogue "all",
+;; which has no tab: a pair is its text font with the mathematics "as the
+;; text font". An entry of a tab is an association list with
 ;;   tab     the part
 ;;   name    the name of the menus
 ;;   text    the master of the text font (the value of `font')
@@ -144,7 +146,7 @@
 ;;   id      the name of the picture of the sample, unique in the tab
 
 (tm-define font-design-tabs
-  '("all" "text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
+  '("text" "math" "sansserif" "typewriter" "bbb" "cal" "frak"))
 
 (define tab-names
   '(("all" . "Text and mathematics") ("text" . "Text")
@@ -589,9 +591,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The paragraphs of the page: a line with its title, the choice (its
-;; parts on the left, its sample on the right), the tabs and the list of
-;; the fonts of the tab, which scrolls. A choice or another tab puts the
-;; paragraphs which change again in place.
+;; parts on the left, its sample on the right) and the list of the fonts
+;; for one part, which scrolls. The names of the parts in the choice are
+;; the buttons which show their fonts: the "tabs" of the list. A choice or
+;; another part puts the paragraphs which change again in place.
 
 (tm-define (tmfs-url-font-design u)
   (string-append "tmfs://font-design/" (url->tmfs-string u)))
@@ -603,7 +606,7 @@
 (define font-design-page-tabs (make-ahash-table))
 
 (define (document-tab u)
-  (or (ahash-ref font-design-page-tabs (url->system u)) "all"))
+  (or (ahash-ref font-design-page-tabs (url->system u)) "text"))
 
 (define (design-action text cmd . args)
   `(action (font-design-button ,text)
@@ -611,18 +614,19 @@
                            (string-recompose (map object->string args) " ")
                            ")")))
 
-(define (action-link text cmd . args)
-  `(action ,text
-           ,(string-append "(" cmd " "
-                           (string-recompose (map object->string args) " ")
-                           ")")))
-
+;; A row of the choice: the name of the part is the button which shows
+;; the fonts for it in the list (pressed for the part which is shown)
 (define (choice-row doc c part)
-  (let* ((val (choice-ref c part))
-         (name (if val (font-design-value-name part val)
-                   "as the text font")))
-    `(row (cell ,(action-link (tab-name part) "font-design-page-tab"
-                              (url->system doc) part))
+  (let* ((d (url->system doc))
+         (val (and-with v (choice-ref c part)
+                (font-design-value-name part v)))
+         (name (or val "as the text font")))
+    `(row (cell ,(if (== part (document-tab doc))
+                     `(font-design-tab-on ,(tab-name part))
+                     `(action (font-design-tab-off ,(tab-name part))
+                              ,(string-append "(font-design-page-tab "
+                                              (object->string d) " "
+                                              (object->string part) ")"))))
           (cell ,(if val `(strong ,name) `(font-design-muted ,name))))))
 
 ;; the choice, in its own fonts: the only fonts which the page loads
@@ -645,6 +649,10 @@
        (twith "table-width" "1par") (twith "table-hmode" "exact")
        (cwith "1" "1" "1" "-1" "cell-hyphen" "t")
        (cwith "1" "1" "1" "-1" "cell-valign" "t")
+       ;; a height of its own, whatever the sample takes in a narrow
+       ;; window: the list has the rest of the window (font-design.ts)
+       (cwith "1" "1" "1" "-1" "cell-vmode" "exact")
+       (cwith "1" "1" "1" "-1" "cell-height" "134pt")
        (cwith "1" "1" "1" "1" "cell-width" "0.42par")
        (cwith "1" "1" "1" "1" "cell-hmode" "exact")
        (cwith "1" "1" "1" "-1" "cell-lsep" "0spc")
@@ -656,8 +664,7 @@
              (tformat (cwith "1" "-1" "1" "-1" "cell-lsep" "0spc")
                       (cwith "1" "-1" "1" "2" "cell-rsep" "1em")
                       (table ,@(map (cut choice-row doc c <>)
-                                    '("text" "math" "sansserif" "typewriter"
-                                      "bbb" "cal" "frak")))))
+                                    font-design-tabs))))
             (concat ,(design-action "Use for the document"
                                     "font-design-page-apply" d)
                     " "
@@ -666,21 +673,6 @@
                     ,(design-action "Start again"
                                     "font-design-page-restart" d))))
          (cell ,(choice-preview c))))))))
-
-(define (tab-bar doc)
-  (let* ((d (url->system doc))
-         (cur (document-tab doc)))
-    `(concat
-      ,@(list-intersperse
-         (map (lambda (tab)
-                (if (== tab cur)
-                    `(font-design-tab-on ,(tab-name tab))
-                    `(action (font-design-tab-off ,(tab-name tab))
-                             ,(string-append "(font-design-page-tab "
-                                             (object->string d) " "
-                                             (object->string tab) ")"))))
-              font-design-tabs)
-         " "))))
 
 ;; is the entry what the choice has for its part?
 (define (entry-chosen? c e)
@@ -737,7 +729,7 @@
     `(font-design-list
       ,scroll
       (document
-        ,@(if (in? tab '("all" "text")) (list)
+        ,@(if (== tab "text") (list)
               (append (default-block doc c tab) (list '(font-design-rule))))
         ,@(append-map (cut section-blocks doc c <>) ss)))))
 
@@ -752,11 +744,10 @@
                                           (url->system (url-tail doc))))
                   (space "1em")
                   (font-design-muted
-                   (concat "Choose the font of each part in its tab; the "
+                   (concat "A part shows its fonts in the list; the "
                            "document changes only with "
                            (em "Use for the document") ".")))
           ,(choice-block doc c)
-          ,(tab-bar doc)
           ,(list-block doc c "100%"))))))
 
 (tmfs-title-handler (font-design name doc)
@@ -768,9 +759,9 @@
 
 (define (page-list)
   (with t (buffer-tree)
-    (and (tm-func? t 'document) (> (tm-arity t) 3)
-         (tree-is? (tree-ref t 3) 'font-design-list)
-         (tree-ref t 3))))
+    (and (tm-func? t 'document) (> (tm-arity t) 2)
+         (tree-is? (tree-ref t 2) 'font-design-list)
+         (tree-ref t 2))))
 
 ;; The paragraphs which change are put again in place, which keeps the
 ;; page where the reader is: the list keeps its position unless the tab
@@ -782,8 +773,7 @@
     (if l
         (with scroll (if top? "100%" (tree->string (tree-ref l 0)))
           (tree-set (tree-ref t 1) (stree->tree (choice-block doc c)))
-          (tree-set (tree-ref t 2) (stree->tree (tab-bar doc)))
-          (tree-set (tree-ref t 3) (stree->tree (list-block doc c scroll))))
+          (tree-set (tree-ref t 2) (stree->tree (list-block doc c scroll))))
         (revert-buffer-revert (tmfs-url-font-design doc)))))
 
 (define (page-context? d)

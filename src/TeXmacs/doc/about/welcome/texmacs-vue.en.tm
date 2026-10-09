@@ -231,11 +231,12 @@
   <\itemize>
     <item><menu|Font design>, in the menu of the fonts (the font button of
     the focus bar), opens a page to choose the fonts of the document by
-    looking at them. It has a tab for each part: the text and the
-    mathematics together, the text, the mathematics, the sans serif and
-    the typewriter text, and the blackboard bold, calligraphic and fraktur
-    letters of the formulas. A tab lists the fonts for its part, each with
-    a few words, a sample of that part and a button to choose it. The
+    looking at them. Its top lists the parts of a document with the font
+    of each: the text, the mathematics, the sans serif and the
+    typewriter text, and the
+    blackboard bold, calligraphic and fraktur letters of the formulas. The
+    name of a part is a button which shows the fonts for it, each with a
+    few words, a sample of that part and a button to choose it. The
     choice is listed at the top of the page with a sample, and <menu|Use
     for the document> gives it to the document. The samples are pictures:
     the page fetches no font but those of the choice. Such fonts show as <menu|Custom> on the font

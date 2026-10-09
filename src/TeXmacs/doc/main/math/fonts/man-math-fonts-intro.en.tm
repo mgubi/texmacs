@@ -66,11 +66,11 @@
   changes the text font alone.
 
   The menus only name the fonts. <menu|Font design>, at the end of the same
-  menu, opens a page which shows them. The page has a tab for each part of
-  a document: <menu|Text and mathematics> for the pairs of the menus, then
-  the text, the mathematics, the sans serif and the typewriter text, and
-  the blackboard bold, calligraphic and fraktur letters of the formulas. A
-  tab lists the fonts its part may have, each with a few words, a sample of
+  menu, opens a page which shows them. Its top lists the parts of a
+  document with the font of each: the text, the mathematics, the sans
+  serif and the typewriter text, and the blackboard bold, calligraphic and
+  fraktur letters of the formulas. The name of a part is a button, which shows
+  under it the fonts the part may have, each with a few words, a sample of
   that part (the alphabet of a calligraphic font, the formulas of a
   mathematical one) and a button <menu|Choose>, so that the text of one
   font may go with the mathematics of another and the calligraphic letters
