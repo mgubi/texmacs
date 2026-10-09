@@ -508,6 +508,8 @@ edit_env_rep::exec (tree t) {
     return exec_has_binding (t);
   case GET_ATTACHMENT:
     return exec_get_attachment (t);
+  case AUTO_ID:
+    return exec_auto_id (t);
 
   case _PATTERN:
     return exec_pattern (t);
@@ -1629,6 +1631,7 @@ edit_env_rep::exec_date (tree t) {
     if (is_compound (u)) return tree (_ERROR, "bad date");
     fm= u->label;
   }
+  read_other (); // the clock: what is made with it is not kept as it is
   return get_date (lan, fm);
 }
 
@@ -2058,6 +2061,62 @@ edit_env_rep::exec_has_binding (tree t) {
   tree value= lookup ((type == 1 ? "1" : "0") * key);
   if (value == tree (UNINIT)) return "false";
   else return "true";
+}
+
+/******************************************************************************
+* The numbers of the automatic labels
+*
+* The entries of the table of contents, of the index, of the glossary and
+* of the lists of figures and tables each put a label where they stand,
+* which gives their page (auto-label in std-automatic.ts). Its name was
+* made of a counter: the label after n others was auto-n, and a new
+* section or index entry renamed the labels of all those after it. They
+* were typeset again for that only, with the same boxes: nearly every
+* paragraph of the user manual after a new section.
+*
+* <auto-id|new> takes a number for a new label and <auto-id> gives the
+* last one taken. The numbers are kept by the bridge which is typeset
+* (bridge_rep::typeset sets auto_ids): typeset again, it gives the same
+* numbers to its labels, in their order, and a label it did not have
+* gets a number which no label has (auto_next). In a complete pass, where
+* every bridge is typeset in the order of the document, the labels are
+* numbered from 1 again, as the counter did: a document which is opened
+* or updated has the names it was saved with. Outside of the bridges
+* (the header of a page...) the numbers are others, and not kept.
+*
+* With the environment variable TEXMACS_STABLE_LABELS set to "off" the
+* counter is used as before (inc-auto, auto-nr).
+******************************************************************************/
+
+tree
+edit_env_rep::exec_auto_id (tree t) {
+  static bool stable= (get_env ("TEXMACS_STABLE_LABELS") != "off");
+  bool fresh= (N(t) >= 1 && exec_string (t[0]) == "new");
+  if (!stable) {
+    if (fresh) { (void) exec (compound ("inc-auto")); return ""; }
+    return exec (tree (VALUE, "auto-nr"));
+  }
+  if (!fresh) {
+    if (N(auto_last) == 0) return exec (tree (VALUE, "auto-nr"));
+    return auto_last;
+  }
+  auto_given++;
+  if (auto_ids == NULL) {
+    auto_last= "x" * as_string (++auto_loose);
+    return "";
+  }
+  int id;
+  if (complete) {
+    id= ++auto_count;
+    if (auto_used < N(*auto_ids)) (*auto_ids)[auto_used]= id;
+    else (*auto_ids) << id;
+  }
+  else if (auto_used < N(*auto_ids)) id= (*auto_ids)[auto_used];
+  else { id= auto_next; (*auto_ids) << id; }
+  auto_used++;
+  if (id >= auto_next) auto_next= id + 1;
+  auto_last= as_string (id);
+  return "";
 }
 
 tree

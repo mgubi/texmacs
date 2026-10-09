@@ -413,6 +413,7 @@ private:
   tree exec_get_binding (tree t);
   tree exec_has_binding (tree t);
   tree exec_get_attachment (tree t);
+  tree exec_auto_id (tree t);
 
   tree exec_pattern (tree t);
 
@@ -505,6 +506,14 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
+  // The numbers of the automatic labels (exec_auto_id in env_exec.cpp):
+  // those of the bridge which is typeset and how many of them it used,
+  // the last one which was given, how many were given, the count of a
+  // complete pass and the next number which no label has
+  array<int>* auto_ids;
+  int         auto_used;
+  string      auto_last;
+  int         auto_given, auto_count, auto_next, auto_loose;
   inline void record_lookups (array<string>* keys, array<tree>* values) {
     rec_keys= keys; rec_values= values; }
   tree lookup_value (string name);

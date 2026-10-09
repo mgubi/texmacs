@@ -44,6 +44,9 @@ public:
   bool                 reads_known; // (sorted env_var_id; when all recorded)
   array<string>        seen_keys;   // the references and attachments it
   array<tree>          seen_values; // looked up, with the values found
+  array<int>           auto_ids; // numbers of its automatic labels
+  string               auto_exit;   // (the last one given when it ends,
+  bool                 auto_gave;   // if it gave any; see exec_auto_id)
   hashmap<string,tree> removed;  // changes of the bridges removed before
                                  // this one since the last pass
 

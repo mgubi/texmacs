@@ -207,6 +207,7 @@ packrat_parser_rep::serialize (tree t, path p) {
     case WRITE:
     case TOC_NOTIFY:
     case CACHE_REF:
+    case AUTO_ID:
       break;
 
     case SPECIFIC:

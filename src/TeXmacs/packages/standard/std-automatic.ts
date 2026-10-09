@@ -34,9 +34,9 @@
 
   <assign|set-part|<macro|Id|body|<with|current-part|<merge|<value|current-part>|.|<arg|Id>>|auto-nr|0|<arg|body>>>>
 
-  <assign|the-auto|<macro|<merge|auto|<value|current-part>|-|<value|auto-nr>>>>
+  <assign|the-auto|<macro|<merge|auto|<value|current-part>|-|<auto-id>>>>
 
-  <assign|auto-label|<macro|<inc-auto><label|<the-auto>>>>
+  <assign|auto-label|<macro|<auto-id|new><label|<the-auto>>>>
 
   <\active*>
     <\src-comment>

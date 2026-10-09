@@ -577,8 +577,8 @@
   character in a line>|<cell|416>|<cell|72>>|<row|<cell|a new
   line>|<cell|419>|<cell|93 to 117>>|<row|<cell|two paragraphs
   joined>|<cell|1134>|<cell|78>>|<row|<cell|a new
-  section>|<cell|1811>|<cell|839>>|<row|<cell|a new numbered
-  equation>|<cell|1142>|<cell|139>>>>>>
+  section>|<cell|1811>|<cell|155>>|<row|<cell|a new numbered
+  equation>|<cell|1142>|<cell|127>>>>>>
     One edit in the middle of the user manual, in milliseconds.
   </big-table>
 
@@ -598,27 +598,49 @@
   93 to 117<nbsp>ms instead of 359; the first change of the number of
   lines after the manual is opened still takes 370, the index itself
   having changed with its page numbers. The pages are made again at every
-  pass, 50<nbsp>ms for 260 of them. And a new section still has 10600 bridges typeset again in
-  700<nbsp>ms: every index entry and every section of <TeXmacs> gets a
-  label named from one counter (<verbatim|auto-1>,
-  <verbatim|auto-2>...), so that a new section renames the labels of all
-  the index entries after it, of which the manual has several in most of
-  its paragraphs on the macros. These bridges do make something else,
-  with the same boxes: only another way of naming these labels would
-  avoid it. The entries of the index itself, 1350 of them with their page
-  numbers, and the paragraphs with references are used again since the
-  references are recorded (before that, the new section took
-  1570<nbsp>ms).
+  pass, 50<nbsp>ms for 260 of them.
 
-  After an edit, once the input pauses, the editor updates its menus,
-  icon bars and tools and then its <abbr|DRD>
-  (<cpp|edit_interface_rep::update_menus>): 29 to 35<nbsp>ms in a document
-  of one paragraph, of which 14 to 18 were the heuristics of the macros,
-  run on every variable of the environment. They are now skipped when the
-  environment at the cursor and the properties are what they were at
-  their last run (<cpp|drd_info_rep::heuristic_init>), and the update
-  takes 10 to 18<nbsp>ms, nearly all of it the expansion of the menus and
-  icon bars in <scheme>.
+  <paragraph|The automatic labels>
+
+  A new section in the manual still had 10600 bridges typeset again, in
+  700<nbsp>ms, for a reason which is not in the typesetter. The entries
+  of the table of contents, of the index, of the glossary and of the
+  lists of figures and tables each put a label where they stand, which
+  gives their page (<markup|auto-label> in
+  <verbatim|std-automatic.ts>). Its name was made of a counter: the label
+  after <math|n> others was <verbatim|auto-><math|n>, so that a new
+  section renamed the labels of all the index entries after it, of which
+  the manual has several in most of its paragraphs on the macros. These
+  bridges did make something else, the same boxes with other names.
+
+  The names are now made of numbers which stay: <markup|auto-id> with the
+  argument <verbatim|new> takes a number for a new label, and without
+  argument gives the last one taken (<cpp|edit_env_rep::exec_auto_id>).
+  The numbers are kept by the bridge which is being typeset: typeset
+  again, it gives the same numbers to its labels, in their order, and a
+  label which it did not have gets a number which no label has. In a
+  complete pass, where every bridge is typeset in the order of the
+  document, the labels are numbered from 1 again, as the counter did: a
+  document which is opened or updated has the names it was saved with,
+  and the saved document is the same, byte for byte, as with the counter.
+  Between two updates the names differ, for the better: after a new
+  section, a line of the table of contents which was not made again
+  still refers to the label of its own section, where with the counter
+  it referred to the label of whatever had taken its number. The new
+  section in the manual takes 155<nbsp>ms instead of 839, with 570
+  bridges typeset again. <verbatim|TEXMACS_STABLE_LABELS=off> uses the
+  counter as before.
+
+  The numbers are those of a bridge, that is of one typesetter: two
+  windows on the same document, whose labels go to the same table, may
+  give different names to the labels made since the last complete pass
+  of each. This has not been looked at.
+
+  The entries of the index itself, 1350 of them with their page numbers,
+  and the paragraphs with references are used again since the references
+  are recorded. The check mode of the recorded reads found one more
+  thing a bridge may depend on, in a paragraph of the manual which shows
+  the current time: the date and the animations make a record unknown.
 
   <subsection|Complete typesetting and references>
 

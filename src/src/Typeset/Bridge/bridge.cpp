@@ -42,7 +42,7 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
-  removed (UNINIT) {}
+  auto_exit (""), auto_gave (false), removed (UNINIT) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -474,6 +474,7 @@ bridge_rep::typeset (int desired_status) {
     //cout << "cached" << LF;
     if (edit_profile.on) edit_profile.cached++;
     add_reads (env, reads_known, reads, seen_keys, seen_values);
+    if (auto_gave) { env->auto_last= auto_exit; env->auto_given++; }
     env->monitored_patch_env (changes);
     // cout << "changes       = " << changes << LF;
   }
@@ -481,6 +482,7 @@ bridge_rep::typeset (int desired_status) {
     // as above; what the bridge writes is as in the previous pass
     if (edit_profile.on) { edit_profile.cached++; edit_profile.unread++; }
     add_reads (env, reads_known, reads, seen_keys, seen_values);
+    if (auto_gave) { env->auto_last= auto_exit; env->auto_given++; }
     env->monitored_patch_env (changes);
     env->compare_changes (ttt->old_patch, changes);
   }
@@ -506,7 +508,16 @@ bridge_rep::typeset (int desired_status) {
     env->record_reads (&my_reads, false);
     env->record_lookups (&my_keys, &my_values);
     env->read_unknown= false;
+    // the numbers of its automatic labels (exec_auto_id in env_exec.cpp)
+    array<int>* outer_ids= env->auto_ids;
+    int outer_used= env->auto_used, given= env->auto_given;
+    env->auto_ids= &auto_ids;
+    env->auto_used= 0;
     my_typeset (desired_status);
+    env->auto_ids= outer_ids;
+    env->auto_used= outer_used;
+    auto_gave= (env->auto_given != given);
+    auto_exit= env->auto_last;
     bool recorded= !env->read_unknown && !env->read_all () &&
                    N(my_reads) <= READS_MAX && N(my_keys) <= LOOKUPS_MAX;
     reads_known= recorded && alone;
