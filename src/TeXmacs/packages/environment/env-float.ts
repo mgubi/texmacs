@@ -124,7 +124,7 @@
 
   <assign|render-footnote|<macro|nr|body|<render-footnote*|<arg|nr>|<arg|nr>|<arg|body>>>>
 
-  <assign|footnote|<macro|body|<style-with|src-compact|none|<next-footnote><render-footnote|<the-footnote>|<arg|body>><space|0spc><label|<merge|footnr-|<the-footnote>>><rsup|<with|font-shape|right|<reference|<merge|footnote-|<the-footnote>>>>>>>>
+  <assign|footnote|<macro|body|<style-with|src-compact|none|<next-footnote><render-footnote|<the-footnote>|<with|cite-note|<value|cite-inline>|<arg|body>>><space|0spc><label|<merge|footnr-|<the-footnote>>><rsup|<with|font-shape|right|<reference|<merge|footnote-|<the-footnote>>>>>>>>
 
   <\active*>
     <\src-comment>

@@ -95,12 +95,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (numeric-token? s)
-  ;; letters, digits, letters: 12, 2b, D2
-  (let loop ((l (csl-chars s)) (state 0))
-    (cond ((null? l) (> state 0))
-          ((csl-digit? (car l)) (and (<= state 1) (loop (cdr l) 1)))
-          ((csl-letter? (car l))
-           (loop (cdr l) (if (== state 0) 0 2)))
+  ;; letters and digits, with a digit: 12, 2b, D2, 123N110
+  (let loop ((l (csl-chars s)) (digit? #f))
+    (cond ((null? l) digit?)
+          ((csl-digit? (car l)) (loop (cdr l) #t))
+          ((csl-letter? (car l)) (loop (cdr l) digit?))
           (else #f))))
 
 (tm-define (csl-number-tokens s)
@@ -179,25 +178,47 @@
               ((!= (string-ref a i) (string-ref b i)) (string-drop b i))
               (else (loop (+ i 1)))))))
 
-(define (page-range format a b)
+(define (page-digits format a b)
+  ;; the end @b of a range of pages which starts at @a, both numbers
   (let* ((b* (expand-page a b))
          (n (string->number a))
          (len (string-length a)))
-    (cond ((or (not format) (not (csl-string-number? a))
-               (not (csl-string-number? b)))
-           b)
+    (cond ((not format) b)
           ((== format "expanded") b*)
           ((== format "minimal") (minimal-page a b* 1))
           ((== format "minimal-two") (minimal-page a b* 2))
           ((in? format '("chicago" "chicago-15" "chicago-16"))
            (cond ((or (< n 100) (== (modulo n 100) 0)) b*)
-                 ((and (== len 4) (== (string-length b*) 4)
-                       (<= (string-length (minimal-page a b* 1)) 4)
+                 ((and (in? format '("chicago" "chicago-15")) (== len 4)
+                       (== (string-length b*) 4)
                        (>= (string-length (minimal-page a b* 1)) 3))
                   b*)
                  ((< (modulo n 100) 10) (minimal-page a b* 1))
                  (else (minimal-page a b* 2))))
           (else b))))
+
+(define (split-page s)
+  ;; "N110" -> ("N" . "110"), or #f when @s does not end with digits
+  (let loop ((i (string-length s)))
+    (if (and (> i 0) (char-numeric? (string-ref s (- i 1))))
+        (loop (- i 1))
+        (and (< i (string-length s))
+             (cons (substring s 0 i) (string-drop s i))))))
+
+(define (page-range format a b delim)
+  ;; pages with the same prefix make a range in the format of the style
+  (let* ((pa (split-page a))
+         (pb (split-page b)))
+    (cond ((and pa pb (== (car pa) (car pb)))
+           (with end (page-digits format (cdr pa) (cdr pb))
+             (string-append a delim
+                            (if (in? format '("minimal" "minimal-two"
+                                              "chicago" "chicago-15"
+                                              "chicago-16"))
+                                end
+                                (string-append (car pb) end)))))
+          ((and (not pa) (not pb)) (string-append a delim b))
+          (else (string-append a "-" b)))))
 
 (define (format-pages ctx s)
   (let* ((toks (csl-number-tokens s))
@@ -208,8 +229,7 @@
           (cond ((null? l) (apply string-append (reverse r)))
                 ((and (>= (length l) 3) (== (cadr l) "-"))
                  (loop (cdddr l)
-                       (cons* (page-range format (car l) (caddr l)) delim
-                              (car l) r)))
+                       (cons (page-range format (car l) (caddr l) delim) r)))
                 ((== (car l) ",") (loop (cdr l) (cons ", " r)))
                 ((== (car l) "&") (loop (cdr l) (cons " & " r)))
                 ((== (car l) "-") (loop (cdr l) (cons delim r)))
@@ -303,7 +323,13 @@
 
 (define (plural-number? var s)
   (with toks (csl-number-tokens s)
-    (cond ((not toks) #f)
+    (cond ((not toks)
+           ;; "213 and 235": several words with digits
+           (> (length (list-filter (csl-split s)
+                                   (lambda (w)
+                                     (list-or (map csl-digit?
+                                                   (csl-chars w))))))
+              1))
           ((in? var '("number-of-pages" "number-of-volumes"))
            (with n (string->number (car toks))
              (and n (> n 1))))
@@ -365,6 +391,7 @@
                     ((< y 1000) (or (term ctx "ad" #f #f) ""))
                     (else "")))
          (suffix (and (not (ctx-ref ctx 'explicit-year-suffix))
+                      (not (ctx-ref ctx 'year-suffix-done))
                       (ctx-ref ctx 'year-suffix))))
     (when suffix (ctx-set! ctx 'year-suffix-done #t))
     (string-append s era (or suffix ""))))
@@ -559,6 +586,16 @@
           (cons 'others? (csl-item-ref (ctx-ref ctx 'item)
                                        (string-append var ":others")))
           (cons 'more (ctx-ref ctx 'names-add))
+          (cons 'levels
+                (and (== (ctx-ref ctx 'mode) 'citation)
+                     (let* ((own (or (ctx-ref ctx 'given-levels) '()))
+                            (all (ctx-ref ctx 'global-levels))
+                            (primary? (ctx-ref ctx 'primary-only?)))
+                       (lambda (name i)
+                         (max (with p (assv i own) (if p (cdr p) 0))
+                              (or (and all (or (not primary?) (== i 0))
+                                       (ahash-ref all (csl-name-key name)))
+                                  0))))))
           (cons 'english? (english? ctx)))))
 
 (define (names-label ctx label-node var count)
@@ -577,7 +614,17 @@
     (if (== (opt 'form "long") "count")
         (csl-pad (car shown) 5)
         (string-recompose
-         (map (cut csl-name-sort-key <> demote)
+         (map (lambda (name)
+                ;; the given names as they are shown: initials sort as such
+                (let* ((iw (opt 'initialize-with #f))
+                       (given (csl-name-ref name 'given)))
+                  (csl-name-sort-key
+                   (if (and iw (string? given)
+                            (!= (opt 'initialize "true") "false"))
+                       (cons (cons 'given (csl-initialize given iw #t #t))
+                             name)
+                       name)
+                   demote)))
               (list-head names (car shown)))
          "  "))))
 
@@ -635,21 +682,45 @@
                                       parts))
                   (if (ctx-ref ctx 'sort?) (csl-pad n 5) (number->string n)))
                 (rt-join parts delim))))
-    (cond ((not (rt-empty? x))
-           (mark! ctx #t)
-           (finish (if own? node src) ctx x))
-          (else
-            (mark! ctx #f)
-            (with sub (csl-child node 'substitute)
-              (and sub (render-substitute sub node ctx)))))))
+    (author-filter
+     ctx
+     (cond ((not (rt-empty? x))
+            (mark! ctx #t)
+            (finish (if own? node src) ctx x))
+           (else
+             (mark! ctx #f)
+             (with sub (csl-child node 'substitute)
+               (and sub (render-substitute sub node ctx))))))))
+
+(define (author-filter ctx x)
+  ;; the first names of a cite can be recorded, or left out
+  (cond ((or (rt-empty? x) (ctx-ref ctx 'sort?) (ctx-ref ctx 'author-done))
+         x)
+        ((!= (ctx-ref ctx 'mode) 'citation)
+         ;; in a bibliography, the names of the entry before are replaced
+         (ctx-set! ctx 'author-done #t)
+         (ctx-set! ctx 'author-text x)
+         (if (and (ctx-ref ctx 'author-substitute)
+                  (== (rt->string x) (ctx-ref ctx 'author-before)))
+             (ctx-ref ctx 'author-substitute)
+             x))
+        (else
+          (ctx-set! ctx 'author-done #t)
+          (ctx-set! ctx 'author-text x)
+          (if (ctx-ref ctx 'suppress-author) #f x))))
 
 (define (render-substitute sub parent ctx)
   (let loop ((l (csl-children sub)))
     (if (null? l) #f
-        (with x (if (== (caar l) 'names)
-                    (render-names (car l) ctx parent)
-                    (render (car l) ctx))
-          (cond ((rt-empty? x) (loop (cdr l)))
+        (let* ((done? (ctx-ref ctx 'author-done))
+               (x (if (== (caar l) 'names)
+                      (render-names (car l) ctx parent)
+                      (render (car l) ctx))))
+          (cond ((and (not done?) (ctx-ref ctx 'author-done)
+                      (ctx-ref ctx 'suppress-author))
+                 ;; the names which are left out are not substituted
+                 #f)
+                ((rt-empty? x) (loop (cdr l)))
                 (else
                   (with vars (csl-split (csl-attr (car l) 'variable ""))
                     (ctx-set! ctx 'suppressed
@@ -752,6 +823,9 @@
 
 (tm-define (csl-render-layout layout ctx)
   (:synopsis "Render the children of the node cs:layout for the item of @ctx")
+  (ctx-set! ctx 'author-done #f)
+  (ctx-set! ctx 'author-text #f)
+  (ctx-set! ctx 'year-suffix-done #f)
   (ctx-set! ctx 'seen #f)
   (ctx-set! ctx 'filled #f)
   (ctx-set! ctx 'suppressed '())
@@ -787,5 +861,7 @@
                   (and (!= s "") s))))))
 
 (tm-define (csl-finish-layout layout ctx x)
-  (:synopsis "Apply the formatting and the affixes of cs:layout to @x")
-  (finish layout ctx x))
+  (:synopsis "Apply the affixes and the formatting of cs:layout to @x")
+  ;; unlike elsewhere, the affixes are formatted too
+  (rt-fmt (csl-node-formatting layout)
+          (rt-affix (csl-attr layout 'prefix) x (csl-attr layout 'suffix))))

@@ -302,7 +302,8 @@
   (if (csl-lower? w) (csl-upcase-first w) w))
 
 (define (title-word w upper? first? last? after-colon?)
-  (let* ((w* (if upper? (csl-upcase-first (csl-locase w)) w))
+  ;; words in capitals are not touched: UK
+  (let* ((w* w)
          (low (csl-locase w)))
     (cond ((and (in? low title-stop-words) (not first?) (not last?)
                 (not after-colon?))

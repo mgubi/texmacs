@@ -17,7 +17,7 @@
 ;; expected result. They are not distributed with TeXmacs.
 
 (texmacs-module (csl csl-fixtures)
-  (:use (csl csl-utils) (csl csl-style) (csl csl-data) (csl csl-process)
+  (:use (csl csl-utils) (csl csl-style) (csl csl-data) (csl csl-process) (csl csl-cite)
         (csl csl-output)))
 
 (define (section-name line)

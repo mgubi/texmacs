@@ -65,8 +65,8 @@
   (let* ((s (if (string-ends? t ".") (string-drop-right t 1) t))
          (l (csl-chars s)))
     (cond ((null? l) "")
-          ;; several capitals written together: "JP"
-          ((and (csl-upper? s) (string-ends? t ".")) s)
+          ;; an abbreviation is kept: "Ph.", "JP."
+          ((string-ends? t ".") s)
           (else (csl-upcase (car l))))))
 
 (tm-define (csl-initialize given iw initialize? hyphen?)
@@ -82,6 +82,10 @@
                    (if (and (nnull? r) (not (string-ends? (car r) iw))
                             (not (string-ends? (car r) " ")))
                        (cons " " r) r)))
+            ((and (== (car l) "-") (nnull? (cdr l)) (csl-lower? (cadr l))
+                  (or initialize? (initial-token? (cadr l))))
+             ;; Guo-ping is G.
+             (loop (cddr l) r))
             ((== (car l) "-")
              (with r* (if (and (nnull? r) (string-ends? (car r) iw)
                                (!= iw iw-trim))
@@ -93,7 +97,12 @@
                (loop (cdr l) (if hyphen? (cons "-" r*) r*))))
             ((and (csl-lower? (car l)) (not (initial-token? (car l))))
              ;; a particle inside the given names
-             (loop (cdr l) (cons (string-append (car l) " ") r)))
+             (loop (cdr l)
+                   (cons (string-append
+                          (if (and (nnull? r) (not (string-ends? (car r) " ")))
+                              " " "")
+                          (car l) " ")
+                         r)))
             ((or initialize? (initial-token? (car l)))
              (loop (cdr l)
                    (cons (string-append (token-initial (car l)) iw) r)))
@@ -142,29 +151,32 @@
                (x2 (rt-fmt (csl-node-formatting node) x1)))
           (rt-affix (csl-attr node 'prefix) x2 (csl-attr node 'suffix))))))
 
-(define (name-given name opt settings)
+(define (name-given name opt settings level)
+  ;; the level 2 of the disambiguation asks for the full given names
   (let* ((given (csl-name-ref name 'given))
          (iw (opt 'initialize-with #f)))
     (cond ((not given) #f)
-          ((and iw (string? given))
+          ((and iw (string? given) (< level 2))
            (csl-initialize given iw (!= (opt 'initialize "true") "false")
                            (assq-ref* settings 'hyphen?)))
           (else given))))
 
-(define (format-name name opt settings inverted?)
+(define (format-name name opt settings inverted? level)
+  ;; @level is 0, or 1 and 2 when the disambiguation adds the initials or
+  ;; the given names
   (let* ((literal (csl-name-ref name 'literal))
          (family (csl-name-ref name 'family))
-         (given (name-given name opt settings))
+         (given (name-given name opt settings level))
          (dp (csl-name-ref name 'dropping-particle))
          (ndp (csl-name-ref name 'non-dropping-particle))
          (suffix (csl-name-ref name 'suffix))
-         (form (opt 'form "long"))
+         (form (if (> level 0) "long" (opt 'form "long")))
          (sep (opt 'sort-separator ", "))
          (demote? (== (assq-ref* settings 'demote) "display-and-sort"))
          (fam (lambda (x) (format-part settings "family" x)))
          (giv (lambda (x) (format-part settings "given" x))))
     (cond (literal (fam literal))
-          ((not family) (giv given))
+          ((not family) (giv (csl-name-ref name 'given)))
           ((== form "short") (fam (join-particle ndp family)))
           ((csl-name-ref name 'static-ordering)
            (spaced (fam family) (giv given)))
@@ -183,6 +195,17 @@
                     ((csl-name-ref name 'comma-suffix)
                      (rt-cat main ", " suffix))
                     (else (rt-cat main " " suffix))))))))
+
+(tm-define (csl-name-key name)
+  (:synopsis "A text which identifies the person @name")
+  ;; "J. J." and "J.J." are the same given names
+  (string-append (rt->string (csl-name-ref name 'non-dropping-particle)) "|"
+                 (rt->string (csl-name-ref name 'family)) "|"
+                 (string-replace
+                  (string-replace (rt->string (csl-name-ref name 'given))
+                                  "." "")
+                  " " "")
+                 "|" (rt->string (csl-name-ref name 'literal))))
 
 (tm-define (csl-name-sort-key name demote)
   (:synopsis "The text by which the name @name is sorted")
@@ -245,10 +268,12 @@
                                                      'static-ordering)))))))
          (delim (opt 'delimiter ", "))
          (fmt (or (assq-ref* settings 'formatting) '()))
+         (levels (assq-ref* settings 'levels))
          (one (lambda (name i)
                 (rt-affix (opt 'prefix #f)
-                          (rt-fmt fmt (format-name name opt settings
-                                                   (inverted? i)))
+                          (rt-fmt fmt (format-name
+                                       name opt settings (inverted? i)
+                                       (if levels (levels name i) 0)))
                           (opt 'suffix #f))))
          (first (map one (list-head names count) (iota count)))
          (and-text (assq-ref* settings 'and))
