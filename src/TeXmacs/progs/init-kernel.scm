@@ -16,6 +16,12 @@
 ;; The initialization continues with init-texmacs.scm.
 
 (define remote-client-list (list))
+;; Tau in a page (and not under node, for the tests): the plugins which need
+;; a program are Web Workers there (worker_link.cpp)
+(define (in-browser?)
+  (let ((s (getenv "TEXMACS_WEB_PLATFORM")))
+    (and (string? s) (not (string=? s "")))))
+
 (define (tm-interactive-hook fun args) (tau-interactive fun args))
 
 (inherit-modules (kernel boot abbrevs)

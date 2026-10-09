@@ -29,6 +29,7 @@
 #include "converter.hpp"
 #include "iterator.hpp"
 #include "boot.hpp"
+#include "analyze.hpp"
 #include "convert.hpp"
 #include "tm_window.hpp"
 #include "tm_buffer.hpp"
@@ -124,7 +125,9 @@ visibility_part (slot s) {
   case SLOT_FOCUS_ICONS_VISIBILITY: return "icons-2";
   case SLOT_USER_ICONS_VISIBILITY: return "icons-3";
   case SLOT_SIDE_TOOLS_VISIBILITY: return "side-0";
+  case SLOT_LEFT_TOOLS_VISIBILITY: return "side-1";
   case SLOT_BOTTOM_TOOLS_VISIBILITY: return "bottom-0";
+  case SLOT_EXTRA_TOOLS_VISIBILITY: return "bottom-1";
   case SLOT_FOOTER_VISIBILITY: return "footer";
   default: return "";
   }
@@ -159,8 +162,17 @@ view_window_rep::query (slot s, int type_id) {
   // "attached to a window" is a non zero identifier (is_attached)
   if (s == SLOT_IDENTIFIER) return close_box<int> (1);
   if (is_canvas_slot (s) && !is_nil (view)) return view->query (s, type_id);
-  if (visibility_part (s) != "")
+  if (visibility_part (s) != "") {
+    // the bars are there until they are hidden, the tools once they are
+    // shown
+    bool tool= s == SLOT_SIDE_TOOLS_VISIBILITY ||
+               s == SLOT_LEFT_TOOLS_VISIBILITY ||
+               s == SLOT_BOTTOM_TOOLS_VISIBILITY ||
+               s == SLOT_EXTRA_TOOLS_VISIBILITY;
+    if (tool && !bar_visibility->contains ((int) s))
+      return close_box<bool> (false);
     return close_box<bool> (bar_visibility [(int) s]);
+  }
   return no_widget_rep::query (s, type_id);
 }
 
@@ -192,7 +204,10 @@ view_window_rep::write (slot s, blackbox index, widget w) {
     simple_widget_rep* v= dynamic_cast<simple_widget_rep*> (w.rep);
     if (v != NULL) {
       v->shown= true;
-      if (v->is_editor_widget ()) tau_post_view (v->id, id, "shown");
+      // (a view in a dialog is not the view of a pane: the description of
+      // the dialog says where it is)
+      if (v->is_editor_widget () && !v->is_embedded_widget ())
+        tau_post_view (v->id, id, "shown");
     }
   }
 }
@@ -306,6 +321,15 @@ tau_chrome (int which, object menu) {
   tau_post_json ("chrome", part, json);
 }
 
+// the context menu of a view: a part as the others, which the page shows
+// under the pointer
+void
+tau_popup (string menu, int view) {
+  object umenu= eval ("'(vertical (link " * menu * "))");
+  string json= as_string (call ("tau-serialize-part", object ("popup"), umenu));
+  tau_post_json ("popup", as_string (view), json);
+}
+
 /******************************************************************************
 * The buffers and the windows, for the tabs and the panes of the page
 *******************************************************************************
@@ -400,7 +424,7 @@ tau_turn () {
   for (int i=0; i<N(views); i++) {
     simple_widget_rep* v= views[i];
     if (!simple_widget_rep::all_widgets->contains ((pointer) v)) continue;
-    if (!v->shown || !v->is_editor_widget () || v->ren == NULL) continue;
+    if (!v->shown || v->ren == NULL) continue;
     if (!v->repaint ()) continue;
     int ew, eh, sx, sy, cx, cy;
     v->extents_in_pixels (ew, eh, sx, sy);
@@ -459,6 +483,8 @@ void
 tau_place (int view, int w, int h, double density, int counter) {
   simple_widget_rep* v= simple_widget_rep::find (view);
   if (v == NULL) return;
+  // (what is not an editor has no window which shows it: the page does)
+  if (!v->is_editor_widget ()) v->shown= true;
   v->set_place (w, h, density, counter);
   tau_turn ();
 }
@@ -492,6 +518,34 @@ tau_key (int view, const char* key) {
   tau_turn ();
 }
 
+// The text which the keyboard made (typed, composed with dead keys or by an
+// input method), in UTF-8: one key for each character, by the names which
+// TeXmacs has for them (as the other ports: cork_key of the Vue port)
+EMSCRIPTEN_KEEPALIVE
+void
+tau_text (int view, const char* text) {
+  simple_widget_rep* v= simple_widget_rep::find (view);
+  if (v == NULL) return;
+  string r= utf8_to_cork (string (text));
+  int pos= 0;
+  while (pos < N(r)) {
+    int start= pos;
+    tm_char_forwards (r, pos);
+    if (pos <= start) pos= start + 1;
+    string k= r (start, pos);
+    int n= N(k);
+    if (n >= 3 && k[0] == '<' && k[1] != '#' && k[n-1] == '>') k= k (1, n-1);
+    if (k == "less") k= "<";
+    else if (k == "gtr") k= ">";
+    else if (k == " ") k= "space";
+    else if (k == "\n" || k == "\r") k= "return";
+    else if (k == "\t") k= "tab";
+    if (!simple_widget_rep::all_widgets->contains ((pointer) v)) break;
+    v->handle_keypress (k, texmacs_time ());
+  }
+  tau_turn ();
+}
+
 EMSCRIPTEN_KEEPALIVE
 void
 tau_invoke (int n) {
@@ -506,6 +560,15 @@ EMSCRIPTEN_KEEPALIVE
 void
 tau_answer (int n, const char* args) {
   eval ("(tau-answer " * as_string (n) * " " * string (args) * ")");
+  tau_turn ();
+}
+
+// a Scheme command of the tests: the worker passes it on only when the
+// page was opened with ?debug (tau-worker.js)
+EMSCRIPTEN_KEEPALIVE
+void
+tau_scheme (const char* code) {
+  exec_delayed (scheme_cmd (string (code)));
   tau_turn ();
 }
 
@@ -905,9 +968,36 @@ widget vsplit_widget (widget a1, widget a2) {
   (void) a1; (void) a2;
   return no_widget (); }
 
+// a widget with what is done when nobody keeps it any more: the window of
+// a view in a dialog, whose buffer is closed then
+class wrapped_widget_rep: public no_widget_rep {
+public:
+  widget  w;
+  command quit;
+  wrapped_widget_rep (widget w2, command q): w (w2), quit (q) {}
+  ~wrapped_widget_rep () { if (!is_nil (quit)) quit (); }
+};
+
 widget wrapped_widget (widget a1, command a2) {
-  (void) a1; (void) a2;
-  return no_widget (); }
+  return widget (tm_new<wrapped_widget_rep> (a1, a2)); }
+
+// The view which a widget made by Scheme is (texmacs-output) or shows
+// (texmacs-input), with the size it wishes: for the description of a
+// dialog (menu-serial.scm)
+array<SI>
+tau_widget_view (widget wid) {
+  array<SI> ret;
+  widget_rep* r= wid.rep;
+  wrapped_widget_rep* ww= dynamic_cast<wrapped_widget_rep*> (r);
+  if (ww != NULL) r= ww->w.rep;
+  view_window_rep* vw= dynamic_cast<view_window_rep*> (r);
+  if (vw != NULL) r= vw->view.rep;
+  simple_widget_rep* v= dynamic_cast<simple_widget_rep*> (r);
+  SI w= 0, h= 0;
+  if (v != NULL && !v->is_editor_widget ()) v->handle_get_size_hint (w, h);
+  ret << w << h << (v == NULL? 0: v->id);
+  return ret;
+}
 
 widget xpm_widget (url a1) {
   (void) a1;

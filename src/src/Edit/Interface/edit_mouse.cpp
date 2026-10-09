@@ -186,6 +186,18 @@ edit_interface_rep::mouse_adjust (SI x, SI y, int mods) {
   x= (SI) (x * magf);
   y= (SI) (y * magf);
   abs_round (x, y);
+#ifdef TAUTEXMACS
+  {
+    // Tau: the menu is described to the page, which shows it where the
+    // pointer is (tau_gui.cpp)
+    void tau_popup (string menu, int view);
+    string menu= "texmacs-popup-menu";
+    if ((mods & (ShiftMask + ControlMask)) != 0)
+      menu= "texmacs-alternative-popup-menu";
+    tau_popup (menu, id);
+    return;
+  }
+#endif
   if (is_nil (popup_win)) {
     SI wx, wy;
     ::get_position (get_window (this), wx, wy);

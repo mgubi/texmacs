@@ -23,7 +23,7 @@
       (string-append s "\n<EOF>\n"))))
 
 (define (javascript-in-browser?)
-  (defined? 'web-files))
+  (in-browser?))
 
 ;; the script of the plugin, in the file system of TeXmacs
 (define (javascript-plugin-script)

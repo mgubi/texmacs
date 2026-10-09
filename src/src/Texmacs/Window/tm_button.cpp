@@ -341,6 +341,11 @@ texmacs_output_widget (tree doc, tree style) {
 
 array<SI>
 get_texmacs_widget_size (widget wid) {
+#ifdef TAUTEXMACS
+  // with the number of the view, which Scheme has no other way to know
+  array<SI> tau_widget_view (widget wid);
+  return tau_widget_view (wid);
+#endif
   array<SI> ret;
   SI w, h;
   ((simple_widget_rep*) wid.rep)->handle_get_size_hint (w, h);

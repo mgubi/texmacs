@@ -87,13 +87,27 @@ $(OUT)/node/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/node-pre.js $(W)/sourc
 # for the page: the core for a worker (tau.js, tau.wasm), the files of
 # TeXmacs in packages (misc/wasm/package.py and packages.js, as the browser
 # build of TeXmacs made them) and the page itself (misc/tau/web)
-WEB_FILES := index.html tau.mjs chrome.mjs tau-worker.js
-web: $(OUT)/web/tau.js web-packages $(patsubst %,$(OUT)/web/%,$(WEB_FILES))
+WEB_FILES := index.html tau.mjs chrome.mjs keys.mjs tau-worker.js
+# the plugins which are Web Workers (src/System/Link/worker_link.cpp, made
+# by misc/wasm/workers.js): their scripts, next to the page. Python and R
+# load their programs from the network when a session starts.
+WEB_PLUGINS := python/tm-python.mjs r/tm-r.mjs
+web: $(OUT)/web/tau.js web-packages $(patsubst %,$(OUT)/web/%,$(WEB_FILES)) \
+     $(patsubst %,$(OUT)/web/%,$(WEB_PLUGINS))
 
-$(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(W)/web/tau-pre.js $(W)/sources.txt
+$(OUT)/web/python/%: $(TM)/plugins/python/web/%
+	@mkdir -p $(OUT)/web/python
+	cp $< $@
+
+$(OUT)/web/r/%: $(TM)/plugins/r/web/%
+	@mkdir -p $(OUT)/web/r
+	cp $< $@
+
+$(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(TM)/misc/wasm/workers.js $(W)/web/tau-pre.js $(W)/sources.txt
 	@mkdir -p $(OUT)/web
 	em++ $(LDFLAGS) -sMODULARIZE=1 -sEXPORT_NAME=tauCore -sENVIRONMENT=worker \
 	  --pre-js $(TM)/misc/wasm/packages.js --pre-js $(W)/web/tau-pre.js \
+	  --pre-js $(TM)/misc/wasm/workers.js \
 	  -sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPU8,FS,ENV \
 	  -sEXPORTED_FUNCTIONS=_main,_malloc,_free \
 	  $(OBJECTS) $(LIBS) -o $@
@@ -133,6 +147,7 @@ $(OBJECTS): $(FLAGS_FILE)
 # written as a PDF, with a home directory of its own
 CHECK_DOC ?= $(TM)/TeXmacs/examples/texts/accent-test.tm
 check: node
+	@$(NODE) $(W)/test/keys-test.mjs
 	@home=$$(mktemp -d); \
 	  TEXMACS_PATH="$(TM)/TeXmacs" TEXMACS_HOME_PATH="$$home/.TeXmacs" HOME="$$home" \
 	    $(NODE) $(OUT)/node/tau.js -headless -c $(CHECK_DOC) $$home/check.pdf -q \

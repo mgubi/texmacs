@@ -337,6 +337,8 @@
   (with (tag cmd type props width) p
     (with l (list-filter (props) string?)
       `((kind . input) (type . ,type)
+        ;; (these give their text and the key at each key: search-widgets.scm)
+        (continuous . ,(in? type '("search" "replace-what" "replace-by")))
         (value . ,(if (null? l) "" (serial-text (car l))))
         (proposals . ,(list->vector (map serial-text l)))
         (width . ,width)
@@ -408,6 +410,16 @@
     (list `((kind . refreshable) (name . ,kind) (number . ,n)
             (items . ,(list->vector (serial-in-part sub make)))))))
 
+(define (serial-view wid input?)
+  "The node of a view in a dialog: a document which is shown (texmacs-output)
+   or edited (texmacs-input). The widget is the view, or the window of the
+   view; it lives as long as the part of the interface."
+  (with l (texmacs-widget-size wid)
+    (serial-keep (lambda () wid))
+    (list `((kind . view) (view . ,(caddr l)) (input . ,input?)
+            (width . ,(quotient (car l) 256))
+            (height . ,(quotient (cadr l) 256))))))
+
 (define (serial-dialog-item p style bar?)
   "The nodes of the item @p of a dialog: an input, tabs, a layout."
   (with tag (car p)
@@ -461,16 +473,28 @@
                                                      (name) name)
                                            (if (string? s) s ""))))))
           ((== tag 'resize)
-           (serial-container tag (cdddr p) style #f
-                             `(width . ,(serial-size ((cadr p))))
-                             `(height . ,(serial-size ((caddr p))))))
+           (let* ((w ((cadr p))) (h ((caddr p))))
+             (with-resize w h
+               (lambda ()
+                 (serial-container tag (cdddr p) style #f
+                                   `(width . ,(serial-size w))
+                                   `(height . ,(serial-size h)))))))
+          ((== tag 'texmacs-output)
+           (with (tag t tmstyle) p
+             (serial-view (widget-texmacs-output (attach-resize (t)) (tmstyle))
+                          #f)))
+          ((== tag 'texmacs-input)
+           (with (tag t tmstyle name) p
+             (serial-view (widget-texmacs-input (attach-resize (t)) (tmstyle)
+                                                (or (name) (url-none)))
+                          #t)))
           ((== tag 'refresh)
            (with (tag s kind) p
              (with name (if (string? s) (string->symbol s) s)
                (serial-refreshable
                 kind
                 (lambda () (serial-items (list 'link name) style bar?))))))
-          ;; a view in a dialog, a tree, a colour: later
+          ;; a tree, a colour, ink: later
           (else (serial-other p)))))
 
 (define (serial-other p)

@@ -12,19 +12,28 @@
 
 let send = () => {};        // to the core
 let afterAction = () => {}; // gives the keyboard back to the view
+let makeView = () => null;   // the canvas of a view in a dialog (tau.mjs)
+let keyName = () => null;    // a key in the notation of TeXmacs (tau.mjs)
 
 const waitingContents = new Map(); // number of a submenu -> resolve
 const waitingFiles = new Map();    // path -> { promise, resolve }
 const popups = [];                 // the open menus, outermost first
+let contextAt = { x: 100, y: 100 }; // where the right button was pressed last
 
 export function init(options) {
 	send = options.send;
 	afterAction = options.afterAction;
+	if (options.makeView) makeView = options.makeView;
+	if (options.keyName) keyName = options.keyName;
 	document.addEventListener("pointerdown", event => {
 		if (!event.target.closest(".tau-popup, .tau-bar")) closePopups(0);
 	}, true);
 	document.addEventListener("keydown", event => {
 		if (event.key === "Escape" && popups.length) { closePopups(0); afterAction(); }
+	}, true);
+	// where the context menu goes: where the right button was pressed
+	document.addEventListener("pointerdown", event => {
+		if (event.button === 2) contextAt = { x: event.clientX, y: event.clientY };
 	}, true);
 	initDialogs();
 }
@@ -42,7 +51,9 @@ export function handle(m) {
 		const bar = document.getElementById("tau-" + m.part);
 		if (!bar) return true;
 		closePopups(0); // the numbers of the old description are forgotten
-		bar.replaceChildren(...renderItems(m.items, { bar: true }));
+		// the tools at the sides and under the views are laid out as dialogs
+		const tool = bar.classList.contains("tau-tool");
+		bar.replaceChildren(...renderItems(m.items, tool ? { dialog: true, row: false } : { bar: true }));
 		return true;
 	}
 	case "visible": {
@@ -61,6 +72,7 @@ export function handle(m) {
 		if (resolve) resolve(m.items);
 		return true;
 	}
+	case "popup": showContextMenu(m.items); return true;
 	case "dialog": showDialog(m); return true;
 	case "close": removeDialog(m.id); return true;
 	case "refresh": {
@@ -255,6 +267,20 @@ async function openPopup(button, node, depth, below) {
 	place(popup, button, below);
 }
 
+// The context menu of a view, which the core describes when the right
+// button is pressed there
+function showContextMenu(items) {
+	closePopups(0);
+	const popup = el("div", "tau-popup");
+	popup.append(...renderItems(items, { bar: false, depth: 1 }));
+	document.body.append(popup);
+	popups.push({ element: popup, button: el("span") });
+	popup.style.maxHeight = (window.innerHeight - 8) + "px";
+	const w = popup.offsetWidth, h = popup.offsetHeight;
+	popup.style.left = Math.max(4, Math.min(contextAt.x, window.innerWidth - 4 - w)) + "px";
+	popup.style.top = Math.max(4, Math.min(contextAt.y, window.innerHeight - 4 - h)) + "px";
+}
+
 // a menu under its button (in a bar) or at its right (in a menu), kept in
 // the window
 function place(popup, button, below) {
@@ -371,6 +397,7 @@ function renderDialogItem(node, context, out) {
 		break;
 	}
 	case "tabs": out.push(renderTabs(node, context)); break;
+	case "view": { const c = makeView(node); if (c) out.push(c); break; }
 	case "input": out.push(renderInput(node)); break;
 	case "enum": out.push(labelled(node, renderEnum(node))); break;
 	case "choice": out.push(renderChoice(node)); break;
@@ -411,6 +438,20 @@ function renderInput(node) {
 	if (w) { wrap.style.width = w; if (w.endsWith("%")) wrap.style.flex = "1"; }
 	// the value goes when it is validated or left, as in the other
 	// interfaces; return also validates a dialog which asks for values
+	if (node.continuous) {
+		// the text and the key at each key (the search bar): the keys which
+		// do not change the text are told by themselves
+		input.addEventListener("input", () => answer(node, [input.value, ""]));
+		input.addEventListener("keydown", event => {
+			const key = keyName(event);
+			if (!key || [...key].length === 1 || ["backspace", "delete", "left", "right", "space"].includes(key)) return;
+			event.preventDefault();
+			event.stopPropagation();
+			answer(node, [input.value, key]);
+		});
+		wrap.append(input);
+		return wrap;
+	}
 	let sent = node.value;
 	const commit = () => { if (input.value !== sent) { sent = input.value; answer(node, sent); } };
 	input.addEventListener("change", commit);

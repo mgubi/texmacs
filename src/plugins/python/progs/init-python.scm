@@ -53,7 +53,7 @@
 ;; (Pyodide: web/tm-python.mjs, copied to python/ next to the page); elsewhere
 ;; the Python program of the computer, with tmpy
 (define (python-in-browser?)
-  (defined? 'web-files))
+  (in-browser?))
 
 (define (python-engine)
   (if (python-in-browser?)
@@ -67,7 +67,7 @@
   (:winpath "Python/Python*" ".")
   ;; (the test of python-in-browser? written out: the requirements are also
   ;; evaluated outside of this file, e.g. by the plugins suite)
-  (:require (or (defined? 'web-files) (!= (python-command) "")))
+  (:require (or (in-browser?) (!= (python-command) "")))
   ,@(python-engine)
   (:preferences (and (not (python-in-browser?)) (supports-jupyter?)))
   (:serializer ,python-serialize)

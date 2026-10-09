@@ -36,7 +36,7 @@
 ;; (webR: web/tm-r.mjs, copied to r/ next to the page), whose inputs end
 ;; with a line <EOF>; elsewhere the R program of the computer
 (define (r-in-browser?)
-  (defined? 'web-files))
+  (in-browser?))
 
 (define (r-serialize-web lan t)
   (with u (pre-serialize lan t)

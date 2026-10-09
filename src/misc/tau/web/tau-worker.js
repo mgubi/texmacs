@@ -2,7 +2,7 @@
 // messages between it and the page (docs/tau-design.md, "The protocol").
 //
 // From the page: { t: "place" | "scroll" | "focus" | "key" | "mouse", view, ... },
-//                { t: "invoke" | "expand", number }, { t: "file", path },
+//                { t: "text", view, text }, { t: "invoke" | "expand", number }, { t: "file", path },
 //                { t: "answer", number, args }, { t: "close", id },
 //                { t: "buffer", what, window, name }, { t: "paste", view, text, html },
 //                { t: "open", ticket, name, bytes }
@@ -12,6 +12,10 @@
 //                { t: "buffers" | "clipboard" | "pick" | "download", ... }
 
 "use strict";
+
+// what the scripts of the worker complain of is told to the page too
+const consoleError = console.error.bind(console);
+console.error = (...args) => { consoleError(...args); postMessage({ t: "log", text: args.map(String).join(" ") }); };
 
 importScripts("tau.js");
 
@@ -35,6 +39,11 @@ function handle(m) {
 		break;
 	case "close":
 		core._tau_closed(m.id);
+		break;
+	case "scheme":
+		// for the tests: a Scheme command, when the page is opened with ?debug
+		if (new URLSearchParams(self.location.search).has("debug"))
+			core.ccall("tau_scheme", null, ["string"], [m.code]);
 		break;
 	case "buffer":
 		core.ccall("tau_buffer", null, ["string", "number", "string"], [m.what, m.window, m.name || ""]);
@@ -61,6 +70,9 @@ function handle(m) {
 		break;
 	case "key":
 		core.ccall("tau_key", null, ["number", "string"], [m.view, m.key]);
+		break;
+	case "text":
+		core.ccall("tau_text", null, ["number", "string"], [m.view, m.text]);
 		break;
 	case "invoke":
 		core._tau_invoke(m.number);
@@ -109,7 +121,7 @@ function collectFiles(node, files) {
 	}
 	for (const key in node) if (typeof node[key] === "object") collectFiles(node[key], files);
 }
-const DESCRIPTIONS = new Set(["chrome", "contents", "dialog", "refresh"]);
+const DESCRIPTIONS = new Set(["chrome", "contents", "dialog", "refresh", "popup"]);
 let tauModule = null;
 function post(message, transfer) {
 	// what Scheme says at the end of a turn comes together

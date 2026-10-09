@@ -250,7 +250,7 @@
   ;;(widget-text s style (color "black") #t)
   (widget-text (translate s) style (color "black") #f))
 
-(define (attach-resize t)
+(define-public (attach-resize t)
   (if (not global-resize) t
       (with (w1 w2 w3 wpos h1 h2 h3 hpos) global-resize
         (with attrs (list "page-medium" "papyrus"
@@ -690,6 +690,13 @@
         (else (make-menu-error "bad length in " (object->string x)))))
 
 (define global-resize #f)
+
+;; Tau: what is described inside a resize knows its size, as what is made
+(define-public (with-resize w h thunk)
+  (with (w1 w2 w3 hpos) (decode-resize w "left")
+    (with (h1 h2 h3 vpos) (decode-resize h "top")
+      (with-global global-resize (list w1 w2 w3 hpos h1 h2 h3 hpos)
+        (thunk)))))
 
 (define (make-resize p style)
   "Make @(resize :%2 :menu-item-list) item."

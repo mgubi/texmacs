@@ -6,6 +6,7 @@
 // what belongs to the browser: the clipboard and the files of the user.
 
 import * as chrome from "./chrome.mjs";
+import { translate, makeLayout, learn, askLayout, browserKey, pasteKey } from "./keys.mjs";
 
 const panesElement = document.getElementById("tau-panes");
 const statusLine = document.getElementById("status");
@@ -23,7 +24,7 @@ let buffers = [];         // the documents: { name, title, modified }
 // for tests and for the console
 const state = { started: false, paints: 0, get view() { return active ? active.view : 0; } };
 window.tau = { state, send, worker, panes, get active() { return active; } };
-chrome.init({ send, afterAction: () => active && active.canvas.focus() });
+chrome.init({ send, afterAction: () => active && focusView(active), makeView: node => makeView(node), keyName: event => keyName(event) });
 
 function setStatus(text) { statusLine.textContent = text; }
 
@@ -34,42 +35,8 @@ function el(tag, className, text) {
 	return e;
 }
 
-// Keys, in the notation of TeXmacs: "a", "return", "S-left", "C-x"...
-const KEYS = {
-	Enter: "return", Backspace: "backspace", Delete: "delete", Tab: "tab", Escape: "escape",
-	ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down",
-	Home: "home", End: "end", PageUp: "pageup", PageDown: "pagedown", Insert: "insert",
-	" ": "space"
-};
-for (let i = 1; i <= 12; i++) KEYS["F" + i] = "F" + i;
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-
-function keyName(event) {
-	if (["Shift", "Control", "Alt", "Meta", "CapsLock", "Dead", "Process"].includes(event.key)) return null;
-	let key = KEYS[event.key];
-	const special = key !== undefined;
-	if (!special) {
-		if (event.key.length !== 1 && [...event.key].length !== 1) return null;
-		key = event.key;
-	}
-	const command = event.ctrlKey || event.metaKey || (event.altKey && !isMac);
-	// a character typed with Shift (or Option on a Mac) is the character
-	// itself; the modifiers which make a command are prefixes
-	if (!special && !command) return key;
-	if (!special && command) key = key.toLowerCase();
-	if (event.shiftKey) key = "S-" + key;
-	if (event.ctrlKey) key = "C-" + key;
-	if (event.altKey) key = "A-" + key;
-	if (event.metaKey) key = "M-" + key;
-	return key;
-}
-
-// the keys which are left to the browser
-function browserKey(event) {
-	const mod = isMac ? event.metaKey : event.ctrlKey;
-	return mod && ["r", "l", "t", "w", "n", "q"].includes(event.key.toLowerCase()) ||
-		event.key === "F5" || event.key === "F11" || event.key === "F12";
-}
+const traceKeys = params.has("trace-keys");
 
 // The pointer: positions in pixels of the canvas; the modifiers as TeXmacs
 // counts them (buttons 1, 2, 4; Shift 256, Control 1024, Alt 2048, Meta 4096)
@@ -78,13 +45,6 @@ function mods(event) {
 	return (event.buttons & 1 ? 1 : 0) | (event.buttons & 4 ? 2 : 0) | (event.buttons & 2 ? 4 : 0) |
 		(event.shiftKey ? 256 : 0) | (event.ctrlKey ? 1024 : 0) |
 		(event.altKey ? 2048 : 0) | (event.metaKey ? 4096 : 0);
-}
-
-// the key which pastes: it is left to the browser, which then gives its
-// clipboard in a "paste" event
-function pasteKey(event) {
-	return (isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey) &&
-		!event.altKey && !event.shiftKey && event.key.toLowerCase() === "v";
 }
 
 // ---------------------------------------------------------------------------
@@ -102,52 +62,80 @@ function makePane(windowNumber) {
 		canvas: el("canvas", "tau-canvas"),
 		extents: { width: 0, height: 0 }, scroll: { x: 0, y: 0 }
 	};
-	const canvas = pane.canvas, holder = el("div", "tau-view");
-	pane.context = canvas.getContext("2d");
-	canvas.tabIndex = 0;
-	holder.append(canvas);
+	const holder = el("div", "tau-view");
+	holder.append(pane.canvas);
 	pane.element.append(pane.tabs, holder);
 	panesElement.append(pane.element);
 	panes.set(windowNumber, pane);
+	attachView(pane);
+	// a file which is dropped on a pane is opened there
+	pane.canvas.addEventListener("dragover", event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
+	pane.canvas.addEventListener("drop", event => {
+		event.preventDefault();
+		focusView(pane);
+		for (const file of event.dataTransfer.files) openFile(file, 0);
+	});
+	return pane;
+}
+
+// A view in a dialog or in a tool (chrome.mjs): a canvas of the size which
+// the core wishes, or of its container. It is a view as that of a pane;
+// one which only shows a document does not take the keyboard.
+const embedded = new Map(); // number of a view -> what shows it
+
+function makeView(node) {
+	const target = { view: node.view, place: 0, canvas: el("canvas", "tau-embedded"), passive: !node.input };
+	if (node.width > 0 && node.height > 0) {
+		target.canvas.style.width = node.width + "px";
+		target.canvas.style.height = node.height + "px";
+	} else target.canvas.classList.add("tau-fill");
+	for (const [view, t] of embedded) if (!t.canvas.isConnected && t.seen) { t.observer.disconnect(); embedded.delete(view); }
+	embedded.set(node.view, target);
+	attachView(target);
+	return target.canvas;
+}
+
+function targetOf(view) {
+	for (const pane of panes.values()) if (pane.view === view) return pane;
+	return embedded.get(view) || null;
+}
+
+// What a canvas which shows a view does: it tells the core its place, the
+// keys and the pointer. target has the canvas and the number of its view.
+function attachView(target) {
+	const canvas = target.canvas;
+	target.context = canvas.getContext("2d");
 
 	// The place: the size of the canvas in pixels of the screen. Each place
 	// has a number, which the core repeats with what it draws for it.
-	pane.sendPlace = () => {
-		if (!pane.view) return;
+	target.sendPlace = () => {
+		if (!target.view || !canvas.isConnected) return;
+		target.seen = true;
 		const density = window.devicePixelRatio || 1;
 		const width = Math.max(1, Math.round(canvas.clientWidth * density));
 		const height = Math.max(1, Math.round(canvas.clientHeight * density));
-		pane.place++;
-		send({ t: "place", view: pane.view, width, height, density, place: pane.place });
+		target.place++;
+		send({ t: "place", view: target.view, width, height, density, place: target.place });
 	};
-	pane.observer = new ResizeObserver(pane.sendPlace);
-	pane.observer.observe(canvas);
-
-	canvas.addEventListener("keydown", event => {
-		if (!pane.view || event.isComposing || browserKey(event) || pasteKey(event)) return;
-		const key = keyName(event);
-		if (!key) return;
-		event.preventDefault();
-		send({ t: "key", view: pane.view, key });
-	});
-	canvas.addEventListener("focus", () => {
-		activate(pane);
-		if (pane.view) send({ t: "focus", view: pane.view, focus: true });
-	});
-	canvas.addEventListener("blur", () => pane.view && send({ t: "focus", view: pane.view, focus: false }));
+	target.observer = new ResizeObserver(target.sendPlace);
+	target.observer.observe(canvas);
+	if (target.passive) return;
+	canvas.classList.add("tau-editable");
 
 	const sendMouse = (kind, event) => {
-		if (!pane.view) return;
+		if (!target.view) return;
 		const rect = canvas.getBoundingClientRect(), density = window.devicePixelRatio || 1;
 		send({
-			t: "mouse", view: pane.view, kind,
+			t: "mouse", view: target.view, kind,
 			x: Math.round((event.clientX - rect.left) * density),
 			y: Math.round((event.clientY - rect.top) * density),
 			mods: mods(event)
 		});
 	};
+	// (a click on the canvas would take the keyboard from its text area)
+	canvas.addEventListener("mousedown", event => event.preventDefault());
 	canvas.addEventListener("pointerdown", event => {
-		canvas.focus();
+		focusView(target);
 		canvas.setPointerCapture(event.pointerId);
 		sendMouse("press-" + (BUTTONS[event.button] || "left"), event);
 		event.preventDefault();
@@ -168,13 +156,13 @@ function makePane(windowNumber) {
 	let pendingScroll = null;
 	canvas.addEventListener("wheel", event => {
 		event.preventDefault();
-		if (!pane.view) return;
+		if (!target.view) return;
 		const density = window.devicePixelRatio || 1;
 		const unit = event.deltaMode === 1 ? 32 : event.deltaMode === 2 ? canvas.clientHeight : 1;
 		if (!pendingScroll) {
 			pendingScroll = { dx: 0, dy: 0 };
 			requestAnimationFrame(() => {
-				send({ t: "scroll", view: pane.view,
+				send({ t: "scroll", view: target.view,
 					dx: Math.round(pendingScroll.dx), dy: Math.round(pendingScroll.dy) });
 				pendingScroll = null;
 			});
@@ -182,15 +170,6 @@ function makePane(windowNumber) {
 		pendingScroll.dx += event.deltaX * unit * density;
 		pendingScroll.dy += event.deltaY * unit * density;
 	}, { passive: false });
-
-	// a file which is dropped on a pane is opened there
-	canvas.addEventListener("dragover", event => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; });
-	canvas.addEventListener("drop", event => {
-		event.preventDefault();
-		canvas.focus();
-		for (const file of event.dataTransfer.files) openFile(file, 0);
-	});
-	return pane;
 }
 
 function activate(pane) {
@@ -208,7 +187,7 @@ function removePane(pane) {
 	if (active === pane) {
 		active = null;
 		const next = panes.values().next().value;
-		if (next) next.canvas.focus();
+		if (next) focusView(next);
 	}
 }
 
@@ -235,13 +214,13 @@ function showTabs(pane) {
 		close.title = "Close the document";
 		close.addEventListener("click", event => { event.stopPropagation(); ask("close", b.name); });
 		tab.append(el("span", "tau-doc-name", b.title + (b.modified ? " •" : "")), close);
-		tab.addEventListener("click", () => { if (b.name !== pane.buffer) ask("switch", b.name); pane.canvas.focus(); });
+		tab.addEventListener("click", () => { if (b.name !== pane.buffer) ask("switch", b.name); focusView(pane); });
 		return tab;
 	});
 	const add = el("button", "tau-doc-button", "+");
 	add.type = "button";
 	add.title = "New document";
-	add.addEventListener("click", () => { ask("new"); pane.canvas.focus(); });
+	add.addEventListener("click", () => { ask("new"); focusView(pane); });
 	pane.tabs.replaceChildren(...tabs, add);
 	if (panes.size > 1) {
 		const close = el("button", "tau-doc-button tau-pane-close", "×");
@@ -251,6 +230,157 @@ function showTabs(pane) {
 		pane.tabs.append(el("span", "tau-glue"), close);
 	}
 }
+
+// ---------------------------------------------------------------------------
+// The keyboard
+// ---------------------------------------------------------------------------
+//
+// A canvas cannot have the text of the keyboard: the browser composes (dead
+// keys, the accents of a Mac, the input methods of Chinese, Japanese...)
+// and pastes in an element which is edited only. So the keyboard of the
+// views is one text area which is not seen, put where the cursor of the
+// view is (the system shows the candidates of an input method there). The
+// view which has the keyboard is the one this text area writes for.
+//
+// A key press is a key or text (keys.mjs): a key is sent by its name of
+// TeXmacs, text is what comes into the text area, sent as it is. What is
+// being composed is shown in the document (the "pre-edit" of TeXmacs).
+
+const layout = makeLayout();
+askLayout(layout);
+let focused = null;   // the pane or the view in a dialog which has the keyboard
+let composing = false;
+
+const area = el("textarea", "tau-keyboard");
+area.setAttribute("aria-hidden", "true");
+area.setAttribute("autocomplete", "off");
+area.setAttribute("autocorrect", "off");
+area.setAttribute("autocapitalize", "off");
+area.spellcheck = false;
+area.tabIndex = -1;
+document.body.append(area);
+
+function trace(...args) { if (traceKeys) console.log("keys:", ...args); }
+
+// the text area at the cursor of the view which has the keyboard
+function placeArea() {
+	const t = focused;
+	if (!t || !t.canvas.isConnected) return;
+	const rect = t.canvas.getBoundingClientRect(), density = window.devicePixelRatio || 1;
+	const c = t.caret || { x: 0, y: 0 };
+	area.style.left = Math.max(0, Math.min(window.innerWidth - 4, rect.left + c.x / density)) + "px";
+	area.style.top = Math.max(0, Math.min(window.innerHeight - 20, rect.top + c.y / density - 16)) + "px";
+}
+
+// give the keyboard to a view
+function focusView(target) {
+	if (!target || target.passive) return;
+	if (focused !== target) {
+		if (focused && focused.view && document.activeElement === area)
+			send({ t: "focus", view: focused.view, focus: false });
+		focused = target;
+		if (target.view && document.activeElement === area) send({ t: "focus", view: target.view, focus: true });
+	}
+	if (panes.get(target.window) === target) activate(target);
+	placeArea();
+	if (document.activeElement !== area) area.focus({ preventScroll: true });
+}
+
+area.addEventListener("focus", () => focused && focused.view && send({ t: "focus", view: focused.view, focus: true }));
+area.addEventListener("blur", () => focused && focused.view && send({ t: "focus", view: focused.view, focus: false }));
+
+function sendKey(key) {
+	if (focused && focused.view) send({ t: "key", view: focused.view, key });
+}
+function sendText(text) {
+	if (text && focused && focused.view) send({ t: "text", view: focused.view, text });
+}
+
+function keyEvent(event) {
+	return { key: event.key, code: event.code, shiftKey: event.shiftKey, ctrlKey: event.ctrlKey,
+		altKey: event.altKey, metaKey: event.metaKey,
+		altGraph: !!(event.getModifierState && event.getModifierState("AltGraph")) };
+}
+
+// the name of a key for an input of the page which wants the keys (the
+// search bar, chrome.mjs): its name, the character of a key which types
+function keyName(event) {
+	const r = translate(keyEvent(event), isMac, layout);
+	return !r ? null : r.key ? r.key : [...event.key].length === 1 ? event.key : null;
+}
+
+// a key press in the text area: true when it was taken
+function handleKey(event) {
+	if (!focused || !focused.view) return false;
+	// the keys of a composition are the input method's
+	if (composing || event.isComposing || event.keyCode === 229) return false;
+	const e = keyEvent(event);
+	if (browserKey(e, isMac) || pasteKey(e, isMac)) { trace(event.key, event.code, "left to the browser"); return false; }
+	learn(layout, e);
+	const r = translate(e, isMac, layout);
+	trace(event.key, event.code, (e.shiftKey ? "s" : "") + (e.ctrlKey ? "c" : "") + (e.altKey ? "a" : "") + (e.metaKey ? "m" : ""),
+		"->", r ? r.key || "text" : "nothing");
+	if (!r || r.text) return false;
+	event.preventDefault();
+	sendKey(r.key);
+	return true;
+}
+
+area.addEventListener("keydown", event => { handleKey(event); event.stopPropagation(); });
+
+// the text which the keyboard made
+area.addEventListener("input", event => {
+	if (composing || event.isComposing) return;
+	const text = area.value;
+	area.value = "";
+	trace("text", JSON.stringify(text));
+	sendText(text);
+});
+area.addEventListener("compositionstart", () => { composing = true; placeArea(); });
+area.addEventListener("compositionupdate", event => {
+	const text = event.data || "";
+	trace("composing", JSON.stringify(text));
+	// what is being composed, with the cursor at its end
+	sendKey(text ? "pre-edit:" + [...text].length + ":" + text : "pre-edit:");
+});
+area.addEventListener("compositionend", event => {
+	composing = false;
+	const text = event.data || "";
+	area.value = "";
+	trace("composed", JSON.stringify(text));
+	sendKey("pre-edit:");
+	sendText(text);
+});
+
+// The keys which are pressed while nothing of the page has the keyboard
+// (after a click on a tab or on the background) are for the view of the
+// active pane, which takes the keyboard back. The keys which the browser
+// would act on (it zooms the page on Cmd with + or -) are not left to it
+// wherever the keyboard is, save in the inputs of the page, where the keys
+// of editing are theirs.
+const EDITING = ["a", "c", "v", "x", "z", "y"];
+document.addEventListener("keydown", event => {
+	if (event.defaultPrevented || event.target === area || !active || !active.view) return;
+	const at = event.target, e = keyEvent(event);
+	const busy = at.closest && at.closest("input, select, textarea, button, .tau-dialog, .tau-popup, .tau-tool");
+	const command = e.ctrlKey || e.metaKey;
+	if (busy) {
+		// a command key which is not the input's: the browser does not get it
+		if (!command || browserKey(e, isMac) || EDITING.includes((e.key || "").toLowerCase())) return;
+		const r = translate(e, isMac, layout);
+		if (!r || !r.key) return;
+		event.preventDefault();
+		if (["M-+", "M--", "M-0", "C-+", "C--", "C-0"].includes(r.key)) send({ t: "key", view: active.view, key: r.key });
+		return;
+	}
+	if (event.isComposing || browserKey(e, isMac) || pasteKey(e, isMac)) return;
+	focusView(active);
+	const r = translate(e, isMac, layout);
+	if (!r) return;
+	event.preventDefault();
+	if (r.key) sendKey(r.key);
+	else if ([...event.key].length === 1) sendText(event.key); // (the text area did not get this one)
+});
 
 // ---------------------------------------------------------------------------
 // The files of the user and the clipboard
@@ -271,7 +401,7 @@ function pickFile(m) {
 	if (ACCEPT[m.type]) input.accept = ACCEPT[m.type];
 	input.addEventListener("change", () => {
 		if (input.files.length) openFile(input.files[0], m.ticket);
-		if (active) active.canvas.focus();
+		if (active) focusView(active);
 	});
 	// The browser opens its file chooser only on an action of the user.
 	// A click or a key did ask for it, a moment ago; when the browser does
@@ -299,16 +429,16 @@ function download(m) {
 	setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-// what is pasted in a view: the text and the HTML of the clipboard
-document.addEventListener("paste", event => {
-	const pane = active;
-	if (!pane || document.activeElement !== pane.canvas || !pane.view) return;
+// what is pasted in a view: the text and the HTML of the clipboard, which
+// the browser gives to the text area of the keyboard
+area.addEventListener("paste", event => {
 	event.preventDefault();
+	if (!focused || !focused.view) return;
 	const data = event.clipboardData;
 	const files = Array.from(data.files || []);
 	if (files.length) { for (const file of files) openFile(file, 0); return; }
 	const text = data.getData("text/plain"), html = data.getData("text/html");
-	if (text || html) send({ t: "paste", view: pane.view, text, html });
+	if (text || html) send({ t: "paste", view: focused.view, text, html });
 });
 
 function copy(text) {
@@ -345,8 +475,8 @@ worker.onmessage = event => {
 		const pane = panes.get(m.window) || makePane(m.window);
 		pane.view = m.view;
 		pane.sendPlace();
-		if (fresh || !active) pane.canvas.focus();
-		send({ t: "focus", view: pane.view, focus: document.activeElement === pane.canvas });
+		if (fresh || !active) focusView(pane);
+		else send({ t: "focus", view: pane.view, focus: focused === pane && document.activeElement === area });
 		break;
 	}
 	case "buffers": {
@@ -364,13 +494,12 @@ worker.onmessage = event => {
 			pane.buffer = w.buffer;
 		}
 		for (const pane of panes.values()) showTabs(pane);
-		if (made) made.canvas.focus(); // a new pane takes the keyboard
+		if (made) focusView(made); // a new pane takes the keyboard
 		showTitle();
 		break;
 	}
 	case "paint": {
-		let pane = null;
-		for (const p of panes.values()) if (p.view === m.view) pane = p;
+		const pane = targetOf(m.view);
 		if (!pane || m.place !== pane.place) break; // for an older place
 		const canvas = pane.canvas;
 		if (canvas.width !== m.width || canvas.height !== m.height) {
@@ -379,6 +508,7 @@ worker.onmessage = event => {
 		pane.context.putImageData(
 			new ImageData(new Uint8ClampedArray(m.pixels), m.width, m.height), 0, 0);
 		pane.extents = m.extents; pane.scroll = m.scroll; pane.caret = m.caret;
+		if (pane === focused && !composing) placeArea();
 		state.paints++;
 		state.started = true;
 		if (params.has("debug"))

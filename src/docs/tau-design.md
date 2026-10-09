@@ -434,7 +434,7 @@ What differs from the protocol above, for now:
 - **No welcome message** over a document given as argument: the home
   directory is new at each visit (in memory), so every start is a first
   one.
-- The keys are those of `keydown`; no input methods, no dead keys.
+- (The keys: see "The keyboard, done again" below.)
 
 **Step 3 is done** (2026-10-09): the menu bar, the icon bars and the
 footer are in the page.
@@ -567,6 +567,120 @@ is copied out (no HTML, no pictures in); "Close TeXmacs" ends the
 worker and leaves the page dead; the panes cannot be resized or split
 in the other direction; images are not picked in several formats, and
 directories not at all.
+
+**Step 6, first part** (2026-10-09): views in dialogs, and the tools.
+
+- **A view in a dialog** is a view as that of a pane, which is what the
+  design asks. `texmacs-output` (a document which is shown: the sample of
+  the font selector) and `texmacs-input` (a document which is edited: the
+  definition in the macro editor) come out of the serialiser as a node
+  `view` with the number of the view and the size it wishes. The page
+  puts a canvas there, which tells its place and gets its pixels like the
+  canvas of a pane; one which is edited also sends its keys and its
+  pointer. The core draws every view which has a place, editor or not.
+  The serialiser keeps the widget with the part of the interface, so the
+  view lives as long as its dialog; the buffer of an edited one is closed
+  with it.
+- Scheme learns the number of the view from `texmacs-widget-size`, which
+  in Tau answers width, height and number: no new glue.
+- **The tools** at the sides and under the views are parts of the
+  interface which the core already described (`side-0`, `side-1`,
+  `bottom-0`, `bottom-1`); the page shows them, laid out as dialogs,
+  when the core says they are visible.
+- **Inputs which answer at each key** (`search`, `replace-what`,
+  `replace-by`) send their text and the key: the search bar searches as
+  one types, and Escape closes it.
+- **A part is described again only when it changed** (it was described
+  at every update before, which would have rebuilt the search bar under
+  the fingers), and all the parts when another window takes the bars.
+
+Checked in Firefox: the sample text of the font selector, drawn and
+refreshed when a family is chosen; the macro editor, typing in its
+definition; Edit → Search, typing in the bar with the hits shown in the
+document, Escape.
+
+The side tools did not show at first: the window answered that its tools
+were visible before they had ever been shown, so the core never said that
+they became so. They are hidden until shown now. Checked with the
+preferences "developer tool" and "side tools" on (the side tools are
+behind both, as in the other ports): Format → Paragraph opens in the
+panel at the right of the views instead of a dialog. The panel at the
+left was not tried.
+
+**Step 6, second part** (2026-10-09): the context menu, the plugins, the
+remote client.
+
+- **The context menu** of the editor is a part as the others (`popup`):
+  the core describes it when the right button is pressed, and the page
+  shows it where the pointer was.
+- **Plugins.** A worker has no processes, but this tree already had the
+  answer of the browser build of `maxs_texmacs`: a plugin is a Web
+  Worker which speaks the protocol of the pipes (`worker_link.cpp`,
+  `misc/wasm/workers.js`), and the server already takes what the workers
+  say at each pass. In Tau the core is itself a worker and starts the
+  plugin as a worker of its own; nothing goes through the page. Linked
+  in as it is, with the scripts of Python (Pyodide) and R (webR) next
+  to the page. The plugins knew the browser by a function of the Vue
+  port (`web-files`); they ask `(in-browser?)` now, which is true in a
+  page and false under node. This is the *job worker* of "More than one
+  worker", for the plugins.
+- **The remote client.** Also there already: in the browser Emscripten
+  makes the sockets of the program WebSockets, and the servers of this
+  branch serve WebSocket clients (`websocket_contact.cpp`). It works
+  from the worker unchanged.
+- For the tests the page can run a Scheme command (`scheme`), only when
+  it was opened with `?debug`.
+
+Checked in Firefox: the context menu under the pointer; with two panes,
+the bars of the one which has the keyboard; a Python session computing
+6*7 (Pyodide loaded from the network by the worker of the plugin); a
+login on a test server of the desktop build (`misc/wasm/remote/server.scm`)
+over WebSocket, whose home directory opens as a tab.
+
+Not done: the JavaScript plugin needs the global `TeXmacs` of
+`misc/wasm/javascript.js`, which calls the Vue port; TikZ and Asymptote
+need their programs built (`misc/wasm/get-tikzjax.sh`,
+`get-asymptote.sh`) and still ask for `web-files`; R was not tried.
+`tree-view`, `color-input` and `ink`; tooltips other than titles; the
+pointer of a view which only shows a document; the dialogs of the Remote
+menu were not gone through.
+
+**The keyboard, done again** (2026-10-09), as the other ports have it
+(`lookup_key` and `postprocess_key_event` of the Vue port, `ime.js` of the
+browser build): the first version sent the key which the browser names,
+and the browsers do not name the keys the same way while Cmd is down.
+
+- **A key press is a key or text** (`misc/tau/web/keys.mjs`, which needs no
+  page). A key has a name (return, left...) or is a character key with
+  Control, Command or Alt; its name is the character at that place of the
+  keyboard with the modifiers as prefixes, Shift folded into the character
+  when it changes it (`M-+`, `M-N`, but `S-left`), Option too save on a
+  Mac with Command or Control (`M-A-s`). The character is taken from the
+  event when it shows the modifier, else from the layout which the browser
+  tells (Chromium), from the keys which were seen typing, and from the US
+  keyboard where the key is as there. A place which is not Latin gives
+  its Latin key for a shortcut (`C-c` on a Russian keyboard).
+- **Text does not come from the keys.** The keyboard of the views is one
+  text area which is not seen, at the cursor of the view which has the
+  keyboard: what comes into it is sent as text (`text`), which the core
+  makes keys of, one for each character, by the names of TeXmacs
+  (`tau_text`). Its composition (dead keys, the accents of a Mac, input
+  methods) is the pre-edit of the editor while it lasts. The canvas has
+  no focus any more; `paste` is an event of this text area.
+- **The keys of the browser.** Those it keeps anyway and reloading are
+  left to it; a key pressed while nothing has the keyboard goes to the
+  view of the active pane; the zoom keys never zoom the page.
+- `misc/tau/test/keys-test.mjs`, run by `make check`: 59 key presses and
+  their names (a Mac and not; US, German, French and Russian keyboards;
+  the key given with Shift or without). `?trace-keys` in the address logs
+  each key press and what was made of it.
+
+Checked in Firefox: typing with `<`, `>` and `&`, a composition (as the
+events of a dead key) shown and committed, text in other alphabets, the
+zoom keys, a click which keeps the keyboard, typing in the definition of
+the macro editor and in the search bar. Not checked: a real dead key and a
+real input method (the test sends their events), Safari and Chrome, a
+keyboard which is not US.
 
 ## Order of the work
 
