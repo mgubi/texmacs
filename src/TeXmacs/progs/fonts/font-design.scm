@@ -649,6 +649,10 @@
        (twith "table-width" "1par") (twith "table-hmode" "exact")
        (cwith "1" "1" "1" "-1" "cell-hyphen" "t")
        (cwith "1" "1" "1" "-1" "cell-valign" "t")
+       ;; a height of its own, whatever the sample takes in a narrow
+       ;; window: the list has the rest of the window (font-design.ts)
+       (cwith "1" "1" "1" "-1" "cell-vmode" "exact")
+       (cwith "1" "1" "1" "-1" "cell-height" "134pt")
        (cwith "1" "1" "1" "1" "cell-width" "0.42par")
        (cwith "1" "1" "1" "1" "cell-hmode" "exact")
        (cwith "1" "1" "1" "-1" "cell-lsep" "0spc")
