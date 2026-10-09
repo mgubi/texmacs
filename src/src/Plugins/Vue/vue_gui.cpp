@@ -4045,6 +4045,10 @@ vue_follow_interface_scale () {
   gui_needs_update= true;
 }
 
+#ifdef __EMSCRIPTEN__
+static const time_t web_frame_dt= 12; // the least time between two frames (ms)
+#endif
+
 static void
 loop_iteration_body () {
   int& delay= loop_delay;
@@ -4068,6 +4072,20 @@ loop_iteration_body () {
         !request_partial_redraw && is_nil (cmd_list) &&
         SDL_PollEvent (NULL) == 0 && texmacs_time () - web_idle_since < pause)
       return;
+  }
+  // No more than some 60 frames a second. On a display of 120 Hz the
+  // browser asks for a frame every 8 ms, and the whole canvas is drawn
+  // again for each: with a large window the graphics card does not keep
+  // up, the browser then holds the frames back for 70 to 90 ms at a time,
+  // and a transition (a menu which drops in) stops halfway; the sooner
+  // the more there is to draw, after 4 frames at an interface scaling of
+  // 2 where it took 10. (web_frame_dt, 12 ms: every frame at 60 Hz, every
+  // other one at 120 Hz.)
+  {
+    static time_t web_last_frame= 0;
+    time_t now= texmacs_time ();
+    if (now - web_last_frame < web_frame_dt) return;
+    web_last_frame= now;
   }
   web_busy= false;
 #endif

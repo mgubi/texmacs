@@ -229,6 +229,12 @@
   <paragraph|9 October 2026>
 
   <\itemize>
+    <item>The menus drop in without stopping halfway. On a display of 120
+    Hz the page drew a frame every 8 ms, more than the graphics card
+    follows with a large window: the browser then held the frames back for
+    a tenth of a second at a time, in the middle of the movement at an
+    interface scaling of 2. The page now draws 60 frames a second at most.
+
     <item>The interface follows the zoom of the browser. Its size was
     that of a whole number of pixels of the screen per point: on a
     display of density 2, a zoom of 115% or 120% made it smaller, and one
