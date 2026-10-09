@@ -13,7 +13,7 @@
 
 (texmacs-module (fonts font-design)
   (:use (fonts fonts-opentype) (fonts font-short-menu) (fonts font-custom)
-        (generic document-edit)))
+        (generic document-edit) (utils library cursor)))
 
 ;; The fonts of a document are a design decision, and the menus only name
 ;; the fonts.  "Font design" opens a page (tmfs://font-design/<document>)
