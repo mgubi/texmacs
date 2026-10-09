@@ -87,7 +87,7 @@ $(OUT)/node/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/node-pre.js $(W)/sourc
 # for the page: the core for a worker (tau.js, tau.wasm), the files of
 # TeXmacs in packages (misc/wasm/package.py and packages.js, as the browser
 # build of TeXmacs made them) and the page itself (misc/tau/web)
-WEB_FILES := index.html tau.mjs tau-worker.js
+WEB_FILES := index.html tau.mjs chrome.mjs tau-worker.js
 web: $(OUT)/web/tau.js web-packages $(patsubst %,$(OUT)/web/%,$(WEB_FILES))
 
 $(OUT)/web/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/packages.js $(W)/web/tau-pre.js $(W)/sources.txt

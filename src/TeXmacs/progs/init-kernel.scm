@@ -44,3 +44,6 @@
                  (kernel old-gui old-gui-form)
                  (kernel old-gui old-gui-test))
 (lazy-define (kernel gui menu-convert) make-menu-widget**)
+;; Tau: the interface as data, for the page
+(lazy-define (kernel gui menu-serial)
+             tau-serialize-part tau-expand tau-invoke)

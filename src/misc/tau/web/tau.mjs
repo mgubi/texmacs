@@ -3,6 +3,8 @@
 // tells it the place of the view, the keys and the pointer, and draws the
 // pixels it sends.
 
+import * as chrome from "./chrome.mjs";
+
 const canvas = document.getElementById("canvas");
 const context = canvas.getContext("2d");
 const statusLine = document.getElementById("status");
@@ -22,6 +24,7 @@ const state = {
 };
 // for tests and for the console
 window.tau = { state, send, worker };
+chrome.init({ send, afterAction: () => canvas.focus() });
 
 function setStatus(text) { statusLine.textContent = text; }
 
@@ -38,6 +41,7 @@ function sendPlace() {
 
 worker.onmessage = event => {
 	const m = event.data;
+	if (chrome.handle(m)) return;
 	switch (m.t) {
 	case "status":
 		if (!state.view) setStatus(m.text);
@@ -66,8 +70,11 @@ worker.onmessage = event => {
 			new ImageData(new Uint8ClampedArray(m.pixels), m.width, m.height), 0, 0);
 		state.extents = m.extents; state.scroll = m.scroll; state.caret = m.caret;
 		state.paints++;
-		setStatus(`view ${m.view} · ${m.width}×${m.height} · document ${m.extents.width}×${m.extents.height}` +
-			` · scroll ${m.scroll.x},${m.scroll.y} · ${state.paints} paints`);
+		state.started = true;
+		if (params.has("debug"))
+			setStatus(`view ${m.view} · ${m.width}×${m.height} · document ${m.extents.width}×${m.extents.height}` +
+				` · scroll ${m.scroll.x},${m.scroll.y} · ${state.paints} paints`);
+		else if (statusLine.textContent) setStatus("");
 		break;
 	}
 };

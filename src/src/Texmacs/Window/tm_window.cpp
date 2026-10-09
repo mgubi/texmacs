@@ -411,6 +411,20 @@ tm_window_rep::get_menu_widget (int which, string menu, widget& w) {
   menu_current (which)= xmenu;
   //cout << "Compute " << menu << "\n";
   object umenu= eval ("'" * menu);
+#ifdef TAUTEXMACS
+  // Tau: no widget is made, the menu is described to the page
+  // (kernel/gui/menu-serial.scm)
+  void tau_chrome (int which, object menu);
+  drd_info old_drd2= the_drd;
+  if (!is_none (window_to_view (id))) {
+    tm_view vw= concrete_view (window_to_view (id));
+    if (vw != NULL) the_drd= vw->ed->drd;
+  }
+  tau_chrome (which, umenu);
+  the_drd= old_drd2;
+  w= glue_widget ();
+  return true;
+#endif
   if (which == 10 || which == 11) w= make_menu_widget (umenu, 400, 1000);
   else w= make_menu_widget (umenu);
   if (menu_caching)

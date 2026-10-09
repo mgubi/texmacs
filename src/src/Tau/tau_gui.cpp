@@ -100,6 +100,25 @@ public:
   void write (slot s, blackbox index, widget w);
 };
 
+static void tau_post_json (const char* kind, string part, string json);
+static hashmap<int,bool> bar_visibility (true);
+
+// the bars of a window, for the page
+static string
+visibility_part (slot s) {
+  switch (s) {
+  case SLOT_HEADER_VISIBILITY: return "menu";
+  case SLOT_MAIN_ICONS_VISIBILITY: return "icons-0";
+  case SLOT_MODE_ICONS_VISIBILITY: return "icons-1";
+  case SLOT_FOCUS_ICONS_VISIBILITY: return "icons-2";
+  case SLOT_USER_ICONS_VISIBILITY: return "icons-3";
+  case SLOT_SIDE_TOOLS_VISIBILITY: return "side-0";
+  case SLOT_BOTTOM_TOOLS_VISIBILITY: return "bottom-0";
+  case SLOT_FOOTER_VISIBILITY: return "footer";
+  default: return "";
+  }
+}
+
 // what the core says of the scrolling to the window is for the view
 static bool
 is_canvas_slot (slot s) {
@@ -110,6 +129,18 @@ is_canvas_slot (slot s) {
 void
 view_window_rep::send (slot s, blackbox val) {
   if (is_canvas_slot (s) && !is_nil (view)) view->send (s, val);
+  else if (s == SLOT_LEFT_FOOTER || s == SLOT_RIGHT_FOOTER) {
+    string text= cork_to_utf8 (open_box<string> (val));
+    tau_post_json ("footer", s == SLOT_LEFT_FOOTER? "left": "right",
+                   "{\"text\":" * scm_quote (text) * "}");
+  }
+  else if (visibility_part (s) != "") {
+    bool flag= open_box<bool> (val);
+    bar_visibility ((int) s)= flag;
+    tau_post_json ("visible", visibility_part (s),
+                   flag? string ("{\"visible\":true}")
+                       : string ("{\"visible\":false}"));
+  }
 }
 
 blackbox
@@ -117,6 +148,8 @@ view_window_rep::query (slot s, int type_id) {
   // "attached to a window" is a non zero identifier (is_attached)
   if (s == SLOT_IDENTIFIER) return close_box<int> (1);
   if (is_canvas_slot (s) && !is_nil (view)) return view->query (s, type_id);
+  if (visibility_part (s) != "")
+    return close_box<bool> (bar_visibility [(int) s]);
   return no_widget_rep::query (s, type_id);
 }
 
@@ -226,6 +259,42 @@ tau_post_view (int id, const char* what) {
   tau_js_view (id, what);
 }
 
+#ifdef __EMSCRIPTEN__
+EM_JS (void, tau_js_json, (const char* kind, const char* part,
+                           const char* json), {
+  if (!Module.tauPost) return;
+  var m= JSON.parse (UTF8ToString (json));
+  m.t= UTF8ToString (kind);
+  m.part= UTF8ToString (part);
+  Module.tauPost (m);
+});
+#else
+static void tau_js_json (const char* kind, const char* part,
+                         const char* json) {
+  (void) kind; (void) part; (void) json; }
+#endif
+
+static void
+tau_post_json (const char* kind, string part, string json) {
+  c_string _part (part);
+  c_string _json (json);
+  tau_js_json (kind, _part, _json);
+}
+
+// a menu, an icon bar or the tools of a window, described to the page:
+// which is -1 for the menu bar, 0 to 3 for the icon bars, 10 and more for
+// the side tools, 20 and more for the bottom tools (tm_window.cpp)
+void
+tau_chrome (int which, object menu) {
+  string part;
+  if (which < 0) part= "menu";
+  else if (which < 10) part= "icons-" * as_string (which);
+  else if (which < 20) part= "side-" * as_string (which - 10);
+  else part= "bottom-" * as_string (which - 20);
+  string json= as_string (call ("tau-serialize-part", object (part), menu));
+  tau_post_json ("chrome", part, json);
+}
+
 /******************************************************************************
 * A turn of the core
 *******************************************************************************
@@ -322,6 +391,22 @@ tau_key (int view, const char* key) {
   if (v == NULL) return;
   v->handle_keypress (utf8_to_cork (string (key)), texmacs_time ());
   tau_turn ();
+}
+
+EMSCRIPTEN_KEEPALIVE
+void
+tau_invoke (int n) {
+  // the action of an entry of a menu, by its number
+  call ("tau-invoke", object (n));
+  tau_turn ();
+}
+
+EMSCRIPTEN_KEEPALIVE
+void
+tau_expand (int n) {
+  // the contents of a submenu, by its number
+  string json= as_string (call ("tau-expand", object (n)));
+  tau_post_json ("contents", as_string (n), json);
 }
 
 EMSCRIPTEN_KEEPALIVE

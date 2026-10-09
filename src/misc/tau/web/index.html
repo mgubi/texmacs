@@ -5,17 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tau</title>
 <style>
+:root {
+	--bar: #ececf0; --bar-border: #c4c4cf; --text: #1e1e28; --dim: #70707e;
+	--hover: #d9d9e3; --pressed: #c3c8e6; --popup: #fafafc; --accent: #3355bb;
+}
 html, body { height: 100%; margin: 0; background: #6e6e91; overflow: hidden; }
-body { display: flex; flex-direction: column; font: 12px/1.3 system-ui, sans-serif; }
+body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-serif; color: var(--text);
+       user-select: none; -webkit-user-select: none; }
+.tau-bar { display: flex; flex-wrap: wrap; align-items: center; background: var(--bar);
+           border-bottom: 1px solid var(--bar-border); padding: 1px 4px; min-height: 0; }
+.tau-bar:empty, .tau-bar[hidden] { display: none; }
+#tau-menu { padding: 0 4px; }
+.tau-entry { font: inherit; color: inherit; background: none; border: 0; border-radius: 4px;
+             padding: 3px 7px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tau-entry:disabled { opacity: 0.4; }
+.tau-entry:hover:not(:disabled), .tau-entry.tau-open { background: var(--hover); }
+.tau-entry.tau-pressed { background: var(--pressed); }
+.tau-bar .tau-entry { padding: 3px 5px; }
+#tau-menu .tau-entry { padding: 4px 8px; }
+.tau-icon { height: 20px; min-width: 12px; display: block; }
+#tau-icons-1 .tau-icon, #tau-icons-2 .tau-icon, #tau-icons-3 .tau-icon { height: 17px; }
+.tau-arrow { font-size: 9px; color: var(--dim); }
+.tau-vsep { width: 1px; align-self: stretch; margin: 3px 4px; background: var(--bar-border); }
+.tau-glue { flex: 1; }
+.tau-group { color: var(--dim); font-size: 11px; padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tau-text { padding: 3px 8px; }
+.tau-symbol { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; font-size: 15px; }
+.tau-color { display: inline-block; width: 16px; height: 16px; border: 1px solid var(--bar-border); }
+.tau-popup { position: fixed; z-index: 10; background: var(--popup); border: 1px solid var(--bar-border);
+             border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.25); padding: 4px; overflow-y: auto;
+             display: flex; flex-direction: column; min-width: 120px; }
+.tau-popup > .tau-entry { justify-content: flex-start; border-radius: 4px; padding: 4px 8px 4px 4px; text-align: left; }
+.tau-popup > .tau-entry:hover:not(:disabled), .tau-popup > .tau-entry.tau-open { background: var(--accent); color: #fff; }
+.tau-popup > .tau-entry:hover .tau-arrow, .tau-popup > .tau-entry:hover .tau-shortcut { color: #dde; }
+.tau-check { width: 14px; text-align: center; font-size: 11px; flex: none; }
+.tau-shortcut { margin-left: auto; padding-left: 24px; color: var(--dim); font-size: 12px; }
+.tau-hsep { height: 1px; margin: 4px 2px; background: var(--bar-border); flex: none; }
+.tau-tile { display: grid; gap: 1px; padding: 2px; }
+.tau-tile .tau-entry { justify-content: center; padding: 3px 4px; }
 #view { flex: 1; min-height: 0; position: relative; }
 #canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: text; }
-#status { padding: 3px 8px; background: #f3f3f6; color: #22222c; border-top: 1px solid #c9c9d4;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#tau-footer { display: flex; gap: 16px; padding: 2px 8px; background: var(--bar); border-top: 1px solid var(--bar-border);
+              font-size: 12px; min-height: 16px; white-space: nowrap; }
+#tau-footer[hidden] { display: none; }
+#tau-footer-left, #status { overflow: hidden; text-overflow: ellipsis; }
+#tau-footer-right { margin-left: auto; color: var(--dim); }
+#status { color: var(--dim); }
 </style>
 </head>
 <body>
+<div id="tau-menu" class="tau-bar"></div>
+<div id="tau-icons-0" class="tau-bar"></div>
+<div id="tau-icons-1" class="tau-bar"></div>
+<div id="tau-icons-2" class="tau-bar"></div>
+<div id="tau-icons-3" class="tau-bar"></div>
 <div id="view"><canvas id="canvas" tabindex="0"></canvas></div>
-<div id="status">Loading Tau…</div>
+<div id="tau-footer"><span id="tau-footer-left"></span><span id="status">Loading Tau…</span><span id="tau-footer-right"></span></div>
 <script type="module" src="tau.mjs"></script>
 </body>
 </html>

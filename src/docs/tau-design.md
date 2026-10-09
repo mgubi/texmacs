@@ -436,6 +436,37 @@ What differs from the protocol above, for now:
   one.
 - The keys are those of `keydown`; no input methods, no dead keys.
 
+**Step 3 is done** (2026-10-09): the menu bar, the icon bars and the
+footer are in the page.
+
+- `kernel/gui/menu-serial.scm` is the serialiser. It walks the markup as
+  `menu-widget.scm` does (which is still there, for the dialogs) and makes
+  nodes, written as JSON: `entry` (label, icon and its file, shortcut,
+  check mark, enabled, help, the number of its action), `submenu` (label,
+  the number of its contents), `separator`, `glue`, `group`, `text`, the
+  containers (`horizontal`, `vertical`, `hlist`, `vlist`, `minibar`, `tile`,
+  `refreshable`). What computes is run (`if`, `when`, `for`, `mini`, `link`,
+  `dynamic`, `promise`, `style`). The inputs, the tabs and the layout of
+  dialogs come out as nodes marked `unsupported`, until step 4.
+- The actions and the contents of the submenus are closures kept in a
+  table, by part of the interface: they are forgotten when the part is
+  described again. `tau-serialize-part`, `tau-expand`, `tau-invoke`.
+- In the core, `tm_window_rep::get_menu_widget` describes the menu instead
+  of making a widget (`tau_chrome` in `tau_gui.cpp`): the parts are `menu`,
+  `icons-0` to `icons-3`, `side-0`..., `bottom-0`... The window of a view
+  passes on the texts of the footer (`footer`) and which bars are visible
+  (`visible`). `tau_invoke` and `tau_expand` are called by the page.
+- In the page, `chrome.mjs` makes the bars and the menus from the nodes.
+  A menu asks for its contents when it opens. The icons are files of the
+  core, whose bytes the page asks of the worker once (`file`): they are in
+  the packages, not at addresses of their own.
+- `load-help-article` was only defined once the help menu had been built,
+  which the menu bar was, whole, at the start: it is a lazy definition now.
+
+Not there yet: the side and bottom tools (described, not shown), the
+context menu of the editor, tooltips other than the titles of the buttons,
+keys in an open menu.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:
