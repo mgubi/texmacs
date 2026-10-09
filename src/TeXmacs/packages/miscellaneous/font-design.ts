@@ -40,6 +40,8 @@
 
   <assign|font|pagella>
 
+  <assign|font-base-size|9>
+
   <assign|math-font|math-pagella>
 
   <assign|font-design-list-height|<macro|0.5pag>>
