@@ -170,6 +170,7 @@ typesetter_rep::typeset () {
   }
 
   // Typeset
+  env->auto_seen= 0;
   if (env->complete) {
     env->local_aux= hashmap<string,tree> (UNINIT);
     env->missing  = hashmap<string,tree> (UNINIT);

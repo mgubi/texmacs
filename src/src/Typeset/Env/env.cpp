@@ -39,7 +39,8 @@ edit_env_rep::edit_env_rep (drd_info& drd2,
   local_aux (local_aux2), global_aux (global_aux2),
   local_att (local_att2), global_att (global_att2),
   missing (UNINIT), redefined (), touched (false),
-  read_unknown (false), rec_keys (NULL), rec_values (NULL)
+  read_unknown (false), rec_keys (NULL), rec_values (NULL),
+  auto_seen (0)
 {
   initialize_default_env ();
   initialize_default_var_type ();

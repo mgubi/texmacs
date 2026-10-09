@@ -157,6 +157,13 @@ public:
     return h; }
 };
 
+// The automatic labels of a document (exec_auto_id in env_exec.cpp): those
+// of 'root' get new numbers, in the order in which they are typeset, if
+// some were numbered out of the order of the document; this is then to
+// be followed by a complete typesetting and by auto_labels_numbered
+bool auto_labels_renumber (tree root);
+void auto_labels_numbered (tree root);
+
 class edit_env;
 class ornament_parameters;
 class art_box_parameters;
@@ -413,6 +420,8 @@ private:
   tree exec_get_binding (tree t);
   tree exec_has_binding (tree t);
   tree exec_get_attachment (tree t);
+  tree exec_auto_id (tree t);
+  bool auto_label_tag (tree& tag, tree& root);
 
   tree exec_pattern (tree t);
 
@@ -505,6 +514,9 @@ public:
   // lookup_value finds again
   array<string>* rec_keys;
   array<tree>*   rec_values;
+  // The tags which made an automatic label in this pass (exec_auto_id in
+  // env_exec.cpp)
+  int auto_seen;
   inline void record_lookups (array<string>* keys, array<tree>* values) {
     rec_keys= keys; rec_values= values; }
   tree lookup_value (string name);

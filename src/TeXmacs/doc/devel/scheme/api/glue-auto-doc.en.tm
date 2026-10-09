@@ -9155,6 +9155,14 @@ source code.
   </explain>
 
   <\explain>
+    <scm|(renumber-auto-labels)>
+<explain-synopsis|no synopsis>
+  <|explain>
+    Calls the <c++> function <cpp|typeset_renumber_labels> which returns
+    <scm|void>.
+  </explain>
+
+  <\explain>
     <scm|(update-players <scm-arg|path> <scm-arg|bool>)>
 <explain-synopsis|no synopsis>
   <|explain>

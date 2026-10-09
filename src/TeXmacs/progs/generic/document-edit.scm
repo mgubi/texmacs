@@ -588,9 +588,13 @@
     (delayed    ; allow typesetting/magic to happen before next update
       (:idle 1)
       (cursor-after
+       ;; the automatic labels are first numbered in the order of the
+       ;; document: the tables which are made hold their names
        (cond ((== what "all") 
+              (renumber-auto-labels)
               (generate-all-aux) (inclusions-gc) (picture-gc) (wait-update-current-buffer))
              ((== what "bibliography")
+              (renumber-auto-labels)
               (generate-all-aux) (wait-update-current-buffer))
              ((== what "buffer") 
               (wait-update-current-buffer))

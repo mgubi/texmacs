@@ -71,6 +71,7 @@ tree morph (tree t, tree u, edit_env env);
 
 tree
 edit_env_rep::animate (tree t) {
+  read_other (); // the state of the animations
   if (is_atomic (t)) return t;
   else if (is_func (t, MORPH)) {
     int i0= -1, i1= -1;
@@ -528,6 +529,7 @@ round_portion (double portion) {
 
 tree
 edit_env_rep::checkout_animation (tree t) {
+  read_other (); // the state of the animations
   if (N(t) < 4) return t;
   int tot= max (as_length (exec (t[1])), 1);
   int cur= max (as_length (exec (t[3])), 0);
@@ -576,6 +578,7 @@ insert_frame (tree a, tree f, double t) {
 
 tree
 edit_env_rep::commit_animation (tree t) {
+  read_other (); // the state of the animations
   if (N(t) < 5) return t;
   tree a= tree (ANIM_STATIC, t[0], t[2], t[3], t[4]);
   tree u= checkout_animation (a);
@@ -628,6 +631,7 @@ as_nice_string (double x) {
 
 tree
 edit_env_rep::expand_morph (tree t) {
+  read_other (); // the state of the animations
   if (is_func (t, ANIM_STATIC, 4) ||
       is_func (t, ANIM_DYNAMIC, 4) ||
       is_compound (t, "anim-edit", 5)) {
