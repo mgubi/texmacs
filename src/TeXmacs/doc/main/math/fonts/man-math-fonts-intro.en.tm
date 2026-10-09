@@ -66,19 +66,21 @@
   changes the text font alone.
 
   The menus only name the fonts. <menu|Font design>, at the end of the same
-  menu, opens a page which shows them: every font has a few words, a
-  sample of its text and of its formulas, and buttons for the parts of the
-  document it may be used for. A whole pair is taken with <menu|Text and
-  mathematics>; the other buttons choose the font of one part and leave
-  the others: the text, the mathematics, the sans serif and the
-  typewriter text, and the blackboard bold, calligraphic and fraktur
-  letters of the formulas, so that the text of one font may go with the
-  mathematics of another and the calligraphic letters of a third. The top
-  of the page lists the choice and shows a sample of it; <menu|Use for the
-  document> gives it to the document, which nothing changes before. The
-  samples of the fonts which come with <TeXmacs> are pictures, so that the
-  page does not load any font but those of the choice; for a font of your
-  system, <menu|Show a sample> makes the picture.
+  menu, opens a page which shows them. The page has a tab for each part of
+  a document: <menu|Text and mathematics> for the pairs of the menus, then
+  the text, the mathematics, the sans serif and the typewriter text, and
+  the blackboard bold, calligraphic and fraktur letters of the formulas. A
+  tab lists the fonts its part may have, each with a few words, a sample of
+  that part (the alphabet of a calligraphic font, the formulas of a
+  mathematical one) and a button <menu|Choose>, so that the text of one
+  font may go with the mathematics of another and the calligraphic letters
+  of a third; a part which has no font of its own follows the text font.
+  The top of the page lists the choice and shows a sample of it;
+  <menu|Use for the document> gives it to the document, which nothing
+  changes before. The samples of the fonts which come with <TeXmacs> are
+  pictures, so that the page does not load any font but those of the
+  choice; for a font of your system, <menu|Show a sample> makes the
+  picture.
 
   A document whose parts have fonts of their own has no font of the menus:
   the font button then says <menu|Custom>, and so does an entry of its

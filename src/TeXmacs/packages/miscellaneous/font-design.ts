@@ -25,7 +25,7 @@
   <\active*>
     <\src-comment>
       The page is a widget (gui-markup): it fits its window, with small
-      margins. Buttons (inside action tags), muted text, the frame of a sample, the rule between two fonts and the scrolling list of the fonts.
+      margins. Buttons (inside action tags), muted text, the tabs, the mark of the chosen font, the frame of a sample, the rule between two fonts and the scrolling list of the fonts.
     </src-comment>
   </active*>
 
@@ -35,7 +35,7 @@
 
   <assign|font-design-sample|<macro|body|<with|ornament-color|#f8f6ee|ornament-sunny-color|#d6d2c4|ornament-shadow-color|#d6d2c4|ornament-hpadding|1spc|ornament-vpadding|1spc|ornament-border|1ln|<ornament|<arg|body>>>>>
 
-  <assign|font|pagella>
+  <assign|font|TeX Gyre Pagella>
 
   <assign|font-family|rm>
 
@@ -43,19 +43,33 @@
 
   <assign|font-base-size|9>
 
-  <assign|math-font|math-pagella>
-
-  <assign|font-design-top-height|25em>
+  <assign|font-design-top-height|27.5em>
 
   <assign|font-design-list-height|<macro|<merge|<look-up|<maximum|<minus|1pag|<value|font-design-top-height>>|10em>|0>|tmpt>>>
 
   <assign|font-design-list|<macro|scroll|body|<with|canvas-type|e|canvas-color|white|canvas-hpadding|1spc|canvas-vpadding|1spc|ornament-border|1ln|ornament-sunny-color|#b8b8c0|ornament-shadow-color|#b8b8c0|<canvas||<merge|t-|<font-design-list-height>>|1par||0%|<arg|scroll>|<arg|body>>>>>
+
+  <assign|font-design-tab-on|<macro|body|<short-lower|<strong|<arg|body>>>>>
+
+  <assign|font-design-tab-off|<macro|body|<short-raise|<arg|body>>>>
+
+  <assign|font-design-chosen|<macro|body|<short-lower|<with|color|dark green|<arg|body>>>>>
+
+  <assign|font-design-heading|<macro|body|<with|color|#606068|font-shape|small-caps|<arg|body>>>>
 
   <assign|font-design-rule|<macro|<with|color|#d4d4dc|<hrule>>>>
 
   <drd-props|font-design-sample|arity|1>
 
   <drd-props|font-design-rule|arity|0>
+
+  <drd-props|font-design-tab-on|arity|1>
+
+  <drd-props|font-design-tab-off|arity|1>
+
+  <drd-props|font-design-chosen|arity|1>
+
+  <drd-props|font-design-heading|arity|1>
 
   <drd-props|font-design-list|arity|2|enable-writability|all>
 
