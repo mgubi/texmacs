@@ -18,6 +18,16 @@
 // the Cache Storage too; the fonts found there are put in place before
 // TeXmacs starts. A font which is never used is never fetched.
 //
+// The network may be slow, or fail for a moment. The fonts of the first
+// screen (EARLY_FONTS) therefore come with the boot files, before TeXmacs
+// starts, without holding the page: read by TeXmacs, each would be a
+// request during which the page does not respond, the larger one for as
+// long as its megabyte takes. A request of a read which fails is made
+// again (TRIES times, a pause in between), and a font which still does not
+// come is fetched in the background, for the next read of it or the next
+// visit: TeXmacs was told that the file could not be read, and draws the
+// characters of that font as missing until then.
+//
 // ?trace-files keeps the list of the files opened (window.tmTrace), which is
 // how misc/wasm/boot-files.txt, the files of the boot package, is made.
 
@@ -26,7 +36,8 @@ var tmPackages = (function () {
   var CACHE = 'texmacs-packages';
   var manifest = null;
   var stats = { onDemand: 0, onDemandBytes: 0, loaded: 0, start: 0,
-                fonts: 0, fontBytes: 0, fontsCached: 0 };
+                fonts: 0, fontBytes: 0, fontsCached: 0,
+                fontsEarly: 0, fontsFailed: 0 };
   var pending = {}; // package name -> [node] still to fill
   var lazyNodes = {}; // the url of a font -> its placeholders (the same font
                       // may be at several places of the tree)
@@ -82,13 +93,39 @@ var tmPackages = (function () {
   // a request now (synchronous; the bytes come as text in the "user
   // defined" charset, the only way for a synchronous request on the main
   // thread)
-  function getNow (address, range) {
+  function getOnce (address, range) {
     var xhr = new XMLHttpRequest ();
     xhr.open ('GET', address, false);
     if (range) xhr.setRequestHeader ('Range', range);
     xhr.overrideMimeType ('text/plain; charset=x-user-defined');
     xhr.send (null);
     return xhr;
+  }
+  // The same, made again when the network fails (send throws) or the answer
+  // is cut short of the size expected: `whole' is the size of the file
+  // when no range was asked for. An answer of the server, whatever its
+  // status, is returned as it is (the callers know what to make of it).
+  var TRIES = 3;
+  function pause (ms) { // the page waits for the read anyway
+    var t = performance.now ();
+    while (performance.now () - t < ms) {}
+  }
+  function getNow (address, range, whole) {
+    var last = null;
+    for (var i = 0; i < TRIES; i++) {
+      if (i) pause (300 * i);
+      try {
+        var xhr = getOnce (address, range);
+        if (xhr.status === 0 ||
+            (whole && xhr.status === 200 && xhr.responseText.length !== whole))
+          last = new Error ('incomplete answer (' + xhr.status + ', ' +
+                            xhr.responseText.length + ' bytes)');
+        else return xhr;
+      } catch (e) { last = e; }
+      console.warn ('TeXmacs: ' + address + (range ? ' (' + range + ')' : '') +
+                    ': ' + last + (i + 1 < TRIES ? ', asked again' : ''));
+    }
+    throw last;
   }
   function textBytes (s, from, n) {
     var bytes = new Uint8Array (n);
@@ -135,7 +172,7 @@ var tmPackages = (function () {
       }
       rangesUseless = true;
     }
-    var all = getNow (url (pkg.url), null);
+    var all = getNow (url (pkg.url), null, pkg.size);
     if (all.status !== 200 || all.responseText.length !== pkg.size)
       throw new Error ('cannot load ' + node.tmPath + ': ' + all.status);
     var bytes = textBytes (all.responseText, 0, pkg.size);
@@ -149,10 +186,18 @@ var tmPackages = (function () {
   // cache for the next visits
   function fetchFont (node) {
     var pkg = node.tmPackage, u = url (pkg.url);
-    var xhr = getNow (u, null);
-    var s = xhr.responseText;
-    if (xhr.status !== 200 || s.length !== pkg.size)
-      throw new Error ('cannot load ' + node.tmPath + ': ' + xhr.status);
+    var xhr, s;
+    try {
+      xhr = getNow (u, null, pkg.size);
+      s = xhr.responseText;
+      if (xhr.status !== 200 || s.length !== pkg.size)
+        throw new Error ('status ' + xhr.status + ', ' + s.length + ' bytes');
+    } catch (e) {
+      console.error ('TeXmacs: cannot load ' + node.tmPath + ' (' + e + '): fetched in the background');
+      stats.fontsFailed++;
+      fetchFontLater (pkg);
+      throw new FS.ErrnoError (29); // EIO: see materialize
+    }
     var bytes = textBytes (s, 0, pkg.size);
     stats.fonts++;
     stats.fontBytes += pkg.size;
@@ -165,6 +210,38 @@ var tmPackages = (function () {
                      'Content-Length': String (bytes.length) } }));
       }).catch (function () {});
     return bytes;
+  }
+
+  // a font which did not come when TeXmacs read it: without holding the
+  // page, into its placeholders and into the cache
+  var later = {};
+  function fetchFontLater (pkg) {
+    var u = url (pkg.url);
+    if (later[u]) return;
+    later[u] = true;
+    fetchPackage ({ url: pkg.url, size: pkg.size }).then (function (bytes) {
+      if (bytes.length !== pkg.size) throw new Error (bytes.length + ' bytes');
+      (lazyNodes[u] || []).forEach (function (n) { if (n.tmPackage) fill (n, bytes); });
+      console.log ('TeXmacs: ' + pkg.name + ' came in the background');
+    }).catch (function (e) {
+      later[u] = false;
+      console.warn ('TeXmacs: ' + pkg.name + ' did not come in the background (' + e + ')');
+    });
+  }
+
+  // The fonts of the first screen, which are not in the boot package: the
+  // typewriter and the sans serif fonts of the welcome page and, where the
+  // keys of the shortcuts are written with the symbols of a Mac (the menus,
+  // the welcome page), the font those come from (widget_symbol_font in
+  // vue_gui.cpp, kbd_render in tm_config.cpp). Without the last one the
+  // command sign of the menus waited for 800 kB during a frame.
+  var MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test (
+    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
+  var EARLY_FONTS = ['fonts/truetype/inconsolata/Inconsolatazi4-Regular.otf',
+                     'fonts/truetype/texgyre/texgyreheros-regular.otf']
+    .concat (MAC ? ['fonts/truetype/stix2/STIXTwoMath-Regular.otf'] : []);
+  function earlyFonts (m) {
+    return (m.lazy || []).filter (function (f) { return EARLY_FONTS.indexOf (f[0]) >= 0; });
   }
 
   // the fonts which an earlier visit fetched, from the cache, before TeXmacs
@@ -181,6 +258,7 @@ var tmPackages = (function () {
         var bytes = new Uint8Array (await resp.arrayBuffer ());
         var nodes = lazyNodes[u];
         if (bytes.length !== nodes[0].tmSize) continue;
+        if (!nodes.some (function (n) { return n.tmPackage; })) continue; // there already
         nodes.forEach (function (n) { if (n.tmPackage) fill (n, bytes); });
         stats.fontsCached++;
       }
@@ -191,8 +269,20 @@ var tmPackages = (function () {
     node.contents = bytes;
     node.tmPackage = null;
   }
+  // The bytes of a placeholder, for a read. A file which cannot be fetched
+  // is an input/output error of the read, as for a file of a disk: an
+  // exception of another kind went through TeXmacs up to the loop of the
+  // page and left the frame it was drawing half done.
   function materialize (node) {
-    if (node.tmPackage) fill (node, fetchNow (node));
+    if (!node.tmPackage) return;
+    var bytes;
+    try { bytes = fetchNow (node); }
+    catch (e) {
+      if (!(e && e.name === 'ErrnoError'))
+        console.error ('TeXmacs: cannot load ' + node.tmPath + ' (' + e + ')');
+      throw new FS.ErrnoError (29); // EIO
+    }
+    fill (node, bytes);
   }
 
   // a file of the tree, before its bytes: its size is known, a read brings
@@ -331,8 +421,10 @@ var tmPackages = (function () {
       return r.json ();
     }).then (async function (m) {
       var boot = m.packages.filter (function (p) { return p.boot; });
-      var total = 0, done = 0, bytes = [];
+      var fonts = earlyFonts (m);
+      var total = 0, done = 0, bytes = [], fontBytes = [];
       boot.forEach (function (p) { total += p.size; });
+      fonts.forEach (function (f) { total += f[2]; });
       var progress = typeof tmProgress !== 'undefined' ? tmProgress.files : function () {};
       progress (0, total);
       for (var i = 0; i < boot.length; i++) {
@@ -340,7 +432,21 @@ var tmPackages = (function () {
         done += boot[i].size;
         progress (done, total);
       }
-      return { manifest: m, boot: boot, bytes: bytes };
+      // the fonts of the first screen (from the cache at a later visit); one
+      // which does not come is left to the read of TeXmacs
+      for (var j = 0; j < fonts.length; j++) {
+        var b = null;
+        for (var k = 0; k < TRIES && !b; k++)
+          try {
+            b = await fetchPackage ({ url: fonts[j][1], size: fonts[j][2] },
+                                    function (n) { progress (done + n, total); });
+            if (b.length !== fonts[j][2]) b = null;
+          } catch (e) { console.warn ('TeXmacs: ' + fonts[j][0] + ': ' + e.message); }
+        fontBytes.push (b);
+        done += fonts[j][2];
+        progress (done, total);
+      }
+      return { manifest: m, boot: boot, bytes: bytes, fonts: fonts, fontBytes: fontBytes };
     });
     return early;
   }
@@ -365,8 +471,14 @@ var tmPackages = (function () {
           await install (r.boot[i], r.bytes[i], false);
           r.bytes[i] = null;
         }
+        r.fonts.forEach (function (f, j) {
+          if (!r.fontBytes[j]) return;
+          (lazyNodes[url (f[1])] || []).forEach (function (n) { if (n.tmPackage) fill (n, r.fontBytes[j]); });
+          stats.fontsEarly++;
+        });
         await restoreFonts ();
         console.log ('TeXmacs: boot files in ' + Math.round (performance.now () - stats.start) + ' ms' +
+                     (stats.fontsEarly ? ', with ' + stats.fontsEarly + ' fonts of the first screen' : '') +
                      (stats.fontsCached ? ', ' + stats.fontsCached + ' fonts from the cache' : ''));
         removeRunDependency ('texmacs-files');
         // the rest once TeXmacs runs (and has had its first frames);
