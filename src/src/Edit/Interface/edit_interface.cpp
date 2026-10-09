@@ -637,8 +637,19 @@ edit_interface_rep::change_time () {
   return last_change;
 }
 
+// (the time of an update of the menus, the icon bars and the tools, which
+// follows every edit after a sixth of a second: TEXMACS_EDIT_PROFILE)
+struct menus_profile {
+  double t;
+  menus_profile (): t (edit_profile.on ? edit_profile_now () : 0) {}
+  ~menus_profile () {
+    if (edit_profile.on)
+      cout << "edit-profile menus: " << edit_profile_now () - t << " ms" << LF; }
+};
+
 void
 edit_interface_rep::update_menus () {
+  menus_profile prof;
   SERVER (menu_main ("(horizontal (link texmacs-menu))"));
   SERVER (menu_icons (0, "(horizontal (link texmacs-main-icons))"));
   SERVER (menu_icons (1, "(horizontal (link texmacs-mode-icons))"));
@@ -834,7 +845,34 @@ edit_interface_rep::apply_changes () {
   if (env_change & (THE_TREE+THE_ENVIRONMENT)) {
     typeset_invalidate_env ();
     SI x1, y1, x2, y2;
+    double prof_t= 0;
+    if (edit_profile.on) {
+      bool on= true;
+      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      prof_t= edit_profile_now ();
+    }
     typeset (x1, y1, x2, y2);
+    if (edit_profile.on) {
+      // the rectangle which is invalidated, and the part of it in the view
+      // (points of the screen)
+      double total= edit_profile_now () - prof_t;
+      rectangle all (x1- 2*pixel, y1- 2*pixel, x2+ 2*pixel, y2+ 2*pixel);
+      rectangle vis= (x2 > x1 && y2 > y1)
+        ? rectangle (max (all->x1, vx1), max (all->y1, vy1),
+                     min (all->x2, vx2), min (all->y2, vy2))
+        : rectangle (0, 0, 0, 0);
+      double f= magf / PIXEL;
+      double vw= (vx2 - vx1) * f, vh= (vy2 - vy1) * f;
+      double rw= max (0.0, (vis->x2 - vis->x1) * f), rh= max (0.0, (vis->y2 - vis->y1) * f);
+      cout << "edit-profile typeset: " << total << " ms in " << edit_profile.passes
+           << " pass(es): bridges " << edit_profile.bridges << " ms ("
+           << edit_profile.redone << " redone, " << edit_profile.cached << " reused), pages "
+           << edit_profile.pages << " ms, changes " << edit_profile.changes << " ms ("
+           << edit_profile.rects << " rectangles from " << edit_profile.lines
+           << " lines); invalid " << (int) rw << " x " << (int) rh << " of the view "
+           << (int) vw << " x " << (int) vh << " = "
+           << (vw * vh > 0 ? (int) (100.0 * rw * rh / (vw * vh) + 0.5) : 0) << "%" << LF;
+    }
     invalidate (x1- 2*pixel, y1- 2*pixel, x2+ 2*pixel, y2+ 2*pixel);
     // check_data_integrety ();
     the_ghost_cursor()= eb->find_check_cursor (tp);

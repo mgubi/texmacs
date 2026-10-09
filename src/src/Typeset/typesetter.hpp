@@ -33,6 +33,21 @@ void notify_remove_node (typesetter ttt, path p);
 void exec_until         (typesetter ttt, path p);
 box  typeset            (typesetter ttt, SI& x1, SI& y1, SI& x2, SI& y2);
 
+// The work done for an edit, measured when the environment variable
+// TEXMACS_EDIT_PROFILE is set: the times (ms) of the stages of the last
+// typesetting pass and what they handled; the editor prints them with the
+// area it invalidated and repainted (edit_interface.cpp, edit_repaint.cpp).
+struct edit_profile_data {
+  bool   on;
+  double bridges, pages, changes;  // ms: the bridges, the pager, the change log
+  int    passes;                   // typesetting passes of this edit
+  int    cached, redone;           // bridges whose result was reused or not
+  int    lines, moved;             // lines (and remembered boxes) logged, changed
+  int    rects;                    // rectangles in the change log
+};
+extern edit_profile_data edit_profile;
+double edit_profile_now ();        // ms, from an arbitrary origin
+
 box        typeset_as_concat (edit_env env, tree t, path ip);
 box        typeset_as_box (edit_env env, tree t, path ip);
 box        typeset_as_atomic (edit_env env, tree t, path ip);
