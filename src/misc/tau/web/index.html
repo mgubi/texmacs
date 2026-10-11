@@ -269,6 +269,14 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 #tau-footer { display: flex; gap: 16px; padding: 2px 8px; background: var(--bar); border-top: 1px solid var(--bar-border);
               font-size: 12px; min-height: 16px; white-space: nowrap; }
 #tau-footer[hidden] { display: none; }
+/* the core is busy: a bar which runs along the top of the page, the cursor of the views, a word in the footer */
+#tau-busy-bar { position: fixed; left: 0; right: 0; top: 0; height: 3px; z-index: 300000; overflow: hidden; pointer-events: none; }
+#tau-busy-bar::before { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; background: var(--accent); border-radius: 2px;
+	animation: tau-working 1.1s linear infinite; }
+@keyframes tau-working { from { left: -30%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { #tau-busy-bar::before { animation: none; left: 0; width: 100%; opacity: 0.6; } }
+body.tau-busy .tau-canvas { cursor: progress; }
+#tau-working { color: var(--accent); }
 #tau-footer-left, #status { overflow: hidden; text-overflow: ellipsis; }
 #tau-footer-right { margin-left: auto; color: var(--dim); }
 #status { color: var(--dim); }
@@ -291,7 +299,8 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 <div id="tau-side-0" class="tau-tool tau-side" hidden></div>
 </div>
 </div>
-<div id="tau-footer"><span id="tau-footer-left"></span><span id="status"></span><span id="tau-footer-right"></span></div>
+<div id="tau-busy-bar" hidden></div>
+<div id="tau-footer"><span id="tau-working" hidden>Working…</span><span id="tau-footer-left"></span><span id="status"></span><span id="tau-footer-right"></span></div>
 <script type="module" src="tau.mjs"></script>
 </body>
 </html>

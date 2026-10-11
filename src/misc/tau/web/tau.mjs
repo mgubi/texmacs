@@ -685,8 +685,33 @@ function copy(text) {
 // The messages of the core
 // ---------------------------------------------------------------------------
 
+// While the core works (it loads a document, typesets a long one...) the
+// worker answers nothing, and the page shows that it is busy. The page
+// asks the worker a few times a second whether it is there: an answer
+// which is late by more than a moment is the core at work, and the answer
+// ends it. The keys which are typed meanwhile wait, and are not lost.
+const BUSY_AFTER = 300, WORKING_AFTER = 2000;
+const busyBar = document.getElementById("tau-busy-bar"), working = document.getElementById("tau-working");
+let pingAt = 0, pingId = 0;
+function setBusy(late) {
+	const busy = late > BUSY_AFTER;
+	state.busy = busy;
+	if (busyBar.hidden === busy) busyBar.hidden = !busy;
+	document.body.classList.toggle("tau-busy", busy);
+	working.hidden = late <= WORKING_AFTER;
+}
+setInterval(() => {
+	if (!state.started || failed || leaving) { setBusy(0); return; }
+	const now = performance.now();
+	if (pingAt) { setBusy(now - pingAt); return; }
+	if (document.hidden) return;
+	pingAt = now;
+	worker.postMessage({ t: "ping", id: ++pingId });
+}, 150);
+
 worker.onmessage = event => {
 	const m = event.data;
+	if (m.t === "pong") { if (m.id === pingId) { pingAt = 0; setBusy(0); } return; }
 	if (chrome.handle(m)) return;
 	switch (m.t) {
 	case "status":

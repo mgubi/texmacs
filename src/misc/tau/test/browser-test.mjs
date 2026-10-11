@@ -72,12 +72,13 @@ class Page {
 			window.sent = []; window.got = [];
 			tau.worker.addEventListener("message", e => {
 				const m = e.data;
+				if (m.t === "pong") return;
 				if (m.t === "log") { if (/[Ee]rror/.test(m.text)) window.got.push({ t: "error", text: m.text }); }
 				else if (m.t === "paint") window.got.push({ t: "paint", view: m.view, w: m.w, h: m.h, width: m.width, height: m.height });
 				else window.got.push({ t: m.t, part: m.part, view: m.view, visible: m.visible, name: m.name, text: m.text, width: m.width, height: m.height });
 			});
 			tau.worker.postMessage = new Proxy(tau.worker.postMessage, {
-				apply(target, self, a) { window.sent.push(a[0]); return Reflect.apply(target, self, a); }
+				apply(target, self, a) { if (a[0].t !== "ping") window.sent.push(a[0]); return Reflect.apply(target, self, a); }
 			});
 		});
 		await this.until("the bars come", () => this.count("#tau-menu .tau-entry").then(n => n >= 8), 30000);
@@ -743,6 +744,26 @@ test("dropped on a view, given in the address", async p => {
 	await p.key("Escape");
 	await p.open("file=/etc/passwd");
 	check("another path is refused", (await p.page.$$eval(".tau-notice", l => l.map(e => e.textContent).join())).includes("No document /etc/passwd"));
+});
+
+test("busy", async p => {
+	await p.open();
+	await p.newDocument();
+	const shown = () => p.page.evaluate(() => ({ bar: !document.getElementById("tau-busy-bar").hidden, cursor: document.body.classList.contains("tau-busy"),
+		word: !document.getElementById("tau-working").hidden, busy: tau.state.busy }));
+	await sleep(700);
+	let b = await shown();
+	check("nothing is shown while the core answers", !b.bar && !b.cursor && !b.word, b);
+	// the core works for three seconds
+	await p.scheme("(with t (texmacs-time) (while (< (- (texmacs-time) t) 3000) (noop)))");
+	await p.until("the bar and the cursor show that it works", async () => { const b = await shown(); return b.bar && b.cursor && b.busy; }, 2500);
+	check("not yet the word in the footer", !(await shown()).word);
+	// (what is typed meanwhile waits)
+	await p.type("Late.");
+	await p.until("after a while, the word in the footer", async () => (await shown()).word, 3000);
+	await p.until("all of it goes when the core answers again", async () => { const b = await shown(); return !b.bar && !b.cursor && !b.word && !b.busy; }, 6000);
+	await p.until("what was typed meanwhile is in the document", async () => (await p.tabs())[0].some(t => t.current && t.name.endsWith("•")));
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
 test("kept in the browser", async p => {

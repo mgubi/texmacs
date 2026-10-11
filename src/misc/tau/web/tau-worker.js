@@ -288,6 +288,8 @@ async function fsRequest(m) {
 }
 
 onmessage = event => {
+	// (the page asks whether the worker is there: it is, when it answers)
+	if (event.data.t === "ping") { postMessage({ t: "pong", id: event.data.id }); return; }
 	if (!core) { waiting.push(event.data); return; }
 	if (frozen) return;
 	try { handle(event.data); }

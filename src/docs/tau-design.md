@@ -1040,6 +1040,25 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
 - `make safari-check` also goes through the panel (a file added, a zip
   and a backup, a save). The texts of the panel are not translated.
 
+### When the core is busy
+
+- The core works in the worker, which answers nothing meanwhile (a
+  document is loaded, a long one typeset, a file of TeXmacs fetched);
+  the page stays responsive and says so. It asks the worker a few times
+  a second whether it is there (`ping`, answered `pong` by the script of
+  the worker, before the core): an answer which is more than 300 ms late
+  is the core at work. Then a thin bar runs along the top of the page
+  and the views have the cursor of progress; after 2 s the footer says
+  "Working…". The answer ends all of it. This needs nothing of the core
+  and sees every kind of work, also the one which no message of the
+  page started.
+- What is typed meanwhile waits in the queue of the worker and is
+  applied after. The work cannot be stopped from the page (a program in
+  WebAssembly is not interrupted), and how far it is cannot be told: the
+  core would have to post that from inside its loops.
+- Nothing is asked while the page is hidden, nor shown once the program
+  stopped.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:
