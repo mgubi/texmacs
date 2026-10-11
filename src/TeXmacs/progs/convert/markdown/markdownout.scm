@@ -40,12 +40,11 @@
 
 (define (mdout-split s)
   ;; the lines of a string
-  (let loop ((i 0) (start 0) (acc '()))
-    (cond ((>= i (string-length s))
-           (reverse (cons (substring s start i) acc)))
-          ((char=? (string-ref s i) #\newline)
-           (loop (+ i 1) (+ i 1) (cons (substring s start i) acc)))
-          (else (loop (+ i 1) start acc)))))
+  (let loop ((start 0) (acc '()))
+    (with i (string-search-forwards "\n" start s)
+      (if (< i 0)
+          (reverse (cons (substring s start (string-length s)) acc))
+          (loop (+ i 1) (cons (substring s start i) acc))))))
 
 (define (mdout-width s)
   ;; the number of characters of a string in UTF-8
@@ -71,43 +70,56 @@
 ;; Only the characters which would be taken for markup are escaped: a text
 ;; with a backslash before each punctuation is hard to read.
 
+(define mdout-special
+  ;; the characters which may have to be escaped, as a table: most
+  ;; characters of a text are passed with one look at it
+  (with v (make-vector 256 #f)
+    (for-each (lambda (c) (vector-set! v (char->integer c) #t))
+              (string->list "\\`$*[]_<&~|"))
+    v))
+
+(define (mdout-escape? s i n cell?)
+  ;; is the special character at i taken for markup?
+  (let* ((c (string-ref s i))
+         (prev (and (> i 0) (string-ref s (- i 1))))
+         (next (and (< (+ i 1) n) (string-ref s (+ i 1)))))
+    (cond ((in? c '(#\\ #\` #\$)) #t)
+          ;; between spaces, * is not emphasis
+          ((char=? c #\*)
+           (not (and prev next (char=? prev #\space) (char=? next #\space))))
+          ;; brackets make nothing without what follows them: a link, a
+          ;; footnote, a task
+          ((char=? c #\[)
+           (and next
+                (or (char=? next #\^)
+                    (and (in? next '(#\space #\x #\X))
+                         (< (+ i 2) n)
+                         (char=? (string-ref s (+ i 2)) #\])))))
+          ((char=? c #\])
+           (and next (in? next '(#\( #\:))))
+          ;; inside a word, _ is not emphasis
+          ((char=? c #\_)
+           (not (and prev next (mdout-alnum? prev) (mdout-alnum? next))))
+          ((char=? c #\<)
+           (and next (or (char-alphabetic? next) (in? next '(#\/ #\! #\?)))))
+          ((char=? c #\&)
+           (and next (or (char-alphabetic? next) (char=? next #\#))))
+          ((char=? c #\~) (and next (char=? next #\~)))
+          ((char=? c #\|) cell?)
+          (else #f))))
+
 (define (mdout-escape s cell?)
+  ;; the text between two escaped characters is copied in one piece
   (let ((n (string-length s)))
-    (let loop ((i 0) (acc '()))
-      (if (>= i n) (apply string-append (reverse acc))
-          (let* ((c (string-ref s i))
-                 (prev (and (> i 0) (string-ref s (- i 1))))
-                 (next (and (< (+ i 1) n) (string-ref s (+ i 1))))
-                 (esc? (cond ((in? c '(#\\ #\` #\$)) #t)
-                             ;; between spaces, * is not emphasis
-                             ((char=? c #\*)
-                              (not (and prev next (char=? prev #\space)
-                                        (char=? next #\space))))
-                             ;; brackets make nothing without what follows
-                             ;; them: a link, a footnote, a task
-                             ((char=? c #\[)
-                              (and next
-                                   (or (char=? next #\^)
-                                       (and (in? next '(#\space #\x #\X))
-                                            (< (+ i 2) n)
-                                            (char=? (string-ref s (+ i 2)) #\])))))
-                             ((char=? c #\])
-                              (and next (in? next '(#\( #\:))))
-                             ;; inside a word, _ is not emphasis
-                             ((char=? c #\_)
-                              (not (and prev next (mdout-alnum? prev)
-                                        (mdout-alnum? next))))
-                             ((char=? c #\<)
-                              (and next (or (char-alphabetic? next)
-                                            (in? next '(#\/ #\! #\?)))))
-                             ((char=? c #\&)
-                              (and next (or (char-alphabetic? next)
-                                            (char=? next #\#))))
-                             ((char=? c #\~) (and next (char=? next #\~)))
-                             ((char=? c #\|) cell?)
-                             (else #f))))
-            (loop (+ i 1)
-                  (cons (if esc? (string #\\ c) (string c)) acc)))))))
+    (let loop ((i 0) (start 0) (acc '()))
+      (cond ((>= i n)
+             (if (null? acc) s
+                 (apply string-append
+                        (reverse (cons (substring s start n) acc)))))
+            ((and (vector-ref mdout-special (char->integer (string-ref s i)))
+                  (mdout-escape? s i n cell?))
+             (loop (+ i 1) i (cons* "\\" (substring s start i) acc)))
+            (else (loop (+ i 1) start acc))))))
 
 (define (mdout-escape-start s)
   ;; a line of a paragraph, which must not start as another block
