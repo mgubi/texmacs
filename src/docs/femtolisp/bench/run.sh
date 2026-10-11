@@ -4,6 +4,10 @@
 # home, under $BENCH_OUT). Usage, from any directory:
 #   TEXMACS_TREE=<src>/TeXmacs BUILDS="femto:<dir1> s7:<dir2> guile:<dir3>" \
 #     sh docs/femtolisp/bench/run.sh boot suites latex conversions marshal manual ui
+# The workloads csl, csl-suites, converters and converter-suites (see
+# ../11-benchmarks-csl-converters.md) need a tree with the CSL processor and
+# the Markdown and office converters; csl reads its data from $BENCH_CSL
+# (see csl.scm).
 # One line per run, RUN build workload round real=<s> rss=<MB>, followed by
 # the lines which the script prints with its own timings. The first run of a
 # build in a new home also builds the font caches: run each workload once to
@@ -36,6 +40,10 @@ for w in "$@"; do
     marshal)     rounds=1; expr="(load \"$BENCH/marshal.scm\")" ;;
     manual)      rounds=3; QUIT=; expr="(load \"$BENCH/manual.scm\")" ;;
     ui)          rounds=3; QUIT=; expr="(load \"$HERE/ui.scm\")" ;;
+    csl)         rounds=3; expr="(load \"$HERE/csl.scm\")" ;;
+    csl-suites)  rounds=3; expr="(load \"$HERE/csl-suites.scm\")" ;;
+    converters)  rounds=3; expr="(load \"$HERE/converters.scm\")" ;;
+    converter-suites) rounds=3; expr="(load \"$HERE/converter-suites.scm\")" ;;
   esac
   r=1
   while [ $r -le $rounds ]; do

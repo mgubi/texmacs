@@ -17,7 +17,8 @@ how it works, what differs from Guile, how it performs, and what is left.
 | [08-lazy-bodies.md](08-lazy-bodies.md) | function bodies expanded and compiled at their first call |
 | [09-browser.md](09-browser.md) | femtolisp in the browser build (`SCHEME=femtolisp`) |
 | [10-benchmarks.md](10-benchmarks.md) | the benchmarks of 2026-10-07: where the time goes, the heap, the caches, what was kept; the size of the code against S7 |
-| [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds |
+| [11-benchmarks-csl-converters.md](11-benchmarks-csl-converters.md) | the benchmarks of 2026-10-10: femtolisp, S7 and Guile on the CSL processor and on the Markdown, Word and OpenDocument converters |
+| [bench/](bench) | The script which runs the benchmarks of `docs/s7/bench` on several builds, and the workloads of 10 and 11 |
 
 The documentation for the developers who maintain the interpreter is with
 the developer documentation of TeXmacs:
