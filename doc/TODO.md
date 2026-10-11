@@ -36,6 +36,22 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
   proposed for `wip_fixes` (PRs #323 to #326): the same changes, which
   merge without conflict. The rename dialog (#318) was tried in Vue only.
 
+- **S7 raises `car: argument is a free cell` now and then in long runs**
+  (found on 2026-10-09 with the fixtures of the CSL test suite, 845 styles
+  processed in one process; also seen in the benchmark of the converters).
+  Four errors in each run with `(*s7* 'cache-macro-expansions?)` on, as
+  TeXmacs runs S7 (the local patch 0005), rarely with it off; never with
+  Guile or femtolisp, which give the same results on the same code. A pair
+  seems to be collected while it is in use. Not investigated. To reproduce:
+  `csl-run-fixtures` of `(csl csl-fixtures)`, see `doc/csl-design.md`.
+- **CSL: the LaTeX export does not know the citations of the style.** A
+  document with a `csl-` style exports its bibliography as it is rendered
+  and its citations as `\cite{key}`, so LaTeX prints the labels of TeXmacs
+  instead of "(Knuth, 1984)" or of the footnotes. The other open points of
+  the CSL processor (the later forms of citations which are evaluated
+  without being typeset, the rules of `subsequent-author-substitute` which
+  work name by name, names in other scripts) are in `doc/csl-design.md`.
+
 ## Kept on purpose
 
 - `smart_font_rep::adjusted_dpi` in `src/src/Graphics/Fonts/smart_font.cpp`
@@ -51,3 +67,6 @@ no headless mode. The Widkit duplicates are fixed on `wip_other_guis` too.
 - Fix the toggle bugs found in `src/TeXmacs/progs/utils/misc/gui-utils.scm`
   and in the style package `src/TeXmacs/packages/new-gui/gui-button.ts`
   (GUI through markup).
+- CSL: download a style by its name from the repository of styles, attach
+  the style to the document so that it travels with it, and read CSL-JSON
+  from Zotero for the fields which BibTeX does not have (`doc/csl-design.md`).

@@ -26,7 +26,7 @@
 
   <assign|cite-raw|<xmacro|keys|<cite-sort|<map-args|cite-arg|tuple|keys>>>>
 
-  <assign|cite|<xmacro|keys|<render-cite|<cite-sort|<map-args|cite-arg|tuple|keys>>>>>
+  <assign|cite|<xmacro|keys|<cite-csl|p|<map-args|cite-csl-key|merge|keys>|<map-args|cite-csl-id|tuple|keys>|<map-args|nocite-arg|concat|keys>|<render-cite|<cite-sort|<map-args|cite-arg|tuple|keys>>>>>>
 </body>
 
 <initial|<\collection>
