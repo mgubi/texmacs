@@ -286,6 +286,30 @@ export async function makeBackup() {
 	files.unshift({ rel: BACKUP_NOTE, time: Date.now(), bytes: new TextEncoder().encode(JSON.stringify(note, null, 1)) });
 	return { blob: await zip(files), files: note.files, bytes };
 }
+// the backup, saved on the computer
+export function backup() {
+	return makeBackup().then(b => {
+		download(backupName(), b.blob);
+		toast("Backup: " + b.files + " files, " + humanSize(b.blob.size) + ". Documents which are not saved are not in it.");
+		return b;
+	}, error => toast("The backup could not be made: " + error.message));
+}
+// a backup is chosen on the computer and restored, in the panel (which asks first)
+export function restore() {
+	const input = el("input");
+	input.type = "file";
+	input.accept = ".zip,application/zip";
+	// (off the page rather than hidden, which some browsers open no chooser for)
+	input.style.cssText = "position:fixed;left:-1000px;top:0;opacity:0";
+	input.addEventListener("change", () => {
+		const file = input.files && input.files[0];
+		input.remove();
+		if (!file) return;
+		file.arrayBuffer().then(buffer => restoreBackup(new Uint8Array(buffer))).catch(error => toast("Not restored: " + error.message));
+	});
+	document.body.append(input);
+	input.click();
+}
 // the bytes of a backup -> { note, entries: [{ rel (in the home), bytes, time }] };
 // an error when they are not a backup
 export async function readBackup(bytes) {
@@ -399,7 +423,7 @@ function panel(mode, opts, done) {
 
 	// A question in the panel: a line with a field (value is a string) or
 	// without one (a confirmation). The promise: the text, true, or null
-	function ask(text, value, yes) {
+	function ask(text, value, yes, other) {
 		if (asking) asking(null);
 		return new Promise(resolve => {
 			question.textContent = "";
@@ -418,7 +442,10 @@ function panel(mode, opts, done) {
 			ok.classList.add("tau-files-yes");
 			question.append(el("span", "tau-files-question", text));
 			if (input) { input.type = "text"; input.spellcheck = false; input.value = value; question.append(input); }
-			question.append(cancel, ok);
+			question.append(cancel);
+			// (another answer than yes: its name is what is answered)
+			if (other) { const b = button(other, () => finish(other)); b.dataset.what = "other"; question.append(b); }
+			question.append(ok);
 			if (input) { input.focus(); input.select(); } else ok.focus();
 		});
 	}
@@ -584,12 +611,7 @@ function panel(mode, opts, done) {
 		// the backup of all of it (the home directory): not in the dialogs to
 		// open and to save, which a restore, starting the page again, would
 		// not end well
-		const b1 = button("Save a backup", () => {
-			makeBackup().then(b => {
-				download(backupName(), b.blob);
-				toast("Backup: " + b.files + " files, " + humanSize(b.blob.size) + ". Documents which are not saved are not in it.");
-			}, error => toast("The backup could not be made: " + error.message));
-		}, "Save a zip of all your files and of your TeXmacs folder on your computer");
+		const b1 = button("Save a backup", () => backup(), "Save a zip of all your files and of your TeXmacs folder on your computer");
 		b1.dataset.what = "backup";
 		const b2 = chooser("restore", "Restore a backup…", { accept: ".zip,application/zip" }, fs => {
 			if (fs[0]) fs[0].arrayBuffer().then(buffer => restore(new Uint8Array(buffer))).catch(error => toast("Not restored: " + error.message));
@@ -604,26 +626,29 @@ function panel(mode, opts, done) {
 		foot.append(button("Cancel", () => close(null)), ok);
 	}
 
-	// The files of a backup are written over those of the home directory (a
-	// file which the backup has not stays), and Tau starts again with them
+	// The files of a backup are written over those of the home directory:
+	// merged with what is there (a file which the backup has not stays) or
+	// in place of it, an exact copy of the backup. Tau starts again with them
 	async function restore(bytes) {
 		const b = await readBackup(bytes);
 		const docs = b.entries.filter(e => !e.rel.startsWith(".TeXmacs/")).length;
 		const size = b.entries.reduce((n, e) => n + e.bytes.length, 0);
 		const when = String(b.note.made || "").replace("T", " ").slice(0, 16);
-		const yes = await ask("Restore the backup made " + when + " (" + docs + " of your files, " + (b.entries.length - docs) +
-			" files of preferences and settings, " + humanSize(size) + ")? Its files replace those of the same name kept in " +
-			"this browser, your preferences included. Documents which are not saved are lost: Tau then starts again.",
-			undefined, "Restore");
-		if (!yes) return;
+		const answer = await ask("Restore the backup made " + when + " (" + docs + " of your files, " + (b.entries.length - docs) +
+			" files of preferences and settings, " + humanSize(size) + ")? \"Restore\" writes its files over those of the same name " +
+			"and keeps the others; \"Replace everything\" first deletes all that is kept in this browser, for an exact copy of the backup. " +
+			"Documents which are not saved are lost: Tau then starts again.",
+			undefined, "Restore", "Replace everything");
+		if (!answer) return;
 		const files = b.entries.map(e => ({ rel: e.rel, bytes: e.bytes.slice().buffer, time: e.time }));
-		await request("restore", { files }, files.map(f => f.bytes));
+		await request("restore", { files, exact: answer !== true }, files.map(f => f.bytes));
 		options.reload();
 	}
 
 	veil.addEventListener("dragover", event => { event.preventDefault(); event.stopPropagation(); });
 	veil.addEventListener("drop", event => {
 		event.preventDefault(); event.stopPropagation();
+		if (!event.dataTransfer) return;
 		if (under(dir, SYS)) { toast("The files of TeXmacs cannot be changed: drop in one of your folders"); return; }
 		dropped(event.dataTransfer).then(items => importFiles(dir, items)).then(added, failed);
 	});
@@ -631,7 +656,7 @@ function panel(mode, opts, done) {
 	for (const t of ["keydown", "keypress", "keyup"]) document.addEventListener(t, onkey, true);
 	document.addEventListener("focusin", onfocus, true);
 	document.body.append(veil);
-	const me = { close, restore };
+	const me = { close, restore, mode };
 	current = me;
 	render();
 	if (nameInput) {
@@ -663,6 +688,43 @@ export function choose(m) {
 	panel(m.mode, m, path => options.chosen(m.ticket, path || ""));
 }
 
+// Files and folders which are dropped on a view: copied into ~/Documents,
+// keeping their structure (a name which is taken gets another one, rather
+// than overwriting). The documents are opened; images, when no document
+// came with them, are inserted where they fell (insert (paths)); a folder
+// is shown in the panel, and its document is opened when it has one.
+const DOC_SUFFIXES = ["tm", "tmml", "ts", "tp", "stm", "tex", "html", "htm", "md", "bib", "scm", "txt"];
+export async function dropOnView(dataTransfer, insert) {
+	const items = await dropped(dataTransfer);
+	if (items.length === 0) return;
+	const there = (await options.request("list", { dir: DOCS })).entries.map(e => e.name);
+	const renamed = {};
+	for (const item of items) {
+		const parts = item.rel.split("/");
+		if (!(parts[0] in renamed)) { renamed[parts[0]] = fresh(there, safe(parts[0])); there.push(renamed[parts[0]]); }
+		parts[0] = renamed[parts[0]];
+		item.rel = parts.join("/");
+	}
+	await importFiles(DOCS, items);
+	const names = Object.values(renamed), tops = (await options.request("list", { dir: DOCS })).entries.filter(e => names.includes(e.name));
+	const docs = tops.filter(e => !e.dir && DOC_SUFFIXES.includes(suffix(e.name)));
+	const images = tops.filter(e => !e.dir && IMAGES.includes(suffix(e.name)));
+	const folders = tops.filter(e => e.dir);
+	for (const e of docs) options.open(e.path);
+	if (images.length > 0 && docs.length === 0) insert(images.map(e => e.path));
+	for (const f of folders) {
+		const mains = (await options.request("list", { dir: f.path })).entries.filter(e => !e.dir && suffix(e.name) === "tm");
+		if (mains.length === 1) options.open(mains[0].path);
+	}
+	if (folders.length > 0) browse(folders[0].path);
+	// (what is neither a document nor an image, nor in a folder, is only kept)
+	if (folders.length > 0 || tops.length > docs.length + images.length || Object.keys(renamed).some(n => renamed[n] !== safe(n)))
+		toast("Copied to Documents: " + names.join(", "));
+}
+
 export const isOpen = () => !!current;
-// (for the tests: a restore of bytes, in the panel which is open)
-export function restoreBackup(bytes) { return current.restore(bytes); }
+// a restore of bytes, in the panel to browse, which is opened if it is not
+export function restoreBackup(bytes) {
+	if (!current || current.mode !== "browse") browse();
+	return current.restore(bytes);
+}

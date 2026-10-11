@@ -838,9 +838,9 @@ same way. `?trace-scroll` logs where the editor asks its views to scroll.
   (`stopped`), which covers the views with what happened and a button to
   start again, where it went on taking keys for nothing.
 
-Known: after "Save as" of a document which was saved before, its tab
-stays marked as changed though the file is written; it does not happen
-when `save-buffer-as` is called without the dialog, and was not found.
+(After "Save as" of a document which was saved before with the key, its
+tab stayed marked as changed though the file was written: found and
+fixed later, see "The files in the browser".)
 
 **Drawing, scrolling and pasting** (2026-10-09).
 
@@ -999,18 +999,46 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   The zip files are made and read in the page, with the compression
   streams of the browser.
 - **Backup**: the whole home directory but the temporary files and the
-  caches, in a zip with a note (`tau-backup.json`). Restoring writes its
-  files over those which are kept, in the page which keeps the home
-  directory only; the worker then does nothing more (the core would
-  save its preferences over the restored ones), writes the home
-  directory to the browser, and the page starts again.
+  caches (the documents, and `~/.TeXmacs` with the preferences and what
+  the user added), in a zip with a note (`tau-backup.json`: format,
+  date, address of the page, number and size of the files); the entries
+  keep the times of the files. Restoring takes such a zip (one without
+  the note is refused, an entry whose path would leave the home
+  directory is skipped) and asks, showing its date and contents, with
+  two answers: "Restore" writes its files over those of the same name
+  and keeps the others; "Replace everything" first deletes all that is
+  kept, for an exact copy of the backup (the browser build of
+  `maxs_texmacs` asks for a Reset before, for that). Only the page which
+  keeps the home directory restores; the worker then does nothing more
+  (the core would save its preferences over the restored ones), writes
+  the home directory to the browser, and the page starts again. Both
+  are in the panel and in the menu of the icon of Tau.
 - While the panel is open the keys do not reach the core, and the
   keyboard goes back to the view when it closes. Its questions (a name,
   a confirmation) are a line of the panel, not dialogs of the browser.
-- Not done, which the browser build of `maxs_texmacs` has: files which
-  are dropped on the page as a whole (a folder, an image inserted where
-  it falls), a document given in the address of the page (`?open=`,
-  `?file=`). The texts of the panel are not translated.
+- **What is dropped on a view** (files, folders with what they hold) is
+  copied to `~/Documents` under names which are free, never over a file
+  which is there. Documents are opened; images, when no document came
+  with them, are inserted where they fell (`drop` to the worker,
+  `tau_drop`, which gives the editor an `image` for each as a drop of
+  TeXmacs does); a folder is shown in the panel and its document opened
+  when it has one.
+- **The address of the page** opens a document once the core is ready:
+  `?file=<path>` one which is kept or a file of TeXmacs (a path under
+  `/home/tau` or `/texmacs`, nothing else), `?open=<address>` one of
+  the web, which the page fetches (the other site has to allow it) and
+  the worker puts in `/tmp/web`, not among the documents of the user.
+  The address runs nothing (the `?x=` of the browser build is not
+  there).
+- **A document which was saved looked modified** after "Save as" when
+  the first save was made with its key: the shortcut leaves a marker in
+  the history of the changes, the save point was recorded with it, and
+  when the marker went and the last two entries were joined
+  (`archiver_rep::simplify`) the depth changed under the save point.
+  The save point at the top of the history now follows the join. This
+  is the code of TeXmacs, not of Tau.
+- `make safari-check` also goes through the panel (a file added, a zip
+  and a backup, a save). The texts of the panel are not translated.
 
 ## Order of the work
 

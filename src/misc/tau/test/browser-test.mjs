@@ -539,11 +539,7 @@ test("tabs and files", async p => {
 	await p.forget();
 	await p.filesName("other.tm");
 	await p.key("Enter");
-	// (the tab is still marked as changed after this, which it should not
-	// be: the core says so when the name is asked in a dialog after an
-	// earlier save, and not when save-buffer-as is called by itself. Not
-	// found yet; the file is written.)
-	await p.until("the document has the new name", async () => (await p.tabs())[0].some(t => t.current && t.name.startsWith("other.tm")));
+	await p.until("the document has the new name, and is not marked as changed", async () => (await p.tabs())[0].some(t => t.current && t.name === "other.tm"));
 	check("the panel is gone", (await p.count(".tau-files")) === 0);
 	// a name which is taken: asked first
 	await p.choose("File", "Save as");
@@ -556,7 +552,7 @@ test("tabs and files", async p => {
 	await p.filesPanel("save", f => !f.asking);
 	await p.key("Escape");
 	await p.until("the panel is given up", async () => (await p.count(".tau-files")) === 0);
-	check("the document keeps its name", (await p.tabs())[0].some(t => t.current && t.name.startsWith("other.tm")));
+	check("the document keeps its name", (await p.tabs())[0].some(t => t.current && t.name === "other.tm"));
 	// load: the documents which are kept are offered
 	await p.choose("File", "Load");
 	f = await p.filesPanel("open");
@@ -634,6 +630,28 @@ test("files in the browser", async p => {
 	});
 	check("a zip is read back", back.names === "d/one.txt,two" && back.same && back.small, back);
 	check("the backup has the files of the user", back.backup.includes("Documents/proj/b.tm") && back.application === "Tau", back);
+	// what is not a backup is refused, and a backup cannot write outside the home directory
+	const bad = await p.page.evaluate(async () => {
+		const enc = new TextEncoder(), bytes = async files => new Uint8Array(await (await tau.files.zip(files)).arrayBuffer());
+		let refused = "";
+		try { await tau.files.readBackup(await bytes([{ rel: "home/Documents/x.tm", bytes: enc.encode("x") }])); } catch (error) { refused = error.message; }
+		const note = { rel: "tau-backup.json", bytes: enc.encode(JSON.stringify({ format: 1, application: "Tau" })) };
+		const r = await tau.files.readBackup(await bytes([note, { rel: "home/../../etc/x", bytes: enc.encode("x") }, { rel: "home/Documents/ok.tm", bytes: enc.encode("x") }, { rel: "elsewhere/y", bytes: enc.encode("y") }]));
+		return { refused, kept: r.entries.map(e => e.rel).join() };
+	});
+	check("a zip which is not a backup is refused", bad.refused.includes("not a backup"), bad);
+	check("only the paths inside the home directory are restored", bad.kept === "Documents/ok.tm", bad);
+	// (a page which does not keep its files does not restore)
+	const no = await p.page.evaluate(() => tau.files.makeBackup().then(async b => {
+		const r = await tau.files.readBackup(new Uint8Array(await b.blob.arrayBuffer()));
+		const files = r.entries.map(e => ({ rel: e.rel, bytes: e.bytes.slice().buffer, time: e.time }));
+		return new Promise(resolve => {
+			const id = 987654, on = e => { if (e.data.t === "fs" && e.data.id === id) { tau.worker.removeEventListener("message", on); resolve(e.data.error || "restored"); } };
+			tau.worker.addEventListener("message", on);
+			tau.worker.postMessage({ t: "fs", id, op: "restore", files });
+		});
+	}));
+	check("no restore in a page which keeps nothing", no.includes("does not keep the files"), no);
 	// a zip which is added is unpacked
 	await p.page.evaluate(async () => {
 		const blob = await tau.files.zip([{ rel: "notes/x.txt", bytes: new TextEncoder().encode("x") }]);
@@ -686,6 +704,47 @@ test("files in the browser", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("dropped on a view, given in the address", async p => {
+	await p.open();
+	await p.newDocument();
+	const drop = files => p.page.evaluate(files => {
+		const data = new DataTransfer();
+		for (const [name, text] of files) data.items.add(new File([text], name));
+		const canvas = document.querySelector(".tau-pane .tau-canvas"), r = canvas.getBoundingClientRect();
+		canvas.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + 120 }));
+	}, files);
+	const doc = "<TeXmacs|2.1.5>\n\n<style|generic>\n\n<\\body>\n  Dropped.\n</body>\n";
+	// a document is kept and opened; a second one of the same name does not replace it
+	await drop([["note.tm", doc]]);
+	await p.until("the document is a tab", async () => (await p.tabs())[0].some(t => t.current && t.name === "note.tm"));
+	await drop([["note.tm", doc]]);
+	await p.until("the second one has a name of its own", async () => (await p.tabs())[0].some(t => t.current && t.name === "note 2.tm"));
+	// an image is kept too, and inserted in the document
+	await p.forget();
+	await drop([["dot.svg", "<svg xmlns='http://www.w3.org/2000/svg' width='40' height='30'><circle cx='20' cy='15' r='10'/></svg>"]]);
+	await p.until("the image goes to the editor", async () => (await p.sent("drop")).some(m => m.paths.join() === "/home/tau/Documents/dot.svg"));
+	await p.until("the document is changed", async () => (await p.tabs())[0].some(t => t.current && t.name === "note 2.tm •"));
+	check("no tab for the image", !(await p.tabs())[0].some(t => t.name.startsWith("dot")));
+	await p.page.evaluate(() => tau.files.browse());
+	const f = await p.filesPanel("browse");
+	check("what was dropped is among the documents", f.names.join() === "dot.svg,note 2.tm,note.tm", f);
+	await p.key("Escape");
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+	// (saved, so that the page can be left without a question)
+	await p.key("s", MOD);
+	await p.until("the document is saved", async () => (await p.tabs())[0].some(t => t.current && t.name === "note 2.tm"));
+	// the address of the page: a document of the web, and a file of TeXmacs
+	await p.open("open=index.html&file=/texmacs/doc/about/welcome/new-welcome.en.tm");
+	await p.until("the document of the web is a tab", async () => (await p.tabs())[0].some(t => t.name.startsWith("index.html")), 20000);
+	await p.until("the file of TeXmacs is a tab", async () => (await p.tabs())[0].filter(t => /Welcome|new-welcome/.test(t.name)).length >= 1, 20000);
+	await p.page.evaluate(() => tau.files.browse());
+	const g = await p.filesPanel("browse");
+	check("a document of the web is not among those of the user", g.names.length === 0, g);
+	await p.key("Escape");
+	await p.open("file=/etc/passwd");
+	check("another path is refused", (await p.page.$$eval(".tau-notice", l => l.map(e => e.textContent).join())).includes("No document /etc/passwd"));
+});
+
 test("kept in the browser", async p => {
 	await p.open("home");
 	check("this page keeps the home directory", (await p.count(".tau-notice")) === 0);
@@ -730,6 +789,29 @@ test("kept in the browser", async p => {
 	await p.page.evaluate(() => tau.files.browse());
 	f = await p.filesPanel("browse");
 	check("the document is back", f.names.includes(name), f);
+	// an exact copy of a backup: what the backup has not goes
+	await p.page.evaluate(async () => { window.backup = new Uint8Array(await (await tau.files.makeBackup()).blob.arrayBuffer()); });
+	await p.filesDrop([["extra.txt", "not in the backup"]]);
+	await p.filesPanel("browse", f => f.names.includes("extra.txt"));
+	await p.key("Escape");
+	await p.until("the panel is closed", async () => (await p.count(".tau-files")) === 0);
+	await p.page.evaluate(() => { window.before = true; tau.files.restoreBackup(window.backup); });
+	f = await p.filesPanel("browse", f => f.asking.startsWith("Restore the backup"));
+	check("the two ways to restore", f.asking.includes("Replace everything"), f);
+	await p.page.click('.tau-files-ask [data-what="other"]');
+	await p.until("the page starts again", () => p.page.evaluate(() => !window.before && !!(window.tau && tau.state.started)), 90000);
+	await p.until("the bars come", () => p.count("#tau-menu .tau-entry").then(n => n >= 8), 30000);
+	await p.page.evaluate(() => tau.files.browse());
+	f = await p.filesPanel("browse");
+	check("the document is there, and what the backup had not is gone", f.names.includes(name) && !f.names.includes("extra.txt"), f);
+	// the menu of the icon has the backup
+	await p.key("Escape");
+	await p.page.click("#tau-app");
+	check("the backup in the menu of Tau", (await p.page.$$eval(".tau-app-menu .tau-entry", l => l.map(e => e.textContent).join("|"))).includes("Save a backup|Restore a backup"));
+	await p.find(".tau-app-menu .tau-entry", "Save a backup").then(h => h.click());
+	await p.until("a backup is given to the user", () => p.page.evaluate(() => tau.state.downloads.some(d => /^tau-backup-\d{4}-\d\d-\d\d\.zip$/.test(d.name) && d.size > 200)));
+	await p.page.evaluate(() => tau.files.browse());
+	f = await p.filesPanel("browse");
 	await p.filesRow(name, "delete");
 	await p.filesPanel("browse", f => f.asking.startsWith("Delete " + name));
 	await p.page.click(".tau-files-ask .tau-files-yes");

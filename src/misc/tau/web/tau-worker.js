@@ -97,10 +97,17 @@ function handle(m) {
 	case "paste":
 		core.ccall("tau_paste", null, ["number", "string", "string"], [m.view, m.text || "", m.html || ""]);
 		break;
+	case "drop":
+		// images which were dropped on a view, and are files now
+		core.ccall("tau_drop", null, ["number", "number", "number", "string"], [m.view, m.x, m.y, m.paths.join("\n")]);
+		break;
 	case "open": {
-		// a file of the user: its bytes are put in the file system of the
-		// core, which is told where
-		const path = USER + "/" + m.name.replace(/[\/\\]/g, "_");
+		// a file for the core, with its bytes: they are put in its file
+		// system (among the documents of the user or, for a document which
+		// is only looked at, aside) and the core is told where
+		const dir = m.temp ? "/tmp/web" : USER;
+		core.FS.mkdirTree(dir);
+		const path = dir + "/" + m.name.replace(/[\/\\]/g, "_");
 		core.FS.writeFile(path, new Uint8Array(m.bytes));
 		core.ccall("tau_file", null, ["number", "string"], [m.ticket || 0, path]);
 		break;
@@ -262,10 +269,13 @@ async function fsRequest(m) {
 		return fsBytes(fsWalk(HOME, "", []).filter(f => !BACKUP_SKIP.some(s => f.rel.startsWith(s))));
 	case "restore": {
 		// The files of a backup are written over those of the home
-		// directory, and kept; the core does nothing more (it would save
-		// its preferences over the restored ones) and the page starts again
+		// directory (or in place of all of them), and kept; the core does
+		// nothing more (it would save its preferences over the restored
+		// ones) and the page starts again
 		if (!core.tauHomeKept) throw new Error("this page does not keep the files: restore the backup in the page of Tau which does");
 		frozen = true;
+		// (an exact copy: what the backup has not goes first)
+		if (m.exact) for (const e of fsList(HOME)) fsRemove(e.path);
 		for (const f of m.files) {
 			if (BACKUP_SKIP.some(s => f.rel.startsWith(s))) continue;
 			fsWrite(fsWritable(HOME + "/" + f.rel), f.bytes, f.time);

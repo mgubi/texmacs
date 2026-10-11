@@ -141,6 +141,9 @@ function openMenu(button, options) {
 		"?trace-keys (the keys in the console), ?arg=… (an option of TeXmacs).");
 	sep();
 	item("Files in this browser…", () => options.files());
+	item("Save a backup", () => options.backup());
+	item("Restore a backup…", () => options.restore());
+	sep();
 	item("Start Tau again", () => options.reload());
 	item("Forget everything kept in this browser…", () => {
 		if (!confirm("Delete the documents and the preferences which Tau keeps in this browser?")) return;

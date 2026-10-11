@@ -405,6 +405,12 @@ archiver_rep::simplify () {
         //show_all ();
         //cout << "\n";
         if (depth == last_autosave + 1) last_autosave= -1;
+        // the state which was saved is the one at the top: it stays there
+        // (a document saved after a pending shortcut, whose marker is taken
+        // away later, was held to be modified when its last two entries
+        // were joined)
+        if (depth == last_save) last_save--;
+        if (depth == last_autosave) last_autosave--;
         depth--;
         simplify ();
       }

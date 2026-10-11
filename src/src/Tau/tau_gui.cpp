@@ -31,6 +31,7 @@
 #include "boot.hpp"
 #include "analyze.hpp"
 #include "convert.hpp"
+#include "picture.hpp"
 #include "tm_window.hpp"
 #include "tm_buffer.hpp"
 #include "new_window.hpp"
@@ -644,6 +645,42 @@ tau_mouse (int view, const char* kind, int x, int y, int mods) {
   SI dx= x, dy= y;
   v->to_document (dx, dy);
   v->handle_mouse (string (kind), dx, dy, mods, texmacs_time ());
+  tau_turn ();
+}
+
+// Images which were dropped on a view (their paths in the file system,
+// one per line), at a point of its canvas: the editor inserts them there,
+// as it does with what is dropped on a window of TeXmacs
+EMSCRIPTEN_KEEPALIVE
+void
+tau_drop (int view, int x, int y, const char* paths) {
+  static int serial= 0;
+  simple_widget_rep* v= simple_widget_rep::find (view);
+  if (v == NULL) return;
+  tree doc (CONCAT);
+  array<string> l= tokenize (utf8_to_cork (string (paths)), "\n");
+  for (int i= 0; i < N(l); i++)
+    if (N(l[i]) > 0) {
+      url u= url_system (l[i]);
+      string ext= locase_all (suffix (u)), w, h;
+      // (a PDF or PostScript picture has its own size; a bitmap its pixels
+      // as points, or the width of the paragraph when it is larger)
+      if (ext != "pdf" && ext != "ps" && ext != "eps") {
+        picture pic= load_picture (u, -1, -1, tree (""), PIXEL);
+        if (!is_nil (pic)) {
+          int pw= pic->get_width (), ph= pic->get_height ();
+          if (pw <= 0 || ph <= 0 || pw > 400) w= "1par";
+          else { w= as_string (pw) * "pt"; h= as_string (ph) * "pt"; }
+        }
+      }
+      doc << tree (IMAGE, as_string (u), w, h, "", "");
+    }
+  if (N(doc) == 0) return;
+  int ticket= ++serial;
+  payloads (ticket)= doc;
+  SI dx= x, dy= y;
+  v->to_document (dx, dy);
+  v->handle_mouse ("drop", dx, dy, ticket, texmacs_time ());
   tau_turn ();
 }
 

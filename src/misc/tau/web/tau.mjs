@@ -33,7 +33,9 @@ app.initApp({
 	nothingKept: params.has("nohome"),
 	reload: () => { leaving = true; location.reload(); },
 	forget: () => { leaving = true; send({ t: "forget-home" }); },
-	files: () => files.browse()
+	files: () => files.browse(),
+	backup: () => files.backup(),
+	restore: () => files.restore()
 });
 app.progress({ what: "" });
 
@@ -91,7 +93,11 @@ function makePane(windowNumber) {
 	pane.canvas.addEventListener("drop", event => {
 		event.preventDefault();
 		focusView(pane);
-		for (const file of event.dataTransfer.files) openFile(file, 0);
+		if (!event.dataTransfer) return;
+		const rect = pane.canvas.getBoundingClientRect(), density = window.devicePixelRatio || 1;
+		const x = Math.round((event.clientX - rect.left) * density), y = Math.round((event.clientY - rect.top) * density);
+		files.dropOnView(event.dataTransfer, paths => worker.postMessage({ t: "drop", view: pane.view, x, y, paths }))
+			.catch(error => console.error("Tau: the drop failed", error));
 	});
 	return pane;
 }
@@ -536,6 +542,34 @@ async function openFile(file, ticket) {
 	worker.postMessage({ t: "open", ticket, name: file.name, bytes }, [bytes]);
 }
 
+// A document which the address of the page gives, opened once the core
+// is ready: ?file=<path>, a file which is kept in the browser or a file of
+// TeXmacs, and ?open=<address>, a document of the web. That one is
+// fetched by the page (another site has to allow it: CORS) and put aside,
+// not among the documents of the user: it is only looked at, until it is
+// saved under a name. What it refers to (images, included files) is not
+// fetched with it. The address runs nothing.
+function openFromAddress() {
+	const file = params.get("file"), src = params.get("open");
+	if (file) {
+		if (/^\/(home\/tau|texmacs)\//.test(file) && !file.split("/").includes(".."))
+			worker.postMessage({ t: "chosen", ticket: 0, path: file });
+		else notice("No document " + file + " in this browser.");
+	}
+	if (!src) return;
+	let address;
+	try { address = new URL(src, location.href); }
+	catch (error) { notice("Not an address: " + src); return; }
+	let name = decodeURIComponent(address.pathname.slice(address.pathname.lastIndexOf("/") + 1)).replace(/[\/\\]/g, "_") || "document.tm";
+	if (!/\.(tm|tmml|ts|tp|stm|tex|html?|md|bib|scm|txt)$/i.test(name)) name += ".tm";
+	fetch(address.href).then(response => {
+		if (!response.ok) throw new Error(response.status + " " + response.statusText);
+		return response.arrayBuffer();
+	}).then(bytes => worker.postMessage({ t: "open", ticket: 0, name, bytes, temp: true }, [bytes]))
+		.catch(error => notice("Cannot open " + address.href + ": " + (error.message || error) +
+			(address.origin !== location.origin ? " (does the site allow it?)" : "")));
+}
+
 // The panel of the files (files.mjs) asks the worker, which has the file
 // system, and waits for its answers
 let fsNext = 1;
@@ -674,6 +708,7 @@ worker.onmessage = event => {
 		homeKept = !!m.homeKept;
 		if (!m.homeKept && !params.has("nohome"))
 			notice("Tau is open in another page of this browser: what is saved here is not kept when this page is closed.");
+		openFromAddress();
 		break;
 	case "quit":
 		// TeXmacs was closed (it asked about what is not saved): it starts again

@@ -82,6 +82,33 @@ try {
 	await sleep(1500);
 	check("closing it leaves the program running", (await stopped()) === 0, await run("return window.tauErrors"));
 
+	// the panel of the files: a folder, a file brought in, a zip and back,
+	// the document saved in the panel
+	await run("tau.files.browse(); return 1;");
+	await sleep(1500);
+	check("the panel of the files shows the documents", await run("const b = document.querySelector('.tau-files'); return !!b && b.dataset.loaded === '1' && b.dataset.dir === '/home/tau/Documents'"));
+	await run(`const data = new DataTransfer(); data.items.add(new File(['kept in Safari'], 'safari.txt'));
+		const input = document.querySelector('.tau-files input[data-what=files]'); input.files = data.files;
+		input.dispatchEvent(new Event('change', { bubbles: true })); return 1;`);
+	await sleep(1500);
+	check("a file which is added is listed", await run("return Array.from(document.querySelectorAll('.tau-files-row'), r => r.dataset.name).join() === 'safari.txt'"));
+	await run(`window.zipped = null; (async () => { const text = 'The quick brown fox. '.repeat(40);
+		const blob = await tau.files.zip([{ rel: 'd/one.txt', bytes: new TextEncoder().encode(text) }]);
+		const l = await tau.files.unzip(new Uint8Array(await blob.arrayBuffer()));
+		const b = await tau.files.makeBackup();
+		window.zipped = { same: new TextDecoder().decode(l[0].bytes) === text, small: blob.size < text.length, backup: b.files }; })().catch(e => { window.zipped = { error: String(e) }; }); return 1;`);
+	await sleep(2500);
+	const zipped = await run("return window.zipped");
+	check("a zip is made and read back, and a backup made", zipped && zipped.same && zipped.small && zipped.backup >= 1, zipped);
+	await run("document.querySelector('.tau-files .tau-dialog-close').click(); return 1;");
+	await run(`tau.send({ t: 'scheme', code: '(choose-file save-buffer-as "Save TeXmacs file" "texmacs")' }); return 1;`);
+	await sleep(1500);
+	await run("const i = document.querySelector('.tau-files-foot .tau-files-name'); i.value = 'safari.tm'; document.querySelector('.tau-files [data-what=ok]').click(); return 1;");
+	await sleep(2500);
+	check("the document is saved from the panel", await run("return Array.from(document.querySelectorAll('.tau-doc-tab.tau-current .tau-doc-name')).some(e => e.textContent === 'safari.tm') && !document.querySelector('.tau-files')"),
+		await run("return Array.from(document.querySelectorAll('.tau-doc-tab .tau-doc-name'), e => e.textContent)"));
+	check("the program is still running", (await stopped()) === 0, await run("return window.tauErrors"));
+
 	if (args.includes("--manual")) {
 		// the user manual: thousands of links, which overflowed the stack
 		await run(`tau.send({ t: 'scheme', code: '(load-help-book "main/man-user-manual")' }); return 1;`);
