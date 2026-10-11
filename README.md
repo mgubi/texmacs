@@ -12,6 +12,10 @@ drawn by the worker (MuPDF) and shown in canvases.
 
 ![Tau in a browser: the icon bars at the left, the documents as tabs, a document with formulas](src/docs/tau.png)
 
+**Try it: https://mgubi.github.io/tau/** (the page is published from a
+repository of its own, [`mgubi/tau`](https://github.com/mgubi/tau), which
+builds this branch).
+
 It branches from [`maxs_texmacs`](https://github.com/mgubi/texmacs/tree/maxs_texmacs)
 and is free to break with its organisation: it is not kept in sync with
 it. The design, the decisions taken and the state of the work are in
@@ -39,9 +43,11 @@ it. The design, the decisions taken and the state of the work are in
   inside them; questions; tooltips over a document.
 - The **keyboard** as in the other ports: shortcuts from the place of
   the keys, dead keys and input methods through a text area of the page.
-- **Documents kept in the browser** (IndexedDB), opened from and given
-  back to the computer; export to PDF; Print and Preview in a tab of the
-  browser; the clipboard of the browser.
+- **Documents kept in the browser** (IndexedDB), with a **file panel**
+  to manage them, which is also where a file is opened and saved:
+  folders, files and zips brought in from the computer and given back,
+  a backup of everything and its restore; export to PDF; Print and
+  Preview in a tab of the browser; the clipboard of the browser.
 - **Plugins** as Web Workers: Python (Pyodide), R (webR), JavaScript,
   Asymptote, TikZ; the client of a remote TeXmacs server over WebSocket.
 - The colour menus with **typographic palettes**; full screen and
@@ -80,6 +86,7 @@ the console), `?arg=…` (an option of TeXmacs, a document to open).
 ```sh
 make -C build-tau -f ../misc/tau/Makefile MUPDF=… check          # node
 make -C build-tau -f ../misc/tau/Makefile MUPDF=… browser-check  # a browser without a display
+make -C build-tau -f ../misc/tau/Makefile MUPDF=… safari-check   # Safari, by hand on a Mac
 ```
 
 `check` runs the table of the keys, converts a document to PDF and runs
@@ -88,6 +95,18 @@ are listed with their reason in `misc/tau/test/suites-expected.txt`).
 `browser-check` drives the page with puppeteer-core (`npm install
 puppeteer-core` in `build-tau/tools`) and Firefox or Chrome: the start,
 typing, the menus, the dialogs, the tabs and the files, the panes...
+`safari-check` drives Safari through `safaridriver` ("Allow remote
+automation" in its settings), where a worker has a much smaller stack.
+
+The workflow `.github/workflows/tau.yml` builds Tau and runs `check` and
+`browser-check` when the branch `tau_ci` is moved (`git push origin
+wip_tau:tau_ci`); the page is an artifact of the run.
+
+The page is published at https://mgubi.github.io/tau/ by the repository
+[`mgubi/tau`](https://github.com/mgubi/tau), which holds one workflow: it
+checks out this branch, builds the page and deploys it to its GitHub
+Pages. A push here does not publish; `gh workflow run pages.yml -R
+mgubi/tau` does.
 
 ## Where things are
 

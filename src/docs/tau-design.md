@@ -543,6 +543,8 @@ browser.
   name is asked in a dialog, the file is written under `/user` and given
   to the user (`download`); saving again a document which lives under
   `/user` gives it again.
+  (Later: the files are kept in the browser, and chosen in a panel of
+  the page; see "What is kept" and "The files in the browser".)
 - **Clipboard.** What is copied stays in the core as a tree, and its
   text goes to the clipboard of the browser (`clipboard`). The key which
   pastes is left to the browser, whose `paste` event gives the text and
@@ -822,10 +824,10 @@ same way. `?trace-scroll` logs where the editor asks its views to scroll.
 - **Save keeps, Download gives.** A document is saved in `~/Documents`
   and is not handed to the browser as a download any more; File →
   Download gives the file of the current document, and what is exported
-  (PDF...) is still given at once. File → Load offers the documents which
-  are kept, the last changed first, with "From this computer" for the
-  file chooser of the browser and "Delete"; a file which is picked or
-  dropped is copied to `~/Documents`.
+  (PDF...) is still given at once. A file which is dropped on a view is
+  copied to `~/Documents` and opened. (File → Load first offered a list
+  of the documents which are kept; the panel of the files replaced it,
+  see below.)
 - **Closing TeXmacs** (which asks about what is not saved) writes the
   home directory and starts the page again, as the browser build of
   `maxs_texmacs` does.
@@ -934,6 +936,81 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   menu says what Tau is, what is kept in the browser and how much, the
   options of the address of the page, and has "Start Tau again" and
   "Forget everything kept in this browser".
+
+**Safari, the CI, and the last suite** (2026-10-10).
+
+- `make safari-check` (`misc/tau/test/safari-test.mjs`), by hand on a
+  Mac: Safari is driven by `safaridriver` ("Allow remote automation" in
+  its settings). The page starts, text is typed, a dialog with a field
+  which is edited is opened and closed; `SAFARI=--manual` also opens the
+  user manual and waits for its passes of typesetting, which is what
+  overflowed the stack of the worker. All of it passes.
+- `.github/workflows/tau.yml` builds the slim MuPDF (cached), the page
+  and the node build, and runs `make check` and `make browser-check`
+  (Firefox) on the branch `tau_ci` only, as the other builds of the
+  repository run on branches of their own: `git push origin
+  wip_tau:tau_ci`. The page is kept as an artifact of the run. Not run
+  yet (nothing was pushed to `tau_ci`); the tests of the page were only
+  ever run on a Mac.
+- The page is published at https://mgubi.github.io/tau/ from a repository
+  of its own, `mgubi/tau`, as Vau has one: the GitHub Pages of this
+  repository are those of the browser build of `maxs_texmacs`, and the
+  two builds stay independent. That repository holds one workflow
+  (`pages.yml`) and no sources: it checks out `wip_tau` here (the
+  repository is public, so no token is needed), builds the slim MuPDF
+  and `make web`, and deploys `build-tau/out/web` as it is (the page
+  only uses relative addresses and needs no special headers). It does
+  not run the tests, which are those of `tau.yml`. A push to `wip_tau`
+  does not publish: `gh workflow run pages.yml -R mgubi/tau [-f
+  ref=...]` does.
+- The suite `parse` fails for the fonts too: two Julia declarations are
+  read back from the glyphs of an EPS file, which Tau writes with
+  OpenType fonts. The check passes in `maxs_texmacs`, native and
+  WebAssembly.
+
+### The files in the browser
+
+- **A panel of the page** (`misc/tau/web/files.mjs`), after the one of
+  the browser build of `maxs_texmacs` (`misc/wasm/files.js`), shows the
+  home directory which is kept in the browser and is where a file is
+  chosen. It has three places: the files of the user (`~/Documents`, and
+  the home directory above it), the TeXmacs folder of the user
+  (`~/.TeXmacs`) and the files of TeXmacs (`/texmacs`), which are only
+  read. In it: add files, a folder with what it holds or a zip which is
+  unpacked (the choosers of the browser, or a drop on the panel), make a
+  folder, rename, delete, save a copy on the computer (a folder as a
+  zip), open a document; "customize" copies a file of TeXmacs to the
+  same place of `~/.TeXmacs`, where TeXmacs looks first. A PDF or an
+  image opens in a tab of the browser, unless an image was asked for.
+- **Open and save** are the same panel: `tau-choose-file` posts `files`
+  (`mode` open or save, a ticket, the title, the type, for a save the
+  name which is proposed and the folder of the document) and the page
+  answers `chosen` with the path, or an empty one when the user gives
+  up. A save over a file which exists asks first. What is exported is
+  still given to the computer once written. File → "Files in this
+  browser..." and the menu of the icon of Tau open the panel to browse
+  (`tau-files`).
+- **The file system is in the worker**, so the panel asks: `fs` with a
+  number and an operation (`list`, `read` a file or all the files of a
+  folder, `write`, `mkdir`, `rename`, `remove`, `copy`, `backup`,
+  `restore`), answered by `fs` with the same number and a value or an
+  error; the bytes are transferred, not copied. The worker only writes
+  under the home directory and only reads there and under `/texmacs`.
+  The zip files are made and read in the page, with the compression
+  streams of the browser.
+- **Backup**: the whole home directory but the temporary files and the
+  caches, in a zip with a note (`tau-backup.json`). Restoring writes its
+  files over those which are kept, in the page which keeps the home
+  directory only; the worker then does nothing more (the core would
+  save its preferences over the restored ones), writes the home
+  directory to the browser, and the page starts again.
+- While the panel is open the keys do not reach the core, and the
+  keyboard goes back to the view when it closes. Its questions (a name,
+  a confirmation) are a line of the panel, not dialogs of the browser.
+- Not done, which the browser build of `maxs_texmacs` has: files which
+  are dropped on the page as a whole (a folder, an image inserted where
+  it falls), a document given in the address of the page (`?open=`,
+  `?file=`). The texts of the panel are not translated.
 
 ## Order of the work
 

@@ -140,6 +140,7 @@ function openMenu(button, options) {
 	text("In the address of the page: ?bars=top or left (the icon bars), ?nohome (nothing is kept), " +
 		"?trace-keys (the keys in the console), ?arg=… (an option of TeXmacs).");
 	sep();
+	item("Files in this browser…", () => options.files());
 	item("Start Tau again", () => options.reload());
 	item("Forget everything kept in this browser…", () => {
 		if (!confirm("Delete the documents and the preferences which Tau keeps in this browser?")) return;

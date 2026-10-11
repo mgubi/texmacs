@@ -169,10 +169,9 @@
 (menu-bind load-menu
   ("Load" (open-document))
   ("Revert" (revert-buffer))
-  ;; the browser build: the files kept in the page (web-files is defined
-  ;; by the Vue plugin there)
-  (if (defined? 'web-files)
-      ("Files in this browser..." (web-files)))
+  ;; in the browser: the files which are kept in the page
+  (if (in-browser?)
+      ("Files in this browser..." (tau-files)))
   (if (not (place-per-buffer?))
       ("Load in new window" (open-document*)))
   ---
@@ -299,6 +298,9 @@
   ("Save" (save-buffer))
   ("Save as" (choose-file save-buffer-as "Save TeXmacs file" "texmacs"))
   ("Download" (tau-download-buffer))
+  ;; in the browser: the files which are kept in the page
+  (if (in-browser?)
+      ("Files in this browser..." (tau-files)))
   ---
   (link print-menu)
   ---

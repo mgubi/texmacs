@@ -1,0 +1,106 @@
+# Tau: TeXmacs in the browser with its editor in a worker and its interface
+# in the page (src/misc/tau, src/docs/tau-design.md). Builds the slim MuPDF
+# (cached), the page and the node build, runs the tests of the core under
+# node (make check: the keys, a document to PDF, the test suites of TeXmacs)
+# and those of the page in a browser without a display (make browser-check),
+# and keeps the page (src/build-tau/out/web) as an artifact of the run:
+# unzip it and serve it (node src/misc/wasm/serve.mjs <dir>).
+#
+# It runs on the branch tau_ci only, as the other builds of this repository
+# run on branches of their own: the work goes on in wip_tau, which triggers
+# nothing, and a state is built and tested by moving tau_ci to it,
+#   git push origin wip_tau:tau_ci
+# (or by hand, from the Actions tab, on the branch tau_ci).
+#
+# The page is not published here: the GitHub Pages of this repository are
+# those of the browser build of maxs_texmacs (wasm.yml). The repository
+# mgubi/tau publishes it (https://mgubi.github.io/tau/): its workflow checks
+# out wip_tau and builds it, when it is started by hand.
+
+name: Tau
+
+on:
+  push:
+    branches: [tau_ci]
+  workflow_dispatch:
+
+concurrency:
+  group: tau-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EMSCRIPTEN_VERSION: 6.0.10
+  MUPDF_VERSION: 1.28.5
+
+jobs:
+  tau:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: src
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSCRIPTEN_VERSION }}
+          actions-cache-folder: emsdk-cache
+
+      # the slim MuPDF, with the patches of TeXmacs: again only when its
+      # script, its patches, its version or Emscripten change
+      - name: Cache of MuPDF
+        uses: actions/cache@v4
+        with:
+          path: src/build-wasm/mupdf-${{ env.MUPDF_VERSION }}-source
+          key: mupdf-${{ env.MUPDF_VERSION }}-emscripten-${{ env.EMSCRIPTEN_VERSION }}-${{ hashFiles('src/misc/wasm/build-mupdf.sh', 'src/misc/wasm/mupdf-*.patch') }}
+
+      - name: MuPDF
+        run: |
+          mkdir -p build-wasm
+          sh misc/wasm/build-mupdf.sh ${{ env.MUPDF_VERSION }}
+
+      - name: Tau (the page and the node build)
+        run: |
+          mkdir -p build-tau
+          make -C build-tau -f ../misc/tau/Makefile -j"$(nproc)" \
+            MUPDF="$PWD/build-wasm/mupdf-${{ env.MUPDF_VERSION }}-source" web node
+
+      - name: Tests of the core (node)
+        run: |
+          # a hang must not take the whole run
+          timeout 1200 make -C build-tau -f ../misc/tau/Makefile \
+            MUPDF="$PWD/build-wasm/mupdf-${{ env.MUPDF_VERSION }}-source" check
+
+      # (the Firefox of the runner is a snap, which does not take a profile
+      # made elsewhere: one which is a plain program)
+      - name: Firefox
+        id: firefox
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Tests of the page (a browser without a display)
+        run: |
+          mkdir -p build-tau/tools
+          (cd build-tau/tools && npm init -y > /dev/null && npm install --no-audit --no-fund puppeteer-core)
+          browser="${{ steps.firefox.outputs.firefox-path }}"
+          test -n "$browser" || browser=$(command -v firefox)
+          echo "browser: $browser"
+          timeout 1500 make -C build-tau -f ../misc/tau/Makefile \
+            MUPDF="$PWD/build-wasm/mupdf-${{ env.MUPDF_VERSION }}-source" \
+            BROWSER="$browser" browser-check
+
+      - name: Sizes
+        run: |
+          ls -l build-tau/out/web | head -40
+          du -sh build-tau/out/web
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tau-web
+          path: src/build-tau/out/web
+          if-no-files-found: error

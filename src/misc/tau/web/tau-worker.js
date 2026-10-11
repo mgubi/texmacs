@@ -133,6 +133,17 @@ function handle(m) {
 		postMessage({ t: "file", path: m.path, bytes }, bytes ? [bytes] : []);
 		break;
 	}
+	case "fs":
+		// a request of the panel of the files (files.mjs), which is answered
+		fsRequest(m).then(
+			r => postMessage({ t: "fs", id: m.id, value: r.value }, r.transfer || []),
+			error => postMessage({ t: "fs", id: m.id, error: String(error && error.message || error) }));
+		break;
+	case "chosen":
+		// the file which was chosen for a question of the core (none: an
+		// empty path), or a document to open (no ticket)
+		core.ccall("tau_file", null, ["number", "string"], [m.ticket || 0, m.path || ""]);
+		break;
 	case "mouse":
 		core.ccall("tau_mouse", null, ["number", "string", "number", "number", "number"],
 			[m.view, m.kind, m.x, m.y, m.mods]);
@@ -140,8 +151,135 @@ function handle(m) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// The file system, for the panel of the files of the page (files.mjs)
+// ---------------------------------------------------------------------------
+
+// The home directory (kept in the browser, tau-pre.js) is the user's: the
+// page lists it, and brings files in and out. The files of TeXmacs
+// (/texmacs) are only read. Nothing else is reached.
+const HOME = "/home/tau", SYS = "/texmacs";
+const BACKUP_SKIP = [".TeXmacs/system/tmp/", ".TeXmacs/system/cache/"];
+let frozen = false; // a backup was restored: the core is not to write over it
+
+function fsClean(path) {
+	const parts = String(path).split("/");
+	if (parts[0] !== "" || parts.slice(1).some(x => x === "" || x === "." || x === ".."))
+		throw new Error("not a path: " + path);
+	return path;
+}
+const under = (path, top) => path === top || path.startsWith(top + "/");
+function fsReadable(path) {
+	fsClean(path);
+	if (!under(path, HOME) && !under(path, SYS)) throw new Error("not a file of the user or of TeXmacs: " + path);
+	return path;
+}
+function fsWritable(path) {
+	fsClean(path);
+	if (!path.startsWith(HOME + "/")) throw new Error("this cannot be changed: " + path);
+	return path;
+}
+const fsParent = path => path.slice(0, path.lastIndexOf("/")) || "/";
+const fsBase = path => path.slice(path.lastIndexOf("/") + 1);
+function fsStat(path) { try { return core.FS.stat(path); } catch (error) { return null; } }
+function fsIsDir(path) { const st = fsStat(path); return !!st && core.FS.isDir(st.mode); }
+function fsTime(st) { const m = st.mtime; return m instanceof Date ? m.getTime() : +m; }
+function fsList(dir) {
+	return core.FS.readdir(dir).filter(n => n !== "." && n !== "..").map(name => {
+		const path = dir + "/" + name, st = core.FS.stat(path);
+		return { name, path, dir: core.FS.isDir(st.mode), size: st.size, time: fsTime(st) };
+	});
+}
+// the files under a directory: [{ rel, path }]
+function fsWalk(dir, rel, out) {
+	for (const e of fsList(dir)) {
+		const r = rel ? rel + "/" + e.name : e.name;
+		if (e.dir) fsWalk(e.path, r, out); else out.push({ rel: r, path: e.path });
+	}
+	return out;
+}
+function fsRemove(path) {
+	if (fsIsDir(path)) {
+		for (const e of fsList(path)) fsRemove(e.path);
+		core.FS.rmdir(path);
+	}
+	else core.FS.unlink(path);
+}
+function fsWrite(path, bytes, time) {
+	core.FS.mkdirTree(fsParent(path));
+	core.FS.writeFile(path, new Uint8Array(bytes));
+	// (the time the file had: the lists of TeXmacs sort and compare by it)
+	if (time > 0) try { core.FS.utime(path, time, time); } catch (error) {}
+}
+// files with their bytes, which go to the page without a copy
+function fsBytes(files) {
+	const value = files.map(f => {
+		const data = core.FS.readFile(f.path);
+		return { rel: f.rel, bytes: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength), time: fsTime(core.FS.stat(f.path)) };
+	});
+	return { value, transfer: value.map(f => f.bytes) };
+}
+
+async function fsRequest(m) {
+	if (frozen) throw new Error("Tau starts again");
+	switch (m.op) {
+	case "list": {
+		// (the two directories of the user are always there)
+		for (const d of [HOME + "/Documents", HOME + "/.TeXmacs"]) if (!fsStat(d)) core.FS.mkdirTree(d);
+		let dir = fsReadable(m.dir);
+		if (!fsIsDir(dir)) dir = HOME + "/Documents";
+		return { value: { dir, entries: fsList(dir), kept: !!core.tauHomeKept } };
+	}
+	case "read": {
+		// a file, or all the files of a directory (under its name)
+		const path = fsReadable(m.path);
+		if (!fsIsDir(path)) return fsBytes([{ rel: fsBase(path), path }]);
+		return fsBytes(fsWalk(path, fsBase(path), []));
+	}
+	case "write":
+		for (const f of m.files) fsWrite(fsWritable(f.path), f.bytes, f.time);
+		return { value: m.files.length };
+	case "mkdir":
+		core.FS.mkdirTree(fsWritable(m.path));
+		return { value: true };
+	case "rename":
+		if (fsStat(fsWritable(m.to))) throw new Error(fsBase(m.to) + " exists already");
+		core.FS.rename(fsWritable(m.from), m.to);
+		return { value: true };
+	case "remove":
+		fsRemove(fsWritable(m.path));
+		return { value: true };
+	case "copy": {
+		// a file or a directory (of TeXmacs) into the home directory
+		const from = fsReadable(m.from), to = fsWritable(m.to);
+		if (fsStat(to)) fsRemove(to);
+		if (fsIsDir(from)) for (const f of fsWalk(from, "", [])) fsWrite(to + "/" + f.rel, core.FS.readFile(f.path), 0);
+		else fsWrite(to, core.FS.readFile(from), 0);
+		return { value: true };
+	}
+	case "backup":
+		// the whole home directory, without what TeXmacs makes again
+		return fsBytes(fsWalk(HOME, "", []).filter(f => !BACKUP_SKIP.some(s => f.rel.startsWith(s))));
+	case "restore": {
+		// The files of a backup are written over those of the home
+		// directory, and kept; the core does nothing more (it would save
+		// its preferences over the restored ones) and the page starts again
+		if (!core.tauHomeKept) throw new Error("this page does not keep the files: restore the backup in the page of Tau which does");
+		frozen = true;
+		for (const f of m.files) {
+			if (BACKUP_SKIP.some(s => f.rel.startsWith(s))) continue;
+			fsWrite(fsWritable(HOME + "/" + f.rel), f.bytes, f.time);
+		}
+		await new Promise(resolve => core.tauSaveHome(resolve));
+		return { value: m.files.length };
+	}
+	}
+	throw new Error("unknown request: " + m.op);
+}
+
 onmessage = event => {
 	if (!core) { waiting.push(event.data); return; }
+	if (frozen) return;
 	try { handle(event.data); }
 	catch (error) {
 		postMessage({ t: "log", text: "error in " + event.data.t + ": " + (error && error.message || error) });

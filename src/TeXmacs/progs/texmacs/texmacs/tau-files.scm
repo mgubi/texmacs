@@ -12,11 +12,13 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The documents of the user are kept in the browser: the home directory of
-;; the core is in its storage (misc/tau/web/tau-pre.js), and ~/Documents is
-;; where they are saved and looked for. A file of the computer is asked of
-;; the page, which puts it there and says so (tau-file-chosen); a file is
-;; given back to the computer when it is exported, or on demand
-;; (tau-download-buffer). See docs/tau-design.md.
+;; the core is in its storage (misc/tau/web/tau-pre.js), with ~/Documents
+;; for what the user saves. A file to open or to save is asked of the page,
+;; which shows its panel of the files (misc/tau/web/files.mjs: the folders
+;; of the home directory, where files of the computer are brought in) and
+;; says what was chosen (tau-file-chosen); a file is given back to the
+;; computer when it is exported, or on demand (tau-download-buffer), or
+;; from the panel. See docs/tau-design.md.
 
 (texmacs-module (texmacs texmacs tau-files)
   (:use (kernel gui menu-serial)))
@@ -84,27 +86,6 @@
 (define file-waiting (make-ahash-table)) ;; ticket -> what to do with the file
 (define file-next 1)
 
-(define (ask-name title prompt default cont)
-  "Ask a name in a dialog and call @cont with it."
-  (let* ((id (tau-dialog-new))
-         (val default)
-         (close (lambda () (tau-dialog-close id)))
-         (ok (lambda () (close) (when (!= val "") (cont val))))
-         (input `(input ,(lambda (s) (when (string? s) (set! val s)))
-                        "string" ,(lambda () (list default)) "24em"))
-         (menu `(vertical
-                  (glue #f #f 0 10)
-                  (hlist (glue #f #f 16 0)
-                         (aligned (item (text ,prompt) ,input))
-                         (glue #f #f 16 0))
-                  (glue #f #f 0 12)
-                  (hlist (glue #t #f 16 0)
-                         (style ,widget-style-button
-                                ("Cancel" ,close) ("Save" ,ok))
-                         (glue #f #f 16 0))
-                  (glue #f #f 0 10))))
-    (tau-dialog-show id menu title close '(submit . #t))))
-
 (define (propose-name name type)
   "The name under which @name is saved in the format @type."
   (if (url-scratch? name) ""
@@ -118,95 +99,70 @@
                                    (string-append "." new)))
             (url->system tail)))))
 
-(define (stored-files)
-  "The names of the documents which are kept, the last changed first."
-  (let* ((dir (system->url user-dir))
-         (l (list-filter (url-read-directory dir "*") url-regular?))
-         (l* (list-sort l (lambda (u v) (> (url-last-modified u)
-                                           (url-last-modified v))))))
-    (map (lambda (u) (url->system (url-tail u))) l*)))
+(define home-dir "/home/tau")
+(define last-dir user-dir) ;; where a file was last chosen
 
-(define (stored-url name)
-  (url-append (system->url user-dir) (url-tail (system->url name))))
+(define (in-home? dir)
+  (or (== dir home-dir) (string-starts? dir (string-append home-dir "/"))))
 
-(define (ask-computer fun title type)
-  "Ask the page for a file of the computer."
+(define (buffer-dir)
+  "The directory of the current document, when it is one of the user."
+  (let* ((u (current-buffer))
+         (dir (if (or (url-scratch? u) (url-rooted-tmfs? u)) ""
+                  (url->system (url-head u)))))
+    (if (in-home? dir) dir last-dir)))
+
+(define (ask-page mode fun title type name dir)
+  "Ask the page for a file, in its panel of the files."
   (with ticket file-next
     (set! file-next (+ ticket 1))
     (ahash-set! file-waiting ticket fun)
-    (tau-post "pick" ""
-              `((ticket . ,ticket)
+    (tau-post "files" ""
+              `((mode . ,mode)
+                (ticket . ,ticket)
                 (title . ,(cork->utf8 (translate title)))
-                (type . ,type)))))
-
-(define (ask-stored fun title type names)
-  "A dialog with the documents which are kept: one is opened or deleted,
-   or a file of the computer is asked for."
-  (let* ((id (tau-dialog-new))
-         (sel (car names))
-         (close (lambda () (tau-dialog-close id)))
-         (open (lambda () (close) (fun (stored-url sel))))
-         (computer (lambda () (close) (ask-computer fun title type)))
-         (delete (lambda ()
-                   (close)
-                   (user-confirm `(concat "Delete " (verbatim ,sel) "?") #f
-                     (lambda (answ)
-                       (when answ (url-remove (stored-url sel)))
-                       (tau-choose-file fun title type "" (url-none))))))
-         (menu `(vertical
-                  (glue #f #f 0 8)
-                  (hlist (glue #f #f 16 0)
-                         (vertical
-                           (text "Documents kept in this browser")
-                           (glue #f #f 0 4)
-                           (resize ,(lambda () "26em") ,(lambda () "16em")
-                             (choice ,(lambda (x) (when (string? x) (set! sel x)))
-                                     ,(lambda () names)
-                                     ,(lambda () sel))))
-                         (glue #f #f 16 0))
-                  (glue #f #f 0 12)
-                  (hlist (glue #f #f 16 0)
-                         (style ,widget-style-button
-                                ("From this computer" ,computer)
-                                ("Delete" ,delete))
-                         (glue #t #f 16 0)
-                         (style ,widget-style-button
-                                ("Cancel" ,close) ("Open" ,open))
-                         (glue #f #f 16 0))
-                  (glue #f #f 0 10))))
-    (tau-dialog-show id menu title close)))
+                (type . ,type)
+                (name . ,name)
+                (dir . ,dir)))))
 
 (tm-define (tau-choose-file fun title type prompt name)
   (:synopsis "Ask the user for a file and call @fun with it")
   (cond ((== type "directory")
          (set-message "Directories cannot be chosen in the browser" title))
         ((== prompt "")
-         ;; a document which is kept, or a file of the computer: of the
-         ;; computer at once when nothing is kept, or for an image
-         (with names (if (in? type '("" "texmacs" "generic")) (stored-files) '())
-           (if (null? names)
-               (ask-computer fun title type)
-               (ask-stored fun title type names))))
+         ;; a file which is kept in the browser; one of the computer is
+         ;; added there, in the panel
+         (ask-page "open" fun title type "" last-dir))
         (else
-         (ask-name title "File name:" (propose-name name type)
-                   (lambda (s)
-                     (with u (stored-url s)
-                       (fun u)
-                       ;; what is exported is for the computer; a document
-                       ;; of TeXmacs stays in the browser
-                       (when (nin? type '("" "texmacs"))
-                         (delayed
-                           (:idle 1)
-                           (tau-download u)))))))))
+         (ask-page "save"
+                   (lambda (u)
+                     (fun u)
+                     ;; what is exported is for the computer; a document
+                     ;; of TeXmacs stays in the browser
+                     (when (nin? type '("" "texmacs"))
+                       (delayed
+                         (:idle 1)
+                         (tau-download u))))
+                   title type (propose-name name type) (buffer-dir)))))
+
+(tm-define (tau-files)
+  (:synopsis "Show the files which are kept in the browser")
+  (tau-post "files" "" `((mode . "browse") (ticket . 0) (dir . ,(buffer-dir)))))
 
 (tm-define (tau-file-chosen ticket u)
   (:synopsis "The page gave the file @u for the question @ticket")
-  (with fun (ahash-ref file-waiting ticket)
+  ;; no file (the user gave up) is an empty path; no ticket is a document
+  ;; to open (dropped on the page, or opened from the panel of the files)
+  (let* ((fun (ahash-ref file-waiting ticket))
+         (path (url->system u)))
     (ahash-remove! file-waiting ticket)
-    (exec-delayed
-      (lambda ()
-        (protected-call
-          (lambda () (if fun (fun u) (load-document u))))))))
+    (when (string-starts? path "/")
+      (when (and fun (in-home? (url->system (url-head u))))
+        (set! last-dir (url->system (url-head u))))
+      (exec-delayed
+        (lambda ()
+          (protected-call
+            (lambda () (if fun (fun u) (load-document u)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The clipboard

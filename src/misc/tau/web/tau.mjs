@@ -7,6 +7,7 @@
 
 import * as chrome from "./chrome.mjs";
 import * as app from "./app.mjs";
+import * as files from "./files.mjs";
 import { translate, makeLayout, learn, askLayout, browserKey, pasteKey } from "./keys.mjs";
 
 const panesElement = document.getElementById("tau-panes");
@@ -31,13 +32,14 @@ app.initApp({
 	homeKept: () => homeKept,
 	nothingKept: params.has("nohome"),
 	reload: () => { leaving = true; location.reload(); },
-	forget: () => { leaving = true; send({ t: "forget-home" }); }
+	forget: () => { leaving = true; send({ t: "forget-home" }); },
+	files: () => files.browse()
 });
 app.progress({ what: "" });
 
 // for tests and for the console
-const state = { started: false, paints: 0, get view() { return active ? active.view : 0; } };
-window.tau = { state, send, worker, panes, get active() { return active; } };
+const state = { started: false, paints: 0, downloads: [], get view() { return active ? active.view : 0; } };
+window.tau = { state, send, worker, panes, files, get active() { return active; } };
 chrome.init({ send, afterAction: () => active && focusView(active), makeView: node => makeView(node), keyName: event => keyName(event) });
 
 function setStatus(text) { statusLine.textContent = text; }
@@ -534,29 +536,31 @@ async function openFile(file, ticket) {
 	worker.postMessage({ t: "open", ticket, name: file.name, bytes }, [bytes]);
 }
 
-const ACCEPT = { image: "image/*,.pdf,.eps,.ps,.svg", texmacs: ".tm,.ts,.tp,.tmml,.stm" };
-
-function pickFile(m) {
-	const input = el("input");
-	input.type = "file";
-	if (ACCEPT[m.type]) input.accept = ACCEPT[m.type];
-	input.addEventListener("change", () => {
-		if (input.files.length) openFile(input.files[0], m.ticket);
-		if (active) focusView(active);
+// The panel of the files (files.mjs) asks the worker, which has the file
+// system, and waits for its answers
+let fsNext = 1;
+const fsWaiting = new Map();
+function fsRequest(op, args, transfer) {
+	return new Promise((resolve, reject) => {
+		const id = fsNext++;
+		fsWaiting.set(id, { resolve, reject });
+		worker.postMessage({ t: "fs", id, op, ...(args || {}) }, transfer || []);
 	});
-	// The browser opens its file chooser only on an action of the user.
-	// A click or a key did ask for it, a moment ago; when the browser does
-	// not count that any more, a button asks again.
-	const allowed = !navigator.userActivation || navigator.userActivation.isActive;
-	if (allowed) { input.click(); return; }
-	const box = el("div", "tau-ask"), button = el("button", "tau-button", "Choose a file…");
-	const cancel = el("button", "tau-button", "Cancel");
-	box.append(el("span", "", m.title || "Load file"), button, cancel);
-	button.addEventListener("click", () => { input.click(); box.remove(); });
-	cancel.addEventListener("click", () => box.remove());
-	document.body.append(box);
-	button.focus();
 }
+function fsAnswer(m) {
+	const w = fsWaiting.get(m.id);
+	fsWaiting.delete(m.id);
+	if (!w) return;
+	if (m.error) w.reject(new Error(m.error)); else w.resolve(m.value);
+}
+files.initFiles({
+	request: fsRequest,
+	chosen: (ticket, path) => worker.postMessage({ t: "chosen", ticket, path }),
+	open: path => worker.postMessage({ t: "chosen", ticket: 0, path }),
+	reload: () => { leaving = true; location.reload(); },
+	focus: () => { if (active) focusView(active); },
+	downloaded: (name, blob) => { state.downloads.push({ name, size: blob.size }); }
+});
 
 function download(m) {
 	if (!m.bytes) return;
@@ -737,7 +741,8 @@ worker.onmessage = event => {
 	}
 	case "clipboard": copy(m.text); break;
 	case "paste-request": pasteFromBrowser(); break;
-	case "pick": pickFile(m); break;
+	case "files": files.choose(m); break;
+	case "fs": fsAnswer(m); break;
 	case "download": download(m); break;
 	case "open-pdf": openPdf(m); break;
 	case "fullscreen": fullScreen(m.on); break;

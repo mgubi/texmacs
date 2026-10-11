@@ -7,4 +7,4 @@ plugins: starts the programs of plugins; in Tau a plugin is a Web Worker, which 
 convert-more: converts EPS to PDF with Ghostscript, which Tau has not
 typeset: expects the line breaks of the TeX fonts; "roman" is Latin Modern in Tau
 version: one width expected of the TeX fonts (25755 for 25754)
-parse: the highlighting of two Julia declarations; not looked into
+parse: two Julia declarations are read back from the glyphs of an EPS file, which Tau writes with OpenType fonts (the check passes in maxs_texmacs, native and WebAssembly)

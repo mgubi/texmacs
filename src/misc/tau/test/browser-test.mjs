@@ -148,6 +148,50 @@ class Page {
 	}
 	dialog(title) { return this.until("the dialog " + title, async () => (await this.dialogs()).find(d => d.title.startsWith(title))); }
 
+	// the panel of the files in a mode (browse, open, save), once it shows
+	// a folder: the folder, the names in it, the name which is proposed
+	filesShown() {
+		return this.page.evaluate(() => {
+			const b = document.querySelector(".tau-files");
+			if (!b || !b.dataset.loaded) return null;
+			const name = b.querySelector(".tau-files-foot .tau-files-name"), ask = b.querySelector(".tau-files-ask");
+			return { mode: b.dataset.mode, dir: b.dataset.dir, title: b.querySelector(".tau-dialog-name").textContent,
+				names: Array.from(b.querySelectorAll(".tau-files-row"), r => r.dataset.name), name: name ? name.value : "",
+				place: b.querySelector(".tau-files-place.tau-current").dataset.place,
+				asking: ask.style.display === "none" ? "" : ask.textContent,
+				tools: b.querySelector(".tau-files-tools").style.display !== "none" };
+		});
+	}
+	filesPanel(mode, test = () => true) {
+		return this.until("the panel of the files (" + mode + ")", async () => {
+			const f = await this.filesShown();
+			return f && f.mode === mode && test(f) ? f : null;
+		});
+	}
+	// a row of the panel: clicked, clicked twice, or one of its actions
+	filesRow(name, what = "click") {
+		return this.page.evaluate((name, what) => {
+			const row = Array.from(document.querySelectorAll(".tau-files-row")).find(r => r.dataset.name === name);
+			if (what === "click") row.click();
+			else if (what === "dblclick") row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+			else row.querySelector('[data-act="' + what + '"]').click();
+		}, name, what);
+	}
+	// a name, in the field which has the keyboard (the one of the panel, or
+	// of a question in it)
+	async filesName(name) {
+		await this.page.evaluate(() => document.activeElement.select());
+		await this.type(name);
+	}
+	// files which are dropped on the panel
+	filesDrop(files) {
+		return this.page.evaluate(files => {
+			const data = new DataTransfer();
+			for (const [name, text] of files) data.items.add(new File([text], name));
+			document.querySelector(".tau-files-veil").dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+		}, files);
+	}
+
 	async click(x, y, options) { await this.page.mouse.click(x, y, options); }
 	async type(text) { await this.page.keyboard.type(text); }
 	async key(name, ...mods) {
@@ -486,33 +530,44 @@ test("tabs and files", async p => {
 	check("saving does not give the file to the user", (await p.got("download")).length === 0);
 	await p.choose("File", "Download");
 	await p.until("it is given when asked for", async () => (await p.got("download")).some(m => m.name === "mine.tm"));
-	// save under a name: the name is asked
+	// save under a name: the panel of the files, in the folder of the
+	// document and with its name
 	await p.type("More. ");
 	await p.choose("File", "Save as");
-	await p.dialog("Save");
+	let f = await p.filesPanel("save");
+	check("the folder and the name of the document", f.dir === "/home/tau/Documents" && f.name === "mine.tm" && f.names.includes("mine.tm"), f);
 	await p.forget();
-	await p.type("other.tm");
+	await p.filesName("other.tm");
 	await p.key("Enter");
 	// (the tab is still marked as changed after this, which it should not
 	// be: the core says so when the name is asked in a dialog after an
 	// earlier save, and not when save-buffer-as is called by itself. Not
 	// found yet; the file is written.)
 	await p.until("the document has the new name", async () => (await p.tabs())[0].some(t => t.current && t.name.startsWith("other.tm")));
+	check("the panel is gone", (await p.count(".tau-files")) === 0);
+	// a name which is taken: asked first
+	await p.choose("File", "Save as");
+	await p.filesPanel("save");
+	await p.filesRow("mine.tm");
+	f = await p.filesPanel("save", f => f.name === "mine.tm");
+	await p.key("Enter");
+	f = await p.filesPanel("save", f => f.asking.includes("Replace mine.tm"));
+	await p.key("Escape");
+	await p.filesPanel("save", f => !f.asking);
+	await p.key("Escape");
+	await p.until("the panel is given up", async () => (await p.count(".tau-files")) === 0);
+	check("the document keeps its name", (await p.tabs())[0].some(t => t.current && t.name.startsWith("other.tm")));
 	// load: the documents which are kept are offered
 	await p.choose("File", "Load");
-	const d = await p.dialog("Load file");
-	check("the two documents which were saved", d.text.includes("mine.tm") && d.text.includes("other.tm"), d.text);
-	await p.page.evaluate(() => {
-		const select = document.querySelector(".tau-dialog .tau-choice");
-		select.value = "mine.tm";
-		select.dispatchEvent(new Event("change", { bubbles: true }));
-	});
-	await (await p.find(".tau-dialog .tau-button", "Open")).click();
+	f = await p.filesPanel("open");
+	check("the two documents which were saved", f.names.includes("mine.tm") && f.names.includes("other.tm"), f);
+	await p.filesRow("mine.tm", "dblclick");
 	await p.until("the one which is chosen is shown", async () => (await p.tabs())[0].some(t => t.current && t.name === "mine.tm"));
 	// exported: the file is for the computer
 	await p.forget();
 	await p.choose("File", "Export", "Pdf");
-	await p.dialog("Save");
+	f = await p.filesPanel("save");
+	check("the name with the suffix of the format", f.name === "mine.pdf", f);
 	await p.key("Enter");
 	await p.until("the PDF is given to the user", async () => (await p.got("download")).some(m => m.name === "mine.pdf"), 30000);
 	// the first tab again
@@ -531,15 +586,115 @@ test("tabs and files", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("files in the browser", async p => {
+	await p.open();
+	await p.newDocument();
+	const n = (await p.tabs())[0].length;
+	await p.choose("File", "Files in this browser");
+	let f = await p.filesPanel("browse");
+	check("the documents of the user, none yet", f.dir === "/home/tau/Documents" && f.names.length === 0 && f.place === "files", f);
+	// what is typed while the panel is there is not for the document
+	await p.forget();
+	await p.type("zz");
+	await sleep(300);
+	check("the keys stay in the panel", (await p.sent("key")).length === 0 && (await p.sent("text")).length === 0, await p.sent());
+	// a folder, with files which are dropped in it
+	await (await p.find(".tau-files-tools .tau-button", "New folder")).click();
+	await p.filesPanel("browse", f => f.asking.startsWith("New folder"));
+	await p.filesName("proj");
+	await p.key("Enter");
+	await p.filesPanel("browse", f => f.names.includes("proj") && !f.asking);
+	await p.filesRow("proj");
+	await p.filesPanel("browse", f => f.dir === "/home/tau/Documents/proj");
+	const doc = "<TeXmacs|2.1.5>\n\n<style|generic>\n\n<\\body>\n  A document of a project.\n</body>\n";
+	await p.filesDrop([["a.tm", doc], ["pic.svg", "<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/>"]]);
+	f = await p.filesPanel("browse", f => f.names.length === 2);
+	check("the files which were dropped", f.names.join() === "a.tm,pic.svg", f);
+	// renamed, copied to the computer (a folder as a zip)
+	await p.filesRow("a.tm", "rename");
+	await p.filesPanel("browse", f => f.asking.startsWith("Rename a.tm"));
+	await p.filesName("b.tm");
+	await p.key("Enter");
+	await p.filesPanel("browse", f => f.names.join() === "b.tm,pic.svg");
+	await p.filesRow("b.tm", "save copy");
+	await p.until("the file is given to the user", () => p.page.evaluate(() => tau.state.downloads.some(d => d.name === "b.tm" && d.size > 50)));
+	await p.page.click(".tau-files-crumbs a:nth-of-type(2)");
+	await p.filesPanel("browse", f => f.dir === "/home/tau/Documents");
+	await p.filesRow("proj", "save copy");
+	await p.until("the folder is given as a zip", () => p.page.evaluate(() => tau.state.downloads.some(d => d.name === "proj.zip" && d.size > 100)));
+	// a zip, there and back; a backup has the files
+	const back = await p.page.evaluate(async () => {
+		const enc = new TextEncoder(), text = "The quick brown fox. ".repeat(40);
+		const blob = await tau.files.zip([{ rel: "d/one.txt", bytes: enc.encode(text), time: Date.UTC(2026, 0, 2, 3, 4, 6) }, { rel: "two", bytes: enc.encode("2") }]);
+		const l = await tau.files.unzip(new Uint8Array(await blob.arrayBuffer()));
+		const b = await tau.files.makeBackup();
+		const r = await tau.files.readBackup(new Uint8Array(await b.blob.arrayBuffer()));
+		return { names: l.map(e => e.rel).join(), same: new TextDecoder().decode(l[0].bytes) === text, small: blob.size < text.length,
+			backup: r.entries.map(e => e.rel), application: r.note.application };
+	});
+	check("a zip is read back", back.names === "d/one.txt,two" && back.same && back.small, back);
+	check("the backup has the files of the user", back.backup.includes("Documents/proj/b.tm") && back.application === "Tau", back);
+	// a zip which is added is unpacked
+	await p.page.evaluate(async () => {
+		const blob = await tau.files.zip([{ rel: "notes/x.txt", bytes: new TextEncoder().encode("x") }]);
+		const data = new DataTransfer();
+		data.items.add(new File([blob], "notes.zip"));
+		const input = document.querySelector('.tau-files input[data-what="zip"]');
+		input.files = data.files;
+		input.dispatchEvent(new Event("change", { bubbles: true }));
+	});
+	await p.filesPanel("browse", f => f.names.includes("notes"));
+	// deleted, after a question
+	await p.filesRow("notes", "delete");
+	await p.filesPanel("browse", f => f.asking.startsWith("Delete notes and everything in it"));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.filesPanel("browse", f => !f.asking && f.names.join() === "proj");
+	// the files of TeXmacs: shown, not changed; one is copied to the
+	// TeXmacs folder of the user
+	await p.page.click('.tau-files-place[data-place="sys"]');
+	f = await p.filesPanel("browse", f => f.dir === "/texmacs");
+	check("the files of TeXmacs", f.names.includes("styles") && f.names.includes("LICENSE") && !f.tools, f);
+	await p.filesRow("LICENSE", "customize");
+	await p.until("it is copied", () => p.count(".tau-toast").then(n => n > 0));
+	await p.page.click('.tau-files-place[data-place="tm"]');
+	f = await p.filesPanel("browse", f => f.dir === "/home/tau/.TeXmacs");
+	check("the copy in the TeXmacs folder of the user", f.names.includes("LICENSE") && f.tools, f);
+	// a document is opened from the panel
+	await p.page.click('.tau-files-place[data-place="files"]');
+	await p.filesPanel("browse", f => f.dir === "/home/tau/Documents");
+	await p.filesRow("proj");
+	await p.filesPanel("browse", f => f.names.includes("b.tm"));
+	await p.filesRow("b.tm", "open");
+	await p.until("the document is a tab", async () => (await p.tabs())[0].some(t => t.current && t.name === "b.tm"));
+	check("one tab more, and no panel", (await p.tabs())[0].length === n + 1 && (await p.count(".tau-files")) === 0);
+	// the keyboard is the document's again; a save proposes its folder
+	await p.type("More.");
+	await p.until("typing reaches the document", async () => (await p.tabs())[0].some(t => t.current && t.name === "b.tm •"));
+	await p.choose("File", "Save as");
+	f = await p.filesPanel("save");
+	check("the folder of the document", f.dir === "/home/tau/Documents/proj" && f.name === "b.tm", f);
+	await p.key("Escape");
+	await p.until("the panel is given up", async () => (await p.count(".tau-files")) === 0);
+	// an image is asked for in the same panel
+	await p.scheme('(choose-file (lambda (u) (set-message (url->system u) "chosen")) "Load image" "image")');
+	f = await p.filesPanel("open");
+	check("the title of the question", f.title === "Load image", f);
+	await p.filesRow("proj");
+	await p.filesPanel("open", f => f.names.includes("pic.svg"));
+	await p.filesRow("pic.svg", "dblclick");
+	await p.until("the image is given to the core", async () => (await p.count(".tau-files")) === 0);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("kept in the browser", async p => {
 	await p.open("home");
 	check("this page keeps the home directory", (await p.count(".tau-notice")) === 0);
 	await p.newDocument();
 	await p.type("To be kept.");
 	await p.choose("File", "Save as");
-	await p.dialog("Save");
+	await p.filesPanel("save");
 	const name = "kept-" + Date.now() + ".tm";
-	await p.type(name);
+	await p.filesName(name);
 	await p.key("Enter");
 	await p.until("the document has its name", async () => (await p.tabs())[0].some(t => t.current && t.name === name));
 	await sleep(1500); // (written to the browser a moment later)
@@ -547,15 +702,40 @@ test("kept in the browser", async p => {
 	// the page again: the document is there
 	await p.open("home");
 	await p.choose("File", "Load");
-	const d = await p.dialog("Load file");
-	check("the document is offered after the page was loaded again", d.text.includes(name), d.text);
-	await p.page.evaluate(name => {
-		const select = document.querySelector(".tau-dialog .tau-choice");
-		select.value = name;
-		select.dispatchEvent(new Event("change", { bubbles: true }));
-	}, name);
-	await (await p.find(".tau-dialog .tau-button", "Open")).click();
+	let f = await p.filesPanel("open");
+	check("the document is offered after the page was loaded again", f.names.includes(name), f);
+	await p.filesRow(name);
+	await p.filesPanel("open", f => f.names.includes(name));
+	await p.page.click('.tau-files [data-what="ok"]');
 	await p.until("and opens", async () => (await p.tabs())[0].some(t => t.current && t.name === name));
+	// a backup of what is kept, the document deleted, the backup restored:
+	// Tau starts again with the document
+	await p.scheme("(tau-files)");
+	await p.filesPanel("browse", f => f.names.includes(name));
+	await p.page.evaluate(async () => {
+		const b = await tau.files.makeBackup();
+		window.backup = new Uint8Array(await b.blob.arrayBuffer());
+		window.backupFiles = b.files;
+	});
+	check("the backup has files", (await p.page.evaluate(() => window.backupFiles)) >= 1);
+	await p.filesRow(name, "delete");
+	await p.filesPanel("browse", f => f.asking.startsWith("Delete " + name));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.filesPanel("browse", f => !f.asking && !f.names.includes(name));
+	await p.page.evaluate(() => { window.before = true; tau.files.restoreBackup(window.backup); });
+	await p.filesPanel("browse", f => f.asking.startsWith("Restore the backup"));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.until("the page starts again", () => p.page.evaluate(() => !window.before && !!(window.tau && tau.state.started)), 90000);
+	await p.until("the bars come", () => p.count("#tau-menu .tau-entry").then(n => n >= 8), 30000);
+	await p.page.evaluate(() => tau.files.browse());
+	f = await p.filesPanel("browse");
+	check("the document is back", f.names.includes(name), f);
+	await p.filesRow(name, "delete");
+	await p.filesPanel("browse", f => f.asking.startsWith("Delete " + name));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.filesPanel("browse", f => !f.names.includes(name));
+	await p.key("Escape");
+	await sleep(1500);
 	// TeXmacs is closed: it starts again
 	await p.page.evaluate(() => { window.before = true; });
 	await p.scheme("(quit-TeXmacs)");

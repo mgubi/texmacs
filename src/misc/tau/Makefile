@@ -87,7 +87,7 @@ $(OUT)/node/tau.js: $(OBJECTS) $(LIBDEPS) $(TM)/misc/wasm/node-pre.js $(W)/sourc
 # for the page: the core for a worker (tau.js, tau.wasm), the files of
 # TeXmacs in packages (misc/wasm/package.py and packages.js, as the browser
 # build of TeXmacs made them) and the page itself (misc/tau/web)
-WEB_FILES := index.html tau.mjs chrome.mjs keys.mjs app.mjs tau-worker.js icon.svg icon-192.png
+WEB_FILES := index.html tau.mjs chrome.mjs keys.mjs app.mjs files.mjs tau-worker.js icon.svg icon-192.png
 # the plugins which are Web Workers (src/System/Link/worker_link.cpp, made
 # by misc/wasm/workers.js): their scripts, next to the page. Python and R
 # load their programs from the network when a session starts.
@@ -217,6 +217,12 @@ check: node
 TOOLS ?= tools
 browser-check: web
 	$(NODE) $(W)/test/browser-test.mjs --dir $(OUT)/web --tools $(TOOLS) $(if $(BROWSER),--browser $(BROWSER)) $(if $(ONLY),--only $(ONLY))
+
+# the page in Safari, by hand on a Mac (misc/tau/test/safari-test.mjs: Safari
+# needs "Allow remote automation"); SAFARI=--manual also opens the user manual
+safari-check: web
+	$(NODE) $(W)/test/safari-test.mjs --dir $(OUT)/web $(SAFARI)
+
 
 FORCE:
 
