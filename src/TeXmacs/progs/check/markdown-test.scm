@@ -62,7 +62,38 @@
           '(markdown "line one" (br) "line two" (br) "three"))
   (check= (parse "a<br>b &amp; &lt; &#65;")
           '(markdown "a" (html "<br>") "b & < A"))
-  (check= (parse "1986\\. A year") '(markdown "1986. A year")))
+  (check= (parse "1986\\. A year") '(markdown "1986. A year"))
+  ;; a link holds no other link, and an address in its text is text
+  (check= (parse "[https://x.y](https://x.y) [a <http://b.c>](u)")
+          '(markdown (a (@ (href "https://x.y")) "https://x.y") " "
+                     (a (@ (href "u")) "a http://b.c")))
+  ;; the runs of * and _ are matched by the lengths which they had first
+  (check= (parse "_foo_bar_baz_ __foo__bar foo_bar_")
+          '(markdown (em "foo_bar_baz") " _" (em "foo__bar foo_bar")))
+  (check= (parse "*foo**bar**baz* *foo**bar* **foo*bar** ***a** b*")
+          '(markdown (em "foo" (strong "bar") "baz") " " (em "foo**bar") " "
+                     (strong "foo*bar") " " (em (strong "a") " b"))))
+
+;; Texts which took a time growing as the square of their length, or
+;; faster: images inside each other, and what opens and is never closed.
+(define (test-parse-long)
+  (check-group "parse long")
+  (let* ((rep (lambda (s n) (apply string-append (make-list n s))))
+         (len (lambda (s) (length (parse s)))))
+    (check= (len (string-append (rep "![" 40) "a" (rep "](u)" 40))) 2)
+    (check= (len (rep "*a_ " 20000)) 2)
+    (check= (len (string-append "a**b " (rep "c* " 20000))) 2)
+    (check= (len (rep "*a b~~ c* " 10000)) 20001)
+    (check= (len (rep "[a " 20000)) 2)
+    (check= (len (string-append (rep "[" 10000) (rep "]" 10000))) 2)
+    (check= (len (rep "[a]((" 10000)) 2)
+    (check= (len (rep "[a](u \"" 10000)) 2)
+    (check= (len (rep "a < b " 20000)) 2)
+    (check= (len (rep "<a <a " 10000)) 2)
+    (check= (len (rep "AT&T " 20000)) 2)
+    (check= (len (rep "\\(a " 20000)) 2)
+    (check= (len (rep "word word\n" 40000)) 2)
+    (check= (len (rep "<!-- x\n\n" 5000)) 5001)))
 
 ;; The formulas are kept as LaTeX. A dollar opens a formula as for Pandoc:
 ;; not before a space, and the one which closes is not after a space nor
@@ -75,7 +106,20 @@
   (check= (parse "\\(a\\) \\[2\\] \\[x=1\\]")
           '(markdown (math "a") " [2] " (displaymath "x=1")))
   (check= (parse "$$\nx=1\n$$") '(markdown (displaymath "x=1")))
-  (check= (parse "\\[\nx=1\n\\]") '(markdown (displaymath "x=1"))))
+  (check= (parse "\\[\nx=1\n\\]") '(markdown (displaymath "x=1")))
+  (check= (parse "\\[ x=1 \\]\n\ntext") '(markdown (displaymath "x=1") (p "text")))
+  ;; the brackets which other programs escape hold words, formulas do not
+  (check= (parse "\\[see Smith (2010)\\] \\[sic!\\] \\[f(x)\\] \\[\\alpha\\]")
+          '(markdown "[see Smith (2010)] [sic!] " (displaymath "f(x)") " "
+                     (displaymath "\\alpha")))
+  ;; what opens a formula and is not closed before a blank line is text,
+  ;; and the text after a formula is kept
+  (check= (parse "$$ is the price\n\nsecond")
+          '(markdown (p "$$ is the price") (p "second")))
+  (check= (parse "\\[x] done\n\nsecond")
+          '(markdown (p "[x] done") (p "second")))
+  (check= (parse "$$x$$ and text")
+          '(markdown (displaymath "x") (p "and text"))))
 
 (define (test-parse-blocks)
   (check-group "parse blocks")
@@ -96,7 +140,18 @@
           '(markdown (html "<div>\nhtml\n</div>")))
   (check= (parse "x[^n] y\n\n[^n]: note")
           '(markdown (p "x" (footnote "n") " y")
-                     (footnote-def "n" (p "note")))))
+                     (footnote-def "n" (p "note"))))
+  ;; a rule at the start is not a header without keys
+  (check= (parse "---\n\ntext\n\n---\n\nmore")
+          '(markdown (hr) (p "text") (hr) (p "more")))
+  (check= (parse "---\nFoo\n---") '(markdown (hr) (h2 "Foo")))
+  ;; the definition of a link has an address without spaces
+  (check= (parse "[Note]: see the appendix\n\n[n]: u 'T'\n\n[n]")
+          '(markdown (p "[Note]: see the appendix")
+                     (p (a (@ (href "u") (title "T")) "n"))))
+  ;; a comment may hold a blank line
+  (check= (parse "<!-- a\n\nb -->\n\ntext")
+          '(markdown (html "<!-- a\n\nb -->") (p "text"))))
 
 (define (test-parse-lists)
   (check-group "parse lists")
@@ -121,7 +176,15 @@
                             (tr (td (@ (align "center")) "1")
                                 (td (@ (align "right")) "2")))))
   (check= (parse "a | b\n--|--\n1 | 2")
-          '(markdown (table (tr (th "a") (th "b")) (tr (td "1") (td "2"))))))
+          '(markdown (table (tr (th "a") (th "b")) (tr (td "1") (td "2")))))
+  ;; a table after the lines of a paragraph
+  (check= (parse "intro\n| a | b |\n|---|---|\n| 1 | 2 |")
+          '(markdown (p "intro")
+                     (table (tr (th "a") (th "b")) (tr (td "1") (td "2")))))
+  ;; in code a backslash is one, and a bar does not end the cell
+  (check= (parse "| a | b |\n|---|---|\n| `x\\` | ``c|d`` |")
+          '(markdown (table (tr (th "a") (th "b"))
+                            (tr (td (code "x\\")) (td (code "c|d")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The serializer
@@ -145,7 +208,16 @@
           "---\ntitle: T\nauthor: A\n---\n\nx\n")
   ;; the code is between more backquotes than it holds
   (check= (write-md '(markdown (code "a`b"))) "``a`b``")
-  (check= (write-md '(markdown (pre "```\nx"))) "````\n```\nx\n````\n"))
+  (check= (write-md '(markdown (pre "```\nx"))) "````\n```\nx\n````\n")
+  ;; code with a space at each end gets one more, which the readers drop
+  (check= (write-md '(markdown (code " a "))) "`  a  `")
+  ;; a heading is one line, and the # which ends it is text
+  (check= (write-md '(markdown (h1 "foo #") (h2 "a" (br) "b") (h1 "c#")))
+          "# foo \\#\n\n## a b\n\n# c#\n")
+  ;; two lists of a kind in a row have different markers
+  (check= (write-md '(markdown (ul (li (p "a"))) (ul (li (p "b")))
+                               (ol (li (p "c"))) (ol (li (p "d")))))
+          "- a\n\n* b\n\n1. c\n\n1) d\n"))
 
 ;; What would be read as markup is escaped, and nothing else.
 (define (test-serialize-escapes)
@@ -156,14 +228,30 @@
           "snake_case 2 * 3 a < b & c")
   (check= (write-md '(markdown "a $5 &amp; `q`")) "a \\$5 \\&amp; \\`q\\`")
   (check= (write-md '(markdown "[x](y) [k]: v [^1]"))
-          "\\[x\\](y) [k\\]: v \\[^1]")
+          "[x\\](y) [k\\]: v [\\^1]")
   (check= (write-md '(markdown (p "# not heading") (p "1. not list")
                                (p "- not item") (p "> not quote")))
           "\\# not heading\n\n1\\. not list\n\n\\- not item\n\n\\> not quote\n")
   (check= (write-md '(markdown (ul (li (p "[ ] not a task")))))
-          "- \\[ ] not a task\n")
+          "- [ \\] not a task\n")
   (check= (write-md '(markdown (table (tr (th "a|b") (th (math "|x|"))))))
-          "| a\\|b | $\\vert x\\vert $ |\n| ---- | --------------- |\n"))
+          "| a\\|b | $\\vert x\\vert $ |\n| ---- | --------------- |\n")
+  ;; an ! before a link, a ~, a ] in the text of a link
+  (check= (write-md '(markdown (p "Wow!" (a (@ (href "u")) "here"))
+                               (p "a ~b~ c ~ d")
+                               (p (a (@ (href "u")) "a]b [ c"))))
+          "Wow\\![here](u)\n\na \\~b\\~ c ~ d\n\n[a\\]b &#91; c](u)\n")
+  ;; next to a letter, the punctuation at the ends of emphasis goes outside
+  (check= (write-md '(markdown "f" (em "(x)") "y A " (em "note.") "Then a"
+                               (strong ".") "b"))
+          "f(*x*)y A *note*.Then a.b")
+  ;; a digit after a formula
+  (check= (write-md '(markdown "x" (math "n") "3")) "x$n$&#51;")
+  ;; a line which would make a table of the line before
+  (check= (write-md '(markdown (p "a | b" (br) "--|--"))) "a | b\\\n\\--|--\n")
+  ;; an address in a text is a link, with all its characters
+  (check= (write-md '(markdown "see http://x.org/?a=1&b=2 and http://x.org/_f_g ok"))
+          "see <http://x.org/?a=1&b=2> and <http://x.org/_f_g> ok"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The import
@@ -192,6 +280,10 @@
           '(subsection (concat (image "i.png" "36px" "" "" "") " T")))
   (check= (import "a  \nb") '(concat "a" (next-line) "b"))
   (check= (import "x[^n]\n\n[^n]: note") '(concat "x" (footnote "note")))
+  ;; a footnote inside itself is its mark
+  (check= (import "x[^a]\n\n[^a]: y[^a]") '(concat "x" (footnote "y[^a]")))
+  ;; a backquote stays one
+  (check= (import "`` a`b `` c ` d") '(concat (verbatim "a`b") " c ` d"))
   ;; the formulas go through the LaTeX converter, HTML through the HTML one
   (check= (import "$x^2$") '(math (concat "x" (rsup "2"))))
   (check= (import "$$\nx=1\n$$") '(equation* (document "x=1")))
@@ -241,6 +333,9 @@
           '(python-code (document "print(1)")))
   (check= (import "```\nx\ny\n```") '(verbatim-code (document "x" "y")))
   (check= (import "---") '(hrule))
+  (check= (import "5. a\n6. b")
+          '(enumerate (document (concat (assign "item-nr" "4") (item) "a")
+                                (concat (item) "b"))))
   (check= (import "| a | b |\n|:-:|--:|\n| 1 | 2 |")
           '(block (tformat (cwith "1" "-1" "1" "1" "cell-halign" "c")
                            (cwith "1" "-1" "2" "2" "cell-halign" "r")
@@ -283,6 +378,13 @@
     (check= (doc "# A\n\n# B\n")
             '(document (body (document (section "A") (section "B")))
                        (style "generic")))
+    ;; the quotes and the backslashes of the header
+    (check= (doc "---\ntitle: \"A \\\"b\\\" c\\\\d\"\nauthor: 'it''s'\n---\n")
+            '(document
+               (body (document
+                       (doc-data (doc-title "A \"b\" c\\d")
+                                 (doc-author (author-data (author-name "it's"))))))
+               (style "generic")))
     (check= (doc "") '(document (body (document "")) (style "generic")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -313,6 +415,11 @@
   (check= (export '(image "i.png" "" "" "" "")) "![](i.png)")
   (check= (export '(concat "a" (next-line) "b")) "a\\\nb")
   (check= (export '(concat "a" (footnote "note") "b")) "a[^1]b\n\n[^1]: note\n")
+  (check= (export '(concat "a" (footnote (concat "b" (footnote "c"))) "d"))
+          "a[^1]d\n\n[^1]: b[^2]\n\n[^2]: c\n")
+  ;; code after code is one piece of code
+  (check= (export '(concat "a" (verbatim "x") (verbatim "``") (verbatim "`")))
+          "a```` x``` ````")
   (check= (export '(with "color" "red" "r")) "r")
   (check= (export '(concat (label "l") "see " (reference "l"))) "see l")
   ;; ... and ` are not the ellipsis and the quote of the conversion
@@ -441,7 +548,20 @@
   (check= (export '(block (tformat (cwith "1" "-1" "2" "2" "cell-halign" "r")
                                    (table (row (cell "a") (cell "b"))
                                           (row (cell "1") (cell "2"))))))
-          "| a   |   b |\n| --- | --: |\n| 1   |   2 |\n"))
+          "| a   |   b |\n| --- | --: |\n| 1   |   2 |\n")
+  ;; a cell holds text: a formula, code and a list are written as text
+  (check= (export '(tabular (tformat (table
+                     (row (cell "a") (cell "b"))
+                     (row (cell (equation* (document "a|b")))
+                          (cell (verbatim-code (document "c1" "c2"))))
+                     (row (cell (enumerate (document (concat (item) "x")
+                                                     (concat (item) "y"))))
+                          (cell ""))))))
+          (string-append
+            "| a            | b            |\n"
+            "| ------------ | ------------ |\n"
+            "| $$a\\vert b$$ | `c1`<br>`c2` |\n"
+            "| 1. x<br>2. y |              |\n")))
 
 ;; A document: a title alone is a heading, a title with authors or a date
 ;; is a YAML header, unless the option says otherwise.
@@ -490,7 +610,14 @@
     "| a   |   b |\n| --- | --: |\n| 1   |   2 |\n"
     "a\n\n$$\nx = 1\n$$\n\nb\n"
     "x[^1]\n\n[^1]: note\n"
-    "2 * 3, snake_case, \\*not em\\*, No name [2]"))
+    "2 * 3, snake_case, \\*not em\\*, No name [2]"
+    "[x\\] done"
+    "Wow\\![here](http://x.org)"
+    "a \\~b\\~ c"
+    "- a\n\n* b\n"
+    "1. a\n\n1) b\n"
+    "5. a\n6. b\n"
+    "# foo \\#\n"))
 
 ;; ... and these trees from Markdown.
 (define tm-same
@@ -510,7 +637,26 @@
     (verbatim-code (document "x" "y"))
     (python-code (document "print(1)"))
     (document "a" (equation* (document "x=1")) "b")
-    (concat "a" (footnote "note") "b")))
+    (concat "a" (footnote "note") "b")
+    ;; what was read back as something else
+    "[x] done"
+    "[^1] is a regexp"
+    (document "[x] done" "second" "third")
+    (itemize (document (concat (item) "[x] literal") (concat (item) "b")))
+    (concat "Wow!" (hlink "here" "http://x.org"))
+    "a ~b~ c"
+    (verbatim " a ")
+    (scm-code (document "`(a ,b)"))
+    (concat "x" (math "n") "3 apples")
+    (hlink "a]b" "http://x.org")
+    (document (section "foo #") "t")
+    (document (itemize (document (concat (item) "a")))
+              (itemize (document (concat (item) "b"))))
+    (enumerate (document (concat (assign "item-nr" "4") (item) "a")
+                         (concat (item) "b")))
+    (concat "a | b" (next-line) "--|--")
+    (block (tformat (table (row (cell (strong "a")) (cell (strong "b")))
+                           (row (cell (verbatim "x\\")) (cell "y")))))))
 
 (define (test-round-trips)
   (check-group "round trips")
@@ -557,6 +703,7 @@
   (:synopsis "Run the tests of the Markdown converters, return the failures")
   (check-suite "markdown")
   (test-parse-inline)
+  (test-parse-long)
   (test-parse-math)
   (test-parse-blocks)
   (test-parse-lists)

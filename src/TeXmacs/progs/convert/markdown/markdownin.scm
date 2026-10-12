@@ -108,6 +108,34 @@
   (with r (string-search-forwards what i s)
     (and (>= r 0) r)))
 
+(define (md-code-end s i n)
+  ;; the end of the run of n backquotes which closes code, from i on, or #f
+  (let loop ((k i))
+    (with b (md-find s k #\`)
+      (and b
+           (with e (md-run s b #\`)
+             (if (== (- e b) n) e (loop e)))))))
+
+;; What is known of the text which is cut into tokens (see md-tokens), so
+;; that a search which fails is made once and not again from each of the
+;; characters which follow: the strings which do not occur any more, the
+;; characters which close no title of a link any more, and for the position
+;; of a [ the one of its ], or 0 when it has none.
+(define md-none #f)
+
+(define (md-known key)
+  (and md-none (ahash-ref md-none key)))
+
+(define (md-note! key val)
+  (if (not md-none) (set! md-none (make-ahash-table)))
+  (ahash-set! md-none key val))
+
+(define (md-search* s i what)
+  ;; as md-search, in the text which is cut into tokens
+  (and (not (md-known what))
+       (or (md-search s i what)
+           (begin (md-note! what #t) #f))))
+
 (define (md-expand-tabs s)
   ;; the tabs at the start of the line as spaces, to the next multiple of 4
   (if (not (md-find s 0 #\tab)) s
@@ -126,13 +154,27 @@
   ;; the lines of the text, without their ends
   (if (>= (string-search-forwards "\r" 0 s) 0)
       (md-lines-any s)
-      ;; the usual case, ends of lines of Unix: from one to the next
-      (let loop ((start 0) (acc '()))
-        (with i (string-search-forwards "\n" start s)
-          (cond ((>= i 0) (loop (+ i 1) (cons (substring s start i) acc)))
-                ((< start (string-length s))
-                 (reverse (cons (substring s start (string-length s)) acc)))
-                (else (reverse acc)))))))
+      ;; the usual case, ends of lines of Unix: from one to the next. The
+      ;; search takes a time which grows with the length of its string: it
+      ;; is made in pieces of the text
+      (let ((n (string-length s)))
+        (let piece ((a 0) (part "") (acc '()))
+          ;; part: the start of a line which the pieces before did not end
+          (if (>= a n)
+              (reverse (if (== part "") acc (cons part acc)))
+              (let* ((b (min n (+ a 8192)))
+                     (t (substring s a b)))
+                (let loop ((start 0) (part part) (acc acc))
+                  (with i (string-search-forwards "\n" start t)
+                    (if (>= i 0)
+                        (loop (+ i 1) ""
+                              (cons (if (== part "") (substring t start i)
+                                        (string-append part
+                                                       (substring t start i)))
+                                    acc))
+                        (piece b
+                               (string-append part (substring t start (- b a)))
+                               acc))))))))))
 
 (define (md-lines-any s)
   (let loop ((i 0) (start 0) (acc '()))
@@ -295,46 +337,49 @@
                          "style" "summary" "table" "tbody" "td" "tfoot" "th"
                          "thead" "title" "tr" "ul" "video"))))))
 
-(define (md-literal-brackets? s i)
-  ;; whether \[ at i opens plain text and not a formula: \[2\], \[see below\]
-  ;; are the escaped brackets which other programs write
-  (with e (md-search s (+ i 2) "\\]")
-    (and e
-         (let* ((t (md-trim (substring s (+ i 2) e)))
-                (m (string-length t)))
-           (and (> m 0)
-                (not (and (== m 1) (char-alphabetic? (string-ref t 0))))
-                (let loop ((j 0))
-                  (or (>= j m)
-                      (let ((c (string-ref t j)))
-                        (and (or (char-alphabetic? c) (char-numeric? c)
-                                 (in? c '(#\space #\, #\. #\; #\: #\-)))
-                             (loop (+ j 1)))))))))))
+(define (md-literal-brackets? s i e)
+  ;; whether the \[ at i, which the \] at e closes, holds plain text and not
+  ;; a formula: \[2\], \[sic!\], \[see Smith (2010)\] are the escaped brackets
+  ;; which other programs write. A text has none of the characters of the
+  ;; formulas, and a word of two letters or more, or no letter at all
+  (and e
+       (let loop ((j (+ i 2)) (run 0) (word? #f) (letter? #f))
+         (if (>= j e) (or word? (not letter?))
+             (let ((c (string-ref s j)))
+               (cond ((or (md-ascii-alpha? c) (< 127 (char->integer c)))
+                      (loop (+ j 1) (+ run 1) (or word? (> run 0)) #t))
+                     ((in? c '(#\\ #\^ #\_ #\= #\+ #\< #\> #\{ #\} #\|)) #f)
+                     (else (loop (+ j 1) 0 word? letter?))))))))
 
 (define (md-math-start? s)
+  ;; does the line start with what opens a formula, $$ or \[ ?
   (let ((t (md-trim s)))
     (or (md-starts? t 0 "$$")
-        (and (md-starts? t 0 "\\[") (not (md-literal-brackets? t 0))))))
+        (and (md-starts? t 0 "\\[")
+             (not (md-literal-brackets? t 0 (md-search t 2 "\\]")))))))
 
 (define (md-split-row s)
-  ;; the cells of a row of a table
+  ;; the cells of a row of a table; the bars of code are text, as the
+  ;; backslashes of code are
   (let* ((t (md-trim s))
          (t (if (md-starts? t 0 "|") (substring t 1 (string-length t)) t))
          (n (string-length t))
          (t (if (and (> n 0) (char=? (string-ref t (- n 1)) #\|)
                      (not (and (> n 1) (char=? (string-ref t (- n 2)) #\\))))
                 (substring t 0 (- n 1)) t)))
-    (let loop ((i 0) (start 0) (acc '()) (code #f))
+    (let loop ((i 0) (start 0) (acc '()))
       (cond ((>= i (string-length t))
              (reverse (cons (md-trim (substring t start i)) acc)))
             ((and (char=? (string-ref t i) #\\) (< (+ i 1) (string-length t)))
-             (loop (+ i 2) start acc code))
+             (loop (+ i 2) start acc))
             ((char=? (string-ref t i) #\`)
-             (loop (+ i 1) start acc (not code)))
-            ((and (char=? (string-ref t i) #\|) (not code))
+             (let* ((j (md-run t i #\`))
+                    (e (md-code-end t j (- j i))))
+               (loop (or e j) start acc)))
+            ((char=? (string-ref t i) #\|)
              (loop (+ i 1) (+ i 1)
-                   (cons (md-trim (substring t start i)) acc) code))
-            (else (loop (+ i 1) start acc code))))))
+                   (cons (md-trim (substring t start i)) acc)))
+            (else (loop (+ i 1) start acc))))))
 
 (define (md-unescape-pipes s)
   (string-replace s "\\|" "|"))
@@ -358,7 +403,10 @@
          (and (nnull? l) (list-and l) l))))
 
 (define (md-ref-def s)
-  ;; (label url title) for the definition of a link, [label]: url "title"
+  ;; (label url title) for the definition of a link, [label]: url "title".
+  ;; The address has no space, or is between < and >, and nothing but a
+  ;; title between quotes or parentheses follows it: [Note]: see below is
+  ;; the text of a paragraph
   (let* ((i (md-indent s)))
     (and (<= i 3) (md-starts? s i "[") (not (md-starts? s i "[^"))
          (let ((j (md-find s i #\])))
@@ -367,23 +415,27 @@
                        (n (string-length s))
                        (angle? (md-starts? s k "<"))
                        (e (if angle?
-                              (or (md-find s k #\>) n)
+                              (md-find s k #\>)
                               (let loop ((e k))
                                 (if (and (< e n) (not (md-space? (string-ref s e))))
-                                    (loop (+ e 1)) e))))
-                       (url (if angle?
-                                (substring s (+ k 1) e)
-                                (substring s k e)))
-                       (rest (md-trim (substring s (min n (if angle? (+ e 1) e))
-                                                 n)))
-                       (m (string-length rest))
-                       (title (if (and (>= m 2)
-                                       (in? (string-ref rest 0) '(#\" #\' #\()))
-                                  (substring rest 1 (- m 1))
-                                  "")))
-                  (and (!= url "")
-                       (or (== rest "") (!= title "") (>= m 2))
-                       (list (md-label (substring s (+ i 1) j)) url title))))))))
+                                    (loop (+ e 1)) e)))))
+                  (and e
+                       (let* ((url (if angle?
+                                       (substring s (+ k 1) e)
+                                       (substring s k e)))
+                              (rest (md-trim (substring s (if angle? (+ e 1) e)
+                                                        n)))
+                              (m (string-length rest))
+                              (title? (and (>= m 2)
+                                           (in? (string
+                                                  (string-ref rest 0)
+                                                  (string-ref rest (- m 1)))
+                                                '("\"\"" "''" "()")))))
+                         (and (!= url "")
+                              (or (== rest "") title?)
+                              (list (md-label (substring s (+ i 1) j)) url
+                                    (if title? (substring rest 1 (- m 1))
+                                        "")))))))))))
 
 (define (md-footnote-def s)
   ;; (label . text) for the definition of a footnote, [^label]: text
@@ -417,13 +469,45 @@
 ;; A block whose text is not parsed yet is (!text tag attributes "text"); the
 ;; functions below return the blocks and the lines which remain.
 
+(define (md-yaml-key? s)
+  ;; does the line start with a key of YAML, as in title: The title?
+  (let ((n (string-length s)))
+    (and (> n 0) (md-ascii-alpha? (string-ref s 0))
+         (let loop ((i 1))
+           (and (< i n)
+                (let ((c (string-ref s i)))
+                  (cond ((char=? c #\:)
+                         (or (== (+ i 1) n) (md-space? (string-ref s (+ i 1)))))
+                        ((or (md-ascii-alpha? c) (md-digit? c)
+                             (char=? c #\_) (char=? c #\-))
+                         (loop (+ i 1)))
+                        (else #f))))))))
+
+(define (md-yaml? lines)
+  ;; are the lines a YAML header and what follows it: keys with their
+  ;; values, up to a line --- or ... ? A document may start with a rule
+  (let loop ((l lines) (key? #f))
+    (and (nnull? l)
+         (let ((s (md-trim-right (car l))))
+           (cond ((in? s '("---" "...")) key?)
+                 ((or (== s "") (char=? (string-ref s 0) #\#))
+                  (loop (cdr l) key?))
+                 ((md-yaml-key? s) (loop (cdr l) #t))
+                 ;; the lines of a value, the items of a list
+                 ((and key? (or (char=? (string-ref s 0) #\space)
+                                (md-starts? s 0 "- ")))
+                  (loop (cdr l) key?))
+                 (else #f))))))
+
 (define (md-front-matter lines)
   ;; the YAML header, as (meta (key "value")...), or #f
   (and (nnull? lines) (== (md-trim-right (car lines)) "---")
+       (md-yaml? (cdr lines))
        (let loop ((l (cdr lines)) (acc '()) (key #f))
          (cond ((null? l) #f)
                ((in? (md-trim-right (car l)) '("---" "..."))
                 (cons `(meta ,@(reverse acc)) (cdr l)))
+               ((md-starts? (car l) 0 "#") (loop (cdr l) acc key))
                (else
                  (let* ((s (car l))
                         (c (md-find s 0 #\:))
@@ -461,12 +545,21 @@
                          (else (loop (cdr l) acc key)))))))))
 
 (define (md-yaml-value s)
+  ;; a value of YAML without its quotes: between " a backslash escapes a
+  ;; backslash or a quote, between ' two quotes are one
   (let* ((t (md-trim s))
-         (n (string-length t)))
-    (if (and (>= n 2) (in? (string-ref t 0) '(#\" #\'))
-             (char=? (string-ref t (- n 1)) (string-ref t 0)))
-        (substring t 1 (- n 1))
-        t)))
+         (n (string-length t))
+         (q (and (>= n 2) (char=? (string-ref t (- n 1)) (string-ref t 0))
+                 (string-ref t 0))))
+    (cond ((eqv? q #\")
+           (let loop ((i 1) (acc '()))
+             (cond ((>= i (- n 1)) (list->string (reverse acc)))
+                   ((and (char=? (string-ref t i) #\\) (< (+ i 2) n)
+                         (in? (string-ref t (+ i 1)) '(#\\ #\")))
+                    (loop (+ i 2) (cons (string-ref t (+ i 1)) acc)))
+                   (else (loop (+ i 1) (cons (string-ref t i) acc))))))
+          ((eqv? q #\') (string-replace (substring t 1 (- n 1)) "''" "'"))
+          (else t))))
 
 (define (md-yaml-values s)
   ;; the values of a key: several for a list on one line, [a, b]
@@ -508,34 +601,43 @@
           (else (cons `(pre ,(md-join (reverse acc) "\n")) l)))))
 
 (define (md-math lines)
-  ;; a formula between $$ and $$, or \[ and \], on lines of its own
+  ;; a formula between $$ and $$, or \[ and \], on its line or on lines of
+  ;; its own; the text which follows its end is a line of those which
+  ;; remain. A formula holds no blank line: #f when it does not end before
+  ;; one, and what opens it is text then
   (let* ((first (md-trim (car lines)))
-         (open (if (md-starts? first 0 "$$") "$$" "\\["))
-         (close (if (== open "$$") "$$" "\\]"))
-         (rest (substring first 2 (string-length first)))
-         (e (md-search rest 0 close)))
-    (if e
-        ;; on one line; what follows the formula is dropped
-        (cons `(displaymath ,(md-trim (substring rest 0 e))) (cdr lines))
-        (let loop ((l (cdr lines)) (acc (if (md-blank? rest) '() (list rest))))
-          (cond ((null? l)
-                 (cons `(displaymath ,(md-join (reverse acc) "\n")) l))
-                ((md-search (car l) 0 close)
-                 (let* ((s (car l))
-                        (e (md-search s 0 close))
-                        (last (md-trim (substring s 0 e))))
+         (close (if (md-starts? first 0 "$$") "$$" "\\]")))
+    (let loop ((s (substring first 2 (string-length first)))
+               (l (cdr lines)) (acc '()))
+      (with e (md-search s 0 close)
+        (cond (e (let* ((last (md-trim (substring s 0 e)))
+                        (after (md-trim (substring s (+ e 2)
+                                                   (string-length s)))))
                    (cons `(displaymath
                             ,(md-join (reverse (if (== last "") acc
                                                    (cons last acc))) "\n"))
-                         (cdr l))))
-                (else (loop (cdr l) (cons (car l) acc))))))))
+                         (if (== after "") l (cons after l)))))
+              ((or (null? l) (md-blank? (car l))) #f)
+              (else (loop (car l) (cdr l)
+                          (if (md-blank? s) acc (cons s acc)))))))))
+
+;; whether the blocks which are parsed have no --> any more
+(define md-no-comment-end? #f)
 
 (define (md-html lines)
-  ;; HTML up to a blank line
-  (let loop ((l lines) (acc '()))
-    (if (or (null? l) (md-blank? (car l)))
-        (cons `(html ,(md-join (reverse acc) "\n")) l)
-        (loop (cdr l) (cons (car l) acc)))))
+  ;; HTML up to a blank line; a comment up to the line where it ends
+  (let* ((end? (lambda (s) (md-search s 0 "-->")))
+         (comment? (and (md-starts? (md-trim-left (car lines)) 0 "<!--")
+                        (not md-no-comment-end?)
+                        (or (list-find lines end?)
+                            (begin (set! md-no-comment-end? #t) #f)))))
+    (let loop ((l lines) (acc '()))
+      (cond ((and comment? (nnull? l) (end? (car l)))
+             (cons `(html ,(md-join (reverse (cons (car l) acc)) "\n"))
+                   (cdr l)))
+            ((or (null? l) (and (not comment?) (md-blank? (car l))))
+             (cons `(html ,(md-join (reverse acc) "\n")) l))
+            (else (loop (cdr l) (cons (car l) acc)))))))
 
 (define (md-blockquote lines)
   (let loop ((l lines) (acc '()))
@@ -652,6 +754,13 @@
             (cons `(footnote-def ,(car def) ,@(md-blocks (reverse acc)))
                   (append (reverse blanks) l))))))
 
+(define (md-table-start head s)
+  ;; the alignments of the columns of the table whose header is the line
+  ;; head and whose next line is s, or #f
+  (and (md-find head 0 #\|)
+       (with a (md-table-delim s)
+         (and a (== (length a) (length (md-split-row head))) a))))
+
 (define (md-paragraph lines)
   ;; a paragraph, a heading with a line under it, or a table
   (let loop ((l (cdr lines)) (acc (list (md-trim-left (car lines)))))
@@ -661,11 +770,13 @@
            (cons `(!text ,(if (== (md-setext (car l)) 1) 'h1 'h2) ()
                          ,(md-trim (md-join (reverse acc) "\n")))
                  (cdr l)))
-          ((and (null? (cdr acc)) (md-find (car acc) 0 #\|)
-                (md-table-delim (car l))
-                (== (length (md-table-delim (car l)))
-                    (length (md-split-row (car acc)))))
-           (md-table (cons (car acc) l) (md-table-delim (car l))))
+          ((md-table-start (car acc) (car l))
+           => (lambda (aligns)
+                (if (null? (cdr acc))
+                    (md-table (cons (car acc) l) aligns)
+                    ;; the lines before the header are a paragraph
+                    (cons `(!text p () ,(md-join (reverse (cdr acc)) "\n"))
+                          (cons (car acc) l)))))
           ((md-interrupts? (car l))
            (cons `(!text p () ,(md-join (reverse acc) "\n")) l))
           (else (loop (cdr l) (cons (md-trim-left (car l)) acc))))))
@@ -684,7 +795,7 @@
           ((md-hr? s) (cons '(hr) (cdr lines)))
           ((md-quote s) (md-blockquote lines))
           ((md-item s) (md-list lines (md-item s)))
-          ((md-math-start? s) (md-math lines))
+          ((and (md-math-start? s) (md-math lines)) => identity)
           ((md-html-block? s) (md-html lines))
           ((md-footnote-def s) (md-footnote lines (md-footnote-def s)))
           ((md-ref-def s)
@@ -695,12 +806,16 @@
           (else (md-paragraph lines)))))
 
 (define (md-blocks lines)
-  (let loop ((l lines) (acc '()))
-    (cond ((null? l) (reverse acc))
-          ((md-blank? (car l)) (loop (cdr l) acc))
-          (else
-            (with r (md-block l)
-              (loop (cdr r) (if (car r) (cons (car r) acc) acc)))))))
+  (with old md-no-comment-end?
+    (set! md-no-comment-end? #f)
+    (let loop ((l lines) (acc '()))
+      (cond ((null? l)
+             (set! md-no-comment-end? old)
+             (reverse acc))
+            ((md-blank? (car l)) (loop (cdr l) acc))
+            (else
+              (with r (md-block l)
+                (loop (cdr r) (if (car r) (cons (car r) acc) acc))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text: characters, code, mathematics
@@ -734,9 +849,14 @@
                   (byte (+ 128 (remainder n 64)))))))
 
 (define (md-entity s i)
-  ;; (text . end) for the entity which starts at the & at i, or #f
-  (let ((e (md-find s i #\;)))
-    (and e (> e (+ i 1)) (<= (- e i) 10)
+  ;; (text . end) for the entity which starts at the & at i, or #f; its
+  ;; name is short
+  (let* ((m (min (string-length s) (+ i 11)))
+         (e (let loop ((j (+ i 1)))
+              (cond ((>= j m) #f)
+                    ((char=? (string-ref s j) #\;) j)
+                    (else (loop (+ j 1)))))))
+    (and e (> e (+ i 1))
          (let* ((name (substring s (+ i 1) e))
                 (v (cond ((md-starts? name 0 "#x")
                           (string->number (substring name 2 (string-length name)) 16))
@@ -753,27 +873,22 @@
 (define (md-code-span s i)
   ;; (node . end) for the code which starts with the backquotes at i
   (let* ((j (md-run s i #\`))
-         (n (- j i)))
-    (let loop ((k j))
-      (with b (md-find s k #\`)
-        (and b
-             (with e (md-run s b #\`)
-               (if (== (- e b) n)
-                   (let* ((t (string-replace (substring s j b) "\n" " "))
-                          (m (string-length t))
-                          (t* (if (and (>= m 2)
-                                       (char=? (string-ref t 0) #\space)
-                                       (char=? (string-ref t (- m 1)) #\space)
-                                       (not (md-blank? t)))
-                                  (substring t 1 (- m 1)) t)))
-                     (cons `(code ,t*) e))
-                   (loop e))))))))
+         (e (md-code-end s j (- j i))))
+    (and e
+         (let* ((t (string-replace (substring s j (- e (- j i))) "\n" " "))
+                (m (string-length t))
+                (t* (if (and (>= m 2)
+                             (char=? (string-ref t 0) #\space)
+                             (char=? (string-ref t (- m 1)) #\space)
+                             (not (md-blank? t)))
+                        (substring t 1 (- m 1)) t)))
+           (cons `(code ,t*) e)))))
 
 (define (md-dollar-math s i)
   ;; (node . end) for a formula which starts with the dollar at i
   (let ((n (string-length s)))
     (if (md-starts? s i "$$")
-        (with e (md-search s (+ i 2) "$$")
+        (with e (md-search* s (+ i 2) "$$")
           (and e (> e (+ i 2))
                (cons `(displaymath ,(md-trim (substring s (+ i 2) e)))
                      (+ e 2))))
@@ -798,8 +913,8 @@
 (define (md-backslash-math s i)
   ;; (node . end) for a formula between \( and \) or \[ and \]
   (let* ((display? (md-starts? s i "\\["))
-         (e (md-search s (+ i 2) (if display? "\\]" "\\)"))))
-    (and e (not (and display? (md-literal-brackets? s i)))
+         (e (md-search* s (+ i 2) (if display? "\\]" "\\)"))))
+    (and e (not (and display? (md-literal-brackets? s i e)))
          (cons (list (if display? 'displaymath 'math)
                      (md-trim (string-replace (substring s (+ i 2) e) "\n" " ")))
                (+ e 2)))))
@@ -809,18 +924,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (md-bracket-end s i)
-  ;; the ] which closes the [ at i, or #f
-  (let ((n (string-length s)))
-    (let loop ((j (+ i 1)) (depth 1))
-      (cond ((>= j n) #f)
-            ((char=? (string-ref s j) #\\) (loop (+ j 2) depth))
-            ((char=? (string-ref s j) #\`)
-             (with c (md-code-span s j)
-               (loop (if c (cdr c) (md-run s j #\`)) depth)))
-            ((char=? (string-ref s j) #\[) (loop (+ j 1) (+ depth 1)))
-            ((char=? (string-ref s j) #\])
-             (if (== depth 1) j (loop (+ j 1) (- depth 1))))
-            (else (loop (+ j 1) depth))))))
+  ;; the ] which closes the [ at i, or #f. The brackets which are met on the
+  ;; way are noted with their ends: they are asked for next
+  (let ((n (string-length s))
+        (known (md-known i)))
+    (if known (and (> known 0) known)
+        (let loop ((j (+ i 1)) (open '()))
+          ;; open: the [ after i which are not closed yet, the last one first
+          (cond ((>= j n)
+                 (for-each (lambda (k) (md-note! k 0)) (cons i open))
+                 #f)
+                ((char=? (string-ref s j) #\\) (loop (+ j 2) open))
+                ((char=? (string-ref s j) #\`)
+                 (let* ((k (md-run s j #\`))
+                        (e (md-code-end s k (- k j))))
+                   (loop (or e k) open)))
+                ((char=? (string-ref s j) #\[) (loop (+ j 1) (cons j open)))
+                ((char=? (string-ref s j) #\])
+                 (if (null? open) j
+                     (begin
+                       (md-note! (car open) j)
+                       (loop (+ j 1) (cdr open)))))
+                (else (loop (+ j 1) open)))))))
 
 (define (md-unescape s)
   ;; without the backslashes before punctuation, and with the entities
@@ -844,12 +969,14 @@
                          (skip (+ k 1)) k)))
                 (angle? (md-starts? s k "<"))
                 (e (if angle?
-                       (md-find s k #\>)
-                       ;; up to a space or to the parenthesis which closes
+                       (md-search* s k ">")
+                       ;; up to a space or to the parenthesis which closes;
+                       ;; an address has few parentheses inside each other
                        (let loop ((e k) (depth 0))
                          (cond ((>= e n) #f)
                                ((char=? (string-ref s e) #\\) (loop (+ e 2) depth))
-                               ((char=? (string-ref s e) #\() (loop (+ e 1) (+ depth 1)))
+                               ((char=? (string-ref s e) #\()
+                                (and (< depth 32) (loop (+ e 1) (+ depth 1))))
                                ((char=? (string-ref s e) #\))
                                 (if (== depth 0) e (loop (+ e 1) (- depth 1))))
                                ((or (md-space? (string-ref s e))
@@ -867,11 +994,12 @@
                         ((in? (string-ref s m) '(#\" #\' #\())
                          (let* ((close (if (char=? (string-ref s m) #\()
                                            #\) (string-ref s m)))
-                                (t (let loop ((t (+ m 1)))
-                                     (cond ((>= t n) #f)
-                                           ((char=? (string-ref s t) #\\) (loop (+ t 2)))
-                                           ((char=? (string-ref s t) close) t)
-                                           (else (loop (+ t 1))))))
+                                (t (and (not (md-known close))
+                                        (let loop ((t (+ m 1)))
+                                          (cond ((>= t n) (md-note! close #t) #f)
+                                                ((char=? (string-ref s t) #\\) (loop (+ t 2)))
+                                                ((char=? (string-ref s t) close) t)
+                                                (else (loop (+ t 1)))))))
                                 (c (and t (md-skip-spaces s (+ t 1)))))
                            (and c (md-starts? s c ")")
                                 (list (md-unescape url)
@@ -901,6 +1029,18 @@
 (define (md-children x)
   (if (and (pair? (cdr x)) (func? (cadr x) '@)) (cddr x) (cdr x)))
 
+;; whether the text of a link is parsed: an address in it is text
+(define md-in-link? #f)
+
+(define (md-unlink l)
+  ;; the nodes l without their links: a link holds no other link
+  (append-map (lambda (x)
+                (cond ((func? x 'a) (md-unlink (md-children x)))
+                      ((and (pair? x) (in? (car x) '(em strong del)))
+                       (list (cons (car x) (md-merge (md-unlink (cdr x))))))
+                      (else (list x))))
+              l))
+
 (define (md-make-link image? inner url title)
   (if image?
       ;; the description is kept as text too: it may be a caption
@@ -909,13 +1049,17 @@
                  (alt ,(md-plain-text l))
                  ,@(if (== title "") '() `((title ,title))))
               ,@l))
-      `(a (@ (href ,url) ,@(if (== title "") '() `((title ,title))))
-          ,@(md-inlines inner))))
+      (with old md-in-link?
+        (set! md-in-link? #t)
+        (with l (md-merge (md-unlink (md-inlines inner)))
+          (set! md-in-link? old)
+          `(a (@ (href ,url) ,@(if (== title "") '() `((title ,title))))
+              ,@l)))))
 
 (define (md-image-size x s i)
   ;; the image x with the width and the height of the attributes which
   ;; follow it at i, as for Pandoc: {width=50% height=2cm}; (node . end)
-  (let* ((e (and (md-starts? s i "{") (md-find s i #\})))
+  (let* ((e (and (md-starts? s i "{") (md-search* s i "}")))
          (l (if e (string-tokenize-by-char (substring s (+ i 1) e) #\space) '()))
          (get (lambda (key)
                 (let loop ((l l))
@@ -953,29 +1097,40 @@
                         (+ e 1)))
                  ;; [text](url "title")
                  ((md-link-tail s (+ e 1))
-                  (with t (md-link-tail s (+ e 1))
-                    (cons (md-make-link image? inner (car t) (cadr t))
-                          (caddr t))))
+                  => (lambda (t)
+                       (cons (md-make-link image? inner (car t) (cadr t))
+                             (caddr t))))
                  ;; [text][label], [text][] and [label]
                  (else
                    (let* ((e2 (and (md-starts? s (+ e 1) "[")
-                                   (md-find s (+ e 1) #\])))
+                                   (md-search* s (+ e 1) "]")))
                           (label (if (and e2 (> e2 (+ e 2)))
                                      (substring s (+ e 2) e2)
                                      inner))
-                          (def (ahash-ref md-refs (md-label label))))
+                          ;; a label is short
+                          (def (and (< (string-length label) 1000)
+                                    (ahash-ref md-refs (md-label label)))))
                      (and def
                           (cons (md-make-link image? inner
                                               (md-unescape (car def))
                                               (md-unescape (cadr def)))
                                 (if e2 (+ e2 1) (+ e 1)))))))))))
 
+(define (md-tag-end s i)
+  ;; the > which ends what the < at i starts, with no < before it, or #f
+  (let ((n (string-length s)))
+    (let loop ((j (+ i 1)))
+      (cond ((>= j n) #f)
+            ((char=? (string-ref s j) #\>) j)
+            ((char=? (string-ref s j) #\<) #f)
+            (else (loop (+ j 1)))))))
+
 (define (md-autolink s i)
   ;; (node . end) for <scheme:address> or <address@host>, or #f
-  (let ((e (md-find s i #\>)))
+  (let ((e (md-tag-end s i)))
     (and e
          (let ((t (substring s (+ i 1) e)))
-           (and (not (md-find t 0 #\space)) (not (md-find t 0 #\<))
+           (and (not (md-find t 0 #\space))
                 (cond ((let ((c (md-find t 0 #\:)))
                          (and c (>= c 2)
                               (list-and (map (lambda (x)
@@ -1055,18 +1210,25 @@
              ,@(opt 'title) ,@(opt 'width) ,@(opt 'height))
           ,@(if (== (get 'alt) "") '() (list (get 'alt))))))
 
+(define (md-lower s)
+  ;; the text which is cut into tokens, in lowercase
+  (or (md-known 'lower)
+      (with t (locase-all s)
+        (md-note! 'lower t)
+        t)))
+
 (define (md-inline-html s i)
   ;; (node . end) for the tag which starts at i, with what it encloses when
   ;; it is closed further on, or #f
   (let ((n (string-length s)))
     (cond ((md-starts? s i "<!--")
-           (with e (md-search s (+ i 4) "-->")
+           (with e (md-search* s (+ i 4) "-->")
              (and e (cons `(html ,(substring s i (+ e 3))) (+ e 3)))))
           ((and (< (+ i 1) n)
                 (or (md-ascii-alpha? (string-ref s (+ i 1)))
                     (and (char=? (string-ref s (+ i 1)) #\/) (< (+ i 2) n)
                          (md-ascii-alpha? (string-ref s (+ i 2))))))
-           (let* ((e (md-find s i #\>))
+           (let* ((e (md-tag-end s i))
                   (closing? (md-starts? s (+ i 1) "/"))
                   (j (let loop ((j (if closing? (+ i 2) (+ i 1))))
                        (if (and (< j n)
@@ -1080,11 +1242,10 @@
                   (or (== j e) (md-space? (string-ref s j))
                       (char=? (string-ref s j) #\/)
                       (char=? (string-ref s j) #\newline))
-                  (not (md-find (substring s i e) 1 #\<))
                   (let* ((close (string-append "</" name ">"))
                          (c (and (not closing?) (not (in? name md-void-tags))
                                  (not (char=? (string-ref s (- e 1)) #\/))
-                                 (md-search (locase-all s) (+ e 1) close))))
+                                 (md-search* (md-lower s) (+ e 1) close))))
                     (cond
                       ;; an image is the same as ![...](...), with its sizes
                       ((and (== name "img") (not closing?))
@@ -1101,9 +1262,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; The text is first cut into tokens: strings, nodes, and the runs of *, _
-;; and ~, as (!delim character length opens? closes?). The runs are then
-;; matched, the closing ones in their order with the nearest opening one
-;; before them, as CommonMark tells.
+;; and ~, as (!delim character length opens? closes? length), with the
+;; length which remains of the run and the one which it had first. The runs
+;; are then matched, the closing ones in their order with the nearest
+;; opening one before them, as CommonMark tells.
 
 (define (md-delim s i)
   ;; the token for the run which starts at i, and its end
@@ -1125,7 +1287,7 @@
          (closes? (if (char=? c #\_)
                       (and right? (or (not left?) (md-punctuation? after)))
                       right?)))
-    (cons (list '!delim c (- j i) opens? closes?) j)))
+    (cons (list '!delim c (- j i) opens? closes? (- j i)) j)))
 
 (define (md-delim? x) (func? x '!delim))
 
@@ -1136,6 +1298,8 @@
   ;; the runs which remain are text
   (map (lambda (x) (if (md-delim? x) (md-delim-text x) x)) l))
 
+(define (md-delim-length x) (cadr (cddddr x)))
+
 (define (md-match? open close)
   (and (char=? (cadr open) (cadr close))
        (cadddr open)
@@ -1143,60 +1307,92 @@
            ;; strike-through: two runs of the same length, one or two
            (and (== (caddr open) (caddr close)) (<= (caddr open) 2))
            ;; a run which both opens and closes does not match a run whose
-           ;; length added to its own is a multiple of 3, unless both are
-           (not (and (or (and (cadddr open) (car (cddddr open)))
-                         (and (cadddr close) (car (cddddr close))))
-                     (== (remainder (+ (caddr open) (caddr close)) 3) 0)
-                     (not (and (== (remainder (caddr open) 3) 0)
-                               (== (remainder (caddr close) 3) 0))))))))
+           ;; length added to its own is a multiple of 3, unless both are:
+           ;; the lengths which the runs had first
+           (let ((m (md-delim-length open))
+                 (n (md-delim-length close)))
+             (not (and (or (car (cddddr open)) (cadddr close))
+                       (== (remainder (+ m n) 3) 0)
+                       (not (and (== (remainder m 3) 0)
+                                 (== (remainder n 3) 0)))))))))
+
+(define (md-delim-kind x)
+  ;; a number below 18 for what md-match? asks of the closing run x: its
+  ;; character, whether it opens too, and its length modulo 3
+  (+ (cond ((char=? (cadr x) #\*) 0) ((char=? (cadr x) #\_) 6) (else 12))
+     (if (cadddr x) 3 0)
+     (remainder (if (char=? (cadr x) #\~) (caddr x) (md-delim-length x)) 3)))
 
 (define (md-emphasis l)
   ;; matches the runs of the list of tokens
-  (let loop ((before '()) (l l))
-    ;; before: the tokens already seen, the nearest first
-    (cond ((null? l) (md-undelim (reverse before)))
-          ((and (md-delim? (car l)) (car (cddddr (car l))))
-           (let* ((close (car l))
-                  (found (let search ((b before) (inner '()))
-                           (cond ((null? b) #f)
-                                 ((and (md-delim? (car b)) (md-match? (car b) close))
-                                  (list (car b) (cdr b) inner))
-                                 (else (search (cdr b) (cons (car b) inner)))))))
-             (if (not found)
-                 ;; a run which does not open either is text
-                 (loop (cons (if (cadddr close) close (md-delim-text close))
-                             before)
-                       (cdr l))
-                 (let* ((open (car found))
-                        (rest (cadr found))
-                        (inner (md-undelim (caddr found)))
-                        (strike? (char=? (cadr close) #\~))
-                        (use (cond (strike? (caddr close))
-                                   ((and (>= (caddr open) 2) (>= (caddr close) 2)) 2)
-                                   (else 1)))
-                        (node (cons (cond (strike? 'del)
-                                          ((== use 2) 'strong)
-                                          (else 'em))
-                                    (md-merge inner)))
-                        (open* (list '!delim (cadr open) (- (caddr open) use)
-                                     (cadddr open) (car (cddddr open))))
-                        (close* (list '!delim (cadr close) (- (caddr close) use)
-                                      (cadddr close) (car (cddddr close))))
-                        (before* (cons node
-                                       (if (> (caddr open*) 0)
-                                           (cons open* rest) rest))))
-                   (if (> (caddr close*) 0)
-                       (loop before* (cons close* (cdr l)))
-                       (loop before* (cdr l)))))))
-          (else (loop (cons (car l) before) (cdr l))))))
+  (let ((bottom (make-vector 18 0)))
+    ;; bottom: for each kind of closing run, the number of the first tokens
+    ;; seen among which no run opens it: they are not searched again
+    (let loop ((before '()) (depth 0) (l l))
+      ;; before: the depth tokens already seen, the nearest first
+      (cond ((null? l) (md-undelim (reverse before)))
+            ((and (md-delim? (car l)) (car (cddddr (car l))))
+             (let* ((close (car l))
+                    (kind (md-delim-kind close))
+                    (low (vector-ref bottom kind))
+                    (found (let search ((b before) (d depth) (inner '()))
+                             (cond ((<= d low) #f)
+                                   ((and (md-delim? (car b))
+                                         (md-match? (car b) close))
+                                    (list (car b) (cdr b) inner d))
+                                   (else (search (cdr b) (- d 1)
+                                                 (cons (car b) inner)))))))
+               (if (not found)
+                   (begin
+                     (vector-set! bottom kind depth)
+                     ;; a run which does not open either is text
+                     (loop (cons (if (cadddr close) close (md-delim-text close))
+                                 before)
+                           (+ depth 1) (cdr l)))
+                   (let* ((open (car found))
+                          (rest (cadr found))
+                          (inner (md-undelim (caddr found)))
+                          (under (- (cadddr found) 1))
+                          (strike? (char=? (cadr close) #\~))
+                          (use (cond (strike? (caddr close))
+                                     ((and (>= (caddr open) 2) (>= (caddr close) 2)) 2)
+                                     (else 1)))
+                          (node (cons (cond (strike? 'del)
+                                            ((== use 2) 'strong)
+                                            (else 'em))
+                                      (md-merge inner)))
+                          (open* (list '!delim (cadr open) (- (caddr open) use)
+                                       (cadddr open) (car (cddddr open))
+                                       (md-delim-length open)))
+                          (close* (list '!delim (cadr close) (- (caddr close) use)
+                                        (cadddr close) (car (cddddr close))
+                                        (md-delim-length close)))
+                          (open? (> (caddr open*) 0))
+                          (before* (cons node (if open? (cons open* rest) rest)))
+                          (depth* (+ under (if open? 2 1))))
+                     ;; the tokens under the opening run are as they were
+                     (let lower ((k 0))
+                       (when (< k 18)
+                         (if (> (vector-ref bottom k) under)
+                             (vector-set! bottom k under))
+                         (lower (+ k 1))))
+                     (if (> (caddr close*) 0)
+                         (loop before* depth* (cons close* (cdr l)))
+                         (loop before* depth* (cdr l)))))))
+            (else (loop (cons (car l) before) (+ depth 1) (cdr l)))))))
 
 (define (md-merge l)
   ;; with the strings which follow each other as one
-  (cond ((null? l) l)
-        ((and (string? (car l)) (nnull? (cdr l)) (string? (cadr l)))
-         (md-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        ((== (car l) "") (md-merge (cdr l)))
-        (else (cons (car l) (md-merge (cdr l))))))
+  (let loop ((l l) (run '()) (acc '()))
+    ;; run: the strings just before l, the last one first
+    (if (and (nnull? l) (string? (car l)))
+        (loop (cdr l) (cons (car l) run) acc)
+        (let* ((s (cond ((null? run) "")
+                        ((null? (cdr run)) (car run))
+                        (else (apply string-append (reverse run)))))
+               (acc* (if (== s "") acc (cons s acc))))
+          (if (null? l) (reverse acc*)
+              (loop (cdr l) '() (cons (car l) acc*)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text: the tokens
@@ -1220,6 +1416,14 @@
         i)))
 
 (define (md-tokens s)
+  ;; what is known of the text is the one of s for this time
+  (with old md-none
+    (set! md-none #f)
+    (with r (md-tokens-sub s)
+      (set! md-none old)
+      r)))
+
+(define (md-tokens-sub s)
   (let ((n (string-length s)))
     (let loop ((from 0) (start 0) (acc '()))
       ;; start: where the text which is not yet in acc begins
@@ -1232,7 +1436,7 @@
             (cond ((char=? c #\\)
                    (cond ((and (or (md-starts? s i "\\(") (md-starts? s i "\\["))
                                (md-backslash-math s i))
-                          (node (md-backslash-math s i)))
+                          => node)
                          ((md-starts? s i "\\\n")
                           (text '(br) (md-skip-spaces s (+ i 2))))
                          ((and (< (+ i 1) n) (md-punctuation? (string-ref s (+ i 1))))
@@ -1257,7 +1461,7 @@
                    (with r (md-entity s i)
                      (if r (text (car r) (cdr r)) (loop (+ i 1) start acc))))
                   ((and (char=? c #\!) (md-starts? s i "![") (md-link s (+ i 1) #t))
-                   (node (md-link s (+ i 1) #t)))
+                   => node)
                   ((char=? c #\[)
                    (with r (md-link s i #f)
                      (if r (node r) (loop (+ i 1) start acc))))
@@ -1266,17 +1470,17 @@
                      (if r (node r) (loop (+ i 1) start acc))))
                   ((in? c '(#\* #\_ #\~))
                    (with r (md-delim s i)
-                     ;; a single ~ is text
+                     ;; more than two ~ are text
                      (if (and (char=? c #\~) (> (caddr (car r)) 2))
                          (loop (cdr r) start acc)
                          (node r))))
-                  ((and (char=? c #\h)
+                  ((and (char=? c #\h) (not md-in-link?)
                         (or (md-starts? s i "http://") (md-starts? s i "https://"))
                         (or (== i 0)
                             (not (or (md-ascii-alpha? (string-ref s (- i 1)))
                                      (md-digit? (string-ref s (- i 1))))))
                         (md-bare-link s i))
-                   (node (md-bare-link s i)))
+                   => node)
                   (else (loop (+ i 1) start acc))))))))
 
 (define (md-inlines s)
@@ -1297,6 +1501,8 @@
 
 (define (md-parse s)
   (set! md-refs (make-ahash-table))
+  (set! md-none #f)
+  (set! md-in-link? #f)
   (let* ((lines (map md-expand-tabs (md-lines s)))
          (front (md-front-matter lines))
          (blocks (md-blocks (if front (cdr front) lines)))

@@ -73,10 +73,10 @@
 
 (define (tmmd-merge l)
   ;; with the strings which follow each other as one, and so for the
-  ;; emphasized texts: *a**b* would not be read as *ab*
+  ;; emphasized texts and for code: *a**b* would not be read as *ab*
   (cond ((null? l) l)
         ((== (car l) "") (tmmd-merge (cdr l)))
-        ((and (pair? (car l)) (in? (caar l) '(em strong del))
+        ((and (pair? (car l)) (in? (caar l) '(em strong del code))
               (nnull? (cdr l)) (func? (cadr l) (caar l)))
          (tmmd-merge (cons `(,(caar l) ,@(tmmd-merge (append (cdar l) (cdadr l))))
                            (cddr l))))
@@ -335,8 +335,8 @@
 (define (tmmd-hlink l)
   ;; a link; a link inside the document is its text
   (if (< (length l) 2) (tmmd-all l)
-      (let ((body (tmmd (car l)))
-            (url (tmmd-plain (cadr l))))
+      (let* ((body (tmmd (car l)))
+             (url (tmmd-plain (cadr l))))
         (if (or (== url "") (string-starts? url "#") (tmmd-has-block? body))
             body
             `((a (@ (href ,url)) ,@(tmmd-merge body)))))))
@@ -435,10 +435,10 @@
 
 (define (tmmd-footnote-add body)
   (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
-  (with label (number->string tmmd-footnote-nr)
-    (set! tmmd-footnotes
-          (cons `(footnote-def ,label ,@(tmmd-blocks (tmmd body)))
-                tmmd-footnotes))
+  ;; the body may hold footnotes: it is converted before the list is read
+  (let* ((label (number->string tmmd-footnote-nr))
+         (def `(footnote-def ,label ,@(tmmd-blocks (tmmd body)))))
+    (set! tmmd-footnotes (cons def tmmd-footnotes))
     `((footnote ,label))))
 
 (define (tmmd-footnote l)
@@ -479,9 +479,10 @@
 
 (define (tmmd-surround l)
   (if (!= (length l) 3) (tmmd-all l)
-      (tmmd-attach (tmmd-inline (tmmd (car l)))
-                   (tmmd (caddr l))
-                   (tmmd-inline (tmmd (cadr l))))))
+      (let* ((before (tmmd-inline (tmmd (car l))))
+             (body (tmmd (caddr l)))
+             (after (tmmd-inline (tmmd (cadr l)))))
+        (tmmd-attach before body after))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Paragraphs, sections and the title
@@ -594,12 +595,26 @@
           ;; text before the first item
           (else (loop (cdr l) (list (car l) '(item)) acc)))))
 
+(define (tmmd-list-start pars)
+  ;; (number . paragraphs) for a list which sets the number of its first
+  ;; item, with (assign "item-nr" "4") before it: this number, and the
+  ;; paragraphs without the assignment; else #f
+  (and (nnull? pars) (func? (car pars) 'concat) (pair? (cdar pars))
+       (with a (cadar pars)
+         (and (func? a 'assign 2) (== (cadr a) "item-nr")
+              (string? (caddr a)) (string->number (caddr a))
+              (cons (+ (string->number (caddr a)) 1)
+                    (cons `(concat ,@(cddar pars)) (cdr pars)))))))
+
 (define (tmmd-list tag l)
   (let* ((body (if (null? l) '(document) (car l)))
          (pars (if (func? body 'document) (cdr body) (list body)))
-         (items (tmmd-items pars)))
+         (start (and (== tag 'ol) (tmmd-list-start pars)))
+         (items (tmmd-items (if start (cdr start) pars))))
     (if (null? items) '()
         `((,tag
+           ,@(if (and start (!= (car start) 1))
+                 `((@ (start ,(number->string (car start))))) '())
            ,@(map (lambda (it)
                     (let* ((item (car it))
                            (check (tmmd-check item))
@@ -642,7 +657,9 @@
 (define (tmmd-render-enunciation l)
   ;; the name with its number, and the body
   (if (< (length l) 2) (tmmd-all l)
-      (tmmd-titled (tmmd (car l)) (tmmd (cadr l)))))
+      (let* ((name (tmmd (car l)))
+             (body (tmmd (cadr l))))
+        (tmmd-titled name body))))
 
 (define tmmd-enunciations
   '(theorem proposition lemma corollary conjecture axiom definition notation
@@ -672,8 +689,8 @@
 (define (tmmd-render-figure l)
   ;; the type, the name with its number, the figure and its caption
   (if (< (length l) 4) (tmmd-all l)
-      (let ((body (tmmd (caddr l)))
-            (caption (tmmd (cadddr l))))
+      (let* ((body (tmmd (caddr l)))
+             (caption (tmmd (cadddr l))))
         (or (tmmd-image-figure body caption)
             (append (tmmd-blocks body)
                     (tmmd-titled (tmmd (cadr l)) caption))))))
@@ -681,8 +698,8 @@
 (define (tmmd-figure name l)
   ;; a figure which was not expanded: the figure and its caption
   (if (< (length l) 2) (tmmd-all l)
-      (let ((body (tmmd (car l)))
-            (caption (tmmd (cadr l))))
+      (let* ((body (tmmd (car l)))
+             (caption (tmmd (cadr l))))
         (or (tmmd-image-figure body caption)
             (append (tmmd-blocks body)
                     (tmmd-titled (list name) caption))))))
@@ -747,19 +764,48 @@
                             (else a)))
                     a))))))
 
+(define (tmmd-cell-lines l)
+  ;; the blocks l as the lines of a cell, each one a list of nodes: a cell
+  ;; holds text only, so that a formula is written in the text, the lines of
+  ;; code are code each, and the items of a list are lines with their marks
+  (append-map
+    (lambda (x)
+      (cond ((func? x 'p) (list (cdr x)))
+            ((func? x '!display) (list (list `(displaymath ,(cadr x)))))
+            ((func? x '!h) (list (cddr x)))
+            ((func? x 'pre)
+             (map (lambda (s) (list `(code ,s)))
+                  (list-filter (string-tokenize-by-char (cAr x) #\newline)
+                               (lambda (s) (!= s "")))))
+            ((func? x 'blockquote) (tmmd-cell-lines (cdr x)))
+            ((or (func? x 'ul) (func? x 'ol))
+             (let loop ((items (list-filter (cdr x) (lambda (y) (func? y 'li))))
+                        (nr 1) (acc '()))
+               (if (null? items) (reverse acc)
+                   (let* ((mark (if (func? x 'ol)
+                                    (string-append (number->string nr) ". ")
+                                    (string-append (tmmd-text "<bullet>") " ")))
+                          (b (list-filter (cdar items)
+                                          (lambda (y) (not (func? y '@)))))
+                          (lines (tmmd-cell-lines b))
+                          (lines (if (null? lines) (list (list mark))
+                                     (cons (cons mark (car lines)) (cdr lines)))))
+                     (loop (cdr items) (+ nr 1)
+                           (append (reverse lines) acc))))))
+            (else '())))
+    l))
+
 (define (tmmd-cell x)
   ;; the text of a cell; its paragraphs are lines
   (let* ((body (if (func? x 'cell 1) (cadr x) x))
          (l (tmmd body)))
     (tmmd-trim
       (if (tmmd-has-block? l)
-          (let loop ((b (tmmd-blocks l)) (acc '()))
-            (cond ((null? b) (reverse acc))
-                  ((func? (car b) 'p)
-                   (loop (cdr b)
-                         (append (reverse (cdar b))
-                                 (if (null? acc) acc (cons '(br) acc)))))
-                  (else (loop (cdr b) acc))))
+          (let loop ((b (tmmd-cell-lines (tmmd-blocks l))) (acc '()))
+            (if (null? b) (reverse acc)
+                (loop (cdr b)
+                      (append (reverse (car b))
+                              (if (null? acc) acc (cons '(br) acc))))))
           l))))
 
 (define (tmmd-table tag l)
@@ -1006,7 +1052,10 @@
 
 (define (tmmd-finalize l)
   ;; the blocks of a document: the levels of its headings, its footnotes
-  (let* ((l (append l (reverse tmmd-footnotes)))
+  (let* ((notes (sort tmmd-footnotes
+                      (lambda (a b) (< (string->number (cadr a))
+                                       (string->number (cadr b))))))
+         (l (append l notes))
          (levels (sort (list-remove-duplicates
                          (append-map tmmd-heading-levels l))
                        <)))
