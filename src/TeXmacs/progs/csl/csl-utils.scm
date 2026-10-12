@@ -235,9 +235,10 @@
 
 (define (raw->string t)
   (cond ((string? t) t)
-        ((and (pair? t) (in? (car t) '(concat document with math em strong
+        ((and (pair? t) (in? (car t) '(concat document math em strong
                                        keepcase rsup rsub)))
          (apply string-append (map raw->string (cdr t))))
+        ;; the variables of a with and their values are no text
         ((and (pair? t) (== (car t) 'with) (nnull? (cdr t)))
          (raw->string (cAr t)))
         (else "")))
@@ -301,16 +302,14 @@
 (define (capitalize-word w)
   (if (csl-lower? w) (csl-upcase-first w) w))
 
-(define (title-word w upper? first? last? after-colon?)
-  ;; words in capitals are not touched: UK
-  (let* ((w* w)
-         (low (csl-locase w)))
-    (cond ((and (in? low title-stop-words) (not first?) (not last?)
-                (not after-colon?))
-           (if (or upper? (csl-lower? w)) low w))
-          (else (capitalize-word w*)))))
+(define (title-word w first? last? after-colon?)
+  ;; words in capitals are not touched, UK, nor is a text in capitals
+  (if (and (in? w title-stop-words) (not first?) (not last?)
+           (not after-colon?))
+      w
+      (capitalize-word w)))
 
-(define (title-case-string s upper? first? last?)
+(define (title-case-string s first? last?)
   ;; returns the new string; @first? and @last? tell whether the string
   ;; starts and ends the text
   (let* ((toks (split-words (csl-chars s) '() '()))
@@ -323,7 +322,7 @@
                      (or (in? c '(":" "?" "!")) (and colon? (== c " ")))
                      c (cons c r))))
             (else
-              (with w (title-word (car l) upper?
+              (with w (title-word (car l)
                                   (and first? (== i 0))
                                   (and last? (== i (- nwords 1)))
                                   colon?)
@@ -394,16 +393,15 @@
             x)))
         ((== how "title")
          (if (not english?) x
-             (let* ((upper? (csl-upper? (rt->string x)))
-                    (n (count-strings x)))
+             (with n (count-strings x)
                (rt-map-indexed
                 (lambda (s i)
                   (if rt-glued?
                       (keep-first-word
                        (lambda (t)
-                         (title-case-string t upper? #f (== i (- n 1))))
+                         (title-case-string t #f (== i (- n 1))))
                        s)
-                      (title-case-string s upper? (== i 0) (== i (- n 1)))))
+                      (title-case-string s (== i 0) (== i (- n 1)))))
                 x))))
         (else x)))
 

@@ -214,20 +214,26 @@
 ;; TeXmacs trees
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (tm-wrap k v body)
-  (cond ((and (== k 'font-style) (== v "italic"))
-         `(with "font-shape" "italic" ,body))
-        ((and (== k 'font-style) (== v "oblique"))
-         `(with "font-shape" "slanted" ,body))
-        ((== k 'font-style) `(with "font-shape" "right" ,body))
+(define (style-shape v)
+  (cond ((== v "italic") "italic")
+        ((== v "oblique") "slanted")
+        (else "right")))
+
+(define (font-shape style caps?)
+  ;; the style and the small capitals make one shape of TeXmacs
+  (cond ((not caps?) style)
+        ((== style "right") "small-caps")
+        (else (string-append style "-small-caps"))))
+
+(define (tm-wrap k v body style caps?)
+  ;; @style and @caps? tell the shape of the text @body
+  (cond ((in? k '(font-style font-variant))
+         `(with "font-shape" ,(font-shape style caps?) ,body))
         ((and (== k 'font-weight) (== v "bold"))
          `(with "font-series" "bold" ,body))
         ((and (== k 'font-weight) (== v "light"))
          `(with "font-series" "light" ,body))
         ((== k 'font-weight) `(with "font-series" "medium" ,body))
-        ((and (== k 'font-variant) (== v "small-caps"))
-         `(with "font-shape" "small-caps" ,body))
-        ((== k 'font-variant) `(with "font-shape" "right" ,body))
         ((and (== k 'text-decoration) (== v "underline")) `(underline ,body))
         ((and (== k 'vertical-align) (== v "sup")) `(rsup ,body))
         ((and (== k 'vertical-align) (== v "sub")) `(rsub ,body))
@@ -247,21 +253,38 @@
           ((== (car l) "") (loop (cdr l) r))
           (else (loop (cdr l) (cons (car l) r))))))
 
-(define (build-tree l)
-  ;; returns (trees . remaining events after the closing event)
+(define no-break-space "<varspace>")
+
+(define (tm-text s)
+  ;; the trees for the string @s, the last one first: the no-break spaces
+  ;; of the locales are the macro nbsp of TeXmacs
+  (let loop ((s s) (r '()))
+    (with i (string-search-forwards no-break-space 0 s)
+      (if (< i 0) (cons s r)
+          (loop (substring s (+ i (string-length no-break-space))
+                           (string-length s))
+                (cons* '(nbsp) (substring s 0 i) r))))))
+
+(define (build-tree l style caps?)
+  ;; returns (trees . remaining events after the closing event); @style
+  ;; and @caps? tell the shape of the text around
   (let loop ((l l) (r '()))
     (cond ((null? l) (cons (reverse r) '()))
-          ((== (caar l) 'text) (loop (cdr l) (cons (cadar l) r)))
+          ((== (caar l) 'text) (loop (cdr l) (append (tm-text (cadar l)) r)))
           ((== (caar l) 'raw) (loop (cdr l) (cons (cadar l) r)))
           ((== (caar l) 'close) (cons (reverse r) (cdr l)))
           ((== (caar l) 'open)
-           (let* ((sub (build-tree (cdr l)))
+           (let* ((k (cadar l))
+                  (v (caddar l))
+                  (style* (if (== k 'font-style) (style-shape v) style))
+                  (caps* (if (== k 'font-variant) (== v "small-caps") caps?))
+                  (sub (build-tree (cdr l) style* caps*))
                   (body (tm-concat (car sub))))
              (loop (cdr sub)
                    (if (== body "") r
-                       (cons (tm-wrap (cadar l) (caddar l) body) r)))))
+                       (cons (tm-wrap k v body style* caps*) r)))))
           (else (loop (cdr l) r)))))
 
 (tm-define (csl->texmacs x locale)
   (:synopsis "The rich text @x as a TeXmacs tree")
-  (tm-concat (car (build-tree (csl-events x locale)))))
+  (tm-concat (car (build-tree (csl-events x locale) "right" #f))))

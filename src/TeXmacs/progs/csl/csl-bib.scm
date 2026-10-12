@@ -48,13 +48,16 @@
          (list-remove-duplicates (csl-sort names string<?)))))
 
 (define (document-style name)
-  ;; a style next to the current document comes first
+  ;; a style next to the current document comes first; returns the style,
+  ;; #f when there is no such style and the symbol invalid when its file
+  ;; is no style which can be used
   (let* ((dir (and (url-rooted? (current-buffer))
                    (url-head (current-buffer))))
-         (u (and dir (url-append dir (string-append name ".csl")))))
-    (if (and u (url-exists? u))
-        (csl-style-from-string name (string-load u))
-        (csl-load-style name))))
+         (u (and dir (url-append dir (string-append name ".csl"))))
+         (own? (and u (url-exists? u))))
+    (or (if own? (csl-style-from-string name (string-load u))
+            (csl-load-style name))
+        (and (or own? (csl-style-file name)) 'invalid))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The citations of the document
@@ -62,8 +65,9 @@
 
 ;; When a bibliography in a CSL style is present, the citation macros
 ;; (cite-csl in std-automatic.ts) write each citation to the auxiliary data
-;; PREFIX-cites, as (tuple mode (tuple entry ...)) where an entry is a key
-;; or (tuple key details) and the mode is
+;; PREFIX-cites, as (tuple mode (tuple entry ...) nr) where an entry is a
+;; key or (tuple key details), nr is the number of the citation in the
+;; document and the mode is
 ;;
 ;;   p   the citation as the style prints it: (Knuth, 1984)
 ;;   t   as part of the sentence: Knuth (1984)
@@ -71,7 +75,9 @@
 ;;   y   without the authors and without the brackets: 1984
 ;;
 ;; The citations are rendered with the bibliography, which carries them as
-;; bindings PREFIX-cite-MODE:SIGNATURE; the macros show these bindings.
+;; bindings PREFIX-cite-MODE:SIGNATURE; the macros show these bindings. A
+;; citation which reads otherwise where it stands has the binding
+;; PREFIX-cite-MODE:SIGNATURE#NR.
 
 (define locator-labels
   '(("p." . "page") ("pp." . "page") ("page" . "page") ("pages" . "page")
@@ -82,6 +88,20 @@
     ("n." . "note") ("note" . "note") ("para." . "paragraph")
     ("pt." . "part") ("part" . "part") ("col." . "column")
     ("bk." . "book") ("v." . "verse") ("vv." . "verse")))
+
+(define (page-token? s)
+  ;; "12", "12a", "A12": at most one letter before the first digit
+  (with l (csl-chars s)
+    (and (nnull? l)
+         (or (csl-digit? (car l))
+             (and (nnull? (cdr l)) (csl-digit? (cadr l)))))))
+
+(define (page-numbers? s)
+  ;; are the details @s numbers of pages? "Lemma2" is not
+  (with toks (csl-number-tokens s)
+    (and toks (list-and (map (lambda (t) (or (in? t '("-" "," "&"))
+                                             (page-token? t)))
+                             toks)))))
 
 (define (parse-details s)
   ;; "pp. 3-5" -> ((locator . "3-5") (label . "page")); other text is a
@@ -94,7 +114,7 @@
     (cond ((== t "") '())
           ((and p (!= rest ""))
            (list (cons 'locator rest) (cons 'label (cdr p))))
-          ((csl-numeric? t) (list (cons 'locator t) (cons 'label "page")))
+          ((page-numbers? t) (list (cons 'locator t) (cons 'label "page")))
           (else (list (cons 'suffix (string-append ", " t)))))))
 
 (define (entry->cite e)
@@ -107,29 +127,42 @@
         (else #f)))
 
 (define (entry-signature e)
-  ;; as the macros cite-csl-key and cite-detail make it
+  ;; as the macros cite-csl-key and cite-detail make it: no key holds a
+  ;; brace, and details which are not a plain text are written "*"
   (cond ((string? e) (string-append e ","))
-        ((and (func? e 'tuple 2) (string? (cadr e)) (string? (caddr e)))
-         (string-append (cadr e) "@" (caddr e) ","))
+        ((and (func? e 'tuple 2) (string? (cadr e)))
+         (string-append (cadr e) "{"
+                        (if (string? (caddr e)) (caddr e) "*") ","))
         (else #f)))
 
+(define (rich-details? e)
+  ;; the signature of such an entry does not tell its details
+  (and (func? e 'tuple 2) (not (string? (caddr e)))))
+
 (define (document-citations prefix)
-  ;; the citations of the document, in order: ((mode signature cites) ...)
-  ;; or #f for those which cannot be understood
+  ;; the citations of the document, in order:
+  ;; ((mode signature cites nr own?) ...), or #f for those which cannot be
+  ;; understood; nr is the number which the macros gave to the citation
+  ;; and own? tells that it needs a binding of its own
   (let* ((aux (tree->stree (get-auxiliary (string-append prefix "-cites"))))
          (l (if (func? aux 'document) (cdr aux) '())))
-    (map (lambda (c)
-           (let* ((ok? (and (func? c 'tuple 2) (string? (cadr c))
+    (map (lambda (c i)
+           (let* ((ok? (and (or (func? c 'tuple 2) (func? c 'tuple 3))
+                            (string? (cadr c))
                             (func? (caddr c) 'tuple)))
                   (entries (if ok? (cdr (caddr c)) '()))
                   (sigs (map entry-signature entries))
-                  (cites (map entry->cite entries)))
+                  (cites (map entry->cite entries))
+                  (nr (and ok? (func? c 'tuple 3) (string? (cadddr c))
+                           (string->number (cadddr c)))))
              (and ok? (nnull? entries) (list-and sigs) (list-and cites)
                   (list (cadr c)
                         (string-append (cadr c) ":"
                                        (apply string-append sigs))
-                        cites))))
-         l)))
+                        cites
+                        (or nr (+ i 1))
+                        (list-or (map rich-details? entries))))))
+         l (iota (length l)))))
 
 (define (render-citation proc mode cites)
   (cond ((== mode "t") (csl-textual-citation proc cites))
@@ -210,17 +243,20 @@
                                                  (string-drop sig 1) suffix)
                                  (quote ,(cdr p))))
                  l))))
-    (let loop ((l (document-citations prefix)) (nr 1) (last '())
+    (let loop ((l (document-citations prefix)) (last '())
                (r (list `(set-binding ,(string-append prefix "-csl")
                                       ,(if note? "note" "true")))))
       (cond ((null? l) r)
-            ((not (car l)) (loop (cdr l) (+ nr 1) '() r))
+            ((not (car l)) (loop (cdr l) '() r))
             (else
               (let* ((mode (car (car l)))
                      (sig (cadr (car l)))
                      (cites (caddr (car l)))
-                     (new? (not (ahash-ref done sig)))
-                     (generic (or (ahash-ref done sig) (render mode cites)))
+                     (nr (cadddr (car l)))
+                     (own? (list-ref (car l) 4))
+                     (old (and (not own?) (ahash-ref done sig)))
+                     (new? (not (or own? old)))
+                     (generic (or old (render mode cites)))
                      (placed? (in? mode '("p" "t")))
                      (cites* (if placed?
                                  (with-positions proc cites last nr
@@ -233,12 +269,12 @@
                                                       'first))
                                                 cites*))))
                      (own (if moved? (render mode cites*) generic)))
-                (ahash-set! done sig generic)
-                (loop (cdr l) (+ nr 1) (if placed? cites last)
+                (when (not own?) (ahash-set! done sig generic))
+                (loop (cdr l) (if placed? cites last)
                       (append
                        r
                        (if new? (bind sig "" generic) '())
-                       (if (!= own generic)
+                       (if (or own? (!= own generic))
                            (bind sig (string-append "#" (number->string nr))
                                  own)
                            '())))))))))
@@ -303,6 +339,8 @@
          (forced (and (> (length opt) 1) (cadr opt))))
     (cond ((not st)
            (string-append "Error: CSL style " name " not found"))
+          ((== st 'invalid)
+           (string-append "Error: CSL style " name " is not valid"))
           ((not (csl-style-ref st 'bibliography))
            (string-append "Error: CSL style " name " has no bibliography"))
           (else
@@ -339,6 +377,8 @@
                     `(bib-list
                       ,(if affixes (longest plain) "")
                       (document
+                        ;; the citations are kept when no entry is found
+                        ,@(if (null? entries) `((concat ,@bindings)) '())
                         ,@(map (lambda (e text i)
                                  (bib-entry
                                   prefix locale text (car e)

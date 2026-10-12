@@ -109,10 +109,20 @@
                         (map (cut label-part <> 1) (list-head names 4)))))
      year)))
 
+(define english-names
+  ;; the names which BibTeX entries give to English, besides "english"
+  '("american" "australian" "british" "canadian" "newzealand" "ukenglish"
+    "usenglish"))
+
+(tm-define (csl-english-language? lang)
+  (:synopsis "Is @lang, a code or a name of a language, English?")
+  (with low (csl-locase (string-trim-both lang))
+    (or (string-starts? low "en") (in? low english-names))))
+
 (tm-define (csl-item-english? item default-lang)
   (:synopsis "Is the item @item in English?")
   (with lang (ahash-ref item "language")
-    (string-starts? (csl-locase (if (string? lang) lang default-lang)) "en")))
+    (csl-english-language? (if (string? lang) lang default-lang))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Dates
@@ -257,12 +267,17 @@
     ("</span>" close)))
 
 (define (tag-at s i)
-  (list-find markup-tags
-             (lambda (t)
-               (let* ((tag (car t))
-                      (n (string-length tag)))
-                 (and (<= (+ i n) (string-length s))
-                      (== (substring s i (+ i n)) tag))))))
+  ;; a span which is not known is a tag without any formatting
+  (or (list-find markup-tags
+                 (lambda (t)
+                   (let* ((tag (car t))
+                          (n (string-length tag)))
+                     (and (<= (+ i n) (string-length s))
+                          (== (substring s i (+ i n)) tag)))))
+      (and (<= (+ i 6) (string-length s))
+           (== (substring s i (+ i 6)) "<span ")
+           (with j (string-search-forwards ">" i s)
+             (and (>= j 0) (list (substring s i (+ j 1)) 'open #f))))))
 
 (define (markup-tokens s)
   ;; the UTF-8 string @s as a list of strings and tags
@@ -286,15 +301,19 @@
           (else
             (let* ((what (cadar l))
                    (sub (build-markup (cdr l)))
-                   (node (if (== what 'nocase)
-                             (cons 'nocase (car sub))
-                             (cons* 'fmt (list what) (car sub)))))
+                   (node (cond ((not what) (rt-cat* (car sub)))
+                               ((== what 'nocase) (cons 'nocase (car sub)))
+                               (else (cons* 'fmt (list what) (car sub))))))
               (loop (cdr sub) (cons node r)))))))
 
 (tm-define (csl-parse-markup s)
   (:synopsis "The rich text of the UTF-8 string @s with HTML like markup")
   (if (not (string-index s #\<)) (utf8->cork s)
-      (rt-cat* (car (build-markup (markup-tokens s))))))
+      ;; a closing tag which closes nothing is left out
+      (let loop ((toks (markup-tokens s)) (r '()))
+        (with p (build-markup toks)
+          (if (null? (cdr p)) (rt-cat* (append r (car p)))
+              (loop (cdr p) (append r (car p))))))))
 
 (define (json-name t)
   (let* ((a (json-attrs t))
@@ -436,18 +455,49 @@
 (define (tree->text t)
   (string-trim-both (rt->string (tree->rt t))))
 
+(define en-dash (utf8->cork "–"))
+(define em-dash (utf8->cork "—"))
+
+(define (verbatim-text t)
+  (cond ((string? t) t)
+        ((not (pair? t)) "")
+        ((== (car t) 'rsub)
+         (apply string-append "_" (map verbatim-text (cdr t))))
+        ((== (car t) 'rsup)
+         (apply string-append "^" (map verbatim-text (cdr t))))
+        ((== (car t) 'nbsp) "~")
+        ((== (car t) 'row)
+         (string-recompose (map verbatim-text (cdr t)) "&"))
+        ((in? (car t) '(with tformat))
+         (if (null? (cdr t)) "" (verbatim-text (cAr t))))
+        (else (apply string-append (map verbatim-text (cdr t))))))
+
+(define (tree->verbatim t)
+  ;; the text of an address or of an identifier. The parser of BibTeX
+  ;; reads every field as LaTeX: the characters _ ^ ~ & and the dashes
+  ;; are written again as they were
+  (string-trim-both
+   (string-replace (string-replace (verbatim-text t) em-dash "---")
+                   en-dash "--")))
+
 (define (sentence-word w first?)
-  ;; the words with only an initial capital lose it
-  (if (and (not first?) (== w (csl-upcase-first (csl-locase w)))) (csl-locase w)
+  ;; the words with only an initial capital lose it; a single letter is
+  ;; kept: "I", "Vitamin A"
+  (if (and (not first?) (nnull? (cdr (csl-chars w)))
+           (== w (csl-upcase-first (csl-locase w))))
+      (csl-locase w)
       w))
 
 (define (sentence-string s first?)
+  ;; returns the new string and whether the next word starts a sentence
   (let loop ((l (csl-chars s)) (word '()) (first? first?) (r '()))
     (define (flush)
       (if (null? word) r
           (cons (sentence-word (apply string-append (reverse word)) first?)
                 r)))
-    (cond ((null? l) (apply string-append (reverse (flush))))
+    (cond ((null? l)
+           (cons (apply string-append (reverse (flush)))
+                 (and (null? word) first?)))
           ((csl-letter? (car l)) (loop (cdr l) (cons (car l) word) first? r))
           (else (loop (cdr l) '()
                       (if (null? word) (or first? (in? (car l) '(":" "?" "!")))
@@ -457,11 +507,16 @@
 (define (sentence-case x)
   ;; BibTeX titles are capitalized, CSL wants them as sentences
   (with first? #t
-    (rt-map (lambda (s)
-              (with r (sentence-string s first?)
-                (when (!= (string-trim-both s) "") (set! first? #f))
-                r))
-            x)))
+    (let walk ((x x))
+      (cond ((string? x)
+             (with p (sentence-string x first?)
+               (set! first? (cdr p))
+               (car p)))
+            ((not (pair? x)) x)
+            ;; protected text and formulas are words like the other ones
+            ((in? (car x) '(raw nocase)) (set! first? #f) x)
+            ((== (car x) 'fmt) (cons* 'fmt (cadr x) (map walk (cddr x))))
+            (else (cons (car x) (map walk (cdr x))))))))
 
 (define (bib-name->name t)
   (let* ((part (lambda (i) (with x (and (> (length t) i) (list-ref t i))
@@ -469,6 +524,9 @@
          (first (part 1)) (von (part 2)) (last (part 3)) (jr (part 4)))
     (cond ((and (not first) (not von) (not jr))
            (if last (list (cons 'literal last)) '()))
+          ;; "and others" which follows no name
+          ((and (not first) (not jr) (== von "and") (== last "others"))
+           (list (cons 'literal last)))
           (else
             (set-part
              (set-part
@@ -488,10 +546,14 @@
           (list-or (map other? names)))))
 
 (define (bib-pages->page t)
+  ;; the parser of BibTeX gives one or two numbers, or the pages as they
+  ;; are written when they are something else ("e1234", "12, 15--17");
+  ;; (bib-pages "0") is what older data has for pages which were not read
   (cond ((func? t 'bib-pages)
-         (string-recompose (list-filter (map tree->text (cdr t))
-                                        (lambda (x) (!= x "")))
-                           "-"))
+         (with l (list-filter (map tree->text (cdr t))
+                              (lambda (x) (!= x "")))
+           (and (nnull? l) (!= l '("0"))
+                (string-replace (string-recompose l "-") "\x15" "-"))))
         (else
           (with s (tree->text t)
             (string-replace (string-replace s "\x15" "-") "--" "-")))))
@@ -529,6 +591,10 @@
          (csl-type (with p (assoc type bibtex-types)
                      (if p (cdr p) "document")))
          (item (csl-make-item key csl-type))
+         ;; the titles in another language keep their capitals
+         (lang (or (text "language") (text "langid")))
+         (sentence (if (and lang (not (csl-english-language? lang))) identity
+                       sentence-case))
          (put! (lambda (var val)
                  (when (and val (or (func? val 'date) (not (rt-empty? val)))
                             (not (ahash-ref item var)))
@@ -547,12 +613,12 @@
     ;; titles, as sentences
     (and-with v (get "title")
       (with sub (get "subtitle")
-        (put! "title" (sentence-case
+        (put! "title" (sentence
                        (if sub (rt-cat (tree->rt v) ": " (tree->rt sub))
                            (tree->rt v))))))
     (when (in? type '("incollection" "inproceedings" "conference" "inbook"))
       (and-with v (get "booktitle")
-        (put! "container-title" (sentence-case (tree->rt v)))))
+        (put! "container-title" (sentence (tree->rt v)))))
     ;; fields which depend on the type
     (and-with v (get "pages") (put! "page" (bib-pages->page v)))
     (and-with v (text "number")
@@ -564,6 +630,8 @@
     (and-with v (text "edition")
       (with p (assoc (csl-locase v) edition-words)
         (put! "edition" (if p (cdr p) v))))
+    ;; the field type replaces the name of the kind of thesis or report
+    (and-with v (get "type") (put! "genre" (tree->rt v)))
     (when (== type "mastersthesis") (put! "genre" "Master's thesis"))
     (when (== type "phdthesis") (put! "genre" "PhD thesis"))
     (and-with v (get "school") (put! "publisher" (tree->rt v)))
@@ -572,21 +640,24 @@
     (and-with v (get "organization") (put! "publisher" (tree->rt v)))
     (and-with v (text "howpublished")
       (if (or (string-starts? v "http://") (string-starts? v "https://"))
-          (put! "URL" v)
+          (put! "URL" (tree->verbatim (get "howpublished")))
           (put! "publisher" (tree->rt (get "howpublished")))))
     (when (and (text "eprint") (not (text "url"))
                (in? (csl-locase (or (text "archiveprefix")
                                     (text "eprinttype") ""))
                     '("arxiv")))
-      (put! "URL" (string-append "https://arxiv.org/abs/" (text "eprint"))))
+      (put! "URL" (string-append "https://arxiv.org/abs/"
+                                 (tree->verbatim (get "eprint")))))
     ;; the other fields
     (for (p bibtex-fields)
       (and-with v (get (car p))
-        (if (in? (cdr p) '("DOI" "URL" "ISBN" "ISSN" "PMID" "PMCID"
-                           "language" "volume" "issue" "chapter-number"
-                           "number-of-pages" "number-of-volumes" "version"))
-            (put! (cdr p) (tree->text v))
-            (put! (cdr p) (tree->rt v)))))
+        (cond ((in? (cdr p) '("DOI" "URL" "ISBN" "ISSN" "PMID" "PMCID"))
+               (put! (cdr p) (tree->verbatim v)))
+              ((in? (cdr p) '("language" "volume" "issue" "chapter-number"
+                              "number-of-pages" "number-of-volumes"
+                              "version"))
+               (put! (cdr p) (tree->text v)))
+              (else (put! (cdr p) (tree->rt v))))))
     item))
 
 (tm-define (csl-bib->items t)

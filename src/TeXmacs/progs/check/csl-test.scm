@@ -123,6 +123,31 @@
 (define (small-html x)
   (csl->html x (csl-processor-locale (small-proc))))
 
+(define (style-of body)
+  ;; the style with the elements @body after cs:info
+  (csl-style-from-string
+   "t" (string-append
+        "<style xmlns=\"http://purl.org/net/xbiblio/csl\" class=\"in-text\""
+        " version=\"1.0\"><info><title>T</title><id>t</id></info>"
+        body "</style>")))
+
+(define (rendered style lang json)
+  ;; the citation of all the items of @json and the entries of the
+  ;; bibliography in @style, as HTML
+  (let* ((items (csl-json->items json))
+         (p (csl-make-processor style lang items))
+         (locale (csl-processor-locale p)))
+    (cons (csl->html (csl-citation p (map (lambda (i)
+                                            (list (cons 'id (csl-item-id i))))
+                                          items))
+                     locale)
+          (map (lambda (e) (csl->html (rt-cat (caddr e) (cadddr e)) locale))
+               (csl-bibliography p)))))
+
+(define (bib-item s)
+  ;; the item for the BibTeX entry in the string @s
+  (car (csl-bib->items (bib-parse s))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Helpers of the processor
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -135,6 +160,10 @@
           "A Tale: Of Two Cities")
   (check= (rt-text-case "the art of programming" "title" #f)
           "the art of programming")
+  ;; a text in capitals is not touched, as the words in capitals
+  (check= (rt-text-case "THE ART OF WAR" "title" #t) "THE ART OF WAR")
+  (check= (rt-text-case "a history of the UK" "title" #t)
+          "A History of the UK")
   (check= (rt-text-case "THE ART" "sentence" #t) "The art")
   (check= (rt-text-case "the iPhone and NASA" "capitalize-first" #t)
           "The iPhone and NASA")
@@ -144,6 +173,9 @@
   (check= (rt-text-case '(cat "on " (nocase "pH") " and " (raw (math "x")))
                         "uppercase" #t)
           '(cat "ON " (nocase "pH") " AND " (raw (math "x"))))
+  ;; the text of a tree: the variables of a with are no text
+  (check= (rt->string '(cat "a " (raw (with "font-shape" "italic" "b"))))
+          "a b")
   (check-group "initials")
   (check= (csl-initialize "Donald Ervin" ". " #t #t) "D. E.")
   (check= (csl-initialize "Donald Ervin" "." #t #t) "D.E.")
@@ -208,6 +240,42 @@
     ;; "and others" is not a name
     (check= (length (csl-item-ref i "author")) 1)
     (check-true (csl-item-ref i "author:others")))
+  (with i (bib-item (string-append "@phdthesis{t, author={and others},"
+                                   " title={T}, type={Habilitation thesis}}"))
+    (check-false (csl-item-ref i "author"))
+    ;; the field type replaces the name of the kind of thesis
+    (check= (csl-item-ref i "genre") "Habilitation thesis"))
+  ;; identifiers and addresses are not LaTeX
+  (with i (bib-item (string-append
+                     "@misc{s, doi={10.1007/978-3-540-30108-0_4},"
+                     " url={https://example.org/~doe/my_paper?a=1&b=2}}"))
+    (check= (csl-item-ref i "DOI") "10.1007/978-3-540-30108-0_4")
+    (check= (csl-item-ref i "URL") "https://example.org/~doe/my_paper?a=1&b=2"))
+  ;; an empty field gives no page, other pages are kept as they are written
+  (check-false (csl-item-ref (bib-item "@misc{s, title={T}, pages={}}")
+                             "page"))
+  (check= (csl-item-ref (bib-item "@misc{s, title={T}, pages={e1234}}") "page")
+          "e1234")
+  (check= (csl-item-ref (bib-item "@misc{s, title={T}, pages={12, 15--17}}")
+                        "page")
+          "12, 15-17")
+  (check-group "sentence case")
+  (let* ((title (lambda (fields)
+                  (csl-item-ref (bib-item (string-append "@book{b, " fields
+                                                         "}"))
+                                "title"))))
+    ;; single letters are kept
+    (check= (title "title={What I Learned About Vitamin A}")
+            "What I learned about vitamin A")
+    ;; protected text is a word like the other ones
+    (check= (title "title={{NASA} Reports On Mars}")
+            '(cat (nocase "NASA") " reports on mars"))
+    (check= (title "title={A Tale: The Two Cities}") "A tale: The two cities")
+    ;; the titles in another language are not changed
+    (check= (title "title={Die Kunst Der Fuge}, language={german}")
+            "Die Kunst Der Fuge")
+    (check= (title "title={The Art Of War}, langid={american}")
+            "The art of war"))
   (check-group "items from CSL-JSON")
   (with i (car (csl-json->items
                 (string-append
@@ -223,6 +291,10 @@
             "van")
     (check= (csl-date-start (csl-item-ref i "issued")) '(2000 5 3))
     (check= (csl-date-end (csl-item-ref i "issued")) '(2001 #f #f)))
+  ;; a tag which is not known has no effect, a stray end tag neither
+  (check= (rt->string (csl-parse-markup "A <span class=\"x\">B</span> C"))
+          "A B C")
+  (check= (rt->string (csl-parse-markup "A</span> <i>B</i> C")) "A B C")
   (check-group "dates")
   (check= (csl-date-start (csl-parse-date "2020-05-12")) '(2020 5 12))
   (check= (csl-date-end (csl-parse-date "2020-05/2021-01")) '(2021 1 #f))
@@ -394,6 +466,242 @@
             "Doe (2001, 2002), Roe, Poe, &#38; Low (1990)")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Particular cases of the rendering elements
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (book id fields)
+  ;; the CSL-JSON of a book with the other @fields
+  (string-append "{\"id\":\"" id "\",\"type\":\"book\","  fields "}"))
+
+(define (books . l)
+  (string-append "[" (string-recompose l ",") "]"))
+
+(define doe "\"author\":[{\"family\":\"Doe\",\"given\":\"J.\"}]")
+
+(define two-knuth
+  (books (book "a" (string-append "\"title\":\"T1\",\"author\":[{\"family\":"
+                                  "\"Knuth\",\"given\":\"D.\"}],"
+                                  "\"issued\":{\"date-parts\":[[1984]]}"))
+         (book "b" (string-append "\"title\":\"T2\",\"author\":[{\"family\":"
+                                  "\"Knuth\",\"given\":\"D.\"}],"
+                                  "\"issued\":{\"date-parts\":[[1984]]}"))))
+
+(define twelve
+  ;; the books k1 to k12, of the volumes 12 to 1
+  (apply books
+         (map (lambda (i)
+                (book (string-append "k" (number->string (+ i 1)))
+                      (string-append "\"title\":\"T" (number->string (+ i 1))
+                                     "\",\"volume\":\""
+                                     (number->string (- 12 i)) "\"")))
+              (iota 12))))
+
+(define (many-authors id given n)
+  ;; a book of @n authors; the given name of the fifth one is @given
+  (book id (string-append
+            "\"title\":\"T\",\"issued\":{\"date-parts\":[[2012]]},"
+            "\"author\":["
+            (string-recompose
+             (map (lambda (i)
+                    (string-append "{\"family\":\"F" (number->string i)
+                                   "\",\"given\":\"" (if (== i 4) given "G")
+                                   "\"}"))
+                  (iota n))
+             ",")
+            "]")))
+
+(define (test-elements)
+  (check-group "substitution")
+  ;; names inside cs:choose inherit cs:name and the label, and the editors
+  ;; which stand for the authors are not printed again
+  (check= (rendered (csl-load-style "chicago-author-date") "en-US"
+                    (books (book "o" (string-append
+                                      "\"title\":\"T\",\"editor\":[{\"family\":"
+                                      "\"Doe\",\"given\":\"J.\"},{\"family\":"
+                                      "\"Roe\",\"given\":\"K.\"}],"
+                                      "\"issued\":{\"date-parts\":[[1999]]}"))))
+          '("(Doe and Roe 1999)" "Doe, J., and K. Roe, eds. 1999. <i>T</i>."))
+  ;; a title which a macro substitutes is not printed again
+  (check= (rendered (csl-load-style "apa") "en-US"
+                    (books (book "t" "\"title\":\"Y\"")))
+          '("(<i>Y</i>, n.d.)" "<i>Y</i>. (n.d.)."))
+  ;; the affixes and the formatting of cs:names apply once to the names
+  ;; which are substituted
+  (check= (cdr (rendered
+                (style-of
+                 (string-append
+                  "<citation><layout><text variable=\"title\"/></layout>"
+                  "</citation><bibliography><layout>"
+                  "<names variable=\"author\" prefix=\"[\" suffix=\"] \""
+                  " font-style=\"italic\"><name/><substitute>"
+                  "<names variable=\"editor\"/></substitute></names>"
+                  "<text variable=\"title\"/></layout></bibliography>"))
+                "en-US"
+                (books (book "a" (string-append
+                                  "\"title\":\"T1\",\"editor\":[{\"family\":"
+                                  "\"Ed\",\"given\":\"E.\"}]")))))
+          '("[<i>E. Ed</i>] T1"))
+  (check-group "groups, dates and macros")
+  ;; no date: the group with the suffix of the year is not left out
+  (check= (rendered (csl-load-style "apa") "en-US"
+                    (books (book "e" (string-append "\"title\":\"Y\"," doe))))
+          '("(Doe, n.d.)" "Doe, J. (n.d.). <i>Y</i>."))
+  ;; a range of years: the months and the days have no range
+  (check= (cdr (rendered
+                (csl-load-style "apa") "en-US"
+                (books (book "r" (string-append
+                                  "\"title\":\"T2\"," doe ",\"issued\":"
+                                  "{\"date-parts\":[[1999],[2001]]}")))))
+          (list (cork->utf8 (u "Doe, J. (1999–2001). <i>T2</i>."))))
+  ;; a macro which calls itself ends
+  (check= (rendered
+           (style-of
+            (string-append
+             "<macro name=\"m\"><text variable=\"title\"/><text macro=\"m\"/>"
+             "</macro><citation><layout><text macro=\"m\"/></layout>"
+             "</citation>"))
+           "en-US" (books (book "t" "\"title\":\"Y\"")))
+          '("Y"))
+  ;; a style needs the layout of the citations
+  (check-false (style-of "<citation/>"))
+  (check-false (csl-style-ref
+                (style-of "<citation><layout/></citation><bibliography/>")
+                'bibliography))
+  (check-group "labels and numbers")
+  (let* ((label (lambda (attrs)
+                  (string-append
+                   "<macro name=\"l\"><text variable=\"citation-label\"/>"
+                   "</macro><citation><layout prefix=\"[\" suffix=\"]\""
+                   " delimiter=\", \"><text macro=\"l\"/></layout></citation>"
+                   "<bibliography" attrs "><layout>"
+                   "<text variable=\"citation-label\" prefix=\"[\""
+                   " suffix=\"] \"/><names variable=\"author\"><name/></names>"
+                   "<date variable=\"issued\" prefix=\" (\" suffix=\")\">"
+                   "<date-part name=\"year\"/></date></layout>"
+                   "</bibliography>"))))
+    ;; equal labels get a suffix, also when a macro prints them; the year
+    ;; does not repeat it after an aligned label
+    (check= (rendered (style-of (label " second-field-align=\"flush\""))
+                      "en-US" two-knuth)
+            '("[Knut84a, Knut84b]" "[Knut84a] D. Knuth (1984)"
+              "[Knut84b] D. Knuth (1984)")))
+  (let* ((style (style-of
+                 (string-append
+                  "<macro name=\"n\"><text variable=\"citation-number\"/>"
+                  "</macro><macro name=\"v\"><number variable=\"volume\"/>"
+                  "</macro><citation collapse=\"citation-number\"><sort>"
+                  "<key macro=\"n\"/></sort><layout prefix=\"[\" suffix=\"]\""
+                  " delimiter=\",\"><text macro=\"n\"/></layout></citation>"
+                  "<bibliography><sort><key macro=\"v\"/></sort><layout>"
+                  "<text variable=\"volume\"/></layout></bibliography>")))
+         (p (csl-make-processor style "en-US" (csl-json->items twelve))))
+    ;; the numbers of the citations are seen through a macro
+    (check-true (csl-processor-ref p 'numeric?))
+    ;; the keys of a macro sort numbers as numbers: the volume 9 comes
+    ;; before the volume 10
+    (check= (map (lambda (e) (rt->string (cadddr e))) (csl-bibliography p))
+            (map number->string (map (lambda (i) (+ i 1)) (iota 12))))
+    (check= (csl->html (csl-citation p (map (lambda (id) (list (cons 'id id)))
+                                            '("k12" "k2" "k10" "k4" "k11")))
+                       (csl-processor-locale p))
+            (cork->utf8 (u "[1–3,9,11]"))))
+  ;; of two items with the same identifier, the first one is kept
+  (check= (cdr (rendered (csl-load-style "ieee") "en-US"
+                         (books (book "a" "\"title\":\"First\"")
+                                (book "a" "\"title\":\"Second\"")
+                                (book "b" "\"title\":\"Third\""))))
+          '("[1]<i>First</i>. " "[2]<i>Third</i>. "))
+  (check-group "names alone")
+  (let* ((p (csl-make-processor (csl-load-style "ieee") "en-US"
+                                (csl-json->items
+                                 (books (book "t" "\"title\":\"Y\"")))))
+         (author (lambda (id)
+                   (csl->html (csl-citation p `(((id . ,id)
+                                                 (author-only . #t))))
+                              (csl-processor-locale p)))))
+    ;; a reference which is not known shows its key, a work without names
+    ;; its title
+    (check= (author "nobody") "<b>nobody</b>")
+    (check= (author "t") "Y"))
+  (check-group "languages")
+  (let* ((rose (lambda (more)
+                 (books (book "a" (string-append
+                                   "\"title\":\"la vie en rose\"," more doe
+                                   ",\"issued\":{\"date-parts\":[[2020]]}")))))
+         (bib (lambda (lang more)
+                (cadr (rendered (csl-load-style "chicago-author-date") lang
+                                (rose more))))))
+    ;; title case is for English: the locale in use, or else the language
+    ;; of the item
+    (check= (bib "en-US" "") "Doe, J. 2020. <i>La Vie En Rose</i>.")
+    (check= (bib "fr-FR" "") "Doe, J. 2020. <i>la vie en rose</i>.")
+    (check= (bib "fr-FR" "\"language\":\"en\",")
+            "Doe, J. 2020. <i>La Vie En Rose</i>.")
+    (check= (bib "en-US" "\"language\":\"fr\",")
+            "Doe, J. 2020. <i>la vie en rose</i>."))
+  ;; two styles of the same name keep their own terms
+  (check= (map (lambda (word)
+                 (car (rendered
+                       (style-of
+                        (string-append
+                         "<locale><terms><term name=\"and\">" word "</term>"
+                         "</terms></locale><citation><layout>"
+                         "<names variable=\"author\"><name form=\"short\""
+                         " and=\"text\"/></names></layout></citation>"))
+                       "en-US"
+                       (books (book "x" (string-append
+                                         "\"author\":[{\"family\":\"A\"},"
+                                         "{\"family\":\"B\"}]"))))))
+               '("UND" "ET"))
+          '("A UND B" "A ET B"))
+  ;; the long ordinals follow the gender of the variable
+  (check= (cdr (rendered
+                (style-of
+                 (string-append
+                  "<citation><layout><text variable=\"title\"/></layout>"
+                  "</citation><bibliography><layout>"
+                  "<number variable=\"edition\" form=\"long-ordinal\"/>"
+                  "<text value=\" \"/>"
+                  "<number variable=\"volume\" form=\"long-ordinal\"/>"
+                  "</layout></bibliography>"))
+                "it-IT" (books (book "a" "\"edition\":\"1\",\"volume\":\"1\""))))
+          '("prima primo"))
+  (check-group "long lists of names")
+  (let* ((style (style-of
+                 (string-append
+                  "<citation et-al-min=\"3\" et-al-use-first=\"1\""
+                  " disambiguate-add-names=\"true\""
+                  " disambiguate-add-givenname=\"true\""
+                  " disambiguate-add-year-suffix=\"true\">"
+                  "<layout prefix=\"(\" suffix=\")\" delimiter=\"; \">"
+                  "<names variable=\"author\"><name form=\"short\""
+                  " initialize-with=\". \"/></names>"
+                  "<date variable=\"issued\" prefix=\" \">"
+                  "<date-part name=\"year\"/></date></layout></citation>"))))
+    ;; names are added up to the first one which differs, which gets its
+    ;; initial
+    (check= (rendered style "en-US" (books (many-authors "x" "Xavier" 6)
+                                           (many-authors "y" "Yves" 6)))
+            (list (string-append "(F0, F1, F2, F3, X. F4, et al. 2012; "
+                                 "F0, F1, F2, F3, Y. F4, et al. 2012)")))
+    ;; the same sixty authors: only the year can tell the works apart
+    (check= (rendered style "en-US" (books (many-authors "x" "G" 60)
+                                           (many-authors "y" "G" 60)))
+            '("(F0 et al. 2012a; F0 et al. 2012b)")))
+  (check-group "shapes and spaces")
+  (with locale (csl-locale #f "fr-FR")
+    ;; small capitals in italics are one shape
+    (check= (csl->texmacs
+             '(fmt ((font-style . "italic"))
+                   (cat "a " (fmt ((font-variant . "small-caps")) "b")))
+             locale)
+            '(with "font-shape" "italic"
+               (concat "a " (with "font-shape" "italic-small-caps" "b"))))
+    ;; the no-break spaces of the French quotes
+    (check= (csl->texmacs '(fmt ((quotes . "true")) "a") locale)
+            `(concat ,(u "«") (nbsp) "a" (nbsp) ,(u "»")))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The styles which come with TeXmacs
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -490,9 +798,9 @@
   (string-append "<TeXmacs|2.1>\n\n<style|generic>\n\n<\\body>\n" body
                  "</body>\n"))
 
-(define (generated-bibliography name text)
-  ;; the bibliography after two rounds of Document > Update > All: the
-  ;; citations are known to the bibliography from the second round on
+(define (generated-body name text)
+  ;; the body after two rounds of Document > Update > All: the citations
+  ;; are known to the bibliography from the second round on
   (let* ((f (tmp-file name))
          (old (current-buffer)))
     (string-save (doc-tm text) f)
@@ -505,11 +813,14 @@
     (generate-all-aux)
     (update-current-buffer)
     (update-forced)
-    (with r (first-of 'bibliography (tree->stree (buffer-get-body f)))
+    (with r (tree->stree (buffer-get-body f))
       (buffer-pretend-saved f)
       (buffer-close f)
       (when (buffer-exists? old) (switch-to-buffer old))
       r)))
+
+(define (generated-bibliography name text)
+  (first-of 'bibliography (generated-body name text)))
 
 (define (bindings b)
   ;; the citations which a generated bibliography carries: (name . text)
@@ -547,15 +858,43 @@
             "(Knuth & van der Hoeven, 1986)")
     ;; the cites of one author are collapsed
     (check= (assoc-ref l "bib-cite-p:knuth84,knuth86,") "(Knuth, 1984, 1986)")
-    (check= (assoc-ref l "bib-cite-p:knuth84@pp. 99-101,")
+    (check= (assoc-ref l "bib-cite-p:knuth84{pp. 99-101,")
             (u "(Knuth, 1984, pp. 99–101)"))
     (check= (assoc-ref l "bib-cite-t:knuth86b,")
             "Knuth & van der Hoeven (1986)")
     (check= (assoc-ref l "bib-cite-a:knuth84,") "Knuth")
     (check= (assoc-ref l "bib-cite-y:knuth84,") "1984")
     ;; details which are no locator follow the cite
-    (check= (assoc-ref l "bib-cite-p:knuth86@for example,")
+    (check= (assoc-ref l "bib-cite-p:knuth86{for example,")
             "(Knuth, 1986, for example)"))
+  (with l (bindings
+           (generated-bibliography
+            "details.tm"
+            (string-append
+             "  See <cite-detail|knuth84|<em|passim>>, <cite|knuth84@x>,"
+             " <cite-detail|knuth84|x>, <cite-detail|knuth84|Lemma2>,"
+             " <cite-detail|knuth84|12a> and <cite-author|nobody>.\n\n"
+             "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n")))
+    ;; details which are not a plain text: the citation has a binding of
+    ;; its own, with the number of the citation
+    (check= (assoc-ref l "bib-cite-p:knuth84{*,#1") "(Knuth, 1984, passim)")
+    ;; a key with @ is not the key of a citation with details
+    (check= (assoc-ref l "bib-cite-p:knuth84@x,") "(knuth84@x)")
+    (check= (assoc-ref l "bib-cite-p:knuth84{x,") "(Knuth, 1984, x)")
+    ;; a word with a digit is no page
+    (check= (assoc-ref l "bib-cite-p:knuth84{Lemma2,") "(Knuth, 1984, Lemma2)")
+    (check= (assoc-ref l "bib-cite-p:knuth84{12a,") "(Knuth, 1984, p. 12a)")
+    ;; the names of a reference which is not known
+    (check= (assoc-ref l "bib-cite-a:nobody,") "nobody"))
+  ;; a bibliography without any entry keeps the citations
+  (with l (bindings
+           (generated-bibliography
+            "none.tm"
+            (string-append
+             "  See <cite|nobody>.\n\n"
+             "  <\\bibliography|bib|csl-apa|refs>\n  </bibliography>\n")))
+    (check= (assoc-ref l "bib-csl") "true")
+    (check= (assoc-ref l "bib-cite-p:nobody,") "(nobody)"))
   (with l (bindings
            (generated-bibliography
             "ieee2.tm"
@@ -588,7 +927,26 @@
     (check= (assoc-ref l "bib-cite-t:knuth84,") "Donald E. Knuth")
     (check= (assoc-ref l "bib-cite-t:knuth84,#4") "Knuth")
     (check= (assoc-ref l "bib-cite-n:knuth84,#4")
-            (u "“Literate Programming.”"))))
+            (u "“Literate Programming.”")))
+  ;; two bibliographies: the citations are numbered in the document, and
+  ;; each bibliography knows the numbers of its own
+  (with l (bindings
+           (generated-body
+            "two.tm"
+            (string-append
+             "  One<cite|knuth84>, two<with|bib-prefix|b2|<cite|knuth86>>,"
+             " three<with|bib-prefix|b2|<cite|knuth86>>"
+             " and four<cite|knuth84>.\n\n"
+             "  <\\bibliography|bib|csl-chicago-notes-bibliography|refs>\n"
+             "  </bibliography>\n\n"
+             "  <\\with|bib-prefix|b2>\n"
+             "    <\\bibliography|b2|csl-chicago-notes-bibliography|refs>\n"
+             "    </bibliography>\n"
+             "  </with>\n")))
+    (check= (assoc-ref l "b2-cite-p:knuth86,#3") "Knuth, The TeXbook.")
+    (check= (assoc-ref l "bib-cite-p:knuth84,#4")
+            (u "Knuth, “Literate Programming.”"))
+    (check= (assoc-ref l "bib-cite-p:knuth84,#3") #f)))
 
 (define (test-document)
   (check-group "document bibliography")
@@ -625,6 +983,7 @@
   (test-items)
   (test-rendering)
   (test-disambiguation)
+  (test-elements)
   (test-styles)
   (remove-tmp-dir)
   (system-mkdir (system->url csl-dir))

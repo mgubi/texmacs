@@ -49,7 +49,8 @@
             (part 'family)))))
 
 (define (default-author proc id)
-  ;; the names of an item whose cite shows none, as in a numeric style
+  ;; the names of an item whose cite shows none, as in a numeric style; a
+  ;; work without names is called by its title
   (let* ((item (csl-processor-item proc id))
          (locale (csl-processor-locale proc))
          (names (or (and item
@@ -59,7 +60,9 @@
                                                      (pair? (car l))))))
                     '()))
          (l (map family-name names)))
-    (cond ((null? l) #f)
+    (cond ((null? l)
+           (and item (or (csl-item-ref item "title-short")
+                         (csl-item-ref item "title"))))
           ((null? (cdr l)) (car l))
           ((null? (cddr l))
            (rt-cat (car l) " " (or (csl-term locale "and" #f #f) "and") " "
@@ -73,9 +76,16 @@
       (cdr p)))
 
 (define (render proc cite)
+  ;; when nothing is known about the authors, the names alone are the key
+  ;; of the reference, as for a reference which is not known
   (let* ((p (csl-render-cite proc cite))
-         (text (if (csl-cite-ref cite 'author-only) (cite-author proc cite p)
-                   (car p))))
+         (author (and (csl-cite-ref cite 'author-only)
+                      (cite-author proc cite p)))
+         (text (cond ((not (csl-cite-ref cite 'author-only)) (car p))
+                     ((rt-empty? author)
+                      (rt-fmt '((font-weight . "bold"))
+                              (csl-cite-ref cite 'id)))
+                     (else author))))
     (vector cite text (rt->string (cdr p)))))
 
 (define (with-affixes r text)
