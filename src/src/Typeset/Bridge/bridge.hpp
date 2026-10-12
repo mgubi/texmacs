@@ -42,6 +42,8 @@ public:
   hashmap<string,tree> changes;  // changes in the environment
   array<int>           reads;    // the variables read by the typesetting
   bool                 reads_known; // (sorted env_var_id; when all recorded)
+  array<string>        seen_keys;   // the references and attachments it
+  array<tree>          seen_values; // looked up, with the values found
   hashmap<string,tree> removed;  // changes of the bridges removed before
                                  // this one since the last pass
 

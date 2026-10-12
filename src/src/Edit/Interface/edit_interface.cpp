@@ -780,13 +780,34 @@ edit_interface_rep::apply_changes () {
       SI wx, wy;
       if (cvw == NULL) ::get_size (get_window (this), wx, wy);
       else ::get_size (widget (cvw), wx, wy);
+      // The size of the widget of a window is that of the whole window,
+      // with its menu bar, tool bars and footer (Qt and Vue): a page which
+      // follows it is taller than what is seen by the height of those,
+      // which differs from one configuration to the next and changes when
+      // a tool bar is shown or hidden. The page follows the canvas, which
+      // is what is seen (the editor is told when its size changes); a
+      // widget without a canvas of its own keeps its size.
+      if (cvw != NULL) {
+        widget cv= ::get_canvas (widget (cvw));
+        SI cw= 0, ch= 0;
+        if (!is_nil (cv)) ::get_size (cv, cw, ch);
+        if (cw > 0 && ch > 0) { wx= cw; wy= ch; }
+      }
       if (get_init_string (SCROLL_BARS) == "false") sb= 0;
       if (get_server () -> in_full_screen_mode ()) sb= 0;
       if (sb) wx -= scrollbar_width();
-      if (wx != cur_wx || wy != cur_wy || new_zoom != old_zoom) {
+      // (also when the document lost the size it was given: its initial
+      // environment is set again when it is loaded again, which the page of
+      // a tmfs document is in the browser after its window got its size;
+      // the page then kept the default size of 10cm for good)
+      tree new_w= as_string ((SI) (wx/magf)) * "tmpt";
+      tree new_h= as_string ((SI) (wy/magf)) * "tmpt";
+      if (wx != cur_wx || wy != cur_wy || new_zoom != old_zoom ||
+          get_init_value (PAGE_SCREEN_WIDTH) != new_w ||
+          get_init_value (PAGE_SCREEN_HEIGHT) != new_h) {
         cur_wx= wx; cur_wy= wy;
-        init_env (PAGE_SCREEN_WIDTH, as_string ((SI) (wx/magf)) * "tmpt");
-        init_env (PAGE_SCREEN_HEIGHT, as_string ((SI) (wy/magf)) * "tmpt");
+        init_env (PAGE_SCREEN_WIDTH, new_w);
+        init_env (PAGE_SCREEN_HEIGHT, new_h);
         notify_change (THE_ENVIRONMENT);
       }
     }
@@ -855,7 +876,7 @@ edit_interface_rep::apply_changes () {
     double prof_t= 0;
     if (edit_profile.on) {
       bool on= true;
-      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+      edit_profile= edit_profile_data { on, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
       prof_t= edit_profile_now ();
     }
     typeset (x1, y1, x2, y2);
@@ -882,7 +903,8 @@ edit_interface_rep::apply_changes () {
            << (edit_profile.breaks_reused > 0 ? " (breaks reused)" : "")
            << (edit_profile.starts > 0
                ? " (search " * as_string (floor (edit_profile.search * 100 + 0.5) / 100)
-                 * " ms, " * as_string (edit_profile.starts) * " starts)"
+                 * " ms, " * as_string (edit_profile.starts) * " starts, "
+                 * as_string (edit_profile.starts_kept) * " with candidates kept)"
                : string (""))
            << ", changes " << edit_profile.changes << " ms ("
            << edit_profile.rects << " rectangles from " << edit_profile.lines

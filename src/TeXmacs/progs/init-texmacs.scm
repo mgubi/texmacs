@@ -45,6 +45,8 @@
 (use-modules (bibtex bib-utils))
 (lazy-define (bibtex bib-complete) current-bib-file citekey-completions)
 (lazy-menu (bibtex bib-widgets) open-bibliography-inserter)
+(lazy-define (csl csl-bib) csl-style-name? csl-available-styles
+             csl-bib-process)
 (lazy-define (bibtex zotero) zotero-update-bibliography zotero-status
              zotero-before-update zotero-managed-file?
              zotero-completion-suffixes zotero-citation-entry
@@ -487,6 +489,11 @@
 (lazy-define (fonts font-old-menu)
 	     text-font-menu math-font-menu prog-font-menu)
 (lazy-menu (fonts font-short-menu) document-short-design-font-menu)
+(lazy-define (fonts font-design) open-font-design font-design-apply
+             font-design-parse)
+(lazy-define (fonts font-custom) font-design-label)
+(lazy-menu (fonts font-custom) document-custom-font-menu)
+(lazy-tmfs-handler (fonts font-design) font-design)
 (lazy-menu (fonts font-features)
            text-font-features-menu document-font-features-menu)
 (lazy-define (fonts font-features)

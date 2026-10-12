@@ -43,15 +43,20 @@
 ;; Strings and lines
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (md-space? c) (or (char=? c #\space) (char=? c #\tab)))
-(define (md-digit? c) (and (char>=? c #\0) (char<=? c #\9)))
+;; These are called for each character of a text: they compare the codes
+;; of the characters with <, which every interpreter does fast.
+(define (md-space? c) (or (eqv? c #\space) (eqv? c #\tab)))
+(define (md-digit? c)
+  (with n (char->integer c) (and (< 47 n) (< n 58))))
 (define (md-ascii-alpha? c)
-  (or (and (char>=? c #\a) (char<=? c #\z))
-      (and (char>=? c #\A) (char<=? c #\Z))))
+  (with n (char->integer c)
+    (or (and (< 96 n) (< n 123)) (and (< 64 n) (< n 91)))))
 (define (md-punctuation? c)
-  (and (< (char->integer c) 128)
-       (not (md-ascii-alpha? c)) (not (md-digit? c))
-       (> (char->integer c) 32)))
+  ;; ASCII, and neither a letter, a digit, a space nor a control character
+  (with n (char->integer c)
+    (and (< 32 n) (< n 128)
+         (not (or (and (< 47 n) (< n 58)) (and (< 64 n) (< n 91))
+                  (and (< 96 n) (< n 123)))))))
 
 (define (md-skip-spaces s i)
   (let loop ((i i))
@@ -119,6 +124,17 @@
 
 (define (md-lines s)
   ;; the lines of the text, without their ends
+  (if (>= (string-search-forwards "\r" 0 s) 0)
+      (md-lines-any s)
+      ;; the usual case, ends of lines of Unix: from one to the next
+      (let loop ((start 0) (acc '()))
+        (with i (string-search-forwards "\n" start s)
+          (cond ((>= i 0) (loop (+ i 1) (cons (substring s start i) acc)))
+                ((< start (string-length s))
+                 (reverse (cons (substring s start (string-length s)) acc)))
+                (else (reverse acc)))))))
+
+(define (md-lines-any s)
   (let loop ((i 0) (start 0) (acc '()))
     (cond ((>= i (string-length s))
            (reverse (if (< start i) (cons (substring s start i) acc) acc)))
@@ -1186,10 +1202,28 @@
 ;; Text: the tokens
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define md-token-start
+  ;; the characters at which something else than text may start, as a
+  ;; table: most characters of a text are passed with one look at it
+  (with v (make-vector 256 #f)
+    (for-each (lambda (c) (vector-set! v (char->integer c) #t))
+              (string->list "\\`$\n&![<*_~h"))
+    v))
+
+(define (md-next-token s i n)
+  ;; the first position from i on where a token may start, or n
+  (let loop ((i i))
+    (if (and (< i n)
+             (not (vector-ref md-token-start
+                              (char->integer (string-ref s i)))))
+        (loop (+ i 1))
+        i)))
+
 (define (md-tokens s)
   (let ((n (string-length s)))
-    (let loop ((i 0) (start 0) (acc '()))
+    (let loop ((from 0) (start 0) (acc '()))
       ;; start: where the text which is not yet in acc begins
+      (define i (md-next-token s from n))
       (define (flush) (if (< start i) (cons (substring s start i) acc) acc))
       (define (node r) (loop (cdr r) (cdr r) (cons (car r) (flush))))
       (define (text t j) (loop j j (cons t (flush))))

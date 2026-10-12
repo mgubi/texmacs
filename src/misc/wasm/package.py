@@ -60,11 +60,16 @@ PACKAGES = [
 ]
 CHUNK = 4 * 1024 * 1024
 
-# the fonts which are fetched only when TeXmacs reads them
+# the fonts which are fetched only when TeXmacs reads them, and the
+# pictures of their samples for the page of the design of the fonts
+# (misc/font-samples, 5.6 MB which only that page reads; packages.js
+# fetches them all in the background once one is read)
 LAZY_DIRS = ['fonts/truetype/', 'fonts/type1/']
 LAZY_EXTS = ['.otf', '.ttf', '.ttc', '.pfb']
+LAZY_SAMPLES = 'misc/font-samples/'
 
 def lazy (rel):
+  if rel.startswith (LAZY_SAMPLES) and rel.endswith ('.pdf'): return True
   return (any (rel.startswith (d) for d in LAZY_DIRS) and
           os.path.splitext (rel)[1].lower () in LAZY_EXTS)
 

@@ -103,6 +103,11 @@ public:
 
 RESOURCE_CODE(smart_map);
 
+void
+smart_fonts_forget () {
+  smart_map::instances= hashmap<string,pointer> (NULL);
+}
+
 smart_map
 get_smart_map (tree fn) {
   string name= recompose (tuple_as_array (fn), "-");

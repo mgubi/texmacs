@@ -32,6 +32,9 @@
 #include "analyze.hpp"
 #include "convert.hpp"
 #include "picture.hpp"
+#include "editor.hpp"
+#include "MuPDF/mupdf_renderer.hpp"
+#include "font.hpp"
 #include "tm_window.hpp"
 #include "tm_buffer.hpp"
 #include "new_window.hpp"
@@ -346,8 +349,34 @@ tau_state () {
 * intervals without a message, for the delayed commands.
 ******************************************************************************/
 
+// A font whose file the network had not brought when TeXmacs first asked
+// for it (fetchFont in misc/wasm/packages.js) has come. It was kept as a
+// bad font, whose characters are drawn as missing: the fonts are forgotten
+// and the documents typeset again, which makes them anew. The script of
+// the packages calls this from outside a turn; the next turn does the work.
+static bool fonts_arrived= false;
+
+extern "C" EMSCRIPTEN_KEEPALIVE void
+vue_web_font_arrived () {
+  fonts_arrived= true;
+}
+
+static void
+tau_follow_fonts () {
+  if (!fonts_arrived) return;
+  fonts_arrived= false;
+  fonts_forget ();
+  mupdf_fonts_forget ();
+  array<url> vs= get_all_views ();
+  for (int i= 0; i < N(vs); i++) {
+    editor ed= view_to_editor (vs[i]);
+    if (!is_nil (ed)) ed->typeset_invalidate_all ();
+  }
+}
+
 static void
 tau_turn () {
+  tau_follow_fonts ();
   array<simple_widget_rep*> views;
   iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
   while (it->busy ()) views << (simple_widget_rep*) it->next ();

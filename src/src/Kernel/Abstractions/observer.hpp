@@ -35,6 +35,7 @@ typedef list<int> path;
 #define OBSERVER_WIDGET     9
 
 #define ADDENDUM_PLAYER     1
+#define ADDENDUM_AUTO_ID    2
 
 /******************************************************************************
 * The observer class

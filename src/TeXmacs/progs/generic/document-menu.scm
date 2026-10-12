@@ -365,6 +365,7 @@
 (menu-bind document-short-font-menu
   ("Default" (init-default-font))
   ---
+  (link document-custom-font-menu)
   (link document-short-design-font-menu)
   (if (and (supports-chinese?) (== (get-init "language") "chinese"))
       ---
@@ -379,6 +380,7 @@
       ---
       (link document-short-chinese-font-menu))
   ---
+  ("Font design" (open-font-design))
   (if (and (new-fonts?) (use-popups?))
       ("Other" (open-document-font-selector)))
   (if (not (and (new-fonts?) (use-popups?)))
@@ -989,7 +991,7 @@
       (-> "Encryption" (link document-encryption-menu)))
   (-> (eval (upcase-first (get-init "language")))
       (link document-language-menu))
-  (-> (eval (upcase-first (font-family-main (get-init "font"))))
+  (-> (eval (font-design-label))
       (link document-short-font-menu)))
 
 (tm-menu (standard-focus-menu t)
@@ -1073,8 +1075,7 @@
     (=> (balloon (eval (upcase-first (get-init "page-type")))
                  "Paper size")
         (link document-page-size-menu))
-    (=> (balloon (eval `(verbatim ,(upcase-first
-                                    (font-family-main (get-init "font")))))
+    (=> (balloon (eval `(verbatim ,(font-design-label)))
                  "Main document font")
         (link document-short-font-menu))
     (=> (balloon (eval (string-append (get-init "font-base-size") "pt"))

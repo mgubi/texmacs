@@ -156,7 +156,8 @@ edit_process_rep::generate_bibliography (
   }
   else {
     bool star= false;
-    if (!bibtex_present () || starts (style, "tm-"))
+    bool csl= starts (style, "csl-");
+    if (!bibtex_present () || starts (style, "tm-") || csl)
       if (is_document (bib_t)) {
         tree new_t (DOCUMENT);
         for (int i=0; i<N(bib_t); i++)
@@ -175,7 +176,7 @@ edit_process_rep::generate_bibliography (
       }
     for (int i=0; i<N(bib_t); i++)
       if (bib_t[i] == "*") star= true;
-    if (!bibtex_present () && !starts (style, "tm-")) {
+    if (!bibtex_present () && !starts (style, "tm-") && !csl) {
       if (style == "abbrv") style= "tm-abbrv";
       else if (style == "acm") style= "tm-acm";
       else if (style == "alpha") style= "tm-alpha";
@@ -207,6 +208,22 @@ edit_process_rep::generate_bibliography (
       eval ("(use-modules (bibtex " * style (3, N(style)) * "))");
       t= stree_to_tree (call (string ("bib-process"),
                               bib, style (3, N(style)), ot));
+    }
+    else if (csl) {
+      // a style of the Citation Style Language, see progs/csl
+      string sbib;
+      if (load_string (bib_file, sbib, false))
+        std_error << "Could not load BibTeX file " << fname;
+      string xsbib;
+      if (!load_string (xbib_file, xsbib, false))
+        sbib << "\n" << xsbib;
+      tree te= bib_entries (parse_bib (sbib), bib_t);
+      eval ("(use-modules (csl csl-bib))");
+      object ot= tree_to_stree (te);
+      object ok= tree_to_stree (bib_t);
+      array<object> args;
+      args << object (bib) << object (style) << ot << ok;
+      t= stree_to_tree (call (string ("csl-bib-process"), args));
     }
     else t= bibtex_run (bib, style, bib_file, bib_t);
     t= arrange_bib (t);

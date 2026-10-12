@@ -587,6 +587,8 @@ init_std_drd () {
         fixed (1, 1, BIFORM) ->
         string_type (0) -> name (0, "kind") ->
         string_type (1) -> name (1, "title"));
+  init (AUTO_ID, "auto-id",
+        options (0, 1));                      // see env_exec.cpp
   init (CACHE_REF, "cache-ref",
         fixed (2, 2, DETAILED) ->
         string_type (0) -> name (0, "hash") ->

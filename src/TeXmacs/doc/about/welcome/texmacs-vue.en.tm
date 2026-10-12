@@ -229,6 +229,48 @@
   <paragraph|9 October 2026>
 
   <\itemize>
+    <item><menu|Font design>, in the menu of the fonts (the font button of
+    the focus bar), opens a page to choose the fonts of the document by
+    looking at them. Its top lists the parts of a document with the font
+    of each: the text, the mathematics, the sans serif and the
+    typewriter text, and the
+    blackboard bold, calligraphic and fraktur letters of the formulas. The
+    name of a part is a button which shows the fonts for it, each with a
+    few words, a sample of that part and a button to choose it. The
+    choice is listed at the top of the page with a sample, and <menu|Use
+    for the document> gives it to the document. The samples are pictures:
+    the page fetches no font but those of the choice. Such fonts show as <menu|Custom> on the font
+    button; <menu|Save as> on the page, or <menu|Save these fonts> in the
+    menu, keeps them under a name, which the menu then offers for every
+    document (<menu|Saved fonts>).
+
+    <item>A slow network no longer leaves signs out of the first screen.
+    The fonts of the first screen which are not among the files of the
+    start (those of the welcome page and, on a Mac, the one of the command
+    sign and of the other keys of the shortcuts in the menus) are fetched
+    with those files, under the progress bar: <TeXmacs> used to fetch each
+    when it first drew with it, holding the page meanwhile, and a request
+    which failed left that font out until the next visit (a question mark
+    for the command sign). A request which fails is now made again. A
+    font which still does not come is asked for in the background, the
+    page going on without it, until it comes: the documents and the menus
+    are then drawn again with it.
+
+    <item>A login from the browser to a server of another version of
+    <TeXmacs>, such as <verbatim|cloud.texmacs.org>, fails: a page has only
+    WebSockets, which those servers do not answer. The message now says
+    so. Until they do, a bridge on your own machine passes the connection
+    on: run <verbatim|node misc/wasm/remote/ws-bridge.mjs> (from the
+    sources of <TeXmacs> <name|Vue>; <verbatim|cloud.texmacs.org> is its
+    default), and log in with the server <verbatim|localhost> and the port
+    6563.
+
+    <item>The menus drop in without stopping halfway. On a display of 120
+    Hz the page drew a frame every 8 ms, more than the graphics card
+    follows with a large window: the browser then held the frames back for
+    a tenth of a second at a time, in the middle of the movement at an
+    interface scaling of 2. The page now draws 60 frames a second at most.
+
     <item>The interface follows the zoom of the browser. Its size was
     that of a whole number of pixels of the screen per point: on a
     display of density 2, a zoom of 115% or 120% made it smaller, and one
