@@ -33,6 +33,7 @@
 (define odt-lists (make-ahash-table))    ; (list style . level) -> kind
 (define odt-list-style #f)               ; the style of the list which is read
 (define odt-list-depth 0)
+(define odt-floats '())                  ; blocks found inside a paragraph
 
 (define (odt-get props key)
   (with p (assoc key props) (and p (cdr p))))
@@ -53,8 +54,8 @@
         (with v (ox-attr x 'fo:font-weight)
           (if v (list (cons 'strong
                             (or (== v "bold")
-                                (and (string->number v)
-                                     (>= (string->number v) 600)))))
+                                (with n (office-number v)
+                                  (and n (>= n 600))))))
               '()))
         (with v (ox-attr x 'style:text-underline-style)
           (if v (list (cons 'underline (!= v "none"))) '()))
@@ -66,13 +67,12 @@
                 ((string-starts? v "super") '((sup . #t) (sub . #f)))
                 ((string-starts? v "sub") '((sub . #t) (sup . #f)))
                 ;; a shift in percents: up or down
-                ((and (string->number (car (string-tokenize-by-char v #\%)))
-                      (> (string->number (car (string-tokenize-by-char v #\%))) 0))
-                 '((sup . #t) (sub . #f)))
-                ((and (string->number (car (string-tokenize-by-char v #\%)))
-                      (< (string->number (car (string-tokenize-by-char v #\%))) 0))
-                 '((sub . #t) (sup . #f)))
-                (else '((sub . #f) (sup . #f)))))
+                (else
+                  (with n (or (office-number (car (string-tokenize-by-char v #\%)))
+                              0)
+                    (cond ((> n 0) '((sup . #t) (sub . #f)))
+                          ((< n 0) '((sub . #t) (sup . #f)))
+                          (else '((sub . #f) (sup . #f))))))))
         (with v (ox-attr x 'fo:color)
           (if v (list (cons 'color (office-color v))) '()))
         (with v (ox-attr x 'fo:background-color)
@@ -165,9 +165,13 @@
                                     (or (ox-attr x 'style:display-name) name))))
                 (with p (ox-attr x 'style:parent-style-name)
                   (if p (list (cons 'parent p)) '()))
-                (with v (ox-attr x 'style:default-outline-level)
-                  (if (and v (string->number v))
-                      (list (cons 'outline (string->number v))) '()))
+                ;; (a style which the program makes for what is formatted
+                ;; by hand)
+                (if (func? group 'office:automatic-styles)
+                    '((automatic . #t)) '())
+                (with v (office-integer (ox-attr x 'style:default-outline-level)
+                                        #f 1 10)
+                  (if v (list (cons 'outline v)) '()))
                 (odt-text-properties (ox-child x 'style:text-properties))
                 (odt-paragraph-properties
                   (ox-child x 'style:paragraph-properties))
@@ -238,7 +242,7 @@
 
 (define (odt-heading-level name)
   (and (string-starts? name "heading ")
-       (string->number (substring name 8 (string-length name)))))
+       (office-integer (substring name 8 (string-length name)) #f 1 10)))
 
 (define (odt-role names)
   ;; (role level) of a paragraph with the styles of these names; the
@@ -266,6 +270,38 @@
          (s (if (string-ends? s "/") (substring s 0 (- (string-length s) 1)) s)))
     s))
 
+(define (odt-apart thunk)
+  ;; the result of the thunk, which reads what is not in the lists around
+  ;; it: a cell, a note, a box of text
+  (let ((old-style odt-list-style)
+        (old-depth odt-list-depth))
+    (set! odt-list-style #f)
+    (set! odt-list-depth 0)
+    (with r (thunk)
+      (set! odt-list-style old-style)
+      (set! odt-list-depth old-depth)
+      r)))
+
+(define (odt-with-floats thunk)
+  ;; (result . blocks): the result of the thunk, which reads the text of a
+  ;; paragraph, and the blocks which were found in this text and which
+  ;; come after the paragraph
+  (with old odt-floats
+    (set! odt-floats '())
+    (let* ((r (thunk))
+           (l odt-floats))
+      (set! odt-floats old)
+      (cons r l))))
+
+(define (odt-formula? name)
+  ;; whether the entry name of the archive is a formula of MathML
+  (with root (office-xml odt-archive name)
+    (and root (pair? root) (symbol? (car root))
+         (let* ((s (symbol->string (car root)))
+                (i (string-search-forwards ":" 0 s)))
+           (== (if (>= i 0) (substring s (+ i 1) (string-length s)) s)
+               "math")))))
+
 (define (odt-frame x)
   ;; a frame: an image, a formula, or a box of text
   (let* ((images (ox-childs x 'draw:image))
@@ -286,10 +322,12 @@
            ;; the formula is in the frame, or in content.xml of a directory
            (let* ((href (ox-attr object 'xlink:href))
                   (inside (ox-find object 'math))
-                  (data (and href
-                             (office-entry odt-archive
-                                           (string-append (odt-entry-name href)
-                                                          "/content.xml")))))
+                  (name (and href (string-append (odt-entry-name href)
+                                                 "/content.xml")))
+                  ;; (another object, such as a chart, has a content too)
+                  (data (and name (office-entry odt-archive name)
+                             (odt-formula? name)
+                             (office-entry odt-archive name))))
              (cond (data
                     (list (office-node 'math
                                        `((display ,(and display? "true")))
@@ -304,14 +342,18 @@
                    (else '()))))
           (image (odt-frame-image x image alt))
           (box
-           ;; the paragraphs of the box, as lines
-           (let loop ((l (odt-blocks (ox-children box))) (acc '()))
+           ;; the paragraphs of the box, as lines; its tables and its
+           ;; lists come after the paragraph which the frame is in
+           (let loop ((l (odt-apart (lambda () (odt-blocks (ox-children box)))))
+                      (acc '()))
              (cond ((null? l) (reverse acc))
                    ((func? (car l) 'p)
                     (loop (cdr l)
                           (append (reverse (ox-children (car l)))
                                   (if (null? acc) acc (cons '(br) acc)))))
-                   (else (loop (cdr l) acc)))))
+                   (else
+                     (set! odt-floats (append odt-floats (list (car l))))
+                     (loop (cdr l) acc)))))
           (else '()))))
 
 (define (odt-frame-image x image alt)
@@ -326,12 +368,15 @@
                      (width ,(ox-attr x 'svg:width))
                      (height ,(ox-attr x 'svg:height))
                      (alt ,alt)))))
-          ;; an image which is not in the archive: its address
-          ((and href (>= (string-search-forwards "://" 0 href) 0))
-           (list (office-node 'image `((name ,href)
-                                       (width ,(ox-attr x 'svg:width))
-                                       (height ,(ox-attr x 'svg:height))
-                                       (alt ,alt)))))
+          ;; An image which is not in the archive is not fetched: a link
+          ;; to its address on the web, and the text of any other address.
+          ((and href (or (string-starts? (locase-all href) "http://")
+                         (string-starts? (locase-all href) "https://")))
+           (list `(link (@ (href ,href))
+                        ,(if (and alt (!= (string-trim-spaces alt) "")) alt href))))
+          ((and href (or (>= (string-search-forwards "://" 0 href) 0)
+                         (string-starts? (locase-all href) "file:")))
+           (list href))
           (else '()))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -354,10 +399,20 @@
 
 (define (odt-span-wrappers name)
   ;; the wrappers of the text of a span, the innermost first
-  (let* ((names (odt-style-names "text" name))
-         (props (if (and (pair? names) (in? (car names) odt-plain-styles)) '()
-                    (odt-style "text" name)))
-         (code? (or (odt-get props 'code)
+  (with names (odt-style-names "text" name)
+    (odt-wrappers (if (and (pair? names) (in? (car names) odt-plain-styles)) '()
+                      (odt-style "text" name))
+                  names)))
+
+(define (odt-paragraph-wrappers name)
+  ;; the wrappers of the text of a paragraph: what its automatic style
+  ;; says of its text, when the whole paragraph is formatted by hand
+  (with own (and name (ahash-ref odt-styles (cons "paragraph" name)))
+    (if (and own (odt-get own 'automatic)) (odt-wrappers own '()) '())))
+
+(define (odt-wrappers props names)
+  ;; the wrappers for the properties props of a style with these names
+  (let* ((code? (or (odt-get props 'code)
                     (list-or (map (lambda (n)
                                     (in? n '("source text" "teletype"
                                              "verbatim char" "code"
@@ -397,8 +452,7 @@
              (odt-wrap-text (odt-inlines (ox-children x))
                             (odt-span-wrappers (ox-attr x 'text:style-name))))
             ((text:s)
-             (with n (or (and (ox-attr x 'text:c) (string->number (ox-attr x 'text:c)))
-                         1)
+             (with n (office-integer (ox-attr x 'text:c) 1 0 1000)
                ;; (spaces which count: not those which odt-trim removes)
                (list (make-string n odt-hard-space))))
             ((text:tab) '((tab)))
@@ -411,7 +465,10 @@
                      (else l))))
             ((text:note)
              (with body (ox-child x 'text:note-body)
-               (if body (list (cons 'note (odt-blocks (ox-children body)))) '())))
+               (if body
+                   (list (cons 'note (odt-apart
+                                       (lambda () (odt-blocks (ox-children body))))))
+                   '())))
             ((text:bookmark text:bookmark-start text:reference-mark
               text:reference-mark-start)
              (with name (ox-attr x 'text:name)
@@ -495,19 +552,22 @@
   (let* ((name (ox-attr x 'text:style-name))
          (props (odt-style "paragraph" name))
          (names (odt-style-names "paragraph" name))
-         (outline (or (and (ox-attr x 'text:outline-level)
-                           (string->number (ox-attr x 'text:outline-level)))
+         (outline (or (office-integer (ox-attr x 'text:outline-level) #f 1 10)
                       (odt-get props 'outline)))
          (role (cond ((and heading? outline)
                       (list "heading" (number->string outline)))
                      (heading? (list "heading" "1"))
                      (else (odt-role names))))
          (align (odt-get props 'align))
-         (l (odt-trim (odt-inlines (ox-children x)))))
+         (r (odt-with-floats
+              (lambda () (odt-trim (odt-inlines (ox-children x))))))
+         (wrappers (if (car role) '() (odt-paragraph-wrappers name)))
+         (l (if (null? wrappers) (car r)
+                (office-merge (odt-wrap-text (car r) wrappers)))))
     (append
       (if (odt-get props 'page-break) '((pagebreak)) '())
-      (if (null? l) '()
-          (list (apply office-node
+      (if (null? l) (cdr r)
+          (cons (apply office-node
                        (cons* 'p
                               `((role ,(car role)) (level ,(cadr role))
                                 (numbered ,(and heading?
@@ -516,7 +576,8 @@
                                 (align ,(cond ((== align "center") "center")
                                               ((in? align '("end" "right")) "right")
                                               (else #f))))
-                              l)))))))
+                              l))
+                (cdr r))))))
 
 (define (odt-list x)
   ;; a list: its style is its own, or the one of the list it is in
@@ -548,9 +609,10 @@
 
 (define (odt-cell x header?)
   ;; the cells of a table:table-cell: itself, as many times as it says
-  (let* ((n (or (and (ox-attr x 'table:number-columns-repeated)
-                     (string->number (ox-attr x 'table:number-columns-repeated)))
-                1))
+  (let* ((n (office-integer (ox-attr x 'table:number-columns-repeated) 1 1 64))
+         (span (lambda (name)
+                 (with k (office-integer (ox-attr x name) 1 1 1000)
+                   (and (> k 1) (number->string k)))))
          (props (odt-style "table-cell" (ox-attr x 'table:style-name)))
          (letters (string-append (if (odt-get props 'border-top) "t" "")
                                  (if (odt-get props 'border-bottom) "b" "")
@@ -563,12 +625,11 @@
                                  `((header ,(and header? "true"))
                                    (borders ,(if (== letters "") "none" letters))
                                    (background ,(odt-get props 'fill))
-                                   (colspan ,(with v (ox-attr x 'table:number-columns-spanned)
-                                               (and v (!= v "1") v)))
-                                   (rowspan ,(with v (ox-attr x 'table:number-rows-spanned)
-                                               (and v (!= v "1") v))))
-                                 (odt-blocks (ox-children x)))))))
-    (map (lambda (i) cell) (iota (min n 64)))))
+                                   (colspan ,(span 'table:number-columns-spanned))
+                                   (rowspan ,(span 'table:number-rows-spanned)))
+                                 (odt-apart
+                                   (lambda () (odt-blocks (ox-children x)))))))))
+    (map (lambda (i) cell) (iota n))))
 
 (define (odt-rows l header?)
   (append-map
@@ -589,23 +650,28 @@
             (else '())))
     l))
 
+(define (odt-column-widths x)
+  ;; the widths of the columns of the element x, a table or a group of
+  ;; its columns: numbers, or #f for a column without a width
+  (append-map
+    (lambda (c)
+      (cond ((func? c 'table:table-column)
+             (let ((n (office-integer (ox-attr c 'table:number-columns-repeated)
+                                      1 1 64))
+                   (w (odt-get (odt-style "table-column"
+                                          (ox-attr c 'table:style-name))
+                               'col-width)))
+               (map (lambda (i) w) (iota n))))
+            ((and (pair? c) (in? (car c) '(table:table-columns
+                                           table:table-column-group
+                                           table:table-header-columns)))
+             (odt-column-widths c))
+            (else '())))
+    (ox-children x)))
+
 (define (odt-table-columns x)
   ;; the widths of the columns, as parts of their sum, or #f
-  (let* ((cols (append-map
-                 (lambda (c)
-                   (cond ((func? c 'table:table-column)
-                          (let ((n (or (and (ox-attr c 'table:number-columns-repeated)
-                                            (string->number
-                                              (ox-attr c 'table:number-columns-repeated)))
-                                       1))
-                                (w (odt-get (odt-style "table-column"
-                                                       (ox-attr c 'table:style-name))
-                                            'col-width)))
-                            (map (lambda (i) w) (iota (min n 64)))))
-                         ((func? c 'table:table-columns)
-                          (ox-childs c 'table:table-column))
-                         (else '())))
-                 (ox-children x)))
+  (let* ((cols (odt-column-widths x))
          (ok? (and (pair? cols) (list-and (map number? cols))))
          (sum (if ok? (apply + cols) 0)))
     (and ok? (> sum 0)
@@ -620,14 +686,14 @@
          (align (odt-get props 'table-align))
          (width (odt-get props 'table-width))
          (percent (and width (string-ends? width "%")
-                       (string->number (substring width 0 (- (string-length width) 1))))))
+                       (office-number (substring width 0 (- (string-length width) 1))))))
     (if (null? rows) '()
         (list (apply office-node
                      (cons* 'table
                             `((align ,(cond ((== align "center") "center")
                                             ((== align "right") "right")
                                             (else #f)))
-                              (width ,(and percent (< percent 100)
+                              (width ,(and percent (> percent 0) (< percent 100)
                                            (string-append
                                              (number->string (/ percent 100.0))
                                              "par")))
@@ -642,12 +708,20 @@
             ((text:p) (odt-paragraph x #f))
             ((text:list) (odt-list x))
             ((table:table) (odt-table x))
-            ((text:section text:index-body) (odt-blocks (ox-children x)))
+            ((text:section text:index-body text:index-title
+              text:numbered-paragraph)
+             (odt-blocks (ox-children x)))
             ;; a table of contents is made again by TeXmacs
             ((text:table-of-content) '((toc)))
+            ;; the other indexes and the bibliography: their text
+            ((text:bibliography text:alphabetical-index text:illustration-index
+              text:table-index text:object-index text:user-index)
+             (with body (ox-child x 'text:index-body)
+               (if body (odt-blocks (ox-children body)) '())))
             ((draw:frame)
-             (with l (odt-frame x)
-               (if (null? l) '() (list (cons 'p l)))))
+             (with r (odt-with-floats (lambda () (odt-frame x)))
+               (append (if (null? (car r)) '() (list (cons 'p (car r))))
+                       (cdr r))))
             (else '())))))
 
 (define (odt-merge-lists l)
@@ -683,8 +757,11 @@
   ;; the blocks of the children l; text which is in no paragraph is one
   (let loop ((l l) (text '()) (acc '()))
     (let ((flush (lambda ()
-                   (with t (odt-trim (odt-inlines (reverse text)))
-                     (if (null? t) acc (cons (cons 'p t) acc))))))
+                   (with r (odt-with-floats
+                             (lambda () (odt-trim (odt-inlines (reverse text)))))
+                     (append (reverse (cdr r))
+                             (if (null? (car r)) acc
+                                 (cons (cons 'p (car r)) acc)))))))
       (cond ((null? l) (reverse (flush)))
             ((or (odt-inline-node? (car l))
                  (and (pair? text) (or (string? (car l)) (func? (car l) 'draw:frame))))
@@ -715,22 +792,30 @@
                             (if (null? a) (get 'dc:creator 'author) a)))))
           (if (null? l) '() (list (cons 'meta l)))))))
 
+;; A file which cannot be read gives a document which says so, and a
+;; message, rather than an empty document.
+(define (odt-error message)
+  (debug-message "convert-error" (string-append message "\n"))
+  `(office (error ,message)))
+
 (tm-define (parse-odt-document s)
   (:type (-> string stree))
   (:synopsis "Read the OpenDocument text @s, a zip archive, into an office tree")
   (set! odt-archive (office-archive s))
-  (if (not odt-archive) '(office)
+  (if (not odt-archive) (odt-error "This file is not an OpenDocument text")
       (let ((content (office-xml odt-archive "content.xml")))
         (set! odt-styles (make-ahash-table))
         (set! odt-style-memo (make-ahash-table))
         (set! odt-lists (make-ahash-table))
         (set! odt-list-style #f)
         (set! odt-list-depth 0)
+        (set! odt-floats '())
         (odt-read-styles (office-xml odt-archive "styles.xml"))
         (odt-read-styles content)
         (let* ((text (and content (ox-path content 'office:body 'office:text)))
-               (r `(office ,@(odt-meta)
-                           ,@(if text (odt-blocks (ox-children text)) '()))))
+               (r (if text
+                      `(office ,@(odt-meta) ,@(odt-blocks (ox-children text)))
+                      (odt-error "This OpenDocument file has no text"))))
           (set! odt-archive #f)
           (set! odt-styles (make-ahash-table))
           (set! odt-style-memo (make-ahash-table))

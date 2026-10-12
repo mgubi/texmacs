@@ -25,10 +25,23 @@
 ;; Text
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define oftm-soft-hyphen (office-utf8 #xad))
+
 (define (oftm-text s)
   ;; the text in the encoding of TeXmacs, without the characters of no
-  ;; width which the programs put around formulas and fields
-  (string-replace (string-replace (utf8->cork s) "<#200B>" "") "<#FEFF>" ""))
+  ;; width which the programs put around formulas and fields, and without
+  ;; the places where a word may be cut, which TeXmacs finds itself
+  (string-replace
+    (string-replace (utf8->cork (string-replace s oftm-soft-hyphen ""))
+                    "<#200B>" "")
+    "<#FEFF>" ""))
+
+(define (oftm-text-nodes s)
+  ;; the text as trees of TeXmacs: a space at which a line is not broken
+  ;; is a tag
+  (with t (oftm-text s)
+    (if (< (string-search-forwards "<varspace>" 0 t) 0) (list t)
+        (oftm-split-spaces t '(("<varspace>" (nbsp)))))))
 
 (define (oftm-concat l)
   ;; a list of TeXmacs trees as one tree
@@ -54,7 +67,7 @@
 
 (define (oftm-plain x)
   ;; the text of an office node, for code
-  (cond ((string? x) (oftm-text x))
+  (cond ((string? x) (string-replace (oftm-text x) "<varspace>" " "))
         ((func? x 'br) "\n")
         ((func? x 'tab) "    ")
         ((and (pair? x) (in? (car x) '(note image math bookmark))) "")
@@ -71,6 +84,29 @@
          (i (string-search-forwards ":" 0 s)))
     (if (>= i 0) (substring s (+ i 1) (string-length s)) s)))
 
+;; The accents above a letter are written with a character, the accent by
+;; itself or the one which combines with a letter: each one as the
+;; converter of MathML knows it, so that it gives the accent of TeXmacs.
+(define oftm-accents
+  (map (lambda (p)
+         (cons (office-utf8 (car p))
+               (if (number? (cdr p)) (office-utf8 (cdr p)) (cdr p))))
+       '((#x302 . "^") (#x2c6 . "^") (#x303 . "~") (#x2dc . "~")
+         (#x304 . #xaf) (#x305 . #xaf) (#x203e . #xaf)
+         (#x307 . "&DiacriticalDot;") (#x2d9 . "&DiacriticalDot;")
+         (#x308 . "&DoubleDot;") (#xa8 . "&DoubleDot;")
+         (#x30a . #x2da) (#x30c . #x2c7) (#x306 . #x2d8) (#x311 . "&#x311;")
+         (#x301 . #xb4) (#x300 . #x60)
+         (#x20d7 . "&RightVector;") (#x2192 . "&RightVector;")
+         (#x20d6 . "&LeftArrow;") (#x2190 . "&LeftArrow;"))))
+
+(define (oftm-accent x)
+  ;; the element x of an accent, with its character as the converter of
+  ;; MathML knows it
+  (with a (and (func? x 'm:mo) (string? (cAr x))
+               (assoc-ref oftm-accents (string-trim-spaces (cAr x))))
+    (if a `(m:mo ,a) x)))
+
 (define (oftm-mathml x)
   ;; The element of MathML x as the converter of MathML wants it: with the
   ;; prefix m: for its elements, whatever prefix they have or have not in
@@ -78,15 +114,19 @@
   (cond ((not (pair? x)) x)
         ((func? x '@) x)
         (else
-          (with name (oftm-local-name (car x))
-            (cons (string->symbol (string-append "m:" name))
-                  (map oftm-mathml
-                       (list-filter
-                         (cdr x)
-                         (lambda (y)
-                           (not (and (pair? y) (symbol? (car y))
-                                     (in? (oftm-local-name (car y))
-                                          '("annotation" "annotation-xml"))))))))))))
+          (let* ((name (oftm-local-name (car x)))
+                 (l (map oftm-mathml
+                         (list-filter
+                           (cdr x)
+                           (lambda (y)
+                             (not (and (pair? y) (symbol? (car y))
+                                       (in? (oftm-local-name (car y))
+                                            '("annotation" "annotation-xml"))))))))
+                 (l (if (and (== name "mover") (== (ox-attr x 'accent) "true")
+                             (pair? l))
+                        (rcons (cDr l) (oftm-accent (cAr l)))
+                        l)))
+            (cons (string->symbol (string-append "m:" name)) l)))))
 
 (define (oftm-from-mathml x)
   ;; the tree of TeXmacs for the element of MathML x; a formula which the
@@ -122,8 +162,19 @@
                       (substring s (+ i (string-length what)) (string-length s))
                       l))))))
 
+(define (oftm-math-text t)
+  ;; text inside a formula: its spaces are spaces
+  (cond ((string? t) (string-replace t "<varspace>" " "))
+        ((pair? t) (cons (car t) (map oftm-math-text (cdr t))))
+        (else t)))
+
 (define (oftm-clean-math t)
   (cond ((string? t) (oftm-concat (oftm-split-spaces t oftm-math-spaces)))
+        ((and (func? t 'with 3) (== (cadr t) "mode") (== (caddr t) "text"))
+         `(with "mode" "text" ,(oftm-math-text (cadddr t))))
+        ;; four dots above: an accent which the converter does not know
+        ((and (func? t 'above 2) (== (caddr t) "<#20DC>"))
+         `(wide ,(oftm-clean-math (cadr t)) "<ddddot>"))
         ((and (pair? t) (func? t 'concat))
          (oftm-concat
            (append-map (lambda (x)
@@ -165,6 +216,10 @@
          (w (or (ox-attr x 'width) ""))
          (h (or (ox-attr x 'height) "")))
     (cond (data (list `(image (tuple (raw-data ,data) ,name) ,w ,h "" "")))
+          ;; (an address is not a file to load when the document is opened)
+          ((or (>= (string-search-forwards "://" 0 name) 0)
+               (string-starts? (locase-all name) "file:"))
+           (list name))
           ((!= name "") (list `(image ,name ,w ,h "" "")))
           (else '()))))
 
@@ -371,7 +426,7 @@
 
 (define (oftm-inline x)
   ;; the list of TeXmacs trees for an inline node
-  (cond ((string? x) (list (oftm-text x)))
+  (cond ((string? x) (oftm-text-nodes x))
         ((not (pair? x)) '())
         (else
           (let ((l (ox-children x)))
@@ -408,6 +463,11 @@
                      (name (oftm-text (or (ox-attr x 'name) ""))))
                  (cond ((== t "") '())
                        ((== name "") (list t))
+                       ;; the number of the page of a label
+                       ((== (ox-attr x 'kind) "page")
+                        (if (and (string? t) (oftm-number? t))
+                            (list `(pageref ,name))
+                            (list `(hlink ,t ,(string-append "#" name)))))
                        ((and (ahash-ref oftm-numbered-labels (ox-attr x 'name))
                              (string? t) (oftm-number? t))
                         (list `(reference ,name)))
@@ -594,7 +654,7 @@
          (twidth (and (not oftm-in-cell?) (ox-attr x 'width)))
          (wide? (and (not oftm-in-cell?) (or wide? (> width 72))))
          (cols (with c (ox-attr x 'columns)
-                 (and c (map string->number (string-tokenize-by-char c #\space)))))
+                 (and c (map office-number (string-tokenize-by-char c #\space)))))
          (cols (and cols (== (length cols) ncols) (list-and cols) cols))
          (wide (if (or wide? twidth)
                    `((twith "table-width" ,(or twidth "1par"))
@@ -630,8 +690,8 @@
   '(section subsection subsubsection paragraph subparagraph))
 
 (define (oftm-heading x)
-  (let* ((n (or (string->number (or (ox-attr x 'level) "1")) 1))
-         (tag (list-ref oftm-sections (max 0 (min (- n 1) 4))))
+  (let* ((n (office-integer (ox-attr x 'level) 1 1 5))
+         (tag (list-ref oftm-sections (- n 1)))
          ;; a heading which says that it has no number
          (tag (if (== (ox-attr x 'numbered) "no")
                   (string->symbol (string-append (symbol->string tag) "*"))
@@ -815,6 +875,11 @@
                 ((list) (oftm-list x))
                 ((table) (list (oftm-table x)))
                 ((pagebreak) '((page-break)))
+                ;; a file which could not be read says so
+                ((error)
+                 (list `(with "color" "red"
+                          ,(oftm-text (apply string-append
+                                             (list-filter (cdr x) string?))))))
                 (else '()))
               (oftm-blocks (cdr l)))))))
 
@@ -827,6 +892,15 @@
 
 (define (oftm-title-block? x)
   (and (func? x 'p) (in? (ox-attr x 'role) oftm-title-roles)))
+
+(define (oftm-lines l)
+  ;; several paragraphs as the lines of one
+  (oftm-concat
+    (let loop ((l l))
+      (if (null? l) l
+          (append (if (func? (car l) 'concat) (cdar l) (list (car l)))
+                  (if (null? (cdr l)) '()
+                      (cons '(next-line) (loop (cdr l)))))))))
 
 (define (oftm-doc-data l meta)
   ;; the title, from the paragraphs l at the start of the document which
@@ -843,13 +917,15 @@
          (dates (get "date"))
          (abstract (get "abstract")))
     (append
-      (if (and (null? titles) (null? authors) (null? dates)) '()
+      ;; (a title, a subtitle or a date of several paragraphs has lines)
+      (if (and (null? titles) (null? subtitles) (null? authors) (null? dates)) '()
           `((doc-data
-              ,@(if (null? titles) '() `((doc-title ,(car titles))))
-              ,@(if (null? subtitles) '() `((doc-subtitle ,(car subtitles))))
+              ,@(if (null? titles) '() `((doc-title ,(oftm-lines titles))))
+              ,@(if (null? subtitles) '()
+                    `((doc-subtitle ,(oftm-lines subtitles))))
               ,@(map (lambda (a) `(doc-author (author-data (author-name ,a))))
                      authors)
-              ,@(if (null? dates) '() `((doc-date ,(car dates)))))))
+              ,@(if (null? dates) '() `((doc-date ,(oftm-lines dates)))))))
       (if (null? abstract) '()
           `((abstract-data (abstract ,(oftm-document abstract))))))))
 

@@ -26,6 +26,9 @@
 ;;   disambiguate whether the condition disambiguate="true" holds
 ;;   locator, label, position, near-note   the data of the cite
 ;;   suppressed   the variables which a cs:substitute has used
+;;   used         the variables which were rendered and were not empty
+;;   macros       the names of the macros which are being expanded
+;;   names-shown  how many of the first names of the layout are shown
 ;;   seen, filled the state of the enclosing cs:group: whether a variable
 ;;                was called, and whether one was not empty
 
@@ -46,6 +49,8 @@
     (ahash-set! ctx 'mode mode)
     (ahash-set! ctx 'area (csl-style-ref style mode))
     (ahash-set! ctx 'suppressed '())
+    (ahash-set! ctx 'used '())
+    (ahash-set! ctx 'macros '())
     (ahash-set! ctx 'names-add 0)
     (ahash-set! ctx 'position 'first)
     ctx))
@@ -57,15 +62,19 @@
   (ctx-set! ctx 'seen #t)
   (when filled? (ctx-set! ctx 'filled #t)))
 
+(define (used! ctx var)
+  ;; cs:substitute suppresses the variables which it has rendered
+  (ctx-set! ctx 'used (cons var (ctx-ref ctx 'used))))
+
 (define (inherited-option ctx key)
   ;; an option of cs:citation or cs:bibliography, or else of cs:style
   (or (and (ctx-ref ctx 'area) (csl-attr (ctx-ref ctx 'area) key))
       (csl-style-option (ctx-ref ctx 'style) key)))
 
 (define (english? ctx)
+  ;; the language of the item, or else the one of the locale in use
   (csl-item-english? (ctx-ref ctx 'item)
-                     (or (csl-style-ref (ctx-ref ctx 'style) 'default-locale)
-                         "en-US")))
+                     (csl-locale-lang (ctx-ref ctx 'locale))))
 
 (define (term ctx name form plural?)
   (csl-term (ctx-ref ctx 'locale) name form plural?))
@@ -143,9 +152,10 @@
         (let* ((locale (ctx-ref ctx 'locale))
                (gender (csl-term-gender locale var))
                (long (and long? (>= n 1) (<= n 10)
-                          (term ctx (string-append "long-ordinal-"
-                                                   (csl-pad n 2))
-                                #f #f))))
+                          (csl-gender-term locale
+                                           (string-append "long-ordinal-"
+                                                          (csl-pad n 2))
+                                           #f gender))))
           (or long
               (string-append s (csl-ordinal-suffix locale n gender)))))))
 
@@ -181,9 +191,11 @@
 (define (page-digits format a b)
   ;; the end @b of a range of pages which starts at @a, both numbers
   (let* ((b* (expand-page a b))
-         (n (string->number a))
-         (len (string-length a)))
+         (len (string-length a))
+         ;; (numbers of more digits than a page has are not read)
+         (n (and (<= len 9) (string->number a))))
     (cond ((not format) b)
+          ((not n) b*)
           ((== format "expanded") b*)
           ((== format "minimal") (minimal-page a b* 1))
           ((== format "minimal-two") (minimal-page a b* 2))
@@ -277,8 +289,16 @@
                   ((null? v) #f)
                   (else #t))))))
 
+(define (sort-number ctx var v)
+  ;; in a sort key, the numbers are padded: 9 comes before 10
+  (if (and (ctx-ref ctx 'sort?) (csl-number-variable? var)
+           (csl-string-number? v))
+      (csl-pad v 10)
+      v))
+
 (define (text-variable ctx var form)
   (let* ((short (and (== form "short")
+                     (nin? var (ctx-ref ctx 'suppressed))
                      (variable-value ctx (string-append var "-short"))))
          (v (if (rt-empty? short) (variable-value ctx var) short)))
     (cond ((rt-empty? v) #f)
@@ -291,18 +311,31 @@
 ;; cs:text, cs:number, cs:label
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (render-macro name ctx)
+  ;; a macro which is being expanded renders nothing: a macro which calls
+  ;; itself ends
+  (let* ((m (csl-style-macro (ctx-ref ctx 'style) name))
+         (open (ctx-ref ctx 'macros)))
+    (and m (nin? name open)
+         (begin
+           (ctx-set! ctx 'macros (cons name open))
+           (with x (render-children (csl-children m) ctx #f)
+             (ctx-set! ctx 'macros open)
+             x)))))
+
 (define (render-text node ctx)
   (cond ((csl-attr node 'variable)
-         (with v (text-variable ctx (csl-attr node 'variable)
-                                (csl-attr node 'form "long"))
-           (mark! ctx (not (rt-empty? v)))
-           (when (== (csl-attr node 'variable) "year-suffix")
+         (let* ((var (csl-attr node 'variable))
+                (v (text-variable ctx var (csl-attr node 'form "long"))))
+           ;; a group is not left out for an empty suffix of the year
+           (when (or (!= var "year-suffix") (not (rt-empty? v)))
+             (mark! ctx (not (rt-empty? v))))
+           (when (not (rt-empty? v)) (used! ctx var))
+           (when (== var "year-suffix")
              (ctx-set! ctx 'year-suffix-done #t))
-           (finish node ctx v)))
+           (finish node ctx (sort-number ctx var v))))
         ((csl-attr node 'macro)
-         (with m (csl-style-macro (ctx-ref ctx 'style) (csl-attr node 'macro))
-           (finish node ctx (and m (render-children (csl-children m) ctx
-                                                    #f)))))
+         (finish node ctx (render-macro (csl-attr node 'macro) ctx)))
         ((csl-attr node 'term)
          (finish node ctx (term ctx (csl-attr node 'term)
                                 (csl-attr node 'form "long")
@@ -315,7 +348,10 @@
          (v (variable-value ctx var))
          (s (and (not (rt-empty? v)) (rt->string v))))
     (mark! ctx (not (rt-empty? v)))
+    (when (not (rt-empty? v)) (used! ctx var))
     (cond ((rt-empty? v) #f)
+          ((and (ctx-ref ctx 'sort?) (csl-string-number? s))
+           (sort-number ctx var s))
           ((csl-number-tokens s)
            (finish node ctx (format-number ctx var s
                                            (csl-attr node 'form "numeric"))))
@@ -481,8 +517,13 @@
                                       (or end? (< i (- n 1))))))
                              block (iota n))
                         delim))))
+          ;; no delimiter of the range when one of its sides is empty
           (rt-join (list (render-date-parts ctx before delim d1 season)
-                         (rt-cat (side d1 #f) range-delim (side d2 #t))
+                         (let* ((left (side d1 #f))
+                                (right (side d2 #t)))
+                           (if (or (rt-empty? left) (rt-empty? right))
+                               (rt-cat left right)
+                               (rt-cat left range-delim right)))
                          (render-date-parts ctx after delim d1 season))
                    delim)))))
 
@@ -506,6 +547,7 @@
            (date-sort-key (car (date-part-nodes node ctx)) d))
           ((not (csl-date-start d))
            (mark! ctx (if (csl-date-literal d) #t #f))
+           (when (csl-date-literal d) (used! ctx var))
            (finish node ctx (csl-date-literal d)))
           (else
             (let* ((spec (date-part-nodes node ctx))
@@ -526,6 +568,7 @@
                                              (csl-date-start d)
                                              (csl-date-season d))))))
               (mark! ctx (not (rt-empty? x)))
+              (when (not (rt-empty? x)) (used! ctx var))
               (finish node ctx x))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -632,6 +675,12 @@
                           label-first? label-var)
   (let* ((opt (name-option ctx name-node))
          (settings (names-settings ctx name-node et-al-node var)))
+    ;; the disambiguation asks how many of the first names are shown; the
+    ;; last one may be shown too after the others are left out
+    (when (and (not (ctx-ref ctx 'sort?)) (not (ctx-ref ctx 'names-shown)))
+      (ctx-set! ctx 'names-shown
+                (if (== (opt 'et-al-use-last "false") "true") (length names)
+                    (car (csl-names-shown names opt settings)))))
     (if (ctx-ref ctx 'sort?)
         (names-sort-key ctx names opt)
         (let* ((x (csl-format-names names opt settings))
@@ -686,7 +735,10 @@
      ctx
      (cond ((not (rt-empty? x))
             (mark! ctx #t)
-            (finish (if own? node src) ctx x))
+            (for-each (cut used! ctx <>) filled)
+            (when same? (used! ctx "translator"))
+            ;; the node which is substituted applies its own attributes
+            (finish node ctx x))
            (else
              (mark! ctx #f)
              (with sub (csl-child node 'substitute)
@@ -710,23 +762,32 @@
           (if (ctx-ref ctx 'suppress-author) #f x))))
 
 (define (render-substitute sub parent ctx)
-  (let loop ((l (csl-children sub)))
-    (if (null? l) #f
-        (let* ((done? (ctx-ref ctx 'author-done))
-               (x (if (== (caar l) 'names)
-                      (render-names (car l) ctx parent)
-                      (render (car l) ctx))))
-          (cond ((and (not done?) (ctx-ref ctx 'author-done)
-                      (ctx-ref ctx 'suppress-author))
-                 ;; the names which are left out are not substituted
-                 #f)
-                ((rt-empty? x) (loop (cdr l)))
-                (else
-                  (with vars (csl-split (csl-attr (car l) 'variable ""))
-                    (ctx-set! ctx 'suppressed
-                              (append vars (ctx-ref ctx 'suppressed))))
-                  (ctx-set! ctx 'substituted #t)
-                  (finish parent ctx x)))))))
+  ;; the first child which is not empty; the children of the branch of a
+  ;; cs:choose which applies stand for it. The variables which the
+  ;; substitution has rendered are not rendered again.
+  (with outer (ctx-ref ctx 'used)
+    (let loop ((l (csl-children sub)))
+      (cond ((null? l) (ctx-set! ctx 'used outer) #f)
+            ((== (caar l) 'choose)
+             (loop (append (choose-branch (car l) ctx) (cdr l))))
+            (else
+              (ctx-set! ctx 'used '())
+              (let* ((done? (ctx-ref ctx 'author-done))
+                     (x (if (== (caar l) 'names)
+                            (render-names (car l) ctx parent)
+                            (render (car l) ctx)))
+                     (vars (ctx-ref ctx 'used)))
+                (ctx-set! ctx 'used (append vars outer))
+                (cond ((and (not done?) (ctx-ref ctx 'author-done)
+                            (ctx-ref ctx 'suppress-author))
+                       ;; the names which are left out are not substituted
+                       #f)
+                      ((rt-empty? x) (loop (cdr l)))
+                      (else
+                        (ctx-set! ctx 'suppressed
+                                  (append vars (ctx-ref ctx 'suppressed)))
+                        (ctx-set! ctx 'substituted #t)
+                        (finish parent ctx x)))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; cs:choose
@@ -772,14 +833,18 @@
           ((== match "none") (not (list-or l)))
           (else (list-and l)))))
 
-(define (render-choose node ctx)
-  ;; the rendered children of the branch which applies: the delimiter of
-  ;; the enclosing element separates them
+(define (choose-branch node ctx)
+  ;; the children of the branch of cs:choose which applies
   (let loop ((l (csl-children node)))
     (cond ((null? l) '())
           ((or (== (caar l) 'else) (condition-holds? (car l) ctx))
-           (render-list (csl-children (car l)) ctx))
+           (csl-children (car l)))
           (else (loop (cdr l))))))
+
+(define (render-choose node ctx)
+  ;; the rendered children of the branch which applies: the delimiter of
+  ;; the enclosing element separates them
+  (render-list (choose-branch node ctx) ctx))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; cs:group and the dispatcher
@@ -821,14 +886,21 @@
   (rt-join (render-list l ctx)
            (if (ctx-ref ctx 'sort?) (or delim " ") delim)))
 
-(tm-define (csl-render-layout layout ctx)
+(tm-define (csl-render-layout layout ctx . opt)
   (:synopsis "Render the children of the node cs:layout for the item of @ctx")
-  (ctx-set! ctx 'author-done #f)
-  (ctx-set! ctx 'author-text #f)
-  (ctx-set! ctx 'year-suffix-done #f)
+  ;; with the optional argument #t, the layout continues the one which was
+  ;; rendered before: the names, the suffix of the year and the variables
+  ;; which were substituted are not rendered again
+  (when (or (null? opt) (not (car opt)))
+    (ctx-set! ctx 'author-done #f)
+    (ctx-set! ctx 'author-text #f)
+    (ctx-set! ctx 'year-suffix-done #f)
+    (ctx-set! ctx 'names-shown #f)
+    (ctx-set! ctx 'suppressed '())
+    (ctx-set! ctx 'used '()))
   (ctx-set! ctx 'seen #f)
   (ctx-set! ctx 'filled #f)
-  (ctx-set! ctx 'suppressed '())
+  (ctx-set! ctx 'macros '())
   (render-children (csl-children layout) ctx #f))
 
 (tm-define (csl-render-macro name ctx)
@@ -836,8 +908,9 @@
   (ctx-set! ctx 'seen #f)
   (ctx-set! ctx 'filled #f)
   (ctx-set! ctx 'suppressed '())
-  (with m (csl-style-macro (ctx-ref ctx 'style) name)
-    (and m (render-children (csl-children m) ctx #f))))
+  (ctx-set! ctx 'used '())
+  (ctx-set! ctx 'macros '())
+  (render-macro name ctx))
 
 (tm-define (csl-render-variable var ctx)
   (:synopsis "The sort key for the variable @var of the item of @ctx")

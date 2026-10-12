@@ -71,6 +71,8 @@
 
   <assign|cite-csl-id|<macro|key|<arg|key>>>
 
+  <assign|cite-csl-details|<macro|details|<if|<equal|<get-label|<arg|details>>|string>|<arg|details>|*>>>
+
   <assign|cite-csl-name|<macro|mode|sig|<merge|<value|bib-prefix>|-cite-|<arg|mode>|:|<arg|sig>>>>
 
   <assign|cite-nr|0>
@@ -81,13 +83,13 @@
 
   <assign|cite-csl-get|<macro|mode|sig|body|<if|<has-binding|<merge|<cite-csl-name|<arg|mode>|<arg|sig>>|#|<value|cite-nr>>>|<get-binding|<merge|<cite-csl-name|<arg|mode>|<arg|sig>>|#|<value|cite-nr>>>|<if|<has-binding|<cite-csl-name|<arg|mode>|<arg|sig>>>|<get-binding|<cite-csl-name|<arg|mode>|<arg|sig>>>|<arg|body>>>>>
 
-  <assign|cite-csl|<macro|mode|sig|data|keys|body|<if|<has-binding|<merge|<value|bib-prefix>|-csl>>|<assign|cite-nr|<plus|<value|cite-nr>|1>><write|<merge|<value|bib-prefix>|-cites>|<tuple|<arg|mode>|<arg|data>>><arg|keys><if|<equal|<get-binding|<merge|<value|bib-prefix>|-csl>>|note>|<if|<equal|<arg|mode>|p>|<cite-note|<cite-csl-get|p|<arg|sig>|<arg|body>>>|<if|<equal|<arg|mode>|t>|<cite-csl-get|t|<arg|sig>|<arg|body>><cite-note|<cite-csl-get|n|<arg|sig>|>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>|<arg|body>>>>
+  <assign|cite-csl|<macro|mode|sig|data|keys|body|<if|<has-binding|<merge|<value|bib-prefix>|-csl>>|<assign|cite-nr|<plus|<value|cite-nr>|1>><write|<merge|<value|bib-prefix>|-cites>|<tuple|<arg|mode>|<arg|data>|<value|cite-nr>>><arg|keys><if|<equal|<get-binding|<merge|<value|bib-prefix>|-csl>>|note>|<if|<equal|<arg|mode>|p>|<cite-note|<cite-csl-get|p|<arg|sig>|<arg|body>>>|<if|<equal|<arg|mode>|t>|<cite-csl-get|t|<arg|sig>|<arg|body>><cite-note|<cite-csl-get|n|<arg|sig>|>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>>|<cite-csl-get|<arg|mode>|<arg|sig>|<arg|body>>>|<arg|body>>>>
 
   <assign|cite-std|<xmacro|keys|<render-cite|<cite-arg|<arg|keys|0>><map-args|cite-arg-extra|concat|keys|1>>>>
 
   <assign|cite|<xmacro|keys|<cite-csl|p|<map-args|cite-csl-key|merge|keys>|<map-args|cite-csl-id|tuple|keys>|<map-args|nocite-arg|concat|keys>|<render-cite|<cite-arg|<arg|keys|0>><map-args|cite-arg-extra|concat|keys|1>>>>>
 
-  <assign|cite-detail|<macro|key|details|<cite-csl|p|<merge|<arg|key>|@|<arg|details>|,>|<tuple|<tuple|<arg|key>|<arg|details>>>|<nocite-arg|<arg|key>>|<render-cite-detail|<cite-arg|<arg|key>>|<arg|details>>>>>
+  <assign|cite-detail|<macro|key|details|<cite-csl|p|<merge|<arg|key>|{|<cite-csl-details|<arg|details>>|,>|<tuple|<tuple|<arg|key>|<arg|details>>>|<nocite-arg|<arg|key>>|<render-cite-detail|<cite-arg|<arg|key>>|<arg|details>>>>>
 
   <assign|cite-parenthesized|<xmacro|keys|<cite-csl|p|<map-args|cite-csl-key|merge|keys>|<map-args|cite-csl-id|tuple|keys>|<map-args|nocite-arg|concat|keys>|<render-cite|<cite-arg|<arg|keys|0>><map-args|cite-arg-extra|concat|keys|1>>>>>
 

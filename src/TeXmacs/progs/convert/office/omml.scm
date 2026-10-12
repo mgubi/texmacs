@@ -103,6 +103,56 @@
           ((omml-letter? (car l)) (loop (cdr l) (cons `(m:mi ,(car l)) acc)))
           (else (loop (cdr l) (cons `(m:mo ,(car l)) acc))))))
 
+(define (omml-text s)
+  ;; the text s of a formula for an element mtext, which loses the spaces
+  ;; at its ends: they are spaces at which a line is not broken
+  (let* ((l (string->list s))
+         (space? (lambda (c) (char=? c #\space)))
+         (n (length l))
+         (i (or (list-find-index l (lambda (c) (not (space? c)))) n))
+         (j (or (list-find-index (reverse l) (lambda (c) (not (space? c)))) n))
+         (hard (lambda (k)
+                 (apply string-append (map (lambda (x) (omml-utf8 #xa0)) (iota k))))))
+    (if (== i n) (hard n)
+        (string-append (hard i) (substring s i (- n j)) (hard j)))))
+
+;; The alphabets of a run (m:scr): for each one the codes of its A and of
+;; its a, of its 0 if it has digits, and of the letters which are elsewhere.
+(define omml-alphabets
+  '(("double-struck" #x1d538 #x1d552 #x1d7d8
+     (67 . #x2102) (72 . #x210d) (78 . #x2115) (80 . #x2119) (81 . #x211a)
+     (82 . #x211d) (90 . #x2124))
+    ("script" #x1d49c #x1d4b6 #f
+     (66 . #x212c) (69 . #x2130) (70 . #x2131) (72 . #x210b) (73 . #x2110)
+     (76 . #x2112) (77 . #x2133) (82 . #x211b) (101 . #x212f) (103 . #x210a)
+     (111 . #x2134))
+    ("fraktur" #x1d504 #x1d51e #f
+     (67 . #x212d) (72 . #x210c) (73 . #x2111) (82 . #x211c) (90 . #x2128))))
+
+(define (omml-script-letter c alphabet)
+  ;; the character c in an alphabet of omml-alphabets
+  (let* ((n (omml-code c))
+         (other (assoc-ref (cdddr alphabet) n)))
+    (cond (other (omml-utf8 other))
+          ((and (>= n 65) (<= n 90)) (omml-utf8 (+ (car alphabet) (- n 65))))
+          ((and (>= n 97) (<= n 122)) (omml-utf8 (+ (cadr alphabet) (- n 97))))
+          ((and (caddr alphabet) (>= n 48) (<= n 57))
+           (omml-utf8 (+ (caddr alphabet) (- n 48))))
+          (else c))))
+
+(define (omml-script-token t scr)
+  ;; the token t of a run in the alphabet scr
+  (with alphabet (assoc-ref omml-alphabets scr)
+    (cond ((not (and (pair? t) (in? (car t) '(m:mi m:mn)) (string? (cAr t)))) t)
+          (alphabet
+            (list (car t)
+                  (apply string-append
+                         (map (lambda (c) (omml-script-letter c alphabet))
+                              (omml-characters (cAr t))))))
+          ((and (func? t 'm:mi) (in? scr '("sans-serif" "monospace")))
+           `(m:mi (@ (mathvariant ,scr)) ,(cAr t)))
+          (else t))))
+
 (define (omml-run x)
   ;; a run: its text as tokens, or as text when it is marked as such
   (let* ((pr (ox-child x 'm:rPr))
@@ -110,17 +160,20 @@
          (normal? (and pr (ox-child pr 'm:nor)
                        (not (in? (omml-val (ox-child pr 'm:nor))
                                  '("0" "false" "off")))))
-         (sty (and pr (omml-val (ox-child pr 'm:sty)))))
+         (sty (and pr (omml-val (ox-child pr 'm:sty))))
+         (scr (and pr (omml-val (ox-child pr 'm:scr))))
+         (script (lambda (l)
+                   (if scr (map (lambda (t) (omml-script-token t scr)) l) l))))
     (cond ((== text "") '())
-          (normal? (list `(m:mtext ,text)))
+          (normal? (list `(m:mtext ,(omml-text text))))
           ((in? sty '("b" "bi"))
            (map (lambda (t)
                   (if (func? t 'm:mi)
                       `(m:mi (@ (mathvariant ,(if (== sty "b") "bold" "bold-italic")))
                              ,(cAr t))
                       t))
-                (omml-tokens text #f)))
-          (else (omml-tokens text (== sty "p"))))))
+                (script (omml-tokens text #f))))
+          (else (script (omml-tokens text (== sty "p")))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The constructions
@@ -278,7 +331,7 @@
             ;; a run of the text of Word inside a formula
             ((w:r)
              (with s (ox-text x)
-               (if (== s "") '() (list `(m:mtext ,s)))))
+               (if (== s "") '() (list `(m:mtext ,(omml-text s))))))
             (else '())))))
 
 (define (omml-list l)
@@ -319,7 +372,10 @@
   (with text (mmlo-visible text*)
   (if (== text "") '()
       (list `(m:r ,@(if (null? props) '() `((m:rPr ,@props)))
-                  (m:t ,text))))))
+                  ;; (the spaces at the ends of a text are kept)
+                  ,(if (or (string-starts? text " ") (string-ends? text " "))
+                       `(m:t (@ (xml:space "preserve")) ,text)
+                       `(m:t ,text)))))))
 
 (define (mmlo-arg tag x)
   ;; the argument tag of a construction, with the formula x
@@ -327,8 +383,8 @@
 
 ;; the big operators, by their codes
 (define mmlo-big-operators
-  '(#x2211 #x220f #x2210 #x222b #x222c #x222d #x222e #x22c0 #x22c1 #x22c2
-    #x22c3 #x2a00 #x2a01 #x2a02 #x2a04 #x2a05 #x2a06))
+  '(#x2211 #x220f #x2210 #x222b #x222c #x222d #x222e #x222f #x2230 #x22c0
+    #x22c1 #x22c2 #x22c3 #x2a00 #x2a01 #x2a02 #x2a04 #x2a05 #x2a06 #x2a0c))
 
 (define (mmlo-big-operator x)
   ;; the character of the element x when it is a big operator, or #f
@@ -428,6 +484,18 @@
               (with n (assoc-ref mmlo-accents (omml-code s))
                 (and n (omml-utf8 n)))))))
 
+(define (mmlo-scripts base sub sup)
+  ;; the nodes of OMML for the element base with the scripts sub and sup
+  ;; after it, each of which may be none
+  (let ((sub? (not (mmlo-is? sub 'none)))
+        (sup? (not (mmlo-is? sup 'none))))
+    (cond ((and sub? sup?)
+           (list `(m:sSubSup ,(mmlo-arg 'm:e base) ,(mmlo-arg 'm:sub sub)
+                             ,(mmlo-arg 'm:sup sup))))
+          (sub? (list `(m:sSub ,(mmlo-arg 'm:e base) ,(mmlo-arg 'm:sub sub))))
+          (sup? (list `(m:sSup ,(mmlo-arg 'm:e base) ,(mmlo-arg 'm:sup sup))))
+          (else (mmlo-node base)))))
+
 (define (mmlo-node x)
   ;; the nodes of OMML for a node of MathML
   (cond ((not (pair? x)) '())
@@ -501,15 +569,22 @@
                                   (list-filter c (lambda (r) (or (mmlo-is? r 'mtr)
                                                                  (mmlo-is? r 'mlabeledtr))))))))
               ((mmultiscripts)
-               ;; the scripts before the base, when there are some
-               (let* ((i (list-find-index c (lambda (y) (mmlo-is? y 'mprescripts)))))
-                 (cond ((and i (>= (length c) (+ i 3)))
+               ;; the base with the scripts after it, and the scripts
+               ;; before it around them, when there are some
+               (let* ((i (list-find-index c (lambda (y) (mmlo-is? y 'mprescripts))))
+                      (after (cond ((null? c) '())
+                                   (i (sublist c 1 i))
+                                   (else (cdr c)))))
+                 (cond ((null? c) '())
+                       ((and i (>= (length c) (+ i 3)))
                         (list `(m:sPre ,(mmlo-arg 'm:sub (list-ref c (+ i 1)))
                                        ,(mmlo-arg 'm:sup (list-ref c (+ i 2)))
-                                       ,(mmlo-arg 'm:e (car c)))))
-                       ((>= (length c) 3)
-                        (list `(m:sSubSup ,(mmlo-arg 'm:e (car c)) ,(mmlo-arg 'm:sub (cadr c))
-                                          ,(mmlo-arg 'm:sup (caddr c)))))
+                                       (m:e ,@(if (>= (length after) 2)
+                                                  (mmlo-scripts (car c) (car after)
+                                                                (cadr after))
+                                                  (mmlo-node (car c)))))))
+                       ((>= (length after) 2)
+                        (mmlo-scripts (car c) (car after) (cadr after)))
                        (else (mmlo-row c)))))
               ((menclose)
                (list `(m:borderBox (m:e ,@(mmlo-row c)))))

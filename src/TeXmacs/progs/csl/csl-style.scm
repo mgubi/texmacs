@@ -21,12 +21,15 @@
 ;;   citation        the node cs:citation
 ;;   bibliography    the node cs:bibliography, or #f
 ;;   locales         the nodes cs:locale of the style
+;;   locale-cache    a hash table from codes to the locales as the style
+;;                   sees them
 ;;   title           the title of the style
 ;;
 ;; A locale is a hash table with the entries
 ;;
 ;;   lang            the code of the locale, such as "en-US"
-;;   terms           a hash table from "name|form" to (single . multiple)
+;;   terms           a hash table from "name|form" to (single . multiple);
+;;                   the terms for one gender are under "name|form|gender"
 ;;   genders         a hash table from the names of terms to genders
 ;;   ordinals        the nodes of the terms ordinal and ordinal-NN
 ;;   dates           a hash table from "text" and "numeric" to nodes cs:date
@@ -72,6 +75,10 @@
         (with l (string-tokenize-by-char href #\/)
           (and (nnull? l) (cAr l)))))))
 
+(define (with-layout node)
+  ;; cs:citation and cs:bibliography are of no use without cs:layout
+  (and node (csl-child node 'layout) node))
+
 (define (make-style name root)
   (let* ((style (make-ahash-table))
          (macros (make-ahash-table))
@@ -85,8 +92,10 @@
     (ahash-set! style 'default-locale (csl-attr root 'default-locale))
     (ahash-set! style 'macros macros)
     (ahash-set! style 'citation (csl-child root 'citation))
-    (ahash-set! style 'bibliography (csl-child root 'bibliography))
+    (ahash-set! style 'bibliography
+                (with-layout (csl-child root 'bibliography)))
     (ahash-set! style 'locales (csl-children-named root 'locale))
+    (ahash-set! style 'locale-cache (make-ahash-table))
     (ahash-set! style 'title (if title (csl-text title) name))
     style))
 
@@ -95,7 +104,8 @@
   (and-with root (csl-parse s)
     (and (== (csl-name root) 'style)
          (if (csl-child root 'citation)
-             (make-style name root)
+             (and (with-layout (csl-child root 'citation))
+                  (make-style name root))
              ;; a dependent style: the parent with the locale of the child
              (and-with parent (and-with p (parent-name root)
                                 (csl-load-style p))
@@ -103,6 +113,7 @@
                  (for (p (ahash-table->list parent))
                    (ahash-set! style (car p) (cdr p)))
                  (ahash-set! style 'name name)
+                 (ahash-set! style 'locale-cache (make-ahash-table))
                  (when (csl-attr root 'default-locale)
                    (ahash-set! style 'default-locale
                                (csl-attr root 'default-locale)))
@@ -216,6 +227,7 @@
         (let* ((name (csl-attr term 'name ""))
                (form (csl-attr term 'form "long"))
                (key (string-append name "|" form))
+               (gf (csl-attr term 'gender-form))
                (single (csl-child term 'single))
                (multiple (csl-child term 'multiple))
                (val (if (or single multiple)
@@ -226,8 +238,14 @@
                  (when ordinals?
                    (ahash-set! locale 'ordinals
                                (cons term (ahash-ref locale 'ordinals)))))
-                ((not (ahash-ref terms key))
-                 (ahash-set! terms key val)))
+                (else
+                  ;; a term for one gender also stands for the term when
+                  ;; it comes first
+                  (when (not (ahash-ref terms key))
+                    (ahash-set! terms key val))
+                  (when (and gf (not (ahash-ref terms (string-append
+                                                       key "|" gf))))
+                    (ahash-set! terms (string-append key "|" gf) val))))
           (when (and (csl-attr term 'gender) (not (ahash-ref genders name)))
             (ahash-set! genders name (csl-attr term 'gender))))))))
 
@@ -263,13 +281,13 @@
 
 (tm-define (csl-locale style lang)
   (:synopsis "The locale @lang as seen by @style")
+  ;; each style keeps its locales: styles of the same name may differ
   (let* ((lang* (or lang (and style (ahash-ref style 'default-locale))
                     "en-US"))
-         (key (string-append (if style (ahash-ref style 'name) "") "|"
-                             lang*)))
-    (or (ahash-ref locale-cache key)
+         (cache (if style (ahash-ref style 'locale-cache) locale-cache)))
+    (or (ahash-ref cache lang*)
         (with locale (make-locale style lang*)
-          (ahash-set! locale-cache key locale)
+          (ahash-set! cache lang* locale)
           locale))))
 
 (tm-define (csl-locale-lang locale)
@@ -305,6 +323,15 @@
 
 (tm-define (csl-term-gender locale name)
   (ahash-ref (ahash-ref locale 'genders) name))
+
+(tm-define (csl-gender-term locale name form gender)
+  (:synopsis "The term @name in the form for @gender, or else for any gender")
+  (or (and gender
+           (with val (ahash-ref (ahash-ref locale 'terms)
+                                (string-append name "|" (or form "long") "|"
+                                               gender))
+             (and val (car val))))
+      (csl-term locale name form #f)))
 
 (define (ordinal-matches? term n gender)
   (let* ((name (csl-attr term 'name ""))

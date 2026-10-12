@@ -41,6 +41,9 @@
              part-title chapter-title section-title subsection-title
              subsubsection-title paragraph-title subparagraph-title
              appendix-title
+             ;; the table of contents: its title, and the entries which
+             ;; the office programs make again
+             render-table-of-contents
              ;; lists
              itemize itemize-minus itemize-dot itemize-arrow
              enumerate enumerate-numeric enumerate-roman
@@ -66,7 +69,9 @@
              java-code javascript-code json-code julia-code r-code
              scala-code fortran-code octave-code scilab-code dot-code
              mmx-code pseudo-code render-code
-             ;; mathematics, which is converted to LaTeX
+             ;; mathematics: the equations, and the fractions and the
+             ;; binomials, whose expansion is layout from which the
+             ;; converter could not tell what they are
              equation* equation-lab equations-base
              eqnarray eqnarray* align align* gather gather* multline
              multline* eqsplit eqsplit*

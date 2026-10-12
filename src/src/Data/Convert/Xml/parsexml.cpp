@@ -45,6 +45,8 @@ struct xml_html_parser {
   array<tree> a;
   int i, n;
   tree stack;
+  int depth;     // depth of the element which is being built
+  int expanded;  // number of characters which declared entities produced
 
   xml_html_parser ();
   inline void skip_space () {
@@ -121,7 +123,12 @@ void load_entities (hashmap<string, string> table, string fname) {
       }
 }
 
-xml_html_parser::xml_html_parser (): entities ("") {
+// Deeper elements are attached to their ancestor of this depth
+#define XML_MAX_DEPTH 1000
+// Declared entities expand to at most this number of characters in all
+#define XML_MAX_EXPANSION 4000000
+
+xml_html_parser::xml_html_parser (): entities (""), depth (0), expanded (0) {
   if (N(html_empty_tag_table) == 0) {
     html_empty_tag_table->insert ("basefont");
     html_empty_tag_table->insert ("br");
@@ -286,7 +293,12 @@ xml_html_parser::parse_name () {
 
 string
 xml_html_parser::expand_entity (string s) {
-  if (entities->contains (s)) return entities[s];
+  if (entities->contains (s)) {
+    // entities which are defined by other entities grow fast
+    if (expanded > XML_MAX_EXPANSION) return "";
+    expanded += N(entities[s]);
+    return entities[s];
+  }
   else if (s[0] == '&') {
     if (N(s)>1 && s[1] == '#') {
       int i= 2;
@@ -311,27 +323,33 @@ xml_html_parser::expand_entity (string s) {
 
 string
 xml_html_parser::expand_entities (string s) {
-  string r;
-  int i, n= N(s);
-  for (i=0; i<n; ) {
-    if (s[i] == '&' || s[i] == '%') {
-      int start= i++;
-      if (i<n && s[i] == '#') {
-        i++;
-        if (i<n && (s[i] == 'x' || s[i] == 'X')) {
+  // expand until nothing changes
+  while (true) {
+    string r;
+    int i, n= N(s), before= expanded;
+    for (i=0; i<n; ) {
+      if (s[i] == '&' || s[i] == '%') {
+        int start= i++;
+        if (i<n && s[i] == '#') {
           i++;
-          while (i<n && is_hex_digit (s[i])) i++;
+          if (i<n && (s[i] == 'x' || s[i] == 'X')) {
+            i++;
+            while (i<n && is_hex_digit (s[i])) i++;
+          }
+          else while (i<n && is_digit (s[i])) i++;
         }
-        else while (i<n && is_digit (s[i])) i++;
+        else while (i<n && is_name_char (s[i])) i++;
+        if (i<n && s[i] == ';') i++;
+        r << expand_entity (s (start, i));
       }
-      else while (i<n && is_name_char (s[i])) i++;
-      if (i<n && s[i] == ';') i++;
-      r << expand_entity (s (start, i));
+      else r << s[i++];
     }
-    else r << s[i++];
+    if (r == s) return r;
+    // a pass which used declared entities counts for its length, so that
+    // an entity which contains itself ends after a bounded amount of work
+    if (expanded != before) expanded += N(r);
+    s= r;
   }
-  if (r == s) return r;
-  return expand_entities (r);
 }
 
 string
@@ -658,9 +676,14 @@ xml_html_parser::build (tree& r) {
       i++;
       if (html && html_empty_tag_table->contains (name))
         r << sub;
+      else if (depth >= XML_MAX_DEPTH)
+        // too deep: the element stays empty and its children follow it
+        r << sub;
       else {
         stack= tuple (name, stack);
+        depth++;
         build (sub);
+        depth--;
         r << sub;
         stack= stack[1];
       }

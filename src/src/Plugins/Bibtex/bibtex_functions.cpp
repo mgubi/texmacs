@@ -825,14 +825,20 @@ bib_field_pages (string p) {
   tree res= compound ("bib-pages");;
   int p1, p2;
   int pos= 0;
-  if (read_int (p, pos, p1)) {
-    res << as_string (p1);
-    while (pos < N(p) && !is_digit (p[pos])) pos++;
-    if (read_int (p, pos, p2))
-      res << as_string (p2);
-    return res;
+  while (pos < N(p) && is_space (p[pos])) pos++;
+  if (pos == N(p)) return res;
+  if (is_digit (p[pos]) && read_int (p, pos, p1)) {
+    // one number, or two numbers with dashes between them
+    int sep= pos;
+    while (pos < N(p) && (is_space (p[pos]) || p[pos] == '-')) pos++;
+    if (pos == N(p)) { res << as_string (p1); return res; }
+    if (pos > sep && is_digit (p[pos]) && read_int (p, pos, p2)) {
+      while (pos < N(p) && is_space (p[pos])) pos++;
+      if (pos == N(p)) { res << as_string (p1) << as_string (p2); return res; }
+    }
   }
-  res << "0";
+  // other pages (e1234, 12, 15--17, iv--xii) are kept as they are written
+  res << replace (replace (trim_spaces (p), "---", "--"), "--", "\25");
   return res;
 }
 

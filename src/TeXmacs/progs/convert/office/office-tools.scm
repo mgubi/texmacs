@@ -30,8 +30,9 @@
 ;;              cells with the attributes header, colspan, rowspan,
 ;;              covered (by a wider or a higher cell), borders (the sides
 ;;              t, b, l, r which have one, or none) and background
-;;            (toc)  the table of contents
+;;            (toc inline...)  the table of contents, with its title
 ;;            (pagebreak)
+;;            (error "message")  for a file which could not be read
 ;;   inlines: "text"  (em ...)  (strong ...)  (underline ...)  (strike ...)
 ;;            (sub ...)  (sup ...)  (code ...)  (smallcaps ...)  (mark ...)
 ;;            (color ...)  with the attribute value, #rrggbb
@@ -43,7 +44,7 @@
 ;;            (math "MathML")  with the attribute display
 ;;            (bookmark)  (ref ...)  with the attribute name; a ref also
 ;;              has kind (seq, heading) and target when its bookmark is
-;;              the one of a number
+;;              the one of a number, or the kind page for its page
 ;;            (seq "1")  a number of a sequence, with the attributes name
 ;;              (Figure; empty for a number which stands for itself), id
 ;;              and labels (the names of the bookmarks of this number)
@@ -129,10 +130,142 @@
   (:synopsis "The entry @name of the @archive, or #f")
   (ahash-ref archive name))
 
+;; The converters know the elements by their usual prefixes (w:p, text:p).
+;; A file may give other prefixes to the same namespaces, or none: its
+;; elements and attributes then get the usual ones.
+(define office-namespaces
+  '(("http://schemas.openxmlformats.org/wordprocessingml/2006/main" . "w")
+    ("http://purl.oclc.org/ooxml/wordprocessingml/main" . "w")
+    ("http://schemas.openxmlformats.org/officeDocument/2006/relationships" . "r")
+    ("http://purl.oclc.org/ooxml/officeDocument/relationships" . "r")
+    ("http://schemas.openxmlformats.org/officeDocument/2006/math" . "m")
+    ("http://purl.oclc.org/ooxml/officeDocument/math" . "m")
+    ("http://schemas.openxmlformats.org/package/2006/relationships" . "")
+    ("http://schemas.openxmlformats.org/drawingml/2006/main" . "a")
+    ("http://purl.oclc.org/ooxml/drawingml/main" . "a")
+    ("http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" . "wp")
+    ("http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing" . "wp")
+    ("http://schemas.openxmlformats.org/markup-compatibility/2006" . "mc")
+    ("urn:schemas-microsoft-com:vml" . "v")
+    ("urn:schemas-microsoft-com:office:office" . "o")
+    ("http://purl.org/dc/elements/1.1/" . "dc")
+    ("urn:oasis:names:tc:opendocument:xmlns:office:1.0" . "office")
+    ("urn:oasis:names:tc:opendocument:xmlns:style:1.0" . "style")
+    ("urn:oasis:names:tc:opendocument:xmlns:text:1.0" . "text")
+    ("urn:oasis:names:tc:opendocument:xmlns:table:1.0" . "table")
+    ("urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" . "draw")
+    ("urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" . "fo")
+    ("urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" . "svg")
+    ("urn:oasis:names:tc:opendocument:xmlns:meta:1.0" . "meta")
+    ("http://www.w3.org/1999/xlink" . "xlink")))
+
+(define (office-declarations x)
+  ;; the namespaces which the element x declares, as (prefix . usual prefix);
+  ;; a namespace which is not known keeps its prefix
+  (append-map
+    (lambda (a)
+      (let* ((s (symbol->string (car a)))
+             (p (cond ((== s "xmlns") "")
+                      ((string-starts? s "xmlns:")
+                       (substring s 6 (string-length s)))
+                      (else #f)))
+             (u (and p (pair? (cdr a)) (string? (cadr a))
+                     (assoc-ref office-namespaces (cadr a)))))
+        (if p (list (cons p (or u p))) '())))
+    (ox-attrs x)))
+
+;; whether the name of an attribute is the one of a declaration: 1 or 0,
+;; so that each name is looked at once
+(define office-declaration-names (make-ahash-table))
+
+(define (office-declaration? name)
+  (with r (ahash-ref office-declaration-names name)
+    (when (not r)
+      (set! r (if (string-starts? (symbol->string name) "xmlns") 1 0))
+      (ahash-set! office-declaration-names name r))
+    (== r 1)))
+
+(define (office-other-prefixes? x)
+  ;; whether an element of the tree x gives to a namespace which is known
+  ;; another prefix than the usual one
+  (and (pair? x) (symbol? (car x))
+       (let loop ((l (cdr x)))
+         (cond ((null? l) #f)
+               ((not (pair? (car l))) (loop (cdr l)))
+               ((eq? (caar l) '@)
+                (or (and (list-or (map (lambda (a) (office-declaration? (car a)))
+                                       (cdar l)))
+                         (list-or (map (lambda (d) (!= (car d) (cdr d)))
+                                       (office-declarations x))))
+                    (loop (cdr l))))
+               ((office-other-prefixes? (car l)) #t)
+               (else (loop (cdr l)))))))
+
+(define (office-usual-name name env attribute?)
+  ;; the symbol name with the usual prefix of its namespace
+  (let* ((s (symbol->string name))
+         (i (string-search-forwards ":" 0 s))
+         (p (if (>= i 0) (substring s 0 i) ""))
+         (q (assoc-ref env p)))
+    (cond ((or (not q) (== q p)) name)
+          ;; an attribute without a prefix is in no namespace
+          ((and attribute? (== p "")) name)
+          ((string-starts? s "xmlns") name)
+          (else
+            (with local (if (>= i 0) (substring s (+ i 1) (string-length s)) s)
+              (string->symbol (if (== q "") local
+                                  (string-append q ":" local))))))))
+
+(define (office-usual-prefixes x env)
+  ;; the element x with the usual prefixes, where env is the list of the
+  ;; declarations around it
+  (cond ((not (pair? x)) x)
+        ((not (symbol? (car x))) x)
+        ((string-starts? (symbol->string (car x)) "*") x)
+        (else
+          (let* ((env (append (office-declarations x) env))
+                 (attrs (map (lambda (a)
+                               (cons (office-usual-name (car a) env #t) (cdr a)))
+                             (ox-attrs x)))
+                 (children (map (lambda (y) (office-usual-prefixes y env))
+                                (ox-children x)))
+                 (tag (office-usual-name (car x) env #f)))
+            (if (null? attrs) (cons tag children)
+                (cons* tag (cons '@ attrs) children))))))
+
 (tm-define (office-xml archive name)
   (:synopsis "The element of the XML entry @name of the @archive, or #f")
-  (with s (ahash-ref archive name)
-    (and s (ox-root (parse-xml s)))))
+  (let* ((s (ahash-ref archive name))
+         (x (and s (ox-root (parse-xml s)))))
+    ;; (the files of the usual programs are left as they are)
+    (set! office-declaration-names (make-ahash-table))
+    (if (office-other-prefixes? x) (office-usual-prefixes x '()) x)))
+
+(tm-define (office-number s)
+  (:synopsis "The number of the attribute @s, or #f")
+  ;; a plain number only: a sign, digits and a decimal point, so that no
+  ;; other number which Scheme reads (a fraction, an infinity) comes in
+  (let* ((n (string-length (if (string? s) s "")))
+         (start (if (and (> n 0) (in? (string-ref s 0) '(#\+ #\-))) 1 0)))
+    (and (> n start) (<= n 15)
+         (char-numeric? (string-ref s start))
+         (let loop ((i start) (dot? #f))
+           (cond ((>= i n) #t)
+                 ((char-numeric? (string-ref s i)) (loop (+ i 1) dot?))
+                 ((and (char=? (string-ref s i) #\.) (not dot?))
+                  (loop (+ i 1) #t))
+                 (else #f)))
+         (string->number s))))
+
+(tm-define (office-integer s default lo hi)
+  (:synopsis "The integer of the attribute @s between @lo and @hi, or @default")
+  ;; an exact integer, whatever the file says: a number with decimals is
+  ;; rounded, and what is not a plain number gives the default
+  (with v (office-number s)
+    (cond ((not v) default)
+          ((>= v hi) hi)
+          ((<= v lo) lo)
+          (else (inexact->exact (round v))))))
 
 (tm-define (office-resolve base target)
   (:synopsis "The name in the archive of @target, relative to the entry @base")
@@ -249,25 +382,63 @@
 ;; Writing XML
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (ox-character-length s i)
+  ;; The number of bytes of the character of UTF-8 at the place i of s,
+  ;; whose first byte is 128 or more; 0 when the bytes are no character.
+  ;; The number is negative for a character which XML does not allow: a
+  ;; half of a pair of UTF-16, U+FFFE, U+FFFF.
+  (let* ((n (string-length s))
+         (byte (lambda (k) (if (< k n) (char->integer (string-ref s k)) 0)))
+         (next? (lambda (k) (and (>= (byte k) #x80) (< (byte k) #xc0))))
+         (b (byte i))
+         (c (byte (+ i 1))))
+    (cond ((and (>= b #xc2) (< b #xe0)) (if (next? (+ i 1)) 2 0))
+          ((and (>= b #xe0) (< b #xf0))
+           (cond ((not (and (next? (+ i 1)) (next? (+ i 2)))) 0)
+                 ((and (== b #xe0) (< c #xa0)) 0)
+                 ((and (== b #xed) (>= c #xa0)) -3)
+                 ((and (== b #xef) (== c #xbf) (>= (byte (+ i 2)) #xbe)) -3)
+                 (else 3)))
+          ((and (>= b #xf0) (< b #xf5))
+           (if (and (next? (+ i 1)) (next? (+ i 2)) (next? (+ i 3))
+                    (not (and (== b #xf0) (< c #x90)))
+                    (not (and (== b #xf4) (>= c #x90))))
+               4 0))
+          (else 0))))
+
+(define ox-replacement
+  ;; the replacement character, U+FFFD, in UTF-8
+  (list->string (map integer->char '(#xef #xbf #xbd))))
+
 (define (ox-escape s quote?)
-  ;; the text s with the characters of XML as entities
-  (let loop ((l (string->list s)) (acc '()))
-    (cond ((null? l) (apply string-append (reverse acc)))
-          ((char=? (car l) #\&) (loop (cdr l) (cons "&amp;" acc)))
-          ((char=? (car l) #\<) (loop (cdr l) (cons "&lt;" acc)))
-          ((char=? (car l) #\>) (loop (cdr l) (cons "&gt;" acc)))
-          ((and quote? (char=? (car l) #\")) (loop (cdr l) (cons "&quot;" acc)))
-          ;; the control characters are not allowed in XML
-          ((and (< (char->integer (car l)) 32)
-                (not (in? (car l) '(#\newline #\tab))))
-           (loop (cdr l) acc))
-          (else
-            ;; (runs of other characters at once)
-            (let sub ((r (cdr l)) (run (list (car l))))
-              (if (and (pair? r) (not (in? (car r) '(#\& #\< #\> #\")))
-                       (>= (char->integer (car r)) 32))
-                  (sub (cdr r) (cons (car r) run))
-                  (loop r (cons (list->string (reverse run)) acc))))))))
+  ;; The text s with the characters of XML as entities. The control
+  ;; characters, which XML does not allow, are left out; the replacement
+  ;; character stands for the bytes which are no character of UTF-8 and
+  ;; for the other characters which XML does not allow.
+  (let ((n (string-length s)))
+    ;; (from start to i: characters which are written as they are)
+    (let loop ((i 0) (start 0) (acc '()))
+      (let ((flush (lambda ()
+                     (if (> i start) (cons (substring s start i) acc) acc))))
+        (if (>= i n)
+            (apply string-append (reverse (flush)))
+            (let* ((c (string-ref s i))
+                   (b (char->integer c))
+                   (entity (cond ((char=? c #\&) "&amp;")
+                                 ((char=? c #\<) "&lt;")
+                                 ((char=? c #\>) "&gt;")
+                                 ((and quote? (char=? c #\")) "&quot;")
+                                 ((and (< b 32) (not (in? c '(#\newline #\tab))))
+                                  "")
+                                 (else #f))))
+              (cond (entity (loop (+ i 1) (+ i 1) (cons entity (flush))))
+                    ((< b 128) (loop (+ i 1) start acc))
+                    (else
+                      (with k (ox-character-length s i)
+                        (if (> k 0)
+                            (loop (+ i k) start acc)
+                            (with j (+ i (max 1 (- k)))
+                              (loop j j (cons ox-replacement (flush))))))))))))))
 
 (define (ox-serialize-sub x)
   ;; the pieces of the text of the node x, in a list
@@ -299,6 +470,19 @@
 (tm-define (ox-serialize-element x)
   (:synopsis "The text of the element @x of XML, without a declaration")
   (apply string-append (ox-serialize-sub x)))
+
+(tm-define (office-uri s)
+  (:synopsis "The address @s, with %XX for the bytes which an address cannot hold")
+  ;; the spaces, the characters which are not of ASCII, some delimiters
+  (apply string-append
+         (map (lambda (c)
+                (with n (char->integer c)
+                  (if (or (<= n 32) (>= n 127)
+                          (in? c '(#\" #\< #\> #\\ #\^ #\` #\{ #\| #\})))
+                      (string-append "%" (if (< n 16) "0" "")
+                                     (upcase-all (number->string n 16)))
+                      (string c))))
+              (string->list s))))
 
 (tm-define (office-decimal x)
   (:synopsis "The number @x with three decimals at most, and no useless ones")

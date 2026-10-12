@@ -21,9 +21,11 @@
 ;; State and tools
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; the definitions of the footnotes, and the tags of the six levels of
-;; headings, for the document which is converted
+;; the definitions of the footnotes, the labels of those which are being
+;; converted, and the tags of the six levels of headings, for the document
+;; which is converted
 (define mdtm-footnotes (make-ahash-table))
+(define mdtm-open-footnotes '())
 (define mdtm-headings '())
 
 (define mdtm-sections
@@ -37,7 +39,13 @@
 (define (mdtm-children x)
   (if (and (pair? (cdr x)) (func? (cadr x) '@)) (cddr x) (cdr x)))
 
-(define (mdtm-text s) (utf8->cork s))
+(define (mdtm-text s)
+  ;; the text in the encoding of TeXmacs; a backquote stays one, as it does
+  ;; for the other formats (alone, it would be the accent of this encoding)
+  (with i (string-search-forwards "`" 0 s)
+    (if (< i 0) (utf8->cork s)
+        (string-append (utf8->cork (substring s 0 i)) "`"
+                       (mdtm-text (substring s (+ i 1) (string-length s)))))))
 
 (define (mdtm-merge l)
   ;; with the strings which follow each other as one
@@ -130,10 +138,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (mdtm-footnote label)
+  ;; the footnote, or its mark as text when it has no definition, or when it
+  ;; is in its own text
   (with def (ahash-ref mdtm-footnotes label)
-    (if def
-        `(footnote ,(with l (mdtm-blocks def)
-                      (if (list-1? l) (car l) (mdtm-document l))))
+    (if (and def (not (in? label mdtm-open-footnotes)))
+        (with old mdtm-open-footnotes
+          (set! mdtm-open-footnotes (cons label old))
+          (with l (mdtm-blocks def)
+            (set! mdtm-open-footnotes old)
+            `(footnote ,(if (list-1? l) (car l) (mdtm-document l)))))
         (string-append "[^" (mdtm-text label) "]"))))
 
 (define (mdtm-inline x)
@@ -219,7 +232,16 @@
               (cdr l)))))
 
 (define (mdtm-list x tag)
-  `(,tag ,(mdtm-document (append-map mdtm-item (mdtm-children x)))))
+  (let* ((l (append-map mdtm-item (mdtm-children x)))
+         (start (string->number (or (mdtm-attr x 'start) "1")))
+         ;; the number of the first item, when it is not 1
+         (l (if (and start (!= start 1) (nnull? l))
+                (cons `(concat (assign "item-nr" ,(number->string (- start 1)))
+                               ,@(if (func? (car l) 'concat) (cdar l)
+                                     (list (car l))))
+                      (cdr l))
+                l)))
+    `(,tag ,(mdtm-document l))))
 
 (define (mdtm-length t)
   ;; a rough measure of the width of a piece of text
@@ -363,6 +385,7 @@
          (md (if file? (cadr x) x))
          (l (if (func? md 'markdown) (cdr md) (list md))))
     (set! mdtm-footnotes (make-ahash-table))
+    (set! mdtm-open-footnotes '())
     (set! mdtm-headings mdtm-sections)
     (mdtm-collect-footnotes md)
     (with r (cond (file? `(document (body ,(mdtm-body l)) (style "generic")))
