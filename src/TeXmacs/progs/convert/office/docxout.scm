@@ -16,7 +16,9 @@
 ;; which its paragraphs use by their names (word/styles.xml), so that the
 ;; document can be given another look in Word, the lists
 ;; (word/numbering.xml), the notes (word/footnotes.xml), the images
-;; (word/media) and the relations which tell where all these are.
+;; (word/media) and the relations which tell where all these are: those of
+;; the text (word/_rels/document.xml.rels) and those of the notes, when
+;; they have links or images (word/_rels/footnotes.xml.rels).
 
 (texmacs-module (convert office docxout)
   (:use (convert office office-tools)
@@ -27,11 +29,14 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define dx-rels '())        ; the relations of the text, reversed
+(define dx-note-rels '())   ; the relations of the notes, reversed
+(define dx-rel-ids (make-ahash-table)) ; a relation of a file -> its identifier
 (define dx-media '())       ; (name data) of the images, reversed
+(define dx-media-files (make-ahash-table)) ; the bytes of an image -> its files
 (define dx-notes '())       ; the elements of the notes, reversed
 (define dx-lists '())       ; (list kind level) of the lists, reversed
 (define dx-id 0)            ; the last number given to a thing
-(define dx-in-note? #f)     ; inside a note: no relations
+(define dx-in-note? #f)     ; inside a note, whose relations are its own
 (define dx-item #f)         ; (list level) for the next paragraph of an item
 (define dx-indent 0)        ; the depth of the lists around a paragraph
 (define dx-cell-align #f)   ; the alignment of the cell around a paragraph
@@ -60,10 +65,20 @@
 (define (dx-val tag v) `(,tag (@ (w:val ,v))))
 
 (define (dx-relation type target external?)
-  ;; the identifier of a new relation of the text
-  (with id (string-append "rId" (number->string (+ (length dx-rels) 1)))
-    (set! dx-rels (cons (list id type target external?) dx-rels))
-    id))
+  ;; The identifier of the relation to this target, of the text or of the
+  ;; notes: each of the two files has its own relations. The same target
+  ;; has one relation in a file.
+  (let* ((key (list dx-in-note? type target external?))
+         (old (ahash-ref dx-rel-ids key)))
+    (or old
+        (let* ((l (if dx-in-note? dx-note-rels dx-rels))
+               (id (string-append "rId" (number->string (+ (length l) 1))))
+               (r (list id type target external?)))
+          (if dx-in-note?
+              (set! dx-note-rels (cons r dx-note-rels))
+              (set! dx-rels (cons r dx-rels)))
+          (ahash-set! dx-rel-ids key id)
+          id))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Runs
@@ -103,28 +118,41 @@
   (with cm (or (office-length->cm s) 5.0)
     (number->string (inexact->exact (round (* cm 360000))))))
 
-(define (dx-image x)
-  ;; a picture in the line; its file goes to word/media
+(define (dx-image-files x n)
+  ;; The names (bitmap svg) of the files of the picture x, the thing of
+  ;; number n, in word/media; svg is #f when it has none. A picture which
+  ;; is used several times is there once.
   (let* ((data (ox-attr x 'data))
+         (svg (ox-attr x 'svg))
+         (key (cons data (or svg "")))
          (name (or (ox-attr x 'name) "image.png"))
-         (n (dx-next-id))
          (dot (let loop ((i (- (string-length name) 1)))
                 (cond ((< i 0) #f)
                       ((char=? (string-ref name i) #\.) i)
                       (else (loop (- i 1))))))
          (suffix (if dot (locase-all (substring name (+ dot 1) (string-length name)))
-                     "png"))
-         (file (string-append "image" (number->string n) "." suffix))
-         (cx (dx-emu (ox-attr x 'width)))
-         (cy (dx-emu (ox-attr x 'height))))
-    (if (or (not data) dx-in-note?) '()
-        (let* ((id (dx-relation "image" (string-append "media/" file) #f))
-               (svg (ox-attr x 'svg))
-               (svg-file (string-append "image" (number->string n) ".svg"))
-               (svg-id (and svg (dx-relation "image"
-                                             (string-append "media/" svg-file) #f))))
+                     "png")))
+    (or (ahash-ref dx-media-files key)
+        (let* ((file (string-append "image" (number->string n) "." suffix))
+               (svg-file (and svg (string-append "image" (number->string n) ".svg"))))
           (set! dx-media (cons (list file data) dx-media))
           (when svg (set! dx-media (cons (list svg-file svg) dx-media)))
+          (ahash-set! dx-media-files key (list file svg-file))
+          (list file svg-file)))))
+
+(define (dx-image x)
+  ;; a picture in the line; its file goes to word/media
+  (let* ((data (ox-attr x 'data))
+         (n (dx-next-id))
+         (cx (dx-emu (ox-attr x 'width)))
+         (cy (dx-emu (ox-attr x 'height))))
+    (if (not data) '()
+        (let* ((files (dx-image-files x n))
+               (file (car files))
+               (id (dx-relation "image" (string-append "media/" file) #f))
+               (svg-id (and (cadr files)
+                            (dx-relation "image"
+                                         (string-append "media/" (cadr files)) #f))))
           (list
             `(w:r
                (w:drawing
@@ -173,7 +201,8 @@
           (else (list formula)))))
 
 (define (dx-note x)
-  ;; the mark of a note; its text goes to word/footnotes.xml
+  ;; the mark of a note; its text goes to word/footnotes.xml (a note has
+  ;; no notes)
   (if dx-in-note? '()
       (let ((n (+ (length dx-notes) 1))
             (old-item dx-item)
@@ -237,11 +266,13 @@
             (map (lambda (id) `(w:bookmarkEnd (@ (w:id ,id)))) (reverse ids)))))
 
 (define (dx-sequence-name s)
-  ;; the name of a sequence for Word: letters of ASCII
+  ;; the name of a sequence for Word: its letters, those of ASCII and
+  ;; those of the other alphabets (the bytes of their characters), without
+  ;; spaces, digits and punctuation
   (with t (list->string
             (list-filter (string->list s)
-                         (lambda (c) (and (< (char->integer c) 128)
-                                          (char-alphabetic? c)))))
+                         (lambda (c) (or (>= (char->integer c) 128)
+                                         (char-alphabetic? c)))))
     (if (== t "") "Sequence" t)))
 
 (define (dx-field-runs instruction runs)
@@ -315,10 +346,11 @@
                                  (@ (w:anchor ,(dx-bookmark-name
                                                  (substring href 1 (string-length href)))))
                                  ,@runs)))
-                       ((or dx-in-note? (== href "")) (dx-inlines l props))
+                       ((== href "") (dx-inlines l props))
                        (else
                          (list `(w:hyperlink
-                                  (@ (r:id ,(dx-relation "hyperlink" href #t)))
+                                  (@ (r:id ,(dx-relation "hyperlink"
+                                                         (office-uri href) #t)))
                                   ,@runs))))))
               ((bookmark)
                (dx-bookmarked (list (or (ox-attr x 'name) "")) '()))
@@ -504,8 +536,9 @@
                              natural))))
          ;; the cells by their place, and those which a higher one covers:
          ;; (row . column) -> the cell which covers it
+         (row-at (list->vector rows))
          (cell-at (lambda (i j)
-                    (with cells (ox-children (list-ref rows i))
+                    (with cells (ox-children (vector-ref row-at i))
                       (and (< j (length cells)) (list-ref cells j)))))
          (above (make-ahash-table))
          (span-of (lambda (c name)
@@ -533,7 +566,7 @@
                          widths))
        ,@(map
            (lambda (i)
-             (let* ((cells (ox-children (list-ref rows i)))
+             (let* ((cells (ox-children (vector-ref row-at i)))
                     (header? (and (pair? cells)
                                   (list-and (map (lambda (c)
                                                    (or (ox-attr c 'covered)
@@ -580,12 +613,24 @@
              (list `(w:p (w:pPr (w:pBdr (w:bottom (@ (w:val "single") (w:sz "6")
                                                      (w:space "1") (w:color "auto"))))))))
             ((toc)
-             (list (dx-field " TOC \\o \"1-3\" \\h \\z \\u "
-                             "Update this field to see the table of contents.")))
+             ;; its title, and a field which Word fills from the headings
+             (append
+               (with title (dx-inlines (ox-children x) '())
+                 (if (null? title) '()
+                     (list `(w:p (w:pPr ,(dx-val 'w:pStyle "TOCHeading"))
+                                 ,@title))))
+               (list (dx-field " TOC \\o \"1-3\" \\h \\z \\u "
+                               "Update this field to see the table of contents."))))
             (else '())))))
 
 (define (dx-blocks l)
-  (append-map dx-block l))
+  ;; the elements of the blocks l; Word makes one table of two tables
+  ;; which follow each other, so that an empty paragraph is between them
+  (let loop ((l (append-map dx-block l)) (acc '()))
+    (cond ((null? l) (reverse acc))
+          ((and (func? (car l) 'w:tbl) (pair? (cdr l)) (func? (cadr l) 'w:tbl))
+           (loop (cdr l) (cons* '(w:p) (car l) acc)))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The files of the archive
@@ -627,6 +672,10 @@
                 `(w:pPr (w:spacing (@ (w:before "480") (w:after "240")))
                         ,(dx-val 'w:jc "center"))
                 `(w:rPr (w:b) ,(dx-val 'w:sz "44") ,(dx-val 'w:szCs "44")))
+     ,(dx-style "paragraph" "TOCHeading" "TOC Heading"
+                (dx-val 'w:basedOn "Normal") (dx-val 'w:next "Normal")
+                `(w:pPr (w:keepNext) (w:spacing (@ (w:before "360") (w:after "120"))))
+                `(w:rPr (w:b) ,(dx-val 'w:sz "36") ,(dx-val 'w:szCs "36")))
      ,(dx-style "paragraph" "Subtitle" "Subtitle"
                 (dx-val 'w:basedOn "Normal") (dx-val 'w:next "Normal") '(w:qFormat)
                 `(w:pPr ,(dx-val 'w:jc "center"))
@@ -760,7 +809,8 @@
 
 (define (dx-footnotes)
   `(w:footnotes
-     (@ (xmlns:w ,dx-ns-w) (xmlns:r ,dx-ns-r) (xmlns:m ,dx-ns-m))
+     (@ (xmlns:w ,dx-ns-w) (xmlns:r ,dx-ns-r) (xmlns:m ,dx-ns-m)
+        (xmlns:wp ,dx-ns-wp))
      (w:footnote (@ (w:type "separator") (w:id "-1"))
                  (w:p (w:r (w:separator))))
      (w:footnote (@ (w:type "continuationSeparator") (w:id "0"))
@@ -833,7 +883,10 @@
   (:type (-> stree string))
   (:synopsis "Write the office tree @x as a Word document, a zip archive")
   (set! dx-rels '())
+  (set! dx-note-rels '())
+  (set! dx-rel-ids (make-ahash-table))
   (set! dx-media '())
+  (set! dx-media-files (make-ahash-table))
   (set! dx-notes '())
   (set! dx-lists '())
   (set! dx-id 0)
@@ -853,11 +906,14 @@
          ;; a document has a paragraph at least
          (blocks (if (null? blocks) (list '(w:p)) blocks))
          (media (reverse dx-media))
+         ;; the relations of the notes, when they have some
+         (note-rels (reverse dx-note-rels))
          (r (zip-pack
               (append
                 '("[Content_Types].xml" "_rels/.rels" "word/document.xml"
                   "word/_rels/document.xml.rels" "word/styles.xml"
                   "word/numbering.xml" "word/footnotes.xml" "word/settings.xml")
+                (if (null? note-rels) '() '("word/_rels/footnotes.xml.rels"))
                 (map (lambda (m) (string-append "word/media/" (car m))) media))
               (append
                 (list (ox-serialize (dx-content-types))
@@ -870,9 +926,14 @@
                       (ox-serialize (dx-numbering))
                       (ox-serialize (dx-footnotes))
                       (ox-serialize (dx-settings)))
+                (if (null? note-rels) '()
+                    (list (ox-serialize (dx-relations note-rels))))
                 (map cadr media)))))
     (set! dx-rels '())
+    (set! dx-note-rels '())
+    (set! dx-rel-ids (make-ahash-table))
     (set! dx-media '())
+    (set! dx-media-files (make-ahash-table))
     (set! dx-notes '())
     (set! dx-lists '())
     r))
