@@ -37,6 +37,7 @@ protected:
   void expose ();
   void normalize ();
   int corrected_depth ();
+  void forget_marker (double m);
 
 public:
   archiver_rep (double author, path rp);

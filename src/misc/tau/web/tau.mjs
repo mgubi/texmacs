@@ -17,7 +17,42 @@ const verbose = params.has("log");
 
 // ?arg=... are the arguments of TeXmacs (a document to open, say)
 const worker = new Worker("tau-worker.js" + location.search);
-const send = message => worker.postMessage(message);
+// What the wheel and the pointer say comes faster than the core may
+// answer: a step of a list which is typeset again takes it a tenth of a
+// second, and steps which wait in a queue are each done in turn, long
+// after the hand stopped. So one such message is with the core at a time
+// (the worker says when it is done with it: a ping sent after it comes
+// back); what comes meanwhile is added up (the wheel) or replaces what
+// waited (the pointer), and goes when the core is free. Any other message
+// first sends what waits, so that the order is kept.
+let pacing = false, paceId = 0;
+const held = new Map(); // what waits: "scroll:<view>" or "move:<view>" -> message
+function paced(m) {
+	if (m.t === "scroll") return "scroll:" + m.view;
+	if (m.t === "mouse" && m.kind === "move") return "move:" + m.view;
+	return null;
+}
+function sendHeld() {
+	for (const m of held.values()) worker.postMessage(m);
+	held.clear();
+}
+function pace() {
+	pacing = true;
+	worker.postMessage({ t: "ping", id: "pace" + (++paceId) });
+}
+function paceDone(id) {
+	if (id !== "pace" + paceId) return;
+	pacing = false;
+	if (held.size) { sendHeld(); pace(); }
+}
+const send = message => {
+	const key = paced(message);
+	if (!key) { sendHeld(); worker.postMessage(message); return; }
+	if (!pacing) { worker.postMessage(message); pace(); return; }
+	const waits = held.get(key);
+	if (waits && message.t === "scroll") { waits.dx += message.dx; waits.dy += message.dy; waits.x = message.x; waits.y = message.y; }
+	else held.set(key, { ...message });
+};
 
 const panes = new Map();  // number of a window of the core -> pane
 let active = null;        // the pane which has the keyboard, or had it last
@@ -41,7 +76,7 @@ app.progress({ what: "" });
 
 // for tests and for the console
 const state = { started: false, paints: 0, downloads: [], get view() { return active ? active.view : 0; } };
-window.tau = { state, send, worker, panes, files, get active() { return active; } };
+window.tau = { state, send, worker, panes, files, fs: (op, args, transfer) => fsRequest(op, args, transfer), get active() { return active; } };
 chrome.init({ send, afterAction: () => active && focusView(active), makeView: node => makeView(node), keyName: event => keyName(event) });
 
 function setStatus(text) { statusLine.textContent = text; }
@@ -96,7 +131,7 @@ function makePane(windowNumber) {
 		if (!event.dataTransfer) return;
 		const rect = pane.canvas.getBoundingClientRect(), density = window.devicePixelRatio || 1;
 		const x = Math.round((event.clientX - rect.left) * density), y = Math.round((event.clientY - rect.top) * density);
-		files.dropOnView(event.dataTransfer, paths => worker.postMessage({ t: "drop", view: pane.view, x, y, paths }))
+		files.dropOnView(event.dataTransfer, paths => send({ t: "drop", view: pane.view, x, y, paths }))
 			.catch(error => console.error("Tau: the drop failed", error));
 	});
 	return pane;
@@ -221,7 +256,9 @@ function attachView(target) {
 			t: "mouse", view: target.view, kind,
 			x: Math.round((event.clientX - rect.left) * density),
 			y: Math.round((event.clientY - rect.top) * density),
-			mods: mods(event)
+			mods: mods(event),
+			// (when it happened: the core may come to it much later)
+			at: performance.timeOrigin + event.timeStamp
 		});
 	};
 	// (a click on the canvas would take the keyboard from its text area)
@@ -235,32 +272,31 @@ function attachView(target) {
 	canvas.addEventListener("pointerup", event => {
 		sendMouse("release-" + (BUTTONS[event.button] || "left"), event);
 	});
-	// the moves which have not been sent yet are merged: one for each frame
-	let pendingMove = null;
-	canvas.addEventListener("pointermove", event => {
-		if (!pendingMove) requestAnimationFrame(() => { sendMouse("move", pendingMove); pendingMove = null; });
-		pendingMove = event;
-	});
+	// (The moves are paced by send: the last one waits while the core works,
+	// and a press or a release sends it first. They were kept for the next
+	// frame before, and a move from before a press then came after it, with
+	// no button: the core took it for the release, and the release which
+	// followed for a second click.)
+	canvas.addEventListener("pointermove", event => sendMouse("move", event));
 	canvas.addEventListener("contextmenu", event => event.preventDefault());
 
-	// The wheel scrolls the view; the steps which have not been sent yet
-	// are added up, one message for each frame
-	let pendingScroll = null;
+	// The wheel scrolls the view; send adds up the steps which come while
+	// the core works
+	let wheelX = 0, wheelY = 0; // (the fractions of a pixel which were not sent)
 	canvas.addEventListener("wheel", event => {
 		event.preventDefault();
 		if (!target.view) return;
 		const density = window.devicePixelRatio || 1;
 		const unit = event.deltaMode === 1 ? 32 : event.deltaMode === 2 ? canvas.clientHeight : 1;
-		if (!pendingScroll) {
-			pendingScroll = { dx: 0, dy: 0 };
-			requestAnimationFrame(() => {
-				send({ t: "scroll", view: target.view,
-					dx: Math.round(pendingScroll.dx), dy: Math.round(pendingScroll.dy) });
-				pendingScroll = null;
-			});
-		}
-		pendingScroll.dx += event.deltaX * unit * density;
-		pendingScroll.dy += event.deltaY * unit * density;
+		wheelX += event.deltaX * unit * density;
+		wheelY += event.deltaY * unit * density;
+		const dx = Math.trunc(wheelX), dy = Math.trunc(wheelY);
+		if (!dx && !dy) return;
+		wheelX -= dx; wheelY -= dy;
+		// (with the place of the pointer, for an editor which takes the wheel)
+		const rect = canvas.getBoundingClientRect();
+		send({ t: "scroll", view: target.view, dx, dy,
+			x: Math.round((event.clientX - rect.left) * density), y: Math.round((event.clientY - rect.top) * density) });
 	}, { passive: false });
 }
 
@@ -560,7 +596,9 @@ function openFromAddress() {
 	let address;
 	try { address = new URL(src, location.href); }
 	catch (error) { notice("Not an address: " + src); return; }
-	let name = decodeURIComponent(address.pathname.slice(address.pathname.lastIndexOf("/") + 1)).replace(/[\/\\]/g, "_") || "document.tm";
+	let name = address.pathname.slice(address.pathname.lastIndexOf("/") + 1);
+	try { name = decodeURIComponent(name); } catch (error) {} // (a "%" which is not an escape)
+	name = name.replace(/[\/\\]/g, "_") || "document.tm";
 	if (!/\.(tm|tmml|ts|tp|stm|tex|html?|md|bib|scm|txt)$/i.test(name)) name += ".tm";
 	fetch(address.href).then(response => {
 		if (!response.ok) throw new Error(response.status + " " + response.statusText);
@@ -585,7 +623,7 @@ function fsAnswer(m) {
 	const w = fsWaiting.get(m.id);
 	fsWaiting.delete(m.id);
 	if (!w) return;
-	if (m.error) w.reject(new Error(m.error)); else w.resolve(m.value);
+	if (m.error) w.reject(Object.assign(new Error(m.error), { restart: !!m.restart })); else w.resolve(m.value);
 }
 files.initFiles({
 	request: fsRequest,
@@ -711,7 +749,10 @@ setInterval(() => {
 
 worker.onmessage = event => {
 	const m = event.data;
-	if (m.t === "pong") { if (m.id === pingId) { pingAt = 0; setBusy(0); } return; }
+	if (m.t === "pong") {
+		if (m.id === pingId) { pingAt = 0; setBusy(0); } else paceDone(m.id);
+		return;
+	}
 	if (chrome.handle(m)) return;
 	switch (m.t) {
 	case "status":

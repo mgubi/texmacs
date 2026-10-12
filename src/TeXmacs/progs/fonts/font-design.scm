@@ -797,7 +797,17 @@
 ;; turned into a percentage with an estimate of the height of the list: the
 ;; extents of what a canvas holds are not known here, and an estimate
 ;; which is off by a fifth only makes the wheel that much faster or slower.
+(define list-height-estimates (make-ahash-table))
+
 (define (list-height-estimate tab)
+  ;; (kept: it looks for the sample of each font, some 40 ms in the browser,
+  ;; which every step of the wheel paid)
+  (or (ahash-ref list-height-estimates tab)
+      (with h (list-height-compute tab)
+        (ahash-set! list-height-estimates tab h)
+        h)))
+
+(define (list-height-compute tab)
   (with entry-height
       (lambda (e)
         (cond ((not (font-design-sample e)) 55)
@@ -820,7 +830,8 @@
                     100))
            (new (max 0 (min 100 (+ old (/ (* 100.0 dy) h))))))
       (when (!= new old)
-        (tree-set (tree-ref l 0) (string-append (number->string new) "%"))))))
+        (canvas-scroll-set (tree-ref l 0)
+                           (string-append (number->string new) "%"))))))
 
 (tm-define (wheel-capture?)
   (:require (font-design-page?))
@@ -866,6 +877,8 @@
   (when (page-context? d)
     (and-with e (font-design-find-entry tab id)
       (font-design-make-sample e (cached-samples))
+      ;; (the entry is taller with its sample)
+      (set! list-height-estimates (make-ahash-table))
       (page-update (system->url d) #f))))
 
 (tm-define (font-design-page-save d)

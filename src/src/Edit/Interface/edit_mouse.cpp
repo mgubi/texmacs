@@ -52,9 +52,29 @@ edit_interface_rep::mouse_clickable_color () {
   return named_color (t->label);
 }
 
+// A press which a box took makes the drag which follows the box's too: it
+// does not select the text under the pointer instead. A box which grabs
+// the pointer (the scroll bar of a canvas: it says where it is, "grab")
+// gets the whole drag, at the nearest of its points when the pointer is
+// away from it: the bar is narrow, and the drag goes to its ends, not into
+// what is beside, above or below.
+static bool box_drag= false;
+static bool box_grab= false;
+static SI   box_x1= 0, box_y1= 0, box_x2= 0, box_y2= 0;
+
 void
 edit_interface_rep::mouse_click (SI x, SI y) {
-  if (mouse_message ("click", x, y)) return;
+  box_drag= mouse_message ("click", x, y);
+  if (box_drag) {
+    rectangles rs;
+    tree g= eb->message ("grab", x, y, rs);
+    box_grab= is_tuple (g, "grab", 4);
+    if (box_grab) {
+      box_x1= x - as_int (g[1]); box_x2= x + as_int (g[2]);
+      box_y1= y - as_int (g[3]); box_y2= y + as_int (g[4]);
+    }
+    return;
+  }
   start_x= x;
   start_y= y;
   send_mouse_grab (this, true);
@@ -62,6 +82,12 @@ edit_interface_rep::mouse_click (SI x, SI y) {
 
 bool
 edit_interface_rep::mouse_extra_click (SI x, SI y) {
+  if (box_drag) {
+    // (the second click on a box which took the first: not on the text)
+    box_drag= false;
+    mouse_message ("double-click", x, y);
+    return true;
+  }
   go_to (x, y);
   if (mouse_message ("double-click", x, y)) return true;
   go_to (x, y);
@@ -124,6 +150,14 @@ edit_interface_rep::mouse_adjust_selection (SI x, SI y, int mods) {
 void
 edit_interface_rep::mouse_drag (SI x, SI y) {
   if (inside_graphics ()) return;
+  if (box_drag) {
+    if (box_grab) {
+      x= max (box_x1, min (box_x2, x));
+      y= max (box_y1, min (box_y2, y));
+    }
+    mouse_message ("drag", x, y);
+    return;
+  }
   if (mouse_message ("drag", x, y)) return;
   go_to (x, y);
   end_x  = x;
@@ -143,7 +177,12 @@ edit_interface_rep::mouse_drag (SI x, SI y) {
 
 void
 edit_interface_rep::mouse_select (SI x, SI y, int mods, bool drag) {
-  if (mouse_message ("select" , x, y)) return;
+  if (mouse_message ("select" , x, y)) { box_drag= false; return; }
+  if (box_drag) {
+    // (the end of a drag of a box, away from it: nothing is selected)
+    box_drag= false;
+    if (drag) return;
+  }
   if (!is_nil (mouse_ids) && (mods & (ShiftMask+Mod2Mask)) == 0 && !drag) {
     call ("link-follow-ids", object (mouse_ids), object ("click"));
     disable_double_clicks ();
@@ -248,7 +287,7 @@ edit_interface_rep::mouse_scroll (SI x, SI y, bool up) {
       new_p= max (min (new_p, 100.0), 0.0);
       tree new_yt= as_string (new_p) * "%";
       if (new_yt != old_yt && is_accessible (obtain_ip (old_yt))) {
-        object fun= symbol_object ("tree-set");
+        object fun= symbol_object ("canvas-scroll-set");
         object cmd= list_object (fun, old_yt, new_yt);
         exec_delayed (scheme_cmd (cmd));
         temp_invalid_cursor= true;

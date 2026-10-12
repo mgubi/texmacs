@@ -154,6 +154,14 @@ struct scrollbar_box_rep: public composite_box_rep {
 tree
 scrollbar_box_rep::message (tree type, SI x, SI y, rectangles& rs) {
   (void) rs;
+  // (the release of the button on the bar is the bar's too: it does not
+  // put the cursor there)
+  if (type == "select") return "done";
+  // (where the bar is, from the point: the drag which follows a press on
+  // it stays with it, edit_interface_rep::mouse_drag)
+  if (type == "grab")
+    return tuple ("grab", as_string (x - x1), as_string (x2 - x),
+                  as_string (y - y1), as_string (y2 - y));
   if (type != "click" && type != "drag") return "";
   tree u= t;
   if (vertical) {
@@ -173,7 +181,8 @@ scrollbar_box_rep::message (tree type, SI x, SI y, rectangles& rs) {
     u= tree (as_string (p) * "%");
   }
   if (u != t && is_accessible (obtain_ip (t))) {
-    object fun= symbol_object ("tree-set");
+    // (canvas-scroll-set: the canvas is not scrolled back to the cursor)
+    object fun= symbol_object ("canvas-scroll-set");
     object cmd= list_object (fun, t, u);
     exec_delayed (scheme_cmd (cmd));
   }

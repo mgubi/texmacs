@@ -600,6 +600,34 @@ remove_marker (patch archive, double m) {
   return remove_marker_bis (compress (archive), m);
 }
 
+// the number of entries of the history above the marker m (-1: none)
+static int
+marker_height (patch archive, double m) {
+  int i= 0;
+  while (nr_undo (archive) != 0) {
+    if (is_marker (car (get_undo (archive)), m, false)) return i;
+    archive= cdr (get_undo (archive));
+    i++;
+  }
+  return -1;
+}
+
+void
+archiver_rep::forget_marker (double m) {
+  // The marker m is taken out of the history. The states which were saved
+  // above it are one entry lower then: a document saved from a menu while
+  // a shortcut was pending, and changed since, was otherwise held to be
+  // the saved one when the marker went
+  int h= marker_height (archive, m);
+  if (h >= 0) {
+    int pos= depth - h; // the depth with the marker at the top
+    if (last_save >= pos) last_save--;
+    if (last_autosave >= pos) last_autosave--;
+  }
+  archive= remove_marker (archive, m);
+  depth--;
+}
+
 void
 archiver_rep::mark_start (double m) {
   //cout << "Mark start " << m << "\n";
@@ -617,8 +645,7 @@ archiver_rep::mark_end (double m) {
     //  cout << "CONFIRM: " << current << "\n";
     confirm ();
   }
-  archive= remove_marker (archive, m);
-  depth--;
+  forget_marker (m);
   simplify ();
   //show_all ();
 }
@@ -630,14 +657,12 @@ archiver_rep::mark_cancel (double m) {
   while (nr_undo (archive) != 0) {
     expose ();
     if (is_marker (car (get_undo (archive)), m, false)) {
-      archive= remove_marker (archive, m);
-      depth--;
+      forget_marker (m);
       simplify ();
       return true;
     }
     if (get_author (car (get_undo (archive))) != the_author) {
-      archive= remove_marker (archive, m);
-      depth--;
+      forget_marker (m);
       return false;
     }
     retract ();

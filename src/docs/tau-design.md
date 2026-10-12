@@ -980,8 +980,14 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   unpacked (the choosers of the browser, or a drop on the panel), make a
   folder, rename, delete, save a copy on the computer (a folder as a
   zip), open a document; "customize" copies a file of TeXmacs to the
-  same place of `~/.TeXmacs`, where TeXmacs looks first. A PDF or an
-  image opens in a tab of the browser, unless an image was asked for.
+  same place of `~/.TeXmacs`, where TeXmacs looks first (a folder is
+  copied into the one of the user: the files of the same name are
+  written over, the others stay). What is added under a name which is
+  taken is asked about first: written over, or kept besides under
+  another name. A PDF or an image opens in a tab of the browser, unless
+  an image was asked for; an image is the picture (`<img>`) of a page
+  made for it, never a document of its own: an SVG file may carry a
+  script, which would run as a script of Tau and reach all the files.
 - **Open and save** are the same panel: `tau-choose-file` posts `files`
   (`mode` open or save, a ticket, the title, the type, for a save the
   name which is proposed and the folder of the document) and the page
@@ -1013,6 +1019,17 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   (the core would save its preferences over the restored ones), writes
   the home directory to the browser, and the page starts again. Both
   are in the panel and in the menu of the icon of Tau.
+- **A restore does not stop half way.** The worker first checks all of
+  it (the paths, a file of the backup where a folder is, or the
+  reverse) and refuses before anything is written; only then the core
+  is stopped (`tau_freeze` ends its turns too) and the files written.
+  An error after that (the browser has no room: `tauSaveHome` now says
+  so) is told to the user, and the page starts again all the same,
+  with what the browser kept. A backup has its folders which are
+  empty. A zip of more than 65535 files has the end record of zip64,
+  the bytes of each entry are checked when read, and a backup which
+  has fewer files than its note says is told as such and is only
+  merged, not put in place of everything.
 - While the panel is open the keys do not reach the core, and the
   keyboard goes back to the view when it closes. Its questions (a name,
   a confirmation) are a line of the panel, not dialogs of the browser.
@@ -1035,8 +1052,11 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   the history of the changes, the save point was recorded with it, and
   when the marker went and the last two entries were joined
   (`archiver_rep::simplify`) the depth changed under the save point.
-  The save point at the top of the history now follows the join. This
-  is the code of TeXmacs, not of Tau.
+  The save point at the top of the history now follows the join, and a
+  save point above a marker goes down with it when the marker is taken
+  out (`forget_marker`: a save from the menu while a shortcut was
+  pending, then a change from a menu, left the document held to be
+  saved). This is the code of TeXmacs, not of Tau.
 - `make safari-check` also goes through the panel (a file added, a zip
   and a backup, a save). The texts of the panel are not translated.
 
@@ -1058,6 +1078,67 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   core would have to post that from inside its loops.
 - Nothing is asked while the page is hidden, nor shown once the program
   stopped.
+
+### The wheel and the pointer, when the editor takes them
+
+- **The wheel for the editor.** A view is scrolled by the wheel
+  (`scroll`), unless the editor which has the keyboard captures it
+  (`wheel-capture?`: the graphics, the page of the design of the fonts,
+  whose list scrolls in a page which does not): then it gets a "wheel"
+  event with the displacement in points, y up, as in the Qt and Vue
+  ports (`tau_scroll_by`), at the place of the pointer, which comes
+  with `scroll`.
+- **The time of a click** is when it happened in the page (`at` of
+  `mouse`, which the worker gives the core as an age), not when the
+  core comes to it: two clicks which waited behind a busy core were a
+  double click.
+- **One step at a time.** The wheel and the pointer say more than the
+  core may follow when a step is costly (the list of the fonts is
+  typeset and drawn again: some 80 ms): the steps waited in the queue of
+  the worker and were each done in turn, long after the hand stopped,
+  with the bar of a busy core. Now one `scroll` or one move of the
+  pointer is with the core at a time: the page sends a `ping` after it,
+  and what comes before the `pong` is added up (the wheel) or replaces
+  what waited (the pointer), and goes then. Any other message first
+  sends what waits, so that a press never overtakes a move. Forty steps
+  of a swipe become some eight, the last drawn a moment after the hand
+  stops.
+- `?profile` in the address sets `TEXMACS_EDIT_PROFILE`: the times of
+  the typesetting and of the drawing of TeXmacs in the console, with
+  those of a turn of Tau (the editors, the drawing and the sending, what
+  is made for the page) and of a wheel which the editor takes. It showed
+  40 ms of a step of the list of the fonts in an estimate of its height
+  which was computed again each time (`fonts/font-design.scm`, kept
+  now); 30 ms of typesetting and 40 ms of drawing remain.
+- **A canvas which holds the cursor** is scrolled so that the cursor is
+  seen whenever the document changes (`cursor_visible`), and a scroll is
+  such a change: once the cursor was in the list of the fonts (any click
+  there), its scroll bar and the wheel were undone at once. What the
+  user asks of a canvas is now set with `canvas-scroll-set`
+  (`generic-edit.scm`: the change with `THE_FREEZE`, which keeps the
+  view from following the cursor that time), by the bar
+  (`scrollbar_box_rep`), by `mouse_scroll` and by the page of the fonts.
+- **A drag belongs to the box which took the press** (`edit_mouse.cpp`):
+  the bar of a canvas is narrow, and a drag whose pointer left it
+  sideways went to the text under it, which it selected. A bar now
+  says where it is when it is pressed (the message "grab"), and the
+  drag goes to its nearest point: along it when the pointer is beside,
+  to its end when the pointer is past it, never into another box. The
+  release on the bar, or at the end of such a drag, does not move the
+  cursor, nor does a second click (a double click put the cursor under
+  the bar and scrolled the list back). A box which takes the press
+  without grabbing (a button) gets the drags over it only, so that it
+  is not drawn as pressed with the pointer away. These are in the code
+  of TeXmacs, not of Tau.
+- **A move which came after its press.** The moves of the pointer were
+  kept for the next frame of the page, the presses and the releases sent
+  at once: a move from just before a press arrived after it, saying that
+  no button was down, which the core took for the release; the release
+  itself was then a second click (a click after a move of the pointer
+  selected a word, or did nothing). The moves and the steps of the wheel
+  now go through the pacing above, which keeps their order.
+- Seen, not changed: the page of the fonts is 4 pixels higher than its
+  view, which gives the view a scroll bar.
 
 ## Order of the work
 

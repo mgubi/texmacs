@@ -20,6 +20,8 @@ Module['preRun'].push(function () {
   ENV['TEXMACS_HOME_PATH'] = TAU_HOME + '/.TeXmacs';
   ENV['LANG'] = 'en_US.UTF-8';
   if (new URLSearchParams (self.location.search).has ('trace-scroll')) ENV['TAU_DEBUG_SCROLL'] = '1';
+  // ?profile: the times of the typesetting and of the drawing, in the console
+  if (new URLSearchParams (self.location.search).has ('profile')) ENV['TEXMACS_EDIT_PROFILE'] = '1';
   // the system of the user, for the shortcuts of TeXmacs: Cmd+... on a Mac
   // (default_look_and_feel in src/Kernel/Abstractions/basic.cpp)
   var platform = (typeof navigator === 'undefined') ? '' :
@@ -69,12 +71,13 @@ Module['preRun'].push(function () {
   else start (true);
 });
 
-// what was changed is written to the browser now, then done is called
+// what was changed is written to the browser now, then done is called,
+// with the error when it could not be (no room left in the browser)
 Module.tauSaveHome = function (done) {
-  if (!Module.tauHomeKept) { if (done) done (); return; }
+  if (!Module.tauHomeKept) { if (done) done (null); return; }
   FS.syncfs (false, function (err) {
     if (err) console.error ('Tau: the home directory cannot be written to the browser: ' + err);
-    if (done) done ();
+    if (done) done (err || null);
   });
 };
 

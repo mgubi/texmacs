@@ -119,7 +119,7 @@
 (lazy-define (generic document-edit) update-document set-document-language
              get-init-page-rendering init-page-rendering)
 (lazy-define (generic generic-edit) notify-activated notify-disactivated
-             wheel-capture?)
+             wheel-capture? canvas-scroll-set)
 (lazy-define (generic generic-doc) focus-help)
 (lazy-define (generic search-widgets) search-toolbar replace-toolbar
              open-search toolbar-search-start interactive-search

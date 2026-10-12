@@ -84,6 +84,10 @@ body { display: flex; flex-direction: column; font: 13px/1.3 system-ui, sans-ser
 .tau-icon { height: 20px; min-width: 12px; display: block; }
 #tau-icons-1 .tau-icon, #tau-icons-2 .tau-icon, #tau-icons-3 .tau-icon { height: 17px; }
 .tau-arrow { font-size: 9px; color: var(--dim); }
+/* (the one of a menu item which has a submenu: a chevron which is drawn, taller than wide) */
+.tau-shortcut.tau-arrow { font-size: 0; display: inline-flex; align-items: center; }
+.tau-shortcut.tau-arrow::after { content: ""; width: 5px; height: 10px; background: currentColor;
+	clip-path: polygon(0 0, 28% 0, 100% 50%, 28% 100%, 0 100%, 72% 50%); }
 .tau-vsep { width: 1px; align-self: stretch; margin: 3px 4px; background: var(--bar-border); }
 .tau-glue { flex: 1; }
 .tau-group { color: var(--dim); font-size: 11px; padding: 4px 8px 2px; text-transform: uppercase; letter-spacing: 0.04em; }

@@ -107,8 +107,15 @@ function handle(m) {
 		// is only looked at, aside) and the core is told where
 		const dir = m.temp ? "/tmp/web" : USER;
 		core.FS.mkdirTree(dir);
-		const path = dir + "/" + m.name.replace(/[\/\\]/g, "_");
-		core.FS.writeFile(path, new Uint8Array(m.bytes));
+		const name = m.name.replace(/[\/\\\u0000-\u001f\u007f]/g, "_") || "file", bytes = new Uint8Array(m.bytes);
+		let path = dir + "/" + name;
+		// (another file of the user with this name is not written over: what
+		// is pasted is always "image.png")
+		if (!m.temp && fsStat(path) && !sameBytes(core.FS.readFile(path), bytes)) {
+			const dot = name.lastIndexOf("."), stem = dot > 0 ? name.slice(0, dot) : name, ext = dot > 0 ? name.slice(dot) : "";
+			for (let k = 2; fsStat(path); k++) path = dir + "/" + stem + " " + k + ext;
+		}
+		core.FS.writeFile(path, bytes);
 		core.ccall("tau_file", null, ["number", "string"], [m.ticket || 0, path]);
 		break;
 	}
@@ -116,7 +123,7 @@ function handle(m) {
 		core._tau_place(m.view, m.width, m.height, m.density, m.place);
 		break;
 	case "scroll":
-		core._tau_scroll_by(m.view, m.dx, m.dy);
+		core._tau_scroll_by(m.view, m.dx, m.dy, m.x || 0, m.y || 0);
 		break;
 	case "focus":
 		core._tau_focus(m.view, m.focus ? 1 : 0);
@@ -144,7 +151,8 @@ function handle(m) {
 		// a request of the panel of the files (files.mjs), which is answered
 		fsRequest(m).then(
 			r => postMessage({ t: "fs", id: m.id, value: r.value }, r.transfer || []),
-			error => postMessage({ t: "fs", id: m.id, error: String(error && error.message || error) }));
+			// (restart: the files are not what they were, the page starts again)
+			error => postMessage({ t: "fs", id: m.id, error: String(error && error.message || error), restart: frozen }));
 		break;
 	case "chosen":
 		// the file which was chosen for a question of the core (none: an
@@ -152,8 +160,9 @@ function handle(m) {
 		core.ccall("tau_file", null, ["number", "string"], [m.ticket || 0, m.path || ""]);
 		break;
 	case "mouse":
-		core.ccall("tau_mouse", null, ["number", "string", "number", "number", "number"],
-			[m.view, m.kind, m.x, m.y, m.mods]);
+		// (at: when it happened, which the core is told as an age)
+		core.ccall("tau_mouse", null, ["number", "string", "number", "number", "number", "number"],
+			[m.view, m.kind, m.x, m.y, m.mods, m.at ? Math.round(Date.now() - m.at) : 0]);
 		break;
 	}
 }
@@ -188,6 +197,11 @@ function fsWritable(path) {
 }
 const fsParent = path => path.slice(0, path.lastIndexOf("/")) || "/";
 const fsBase = path => path.slice(path.lastIndexOf("/") + 1);
+function sameBytes(a, b) {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+	return true;
+}
 function fsStat(path) { try { return core.FS.stat(path); } catch (error) { return null; } }
 function fsIsDir(path) { const st = fsStat(path); return !!st && core.FS.isDir(st.mode); }
 function fsTime(st) { const m = st.mtime; return m instanceof Date ? m.getTime() : +m; }
@@ -197,11 +211,17 @@ function fsList(dir) {
 		return { name, path, dir: core.FS.isDir(st.mode), size: st.size, time: fsTime(st) };
 	});
 }
-// the files under a directory: [{ rel, path }]
-function fsWalk(dir, rel, out) {
+// the files under a directory: [{ rel, path }]; with dirs, the
+// directories which are empty too: { rel, path, dir: true }
+function fsWalk(dir, rel, out, dirs) {
 	for (const e of fsList(dir)) {
 		const r = rel ? rel + "/" + e.name : e.name;
-		if (e.dir) fsWalk(e.path, r, out); else out.push({ rel: r, path: e.path });
+		if (!e.dir) out.push({ rel: r, path: e.path });
+		else {
+			const n = out.length;
+			fsWalk(e.path, r, out, dirs);
+			if (dirs && out.length === n) out.push({ rel: r, path: e.path, dir: true });
+		}
 	}
 	return out;
 }
@@ -221,10 +241,35 @@ function fsWrite(path, bytes, time) {
 // files with their bytes, which go to the page without a copy
 function fsBytes(files) {
 	const value = files.map(f => {
+		if (f.dir) return { rel: f.rel, dir: true, bytes: new ArrayBuffer(0), time: fsTime(core.FS.stat(f.path)) };
 		const data = core.FS.readFile(f.path);
 		return { rel: f.rel, bytes: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength), time: fsTime(core.FS.stat(f.path)) };
 	});
 	return { value, transfer: value.map(f => f.bytes) };
+}
+
+const backupSkips = f => BACKUP_SKIP.some(s => (f.rel + "/").startsWith(s));
+// the files of a backup can be written: or an error, before anything is
+function restoreCheck(files, exact) {
+	const kinds = new Map(); // what the backup makes of a path: "file" or "dir"
+	for (const f of files) {
+		fsWritable(HOME + "/" + f.rel);
+		const parts = f.rel.split("/"), kind = f.dir ? "dir" : "file";
+		for (let i = 1; i < parts.length; i++) {
+			const d = parts.slice(0, i).join("/");
+			if (kinds.get(d) === "file") throw new Error("the backup has " + d + " both as a file and as a folder");
+			kinds.set(d, "dir");
+		}
+		if (kinds.has(f.rel) && kinds.get(f.rel) !== kind) throw new Error("the backup has " + f.rel + " both as a file and as a folder");
+		kinds.set(f.rel, kind);
+	}
+	if (exact) return;
+	for (const [rel, kind] of kinds) {
+		const st = fsStat(HOME + "/" + rel);
+		if (st && core.FS.isDir(st.mode) !== (kind === "dir"))
+			throw new Error(rel + " is a " + (kind === "dir" ? "file" : "folder") + " here and a " + (kind === "dir" ? "folder" : "file") +
+				" in the backup: rename or delete it first, or replace everything");
+	}
 }
 
 async function fsRequest(m) {
@@ -258,30 +303,51 @@ async function fsRequest(m) {
 		return { value: true };
 	case "copy": {
 		// a file or a directory (of TeXmacs) into the home directory
+		// A directory is copied into the one which is there: the files of
+		// the same name are written over, what the user has besides stays
+		// (~/.TeXmacs/progs is not emptied for a copy of the one of TeXmacs)
 		const from = fsReadable(m.from), to = fsWritable(m.to);
-		if (fsStat(to)) fsRemove(to);
-		if (fsIsDir(from)) for (const f of fsWalk(from, "", [])) fsWrite(to + "/" + f.rel, core.FS.readFile(f.path), 0);
-		else fsWrite(to, core.FS.readFile(from), 0);
-		return { value: true };
+		const files = fsIsDir(from) ? fsWalk(from, "", []).map(f => ({ from: f.path, to: to + "/" + f.rel })) : [{ from, to }];
+		if (fsStat(to) && fsIsDir(to) !== fsIsDir(from))
+			throw new Error(fsBase(to) + " is a " + (fsIsDir(to) ? "folder" : "file") + " in your folder: rename or delete it first");
+		// (nothing is written when a file would take the place of a folder)
+		for (const f of files) {
+			if (fsIsDir(f.to)) throw new Error(f.to.slice(HOME.length + 1) + " is a folder in your folder: rename or delete it first");
+			for (let d = fsParent(f.to); d.length > to.length; d = fsParent(d))
+				if (fsStat(d) && !fsIsDir(d)) throw new Error(d.slice(HOME.length + 1) + " is a file in your folder: rename or delete it first");
+		}
+		if (fsIsDir(from)) core.FS.mkdirTree(to);
+		for (const f of files) fsWrite(f.to, core.FS.readFile(f.from), 0);
+		return { value: files.length };
 	}
 	case "backup":
 		// the whole home directory, without what TeXmacs makes again
-		return fsBytes(fsWalk(HOME, "", []).filter(f => !BACKUP_SKIP.some(s => f.rel.startsWith(s))));
+		// (with the folders which are empty)
+		return fsBytes(fsWalk(HOME, "", [], true).filter(f => !backupSkips(f)));
 	case "restore": {
 		// The files of a backup are written over those of the home
 		// directory (or in place of all of them), and kept; the core does
 		// nothing more (it would save its preferences over the restored
 		// ones) and the page starts again
 		if (!core.tauHomeKept) throw new Error("this page does not keep the files: restore the backup in the page of Tau which does");
+		// Nothing is touched before all of it is known to fit: a path which
+		// is not one of the home directory, a file where there is a folder
+		const files = m.files.filter(f => !backupSkips(f));
+		restoreCheck(files, m.exact);
+		// From here on the files are not what the core knows: it stops (its
+		// turns too, which would write its preferences over the restored
+		// ones), and the page starts again whatever happens
 		frozen = true;
+		try { core._tau_freeze(); } catch (error) {}
 		// (an exact copy: what the backup has not goes first)
 		if (m.exact) for (const e of fsList(HOME)) fsRemove(e.path);
-		for (const f of m.files) {
-			if (BACKUP_SKIP.some(s => f.rel.startsWith(s))) continue;
-			fsWrite(fsWritable(HOME + "/" + f.rel), f.bytes, f.time);
+		for (const f of files) {
+			if (f.dir) core.FS.mkdirTree(HOME + "/" + f.rel);
+			else fsWrite(HOME + "/" + f.rel, f.bytes, f.time);
 		}
-		await new Promise(resolve => core.tauSaveHome(resolve));
-		return { value: m.files.length };
+		const failed = await new Promise(resolve => core.tauSaveHome(resolve));
+		if (failed) throw new Error("the browser did not store the files (" + (failed.message || failed) + ")");
+		return { value: files.length };
 	}
 	}
 	throw new Error("unknown request: " + m.op);
@@ -292,6 +358,9 @@ onmessage = event => {
 	if (event.data.t === "ping") { postMessage({ t: "pong", id: event.data.id }); return; }
 	if (!core) { waiting.push(event.data); return; }
 	if (frozen) return;
+	// (a program which stopped is not called again; its files are still
+	// read, for a backup of them)
+	if (dead && event.data.t !== "fs") return;
 	try { handle(event.data); }
 	catch (error) {
 		postMessage({ t: "log", text: "error in " + event.data.t + ": " + (error && error.message || error) });

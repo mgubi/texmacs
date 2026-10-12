@@ -32,6 +32,7 @@
 #include "analyze.hpp"
 #include "convert.hpp"
 #include "picture.hpp"
+#include "typesetter.hpp"
 #include "editor.hpp"
 #include "MuPDF/mupdf_renderer.hpp"
 #include "font.hpp"
@@ -376,6 +377,9 @@ tau_follow_fonts () {
 
 static void
 tau_turn () {
+  // (TEXMACS_EDIT_PROFILE, ?profile in the page: where a turn spends its time)
+  bool prof= edit_profile.on;
+  double t0= prof ? emscripten_get_now () : 0, t1= t0, t2= t0, t3= t0;
   tau_follow_fonts ();
   array<simple_widget_rep*> views;
   iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
@@ -384,6 +388,7 @@ tau_turn () {
   for (int i=0; i<N(views); i++)
     if (views[i]->shown) views[i]->notify_resize ();
   if (the_interpose_handler != NULL) the_interpose_handler ();
+  if (prof) t1= emscripten_get_now ();
   for (int i=0; i<N(views); i++) {
     simple_widget_rep* v= views[i];
     if (!simple_widget_rep::all_widgets->contains ((pointer) v)) continue;
@@ -396,6 +401,7 @@ tau_turn () {
                   v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
                   ew, eh, sx, sy, cx, cy);
   }
+  if (prof) t2= emscripten_get_now ();
   // what Scheme has to say to the page (menu-serial.scm)
   string out= as_string (call ("tau-outbox"));
   if (N(out) != 0) tau_post_json ("batch", "", out);
@@ -404,6 +410,13 @@ tau_turn () {
   if (state != last_state) {
     last_state= state;
     tau_post_json ("buffers", "", state);
+  }
+  if (prof) {
+    t3= emscripten_get_now ();
+    if (t3 - t0 >= 5)
+      cout << "tau-profile turn: " << (int) (t3 - t0) << " ms (editors "
+           << (int) (t1 - t0) << ", drawing and sending " << (int) (t2 - t1)
+           << ", for the page " << (int) (t3 - t2) << ")\n";
   }
 }
 
@@ -453,12 +466,42 @@ tau_place (int view, int w, int h, double density, int counter) {
   tau_turn ();
 }
 
+// The time of an event of the pointer: when it happened in the page (age
+// milliseconds ago), not when the core comes to it, which may be much
+// later when it was busy; two clicks which waited together were a double
+// click otherwise. The times never go back.
+static time_t
+pointer_time (int age) {
+  static time_t last= 0;
+  time_t t= texmacs_time () - max (0, min (age, 60000));
+  if (t < last) t= last;
+  last= t;
+  return t;
+}
+
 EMSCRIPTEN_KEEPALIVE
 void
-tau_scroll_by (int view, int dx, int dy) {
+tau_scroll_by (int view, int dx, int dy, int x, int y) {
+  // (x, y): where the pointer is, in pixels of the canvas
   simple_widget_rep* v= simple_widget_rep::find (view);
   if (v == NULL) return;
-  v->scroll_by (dx, dy);
+  // The editor which has the keyboard gets the wheel when it captures it
+  // (the graphics, the page of the design of the fonts), as in the other
+  // ports: a "wheel" event with the displacement in points, y up, instead
+  // of the view being scrolled
+  if (v->has_focus && v->is_editor_widget () && v->density > 0 &&
+      as_bool (call ("wheel-capture?"))) {
+    array<double> data;
+    data << (-dx / v->density) << (-dy / v->density);
+    double t0= edit_profile.on ? emscripten_get_now () : 0;
+    SI px= x, py= y;
+    v->to_document (px, py);
+    v->handle_mouse ("wheel", px, py, 0, pointer_time (0), data);
+    if (edit_profile.on)
+      cout << "tau-profile wheel for the editor: "
+           << (int) (emscripten_get_now () - t0) << " ms\n";
+  }
+  else v->scroll_by (dx, dy);
   tau_turn ();
 }
 
@@ -666,15 +709,27 @@ tau_paste (int view, const char* text, const char* html) {
 
 EMSCRIPTEN_KEEPALIVE
 void
-tau_mouse (int view, const char* kind, int x, int y, int mods) {
+tau_mouse (int view, const char* kind, int x, int y, int mods, int age) {
   // kind as in TeXmacs ("press-left", "move", "release-left"...); the
-  // position in pixels of the canvas, from its top left corner
+  // position in pixels of the canvas, from its top left corner; age: how
+  // long ago it happened, in milliseconds
   simple_widget_rep* v= simple_widget_rep::find (view);
   if (v == NULL) return;
   SI dx= x, dy= y;
   v->to_document (dx, dy);
-  v->handle_mouse (string (kind), dx, dy, mods, texmacs_time ());
+  v->handle_mouse (string (kind), dx, dy, mods, pointer_time (age));
   tau_turn ();
+}
+
+// The files of the home directory were replaced under the core (a backup
+// was restored, tau-worker.js): it makes no more turns, which would write
+// over them, until the page starts again
+EMSCRIPTEN_KEEPALIVE
+void
+tau_freeze () {
+#ifdef __EMSCRIPTEN__
+  emscripten_cancel_main_loop ();
+#endif
 }
 
 // Images which were dropped on a view (their paths in the file system,
@@ -709,7 +764,9 @@ tau_drop (int view, int x, int y, const char* paths) {
   payloads (ticket)= doc;
   SI dx= x, dy= y;
   v->to_document (dx, dy);
-  v->handle_mouse ("drop", dx, dy, ticket, texmacs_time ());
+  v->handle_mouse ("drop", dx, dy, ticket, pointer_time (0));
+  // (when the editor did not take it)
+  payloads->reset (ticket);
   tau_turn ();
 }
 

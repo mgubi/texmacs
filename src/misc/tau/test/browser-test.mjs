@@ -512,6 +512,12 @@ test("tabs and files", async p => {
 	await p.open();
 	await p.newDocument();
 	const n = (await p.tabs())[0].length;
+	// (a new document which is exported is not proposed as a document of TeXmacs)
+	await p.choose("File", "Export", "Pdf");
+	const first = await p.filesPanel("save");
+	check("a name with the suffix of the format for a new document", first.name === "untitled.pdf", first);
+	await p.key("Escape");
+	await p.until("the panel is given up", async () => (await p.count(".tau-files")) === 0);
 	// a file of the user, dropped on the view
 	await p.page.evaluate(() => {
 		const text = "<TeXmacs|2.1.5>\n\n<style|generic>\n\n<\\body>\n  A file of the user.\n</body>\n";
@@ -607,6 +613,36 @@ test("files in the browser", async p => {
 	await p.filesDrop([["a.tm", doc], ["pic.svg", "<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'/>"]]);
 	f = await p.filesPanel("browse", f => f.names.length === 2);
 	check("the files which were dropped", f.names.join() === "a.tm,pic.svg", f);
+	// what comes with a name which is taken is asked about: kept besides, or written over
+	await p.filesDrop([["pic.svg", "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'/>"]]);
+	f = await p.filesPanel("browse", f => f.asking.startsWith("pic.svg exists already"));
+	check("nothing is written before the answer", f.names.length === 2, f);
+	// (the question is about this folder: going elsewhere gives it up)
+	await p.page.click(".tau-files-crumbs a:nth-of-type(2)");
+	await p.filesPanel("browse", f => f.dir === "/home/tau/Documents" && !f.asking);
+	await p.filesRow("proj");
+	f = await p.filesPanel("browse", f => f.dir === "/home/tau/Documents/proj");
+	check("given up: nothing was written", f.names.join() === "a.tm,pic.svg", f);
+	await p.filesDrop([["pic.svg", "<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'/>"]]);
+	await p.filesPanel("browse", f => f.asking.startsWith("pic.svg exists already"));
+	await p.page.click('.tau-files-ask [data-what="other"]');
+	await p.filesPanel("browse", f => !f.asking && f.names.join() === "a.tm,pic 2.svg,pic.svg");
+	await p.filesDrop([["pic 2.svg", "<svg xmlns='http://www.w3.org/2000/svg' width='9' height='9'><script>window.opener.hacked = true</script></svg>"]]);
+	await p.filesPanel("browse", f => f.asking.startsWith("pic 2.svg exists already"));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.filesPanel("browse", f => !f.asking && f.names.length === 3);
+	// an image is shown as a picture in a tab of the browser: its scripts do not run
+	const shown = new Promise(resolve => browser.once("targetcreated", t => resolve(t.page())));
+	await p.filesRow("pic 2.svg", "open");
+	const tab = await shown;
+	await p.until("the picture is in the tab", () => tab.evaluate(() => { const i = document.querySelector("img"); return !!i && i.complete && i.naturalWidth === 9; }));
+	check("the tab is not the file", (await tab.evaluate(() => location.href)) === "about:blank" && !(await p.page.evaluate(() => window.hacked)));
+	await tab.close();
+	await p.page.bringToFront();
+	await p.filesRow("pic 2.svg", "delete");
+	await p.filesPanel("browse", f => f.asking.startsWith("Delete pic 2.svg"));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.filesPanel("browse", f => !f.asking && f.names.join() === "a.tm,pic.svg");
 	// renamed, copied to the computer (a folder as a zip)
 	await p.filesRow("a.tm", "rename");
 	await p.filesPanel("browse", f => f.asking.startsWith("Rename a.tm"));
@@ -624,11 +660,29 @@ test("files in the browser", async p => {
 		const enc = new TextEncoder(), text = "The quick brown fox. ".repeat(40);
 		const blob = await tau.files.zip([{ rel: "d/one.txt", bytes: enc.encode(text), time: Date.UTC(2026, 0, 2, 3, 4, 6) }, { rel: "two", bytes: enc.encode("2") }]);
 		const l = await tau.files.unzip(new Uint8Array(await blob.arrayBuffer()));
+		// (a zip with its folders; one whose bytes changed; one of more files than the end record of a zip counts)
+		const bytes = async files => new Uint8Array(await (await tau.files.zip(files)).arrayBuffer());
+		const withDir = await tau.files.unzip(await bytes([{ rel: "empty/", bytes: new Uint8Array(0) }, { rel: "f", bytes: enc.encode("f") }]), true);
+		const hurt = await bytes([{ rel: "x.txt", bytes: enc.encode("unchanged") }]);
+		hurt[30 + 5 + 2] ^= 1;
+		let damaged = "";
+		try { await tau.files.unzip(hurt); } catch (error) { damaged = error.message; }
+		const many = [];
+		for (let i = 0; i < 66000; i++) many.push({ rel: "m/" + i, bytes: new Uint8Array(0) });
+		const all = (await tau.files.unzip(await bytes(many))).length;
+		await tau.fs("mkdir", { path: "/home/tau/Documents/nothing-in-it" });
 		const b = await tau.files.makeBackup();
+		await tau.fs("remove", { path: "/home/tau/Documents/nothing-in-it" });
 		const r = await tau.files.readBackup(new Uint8Array(await b.blob.arrayBuffer()));
 		return { names: l.map(e => e.rel).join(), same: new TextDecoder().decode(l[0].bytes) === text, small: blob.size < text.length,
-			backup: r.entries.map(e => e.rel), application: r.note.application };
+			backup: r.entries.map(e => e.rel), application: r.note.application, missing: r.missing,
+			emptyDir: r.entries.some(e => e.rel === "Documents/nothing-in-it" && e.dir),
+			dirs: withDir.map(e => e.rel + (e.dir ? "/" : "")).join(), damaged, all };
 	});
+	check("a zip keeps its folders", back.dirs === "empty/,f", back.dirs);
+	check("a zip whose bytes changed is refused", back.damaged.includes("damaged"), back.damaged);
+	check("a zip of very many files", back.all === 66000, back.all);
+	check("the backup has the folders which are empty, and all its files", back.emptyDir && back.missing === 0, back);
 	check("a zip is read back", back.names === "d/one.txt,two" && back.same && back.small, back);
 	check("the backup has the files of the user", back.backup.includes("Documents/proj/b.tm") && back.application === "Tau", back);
 	// what is not a backup is refused, and a backup cannot write outside the home directory
@@ -638,8 +692,11 @@ test("files in the browser", async p => {
 		try { await tau.files.readBackup(await bytes([{ rel: "home/Documents/x.tm", bytes: enc.encode("x") }])); } catch (error) { refused = error.message; }
 		const note = { rel: "tau-backup.json", bytes: enc.encode(JSON.stringify({ format: 1, application: "Tau" })) };
 		const r = await tau.files.readBackup(await bytes([note, { rel: "home/../../etc/x", bytes: enc.encode("x") }, { rel: "home/Documents/ok.tm", bytes: enc.encode("x") }, { rel: "elsewhere/y", bytes: enc.encode("y") }]));
-		return { refused, kept: r.entries.map(e => e.rel).join() };
+		const note3 = { rel: "tau-backup.json", bytes: enc.encode(JSON.stringify({ format: 1, application: "Tau", files: 3 })) };
+		const part = await tau.files.readBackup(await bytes([note3, { rel: "home/Documents/ok.tm", bytes: enc.encode("x") }]));
+		return { refused, kept: r.entries.map(e => e.rel).join(), missing: part.missing };
 	});
+	check("a backup which lost files says so", bad.missing === 2, bad);
 	check("a zip which is not a backup is refused", bad.refused.includes("not a backup"), bad);
 	check("only the paths inside the home directory are restored", bad.kept === "Documents/ok.tm", bad);
 	// (a page which does not keep its files does not restore)
@@ -678,6 +735,19 @@ test("files in the browser", async p => {
 	await p.page.click('.tau-files-place[data-place="tm"]');
 	f = await p.filesPanel("browse", f => f.dir === "/home/tau/.TeXmacs");
 	check("the copy in the TeXmacs folder of the user", f.names.includes("LICENSE") && f.tools, f);
+	// a folder of TeXmacs is copied into the one of the user: what the user has there stays
+	const merged = await p.page.evaluate(async () => {
+		const mine = "/home/tau/.TeXmacs/progs/kernel/boot/mine.scm";
+		await tau.fs("write", { files: [{ path: mine, bytes: new TextEncoder().encode(";; mine").buffer, time: 0 }] });
+		await tau.fs("copy", { from: "/texmacs/progs/kernel/boot", to: "/home/tau/.TeXmacs/progs/kernel/boot" });
+		const names = (await tau.fs("list", { dir: "/home/tau/.TeXmacs/progs/kernel/boot" })).entries.map(e => e.name);
+		let refused = "";
+		try { await tau.fs("copy", { from: "/texmacs/progs/kernel", to: "/home/tau/.TeXmacs/LICENSE" }); } catch (error) { refused = error.message; }
+		await tau.fs("remove", { path: "/home/tau/.TeXmacs/progs" });
+		return { names, refused };
+	});
+	check("the files of the user stay in a folder which is customized", merged.names.includes("mine.scm") && merged.names.includes("boot.scm"), merged);
+	check("a folder does not take the place of a file", merged.refused.includes("is a file"), merged);
 	// a document is opened from the panel
 	await p.page.click('.tau-files-place[data-place="files"]');
 	await p.filesPanel("browse", f => f.dir === "/home/tau/Documents");
@@ -766,6 +836,96 @@ test("busy", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("the wheel for the editor", async p => {
+	await p.open();
+	await p.newDocument();
+	// the page of the design of the fonts: a document which fits its view,
+	// with a list in it which the wheel scrolls (the editor captures it)
+	await p.scheme("(open-font-design)");
+	const position = async () => {
+		await p.scheme('(set-message (with t (buffer-tree) (if (> (tree-arity t) 2) (string-append "at " (tree->string (tree-ref (tree-ref t 2) 0))) "no list")) "")');
+		await sleep(300);
+		return p.page.$eval("#tau-footer-left", e => e.textContent);
+	};
+	await p.until("the page of the fonts, its list at the top", async () => (await position()).includes("at 100%"), 30000);
+	const box = await p.page.$eval(".tau-pane .tau-canvas", c => { const r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+	await p.page.mouse.move(box.x, box.y);
+	await p.forget();
+	for (let i = 0; i < 5; i++) { await p.page.mouse.wheel({ deltaY: 120 }); await sleep(120); }
+	await p.until("the wheel reaches the core", async () => (await p.sent("scroll")).length > 0);
+	let at = "";
+	await p.until("the list moved down, not the page", async () => { at = await position(); return /at \d/.test(at) && !at.includes("at 100%"); });
+	const scrolled = parseFloat(at.replace(/.*at /, ""));
+	check("down the list", scrolled < 100 && scrolled > 50, at);
+	for (let i = 0; i < 8; i++) { await p.page.mouse.wheel({ deltaY: -120 }); await sleep(120); }
+	await p.until("and back to its top", async () => (await position()).includes("at 100%"));
+	// a fast swipe: the steps do not queue up for the core, which takes a
+	// while for each; they are added up while it works, and it is not
+	// shown as busy
+	await p.forget();
+	const swipe = await p.page.evaluate(async (x, y) => {
+		const canvas = document.querySelector(".tau-pane .tau-canvas");
+		let busy = false;
+		for (let i = 0; i < 40; i++) {
+			canvas.dispatchEvent(new WheelEvent("wheel", { deltaY: 12, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+			await new Promise(r => setTimeout(r, 10));
+			busy = busy || tau.state.busy;
+		}
+		for (let i = 0; i < 15; i++) { await new Promise(r => setTimeout(r, 100)); busy = busy || tau.state.busy; }
+		return { busy };
+	}, box.x, box.y);
+	const steps = (await p.sent("scroll")).length;
+	check("forty steps of the wheel are fewer messages", steps >= 2 && steps <= 20, steps);
+	check("the core is not shown as busy while the list scrolls", !swipe.busy);
+	check("all of the swipe arrived", (await p.sent("scroll")).reduce((n, m) => n + m.dy, 0) === 40 * 12 * 2, await p.sent("scroll"));
+	at = await position();
+	check("the list followed", parseFloat(at.replace(/.*at /, "")) < 100, at);
+	// The scroll bar of the list, with the cursor in the list: a canvas is
+	// scrolled back to its cursor when the document changes, which undid
+	// what the bar asked. A click on the bar goes there; a drag follows the
+	// pointer, also when it leaves the narrow bar sideways, and stays.
+	const r = await p.page.$eval(".tau-pane .tau-canvas", c => { const r = c.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+	const bar = Math.round(r.x + r.w - 22), top = r.y + 280, bottom = r.y + r.h - 20;
+	const where = async () => parseFloat((await position()).replace(/.*at /, ""));
+	await p.page.mouse.click(Math.round(r.x + 300), Math.round(top + 60));
+	await sleep(500);
+	await p.page.mouse.click(bar, Math.round(top + (bottom - top) * 0.3));
+	await p.until("a click on the bar of the list goes there", async () => { const w = await where(); return w > 55 && w < 85; });
+	await p.page.mouse.move(bar, Math.round(top + (bottom - top) * 0.3));
+	await p.page.mouse.down();
+	const seen = [];
+	for (let i = 1; i <= 8; i++) {
+		await p.page.mouse.move(bar + (i % 2 ? 12 : -30), Math.round(top + (bottom - top) * (0.3 + 0.06 * i)));
+		await sleep(150);
+		if (i % 2 === 0) seen.push(await where());
+	}
+	await p.page.mouse.up();
+	await sleep(800);
+	check("the list follows the drag of its bar", seen.every((w, i) => i === 0 || w < seen[i - 1] - 3) && seen[seen.length - 1] < 35, seen);
+	await p.until("and stays where it was left", async () => Math.abs((await where()) - seen[seen.length - 1]) < 1);
+	// past the end of the bar the drag goes to its end, and no further
+	await p.page.mouse.move(bar, Math.round(top + (bottom - top) * 0.5));
+	await p.page.mouse.down();
+	await p.page.mouse.move(bar - 40, Math.round(top + (bottom - top) * 0.8));
+	await sleep(150);
+	await p.page.mouse.move(bar - 40, Math.round(r.y + r.h - 1));
+	await sleep(300);
+	await p.page.mouse.up();
+	await p.until("a drag past the end of the bar goes to the end", async () => (await where()) < 1);
+	// two clicks on the bar are the bar's: the cursor does not go under
+	// it, which scrolled the list back
+	await p.page.mouse.click(bar, Math.round(top + (bottom - top) * 0.5));
+	await p.page.mouse.click(bar, Math.round(top + (bottom - top) * 0.5));
+	await p.until("a double click on the bar goes there", async () => { const w = await where(); return w > 35 && w < 65; });
+	const twice = await where();
+	await sleep(800);
+	check("and the list stays there", Math.abs((await where()) - twice) < 1, [twice, await where()]);
+	// an ordinary document still scrolls as a whole
+	await p.page.click(".tau-doc-tab");
+	await sleep(500);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("kept in the browser", async p => {
 	await p.open("home");
 	check("this page keeps the home directory", (await p.count(".tau-notice")) === 0);
@@ -798,6 +958,23 @@ test("kept in the browser", async p => {
 		window.backupFiles = b.files;
 	});
 	check("the backup has files", (await p.page.evaluate(() => window.backupFiles)) >= 1);
+	// a backup which does not fit what is there (a folder where a document
+	// is) is refused before anything is written, and Tau goes on
+	await p.page.evaluate(async name => {
+		const enc = new TextEncoder();
+		const note = { rel: "tau-backup.json", bytes: enc.encode(JSON.stringify({ format: 1, application: "Tau", files: 2 })) };
+		const blob = await tau.files.zip([note, { rel: "home/Documents/first.txt", bytes: enc.encode("1") },
+			{ rel: "home/Documents/" + name + "/inside.txt", bytes: enc.encode("2") }]);
+		window.refused = "";
+		tau.files.restoreBackup(new Uint8Array(await blob.arrayBuffer())).catch(error => { window.refused = error.message + (error.restart ? " (restart)" : ""); });
+	}, name);
+	await p.filesPanel("browse", f => f.asking.startsWith("Restore the backup"));
+	await p.page.click(".tau-files-ask .tau-files-yes");
+	await p.until("the backup is refused", () => p.page.evaluate(() => window.refused !== ""));
+	check("why it is refused", (await p.page.evaluate(() => window.refused)).includes("is a file here and a folder in the backup"), await p.page.evaluate(() => window.refused));
+	await p.page.evaluate(() => tau.files.browse());
+	f = await p.filesPanel("browse", f => f.names.includes(name));
+	check("nothing of it was written", !f.names.includes("first.txt"), f);
 	await p.filesRow(name, "delete");
 	await p.filesPanel("browse", f => f.asking.startsWith("Delete " + name));
 	await p.page.click(".tau-files-ask .tau-files-yes");

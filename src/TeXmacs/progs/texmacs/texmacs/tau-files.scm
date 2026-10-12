@@ -88,11 +88,14 @@
 
 (define (propose-name name type)
   "The name under which @name is saved in the format @type."
-  (if (url-scratch? name) ""
-      (let* ((tail (url-tail name))
-             (old (url-suffix tail))
-             (new (if (in? type '("" "image" "directory")) ""
-                      (format-default-suffix type))))
+  (let* ((tail (url-tail name))
+         (old (url-suffix tail))
+         (new (if (in? type '("" "image" "directory")) ""
+                  (format-default-suffix type))))
+    ;; (a new document has no name: one with the suffix of the format, so
+    ;; that what is exported is not saved as a document of TeXmacs)
+    (if (url-scratch? name)
+        (if (in? new '("" "tm")) "" (string-append "untitled." new))
         (if (and (!= old "") (!= new "") (!= old new)
                  (!= (format-from-suffix old) type))
             (url->system (url-glue (url-unglue tail (+ (string-length old) 1))

@@ -44,7 +44,8 @@ function suffix(name) {
 const join = (dir, name) => dir === "/" ? "/" + name : dir + "/" + name;
 const base = p => p.slice(p.lastIndexOf("/") + 1);
 // a name of a file which is given by the user, or comes with a file
-const safe = n => n.split("/").join("_").split("\\").join("_");
+// (no separator, and no control character: the paths go to the core in lines)
+const safe = n => n.replace(/[\/\\\u0000-\u001f\u007f]/g, "_");
 function humanSize(n) {
 	return n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB";
 }
@@ -95,7 +96,8 @@ function fromDosTime(t, d) {
 	if (!d) return 0;
 	return new Date(1980 + (d >> 9), ((d >> 5) & 15) - 1, d & 31, t >> 11, (t >> 5) & 63, (t & 31) * 2).getTime();
 }
-// files: [{ rel, bytes, time? }] -> a zip file (a Blob)
+// files: [{ rel, bytes, time? }] -> a zip file (a Blob); a rel which ends
+// with "/" is a folder
 export async function zip(files) {
 	const canDeflate = typeof CompressionStream !== "undefined";
 	const enc = new TextEncoder(), parts = [], central = [];
@@ -126,34 +128,63 @@ export async function zip(files) {
 		central.push(new Uint8Array(c.buffer), name);
 		offset += 30 + name.length + comp.length;
 	}
-	const size = central.reduce((s, a) => s + a.length, 0);
+	const size = central.reduce((s, a) => s + a.length, 0), n = files.length, tail = [];
+	if (offset + size > 0xFFFFFFFF) throw new Error("more than 4 GB: too much for a zip made here");
+	if (n >= 0xFFFF) {
+		// more files than the end record counts: the one of zip64 before
+		// it, and where it is
+		const z = new DataView(new ArrayBuffer(76));
+		z.setUint32(0, 0x06064b50, true); z.setBigUint64(4, 44n, true);
+		z.setUint16(12, 45, true); z.setUint16(14, 45, true);
+		z.setBigUint64(24, BigInt(n), true); z.setBigUint64(32, BigInt(n), true);
+		z.setBigUint64(40, BigInt(size), true); z.setBigUint64(48, BigInt(offset), true);
+		z.setUint32(56, 0x07064b50, true); z.setBigUint64(64, BigInt(offset + size), true);
+		z.setUint32(72, 1, true);
+		tail.push(new Uint8Array(z.buffer));
+	}
 	const e = new DataView(new ArrayBuffer(22));
-	e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true);
-	e.setUint16(10, files.length, true); e.setUint32(12, size, true);
+	e.setUint32(0, 0x06054b50, true); e.setUint16(8, Math.min(n, 0xFFFF), true);
+	e.setUint16(10, Math.min(n, 0xFFFF), true); e.setUint32(12, size, true);
 	e.setUint32(16, offset, true);
-	return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/zip" });
+	tail.push(new Uint8Array(e.buffer));
+	return new Blob(parts.concat(central, tail), { type: "application/zip" });
 }
-// the bytes of a zip file -> [{ rel, bytes, time }] (stored and deflated entries)
-export async function unzip(bytes) {
+// the bytes of a zip file -> [{ rel, bytes, time }] (stored and deflated
+// entries); with dirs, its folders too: { rel, dir: true, ... }. An entry
+// whose bytes are not those which were packed is an error
+export async function unzip(bytes, dirs) {
 	const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 	let end = -1;
 	for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--)
 		if (v.getUint32(i, true) === 0x06054b50) { end = i; break; }
 	if (end < 0) throw new Error("not a zip file");
-	const n = v.getUint16(end + 10, true), dec = new TextDecoder(), out = [];
-	let p = v.getUint32(end + 16, true);
+	const dec = new TextDecoder(), out = [];
+	let n = v.getUint16(end + 10, true), p = v.getUint32(end + 16, true);
+	if ((n === 0xFFFF || p === 0xFFFFFFFF) && end >= 20 && v.getUint32(end - 20, true) === 0x07064b50) {
+		// (zip64: the count and the place of the directory are in its record)
+		const z = Number(v.getBigUint64(end - 12, true));
+		if (z + 56 > bytes.length || v.getUint32(z, true) !== 0x06064b50) throw new Error("the zip file is damaged");
+		n = Number(v.getBigUint64(z + 32, true));
+		p = Number(v.getBigUint64(z + 48, true));
+	}
 	for (let k = 0; k < n; k++) {
-		const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true);
+		if (p + 46 > bytes.length || v.getUint32(p, true) !== 0x02014b50) throw new Error("the zip file is damaged");
+		const method = v.getUint16(p + 10, true), csize = v.getUint32(p + 20, true), crc = v.getUint32(p + 16, true);
 		const time = fromDosTime(v.getUint16(p + 12, true), v.getUint16(p + 14, true));
 		const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true);
 		const clen = v.getUint16(p + 32, true), local = v.getUint32(p + 42, true);
 		const name = dec.decode(bytes.subarray(p + 46, p + 46 + nlen));
 		p += 46 + nlen + xlen + clen;
-		if (name.endsWith("/") || name.startsWith("__MACOSX/")) continue;
+		if (name.startsWith("__MACOSX/")) continue;
+		if (name.endsWith("/")) {
+			if (dirs) out.push({ rel: name.slice(0, -1), dir: true, bytes: new Uint8Array(0), time });
+			continue;
+		}
 		const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
 		let data = bytes.subarray(start, start + csize);
 		if (method === 8) data = await transform(data, new DecompressionStream("deflate-raw"));
 		else if (method !== 0) continue; // another compression: skipped
+		if (crc32(data) !== crc) throw new Error("the zip file is damaged (" + name + ")");
 		out.push({ rel: name, bytes: new Uint8Array(data), time });
 	}
 	return out;
@@ -187,14 +218,15 @@ function toast(text) {
 }
 
 // File objects with their relative paths -> written under dir; the paths
-// at the top of what was written
-async function importFiles(dir, items) {
-	const files = [], tops = [];
+// at the top of what was written. What has the name of something which is
+// there already is asked about: clash (the names) answers "replace" (the
+// files are written over those of the same name), "both" (what comes gets
+// another name) or nothing (nothing is written, and null is the answer)
+async function importFiles(dir, items, clash) {
+	const files = [];
 	const add = (rel, bytes, time) => {
-		const path = join(dir, rel.split("/").filter(x => x && x !== "." && x !== "..").map(safe).join("/"));
-		files.push({ path, bytes, time: time || 0 });
-		const top = join(dir, path.slice(dir.length + 1).split("/")[0]);
-		if (!tops.includes(top)) tops.push(top);
+		const parts = rel.split("/").filter(x => x && x !== "." && x !== "..").map(safe);
+		if (parts.length) files.push({ parts, bytes, time: time || 0 });
 	};
 	for (const item of items) {
 		const bytes = new Uint8Array(await item.file.arrayBuffer());
@@ -210,10 +242,22 @@ async function importFiles(dir, items) {
 		}
 		add(item.rel, bytes, item.file.lastModified);
 	}
+	if (files.length && clash) {
+		const there = (await options.request("list", { dir })).entries.map(e => e.name);
+		const taken = [...new Set(files.map(f => f.parts[0]))].filter(n => there.includes(n));
+		const answer = taken.length ? await clash(taken) : "replace";
+		if (!answer) return null;
+		if (answer === "both") {
+			const other = {};
+			for (const n of taken) { other[n] = fresh(there, n); there.push(other[n]); }
+			for (const f of files) if (f.parts[0] in other) f.parts[0] = other[f.parts[0]];
+		}
+	}
+	const tops = [...new Set(files.map(f => join(dir, f.parts[0])))];
 	if (files.length) {
 		// (each file in a buffer of its own, which goes to the worker)
-		for (const f of files) f.bytes = f.bytes.slice().buffer;
-		await options.request("write", { files }, files.map(f => f.bytes));
+		const written = files.map(f => ({ path: join(dir, f.parts.join("/")), bytes: f.bytes.slice().buffer, time: f.time }));
+		await options.request("write", { files: written }, written.map(f => f.bytes));
 	}
 	return tops;
 }
@@ -254,13 +298,33 @@ const TYPES = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpe
 	webp: "image/webp", svg: "image/svg+xml", bmp: "image/bmp" };
 const browserViews = p => suffix(p) in TYPES;
 const IMAGES = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tif", "tiff", "pdf", "eps", "ps"];
+// An image is shown as the picture of a page which is made here, never as
+// a document of its own: an SVG file may carry a script, which would run
+// as a script of this page and reach all the files kept in the browser. A
+// picture runs none. (The PDF viewer of the browser runs none of ours.)
 function viewInBrowser(path) {
 	// (the tab is opened now, with the click: later the browser would refuse)
 	const tab = window.open("", "_blank");
+	if (!tab) { toast("The browser did not let a tab open for " + base(path)); return; }
 	options.request("read", { path }).then(files => {
-		const url = URL.createObjectURL(new Blob([files[0].bytes], { type: TYPES[suffix(path)] }));
-		if (tab) tab.location = url; else toast("The browser did not let a tab open for " + base(path));
-	}).catch(error => { if (tab) tab.close(); toast(error.message); });
+		const type = TYPES[suffix(path)], url = URL.createObjectURL(new Blob([files[0].bytes], { type }));
+		if (type === "application/pdf") {
+			tab.opener = null;
+			tab.location = url;
+			// (kept while the viewer loads it)
+			setTimeout(() => URL.revokeObjectURL(url), 60000);
+			return;
+		}
+		const doc = tab.document, img = doc.createElement("img");
+		doc.title = base(path);
+		doc.body.style.cssText = "margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f4f6";
+		img.style.cssText = "max-width:100%;max-height:100vh;background:#fff";
+		img.alt = base(path);
+		img.addEventListener("load", () => URL.revokeObjectURL(url));
+		img.addEventListener("error", () => URL.revokeObjectURL(url));
+		img.src = url;
+		doc.body.append(img);
+	}).catch(error => { tab.close(); toast(error.message); });
 }
 
 // ---------------------------------------------------------------------------
@@ -279,10 +343,12 @@ function backupName() {
 }
 // -> { blob, files, bytes }
 export async function makeBackup() {
-	const files = (await options.request("backup", {})).map(f => ({ rel: BACKUP_ROOT + f.rel, bytes: f.bytes, time: f.time }));
+	// (a folder which is empty is an entry too: its name with "/")
+	const all = await options.request("backup", {});
+	const files = all.map(f => ({ rel: BACKUP_ROOT + f.rel + (f.dir ? "/" : ""), bytes: f.bytes, time: f.time }));
 	const bytes = files.reduce((n, f) => n + f.bytes.byteLength, 0);
 	const note = { format: 1, application: "Tau", made: new Date().toISOString(),
-		address: location.origin + location.pathname, files: files.length, bytes };
+		address: location.origin + location.pathname, files: all.filter(f => !f.dir).length, bytes };
 	files.unshift({ rel: BACKUP_NOTE, time: Date.now(), bytes: new TextEncoder().encode(JSON.stringify(note, null, 1)) });
 	return { blob: await zip(files), files: note.files, bytes };
 }
@@ -310,10 +376,11 @@ export function restore() {
 	document.body.append(input);
 	input.click();
 }
-// the bytes of a backup -> { note, entries: [{ rel (in the home), bytes, time }] };
-// an error when they are not a backup
+// the bytes of a backup -> { note, entries: [{ rel (in the home), bytes,
+// time, dir? }], missing }; an error when they are not a backup. missing:
+// how many of the files it was made with are not in it
 export async function readBackup(bytes) {
-	const all = await unzip(bytes), entries = [];
+	const all = await unzip(bytes, true), entries = [];
 	let note = null;
 	for (const e of all) {
 		if (e.rel === BACKUP_NOTE) {
@@ -323,11 +390,12 @@ export async function readBackup(bytes) {
 			const rel = e.rel.slice(BACKUP_ROOT.length);
 			// (no path which leaves the home directory)
 			if (rel === "" || rel.split("/").some(q => q === "" || q === "." || q === "..")) continue;
-			entries.push({ rel, bytes: e.bytes, time: e.time });
+			entries.push({ rel, bytes: e.bytes, time: e.time, dir: !!e.dir });
 		}
 	}
 	if (!note || note.format !== 1) throw new Error("this zip is not a backup of Tau");
-	return { note, entries };
+	const missing = Math.max(0, (Number(note.files) || 0) - entries.filter(e => !e.dir).length);
+	return { note, entries, missing };
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +432,7 @@ function panel(mode, opts, done) {
 		nameInput = el("input", "tau-files-name");
 		nameInput.type = "text";
 		nameInput.spellcheck = false;
-		nameInput.value = opts.name || "untitled.tm";
+		nameInput.value = opts.name || (opts.type === "image" ? "untitled.png" : "untitled.tm");
 		foot.append(el("span", "", "Name:"), nameInput);
 	}
 	else {
@@ -482,13 +550,18 @@ function panel(mode, opts, done) {
 	async function customize(e) {
 		const rel = e.path.slice(SYS.length + 1), to = join(USER_TM, rel);
 		const there = (await request("list", { dir: to.slice(0, to.lastIndexOf("/")) })).entries.some(x => x.path === to);
-		if (there && !(await ask(".TeXmacs/" + rel + " exists already: replace it by the one of TeXmacs?", undefined, "Replace"))) return;
+		// (a folder is copied into the one of the user, whose other files stay)
+		if (there && !(await ask(e.dir
+			? ".TeXmacs/" + rel + " exists already: write the files of TeXmacs over yours of the same name? Your other files there stay."
+			: ".TeXmacs/" + rel + " exists already: replace it by the one of TeXmacs?", undefined, "Replace"))) return;
 		await request("copy", { from: e.path, to });
 		toast("Copied to .TeXmacs/" + rel + ": TeXmacs uses your copy, which you can edit " +
 			"(a style or a package in the next document, Scheme code at the next start)");
 	}
 
 	async function go(to, select) {
+		// (a question is about this folder: going elsewhere gives it up)
+		if (asking && to !== dir) asking(null);
 		try {
 			const r = await request("list", { dir: to });
 			dir = r.dir; entries = r.entries; kept = r.kept;
@@ -590,14 +663,21 @@ function panel(mode, opts, done) {
 		}
 	}
 
-	const added = tops => refresh(tops.length === 1 ? tops[0] : null);
+	const added = tops => { if (tops) refresh(tops.length === 1 ? tops[0] : null); };
+	// what comes with a name which is taken in the folder: asked first
+	const clash = async names => {
+		const answer = await ask((names.length === 1 ? names[0] + " exists" : names.length + " of these exist (" +
+			names.slice(0, 4).join(", ") + (names.length > 4 ? "…" : "") + ")") + " already in this folder. Replace, or keep both?",
+			undefined, "Replace", "Keep both");
+		return answer === true ? "replace" : answer ? "both" : null;
+	};
 	tools.append(
 		chooser("files", "Add files…", { multiple: "" }, fs =>
-			importFiles(dir, fs.map(f => ({ rel: f.name, file: f }))).then(added, failed)),
+			importFiles(dir, fs.map(f => ({ rel: f.name, file: f })), clash).then(added, failed)),
 		chooser("folder", "Add a folder…", { webkitdirectory: "", multiple: "" }, fs =>
-			importFiles(dir, fs.map(f => ({ rel: f.webkitRelativePath || f.name, file: f }))).then(added, failed)),
+			importFiles(dir, fs.map(f => ({ rel: f.webkitRelativePath || f.name, file: f })), clash).then(added, failed)),
 		chooser("zip", "Add a zip…", { accept: ".zip" }, fs =>
-			importFiles(dir, fs.map(f => ({ rel: f.name, file: f, unpack: true })))
+			importFiles(dir, fs.map(f => ({ rel: f.name, file: f, unpack: true })), clash)
 				.then(added, error => toast("Cannot read the zip: " + error.message))),
 		button("New folder", async () => {
 			let n = await ask("New folder", fresh(entries.map(e => e.name), "folder"), "Create");
@@ -631,17 +711,30 @@ function panel(mode, opts, done) {
 	// in place of it, an exact copy of the backup. Tau starts again with them
 	async function restore(bytes) {
 		const b = await readBackup(bytes);
-		const docs = b.entries.filter(e => !e.rel.startsWith(".TeXmacs/")).length;
-		const size = b.entries.reduce((n, e) => n + e.bytes.length, 0);
+		const real = b.entries.filter(e => !e.dir);
+		const docs = real.filter(e => !e.rel.startsWith(".TeXmacs/")).length;
+		const size = real.reduce((n, e) => n + e.bytes.length, 0);
 		const when = String(b.note.made || "").replace("T", " ").slice(0, 16);
-		const answer = await ask("Restore the backup made " + when + " (" + docs + " of your files, " + (b.entries.length - docs) +
-			" files of preferences and settings, " + humanSize(size) + ")? \"Restore\" writes its files over those of the same name " +
-			"and keeps the others; \"Replace everything\" first deletes all that is kept in this browser, for an exact copy of the backup. " +
-			"Documents which are not saved are lost: Tau then starts again.",
-			undefined, "Restore", "Replace everything");
+		const what = "the backup made " + when + " (" + docs + " of your files, " + (real.length - docs) +
+			" files of preferences and settings, " + humanSize(size) + ")";
+		// (a backup which lost files is not put in place of everything)
+		const answer = b.missing
+			? await ask("This backup is not whole: " + b.missing + " of the " + b.note.files + " files it was made with are not in it. Restore " +
+				what + " all the same? Its files are written over those of the same name, the others stay. " +
+				"Documents which are not saved are lost: Tau then starts again.", undefined, "Restore")
+			: await ask("Restore " + what + "? \"Restore\" writes its files over those of the same name " +
+				"and keeps the others; \"Replace everything\" first deletes all that is kept in this browser, for an exact copy of the backup. " +
+				"Documents which are not saved are lost: Tau then starts again.",
+				undefined, "Restore", "Replace everything");
 		if (!answer) return;
-		const files = b.entries.map(e => ({ rel: e.rel, bytes: e.bytes.slice().buffer, time: e.time }));
-		await request("restore", { files, exact: answer !== true }, files.map(f => f.bytes));
+		const files = b.entries.map(e => ({ rel: e.rel, dir: e.dir, bytes: e.bytes.slice().buffer, time: e.time }));
+		try { await request("restore", { files, exact: answer !== true }, files.map(f => f.bytes)); }
+		catch (error) {
+			// (refused before anything was written: nothing more to do)
+			if (!error.restart) throw error;
+			// the files are in between, and the core has stopped
+			await ask("The backup could not be restored: " + error.message + ". Tau starts again with what the browser kept.", undefined, "OK");
+		}
 		options.reload();
 	}
 
@@ -650,7 +743,8 @@ function panel(mode, opts, done) {
 		event.preventDefault(); event.stopPropagation();
 		if (!event.dataTransfer) return;
 		if (under(dir, SYS)) { toast("The files of TeXmacs cannot be changed: drop in one of your folders"); return; }
-		dropped(event.dataTransfer).then(items => importFiles(dir, items)).then(added, failed);
+		const into = dir;
+		dropped(event.dataTransfer).then(items => importFiles(into, items, clash)).then(added, failed);
 	});
 	veil.addEventListener("mousedown", event => { if (event.target === veil) close(null); });
 	for (const t of ["keydown", "keypress", "keyup"]) document.addEventListener(t, onkey, true);

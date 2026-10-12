@@ -287,6 +287,16 @@
 (tm-define (pinch-rotate angle)
   (geometry-rotate (focus-tree) angle))
 
+(tm-define (canvas-scroll-set t u)
+  (:synopsis "Set the scroll position @t of a canvas to @u, as the user asked")
+  ;; A canvas which holds the cursor is scrolled so that the cursor is
+  ;; seen, whenever the document changes: a position which the user set
+  ;; (the scroll bar of the canvas, the wheel) would be undone at once when
+  ;; the cursor is in the part which goes out of sight. THE_FREEZE (512)
+  ;; with the change keeps the view from following the cursor this time.
+  (tree-set t u)
+  (notify-change 512))
+
 (tm-define (wheel-capture?) #f)
 (tm-define (wheel-event x y) (noop))
 
