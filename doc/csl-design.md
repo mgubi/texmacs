@@ -5,7 +5,7 @@ Language (CSL 1.0.2) written in Scheme, so that TeXmacs can use the styles
 of <https://github.com/citation-style-language/styles> (2864 independent
 styles, 8001 journal aliases) for bibliographies and citations.
 
-## Status (2026-10-09)
+## Status (2026-10-12)
 
 Working:
 
@@ -33,18 +33,7 @@ Working:
   with the positions first, subsequent, ibid, and in footnotes for the
   styles of the class note.
 
-Not done yet:
-
-- `subsequent-author-substitute` with the rules partial-each and
-  partial-first, `display` blocks, non-Latin name order, markup inside
-  names.
-- Disambiguation which looks at the subsequent form of a cite; the
-  incremental use of the condition `disambiguate`.
-- Downloading styles by name, attaching the style to the document,
-  CSL-JSON from Zotero.
-- The LaTeX export of a document with a `csl-` style keeps the rendered
-  bibliography and exports the citations as `\cite{key}`: LaTeX then
-  prints the labels of TeXmacs, not the citations of the style.
+What is open is listed in "Open points" below.
 
 Conformance: `csl-run-fixtures` of `(csl csl-fixtures)` runs the official
 fixtures (`processor-tests/humans` of the CSL test-suite, not distributed
@@ -54,10 +43,14 @@ not feed yet). The results are the same with S7 and with Guile 1.8. The
 failures are mostly conventions of citeproc-js (markup inside fields,
 names in other scripts, superscript ordinals) and corners of names, sorting
 and text case. On eight varied references, the bibliographies of the 13
-styles which come with TeXmacs agree with `pandoc --citeproc` except for
-deliberate differences: the particle of "van der Hoeven" stays with the
-family name, "Second" edition becomes "2nd ed.", the month of a `misc`
-entry is kept.
+styles which come with TeXmacs differ from those of `pandoc --citeproc` in
+two to five entries each. In the four styles whose differences were read
+(IEEE, APA, Chicago author-date, Nature), each one had one of these
+causes: formulas in titles (kept here, flattened by pandoc), the particle
+of "van der Hoeven" (it stays with the family name here), "Second" edition
+(here "2nd ed."), and a `misc` entry (its month is kept and its title is
+quoted here). The differences of the nine other styles were counted, not
+read.
 
 ## Citations
 
@@ -93,12 +86,8 @@ text, and the rest (mode `n`), which goes to the footnote. The values of
 the bindings are quoted, so that the macros inside them are expanded where
 the citation stands.
 
-Known limit: the number N of a citation is counted by the typesetter in
-the order in which the macros are evaluated, and the processor counts the
-entries of the auxiliary data; a citation which is evaluated but not
-typeset (in a title which is also used for a header) could shift the
-numbers of the later citations, which would then miss their "later
-citation" forms.
+The number N of a citation is counted by the typesetter, which is a
+known limit: see "Open points".
 
 ## Modules (`TeXmacs/progs/csl`)
 
@@ -148,12 +137,82 @@ The von part of a name is the non-dropping particle. "and others" forces
 "et al.". Titles are turned into sentence case (words with only an initial
 capital lose it, braces protect), as CSL styles expect.
 
+## Open points
+
+As of 2026-10-12, with the processor merged into `maxs_texmacs`.
+
+### What gives a wrong result today
+
+- **LaTeX export.** A document with a `csl-` style exports its bibliography
+  as it is rendered and its citations as `\cite{key}`: LaTeX prints the
+  labels of TeXmacs, not "(Knuth, 1984)" nor the footnotes.
+- **The later forms of citations can be missed.** The short or ibid form
+  of a repeated citation is found by the number of the citation, which the
+  typesetter counts as the macros are evaluated, while the processor counts
+  the entries of the auxiliary data. A citation which is evaluated but not
+  typeset (in a title which is also used for a header) could shift the
+  numbers of the citations after it. Foreseen, not reproduced.
+- **A textual citation of a note style inside a footnote of the author.**
+  The names stay in the text and the rest should stay there too
+  (`cite-note` is `cite-inline` inside `footnote`); not tried.
+- **`cite-textual` takes keys only**: "Knuth (1984, p. 12)" cannot be
+  written.
+- **Nothing tells that an update is pending.** A new or changed citation
+  shows its key, or the label of its entry between brackets, until the next
+  update, and a style which has just been chosen needs two updates.
+
+### Parts of CSL which are not implemented
+
+- `subsequent-author-substitute` with the rules which work name by name
+  (partial-each, partial-first); complete-all and complete-each are done.
+- The attribute `display` (block, indent, left-margin, right-inline) has
+  no effect in the TeXmacs output; 3% of the styles use it.
+- Names in other scripts than Latin are ordered as Western names.
+- Markup inside the fields of names is not read.
+- The disambiguation does not look at the subsequent form of a cite, and
+  the condition `disambiguate` is set for all the ambiguous items at once
+  instead of one after the other.
+- Sorting compares unaccented lower case strings, not by the rules of the
+  locale.
+- The locators are recognized from a fixed list of English abbreviations
+  ("p.", "chap.", "sec."...); any other detail becomes a suffix of the
+  cite.
+
+### What was not checked
+
+- **The fixtures**: 646 of 845 pass, 136 fail, 63 are skipped because the
+  runner does not feed histories of citations nor abbreviations.
+- **Real styles**: only the 13 styles which come along were compared with
+  pandoc, on bibliographies of eight references, and the differences of
+  four of them were read (see the status). Citations were compared on
+  three references.
+- **The look.** Everything was checked on exports and on trees: the
+  hanging indentations, the widths of the labels, the footnotes and the
+  entries of the style chooser were never seen in a window.
+- **The browser build** was neither built nor run with this code.
+- **The database tool**: `doi`, `url`, `language` and `isbn` are not among
+  its declared fields; they are mapped from `.bib` files, and whether they
+  survive the database was not checked.
+
+### Not started
+
+- Style management: download a style by its name, attach the style to the
+  document so that it travels with it, a chooser which copes with
+  thousands of styles.
+- CSL-JSON from Zotero, for the types and the fields which BibTeX does not
+  have: today everything goes through BibTeX entries.
+- A chapter in the developer documentation of TeXmacs (there is this file
+  and the section of the manual).
+- A pull request to `wip_fixes`: the work is on `wip_csl` and in
+  `maxs_texmacs` only.
+
 ## Next steps
 
-1. Style management: download by name, the style attached to the document.
-2. CSL-JSON from Zotero, for the fields which BibTeX does not have.
-3. The remaining fixtures of names, sorting and text case.
-4. The LaTeX export of citations in CSL styles.
+1. The LaTeX export of the citations, and a look at documents in a window:
+   what a user meets first.
+2. Style management: download by name, the style attached to the document.
+3. CSL-JSON from Zotero.
+4. The remaining fixtures of names, sorting and text case.
 
 ## A bug found on the way
 
