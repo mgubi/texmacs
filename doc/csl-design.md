@@ -63,12 +63,14 @@ the citations are rendered with the bibliography and kept in the document:
    `packages/standard/std-automatic.ts`, used by `cite`, `cite-detail`,
    `cite-textual`, `cite-parenthesized`, `cite-author`, `cite-year`, also
    in the packages `cite-author-year` and `cite-sort`) write each citation
-   to the auxiliary data `PREFIX-cites`, as `(tuple mode (tuple entry...))`
-   with the modes `p`, `t`, `a`, `y`, and count the citations in `cite-nr`.
+   to the auxiliary data `PREFIX-cites`, as
+   `(tuple mode (tuple entry...) nr)` with the modes `p`, `t`, `a`, `y`,
+   and count the citations of the document in `cite-nr`, which is `nr`.
 3. At the next update, `csl-bib-process` reads `PREFIX-cites`, renders each
    different citation and puts the results in the first entry of the
    bibliography, as `(set-binding "PREFIX-cite-MODE:SIGNATURE" tree)`;
-   the signature is made of the keys and details. A citation which reads
+   the signature is made of the keys and details (`key{detail,`, and
+   `key{*,` for a detail which is not a plain text). A citation which reads
    otherwise where it stands (a later citation of a work, ibid) gets one
    more binding, with `#N` after the name, N being its number.
 4. The macros show the binding of the citation, or else what they showed
