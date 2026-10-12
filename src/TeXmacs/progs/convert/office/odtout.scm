@@ -29,6 +29,7 @@
 (define ot-styles (make-ahash-table)) ; key of a formatting -> name of its style
 (define ot-style-list '())            ; the automatic styles, reversed
 (define ot-files '())                 ; (name type data) of the files, reversed
+(define ot-pictures (make-ahash-table)) ; the bytes of an image -> its files
 (define ot-id 0)                      ; the last number given to a thing
 (define ot-cell-align #f)             ; the alignment of the cell around
 (define ot-numbered? #f)              ; the headings are numbered
@@ -137,29 +138,43 @@
           (style (list `(text:span (@ (text:style-name ,style)) ,@l)))
           (else l))))
 
-(define (ot-image x)
+(define (ot-image-files x n)
+  ;; The names (bitmap svg) of the files of the picture x, the thing of
+  ;; number n, in Pictures; svg is #f when it has none. A picture which is
+  ;; used several times is there once.
   (let* ((data (ox-attr x 'data))
+         (svg (ox-attr x 'svg))
+         (key (cons data (or svg "")))
          (name (or (ox-attr x 'name) "image.png"))
-         (n (ot-next-id))
          (dot (let loop ((i (- (string-length name) 1)))
                 (cond ((< i 0) #f)
                       ((char=? (string-ref name i) #\.) i)
                       (else (loop (- i 1))))))
          (suffix (if dot (locase-all (substring name (+ dot 1) (string-length name)))
                      "png"))
-         (file (string-append "Pictures/image" (number->string n) "." suffix))
          (type (cond ((in? suffix '("jpg" "jpeg")) "image/jpeg")
                      ((== suffix "gif") "image/gif")
-                     (else "image/png")))
-         (svg (ox-attr x 'svg))
-         (svg-file (string-append "Pictures/image" (number->string n) ".svg"))
-         (w (or (office-length->cm (ox-attr x 'width)) 5.0))
-         (h (or (office-length->cm (ox-attr x 'height)) 3.0)))
-    (if (not data) '()
-        (begin
+                     (else "image/png"))))
+    (or (ahash-ref ot-pictures key)
+        (let* ((file (string-append "Pictures/image" (number->string n) "." suffix))
+               (svg-file (and svg (string-append "Pictures/image" (number->string n)
+                                                 ".svg"))))
           (set! ot-files (cons (list file type data) ot-files))
           (when svg
             (set! ot-files (cons (list svg-file "image/svg+xml" svg) ot-files)))
+          (ahash-set! ot-pictures key (list file svg-file))
+          (list file svg-file)))))
+
+(define (ot-image x)
+  (let* ((data (ox-attr x 'data))
+         (n (ot-next-id))
+         (w (or (office-length->cm (ox-attr x 'width)) 5.0))
+         (h (or (office-length->cm (ox-attr x 'height)) 3.0)))
+    (if (not data) '()
+        (let* ((files (ot-image-files x n))
+               (file (car files))
+               (svg (cadr files))
+               (svg-file (cadr files)))
           (list `(draw:frame
                    (@ (draw:style-name "fr1")
                       (draw:name ,(string-append "Image" (number->string n)))
@@ -181,16 +196,85 @@
          (i (string-search-forwards ":" 0 s)))
     (string->symbol (if (>= i 0) (substring s (+ i 1) (string-length s)) s))))
 
+;; LibreOffice reads the MathML of a formula into its own language of
+;; formulas, and not all of MathML comes through: a name which is a word
+;; of this language (in, sup, over) is an error, as is a relation without
+;; something at each of its sides; a fraction has a bar always; a hat is
+;; only shown as the letter-like circumflex. What follows writes these
+;; with what is shown well.
+
+(define ot-math-functions
+  ;; the names which are functions of the language of LibreOffice too
+  '("sin" "cos" "tan" "cot" "sinh" "cosh" "tanh" "coth" "arcsin" "arccos"
+    "arctan" "arccot" "ln" "log" "exp" "lim"))
+
+(define (ot-math-word? s)
+  ;; a word: two letters of ASCII or more
+  (and (> (string-length s) 1)
+       (list-and (map (lambda (c) (and (< (char->integer c) 128)
+                                       (char-alphabetic? c)))
+                      (string->list s)))))
+
+(define (ot-math-operator? x signs?)
+  ;; an operator which needs something at its side; the signs, which may
+  ;; have nothing before them, are such ones when signs? is #t
+  (and (func? x 'mo) (not (ox-attr x 'form))
+       (or signs?
+           (not (in? (ox-text x)
+                     (list "+" "-" (office-utf8 #x2212) (office-utf8 #xb1)
+                           (office-utf8 #x2213) (office-utf8 #xac)))))))
+
+(define (ot-math-operands l)
+  ;; the elements l of a row, with an empty row for what an operator at
+  ;; its start or at its end applies to
+  (let* ((l (if (and (pair? l) (ot-math-operator? (car l) #f)) (cons '(mrow) l) l))
+         (l (if (and (pair? l) (ot-math-operator? (cAr l) #t))
+                (append l (list '(mrow)))
+                l)))
+    l))
+
 (define (ot-plain-mathml x)
-  ;; a tree of MathML without the prefixes of its elements
+  ;; a tree of MathML without the prefixes of its elements, as LibreOffice
+  ;; shows it well
   (cond ((not (pair? x)) x)
         ((func? x '@) x)
-        ;; the brackets grow with what they enclose
-        ((and (== (ot-local-name (car x)) 'mo)
-              (in? (ox-attr x 'form) '("prefix" "postfix"))
-              (not (ox-attr x 'stretchy)))
-         `(mo (@ ,@(ox-attrs x) (stretchy "true")) ,@(ox-children x)))
-        (else (cons (ot-local-name (car x)) (map ot-plain-mathml (cdr x))))))
+        (else
+          (let* ((name (ot-local-name (car x)))
+                 (c (ox-children x))
+                 (text (and (list-1? c) (string? (car c)) (car c))))
+            (cond
+              ;; the brackets grow with what they enclose; they are said
+              ;; to be brackets, or a bar is an error
+              ((and (== name 'mo) (in? (ox-attr x 'form) '("prefix" "postfix"))
+                    (not (ox-attr x 'stretchy)))
+               `(mo (@ ,@(ox-attrs x)
+                       ,@(if (ox-attr x 'fence) '() '((fence "true")))
+                       (stretchy "true"))
+                    ,@c))
+              ;; a name which is a word, and a bar which is no bracket: text
+              ((and (in? name '(mi mo)) text
+                    (or (== text "|")
+                        (and (ot-math-word? text) (not (in? text ot-math-functions)))))
+               `(mtext ,text))
+              ;; a fraction without a bar: one above the other
+              ((and (== name 'mfrac) (== (length (ox-elements x)) 2)
+                    (in? (ox-attr x 'linethickness) '("0" "0pt" "0px")))
+               `(mtable ,@(map (lambda (y) `(mtr (mtd ,(ot-plain-mathml y))))
+                               (ox-elements x))))
+              ;; a hat
+              ((and (== name 'mover) (== (length c) 2) (pair? (cadr c))
+                    (== (ot-local-name (car (cadr c))) 'mo)
+                    (== (ox-children (cadr c)) '("^")))
+               `(mover ,(ot-plain-mathml (car c)) (mo ,(office-utf8 #x2c6))))
+              (else
+                (with l (map ot-plain-mathml (cdr x))
+                  (cons name
+                        (if (in? name '(math mrow mtd mstyle msqrt))
+                            ;; (the attributes come first)
+                            (if (and (pair? l) (func? (car l) '@))
+                                (cons (car l) (ot-math-operands (cdr l)))
+                                (ot-math-operands l))
+                            l)))))))))
 
 (define (ot-math x)
   ;; a formula: an object, whose file of MathML is in a directory
@@ -298,7 +382,10 @@
                      (inner (ot-inlines l props)))
                  (cond ((null? inner) '())
                        ((in? href '("" "#")) inner)
-                       (else (list `(text:a (@ (xlink:type "simple") (xlink:href ,href)
+                       (else (list `(text:a (@ (xlink:type "simple")
+                                               (xlink:href
+                                                 ,(if (string-starts? href "#") href
+                                                      (office-uri href)))
                                                (text:style-name "Internet_20_link")
                                                (text:visited-style-name
                                                  "Visited_20_Internet_20_Link"))
@@ -381,63 +468,86 @@
                        ,@l))
         (list `(text:p (@ (text:style-name ,style)) ,@l)))))
 
-(define (ot-list-kinds x)
-  ;; the kinds of the levels of a list: its own, and those of the first
-  ;; list at each level inside it
-  (cons (if (== (ox-attr x 'kind) "number") "n" "b")
-        (let loop ((items (ox-children x)))
-          (cond ((null? items) '())
-                ((list-find (ox-children (car items)) (lambda (y) (func? y 'list)))
-                 => ot-list-kinds)
-                (else (loop (cdr items)))))))
-
-(define (ot-list-style kinds)
-  ;; the name of the style of a list whose levels have these kinds
-  (let* ((kinds (append kinds
-                        (map (lambda (i) (cAr kinds)) (iota (max 0 (- 9 (length kinds)))))))
-         (kinds (sublist kinds 0 9)))
-    (ot-style
-      (cons 'list kinds) "L"
-      (lambda (name)
-        `(text:list-style
-           (@ (style:name ,name))
-           ,@(map (lambda (kind i)
-                    (let ((props `(style:list-level-properties
+(define (ot-list-style kind)
+  ;; The name of the style of a list of this kind, "n" for numbers or "b"
+  ;; for bullets. A list inside another one has its own style, of its own
+  ;; kind, of which it takes the level of its depth: so the style has all
+  ;; the levels.
+  (ot-style
+    (list 'list kind) "L"
+    (lambda (name)
+      `(text:list-style
+         (@ (style:name ,name))
+         ,@(map (lambda (i)
+                  (let ((props `(style:list-level-properties
                                     (@ (text:list-level-position-and-space-mode
                                          "label-alignment"))
                                     (style:list-level-label-alignment
                                       (@ (text:label-followed-by "listtab")
                                          (fo:text-indent "-0.635cm")
                                          (fo:margin-left ,(ot-cm (* 1.27 (+ i 1)))))))))
-                      (if (== kind "n")
-                          `(text:list-level-style-number
-                             (@ (text:level ,(number->string (+ i 1)))
-                                (style:num-suffix ".") (style:num-format "1"))
-                             ,props)
-                          `(text:list-level-style-bullet
-                             (@ (text:level ,(number->string (+ i 1)))
-                                (text:bullet-char
-                                  ,(office-utf8 (list-ref '(#x2022 #x25e6 #x25aa)
-                                                          (modulo i 3)))))
-                             ,props))))
-                  kinds (iota 9)))))))
+                    (if (== kind "n")
+                        `(text:list-level-style-number
+                           (@ (text:level ,(number->string (+ i 1)))
+                              (style:num-suffix ".") (style:num-format "1"))
+                           ,props)
+                        `(text:list-level-style-bullet
+                           (@ (text:level ,(number->string (+ i 1)))
+                              (text:bullet-char
+                                ,(office-utf8 (list-ref '(#x2022 #x25e6 #x25aa)
+                                                        (modulo i 3)))))
+                           ,props))))
+                (iota 9))))))
 
-(define (ot-list x top?)
-  ;; a list; the style of the outer list is the one of those inside it
-  (with items (list-filter (ox-children x) (lambda (y) (func? y 'item)))
-    (if (null? items) '()
-        (list `(text:list
-                 ,@(if top?
-                       `((@ (text:style-name ,(ot-list-style (ot-list-kinds x)))))
-                       '())
-                 ,@(map (lambda (item)
-                          `(text:list-item
-                             ,@(append-map
-                                 (lambda (b)
-                                   (if (func? b 'list) (ot-list b #f)
-                                       (ot-block b "Text_20_body")))
-                                 (ox-children item))))
-                        items))))))
+;; An item of a list holds paragraphs and lists, and no table: a list ends
+;; before a table of one of its items and goes on after it, with the next
+;; number. What follows the table in its item is in an item without a
+;; number (text:list-header).
+
+(define (ot-item-parts item)
+  ;; the elements of an item: (elements table elements ... elements), the
+  ;; lists of those which an item holds and, between them, the tables
+  (let loop ((l (append-map (lambda (b)
+                              (if (func? b 'list) (ot-list b)
+                                  (ot-block b "Text_20_body")))
+                            (ox-children item)))
+             (cur '()) (acc '()))
+    (cond ((null? l) (reverse (cons (reverse cur) acc)))
+          ((in? (car (car l)) '(table:table text:table-of-content))
+           (loop (cdr l) '() (cons* (car l) (reverse cur) acc)))
+          (else (loop (cdr l) (cons (car l) cur) acc)))))
+
+(define (ot-list x)
+  ;; the elements of a list: the list, or its pieces with the tables of
+  ;; its items between them
+  (let* ((style (ot-list-style (if (== (ox-attr x 'kind) "number") "n" "b")))
+         ;; the piece with these items, reversed, after the elements out
+         (close (lambda (rows out)
+                  (if (null? rows) out
+                      (cons `(text:list
+                               (@ (text:style-name ,style)
+                                  ,@(if (null? out) '()
+                                        '((text:continue-numbering "true"))))
+                               ,@(reverse rows))
+                            out)))))
+    (let loop ((items (list-filter (ox-children x) (lambda (y) (func? y 'item))))
+               (rows '()) (out '()))
+      (if (null? items)
+          (reverse (close rows out))
+          (let* ((parts (ot-item-parts (car items)))
+                 ;; (an item which starts with a table still has its number)
+                 (first (if (and (null? (car parts)) (pair? (cdr parts)))
+                            '((text:p (@ (text:style-name "Text_20_body"))))
+                            (car parts))))
+            (let sub ((l (cdr parts))
+                      (rows (cons `(text:list-item ,@first) rows))
+                      (out out))
+              (if (null? l)
+                  (loop (cdr items) rows out)
+                  (sub (cddr l)
+                       (if (null? (cadr l)) '()
+                           (list `(text:list-header ,@(cadr l))))
+                       (cons (car l) (close rows out))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tables
@@ -574,7 +684,7 @@
         (else
           (case (car x)
             ((p) (ot-paragraph x default))
-            ((list) (ot-list x #t))
+            ((list) (ot-list x))
             ((table) (list (ot-table x)))
             ((pagebreak)
              (list `(text:p (@ (text:style-name
@@ -583,12 +693,23 @@
              (list `(text:p (@ (text:style-name
                                  ,(ot-paragraph-style "Text_20_body" #f #f #t))))))
             ((toc)
-             (list `(text:table-of-content
-                      (@ (text:name "Table of Contents1"))
-                      (text:table-of-content-source (@ (text:outline-level "3")))
-                      (text:index-body
-                        (text:p (@ (text:style-name "Text_20_body"))
-                                "Update this index to see the table of contents.")))))
+             ;; its title, and an index which the program fills from the
+             ;; headings
+             (with title (ot-inlines (ox-children x) '())
+               (list `(text:table-of-content
+                        (@ (text:name "Table of Contents1"))
+                        (text:table-of-content-source
+                          (@ (text:outline-level "3"))
+                          ,@(if (null? title) '()
+                                `((text:index-title-template ,(ox-text x)))))
+                        (text:index-body
+                          ,@(if (null? title) '()
+                                `((text:index-title
+                                    (@ (text:name "Table of Contents1_Head"))
+                                    (text:p (@ (text:style-name "Contents_20_Heading"))
+                                            ,@title))))
+                          (text:p (@ (text:style-name "Text_20_body"))
+                                  "Update this index to see the table of contents."))))))
             (else '())))))
 
 (define (ot-blocks-with l default)
@@ -661,6 +782,10 @@
           '((fo:font-size "22pt") (fo:font-weight "bold")))
        ,(ot-paragraph-style-element
           "Subtitle" #f "Heading" '((fo:text-align "center")) '((fo:font-size "15pt")))
+       ,(ot-paragraph-style-element
+          "Contents_20_Heading" "Contents Heading" "Heading"
+          '((fo:margin-top "0.6cm") (fo:margin-bottom "0.2cm"))
+          '((fo:font-size "18pt") (fo:font-weight "bold")))
        ,(ot-paragraph-style-element
           "Author" #f "Text_20_body" '((fo:text-align "center")) '((fo:font-size "12pt")))
        ,(ot-paragraph-style-element
@@ -799,6 +924,7 @@
   (set! ot-styles (make-ahash-table))
   (set! ot-style-list '())
   (set! ot-files '())
+  (set! ot-pictures (make-ahash-table))
   (set! ot-id 0)
   (set! ot-cell-align #f)
   (set! ot-numbered? (office-numbered-headings? x))
@@ -823,4 +949,5 @@
     (set! ot-styles (make-ahash-table))
     (set! ot-style-list '())
     (set! ot-files '())
+    (set! ot-pictures (make-ahash-table))
     r))
