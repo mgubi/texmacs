@@ -168,6 +168,9 @@ url_temp_dir () {
     u= url_temp_dir_sub ();
     make_dir (u);
   }
+  // (taken away under a program which runs: made again, or the next
+  // temporary file is an error which ends it)
+  else if (!is_directory (u)) make_dir (u);
   return u;
 }
 
@@ -176,8 +179,12 @@ process_running (int pid) {
   // only print the command name, without header; empty if pid is not running
   // (the macOS bundle runs as .../MacOS/TeXmacs, hence the case folding)
   string cmd= "ps -p " * as_string (pid) * " -o comm=";
-  string ret= eval_system (cmd);
-  return occurs ("texmacs", locase_all (ret));
+  string ret= locase_all (eval_system (cmd));
+  // (Tau is two programs, tau_core and tau_shell, with the same home: a
+  // new one took the temporary files of those which ran, which then
+  // ended at the next file they wrote)
+  return occurs ("texmacs", ret) || occurs ("tau_core", ret) ||
+         occurs ("tau_shell", ret);
 }
 
 static void
