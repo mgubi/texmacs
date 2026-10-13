@@ -30,7 +30,8 @@
 #include <cctype>
 #include <string.h> // memset, memcpy (without Qt, which included it)
 
-#if defined(OS_MACOS)
+// (the shell of Tau, misc/tau/shell, has not the plugin for the Mac)
+#if defined(OS_MACOS) && !defined(TAU_SHELL)
   #include "MacOS/mac_utilities.h"
 #endif
 
@@ -812,7 +813,7 @@ socket_server_rep::~socket_server_rep () {}
 
 string
 socket_server_rep::start () {
-#if defined(OS_MACOS)
+#if defined(OS_MACOS) && !defined(TAU_SHELL)
   mac_begin_server ();
 #endif
   socket_id = -1;
@@ -903,7 +904,7 @@ socket_server_rep::stop () {
   collect_stopped_links ();
   safe_server_close (socket_id);
   socket_id= -1;
-#if defined(OS_MACOS)
+#if defined(OS_MACOS) && !defined(TAU_SHELL)
   mac_end_server ();
 #endif
   checkout (this);

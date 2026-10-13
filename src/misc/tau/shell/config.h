@@ -53,7 +53,11 @@
 #define WORD_LENGTH_INC 7
 #define WORD_MASK 0xfffffffffffffff8
 
-// (no OS_MACOS: what it turns on is for the GUIs of TeXmacs on a Mac)
-#ifndef __APPLE__
+// The machine: Vue behaves as each system expects (on a Mac the system
+// glides after a swipe and Vue must not, option composes characters, the
+// wheel zooms with command...)
+#ifdef __APPLE__
+#define OS_MACOS 1
+#else
 #define OS_GNU_LINUX 1
 #endif

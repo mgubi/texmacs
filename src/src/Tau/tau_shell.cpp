@@ -186,8 +186,12 @@ core_start (url exe, int argc, char** argv) {
     close (in_pipe[1]); close (out_pipe[0]);
     setenv ("TAU_FD", std::to_string (out_pipe[1]).c_str (), 1);
     setenv ("TAU_DESKTOP", "1", 1);
-#ifdef __APPLE__
+    // the machine, for the shortcuts of the core (default_look_and_feel
+    // in basic.cpp); elsewhere the core looks at the desktop itself
+#if defined(__APPLE__)
     setenv ("TEXMACS_WEB_PLATFORM", "macos", 0);
+#elif defined(_WIN32)
+    setenv ("TEXMACS_WEB_PLATFORM", "windows", 0);
 #endif
     std::vector<char*> args;
     args.push_back ((char*) prog.c_str ());
@@ -225,9 +229,33 @@ struct json {
     for (auto& p : o) if (p.first == key) return true;
     return false;
   }
-  // the text of a string, in the encoding of TeXmacs
+  // The text of a string, in the encoding of TeXmacs. What is not ASCII
+  // is written by its number, <#2318>: utf8_to_cork gives the names of
+  // the universal encoding where it has one ("<place of interest sign>"
+  // for the command key of a Mac), which the fonts of the interface show
+  // letter by letter
   string text () const {
-    return kind == STR? utf8_to_cork (string (s.c_str ())): string (""); }
+    if (kind != STR) return string ("");
+    string r;
+    const unsigned char* p= (const unsigned char*) s.c_str ();
+    while (*p) {
+      unsigned c= *p;
+      int extra= c < 0x80? 0: c < 0xE0? 1: c < 0xF0? 2: 3;
+      if (extra == 0) {
+        if (c == '<') r << "<less>";
+        else if (c == '>') r << "<gtr>";
+        else r << (char) c;
+        p++;
+        continue;
+      }
+      c &= (0x3F >> extra);
+      p++;
+      for (int i= 0; i < extra && (*p & 0xC0) == 0x80; i++, p++)
+        c= (c << 6) | (*p & 0x3F);
+      r << "<#" << upcase_all (as_hexadecimal ((int) c)) << ">";
+    }
+    return r;
+  }
   std::string str () const { return kind == STR? s: std::string (); }
   int num () const { return kind == NUM? (int) n: 0; }
   bool truth () const { return kind == BOOL? b: (kind != NUL); }

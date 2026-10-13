@@ -1343,6 +1343,28 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   menu of a view. Not seen: the dialog of the files (it is the system's;
   the request comes with the right folder), a tooltip.
 
+- **The machine.** The shell is built for the system it runs on (its
+  `config.h` defines `OS_MACOS` on a Mac): Vue then leaves the glide
+  after a swipe to the system (it added its own on top: the wheel
+  changed speed and did not stop under the fingers), lets option compose
+  characters, zooms with command. It tells the core the platform
+  (`TEXMACS_WEB_PLATFORM`, which `default_look_and_feel` now reads on
+  every build): the shortcuts are those of the system, ⌘Z and not C-z.
+  The font of the interface is the one of the system on a Mac (Lucida
+  Grande, by its file), which has the signs of the keys; a text of the
+  interface which is not ASCII is written by its number (`<#2318>`),
+  since `utf8_to_cork` gives names which the fonts of the interface
+  show letter by letter. The plugin of TeXmacs for the Mac is not in the
+  tree: its three uses (the beep, two calls of the sockets) are cut by
+  `TAU_SHELL`.
+- **Paced**: the wheel and the moves of the pointer, one with the core
+  at a time (a ping answers), and the place which a dragged scroll bar
+  asks for: the canvas stays where the frame is, and follows with the
+  paint which answers (moved at once it showed white where the document
+  had not come). **Palettes**: a color is a patch, a symbol is typeset
+  with the smart fonts (`set_new_fonts`). **Input methods**: the cursor
+  comes with each paint and is told to Vue, the candidates open there.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:

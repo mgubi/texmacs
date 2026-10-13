@@ -362,7 +362,7 @@ use_macos_fonts () {
 // TeXmacs, see layout_keys in vue_gui.cpp)
 bool
 use_macos_keys () {
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(TAUTEXMACS)
   string s= get_preference ("look and feel");
   if (s == "default") s= default_look_and_feel ();
   return s == "macos";
@@ -373,12 +373,14 @@ use_macos_keys () {
 
 static const char*
 default_look_and_feel_impl () {
-#ifdef __EMSCRIPTEN__
-  // in the browser, that of the platform of the browser (web-pre.js), so
-  // that the shortcuts of TeXmacs and of the browser agree (Cmd+V on a Mac)
+  // In the browser, that of the platform of the browser (web-pre.js), so
+  // that the shortcuts of TeXmacs and of the browser agree (Cmd+V on a
+  // Mac); the core of Tau on the desktop is told in the same way by the
+  // program which has the windows and knows the machine (tau_shell.cpp)
   string web= get_env ("TEXMACS_WEB_PLATFORM");
   if (web == "macos") return "macos";
   if (web == "windows") return "windows";
+#ifdef __EMSCRIPTEN__
   return "gnome";
 #endif
   if (os_mingw () || os_win32 ()) return "windows";

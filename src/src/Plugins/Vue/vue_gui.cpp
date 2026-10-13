@@ -43,8 +43,10 @@ widget tau_shell_window ();
 #include "boot.hpp"      // is_headless
 #include "tm_window.hpp"
 #include "new_window.hpp"   // buffer_to_windows (the tabs of the page)
-#ifdef OS_MACOS
+#if defined(OS_MACOS) && !defined(TAU_SHELL)
 #include "MacOS/mac_utilities.h" // mac_beep
+#endif
+#ifdef OS_MACOS
 #include <objc/runtime.h> // the NSWindow of a tool window, see set_on_top
 #include <objc/message.h>
 #endif
@@ -5533,6 +5535,16 @@ font get_default_font (bool tt, bool mini, bool bold) {
   // no TeX fonts: Fira, which comes with TeXmacs (the TeX fonts of the
   // fallback below have no glyph for the arrows and marks of the widgets)
   if (tt) return unicode_font (bold ? "FiraMono-Bold" : "FiraMono-Regular", sz, dpi);
+#ifdef TAU_SHELL
+  // (on a Mac the font of the system, as below: it has the signs of the
+  // keys, which the shortcuts of the menus are written with)
+  // (by its file: the rules which find a font by its family are those of
+  // Scheme, which the shell has not)
+  if (use_macos_fonts ()) {
+    font fn= unicode_font ("LucidaGrande", sz, (int) (0.95 * dpi));
+    if (!is_nil (fn) && fn->supports ("<#2318>")) return fn;
+  }
+#endif
   return unicode_font (bold ? "FiraSans-Bold" : "FiraSans-Regular",
                        sz, (int) (0.95 * dpi));
 #endif
@@ -6128,7 +6140,7 @@ void clear_selection (string key) {
 void beep () {
   // Issue a beep: the system alert sound on macOS, the console bell
   // elsewhere (SDL has no beep of its own)
-#ifdef OS_MACOS
+#if defined(OS_MACOS) && !defined(TAU_SHELL)
   mac_beep ();
 #else
   cerr << "\a" << flush;
