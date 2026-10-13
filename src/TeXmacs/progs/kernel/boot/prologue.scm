@@ -18,8 +18,9 @@
 ;; Additional support for loading modules
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (for S7, module loading is implemented in boot-s7.scm)
-(if (not (s7-scheme?))
+;; (for S7 and femtolisp, module loading is implemented in boot-s7.scm and
+;; boot-femtolisp.scm)
+(if (not (or (s7-scheme?) (femtolisp-scheme?)))
  (begin
   (define module-loaded-table (make-ahash-table))
 

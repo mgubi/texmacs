@@ -169,8 +169,11 @@
     (when (and (tree-is? c 'concat) (= (tree-arity c) 1))
       (tree-set! c (tree-ref c 0)))))
 
-(define-macro (concat-isolate! t)
-  `(cond ((not (tree-is? t :up 'concat)) (noop))
+(define (concat-isolate! t)
+  ;; a function rather than a macro: a macro whose expansion contains itself
+  ;; loops forever with a Scheme which expands the macros before running the
+  ;; code (femtolisp)
+  (cond ((not (tree-is? t :up 'concat)) (noop))
 	 ((not (tree-is? t :up :up 'document)) (noop))
 	 ((= (tree-arity (tree-up t)) 1) (tree-set! t :up t))
 	 ((< (tree-index t) (- (tree-arity (tree-up t)) 1))

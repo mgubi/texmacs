@@ -26,6 +26,14 @@
 * The object representation class
 ******************************************************************************/
 
+#if defined(USE_FEMTOLISP)
+
+// a tmscm is a root of the garbage collector of femtolisp by itself
+tmscm_object_rep::tmscm_object_rep (tmscm obj): handle (obj) {}
+tmscm_object_rep::~tmscm_object_rep () {}
+
+#else
+
 static list<tmscm > destroy_list;
 extern tmscm object_stack;
 
@@ -47,6 +55,8 @@ tmscm_object_rep::~tmscm_object_rep () {
     // because the destructor can be called during garbage collection.
   destroy_list= list<tmscm > ( handle, destroy_list);
 }
+
+#endif
 
 
 /******************************************************************************

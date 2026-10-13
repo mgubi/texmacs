@@ -388,8 +388,9 @@
 ;; the one of Scheme.
 (define (test-dates)
   (check-group "dates")
-  ;; S7 has no localtime and strftime to compute the expected dates
-  (when (not (s7-scheme?))
+  ;; S7 and femtolisp have no localtime and strftime to compute the expected
+  ;; dates
+  (when (not (or (s7-scheme?) (femtolisp-scheme?)))
     (let* ((now (localtime (current-time)))
            (fmt (lambda (f) (strftime f now))))
       (check= (ev '(date "%Y-%m-%d")) (fmt "%Y-%m-%d"))
