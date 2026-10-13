@@ -26,7 +26,9 @@
 ;; its directory is then added), family (the font family, rm or ss, the
 ;; text is set in, rm when absent), menu (label) and group
 ;; (Serif, Sans serif or Other: the section of the font menus, where the
-;; labels follow the names LaTeX users know, Times for Termes and so on).
+;; labels follow the names LaTeX users know, Times for Termes and so on)
+;; and variants (the variants of the text companion, see below; the key
+;; stays in Scheme).
 ;;
 ;; A companion is named the way the `font' environment variable names one,
 ;; that is by its MASTER, the second field of an entry of
@@ -42,8 +44,95 @@
 ;; one that companion pulls in for formulas, so canonical pairings come
 ;; first.
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The variants of a design
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A design may come in variants: the weights Light, Text and Medium of IBM
+;; Plex, the condensed width of DejaVu. A variant is a master of its own
+;; in TeXmacs/fonts/font-features.scm, with its italic and its bold, so that
+;; a document set in it finds its emphasis there. The variants of a design
+;; are a list of (label master), in the order of the menus; the first one,
+;; "Regular", is the design itself, the base of the others.
+;;
+;; The families of a variant are those of TeXmacs/fonts/font-database.scm.
+;; The condensed and expanded widths, the light weights of Antykwa
+;; Poltawskiego and of Latin Modern Mono Prop come with a bold of their
+;; own. The other weights have none, and their families list one which is
+;; paired with them by hand, as the style Bold: IBM Plex Light with IBM
+;; Plex SemiBold, IBM Plex Text and Medium with IBM Plex Bold, the light
+;; weights of Iwona, Kurier and Antykwa Torunska with the bold of the
+;; regular weight, and their light condensed ones with the condensed bold.
+;; A face may so be listed in two families: the variables of a font hold
+;; one series, and a style "Light Bold" could not be selected.
+
+(define font-variant-bases (make-ahash-table))
+(define font-variant-labels (make-ahash-table))
+(define font-variant-masters (list))
+
+(tm-define (font-variants-declare l)
+  (:synopsis "Declare the masters of the list @l of (label master) as variants")
+  (when (nnull? l)
+    (with base (cadr (car l))
+      (for (v (cdr l))
+        (when (not (ahash-ref font-variant-bases (cadr v)))
+          (set! font-variant-masters (rcons font-variant-masters (cadr v))))
+        (ahash-set! font-variant-bases (cadr v) base)
+        (ahash-set! font-variant-labels (cadr v) (car v))))))
+
+(tm-define (font-variant-base master)
+  (:synopsis "The design which @master is a variant of, or @master")
+  (or (ahash-ref font-variant-bases master) master))
+
+(tm-define (font-variants-of base)
+  (:synopsis "The masters which are variants of the design @base")
+  (list-filter font-variant-masters
+               (lambda (m) (== (ahash-ref font-variant-bases m) base))))
+
+(tm-define (font-variant-label master)
+  (:synopsis "The label of the variant @master of its design, or #f")
+  (ahash-ref font-variant-labels master))
+
+(define (master-installed? master)
+  (list-or (map (lambda (fam) (nnull? (font-database-styles fam)))
+                (font-master->families master))))
+
+(tm-define (font-variants-installed l)
+  (:synopsis "The variants of @l to offer: none unless one besides the first is installed")
+  (if (null? l) l
+      (with r (list-filter (cdr l) (lambda (v) (master-installed? (cadr v))))
+        (if (null? r) r (cons (car l) r)))))
+
+(tm-define (font-variant-value master)
+  (:synopsis "The value of `font' for a document set in @master")
+  ;; formulas follow the math companion of the text font, and a variant is
+  ;; a master without one: the companion of its design is named by a rule
+  (let* ((base (font-variant-base master))
+         (math (math-family-for-text base)))
+    (if (or (== master base) (== math "")) master
+        (string-append "math=" math "," master))))
+
+(tm-define (font-variants-label label v)
+  (:synopsis "The label of the submenu of the design @label, set in the variant @v")
+  ;; a submenu has no check mark: the variant in use, or #f, is named
+  (if v `(concat ,label " (" ,(car v) ")") label))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The profiles
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define math-font-variants (make-ahash-table))
+
+(tm-define (math-font-profile-declare name props)
+  (with v (assq 'variants props)
+    (when v
+      (ahash-set! math-font-variants name (cdr v))
+      (font-variants-declare (cdr v)))
+    (math-font-profile-set
+     name (list-filter props (lambda (x) (!= (car x) 'variants))))))
+
 (define-public-macro (define-math-font-profile name . props)
-  `(math-font-profile-set ,name ',props))
+  `(math-font-profile-declare ,name ',props))
 
 (define-math-font-profile "Latin Modern Math"
   (file "latinmodern-math") (text "Latin Modern Roman")
@@ -79,7 +168,8 @@
 (define-math-font-profile "TeX Gyre DejaVu Math"
   (file "texgyredejavu-math") (text "DejaVu")
   (sans "DejaVu") (mono "DejaVu")
-  (letters "math") (menu "DejaVu") (group "Serif"))
+  (letters "math") (menu "DejaVu") (group "Serif")
+  (variants ("Regular" "DejaVu") ("Condensed" "DejaVu Condensed")))
 
 (define-math-font-profile "Stix Two Math"
   (file "STIXTwoMath-Regular") (text "Stix Two Text")
@@ -163,7 +253,10 @@
 (define-math-font-profile "IBM Plex Math"
   (file "IBMPlexMath-Regular") (text "IBM Plex") (family "ss")
   (sans "IBM Plex") (mono "IBM Plex")
-  (letters "math") (menu "IBM Plex") (group "Sans serif"))
+  (letters "math") (menu "IBM Plex") (group "Sans serif")
+  (variants ("Regular" "IBM Plex") ("Text" "IBM Plex Text")
+            ("Light" "IBM Plex Light") ("Medium" "IBM Plex Medium")
+            ("Condensed" "IBM Plex Condensed")))
 
 (define-math-font-profile "Garamond-Math"
   (file "Garamond-Math") (text "EB Garamond")
@@ -221,9 +314,11 @@
 ;; Formulas are set in the math companion of the text font, whatever the
 ;; math-font variable says, unless the text font is roman. A math font
 ;; which is not the companion of its text font (Euler Math and Asana Math
-;; with Pagella, KpMath Sans with Kepler) is therefore given by a rule.
-(define (opentype-font-value math)
-  (with text (math-font-profile-attr math "text")
+;; with Pagella, KpMath Sans with Kepler) is therefore given by a rule, and
+;; so is the one of a variant of the text font, which is a master without
+;; a profile: the optional argument is the master of a variant.
+(tm-define (opentype-font-value math . opt)
+  (with text (if (null? opt) (math-font-profile-attr math "text") (car opt))
     (if (== (math-family-for-text text) math) text
         (string-append "math=" math "," text))))
 
@@ -238,6 +333,18 @@
 (tm-define (opentype-font-local? math)
   (== (get-env "font") (opentype-font-value math)))
 
+(tm-define (opentype-font-variants math)
+  (:synopsis "The variants of the text of @math which the menus offer")
+  (font-variants-installed (or (ahash-ref math-font-variants math) (list))))
+
+(tm-define (opentype-font-values)
+  (:synopsis "The values of `font' of the entries of the menus with mathematics")
+  (append-map (lambda (p)
+                (cons (opentype-font-value (cadr p))
+                      (map (lambda (v) (opentype-font-value (cadr p) (cadr v)))
+                           (opentype-font-variants (cadr p)))))
+              (opentype-math-font-list)))
+
 (define (tex-gyre-package math)
   (with text (math-font-profile-attr math "text")
     (and (string-starts? text "TeX Gyre ")
@@ -247,19 +354,36 @@
 ;; The menus below are built in loops, so their entries say which one is
 ;; checked with (check ...): the check mark a command declares is applied
 ;; to the arguments as written in the menu, (cadr p), not to their values
-(define (test-opentype-font? math)
-  (with pack (tex-gyre-package math)
+(define (test-opentype-font? math . opt)
+  (with pack (and (null? opt) (tex-gyre-package math))
     (if pack
         ;; the TeX Gyre fonts go through the package of their mathematics
         (has-style-package? pack)
-        (and (== (get-init "font") (opentype-font-value math))
+        (and (== (get-init "font") (apply opentype-font-value (cons math opt)))
              (== (get-init "font-family") (opentype-font-family math))))))
 
-(tm-define (init-opentype-font math)
+(tm-define (init-opentype-font math . opt)
   (:synopsis "Set the text and mathematics of the document in @math")
-  (init-font (opentype-font-value math) math)
+  ;; the optional argument is the master of a variant of the text
+  (init-font (apply opentype-font-value (cons math opt)) math)
   (with fam (opentype-font-family math)
     (when (!= fam "rm") (init-env "font-family" fam))))
+
+;; The entry of a font of the list @l: a submenu when its text has variants
+(tm-menu (opentype-font-entries l)
+  (for (p l)
+    (with vs (opentype-font-variants (cadr p))
+      (assuming (null? vs)
+        ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
+         (init-opentype-font (cadr p))))
+      (assuming (nnull? vs)
+        (-> (eval (font-variants-label
+                   (car p) (list-find vs (lambda (v) (test-opentype-font?
+                                                      (cadr p) (cadr v))))))
+            (for (v vs)
+              ((check (eval (car v)) "*"
+                      (test-opentype-font? (cadr p) (cadr v)))
+               (init-opentype-font (cadr p) (cadr v)))))))))
 
 (tm-menu (opentype-math-font-menu)
   (for (p (opentype-math-font-list))
@@ -270,19 +394,13 @@
 ;; and a menu with arguments has lost them by then ("widget expected"):
 ;; hence one menu without arguments for each section
 (tm-menu (opentype-serif-font-menu)
-  (for (p (opentype-math-font-group-list "Serif"))
-    ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
-     (init-opentype-font (cadr p)))))
+  (dynamic (opentype-font-entries (opentype-math-font-group-list "Serif"))))
 
 (tm-menu (opentype-sans-font-menu)
-  (for (p (opentype-math-font-group-list "Sans serif"))
-    ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
-     (init-opentype-font (cadr p)))))
+  (dynamic (opentype-font-entries (opentype-math-font-group-list "Sans serif"))))
 
 (tm-menu (opentype-other-font-menu)
-  (for (p (opentype-math-font-group-list "Other"))
-    ((check (eval (car p)) "*" (test-opentype-font? (cadr p)))
-     (init-opentype-font (cadr p)))))
+  (dynamic (opentype-font-entries (opentype-math-font-group-list "Other"))))
 
 ;; Text fonts without mathematics: a profile with companions only (no file,
 ;; so that it is not offered in the menus of math fonts), for the typewriter
@@ -299,3 +417,16 @@
              "Antykwa Poltawskiego" "Antykwa Torunska" "Gentium Plus"
              "Iwona" "Kurier"))
   (math-font-profile-set name '((mono "Inconsolatazi4, TeX Gyre Cursor"))))
+
+;; The variants of the same fonts take the same typewriter text, and the
+;; condensed variants of IBM Plex and DejaVu, which have no typewriter face,
+;; the one of their design (named by its family: a companion counts as
+;; installed when the font database has styles for its name)
+(for (name '("Antykwa Poltawskiego Light" "Antykwa Poltawskiego Condensed"
+             "Antykwa Poltawskiego Expanded" "Antykwa Torunska Light"
+             "Antykwa Torunska Condensed" "Antykwa Torunska Condensed Light"
+             "Iwona Light" "Iwona Condensed" "Iwona Condensed Light"
+             "Kurier Light" "Kurier Condensed" "Kurier Condensed Light"))
+  (math-font-profile-set name '((mono "Inconsolatazi4, TeX Gyre Cursor"))))
+(math-font-profile-set "IBM Plex Condensed" '((mono "IBM Plex Mono")))
+(math-font-profile-set "DejaVu Condensed" '((mono "DejaVu Sans Mono")))

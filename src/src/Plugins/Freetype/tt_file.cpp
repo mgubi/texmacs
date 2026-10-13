@@ -41,11 +41,18 @@ tt_extend_font_path (url u) {
   }
 }
 
+#ifndef OS_MINGW
 // OpenType and TrueType font directories of the TeX Live installations
-// found under the usual roots, whatever their year
+// found under the usual roots, whatever their year; a newer year comes
+// before an older one. A distribution may also install TeX Live without a
+// directory for the year. The trees are large and do not change while
+// TeXmacs runs, so they are walked once.
 static url
 texlive_font_dirs () {
-  url r= url_none ();
+  static bool done= false;
+  static url  r   = url_none ();
+  if (done) return r;
+  done= true;
   const char* roots[]= { "/usr/local/texlive", "/usr/share/texlive",
                          "/opt/texlive", "$HOME/texlive" };
   for (int i= 0; i < 4; i++) {
@@ -54,9 +61,12 @@ texlive_font_dirs () {
     bool err= false;
     array<string> a= read_directory (root, err);
     if (err) continue;
-    for (int j= 0; j < N(a); j++) {
+    a << string ("");
+    for (int j= N(a) - 1; j >= 0; j--) {
       if (starts (a[j], ".")) continue;
-      url fonts= root * url (a[j]) * url ("texmf-dist") * url ("fonts");
+      url fonts= root * url ("texmf-dist") * url ("fonts");
+      if (a[j] != "")
+        fonts= root * url (a[j]) * url ("texmf-dist") * url ("fonts");
       if (!is_directory (fonts)) continue;
       r= r | search_sub_dirs (fonts * url ("opentype"))
            | search_sub_dirs (fonts * url ("truetype"));
@@ -64,6 +74,7 @@ texlive_font_dirs () {
   }
   return r;
 }
+#endif
 
 url
 tt_font_path () {
@@ -96,17 +107,12 @@ tt_font_path () {
     search_sub_dirs ("/usr/share/fonts/truetype") |
     search_sub_dirs ("/usr/local/share/fonts/opentype") |
     search_sub_dirs ("/usr/local/share/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2020/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2021/texmf-dist/fonts/truetype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/opentype") |
-    search_sub_dirs ("/usr/local/texlive/2022/texmf-dist/fonts/truetype");
+    texlive_font_dirs ();
 #endif
 }
 
 static url
-tt_locate (string name) {
+tt_locate (string name, url tt_path) {
   if (ends (name, ".pfb")) {
     /*
     if (starts (name, "rpag")) name= "uag" * name (4, N (name) - 4) * "8a.pfb";
@@ -148,7 +154,6 @@ tt_locate (string name) {
 	}
     }
 
-  url tt_path= tt_font_path ();
   //cout << "Resolve " << name << " in " << tt_path << "\n";
   return resolve (tt_path * name);
 }
@@ -164,15 +169,17 @@ tt_font_find_sub (string name) {
   // sign and the code of 'A' is 'a'. TeXmacs asks for characters by Unicode
   // and needs the cmap of the sfnt file. The same choice gives the PDF
   // writer real glyph indices instead of character codes.
-  u= tt_locate (name * ".otf");
+  // The font path is the same for the five suffixes
+  url tt_path= tt_font_path ();
+  u= tt_locate (name * ".otf", tt_path);
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttf");
+  u= tt_locate (name * ".ttf", tt_path);
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".ttc");
+  u= tt_locate (name * ".ttc", tt_path);
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".pfb");
+  u= tt_locate (name * ".pfb", tt_path);
   if (!is_none (u)) return u;
-  u= tt_locate (name * ".dfont");
+  u= tt_locate (name * ".dfont", tt_path);
   return u;
 }
 

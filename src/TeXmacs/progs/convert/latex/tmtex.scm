@@ -450,6 +450,7 @@
 
 (logic-table latex-text-symbols%
   ("#20AC"         euro)
+  ("euro"          euro)
   ("cent"          textcent)
   ("circledR"      textregistered)
   ("copyright"     textcopyright)

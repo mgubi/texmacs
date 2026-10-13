@@ -469,24 +469,123 @@ ot_mathtable_rep::get_kerning (unsigned int glyphID, int height, bool top,
   return kt.kernValues[idx].value;
 }
 
+/******************************************************************************
+ * Reading the tables of a font file which may be truncated or wrong
+ ******************************************************************************/
+
+// One table of a font file. Every offset and every count comes from the
+// file, so each read is checked against the length of the table: a read
+// outside gives zero and marks the table as bad, after which every read
+// gives zero. The number of reads is limited as well, because wrong offsets
+// can make the same records be read over and over, whereas a sound table is
+// read about once.
+struct ot_table {
+  string    s;
+  long long n;
+  long long reads;
+  bool      ok;
+
+  ot_table (string s2)
+      : s (s2), n (N (s2)), reads (16 * ((long long) N (s2)) + 4096),
+        ok (true) {}
+
+  inline bool has (long long i, long long len) {
+    return i >= 0 && len >= 0 && i + len <= n;
+  }
+  inline unsigned int u16 (long long i) {
+    if (!ok || !has (i, 2) || --reads < 0) { ok= false; return 0; }
+    return (((unsigned int) ((U8) s[(int) i])) << 8) + ((U8) s[(int) i + 1]);
+  }
+  inline int s16 (long long i) {
+    return (int) ((S16) u16 (i));
+  }
+  inline unsigned int u32 (long long i) {
+    unsigned int hi= u16 (i);
+    return (hi << 16) + u16 (i + 2);
+  }
+  inline string tag (long long i) {
+    if (!ok || !has (i, 4)) { ok= false; return ""; }
+    return s ((int) i, (int) i + 4);
+  }
+  // nr records of the given size at offset i, when the table holds them
+  inline int count (long long i, long long nr, long long size) {
+    if (!ok || !has (i, nr * size)) { ok= false; return 0; }
+    return (int) nr;
+  }
+};
+
+static inline unsigned int
+raw_U16 (const char* buf, int i) {
+  return (((unsigned int) ((U8) buf[i])) << 8) + ((U8) buf[i + 1]);
+}
+
+static inline unsigned int
+raw_U32 (const char* buf, int i) {
+  return (raw_U16 (buf, i) << 16) + raw_U16 (buf, i + 2);
+}
+
+static inline bool
+raw_tag (const char* buf, int i, const char* tag) {
+  return buf[i] == tag[0] && buf[i + 1] == tag[1] &&
+         buf[i + 2] == tag[2] && buf[i + 3] == tag[3];
+}
+
+// The table with the given tag of the first font in a file, or the empty
+// string. The directory is read in the buffer of the file, so that only the
+// table itself is copied. A table which the file cuts short is returned as
+// far as it goes.
+static string
+ot_find_table (const char* buf, int n, const char* tag) {
+  if (buf == NULL || n < 12) return "";
+  long long h= 0;
+  if (raw_tag (buf, 0, "ttcf")) {
+    if (n < 16 || raw_U32 (buf, 8) == 0) return "";
+    h= raw_U32 (buf, 12);
+    if (h + 12 > n) return "";
+  }
+  int hh= (int) h;
+  if (!(raw_U32 (buf, hh) == 0x00010000 || raw_tag (buf, hh, "OTTO") ||
+        raw_tag (buf, hh, "true") || raw_tag (buf, hh, "typ1")))
+    return "";
+  int nr= (int) raw_U16 (buf, hh + 4);
+  for (int k= 0; k < nr; k++) {
+    long long rec= h + 12 + 16 * k;
+    if (rec + 16 > n) return "";
+    if (!raw_tag (buf, (int) rec, tag)) continue;
+    long long start= raw_U32 (buf, (int) rec + 8);
+    long long len  = raw_U32 (buf, (int) rec + 12);
+    if (start >= n) return "";
+    if (len > n - start) len= n - start;
+    return string (buf + start, (int) len);
+  }
+  return "";
+}
+
 // a helper function to parse the coverage table
 // return an array of glyphID
 static array<unsigned int>
-parse_coverage_table (const string& tt, int offset) {
-  int format= get_U16 (tt, offset);
+parse_coverage_table (ot_table& t, long long offset) {
+  int format= t.u16 (offset);
   array<unsigned int> coverage;
   if (format == 1) {
-    unsigned int glyphCount= get_U16 (tt, offset + 2);
-    for (unsigned int i= 0; i < glyphCount; i++) {
-      unsigned int glyphID= get_U16 (tt, offset + 4 + 2 * i);
+    int glyphCount= t.count (offset + 4, t.u16 (offset + 2), 2);
+    for (int i= 0; i < glyphCount; i++) {
+      unsigned int glyphID= t.u16 (offset + 4 + 2 * i);
       coverage << glyphID;
     }
   }
   else if (format == 2) {
-    unsigned int rangeCount= get_U16 (tt, offset + 2);
-    for (unsigned int i= 0; i < rangeCount; i++) {
-      unsigned int startGlyphID= get_U16 (tt, offset + 4 + 6 * i);
-      unsigned int endGlyphID= get_U16 (tt, offset + 4 + 6 * i + 2);
+    int rangeCount= t.count (offset + 4, t.u16 (offset + 2), 6);
+    for (int i= 0; i < rangeCount; i++) {
+      unsigned int startGlyphID= t.u16 (offset + 4 + 6 * i);
+      unsigned int endGlyphID= t.u16 (offset + 4 + 6 * i + 2);
+      // the ranges are disjoint, so together they cannot hold more glyphs
+      // than a font has
+      if (endGlyphID < startGlyphID ||
+          N (coverage) + (int) (endGlyphID - startGlyphID) + 1 > 65536) {
+        t.ok= false;
+        break;
+      }
       for (unsigned int glyphID= startGlyphID; glyphID <= endGlyphID;
            glyphID++) {
         coverage << glyphID;
@@ -494,26 +593,31 @@ parse_coverage_table (const string& tt, int offset) {
     }
   }
   else {
-    cout << "parse_coverage_table : coverage format " << format
-         << " not supported." << LF;
+    if (t.ok && DEBUG_VERBOSE)
+      debug_fonts << "parse_coverage_table : coverage format " << format
+                  << " not supported." << LF;
+    t.ok= false;
   }
+  if (!t.ok) return array<unsigned int> ();
   return coverage;
 }
 
 // a helper function to parse the MathValueRecord
 static MathValueRecord
-parse_math_record (const string& tt, int parent_table_offset,
-                   int record_offset) {
+parse_math_record (ot_table& t, long long parent_table_offset,
+                   long long record_offset) {
   MathValueRecord record;
-  int value= get_S16 (tt, parent_table_offset + record_offset);
+  int value= t.s16 (parent_table_offset + record_offset);
   unsigned int deviceOffset=
-      get_U16 (tt, parent_table_offset + record_offset + 2);
-  if (deviceOffset > 0) {
-    int deviceAbsOffset= parent_table_offset + deviceOffset;
-    unsigned int startSize= get_U16 (tt, deviceAbsOffset);
-    unsigned int endSize= get_U16 (tt, deviceAbsOffset + 2);
-    unsigned int deltaFormat= get_U16 (tt, deviceAbsOffset + 4);
-    unsigned int deltaValues= get_U16 (tt, deviceAbsOffset + 6);
+      t.u16 (parent_table_offset + record_offset + 2);
+  // the device table is not used, and the shortest one is two bytes shorter
+  // than what is read here: it is left out when the table ends before
+  if (deviceOffset > 0 && t.has (parent_table_offset + deviceOffset, 8)) {
+    long long deviceAbsOffset= parent_table_offset + deviceOffset;
+    unsigned int startSize= t.u16 (deviceAbsOffset);
+    unsigned int endSize= t.u16 (deviceAbsOffset + 2);
+    unsigned int deltaFormat= t.u16 (deviceAbsOffset + 4);
+    unsigned int deltaValues= t.u16 (deviceAbsOffset + 6);
     record.hasDevice= true;
     record.deviceTable= {startSize, endSize, deltaFormat, deltaValues};
   }
@@ -524,36 +628,37 @@ parse_math_record (const string& tt, int parent_table_offset,
 // a helper function to parse the MathGlyphConstruction table
 // return true if the sub table GlyphAssembly is not NULL
 static bool
-parse_construction (const string& tt, unsigned int construction_offset,
+parse_construction (ot_table& t, long long construction_offset,
                     array<unsigned int>& variantGlyph,
                     array<unsigned int>& advanceMeasurement,
                     GlyphAssembly& assembly) {
-  unsigned int glyphAssemblyOffset= get_U16 (tt, construction_offset);
-  unsigned int variantCount= get_U16 (tt, construction_offset + 2);
+  unsigned int glyphAssemblyOffset= t.u16 (construction_offset);
+  int variantCount=
+      t.count (construction_offset + 4, t.u16 (construction_offset + 2), 4);
 
   // MathGlyphVariantRecord
-  for (unsigned int i= 0; i < variantCount; i++) {
+  for (int i= 0; i < variantCount; i++) {
     unsigned int mathGlyphVariantGlyph=
-        get_U16 (tt, construction_offset + 4 + 4*i);
+        t.u16 (construction_offset + 4 + 4*i);
     unsigned int mathGlyphVariantAdvanceMeasurement=
-        get_U16 (tt, construction_offset + 4 + 4*i + 2);
+        t.u16 (construction_offset + 4 + 4*i + 2);
     variantGlyph << mathGlyphVariantGlyph;
     advanceMeasurement << mathGlyphVariantAdvanceMeasurement;
   }
 
   // GlyphAssembly table, may be NULL
   if (glyphAssemblyOffset > 0) {
-    // TODO
-    int glyphAssemblyAbsOffset= construction_offset + glyphAssemblyOffset;
+    long long glyphAssemblyAbsOffset=
+        construction_offset + glyphAssemblyOffset;
     assembly.italicsCorrection=
-        parse_math_record (tt, glyphAssemblyAbsOffset, 0);
-    unsigned int partCount= get_U16 (tt, glyphAssemblyAbsOffset + 4);
+        parse_math_record (t, glyphAssemblyAbsOffset, 0);
+    int partCount= t.count (glyphAssemblyAbsOffset + 6,
+                            t.u16 (glyphAssemblyAbsOffset + 4), 10);
     // GlyphPart records
     for (int j= 0, offset= 6; j < partCount; j++) {
       array<unsigned int> part (5);
       for (int k= 0; k < 5; k++, offset+= 2) {
-        part[k]=
-            get_U16 (tt, construction_offset + glyphAssemblyOffset + offset);
+        part[k]= t.u16 (glyphAssemblyAbsOffset + offset);
       }
       assembly.partRecords << GlyphPartRecord{part[0], part[1], part[2],
                                               part[3], part[4]};
@@ -563,24 +668,26 @@ parse_construction (const string& tt, unsigned int construction_offset,
   return (glyphAssemblyOffset > 0);
 }
 
-// a helper function to parse the MathVariants table
+// a helper function to parse the MathVariants table; count is the number
+// of constructions the table announces for this coverage
 static void
-parse_variants (const string& tt, int var_offset, int coverage_offset,
-                int construction_offset,
+parse_variants (ot_table& t, long long var_offset, long long coverage_offset,
+                long long construction_offset, int count,
                 hashmap<unsigned int, array<unsigned int>>& glyph_variants,
                 hashmap<unsigned int, array<unsigned int>>& glyph_variants_adv,
                 hashmap<unsigned int, GlyphAssembly>& glyph_assembly) {
 
-  auto coverage= parse_coverage_table (tt, coverage_offset);
-  int  coverage_N= N (coverage);
-  for (unsigned int i= 0; i < coverage_N; i++) {
+  auto coverage= parse_coverage_table (t, coverage_offset);
+  int  coverage_N= min (N (coverage), t.count (construction_offset, count, 2));
+  for (int i= 0; i < coverage_N && t.ok; i++) {
     unsigned int glyph= coverage[i];
     unsigned int glyphConstructionOffset=
-        get_U16 (tt, construction_offset + 2 * i);
+        t.u16 (construction_offset + 2 * i);
+    if (glyphConstructionOffset == 0) continue;
     array<unsigned int> variants;
     array<unsigned int> adv;
     GlyphAssembly assembly;
-    bool has_assemply= parse_construction (tt, 
+    bool has_assemply= parse_construction (t,
       var_offset + glyphConstructionOffset, variants, adv, assembly);
     glyph_variants (glyph)= variants;
     glyph_variants_adv (glyph)= adv;
@@ -592,54 +699,56 @@ parse_variants (const string& tt, int var_offset, int coverage_offset,
 
 // a helper function to parse the MathKern table
 static MathKernTable
-parse_math_kern_table (const string& tt, int offset) {
-  unsigned int  heightCount= get_U16 (tt, offset);
+parse_math_kern_table (ot_table& t, long long offset) {
+  unsigned int  heightCount= t.u16 (offset);
+  // heightCount heights and one more kern value
+  if (t.count (offset + 2, 2 * heightCount + 1, 4) == 0) heightCount= 0;
   MathKernTable kern (heightCount);
   for (unsigned int i= 0; i < heightCount; i++) {
-    kern.correctionHeight[i]= parse_math_record (tt, offset, 2 + 4 * i);
+    kern.correctionHeight[i]= parse_math_record (t, offset, 2 + 4 * i);
   }
   for (unsigned int i= 0; i < heightCount + 1; i++) {
     kern.kernValues[i]=
-        parse_math_record (tt, offset, 2 + 4 * heightCount + 4 * i);
+        parse_math_record (t, offset, 2 + 4 * heightCount + 4 * i);
   }
   return kern;
 }
 
 // a helper function to parse the MathKernInfo table
 static void
-parse_math_kern_info_table (const string& tt, int offset,
+parse_math_kern_info_table (ot_table& t, long long offset,
                             hashmap<unsigned int, MathKernInfoRecord>& table) {
-  unsigned int mathKernCoverageOffset= get_U16 (tt, offset);
-  // unsigned int mathKernCount          = get_U16 (tt, offset + 2);
+  unsigned int mathKernCoverageOffset= t.u16 (offset);
+  unsigned int mathKernCount         = t.u16 (offset + 2);
   if (mathKernCoverageOffset == 0) return; // no coverage, no kerning
-  auto coverage= parse_coverage_table (tt, offset + mathKernCoverageOffset);
-  int  coverage_N= N (coverage);
-  for (unsigned int i= 0; i < coverage_N; i++) {
+  auto coverage= parse_coverage_table (t, offset + mathKernCoverageOffset);
+  int  coverage_N= min (N (coverage), t.count (offset + 4, mathKernCount, 8));
+  for (int i= 0; i < coverage_N && t.ok; i++) {
     unsigned int glyphID= coverage[i];
     MathKernInfoRecord record;
-    unsigned int topRightMathKernOffset= get_U16 (tt, offset + 4 + 8 * i);
-    unsigned int topLeftMathKernOffset= get_U16 (tt, offset + 4 + 8 * i + 2);
+    unsigned int topRightMathKernOffset= t.u16 (offset + 4 + 8 * i);
+    unsigned int topLeftMathKernOffset= t.u16 (offset + 4 + 8 * i + 2);
     unsigned int bottomRightMathKernOffset=
-        get_U16 (tt, offset + 4 + 8 * i + 4);
-    unsigned int bottomLeftMathKernOffset= get_U16 (tt, offset + 4 + 8 * i + 6);
+        t.u16 (offset + 4 + 8 * i + 4);
+    unsigned int bottomLeftMathKernOffset= t.u16 (offset + 4 + 8 * i + 6);
     if (topRightMathKernOffset > 0) {
       record.topRight=
-          parse_math_kern_table (tt, offset + topRightMathKernOffset);
+          parse_math_kern_table (t, offset + topRightMathKernOffset);
       record.hasTopRight= true;
     }
     if (topLeftMathKernOffset > 0) {
       record.topLeft=
-          parse_math_kern_table (tt, offset + topLeftMathKernOffset);
+          parse_math_kern_table (t, offset + topLeftMathKernOffset);
       record.hasTopLeft= true;
     }
     if (bottomRightMathKernOffset > 0) {
       record.bottomRight=
-          parse_math_kern_table (tt, offset + bottomRightMathKernOffset);
+          parse_math_kern_table (t, offset + bottomRightMathKernOffset);
       record.hasBottomRight= true;
     }
     if (bottomLeftMathKernOffset > 0) {
       record.bottomLeft=
-          parse_math_kern_table (tt, offset + bottomLeftMathKernOffset);
+          parse_math_kern_table (t, offset + bottomLeftMathKernOffset);
       record.hasBottomLeft= true;
     }
     table (glyphID)= record;
@@ -647,36 +756,37 @@ parse_math_kern_info_table (const string& tt, int offset,
 }
 
 // a helper function to parse the MathValueRecords with coverage table,
-// used in parsing MathItalicsCorrectionInfo and MathTopAccentAttachment
+// used in parsing MathItalicsCorrectionInfo and MathTopAccentAttachment;
+// the number of records follows the coverage offset in the parent table
 static void
 parse_record_with_coverage (
-    const string& tt, int parent_table_offset, int coverage_offset,
+    ot_table& t, long long parent_table_offset, int coverage_offset,
     int record_offset, hashmap<unsigned int, MathValueRecord>& record_map) {
   if (coverage_offset == 0) return; // NULL coverage: nothing is covered
-  int coverage_abs_offset = parent_table_offset + coverage_offset;
-  array<unsigned int> coverage= parse_coverage_table (tt, coverage_abs_offset);
-  int record_abs_offset= parent_table_offset + record_offset;
-  int coverage_N= N (coverage);
-  for (unsigned int i= 0; i < coverage_N; i++) {
+  long long coverage_abs_offset = parent_table_offset + coverage_offset;
+  array<unsigned int> coverage= parse_coverage_table (t, coverage_abs_offset);
+  int count= t.u16 (parent_table_offset + 2);
+  int coverage_N= min (N (coverage),
+                       t.count (parent_table_offset + record_offset, count, 4));
+  for (int i= 0; i < coverage_N && t.ok; i++) {
     unsigned int glyphID= coverage[i];
     record_map (glyphID)=
-        parse_math_record (tt, parent_table_offset, record_offset + 4 * i);
+        parse_math_record (t, parent_table_offset, record_offset + 4 * i);
   }
-  (void) record_abs_offset; // avoid unused warning
 }
 
 // parse the OpenType MATH constants table.
 static void
-parse_constant (const string& tt, int offset, MathConstantsTable& table) {
-  int scriptPercentScaleDown= get_S16 (tt, offset);
-  int scriptScriptPercentScaleDown= get_S16 (tt, offset + 2);
-  unsigned int delimitedSubFormulaMinHeight= get_U16 (tt, offset + 4);
-  unsigned int displayOperatorMinHeight= get_U16 (tt, offset + 6);
+parse_constant (ot_table& t, long long offset, MathConstantsTable& table) {
+  int scriptPercentScaleDown= t.s16 (offset);
+  int scriptScriptPercentScaleDown= t.s16 (offset + 2);
+  unsigned int delimitedSubFormulaMinHeight= t.u16 (offset + 4);
+  unsigned int displayOperatorMinHeight= t.u16 (offset + 6);
   for (int i= 0; i < otmathConstantsRecordsEnd; i++) {
-    table.records[i]= parse_math_record (tt, offset, 8 + 4 * i);
+    table.records[i]= parse_math_record (t, offset, 8 + 4 * i);
   }
   int radicalDegreeBottomRaisePercent=
-      get_S16 (tt, offset + 8 + 4 * otmathConstantsRecordsEnd);
+      t.s16 (offset + 8 + 4 * otmathConstantsRecordsEnd);
   table.scriptPercentScaleDown= scriptPercentScaleDown;
   table.scriptScriptPercentScaleDown= scriptScriptPercentScaleDown;
   table.delimitedSubFormulaMinHeight= delimitedSubFormulaMinHeight;
@@ -684,130 +794,143 @@ parse_constant (const string& tt, int offset, MathConstantsTable& table) {
   table.radicalDegreeBottomRaisePercent= radicalDegreeBottomRaisePercent;
 }
 
-// parse the OpenType MATH table
-// buf is a .otf file content
-// tt is a buffer of the MATH table
+// parse the OpenType MATH table of the file held in buf. A table which
+// cannot be read in full, or which has no constants, is not used at all.
 ot_mathtable
-parse_mathtable (const string& buf) {
-  if ((N (buf) == 0) || (!tt_correct_version (buf, 0))) return {};
-  string tt= tt_table (buf, 0, "MATH");
-
+parse_mathtable (const char* buf, int n) {
+  string tt= ot_find_table (buf, n, "MATH");
   if (N (tt) == 0) return {};
+  ot_table     t (tt);
   ot_mathtable table (tm_new<ot_mathtable_rep> ());
 
   // MATH Header
-  table->majorVersion= get_U16 (tt, 0);
-  table->minorVersion= get_U16 (tt, 2);
-  int mathConstantsOffset= get_U16 (tt, 4);
-  int mathGlyphInfoOffset= get_U16 (tt, 6);
-  int mathVariantsOffset= get_U16 (tt, 8);
+  table->majorVersion= t.u16 (0);
+  table->minorVersion= t.u16 (2);
+  int mathConstantsOffset= t.u16 (4);
+  int mathGlyphInfoOffset= t.u16 (6);
+  int mathVariantsOffset= t.u16 (8);
+  table->minConnectorOverlap= 0;
 
   // version check
   if ((table->majorVersion != 1) || (table->minorVersion != 0)) return {};
 
   // parse MathConstants table
-  parse_constant (tt, mathConstantsOffset, table->constants_table);
+  if (mathConstantsOffset == 0) return {};
+  parse_constant (t, mathConstantsOffset, table->constants_table);
 
-  // MathGlyphInfo table
-  int mathItalicsCorrectionInfoOffset= get_U16 (tt, mathGlyphInfoOffset + 0);
-  int mathTopAccentAttachmentOffset= get_U16 (tt, mathGlyphInfoOffset + 2);
-  int extendedShapeCoverageOffset= get_U16 (tt, mathGlyphInfoOffset + 4);
-  int mathKernInfoOffset= get_U16 (tt, mathGlyphInfoOffset + 6);
+  // MathGlyphInfo table (may be NULL)
+  if (mathGlyphInfoOffset > 0) {
+    int mathItalicsCorrectionInfoOffset= t.u16 (mathGlyphInfoOffset + 0);
+    int mathTopAccentAttachmentOffset= t.u16 (mathGlyphInfoOffset + 2);
+    int extendedShapeCoverageOffset= t.u16 (mathGlyphInfoOffset + 4);
+    int mathKernInfoOffset= t.u16 (mathGlyphInfoOffset + 6);
 
-  // MathItalicsCorrectionInfo table (may be NULL)
-  if (mathItalicsCorrectionInfoOffset > 0) {
-    int mathItalicsCorrectionInfoAbsOffset=
-        mathGlyphInfoOffset + mathItalicsCorrectionInfoOffset;
-    int italicsCorrectionCoverageOffset=
-        get_U16 (tt, mathItalicsCorrectionInfoAbsOffset + 0);
-    // italicsCorrectionCount at offset 2 is implied by the coverage table
-    parse_record_with_coverage (tt, mathItalicsCorrectionInfoAbsOffset,
-                                italicsCorrectionCoverageOffset, 4,
-                                table->italics_correction);
-  }
-
-  // MathTopAccentAttachment table (may be NULL)
-  if (mathTopAccentAttachmentOffset > 0) {
-    int mathTopAccentAttachmentAbsOffset=
-        mathGlyphInfoOffset + mathTopAccentAttachmentOffset;
-    int topAccentCoverageOffset=
-        get_U16 (tt, mathTopAccentAttachmentAbsOffset + 0);
-    parse_record_with_coverage (tt, mathTopAccentAttachmentAbsOffset,
-                                topAccentCoverageOffset, 4, table->top_accent);
-  }
-
-  // ExtendedShapeCoverage table (may be NULL)
-  //cout << "parse ExtendedShapeCoverage\n";
-  if (extendedShapeCoverageOffset > 0) {
-    auto extendedShapeCoverage= parse_coverage_table (
-        tt, mathGlyphInfoOffset + extendedShapeCoverageOffset);
-    for (int i= 0;  i< N(extendedShapeCoverage); i++) {
-      table->extended_shape_coverage->insert (extendedShapeCoverage[i]);
+    // MathItalicsCorrectionInfo table (may be NULL)
+    if (mathItalicsCorrectionInfoOffset > 0) {
+      int mathItalicsCorrectionInfoAbsOffset=
+          mathGlyphInfoOffset + mathItalicsCorrectionInfoOffset;
+      int italicsCorrectionCoverageOffset=
+          t.u16 (mathItalicsCorrectionInfoAbsOffset + 0);
+      parse_record_with_coverage (t, mathItalicsCorrectionInfoAbsOffset,
+                                  italicsCorrectionCoverageOffset, 4,
+                                  table->italics_correction);
     }
+
+    // MathTopAccentAttachment table (may be NULL)
+    if (mathTopAccentAttachmentOffset > 0) {
+      int mathTopAccentAttachmentAbsOffset=
+          mathGlyphInfoOffset + mathTopAccentAttachmentOffset;
+      int topAccentCoverageOffset=
+          t.u16 (mathTopAccentAttachmentAbsOffset + 0);
+      parse_record_with_coverage (t, mathTopAccentAttachmentAbsOffset,
+                                  topAccentCoverageOffset, 4,
+                                  table->top_accent);
+    }
+
+    // ExtendedShapeCoverage table (may be NULL)
+    if (extendedShapeCoverageOffset > 0) {
+      auto extendedShapeCoverage= parse_coverage_table (
+          t, mathGlyphInfoOffset + extendedShapeCoverageOffset);
+      for (int i= 0;  i< N(extendedShapeCoverage); i++) {
+        table->extended_shape_coverage->insert (extendedShapeCoverage[i]);
+      }
+    }
+
+    // MathKernInfo table (may be NULL)
+    if (mathKernInfoOffset > 0)
+      parse_math_kern_info_table (t, mathGlyphInfoOffset + mathKernInfoOffset,
+                                  table->math_kern_info);
   }
 
+  // MathVariants table (may be NULL)
+  if (mathVariantsOffset > 0) {
+    table->minConnectorOverlap= t.u16 (mathVariantsOffset + 0);
+    // both coverage offsets may be NULL, for a font with no vertical or no
+    // horizontal variants; adding zero to the parent offset would make the
+    // parser read minConnectorOverlap as a coverage format
+    int vertGlyphCoverageRel = t.u16 (mathVariantsOffset + 2);
+    int horizGlyphCoverageRel= t.u16 (mathVariantsOffset + 4);
+    int vertGlyphCoverageOffset = mathVariantsOffset + vertGlyphCoverageRel;
+    int horizGlyphCoverageOffset= mathVariantsOffset + horizGlyphCoverageRel;
+    int vertGlyphCount= t.u16 (mathVariantsOffset + 6);
+    int horizGlyphCount= t.u16 (mathVariantsOffset + 8);
 
-  // MathKernInfo table (may be NULL)
-  if (mathKernInfoOffset > 0)
-    parse_math_kern_info_table (tt, mathGlyphInfoOffset + mathKernInfoOffset,
-                                table->math_kern_info);
+    // parse vertical variants
+    if (vertGlyphCoverageRel > 0)
+      parse_variants (t, mathVariantsOffset, vertGlyphCoverageOffset,
+                      mathVariantsOffset + 10, vertGlyphCount,
+                      table->ver_glyph_variants,
+                      table->ver_glyph_variants_adv,
+                      table->ver_glyph_assembly);
 
-  // math variants
-  table->minConnectorOverlap= get_U16 (tt, mathVariantsOffset + 0);
-  // both coverage offsets may be NULL, for a font with no vertical or no
-  // horizontal variants; adding zero to the parent offset would make the
-  // parser read minConnectorOverlap as a coverage format
-  int vertGlyphCoverageRel = get_U16 (tt, mathVariantsOffset + 2);
-  int horizGlyphCoverageRel= get_U16 (tt, mathVariantsOffset + 4);
-  int vertGlyphCoverageOffset = mathVariantsOffset + vertGlyphCoverageRel;
-  int horizGlyphCoverageOffset= mathVariantsOffset + horizGlyphCoverageRel;
-  int vertGlyphCount= get_U16 (tt, mathVariantsOffset + 6);
-  //int horizGlyphCount= get_U16 (tt, mathVariantsOffset + 8); // unused
+    // parse horizontal variants
+    if (horizGlyphCoverageRel > 0)
+      parse_variants (t, mathVariantsOffset, horizGlyphCoverageOffset,
+                      mathVariantsOffset + 10 + 2 * vertGlyphCount,
+                      horizGlyphCount,
+                      table->hor_glyph_variants,
+                      table->hor_glyph_variants_adv,
+                      table->hor_glyph_assembly);
+  }
 
-  // (tt-dump "/Users/mgubi/t/svn-src/TeXmacs/fonts/truetype/texgyre/texgyrepagella-math.otf")
-
-
-  // parse vertical variants
-  // cout << "parse vertical variants\n";
-  if (vertGlyphCoverageRel > 0)
-    parse_variants (tt, mathVariantsOffset, vertGlyphCoverageOffset,
-                    mathVariantsOffset + 10, table->ver_glyph_variants,
-                    table->ver_glyph_variants_adv, table->ver_glyph_assembly);
-
-  // parse horizontal variants
-  // cout << "parse horizontal variants\n";
-  if (horizGlyphCoverageRel > 0)
-    parse_variants (tt, mathVariantsOffset, horizGlyphCoverageOffset,
-                    mathVariantsOffset + 10 + 2 * vertGlyphCount,
-                    table->hor_glyph_variants, table->hor_glyph_variants_adv,
-                    table->hor_glyph_assembly);
-
+  if (!t.ok) return {};
   return table;
 }
 
+ot_mathtable
+parse_mathtable (const string& buf) {
+  string b= buf;
+  if (N (b) == 0) return {};
+  return parse_mathtable (&b[0], N (b));
+}
+
 /******************************************************************************
- * OpenType GSUB: single (type 1) and alternate (type 3) substitutions
+ * OpenType GSUB: substitutions of one glyph by one glyph (types 1 and 2) and
+ * alternate substitutions (type 3)
  ******************************************************************************/
 
 static void
-parse_gsub_subtable (const string& gsub, int type, int off, ot_gsub_map& m) {
+parse_gsub_subtable (ot_table& t, int type, long long off, ot_gsub_map& m) {
   if (type == 7) { // extension: the real type and a 32 bit offset
-    int ext_type= get_U16 (gsub, off + 2);
-    int ext_off = (int) get_U32 (gsub, off + 4);
-    parse_gsub_subtable (gsub, ext_type, off + ext_off, m);
+    int       ext_type= t.u16 (off + 2);
+    long long ext_off = t.u32 (off + 4);
+    // an extension does not lead to another extension
+    if (ext_type == 7) return;
+    parse_gsub_subtable (t, ext_type, off + ext_off, m);
     return;
   }
-  int format= get_U16 (gsub, off);
-  // Only single (type 1) and alternate (type 3) substitutions are read. In
-  // any other lookup the fields below mean something else, so the coverage
-  // table must not even be parsed: it would read garbage and complain.
+  int format= t.u16 (off);
+  // Only single (type 1), multiple (type 2) and alternate (type 3)
+  // substitutions are read. In any other lookup the fields below mean
+  // something else, so the coverage table must not even be parsed.
   if (!((type == 1 && (format == 1 || format == 2)) ||
+        (type == 2 && format == 1) ||
         (type == 3 && format == 1)))
     return;
-  int cov_off= get_U16 (gsub, off + 2);
-  array<unsigned int> cov= parse_coverage_table (gsub, off + cov_off);
+  int cov_off= t.u16 (off + 2);
+  array<unsigned int> cov= parse_coverage_table (t, off + cov_off);
   if (type == 1 && format == 1) {
-    int delta= (int) (S16) get_U16 (gsub, off + 4);
+    int delta= t.s16 (off + 4);
     for (int i= 0; i < N(cov); i++)
       if (!m->contains (cov[i])) {
         array<unsigned int> a;
@@ -816,69 +939,161 @@ parse_gsub_subtable (const string& gsub, int type, int off, ot_gsub_map& m) {
       }
   }
   else if (type == 1 && format == 2) {
-    int count= get_U16 (gsub, off + 4);
+    int count= t.count (off + 6, t.u16 (off + 4), 2);
     for (int i= 0; i < N(cov) && i < count; i++)
       if (!m->contains (cov[i])) {
         array<unsigned int> a;
-        a << (unsigned int) get_U16 (gsub, off + 6 + 2*i);
+        a << (unsigned int) t.u16 (off + 6 + 2*i);
         m (cov[i])= a;
       }
   }
+  else if (type == 2) {
+    // a multiple substitution replaces a glyph by a sequence; some fonts
+    // keep their one to one substitutions in such a lookup, and only the
+    // sequences of one glyph are taken
+    int count= t.count (off + 6, t.u16 (off + 4), 2);
+    for (int i= 0; i < N(cov) && i < count && t.ok; i++) {
+      long long seq_off= off + t.u16 (off + 6 + 2*i);
+      if (t.u16 (seq_off) != 1) continue;
+      if (!m->contains (cov[i])) {
+        array<unsigned int> a;
+        a << (unsigned int) t.u16 (seq_off + 2);
+        m (cov[i])= a;
+      }
+    }
+  }
   else if (type == 3 && format == 1) {
-    int count= get_U16 (gsub, off + 4);
-    for (int i= 0; i < N(cov) && i < count; i++) {
-      int set_off= off + get_U16 (gsub, off + 6 + 2*i);
-      int n= get_U16 (gsub, set_off);
+    int count= t.count (off + 6, t.u16 (off + 4), 2);
+    for (int i= 0; i < N(cov) && i < count && t.ok; i++) {
+      long long set_off= off + t.u16 (off + 6 + 2*i);
+      int n= t.count (set_off + 2, t.u16 (set_off), 2);
       array<unsigned int> alts;
-      for (int k= 0; k < n; k++) alts << (unsigned int) get_U16 (gsub, set_off + 2 + 2*k);
+      for (int k= 0; k < n; k++)
+        alts << (unsigned int) t.u16 (set_off + 2 + 2*k);
       if (!m->contains (cov[i])) m (cov[i])= alts;
     }
   }
 }
 
-// Every feature tag the GSUB table offers, in the order of the table and
-// without repetitions: what a font is able to do, for a menu to propose.
+static void
+insert_sorted (array<int>& a, int x) {
+  int i= 0;
+  while (i < N(a) && a[i] < x) i++;
+  if (i < N(a) && a[i] == x) return;
+  a << x;
+  for (int j= N(a) - 1; j > i; j--) a[j]= a[j-1];
+  a[i]= x;
+}
+
+// The feature records with the given tag which apply when no language is
+// asked for: the ones of the default language system of each script. The
+// records of a particular language, like the small capitals of Turkish with
+// their dotted i, are left out. The Latin script comes first, then the
+// default script, then the others, and the first record which maps a glyph
+// decides. A table without any script gives all its records.
+static array<int>
+default_feature_records (ot_table& t, string feature) {
+  array<int> r;
+  int script_list  = t.u16 (4);
+  int feature_list = t.u16 (6);
+  int feature_count= t.count (feature_list + 2, t.u16 (feature_list), 6);
+  int script_count = t.count (script_list + 2, t.u16 (script_list), 6);
+  if (script_count == 0) {
+    for (int f= 0; f < feature_count; f++)
+      if (t.tag (feature_list + 2 + 6*f) == feature) r << f;
+    return r;
+  }
+  for (int pass= 0; pass < 3; pass++)
+    for (int s= 0; s < script_count && t.ok; s++) {
+      int    rec= script_list + 2 + 6*s;
+      string tag= t.tag (rec);
+      int    which= (tag == "latn"? 0: (tag == "DFLT"? 1: 2));
+      if (which != pass) continue;
+      int script= script_list + t.u16 (rec + 4);
+      int def   = t.u16 (script);
+      if (def == 0) continue;
+      int sys= script + def;
+      int nf = t.count (sys + 6, t.u16 (sys + 4), 2);
+      for (int k= 0; k < nf; k++) {
+        int f= t.u16 (sys + 6 + 2*k);
+        if (f >= feature_count || contains (f, r)) continue;
+        if (t.tag (feature_list + 2 + 6*f) == feature) r << f;
+      }
+    }
+  return r;
+}
+
+static ot_gsub_map
+parse_gsub_feature_table (string gsub, string feature) {
+  ot_gsub_map m;
+  if (N (gsub) < 10) return m;
+  ot_table t (gsub);
+  int feature_list= t.u16 (6);
+  int lookup_list = t.u16 (8);
+  int lookup_count= t.count (lookup_list + 2, t.u16 (lookup_list), 2);
+  array<int> recs= default_feature_records (t, feature);
+  for (int i= 0; i < N(recs) && t.ok; i++) {
+    int rec = feature_list + 2 + 6 * recs[i];
+    int feat= feature_list + t.u16 (rec + 4);
+    int nl  = t.count (feat + 4, t.u16 (feat + 2), 2);
+    // the lookups of a feature apply in the order of the lookup list
+    array<int> lookups;
+    for (int l= 0; l < nl; l++) {
+      int li= t.u16 (feat + 4 + 2*l);
+      if (li < lookup_count) insert_sorted (lookups, li);
+    }
+    for (int l= 0; l < N(lookups) && t.ok; l++) {
+      int lookup= lookup_list + t.u16 (lookup_list + 2 + 2 * lookups[l]);
+      int type  = t.u16 (lookup);
+      int nsub  = t.count (lookup + 6, t.u16 (lookup + 4), 2);
+      for (int s= 0; s < nsub && t.ok; s++)
+        parse_gsub_subtable (t, type, lookup + t.u16 (lookup + 6 + 2*s), m);
+    }
+  }
+  if (!t.ok) return ot_gsub_map ();
+  return m;
+}
+
+// The feature tags of the GSUB table for which something can be applied,
+// in the order of the table and without repetitions: what a font is able
+// to do, for a menu to propose. A feature made of ligatures or of
+// contextual substitutions only is not listed, since they are not read.
+array<string>
+parse_gsub_tags (const char* buf, int n) {
+  array<string> r;
+  string gsub= ot_find_table (buf, n, "GSUB");
+  if (N (gsub) < 10) return r;
+  ot_table t (gsub);
+  int feature_list = t.u16 (6);
+  int feature_count= t.count (feature_list + 2, t.u16 (feature_list), 6);
+  array<string> tags;
+  for (int f= 0; f < feature_count; f++) {
+    string tag= t.tag (feature_list + 2 + 6*f);
+    if (N (tag) == 4 && !contains (tag, tags)) tags << tag;
+  }
+  if (!t.ok) return r;
+  for (int i= 0; i < N(tags); i++)
+    if (N (parse_gsub_feature_table (gsub, tags[i])) != 0) r << tags[i];
+  return r;
+}
+
 array<string>
 parse_gsub_tags (const string& buf) {
-  array<string> r;
-  if ((N (buf) == 0) || (!tt_correct_version (buf, 0))) return r;
-  string gsub= tt_table (buf, 0, "GSUB");
-  if (N (gsub) < 10) return r;
-  int feature_list= get_U16 (gsub, 6);
-  int feature_count= get_U16 (gsub, feature_list);
-  for (int f= 0; f < feature_count; f++) {
-    string tag= get_tag (gsub, feature_list + 2 + 6*f);
-    if (N (tag) == 4 && !contains (tag, r)) r << tag;
-  }
-  return r;
+  string b= buf;
+  if (N (b) == 0) return array<string> ();
+  return parse_gsub_tags (&b[0], N (b));
+}
+
+ot_gsub_map
+parse_gsub_feature (const char* buf, int n, string feature) {
+  return parse_gsub_feature_table (ot_find_table (buf, n, "GSUB"), feature);
 }
 
 ot_gsub_map
 parse_gsub_feature (const string& buf, string feature) {
-  ot_gsub_map m;
-  if ((N (buf) == 0) || (!tt_correct_version (buf, 0))) return m;
-  string gsub= tt_table (buf, 0, "GSUB");
-  if (N (gsub) < 10) return m;
-  int feature_list= get_U16 (gsub, 6);
-  int lookup_list = get_U16 (gsub, 8);
-  int feature_count= get_U16 (gsub, feature_list);
-  int lookup_count = get_U16 (gsub, lookup_list);
-  for (int f= 0; f < feature_count; f++) {
-    int rec= feature_list + 2 + 6*f;
-    if (get_tag (gsub, rec) != feature) continue;
-    int feat= feature_list + get_U16 (gsub, rec + 4);
-    int nl= get_U16 (gsub, feat + 2);
-    for (int l= 0; l < nl; l++) {
-      int li= get_U16 (gsub, feat + 4 + 2*l);
-      if (li >= lookup_count) continue;
-      int lookup= lookup_list + get_U16 (gsub, lookup_list + 2 + 2*li);
-      int type= get_U16 (gsub, lookup);
-      int nsub= get_U16 (gsub, lookup + 4);
-      for (int s= 0; s < nsub; s++)
-        parse_gsub_subtable (gsub, type, lookup + get_U16 (gsub, lookup + 6 + 2*s), m);
-    }
-  }
-  return m;
+  string b= buf;
+  if (N (b) == 0) return ot_gsub_map ();
+  return parse_gsub_feature (&b[0], N (b), feature);
 }
 
 /******************************************************************************
@@ -887,21 +1102,36 @@ parse_gsub_feature (const string& buf, string feature) {
 
 bool
 ot_gpos_kern_rep::empty () {
-  return N (pairs) == 0 && N (classes) == 0;
+  return N (lookups) == 0;
 }
 
+// Each lookup of the feature moves the pair on its own, so their values
+// add up. Inside a lookup the first subtable which knows the pair decides:
+// a subtable of pairs when it lists the pair, a subtable of classes as soon
+// as it covers the left glyph.
 int
 ot_gpos_kern_rep::get (unsigned int left, unsigned int right) {
   unsigned int key= (left << 16) | (right & 0xffff);
-  if (pairs->contains (key)) return pairs[key];
-  for (int i= 0; i < N (classes); i++) {
-    ot_kern_classes& k= classes[i];
-    if (!k.coverage->contains (left)) continue;
-    int c1= k.class1[left], c2= k.class2[right];
-    if (c1 < k.class1_count && c2 < k.class2_count)
-      return k.values[c1 * k.class2_count + c2];
+  if (cache->contains (key)) return cache[key];
+  int r= 0;
+  for (int i= 0; i < N (lookups); i++) {
+    array<ot_kern_subtable>& subs= lookups[i];
+    for (int j= 0; j < N (subs); j++) {
+      ot_kern_subtable& k= subs[j];
+      if (!k.coverage->contains (left)) continue;
+      if (!k.by_class) {
+        if (!k.pairs->contains (key)) continue;
+        r += k.pairs[key];
+        break;
+      }
+      int c1= k.class1[left], c2= k.class2[right];
+      if (c1 >= k.class1_count || c2 >= k.class2_count) continue;
+      if (N (k.values) != 0) r += k.values[c1 * k.class2_count + c2];
+      break;
+    }
   }
-  return 0;
+  cache (key)= r;
+  return r;
 }
 
 // number of bytes of a value record with the given value format
@@ -925,104 +1155,138 @@ x_advance_offset (int format) {
 
 // glyph -> class; class 0 is the default and is not stored
 static void
-parse_class_def (const string& t, int off, hashmap<unsigned int, int>& m) {
-  int format= get_U16 (t, off);
+parse_class_def (ot_table& t, long long off, hashmap<unsigned int, int>& m) {
+  int format= t.u16 (off);
   if (format == 1) {
-    unsigned int start= get_U16 (t, off + 2);
-    int          n    = get_U16 (t, off + 4);
+    unsigned int start= t.u16 (off + 2);
+    int          n    = t.count (off + 6, t.u16 (off + 4), 2);
     for (int i= 0; i < n; i++) {
-      int c= get_U16 (t, off + 6 + 2 * i);
+      int c= t.u16 (off + 6 + 2 * i);
       if (c != 0) m (start + i)= c;
     }
   }
   else if (format == 2) {
-    int n= get_U16 (t, off + 2);
+    int n    = t.count (off + 4, t.u16 (off + 2), 6);
+    int total= 0;
     for (int i= 0; i < n; i++) {
-      unsigned int s= get_U16 (t, off + 4 + 6 * i);
-      unsigned int e= get_U16 (t, off + 4 + 6 * i + 2);
-      int          c= get_U16 (t, off + 4 + 6 * i + 4);
+      unsigned int s= t.u16 (off + 4 + 6 * i);
+      unsigned int e= t.u16 (off + 4 + 6 * i + 2);
+      int          c= t.u16 (off + 4 + 6 * i + 4);
+      // the ranges are disjoint, as those of a coverage
+      if (e < s || total + (int) (e - s) + 1 > 65536) {
+        t.ok= false;
+        break;
+      }
+      total += (int) (e - s) + 1;
       if (c != 0)
-        for (unsigned int g= s; g <= e && g <= s + 0xffff; g++) m (g)= c;
+        for (unsigned int g= s; g <= e; g++) m (g)= c;
     }
   }
 }
 
-static void
-parse_pair_pos (const string& t, int off, ot_gpos_kern_rep* r) {
-  int format  = get_U16 (t, off);
-  if (format != 1 && format != 2) return;
-  int cov_off = get_U16 (t, off + 2);
-  int vf1     = get_U16 (t, off + 4);
-  int vf2     = get_U16 (t, off + 6);
+// read one pair adjustment subtable; false when there is nothing to keep
+static bool
+parse_pair_pos (ot_table& t, long long off, ot_kern_subtable& k) {
+  int format  = t.u16 (off);
+  if (format != 1 && format != 2) return false;
+  int cov_off = t.u16 (off + 2);
+  int vf1     = t.u16 (off + 4);
+  int vf2     = t.u16 (off + 6);
+  // a subtable which does not change the advance still decides for its
+  // pairs, with a value of zero
   int xadv    = x_advance_offset (vf1);
-  if (xadv < 0) return; // nothing which changes an advance
   int sz1= value_record_size (vf1), sz2= value_record_size (vf2);
   array<unsigned int> cov= parse_coverage_table (t, off + cov_off);
+  for (int i= 0; i < N (cov); i++) k.coverage->insert (cov[i]);
   if (format == 1) {
-    int n= get_U16 (t, off + 8);
-    for (int i= 0; i < N (cov) && i < n; i++) {
-      int set_off= off + get_U16 (t, off + 10 + 2 * i);
-      int m      = get_U16 (t, set_off);
+    k.by_class= false;
+    int n= t.count (off + 10, t.u16 (off + 8), 2);
+    for (int i= 0; i < N (cov) && i < n && t.ok; i++) {
+      long long set_off= off + t.u16 (off + 10 + 2 * i);
+      int m= t.count (set_off + 2, t.u16 (set_off), 2 + sz1 + sz2);
       for (int j= 0; j < m; j++) {
-        int          rec   = set_off + 2 + j * (2 + sz1 + sz2);
-        unsigned int second= get_U16 (t, rec);
-        int          v     = (int) get_S16 (t, rec + 2 + xadv);
-        if (v != 0) r->pairs ((cov[i] << 16) | second)= v;
+        long long    rec   = set_off + 2 + j * (2 + sz1 + sz2);
+        unsigned int second= t.u16 (rec);
+        unsigned int key   = (cov[i] << 16) | second;
+        int          v     = (xadv < 0? 0: t.s16 (rec + 2 + xadv));
+        if (!k.pairs->contains (key)) k.pairs (key)= v;
       }
     }
   }
-  else if (format == 2) {
-    ot_kern_classes k;
-    for (int i= 0; i < N (cov); i++) k.coverage->insert (cov[i]);
-    parse_class_def (t, off + get_U16 (t, off + 8), k.class1);
-    parse_class_def (t, off + get_U16 (t, off + 10), k.class2);
-    k.class1_count= get_U16 (t, off + 12);
-    k.class2_count= get_U16 (t, off + 14);
-    if (k.class1_count <= 0 || k.class2_count <= 0) return;
-    k.values= array<int> (k.class1_count * k.class2_count);
-    int base= off + 16, rec_size= sz1 + sz2;
-    for (int a= 0; a < k.class1_count; a++)
-      for (int b= 0; b < k.class2_count; b++) {
-        int rec= base + (a * k.class2_count + b) * rec_size;
-        k.values[a * k.class2_count + b]= (int) get_S16 (t, rec + xadv);
-      }
-    r->classes << k;
+  else {
+    k.by_class= true;
+    parse_class_def (t, off + t.u16 (off + 8), k.class1);
+    parse_class_def (t, off + t.u16 (off + 10), k.class2);
+    k.class1_count= t.u16 (off + 12);
+    k.class2_count= t.u16 (off + 14);
+    if (k.class1_count <= 0 || k.class2_count <= 0) return false;
+    int rec_size= sz1 + sz2;
+    long long nr= ((long long) k.class1_count) * k.class2_count;
+    if (!t.has (off + 16, nr * rec_size)) {
+      t.ok= false;
+      return false;
+    }
+    if (xadv >= 0) {
+      k.values= array<int> ((int) nr);
+      long long base= off + 16;
+      for (int a= 0; a < k.class1_count; a++)
+        for (int b= 0; b < k.class2_count; b++) {
+          long long rec= base + ((long long) (a * k.class2_count + b)) * rec_size;
+          k.values[a * k.class2_count + b]= t.s16 (rec + xadv);
+        }
+    }
   }
+  return t.ok;
+}
+
+ot_gpos_kern
+parse_gpos_kern (const char* buf, int n) {
+  string gpos= ot_find_table (buf, n, "GPOS");
+  if (N (gpos) < 10) return {};
+  ot_table t (gpos);
+  ot_gpos_kern r (tm_new<ot_gpos_kern_rep> ());
+  int feature_list= t.u16 (6);
+  int lookup_list = t.u16 (8);
+  int feature_count= t.count (feature_list + 2, t.u16 (feature_list), 6);
+  int lookup_count = t.count (lookup_list + 2, t.u16 (lookup_list), 2);
+  // the lookups of all 'kern' features, in the order of the lookup list
+  array<int> lookups;
+  for (int f= 0; f < feature_count && t.ok; f++) {
+    int rec= feature_list + 2 + 6 * f;
+    if (t.tag (rec) != "kern") continue;
+    int feat= feature_list + t.u16 (rec + 4);
+    int nl  = t.count (feat + 4, t.u16 (feat + 2), 2);
+    for (int l= 0; l < nl; l++) {
+      int li= t.u16 (feat + 4 + 2 * l);
+      if (li < lookup_count) insert_sorted (lookups, li);
+    }
+  }
+  for (int l= 0; l < N (lookups) && t.ok; l++) {
+    int lookup= lookup_list + t.u16 (lookup_list + 2 + 2 * lookups[l]);
+    int type  = t.u16 (lookup);
+    int nsub  = t.count (lookup + 6, t.u16 (lookup + 4), 2);
+    array<ot_kern_subtable> subs;
+    for (int s= 0; s < nsub && t.ok; s++) {
+      long long sub= lookup + t.u16 (lookup + 6 + 2 * s);
+      if (type == 9) { // extension positioning
+        if (t.u16 (sub + 2) != 2) continue;
+        sub += (long long) t.u32 (sub + 4);
+      }
+      else if (type != 2) continue;
+      ot_kern_subtable k;
+      if (parse_pair_pos (t, sub, k)) subs << k;
+    }
+    if (N (subs) != 0) r->lookups << subs;
+  }
+  if (!t.ok) return {};
+  return r;
 }
 
 ot_gpos_kern
 parse_gpos_kern (const string& buf) {
-  if ((N (buf) == 0) || (!tt_correct_version (buf, 0))) return {};
-  string t= tt_table (buf, 0, "GPOS");
-  if (N (t) < 10) return {};
-  ot_gpos_kern r (tm_new<ot_gpos_kern_rep> ());
-  int feature_list= get_U16 (t, 6);
-  int lookup_list = get_U16 (t, 8);
-  int feature_count= get_U16 (t, feature_list);
-  int lookup_count = get_U16 (t, lookup_list);
-  for (int f= 0; f < feature_count; f++) {
-    int rec= feature_list + 2 + 6 * f;
-    if (get_tag (t, rec) != "kern") continue;
-    int feat= feature_list + get_U16 (t, rec + 4);
-    int nl  = get_U16 (t, feat + 2);
-    for (int l= 0; l < nl; l++) {
-      int li= get_U16 (t, feat + 4 + 2 * l);
-      if (li >= lookup_count) continue;
-      int lookup= lookup_list + get_U16 (t, lookup_list + 2 + 2 * li);
-      int type  = get_U16 (t, lookup);
-      int nsub  = get_U16 (t, lookup + 4);
-      for (int s= 0; s < nsub; s++) {
-        int sub= lookup + get_U16 (t, lookup + 6 + 2 * s);
-        if (type == 2) parse_pair_pos (t, sub, r.rep);
-        else if (type == 9) { // extension positioning
-          int ext_type= get_U16 (t, sub + 2);
-          int ext_off = (int) get_U32 (t, sub + 4);
-          if (ext_type == 2) parse_pair_pos (t, sub + ext_off, r.rep);
-        }
-      }
-    }
-  }
-  return r;
+  string b= buf;
+  if (N (b) == 0) return {};
+  return parse_gpos_kern (&b[0], N (b));
 }
 
 ot_mathtable

@@ -4,8 +4,9 @@
 # usage: tests/opentype/render-samples.sh [-r dpi] [-o outdir] [-c refdir]
 #
 #   -o outdir   where to put <sample>-<rev>.pdf/.png (default tests/build/vis)
-#   -c refdir   compare each PNG with refdir/<sample>.png using ImageMagick
-#               and report the number of differing pixels
+#   -c refdir   compare each PNG with refdir/<sample>-<page>.png using
+#               ImageMagick; a page with more differing pixels than
+#               TM_PIXEL_TOLERANCE (default 0) makes the script fail
 #   -r dpi      rasterization resolution for mutool (default 150)
 #
 # Environment:
@@ -87,6 +88,13 @@ for tm in "$here"/samples/*.tm; do
       diff="${png%.png}-diff.png"
       n=$(compare -metric AE "$refpng" "$png" "$diff" 2>&1 || true)
       echo "  differing pixels w.r.t. $refpng: $n  ($diff)"
+      case $n in
+        ''|*[!0-9]*) echo "  comparison FAILED"; status=1 ;;
+        *) if [ "$n" -gt "${TM_PIXEL_TOLERANCE:-0}" ]; then
+             echo "  FAILED: more than ${TM_PIXEL_TOLERANCE:-0} differing pixels"
+             status=1
+           fi ;;
+      esac
     fi
   done
 done

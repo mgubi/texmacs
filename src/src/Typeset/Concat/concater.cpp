@@ -157,6 +157,16 @@ concater_rep::with_limits (int status) {
 
 void
 concater_rep::typeset (tree t, path ip) {
+  // the items remember the font of the environment they were typeset in,
+  // which is no longer the current one when scripts are attached to them
+  int start= N(a);
+  typeset_main (t, ip);
+  for (int i= min (start, N(a)); i<N(a); i++)
+    if (is_nil (a[i]->fn)) a[i]->fn= env->fn;
+}
+
+void
+concater_rep::typeset_main (tree t, path ip) {
   // cout << "Typeset " << t << "\n";
   // cout << "Typeset " << t << ", " << ip << ", " << obtain_ip (t) << "\n";
 

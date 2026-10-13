@@ -19,7 +19,7 @@
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 top=$(cd "$here/../.." && pwd)
-out="$top/src/opentype-math"
+out="$top/doc/opentype-math"
 dpi=300
 width=1100
 while getopts "o:r:w:" opt; do
@@ -40,6 +40,8 @@ export TEXMACS_HOME_PATH="${TEXMACS_HOME_PATH:-$top/tests/build/home}"
 mkdir -p "$out" "$TEXMACS_HOME_PATH"
 tmp="$top/tests/build/gallery"
 mkdir -p "$tmp"
+# ImageMagick 7 has magick, ImageMagick 6 convert
+if command -v magick > /dev/null; then magick=magick; else magick=convert; fi
 
 if [ $# -gt 0 ]; then
   families=$*
@@ -96,7 +98,7 @@ echo "$families" | tr '|' '\n' | while read -r fam; do
     echo "  $fam: FAILED, see $tmp/$name.log"; continue
   fi
   mutool draw -q -r "$dpi" -o "$tmp/$name-%d.png" "$tmp/$name.pdf" 2>/dev/null
-  magick "$tmp/$name-1.png" -trim +repage -bordercolor white -border 24 \
+  $magick "$tmp/$name-1.png" -trim +repage -bordercolor white -border 24 \
          -resize "${width}x" -colorspace Gray -depth 8 -strip "$out/$name.png"
   echo "  $fam -> $out/$name.png"
 done

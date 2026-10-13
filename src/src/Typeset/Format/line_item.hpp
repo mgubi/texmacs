@@ -51,6 +51,7 @@ public:
   bool       limits;    // line items has limits
   language   lan;       // language for hyphenating strings
   tree       t;         // for control items
+  font       fn;        // font in use where the item was typeset (or nil)
 
   line_item_rep (int type, int ot_type, box b, int penalty);
   line_item_rep (int type, int ot_type, box b, int penalty, language lan);

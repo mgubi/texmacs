@@ -6,7 +6,9 @@ Gyre profiles (Palatino, Times, Bookman, Schoolbook, Euler) and of the
 Palatino of macOS.
 
 Upstream: https://ctan.org/pkg/inconsolata
-License: SIL Open Font License 1.1, see OFL.txt
+License: Inconsolatazi4-Regular.otf is under the SIL Open Font License 1.1,
+see OFL.txt; Inconsolatazi4-Bold.otf is under the Apache License 2.0, see
+LICENSE-2.0.txt
 
 | File | Version | Copyright |
 |---|---|---|

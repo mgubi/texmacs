@@ -196,6 +196,7 @@ class concater_rep {
 public:
   concater_rep (edit_env env, bool rigid= false);
   void typeset (tree t, path ip);
+  void typeset_main (tree t, path ip);
   void finish ();
 
   friend class liner_rep;
