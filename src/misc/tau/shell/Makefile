@@ -15,8 +15,12 @@
 #
 #   mkdir -p build-tau-shell
 #   make -C build-tau-shell -f ../misc/tau/shell/Makefile -j8
-#   TAU_CORE=build-tau-native/tau_core TEXMACS_PATH=$PWD/TeXmacs \
-#     build-tau-shell/tau_shell
+#   build-tau-shell/tau_shell
+#
+# The shell finds the files of TeXmacs (../TeXmacs from where it is) and
+# the core (../build-tau-native/tau_core, which this Makefile builds too)
+# by itself, and keeps its settings in ~/.TauTeXmacs; TEXMACS_PATH,
+# TAU_CORE and TEXMACS_HOME_PATH say otherwise.
 #
 # MuPDF, FreeType and SDL3 are those of the system (PREFIX, Homebrew here).
 
@@ -50,7 +54,12 @@ CXXFLAGS := $(OPT) -w -std=c++20
 DEPFLAGS := -MMD -MP
 LIBS     := -L$(PREFIX)/lib -lmupdf -lmupdf-third -lfreetype -liconv -lz -lm -lSDL3 -lSDL3_ttf -framework Cocoa
 
-all: tau_shell
+all: tau_shell core
+
+# the core, which the shell starts (it looks for it in ../build-tau-native)
+core:
+	@mkdir -p ../build-tau-native
+	$(MAKE) -C ../build-tau-native -f $(W)/native/Makefile tau_core
 
 tau_shell: $(OBJECTS)
 	$(CXX) $(OPT) $(OBJECTS) $(LIBS) -o $@
@@ -67,4 +76,4 @@ clean:
 	rm -rf $(OBJ) tau_shell
 
 -include $(OBJECTS:.o=.d)
-.PHONY: all clean
+.PHONY: all clean core

@@ -1324,7 +1324,24 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   draws, for such tests. (The script of Vue does not turn its loop while
   it waits: several short waits, not a long one, or what the core says
   meanwhile is handled late.)
-- Not seen: the dialog of the files (it is the system's), a tooltip.
+- **By itself**: `tau_shell` finds the files of TeXmacs (`../TeXmacs`
+  from where it is) and the core (`../build-tau-native/tau_core`, which
+  its Makefile builds too) and keeps its settings in `~/.TauTeXmacs`,
+  not in those of TeXmacs; `TEXMACS_PATH`, `TAU_CORE` and
+  `TEXMACS_HOME_PATH` say otherwise.
+- **The desktop is not a browser.** The core took itself for one (the
+  shell gives it `TEXMACS_WEB_PLATFORM` for the shortcuts of the system):
+  the menu had "Files in this browser", the files were asked for in
+  `/home/tau`. The shell now also says `TAU_DESKTOP`, `in-browser?` is
+  false with it and `in-desktop?` true: the files are those of the
+  computer, from the home directory of the user, and a paste from a menu
+  still asks the shell for the clipboard.
+- Escape closes the menu of a view; full screen and the PDF of Print and
+  Preview (opened by the program of the system) are handled.
+- Seen since: the close cross of a tab with a document which is not
+  saved (the question of the core, and "yes" closes it), Escape on the
+  menu of a view. Not seen: the dialog of the files (it is the system's;
+  the request comes with the right folder), a tooltip.
 
 ## Order of the work
 

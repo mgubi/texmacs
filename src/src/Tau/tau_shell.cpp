@@ -184,6 +184,7 @@ core_start (url exe, int argc, char** argv) {
     dup2 (in_pipe[0], 0);
     close (in_pipe[1]); close (out_pipe[0]);
     setenv ("TAU_FD", std::to_string (out_pipe[1]).c_str (), 1);
+    setenv ("TAU_DESKTOP", "1", 1);
 #ifdef __APPLE__
     setenv ("TEXMACS_WEB_PLATFORM", "macos", 0);
 #endif
@@ -334,6 +335,7 @@ json_parse (const char* data, size_t n) {
 class tau_view_rep;
 static hashmap<int,pointer> views (NULL); // number of a view -> its canvas
 static std::string clipboard_text ();
+static bool close_context_menu ();
 
 class tau_view_rep: public vue_simple_widget_rep {
 public:
@@ -389,6 +391,8 @@ public:
   void handle_keypress (string key, time_t t) {
     (void) t;
     if (!view || !input) return;
+    // (Escape with the menu of the view open closes the menu)
+    if (key == "escape" && close_context_menu ()) return;
     if (key == "M-v" || key == "C-v") {
       // what the system has to paste, if it has a text: the core has its
       // own clipboard only
@@ -920,13 +924,17 @@ refresh_part (const json& m) {
 
 // the menu of a view, where the pointer is
 static widget context_menu;
+static bool
+close_context_menu () {
+  if (is_nil (context_menu)) return false;
+  set_visibility (context_menu, false);
+  destroy_window_widget (context_menu);
+  context_menu= widget ();
+  return true;
+}
 static void
 show_context_menu (const json& m) {
-  if (!is_nil (context_menu)) {
-    set_visibility (context_menu, false);
-    destroy_window_widget (context_menu);
-    context_menu= widget ();
-  }
+  close_context_menu ();
   widget menu= vertical_menu (build_items (m["items"], 0, { false, false }));
   context_menu= popup_window_widget (popup_widget (menu), "Popup menu");
   float x= 0, y= 0;
@@ -1149,6 +1157,20 @@ handle_message (std::string kind, std::string part, const json& desc) {
       core_say ("paste " + std::to_string (the_view->view) + " " + escaped (clipboard_text ()));
   }
   else if (kind == "files") choose_file (desc);
+  else if (kind == "fullscreen") set_full_screen (the_window, desc["on"].truth ());
+  else if (kind == "open-pdf") {
+    // Print and Preview write a PDF: the program of the system shows it
+    std::string path= desc["path"].str ();
+    pid_t pid= fork ();
+    if (pid == 0) {
+#ifdef __APPLE__
+      execlp ("open", "open", path.c_str (), (char*) NULL);
+#else
+      execlp ("xdg-open", "xdg-open", path.c_str (), (char*) NULL);
+#endif
+      _exit (127);
+    }
+  }
   else if (kind == "quit") exit (0);
 }
 
@@ -1228,6 +1250,28 @@ public:
 /******************************************************************************
 * The program
 ******************************************************************************/
+
+// Where things are when nothing says so: the files of TeXmacs and the
+// core next to the place of this program (as the builds of misc/tau leave
+// them), and a home directory of its own, which TeXmacs is not to share
+void
+tau_shell_defaults (const char* argv0) {
+  std::string self (argv0 == NULL? "": argv0), dir (".");
+  if (self.find ('/') != std::string::npos) dir= self.substr (0, self.rfind ('/'));
+  auto first= [] (std::vector<std::string> l) {
+    for (auto& p : l) if (access (p.c_str (), R_OK) == 0) return p;
+    return std::string (); };
+  if (getenv ("TEXMACS_PATH") == NULL) {
+    std::string p= first ({ dir + "/../TeXmacs", dir + "/../share/TeXmacs", dir + "/TeXmacs" });
+    if (p != "") setenv ("TEXMACS_PATH", p.c_str (), 1);
+  }
+  if (getenv ("TEXMACS_HOME_PATH") == NULL && getenv ("HOME") != NULL)
+    setenv ("TEXMACS_HOME_PATH", (std::string (getenv ("HOME")) + "/.TauTeXmacs").c_str (), 1);
+  if (getenv ("TAU_CORE") == NULL) {
+    std::string p= first ({ dir + "/tau_core", dir + "/../build-tau-native/tau_core" });
+    if (p != "") setenv ("TAU_CORE", p.c_str (), 1);
+  }
+}
 
 void
 tau_shell_main (int argc, char** argv) {

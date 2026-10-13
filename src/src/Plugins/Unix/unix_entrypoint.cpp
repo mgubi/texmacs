@@ -234,6 +234,12 @@ int reexec_detached (int argc, char** argv) {
 #endif
 
 int main (int argc, char** argv) {
+#ifdef TAU_SHELL
+  // the desktop program of Tau (src/Tau/tau_shell.cpp): where the files
+  // of TeXmacs, its home directory and the core are, before all the rest
+  void tau_shell_defaults (const char* argv0);
+  tau_shell_defaults (argv[0]);
+#endif
 #if EXPERIMENTAL_REEXEC_DETACHED
   reexec_detached (argc, argv);
 #endif

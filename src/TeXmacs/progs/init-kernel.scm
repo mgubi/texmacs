@@ -16,11 +16,19 @@
 ;; The initialization continues with init-texmacs.scm.
 
 (define remote-client-list (list))
+;; Tau on the desktop: the core is a program of the machine, started by the
+;; one which has the windows (tau_shell, which sets TAU_DESKTOP). It has
+;; the files of the computer and its programs, and something which shows
+;; its interface, as a page does
+(define (in-desktop?)
+  (let ((s (getenv "TAU_DESKTOP")))
+    (and (string? s) (not (string=? s "")))))
+
 ;; Tau in a page (and not under node, for the tests): the plugins which need
 ;; a program are Web Workers there (worker_link.cpp)
 (define (in-browser?)
   (let ((s (getenv "TEXMACS_WEB_PLATFORM")))
-    (and (string? s) (not (string=? s "")))))
+    (and (string? s) (not (string=? s "")) (not (in-desktop?)))))
 
 (define (tm-interactive-hook fun args) (tau-interactive fun args))
 

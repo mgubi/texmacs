@@ -23,7 +23,14 @@
 (texmacs-module (texmacs texmacs tau-files)
   (:use (kernel gui menu-serial)))
 
-(define user-dir "/home/tau/Documents")
+;; (on the desktop the files are those of the computer: the home directory
+;; of the user, and its Documents when there is one)
+(define desktop-home (or (and (in-desktop?) (getenv "HOME")) ""))
+(define user-dir
+  (cond ((== desktop-home "") "/home/tau/Documents")
+        ((url-exists? (system->url (string-append desktop-home "/Documents")))
+         (string-append desktop-home "/Documents"))
+        (else desktop-home)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Giving a file to the user
@@ -102,7 +109,7 @@
                                    (string-append "." new)))
             (url->system tail)))))
 
-(define home-dir "/home/tau")
+(define home-dir (if (== desktop-home "") "/home/tau" desktop-home))
 (define last-dir user-dir) ;; where a file was last chosen
 
 (define (in-home? dir)
@@ -177,7 +184,7 @@
   ;; it. A command of a menu has to ask: the page reads the clipboard (the
   ;; browser may ask the user) and pastes, or says that it could not, and
   ;; what TeXmacs kept is pasted.
-  (if (in-browser?)
+  (if (or (in-browser?) (in-desktop?))
       (tau-post "paste-request" "" '())
       (kbd-paste)))
 
