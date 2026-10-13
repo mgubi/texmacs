@@ -20,7 +20,7 @@ function link(text, href) {
 
 function head() {
 	const h = el("div", "tau-app-head"), img = el("img"), names = el("div");
-	img.src = "icon.svg"; img.alt = "";
+	img.src = "icon.png"; img.alt = "";
 	const title = el("div", "tau-app-title", "Tau");
 	title.append(el("span", "tau-app-badge", "experimental"));
 	names.append(title, el("div", "tau-app-sub", "GNU TeXmacs in the browser"));
