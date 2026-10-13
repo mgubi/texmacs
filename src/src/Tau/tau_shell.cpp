@@ -401,13 +401,14 @@ public:
   bool    wheel_sent;        // a step is with the core
   std::string move_held;     // the last move, which waits
   bool    move_sent;
+  bool    place_sent, place_held; // a place is with the core; another waits
 
   tau_view_rep (int v= 0, bool emb= false, bool inp= true, SI hw= 0, SI hh= 0):
     view (0), place (0), pw (0), ph (0), pix (NULL), fw (0), fh (0),
     embedded (emb), input (inp), hint_w (hw), hint_h (hh),
     ax (0), ay (0), asked (false), wanted (false), want_x (0), want_y (0),
     wheel_x (0), wheel_y (0), wheel_px (0), wheel_py (0), wheel_sent (false),
-    move_sent (false) { set_view (v); }
+    move_sent (false), place_sent (false), place_held (false) { set_view (v); }
   ~tau_view_rep () {
     if (view && views [view] == (pointer) this) views->reset (view);
     if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix); }
@@ -427,15 +428,31 @@ public:
     if (view && views [view] == (pointer) this) views->reset (view);
     view= v;
     if (view) views (view)= (pointer) this;
+    // (what was asked of the view before is answered to no one)
+    wheel_sent= move_sent= asked= place_sent= place_held= false;
+    move_held= "";
     say_place ();
   }
 
+  // The size of the canvas changes at each step when the line between
+  // two panes is dragged, and each size is a new place for which the core
+  // draws all of the view: one at a time, as for the wheel. (Each place
+  // which is told is then answered, and its frame is shown: told at every
+  // step, none was ever the last one, and the view flickered between an
+  // old frame and nothing.)
   void handle_notify_resize (SI w, SI h) {
     if (ren == NULL) return;
     int nw= (int) (w / ren->pixel), nh= (int) (h / ren->pixel);
     if (nw == pw && nh == ph) return;
     pw= nw; ph= nh;
+    if (place_sent) { place_held= true; return; }
+    send_place ();
+  }
+  void send_place () {
+    if (!view) return;
+    place_sent= true; place_held= false;
     say_place ();
+    core_say ("ping place " + std::to_string (view));
   }
   void handle_keypress (string key, time_t t) {
     (void) t;
@@ -523,6 +540,7 @@ public:
   void done (std::string what) {
     if (what == "wheel") { wheel_sent= false; send_wheel (); }
     else if (what == "bar") { asked= false; send_bar (); }
+    else if (what == "place") { place_sent= false; if (place_held) send_place (); }
     else if (what == "move") {
       move_sent= false;
       if (move_held != "") {
@@ -536,7 +554,9 @@ public:
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
     if (getenv ("TAU_SHELL_DEBUG") != NULL && !strcmp (getenv ("TAU_SHELL_DEBUG"), "2"))
       fprintf (stderr, "tau_shell] repaint view %d\n", view);
-    win->set_background (white);
+    // (what the frame does not cover, while the canvas is larger than it:
+    // the grey which is around a page, a white flashed)
+    win->set_background (is_nil (frame)? white: rgb_color (160, 160, 160));
     win->clear (x1, y1, x2, y2);
     if (is_nil (frame)) return;
     win->draw_picture (frame, ax, ay - fh * win->pixel);
@@ -1304,10 +1324,13 @@ set_tabs (const json& desc) {
       bool current= b["name"].str () == win["buffer"].str ();
       string title= b["title"].text () * (b["modified"].truth ()? string (" *"): string (""));
       int st= WIDGET_STYLE_BUTTON | (current? WIDGET_STYLE_PRESSED: 0);
-      // (the one which is shown: in bold)
-      a << menu_button (text_widget (title, st | (current? WIDGET_STYLE_BOLD: 0), black, false),
-                        tm_new<buffer_command_rep> ("switch", place, b["name"].str ()),
-                        "", "", st)
+      // (the one which the current pane shows: in bold and in blue, the
+      // others in grey; the whole name of its file when the pointer rests)
+      widget label= text_widget (title, current? WIDGET_STYLE_BOLD: 0,
+                                 current? rgb_color (0, 64, 160): rgb_color (96, 96, 96), false);
+      widget tab= menu_button (label, tm_new<buffer_command_rep> ("switch", place, b["name"].str ()),
+                               "", "", st);
+      a << balloon_widget (tab, text_widget (b["name"].text (), 0, black, false))
         << menu_button (text_widget ("<times>", WIDGET_STYLE_GREY, black, false),
                         tm_new<buffer_command_rep> ("close", place, b["name"].str ()),
                         "", "", 0)

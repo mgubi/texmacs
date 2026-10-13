@@ -5541,7 +5541,7 @@ font get_default_font (bool tt, bool mini, bool bold) {
   // (by its file: the rules which find a font by its family are those of
   // Scheme, which the shell has not)
   if (use_macos_fonts ()) {
-    font fn= unicode_font ("LucidaGrande", sz, (int) (0.95 * dpi));
+    font fn= unicode_font (bold? "LucidaGrandeBold": "LucidaGrande", sz, (int) (0.95 * dpi));
     if (!is_nil (fn) && fn->supports ("<#2318>")) return fn;
   }
 #endif
@@ -6239,7 +6239,10 @@ void show_help_balloon (widget balloon, SI x, SI y) {
   // window of the editor; it disappears as soon as the user presses a key
   // or moves the mouse (see process_event)
   close_help_balloon ();
+#ifndef TAU_SHELL
+  // (the shell of Tau has its one window, and none of TeXmacs)
   if (!has_current_window ()) return;
+#endif
   SI wx= 0, wy= 0;
   get_position (get_window (VUE_CURRENT_WINDOW), wx, wy);
   help_balloon_wid= popup_window_widget (balloon, "Balloon");
