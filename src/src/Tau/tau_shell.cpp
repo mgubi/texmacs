@@ -951,8 +951,17 @@ build (const json& node, int style, context c) {
     if (N(a) >= 2) w= (kind == "hsplit"? hsplit_widget (a[0], a[1]): vsplit_widget (a[0], a[1]));
     else w= pack (a, column);
   }
-  else if (kind == "scrollable")
-    w= user_canvas_widget (pack (build_items (node["items"], style, column), column), 0);
+  else if (kind == "scrollable") {
+    // A list of choices scrolls by itself in Vue when it has less room
+    // than it needs (in a resize): around it a canvas would be a second
+    // thing which scrolls, at the same place, and the wheel went to the
+    // one which had nothing to scroll
+    const json& in= node["items"];
+    if (in.a.size () == 1 && in.a[0]["kind"].str () == "choice")
+      w= pack (build_items (in, style, column), column);
+    else
+      w= user_canvas_widget (pack (build_items (in, style, column), column), 0);
+  }
   else if (kind == "resize") {
     widget inner= pack (build_items (node["items"], style, column), column);
     string h= node["height"].text ();
@@ -973,12 +982,17 @@ build (const json& node, int style, context c) {
     w= aligned_widget (lhs, rhs, 0, 0, 0, 0);
   }
   else if (kind == "tabs") {
+    // (with icons for the tabs, by their names as for the buttons: the
+    // preferences)
     array<widget> tabs, bodies;
+    array<url> icons;
     for (const json& t : node["tabs"].a) {
       tabs << pack (build_items (t["label"], style, row), row);
       bodies << pack (build_items (t["items"], style, column), column);
+      if (t.has ("icon") && t["icon"].str () != "") icons << url (t["icon"].text ());
     }
-    w= tabs_widget (tabs, bodies);
+    if (N(icons) == N(tabs) && N(tabs) > 0) w= icon_tabs_widget (icons, tabs, bodies);
+    else w= tabs_widget (tabs, bodies);
   }
   else if (kind == "view") {
     w= widget (tm_new<tau_view_rep> (node["view"].num (), true,

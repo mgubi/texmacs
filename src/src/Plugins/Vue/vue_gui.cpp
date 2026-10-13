@@ -1234,7 +1234,11 @@ vue_sdl_mupdf_window_rep::process_redraw () {
   // rendering of every window is saved there as window-<id>.png at each redraw
   static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
   if (N(snapshot_dir) > 0) {
-    save_pixmap_as_png (ctx, pix, snapshot_dir * "/window-" * as_string (id) * ".png");
+    // (TEXMACS_VUE_SNAPSHOT_NAMED: only those which a script asks for; a
+    // large window which is redrawn often takes all the time otherwise)
+    static bool named_only= (get_env ("TEXMACS_VUE_SNAPSHOT_NAMED") != "");
+    if (!named_only)
+      save_pixmap_as_png (ctx, pix, snapshot_dir * "/window-" * as_string (id) * ".png");
     // a virtual window is saved with the host which draws it
     bool target= (snapshot_win == this) ||
                  (snapshot_win != NULL && snapshot_win->platform_window () == NULL && is_host (this));
@@ -1385,11 +1389,18 @@ vue_sdl_gpu_window_rep::process_redraw () {
   bool same= (h == presented);
   static string snapshot_dir= get_env ("TEXMACS_VUE_SNAPSHOT");
   if (N(snapshot_dir) > 0) {
-    picture shot= gpu_read_screen (dev_w, dev_h);
+    static bool named_only= (get_env ("TEXMACS_VUE_SNAPSHOT_NAMED") != "");
+    bool wanted= (snapshot_win == this) ||
+                 (snapshot_win != NULL && snapshot_win->platform_window () == NULL &&
+                  is_host (this));
+    picture shot;
+    if (!named_only || (wanted && N(snapshot_name) > 0))
+      shot= gpu_read_screen (dev_w, dev_h);
     if (!is_nil (shot)) {
       fz_pixmap* pix= ((mupdf_picture_rep*) shot->get_handle ())->pix;
-      save_pixmap_as_png (mupdf_context (), pix,
-                          snapshot_dir * "/window-" * as_string (id) * ".png");
+      if (!named_only)
+        save_pixmap_as_png (mupdf_context (), pix,
+                            snapshot_dir * "/window-" * as_string (id) * ".png");
       bool target= (snapshot_win == this) ||
                    (snapshot_win != NULL && snapshot_win->platform_window () == NULL &&
                     is_host (this));

@@ -4244,6 +4244,7 @@ void Clay_UpdateScrollContainers(bool enableDragScrolling, Clay_Vector2 scrollDe
     // Don't apply scroll events to ancestors of the inner element
     int32_t highestPriorityElementIndex = -1;
     Clay__ScrollContainerDataInternal *highestPriorityScrollData = CLAY__NULL;
+    bool fallbackOnly = false; // (TeXmacs) see below
     for (int32_t i = 0; i < context->scrollContainerDatas.length; i++) {
         Clay__ScrollContainerDataInternal *scrollData = Clay__ScrollContainerDataInternalArray_Get(&context->scrollContainerDatas, i);
         if (!scrollData->openThisFrame) {
@@ -4293,8 +4294,23 @@ void Clay_UpdateScrollContainers(bool enableDragScrolling, Clay_Vector2 scrollDe
 
         for (int32_t j = 0; j < context->pointerOverIds.length; ++j) { // TODO n & m are small here but this being n*m gives me the creeps
             if (scrollData->layoutElement->id == Clay_ElementIdArray_Get(&context->pointerOverIds, j)->id) {
-                highestPriorityElementIndex = j;
-                highestPriorityScrollData = scrollData;
+                // (TeXmacs) Of the containers under the pointer, the one which
+                // gets the wheel is the innermost which has something to
+                // scroll along the wheel. It was the last one of this loop,
+                // whatever its depth: a list in a dialog which is itself a
+                // container (and scrolls nothing) did not get the wheel.
+                // The elements under the pointer come outermost first.
+                Clay_ClipElementConfig *clip = &scrollData->layoutElement->config.clip;
+                bool canV = clip->vertical && scrollData->contentSize.height > scrollData->layoutElement->dimensions.height;
+                bool canH = clip->horizontal && scrollData->contentSize.width > scrollData->layoutElement->dimensions.width;
+                bool useful = (scrollDelta.y != 0 && canV) || (scrollDelta.x != 0 && canH) || !scrollOccurred;
+                if (!useful) {
+                    if (highestPriorityScrollData == CLAY__NULL) { highestPriorityElementIndex = j; highestPriorityScrollData = scrollData; fallbackOnly = true; }
+                } else if (fallbackOnly || j > highestPriorityElementIndex) {
+                    highestPriorityElementIndex = j;
+                    highestPriorityScrollData = scrollData;
+                    fallbackOnly = false;
+                }
             }
         }
     }
