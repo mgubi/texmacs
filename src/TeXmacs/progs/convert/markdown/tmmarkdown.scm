@@ -53,12 +53,18 @@
   ;; conversion would change: ... into an ellipsis, ` into a quote
   (if (null? l) (cork->utf8 s)
       (let* ((what (car l))
-             (i (string-search-forwards what 0 s)))
-        (if (< i 0) (tmmd-keep s (cdr l))
-            (string-append
-              (tmmd-keep (substring s 0 i) (cdr l)) what
-              (tmmd-keep (substring s (+ i (string-length what))
-                                    (string-length s)) l))))))
+             (n (string-length what)))
+        (let loop ((start 0) (acc '()))
+          (with i (string-search-forwards what start s)
+            (if (< i 0)
+                (apply string-append
+                       (reverse (cons (tmmd-keep (substring s start
+                                                            (string-length s))
+                                                 (cdr l))
+                                      acc)))
+                (loop (+ i n)
+                      (cons what (cons (tmmd-keep (substring s start i) (cdr l))
+                                       acc)))))))))
 
 (define (tmmd-text s) (tmmd-keep s '("...")))
 (define (tmmd-code-text s) (tmmd-keep s '("..." "`")))
@@ -74,15 +80,20 @@
 (define (tmmd-merge l)
   ;; with the strings which follow each other as one, and so for the
   ;; emphasized texts and for code: *a**b* would not be read as *ab*
-  (cond ((null? l) l)
-        ((== (car l) "") (tmmd-merge (cdr l)))
-        ((and (pair? (car l)) (in? (caar l) '(em strong del code))
-              (nnull? (cdr l)) (func? (cadr l) (caar l)))
-         (tmmd-merge (cons `(,(caar l) ,@(tmmd-merge (append (cdar l) (cdadr l))))
-                           (cddr l))))
-        ((and (string? (car l)) (nnull? (cdr l)) (string? (cadr l)))
-         (tmmd-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        (else (cons (car l) (tmmd-merge (cdr l))))))
+  (let loop ((l l) (acc '()))
+    ;; acc: what is merged, the last node first
+    (cond ((null? l) (reverse acc))
+          ((== (car l) "") (loop (cdr l) acc))
+          ((and (nnull? acc) (pair? (car acc))
+                (in? (caar acc) '(em strong del code))
+                (func? (car l) (caar acc)))
+           (loop (cdr l)
+                 (cons `(,(caar acc)
+                         ,@(tmmd-merge (append (cdar acc) (cdar l))))
+                       (cdr acc))))
+          ((and (nnull? acc) (string? (car acc)) (string? (car l)))
+           (loop (cdr l) (cons (string-append (car acc) (car l)) (cdr acc))))
+          (else (loop (cdr l) (cons (car l) acc))))))
 
 (define (tmmd-squeeze s)
   ;; with one space for several

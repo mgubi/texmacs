@@ -285,14 +285,20 @@
     (string-append q (if pad? " " "") s (if pad? " " "") q)))
 
 (define (mdout-url s)
-  ;; an address with spaces or parentheses is written between < and >
+  ;; an address with spaces or parentheses is written between < and >,
+  ;; where these two are written after a backslash
   (if (or (string-index s #\space) (string-index s #\() (string-index s #\)))
-      (string-append "<" s ">")
+      (string-append "<" (string-replace (string-replace s "<" "\\<")
+                                         ">" "\\>")
+                     ">")
       s))
 
 (define (mdout-title s)
   (if (or (not s) (== s "")) ""
-      (string-append " \"" (string-replace s "\"" "\\\"") "\"")))
+      (string-append " \""
+                     (string-replace (string-replace s "\\" "\\\\")
+                                     "\"" "\\\"")
+                     "\"")))
 
 (define (mdout-html-attr x name)
   ;; the attribute name of x as HTML writes it, if x has it

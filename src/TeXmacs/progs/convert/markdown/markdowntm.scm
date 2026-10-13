@@ -42,18 +42,26 @@
 (define (mdtm-text s)
   ;; the text in the encoding of TeXmacs; a backquote stays one, as it does
   ;; for the other formats (alone, it would be the accent of this encoding)
-  (with i (string-search-forwards "`" 0 s)
-    (if (< i 0) (utf8->cork s)
-        (string-append (utf8->cork (substring s 0 i)) "`"
-                       (mdtm-text (substring s (+ i 1) (string-length s)))))))
+  (let loop ((start 0) (acc '()))
+    (with i (string-search-forwards "`" start s)
+      (if (< i 0)
+          (apply string-append
+                 (reverse (cons (utf8->cork (substring s start
+                                                       (string-length s)))
+                                acc)))
+          (loop (+ i 1) (cons "`" (cons (utf8->cork (substring s start i))
+                                        acc)))))))
 
 (define (mdtm-merge l)
   ;; with the strings which follow each other as one
-  (cond ((null? l) l)
-        ((== (car l) "") (mdtm-merge (cdr l)))
-        ((and (string? (car l)) (nnull? (cdr l)) (string? (cadr l)))
-         (mdtm-merge (cons (string-append (car l) (cadr l)) (cddr l))))
-        (else (cons (car l) (mdtm-merge (cdr l))))))
+  (let loop ((l l) (strs '()) (acc '()))
+    ;; strs: the strings before l which are not in acc yet, the last first
+    (let ((flush (lambda ()
+                   (with s (apply string-append (reverse strs))
+                     (if (== s "") acc (cons s acc))))))
+      (cond ((null? l) (reverse (flush)))
+            ((string? (car l)) (loop (cdr l) (cons (car l) strs) acc))
+            (else (loop (cdr l) '() (cons (car l) (flush))))))))
 
 (define (mdtm-concat l)
   (with r (mdtm-merge l)
@@ -139,9 +147,11 @@
 
 (define (mdtm-footnote label)
   ;; the footnote, or its mark as text when it has no definition, or when it
-  ;; is in its own text
+  ;; is in the text of a footnote: a footnote does not hold others, and
+  ;; definitions which refer to each other twice would make a document
+  ;; whose size doubles with each of them
   (with def (ahash-ref mdtm-footnotes label)
-    (if (and def (not (in? label mdtm-open-footnotes)))
+    (if (and def (null? mdtm-open-footnotes))
         (with old mdtm-open-footnotes
           (set! mdtm-open-footnotes (cons label old))
           (with l (mdtm-blocks def)
@@ -180,15 +190,35 @@
 (define (mdtm-size s)
   ;; a length of TeXmacs for the width or the height of an image: a number
   ;; is in pixels and a percentage is a part of the width of the paragraph
+  ;; and anything else is a number with a unit of length, or nothing
   (cond ((or (not s) (== s "")) "")
-        ((string->number s) (string-append s "px"))
+        ((mdtm-number s) (string-append s "px"))
         ((and (string-ends? s "%")
-              (string->number (substring s 0 (- (string-length s) 1))))
+              (mdtm-number (substring s 0 (- (string-length s) 1))))
          (string-append
            (number->string
-             (/ (string->number (substring s 0 (- (string-length s) 1))) 100.0))
+             (/ (mdtm-number (substring s 0 (- (string-length s) 1))) 100.0))
            "par"))
-        (else s)))
+        (else
+          (let* ((n (string-length s))
+                 (k (let loop ((k n))
+                      (if (and (> k 0) (char-alphabetic? (string-ref s (- k 1))))
+                          (loop (- k 1)) k))))
+            (if (and (mdtm-number (substring s 0 k))
+                     (in? (substring s k n) mdtm-units))
+                s "")))))
+
+(define mdtm-units
+  '("px" "pt" "bp" "mm" "cm" "in" "em" "ex" "pc" "par" "pag" "fn" "spc"))
+
+(define (mdtm-number s)
+  ;; the number which a string of digits with at most one dot is, or #f
+  (and (!= s "") (!= s ".")
+       (let loop ((i 0) (dot? #f))
+         (cond ((>= i (string-length s)) (string->number s))
+               ((char-numeric? (string-ref s i)) (loop (+ i 1) dot?))
+               ((and (char=? (string-ref s i) #\.) (not dot?)) (loop (+ i 1) #t))
+               (else #f)))))
 
 (define (mdtm-image x)
   `(image ,(mdtm-text (or (mdtm-attr x 'src) ""))

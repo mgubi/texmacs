@@ -86,7 +86,10 @@
     in bold. A table too wide for the page gets its width and its cells are
     broken into lines.
 
-    <item*|Quotations, rules, footnotes>
+    <item*|Quotations, rules, footnotes>A footnote does not hold other
+    footnotes: a mark inside the text of a footnote stays as it is written.
+    Quotations and lists inside each other are read down to a hundred
+    levels, and are text beyond.
 
     <item*|<name|Html>>The tags of <name|Html> inside the text are read by
     the <hlink|converter for <name|Html>|../html/man-html.en.tm>.
@@ -140,6 +143,16 @@
     display (<menu|Edit|Preferences|Convert|Markdown> turns this off: they
     are then plain text). Colors, fonts, sizes and alignments are dropped,
     and so are the drawings made with <TeXmacs>.
+
+    <item*|What does not come back>A file which is written and read again
+    is not always the document it was. A formula which is a single symbol
+    is written as its character, and is text afterwards. The sizes of the
+    images come back in pixels or as parts of the paragraph, whatever
+    their unit was, and a height which is neither is dropped. The headings
+    start again at the first level, so that the sections of a document
+    with chapters are subsections afterwards. An address which stands in
+    the text is a link when it is read, and braces which follow an image
+    are read as its size.
   </description>
 
   To write something only into the <name|Markdown> file,
