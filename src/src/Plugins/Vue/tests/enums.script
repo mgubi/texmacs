@@ -1,0 +1,38 @@
+# needs enums.scm: an editable enum takes what is typed on return
+# ("enum: 13pt") and a choice from its list ("enum: 12pt"); the enum of
+# values of different widths is as wide as the widest (e0); the choice list
+# scrolls (e5); the long enum at the bottom opens its list above itself,
+# within the window (e3), which scrolls (e4), and an item is chosen in it
+wait 6000
+window Vue enums
+snapshot e0
+click 120 19
+wait 300
+key End
+key Backspace
+key Backspace
+key Backspace
+key Backspace
+text 13pt
+key Return
+wait 500
+snapshot e1
+click 149 19
+wait 500
+snapshot e2
+click 120 74
+wait 500
+snapshot e2b
+click 105 500
+wait 500
+snapshot e3
+move 105 300
+wait 200
+wheel 105 300 0 -5
+wait 700
+snapshot e4
+click 100 300
+wait 500
+wheel 60 100 0 -3
+wait 700
+snapshot e5

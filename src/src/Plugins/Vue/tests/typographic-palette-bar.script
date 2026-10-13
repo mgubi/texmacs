@@ -1,0 +1,27 @@
+# needs typographic-palette-bar.scm: Format > Colour from the menu bar (col:
+# "Palette: Classical", the standard grid), "Earth" chosen in the list of
+# the palettes (on: its colours in the open menu, which moves up if it no
+# longer fits), then "Classical" (off: the grid of before). The refresh
+# asked for in the menu reaches the editor window (windows_refresh), which
+# no other window opens. Positions for the default window of the test home.
+wait 6000
+window No name
+click 231 15
+wait 900
+move 242 275
+wait 1200
+snapshot col
+move 400 280
+wait 300
+move 505 311
+wait 300
+click 505 311
+wait 900
+click 460 385
+wait 1500
+snapshot on
+click 505 311
+wait 900
+click 472 331
+wait 1500
+snapshot off

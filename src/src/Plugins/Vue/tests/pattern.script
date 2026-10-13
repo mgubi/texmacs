@@ -1,0 +1,4 @@
+# needs pattern.scm: paper background and pattern-filled glyphs
+wait 8000
+window #2
+snapshot pat1

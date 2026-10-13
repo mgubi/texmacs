@@ -1,0 +1,22 @@
+# needs submenu.scm: open the first menu (s1), then its submenu "More",
+# which must stay open together with its parent (s2), choose "Beta" in it
+# ("SUB beta" in the log), then open the second menu, which closes the
+# first one (s4)
+wait 6000
+window Submenus
+resize 400 260
+wait 800
+click 30 16
+wait 700
+snapshot s1
+click 50 65
+wait 700
+snapshot s2
+click 130 65
+wait 700
+snapshot s3
+click 30 16
+wait 500
+click 90 16
+wait 700
+snapshot s4

@@ -1,0 +1,6 @@
+# the View menu has items with check marks
+wait 6000
+window #2
+click 397 12
+wait 800
+snapshot checks

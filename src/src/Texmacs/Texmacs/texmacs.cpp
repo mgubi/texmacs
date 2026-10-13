@@ -890,7 +890,14 @@ texmacs_entrypoint (int argc, char** argv) {
 //#ifdef EXPERIMENTAL
 //  test_environments ();
 //#endif
+#ifdef TAU_SHELL
+  // the desktop program of Tau (src/Tau/tau_shell.cpp): the interface
+  // only, the editor is in another process
+  void tau_shell_main (int argc, char** argv);
+  start_scheme (argc, argv, tau_shell_main);
+#else
   start_scheme (argc, argv, TeXmacs_main);
+#endif
 #ifdef QTTEXMACS
   if (headless_mode)
     delete qtmcoreapp;

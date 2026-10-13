@@ -1,0 +1,6 @@
+# needs resize-pos.scm: the box shows Line 20 at its bottom, the wide row
+# its middle (Line 11)
+wait 8000
+window Vue resize
+snapshot resize
+wait 500

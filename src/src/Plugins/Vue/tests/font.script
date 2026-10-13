@@ -1,0 +1,13 @@
+# needs font.scm: open the font selector, close it from its title bar,
+# keep running (the sample text is an editor which outlives the window)
+wait 9000
+window Font
+snapshot f0
+close
+wait 1500
+window #2
+click 300 400
+wait 300
+text abc
+wait 800
+snapshot f1

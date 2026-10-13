@@ -1,0 +1,12 @@
+# needs interactive.scm: the query line in the footer
+wait 9000
+window #2
+focus
+wait 800
+snapshot ia1
+text Bob
+wait 500
+snapshot ia2
+key Return
+wait 800
+snapshot ia3

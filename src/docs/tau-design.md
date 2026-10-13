@@ -1248,6 +1248,84 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   events (7000 lines) serves as it is. Or the page itself in a web view,
   which is days and keeps the interface which exists.
 
+- **Vue for the interface** (chosen 2026-10-13; `src/Tau/tau_shell.cpp`,
+  `misc/tau/shell`). The widgets of TeXmacs (`widget.hpp`), which Vue
+  implements, are what `menu-widget.scm` made and what the serialiser of
+  Tau describes instead: a description is made into widgets node by
+  node (an entry is `menu_button` with a command which sends the number
+  of its action, a submenu `pulldown_button` with a promise which asks
+  the core for its contents and waits for them, an icon `xpm_widget` of
+  the file the core found). So the program is TeXmacs built with Vue as
+  usual and the switch `TAU_SHELL`, from the tree of Tau (`Plugins/Vue`
+  is back in it, as in `maxs_texmacs`, with three places cut by the
+  switch: the window of TeXmacs which is current, twice, and the TeX
+  fonts), started at `tau_shell_main` in place of the server of
+  TeXmacs: no buffer, no editor, and of Scheme the interpreter alone,
+  for the values the widgets give their commands, with a dozen
+  definitions for what Vue asks (`wheel-capture?` is true: the wheel
+  goes to the core). A view of the core is a canvas of Vue
+  (`tau_view_rep`, a `vue_simple_widget_rep`) which draws the pixels of
+  the paints and sends the keys and the pointer as Vue gives them to
+  an editor; its place is its size.
+- Done so far: the window with the menu bar, the four icon bars, the
+  footer, the title, and the view; menus open with their contents,
+  shortcuts and greyed entries, entries act, typing, clicking and the
+  wheel work. Then the rest of the vocabulary: what Scheme says comes in
+  batches (`batch`); a dialog is a window of Vue made of its description
+  (`plain_window_widget`, whose closing tells the core), with rows and
+  columns, tabs, aligned rows, inputs, enums, choices and toggles, whose
+  commands send their value under their number (`answer`, the value
+  written as Scheme reads it); a part which comes again (`refresh`) is a
+  place whose widgets are replaced (`tau_slot_rep`); the tools at the
+  sides and under the view are parts like the bars, and a field in one
+  takes the keyboard by its name (`send_keyboard_focus_on`, as TeXmacs
+  does for the search); the menu of a view is a popup window at the
+  pointer; a view in a dialog is another canvas, the paints go to each
+  by its number; the clipboard of the system is set by `clipboard` and
+  read for a paste (`paste`); a file which the core asks for is chosen
+  in the dialog of the system (`chosen`). `TAU_SHELL_DEBUG` prints what
+  the core says.
+- Seen with the snapshots and the scripted events of Vue
+  (`TEXMACS_VUE_SNAPSHOT`, `TEXMACS_VUE_SCRIPT`, docs/vue-testing.md):
+  the preferences (tabs, enums; "Simplified menus" chosen there changes
+  the menu bar), the menu of the view, the search tool (what is typed
+  goes to its field and the matches are marked in the document). Not
+  seen: the dialog of the files (it is the system's), views in dialogs.
+- **The scroll bars** are those of the canvas of Vue: each paint says
+  where the view is in its document and how large the document is, the
+  canvas takes these as its extents and its position and draws the frame
+  there; when a bar is dragged Vue moves the canvas, and the core is
+  asked to scroll by the difference (`tau_view_rep::follow`). The wheel
+  goes to the core.
+- **The documents are tabs** in the bar just above the view (the place of
+  the icons of the user, the fourth bar, which the core seldom uses): a
+  click switches (`buffer switch`), the cross closes; one document, no
+  tabs. **Closing the window** asks the core to quit
+  (`safely-quit-TeXmacs`), which asks first when documents are not
+  saved, in a dialog as any other.
+- **Icons by their names**: the core gives the file it found for an
+  icon, but Vue draws a file at its own size (a flag filled the window);
+  by the name of the markup Vue finds it in the icon set and the theme
+  and gives it the size of an icon.
+- **The other windows of the core** (View → New window) are windows
+  here too, each with its view and nothing else (`view_of_place`): the
+  bars of the main window are those of the view which has the keyboard,
+  as the core says them. A window which is closed gives its place up
+  (`buffer close-window`), and the ones which the core has no more go.
+- **What is dropped on a view** (Vue makes items of it): the images are
+  inserted where they fell (`drop`, as in the page), the other files are
+  opened, a text is pasted. **A tooltip** of the core is a view in a
+  tooltip window of Vue.
+- Seen since: the font selector whole (lists, enums, the sample which
+  the core typesets in a view of the dialog; a family which is chosen is
+  answered, the styles come again and the sample is typeset anew), a
+  second window which takes what is typed, an image dropped on the view.
+  `TAU_SHELL_EVAL` is a command of Scheme which the core runs once it
+  draws, for such tests. (The script of Vue does not turn its loop while
+  it waits: several short waits, not a long one, or what the core says
+  meanwhile is handled late.)
+- Not seen: the dialog of the files (it is the system's), a tooltip.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:

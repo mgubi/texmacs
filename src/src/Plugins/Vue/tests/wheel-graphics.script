@@ -1,0 +1,14 @@
+# needs wheel-graphics.scm: the cursor is in a graphics, where the wheel
+# goes to the editor ("got: wheel dx dy"), and the view does not scroll
+# (the scroll printed by F12 stays 0)
+wait 9000
+window #2
+focus
+wait 500
+key F12
+wheel 300 200 0 -2
+wait 300
+wheel 300 200 0 -2
+wait 800
+key F12
+snapshot graphics

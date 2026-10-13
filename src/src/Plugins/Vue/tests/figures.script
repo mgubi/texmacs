@@ -1,0 +1,4 @@
+# needs figures.scm: PDF figures drawn by MuPDF, upright and rotated
+wait 9000
+window #2
+snapshot fig1

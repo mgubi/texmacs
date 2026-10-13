@@ -1,0 +1,7 @@
+# needs prefs-tool.scm: the section tabs of the preferences tool
+wait 9000
+window #2
+snapshot pt0
+click 1057 191
+wait 1000
+snapshot pt1

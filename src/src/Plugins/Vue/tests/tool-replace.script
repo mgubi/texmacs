@@ -1,0 +1,4 @@
+# needs tool-replace.scm: replacing the font tool must not crash
+wait 10000
+window #2
+snapshot tr1

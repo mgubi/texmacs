@@ -1,0 +1,34 @@
+wait 5000
+window Vue test
+snapshot t0
+click 40 34
+wait 300
+click 250 68
+wait 300
+click 130 143
+wait 500
+snapshot t1-enum-open
+click 140 175
+wait 500
+snapshot t2-enum-chosen
+click 214 143
+wait 300
+click 50 168
+wait 200
+text p
+wait 500
+snapshot t3-filter-ap
+click 40 203
+wait 300
+click 19 372
+wait 500
+snapshot t4-tree-open
+click 40 372
+wait 300
+press 50 600
+move 100 650
+move 200 700
+release 200 700
+wait 500
+snapshot t5-ink
+wait 300

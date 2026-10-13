@@ -1,0 +1,26 @@
+# needs wheel-travel.scm (a long document): scrolling shifts the backing
+# store and repaints only the exposed strips; the result must be identical
+# to a repaint from scratch (s1 = s2), also after scrolling back (s3 = s4)
+wait 7000
+window #2
+wait 500
+wheel 300 400 0 -2
+wait 100
+wheel 300 400 0 -2
+wait 100
+wheel 300 400 0 -0.3
+wait 100
+wheel 300 400 0 -1.5
+wait 700
+snapshot s1
+repaint
+wait 300
+snapshot s2
+wheel 300 400 0 1.2
+wait 100
+wheel 300 400 0 2.5
+wait 700
+snapshot s3
+repaint
+wait 300
+snapshot s4

@@ -84,3 +84,4 @@ src/Plugins/Qt*/moc_*.cpp
 TeXmacs/doc/about/welcome/texmacs-vue-build.en.tm
 /build-tau/
 /build-tau-native/
+/build-tau-shell/

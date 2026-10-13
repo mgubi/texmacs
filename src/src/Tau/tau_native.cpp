@@ -16,7 +16,8 @@
 *
 * - what the other side says comes on the standard input, a line for each
 *   message: its name and its arguments, the last of which may hold spaces
-*   ("key 3 C-x", "mouse 3 press-left 120 80 1 0", "place 3 800 600 2 1");
+*   ("key 3 C-x", "mouse 3 press-left 120 80 1 0", "place 3 800 600 2 1",
+*   "answer 12 \"a value\" #t", "chosen 4 /home/me/a.tm");
 * - what the core says goes to the descriptor which the variable TAU_FD
 *   names (the standard output is for what TeXmacs prints), in frames: four
 *   letters, the length of what follows in four bytes, and that. "VIEW"
@@ -50,6 +51,11 @@ extern "C" {
   void tau_expand (int n);
   void tau_scheme (const char* code);
   void tau_closed (int id);
+  void tau_answer (int n, const char* args);
+  void tau_file (int ticket, const char* path);
+  void tau_paste (int view, const char* text, const char* html);
+  void tau_buffer (const char* what, int place, const char* name);
+  void tau_drop (int view, int x, int y, const char* paths);
 }
 
 static int out_fd= -2;
@@ -199,6 +205,29 @@ dispatch (const std::string& line, void (*turn) (void)) {
   else if (name == "close") tau_closed (num (line, pos));
   else if (name == "scheme")
     tau_scheme (unescape (word (line, pos, true)).c_str ());
+  else if (name == "answer") {
+    // (the arguments as Scheme reads them)
+    int n= num (line, pos);
+    tau_answer (n, unescape (word (line, pos, true)).c_str ());
+  }
+  else if (name == "chosen") {
+    int ticket= num (line, pos);
+    tau_file (ticket, word (line, pos, true).c_str ());
+  }
+  else if (name == "paste") {
+    int view= num (line, pos);
+    tau_paste (view, unescape (word (line, pos, true)).c_str (), "");
+  }
+  else if (name == "drop") {
+    // (images which were dropped: their paths, a line for each)
+    int view= num (line, pos), x= num (line, pos), y= num (line, pos);
+    tau_drop (view, x, y, unescape (word (line, pos, true)).c_str ());
+  }
+  else if (name == "buffer") {
+    std::string what= word (line, pos);
+    int place= num (line, pos);
+    tau_buffer (what.c_str (), place, word (line, pos, true).c_str ());
+  }
   else if (name == "ping") {
     // (answered once all that came before it is done, as in the page)
     std::string id= word (line, pos, true);

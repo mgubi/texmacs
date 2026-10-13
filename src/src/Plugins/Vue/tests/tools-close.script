@@ -1,0 +1,11 @@
+# needs tools-close.scm: replace the right tool, add a bottom one, close the top one
+wait 5000
+window #2
+snapshot a0
+wait 3000
+snapshot a1
+wait 3000
+snapshot a2
+click 1400 149
+wait 1500
+snapshot a3
