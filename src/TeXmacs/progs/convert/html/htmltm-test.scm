@@ -526,7 +526,7 @@
          (image "foo" "100px" "50px"))
    (test "img, %"
          '(img (@ (src "foo") (width "50%")))
-         (image "foo" "1/2par" ""))))
+         (image "foo" "0.5par" ""))))
 
 (define (regtest-htmltm-alignment)
   (regression-test-group

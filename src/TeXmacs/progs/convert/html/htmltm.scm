@@ -313,7 +313,11 @@
 	      ((string->number s) => (lambda (n) (tmlength n 'px)))
 	      ((and (string-ends? s "%")
 		    (string->number (string-drop-right s 1)))
-	       => (lambda (n) (tmlength (/ n 100) 'par)))
+	       ;; NOTE: a fraction such as 1/2 is not a number of a length
+	       => (lambda (n)
+		    (with q (/ n 100)
+		      (tmlength (if (integer? q) q (exact->inexact q))
+				'par))))
 	      (else (tmlength))))))
 
 (define (htmltm-image env a c)
