@@ -202,14 +202,21 @@ show_context_menu (widget menu, SI x, SI y) {
   set_visibility (footer_popup_wid, true);
 }
 
+// the pointer over the divider of a split widget (vue_gui.cpp)
+void vue_split_pointer (unsigned int id, int shape);
+
 class footer_popup_command_rep : public command_rep {
   SI x, y;
 public:
   footer_popup_command_rep (SI x2, SI y2) : x (x2), y (y2) {}
   void apply () {
 #ifndef TAU_SHELL
-    // (in the shell of Tau the menu is the core's: not yet)
     show_context_menu (make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))")), x, y);
+#else
+    // (in the shell of Tau the menu is the core's, which is asked for it
+    // and shown where the pointer is: tau_shell.cpp)
+    void tau_shell_footer_popup ();
+    tau_shell_footer_popup ();
 #endif
   }
   void apply (object arg) { (void) arg; apply (); }
@@ -3917,7 +3924,7 @@ vue_ui_rep::do_layout () {
     // both panes share the space equally
     vue_split_widget_star d= open_box<vue_split_widget_star> (data);
     bool horiz= (type == "hsplit_widget");
-    const float bar= ui_pxf (8);
+    const float bar= ui_pxf (10);
     Clay_ElementId my_id= CLAY_SIDI (CLAY_TM_STRING (type), id);
     Clay_ElementId bar_id= CLAY_IDI ("splitter", id);
     Clay_ElementData ed= Clay_GetElementData (my_id);
@@ -3949,12 +3956,27 @@ vue_ui_rep::do_layout () {
       CLAY_AUTO_ID({ .layout= { .sizing= first }}) {
         concrete (d.a)->do_layout ();
       }
+      // the divider: a dark line (it stands out from the grey around the
+      // pages and from the scroll bars) with a light grip in the middle;
+      // under the pointer it has the colour of a selection and the
+      // pointer is the double arrow of a resize
+      bool over= d.dragging || Clay_PointerOver (bar_id);
+      vue_split_pointer (id, over ? (horiz ? 1 : 4) : 0);
       CLAY(bar_id, {
-        .backgroundColor= (d.dragging || Clay_PointerOver (bar_id)) ? palette[0] : palette[3],
+        .backgroundColor= over ? the_theme.selection : the_theme.text_grey,
         .layout= {
           .sizing= {
             .width=  horiz ? CLAY_SIZING_FIXED (bar) : CLAY_SIZING_GROW(0),
-            .height= horiz ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIXED (bar) }}}) {};
+            .height= horiz ? CLAY_SIZING_GROW(0) : CLAY_SIZING_FIXED (bar) },
+          .childAlignment= { .x= CLAY_ALIGN_X_CENTER, .y= CLAY_ALIGN_Y_CENTER }}}) {
+        CLAY_AUTO_ID({
+          .backgroundColor= over ? the_theme.selection_text : the_theme.background,
+          .layout= {
+            .sizing= {
+              .width=  CLAY_SIZING_FIXED (horiz ? ui_pxf (2) : ui_pxf (40)),
+              .height= CLAY_SIZING_FIXED (horiz ? ui_pxf (40) : ui_pxf (2)) }},
+          .cornerRadius= CLAY_CORNER_RADIUS (ui_pxf (1)) }) {}
+      }
       CLAY_AUTO_ID({ .layout= { .sizing= second }}) {
         concrete (d.b)->do_layout ();
       }

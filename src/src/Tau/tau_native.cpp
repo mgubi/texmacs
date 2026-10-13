@@ -51,6 +51,7 @@ extern "C" {
   void tau_expand (int n);
   void tau_scheme (const char* code);
   void tau_closed (int id);
+  void tau_context_menu (int view);
   void tau_answer (int n, const char* args);
   void tau_file (int ticket, const char* path);
   void tau_paste (int view, const char* text, const char* html);
@@ -203,6 +204,8 @@ dispatch (const std::string& line, void (*turn) (void)) {
   else if (name == "invoke") tau_invoke (num (line, pos));
   else if (name == "expand") tau_expand (num (line, pos));
   else if (name == "close") tau_closed (num (line, pos));
+  // (the context menu of a view, asked from outside it: a tag of the footer)
+  else if (name == "popup") tau_context_menu (num (line, pos));
   else if (name == "scheme")
     tau_scheme (unescape (word (line, pos, true)).c_str ());
   else if (name == "answer") {

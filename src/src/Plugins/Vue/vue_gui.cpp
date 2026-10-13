@@ -2170,6 +2170,20 @@ set_frame_cursor (int e) {
   if (cursors[e] != NULL) SDL_SetCursor (cursors[e]);
 }
 
+// The divider of a split widget says, when it is laid out, whether the
+// pointer is over it (or drags it), and with which double arrow (1: left
+// and right, 4: up and down, 0: not any more)
+static unsigned int split_owner= 0;
+static int split_shape= 0;
+
+void
+vue_split_pointer (unsigned int id, int shape) {
+  if (shape != 0) { split_owner= id; split_shape= shape; }
+  else if (split_owner == id && split_shape != 0) split_shape= 0;
+  else return;
+  set_frame_cursor (split_shape);
+}
+
 void
 vue_virtual_window_rep::show () {
   shown= true;
@@ -2767,7 +2781,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
       if (old != NULL) pointer_left (old);
     }
   }
-  if (kind == 0) set_frame_cursor (edges);
+  if (kind == 0) set_frame_cursor (edges != 0 ? edges : split_shape);
   if (title) return NULL;
   if (target == NULL) return win;
   x= sx - target->x;

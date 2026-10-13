@@ -334,6 +334,15 @@ tau_popup (string menu, int view) {
   tau_post_json ("popup", as_string (view), json);
 }
 
+#ifndef __EMSCRIPTEN__
+// the same when the other side asks for it: a right click on a tag of the
+// interactive footer, once the tag is selected (tau_native.cpp, "popup")
+extern "C" void
+tau_context_menu (int view) {
+  tau_popup ("texmacs-popup-menu", view);
+}
+#endif
+
 /******************************************************************************
 * The buffers and the windows, for the tabs and the panes of the page
 *******************************************************************************

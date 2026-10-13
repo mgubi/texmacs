@@ -1308,6 +1308,17 @@ show_panes () {
   if (!is_nil (w)) set_scrollable (the_frame, w);
 }
 
+// A right click on a tag of the interactive footer (vue_widget.cpp): the
+// tag is selected by its command, which went first, and the core is asked
+// for the context menu of the view which has the keyboard
+void
+tau_shell_footer_popup () {
+  pane* p= (pane*) panes [current_place];
+  tau_view_rep* v= (p != NULL? p->view: the_view);
+  if (v != NULL && v->view)
+    core_say ("popup " + std::to_string (v->view));
+}
+
 static tau_view_rep*
 view_of_place (int place) {
   pane* p= (pane*) panes [place];
