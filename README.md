@@ -1,6 +1,6 @@
 # Tau — branch `wip_tau`
 
-<img src="src/misc/tau/web/icon.png" width="96" align="right" alt="The icon of Tau">
+<img src="src/misc/tau/icons/tau.svg" width="96" align="right" alt="The icon of Tau">
 
 **Tau** is an experiment with [GNU TeXmacs](https://texmacs.org) in the
 browser, organised differently from the other ports: the editor, the

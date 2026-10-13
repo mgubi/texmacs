@@ -30,7 +30,18 @@ for size in 256 192 180; do
   sips -z "$size" "$size" "$here/tau.png" \
     --out "$here/../web/$name" >/dev/null
 done
+# The vector icon: the page shows it as it is (the app button, the loading
+# panel, the icon of the tab).
+cp "$here/tau.svg" "$here/../web/icon.svg"
+
 # The window and the Dock of the desktop program (tau_shell), and the page
-# about Tau in the documentation.
-cp "$here/../web/icon.png" "$src/TeXmacs/misc/images/tau-256.png"
+# about Tau in the documentation: MuPDF, which draws there, has no SVG
+# filters, so they get a picture of the vector icon (librsvg), or of the
+# raster master without it.
+if command -v rsvg-convert >/dev/null; then
+  rsvg-convert -w 256 -h 256 "$here/tau.svg" \
+    -o "$src/TeXmacs/misc/images/tau-256.png"
+else
+  cp "$here/../web/icon.png" "$src/TeXmacs/misc/images/tau-256.png"
+fi
 printf 'Tau icons exported to %s\n' "$out"

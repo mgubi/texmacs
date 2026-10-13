@@ -23,13 +23,16 @@ To preview the SVG with librsvg (optional):
 rsvg-convert -w 1254 -h 1254 misc/tau/icons/tau.svg -o /tmp/tau-svg.png
 ```
 
-The web app uses `../web/icon.png` (256 pixels), `icon-192.png` for the browser
-fallback, and `icon-180.png` for the Apple touch icon. The app button and loading
-panel use the same artwork.
+The web app shows the vector icon itself, `../web/icon.svg` (a copy of
+`tau.svg`): the app button, the loading panel and the icon of the tab. The
+PNG files beside it are for what cannot take an SVG: `icon.png` (256 pixels)
+and `icon-192.png` as fallbacks of the tab icon, `icon-180.png` for the Apple
+touch icon.
 
-The desktop program (`tau_shell`) shows `TeXmacs/misc/images/tau-256.png`, a
-copy of `../web/icon.png`, as the icon of its window and in the Dock, and the
-page about Tau of the documentation (Help → About Tau) shows it too.
+The desktop program (`tau_shell`) draws with MuPDF, which has no SVG filters:
+it shows `TeXmacs/misc/images/tau-256.png`, a picture of `tau.svg` made with
+librsvg, as the icon of its window and in the Dock, and the page about Tau of
+the documentation (Help → About Tau) shows it too.
 
 `../../../packages/macos/Tau.icns` contains the standard macOS icon sizes
 16, 32, 128, 256, and 512 points, each at 1x and 2x, up to 1024 pixels. It is a
