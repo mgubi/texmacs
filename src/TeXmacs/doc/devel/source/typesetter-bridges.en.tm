@@ -457,7 +457,12 @@
   difference). A character typed in a line then costs a quarter of the
   time in the pager, which still formats every page with its header and
   footer. An edit which changes the number of lines, or the height of
-  one, changes the signature and is searched in full.
+  one, changes the signature and is searched in full. What the breaker
+  changes in the items it gets (a footnote on two columns of an item on
+  one column goes to the next item on two columns, and some penalties are
+  set) is done before the signature is taken, at every pass
+  (<cpp|breaker_prepare_items>): the skeleton refers to the items as they
+  are after it, and the pager needs them so when the search is skipped.
 
   That search finds the same breaks as before, in the same order and with
   the same arithmetic, but faster for the positions with no pending float
@@ -541,7 +546,13 @@
   <cpp|changes> only hold those whose value it changed. In the same way a
   paragraph which is removed no longer has every bridge after it typeset
   again: the bridge which follows keeps the changes of the removed one,
-  which the next pass compares with the environment.
+  which the next pass compares with the environment. A bridge which binds
+  variables for the bridges below it (a <markup|with>, an ornament, a
+  locus, a formatting tag) writes them without a record of the change,
+  since they have their values back when it is done: it keeps what it
+  bound, and the variables whose binding differs from the previous pass
+  are in <cpp|old_patch> while the bridges below it are typeset
+  (<cpp|bridge_rep::bind_start> and <cpp|bind_end>).
   <verbatim|TEXMACS_TYPESET_READS> may be <verbatim|off>, or
   <verbatim|check> to typeset again all the same and report a bridge
   whose lines, contents or changes differ.
@@ -639,7 +650,12 @@
   <verbatim|auto-x><math|k>, numbered by the old counter. The variable
   <src-var|auto-last> holds the last name which was given: the next tag
   which makes a label after a new one reads another value and is typeset
-  again, once.
+  again, once. The variable <src-var|auto-open> holds the last names
+  given by the tag and by the tags around it in the document, from which
+  a tag knows how many labels it made when a tag inside it made one in
+  between; it is a variable and not a count kept with the tag, since the
+  labels of one tag may be made by several bridges, of which some are
+  used again.
 
   The numbers follow the order in which the tags first made a label. When
   the document is updated they are given again, from 1 and in the order of
