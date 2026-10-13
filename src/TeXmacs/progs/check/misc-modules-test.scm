@@ -816,6 +816,30 @@
         ((== (car t) 'action) (list (caddr t)))
         (else (append-map design-actions (cdr t)))))
 
+;; A position of the cursor history whose buffer was closed is forgotten,
+;; not read
+(define (test-cursor-history)
+  (check-group "cursor history")
+  (with-buffer-doc '(document "one" "two") '("generic")
+    (lambda ()
+      (go-end)
+      (cursor-history-add (cursor-path))))
+  (with-buffer-doc '(document "three" "four") '("generic")
+    (lambda ()
+      (with start (cursor-path)
+        (cursor-history-add start)
+        (check-true (cursor-has-history?))
+        (go-end)
+        (with end (cursor-path)
+          (cursor-history-add end)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (cursor-history-backward)
+          (check= (cursor-path) start)
+          (check-false (cursor-has-history?))
+          (cursor-history-forward)
+          (check= (cursor-path) end))))))
+
 (define (test-font-design-page)
   (check-group "font design: page")
   (with-buffer-doc '(document "x") '("generic")
@@ -2484,7 +2508,8 @@
   (for-each run-group
             (list test-help-files test-doc-parse test-tmdoc-expand
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
-                  test-font-database test-font-design test-font-design-page
+                  test-font-database test-font-design test-cursor-history
+                  test-font-design-page
                   test-font-design-apply
                   test-font-variants test-font-variant-menus test-font-weights
                   test-font-design-variants
