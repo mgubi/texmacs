@@ -42,7 +42,7 @@ bridge nil_bridge;
 bridge_rep::bridge_rep (typesetter ttt2, tree st2, path ip2):
   ttt (ttt2), env (ttt->env), st (st2), ip (ip2),
   status (CORRUPTED), changes (UNINIT), reads (), reads_known (false),
-  removed (UNINIT) {}
+  removed (UNINIT), bound (UNINIT) {}
 
 static tree inactive_auto
   (MACRO, "x", tree (REWRITE_INACTIVE, tree (ARG, "x"), "recurse*"));
@@ -341,6 +341,14 @@ extern tree the_et;
 * have now, and those which differ enter old_patch, as after a bridge
 * which is typeset again.
 *
+* A bridge which binds variables for the bridges below it (a with, an
+* ornament, a locus, a formatting tag) writes them without a record of
+* the change: they have their values back when it is done, and are not
+* among its changes. Below it they are others than in the previous pass
+* when it binds other values: it keeps what it bound ('bound'), and the
+* variables whose binding differs are in old_patch while the bridges below
+* it are typeset (bind_start and bind_end).
+*
 * TEXMACS_TYPESET_READS may be "off" (typeset again as before) or "check"
 * (typeset again all the same, and report a result which differs).
 ******************************************************************************/
@@ -431,6 +439,44 @@ lines_signature (array<page_item> l) {
       << (SI) l[i]->spc->min << (SI) l[i]->spc->def << (SI) l[i]->spc->max
       << (SI) l[i]->penalty << (SI) N(l[i]->fl);
   return r;
+}
+
+// 'now' is a tuple of the variables which the bridge binds and of their
+// values. The result is what bind_end needs to put old_patch back, when
+// the bridges below are typeset
+tree
+bridge_rep::bind_start (tree now) {
+  tree outer (TUPLE);
+  if (now == bound) return outer;
+  for (int i=0; i+1<N(now); i+=2) {
+    if (!is_atomic (now[i])) continue;
+    string var= now[i]->label;
+    // (the value bound in the previous pass, which is the last one of
+    // the variable in 'bound')
+    tree prev (UNINIT);
+    bool same= false;
+    if (is_func (bound, TUPLE))
+      for (int j=0; j+1<N(bound); j+=2)
+        if (bound[j] == now[i]) { prev= bound[j+1]; same= (prev == now[i+1]); }
+    for (int j=i+2; j+1<N(now); j+=2)
+      if (now[j] == now[i]) same= true; // (bound again further on)
+    if (same) continue;
+    if (ttt->old_patch->contains (var))
+      outer << tree (var) << tree ("1") << ttt->old_patch [var];
+    else outer << tree (var) << tree ("0") << tree (UNINIT);
+    ttt->old_patch (var)= prev;
+  }
+  bound= copy (now);
+  return outer;
+}
+
+void
+bridge_rep::bind_end (tree outer) {
+  for (int i=N(outer)-3; i>=0; i-=3) {
+    string var= outer[i]->label;
+    if (outer[i+1] == "1") ttt->old_patch (var)= outer[i+2];
+    else ttt->old_patch->reset (var);
+  }
 }
 
 void

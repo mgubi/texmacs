@@ -182,7 +182,11 @@ bridge_with_rep::my_typeset (int desired_status) {
   // for (i=0; i<k; i++) env->monitored_write_update (vars[i], newv[i]);
   for (i=0; i<k; i++) env->write_update (vars[i], newv[i]);
   ttt->insert_marker (st, ip);
+  tree now (TUPLE);
+  for (i=0; i<k; i++) now << tree (vars[i]) << newv[i];
+  tree outer= bind_start (now);
   body->typeset (desired_status);
+  bind_end (outer);
   for (i=k-1; i>=0; i--) env->write_update (vars[i], oldv[i]);
   STACK_DELETE_ARRAY(vars);
   STACK_DELETE_ARRAY(oldv);
