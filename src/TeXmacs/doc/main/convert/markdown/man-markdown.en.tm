@@ -44,6 +44,69 @@
   <verbatim|a price of $5 and $6> has no formula. A formula which is a
   single symbol, such as an arrow, is written as this character.
 
+  <paragraph|The style for Markdown files>
+
+  A file which is opened is a document of the style <tmstyle|markdown>:
+  text without serifs, headings without numbers, and a few macros which
+  keep what <name|Markdown> says and the standard tags do not. Such a
+  document is written as the file it was read from: what you did not
+  touch keeps its meaning, and what <name|Markdown> cannot say in two ways
+  keeps its text; what you edit is written anew.
+
+  <\description>
+    <item*|Headings>The six levels are <markup|section>,
+    <markup|subsection>, <markup|subsubsection>, <markup|paragraph>,
+    <markup|subparagraph> and <markup|md-h6>, whatever the first one of the
+    file is, and a file has no title of its own.
+
+    <item*|The header>The lines of a <name|YAML> header are kept in
+    <markup|md-metadata>, one <markup|md-meta> with a key and its value
+    for each of them (and without key for a line which has none: an item
+    of a list, a comment). Keys can be edited, added and removed, and are
+    written in their order.
+
+    <item*|Formulas, tables, <name|Html>>They are in <markup|md-source>
+    (in a paragraph) or <markup|md-block-source> (on lines of their own),
+    with the text of the file for them: <verbatim|\\(x\\)> stays
+    <verbatim|\\(x\\)>, a table keeps the widths of its columns, and
+    <name|Html> which <TeXmacs> does not understand, a comment for
+    instance, is kept and shown as a flag. As soon as the formula, the
+    table or the text is edited, it is written by <TeXmacs>.
+
+    <item*|Lists>The lists whose items start with <verbatim|->,
+    <verbatim|*> and <verbatim|+> are <markup|itemize-minus>,
+    <markup|itemize-dot> and <markup|itemize-arrow>, and a list with blank
+    lines between its items is in <markup|md-loose>.
+
+    <item*|Code>The words after the fence are kept by <markup|md-fence>
+    when the language is not one of those which <TeXmacs> highlights, or
+    is not written as <TeXmacs> writes it (<verbatim|c> for
+    <verbatim|cpp>).
+
+    <item*|Images>An image with a description or a title is in
+    <markup|md-image>; an image alone with a description and no title is a
+    figure with this caption, as below.
+
+    <item*|Footnotes>A footnote whose label is not its number is
+    <markup|md-footnote>, with this label, and <markup|md-footnote-text>
+    marks the place where its text is written when this is not the end of
+    the file.
+  </description>
+
+  What <name|Markdown> writes in several ways is written in one when it
+  is none of the above: the lines of a paragraph are joined, a heading
+  with a line under it starts with <verbatim|#>, code is between
+  <verbatim|```>, a rule is <verbatim|***>, emphasis is written with
+  stars, a link through a definition is written with its address, and a
+  character written as <verbatim|&amp;> or after a backslash is written
+  as itself unless it would be taken for markup. The file which is
+  written says the same, and is written as itself from then on.
+
+  With <menu|Edit|Preferences|Convert|Markdown> a file is read as a
+  document of the style <tmstyle|generic> instead, with the title and
+  the sections which <TeXmacs> displays for it; text which is pasted is
+  always read so, since it may go into any document.
+
   <paragraph|What is read>
 
   <\description>
@@ -144,7 +207,8 @@
     are then plain text). Colors, fonts, sizes and alignments are dropped,
     and so are the drawings made with <TeXmacs>.
 
-    <item*|What does not come back>A file which is written and read again
+    <item*|What does not come back>Outside the style
+    <tmstyle|markdown>, a file which is written and read again
     is not always the document it was. A formula which is a single symbol
     is written as its character, and is text afterwards. The sizes of the
     images come back in pixels or as parts of the paragraph, whatever

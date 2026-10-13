@@ -20,7 +20,8 @@
 ;; (tmmarkdown.scm) knows them, and their expansion is layout which Markdown
 ;; cannot express. The same is done for Html, see tmhtml-expand.scm.
 
-(texmacs-module (convert markdown tmmarkdown-expand))
+(texmacs-module (convert markdown tmmarkdown-expand)
+  (:use (convert markdown tmmarkdown)))
 
 (define (tmmarkdown-env-macro name)
   `(associate ,(symbol->string name)
@@ -32,6 +33,29 @@
   (:secure #t)
   ;; (quoted: the typesetter evaluates what an extern returns)
   `(quote (markdown-doc-data ,@(tm-children (tm->stree t)))))
+
+;; a formula or HTML of a file (the macros md-math and md-html of the style
+;; markdown): its source, when its body is still the copy which was made
+;; when it was read, and its body else. This is told here, before the
+;; expansion, which would change the body and the copy
+(define (tmmarkdown-md-source kind t)
+  (with l (tm-children (tm->stree t))
+    (cond ((null? l) "")
+          ((and (== (length l) 3) (== (car l) (caddr l)))
+           ;; (quoted: the typesetter evaluates what an extern returns)
+           `(quote (md-kept ,(if (and (== kind "block")
+                                      (tmmarkdown-table? (car l)))
+                                 "table" kind)
+                            ,(cadr l))))
+          (else (car l)))))
+
+(tm-define (tmmarkdown-md-inline-source t)
+  (:secure #t)
+  (tmmarkdown-md-source "inline" t))
+
+(tm-define (tmmarkdown-md-block-source t)
+  (:secure #t)
+  (tmmarkdown-md-source "block" t))
 
 (tm-define (tmmarkdown-env-patch)
   `(collection
@@ -75,6 +99,15 @@
              tmdoc-title tmdoc-title* tmdoc-title** tmdoc-copyright
              tmdoc-license tmdoc-flag
              html-tag html-attr html-div-style html-div-class html-style
-             html-class))
+             html-class
+             ;; the macros of the style markdown
+             md-loose md-fence md-image md-footnote md-footnote-text
+             md-metadata md-meta md-h6))
+    (associate "md-source"
+               (xmacro "x" (extern "tmmarkdown-md-inline-source"
+                                   (quote-arg "x"))))
+    (associate "md-block-source"
+               (xmacro "x" (extern "tmmarkdown-md-block-source"
+                                   (quote-arg "x"))))
     (associate "doc-data"
                (xmacro "x" (extern "tmmarkdown-doc-data" (quote-arg "x"))))))

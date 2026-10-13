@@ -442,11 +442,16 @@
                      "](" (mdout-url (or (mdout-attr x 'src) ""))
                      (mdout-title (mdout-attr x 'title)) ")")))
               ((br) (if cell? "<br>" "\\\n"))
+              ;; (a formula as it was written, but in the cell of a table,
+              ;; where its bars would end the cell)
               ((math)
-               (string-append "$" (mdout-cell-math (mdout-join l "") cell?) "$"))
+               (or (and (not cell?) (mdout-attr x 'source))
+                   (string-append "$" (mdout-cell-math (mdout-join l "") cell?)
+                                  "$")))
               ((displaymath)
-               (string-append "$$" (mdout-cell-math (mdout-join l "") cell?)
-                              "$$"))
+               (or (and (not cell?) (mdout-attr x 'source))
+                   (string-append "$$" (mdout-cell-math (mdout-join l "") cell?)
+                                  "$$")))
               ((html) (mdout-join l ""))
               ((footnote) (string-append "[^" (mdout-join l "") "]"))
               (else (mdout-inlines l cell?)))))))
@@ -511,7 +516,14 @@
                                           "\"" "\\\"") "\"")
       s))
 
-(define (mdout-meta l)
+(define (mdout-meta x)
+  ;; the YAML header: its lines as they are written, if it has them
+  (with source (mdout-attr x 'source)
+    (if source
+        `("---" ,@(if (== source "") '() (mdout-split source)) "---")
+        (mdout-meta-values (mdout-children x)))))
+
+(define (mdout-meta-values l)
   ;; the YAML header; a key with several values is a list
   (let loop ((l l) (acc '()) (seen '()))
     (cond ((null? l) `("---" ,@(reverse acc) "---"))
@@ -534,7 +546,7 @@
   (let* ((s (mdout-join (list-filter (mdout-children x) string?) ""))
          (n (max 3 (+ (mdout-longest-run s #\`) 1)))
          (fence (make-string n #\`)))
-    `(,(string-append fence (or (mdout-attr x 'lang) ""))
+    `(,(string-append fence (or (mdout-attr x 'info) (mdout-attr x 'lang) ""))
       ,@(mdout-split s)
       ,fence)))
 
@@ -548,21 +560,44 @@
          (rest (make-string (string-length marker) #\space)))
     (mdout-prefix (mdout-blocks l loose?) first rest)))
 
+(define (mdout-needs-blank? a b)
+  ;; is a blank line needed between the blocks a and b which follow each
+  ;; other in an item? Without it a paragraph would go on the paragraph, the
+  ;; quote or the list before it, and a table or HTML would take what
+  ;; follows; code between fences, a heading, a rule, a quote, a list and
+  ;; a table start by themselves
+  (and (pair? a) (pair? b)
+       (or (in? (car a) '(table html))
+           (and (func? b 'p) (in? (car a) '(p blockquote ul ol)))
+           (and (func? a 'p) (in? (car b) '(html footnote-def))))))
+
 (define (mdout-loose? x)
   ;; a list is written with blank lines between its items when it had some,
-  ;; or when an item holds more than a paragraph and lists
+  ;; or when two blocks of an item need one between them: the list is read
+  ;; as one with blank lines then
   (or (== (mdout-attr x 'loose) "true")
       (list-or (map (lambda (li)
-                      (with l (list-filter (mdout-children li)
-                                           (lambda (b) (not (and (pair? b)
-                                                                 (in? (car b) '(ul ol))))))
-                        (> (length l) 1)))
+                      (let loop ((l (mdout-children li)))
+                        (and (nnull? l) (nnull? (cdr l))
+                             (or (mdout-needs-blank? (car l) (cadr l))
+                                 (loop (cdr l))))))
                     (mdout-children x)))))
 
-(define (mdout-list x other?)
-  ;; other?: with the other marker, * for - and ) for the dot, which starts
-  ;; a new list after a list of the same kind
+(define (mdout-list-marker x avoid)
+  ;; what the items of the list start with: -, * or +, a dot or a
+  ;; parenthesis after a number. A list after a list of the same kind would
+  ;; be read as one with the marker of that one, avoid: it takes another
+  (let* ((m (if (func? x 'ol) "."
+                (with a (mdout-attr x 'marker)
+                  (if (in? a '("*" "+")) a "-")))))
+    (cond ((!= m avoid) m)
+          ((func? x 'ol) ")")
+          ((== m "-") "*")
+          (else "-"))))
+
+(define (mdout-list x avoid)
   (let* ((ordered? (func? x 'ol))
+         (mark (mdout-list-marker x avoid))
          (loose? (mdout-loose? x))
          (start (or (and (mdout-attr x 'start)
                          (string->number (mdout-attr x 'start)))
@@ -570,9 +605,8 @@
     (let loop ((l (mdout-children x)) (i start) (acc '()))
       (if (null? l) (reverse acc)
           (let* ((marker (if ordered?
-                             (string-append (number->string i)
-                                            (if other? ") " ". "))
-                             (if other? "* " "- ")))
+                             (string-append (number->string i) mark " ")
+                             (string-append mark " ")))
                  (lines (mdout-item (car l) marker loose?)))
             (loop (cdr l) (+ i 1)
                   (append (reverse lines)
@@ -661,7 +695,7 @@
         (else
           (let ((l (mdout-children x)))
             (case (car x)
-              ((meta) (mdout-meta (cdr x)))
+              ((meta) (mdout-meta x))
               ((h1 h2 h3 h4 h5 h6)
                (let* ((n (- (char->integer (string-ref (symbol->string (car x)) 1))
                             (char->integer #\0)))
@@ -676,9 +710,15 @@
               ((ul ol) (mdout-list x #f))
               ((pre) (mdout-pre x))
               ((hr) (list "***"))
-              ((table) (mdout-table x))
+              ;; (a table and a formula as they were written, if they
+              ;; have their source)
+              ((table)
+               (with source (mdout-attr x 'source)
+                 (if source (mdout-split source) (mdout-table x))))
               ((displaymath)
-               `("$$" ,@(mdout-split (mdout-join l "")) "$$"))
+               (with source (mdout-attr x 'source)
+                 (if source (mdout-split source)
+                     `("$$" ,@(mdout-split (mdout-join l "")) "$$"))))
               ((html) (mdout-split (mdout-join l "")))
               ((footnote-def) (mdout-footnote-def x))
               ((markdown) (mdout-blocks l #t))
@@ -688,21 +728,23 @@
 (define (mdout-blocks l loose?)
   ;; the lines of blocks; between them a blank line, except in an item of a
   ;; list without blank lines, before a list inside it
-  (let loop ((l l) (acc '()) (first? #t) (prev #f) (other? #f))
-    ;; prev: the block before, other?: a list with the other marker
+  (let loop ((l l) (acc '()) (first? #t) (prev #f) (mark #f))
+    ;; prev: the block before, mark: its marker if it is a list
     (cond ((null? l) (reverse acc))
           (else
             (let* ((x (car l))
                    (items? (and (pair? x) (in? (car x) '(ul ol))))
                    ;; two lists of a kind in a row would be read as one
-                   (other? (and items? (func? prev (car x)) (not other?)))
-                   (lines (if items? (mdout-list x other?) (mdout-block x)))
-                   (sep? (and (not first?) (or loose? (not items?)))))
+                   (avoid (and items? (func? prev (car x)) mark))
+                   (mark (and items? (mdout-list-marker x avoid)))
+                   (lines (if items? (mdout-list x avoid) (mdout-block x)))
+                   (sep? (and (not first?)
+                              (or loose? (mdout-needs-blank? prev x)))))
               (if (null? lines)
-                  (loop (cdr l) acc first? prev other?)
+                  (loop (cdr l) acc first? prev mark)
                   (loop (cdr l)
                         (append (reverse lines) (if sep? (cons "" acc) acc))
-                        #f x other?)))))))
+                        #f x mark)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Interface
@@ -716,9 +758,11 @@
 (tm-define (serialize-markdown x)
   (:type (-> stree string))
   (:synopsis "Write the Markdown tree @x as Markdown")
-  (let* ((x (if (func? x '!file 1) (cadr x) x))
+  (let* ((file? (func? x '!file 1))
+         (x (if file? (cadr x) x))
          (l (if (func? x 'markdown) (cdr x) (list x))))
-    (if (list-or (map mdout-block? l))
+    ;; (a file is blocks, also when it is a formula or HTML alone)
+    (if (or (list-or (map mdout-block? l)) (and file? (nnull? l)))
         (string-append (mdout-join (mdout-blocks l #t) "\n") "\n")
         ;; text only: a snippet
         (mdout-join (mdout-text l) "\n"))))

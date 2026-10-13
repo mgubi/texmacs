@@ -29,7 +29,11 @@
 ;;            (html "text")  (footnote "label")
 ;;
 ;; A node may have attributes, (tag (@ (name "value")...) ...): start and
-;; loose for the lists, checked for the items of task lists, lang for pre,
+;; loose for the lists, marker for those whose items start with * or +, checked for the items of task lists, lang for pre
+;; (and info, for all the words after the fence when there are several),
+;; source for meta (the lines of the header as they are written), for a
+;; table, and for a formula which is not written $latex$ or, on lines of
+;; its own, between two lines $$,
 ;; align for th and td, href and title for a, src, alt, title, width and
 ;; height for img (the sizes as in HTML or CSS: 300, 50%, 2cm). The
 ;; children of img are its description, of which alt is the plain text.
@@ -545,6 +549,12 @@
                   (loop (cdr l) key?))
                  (else #f))))))
 
+(define (md-lines-until l end)
+  ;; the lines of l before its tail end
+  (let loop ((l l) (acc '()))
+    (if (or (null? l) (eq? l end)) (reverse acc)
+        (loop (cdr l) (cons (car l) acc)))))
+
 (define (md-front-matter lines)
   ;; the YAML header, as (meta (key "value")...), or #f
   (and (nnull? lines) (== (md-trim-right (car lines)) "---")
@@ -552,7 +562,10 @@
        (let loop ((l (cdr lines)) (acc '()) (key #f))
          (cond ((null? l) #f)
                ((in? (md-trim-right (car l)) '("---" "..."))
-                (cons `(meta ,@(reverse acc)) (cdr l)))
+                (cons `(meta (@ (source ,(md-join (md-lines-until (cdr lines) l)
+                                                  "\n")))
+                             ,@(reverse acc))
+                      (cdr l)))
                ((md-starts? (car l) 0 "#") (loop (cdr l) acc key))
                (else
                  (let* ((s (car l))
@@ -627,7 +640,10 @@
                              (not (md-space? (string-ref info e))))
                         (loop (+ e 1)) e)))
                (lang (substring info 0 e)))
-          (cons `(pre ,@(if (== lang "") '() `((@ (lang ,lang))))
+          (cons `(pre ,@(if (== lang "") '()
+                            `((@ (lang ,lang)
+                                 ,@(if (== (md-trim info) lang) '()
+                                       `((info ,(md-trim info)))))))
                       ,(md-join (reverse acc) "\n"))
                 (if (null? l) l (cdr l))))
         (loop (cdr l) (cons (md-dedent (car l) (caddr fence)) acc)))))
@@ -668,10 +684,16 @@
           (cond (e (let* ((last (md-trim (substring s 0 e)))
                           (after (md-trim (substring s (+ e 2)
                                                      (string-length s)))))
-                     (cons `(displaymath
-                              ,(md-join (reverse (if (== last "") acc
-                                                     (cons last acc))) "\n"))
-                           (if (== after "") l (cons after l)))))
+                     (let* ((tex (md-join (reverse (if (== last "") acc
+                                                       (cons last acc))) "\n"))
+                            (raw (md-join (md-lines-until lines l) "\n")))
+                       (cons `(displaymath
+                                ,@(if (or (!= after "")
+                                          (== raw (string-append "$$\n" tex
+                                                                 "\n$$")))
+                                      '() `((@ (source ,raw))))
+                                ,tex)
+                             (if (== after "") l (cons after l))))))
                 ((or (null? l) (md-blank? (car l)))
                  (set! md-no-math-end
                        (cons (cons close (length l)) md-no-math-end))
@@ -771,7 +793,10 @@
                    (attrs (append
                             (if (and ordered? start (!= start 1))
                                 `((start ,(number->string start))) '())
-                            (if loose? '((loose "true")) '()))))
+                            (if loose? '((loose "true")) '())
+                            ;; (a list with dashes has none)
+                            (if (in? kind '(#\* #\+))
+                                `((marker ,(string kind))) '()))))
               (cons `(,(if ordered? 'ol 'ul)
                       ,@(if (null? attrs) '() `((@ ,@attrs)))
                       ,@(reverse items))
@@ -791,7 +816,9 @@
              (rows (list `(tr ,@(cells 'th (md-split-row (car lines)))))))
     (if (or (null? l) (md-blank? (car l)) (md-interrupts? (car l))
             (not (md-find (car l) 0 #\|)))
-        (cons `(table ,@(reverse rows)) l)
+        (cons `(table (@ (source ,(md-join (md-lines-until lines l) "\n")))
+                      ,@(reverse rows))
+              l)
         (loop (cdr l)
               (cons `(tr ,@(cells 'td (md-split-row (car l)))) rows)))))
 
@@ -952,13 +979,22 @@
                         (substring t 1 (- m 1)) t)))
            (cons `(code ,t*) e)))))
 
+(define (md-math-node tag mark tex raw)
+  ;; a formula of the text, with its source when it is not written between
+  ;; two marks
+  `(,tag ,@(if (== raw (string-append mark tex mark)) '()
+               `((@ (source ,raw))))
+         ,tex))
+
 (define (md-dollar-math s i)
   ;; (node . end) for a formula which starts with the dollar at i
   (let ((n (string-length s)))
     (if (md-starts? s i "$$")
         (with e (md-search* s (+ i 2) "$$")
           (and e (> e (+ i 2))
-               (cons `(displaymath ,(md-trim (substring s (+ i 2) e)))
+               (cons (md-math-node 'displaymath "$$"
+                                   (md-trim (substring s (+ i 2) e))
+                                   (substring s i (+ e 2)))
                      (+ e 2))))
         ;; a dollar which is followed by a space does not open a formula,
         ;; one which follows a space or is followed by a digit does not
@@ -973,8 +1009,11 @@
                       (and (not (md-space? (string-ref s (- j 1))))
                            (not (and (< (+ j 1) n)
                                      (md-digit? (string-ref s (+ j 1)))))
-                           (cons `(math ,(string-replace (substring s (+ i 1) j)
-                                                         "\n" " "))
+                           (cons (md-math-node
+                                   'math "$"
+                                   (string-replace (substring s (+ i 1) j)
+                                                   "\n" " ")
+                                   (substring s i (+ j 1)))
                                  (+ j 1))))
                      (else (loop (+ j 1)))))))))
 
@@ -983,8 +1022,10 @@
   (let* ((display? (md-starts? s i "\\["))
          (e (md-search* s (+ i 2) (if display? "\\]" "\\)"))))
     (and e (not (and display? (md-literal-brackets? s i e)))
-         (cons (list (if display? 'displaymath 'math)
-                     (md-trim (string-replace (substring s (+ i 2) e) "\n" " ")))
+         (cons (md-math-node
+                 (if display? 'displaymath 'math) (if display? "$$" "$")
+                 (md-trim (string-replace (substring s (+ i 2) e) "\n" " "))
+                 (substring s i (+ e 2)))
                (+ e 2)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
