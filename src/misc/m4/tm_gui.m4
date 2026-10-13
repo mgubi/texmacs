@@ -51,6 +51,10 @@ AC_DEFUN([TM_GUI],[
             then QT_PLUGINS_LIST="imageformats,platforms,iconengines"
             else QT_PLUGINS_LIST="accessible,imageformats"
             fi
+            # the TLS of Qt 6 (WebSocket clients of the server over TLS)
+            if test $QT_MAJOR -ge 6
+            then QT_PLUGINS_LIST="$QT_PLUGINS_LIST,tls"
+            fi
          fi
          CONFIG_QTPIPES="yes"
          ;;

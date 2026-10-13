@@ -961,8 +961,9 @@ var tmFrame = (function () {
       'programs. For the same reason, the converters and tools which need an external ' +
       'program (LaTeX, Ghostscript, ImageMagick, the spell checker, Git) are missing.',
       'Only the fonts which come with TeXmacs: the page cannot see the fonts of the system.',
-      'The remote tools (the Remote menu) connect over WebSocket to a TeXmacs server of ' +
-      'this branch, on this machine only for now (no encrypted wss yet).',
+      'The remote tools (the Remote menu) connect over WebSocket to a server run by ' +
+      'TeXmacs Vue. To a server on another machine the connection is encrypted (wss), ' +
+      'which needs a certificate there that the browser trusts.',
       'TeXmacs Vue keeps your files from one tab of the browser at a time: in another ' +
       'tab it shows them, but does not keep its changes, until you move TeXmacs there ' +
       '("Use TeXmacs here").',

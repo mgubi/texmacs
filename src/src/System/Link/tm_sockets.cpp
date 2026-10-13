@@ -62,6 +62,7 @@
 #define INET_NTOP inet_ntop
 #define TM_FD_SET(fd, set) FD_SET(fd, set)
 #define GETSOCKOPT getsockopt
+#define SETSOCKOPT setsockopt
 
 #else
 
@@ -83,6 +84,7 @@
 #define FD_ISSET __WSAFDIsSet
 #define TM_FD_SET(fd, set) FD_SET((u_int) fd, set)
 #define GETSOCKOPT wsoc::getsockopt
+#define SETSOCKOPT wsoc::setsockopt
 
 #endif
 
@@ -209,21 +211,44 @@ socket_present () {
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-// In the browser a socket is a WebSocket (Emscripten), to ws://host:port/
-// or wss://host:port/. A page served over https may open wss only (a ws
-// from it is blocked as mixed content), save to this machine, which the
-// browser trusts: wss to the other hosts then, ws otherwise (a page over
-// http, a server on this machine). ?websocket=wss (or ws) in the address of
-// the page says which, whatever the page (the tests serve it over http)
-EM_JS (int, web_socket_scheme, (const char* host), {
+// In the browser a socket is a WebSocket (Emscripten). A TeXmacs server
+// serves the WebSockets at a port of their own, by default the one which
+// follows its port, so that a connection to host:port opens
+// ws://host:port+1/ or wss://host:port+1/. ?websocket-port=N in the address
+// of the page gives another port (the preference "server websocket port"
+// of the server, or the port of a bridge).
+//
+// The server speaks wss when it is open to other machines and asks its
+// clients for TLS, ws otherwise (a server for this machine only, or one
+// without TLS). So: ws to this machine, and wss to another host when the
+// login is one over TLS; a page served over https may open wss only to
+// another host anyway (a ws from it is blocked as mixed content).
+// ?websocket=wss (or ws) in the address of the page says which, whatever
+// the page and the server (the tests use it).
+static bool web_socket_tls= false;
+
+void
+web_socket_over_tls (bool tls) {
+  web_socket_tls= tls;
+}
+
+EM_JS (int, web_socket_scheme, (const char* host, int tls), {
   var h = UTF8ToString (host);
   var page = typeof location !== 'undefined' ? location : null;
   var q = page ? new URLSearchParams (page.search).get ('websocket') : null;
   var local = /^(localhost|127\.[0-9.]+|::1|\[::1\])$/i.test (h);
+  var https = page && page.protocol === 'https:';
   var scheme = (q === 'wss' || q === 'ws') ? q :
-               (page && page.protocol === 'https:' && !local ? 'wss' : 'ws');
+               (!local && (https || tls) ? 'wss' : 'ws');
   if (typeof SOCKFS !== 'undefined') SOCKFS.websocketArgs['url'] = scheme + '://';
   return scheme === 'wss' ? 1 : 0;
+});
+
+EM_JS (int, web_socket_port, (int port), {
+  var page = typeof location !== 'undefined' ? location : null;
+  var q = page ? new URLSearchParams (page.search).get ('websocket-port') : null;
+  var n = q ? parseInt (q, 10) : NaN;
+  return (n > 0 && n < 65536) ? n : port + 1;
 });
 
 // The browser does not tell a page why a WebSocket failed (security): a
@@ -236,9 +261,12 @@ static string
 web_socket_failure (int s) {
   if (web_socket_got->contains (s) || web_socket_url[s] == "") return "";
   return " (" * web_socket_url[s] * " could not be opened: no TeXmacs "
-    "server there, one which does not serve WebSocket clients (its "
-    "preference \"server websocket\"), or, for wss, a certificate which "
-    "the browser does not trust)";
+    "server there, one which does not serve WebSocket clients at that "
+    "port (its preferences \"server websocket\" and \"server websocket "
+    "port\"), one which speaks " * (starts (web_socket_url[s], "wss") ?
+      string ("ws") : string ("wss")) * " there (?websocket=... in the "
+    "address of the page) or, for wss, a certificate which the browser "
+    "does not trust)";
 }
 #else
 static string web_socket_failure (int s) { (void) s; return ""; }
@@ -259,7 +287,10 @@ int try_connect (const char* host, const char* port, int timeout,
 
   if (errbuf && errlen > 0) errbuf[0]= '\0';
 #ifdef __EMSCRIPTEN__
-  bool wss= web_socket_scheme (host) != 0;
+  bool wss= web_socket_scheme (host, web_socket_tls ? 1 : 0) != 0;
+  // the port of the WebSockets of the server
+  c_string _wport (as_string (web_socket_port (atoi (port))));
+  port= (const char*) _wport;
 #endif
 
   int x= GETADDRINFO (host, port, &hints, &result);
@@ -388,6 +419,7 @@ socket_link_rep::socket_link_rep (int fd, SOCKADDR_STORAGE* addr,
   host (""), port (0), socket_id (fd), contact (contact2), server (server2),
   handshake (false), read_enabled (false), write_enabled (false) {
   alive= false;
+  since= texmacs_time ();
   memcpy (&address, addr, sizeof(address));
   host= string_from_socket_address (&address);
 }
@@ -398,6 +430,7 @@ socket_link_rep::socket_link_rep (string host2, unsigned short port2,
   host (host2), port (port2), socket_id (-1), contact (contact2), server (NULL),
   handshake (false), read_enabled (false), write_enabled (false) {
   alive= false;
+  since= texmacs_time ();
 }
 
 // the notifiers: readable and writable sockets call back here; which
@@ -799,7 +832,8 @@ checkout (socket_server_rep* s) {
 
 socket_server_rep::socket_server_rep (string host2, unsigned short port2):
   host (host2), port (port2), socket_id (-1), listening (false),
-  socket_ptr_from_id ((pointer) NULL) {}
+  socket_ptr_from_id ((pointer) NULL), websocket_id (-1),
+  websocket_secure (false), websocket_listening (false) {}
 
 void
 socket_server_rep::accept_callback (void* obj, void* info) {
@@ -808,7 +842,109 @@ socket_server_rep::accept_callback (void* obj, void* info) {
   if (exists (srv)) srv->connection (srv->socket_id);
 }
 
+void
+socket_server_rep::websocket_accept_callback (void* obj, void* info) {
+  (void) info;
+  socket_server_rep* srv= (socket_server_rep*) obj;
+  if (exists (srv)) srv->connection (srv->websocket_id);
+}
+
 socket_server_rep::~socket_server_rep () {}
+
+/******************************************************************************
+* The port of the WebSocket clients
+*
+* The clients in a browser come to a port of their own (by default the one
+* which follows the port of the server), as in the versions with Qt (see
+* QTMSockets.cpp): the port of the server and its clients are left as they
+* are. Here the handshake and the frames of the WebSockets are those of
+* websocket_contact.cpp.
+*
+* The preference "server websocket" says who may come: "local" (the
+* default) only this machine, "on" everybody, "off" nobody. The port speaks
+* wss (WebSockets over TLS) when it is open to other machines and the
+* server asks its clients for TLS (preference "tls-server"), so that no
+* password travels in clear; otherwise it speaks ws.
+******************************************************************************/
+
+void
+socket_server_rep::close_slow_clients () {
+  // A client which does not finish the opening of its connection (the
+  // handshake of TLS or of a WebSocket) is not kept. There is no timer
+  // here: they are looked at when another client comes.
+  int timeout= as_int (get_preference ("server contact timeout", "10000"));
+  if (timeout <= 0) timeout= 10000;
+  array<socket_link_rep*> slow;
+  iterator<pointer> it= iterate (connections);
+  while (it->busy ()) {
+    socket_link_rep* c= (socket_link_rep*) it->next ();
+    if (c->opening () && texmacs_time () - c->since > timeout) slow << c;
+  }
+  for (int i= 0; i < N(slow); i++) {
+    SLOGE ("connection of " * slow[i]->get_host_name () * " at socket "
+        * as_string (slow[i]->get_socket_id ()) * " closed: not opened in time");
+    slow[i]->stop ();
+  }
+}
+
+void
+socket_server_rep::start_websockets () {
+  string mode= get_preference ("server websocket", "local");
+  if (mode == "default") mode= "local";
+  if (mode == "off") return;
+  string pref= get_preference ("server websocket port", "default");
+  int wport= is_int (pref) ? as_int (pref) : port + 1;
+  bool everyone= (mode == "on");
+  websocket_secure= everyone && get_preference ("tls-server") == string ("on");
+  string where= (everyone ? string ("") : string ("localhost")) * ":"
+    * as_string (wport);
+  if (websocket_secure && !gnutls_present ()) {
+    SLOGE ("no WebSocket clients at " * where * ": GnuTLS is missing");
+    return;
+  }
+
+  c_string _port (as_string (wport));
+  struct ADDRINFO hints;
+  struct ADDRINFO *result, *rp;
+  memset (&hints, 0, sizeof(struct ADDRINFO));
+  hints.ai_family = everyone ? AF_UNSPEC : AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+  int x = GETADDRINFO(everyone ? (char*) NULL : (char*) "127.0.0.1",
+    (char*) _port, &hints, &result);
+  if (x != 0)  {
+    SLOGE ("cannot serve WebSocket clients at " * where * ": "
+        * as_string (GAI_STRERROR(x)));
+    return;
+  }
+  int fd= -1;
+  for (rp = result; rp != NULL; rp = rp->ai_next) {
+    fd= SOCKET(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (fd < 0) continue;
+    // the port is free again as soon as the server stops
+    int yes= 1;
+    (void) SETSOCKOPT (fd, SOL_SOCKET, SO_REUSEADDR,
+                       (const char*) &yes, sizeof (yes));
+    if (set_socket_noblock (fd) != -1 &&
+        BIND(fd, rp->ai_addr, rp->ai_addrlen) == 0 &&
+        LISTEN(fd, 1024) == 0) break;
+    SERRNO_LOGE ("port of the WebSocket clients");
+    safe_server_close (fd);
+    fd= -1;
+  }
+  FREEADDRINFO(result);
+  if (fd < 0) {
+    SLOGE ("cannot serve WebSocket clients at " * where);
+    return;
+  }
+  websocket_id= fd;
+  websocket_notifier= socket_notifier (websocket_id,
+    &websocket_accept_callback, this, NULL, false);
+  add_notifier (websocket_notifier);
+  websocket_listening= true;
+  SLOGI ("waiting for WebSocket clients ("
+      * string (websocket_secure ? "wss" : "ws") * ") at " * where);
+}
 
 string
 socket_server_rep::start () {
@@ -882,6 +1018,7 @@ socket_server_rep::start () {
   add_notifier (notifier);
   listening= true;
   SLOGI ("waiting for connections at " * host * ":" * as_string (port));
+  start_websockets ();
   call ("server-create-default-admin-account");
   return "";
 }
@@ -900,9 +1037,16 @@ socket_server_rep::stop () {
     listening= false;
   }
   notifier= socket_notifier ();
+  if (websocket_listening) {
+    remove_notifier (websocket_notifier);
+    websocket_listening= false;
+  }
+  websocket_notifier= socket_notifier ();
   collect_stopped_links ();
   safe_server_close (socket_id);
   socket_id= -1;
+  if (websocket_id >= 0) safe_server_close (websocket_id);
+  websocket_id= -1;
 #if defined(OS_MACOS)
   mac_end_server ();
 #endif
@@ -918,7 +1062,10 @@ socket_server_rep::connection (int s) {
   int client; socket_link_rep* clt;
   SOCKADDR_STORAGE cltadd;
   socklen_t sz= sizeof (cltadd);
-  if (!listening) return;
+  close_slow_clients ();
+  // from the port of the server, or from the port of the WebSockets
+  bool websocket= (s == websocket_id);
+  if (websocket ? !websocket_listening : !listening) return;
   client= ACCEPT(s, (SOCKADDR*) &cltadd, &sz);
   if (client <= 0) {
     switch (ERRNO) {
@@ -963,19 +1110,18 @@ socket_server_rep::connection (int s) {
     authentications << _anonymous;
 
   bool is_tls_server = get_preference ("tls-server") == string ("on");
-  tm_contact inner= is_tls_server ?
-    make_tls_server_contact (authentications) :
-    make_socket_server_contact (authentications);
-  // the clients in a browser come as WebSockets (websocket_contact.cpp),
-  // the others through the inner contact
-  string ws_mode= get_preference ("server websocket", "local");
-  if (ws_mode == "default") ws_mode= "local";
-  bool local= starts (address, "127.") || address == "[::1]" ||
-              starts (address, "[::ffff:127.");
-  tm_contact contact= inner;
-  if (ws_mode != "off")
-    contact= make_websocket_server_contact (inner, is_tls_server,
-                                            authentications, ws_mode, local);
+  tm_contact contact;
+  if (!websocket)
+    contact= is_tls_server ?
+      make_tls_server_contact (authentications) :
+      make_socket_server_contact (authentications);
+  else if (!websocket_secure)
+    contact= make_websocket_server_contact (tm_contact ());
+  else {
+    // a WebSocket inside a TLS session (websocket_contact.cpp)
+    tm_contact tls= make_tls_server_contact (authentications);
+    if (!is_nil (tls)) contact= make_websocket_server_contact (tls);
+  }
 
   if (!contact.rep) {
     SLOGE ("contact creation failed from " * string_from_socket_address (&cltadd)

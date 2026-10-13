@@ -1,5 +1,5 @@
 // a WebSocket client of the TeXmacs server: node client.mjs [url]
-const url = process.argv[2] || 'ws://127.0.0.1:6561/';
+const url = process.argv[2] || 'ws://127.0.0.1:6562/';
 const ws = new WebSocket (url, ['binary']);
 ws.binaryType = 'arraybuffer';
 const packet = s => { const b = Buffer.from (s, 'utf8'); return Buffer.concat ([Buffer.from (b.length + '\n'), b]); };

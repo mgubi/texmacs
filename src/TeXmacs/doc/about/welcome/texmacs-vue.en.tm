@@ -203,7 +203,8 @@
     computer if it allows the page. <name|Albert> does not answer web pages.
 
     <item>The <menu|Remote> menu connects to a <TeXmacs> server over
-    WebSocket, on the same computer only for now.
+    WebSocket: a server of <TeXmacs> <name|Vue> on the same computer, or
+    one on another computer which is open to browsers.
 
     <item><TeXmacs> <name|Vue> types, scrolls and typesets as fast as the
     desktop program, but its <name|Scheme> runs two to three times slower,
@@ -225,6 +226,23 @@
   <section|Recent changes>
 
   The additions to <TeXmacs> <name|Vue>, the newest first.
+
+  <paragraph|13 October 2026>
+
+  <\itemize>
+    <item>A <TeXmacs> server now answers the browsers at a port of its
+    own, the one after its usual port (6562 for 6561), and leaves its usual
+    port to the other versions of <TeXmacs>. Nothing changes in the login:
+    the port to give is still the one of the server, and the page goes to
+    the next one. A server started by an older <TeXmacs> <name|Vue> has to
+    be updated together with the page.
+
+    <item>To a server on another computer, a login over TLS goes through
+    secure WebSockets (<verbatim|wss>), whatever the page; to a server on
+    the same computer it stays in clear, without any certificate. Such a
+    server serves the browsers of other computers when its preference
+    <verbatim|server websocket> is <verbatim|on>.
+  </itemize>
 
   <paragraph|9 October 2026>
 
@@ -263,7 +281,7 @@
     on: run <verbatim|node misc/wasm/remote/ws-bridge.mjs> (from the
     sources of <TeXmacs> <name|Vue>; <verbatim|cloud.texmacs.org> is its
     default), and log in with the server <verbatim|localhost> and the port
-    6563.
+    6562 (the bridge listens at the next one, as a server does).
 
     <item>The menus drop in without stopping halfway. On a display of 120
     Hz the page drew a frame every 8 ms, more than the graphics card

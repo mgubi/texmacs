@@ -77,15 +77,12 @@ sha1 (string msg) {
 /******************************************************************************
 * The contact
 *
-* The first bytes of a client say what it is: "GET " opens the handshake of
-* a WebSocket (TeXmacs in a page served over http, or on this machine); a
-* TLS record (0x16, a ClientHello) is a client over TLS, whose first bytes
-* within TLS say it again: "GET " is a WebSocket over TLS (wss, TeXmacs in
-* a page served over https, which may open no other), anything else a
-* TeXmacs client over TLS, handed to the inner contact with what was read
-* of it. A TeXmacs client speaks first (its login), the server never does,
-* so that waiting for those bytes cannot block either. Any other client
-* goes to the inner contact, as before.
+* The versions of TeXmacs without Qt serve the clients in a browser with
+* this contact, on the port of the WebSockets (see tm_sockets.cpp; the
+* versions with Qt leave it to the Qt WebSockets module, see QTMSockets.cpp).
+* Every client of that port opens a WebSocket: the handshake of TLS first
+* when the port speaks wss, then the request of the handshake of the
+* WebSocket, then frames.
 *
 * The TLS session of a wss client uses the certificate of the server
 * ($TEXMACS_SERVER_CERT_DIR/cert.pem and key.pem, see gnutls.cpp), which
@@ -93,13 +90,10 @@ sha1 (string msg) {
 * the host (Let's Encrypt...), not the self-signed one of the tests.
 ******************************************************************************/
 
-#define WS_SNIFF 0  // the first bytes decide
+#define WS_TLS   0  // the handshake of TLS
 #define WS_HTTP  1  // the request of the handshake
 #define WS_OPEN  2  // frames
-#define WS_INNER 3  // another client: the inner contact
-#define WS_DEAD  4
-#define WS_TLS   5  // the handshake of TLS
-#define WS_TSNIFF 6 // TLS is up: its first bytes decide
+#define WS_DEAD  3
 
 static bool
 would_block (int err) {
@@ -120,26 +114,17 @@ last_socket_error () {
 }
 
 struct websocket_server_contact_rep: tm_contact_rep {
-  tm_contact inner;
-  bool inner_tls;  // the inner contact is a TLS one (preference tls-server)
-  array<array<string> > auths;
   tm_contact tls;  // the TLS session of a client over TLS
   bool secure;     // the bytes go through tls
-  string mode;
-  bool local;
   int io, state;
   bool peer_closed;
   string error;
   string raw;   // read, not yet decoded
   string data;  // decoded, not yet received
-  string early; // what was read of a TeXmacs client over TLS
 
-  websocket_server_contact_rep (tm_contact inner2, bool inner_tls2,
-                                array<array<string> > auths2,
-                                string mode2, bool local2):
-    inner (inner2), inner_tls (inner_tls2), auths (auths2), secure (false),
-    mode (mode2), local (local2), io (-1), state (WS_SNIFF),
-    peer_closed (false) {
+  websocket_server_contact_rep (tm_contact tls2):
+    tls (tls2), secure (false), io (-1),
+    state (is_nil (tls2) ? WS_HTTP : WS_TLS), peer_closed (false) {
     type= SOCKET_SERVER; }
 
   void fail (string msg) { error= msg; state= WS_DEAD; }
@@ -267,15 +252,6 @@ struct websocket_server_contact_rep: tm_contact_rep {
     return true;
   }
 
-  bool websocket_allowed () {
-    if (mode == "off" || (mode != "on" && !local)) {
-      fail ("WebSocket clients are not served "
-            "(preference \"server websocket\")");
-      return false;
-    }
-    return true;
-  }
-
   // the request of the handshake, and the answer
   void handshake () {
     if (!gather (16385, "during the WebSocket handshake")) return;
@@ -321,41 +297,6 @@ struct websocket_server_contact_rep: tm_contact_rep {
 
   void start (int io2) {
     io= io2;
-    if (state == WS_SNIFF) {
-      char buf[4];
-      int r= WS_RECV (io, buf, 4, MSG_PEEK);
-      if (r < 0) {
-        if (!would_block (last_socket_error ())) fail ("cannot read the client");
-        return;
-      }
-      if (r == 0) { fail ("closed by the client"); return; }
-      string head (buf, r);
-      if (head == string ("GET ") (0, r)) {
-        if (r < 4) return; // "GET " may come in pieces
-        if (!websocket_allowed ()) return;
-        state= WS_HTTP;
-      }
-      else if (buf[0] == '\x16' && gnutls_present ()) {
-        // a client over TLS: the session of the inner contact when it
-        // does TLS, else one of its own, for the WebSocket clients only
-        if (inner_tls && !is_nil (inner)) tls= inner;
-        else {
-          array<array<string> > a= auths;
-          if (N(a) == 0) {
-            array<string> anonymous;
-            anonymous << string ("anonymous");
-            a << anonymous;
-          }
-          tls= make_tls_server_contact (a);
-        }
-        if (is_nil (tls)) { fail ("no TLS for this client"); return; }
-        state= WS_TLS;
-      }
-      else {
-        if (is_nil (inner)) { fail ("no contact for this client"); return; }
-        state= WS_INNER;
-      }
-    }
     if (state == WS_TLS) {
       ::start (tls, io); // again at each call, until the handshake is over
       if (!is_alive (tls)) {
@@ -365,51 +306,26 @@ struct websocket_server_contact_rep: tm_contact_rep {
       }
       if (!is_active (tls)) return;
       secure= true;
-      state= WS_TSNIFF;
-    }
-    if (state == WS_TSNIFF) {
-      if (!gather (4, "before its first request")) return;
-      if (raw == string ("GET ") (0, min (4, N(raw))) && N(raw) < 4)
-        return; // "GET " may come in pieces
-      if (starts (raw, "GET ")) {
-        if (!websocket_allowed ()) return;
-        state= WS_HTTP;
-      }
-      else if (inner_tls && tls.rep == inner.rep) {
-        early= raw;
-        raw= "";
-        state= WS_INNER;
-        return; // the inner contact is started: the session is its own
-      }
-      else {
-        fail ("TeXmacs clients over TLS are not served "
-              "(preference \"tls-server\")");
-        return;
-      }
+      state= WS_HTTP;
     }
     if (state == WS_HTTP) handshake ();
-    else if (state == WS_INNER) ::start (inner, io);
   }
 
   void stop () {
-    if (state == WS_INNER) ::stop (inner);
-    else {
-      if (state == WS_OPEN && !peer_closed) {
-        // a close frame, if the connection takes it at once
-        if (secure) (void) ::send (tls, "\x88\0", 2);
-        else {
-          char f[2]= { (char) 0x88, 0 };
-          (void) WS_SEND (io, f, 2);
-        }
+    if (state == WS_OPEN && !peer_closed) {
+      // a close frame, if the connection takes it at once
+      if (secure) (void) ::send (tls, "\x88\0", 2);
+      else {
+        char f[2]= { (char) 0x88, 0 };
+        (void) WS_SEND (io, f, 2);
       }
-      if (!is_nil (tls) && is_alive (tls)) ::stop (tls);
     }
+    if (!is_nil (tls) && is_alive (tls)) ::stop (tls);
     state= WS_DEAD;
     io= -1;
   }
 
   int send (const void* buffer, size_t length) {
-    if (state == WS_INNER) return ::send (inner, buffer, length);
     if (state != WS_OPEN) return -1;
     if (!send_frame (0x2, string ((const char*) buffer, (int) length))) {
       fail ("cannot write to the WebSocket client");
@@ -420,13 +336,6 @@ struct websocket_server_contact_rep: tm_contact_rep {
 
   // the decoded data; -1 while there is none yet (EAGAIN), 0 at the end
   int receive (void* buffer, size_t length) {
-    if (state == WS_INNER) {
-      if (N(early) == 0) return ::receive (inner, buffer, length);
-      int n= min ((int) length, N(early));
-      memcpy (buffer, (const char*) c_string (early (0, n)), n);
-      early= early (n, N(early));
-      return n;
-    }
     if (state != WS_OPEN) return -1;
     if (N(data) == 0 && !peer_closed) {
       char buf[16384];
@@ -449,28 +358,17 @@ struct websocket_server_contact_rep: tm_contact_rep {
 
   bool alive () {
     if (state == WS_DEAD) return false;
-    if (state == WS_INNER) return is_alive (inner);
     if (secure || state == WS_TLS) return is_alive (tls);
     return true;
   }
 
-  bool active () {
-    if (state == WS_OPEN) return true;
-    if (state == WS_INNER) return is_active (inner);
-    return false;
-  }
+  bool active () { return state == WS_OPEN; }
 
-  string last_error () {
-    if (state == WS_INNER) return ::last_error (inner);
-    return error;
-  }
+  string last_error () { return error; }
 };
 
 tm_contact
-make_websocket_server_contact (tm_contact inner, bool inner_tls,
-                               array<array<string> > auths,
-                               string mode, bool local) {
+make_websocket_server_contact (tm_contact tls) {
   return tm_contact ((tm_contact_rep*)
-    tm_new<websocket_server_contact_rep> (inner, inner_tls, auths,
-                                          mode, local));
+    tm_new<websocket_server_contact_rep> (tls));
 }
