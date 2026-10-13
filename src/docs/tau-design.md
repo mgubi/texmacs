@@ -1208,6 +1208,46 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
   The page of the design of the fonts (40 ms of drawing for a step) is
   the exception, and a matter of its own.
 
+### On the desktop
+
+- Asked 2026-10-13: a desktop GUI for Tau, with Vue (the GUI of
+  `maxs_texmacs` on SDL3, Clay and the renderer of TeXmacs) in the main
+  thread and the typesetter in another. Not as two threads of one
+  program: Vue is made of the kernel of TeXmacs (strings, trees, fonts,
+  the renderer), and the kernel is for one thread (plain reference
+  counts, one allocator, caches which are globals, one context of
+  MuPDF). As **two processes**, which is what the page and its worker
+  are: the core as it is, and a program with the windows, each with its
+  own kernel if it needs one, and the protocol between them.
+- **A trial** (`misc/tau/native`): the core builds for the machine from
+  the same sources and configuration (`Makefile`, `config.h` with
+  pointers of 8 bytes; MuPDF, FreeType and SDL3 of the system), with
+  three changes of `tau_gui.cpp` (the clock, two stubs whose arguments
+  were `int` for `SI`, a font which `widget.cpp` asks for: the link for
+  WebAssembly had let them pass). `src/Tau/tau_native.cpp` is the
+  transport: what the other side says comes on the standard input, a
+  line for each message; what the core says goes to a pipe in frames
+  (`VIEW`, `JSON`, `PANT` with the pixels, `PONG`). `tau_shell.cpp` is a
+  window of SDL which starts the core, shows its view and sends it the
+  keys, the pointer and the wheel; it links nothing of TeXmacs and has
+  no menus (the descriptions arrive and are counted).
+- **Measured** (`tau_shell --bench`, a view of 2000 × 1400 pixels, an
+  Apple M-series laptop): the core paints 0.25 s after the program
+  starts; from a key to its pixels in the other process 3.6 ms, from a
+  step of the wheel (the whole view, 11 MB through the pipe) 4 ms, the
+  pixels into the texture 0.6 ms. In the user manual as one book a key
+  is 12 ms, 8.6 of typesetting, where the browser takes 18 ms for the
+  bridges alone (the book is not in pages there: the two are not the
+  same measure). The pipe is not what limits: shared memory for the
+  pixels is not needed yet.
+- **What a desktop Tau needs beyond this**: the interface. The page
+  builds it in HTML from the descriptions (some fifty kinds of nodes);
+  Vue's widgets (8000 lines) are made by Scheme through the widget
+  interface of TeXmacs, with closures for commands, and would be made
+  from the descriptions instead, with numbers. Its layer of windows and
+  events (7000 lines) serves as it is. Or the page itself in a web view,
+  which is days and keeps the interface which exists.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:

@@ -45,6 +45,21 @@
 #include <stdlib.h>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#define tau_now emscripten_get_now
+#else
+// The native core (misc/tau/native): what is posted goes to another
+// process, and what it says comes in a loop (tau_native.cpp)
+#define tau_now edit_profile_now
+void tau_native_view (int view, int window, const char* what);
+void tau_native_paint (int view, int counter, int w, int h,
+                       const unsigned char* pixels,
+                       int x1, int y1, int x2, int y2,
+                       int ew, int eh, int sx, int sy, int cx, int cy);
+void tau_native_json (const char* kind, const char* part, const char* json);
+void tau_native_loop (void (*turn) (void));
+#endif
+#ifndef EMSCRIPTEN_KEEPALIVE
+#define EMSCRIPTEN_KEEPALIVE
 #endif
 
 /******************************************************************************
@@ -222,14 +237,13 @@ EM_JS (void, tau_js_paint, (int view, int counter, int w, int h,
 });
 #else
 static void tau_js_view (int view, int window, const char* what) {
-  (void) view; (void) window; (void) what; }
+  tau_native_view (view, window, what); }
 static void tau_js_paint (int view, int counter, int w, int h,
                           const unsigned char* pixels,
                           int x1, int y1, int x2, int y2,
                           int ew, int eh, int sx, int sy, int cx, int cy) {
-  (void) view; (void) counter; (void) w; (void) h; (void) pixels;
-  (void) x1; (void) y1; (void) x2; (void) y2;
-  (void) ew; (void) eh; (void) sx; (void) sy; (void) cx; (void) cy; }
+  tau_native_paint (view, counter, w, h, pixels, x1, y1, x2, y2,
+                    ew, eh, sx, sy, cx, cy); }
 #endif
 
 static void
@@ -249,7 +263,7 @@ EM_JS (void, tau_js_json, (const char* kind, const char* part,
 #else
 static void tau_js_json (const char* kind, const char* part,
                          const char* json) {
-  (void) kind; (void) part; (void) json; }
+  tau_native_json (kind, part, json); }
 #endif
 
 static void
@@ -379,7 +393,7 @@ static void
 tau_turn () {
   // (TEXMACS_EDIT_PROFILE, ?profile in the page: where a turn spends its time)
   bool prof= edit_profile.on;
-  double t0= prof ? emscripten_get_now () : 0, t1= t0, t2= t0, t3= t0;
+  double t0= prof ? tau_now () : 0, t1= t0, t2= t0, t3= t0;
   double draw_ms= 0, draw_px= 0;
   tau_follow_fonts ();
   array<simple_widget_rep*> views;
@@ -389,14 +403,14 @@ tau_turn () {
   for (int i=0; i<N(views); i++)
     if (views[i]->shown) views[i]->notify_resize ();
   if (the_interpose_handler != NULL) the_interpose_handler ();
-  if (prof) t1= emscripten_get_now ();
+  if (prof) t1= tau_now ();
   for (int i=0; i<N(views); i++) {
     simple_widget_rep* v= views[i];
     if (!simple_widget_rep::all_widgets->contains ((pointer) v)) continue;
     if (!v->shown || v->ren == NULL) continue;
-    double d0= prof ? emscripten_get_now () : 0;
+    double d0= prof ? tau_now () : 0;
     if (!v->repaint ()) continue;
-    if (prof) { draw_ms += emscripten_get_now () - d0; draw_px += (double) (v->drawn_x2 - v->drawn_x1) * (v->drawn_y2 - v->drawn_y1); }
+    if (prof) { draw_ms += tau_now () - d0; draw_px += (double) (v->drawn_x2 - v->drawn_x1) * (v->drawn_y2 - v->drawn_y1); }
     int ew, eh, sx, sy, cx, cy;
     v->extents_in_pixels (ew, eh, sx, sy);
     v->cursor_in_pixels (cx, cy);
@@ -404,7 +418,7 @@ tau_turn () {
                   v->drawn_x1, v->drawn_y1, v->drawn_x2, v->drawn_y2,
                   ew, eh, sx, sy, cx, cy);
   }
-  if (prof) t2= emscripten_get_now ();
+  if (prof) t2= tau_now ();
   // what Scheme has to say to the page (menu-serial.scm)
   string out= as_string (call ("tau-outbox"));
   if (N(out) != 0) tau_post_json ("batch", "", out);
@@ -415,7 +429,7 @@ tau_turn () {
     tau_post_json ("buffers", "", state);
   }
   if (prof) {
-    t3= emscripten_get_now ();
+    t3= tau_now ();
     if (t3 - t0 >= 1)
       cout << "tau-profile turn: " << (t3 - t0) << " ms (editors "
            << (t1 - t0) << ", drawing " << draw_ms << ", sending "
@@ -446,6 +460,8 @@ gui_start_loop () {
   // the delayed commands. Control does not come back here: the stack is
   // unwound (the server of TeXmacs_main is not on it).
   emscripten_set_main_loop (tau_turn, 20, true);
+#else
+  tau_native_loop (tau_turn);
 #endif
 }
 
@@ -497,13 +513,13 @@ tau_scroll_by (int view, int dx, int dy, int x, int y) {
       as_bool (call ("wheel-capture?"))) {
     array<double> data;
     data << (-dx / v->density) << (-dy / v->density);
-    double t0= edit_profile.on ? emscripten_get_now () : 0;
+    double t0= edit_profile.on ? tau_now () : 0;
     SI px= x, py= y;
     v->to_document (px, py);
     v->handle_mouse ("wheel", px, py, 0, pointer_time (0), data);
     if (edit_profile.on)
       cout << "tau-profile wheel for the editor: "
-           << (int) (emscripten_get_now () - t0) << " ms\n";
+           << (int) (tau_now () - t0) << " ms\n";
   }
   else v->scroll_by (dx, dy);
   tau_turn ();
@@ -929,7 +945,7 @@ tau_paste_text (string text, string html) {
 * The constructors of widgets: nothing is made
 ******************************************************************************/
 
-widget aligned_widget (array<widget> a1, array<widget> a2, int a3, int a4, int a5, int a6) {
+widget aligned_widget (array<widget> a1, array<widget> a2, SI a3, SI a4, SI a5, SI a6) {
   (void) a1; (void) a2; (void) a3; (void) a4; (void) a5; (void) a6;
   return no_widget (); }
 
@@ -971,11 +987,16 @@ widget file_chooser_widget (command a1, string a2, string a3) {
   (void) a1; (void) a2; (void) a3;
   return no_widget (); }
 
-widget glue_widget (bool a1, bool a2, int a3, int a4) {
+// (the font of the widgets: there are none; asked by widget.cpp)
+font get_default_font (bool tt, bool mini, bool bold) {
+  (void) tt; (void) mini; (void) bold;
+  return font (); }
+
+widget glue_widget (bool a1, bool a2, SI a3, SI a4) {
   (void) a1; (void) a2; (void) a3; (void) a4;
   return no_widget (); }
 
-widget glue_widget (tree a1, bool a2, bool a3, int a4, int a5) {
+widget glue_widget (tree a1, bool a2, bool a3, SI a4, SI a5) {
   (void) a1; (void) a2; (void) a3; (void) a4; (void) a5;
   return no_widget (); }
 
@@ -1144,7 +1165,7 @@ tau_widget_view (widget wid) {
   simple_widget_rep* v= dynamic_cast<simple_widget_rep*> (r);
   SI w= 0, h= 0;
   if (v != NULL && !v->is_editor_widget ()) v->handle_get_size_hint (w, h);
-  ret << w << h << (v == NULL? 0: v->id);
+  ret << w << h << (SI) (v == NULL? 0: v->id);
   return ret;
 }
 
