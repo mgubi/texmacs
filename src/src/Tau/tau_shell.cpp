@@ -147,7 +147,8 @@ static void
 core_say (std::string line) {
   if (core_in < 0) return;
   static bool debug= (getenv ("TAU_SHELL_DEBUG") != NULL);
-  if (debug && line.compare (0, 11, "mouse ") != 0 && line.find (" move ") == std::string::npos)
+  static bool moves= debug && !strcmp (getenv ("TAU_SHELL_DEBUG"), "2");
+  if (debug && line != "ping busy" && (moves || line.find (" move ") == std::string::npos))
     fprintf (stderr, "tau_shell] > %s\n", line.c_str ());
   line.push_back ('\n');
   const char* p= line.data (); size_t n= line.size ();
@@ -528,6 +529,8 @@ public:
     }
   }
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
+    if (getenv ("TAU_SHELL_DEBUG") != NULL && !strcmp (getenv ("TAU_SHELL_DEBUG"), "2"))
+      fprintf (stderr, "tau_shell] repaint view %d\n", view);
     win->set_background (white);
     win->clear (x1, y1, x2, y2);
     if (is_nil (frame)) return;
@@ -1137,6 +1140,59 @@ choose_file (const json& m) {
 * What the core says, at each turn of the loop of Vue
 ******************************************************************************/
 
+// When the core is busy (a document is loaded, a long one typeset) it
+// answers nothing, and this program stays alive: it says so. As the page
+// does, it asks the core a few times a second whether it is there (a
+// ping); an answer which is late is the core at work. The right footer
+// then says "Working", with the seconds once they count, and has its text
+// back with the answer. A timer turns the loop of Vue meanwhile.
+static string right_footer;    // what the core said last
+static bool   busy_asked= false;
+static Uint64 busy_asked_at= 0, busy_last= 0;
+static int    busy_shown= -1;   // the seconds which the footer shows, or -1
+
+static void
+busy_answered () {
+  busy_asked= false;
+  if (busy_shown >= 0) {
+    busy_shown= -1;
+    set_right_footer (the_frame, right_footer);
+    needs_update ();
+  }
+}
+
+static void
+busy_check () {
+  if (core_gone || is_nil (the_frame)) return;
+  Uint64 now= SDL_GetTicks ();
+  if (!busy_asked) {
+    if (now - busy_last < 150) return;
+    busy_last= now;
+    busy_asked= true; busy_asked_at= now;
+    core_say ("ping busy");
+    return;
+  }
+  Uint64 late= now - busy_asked_at;
+  if (late < 300) return;
+  int seconds= (int) (late / 1000);
+  if (seconds == busy_shown) return;
+  busy_shown= seconds;
+  string text= "Working<#2026>";
+  if (seconds >= 2) text << " " << as_string (seconds) << " s";
+  set_right_footer (the_frame, text);
+  needs_update ();
+  if (getenv ("TAU_SHELL_DEBUG") != NULL)
+    fprintf (stderr, "tau_shell] the core is busy (%d s)\n", seconds);
+}
+
+static Uint32
+busy_timer (void* data, SDL_TimerID id, Uint32 interval) {
+  (void) data; (void) id;
+  SDL_Event e; SDL_zero (e); e.type= frame_event;
+  SDL_PushEvent (&e);
+  return interval;
+}
+
 // The other windows of the core (View -> New window): each is a window of
 // its own here, with a view and nothing else; the bars of the main window
 // are those of the view which has the keyboard, as the core says them.
@@ -1250,7 +1306,10 @@ handle_message (std::string kind, std::string part, const json& desc) {
   else if (kind == "visible") set_visible (part, desc["visible"].truth ());
   else if (kind == "footer") {
     if (part == "left") set_left_footer (the_frame, desc["text"].text ());
-    else set_right_footer (the_frame, desc["text"].text ());
+    else {
+      right_footer= desc["text"].text ();
+      if (busy_shown < 0) set_right_footer (the_frame, right_footer);
+    }
   }
   else if (kind == "buffers") {
     // the title of the window: the document which is shown
@@ -1323,6 +1382,10 @@ handle_frame (core_frame& f) {
     }
   }
   else if (!strcmp (f.tag, "PONG")) {
+    if (f.body.size () == 4 && !memcmp (f.body.data (), "busy", 4)) {
+      busy_answered ();
+      return;
+    }
     // ("wheel <view>" or "move <view>": see tau_view_rep)
     char what[16]; int view= 0;
     if (sscanf (std::string (f.body.begin (), f.body.end ()).c_str (), "%15s %d", what, &view) == 2) {
@@ -1346,6 +1409,7 @@ handle_frame (core_frame& f) {
 
 static void
 shell_turn () {
+  busy_check ();
   std::deque<core_frame> got;
   bool gone;
   {
@@ -1450,6 +1514,7 @@ tau_shell_main (int argc, char** argv) {
     cerr << "tau_shell] cannot start " << core << LF;
     exit (1);
   }
+  SDL_AddTimer (150, busy_timer, NULL);
   gui_interpose (shell_turn);
   gui_start_loop ();
   if (core_in >= 0) close (core_in);
