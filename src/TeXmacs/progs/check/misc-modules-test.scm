@@ -812,7 +812,9 @@
         (let* ((page (current-buffer))
                (l (design-actions (tree->stree (buffer-tree)))))
           (check-true (!= page doc))
-          (check-true (> (length l) 50))
+          ;; (the seven parts and a choice for each of the shipped fonts with
+          ;; mathematics, at least; the fonts of the system add theirs)
+          (check-true (> (length l) 30))
           (check= (list-filter l (lambda (s)
                                    (or (string-occurs? "/" s)
                                        (string-occurs? "\\" s)
