@@ -65,7 +65,7 @@
     <path id="grid-horizontal" d="M150 248 H1105 M136 451 H1116 M135 638 H1120 M138 842 H1118 M151 1033 H1104"/>
     <path id="grid-vertical" d="M288 150 V1111 M517 150 V1117 M740 150 V1117 M967 150 V1109"/>
   </g>
-  <g id="glyph-borders" inkscape:groupmode="layer" inkscape:label="Glyph borders" fill="none" stroke="#20384c" stroke-width="16" stroke-linejoin="round" filter="url(#glyph-shadow)">
+  <g id="glyph-borders" inkscape:groupmode="layer" inkscape:label="Glyph borders" fill="none" stroke="#20384c" stroke-width="24" stroke-linejoin="round" filter="url(#glyph-shadow)">
     <use href="#left-bracket-shape"/>
     <use href="#right-bracket-shape"/>
     <use href="#tau-shape"/>
@@ -82,7 +82,7 @@
     <rect x="100" y="300" width="1050" height="720" fill="url(#glyph-chalk-pattern)"/>
   </g>
   <g id="tile-outline" inkscape:groupmode="layer" inkscape:label="Tile border" fill="none">
-    <use href="#tile-shape" stroke="#172b3b" stroke-width="8"/>
-    <use href="#tile-shape" stroke="url(#tile-border)" stroke-width="3.5"/>
+    <use href="#tile-shape" stroke="#172b3b" stroke-width="12"/>
+    <use href="#tile-shape" stroke="url(#tile-border)" stroke-width="5"/>
   </g>
 </svg>
