@@ -808,6 +808,15 @@ pack (array<widget> a, context c) {
   return c.row? horizontal_menu (a): vertical_menu (a);
 }
 
+// a command of Scheme for the core
+class scheme_command_rep: public command_rep {
+  std::string code;
+public:
+  scheme_command_rep (std::string code2): code (code2) {}
+  void apply () { core_say ("scheme " + escaped (code)); }
+  tm_ostream& print (tm_ostream& out) { return out << "scheme command"; }
+};
+
 class contents_promise_rep: public promise_rep<widget> {
   int number;
 public:
@@ -1061,7 +1070,19 @@ set_part (std::string part, const json& desc) {
     }
   }
   first_input= widget ();
-  if (part == "menu") set_main_menu (the_frame, w);
+  if (part == "menu") {
+    // the logo of Tau at the left of the menus: a button for the page
+    // about Tau and what changed (as "About Tau" in the Help menu)
+    static url logo= resolve (url ("$TEXMACS_PATH/misc/pixmaps/tau-logo.svg"));
+    if (!is_none (logo)) {
+      command about= tm_new<scheme_command_rep> (
+        "(load-help-article \"about/tau/tau\")");
+      array<widget> a;
+      a << menu_button (xpm_widget (logo), about, "", "", 0) << w;
+      w= horizontal_menu (a);
+    }
+    set_main_menu (the_frame, w);
+  }
   else if (part == "icons-0") set_main_icons (the_frame, w);
   else if (part == "icons-1") set_mode_icons (the_frame, w);
   else if (part == "icons-2") set_focus_icons (the_frame, w);

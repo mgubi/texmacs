@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="20" viewBox="0 0 60 40">
+ <!-- The logo of Tau in the menu bar: a tau between angle brackets, white
+      on a black frame with rounded corners. The shapes are drawn (no font
+      is needed). -->
+ <rect x="1" y="1" width="58" height="38" rx="9" ry="9" fill="#000000"/>
+ <g fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17 9 L10 20 L17 31"/>
+  <path d="M43 9 L50 20 L43 31"/>
+  <path d="M21.5 18 Q22.5 14 26 14 H38.5"/>
+  <path d="M30 14 V25 Q30 29.5 34.5 28.5"/>
+ </g>
+</svg>

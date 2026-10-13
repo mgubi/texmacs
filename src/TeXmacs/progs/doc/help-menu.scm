@@ -37,6 +37,9 @@
 	(if (defined? 'web-files)
 	    ("TeXmacs in the browser"
 	     (load-help-article "about/welcome/texmacs-vue")))
+	;; Tau: what it is and what changed (also its logo in the menu bar)
+	(if (or (in-browser?) (in-desktop?))
+	    ("About Tau" (load-help-article "about/tau/tau")))
 	---)
   (if (detailed-menus?)
       (when (url-exists-in-help? "main/config/man-configuration.en.tm")
