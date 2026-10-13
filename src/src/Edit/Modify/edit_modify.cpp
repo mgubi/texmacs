@@ -268,7 +268,7 @@ edit_touch (editor_rep* ed, path p) {
 
 void
 edit_modify_rep::clear_undo_history () {
-  global_clear_history ();
+  arch->clear ();
 }
 
 double
