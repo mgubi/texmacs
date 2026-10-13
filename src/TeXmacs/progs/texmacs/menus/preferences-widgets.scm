@@ -752,6 +752,13 @@
 
 (tm-widget (markdown-preferences-widget)
   ======
+  (bold (text "Markdown -> TeXmacs"))
+  ===
+  (aligned
+    (meti (hlist // (text "Read a file as a document of the style markdown, which is written back as it was"))
+      (toggle (set-boolean-preference "markdown->texmacs:faithful" answer)
+              (get-boolean-preference "markdown->texmacs:faithful"))))
+  ======
   (bold (text "TeXmacs -> Markdown"))
   ===
   (aligned

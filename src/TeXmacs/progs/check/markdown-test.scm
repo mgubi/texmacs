@@ -27,6 +27,15 @@
   (:use (check check-lib)))
 
 (define (parse s) (convert s "markdown-snippet" "markdown-stree"))
+(define (plain t)
+  ;; the Markdown tree without the texts of the file which it keeps for
+  ;; the tables and for some formulas (the attribute source)
+  (cond ((not (pair? t)) t)
+        ((and (pair? (cdr t)) (func? (cadr t) '@))
+         (with a (list-filter (cdadr t) (lambda (x) (not (func? x 'source))))
+           `(,(car t) ,@(if (null? a) '() `((@ ,@a))) ,@(map plain (cddr t)))))
+        (else (cons (car t) (map plain (cdr t))))))
+(define (parse* s) (plain (parse s)))
 (define (write-md t) (convert t "markdown-stree" "markdown-snippet"))
 (define (import s) (convert s "markdown-snippet" "texmacs-stree"))
 (define (export t . opts)
@@ -115,25 +124,25 @@
 ;; before a digit. \[2\] are the brackets which other programs escape.
 (define (test-parse-math)
   (check-group "parse math")
-  (check= (parse "$x^2$ and $5 and $6")
+  (check= (parse* "$x^2$ and $5 and $6")
           '(markdown (math "x^2") " and $5 and $6"))
-  (check= (parse "\\$5") '(markdown "$5"))
-  (check= (parse "\\(a\\) \\[2\\] \\[x=1\\]")
+  (check= (parse* "\\$5") '(markdown "$5"))
+  (check= (parse* "\\(a\\) \\[2\\] \\[x=1\\]")
           '(markdown (math "a") " [2] " (displaymath "x=1")))
-  (check= (parse "$$\nx=1\n$$") '(markdown (displaymath "x=1")))
-  (check= (parse "\\[\nx=1\n\\]") '(markdown (displaymath "x=1")))
-  (check= (parse "\\[ x=1 \\]\n\ntext") '(markdown (displaymath "x=1") (p "text")))
+  (check= (parse* "$$\nx=1\n$$") '(markdown (displaymath "x=1")))
+  (check= (parse* "\\[\nx=1\n\\]") '(markdown (displaymath "x=1")))
+  (check= (parse* "\\[ x=1 \\]\n\ntext") '(markdown (displaymath "x=1") (p "text")))
   ;; the brackets which other programs escape hold words, formulas do not
-  (check= (parse "\\[see Smith (2010)\\] \\[sic!\\] \\[f(x)\\] \\[\\alpha\\]")
+  (check= (parse* "\\[see Smith (2010)\\] \\[sic!\\] \\[f(x)\\] \\[\\alpha\\]")
           '(markdown "[see Smith (2010)] [sic!] " (displaymath "f(x)") " "
                      (displaymath "\\alpha")))
   ;; what opens a formula and is not closed before a blank line is text,
   ;; and the text after a formula is kept
-  (check= (parse "$$ is the price\n\nsecond")
+  (check= (parse* "$$ is the price\n\nsecond")
           '(markdown (p "$$ is the price") (p "second")))
-  (check= (parse "\\[x] done\n\nsecond")
+  (check= (parse* "\\[x] done\n\nsecond")
           '(markdown (p "[x] done") (p "second")))
-  (check= (parse "$$x$$ and text")
+  (check= (parse* "$$x$$ and text")
           '(markdown (displaymath "x") (p "and text"))))
 
 (define (test-parse-blocks)
@@ -173,7 +182,7 @@
   (check= (parse "- a\n- b\n  - c\n\n1. x\n2. y")
           '(markdown (ul (li (p "a")) (li (p "b") (ul (li (p "c")))))
                      (ol (li (p "x")) (li (p "y")))))
-  (check= (parse "+ plus list") '(markdown (ul (li (p "plus list")))))
+  (check= (parse "+ plus list") '(markdown (ul (@ (marker "+")) (li (p "plus list")))))
   (check= (parse "3. a\n4. b")
           '(markdown (ol (@ (start "3")) (li (p "a")) (li (p "b")))))
   (check= (parse "- [ ] todo\n- [x] done")
@@ -185,19 +194,19 @@
 
 (define (test-parse-tables)
   (check-group "parse tables")
-  (check= (parse "| a | b |\n|:-:|--:|\n| 1 | 2 |")
+  (check= (parse* "| a | b |\n|:-:|--:|\n| 1 | 2 |")
           '(markdown (table (tr (th (@ (align "center")) "a")
                                 (th (@ (align "right")) "b"))
                             (tr (td (@ (align "center")) "1")
                                 (td (@ (align "right")) "2")))))
-  (check= (parse "a | b\n--|--\n1 | 2")
+  (check= (parse* "a | b\n--|--\n1 | 2")
           '(markdown (table (tr (th "a") (th "b")) (tr (td "1") (td "2")))))
   ;; a table after the lines of a paragraph
-  (check= (parse "intro\n| a | b |\n|---|---|\n| 1 | 2 |")
+  (check= (parse* "intro\n| a | b |\n|---|---|\n| 1 | 2 |")
           '(markdown (p "intro")
                      (table (tr (th "a") (th "b")) (tr (td "1") (td "2")))))
   ;; in code a backslash is one, and a bar does not end the cell
-  (check= (parse "| a | b |\n|---|---|\n| `x\\` | ``c|d`` |")
+  (check= (parse* "| a | b |\n|---|---|\n| `x\\` | ``c|d`` |")
           '(markdown (table (tr (th "a") (th "b"))
                             (tr (td (code "x\\")) (td (code "c|d")))))))
 
@@ -373,7 +382,10 @@
 ;; title, and the other headings move up.
 (define (test-import-document)
   (check-group "import document")
-  (let ((doc (lambda (s) (convert s "markdown-document" "texmacs-stree"))))
+  ;; (as a document of the style generic, with a title: the option is on
+  ;; by default, see the group "style markdown")
+  (let ((doc (lambda (s) (convert s "markdown-document" "texmacs-stree"
+                                  (cons "markdown->texmacs:faithful" "off")))))
     (check= (doc "# T\n\n## S\n\nx\n")
             '(document (body (document (doc-data (doc-title "T"))
                                        (section "S") "x"))
@@ -791,6 +803,161 @@
     (when (buffer-exists? old) (switch-to-buffer old))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The style markdown
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A file is read as a document of the style markdown (styles/markdown.ts),
+;; whose macros keep what the standard tags do not say, and which is
+;; written as the file it was read from.
+(define (md->tm s) (convert s "markdown-document" "texmacs-stree"))
+(define (tm->md t) (convert t "texmacs-stree" "markdown-document"))
+(define (md->md s) (tm->md (md->tm s)))
+(define (md-tree s) (convert s "markdown-document" "markdown-stree"))
+(define (md-body s) (cdr (cadr (cadr (md->tm s)))))
+
+(define markdown-file
+  (string-append
+    "---\ntitle: The title\ntags: [a, b]\nlist:\n  - x\n# comment\n"
+    "layout: post\n---\n\n"
+    "## Starts at two\n\n"
+    "Some *text* with $a=b$ and \\(c+d\\) and a note[^n] and "
+    "<span class=\"x\">html</span>.\n\n"
+    "###### six\n\n"
+    "$$\n\\begin{aligned}a&=b\\\\c&=d\\end{aligned}\n$$\n\n"
+    "* star one\n\n* star two\n\n+ plus\n\n"
+    "```rust ignore\nfn main() {}\n```\n\n```c\nint x;\n```\n\n"
+    "![alt *text*](i.png \"The title\")\n\n"
+    "Inline ![alt](i.png) image and [anchor](#starts-at-two).\n\n"
+    "| a | b | c |\n|:--|:-:|--:|\n| 1 | 2 | 3 |\n\n"
+    "<!-- a comment -->\n\n"
+    "<div class=\"note\">\nhtml block\n</div>\n\n"
+    "[^n]: The note.\n\n"
+    "[^orphan]: Nobody refers to this.\n"))
+
+(define (test-style-import)
+  (check-group "style markdown, import")
+  (check= (cddr (md->tm "x\n")) '((style "markdown")))
+  ;; each heading at its level, and no title
+  (check= (md-body "# A\n\n## B\n\n###### F\n")
+          '((section "A") (subsection "B") (md-h6 "F")))
+  ;; the header: a line, a key
+  (check= (md-body "---\ntitle: T\ntags:\n  - a\n---\n\nx\n")
+          '((md-metadata (document (md-meta "title" "T") (md-meta "tags" "")
+                                   (md-meta "" "  - a")))
+            "x"))
+  ;; a formula as it is written, with a copy of what it was read as; a
+  ;; formula which TeXmacs writes in the same way has no need of it
+  (check= (md-body "$a=b$ $x^2$ \\(y\\)\n")
+          '((concat (md-source (math "a=b") "$a=b$" (math "a=b")) " "
+                    (math (concat "x" (rsup "2"))) " "
+                    (md-source (math "y") "\\(y\\)" (math "y")))))
+  (check= (md-body "<!-- c -->\n")
+          '((md-block-source "" "<less>!-- c --<gtr>" "")))
+  ;; lists: the character of the items, the blank lines
+  (check= (md-body "- a\n\n* b\n\n+ c\n")
+          '((itemize-minus (document (concat (item) "a")))
+            (itemize-dot (document (concat (item) "b")))
+            (itemize-arrow (document (concat (item) "c")))))
+  (check= (md-body "- a\n\n- b\n")
+          '((md-loose (itemize-minus (document (concat (item) "a")
+                                               (concat (item) "b"))))))
+  ;; code: the words after the fence, when the tag does not say them
+  (check= (md-body "```python\nx\n```\n\n```py\nx\n```\n\n```rust\nx\n```\n")
+          '((python-code (document "x"))
+            (md-fence "py" (python-code (document "x")))
+            (md-fence "rust" (verbatim-code (document "x")))))
+  ;; images and footnotes
+  (check= (md-body "a ![d](i.png) ![](j.png) ![d](i.png \"T\")\n")
+          '((concat "a " (md-image (image "i.png" "" "" "" "") "d" "") " "
+                    (image "j.png" "" "" "" "") " "
+                    (md-image (image "i.png" "" "" "" "") "d" "T"))))
+  (check= (md-body "a[^1] b[^x]\n\n[^1]: one\n\n[^x]: two\n")
+          '((concat "a" (footnote "one") " b" (md-footnote "x" "two"))))
+  (check= (md-body "a[^x]\n\n[^x]: two\n\nlast\n")
+          '((concat "a" (md-footnote "x" "two")) (md-footnote-text "x") "last"))
+  ;; with the option off, as before the style
+  (check= (convert "# T\n\nx\n" "markdown-document" "texmacs-stree"
+                   (cons "markdown->texmacs:faithful" "off"))
+          '(document (body (document (doc-data (doc-title "T")) "x"))
+                     (style "generic"))))
+
+(define (test-style-round-trip)
+  (check-group "style markdown, round trip")
+  ;; a file with all of this is written as it was read
+  (check= (md->md markdown-file) markdown-file)
+  ;; what Markdown writes in several ways is written in one: the file
+  ;; which is written says the same, and is written as itself
+  (for-each
+    (lambda (s)
+      (with t (md->md s)
+        (check= (md-tree t) (md-tree s))
+        (check= (md->md t) t)))
+    '("Setext\n======\n\nSub\n---\n\ntext\n"
+      "soft\nbreak and  \nhard break\n"
+      "1) a\n2) b\n"
+      "~~~\ntilde\n~~~\n\n    indented\n"
+      "a\n\n---\n\nb\n"
+      "[t][r] and http://u.v/x here\n\n[r]: http://u.v \"T\"\n"
+      "a &amp; b &copy; \\*c\\* _d_ __e__\n"
+      "* a\n* b:\n  ```scheme\n  (c)\n  ```\n  after\n* c\n"
+      "* a\n  | x | y |\n  |---|---|\n  | 1 | 2 |\n* b\n"
+      "> quote\n> more\n>\n> - a\n"
+      "- [ ] todo\n- [x] done\n    - sub\n"
+      "t[^n]\n\n[^n]: first\n\n    second\n"))
+  ;; what was edited is written anew, and the rest as it was
+  (let* ((s "$a=b$ and \\(c\\)\n\n| a |\n|:-:|\n| 1 |\n")
+         (t (md->tm s))
+         (edit (lambda (x)
+                 ;; the body of the first formula, and of the table
+                 (cond ((and (func? x 'md-source 3) (== (caddr x) "$a=b$"))
+                        `(md-source (math "z") ,(caddr x) ,(cadddr x)))
+                       (else x))))
+         (walk (lambda (x)
+                 (let loop ((x x))
+                   (if (pair? x) (edit (cons (car x) (map loop (cdr x)))) x)))))
+    (check= (tm->md t) s)
+    (check= (tm->md (walk t)) "$z$ and \\(c\\)\n\n| a |\n|:-:|\n| 1 |\n"))
+  ;; a new footnote takes a number which is not the label of another
+  (check= (tm->md '(document
+                     (body (document (concat "a" (footnote "new")
+                                             "b" (md-footnote "1" "old"))))
+                     (style "markdown")))
+          "a[^2]b[^1]\n\n[^2]: new\n\n[^1]: old\n"))
+
+;; The same through a buffer, whose macros are expanded when it is saved.
+(define (test-style-buffer)
+  (check-group "style markdown, buffer")
+  (let* ((old (current-buffer))
+         (dir (url-append (url-temp-dir) "markdown-test"))
+         (from (url-append dir "in.md"))
+         (to (url-append dir "saved.md")))
+    (system-mkdir dir)
+    (string-save markdown-file from)
+    (load-buffer from)
+    (with u (current-buffer)
+      (with r (check-run
+                (lambda ()
+                  (update-forced)
+                  (check= (get-style-list) '("markdown"))
+                  (export-buffer-main u to "markdown" (list :overwrite))
+                  (check= (string-load to) markdown-file)
+                  ;; a word is typed in the first paragraph
+                  (with p (tree-ref (buffer-tree) 2)
+                    (tree-set (tree-ref p 0) "Other "))
+                  (update-forced)
+                  (export-buffer-main u to "markdown" (list :overwrite))
+                  (check= (string-load to)
+                          (string-replace markdown-file "Some *text*"
+                                          "Other *text*"))))
+        (when (and (pair? r) (== (car r) 'error))
+          (check-report #f "the group" (object->string r))))
+      (if (url-exists? to) (system-remove to))
+      (if (url-exists? from) (system-remove from))
+      (buffer-pretend-saved u)
+      (buffer-close u)
+      (when (buffer-exists? old) (switch-to-buffer old)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The format
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -843,5 +1010,8 @@
   (test-long)
   (test-round-trips)
   (test-export-buffer)
+  (test-style-import)
+  (test-style-round-trip)
+  (test-style-buffer)
   (test-format)
   (check-end))
