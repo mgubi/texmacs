@@ -6183,7 +6183,12 @@ void vue_texmacs_widget_rep::do_layout () {
   {
     if (visibility[0]) CLAY(CLAY_ID_LOCAL("MainMenuBar"), {
       .layout= {
+#ifdef TAU_SHELL
+        // (the logo of Tau is first: a button, which has its own margin)
+        .padding= { ui_px (4), bar_hpad, 0, 0 },
+#else
         .padding= { bar_hpad, bar_hpad, 0, 0 },
+#endif
         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER },
         .sizing= {
           .width=  CLAY_SIZING_GROW(0),
