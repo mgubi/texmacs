@@ -922,7 +922,8 @@ Not gone through: the dialogs of the Remote menu.
 peach chalk angle brackets, centered on a blue slate blackboard with a
 faint grid, a soft light gradient and rounded corners. The glyphs and
 tile have quiet slate borders. The approved raster master is
-`misc/tau/icons/tau.png`; `misc/tau/icons/README.md` describes the exports
+`misc/tau/icons/tau.png`, with an editable vector reconstruction beside it
+as `tau.svg`; `misc/tau/icons/README.md` describes the exports
 and how to regenerate them. The page uses `misc/tau/web/icon.png`, with
 192-pixel and 180-pixel exports for the browser and touch icon. The macOS
 icon is `packages/macos/Tau.icns`, with standard and Retina representations
