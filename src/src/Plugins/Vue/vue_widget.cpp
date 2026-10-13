@@ -5358,6 +5358,13 @@ vue_plain_window_widget_rep::query (slot s, int type_id) {
       if (win) win->get_size (w, h);
       return close_box<coord2> (coord2 (w, h));
     }
+    case SLOT_VISIBILITY:
+    {
+      // is the window shown, or asked to be? (a popup is hidden by the
+      // interface itself, and who opened it wants to know)
+      check_type_id<bool> (type_id, s);
+      return close_box<bool> (win != NULL && (win->visible_requested || win->shown));
+    }
     default:
       return vue_widget_rep::query (s, type_id);
   }

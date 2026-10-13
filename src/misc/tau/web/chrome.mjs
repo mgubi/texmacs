@@ -308,7 +308,10 @@ function renderSubmenu(node, context) {
 		if (b.classList.contains("tau-open")) closePopups(depth); else open();
 	});
 	// once a menu of a bar is open, the others open under the pointer
-	b.addEventListener("pointerenter", () => {
+	b.addEventListener("pointerenter", event => {
+		// (a finger has no hover: its tap is the click, which would close
+		// what its arrival had just opened)
+		if (event.pointerType === "touch") return;
 		if (context.bar ? popups.length > 0 && !b.classList.contains("tau-open") : true) {
 			if (!b.classList.contains("tau-open")) open();
 		}
@@ -523,8 +526,16 @@ function renderInput(node) {
 		// do not change the text are told by themselves
 		input.addEventListener("input", () => answer(node, [input.value, ""]));
 		input.addEventListener("keydown", event => {
+			// (not while an input method composes: its Enter chooses a
+			// candidate. And the keys which edit the text of the field are
+			// the field's: the arrows and the deletions with any modifier,
+			// the start and the end, select all, copy, cut, paste, undo)
+			if (event.isComposing || event.keyCode === 229) return;
 			const key = keyName(event);
-			if (!key || [...key].length === 1 || ["backspace", "delete", "left", "right", "space"].includes(key)) return;
+			if (!key || [...key].length === 1) return;
+			const base = key.replace(/^([SCAM]-)+/, "");
+			if (["backspace", "delete", "left", "right", "home", "end", "space"].includes(base)) return;
+			if ((event.ctrlKey || event.metaKey) && !event.altKey && ["a", "c", "v", "x", "z", "y"].includes(base.toLowerCase())) return;
 			event.preventDefault();
 			event.stopPropagation();
 			answer(node, [input.value, key]);
@@ -536,7 +547,9 @@ function renderInput(node) {
 	const commit = () => { if (input.value !== sent) { sent = input.value; answer(node, sent); } };
 	input.addEventListener("change", commit);
 	input.addEventListener("keydown", event => {
-		if (event.key !== "Enter") return;
+		// (the Enter which chooses a candidate of an input method is not
+		// the one which validates)
+		if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
 		sent = input.value;
 		answer(node, sent);
 		const d = input.closest(".tau-dialog");
@@ -663,10 +676,14 @@ function showDialog(m) {
 function removeDialog(id) {
 	const d = dialogs.get(id);
 	if (!d) return;
-	const focused = d.contains(document.activeElement);
+	// (the keyboard goes back to the document unless a field of another
+	// dialog has it: a view in the dialog which goes typed through the
+	// text area of the page, which is not inside it)
+	const at = document.activeElement;
+	const elsewhere = at && at.closest && at.closest(".tau-dialog") && !d.contains(at);
 	dialogs.delete(id);
 	d.remove();
-	if (focused || !dialogs.size) afterAction();
+	if (!elsewhere) afterAction();
 }
 
 // a dialog is moved by its title
@@ -682,7 +699,10 @@ function drag(d, bar) {
 		move(event);
 		bar.setPointerCapture(event.pointerId);
 		bar.addEventListener("pointermove", move);
-		bar.addEventListener("pointerup", () => bar.removeEventListener("pointermove", move), { once: true });
+		// (the end of the drag, or its loss: a touch which the browser takes)
+		const end = () => { bar.removeEventListener("pointermove", move); bar.removeEventListener("pointerup", end); bar.removeEventListener("pointercancel", end); };
+		bar.addEventListener("pointerup", end);
+		bar.addEventListener("pointercancel", end);
 	});
 }
 
@@ -714,16 +734,18 @@ function chevron(c, end) {
 		event.stopPropagation();
 		step();
 		stop();
-		timer = setInterval(() => step(12), 30);
+		timer = setInterval(() => { if (b.isConnected) step(12); else stop(); }, 30);
 	});
 	b.addEventListener("pointerup", stop);
+	b.addEventListener("pointercancel", stop);
 	b.addEventListener("pointerleave", stop);
 	b.addEventListener("click", event => event.stopPropagation());
 	// in a menu the pointer over the chevron scrolls
 	b.addEventListener("pointerenter", () => {
 		if (!c.classList.contains("tau-popup")) return;
 		stop();
-		timer = setInterval(() => step(8), 30);
+		// (until the pointer leaves, or the menu goes under it)
+		timer = setInterval(() => { if (b.isConnected) step(8); else stop(); }, 30);
 	});
 	return anchor;
 }

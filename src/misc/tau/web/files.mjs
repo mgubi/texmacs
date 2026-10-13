@@ -233,7 +233,9 @@ async function importFiles(dir, items, clash) {
 		if (suffix(item.rel) === "zip" && item.unpack) {
 			// a zip of one folder gives that folder; the files of a zip
 			// without one go into a folder named after it
-			const entries = await unzip(bytes), first = {};
+			// (maps of names without the names which every object has: a file
+			// may be called "constructor" or "toString")
+			const entries = await unzip(bytes), first = Object.create(null);
 			for (const e of entries) first[e.rel.split("/")[0]] = e.rel.includes("/");
 			const names = Object.keys(first), one = names.length === 1 && first[names[0]];
 			const into = one ? "" : item.rel.slice(0, item.rel.length - 4) + "/";
@@ -248,7 +250,7 @@ async function importFiles(dir, items, clash) {
 		const answer = taken.length ? await clash(taken) : "replace";
 		if (!answer) return null;
 		if (answer === "both") {
-			const other = {};
+			const other = Object.create(null);
 			for (const n of taken) { other[n] = fresh(there, n); there.push(other[n]); }
 			for (const f of files) if (f.parts[0] in other) f.parts[0] = other[f.parts[0]];
 		}
@@ -792,7 +794,7 @@ export async function dropOnView(dataTransfer, insert) {
 	const items = await dropped(dataTransfer);
 	if (items.length === 0) return;
 	const there = (await options.request("list", { dir: DOCS })).entries.map(e => e.name);
-	const renamed = {};
+	const renamed = Object.create(null);
 	for (const item of items) {
 		const parts = item.rel.split("/");
 		if (!(parts[0] in renamed)) { renamed[parts[0]] = fresh(there, safe(parts[0])); there.push(renamed[parts[0]]); }

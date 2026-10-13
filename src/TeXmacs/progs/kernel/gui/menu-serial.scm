@@ -61,7 +61,10 @@
         ((symbol? x) (json-string (symbol->string x)))
         ((vector? x)
          (string-append "[" (json-join (map json (vector->list x))) "]"))
-        ((list? x)
+        ;; (an object is a list of pairs with a name: anything else which
+        ;; got here, the list of trees which a test returned, is no value)
+        ((and (list? x)
+              (list-and (map (lambda (p) (and (pair? p) (symbol? (car p)))) x)))
          (string-append
           "{"
           (json-join (map (lambda (p)
@@ -92,6 +95,13 @@
 
 (define serial-children (make-ahash-table)) ;; part -> list of parts
 (define serial-refresh (make-ahash-table))  ;; number -> (kind . part)
+(define serial-contents (make-ahash-table)) ;; numbers of contents -> #t
+
+(define (serial-keep-contents make)
+  "Keep the closure @make, which gives the contents of a submenu (tau-expand)."
+  (with n (serial-keep make)
+    (ahash-set! serial-contents n #t)
+    n))
 
 (define (serial-forget part)
   "Forget the closures of @part, and those of the parts inside it."
@@ -100,6 +110,7 @@
   (ahash-remove! serial-children part)
   (for (n (or (ahash-ref serial-parts part) '()))
     (ahash-remove! serial-table n)
+    (ahash-remove! serial-contents n)
     (ahash-remove! serial-refresh n))
   (ahash-remove! serial-parts part))
 
@@ -139,7 +150,16 @@
   (if (null? outbox) ""
       (with l (reverse outbox)
         (set! outbox '())
-        (json `((msgs . ,(list->vector l)))))))
+        ;; (each by itself: one which cannot be written is left out, and
+        ;; the others of the turn still leave)
+        (string-append
+         "{\"msgs\":["
+         (json-join
+          (list-filter
+           (map (lambda (m) (catch #t (lambda () (json m)) (lambda args "")))
+                l)
+           (lambda (s) (!= s ""))))
+         "]}"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Labels
@@ -284,7 +304,9 @@
        (with source (promise-source action)
          (or (not (pair? source))
              (with prop (property (car source) :applicable)
-               (or (not prop) (apply (car prop) (list))))))))
+               ;; (yes or no: the test may answer with what it found)
+               (or (not prop)
+                   (if (apply (car prop) (list)) #t #f)))))))
 
 (define (entry-help action)
   (and-with source (promise-source action)
@@ -327,6 +349,9 @@
 ;; a formula in the default font (make_symbol_image), and kept among the
 ;; files of the user (which stay in the browser).
 
+(define (string-ascii? s)
+  (list-and (map (lambda (c) (< (char->integer c) 128)) (string->list s))))
+
 (define symbol-files (make-ahash-table))
 
 (define (symbol-file-name sym)
@@ -363,7 +388,8 @@
         (symbol . #t)
         ;; (as TeXmacs names it, for an interface which typesets it itself:
         ;; the desktop; Unicode does not say which glyph of mathematics)
-        ,@(if (in-desktop?) `((tm . ,symstring)) '())
+        ,@(if (and (in-desktop?) (string-ascii? symstring))
+              `((tm . ,symstring)) '())
         ,@(if (in-browser?)
               (with f (symbol-file symstring)
                 (if (== f "") '() `((file . ,f))))
@@ -383,7 +409,7 @@
       (pull . ,(if (== tag '=>) "down" "right"))
       ,@(serial-label label style)
       (enabled . ,(active? style))
-      (contents . ,(serial-keep
+      (contents . ,(serial-keep-contents
                     (lambda () (serial-items-list items style #f)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -671,11 +697,26 @@
 
 (tm-define (tau-expand n)
   (:synopsis "The contents kept under the number @n, as JSON")
-  (with x (ahash-ref serial-table n)
+  ;; Only what was kept as contents: a number of an action is not run
+  ;; here. What a submenu holds is kept in a part of its own, inside the
+  ;; part of the submenu, and forgotten when the submenu is opened again:
+  ;; a menu which is opened many times does not fill the table.
+  (with x (and (ahash-ref serial-contents n) (ahash-ref serial-table n))
     (if (not x) "{\"items\":[]}"
-        (begin
-          (set! serial-part (car x))
-          (json `((items . ,(list->vector ((cdr x))))))))))
+        (let* ((part (car x))
+               (sub (string-append part "/x" (number->string n))))
+          (serial-forget sub)
+          (when (not (in? sub (or (ahash-ref serial-children part) '())))
+            (ahash-set! serial-children part
+                        (cons sub (or (ahash-ref serial-children part) '()))))
+          (with old serial-part
+            (catch #t
+              (lambda ()
+                (json `((items . ,(list->vector
+                                   (serial-in-part sub (cdr x)))))))
+              (lambda args
+                (set! serial-part old)
+                "{\"items\":[]}")))))))
 
 (tm-define (tau-invoke n)
   (:synopsis "Run the action kept under the number @n")

@@ -2191,13 +2191,22 @@ set_frame_cursor (int e) {
 // and right, 4: up and down, 0: not any more)
 static unsigned int split_owner= 0;
 static int split_shape= 0;
+static Uint64 split_seen= 0;
 
 void
 vue_split_pointer (unsigned int id, int shape) {
-  if (shape != 0) { split_owner= id; split_shape= shape; }
+  if (shape != 0) { split_owner= id; split_shape= shape; split_seen= SDL_GetTicks (); }
   else if (split_owner == id && split_shape != 0) split_shape= 0;
   else return;
   set_frame_cursor (split_shape);
+}
+
+// (a divider which went with its window while the pointer was over it
+// says nothing any more: its arrow is forgotten after a moment)
+static int
+split_pointer_now () {
+  if (split_shape != 0 && SDL_GetTicks () - split_seen > 1000) split_shape= 0;
+  return split_shape;
 }
 
 void
@@ -2797,7 +2806,7 @@ route_pointer (vue_window win, float& x, float& y, int kind) {
       if (old != NULL) pointer_left (old);
     }
   }
-  if (kind == 0) set_frame_cursor (edges != 0 ? edges : split_shape);
+  if (kind == 0) set_frame_cursor (edges != 0 ? edges : split_pointer_now ());
   if (title) return NULL;
   if (target == NULL) return win;
   x= sx - target->x;

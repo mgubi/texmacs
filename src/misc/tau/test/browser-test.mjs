@@ -1199,6 +1199,24 @@ test("the debugging console", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("the address runs nothing", async p => {
+	// an option of TeXmacs in the address ("-x" runs Scheme) is left out,
+	// and a variable of the environment which is no switch of the typesetter
+	// too; a document named there is still opened
+	await p.open("arg=-x&arg=" + encodeURIComponent("(define tau-injected #t)") +
+		"&arg=" + encodeURIComponent("/texmacs/doc/about/welcome/new-welcome.en.tm") +
+		"&env=" + encodeURIComponent("TAU_INJECTED_ENV=yes") + "&env=" + encodeURIComponent("TEXMACS_PAGE_REUSE=check"));
+	await sleep(1500);
+	await p.scheme('(set-message (string-append (if (defined? (quote tau-injected)) "INJECTED" "clean") " env:" (if (== (getenv "TAU_INJECTED_ENV") "yes") "SET" "unset") " switch:" (or (getenv "TEXMACS_PAGE_REUSE") "none")) "")');
+	await sleep(400);
+	const said = await p.page.$eval("#tau-footer-left", e => e.textContent);
+	check("the Scheme of the address was not run", said.includes("clean"), said);
+	check("its variable was not set", said.includes("env:unset"), said);
+	check("a switch of the typesetter is", said.includes("switch:check"), said);
+	await p.until("the document of the address is a tab", async () => (await p.tabs())[0].filter(t => /Welcome|new-welcome/.test(t.name)).length >= 1, 20000);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("stopped", async p => {
 	await p.open();
 	await p.newDocument();

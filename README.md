@@ -79,7 +79,7 @@ converts documents without a page.
 
 In the address of the page: `?bars=top` or `left` (the icon bars),
 `?nohome` (nothing is kept in the browser), `?trace-keys` (the keys in
-the console), `?arg=…` (an option of TeXmacs, a document to open).
+the console), `?arg=…` (a document of TeXmacs to open).
 
 ## Tests
 

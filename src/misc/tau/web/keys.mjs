@@ -59,6 +59,9 @@ export function makeLayout() {
 // a key which typed text tells what is at its place
 export function learn(layout, event) {
 	if (event.ctrlKey || event.metaKey || event.altKey || !event.code) return;
+	// (a character made with AltGr is not the one of the key: on Linux it
+	// comes without Control or Alt, and "{" was learnt as the key of 7)
+	if (event.altGraph || (event.getModifierState && event.getModifierState("AltGraph"))) return;
 	const c = single(event.key);
 	if (!c || c === " ") return;
 	if (event.shiftKey) layout.shift.set(event.code, c);

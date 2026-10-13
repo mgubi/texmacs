@@ -15,7 +15,7 @@ const statusLine = document.getElementById("status");
 const params = new URLSearchParams(location.search);
 const verbose = params.has("log");
 
-// ?arg=... are the arguments of TeXmacs (a document to open, say)
+// ?arg=... is a document to open (a path under /texmacs or /home/tau)
 const worker = new Worker("tau-worker.js" + location.search);
 // What the wheel and the pointer say comes faster than the core may
 // answer: a step of a list which is typeset again takes it a tenth of a
@@ -175,10 +175,11 @@ function addScrollbars(pane, holder) {
 			const up = () => {
 				track.classList.remove("tau-dragging");
 				thumb.removeEventListener("pointermove", move);
-				thumb.removeEventListener("pointerup", up);
+				thumb.removeEventListener("pointerup", up); thumb.removeEventListener("pointercancel", up);
 			};
 			thumb.addEventListener("pointermove", move);
 			thumb.addEventListener("pointerup", up);
+			thumb.addEventListener("pointercancel", up);
 		});
 		track.addEventListener("pointerdown", event => {
 			if (event.target !== track) return;
@@ -313,9 +314,10 @@ for (const [id, sign] of [["tau-side-0", -1], ["tau-side-1", 1]]) {
 		grip.setPointerCapture(event.pointerId);
 		const x0 = event.clientX, w0 = tool.offsetWidth;
 		const move = e => { tool.style.width = Math.max(160, Math.min(window.innerWidth * 0.6, w0 + sign * (e.clientX - x0))) + "px"; };
-		const up = () => { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); };
+		const up = () => { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); grip.removeEventListener("pointercancel", up); };
 		grip.addEventListener("pointermove", move);
 		grip.addEventListener("pointerup", up);
+		grip.addEventListener("pointercancel", up);
 	});
 }
 
@@ -342,10 +344,11 @@ function layoutPanes() {
 			const up = () => {
 				divider.classList.remove("tau-dragging");
 				divider.removeEventListener("pointermove", move);
-				divider.removeEventListener("pointerup", up);
+				divider.removeEventListener("pointerup", up); divider.removeEventListener("pointercancel", up);
 			};
 			divider.addEventListener("pointermove", move);
 			divider.addEventListener("pointerup", up);
+			divider.addEventListener("pointercancel", up);
 		});
 		// a double click gives them the same width again
 		divider.addEventListener("dblclick", () => {
@@ -652,15 +655,18 @@ function download(m) {
 // took long to make): a line with a link then.
 function openPdf(m) {
 	if (!m.bytes) return;
+	// (the address of the PDF is given back once the tab has it, or when the
+	// line which offers it goes: each stayed in memory as long as the page)
 	const url = URL.createObjectURL(new Blob([m.bytes], { type: "application/pdf" }));
+	const forget = () => setTimeout(() => URL.revokeObjectURL(url), 60000);
 	const tab = window.open(url, "_blank");
-	if (tab) return;
+	if (tab) { forget(); return; }
 	const bar = el("div", "tau-notice"), link = el("a", "", "Open " + m.name), close = el("button", "tau-doc-close", "×");
 	link.href = url;
 	link.target = "_blank";
-	link.addEventListener("click", () => bar.remove());
+	link.addEventListener("click", () => { bar.remove(); forget(); });
 	close.type = "button";
-	close.addEventListener("click", () => bar.remove());
+	close.addEventListener("click", () => { bar.remove(); URL.revokeObjectURL(url); });
 	bar.append(el("span", "", "The PDF is ready."), link, close);
 	panesElement.parentElement.insertBefore(bar, panesElement);
 }
@@ -713,10 +719,16 @@ async function pasteFromBrowser() {
 	focusView(target);
 }
 
+let copyFailed = false;
 function copy(text) {
 	const done = navigator.clipboard && navigator.clipboard.writeText
 		? navigator.clipboard.writeText(text) : Promise.reject(new Error("no clipboard"));
-	done.catch(error => { if (verbose) console.log("clipboard: " + error.message); });
+	// (a browser which refuses is said, once: what was copied is not where
+	// the user thinks it is)
+	done.catch(error => {
+		if (verbose) console.log("clipboard: " + error.message);
+		if (!copyFailed) { copyFailed = true; notice("The browser did not let Tau write to the clipboard: copy with the keys of the browser (" + (isMac ? "⌘C" : "Ctrl+C") + ")."); }
+	});
 }
 
 // ---------------------------------------------------------------------------
@@ -764,15 +776,27 @@ worker.onmessage = event => {
 	case "log":
 		if (verbose) console.log(m.text);
 		break;
+	case "storage":
+		// what was saved could not be written to the browser (no room
+		// left): said once, it is true of all that follows
+		if (!storageFailed) {
+			storageFailed = true;
+			notice("The browser could not store your documents (" + m.text + "): what you save now may be lost when this page is closed. Download a copy of your documents, or save a backup.");
+		}
+		break;
 	case "failed":
 		setStatus("Tau could not start: " + m.text);
 		app.failed("Tau could not start: " + m.text);
+		failure(m.text, "Tau could not start");
 		break;
 	case "ready":
 		if (!state.started) setStatus("Tau is ready, no view yet");
 		// another page of Tau keeps the documents and the preferences
 		homeKept = !!m.homeKept;
-		if (!m.homeKept && !params.has("nohome"))
+		// (or the browser could not give them: nothing is written over them)
+		if (!m.homeKept && m.homeError)
+			notice("The documents kept in this browser could not be read (" + m.homeError + "): what is saved here is not kept, and what the browser has is left as it is.");
+		else if (!m.homeKept && !params.has("nohome"))
 			notice("Tau is open in another page of this browser: what is saved here is not kept when this page is closed.");
 		openFromAddress();
 		break;
@@ -855,6 +879,8 @@ worker.onerror = event => {
 };
 
 // A line over the views which the user closes
+let storageFailed = false;
+
 function notice(text) {
 	const bar = el("div", "tau-notice"), close = el("button", "tau-doc-close", "×");
 	close.type = "button";
@@ -865,13 +891,26 @@ function notice(text) {
 
 // The program stopped: nothing which is typed reaches it any more
 let failed = false;
-function failure(text) {
+function failure(text, title) {
 	if (failed) return;
 	failed = true;
 	const box = el("div", "tau-failure"), again = el("button", "tau-button", "Start Tau again");
 	again.type = "button";
 	again.addEventListener("click", () => { leaving = true; location.reload(); });
-	box.append(el("div", "tau-failure-title", "Tau stopped"), el("div", "", text), again);
+	// What is kept in the browser is still within reach: a copy of it, and
+	// a way to start from nothing when it is what stops Tau (the worker
+	// answers these two without the program)
+	const backup = el("button", "tau-button", "Save a backup"), forget = el("button", "tau-button", "Forget everything…");
+	backup.type = forget.type = "button";
+	backup.addEventListener("click", () => files.backup());
+	forget.addEventListener("click", () => {
+		if (!confirm("Delete the documents and the preferences which Tau keeps in this browser?")) return;
+		leaving = true;
+		send({ t: "forget-home" });
+	});
+	const actions = el("div", "tau-failure-actions");
+	actions.append(backup, forget, again);
+	box.append(el("div", "tau-failure-title", title || "Tau stopped"), el("div", "", text), actions);
 	const veil = el("div", "tau-veil");
 	veil.append(box);
 	document.body.append(veil);

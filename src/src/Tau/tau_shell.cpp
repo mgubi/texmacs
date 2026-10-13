@@ -176,13 +176,32 @@ escaped (std::string s) {
   return r;
 }
 
+// The end of this program: at once, without the destructors of what is
+// static, which the thread of the reader may be using (the frames, their
+// lock) and which refer to each other (the widgets, the tables)
+static void
+shell_exit (int code) {
+  fflush (stdout); fflush (stderr);
+  _exit (code);
+}
+
 static bool
 core_start (url exe, int argc, char** argv) {
   int in_pipe[2], out_pipe[2];
   if (pipe (in_pipe) != 0 || pipe (out_pipe) != 0) return false;
   signal (SIGPIPE, SIG_IGN);
+  // (the ends which stay here are not for the programs which are started
+  // later, the one which shows a PDF: with them it kept the core alive
+  // after this program had gone)
+  fcntl (in_pipe[1], F_SETFD, FD_CLOEXEC);
+  fcntl (out_pipe[0], F_SETFD, FD_CLOEXEC);
   std::string prog= std_of (as_string (exe));
   core_pid= fork ();
+  if (core_pid < 0) {
+    close (in_pipe[0]); close (in_pipe[1]);
+    close (out_pipe[0]); close (out_pipe[1]);
+    return false;
+  }
   if (core_pid == 0) {
     dup2 (in_pipe[0], 0);
     close (in_pipe[1]); close (out_pipe[0]);
@@ -309,9 +328,20 @@ json_string (const char*& p, const char* end) {
   return r;
 }
 
+// (what is parsed ends with a zero, see json_parse: a description which
+// stops short is read to that zero and no further; and it is not nested
+// without end)
+static int json_depth= 0;
+struct json_deeper {
+  json_deeper () { json_depth++; }
+  ~json_deeper () { json_depth--; }
+};
+
 static json
 json_value (const char*& p, const char* end) {
   json v;
+  json_deeper deeper;
+  if (json_depth > 256) { p= end; return v; }
   json_space (p, end);
   if (p >= end) return v;
   if (*p == '{') {
@@ -355,8 +385,10 @@ json_value (const char*& p, const char* end) {
 
 static json
 json_parse (const char* data, size_t n) {
-  const char* p= data;
-  return json_value (p, data + n);
+  // (a copy which ends with a zero: the frame it comes from does not)
+  std::string copy (data == NULL? "": data, data == NULL? 0: n);
+  const char* p= copy.c_str ();
+  return json_value (p, copy.c_str () + copy.size ());
 }
 
 /******************************************************************************
@@ -500,7 +532,7 @@ public:
         else if (is_atomic (doc[i])) {
           url u= url_system (doc[i]->label);
           if (is_rooted (u) && exists (u))
-            core_say ("chosen 0 " + std_of (cork_to_utf8 (doc[i]->label)));
+            core_say ("chosen 0 " + escaped (std_of (cork_to_utf8 (doc[i]->label))));
           else text += std_of (cork_to_utf8 (doc[i]->label));
         }
       if (images != "")
@@ -610,15 +642,20 @@ public:
   }
 
   // a paint of the core: the rectangle which changed
-  void paint (const int32_t* n, const unsigned char* px) {
+  // (bytes: how many pixels came with the numbers. The numbers are checked
+  // against them and against the picture which could be made: a picture
+  // which could not is one pixel, whatever was asked)
+  void paint (const int32_t* n, const unsigned char* px, size_t bytes) {
     if (n[0] != view || n[1] != place) return; // for another place
     int w= n[2], h= n[3], x= n[4], y= n[5], dw= n[6], dh= n[7];
+    if (w < 1 || h < 1 || w > 16384 || h > 16384 || dw < 1 || dh < 1 ||
+        dw > w || dh > h || bytes < (size_t) 4 * dw * dh) return;
     fz_context* ctx= mupdf_context ();
     if (pix == NULL || w != fw || h != fh) {
       if (pix != NULL) fz_drop_pixmap (ctx, pix);
       pix= mupdf_new_pixmap (w, h);
       fz_clear_pixmap_with_value (ctx, pix, 0xff);
-      fw= w; fh= h;
+      fw= fz_pixmap_width (ctx, pix); fh= fz_pixmap_height (ctx, pix);
     }
     if (pix == NULL || x < 0 || y < 0 || x + dw > fw || y + dh > fh) return;
     unsigned char* dst= fz_pixmap_samples (ctx, pix);
@@ -696,11 +733,16 @@ expand (int number) {
     while (!frames.empty ()) {
       core_frame f= std::move (frames.front ());
       frames.pop_front ();
-      if (!strcmp (f.tag, "JSON")) {
+      // (a frame with its two zeros, as in handle_frame)
+      const char* z1= f.body.empty ()? NULL:
+        (const char*) memchr (f.body.data (), 0, f.body.size ());
+      const char* z2= z1 == NULL? NULL:
+        (const char*) memchr (z1 + 1, 0, f.body.size () - (size_t) (z1 + 1 - (const char*) f.body.data ()));
+      if (!strcmp (f.tag, "JSON") && z2 != NULL) {
         const char* kind= (const char*) f.body.data ();
-        const char* fpart= kind + strlen (kind) + 1;
+        const char* fpart= z1 + 1;
         if (!strcmp (kind, "contents") && part == fpart) {
-          const char* js= fpart + strlen (fpart) + 1;
+          const char* js= z2 + 1;
           if (getenv ("TAU_SHELL_DEBUG") != NULL)
             fprintf (stderr, "tau_shell] contents %s %.*s\n", fpart,
                      (int) std::min ((size_t) 1800, f.body.size () - (size_t) (js - kind)), js);
@@ -1205,10 +1247,14 @@ static widget context_menu;
 static bool
 close_context_menu () {
   if (is_nil (context_menu)) return false;
+  // (Vue hides the menu by itself, when an item is chosen or the pointer
+  // is pressed elsewhere: it was open only if it is still shown, and a key
+  // is taken for it only then)
+  bool was_open= query<bool> (context_menu, SLOT_VISIBILITY);
   set_visibility (context_menu, false);
   destroy_window_widget (context_menu);
   context_menu= widget ();
-  return true;
+  return was_open;
 }
 static void
 show_context_menu (const json& m) {
@@ -1268,7 +1314,7 @@ public:
     string path;
     int i= search_forwards ("\"", 0, file);
     if (i >= 0) path= scm_unquote (file (i, search_backwards ("\"", N(file), file) + 1));
-    core_say ("chosen " + std::to_string (ticket) + " " + std_of (path));
+    core_say ("chosen " + std::to_string (ticket) + " " + escaped (std_of (path)));
     chooser= widget (); // (the two refer to each other)
   }
   void apply (object args) { (void) args; apply (); }
@@ -1446,7 +1492,8 @@ class buffer_command_rep: public command_rep {
 public:
   buffer_command_rep (std::string w, int p, std::string n):
     what (w), name (n), place (p) {}
-  void apply () { core_say ("buffer " + what + " " + std::to_string (place) + " " + name); }
+  void apply () {
+    core_say ("buffer " + what + " " + std::to_string (place) + " " + escaped (name)); }
   void apply (object args) { (void) args; apply (); }
   tm_ostream& print (tm_ostream& out) { return out << "buffer"; }
 };
@@ -1571,18 +1618,24 @@ handle_message (std::string kind, std::string part, const json& desc) {
   else if (kind == "fullscreen") set_full_screen (the_window, desc["on"].truth ());
   else if (kind == "open-pdf") {
     // Print and Preview write a PDF: the program of the system shows it
+    // (started by a child which ends at once and is waited for: the
+    // program belongs to nobody here, and leaves nothing behind)
     std::string path= desc["path"].str ();
     pid_t pid= fork ();
     if (pid == 0) {
+      if (fork () == 0) {
 #ifdef __APPLE__
-      execlp ("open", "open", path.c_str (), (char*) NULL);
+        execlp ("open", "open", path.c_str (), (char*) NULL);
 #else
-      execlp ("xdg-open", "xdg-open", path.c_str (), (char*) NULL);
+        execlp ("xdg-open", "xdg-open", path.c_str (), (char*) NULL);
 #endif
-      _exit (127);
+        _exit (127);
+      }
+      _exit (0);
     }
+    if (pid > 0) { int status= 0; waitpid (pid, &status, 0); }
   }
-  else if (kind == "quit") exit (0);
+  else if (kind == "quit") shell_exit (0);
 }
 
 static void
@@ -1602,7 +1655,7 @@ handle_frame (core_frame& f) {
       fprintf (stderr, "tau_shell] PANT view %d place %d size %dx%d rect %d,%d %dx%d scroll %d,%d of %dx%d%s\n",
                n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[10], n[11], n[8], n[9],
                v == NULL? " (no canvas)": (n[1] != v->place? " (another place)": ""));
-    if (v != NULL) v->paint (n, f.body.data () + 56);
+    if (v != NULL) v->paint (n, f.body.data () + 56, f.body.size () - 56);
     // TAU_SHELL_EVAL: a command of Scheme for the core, once it draws
     // (for the tests: a dialog to open)
     static bool evaluated= false;
@@ -1627,9 +1680,16 @@ handle_frame (core_frame& f) {
     }
   }
   else if (!strcmp (f.tag, "JSON")) {
+    // (the kind, the part and the description, each ended by a zero: a
+    // frame without the two zeros is none)
     const char* kind= (const char*) f.body.data ();
-    const char* part= kind + strlen (kind) + 1;
-    const char* js= part + strlen (part) + 1;
+    const char* stop= kind + f.body.size ();
+    const char* z1= (const char*) memchr (kind, 0, f.body.size ());
+    if (z1 == NULL) return;
+    const char* part= z1 + 1;
+    const char* z2= (const char*) memchr (part, 0, (size_t) (stop - part));
+    if (z2 == NULL) return;
+    const char* js= z2 + 1;
     json desc= json_parse (js, f.body.size () - (size_t) (js - kind));
     // TAU_SHELL_DEBUG: what the core says, as it comes
     static bool debug= (getenv ("TAU_SHELL_DEBUG") != NULL);
@@ -1672,7 +1732,7 @@ shell_turn () {
   if (gone && !is_nil (the_window)) {
     // the core is gone: so is this program
     cout << "tau_shell] the core stopped" << LF;
-    exit (0);
+    shell_exit (0);
   }
 }
 
@@ -1681,7 +1741,7 @@ shell_turn () {
 class quit_command_rep: public command_rep {
 public:
   void apply () {
-    if (core_gone || core_in < 0) exit (0);
+    if (core_gone || core_in < 0) shell_exit (0);
     core_say ("scheme (safely-quit-TeXmacs)");
   }
   void apply (object args) { (void) args; apply (); }
@@ -1764,13 +1824,13 @@ tau_shell_main (int argc, char** argv) {
 
   if (!core_start (url_system (core), argc, argv)) {
     cerr << "tau_shell] cannot start " << core << LF;
-    exit (1);
+    shell_exit (1);
   }
   SDL_AddTimer (150, busy_timer, NULL);
   gui_interpose (shell_turn);
   gui_start_loop ();
   if (core_in >= 0) close (core_in);
-  exit (0);
+  shell_exit (0);
 }
 
 #endif // TAU_SHELL

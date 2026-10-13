@@ -138,7 +138,7 @@ function openMenu(button, options) {
 			if (menu) kept.textContent = "Kept in this browser: your documents and preferences (" + human(e.usage || 0) + " used).";
 		}).catch(() => {});
 	text("In the address of the page: ?bars=top or left (the icon bars), ?nohome (nothing is kept), " +
-		"?trace-keys (the keys in the console), ?arg=… (an option of TeXmacs).");
+		"?trace-keys (the keys in the console), ?arg=… (a document of TeXmacs to open).");
 	sep();
 	item("Files in this browser…", () => options.files());
 	item("Save a backup", () => options.backup());

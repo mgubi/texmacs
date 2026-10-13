@@ -26,8 +26,11 @@ Module['preRun'].push(function () {
   // its switches (TEXMACS_PAGE_HF_CACHE=check...)
   if (new URLSearchParams (self.location.search).has ('debug'))
     new URLSearchParams (self.location.search).getAll ('env').forEach (function (e) {
+      // (the switches of the typesetter and of its profiles, and no other
+      // variable: a link must not say where TeXmacs finds its programs)
       var i = e.indexOf ('=');
-      if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
+      if (i > 0 && /^TEXMACS_(PAGE|EDIT|TYPESET)_[A-Z_]+$/.test (e.slice (0, i)))
+        ENV[e.slice (0, i)] = e.slice (i + 1);
     });
   // the system of the user, for the shortcuts of TeXmacs: Cmd+... on a Mac
   // (default_look_and_feel in src/Kernel/Abstractions/basic.cpp)
@@ -58,14 +61,48 @@ Module['preRun'].push(function () {
     };
     if (!kept) { done (); return; }
     try {
+      // What changes in the home is written to the browser by itself
+      // (autoPersist), through IDBFS.syncfs, which is watched here:
+      // - nothing is written while the home is being read: a write then
+      //   took what was read so far for the whole home, and removed the
+      //   rest from the browser;
+      // - nothing is written at all when the home could not be read: the
+      //   little which was read would replace what the browser keeps;
+      // - a write which fails (no room left in the browser) is said to
+      //   the page: it said nothing, and what was saved was gone at the
+      //   next visit.
+      var realSync = IDBFS.syncfs, reading = true, read = false, held = [];
+      IDBFS.syncfs = function (mount, populate, callback) {
+        if (!populate && reading) { held.push (callback); return; }
+        if (!populate && !read) { if (callback) callback (null); return; }
+        realSync.call (IDBFS, mount, populate, function (err) {
+          if (err && !populate) {
+            console.error ('Tau: the home directory cannot be written to the browser: ' + err);
+            try { postMessage ({ t: 'storage', text: String (err && err.message || err) }); } catch (e) {}
+          }
+          if (callback) callback (err);
+        });
+      };
       FS.mount (IDBFS, { autoPersist: true }, TAU_HOME);
       FS.syncfs (true, function (err) {
-        if (err) console.error ('Tau: the home directory kept in the browser cannot be read: ' + err);
-        else Module.tauHomeKept = true;
+        reading = false;
+        if (err) {
+          console.error ('Tau: the home directory kept in the browser cannot be read: ' + err);
+          Module.tauHomeError = String (err && err.message || err);
+        }
+        else { Module.tauHomeKept = true; read = true; }
+        // (what was asked to be written meanwhile: now, once, or never)
+        var waiting = held; held = [];
+        if (read && waiting.length > 0)
+          IDBFS.syncfs (FS.lookupPath (TAU_HOME).node.mount, false, function (e) {
+            waiting.forEach (function (c) { if (c) c (e); });
+          });
+        else waiting.forEach (function (c) { if (c) c (null); });
         done ();
       });
     } catch (e) {
       console.error ('Tau: the home directory cannot be kept in the browser: ' + e);
+      Module.tauHomeError = String (e && e.message || e);
       done ();
     }
   };

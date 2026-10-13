@@ -400,8 +400,10 @@ under node.
     make -C build-tau -f ../misc/tau/Makefile -j8 MUPDF=... web
     make -C build-tau -f ../misc/tau/Makefile serve    # http://localhost:8080/
 
-`index.html?arg=/texmacs/doc/...` opens a document of TeXmacs (the `arg`s
-are its arguments), `?log` sends its output to the console.
+`index.html?arg=/texmacs/doc/...` opens a document of TeXmacs (an `arg`
+is a path under `/texmacs` or `/home/tau`; anything else, an option of
+TeXmacs above all, is left out: `-x` would run what a link says), `?log`
+sends its output to the console.
 
 - `out/web` has the core for a worker (`tau.js`, `tau.wasm`), the files of
   TeXmacs in packages (`misc/wasm/package.py` and `packages.js`, unchanged)

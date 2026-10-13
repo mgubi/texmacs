@@ -277,6 +277,9 @@ cache_initialize () {
       remove (cache * url ("file_cache"));
       remove (cache * url ("stat_cache.scm"));
       remove (cache * url ("validate_cache.scm"));
+      // (the pictures of the symbols of the palettes, which another build
+      // may draw otherwise: menu-serial.scm)
+      remove (cache * url ("symbol-pictures") * url_wildcard ("*.png"));
       // (in a new home the directory is not there yet: this comes before
       // init_user_dirs. Without it the stamp was not written, with a
       // warning, and the next start cleared the caches which this one made)

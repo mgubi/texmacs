@@ -29,6 +29,7 @@
 #include "converter.hpp"
 #include "iterator.hpp"
 #include "boot.hpp"
+#include "colors.hpp"
 #include "analyze.hpp"
 #include "convert.hpp"
 #include "picture.hpp"
@@ -180,10 +181,12 @@ tau_footer_menus () {
   is_on= true;
 }
 
+static string json_quote (string s);
+
 void
 tau_footer (string side, string text) {
-  tau_post_json ("footer", side,
-                 "{\"text\":" * scm_quote (cork_to_utf8 (text)) * "}");
+  // (as JSON has its strings: a control character is no part of one)
+  tau_post_json ("footer", side, "{\"text\":" * json_quote (text) * "}");
   // (the editor sends the left footer first, then the right one)
   if (side == "right") tau_footer_menus ();
 }
@@ -224,6 +227,10 @@ static void (*the_interpose_handler) (void) = NULL;
 void
 gui_open (int& argc, char** argv) {
   (void) argc; (void) argv;
+  // (the colours which have names in the sources, black, white, red...:
+  // an interface gives them their values, and without one they were all
+  // nothing, a transparent black)
+  initialize_colors ();
 }
 
 void
@@ -365,6 +372,21 @@ json_quote (string s) {
   return r * "\"";
 }
 
+// (the name of a file is as the system has it, in UTF-8: not a text of
+// TeXmacs, and it comes back as it went to name the buffer, see tau_buffer)
+static string
+json_quote_raw (string u) {
+  string r= "\"";
+  for (int i=0; i<N(u); i++) {
+    unsigned char c= (unsigned char) u[i];
+    if (c == '"' || c == '\\') r << '\\' << u[i];
+    else if (c == '\n') r << "\\n";
+    else if (c < 32) r << ' ';
+    else r << u[i];
+  }
+  return r * "\"";
+}
+
 static string
 tau_state () {
   // (and where the main and the mode icon bars are, which is of the page)
@@ -374,12 +396,14 @@ tau_state () {
   bool first= true;
   for (int i=0; i<N(bs); i++) {
     if (!as_bool (call ("buffer-in-menu?", object (bs[i])))) continue;
+    // (a title which is the name of the file is in UTF-8 as the name is)
     string title= get_title_buffer (bs[i]);
+    bool named= (title == "" || title == as_string (tail (bs[i])));
     if (title == "") title= as_string (tail (bs[i]));
     if (!first) r << ",";
     first= false;
-    r << "{\"name\":" << json_quote (as_string (bs[i]))
-      << ",\"title\":" << json_quote (title)
+    r << "{\"name\":" << json_quote_raw (as_string (bs[i]))
+      << ",\"title\":" << (named? json_quote_raw (title): json_quote (title))
       << ",\"modified\":" << (buffer_modified (bs[i])? "true": "false")
       << "}";
   }
@@ -395,7 +419,7 @@ tau_state () {
     first= false;
     r << "{\"window\":" << as_string (place)
       << ",\"view\":" << as_string (v->id)
-      << ",\"buffer\":" << json_quote (as_string (vw->buf->buf->name))
+      << ",\"buffer\":" << json_quote_raw (as_string (vw->buf->buf->name))
       << "}";
   }
   r << "]}";
@@ -726,12 +750,25 @@ tau_expand (int n) {
 // window): to show a buffer there ("switch"), to close a buffer ("close"),
 // a new document there ("new"), to give the place up ("close-window"). The
 // buffer is named as in the state.
+// A name of a file or of a buffer from the other side: one with a control
+// character (a new line...) is none which TeXmacs can have, and making an
+// address of it ended the core
+static bool
+plain_name (const char* s) {
+  if (s == NULL) return false;
+  for (const unsigned char* p= (const unsigned char*) s; *p != 0; p++)
+    if (*p < 32 || *p == 127) return false;
+  return true;
+}
+
 EMSCRIPTEN_KEEPALIVE
 void
 tau_buffer (const char* what_c, int place, const char* name_c) {
+  if (!plain_name (name_c)) return;
   string what (what_c);
   url win= place_url (place);
-  url name= url_system (utf8_to_cork (string (name_c)));
+  // (the name as the state gave it: of the system, not a text of TeXmacs)
+  url name= url_system (string (name_c));
   if (!is_place (place) || place_view (place) == NULL) return;
   if (what == "close-window") {
     object cmd= list_object (symbol_object ("safely-kill-place"),
@@ -755,8 +792,12 @@ tau_buffer (const char* what_c, int place, const char* name_c) {
 EMSCRIPTEN_KEEPALIVE
 void
 tau_file (int ticket, const char* path) {
+  // (no file then: the question of the ticket is answered with none)
+  if (!plain_name (path)) path= "";
   call ("tau-file-chosen", object (ticket),
-        object (url_system (utf8_to_cork (string (path)))));
+        // (a path of the system as it is: a name with an accent written
+        // as a text of TeXmacs was the name of no file)
+        object (url_system (string (path))));
   tau_turn ();
 }
 
@@ -830,9 +871,10 @@ tau_drop (int view, int x, int y, const char* paths) {
   simple_widget_rep* v= simple_widget_rep::find (view);
   if (v == NULL) return;
   tree doc (CONCAT);
-  array<string> l= tokenize (utf8_to_cork (string (paths)), "\n");
+  // (the paths are of the system; in the document they are a text)
+  array<string> l= tokenize (string (paths), "\n");
   for (int i= 0; i < N(l); i++)
-    if (N(l[i]) > 0) {
+    if (N(l[i]) > 0 && plain_name (c_string (l[i]))) {
       url u= url_system (l[i]);
       string ext= locase_all (suffix (u)), w, h;
       // (a PDF or PostScript picture has its own size; a bitmap its pixels
@@ -845,7 +887,7 @@ tau_drop (int view, int x, int y, const char* paths) {
           else { w= as_string (pw) * "pt"; h= as_string (ph) * "pt"; }
         }
       }
-      doc << tree (IMAGE, as_string (u), w, h, "", "");
+      doc << tree (IMAGE, utf8_to_cork (as_string (u)), w, h, "", "");
     }
   if (N(doc) == 0) return;
   int ticket= ++serial;

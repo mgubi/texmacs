@@ -72,17 +72,6 @@ function handle(m) {
 	case "close":
 		core._tau_closed(m.id);
 		break;
-	case "forget-home": {
-		// what is kept in the browser is deleted; the page starts again
-		const names = ["/home/tau"];
-		Promise.all(names.map(name => new Promise(resolve => {
-			try {
-				const r = indexedDB.deleteDatabase(name);
-				r.onsuccess = r.onerror = r.onblocked = () => resolve();
-			} catch (error) { resolve(); }
-		}))).then(() => postMessage({ t: "quit" }));
-		break;
-	}
 	case "fullscreen-left":
 		core._tau_fullscreen_left();
 		break;
@@ -357,11 +346,27 @@ async function fsRequest(m) {
 	throw new Error("unknown request: " + m.op);
 }
 
+// what is kept in the browser is deleted; the page starts again
+function forgetHome() {
+	const names = ["/home/tau"];
+	Promise.all(names.map(name => new Promise(resolve => {
+		try {
+			const r = indexedDB.deleteDatabase(name);
+			r.onsuccess = r.onerror = r.onblocked = () => resolve();
+		} catch (error) { resolve(); }
+	}))).then(() => postMessage({ t: "quit" }));
+}
+
 onmessage = event => {
 	// (the page asks whether the worker is there: it is, when it answers)
 	if (event.data.t === "ping") { postMessage({ t: "pong", id: event.data.id }); return; }
+	// (what is kept in the browser is forgotten without the program, which
+	// may be what cannot start with it)
+	if (event.data.t === "forget-home") { forgetHome(); return; }
 	if (!core) { waiting.push(event.data); return; }
-	if (frozen) return;
+	// (after a backup was restored the page starts again: a request for the
+	// files is answered, with that, and the rest is not listened to)
+	if (frozen && event.data.t !== "fs") return;
 	// (a program which stopped is not called again; its files are still
 	// read, for a backup of them)
 	if (dead && event.data.t !== "fs") return;
@@ -387,7 +392,13 @@ function stopped(error) {
 self.addEventListener("error", event => stopped(event.error || event.message));
 self.addEventListener("unhandledrejection", event => stopped(event.reason));
 
-const args = new URLSearchParams(self.location.search).getAll("arg");
+// The address of the page names documents to open (?arg=<path>), and
+// nothing else: an option of TeXmacs would run what a link says ("-x" a
+// command of Scheme, "-i" a file of them), with the documents of the user
+// at hand. A document is one which is kept or a file of TeXmacs, as for
+// ?file=.
+const args = new URLSearchParams(self.location.search).getAll("arg").filter(a =>
+	/^\/(texmacs|home\/tau)\//.test(a) && !a.split("/").includes("..") && !/[\0-\x1f]/.test(a));
 
 // The icons of a description go with it: the files which its nodes name
 // and which the page has not got yet are read here and added to the
@@ -440,9 +451,17 @@ tauCore({
 	onRuntimeInitialized: () => postMessage({ t: "progress", what: "starting" })
 }).then(module => {
 	core = module;
-	postMessage({ t: "ready", homeKept: !!module.tauHomeKept });
+	postMessage({ t: "ready", homeKept: !!module.tauHomeKept, homeError: module.tauHomeError || "" });
 	for (const m of waiting.splice(0)) handle(m);
 }).catch(error => {
 	postMessage({ t: "failed", text: String(error && error.message || error) });
+	// The program did not start, but its files may be there (the home kept
+	// in the browser was read before it): the requests for them which
+	// waited, a backup, are answered; the others are dropped
+	if (tauModule && tauModule.FS) {
+		core = tauModule;
+		dead = true;
+		for (const m of waiting.splice(0)) if (m.t === "fs") { try { handle(m); } catch (e) {} }
+	}
 	throw error;
 });

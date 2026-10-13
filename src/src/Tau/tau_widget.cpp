@@ -61,9 +61,17 @@ simple_widget_rep::set_place (int w, int h, double density2, int counter) {
   // the page tells the size of the canvas and the density of the screen;
   // the counter comes back with what is drawn for this place
   place_counter= counter;
+  // (what the other side says is not trusted: a canvas has a size which a
+  // picture can have, and a screen a density which is a number, from 1 to
+  // 8. More would be a unit of zero for the grid of the pixels, or a
+  // picture which cannot be made, of which a part would then be sent)
+  const int max_side= 16384;
   if (w < 1) w= 1;
   if (h < 1) h= 1;
-  if (density2 <= 0.0) density2= 1.0;
+  if (w > max_side) w= max_side;
+  if (h > max_side) h= max_side;
+  if (!(density2 > 0.0)) density2= 1.0;
+  if (density2 > 8.0) density2= 8.0;
   if (w == px_w && h == px_h && density2 == density && ren != NULL) {
     // the same place told again: the page may have dropped what was drawn
     // for the place before, so all of it is sent for this one
@@ -74,6 +82,12 @@ simple_widget_rep::set_place (int w, int h, double density2, int counter) {
   // the density of the screen, as the core knows it (a whole number)
   set_retina_factor (max (1, (int) (density + 0.5)));
   backing= native_opaque_picture (px_w, px_h, 0, 0);
+  // (a picture which could not be made is one pixel: the place is then
+  // that one pixel, not the size which was asked)
+  if (backing->get_width () != px_w || backing->get_height () != px_h) {
+    px_w= backing->get_width ();
+    px_h= backing->get_height ();
+  }
   if (ren != NULL) delete_renderer (ren);
   ren= picture_renderer (backing, std_shrinkf * retina_factor);
   place_w= px_w * ren->pixel;

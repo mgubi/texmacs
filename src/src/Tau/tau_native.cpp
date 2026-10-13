@@ -17,7 +17,10 @@
 * - what the other side says comes on the standard input, a line for each
 *   message: its name and its arguments, the last of which may hold spaces
 *   ("key 3 C-x", "mouse 3 press-left 120 80 1 0", "place 3 800 600 2 1",
-*   "answer 12 \"a value\" #t", "chosen 4 /home/me/a.tm");
+*   "answer 12 \"a value\" #t", "chosen 4 /home/me/a.tm"). A last
+*   argument which is a text, a path or a name has its new lines written
+*   \n and its backslashes twice: a line is one message, whatever a file
+*   is called;
 * - what the core says goes to the descriptor which the variable TAU_FD
 *   names (the standard output is for what TeXmacs prints), in frames: four
 *   letters, the length of what follows in four bytes, and that. "VIEW"
@@ -141,10 +144,12 @@ tau_native_paint (int view, int counter, int w, int h,
 * What the other side says
 ******************************************************************************/
 
-// the next word of a line (the rest of the line when last is true)
+// the next word of a line (the rest of the line when last is true: after
+// the one space which separates it, since a text may begin with spaces)
 static std::string
 word (const std::string& line, size_t& pos, bool last= false) {
-  while (pos < line.size () && line[pos] == ' ') pos++;
+  if (last) { if (pos < line.size () && line[pos] == ' ') pos++; }
+  else while (pos < line.size () && line[pos] == ' ') pos++;
   size_t start= pos;
   if (last) pos= line.size ();
   else while (pos < line.size () && line[pos] != ' ') pos++;
@@ -214,8 +219,9 @@ dispatch (const std::string& line, void (*turn) (void)) {
     tau_answer (n, unescape (word (line, pos, true)).c_str ());
   }
   else if (name == "chosen") {
+    // (a path may hold anything, a new line too: escaped as a text is)
     int ticket= num (line, pos);
-    tau_file (ticket, word (line, pos, true).c_str ());
+    tau_file (ticket, unescape (word (line, pos, true)).c_str ());
   }
   else if (name == "paste") {
     int view= num (line, pos);
@@ -229,7 +235,8 @@ dispatch (const std::string& line, void (*turn) (void)) {
   else if (name == "buffer") {
     std::string what= word (line, pos);
     int place= num (line, pos);
-    tau_buffer (what.c_str (), place, word (line, pos, true).c_str ());
+    tau_buffer (what.c_str (), place,
+                unescape (word (line, pos, true)).c_str ());
   }
   else if (name == "ping") {
     // (answered once all that came before it is done, as in the page)
