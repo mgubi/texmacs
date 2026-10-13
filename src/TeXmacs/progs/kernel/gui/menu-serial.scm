@@ -545,7 +545,8 @@
            (list `((kind . glue) (hext . ,(second p)) (vext . ,(third p))
                    (width . ,(fourth p)) (height . ,(fifth p)))))
           ((== tag 'color)
-           (list `((kind . color))))
+           (list `((kind . color)
+                   ,@(serial-color (second p) (fifth p) (sixth p)))))
           ((== tag 'invisible) (list))
           ;; containers
           ((in? tag '(horizontal vertical hlist vlist))

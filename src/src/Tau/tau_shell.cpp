@@ -378,6 +378,9 @@ public:
   picture frame;       // the pixels which the core sent for this place
   fz_pixmap* pix;      // (the pixels themselves: see paint)
   int     fw, fh;
+  int     doc_w;       // the width of the document, in pixels
+  bool    centred;     // the frame has the same margin at both sides
+  color   side_color, below_color; // what the frame has at its edges
   bool    embedded;    // in a dialog, with a size of its own
   bool    input;       // it takes the keyboard
   SI      hint_w, hint_h;
@@ -404,7 +407,8 @@ public:
   bool    place_sent, place_held; // a place is with the core; another waits
 
   tau_view_rep (int v= 0, bool emb= false, bool inp= true, SI hw= 0, SI hh= 0):
-    view (0), place (0), pw (0), ph (0), pix (NULL), fw (0), fh (0),
+    view (0), place (0), pw (0), ph (0), pix (NULL), fw (0), fh (0), doc_w (0),
+    centred (false), side_color (white), below_color (white),
     embedded (emb), input (inp), hint_w (hw), hint_h (hh),
     ax (0), ay (0), asked (false), wanted (false), want_x (0), want_y (0),
     wheel_x (0), wheel_y (0), wheel_px (0), wheel_py (0), wheel_sent (false),
@@ -554,12 +558,28 @@ public:
   void handle_repaint (renderer win, SI x1, SI y1, SI x2, SI y2) {
     if (getenv ("TAU_SHELL_DEBUG") != NULL && !strcmp (getenv ("TAU_SHELL_DEBUG"), "2"))
       fprintf (stderr, "tau_shell] repaint view %d\n", view);
-    // (what the frame does not cover, while the canvas is larger than it:
-    // the grey which is around a page, a white flashed)
-    win->set_background (is_nil (frame)? white: rgb_color (160, 160, 160));
+    if (is_nil (frame)) {
+      win->set_background (white);
+      win->clear (x1, y1, x2, y2);
+      return;
+    }
+    // While the canvas has not the size of the frame (the line between two
+    // panes is dragged, and the frame of the new size is on its way), what
+    // the frame does not cover is filled with what it has at its edges
+    // (the grey around a page, or the white of a page which is cut), and
+    // a page which is in the middle of its view stays in the middle: the
+    // core will draw it there. Filled with one color and drawn from the
+    // left, the edges flashed and the page jumped at each step.
+    SI px= win->pixel;
+    SI shift= (centred && pw > 0 && pw != fw)? ((SI) (pw - fw) / 2) * px: 0;
+    SI bottom= ay - fh * px;
+    win->set_background (side_color);
     win->clear (x1, y1, x2, y2);
-    if (is_nil (frame)) return;
-    win->draw_picture (frame, ax, ay - fh * win->pixel);
+    if (y1 < bottom) {
+      win->set_background (below_color);
+      win->clear (x1, y1, x2, min (y2, bottom));
+    }
+    win->draw_picture (frame, ax + shift, bottom);
   }
   // A scroll bar of Vue is dragged: Vue asks the canvas to go elsewhere.
   // The canvas stays where the frame is (it has no other pixels to show:
@@ -612,11 +632,27 @@ public:
     // was: a selection which was dragged showed when the button came up
     frame= mupdf_picture (pix, 0, 0);
     ((mupdf_picture_rep*) frame->get_handle ())->opaque= true;
+    if (dw == fw && dh == fh && fw > 8 && fh > 8) {
+      // (a whole frame: what it has at its edges, for handle_repaint; the
+      // margins in the row of the middle are as wide at both sides when
+      // the page is in the middle of the view)
+      const unsigned char* row= dst + (ptrdiff_t) (fh / 2) * stride;
+      const unsigned char* last= row + 4 * (fw - 1);
+      int lead= 0, trail= 0;
+      while (lead < fw && !memcmp (row + 4 * lead, row, 3)) lead++;
+      while (trail < fw && !memcmp (last - 4 * trail, last, 3)) trail++;
+      centred= !memcmp (row, last, 3) && lead < fw && lead > 2 &&
+               lead - trail <= 2 && trail - lead <= 2;
+      side_color= rgb_color (last[0], last[1], last[2]);
+      const unsigned char* low= dst + (ptrdiff_t) (fh - 1) * stride + 4 * (fw / 2);
+      below_color= rgb_color (low[0], low[1], low[2]);
+    }
     if (!embedded && ren != NULL) {
       // the extents of the document and where the view is in it
       SI px= ren->pixel;
       SI nx= (SI) n[10] * px, ny= -(SI) n[11] * px;
       extents= rectangle (0, -(SI) max (n[9], h) * px, (SI) max (n[8], w) * px, 0);
+      doc_w= n[8];
       ax= nx; ay= ny;
       // where the cursor is, for the input methods of the system, which
       // put their candidates there (update_text_input_area)
@@ -863,6 +899,11 @@ build (const json& node, int style, context c) {
                     node["width"].num () * PIXEL, node["height"].num () * PIXEL);
   else if (kind == "text")
     w= text_widget (node["label"].text (), style, black, false);
+  else if (kind == "color") {
+    // a patch of a color by itself (the color of the text, in the footer)
+    if (!node.has ("color")) return widget ();
+    w= build_label (node, style);
+  }
   else if (kind == "entry") {
     command cmd= tm_new<invoke_command_rep> (node["action"].num ());
     if (node["button"].truth () && c.dialog) st |= WIDGET_STYLE_BUTTON;
@@ -983,8 +1024,21 @@ build_items (const json& items, int style, context c) {
 }
 
 // a part of the window: the menu bar, an icon bar, the tools at a side
+void vue_set_footer_menus (widget tm, bool on, widget env, widget path); // vue_widget.cpp
+float vue_footer_room (widget tm);
+static bool footer_menus_on= false;
+
 static void
 set_part (std::string part, const json& desc) {
+  if (part == "footer-env" || part == "footer-path") {
+    // the interactive status bar: its two menus, which Vue lays out in
+    // the place of the texts of the footer
+    context c= { false, true };
+    widget w= horizontal_menu (build_items (desc["items"], 0, c));
+    if (part == "footer-env") vue_set_footer_menus (the_frame, footer_menus_on, w, widget ());
+    else vue_set_footer_menus (the_frame, footer_menus_on, widget (), w);
+    return;
+  }
   bool tool= part.compare (0, 5, "side-") == 0 || part.compare (0, 7, "bottom-") == 0;
   context c= { tool, !tool };
   first_input= widget ();
@@ -1188,6 +1242,8 @@ busy_answered () {
   if (busy_shown >= 0) {
     busy_shown= -1;
     set_right_footer (the_frame, right_footer);
+    if (footer_menus_on)
+      vue_set_footer_menus (the_frame, true, widget (), widget ());
     needs_update ();
   }
 }
@@ -1205,14 +1261,21 @@ busy_check () {
   }
   Uint64 late= now - busy_asked_at;
   if (late < 300) return;
-  int seconds= (int) (late / 1000);
-  if (seconds == busy_shown) return;
-  busy_shown= seconds;
-  string text= "Working<#2026>";
+  // (one dot, two, three, and again: it is alive)
+  int seconds= (int) (late / 1000), dots= 1 + (int) ((late / 400) % 3);
+  int shown= 4 * seconds + dots;
+  if (shown == busy_shown) return;
+  // (the menus of the footer make way for the words)
+  if (busy_shown < 0 && footer_menus_on)
+    vue_set_footer_menus (the_frame, false, widget (), widget ());
+  busy_shown= shown;
+  string text= "Working";
+  for (int i= 0; i < dots; i++) text << ".";
+  for (int i= dots; i < 3; i++) text << " ";
   if (seconds >= 2) text << " " << as_string (seconds) << " s";
   set_right_footer (the_frame, text);
   needs_update ();
-  if (getenv ("TAU_SHELL_DEBUG") != NULL)
+  if (getenv ("TAU_SHELL_DEBUG") != NULL && dots == 1)
     fprintf (stderr, "tau_shell] the core is busy (%d s)\n", seconds);
 }
 
@@ -1378,6 +1441,10 @@ handle_message (std::string kind, std::string part, const json& desc) {
   }
   else if (kind == "chrome") set_part (part, desc);
   else if (kind == "visible") set_visible (part, desc["visible"].truth ());
+  else if (kind == "footer-menus") {
+    footer_menus_on= desc["on"].truth ();
+    vue_set_footer_menus (the_frame, footer_menus_on, widget (), widget ());
+  }
   else if (kind == "footer") {
     if (part == "left") set_left_footer (the_frame, desc["text"].text ());
     else {
@@ -1480,9 +1547,24 @@ handle_frame (core_frame& f) {
   }
 }
 
+// the room which the tags of the footer have, in characters (some 7
+// points each), for the core, which folds the outer tags which do not fit
+static void
+footer_budget () {
+  static int told= 0;
+  if (!footer_menus_on) return;
+  float room= vue_footer_room (the_frame);
+  if (room <= 0) return;
+  int budget= max ((int) (room / 7.0f), 12);
+  if (budget == told) return;
+  told= budget;
+  core_say ("scheme (footer-set-budget " + std::to_string (budget) + ")");
+}
+
 static void
 shell_turn () {
   busy_check ();
+  footer_budget ();
   std::deque<core_frame> got;
   bool gone;
   {

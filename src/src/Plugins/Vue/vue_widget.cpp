@@ -207,7 +207,10 @@ class footer_popup_command_rep : public command_rep {
 public:
   footer_popup_command_rep (SI x2, SI y2) : x (x2), y (y2) {}
   void apply () {
+#ifndef TAU_SHELL
+    // (in the shell of Tau the menu is the core's: not yet)
     show_context_menu (make_menu_widget (eval ("'(vertical (link texmacs-popup-menu))")), x, y);
+#endif
   }
   void apply (object arg) { (void) arg; apply (); }
   tm_ostream& print (tm_ostream& out) { return out << "<footer_popup_command>"; }
@@ -5589,6 +5592,10 @@ class vue_texmacs_widget_rep : public vue_widget_rep {
   vue_widget footer_env, footer_path;
   float footer_room; // the width of the tags in the last layout, points
   void update_footer_menus ();
+#ifdef TAU_SHELL
+  friend void vue_set_footer_menus (widget tm, bool on, widget env, widget path);
+  friend float vue_footer_room (widget tm);
+#endif
 
   // the title of the window and the marker of a document with unsaved
   // changes. TeXmacs sends them to this widget, which only learns which
@@ -5677,13 +5684,18 @@ vue_texmacs_widget_rep::send (slot s, blackbox val) {
       left_footer= check_open<string> (val, s);
       // the editor sends the left footer first (edit_interface_rep::
       // set_footer), having said what it shows
+#ifndef TAU_SHELL
+      // (in the shell of Tau the core says it: vue_set_footer_menus)
       footer_menus= get_preference ("interactive footer") == "on" &&
                     as_bool (call ("footer-environment?"));
+#endif
       break;
       
     case SLOT_RIGHT_FOOTER:
       right_footer= check_open<string> (val, s);
+#ifndef TAU_SHELL
       if (footer_menus) update_footer_menus ();
+#endif
       break;
       
     case SLOT_SCROLLBARS_VISIBILITY:
@@ -6010,6 +6022,26 @@ footer_menu (object& current, vue_widget& w, string menu) {
   current= x;
   w= concrete (make_menu_widget (m));
 }
+
+#ifdef TAU_SHELL
+// The shell of Tau (src/Tau/tau_shell.cpp) has the menus of the footer
+// from the core, made into widgets: they are given here, with whether the
+// footer shows them. And the room which the tags have, for the core.
+void
+vue_set_footer_menus (widget tm, bool on, widget env, widget path) {
+  vue_texmacs_widget_rep* r= dynamic_cast<vue_texmacs_widget_rep*> (tm.rep);
+  if (r == NULL) return;
+  if (!is_nil (env)) r->footer_env= concrete (env);
+  if (!is_nil (path)) r->footer_path= concrete (path);
+  r->footer_menus= on && !is_nil (r->footer_env) && !is_nil (r->footer_path);
+}
+
+float
+vue_footer_room (widget tm) {
+  vue_texmacs_widget_rep* r= dynamic_cast<vue_texmacs_widget_rep*> (tm.rep);
+  return r == NULL? 0: r->footer_room;
+}
+#endif
 
 void
 vue_texmacs_widget_rep::update_footer_menus () {

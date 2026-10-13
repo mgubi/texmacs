@@ -159,7 +159,7 @@
         ("Focus dependent icons" (toggle-visible-icon-bar 2))
         ("User provided icons" (toggle-visible-icon-bar 3)))
   ("Status bar" (toggle-visible-footer))
-  (if (or (vue-gui?) (ns-gui?))
+  (if (or (vue-gui?) (ns-gui?) (in-desktop?))
       (when (visible-footer?)
         ("Interactive status bar" (toggle-preference "interactive footer"))))
   (if (with-developer-tool?)

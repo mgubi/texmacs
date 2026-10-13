@@ -144,10 +144,48 @@ tau_fullscreen (bool on) {
                                      : string ("{\"on\":false}"));
 }
 
+// The interactive status bar (docs/vue-interactive-footer.md), for the
+// desktop: when the footer is the environment at the cursor and not a
+// message, and the preference asks for it, its two menus (the properties
+// of the text at the cursor, the tags around it) are described as parts
+// are, "footer-env" and "footer-path", and the program which has the
+// windows shows them in the place of the texts. They are described again
+// when their expansions change, as the bars are.
+static void
+tau_footer_menus () {
+  static bool is_on= false;
+  static object last_env, last_path;
+  bool on= get_env ("TAU_DESKTOP") != "" &&
+           get_preference ("interactive footer") == "on" &&
+           as_bool (call ("footer-environment?"));
+  if (!on) {
+    if (is_on) tau_post_json ("footer-menus", "", "{\"on\":false}");
+    is_on= false;
+    return;
+  }
+  object env = eval ("'(horizontal (link texmacs-footer-environment))");
+  object path= eval ("'(horizontal (link texmacs-footer-path))");
+  object xenv= call ("menu-expand", env), xpath= call ("menu-expand", path);
+  if (!is_on || !(xenv == last_env)) {
+    last_env= xenv;
+    tau_post_json ("chrome", "footer-env",
+                   as_string (call ("tau-serialize-part", object ("footer-env"), env)));
+  }
+  if (!is_on || !(xpath == last_path)) {
+    last_path= xpath;
+    tau_post_json ("chrome", "footer-path",
+                   as_string (call ("tau-serialize-part", object ("footer-path"), path)));
+  }
+  if (!is_on) tau_post_json ("footer-menus", "", "{\"on\":true}");
+  is_on= true;
+}
+
 void
 tau_footer (string side, string text) {
   tau_post_json ("footer", side,
                  "{\"text\":" * scm_quote (cork_to_utf8 (text)) * "}");
+  // (the editor sends the left footer first, then the right one)
+  if (side == "right") tau_footer_menus ();
 }
 
 // A view is shown at a place, or not any more (attach_view and detach_view
