@@ -365,6 +365,8 @@ json_parse (const char* data, size_t n) {
 class tau_view_rep;
 static hashmap<int,pointer> views (NULL); // number of a view -> its canvas
 static std::string clipboard_text ();
+class tau_view_rep;
+static void view_has_keyboard (tau_view_rep* v);
 widget box_widget (scheme_tree p, string s, color col, bool trans, bool ink); // tm_button.cpp
 static bool close_context_menu ();
 
@@ -374,6 +376,7 @@ public:
   int     place;       // the number of its last place
   int     pw, ph;      // the size of the place, in pixels
   picture frame;       // the pixels which the core sent for this place
+  fz_pixmap* pix;      // (the pixels themselves: see paint)
   int     fw, fh;
   bool    embedded;    // in a dialog, with a size of its own
   bool    input;       // it takes the keyboard
@@ -400,13 +403,14 @@ public:
   bool    move_sent;
 
   tau_view_rep (int v= 0, bool emb= false, bool inp= true, SI hw= 0, SI hh= 0):
-    view (0), place (0), pw (0), ph (0), fw (0), fh (0),
+    view (0), place (0), pw (0), ph (0), pix (NULL), fw (0), fh (0),
     embedded (emb), input (inp), hint_w (hw), hint_h (hh),
     ax (0), ay (0), asked (false), wanted (false), want_x (0), want_y (0),
     wheel_x (0), wheel_y (0), wheel_px (0), wheel_py (0), wheel_sent (false),
     move_sent (false) { set_view (v); }
   ~tau_view_rep () {
-    if (view && views [view] == (pointer) this) views->reset (view); }
+    if (view && views [view] == (pointer) this) views->reset (view);
+    if (pix != NULL) fz_drop_pixmap (mupdf_context (), pix); }
   bool is_editor_widget () { return true; }
   bool is_embedded_widget () { return embedded; }
   void handle_get_size_hint (SI& w, SI& h) { w= hint_w; h= hint_h; }
@@ -452,6 +456,7 @@ public:
   void handle_keyboard_focus (bool has_focus, time_t t) {
     (void) t;
     if (view) core_say ("focus " + std::to_string (view) + (has_focus? " 1": " 0"));
+    if (has_focus && !embedded) view_has_keyboard (this);
   }
   void handle_mouse (string kind, SI x, SI y, int mods, time_t t,
                      array<double> data) {
@@ -567,20 +572,26 @@ public:
   void paint (const int32_t* n, const unsigned char* px) {
     if (n[0] != view || n[1] != place) return; // for another place
     int w= n[2], h= n[3], x= n[4], y= n[5], dw= n[6], dh= n[7];
-    if (is_nil (frame) || w != fw || h != fh) {
-      frame= native_opaque_picture (w, h, 0, 0);
+    fz_context* ctx= mupdf_context ();
+    if (pix == NULL || w != fw || h != fh) {
+      if (pix != NULL) fz_drop_pixmap (ctx, pix);
+      pix= mupdf_new_pixmap (w, h);
+      fz_clear_pixmap_with_value (ctx, pix, 0xff);
       fw= w; fh= h;
     }
-    mupdf_picture_rep* p= (mupdf_picture_rep*) frame->get_handle ();
-    if (p == NULL || p->pix == NULL || x < 0 || y < 0 || x + dw > fw || y + dh > fh) return;
-    fz_context* ctx= mupdf_context ();
-    unsigned char* dst= fz_pixmap_samples (ctx, p->pix);
-    ptrdiff_t stride= fz_pixmap_stride (ctx, p->pix);
+    if (pix == NULL || x < 0 || y < 0 || x + dw > fw || y + dh > fh) return;
+    unsigned char* dst= fz_pixmap_samples (ctx, pix);
+    ptrdiff_t stride= fz_pixmap_stride (ctx, pix);
     for (int row= 0; row < dh; row++)
       memcpy (dst + (ptrdiff_t) (y + row) * stride + 4 * x,
               px + (size_t) 4 * row * dw, (size_t) 4 * dw);
-    // (the image which MuPDF made of the pixmap is not of these pixels)
-    if (p->im != NULL) { fz_drop_image (ctx, p->im); p->im= NULL; }
+    // A new picture on the same pixels at each paint: the renderers know a
+    // picture by its number (the GPU one keeps a texture of it, and Vue
+    // does not present a frame which draws what the last one drew), so a
+    // picture whose pixels changed under it went on being shown as it
+    // was: a selection which was dragged showed when the button came up
+    frame= mupdf_picture (pix, 0, 0);
+    ((mupdf_picture_rep*) frame->get_handle ())->opaque= true;
     if (!embedded && ren != NULL) {
       // the extents of the document and where the view is in it
       SI px= ren->pixel;
@@ -1193,38 +1204,42 @@ busy_timer (void* data, SDL_TimerID id, Uint32 interval) {
   return interval;
 }
 
-// The other windows of the core (View -> New window): each is a window of
-// its own here, with a view and nothing else; the bars of the main window
-// are those of the view which has the keyboard, as the core says them.
-struct pane { widget window; tau_view_rep* view; };
+// The other windows of the core (View -> New window) are panes of the
+// one window, side by side with a line between them which is dragged, as
+// in the page: each has a view, and the bars are those of the view which
+// has the keyboard, as the core says them. The main place is the first.
+struct pane { widget w; tau_view_rep* view; };
 static hashmap<int,pointer> panes (NULL); // number of a place -> its pane
+static array<int> pane_order;             // the places, from left to right
 static int main_place= 0;
+static int current_place= 0;              // the one which has the keyboard
 
-class close_pane_command_rep: public command_rep {
-  int place;
-public:
-  close_pane_command_rep (int p): place (p) {}
-  void apply () { core_say ("buffer close-window " + std::to_string (place) + " -"); }
-  void apply (object args) { (void) args; apply (); }
-  tm_ostream& print (tm_ostream& out) { return out << "close pane " << place; }
-};
+static void
+show_panes () {
+  widget w;
+  for (int i= 0; i < N(pane_order); i++) {
+    pane* p= (pane*) panes [pane_order[i]];
+    if (p == NULL) continue;
+    w= is_nil (w)? p->w: hsplit_widget (w, p->w);
+  }
+  if (!is_nil (w)) set_scrollable (the_frame, w);
+}
 
 static tau_view_rep*
 view_of_place (int place) {
-  if (main_place == 0) main_place= place;
-  if (place == main_place) return the_view;
   pane* p= (pane*) panes [place];
   if (p == NULL) {
     p= new pane ();
-    p->view= tm_new<tau_view_rep> ();
-    widget frame= texmacs_widget (0, command ());
-    p->window= plain_window_widget (frame, "Tau", tm_new<close_pane_command_rep> (place));
-    set_header_visibility (frame, false);
-    set_footer_visibility (frame, false);
-    set_size (p->window, 800 * PIXEL, 600 * PIXEL);
-    set_scrollable (frame, widget (p->view));
-    set_visibility (p->window, true);
+    if (main_place == 0) {
+      // (the view which the window was made with)
+      main_place= current_place= place;
+      p->view= the_view;
+    }
+    else p->view= tm_new<tau_view_rep> ();
+    p->w= widget (p->view);
     panes (place)= (pointer) p;
+    pane_order << place;
+    if (N(pane_order) > 1) show_panes ();
   }
   return p->view;
 }
@@ -1232,21 +1247,29 @@ view_of_place (int place) {
 // the places which the core has no more
 static void
 drop_panes (const json& desc) {
-  array<int> gone;
-  for (iterator<int> it= iterate (panes); it->busy (); ) {
-    int place= it->next ();
+  array<int> kept;
+  bool changed= false;
+  for (int i= 0; i < N(pane_order); i++) {
+    int place= pane_order[i];
     bool found= false;
     for (const json& w : desc["windows"].a) found= found || w["window"].num () == place;
-    if (!found) gone << place;
-  }
-  for (int i= 0; i < N(gone); i++) {
-    pane* p= (pane*) panes [gone[i]];
-    panes->reset (gone[i]);
-    if (p == NULL) continue;
-    set_visibility (p->window, false);
-    destroy_window_widget (p->window);
+    if (found) { kept << place; continue; }
+    pane* p= (pane*) panes [place];
+    panes->reset (place);
+    if (p != NULL && p->view == the_view) the_view= NULL;
     delete p;
+    changed= true;
   }
+  if (!changed) return;
+  pane_order= kept;
+  if (N(kept) > 0) {
+    pane* first= (pane*) panes [kept[0]];
+    if (the_view == NULL && first != NULL) { the_view= first->view; main_place= kept[0]; }
+    bool has= false;
+    for (int i= 0; i < N(kept); i++) has= has || kept[i] == current_place;
+    if (!has) current_place= kept[0];
+  }
+  show_panes ();
 }
 
 // The documents, as tabs over the view: the one which is shown is
@@ -1265,12 +1288,14 @@ public:
   tm_ostream& print (tm_ostream& out) { return out << "buffer"; }
 };
 
+static json last_buffers; // the documents and the places, as last told
+
 static void
 set_tabs (const json& desc) {
   if (desc["windows"].a.empty ()) return;
   const json* found= &desc["windows"].a.front ();
   for (const json& w : desc["windows"].a)
-    if (w["window"].num () == main_place) found= &w;
+    if (w["window"].num () == current_place) found= &w;
   const json& win= *found;
   int place= win["window"].num ();
   array<widget> a;
@@ -1288,11 +1313,37 @@ set_tabs (const json& desc) {
                         "", "", 0)
         << glue_widget (false, false, 6 * PIXEL, 0);
     }
-  if (N(a) > 0) {
+  if (desc["windows"].a.size () > 1) {
+    // more than one pane: each can be closed
     a << glue_widget (true, false, 0, 0);
+    int nr= 0;
+    for (int i= 0; i < N(pane_order); i++) {
+      nr++;
+      bool cur= pane_order[i] == current_place;
+      a << text_widget ("Pane " * as_string (nr), cur? WIDGET_STYLE_BOLD: WIDGET_STYLE_GREY, black, false)
+        << menu_button (text_widget ("<times>", WIDGET_STYLE_GREY, black, false),
+                        tm_new<buffer_command_rep> (std::string ("close-window"), pane_order[i], std::string ("-")),
+                        "", "", 0)
+        << glue_widget (false, false, 8 * PIXEL, 0);
+    }
+  }
+  if (N(a) > 0) {
+    if (desc["windows"].a.size () <= 1) a << glue_widget (true, false, 0, 0);
     set_user_icons (the_frame, horizontal_menu (a));
   }
   set_user_icons_visibility (the_frame, N(a) > 0);
+}
+
+// a view got the keyboard: its place is the current one, whose documents
+// the tabs show
+static void
+view_has_keyboard (tau_view_rep* v) {
+  for (int i= 0; i < N(pane_order); i++) {
+    pane* p= (pane*) panes [pane_order[i]];
+    if (p == NULL || p->view != v || pane_order[i] == current_place) continue;
+    current_place= pane_order[i];
+    if (last_buffers.kind == json::OBJ) set_tabs (last_buffers);
+  }
 }
 
 static void
@@ -1314,17 +1365,16 @@ handle_message (std::string kind, std::string part, const json& desc) {
   else if (kind == "buffers") {
     // the title of the window: the document which is shown
     if (desc["windows"].a.empty ()) return;
-    set_tabs (desc);
     drop_panes (desc);
-    for (const json& w : desc["windows"].a) {
-      int place= w["window"].num ();
-      pane* p= (pane*) panes [place];
-      if (place != main_place && p == NULL) continue;
-      for (const json& b : desc["buffers"].a)
-        if (b["name"].str () == w["buffer"].str ())
-          set_name (place == main_place? the_window: p->window, b["title"].text () *
-                    (b["modified"].truth ()? string (" * - Tau"): string (" - Tau")));
-    }
+    last_buffers= desc;
+    set_tabs (desc);
+    // the title of the window: the document of the pane with the keyboard
+    for (const json& w : desc["windows"].a)
+      if (w["window"].num () == current_place)
+        for (const json& b : desc["buffers"].a)
+          if (b["name"].str () == w["buffer"].str ())
+            set_name (the_window, b["title"].text () *
+                      (b["modified"].truth ()? string (" * - Tau"): string (" - Tau")));
   }
   else if (kind == "dialog") show_dialog (desc);
   else if (kind == "close") remove_dialog (desc["id"].num ());
