@@ -78,6 +78,18 @@
     (server-log-write `info
       (string-append "Turning TLS " val))))
 
+(define (notify-server-websocket var val)
+  (when (server-started?)
+    (server-log-write `info
+      (string-append "WebSocket clients: " val
+                     " (takes effect when the server is restarted)"))))
+
+(define (notify-server-websocket-port var val)
+  (when (server-started?)
+    (server-log-write `info
+      (string-append "WebSocket port: " val
+                     " (takes effect when the server is restarted)"))))
+
 (define (notify-tls-server-authentication-anonymous var val)
   (when (server-started?)
     (server-log-write `info
@@ -162,6 +174,15 @@
    notify-tls-server)
   ("tls-server authentication anonymous" "on"
    notify-tls-server-authentication-anonymous)
+  ;; the clients in a browser, whose sockets are WebSockets: "local" serves
+  ;; those of this machine only, "on" any, "off" none. They come to a port
+  ;; of their own, by default the one after the port of the server
+  ;; (QTMSockets.cpp, with the Qt WebSockets module). Both preferences are
+  ;; read when the server starts.
+  ("server websocket" "local"
+   notify-server-websocket)
+  ("server websocket port" "default"
+   notify-server-websocket-port)
   ("server contact timeout" "10000" ;; 10s
    notify-server-contact-timeout)
   ("server connection timeout" "120" ;; 120s

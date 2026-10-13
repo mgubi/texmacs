@@ -17,6 +17,10 @@
 #include <QPointer>
 #include <QThread>
 #include <QSocketNotifier>
+#ifdef QT_WEBSOCKETS_LIB
+#include <QWebSocket>
+#include <QWebSocketServer>
+#endif
 
 #ifndef OS_MINGW
 
@@ -100,7 +104,7 @@ public slots:
   void resume_start (int);
 signals:
   void disconnection (socket_link_rep* clt);
-private:
+protected:
   string host;
   unsigned short port;
   int socket_id;
@@ -114,7 +118,34 @@ private:
 
   void connect_data_notifiers ();
   void connect_handshake_notifiers ();
+  virtual void close_socket ();
 };
+
+/******************************************************************************
+* Links of WebSocket clients
+******************************************************************************/
+
+#ifdef QT_WEBSOCKETS_LIB
+
+class websocket_link_rep: public socket_link_rep {
+  Q_OBJECT
+public:
+  websocket_link_rep (int id, QWebSocket* ws);
+  ~websocket_link_rep ();
+  string  start ();
+  void    write (string s, int channel=LINK_OUT);
+
+public slots:
+  void binary_received (const QByteArray& data);
+  void text_received (const QString& data);
+  void closed ();
+protected:
+  void close_socket ();
+private:
+  QPointer<QWebSocket> ws;
+};
+
+#endif
 
 /******************************************************************************
 * Server
@@ -138,10 +169,18 @@ public:
 public slots:
   void connection (int client);
   void disconnection (socket_link_rep* client_ptr);
+#ifdef QT_WEBSOCKETS_LIB
+  void websocket_connection ();
+#endif
 private:
   int socket_id;
   hashset<pointer> connections;
   QPointer<QSocketNotifier> notifier_ptr;
   hashmap<int,pointer> socket_ptr_from_id;
   socket_link_rep* find_connection_ptr (int id);
+  void add_link (socket_link_rep* clt, string from);
+#ifdef QT_WEBSOCKETS_LIB
+  QPointer<QWebSocketServer> websocket_server_ptr;
+  void start_websockets ();
+#endif
 };
