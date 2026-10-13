@@ -1125,6 +1125,37 @@ test("the preview of a reference", async p => {
 	check("no error of the core", (await p.errors()).length === 0, await p.errors());
 });
 
+test("the symbols of a palette", async p => {
+	await p.open();
+	await p.newDocument();
+	// in a formula the mode bar has palettes of symbols: each symbol is a
+	// picture which the core made (the browser has not their fonts)
+	await p.scheme("(make (quote math))");
+	await p.until("the bar of the formulas", async () => (await p.count('#tau-icons-1 [title="Miscellaneous symbols"], #tau-icons-1 [title*="iscellaneous"]')) > 0, 20000);
+	await p.page.click('#tau-icons-1 [title*="iscellaneous"]');
+	try { await p.until("the palette, with pictures", async () => (await p.count("img.tau-symbol")) > 40, 60000); }
+	catch (e) { throw new Error(e.message + " " + JSON.stringify([await p.count("img.tau-symbol"), await p.count(".tau-symbol"), await p.errors(), (await p.got("contents")).length]).slice(0, 1500)); }
+	await p.until("which are drawn", () => p.page.evaluate(() => {
+		const l = [...document.querySelectorAll("img.tau-symbol")];
+		return l.filter(i => i.complete && i.naturalWidth > 0).length >= l.length - 8;
+	}), 20000);
+	const sizes = await p.page.$$eval("img.tau-symbol", l => l.map(i => [i.alt, Math.round(i.getBoundingClientRect().width), Math.round(i.getBoundingClientRect().height)]));
+	// (drawn: black on nothing)
+	const inked = await p.page.$$eval("img.tau-symbol", l => l.slice(0, 8).map(i => {
+		const c = document.createElement("canvas"); c.width = i.naturalWidth; c.height = i.naturalHeight;
+		const g = c.getContext("2d"); g.drawImage(i, 0, 0);
+		const d = g.getImageData(0, 0, c.width, c.height).data;
+		let dark = 0;
+		for (let k = 0; k < d.length; k += 4) if (d[k + 3] > 100 && d[k] < 100) dark++;
+		return dark;
+	}));
+	check("the pictures have their symbols", inked.every(n => n > 20), inked);
+	await sleep(800);
+	const j = sizes.filter(x => x[0] === "<jmath>");
+	check("<jmath> has a picture of the size of a letter", j.length === 1 && j[0][1] >= 3 && j[0][1] <= 20 && j[0][2] >= 8 && j[0][2] <= 24, [j, sizes.slice(0, 8)]);
+	check("no error of the core", (await p.errors()).length === 0, await p.errors());
+});
+
 test("stopped", async p => {
 	await p.open();
 	await p.newDocument();

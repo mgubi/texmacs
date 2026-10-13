@@ -8443,6 +8443,21 @@ tmg_system_remove (tmscm arg1) {
 }
 
 tmscm
+tmg_symbol_2image (tmscm arg1, tmscm arg2) {
+  TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "symbol->image");
+  TMSCM_ASSERT_STRING (arg2, TMSCM_ARG2, "symbol->image");
+
+  url in1= tmscm_to_url (arg1);
+  string in2= tmscm_to_string (arg2);
+
+  // TMSCM_DEFER_INTS;
+  make_symbol_image (in1, in2);
+  // TMSCM_ALLOW_INTS;
+
+  return TMSCM_UNSPECIFIED;
+}
+
+tmscm
 tmg_system_mkdir (tmscm arg1) {
   TMSCM_ASSERT_URL (arg1, TMSCM_ARG1, "system-mkdir");
 
@@ -12305,6 +12320,7 @@ initialize_glue_basic () {
   tmscm_install_procedure ("system-move",  tmg_system_move, 2, 0, 0);
   tmscm_install_procedure ("system-copy",  tmg_system_copy, 2, 0, 0);
   tmscm_install_procedure ("system-remove",  tmg_system_remove, 1, 0, 0);
+  tmscm_install_procedure ("symbol->image",  tmg_symbol_2image, 2, 0, 0);
   tmscm_install_procedure ("system-mkdir",  tmg_system_mkdir, 1, 0, 0);
   tmscm_install_procedure ("system-rmdir",  tmg_system_rmdir, 1, 0, 0);
   tmscm_install_procedure ("system-rmdir-recursive",  tmg_system_rmdir_recursive, 1, 0, 0);

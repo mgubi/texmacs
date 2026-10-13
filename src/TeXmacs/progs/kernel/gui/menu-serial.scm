@@ -321,6 +321,37 @@
         ,@(if help `((help . ,help)) '())
         (action . ,(serial-keep action))))))
 
+;; In the page a symbol of a palette is a picture which the core makes: the
+;; fonts of the browser do not have all the symbols of TeXmacs (<jmath>,
+;; the big operators...), nor the same glyphs. Each is drawn once, as in
+;; a formula in the default font (make_symbol_image), and kept among the
+;; files of the user (which stay in the browser).
+
+(define symbol-files (make-ahash-table))
+
+(define (symbol-file-name sym)
+  (string-append
+   (apply string-append
+          (map (lambda (c) (number->string (char->integer c) 16))
+               (string->list sym)))
+   ".png"))
+
+(define (symbol-file sym)
+  "The file of a picture of the symbol @sym, or the empty string."
+  (or (ahash-ref symbol-files sym)
+      (let* ((dir (url-append (unix->url "$TEXMACS_HOME_PATH")
+                              (unix->url "system/cache/symbol-pictures")))
+             (u (url-append dir (unix->url (symbol-file-name sym))))
+             (f (catch #t
+                  (lambda ()
+                    (when (not (url-exists? u))
+                      (when (not (url-exists? dir)) (system-mkdir dir))
+                      (symbol->image u sym))
+                    (if (url-exists? u) (url-concretize u) ""))
+                  (lambda args ""))))
+        (ahash-set! symbol-files sym f)
+        f)))
+
 (define (serial-symbol p style)
   "The node of the symbol button @p."
   (with (tag symstring . opt) p
@@ -333,6 +364,10 @@
         ;; (as TeXmacs names it, for an interface which typesets it itself:
         ;; the desktop; Unicode does not say which glyph of mathematics)
         ,@(if (in-desktop?) `((tm . ,symstring)) '())
+        ,@(if (in-browser?)
+              (with f (symbol-file symstring)
+                (if (== f "") '() `((file . ,f))))
+              '())
         (shortcut . ,sh)
         (check . "")
         (enabled . ,(active? style))

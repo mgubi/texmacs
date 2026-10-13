@@ -668,6 +668,7 @@
   (url-resolve resolve (url url string))
   (url-resolve-in-path resolve_in_path (url url))
   (url-resolve-pattern resolve_pattern (url url))
+  (symbol->image make_symbol_image (void url string))
   (url-exists? exists (bool url))
   (url-exists-in-path? exists_in_path (bool url))
   (url-exists-in-tex? exists_in_tex (bool url))

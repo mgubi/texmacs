@@ -1306,6 +1306,9 @@ static bool exists_in_tex (url u) { (void) u; return false; }
 #include "MuPDF/pdf_extract_attachment.hpp"
 #include "MuPDF/pdf_make_attachment.hpp"
 
+// (boxes.cpp: a picture of a symbol)
+void make_symbol_image (url dest, string sym);
+
 #include "../Glue/glue_basic.cpp"
 #include "../Glue/glue_editor.cpp"
 #include "../Glue/glue_server.cpp"

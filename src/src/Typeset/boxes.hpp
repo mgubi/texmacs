@@ -278,6 +278,7 @@ public:
   friend struct effect_box_rep;
   friend void make_eps (url dest, box b, int dpi);
   friend void make_raster_image (url dest, box b, double zoom);
+void make_symbol_image (url dest, string sym);
 };
 ABSTRACT_NULL_CODE(box);
 

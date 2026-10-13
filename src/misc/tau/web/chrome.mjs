@@ -102,6 +102,10 @@ function mime(path) {
 
 // An icon: the core found its file, which is in the file system of the
 // worker; its bytes are asked once
+// (the pictures of the symbols are larger than they are shown: this brings a
+// symbol of 10 points to the size of the text of the menus)
+const SYMBOL_SCALE = 0.25;
+
 function iconUrl(path) {
 	let w = waitingFiles.get(path);
 	if (!w) {
@@ -150,7 +154,29 @@ function label(node, context) {
 		}
 		parts.push(img);
 	}
-	if (node.label !== undefined) parts.push(el("span", node.symbol ? "tau-symbol" : "tau-label", node.label));
+	if (node.symbol && node.file) {
+		// a symbol of a palette: a picture which the core made of it (the
+		// fonts of the browser do not have them all), larger than it is shown
+		const img = el("img", "tau-symbol");
+		img.alt = node.label || "";
+		img.draggable = false;
+		img.addEventListener("load", () => {
+			img.style.width = (img.naturalWidth * SYMBOL_SCALE) + "px";
+			img.style.height = (img.naturalHeight * SYMBOL_SCALE) + "px";
+		});
+		const known = waitingFiles.get(node.file);
+		if (known && known.url) img.src = known.url;
+		else iconUrl(node.file).then(url => { if (url) img.src = url; });
+		parts.push(img);
+	}
+	else if (node.symbol && /^<.+>$/.test(node.label || "")) {
+		// (a symbol which the fonts of TeXmacs do not have: its name would
+		// widen the whole column of the palette)
+		const missing = el("span", "tau-symbol tau-symbol-missing", "?");
+		missing.title = node.label;
+		parts.push(missing);
+	}
+	else if (node.label !== undefined) parts.push(el("span", node.symbol ? "tau-symbol" : "tau-label", node.label));
 	if (node.color !== undefined) {
 		// a colour, or a pattern (a picture of the core, as an icon)
 		const c = el("span", "tau-color");

@@ -967,6 +967,25 @@ make_raster_image (url name, box b, double zoomf) {
   renderer ren= picture_renderer (pic, zoomf);
   rectangles rs;
   b->redraw (ren, path (0), rs);
-  save_picture (name, pic);
+  // (the renderer first: a text which it still holds is drawn when it
+  // ends, and was missing from the picture with MuPDF)
   tm_delete (ren);
+  save_picture (name, pic);
+}
+
+// A picture of a symbol of mathematics ("<jmath>") as the default font
+// draws it in a formula, larger than it is on the screen (see the page), in the
+// PNG file dest: for the interfaces which cannot typeset it themselves
+// (the palettes of symbols in the page of Tau)
+box text_box (path ip, int pos, string s, font fn, pencil pen);
+
+void
+make_symbol_image (url name, string sym) {
+  font fn= smart_font ("roman", "mr", "medium", "normal",
+                       "roman", "rm", "medium", "mathitalic", 10, 600);
+  // (not the variable "black", which the interface sets and which Tau,
+  // without one, leaves at nothing: transparent)
+  box b= text_box (decorate (), 0, sym, fn, pencil (rgb_color (0, 0, 0)));
+  if (b->x4 - b->x3 < 5*PIXEL || b->y4 - b->y3 < 5*PIXEL) return;
+  make_raster_image (name, b, 5.0);
 }
