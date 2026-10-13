@@ -17,6 +17,39 @@
 #include "Format/stack_border.hpp"
 #include "Page/skeleton.hpp"
 
+// What the pager made in the last pass, kept by the typesetter for the
+// next one (make_pages.cpp, "The pages of the last pass"): the headers and
+// footers, with what their typesetting read, and the texts of the pages,
+// with the boxes they are made of.
+struct page_part {
+  bool          ok;      // what follows is known
+  tree          what;    // the header or footer which was typeset
+  array<string> vars;    // the variables it read, and their values
+  array<tree>   values;
+  array<string> keys;    // the references it looked up, and their values
+  array<tree>   looked;
+  box           b;       // the result
+  inline page_part (): ok (false) {}
+};
+
+struct page_text {
+  bool          ok;
+  array<box>    bs;      // the lines
+  array<double> nums;    // their spaces, the heights and stretches
+  array<tree>   ts;      // the kinds of the insertions
+  box           b;       // the result
+  inline page_text (): ok (false) {}
+};
+
+struct page_memo {
+  array<double>     pars;   // the parameters of the pager
+  array<tree>       state;  // the variables from which the environment
+                            // derives a state (fonts, colors...)
+  array<page_part>  headers;
+  array<page_part>  footers;
+  array<page_text>  texts;
+};
+
 class pager_rep {
 public:
   path                 ip;
@@ -51,6 +84,7 @@ public:
   int          page_offset;
   SI           cur_top;
   array<box>   pages;
+  page_memo*   memo;     // the pages of the last pass, or NULL
 
   array<box>   lines_bx;
   array<space> lines_ht;
@@ -68,6 +102,10 @@ protected: // making page boxes
   box  pages_format (insertion ins);
   box  pages_format (pagelet pg);
   box  pages_make_page (pagelet pg);
+  void memo_start ();
+  box  make_part (array<page_part>* parts, tree what);
+  void text_parts (pagelet pg, page_text& pt);
+  void text_parts (insertion ins, page_text& pt);
   void pages_make ();
   void papyrus_make ();
 

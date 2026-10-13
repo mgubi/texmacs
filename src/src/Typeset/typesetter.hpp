@@ -48,6 +48,8 @@ struct edit_profile_data {
   int    breaks_reused;            // searches of page breaks avoided
   double search;                   // ms: the search of the page breaks
   int    starts, starts_kept;      // starts of pages tried, with kept candidates
+  int    pages_made;               // pages put together
+  int    texts_kept, parts_kept;   // their texts, headers and footers kept
 };
 extern edit_profile_data edit_profile;
 double edit_profile_now ();        // ms, from an arbitrary origin
