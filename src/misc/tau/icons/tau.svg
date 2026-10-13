@@ -6,9 +6,9 @@
        Remove the texture layers or their filters for a clean vector appearance. -->
   <defs>
     <linearGradient id="board-gradient" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#415f78"/>
-      <stop offset="0.50" stop-color="#2d475b"/>
-      <stop offset="1" stop-color="#1c2e3e"/>
+      <stop offset="0" stop-color="#5a83a2"/>
+      <stop offset="0.50" stop-color="#304e66"/>
+      <stop offset="1" stop-color="#101e2c"/>
     </linearGradient>
     <radialGradient id="board-light" gradientUnits="userSpaceOnUse" cx="250" cy="230" r="1000">
       <stop offset="0" stop-color="#789ab2" stop-opacity="0.24"/>
