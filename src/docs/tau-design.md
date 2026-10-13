@@ -918,13 +918,16 @@ panes one above the other.
 
 Not gone through: the dialogs of the Remote menu.
 
-**The icon of Tau** (2026-10-09): `misc/tau/web/icon.svg`, a tau between
-angle brackets, bold and slanted as in a sans serif font for mathematics,
-drawn (no font is needed): the brackets in a cool hue and the tau in a
-warm one, each with a border in its hue, a side and a shadow, on a dark
-slate frame with rounded corners and the grid of technical paper. It is
-the icon of the page (with a PNG of 192 pixels beside it), and as in the
-page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
+**The icon of Tau** (2026-10-13): a bold upright sans serif tau between
+peach chalk angle brackets, centered on a blue slate blackboard with a
+faint grid, a soft light gradient and rounded corners. The glyphs and
+tile have quiet slate borders. The approved raster master is
+`misc/tau/icons/tau.png`; `misc/tau/icons/README.md` describes the exports
+and how to regenerate them. The page uses `misc/tau/web/icon.png`, with
+192-pixel and 180-pixel exports for the browser and touch icon. The macOS
+icon is `packages/macos/Tau.icns`, with standard and Retina representations
+from 16 to 1024 pixels. As in the page of TeXmacs Vue
+(`misc/wasm/progress.js`, `frame.js`), it is shown:
 
 - on **the panel of the loading** (`app.mjs`): the icon, the name, a few
   words and a link to the sources, a bar and a line which tell the share
