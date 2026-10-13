@@ -664,6 +664,48 @@
   thing a bridge may depend on, in a paragraph of the manual which shows
   the current time: the date and the animations make a record unknown.
 
+  <paragraph|The pages>
+
+  With the bridges and the breaks used again, most of what an edit in a
+  book costs is the making of the pages: for each page the pager stacks
+  the lines and stretches them to the height of the page, and typesets
+  the header and the footer. In a view of the manual with 379 pages this
+  took 60 to 70<nbsp>ms at every pass, of which 40 to 55 for the headers
+  and footers and 10 to 13 for the stacks.
+
+  The typesetter now keeps what the pager made in the last pass
+  (<cpp|page_memo>, filled by <cpp|pager_rep::pages_make_page> and
+  <cpp|pager_rep::make_part> in <source-link|Typeset/Page/make_pages.cpp|src/Typeset/Page/make_pages.cpp>), page by page. The text of a
+  page is used again when it is made of the very same boxes, which is
+  what a bridge which is used again gives, with the same spaces, in
+  insertions of the same kinds, heights and stretches
+  (<cpp|pager_rep::text_parts> lists all that <cpp|pages_format> uses). A
+  header or a footer is used again when the tree to typeset is the same
+  and the variables which its typesetting read have the values they had,
+  with the same record as the one of the bridges: the number of the page
+  is one of them, and so is every macro of the style which the header
+  calls; the references it looks up are recorded with their values. One
+  which reads something which is not a variable is typeset again, and in
+  a complete pass they all are, since such a pass collects the
+  references which are used. Nothing is kept when a parameter of the
+  pager changed, or one of the variables from which the environment
+  derives a state which is not read as a variable, such as the font and
+  the color (<cpp|edit_env_rep::derived_state>), and when the whole
+  document is to be typeset again (<cpp|notify_assign> of the root): the
+  reason may be one which the pager does not see, such as the fonts which
+  a browser receives late. The pages without text are not kept: they cost
+  nothing.
+
+  The pager then takes 13 to 21<nbsp>ms for a character typed in the
+  manual, and the whole typesetting 35 to 45<nbsp>ms instead of 85 to
+  100; two paragraphs joined take 35 instead of 90, a new line 60 to 75
+  instead of 120 and a new section 135 instead of 200. What remains of
+  the pager is the signature for the breaks and the list of the boxes of
+  each page; the visit of the bridges which are used again takes 11 to
+  13<nbsp>ms. <verbatim|TEXMACS_PAGE_REUSE=off> makes every page again,
+  and <verbatim|=check> makes them again too and compares them with what
+  is kept. On papyrus there is one page and nothing of this applies.
+
   <subsection|Complete typesetting and references>
 
   References, tables of contents and page numbers need several passes. The
@@ -731,6 +773,16 @@
   <cpp|old_bgs>). Since cached paragraphs keep their boxes, typing in a
   paragraph usually only invalidates that paragraph, plus the following
   ones if its height changed.
+
+  A line keeps the address of the change log, which is a member of the
+  typesetter, and writes to it when it is destroyed: the lines must not
+  outlive the typesetter. The editor therefore releases its box
+  <cpp|eb> before it deletes the typesetter
+  (<cpp|edit_typeset_rep::~edit_typeset_rep>), and the destructor of the
+  typesetter releases the bridges, the lines and the pages it keeps
+  before the log. In the other order, which was the one of the members,
+  the lines of a view which was closed wrote into memory which was
+  already free.
 
   <subsection|The editor side>
 

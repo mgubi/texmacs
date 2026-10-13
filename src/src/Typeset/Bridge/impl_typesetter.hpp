@@ -13,6 +13,7 @@
 #define IMPL_TYPESETTER_H
 #include "Bridge/bridge.hpp"
 
+struct page_memo;
 class typesetter_rep {
 public:
   edit_env&    env;
@@ -28,9 +29,11 @@ public:
   SI x1, y1, x2, y2;
   hashmap<string,tree> old_patch;
   bool paper;
+  page_memo* kept_pages;   // the pages of the last pass (pager.hpp)
 
 public:
   typesetter_rep (edit_env& env, tree et, path ip);
+  ~typesetter_rep ();
 
   void insert_stack     (array<page_item> l, stack_border sb);
   void insert_parunit   (tree t, path ip);

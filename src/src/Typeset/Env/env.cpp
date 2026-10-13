@@ -11,6 +11,7 @@
 
 #include "env.hpp"
 #include "iterator.hpp"
+#include "merge_sort.hpp"
 extern hashmap<string,int> default_var_type;
 void initialize_default_var_type ();
 extern hashmap<string,tree> default_env;
@@ -167,13 +168,52 @@ edit_env_rep::lookup (string name) {
   return value;
 }
 
-// a number for each name of variable (see env_table)
+array<tree>
+edit_env_rep::derived_state () {
+  static array<string> names;
+  static int known= -1;
+  if (known != N(var_type)) {
+    names= array<string> ();
+    iterator<string> it= iterate (var_type);
+    while (it->busy ()) {
+      string var= it->next ();
+      if (!plain_variable (var)) names << var;
+    }
+    merge_sort (names);
+    known= N(var_type);
+  }
+  array<tree> r;
+  for (int i=0; i<N(names); i++) r << env.h [names[i]];
+  return r;
+}
+
+// a number for each name of variable (see env_table), and back
+static hashmap<string,int>&
+var_ids () {
+  static hashmap<string,int> ids (-1);
+  return ids;
+}
+
+static array<string>&
+var_names () {
+  static array<string> names;
+  return names;
+}
+
 int
 env_var_id (string var) {
-  static hashmap<string,int> ids (-1);
-  int id= ids [var];
-  if (id < 0) { id= N(ids); ids (var)= id; }
+  int id= var_ids () [var];
+  if (id < 0) {
+    id= N(var_names ());
+    var_ids () (var)= id;
+    var_names () << var;
+  }
   return id;
+}
+
+string
+env_var_name (int id) {
+  return var_names () [id];
 }
 
 void

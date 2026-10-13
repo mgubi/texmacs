@@ -919,6 +919,12 @@ edit_interface_rep::apply_changes () {
                  * " ms, " * as_string (edit_profile.starts) * " starts, "
                  * as_string (edit_profile.starts_kept) * " with candidates kept)"
                : string (""))
+           << (edit_profile.pages_made > 0
+               ? " (" * as_string (edit_profile.pages_made) * " pages, "
+                 * as_string (edit_profile.texts_kept) * " texts and "
+                 * as_string (edit_profile.parts_kept)
+                 * " headers and footers kept)"
+               : string (""))
            << ", changes " << edit_profile.changes << " ms ("
            << edit_profile.rects << " rectangles from " << edit_profile.lines
            << " lines); invalid " << (int) rw << " x " << (int) rh << " of the view "

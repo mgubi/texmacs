@@ -45,7 +45,12 @@ edit_typeset_rep::edit_typeset_rep ():
     init_update ();
 }
 
-edit_typeset_rep::~edit_typeset_rep () { delete_typesetter (ttt); }
+edit_typeset_rep::~edit_typeset_rep () {
+  // a line of the document which is destroyed logs its place in the change
+  // log of the typesetter (phrase_box_rep): the boxes go before it does
+  eb= box ();
+  delete_typesetter (ttt);
+}
 
 void
 edit_typeset_rep::set_data (new_data data) {
