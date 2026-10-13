@@ -10,7 +10,8 @@ generation tool.
 
 `tau.svg` is an editable vector reconstruction of this master. Its tile and
 three glyph silhouettes are traced as cubic paths; the grid, borders, gradient,
-and chalk textures are separate named layers. It contains no embedded bitmap,
+and chalk textures are separate named layers. The glyph borders have their own
+layer, and the board uses a diagonal blue gradient with a gentle light bloom. It contains no embedded bitmap,
 external resource, or font. The chalk texture is an approximation made from
 editable stroke patterns and SVG filters, so it is not pixel-identical to the
 raster. The approved PNG remains the source of the production web and macOS
