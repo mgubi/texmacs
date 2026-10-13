@@ -134,6 +134,20 @@ can hold on to one. The mechanism is the same as with Guile.
   through `object-stack`, not through the blackbox. That is why
   `mark_blackbox` can be a no-op.
 
+- **Lists built in C++.** The collector of s7 does not look at the C++ stack.
+  It spares the last cells which were made (`gc-temps-size`, 256 by default),
+  which covers a value on its way back to Scheme, but not a list which C++
+  builds piece by piece: `scheme_tree_to_tmscm` makes the last element first
+  and held the part already built in a local variable while it converted the
+  others. When those took more than 256 cells and a collection came, the end
+  of the list was freed and used again. The user manual opened as a book lost
+  its initial environment that way (it comes after the body in the document),
+  at random, since it depends on when the collector runs. All the functions
+  of `glue.cpp` which build a list now hold a `tmscm_builder`, which turns the
+  collector off while one exists (the heap grows instead); with Guile, whose
+  collector scans the stack, the class does nothing. New code which builds a
+  Scheme list from C++ must do the same.
+
 ## 1.6 Glue generation
 
 - **Tables.** `src/Scheme/Glue/build-glue-{basic,editor,server}.scm` list
