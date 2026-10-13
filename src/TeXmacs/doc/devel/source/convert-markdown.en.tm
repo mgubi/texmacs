@@ -216,6 +216,47 @@
     whole document only.
   </itemize>
 
+  <section|The style for the files>
+
+  A file is read as a document of the style <tmstyle|markdown>
+  (<source-link|styles/markdown.ts|TeXmacs/styles/markdown.ts>), and written as it was read. The import
+  of a file (<scm|mdtm-faithful?>, off for a piece of text and with the
+  option <verbatim|markdown-\<gtr\>texmacs:faithful>) uses the macros of
+  this style for what the standard tags do not say, and the export knows
+  them (<scm|tmmd-faithful?> for a document of the style, where each
+  heading has its level and a link to <verbatim|#name> is kept).
+
+  <\description>
+    <item*|Structure><markup|md-metadata> and <markup|md-meta> for the
+    lines of the header, of which the tree keeps the source;
+    <markup|md-h6>; <markup|md-loose>; the three lists for the markers
+    <verbatim|->, <verbatim|*> and <verbatim|+> (the attribute
+    <verbatim|marker>); <markup|md-fence> (the attribute
+    <verbatim|info>); <markup|md-image>; <markup|md-footnote> and
+    <markup|md-footnote-text>.
+
+    <item*|Sources><markup|md-source> and <markup|md-block-source> hold a
+    body, the text of the file for it and a copy of the body: a formula,
+    a table, a piece of <name|HTML>, and with an empty body what
+    <TeXmacs> does not understand. The text is written as long as the
+    body is the copy. In a buffer this must be told before the macros are
+    expanded, which changes both: the two macros are replaced by externs
+    (<scm|tmmarkdown-md-source> in <source-link|tmmarkdown-expand.scm|TeXmacs/progs/convert/markdown/tmmarkdown-expand.scm>) which
+    get their arguments as they are and leave <markup|md-kept> with the
+    text, or the body. A text which is kept becomes a node with the
+    attribute <verbatim|source>, which the serializer writes as it is.
+  </description>
+
+  The property which the tests check: for a file <math|x>, the file
+  <math|N<around|(|x|)>> which is written after reading it has the same
+  <name|Markdown> tree as <math|x>, and <math|N<around|(|N<around|(|x|)>|)>=N<around|(|x|)>>.
+  The spelling which <math|N> changes is the one which has no node of
+  its own in the tree (lines of a paragraph, headings with a line under
+  them, fences, rules, markers of emphasis, definitions of links,
+  entities). To keep one more, give it an attribute in the parser, a
+  macro in the style, and handle both in the import, the export and the
+  serializer; or keep the block in <markup|md-block-source>.
+
   <section|The serializer>
 
   <scm|serialize-markdown> writes a block as a list of lines, to which the

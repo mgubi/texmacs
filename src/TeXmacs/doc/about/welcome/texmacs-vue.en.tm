@@ -230,6 +230,14 @@
   <paragraph|13 October 2026>
 
   <\itemize>
+    <item>A <name|Markdown> file is opened as a document of the new style
+    <tmstyle|markdown>, with text without serifs and headings without
+    numbers, and is saved as it was read: its <name|YAML> header, its
+    formulas, tables and <name|Html> keep their text, and so do the levels
+    of its headings, its lists, its code, images and footnotes, as long
+    as you do not edit them. See <menu|Help|Manual|Compatibility with
+    other formats>.
+
     <item>A <TeXmacs> server now answers the browsers at a port of its
     own, the one after its usual port (6562 for 6561), and leaves its usual
     port to the other versions of <TeXmacs>. Nothing changes in the login:

@@ -14,8 +14,18 @@
 ;; The Markdown trees are described in markdownin.scm. Their mathematics is
 ;; LaTeX and their HTML is HTML: both go through the converters of TeXmacs
 ;; for these formats.
+;;
+;; A file becomes a document of the style markdown, whose macros keep what
+;; the standard tags do not say (mdtm-faithful?): the levels of the
+;; headings, the header in YAML, the text of the file for a formula, a
+;; table and a piece of HTML, the lists with blank lines, the words after the fence of
+;; code, the description and the title of an image, the labels of the
+;; footnotes. Such a document is written as the Markdown it was read from
+;; (see tmmarkdown.scm). A piece of text, which may be pasted into any
+;; document, gets the standard tags only.
 
-(texmacs-module (convert markdown markdowntm))
+(texmacs-module (convert markdown markdowntm)
+  (:use (convert markdown tmmarkdown)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; State and tools
@@ -27,6 +37,13 @@
 (define mdtm-footnotes (make-ahash-table))
 (define mdtm-open-footnotes '())
 (define mdtm-headings '())
+;; whether the macros of the style markdown are used, and then the labels
+;; of the footnotes which are their numbers, in the order of the text
+(define mdtm-faithful? #f)
+(define mdtm-numbered-footnotes '())
+
+(define mdtm-faithful-sections
+  '(section subsection subsubsection paragraph subparagraph md-h6))
 
 (define mdtm-sections
   '(section subsection subsubsection paragraph subparagraph subparagraph))
@@ -96,9 +113,44 @@
             (lambda args #f))
     (and r (!= r "") (mdtm-unary-document r))))
 
-(define (mdtm-math s)
-  (or (mdtm-latex (string-append "$" s "$"))
-      `(math ,(mdtm-text s))))
+(define (mdtm-source s)
+  ;; a text of the file as an argument of a macro: its lines
+  (with l (mdtm-lines s)
+    (if (list-1? l) (mdtm-text (car l)) `(tuple ,@(map mdtm-text l)))))
+
+(define (mdtm-plain-math? t)
+  ;; a formula of the tags which are written without the macros of a style:
+  ;; it is written in a document as it is here
+  (or (string? t)
+      (and (pair? t)
+           (in? (car t) '(math equation* document concat rsub rsup lsub lsup
+                          frac sqrt wide around around* left right mid big
+                          text with))
+           (list-and (map mdtm-plain-math? (cdr t))))))
+
+(define (mdtm-keep t raw block?)
+  ;; the tree t for the text raw of the file, with this text and a copy of
+  ;; t (see tmmd-md-source)
+  (if (not mdtm-faithful?) t
+      `(,(if block? 'md-block-source 'md-source) ,t ,(mdtm-source raw) ,t)))
+
+(define (mdtm-keep-math t tag s raw block?)
+  ;; the formula t which was written as the LaTeX s, in the text raw: with
+  ;; this text, unless t is surely written back so
+  (if (or (not mdtm-faithful?)
+          (and (not raw) (mdtm-plain-math? t)
+               (== (tmmd-normal t) (object->string `((,tag ,s))))))
+      t
+      (mdtm-keep t (or raw (if (== tag 'math) (string-append "$" s "$")
+                               (string-append "$$\n" s "\n$$")))
+                 block?)))
+
+(define (mdtm-keep-html t s) (mdtm-keep t s #f))
+
+(define (mdtm-math s . raw)
+  (mdtm-keep-math (or (mdtm-latex (string-append "$" s "$"))
+                      `(math ,(mdtm-text s)))
+                  'math s (and (nnull? raw) (car raw)) #f))
 
 (define (mdtm-environment? s)
   ;; a formula which is an environment of LaTeX by itself, as align
@@ -108,9 +160,15 @@
                        '("align" "eqnarray" "gather" "multline" "equation"
                          "flalign" "alignat"))))))
 
-(define (mdtm-display-math s)
-  (or (mdtm-latex (if (mdtm-environment? s) s (string-append "\\[" s "\\]")))
-      `(equation* (document ,(mdtm-text s)))))
+(define (mdtm-display-math s raw block?)
+  ;; raw: the text of the file, or #f for a formula between two $$, with
+  ;; lines of their own when it is not in a paragraph (block?)
+  (mdtm-keep-math
+    (or (mdtm-latex (if (mdtm-environment? s) s (string-append "\\[" s "\\]")))
+        `(equation* (document ,(mdtm-text s))))
+    '!display s
+    (or raw (and (not block?) (string-append "$$" s "$$")))
+    block?))
 
 (define (mdtm-html s)
   ;; the HTML snippet s as a TeXmacs tree; a comment, or what TeXmacs does
@@ -139,7 +197,12 @@
   (let* ((lang (locase-all (or (mdtm-attr x 'lang) "")))
          (tag (or (assoc-ref mdtm-languages lang) 'verbatim-code))
          (s (apply string-append (list-filter (mdtm-children x) string?))))
-    `(,tag ,(mdtm-document (map mdtm-text (mdtm-lines s))))))
+    (let* ((code `(,tag ,(mdtm-document (map mdtm-text (mdtm-lines s)))))
+           (info (or (mdtm-attr x 'info) (mdtm-attr x 'lang) "")))
+      ;; the words after the fence, when the tag is not written with them
+      (if (and mdtm-faithful? (!= info (tmmd-language-name tag)))
+          `(md-fence ,(mdtm-text info) ,code)
+          code))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Text
@@ -154,9 +217,14 @@
     (if (and def (null? mdtm-open-footnotes))
         (with old mdtm-open-footnotes
           (set! mdtm-open-footnotes (cons label old))
-          (with l (mdtm-blocks def)
+          (let* ((l (mdtm-blocks def))
+                 (body (if (list-1? l) (car l) (mdtm-document l))))
             (set! mdtm-open-footnotes old)
-            `(footnote ,(if (list-1? l) (car l) (mdtm-document l)))))
+            ;; with its label, when it is not the number it would get
+            (if (and mdtm-faithful?
+                     (not (in? label mdtm-numbered-footnotes)))
+                `(md-footnote ,(mdtm-text label) ,body)
+                `(footnote ,body))))
         (string-append "[^" (mdtm-text label) "]"))))
 
 (define (mdtm-inline x)
@@ -179,11 +247,16 @@
                      (title (or (mdtm-attr x 'title) "")))
                  (if (== title "") `((hlink ,body ,url))
                      `((hlink* ,body ,url ,(mdtm-text title))))))
-              ((img) (list (mdtm-image x)))
+              ((img) (list (mdtm-described-image x)))
               ((br) '((next-line)))
-              ((math) (list (mdtm-math (apply string-append l))))
-              ((displaymath) (list (mdtm-display-math (apply string-append l))))
-              ((html) (list (mdtm-html (apply string-append l))))
+              ((math) (list (mdtm-math (apply string-append l)
+                                       (mdtm-attr x 'source))))
+              ((displaymath)
+               (list (mdtm-display-math (apply string-append l)
+                                        (mdtm-attr x 'source) #f)))
+              ((html)
+               (with s (apply string-append l)
+                 (list (mdtm-keep-html (mdtm-html s) s))))
               ((footnote) (list (mdtm-footnote (apply string-append l))))
               (else (append-map mdtm-inline l)))))))
 
@@ -225,6 +298,14 @@
           ,(mdtm-size (mdtm-attr x 'width))
           ,(mdtm-size (mdtm-attr x 'height)) "" ""))
 
+(define (mdtm-described-image x)
+  ;; the image, with its description and its title when it has one
+  (let* ((title (or (mdtm-attr x 'title) ""))
+         (alt (mdtm-inlines (mdtm-children x))))
+    (if (or (not mdtm-faithful?) (and (== title "") (== alt "")))
+        (mdtm-image x)
+        `(md-image ,(mdtm-image x) ,alt ,(mdtm-text title)))))
+
 (define (mdtm-figure l)
   ;; a figure, when the nodes l of a paragraph are a single image with a
   ;; title or a description, which is the caption (as Pandoc does); else #f
@@ -235,6 +316,8 @@
                         ((!= title "") (mdtm-text title))
                         (else (mdtm-inlines (mdtm-children x))))))
     (and x (!= caption "")
+         ;; (with a title, the description is not the caption)
+         (not (and mdtm-faithful? (!= title "")))
          `(big-figure ,(mdtm-image x) ,caption))))
 
 (define (mdtm-no-spaces s)
@@ -270,8 +353,11 @@
                                ,@(if (func? (car l) 'concat) (cdar l)
                                      (list (car l))))
                       (cdr l))
-                l)))
-    `(,tag ,(mdtm-document l))))
+                l))
+         (r `(,tag ,(mdtm-document l))))
+    (if (and mdtm-faithful? (== (mdtm-attr x 'loose) "true"))
+        `(md-loose ,r)
+        r)))
 
 (define (mdtm-length t)
   ;; a rough measure of the width of a piece of text
@@ -302,6 +388,8 @@
                (with j (number->string i)
                  (cond ((== a "center") `((cwith "1" "-1" ,j ,j "cell-halign" "c")))
                        ((== a "right") `((cwith "1" "-1" ,j ,j "cell-halign" "r")))
+                       ((and mdtm-faithful? (== a "left"))
+                        `((cwith "1" "-1" ,j ,j "cell-halign" "l")))
                        (else '()))))
              aligns (map (lambda (i) (+ i 1)) (iota (length aligns)))))
          (cell (lambda (c)
@@ -331,15 +419,28 @@
               ((h1 h2 h3 h4 h5 h6) (mdtm-heading x))
               ((p) (list (or (mdtm-figure l) (mdtm-inlines l))))
               ((blockquote) `((quotation ,(mdtm-document (mdtm-blocks l)))))
-              ((ul) (list (mdtm-list x 'itemize)))
+              ((ul)
+               ;; the items of the file start with a dash, a star or a plus
+               (with m (mdtm-attr x 'marker)
+                 (list (mdtm-list x (cond ((not mdtm-faithful?) 'itemize)
+                                          ((== m "*") 'itemize-dot)
+                                          ((== m "+") 'itemize-arrow)
+                                          (else 'itemize-minus))))))
               ((ol) (list (mdtm-list x 'enumerate)))
               ((pre) (list (mdtm-pre x)))
               ((hr) '((hrule)))
-              ((table) (list (mdtm-table x)))
-              ((displaymath) (list (mdtm-display-math (apply string-append l))))
+              ((table)
+               (let ((t (mdtm-table x))
+                     (raw (mdtm-attr x 'source)))
+                 (list (if raw (mdtm-keep t raw #t) t))))
+              ((displaymath)
+               (list (mdtm-display-math (apply string-append l)
+                                        (mdtm-attr x 'source) #t)))
               ((html)
-               (with r (mdtm-html (apply string-append l))
-                 (cond ((== r "") '())
+               (let* ((s (apply string-append l))
+                      (r (mdtm-html s)))
+                 (cond (mdtm-faithful? (list (mdtm-keep r s #t)))
+                       ((== r "") '())
                        ((func? r 'document) (cdr r))
                        (else (list r)))))
               ((footnote-def meta) '())
@@ -387,9 +488,94 @@
           `((abstract-data
               (abstract (document ,(mdtm-text (car abstract))))))))))
 
+(define (mdtm-yaml-key s)
+  ;; the place of the colon after the key which starts the line, or #f
+  (let ((n (string-length s)))
+    (and (> n 0) (char-alphabetic? (string-ref s 0))
+         (let loop ((i 1))
+           (and (< i n)
+                (with c (string-ref s i)
+                  (cond ((char=? c #\:)
+                         (and (or (== (+ i 1) n)
+                                  (char=? (string-ref s (+ i 1)) #\space))
+                              i))
+                        ((or (char-alphabetic? c) (char-numeric? c)
+                             (in? c '(#\_ #\- #\.)))
+                         (loop (+ i 1)))
+                        (else #f))))))))
+
+(define (mdtm-metadata source)
+  ;; the header of the file: a md-meta for each of its lines
+  `(md-metadata
+     ,(mdtm-document
+        (map (lambda (s)
+               (with i (mdtm-yaml-key s)
+                 (if i
+                     `(md-meta ,(mdtm-text (substring s 0 i))
+                               ,(mdtm-text (string-trim-spaces
+                                             (substring s (+ i 1)
+                                                        (string-length s)))))
+                     `(md-meta "" ,(mdtm-text s)))))
+             (if (== source "") '() (mdtm-lines source))))))
+
+(define (mdtm-footnote-labels x)
+  ;; the labels of the footnotes of the text, but for those of the
+  ;; definitions, in their order
+  (cond ((not (pair? x)) '())
+        ((func? x 'footnote-def) '())
+        ((and (func? x 'footnote 1) (string? (cadr x))) (list (cadr x)))
+        (else (append-map mdtm-footnote-labels (cdr x)))))
+
+(define (mdtm-notes-last? l labels)
+  ;; are the definitions of the footnotes the last blocks, those of the
+  ;; labels and in their order? They are written so
+  (let* ((def? (lambda (x) (func? x 'footnote-def)))
+         (tail (let loop ((r (reverse l)) (acc '()))
+                 (if (and (nnull? r) (def? (car r)))
+                     (loop (cdr r) (cons (car r) acc))
+                     acc))))
+    (and (== (length (list-filter l def?)) (length tail))
+         (== (map cadr tail) labels))))
+
+(define (mdtm-faithful-body l)
+  ;; the body of a document of the style markdown, from its blocks: the
+  ;; header as it is written, and each heading at its level
+  (let* ((source (lambda (x) (and (func? x 'meta) (mdtm-attr x 'source))))
+         (labels (list-remove-duplicates
+                   (append-map mdtm-footnote-labels l)))
+         (last? (mdtm-notes-last? l labels)))
+    (set! mdtm-headings mdtm-faithful-sections)
+    (set! mdtm-numbered-footnotes
+          (let loop ((l labels) (i 1) (acc '()))
+            (cond ((null? l) acc)
+                  ((== (car l) (number->string i))
+                   (loop (cdr l) (+ i 1) (cons (car l) acc)))
+                  (else (loop (cdr l) (+ i 1) acc)))))
+    (mdtm-document
+      (append-map (lambda (x)
+                    (cond ((source x) (list (mdtm-metadata (source x))))
+                          ((func? x 'meta) '())
+                          ;; the definition of a footnote which the text
+                          ;; does not have: as it is written
+                          ((and (func? x 'footnote-def) (pair? (cdr x))
+                                (nin? (cadr x) labels))
+                           (list (mdtm-keep
+                                   "" (string-trim-spaces
+                                        (convert `(markdown ,x) "markdown-stree"
+                                                 "markdown-snippet"))
+                                   #t)))
+                          ;; where the text of a footnote is written, when
+                          ;; this is not after everything else
+                          ((and (func? x 'footnote-def) (pair? (cdr x))
+                                (not last?))
+                           `((md-footnote-text ,(mdtm-text (cadr x)))))
+                          (else (mdtm-block x))))
+                  l))))
+
 (define (mdtm-body l)
   ;; the body of a document, from its blocks
-  (let* ((meta (append-map cdr (list-filter l (lambda (x) (func? x 'meta)))))
+  (let* ((meta (append-map mdtm-children
+                           (list-filter l (lambda (x) (func? x 'meta)))))
          (blocks (list-filter l (lambda (x) (not (func? x 'meta)))))
          ;; a single heading of the first level, at the start, is the title
          ;; when the header gives none
@@ -408,7 +594,7 @@
       (append (mdtm-doc-data meta title)
               (mdtm-blocks (if title? (cdr blocks) blocks))))))
 
-(tm-define (markdown->texmacs x)
+(tm-define (markdown->texmacs x . opts)
   (:type (-> stree stree))
   (:synopsis "Convert the Markdown tree @x into a TeXmacs tree")
   (let* ((file? (func? x '!file 1))
@@ -417,8 +603,20 @@
     (set! mdtm-footnotes (make-ahash-table))
     (set! mdtm-open-footnotes '())
     (set! mdtm-headings mdtm-sections)
+    ;; (with the option off, a file is a document of the style generic
+    ;; with its title, as it was before the style markdown)
+    (set! mdtm-faithful?
+          (and file?
+               (!= (assoc-ref (if (and (nnull? opts) (list? (car opts)))
+                                  (car opts) '())
+                              "markdown->texmacs:faithful")
+                   "off")))
+    (set! mdtm-numbered-footnotes '())
     (mdtm-collect-footnotes md)
-    (with r (cond (file? `(document (body ,(mdtm-body l)) (style "generic")))
+    (with r (cond ((and file? mdtm-faithful?)
+                   `(document (body ,(mdtm-faithful-body l))
+                              (style "markdown")))
+                  (file? `(document (body ,(mdtm-body l)) (style "generic")))
                   ;; a snippet of text only
                   ((list-and (map (lambda (b)
                                     (or (string? b)
@@ -431,4 +629,5 @@
                   (else (with b (mdtm-blocks l)
                           (if (list-1? b) (car b) (mdtm-document b)))))
       (set! mdtm-footnotes (make-ahash-table))
+      (set! mdtm-faithful? #f)
       r)))

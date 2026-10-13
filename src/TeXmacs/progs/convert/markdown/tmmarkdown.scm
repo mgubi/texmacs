@@ -33,8 +33,10 @@
 (define tmmd-document? #f)      ; a whole document, and not a piece of one
 (define tmmd-image-nr 0)        ; the images which were saved as files
 (define tmmd-front-matter? #t)  ; the title in a YAML header
-(define tmmd-footnotes '())     ; the definitions of the footnotes, reversed
-(define tmmd-footnote-nr 0)
+(define tmmd-footnotes '())     ; the definitions of the footnotes, reversed,
+(define tmmd-footnote-nr 0)     ; each with the rank of its mark in the text
+(define tmmd-faithful? #f)      ; a document of the style markdown
+(define tmmd-labels '())        ; the labels which its footnotes keep
 
 (define (tmmd-initialize opts)
   (set! tmmd-html? (!= (assoc-ref opts "texmacs->markdown:html") "off"))
@@ -42,6 +44,8 @@
         (!= (assoc-ref opts "texmacs->markdown:front-matter") "off"))
   (set! tmmd-footnotes '())
   (set! tmmd-footnote-nr 0)
+  (set! tmmd-faithful? #f)
+  (set! tmmd-labels '())
   (set! tmmd-image-nr 0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -72,7 +76,7 @@
 (define (tmmd-block? x)
   (and (pair? x)
        (in? (car x) '(meta h1 h2 h3 h4 h5 h6 !h p blockquote ul ol pre hr
-                      table footnote-def !display))))
+                      table footnote-def !display !raw !note))))
 
 (define (tmmd-blank? x)
   (and (string? x) (== (string-trim-spaces x) "")))
@@ -348,7 +352,10 @@
   (if (< (length l) 2) (tmmd-all l)
       (let* ((body (tmmd (car l)))
              (url (tmmd-plain (cadr l))))
-        (if (or (== url "") (string-starts? url "#") (tmmd-has-block? body))
+        ;; (but in a document of the style markdown, where it is a link
+        ;; of the file to one of its headings)
+        (if (or (== url "") (tmmd-has-block? body)
+                (and (string-starts? url "#") (not tmmd-faithful?)))
             body
             `((a (@ (href ,url)) ,@(tmmd-merge body)))))))
 
@@ -444,16 +451,187 @@
                  (list-intersperse (map tmmd-plain l) ", "))
           "]")))
 
-(define (tmmd-footnote-add body)
-  (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
+(define tmmd-footnote-rank 0)
+
+(define (tmmd-footnote-add body label)
+  ;; the footnote with this label, or with the next number which is not
+  ;; the label of another one
+  (set! tmmd-footnote-rank (+ tmmd-footnote-rank 1))
   ;; the body may hold footnotes: it is converted before the list is read
-  (let* ((label (number->string tmmd-footnote-nr))
+  (let* ((rank tmmd-footnote-rank)
+         (label (or label
+                    (let loop ()
+                      (set! tmmd-footnote-nr (+ tmmd-footnote-nr 1))
+                      (with s (number->string tmmd-footnote-nr)
+                        (if (in? s tmmd-labels) (loop) s)))))
          (def `(footnote-def ,label ,@(tmmd-blocks (tmmd body)))))
-    (set! tmmd-footnotes (cons def tmmd-footnotes))
+    (set! tmmd-footnotes (cons (cons rank def) tmmd-footnotes))
     `((footnote ,label))))
 
 (define (tmmd-footnote l)
-  (if (null? l) '() (tmmd-footnote-add (car l))))
+  (if (null? l) '() (tmmd-footnote-add (car l) #f)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The macros of the style markdown
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; The import of a file (markdowntm.scm) uses them for what the standard
+;; tags do not say, and each one is written as what it was read from.
+;; md-source and md-block-source hold a body, the text of the file it was
+;; read from and a copy of the body as it was read: the text is written as
+;; long as the body is this copy, and the body else, which was edited.
+;; When a document is expanded this is told before the expansion
+;; (tmmarkdown-md-source in tmmarkdown-expand.scm, which leaves md-kept
+;; with the text).
+
+(define (tmmd-source x)
+  ;; the text of an argument which holds text of the file: a line, or a
+  ;; tuple of lines
+  (cond ((string? x) (tmmd-code-text x))
+        ((func? x 'tuple)
+         (let loop ((l (cdr x)) (acc '()))
+           (cond ((null? l) (apply string-append (reverse acc)))
+                 ((null? acc) (loop (cdr l) (list (tmmd-source (car l)))))
+                 (else (loop (cdr l) (cons (tmmd-source (car l))
+                                           (cons "\n" acc)))))))
+        (else "")))
+
+(define (tmmd-normal-nodes t)
+  ;; the nodes for the tree t, whatever the options and the footnotes of
+  ;; the document which is converted
+  (let ((html? tmmd-html?) (flat? tmmd-flat?) (notes tmmd-footnotes)
+        (nr tmmd-footnote-nr) (rank tmmd-footnote-rank))
+    (set! tmmd-html? #t)
+    (set! tmmd-flat? #f)
+    (with r (tmmd t)
+      (set! tmmd-html? html?)
+      (set! tmmd-flat? flat?)
+      (set! tmmd-footnotes notes)
+      (set! tmmd-footnote-nr nr)
+      (set! tmmd-footnote-rank rank)
+      r)))
+
+(tm-define (tmmd-normal t)
+  (:synopsis "What the TeXmacs tree @t is written as, as a string")
+  (object->string (tmmd-normal-nodes t)))
+
+(tm-define (tmmd-language-name tag)
+  (:synopsis "The language which is written after the fence of the code @tag")
+  (or (assoc-ref tmmd-languages tag) ""))
+
+(define (tmmd-md-source* kind l)
+  (cond ((null? l) '())
+        ((and (== (length l) 3) (== (car l) (caddr l)))
+         (tmmd-md-kept (list kind (cadr l))))
+        (else (tmmd (car l)))))
+
+(define (tmmd-md-source l) (tmmd-md-source* "inline" l))
+(define (tmmd-md-block-source l)
+  (tmmd-md-source* (if (and (nnull? l) (tmmarkdown-table? (car l)))
+                       "table" "block")
+                   l))
+
+(tm-define (tmmarkdown-table? x)
+  (:synopsis "Is the tree @x a table?")
+  (and (pair? x)
+       (in? (car x) '(block block* tabular tabular* wide-block wide-tabular
+                      tformat table))))
+
+(define (tmmd-md-kept l)
+  ;; (md-kept kind text): the text of the file, in a paragraph or as
+  ;; paragraphs of its own. These are (!raw kind "text") until the document
+  ;; is put together, and then a table, a formula or HTML with this text
+  ;; as their source (see tmmd-set-headings)
+  (if (< (length l) 2) '()
+      (with s (tmmd-source (cadr l))
+        (cond ((== (car l) "inline") `((html ,s)))
+              ((== (car l) "table") `((!raw "table" ,s)))
+              ((or (string-starts? s "$$") (string-starts? s "\\["))
+               `((!raw "display" ,s)))
+              (else `((!raw "html" ,s)))))))
+
+(define (tmmd-md-loose l)
+  ;; the lists of the body, with blank lines between their items
+  (map (lambda (x)
+         (if (and (pair? x) (in? (car x) '(ul ol)))
+             (if (and (pair? (cdr x)) (func? (cadr x) '@))
+                 `(,(car x) (@ (loose "true") ,@(cdadr x)) ,@(cddr x))
+                 `(,(car x) (@ (loose "true")) ,@(cdr x)))
+             x))
+       (tmmd-all l)))
+
+(define (tmmd-md-fence l)
+  ;; code with the words which follow its fence: the first is the language
+  (if (< (length l) 2) (tmmd-all l)
+      (let* ((info (string-trim-spaces (tmmd-plain (car l))))
+             (i (string-search-forwards " " 0 info))
+             (lang (if (< i 0) info (substring info 0 i))))
+        (map (lambda (x)
+               (if (func? x 'pre)
+                   `(pre ,@(if (== info "") '()
+                               `((@ (lang ,lang)
+                                    ,@(if (== info lang) '() `((info ,info))))))
+                         ,@(if (and (pair? (cdr x)) (func? (cadr x) '@))
+                               (cddr x) (cdr x)))
+                   x))
+             (tmmd (cadr l))))))
+
+(define (tmmd-md-image l)
+  ;; an image with its description and its title
+  (if (< (length l) 3) (tmmd-first l)
+      (let* ((alt (tmmd-trim (tmmd-inline (tmmd (cadr l)))))
+             (title (tmmd-plain (caddr l))))
+        (map (lambda (x)
+               (if (and (func? x 'img) (pair? (cdr x)) (func? (cadr x) '@))
+                   `(img (@ ,@(list-filter (cdadr x)
+                                           (lambda (a) (nin? (car a) '(alt title))))
+                            (alt ,(apply string-append (map tmmd-node-text alt)))
+                            ,@(if (== title "") '() `((title ,title))))
+                         ,@alt)
+                   x))
+             (tmmd (car l))))))
+
+(define (tmmd-node-text x)
+  ;; the text of a node, without its markup
+  (cond ((string? x) x)
+        ((not (pair? x)) "")
+        ((and (pair? (cdr x)) (func? (cadr x) '@))
+         (apply string-append (map tmmd-node-text (cddr x))))
+        (else (apply string-append (map tmmd-node-text (cdr x))))))
+
+(define (tmmd-md-footnote l)
+  (if (< (length l) 2) (tmmd-footnote l)
+      (tmmd-footnote-add (cadr l) (tmmd-plain (car l)))))
+
+(define (tmmd-md-metadata l)
+  ;; the header of the file, a line for each md-meta
+  (let* ((body (if (null? l) '(document) (car l)))
+         (entries (list-filter (if (func? body 'document) (cdr body) (list body))
+                               (lambda (x) (func? x 'md-meta 2))))
+         (line (lambda (x)
+                 (let ((key (tmmd-plain (cadr x)))
+                       (val (tmmd-plain (caddr x))))
+                   (cond ((== key "") val)
+                         ((== val "") (string-append key ":"))
+                         (else (string-append key ": " val)))))))
+    `((meta (@ (source ,(let loop ((l (map line entries)) (acc '()))
+                          (cond ((null? l) (apply string-append (reverse acc)))
+                                ((null? acc) (loop (cdr l) (list (car l))))
+                                (else (loop (cdr l)
+                                            (cons (car l) (cons "\n" acc))))))))))))
+
+(define (tmmd-md-h6 l) (tmmd-heading 7 l))
+
+(define (tmmd-md-footnote-text l)
+  ;; where the text of the footnote with this label is written
+  (if (null? l) '() `((!note ,(tmmd-plain (car l))))))
+
+(define (tmmd-kept-labels x)
+  ;; the labels of the footnotes of the tree which keep theirs
+  (cond ((not (pair? x)) '())
+        ((and (func? x 'md-footnote 2) (string? (cadr x)))
+         (cons (tmmd-plain (cadr x)) (tmmd-kept-labels (caddr x))))
+        (else (append-map tmmd-kept-labels (cdr x)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Variables of the environment
@@ -643,6 +821,16 @@
                   items))))))
 
 (define (tmmd-itemize l) (tmmd-list 'ul l))
+
+(define (tmmd-marked-list marker l)
+  ;; in a document of the style markdown the three lists are those whose
+  ;; items start with a dash, a star and a plus
+  (with r (tmmd-list 'ul l)
+    (if (and tmmd-faithful? (nnull? r))
+        `((ul (@ (marker ,marker)) ,@(cdar r)) ,@(cdr r))
+        r)))
+(define (tmmd-itemize-dot l) (tmmd-marked-list "*" l))
+(define (tmmd-itemize-arrow l) (tmmd-marked-list "+" l))
 (define (tmmd-enumerate l) (tmmd-list 'ol l))
 
 (define (tmmd-quotation l)
@@ -987,6 +1175,17 @@
   (eqref tmmd-eqref)
   ((:or cite nocite cite-detail) tmmd-cite)
   (footnote tmmd-footnote)
+  (md-source tmmd-md-source)
+  (md-block-source tmmd-md-block-source)
+  (md-kept tmmd-md-kept)
+  (md-loose tmmd-md-loose)
+  (md-fence tmmd-md-fence)
+  (md-image tmmd-md-image)
+  (md-footnote tmmd-md-footnote)
+  (md-metadata tmmd-md-metadata)
+  (md-meta tmmd-noop)
+  (md-h6 tmmd-md-h6)
+  (md-footnote-text tmmd-md-footnote-text)
 
   ;; mathematics
   (math tmmd-math)
@@ -1006,7 +1205,9 @@
   ((:or abstract abstract-data) tmmd-abstract)
 
   ;; lists and quotations
-  ((:or itemize itemize-minus itemize-dot itemize-arrow) tmmd-itemize)
+  ((:or itemize itemize-minus) tmmd-itemize)
+  (itemize-dot tmmd-itemize-dot)
+  (itemize-arrow tmmd-itemize-arrow)
   ((:or description description-compact description-dash description-aligned
         description-long description-paragraphs)
    tmmd-itemize)
@@ -1050,6 +1251,18 @@
   ;; which is used; the levels below keep their distances
   (cond ((not (pair? x)) x)
         ((func? x '!display) `(displaymath ,(cadr x)))
+        ((func? x '!raw 2)
+         (cond ((== (cadr x) "table") `(table (@ (source ,(caddr x)))))
+               ((== (cadr x) "display")
+                `(displaymath (@ (source ,(caddr x))) ""))
+               (else `(html ,(caddr x)))))
+        ;; in a document of the style markdown each heading has its
+        ;; level: 1 for a section, 2 for a subsection...
+        ((and (func? x '!h) tmmd-faithful?)
+         `(,(string->symbol
+              (string-append "h" (number->string
+                                   (max 1 (min 6 (- (cadr x) 1))))))
+           ,@(cddr x)))
         ((func? x '!h)
          (let* ((title? (in? -1 levels))
                 (below (list-filter levels (lambda (l) (>= l 0))))
@@ -1063,10 +1276,19 @@
 
 (define (tmmd-finalize l)
   ;; the blocks of a document: the levels of its headings, its footnotes
-  (let* ((notes (sort tmmd-footnotes
-                      (lambda (a b) (< (string->number (cadr a))
-                                       (string->number (cadr b))))))
-         (l (append l notes))
+  (let* ((notes (map cdr (sort tmmd-footnotes
+                               (lambda (a b) (< (car a) (car b))))))
+         ;; the texts of the footnotes: where the document says (!note
+         ;; "label"), and after everything else for the others
+         (placed (append-map (lambda (x) (if (func? x '!note 1) (cdr x) '())) l))
+         (l (append
+              (append-map
+                (lambda (x)
+                  (if (func? x '!note 1)
+                      (list-filter notes (lambda (n) (== (cadr n) (cadr x))))
+                      (list x)))
+                l)
+              (list-filter notes (lambda (n) (nin? (cadr n) placed)))))
          (levels (sort (list-remove-duplicates
                          (append-map tmmd-heading-levels l))
                        <)))
@@ -1080,9 +1302,16 @@
   (:type (-> stree list stree))
   (:synopsis "Convert the TeXmacs tree @x into a Markdown tree")
   (tmmd-initialize opts)
+  (set! tmmd-footnote-rank 0)
   (set! tmmd-document?
         (and (func? x 'document) (tmfile-extract x 'body)
              (or (tmfile-extract x 'TeXmacs) (tmfile-extract x 'style))))
+  (set! tmmd-faithful?
+        (and tmmd-document?
+             (with style (tmfile-extract x 'style)
+               (or (== style "markdown")
+                   (and (pair? style) (in? "markdown" (cdr style)))))))
+  (set! tmmd-labels (tmmd-kept-labels x))
   (if tmmd-document?
       (with body (tmfile-extract x 'body)
         `(!file (markdown ,@(tmmd-finalize (tmmd-blocks (tmmd body))))))
