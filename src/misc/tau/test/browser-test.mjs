@@ -1133,7 +1133,9 @@ test("the symbols of a palette", async p => {
 	await p.scheme("(make (quote math))");
 	await p.until("the bar of the formulas", async () => (await p.count('#tau-icons-1 [title="Miscellaneous symbols"], #tau-icons-1 [title*="iscellaneous"]')) > 0, 20000);
 	await p.page.click('#tau-icons-1 [title*="iscellaneous"]');
-	try { await p.until("the palette, with pictures", async () => (await p.count("img.tau-symbol")) > 40, 60000); }
+	// (a symbol which no font has makes the core look into all the fonts,
+	// which a browser that never had them fetches first: minutes, once)
+	try { await p.until("the palette, with pictures", async () => (await p.count("img.tau-symbol")) > 40, 240000); }
 	catch (e) { throw new Error(e.message + " " + JSON.stringify([await p.count("img.tau-symbol"), await p.count(".tau-symbol"), await p.errors(), (await p.got("contents")).length]).slice(0, 1500)); }
 	await p.until("which are drawn", () => p.page.evaluate(() => {
 		const l = [...document.querySelectorAll("img.tau-symbol")];
