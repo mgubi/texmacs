@@ -736,6 +736,39 @@
               "\\begin{equation}\n  x = 1\n\\end{equation}")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Export: the packages of the symbols
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; A symbol needs at most one package (latex-needs%): with two the export
+;; of the document fails. The euro sign is \euro of eurosym, as the
+;; character <#20AC> and as the symbol <euro>; the symbols which LaTeX or a
+;; macro of the preamble provides do not ask for unicode-math.
+(define (test-export-symbol-packages)
+  (check-group "export: packages of the symbols")
+  (check= (list-filter (append (logic-apply-list '(latex-symbol%))
+                               (logic-apply-list '(latex-big-symbol%)))
+                       (lambda (x)
+                         (> (length (logic-ref-list latex-needs% x)) 1)))
+          '())
+  (for (euro '("<#20AC>" "<euro>"))
+    (with s (td '("generic") `(document ,(string-append "Price 5 " euro)))
+      (check-true (string-contains? s "\\usepackage{eurosym}"))
+      (check-true (string-contains? s "Price 5 {\\euro}"))
+      (check-false (string-contains? s "unicode-math"))))
+  (with s (td '("generic") '(document (math "5<euro>")))
+    (check-true (string-contains? s "\\usepackage{eurosym}"))
+    (check-true (string-contains? s "$5 \\euro$")))
+  (for (x '("<lgroup>" "<rgroup>" "<dotminus>" "<dottimes>" "<btimes>"
+            "<mapsup>" "<mapsdown>"))
+    (with s (td '("generic") `(document (math ,(string-append "a" x "b"))))
+      (check-false (string-contains? s "unicode-math"))
+      (check-false (string-contains? s "nonconverted"))))
+  (with s (td '("generic") '(document (math "a<dotminus>b")))
+    (check-true (string-contains? s "\\newcommand{\\dotminus}")))
+  (with s (td '("generic") '(document (math "a<dprime>b")))
+    (check-true (string-contains? s "\\usepackage{unicode-math}"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -757,6 +790,7 @@
   (test-export-verbatim)
   (test-export-macros)
   (test-export-documents)
+  (test-export-symbol-packages)
   (test-import-special)
   (test-import-styles)
   (test-import-sections)

@@ -139,7 +139,10 @@
    (symbol "<btimes>"))
   ("Big operators"
    (link big-operator-menu))
-  ("More big operators"
+  ;; TeXmacs has no big operator for these: they are symbols of the size
+  ;; of the text, which take no limits and do not grow in a displayed
+  ;; formula
+  ("Operators of the size of the text"
    (symbol "<Bbbsum>") (symbol "<intclockwise>")
    (symbol "<varointclockwise>") (symbol "<ointctrclockwise>")
    (symbol "<bigbot>") (symbol "<bigtop>") (symbol "<bigcupdot>")
@@ -254,27 +257,38 @@
    (symbol "<mdwhtlozenge>")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; A window with one tab per group
+;; A window with one group at a time
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define math-symbols-groups
   (list "Common" "Greek" "Letters" "Operators"
         "Relations" "Arrows" "Brackets" "Miscellaneous"))
 
+;; The buttons of a group are made when the group is shown: the groups
+;; hold some fourteen hundred symbols, and making them all at once keeps
+;; the window from opening for seconds. The row of buttons at the top
+;; chooses the group, as the tabs of a notebook would.
+
+(define math-symbols-current "Common")
+
+(define (math-symbols-show group)
+  (set! math-symbols-current group)
+  (refresh-now "math-symbols-group"))
+
 (tm-widget (math-symbols-widget)
   (resize "820px" "560px"
     (padded
-      (tabs
-        (tab (text "Common") (scrollable (dynamic (math-symbols-group "Common" 16))))
-        (tab (text "Greek") (scrollable (dynamic (math-symbols-group "Greek" 16))))
-        (tab (text "Letters") (scrollable (dynamic (math-symbols-group "Letters" 16))))
-        (tab (text "Operators") (scrollable (dynamic (math-symbols-group "Operators" 16))))
-        (tab (text "Relations") (scrollable (dynamic (math-symbols-group "Relations" 16))))
-        (tab (text "Arrows") (scrollable (dynamic (math-symbols-group "Arrows" 16))))
-        (tab (text "Brackets") (scrollable (dynamic (math-symbols-group "Brackets" 16))))
-        (tab (text "Miscellaneous")
-             (scrollable
-               (dynamic (math-symbols-group "Miscellaneous" 16))))))))
+      (explicit-buttons
+        (hlist
+          (for (group math-symbols-groups)
+            ((eval group) (math-symbols-show group)) //)
+          >>>))
+      ===
+      (refreshable "math-symbols-group"
+        (hlist (bold (text (eval math-symbols-current))) >>>)
+        ===
+        (scrollable
+          (dynamic (math-symbols-group math-symbols-current 16)))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; A side tool with one group at a time

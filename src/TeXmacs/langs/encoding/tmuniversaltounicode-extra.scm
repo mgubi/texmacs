@@ -30,10 +30,6 @@
 ("<fracslash>"		"#2044")	; fraction slash [12 fonts]
 ("<qprime>"		"#2057")	; quadruple prime, not superscripted [9 fonts]
 
-;;; Currency
-
-("<euro>"		"#20AC")	; euro sign [12 fonts]
-
 ;;; Letterlike
 
 ("<Eulerconst>"		"#2107")	; euler constant [10 fonts]
