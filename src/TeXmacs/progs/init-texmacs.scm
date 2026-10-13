@@ -487,7 +487,7 @@
 (lazy-menu (fonts font-short-menu) document-short-design-font-menu)
 (lazy-define (fonts font-design) open-font-design font-design-apply
              font-design-parse)
-(lazy-define (fonts font-custom) font-design-label)
+(lazy-define (fonts font-custom) font-design-label font-design-menu-label)
 (lazy-menu (fonts font-custom) document-custom-font-menu)
 (lazy-tmfs-handler (fonts font-design) font-design)
 (lazy-menu (fonts font-features)

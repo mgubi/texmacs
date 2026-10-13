@@ -111,8 +111,6 @@
 	     (load-help-article "devel/format/regular/regular"))
 	    ("Stylesheet language"
 	     (load-help-article "devel/format/stylesheet/stylesheet"))
-	    ("Fonts, from selection to glyph"
-	     (load-help-buffer "devel/fonts/font-guide"))
 	    ("Standard TeXmacs styles"
 	     (load-help-article "main/styles/styles"))
 	    ("Compatibility with other formats"
@@ -131,8 +129,6 @@
 	     (load-help-article "devel/plugin/plugins"))
 	    ("Interfacing TeXmacs with other programs"
 	     (load-help-buffer "devel/interface/interface"))
-	    ("Fonts, from selection to glyph"
-	     (load-help-buffer "devel/fonts/font-guide"))
 	    ("About the source code of TeXmacs"
 	     (load-help-buffer "devel/source/source"))))
   (-> "Plug-ins"

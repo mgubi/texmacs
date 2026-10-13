@@ -41,7 +41,7 @@ struct virtual_font_rep: font_rep {
   hashmap<string,bool> sup_svg;
 
   virtual_font_rep (string name, font base, string vname, int size,
-                    int hdpi, int vdpi, bool extend);
+                    int hdpi, int vdpi, bool extend, int room);
   scheme_tree exec (scheme_tree t);
   bool   supported (scheme_tree t, bool svg);
   bool   supported (string c, bool svg);
@@ -79,11 +79,11 @@ struct virtual_font_rep: font_rep {
 
 virtual_font_rep::virtual_font_rep (
   string name, font base, string vname, int size2,
-  int hdpi2, int vdpi2, bool extend2):
+  int hdpi2, int vdpi2, bool extend2, int room):
     font_rep (name, base), base_fn (base), fn_name (vname),
     virt (load_translator (vname)), size (size2),
     hdpi (hdpi2), vdpi (vdpi2), extend (extend2),
-    last (N(virt->virt_def)),
+    last (max (N(virt->virt_def), room)),
     fnm (std_font_metric (name, tm_new_array<metric> (last), 0, last-1)),
     fng (std_font_glyphs (name, tm_new_array<glyph> (last), 0, last-1)),
     trm (metric_struct ()), trg (glyph ()),
@@ -2141,11 +2141,19 @@ virtual_font_draws_vectors (font fn, string s) {
 font
 virtual_font (font base, string name, int size,
               int hdpi, int vdpi, bool extend) {
+  return virtual_font (base, name, size, hdpi, vdpi, extend, 0);
+}
+
+// A virtual font with room for the given number of glyphs, for a translator
+// which still receives definitions
+font
+virtual_font (font base, string name, int size,
+              int hdpi, int vdpi, bool extend, int room) {
   string full_name=
     base->res_name * (extend? string ("#enhance-"): string ("#virtual-")) *
     name * as_string (size) * "@" * as_string (hdpi);
   if (vdpi != hdpi) full_name << "x" << vdpi;
   return make (font, full_name,
                tm_new<virtual_font_rep> (full_name, base, name, size,
-                                         hdpi, vdpi, extend));
+                                         hdpi, vdpi, extend, room));
 }

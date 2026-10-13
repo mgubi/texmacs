@@ -682,6 +682,18 @@ remove_other (array<string> a, bool keep_glyphs) {
   return r;
 }
 
+// The words Regular, Book and Medium of a style name all stand for the
+// normal weight and are not features, so that a family with a Regular and
+// a Medium face has two faces at the same distance of a request. The
+// regular face is the one to take then, a Book face comes next, and a
+// Medium face is only for a family which has nothing else.
+static int
+normal_weight_rank (string style) {
+  if (occurs ("Medium", style)) return 2;
+  if (occurs ("Book", style)) return 1;
+  return 0;
+}
+
 void
 search_font_among (array<string> v, array<string> fams, array<string> avoid,
                    int& best_d1, array<string>& best_result, bool strict) {
@@ -696,6 +708,7 @@ search_font_among (array<string> v, array<string> fams, array<string> avoid,
   best_d1= D_INFINITY;
   int best_d2= D_INFINITY + 1;
   double best_d3= 1000000.0;
+  int best_d4= 0;
   best_result= array<string> (v[0], string ("Unknown"));
   for (int i=0; i<N(fams); i++)
     if (N (avoid) == 0 || !contains (family_to_master (fams[i]), avoid)) {
@@ -707,18 +720,26 @@ search_font_among (array<string> v, array<string> fams, array<string> avoid,
 	if (!strict) wx= remove_other (wx);
 	int d1= distance (v, vx, w, wx);
         //cout << "  " << w << ", " << wx << " -> " << d1 << "\n";
+	// the finer distances are only needed for a candidate which may
+	// win; one which wins on the first distance needs them too, for
+	// the next candidates to be compared with
 	int d2= D_INFINITY + 1;
-	if (d1 == best_d1 || best_d2 == D_INFINITY + 1)
+	if (d1 <= best_d1 || best_d2 == D_INFINITY + 1)
 	  d2= distance (remove_other (vx, false), remove_other (wx, false));
 	double d3= 1000000.0;
-	if ((d1 == best_d1 && d2 <= best_d2) || best_d3 == 1000000.0)
+	if (d1 < best_d1 || (d1 == best_d1 && d2 <= best_d2) ||
+	    best_d3 == 1000000.0)
 	  d3= guessed_distance (v[0], w[0]);
+	int d4= normal_weight_rank (stys[j]);
 	if ((d1 <  best_d1) ||
 	    (d1 == best_d1 && d2 <  best_d2) ||
-	    (d1 == best_d1 && d2 == best_d2 && d3 < best_d3)) {
+	    (d1 == best_d1 && d2 == best_d2 && d3 < best_d3) ||
+	    (d1 == best_d1 && d2 == best_d2 && d3 == best_d3 &&
+	     d4 < best_d4)) {
 	  best_d1= d1;
 	  best_d2= d2;
 	  best_d3= d3;
+	  best_d4= d4;
 	  best_result= array<string> (fams[i], stys[j]);
 	  //cout << "  Better " << w << ", " << wx
 	  //     << " -> " << d1 << ", " << d2 << ", " << d3 << "\n";

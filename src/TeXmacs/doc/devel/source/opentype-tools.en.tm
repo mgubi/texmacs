@@ -238,7 +238,7 @@
 
     <item*|<source-link|font-gallery.sh|tests/opentype/font-gallery.sh>>One specimen per installed profiled
     math font (asked from <TeXmacs> with <scm|opentype-math-font-list>), the
-    images of <source-link|src/OPENTYPEMATH.md|src/OPENTYPEMATH.md>.
+    images of <source-link|doc/OPENTYPEMATH.md|doc/OPENTYPEMATH.md>.
 
     <item*|<source-link|missing-symbols.py|tests/opentype/missing-symbols.py>, <source-link|survey-math-fonts.py|tests/opentype/survey-math-fonts.py>,
     <source-link|assembly-report.py|tests/opentype/assembly-report.py>>Tools which generated the symbol tables,

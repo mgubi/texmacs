@@ -36,6 +36,7 @@
 
 font unicode_font (string family, int size, int hdpi, int vdpi);
 font rubber_unicode_font (font base, tt_face face);
+inline string get_right (string s);
 
 hashmap<string,double> lsup_guessed_table ();
 hashmap<string,double> rsub_guessed_table ();
@@ -148,6 +149,8 @@ struct unicode_font_rep: font_rep {
   bool is_extended_shape (string s);
   bool get_top_accent (string s, SI& x);
   bool get_feature_variant (string s, string feature, int alt, string& r);
+  void set_glyph_unicode (string s, int code);
+  int  source_unicode (string s);
   void init_ot_math (tt_face face);
   hashset<unsigned int> ot_integral;
 
@@ -326,7 +329,12 @@ unicode_font_rep::unicode_font_rep (string name,
   this->ot_face= tt_face (family);
   bool    has_ot  = !is_nil (ot_face) && !is_nil (ot_face->math_table);
   bool    tuned   = hand_tuned_math_fonts || !has_ot;
-  if (has_ot) init_ot_math (ot_face);
+  // a font which is being hand tuned is typeset as if it had no MATH table
+  bool    by_hand = tuned &&
+    (starts (family, "STIX-") || tuned_gyre || starts (family, "Papyrus") ||
+     starts (family, "LinLibertine") || starts (family, "LinBiolinum") ||
+     starts (family, "FiraSans"));
+  if (has_ot && !by_hand) init_ot_math (ot_face);
 
   if (tuned && starts (family, "STIX-")) {
     if (!ends (family, "italic")) {
@@ -481,7 +489,7 @@ unicode_font_rep::unicode_font_rep (string name,
       above_correct= above_fira_italic_table ();
     }
   }
-  else if (has_ot) math_type= MATH_TYPE_OPENTYPE;
+  else if (has_ot && !by_hand) math_type= MATH_TYPE_OPENTYPE;
 }
 
 // Load the layout parameters of an OpenType MATH table. This runs before
@@ -759,7 +767,7 @@ unicode_font_rep::read_unicode_char (string s, int& i) {
 unsigned int
 unicode_font_rep::ligature_replace (unsigned int uc, string s, int& i) {
   int n= N(s);
-  if (((char) uc) == 'f') {
+  if (uc == 'f') {
     if (i<n && s[i] == 'i' && (ligs & LIGATURE_FI) != 0) {
       i++; return 0xfb01; }
     else if (i<n && s[i] == 'l' && (ligs & LIGATURE_FL) != 0) {
@@ -776,7 +784,7 @@ unicode_font_rep::ligature_replace (unsigned int uc, string s, int& i) {
       i++; return 0xfb00; }
     else return uc;
   }
-  else if (((char) uc) == 's') {
+  else if (uc == 's') {
     if (i<n && s[i] == 't' && (ligs & LIGATURE_ST) != 0) {
       i++; return 0xfb06; }
     else return uc;
@@ -807,7 +815,7 @@ unicode_font_rep::get_extents (string s, metric& ex) {
   else {
     int i= 0, n= N(s);
     unsigned int uc= read_unicode_char (s, i);
-    if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+    if (ligs > 0 && (uc == 'f' || uc == 's'))
       uc= ligature_replace (uc, s, i);
     metric_struct* first= fnm->get (uc);
     ex->x1= ROUND (first->x1);
@@ -823,7 +831,7 @@ unicode_font_rep::get_extents (string s, metric& ex) {
     while (i<n) {
       unsigned int pc= uc;
       uc= read_unicode_char (s, i);
-      if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+      if (ligs > 0 && (uc == 'f' || uc == 's'))
         uc= ligature_replace (uc, s, i);
       x += ROUND (fnm->kerning (pc, uc));
       metric_struct* next= fnm->get (uc);
@@ -853,7 +861,7 @@ unicode_font_rep::get_xpositions (string s, SI* xpos, bool ligf) {
     int start= i;
     unsigned int pc= uc;
     uc= read_unicode_char (s, i);
-    if (ligs > 0 && ligf && (((char) uc) == 'f' || ((char) uc) == 's'))
+    if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
       uc= ligature_replace (uc, s, i);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
     metric_struct* next= fnm->get (uc);
@@ -877,7 +885,7 @@ unicode_font_rep::draw_fixed (renderer ren, string s, SI x, SI y, bool ligf) {
   while (i<n) {
     unsigned int pc= uc;
     uc= read_unicode_char (s, i);
-    if (ligs > 0 && ligf && (((char) uc) == 'f' || ((char) uc) == 's'))
+    if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
       uc= ligature_replace (uc, s, i);
     if (pc != 0xffffffff) x += ROUND (fnm->kerning (pc, uc));
     ren->draw (uc, fng, x, y);
@@ -905,7 +913,7 @@ void
 unicode_font_rep::advance_glyph (string s, int& pos, bool ligf) {
   if (pos >= N(s)) return;
   unsigned int uc= read_unicode_char (s, pos);
-  if (ligs > 0 && ligf && (((char) uc) == 'f' || ((char) uc) == 's'))
+  if (ligs > 0 && ligf && (uc == 'f' || uc == 's'))
     uc= ligature_replace (uc, s, pos);
 }
 
@@ -914,7 +922,7 @@ unicode_font_rep::get_glyph (string s) {
   int i= 0, n= N(s);
   if (n == 0) return font_rep::get_glyph (s);
   unsigned int uc= read_unicode_char (s, i);
-  if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+  if (ligs > 0 && (uc == 'f' || uc == 's'))
     uc= ligature_replace (uc, s, i);
   if (i != n) return font_rep::get_glyph (s);
   glyph gl= fng->get (uc);
@@ -927,7 +935,7 @@ unicode_font_rep::index_glyph (string s, font_metric& rm, font_glyphs& rg) {
   int i= 0, n= N(s);
   if (n == 0) return font_rep::index_glyph (s, rm, rg);
   unsigned int uc= read_unicode_char (s, i);
-  if (ligs > 0 && (((char) uc) == 'f' || ((char) uc) == 's'))
+  if (ligs > 0 && (uc == 'f' || uc == 's'))
     uc= ligature_replace (uc, s, i);
   if (i != n) return font_rep::index_glyph (s, rm, rg);
   glyph gl= fng->get (uc);
@@ -1112,7 +1120,7 @@ unicode_font_rep::get_rsub_correction_at (string s, SI h) {
 
     if (has_ic || has_kern) {
       // for integral, we use 3/5 of italic correction for rsub, otherwise 0
-      ic  = is_ot_integral (s) ? (SI) (0.6 * ic) : 0;
+      ic  = is_ot_integral (get_right (s)) ? (SI) (0.6 * ic) : 0;
       return -ic + kern;
     }
   }
@@ -1135,7 +1143,7 @@ unicode_font_rep::get_rsup_correction_at (string s, SI h) {
 
     if (has_ic || has_kern) {
       // for integral signs, we use 2/5 of italic correction for rsup
-      if (is_ot_integral (s)) ic= (SI) (0.4 * ic);
+      if (is_ot_integral (get_right (s))) ic= (SI) (0.4 * ic);
       return ic + kern;
     }
   }
@@ -1199,6 +1207,17 @@ unicode_font_rep::make_rubber_font (font base) {
   return font_rep::make_rubber_font (base);
 }
 
+// The rubber font which stretches the glyphs of a font from the MATH table
+// of its file, also for a font which is hand tuned and typeset without
+// that table; the empty font when the file has no such table
+font
+math_table_rubber_font (font base) {
+  unicode_font_rep* u= dynamic_cast<unicode_font_rep*> (base.rep);
+  if (u == NULL || is_nil (u->ot_face) || is_nil (u->ot_face->math_table))
+    return font ();
+  return rubber_unicode_font (base, u->ot_face);
+}
+
 inline int
 decode_index (FT_Face face, int i) {
   if (i < 0xc000000) return ft_get_char_index (face, i);
@@ -1214,6 +1233,10 @@ unicode_font_rep::get_glyphID (string s) {
   font_metric fm;
   font_glyphs fg;
   if (is_nil (ot_face)) return 0;
+  // a glyph belongs to one character
+  int pos= 0;
+  tm_char_forwards (s, pos);
+  if (pos != N(s)) return 0;
   int         index= index_glyph (s, fm, fg);
   return decode_index (ot_face->ft_face, index);
 }
@@ -1284,6 +1307,13 @@ unicode_font_rep::get_top_accent (string s, SI& x) {
   unsigned int glyphID= get_glyphID (s);
   if (!math_table->top_accent->contains (glyphID)) return false;
   x= design_unit_to_metric_x (math_table->top_accent[glyphID].value);
+  // an attachment point lies over the glyph; a font which puts it far
+  // from the ink is not believed (GFS Neohellenic Math has the points of
+  // zero width accents for its acute and grave accents, which are not)
+  metric ex;
+  get_extents (s, ex);
+  SI w= ex->x4 - ex->x3;
+  if (w > 0 && (x < ex->x3 - w || x > ex->x4 + w)) return false;
   return true;
 }
 
@@ -1298,7 +1328,27 @@ unicode_font_rep::get_feature_variant (string s, string feature, int alt,
   array<unsigned int> alts= m[glyphID];
   if (alt < 0 || alt >= N(alts)) return false;
   r= "<@" * as_hexadecimal (alts[alt], 4) * ">";
+  set_glyph_unicode (r, source_unicode (s));
   return true;
+}
+
+// The Unicode value of the character s, or the one recorded for it when s
+// is a native glyph name
+int
+unicode_font_rep::source_unicode (string s) {
+  int i= 0;
+  unsigned int uc= read_unicode_char (s, i);
+  if (uc < 0xc000000) return (int) uc;
+  return max (0, native_glyph_get_unicode (fng->res_name, uc - 0xc000000));
+}
+
+void
+unicode_font_rep::set_glyph_unicode (string s, int code) {
+  if (!starts (s, "<@")) return;
+  int i= 0;
+  unsigned int uc= read_unicode_char (s, i);
+  if (uc >= 0xc000000)
+    native_glyph_set_unicode (fng->res_name, uc - 0xc000000, code);
 }
 
 // The OpenType features a font file offers, for a menu or a dialog to
@@ -1350,6 +1400,7 @@ font
 unicode_font (string family, int size, int hdpi, int vdpi) {
   string name= "unicode:" * family * as_string (size) * "@" * as_string (hdpi);
   if (vdpi != hdpi) name << "x" << as_string (vdpi);
+  name << hand_tuned_suffix ();
   return make (font, name,
                tm_new<unicode_font_rep> (name, family, size, hdpi, vdpi));
 }

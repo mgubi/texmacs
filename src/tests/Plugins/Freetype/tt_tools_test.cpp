@@ -305,11 +305,296 @@ test_gsub_tags () {
   array<string> tags= parse_gsub_tags (buf);
   CHECK (N (tags) > 0);
   CHECK (contains (string ("onum"), tags));
-  CHECK (contains (string ("liga"), tags));
   CHECK (!contains (string ("zzzz"), tags));
+  // only the features for which something can be applied: not the
+  // ligatures, and not 'locl', which this font has for some languages only
+  CHECK (!contains (string ("liga"), tags));
+  CHECK (!contains (string ("locl"), tags));
+  string buf2;
+  CHECK (!load_string (shipped_font ("libertinus/LibertinusSans-Regular.otf"),
+                         buf2, false));
+  tags= parse_gsub_tags (buf2);
+  CHECK (contains (string ("smcp"), tags));
+  CHECK (contains (string ("c2sc"), tags));
+  CHECK (!contains (string ("calt"), tags));
   // a font without GSUB gives nothing, and so does a broken buffer
   CHECK_EQ (N (parse_gsub_tags (string (""))), 0);
   CHECK_EQ (N (parse_gsub_tags (string ("this is not a font"))), 0);
+}
+
+/******************************************************************************
+* Truncated and wrong tables, made here from the shipped fonts
+******************************************************************************/
+
+static int
+u16_at (string s, int i) {
+  return (((int) ((unsigned char) s[i])) << 8) + ((unsigned char) s[i+1]);
+}
+
+static int
+u32_at (string s, int i) {
+  return (u16_at (s, i) << 16) + u16_at (s, i+2);
+}
+
+static string
+be16 (int x) {
+  string r;
+  r << ((char) ((x >> 8) & 255)) << ((char) (x & 255));
+  return r;
+}
+
+static string
+be32 (unsigned int x) {
+  return be16 ((int) (x >> 16)) * be16 ((int) (x & 0xffff));
+}
+
+// position of the directory entry of a table in a font file, or -1
+static int
+table_entry (string font, string tag) {
+  int nr= u16_at (font, 4);
+  for (int k= 0; k < nr; k++)
+    if (font (12 + 16*k, 16 + 16*k) == tag) return 12 + 16*k;
+  return -1;
+}
+
+static string
+table_of (string font, string tag) {
+  int e= table_entry (font, tag);
+  if (e < 0) return "";
+  return font (u32_at (font, e + 8), u32_at (font, e + 8) + u32_at (font, e + 12));
+}
+
+// the font with other contents for one of its tables: the new table is put
+// at the end of the file and the directory is made to point to it
+static string
+with_table (string font, string tag, string data) {
+  int e= table_entry (font, tag);
+  if (e < 0) return font;
+  string r= copy (font);
+  while ((N(r) & 3) != 0) r << '\0';
+  string entry= be32 ((unsigned int) N(r)) * be32 ((unsigned int) N(data));
+  for (int i= 0; i < 8; i++) r[e + 8 + i]= entry[i];
+  r << data;
+  return r;
+}
+
+static string
+load_shipped (string name) {
+  string s;
+  load_string (shipped_font (name), s, false);
+  return s;
+}
+
+static void
+test_truncated_math () {
+  // a MATH table which stops before its end is not used at all
+  string font= load_shipped ("texgyre/texgyrepagella-math.otf");
+  string math= table_of (font, "MATH");
+  CHECK (N (math) > 20000);
+  CHECK (!is_nil (parse_mathtable (with_table (font, "MATH", math))));
+  int cuts[]= { 0, 1, 4, 9, 10, 11, 12, 100, 225, 1000,
+                N (math) / 10, N (math) / 3, N (math) / 2, 2 * N (math) / 3 };
+  for (int i= 0; i < 14; i++) {
+    ot_mathtable t=
+      parse_mathtable (with_table (font, "MATH", math (0, cuts[i])));
+    CHECK_MSG (is_nil (t), "MATH cut at " * as_string (cuts[i]));
+  }
+  // the file itself cut short, anywhere: the table is whole or it is not
+  // used
+  int e= table_entry (font, "MATH");
+  int start= u32_at (font, e + 8), end= start + u32_at (font, e + 12);
+  for (int n= 0; n < N (font); n += 4099) {
+    ot_mathtable t= parse_mathtable (font (0, n));
+    if (n >= end) CHECK_MSG (!is_nil (t), "file cut at " * as_string (n));
+    if (n <= (start + end) / 2)
+      CHECK_MSG (is_nil (t), "file cut at " * as_string (n));
+  }
+  // header offsets which point outside the table
+  string far= math (0, 4) * be16 (0xffff) * be16 (0xffff) * be16 (0xffff) *
+              math (10, N (math));
+  CHECK (is_nil (parse_mathtable (with_table (font, "MATH", far))));
+}
+
+static void
+test_math_null_parts () {
+  // MathGlyphInfo and MathVariants may be absent; the header is not to be
+  // read in their place, whatever the constants look like
+  string font= load_shipped ("texgyre/texgyrepagella-math.otf");
+  string math= table_of (font, "MATH");
+  int    co  = u16_at (math, 4);
+  for (int scale= 1; scale <= 2; scale++) {
+    string m= math (0, 6) * be16 (0) * be16 (0) * math (10, co) *
+              be16 (scale) * math (co + 2, co + 214);
+    ot_mathtable t= parse_mathtable (with_table (font, "MATH", m));
+    CHECK (!is_nil (t));
+    if (is_nil (t)) continue;
+    CHECK_EQ (t->constants_table[scriptPercentScaleDown], scale);
+    CHECK_EQ (t->constants_table[axisHeight], 250);
+    CHECK_EQ (N (t->italics_correction), 0);
+    CHECK_EQ (N (t->top_accent), 0);
+    CHECK_EQ (N (t->extended_shape_coverage), 0);
+    CHECK_EQ (N (t->math_kern_info), 0);
+    CHECK_EQ (N (t->ver_glyph_variants), 0);
+    CHECK_EQ (N (t->hor_glyph_variants), 0);
+  }
+  // without constants there is nothing to typeset with
+  string m= math (0, 4) * be16 (0) * math (6, N (math));
+  CHECK (is_nil (parse_mathtable (with_table (font, "MATH", m))));
+}
+
+// a MATH table whose vertical coverage has nr ranges of all the glyphs
+static string
+math_with_ranges (int nr) {
+  string r= be16 (1) * be16 (0) * be16 (10) * be16 (226) * be16 (234);
+  r << string ('\0', 216);                               // constants
+  r << be16 (0) << be16 (0) << be16 (0) << be16 (0);     // glyph info
+  r << be16 (0) << be16 (10) << be16 (0) << be16 (0) << be16 (0);
+  r << be16 (2) << be16 (nr);
+  for (int i= 0; i < nr; i++) r << be16 (0) << be16 (0xffff) << be16 (0);
+  return r;
+}
+
+static void
+test_oversized_coverage () {
+  // a coverage cannot hold more glyphs than a font has; reading one which
+  // claims to takes no time and no memory
+  string font= load_shipped ("texgyre/texgyrepagella-math.otf");
+  int nrs[]= { 2, 40, 300, 65535 };
+  for (int i= 0; i < 4; i++) {
+    string m= math_with_ranges (nrs[i]);
+    CHECK_MSG (is_nil (parse_mathtable (with_table (font, "MATH", m))),
+               as_string (nrs[i]) * " ranges");
+  }
+  // one range of all the glyphs, for which the table has no construction
+  ot_mathtable t=
+    parse_mathtable (with_table (font, "MATH", math_with_ranges (1)));
+  CHECK (!is_nil (t));
+  if (!is_nil (t)) CHECK_EQ (N (t->ver_glyph_variants), 0);
+}
+
+// a GSUB or GPOS table with one feature made of one lookup with one subtable
+static string
+layout_table (string tag, int lookup_type, string subtable) {
+  string scripts = be16 (0);
+  string features= be16 (1) * tag * be16 (8) *
+                   be16 (0) * be16 (1) * be16 (0);
+  string lookups = be16 (1) * be16 (4) *
+                   be16 (lookup_type) * be16 (0) * be16 (1) * be16 (8) *
+                   subtable;
+  return be16 (1) * be16 (0) * be16 (10) * be16 (10 + N (scripts)) *
+         be16 (10 + N (scripts) + N (features)) *
+         scripts * features * lookups;
+}
+
+static void
+test_wrong_gsub () {
+  string font= load_shipped ("texgyre/texgyrepagella-regular.otf");
+  string gsub= table_of (font, "GSUB");
+  CHECK (N (gsub) > 1000);
+  // a sound table made the same way is read: glyph 5 becomes glyph 7
+  string single= be16 (1) * be16 (6) * be16 (2) * be16 (1) * be16 (1) *
+                 be16 (5);
+  ot_gsub_map ok= parse_gsub_feature (
+    with_table (font, "GSUB", layout_table ("ss01", 1, single)), "ss01");
+  CHECK_EQ (N (ok), 1);
+  CHECK (ok->contains (5) && N (ok[5]) == 1 && ok[5][0] == 7);
+  // an extension subtable which leads to itself
+  string loop= be16 (1) * be16 (7) * be32 (0);
+  string f1  = with_table (font, "GSUB", layout_table ("ss01", 7, loop));
+  CHECK_EQ (N (parse_gsub_feature (f1, "ss01")), 0);
+  CHECK_EQ (N (parse_gsub_tags (f1)), 0);
+  // an extension subtable which leads far outside the table
+  unsigned int offs[]= { 0x7ffffff0u, 0xfffffff0u, 0x10000u };
+  for (int i= 0; i < 3; i++) {
+    string far= be16 (1) * be16 (1) * be32 (offs[i]);
+    string f2 = with_table (font, "GSUB", layout_table ("ss01", 7, far));
+    CHECK_EQ (N (parse_gsub_feature (f2, "ss01")), 0);
+  }
+  // a set of alternates which claims more glyphs than the table holds
+  string alt= be16 (1) * be16 (8) * be16 (1) * be16 (14) *
+              be16 (1) * be16 (1) * be16 (5) * be16 (0xffff);
+  string f3 = with_table (font, "GSUB", layout_table ("ss01", 3, alt));
+  CHECK_EQ (N (parse_gsub_feature (f3, "ss01")), 0);
+  // the table of the font, cut anywhere
+  for (int n= 0; n < N (gsub); n += 487) {
+    string f4= with_table (font, "GSUB", gsub (0, n));
+    parse_gsub_tags (f4);
+    parse_gsub_feature (f4, "smcp");
+    parse_gsub_feature (f4, "aalt");
+  }
+  CHECK (N (parse_gsub_feature (font, "smcp")) > 100);
+}
+
+// a pair adjustment subtable by classes, with the given numbers of classes
+// and the given x advances for them
+static string
+pair_classes (int c1, int c2, string values) {
+  int n= 16 + N (values);
+  return be16 (2) * be16 (n) * be16 (4) * be16 (0) *
+         be16 (n + 6) * be16 (n + 10) * be16 (c1) * be16 (c2) * values *
+         be16 (1) * be16 (1) * be16 (5) *   // coverage: glyph 5
+         be16 (2) * be16 (0) *              // class definitions, empty
+         be16 (2) * be16 (0);
+}
+
+static void
+test_wrong_gpos () {
+  string font= load_shipped ("texgyre/texgyrepagella-regular.otf");
+  string gpos= table_of (font, "GPOS");
+  CHECK (N (gpos) > 1000);
+  // a sound table made the same way is read
+  string one= pair_classes (1, 1, be16 (-50 & 0xffff));
+  ot_gpos_kern ok= parse_gpos_kern (
+    with_table (font, "GPOS", layout_table ("kern", 2, one)));
+  CHECK (!is_nil (ok) && !ok->empty ());
+  if (!is_nil (ok)) CHECK_EQ (ok->get (5, 9), -50);
+  // class counts whose product does not fit the table, or an integer
+  int counts[]= { 3000, 46341, 65535 };
+  for (int i= 0; i < 3; i++) {
+    string sub= pair_classes (counts[i], counts[i], "");
+    ot_gpos_kern k= parse_gpos_kern (
+      with_table (font, "GPOS", layout_table ("kern", 2, sub)));
+    CHECK_MSG (is_nil (k) || k->empty (), as_string (counts[i]) * " classes");
+    if (!is_nil (k)) CHECK_EQ (k->get (5, 9), 0);
+  }
+  // the table of the font, cut anywhere
+  for (int n= 0; n < N (gpos); n += 911) {
+    ot_gpos_kern k= parse_gpos_kern (with_table (font, "GPOS", gpos (0, n)));
+    if (!is_nil (k)) k->get (34, 55);
+  }
+  ot_gpos_kern k= parse_gpos_kern (font);
+  CHECK (!is_nil (k) && !k->empty ());
+}
+
+static void
+test_gpos_several_lookups () {
+  // The 'kern' feature of Libertinus Serif has several lookups, and the
+  // first one covers V and A with a class of value zero for these pairs;
+  // the kerning comes from a later lookup. Values from fontTools.
+  string buf= load_shipped ("libertinus/LibertinusSerif-Regular.otf");
+  ot_gpos_kern k= parse_gpos_kern (buf);
+  CHECK (!is_nil (k) && !k->empty ());
+  if (is_nil (k)) return;
+  CHECK_EQ (k->get (55, 70), -80);   // V e
+  CHECK_EQ (k->get (34, 69), -12);   // A d
+  CHECK_EQ (k->get (55, 70), -80);   // asked again
+}
+
+static void
+test_gsub_default_language () {
+  // Libertinus Sans has one 'smcp' feature for Turkish and its relatives,
+  // listed first, and one for the other languages. Without a language the
+  // i becomes i.sc (glyph 2203) and not the dotted idotaccent.sc (2372).
+  // The small capitals themselves are in a lookup of type 2.
+  string buf= load_shipped ("libertinus/LibertinusSans-Regular.otf");
+  ot_gsub_map m= parse_gsub_feature (buf, "smcp");
+  CHECK (N (m) >= 90);
+  CHECK (m->contains (74));
+  if (m->contains (74)) {
+    CHECK_EQ (N (m[74]), 1);
+    CHECK_EQ ((int) m[74][0], 2203);
+  }
+  CHECK (N (parse_gsub_feature (buf, "c2sc")) >= 90);
 }
 
 int
@@ -324,5 +609,12 @@ main () {
   RUN (test_stixtwo_kerning);
   RUN (test_gpos_kern);
   RUN (test_gsub_tags);
+  RUN (test_truncated_math);
+  RUN (test_math_null_parts);
+  RUN (test_oversized_coverage);
+  RUN (test_wrong_gsub);
+  RUN (test_wrong_gpos);
+  RUN (test_gpos_several_lookups);
+  RUN (test_gsub_default_language);
   return test_report ();
 }

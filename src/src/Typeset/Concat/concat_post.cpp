@@ -33,17 +33,21 @@ concater_rep::succ (int i) {
   return i;
 }
 
-inline font
-get_reference_font (box b, font fn) {
-  // FIXME: the active font should really be part of 'line_item_rep'.
-  // Currently, the font that is used for spacing parameters of scripts
-  // can be completely unrelated to the fonts of the reference box and
-  // the fonts of the scripts.  This occurs for instance when typesetting
-  // (with "magnification" "10" [some box with limits]).  In such cases,
-  // the env->fn at the time that we actually attach the limits is
-  // typically ten times smaller than the font for the actual box.
-  if (b->get_type () != TEXT_BOX) return fn;
-  else return b->get_leaf_font ();
+inline static font
+get_reference_font (line_item item, font fn) {
+  // The font used for the spacing parameters of scripts. The current font
+  // at the time that the scripts are attached can be unrelated to the font
+  // of the reference box: for a formula inside text it is the text font,
+  // and inside (with "magnification" "10" [some box with limits]) it is
+  // ten times smaller than the font for the actual box. An OpenType math
+  // font, whose placement rules differ from those of a text font, is
+  // therefore taken from the item, which remembers the font it was
+  // typeset with.
+  box b= item->b;
+  if (b->get_type () == TEXT_BOX) return b->get_leaf_font ();
+  if (!is_nil (item->fn) && item->fn->math_type == MATH_TYPE_OPENTYPE)
+    return item->fn;
+  return fn;
 }
 
 /******************************************************************************
@@ -136,7 +140,7 @@ concater_rep::glue_right_markers (box b, int ref, int arg, bool flag) {
 void
 concater_rep::glue (box b, int ref, int arg) {
   if (a[ref]->op_type == OP_BIG && arg >= ref && !a[ref]->limits) {
-    font ref_fn= get_reference_font (a[ref]->b, env->fn);
+    font ref_fn= get_reference_font (a[ref], env->fn);
     if (ref_fn->math_type != MATH_TYPE_NORMAL)
       if (a[ref]->spc->def > 0) {
         space spc= ref_fn->spc;
@@ -146,17 +150,19 @@ concater_rep::glue (box b, int ref, int arg) {
   
   space spc = max (a[ref]->spc, a[arg]->spc);
 
+  font ref_fn= a[ref]->fn;
   a[arg]  = line_item (OBSOLETE_ITEM, OP_SKIP, a[arg]->b, a[arg]->penalty);
   a[ref]  = line_item (arg<ref? GLUE_LEFT_ITEM: GLUE_RIGHT_ITEM,
                        a[ref]->op_type, b,
                        min (a[ref]->penalty, a[arg]->penalty));
   a[ref]->spc = spc;
+  a[ref]->fn  = ref_fn;
 }
 
 void
 concater_rep::glue (box b, int ref, int arg1, int arg2) {
   if (a[ref]->op_type == OP_BIG && !a[ref]->limits) {
-    font ref_fn= get_reference_font (a[ref]->b, env->fn);
+    font ref_fn= get_reference_font (a[ref], env->fn);
     if (ref_fn->math_type != MATH_TYPE_NORMAL)
       if (a[ref]->spc->def > 0) {
         space spc= ref_fn->spc;
@@ -170,8 +176,10 @@ concater_rep::glue (box b, int ref, int arg1, int arg2) {
   space ref_spc= a[ref]->spc;
   a[arg1]= line_item (OBSOLETE_ITEM, OP_SKIP, a[arg1]->b, a[arg1]->penalty);
   a[arg2]= line_item (OBSOLETE_ITEM, OP_SKIP, a[arg2]->b, a[arg2]->penalty);
+  font ref_fn= a[ref]->fn;
   a[ref]= line_item (GLUE_BOTH_ITEM, a[ref]->op_type, b, pen);
   a[ref]->spc = spc;
+  a[ref]->fn  = ref_fn;
 }
 
 void
@@ -235,7 +243,7 @@ concater_rep::handle_scripts (int start, int end) {
     if (l==-1) {
       if (r==N(a)) { i++; continue; }
       else {
-        font ref_fn= get_reference_font (a[i]->b, env->fn);
+        font ref_fn= get_reference_font (a[i], env->fn);
         box mb= glue_right_markers (a[i]->b, i, r, false);
         if (a[i]->limits)
           b= limit_box (sip, mb, rb1, rb2, ref_fn, true);
@@ -245,7 +253,7 @@ concater_rep::handle_scripts (int start, int end) {
       }
     }
     else {
-      font ref_fn= get_reference_font (a[i]->b, env->fn);
+      font ref_fn= get_reference_font (a[i], env->fn);
       box mb= glue_left_markers (a[i]->b, i, l);
       if (r==N(a)) {
         b= left_script_box (sip, mb, lb1, lb2, ref_fn, env->vert_pos);

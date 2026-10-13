@@ -68,6 +68,7 @@ struct lim_box_rep: public composite_box_rep {
   box  ref;
   font fn;
   bool glued;
+  bool stretched;
   int  type;
   lim_box_rep (path ip, box ref, box lo, box hi, font fn, bool glued,
                bool stretched= false);
@@ -81,15 +82,15 @@ struct lim_box_rep: public composite_box_rep {
 };
 
 lim_box_rep::lim_box_rep (path ip, box r2, box lo, box hi, font fn2, bool gl,
-                          bool stretched):
-  composite_box_rep (ip), ref (r2), fn (fn2), glued (gl)
+                          bool st):
+  composite_box_rep (ip), ref (r2), fn (fn2), glued (gl), stretched (st)
 {
   SI sep_lo= fn->sep + fn->yshift;
   SI sep_hi= fn->sep + (fn->yshift >> 1);
   SI X, Y;
   insert (ref, 0, 0);
   type= 0;
-  bool use_opentype= fn->ot_math &&
+  bool use_opentype= fn->math_type == MATH_TYPE_OPENTYPE && fn->ot_math &&
                      (fn->lower_limit_gap_min > 0) &&
                      (fn->lower_limit_baseline_drop_min > 0);
 
@@ -160,7 +161,7 @@ lim_box_rep::adjust_kerning (int mode, double factor) {
   box sub, sup;
   if ((type & 1) != 0) sub= bs[1]->adjust_kerning (mode, factor/2);
   if ((type & 2) != 0) sup= bs[N(bs)-1]->adjust_kerning (mode, factor/2);
-  return limit_box (ip, body, sub, sup, fn, glued);
+  return limit_box (ip, body, sub, sup, fn, glued, stretched);
 }
 
 box
@@ -170,7 +171,7 @@ lim_box_rep::expand_glyphs (int mode, double factor) {
   box sub, sup;
   if ((type & 1) != 0) sub= bs[1]->expand_glyphs (0, factor);
   if ((type & 2) != 0) sup= bs[N(bs)-1]->expand_glyphs (0, factor);
-  return limit_box (ip, body, sub, sup, fn, glued);
+  return limit_box (ip, body, sub, sup, fn, glued, stretched);
 }
 
 path
@@ -378,32 +379,38 @@ struct side_box_rep: public composite_box_rep {
 
 // Script shifts according to the OpenType MATH specification: the standard
 // shifts for ordinary glyphs; for boxes and extended shapes the scripts
-// follow the height of the base within the baseline drop limits; minimum
-// gap between a subscript and a superscript, resolved as in TeX.
+// follow the height of the base within the baseline drop limits, without
+// coming closer to the baseline than the standard shifts; minimum gap
+// between a subscript and a superscript, resolved as in TeX.
 static void
 ot_script_shifts (font fn, box ref, int level, box sub, box sup,
                   SI& ysub, SI& ysup) {
   bool ext= ref->extended_shape ();
   if (!is_nil (sup)) {
-    ysup= ref->sup_lo_base (level);
-    if (ext) ysup= max (ysup, ref->y2 - fn->sup_drop_max);
+    if (ext) {
+      ysup= fn->ysup_lo_base - (level < 0? fn->yshift: 0);
+      ysup= max (ysup, ref->y2 - fn->sup_drop_max);
+    }
+    else ysup= ref->sup_lo_base (level);
     if (ysup + sup->y1 < fn->ysup_lo_lim) ysup= fn->ysup_lo_lim - sup->y1;
   }
   if (!is_nil (sub)) {
-    ysub= ref->sub_lo_base (level);
-    if (ext) ysub= min (ysub, ref->y1 - fn->sub_drop_min);
+    // the table has a single shift for subscripts, whatever the style
+    if (ext) ysub= min (fn->ysub_lo_base, ref->y1 - fn->sub_drop_min);
+    else ysub= ref->sub_lo_base (min (level, 0));
     if (ysub + sub->y2 > fn->ysub_hi_lim) ysub= fn->ysub_hi_lim - sub->y2;
   }
   if (!is_nil (sub) && !is_nil (sup)) {
+    // the subscript goes down until the gap is wide enough; then both
+    // scripts go up as long as the bottom of the superscript is below
+    // superscriptBottomMaxWithSubscript
     SI gap= (ysup + sup->y1) - (ysub + sub->y2);
     if (gap < fn->sub_sup_gap_min) {
-      SI delta= fn->sub_sup_gap_min - gap;
-      ysub -= delta;
-      SI over= (ysup + sup->y1) - fn->sup_bottom_max_with_sub;
-      if (over > 0) {
-        SI d2= min (over, delta);
-        ysup -= d2;
-        ysub += d2;
+      ysub -= fn->sub_sup_gap_min - gap;
+      SI psi= fn->sup_bottom_max_with_sub - (ysup + sup->y1);
+      if (psi > 0) {
+        ysup += psi;
+        ysub += psi;
       }
     }
   }
@@ -485,7 +492,8 @@ side_box_rep::side_box_rep (
   }
 
   // fonts with an OpenType MATH table place scripts by its constants
-  bool ot= fn->ot_math && (fn->sub_sup_gap_min > 0);
+  bool ot= fn->math_type == MATH_TYPE_OPENTYPE && fn->ot_math &&
+           (fn->sub_sup_gap_min > 0);
   if (ot) {
     ot_script_shifts (fn, ref, level, l1, l2, lsub, lsup);
     ot_script_shifts (fn, ref, level, r1, r2, rsub, rsup);

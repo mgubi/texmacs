@@ -21,6 +21,9 @@
 ;;     the meta data of a manual page (tmdoc-edit.scm);
 ;;   - fonts: the font database for the fonts shipped in TeXmacs/fonts
 ;;     (families, styles, files, characteristics, masters and features),
+;;     the variants of a design in the menus and in the page of the fonts
+;;     (fonts-opentype.scm, font-short-menu.scm, font-design.scm) and the
+;;     weights of the font at the cursor (font-weight.scm),
 ;;     the logical font descriptors and their search, the substitutions,
 ;;     the typesetting with them and init-font, which picks the text and
 ;;     math fonts and the style package of a font (generic/document-edit);
@@ -51,7 +54,8 @@
 
 (texmacs-module (check misc-modules-test)
   (:use (check check-lib)
-        (fonts font-design)
+        (fonts font-design) (fonts font-custom) (fonts font-features)
+        (fonts fonts-opentype) (fonts font-short-menu) (fonts font-weight)
         (doc help-funcs)
         (doc tmdoc)
         (doc tmdoc-search)
@@ -617,6 +621,21 @@
   (check= (logical-font-search
            (logical-font-private "Latin Modern Mono" "tt" "medium" "right"))
           '("Latin Modern Mono" "10 Regular"))
+  ;; the bold of a light weight is the bold of a light family, the variables
+  ;; of a font hold one series only
+  (for (x '(("Antykwa Poltawskiego Light" "Bold")
+            ("Antykwa Poltawskiego Light" "Bold Italic")
+            ("Latin Modern Mono Prop Light" "10 Bold")
+            ("Latin Modern Mono Prop Light" "10 BoldOblique")))
+    (with lf (logical-font-public (car x) (cadr x))
+      (check= (logical-font-search
+               (logical-font-private
+                (logical-font-family lf) (logical-font-variant lf)
+                (logical-font-series lf) (logical-font-shape lf)))
+              x)))
+  (check= (logical-font-search
+           (logical-font-private "Antykwa Poltawskiego" "rm" "light" "right"))
+          '("Antykwa Poltawskiego" "Light"))
   (check-true (tt-exists? "texgyrepagella-regular"))
   (check-true (tt-exists? "LinLibertine_R"))
   (check-true (font-exists-in-tt? "FiraSans-Regular"))
@@ -692,6 +711,7 @@
             ("text" "Antykwa Torunska") ("text" "Iwona") ("text" "Fira")
             ("text" "Chorus")
             ("math" "Roman") ("math" "Euler") ("math" "STIX Two")
+            ("math" "Noto Sans") ("frak" "Noto Sans")
             ("sansserif" "Iwona") ("sansserif" "Fira") ("sansserif" "DejaVu")
             ("typewriter" "Inconsolata") ("typewriter" "Cursor")
             ("typewriter" "Fira") ("typewriter" "IBM Plex")
@@ -762,7 +782,800 @@
   (check= (caddr (font-design-sample-tree (design-entry "cal" "Times")))
           "cal=TeX Gyre Termes Math,roman")
   (check= (caddr (font-design-sample-tree (design-entry "sansserif" "Iwona")))
-          "sansserif=Iwona,roman"))
+          "sansserif=Iwona,roman")
+  ;; a typewriter or a sans serif face is not called a serif
+  (for (tab '("sansserif" "typewriter"))
+    (check= (list-filter (map (lambda (e) (cdr (assq 'label e)))
+                              (font-design-entries tab))
+                         (lambda (s) (string-ends? s " Serif")))
+            '()))
+  (check= (cdr (assq 'label (design-entry "typewriter" "IBM Plex")))
+          "IBM Plex")
+  ;; what the page does not show is kept: the other rules of the value of
+  ;; `font', the font family and the math-font variable
+  (let* ((font "greek=Stix Two Math,italic=TeX Gyre Pagella,roman")
+         (c (font-design-parse font "tt" "math-stix"))
+         (c1 (font-design-choose c (design-entry "typewriter" "Fira")))
+         (c2 (font-design-choose c (design-entry "math" "Euler"))))
+    (check= (assoc-ref c "text") "roman")
+    (check= (assoc-ref c "family") "tt")
+    (check= (assoc-ref c "math-font") "math-stix")
+    (check= (font-design-font c) font)
+    (check= (font-design-font c1)
+            "greek=Stix Two Math,italic=TeX Gyre Pagella,typewriter=Fira,roman")
+    (check= (assoc-ref c1 "math-font") "math-stix")
+    (check= (assoc-ref c2 "math-font") #f)
+    (check= (font-design-font c2)
+            "greek=Stix Two Math,italic=TeX Gyre Pagella,math=Euler Math,roman"))
+  (check= (assoc-ref (font-design-parse "roman" "rm") "math-font") #f))
+
+;; The actions of the page name no document: a path, with the backslashes
+;; and the quotes it may have, does not come back from a tree as it went in
+(define (design-actions t)
+  (cond ((not (pair? t)) '())
+        ((== (car t) 'action) (list (caddr t)))
+        (else (append-map design-actions (cdr t)))))
+
+(define (test-font-design-page)
+  (check-group "font design: page")
+  (with-buffer-doc '(document "x") '("generic")
+    (lambda ()
+      (with doc (current-buffer)
+        (open-font-design)
+        (let* ((page (current-buffer))
+               (l (design-actions (tree->stree (buffer-tree)))))
+          (check-true (!= page doc))
+          (check-true (> (length l) 50))
+          (check= (list-filter l (lambda (s)
+                                   (or (string-occurs? "/" s)
+                                       (string-occurs? "\\" s)
+                                       (not (string-starts?
+                                             s "(font-design-page-")))))
+                  '())
+          (check-true (in? "(font-design-page-apply)" l))
+          (check-true (in? "(font-design-page-tab \"math\")" l))
+          ;; the page of the fonts has no page of its own
+          (open-font-design)
+          (check= (current-buffer) page)
+          (font-design-page-tab "typewriter")
+          (font-design-page-choose "typewriter" "typewriter-fira")
+          (font-design-page-apply)
+          (check= (current-buffer) doc)
+          (check= (get-init "font") "typewriter=Fira,roman")
+          (buffer-close page))))))
+
+;; The fonts of a document: its style packages and the three variables
+(define (design-state)
+  (update-forced)
+  (list (get-init "font") (get-init "font-family") (get-init "math-font")
+        (get-style-list)))
+
+(define (design-rules font)
+  (string-tokenize-by-char font #\,))
+
+(define (design-choice)
+  (font-design-parse (get-init "font") (get-init "font-family")
+                     (get-init "math-font")))
+
+;; The page gives the document the choice with the one the document had:
+;; nothing chosen changes nothing, and a font for the typewriter text
+;; changes the typewriter text only
+(define (test-font-design-apply)
+  (check-group "font design: apply")
+  (for (setup (list (lambda () (init-env "math-font" "math-stix"))
+                    (lambda () (init-env "math-font" "Stix Two Math"))
+                    (lambda () (init-opentype-font "TeX Gyre Pagella Math"))
+                    (lambda () (init-opentype-font "TeX Gyre Termes Math"))
+                    (lambda () (init-opentype-font "Euler Math"))
+                    (lambda () (init-opentype-font "KpMathSans"))
+                    (lambda ()
+                      (init-env "font" (string-append "greek=Stix Two Math,"
+                                                      "italic=TeX Gyre Pagella,"
+                                                      "roman")))
+                    (lambda () (init-env "font-family" "tt"))))
+    (with-buffer-doc '(document "x") '("generic")
+      (lambda ()
+        (setup)
+        (let* ((s0 (design-state))
+               (c0 (design-choice)))
+          (font-design-apply c0 c0)
+          (check= (design-state) s0)
+          (font-design-apply
+           (font-design-choose c0 (design-entry "typewriter" "Fira")) c0)
+          (with s1 (design-state)
+            (check= (cdr s1) (cdr s0))
+            (check-true (in? "typewriter=Fira" (design-rules (car s1))))
+            (check= (list-difference (design-rules (car s1))
+                                     '("typewriter=Fira"))
+                    (design-rules (car s0))))))))
+  ;; a mathematical font of the page replaces the math-font variable
+  (with-buffer-doc '(document "x") '("generic")
+    (lambda ()
+      (init-env "math-font" "math-stix")
+      (with c0 (design-choice)
+        (font-design-apply
+         (font-design-choose c0 (design-entry "math" "Euler")) c0)
+        (check= (design-state)
+                '("math=Euler Math,roman" "rm" "roman" ("generic")))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; The variants of a design and the weights of a font
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; the file of the face which the font variables select
+(define (face-file family variant series shape)
+  (with r (logical-font-search
+           (logical-font-private family variant series shape))
+    (with l (font-database-search (car r) (cadr r))
+      (and (pair? l) (car l)))))
+
+(define (four-faces master variant)
+  (map (lambda (x) (face-file master variant (car x) (cadr x)))
+       '(("medium" "right") ("medium" "italic")
+         ("bold" "right") ("bold" "italic"))))
+
+;; the regular, italic, bold and bold italic faces of the variants: where a
+;; weight has no bold of its own, the one it is paired with
+(define variant-faces
+  '(("IBM Plex Text" "rm" "IBMPlexSerif-Text.otf" "IBMPlexSerif-TextItalic.otf"
+     "IBMPlexSerif-Bold.otf" "IBMPlexSerif-BoldItalic.otf")
+    ("IBM Plex Text" "ss" "IBMPlexSans-Text.otf" "IBMPlexSans-TextItalic.otf"
+     "IBMPlexSans-Bold.otf" "IBMPlexSans-BoldItalic.otf")
+    ("IBM Plex Text" "tt" "IBMPlexMono-Text.otf" "IBMPlexMono-TextItalic.otf"
+     "IBMPlexMono-Bold.otf" "IBMPlexMono-BoldItalic.otf")
+    ("IBM Plex Light" "rm" "IBMPlexSerif-Light.otf"
+     "IBMPlexSerif-LightItalic.otf" "IBMPlexSerif-SemiBold.otf"
+     "IBMPlexSerif-SemiBoldItalic.otf")
+    ("IBM Plex Light" "ss" "IBMPlexSans-Light.otf"
+     "IBMPlexSans-LightItalic.otf" "IBMPlexSans-SemiBold.otf"
+     "IBMPlexSans-SemiBoldItalic.otf")
+    ("IBM Plex Light" "tt" "IBMPlexMono-Light.otf"
+     "IBMPlexMono-LightItalic.otf" "IBMPlexMono-SemiBold.otf"
+     "IBMPlexMono-SemiBoldItalic.otf")
+    ("IBM Plex Medium" "rm" "IBMPlexSerif-Medium.otf"
+     "IBMPlexSerif-MediumItalic.otf" "IBMPlexSerif-Bold.otf"
+     "IBMPlexSerif-BoldItalic.otf")
+    ("IBM Plex Medium" "ss" "IBMPlexSans-Medium.otf"
+     "IBMPlexSans-MediumItalic.otf" "IBMPlexSans-Bold.otf"
+     "IBMPlexSans-BoldItalic.otf")
+    ("IBM Plex Medium" "tt" "IBMPlexMono-Medium.otf"
+     "IBMPlexMono-MediumItalic.otf" "IBMPlexMono-Bold.otf"
+     "IBMPlexMono-BoldItalic.otf")
+    ("IBM Plex Condensed" "ss" "IBMPlexSansCondensed-Regular.otf"
+     "IBMPlexSansCondensed-Italic.otf" "IBMPlexSansCondensed-Bold.otf"
+     "IBMPlexSansCondensed-BoldItalic.otf")
+    ("DejaVu Condensed" "rm" "DejaVuSerifCondensed.ttf"
+     "DejaVuSerifCondensed-Italic.ttf" "DejaVuSerifCondensed-Bold.ttf"
+     "DejaVuSerifCondensed-BoldItalic.ttf")
+    ("DejaVu Condensed" "ss" "DejaVuSansCondensed.ttf"
+     "DejaVuSansCondensed-Oblique.ttf" "DejaVuSansCondensed-Bold.ttf"
+     "DejaVuSansCondensed-BoldOblique.ttf")
+    ("Iwona Light" "rm" "IwonaLight-Regular.otf" "IwonaLight-Italic.otf"
+     "Iwona-Bold.otf" "Iwona-BoldItalic.otf")
+    ("Iwona Condensed" "rm" "IwonaCond-Regular.otf" "IwonaCond-Italic.otf"
+     "IwonaCond-Bold.otf" "IwonaCond-BoldItalic.otf")
+    ("Iwona Condensed Light" "rm" "IwonaCondLight-Regular.otf"
+     "IwonaCondLight-Italic.otf" "IwonaCond-Bold.otf"
+     "IwonaCond-BoldItalic.otf")
+    ("Kurier Light" "rm" "KurierLight-Regular.otf" "KurierLight-Italic.otf"
+     "Kurier-Bold.otf" "Kurier-BoldItalic.otf")
+    ("Kurier Condensed" "rm" "KurierCond-Regular.otf" "KurierCond-Italic.otf"
+     "KurierCond-Bold.otf" "KurierCond-BoldItalic.otf")
+    ("Kurier Condensed Light" "rm" "KurierCondLight-Regular.otf"
+     "KurierCondLight-Italic.otf" "KurierCond-Bold.otf"
+     "KurierCond-BoldItalic.otf")
+    ("Antykwa Torunska Light" "rm" "AntykwaTorunskaLight-Regular.otf"
+     "AntykwaTorunskaLight-Italic.otf" "AntykwaTorunska-Bold.otf"
+     "AntykwaTorunska-BoldItalic.otf")
+    ("Antykwa Torunska Condensed" "rm" "AntykwaTorunskaCond-Regular.otf"
+     "AntykwaTorunskaCond-Italic.otf" "AntykwaTorunskaCond-Bold.otf"
+     "AntykwaTorunskaCond-BoldItalic.otf")
+    ("Antykwa Torunska Condensed Light" "rm"
+     "AntykwaTorunskaCondLight-Regular.otf"
+     "AntykwaTorunskaCondLight-Italic.otf" "AntykwaTorunskaCond-Bold.otf"
+     "AntykwaTorunskaCond-BoldItalic.otf")
+    ("Antykwa Poltawskiego Light" "rm" "antpoltlt-regular.otf"
+     "antpoltlt-italic.otf" "antpoltlt-bold.otf" "antpoltlt-bolditalic.otf")
+    ("Antykwa Poltawskiego Condensed" "rm" "antpoltcond-regular.otf"
+     "antpoltcond-italic.otf" "antpoltcond-bold.otf"
+     "antpoltcond-bolditalic.otf")
+    ("Antykwa Poltawskiego Expanded" "rm" "antpoltexpd-regular.otf"
+     "antpoltexpd-italic.otf" "antpoltexpd-bold.otf"
+     "antpoltexpd-bolditalic.otf")
+    ("Latin Modern Mono Proportional" "tt" "lmmonoprop10-regular.otf"
+     "lmmonoprop10-oblique.otf" "lmmonoproplt10-bold.otf"
+     "lmmonoproplt10-boldoblique.otf")
+    ("Latin Modern Mono Light" "tt" "lmmonoproplt10-regular.otf"
+     "lmmonoproplt10-oblique.otf" "lmmonoproplt10-bold.otf"
+     "lmmonoproplt10-boldoblique.otf")))
+
+(define (test-font-variants)
+  (check-group "font variants")
+  ;; the variants which the menus declare, and their design
+  (check= (font-variant-base "IBM Plex Light") "IBM Plex")
+  (check= (font-variant-base "IBM Plex") "IBM Plex")
+  (check= (font-variant-base "TeX Gyre Pagella") "TeX Gyre Pagella")
+  (check= (font-variant-label "IBM Plex Light") "Light")
+  (check= (font-variant-label "Iwona Condensed Light") "Light condensed")
+  (check= (font-variant-label "IBM Plex") #f)
+  (check= (font-variants-of "IBM Plex")
+          '("IBM Plex Text" "IBM Plex Light" "IBM Plex Medium"
+            "IBM Plex Condensed"))
+  (check= (font-variants-of "Iwona")
+          '("Iwona Light" "Iwona Condensed" "Iwona Condensed Light"))
+  (check= (font-variants-of "Latin Modern Mono")
+          '("Latin Modern Mono Proportional" "Latin Modern Mono Light"))
+  (check= (font-variants-of "TeX Gyre Pagella") '())
+  ;; a submenu needs one installed variant besides the design itself
+  (check= (font-variants-installed '()) '())
+  (check= (font-variants-installed '(("Regular" "Iwona"))) '())
+  (check= (font-variants-installed
+           '(("Regular" "Iwona") ("Light" "No Such Master Zzz")))
+          '())
+  (check= (font-variants-installed
+           '(("Regular" "Iwona") ("Light" "Iwona Light")
+             ("Black" "No Such Master Zzz")))
+          '(("Regular" "Iwona") ("Light" "Iwona Light")))
+  (check= (map car (opentype-font-variants "IBM Plex Math"))
+          '("Regular" "Text" "Light" "Medium" "Condensed"))
+  (check= (opentype-font-variants "TeX Gyre DejaVu Math")
+          '(("Regular" "DejaVu") ("Condensed" "DejaVu Condensed")))
+  (check= (opentype-font-variants "Fira Math") '())
+  (check= (map car (text-font-variants "IBM Plex"))
+          '("Regular" "Text" "Light" "Medium"))
+  (check= (map car (text-font-variants "IBM Plex Mono"))
+          '("Regular" "Text" "Light" "Medium"))
+  (check= (map car (text-font-variants "Iwona"))
+          '("Regular" "Light" "Condensed" "Light condensed"))
+  (check= (map car (text-font-variants "Antykwa Poltawskiego"))
+          '("Regular" "Light" "Condensed" "Expanded"))
+  (check= (text-font-variants "Latin Modern Mono")
+          '(("Regular" "Latin Modern Mono")
+            ("Proportional" "Latin Modern Mono Proportional")
+            ("Proportional light" "Latin Modern Mono Light")))
+  (check= (text-font-variants "TeX Gyre Heros") '())
+  ;; a variant keeps the mathematics of its design
+  (check= (font-variant-value "IBM Plex") "IBM Plex")
+  (check= (font-variant-value "IBM Plex Light")
+          "math=IBM Plex Math,IBM Plex Light")
+  (check= (font-variant-value "DejaVu Condensed")
+          "math=TeX Gyre DejaVu Math,DejaVu Condensed")
+  (check= (font-variant-value "Iwona Light") "Iwona Light")
+  (check= (opentype-font-value "IBM Plex Math") "IBM Plex")
+  (check= (opentype-font-value "IBM Plex Math" "IBM Plex Condensed")
+          "math=IBM Plex Math,IBM Plex Condensed")
+  (check-true (in? "math=IBM Plex Math,IBM Plex Medium" (opentype-font-values)))
+  ;; each variant is a master with its italic and its bold
+  (for (x variant-faces)
+    (check= (four-faces (car x) (cadr x)) (cddr x)))
+  ;; and the faces of the designs are what they were
+  (check= (four-faces "IBM Plex" "ss")
+          '("IBMPlexSans-Regular.otf" "IBMPlexSans-Italic.otf"
+            "IBMPlexSans-Bold.otf" "IBMPlexSans-BoldItalic.otf"))
+  (check= (four-faces "IBM Plex" "tt")
+          '("IBMPlexMono-Regular.otf" "IBMPlexMono-Italic.otf"
+            "IBMPlexMono-Bold.otf" "IBMPlexMono-BoldItalic.otf"))
+  (check= (four-faces "Iwona" "rm")
+          '("Iwona-Regular.otf" "Iwona-Italic.otf"
+            "Iwona-Bold.otf" "Iwona-BoldItalic.otf"))
+  (check= (face-file "Iwona" "rm" "light" "right") "IwonaLight-Regular.otf")
+  (check= (face-file "Latin Modern Mono" "tt" "medium" "right")
+          "lmmono10-regular.otf"))
+
+;; The entries of an expanded menu: (label checked?) for an entry with a
+;; check mark, (label body) for a submenu. The body of an expanded submenu
+;; has lost its procedures: the entries of a submenu are those of its body
+;; in the menu as its function gives it, where a loop is still to be run
+(define (menu-label x)
+  (cond ((string? x) x)
+        ((and (pair? x) (== (car x) 'concat))
+         (apply string-append (map menu-label (cdr x))))
+        (else "")))
+
+(define (menu-entries t)
+  (cond ((not (pair? t)) '())
+        ((== (car t) '->) (list (list (menu-label (cadr t)) (cddr t))))
+        ((and (pair? (car t)) (== (caar t) 'check))
+         (list (list (menu-label (cadr (car t))) (cadddr (car t)))))
+        ((symbol? (car t)) (append-map menu-entries (cdr t)))
+        (else (append-map menu-entries t))))
+
+(define (menu-entries-of m)
+  (menu-entries (menu-expand `(vertical (link ,m)))))
+
+(define (submenu-body t label)
+  (cond ((not (pair? t)) #f)
+        ((and (== (car t) '->) (== (menu-label (cadr t)) label)) (cddr t))
+        ((and (== (car t) 'for) (procedure? (cadr t)))
+         (submenu-body (append-map (cadr t) ((caddr t))) label))
+        (else (list-or (map (lambda (x) (submenu-body x label)) t)))))
+
+(define (submenu-entries menu label)
+  (with body (submenu-body menu label)
+    (if body (menu-entries (menu-expand `(vertical ,@body))) '())))
+
+(define (text-submenu kind label)
+  (submenu-entries (text-font-entries (text-font-list kind)) label))
+
+(define (opentype-submenu group label)
+  (submenu-entries (opentype-font-entries (opentype-math-font-group-list group))
+                   label))
+
+(define (font-state)
+  (update-current-buffer)
+  (update-forced)
+  (list (get-init "font") (get-init "font-family") (get-init "math-font")))
+
+(define (test-font-variant-menus)
+  (check-group "font variants: menus")
+  (with-buffer-doc '(document "x") '("generic")
+    (lambda ()
+      ;; a design with variants is a submenu, the others are entries
+      (with l (menu-entries-of 'text-font-sans-menu)
+        (check-true (pair? (cadr (assoc "Iwona" l))))
+        (check-true (pair? (cadr (assoc "Kurier" l))))
+        (check= (assoc "Heros" l) '("Heros" #f))
+        (check= (text-submenu 'sans "Iwona")
+                '(("Regular" #f) ("Light" #f) ("Condensed" #f)
+                  ("Light condensed" #f))))
+      ;; a variant of a text font: the submenu names it and marks it
+      (init-text-font "Iwona" "Iwona Light")
+      (check= (font-state) '("Iwona Light" "rm" "roman"))
+      (with l (menu-entries-of 'text-font-sans-menu)
+        (check-false (assoc "Iwona" l))
+        (check-true (pair? (cadr (assoc "Iwona (Light)" l))))
+        (check-true (pair? (cadr (assoc "Kurier" l)))))
+      (check= (text-submenu 'sans "Iwona (Light)")
+              '(("Regular" #f) ("Light" #t) ("Condensed" #f)
+                ("Light condensed" #f)))
+      (check= (font-design-label) "Iwona Light")
+      (check-false (font-design-custom?))
+      (init-text-font "Iwona" "Iwona")
+      (check= (font-state) '("Iwona" "rm" "roman"))
+      (check= (text-submenu 'sans "Iwona (Regular)")
+              '(("Regular" #t) ("Light" #f) ("Condensed" #f)
+                ("Light condensed" #f)))
+      ;; a variant of a font with mathematics keeps them, and its profile
+      ;; stays the current one
+      (init-opentype-font "IBM Plex Math" "IBM Plex Condensed")
+      (check= (font-state)
+              '("math=IBM Plex Math,IBM Plex Condensed" "ss" "IBM Plex Math"))
+      (with l (menu-entries-of 'opentype-sans-font-menu)
+        (check= (assoc "Fira" l) '("Fira" #f))
+        (check-true (pair? (cadr (assoc "IBM Plex (Condensed)" l)))))
+      (check= (opentype-submenu "Sans serif" "IBM Plex (Condensed)")
+              '(("Regular" #f) ("Text" #f) ("Light" #f) ("Medium" #f)
+                ("Condensed" #t)))
+      (check= (font-design-label) "IBM Plex Condensed")
+      (check-false (font-design-custom?))
+      ;; the serif faces of the same master are another entry
+      (check-true (pair? (cadr (assoc "IBM Plex" (menu-entries-of
+                                                  'text-font-serif-menu)))))
+      (check= (text-submenu 'serif "IBM Plex")
+              '(("Regular" #f) ("Text" #f) ("Light" #f) ("Medium" #f)))
+      (init-text-font "IBM Plex" "IBM Plex Light")
+      (check= (font-state)
+              '("math=IBM Plex Math,IBM Plex Light" "rm" "IBM Plex Math"))
+      (check= (text-submenu 'serif "IBM Plex (Light)")
+              '(("Regular" #f) ("Text" #f) ("Light" #t) ("Medium" #f)))
+      (check-true (pair? (cadr (assoc "IBM Plex" (menu-entries-of
+                                                  'opentype-sans-font-menu)))))
+      ;; the typewriter faces are set with the typewriter font family
+      (init-text-font "Latin Modern Mono" "Latin Modern Mono Proportional")
+      (check= (cDr (font-state)) '("Latin Modern Mono Proportional" "tt"))
+      (check= (text-submenu 'mono "Latin Modern (Proportional)")
+              '(("Regular" #f) ("Proportional" #t) ("Proportional light" #f)))
+      (init-text-font "IBM Plex Mono" "IBM Plex Medium")
+      (check= (cDr (font-state)) '("math=IBM Plex Math,IBM Plex Medium" "tt"))
+      (check= (text-submenu 'mono "IBM Plex (Medium)")
+              '(("Regular" #f) ("Text" #f) ("Light" #f) ("Medium" #t)))
+      (check-true (pair? (cadr (assoc "IBM Plex" (menu-entries-of
+                                                  'text-font-serif-menu)))))
+      ;; the menus of the fonts build
+      (for (m '(document-short-design-font-menu text-font-serif-menu
+                text-font-sans-menu text-font-mono-menu
+                opentype-serif-font-menu opentype-sans-font-menu))
+        (check-true (make-menu-widget `(vertical (link ,m)) 0))))))
+
+;; The weights of a face, as (label file): the faces are named by the
+;; values of font, font-family, font-series and font-shape
+(define (weight-files face)
+  (map (lambda (x) (list (car x) (apply face-file (cadr x))))
+       (font-weights-of face)))
+
+(define (weight-face face label)
+  (and-with x (assoc label (font-weights-of face)) (cadr x)))
+
+(define (test-font-weights)
+  (check-group "font weights")
+  (check= (weight-files '("IBM Plex" "ss" "medium" "right"))
+          '(("Thin" "IBMPlexSans-Thin.otf")
+            ("Extra light" "IBMPlexSans-ExtraLight.otf")
+            ("Light" "IBMPlexSans-Light.otf")
+            ("Regular" "IBMPlexSans-Regular.otf")
+            ("Text" "IBMPlexSans-Text.otf")
+            ("Medium" "IBMPlexSans-Medium.otf")
+            ("Semibold" "IBMPlexSans-SemiBold.otf")
+            ("Bold" "IBMPlexSans-Bold.otf")))
+  (check= (weight-files '("IBM Plex" "rm" "bold" "italic"))
+          '(("Thin" "IBMPlexSerif-ThinItalic.otf")
+            ("Extra light" "IBMPlexSerif-ExtraLightItalic.otf")
+            ("Light" "IBMPlexSerif-LightItalic.otf")
+            ("Regular" "IBMPlexSerif-Italic.otf")
+            ("Text" "IBMPlexSerif-TextItalic.otf")
+            ("Medium" "IBMPlexSerif-MediumItalic.otf")
+            ("Semibold" "IBMPlexSerif-SemiBoldItalic.otf")
+            ("Bold" "IBMPlexSerif-BoldItalic.otf")))
+  (check= (weight-files '("IBM Plex" "tt" "medium" "right"))
+          '(("Thin" "IBMPlexMono-Thin.otf")
+            ("Extra light" "IBMPlexMono-ExtraLight.otf")
+            ("Light" "IBMPlexMono-Light.otf")
+            ("Regular" "IBMPlexMono-Regular.otf")
+            ("Text" "IBMPlexMono-Text.otf")
+            ("Medium" "IBMPlexMono-Medium.otf")
+            ("Semibold" "IBMPlexMono-SemiBold.otf")
+            ("Bold" "IBMPlexMono-Bold.otf")))
+  (check= (weight-files '("Iwona" "rm" "medium" "right"))
+          '(("Light" "IwonaLight-Regular.otf") ("Regular" "Iwona-Regular.otf")
+            ("Bold" "Iwona-Bold.otf") ("Heavy" "IwonaHeavy-Regular.otf")))
+  (check= (weight-files '("Kurier" "rm" "medium" "italic"))
+          '(("Light" "KurierLight-Italic.otf") ("Regular" "Kurier-Italic.otf")
+            ("Bold" "Kurier-BoldItalic.otf")
+            ("Heavy" "KurierHeavy-Italic.otf")))
+  (check= (weight-files '("Antykwa Torunska" "rm" "medium" "right"))
+          '(("Light" "AntykwaTorunskaLight-Regular.otf")
+            ("Regular" "AntykwaTorunska-Regular.otf")
+            ("Bold" "AntykwaTorunska-Bold.otf")))
+  (check= (weight-files '("TeX Gyre Pagella" "rm" "medium" "right"))
+          '(("Regular" "texgyrepagella-regular.otf")
+            ("Bold" "texgyrepagella-bold.otf")))
+  ;; in a variant, the weights of the design in the width of the variant;
+  ;; Bold is the bold which the variant is paired with
+  (check= (weight-files '("IBM Plex Light" "ss" "medium" "right"))
+          '(("Thin" "IBMPlexSans-Thin.otf")
+            ("Extra light" "IBMPlexSans-ExtraLight.otf")
+            ("Light" "IBMPlexSans-Light.otf")
+            ("Regular" "IBMPlexSans-Regular.otf")
+            ("Text" "IBMPlexSans-Text.otf")
+            ("Medium" "IBMPlexSans-Medium.otf")
+            ("Semibold" "IBMPlexSans-SemiBold.otf")
+            ("Bold" "IBMPlexSans-SemiBold.otf")))
+  (check= (weight-files '("IBM Plex Text" "rm" "medium" "right"))
+          '(("Thin" "IBMPlexSerif-Thin.otf")
+            ("Extra light" "IBMPlexSerif-ExtraLight.otf")
+            ("Light" "IBMPlexSerif-Light.otf")
+            ("Regular" "IBMPlexSerif-Regular.otf")
+            ("Text" "IBMPlexSerif-Text.otf")
+            ("Medium" "IBMPlexSerif-Medium.otf")
+            ("Semibold" "IBMPlexSerif-SemiBold.otf")
+            ("Bold" "IBMPlexSerif-Bold.otf")))
+  (check= (weight-files '("IBM Plex Condensed" "ss" "medium" "italic"))
+          '(("Thin" "IBMPlexSansCondensed-ThinItalic.otf")
+            ("Extra light" "IBMPlexSansCondensed-ExtraLightItalic.otf")
+            ("Light" "IBMPlexSansCondensed-LightItalic.otf")
+            ("Regular" "IBMPlexSansCondensed-Italic.otf")
+            ("Text" "IBMPlexSansCondensed-TextItalic.otf")
+            ("Medium" "IBMPlexSansCondensed-MediumItalic.otf")
+            ("Semibold" "IBMPlexSansCondensed-SemiBoldItalic.otf")
+            ("Bold" "IBMPlexSansCondensed-BoldItalic.otf")))
+  (check= (weight-files '("Iwona Condensed Light" "rm" "medium" "right"))
+          '(("Light" "IwonaCondLight-Regular.otf")
+            ("Regular" "IwonaCond-Regular.otf")
+            ("Bold" "IwonaCond-Bold.otf")
+            ("Heavy" "IwonaCondHeavy-Regular.otf")))
+  (check= (weight-files '("Latin Modern Mono Proportional" "tt" "medium"
+                          "right"))
+          '(("Light" "lmmonoproplt10-regular.otf")
+            ("Regular" "lmmonoprop10-regular.otf")
+            ("Bold" "lmmonoproplt10-bold.otf")))
+  ;; what an entry sets: the series, or the font of another master
+  (check= (weight-face '("IBM Plex" "ss" "medium" "right") "Semibold")
+          '("IBM Plex" "ss" "semibold" "right"))
+  (check= (weight-face '("IBM Plex" "ss" "medium" "right") "Medium")
+          '("IBM Plex Medium" "ss" "medium" "right"))
+  (check= (weight-face '("IBM Plex Light" "ss" "medium" "right") "Bold")
+          '("IBM Plex Light" "ss" "bold" "right"))
+  (check= (weight-face '("IBM Plex Light" "ss" "medium" "right") "Light")
+          '("IBM Plex Light" "ss" "medium" "right"))
+  (check= (weight-face '("IBM Plex Light" "ss" "medium" "right") "Thin")
+          '("IBM Plex" "ss" "thin" "right"))
+  (check= (weight-face '("Iwona Condensed" "rm" "medium" "right") "Heavy")
+          '("Iwona" "rm" "heavy" "condensed"))
+  (check= (weight-face '("Latin Modern Mono Light" "tt" "medium" "right")
+                       "Regular")
+          '("Latin Modern Mono" "tt" "medium" "proportional"))
+  ;; at the cursor, and for a selection
+  (with-buffer-doc '(document "Hamburgefonts" "Hamburgefonts") '("generic")
+    (lambda ()
+      (init-text-font "Iwona" "Iwona Condensed")
+      (update-current-buffer)
+      (update-forced)
+      (tree-go-to (bt 0) 3)
+      (check= (map car (font-weights-here))
+              '("Light" "Regular" "Bold" "Heavy"))
+      (check= (map (lambda (x) (cadr x))
+                   (menu-entries-of 'text-font-weight-menu))
+              '(#f #t #f #f))
+      (tree-select (bt 0))
+      (edit (make-font-face (cadr (assoc "Heavy" (font-weights-here)))))
+      (selection-cancel)
+      (tree-go-to (bt 1) 3)
+      (tree-select (bt 1))
+      (edit (make-font-face '("Iwona Condensed" "rm" "bold" "right")))
+      (selection-cancel)
+      (check= (body)
+              '(document
+                 (with "font" "Iwona" "font-series" "heavy"
+                       "font-shape" "condensed" "Hamburgefonts")
+                 (with "font-series" "bold" "Hamburgefonts")))
+      (tree-go-to (bt 0 6) 3)
+      (update-forced)
+      (check= (map (lambda (x) (cadr x))
+                   (menu-entries-of 'text-font-weight-menu))
+              '(#f #f #f #t))
+      (check-true (make-menu-widget '(vertical (link text-font-weight-menu))
+                                    0))))
+  ;; a font with one weight is offered the three series
+  (with-buffer-doc '(document "Hamburgefonts") '("generic")
+    (lambda ()
+      (init-text-font "Latin Modern Mono" "Latin Modern Mono")
+      (update-current-buffer)
+      (update-forced)
+      (tree-go-to (bt 0) 3)
+      (check= (map car (font-weights-here)) '("Regular"))
+      (check= (menu-entries-of 'text-font-weight-menu) '())
+      (check-true (make-menu-widget '(vertical (link text-font-weight-menu))
+                                    0)))))
+
+;; The variants in the page of the fonts
+(define (design-variant tab name label)
+  (let* ((e (design-entry tab name))
+         (v (and e (assoc label (font-design-variants e)))))
+    (and v (font-design-variant-entry e v))))
+
+(define (chosen-marks t)
+  ;; the texts of the marks of what is chosen in the page
+  (cond ((not (pair? t)) '())
+        ((== (car t) 'font-design-chosen) (list (cadr t)))
+        (else (append-map chosen-marks (cdr t)))))
+
+(define (test-font-design-variants)
+  (check-group "font design: variants")
+  ;; the variants of a font have the face of its tab
+  (for (x '(("text" "IBM Plex" ("Regular" "Text" "Light" "Medium" "Condensed"))
+            ("text" "IBM Plex Serif" ("Regular" "Text" "Light" "Medium"))
+            ("text" "DejaVu" ("Regular" "Condensed"))
+            ("text" "Iwona" ("Regular" "Light" "Condensed" "Light condensed"))
+            ("text" "Antykwa Poltawskiego"
+             ("Regular" "Light" "Condensed" "Expanded"))
+            ("text" "Palatino" ())
+            ("sansserif" "IBM Plex"
+             ("Regular" "Text" "Light" "Medium" "Condensed"))
+            ("sansserif" "DejaVu" ("Regular" "Condensed"))
+            ("typewriter" "IBM Plex" ("Regular" "Text" "Light" "Medium"))
+            ("typewriter" "DejaVu" ())
+            ("typewriter" "Latin Modern"
+             ("Regular" "Proportional" "Proportional light"))
+            ("math" "IBM Plex" ())))
+    (check= (map car (font-design-variants (design-entry (car x) (cadr x))))
+            (caddr x)))
+  ;; a variant is an entry with a picture of its own
+  (for (tab '("text" "sansserif" "typewriter"))
+    (for (e (font-design-entries tab))
+      (for (v (font-design-variants e))
+        (with ve (font-design-variant-entry e v)
+          (check= (font-design-find-entry tab (cdr (assq 'id ve))) ve)
+          (when (in? (cdr (assq 'name e))
+                     '("IBM Plex" "IBM Plex Serif" "DejaVu" "Iwona" "Kurier"
+                       "Antykwa Poltawskiego" "Antykwa Torunska"
+                       "Latin Modern"))
+            (check-true (url? (font-design-sample ve))))))))
+  (with e (design-variant "text" "IBM Plex" "Light")
+    (check= (cdr (assq 'id e)) "text-ibm-plex-light")
+    (check= (cdr (assq 'label e)) "IBM Plex (Light)")
+    (check= (cdr (assq 'text e)) "IBM Plex Light")
+    (check= (caddr (font-design-sample-tree e)) "IBM Plex Light"))
+  (check= (design-variant "text" "IBM Plex" "Regular")
+          (design-entry "text" "IBM Plex"))
+  (check= (caddr (font-design-sample-tree
+                  (design-variant "typewriter" "Latin Modern" "Proportional")))
+          "typewriter=Latin Modern Mono Proportional,roman")
+  ;; a variant chosen for a part; the variant of a text font names the
+  ;; mathematics of its design, which leave with it
+  (let* ((c0 (font-design-parse "roman" "rm"))
+         (c1 (font-design-choose c0 (design-variant "text" "IBM Plex" "Light")))
+         (c2 (font-design-choose c1 (design-variant "text" "IBM Plex"
+                                                    "Condensed")))
+         (c3 (font-design-choose c2 (design-entry "text" "IBM Plex")))
+         (c4 (font-design-choose c2 (design-entry "text" "Iwona")))
+         (c5 (font-design-choose c4 (design-variant "text" "Iwona" "Light")))
+         (c6 (font-design-choose
+              (font-design-choose c1 (design-entry "math" "Euler"))
+              (design-variant "text" "IBM Plex Serif" "Medium")))
+         (c7 (font-design-choose c0 (design-variant "sansserif" "DejaVu"
+                                                    "Condensed")))
+         (c8 (font-design-choose c7 (design-variant "typewriter" "IBM Plex"
+                                                    "Text"))))
+    (check= (font-design-font c1) "math=IBM Plex Math,IBM Plex Light")
+    (check= (assoc-ref c1 "family") "ss")
+    (check= (font-design-font c2) "math=IBM Plex Math,IBM Plex Condensed")
+    (check= (font-design-font c3) "IBM Plex")
+    (check= (assoc-ref c3 "math") #f)
+    (check= (font-design-font c4) "Iwona")
+    (check= (font-design-font c5) "Iwona Light")
+    (check= (font-design-font c6) "math=Euler Math,IBM Plex Medium")
+    (check= (assoc-ref c6 "family") "rm")
+    (check= (font-design-font c7) "sansserif=DejaVu Condensed,roman")
+    (check= (font-design-font c8)
+            "typewriter=IBM Plex Text,sansserif=DejaVu Condensed,roman")
+    (check= (font-design-font (font-design-parse (font-design-font c1) "ss"))
+            (font-design-font c1))
+    (check= (assoc-ref (font-design-parse (font-design-font c1) "ss") "math")
+            "IBM Plex Math")
+    (check= (font-design-font (font-design-parse (font-design-font c8) "rm"))
+            (font-design-font c8)))
+  ;; a variant gives the document what its entry of the menus gives
+  (with menu-state #f
+    (with-buffer-doc '(document "x") '("generic")
+      (lambda ()
+        (init-opentype-font "IBM Plex Math" "IBM Plex Light")
+        (set! menu-state (design-state))))
+    (with-buffer-doc '(document "x") '("generic")
+      (lambda ()
+        (init-opentype-font "IBM Plex Math")
+        (let* ((s0 (design-state))
+               (c0 (design-choice)))
+          (font-design-apply
+           (font-design-choose c0 (design-variant "text" "IBM Plex" "Light"))
+           c0)
+          (check= (design-state) menu-state)
+          ;; nothing chosen changes nothing, a part changes that part only
+          (with c1 (design-choice)
+            (font-design-apply c1 c1)
+            (check= (design-state) menu-state)
+            (font-design-apply
+             (font-design-choose c1 (design-variant "typewriter" "Latin Modern"
+                                                    "Proportional"))
+             c1)
+            (with s2 (design-state)
+              (check= (cdr s2) (cdr menu-state))
+              (check= (car s2)
+                      (string-append "math=IBM Plex Math,typewriter=Latin "
+                                     "Modern Mono Proportional,"
+                                     "IBM Plex Light"))))
+          ;; and back to the design itself
+          (with c3 (design-choice)
+            (font-design-apply
+             (font-design-choose c3 (design-entry "text" "IBM Plex")) c3)
+            (check= (car (design-state))
+                    "typewriter=Latin Modern Mono Proportional,IBM Plex")
+            (check= (cdr (design-state)) (cdr s0)))))))
+  (for (setup (list (lambda () (init-env "math-font" "math-stix"))
+                    (lambda () (init-opentype-font "TeX Gyre Pagella Math"))
+                    (lambda () (init-opentype-font "Euler Math"))
+                    (lambda () (init-text-font "Iwona" "Iwona Light"))
+                    (lambda ()
+                      (init-opentype-font "TeX Gyre DejaVu Math"
+                                          "DejaVu Condensed"))
+                    (lambda () (init-env "font" "IBM Plex Text"))))
+    (with-buffer-doc '(document "x") '("generic")
+      (lambda ()
+        (setup)
+        (let* ((s0 (design-state))
+               (c0 (design-choice)))
+          (font-design-apply c0 c0)
+          (check= (design-state) s0)
+          (font-design-apply
+           (font-design-choose c0 (design-variant "sansserif" "Iwona"
+                                                  "Light condensed"))
+           c0)
+          (with s1 (design-state)
+            (check= (cdr s1) (cdr s0))
+            (check= (list-difference (design-rules (car s1))
+                                     '("sansserif=Iwona Condensed Light"))
+                    (design-rules (car s0)))
+            (check-true (in? "sansserif=Iwona Condensed Light"
+                             (design-rules (car s1)))))))))
+  ;; the page: the variants of the chosen font are a second choice
+  (with-buffer-doc '(document "x") '("generic")
+    (lambda ()
+      (with doc (current-buffer)
+        (init-text-font "Iwona" "Iwona Light")
+        (update-current-buffer)
+        (update-forced)
+        (open-font-design)
+        (font-design-page-tab "text")
+        (let* ((page (current-buffer))
+               (t (tree->stree (buffer-tree)))
+               (l (design-actions t)))
+          ;; the font of the document and its variant are the chosen ones
+          (check-true (in? "Light" (chosen-marks t)))
+          (check-false (in? "Regular" (chosen-marks t)))
+          (check-true
+           (in? "(font-design-page-choose \"text\" \"text-iwona-condensed\")"
+                l))
+          (check-true (in? "(font-design-page-choose \"text\" \"text-iwona\")"
+                           l))
+          (check-false
+           (in? "(font-design-page-choose \"text\" \"text-iwona-light\")" l))
+          ;; the variants of the fonts which are not chosen are not shown
+          (check-false
+           (in? "(font-design-page-choose \"text\" \"text-kurier-light\")" l))
+          (font-design-page-choose "text" "text-iwona-condensed")
+          (with t2 (tree->stree (buffer-tree))
+            (check-true (in? "Condensed" (chosen-marks t2)))
+            (check-false (in? "Light" (chosen-marks t2))))
+          (font-design-page-tab "typewriter")
+          (font-design-page-choose "typewriter" "typewriter-latin-modern")
+          (font-design-page-choose "typewriter"
+                                   "typewriter-latin-modern-proportional")
+          (check-true (in? "Proportional"
+                           (chosen-marks (tree->stree (buffer-tree)))))
+          (font-design-page-apply)
+          (check= (current-buffer) doc)
+          (check= (get-init "font")
+                  (string-append "typewriter=Latin Modern Mono Proportional,"
+                                 "Iwona Condensed"))
+          ;; (the font family which the menu gave the document stays)
+          (check= (get-init "font-family") "rm")
+          ;; the page opened again shows the variants of the document
+          (buffer-close page)
+          (open-font-design)
+          (font-design-page-tab "text")
+          (with t3 (tree->stree (buffer-tree))
+            (check-true (in? "Condensed" (chosen-marks t3)))
+            (font-design-page-tab "typewriter")
+            (check-true (in? "Proportional"
+                             (chosen-marks (tree->stree (buffer-tree))))))
+          (with page2 (current-buffer)
+            (switch-to-buffer doc)
+            (buffer-close page2)))))))
+
+;; The saved fonts: the names which the preferences cannot keep, and the
+;; fonts of a value which are not installed (nothing is saved here)
+(define (test-font-custom)
+  (check-group "font design: saved fonts")
+  (check-true (font-design-name? "My fonts (2) a/b"))
+  (check-false (font-design-name? ""))
+  (check-false (font-design-name? "say \"hi\""))
+  (check-false (font-design-name? "back\\slash"))
+  (with l (font-designs)
+    (check-false (font-design-store "say \"hi\"" "roman" "rm"))
+    (check-false (font-design-store "back\\slash" "roman" "rm"))
+    (check= (font-designs) l))
+  (check= (font-design-missing "typewriter=Fira,sansserif=Iwona,Gentium Plus")
+          '())
+  (check= (font-design-missing "math=Euler Math,roman") '())
+  (check= (font-design-missing "typewriter=NoSuchFont Mono,NoSuchFont")
+          '("NoSuchFont Mono" "NoSuchFont")))
+
+;; The features of a font: the file of the font which draws a character,
+;; from the name the editor has for it, and the features of the document
+(define (test-font-features)
+  (check-group "font features")
+  (check= (font-file-of-subfont "unicode:STIXTwoText-Regular10@600" "10")
+          "STIXTwoText-Regular")
+  (check= (font-file-of-subfont "unicode:lmroman10-regular7@600" "7")
+          "lmroman10-regular")
+  (check= (font-file-of-subfont
+           "unicode:FiraMath-Regular10@600#enhance-emu-fundamental10@600" "10")
+          "FiraMath-Regular")
+  (check= (font-file-of-subfont "ec:ecrm10@600" "10") #f)
+  (check-true (in? "smcp" (font-features-of-file "STIXTwoText-Regular")))
+  (check-false (in? "calt" (font-features-proposed)))
+  ;; the features of the document do not follow those at the cursor
+  (with-buffer-doc '(document (with "font-features" "smcp" "caps")) '("generic")
+    (lambda ()
+      (go-to (rel (list 0 2 2)))
+      (font-features-toggle-global "onum")
+      (check= (get-init "font-features") "onum")
+      (font-features-toggle-global "lnum")
+      (check= (get-init "font-features") "lnum")
+      (font-features-toggle-global "zero")
+      (check= (get-init "font-features") "lnum,zero")
+      (font-features-toggle-global "lnum")
+      (font-features-toggle-global "zero")
+      (check-false (init-has? "font-features")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Logical fonts
@@ -1671,7 +2484,11 @@
   (for-each run-group
             (list test-help-files test-doc-parse test-tmdoc-expand
                   test-tmdoc-rewrite test-doc-search test-tmdoc-edit
-                  test-font-database test-font-design test-logical-fonts
+                  test-font-database test-font-design test-font-design-page
+                  test-font-design-apply
+                  test-font-variants test-font-variant-menus test-font-weights
+                  test-font-design-variants
+                  test-font-custom test-font-features test-logical-fonts
                   test-font-typesetting test-init-font
                   test-language-names test-translations test-hyphenation
                   test-spelling
