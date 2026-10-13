@@ -229,6 +229,19 @@
   <paragraph|9 October 2026>
 
   <\itemize>
+    <item>Editing a long document is faster. A new section, a numbered
+    equation or the join of two paragraphs used to typeset everything
+    after it again, since the numbers changed: now only what shows one of
+    these numbers is. The page breaks are searched faster, and not at all
+    when no line changed its height. In the user manual, a book of some
+    260 pages, a letter takes about 60<nbsp>ms instead of 270 and a new
+    section about 110<nbsp>ms instead of 1250 (on a desktop computer; the
+    pages are the same).
+
+    <item>The entries of a table of contents and of an index keep pointing
+    to their places when sections or index entries are added before them:
+    they no longer wait for <menu|Document|Update|All> to be right again.
+
     <item><menu|Font design>, in the menu of the fonts (the font button of
     the focus bar), opens a page to choose the fonts of the document by
     looking at them. Its top lists the parts of a document with the font

@@ -24,6 +24,11 @@ typesetter_rep::typesetter_rep (edit_env& env2, tree et, path ip):
   paper= (env->get_string (PAGE_MEDIUM) == "paper");
   br= make_bridge (this, et, ip);
   x1= y1= x2= y2=0;
+  kept_pages= tm_new<page_memo> ();
+}
+
+typesetter_rep::~typesetter_rep () {
+  tm_delete (kept_pages);
 }
 
 typesetter
@@ -181,6 +186,7 @@ typesetter_rep::typeset () {
   br->typeset (PROCESSED+ WANTED_PARAGRAPH);
   double t1= edit_profile.on ? edit_profile_now () : 0;
   pager ppp= tm_new<pager_rep> (br->ip, env, l);
+  ppp->memo= kept_pages;
   box rb= ppp->make_pages ();
   if (env->complete && paper) determine_page_references (rb);
   tm_delete (ppp);
@@ -193,6 +199,15 @@ typesetter_rep::typeset () {
   return rb;
 }
 
+// the length of the change log, without a recursion as deep as it is long
+// (N of a list: too deep for a browser after the first pass of a book)
+static int
+log_length (rectangles l) {
+  int n= 0;
+  for (; !is_nil (l); l= l->next) n++;
+  return n;
+}
+
 box
 typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   x1= x1b; y1= y1b; x2=x2b; y2= y2b;
@@ -200,9 +215,9 @@ typesetter_rep::typeset (SI& x1b, SI& y1b, SI& x2b, SI& y2b) {
   // cout << "-------------------------------------------------------------\n";
   double t0= edit_profile.on ? edit_profile_now () : 0;
   b->position_at (0, 0, change_log);
-  if (edit_profile.on) edit_profile.lines += N(change_log) / 2;
+  if (edit_profile.on) edit_profile.lines += log_length (change_log) / 2;
   change_log= requires_update (change_log);
-  if (edit_profile.on) edit_profile.rects += N(change_log);
+  if (edit_profile.on) edit_profile.rects += log_length (change_log);
   rectangle r (0, 0, 0, 0);
   if (!is_nil (change_log)) r= least_upper_bound (change_log);
   array<brush> new_bgs;

@@ -136,6 +136,7 @@
 // variables are recorded by number (env_var_id): the sets of the bridges
 // are arrays of integers.
 int env_var_id (string var);
+string env_var_name (int id);
 class env_table {
 public:
   hashmap<string,tree>  h;
@@ -524,6 +525,8 @@ public:
   // a variable whose value is all there is to it: no state of the
   // environment is derived from it when it is written (the types for
   // which update (string) does nothing)
+  // the values of the variables which are not plain, in a fixed order
+  array<tree> derived_state ();
   inline bool plain_variable (string s) {
     int type= var_type [s];
     return type == Env_User || type == Env_Fixed ||

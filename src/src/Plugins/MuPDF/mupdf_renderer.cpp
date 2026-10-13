@@ -128,6 +128,28 @@ snapshot_pixmap (fz_context *ctx, fz_pixmap *pix) {
   }
 }
 
+// A benchmark (tau_dry in src/Tau/tau_gui.cpp, misc/tau/test/render-bench.mjs):
+// when it is on, what is drawn is written down as the commands of a
+// display list would be (their kind and the size of their arguments, in a
+// buffer) and not drawn. The time of a repaint is then what the editor
+// spends to say what is to be drawn, without the drawing itself.
+bool mupdf_dry= false;
+long mupdf_dry_n[6]= { 0, 0, 0, 0, 0, 0 };
+long mupdf_dry_bytes= 0;
+static inline bool
+mupdf_dry_op (int kind, int bytes) {
+  if (!mupdf_dry) return false;
+  static unsigned char buf[1 << 16];
+  static int pos= 0;
+  if (bytes > (1 << 15)) bytes= 1 << 15;
+  if (pos + bytes > (1 << 16)) pos= 0;
+  memset (buf + pos, kind + 1, bytes);
+  pos += bytes;
+  mupdf_dry_n[kind]++;
+  mupdf_dry_bytes += bytes;
+  return true;
+}
+
 /******************************************************************************
 * Fitz pixmaps
 ******************************************************************************/
@@ -490,6 +512,7 @@ mupdf_renderer_rep::end_text () {
 
 void
 mupdf_renderer_rep::set_transformation (frame fr) {
+  (void) mupdf_dry_op (4, 52);
   ASSERT (fr->linear, "only linear transformations have been implemented");
 
   end_text ();
@@ -520,6 +543,7 @@ mupdf_renderer_rep::set_transformation (frame fr) {
 
 void
 mupdf_renderer_rep::reset_transformation () {
+  (void) mupdf_dry_op (4, 4);
   unclip ();
   fz_context* ctx= mupdf_context ();
   mupdf_protected ("reset_transformation", [&] () { proc->op_Q (ctx, proc); });
@@ -533,6 +557,7 @@ mupdf_renderer_rep::reset_transformation () {
 
 void
 mupdf_renderer_rep::set_clipping (SI x1, SI y1, SI x2, SI y2, bool restore) {
+  (void) mupdf_dry_op (4, 24);
   renderer_rep::set_clipping (x1, y1, x2, y2, restore);
 
   end_text();
@@ -827,6 +852,7 @@ mupdf_renderer_rep::select_line_width (SI w) {
 
 void
 mupdf_renderer_rep::set_pencil (pencil pen2) {
+  (void) mupdf_dry_op (4, 24);
   // debug_convert << "set_pencil\n";
   pen= pen2;
   lw= pen->get_width ();
@@ -851,6 +877,7 @@ mupdf_renderer_rep::set_pencil (pencil pen2) {
 
 void
 mupdf_renderer_rep::set_brush (brush br) {
+  (void) mupdf_dry_op (4, 24);
   // debug_convert << "set_brush\n";
   fg_brush= br;
   pen= pencil (br);
@@ -959,6 +986,7 @@ mupdf_renderer_rep::tile_direct (SI x1, SI y1, SI x2, SI y2, fz_pixmap* tile) {
 
 void
 mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_dry_op (1, 20)) return;
   // the neutral pattern around the pages, as in the Qt port: white, then
   // the pattern image tiled at its natural size
   static url u= url_none ();
@@ -1013,6 +1041,7 @@ mupdf_renderer_rep::clear_device (SI x1, SI y1, SI x2, SI y2) {
 
 void
 mupdf_renderer_rep::set_background (brush b) {
+  (void) mupdf_dry_op (4, 24);
   // debug_convert << "set_background\n";
   bg_brush= b;
   bg= b->get_color ();
@@ -1024,6 +1053,7 @@ mupdf_renderer_rep::set_background (brush b) {
 
 void
 mupdf_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_dry_op (2, 20)) return;
   // debug_convert << "line\n";
   end_text ();
   proc->op_m (mupdf_context (), proc, to_x (x1), to_y (y1));
@@ -1033,6 +1063,7 @@ mupdf_renderer_rep::line (SI x1, SI y1, SI x2, SI y2) {
 
 void
 mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
+  if (mupdf_dry_op (2, 8 + 8 * N(x))) return;
   // debug_convert << "lines\n";
   end_text ();
   int i, n= N(x);
@@ -1055,6 +1086,7 @@ mupdf_renderer_rep::lines (array<SI> x, array<SI> y) {
 
 void
 mupdf_renderer_rep::clear (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_dry_op (1, 20)) return;
   if ((is_nil (bg_brush) || bg_brush->get_type () != brush_pattern) &&
       fill_direct (x1, y1, x2, y2, bg)) return; // a plain background color
   end_text ();
@@ -1294,6 +1326,7 @@ mupdf_renderer_rep::draw_pixmap_scaled_direct (fz_pixmap* src, SI x, SI y,
 
 void
 mupdf_renderer_rep::fill (SI x1, SI y1, SI x2, SI y2) {
+  if (mupdf_dry_op (1, 20)) return;
   if ((x1<x2) && (y1<y2))
   {
     if (!fill_is_pattern && fill_direct (x1, y1, x2, y2, fg)) return;
@@ -1311,6 +1344,7 @@ void
 mupdf_renderer_rep::bezier_arc (SI x1, SI y1, SI x2, SI y2,
                                 int alpha, int delta, bool filled)
 {
+  if (mupdf_dry_op (2, 32)) return;
   // PDF can describe only cubic bezier paths, so we have to make up the arc
   // with them. Since this is not mathematically exact, we minimize errors by
   // drawing beziers sub-arcs of at most 90??
@@ -1373,6 +1407,7 @@ mupdf_renderer_rep::bezier_arc (SI x1, SI y1, SI x2, SI y2,
 
 void
 mupdf_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
+  if (mupdf_dry_op (2, 28)) return;
   // debug_convert << "arc\n";
   end_text ();
   bezier_arc(x1, y1, x2, y2, alpha, delta, false);
@@ -1381,6 +1416,7 @@ mupdf_renderer_rep::arc (SI x1, SI y1, SI x2, SI y2, int alpha, int delta) {
 void
 mupdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2,
                               int alpha, int delta) {
+  if (mupdf_dry_op (2, 28)) return;
   // debug_convert << "fill_arc\n";
   end_text ();
   bezier_arc(x1, y1, x2, y2, alpha, delta, true);
@@ -1388,6 +1424,7 @@ mupdf_renderer_rep::fill_arc (SI x1, SI y1, SI x2, SI y2,
 
 void
 mupdf_renderer_rep::polygon (array<SI> x, array<SI> y, bool convex) {
+  if (mupdf_dry_op (2, 8 + 8 * N(x))) return;
   // debug_convert << "polygon\n";
   int i, n= N(x);
   if ((N(y) != n) || (n<1)) return;
@@ -1409,6 +1446,7 @@ void
 mupdf_renderer_rep::rounded_rectangle (SI x1, SI y1, SI x2, SI y2,
                                        SI r_tl, SI r_tr, SI r_br, SI r_bl,
                                        bool filled) {
+  if (mupdf_dry_op (2, 40)) return;
   // Draw a rectangle with rounded corners using cubic Bézier curves
   // r_tl, r_tr, r_br, r_bl are the radii for top-left, top-right,
   // bottom-right, and bottom-left corners respectively
@@ -1850,6 +1888,7 @@ cache_pixmap (tree key, fz_pixmap* pix) {
 
 void
 mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
+  if (mupdf_dry_op (3, 20)) return;
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
   flush_proxy_text (pict->pix);
@@ -1876,6 +1915,7 @@ mupdf_renderer_rep::draw_picture (picture p, SI x, SI y, int alpha) {
 void
 mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
                                          int alpha) {
+  if (mupdf_dry_op (3, 28)) return;
   p= as_mupdf_picture (p);
   mupdf_picture_rep* pict= (mupdf_picture_rep*) p->get_handle ();
   flush_proxy_text (pict->pix);
@@ -1892,6 +1932,7 @@ mupdf_renderer_rep::draw_picture_scaled (picture p, SI x, SI y, double s,
 
 void
 mupdf_renderer_rep::draw_scalable (scalable im, SI x, SI y, int alpha) {
+  if (mupdf_dry_op (3, 20)) return;
   // debug_convert << "pdf renderer, draw_scalable "
   //   << im->get_name () << " at " << x << ", " << y
   //   << " (" << alpha << ")" << LF;
@@ -2312,6 +2353,7 @@ mupdf_glyph_outline (string fontname, int c, array<double>& q, double& em) {
 
 void
 mupdf_renderer_rep::draw (int c, font_glyphs fng, SI x, SI y) {
+  if (mupdf_dry_op (0, 16)) return;
   if (pen->get_type () == pencil_brush &&
       !is_nil (pen->get_brush ()) &&
       pen->get_brush ()->get_type () == brush_pattern) {
@@ -2499,6 +2541,7 @@ translate_pixmap (fz_pixmap *dest_pix, fz_irect dest_rect,
 
 void
 mupdf_renderer_rep::fetch (SI x1, SI y1, SI x2, SI y2, renderer ren, SI x, SI y) {
+  if (mupdf_dry_op (5, 32)) return;
   ASSERT (ren != NULL, "invalid situation");
   if (ren->is_printer ()) return;
   mupdf_renderer_rep* src= (mupdf_renderer_rep*) ren->get_handle ();
@@ -2673,6 +2716,7 @@ mupdf_renderer_rep::put_shadow (renderer ren, SI x1, SI y1, SI x2, SI y2) {
 
 void 
 mupdf_renderer_rep::apply_shadow (SI x1, SI y1, SI x2, SI y2)  {
+  if (mupdf_dry_op (5, 20)) return;
   if (master == NULL) return;
   if (pixmap == static_cast<mupdf_renderer_rep*>(master)->pixmap) return;
   outer_round (x1, y1, x2, y2);

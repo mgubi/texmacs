@@ -91,6 +91,10 @@ function handle(m) {
 		if (new URLSearchParams(self.location.search).has("debug"))
 			core.ccall("tau_scheme", null, ["string"], [m.code]);
 		break;
+	case "dry":
+		// for the benchmark of the drawing (misc/tau/test/render-bench.mjs)
+		if (new URLSearchParams(self.location.search).has("debug")) core._tau_dry(m.on ? 1 : 0);
+		break;
 	case "buffer":
 		core.ccall("tau_buffer", null, ["string", "number", "string"], [m.what, m.window, m.name || ""]);
 		break;

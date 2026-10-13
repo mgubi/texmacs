@@ -380,6 +380,7 @@ tau_turn () {
   // (TEXMACS_EDIT_PROFILE, ?profile in the page: where a turn spends its time)
   bool prof= edit_profile.on;
   double t0= prof ? emscripten_get_now () : 0, t1= t0, t2= t0, t3= t0;
+  double draw_ms= 0, draw_px= 0;
   tau_follow_fonts ();
   array<simple_widget_rep*> views;
   iterator<pointer> it= iterate (simple_widget_rep::all_widgets);
@@ -393,7 +394,9 @@ tau_turn () {
     simple_widget_rep* v= views[i];
     if (!simple_widget_rep::all_widgets->contains ((pointer) v)) continue;
     if (!v->shown || v->ren == NULL) continue;
+    double d0= prof ? emscripten_get_now () : 0;
     if (!v->repaint ()) continue;
+    if (prof) { draw_ms += emscripten_get_now () - d0; draw_px += (double) (v->drawn_x2 - v->drawn_x1) * (v->drawn_y2 - v->drawn_y1); }
     int ew, eh, sx, sy, cx, cy;
     v->extents_in_pixels (ew, eh, sx, sy);
     v->cursor_in_pixels (cx, cy);
@@ -413,10 +416,11 @@ tau_turn () {
   }
   if (prof) {
     t3= emscripten_get_now ();
-    if (t3 - t0 >= 5)
-      cout << "tau-profile turn: " << (int) (t3 - t0) << " ms (editors "
-           << (int) (t1 - t0) << ", drawing and sending " << (int) (t2 - t1)
-           << ", for the page " << (int) (t3 - t2) << ")\n";
+    if (t3 - t0 >= 1)
+      cout << "tau-profile turn: " << (t3 - t0) << " ms (editors "
+           << (t1 - t0) << ", drawing " << draw_ms << ", sending "
+           << (t2 - t1 - draw_ms) << ", pixels " << (int) draw_px
+           << ", for the page " << (t3 - t2) << ")\n";
   }
 }
 
@@ -730,6 +734,27 @@ tau_freeze () {
 #ifdef __EMSCRIPTEN__
   emscripten_cancel_main_loop ();
 #endif
+}
+
+// A benchmark: with on, the views are not drawn, their drawing commands
+// are counted (mupdf_dry in mupdf_renderer.cpp). Off: the counts are told
+EMSCRIPTEN_KEEPALIVE
+void
+tau_dry (int on) {
+  extern bool mupdf_dry;
+  extern long mupdf_dry_n[6];
+  extern long mupdf_dry_bytes;
+  if (!on && mupdf_dry)
+    cout << "tau-dry: glyphs " << (int) mupdf_dry_n[0]
+         << ", rectangles " << (int) mupdf_dry_n[1]
+         << ", paths " << (int) mupdf_dry_n[2]
+         << ", pictures " << (int) mupdf_dry_n[3]
+         << ", state " << (int) mupdf_dry_n[4]
+         << ", copies " << (int) mupdf_dry_n[5]
+         << ", bytes " << (int) mupdf_dry_bytes << "\n";
+  for (int i= 0; i < 6; i++) mupdf_dry_n[i]= 0;
+  mupdf_dry_bytes= 0;
+  mupdf_dry= (on != 0);
 }
 
 // Images which were dropped on a view (their paths in the file system,

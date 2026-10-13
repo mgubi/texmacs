@@ -52,6 +52,7 @@ pager_rep::pager_rep (path ip2, edit_env env2, array<page_item> l2):
 
   page_offset= env->first_page - 1;
   cur_top= 0;
+  memo= NULL;
 }
 
 /******************************************************************************
@@ -200,8 +201,7 @@ pager_rep::make_header (bool empty_flag) {
   tree old= env->local_begin (PAR_COLUMNS, "1");
   string which= (N(pages)&1)==0? PAGE_ODD_HEADER: PAGE_EVEN_HEADER;
   if (style [PAGE_THIS_HEADER] != "") which= PAGE_THIS_HEADER;
-  box b= typeset_as_concat (env, attach_here (tree (PARA, style[which]),
-					      decorate()));
+  box b= make_part (memo == NULL? NULL: &memo->headers, style[which]);
   style (PAGE_THIS_HEADER) = "";
   env->local_end (PAR_COLUMNS, old);
   return b;
@@ -215,8 +215,7 @@ pager_rep::make_footer (bool empty_flag) {
   tree old= env->local_begin (PAR_COLUMNS, "1");
   string which= (N(pages)&1)==0? PAGE_ODD_FOOTER: PAGE_EVEN_FOOTER;
   if (style [PAGE_THIS_FOOTER] != "") which= PAGE_THIS_FOOTER;
-  box b= typeset_as_concat (env, attach_here (tree (PARA, style[which]),
-					      decorate()));
+  box b= make_part (memo == NULL? NULL: &memo->footers, style[which]);
   style (PAGE_THIS_FOOTER) = "";
   env->local_end (PAR_COLUMNS, old);
   return b;
@@ -249,6 +248,7 @@ pager_rep::adjust_margins (bool empty_flag) {
 
 box
 pager_rep::make_pages () {
+  memo_start ();
   if (paper) pages_make ();
   else papyrus_make ();
 

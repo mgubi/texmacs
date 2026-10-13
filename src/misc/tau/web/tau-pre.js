@@ -22,6 +22,13 @@ Module['preRun'].push(function () {
   if (new URLSearchParams (self.location.search).has ('trace-scroll')) ENV['TAU_DEBUG_SCROLL'] = '1';
   // ?profile: the times of the typesetting and of the drawing, in the console
   if (new URLSearchParams (self.location.search).has ('profile')) ENV['TEXMACS_EDIT_PROFILE'] = '1';
+  // ?debug&env=NAME=value: a variable of the environment of TeXmacs, for
+  // its switches (TEXMACS_PAGE_HF_CACHE=check...)
+  if (new URLSearchParams (self.location.search).has ('debug'))
+    new URLSearchParams (self.location.search).getAll ('env').forEach (function (e) {
+      var i = e.indexOf ('=');
+      if (i > 0) ENV[e.slice (0, i)] = e.slice (i + 1);
+    });
   // the system of the user, for the shortcuts of TeXmacs: Cmd+... on a Mac
   // (default_look_and_feel in src/Kernel/Abstractions/basic.cpp)
   var platform = (typeof navigator === 'undefined') ? '' :

@@ -1140,6 +1140,74 @@ page of TeXmacs Vue (`misc/wasm/progress.js`, `frame.js`) it is shown:
 - Seen, not changed: the page of the fonts is 4 pixels higher than its
   view, which gives the view a scroll bar.
 
+### A thread for the drawing?
+
+- Asked 2026-10-13: the core would write down what is to be drawn (a
+  display list) and another worker would draw it, with MuPDF there. The
+  typesetter does not call MuPDF (the metrics are FreeType's); the core
+  uses it for the sizes of the images, the pictures of snippets, the
+  attachments of a PDF and PDF to SVG, which would become requests.
+- Measured first (`misc/tau/test/render-bench.mjs`; `tau_dry` makes the
+  renderer write its commands down instead of drawing; Firefox, a view of
+  1280 × 860 at density 2, means of a step, in ms of the core):
+
+  | document | scroll: turn | drawing | of which saying what to draw | typing: turn | typesetting | drawing |
+  |---|---|---|---|---|---|---|
+  | prose | 6.8 | 5.4 | 1.1 | 5.0 | 2.5 | 0.7 |
+  | maths | 7.0 | 5.3 | 1.6 | 6.7 | 4.0 | 0.7 |
+  | tables | 7.4 | 5.7 | 2.0 | 6.7 | 4.0 | 0.7 |
+  | pictures | 5.8 | 4.2 | 0.2 | 5.9 | 2.0 | 1.8 |
+  | user manual | 7.8–9.5 | 6.1–7.5 | 2.0–2.7 | 139 | 135 | 1.0 |
+
+  A view which is drawn whole is some 1800 commands, 32 KB of them. The
+  copy of the pixels for the page is 1.2 ms of a scroll.
+- **The user manual as one book** (Help → Manual → User manual: 13000
+  lines, 642 views high) scrolls as the others do, and a key costs it
+  135 ms, all of it typesetting: 112 ms in the pages (with the breaks
+  reused) and 17 ms in the bridges (2 redone, 3028 reused), 1 ms of
+  drawing. A thread for the drawing changes nothing there; what a long
+  document needs is in the making of the pages. A view of it is some
+  9700 commands (5000 rectangles and 4000 changes of state for 640
+  glyphs: not looked into).
+- **What the key cost in the manual** (looked into the same day): 94 of
+  the 113 ms of the pager were the headers and the footers of the 379
+  pages, typeset again at every pass, and 12 the texts of the pages,
+  stacked again. Both are kept from a pass to the next by the work on
+  the typesetter in `maxs_texmacs` ("The pages of the last pass",
+  `make_pages.cpp`; `TEXMACS_PAGE_REUSE=check` makes them again and
+  compares), which is taken here; a cache of the headers alone which was
+  first written for Tau was dropped for it.
+  `render-bench.mjs --env TEXMACS_PAGE_REUSE=check --stress 1` (new
+  lines, a chapter, a section, all undone) is the check in the browser.
+  `?debug&env=NAME=value` sets such a switch of TeXmacs in the page.
+- **What is left of an edit in the manual**, stage by stage
+  (`render-bench.mjs --only manual --edits 1`, means in ms; measured
+  with the cache of the headers alone and with timers in the pager which
+  were taken out again):
+
+  | | a character | a new line | a line removed |
+  |---|---|---|---|
+  | typesetting | 64 | 91 | 73 |
+  | the bridges (2 to 8 typeset again, 3000 visited) | 19 | 17 | 17 |
+  | the pager: the breaks (signature, matching, search) | 20 | 45 | 29 |
+  | of which the search itself | 5 | 13 | 7 |
+  | the pager: the format of the pages | 12 | 12 | 12 |
+  | the pager: headers and footers | 4 | 7 | 4 |
+  | the change log | 4 | 6 | 7 |
+  | the environment at the cursor | 3 | 3 | 3 |
+
+  (Some of the twelve characters change the number of lines, hence a
+  search in the first column: 8 ms of breaks when there is none.) The
+  menus, a moment after the last key: 15 ms, 8 of them the focus icons.
+  No footnote or float is formatted by the pager: their boxes come from
+  the bridges and are only stacked. One structure which is a single unit:
+  a table of 60 rows by 6 costs 7 ms for a character in a cell; a
+  paragraph of 4000 words 122 ms, all of it broken into lines again.
+- **Not worth it for these**: a step of a scroll would go from 7 ms to
+  some 3, a key from 6 ms to some 5.5, both well inside a frame today.
+  The page of the design of the fonts (40 ms of drawing for a step) is
+  the exception, and a matter of its own.
+
 ## Order of the work
 
 1. **The core alone.** Cut the tree; build without a GUI; under node:
