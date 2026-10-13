@@ -127,6 +127,36 @@
       (list-or (map (lambda (c) (and (pair? c) (node-mentions? c var)))
                     (csl-children node)))))
 
+(define (macro-calls node)
+  ;; the names of the macros which the cs:text below @node call
+  (append (if (and (== (csl-name node) 'text) (csl-attr node 'macro))
+              (list (csl-attr node 'macro))
+              '())
+          (append-map (lambda (c) (if (pair? c) (macro-calls c) '()))
+                      (csl-children node))))
+
+(define (area-mentions? style node var)
+  ;; as node-mentions?, also through the macros which are called
+  (let loop ((nodes (list node)) (seen '()))
+    (cond ((null? nodes) #f)
+          ((node-mentions? (car nodes) var) #t)
+          (else
+            (let* ((new (list-filter
+                         (list-remove-duplicates (macro-calls (car nodes)))
+                         (lambda (m) (nin? m seen))))
+                   (bodies (list-filter (map (cut csl-style-macro style <>)
+                                             new)
+                                        identity)))
+              (loop (append (cdr nodes) bodies) (append new seen)))))))
+
+(define (distinct-items items)
+  ;; the first of the items with the same identifier
+  (let loop ((l items) (seen (make-ahash-table)) (r '()))
+    (cond ((null? l) (reverse r))
+          ((ahash-ref seen (csl-item-id (car l))) (loop (cdr l) seen r))
+          (else (ahash-set! seen (csl-item-id (car l)) #t)
+                (loop (cdr l) seen (cons (car l) r))))))
+
 (define (set-numbers! proc ids)
   (with numbers (make-ahash-table)
     (for-each (lambda (id i) (ahash-set! numbers id (+ i 1)))
@@ -137,6 +167,7 @@
   (:synopsis "A processor for @items, in the order in which they are cited")
   (let* ((proc (make-ahash-table))
          (table (make-ahash-table))
+         (items (distinct-items items))
          (ids (map csl-item-id items))
          (bib (csl-style-ref style 'bibliography)))
     (for (item items) (ahash-set! table (csl-item-id item) item))
@@ -148,7 +179,7 @@
     (ahash-set! proc 'explicit-year-suffix
                 (node-mentions? (csl-style-ref style 'root) "year-suffix"))
     (ahash-set! proc 'numeric?
-                (node-mentions? (csl-style-ref style 'citation)
+                (area-mentions? style (csl-style-ref style 'citation)
                                 "citation-number"))
     (set-numbers! proc ids)
     (with sorted (sort-by-keys proc items (sort-keys proc bib) 'bibliography
@@ -194,8 +225,9 @@
     (if (and align (nnull? children))
         (let* ((first (csl-render-layout (list 'layout '() (car children))
                                          ctx))
+               ;; what the first field has rendered is not rendered again
                (rest (csl-render-layout (cons* 'layout '() (cdr children))
-                                        ctx)))
+                                        ctx #t)))
           (remember
            (list id (ahash-ref ctx 'number)
                  (csl-finish-layout
@@ -333,27 +365,55 @@
                 (cons (cons pos level)
                       (list-filter l (lambda (p) (!= (car p) pos)))))))
 
-(define (refine! proc ids names? givens?)
+(define (names-shown proc id)
+  ;; how many of the first names of the cite of the item @id are shown, or
+  ;; #f when the cite shows no names
+  (let* ((item (csl-processor-item proc id))
+         (area (csl-style-ref (ahash-ref proc 'style) 'citation))
+         (ctx (item-context proc item 'citation)))
+    (setup-cite ctx (list (cons 'id id)))
+    (csl-render-layout (csl-child area 'layout) ctx)
+    (ahash-ref ctx 'names-shown)))
+
+(define (same-person? proc ids pos)
+  ;; is the name number @pos of all the items @ids the same person?
+  (with keys (map (lambda (id)
+                    (with names (item-names proc id)
+                      (and (< pos (length names))
+                           (csl-name-key (list-ref names pos)))))
+                  ids)
+    (list-and (map (lambda (k) (== k (car keys))) (cdr keys)))))
+
+(define (refine! proc ids names? givens? tried)
   ;; try to tell apart the items @ids, whose cites read the same; returns
-  ;; whether some of them could be
+  ;; whether some of them could be. The initials and the given names of
+  ;; the first @tried names are known not to help.
   (let* ((snap (snapshot proc ids))
          (longest (apply max (map (lambda (id) (length (item-names proc id)))
                                   ids)))
-         (again (lambda (cls)
+         ;; only the names which are shown and which differ can help
+         (shown (if givens?
+                    (apply max (map (lambda (id)
+                                      (or (names-shown proc id) longest))
+                                    ids))
+                    0))
+         (again (lambda (cls tried)
                   (for (c cls)
-                    (when (> (length c) 1) (refine! proc c names? givens?)))
+                    (when (> (length c) 1)
+                      (refine! proc c names? givens? tried)))
                   #t)))
     (or
      ;; the initials, then the given names, of one name
      (and givens?
-          (let loop ((pos 0) (level 1))
-            (cond ((>= pos longest) #f)
-                  ((> level 2) (loop (+ pos 1) 1))
+          (let loop ((pos tried) (level 1))
+            (cond ((>= pos (min shown longest)) #f)
+                  ((or (> level 2) (same-person? proc ids pos))
+                   (loop (+ pos 1) 1))
                   (else
                     (for (id ids) (set-level! proc id pos level))
                     (with cls (classes proc ids)
                       (if (> (length cls) 1)
-                          (again cls)
+                          (again cls pos)
                           (begin
                             (restore! proc snap)
                             (loop pos (+ level 1)))))))))
@@ -364,13 +424,13 @@
                              (state-ref proc id 'names-add 0)))
                         ids))
           (< (state-ref proc (car ids) 'names-add 0) longest)
-          (begin
+          (with tried* (max tried (min shown longest))
             (for (id ids)
               (state-set! proc id 'names-add
                           (+ (state-ref proc id 'names-add 0) 1)))
             (with cls (classes proc ids)
-              (cond ((> (length cls) 1) (again cls))
-                    ((refine! proc ids names? givens?) #t)
+              (cond ((> (length cls) 1) (again cls tried*))
+                    ((refine! proc ids names? givens? tried*) #t)
                     (else (restore! proc snap) #f))))))))
 
 (define (person-initials name iw)
@@ -443,7 +503,7 @@
          (on? (lambda (key) (csl-attr? area key "true")))
          (ids (ahash-ref proc 'order))
          (rule (csl-attr area 'givenname-disambiguation-rule "by-cite"))
-         (label? (node-mentions? area "citation-label")))
+         (label? (area-mentions? style area "citation-label")))
     (when (and (on? 'disambiguate-add-givenname) (!= rule "by-cite"))
       (set-global-levels! proc rule))
     (when (or (on? 'disambiguate-add-names)
@@ -451,7 +511,8 @@
       (for (c (ambiguous proc ids))
         (refine! proc c (on? 'disambiguate-add-names)
                  (and (on? 'disambiguate-add-givenname)
-                      (== rule "by-cite")))))
+                      (== rule "by-cite"))
+                 0)))
     (when (node-has-attr? (csl-style-ref style 'root) 'disambiguate)
       (for (c (ambiguous proc ids))
         (for (id c) (state-set! proc id 'flag #t))))

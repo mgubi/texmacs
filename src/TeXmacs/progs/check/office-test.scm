@@ -601,6 +601,377 @@
           '((p (math "<math><mi>x</mi></math>")))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; What the readers must not lose, and files which are not as usual
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (docx-parts body . parts)
+  ;; the blocks of a Word document with this body and these other entries
+  ;; of the archive, each (name . text)
+  (cdr (parse-docx-document
+         (zip-pack (cons "word/document.xml" (map car parts))
+                   (cons (string-append "<?xml version='1.0'?><w:document" docx-ns
+                                        "><w:body>" body "</w:body></w:document>")
+                         (map cdr parts))))))
+
+(define (odt-parts body automatic . parts)
+  ;; the same for an OpenDocument text, with these automatic styles
+  (cdr (parse-odt-document
+         (zip-pack (cons "content.xml" (map car parts))
+                   (cons (string-append "<?xml version='1.0'?><office:document-content"
+                                        odt-ns "><office:automatic-styles>" automatic
+                                        "</office:automatic-styles><office:body><office:text>"
+                                        body "</office:text></office:body>"
+                                        "</office:document-content>")
+                         (map cdr parts))))))
+
+(define (in-tm l)
+  ;; the paragraphs of TeXmacs for the blocks l of a reader
+  (cdr (cadr (cadr (office->texmacs (cons 'office l))))))
+
+(define (test-docx-more-text)
+  (check-group "docx more text")
+  ;; the runs of a text which says its direction
+  (check= (docx (wp (wr "a ") "<w:dir w:val='rtl'>" (wr "b") "</w:dir>"
+                    "<w:bdo w:val='ltr'>" (wr "c") "</w:bdo>"))
+          '((p "a bc")))
+  ;; the characters of a font of symbols: the one of Unicode, a character
+  ;; which stands for one which is not known, the code in another font
+  (let ((sym (lambda (font char)
+               (docx (wp (wr "a ") "<w:r><w:sym w:font='" font "' w:char='" char
+                         "'/></w:r>")))))
+    (check= (sym "Wingdings" "F0E0") `((p ,(string-append "a " (office-utf8 #x2192)))))
+    (check= (sym "Symbol" "F061") `((p ,(string-append "a " (office-utf8 #x3b1)))))
+    (check= (sym "Symbol" "F0AE") `((p ,(string-append "a " (office-utf8 #x2192)))))
+    (check= (sym "Wingdings" "F0B7") `((p ,(string-append "a " (office-utf8 #xfffd)))))
+    (check= (sym "Arial" "0041") '((p "a A")))
+    (check= (sym "Arial" "zz") '((p "a "))))
+  ;; hidden text is not there; a run of a script which is written from
+  ;; right to left is bold by a property of its own
+  (check= (docx (wp (wr "a") (wr "hidden" "<w:vanish/>"))) '((p "a")))
+  (check= (docx (wp (wr "x" "<w:rtl/><w:b/><w:iCs/>") (wr "y" "<w:bCs/>")))
+          '((p (em "x") "y")))
+  ;; a field which ends in a later paragraph loses nothing
+  (check= (docx (string-append
+                  (wp (wr "Before ") "<w:r><w:fldChar w:fldCharType='begin'/></w:r>"
+                      "<w:r><w:instrText> ADDIN ZOTERO_BIBL </w:instrText></w:r>"
+                      "<w:r><w:fldChar w:fldCharType='separate'/></w:r>" (wr "One."))
+                  (wp (wr "Two.") "<w:r><w:fldChar w:fldCharType='end'/></w:r>"
+                      (wr " After"))))
+          '((p "Before One.") (p "Two. After")))
+  (check= (docx (string-append
+                  (wp (wr "a ") "<w:r><w:fldChar w:fldCharType='begin'/></w:r>"
+                      "<w:r><w:instrText> HYPERLINK \"http://a.b\" </w:instrText></w:r>"
+                      "<w:r><w:fldChar w:fldCharType='separate'/></w:r>" (wr "one"))
+                  (wp (wr "two") "<w:r><w:fldChar w:fldCharType='end'/></w:r>")
+                  (wp (wr "x"))))
+          '((p "a " (link (@ (href "http://a.b")) "one"))
+            (p (link (@ (href "http://a.b")) "two"))
+            (p "x")))
+  ;; the instructions of the fields: an address with a space, a bookmark
+  ;; in a file, a bookmark with a space, the page of a bookmark
+  (let ((field (lambda (instr)
+                 (docx (wp "<w:fldSimple w:instr='" instr "'>" (wr "t")
+                           "</w:fldSimple>")))))
+    (check= (field " HYPERLINK \"http://x.org/a b.html\" \\o \"tip\" ")
+            '((p (link (@ (href "http://x.org/a b.html")) "t"))))
+    (check= (field " HYPERLINK \"other.docx\" \\l \"sec2\" ")
+            '((p (link (@ (href "other.docx#sec2")) "t"))))
+    (check= (field " HYPERLINK \\l \"My mark\" ")
+            '((p (link (@ (href "#My mark")) "t"))))
+    (check= (field " REF fig1 \\r \\h ") '((p (ref (@ (name "fig1")) "t"))))
+    (check= (field " PAGEREF _Ref1 \\h ")
+            '((p (ref (@ (name "_Ref1") (kind "page")) "t")))))
+  ;; a note which refers to itself is read once
+  (check= (docx-parts
+            (wp (wr "a") "<w:r><w:footnoteReference w:id='1'/></w:r>")
+            (cons "word/footnotes.xml"
+                  (string-append
+                    "<w:footnotes" docx-ns "><w:footnote w:id='1'>"
+                    (wp (wr "n") "<w:r><w:footnoteReference w:id='1'/></w:r>")
+                    "</w:footnote></w:footnotes>")))
+          '((p "a" (note (p "n")))))
+  ;; the picture of the fallback when the choice gives nothing, and all
+  ;; the pictures of a group
+  (let ((rels (cons "word/_rels/document.xml.rels"
+                    (string-append
+                      "<Relationships><Relationship Id='rId1' Target='media/a.png'/>"
+                      "<Relationship Id='rId2' Target='media/b.png'/></Relationships>"))))
+    (check= (docx-parts
+              (wp "<w:r><mc:AlternateContent><mc:Choice Requires='cx'><w:drawing>"
+                  "<cx:chart r:id='rId5'/></w:drawing></mc:Choice><mc:Fallback>"
+                  "<w:drawing><a:blip r:embed='rId1'/></w:drawing></mc:Fallback>"
+                  "</mc:AlternateContent></w:r>")
+              rels (cons "word/media/a.png" "A"))
+            '((p (image (@ (name "a.png") (data "A"))))))
+    (check= (docx-parts
+              (wp "<w:r><w:drawing><wp:extent cx='360000' cy='360000'/><wpg:wgp>"
+                  "<a:blip r:embed='rId1'/><a:blip r:embed='rId2'/></wpg:wgp>"
+                  "</w:drawing></w:r>")
+              rels (cons "word/media/a.png" "A") (cons "word/media/b.png" "B"))
+            '((p (image (@ (name "a.png") (data "A")))
+                 (image (@ (name "b.png") (data "B"))))))))
+
+(define (test-docx-more-blocks)
+  (check-group "docx more blocks")
+  (let ((item (lambda (id text)
+                (wp "<w:pPr><w:numPr><w:ilvl w:val='0'/><w:numId w:val='" id
+                    "'/></w:numPr></w:pPr>" (wr text))))
+        (numbering (lambda (s)
+                     (cons "word/numbering.xml"
+                           (string-append "<w:numbering" docx-ns ">" s
+                                          "</w:numbering>")))))
+    ;; a level without a mark: one more paragraph of the item before, and
+    ;; the list goes on after it
+    (check= (docx-parts
+              (string-append (item "2" "one") (item "1" "more") (item "2" "two"))
+              (numbering
+                (string-append
+                  "<w:abstractNum w:abstractNumId='0'><w:lvl w:ilvl='0'>"
+                  "<w:numFmt w:val='bullet'/><w:lvlText w:val=' '/></w:lvl></w:abstractNum>"
+                  "<w:abstractNum w:abstractNumId='1'><w:lvl w:ilvl='0'>"
+                  "<w:numFmt w:val='decimal'/><w:lvlText w:val='%1.'/></w:lvl></w:abstractNum>"
+                  "<w:num w:numId='1'><w:abstractNumId w:val='0'/></w:num>"
+                  "<w:num w:numId='2'><w:abstractNumId w:val='1'/></w:num>")))
+            '((list (@ (kind "number")) (item (p "one") (p "more")) (item (p "two")))))
+    ;; a list whose levels are those of a style of lists
+    (check= (docx-parts
+              (item "1" "one")
+              (numbering
+                (string-append
+                  "<w:abstractNum w:abstractNumId='0'><w:lvl w:ilvl='0'>"
+                  "<w:numFmt w:val='decimal'/></w:lvl></w:abstractNum>"
+                  "<w:abstractNum w:abstractNumId='1'><w:numStyleLink w:val='L'/>"
+                  "</w:abstractNum>"
+                  "<w:num w:numId='1'><w:abstractNumId w:val='1'/></w:num>"
+                  "<w:num w:numId='2'><w:abstractNumId w:val='0'/></w:num>"))
+              (cons "word/styles.xml"
+                    (string-append
+                      "<w:styles" docx-ns "><w:style w:type='numbering' w:styleId='L'>"
+                      "<w:pPr><w:numPr><w:numId w:val='2'/></w:numPr></w:pPr>"
+                      "</w:style></w:styles>")))
+            '((list (@ (kind "number")) (item (p "one"))))))
+  (let ((tc (lambda (props text)
+              (string-append "<w:tc><w:tcPr>" props "</w:tcPr>" (wp (wr text)) "</w:tc>")))
+        (plain (lambda (text) `(cell (@ (borders "none")) (p ,text)))))
+    ;; the rows and the cells inside a content control
+    (check= (docx (string-append
+                    "<w:tbl><w:tr>" (tc "" "a") "<w:sdt><w:sdtContent>" (tc "" "b")
+                    "</w:sdtContent></w:sdt></w:tr><w:sdt><w:sdtContent><w:tr>"
+                    (tc "" "c") (tc "" "d") "</w:tr></w:sdtContent></w:sdt></w:tbl>"))
+            `((table (row ,(plain "a") ,(plain "b")) (row ,(plain "c") ,(plain "d")))))
+    ;; a row which starts after the first column
+    (check= (docx (string-append
+                    "<w:tbl><w:tr>" (tc "" "a") (tc "" "b") "</w:tr>"
+                    "<w:tr><w:trPr><w:gridBefore w:val='1'/></w:trPr>" (tc "" "c")
+                    "</w:tr></w:tbl>"))
+            `((table (row ,(plain "a") ,(plain "b"))
+                     (row (cell (@ (borders "none"))) ,(plain "c")))))
+    ;; a cell which goes on a merge that no cell starts keeps its text
+    (check= (docx (string-append
+                    "<w:tbl><w:tr>" (tc "" "a") "</w:tr><w:tr>" (tc "<w:vMerge/>" "b")
+                    "</w:tr><w:tr>" (tc "<w:vMerge/>" "") "</w:tr></w:tbl>"))
+            `((table (row ,(plain "a"))
+                     (row (cell (@ (rowspan "2") (borders "none")) (p "b")))
+                     (row (cell (@ (covered "true")))))))
+    ;; a row which was deleted is not there
+    (check= (docx (string-append
+                    "<w:tbl><w:tr><w:trPr><w:del w:id='1'/></w:trPr>" (tc "" "gone")
+                    "</w:tr><w:tr>" (tc "" "kept") "</w:tr></w:tbl>"))
+            `((table (row ,(plain "kept")))))
+    ;; numbers which are not those of a table: no error, no huge table
+    (check= (docx (string-append "<w:tbl><w:tr>" (tc "<w:gridSpan w:val='0'/>" "x")
+                                 "</w:tr></w:tbl>"))
+            `((table (row ,(plain "x")))))
+    (check= (length (cdr (cadr (car (docx (string-append
+                                            "<w:tbl><w:tr>"
+                                            (tc "<w:gridSpan w:val='30000000'/>" "x")
+                                            "</w:tr></w:tbl>"))))))
+            63)
+    (check= (docx (string-append "<w:tbl><w:tblPr><w:tblLook w:val='1.5'/></w:tblPr><w:tr>"
+                                 (tc "" "x") "</w:tr></w:tbl>"))
+            `((table (row ,(plain "x"))))))
+  (check= (docx (wp "<w:pPr><w:outlineLvl w:val='1.4'/></w:pPr>" (wr "H")))
+          '((p (@ (role "heading") (level "2")) "H")))
+  (check= (docx (wp "<w:pPr><w:ind w:left='720.5'/></w:pPr>" (wr "x")))
+          '((p "x"))))
+
+(define (test-odt-more)
+  (check-group "odt more")
+  ;; a paragraph which is bold as a whole, by its automatic style
+  (check= (odt-parts
+            "<text:p text:style-name='P9'>all <text:span>bold</text:span></text:p>"
+            (string-append "<style:style style:name='P9' style:family='paragraph'>"
+                           "<style:text-properties fo:font-weight='bold'/></style:style>"))
+          '((p (strong "all bold"))))
+  ;; the bibliography, the other indexes, a paragraph with a number
+  (check= (odt (string-append
+                 "<text:bibliography><text:index-body><text:index-title>" (tp "Refs")
+                 "</text:index-title>" (tp "[1] A.") "</text:index-body></text:bibliography>"
+                 "<text:alphabetical-index><text:index-body>" (tp "apple 3")
+                 "</text:index-body></text:alphabetical-index>"
+                 "<text:numbered-paragraph>" (tp "n") "</text:numbered-paragraph>"))
+          '((p "Refs") (p "[1] A.") (p "apple 3") (p "n")))
+  ;; an object which is no formula is its picture, not an equation
+  (check= (odt-parts
+            (tp "<draw:frame><draw:object xlink:href='./Object 1'/>"
+                "<draw:image xlink:href='./ObjectReplacements/Object 1'/></draw:frame>")
+            ""
+            (cons "Object 1/content.xml"
+                  (string-append "<office:document-content" odt-ns "><office:body>"
+                                 "<office:chart>" (tp "Sales") "</office:chart>"
+                                 "</office:body></office:document-content>"))
+            (cons "ObjectReplacements/Object 1" "PNGDATA"))
+          '((p (image (@ (name "Object 1") (data "PNGDATA"))))))
+  ;; numbers which are not those of a text: no error, no huge text
+  (check= (odt (tp "a<text:s text:c='-1'/>b")) '((p "ab")))
+  (check= (odt (tp "a<text:s text:c='1.4'/>b")) '((p "a b")))
+  (check= (string-length (cadr (car (odt (tp "a<text:s text:c='30000000'/>b"))))) 1002)
+  (check= (odt (string-append
+                 "<table:table><table:table-row>"
+                 "<table:table-cell table:number-columns-repeated='-1'"
+                 " table:number-columns-spanned='x'>" (tp "c")
+                 "</table:table-cell></table:table-row></table:table>"))
+          '((table (row (cell (@ (borders "none")) (p "c"))))))
+  (check= (odt "<text:h text:outline-level='2.4'>H</text:h>")
+          '((p (@ (role "heading") (level "2")) "H")))
+  ;; the list around a table is not the one of its cells
+  (check= (odt (string-append
+                 "<text:list text:style-name='L1'><text:list-item><table:table>"
+                 "<table:table-row><table:table-cell><text:list text:style-name='L1'>"
+                 "<text:list-item><text:list><text:list-item>" (tp "x")
+                 "</text:list-item></text:list></text:list-item></text:list>"
+                 "</table:table-cell></table:table-row></table:table>"
+                 "</text:list-item></text:list>"))
+          '((list (@ (kind "bullet"))
+                  (item (table (row (cell (@ (borders "none"))
+                                          (list (@ (kind "bullet"))
+                                                (item (list (@ (kind "number"))
+                                                            (item (p "x"))))))))))))
+  ;; the widths of the columns which are in a group
+  (check= (odt (string-append
+                 "<table:table><table:table-columns>"
+                 "<table:table-column table:style-name='ColA'/>"
+                 "<table:table-column table:style-name='ColB'/></table:table-columns>"
+                 "<table:table-row><table:table-cell>" (tp "1") "</table:table-cell>"
+                 "<table:table-cell>" (tp "2") "</table:table-cell>"
+                 "</table:table-row></table:table>"))
+          '((table (@ (columns "0.25 0.75"))
+                   (row (cell (@ (borders "none")) (p "1"))
+                        (cell (@ (borders "none")) (p "2"))))))
+  ;; a table in a box of text comes after the paragraph of the box
+  (check= (odt (tp "a<draw:frame><draw:text-box><table:table><table:table-row>"
+                   "<table:table-cell>" (tp "in") "</table:table-cell>"
+                   "</table:table-row></table:table>" (tp "b")
+                   "</draw:text-box></draw:frame>"))
+          '((p "ab") (table (row (cell (@ (borders "none")) (p "in"))))))
+  ;; an image which is not in the archive is not one to fetch: a link to
+  ;; its address on the web, the text of another address
+  (check= (odt (tp "<draw:frame><draw:image xlink:href='http://a.b/p.png'/>"
+                   "<svg:title>A picture</svg:title></draw:frame>"))
+          '((p (link (@ (href "http://a.b/p.png")) "A picture"))))
+  (check= (odt (tp "x <draw:frame><draw:image xlink:href='file:///etc/passwd'/>"
+                   "</draw:frame>"))
+          '((p "x file:///etc/passwd")))
+  (check= (in-tm '((p (image (@ (name "http://a.b/p.png"))))))
+          '("http://a.b/p.png")))
+
+(define (test-import-math)
+  (check-group "import math")
+  (let ((f (lambda (s) (in-tm (docx (wp (wr "f ") "<m:oMath>" s "</m:oMath>")))))
+        (acc (lambda (code)
+               (string-append "<m:acc><m:accPr><m:chr m:val='&#x" code ";'/></m:accPr>"
+                              "<m:e>" (mr "x") "</m:e></m:acc>"))))
+    ;; a division is no bracket
+    (check= (f (mr "a/b+c")) '((concat "f " (math "a/b+c"))))
+    (check= (f (string-append "<m:f><m:fPr><m:type m:val='lin'/></m:fPr><m:num>" (mr "a")
+                              "</m:num><m:den>" (mr "b") "</m:den></m:f>" (mr "+c")))
+            '((concat "f " (math "a/b+c"))))
+    (check= (in-tm '((p "f " (math "<math><mi>a</mi><mo>/</mo><mi>b</mi></math>"))))
+            '((concat "f " (math "a/b"))))
+    ;; the accents are those of TeXmacs
+    (check= (map (lambda (code) (f (acc code)))
+                 '("302" "307" "308" "30a" "20d7" "20db" "20dc"))
+            (map (lambda (a) `((concat "f " (math (wide "x" ,a)))))
+                 '("^" "<dot>" "<ddot>" "<abovering>" "<vect>" "<dddot>" "<ddddot>")))
+    (check= (in-tm `((p "f " (math ,(string-append
+                                      "<math><mover accent='true'><mi>x</mi><mo>"
+                                      (office-utf8 #x2d9) "</mo></mover></math>")))))
+            '((concat "f " (math (wide "x" "<dot>")))))
+    ;; the alphabets of a run
+    (check= (f (string-append
+                 "<m:r><m:rPr><m:scr m:val='double-struck'/></m:rPr><m:t>R</m:t></m:r>"
+                 "<m:r><m:rPr><m:scr m:val='script'/></m:rPr><m:t>L</m:t></m:r>"
+                 "<m:r><m:rPr><m:scr m:val='fraktur'/></m:rPr><m:t>g</m:t></m:r>"))
+            '((concat "f " (math "<bbb-R><cal-L><frak-g>"))))
+    ;; text in a formula keeps the spaces around it
+    (check= (f (string-append (mr "x") "<m:r><m:rPr><m:nor/></m:rPr>"
+                              "<m:t xml:space='preserve'> for all </m:t></m:r>" (mr "y")))
+            '((concat "f " (math (concat "x" (with "mode" "text" " for all ") "y")))))))
+
+(define (test-import-files)
+  (check-group "import files")
+  ;; a file which is no archive, or which has no text, says so
+  (check= (convert "not an archive" "docx-document" "texmacs-stree")
+          '(document (body (document (with "color" "red"
+                                       "This file is not a Word document")))
+                     (style "generic")))
+  (check= (parse-docx-document (zip-pack '("a.txt") '("x")))
+          '(office (error "This Word document has no text")))
+  (check= (parse-odt-document "not an archive")
+          '(office (error "This file is not an OpenDocument text")))
+  (check= (parse-odt-document (zip-pack '("a.txt") '("x")))
+          '(office (error "This OpenDocument file has no text")))
+  ;; other prefixes for the namespaces, or none
+  (let ((w "http://schemas.openxmlformats.org/wordprocessingml/2006/main")
+        (m "http://schemas.openxmlformats.org/officeDocument/2006/math")
+        (t "urn:oasis:names:tc:opendocument:xmlns:text:1.0")
+        (o "urn:oasis:names:tc:opendocument:xmlns:office:1.0"))
+    (check= (parse-docx-document
+              (zip-pack '("word/document.xml")
+                        (list (string-append
+                                "<x:document xmlns:x='" w "'><x:body><x:p><x:r>"
+                                "<x:rPr><x:b x:val='0'/><x:i/></x:rPr><x:t>hello</x:t>"
+                                "</x:r></x:p></x:body></x:document>"))))
+            '(office (p (em "hello"))))
+    (check= (parse-docx-document
+              (zip-pack '("word/document.xml")
+                        (list (string-append
+                                "<document xmlns='" w "'><body><p><r><t>hello</t></r>"
+                                "<n:oMath xmlns:n='" m "'><n:r><n:t>x</n:t></n:r></n:oMath>"
+                                "</p></body></document>"))))
+            '(office (p "hello" (math (@ (form "sxml")) (m:math (m:mi "x"))))))
+    (check= (parse-odt-document
+              (zip-pack '("content.xml")
+                        (list (string-append
+                                "<a:document-content xmlns:a='" o "' xmlns:b='" t "'>"
+                                "<a:body><a:text><b:p>hello<b:s b:c='2'/>x</b:p></a:text>"
+                                "</a:body></a:document-content>"))))
+            '(office (p "hello  x")))))
+
+(define (test-officetm-more)
+  (check-group "officetm more")
+  ;; a space at which a line is not broken, a place where a word may be cut
+  (check= (in-tm `((p ,(string-append "a" (office-utf8 #xa0) "b sil"
+                                      (office-utf8 #xad) "ben"))))
+          '((concat "a" (nbsp) "b silben")))
+  ;; the page of a bookmark
+  (check= (in-tm '((p (bookmark (@ (name "b"))) "x")
+                   (p "page " (ref (@ (name "b") (kind "page")) "5"))))
+          '((concat (label "b") "x") (concat "page " (pageref "b"))))
+  ;; a title of two paragraphs has two lines; a subtitle alone is kept
+  (check= (in-tm '((p (@ (role "title")) "One") (p (@ (role "title")) "Two")
+                   (p (@ (role "date")) "2026") (p (@ (role "date")) "May") (p "x")))
+          '((doc-data (doc-title (concat "One" (next-line) "Two"))
+                      (doc-date (concat "2026" (next-line) "May")))
+            "x"))
+  (check= (in-tm '((p (@ (role "subtitle")) "S") (p "x")))
+          '((doc-data (doc-subtitle "S")) "x"))
+  ;; a level which is no small integer
+  (check= (in-tm '((p (@ (role "heading") (level "2.6")) "H")))
+          '((subsubsection "H")))
+  (check= (in-tm '((p (@ (role "heading") (level "x")) "H"))) '((section "H"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Office trees as TeXmacs trees
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1173,6 +1544,205 @@
         office-same))
     '("docx-document" "odt-document")))
 
+;; More of the export: what the converter and the writers must keep.
+
+(define (export-entry z name)
+  ;; the text of the file name of the archive z, or ""
+  (or (office-entry (office-archive z) name) ""))
+
+(define (export-has? s what)
+  (>= (string-search-forwards what 0 s) 0))
+
+(define (test-export-math)
+  (check-group "export math")
+  (let ((nbsp (office-utf8 #xa0)))
+    ;; a binomial is a fraction without a bar in brackets; the fractions
+    ;; of LaTeX are fractions; mod is a text
+    (check= (of '(math (concat (binom "n" "k") "+" (tfrac "1" "2") "+a" (bmod) "b")))
+            `((p (math (@ (form "sxml"))
+                       (m:math
+                         (m:mrow (m:mrow (m:mo (@ (form "prefix")) "(")
+                                         (m:mfrac (@ (linethickness "0"))
+                                                  (m:mi "n") (m:mi "k"))
+                                         (m:mo (@ (form "postfix")) ")"))
+                                 (m:mo "+") (m:mfrac (m:mn "1") (m:mn "2"))
+                                 (m:mo "+") (m:mi "a")
+                                 (m:mtext ,(string-append nbsp "mod" nbsp))
+                                 (m:mi "b"))))))))
+  (check= (mathml->omml '(m:math (m:mfrac (@ (linethickness "0")) (m:mi "n") (m:mi "k"))))
+          '(m:oMath (m:f (m:fPr (m:type (@ (m:val "noBar"))))
+                         (m:num (m:r (m:t "n"))) (m:den (m:r (m:t "k"))))))
+  ;; the brackets by their characters; no bracket at a side is a bracket
+  ;; without a character
+  (check= (of '(math (concat (around* "<langle>" "u" "<rangle>")
+                             (left "{") "y" (right "."))))
+          `((p (math (@ (form "sxml"))
+                     (m:math
+                       (m:mrow (m:mrow (m:mo (@ (form "prefix")) ,(office-utf8 #x27e8))
+                                       (m:mi "u")
+                                       (m:mo (@ (form "postfix")) ,(office-utf8 #x27e9)))
+                               (m:mrow (m:mo (@ (form "prefix")) "{") (m:mi "y")
+                                       (m:mo (@ (form "postfix"))))))))))
+  (check= (mathml->omml '(m:math (m:mrow (m:mo (@ (form "prefix")) "{") (m:mi "y")
+                                         (m:mo (@ (form "postfix"))))))
+          '(m:oMath (m:d (m:dPr (m:begChr (@ (m:val "{"))) (m:endChr (@ (m:val ""))))
+                         (m:e (m:r (m:t "y"))))))
+  ;; an operator which is a word is a name; a big operator which is
+  ;; written as a word is its character; an accent which is not known is
+  ;; left out
+  (check= (of '(math (concat (below "lim" "n") (big "iint") "f" (wide "x" "<tilde>"))))
+          `((p (math (@ (form "sxml"))
+                     (m:math (m:mrow (m:munder (m:mi "lim") (m:mi "n"))
+                                     (m:mo ,(office-utf8 #x222c)) (m:mi "f")
+                                     (m:mi "x")))))))
+  ;; the scripts after the base are kept with those before it
+  (check= (mathml->omml '(m:math (m:mmultiscripts (m:mi "X") (m:mi "b") (m:none)
+                                                  (m:mprescripts) (m:mi "a") (m:none))))
+          '(m:oMath (m:sPre (m:sub (m:r (m:t "a"))) (m:sup)
+                            (m:e (m:sSub (m:e (m:r (m:t "X")))
+                                         (m:sub (m:r (m:t "b"))))))))
+  ;; the spaces at the ends of a text of a formula are kept
+  (check= (mathml->omml '(m:math (m:mtext " if ")))
+          '(m:oMath (m:r (m:rPr (m:nor)) (m:t (@ (xml:space "preserve")) " if "))))
+  ;; a formula of an OpenDocument text, as LibreOffice shows it well: a
+  ;; word which is no function is text, a relation has something at each
+  ;; side, a fraction without a bar is a table, a hat is the circumflex
+  (let* ((odt (serialize-odt-document
+                `(office (p (math (@ (form "sxml"))
+                                  (m:math (m:mrow (m:mo "=") (m:mi "sup") (m:mi "sin")
+                                                  (m:mfrac (@ (linethickness "0"))
+                                                           (m:mi "n") (m:mi "k"))
+                                                  (m:mover (m:mi "x") (m:mo "^")))))))))
+         (m (export-entry odt "Formula-1/content.xml")))
+    (check-true (export-has? m "<mrow><mrow/><mo>=</mo><mtext>sup</mtext><mi>sin</mi>"))
+    (check-true (export-has? m "<mtable><mtr><mtd><mi>n</mi></mtd></mtr>"))
+    (check-true (export-has? m (string-append "<mo>" (office-utf8 #x2c6) "</mo>")))))
+
+(define (test-export-blocks)
+  (check-group "export blocks")
+  ;; an appendix is a heading of the first level which is in use
+  (check= (of '(document (section "S") (subsection "T") (appendix "A")))
+          '((p (@ (role "heading") (level "1")) "S")
+            (p (@ (role "heading") (level "2")) "T")
+            (p (@ (role "heading") (level "1")) "A")))
+  ;; the numbers of the rows of several equations, each with its labels
+  (check= (of '(eqnarray
+                 (document
+                   (tformat
+                     (table (row (cell "x")
+                                 (cell (concat "=y" (htab "5mm")
+                                               (with "mode" "text" "(1)") (label "e1"))))
+                            (row (cell "z")
+                                 (cell (concat "=w" (htab "5mm")
+                                               (with "mode" "text" "(2)") (label "e2")))))))))
+          '((p (math (@ (display "true") (form "sxml"))
+                     (m:math (m:mtable (@ (columnalign "left left"))
+                                       (m:mtr (m:mtd (m:mi "x"))
+                                              (m:mtd (m:mrow (m:mo "=") (m:mi "y"))))
+                                       (m:mtr (m:mtd (m:mi "z"))
+                                              (m:mtd (m:mrow (m:mo "=") (m:mi "w")))))))
+               (tab) "(" (seq (@ (name "Equation") (id "Equation1") (labels "e1")) "1")
+               ") (" (seq (@ (name "Equation") (id "Equation2") (labels "e2")) "2")
+               ")")))
+  ;; A label with a space is one bookmark. A link to it whose text is its
+  ;; number, or the ? of a number which is not known, is a reference; a
+  ;; link with a text of its own keeps it.
+  (check= (of '(document
+                 (render-theorem "Theorem 1" (document (concat (label "a b") "T")))
+                 (concat (hlink "1" "#a b") (hlink "the theorem" "#a b")
+                         (hlink "?" "#a b"))))
+          '((p (@ (role "theorem"))
+               (strong "Theorem " (seq (@ (name "Theorem") (id "Theorem1")
+                                          (labels "a_b")) "1") ".")
+               " T")
+            (p (ref (@ (name "a_b") (kind "seq") (target "Theorem1")) "1")
+               (ref (@ (name "a_b")) "the theorem")
+               (ref (@ (name "a_b") (kind "seq") (target "Theorem1")) "?"))))
+  ;; formats without a table
+  (check= (of '(document (tformat) "x")) '((p "x")))
+  ;; the table of contents, with its title when the editor expanded it
+  (check= (of '(document (render-table-of-contents "Contents" (document "entries"))
+                         (table-of-contents "toc" (document ""))))
+          '((toc "Contents") (toc)))
+  ;; many formats of a cell each do not take the time of all the cells
+  (let* ((n 300)
+         (t `(tabular
+               (tformat
+                 ,@(map (lambda (i)
+                          `(cwith ,(number->string (+ i 1)) ,(number->string (+ i 1))
+                                  "1" "1" "cell-halign" "r"))
+                        (iota n))
+                 (table ,@(map (lambda (i) '(row (cell "a") (cell "b"))) (iota n))))))
+         (start (texmacs-time))
+         (r (of t)))
+    (check= (length (ox-children (car r))) n)
+    (check= (ox-attr (car (ox-children (cAr (ox-children (car r))))) 'align) "right")
+    (check-true (< (- (texmacs-time) start) 2000))))
+
+(define (test-export-writers)
+  (check-group "export writers")
+  ;; the characters which XML does not allow, and the bytes which are no
+  ;; character, are the replacement character
+  (check= (ox-serialize-element
+            `(a ,(string-append "x" (bytes #xed #xa0 #x80 #xef #xbf #xbe #xff #xc3 #xa9)
+                                "y")))
+          (string-append "<a>x" (office-utf8 #xfffd) (office-utf8 #xfffd)
+                         (office-utf8 #xfffd) (office-utf8 #xe9) "y</a>"))
+  (check= (office-uri "http://x.y/a b?q=\"1\"#f") "http://x.y/a%20b?q=%221%22#f")
+  (let* ((image '(image (@ (name "pic.png") (data "PNGDATA") (width "2cm")
+                           (height "1cm"))))
+         (tree `(office
+                  (toc "Contents")
+                  (p "a" (note (p ,image (link (@ (href "http://x.y/a b")) "l")))
+                     ,image ,image (link (@ (href "http://x.y/a b")) "m"))
+                  (list (@ (kind "number"))
+                        (item (p "one") (list (@ (kind "bullet")) (item (p "b")))
+                              (list (@ (kind "number")) (item (p "n"))))
+                        (item (table (row (cell (p "t")))) (p "after"))
+                        (item (p "three")))
+                  (table (row (cell (p "x"))))
+                  (table (row (cell (p "y"))))
+                  (p (strong (seq (@ (name ,(string-append (office-utf8 #x422) " 1"))
+                                     (id "s1")) "1")))))
+         (docx (serialize-docx-document tree))
+         (odt (serialize-odt-document tree))
+         (text (export-entry docx "word/document.xml"))
+         (notes (export-entry docx "word/footnotes.xml"))
+         (rels (export-entry docx "word/_rels/footnotes.xml.rels"))
+         (content (export-entry odt "content.xml")))
+    ;; the notes have their own relations, for their links and images;
+    ;; the targets of the links are addresses
+    (check-true (export-has? rels "Target=\"media/image1.png\""))
+    (check-true (export-has? rels "Target=\"http://x.y/a%20b\""))
+    (check-true (export-has? notes "r:embed=\"rId1\""))
+    (check-true (export-has? notes "<w:hyperlink r:id=\"rId2\">"))
+    (check-true (export-has? content "xlink:href=\"http://x.y/a%20b\""))
+    ;; an image which is used several times is stored once
+    (check= (list-filter (archive-names docx)
+                         (lambda (n) (string-starts? n "word/media/")))
+            '("word/media/image1.png"))
+    (check= (length (list-filter (archive-names odt)
+                                 (lambda (n) (string-starts? n "Pictures/"))))
+            1)
+    ;; an empty paragraph between two tables of a Word document
+    (check-true (export-has? text "</w:tbl><w:p/><w:tbl>"))
+    ;; the name of a sequence keeps the letters which are not of ASCII
+    (check-true (export-has? text (string-append " SEQ " (office-utf8 #x422) " ")))
+    ;; the table of contents: its title and a field, or an index
+    (check-true (export-has? text "<w:pStyle w:val=\"TOCHeading\"/>"))
+    (check-true (export-has? text " TOC "))
+    (check-true (export-has? content "<text:index-title-template>Contents<"))
+    ;; in an OpenDocument text each list has the style of its kind, and a
+    ;; list ends before a table of one of its items and goes on after it
+    (check-true (export-has? content "<text:list text:style-name=\"L1\"><text:list-item>"))
+    (check-true (export-has? content "<text:list text:style-name=\"L2\"><text:list-item>"))
+    (check-true (export-has? content "</table:table><text:list text:style-name=\"L1\" text:continue-numbering=\"true\"><text:list-header>"))
+    ;; both files are read back: the table of the list, the tables apart
+    (let ((back (cdr (parse-odt-document odt))))
+      (check= (length (list-filter back (lambda (x) (func? x 'table)))) 3))
+    (let ((back (cdr (parse-docx-document docx))))
+      (check= (length (list-filter back (lambda (x) (func? x 'table)))) 3))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The formats
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1198,9 +1768,11 @@
                    "odt-document" "texmacs-stree")
           '(document (body (document (section "Intro") (concat "a " (em "b"))))
                      (style "generic")))
-  ;; a file which is no archive is an empty document
-  (check= (convert "not an archive" "docx-document" "texmacs-stree")
-          '(document (body (document "")) (style "generic"))))
+  ;; a file which is no archive is a document which says so
+  (check= (convert "not an archive" "odt-document" "texmacs-stree")
+          '(document (body (document (with "color" "red"
+                                       "This file is not an OpenDocument text")))
+                     (style "generic"))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
@@ -1219,6 +1791,12 @@
   (test-omml)
   (test-odt-text)
   (test-odt-blocks)
+  (test-docx-more-text)
+  (test-docx-more-blocks)
+  (test-odt-more)
+  (test-import-math)
+  (test-import-files)
+  (test-officetm-more)
   (test-officetm-text)
   (test-officetm-math)
   (test-officetm-blocks)
@@ -1235,5 +1813,8 @@
   (test-writers)
   (test-round-trips)
   (test-numbered-round-trip)
+  (test-export-math)
+  (test-export-blocks)
+  (test-export-writers)
   (test-formats)
   (check-end))
