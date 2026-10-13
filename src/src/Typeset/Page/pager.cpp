@@ -195,6 +195,8 @@ pager_rep::end_page (bool flag) {
 
 box
 pager_rep::make_header (bool empty_flag) {
+  if (memo != NULL && (!show_hf || empty_flag) && N(pages) < N(memo->headers))
+    memo->headers [N(pages)]= page_part ();
   if (!show_hf || empty_flag) return empty_box (decorate ());
   env->write (PAGE_NR, as_string (N(pages)+1+page_offset));
   env->write (PAGE_THE_PAGE, style[PAGE_THE_PAGE]);
@@ -209,6 +211,8 @@ pager_rep::make_header (bool empty_flag) {
 
 box
 pager_rep::make_footer (bool empty_flag) {
+  if (memo != NULL && (!show_hf || empty_flag) && N(pages) < N(memo->footers))
+    memo->footers [N(pages)]= page_part ();
   if (!show_hf || empty_flag) return empty_box (decorate ());
   env->write (PAGE_NR, as_string (N(pages)+1+page_offset));
   env->write (PAGE_THE_PAGE, style[PAGE_THE_PAGE]);
