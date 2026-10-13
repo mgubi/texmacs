@@ -18,6 +18,23 @@ went); add what you find. Paths are relative to the repository root.
 
 ## Bugs found, not fixed
 
+- **OpenType work, after the audit of 2026-10-13** (`src/doc/opentype-audit.md`,
+  section "State after the fixes", has the full list). Not tried in a window:
+  the cursor under an accent or around a negation in a formula (the boxes
+  are wrapped as the primes are, only the tree-to-box direction is tested),
+  the font design page with its row of variants, the menu Format > Font >
+  Weight. Not compiled anywhere yet: the Linux and Windows branches of the
+  font path in `src/src/Plugins/Freetype/tt_file.cpp` (TeX Live of any year
+  on Linux). Seen and not traced: a bus error at startup (three times, never
+  reproduced), four import checks of the suite `latex` which fail on the
+  first run with a new home directory only.
+- **The unit tests cannot be built without Qt.** `src/tests/Makefile` runs
+  `moc` on the tests which declare a `Q_OBJECT` and `TM_MOC` is empty in a
+  Vue or Cocoa build, so `make -C tests` and `tests/opentype/check.sh` stop
+  at the first such test. The unit tests run on a Qt build only.
+- **Cursor history.** PR #337 on `wip_fixes` holds the fix which is already
+  here (278d12fc27): a saved position whose buffer was closed was read
+  after its tree was freed.
 None left from the list of 2026-10-07. The fixes are in e6c092506c (ports,
 build, docs, fonts), in the commit "Qt pipes: commands run by sh, in a
 process group stopped as a whole" and in the merge of `wip_fixes`
