@@ -17,6 +17,15 @@
 #include <QPointer>
 #include <QThread>
 #include <QSocketNotifier>
+#ifdef QT_WEBSOCKETS_LIB
+#include <QHash>
+#include <QTcpSocket>
+#include <QWebSocket>
+#include <QWebSocketServer>
+#ifndef QT_NO_SSL
+#include <QSslSocket>
+#endif
+#endif
 
 #ifndef OS_MINGW
 
@@ -100,7 +109,7 @@ public slots:
   void resume_start (int);
 signals:
   void disconnection (socket_link_rep* clt);
-private:
+protected:
   string host;
   unsigned short port;
   int socket_id;
@@ -114,7 +123,67 @@ private:
 
   void connect_data_notifiers ();
   void connect_handshake_notifiers ();
+  virtual void close_socket ();
 };
+
+/******************************************************************************
+* Links and connections of WebSocket clients
+******************************************************************************/
+
+#ifdef QT_WEBSOCKETS_LIB
+
+class socket_server_rep;
+
+class websocket_link_rep: public socket_link_rep {
+  Q_OBJECT
+public:
+  websocket_link_rep (int io, SOCKADDR_STORAGE* addr, QWebSocket* ws);
+  ~websocket_link_rep ();
+  string  start ();
+  void    write (string s, int channel=LINK_OUT);
+
+public slots:
+  void binary_received (const QByteArray& data);
+  void text_received (const QString& data);
+  void closed ();
+protected:
+  void close_socket ();
+private:
+  QPointer<QWebSocket> ws;
+};
+
+class socket_sniffer_rep: public QObject {
+  Q_OBJECT
+public:
+  socket_sniffer_rep (socket_server_rep* server, int io,
+                      SOCKADDR_STORAGE* addr);
+  ~socket_sniffer_rep ();
+
+public slots:
+  void look ();
+  void encrypted ();
+  void failed ();
+private:
+  socket_server_rep* server;
+  int socket_id;
+  bool owner;  // the socket is still to be closed here
+  bool dead;
+  SOCKADDR_STORAGE address;
+  QPointer<QSocketNotifier> notifier_ptr;
+  QPointer<QTcpSocket> tls_ptr;
+  time_t partial_since;
+  int poll_delay;
+
+  bool allowed (bool tls);
+  void start_tls ();
+};
+
+struct websocket_pending {
+  int socket_id;
+  SOCKADDR_STORAGE address;
+};
+
+#endif
 
 /******************************************************************************
 * Server
@@ -135,13 +204,25 @@ public:
   int number_of_connections () {
     return N(connections); }
   void listen_connections (int msecs);
+  void serve (int client, SOCKADDR_STORAGE cltadd);
+#ifdef QT_WEBSOCKETS_LIB
+  void serve_websocket (QTcpSocket* sock, int client, SOCKADDR_STORAGE* addr);
+#endif
 public slots:
   void connection (int client);
   void disconnection (socket_link_rep* client_ptr);
+#ifdef QT_WEBSOCKETS_LIB
+  void websocket_connection ();
+#endif
 private:
   int socket_id;
   hashset<pointer> connections;
   QPointer<QSocketNotifier> notifier_ptr;
   hashmap<int,pointer> socket_ptr_from_id;
   socket_link_rep* find_connection_ptr (int id);
+  void add_link (socket_link_rep* clt, string from);
+#ifdef QT_WEBSOCKETS_LIB
+  QPointer<QWebSocketServer> websocket_server_ptr;
+  QHash<QString,websocket_pending> websocket_pendings;
+#endif
 };
