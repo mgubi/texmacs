@@ -525,14 +525,20 @@ prints, the `get_unicode_range` experiment) were dropped.
   delimiters and gaps changing for TeX Gyre Pagella.
 
 - **GSUB features.** `parse_gsub_feature` reads the single and alternate
-  substitutions of one feature (lookup types 1, 3 and 7), cached per face;
+  substitutions of one feature (lookup types 1 and 3, type 2 when it maps a
+  glyph to one glyph, and their extensions of type 7), from the feature
+  records of the default language systems (`latn`, then `DFLT`, then the
+  other scripts), cached per face; `parse_gsub_tags` lists the features for
+  which this gives a substitution. Every reader of a table checks its reads
+  against the length of the table, and a table which is cut or whose offsets
+  point outside gives no data;
   `get_feature_variant (s, feature, alt, r)` exposes them on fonts as
   native glyph names. Used for `dtls` (dotless i and j under accents, in
   `typeset_wide`) and `flac` (flattened accents over bases taller than
   `flattenedAccentBaseHeight`). Narrow accents of untuned OpenType fonts
   are placed by `accentBaseHeight` and the attachment points as well.
-  `ssty` is read but not yet applied: the font does not know whether it is
-  used at script size, which needs a flag from the environment.
+  `ssty` is applied to the fonts of script sizes, see "Script sizes and
+  `ssty`" above.
 
 - **Smart font size queries.** Unnumbered rubber names and their
   numbered sizes can resolve to different subfonts of a smart font (the
@@ -1013,14 +1019,17 @@ already part of the main build, and `mac_images_test`, whose functions
 `mac_images.h` does not declare in a Qt 6 build. Two of the binaries are
 this work:
 
-- `tests/Plugins/Freetype/tt_tools_test.cpp`, ten tests of the readers
-  against values extracted with fontTools: a font without a MATH table and a
-  truncated one, the constants of the shipped `texgyrepagella-math.otf`
+- `tests/Plugins/Freetype/tt_tools_test.cpp`, tests of the readers
+  against values extracted with fontTools, and on tables damaged in the test
+  itself (MATH, GSUB and GPOS cut at many lengths, offsets outside the
+  table, an extension lookup naming itself, oversized coverages and class
+  counts): a font without a MATH table, the constants of the shipped `texgyrepagella-math.otf`
   including a negative one, its glyph info, its vertical and horizontal
   variants and assemblies, the absence of MathKernInfo there, the MathKern
-  lookup with its height intervals on STIX Two Math, GPOS pair kerning, and
-  the GSUB feature tags.
-- `tests/Graphics/Fonts/opentype_font_test.cpp`, twenty-four tests of the font
+  lookup with its height intervals on STIX Two Math, GPOS pair kerning
+  with several lookups, the GSUB feature tags and the default language
+  system.
+- `tests/Graphics/Fonts/opentype_font_test.cpp`, the tests of the font
   level: activation and `math_type` of the shipped fonts, the conversion of
   the constants and its linearity in the size, italic correction, rubber
   variants by number and by target height, assemblies and their monotonicity,
@@ -1068,7 +1077,7 @@ renders in one PNG. LuaLaTeX is the reference implementation of the
 specification, so a disagreement is worth looking at.
 
 `tests/opentype/font-gallery.sh` renders one specimen per installed math font
-into `src/opentype-math/`, which is the gallery of `src/OPENTYPEMATH.md`.
+into `doc/opentype-math/`, which is the gallery of `doc/OPENTYPEMATH.md`.
 `tests/opentype/survey-math-fonts.py` produces the statistics of
 `doc/opentype-math-fonts-survey.md` with fontTools, and
 `tests/opentype/missing-symbols.py` those of
@@ -1406,10 +1415,9 @@ L (a week or more). Phases 1 and 2 are independent of 3; phase 4 needs 3.
   *Done: `deps` is defined, and `src/Deps` holds a dependency file per
   object.*
 - Replace the hard-coded TeX Live years in `tt_font_path` by a glob or
-  `kpsewhich`, so system math fonts are found. *Done for macOS only:*
+  `kpsewhich`, so system math fonts are found. *Done for macOS and Linux:*
   `texlive_font_dirs` scans `/usr/local/texlive`, `/usr/share/texlive`,
-  `/opt/texlive` and `$HOME/texlive` for any year; the Linux branch of
-  `tt_file.cpp` still lists 2020, 2021 and 2022 by hand.
+  `/opt/texlive` and `$HOME/texlive` for any year, the newest first.
 - Document the family name normalization of `tt_font_name` ("STIX Two
   Math" becomes "Stix Two Math"), which is why the sample uses that
   spelling; no alias mechanism is needed.

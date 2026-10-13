@@ -13,11 +13,11 @@ This branch teaches TeXmacs to typeset mathematics with the fonts that
 LaTeX users know from `unicode-math`, and to offer them the way LaTeX
 packages do: a text font and its mathematics chosen together.
 
-![Latin Modern Math](src/opentype-math/latin-modern-math.png)
+![Latin Modern Math](doc/opentype-math/latin-modern-math.png)
 
-![Libertinus Math](src/opentype-math/libertinus-math.png)
+![Libertinus Math](doc/opentype-math/libertinus-math.png)
 
-![Fira Math](src/opentype-math/fira-math.png)
+![Fira Math](doc/opentype-math/fira-math.png)
 
 **Formulas laid out from the `MATH` table.** An OpenType math font says how
 its formulas are to be built: the position of scripts and limits, fractions
@@ -43,13 +43,13 @@ they draw used to come out as its name in red). Fonts are found in their
 OpenType form before their Type 1 form, and a rescan of the fonts on disk
 takes seconds instead of minutes.
 
-**Fonts TeXmacs knows.** Twenty-four math fonts have a profile that says
+**Fonts TeXmacs knows.** Twenty-five math fonts have a profile that says
 what the `MATH` table cannot: which text, sans serif and typewriter fonts go
 with them, where their letters come from, and where they belong in the
 menus. XITS, Asana, IBM Plex, Garamond, Old Standard, DejaVu, Lete Sans,
 New Computer Modern Sans and GFS Neohellenic are used as soon as they are
 installed, in the font directories of the system or of TeXmacs, or from TeX
-Live (any year on macOS, 2020 to 2022 on Linux, or through
+Live (of any year, on macOS and Linux, or through
 `TEXMACS_FONT_PATH`). Any other font with a `MATH`
 table works too, without a profile and outside the menus, named in the
 document as `math=Cambria Math,Cambria`.
@@ -74,7 +74,7 @@ markup in a balloon, to insert them with a click.
 - `Help > Manual > Fonts` in TeXmacs: choosing fonts, the mathematical
   fonts, with a sample of every font that comes with TeXmacs and a list of
   the others, and the reference chapter *Fonts, from selection to glyph*.
-- [`src/OPENTYPEMATH.md`](src/OPENTYPEMATH.md): what the branch implements,
+- [`doc/OPENTYPEMATH.md`](doc/OPENTYPEMATH.md): what the branch implements,
   how to build and test it, and a specimen of every profiled font.
 - [`doc/opentype-math-design.md`](doc/opentype-math-design.md): the design,
   the status log and everything that is still missing.

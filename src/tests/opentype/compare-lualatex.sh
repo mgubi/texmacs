@@ -26,18 +26,19 @@ out="$top/tests/build/compare"; mkdir -p "$out"
 export TEXMACS_PATH="$top/TeXmacs"
 export TEXMACS_HOME_PATH="${TEXMACS_HOME_PATH:-$top/tests/build/home}"
 [ -n "$TM_TEST_FONT_DIR" ] && export TEXMACS_FONT_PATH="$TM_TEST_FONT_DIR"
-PATH="$PATH:/Library/TeX/texbin"
+[ -d /Library/TeX/texbin ] && PATH="$PATH:/Library/TeX/texbin"
+# ImageMagick 7 has magick, ImageMagick 6 convert
+if command -v magick > /dev/null; then magick=magick; else magick=convert; fi
 
-if [ $# -gt 0 ]; then
-  pairs=""
-  for name in "$@"; do pairs="$pairs $here/compare/$name.tex"; done
-else
-  pairs=$(echo "$here"/compare/*.tex)
+if [ $# -eq 0 ]; then
+  for tex in "$here"/compare/*.tex; do
+    set -- "$@" "$(basename "$tex" .tex)"
+  done
 fi
 
-for tex in $pairs; do
+for name in "$@"; do
+  tex="$here/compare/$name.tex"
   [ -f "$tex" ] || { echo "no $tex"; continue; }
-  name=$(basename "$tex" .tex)
   tm="$here/compare/$name.tm"
   [ -f "$tm" ] || { echo "no $tm, skipping"; continue; }
 
@@ -76,10 +77,10 @@ for tex in $pairs; do
   mutool draw -q -r 300 -o "$out/$name-ours.png" "$out/$name-ours.pdf" 2>/dev/null
 
   for v in ref ours; do
-    magick "$out/$name-$v.png" -trim +repage -resize 1400x \
+    $magick "$out/$name-$v.png" -trim +repage -resize 1400x \
            -bordercolor white -border 12 "$out/$name-$v-t.png"
   done
   # LuaLaTeX on top, TeXmacs below
-  magick "$out/$name-ref-t.png" "$out/$name-ours-t.png" -append "$out/$name-compare.png"
+  $magick "$out/$name-ref-t.png" "$out/$name-ours-t.png" -append "$out/$name-compare.png"
   echo "$name: $out/$name-compare.png (LuaLaTeX above, TeXmacs below)"
 done

@@ -66,7 +66,8 @@ the degree tucked in by `radicalKernAfterDegree`.
 read and exposed as glyph variants: `dtls` for dotless letters under accents,
 `flac` for flattened accents over tall bases, `ssty` for the script-size
 alternates, applied through a font decorator at script levels. Pair kerning
-is read from the GPOS `kern` feature, both explicit pairs and class matrices:
+is read from the GPOS `kern` feature, both explicit pairs and class matrices,
+the lookups of the feature adding up:
 no OpenType math font ships a legacy `kern` table, so before this every one
 of them was set with no kerning at all.
 
@@ -75,7 +76,7 @@ of them was set with no kerning at all.
 the text, sans serif and typewriter companions of a math font, whether math
 letters come from the math font or from the text italic, the family (roman
 or sans serif) its text is set in, a file of a text companion the database
-may not know, and the menu label and section. Twenty-four fonts are
+may not know, and the menu label and section. Twenty-five fonts are
 profiled, each declared with `define-math-font-profile`. A companion is
 named the way the `font` environment variable names a font, by its master
 (a family is accepted too and mapped to its master). A text family typesets
@@ -91,10 +92,10 @@ the `bold-math` key is recorded but not consulted.
 `fonts/font-short-menu.scm`). The font button of the focus toolbar offers
 the installed profiled fonts under the names LaTeX users know, in a Serif
 section (Latin Modern, New Computer Modern, Times, Palatino, Bookman,
-Schoolbook, STIX Two, Libertinus, Kp Fonts, Utopia, Charter, Euler,
-Concrete, DejaVu), a Sans serif section (Fira, Kp Sans, Computer Modern
-Sans, Lete Sans) and a submenu of the others (XITS, Asana, IBM Plex,
-Garamond, Old Standard, GFS Neohellenic); `Document > Font > Mathematical
+Schoolbook, DejaVu, STIX Two, Libertinus, Kp Fonts, Utopia, Charter, Euler,
+Concrete, Garamond, Old Standard), a Sans serif section (Fira, Kp Sans,
+Computer Modern Sans, Lete Sans, Noto Sans, IBM Plex, GFS Neohellenic) and a
+submenu of the others (XITS, Asana); `Document > Font > Mathematical
 font` lists them all at its end. `init-opentype-font` sets the text font,
 the math font and the family. Formulas follow the math companion of the
 text font, not `math-font`, which counts only with the text font `roman`,
@@ -105,11 +106,17 @@ Asana Math with Pagella, KpMath Sans with Kepler) is written as a rule,
 
 **Shipped fonts** (`TeXmacs/fonts/truetype`). Latin Modern Math with LM
 Roman, Sans and Mono; New Computer Modern Math regular and bold with the
-NewCM10 faces (its Sans and Mono are not shipped); STIX Two; KpMath, KpMath
+NewCM10 faces, NewCM Sans with its math font and NewCM Mono; STIX Two; KpMath, KpMath
 Sans and their bold faces with KpRoman, KpSans and KpMono (0.66); Fira Math
 0.3.4 beside Fira Sans and Mono; Libertinus Math with Serif, Sans and Mono;
 Erewhon and XCharter with their math fonts; Concrete Math with the Concrete
-faces of CM Unicode; Euler Math, set with TeX Gyre Pagella. The TeX Gyre
+faces of CM Unicode; Euler Math, set with TeX Gyre Pagella; TeX Gyre
+DejaVu Math with the DejaVu faces; Garamond Math with EB Garamond; Old
+Standard with its math font; GFS Neohellenic with its math font; Lete Sans
+Math; Noto Sans Math with Noto Sans and Noto Sans Mono; IBM Plex Math with
+the Plex families; Inconsolata as a typewriter companion; and text
+families without mathematics of their own (Gentium Plus, Iwona, Kurier, the
+two Antykwa fonts, Linux Libertine). The TeX Gyre
 Pagella, Termes, Bonum and Schola Math fonts and the first STIX fonts were
 shipped before. All their text and math faces are registered in the global
 database, so they work in a fresh installation without a scan (the size
