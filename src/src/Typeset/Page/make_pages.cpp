@@ -235,6 +235,12 @@ same_text (page_text& t1, page_text& t2) {
 void
 pager_rep::memo_start () {
   if (memo == NULL) return;
+  if (page_reuse_mode () == 0) {
+    // as before: nothing is kept, nor looked at
+    *memo= page_memo ();
+    memo= NULL;
+    return;
+  }
   array<double> pars;
   pars << (double) text_width << (double) text_height << (double) width
        << (double) height << (double) odd << (double) even << (double) top
@@ -287,6 +293,7 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
   array<tree>* outer_values= env->rec_values;
   hashmap<int,bool> reads (false);
   page_part now;
+  hashmap<string,tree> before= env->all_values ();
   env->record_reads (&reads, false);
   env->record_lookups (&now.keys, &now.looked);
   env->read_unknown= false;
@@ -304,8 +311,12 @@ pager_rep::make_part (array<page_part>* parts, tree what) {
     iterator<int> it= iterate (reads);
     while (it->busy ()) {
       string var= env_var_name (it->next ());
+      tree val= env->read (var);
+      // a part which changes a variable it reads would be compared, the
+      // next time, with a value which is not the one it started from
+      if (!same_tree (val, before [var])) now.ok= false;
       now.vars << var;
-      now.values << env->read (var);
+      now.values << val;
     }
   }
   now.what= what;
@@ -362,10 +373,21 @@ pager_rep::text_parts (pagelet pg, page_text& pt) {
   for (int i=0; i<n; i++) {
     insertion ins= pg->ins[i];
     text_parts (ins, pt);
-    if (i < n-1 && !is_nil (ins->end)) {
-      page_item item= access (l, path_dec (ins->end));
-      pt.nums << (double) item->spc->min << (double) item->spc->def
-              << (double) item->spc->max;
+    if (i < n-1) {
+      // the space after the insertion, in the cases in which pages_format
+      // takes it (the end of an empty insertion is no item)
+      insertion next= pg->ins[i+1];
+      bool fnote= is_tuple (ins->type, "footnote");
+      bool nfnote= is_tuple (next->type, "footnote");
+      bool mcol= ins->type != next->type && !nfnote &&
+                 !is_tuple (ins->type, "float") &&
+                 (is_tuple (ins->type, "multi-column") ||
+                  is_tuple (next->type, "multi-column"));
+      if (mcol || (fnote && nfnote)) {
+        page_item item= access (l, path_dec (ins->end));
+        pt.nums << (double) item->spc->min << (double) item->spc->def
+                << (double) item->spc->max;
+      }
     }
   }
 }
@@ -379,7 +401,11 @@ pager_rep::pages_make_page (pagelet pg) {
   page_text now;
   now.ok= true;
   if (memo != NULL) text_parts (pg, now);
-  if (memo == NULL || !now.ok) sb= pages_format (pg);
+  if (memo == NULL || !now.ok) {
+    sb= pages_format (pg);
+    if (memo != NULL && nr_page < N(memo->texts))
+      memo->texts [nr_page]= page_text ();
+  }
   else {
     // the text of the last pass, when it was made of the same boxes
     while (N(memo->texts) <= nr_page) memo->texts << page_text ();
@@ -434,6 +460,13 @@ pager_rep::pages_make () {
   int i, n= N(sk);
   for (i=0; i<n; i++)
     pages << pages_make_page (sk[i]);
+  if (memo != NULL) {
+    // the pages which are no longer there are not kept: their lines
+    // must go now, to log the place they leave (see phrase_box_rep)
+    if (N(memo->texts)   > n) memo->texts  = range (memo->texts, 0, n);
+    if (N(memo->headers) > n) memo->headers= range (memo->headers, 0, n);
+    if (N(memo->footers) > n) memo->footers= range (memo->footers, 0, n);
+  }
 }
 
 void

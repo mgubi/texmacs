@@ -527,6 +527,8 @@ public:
   // which update (string) does nothing)
   // the values of the variables which are not plain, in a fixed order
   array<tree> derived_state ();
+  // a copy of the table of the variables (not recorded as a read)
+  inline hashmap<string,tree> all_values () { return copy (env.h); }
   inline bool plain_variable (string s) {
     int type= var_type [s];
     return type == Env_User || type == Env_Fixed ||

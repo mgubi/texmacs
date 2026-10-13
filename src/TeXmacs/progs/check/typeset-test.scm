@@ -718,6 +718,53 @@
       (check-true (<= p60 (* 3 p20)))
       (check-true (>= p60 (* 3 (- p20 1)))))))
 
+;; The pager keeps the pages of the last pass (Typeset/Page/make_pages.cpp):
+;; a page break with nothing to say at it, pages which go away and come
+;; back, and a paragraph at the same place as after a typesetting of the
+;; whole document.
+(define (test-pages-kept)
+  (check-group "pages kept")
+  (with-typeset-body
+   `(document ,@(map (lambda (i)
+                       `(concat (if-page-break "t" (document)) ,lorem))
+                     (iota 40)))
+   (lambda ()
+     (init-env "page-type" "a5")
+     (update-current-buffer)
+     (update-forced)
+     (with n (get-page-count)
+       (check-true (> n 1))
+       (tree-set (tree-ref (buffer-tree) 0) "changed")
+       (update-forced)
+       (check-true (> (get-page-count) 1)))))
+  (with-typeset-body
+   `(document ,@(map (lambda (i) lorem) (iota 60)))
+   (lambda ()
+     (let* ((n (get-page-count))
+            (r (rect 20)))
+       (check-true (> n 2))
+       ;; a letter in a paragraph: the other pages are kept
+       (tree-set (tree-ref (buffer-tree) 30) (string-append lorem " x"))
+       (update-forced)
+       (check= (get-page-count) n)
+       (check= (rect 20) r)
+       ;; the last pages go away and come back
+       (tree-remove (buffer-tree) 30 30)
+       (update-forced)
+       (with m (get-page-count)
+         (check-true (< m n))
+         ;; (the breaks of a shorter document may be others)
+         (tree-insert (buffer-tree) 30 (map (lambda (i) lorem) (iota 30)))
+         (update-forced)
+         (check= (get-page-count) n)
+         (check= (rect 20) r)
+         ;; as after a typesetting of the whole document
+         (with r2 (rect 50)
+           (update-current-buffer)
+           (update-forced)
+           (check= (rect 50) r2)
+           (check= (get-page-count) n)))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The suite
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -749,4 +796,5 @@
   (test-tables)
   (test-paragraphs)
   (test-pages)
+  (test-pages-kept)
   (check-end))
