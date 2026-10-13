@@ -779,16 +779,25 @@ public:
 
 // A part which the core sends again ("refresh"): a place for widgets
 // which are replaced, in the layout of Vue, which is made anew at each pass
+// (a slot goes with the widgets around it, when a menu closes or a part
+// which holds it is itself sent again: the core may still refresh it)
+class tau_slot_rep;
+struct slot_info { tau_slot_rep* slot; bool dialog; bool row; };
+static hashmap<int,pointer> slots (NULL); // number of a refreshable -> its slot
+
 class tau_slot_rep: public vue_widget_rep {
 public:
   widget content;
-  tau_slot_rep (): vue_widget_rep ("tau-slot") {}
+  int number;
+  tau_slot_rep (int number2): vue_widget_rep ("tau-slot"), number (number2) {}
+  ~tau_slot_rep () {
+    slot_info* info= (slot_info*) slots [number];
+    if (info != NULL && info->slot == this) { slots->reset (number); delete info; }
+  }
   void do_layout () { if (!is_nil (content)) concrete (content)->do_layout (); }
   bool post_layout () {
     return !is_nil (content) && concrete (content)->post_layout (); }
 };
-struct slot_info { tau_slot_rep* slot; bool dialog; bool row; };
-static hashmap<int,pointer> slots (NULL); // number of a refreshable -> its slot
 
 // where a node is: in a menu or a bar, or in a dialog (or a tool), where
 // it is laid out; in a row or in a column
@@ -929,10 +938,12 @@ build (const json& node, int style, context c) {
     else w= pulldown_button (build_label (node, st), pw);
   }
   else if (kind == "refreshable") {
-    tau_slot_rep* slot= tm_new<tau_slot_rep> ();
+    int number= node["number"].num ();
+    tau_slot_rep* slot= tm_new<tau_slot_rep> (number);
     slot->content= pack (build_items (node["items"], style, c), c);
-    slot_info* info= new slot_info { slot, c.dialog, c.row };
-    slots (node["number"].num ())= (pointer) info;
+    slot_info* old= (slot_info*) slots [number];
+    if (old != NULL) delete old;
+    slots (number)= (pointer) new slot_info { slot, c.dialog, c.row };
     w= widget (slot);
   }
   else if (kind == "hsplit" || kind == "vsplit") {
@@ -1149,7 +1160,13 @@ refresh_part (const json& m) {
   slot_info* info= (slot_info*) slots [m["number"].num ()];
   if (info == NULL) return;
   context c= { info->dialog, info->row };
-  info->slot->content= pack (build_items (m["items"], 0, c), c);
+  // (built first: a slot inside what is replaced may be this very one's
+  // child, and the slot is kept while its content changes)
+  widget keep (info->slot);
+  widget content= pack (build_items (m["items"], 0, c), c);
+  info= (slot_info*) slots [m["number"].num ()];
+  if (info == NULL) return;
+  info->slot->content= content;
   gui_needs_relayout= true;
 }
 
