@@ -277,6 +277,14 @@ cache_initialize () {
       remove (cache * url ("file_cache"));
       remove (cache * url ("stat_cache.scm"));
       remove (cache * url ("validate_cache.scm"));
+      // (in a new home the directory is not there yet: this comes before
+      // init_user_dirs. Without it the stamp was not written, with a
+      // warning, and the next start cleared the caches which this one made)
+      if (!is_directory (cache)) {
+        mkdir (texmacs_home_path);
+        mkdir (texmacs_home_path * url ("system"));
+        mkdir (cache);
+      }
       save_string (stamp, build, false);
     }
   }

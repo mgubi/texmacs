@@ -1177,6 +1177,12 @@ test("a displayed formula from the keyboard", async p => {
 
 test("the debugging console", async p => {
 	await p.open();
+	// (the stamp of the build, which says when the caches are to be cleared,
+	// is written at the first start of a new home)
+	await p.scheme('(set-message (if (url-exists? (system->url "$TEXMACS_HOME_PATH/system/cache/web-build.txt")) "the stamp is there" "no stamp") "")');
+	await sleep(400);
+	const stamp = await p.page.$eval("#tau-footer-left", e => e.textContent);
+	check("the stamp of the build is written", stamp.includes("the stamp is there"), stamp);
 	// a window with tabs, each a view of the messages of the core
 	await p.scheme("(open-debug-console)");
 	await p.until("the console, with a view", async () => (await p.count(".tau-dialog canvas")) >= 1, 20000);
