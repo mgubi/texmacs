@@ -816,6 +816,48 @@
      (check-false (renumber-auto-labels))
      (check= (cadr (tree->stree (get-reference "auto-1"))) "1")
      (check= (cadr (tree->stree (get-reference "auto-3"))) "3"))))
+;; Blocks of paragraphs which did not change are replayed after the first
+;; one (Typeset/Bridge/bridge_document.cpp). A paragraph without a line (a
+;; hidden one) only passes on the space after it: when that space changes,
+;; the paragraphs after it move, also when it is the first of a block.
+(define (places-from-scratch body n)
+  ;; the rectangles of the @n paragraphs of @body, typeset in a buffer of
+  ;; its own
+  (let* ((old (current-buffer))
+         (u (new-buffer)))
+    (switch-to-buffer* u)
+    (buffer-set-body u (tree-copy body))
+    (update-forced)
+    (with r (map (lambda (i) (rect i)) (iota n))
+      (buffer-close u)
+      (switch-to-buffer* old)
+      r)))
+
+(define (test-block-replay)
+  (check-group "block replay")
+  (with-typeset-body
+   `(document ,@(map (lambda (i)
+                       (if (odd? i)
+                           '(with "par-par-sep" "0fn" (hidden "h"))
+                           (string-append "paragraph number "
+                                          (number->string i))))
+                     (iota 240)))
+   (lambda ()
+     (let* ((n 240)
+            (places (lambda () (map (lambda (i) (rect i)) (iota n))))
+            (bad 0))
+       ;; an edit elsewhere, so that every block was recorded and replayed
+       (tree-set (tree-ref (buffer-tree) 0) "first")
+       (update-forced)
+       (for (i (iota n))
+         (when (odd? i)
+           (tree-set (tree-ref (buffer-tree) i 1) "5fn")
+           (update-forced)
+           (when (!= (places) (places-from-scratch (buffer-tree) n))
+             (set! bad (+ bad 1)))
+           (tree-set (tree-ref (buffer-tree) i 1) "0fn")
+           (update-forced)))
+       (check= bad 0)))))
 
 ;; After an update the automatic labels are named as by the counter: auto-1
 ;; to auto-n in the order in which they are made, also when a tag makes two
@@ -1111,4 +1153,5 @@
   (test-labels-of-parts)
   (test-labels-after-undo)
   (test-incremental-against-scratch)
+  (test-block-replay)
   (check-end))

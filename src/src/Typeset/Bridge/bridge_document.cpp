@@ -58,8 +58,15 @@ struct doc_run {
   SI                   height, sep, hor_sep, ver_sep, bot;
   space                vspc_after;
   bool                 nobr_after;
+  // the border of the stack before the tail: the tail was shoved against
+  // it, and a head without a line only changes this
+  SI                   in_height, in_sep, in_hor_sep, in_ver_sep, in_bot;
+  space                in_vspc_after;
+  bool                 in_nobr_after;
   hashmap<string,tree> patch;     // composed environment changes
   doc_run (): ok (false), head_back (0), vspc_after (0), nobr_after (false),
+              in_height (0), in_sep (0), in_hor_sep (0), in_ver_sep (0),
+              in_bot (0), in_vspc_after (0), in_nobr_after (false),
               patch (UNINIT) {}
 };
 
@@ -312,9 +319,17 @@ bridge_document_rep::replay_tail (doc_run& run, int s, int e) {
   int idx= last_line_item (ttt->l);
   if (idx < 0 || N(ttt->l) - idx != run.head_back) return false;
   if (ttt->l[idx].operator-> () != run.head_item.operator-> ()) return false;
+  // the last line may be one of an earlier paragraph, when the head (or
+  // what is between) has no line: the border must be the one the tail
+  // was typeset against
+  stack_border sb= ttt->sb;
+  if (sb->height != run.in_height || sb->sep != run.in_sep ||
+      sb->hor_sep != run.in_hor_sep || sb->ver_sep != run.in_ver_sep ||
+      sb->bot != run.in_bot || sb->vspc_after != run.in_vspc_after ||
+      sb->nobr_after != run.in_nobr_after)
+    return false;
   ttt->l[idx]= run.repl;
   ttt->l << run.app;
-  stack_border sb= ttt->sb;
   sb->height    = run.height;
   sb->sep       = run.sep;
   sb->hor_sep   = run.hor_sep;
@@ -338,16 +353,24 @@ bridge_document_rep::record_tail (doc_run& run, int s, int e,
   int idx= last_line_item (ttt->l);
   page_item head_item= (idx >= 0? ttt->l[idx]: page_item ());
   int n0= N(ttt->l);
+  stack_border sb0= ttt->sb;
+  SI in_height= sb0->height, in_sep= sb0->sep, in_hor_sep= sb0->hor_sep;
+  SI in_ver_sep= sb0->ver_sep, in_bot= sb0->bot;
+  space in_vspc_after= sb0->vspc_after;
+  bool in_nobr_after= sb0->nobr_after;
   for (int k= s; k < e; k++)
     typeset_one (k, n, desired_status, a, b);
-  run.ok= false;
+  // nothing of the previous record is kept: it holds lines, which log
+  // the place they leave when they go (see phrase_box_rep)
+  run= doc_run ();
   if (idx < 0) return;
-  run.brs = array<bridge> ();
-  run.vers= array<int> ();
   hashmap<string,tree> patch (UNINIT);
   for (int k= s; k < e; k++) {
     bridge_rep* br= brs[k].operator-> ();
-    if (br->status != PROCESSED + WANTED_PARAGRAPH) return;
+    if (br->status != PROCESSED + WANTED_PARAGRAPH) {
+      run= doc_run ();
+      return;
+    }
     run.brs  << brs[k];
     run.vers << br->version;
     hashmap<string,tree> ch= br->changes;
@@ -369,6 +392,13 @@ bridge_document_rep::record_tail (doc_run& run, int s, int e,
   run.bot       = sb->bot;
   run.vspc_after= sb->vspc_after;
   run.nobr_after= sb->nobr_after;
+  run.in_height    = in_height;
+  run.in_sep       = in_sep;
+  run.in_hor_sep   = in_hor_sep;
+  run.in_ver_sep   = in_ver_sep;
+  run.in_bot       = in_bot;
+  run.in_vspc_after= in_vspc_after;
+  run.in_nobr_after= in_nobr_after;
   run.patch     = patch;
   run.ok        = true;
 }

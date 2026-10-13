@@ -307,6 +307,17 @@ bridge_rep::~bridge_rep () {
   if (chunk_cache != NULL) tm_delete (chunk_cache);
 }
 
+// The chunks of a bridge hold its lines until the next time it makes
+// chunks: when it no longer does (its last float went away), they must go,
+// or a line which is replaced later would not log the place it leaves
+static inline void
+drop_chunks (bridge_rep* br) {
+  if (br->chunk_cache != NULL) {
+    tm_delete (br->chunk_cache);
+    br->chunk_cache= NULL;
+  }
+}
+
 static inline bool
 chunkable (page_item& it) {
   return it->type == PAGE_LINE_ITEM && N(it->fl) == 0 && it->nr_cols <= 1;
@@ -778,7 +789,10 @@ bridge_rep::typeset (int desired_status) {
   // ttt->insert_stack (l, sb);
   //if (N(l) == 0); else
   bool root= (this == ttt->br.operator-> ());
-  if (ttt->paper || (N(l) <= 1)) ttt->insert_stack (l, sb);
+  if (ttt->paper || (N(l) <= 1)) {
+    drop_chunks (this);
+    ttt->insert_stack (l, sb);
+  }
   else if (stack_cache_ok && strong_equal (ip, stack_cache_ip) &&
            (!root || stack_cache_snap == ttt->snap_pixel)) {
     if (root && N(stack_cache) > 0) ttt->last_body= stack_cache[0]->b;
@@ -797,6 +811,7 @@ bridge_rep::typeset (int desired_status) {
       ttt->insert_stack (stack_cache, sb);
     }
     else {
+      drop_chunks (this);
       int first=-1, last=-1;
       array<box> bs;
       array<SI>  spc;
